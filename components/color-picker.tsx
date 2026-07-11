@@ -82,7 +82,7 @@ export const PRESET_COLORS = [
 function GradientTrack({ hues, height = 26 }: { hues: string[]; height?: number }) {
   // 用多段色块模拟渐变(避免依赖 linear-gradient 原生模块)
   return (
-    <View style={[styles.trackRow, { height }]} pointerEvents="none">
+    <View style={[styles.trackRow, { height }, { pointerEvents: "none" }]}>
       {hues.map((c, i) => (
         <View key={i} style={{ flex: 1, backgroundColor: c }} />
       ))}
@@ -129,7 +129,7 @@ function SliderRow({
           <GradientTrack hues={trackColors} />
         </View>
         <View
-          pointerEvents="none"
+
           style={[
             styles.thumb,
             {

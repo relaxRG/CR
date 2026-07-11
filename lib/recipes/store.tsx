@@ -70,6 +70,8 @@ export interface RecipeDraft {
   notes: string;
   /** 卡片标签顺序与可见性(null 使用默认全显示) */
   cardTagOrder?: Recipe["cardTagOrder"];
+  /** 结构化引用来源（可选，书库导入 / AI 补全 / 手动填写） */
+  sourceRef?: Recipe["sourceRef"];
 }
 
 interface RecipeStore {

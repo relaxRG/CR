@@ -1,3 +1,57 @@
+/**
+ * 引用来源结构体：区分「配方创作者」和「文字来源（书/网站）」
+ * 创作者 = 谁发明了这款配方（调酒师/酒吧）
+ * 文字来源 = 从哪里获得这个配方文本（书/网站）
+ * 两者完全独立：一款1920年代的经典配方可能被收录在2014年出版的书中
+ */
+export interface SourceRef {
+  // ── 配方创作者（谁发明了这款配方）──
+  /** 创作者姓名，如 "Alex Day" / "Death & Co" / "Harry Craddock" */
+  creator: string;
+  /** 创作年份，如 "2009" / "circa 1920s" / "1930" */
+  createdYear: string;
+  /** AI 对创作者信息的置信度 */
+  creatorConfidence: "high" | "medium" | "low";
+
+  // ── 文字来源（从哪里获得这个配方文本）──
+  /** 书名/网站名，如 "Death & Co: Modern Classic Cocktails" */
+  bookTitle: string;
+  /** 书的作者，如 "David Kaplan, Nick Fauchald, Alex Day" */
+  bookAuthor: string;
+  /** 出版社，如 "Ten Speed Press" */
+  publisher: string;
+  /** 出版年份，如 "2014" */
+  publishYear: string;
+  /** 页码或章节位置，如 "p.234" / "Chapter 5" */
+  pageRef: string;
+  /** 章节标题，如 "Chapter Five: THE SPECS" */
+  chapterTitle: string;
+  /** 原始文字片段（直接复制的原文，供对照核实） */
+  rawText: string;
+  /** 网络来源 URL（非书籍时） */
+  sourceUrl: string;
+  /** 文字来源的置信度：书库导入=high，AI推断=medium/low */
+  sourceConfidence: "high" | "medium" | "low";
+}
+
+/** 创建空的 SourceRef */
+export function emptySourceRef(): SourceRef {
+  return {
+    creator: "",
+    createdYear: "",
+    creatorConfidence: "low",
+    bookTitle: "",
+    bookAuthor: "",
+    publisher: "",
+    publishYear: "",
+    pageRef: "",
+    chapterTitle: "",
+    rawText: "",
+    sourceUrl: "",
+    sourceConfidence: "low",
+  };
+}
+
 export interface Ingredient {
   id: string;
   name: string;
@@ -188,6 +242,8 @@ export interface Recipe {
   occasion: string;
   /** 引用来源:书籍、网站、调酒师等,如"Cocktail Codex, p.120" */
   source: string;
+  /** 结构化引用来源（比 source 字符串更精细的版本，可选） */
+  sourceRef?: SourceRef;
   /** 配方故事:历史、来历、创作背景 */
   story: string;
   /** 风味描述:口感与风味的文字描述 */
@@ -256,6 +312,7 @@ export function normalizeRecipe(r: Partial<Recipe> & Pick<Recipe, "id" | "name">
   base.drinkDuration = r.drinkDuration ?? "";
   base.occasion = r.occasion ?? "";
   base.source = r.source ?? "";
+  base.sourceRef = r.sourceRef ?? undefined;
   base.story = r.story ?? "";
   base.flavorDesc = r.flavorDesc ?? "";
   base.strengthBand = (r.strengthBand ?? "") as StrengthBand | "";

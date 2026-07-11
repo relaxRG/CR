@@ -1425,7 +1425,7 @@ export default function BookReaderScreen() {
 
       {/* ── Reader Settings Panel ── */}
       {showReaderSettings && (
-        <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
+        <View style={[StyleSheet.absoluteFillObject, { pointerEvents: "box-none" }]}>
           <Pressable style={[StyleSheet.absoluteFillObject, { backgroundColor: "rgba(0,0,0,0.4)" }]} onPress={() => setShowReaderSettings(false)} />
           <View style={[styles.settingsSheet, { backgroundColor: colors.background, borderColor: colors.border }]}>
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10 }}>
@@ -1496,7 +1496,7 @@ export default function BookReaderScreen() {
 
       {/* ── TOC drawer ── */}
       {tocOpen && (
-        <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
+        <View style={[StyleSheet.absoluteFillObject, { pointerEvents: "box-none" }]}>
           <Pressable style={[StyleSheet.absoluteFillObject, { backgroundColor: "rgba(0,0,0,0.4)" }]} onPress={() => setTocOpen(false)} />
           <View style={[styles.tocSheet, { backgroundColor: colors.background, borderColor: colors.border }]}>
             <Text style={[styles.tocTitle, { color: colors.foreground }]}>{zh ? "目录" : "Table of Contents"}</Text>
@@ -1521,7 +1521,7 @@ export default function BookReaderScreen() {
       {/* ── Extract results Modal ── */}
       {/* Extract results overlay (transparent, keeps WebView mounted and scroll position) */}
       {showExtractResults && (
-        <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
+        <View style={[StyleSheet.absoluteFillObject, { pointerEvents: "box-none" }]}>
           <Pressable
             style={[StyleSheet.absoluteFillObject, { backgroundColor: "rgba(0,0,0,0.45)" }]}
             onPress={() => setShowExtractResults(false)}

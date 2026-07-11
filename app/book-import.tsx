@@ -31,7 +31,7 @@ import {
 import { extractEpubToFileSystem } from "@/lib/import/extract";
 import { detectRecipesInText, RecipeCandidate, classifyCandidateKindEnhanced } from "@/lib/import/detect";
 import { ParsedRecipe } from "@/lib/recipes/parser";
-import { genId } from "@/lib/recipes/types";
+import { genId, SourceRef } from "@/lib/recipes/types";
 import { useRecipeStore } from "@/lib/recipes/store";
 import { useHomemadeStore } from "@/lib/homemade/store";
 import { classifyPrepGroup, guessPrepType } from "@/lib/homemade/types";
@@ -681,6 +681,21 @@ export default function BookImportScreen() {
     const selected = reviewItems.filter((r) => r.checked);
     if (selected.length === 0) return;
     const source = bookTitle;
+    // 构建书库导入的结构化引用来源（文字来源置信度=high，创作者待AI补全=low）
+    const buildSourceRef = (chapterTitle: string, rawText: string): SourceRef => ({
+      creator: "",
+      createdYear: "",
+      creatorConfidence: "low",
+      bookTitle: bookTitle,
+      bookAuthor: "",
+      publisher: "",
+      publishYear: "",
+      pageRef: "",
+      chapterTitle,
+      rawText: rawText.slice(0, 500),
+      sourceUrl: "",
+      sourceConfidence: "high",
+    });
     let recipeCount = 0;
     let prepCount = 0;
     for (const row of selected) {
@@ -703,6 +718,7 @@ export default function BookImportScreen() {
           shelfLife: "",
           storage: "",
           source,
+          sourceRef: buildSourceRef(row.candidate.sectionTitle, row.candidate.raw),
           notes: "",
         });
         prepCount++;
@@ -719,6 +735,7 @@ export default function BookImportScreen() {
           codexFamily: normalizeCodexFamilyDecl(p.codexFamily || ""),
           flavors: [],
           source: p.source || source,
+          sourceRef: buildSourceRef(row.candidate.sectionTitle, row.candidate.raw),
           story: "",
           flavorDesc: "",
           ingredients: p.ingredients,
@@ -729,8 +746,32 @@ export default function BookImportScreen() {
         const newRecipe = addRecipe(draft);
         const ingNames = p.ingredients.map((i) => i.name).filter(Boolean);
         enrichRecipeMutation.mutate(
-          { name: draft.name, nameEn: draft.nameEn || undefined, baseSpirit: draft.baseSpirit || undefined, ingredients: ingNames.length > 0 ? ingNames : undefined },
-          { onSuccess: (result) => { if (result.flavors.length > 0) updateRecipe(newRecipe.id, { ...draft, flavors: result.flavors }); } },
+          {
+            name: draft.name,
+            nameEn: draft.nameEn || undefined,
+            baseSpirit: draft.baseSpirit || undefined,
+            ingredients: ingNames.length > 0 ? ingNames : undefined,
+            rawText: row.candidate.raw ? row.candidate.raw.slice(0, 800) : undefined,
+            bookTitle: bookTitle || undefined,
+          },
+          {
+            onSuccess: (result) => {
+              const patch: Record<string, unknown> = {};
+              if (result.flavors.length > 0) patch.flavors = result.flavors;
+              // 用 AI 补全的创作者/年份更新 sourceRef（置信度由 AI 返回）
+              if (result.creator || result.createdYear) {
+                patch.sourceRef = {
+                  ...draft.sourceRef!,
+                  creator: result.creator || "",
+                  createdYear: result.createdYear || "",
+                  creatorConfidence: result.creatorConfidence,
+                };
+              }
+              if (Object.keys(patch).length > 0) {
+                updateRecipe(newRecipe.id, { ...draft, ...patch });
+              }
+            },
+          },
         );
         recipeCount++;
       }
@@ -1512,7 +1553,7 @@ function ScanRangePicker({
   const [mode, setMode] = useState<"all" | "range">(scanRange ? "range" : "all");
 
   return (
-    <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
+    <View style={[StyleSheet.absoluteFillObject, { pointerEvents: "box-none" }]}>
       <Pressable
         style={[StyleSheet.absoluteFillObject, { backgroundColor: "rgba(0,0,0,0.4)" }]}
         onPress={onClose}

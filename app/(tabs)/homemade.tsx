@@ -885,7 +885,7 @@ export default function HomemadeScreen() {
                     color={checked ? colors.primary : colors.muted}
                   />
                 </View>
-                <View style={{ flex: 1 }} pointerEvents="none">
+                <View style={{ flex: 1, pointerEvents: "none" }}>
                   <PrepRowInner
                     prep={item}
                     isFirst={index === 0}

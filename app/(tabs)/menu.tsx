@@ -156,7 +156,7 @@ function MenuEntryCard({
       )}
 
       {/* 配方卡片（点击跳转详情） */}
-      <View style={{ flex: 1 }} pointerEvents={selectionMode ? "none" : "auto"}>
+      <View style={{ flex: 1, pointerEvents: selectionMode ? "none" : "auto" }}>
         <RecipeCard recipe={recipe} isFirst isLast />
       </View>
 

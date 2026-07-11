@@ -653,7 +653,7 @@ export function RecipesScreen() {
                     color={checked ? colors.primary : colors.muted}
                   />
                 </View>
-                <View style={{ flex: 1 }} pointerEvents="none">
+                <View style={{ flex: 1, pointerEvents: "none" }}>
                   <RecipeCard
                     recipe={item}
                     isFirst={index === 0}

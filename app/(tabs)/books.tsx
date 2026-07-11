@@ -492,7 +492,7 @@ export default function BooksScreen() {
 
     {/* ── 长按操作菜单 ── */}
     {actionBook && (
-      <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
+      <View style={[StyleSheet.absoluteFillObject, { pointerEvents: "box-none" }]}>
         <Pressable
           style={[StyleSheet.absoluteFillObject, { backgroundColor: "rgba(0,0,0,0.45)" }]}
           onPress={() => setActionBook(null)}

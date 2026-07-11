@@ -50,6 +50,8 @@ import {
   FLAVOR_TEXTURE_TAGS,
   FLAVOR_LAYER_LABELS,
   FLAVOR_TAG_EN,
+  emptySourceRef,
+  type SourceRef,
 } from "@/lib/recipes/types";
 import { FLAVOR_TAG_DEFAULT_COLORS } from "@/lib/settings/card-tags";
 
@@ -256,6 +258,10 @@ export default function RecipeFormScreen() {
   const [codexFamily, setCodexFamily] = useState(editing?.codexFamily ?? "");
   const [flavors, setFlavors] = useState<string[]>(editing?.flavors ?? []);
   const [source, setSource] = useState(editing?.source ?? "");
+  const [sourceRef, setSourceRef] = useState<SourceRef>(editing?.sourceRef ?? emptySourceRef());
+  const [showSourceRef, setShowSourceRef] = useState(
+    !!(editing?.sourceRef && (editing.sourceRef.bookTitle || editing.sourceRef.creator || editing.sourceRef.createdYear))
+  );
   const [story, setStory] = useState(editing?.story ?? "");
   const [flavorDesc, setFlavorDesc] = useState(editing?.flavorDesc ?? "");
   const [ingredients, setIngredients] = useState<Ingredient[]>(
@@ -683,6 +689,10 @@ export default function RecipeFormScreen() {
       garnish: garnish.trim(),
     notes: notes.trim(),
       cardTagOrder: null,
+      // 只有当用户填写了至少一个 sourceRef 字段时才保存
+      sourceRef: (sourceRef.bookTitle || sourceRef.creator || sourceRef.createdYear || sourceRef.bookAuthor || sourceRef.publishYear || sourceRef.chapterTitle || sourceRef.pageRef)
+        ? sourceRef
+        : editing?.sourceRef,
   };
     if (editing) {
       updateRecipe(editing.id, draft);
@@ -1588,6 +1598,41 @@ export default function RecipeFormScreen() {
             returnKeyType="done"
             style={{ lineHeight: 20 }}
           />
+
+          {/* SourceRef — 结构化引用来源（可展开编辑） */}
+          <Pressable
+            style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1, marginTop: 12, flexDirection: "row" as const, alignItems: "center" as const, gap: 4 }]}
+            onPress={() => setShowSourceRef((v) => !v)}
+          >
+            <IconSymbol name={showSourceRef ? "chevron.down" : "chevron.right"} size={14} color={colors.muted} />
+            <Text className="text-sm text-muted">{lang === "zh" ? "详细引用来源（书名/创作者/年份）" : "Detailed Source (book / creator / year)"}</Text>
+          </Pressable>
+          {showSourceRef ? (
+            <View className="bg-surface border border-border rounded-xl p-4 mt-2" style={{ gap: 10 }}>
+              {([
+                { key: "bookTitle", label: lang === "zh" ? "书名" : "Book Title" },
+                { key: "bookAuthor", label: lang === "zh" ? "书作者" : "Book Author" },
+                { key: "publishYear", label: lang === "zh" ? "出版年份" : "Publish Year" },
+                { key: "chapterTitle", label: lang === "zh" ? "章节" : "Chapter" },
+                { key: "pageRef", label: lang === "zh" ? "页码" : "Page" },
+                { key: "creator", label: lang === "zh" ? "配方创作者" : "Creator" },
+                { key: "createdYear", label: lang === "zh" ? "创作年份" : "Created Year" },
+              ] as { key: keyof SourceRef; label: string }[]).map(({ key, label }) => (
+                <View key={String(key)}>
+                  <Text className="text-xs text-muted mb-1">{label}</Text>
+                  <TextInput
+                    className="bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                    placeholder="—"
+                    placeholderTextColor={colors.muted}
+                    value={typeof sourceRef[key] === "string" ? (sourceRef[key] as string) : ""}
+                    onChangeText={(v) => setSourceRef((prev: SourceRef) => ({ ...prev, [key]: v }))}
+                    returnKeyType="done"
+                    style={{ lineHeight: 18 }}
+                  />
+                </View>
+              ))}
+            </View>
+          ) : null}
 
         </ScrollView>
 

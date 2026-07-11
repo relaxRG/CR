@@ -1,5 +1,6 @@
 // Homemade preps library: syrups, infusions, cordials, batches, etc.
 // English-first design with Chinese translations.
+import { SourceRef } from "@/lib/recipes/types";
 
 /** 自制库顶层分组:含酒精 / 无酒精(类似酒库的基酒库/酒款库/原材料库) */
 export type PrepGroup = "alcoholic" | "non_alcoholic";
@@ -43,6 +44,8 @@ export interface HomemadePrep {
    * 如 "The Waldorf Astoria Bar Book · Frank Caiafa · 2016" 或 "店名 · 创作者 · 年份"。
    */
   source: string;
+  /** 结构化引用来源（比 source 字符串更精细的版本，可选） */
+  sourceRef?: SourceRef;
   notes: string;
   builtin: boolean;
   /** 做过/未做过:是否已亲手制作过该自制品 */
@@ -304,6 +307,7 @@ export function normalizePrep(p: Partial<HomemadePrep> & { id: string }): Homema
     storage: p.storage ?? "",
     notes: p.notes ?? "",
     source: p.source ?? "",
+    sourceRef: p.sourceRef ?? undefined,
     builtin: p.builtin ?? false,
     made: p.made === true,
     rating:

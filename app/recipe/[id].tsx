@@ -54,6 +54,7 @@ import {
   STRENGTH_BAND_LABELS,
   codexFamilyLabel,
   localizedTagName,
+  type SourceRef,
 } from "@/lib/recipes/types";
 
 export default function RecipeDetailScreen() {
@@ -558,6 +559,96 @@ export default function RecipeDetailScreen() {
           </>
         ) : null}
 
+        {/* SourceRef — 结构化引用来源（书库导入 / AI 补全） */}
+        {recipe.sourceRef && (recipe.sourceRef.bookTitle || recipe.sourceRef.creator || recipe.sourceRef.createdYear) ? (
+          <>
+            <Text className="text-[13px] text-muted uppercase mt-6 mb-2 px-4" style={styles.groupHeader}>
+              {lang === "zh" ? "引用来源详情" : "Source Details"}
+            </Text>
+            <View className="bg-surface rounded-xl p-4" style={{ gap: 10 }}>
+              {/* 文字来源（书/网站） */}
+              {(recipe.sourceRef.bookTitle || recipe.sourceRef.chapterTitle) ? (
+                <View>
+                  <View className="flex-row items-center" style={{ gap: 6, marginBottom: 6 }}>
+                    <Text className="text-[11px] font-semibold text-muted uppercase">
+                      {lang === "zh" ? "文字来源" : "Text Source"}
+                    </Text>
+                    <SourceConfidenceBadge confidence={recipe.sourceRef.sourceConfidence} />
+                  </View>
+                  {recipe.sourceRef.bookTitle ? (
+                    <View className="flex-row items-start justify-between">
+                      <Text className="text-sm text-muted" style={{ width: 80 }}>{lang === "zh" ? "书名" : "Book"}</Text>
+                      <Text className="text-sm text-foreground flex-1 text-right" style={{ lineHeight: 19 }}>
+                        {recipe.sourceRef.bookTitle}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {recipe.sourceRef.bookAuthor ? (
+                    <View className="flex-row items-start justify-between" style={{ marginTop: 4 }}>
+                      <Text className="text-sm text-muted" style={{ width: 80 }}>{lang === "zh" ? "作者" : "Author"}</Text>
+                      <Text className="text-sm text-foreground flex-1 text-right" style={{ lineHeight: 19 }}>
+                        {recipe.sourceRef.bookAuthor}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {recipe.sourceRef.publishYear ? (
+                    <View className="flex-row items-start justify-between" style={{ marginTop: 4 }}>
+                      <Text className="text-sm text-muted" style={{ width: 80 }}>{lang === "zh" ? "出版年份" : "Published"}</Text>
+                      <Text className="text-sm text-foreground flex-1 text-right" style={{ lineHeight: 19 }}>
+                        {recipe.sourceRef.publishYear}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {recipe.sourceRef.chapterTitle ? (
+                    <View className="flex-row items-start justify-between" style={{ marginTop: 4 }}>
+                      <Text className="text-sm text-muted" style={{ width: 80 }}>{lang === "zh" ? "章节" : "Chapter"}</Text>
+                      <Text className="text-sm text-foreground flex-1 text-right" style={{ lineHeight: 19 }}>
+                        {recipe.sourceRef.chapterTitle}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {recipe.sourceRef.pageRef ? (
+                    <View className="flex-row items-start justify-between" style={{ marginTop: 4 }}>
+                      <Text className="text-sm text-muted" style={{ width: 80 }}>{lang === "zh" ? "页码" : "Page"}</Text>
+                      <Text className="text-sm text-foreground flex-1 text-right" style={{ lineHeight: 19 }}>
+                        {recipe.sourceRef.pageRef}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              ) : null}
+
+              {/* 配方创作者（与文字来源分隔） */}
+              {(recipe.sourceRef.creator || recipe.sourceRef.createdYear) ? (
+                <View style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, paddingTop: 10 }}>
+                  <View className="flex-row items-center" style={{ gap: 6, marginBottom: 6 }}>
+                    <Text className="text-[11px] font-semibold text-muted uppercase">
+                      {lang === "zh" ? "配方创作者" : "Creator"}
+                    </Text>
+                    <SourceConfidenceBadge confidence={recipe.sourceRef.creatorConfidence} />
+                  </View>
+                  {recipe.sourceRef.creator ? (
+                    <View className="flex-row items-start justify-between">
+                      <Text className="text-sm text-muted" style={{ width: 80 }}>{lang === "zh" ? "创作者" : "Creator"}</Text>
+                      <Text className="text-sm text-foreground flex-1 text-right" style={{ lineHeight: 19 }}>
+                        {recipe.sourceRef.creator}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {recipe.sourceRef.createdYear ? (
+                    <View className="flex-row items-start justify-between" style={{ marginTop: 4 }}>
+                      <Text className="text-sm text-muted" style={{ width: 80 }}>{lang === "zh" ? "创作年份" : "Created"}</Text>
+                      <Text className="text-sm text-foreground flex-1 text-right" style={{ lineHeight: 19 }}>
+                        {recipe.sourceRef.createdYear}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              ) : null}
+            </View>
+          </>
+        ) : null}
+
         {/* Cost estimate — kept last per information hierarchy */}
         {recipe.ingredients.length > 0 ? (
           <>
@@ -919,3 +1010,34 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
 });
+
+/** 置信度徽章：high=绿色，medium=橙色警示，low=红色警示 */
+function SourceConfidenceBadge({ confidence }: { confidence: "high" | "medium" | "low" }) {
+  const colors = useColors();
+  const colorMap = {
+    high: colors.success,
+    medium: colors.warning,
+    low: colors.error,
+  };
+  const labelMap = {
+    high: "高置信度",
+    medium: "中置信度",
+    low: "低置信度",
+  };
+  return (
+    <View
+      style={{
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4,
+        backgroundColor: colorMap[confidence] + "22",
+        borderWidth: 1,
+        borderColor: colorMap[confidence],
+      }}
+    >
+      <Text style={{ fontSize: 10, color: colorMap[confidence], fontWeight: "600" }}>
+        {labelMap[confidence]}
+      </Text>
+    </View>
+  );
+}

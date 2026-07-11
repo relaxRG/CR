@@ -439,6 +439,10 @@ export const appRouter = router({
           flavorDesc: z.string().max(2000).optional(),
           existingSpirits: z.array(z.string().max(100)).max(50).optional(),
           existingGlasses: z.array(z.string().max(100)).max(50).optional(),
+          /** 书库导入时的原始文字片段（用于 AI 推断创作者/年份） */
+          rawText: z.string().max(2000).optional(),
+          /** 书库导入时的书名（用于 AI 推断创作者/年份） */
+          bookTitle: z.string().max(300).optional(),
         }),
       )
       .mutation(async ({ input }) => {
@@ -446,12 +450,14 @@ export const appRouter = router({
         const VALID_FLAVOR_TAGS = ["酸","甜","苦","烈","鲜","柑橘","热带","草本","花香","烟熏","木桶","香料","坚果可可","清爽","浓郁","干爽","复杂"];
         const spiritList = (input.existingSpirits ?? []).join("、") || "金酒、朗姆、伏特加、威士忌、龙舌兰、白兰地、梅斯卡尔、卡沙萨、皮斯科、利口酒、无酒精、其他";
         const glassList = (input.existingGlasses ?? []).join("、") || "马天尼杯、古典杯、高球杯、柯林杯、库佩杯、飓风杯、子弹杯、其他";
+        const rawTextSection = input.rawText ? `\n原始文字片段（来自书籍，供推断创作者/年份参考）:\n${input.rawText.slice(0, 800)}` : "";
+        const bookTitleSection = input.bookTitle ? `\n书名: ${input.bookTitle}` : "";
         const prompt = `你是专业调酒知识专家。根据以下鸡尾酒信息，尽可能准确地补全资料。如果你熟悉这款鸡尾酒，请给出高置信度；如果只能从配料推断，请如实标注置信度。
 
 配方名称: ${input.name}${input.nameEn ? ` (${input.nameEn})` : ""}
 ${input.baseSpirit ? `基酒: ${input.baseSpirit}` : ""}
 ${input.method ? `调制方式: ${input.method}` : ""}
-${(input.ingredientsWithAmounts ?? []).length > 0 ? `配料（含用量，用量最大的含酒精原料即为基酒）: ${(input.ingredientsWithAmounts ?? []).map(i => i.amount ? i.name + " " + i.amount : i.name).join(", ")}` : (input.ingredients ?? []).length > 0 ? `配料: ${(input.ingredients ?? []).join(", ")}` : ""}
+${(input.ingredientsWithAmounts ?? []).length > 0 ? `配料（含用量，用量最大的含酒精原料即为基酒）: ${(input.ingredientsWithAmounts ?? []).map(i => i.amount ? i.name + " " + i.amount : i.name).join(", ")}` : (input.ingredients ?? []).length > 0 ? `配料: ${(input.ingredients ?? []).join(", ")}` : ""}${rawTextSection}${bookTitleSection}
 
 可选基酒列表（优先从此列表中选择）: ${spiritList}
 可选杯型列表（优先从此列表中选择）: ${glassList}
@@ -469,7 +475,11 @@ ${(input.ingredientsWithAmounts ?? []).length > 0 ? `配料（含用量，用量
   "suggestedGlass": "推荐杯型（优先从可选杯型列表中选，若列表中没有合适的可自由填写，不确定则返回空字符串）",
   "suggestedGlassConfidence": "high"|"medium"|"low",
   "suggestedIce": "推荐冰块类型（如：大方冰/碎冰/球冰/标准方冰/长条冰/无冰，不确定则返回空字符串）",
-  "suggestedIceConfidence": "high"|"medium"|"low"
+  "suggestedIceConfidence": "high"|"medium"|"low",
+  "creator": "配方创作者姓名（调酒师/酒吧名，如 'Harry Craddock' / 'Death & Co'），不确定则返回空字符串。注意：创作者≠书的作者，书的作者只是记录者",
+  "creatorConfidence": "high"（有明确文献记载）| "medium"（有合理推断依据）| "low"（不确定或无法判断）,
+  "createdYear": "创作年份或年代（如 '1930' / 'circa 1920s' / '2009'），不确定则返回空字符串",
+  "createdYearConfidence": "high"| "medium"| "low"
 }`;
         // 25s timeout to prevent hang
         const signal = AbortSignal.timeout(25_000);
@@ -506,6 +516,11 @@ ${(input.ingredientsWithAmounts ?? []).length > 0 ? `配料（含用量，用量
           suggestedGlassConfidence: validConf(p.suggestedGlassConfidence),
           suggestedIce: typeof p.suggestedIce === "string" ? p.suggestedIce.trim() : "",
           suggestedIceConfidence: validConf(p.suggestedIceConfidence),
+          // 创作者信息（新增）
+          creator: typeof p.creator === "string" ? p.creator.trim() : "",
+          creatorConfidence: validConf(p.creatorConfidence),
+          createdYear: typeof p.createdYear === "string" ? p.createdYear.trim() : "",
+          createdYearConfidence: validConf(p.createdYearConfidence),
         };
       }),
 
