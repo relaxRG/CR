@@ -40,6 +40,19 @@
 
 ## 待完成
 - [ ] 书籍卡片滑动操作（删除、分享、标记已读）
+
+## 基酒标签体系重构（2026-07-12）
+- [x] BASE_SPIRITS 扩展到 12 个：新增梅斯卡尔、卡沙萨、皮斯科（基于 IBA 官方配方和专业文献）
+- [x] TAG_NAME_DICT 添加新基酒的英文映射
+- [x] store.tsx 迁移逻辑：已有用户自动注入缺失的新基酒标签
+- [x] server/routers.ts enrichRecipe：默认基酒列表更新为 12 个，支持 ingredientsWithAmounts 传参
+- [x] server/routers.ts：多基酒等量时用逗号分隔返回，isMultiBaseSpirit 字段
+- [x] recipe-form.tsx：新增 MultiSpiritChipGroup 组件支持多选基酒
+- [x] recipe-form.tsx：AI 补全传入 ingredientsWithAmounts 用量数据
+- [x] recipe-form.tsx：置信度 UI（高=绿色/中=橙色/低=红色边框 + AI 标签）
+- [x] recipe-form.tsx：低置信度显示提示横幅，不自动选中
+- [x] recipe-form.tsx：高置信度自动选中，用户可手动修改后清除 AI 标记
+- [x] icon-symbol.tsx：添加 info.circle 和 exclamationmark.triangle 图标映射
 - [ ] 字体选择（系统字体/衬线字体/无衬线字体）
 - [ ] 书籍分类与标签
 - [ ] 书籍笔记与高亮功能

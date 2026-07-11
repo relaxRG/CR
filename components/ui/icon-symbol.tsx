@@ -62,6 +62,8 @@ const MAPPING = {
   "globe": "language",
   "icloud.fill": "cloud",
   "info.circle.fill": "info",
+  "info.circle": "info-outline",
+  "exclamationmark.triangle": "warning-amber",
   "heart": "favorite-border",
   "heart.fill": "favorite",
   "trash": "delete-outline",

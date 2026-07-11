@@ -119,6 +119,89 @@ function ChipGroup({
   );
 }
 
+/** 多选基酒 Chip 组，支持逗号分隔的多值字符串，带置信度边框 */
+function MultiSpiritChipGroup({
+  options,
+  value,
+  onChange,
+  colorsMap,
+  newTags,
+  labelOf,
+  aiConfidence,
+  aiSuggestedSpirits,
+}: {
+  options: readonly string[];
+  value: string; // comma-separated, e.g. "威士忌,白兰地"
+  onChange: (v: string) => void;
+  colorsMap?: Record<string, string>;
+  newTags?: readonly string[];
+  labelOf?: (v: string) => string;
+  aiConfidence?: "high" | "medium" | "low" | null;
+  aiSuggestedSpirits?: string[];
+}) {
+  const colors = useColors();
+  const selected = value ? value.split(",").map((s) => s.trim()).filter(Boolean) : [];
+
+  const toggle = (opt: string) => {
+    const next = selected.includes(opt)
+      ? selected.filter((s) => s !== opt)
+      : [...selected, opt];
+    onChange(next.join(","));
+  };
+
+  const getAiBorderColor = (opt: string): string | null => {
+    if (!aiSuggestedSpirits?.includes(opt)) return null;
+    if (aiConfidence === "high") return "#34C759";
+    if (aiConfidence === "medium") return "#FF9500";
+    return "#FF6B35";
+  };
+
+  return (
+    <View style={styles.chipWrap}>
+      {options.map((opt) => {
+        const active = selected.includes(opt);
+        const tint = colorsMap?.[opt];
+        const isNew = newTags?.includes(opt) ?? false;
+        const aiBorderColor = getAiBorderColor(opt);
+        return (
+          <View key={opt} style={{ position: "relative" }}>
+            <Pressable
+              onPress={() => toggle(opt)}
+              style={[
+                styles.chip,
+                {
+                  backgroundColor: active ? (tint ?? colors.primary) : colors.surface,
+                  borderColor: active
+                    ? (tint ?? colors.primary)
+                    : isNew
+                      ? "#FF9500"
+                      : aiBorderColor
+                        ? aiBorderColor
+                        : (tint ? tint + "66" : colors.border),
+                  borderWidth: (isNew && !active) || (!!aiBorderColor && !active) ? 1.5 : 1,
+                },
+              ]}
+            >
+              <Text style={[styles.chipText, { color: active ? "#FFFFFF" : colors.muted }]}>
+                {labelOf ? labelOf(opt) : opt}
+              </Text>
+            </Pressable>
+            {isNew && !active ? (
+              <View style={{ position: "absolute", top: -5, right: -3, backgroundColor: "#FF9500", borderRadius: 6, paddingHorizontal: 4, paddingVertical: 1 }}>
+                <Text style={{ fontSize: 9, lineHeight: 11, fontWeight: "700", color: "#FFFFFF" }}>新</Text>
+              </View>
+            ) : aiBorderColor && !active && !isNew ? (
+              <View style={{ position: "absolute", top: -5, right: -3, backgroundColor: aiBorderColor, borderRadius: 6, paddingHorizontal: 4, paddingVertical: 1 }}>
+                <Text style={{ fontSize: 9, lineHeight: 11, fontWeight: "700", color: "#FFFFFF" }}>AI</Text>
+              </View>
+            ) : null}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 export default function RecipeFormScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const {
@@ -202,6 +285,10 @@ export default function RecipeFormScreen() {
   /** Which ingredient row is focused (shows live suggestions) */
   /** 风味标签专属置信度（来自自动 AI 分析） */
   const [flavorConfidence, setFlavorConfidence] = useState<"high" | "medium" | "low" | null>(null);
+  /** AI 推断基酒的置信度 */
+  const [spiritConfidence, setSpiritConfidence] = useState<"high" | "medium" | "low" | null>(null);
+  /** AI 推断的基酒列表（用于置信度边框高亮） */
+  const [aiSuggestedSpirits, setAiSuggestedSpirits] = useState<string[]>([]);
   const [newSpiritTags, setNewSpiritTags] = useState<string[]>([]);
   const [newGlassTags, setNewGlassTags] = useState<string[]>([]);
   /** 防止重复触发自动 AI 风味分析 */
@@ -268,6 +355,21 @@ export default function RecipeFormScreen() {
     setNewSpiritTags((prev) => (prev.includes(nextName) ? prev : [...prev, nextName]));
     return nextName;
   };
+
+  /** 处理 AI 返回的基酒（支持逗号分隔多基酒），返回逗号分隔的规范化名称 */
+  const resolveAiSpirits = (raw: string): string => {
+    const parts = raw.split(",").map((s) => s.trim()).filter(Boolean);
+    const resolved = parts.map((p) => {
+      const hit = spiritNames.find((s) => p.includes(s) || s.includes(p));
+      if (hit) return hit;
+      // 尝试创建新标签（仅当不是品牌名时）
+      const created = addTag("spirit", p, CATEGORY_COLORS[0]);
+      const nextName = created?.name ?? p;
+      setNewSpiritTags((prev) => (prev.includes(nextName) ? prev : [...prev, nextName]));
+      return nextName;
+    });
+    return resolved.join(",");
+  };
   const ensureGlassName = (raw: string) => {
     const cleaned = raw.trim();
     if (!cleaned) return "";
@@ -293,12 +395,14 @@ export default function RecipeFormScreen() {
     setAiEnriching(true);
     setAiResult(null);
     const ingNames = ingredients.map((i) => i.name).filter(Boolean);
+    const ingWithAmounts = ingredients.filter((i) => i.name.trim()).map((i) => ({ name: i.name, amount: i.amount }));
     enrichRecipeMutation.mutate(
       {
         name: recipeName,
         nameEn: nameEn.trim() || undefined,
         baseSpirit: baseSpirit || undefined,
         ingredients: ingNames.length > 0 ? ingNames : undefined,
+        ingredientsWithAmounts: ingWithAmounts.length > 0 ? ingWithAmounts : undefined,
         source: source.trim() || undefined,
         story: story.trim() || undefined,
         flavorDesc: flavorDesc.trim() || undefined,
@@ -309,9 +413,15 @@ export default function RecipeFormScreen() {
       {
         onSuccess: (result) => {
           if (!isMountedRef.current) return;
-          if (!baseSpirit && result.suggestedBaseSpirit && result.suggestedBaseSpiritConfidence === "high") {
-            const nextName = ensureSpiritName(result.suggestedBaseSpirit);
-            if (nextName) setBaseSpirit(nextName);
+          if (!baseSpirit && result.suggestedBaseSpirit) {
+            const conf = result.suggestedBaseSpiritConfidence ?? "medium";
+            const resolved = resolveAiSpirits(result.suggestedBaseSpirit);
+            const spirits = resolved.split(",").map(s => s.trim()).filter(Boolean);
+            setSpiritConfidence(conf);
+            setAiSuggestedSpirits(spirits);
+            if (conf === "high") {
+              setBaseSpirit(resolved);
+            }
           }
           if (!glass && result.suggestedGlass && result.suggestedGlassConfidence === "high") {
             const nextName = ensureGlassName(result.suggestedGlass);
@@ -344,12 +454,14 @@ export default function RecipeFormScreen() {
     if (!isOnline) return; // Skip auto AI analysis when offline
     autoFlavorDoneRef.current = true;
     const ingNames = ingredients.map((i) => i.name).filter(Boolean);
+    const ingWithAmounts = ingredients.filter((i) => i.name.trim()).map((i) => ({ name: i.name, amount: i.amount }));
     enrichRecipeMutation.mutate(
       {
         name: recipeName,
         nameEn: nameEn.trim() || undefined,
         baseSpirit: baseSpirit || undefined,
         ingredients: ingNames.length > 0 ? ingNames : undefined,
+        ingredientsWithAmounts: ingWithAmounts.length > 0 ? ingWithAmounts : undefined,
         method: method || undefined,
         existingSpirits: spiritNames,
         existingGlasses: glassNames,
@@ -362,9 +474,15 @@ export default function RecipeFormScreen() {
             const conf = result.flavorConfidence ?? result.confidence ?? "medium";
             setFlavorConfidence(conf);
           }
-          if (!baseSpirit && result.suggestedBaseSpirit && result.suggestedBaseSpiritConfidence === "high") {
-            const nextName = ensureSpiritName(result.suggestedBaseSpirit);
-            if (nextName) setBaseSpirit(nextName);
+          if (!baseSpirit && result.suggestedBaseSpirit) {
+            const conf = result.suggestedBaseSpiritConfidence ?? "medium";
+            const resolved = resolveAiSpirits(result.suggestedBaseSpirit);
+            const spirits = resolved.split(",").map(s => s.trim()).filter(Boolean);
+            setSpiritConfidence(conf);
+            setAiSuggestedSpirits(spirits);
+            if (conf === "high") {
+              setBaseSpirit(resolved);
+            }
           }
           if (!glass && result.suggestedGlass && result.suggestedGlassConfidence === "high") {
             const nextName = ensureGlassName(result.suggestedGlass);
@@ -406,8 +524,12 @@ export default function RecipeFormScreen() {
       setFlavors(aiResult.flavors);
     }
     if (!baseSpirit && aiResult.suggestedBaseSpirit) {
-      const nextName = ensureSpiritName(aiResult.suggestedBaseSpirit);
-      if (nextName) setBaseSpirit(nextName);
+      const resolved = resolveAiSpirits(aiResult.suggestedBaseSpirit);
+      if (resolved) {
+        setBaseSpirit(resolved);
+        setSpiritConfidence(null);
+        setAiSuggestedSpirits([]);
+      }
     }
     if (!glass && aiResult.suggestedGlass) {
       const nextName = ensureGlassName(aiResult.suggestedGlass);
@@ -888,18 +1010,74 @@ export default function RecipeFormScreen() {
           </View>
 
           {/* Base spirit */}
-          <Text className="text-sm font-medium text-muted mt-5 mb-1.5">{t("form.spirit")}</Text>
+          <View className="flex-row items-center justify-between mt-5 mb-1.5">
+            <Text className="text-sm font-medium text-muted">{t("form.spirit")}</Text>
+            {spiritConfidence !== null && (
+              <View className="flex-row items-center" style={{ gap: 4 }}>
+                <IconSymbol
+                  name="sparkles"
+                  size={12}
+                  color={spiritConfidence === "high" ? colors.success : spiritConfidence === "medium" ? "#FF9500" : "#FF6B35"}
+                />
+                <Text className="text-xs" style={{ color: spiritConfidence === "high" ? colors.success : spiritConfidence === "medium" ? "#FF9500" : "#FF6B35" }}>
+                  {spiritConfidence === "high"
+                    ? (lang === "zh" ? "AI 已标注" : "AI tagged")
+                    : spiritConfidence === "medium"
+                      ? (lang === "zh" ? "AI 推断，请确认" : "AI inferred, please confirm")
+                      : (lang === "zh" ? "置信度低，请手动选择" : "Low confidence, please select")}
+                </Text>
+              </View>
+            )}
+          </View>
+          {/* 多基酒提示 */}
+          {baseSpirit && baseSpirit.includes(",") && (
+            <View
+              className="flex-row items-start rounded-xl px-3 py-2 mb-2"
+              style={{ backgroundColor: "#007AFF15", borderWidth: 1, borderColor: "#007AFF44", gap: 8 }}
+            >
+              <IconSymbol name="info.circle" size={14} color="#007AFF" style={{ marginTop: 1 }} />
+              <Text className="text-xs flex-1" style={{ color: "#007AFF", lineHeight: 18 }}>
+                {lang === "zh"
+                  ? `多基酒配方：${baseSpirit.split(",").join(" + ")}，用量相等，已全部标注。`
+                  : `Multi-spirit recipe: ${baseSpirit.split(",").join(" + ")} in equal parts.`}
+              </Text>
+            </View>
+          )}
+          {/* 低置信度警告横幅 */}
+          {spiritConfidence === "low" && (
+            <View
+              className="flex-row items-start rounded-xl px-3 py-2 mb-2"
+              style={{ backgroundColor: "#FF6B3515", borderWidth: 1, borderColor: "#FF6B3544", gap: 8 }}
+            >
+              <IconSymbol name="exclamationmark.triangle" size={14} color="#FF6B35" style={{ marginTop: 1 }} />
+              <Text className="text-xs flex-1" style={{ color: "#FF6B35", lineHeight: 18 }}>
+                {lang === "zh"
+                  ? "未找到可靠信息，请手动选择基酒。"
+                  : "No reliable info found. Please select base spirit manually."}
+              </Text>
+              <Pressable onPress={() => setSpiritConfidence(null)} hitSlop={8}>
+                <IconSymbol name="xmark" size={12} color="#FF6B35" />
+              </Pressable>
+            </View>
+          )}
           {spiritNames.length > 0 ? (
-            <ChipGroup
+            <MultiSpiritChipGroup
               options={spiritNames}
               value={baseSpirit}
-              onChange={setBaseSpirit}
+              onChange={(v) => {
+                setBaseSpirit(v);
+                // User manually changed → clear AI confidence indicator
+                setSpiritConfidence(null);
+                setAiSuggestedSpirits([]);
+              }}
               colorsMap={spiritColors}
               newTags={newSpiritTags}
               labelOf={(v) => {
                 const tag = spiritTags.find((tg) => tg.name === v);
                 return localizedTagName(v, tag?.nameEn, lang);
               }}
+              aiConfidence={spiritConfidence}
+              aiSuggestedSpirits={aiSuggestedSpirits}
             />
           ) : (
             <Text className="text-xs text-muted">{t("form.noSpirit")}</Text>

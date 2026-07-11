@@ -433,6 +433,7 @@ export const appRouter = router({
           baseSpirit: z.string().max(100).optional(),
           method: z.string().max(100).optional(),
           ingredients: z.array(z.string().max(200)).max(30).optional(),
+          ingredientsWithAmounts: z.array(z.object({ name: z.string().max(200), amount: z.string().max(100) })).max(30).optional(),
           source: z.string().max(500).optional(),
           story: z.string().max(2000).optional(),
           flavorDesc: z.string().max(2000).optional(),
@@ -443,14 +444,14 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         // 17 个精炼风味标签（与客户端 FLAVOR_TAGS 保持一致）
         const VALID_FLAVOR_TAGS = ["酸","甜","苦","烈","鲜","柑橘","热带","草本","花香","烟熏","木桶","香料","坚果可可","清爽","浓郁","干爽","复杂"];
-        const spiritList = (input.existingSpirits ?? []).join("、") || "金酒、朗姆、伏特加、威士忌、龙舌兰、白兰地、利口酒、无酒精、其他";
+        const spiritList = (input.existingSpirits ?? []).join("、") || "金酒、朗姆、伏特加、威士忌、龙舌兰、白兰地、梅斯卡尔、卡沙萨、皮斯科、利口酒、无酒精、其他";
         const glassList = (input.existingGlasses ?? []).join("、") || "马天尼杯、古典杯、高球杯、柯林杯、库佩杯、飓风杯、子弹杯、其他";
         const prompt = `你是专业调酒知识专家。根据以下鸡尾酒信息，尽可能准确地补全资料。如果你熟悉这款鸡尾酒，请给出高置信度；如果只能从配料推断，请如实标注置信度。
 
 配方名称: ${input.name}${input.nameEn ? ` (${input.nameEn})` : ""}
 ${input.baseSpirit ? `基酒: ${input.baseSpirit}` : ""}
 ${input.method ? `调制方式: ${input.method}` : ""}
-${(input.ingredients ?? []).length > 0 ? `配料: ${(input.ingredients ?? []).join(", ")}` : ""}
+${(input.ingredientsWithAmounts ?? []).length > 0 ? `配料（含用量，用量最大的含酒精原料即为基酒）: ${(input.ingredientsWithAmounts ?? []).map(i => i.amount ? i.name + " " + i.amount : i.name).join(", ")}` : (input.ingredients ?? []).length > 0 ? `配料: ${(input.ingredients ?? []).join(", ")}` : ""}
 
 可选基酒列表（优先从此列表中选择）: ${spiritList}
 可选杯型列表（优先从此列表中选择）: ${glassList}
@@ -463,7 +464,7 @@ ${(input.ingredients ?? []).length > 0 ? `配料: ${(input.ingredients ?? []).jo
   "flavorDesc": "${input.flavorDesc ? "(已有内容,如有更好信息可补充,否则返回空字符串)" : "风味描述:口感特点与风味层次(中文,50字内),不清楚则返回空字符串"}",
   "source": "${input.source ? "(已有内容,不要修改,返回空字符串)" : "引用来源:如 'IBA Official Cocktail' / 'The Savoy Cocktail Book' / 调酒师名字等,不确定则返回空字符串"}",
   "confidence": "high"|"medium"|"low"（对整体补全结果的置信度）,
-  "suggestedBaseSpirit": "${input.baseSpirit ? "(已有基酒,返回空字符串)" : "推荐基酒（优先从可选基酒列表中选，若列表中没有合适的可自由填写，不确定则返回空字符串）"}",
+  "suggestedBaseSpirit": "${input.baseSpirit ? "(已有基酒,返回空字符串)" : "推荐基酒（优先从可选基酒列表中选，若列表中没有合适的可自由填写，不确定则返回空字符串）。若两种烈酒用量相等，用逗号分隔列出所有，如：威士忌,白兰地"}",
   "suggestedBaseSpiritConfidence": "high"|"medium"|"low",
   "suggestedGlass": "推荐杯型（优先从可选杯型列表中选，若列表中没有合适的可自由填写，不确定则返回空字符串）",
   "suggestedGlassConfidence": "high"|"medium"|"low",
@@ -499,6 +500,7 @@ ${(input.ingredients ?? []).length > 0 ? `配料: ${(input.ingredients ?? []).jo
           confidence: validConf(p.confidence),
           flavorConfidence: validConf(p.flavorConfidence),
           suggestedBaseSpirit: typeof p.suggestedBaseSpirit === "string" ? p.suggestedBaseSpirit.trim() : "",
+          isMultiBaseSpirit: typeof p.suggestedBaseSpirit === "string" && p.suggestedBaseSpirit.includes(","),
           suggestedBaseSpiritConfidence: validConf(p.suggestedBaseSpiritConfidence),
           suggestedGlass: typeof p.suggestedGlass === "string" ? p.suggestedGlass.trim() : "",
           suggestedGlassConfidence: validConf(p.suggestedGlassConfidence),

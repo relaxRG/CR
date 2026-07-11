@@ -226,6 +226,18 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
             notifySyncChange(TAGS_KEY);
           }
         }
+        // 老用户升级:注入新增的 BASE_SPIRITS 标签（如梅斯卡尔、卡沙萨、皮斯科）
+        if (tRaw) {
+          const allDefaults = buildDefaultTags();
+          const missingSpirits = allDefaults.filter(
+            (d) => d.kind === "spirit" && !tagList.some((t) => t.kind === "spirit" && t.name === d.name),
+          );
+          if (missingSpirits.length > 0) {
+            tagList = [...tagList, ...missingSpirits];
+            await AsyncStorage.setItem(TAGS_KEY, JSON.stringify(tagList));
+            notifySyncChange(TAGS_KEY);
+          }
+        }
         const groupList: TagGroup[] = (gRaw ? (JSON.parse(gRaw) as TagGroup[]) : []).map(
           (g) => migrateTagNameEn(g),
         );
