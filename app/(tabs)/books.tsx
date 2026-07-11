@@ -19,6 +19,35 @@ import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
 import { useBookStore, StoredBook } from "@/lib/books/store";
 
+/** Decode HTML entities in display strings */
+function decodeHtml(str: string): string {
+  return str
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#x27;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
+}
+
+/** Book cover image with error fallback */
+function BookCover({ uri, color }: { uri?: string; color: string }) {
+  const [failed, setFailed] = React.useState(false);
+  if (uri && !failed) {
+    return (
+      <Image
+        source={{ uri }}
+        style={styles.coverImage}
+        onError={() => setFailed(true)}
+      />
+    );
+  }
+  return <IconSymbol name="book.fill" size={28} color={color} />;
+}
+
 export default function BooksScreen() {
   const colors = useColors();
   const router = useRouter();
@@ -370,15 +399,7 @@ export default function BooksScreen() {
                     { backgroundColor: bookColor(book.id) + "28" },
                   ]}
                 >
-                  {book.coverUri ? (
-                    <Image
-                      source={{ uri: book.coverUri }}
-                      style={styles.coverImage}
-                      onError={() => {/* fallback handled by conditional */}}
-                    />
-                  ) : (
-                    <IconSymbol name="book.fill" size={28} color={bookColor(book.id)} />
-                  )}
+                  <BookCover uri={book.coverUri} color={bookColor(book.id)} />
                   {book.isFavorite && (
                     <View style={styles.favBadge}>
                       <IconSymbol name="heart.fill" size={8} color="#FF3B30" />
@@ -391,11 +412,11 @@ export default function BooksScreen() {
                     style={[styles.bookTitle, { color: colors.foreground }]}
                     numberOfLines={2}
                   >
-                    {book.title || book.fileName}
+                    {decodeHtml(book.title || book.fileName)}
                   </Text>
                   {book.author && (
                     <Text style={[styles.bookAuthor, { color: colors.muted }]} numberOfLines={1}>
-                      {book.author}
+                      {decodeHtml(book.author)}
                     </Text>
                   )}
                   <Text style={[styles.bookMeta, { color: colors.muted }]} numberOfLines={1}>

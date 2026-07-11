@@ -52,6 +52,8 @@ interface ReadingBlock {
   candidateConfidence: number;
   /** User selected this block for import */
   selected: boolean;
+  /** Already imported — show green badge, disable re-selection */
+  isImported?: boolean;
   /** Parsed candidate data (filled when AI scans this block) */
   candidate?: RecipeCandidate;
 }
@@ -178,6 +180,17 @@ export default function BookImportScreen() {
   const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
   const [importResult, setImportResult] = useState<{ recipes: number; preps: number } | null>(null);
   const [reviewError, setReviewError] = useState("");
+
+  // Cumulative import tracking (stay in reading phase after each import)
+  const [importedBlockIds, setImportedBlockIds] = useState<Set<string>>(new Set());
+  const [totalImported, setTotalImported] = useState<{ recipes: number; preps: number }>({ recipes: 0, preps: 0 });
+
+  // Multi-import queue state
+  const [importedBookId, setImportedBookId] = useState<string | null>(null);
+  const [lastImportedTitle, setLastImportedTitle] = useState("");
+  const [showImportSuccess, setShowImportSuccess] = useState(false);
+  const [queueTotal, setQueueTotal] = useState(0);
+  const [queueDone, setQueueDone] = useState(0);
 
   const pendingRef = useRef<PendingFile | null>(null);
   const currentBookSectionsRef = useRef<ExtractedBook["sections"]>([]);
@@ -311,18 +324,25 @@ export default function BookImportScreen() {
     const res = await DocumentPicker.getDocumentAsync({
       type: ["application/epub+zip", "application/pdf"],
       copyToCacheDirectory: true,
-      multiple: false,
+      multiple: true,
     });
     if (res.canceled || !res.assets?.length) return;
-    const asset = res.assets[0];
+    const assets = res.assets;
+    setQueueTotal(assets.length);
+    setQueueDone(0);
+    setShowImportSuccess(false);
+    for (let assetIdx = 0; assetIdx < assets.length; assetIdx++) {
+    const asset = assets[assetIdx];
     const isEpub = /\.epub$/i.test(asset.name) || asset.mimeType === "application/epub+zip";
     const isPdf = /\.pdf$/i.test(asset.name) || asset.mimeType === "application/pdf";
     if (!isEpub && !isPdf) {
       setLoadError(zh ? "仅支持 EPUB 或 PDF 文件" : "Only EPUB or PDF files are supported");
-      return;
+      continue;
     }
     setPhase("loading");
-    setLoadStatus(zh ? "正在读取文件…" : "Reading file…");
+    setLoadStatus(assets.length > 1
+      ? (zh ? `正在导入 ${assetIdx + 1}/${assets.length}：${asset.name}` : `Importing ${assetIdx + 1}/${assets.length}: ${asset.name}`)
+      : (zh ? "正在读取文件…" : "Reading file…"));
     try {
       if (isEpub && Platform.OS !== "web") {
         // Native EPUB: use filesystem extractor (supports 1GB+, no full Base64 read)
@@ -345,7 +365,12 @@ export default function BookImportScreen() {
           },
           result.chapters,
         );
-        router.replace(`/book-reader?id=${stored.id}`);
+        // Don't auto-navigate: let user decide to read or import more
+        setPhase("idle");
+        setLoadStatus("");
+        setImportedBookId(stored.id);
+        setLastImportedTitle(stored.title || asset.name.replace(/\.epub$/i, ""));
+        setShowImportSuccess(true);
       } else if (isEpub && Platform.OS === "web") {
         // Web EPUB: fall back to in-memory rendering
         const resp = await fetch(asset.uri);
@@ -358,7 +383,11 @@ export default function BookImportScreen() {
           { title, fileName: asset.name, format: "epub", sectionCount: htmlBook.chapters.length, css: htmlBook.css },
           htmlBook.chapters,
         );
-        router.replace(`/book-reader?id=${stored.id}`);
+        setPhase("idle");
+        setLoadStatus("");
+        setImportedBookId(stored.id);
+        setLastImportedTitle(stored.title || asset.name.replace(/\.epub$/i, ""));
+        setShowImportSuccess(true);
       } else if (isPdf) {
         // PDF: read into buffer then OCR or extract
         let buffer: ArrayBuffer;
@@ -390,6 +419,8 @@ export default function BookImportScreen() {
       );
       setPhase("idle");
     }
+    setQueueDone((d) => d + 1);
+    } // end for loop
   }, [zh, runOcr, loadPlainBookIntoReader, addBookWithHtml, router]);
 
   // ─── AI scanning during reading ─────────────────────────────────────────────
@@ -689,9 +720,31 @@ export default function BookImportScreen() {
         recipeCount++;
       }
     }
-    setImportResult({ recipes: recipeCount, preps: prepCount });
+    // Update cumulative totals
+    setTotalImported((prev) => ({
+      recipes: prev.recipes + recipeCount,
+      preps: prev.preps + prepCount,
+    }));
+
+    // Mark imported blocks as done and deselect them
+    const importedIds = new Set(selected.map((r) => r.blockId));
+    setImportedBlockIds((prev) => {
+      const next = new Set(prev);
+      importedIds.forEach((id) => next.add(id));
+      return next;
+    });
+    setBlocks((prev) =>
+      prev.map((b) =>
+        importedIds.has(b.id)
+          ? { ...b, selected: false, isImported: true }
+          : b,
+      ),
+    );
+
+    // Clear review items and go back to reading (not done phase)
     setReviewItems([]);
-    setPhase("done");
+    setImportResult({ recipes: recipeCount, preps: prepCount });
+    setPhase("reading");
     if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   }, [reviewItems, bookTitle, zh, addRecipe, updateRecipe, addPrep, sections, types, enrichRecipeMutation]);
 
@@ -756,13 +809,17 @@ export default function BookImportScreen() {
                 ? scanProgress
                   ? `${zh ? "AI 扫描中" : "AI scanning"} ${scanProgress.done}/${scanProgress.total}…`
                   : (zh ? "AI 扫描中…" : "AI scanning…")
-                : candidateCount > 0
+                : (totalImported.recipes + totalImported.preps) > 0
                   ? zh
-                    ? `发现 ${candidateCount} 处候选配方，已选 ${selectedCount} 处`
-                    : `${candidateCount} recipe hints · ${selectedCount} selected`
-                  : zh
-                    ? "阅读并点击段落来选取配方"
-                    : "Read and tap paragraphs to select recipes"}
+                    ? `已导入 ${totalImported.recipes + totalImported.preps} 个${candidateCount > 0 ? `，还有 ${candidateCount} 处候选` : ""}`
+                    : `${totalImported.recipes + totalImported.preps} imported${candidateCount > 0 ? ` · ${candidateCount} hints` : ""}`
+                  : candidateCount > 0
+                    ? zh
+                      ? `发现 ${candidateCount} 处候选配方，已选 ${selectedCount} 处`
+                      : `${candidateCount} recipe hints · ${selectedCount} selected`
+                    : zh
+                      ? "阅读并点击段落来选取配方"
+                      : "Read and tap paragraphs to select recipes"}
             </Text>
           )}
         </View>
@@ -857,6 +914,79 @@ export default function BookImportScreen() {
                 : "💡 New: book import is now a reader. Open a file, browse it — orange-highlighted paragraphs are AI-detected recipe candidates. Tap to select. Then tap Import."}
             </Text>
           </View>
+
+          {/* ── Import success banner ── */}
+          {showImportSuccess && importedBookId && (
+            <View style={[styles.card, { borderColor: "#34C759" + "44", backgroundColor: "#34C75910", marginTop: 12, padding: 16 }]}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                <IconSymbol name="checkmark.circle.fill" size={22} color="#34C759" />
+                <Text style={{ fontSize: 15, fontWeight: "600", color: "#34C759", flex: 1 }} numberOfLines={2}>
+                  {queueTotal > 1
+                    ? (zh ? `已成功导入 ${queueDone}/${queueTotal} 本书籍` : `Imported ${queueDone}/${queueTotal} books`)
+                    : (zh ? `「${lastImportedTitle}」导入成功` : `"${lastImportedTitle}" imported`)}
+                </Text>
+              </View>
+              <View style={{ flexDirection: "row", gap: 10 }}>
+                <Pressable
+                  onPress={() => { tap(); setShowImportSuccess(false); void pickFile(); }}
+                  style={({ pressed }) => [
+                    { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+                      paddingVertical: 10, borderRadius: 10, backgroundColor: colors.surface,
+                      borderWidth: 1, borderColor: colors.border },
+                    pressed && { opacity: 0.75 },
+                  ]}
+                >
+                  <IconSymbol name="plus.circle" size={16} color={colors.primary} />
+                  <Text style={{ fontSize: 14, fontWeight: "600", color: colors.primary }}>
+                    {zh ? "继续导入" : "Import More"}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => { tap(); router.back(); }}
+                  style={({ pressed }) => [
+                    { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+                      paddingVertical: 10, borderRadius: 10, backgroundColor: "#34C759" },
+                    pressed && { opacity: 0.85 },
+                  ]}
+                >
+                  <IconSymbol name="books.vertical.fill" size={16} color="#FFFFFF" />
+                  <Text style={{ fontSize: 14, fontWeight: "600", color: "#FFFFFF" }}>
+                    {zh ? "返回书库" : "Back to Library"}
+                  </Text>
+                </Pressable>
+              </View>
+              {importedBookId && (
+                <Pressable
+                  onPress={() => { tap(); router.replace(`/book-reader?id=${importedBookId}`); }}
+                  style={({ pressed }) => [
+                    { marginTop: 8, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+                      paddingVertical: 8 },
+                    pressed && { opacity: 0.7 },
+                  ]}
+                >
+                  <IconSymbol name="book.fill" size={14} color={colors.muted} />
+                  <Text style={{ fontSize: 13, color: colors.muted }}>
+                    {zh ? "立即阅读" : "Read Now"}
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+          )}
+
+          {/* ── Batch import progress ── */}
+          {queueTotal > 1 && queueDone > 0 && queueDone < queueTotal && (
+            <View style={[styles.hintBox, { borderColor: colors.primary + "44", backgroundColor: colors.primary + "08", marginTop: 12 }]}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text style={{ fontSize: 13, color: colors.primary, fontWeight: "600" }}>
+                  {zh ? `批量导入进度：${queueDone}/${queueTotal}` : `Batch import: ${queueDone}/${queueTotal}`}
+                </Text>
+              </View>
+              <View style={{ height: 4, backgroundColor: colors.border, borderRadius: 2, overflow: "hidden" }}>
+                <View style={{ height: 4, backgroundColor: colors.primary, borderRadius: 2, width: `${Math.round((queueDone / queueTotal) * 100)}%` }} />
+              </View>
+            </View>
+          )}
         </ScrollView>
       )}
 
@@ -911,18 +1041,21 @@ export default function BookImportScreen() {
               }
               // Paragraph block
               const isSelected = block.selected;
-              const isHint = block.isCandidate && !isSelected;
+              const isImported = block.isImported === true;
+              const isHint = block.isCandidate && !isSelected && !isImported;
               return (
                 <Pressable
                   key={block.id}
-                  onPress={() => toggleBlock(block.id)}
+                  onPress={() => { if (!isImported) toggleBlock(block.id); }}
                   style={({ pressed }) => [
                     styles.paragraphBlock,
                     {
-                      backgroundColor: isSelected
-                        ? colors.primary + "18"
-                        : isHint
-                          ? "#FF950012"
+                      backgroundColor: isImported
+                        ? "#34C75912"
+                        : isSelected
+                          ? colors.primary + "18"
+                          : isHint
+                            ? "#FF950012"
                           : "transparent",
                       borderColor: isSelected
                         ? colors.primary + "55"
@@ -941,6 +1074,14 @@ export default function BookImportScreen() {
                           <IconSymbol name="checkmark" size={9} color="#FFF" />
                           <Text style={{ color: "#FFF", fontSize: 10, fontWeight: "700" }}>
                             {zh ? "已选" : "Selected"}
+                          </Text>
+                        </View>
+                      )}
+                      {isImported && (
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 4 }}>
+                          <IconSymbol name="checkmark.circle.fill" size={12} color="#34C759" />
+                          <Text style={{ fontSize: 11, color: "#34C759", fontWeight: "600" }}>
+                            {zh ? "已导入" : "Imported"}
                           </Text>
                         </View>
                       )}
@@ -1035,6 +1176,54 @@ export default function BookImportScreen() {
               >
                 <Text style={{ color: colors.primary, fontSize: 13 }}>
                   {zh ? `选中全部 ${candidateCount} 个候选` : `Select all ${candidateCount} candidates`}
+                </Text>
+              </Pressable>
+            )}
+            {/* Last import success toast */}
+            {importResult && phase === "reading" && (
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 4 }}>
+                <IconSymbol name="checkmark.circle.fill" size={14} color="#34C759" />
+                <Text style={{ fontSize: 12, color: "#34C759", fontWeight: "600" }}>
+                  {zh
+                    ? `已导入 ${importResult.recipes + importResult.preps} 个配方，继续选取更多`
+                    : `${importResult.recipes + importResult.preps} imported — keep selecting`}
+                </Text>
+              </View>
+            )}
+            {/* Finish reading button — visible when some imports done */}
+            {(totalImported.recipes + totalImported.preps) > 0 && (
+              <Pressable
+                onPress={() => {
+                  tap();
+                  if (Platform.OS === "web") {
+                    if (window.confirm(zh
+                      ? `已导入 ${totalImported.recipes} 个配方、${totalImported.preps} 个自制。完成并返回书库？`
+                      : `Imported ${totalImported.recipes} recipes & ${totalImported.preps} preps. Finish and go back?`)) {
+                      router.back();
+                    }
+                  } else {
+                    Alert.alert(
+                      zh ? "导入完成" : "Import Complete",
+                      zh
+                        ? `共导入 ${totalImported.recipes} 个配方、${totalImported.preps} 个自制品。`
+                        : `${totalImported.recipes} recipes and ${totalImported.preps} preps imported.`,
+                      [
+                        { text: zh ? "继续阅读" : "Keep Reading", style: "cancel" },
+                        { text: zh ? "返回书库" : "Back to Library", onPress: () => router.back() },
+                      ],
+                    );
+                  }
+                }}
+                style={({ pressed }) => [
+                  { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+                    paddingVertical: 8, opacity: pressed ? 0.7 : 1 },
+                ]}
+              >
+                <IconSymbol name="books.vertical.fill" size={14} color={colors.muted} />
+                <Text style={{ fontSize: 13, color: colors.muted }}>
+                  {zh
+                    ? `完成阅读，返回书库（已导入 ${totalImported.recipes + totalImported.preps} 个）`
+                    : `Done reading · ${totalImported.recipes + totalImported.preps} imported`}
                 </Text>
               </Pressable>
             )}

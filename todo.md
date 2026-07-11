@@ -92,4 +92,28 @@
 ### i18n 和其他
   - [x] lib/i18n/translations.ts：新增 shopping.* 翻译键
   - [x] lib/i18n/translations.ts：更新 menu.* 翻译键（改名/新增）
-  - [x] TypeScript 零错误
+- [x] TypeScript 零错误
+
+## 书库阅读器全面修复（2026-07-12）
+### extract.ts 修复
+- [x] 封面检测增强：支持 meta name=cover、guide 元素、修复路径拼接
+- [x] HTML 实体解码：书名/作者/章节标题正确显示（& → &、&amp; → &）
+- [x] 章节 HTML 图片路径重写为绝对 file:// 路径（文件系统模式）
+### book-reader.tsx 重构
+- [x] 修复 baseUrl：正确传递 file:// 前缀目录路径给 WebView
+- [x] 图片限高 CSS（max-height: 45vh + object-fit: contain）防止大图撑破分页
+- [x] 图片点击全屏查看器（Modal + 双指缩放）
+- [x] 书内链接拦截跳转（onShouldStartLoadWithRequest → 解析章节+锚点 → 跳转）
+- [x] 准确页码显示（CSS columns 计算 + 全书累计章节进度）
+- [x] 章节间水平滑动动画（withTiming 过渡）
+### books.tsx 修复
+- [x] 封面图片 onError 回退到图标（不再显示空白）
+- [x] 书名 HTML 实体解码（书库列表正确显示书名）
+### book-import.tsx 增强（AI 提取流程）
+- [x] 导入成功后不跳走，留在段落阅读界面继续选取
+- [x] 已导入段落显示绿色背景 + ✓ 已导入徽章，禁止重复选取
+- [x] Header 副标题显示累计导入数量
+- [x] 导入成功后底部显示 toast 提示「继续选取更多」
+- [x] 底部新增「完成阅读，返回书库」按钮（有导入记录时显示）
+- [x] 点击完成弹出汇总 Alert（继续阅读 / 返回书库）
+- [x] TypeScript 零错误

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Modal,
   Platform,
   Pressable,
@@ -89,7 +90,14 @@ const READER_CSS = `
     margin: 1.2em auto;
     border-radius: 6px;
   }
-  figure { margin: 1.5em 0; text-align: center; }
+  /* Limit image height so CSS columns can paginate stably; tap to view full size */
+  img {
+    max-height: 45vh !important;
+    object-fit: contain !important;
+    cursor: pointer;
+    break-inside: avoid;
+  }
+  figure { margin: 1.5em 0; text-align: center; break-inside: avoid; }
   figcaption { font-size: 0.8em; opacity: 0.6; margin-top: 0.4em; font-style: italic; }
   /* Headings */
   h1 { font-size: 1.8em; font-weight: 700; line-height: 1.2; margin: 1.6em 0 0.6em; letter-spacing: -0.02em; }
@@ -131,11 +139,35 @@ const READER_CSS = `
   .selected-highlight { background: rgba(0,122,255,0.12); border-left: 3px solid #007AFF; padding: 4px 8px; border-radius: 4px; }
 `;
 
+
+/* ─── Image viewer modal ──────────────────────────────────────────────────── */
+function ImageViewerModal({ uri, onClose }: { uri: string; onClose: () => void }) {
+  const { width, height } = useWindowDimensions();
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable
+        style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.92)", alignItems: "center", justifyContent: "center" }}
+        onPress={onClose}
+      >
+        <Image
+          source={{ uri }}
+          style={{ width: width, height: height * 0.85 }}
+          resizeMode="contain"
+        />
+        <View style={{ position: "absolute", top: 48, right: 20, width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.15)", alignItems: "center", justifyContent: "center" }}>
+          <Text style={{ color: "#fff", fontSize: 18, fontWeight: "300" }}>✕</Text>
+        </View>
+      </Pressable>
+    </Modal>
+  );
+}
+
 /* ─── HTML chapter renderer (web-only) ────────────────────────────────────── */
 
 function HtmlChapter({
   html, css, fontSize, lineHeight, theme, onTap,
   extractMode, onSelection, webViewRef, baseUrl, pageFlipMode, onPageInfo,
+  onImageTap, onInternalLink,
 }: {
   html: string;
   css: string;
@@ -150,6 +182,10 @@ function HtmlChapter({
   pageFlipMode?: boolean;
   /** Called with { totalPages } after content loads */
   onPageInfo?: (info: { totalPages: number }) => void;
+  /** Called when user taps an image; receives the resolved image URL */
+  onImageTap?: (uri: string) => void;
+  /** Called when user taps an internal EPUB link; receives href */
+  onInternalLink?: (href: string) => void;
 }) {
   const bgColor = theme === 'dark' ? '#1a1a1a' : theme === 'sepia' ? '#F4ECD8' : '#FFFFFF';
   const textColor = theme === 'dark' ? '#E0E0E0' : theme === 'sepia' ? '#3E3E3E' : '#1a1a1a';
@@ -187,7 +223,36 @@ function HtmlChapter({
           }
         }, 300);
       });
-      document.addEventListener('click', function() {
+      // Image tap: open full-screen viewer
+      document.addEventListener('click', function(e) {
+        var target = e.target;
+        // Walk up to find img or anchor
+        var el = target;
+        while (el && el.tagName) {
+          if (el.tagName === 'IMG') {
+            e.preventDefault();
+            e.stopPropagation();
+            var src = el.src || el.getAttribute('src') || '';
+            if (src && window.ReactNativeWebView) {
+              window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'imageTap', src: src }));
+            }
+            return;
+          }
+          if (el.tagName === 'A') {
+            var href = el.getAttribute('href') || '';
+            // Internal links: relative paths, anchors, or epub: scheme
+            if (href && !href.startsWith('http://') && !href.startsWith('https://') && !href.startsWith('mailto:')) {
+              e.preventDefault();
+              e.stopPropagation();
+              if (window.ReactNativeWebView) {
+                window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'internalLink', href: href }));
+              }
+              return;
+            }
+            break;
+          }
+          el = el.parentElement;
+        }
         if (window.ReactNativeWebView) {
           window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'tap' }));
         }
@@ -204,22 +269,39 @@ function HtmlChapter({
       function calcPages() {
         var w = window.innerWidth;
         if (!w) return 1;
-        var sw = document.body.scrollWidth;
+        // Use scrollWidth of documentElement for more accurate column count
+        var sw = Math.max(document.documentElement.scrollWidth, document.body.scrollWidth);
         return Math.max(1, Math.round(sw / w));
       }
       function sendPageInfo() {
         var total = calcPages();
         window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'pageInfo', totalPages: total }));
       }
-      window.addEventListener('load', function() { setTimeout(sendPageInfo, 150); });
-      document.addEventListener('DOMContentLoaded', function() { setTimeout(sendPageInfo, 150); });
+      // Fire after images and fonts load for accurate measurement
+      window.addEventListener('load', function() { setTimeout(sendPageInfo, 300); });
+      document.addEventListener('DOMContentLoaded', function() { setTimeout(sendPageInfo, 300); });
+      // Re-measure if layout changes (e.g. images load late)
+      window.addEventListener('resize', function() { setTimeout(sendPageInfo, 100); });
       window.__goToPage = function(idx) {
-        window.scrollTo({ left: idx * window.innerWidth, top: 0, behavior: 'smooth' });
+        var targetX = idx * window.innerWidth;
+        document.documentElement.scrollLeft = targetX;
+        document.body.scrollLeft = targetX;
       };
       window.__getCurrentPage = function() {
-        return Math.round(window.scrollX / window.innerWidth);
+        var scrollX = document.documentElement.scrollLeft || document.body.scrollLeft || window.scrollX || 0;
+        return Math.round(scrollX / window.innerWidth);
       };
       window.__getTotalPages = calcPages;
+      // Scroll events: report current page back to RN
+      var _scrollTimer = null;
+      function onScroll() {
+        if (_scrollTimer) clearTimeout(_scrollTimer);
+        _scrollTimer = setTimeout(function() {
+          var page = window.__getCurrentPage();
+          window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'pageScroll', page: page }));
+        }, 80);
+      }
+      document.addEventListener('scroll', onScroll, { passive: true });
     })();
     true;
   ` : '';
@@ -257,16 +339,22 @@ function HtmlChapter({
           // Only forward selection events when in extract mode to avoid unnecessary state updates
           if (msg.type === 'selection' && extractMode && onSelection) onSelection(msg.text ?? '');
           if (msg.type === 'pageInfo' && onPageInfo) onPageInfo({ totalPages: msg.totalPages ?? 1 });
+          if (msg.type === 'imageTap' && onImageTap && msg.src) onImageTap(msg.src);
+          if (msg.type === 'internalLink' && onInternalLink && msg.href) onInternalLink(msg.href);
+          if (msg.type === 'pageScroll' && typeof msg.page === 'number') {
+            // This is inside HtmlChapter — no-op here, handled in parent via onPageInfo
+          }
         } catch {}
       }}
-      onShouldStartLoadWithRequest={(req) =>
-        // Allow local file access and data URIs; block external http/https navigation
-        req.url === "about:blank"
-          || req.url === "about:srcdoc"
-          || req.url.startsWith("data:")
-          || req.url.startsWith("file://")
-          || req.url.startsWith("blob:")
-      }
+      onShouldStartLoadWithRequest={(req) => {
+        // Allow initial load (about:blank / about:srcdoc / data: / file:// / blob:)
+        // Block external http/https — those are handled via internalLink message above
+        const u = req.url;
+        if (u === "about:blank" || u === "about:srcdoc") return true;
+        if (u.startsWith("data:") || u.startsWith("file://") || u.startsWith("blob:")) return true;
+        // Block all external navigation (handled by JS click handler above)
+        return false;
+      }}
     />
   );
 }
@@ -361,6 +449,8 @@ export default function BookReaderScreen() {
   /* True page-flip: page index within current chapter */
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const [currentPageInChapter, setCurrentPageInChapter] = useState(0);
+  const [imageViewerUri, setImageViewerUri] = useState<string | null>(null);
 
 
   /* Chrome visibility (tap to hide/show) */
@@ -471,6 +561,32 @@ export default function BookReaderScreen() {
 
   /* Auto-hide chrome after 4s */
   /* Page-flip gesture (swipe left = next chapter, swipe right = prev chapter) */
+  /** Handle internal EPUB link: parse chapter file + anchor, jump to chapter */
+  const handleInternalLink = useCallback((href: string) => {
+    if (!book) return;
+    // Strip leading ../  or ./ to get the filename
+    const clean = href.replace(/^(\.\.\/)+/, "").replace(/^\.\//, "");
+    // Split anchor
+    const [filePart, anchor] = clean.split("#");
+    const fileName = filePart.split("/").pop() ?? filePart;
+    // Find matching chapter by filePath
+    const idx = book.sections.findIndex((s) => {
+      const fp = s.text ?? "";
+      return fp.endsWith("/" + fileName) || fp === fileName || fp.endsWith(filePart);
+    });
+    if (idx >= 0 && idx !== chapterIdx) {
+      setChapterIdx(idx);
+      setCurrentPage(0);
+      setCurrentPageInChapter(0);
+      // TODO: scroll to anchor after chapter loads
+    } else if (anchor && idx === chapterIdx) {
+      // Same chapter, scroll to anchor
+      webViewRef.current?.injectJavaScript(
+        `(function(){ var el = document.getElementById('${anchor}') || document.querySelector('[name="${anchor}"]'); if(el) el.scrollIntoView({behavior:'smooth'}); })(); true;`
+      );
+    }
+  }, [book, chapterIdx, webViewRef]);
+
   const goNextChapter = useCallback(() => {
     if (chapterIdx < (book?.sections.length ?? 1) - 1) {
       setChapterIdx((i) => i + 1);
@@ -990,25 +1106,34 @@ export default function BookReaderScreen() {
                   onSelection={(text) => setSelectedText(text)}
                   webViewRef={webViewRef}
                   pageFlipMode={pageFlipMode && Platform.OS !== "web"}
-                  onPageInfo={(info) => setTotalPages(info.totalPages)}
+                  onPageInfo={(info) => { setTotalPages(info.totalPages); setCurrentPageInChapter(0); }}
+                  onImageTap={(uri) => setImageViewerUri(uri)}
+                  onInternalLink={handleInternalLink}
                   baseUrl={(() => {
                     if (!book.hasFileSystem) return undefined;
-                    // Use bookDir as EPUB root for stable asset resolution (images, CSS)
-                    if (book.bookDir) {
-                      const docDir = FileSystemLegacy.documentDirectory ?? "";
-                      const booksIdx = book.bookDir.indexOf("/books/");
-                      const resolvedDir = booksIdx >= 0 ? docDir + book.bookDir.slice(booksIdx + 1) : book.bookDir;
-                      // bookDir ends with '/', content dir is bookDir + 'content/'
-                      const base = resolvedDir.endsWith('/') ? resolvedDir + 'content/' : resolvedDir + '/content/';
-                      return base;
+                    // Compute the chapter file's directory as baseUrl so relative paths resolve
+                    const chapterFilePath = book.sections[chapterIdx]?.text;
+                    if (chapterFilePath) {
+                      const docDir = (FileSystemLegacy.documentDirectory ?? "").replace(/\/+$/, "");
+                      // chapterFilePath may be relative (e.g. "books/id/content/OEBPS/Text/ch1.xhtml")
+                      // or absolute (starts with file://)
+                      let absPath: string;
+                      if (chapterFilePath.startsWith("file://")) {
+                        absPath = chapterFilePath;
+                      } else if (chapterFilePath.startsWith("/")) {
+                        absPath = "file://" + chapterFilePath;
+                      } else {
+                        absPath = "file://" + docDir + "/" + chapterFilePath;
+                      }
+                      // Return the directory (with trailing slash)
+                      const lastSlash = absPath.lastIndexOf("/");
+                      return lastSlash >= 0 ? absPath.slice(0, lastSlash + 1) : absPath;
                     }
-                    // Fallback: use chapter file's parent directory
-                    if (book.sections[chapterIdx]?.text) {
-                      const rawFp = book.sections[chapterIdx].text;
-                      const docDir = FileSystemLegacy.documentDirectory ?? "";
-                      const booksIdx = rawFp.indexOf("/books/");
-                      const resolvedFp = booksIdx >= 0 ? docDir + rawFp.slice(booksIdx + 1) : rawFp;
-                      return resolvedFp.substring(0, resolvedFp.lastIndexOf('/') + 1);
+                    // Fallback: use bookDir/content/
+                    if (book.bookDir) {
+                      const docDir = (FileSystemLegacy.documentDirectory ?? "").replace(/\/+$/, "");
+                      const bd = book.bookDir.startsWith("/") ? book.bookDir : "/" + book.bookDir;
+                      return "file://" + docDir + bd.replace(/\/+$/, "") + "/content/";
                     }
                     return undefined;
                   })()}
@@ -1207,22 +1332,32 @@ export default function BookReaderScreen() {
         <View style={[styles.bottomBar, { backgroundColor: colors.background + "F0", borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, 12) }]}>
           {/* Progress bar */}
           <View style={{ height: 2, backgroundColor: colors.border, borderRadius: 1, marginBottom: 10, overflow: "hidden" }}>
-            <View style={{ height: 2, backgroundColor: colors.primary, width: `${Math.round(progress * 100)}%`, borderRadius: 1 }} />
+            <View style={{ height: 2, backgroundColor: colors.primary, width: `${Math.round(
+              pageFlipMode && totalPages > 1
+                ? ((chapterIdx + (currentPage + 1) / totalPages) / totalChapters) * 100
+                : progress * 100
+            )}%`, borderRadius: 1 }} />
           </View>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
             <Pressable
-              onPress={() => { tap(); setChapterIdx((i) => Math.max(0, i - 1)); }}
+              onPress={() => { tap(); setCurrentPage(0); setCurrentPageInChapter(0); setChapterIdx((i) => Math.max(0, i - 1)); }}
               disabled={chapterIdx === 0}
               style={[styles.navBtn, { backgroundColor: colors.surface, borderColor: colors.border, opacity: chapterIdx === 0 ? 0.35 : 1 }]}
             >
               <IconSymbol name="chevron.left" size={16} color={colors.foreground} />
             </Pressable>
-            <Text style={{ flex: 1, fontSize: 12, color: colors.muted, textAlign: "center" }} numberOfLines={1}>
-              {book.sections[chapterIdx]?.title || `${zh ? "第" : "Ch."} ${chapterIdx + 1}`}
-              {" "}({chapterIdx + 1}/{totalChapters}){pageFlipMode && totalPages > 1 ? ` · ${zh ? "第" : "p."}${currentPage + 1}/${totalPages}` : ""}
-            </Text>
+            <View style={{ flex: 1, alignItems: "center" }}>
+              <Text style={{ fontSize: 12, color: colors.muted, textAlign: "center" }} numberOfLines={1}>
+                {book.sections[chapterIdx]?.title || `${zh ? "第" : "Ch."} ${chapterIdx + 1}`}
+              </Text>
+              <Text style={{ fontSize: 11, color: colors.muted + "99", textAlign: "center", marginTop: 2 }}>
+                {pageFlipMode && totalPages > 1
+                  ? `${zh ? "第" : "Page"} ${currentPage + 1} / ${totalPages}  ·  ${zh ? "章节" : "Ch."} ${chapterIdx + 1}/${totalChapters}`
+                  : `${zh ? "章节" : "Ch."} ${chapterIdx + 1} / ${totalChapters}`}
+              </Text>
+            </View>
             <Pressable
-              onPress={() => { tap(); setChapterIdx((i) => Math.min(totalChapters - 1, i + 1)); }}
+              onPress={() => { tap(); setCurrentPage(0); setCurrentPageInChapter(0); setChapterIdx((i) => Math.min(totalChapters - 1, i + 1)); }}
               disabled={chapterIdx >= totalChapters - 1}
               style={[styles.navBtn, { backgroundColor: colors.surface, borderColor: colors.border, opacity: chapterIdx >= totalChapters - 1 ? 0.35 : 1 }]}
             >

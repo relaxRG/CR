@@ -52,6 +52,7 @@ const MAPPING = {
   "checkmark.circle.fill": "check-circle",
   "minus.circle.fill": "remove-circle",
   "plus.circle.fill": "add-circle",
+  "plus.circle": "add-circle-outline",
   "sparkles": "auto-awesome",
   "link": "link",
   "arrow.triangle.2.circlepath": "sync",

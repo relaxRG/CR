@@ -58,6 +58,18 @@ export function htmlToText(html: string): string {
     .trim();
 }
 
+/** 解码 HTML 实体（&amp; &lt; &gt; &quot; &#xxx; &#xXXX;） */
+function decodeHtmlEntities(s: string): string {
+  return s
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&apos;/gi, "'")
+    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(Number(d)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)));
+}
+
 function dirOf(path: string): string {
   const i = path.lastIndexOf("/");
   return i >= 0 ? path.slice(0, i + 1) : "";
@@ -218,7 +230,7 @@ export async function extractEpubForReading(data: ArrayBuffer): Promise<Extracte
   }
 
   if (chapters.length === 0) throw new Error("EPUB 中未找到可读章节");
-  return { title, chapters, css };
+  return { title: decodeHtmlEntities(title), chapters, css };
 }
 
 /**
@@ -337,12 +349,46 @@ export async function extractEpubToFileSystem(
 
   // Find cover image
   let coverUri: string | undefined;
+  const coverMetaId = opf.match(/<meta\b[^>]*name="cover"[^>]*content="([^"]+)"/i)?.[1]
+    ?? opf.match(/<meta\b[^>]*content="([^"]+)"[^>]*name="cover"/i)?.[1];
+  const guideCoverHref = opf.match(/<reference\b[^>]*type="cover"[^>]*href="([^"]+)"/i)?.[1]
+    ?? opf.match(/<reference\b[^>]*href="([^"]+)"[^>]*type="cover"/i)?.[1];
+  const findCoverFromItem = (href: string): string => {
+    const path = resolvePath(opfDir, decodeURIComponent(href));
+    return `${contentDir}${path}`;
+  };
+  // Priority 1: properties="cover-image"
   for (const [, { href, mediaType, properties }] of manifest) {
-    if (properties === "cover-image" || /cover/i.test(href)) {
-      if (/image/i.test(mediaType)) {
-        const path = resolvePath(opfDir, decodeURIComponent(href));
-        coverUri = `${contentDir}${path}`;
+    if (properties === "cover-image" && /image/i.test(mediaType)) {
+      coverUri = findCoverFromItem(href);
+      break;
+    }
+  }
+  // Priority 2: meta name="cover" -> item id
+  if (!coverUri && coverMetaId) {
+    const item = manifest.get(coverMetaId);
+    if (item && /image/i.test(item.mediaType)) {
+      coverUri = findCoverFromItem(item.href);
+    }
+  }
+  // Priority 3: href contains "cover"
+  if (!coverUri) {
+    for (const [, { href, mediaType }] of manifest) {
+      if (/cover/i.test(href) && /image/i.test(mediaType)) {
+        coverUri = findCoverFromItem(href);
         break;
+      }
+    }
+  }
+  // Priority 4: guide reference type="cover" (may be HTML file with cover img)
+  if (!coverUri && guideCoverHref) {
+    const guidePath = resolvePath(opfDir, decodeURIComponent(guideCoverHref));
+    const guideHtml = await zip.file(guidePath)?.async("string");
+    if (guideHtml) {
+      const imgSrc = guideHtml.match(/\bsrc="([^"]+\.(jpe?g|png|webp|gif))"/i)?.[1];
+      if (imgSrc) {
+        const imgPath = resolvePath(dirOf(guidePath), decodeURIComponent(imgSrc));
+        coverUri = `${contentDir}${imgPath}`;
       }
     }
   }
@@ -366,7 +412,7 @@ export async function extractEpubToFileSystem(
       html.match(/<h[1-3][^>]*>([\s\S]*?)<\/h[1-3]>/i)?.[1]?.replace(/<[^>]+>/g, "").trim()
       ?? html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.trim()
       ?? epubRelPath.split("/").pop()?.replace(/\.x?html?$/i, "") ?? "";
-    chapters.push({ title: heading, filePath: localFilePath });
+    chapters.push({ title: decodeHtmlEntities(heading), filePath: localFilePath });
   }
 
   if (chapters.length === 0) throw new Error("EPUB 中未找到可读章节");
@@ -378,7 +424,7 @@ export async function extractEpubToFileSystem(
     { encoding: FileSystem.EncodingType.UTF8 },
   );
 
-  return { title, author, bookDir, chapters, css, coverUri };
+  return { title: decodeHtmlEntities(title), author: decodeHtmlEntities(author), bookDir, chapters, css, coverUri };
 }
 
 export async function extractPdf(data: ArrayBuffer): Promise<ExtractedBook> {
