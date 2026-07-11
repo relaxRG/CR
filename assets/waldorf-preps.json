@@ -1,0 +1,832 @@
+{
+ "preps": [
+  {
+   "srcName": "ABSINTHE BITTERS",
+   "nameEn": "Absinthe Bitters",
+   "nameZh": "苦艾酒苦精",
+   "type": "bitters",
+   "ingredients": [
+    "3 oz. Peychaud's bitters 佩肖苦精",
+    "3 oz. Émile Pernot Vieux Pontarlier absinthe 埃米尔·佩诺老蓬塔利耶苦艾酒"
+   ],
+   "recipe": "Add ingredients to glass jar and stir to integrate. Funnel into bitters bottle. Lasts indefinitely.\n将两种材料倒入玻璃罐搅拌均匀,用漏斗装入苦精瓶。可无限期保存。",
+   "yield": "~180ml (6 oz.)",
+   "shelfLife": "无限期 Indefinitely",
+   "storage": "苦精瓶密封避光 Sealed bitters bottle",
+   "notes": "Peacock Alley 2005 年重开以来沿用的配方,是任何要求两者之一的酒谱的绝佳替代,也是踏入自制原料世界的第一步。"
+  },
+  {
+   "srcName": "AROMATIC BITTERS",
+   "nameEn": "Aromatic Bitters",
+   "nameZh": "自制芳香苦精",
+   "type": "bitters",
+   "ingredients": [
+    "Peel/rind of 1 grapefruit 1个西柚的果皮",
+    "Peel/rind of 2 oranges 2个橙子的果皮",
+    "Peel/rind of 4 lemons 4个柠檬的果皮",
+    "Peel/rind of 4 limes 4个青柠的果皮",
+    "⅛ c. allspice berries 多香果粒",
+    "⅛ c. caraway 葛缕子",
+    "⅛ c. cardamom pods 小豆蔻荚",
+    "⅛ c. celery seed 芹菜籽",
+    "⅛ c. coriander seed 芫荽籽",
+    "⅛ c. fennel seed 茴香籽",
+    "⅛ c. juniper berries 杜松子",
+    "⅛ c. peppercorns 黑胡椒粒",
+    "1 cinnamon stick 肉桂棒",
+    "2 whole nutmeg seeds 整颗肉豆蔻",
+    "12 cloves 丁香",
+    "1 star anise 八角",
+    "1 vanilla bean, split 香草荚(纵切)",
+    "750 ml. Wray & Nephew overproof rum 雷牌高度朗姆酒"
+   ],
+   "recipe": "Place citrus rinds on baking sheet and bake for approximately 30 minutes at 200 degrees, or until about 60 percent dry. You can skip this process entirely and use fresh rinds for a different taste. Add all ingredients to an airtight glass jar. Let sit for 2 to 3 months and then strain twice, first through fine mesh, then through a coffee filter. Funnel into a bitters bottle. Lasts indefinitely.\n柑橘皮平铺烤盘,200°F(约93°C)烘烤约30分钟至六成干(也可直接用新鲜果皮,风味更明亮)。全部材料放入密封玻璃罐,静置2至3个月后先经细网、再经咖啡滤纸两道过滤,装入苦精瓶。可无限期保存。",
+   "yield": "~750ml",
+   "shelfLife": "无限期 Indefinitely",
+   "storage": "苦精瓶密封避光 Sealed bitters bottle",
+   "notes": "以雷牌高度朗姆为基底而非中性烈酒,自带质朴气质;香料偏重使成品比市售苦精更清新芳香。"
+  },
+  {
+   "srcName": "CITRUS BITTERS",
+   "nameEn": "Citrus Bitters",
+   "nameZh": "自制柑橘苦精",
+   "type": "bitters",
+   "ingredients": [
+    "Peel/rind of 1 grapefruit 1个西柚的果皮",
+    "Peel/rind of 2 oranges 2个橙子的果皮",
+    "Peel/rind of 4 lemons 4个柠檬的果皮",
+    "Peel/rind of 4 limes 4个青柠的果皮",
+    "⅛ c. caraway 葛缕子",
+    "⅛ c. cardamom 小豆蔻",
+    "⅛ c. celery seed 芹菜籽",
+    "⅛ c. coriander seed 芫荽籽",
+    "2 whole nutmeg seeds 整颗肉豆蔻",
+    "1 vanilla bean, split 香草荚(纵切)",
+    "750 ml. Wray & Nephew overproof rum 雷牌高度朗姆酒"
+   ],
+   "recipe": "Place citrus rinds on baking sheet and bake for approximately 30 minutes at 200 degrees, or until about 60 percent dry. As with the aromatic bitters, you can skip this process and use fresh rinds for a brighter result. Add all ingredients to an airtight glass jar. Let sit for 2 to 3 months and strain twice, first through fine mesh, then through a coffee filter. Funnel into a bitters bottle. Lasts indefinitely.\n柑橘皮200°F烘烤约30分钟至六成干(或用新鲜果皮取得更明亮的效果)。全部材料入密封玻璃罐静置2至3个月,细网+咖啡滤纸两道过滤,装瓶。可无限期保存。",
+   "yield": "~750ml",
+   "shelfLife": "无限期 Indefinitely",
+   "storage": "苦精瓶密封避光 Sealed bitters bottle",
+   "notes": "若想做纯橙味苦精,书中建议先按本配方制作,再与一两个橙子的果皮二次浸2周,得到橙味主导且保留全柑橘深度的成品。"
+  },
+  {
+   "srcName": "GENTIAN ROOT INFUSION",
+   "nameEn": "Gentian Root Infusion",
+   "nameZh": "龙胆根浸渍液",
+   "type": "tincture",
+   "ingredients": [
+    "1 tbsp. dried gentian root 干龙胆根",
+    "8 oz. Wray & Nephew overproof rum 雷牌高度朗姆酒"
+   ],
+   "recipe": "Carefully place gentian in airtight glass jar. Add rum and infuse for at least 1 month. Fine-strain and funnel into bitters bottle. Lasts indefinitely.\n将龙胆根放入密封玻璃罐,加朗姆酒浸渍至少1个月,细滤后装入苦精瓶。可无限期保存。",
+   "yield": "~240ml (8 oz.)",
+   "shelfLife": "无限期 Indefinitely",
+   "storage": "苦精瓶密封避光 Sealed bitters bottle",
+   "notes": "在任何苦精配方中加少量,即可增添一层苦味基调。"
+  },
+  {
+   "srcName": "CINNAMON BITTERS",
+   "nameEn": "Cinnamon Bitters",
+   "nameZh": "自制肉桂苦精",
+   "type": "bitters",
+   "ingredients": [
+    "1 cinnamon stick 肉桂棒",
+    "8 oz. house-made Aromatic Bitters or Angostura bitters 自制芳香苦精或安高天娜苦精"
+   ],
+   "recipe": "Add ingredients to airtight glass jar and let sit for 1 week. Strain twice, first through fine mesh, then through a coffee filter. Funnel into a bitters bottle. Lasts indefinitely.\n材料入密封玻璃罐静置1周,细网+咖啡滤纸两道过滤,装瓶。可无限期保存。",
+   "yield": "~240ml (8 oz.)",
+   "shelfLife": "无限期 Indefinitely",
+   "storage": "苦精瓶密封避光 Sealed bitters bottle",
+   "notes": "秋冬使用最多但相当百搭;可用于大吉利变体,或加入热茶提味。"
+  },
+  {
+   "srcName": "COCOA BITTERS",
+   "nameEn": "Cocoa Bitters",
+   "nameZh": "自制可可苦精",
+   "type": "bitters",
+   "ingredients": [
+    "8 oz. house-made Citrus Bitters or Regans' Orange Bitters No. 6 自制柑橘苦精或里根6号橙味苦精",
+    "4 oz. Noel cocoa nibs 诺埃尔可可碎"
+   ],
+   "recipe": "Add ingredients to airtight glass jar. Stir to integrate and let infuse for at least 3 weeks, stirring occasionally. Strain twice, first through fine mesh, then through a coffee filter. Funnel into a bitters bottle. Lasts indefinitely.\n材料入密封玻璃罐搅匀,浸渍至少3周(间或搅拌),两道过滤后装瓶。可无限期保存。",
+   "yield": "~240ml (8 oz.)",
+   "shelfLife": "无限期 Indefinitely",
+   "storage": "苦精瓶密封避光 Sealed bitters bottle",
+   "notes": "夏日酸酒类的完美搭档,与龙舌兰极为合拍,为几乎任何鸡尾酒增添『这是什么?』的迷人特质。"
+  },
+  {
+   "srcName": "COFFEE BITTERS",
+   "nameEn": "Coffee Bitters",
+   "nameZh": "自制咖啡苦精",
+   "type": "bitters",
+   "ingredients": [
+    "8 oz. house-made Citrus Bitters or Regans' Orange Bitters No. 6 自制柑橘苦精或里根6号橙味苦精",
+    "⅓ c. whole espresso or French roast coffee beans 意式浓缩或法式烘焙咖啡豆(整豆)"
+   ],
+   "recipe": "Add ingredients to airtight glass jar. Stir to integrate and let infuse for 2 weeks. Strain twice, first through fine mesh, then through a coffee filter. Funnel into a bitters bottle. Lasts indefinitely.\n材料入密封玻璃罐搅匀,浸渍2周,两道过滤后装瓶。可无限期保存。",
+   "yield": "~240ml (8 oz.)",
+   "shelfLife": "无限期 Indefinitely",
+   "storage": "苦精瓶密封避光 Sealed bitters bottle",
+   "notes": "为古典鸡尾酒和萨泽拉克等经典增添独特转折。"
+  },
+  {
+   "srcName": "CRANBERRY BITTERS",
+   "nameEn": "Cranberry Bitters",
+   "nameZh": "自制蔓越莓苦精",
+   "type": "bitters",
+   "ingredients": [
+    "2 oz. house-made Citrus Bitters or Regans' Orange Bitters No. 6 自制柑橘苦精或里根6号橙味苦精",
+    "6 oz. Wray & Nephew overproof rum 雷牌高度朗姆酒",
+    "1 c. fresh or frozen cranberries 新鲜或冷冻蔓越莓",
+    "1 rind of whole orange 1个橙子的果皮"
+   ],
+   "recipe": "Add all ingredients to airtight glass jar. Stir to integrate. Let rest for at least 2 weeks. Strain twice, first through fine mesh, then through a coffee filter. Funnel into a bitters bottle. Best if used within 6 months.\n全部材料入密封玻璃罐搅匀,静置至少2周,两道过滤后装瓶。最好在6个月内用完。",
+   "yield": "~240ml (8 oz.)",
+   "shelfLife": "6个月内最佳 Best within 6 months",
+   "storage": "苦精瓶密封避光 Sealed bitters bottle",
+   "notes": "最初为香槟鸡尾酒而创,也可在 Collins 或金汤力中加几滴。"
+  },
+  {
+   "srcName": "PEACH BITTERS",
+   "nameEn": "Peach Bitters",
+   "nameZh": "自制桃子苦精",
+   "type": "bitters",
+   "ingredients": [
+    "8 oz. house-made Citrus Bitters or Regans' Orange Bitters No. 6 自制柑橘苦精或里根6号橙味苦精",
+    "1–2 fresh, ripe peaches, pitted and cubed 新鲜熟桃(去核切块)",
+    "½ oz. Combier Pêche de Vigne peach liqueur (optional) 康比尔桃子利口酒(可选)"
+   ],
+   "recipe": "Add peach to airtight glass jar. Add bitters and infuse for two weeks. Strain through sieve, extracting as much liquid from fruit as possible. Strain through coffee filter. Add peach liqueur if necessary.\n桃块入密封玻璃罐,加苦精浸渍2周。经筛过滤并尽量压出果肉中的液体,再经咖啡滤纸过滤。视需要加桃子利口酒。",
+   "yield": "~240ml (8 oz.)",
+   "shelfLife": "6个月内最佳 Best within 6 months",
+   "storage": "苦精瓶密封避光 Sealed bitters bottle",
+   "notes": "桃子利口酒用于弥补不够熟的桃子,如需仅按1/4 oz.递增添加;夏日古典或朱丽普中使用效果惊喜。"
+  },
+  {
+   "srcName": "PEPSIN BITTERS",
+   "nameEn": "Pepsin Bitters",
+   "nameZh": "自制胃蛋白酶苦精",
+   "type": "bitters",
+   "ingredients": [
+    "12 oz. Dr Pepper soda reduced to 4 oz. 胡椒博士汽水(浓缩至4盎司)",
+    "2 oz. house-made Citrus Bitters or Regans' Orange Bitters No. 6 自制柑橘苦精或里根6号橙味苦精"
+   ],
+   "recipe": "Place Dr Pepper in a saucepan over low to medium heat. Reduce to about 4 oz. (about 10 minutes). Let cool and funnel into small, clean bitters bottle. Add Citrus Bitters and shake to integrate. Best used within 6 months.\n胡椒博士汽水以中小火熬煮约10分钟浓缩至约4盎司,放凉后装入干净的小苦精瓶,加柑橘苦精摇匀。最好在6个月内用完。",
+   "yield": "~180ml (6 oz.)",
+   "shelfLife": "6个月内最佳 Best within 6 months",
+   "storage": "苦精瓶密封避光 Sealed bitters bottle",
+   "notes": "胃蛋白酶苦精早已停产,书中认为这是不错的复刻;传说它是百事可乐与胡椒博士的原型。"
+  },
+  {
+   "srcName": "DRIED APPLE CHIPS",
+   "nameEn": "Dried Apple Chips",
+   "nameZh": "苹果干片",
+   "type": "garnish",
+   "ingredients": [
+    "1 Granny Smith apple, cored and thinly sliced 青苹果(去核切薄片)",
+    "1 c. Simple Syrup 单糖浆"
+   ],
+   "recipe": "Place syrup in container and steep apple slices in it for a few minutes. Remove slices from syrup and place on baking tray lined with parchment paper or Silpat nonstick mat. Dry in 180-degree oven for about 1 hour and 15 minutes. Wrap in plastic and store in airtight container for up to a week.\n苹果薄片在糖浆中浸泡几分钟后取出,平铺于垫烘焙纸的烤盘上,180°F(约82°C)烘干约1小时15分钟。以保鲜膜包裹存于密封容器,可保存最多1周。",
+   "yield": "约1个苹果的量",
+   "shelfLife": "1周 Up to a week",
+   "storage": "密封容器常温 Airtight container",
+   "notes": ""
+  },
+  {
+   "srcName": "CORIANDER AND PINK PEPPERCORN RIM",
+   "nameEn": "Coriander and Pink Peppercorn Rim",
+   "nameZh": "芫荽粉红胡椒盐边",
+   "type": "garnish",
+   "ingredients": [
+    "4 oz. coriander seeds 芫荽籽",
+    "2 oz. pink peppercorns 粉红胡椒粒",
+    "1 oz. kosher salt 粗盐"
+   ],
+   "recipe": "Add coriander and peppercorns to electric spice grinder and grind until fine. Add kosher salt and pulse once or twice to integrate. Place on small plate.\n芫荽籽与粉红胡椒用电动研磨器磨细,加入粗盐点动一两次混匀,盛于小碟用于杯口沾边。",
+   "yield": "~200g (7 oz.)",
+   "shelfLife": "数月 Months (dry)",
+   "storage": "密封罐干燥保存 Airtight jar, dry",
+   "notes": "用于胡萝卜汁版血腥玛丽 Bloody Bunny,也适合标准血腥玛丽。"
+  },
+  {
+   "srcName": "BLOODY MARY MIX",
+   "nameEn": "Bloody Mary Mix",
+   "nameZh": "自制血腥玛丽预调汁",
+   "type": "batch",
+   "ingredients": [
+    "1 46 oz. can Sacramento tomato juice (chilled) 番茄汁(冰镇,约1.36升)",
+    "1 tbsp. freshly ground pepper 现磨黑胡椒",
+    "1 tbsp. celery seed (or dried celery flakes) 芹菜籽(或干芹菜碎)",
+    "2 rounded tbsp. white horseradish 白辣根",
+    "1 tsp. kosher salt (optional) 粗盐(可选)",
+    "12 dashes Lea & Perrins Worcestershire sauce 李派林喼汁",
+    "8 dashes Tabasco sauce 塔巴斯科辣椒仔",
+    "1 tsp. brown sugar 红糖"
+   ],
+   "recipe": "Add all ingredients to large, sealable container. Shake well.\n全部材料倒入可密封的大容器,充分摇匀。",
+   "yield": "~1.4L (46+ oz.)",
+   "shelfLife": "次日最佳 Best if used next day",
+   "storage": "冷藏密封 Refrigerated, sealed",
+   "notes": "见血腥玛丽条目获取上桌建议。"
+  },
+  {
+   "srcName": "HOT (COLD) COCOA MIX",
+   "nameEn": "Hot (Cold) Cocoa Mix",
+   "nameZh": "自制可可混合液",
+   "type": "batch",
+   "ingredients": [
+    "4 oz. heavy cream 淡奶油",
+    "8 oz. whole milk 全脂牛奶",
+    "3–4 oz. Manjari chocolate pistoles, 64% cocoa 曼加利64%黑巧克力币"
+   ],
+   "recipe": "Bring the cream and milk just to a boil over medium heat, remove from heat, and add the chocolate. Let sit for 2 minutes, then whisk until fully blended.\n奶油与牛奶中火加热至刚沸腾,离火加入巧克力,静置2分钟后搅打至完全融合。",
+   "yield": "~450ml (15 oz.)",
+   "shelfLife": "冷藏数日 A few days refrigerated",
+   "storage": "冷藏密封 Refrigerated, sealed",
+   "notes": "用于 Chocolatini,冬季亦作热可可;可调整巧克力用量控制稠度,喜甜可加约1盎司单糖浆。"
+  },
+  {
+   "srcName": "WHITE COCOA MIX",
+   "nameEn": "White Cocoa Mix",
+   "nameZh": "自制白可可混合液",
+   "type": "batch",
+   "ingredients": [
+    "4 oz. heavy cream 淡奶油",
+    "8 oz. whole milk 全脂牛奶",
+    "6 oz. Valrhona white chocolate pistoles 法芙娜白巧克力币"
+   ],
+   "recipe": "Bring the cream and milk just to a boil over medium heat, remove from heat, and add the white chocolate. Let sit for 2 minutes, then whisk until fully blended.\n奶油与牛奶中火加热至刚沸腾,离火加入白巧克力,静置2分钟后搅打至完全融合。",
+   "yield": "~500ml (18 oz.)",
+   "shelfLife": "冷藏数日 A few days refrigerated",
+   "storage": "冷藏密封 Refrigerated, sealed",
+   "notes": "用于 Biscotti and Cream,冬季可作浓郁的白巧热可可,宜小杯供应。"
+  },
+  {
+   "srcName": "SOUR MIX",
+   "nameEn": "Sour Mix",
+   "nameZh": "自制酸酒预调汁",
+   "type": "batch",
+   "ingredients": [
+    "2 egg whites 蛋清",
+    "12 oz. freshly squeezed lemon juice (fine-strained) 鲜榨柠檬汁(细滤)",
+    "10 oz. Simple Syrup 单糖浆"
+   ],
+   "recipe": "Add egg whites and half of the syrup to an airtight container and shake well for 10 seconds. Add remaining ingredients and continue to shake well for 10 seconds. Funnel into glass bottle, refrigerate, and use as needed. Best if used within 48 hours.\n蛋清与一半糖浆入密封容器摇10秒,加入其余材料再摇10秒,装入玻璃瓶冷藏备用。最好48小时内用完。",
+   "yield": "~680ml (23 oz.)",
+   "shelfLife": "48小时内最佳 Best within 48 hours",
+   "storage": "冷藏密封 Refrigerated, sealed",
+   "notes": "Peacock Alley 每日现做;家庭少量调制时可直接在杯中用柠檬汁+单糖浆+少许蛋清替代。"
+  },
+  {
+   "srcName": "RASPBERRY SHRUB",
+   "nameEn": "Raspberry Shrub",
+   "nameZh": "自制覆盆子果醋糖浆",
+   "type": "shrub",
+   "ingredients": [
+    "2 parts house-made Raspberry Syrup 自制覆盆子糖浆(2份)",
+    "1 part apple cider vinegar 苹果醋(1份)"
+   ],
+   "recipe": "Add ingredients to clean glass container and stir to combine. Store in the refrigerator for up to 6 months.\n材料倒入干净玻璃容器搅拌均匀,冷藏保存,最长6个月。",
+   "yield": "按比例 As needed",
+   "shelfLife": "6个月 Up to 6 months",
+   "storage": "冷藏密封 Refrigerated, sealed",
+   "notes": "可兑苏打水做无酒精时令饮品;本配方是几乎所有水果 shrub 的优秀模板。"
+  },
+  {
+   "srcName": "SIMPLE SYRUP",
+   "nameEn": "Simple Syrup",
+   "nameZh": "单糖浆",
+   "type": "syrup",
+   "ingredients": [
+    "8 oz. granulated sugar 白砂糖",
+    "8 oz. water 水"
+   ],
+   "recipe": "Add ingredients to saucepan and stir over medium heat until sugar is dissolved (about 3 minutes). Remove from heat, let cool, and store in clean glass bottle. Lasts in the refrigerator for up to 1 month. For a richer syrup, cut the amount of water in half (refrigerated shelf life: about three months).\n糖与水入锅中火搅拌约3分钟至糖溶解,离火放凉后装入干净玻璃瓶。冷藏可存1个月;水减半可得浓糖浆(冷藏约3个月)。",
+   "yield": "~360ml",
+   "shelfLife": "冷藏1个月 1 month refrigerated",
+   "storage": "冷藏玻璃瓶 Glass bottle, refrigerated",
+   "notes": ""
+  },
+  {
+   "srcName": "GUM SYRUP",
+   "nameEn": "Gum Syrup",
+   "nameZh": "阿拉伯胶糖浆",
+   "type": "syrup",
+   "ingredients": [
+    "2 oz. gum arabic powder 阿拉伯胶粉",
+    "2 oz. room-temperature water 室温水",
+    "4 oz. water 水",
+    "12 oz. superfine sugar 细砂糖"
+   ],
+   "recipe": "Step 1: Add gum arabic and room-temperature water to a medium-size, nonreactive bowl and whisk for a couple of minutes to integrate. Cover and let rest for at least an hour or until all gum arabic powder has been absorbed. Step 2: In a saucepan, combine sugar and water. Heat until sugar dissolves (about 3 minutes). Add gum arabic mixture and stir to integrate. Remove from heat immediately and allow to cool. Let rest for at least an hour. Fine-strain through conical strainer into glass bottle and refrigerate.\n第一步:阿拉伯胶粉与室温水在非反应性碗中搅打数分钟,加盖静置至少1小时至胶粉完全吸水。第二步:糖与水入锅加热约3分钟至溶解,加入胶液搅匀后立即离火放凉,静置至少1小时,经锥形滤网细滤入玻璃瓶冷藏。",
+   "yield": "~500ml",
+   "shelfLife": "冷藏约3个月 ~3 months refrigerated",
+   "storage": "冷藏玻璃瓶 Glass bottle, refrigerated",
+   "notes": "可加新鲜菠萝块浸泡过夜升级,果与浆皆宜用于经典潘趣(如 Pisco Punch)。"
+  },
+  {
+   "srcName": "DEMERARA SYRUP",
+   "nameEn": "Demerara Syrup",
+   "nameZh": "自制德麦拉拉糖浆",
+   "type": "syrup",
+   "ingredients": [
+    "12 oz. demerara sugar 德麦拉拉蔗糖",
+    "6 oz. water 水"
+   ],
+   "recipe": "Add ingredients to saucepan and stir over medium heat until sugar is dissolved. Remove from heat, let cool, and store in clean glass bottle. Refrigerated shelf life is about 2 months.\n糖与水入锅中火搅拌至溶解,离火放凉装瓶。冷藏可存约2个月。",
+   "yield": "~420ml",
+   "shelfLife": "冷藏约2个月 ~2 months refrigerated",
+   "storage": "冷藏玻璃瓶 Glass bottle, refrigerated",
+   "notes": "2:1 浓稠版本;也可按 1:1 制作,但需相应调整酒谱用量。"
+  },
+  {
+   "srcName": "AGAVE SYRUP",
+   "nameEn": "Agave Syrup",
+   "nameZh": "龙舌兰糖浆",
+   "type": "rich-syrup",
+   "ingredients": [
+    "4 oz. organic agave nectar 有机龙舌兰蜜",
+    "4 oz. hot water 热水"
+   ],
+   "recipe": "Mix ingredients in a medium bowl. Whisk until combined, then store in a glass jar. Refrigerated shelf life is about 2 months.\n材料在碗中搅打均匀,装入玻璃罐。冷藏可存约2个月。",
+   "yield": "~240ml",
+   "shelfLife": "冷藏约2个月 ~2 months refrigerated",
+   "storage": "冷藏玻璃罐 Glass jar, refrigerated",
+   "notes": ""
+  },
+  {
+   "srcName": "BERRY SYRUP",
+   "nameEn": "Berry Syrup (Raspberry, Strawberry, Etc.)",
+   "nameZh": "自制莓果糖浆(覆盆子/草莓等)",
+   "type": "syrup",
+   "ingredients": [
+    "8 oz. water 水",
+    "1 c. sugar 糖",
+    "1½ c. fresh berries of choice (about 12 oz.) 新鲜莓果(覆盆子/草莓等)",
+    "1 oz. vodka (optional) 伏特加(可选,延长保存)"
+   ],
+   "recipe": "Add water and sugar to saucepan. Stir over medium heat until integrated, about 3 minutes. Add fruit and simmer over low heat for 3 to 5 minutes, breaking up the fruit a bit with a spoon. Do not boil. Remove from heat and allow to steep for 15 minutes, then strain through fine mesh strainer, gently pressing down on the fruit. Cool to room temperature, then funnel into clean glass bottle. Refrigerate for up to 3 weeks. Add vodka to extend shelf life up to 6 weeks.\n水与糖中火搅拌约3分钟融合,加入莓果小火慢煮3至5分钟并用勺略压碎(勿沸腾),离火浸泡15分钟后经细网过滤(轻压果肉),放凉装瓶。冷藏3周;加伏特加可延长至6周。",
+   "yield": "~500ml",
+   "shelfLife": "冷藏3周(加伏特加6周)",
+   "storage": "冷藏玻璃瓶 Glass bottle, refrigerated",
+   "notes": "覆盆子与草莓糖浆见于老酒吧的许多酒谱;也可换用其他莓果创作。覆盆子糖浆即以覆盆子制作本配方。"
+  },
+  {
+   "srcName": "FALERNUM",
+   "nameEn": "Falernum",
+   "nameZh": "自制法勒南",
+   "type": "falernum",
+   "ingredients": [
+    "16 oz. Wray & Nephew overproof rum 雷牌高度朗姆酒",
+    "Rinds from 5 large limes 5个大青柠的果皮",
+    "10 cloves 丁香",
+    "¼ oz. almond extract 杏仁提取物",
+    "½ c. peeled and chopped gingerroot 去皮切碎姜根",
+    "½ split vanilla bean 香草荚(半根纵切)",
+    "2 star anise 八角",
+    "1 cinnamon stick 肉桂棒",
+    "Simple Syrup (4:1 兑基液) 单糖浆"
+   ],
+   "recipe": "Combine all ingredients except the simple syrup, infuse for at least 10 days, then fine-strain. Add 4 oz. simple syrup to every 1 oz. Falernum base. Place in a glass jar and shake to combine. Falernum base lasts indefinitely; Falernum syrup, up to 6 weeks.\n除单糖浆外全部材料混合浸渍至少10天后细滤得法勒南基液。按每1盎司基液兑4盎司单糖浆的比例调和摇匀。基液可无限期保存;调好的法勒南糖浆可存6周。",
+   "yield": "~1.9L syrup (64 oz.)",
+   "shelfLife": "基液无限期;糖浆6周",
+   "storage": "玻璃罐;糖浆冷藏 Glass jar; syrup refrigerated",
+   "notes": "加勒比香料糖浆,Tiki 经典(Planter's Punch/Zombie)必备;4:1 为书中推荐比例,3:1 亦可。"
+  },
+  {
+   "srcName": "GRENADINE",
+   "nameEn": "Grenadine",
+   "nameZh": "自制红石榴糖浆",
+   "type": "syrup",
+   "ingredients": [
+    "12 oz. pomegranate juice (Pom Wonderful brand works just fine) 石榴汁",
+    "12 oz. demerara sugar 德麦拉拉蔗糖",
+    "Peel of two oranges 2个橙子的果皮",
+    "1 oz. unflavored vodka (optional preservative) 伏特加(可选防腐)"
+   ],
+   "recipe": "Add all ingredients to saucepan. Heat and remove as soon as boiling begins. Leave peels in for 3 to 5 minutes, then remove. Let cool, strain into glass container, and refrigerate. Add 1 oz. unflavored vodka to preserve for up to 1 month (optional).\n全部材料入锅加热,一沸即离火。橙皮留浸3至5分钟后取出,放凉过滤入玻璃容器冷藏。可加1盎司伏特加防腐,存至1个月。",
+   "yield": "~600ml",
+   "shelfLife": "冷藏约1个月 ~1 month refrigerated",
+   "storage": "冷藏玻璃瓶 Glass bottle, refrigerated",
+   "notes": "自制之后再无回头路——它会给每一杯含它的酒带来惊艳,包括秀兰·邓波儿(给孩子喝请省略伏特加)。"
+  },
+  {
+   "srcName": "HONEY SYRUP",
+   "nameEn": "Honey Syrup",
+   "nameZh": "自制蜂蜜糖浆",
+   "type": "rich-syrup",
+   "ingredients": [
+    "4 oz. honey 蜂蜜",
+    "4 oz. hot water 热水"
+   ],
+   "recipe": "Add ingredients to saucepan and stir over medium heat until honey is dissolved. Remove from heat, let cool, and store in clean glass bottle. Refrigerate up to 2 months.\n蜂蜜与热水入锅中火搅拌至溶解,离火放凉装瓶。冷藏可存2个月。",
+   "yield": "~240ml",
+   "shelfLife": "冷藏2个月 2 months refrigerated",
+   "storage": "冷藏玻璃瓶 Glass bottle, refrigerated",
+   "notes": "不同蜂蜜风味各异,可微调水蜜比例凸显蜂蜜个性。"
+  },
+  {
+   "srcName": "HONEY AND GINGER SYRUP",
+   "nameEn": "Honey and Ginger Syrup",
+   "nameZh": "自制蜂蜜生姜糖浆",
+   "type": "rich-syrup",
+   "ingredients": [
+    "½ c. peeled and chopped gingerroot 去皮切碎姜根",
+    "8 oz. honey 蜂蜜",
+    "4 oz. water 水"
+   ],
+   "recipe": "Add honey and water to saucepan and bring to a boil. Add chopped ginger and allow to simmer over low heat for 10 minutes. Remove from heat and let steep for 30 minutes. Strain and refrigerate for up to 2 months.\n蜂蜜与水入锅煮沸,加入姜末小火慢煮10分钟,离火浸泡30分钟,过滤后冷藏,可存2个月。",
+   "yield": "~330ml",
+   "shelfLife": "冷藏2个月 2 months refrigerated",
+   "storage": "冷藏玻璃瓶 Glass bottle, refrigerated",
+   "notes": ""
+  },
+  {
+   "srcName": "MINT OR HERBAL SYRUP",
+   "nameEn": "Mint or Herbal Syrup",
+   "nameZh": "薄荷/香草糖浆",
+   "type": "syrup",
+   "ingredients": [
+    "8 oz. water 水",
+    "8 oz. granulated sugar 白砂糖",
+    "1 c. fresh mint or fresh basil leaves 新鲜薄荷或罗勒叶(或 ½ c. 迷迭香)"
+   ],
+   "recipe": "Stir together water and sugar in a saucepan and heat to integrate. Bring to a boil and remove from heat. Add herb of choice and let steep for 5 minutes. Strain through fine mesh sieve. Best if used within 1 week.\n水与糖入锅加热搅拌融合,煮沸后离火,加入香草浸泡5分钟(切勿超时以免发苦),细网过滤。最好1周内用完。",
+   "yield": "~360ml",
+   "shelfLife": "1周内最佳 Best within 1 week",
+   "storage": "冷藏玻璃瓶 Glass bottle, refrigerated",
+   "notes": "香草浸泡如泡茶,超过5分钟会苦;迷迭香风味强烈,用量减半。"
+  },
+  {
+   "srcName": "PINEAPPLE SYRUP",
+   "nameEn": "Pineapple Syrup",
+   "nameZh": "自制菠萝糖浆",
+   "type": "syrup",
+   "ingredients": [
+    "2 c. granulated sugar 白砂糖",
+    "16 oz. water 水",
+    "1 fresh pineapple, peeled, cored, and cubed 新鲜菠萝(去皮去芯切块)",
+    "2 oz. unflavored vodka (preservative) 伏特加(防腐)"
+   ],
+   "recipe": "Add sugar and water to saucepan and stir over medium heat until sugar is dissolved. Remove from heat and pour into heatproof bowl. Add prepared pineapple. Allow to cool, and refrigerate overnight. Strain pineapple from syrup using a mesh strainer, pressing down on fruit. Fine-strain again and funnel into clean glass bottle. Add 2 oz. unflavored vodka as a preservative and refrigerate. Lasts 4 to 6 weeks.\n糖与水中火搅拌至溶解,离火倒入耐热碗,加入菠萝块放凉后冷藏过夜。经网筛滤出糖浆(压出果肉汁液),再次细滤装瓶,加2盎司伏特加防腐,冷藏。可存4至6周。",
+   "yield": "~700ml",
+   "shelfLife": "4-6周 4 to 6 weeks",
+   "storage": "冷藏玻璃瓶 Glass bottle, refrigerated",
+   "notes": "夏日鸡尾酒的核心;诀窍是把菠萝加入热糖浆以快速萃取风味。"
+  },
+  {
+   "srcName": "CINNAMON VODKA",
+   "nameEn": "Cinnamon Vodka",
+   "nameZh": "自制肉桂伏特加",
+   "type": "infusion",
+   "ingredients": [
+    "1 750 ml. bottle unflavored vodka 原味伏特加(750毫升)",
+    "2 cinnamon sticks 肉桂棒"
+   ],
+   "recipe": "Place one 750 ml. bottle of unflavored vodka and 2 cinnamon sticks in airtight glass container and stir every other day for a week. Strain and funnel back into bottle. Lasts indefinitely. Do not add cinnamon sticks directly to liquor bottle, as they will expand and you will not be able to remove them.\n伏特加与2根肉桂棒放入密封玻璃容器,每隔一天搅拌一次,共1周。过滤后灌回原瓶。可无限期保存。切勿将肉桂棒直接投入酒瓶——受潮膨胀后无法取出,会导致成品过苦。",
+   "yield": "~750ml",
+   "shelfLife": "无限期 Indefinitely",
+   "storage": "原瓶密封 Sealed bottle",
+   "notes": "用于 Cinful、Fallen Apples、Fezziwig's Recline、Gingerbread Man、Pie on the Sill、Rabbit's Dilemma。"
+  },
+  {
+   "srcName": "PEACH BRANDY",
+   "nameEn": "Peach Brandy (Homemade Substitute)",
+   "nameZh": "自制桃子白兰地(替代版)",
+   "type": "liqueur",
+   "ingredients": [
+    "4 oz. Laird's bonded applejack 莱尔德保税苹果杰克",
+    "2 oz. Combier Pêche de Vigne peach liqueur 康比尔桃子利口酒",
+    "1 oz. Alexander grappa di Cabernet (optional) 亚历山大赤霞珠格拉帕(可选)"
+   ],
+   "recipe": "Place all ingredients in glass bottle and gently shake to combine. Lasts indefinitely.\n全部材料装入玻璃瓶轻摇混合。可无限期保存。",
+   "yield": "~210ml (7 oz.)",
+   "shelfLife": "无限期 Indefinitely",
+   "storage": "玻璃瓶密封 Sealed glass bottle",
+   "notes": "真正的桶陈桃子白兰地极少见;此为 David Wondrich 推荐的 2:1 替代方案,格拉帕补足质朴气息。用于 Fish House Punch、Julep/Smash、Punch。会略增甜度,配方中糖量可酌减。"
+  },
+  {
+   "srcName": "Black Cherry Infusion",
+   "nameEn": "Black Cherry Infused Absolut Vodka",
+   "nameZh": "黑樱桃浸渍绝对伏特加",
+   "type": "infusion",
+   "ingredients": [
+    "1 c. fresh black cherries, split 新鲜黑樱桃(切开)",
+    "1 liter Absolut vodka 绝对伏特加(1升)"
+   ],
+   "recipe": "Place all ingredients in airtight glass container for 7 days. Fine-strain and funnel back into bottle. Best if used within 3 months.\n全部材料放入密封玻璃容器浸渍7天,细滤后灌回原瓶。最好3个月内用完。",
+   "yield": "~1L",
+   "shelfLife": "3个月内最佳 Best within 3 months",
+   "storage": "原瓶密封 Sealed bottle",
+   "notes": "出自 Black Cherry Soda(Peacock Alley)。",
+   "source": "Black Cherry Soda 条目内嵌配方"
+  },
+  {
+   "srcName": "Galliano Infusion",
+   "nameEn": "Strawberry and Pink Peppercorn-Infused Galliano",
+   "nameZh": "草莓粉红胡椒浸渍加利安诺",
+   "type": "infusion",
+   "ingredients": [
+    "1 lb. fresh, ripe strawberries (rinsed, cored, and halved) 新鲜熟草莓(洗净去蒂对半)",
+    "1 750 ml. bottle Galliano 加利安诺利口酒(750毫升)",
+    "3 tbsp. pink peppercorns 粉红胡椒粒"
+   ],
+   "recipe": "Add ingredients to airtight, glass container and let infuse for 7 to 10 days. Fine-strain, then funnel back into bottle.\n材料入密封玻璃容器浸渍7至10天,细滤后灌回原瓶。",
+   "yield": "~750ml",
+   "shelfLife": "数月 Months",
+   "storage": "原瓶密封 Sealed bottle",
+   "notes": "出自 Champagne Cocktail 条目(Gardening at Night)。",
+   "source": "Champagne Cocktail 条目内嵌配方"
+  },
+  {
+   "srcName": "Orange Gin",
+   "nameEn": "Orange Gin",
+   "nameZh": "自制橙味金酒",
+   "type": "infusion",
+   "ingredients": [
+    "20 oz. Hayman's Old Tom gin 海曼老汤姆金酒",
+    "5 oz. Luxardo Triplum orange liqueur 路萨朵三重橙利口酒",
+    "1 peel of whole orange (with no pith) 1个橙子的果皮(去白瓤)",
+    "3 whole cloves 丁香"
+   ],
+   "recipe": "Add all ingredients to airtight container and infuse for two weeks, stirring occasionally. Fine-strain and funnel back into bottle. Best used within 6 months.\n全部材料入密封容器浸渍2周(间或搅拌),细滤后灌回瓶中。最好6个月内用完。",
+   "yield": "~750ml (25 oz.)",
+   "shelfLife": "6个月内最佳 Best within 6 months",
+   "storage": "原瓶密封 Sealed bottle",
+   "notes": "出自 Chanticleer。",
+   "source": "Chanticleer 条目内嵌配方"
+  },
+  {
+   "srcName": "Apple Compote",
+   "nameEn": "Apple Compote",
+   "nameZh": "苹果蜜饯",
+   "type": "garnish",
+   "ingredients": [
+    "1 c. water 水",
+    "¼ c. demerara sugar 德麦拉拉蔗糖",
+    "½ vanilla bean, split in half lengthwise 香草荚(纵切半根)",
+    "2 oz. Laird's bonded applejack 莱尔德保税苹果杰克",
+    "⅛ tsp. ground cinnamon 肉桂粉",
+    "⅛ tsp. ground cloves 丁香粉",
+    "⅛ tsp. ground nutmeg 肉豆蔻粉",
+    "2 oz. fresh lemon juice 鲜柠檬汁",
+    "1 pinch salt 盐(1撮)",
+    "4 large Golden Delicious apples, cored and cubed 金冠苹果(去核切块)"
+   ],
+   "recipe": "In a saucepan, combine all ingredients except apples and bring to a boil. Simmer until the sugar is dissolved and the mixture thickens slightly, about 5 minutes. Add the apples and return to a boil. Lower the heat and simmer, stirring occasionally, until the apples are very tender and the mixture thickens, about 30 minutes. Remove from heat and remove the vanilla bean pods. Let cool to room temperature before serving. Place in plastic container and refrigerate for later use.\n除苹果外全部材料入锅煮沸,小火约5分钟至糖溶解且略稠。加入苹果再次煮沸后转小火,间或搅拌炖约30分钟至苹果软烂浓稠。离火取出香草荚,放凉至室温。装入容器冷藏备用。",
+   "yield": "~800ml",
+   "shelfLife": "冷藏约1周 ~1 week refrigerated",
+   "storage": "冷藏密封 Refrigerated, sealed",
+   "notes": "出自 Cinful(Peacock Alley)。",
+   "source": "Cinful 条目内嵌配方"
+  },
+  {
+   "srcName": "Bacardi Elixir Cordial",
+   "nameEn": "Bacardi Elixir Cordial",
+   "nameZh": "自制百加得长生药甜酒",
+   "type": "liqueur",
+   "ingredients": [
+    "2 c. prunes (halved) 西梅干(对半)",
+    "20 oz. Bacardi y Cia Heritage white rum 百加得传承白朗姆",
+    "6 oz. Bacardi 8 Year Old dark rum 百加得8年黑朗姆",
+    "4 oz. Carpano Antica sweet vermouth 卡帕诺安提卡甜味美思",
+    "2 oz. house-made Demerara Syrup 自制德麦拉拉糖浆"
+   ],
+   "recipe": "Add prunes to airtight container, cover with both rums, and let rest for 2 weeks, stirring once or twice a week. Strain to remove prunes. Add vermouth and syrup. Stir to integrate and funnel into bottle.\n西梅入密封容器,倒入两种朗姆浸没,静置2周(每周搅拌一两次)。滤除西梅,加入味美思与糖浆搅匀,装瓶。",
+   "yield": "~950ml (32 oz.)",
+   "shelfLife": "数月(冷藏更佳)",
+   "storage": "玻璃瓶密封冷藏 Sealed bottle, refrigerated",
+   "notes": "出自 Elixir。",
+   "source": "Elixir 条目内嵌配方"
+  },
+  {
+   "srcName": "Coffee Bean–Infused Vodka",
+   "nameEn": "Coffee Bean-Infused Vodka",
+   "nameZh": "咖啡豆浸渍伏特加",
+   "type": "infusion",
+   "ingredients": [
+    "1 c. Italian espresso beans 意式浓缩咖啡豆",
+    "1 c. French roast coffee beans 法式烘焙咖啡豆",
+    "32 oz. unflavored vodka 原味伏特加"
+   ],
+   "recipe": "Add 1 c. Italian espresso beans and 1 c. French roast coffee beans to airtight glass jar. Add 32 oz. unflavored vodka and infuse for no more than 7 days. Fine-strain and funnel back into bottle. Lasts at least 6 months.\n两种咖啡豆各1杯放入密封玻璃罐,加入32盎司伏特加,浸渍不超过7天。细滤后灌回瓶中。至少可存6个月。",
+   "yield": "~950ml (32 oz.)",
+   "shelfLife": "至少6个月 At least 6 months",
+   "storage": "原瓶密封 Sealed bottle",
+   "notes": "出自 Espresso Cocktail(Peacock Alley)。",
+   "source": "Espresso Cocktail 条目内嵌配方"
+  },
+  {
+   "srcName": "Ginger and Lemongrass–Infused",
+   "nameEn": "Ginger and Lemongrass-Infused G'Vine Floraison Gin",
+   "nameZh": "生姜香茅浸渍纪凡花果香金酒",
+   "type": "infusion",
+   "ingredients": [
+    "½ c. peeled and chopped fresh ginger 去皮切碎鲜姜",
+    "12 lemongrass leaves, cleaned and chopped into thirds 香茅叶(洗净切三段)",
+    "1 750 ml. bottle G'Vine Floraison gin 纪凡花果香金酒(750毫升)"
+   ],
+   "recipe": "Add all ingredients to large, airtight glass container. Seal and stir occasionally for 10 days. Double-strain and funnel back into bottle. Lasts up to 2 months.\n全部材料入大号密封玻璃容器,密封10天并间或搅拌。双重过滤后灌回瓶中。可存2个月。",
+   "yield": "~750ml",
+   "shelfLife": "2个月 Up to 2 months",
+   "storage": "原瓶密封 Sealed bottle",
+   "notes": "出自 Ginger Collins(Peacock Alley)。",
+   "source": "Ginger Collins 条目内嵌配方"
+  },
+  {
+   "srcName": "Vanilla Bean-Infused Plantation",
+   "nameEn": "Vanilla Bean-Infused Plantation Original Dark Rum",
+   "nameZh": "香草荚浸渍普兰爵黑朗姆",
+   "type": "infusion",
+   "ingredients": [
+    "1 whole vanilla bean 整根香草荚",
+    "1 750 ml. bottle Plantation Original Dark rum 普兰爵原味黑朗姆(750毫升)"
+   ],
+   "recipe": "Split one whole vanilla bean lengthwise, scrape out seeds, and place bean and seeds in bottle. Agitate every other day for a week and begin to use.\n香草荚纵向剖开刮出籽,荚与籽一同放入瓶中。每隔一天摇动一次,一周后即可使用。",
+   "yield": "~750ml",
+   "shelfLife": "数月 Months",
+   "storage": "原瓶密封 Sealed bottle",
+   "notes": "出自 Gingerbread Man(Peacock Alley)。",
+   "source": "Gingerbread Man 条目内嵌配方"
+  },
+  {
+   "srcName": "HIGH THREAD COUNT Spiced Rum",
+   "nameEn": "Spiced Rum Infusion (Amber Rum)",
+   "nameZh": "香料朗姆浸渍(琥珀朗姆版)",
+   "type": "infusion",
+   "ingredients": [
+    "1 750 ml. bottle amber rum (Ron del Barrilito 2 Star or Cruzan dark) 琥珀朗姆(750毫升)",
+    "1 vanilla bean, split 香草荚(纵切)",
+    "1 orange rind (preferably dried) 橙皮(最好是干橙皮)",
+    "1 cinnamon stick 肉桂棒",
+    "6 allspice berries 多香果粒",
+    "3 cloves 丁香",
+    "12 black peppercorns 黑胡椒粒",
+    "1 whole nutmeg seed 整颗肉豆蔻",
+    "¼ cup fresh ginger, julienned and crushed 鲜姜(切丝压碎)"
+   ],
+   "recipe": "Add all ingredients to an airtight glass container. Let stand for 7 days and taste. If you want a bit more flavor, remove cinnamon stick and let rest for 3 more days. Fine-strain, then funnel back into bottle. Best used within 6 months.\n全部材料入密封玻璃容器静置7天后品尝;如需更浓风味,取出肉桂棒再放3天。细滤后灌回瓶中。最好6个月内用完。",
+   "yield": "~750ml",
+   "shelfLife": "6个月内最佳 Best within 6 months",
+   "storage": "原瓶密封 Sealed bottle",
+   "notes": "出自 High Thread Count(Peacock Alley)。",
+   "source": "High Thread Count 条目内嵌配方"
+  },
+  {
+   "srcName": "Cocoa-Infused Whiskey",
+   "nameEn": "Cocoa-Infused Whiskey (Stranahan's Colorado)",
+   "nameZh": "可可浸渍威士忌(斯特拉纳汉)",
+   "type": "infusion",
+   "ingredients": [
+    "½ cup Noel cocoa nibs (France) 诺埃尔可可碎(法国)",
+    "1 750 ml. bottle Stranahan's Colorado whiskey 斯特拉纳汉科罗拉多威士忌(750毫升)"
+   ],
+   "recipe": "Place ingredients in airtight glass jar for 3 to 5 days, stirring occasionally. Fine-strain and funnel back into bottle. (Do not let macerate any longer, as the result becomes overly bitter.) Best if used within 6 months.\n材料入密封玻璃罐浸渍3至5天(间或搅拌)。细滤后灌回瓶中(切勿浸泡过久,否则会过苦)。最好6个月内用完。",
+   "yield": "~750ml",
+   "shelfLife": "6个月内最佳 Best within 6 months",
+   "storage": "原瓶密封 Sealed bottle",
+   "notes": "出自 Old Fashioned(Pre-Prohibition Variations)。",
+   "source": "Old Fashioned 条目内嵌配方"
+  },
+  {
+   "srcName": "Apple, Pear, and Orange Peel",
+   "nameEn": "Apple, Pear, and Orange Peel-Infused Bourbon",
+   "nameZh": "苹果梨橙皮浸渍波本威士忌",
+   "type": "infusion",
+   "ingredients": [
+    "2 Fuji apples 富士苹果",
+    "1 Bosc pear 博斯克梨",
+    "1 whole orange rind (peeled, with as little pith as possible) 整个橙子的果皮(尽量少带白瓤)",
+    "1 750 ml. bottle Henry McKenna bonded bourbon 亨利麦肯纳保税波本(750毫升)"
+   ],
+   "recipe": "Wash fruit. Core and cube apples and pear. Place in airtight glass container along with orange peel. Add bourbon and macerate for at least 10 days, stirring occasionally. Fine-strain and funnel back into bottle.\n水果洗净,苹果与梨去核切块,与橙皮一起放入密封玻璃容器。倒入波本浸渍至少10天(间或搅拌)。细滤后灌回瓶中。",
+   "yield": "~750ml",
+   "shelfLife": "数月 Months",
+   "storage": "原瓶密封 Sealed bottle",
+   "notes": "出自 Old Fashioned(Pre-Prohibition Variations)。",
+   "source": "Old Fashioned 条目内嵌配方"
+  },
+  {
+   "srcName": "Cranberry-Infused Vodka",
+   "nameEn": "Cranberry Infused Vodka",
+   "nameZh": "蔓越莓浸渍伏特加",
+   "type": "infusion",
+   "ingredients": [
+    "2 c. fresh (or frozen) cranberries 新鲜或冷冻蔓越莓",
+    "32 oz. vodka 伏特加"
+   ],
+   "recipe": "Place 2 c. fresh (or frozen) cranberries in airtight glass container. Add 32 oz. vodka. Seal and let rest for at least 1 week. Fine-strain and funnel back into bottle.\n蔓越莓放入密封玻璃容器,加入32盎司伏特加,密封静置至少1周。细滤后灌回瓶中。",
+   "yield": "~950ml (32 oz.)",
+   "shelfLife": "数月 Months",
+   "storage": "原瓶密封 Sealed bottle",
+   "notes": "出自 The Peacock(2006 to Present)。",
+   "source": "The Peacock 条目内嵌配方"
+  },
+  {
+   "srcName": "RASPBERRY BERET Spiced Rum",
+   "nameEn": "Spiced Rum Infusion (Appleton)",
+   "nameZh": "香料朗姆浸渍(阿普尔顿版)",
+   "type": "infusion",
+   "ingredients": [
+    "1 750 ml. bottle Appleton Reserve rum 阿普尔顿珍藏朗姆(750毫升)",
+    "2 tablespoons black peppercorns 黑胡椒粒",
+    "1 orange rind 橙皮",
+    "4 Calamyrna or Turkish dried figs, halved 无花果干(对半)",
+    "1 Fuji apple, cored and cubed 富士苹果(去核切块)",
+    "¼ cup fresh ginger, julienned and crushed 鲜姜(切丝压碎)",
+    "¼ cup dried coriander seeds 干芫荽籽"
+   ],
+   "recipe": "Add all ingredients to an airtight glass container. Let stand for 7 days and taste. If you want a bit more flavor, infuse for 3 more days. Fine-strain, then funnel back into bottle. Best used within 6 months.\n全部材料入密封玻璃容器静置7天后品尝;如需更浓风味再浸3天。细滤后灌回瓶中。最好6个月内用完。",
+   "yield": "~750ml",
+   "shelfLife": "6个月内最佳 Best within 6 months",
+   "storage": "原瓶密封 Sealed bottle",
+   "notes": "出自 Raspberry Beret(Peacock Alley)。",
+   "source": "Raspberry Beret 条目内嵌配方"
+  },
+  {
+   "srcName": "Black Cherry-Infused Bourbon",
+   "nameEn": "Black Cherry-Infused Bourbon (Henry McKenna)",
+   "nameZh": "黑樱桃浸渍波本(亨利麦肯纳)",
+   "type": "infusion",
+   "ingredients": [
+    "1 c. fresh black cherries, split 新鲜黑樱桃(切开)",
+    "1 750 ml. bottle Henry McKenna bonded bourbon 亨利麦肯纳保税波本(750毫升)"
+   ],
+   "recipe": "Place all ingredients in airtight glass container for 7 days. Fine-strain and funnel back into bottle. Best if used within two months.\n全部材料放入密封玻璃容器浸渍7天,细滤后灌回瓶中。最好2个月内用完。",
+   "yield": "~750ml",
+   "shelfLife": "2个月内最佳 Best within 2 months",
+   "storage": "原瓶密封 Sealed bottle",
+   "notes": "出自 Rooftop Magic(Peacock Alley)。",
+   "source": "Rooftop Magic 条目内嵌配方"
+  },
+  {
+   "srcName": "Sweet Vermouth Infusion",
+   "nameEn": "Sweet Vermouth Infusion",
+   "nameZh": "香料甜味美思浸渍",
+   "type": "fortified",
+   "ingredients": [
+    "1 750 ml. bottle sweet vermouth 甜味美思(750毫升)",
+    "6 cardamom pods 小豆蔻荚",
+    "6 cloves 丁香",
+    "1 cinnamon stick 肉桂棒"
+   ],
+   "recipe": "Bring to boil one bottle sweet vermouth (750 ml.) with 6 cardamom pods, 6 cloves, and 1 cinnamon stick. Remove from heat and allow to cool, fine-strain, and funnel back into bottle. Lasts 6 weeks refrigerated.\n甜味美思与小豆蔻、丁香、肉桂棒一同煮沸,离火放凉,细滤后灌回瓶中。冷藏可存6周。",
+   "yield": "~750ml",
+   "shelfLife": "冷藏6周 6 weeks refrigerated",
+   "storage": "冷藏密封 Refrigerated, sealed",
+   "notes": "出自 Shanghai Tea(Peacock Alley)。",
+   "source": "Shanghai Tea 条目内嵌配方"
+  },
+  {
+   "srcName": "Lemonade",
+   "nameEn": "Lemonade (Waldorf)",
+   "nameZh": "自制柠檬水",
+   "type": "juice",
+   "ingredients": [
+    "2 oz. fresh lemon juice 鲜柠檬汁",
+    "1½ oz. Simple Syrup 单糖浆",
+    "5 oz. water (chilled) 冰水"
+   ],
+   "recipe": "Add all ingredients to mixing glass and stir to integrate.\n全部材料入调酒杯搅拌均匀。",
+   "yield": "~250ml (8.5 oz.)",
+   "shelfLife": "当日饮用 Same day",
+   "storage": "现调现用 Make fresh",
+   "notes": "出自 Sheridan Punch。",
+   "source": "Sheridan Punch 条目内嵌配方"
+  },
+  {
+   "srcName": "Prune Syrup",
+   "nameEn": "Prune Syrup",
+   "nameZh": "西梅糖浆",
+   "type": "syrup",
+   "ingredients": [
+    "1 c. water 水",
+    "1 c. sugar 糖",
+    "½ c. chopped dried prunes 切碎西梅干"
+   ],
+   "recipe": "In a saucepan, bring water and sugar to boil over medium heat. Add chopped prunes and allow to cool. Refrigerate overnight and strain. Lasts up to one month.\n水与糖中火煮沸,加入西梅碎后放凉,冷藏过夜后过滤。可存1个月。",
+   "yield": "~300ml",
+   "shelfLife": "1个月 Up to 1 month",
+   "storage": "冷藏玻璃瓶 Glass bottle, refrigerated",
+   "notes": "出自 Tea Cobbler。",
+   "source": "Tea Cobbler 条目内嵌配方"
+  },
+  {
+   "srcName": "Cherry-Infused Rum",
+   "nameEn": "Cherry-Infused Rum",
+   "nameZh": "樱桃浸渍朗姆",
+   "type": "infusion",
+   "ingredients": [
+    "8 oz. ripe and pitted sweet cherries 熟甜樱桃(去核)",
+    "16 oz. Smith & Cross navy-strength rum 史密斯克罗斯海军强度朗姆"
+   ],
+   "recipe": "Add cherries to airtight glass container and muddle briefly to expose flesh. Add rum and infuse for at least 3 hours or overnight. Fine-strain prior to use.\n樱桃入密封玻璃容器略捣露出果肉,加朗姆浸渍至少3小时或过夜。使用前细滤。",
+   "yield": "~480ml (16 oz.)",
+   "shelfLife": "数周(冷藏更佳)",
+   "storage": "密封冷藏 Sealed, refrigerated",
+   "notes": "出自 Claret Cup aux Cerises Punch。",
+   "source": "Claret Cup Punch 条目内嵌配方"
+  }
+ ]
+}

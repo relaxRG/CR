@@ -18,6 +18,16 @@ import type { EdgeInsets, Metrics, Rect } from "react-native-safe-area-context";
 
 import { trpc, createTRPCClient } from "@/lib/trpc";
 import { initManusRuntime, subscribeSafeAreaInsets } from "@/lib/_core/manus-runtime";
+import { RecipeProvider } from "@/lib/recipes/store";
+import { I18nProvider } from "@/lib/i18n";
+import { SyncProvider } from "@/lib/sync/provider";
+import { BottleProvider } from "@/lib/bottles/store";
+import { BottleTaxonomyProvider } from "@/lib/bottles/taxonomy";
+import { HomemadeProvider } from "@/lib/homemade/store";
+import { IceSettingsProvider } from "@/lib/ice/store";
+import { LabProvider } from "@/lib/lab/store";
+import { BookStoreProvider } from "@/lib/books/store";
+import { MenuProvider } from "@/lib/menu/store";
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
@@ -44,6 +54,7 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => {
+    // App-only build: web SafeArea override no longer used.
     if (Platform.OS !== "web") return;
     const unsubscribe = subscribeSafeAreaInsets(handleSafeAreaUpdate);
     return () => unsubscribe();
@@ -59,6 +70,11 @@ export default function RootLayout() {
             refetchOnWindowFocus: false,
             // Retry failed requests once
             retry: 1,
+          },
+          mutations: {
+            // AI mutations should not auto-retry — they are expensive and
+            // a timeout/error is usually not transient. Callers handle errors explicitly.
+            retry: 0,
           },
         },
       }),
@@ -82,14 +98,54 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <trpc.Provider client={trpcClient} queryClient={queryClient}>
         <QueryClientProvider client={queryClient}>
-          {/* Default to hiding native headers so raw route segments don't appear (e.g. "(tabs)", "products/[id]"). */}
-          {/* If a screen needs the native header, explicitly enable it and set a human title via Stack.Screen options. */}
-          {/* in order for ios apps tab switching to work properly, use presentation: "fullScreenModal" for login page, whenever you decide to use presentation: "modal*/}
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="oauth/callback" />
-          </Stack>
-          <StatusBar style="auto" />
+      <I18nProvider>
+      <SyncProvider>
+      <RecipeProvider>
+          <BottleTaxonomyProvider>
+          <BottleProvider>
+          <HomemadeProvider>
+          <IceSettingsProvider>
+          <LabProvider>
+          <BookStoreProvider>
+          <MenuProvider>
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="recipe/[id]" />
+              <Stack.Screen
+                name="recipe-form"
+                options={{ presentation: "modal" }}
+              />
+              <Stack.Screen name="bottle/[id]" />
+              <Stack.Screen
+                name="bottle-form"
+                options={{ presentation: "modal" }}
+              />
+              <Stack.Screen name="homemade/[id]" />
+              <Stack.Screen
+                name="homemade-form"
+                options={{ presentation: "modal" }}
+              />
+              <Stack.Screen name="ice-settings" options={{ presentation: "modal" }} />
+              <Stack.Screen name="lab/index" />
+              <Stack.Screen name="lab/[id]" />
+              <Stack.Screen name="lab/new" options={{ presentation: "modal" }} />
+              <Stack.Screen name="lab/batch-form" options={{ presentation: "modal" }} />
+              <Stack.Screen name="lab/compare" />
+              <Stack.Screen name="oauth/callback" />
+              <Stack.Screen name="book-reader" />
+              <Stack.Screen name="card-tag-settings" options={{ presentation: "modal" }} />
+            </Stack>
+            <StatusBar style="auto" />
+          </MenuProvider>
+          </BookStoreProvider>
+          </LabProvider>
+          </IceSettingsProvider>
+          </HomemadeProvider>
+          </BottleProvider>
+          </BottleTaxonomyProvider>
+          </RecipeProvider>
+          </SyncProvider>
+          </I18nProvider>
         </QueryClientProvider>
       </trpc.Provider>
     </GestureHandlerRootView>

@@ -66,6 +66,7 @@ export type InvokeParams = {
   model?: string;
   thinking?: Record<string, unknown>;
   reasoning?: Record<string, unknown>;
+  signal?: AbortSignal;
 };
 
 export type ToolCall = {
