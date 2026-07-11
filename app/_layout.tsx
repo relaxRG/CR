@@ -108,6 +108,7 @@ export default function RootLayout() {
           <LabProvider>
           <BookStoreProvider>
           <MenuProvider>
+          <ShoppingProvider>
             <Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="recipe/[id]" />
@@ -136,6 +137,7 @@ export default function RootLayout() {
               <Stack.Screen name="card-tag-settings" options={{ presentation: "modal" }} />
             </Stack>
             <StatusBar style="auto" />
+          </ShoppingProvider>
           </MenuProvider>
           </BookStoreProvider>
           </LabProvider>
@@ -173,3 +175,4 @@ export default function RootLayout() {
     </ThemeProvider>
   );
 }
+import { ShoppingProvider } from "@/lib/shopping/store";

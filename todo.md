@@ -59,3 +59,37 @@
 - [ ] 书籍统计数据
 - [ ] 拖拽导入书籍
 - [ ] 批量导入多个书籍文件
+- [ ] 批量导入多个书籍文件
+
+## 门店酒单重构（2026-07-12）
+## 门店模块全面重构（2026-07-12）
+### 数据层
+- [x] lib/menu/store.tsx：新增 ungroupedEntries 无分组配方支持
+- [x] lib/menu/store.tsx：新增 BATCH_SET_PRICE 批量定价 action
+- [x] lib/menu/store.tsx：新增无分组相关 action（ADD_UNGROUPED_ENTRY / REMOVE_UNGROUPED_ENTRY / SET_UNGROUPED_PRICE）
+- [x] lib/menu/store.tsx：MenuEntry.available 改为在售/停售语义，新加入默认停售
+  - [x] lib/shopping/store.tsx：新建采购清单数据 store（ShoppingItem/OnlineLink/OfflineNote）
+### 门店酒单页（app/(tabs)/menu.tsx）
+  - [x] 使用 RecipeCard 卡片化展示配方
+  - [x] 每张卡片：在售/停售状态点 + 售价 + 利润率（成本来自 estimateRecipeCostSmart）
+  - [x] 批量操作：多选 → 批量上架/下架/定价/移除
+  - [x] 无分组配方直接加入酒单（分组可选）
+  - [x] 新加入配方默认停售
+### 采购清单页（app/(tabs)/shopping.tsx）
+  - [x] 自动聚合所有「在售」配方的原材料
+  - [x] 与酒库（烈酒/原材料）智能匹配，标注「已有」
+  - [x] 与自制库智能匹配，自制品单独分区
+  - [x] 同一原材料跨配方合并，显示关联配方列表
+  - [x] 两大渠道分类：网络采购（URL+平台名）和酒商采购（备注）
+  - [x] Linking.openURL 跳转网络购买链接
+  - [x] 已采购标记（持久化）
+  - [x] 手动添加额外采购项
+### 主容器（app/(tabs)/index.tsx）
+  - [x] Tab 名称「门店酒单」→「门店」
+  - [x] 门店内部 Segmented Control：门店酒单 / 采购清单
+  - [x] 接入 shopping.tsx 子页面
+  - [x] 副标题更新（显示在售数量/待采购数量）
+### i18n 和其他
+  - [x] lib/i18n/translations.ts：新增 shopping.* 翻译键
+  - [x] lib/i18n/translations.ts：更新 menu.* 翻译键（改名/新增）
+  - [x] TypeScript 零错误

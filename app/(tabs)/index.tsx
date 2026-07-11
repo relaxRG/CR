@@ -1,7 +1,8 @@
 /**
  * 酒单 Tab 主容器
- * 大标题 + iOS 原生 pill 主切换器（酒单 / 研发 / 门店酒单）
+ * 大标题 + iOS 原生 pill 主切换器（酒单 / 研发 / 门店）
  * 三个子页面始终挂载（保留筛选/滚动状态），用 display:none 切换可见性。
+ * 门店分区内部再有 门店酒单 / 采购清单 两个子切换器。
  */
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import * as Haptics from "expo-haptics";
@@ -15,31 +16,44 @@ import { useMenuStore } from "@/lib/menu/store";
 import { RecipesScreen } from "./recipes";
 import { LabIndexScreen } from "../lab/index";
 import MenuScreen from "./menu";
+import ShoppingScreen from "./shopping";
 
 type RecipesTab = "recipes" | "lab" | "menu";
+type StoreSubTab = "menu" | "shopping";
 
 export default function RecipesTabScreen() {
   const colors = useColors();
   const { lang } = useI18n();
   const insets = useSafeAreaInsets();
   const [tab, setTab] = usePersistedState<RecipesTab>("recipes.tab.v1", "recipes");
+  const [storeSubTab, setStoreSubTab] = usePersistedState<StoreSubTab>("store.subtab.v1", "menu");
 
   // 副标题数量
   const { recipes } = useRecipeStore();
   const { projects } = useLabStore();
-  const { groups } = useMenuStore();
-  const menuEntries = groups.reduce((sum, g) => sum + g.entries.length, 0);
+  const { groups, ungroupedEntries } = useMenuStore();
+  const menuEntries = groups.reduce((sum, g) => sum + g.entries.length, 0) + ungroupedEntries.length;
+  const onSaleCount = [
+    ...groups.flatMap((g) => g.entries),
+    ...ungroupedEntries,
+  ].filter((e) => e.available).length;
 
   const TABS: { key: RecipesTab; zh: string; en: string }[] = [
     { key: "recipes", zh: "酒单", en: "Recipes" },
     { key: "lab", zh: "研发", en: "R&D" },
-    { key: "menu", zh: "门店酒单", en: "Menu" },
+    { key: "menu", zh: "门店", en: "Store" },
   ];
 
   const handleSwitch = (key: RecipesTab) => {
     if (key === tab) return;
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setTab(key);
+  };
+
+  const handleStoreSubSwitch = (key: StoreSubTab) => {
+    if (key === storeSubTab) return;
+    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setStoreSubTab(key);
   };
 
   // 副标题
@@ -53,8 +67,8 @@ export default function RecipesTabScreen() {
           ? projects.length > 0 ? `${projects.length} projects in progress` : "Experiment and iterate"
           : projects.length > 0 ? `${projects.length} 个研发项目` : "实验与迭代"
         : lang === "en"
-          ? menuEntries > 0 ? `${menuEntries} drinks · ${groups.length} groups` : "Create menu groups for your bar"
-          : menuEntries > 0 ? `${menuEntries} 款酒 · ${groups.length} 个分组` : "为门店创建酒单分组";
+          ? menuEntries > 0 ? `${onSaleCount} on sale · ${menuEntries} total` : "Set up your store menu"
+          : menuEntries > 0 ? `在售 ${onSaleCount} 款 · 共 ${menuEntries} 款` : "设置门店酒单";
 
   // 大标题
   const title =
@@ -62,7 +76,7 @@ export default function RecipesTabScreen() {
       ? lang === "en" ? "Recipes" : "酒单"
       : tab === "lab"
         ? lang === "en" ? "R&D Lab" : "研发"
-        : lang === "en" ? "Store Menu" : "门店酒单";
+        : lang === "en" ? "Store" : "门店";
 
   // Override top inset to 0 for child screens
   const childInsets = { ...insets, top: 0 };
@@ -116,6 +130,46 @@ export default function RecipesTabScreen() {
             );
           })}
         </View>
+        {/* 门店内部子切换器 */}
+        {tab === "menu" && (
+          <View style={[styles.subSegContainer, { backgroundColor: colors.border + "33" }]}>
+            {(["menu", "shopping"] as StoreSubTab[]).map((key) => {
+              const label = key === "menu"
+                ? (lang === "en" ? "Menu" : "门店酒单")
+                : (lang === "en" ? "Shopping" : "采购清单");
+              const active = storeSubTab === key;
+              return (
+                <Pressable
+                  key={key}
+                  onPress={() => handleStoreSubSwitch(key)}
+                  style={[
+                    styles.subSegItem,
+                    active && {
+                      backgroundColor: colors.background,
+                      shadowColor: "#000",
+                      shadowOpacity: 0.08,
+                      shadowRadius: 2,
+                      shadowOffset: { width: 0, height: 1 },
+                      elevation: 1,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.subSegText,
+                      {
+                        color: active ? colors.foreground : colors.muted,
+                        fontWeight: active ? "600" : "400",
+                      },
+                    ]}
+                  >
+                    {label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
       </View>
 
       {/* 子屏：始终挂载，display:none 切换 */}
@@ -126,8 +180,14 @@ export default function RecipesTabScreen() {
         <View style={[{ flex: 1 }, tab !== "lab" && styles.hidden]}>
           <LabIndexScreen embedded />
         </View>
+        {/* 门店分区：两个子页面 */}
         <View style={[{ flex: 1 }, tab !== "menu" && styles.hidden]}>
-          <MenuScreen />
+          <View style={[{ flex: 1 }, storeSubTab !== "menu" && styles.hidden]}>
+            <MenuScreen />
+          </View>
+          <View style={[{ flex: 1 }, storeSubTab !== "shopping" && styles.hidden]}>
+            <ShoppingScreen />
+          </View>
         </View>
       </SafeAreaInsetsContext.Provider>
     </View>
@@ -138,6 +198,24 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 20,
     paddingBottom: 8,
+  },
+  subSegContainer: {
+    flexDirection: "row",
+    borderRadius: 8,
+    padding: 2,
+    gap: 2,
+    marginTop: 6,
+  },
+  subSegItem: {
+    flex: 1,
+    height: 28,
+    borderRadius: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  subSegText: {
+    fontSize: 13,
+    lineHeight: 18,
   },
   title: {
     fontSize: 30,

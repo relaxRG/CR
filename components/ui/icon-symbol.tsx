@@ -87,6 +87,10 @@ const MAPPING = {
   "eye.slash": "visibility-off",
   "dollarsign.circle.fill": "monetization-on",
   "cart.fill": "shopping-cart",
+  "cart": "shopping-cart",
+  "building.2": "business",
+  "arrow.up.right.square": "open-in-new",
+  "flask": "science",
   "list.dash": "reorder",
 } as IconMapping;
 

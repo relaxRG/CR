@@ -7,7 +7,7 @@ export interface MenuEntry {
   id: string;          // unique entry id (uuid)
   recipeId: string;    // reference to Recipe.id
   price: number | null; // 门店售价（元），null 表示未设置
-  available: boolean;  // 今日是否供应
+  available: boolean;  // 兼容性保留，UI 已不展示
   sortIndex: number;
   addedAt: string;     // ISO date
 }
@@ -22,6 +22,8 @@ export interface MenuGroup {
 
 export interface MenuState {
   groups: MenuGroup[];
+  /** 未分配到任何分组的配方条目 */
+  ungroupedEntries: MenuEntry[];
 }
 
 // ─── Actions ─────────────────────────────────────────────────────────────────
@@ -38,7 +40,15 @@ type Action =
   | { type: "SET_PRICE"; groupId: string; entryId: string; price: number | null }
   | { type: "TOGGLE_AVAILABLE"; groupId: string; entryId: string }
   | { type: "REORDER_ENTRIES"; groupId: string; entries: MenuEntry[] }
-  | { type: "MOVE_ENTRY"; entryId: string; fromGroupId: string; toGroupId: string };
+  | { type: "MOVE_ENTRY"; entryId: string; fromGroupId: string; toGroupId: string }
+  // 无分组 actions
+  | { type: "ADD_UNGROUPED_ENTRY"; recipeId: string }
+  | { type: "REMOVE_UNGROUPED_ENTRY"; entryId: string }
+  | { type: "SET_UNGROUPED_PRICE"; entryId: string; price: number | null }
+  | { type: "REORDER_UNGROUPED"; entries: MenuEntry[] }
+  // 批量定价
+  | { type: "BATCH_SET_PRICE"; entryIds: string[]; price: number | null }
+  | { type: "TOGGLE_UNGROUPED_AVAILABLE"; entryId: string };
 
 function uuid(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -46,8 +56,14 @@ function uuid(): string {
 
 function reducer(state: MenuState, action: Action): MenuState {
   switch (action.type) {
-    case "LOAD":
-      return action.payload;
+    case "LOAD": {
+      // 兼容旧数据：若没有 ungroupedEntries 字段，补充空数组
+      const payload = action.payload;
+      return {
+        groups: payload.groups ?? [],
+        ungroupedEntries: payload.ungroupedEntries ?? [],
+      };
+    }
 
     case "ADD_GROUP": {
       const newGroup: MenuGroup = {
@@ -57,31 +73,34 @@ function reducer(state: MenuState, action: Action): MenuState {
         sortIndex: state.groups.length,
         entries: [],
       };
-      return { groups: [...state.groups, newGroup] };
+      return { ...state, groups: [...state.groups, newGroup] };
     }
 
     case "RENAME_GROUP":
       return {
+        ...state,
         groups: state.groups.map((g) =>
           g.id === action.groupId ? { ...g, name: action.name } : g
         ),
       };
 
     case "DELETE_GROUP":
-      return { groups: state.groups.filter((g) => g.id !== action.groupId) };
+      return { ...state, groups: state.groups.filter((g) => g.id !== action.groupId) };
 
     case "TOGGLE_COLLAPSE":
       return {
+        ...state,
         groups: state.groups.map((g) =>
           g.id === action.groupId ? { ...g, collapsed: !g.collapsed } : g
         ),
       };
 
     case "REORDER_GROUPS":
-      return { groups: action.groups };
+      return { ...state, groups: action.groups };
 
     case "ADD_ENTRY": {
       return {
+        ...state,
         groups: state.groups.map((g) => {
           if (g.id !== action.groupId) return g;
           // 防止重复添加同一配方到同一分组
@@ -101,6 +120,7 @@ function reducer(state: MenuState, action: Action): MenuState {
 
     case "REMOVE_ENTRY":
       return {
+        ...state,
         groups: state.groups.map((g) =>
           g.id === action.groupId
             ? { ...g, entries: g.entries.filter((e) => e.id !== action.entryId) }
@@ -110,6 +130,7 @@ function reducer(state: MenuState, action: Action): MenuState {
 
     case "SET_PRICE":
       return {
+        ...state,
         groups: state.groups.map((g) =>
           g.id === action.groupId
             ? {
@@ -124,6 +145,7 @@ function reducer(state: MenuState, action: Action): MenuState {
 
     case "TOGGLE_AVAILABLE":
       return {
+        ...state,
         groups: state.groups.map((g) =>
           g.id === action.groupId
             ? {
@@ -135,9 +157,17 @@ function reducer(state: MenuState, action: Action): MenuState {
             : g
         ),
       };
+    case "TOGGLE_UNGROUPED_AVAILABLE":
+      return {
+        ...state,
+        ungroupedEntries: state.ungroupedEntries.map((e) =>
+          e.id === action.entryId ? { ...e, available: !e.available } : e
+        ),
+      };
 
     case "REORDER_ENTRIES":
       return {
+        ...state,
         groups: state.groups.map((g) =>
           g.id === action.groupId ? { ...g, entries: action.entries } : g
         ),
@@ -161,7 +191,58 @@ function reducer(state: MenuState, action: Action): MenuState {
           return g;
         });
       }
-      return { groups: newGroups };
+      return { ...state, groups: newGroups };
+    }
+
+    // ─── 无分组 actions ───────────────────────────────────────────────────────
+
+    case "ADD_UNGROUPED_ENTRY": {
+      // 防止重复添加
+      if (state.ungroupedEntries.some((e) => e.recipeId === action.recipeId)) return state;
+      const entry: MenuEntry = {
+        id: uuid(),
+        recipeId: action.recipeId,
+        price: null,
+        available: true,
+        sortIndex: state.ungroupedEntries.length,
+        addedAt: new Date().toISOString(),
+      };
+      return { ...state, ungroupedEntries: [...state.ungroupedEntries, entry] };
+    }
+
+    case "REMOVE_UNGROUPED_ENTRY":
+      return {
+        ...state,
+        ungroupedEntries: state.ungroupedEntries.filter((e) => e.id !== action.entryId),
+      };
+
+    case "SET_UNGROUPED_PRICE":
+      return {
+        ...state,
+        ungroupedEntries: state.ungroupedEntries.map((e) =>
+          e.id === action.entryId ? { ...e, price: action.price } : e
+        ),
+      };
+
+    case "REORDER_UNGROUPED":
+      return { ...state, ungroupedEntries: action.entries };
+
+    // ─── 批量定价 ─────────────────────────────────────────────────────────────
+
+    case "BATCH_SET_PRICE": {
+      const idSet = new Set(action.entryIds);
+      return {
+        ...state,
+        groups: state.groups.map((g) => ({
+          ...g,
+          entries: g.entries.map((e) =>
+            idSet.has(e.id) ? { ...e, price: action.price } : e
+          ),
+        })),
+        ungroupedEntries: state.ungroupedEntries.map((e) =>
+          idSet.has(e.id) ? { ...e, price: action.price } : e
+        ),
+      };
     }
 
     default:
@@ -176,6 +257,7 @@ const STORAGE_KEY = "menu_store_v1";
 interface MenuContextValue {
   ready: boolean;
   groups: MenuGroup[];
+  ungroupedEntries: MenuEntry[];
   addGroup: (name: string) => void;
   renameGroup: (groupId: string, name: string) => void;
   deleteGroup: (groupId: string) => void;
@@ -187,16 +269,24 @@ interface MenuContextValue {
   toggleAvailable: (groupId: string, entryId: string) => void;
   reorderEntries: (groupId: string, entries: MenuEntry[]) => void;
   moveEntry: (entryId: string, fromGroupId: string, toGroupId: string) => void;
+  // 无分组 actions
+  addUngroupedEntry: (recipeId: string) => void;
+  removeUngroupedEntry: (entryId: string) => void;
+  setUngroupedPrice: (entryId: string, price: number | null) => void;
+  reorderUngrouped: (entries: MenuEntry[]) => void;
+  // 批量定价
+  batchSetPrice: (entryIds: string[], price: number | null) => void;
+  toggleUngroupedAvailable: (entryId: string) => void;
   /** 返回某 recipeId 所在的所有 groupId */
   groupsContaining: (recipeId: string) => string[];
-  /** 返回整个门店酒单中的配方 id 集合（去重） */
+  /** 返回整个门店酒单中的配方 id 集合（去重，含无分组） */
   allRecipeIds: Set<string>;
 }
 
 const MenuContext = createContext<MenuContextValue | null>(null);
 
 export function MenuProvider({ children }: { children: React.ReactNode }) {
-  const [state, dispatch] = useReducer(reducer, { groups: [] });
+  const [state, dispatch] = useReducer(reducer, { groups: [], ungroupedEntries: [] });
   const [ready, setReady] = React.useState(false);
 
   // 加载持久化数据
@@ -233,6 +323,13 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
   const reorderEntries = useCallback((groupId: string, entries: MenuEntry[]) => dispatch({ type: "REORDER_ENTRIES", groupId, entries }), []);
   const moveEntry = useCallback((entryId: string, fromGroupId: string, toGroupId: string) => dispatch({ type: "MOVE_ENTRY", entryId, fromGroupId, toGroupId }), []);
 
+  const addUngroupedEntry = useCallback((recipeId: string) => dispatch({ type: "ADD_UNGROUPED_ENTRY", recipeId }), []);
+  const removeUngroupedEntry = useCallback((entryId: string) => dispatch({ type: "REMOVE_UNGROUPED_ENTRY", entryId }), []);
+  const setUngroupedPrice = useCallback((entryId: string, price: number | null) => dispatch({ type: "SET_UNGROUPED_PRICE", entryId, price }), []);
+  const reorderUngrouped = useCallback((entries: MenuEntry[]) => dispatch({ type: "REORDER_UNGROUPED", entries }), []);
+  const batchSetPrice = useCallback((entryIds: string[], price: number | null) => dispatch({ type: "BATCH_SET_PRICE", entryIds, price }), []);
+  const toggleUngroupedAvailable = useCallback((entryId: string) => dispatch({ type: "TOGGLE_UNGROUPED_AVAILABLE", entryId }), []);
+
   const groupsContaining = useCallback(
     (recipeId: string) =>
       state.groups.filter((g) => g.entries.some((e) => e.recipeId === recipeId)).map((g) => g.id),
@@ -240,8 +337,11 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
   );
 
   const allRecipeIds = React.useMemo(
-    () => new Set(state.groups.flatMap((g) => g.entries.map((e) => e.recipeId))),
-    [state.groups]
+    () => new Set([
+      ...state.groups.flatMap((g) => g.entries.map((e) => e.recipeId)),
+      ...state.ungroupedEntries.map((e) => e.recipeId),
+    ]),
+    [state.groups, state.ungroupedEntries]
   );
 
   return (
@@ -249,6 +349,7 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
       value={{
         ready,
         groups: state.groups,
+        ungroupedEntries: state.ungroupedEntries,
         addGroup,
         renameGroup,
         deleteGroup,
@@ -260,6 +361,12 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
         toggleAvailable,
         reorderEntries,
         moveEntry,
+        addUngroupedEntry,
+        removeUngroupedEntry,
+        setUngroupedPrice,
+        reorderUngrouped,
+        batchSetPrice,
+        toggleUngroupedAvailable,
         groupsContaining,
         allRecipeIds,
       }}
