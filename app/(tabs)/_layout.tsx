@@ -61,6 +61,8 @@ export default function TabLayout() {
       {/* Legacy routes kept for deep-link compatibility; hidden from Tab Bar */}
       <Tabs.Screen name="bottles" options={{ href: null }} />
       <Tabs.Screen name="homemade" options={{ href: null }} />
+      <Tabs.Screen name="menu" options={{ href: null }} />
+      <Tabs.Screen name="recipes" options={{ href: null }} />
     </Tabs>
   );
 }
