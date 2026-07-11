@@ -1,0 +1,25 @@
+{
+  "cli": {
+    "version": ">= 13.0.0",
+    "appVersionSource": "remote",
+    "promptToConfigurePushNotifications": false
+  },
+  "build": {
+    "production": {
+      "autoIncrement": true,
+      "ios": {
+        "resourceClass": "m-medium"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "ascAppId": "6788653669",
+        "ascApiKeyPath": "/home/ubuntu/.apple-creds/AuthKey_ACAUMUU5ZW.p8",
+        "ascApiKeyId": "ACAUMUU5ZW",
+        "ascApiKeyIssuerId": "4c2aa939-390b-4d72-afef-7724d6238127"
+      }
+    }
+  }
+}
