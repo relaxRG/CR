@@ -29,7 +29,7 @@ import {
   ExtractedBook,
 } from "@/lib/import/extract";
 import { extractEpubToFileSystem } from "@/lib/import/extract";
-import { detectRecipesInText, RecipeCandidate } from "@/lib/import/detect";
+import { detectRecipesInText, RecipeCandidate, classifyCandidateKindEnhanced } from "@/lib/import/detect";
 import { ParsedRecipe } from "@/lib/recipes/parser";
 import { genId } from "@/lib/recipes/types";
 import { useRecipeStore } from "@/lib/recipes/store";
@@ -210,16 +210,17 @@ export default function BookImportScreen() {
   const { addBook, addBookWithHtml, addBookFromFileSystem } = useBookStore();
 
   const existingNames = useMemo(() => {
-    const set = new Set<string>();
+    const recipeNames = new Set<string>();
     for (const r of recipes) {
-      if (r.name) set.add(r.name.toLowerCase().trim());
-      if (r.nameEn) set.add(r.nameEn.toLowerCase().trim());
+      if (r.name) recipeNames.add(r.name.toLowerCase().trim());
+      if (r.nameEn) recipeNames.add(r.nameEn.toLowerCase().trim());
     }
+    const prepNames = new Set<string>();
     for (const p of preps) {
-      if (p.name) set.add(p.name.toLowerCase().trim());
-      if (p.nameAlt) set.add(p.nameAlt.toLowerCase().trim());
+      if (p.name) prepNames.add(p.name.toLowerCase().trim());
+      if (p.nameAlt) prepNames.add(p.nameAlt.toLowerCase().trim());
     }
-    return set;
+    return { recipeNames, prepNames };
   }, [recipes, preps]);
 
   const tap = () => {
@@ -463,11 +464,13 @@ export default function BookImportScreen() {
             }
           }
           if (bestIdx >= 0 && bestScore > 0.25) {
+            const { kind: eKind2, confidence: eConf2 } = classifyCandidateKindEnhanced(cand.name, cand.parsed, title);
+            const enhCand2 = { ...cand, kind: eKind2, confidence: Math.max(cand.confidence, eConf2) };
             next[bestIdx] = {
               ...next[bestIdx],
               isCandidate: true,
-              candidateConfidence: cand.confidence,
-              candidate: cand,
+              candidateConfidence: enhCand2.confidence,
+              candidate: enhCand2,
             };
           }
         }
@@ -522,11 +525,13 @@ export default function BookImportScreen() {
               for (const w of rawWords) if (blockLower.includes(w)) overlap++;
               const score = rawWords.length > 0 ? overlap / rawWords.length : 0;
               if (score > 0.3 && (!next[idx].isCandidate || cand.confidence > next[idx].candidateConfidence)) {
+                const { kind: eKind, confidence: eConf } = classifyCandidateKindEnhanced(cand.name, cand.parsed, b.sectionTitle || "");
+                const enhCand = { ...cand, kind: eKind, confidence: Math.max(cand.confidence, eConf) };
                 next[idx] = {
                   ...next[idx],
                   isCandidate: true,
-                  candidateConfidence: cand.confidence,
-                  candidate: cand,
+                  candidateConfidence: enhCand.confidence,
+                  candidate: enhCand,
                 };
               }
             }
@@ -563,19 +568,29 @@ export default function BookImportScreen() {
     if (selected.length === 0) return;
     const items: ReviewItem[] = selected.map((b) => {
       // Use existing candidate if available, else detect from block text
-      const cand: RecipeCandidate = b.candidate ?? (() => {
+      // Build base candidate
+      const baseCand: RecipeCandidate = b.candidate ?? (() => {
         const detected = detectRecipesInText(b.text, b.sectionTitle);
-        return detected[0] ?? {
+        if (detected[0]) return detected[0];
+        const fallbackName = b.text.split("\n")[0].slice(0, 48).trim();
+        return {
           id: genId(),
           kind: "cocktail" as const,
-          name: b.text.split("\n")[0].slice(0, 48).trim(),
-          parsed: { name: b.text.split("\n")[0].slice(0, 48).trim(), ingredients: [], steps: b.text, garnish: "", glass: "", method: "", source: "", variantOf: "", codexFamily: "", baseSpirit: "" },
+          name: fallbackName,
+          parsed: { name: fallbackName, ingredients: [], steps: b.text, garnish: "", glass: "", method: "", source: "", variantOf: "", codexFamily: "", baseSpirit: "" },
           raw: b.text,
           sectionTitle: b.sectionTitle,
-          confidence: 0.5,
+          confidence: 0.4,
         };
       })();
-      const duplicate = !!cand.name && existingNames.has(cand.name.toLowerCase().trim());
+      // Re-classify with enhanced logic (covers smoked/infused/wash etc.)
+      const { kind: enhancedKind, confidence: enhancedConf } = classifyCandidateKindEnhanced(
+        baseCand.name, baseCand.parsed, b.sectionTitle,
+      );
+      const cand: RecipeCandidate = { ...baseCand, kind: enhancedKind, confidence: Math.max(baseCand.confidence, enhancedConf) };
+      // Duplicate check scoped to target library
+      const targetNames = cand.kind === "prep" ? existingNames.prepNames : existingNames.recipeNames;
+      const duplicate = !!cand.name && targetNames.has(cand.name.toLowerCase().trim());
       return {
         blockId: b.id,
         candidate: cand,
@@ -1313,6 +1328,14 @@ export default function BookImportScreen() {
                         </Text>
                       </View>
                     )}
+                    {/* Kind badge: shows current classification with color */}
+                    <View style={[styles.badge, {
+                      backgroundColor: row.kind === "prep" ? "#34C75922" : "#007AFF22",
+                    }]}>
+                      <Text style={{ color: row.kind === "prep" ? "#34C759" : "#007AFF", fontSize: 11, fontWeight: "700" }}>
+                        {row.kind === "prep" ? (zh ? "→ 自制库" : "→ Prep") : (zh ? "→ 配方库" : "→ Recipe")}
+                      </Text>
+                    </View>
                   </Pressable>
                   {/* Kind switcher */}
                   <View style={{ flexDirection: "row", paddingHorizontal: 16, paddingBottom: 12, gap: 8 }}>
@@ -1328,7 +1351,9 @@ export default function BookImportScreen() {
                           ]}
                         >
                           <Text style={{ fontSize: 12, fontWeight: "600", color: active ? "#FFF" : colors.muted }}>
-                            {k === "cocktail" ? (zh ? "鸡尾酒" : "Cocktail") : (zh ? "自制（糖浆等）" : "Prep")}
+                            {k === "cocktail"
+                            ? (zh ? "🍸 配方库" : "🍸 Recipe")
+                            : (zh ? "🧪 自制库" : "🧪 Prep")}
                           </Text>
                         </Pressable>
                       );

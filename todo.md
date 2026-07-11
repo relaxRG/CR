@@ -94,6 +94,14 @@
   - [x] lib/i18n/translations.ts：更新 menu.* 翻译键（改名/新增）
 - [x] TypeScript 零错误
 
+## 书库导入分类准确性修复（2026-07-12）
+- [x] detect.ts：扩展 PREP_NAME_RE 关键词（smoked/infused/wash/gum syrup/demerara 等 30+ 新词）
+- [x] detect.ts：新增 classifyCandidateKindEnhanced（名称+配料+步骤+章节标题综合判断，返回置信度）
+- [x] book-import.tsx：修复重复检测分库隔离（recipe/prep 各自独立 Set，不再互相误判）
+- [x] book-import.tsx：所有扫描路径（localScan/runAiScan/proceedToConfirm）统一使用增强分类
+- [x] book-import.tsx：confirm phase UI 显示彩色分类标签（→配方库/→自制库）
+- [x] book-import.tsx：kind switcher 改为「🍸 配方库 / 🧪 自制库」更直观
+- [x] TypeScript 零错误
 ## 书库阅读器全面修复（2026-07-12）
 ### extract.ts 修复
 - [x] 封面检测增强：支持 meta name=cover、guide 元素、修复路径拼接

@@ -22,7 +22,7 @@ export interface RecipeCandidate {
 
 /** 名称中出现即判为自制配方的关键词 */
 const PREP_NAME_RE =
-  /糖浆|syrup|cordial|shrub|sherbet|oleo[\s-]?saccharum|orgeat|falernum|苦精|bitters|tincture|酊剂|infus(?:ion|ed)|浸渍|浸泡|solution|溶液|premix|pre-?batch|puree|果泥|自制|house[\s-]?made|grenadine|honey\s*mix|奶洗|milk[\s-]?wash|fat[\s-]?wash|油脂洗/i;
+  /糖浆|syrup|cordial|shrub|sherbet|oleo[\s-]?saccharum|orgeat|falernum|苦精|bitters|tincture|酊剂|infus(?:ion|ed)|浸渍|浸泡|solution|溶液|premix|pre-?batch|puree|果泥|自制|house[\s-]?made|grenadine|honey\s*mix|奶洗|milk[\s-]?wash|fat[\s-]?wash|油脂洗|smoked|smoke[\s-]?infused|clarif(?:ied|ication)|washed|wash\b|gum\s*syrup|simple\s*syrup|rich\s*syrup|demerara|cinnamon\s*syrup|ginger\s*syrup|vanilla\s*syrup|honey\s*syrup|oat\s*milk|coconut\s*cream|pineapple\s*gum|acid\s*(?:solution|adjust)|phosphoric|citric\s*acid|saline|salt\s*solution|tepache|kombucha|kefir|ferment|batch|bottled\s*cocktail|pre-?batched/i;
 
 /** 明显不是配方名称的行(章节头/目录/版权等) */
 const NOISE_NAME_RE =
@@ -108,6 +108,49 @@ export function classifyCandidateKind(name: string, parsed: ParsedRecipe): "cock
   if (!hasSpirit && prepIngHint && /糖浆|syrup|浸渍|infus|solution|溶液/i.test(parsed.steps + " " + ingText))
     return "prep";
   return "cocktail";
+}
+
+/**
+ * 增强版分类：结合名称、配料、步骤综合判断
+ * 返回 { kind, confidence } 以便 UI 显示置信度
+ */
+export function classifyCandidateKindEnhanced(
+  name: string,
+  parsed: ParsedRecipe,
+  sectionTitle = "",
+): { kind: "cocktail" | "prep"; confidence: number } {
+  // 1. 名称关键词命中 → 高置信度
+  if (PREP_NAME_RE.test(name)) return { kind: "prep", confidence: 0.95 };
+
+  const ingText = parsed.ingredients.map((i) => i.name).join(" ");
+  const allText = `${name} ${ingText} ${parsed.steps} ${sectionTitle}`;
+
+  // 2. 章节标题含 prep 关键词
+  if (PREP_NAME_RE.test(sectionTitle)) return { kind: "prep", confidence: 0.85 };
+
+  // 3. 配料中有烈酒 → 强烈倾向 cocktail
+  const hasSpirit =
+    /\bgin\b|rum\b|vodka\b|whisk(?:e?y|ies)|bourbon|tequila|mezcal|brandy|cognac|calvados|pisco|cachaca|absinthe|chartreuse|campari|aperol|vermouth|amaro|fernet|cynar|suze|lillet|port\b|sherry|madeira|sake\b|beer\b|wine\b|champagne|prosecco|cava\b|金酒|朗姆|伏特加|威士忌|龙舌兰|白兰地|利口酒|味美思|苦艾酒/i.test(
+      ingText,
+    );
+  if (hasSpirit) return { kind: "cocktail", confidence: 0.9 };
+
+  // 4. 步骤/配料含 prep 制作动词（加热、浸泡、过滤等）
+  const hasPrepVerb =
+    /\b(?:heat|simmer|boil|steep|strain|infus|blend|combine\s+(?:and\s+)?(?:heat|simmer)|let\s+(?:sit|rest|cool)|refrigerat|store|bottle|seal|shake\s+(?:and\s+)?strain\s+(?:into\s+)?(?:a\s+)?(?:jar|bottle|container)|加热|煮|熬|浸泡|过滤|冷藏|装瓶)\b/i.test(
+      allText,
+    );
+  const prepIngHint =
+    /sugar|honey|water|peel|spice|citric|acid|salt|cream|milk|juice\s+of|zest/i.test(ingText);
+
+  if (hasPrepVerb && prepIngHint && !hasSpirit) return { kind: "prep", confidence: 0.8 };
+
+  // 5. 配料很少（1-2种）且都是非酒精 → 可能是 prep
+  if (parsed.ingredients.length <= 2 && !hasSpirit && prepIngHint)
+    return { kind: "prep", confidence: 0.65 };
+
+  // 6. 默认 cocktail
+  return { kind: "cocktail", confidence: 0.7 };
 }
 
 /**
