@@ -8,6 +8,7 @@ import {
   runInitialSync,
   subscribeSyncState,
   type SyncState,
+  triggerStoreReload,
 } from "./engine";
 
 /**
@@ -73,6 +74,9 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         if (overwritten && Platform.OS === "web" && typeof window !== "undefined") {
           // 云端数据已写入本地存储,刷新以让各 store 重新加载
           window.location.reload();
+        } else if (overwritten && Platform.OS !== "web") {
+          // 原生端:通知各 store 从 AsyncStorage 重新加载
+          triggerStoreReload();
         }
       } catch (err: unknown) {
         if (cancelled) return;

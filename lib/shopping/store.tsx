@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useReducer } from "react";
+import { notifySyncChange, registerStoreReload } from "../sync/engine";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -196,9 +197,21 @@ export function ShoppingProvider({ children }: { children: React.ReactNode }) {
       .finally(() => setReady(true));
   }, []);
 
+  // 原生端云同步覆盖后重载
+  useEffect(() => {
+    return registerStoreReload(() => {
+      AsyncStorage.getItem(STORAGE_KEY).then((raw) => {
+        if (raw) {
+          try { dispatch({ type: "LOAD", payload: JSON.parse(raw) as ShoppingState }); } catch {}
+        }
+      });
+    });
+  }, []);
+
   useEffect(() => {
     if (!ready) return;
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state)).catch(() => {});
+    notifySyncChange(STORAGE_KEY);
   }, [state, ready]);
 
   const upsertItem = useCallback((item: ShoppingItem) => dispatch({ type: "UPSERT_ITEM", item }), []);

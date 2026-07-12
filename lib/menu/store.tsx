@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useReducer } from "react";
+import { notifySyncChange, registerStoreReload } from "../sync/engine";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -289,7 +290,7 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, { groups: [], ungroupedEntries: [] });
   const [ready, setReady] = React.useState(false);
 
-  // 加载持久化数据
+  // 加载持久化数据（也作为同步重载入口）
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY)
       .then((raw) => {
@@ -305,10 +306,22 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
       .finally(() => setReady(true));
   }, []);
 
+  // 原生端云同步覆盖后重载
+  useEffect(() => {
+    return registerStoreReload(() => {
+      AsyncStorage.getItem(STORAGE_KEY).then((raw) => {
+        if (raw) {
+          try { dispatch({ type: "LOAD", payload: JSON.parse(raw) as MenuState }); } catch {}
+        }
+      });
+    });
+  }, []);
+
   // 持久化
   useEffect(() => {
     if (!ready) return;
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state)).catch(() => {});
+    notifySyncChange(STORAGE_KEY);
   }, [state, ready]);
 
   const addGroup = useCallback((name: string) => dispatch({ type: "ADD_GROUP", name }), []);

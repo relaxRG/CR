@@ -29,6 +29,10 @@ export const SYNC_KEYS = [
   "cocktail.lab.projects",
   "cocktail.lab.batches",
   "app.lang.v1",
+  "cocktail.books.v1",
+  "menu_store_v1",
+  "shopping_store_v1",
+  "cocktail.iceSettings.v2",
 ] as const;
 
 const TS_PREFIX = "sync.ts."; // 每个键的本地最后修改时间戳
@@ -178,4 +182,20 @@ export function disableSync() {
   dirtyKeys.clear();
   if (pushTimer) clearTimeout(pushTimer);
   setState({ enabled: false, syncing: false });
+}
+
+/**
+ * 原生端 store 重载机制:
+ * 初始同步覆盖本地 AsyncStorage 后,各 store 需要重新从 AsyncStorage 加载。
+ * 通过注册/取消注册回调实现,避免在 engine 里直接依赖 React。
+ */
+const reloadCallbacks = new Set<() => void>();
+
+export function registerStoreReload(fn: () => void): () => void {
+  reloadCallbacks.add(fn);
+  return () => reloadCallbacks.delete(fn);
+}
+
+export function triggerStoreReload() {
+  reloadCallbacks.forEach((fn) => fn());
 }

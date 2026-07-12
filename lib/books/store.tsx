@@ -7,6 +7,7 @@ import React, {
   useState,
 } from "react";
 import { genId } from "../recipes/types";
+import { notifySyncChange, registerStoreReload } from "../sync/engine";
 
 const BOOKS_KEY = "cocktail.books.v1";
 
@@ -92,7 +93,7 @@ export function BookStoreProvider({ children }: { children: React.ReactNode }) {
   const [books, setBooks] = useState<StoredBook[]>([]);
   const [ready, setReady] = useState(false);
 
-  useEffect(() => {
+  const loadFromStorage = useCallback(() => {
     AsyncStorage.getItem(BOOKS_KEY)
       .then((raw) => {
         if (raw) {
@@ -102,8 +103,17 @@ export function BookStoreProvider({ children }: { children: React.ReactNode }) {
       .finally(() => setReady(true));
   }, []);
 
+  useEffect(() => {
+    loadFromStorage();
+  }, [loadFromStorage]);
+
+  useEffect(() => {
+    return registerStoreReload(loadFromStorage);
+  }, [loadFromStorage]);
+
   const persist = (next: StoredBook[]) => {
     AsyncStorage.setItem(BOOKS_KEY, JSON.stringify(next)).catch(() => {});
+    notifySyncChange(BOOKS_KEY);
   };
 
   const addBook = useCallback(

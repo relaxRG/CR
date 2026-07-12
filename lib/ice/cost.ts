@@ -10,6 +10,7 @@
  * 改名/调价后全部配方成本即时更新。
  */
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { notifySyncChange } from "../sync/engine";
 
 export type IcePricing = "perDrink" | "perGram" | "perPiece";
 
@@ -132,6 +133,7 @@ export async function loadIceSettings(): Promise<IceSettings> {
 
 export async function saveIceSettings(s: IceSettings): Promise<void> {
   await AsyncStorage.setItem(ICE_SETTINGS_KEY, JSON.stringify(s));
+  notifySyncChange(ICE_SETTINGS_KEY);
 }
 
 /** 单杯成本(按该款计价方式) */

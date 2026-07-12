@@ -18,6 +18,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
 import { useBookStore, StoredBook } from "@/lib/books/store";
+import { useIsTablet } from "@/hooks/use-is-tablet";
 
 /** Decode HTML entities in display strings */
 function decodeHtml(str: string): string {
@@ -54,6 +55,7 @@ export default function BooksScreen() {
   const { lang } = useI18n();
   const zh = lang === "zh";
   const { books, ready, deleteBook, updateBook } = useBookStore();
+  const isTablet = useIsTablet();
 
   const [sortBy, setSortBy] = useState<"importedAt" | "title" | "progress">("importedAt");
   const [filterStatus, setFilterStatus] = useState<"all" | "unread" | "reading" | "completed">("all");
@@ -370,26 +372,35 @@ export default function BooksScreen() {
         <FlatList
           data={filteredAndSorted}
           keyExtractor={(b) => b.id}
+          numColumns={isTablet ? 2 : 1}
+          key={isTablet ? "grid" : "list"}
           contentContainerStyle={{
             paddingHorizontal: 20,
             paddingTop: 4,
             paddingBottom: 100,
           }}
+          columnWrapperStyle={isTablet ? { gap: 12 } : undefined}
           renderItem={({ item: book, index }) => (
             <Pressable
               onPress={() => handleOpen(book)}
               onLongPress={() => handleLongPress(book)}
-              style={({ pressed }) => [pressed && { opacity: 0.75 }]}
+              style={({ pressed }) => [
+                isTablet && { flex: 1 },
+                pressed && { opacity: 0.75 },
+              ]}
             >
               <View
                 style={[
                   styles.bookCard,
                   { backgroundColor: colors.surface },
-                  index === 0 && { borderTopLeftRadius: 14, borderTopRightRadius: 14 },
-                  index === filteredAndSorted.length - 1 && {
-                    borderBottomLeftRadius: 14,
-                    borderBottomRightRadius: 14,
-                  },
+                  isTablet
+                    ? { borderRadius: 14, marginBottom: 12 }
+                    : {
+                        borderTopLeftRadius: index === 0 ? 14 : 0,
+                        borderTopRightRadius: index === 0 ? 14 : 0,
+                        borderBottomLeftRadius: index === filteredAndSorted.length - 1 ? 14 : 0,
+                        borderBottomRightRadius: index === filteredAndSorted.length - 1 ? 14 : 0,
+                      },
                 ]}
               >
                 {/* Cover icon */}

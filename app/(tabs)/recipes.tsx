@@ -19,6 +19,7 @@ import DraggableFlatList, {
   RenderItemParams,
 } from "react-native-draggable-flatlist";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useIsTablet } from "@/hooks/use-is-tablet";
 
 import { RecipeGroupCard } from "@/components/recipe-group-card";
 import { RecipeCard } from "@/components/recipe-card";
@@ -77,6 +78,7 @@ export function RecipesScreen() {
   const { bottles } = useBottleStore();
   const { preps } = useHomemadeStore();
   const flavorTags = tagsOf("flavor");
+  const isTablet = useIsTablet();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>({ type: "all" });
   // 多选模式:批量删除/批量改分类/风味
@@ -778,10 +780,16 @@ export function RecipesScreen() {
         <FlatList
           data={sorted}
           keyExtractor={(r) => r.id}
+          numColumns={isTablet ? 2 : 1}
+          key={isTablet ? "grid-select" : "list-select"}
+          columnWrapperStyle={isTablet ? { gap: 12, paddingHorizontal: 20 } : undefined}
           renderItem={({ item, index }) => {
             const checked = selectedIds.includes(item.id);
             return (
-              <Pressable onPress={() => toggleSelect(item.id)} style={styles.selRow}>
+              <Pressable
+                onPress={() => toggleSelect(item.id)}
+                style={[styles.selRow, isTablet && { flex: 1, marginBottom: 8 }]}
+              >
                 <View style={styles.selCheckWrap}>
                   <IconSymbol
                     name={checked ? "checkmark.circle.fill" : "circle"}
@@ -800,7 +808,7 @@ export function RecipesScreen() {
             );
           }}
           contentContainerStyle={{
-            paddingHorizontal: 20,
+            paddingHorizontal: isTablet ? 0 : 20,
             paddingTop: 4,
             paddingBottom: 160 + insets.bottom,
           }}

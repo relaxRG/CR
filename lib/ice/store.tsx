@@ -1,5 +1,6 @@
 /** 冰块成本设置的全局 Context:一次设置,全 App 自动生效 */
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { registerStoreReload } from "../sync/engine";
 
 import {
   DEFAULT_ICE_SETTINGS,
@@ -25,6 +26,13 @@ export function IceSettingsProvider({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     loadIceSettings().then(setState);
+  }, []);
+
+  // 原生端云同步覆盖后重载
+  useEffect(() => {
+    return registerStoreReload(() => {
+      loadIceSettings().then(setState);
+    });
   }, []);
 
   const value = useMemo<IceCtx>(
