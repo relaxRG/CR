@@ -139,57 +139,53 @@ function MenuEntryCard({
   const isAvailable = entry.available;
 
   return (
-    <View style={[styles.entryCardWrap, selected && { backgroundColor: colors.primary + "11" }]}>
-      {/* 选中框（批量模式） */}
-      {selectionMode && (
-        <Pressable
-          onPress={onToggleSelect}
-          hitSlop={8}
-          style={styles.checkboxWrap}
-        >
-          <IconSymbol
-            name={selected ? "checkmark.square.fill" : "square"}
-            size={22}
-            color={selected ? colors.primary : colors.muted}
-          />
-        </Pressable>
-      )}
+    <View style={[styles.entryCardWrap, { backgroundColor: colors.surface }, selected && { backgroundColor: colors.primary + "11" }]}>
+      {/* 主行：选中框 + 配方信息 + 操作区（水平排列，无绝对定位） */}
+      <View style={styles.entryMainRow}>
+        {/* 选中框（批量模式） */}
+        {selectionMode && (
+          <Pressable onPress={onToggleSelect} hitSlop={8} style={styles.checkboxWrap}>
+            <IconSymbol
+              name={selected ? "checkmark.square.fill" : "square"}
+              size={22}
+              color={selected ? colors.primary : colors.muted}
+            />
+          </Pressable>
+        )}
 
-      {/* 配方卡片（点击跳转详情） */}
-      <View style={{ flex: 1, pointerEvents: selectionMode ? "none" : "auto" }}>
-        <RecipeCard recipe={recipe} isFirst isLast />
-      </View>
+        {/* 配方信息区（占满剩余宽度） */}
+        <View style={{ flex: 1 }} pointerEvents={selectionMode ? "none" : "auto" as any}>
+          <RecipeCard recipe={recipe} isFirst isLast />
+        </View>
 
-      {/* 右侧操作区 */}
-      <View style={styles.entryActions}>
-        {/* 在售/停售状态点 */}
-        <Pressable
-          onPress={() => {
-            if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            onToggleAvailable();
-          }}
-          hitSlop={8}
-          style={styles.availBtn}
-        >
-          <View style={[
-            styles.availDot,
-            { backgroundColor: isAvailable ? colors.success : colors.border },
-          ]} />
-          <Text style={[styles.availLabel, { color: isAvailable ? colors.success : colors.muted }]}>
-            {isAvailable ? "在售" : "停售"}
-          </Text>
-        </Pressable>
-        {/* 删除 */}
-        <Pressable
-          onPress={() => {
-            if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            onRemove();
-          }}
-          hitSlop={8}
-          style={({ pressed }) => [{ opacity: pressed ? 0.5 : 1 }]}
-        >
-          <IconSymbol name="minus.circle.fill" size={18} color={colors.error} />
-        </Pressable>
+        {/* 右侧操作区：在售状态 + 删除（垂直排列，不覆盖卡片内容） */}
+        <View style={styles.entryActions}>
+          {/* 在售/停售 pill */}
+          <Pressable
+            onPress={() => {
+              if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              onToggleAvailable();
+            }}
+            hitSlop={8}
+            style={[styles.availPill, { backgroundColor: isAvailable ? colors.success + "20" : colors.border + "60" }]}
+          >
+            <View style={[styles.availDot, { backgroundColor: isAvailable ? colors.success : colors.muted }]} />
+            <Text style={[styles.availLabel, { color: isAvailable ? colors.success : colors.muted }]}>
+              {isAvailable ? "在售" : "停售"}
+            </Text>
+          </Pressable>
+          {/* 删除 */}
+          <Pressable
+            onPress={() => {
+              if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              onRemove();
+            }}
+            hitSlop={8}
+            style={({ pressed }) => [{ opacity: pressed ? 0.5 : 1 }]}
+          >
+            <IconSymbol name="minus.circle.fill" size={18} color={colors.error} />
+          </Pressable>
+        </View>
       </View>
 
       {/* 售价 + 利润率行 */}
@@ -239,7 +235,7 @@ function GroupHeader({ group, onAddRecipe }: GroupHeaderProps) {
     <Pressable
       style={({ pressed }) => [
         styles.groupHeader,
-        { borderBottomColor: colors.border, backgroundColor: colors.surface },
+        { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
         pressed && { opacity: 0.8 },
       ]}
       onPress={() => {
@@ -249,19 +245,21 @@ function GroupHeader({ group, onAddRecipe }: GroupHeaderProps) {
     >
       <IconSymbol
         name={group.collapsed ? "chevron.right" : "chevron.down"}
-        size={14}
+        size={13}
         color={colors.muted}
       />
-      <Text style={[styles.groupName, { color: colors.foreground }]}>{group.name}</Text>
-      <Text style={[styles.groupCount, { color: colors.muted }]}>
+      <Text style={[styles.groupName, { color: colors.foreground }]} numberOfLines={1}>{group.name}</Text>
+      <Text style={[styles.groupCount, { color: colors.muted, backgroundColor: colors.border + "60", paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999 }]}>
         {group.entries.filter((e) => e.available).length}/{group.entries.length}
       </Text>
-      <Pressable onPress={onAddRecipe} hitSlop={8} style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}>
-        <IconSymbol name="plus.circle.fill" size={20} color={colors.primary} />
-      </Pressable>
-      <Pressable onPress={handleOptions} hitSlop={8} style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}>
-        <IconSymbol name="ellipsis" size={18} color={colors.muted} />
-      </Pressable>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+        <Pressable onPress={onAddRecipe} hitSlop={10} style={({ pressed }) => [styles.groupActionBtn, { opacity: pressed ? 0.6 : 1 }]}>
+          <IconSymbol name="plus.circle.fill" size={20} color={colors.primary} />
+        </Pressable>
+        <Pressable onPress={handleOptions} hitSlop={10} style={({ pressed }) => [styles.groupActionBtn, { opacity: pressed ? 0.6 : 1 }]}>
+          <IconSymbol name="ellipsis" size={18} color={colors.muted} />
+        </Pressable>
+      </View>
     </Pressable>
   );
 }
@@ -901,19 +899,27 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 10,
+    paddingVertical: 9,
+    borderRadius: 12,
     gap: 8,
   },
   groupName: {
     flex: 1,
     fontSize: 14,
-    fontWeight: "600",
-    lineHeight: 19,
+    fontWeight: "700",
+    lineHeight: 20,
   },
   groupCount: {
     fontSize: 12,
-    fontWeight: "500",
+    fontWeight: "600",
+    lineHeight: 17,
+  },
+  groupActionBtn: {
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 8,
   },
   // 配方卡片行
   entryCardWrap: {
@@ -921,20 +927,31 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     marginBottom: 6,
   },
+  entryMainRow: {
+    flexDirection: "row",
+    alignItems: "stretch",
+  },
   checkboxWrap: {
-    position: "absolute",
-    left: 8,
-    top: 10,
-    zIndex: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingLeft: 10,
+    paddingRight: 4,
   },
   entryActions: {
-    position: "absolute",
-    right: 8,
-    top: 8,
     flexDirection: "column",
     alignItems: "center",
+    justifyContent: "center",
     gap: 6,
-    zIndex: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+  },
+  availPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 999,
   },
   availBtn: {
     alignItems: "center",
