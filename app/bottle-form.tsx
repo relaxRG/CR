@@ -25,6 +25,7 @@ import { useBottleTaxonomy } from "@/lib/bottles/taxonomy";
 import { trpc } from "@/lib/trpc";
 import type { EnrichedProduct } from "@/server/routers";
 import * as ImagePicker from "expo-image-picker";
+import { BOTTLE_GROUPS } from "@/lib/bottles/types";
 
 export default function BottleFormScreen() {
   const colors = useColors();
@@ -39,7 +40,7 @@ export default function BottleFormScreen() {
       prefillStyle?: string;
     }>();
   const { getBottle, addBottle, updateBottle } = useBottleStore();
-  const { categories: taxCategories, categoryLabel, stylesOf } = useBottleTaxonomy();
+  const { categories: taxCategories, categoryLabel, stylesOf, categoriesOfGroup } = useBottleTaxonomy();
   const editing = getBottle(id);
   const isMountedRef = useRef(true);
   useEffect(() => {
@@ -460,34 +461,61 @@ export default function BottleFormScreen() {
             </View>
           )}
 
-          <Text className="text-sm font-medium text-foreground mb-1.5">{t("bform.category")}</Text>
-          <View className="flex-row flex-wrap mb-4" style={{ gap: 8 }}>
-            {taxCategories.map((c) => c.zh).map((cat) => {
-              const active = category === cat;
-              return (
-                <Pressable
-                  key={cat}
-                  onPress={() => setCategory(cat)}
-                  style={[
-                    styles.chip,
-                    {
-                      backgroundColor: active ? colors.primary : colors.surface,
-                      borderColor: active ? colors.primary : colors.border,
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.chipText,
-                      { color: active ? "#FFFFFF" : colors.foreground },
-                    ]}
-                  >
-                    {categoryLabel(cat, lang)}
+         <Text className="text-sm font-medium text-foreground mb-1.5">{t("bform.category")}</Text>
+          {BOTTLE_GROUPS.map((grp) => {
+            const groupCats = categoriesOfGroup(grp.key);
+            if (groupCats.length === 0) return null;
+            return (
+              <View key={grp.key} style={{ marginBottom: 10 }}>
+                <View className="flex-row items-center mb-1.5" style={{ gap: 6 }}>
+                  <View
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: 4,
+                      backgroundColor:
+                        grp.key === "spirits"
+                          ? colors.warning
+                          : grp.key === "bottles"
+                            ? colors.primary
+                            : colors.success,
+                    }}
+                  />
+                  <Text className="text-[13px] font-semibold text-foreground" style={{ lineHeight: 18 }}>
+                    {lang === "en" ? grp.en : grp.zh}
                   </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+                </View>
+                <View className="flex-row flex-wrap" style={{ gap: 8 }}>
+                  {groupCats.map((cat) => {
+                    const active = category === cat;
+                    return (
+                      <Pressable
+                        key={cat}
+                        onPress={() => setCategory(cat)}
+                        style={[
+                          styles.chip,
+                          {
+                            backgroundColor: active ? colors.primary : colors.surface,
+                            borderColor: active ? colors.primary : colors.border,
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.chipText,
+                            { color: active ? "#FFFFFF" : colors.foreground },
+                          ]}
+                        >
+                          {categoryLabel(cat, lang)}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            );
+          })}
+          <View style={{ marginBottom: 4 }} />
 
           {stylesOf(category).length > 0 && (
             <>
