@@ -1,7 +1,7 @@
 import * as Haptics from "expo-haptics";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React from "react";
-import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Platform, Pressable, ScrollView, ScrollView as HScrollView, StyleSheet, Text, View } from "react-native";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { StarRating } from "@/components/star-rating";
@@ -12,7 +12,7 @@ import { displayNames } from "@/lib/utils";
 import { useHomemadeStore } from "@/lib/homemade/store";
 import { useBottleStore } from "@/lib/bottles/store";
 import { estimatePrepCost } from "@/lib/homemade/cost";
-import { prepTypeLabelIn } from "@/lib/homemade/types";
+import { prepTypeLabelIn, prepSectionLabelIn, prepSectionOfIn } from "@/lib/homemade/types";
 import { detectPrepTechniques, techniqueDesc, techniqueLabel } from "@/lib/homemade/technique";
 import { parseSource } from "@/lib/recipes/source-parse";
 
@@ -21,7 +21,7 @@ export default function HomemadeDetailScreen() {
   const router = useRouter();
   const { t, lang } = useI18n();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { getPrep, deletePrep, togglePrepMade, setPrepRating, types } = useHomemadeStore();
+  const { getPrep, deletePrep, togglePrepMade, setPrepRating, types, sections } = useHomemadeStore();
   const { bottles } = useBottleStore();
   const prep = getPrep(id);
 
@@ -76,6 +76,26 @@ export default function HomemadeDetailScreen() {
   const cost = estimatePrepCost(prep, bottles);
   const techs = detectPrepTechniques(prep);
   const primaryTechDesc = techs.length > 0 ? techniqueDesc(techs[0], lang) : "";
+
+  // 标签分区数据
+  const sectionKey = prepSectionOfIn(types, prep.type);
+  const sectionLabelText = prepSectionLabelIn(sections, sectionKey, lang);
+  const typeLabelText = prepTypeLabelIn(types, prep.type, lang);
+
+  const chipStyle = (primary?: boolean) => ({
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    marginRight: 6,
+    backgroundColor: primary ? (colors.primary + "22") : colors.surface,
+    borderWidth: 1,
+    borderColor: primary ? (colors.primary + "55") : colors.border,
+  });
+  const chipTextStyle = (primary?: boolean) => ({
+    fontSize: 13,
+    color: primary ? colors.primary : colors.foreground,
+    fontWeight: primary ? ("600" as const) : ("400" as const),
+  });
 
   const sectionTitle = (label: string) => (
     <Text
@@ -137,6 +157,27 @@ export default function HomemadeDetailScreen() {
         {names.secondary ? (
           <Text className="text-base text-muted mt-1">{names.secondary}</Text>
         ) : null}
+
+        {/* 标签分区行：分区 + 类型 + 工艺标签 */}
+        <HScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ flexDirection: "row", alignItems: "center", marginTop: 10, marginBottom: 2 }}
+        >
+          <View style={chipStyle(true)}>
+            <Text style={chipTextStyle(true)}>{sectionLabelText}</Text>
+          </View>
+          {typeLabelText !== sectionLabelText ? (
+            <View style={chipStyle(false)}>
+              <Text style={chipTextStyle(false)}>{typeLabelText}</Text>
+            </View>
+          ) : null}
+          {techs.slice(0, 3).map((techKey) => (
+            <View key={techKey} style={chipStyle(false)}>
+              <Text style={chipTextStyle(false)}>{techniqueLabel(techKey, lang)}</Text>
+            </View>
+          ))}
+        </HScrollView>
 
         {sectionTitle(t("bottle.info"))}
         <View className="bg-surface rounded-xl px-4">

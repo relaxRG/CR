@@ -1,7 +1,7 @@
 import * as Haptics from "expo-haptics";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React from "react";
-import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Platform, Pressable, ScrollView, ScrollView as HScrollView, StyleSheet, Text, View } from "react-native";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { StarRating } from "@/components/star-rating";
@@ -19,6 +19,21 @@ export default function BottleDetailScreen() {
   const { getBottle, deleteBottle, setBottleRating } = useBottleStore();
   const { categoryLabel } = useBottleTaxonomy();
   const bottle = getBottle(id);
+
+  const chipStyle = (primary?: boolean) => ({
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    marginRight: 6,
+    backgroundColor: primary ? (colors.primary + "22") : colors.surface,
+    borderWidth: 1,
+    borderColor: primary ? (colors.primary + "55") : colors.border,
+  });
+  const chipTextStyle = (primary?: boolean) => ({
+    fontSize: 13,
+    color: primary ? colors.primary : colors.foreground,
+    fontWeight: primary ? ("600" as const) : ("400" as const),
+  });
 
   if (!bottle) {
     return (
@@ -105,6 +120,24 @@ export default function BottleDetailScreen() {
             {lang === "en" ? bottle.nameZh : bottle.nameEn}
           </Text>
         ) : null}
+
+        {/* 标签分区行：分类 + 风格子标签 */}
+        <HScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ flexDirection: "row", alignItems: "center", marginTop: 10, marginBottom: 2 }}
+        >
+          <View style={chipStyle(true)}>
+            <Text style={chipTextStyle(true)}>
+              {categoryLabel(bottle.category, lang)}
+            </Text>
+          </View>
+          {bottle.style ? (
+            <View style={chipStyle(false)}>
+              <Text style={chipTextStyle(false)}>{bottle.style}</Text>
+            </View>
+          ) : null}
+        </HScrollView>
 
         <Text className="text-[13px] text-muted uppercase mt-6 mb-2 px-4" style={{ letterSpacing: 0.4, lineHeight: 18 }}>
           {t("bottle.info")}
