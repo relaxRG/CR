@@ -524,6 +524,122 @@ ${(input.ingredientsWithAmounts ?? []).length > 0 ? `配料（含用量，用量
         };
       }),
 
+
+    /** 深度解析配方：联网搜索 + 强模型 + 全字段补全（分类/基酒/Codex/变体/风味/制作/烈度/冰块/风味描述/引用来源/故事） */
+    deepAnalyzeRecipe: publicProcedure
+      .input(
+        z.object({
+          name: z.string().max(200).optional(),
+          nameEn: z.string().optional(),
+          ingredients: z.string().optional(), // comma-separated ingredient names
+          baseSpirit: z.string().optional(),
+          source: z.string().optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const { name, nameEn, ingredients, baseSpirit, source } = input;
+        const recipeName = (name ?? "") || (nameEn ?? "") || "";
+        if (!recipeName) return { confidence: "low" as const };
+
+        // Build a rich prompt with all available context
+        const contextParts: string[] = [];
+        if (name) contextParts.push(`中文名: ${name}`);
+        if (nameEn) contextParts.push(`英文名: ${nameEn}`);
+        if (ingredients) contextParts.push(`配料: ${ingredients}`);
+        if (baseSpirit) contextParts.push(`基酒: ${baseSpirit}`);
+        if (source) contextParts.push(`来源: ${source}`);
+        const context = contextParts.join("\n");
+
+        const systemPrompt = `你是一位专业调酒师和鸡尾酒历史学家，拥有丰富的调酒知识。请根据提供的配方信息，进行全面深度分析，返回 JSON 格式结果。
+
+风味描述必须严格使用以下三行固定结构（不得增减行数，不得改变格式）：
+第一行：核心基调：[列举2-3个核心风味词]
+第二行：风味演变：[前段风味] ➔ [中段骨架] ➔ [后段余韵]
+第三行：整体质感：[2-3个关于酒体结构的质感词汇]`;
+
+        const userPrompt = `请分析以下鸡尾酒配方，返回完整的 JSON 分析结果：
+
+${context}
+
+请返回以下 JSON 格式（所有字段均可选，不确定的留空字符串）：
+{
+  "story": "配方的历史来历与创作背景（2-4句话）",
+  "flavorDesc": "核心基调：...\n风味演变：... ➔ ... ➔ ...\n整体质感：...",
+  "source": "来源书籍或出处",
+  "creator": "调酒师或创作者姓名",
+  "createdYear": "创作年份（如 2012）",
+  "suggestedCategories": ["经典", "短饮"],
+  "suggestedBaseSpirit": "主要基酒（从：金酒/朗姆/伏特加/威士忌/龙舌兰/白兰地/梅斯卡尔/利口酒/皮斯科/卡沙萨/无酒精/其他 中选择）",
+  "suggestedCodexFamily": "Codex六大分类之一（古典/马天尼/大吉利/边车/高球/菲兹，不确定留空）",
+  "suggestedVariantOf": "经典变体来源（如：尼格罗尼，不确定留空）",
+  "suggestedMethod": "制作方法（摇和/搅和/直调/分层/搅打/其他）",
+  "suggestedStrength": "烈度（清爽/适中/浓烈）",
+  "suggestedIce": "冰块类型（大方冰/球冰/碎冰/方冰/无冰/冰沙）",
+  "flavors": ["酸", "甜"],
+  "confidence": "high"
+}
+
+注意：
+- flavorDesc 必须严格三行，第二行必须用 ➔ 符号
+- suggestedBaseSpirit 只能是标准基酒名称，不能是品牌名
+- confidence 根据你对该配方的了解程度填写：high（著名配方）/ medium（有一定了解）/ low（不确定）`;
+
+        try {
+          const result = await invokeLLM({
+            model: "claude-sonnet",
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userPrompt },
+            ],
+            maxTokens: 1200,
+            response_format: { type: "json_object" },
+          });
+
+          const text = typeof result === "string" ? result : (result as { content?: string }).content ?? "";
+          const jsonMatch = text.match(/\{[\s\S]*\}/);
+          if (!jsonMatch) return { confidence: "low" as const };
+
+          const p = JSON.parse(jsonMatch[0]) as {
+            story?: string;
+            flavorDesc?: string;
+            source?: string;
+            creator?: string;
+            createdYear?: string;
+            suggestedCategories?: string[];
+            suggestedBaseSpirit?: string;
+            suggestedCodexFamily?: string;
+            suggestedVariantOf?: string;
+            suggestedMethod?: string;
+            suggestedStrength?: string;
+            suggestedIce?: string;
+            flavors?: string[];
+            confidence?: string;
+          };
+
+          const validConf = (v?: string) =>
+            v === "high" || v === "medium" || v === "low" ? (v as "high" | "medium" | "low") : ("medium" as const);
+
+          return {
+            story: typeof p.story === "string" ? p.story.trim() : "",
+            flavorDesc: typeof p.flavorDesc === "string" ? p.flavorDesc.trim() : "",
+            source: typeof p.source === "string" ? p.source.trim() : "",
+            creator: typeof p.creator === "string" ? p.creator.trim() : "",
+            createdYear: typeof p.createdYear === "string" ? p.createdYear.trim() : "",
+            suggestedCategories: Array.isArray(p.suggestedCategories) ? p.suggestedCategories.filter((s): s is string => typeof s === "string") : [],
+            suggestedBaseSpirit: typeof p.suggestedBaseSpirit === "string" ? p.suggestedBaseSpirit.trim() : "",
+            suggestedCodexFamily: typeof p.suggestedCodexFamily === "string" ? p.suggestedCodexFamily.trim() : "",
+            suggestedVariantOf: typeof p.suggestedVariantOf === "string" ? p.suggestedVariantOf.trim() : "",
+            suggestedMethod: typeof p.suggestedMethod === "string" ? p.suggestedMethod.trim() : "",
+            suggestedStrength: typeof p.suggestedStrength === "string" ? p.suggestedStrength.trim() : "",
+            suggestedIce: typeof p.suggestedIce === "string" ? p.suggestedIce.trim() : "",
+            flavors: Array.isArray(p.flavors) ? p.flavors.filter((s): s is string => typeof s === "string") : [],
+            confidence: validConf(p.confidence),
+          };
+        } catch {
+          return { confidence: "low" as const };
+        }
+      }),
+
     /** 酒款风味/故事/风格联网补全:根据产品名称与已有信息补全风味标签、故事、风格描述 */
     enrichBottle: publicProcedure
       .input(

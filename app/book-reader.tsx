@@ -68,6 +68,41 @@ interface ExtractedRecipe {
 
 /* ─── Reading CSS injected into HTML renderer ─────────────────────────────── */
 
+/* ─── Inline EPUB images as base64 to bypass WebView sandbox restrictions ───── */
+async function inlineImagesAsBase64(html: string, chapterFilePath: string): Promise<string> {
+  // Determine the base directory of the chapter file
+  const lastSlash = chapterFilePath.lastIndexOf("/");
+  const baseDir = lastSlash >= 0 ? chapterFilePath.slice(0, lastSlash + 1) : "";
+  const imgRegex = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
+  const matches: { full: string; src: string }[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = imgRegex.exec(html)) !== null) {
+    matches.push({ full: m[0], src: m[1] });
+  }
+  if (matches.length === 0) return html;
+  let result = html;
+  for (const { full, src } of matches) {
+    // Skip already-inlined or remote images
+    if (src.startsWith("data:") || src.startsWith("http")) continue;
+    try {
+      const cleanSrc = src.replace(/^(\.\.\/)+/, "").replace(/^\.\//, "");
+      const docDir = FileSystemLegacy.documentDirectory ?? "";
+      const booksIdx = baseDir.indexOf("/books/");
+      const resolvedBase = booksIdx >= 0 ? docDir + baseDir.slice(booksIdx + 1) : baseDir;
+      const imgPath = resolvedBase + cleanSrc;
+      const ext = imgPath.split(".").pop()?.toLowerCase() ?? "png";
+      const mimeMap: Record<string, string> = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", gif: "image/gif", svg: "image/svg+xml", webp: "image/webp" };
+      const mime = mimeMap[ext] ?? "image/png";
+      const b64 = await FileSystemLegacy.readAsStringAsync(imgPath, { encoding: FileSystemLegacy.EncodingType.Base64 });
+      const dataUri = `data:${mime};base64,${b64}`;
+      result = result.replace(full, full.replace(src, dataUri));
+    } catch {
+      // Silently skip unreadable images — never block rendering
+    }
+  }
+  return result;
+}
+
 const READER_CSS = `
   /* Base */
   *, *::before, *::after { box-sizing: border-box; }
@@ -456,6 +491,8 @@ export default function BookReaderScreen() {
   /* Chrome visibility (tap to hide/show) */
   const [chromeVisible, setChromeVisible] = useState(true);
   const chromeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /* Navigation history for "back to previous location" after internal link jumps */
+  const [navHistory, setNavHistory] = useState<{ chapterIdx: number; page: number }[]>([]);
 
   /* Selection mode */
   const [phase, setPhase] = useState<Phase>("reading");
@@ -526,8 +563,12 @@ export default function BookReaderScreen() {
         tryRead(resolvedPath)
           .catch(() => tryRead(rawPath))
           .then((html) => {
-            setChapterHtml(html);
-            setLoadingChapter(false);
+            // Inline images as base64 to bypass WebView sandbox restrictions
+            const chapterFilePath = book.sections[chapterIdx].text;
+            inlineImagesAsBase64(html, chapterFilePath).then((inlined) => {
+              setChapterHtml(inlined);
+              setLoadingChapter(false);
+            });
           })
           .catch(() => {
             setChapterHtml("<p>章节文件读取失败，请重新导入书籍</p>");
@@ -1025,9 +1066,28 @@ export default function BookReaderScreen() {
       {/* ── Top chrome (auto-hide) ── */}
       {chromeVisible && phase === "reading" && (
         <View style={[styles.topBar, { backgroundColor: colors.background + "F0", borderBottomColor: colors.border }]}>
-          <Pressable onPress={() => router.back()} hitSlop={8} style={({ pressed }) => [pressed && { opacity: 0.6 }]}>
-            <IconSymbol name="chevron.left" size={20} color={colors.foreground} />
-          </Pressable>
+          {navHistory.length > 0 ? (
+            <Pressable
+              onPress={() => {
+                const prev = navHistory[navHistory.length - 1];
+                setNavHistory((h) => h.slice(0, -1));
+                setChapterIdx(prev.chapterIdx);
+                setCurrentPage(prev.page);
+                setCurrentPageInChapter(prev.page);
+                webViewRef.current?.injectJavaScript(`window.__goToPage && window.__goToPage(${prev.page}); true;`);
+                if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              }}
+              hitSlop={8}
+              style={({ pressed }) => [{ flexDirection: "row", alignItems: "center", gap: 2 }, pressed && { opacity: 0.6 }]}
+            >
+              <IconSymbol name="chevron.left" size={20} color={colors.primary} />
+              <Text style={{ fontSize: 13, color: colors.primary, fontWeight: "500" }}>返回</Text>
+            </Pressable>
+          ) : (
+            <Pressable onPress={() => router.back()} hitSlop={8} style={({ pressed }) => [pressed && { opacity: 0.6 }]}>
+              <IconSymbol name="chevron.left" size={20} color={colors.foreground} />
+            </Pressable>
+          )}
           <Text style={[styles.topBarTitle, { color: colors.foreground }]} numberOfLines={1}>
             {book.title || book.fileName}
           </Text>

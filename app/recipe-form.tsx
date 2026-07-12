@@ -230,6 +230,7 @@ export default function RecipeFormScreen() {
   const { t, lang } = useI18n();
   const { getRecipe, addRecipe, updateRecipe, categories, tagsOf, addTag } = useRecipeStore();
   const enrichRecipeMutation = trpc.lookup.enrichRecipe.useMutation();
+  const deepAnalyzeMutation = trpc.lookup.deepAnalyzeRecipe.useMutation();
   const { isOnline } = useNetwork();
   const { preps } = useHomemadeStore();
   const { bottles } = useBottleStore();
@@ -287,6 +288,13 @@ export default function RecipeFormScreen() {
     suggestedGlassConfidence?: "high" | "medium" | "low";
     suggestedIce?: string;
     suggestedIceConfidence?: "high" | "medium" | "low";
+    isDeepAnalysis?: boolean;
+    suggestedCategories?: string[];
+    suggestedCodexFamily?: string;
+    suggestedVariantOf?: string;
+    suggestedMethod?: string;
+    creator?: string;
+    createdYear?: string;
   } | null>(null);
   /** Which ingredient row is focused (shows live suggestions) */
   /** 风味标签专属置信度（来自自动 AI 分析） */
@@ -368,13 +376,30 @@ export default function RecipeFormScreen() {
     const resolved = parts.map((p) => {
       const hit = spiritNames.find((s) => p.includes(s) || s.includes(p));
       if (hit) return hit;
-      // 尝试创建新标签（仅当不是品牌名时）
-      const created = addTag("spirit", p, CATEGORY_COLORS[0]);
-      const nextName = created?.name ?? p;
-      setNewSpiritTags((prev) => (prev.includes(nextName) ? prev : [...prev, nextName]));
-      return nextName;
+      // 品牌名→标准基酒规范化映射，防止品牌名被当作新标签
+      const brandKeywords: [string, string][] = [
+        ["vodka", "伏特加"], ["gin", "金酒"], ["rum", "朗姆"], ["whisky", "威士忌"],
+        ["whiskey", "威士忌"], ["tequila", "龙舌兰"], ["mezcal", "梅斯卡尔"],
+        ["brandy", "白兰地"], ["cognac", "白兰地"], ["pisco", "皮斯科"],
+        ["cachaca", "卡沙萨"], ["sake", "清酒"],
+      ];
+      const pLower = p.toLowerCase();
+      for (const [keyword, standard] of brandKeywords) {
+        if (pLower.includes(keyword)) {
+          const standardHit = spiritNames.find((s) => s === standard || s.includes(standard));
+          return standardHit ?? standard;
+        }
+      }
+      // Only create new tag for short names (≤8 chars), not brand descriptions
+      if (p.length <= 8) {
+        const created = addTag("spirit", p, CATEGORY_COLORS[0]);
+        const nextName = created?.name ?? p;
+        setNewSpiritTags((prev) => (prev.includes(nextName) ? prev : [...prev, nextName]));
+        return nextName;
+      }
+      return "";
     });
-    return resolved.join(",");
+    return [...new Set(resolved.filter(Boolean))].join(",");
   };
   const ensureGlassName = (raw: string) => {
     const cleaned = raw.trim();
@@ -453,6 +478,48 @@ export default function RecipeFormScreen() {
    * 打开表单时自动触发 AI 风味分析（仅一次）。
    * 结果直接点亮风味标签；低置信度时显示警告横幅。
    */
+  /** 深度解析：联网 + 强模型，补全所有字段 */
+  const handleDeepAnalyze = () => {
+    const recipeName = name.trim() || nameEn.trim();
+    if (!recipeName || deepAnalyzeMutation.isPending) return;
+    if (!isOnline) {
+      Alert.alert(t("offline.title"), t("offline.aiUnavailable"));
+      return;
+    }
+    setAiEnriching(true);
+    setAiResult(null);
+    const ingNames = ingredients.map((i) => i.name).filter(Boolean);
+    deepAnalyzeMutation.mutate(
+      {
+        name: name.trim() || undefined,
+        nameEn: nameEn.trim() || undefined,
+        ingredients: ingNames.length > 0 ? ingNames.join(", ") : undefined,
+        baseSpirit: baseSpirit || undefined,
+        source: source.trim() || undefined,
+      },
+      {
+        onSuccess: (result) => {
+          if (!isMountedRef.current) return;
+          if (!baseSpirit && result.suggestedBaseSpirit) {
+            const resolved = resolveAiSpirits(result.suggestedBaseSpirit);
+            const spirits = resolved.split(",").map((s) => s.trim()).filter(Boolean);
+            setSpiritConfidence("high");
+            setAiSuggestedSpirits(spirits);
+            setBaseSpirit(resolved);
+          }
+          setAiResult({ ...result, isDeepAnalysis: true });
+          setAiEnriching(false);
+        },
+        onError: (err: unknown) => {
+          if (!isMountedRef.current) return;
+          setAiEnriching(false);
+          const msg = err instanceof Error ? err.message : "深度解析失败，请重试";
+          Alert.alert("深度解析失败", msg);
+        },
+      },
+    );
+  };
+
   useEffect(() => {
     if (autoFlavorDoneRef.current) return;
     const recipeName = name.trim() || nameEn.trim();
@@ -544,6 +611,27 @@ export default function RecipeFormScreen() {
     if (!ice && aiResult.suggestedIce) {
       const nextName = normalizeIceName(aiResult.suggestedIce);
       if ((ICE_TYPES as readonly string[]).includes(nextName)) setIce(nextName);
+    }
+    // Deep analysis extra fields
+    if (aiResult.isDeepAnalysis) {
+      if (aiResult.suggestedCodexFamily && !codexFamily) {
+        setCodexFamily(aiResult.suggestedCodexFamily);
+      }
+      if (aiResult.suggestedVariantOf && !variantOf) {
+        setVariantOf(aiResult.suggestedVariantOf);
+      }
+      if (aiResult.suggestedMethod) {
+        setMethod(aiResult.suggestedMethod);
+      }
+      if (aiResult.creator || aiResult.createdYear) {
+        setSourceRef((prev) => ({
+          ...prev,
+          creator: aiResult.creator && !prev.creator ? aiResult.creator : prev.creator,
+          createdYear: aiResult.createdYear && !prev.createdYear ? aiResult.createdYear : prev.createdYear,
+          creatorConfidence: "medium",
+        }));
+        setShowSourceRef(true);
+      }
     }
     setAiResult(null);
   };
@@ -840,42 +928,73 @@ export default function RecipeFormScreen() {
           )}
 
           {/* AI Fill button — prominent, right below name fields */}
-          <Pressable
-            onPress={handleAiEnrich}
-            disabled={aiEnriching || (!name.trim() && !nameEn.trim())}
-            style={({ pressed }) => [
-              {
-                flexDirection: "row" as const,
-                alignItems: "center" as const,
-                justifyContent: "center" as const,
-                gap: 6,
-                marginTop: 12,
-                paddingVertical: 10,
-                paddingHorizontal: 16,
-                borderRadius: 12,
-                borderWidth: 1,
-                borderColor: (!name.trim() && !nameEn.trim()) ? colors.border : colors.primary + "55",
-                backgroundColor: (!name.trim() && !nameEn.trim()) ? colors.surface : colors.primary + "0E",
-                opacity: pressed ? 0.7 : 1,
-              },
-            ]}
-          >
-            {aiEnriching ? (
-              <>
-                <IconSymbol name="sparkles" size={15} color={colors.primary} />
-                <Text style={{ fontSize: 14, fontWeight: "600", color: colors.primary }}>
-                  {lang === "zh" ? "AI 补全中…" : "AI filling…"}
-                </Text>
-              </>
-            ) : (
-              <>
-                <IconSymbol name="sparkles" size={15} color={(!name.trim() && !nameEn.trim()) ? colors.muted : colors.primary} />
-                <Text style={{ fontSize: 14, fontWeight: "600", color: (!name.trim() && !nameEn.trim()) ? colors.muted : colors.primary }}>
-                  {lang === "zh" ? "AI 补全故事与风味" : "AI Fill Story & Flavors"}
-                </Text>
-              </>
-            )}
-          </Pressable>
+          {/* AI action buttons row */}
+          <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
+            {/* 深度解析 — primary button */}
+            <Pressable
+              onPress={handleDeepAnalyze}
+              disabled={deepAnalyzeMutation.isPending || aiEnriching || (!name.trim() && !nameEn.trim())}
+              style={({ pressed }) => [
+                {
+                  flex: 1,
+                  flexDirection: "row" as const,
+                  alignItems: "center" as const,
+                  justifyContent: "center" as const,
+                  gap: 6,
+                  paddingVertical: 10,
+                  paddingHorizontal: 14,
+                  borderRadius: 12,
+                  backgroundColor: (!name.trim() && !nameEn.trim()) ? colors.surface : colors.primary,
+                  opacity: pressed ? 0.75 : 1,
+                },
+              ]}
+            >
+              {deepAnalyzeMutation.isPending ? (
+                <>
+                  <IconSymbol name="globe" size={15} color="#FFFFFF" />
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: "#FFFFFF" }}>
+                    {lang === "zh" ? "联网查询中…" : "Searching…"}
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <IconSymbol name="globe" size={15} color={(!name.trim() && !nameEn.trim()) ? colors.muted : "#FFFFFF"} />
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: (!name.trim() && !nameEn.trim()) ? colors.muted : "#FFFFFF" }}>
+                    {lang === "zh" ? "深度解析" : "Deep Analyze"}
+                  </Text>
+                </>
+              )}
+            </Pressable>
+            {/* AI 补全 — secondary button */}
+            <Pressable
+              onPress={handleAiEnrich}
+              disabled={aiEnriching || deepAnalyzeMutation.isPending || (!name.trim() && !nameEn.trim())}
+              style={({ pressed }) => [
+                {
+                  flexDirection: "row" as const,
+                  alignItems: "center" as const,
+                  justifyContent: "center" as const,
+                  gap: 5,
+                  paddingVertical: 10,
+                  paddingHorizontal: 12,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: (!name.trim() && !nameEn.trim()) ? colors.border : colors.primary + "55",
+                  backgroundColor: (!name.trim() && !nameEn.trim()) ? colors.surface : colors.primary + "0E",
+                  opacity: pressed ? 0.7 : 1,
+                },
+              ]}
+            >
+              {aiEnriching ? (
+                <IconSymbol name="sparkles" size={14} color={colors.primary} />
+              ) : (
+                <IconSymbol name="sparkles" size={14} color={(!name.trim() && !nameEn.trim()) ? colors.muted : colors.primary} />
+              )}
+              <Text style={{ fontSize: 12, fontWeight: "600", color: (!name.trim() && !nameEn.trim()) ? colors.muted : colors.primary }}>
+                {aiEnriching ? (lang === "zh" ? "补全中…" : "Filling…") : (lang === "zh" ? "AI 补全" : "AI Fill")}
+              </Text>
+            </Pressable>
+          </View>
           {aiResult && (
             <View
               className="rounded-xl border px-3 py-3 mt-2"
@@ -955,6 +1074,32 @@ export default function RecipeFormScreen() {
                   {lang === "zh" ? "冰块建议: " : "Ice: "}
                   {aiResult.suggestedIce}
                   {aiResult.suggestedIceConfidence ? ` · ${aiResult.suggestedIceConfidence}` : ""}
+                </Text>
+              ) : null}
+              {/* Deep analysis extra fields */}
+              {aiResult.isDeepAnalysis && aiResult.suggestedCodexFamily ? (
+                <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>
+                  {lang === "zh" ? "Codex 家族: " : "Codex family: "}{aiResult.suggestedCodexFamily}
+                </Text>
+              ) : null}
+              {aiResult.isDeepAnalysis && aiResult.suggestedVariantOf ? (
+                <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>
+                  {lang === "zh" ? "变体来源: " : "Variant of: "}{aiResult.suggestedVariantOf}
+                </Text>
+              ) : null}
+              {aiResult.isDeepAnalysis && aiResult.suggestedMethod ? (
+                <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>
+                  {lang === "zh" ? "制作方法: " : "Method: "}{aiResult.suggestedMethod}
+                </Text>
+              ) : null}
+              {aiResult.isDeepAnalysis && aiResult.creator ? (
+                <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>
+                  {lang === "zh" ? "创作者: " : "Creator: "}{aiResult.creator}{aiResult.createdYear ? ` (${aiResult.createdYear})` : ""}
+                </Text>
+              ) : null}
+              {aiResult.isDeepAnalysis && aiResult.suggestedCategories && aiResult.suggestedCategories.length > 0 ? (
+                <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>
+                  {lang === "zh" ? "建议分类: " : "Categories: "}{aiResult.suggestedCategories.join("、")}
                 </Text>
               ) : null}
               <Pressable
