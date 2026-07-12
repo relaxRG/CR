@@ -34,7 +34,7 @@ import { useBookStore } from "@/lib/books/store";
 import { detectRecipesInText, RecipeCandidate } from "@/lib/import/detect";
 import { htmlToText } from "@/lib/import/extract";
 import { ParsedRecipe } from "@/lib/recipes/parser";
-import { genId, CATEGORY_COLORS } from "@/lib/recipes/types";
+import { genId, CATEGORY_COLORS, emptySourceRef } from "@/lib/recipes/types";
 import { useRecipeStore } from "@/lib/recipes/store";
 import { useHomemadeStore } from "@/lib/homemade/store";
 import { classifyPrepGroup, guessPrepType } from "@/lib/homemade/types";
@@ -127,12 +127,15 @@ const READER_CSS = `
   }
   /* Limit image height so CSS columns can paginate stably; tap to view full size */
   img {
-    max-height: 45vh !important;
+    max-height: 35vh !important;
     object-fit: contain !important;
     cursor: pointer;
     break-inside: avoid;
+    page-break-inside: avoid;
   }
-  figure { margin: 1.5em 0; text-align: center; break-inside: avoid; }
+  figure { margin: 1.5em 0; text-align: center; break-inside: avoid; page-break-inside: avoid; }
+  /* EPUB 常把图片嵌套在 div/p 中，给这些容器也加 break-inside 防止跨列叠加 */
+  div:has(> img), p:has(> img), div:has(> figure), p:has(> figure) { break-inside: avoid; page-break-inside: avoid; }
   figcaption { font-size: 0.8em; opacity: 0.6; margin-top: 0.4em; font-style: italic; }
   /* Headings */
   h1 { font-size: 1.8em; font-weight: 700; line-height: 1.2; margin: 1.6em 0 0.6em; letter-spacing: -0.02em; }
@@ -229,8 +232,8 @@ function HtmlChapter({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const fullHtml = useMemo(() => {
     // eslint-disable-next-line prefer-template
-    if (pageFlipMode) {
-      return `<!DOCTYPE html>\n<html>\n<head>\n<meta charset="utf-8"/>\n<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>\n<style>\n${READER_CSS}\n${css}\nhtml {\n  overflow: hidden;\n  height: 100vh;\n  width: 100vw;\n}\nbody {\n  font-size: ${fontSize}px;\n  line-height: ${lineHeight};\n  background: ${bgColor};\n  color: ${textColor};\n  margin: 0;\n  padding: 20px 20px 80px 20px;\n  box-sizing: border-box;\n  height: 100vh;\n  overflow: hidden;\n  -webkit-text-size-adjust: none;\n  word-wrap: break-word;\n  overflow-wrap: break-word;\n  columns: 1;\n  column-width: calc(100vw - 40px);\n  column-gap: 40px;\n}\na { color: ${linkColor}; }\nimg { max-width: 100% !important; height: auto !important; break-inside: avoid; max-height: 80vh; }\n* { max-width: 100% !important; }\npre, code { white-space: pre-wrap; font-size: 0.9em; break-inside: avoid; }\nh1,h2,h3,h4,h5,h6 { break-after: avoid; }\n</style>\n</head>\n<body>${html}</body>\n</html>`;
+      if (pageFlipMode) {
+      return `<!DOCTYPE html>\n<html>\n<head>\n<meta charset="utf-8"/>\n<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>\n<style>\n${READER_CSS}\n${css}\nhtml {\n  overflow: hidden;\n  height: 100vh;\n  width: 100vw;\n}\nbody {\n  font-size: ${fontSize}px;\n  line-height: ${lineHeight};\n  background: ${bgColor};\n  color: ${textColor};\n  margin: 0;\n  padding: 20px 20px 80px 20px;\n  box-sizing: border-box;\n  height: 100vh;\n  overflow: hidden;\n  -webkit-text-size-adjust: none;\n  word-wrap: break-word;\n  overflow-wrap: break-word;\n  columns: 1;\n  column-width: calc(100vw - 40px);\n  column-gap: 40px;\n}\na { color: ${linkColor}; }\nimg { max-width: 100% !important; height: auto !important; break-inside: avoid; page-break-inside: avoid; max-height: 35vh !important; display: block; }\nfigure, div:has(> img), p:has(> img), div:has(> figure), p:has(> figure) { break-inside: avoid; page-break-inside: avoid; }\n* { max-width: 100% !important; }\npre, code { white-space: pre-wrap; font-size: 0.9em; break-inside: avoid; }\nh1,h2,h3,h4,h5,h6 { break-after: avoid; }\n</style>\n</head>\n<body>${html}</body>\n</html>`;
     }
     return `<!DOCTYPE html>\n<html>\n<head>\n<meta charset="utf-8"/>\n<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=2.0"/>\n<style>\n${READER_CSS}\n${css}\nhtml, body {\n  font-size: ${fontSize}px;\n  line-height: ${lineHeight};\n  background: ${bgColor};\n  color: ${textColor};\n  padding: 0 20px 80px 20px;\n  margin: 0;\n  -webkit-text-size-adjust: none;\n  word-wrap: break-word;\n  overflow-wrap: break-word;\n}\na { color: ${linkColor}; }\nimg { max-width: 100% !important; height: auto !important; }\n* { max-width: 100% !important; }\npre, code { white-space: pre-wrap; font-size: 0.9em; }\n</style>\n</head>\n<body>${html}</body>\n</html>`;
   }, [html, css, fontSize, lineHeight, bgColor, textColor, linkColor, pageFlipMode]);
@@ -422,13 +425,20 @@ type Phase = "reading" | "select" | "confirm" | "done";
 
 /* ─── Main screen ──────────────────────────────────────────────────────────── */
 
-export default function BookReaderScreen() {
+  export default function BookReaderScreen() {
   const colors = useColors();
   const router = useRouter();
   const { lang, t } = useI18n();
   const insets = useSafeAreaInsets();
   const zh = lang === "zh";
   const { id } = useLocalSearchParams<{ id: string }>();
+
+  /* Prevent setState-after-unmount in async AI callbacks */
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => { isMountedRef.current = false; };
+  }, []);
 
   const { books, loadChapter, updatePosition } = useBookStore();
   const book = books.find((b) => b.id === id);
@@ -457,6 +467,7 @@ export default function BookReaderScreen() {
   };
   const translateMutation = trpc.bookImport.translate.useMutation();
   const enrichRecipeMutation = trpc.lookup.enrichRecipe.useMutation();
+  const deepAnalyzeMutation = trpc.lookup.deepAnalyzeRecipe.useMutation();
   const extractMutation = trpc.lookup.extractRecipesFromText.useMutation();
   const { isOnline } = useNetwork();
 
@@ -506,6 +517,8 @@ export default function BookReaderScreen() {
   const [extractMode, setExtractMode] = useState(false);
   const extractModeRef = useRef(false); // Ref to access extractMode in callbacks without re-creating them
   const [selectedText, setSelectedText] = useState("");
+  // 跨页累积：换页时 WebView selection 被清空，但已选文字保留在 selectedText 中
+  const appendModeRef = useRef(false);
   const [extractError, setExtractError] = useState("");
   const [extractResults, setExtractResults] = useState<ExtractedRecipe[]>([]);
   const [showExtractResults, setShowExtractResults] = useState(false);
@@ -780,6 +793,7 @@ export default function BookReaderScreen() {
     extractModeRef.current = true;
     setExtractMode(true);
     setSelectedText("");
+    appendModeRef.current = false;
     setExtractError("");
     setExtractResults([]);
     setShowExtractResults(false);
@@ -793,6 +807,7 @@ export default function BookReaderScreen() {
     extractModeRef.current = false;
     setExtractMode(false);
     setSelectedText("");
+    appendModeRef.current = false;
     setExtractError("");
     setShowExtractResults(false);
     setSelectedExtractIds(new Set());
@@ -831,10 +846,50 @@ export default function BookReaderScreen() {
       garnish: recipe.garnish,
       notes: recipe.notes,
     };
-    addRecipe(draft);
+    const newRecipe = addRecipe({ ...draft, sourceRef: { ...emptySourceRef(), bookTitle: source, sourceConfidence: "high" as const } });
     setImportedRecipeIds((prev) => new Set([...prev, idx]));
     if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  }, [book, zh, addRecipe, ensureSpiritNameBook, ensureGlassNameBook]);
+    // 串联 enrichRecipe → deepAnalyzeRecipe（后台静默，不阻塞 UI）
+    const ingNames = draft.ingredients.map((ing) => ing.name).filter(Boolean);
+    enrichRecipeMutation.mutate(
+      { name: draft.name, nameEn: draft.nameEn || undefined, baseSpirit: draft.baseSpirit || undefined, ingredients: ingNames.length > 0 ? ingNames : undefined, bookTitle: source || undefined },
+      {
+        onSuccess: (result) => {
+          if (!isMountedRef.current) return;
+          const patch: Record<string, unknown> = {};
+          if (result.flavors.length > 0) patch.flavors = result.flavors;
+          if (result.story) patch.story = result.story;
+          if (result.flavorDesc) patch.flavorDesc = result.flavorDesc;
+          if (result.creator || result.createdYear) {
+            patch.sourceRef = { ...emptySourceRef(), bookTitle: source, sourceConfidence: "high" as const, creator: result.creator || "", createdYear: result.createdYear || "", creatorConfidence: result.creatorConfidence };
+          }
+          if (Object.keys(patch).length > 0) updateRecipe(newRecipe.id, { ...draft, ...patch });
+          deepAnalyzeMutation.mutate(
+            { name: draft.name || undefined, nameEn: draft.nameEn || undefined, ingredients: ingNames.length > 0 ? ingNames.join(", ") : undefined, baseSpirit: draft.baseSpirit || undefined, source: draft.source || undefined },
+            {
+              onSuccess: (deepResult) => {
+                if (!isMountedRef.current) return;
+                const deepPatch: Record<string, unknown> = {};
+                if (deepResult.story) deepPatch.story = deepResult.story;
+                if (deepResult.flavorDesc) deepPatch.flavorDesc = deepResult.flavorDesc;
+                if (deepResult.flavors && deepResult.flavors.length > 0 && (result.flavors ?? []).length === 0) deepPatch.flavors = deepResult.flavors;
+                if (deepResult.suggestedCodexFamily && !draft.codexFamily) { const n = normalizeCodexFamilyDecl(deepResult.suggestedCodexFamily); if (n) deepPatch.codexFamily = n; }
+                if (deepResult.suggestedMethod && !draft.method) deepPatch.method = deepResult.suggestedMethod;
+                if (deepResult.suggestedVariantOf && !draft.variantOf) deepPatch.variantOf = deepResult.suggestedVariantOf;
+                if (deepResult.creator || deepResult.createdYear) {
+                  const currentRef = (patch.sourceRef as ReturnType<typeof emptySourceRef> | undefined) ?? { ...emptySourceRef(), bookTitle: source, sourceConfidence: "high" as const };
+                  if (!currentRef.creator && deepResult.creator) {
+                    deepPatch.sourceRef = { ...currentRef, creator: deepResult.creator, createdYear: deepResult.createdYear || currentRef.createdYear, creatorConfidence: "medium" as const };
+                  }
+                }
+                if (Object.keys(deepPatch).length > 0) updateRecipe(newRecipe.id, { ...draft, ...patch, ...deepPatch });
+              },
+            },
+          );
+        },
+      },
+    );
+  }, [book, zh, addRecipe, updateRecipe, enrichRecipeMutation, deepAnalyzeMutation, ensureSpiritNameBook, ensureGlassNameBook]);
 
   /** Batch import all extracted recipes at once */
   const batchImportAll = useCallback(() => {
@@ -847,7 +902,7 @@ export default function BookReaderScreen() {
     const source = book?.title ?? "";
     // Build all drafts first, then write atomically to avoid async state race
     const pendingIdxs: number[] = [];
-    const drafts = [];
+    const drafts: Array<{ name: string; nameEn: string; categoryId: null; baseSpirit: string; glass: string; method: string; strength: "medium"; variantOf: string; codexFamily: string; flavors: string[]; source: string; story: string; flavorDesc: string; ingredients: Array<{ id: string; name: string; amount: string; unit: string; notes: string }>; steps: string; garnish: string; notes: string }> = [];
     for (const idx of targetIds) {
       if (importedRecipeIds.has(idx)) continue;
       const recipe = extractResults[idx];
@@ -901,7 +956,51 @@ export default function BookReaderScreen() {
       setExtractSelectMode(false);
     }
     if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  }, [extractResults, importedRecipeIds, batchImporting, extractSelectMode, selectedExtractIds, book, zh, addRecipes, ensureSpiritNameBook, ensureGlassNameBook]);
+    // 批量导入后串联 enrichRecipe + deepAnalyzeRecipe（后台静默，不阻塞 UI）
+    added.forEach((newRecipe, i) => {
+      const draft = drafts[i];
+      if (!newRecipe || !draft) return;
+      const ingNames = (draft.ingredients as Array<{ name: string }>).map((ing) => ing.name).filter(Boolean);
+      enrichRecipeMutation.mutate(
+        { name: draft.name, nameEn: draft.nameEn || undefined, baseSpirit: draft.baseSpirit || undefined, ingredients: ingNames.length > 0 ? ingNames : undefined, bookTitle: source || undefined },
+        {
+          onSuccess: (result) => {
+            if (!isMountedRef.current) return;
+            const patch: Record<string, unknown> = {};
+            if (result.flavors.length > 0) patch.flavors = result.flavors;
+            if (result.story) patch.story = result.story;
+            if (result.flavorDesc) patch.flavorDesc = result.flavorDesc;
+            if (result.creator || result.createdYear) {
+              patch.sourceRef = { ...emptySourceRef(), bookTitle: source, sourceConfidence: "high" as const, creator: result.creator || "", createdYear: result.createdYear || "", creatorConfidence: result.creatorConfidence };
+            }
+            if (Object.keys(patch).length > 0) updateRecipe(newRecipe.id, { ...draft, ...patch });
+            deepAnalyzeMutation.mutate(
+              { name: draft.name || undefined, nameEn: draft.nameEn || undefined, ingredients: ingNames.length > 0 ? ingNames.join(", ") : undefined, baseSpirit: draft.baseSpirit || undefined, source: draft.source || undefined },
+              {
+                onSuccess: (deepResult) => {
+                  if (!isMountedRef.current) return;
+                  const deepPatch: Record<string, unknown> = {};
+                  if (deepResult.story) deepPatch.story = deepResult.story;
+                  if (deepResult.flavorDesc) deepPatch.flavorDesc = deepResult.flavorDesc;
+                  if (deepResult.flavors && deepResult.flavors.length > 0 && (result.flavors ?? []).length === 0) deepPatch.flavors = deepResult.flavors;
+                  if (deepResult.suggestedCodexFamily && !draft.codexFamily) { const n = normalizeCodexFamilyDecl(deepResult.suggestedCodexFamily); if (n) deepPatch.codexFamily = n; }
+                  if (deepResult.suggestedMethod && !draft.method) deepPatch.method = deepResult.suggestedMethod;
+                  if (deepResult.suggestedVariantOf && !draft.variantOf) deepPatch.variantOf = deepResult.suggestedVariantOf;
+                  if (deepResult.creator || deepResult.createdYear) {
+                    const currentRef = (patch.sourceRef as ReturnType<typeof emptySourceRef> | undefined) ?? { ...emptySourceRef(), bookTitle: source, sourceConfidence: "high" as const };
+                    if (!currentRef.creator && deepResult.creator) {
+                      deepPatch.sourceRef = { ...currentRef, creator: deepResult.creator, createdYear: deepResult.createdYear || currentRef.createdYear, creatorConfidence: "medium" as const };
+                    }
+                  }
+                  if (Object.keys(deepPatch).length > 0) updateRecipe(newRecipe.id, { ...draft, ...patch, ...deepPatch });
+                },
+              },
+            );
+          },
+        },
+      );
+    });
+  }, [extractResults, importedRecipeIds, batchImporting, extractSelectMode, selectedExtractIds, book, zh, addRecipes, updateRecipe, enrichRecipeMutation, deepAnalyzeMutation, ensureSpiritNameBook, ensureGlassNameBook]);
 
   const doExtract = useCallback(async () => {
     const text = selectedText.trim();
@@ -1163,7 +1262,17 @@ export default function BookReaderScreen() {
                   theme={theme}
                   onTap={Platform.OS !== "web" ? handleTap : undefined}
                   extractMode={extractMode}
-                  onSelection={(text) => setSelectedText(text)}
+                  onSelection={(text) => {
+                    // 追加模式：换页后 WebView selection 被清空（text=""），保留已有内容
+                    // 只有用户主动选取了新文字（text 非空）时才追加
+                    if (!text.trim()) return;
+                    setSelectedText((prev) => {
+                      if (!prev.trim()) return text;
+                      // 避免重复追加相同内容
+                      if (prev.includes(text.trim())) return prev;
+                      return prev + "\n" + text;
+                    });
+                  }}
                   webViewRef={webViewRef}
                   pageFlipMode={pageFlipMode && Platform.OS !== "web"}
                   onPageInfo={(info) => { setTotalPages(info.totalPages); setCurrentPageInChapter(0); }}
@@ -1445,9 +1554,18 @@ export default function BookReaderScreen() {
                 {zh ? "选区提取模式" : "Selection Extract"}
               </Text>
               <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>
-                {selectedText.trim().length > 0
-                  ? (zh ? `已选 ${selectedText.trim().length} 字` : `${selectedText.trim().length} chars selected`)
-                  : (zh ? "长按文字选取配方内容" : "Long-press to select recipe text")}
+                  {selectedText.trim().length > 0
+                    ? (zh ? `已选 ${selectedText.trim().length} 字` : `${selectedText.trim().length} chars selected`)
+                    : (zh ? "长按文字选取配方内容" : "Long-press to select recipe text")}
+                {selectedText.trim().length > 0 && (
+                  <Pressable
+                    onPress={() => { setSelectedText(""); appendModeRef.current = false; }}
+                    hitSlop={8}
+                    style={({ pressed }) => [{ marginTop: 4, alignSelf: "flex-start", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }, pressed && { opacity: 0.6 }]}
+                  >
+                    <Text style={{ fontSize: 11, color: colors.muted }}>{zh ? "清空重选" : "Clear"}</Text>
+                  </Pressable>
+                )}
               </Text>
             </View>
             <Pressable
