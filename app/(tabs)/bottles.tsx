@@ -115,7 +115,7 @@ export default function BottlesScreen() {
   const [enrichProgress, setEnrichProgress] = useState<{ done: number; total: number } | null>(null);
   const [enrichErrors, setEnrichErrors] = useState<string[]>([]);
   // 多选 AI 批量补全(补全 flavorTags/story/styleDesc)
-  const enrichBottleMutation = trpc.lookup.enrichBottle.useMutation();
+  const enrichBottleFullMutation = trpc.lookup.enrichBottleFull.useMutation();
   const [enrichingSelected, setEnrichingSelected] = useState(false);
   const [enrichSelectedMsg, setEnrichSelectedMsg] = useState<string | null>(null);
   const [enrichSelectedProgress, setEnrichSelectedProgress] = useState<{ done: number; total: number } | null>(null);
@@ -188,7 +188,7 @@ export default function BottlesScreen() {
     for (let i = 0; i < targets.length; i++) {
       const b = targets[i];
       try {
-        const res = await enrichBottleMutation.mutateAsync({
+        const res = await enrichBottleFullMutation.mutateAsync({
           nameZh: b.nameZh || undefined,
           nameEn: b.nameEn || undefined,
           category: b.category || undefined,
@@ -196,15 +196,13 @@ export default function BottlesScreen() {
           brand: b.brand || undefined,
           origin: b.origin || undefined,
         });
-        const patch: Partial<{ flavorTags: string[]; story: string; styleDesc: string }> = {};
-        if (res.flavorTags && res.flavorTags.length > 0 && (!b.flavorTags || b.flavorTags.length === 0)) {
-          patch.flavorTags = res.flavorTags;
-        }
-        if (res.story && !b.story?.trim()) patch.story = res.story;
-        if (res.styleDesc && !b.styleDesc?.trim()) patch.styleDesc = res.styleDesc;
-        if (Object.keys(patch).length > 0) {
-          updateBottle(b.id, { ...b, ...patch } as Parameters<typeof updateBottle>[1]);
-          updated++;
+        if (res.found || res.nameZh || res.nameEn) {
+          const enrichedItem = { ...res, query: b.nameZh || b.nameEn || "" } as Parameters<typeof applyEnrichedToBottle>[1];
+          const draft = applyEnrichedToBottle(b, enrichedItem);
+          if (draft) {
+            updateBottle(b.id, draft);
+            updated++;
+          }
         }
       } catch {
         errors.push(b.nameZh || b.nameEn || `#${i + 1}`);
@@ -219,7 +217,7 @@ export default function BottlesScreen() {
     setEnrichSelectedMsg(updated > 0 ? t("lookup.batchDone", { n: updated }) : t("lookup.enrichNone"));
     setEnrichingSelected(false);
     setEnrichSelectedProgress(null);
-  }, [enrichingSelected, selectedIds, bottles, enrichBottleMutation, updateBottle, t]);
+  }, [enrichingSelected, selectedIds, bottles, enrichBottleFullMutation, updateBottle, t]);
 
   // 快捷筛选解析:大分类(类别)与其下细化的风格集合
   const quickCats = Object.keys(quickSel);

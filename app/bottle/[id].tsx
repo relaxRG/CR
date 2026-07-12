@@ -1,7 +1,7 @@
-import * as Haptics from "expo-haptics";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React from "react";
 import { Alert, Platform, Pressable, ScrollView, ScrollView as HScrollView, StyleSheet, Text, View } from "react-native";
+import * as Haptics from "expo-haptics";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { StarRating } from "@/components/star-rating";
@@ -179,6 +179,89 @@ export default function BottleDetailScreen() {
               <Text className="text-[15px] text-foreground" style={{ lineHeight: 22 }}>
                 {bottle.notes}
               </Text>
+            </View>
+          </>
+        ) : null}
+
+        {/* 风味标签 */}
+        {bottle.flavorTags && bottle.flavorTags.length > 0 ? (
+          <>
+            <Text className="text-[13px] text-muted uppercase mt-6 mb-2 px-4" style={{ letterSpacing: 0.4, lineHeight: 18 }}>
+              {lang === "zh" ? "风味" : "Flavor"}
+            </Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, paddingHorizontal: 4 }}>
+              {bottle.flavorTags.map((tag) => (
+                <View
+                  key={tag}
+                  style={{
+                    paddingHorizontal: 12,
+                    paddingVertical: 5,
+                    borderRadius: 16,
+                    backgroundColor: colors.primary + "14",
+                    borderWidth: 1,
+                    borderColor: colors.primary + "44",
+                  }}
+                >
+                  <Text style={{ fontSize: 13, color: colors.primary, fontWeight: "500" }}>{tag}</Text>
+                </View>
+              ))}
+            </View>
+          </>
+        ) : null}
+
+        {/* 故事 / 介绍 */}
+        {bottle.story ? (
+          <>
+            <Text className="text-[13px] text-muted uppercase mt-6 mb-2 px-4" style={{ letterSpacing: 0.4, lineHeight: 18 }}>
+              {lang === "zh" ? "故事与介绍" : "Story"}
+            </Text>
+            <View className="bg-surface rounded-xl px-4 py-3">
+              <Text className="text-[15px] text-foreground" style={{ lineHeight: 24 }}>
+                {bottle.story}
+              </Text>
+            </View>
+          </>
+        ) : null}
+
+        {/* 风格描述 */}
+        {bottle.styleDesc ? (
+          <>
+            <Text className="text-[13px] text-muted uppercase mt-6 mb-2 px-4" style={{ letterSpacing: 0.4, lineHeight: 18 }}>
+              {lang === "zh" ? "风格描述" : "Style Description"}
+            </Text>
+            <View className="bg-surface rounded-xl px-4 py-3">
+              <Text className="text-[15px] text-foreground" style={{ lineHeight: 24 }}>
+                {bottle.styleDesc}
+              </Text>
+            </View>
+          </>
+        ) : null}
+
+        {/* 深度资料：蒸馏厂 / 搭配 / 用途 / 季节 */}
+        {(bottle.distilleryInfo || bottle.pairingNotes || bottle.usageNotes || bottle.seasonality) ? (
+          <>
+            <Text className="text-[13px] text-muted uppercase mt-6 mb-2 px-4" style={{ letterSpacing: 0.4, lineHeight: 18 }}>
+              {lang === "zh" ? "深度资料" : "Deep Info"}
+            </Text>
+            <View className="bg-surface rounded-xl px-4">
+              {[
+                bottle.distilleryInfo && { label: lang === "zh" ? "蒸馏厂" : "Distillery", value: bottle.distilleryInfo },
+                bottle.pairingNotes && { label: lang === "zh" ? "搭配建议" : "Pairing", value: bottle.pairingNotes },
+                bottle.usageNotes && { label: lang === "zh" ? "调酒用途" : "Usage", value: bottle.usageNotes },
+                bottle.seasonality && { label: lang === "zh" ? "季节性" : "Seasonality", value: bottle.seasonality },
+              ].filter(Boolean).map((row, idx, arr) => row && (
+                <View
+                  key={row.label}
+                  style={idx < arr.length - 1 ? { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, paddingVertical: 12 } : { paddingVertical: 12 }}
+                >
+                  <Text style={{ fontSize: 12, color: colors.muted, fontWeight: "600", marginBottom: 4, letterSpacing: 0.3 }}>
+                    {row.label.toUpperCase()}
+                  </Text>
+                  <Text style={{ fontSize: 14, color: colors.foreground, lineHeight: 22 }}>
+                    {row.value}
+                  </Text>
+                </View>
+              ))}
             </View>
           </>
         ) : null}

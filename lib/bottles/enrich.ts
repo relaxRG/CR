@@ -41,9 +41,13 @@ export function applyEnrichedToBottle(b: Bottle, item: EnrichedProduct): BottleD
     abv: b.abv > 0 ? b.abv : item.abv,
     priceCny: b.priceCny > 0 ? b.priceCny : item.priceCny,
     notes: isAutoAdded || !b.notes ? item.notes || b.notes : b.notes,
-    flavorTags: [],
-    story: "",
-    styleDesc: "",
+    flavorTags: b.flavorTags?.length > 0 ? b.flavorTags : ((item as { flavorTags?: string[] }).flavorTags ?? []),
+    story: b.story || (item as { story?: string }).story || "",
+    styleDesc: b.styleDesc || (item as { styleDesc?: string }).styleDesc || "",
+    distilleryInfo: b.distilleryInfo || (item as { distilleryInfo?: string }).distilleryInfo || "",
+    pairingNotes: b.pairingNotes || (item as { pairingNotes?: string }).pairingNotes || "",
+    usageNotes: b.usageNotes || (item as { usageNotes?: string }).usageNotes || "",
+    seasonality: b.seasonality || (item as { seasonality?: string }).seasonality || "",
     rating: b.rating,
   };
   const changed =
@@ -56,6 +60,13 @@ export function applyEnrichedToBottle(b: Bottle, item: EnrichedProduct): BottleD
     draft.volume !== b.volume ||
     draft.abv !== b.abv ||
     draft.priceCny !== b.priceCny ||
-    draft.notes !== b.notes;
+    draft.notes !== b.notes ||
+    draft.flavorTags.length !== (b.flavorTags?.length ?? 0) ||
+    draft.story !== (b.story ?? "") ||
+    draft.styleDesc !== (b.styleDesc ?? "") ||
+    draft.distilleryInfo !== (b.distilleryInfo ?? "") ||
+    draft.pairingNotes !== (b.pairingNotes ?? "") ||
+    draft.usageNotes !== (b.usageNotes ?? "") ||
+    draft.seasonality !== (b.seasonality ?? "");
   return changed ? draft : null;
 }

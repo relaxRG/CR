@@ -216,23 +216,34 @@ const translatedItemSchema = z.object({
 export type TranslatedRecipeItem = z.infer<typeof translatedItemSchema>;
 
 const ENRICH_SYSTEM_PROMPT = `你是一个鸡尾酒/酒类知识专家。用户会给出一个或多个酒、原料或产品的名称(可能含品牌、也可能附照片),它们在用户的私人库中暂无资料。请根据你已有的行业知识,尽力还原每件产品的真实资料,补全为结构化条目。
+你是专业的烈酒/饮料/原材料知识专家，深度研习 Cocktail Codex（David Wondrich）、The Bar Book（Jeffrey Morgenthaler）、Difford's Guide（Simon Difford）、Liquid Intelligence（Dave Arnold）、WSET 烈酒教材（Level 3/4）、IBA 官方配方库、Whisky Advocate、Wine Spectator、Spirits Business、The Oxford Companion to Spirits & Cocktails 等权威资料与档案库。用户会给出一个或多个酒、原料或产品的名称(可能含品牌、也可能附照片),请根据权威资料补全为结构化条目。
 
 请输出 JSON:
 {"items":[{
   "query":"原样返回用户给出的名称(附照片且无名称时填识别出的名称)",
   "found": true,
-  "nameZh":"中文名(通用译名,如 君度橙酒)","nameEn":"英文名(如 Cointreau)",
+  "nameZh":"中文名(中国市场通用译名,如 君度橙酒)","nameEn":"英文名(品牌官方英文名,如 Cointreau)",
   "category":"必须从以下枚举精确选一:金酒/朗姆/伏特加/威士忌/龙舌兰/白兰地/利口酒/苦精/味美思/开胃酒/起泡酒/葡萄酒/清酒烧酒/中式白酒/糖浆/软饮/糖与甜味剂/果蔬/香料与草本/花卉/茶咖与可可/坚果与谷物/乳蛋/酸类与添加剂/其他",
   "style":"风格子分类(如 London Dry / Bourbon / Orange Liqueur),不确定填 \\"\\"",
-  "brand":"品牌(如 Cointreau)","origin":"产地国家/地区","volume":"常见规格如 700ml","abv":40,"priceCny":170,
+  "brand":"品牌(如 Cointreau)","origin":"产地精确到国家/地区(如 苏格兰高地)","volume":"常见规格如 700ml","abv":40,"priceCny":170,
   "notes":"一句话简介:风味特征、常见用途、代表配方等(中文,50 字内)",
+  "flavorTags":["草本","果味"] 从["草本","果味","柑橘","花香","甜润","酸爽","苦韵","辛香","烟熏","咸鲜","清爽","浓郁","坚果","奶油","干爽","热带","焦糖","咖啡","巧克力","泥煤","蜂蜜","香草"]中选2-4个,
+  "story":"产品故事/介绍(中文,80字内,描述历史背景与风味特点),不确定填\\"\\"",
+  "styleDesc":"风格特点详细描述(中文,50字内),不确定填\\"\\"",
+  "distilleryInfo":"蒸馏厂/酒厂简介(基酒库专用,中文,60字内),其他类型填\\"\\"",
+  "pairingNotes":"搭配建议(酒款库专用,中文,40字内),其他类型填\\"\\"",
+  "usageNotes":"调酒用途说明(原材料库专用,中文,60字内),其他类型填\\"\\"",
+  "seasonality":"季节性说明(原材料库专用,中文,20字内),其他类型填\\"\\"",
   "confidence":"high"|"medium"|"low"
 }]}
 规则:
 - 每个名称对应一个条目,不得增删;完全无法识别的名称输出 {"query":"原名","found":false}
-- 数值字段 abv/priceCny 输出数字:abv 未知填 0;priceCny 给出中国市场常见零售价的合理估计(元),完全无从估计填 0
+- 数值字段 abv/priceCny 输出数字:abv 未知填 0;priceCny 参考中国市场主流电商(京东/天猫)零售价给出合理估计,完全无从估计填 0
+- nameZh 使用中国市场通用译名;nameEn 使用品牌官方英文名称
+- 产地精确到国家/地区(如"苏格兰高地""墨西哥哈利斯科州")
 - 未知字符串字段填 ""
 - category 必须严格落在上述枚举中,选最贴切的一个;是自制/新鲜原料时也归入最接近的分类
+- flavorTags 只能从给定列表中选,不能自造新标签
 - 不要编造不存在的品牌;不确定品牌就留空但仍可给出通用品类资料
 - confidence:资料把握程度(知名大牌 high,通用品类 medium,勉强猜测 low)`;
 
@@ -253,6 +264,18 @@ const enrichSchema = z.object({
 });
 
 export type EnrichedProduct = z.infer<typeof enrichSchema>;
+
+/** 扩展 schema：包含深度字段（全字段补全） */
+const enrichSchemaFull = enrichSchema.extend({
+  flavorTags: z.array(z.string()).catch([]),
+  story: z.string().catch(""),
+  styleDesc: z.string().catch(""),
+  distilleryInfo: z.string().catch(""),
+  pairingNotes: z.string().catch(""),
+  usageNotes: z.string().catch(""),
+  seasonality: z.string().catch(""),
+});
+export type EnrichedProductFull = z.infer<typeof enrichSchemaFull>;
 
 function parseJsonObjectLoose(text: string): unknown {
   try {
@@ -873,7 +896,8 @@ ${input.origin ? `产地: ${input.origin}` : ""}
 - seasonality: 季节性说明（中文，20字内，不确定填""）`;
         }
 
-        const prompt = `你是专业的烈酒/饮料/原材料知识专家（基于 Cocktail Codex、The Bar Book、Liquid Intelligence 等权威资料）。
+        const VALID_FLAVOR_TAGS_FULL = ["草本","果味","柑橘","花香","甜润","酸爽","苦韵","辛香","烟熏","咸鲜","清爽","浓郁","坚果","奶油","干爽","热带","焦糖","咖啡","巧克力","泥煤","蜂蜜","香草","坚硬","辛辣"];
+        const prompt = `你是专业的烈酒/饮料/原材料知识专家，深度研习 Cocktail Codex（David Wondrich）、The Bar Book（Jeffrey Morgenthaler）、Difford's Guide（Simon Difford）、Liquid Intelligence（Dave Arnold）、WSET 烈酒教材（Level 3/4）、IBA 官方配方库、Whisky Advocate、Wine Spectator、Spirits Business、The Oxford Companion to Spirits & Cocktails 等权威资料与档案库。
 根据以下产品信息，一次性补全所有字段。
 
 产品名称: ${name || "（未知，请根据照片识别）"}${knownCategory}${knownStyle}${knownBrand}${knownOrigin}
@@ -882,17 +906,17 @@ ${librarySpecificInstructions}
 请输出 JSON（所有字段必须存在，不确定的字符串填 ""，数字填 0）:
 {
   "found": true/false（是否识别到该产品）,
-  "nameZh": "中文名（通用译名，如 君度橙酒）",
-  "nameEn": "英文名（如 Cointreau）",
+  "nameZh": "中文名（中国市场通用译名，如 君度橙酒）",
+  "nameEn": "英文名（品牌官方英文名，如 Cointreau）",
   "category": "必须从以下枚举精确选一: ${VALID_CATEGORIES.join("/")}",
   "style": "风格子标签，必须从 styleOptions 列表中精确选一${styleOptions}，不确定填 \"\"",
   "brand": "品牌名（如 Hendrick's），不确定填 \"\"",
-  "origin": "产地国家/地区（如 Scotland），不确定填 \"\"",
+  "origin": "产地精确到国家/地区（如 苏格兰高地、墨西哥哈利斯科州），不确定填 \"\"",
   "volume": "常见规格（如 700ml），不确定填 \"\"",
   "abv": 酒精度数（数字，如 40），未知填 0,
   "priceCny": 中国市场常见零售价估计（人民币，数字），完全无从估计填 0,
   "notes": "一句话简介：风味特征、常见用途（中文，50字内）",
-  "flavorTags": 从 ${JSON.stringify(VALID_FLAVOR_TAGS_BOTTLE)} 中选最合适的2-4个（数组），只能选列表中的值,
+  "flavorTags": 从 ${JSON.stringify(VALID_FLAVOR_TAGS_FULL)} 中选最合适的2-4个（数组），只能选列表中的值,
   "story": "产品故事/介绍（中文，80字内，描述历史背景与风味特点），不确定填 \"\"",
   "styleDesc": "风格特点详细描述（中文，50字内，区别于 style 子标签），不确定填 \"\"",
   "distilleryInfo": "蒸馏厂/酒厂简介（基酒库专用，中文，60字内），不确定填 \"\"",
@@ -905,6 +929,9 @@ ${librarySpecificInstructions}
 - category 必须严格落在上述枚举中，选最贴切的一个
 - style 必须从对应 category 的 styleOptions 列表中精确选一，不在列表中的填 ""
 - flavorTags 只能从给定列表中选，不能自造新标签
+- nameZh 使用中国市场通用译名（如「君度橙酒」而非「柯因特罗」）；nameEn 使用品牌官方英文名称
+- 产地精确到国家/地区（如「苏格兰高地」「墨西哥哈利斯科州」）
+- priceCny 参考中国市场主流电商（京东/天猫）零售价，给出合理估计
 - 不要编造不存在的品牌；不确定品牌就留空但仍可给出通用品类资料
 - 只输出 JSON，不要任何解释文字`;
 
@@ -1013,7 +1040,7 @@ ${librarySpecificInstructions}
           : [];
         const items: EnrichedProduct[] = [];
         for (const it of arr.slice(0, 8)) {
-          const r = enrichSchema.safeParse(it);
+          const r = enrichSchemaFull.safeParse(it);
           if (r.success) items.push(r.data);
         }
         return { items };
