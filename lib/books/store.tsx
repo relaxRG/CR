@@ -34,6 +34,8 @@ export interface StoredBook {
   lastPosition: number;
   /** Chapter index for HTML books */
   lastChapter: number;
+  /** Page index within chapter for HTML books */
+  lastPage?: number;
   importedAt: number;
   lastReadAt: number;
   /** 作者 */
@@ -73,7 +75,7 @@ interface BookStore {
   ) => Promise<StoredBook>;
   loadChapter: (bookId: string, idx: number) => Promise<string | null>;
   deleteBook: (id: string) => void;
-  updatePosition: (id: string, position: number, chapter?: number) => void;
+  updatePosition: (id: string, position: number, chapter?: number, page?: number) => void;
   updateBook: (id: string, patch: Partial<Pick<StoredBook, "isFavorite" | "readingStatus" | "tags" | "bookmarks">>) => void;
 }
 
@@ -201,11 +203,11 @@ export function BookStoreProvider({ children }: { children: React.ReactNode }) {
   );
 
   const updatePosition = useCallback(
-    (id: string, position: number, chapter?: number) => {
+    (id: string, position: number, chapter?: number, page?: number) => {
       setBooks((prev) => {
         const next = prev.map((b) =>
           b.id === id
-            ? { ...b, lastPosition: position, lastChapter: chapter ?? b.lastChapter, lastReadAt: Date.now() }
+            ? { ...b, lastPosition: position, lastChapter: chapter ?? b.lastChapter, lastPage: page ?? b.lastPage ?? 0, lastReadAt: Date.now() }
             : b,
         );
         persist(next);

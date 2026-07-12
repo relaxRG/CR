@@ -511,9 +511,12 @@ type Phase = "reading" | "select" | "confirm" | "done";
   }));
 
   /* True page-flip: page index within current chapter */
-  const [currentPage, setCurrentPage] = useState(0);
+  const [currentPage, setCurrentPage] = useState(book?.lastPage ?? 0);
+  // Refs for gesture callbacks — avoid stale closure values that cause page jumps
+  const currentPageRef = useRef(book?.lastPage ?? 0);
+  const totalPagesRef = useRef(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [currentPageInChapter, setCurrentPageInChapter] = useState(0);
+  const [currentPageInChapter, setCurrentPageInChapter] = useState(book?.lastPage ?? 0);
   const [imageViewerUri, setImageViewerUri] = useState<string | null>(null);
 
 
@@ -550,10 +553,10 @@ type Phase = "reading" | "select" | "confirm" | "done";
   /* Auto-save reading position every 30s */
   const autoSaveTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   useEffect(() => {
-    autoSaveTimer.current = setInterval(() => {
-      if (book && phase === 'reading') {
-        updatePosition(book.id, chapterIdx, chapterIdx);
-      }
+      autoSaveTimer.current = setInterval(() => {
+        if (book && phase === 'reading') {
+          updatePosition(book.id, chapterIdx, chapterIdx, currentPageRef.current);
+        }
     }, 30000);
     return () => {
       if (autoSaveTimer.current) clearInterval(autoSaveTimer.current);
@@ -675,26 +678,28 @@ type Phase = "reading" | "select" | "confirm" | "done";
 
   /* Navigate within current chapter pages (page-flip mode) */
   const goNextPage = useCallback(() => {
-    if (currentPage < totalPages - 1) {
-      const nextPage = currentPage + 1;
+    if (currentPageRef.current < totalPagesRef.current - 1) {
+      const nextPage = currentPageRef.current + 1;
       setCurrentPage(nextPage);
+      currentPageRef.current = nextPage;
       webViewRef.current?.injectJavaScript(`window.__goToPage && window.__goToPage(${nextPage}); true;`);
       if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } else {
       goNextChapter();
     }
-  }, [currentPage, totalPages, goNextChapter]);
+  }, [goNextChapter]);
 
   const goPrevPage = useCallback(() => {
-    if (currentPage > 0) {
-      const prevPage = currentPage - 1;
+    if (currentPageRef.current > 0) {
+      const prevPage = currentPageRef.current - 1;
       setCurrentPage(prevPage);
+      currentPageRef.current = prevPage;
       webViewRef.current?.injectJavaScript(`window.__goToPage && window.__goToPage(${prevPage}); true;`);
       if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } else {
       goPrevChapter();
     }
-  }, [currentPage, goPrevChapter]);
+  }, [goPrevChapter]);
 
   const pageFlipGesture = useMemo(() => {
     const disabled = !pageFlipMode || Platform.OS === "web";
@@ -720,7 +725,7 @@ type Phase = "reading" | "select" | "confirm" | "done";
           Math.abs(e.translationX) > THRESHOLD || Math.abs(e.velocityX) > VELOCITY_THRESHOLD;
         if (shouldFlip) {
           const dir = e.translationX < 0 ? 1 : -1;
-          if (totalPages > 1) {
+          if (totalPagesRef.current > 1) {
             // Page-level navigation within chapter
             if (dir > 0) runOnJS(goNextPage)();
             else runOnJS(goPrevPage)();
@@ -1293,7 +1298,7 @@ type Phase = "reading" | "select" | "confirm" | "done";
                   }}
                   webViewRef={webViewRef}
                   pageFlipMode={pageFlipMode && Platform.OS !== "web"}
-                  onPageInfo={(info) => { setTotalPages(info.totalPages); setCurrentPageInChapter(0); }}
+                  onPageInfo={(info) => { setTotalPages(info.totalPages); totalPagesRef.current = info.totalPages; setCurrentPageInChapter(0); }}
                   onImageTap={(uri) => setImageViewerUri(uri)}
                   onInternalLink={handleInternalLink}
                   baseUrl={(() => {
@@ -1573,7 +1578,12 @@ type Phase = "reading" | "select" | "confirm" | "done";
               </Text>
               <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>
                   {selectedText.trim().length > 0
-                    ? (zh ? `已选 ${selectedText.trim().length} 字` : `${selectedText.trim().length} chars selected`)
+                    ? (() => {
+                        const paras = selectedText.trim().split('\n').filter((s: string) => s.trim().length > 0).length;
+
+                        const chars = selectedText.trim().length;
+                        return zh ? `已选 ${paras} 段 · ${chars} 字` : `${paras} para${paras !== 1 ? 's' : ''} · ${chars} chars`;
+                      })()
                     : (zh ? "长按文字选取配方内容" : "Long-press to select recipe text")}
                 {selectedText.trim().length > 0 && (
                   <Pressable
