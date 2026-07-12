@@ -69,6 +69,7 @@ const MAPPING = {
   "heart.fill": "favorite",
   "trash": "delete-outline",
   "book": "book",
+  "book.closed": "menu-book",
   "arrow.up.arrow.down": "swap-vert",
   "line.3.horizontal.decrease": "filter-list",
   "text.cursor": "text-fields",

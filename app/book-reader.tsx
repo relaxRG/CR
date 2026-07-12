@@ -6,6 +6,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  PanResponder,
   ScrollView,
   StyleSheet,
   Text,
@@ -24,6 +25,7 @@ import Animated, {
   withTiming,
   runOnJS,
 } from "react-native-reanimated";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -193,6 +195,10 @@ const READER_CSS = `
   /* Custom highlights */
   .recipe-highlight { background: rgba(255,149,0,0.12); border-left: 3px solid #FF9500; padding: 4px 8px; border-radius: 4px; }
   .selected-highlight { background: rgba(0,122,255,0.12); border-left: 3px solid #007AFF; padding: 4px 8px; border-radius: 4px; }
+  /* User highlight colors */
+  .hl-yellow { background: rgba(255,214,10,0.38) !important; border-radius: 2px; }
+  .hl-green  { background: rgba(52,199,89,0.32) !important; border-radius: 2px; }
+  .hl-pink   { background: rgba(255,45,85,0.28) !important; border-radius: 2px; }
 `;
 
 
@@ -224,6 +230,7 @@ function HtmlChapter({
   html, css, fontSize, lineHeight, theme, onTap,
   extractMode, onSelection, webViewRef, baseUrl, pageFlipMode, onPageInfo,
   onImageTap, onInternalLink,
+  fontFamily, margin, letterSpacing, highlights, onHighlight,
 }: {
   html: string;
   css: string;
@@ -236,25 +243,35 @@ function HtmlChapter({
   webViewRef?: React.RefObject<InstanceType<typeof WebView> | null>;
   baseUrl?: string;
   pageFlipMode?: boolean;
-  /** Called with { totalPages } after content loads */
   onPageInfo?: (info: { totalPages: number }) => void;
-  /** Called when user taps an image; receives the resolved image URL */
   onImageTap?: (uri: string) => void;
-  /** Called when user taps an internal EPUB link; receives href */
   onInternalLink?: (href: string) => void;
+  fontFamily?: 'serif' | 'sans' | 'mono';
+  margin?: number;
+  letterSpacing?: number;
+  highlights?: Array<{ id: string; text: string; color: 'yellow' | 'green' | 'pink' }>;
+  onHighlight?: (text: string, color: 'yellow' | 'green' | 'pink') => void;
 }) {
-  const bgColor = theme === 'dark' ? '#1a1a1a' : theme === 'sepia' ? '#F4ECD8' : '#FFFFFF';
-  const textColor = theme === 'dark' ? '#E0E0E0' : theme === 'sepia' ? '#3E3E3E' : '#1a1a1a';
+  const bgColor = theme === 'dark' ? '#1a1a1a' : theme === 'sepia' ? '#F8F0E3' : '#FFFFFF';
+  const textColor = theme === 'dark' ? '#E0E0E0' : theme === 'sepia' ? '#3B2F2F' : '#1a1a1a';
   const linkColor = theme === 'dark' ? '#64B5F6' : '#007AFF';
+  const fontFamilyCss = fontFamily === 'sans'
+    ? `-apple-system, 'Helvetica Neue', sans-serif`
+    : fontFamily === 'mono'
+    ? `'Menlo', 'Courier New', monospace`
+    : `'Georgia', 'Times New Roman', serif`;
+  const marginPx = margin ?? 20;
+  const letterSpacingCss = letterSpacing ?? 0;
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const fullHtml = useMemo(() => {
     // eslint-disable-next-line prefer-template
       if (pageFlipMode) {
       return `<!DOCTYPE html>\n<html>\n<head>\n<meta charset="utf-8"/>\n<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>\n<style>\n${READER_CSS}\n${css}\nhtml {\n  overflow: hidden;\n  height: 100vh;\n  width: 100vw;\n}\nbody {\n  font-size: ${fontSize}px;\n  line-height: ${lineHeight};\n  background: ${bgColor};\n  color: ${textColor};\n  margin: 0;\n  padding: 20px 20px 80px 20px;\n  box-sizing: border-box;\n  height: 100vh;\n  overflow: hidden;\n  -webkit-text-size-adjust: none;\n  word-wrap: break-word;\n  overflow-wrap: break-word;\n  columns: 1;\n  column-width: calc(100vw - 40px);\n  column-gap: 40px;\n}\na { color: ${linkColor}; }\nimg { max-width: 100% !important; height: auto !important; break-inside: avoid; page-break-inside: avoid; max-height: 35vh !important; display: block !important; float: none !important; }\nfigure, div:has(> img), p:has(> img), div:has(> figure), p:has(> figure) { break-inside: avoid; page-break-inside: avoid; float: none !important; clear: both !important; display: block !important; }\n[style*="float"] { float: none !important; clear: both !important; }\n* { max-width: 100% !important; }\npre, code { white-space: pre-wrap; font-size: 0.9em; break-inside: avoid; }\nh1,h2,h3,h4,h5,h6 { break-after: avoid; }\n</style>\n</head>\n<body>${html}</body>\n</html>`;
+      return `<!DOCTYPE html>\n<html>\n<head>\n<meta charset="utf-8"/>\n<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>\n<style>\n${READER_CSS}\n${css}\nhtml {\n  overflow: hidden;\n  height: 100vh;\n  width: 100vw;\n}\nbody {\n  font-size: ${fontSize}px;\n  line-height: ${lineHeight};\n  font-family: ${fontFamilyCss};\n  letter-spacing: ${letterSpacingCss}px;\n  background: ${bgColor};\n  color: ${textColor};\n  margin: 0;\n  padding: ${marginPx}px ${marginPx}px 80px ${marginPx}px;\n  box-sizing: border-box;\n  height: 100vh;\n  overflow: hidden;\n  -webkit-text-size-adjust: none;\n  word-wrap: break-word;\n  overflow-wrap: break-word;\n  columns: 1;\n  column-width: calc(100vw - ${marginPx * 2}px);\n  column-gap: ${marginPx * 2}px;\n}\na { color: ${linkColor}; }\nimg { max-width: 100% !important; height: auto !important; break-inside: avoid; page-break-inside: avoid; max-height: 35vh !important; display: block !important; float: none !important; }\nfigure, div:has(> img), p:has(> img), div:has(> figure), p:has(> figure) { break-inside: avoid; page-break-inside: avoid; float: none !important; clear: both !important; display: block !important; }\n[style*="float"] { float: none !important; clear: both !important; }\n* { max-width: 100% !important; }\npre, code { white-space: pre-wrap; font-size: 0.9em; break-inside: avoid; }\nh1,h2,h3,h4,h5,h6 { break-after: avoid; }\n</style>\n</head>\n<body>${html}</body>\n</html>`;
     }
-    return `<!DOCTYPE html>\n<html>\n<head>\n<meta charset="utf-8"/>\n<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=2.0"/>\n<style>\n${READER_CSS}\n${css}\nhtml, body {\n  font-size: ${fontSize}px;\n  line-height: ${lineHeight};\n  background: ${bgColor};\n  color: ${textColor};\n  padding: 0 20px 80px 20px;\n  margin: 0;\n  -webkit-text-size-adjust: none;\n  word-wrap: break-word;\n  overflow-wrap: break-word;\n}\na { color: ${linkColor}; }\nimg { max-width: 100% !important; height: auto !important; }\n* { max-width: 100% !important; }\npre, code { white-space: pre-wrap; font-size: 0.9em; }\n</style>\n</head>\n<body>${html}</body>\n</html>`;
-  }, [html, css, fontSize, lineHeight, bgColor, textColor, linkColor, pageFlipMode]);
+    return `<!DOCTYPE html>\n<html>\n<head>\n<meta charset="utf-8"/>\n<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=2.0"/>\n<style>\n${READER_CSS}\n${css}\nhtml, body {\n  font-size: ${fontSize}px;\n  line-height: ${lineHeight};\n  font-family: ${fontFamilyCss};\n  letter-spacing: ${letterSpacingCss}px;\n  background: ${bgColor};\n  color: ${textColor};\n  padding: 0 ${marginPx}px 80px ${marginPx}px;\n  margin: 0;\n  -webkit-text-size-adjust: none;\n  word-wrap: break-word;\n  overflow-wrap: break-word;\n}\na { color: ${linkColor}; }\nimg { max-width: 100% !important; height: auto !important; }\n* { max-width: 100% !important; }\npre, code { white-space: pre-wrap; font-size: 0.9em; }\n</style>\n</head>\n<body>${html}</body>\n</html>`;
+  }, [html, css, fontSize, lineHeight, bgColor, textColor, linkColor, pageFlipMode, fontFamilyCss, letterSpacingCss, marginPx]);
 
   const injectedScript = `
     document.addEventListener('click', function() {
@@ -313,6 +330,46 @@ function HtmlChapter({
           window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'tap' }));
         }
       });
+      // Long-press highlight menu
+      var _lpTimer = null;
+      var _lpStartX = 0, _lpStartY = 0;
+      document.addEventListener('touchstart', function(e) {
+        _lpStartX = e.touches[0].clientX; _lpStartY = e.touches[0].clientY;
+        _lpTimer = setTimeout(function() {
+          var sel = window.getSelection ? window.getSelection().toString().trim() : '';
+          if (sel.length > 0 && window.ReactNativeWebView) {
+            window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'longPressSelection', text: sel }));
+          }
+        }, 600);
+      }, { passive: true });
+      document.addEventListener('touchmove', function(e) {
+        if (_lpTimer && (Math.abs(e.touches[0].clientX - _lpStartX) > 8 || Math.abs(e.touches[0].clientY - _lpStartY) > 8)) {
+          clearTimeout(_lpTimer); _lpTimer = null;
+        }
+      }, { passive: true });
+      document.addEventListener('touchend', function() { if (_lpTimer) { clearTimeout(_lpTimer); _lpTimer = null; } }, { passive: true });
+      // Apply highlights from RN
+      window.__applyHighlights = function(hls) {
+        document.querySelectorAll('.hl-yellow,.hl-green,.hl-pink').forEach(function(el) {
+          var parent = el.parentNode; while (el.firstChild) parent.insertBefore(el.firstChild, el); parent.removeChild(el);
+        });
+        if (!hls || hls.length === 0) return;
+        hls.forEach(function(h) {
+          var text = h.text; var cls = 'hl-' + h.color; if (!text) return;
+          var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
+          var node;
+          while ((node = walker.nextNode())) {
+            var idx = node.nodeValue.indexOf(text);
+            if (idx >= 0) {
+              var range = document.createRange();
+              range.setStart(node, idx); range.setEnd(node, idx + text.length);
+              var span = document.createElement('span'); span.className = cls;
+              try { range.surroundContents(span); } catch(e) {}
+              break;
+            }
+          }
+        });
+      };
     })();
     true;
   `;
@@ -400,6 +457,9 @@ function HtmlChapter({
           if (msg.type === 'pageScroll' && typeof msg.page === 'number') {
             // This is inside HtmlChapter — no-op here, handled in parent via onPageInfo
           }
+          if (msg.type === 'longPressSelection' && msg.text && onHighlight) {
+            onHighlight(msg.text, 'yellow');
+          }
         } catch {}
       }}
       onShouldStartLoadWithRequest={(req) => {
@@ -443,7 +503,7 @@ type Phase = "reading" | "select" | "confirm" | "done";
 
 /* ─── Main screen ──────────────────────────────────────────────────────────── */
 
-  export default function BookReaderScreen() {
+export default function BookReaderScreen() {
   const colors = useColors();
   const router = useRouter();
   const { lang, t } = useI18n();
@@ -501,6 +561,13 @@ type Phase = "reading" | "select" | "confirm" | "done";
   const [theme, setTheme] = useState<'light' | 'dark' | 'sepia'>('light');
   const [showReaderSettings, setShowReaderSettings] = useState(false);
   const [bookmarks, setBookmarks] = useState<number[]>([]);
+  const [fontFamily, setFontFamily] = useState<'serif' | 'sans' | 'mono'>('serif');
+  const [margin, setMargin] = useState<number>(20);
+  const [letterSpacing, setLetterSpacing] = useState<number>(0);
+  const [highlights, setHighlights] = useState<Array<{ id: string; text: string; color: 'yellow' | 'green' | 'pink'; chapterIdx: number }>>([]);
+  const [highlightMenu, setHighlightMenu] = useState<{ text: string } | null>(null);
+  const SETTINGS_KEY = `cocktail.reader.settings.v1.${id}`;
+  const HIGHLIGHTS_KEY = `cocktail.reader.highlights.v1.${id}`;
 
   /* Page-flip mode (swipe left/right to change chapter) */
   const [pageFlipMode, setPageFlipMode] = useState(true);
@@ -562,6 +629,71 @@ type Phase = "reading" | "select" | "confirm" | "done";
       if (autoSaveTimer.current) clearInterval(autoSaveTimer.current);
     };
   }, [book, chapterIdx, phase, updatePosition]);
+
+  /* Load reader settings from AsyncStorage on mount */
+  useEffect(() => {
+    AsyncStorage.getItem(SETTINGS_KEY).then((raw) => {
+      if (!raw) return;
+      try {
+        const s = JSON.parse(raw);
+        if (s.fontSize) setFontSize(s.fontSize);
+        if (s.lineHeight) setLineHeight(s.lineHeight);
+        if (s.theme) setTheme(s.theme);
+        if (s.fontFamily) setFontFamily(s.fontFamily);
+        if (s.margin !== undefined) setMargin(s.margin);
+        if (s.letterSpacing !== undefined) setLetterSpacing(s.letterSpacing);
+      } catch {}
+    });
+    AsyncStorage.getItem(HIGHLIGHTS_KEY).then((raw) => {
+      if (!raw) return;
+      try { setHighlights(JSON.parse(raw)); } catch {}
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /* Persist settings whenever they change */
+  useEffect(() => {
+    AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify({ fontSize, lineHeight, theme, fontFamily, margin, letterSpacing }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fontSize, lineHeight, theme, fontFamily, margin, letterSpacing]);
+
+  /* Persist highlights whenever they change */
+  useEffect(() => {
+    AsyncStorage.setItem(HIGHLIGHTS_KEY, JSON.stringify(highlights));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlights]);
+
+  /* Inject highlights into WebView after chapter loads */
+  useEffect(() => {
+    if (!webViewRef.current) return;
+    const chHL = highlights.filter((h) => h.chapterIdx === chapterIdx);
+    const script = `window.__applyHighlights && window.__applyHighlights(${JSON.stringify(chHL)}); true;`;
+    const timer = setTimeout(() => { webViewRef.current?.injectJavaScript(script); }, 700);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chapterHtml, chapterIdx, highlights]);
+
+  /* Progress bar drag */
+  const progressBarWidth = useRef(0);
+  const progressPanResponder = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderGrant: (e) => {
+      const total = book?.sections.length ?? 1;
+      const ratio = Math.max(0, Math.min(1, e.nativeEvent.locationX / (progressBarWidth.current || 1)));
+      const target = Math.floor(ratio * total);
+      setChapterIdx(Math.max(0, Math.min(total - 1, target)));
+      setCurrentPage(0);
+      if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    },
+    onPanResponderMove: (e) => {
+      const total = book?.sections.length ?? 1;
+      const ratio = Math.max(0, Math.min(1, e.nativeEvent.locationX / (progressBarWidth.current || 1)));
+      const target = Math.floor(ratio * total);
+      setChapterIdx(Math.max(0, Math.min(total - 1, target)));
+    },
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [book]);
 
   const tap = () => {
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -1181,6 +1313,18 @@ type Phase = "reading" | "select" | "confirm" | "done";
   /* ─── Render ─────────────────────────────────────────────────────────────── */
 
   const chapterTitles = book.sections.map((s) => s.title);
+  const chapterHighlights = highlights.filter((h) => h.chapterIdx === chapterIdx);
+
+  const handleHighlight = useCallback((text: string, _color: 'yellow' | 'green' | 'pink') => {
+    setHighlightMenu({ text });
+  }, []);
+
+  const applyHighlight = useCallback((text: string, color: 'yellow' | 'green' | 'pink') => {
+    const newHL = { id: `hl_${Date.now()}`, text, color, chapterIdx };
+    setHighlights((prev) => [...prev.filter((h) => !(h.text === text && h.chapterIdx === chapterIdx)), newHL]);
+    setHighlightMenu(null);
+    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, [chapterIdx]);
 
   return (
     <ScreenContainer edges={["top", "left", "right"]}>
@@ -1207,20 +1351,18 @@ type Phase = "reading" | "select" | "confirm" | "done";
             </Pressable>
           ) : (
             <Pressable onPress={() => router.back()} hitSlop={8} style={({ pressed }) => [pressed && { opacity: 0.6 }]}>
-              <IconSymbol name="chevron.left" size={20} color={colors.foreground} />
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
+                <IconSymbol name="chevron.left" size={20} color={colors.primary} />
+                <Text style={{ fontSize: 13, color: colors.primary, fontWeight: "500" }}>
+                  {pageFlipMode && totalPages > 1 ? String(currentPage + 1) : String(chapterIdx + 1)}
+                </Text>
+              </View>
             </Pressable>
           )}
-          <Text style={[styles.topBarTitle, { color: colors.foreground }]} numberOfLines={1}>
+          <Text style={[styles.topBarTitle, { color: colors.muted, fontSize: 13, fontWeight: "400" }]} numberOfLines={1}>
             {book.title || book.fileName}
           </Text>
           <View style={{ flexDirection: "row", gap: 4 }}>
-            {/* Font size controls */}
-            <Pressable onPress={() => { tap(); setFontSize((f) => Math.max(12, f - 1)); }} hitSlop={8} style={[styles.iconBtn, { backgroundColor: colors.surface }]}>
-              <Text style={{ fontSize: 11, color: colors.muted, fontWeight: "600" }}>A−</Text>
-            </Pressable>
-            <Pressable onPress={() => { tap(); setFontSize((f) => Math.min(24, f + 1)); }} hitSlop={8} style={[styles.iconBtn, { backgroundColor: colors.surface }]}>
-              <Text style={{ fontSize: 14, color: colors.foreground, fontWeight: "600" }}>A+</Text>
-            </Pressable>
             {/* Reader Settings */}
             <Pressable onPress={() => { tap(); setShowReaderSettings(true); }} hitSlop={8} style={[styles.iconBtn, { backgroundColor: colors.surface }]}>
               <IconSymbol name="slider.horizontal.3" size={16} color={colors.foreground} />
@@ -1329,6 +1471,11 @@ type Phase = "reading" | "select" | "confirm" | "done";
                     }
                     return undefined;
                   })()}
+                  fontFamily={fontFamily}
+                  margin={margin}
+                  letterSpacing={letterSpacing}
+                  highlights={chapterHighlights}
+                  onHighlight={handleHighlight}
                 />
               </Animated.View>
             </GestureDetector>
@@ -1523,13 +1670,31 @@ type Phase = "reading" | "select" | "confirm" | "done";
       {chromeVisible && phase === "reading" && (
         <View style={[styles.bottomBar, { backgroundColor: colors.background + "F0", borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, 12) }]}>
           {/* Progress bar */}
-          <View style={{ height: 2, backgroundColor: colors.border, borderRadius: 1, marginBottom: 10, overflow: "hidden" }}>
-            <View style={{ height: 2, backgroundColor: colors.primary, width: `${Math.round(
+          <View
+            style={{ height: 20, justifyContent: "center", marginBottom: 6 }}
+            onLayout={(e) => { progressBarWidth.current = e.nativeEvent.layout.width; }}
+            {...progressPanResponder.panHandlers}
+          >
+            <View style={{ height: 3, backgroundColor: colors.border, borderRadius: 2, overflow: "hidden" }}>
+              <View style={{ height: 3, backgroundColor: colors.primary, borderRadius: 2, width: `${Math.round(
+                pageFlipMode && totalPages > 1
+                  ? ((chapterIdx + (currentPage + 1) / totalPages) / totalChapters) * 100
+                  : progress * 100
+              )}%` }} />
+            </View>
+            {/* Thumb indicator */}
+            <View style={{ position: "absolute", left: `${Math.round(
               pageFlipMode && totalPages > 1
                 ? ((chapterIdx + (currentPage + 1) / totalPages) / totalChapters) * 100
                 : progress * 100
-            )}%`, borderRadius: 1 }} />
+            )}%`, top: 3, width: 14, height: 14, borderRadius: 7, backgroundColor: colors.primary, marginLeft: -7, shadowColor: "#000", shadowOpacity: 0.15, shadowRadius: 3, elevation: 3 }} />
           </View>
+          {/* Page info row */}
+          <Text style={{ fontSize: 11, color: colors.muted, textAlign: "center", marginBottom: 6 }}>
+            {pageFlipMode && totalPages > 1
+              ? `${chapterIdx + 1}/${totalChapters}章  ·  第 ${currentPage + 1}/${totalPages} 页`
+              : `${chapterIdx + 1} / ${totalChapters} 章`}
+          </Text>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
             <Pressable
               onPress={() => { tap(); setCurrentPage(0); setCurrentPageInChapter(0); setChapterIdx((i) => Math.max(0, i - 1)); }}
@@ -1674,10 +1839,61 @@ type Phase = "reading" | "select" | "confirm" | "done";
                 <View style={{ flexDirection: "row", gap: 6 }}>
                   {(["light", "dark", "sepia"] as const).map((t) => (
                     <Pressable key={t} onPress={() => setTheme(t)} style={[{ flex: 1, paddingVertical: 8, borderRadius: 6, alignItems: "center", borderWidth: 1 }, theme === t ? { backgroundColor: colors.primary, borderColor: colors.primary } : { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                      <Text style={{ fontSize: 12, fontWeight: "500", color: theme === t ? "#FFF" : colors.foreground }}>{t === "light" ? (zh ? "浅色" : "Light") : t === "dark" ? (zh ? "深色" : "Dark") : (zh ? "护眼" : "Sepia")}</Text>
+                      <Text style={{ fontSize: 12, fontWeight: "500", color: theme === t ? "#FFF" : colors.foreground }}>{t === "light" ? (zh ? "浅色" : "Light") : t === "dark" ? (zh ? "深色" : "Dark") : (zh ? "米黄" : "Sepia")}</Text>
                     </Pressable>
                   ))}
                 </View>
+              </View>
+
+              {/* Font Family */}
+              <View style={{ paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
+                <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground, marginBottom: 8 }}>{zh ? "字体" : "Font"}</Text>
+                <View style={{ flexDirection: "row", gap: 6 }}>
+                  {([["serif", zh ? "衬线" : "Serif"], ["sans", zh ? "无衬线" : "Sans"], ["mono", zh ? "等宽" : "Mono"]] as const).map(([ff, label]) => (
+                    <Pressable key={ff} onPress={() => { tap(); setFontFamily(ff); }} style={[{ flex: 1, paddingVertical: 8, borderRadius: 6, alignItems: "center", borderWidth: 1 }, fontFamily === ff ? { backgroundColor: colors.primary, borderColor: colors.primary } : { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                      <Text style={{ fontSize: 12, fontWeight: "500", color: fontFamily === ff ? "#FFF" : colors.foreground }}>{label}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+
+              {/* Margin */}
+              <View style={{ paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
+                <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground, marginBottom: 8 }}>{zh ? "页边距" : "Margin"}</Text>
+                <View style={{ flexDirection: "row", gap: 6 }}>
+                  {([[12, zh ? "窄" : "Narrow"], [20, zh ? "中" : "Medium"], [32, zh ? "宽" : "Wide"]] as const).map(([m, label]) => (
+                    <Pressable key={m} onPress={() => { tap(); setMargin(m); }} style={[{ flex: 1, paddingVertical: 8, borderRadius: 6, alignItems: "center", borderWidth: 1 }, margin === m ? { backgroundColor: colors.primary, borderColor: colors.primary } : { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                      <Text style={{ fontSize: 12, fontWeight: "500", color: margin === m ? "#FFF" : colors.foreground }}>{label}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+
+              {/* Letter Spacing */}
+              <View style={{ paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
+                <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground, marginBottom: 8 }}>{zh ? "字间距" : "Letter Spacing"}</Text>
+                <View style={{ flexDirection: "row", gap: 6 }}>
+                  {([[0, zh ? "紧凑" : "Tight"], [0.5, zh ? "标准" : "Normal"], [1.5, zh ? "宽松" : "Wide"]] as const).map(([ls, label]) => (
+                    <Pressable key={ls} onPress={() => { tap(); setLetterSpacing(ls); }} style={[{ flex: 1, paddingVertical: 8, borderRadius: 6, alignItems: "center", borderWidth: 1 }, letterSpacing === ls ? { backgroundColor: colors.primary, borderColor: colors.primary } : { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                      <Text style={{ fontSize: 12, fontWeight: "500", color: letterSpacing === ls ? "#FFF" : colors.foreground }}>{label}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+
+              {/* Font Size (A- / A+) */}
+              <View style={{ paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
+                <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground, marginBottom: 8 }}>{zh ? "字号" : "Font Size"}</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                  <Pressable onPress={() => { tap(); setFontSize((f) => Math.max(12, f - 1)); }} hitSlop={8} style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" }}>
+                    <Text style={{ fontSize: 14, color: colors.foreground, fontWeight: "600" }}>A−</Text>
+                  </Pressable>
+                  <Text style={{ flex: 1, textAlign: "center", fontSize: 22, color: colors.foreground, fontWeight: "300" }}>Aa</Text>
+                  <Pressable onPress={() => { tap(); setFontSize((f) => Math.min(28, f + 1)); }} hitSlop={8} style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" }}>
+                    <Text style={{ fontSize: 17, color: colors.foreground, fontWeight: "600" }}>A+</Text>
+                  </Pressable>
+                </View>
+                <Text style={{ fontSize: 11, color: colors.muted, textAlign: "center", marginTop: 6 }}>{fontSize}pt</Text>
               </View>
 
               {/* Page Flip Mode */}
@@ -1705,18 +1921,38 @@ type Phase = "reading" | "select" | "confirm" | "done";
         <View style={[StyleSheet.absoluteFillObject, { pointerEvents: "box-none" }]}>
           <Pressable style={[StyleSheet.absoluteFillObject, { backgroundColor: "rgba(0,0,0,0.4)" }]} onPress={() => setTocOpen(false)} />
           <View style={[styles.tocSheet, { backgroundColor: colors.background, borderColor: colors.border }]}>
-            <Text style={[styles.tocTitle, { color: colors.foreground }]}>{zh ? "目录" : "Table of Contents"}</Text>
+            {/* Apple Books style header: cover + title + page info */}
+            <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, gap: 12 }}>
+              {book.coverUri ? (
+                <Image source={{ uri: book.coverUri }} style={{ width: 44, height: 60, borderRadius: 4, backgroundColor: colors.surface }} resizeMode="cover" />
+              ) : (
+                <View style={{ width: 44, height: 60, borderRadius: 4, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center" }}>
+                  <IconSymbol name="book.closed" size={20} color={colors.muted} />
+                </View>
+              )}
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }} numberOfLines={2}>{book.title || book.fileName}</Text>
+                <Text style={{ fontSize: 12, color: colors.muted, marginTop: 3 }}>
+                  {zh ? `第 ${chapterIdx + 1} 章，共 ${totalChapters} 章` : `Ch. ${chapterIdx + 1} of ${totalChapters}`}
+                </Text>
+              </View>
+              <Pressable onPress={() => setTocOpen(false)} hitSlop={8} style={({ pressed }) => [{ width: 28, height: 28, borderRadius: 14, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center" }, pressed && { opacity: 0.6 }]}>
+                <IconSymbol name="xmark" size={14} color={colors.muted} />
+              </Pressable>
+            </View>
             <ScrollView style={{ flex: 1 }}>
               {chapterTitles.map((title, i) => (
                 <Pressable
                   key={i}
                   onPress={() => { tap(); setChapterIdx(i); setTocOpen(false); showChrome(); }}
-                  style={({ pressed }) => [styles.tocRow, { borderBottomColor: colors.border }, pressed && { opacity: 0.6 }]}
+                  style={({ pressed }) => [styles.tocRow, { borderBottomColor: colors.border, paddingLeft: title && title.match(/^\s/) ? 32 : 16 }, pressed && { backgroundColor: colors.surface }]}
                 >
-                  <Text style={{ fontSize: 14, color: i === chapterIdx ? colors.primary : colors.foreground, fontWeight: i === chapterIdx ? "600" : "400" }} numberOfLines={2}>
-                    {title || `${zh ? "第" : "Chapter"} ${i + 1}`}
-                  </Text>
-                  {i === chapterIdx && <IconSymbol name="checkmark" size={14} color={colors.primary} />}
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, color: i === chapterIdx ? colors.primary : colors.foreground, fontWeight: i === chapterIdx ? "600" : "400" }} numberOfLines={2}>
+                      {title || `${zh ? "第" : "Chapter"} ${i + 1}`}
+                    </Text>
+                  </View>
+                  <Text style={{ fontSize: 12, color: colors.muted, marginLeft: 8, minWidth: 24, textAlign: "right" }}>{i + 1}</Text>
                 </Pressable>
               ))}
             </ScrollView>
@@ -2057,10 +2293,31 @@ type Phase = "reading" | "select" | "confirm" | "done";
               </Pressable>
             </View>
           )}
+      </View>
+      </View>
+    )}
+
+    {/* ── Highlight color picker ── */}
+    {highlightMenu && (
+      <View style={[StyleSheet.absoluteFillObject, { pointerEvents: "box-none" }]}>
+        <Pressable style={[StyleSheet.absoluteFillObject]} onPress={() => setHighlightMenu(null)} />
+        <View style={{ position: "absolute", bottom: Math.max(insets.bottom + 80, 100), left: 20, right: 20, backgroundColor: colors.background, borderRadius: 16, padding: 16, shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 12, elevation: 8, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border }}>
+          <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 10, textAlign: "center" }}>{zh ? "选择高亮颜色" : "Choose highlight color"}</Text>
+          <Text style={{ fontSize: 13, color: colors.foreground, marginBottom: 12, textAlign: "center" }} numberOfLines={2}>「{highlightMenu.text.slice(0, 40)}{highlightMenu.text.length > 40 ? "…" : ""}」</Text>
+          <View style={{ flexDirection: "row", gap: 10, justifyContent: "center" }}>
+            {([["yellow", "#FFD60A", zh ? "黄色" : "Yellow"], ["green", "#30D158", zh ? "绿色" : "Green"], ["pink", "#FF375F", zh ? "粉色" : "Pink"]] as const).map(([color, hex, label]) => (
+              <Pressable key={color} onPress={() => applyHighlight(highlightMenu.text, color)} style={({ pressed }) => [{ alignItems: "center", gap: 4 }, pressed && { opacity: 0.7 }]}>
+                <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: hex + "44", borderWidth: 2, borderColor: hex, alignItems: "center", justifyContent: "center" }}>
+                  <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: hex }} />
+                </View>
+                <Text style={{ fontSize: 11, color: colors.muted }}>{label}</Text>
+              </Pressable>
+            ))}
+          </View>
         </View>
-        </View>
-      )}
-    </ScreenContainer>
+      </View>
+    )}
+  </ScreenContainer>
   );
 }
 
