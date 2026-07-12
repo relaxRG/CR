@@ -61,7 +61,7 @@ export default function MeScreen() {
     <ScreenContainer>
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
         <View className="px-5 pt-4 pb-4">
-          <Text className="text-3xl font-bold text-foreground">{t("me.title")}</Text>
+          <Text style={{ fontSize: 34, fontWeight: "700", lineHeight: 41, color: colors.foreground }}>{t("me.title")}</Text>
           <Text className="text-sm text-muted mt-1">{t("me.subtitle")}</Text>
         </View>
 
@@ -71,21 +71,23 @@ export default function MeScreen() {
             onPress={handleAccountPress}
             style={({ pressed }) => [pressed && { opacity: 0.7 }]}
           >
-            <View className="flex-row items-center bg-surface rounded-2xl border border-border px-4 py-3.5">
-              <View style={[styles.iconWrap, { backgroundColor: "#0A84FF" }]}>
-                <IconSymbol name="icloud.fill" size={18} color="#FFFFFF" />
-              </View>
-              <View className="flex-1">
-                <Text className="text-base font-semibold text-foreground">
-                  {isAuthenticated && user?.name ? user.name : t("sync.title")}
+            <View style={{ backgroundColor: colors.surface, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, overflow: "hidden" }}>
+              <View style={styles.row}>
+                <View style={[styles.iconWrap, { backgroundColor: "#0A84FF" }]}>
+                  <IconSymbol name="icloud.fill" size={18} color="#FFFFFF" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rowTitle} className="text-foreground">
+                    {isAuthenticated && user?.name ? user.name : t("sync.title")}
+                  </Text>
+                  <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>
+                    {syncStatusText}
+                  </Text>
+                </View>
+                <Text style={{ color: colors.primary, fontSize: 15, fontWeight: "600" }}>
+                  {isAuthenticated ? t("sync.logout") : t("sync.login")}
                 </Text>
-                <Text className="text-xs text-muted mt-0.5" numberOfLines={1}>
-                  {syncStatusText}
-                </Text>
               </View>
-              <Text style={{ color: colors.primary, fontSize: 14, fontWeight: "600" }}>
-                {isAuthenticated ? t("sync.logout") : t("sync.login")}
-              </Text>
             </View>
           </Pressable>
         </View>
@@ -119,15 +121,15 @@ export default function MeScreen() {
               <View style={[styles.iconWrap, { backgroundColor: colors.primary }]}>
                 <IconSymbol name="tag.fill" size={18} color="#FFFFFF" />
               </View>
-              <View className="flex-1">
-                <Text className="text-base font-semibold text-foreground">{t("me.tags")}</Text>
-                <Text className="text-xs text-muted mt-0.5" numberOfLines={1}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowTitle} className="text-foreground">{t("me.tags")}</Text>
+                <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>
                   {t("me.tags.desc")}
                 </Text>
               </View>
               <IconSymbol name="chevron.right" size={18} color={colors.muted} />
             </Pressable>
-            <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 62 }} />
+            <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 64 }} />
             <Pressable
               onPress={() => {
                 tap();
@@ -138,15 +140,15 @@ export default function MeScreen() {
               <View style={[styles.iconWrap, { backgroundColor: "#34C759" }]}>
                 <IconSymbol name="square.and.arrow.down.fill" size={18} color="#FFFFFF" />
               </View>
-              <View className="flex-1">
-                <Text className="text-base font-semibold text-foreground">{t("me.import")}</Text>
-                <Text className="text-xs text-muted mt-0.5" numberOfLines={1}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowTitle} className="text-foreground">{t("me.import")}</Text>
+                <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>
                   {t("me.import.desc")}
                 </Text>
               </View>
               <IconSymbol name="chevron.right" size={18} color={colors.muted} />
             </Pressable>
-            <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 62 }} />
+            <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 64 }} />
             <Pressable
               onPress={() => {
                 tap();
@@ -157,15 +159,15 @@ export default function MeScreen() {
               <View style={[styles.iconWrap, { backgroundColor: "#FF9500" }]}>
                 <IconSymbol name="rectangle.3.group.fill" size={18} color="#FFFFFF" />
               </View>
-              <View className="flex-1">
-                <Text className="text-base font-semibold text-foreground">{t("me.cardTags")}</Text>
-                <Text className="text-xs text-muted mt-0.5" numberOfLines={1}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowTitle} className="text-foreground">{t("me.cardTags")}</Text>
+                <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>
                   {t("me.cardTags.desc")}
                 </Text>
               </View>
               <IconSymbol name="chevron.right" size={18} color={colors.muted} />
             </Pressable>
-            <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 62 }} />
+            <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 64 }} />
             <Pressable
               onPress={() => {
                 tap();
@@ -176,15 +178,15 @@ export default function MeScreen() {
               <View style={[styles.iconWrap, { backgroundColor: "#FF9500" }]}>
                 <IconSymbol name="book.fill" size={18} color="#FFFFFF" />
               </View>
-              <View className="flex-1">
-                <Text className="text-base font-semibold text-foreground">{t("me.bookImport")}</Text>
-                <Text className="text-xs text-muted mt-0.5" numberOfLines={1}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowTitle} className="text-foreground">{t("me.bookImport")}</Text>
+                <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>
                   {t("me.bookImport.desc")}
                 </Text>
               </View>
               <IconSymbol name="chevron.right" size={18} color={colors.muted} />
             </Pressable>
-            <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 62 }} />
+            <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 64 }} />
             <Pressable
               onPress={() => {
                 tap();
@@ -195,9 +197,9 @@ export default function MeScreen() {
               <View style={[styles.iconWrap, { backgroundColor: "#5AC8FA" }]}>
                 <IconSymbol name="snowflake" size={18} color="#FFFFFF" />
               </View>
-              <View className="flex-1">
-                <Text className="text-base font-semibold text-foreground">{t("me.ice")}</Text>
-                <Text className="text-xs text-muted mt-0.5" numberOfLines={1}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowTitle} className="text-foreground">{t("me.ice")}</Text>
+                <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>
                   {t("me.ice.desc")}
                 </Text>
               </View>
@@ -208,26 +210,28 @@ export default function MeScreen() {
 
         {/* 语言设置 */}
         <View className="px-5 pb-4">
-          <View className="flex-row items-center bg-surface rounded-2xl border border-border px-4 py-3.5">
-            <View style={[styles.iconWrap, { backgroundColor: "#5856D6" }]}>
-              <IconSymbol name="globe" size={18} color="#FFFFFF" />
-            </View>
-            <Text className="flex-1 text-base text-foreground">{t("me.language")}</Text>
-            <View className="flex-row bg-background rounded-lg p-0.5" style={{ gap: 2 }}>
-              {(["zh", "en"] as const).map((l) => (
-                <Pressable
-                  key={l}
-                  onPress={() => {
-                    tap();
-                    setLang(l);
-                  }}
-                  style={[styles.langSeg, lang === l && { backgroundColor: colors.primary }]}
-                >
-                  <Text style={[styles.langSegText, { color: lang === l ? "#FFFFFF" : colors.muted }]}>
-                    {l === "zh" ? "中文" : "English"}
-                  </Text>
-                </Pressable>
-              ))}
+          <View style={{ backgroundColor: colors.surface, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, overflow: "hidden" }}>
+            <View style={styles.row}>
+              <View style={[styles.iconWrap, { backgroundColor: "#5856D6" }]}>
+                <IconSymbol name="globe" size={18} color="#FFFFFF" />
+              </View>
+              <Text style={[styles.rowTitle, { flex: 1 }]} className="text-foreground">{t("me.language")}</Text>
+              <View style={{ flexDirection: "row", backgroundColor: colors.background, borderRadius: 8, padding: 2, gap: 2 }}>
+                {(["zh", "en"] as const).map((l) => (
+                  <Pressable
+                    key={l}
+                    onPress={() => {
+                      tap();
+                      setLang(l);
+                    }}
+                    style={[styles.langSeg, lang === l && { backgroundColor: colors.primary }]}
+                  >
+                    <Text style={[styles.langSegText, { color: lang === l ? "#FFFFFF" : colors.muted }]}>
+                      {l === "zh" ? "中文" : "English"}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
             </View>
           </View>
         </View>
@@ -245,12 +249,21 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   iconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: 9,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 2,
+  },
+  rowTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    lineHeight: 22,
+  },
+  rowDesc: {
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 2,
   },
   langSeg: {
     paddingHorizontal: 12,

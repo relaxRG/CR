@@ -82,7 +82,7 @@ export const DEFAULT_CARD_TAG_SETTINGS: CardTagSettings = {
   showBottleVolume: true,
   recipeCardSlotOrder: [...CARD_TAG_SLOTS],
   recipeCardSlotHidden: [],
-  recipeCardRow1Slots: ["category", "codexFamily", "baseSpirit"],
+  recipeCardRow1Slots: ["category", "codexFamily", "baseSpirit", "duration", "occasion"],
   recipeCardColors: {},
   flavorTagConfigs: {},
   flavorTagOrder: [...FLAVOR_TAGS],

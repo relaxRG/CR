@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -7,6 +7,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -308,6 +309,17 @@ export default function RecipeFormScreen() {
     suggestedOccasion?: string;
     suggestedOccasionConfidence?: "high" | "medium" | "low";
   } | null>(null);
+  /** 逐字段 toggle：key = field key, value = true(接受) / false(拒绝) */
+  const [aiToggles, setAiToggles] = useState<Record<string, boolean>>({});
+  /** Undo snapshot：应用 AI 建议前的字段快照 */
+  const [undoSnapshot, setUndoSnapshot] = useState<null | {
+    story: string; flavorDesc: string; source: string; flavors: string[];
+    baseSpirit: string; glass: string; ice: string; codexFamily: string;
+    variantOf: string; method: string; drinkDuration: string; occasion: string;
+    creator: string; createdYear: string;
+  }>(null);
+  /** Undo toast 倒计时 timer ref */
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Which ingredient row is focused (shows live suggestions) */
   /** 风味标签专属置信度（来自自动 AI 分析） */
   const [flavorConfidence, setFlavorConfidence] = useState<"high" | "medium" | "low" | null>(null);
@@ -644,72 +656,204 @@ export default function RecipeFormScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // 仅挂载时触发一次
 
-  const applyAiResult = () => {
-    if (!aiResult) return;
-    if (aiResult.story && !story.trim()) setStory(aiResult.story);
-    if (aiResult.flavorDesc && !flavorDesc.trim()) setFlavorDesc(aiResult.flavorDesc);
-    if (aiResult.source && !source.trim()) setSource(aiResult.source);
-    if (aiResult.flavors && aiResult.flavors.length > 0 && flavors.length === 0) {
-      // 规范化风味标签（英→中），只保留 FLAVOR_TAGS 中存在的标准标签
-      const normalizedFlavors = normalizeTagArrayToZh(aiResult.flavors, FLAVOR_TAGS);
-      if (normalizedFlavors.length > 0) setFlavors(normalizedFlavors);
+  /** ─── AI Fill 字段定义 ─────────────────────────────────────────────── */
+  type AiConflict = "new" | "override" | "confirm" | "low";
+  type AiFieldDef = {
+    key: string;
+    labelZh: string;
+    labelEn: string;
+    aiValue: string;
+    currentValue: string;
+    conflict: AiConflict;
+    confidence: "high" | "medium" | "low";
+  };
+
+  /** 根据当前 aiResult 构建字段 diff 列表 */
+  const buildAiFields = useCallback((): AiFieldDef[] => {
+    if (!aiResult) return [];
+    const fields: AiFieldDef[] = [];
+    const conf = (c?: "high" | "medium" | "low") => c ?? "medium";
+    const conflict = (cur: string, ai: string, c: "high" | "medium" | "low"): AiConflict => {
+      if (c === "low") return "low";
+      if (!cur) return "new";
+      if (cur === ai) return "confirm";
+      return "override";
+    };
+
+    // Base Spirit
+    if (aiResult.suggestedBaseSpirit) {
+      const resolved = resolveAiSpirits(aiResult.suggestedBaseSpirit) || aiResult.suggestedBaseSpirit;
+      const c = conf(aiResult.suggestedBaseSpiritConfidence);
+      fields.push({ key: "baseSpirit", labelZh: "基酒", labelEn: "Base Spirit", aiValue: resolved, currentValue: baseSpirit, conflict: conflict(baseSpirit, resolved, c), confidence: c });
     }
-    if (!baseSpirit && aiResult.suggestedBaseSpirit) {
-      const resolved = resolveAiSpirits(aiResult.suggestedBaseSpirit);
-      if (resolved) {
-        setBaseSpirit(resolved);
-        setSpiritConfidence(null);
-        setAiSuggestedSpirits([]);
+    // Glass
+    if (aiResult.suggestedGlass) {
+      const resolved = ensureGlassName(aiResult.suggestedGlass) || aiResult.suggestedGlass;
+      const c = conf(aiResult.suggestedGlassConfidence);
+      fields.push({ key: "glass", labelZh: "杯型", labelEn: "Glass", aiValue: resolved, currentValue: glass, conflict: conflict(glass, resolved, c), confidence: c });
+    }
+    // Ice
+    if (aiResult.suggestedIce) {
+      const resolved = normalizeIceName(aiResult.suggestedIce);
+      const c = conf(aiResult.suggestedIceConfidence);
+      if ((ICE_TYPES as readonly string[]).includes(resolved)) {
+        fields.push({ key: "ice", labelZh: "冰块", labelEn: "Ice", aiValue: resolved, currentValue: ice, conflict: conflict(ice, resolved, c), confidence: c });
       }
     }
-    if (!glass && aiResult.suggestedGlass) {
-      const nextName = ensureGlassName(aiResult.suggestedGlass);
-      if (nextName) setGlass(nextName);
-    }
-    if (!ice && aiResult.suggestedIce) {
-      const nextName = normalizeIceName(aiResult.suggestedIce);
-      // normalizeIceName 已通过词典规范化，直接检查是否在标准列表中
-      if ((ICE_TYPES as readonly string[]).includes(nextName)) setIce(nextName);
-    }
-    // Codex 家族（所有 AI 路径均可返回）
-    if (aiResult.suggestedCodexFamily && !codexFamily) {
-      const normalizedFamily = CODEX_FAMILIES.find((f) =>
-        f === aiResult.suggestedCodexFamily ||
-        f.startsWith(aiResult.suggestedCodexFamily ?? "") ||
-        (aiResult.suggestedCodexFamily ?? "").includes(f.split(" ")[0])
-      ) ?? aiResult.suggestedCodexFamily;
-      if (normalizedFamily) setCodexFamily(normalizedFamily);
-    }
-    if (aiResult.suggestedVariantOf && !variantOf) {
-      setVariantOf(aiResult.suggestedVariantOf);
-    }
+    // Method
     if (aiResult.suggestedMethod) {
-      const normalizedMethod = normalizeTagToZh(aiResult.suggestedMethod);
-      const validMethod = METHODS.find((m) => m === normalizedMethod || normalizedMethod.includes(m) || m.includes(normalizedMethod));
-      if (validMethod) setMethod(validMethod);
-      else if (METHODS.includes(normalizedMethod as typeof METHODS[number])) setMethod(normalizedMethod as typeof METHODS[number]);
+      const nm = normalizeTagToZh(aiResult.suggestedMethod);
+      const valid = METHODS.find((m) => m === nm || nm.includes(m) || m.includes(nm));
+      if (valid) fields.push({ key: "method", labelZh: "制作方法", labelEn: "Method", aiValue: valid, currentValue: method, conflict: conflict(method, valid, "medium"), confidence: "medium" });
     }
-    if (aiResult.creator || aiResult.createdYear) {
-      setSourceRef((prev) => ({
-        ...prev,
-        creator: aiResult.creator && !prev.creator ? aiResult.creator : prev.creator,
-        createdYear: aiResult.createdYear && !prev.createdYear ? aiResult.createdYear : prev.createdYear,
-        creatorConfidence: "medium",
-      }));
-      setShowSourceRef(true);
+    // Codex Family
+    if (aiResult.suggestedCodexFamily) {
+      const nf = CODEX_FAMILIES.find((f) => f === aiResult.suggestedCodexFamily || f.startsWith(aiResult.suggestedCodexFamily ?? "") || (aiResult.suggestedCodexFamily ?? "").includes(f.split(" ")[0])) ?? aiResult.suggestedCodexFamily;
+      fields.push({ key: "codexFamily", labelZh: "Codex 家族", labelEn: "Codex Family", aiValue: nf, currentValue: codexFamily, conflict: conflict(codexFamily, nf, "medium"), confidence: "medium" });
     }
-    // 饮用时长：用户点「应用」时强制写入（白名单校验）
+    // Variant Of
+    if (aiResult.suggestedVariantOf) {
+      fields.push({ key: "variantOf", labelZh: "变体来源", labelEn: "Variant Of", aiValue: aiResult.suggestedVariantOf, currentValue: variantOf, conflict: conflict(variantOf, aiResult.suggestedVariantOf, "medium"), confidence: "medium" });
+    }
+    // Drink Duration
     if (aiResult.suggestedDrinkDuration && (DRINK_DURATIONS as readonly string[]).includes(aiResult.suggestedDrinkDuration)) {
-      setDrinkDuration(aiResult.suggestedDrinkDuration);
-      setDurationUserOverride(true);
+      const c = conf(aiResult.suggestedDurationConfidence);
+      const dispAi = aiResult.suggestedDrinkDuration === "短饮" ? "Short Drink / 短饮" : "Long Drink / 长饮";
+      const dispCur = drinkDuration === "短饮" ? "Short Drink / 短饮" : drinkDuration === "长饮" ? "Long Drink / 长饮" : drinkDuration;
+      fields.push({ key: "drinkDuration", labelZh: "饮用时长", labelEn: "Duration", aiValue: dispAi, currentValue: dispCur, conflict: conflict(drinkDuration, aiResult.suggestedDrinkDuration, c), confidence: c });
     }
-    // 饮用场合：用户点「应用」时强制写入（白名单校验）
+    // Occasion
     if (aiResult.suggestedOccasion && (OCCASIONS as readonly string[]).includes(aiResult.suggestedOccasion)) {
-      setOccasion(aiResult.suggestedOccasion);
-      setOccasionUserOverride(true);
+      const c = conf(aiResult.suggestedOccasionConfidence);
+      const occEn: Record<string, string> = { "餐前酒": "Aperitif", "餐后酒": "Digestif", "全天酒": "All Day", "佐餐酒": "With Dinner", "睡前酒": "Nightcap", "派对酒": "Party" };
+      const dispAi = `${occEn[aiResult.suggestedOccasion] ?? aiResult.suggestedOccasion} / ${aiResult.suggestedOccasion}`;
+      const dispCur = occasion ? `${occEn[occasion] ?? occasion} / ${occasion}` : "";
+      fields.push({ key: "occasion", labelZh: "饮用场合", labelEn: "Occasion", aiValue: dispAi, currentValue: dispCur, conflict: conflict(occasion, aiResult.suggestedOccasion, c), confidence: c });
     }
+    // Story
+    if (aiResult.story) {
+      const c = conf(aiResult.confidence);
+      fields.push({ key: "story", labelZh: "故事", labelEn: "Story", aiValue: aiResult.story.slice(0, 60) + (aiResult.story.length > 60 ? "…" : ""), currentValue: story ? story.slice(0, 30) + "…" : "", conflict: conflict(story.trim(), aiResult.story, c), confidence: c });
+    }
+    // Flavor Desc
+    if (aiResult.flavorDesc) {
+      const c = conf(aiResult.confidence);
+      fields.push({ key: "flavorDesc", labelZh: "风味描述", labelEn: "Flavor Desc", aiValue: aiResult.flavorDesc.slice(0, 60) + (aiResult.flavorDesc.length > 60 ? "…" : ""), currentValue: flavorDesc ? flavorDesc.slice(0, 30) + "…" : "", conflict: conflict(flavorDesc.trim(), aiResult.flavorDesc, c), confidence: c });
+    }
+    // Source
+    if (aiResult.source) {
+      fields.push({ key: "source", labelZh: "来源", labelEn: "Source", aiValue: aiResult.source, currentValue: source, conflict: conflict(source.trim(), aiResult.source, "medium"), confidence: "medium" });
+    }
+    // Creator / Year
+    if (aiResult.creator || aiResult.createdYear) {
+      const aiVal = [aiResult.creator, aiResult.createdYear].filter(Boolean).join(" · ");
+      const curVal = [sourceRef.creator, sourceRef.createdYear].filter(Boolean).join(" · ");
+      fields.push({ key: "creator", labelZh: "创作者", labelEn: "Creator", aiValue: aiVal, currentValue: curVal, conflict: conflict(curVal, aiVal, "medium"), confidence: "medium" });
+    }
+    // Flavors
+    if (aiResult.flavors && aiResult.flavors.length > 0) {
+      const normalized = normalizeTagArrayToZh(aiResult.flavors, FLAVOR_TAGS);
+      if (normalized.length > 0) {
+        const c = conf(aiResult.confidence);
+        fields.push({ key: "flavors", labelZh: "风味标签", labelEn: "Flavors", aiValue: normalized.slice(0, 4).join(" · ") + (normalized.length > 4 ? ` +${normalized.length - 4}` : ""), currentValue: flavors.length > 0 ? flavors.slice(0, 3).join(" · ") + (flavors.length > 3 ? `…` : "") : "", conflict: conflict(flavors.length > 0 ? "has" : "", "has", c), confidence: c });
+      }
+    }
+    return fields;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aiResult, baseSpirit, glass, ice, method, codexFamily, variantOf, drinkDuration, occasion, story, flavorDesc, source, sourceRef, flavors]);
+
+  /** 初始化 toggles：新增字段默认 on，覆盖字段默认 off，低置信默认 off */
+  useEffect(() => {
+    if (!aiResult) { setAiToggles({}); return; }
+    const fields = buildAiFields();
+    const defaults: Record<string, boolean> = {};
+    for (const f of fields) {
+      defaults[f.key] = f.conflict === "new" || f.conflict === "confirm";
+    }
+    setAiToggles(defaults);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aiResult]);
+
+  /** 实际写入单个字段 */
+  const applyField = useCallback((key: string) => {
+    if (!aiResult) return;
+    if (key === "baseSpirit" && aiResult.suggestedBaseSpirit) {
+      const resolved = resolveAiSpirits(aiResult.suggestedBaseSpirit);
+      if (resolved) { setBaseSpirit(resolved); setSpiritConfidence(null); setAiSuggestedSpirits([]); }
+    } else if (key === "glass" && aiResult.suggestedGlass) {
+      const n = ensureGlassName(aiResult.suggestedGlass); if (n) setGlass(n);
+    } else if (key === "ice" && aiResult.suggestedIce) {
+      const n = normalizeIceName(aiResult.suggestedIce); if ((ICE_TYPES as readonly string[]).includes(n)) setIce(n);
+    } else if (key === "method" && aiResult.suggestedMethod) {
+      const nm = normalizeTagToZh(aiResult.suggestedMethod);
+      const v = METHODS.find((m) => m === nm || nm.includes(m) || m.includes(nm));
+      if (v) setMethod(v);
+    } else if (key === "codexFamily" && aiResult.suggestedCodexFamily) {
+      const nf = CODEX_FAMILIES.find((f) => f === aiResult.suggestedCodexFamily || f.startsWith(aiResult.suggestedCodexFamily ?? "") || (aiResult.suggestedCodexFamily ?? "").includes(f.split(" ")[0])) ?? aiResult.suggestedCodexFamily;
+      if (nf) setCodexFamily(nf);
+    } else if (key === "variantOf" && aiResult.suggestedVariantOf) {
+      setVariantOf(aiResult.suggestedVariantOf);
+    } else if (key === "drinkDuration" && aiResult.suggestedDrinkDuration) {
+      setDrinkDuration(aiResult.suggestedDrinkDuration); setDurationUserOverride(true);
+    } else if (key === "occasion" && aiResult.suggestedOccasion) {
+      setOccasion(aiResult.suggestedOccasion); setOccasionUserOverride(true);
+    } else if (key === "story" && aiResult.story) {
+      setStory(aiResult.story);
+    } else if (key === "flavorDesc" && aiResult.flavorDesc) {
+      setFlavorDesc(aiResult.flavorDesc);
+    } else if (key === "source" && aiResult.source) {
+      setSource(aiResult.source);
+    } else if (key === "creator" && (aiResult.creator || aiResult.createdYear)) {
+      setSourceRef((prev) => ({ ...prev, creator: aiResult!.creator && !prev.creator ? aiResult!.creator : prev.creator, createdYear: aiResult!.createdYear && !prev.createdYear ? aiResult!.createdYear : prev.createdYear, creatorConfidence: "medium" }));
+      setShowSourceRef(true);
+    } else if (key === "flavors" && aiResult.flavors) {
+      const normalized = normalizeTagArrayToZh(aiResult.flavors, FLAVOR_TAGS);
+      if (normalized.length > 0) setFlavors(normalized);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aiResult]);
+
+  /** 应用所有 toggle=true 的字段，保存 undo 快照，显示 undo toast */
+  const applyAiResult = useCallback((toggleOverride?: Record<string, boolean>) => {
+    if (!aiResult) return;
+    const toggles = toggleOverride ?? aiToggles;
+    const fields = buildAiFields();
+    // 保存 undo 快照
+    setUndoSnapshot({ story, flavorDesc, source, flavors, baseSpirit, glass, ice, codexFamily, variantOf, method, drinkDuration, occasion, creator: sourceRef.creator ?? "", createdYear: sourceRef.createdYear ?? "" });
+    // 应用选中字段
+    for (const f of fields) {
+      if (toggles[f.key] !== false) applyField(f.key);
+    }
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setAiResult(null);
-  };
+    // 5 秒后自动清除 undo
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    undoTimerRef.current = setTimeout(() => setUndoSnapshot(null), 5000);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aiResult, aiToggles, buildAiFields, applyField, story, flavorDesc, source, flavors, baseSpirit, glass, ice, codexFamily, variantOf, method, drinkDuration, occasion, sourceRef]);
+
+  /** 撤销 AI 应用 */
+  const undoAiApply = useCallback(() => {
+    if (!undoSnapshot) return;
+    setStory(undoSnapshot.story);
+    setFlavorDesc(undoSnapshot.flavorDesc);
+    setSource(undoSnapshot.source);
+    setFlavors(undoSnapshot.flavors);
+    setBaseSpirit(undoSnapshot.baseSpirit);
+    setGlass(undoSnapshot.glass);
+    setIce(undoSnapshot.ice);
+    setCodexFamily(undoSnapshot.codexFamily);
+    setVariantOf(undoSnapshot.variantOf);
+    setMethod(undoSnapshot.method as typeof METHODS[number]);
+    setDrinkDuration(undoSnapshot.drinkDuration);
+    setOccasion(undoSnapshot.occasion);
+    if (undoSnapshot.creator || undoSnapshot.createdYear) {
+      setSourceRef((prev) => ({ ...prev, creator: undoSnapshot!.creator, createdYear: undoSnapshot!.createdYear }));
+    }
+    setUndoSnapshot(null);
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  }, [undoSnapshot]);
 
   const canSave = name.trim().length > 0 || nameEn.trim().length > 0;
 
@@ -1044,148 +1188,144 @@ export default function RecipeFormScreen() {
             </Pressable>
           </View>
           {aiResult && (
-            <View
-              className="rounded-xl border px-3 py-3 mt-2"
-              style={{ borderColor: colors.primary + "44", backgroundColor: colors.primary + "0A", gap: 8 }}
-            >
-              <View className="flex-row items-center justify-between">
-                <View className="flex-row items-center" style={{ gap: 6 }}>
-                  <IconSymbol name="sparkles" size={13} color={colors.primary} />
-                  <Text className="text-xs font-medium" style={{ color: colors.primary }}>
-                    {lang === "zh" ? "AI 建议" : "AI Suggestion"}
-                  </Text>
-                  <View
-                    className="px-1.5 py-0.5 rounded-full"
-                    style={{
-                      backgroundColor:
-                        aiResult.confidence === "high"
-                          ? colors.success + "22"
-                          : aiResult.confidence === "medium"
-                            ? "#FF950022"
-                            : colors.border,
-                    }}
-                  >
-                    <Text
-                      className="text-[10px] font-medium"
-                      style={{
-                        color:
-                          aiResult.confidence === "high"
-                            ? colors.success
-                            : aiResult.confidence === "medium"
-                              ? "#FF9500"
-                              : colors.muted,
+            (() => {
+              const aiFields = buildAiFields();
+              const conflictColor = (c: "new" | "override" | "confirm" | "low") =>
+                c === "new" ? colors.primary : c === "override" ? "#FF9500" : c === "confirm" ? colors.success : colors.muted;
+              const conflictLabel = (c: "new" | "override" | "confirm" | "low") =>
+                lang === "zh"
+                  ? c === "new" ? "新增" : c === "override" ? "覆盖" : c === "confirm" ? "确认" : "低可信"
+                  : c === "new" ? "New" : c === "override" ? "Override" : c === "confirm" ? "Match" : "Low";
+              const toggledCount = aiFields.filter((f) => aiToggles[f.key] !== false).length;
+              return (
+                <View
+                  className="rounded-xl border mt-2"
+                  style={{ borderColor: colors.primary + "44", backgroundColor: colors.primary + "0A" }}
+                >
+                  {/* ── Header ── */}
+                  <View className="flex-row items-center justify-between px-3 pt-3 pb-2">
+                    <View className="flex-row items-center" style={{ gap: 6 }}>
+                      <IconSymbol name="sparkles" size={13} color={colors.primary} />
+                      <Text style={{ fontSize: 12, fontWeight: "600", color: colors.primary }}>
+                        {lang === "zh" ? "AI 建议" : "AI Suggestion"}
+                      </Text>
+                      <View className="px-1.5 py-0.5 rounded-full" style={{ backgroundColor: aiResult.confidence === "high" ? colors.success + "22" : aiResult.confidence === "medium" ? "#FF950022" : colors.border }}>
+                        <Text style={{ fontSize: 10, fontWeight: "600", color: aiResult.confidence === "high" ? colors.success : aiResult.confidence === "medium" ? "#FF9500" : colors.muted }}>
+                          {aiResult.confidence === "high" ? (lang === "zh" ? "高可信" : "High") : aiResult.confidence === "medium" ? (lang === "zh" ? "中可信" : "Medium") : (lang === "zh" ? "低可信" : "Low")}
+                        </Text>
+                      </View>
+                      <Text style={{ fontSize: 10, color: colors.muted }}>{lang === "zh" ? `${aiFields.length} 个字段` : `${aiFields.length} fields`}</Text>
+                    </View>
+                    <Pressable onPress={() => setAiResult(null)} hitSlop={8}>
+                      <IconSymbol name="xmark" size={14} color={colors.muted} />
+                    </Pressable>
+                  </View>
+                  {/* ── Quick actions ── */}
+                  <View className="flex-row px-3 pb-2" style={{ gap: 6 }}>
+                    <Pressable
+                      onPress={() => {
+                        const all: Record<string, boolean> = {};
+                        for (const f of aiFields) all[f.key] = true;
+                        setAiToggles(all);
                       }}
+                      style={({ pressed }) => ({ flex: 1, paddingVertical: 5, borderRadius: 7, alignItems: "center" as const, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, opacity: pressed ? 0.6 : 1 })}
                     >
-                      {aiResult.confidence === "high"
-                        ? (lang === "zh" ? "高可信" : "High")
-                        : aiResult.confidence === "medium"
-                          ? (lang === "zh" ? "中可信" : "Medium")
-                          : (lang === "zh" ? "低可信" : "Low")}
-                    </Text>
+                      <Text style={{ fontSize: 11, fontWeight: "500", color: colors.foreground }}>{lang === "zh" ? "全选" : "Select All"}</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => {
+                        const blanks: Record<string, boolean> = {};
+                        for (const f of aiFields) blanks[f.key] = f.conflict === "new";
+                        setAiToggles(blanks);
+                      }}
+                      style={({ pressed }) => ({ flex: 1, paddingVertical: 5, borderRadius: 7, alignItems: "center" as const, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, opacity: pressed ? 0.6 : 1 })}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: "500", color: colors.primary }}>{lang === "zh" ? "只填空白" : "Blanks Only"}</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => {
+                        const none: Record<string, boolean> = {};
+                        for (const f of aiFields) none[f.key] = false;
+                        setAiToggles(none);
+                      }}
+                      style={({ pressed }) => ({ flex: 1, paddingVertical: 5, borderRadius: 7, alignItems: "center" as const, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, opacity: pressed ? 0.6 : 1 })}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: "500", color: colors.muted }}>{lang === "zh" ? "全不选" : "Deselect"}</Text>
+                    </Pressable>
+                  </View>
+                  {/* ── Field diff list ── */}
+                  <View style={{ borderTopWidth: 0.5, borderTopColor: colors.border + "88" }}>
+                    {aiFields.map((f, idx) => {
+                      const isOn = aiToggles[f.key] !== false;
+                      const cc = conflictColor(f.conflict);
+                      return (
+                        <View
+                          key={f.key}
+                          style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 9, borderBottomWidth: idx < aiFields.length - 1 ? 0.5 : 0, borderBottomColor: colors.border + "66", gap: 8, opacity: isOn ? 1 : 0.45 }}
+                        >
+                          {/* conflict badge */}
+                          <View style={{ width: 36, alignItems: "center" }}>
+                            <View style={{ paddingHorizontal: 4, paddingVertical: 2, borderRadius: 4, backgroundColor: cc + "22" }}>
+                              <Text style={{ fontSize: 9, fontWeight: "700", color: cc }}>{conflictLabel(f.conflict)}</Text>
+                            </View>
+                          </View>
+                          {/* label + values */}
+                          <View style={{ flex: 1, gap: 1 }}>
+                            <Text style={{ fontSize: 11, fontWeight: "600", color: colors.foreground, lineHeight: 15 }}>
+                              {lang === "zh" ? f.labelZh : f.labelEn}
+                            </Text>
+                            {f.currentValue ? (
+                              <Text style={{ fontSize: 10, color: colors.muted, lineHeight: 14 }} numberOfLines={1}>
+                                {f.currentValue} → <Text style={{ color: cc, fontWeight: "500" }}>{f.aiValue}</Text>
+                              </Text>
+                            ) : (
+                              <Text style={{ fontSize: 10, color: cc, fontWeight: "500", lineHeight: 14 }} numberOfLines={1}>{f.aiValue}</Text>
+                            )}
+                          </View>
+                          {/* toggle */}
+                          <Switch
+                            value={isOn}
+                            onValueChange={(v) => setAiToggles((prev) => ({ ...prev, [f.key]: v }))}
+                            trackColor={{ false: colors.border, true: colors.primary + "88" }}
+                            thumbColor={isOn ? colors.primary : colors.muted}
+                            style={{ transform: [{ scaleX: 0.75 }, { scaleY: 0.75 }] }}
+                          />
+                        </View>
+                      );
+                    })}
+                  </View>
+                  {/* ── Apply button ── */}
+                  <View className="flex-row px-3 pt-2 pb-3" style={{ gap: 8 }}>
+                    <Pressable
+                      onPress={() => applyAiResult()}
+                      style={({ pressed }) => ({ flex: 1, paddingVertical: 8, borderRadius: 9, alignItems: "center" as const, backgroundColor: toggledCount > 0 ? colors.primary : colors.border, opacity: pressed ? 0.8 : 1 })}
+                    >
+                      <Text style={{ fontSize: 13, fontWeight: "600", color: toggledCount > 0 ? "#FFFFFF" : colors.muted }}>
+                        {lang === "zh" ? `应用 ${toggledCount} 项` : `Apply ${toggledCount} fields`}
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => setAiResult(null)}
+                      style={({ pressed }) => ({ paddingVertical: 8, paddingHorizontal: 14, borderRadius: 9, alignItems: "center" as const, borderWidth: 1, borderColor: colors.border, opacity: pressed ? 0.6 : 1 })}
+                    >
+                      <Text style={{ fontSize: 13, color: colors.muted }}>{lang === "zh" ? "忽略" : "Dismiss"}</Text>
+                    </Pressable>
                   </View>
                 </View>
-                <Pressable onPress={() => setAiResult(null)} hitSlop={8}>
-                  <IconSymbol name="xmark" size={14} color={colors.muted} />
-              </Pressable>
-            </View>
-              {aiResult.story ? (
-                <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>
-                  {lang === "zh" ? "故事: " : "Story: "}{aiResult.story}
+              );
+            })()
+          )}
+          {/* ── Undo toast ── */}
+          {undoSnapshot && (
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: colors.success + "18", borderWidth: 1, borderColor: colors.success + "44" }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <IconSymbol name="checkmark.circle.fill" size={14} color={colors.success} />
+                <Text style={{ fontSize: 12, fontWeight: "500", color: colors.success }}>
+                  {lang === "zh" ? "AI 建议已应用" : "AI suggestions applied"}
                 </Text>
-              ) : null}
-              {aiResult.flavorDesc ? (
-                <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>
-                  {lang === "zh" ? "风味: " : "Flavor desc: "}{aiResult.flavorDesc}
-                </Text>
-              ) : null}
-              {aiResult.source ? (
-                <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>
-                  {lang === "zh" ? "来源: " : "Source: "}{aiResult.source}
-                </Text>
-              ) : null}
-              {!baseSpirit && aiResult.suggestedBaseSpirit ? (
-                <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>
-                  {lang === "zh" ? "基酒建议: " : "Base spirit: "}
-                  {aiResult.suggestedBaseSpirit}
-                  {aiResult.suggestedBaseSpiritConfidence ? ` · ${aiResult.suggestedBaseSpiritConfidence}` : ""}
-                </Text>
-              ) : null}
-              {!glass && aiResult.suggestedGlass ? (
-                <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>
-                  {lang === "zh" ? "杯型建议: " : "Glass: "}
-                  {aiResult.suggestedGlass}
-                  {aiResult.suggestedGlassConfidence ? ` · ${aiResult.suggestedGlassConfidence}` : ""}
-                </Text>
-              ) : null}
-              {!ice && aiResult.suggestedIce ? (
-                <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>
-                  {lang === "zh" ? "冰块建议: " : "Ice: "}
-                  {aiResult.suggestedIce}
-                  {aiResult.suggestedIceConfidence ? ` · ${aiResult.suggestedIceConfidence}` : ""}
-                </Text>
-              ) : null}
-              {/* Deep analysis extra fields */}
-              {aiResult.suggestedCodexFamily ? (
-                <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>
-                  {lang === "zh" ? "Codex 家族: " : "Codex family: "}{aiResult.suggestedCodexFamily}
-                </Text>
-              ) : null}
-              {aiResult.suggestedVariantOf ? (
-                <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>
-                  {lang === "zh" ? "变体来源: " : "Variant of: "}{aiResult.suggestedVariantOf}
-                </Text>
-              ) : null}
-              {aiResult.suggestedMethod ? (
-                <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>
-                  {lang === "zh" ? "制作方法: " : "Method: "}{aiResult.suggestedMethod}
-                </Text>
-              ) : null}
-              {aiResult.creator ? (
-                <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>
-                  {lang === "zh" ? "创作者: " : "Creator: "}{aiResult.creator}{aiResult.createdYear ? ` (${aiResult.createdYear})` : ""}
-                </Text>
-              ) : null}
-              {aiResult.suggestedCategories && aiResult.suggestedCategories.length > 0 ? (
-                <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>
-                  {lang === "zh" ? "建议分类: " : "Categories: "}{aiResult.suggestedCategories.join("、")}
-                </Text>
-              ) : null}
-              {/* 饮用时长 AI 建议 */}
-              {aiResult.suggestedDrinkDuration ? (
-                <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>
-                  {lang === "zh" ? "饮用时长: " : "Duration: "}
-                  {lang === "zh" ? aiResult.suggestedDrinkDuration : (aiResult.suggestedDrinkDuration === "短饮" ? "Short Drink" : "Long Drink")}
-                  {aiResult.suggestedDurationConfidence === "high" ? " ✓" : aiResult.suggestedDurationConfidence === "low" ? " ?" : ""}
-                </Text>
-              ) : null}
-              {/* 饮用场合 AI 建议 */}
-              {aiResult.suggestedOccasion ? (() => {
-                const occEn: Record<string, string> = { "餐前酒": "Aperitif", "餐后酒": "Digestif", "全天酒": "All Day", "佐餐酒": "With Dinner", "睡前酒": "Nightcap", "派对酒": "Party" };
-                return (
-                  <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>
-                    {lang === "zh" ? "饮用场合: " : "Occasion: "}
-                    {lang === "zh" ? aiResult.suggestedOccasion : (occEn[aiResult.suggestedOccasion] ?? aiResult.suggestedOccasion)}
-                    {aiResult.suggestedOccasionConfidence === "high" ? " ✓" : aiResult.suggestedOccasionConfidence === "low" ? " ?" : ""}
-                  </Text>
-                );
-              })() : null}
-              <Pressable
-                onPress={applyAiResult}
-                style={({ pressed }) => [
-                  {
-                    marginTop: 2,
-                    paddingVertical: 7,
-                    paddingHorizontal: 14,
-                    borderRadius: 8,
-                    alignItems: "center" as const,
-                    backgroundColor: colors.primary,
-                    opacity: pressed ? 0.8 : 1,
-                  },
-                ]}
-              >
-                <Text className="text-xs font-semibold" style={{ color: "#FFFFFF" }}>
-                  {lang === "zh" ? "应用到空白字段" : "Apply to empty fields"}
-                </Text>
+              </View>
+              <Pressable onPress={undoAiApply} hitSlop={8} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
+                <Text style={{ fontSize: 12, fontWeight: "600", color: colors.primary }}>{lang === "zh" ? "撤销" : "Undo"}</Text>
               </Pressable>
             </View>
           )}
@@ -1347,10 +1487,35 @@ export default function RecipeFormScreen() {
             style={{ lineHeight: 20 }}
           />
 
-          {/* Drink duration (single-select) */}
-          {/* Drink Duration */}
+          {/* Drink Duration — chip 选择（与 Strength 同风格） */}
           <Text className="text-sm font-medium text-muted mt-5 mb-1.5">{t("form.duration")}</Text>
-          <View style={styles.chipWrap}>
+          <View
+            className="bg-surface border border-border rounded-xl px-3 py-2.5"
+            style={{ gap: 2 }}
+          >
+            {drinkDuration ? (
+              <>
+                <View className="flex-row items-center" style={{ gap: 8 }}>
+                  <Text className="text-base font-semibold text-foreground" style={{ lineHeight: 22 }}>
+                    {lang === "en" ? (drinkDuration === "短饮" ? "Short Drink" : "Long Drink") : drinkDuration}
+                  </Text>
+                  {!durationUserOverride && (
+                    <Text className="text-xs text-muted" style={{ lineHeight: 20 }}>
+                      {lang === "zh" ? "AI 推断" : "AI inferred"}
+                    </Text>
+                  )}
+                </View>
+                <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>
+                  {lang === "zh" ? "点击下方选项可手动修改" : "Tap below to override"}
+                </Text>
+              </>
+            ) : (
+              <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>
+                {lang === "zh" ? "未选择（AI 将自动推断）" : "Not set — AI will infer"}
+              </Text>
+            )}
+          </View>
+          <View style={[styles.chipWrap, { marginTop: 8 }]}>
             {(DRINK_DURATIONS as readonly string[]).map((dur) => {
               const active = drinkDuration === dur;
               return (
@@ -1360,8 +1525,8 @@ export default function RecipeFormScreen() {
                   style={[
                     styles.chip,
                     {
-                      backgroundColor: active ? colors.primary : colors.surface,
-                      borderColor: active ? colors.primary : colors.border,
+                      backgroundColor: active ? "#007AFF" : colors.surface,
+                      borderColor: active ? "#007AFF" : colors.border,
                     },
                   ]}
                 >
@@ -1373,9 +1538,35 @@ export default function RecipeFormScreen() {
             })}
           </View>
 
-          {/* Occasion */}
+          {/* Occasion — chip 选择（与 Strength 同风格） */}
           <Text className="text-sm font-medium text-muted mt-5 mb-1.5">{t("form.occasion")}</Text>
-          <View style={styles.chipWrap}>
+          <View
+            className="bg-surface border border-border rounded-xl px-3 py-2.5"
+            style={{ gap: 2 }}
+          >
+            {occasion ? (
+              <>
+                <View className="flex-row items-center" style={{ gap: 8 }}>
+                  <Text className="text-base font-semibold text-foreground" style={{ lineHeight: 22 }}>
+                    {lang === "en" ? ({ "餐前酒": "Aperitif", "餐后酒": "Digestif", "全天酒": "All Day", "佐餐酒": "With Dinner", "睡前酒": "Nightcap", "派对酒": "Party" }[occasion] ?? occasion) : occasion}
+                  </Text>
+                  {!occasionUserOverride && (
+                    <Text className="text-xs text-muted" style={{ lineHeight: 20 }}>
+                      {lang === "zh" ? "AI 推断" : "AI inferred"}
+                    </Text>
+                  )}
+                </View>
+                <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>
+                  {lang === "zh" ? "点击下方选项可手动修改" : "Tap below to override"}
+                </Text>
+              </>
+            ) : (
+              <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>
+                {lang === "zh" ? "未选择（AI 将自动推断）" : "Not set — AI will infer"}
+              </Text>
+            )}
+          </View>
+          <View style={[styles.chipWrap, { marginTop: 8 }]}>
             {(OCCASIONS as readonly string[]).map((occ) => {
               const active = occasion === occ;
               const occEn: Record<string, string> = { "餐前酒": "Aperitif", "餐后酒": "Digestif", "全天酒": "All Day", "佐餐酒": "With Dinner", "睡前酒": "Nightcap", "派对酒": "Party" };
@@ -1386,8 +1577,8 @@ export default function RecipeFormScreen() {
                   style={[
                     styles.chip,
                     {
-                      backgroundColor: active ? colors.primary : colors.surface,
-                      borderColor: active ? colors.primary : colors.border,
+                      backgroundColor: active ? "#AF52DE" : colors.surface,
+                      borderColor: active ? "#AF52DE" : colors.border,
                     },
                   ]}
                 >

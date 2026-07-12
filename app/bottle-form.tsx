@@ -247,8 +247,8 @@ export default function BottleFormScreen() {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={{ flex: 1 }}
       >
-        {/* Header */}
-        <View className="flex-row items-center px-4 pt-1 pb-2">
+       {/* Header */}
+        <View className="flex-row items-center px-4 pt-3 pb-2">
           <Pressable
             onPress={() => router.back()}
             hitSlop={8}

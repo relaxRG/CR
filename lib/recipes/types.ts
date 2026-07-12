@@ -202,8 +202,8 @@ export const FLAVOR_TAG_EN: Record<string, string> = {
 };
 
 /** 卡片标签槽位 */
-export type CardTagSlot = "category" | "codexFamily" | "baseSpirit" | "flavors" | "strength" | "rating" | "cost";
-export const CARD_TAG_SLOTS: CardTagSlot[] = ["category", "codexFamily", "baseSpirit", "flavors", "strength", "rating", "cost"];
+export type CardTagSlot = "category" | "codexFamily" | "baseSpirit" | "flavors" | "strength" | "rating" | "cost" | "duration" | "occasion";
+export const CARD_TAG_SLOTS: CardTagSlot[] = ["category", "codexFamily", "baseSpirit", "flavors", "strength", "rating", "cost", "duration", "occasion"];
 export const CARD_TAG_SLOT_LABELS: Record<CardTagSlot, { zh: string; en: string }> = {
   category:    { zh: "分类",       en: "Category" },
   codexFamily: { zh: "Codex 家族", en: "Codex Family" },
@@ -212,6 +212,8 @@ export const CARD_TAG_SLOT_LABELS: Record<CardTagSlot, { zh: string; en: string 
   strength:    { zh: "烈度",       en: "Strength" },
   rating:      { zh: "评分",       en: "Rating" },
   cost:        { zh: "成本",       en: "Cost" },
+  duration:    { zh: "饮用时长",   en: "Drink Duration" },
+  occasion:    { zh: "饮用场合",   en: "Occasion" },
 };
 
 export interface Recipe {

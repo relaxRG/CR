@@ -20,6 +20,7 @@ import {
   codexFamilyLabel,
   localizedTagName,
 } from "@/lib/recipes/types";
+import { DRINK_DURATIONS, OCCASIONS } from "@/lib/recipes/types";
 import {
   useCardTagSettings,
   DEFAULT_CARD_TAG_SETTINGS,
@@ -269,6 +270,44 @@ export function useRecipeTagRows(
             ≈¥{costTotal.toFixed(1)}
           </Text>
         </View>
+      );
+    }
+
+    if (slot === "duration") {
+      if (!recipe.drinkDuration) return null;
+      const color = customColors.duration ?? "#007AFF";
+      const durEn: Record<string, string> = { "短饮": "Short", "长饮": "Long" };
+      const label = lang === "en" ? (durEn[recipe.drinkDuration] ?? recipe.drinkDuration) : recipe.drinkDuration;
+      return (
+        <Pressable
+          key="duration"
+          onPress={() => handleTagPress("duration", recipe.drinkDuration)}
+          hitSlop={4}
+          style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+        >
+          <View style={[tagStyles.pill, { backgroundColor: color + "20" }]}>
+            <Text style={[tagStyles.pillText, { color }]}>{label}</Text>
+          </View>
+        </Pressable>
+      );
+    }
+
+    if (slot === "occasion") {
+      if (!recipe.occasion) return null;
+      const color = customColors.occasion ?? "#AF52DE";
+      const occEn: Record<string, string> = { "餐前酒": "Aperitif", "餐后酒": "Digestif", "全天酒": "All Day", "佐餐酒": "With Dinner", "睡前酒": "Nightcap", "派对酒": "Party" };
+      const label = lang === "en" ? (occEn[recipe.occasion] ?? recipe.occasion) : recipe.occasion;
+      return (
+        <Pressable
+          key="occasion"
+          onPress={() => handleTagPress("occasion", recipe.occasion)}
+          hitSlop={4}
+          style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+        >
+          <View style={[tagStyles.pill, tagStyles.pillBorder, { backgroundColor: color + "12", borderColor: color + "66" }]}>
+            <Text style={[tagStyles.pillText, { color }]}>{label}</Text>
+          </View>
+        </Pressable>
       );
     }
 

@@ -204,8 +204,8 @@ export default function HomemadeFormScreen() {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={{ flex: 1 }}
       >
-        {/* Header */}
-        <View className="flex-row items-center justify-between px-4 pt-1 pb-2">
+       {/* Header */}
+        <View className="flex-row items-center justify-between px-4 pt-3 pb-2">
           <Pressable onPress={() => router.back()} hitSlop={8}>
             <IconSymbol name="xmark" size={24} color={colors.muted} />
           </Pressable>
