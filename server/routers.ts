@@ -446,47 +446,90 @@ export const appRouter = router({
         }),
       )
       .mutation(async ({ input }) => {
-        // 17 个精炼风味标签（与客户端 FLAVOR_TAGS 保持一致）
+        // ── 固定标签白名单（与客户端保持一致）──────────────────────────────
         const VALID_FLAVOR_TAGS = ["酸","甜","苦","烈","鲜","柑橘","热带","草本","花香","烟熏","木桶","香料","坚果可可","清爽","浓郁","干爽","复杂"];
+        const VALID_DURATIONS   = ["短饮","长饮"];
+        const VALID_OCCASIONS   = ["餐前酒","餐后酒","全天酒","佐餐酒","睡前酒","派对酒"];
+        const VALID_METHODS     = ["摇和","搅拌","直调","分层","搅打"];
+        const VALID_ICE         = ["标准方冰","大方冰","球冰","碎冰","长条冰","无冰"];
+        const VALID_STRENGTHS   = ["清爽","适中","浓烈"];
+        const CODEX_LIST        = ["古典 Old-Fashioned","马天尼 Martini","大吉利 Daiquiri","边车 Sidecar","高球 Highball","菲兹 Flip"];
+
         const spiritList = (input.existingSpirits ?? []).join("、") || "金酒、朗姆、伏特加、威士忌、龙舌兰、白兰地、梅斯卡尔、卡沙萨、皮斯科、利口酒、无酒精、其他";
-        const glassList = (input.existingGlasses ?? []).join("、") || "马天尼杯、古典杯、高球杯、柯林杯、库佩杯、飓风杯、子弹杯、其他";
-        const rawTextSection = input.rawText ? `\n原始文字片段（来自书籍，供推断创作者/年份参考）:\n${input.rawText.slice(0, 800)}` : "";
+        const glassList  = (input.existingGlasses ?? []).join("、") || "马天尼杯、古典杯、高球杯、柯林杯、库佩杯、飓风杯、子弹杯、尼克诺拉杯、郁金香杯、笛型杯、提基杯、铜杯、朱莉普杯、其他";
+        const rawTextSection  = input.rawText   ? `\n原始文字片段（来自书籍，供推断创作者/年份参考）:\n${input.rawText.slice(0, 800)}`  : "";
         const bookTitleSection = input.bookTitle ? `\n书名: ${input.bookTitle}` : "";
-        const prompt = `你是专业调酒知识专家。根据以下鸡尾酒信息，尽可能准确地补全资料。如果你熟悉这款鸡尾酒，请给出高置信度；如果只能从配料推断，请如实标注置信度。
+
+        const ingredientLine = (input.ingredientsWithAmounts ?? []).length > 0
+          ? `配料（含用量，用量最大的含酒精原料即为基酒）: ${(input.ingredientsWithAmounts ?? []).map(i => i.amount ? `${i.name} ${i.amount}` : i.name).join(", ")}`
+          : (input.ingredients ?? []).length > 0
+            ? `配料: ${(input.ingredients ?? []).join(", ")}`
+            : "";
+
+        const systemPrompt = `你是专业调酒知识专家兼鸡尾酒历史学家。根据配方信息进行全面深度分析，返回 JSON。
+
+【风味描述格式】必须严格三行，不得增减：
+第一行：核心基调：[2-3个核心风味词]
+第二行：风味演变：[前段] ➔ [中段] ➔ [后段余韵]
+第三行：整体质感：[2-3个酒体结构质感词]
+
+【引用来源识别规则】
+- 书籍格式：书名 + 年份，如 "The Savoy Cocktail Book, 1930"
+- IBA 官方：如 "IBA Official Cocktail"
+- 破折号署名：如原文含 "— Harry McElhone" 则 creator="Harry McElhone"，source="ABC of Mixing Cocktails"
+- 创作者≠书的作者（书作者只是记录者）
+
+【重要】所有标签字段必须使用中文，不得使用英文单词。`;
+
+        const userPrompt = `请分析以下鸡尾酒配方，返回完整 JSON：
 
 配方名称: ${input.name}${input.nameEn ? ` (${input.nameEn})` : ""}
 ${input.baseSpirit ? `基酒: ${input.baseSpirit}` : ""}
 ${input.method ? `调制方式: ${input.method}` : ""}
-${(input.ingredientsWithAmounts ?? []).length > 0 ? `配料（含用量，用量最大的含酒精原料即为基酒）: ${(input.ingredientsWithAmounts ?? []).map(i => i.amount ? i.name + " " + i.amount : i.name).join(", ")}` : (input.ingredients ?? []).length > 0 ? `配料: ${(input.ingredients ?? []).join(", ")}` : ""}${rawTextSection}${bookTitleSection}
+${ingredientLine}${rawTextSection}${bookTitleSection}
 
-可选基酒列表（优先从此列表中选择）: ${spiritList}
-可选杯型列表（优先从此列表中选择）: ${glassList}
+可选基酒列表（只能从此列表选）: ${spiritList}
+可选杯型列表（只能从此列表选）: ${glassList}
 
-请输出 JSON（严格按照以下格式）:
+请输出以下 JSON（不确定的字段返回空字符串 ""）:
 {
-  "flavors": 从 ["酸","甜","苦","烈","鲜","柑橘","热带","草本","花香","烟熏","木桶","香料","坚果可可","清爽","浓郁","干爽","复杂"] 中选出最贴切的2-5个标签（数组，只能从上面列表中选，不能自造），
-  "flavorConfidence": "high"（你对这款鸡尾酒非常熟悉，风味标签有把握）| "medium"（有一定了解，标签较可靠）| "low"（主要靠配料推断，不太确定），
-  "story": "${input.story ? "(已有内容,如有更好信息可补充,否则返回空字符串)" : "这款鸡尾酒的历史来历与创作故事(中文,100字内),不清楚则返回空字符串"}",
-  "flavorDesc": "${input.flavorDesc ? "(已有内容,如有更好信息可补充,否则返回空字符串)" : "风味描述:口感特点与风味层次(中文,50字内),不清楚则返回空字符串"}",
-  "source": "${input.source ? "(已有内容,不要修改,返回空字符串)" : "引用来源:如 'IBA Official Cocktail' / 'The Savoy Cocktail Book' / 调酒师名字等,不确定则返回空字符串"}",
-  "confidence": "high"|"medium"|"low"（对整体补全结果的置信度）,
-  "suggestedBaseSpirit": "${input.baseSpirit ? "(已有基酒,返回空字符串)" : "推荐基酒（优先从可选基酒列表中选，若列表中没有合适的可自由填写，不确定则返回空字符串）。若两种烈酒用量相等，用逗号分隔列出所有，如：威士忌,白兰地"}",
+  "flavors": ["酸","甜"] // 从 ${JSON.stringify(VALID_FLAVOR_TAGS)} 中选2-5个，只能选列表中的值,
+  "flavorConfidence": "high"|"medium"|"low",
+  "story": "${input.story ? "(已有内容，如有更好信息可补充，否则返回\"\")" : "历史来历与创作故事（中文，100字内）"}",
+  "flavorDesc": "${input.flavorDesc ? "(已有内容，如有更好信息可补充，否则返回\"\")" : "严格三行格式：\\n核心基调：...\\n风味演变：... ➔ ... ➔ ...\\n整体质感：..."}",
+  "source": "${input.source ? "(已有内容，不要修改，返回\"\")" : "引用来源（书名/IBA/调酒师名等）"}",
+  "confidence": "high"|"medium"|"low",
+  "suggestedBaseSpirit": "${input.baseSpirit ? "(已有基酒，返回\"\")" : "从可选基酒列表中选，若两种等量用逗号分隔如：威士忌,白兰地"}",
   "suggestedBaseSpiritConfidence": "high"|"medium"|"low",
-  "suggestedGlass": "推荐杯型（优先从可选杯型列表中选，若列表中没有合适的可自由填写，不确定则返回空字符串）",
+  "suggestedGlass": "从可选杯型列表中选",
   "suggestedGlassConfidence": "high"|"medium"|"low",
-  "suggestedIce": "推荐冰块类型（如：大方冰/碎冰/球冰/标准方冰/长条冰/无冰，不确定则返回空字符串）",
+  "suggestedIce": "从 ${JSON.stringify(VALID_ICE)} 中选一个",
   "suggestedIceConfidence": "high"|"medium"|"low",
-  "creator": "配方创作者姓名（调酒师/酒吧名，如 'Harry Craddock' / 'Death & Co'），不确定则返回空字符串。注意：创作者≠书的作者，书的作者只是记录者",
-  "creatorConfidence": "high"（有明确文献记载）| "medium"（有合理推断依据）| "low"（不确定或无法判断）,
-  "createdYear": "创作年份或年代（如 '1930' / 'circa 1920s' / '2009'），不确定则返回空字符串",
-  "createdYearConfidence": "high"| "medium"| "low"
+  "suggestedMethod": "从 ${JSON.stringify(VALID_METHODS)} 中选一个",
+  "suggestedStrength": "从 ${JSON.stringify(VALID_STRENGTHS)} 中选一个",
+  "suggestedDrinkDuration": "从 ${JSON.stringify(VALID_DURATIONS)} 中选一个。判断规则：含苏打水/汤力水/姜汁啤酒/果汁大量=长饮；纯烈酒+利口酒少量=短饮",
+  "suggestedDurationConfidence": "high"|"medium"|"low",
+  "suggestedOccasion": "从 ${JSON.stringify(VALID_OCCASIONS)} 中选一个。判断规则：含苦味开胃酒/金巴利/阿佩罗=餐前酒；含奶油/咖啡/巧克力=餐后酒；无酒精=全天酒；高ABV烈性=睡前酒；热带/派对风格=派对酒；其他=全天酒",
+  "suggestedOccasionConfidence": "high"|"medium"|"low",
+  "suggestedCodexFamily": "从 ${JSON.stringify(CODEX_LIST)} 中选一个，不确定返回\"\"",
+  "suggestedVariantOf": "经典变体来源（如：尼格罗尼），不确定返回\"\"",
+  "creator": "配方创作者姓名（调酒师/酒吧名），注意：创作者≠书的作者",
+  "creatorConfidence": "high"|"medium"|"low",
+  "createdYear": "创作年份或年代（如 '1930' / 'circa 1920s'）",
+  "createdYearConfidence": "high"|"medium"|"low"
 }`;
-        // 25s timeout to prevent hang
-        const signal = AbortSignal.timeout(25_000);
+
+        // 35s timeout（claude-sonnet 需要更长时间）
+        const signal = AbortSignal.timeout(35_000);
         let response;
         try {
           response = await invokeLLM({
-            messages: [{ role: "user", content: prompt }],
+            model: "claude-sonnet",
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userPrompt },
+            ],
+            maxTokens: 1200,
             response_format: { type: "json_object" },
             signal,
           });
@@ -494,33 +537,75 @@ ${(input.ingredientsWithAmounts ?? []).length > 0 ? `配料（含用量，用量
           const isTimeout = err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError");
           throw new Error(isTimeout ? "AI 分析超时，请稍后重试" : `AI 分析失败: ${err instanceof Error ? err.message : String(err)}`);
         }
-        const raw = response.choices[0]?.message?.content;
+        const raw = typeof response === "string" ? response : (response as { choices?: Array<{ message?: { content?: string } }> }).choices?.[0]?.message?.content ?? "";
         const parsed = parseJsonObjectLoose(typeof raw === "string" ? raw : "");
         const p = parsed as Record<string, unknown>;
-        // 过滤：只保留合法的 17 个标签
-        const rawFlavors = Array.isArray(p.flavors) ? (p.flavors as string[]) : [];
-        const validFlavors = rawFlavors.filter((f) => VALID_FLAVOR_TAGS.includes(f)).slice(0, 6);
+
         const validConf = (v: unknown): "high" | "medium" | "low" =>
           (["high", "medium", "low"] as const).includes(v as "high") ? v as "high" | "medium" | "low" : "medium";
+
+        // ── 严格白名单过滤 ──────────────────────────────────────────────────
+        const rawFlavors = Array.isArray(p.flavors) ? (p.flavors as string[]) : [];
+        const validFlavors = rawFlavors.filter((f) => VALID_FLAVOR_TAGS.includes(f)).slice(0, 6);
+
+        const rawDuration = typeof p.suggestedDrinkDuration === "string" ? p.suggestedDrinkDuration.trim() : "";
+        const validDuration = VALID_DURATIONS.includes(rawDuration) ? rawDuration : "";
+
+        const rawOccasion = typeof p.suggestedOccasion === "string" ? p.suggestedOccasion.trim() : "";
+        const validOccasion = VALID_OCCASIONS.includes(rawOccasion) ? rawOccasion : "";
+
+        const rawMethod = typeof p.suggestedMethod === "string" ? p.suggestedMethod.trim() : "";
+        const validMethod = VALID_METHODS.includes(rawMethod) ? rawMethod : "";
+
+        const rawStrength = typeof p.suggestedStrength === "string" ? p.suggestedStrength.trim() : "";
+        const validStrength = VALID_STRENGTHS.includes(rawStrength) ? rawStrength : "";
+
+        const rawIce = typeof p.suggestedIce === "string" ? p.suggestedIce.trim() : "";
+        const validIce = VALID_ICE.includes(rawIce) ? rawIce : "";
+
+        const rawCodex = typeof p.suggestedCodexFamily === "string" ? p.suggestedCodexFamily.trim() : "";
+        const validCodex = CODEX_LIST.find(c => c === rawCodex || c.startsWith(rawCodex) || rawCodex.includes(c.split(" ")[0])) ?? "";
+
+        // ── flavorDesc 三行格式校验 ──────────────────────────────────────────
+        const rawFlavorDesc = typeof p.flavorDesc === "string" ? p.flavorDesc.trim() : "";
+        const flavorDescLines = rawFlavorDesc.split("\n").filter(l => l.trim());
+        const isValidFlavorDesc = flavorDescLines.length === 3
+          && flavorDescLines[0].includes("核心基调")
+          && flavorDescLines[1].includes("➔")
+          && flavorDescLines[2].includes("整体质感");
+        const validFlavorDesc = isValidFlavorDesc ? rawFlavorDesc : "";
+
         return {
           flavors: validFlavors,
+          flavorConfidence: validConf(p.flavorConfidence),
           story: typeof p.story === "string" ? p.story.trim() : "",
-          flavorDesc: typeof p.flavorDesc === "string" ? p.flavorDesc.trim() : "",
+          flavorDesc: validFlavorDesc,
           source: typeof p.source === "string" ? p.source.trim() : "",
           confidence: validConf(p.confidence),
-          flavorConfidence: validConf(p.flavorConfidence),
           suggestedBaseSpirit: typeof p.suggestedBaseSpirit === "string" ? p.suggestedBaseSpirit.trim() : "",
           isMultiBaseSpirit: typeof p.suggestedBaseSpirit === "string" && p.suggestedBaseSpirit.includes(","),
           suggestedBaseSpiritConfidence: validConf(p.suggestedBaseSpiritConfidence),
           suggestedGlass: typeof p.suggestedGlass === "string" ? p.suggestedGlass.trim() : "",
           suggestedGlassConfidence: validConf(p.suggestedGlassConfidence),
-          suggestedIce: typeof p.suggestedIce === "string" ? p.suggestedIce.trim() : "",
+          suggestedIce: validIce,
           suggestedIceConfidence: validConf(p.suggestedIceConfidence),
-          // 创作者信息（新增）
+          suggestedMethod: validMethod,
+          suggestedStrength: validStrength,
+          // ── 新增：饮用时长 / 场合（严格白名单） ──
+          suggestedDrinkDuration: validDuration,
+          suggestedDurationConfidence: validConf(p.suggestedDurationConfidence),
+          suggestedOccasion: validOccasion,
+          suggestedOccasionConfidence: validConf(p.suggestedOccasionConfidence),
+          // ── 新增：Codex 家族 / 变体来源 ──
+          suggestedCodexFamily: validCodex,
+          suggestedVariantOf: typeof p.suggestedVariantOf === "string" ? p.suggestedVariantOf.trim() : "",
+          // ── 创作者信息 ──
           creator: typeof p.creator === "string" ? p.creator.trim() : "",
           creatorConfidence: validConf(p.creatorConfidence),
           createdYear: typeof p.createdYear === "string" ? p.createdYear.trim() : "",
           createdYearConfidence: validConf(p.createdYearConfidence),
+          // 标记为全字段深度分析（供 recipe-form 判断是否应用所有字段）
+          isDeepAnalysis: true,
         };
       }),
 

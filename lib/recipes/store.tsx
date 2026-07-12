@@ -306,9 +306,10 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
         ...(draft.nameEn === undefined ? { nameEn: "" } : {}),
         ...(draft.rating === undefined ? { rating: null } : {}),
       };
-      // 智能归类:饮用时长与场合始终由引擎自动判定(无需人工填写)
-      recipe.drinkDuration = inferDrinkDuration(recipe);
-      recipe.occasion = inferOccasion(recipe);
+      // 四层优先级融合：draft（AI/用户手动）> 启发式推断 > ""
+      // draft 中有值（AI 或用户手动选择）时直接保留，否则启发式推断保底
+      if (!recipe.drinkDuration) recipe.drinkDuration = inferDrinkDuration(recipe) || "";
+      if (!recipe.occasion) recipe.occasion = inferOccasion(recipe) || "";
       // 经典变体智能识别:人工未填写时自动判定(人工填写优先)
       if (!recipe.variantOf) recipe.variantOf = inferVariantOf(recipe);
       // Codex 家族智能识别:人工/文本声明未给出时自动判定
@@ -383,9 +384,21 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
         recipesRef.current.map((r) => {
           if (r.id !== id) return r;
           const next = { ...r, ...draft, updatedAt: Date.now() };
-          // 编辑后重新智能归类(配料/杯型/方法可能已变化)
-          next.drinkDuration = inferDrinkDuration(next);
-          next.occasion = inferOccasion(next);
+          // 四层优先级融合：draft（用户手动/AI）> 启发式推断 > 原有值
+          // 若 draft 明确传入了值（包括空字符串表示用户清空），优先使用
+          // 若 draft 未传入（undefined），保留原有值或重新推断
+          if (draft.drinkDuration !== undefined) {
+            // 用户或 AI 明确设置了值（含空字符串=清空），保留
+            next.drinkDuration = draft.drinkDuration || inferDrinkDuration(next) || "";
+          } else {
+            // draft 未传入，配料/杯型可能变化，重新推断（但不覆盖已有的非空值）
+            if (!next.drinkDuration) next.drinkDuration = inferDrinkDuration(next) || "";
+          }
+          if (draft.occasion !== undefined) {
+            next.occasion = draft.occasion || inferOccasion(next) || "";
+          } else {
+            if (!next.occasion) next.occasion = inferOccasion(next) || "";
+          }
           // 变体来源:人工清空或从未填写时重新智能判定
           if (!next.variantOf) next.variantOf = inferVariantOf(next);
           // Codex 家族:人工清空或从未填写时重新智能判定

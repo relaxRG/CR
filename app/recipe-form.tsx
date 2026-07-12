@@ -54,6 +54,8 @@ import {
   type SourceRef,
   normalizeTagToZh,
   normalizeTagArrayToZh,
+  DRINK_DURATIONS,
+  OCCASIONS,
 } from "@/lib/recipes/types";
 import { FLAVOR_TAG_DEFAULT_COLORS } from "@/lib/settings/card-tags";
 
@@ -232,7 +234,6 @@ export default function RecipeFormScreen() {
   const { t, lang } = useI18n();
   const { getRecipe, addRecipe, updateRecipe, categories, tagsOf, addTag } = useRecipeStore();
   const enrichRecipeMutation = trpc.lookup.enrichRecipe.useMutation();
-  const deepAnalyzeMutation = trpc.lookup.deepAnalyzeRecipe.useMutation();
   const { isOnline } = useNetwork();
   const { preps } = useHomemadeStore();
   const { bottles } = useBottleStore();
@@ -260,6 +261,11 @@ export default function RecipeFormScreen() {
   const [variantOf, setVariantOf] = useState(editing?.variantOf ?? "");
   const [codexFamily, setCodexFamily] = useState(editing?.codexFamily ?? "");
   const [flavors, setFlavors] = useState<string[]>(editing?.flavors ?? []);
+  const [drinkDuration, setDrinkDuration] = useState(editing?.drinkDuration ?? "");
+  const [occasion, setOccasion] = useState(editing?.occasion ?? "");
+  /** 用户手动选择保护标记：true 时 AI 不覆盖 */
+  const [durationUserOverride, setDurationUserOverride] = useState(!!(editing?.drinkDuration));
+  const [occasionUserOverride, setOccasionUserOverride] = useState(!!(editing?.occasion));
   const [source, setSource] = useState(editing?.source ?? "");
   const [sourceRef, setSourceRef] = useState<SourceRef>(editing?.sourceRef ?? emptySourceRef());
   const [showSourceRef, setShowSourceRef] = useState(
@@ -297,6 +303,10 @@ export default function RecipeFormScreen() {
     suggestedMethod?: string;
     creator?: string;
     createdYear?: string;
+    suggestedDrinkDuration?: string;
+    suggestedDurationConfidence?: "high" | "medium" | "low";
+    suggestedOccasion?: string;
+    suggestedOccasionConfidence?: "high" | "medium" | "low";
   } | null>(null);
   /** Which ingredient row is focused (shows live suggestions) */
   /** 风味标签专属置信度（来自自动 AI 分析） */
@@ -494,7 +504,7 @@ export default function RecipeFormScreen() {
   /** 深度解析：联网 + 强模型，补全所有字段 */
   const handleDeepAnalyze = () => {
     const recipeName = name.trim() || nameEn.trim();
-    if (!recipeName || deepAnalyzeMutation.isPending) return;
+    if (!recipeName || enrichRecipeMutation.isPending) return;
     if (!isOnline) {
       Alert.alert(t("offline.title"), t("offline.aiUnavailable"));
       return;
@@ -502,13 +512,16 @@ export default function RecipeFormScreen() {
     setAiEnriching(true);
     setAiResult(null);
     const ingNames = ingredients.map((i) => i.name).filter(Boolean);
-    deepAnalyzeMutation.mutate(
+    enrichRecipeMutation.mutate(
       {
-        name: name.trim() || undefined,
+        name: name.trim() || nameEn.trim(),
         nameEn: nameEn.trim() || undefined,
-        ingredients: ingNames.length > 0 ? ingNames.join(", ") : undefined,
+        ingredients: ingNames.length > 0 ? ingNames : undefined,
         baseSpirit: baseSpirit || undefined,
         source: source.trim() || undefined,
+        method: method || undefined,
+        existingSpirits: spiritNames,
+        existingGlasses: glassNames,
       },
       {
         onSuccess: (result) => {
@@ -520,69 +533,32 @@ export default function RecipeFormScreen() {
             setAiSuggestedSpirits(spirits);
             setBaseSpirit(resolved);
           }
+          if (!glass && result.suggestedGlass && result.suggestedGlassConfidence === "high") {
+            const nextName = ensureGlassName(result.suggestedGlass);
+            if (nextName) setGlass(nextName);
+          }
+          if (!ice && result.suggestedIce && result.suggestedIceConfidence === "high") {
+            const nextName = normalizeIceName(result.suggestedIce);
+            if ((ICE_TYPES as readonly string[]).includes(nextName)) setIce(nextName);
+          }
+          // 饮用时长：未 override 且 AI 高/中置信度时写入
+          if (!durationUserOverride && result.suggestedDrinkDuration) {
+            const conf = result.suggestedDurationConfidence ?? "medium";
+            if (conf === "high" || conf === "medium") setDrinkDuration(result.suggestedDrinkDuration);
+          }
+          // 饮用场合：未 override 且 AI 高/中置信度时写入
+          if (!occasionUserOverride && result.suggestedOccasion) {
+            const conf = result.suggestedOccasionConfidence ?? "medium";
+            if (conf === "high" || conf === "medium") setOccasion(result.suggestedOccasion);
+          }
           setAiResult({ ...result, isDeepAnalysis: true });
           setAiEnriching(false);
         },
         onError: (err: unknown) => {
           if (!isMountedRef.current) return;
           setAiEnriching(false);
-          const msg = err instanceof Error ? err.message : "";
-          // 如果服务端路由不存在（版本不匹配），自动回退到 enrichRecipe
-          if (msg.includes("No procedure found") || msg.includes("NOT_FOUND") || msg.includes("404")) {
-            const recipeName = name.trim() || nameEn.trim();
-            const ingNames = ingredients.map((i) => i.name).filter(Boolean);
-            const ingWithAmounts = ingredients.filter((i) => i.name.trim()).map((i) => ({ name: i.name, amount: i.amount }));
-            setAiEnriching(true);
-            enrichRecipeMutation.mutate(
-              {
-                name: recipeName,
-                nameEn: nameEn.trim() || undefined,
-                baseSpirit: baseSpirit || undefined,
-                ingredients: ingNames.length > 0 ? ingNames : undefined,
-                ingredientsWithAmounts: ingWithAmounts.length > 0 ? ingWithAmounts : undefined,
-                method: method || undefined,
-                existingSpirits: spiritNames,
-                existingGlasses: glassNames,
-              },
-              {
-                onSuccess: (result) => {
-                  if (!isMountedRef.current) return;
-                  if (result.flavors && result.flavors.length > 0) {
-                    setFlavors(result.flavors);
-                    const conf = result.flavorConfidence ?? result.confidence ?? "medium";
-                    setFlavorConfidence(conf);
-                  }
-                  if (!baseSpirit && result.suggestedBaseSpirit) {
-                    const resolved = resolveAiSpirits(result.suggestedBaseSpirit);
-                    const spirits = resolved.split(",").map((s) => s.trim()).filter(Boolean);
-                    setSpiritConfidence("high");
-                    setAiSuggestedSpirits(spirits);
-                    setBaseSpirit(resolved);
-                  }
-                  if (!glass && result.suggestedGlass && result.suggestedGlassConfidence === "high") {
-                    const nextName = ensureGlassName(result.suggestedGlass);
-                    if (nextName) setGlass(nextName);
-                  }
-                  if (!ice && result.suggestedIce && result.suggestedIceConfidence === "high") {
-                    const nextName = normalizeIceName(result.suggestedIce);
-                    if ((ICE_TYPES as readonly string[]).includes(nextName)) setIce(nextName);
-                  }
-                  if (result.story || result.flavorDesc || result.source || result.suggestedBaseSpirit) {
-                    setAiResult({ ...result, isDeepAnalysis: false });
-                  }
-                  setAiEnriching(false);
-                },
-                onError: (fallbackErr: unknown) => {
-                  if (!isMountedRef.current) return;
-                  setAiEnriching(false);
-                  const fallbackMsg = fallbackErr instanceof Error ? fallbackErr.message : "AI 补全失败，请重试";
-                  Alert.alert("AI 补全失败", fallbackMsg);
-                },
-              },
-            );
-          } else {
-            Alert.alert("AI 补全失败", msg || "请重试");
-          }
+          const msg = err instanceof Error ? err.message : "AI 补全失败，请重试";
+          Alert.alert("AI 补全失败", msg);
         },
       },
     );
@@ -633,6 +609,16 @@ export default function RecipeFormScreen() {
             const nextName = normalizeIceName(result.suggestedIce);
             if ((ICE_TYPES as readonly string[]).includes(nextName)) setIce(nextName);
           }
+          // 自动触发：饮用时长（未 override，高/中置信度）
+          if (!durationUserOverride && result.suggestedDrinkDuration) {
+            const conf = result.suggestedDurationConfidence ?? "medium";
+            if (conf === "high" || conf === "medium") setDrinkDuration(result.suggestedDrinkDuration);
+          }
+          // 自动触发：饮用场合（未 override，高/中置信度）
+          if (!occasionUserOverride && result.suggestedOccasion) {
+            const conf = result.suggestedOccasionConfidence ?? "medium";
+            if (conf === "high" || conf === "medium") setOccasion(result.suggestedOccasion);
+          }
           // 同时存入 aiResult，供用户按需应用故事/来源等字段
           if (
             result.story ||
@@ -640,7 +626,9 @@ export default function RecipeFormScreen() {
             result.source ||
             result.suggestedBaseSpirit ||
             result.suggestedGlass ||
-            result.suggestedIce
+            result.suggestedIce ||
+            result.suggestedDrinkDuration ||
+            result.suggestedOccasion
           ) {
             setAiResult(result);
           }
@@ -683,36 +671,42 @@ export default function RecipeFormScreen() {
       // normalizeIceName 已通过词典规范化，直接检查是否在标准列表中
       if ((ICE_TYPES as readonly string[]).includes(nextName)) setIce(nextName);
     }
-    // Deep analysis extra fields
-    if (aiResult.isDeepAnalysis) {
-      if (aiResult.suggestedCodexFamily && !codexFamily) {
-        // Codex 家族格式为 "中文 English"，normalizeTagToZh 可能返回纯中文，需保留原格式
-        const normalizedFamily = CODEX_FAMILIES.find((f) =>
-          f === aiResult.suggestedCodexFamily ||
-          f.startsWith(aiResult.suggestedCodexFamily ?? "") ||
-          (aiResult.suggestedCodexFamily ?? "").includes(f.split(" ")[0])
-        ) ?? aiResult.suggestedCodexFamily;
-        if (normalizedFamily) setCodexFamily(normalizedFamily);
-      }
-      if (aiResult.suggestedVariantOf && !variantOf) {
-        setVariantOf(aiResult.suggestedVariantOf);
-      }
-      if (aiResult.suggestedMethod) {
-        // 制作方法规范化（英→中）
-        const normalizedMethod = normalizeTagToZh(aiResult.suggestedMethod);
-        const validMethod = METHODS.find((m) => m === normalizedMethod || normalizedMethod.includes(m) || m.includes(normalizedMethod));
-        if (validMethod) setMethod(validMethod);
-        else if (METHODS.includes(normalizedMethod as typeof METHODS[number])) setMethod(normalizedMethod as typeof METHODS[number]);
-      }
-      if (aiResult.creator || aiResult.createdYear) {
-        setSourceRef((prev) => ({
-          ...prev,
-          creator: aiResult.creator && !prev.creator ? aiResult.creator : prev.creator,
-          createdYear: aiResult.createdYear && !prev.createdYear ? aiResult.createdYear : prev.createdYear,
-          creatorConfidence: "medium",
-        }));
-        setShowSourceRef(true);
-      }
+    // Codex 家族（所有 AI 路径均可返回）
+    if (aiResult.suggestedCodexFamily && !codexFamily) {
+      const normalizedFamily = CODEX_FAMILIES.find((f) =>
+        f === aiResult.suggestedCodexFamily ||
+        f.startsWith(aiResult.suggestedCodexFamily ?? "") ||
+        (aiResult.suggestedCodexFamily ?? "").includes(f.split(" ")[0])
+      ) ?? aiResult.suggestedCodexFamily;
+      if (normalizedFamily) setCodexFamily(normalizedFamily);
+    }
+    if (aiResult.suggestedVariantOf && !variantOf) {
+      setVariantOf(aiResult.suggestedVariantOf);
+    }
+    if (aiResult.suggestedMethod) {
+      const normalizedMethod = normalizeTagToZh(aiResult.suggestedMethod);
+      const validMethod = METHODS.find((m) => m === normalizedMethod || normalizedMethod.includes(m) || m.includes(normalizedMethod));
+      if (validMethod) setMethod(validMethod);
+      else if (METHODS.includes(normalizedMethod as typeof METHODS[number])) setMethod(normalizedMethod as typeof METHODS[number]);
+    }
+    if (aiResult.creator || aiResult.createdYear) {
+      setSourceRef((prev) => ({
+        ...prev,
+        creator: aiResult.creator && !prev.creator ? aiResult.creator : prev.creator,
+        createdYear: aiResult.createdYear && !prev.createdYear ? aiResult.createdYear : prev.createdYear,
+        creatorConfidence: "medium",
+      }));
+      setShowSourceRef(true);
+    }
+    // 饮用时长：用户点「应用」时强制写入（白名单校验）
+    if (aiResult.suggestedDrinkDuration && (DRINK_DURATIONS as readonly string[]).includes(aiResult.suggestedDrinkDuration)) {
+      setDrinkDuration(aiResult.suggestedDrinkDuration);
+      setDurationUserOverride(true);
+    }
+    // 饮用场合：用户点「应用」时强制写入（白名单校验）
+    if (aiResult.suggestedOccasion && (OCCASIONS as readonly string[]).includes(aiResult.suggestedOccasion)) {
+      setOccasion(aiResult.suggestedOccasion);
+      setOccasionUserOverride(true);
     }
     setAiResult(null);
   };
@@ -858,6 +852,8 @@ export default function RecipeFormScreen() {
       garnish: garnish.trim(),
     notes: notes.trim(),
       cardTagOrder: null,
+      drinkDuration: drinkDuration || undefined,
+      occasion: occasion || undefined,
       // 只有当用户填写了至少一个 sourceRef 字段时才保存
       sourceRef: (sourceRef.bookTitle || sourceRef.creator || sourceRef.createdYear || sourceRef.bookAuthor || sourceRef.publishYear || sourceRef.chapterTitle || sourceRef.pageRef)
         ? sourceRef
@@ -1014,7 +1010,7 @@ export default function RecipeFormScreen() {
             {/* 统一 AI 补全按钮 — 调用 deepAnalyzeRecipe（全字段，claude-sonnet） */}
             <Pressable
               onPress={handleDeepAnalyze}
-              disabled={deepAnalyzeMutation.isPending || aiEnriching || (!name.trim() && !nameEn.trim())}
+              disabled={enrichRecipeMutation.isPending || aiEnriching || (!name.trim() && !nameEn.trim())}
               style={({ pressed }) => [
                 {
                   flex: 1,
@@ -1030,7 +1026,7 @@ export default function RecipeFormScreen() {
                 },
               ]}
             >
-              {deepAnalyzeMutation.isPending || aiEnriching ? (
+              {enrichRecipeMutation.isPending || aiEnriching ? (
                 <>
                   <IconSymbol name="sparkles" size={15} color="#FFFFFF" />
                   <Text style={{ fontSize: 13, fontWeight: "700", color: "#FFFFFF" }}>
@@ -1129,31 +1125,50 @@ export default function RecipeFormScreen() {
                 </Text>
               ) : null}
               {/* Deep analysis extra fields */}
-              {aiResult.isDeepAnalysis && aiResult.suggestedCodexFamily ? (
+              {aiResult.suggestedCodexFamily ? (
                 <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>
                   {lang === "zh" ? "Codex 家族: " : "Codex family: "}{aiResult.suggestedCodexFamily}
                 </Text>
               ) : null}
-              {aiResult.isDeepAnalysis && aiResult.suggestedVariantOf ? (
+              {aiResult.suggestedVariantOf ? (
                 <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>
                   {lang === "zh" ? "变体来源: " : "Variant of: "}{aiResult.suggestedVariantOf}
                 </Text>
               ) : null}
-              {aiResult.isDeepAnalysis && aiResult.suggestedMethod ? (
+              {aiResult.suggestedMethod ? (
                 <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>
                   {lang === "zh" ? "制作方法: " : "Method: "}{aiResult.suggestedMethod}
                 </Text>
               ) : null}
-              {aiResult.isDeepAnalysis && aiResult.creator ? (
+              {aiResult.creator ? (
                 <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>
                   {lang === "zh" ? "创作者: " : "Creator: "}{aiResult.creator}{aiResult.createdYear ? ` (${aiResult.createdYear})` : ""}
                 </Text>
               ) : null}
-              {aiResult.isDeepAnalysis && aiResult.suggestedCategories && aiResult.suggestedCategories.length > 0 ? (
+              {aiResult.suggestedCategories && aiResult.suggestedCategories.length > 0 ? (
                 <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>
                   {lang === "zh" ? "建议分类: " : "Categories: "}{aiResult.suggestedCategories.join("、")}
                 </Text>
               ) : null}
+              {/* 饮用时长 AI 建议 */}
+              {aiResult.suggestedDrinkDuration ? (
+                <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>
+                  {lang === "zh" ? "饮用时长: " : "Duration: "}
+                  {lang === "zh" ? aiResult.suggestedDrinkDuration : (aiResult.suggestedDrinkDuration === "短饮" ? "Short Drink" : "Long Drink")}
+                  {aiResult.suggestedDurationConfidence === "high" ? " ✓" : aiResult.suggestedDurationConfidence === "low" ? " ?" : ""}
+                </Text>
+              ) : null}
+              {/* 饮用场合 AI 建议 */}
+              {aiResult.suggestedOccasion ? (() => {
+                const occEn: Record<string, string> = { "餐前酒": "Aperitif", "餐后酒": "Digestif", "全天酒": "All Day", "佐餐酒": "With Dinner", "睡前酒": "Nightcap", "派对酒": "Party" };
+                return (
+                  <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>
+                    {lang === "zh" ? "饮用场合: " : "Occasion: "}
+                    {lang === "zh" ? aiResult.suggestedOccasion : (occEn[aiResult.suggestedOccasion] ?? aiResult.suggestedOccasion)}
+                    {aiResult.suggestedOccasionConfidence === "high" ? " ✓" : aiResult.suggestedOccasionConfidence === "low" ? " ?" : ""}
+                  </Text>
+                );
+              })() : null}
               <Pressable
                 onPress={applyAiResult}
                 style={({ pressed }) => [
@@ -1333,6 +1348,57 @@ export default function RecipeFormScreen() {
           />
 
           {/* Drink duration (single-select) */}
+          {/* Drink Duration */}
+          <Text className="text-sm font-medium text-muted mt-5 mb-1.5">{t("form.duration")}</Text>
+          <View style={styles.chipWrap}>
+            {(DRINK_DURATIONS as readonly string[]).map((dur) => {
+              const active = drinkDuration === dur;
+              return (
+                <Pressable
+                  key={dur}
+                  onPress={() => { setDrinkDuration(active ? "" : dur); setDurationUserOverride(true); }}
+                  style={[
+                    styles.chip,
+                    {
+                      backgroundColor: active ? colors.primary : colors.surface,
+                      borderColor: active ? colors.primary : colors.border,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.chipText, { color: active ? "#FFFFFF" : colors.muted }]}>
+                    {lang === "zh" ? dur : (dur === "短饮" ? "Short Drink" : "Long Drink")}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {/* Occasion */}
+          <Text className="text-sm font-medium text-muted mt-5 mb-1.5">{t("form.occasion")}</Text>
+          <View style={styles.chipWrap}>
+            {(OCCASIONS as readonly string[]).map((occ) => {
+              const active = occasion === occ;
+              const occEn: Record<string, string> = { "餐前酒": "Aperitif", "餐后酒": "Digestif", "全天酒": "All Day", "佐餐酒": "With Dinner", "睡前酒": "Nightcap", "派对酒": "Party" };
+              return (
+                <Pressable
+                  key={occ}
+                  onPress={() => { setOccasion(active ? "" : occ); setOccasionUserOverride(true); }}
+                  style={[
+                    styles.chip,
+                    {
+                      backgroundColor: active ? colors.primary : colors.surface,
+                      borderColor: active ? colors.primary : colors.border,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.chipText, { color: active ? "#FFFFFF" : colors.muted }]}>
+                    {lang === "zh" ? occ : (occEn[occ] ?? occ)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
           {/* Flavor tags */}
           <View className="flex-row items-center justify-between mt-5 mb-1.5">
             <Text className="text-sm font-medium text-muted">{t("form.flavors.multi")}</Text>
