@@ -124,6 +124,7 @@ const READER_CSS = `
     height: auto !important;
     margin: 1.2em auto;
     border-radius: 6px;
+    float: none !important;
   }
   /* Limit image height so CSS columns can paginate stably; tap to view full size */
   img {
@@ -132,10 +133,27 @@ const READER_CSS = `
     cursor: pointer;
     break-inside: avoid;
     page-break-inside: avoid;
+    float: none !important;
   }
-  figure { margin: 1.5em 0; text-align: center; break-inside: avoid; page-break-inside: avoid; }
-  /* EPUB 常把图片嵌套在 div/p 中，给这些容器也加 break-inside 防止跨列叠加 */
-  div:has(> img), p:has(> img), div:has(> figure), p:has(> figure) { break-inside: avoid; page-break-inside: avoid; }
+  figure {
+    margin: 1.5em 0;
+    text-align: center;
+    break-inside: avoid;
+    page-break-inside: avoid;
+    float: none !important;
+    clear: both !important;
+    display: block !important;
+  }
+  /* EPUB 常把图片嵌套在 div/p 中，清除 float 并防止跨列叠加 */
+  div:has(> img), p:has(> img), div:has(> figure), p:has(> figure) {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    float: none !important;
+    clear: both !important;
+    overflow: hidden;
+  }
+  /* 全局清除所有 float（EPUB 原始排版的 float 在移动端 columns 模式下会叠加乱码） */
+  [style*="float"] { float: none !important; clear: both !important; }
   figcaption { font-size: 0.8em; opacity: 0.6; margin-top: 0.4em; font-style: italic; }
   /* Headings */
   h1 { font-size: 1.8em; font-weight: 700; line-height: 1.2; margin: 1.6em 0 0.6em; letter-spacing: -0.02em; }
@@ -233,7 +251,7 @@ function HtmlChapter({
   const fullHtml = useMemo(() => {
     // eslint-disable-next-line prefer-template
       if (pageFlipMode) {
-      return `<!DOCTYPE html>\n<html>\n<head>\n<meta charset="utf-8"/>\n<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>\n<style>\n${READER_CSS}\n${css}\nhtml {\n  overflow: hidden;\n  height: 100vh;\n  width: 100vw;\n}\nbody {\n  font-size: ${fontSize}px;\n  line-height: ${lineHeight};\n  background: ${bgColor};\n  color: ${textColor};\n  margin: 0;\n  padding: 20px 20px 80px 20px;\n  box-sizing: border-box;\n  height: 100vh;\n  overflow: hidden;\n  -webkit-text-size-adjust: none;\n  word-wrap: break-word;\n  overflow-wrap: break-word;\n  columns: 1;\n  column-width: calc(100vw - 40px);\n  column-gap: 40px;\n}\na { color: ${linkColor}; }\nimg { max-width: 100% !important; height: auto !important; break-inside: avoid; page-break-inside: avoid; max-height: 35vh !important; display: block; }\nfigure, div:has(> img), p:has(> img), div:has(> figure), p:has(> figure) { break-inside: avoid; page-break-inside: avoid; }\n* { max-width: 100% !important; }\npre, code { white-space: pre-wrap; font-size: 0.9em; break-inside: avoid; }\nh1,h2,h3,h4,h5,h6 { break-after: avoid; }\n</style>\n</head>\n<body>${html}</body>\n</html>`;
+      return `<!DOCTYPE html>\n<html>\n<head>\n<meta charset="utf-8"/>\n<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>\n<style>\n${READER_CSS}\n${css}\nhtml {\n  overflow: hidden;\n  height: 100vh;\n  width: 100vw;\n}\nbody {\n  font-size: ${fontSize}px;\n  line-height: ${lineHeight};\n  background: ${bgColor};\n  color: ${textColor};\n  margin: 0;\n  padding: 20px 20px 80px 20px;\n  box-sizing: border-box;\n  height: 100vh;\n  overflow: hidden;\n  -webkit-text-size-adjust: none;\n  word-wrap: break-word;\n  overflow-wrap: break-word;\n  columns: 1;\n  column-width: calc(100vw - 40px);\n  column-gap: 40px;\n}\na { color: ${linkColor}; }\nimg { max-width: 100% !important; height: auto !important; break-inside: avoid; page-break-inside: avoid; max-height: 35vh !important; display: block !important; float: none !important; }\nfigure, div:has(> img), p:has(> img), div:has(> figure), p:has(> figure) { break-inside: avoid; page-break-inside: avoid; float: none !important; clear: both !important; display: block !important; }\n[style*="float"] { float: none !important; clear: both !important; }\n* { max-width: 100% !important; }\npre, code { white-space: pre-wrap; font-size: 0.9em; break-inside: avoid; }\nh1,h2,h3,h4,h5,h6 { break-after: avoid; }\n</style>\n</head>\n<body>${html}</body>\n</html>`;
     }
     return `<!DOCTYPE html>\n<html>\n<head>\n<meta charset="utf-8"/>\n<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=2.0"/>\n<style>\n${READER_CSS}\n${css}\nhtml, body {\n  font-size: ${fontSize}px;\n  line-height: ${lineHeight};\n  background: ${bgColor};\n  color: ${textColor};\n  padding: 0 20px 80px 20px;\n  margin: 0;\n  -webkit-text-size-adjust: none;\n  word-wrap: break-word;\n  overflow-wrap: break-word;\n}\na { color: ${linkColor}; }\nimg { max-width: 100% !important; height: auto !important; }\n* { max-width: 100% !important; }\npre, code { white-space: pre-wrap; font-size: 0.9em; }\n</style>\n</head>\n<body>${html}</body>\n</html>`;
   }, [html, css, fontSize, lineHeight, bgColor, textColor, linkColor, pageFlipMode]);
