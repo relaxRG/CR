@@ -68,60 +68,51 @@ export default function BottleFormScreen() {
   const [flavorTags, setFlavorTags] = useState<string[]>(editing?.flavorTags ?? []);
   const [story, setStory] = useState(editing?.story ?? "");
   const [styleDesc, setStyleDesc] = useState(editing?.styleDesc ?? "");
+  const [distilleryInfo, setDistilleryInfo] = useState(editing?.distilleryInfo ?? "");
+  const [pairingNotes, setPairingNotes] = useState(editing?.pairingNotes ?? "");
+  const [usageNotes, setUsageNotes] = useState(editing?.usageNotes ?? "");
+  const [seasonality, setSeasonality] = useState(editing?.seasonality ?? "");
 
   const canSave = nameZh.trim().length > 0 || nameEn.trim().length > 0;
 
-  // 联网识别 + AI 风味补全:两步串联,合并结果后统一预览
-  const enrichMutation = trpc.lookup.enrich.useMutation();
-  const enrichBottleMutation = trpc.lookup.enrichBottle.useMutation();
+  // 联网识别 + AI 全字段补全：单步强模型（enrichBottleFull）
+  const enrichBottleFullMutation = trpc.lookup.enrichBottleFull.useMutation();
   const [lookupBusy, setLookupBusy] = useState<"text" | "photo" | null>(null);
   const [lookupStatus, setLookupStatus] = useState<{ kind: "ok" | "err"; msg: string } | null>(
     null,
   );
 
-  type CombinedResult = EnrichedProduct & {
-    flavorTags: string[];
-    story: string;
-    styleDesc: string;
-    flavorConfidence: "high" | "medium" | "low";
-  };
-  const [pendingResult, setPendingResult] = useState<CombinedResult | null>(null);
+  type FullResult = Awaited<ReturnType<typeof enrichBottleFullMutation.mutateAsync>>;
+  const [pendingResult, setPendingResult] = useState<FullResult | null>(null);
 
-  /** 串联两步:先识别基本信息,再补全风味/故事 */
-  const runCombinedLookup = async (
-    enrichArgs: Parameters<typeof enrichMutation.mutateAsync>[0],
-  ): Promise<void> => {
-    const res = await enrichMutation.mutateAsync(enrichArgs);
-    const item = res.items.find((i) => i.found);
-    if (!item) {
+  /** 单步强模型：enrichBottleFull */
+  const runFullLookup = async (opts: {
+    names?: string[];
+    imageBase64?: string;
+    imageMime?: string;
+  }): Promise<void> => {
+    const res = await enrichBottleFullMutation.mutateAsync({
+      nameZh: nameZh.trim() || undefined,
+      nameEn: (opts.names?.[0] || nameEn.trim()) || undefined,
+      category: category || undefined,
+      style: style.trim() || undefined,
+      brand: brand.trim() || undefined,
+      origin: origin.trim() || undefined,
+      imageBase64: opts.imageBase64,
+      imageMime: opts.imageMime,
+    });
+    if (!res.found) {
       if (isMountedRef.current) setLookupStatus({ kind: "err", msg: t("lookup.notFound") });
       return;
     }
-    // Use info from step-1 to inform step-2 (richer context = better flavor result)
-    const resolvedCategory = item.category && taxCategories.some((c) => c.zh === item.category)
-      ? item.category
-      : category;
-    const flavorRes = await enrichBottleMutation.mutateAsync({
-      nameZh: item.nameZh || nameZh.trim() || undefined,
-      nameEn: item.nameEn || nameEn.trim() || undefined,
-      category: resolvedCategory || undefined,
-      style: item.style || style.trim() || undefined,
-      brand: item.brand || brand.trim() || undefined,
-      origin: item.origin || origin.trim() || undefined,
-    });
-    if (isMountedRef.current) setPendingResult({
-      ...item,
-      flavorTags: flavorRes.flavorTags,
-      story: flavorRes.story,
-      styleDesc: flavorRes.styleDesc,
-      flavorConfidence: flavorRes.confidence,
-    });
+    if (isMountedRef.current) setPendingResult(res);
   };
 
-  const applyResult = (r: CombinedResult) => {
+  const applyResult = (r: FullResult) => {
     if (!nameZh.trim() && r.nameZh) setNameZh(r.nameZh);
     if (!nameEn.trim() && r.nameEn) setNameEn(r.nameEn);
     if (r.category && taxCategories.some((c) => c.zh === r.category)) setCategory(r.category);
+    // style 严格白名单：只在当前 style 为空时写入（override 保护）
     if (!style.trim() && r.style) setStyle(r.style);
     if (!brand.trim() && r.brand) setBrand(r.brand);
     if (!origin.trim() && r.origin) setOrigin(r.origin);
@@ -130,8 +121,15 @@ export default function BottleFormScreen() {
     if (!(parseFloat(price) > 0) && r.priceCny > 0) setPrice(String(r.priceCny));
     if (!notes.trim() && r.notes) setNotes(r.notes);
     if (flavorTags.length === 0 && r.flavorTags.length > 0) setFlavorTags(r.flavorTags);
-    if (!story.trim() && r.story) setStory(r.story);
-    if (!styleDesc.trim() && r.styleDesc) setStyleDesc(r.styleDesc);
+    // 置信度分级：medium/high 写入故事/描述；low 只写基本信息
+    if (r.confidence !== "low") {
+      if (!story.trim() && r.story) setStory(r.story);
+      if (!styleDesc.trim() && r.styleDesc) setStyleDesc(r.styleDesc);
+      if (!distilleryInfo.trim() && r.distilleryInfo) setDistilleryInfo(r.distilleryInfo);
+      if (!pairingNotes.trim() && r.pairingNotes) setPairingNotes(r.pairingNotes);
+      if (!usageNotes.trim() && r.usageNotes) setUsageNotes(r.usageNotes);
+      if (!seasonality.trim() && r.seasonality) setSeasonality(r.seasonality);
+    }
     if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setPendingResult(null);
     setLookupStatus({ kind: "ok", msg: t("lookup.filled") });
@@ -151,7 +149,7 @@ export default function BottleFormScreen() {
     setPendingResult(null);
     setLookupBusy("text");
     try {
-      await runCombinedLookup({ names: [query] });
+      await runFullLookup({ names: [query] });
     } catch {
       setLookupStatus({ kind: "err", msg: t("smartImport.fail.msg") });
     } finally {
@@ -176,10 +174,8 @@ export default function BottleFormScreen() {
       if (picked.canceled || !picked.assets?.[0]?.base64) return;
       setLookupBusy("photo");
       const asset = picked.assets[0];
-      const query = [nameZh.trim(), nameEn.trim(), brand.trim()].filter(Boolean).join(" ");
-      await runCombinedLookup({
-        names: query ? [query] : [],
-        imageBase64: asset.base64!,
+      await runFullLookup({
+        imageBase64: asset.base64 ?? undefined,
         imageMime: asset.mimeType || "image/jpeg",
       });
     } catch {

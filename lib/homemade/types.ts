@@ -48,6 +48,16 @@ export interface HomemadePrep {
   sourceRef?: SourceRef;
   notes: string;
   builtin: boolean;
+  /** 自制品故事/介绍（AI 补全） */
+  story?: string;
+  /** 风格/口感描述（AI 补全） */
+  styleDesc?: string;
+  /** 风味标签（AI 补全，从预设列表中选） */
+  flavorTags?: string[];
+  /** 工艺标签（AI 识别，从 TECHNIQUES 中选） */
+  techniques?: string[];
+  /** 调酒用途说明（AI 补全） */
+  usageNotes?: string;
   /** 做过/未做过:是否已亲手制作过该自制品 */
   made: boolean;
   /** 评分:1-10 整数,null 表示未评分(无半星) */

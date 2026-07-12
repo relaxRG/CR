@@ -784,6 +784,186 @@ ${input.origin ? `产地: ${input.origin}` : ""}
         };
       }),
 
+    /**
+     * 全字段一步补全（claude-sonnet）：合并原 enrich + enrichBottle 两步为单次强模型调用。
+     * 支持基酒库 / 酒款库 / 原材料库三库差异化 prompt，所有标签严格白名单校验。
+     */
+    enrichBottleFull: publicProcedure
+      .input(
+        z.object({
+          nameZh: z.string().max(200).optional(),
+          nameEn: z.string().max(200).optional(),
+          category: z.string().max(100).optional(),
+          style: z.string().max(100).optional(),
+          brand: z.string().max(200).optional(),
+          origin: z.string().max(200).optional(),
+          imageBase64: z.string().max(14_000_000).optional(),
+          imageMime: z.string().max(64).optional(),
+        }),
+      )
+      .mutation(async ({ input }) => {
+        // ── 白名单常量 ──────────────────────────────────────────────────
+        const BOTTLE_STYLES_MAP: Record<string, string[]> = {
+          金酒: ["London Dry","Plymouth","Old Tom","Genever","Contemporary","Navy Strength","Sloe Gin"],
+          朗姆: ["Spanish Style (Blanco)","Spanish Style (Añejo)","English Style (Jamaican)","English Style (Demerara)","French Style (Agricole Blanc)","French Style (Agricole Ambre)","Overproof","Black Rum","Spiced Rum","Cachaça"],
+          伏特加: ["Wheat","Rye","Potato","Corn","Grape","Flavored"],
+          威士忌: ["Bourbon","Rye","Tennessee","Scotch Blended","Scotch Single Malt","Islay Single Malt","Irish","Japanese","Canadian"],
+          龙舌兰: ["Tequila Blanco","Tequila Reposado","Tequila Añejo","Mezcal Joven","Mezcal Reposado","Sotol","Raicilla"],
+          白兰地: ["Cognac VS","Cognac VSOP","Cognac XO","Armagnac","Calvados","Pisco","Apple Brandy","Grappa","Eau de Vie"],
+          利口酒: ["Orange Liqueur","Cherry Liqueur","Coffee Liqueur","Herbal Liqueur","Amaro","Cream Liqueur","Nut Liqueur","Fruit Liqueur","Floral Liqueur","Anise Liqueur"],
+          苦精: ["Aromatic","Orange","Celery","Chocolate","Peach","Tiki"],
+          味美思: ["Dry Vermouth","Blanc/Bianco","Sweet Vermouth","Ambrato","Quinquina","Americano"],
+          开胃酒: ["Aperitivo","Amaro Leggero","Amaro Medio","Amaro Denso","Fernet","Gentian"],
+          起泡酒: ["Champagne","Prosecco","Cava","Crémant","Pét-Nat"],
+          葡萄酒: ["Dry White","Dry Red","Sherry Fino","Sherry Oloroso","Sherry PX","Port","Madeira","Sauternes"],
+          清酒烧酒: ["Junmai","Junmai Ginjo","Junmai Daiginjo","Nigori","Umeshu","Mugi Shochu","Imo Shochu","Kome Shochu","Soju"],
+          中式白酒: ["Sauce Aroma 酱香","Strong Aroma 浓香","Light Aroma 清香","Rice Aroma 米香"],
+          糖浆: ["Syrup","Cordial","Shrub","Cream/Foam"],
+          软饮: ["Soda","Tonic","Ginger Beer","Ginger Ale","Sparkling Water","Cola"],
+          糖与甜味剂: ["Refined Sugar","Raw / Dark Sugar","Sugar Cube","Honey & Nectar","Molasses & Concentrate"],
+          果蔬: ["Citrus","Fresh Fruit","Fresh Vegetable","Dried Fruit","Dried Vegetable"],
+          香料与草本: ["Dried Spice","Fresh Herb","Bittering Botanical"],
+          花卉: ["Dried Flowers","Fresh Edible Flowers","Floral Water"],
+          茶咖与可可: ["Cacao","Tea","Coffee"],
+          坚果与谷物: ["Nut","Grain / Seed"],
+          乳蛋: ["Milk / Cream","Egg","Butter / Cheese"],
+          酸类与添加剂: ["Powdered Acid","Vinegar","Salt & Mineral","Texture / Clarifier"],
+        };
+        const VALID_CATEGORIES = ["金酒","朗姆","伏特加","威士忌","龙舌兰","白兰地","利口酒","苦精","味美思","开胃酒","起泡酒","葡萄酒","清酒烧酒","中式白酒","糖浆","软饮","糖与甜味剂","果蔬","香料与草本","花卉","茶咖与可可","坚果与谷物","乳蛋","酸类与添加剂","其他"];
+        const VALID_FLAVOR_TAGS_BOTTLE = ["草本","果味","柑橘","花香","甜润","酸爽","苦韵","辛香","烟熏","咸鲜","清爽","浓郁","坚果","奶油","干爽","热带","焦糖","咖啡","巧克力","泥煤","蜂蜜","香草","坚硬","辛辣"];
+
+        // ── 判断库类型 ──────────────────────────────────────────────────
+        const BASE_SPIRITS = ["金酒","朗姆","伏特加","威士忌","龙舌兰","白兰地","清酒烧酒","中式白酒"];
+        const WINE_SPIRITS = ["利口酒","苦精","味美思","开胃酒","起泡酒","葡萄酒","糖浆","软饮"];
+        const RAW_MATERIALS = ["糖与甜味剂","果蔬","香料与草本","花卉","茶咖与可可","坚果与谷物","乳蛋","酸类与添加剂"];
+        const cat = input.category ?? "";
+        const libraryType = BASE_SPIRITS.includes(cat) ? "base"
+          : WINE_SPIRITS.includes(cat) ? "wine"
+          : RAW_MATERIALS.includes(cat) ? "material"
+          : "base"; // 未知时默认基酒库逻辑
+
+        const name = [input.nameEn, input.nameZh].filter(Boolean).join(" / ");
+        const knownStyle = input.style ? `\n已知风格: ${input.style}` : "";
+        const knownBrand = input.brand ? `\n品牌: ${input.brand}` : "";
+        const knownOrigin = input.origin ? `\n产地: ${input.origin}` : "";
+        const knownCategory = cat ? `\n分类: ${cat}` : "";
+        const styleOptions = cat && BOTTLE_STYLES_MAP[cat] ? `\n可选风格子标签（必须从中选一，不确定填""）: ${JSON.stringify(BOTTLE_STYLES_MAP[cat])}` : "";
+
+        // ── 三库差异化 prompt ───────────────────────────────────────────
+        let librarySpecificInstructions = "";
+        if (libraryType === "base") {
+          librarySpecificInstructions = `
+重点补全方向（基酒库）：
+- 蒸馏工艺与产区特征（如"铜壶蒸馏，苏格兰高地产区"）
+- 陈年方式（如"波本桶陈12年"）
+- 代表性鸡尾酒用途（如"适合 Negroni、Martini"）
+- distilleryInfo: 蒸馏厂/酒厂简介（中文，60字内，不确定填""）`;
+        } else if (libraryType === "wine") {
+          librarySpecificInstructions = `
+重点补全方向（酒款库）：
+- 风格流派与苦味/甜度来源（如"以龙胆草为主苦味来源"）
+- 常见调酒用途与搭配（如"适合 Aperol Spritz、Negroni"）
+- pairingNotes: 搭配建议（中文，40字内，不确定填""）`;
+        } else {
+          librarySpecificInstructions = `
+重点补全方向（原材料库）：
+- 产地与季节性（如"西西里柠檬，春季最佳"）
+- 调酒用途（如"皮油常用于 Martini 装饰，果汁用于酸味鸡尾酒"）
+- usageNotes: 调酒用途说明（中文，60字内，不确定填""）
+- seasonality: 季节性说明（中文，20字内，不确定填""）`;
+        }
+
+        const prompt = `你是专业的烈酒/饮料/原材料知识专家（基于 Cocktail Codex、The Bar Book、Liquid Intelligence 等权威资料）。
+根据以下产品信息，一次性补全所有字段。
+
+产品名称: ${name || "（未知，请根据照片识别）"}${knownCategory}${knownStyle}${knownBrand}${knownOrigin}
+${librarySpecificInstructions}
+
+请输出 JSON（所有字段必须存在，不确定的字符串填 ""，数字填 0）:
+{
+  "found": true/false（是否识别到该产品）,
+  "nameZh": "中文名（通用译名，如 君度橙酒）",
+  "nameEn": "英文名（如 Cointreau）",
+  "category": "必须从以下枚举精确选一: ${VALID_CATEGORIES.join("/")}",
+  "style": "风格子标签，必须从 styleOptions 列表中精确选一${styleOptions}，不确定填 \"\"",
+  "brand": "品牌名（如 Hendrick's），不确定填 \"\"",
+  "origin": "产地国家/地区（如 Scotland），不确定填 \"\"",
+  "volume": "常见规格（如 700ml），不确定填 \"\"",
+  "abv": 酒精度数（数字，如 40），未知填 0,
+  "priceCny": 中国市场常见零售价估计（人民币，数字），完全无从估计填 0,
+  "notes": "一句话简介：风味特征、常见用途（中文，50字内）",
+  "flavorTags": 从 ${JSON.stringify(VALID_FLAVOR_TAGS_BOTTLE)} 中选最合适的2-4个（数组），只能选列表中的值,
+  "story": "产品故事/介绍（中文，80字内，描述历史背景与风味特点），不确定填 \"\"",
+  "styleDesc": "风格特点详细描述（中文，50字内，区别于 style 子标签），不确定填 \"\"",
+  "distilleryInfo": "蒸馏厂/酒厂简介（基酒库专用，中文，60字内），不确定填 \"\"",
+  "pairingNotes": "搭配建议（酒款库专用，中文，40字内），不确定填 \"\"",
+  "usageNotes": "调酒用途说明（原材料库专用，中文，60字内），不确定填 \"\"",
+  "seasonality": "季节性说明（原材料库专用，中文，20字内），不确定填 \"\"",
+  "confidence": "high"/"medium"/"low"（资料把握程度：知名大牌=high，通用品类=medium，勉强猜测=low）
+}
+规则：
+- category 必须严格落在上述枚举中，选最贴切的一个
+- style 必须从对应 category 的 styleOptions 列表中精确选一，不在列表中的填 ""
+- flavorTags 只能从给定列表中选，不能自造新标签
+- 不要编造不存在的品牌；不确定品牌就留空但仍可给出通用品类资料
+- 只输出 JSON，不要任何解释文字`;
+
+        const parts: MessageContent[] = [];
+        if (input.imageBase64) {
+          parts.push({
+            type: "image_url",
+            image_url: { url: `data:${input.imageMime || "image/jpeg"};base64,${input.imageBase64}` },
+          });
+        }
+        parts.push({ type: "text", text: prompt });
+
+        const signal = AbortSignal.timeout(35_000);
+        let response;
+        try {
+          response = await invokeLLM({
+            model: "claude-sonnet",
+            messages: [{ role: "user", content: parts.length === 1 ? prompt : parts }],
+            response_format: { type: "json_object" },
+            signal,
+          });
+        } catch (err: unknown) {
+          const isTimeout = err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError");
+          throw new Error(isTimeout ? "AI 分析超时，请稍后重试" : `AI 分析失败: ${err instanceof Error ? err.message : String(err)}`);
+        }
+        const raw = response.choices[0]?.message?.content;
+        const p = parseJsonObjectLoose(typeof raw === "string" ? raw : "") as Record<string, unknown>;
+
+        // ── 严格白名单校验 ──────────────────────────────────────────────
+        const resolvedCategory = VALID_CATEGORIES.includes(p.category as string) ? (p.category as string) : (cat || "");
+        const styleList = BOTTLE_STYLES_MAP[resolvedCategory] ?? [];
+        const rawStyle = typeof p.style === "string" ? p.style.trim() : "";
+        const validatedStyle = styleList.includes(rawStyle) ? rawStyle : "";
+        const rawFlavors = Array.isArray(p.flavorTags) ? (p.flavorTags as string[]) : [];
+        const validatedFlavors = rawFlavors.filter((f) => VALID_FLAVOR_TAGS_BOTTLE.includes(f)).slice(0, 4);
+
+        return {
+          found: p.found !== false,
+          nameZh: typeof p.nameZh === "string" ? p.nameZh.trim() : "",
+          nameEn: typeof p.nameEn === "string" ? p.nameEn.trim() : "",
+          category: resolvedCategory,
+          style: validatedStyle,
+          brand: typeof p.brand === "string" ? p.brand.trim() : "",
+          origin: typeof p.origin === "string" ? p.origin.trim() : "",
+          volume: typeof p.volume === "string" ? p.volume.trim() : "",
+          abv: typeof p.abv === "number" && p.abv >= 0 ? p.abv : 0,
+          priceCny: typeof p.priceCny === "number" && p.priceCny >= 0 ? p.priceCny : 0,
+          notes: typeof p.notes === "string" ? p.notes.trim() : "",
+          flavorTags: validatedFlavors,
+          story: typeof p.story === "string" ? p.story.trim() : "",
+          styleDesc: typeof p.styleDesc === "string" ? p.styleDesc.trim() : "",
+          distilleryInfo: typeof p.distilleryInfo === "string" ? p.distilleryInfo.trim() : "",
+          pairingNotes: typeof p.pairingNotes === "string" ? p.pairingNotes.trim() : "",
+          usageNotes: typeof p.usageNotes === "string" ? p.usageNotes.trim() : "",
+          seasonality: typeof p.seasonality === "string" ? p.seasonality.trim() : "",
+          confidence: (["high","medium","low"] as const).includes(p.confidence as "high") ? p.confidence as "high"|"medium"|"low" : "medium",
+        };
+      }),
+
     /** 联网识别:未知产品名称/照片 → LLM 知识补全为结构化资料 */
     enrich: publicProcedure
       .input(
@@ -852,22 +1032,41 @@ ${input.origin ? `产地: ${input.origin}` : ""}
         const ingredientList = input.ingredients?.length
           ? `\n配方原料: ${input.ingredients.join(", ")}`
           : "";
-        const prompt = `你是专业的调酒师和自制饮品专家。根据以下自制品信息，补全风味描述、制作故事和储存说明。
-自制品名称: ${displayName}
-${input.type ? `类型: ${input.type}` : ""}${ingredientList}
+        // ── 白名单常量 ──────────────────────────────────────────────────
+        const VALID_PREP_TYPES = ["infusion","fat-wash","butter-wash","oil-wash","rapid-infusion","sous-vide-infusion","ultrasonic-infusion","rotovap","cold-brew-spirit","smoke-infusion","liqueur","fruit-liqueur","herbal-liqueur","nut-liqueur","cream-liqueur","amaro","falernum","bitters","aromatic-bitters","citrus-bitters","herbal-bitters","tincture","spice-tincture","citrus-tincture","redistilled","batch","bottled-cocktail","barrel-aged","fortified","fermented","homebrew-beer","homebrew-wine","syrup","rich-syrup","spiced-syrup","herbal-syrup","floral-syrup","fruit-syrup","caramel-syrup","coffee-tea-syrup","orgeat","oleo","juice","clarified-juice","super-juice","cordial","solution","acid-adjusted","shrub","lacto-ferment-drink","zero-spirit","na-bitters","na-liqueur","kombucha","water-kefir","ginger-beer","tepache","jun","foam","spherification-prep","garnish","other"];
+        const VALID_TECHNIQUES = ["rotovap","centrifuge","fat_wash","milk_wash","rapid_infusion","sous_pression","sous_vide","fermentation","barrel_age","ultrasonic","enzyme_pectinase","enzyme_amylase","spherification","emulsification","liquid_nitrogen","steam_distill","bottle_age","oak_stave","carbonation","smoke","acid_adjust","oleo","heat_cook","cold_steep","room_steep"];
+        const VALID_SECTIONS = ["infused-spirit","homemade-liqueur","bitters-tincture","modified-spirit","homemade-spirit","homemade-syrup","juice-cordial","shrub-vinegar","zero-proof","na-ferment","misc"];
+        const VALID_FLAVOR_TAGS = ["酸","甜","苦","烈","鲜","柑橘","热带","草本","花香","烟熏","木桶","香料","坚果可可","清爽","浓郁","干爽","复杂"];
 
-请输出 JSON:
+        const knownType = input.type ? `\n已知类型: ${input.type}` : "";
+        const prompt = `你是专业的调酒师和自制饮品专家（基于 Liquid Intelligence、The Bar Book、Cocktail Codex 等权威资料）。
+根据以下自制品信息，一次性补全所有字段。
+
+自制品名称: ${displayName}${knownType}${ingredientList}
+
+请输出 JSON（所有字段必须存在，不确定的字符串填 ""，数组填 []）:
 {
-  "story": "自制品介绍/故事(中文,80字内,描述风味特点和用途,不确定则返回空字符串)",
-  "styleDesc": "风格/口感描述(中文,40字内,不确定则返回空字符串)",
-  "shelfLife": "建议保质期(如'冷藏2周'或'密封常温1个月',不确定则返回空字符串)",
-  "storage": "储存建议(如'冷藏密封保存,使用前摇匀',不确定则返回空字符串)",
-  "confidence": "high"|"medium"|"low"
-}`;
-        const signal = AbortSignal.timeout(25_000);
+  "section": "分区key，必须从以下精确选一: ${VALID_SECTIONS.join("/")}。含酒精(浸渍/利口酒/苦精/改制/发酵)→前5个；无酒精(糖浆/果汁/醋饮/零度/无酒精发酵/装饰)→后6个",
+  "prepType": "类型key，必须从以下精确选一: ${VALID_PREP_TYPES.join("/")}，不确定填 \"other\"",
+  "techniques": 识别到的工艺key数组，从 ${JSON.stringify(VALID_TECHNIQUES)} 中选0-4个，只能选列表中的值,
+  "flavorTags": 风味标签数组，从 ${JSON.stringify(VALID_FLAVOR_TAGS)} 中选1-3个，只能选列表中的值,
+  "story": "自制品介绍/故事（中文，80字内，描述风味特点和调酒用途），不确定填 \"\"",
+  "styleDesc": "风格/口感描述（中文，40字内），不确定填 \"\"",
+  "shelfLife": "建议保质期（如'冷藏2周'或'密封常温1个月'），不确定填 \"\"",
+  "storage": "储存建议（如'冷藏密封保存，使用前摇匀'），不确定填 \"\"",
+  "usageNotes": "调酒用途说明（中文，50字内，如'可替代 Cointreau，适合 Margarita'），不确定填 \"\"",
+  "confidence": "high"/"medium"/"low"
+}
+规则：
+- section 和 prepType 必须严格落在上述枚举中
+- techniques 只能从给定列表中选，不能自造新key
+- flavorTags 只能从给定列表中选
+- 只输出 JSON，不要任何解释文字`;
+        const signal = AbortSignal.timeout(30_000);
         let response;
         try {
           response = await invokeLLM({
+            model: "claude-sonnet",
             messages: [{ role: "user", content: prompt }],
             response_format: { type: "json_object" },
             signal,
@@ -879,11 +1078,27 @@ ${input.type ? `类型: ${input.type}` : ""}${ingredientList}
         const raw = response.choices[0]?.message?.content;
         const parsed = parseJsonObjectLoose(typeof raw === "string" ? raw : "");
         const p = parsed as Record<string, unknown>;
+
+        // ── 严格白名单校验 ──────────────────────────────────────────────
+        const rawSection = typeof p.section === "string" ? p.section.trim() : "";
+        const validatedSection = VALID_SECTIONS.includes(rawSection) ? rawSection : "";
+        const rawPrepType = typeof p.prepType === "string" ? p.prepType.trim() : "";
+        const validatedPrepType = VALID_PREP_TYPES.includes(rawPrepType) ? rawPrepType : "other";
+        const rawTechniques = Array.isArray(p.techniques) ? (p.techniques as string[]) : [];
+        const validatedTechniques = rawTechniques.filter((t) => VALID_TECHNIQUES.includes(t)).slice(0, 4);
+        const rawFlavors = Array.isArray(p.flavorTags) ? (p.flavorTags as string[]) : [];
+        const validatedFlavors = rawFlavors.filter((f) => VALID_FLAVOR_TAGS.includes(f)).slice(0, 3);
+
         return {
+          section: validatedSection,
+          prepType: validatedPrepType,
+          techniques: validatedTechniques,
+          flavorTags: validatedFlavors,
           story: typeof p.story === "string" ? p.story.trim() : "",
           styleDesc: typeof p.styleDesc === "string" ? p.styleDesc.trim() : "",
           shelfLife: typeof p.shelfLife === "string" ? p.shelfLife.trim() : "",
           storage: typeof p.storage === "string" ? p.storage.trim() : "",
+          usageNotes: typeof p.usageNotes === "string" ? p.usageNotes.trim() : "",
           confidence: (["high", "medium", "low"] as const).includes(p.confidence as "high") ? p.confidence as "high" | "medium" | "low" : "medium",
         };
       }),

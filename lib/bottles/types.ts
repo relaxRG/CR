@@ -202,6 +202,14 @@ export interface Bottle {
   story: string;
   /** 风格说明(详细描述,区别于 style 子分类标签) */
   styleDesc: string;
+  /** 蒸馏厂/酒厂简介（基酒库专用） */
+  distilleryInfo?: string;
+  /** 搭配建议（酒款库专用） */
+  pairingNotes?: string;
+  /** 调酒用途说明（原材料库专用） */
+  usageNotes?: string;
+  /** 季节性说明（原材料库专用） */
+  seasonality?: string;
   /** 是否内置数据(内置数据也可编辑/删除) */
   builtin: boolean;
   /** 评分:1-10 整数,null 表示未评分(无半星) */

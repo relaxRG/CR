@@ -17,6 +17,8 @@ import { SmartImportBar } from "@/components/smart-import-bar";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
+import { trpc } from "@/lib/trpc";
+import { useNetwork } from "@/hooks/use-network";
 import { useHomemadeStore } from "@/lib/homemade/store";
 import {
   PREP_GROUPS,
@@ -73,10 +75,57 @@ export default function HomemadeFormScreen() {
   const [storage, setStorage] = useState(editing?.storage ?? "");
   const [source, setSource] = useState(editing?.source ?? "");
   const [notes, setNotes] = useState(editing?.notes ?? "");
+  const [story, setStory] = useState(editing?.story ?? "");
+  const [styleDesc, setStyleDesc] = useState(editing?.styleDesc ?? "");
+  const [usageNotes, setUsageNotes] = useState(editing?.usageNotes ?? "");
+  const [flavorTags, setFlavorTags] = useState<string[]>(editing?.flavorTags ?? []);
+  const [techniques, setTechniques] = useState<string[]>(editing?.techniques ?? []);
   /** 用户是否已手动选过类型(选过则不再自动推断覆盖) */
   const [typeTouched, setTypeTouched] = useState(Boolean(editing) || Boolean(prefillType));
 
   const canSave = useMemo(() => name.trim().length > 0, [name]);
+
+  // ── AI 补全 ──────────────────────────────────────────────────────────
+  const { isOnline } = useNetwork();
+  const enrichHomemadeMutation = trpc.lookup.enrichHomemade.useMutation();
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiStatus, setAiStatus] = useState<{ kind: "ok" | "err"; msg: string } | null>(null);
+
+  const handleAiEnrich = async () => {
+    const displayName = [name.trim(), nameAlt.trim()].filter(Boolean).join(" / ");
+    if (!displayName) {
+      setAiStatus({ kind: "err", msg: lang === "en" ? "Please enter a name first" : "请先输入名称" });
+      return;
+    }
+    if (!isOnline) return;
+    setAiBusy(true);
+    setAiStatus(null);
+    try {
+      const res = await enrichHomemadeMutation.mutateAsync({
+        name: name.trim(),
+        nameAlt: nameAlt.trim() || undefined,
+        type: type || undefined,
+        ingredients: ingRows.map((r) => r.name).filter(Boolean),
+      });
+      if (res.prepType && res.prepType !== "other" && !typeTouched) {
+        const matched = typeList.find((t) => t.key === res.prepType);
+        if (matched) { setType(res.prepType); setTypeTouched(true); }
+      }
+      if (res.techniques.length > 0 && techniques.length === 0) setTechniques(res.techniques);
+      if (res.flavorTags.length > 0 && flavorTags.length === 0) setFlavorTags(res.flavorTags);
+      if (!story.trim() && res.story) setStory(res.story);
+      if (!styleDesc.trim() && res.styleDesc) setStyleDesc(res.styleDesc);
+      if (!shelfLife.trim() && res.shelfLife) setShelfLife(res.shelfLife);
+      if (!storage.trim() && res.storage) setStorage(res.storage);
+      if (!usageNotes.trim() && res.usageNotes) setUsageNotes(res.usageNotes);
+      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setAiStatus({ kind: "ok", msg: lang === "en" ? "AI filled in fields" : "AI 已补全字段" });
+    } catch {
+      setAiStatus({ kind: "err", msg: lang === "en" ? "AI analysis failed" : "AI 分析失败，请重试" });
+    } finally {
+      setAiBusy(false);
+    }
+  };
 
   /** 名称/配料变化后智能推断类型(仅在用户未手动选择时) */
   const autoGuessType = () => {
@@ -119,6 +168,11 @@ export default function HomemadeFormScreen() {
       storage: storage.trim(),
       source: source.trim(),
       notes: notes.trim(),
+      story: story.trim(),
+      styleDesc: styleDesc.trim(),
+      usageNotes: usageNotes.trim(),
+      flavorTags,
+      techniques,
     };
     if (editing) {
       updatePrep(editing.id, payload);
@@ -192,6 +246,38 @@ export default function HomemadeFormScreen() {
                 if (item.notes) setNotes(item.notes);
               }}
             />
+          )}
+          {/* AI 补全按钮 */}
+          <Pressable
+            onPress={handleAiEnrich}
+            disabled={aiBusy || !isOnline}
+            style={({ pressed }) => ({
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              marginTop: 8,
+              marginBottom: 4,
+              paddingVertical: 10,
+              paddingHorizontal: 16,
+              borderRadius: 10,
+              backgroundColor: colors.surface,
+              borderWidth: 1,
+              borderColor: colors.border,
+              opacity: (aiBusy || !isOnline) ? 0.5 : pressed ? 0.7 : 1,
+            })}
+          >
+            <IconSymbol name="sparkles" size={16} color={colors.primary} />
+            <Text style={{ fontSize: 14, fontWeight: "600", color: colors.primary }}>
+              {aiBusy
+                ? (lang === "en" ? "Analyzing…" : "AI 分析中…")
+                : (lang === "en" ? "AI Auto-fill" : "AI 自动补全")}
+            </Text>
+          </Pressable>
+          {aiStatus && (
+            <Text style={{ fontSize: 12, textAlign: "center", marginBottom: 4, color: aiStatus.kind === "ok" ? colors.success : colors.error }}>
+              {aiStatus.msg}
+            </Text>
           )}
           {fieldLabel(t("hmform.name"))}
           <TextInput
@@ -465,6 +551,46 @@ export default function HomemadeFormScreen() {
             placeholderTextColor={colors.muted}
             multiline
           />
+          {(story || styleDesc || usageNotes) ? (
+            <>
+              {story ? (
+                <>
+                  {fieldLabel(lang === "en" ? "Story / Introduction" : "介绍/故事")}
+                  <TextInput
+                    style={[...inputStyle, styles.multiline, { minHeight: 60 }]}
+                    value={story}
+                    onChangeText={setStory}
+                    multiline
+                    placeholderTextColor={colors.muted}
+                  />
+                </>
+              ) : null}
+              {styleDesc ? (
+                <>
+                  {fieldLabel(lang === "en" ? "Style / Taste" : "风格/口感")}
+                  <TextInput
+                    style={inputStyle}
+                    value={styleDesc}
+                    onChangeText={setStyleDesc}
+                    placeholderTextColor={colors.muted}
+                    returnKeyType="done"
+                  />
+                </>
+              ) : null}
+              {usageNotes ? (
+                <>
+                  {fieldLabel(lang === "en" ? "Usage Notes" : "调酒用途")}
+                  <TextInput
+                    style={inputStyle}
+                    value={usageNotes}
+                    onChangeText={setUsageNotes}
+                    placeholderTextColor={colors.muted}
+                    returnKeyType="done"
+                  />
+                </>
+              ) : null}
+            </>
+          ) : null}
         </ScrollView>
       </KeyboardAvoidingView>
     </ScreenContainer>
