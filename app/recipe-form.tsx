@@ -526,8 +526,63 @@ export default function RecipeFormScreen() {
         onError: (err: unknown) => {
           if (!isMountedRef.current) return;
           setAiEnriching(false);
-          const msg = err instanceof Error ? err.message : "深度解析失败，请重试";
-          Alert.alert("深度解析失败", msg);
+          const msg = err instanceof Error ? err.message : "";
+          // 如果服务端路由不存在（版本不匹配），自动回退到 enrichRecipe
+          if (msg.includes("No procedure found") || msg.includes("NOT_FOUND") || msg.includes("404")) {
+            const recipeName = name.trim() || nameEn.trim();
+            const ingNames = ingredients.map((i) => i.name).filter(Boolean);
+            const ingWithAmounts = ingredients.filter((i) => i.name.trim()).map((i) => ({ name: i.name, amount: i.amount }));
+            setAiEnriching(true);
+            enrichRecipeMutation.mutate(
+              {
+                name: recipeName,
+                nameEn: nameEn.trim() || undefined,
+                baseSpirit: baseSpirit || undefined,
+                ingredients: ingNames.length > 0 ? ingNames : undefined,
+                ingredientsWithAmounts: ingWithAmounts.length > 0 ? ingWithAmounts : undefined,
+                method: method || undefined,
+                existingSpirits: spiritNames,
+                existingGlasses: glassNames,
+              },
+              {
+                onSuccess: (result) => {
+                  if (!isMountedRef.current) return;
+                  if (result.flavors && result.flavors.length > 0) {
+                    setFlavors(result.flavors);
+                    const conf = result.flavorConfidence ?? result.confidence ?? "medium";
+                    setFlavorConfidence(conf);
+                  }
+                  if (!baseSpirit && result.suggestedBaseSpirit) {
+                    const resolved = resolveAiSpirits(result.suggestedBaseSpirit);
+                    const spirits = resolved.split(",").map((s) => s.trim()).filter(Boolean);
+                    setSpiritConfidence("high");
+                    setAiSuggestedSpirits(spirits);
+                    setBaseSpirit(resolved);
+                  }
+                  if (!glass && result.suggestedGlass && result.suggestedGlassConfidence === "high") {
+                    const nextName = ensureGlassName(result.suggestedGlass);
+                    if (nextName) setGlass(nextName);
+                  }
+                  if (!ice && result.suggestedIce && result.suggestedIceConfidence === "high") {
+                    const nextName = normalizeIceName(result.suggestedIce);
+                    if ((ICE_TYPES as readonly string[]).includes(nextName)) setIce(nextName);
+                  }
+                  if (result.story || result.flavorDesc || result.source || result.suggestedBaseSpirit) {
+                    setAiResult({ ...result, isDeepAnalysis: false });
+                  }
+                  setAiEnriching(false);
+                },
+                onError: (fallbackErr: unknown) => {
+                  if (!isMountedRef.current) return;
+                  setAiEnriching(false);
+                  const fallbackMsg = fallbackErr instanceof Error ? fallbackErr.message : "AI 补全失败，请重试";
+                  Alert.alert("AI 补全失败", fallbackMsg);
+                },
+              },
+            );
+          } else {
+            Alert.alert("AI 补全失败", msg || "请重试");
+          }
         },
       },
     );
