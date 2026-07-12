@@ -60,8 +60,9 @@ export function RecipeCard({
       style={({ pressed }) => [styles.pressable, pressed && { opacity: 0.7 }]}
     >
       <View
-        className="bg-surface px-4 py-3"
+        className="bg-surface px-4"
         style={[
+          { paddingVertical: 14 },
           isFirst && { borderTopLeftRadius: 12, borderTopRightRadius: 12 },
           isLast && { borderBottomLeftRadius: 12, borderBottomRightRadius: 12 },
         ]}
@@ -77,11 +78,11 @@ export function RecipeCard({
                   style={{ height: 24 }}
                   contentContainerStyle={{ alignItems: "baseline", gap: 6 }}
                 >
-                  <Text className="text-base font-semibold text-foreground" style={{ lineHeight: 22 }}>
+                  <Text style={{ fontSize: 17, fontWeight: "600", lineHeight: 24 }} className="text-foreground">
                     {dn.primary}
                   </Text>
                   {dn.secondary ? (
-                    <Text className="text-xs text-muted" style={{ lineHeight: 22 }}>
+                    <Text className="text-sm text-muted" style={{ lineHeight: 24 }}>
                       {dn.secondary}
                     </Text>
                   ) : null}
@@ -116,7 +117,7 @@ export function RecipeCard({
               </ScrollView>
             )}
           </View>
-          <View className="flex-row items-center" style={{ gap: 14 }}>
+          <View className="flex-row items-center" style={{ gap: 16 }}>
             <Pressable
               onPress={handleMade}
               hitSlop={10}
@@ -124,7 +125,7 @@ export function RecipeCard({
             >
               <IconSymbol
                 name={recipe.made ? "checkmark.circle.fill" : "checkmark.circle"}
-                size={24}
+                size={22}
                 color={recipe.made ? colors.success : colors.muted}
               />
             </Pressable>
@@ -135,13 +136,13 @@ export function RecipeCard({
             >
               <IconSymbol
                 name={recipe.favorite ? "star.fill" : "star"}
-                size={24}
+                size={22}
                 color={recipe.favorite ? colors.primary : colors.muted}
               />
             </Pressable>
           </View>
         </View>
-        <Text className="text-sm text-muted mt-2" numberOfLines={1} style={{ height: 20 }}>
+        <Text className="text-sm text-muted mt-2" numberOfLines={1} style={{ height: 18, lineHeight: 18 }}>
           {ingredientSummary || " "}
         </Text>
       </View>
@@ -149,7 +150,7 @@ export function RecipeCard({
         <View className="bg-surface">
           <View
             className="bg-border"
-            style={{ height: StyleSheet.hairlineWidth, marginLeft: 16 }}
+            style={{ height: StyleSheet.hairlineWidth, marginLeft: 20 }}
           />
         </View>
       ) : null}

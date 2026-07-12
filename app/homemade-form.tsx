@@ -600,9 +600,9 @@ export default function HomemadeFormScreen() {
 const styles = StyleSheet.create({
   input: {
     borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: 12,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 12,
     fontSize: 15,
     lineHeight: 20,
   },
@@ -617,8 +617,8 @@ const styles = StyleSheet.create({
   },
   chip: {
     paddingHorizontal: 12,
-    height: 32,
-    borderRadius: 16,
+    height: 36,
+    borderRadius: 18,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",

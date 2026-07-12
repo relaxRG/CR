@@ -218,16 +218,16 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   title: {
-    fontSize: 30,
+    fontSize: 34,
     fontWeight: "700",
-    lineHeight: 36,
+    lineHeight: 41,
     letterSpacing: 0.3,
   },
   subtitle: {
     fontSize: 13,
     lineHeight: 18,
     marginTop: 2,
-    marginBottom: 10,
+    marginBottom: 12,
   },
   segContainer: {
     flexDirection: "row",
@@ -237,13 +237,13 @@ const styles = StyleSheet.create({
   },
   segItem: {
     flex: 1,
-    height: 32,
+    height: 34,
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
   },
   segText: {
-    fontSize: 14,
+    fontSize: 13,
     lineHeight: 19,
   },
   hidden: {

@@ -905,7 +905,7 @@ export default function RecipeFormScreen() {
         <Text className="text-lg font-semibold text-foreground">
           {editing ? t("form.title.edit") : t("form.title.new")}
         </Text>
-        <View style={{ width: 24 }} />
+        <View style={{ width: 28 }} />
       </View>
 
       <KeyboardAvoidingView
@@ -1975,12 +1975,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   saveBtn: {
-    paddingVertical: 14,
-    borderRadius: 14,
+    paddingVertical: 15,
+    borderRadius: 16,
     alignItems: "center",
   },
   saveBtnText: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: "600",
     lineHeight: 22,
   },

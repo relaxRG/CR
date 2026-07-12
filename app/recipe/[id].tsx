@@ -299,7 +299,7 @@ export default function RecipeDetailScreen() {
           const dn = displayNames(recipe.nameEn, recipe.name, lang);
           return (
             <>
-              <Text className="text-3xl font-bold text-foreground mt-2">{dn.primary}</Text>
+              <Text style={{ fontSize: 28, fontWeight: "700", lineHeight: 34 }} className="text-foreground mt-2">{dn.primary}</Text>
               {dn.secondary ? (
                 <Text className="text-base text-muted mt-1">{dn.secondary}</Text>
               ) : null}

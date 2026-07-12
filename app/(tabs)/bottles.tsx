@@ -1072,7 +1072,7 @@ function BottleCardInner({
       <View
         className="bg-surface px-4"
         style={[
-          { paddingVertical: 13 },
+          { paddingVertical: 14 },
           isFirst && { borderTopLeftRadius: 12, borderTopRightRadius: 12 },
           isLast && { borderBottomLeftRadius: 12, borderBottomRightRadius: 12 },
         ]}
@@ -1080,10 +1080,10 @@ function BottleCardInner({
         <View className="flex-row items-center">
           <View className="flex-1 pr-2">
             <View style={{ minHeight: 40, justifyContent: "center" }}>
-              <Text className="text-[16px] font-semibold text-foreground" numberOfLines={1} style={{ lineHeight: 22 }}>
+              <Text style={{ fontSize: 17, fontWeight: "600", lineHeight: 24 }} className="text-foreground" numberOfLines={1}>
                 {lang === "en" && bottle.nameEn ? bottle.nameEn : bottle.nameZh}
               </Text>
-              <Text className="text-[12px] mt-0.5" style={{ color: "#8E8E93", lineHeight: 16 }} numberOfLines={1}>
+              <Text className="text-sm text-muted mt-0.5" style={{ lineHeight: 18 }} numberOfLines={1}>
                 {(lang === "en" ? bottle.nameZh : bottle.nameEn) || " "}
               </Text>
             </View>
@@ -1132,7 +1132,7 @@ function BottleCardInner({
           <View className="items-end">
             {bottle.priceCny > 0 ? (
               <>
-                <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, lineHeight: 22 }}>¥{bottle.priceCny}</Text>
+                <Text style={{ fontSize: 17, fontWeight: "700", color: colors.foreground, lineHeight: 24 }}>¥{bottle.priceCny}</Text>
                 <Text style={{ fontSize: 10, color: colors.muted, lineHeight: 14, marginTop: 1 }}>{t("bottles.price.ref")}</Text>
               </>
             ) : (
@@ -1153,7 +1153,7 @@ function BottleCardInner({
             style={{
               height: StyleSheet.hairlineWidth,
               backgroundColor: colors.border,
-              marginLeft: 16,
+              marginLeft: 20,
             }}
           />
         </View>

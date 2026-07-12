@@ -1,0 +1,16 @@
+来源：/home/ubuntu/screenshots/webdev-preview-root-1783877358795873911-4656.png
+- 酒单首页当前已有大标题、分段切换、搜索栏、筛选标签与配方列表。
+- 当前问题主要是顶部与列表层级偏平，标签密度较高，整体更像功能库页面。
+
+来源：/home/ubuntu/ui_before/03_bottles_before.png
+- 酒库页已有分段、搜索、分类标签、容量与价格信息。
+- 当前问题主要是列表呈现过于直接，缺少原生 grouped 视觉层级。
+
+来源：/home/ubuntu/ui_before/08_recipe_detail_before.png
+- 当前截图显示“配方不存在或已被删除”，说明该改前详情截图不具代表性。
+- 因此详情页方案主要基于既有上下文、已知字段结构与 Apple HIG 目标制定。
+
+来源：/home/ubuntu/ui_before/05_recipe_form_before.png
+- 当前截图为 unmatched route，不足以作为有效视觉基准。
+- 表单重构方案因此以既有文件结构、已知功能与 HIG 目标为准。
+

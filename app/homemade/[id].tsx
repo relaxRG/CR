@@ -151,7 +151,7 @@ export default function HomemadeDetailScreen() {
       </View>
 
       <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}>
-        <Text className="text-3xl font-bold text-foreground" style={{ lineHeight: 40 }}>
+        <Text style={{ fontSize: 28, fontWeight: "700", lineHeight: 34 }} className="text-foreground">
           {names.primary}
         </Text>
         {names.secondary ? (

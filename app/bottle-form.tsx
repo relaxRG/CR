@@ -598,8 +598,8 @@ const styles = StyleSheet.create({
   },
   chip: {
     paddingHorizontal: 14,
-    height: 34,
-    borderRadius: 17,
+    height: 36,
+    borderRadius: 18,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
@@ -610,14 +610,14 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   saveBtn: {
-    height: 50,
-    borderRadius: 14,
+    height: 52,
+    borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
   },
   saveBtnText: {
     color: "#FFFFFF",
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: "600",
     lineHeight: 22,
   },
