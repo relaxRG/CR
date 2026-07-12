@@ -11,6 +11,7 @@ import {
   TextInput,
   View,
   ActivityIndicator,
+  Modal,
 } from "react-native";
 import * as Haptics from "expo-haptics";
 import DraggableFlatList, {
@@ -43,6 +44,7 @@ import { useBottleStore } from "@/lib/bottles/store";
 import { useHomemadeStore } from "@/lib/homemade/store";
 import { useRecipeStore } from "@/lib/recipes/store";
 import { trpc } from "@/lib/trpc";
+import { normalizeCodexFamilyDecl } from "@/lib/recipes/lineage";
 import {
   CODEX_FAMILIES,
   BASE_SPIRITS,
@@ -87,10 +89,17 @@ export function RecipesScreen() {
     return () => { isMountedRef.current = false; };
   }, []);
   const enrichRecipeMutation = trpc.lookup.enrichRecipe.useMutation();
+  const deepAnalyzeMutation = trpc.lookup.deepAnalyzeRecipe.useMutation();
   const [enrichingRecipes, setEnrichingRecipes] = useState(false);
   const [enrichRecipeMsg, setEnrichRecipeMsg] = useState<string | null>(null);
   const [enrichRecipeProgress, setEnrichRecipeProgress] = useState<{ done: number; total: number } | null>(null);
   const [enrichRecipeErrors, setEnrichRecipeErrors] = useState<string[]>([]);
+  const [batchDeepRunning, setBatchDeepRunning] = useState(false);
+  const [batchDeepProgress, setBatchDeepProgress] = useState<{ done: number; total: number } | null>(null);
+  const [batchDeepMsg, setBatchDeepMsg] = useState<string | null>(null);
+  const [batchDeepErrors, setBatchDeepErrors] = useState<string[]>([]);
+  const [showBatchDeepConfirm, setShowBatchDeepConfirm] = useState(false);
+  const cancelBatchDeepRef = useRef(false);
   // 快捷筛选(独立于 Filter 面板,持久化保留):分类 → 基酒子分类
   const [quickSel, setQuickSel] = usePersistedState<QuickSelection>("quick.recipes.v1", {});
   // Filter 面板多选筛选状态(与快捷筛选相互独立)
@@ -443,6 +452,88 @@ export function RecipesScreen() {
     setEnrichRecipeProgress(null);
   }, [enrichingRecipes, selectedIds, recipes, enrichRecipeMutation, updateRecipe, t]);
 
+  const batchDeepTargets = useMemo(
+    () =>
+      recipes.filter(
+        (r) =>
+          !r.flavorDesc?.trim() ||
+          !r.story?.trim() ||
+          (r.flavors ?? []).length === 0 ||
+          !r.codexFamily?.trim() ||
+          !r.method?.trim(),
+      ).slice(0, 200),
+    [recipes],
+  );
+
+  const handleBatchDeepAnalyze = useCallback(async () => {
+    const targets = batchDeepTargets;
+    if (targets.length === 0) {
+      setBatchDeepMsg(t("sel.batchDeepAnalyze.noMissing"));
+      return;
+    }
+    cancelBatchDeepRef.current = false;
+    setBatchDeepRunning(true);
+    setBatchDeepMsg(null);
+    setBatchDeepProgress({ done: 0, total: targets.length });
+    setBatchDeepErrors([]);
+    let updated = 0;
+    const errors: string[] = [];
+    for (let i = 0; i < targets.length; i++) {
+      if (cancelBatchDeepRef.current) break;
+      const r = targets[i];
+      try {
+        const ingNames = (r.ingredients ?? []).map((ing) => ing.name).filter(Boolean);
+        const res = await deepAnalyzeMutation.mutateAsync({
+          name: r.name || undefined,
+          nameEn: r.nameEn || undefined,
+          ingredients: ingNames.length > 0 ? ingNames.join(", ") : undefined,
+          baseSpirit: r.baseSpirit || undefined,
+          source: r.source || undefined,
+        });
+        const patch: Partial<Recipe> = {};
+        if (res.story && !r.story?.trim()) patch.story = res.story;
+        if (res.flavorDesc && !r.flavorDesc?.trim()) patch.flavorDesc = res.flavorDesc;
+        if (res.flavors && res.flavors.length > 0 && (!r.flavors || r.flavors.length === 0)) patch.flavors = res.flavors;
+        if (res.suggestedCodexFamily && !r.codexFamily?.trim()) {
+          const normalized = normalizeCodexFamilyDecl(res.suggestedCodexFamily);
+          if (normalized) patch.codexFamily = normalized;
+        }
+        if (res.suggestedMethod && !r.method?.trim()) patch.method = res.suggestedMethod;
+        if (res.suggestedVariantOf && !r.variantOf?.trim()) patch.variantOf = res.suggestedVariantOf;
+        if (res.creator || res.createdYear) {
+          const prevRef = r.sourceRef ?? {
+            creator: "", createdYear: "", creatorConfidence: "low" as const,
+            bookTitle: "", bookAuthor: "", publisher: "", publishYear: "",
+            pageRef: "", chapterTitle: "", rawText: "", sourceUrl: "",
+            sourceConfidence: "medium" as const,
+          };
+          if (!prevRef.creator && res.creator) {
+            patch.sourceRef = { ...prevRef, creator: res.creator, createdYear: res.createdYear || prevRef.createdYear, creatorConfidence: "medium" };
+          }
+        }
+        if (Object.keys(patch).length > 0) {
+          updateRecipe(r.id, { ...r, ...patch } as Parameters<typeof updateRecipe>[1]);
+          updated++;
+        }
+      } catch {
+        errors.push(r.name || r.nameEn || `#${i + 1}`);
+      }
+      if (isMountedRef.current) setBatchDeepProgress({ done: i + 1, total: targets.length });
+    }
+    if (!isMountedRef.current) return;
+    if (updated > 0 && Platform.OS !== "web") {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+    setBatchDeepErrors(errors);
+    setBatchDeepMsg(
+      updated > 0
+        ? t("sel.batchDeepAnalyze.done", { n: updated })
+        : t("sel.batchDeepAnalyze.none"),
+    );
+    setBatchDeepRunning(false);
+    setBatchDeepProgress(null);
+  }, [batchDeepTargets, deepAnalyzeMutation, updateRecipe, isMountedRef, t]);
+
   const chipStyle = (active: boolean) => [
     styles.chip,
     {
@@ -457,6 +548,7 @@ export function RecipesScreen() {
   ];
 
   return (
+    <>
     <ScreenContainer edges={[]}>
      {/* Search bar + multi-select button */}
      <View className="px-5 pt-2 pb-3" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -497,6 +589,30 @@ export function RecipesScreen() {
             {selectMode ? t("sel.exit") : t("sel.enter")}
           </Text>
         </Pressable>
+        {/* 批量解析按钮 */}
+        {!selectMode ? (
+          <Pressable
+            disabled={batchDeepRunning}
+            onPress={() => {
+              if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setShowBatchDeepConfirm(true);
+            }}
+            style={({ pressed }) => [
+              styles.selectBtn,
+              {
+                backgroundColor: batchDeepRunning ? colors.primary : colors.surface,
+                borderColor: batchDeepRunning ? colors.primary : colors.border,
+              },
+              pressed && { opacity: 0.7 },
+            ]}
+          >
+            <Text style={[styles.selectBtnText, { color: batchDeepRunning ? "#FFFFFF" : colors.muted }]}>
+              {batchDeepRunning && batchDeepProgress
+                ? `${batchDeepProgress.done}/${batchDeepProgress.total}`
+                : t("sel.batchDeepAnalyze")}
+            </Text>
+          </Pressable>
+        ) : null}
      </View>
 
       {/* Filter chips */}
@@ -806,6 +922,70 @@ export function RecipesScreen() {
         </>
       )}
     </ScreenContainer>
+      {/* 批量深度解析进度横幅 */}
+      {batchDeepRunning && batchDeepProgress ? (
+        <View style={{ marginHorizontal: 16, marginBottom: 8, padding: 10, borderRadius: 10, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.primary, flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <ActivityIndicator size="small" color={colors.primary} />
+          <Text style={{ fontSize: 13, color: colors.foreground, flex: 1 }}>
+            {t("sel.batchDeepAnalyze.progress", { done: batchDeepProgress.done, total: batchDeepProgress.total })}
+          </Text>
+          <Pressable onPress={() => { cancelBatchDeepRef.current = true; }} hitSlop={8}>
+            <Text style={{ fontSize: 13, color: colors.error }}>{t("common.cancel")}</Text>
+          </Pressable>
+        </View>
+      ) : batchDeepMsg ? (
+        <View style={{ marginHorizontal: 16, marginBottom: 8, padding: 10, borderRadius: 10, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <Text style={{ fontSize: 13, color: colors.foreground, flex: 1 }}>{batchDeepMsg}</Text>
+          {batchDeepErrors.length > 0 && (
+            <Text style={{ fontSize: 11, color: colors.warning }}>失败: {batchDeepErrors.slice(0, 3).join(", ")}{batchDeepErrors.length > 3 ? `…+${batchDeepErrors.length - 3}` : ""}</Text>
+          )}
+          <Pressable onPress={() => setBatchDeepMsg(null)} hitSlop={8}>
+            <Text style={{ fontSize: 13, color: colors.primary }}>{t("common.cancel")}</Text>
+          </Pressable>
+        </View>
+      ) : null}
+      {/* 批量深度解析确认 Modal */}
+      <Modal
+        visible={showBatchDeepConfirm}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowBatchDeepConfirm(false)}
+      >
+        <Pressable
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "center", alignItems: "center" }}
+          onPress={() => setShowBatchDeepConfirm(false)}
+        >
+          <Pressable
+            style={{ backgroundColor: colors.surface, borderRadius: 16, padding: 24, marginHorizontal: 32, width: "85%", gap: 12 }}
+            onPress={() => {}}
+          >
+            <Text style={{ fontSize: 17, fontWeight: "700", color: colors.foreground }}>
+              {t("sel.batchDeepAnalyze.confirm.title")}
+            </Text>
+            <Text style={{ fontSize: 14, color: colors.muted, lineHeight: 20 }}>
+              {t("sel.batchDeepAnalyze.confirm.msg", { n: batchDeepTargets.length })}
+            </Text>
+            <View style={{ flexDirection: "row", gap: 10, marginTop: 4 }}>
+              <Pressable
+                style={({ pressed }) => [{ flex: 1, paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: colors.border, alignItems: "center" }, pressed && { opacity: 0.7 }]}
+                onPress={() => setShowBatchDeepConfirm(false)}
+              >
+                <Text style={{ fontSize: 15, color: colors.muted }}>{t("common.cancel")}</Text>
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [{ flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: colors.primary, alignItems: "center" }, pressed && { opacity: 0.8 }]}
+                onPress={() => {
+                  setShowBatchDeepConfirm(false);
+                  handleBatchDeepAnalyze();
+                }}
+              >
+                <Text style={{ fontSize: 15, fontWeight: "600", color: "#FFFFFF" }}>{t("sel.batchDeepAnalyze")}</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </>
   );
 }
 

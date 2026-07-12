@@ -204,6 +204,7 @@ export default function BookImportScreen() {
   const ocrMutation = trpc.bookImport.ocr.useMutation();
   const translateMutation = trpc.bookImport.translate.useMutation();
   const enrichRecipeMutation = trpc.lookup.enrichRecipe.useMutation();
+  const deepAnalyzeMutation = trpc.lookup.deepAnalyzeRecipe.useMutation();
 
   const { addRecipe, updateRecipe, recipes } = useRecipeStore();
   const { addPrep, preps, sections, types } = useHomemadeStore();
@@ -770,6 +771,48 @@ export default function BookImportScreen() {
               if (Object.keys(patch).length > 0) {
                 updateRecipe(newRecipe.id, { ...draft, ...patch });
               }
+              // 自动串联深度解析：在 enrichRecipe 完成后，进一步补全缺少的字段
+              const ingNames = (draft.ingredients ?? []).map((i) => i.name).filter(Boolean);
+              deepAnalyzeMutation.mutate(
+                {
+                  name: draft.name || undefined,
+                  nameEn: draft.nameEn || undefined,
+                  ingredients: ingNames.length > 0 ? ingNames.join(", ") : undefined,
+                  baseSpirit: draft.baseSpirit || undefined,
+                  source: draft.source || undefined,
+                },
+                {
+                  onSuccess: (deepResult) => {
+                    if (!isMountedRef.current) return;
+                    const deepPatch: Record<string, unknown> = {};
+                    if (deepResult.story) deepPatch.story = deepResult.story;
+                    if (deepResult.flavorDesc) deepPatch.flavorDesc = deepResult.flavorDesc;
+                    if (deepResult.flavors && deepResult.flavors.length > 0 && (result.flavors ?? []).length === 0) {
+                      deepPatch.flavors = deepResult.flavors;
+                    }
+                    if (deepResult.suggestedCodexFamily && !draft.codexFamily) {
+                      const normalized = normalizeCodexFamilyDecl(deepResult.suggestedCodexFamily);
+                      if (normalized) deepPatch.codexFamily = normalized;
+                    }
+                    if (deepResult.suggestedMethod && !draft.method) deepPatch.method = deepResult.suggestedMethod;
+                    if (deepResult.suggestedVariantOf && !draft.variantOf) deepPatch.variantOf = deepResult.suggestedVariantOf;
+                    if (deepResult.creator || deepResult.createdYear) {
+                      const currentRef = (patch.sourceRef as typeof draft.sourceRef) ?? draft.sourceRef;
+                      if (currentRef && !currentRef.creator && deepResult.creator) {
+                        deepPatch.sourceRef = {
+                          ...currentRef,
+                          creator: deepResult.creator,
+                          createdYear: deepResult.createdYear || currentRef.createdYear,
+                          creatorConfidence: "medium",
+                        };
+                      }
+                    }
+                    if (Object.keys(deepPatch).length > 0) {
+                      updateRecipe(newRecipe.id, { ...draft, ...patch, ...deepPatch });
+                    }
+                  },
+                },
+              );
             },
           },
         );
@@ -802,7 +845,7 @@ export default function BookImportScreen() {
     setImportResult({ recipes: recipeCount, preps: prepCount });
     setPhase("reading");
     if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  }, [reviewItems, bookTitle, zh, addRecipe, updateRecipe, addPrep, sections, types, enrichRecipeMutation]);
+  }, [reviewItems, bookTitle, zh, addRecipe, updateRecipe, addPrep, sections, types, enrichRecipeMutation, deepAnalyzeMutation]);
 
   // ─── Chapter headings for navigation ────────────────────────────────────────
   const chapterHeadings = useMemo(

@@ -108,6 +108,13 @@ const dict = {
   "sel.sheet.apply": { zh: "应用到 {n} 项", en: "Apply to {n} items" },
   "sel.sheet.clearField": { zh: "清除该字段", en: "Clear this field" },
   "sel.aiEnrich": { zh: "AI 补全", en: "AI Fill" },
+  "sel.batchDeepAnalyze": { zh: "批量解析", en: "Batch Analyze" },
+  "sel.batchDeepAnalyze.confirm.title": { zh: "批量深度解析", en: "Batch Deep Analyze" },
+  "sel.batchDeepAnalyze.confirm.msg": { zh: "发现 {n} 条配方缺少字段，是否批量深度解析？（上限 200 条）", en: "Found {n} recipes with missing fields. Batch deep analyze? (max 200)" },
+  "sel.batchDeepAnalyze.progress": { zh: "深度解析中… {done}/{total}", en: "Analyzing… {done}/{total}" },
+  "sel.batchDeepAnalyze.done": { zh: "已深度解析 {n} 条配方", en: "Deep analyzed {n} recipes" },
+  "sel.batchDeepAnalyze.none": { zh: "所有配方字段均已完整", en: "All recipes are already complete" },
+  "sel.batchDeepAnalyze.noMissing": { zh: "没有发现缺少字段的配方", en: "No recipes with missing fields found" },
   // Color picker
   "color.hexHint": { zh: "输入 HEX 色值后回车", en: "Type HEX and press enter" },
   "color.hue": { zh: "色相", en: "Hue" },
