@@ -555,7 +555,9 @@ ${(input.ingredientsWithAmounts ?? []).length > 0 ? `配料（含用量，用量
 风味描述必须严格使用以下三行固定结构（不得增减行数，不得改变格式）：
 第一行：核心基调：[列举2-3个核心风味词]
 第二行：风味演变：[前段风味] ➔ [中段骨架] ➔ [后段余韵]
-第三行：整体质感：[2-3个关于酒体结构的质感词汇]`;
+第三行：整体质感：[2-3个关于酒体结构的质感词汇]
+
+重要规则：所有标签字段（杯型、基酒、制作方法、冰块、风味、分类等）必须使用中文，不得使用英文。`;
 
         const userPrompt = `请分析以下鸡尾酒配方，返回完整的 JSON 分析结果：
 
@@ -569,19 +571,22 @@ ${context}
   "creator": "调酒师或创作者姓名",
   "createdYear": "创作年份（如 2012）",
   "suggestedCategories": ["经典", "短饮"],
-  "suggestedBaseSpirit": "主要基酒（从：金酒/朗姆/伏特加/威士忌/龙舌兰/白兰地/梅斯卡尔/利口酒/皮斯科/卡沙萨/无酒精/其他 中选择）",
-  "suggestedCodexFamily": "Codex六大分类之一（古典/马天尼/大吉利/边车/高球/菲兹，不确定留空）",
+  "suggestedBaseSpirit": "主要基酒，必须从以下中文名称中选择：金酒/朗姆/伏特加/威士忌/龙舌兰/白兰地/梅斯卡尔/利口酒/皮斯科/卡沙萨/无酒精/其他，不能使用英文或品牌名",
+  "suggestedCodexFamily": "Codex六大分类之一，必须使用以下格式之一：古典 Old-Fashioned/马天尼 Martini/大吉利 Daiquiri/边车 Sidecar/高球 Highball/菲兹 Flip，不确定留空",
   "suggestedVariantOf": "经典变体来源（如：尼格罗尼，不确定留空）",
-  "suggestedMethod": "制作方法（摇和/搅和/直调/分层/搅打/其他）",
-  "suggestedStrength": "烈度（清爽/适中/浓烈）",
-  "suggestedIce": "冰块类型（大方冰/球冰/碎冰/方冰/无冰/冰沙）",
+  "suggestedMethod": "制作方法，必须从以下中文名称中选择：摇和/搅拌/直调/分层/搅打",
+  "suggestedStrength": "烈度，必须从以下中文名称中选择：清爽/适中/浓烈",
+  "suggestedIce": "冰块类型，必须从以下中文名称中选择：标准方冰/大方冰/球冰/碎冰/长条冰/无冰",
+  "suggestedGlass": "杯型，必须从以下中文名称中选择：马天尼杯/古典杯/高球杯/柯林杯/库佩杯/飓风杯/子弹杯/尼克诺拉杯/郁金香杯/笛型杯/提基杯/铜杯/红酒杯/朱莉普杯/其他",
   "flavors": ["酸", "甜"],
   "confidence": "high"
 }
 
 注意：
 - flavorDesc 必须严格三行，第二行必须用 ➔ 符号
-- suggestedBaseSpirit 只能是标准基酒名称，不能是品牌名
+- 所有标签字段必须使用中文，不得使用英文单词
+- suggestedBaseSpirit 只能是标准基酒名称，不能是品牌名（如不能写 "Aylesbury Duck vodka"，应写 "伏特加"）
+- suggestedGlass 必须使用中文杯型名称（如不能写 "coupe"，应写 "库佩杯"）
 - confidence 根据你对该配方的了解程度填写：high（著名配方）/ medium（有一定了解）/ low（不确定）`;
 
         try {
@@ -612,6 +617,7 @@ ${context}
             suggestedMethod?: string;
             suggestedStrength?: string;
             suggestedIce?: string;
+            suggestedGlass?: string;
             flavors?: string[];
             confidence?: string;
           };
@@ -632,6 +638,7 @@ ${context}
             suggestedMethod: typeof p.suggestedMethod === "string" ? p.suggestedMethod.trim() : "",
             suggestedStrength: typeof p.suggestedStrength === "string" ? p.suggestedStrength.trim() : "",
             suggestedIce: typeof p.suggestedIce === "string" ? p.suggestedIce.trim() : "",
+            suggestedGlass: typeof p.suggestedGlass === "string" ? p.suggestedGlass.trim() : "",
             flavors: Array.isArray(p.flavors) ? p.flavors.filter((s): s is string => typeof s === "string") : [],
             confidence: validConf(p.confidence),
           };

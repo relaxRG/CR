@@ -523,6 +523,56 @@ export function autoFillTagNames(input: string): { name: string; nameEn: string 
   return zh ? { name: zh, nameEn: raw } : { name: raw, nameEn: raw };
 }
 
+/**
+ * 将 AI 返回的任意语言标签规范化为中文标准名称。
+ * 策略（优先级从高到低）：
+ * 1. 已是中文 → 直接返回
+ * 2. 精确查反向词典（大小写不敏感）
+ * 3. 去掉常见后缀（Glass/Cup/Ice/Mug）后再查反向词典
+ * 4. 在反向词典 key 中做包含匹配（处理 "coupe glass" 这类带空格的输入）
+ * 5. 查不到 → 返回原文（调用方决定是否创建新标签）
+ */
+export function normalizeTagToZh(raw: string): string {
+  const s = raw.trim();
+  if (!s) return "";
+  // 1. 已含中文，直接返回
+  if (hasCJK(s)) return s;
+  // 2. 精确查反向词典
+  const exact = TAG_NAME_DICT_REV[s.toLowerCase()];
+  if (exact) return exact;
+  // 3. 去掉常见英文后缀再查
+  const stripped = s.replace(/\s*(glass|cup|mug|ice|cubes?|sphere|spear|drink)\s*$/i, "").trim();
+  if (stripped && stripped !== s) {
+    const hit = TAG_NAME_DICT_REV[stripped.toLowerCase()];
+    if (hit) return hit;
+  }
+  // 4. 反向词典 key 包含匹配（处理 "coupe glass" → key "coupe glass" 存在）
+  const sLower = s.toLowerCase();
+  for (const [enKey, zhVal] of Object.entries(TAG_NAME_DICT_REV)) {
+    if (sLower.includes(enKey) || enKey.includes(sLower)) return zhVal;
+  }
+  // 5. 返回原文
+  return s;
+}
+
+/**
+ * 将 AI 返回的风味/分类标签数组规范化为中文，过滤掉无法识别的空值。
+ * 只接受在 FLAVOR_TAGS 或传入的合法列表中存在的标签（可选校验）。
+ */
+export function normalizeTagArrayToZh(
+  tags: string[],
+  allowedSet?: readonly string[],
+): string[] {
+  const result: string[] = [];
+  for (const t of tags) {
+    const zh = normalizeTagToZh(t);
+    if (!zh) continue;
+    if (allowedSet && !allowedSet.includes(zh)) continue;
+    if (!result.includes(zh)) result.push(zh);
+  }
+  return result;
+}
+
 /** 旧英文译名 → 新译名升级映射(词典修订后自动迁移已存数据) */
 const TAG_NAME_EN_UPGRADES: Record<string, string> = {
   Martini: "Martini Glass",

@@ -52,6 +52,8 @@ import {
   FLAVOR_TAG_EN,
   emptySourceRef,
   type SourceRef,
+  normalizeTagToZh,
+  normalizeTagArrayToZh,
 } from "@/lib/recipes/types";
 import { FLAVOR_TAG_DEFAULT_COLORS } from "@/lib/settings/card-tags";
 
@@ -374,23 +376,18 @@ export default function RecipeFormScreen() {
   const resolveAiSpirits = (raw: string): string => {
     const parts = raw.split(",").map((s) => s.trim()).filter(Boolean);
     const resolved = parts.map((p) => {
-      const hit = spiritNames.find((s) => p.includes(s) || s.includes(p));
+      // 先用词典规范化（英→中），再匹配已有标签
+      const normalized = normalizeTagToZh(p);
+      const hit = spiritNames.find((s) => normalized.includes(s) || s.includes(normalized) || p.includes(s) || s.includes(p));
       if (hit) return hit;
-      // 品牌名→标准基酒规范化映射，防止品牌名被当作新标签
-      const brandKeywords: [string, string][] = [
-        ["vodka", "伏特加"], ["gin", "金酒"], ["rum", "朗姆"], ["whisky", "威士忌"],
-        ["whiskey", "威士忌"], ["tequila", "龙舌兰"], ["mezcal", "梅斯卡尔"],
-        ["brandy", "白兰地"], ["cognac", "白兰地"], ["pisco", "皮斯科"],
-        ["cachaca", "卡沙萨"], ["sake", "清酒"],
-      ];
-      const pLower = p.toLowerCase();
-      for (const [keyword, standard] of brandKeywords) {
-        if (pLower.includes(keyword)) {
-          const standardHit = spiritNames.find((s) => s === standard || s.includes(standard));
-          return standardHit ?? standard;
-        }
+      // 词典命中了中文标准名，尝试匹配已有标签
+      if (normalized !== p) {
+        const normHit = spiritNames.find((s) => s === normalized || s.includes(normalized) || normalized.includes(s));
+        if (normHit) return normHit;
+        // 词典中文名存在但标签库里没有，直接用词典中文名（不创建新标签）
+        return normalized;
       }
-      // Only create new tag for short names (≤8 chars), not brand descriptions
+      // 未命中词典：短名称（≤8字符）才允许创建新标签，防止品牌描述被当成标签
       if (p.length <= 8) {
         const created = addTag("spirit", p, CATEGORY_COLORS[0]);
         const nextName = created?.name ?? p;
@@ -404,8 +401,17 @@ export default function RecipeFormScreen() {
   const ensureGlassName = (raw: string) => {
     const cleaned = raw.trim();
     if (!cleaned) return "";
-    const hit = glassNames.find((g) => cleaned.includes(g) || g.includes(cleaned));
+    // 先用词典规范化（英→中），再匹配已有标签
+    const normalized = normalizeTagToZh(cleaned);
+    const searchName = normalized !== cleaned ? normalized : cleaned;
+    const hit = glassNames.find((g) =>
+      searchName.includes(g) || g.includes(searchName) ||
+      cleaned.includes(g) || g.includes(cleaned)
+    );
     if (hit) return hit;
+    // 词典命中了中文名，直接使用，不创建重复标签
+    if (normalized !== cleaned) return normalized;
+    // 未命中词典，创建新标签
     const created = addTag("glass", cleaned, CATEGORY_COLORS[3]);
     const nextName = created?.name ?? cleaned;
     setNewGlassTags((prev) => (prev.includes(nextName) ? prev : [...prev, nextName]));
@@ -414,7 +420,14 @@ export default function RecipeFormScreen() {
   const normalizeIceName = (raw: string) => {
     const cleaned = raw.trim();
     if (!cleaned) return "";
-    return ICE_TYPES.find((it) => cleaned.includes(it) || it.includes(cleaned)) ?? cleaned;
+    // 先用词典规范化（英→中），再匹配标准冰块类型
+    const normalized = normalizeTagToZh(cleaned);
+    const searchName = normalized !== cleaned ? normalized : cleaned;
+    return (
+      ICE_TYPES.find((it) => searchName.includes(it) || it.includes(searchName)) ??
+      ICE_TYPES.find((it) => cleaned.includes(it) || it.includes(cleaned)) ??
+      normalized
+    );
   };
   const handleAiEnrich = () => {
     const recipeName = name.trim() || nameEn.trim();
@@ -594,7 +607,9 @@ export default function RecipeFormScreen() {
     if (aiResult.flavorDesc && !flavorDesc.trim()) setFlavorDesc(aiResult.flavorDesc);
     if (aiResult.source && !source.trim()) setSource(aiResult.source);
     if (aiResult.flavors && aiResult.flavors.length > 0 && flavors.length === 0) {
-      setFlavors(aiResult.flavors);
+      // 规范化风味标签（英→中），只保留 FLAVOR_TAGS 中存在的标准标签
+      const normalizedFlavors = normalizeTagArrayToZh(aiResult.flavors, FLAVOR_TAGS);
+      if (normalizedFlavors.length > 0) setFlavors(normalizedFlavors);
     }
     if (!baseSpirit && aiResult.suggestedBaseSpirit) {
       const resolved = resolveAiSpirits(aiResult.suggestedBaseSpirit);
@@ -610,18 +625,29 @@ export default function RecipeFormScreen() {
     }
     if (!ice && aiResult.suggestedIce) {
       const nextName = normalizeIceName(aiResult.suggestedIce);
+      // normalizeIceName 已通过词典规范化，直接检查是否在标准列表中
       if ((ICE_TYPES as readonly string[]).includes(nextName)) setIce(nextName);
     }
     // Deep analysis extra fields
     if (aiResult.isDeepAnalysis) {
       if (aiResult.suggestedCodexFamily && !codexFamily) {
-        setCodexFamily(aiResult.suggestedCodexFamily);
+        // Codex 家族格式为 "中文 English"，normalizeTagToZh 可能返回纯中文，需保留原格式
+        const normalizedFamily = CODEX_FAMILIES.find((f) =>
+          f === aiResult.suggestedCodexFamily ||
+          f.startsWith(aiResult.suggestedCodexFamily ?? "") ||
+          (aiResult.suggestedCodexFamily ?? "").includes(f.split(" ")[0])
+        ) ?? aiResult.suggestedCodexFamily;
+        if (normalizedFamily) setCodexFamily(normalizedFamily);
       }
       if (aiResult.suggestedVariantOf && !variantOf) {
         setVariantOf(aiResult.suggestedVariantOf);
       }
       if (aiResult.suggestedMethod) {
-        setMethod(aiResult.suggestedMethod);
+        // 制作方法规范化（英→中）
+        const normalizedMethod = normalizeTagToZh(aiResult.suggestedMethod);
+        const validMethod = METHODS.find((m) => m === normalizedMethod || normalizedMethod.includes(m) || m.includes(normalizedMethod));
+        if (validMethod) setMethod(validMethod);
+        else if (METHODS.includes(normalizedMethod as typeof METHODS[number])) setMethod(normalizedMethod as typeof METHODS[number]);
       }
       if (aiResult.creator || aiResult.createdYear) {
         setSourceRef((prev) => ({
@@ -930,7 +956,7 @@ export default function RecipeFormScreen() {
           {/* AI Fill button — prominent, right below name fields */}
           {/* AI action buttons row */}
           <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
-            {/* 深度解析 — primary button */}
+            {/* 统一 AI 补全按钮 — 调用 deepAnalyzeRecipe（全字段，claude-sonnet） */}
             <Pressable
               onPress={handleDeepAnalyze}
               disabled={deepAnalyzeMutation.isPending || aiEnriching || (!name.trim() && !nameEn.trim())}
@@ -949,50 +975,21 @@ export default function RecipeFormScreen() {
                 },
               ]}
             >
-              {deepAnalyzeMutation.isPending ? (
+              {deepAnalyzeMutation.isPending || aiEnriching ? (
                 <>
-                  <IconSymbol name="globe" size={15} color="#FFFFFF" />
+                  <IconSymbol name="sparkles" size={15} color="#FFFFFF" />
                   <Text style={{ fontSize: 13, fontWeight: "700", color: "#FFFFFF" }}>
-                    {lang === "zh" ? "联网查询中…" : "Searching…"}
+                    {lang === "zh" ? "AI 分析中…" : "Analyzing…"}
                   </Text>
                 </>
               ) : (
                 <>
-                  <IconSymbol name="globe" size={15} color={(!name.trim() && !nameEn.trim()) ? colors.muted : "#FFFFFF"} />
+                  <IconSymbol name="sparkles" size={15} color={(!name.trim() && !nameEn.trim()) ? colors.muted : "#FFFFFF"} />
                   <Text style={{ fontSize: 13, fontWeight: "700", color: (!name.trim() && !nameEn.trim()) ? colors.muted : "#FFFFFF" }}>
-                    {lang === "zh" ? "深度解析" : "Deep Analyze"}
+                    {lang === "zh" ? "✦ AI 补全" : "✦ AI Fill"}
                   </Text>
                 </>
               )}
-            </Pressable>
-            {/* AI 补全 — secondary button */}
-            <Pressable
-              onPress={handleAiEnrich}
-              disabled={aiEnriching || deepAnalyzeMutation.isPending || (!name.trim() && !nameEn.trim())}
-              style={({ pressed }) => [
-                {
-                  flexDirection: "row" as const,
-                  alignItems: "center" as const,
-                  justifyContent: "center" as const,
-                  gap: 5,
-                  paddingVertical: 10,
-                  paddingHorizontal: 12,
-                  borderRadius: 12,
-                  borderWidth: 1,
-                  borderColor: (!name.trim() && !nameEn.trim()) ? colors.border : colors.primary + "55",
-                  backgroundColor: (!name.trim() && !nameEn.trim()) ? colors.surface : colors.primary + "0E",
-                  opacity: pressed ? 0.7 : 1,
-                },
-              ]}
-            >
-              {aiEnriching ? (
-                <IconSymbol name="sparkles" size={14} color={colors.primary} />
-              ) : (
-                <IconSymbol name="sparkles" size={14} color={(!name.trim() && !nameEn.trim()) ? colors.muted : colors.primary} />
-              )}
-              <Text style={{ fontSize: 12, fontWeight: "600", color: (!name.trim() && !nameEn.trim()) ? colors.muted : colors.primary }}>
-                {aiEnriching ? (lang === "zh" ? "补全中…" : "Filling…") : (lang === "zh" ? "AI 补全" : "AI Fill")}
-              </Text>
             </Pressable>
           </View>
           {aiResult && (
