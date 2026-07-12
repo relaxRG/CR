@@ -458,26 +458,46 @@ export function RecipesScreen() {
 
   return (
     <ScreenContainer edges={[]}>
-      {/* Search bar + multi-select button */}
-      <View className="px-5 pt-2 pb-3" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-        <View style={{ flex: 1 }} className="flex-row items-center bg-surface border border-border rounded-xl px-3">
-          <IconSymbol name="magnifyingglass" size={18} color={colors.muted} />
-          <TextInput
-            className="flex-1 py-2.5 px-2 text-base text-foreground"
-            placeholder={t("home.search.placeholder")}
-            placeholderTextColor={colors.muted}
-            value={query}
-            onChangeText={setQuery}
-            returnKeyType="done"
-            style={{ lineHeight: 20 }}
-          />
-          {query.length > 0 ? (
-            <Pressable onPress={() => setQuery("")} hitSlop={8}>
-              <IconSymbol name="xmark.circle.fill" size={18} color={colors.muted} />
-            </Pressable>
-          ) : null}
-        </View>
-      </View>
+     {/* Search bar + multi-select button */}
+     <View className="px-5 pt-2 pb-3" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+       <View style={{ flex: 1 }} className="flex-row items-center bg-surface border border-border rounded-xl px-3">
+         <IconSymbol name="magnifyingglass" size={18} color={colors.muted} />
+         <TextInput
+           className="flex-1 py-2.5 px-2 text-base text-foreground"
+           placeholder={t("home.search.placeholder")}
+           placeholderTextColor={colors.muted}
+           value={query}
+           onChangeText={setQuery}
+           returnKeyType="done"
+           style={{ lineHeight: 20 }}
+         />
+         {query.length > 0 ? (
+           <Pressable onPress={() => setQuery("")} hitSlop={8}>
+             <IconSymbol name="xmark.circle.fill" size={18} color={colors.muted} />
+           </Pressable>
+         ) : null}
+       </View>
+        {/* 多选按钮 */}
+        <Pressable
+          onPress={() => {
+            if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            if (selectMode) exitSelectMode();
+            else setSelectMode(true);
+          }}
+          style={({ pressed }) => [
+            styles.selectBtn,
+            {
+              backgroundColor: selectMode ? colors.primary : colors.surface,
+              borderColor: selectMode ? colors.primary : colors.border,
+            },
+            pressed && { opacity: 0.7 },
+          ]}
+        >
+          <Text style={[styles.selectBtnText, { color: selectMode ? "#FFFFFF" : colors.muted }]}>
+            {selectMode ? t("sel.exit") : t("sel.enter")}
+          </Text>
+        </Pressable>
+     </View>
 
       {/* Filter chips */}
       {/* 快捷筛选:与 Filter 面板互不联动;大分类展开基酒子分类,状态持久保留 */}
