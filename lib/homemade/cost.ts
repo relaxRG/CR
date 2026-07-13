@@ -5,6 +5,7 @@ import { parseAmountToMl } from "../bottles/cost";
 import { HomemadePrep } from "./types";
 import { Bottle, bottleGroupOf } from "../bottles/types";
 import { parseVolumeToMl } from "../bottles/cost";
+import { smartLinkIngredient } from "../recipes/smart-link";
 
 /**
  * Reference price entry for a raw material on Chinese shopping sites.
@@ -146,6 +147,8 @@ export interface PrepIngredientCost {
   ref: string | null;
   /** Matched bottle-library entry id (raw material or spirit) for tap-to-edit price */
   bottleId: string | null;
+  /** Matched homemade-prep entry id for tap-to-view prep */
+  homemadeId: string | null;
 }
 
 export interface PrepCostEstimate {
@@ -342,12 +345,41 @@ export function matchMaterialBottle(line: string, bottles: Bottle[]): Bottle | n
  * Priority: 1) bottle-library raw materials (user-editable prices) →
  * 2) bottle-library spirits → 3) built-in Chinese-market reference table.
  */
-export function estimatePrepCost(prep: HomemadePrep, bottles: Bottle[]): PrepCostEstimate {
+export function estimatePrepCost(
+  prep: HomemadePrep,
+  bottles: Bottle[],
+  allPreps: HomemadePrep[] = [],
+): PrepCostEstimate {
+  // Exclude self to prevent circular references
+  const otherPreps = allPreps.filter((p) => p.id !== prep.id);
   const items: PrepIngredientCost[] = prep.ingredients.map((line) => {
     const parsed = parseQuantity(line);
     const gpp = gramsPerPieceOf(line);
     // 果皮行:成本按整果价折减(取皮通常不足整果价值的 1/3)
     const peelFactor = /peels?|rinds?|zests?|果皮|(?<![果])皮\b/i.test(line) ? 0.35 : 1;
+    // 0) Smart-link: check if ingredient matches a homemade prep (self excluded)
+    if (otherPreps.length > 0) {
+      const link = smartLinkIngredient(line.replace(/^\d[\d\s./]*(?:ml|g|oz|cl|dash|drop|piece|个|克|毫升|升|勺|茶匙|大匙)?[\s,，]*/i, "").trim(), bottles, otherPreps);
+      if (link?.kind === "prep") {
+        // Estimate cost from prep's own costPer30Ml if available
+        const linkedPrep = link.prep;
+        const linkedCost = estimatePrepCost(linkedPrep, bottles, []);
+        const costPer30 = linkedCost.costPer30Ml;
+        const amountMl = parsed?.unit === "ml" ? parsed.qty : null;
+        const cost = costPer30 !== null && amountMl !== null ? (costPer30 / 30) * amountMl : null;
+        return {
+          line,
+          materialEn: linkedPrep.nameAlt && !/[\u4e00-\u9fff]/.test(linkedPrep.nameAlt) ? linkedPrep.nameAlt : linkedPrep.name,
+          materialZh: /[\u4e00-\u9fff]/.test(linkedPrep.name) ? linkedPrep.name : linkedPrep.nameAlt,
+          quantity: parsed?.qty ?? null,
+          unit: parsed?.unit ?? null,
+          cost,
+          ref: costPer30 !== null ? `¥${costPer30.toFixed(2)}/30ml` : null,
+          bottleId: null,
+          homemadeId: linkedPrep.id,
+        };
+      }
+    }
     // 1) Raw-material entries in the bottle library (merged cost library, user editable)
     if (parsed) {
       const mat = matchMaterialBottle(line, bottles);
@@ -365,6 +397,7 @@ export function estimatePrepCost(prep: HomemadePrep, bottles: Bottle[]): PrepCos
             cost: pricePerUnit * converted * peelFactor,
             ref: `¥${mat.priceCny}/${mat.volume}`,
             bottleId: mat.id,
+            homemadeId: null,
           };
         }
       }
@@ -384,6 +417,7 @@ export function estimatePrepCost(prep: HomemadePrep, bottles: Bottle[]): PrepCos
             cost: (bottle.priceCny / volumeMl) * parsed.qty,
             ref: `¥${bottle.priceCny}/${bottle.volume}`,
             bottleId: bottle.id,
+            homemadeId: null,
           };
         }
       }
@@ -391,14 +425,14 @@ export function estimatePrepCost(prep: HomemadePrep, bottles: Bottle[]): PrepCos
     // 3) Built-in material reference price table
     const mp = matchMaterial(line);
     if (!mp) {
-      return { line, materialEn: null, materialZh: null, quantity: parsed?.qty ?? null, unit: parsed?.unit ?? null, cost: null, ref: null, bottleId: null };
+      return { line, materialEn: null, materialZh: null, quantity: parsed?.qty ?? null, unit: parsed?.unit ?? null, cost: null, ref: null, bottleId: null, homemadeId: null };
     }
     if (!parsed) {
-      return { line, materialEn: mp.en, materialZh: mp.zh, quantity: null, unit: null, cost: null, ref: mp.ref, bottleId: null };
+      return { line, materialEn: mp.en, materialZh: mp.zh, quantity: null, unit: null, cost: null, ref: mp.ref, bottleId: null, homemadeId: null };
     }
     const converted = convertQty(parsed.qty, parsed.unit, mp.unit, gpp);
     if (converted === null) {
-      return { line, materialEn: mp.en, materialZh: mp.zh, quantity: parsed.qty, unit: parsed.unit, cost: null, ref: mp.ref, bottleId: null };
+      return { line, materialEn: mp.en, materialZh: mp.zh, quantity: parsed.qty, unit: parsed.unit, cost: null, ref: mp.ref, bottleId: null, homemadeId: null };
     }
     return {
       line,
@@ -409,6 +443,7 @@ export function estimatePrepCost(prep: HomemadePrep, bottles: Bottle[]): PrepCos
       cost: mp.pricePerUnit * converted * peelFactor,
       ref: mp.ref,
       bottleId: null,
+      homemadeId: null,
     };
   });
 

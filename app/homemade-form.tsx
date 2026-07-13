@@ -55,7 +55,7 @@ export default function HomemadeFormScreen() {
     prefillNameAlt?: string;
     prefillType?: string;
   }>();
-  const { getPrep, addPrep, updatePrep, sections, types: typeList } = useHomemadeStore();
+  const { getPrep, addPrep, updatePrep, sections, types: typeList, preps: allPreps } = useHomemadeStore();
   const { bottles } = useBottleStore();
   const editing = getPrep(id);
 
@@ -379,7 +379,7 @@ export default function HomemadeFormScreen() {
             const showSuggest =
               focusedIng === row.id && trimmed.length > 0 && pickedIng[row.id] !== row.name;
             const liveSuggestions = showSuggest
-              ? suggestIngredients(trimmed, bottles, [], lang).filter((s) => s.value !== trimmed)
+              ? suggestIngredients(trimmed, bottles, allPreps.filter((p) => p.id !== (editing?.id ?? "")), lang).filter((s) => s.value !== trimmed)
               : [];
             return (
               <View key={row.id} style={{ marginBottom: 8 }}>

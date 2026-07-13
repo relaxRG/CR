@@ -12,6 +12,7 @@ import { displayNames } from "@/lib/utils";
 import { useHomemadeStore } from "@/lib/homemade/store";
 import { useBottleStore } from "@/lib/bottles/store";
 import { estimatePrepCost } from "@/lib/homemade/cost";
+import { smartLinkIngredient } from "@/lib/recipes/smart-link";
 import { prepTypeLabelIn, prepSectionLabelIn, prepSectionOfIn } from "@/lib/homemade/types";
 import { detectPrepTechniques, techniqueDesc, techniqueLabel } from "@/lib/homemade/technique";
 import { parseSource } from "@/lib/recipes/source-parse";
@@ -22,6 +23,7 @@ export default function HomemadeDetailScreen() {
   const { t, lang } = useI18n();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { getPrep, deletePrep, togglePrepMade, setPrepRating, types, sections } = useHomemadeStore();
+  const { preps } = useHomemadeStore();
   const { bottles } = useBottleStore();
   const prep = getPrep(id);
 
@@ -73,7 +75,8 @@ export default function HomemadeDetailScreen() {
   ];
 
   const names = displayNames(prep.name, prep.nameAlt, lang);
-  const cost = estimatePrepCost(prep, bottles);
+  const otherPreps = preps.filter((p) => p.id !== prep.id);
+  const cost = estimatePrepCost(prep, bottles, otherPreps);
   const techs = detectPrepTechniques(prep);
   const primaryTechDesc = techs.length > 0 ? techniqueDesc(techs[0], lang) : "";
 
@@ -222,31 +225,81 @@ export default function HomemadeDetailScreen() {
           </View>
         ) : null}
 
-        {prep.ingredients.length > 0 ? (
-          <>
-            {sectionTitle(t("hmform.ingredients"))}
-            <View className="bg-surface rounded-xl px-4">
-              {prep.ingredients.map((ing, idx) => (
-                <View
-                  key={`${ing}-${idx}`}
-                  className="py-2.5"
-                  style={
-                    idx < prep.ingredients.length - 1
-                      ? {
-                          borderBottomWidth: StyleSheet.hairlineWidth,
-                          borderBottomColor: colors.border,
-                        }
-                      : undefined
-                  }
-                >
-                  <Text className="text-[15px] text-foreground" style={{ lineHeight: 21 }}>
-                    {ing}
+  {prep.ingredients.length > 0 ? (
+    <>
+      {sectionTitle(t("hmform.ingredients"))}
+      <View className="bg-surface rounded-xl px-4">
+        {prep.ingredients.map((ing, idx) => {
+          // Strip leading quantity for smart-link matching
+          const ingNameOnly = ing.replace(/^\d[\d\s./]*(?:ml|g|oz|cl|dash|drop|piece|个|克|毫升|升|勺|茶匙|大匙)?[\s,，]*/i, "").trim();
+          const link = ingNameOnly.length >= 2
+            ? smartLinkIngredient(ingNameOnly, bottles, otherPreps)
+            : null;
+          const isLast = idx === prep.ingredients.length - 1;
+          const rowContent = (
+            <View
+              className="flex-row items-center py-2.5"
+              style={!isLast ? { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border } : undefined}
+            >
+              <View className="flex-1">
+                <Text className="text-[15px] text-foreground" style={{ lineHeight: 21 }}>
+                  {ing}
+                </Text>
+                {link ? (
+                  <Text className="text-xs mt-0.5" style={{ color: colors.primary }} numberOfLines={1}>
+                    {link.kind === "bottle"
+                      ? (lang === "zh" ? (link.bottle.nameZh || link.bottle.nameEn) : (link.bottle.nameEn || link.bottle.nameZh))
+                      : (lang === "zh"
+                          ? (/[\u4e00-\u9fff]/.test(link.prep.name) ? link.prep.name : link.prep.nameAlt || link.prep.name)
+                          : (!/[\u4e00-\u9fff]/.test(link.prep.name) ? link.prep.name : link.prep.nameAlt || link.prep.name)
+                        )
+                    }
                   </Text>
-                </View>
-              ))}
+                ) : null}
+              </View>
+              {link ? (
+                <IconSymbol
+                  name={link.kind === "prep" ? "sparkles" : "chevron.right"}
+                  size={14}
+                  color={colors.primary}
+                  style={{ marginLeft: 6 }}
+                />
+              ) : null}
             </View>
-          </>
-        ) : null}
+          );
+          if (link?.kind === "bottle") {
+            return (
+              <Pressable
+                key={`${ing}-${idx}`}
+                onPress={() => {
+                  if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  router.push({ pathname: "/bottle/[id]", params: { id: link.bottle.id } });
+                }}
+                style={({ pressed }) => [pressed && { opacity: 0.7 }]}
+              >
+                {rowContent}
+              </Pressable>
+            );
+          }
+          if (link?.kind === "prep") {
+            return (
+              <Pressable
+                key={`${ing}-${idx}`}
+                onPress={() => {
+                  if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  router.push({ pathname: "/homemade/[id]", params: { id: link.prep.id } });
+                }}
+                style={({ pressed }) => [pressed && { opacity: 0.7 }]}
+              >
+                {rowContent}
+              </Pressable>
+            );
+          }
+          return <View key={`${ing}-${idx}`}>{rowContent}</View>;
+        })}
+      </View>
+    </>
+  ) : null}
 
         {/* Cost estimate card */}
         {prep.ingredients.length > 0 ? (
@@ -320,9 +373,21 @@ export default function HomemadeDetailScreen() {
                 return item.bottleId ? (
                   <Pressable
                     key={`${item.line}-${idx}`}
-                    onPress={() =>
-                      router.push({ pathname: "/bottle/[id]", params: { id: item.bottleId! } })
-                    }
+                    onPress={() => {
+                      if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      router.push({ pathname: "/bottle/[id]", params: { id: item.bottleId! } });
+                    }}
+                    style={({ pressed }) => [pressed && { opacity: 0.7 }]}
+                  >
+                    {row}
+                  </Pressable>
+                ) : item.homemadeId ? (
+                  <Pressable
+                    key={`${item.line}-${idx}`}
+                    onPress={() => {
+                      if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      router.push({ pathname: "/homemade/[id]", params: { id: item.homemadeId! } });
+                    }}
                     style={({ pressed }) => [pressed && { opacity: 0.7 }]}
                   >
                     {row}
