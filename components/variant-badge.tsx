@@ -9,6 +9,10 @@ import { useI18n } from "@/lib/i18n";
 import { analyzeLineage, type LineageVerdict } from "@/lib/recipes/lineage";
 import type { Recipe } from "@/lib/recipes/types";
 
+/** variantOf 三状态特殊值常量 */
+export const VARIANT_CLASSIC_ORIGINAL = "CLASSIC_ORIGINAL";
+export const VARIANT_MODERN_ORIGINAL = "MODERN_ORIGINAL";
+
 /** 模块级结果缓存:列表 400+ 卡片每行跑加权引擎开销大,以名称+配料指纹为键缓存 */
 const verdictCache = new Map<string, LineageVerdict>();
 function cachedAnalyze(
@@ -27,17 +31,27 @@ function cachedAnalyze(
 
 /**
  * 解析配方的「Variant of」展示名:
- * - 人工填写的 variantOf 优先
+ * - CLASSIC_ORIGINAL → 「经典原版 Classic Original」
+ * - MODERN_ORIGINAL → 「现代创作 Modern Original」
+ * - 人工填写的母配方名 → 优先使用
  * - 否则用智能谱系引擎判定(low 置信度不显示)
- * - 配方本身即经典时返回 isClassic=true(卡片/详情标注「经典原方 Classic」)
  */
 export function resolveVariantLabel(
   recipe: Pick<Recipe, "name" | "nameEn" | "ingredients" | "method" | "baseSpirit" | "glass" | "variantOf">,
   lang: string,
-): { label: string; verdict: LineageVerdict | null; isClassic?: boolean } | null {
+): { label: string; verdict: LineageVerdict | null; isClassic?: boolean; isModern?: boolean } | null {
   const verdict = cachedAnalyze(recipe);
   const manual = (recipe.variantOf ?? "").trim();
   const nameNorm = `${recipe.name} ${recipe.nameEn ?? ""}`.toLowerCase();
+
+  // 三状态特殊值处理
+  if (manual === VARIANT_CLASSIC_ORIGINAL) {
+    return { label: lang === "en" ? "Classic Original" : "经典原版", verdict, isClassic: true };
+  }
+  if (manual === VARIANT_MODERN_ORIGINAL) {
+    return { label: lang === "en" ? "Modern Original" : "现代创作", verdict, isModern: true };
+  }
+
   if (manual) {
     // 配方本身即经典:人工字段与名称一致时标注经典原方
     if (nameNorm.includes(manual.toLowerCase())) {
@@ -73,10 +87,12 @@ interface VariantBadgeProps {
   >;
   /** compact:列表卡片小标签(不可点开);full:详情页标注(点按弹资料浮层) */
   mode?: "full" | "compact";
+  /** AI 返回的展开详情文字（优先于本地引擎 narrative） */
+  aiDetail?: string;
 }
 
 /** 「Variant of 经典鸡尾酒」标注:详情页点按弹出完整谱系论证浮层 */
-export function VariantBadge({ recipe, mode = "full" }: VariantBadgeProps) {
+export function VariantBadge({ recipe, mode = "full", aiDetail }: VariantBadgeProps) {
   const colors = useColors();
   const { t, lang } = useI18n();
   const insets = useSafeAreaInsets();
@@ -89,6 +105,25 @@ export function VariantBadge({ recipe, mode = "full" }: VariantBadgeProps) {
   );
   if (!resolved) return null;
 
+  // 三状态颜色映射
+  const manual = (recipe.variantOf ?? "").trim();
+  const badgeColor =
+    manual === VARIANT_CLASSIC_ORIGINAL
+      ? "#22C55E"
+      : manual === VARIANT_MODERN_ORIGINAL
+        ? colors.muted
+        : colors.primary;
+
+  // 展开内容：AI 详情优先，兜底本地引擎 narrative
+  const detailText = aiDetail || resolved.verdict?.narrative || "";
+
+  // 显示文字
+  const displayText = resolved.isClassic
+    ? t("variant.classicSelf")
+    : resolved.isModern
+      ? (lang === "en" ? "Modern Original" : "现代创作")
+      : t("variant.of", { name: resolved.label });
+
   if (mode === "compact") {
     // Apple HIG:纯文字次要标注,无色块背景,与主名左对齐
     return (
@@ -97,9 +132,7 @@ export function VariantBadge({ recipe, mode = "full" }: VariantBadgeProps) {
         numberOfLines={1}
         style={{ color: colors.muted, lineHeight: 16 }}
       >
-        {resolved.isClassic
-          ? t("variant.classicSelf")
-          : t("variant.of", { name: resolved.label })}
+        {displayText}
       </Text>
     );
   }
@@ -116,13 +149,11 @@ export function VariantBadge({ recipe, mode = "full" }: VariantBadgeProps) {
         hitSlop={8}
         style={({ pressed }) => [styles.badgeRow, pressed && { opacity: 0.6 }]}
       >
-        <IconSymbol name="book.fill" size={13} color={colors.primary} />
-        <Text className="text-sm font-medium" style={{ color: colors.primary }}>
-          {resolved.isClassic
-            ? t("variant.classicSelf")
-            : t("variant.of", { name: resolved.label })}
+        <IconSymbol name="book.fill" size={13} color={badgeColor} />
+        <Text className="text-sm font-medium" style={{ color: badgeColor }}>
+          {displayText}
         </Text>
-        <IconSymbol name="chevron.right" size={12} color={colors.muted} />
+        <IconSymbol name="chevron.right" size={12} color={badgeColor} />
       </Pressable>
 
       <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
@@ -150,9 +181,9 @@ export function VariantBadge({ recipe, mode = "full" }: VariantBadgeProps) {
             contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 8 }}
             showsVerticalScrollIndicator={false}
           >
-            {resolved.verdict ? (
+            {detailText ? (
               <Text className="text-[15px] text-foreground" style={{ lineHeight: 24 }}>
-                {resolved.verdict.narrative}
+                {detailText}
               </Text>
             ) : null}
             <Text className="text-xs text-muted mt-3" style={{ lineHeight: 18 }}>

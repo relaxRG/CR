@@ -301,6 +301,8 @@ export default function RecipeFormScreen() {
     suggestedCategories?: string[];
     suggestedCodexFamily?: string;
     suggestedVariantOf?: string;
+    variantOfDetail?: string;
+    variantOfConfidence?: "high" | "medium" | "low";
     suggestedMethod?: string;
     creator?: string;
     createdYear?: string;
@@ -712,8 +714,17 @@ export default function RecipeFormScreen() {
       fields.push({ key: "codexFamily", labelZh: "Codex 家族", labelEn: "Codex Family", aiValue: nf, currentValue: codexFamily, conflict: conflict(codexFamily, nf, "medium"), confidence: "medium" });
     }
     // Variant Of
-    if (aiResult.suggestedVariantOf) {
-      fields.push({ key: "variantOf", labelZh: "变体来源", labelEn: "Variant Of", aiValue: aiResult.suggestedVariantOf, currentValue: variantOf, conflict: conflict(variantOf, aiResult.suggestedVariantOf, "medium"), confidence: "medium" });
+    // variantOf 永远出现（三状态必填：CLASSIC_ORIGINAL / 母配方名 / MODERN_ORIGINAL）
+    {
+      const sv = aiResult.suggestedVariantOf ?? "MODERN_ORIGINAL";
+      const c = aiResult.variantOfConfidence ? conf(aiResult.variantOfConfidence) : "medium";
+      const displayMap: Record<string, string> = {
+        "CLASSIC_ORIGINAL": "经典原版 Classic Original",
+        "MODERN_ORIGINAL": "现代创作 Modern Original",
+      };
+      const displayVal = displayMap[sv] ?? sv;
+      const displayCur = variantOf ? (displayMap[variantOf] ?? variantOf) : "";
+      fields.push({ key: "variantOf", labelZh: "变体来源", labelEn: "Variant Of", aiValue: displayVal, currentValue: displayCur, conflict: conflict(variantOf, sv, c), confidence: c });
     }
     // Drink Duration
     if (aiResult.suggestedDrinkDuration && (DRINK_DURATIONS as readonly string[]).includes(aiResult.suggestedDrinkDuration)) {
@@ -1489,33 +1500,7 @@ export default function RecipeFormScreen() {
 
           {/* Drink Duration — chip 选择（与 Strength 同风格） */}
           <Text className="text-sm font-medium text-muted mt-5 mb-1.5">{t("form.duration")}</Text>
-          <View
-            className="bg-surface border border-border rounded-xl px-3 py-2.5"
-            style={{ gap: 2 }}
-          >
-            {drinkDuration ? (
-              <>
-                <View className="flex-row items-center" style={{ gap: 8 }}>
-                  <Text className="text-base font-semibold text-foreground" style={{ lineHeight: 22 }}>
-                    {lang === "en" ? (drinkDuration === "短饮" ? "Short Drink" : "Long Drink") : drinkDuration}
-                  </Text>
-                  {!durationUserOverride && (
-                    <Text className="text-xs text-muted" style={{ lineHeight: 20 }}>
-                      {lang === "zh" ? "AI 推断" : "AI inferred"}
-                    </Text>
-                  )}
-                </View>
-                <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>
-                  {lang === "zh" ? "点击下方选项可手动修改" : "Tap below to override"}
-                </Text>
-              </>
-            ) : (
-              <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>
-                {lang === "zh" ? "未选择（AI 将自动推断）" : "Not set — AI will infer"}
-              </Text>
-            )}
-          </View>
-          <View style={[styles.chipWrap, { marginTop: 8 }]}>
+          <View style={[styles.chipWrap, { marginTop: 4 }]}>
             {(DRINK_DURATIONS as readonly string[]).map((dur) => {
               const active = drinkDuration === dur;
               return (
@@ -1540,33 +1525,7 @@ export default function RecipeFormScreen() {
 
           {/* Occasion — chip 选择（与 Strength 同风格） */}
           <Text className="text-sm font-medium text-muted mt-5 mb-1.5">{t("form.occasion")}</Text>
-          <View
-            className="bg-surface border border-border rounded-xl px-3 py-2.5"
-            style={{ gap: 2 }}
-          >
-            {occasion ? (
-              <>
-                <View className="flex-row items-center" style={{ gap: 8 }}>
-                  <Text className="text-base font-semibold text-foreground" style={{ lineHeight: 22 }}>
-                    {lang === "en" ? ({ "餐前酒": "Aperitif", "餐后酒": "Digestif", "全天酒": "All Day", "佐餐酒": "With Dinner", "睡前酒": "Nightcap", "派对酒": "Party" }[occasion] ?? occasion) : occasion}
-                  </Text>
-                  {!occasionUserOverride && (
-                    <Text className="text-xs text-muted" style={{ lineHeight: 20 }}>
-                      {lang === "zh" ? "AI 推断" : "AI inferred"}
-                    </Text>
-                  )}
-                </View>
-                <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>
-                  {lang === "zh" ? "点击下方选项可手动修改" : "Tap below to override"}
-                </Text>
-              </>
-            ) : (
-              <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>
-                {lang === "zh" ? "未选择（AI 将自动推断）" : "Not set — AI will infer"}
-              </Text>
-            )}
-          </View>
-          <View style={[styles.chipWrap, { marginTop: 8 }]}>
+          <View style={[styles.chipWrap, { marginTop: 4 }]}>
             {(OCCASIONS as readonly string[]).map((occ) => {
               const active = occasion === occ;
               const occEn: Record<string, string> = { "餐前酒": "Aperitif", "餐后酒": "Digestif", "全天酒": "All Day", "佐餐酒": "With Dinner", "睡前酒": "Nightcap", "派对酒": "Party" };

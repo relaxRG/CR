@@ -489,7 +489,50 @@ export const appRouter = router({
             ? `配料: ${(input.ingredients ?? []).join(", ")}`
             : "";
 
-        const systemPrompt = `你是专业调酒知识专家兼鸡尾酒历史学家。根据配方信息进行全面深度分析，返回 JSON。
+        const systemPrompt = `你是专业调酒知识专家兼鸡尾酒历史学家，精通中英文繁体中文调酒文献。根据配方信息进行全面深度分析，返回 JSON。
+
+【权威知识库 — 请基于以下资料判断配方谱系与置信度】
+英文经典文献：
+· Jerry Thomas《Bartender's Guide / How to Mix Drinks》(1862) — 最早鸡尾酒配方书
+· Harry Johnson《Bartenders' Manual》(1882/1888) — Martini/Manhattan 早期记录
+· Hugo Ensslin《Recipes for Mixed Drinks》(1916) — Aviation 首次记录
+· Harry Craddock《The Savoy Cocktail Book》(1930) — 禁酒令时代伦敦权威，750+ 配方
+· David A. Embury《The Fine Art of Mixing Drinks》(1948) — 六大基础鸡尾酒分类理论奠基
+· Mr. Boston Official Bartender's Guide (1935–现代版) — 美国最畅销调酒参考书
+· Gary Regan《The Joy of Mixology》(2003) — 家族分类法（New Sours/Old Sours/Duos/Trios）
+· David Wondrich《Imbibe!》(2007, 2015修订) — 美国鸡尾酒历史权威考证，James Beard Award
+· David Wondrich《Punch》(2010) — 潘趣酒历史与配方
+· Jim Meehan《The PDT Cocktail Book》(2011) — 纽约 PDT 酒吧经典配方
+· Death & Co《Cocktail Codex》(2018) — 六大母配方体系权威定义
+· Jim Meehan《Meehan's Bartender Manual》(2017) — 现代调酒全面参考
+· Jeffrey Morgenthaler《The Bar Book》(2014) — 技术导向调酒参考
+· Dale DeGroff《The Craft of the Cocktail》(2002) — Rainbow Room 传奇调酒师
+· Ted Haigh《Vintage Spirits and Forgotten Cocktails》(2009) — 复古配方复兴
+· IBA (International Bartenders Association) Official Cocktail List — 国际调酒师协会官方认定
+· Difford's Guide (diffordsguide.com) — 3000+ 配方在线权威数据库
+· Kindred Cocktails Database — 历史配方考证数据库
+现代创作参考：
+· Death & Co New York (2006–) — Phil Ward/Brian Miller/Joaquín Simó 等
+· Attaboy NYC (Sam Ross, Michael McIlroy) — Paper Plane/Penicillin 发源地
+· The Aviary Chicago (Grant Achatz) — 分子调酒前沿
+中文/繁体中文文献：
+· 《调酒师手册》(中国轻工业出版社) — 大陆调酒职业培训标准教材
+· 《世界鸡尾酒大全》(台湾版) — 繁体中文最全面鸡尾酒百科
+· 《经典鸡尾酒》方正出版 — 中文经典配方权威参考
+· 台湾调酒协会 (TBSA) 资料库 — 台湾调酒考证与认证标准
+· 香港调酒师协会 (HKBA) 资料库 — 港式调酒传承与创新记录
+· 《威士忌圣经》Jim Murray (中文版) — 威士忌风味描述参考
+· WSET 烈酒课程官方教材《烈酒品鉴》(中文版)
+学术/风味化学：
+· Journal of Agricultural and Food Chemistry — 鸡尾酒风味化合物分析
+· Food Quality and Preference — 感官评价方法论
+· Flavour journal (BioMed Central) — 风味感知跨学科研究
+· Chemical Senses — 嗅觉/味觉神经科学
+
+【variantOf 置信度规则】
+- high：在上述权威资料中有明确记载的经典/变体关系
+- medium：业界公认但无单一权威来源
+- low：推断，不确定
 
 【风味描述格式】必须严格三行，不得增减：
 第一行：核心基调：[2-3个核心风味词]
@@ -535,7 +578,9 @@ ${ingredientLine}${rawTextSection}${bookTitleSection}
   "suggestedOccasion": "从 ${JSON.stringify(VALID_OCCASIONS)} 中选一个。判断规则：含苦味开胃酒/金巴利/阿佩罗=餐前酒；含奶油/咖啡/巧克力=餐后酒；无酒精=全天酒；高ABV烈性=睡前酒；热带/派对风格=派对酒；其他=全天酒",
   "suggestedOccasionConfidence": "high"|"medium"|"low",
   "suggestedCodexFamily": "从 ${JSON.stringify(CODEX_LIST)} 中选一个，不确定返回\"\"",
-  "suggestedVariantOf": "经典变体来源（如：尼格罗尼），不确定返回\"\"",
+  "suggestedVariantOf": "【必填，三选一，禁止留空】：'CLASSIC_ORIGINAL'（本配方本身就是经典原版，如 Negroni/Daiquiri/Old Fashioned 本身）| '[母配方名]'（本配方是某经典的变体，如 '尼格罗尼 Negroni'）| 'MODERN_ORIGINAL'（现代创作或无法确认经典来源）",
+  "variantOfDetail": "展开内容（100-200字中文）：CLASSIC_ORIGINAL→该配方历史背景+首次文献记载来源+年代+地点；[母配方名]→母配方简介+本配方与母配方的变体关系（改了什么/为什么）；MODERN_ORIGINAL→创作者/年份/酒吧/背景（若已知），完全不详则写'现代创作，来源不详'",
+  "variantOfConfidence": "high（权威资料明确记载）| medium（业界公认但无单一权威来源）| low（推断）",
   "creator": "配方创作者姓名（调酒师/酒吧名），注意：创作者≠书的作者",
   "creatorConfidence": "high"|"medium"|"low",
   "createdYear": "创作年份或年代（如 '1930' / 'circa 1920s'）",
@@ -621,7 +666,9 @@ ${ingredientLine}${rawTextSection}${bookTitleSection}
           suggestedOccasionConfidence: validConf(p.suggestedOccasionConfidence),
           // ── 新增：Codex 家族 / 变体来源 ──
           suggestedCodexFamily: validCodex,
-          suggestedVariantOf: typeof p.suggestedVariantOf === "string" ? p.suggestedVariantOf.trim() : "",
+          suggestedVariantOf: typeof p.suggestedVariantOf === "string" && p.suggestedVariantOf.trim() ? p.suggestedVariantOf.trim() : "MODERN_ORIGINAL",
+          variantOfDetail: typeof p.variantOfDetail === "string" ? p.variantOfDetail.trim() : "",
+          variantOfConfidence: validConf(p.variantOfConfidence),
           // ── 创作者信息 ──
           creator: typeof p.creator === "string" ? p.creator.trim() : "",
           creatorConfidence: validConf(p.creatorConfidence),
@@ -658,7 +705,13 @@ ${ingredientLine}${rawTextSection}${bookTitleSection}
         if (source) contextParts.push(`来源: ${source}`);
         const context = contextParts.join("\n");
 
-        const systemPrompt = `你是一位专业调酒师和鸡尾酒历史学家，拥有丰富的调酒知识。请根据提供的配方信息，进行全面深度分析，返回 JSON 格式结果。
+        const systemPrompt = `你是一位专业调酒师和鸡尾酒历史学家，精通中英文繁体中文调酒文献。请根据提供的配方信息，进行全面深度分析，返回 JSON 格式结果。
+
+【权威知识库】英文：Jerry Thomas《Bartender's Guide》(1862) · Harry Craddock《The Savoy Cocktail Book》(1930) · David A. Embury《The Fine Art of Mixing Drinks》(1948) · Gary Regan《The Joy of Mixology》(2003) · David Wondrich《Imbibe!》(2007) · Death & Co《Cocktail Codex》(2018) · Jim Meehan《The PDT Cocktail Book》(2011) · Jeffrey Morgenthaler《The Bar Book》(2014) · Dale DeGroff《The Craft of the Cocktail》(2002) · IBA Official Cocktail List · Difford's Guide · Kindred Cocktails Database
+中文/繁体：《调酒师手册》· 《世界鸡尾酒大全》(台湾版) · 《经典鸡尾酒》方正出版 · 台湾调酒协会(TBSA) · 香港调酒师协会(HKBA) · WSET《烈酒品鉴》中文版
+学术：Journal of Agricultural and Food Chemistry · Food Quality and Preference · Flavour journal · Chemical Senses
+
+【variantOf 置信度规则】high=权威资料明确记载；medium=业界公认但无单一权威来源；low=推断
 
 风味描述必须严格使用以下三行固定结构（不得增减行数，不得改变格式）：
 第一行：核心基调：[列举2-3个核心风味词]
@@ -681,7 +734,9 @@ ${context}
   "suggestedCategories": ["经典", "短饮"],
   "suggestedBaseSpirit": "主要基酒，必须从以下中文名称中选择：金酒/朗姆/伏特加/威士忌/龙舌兰/白兰地/梅斯卡尔/利口酒/皮斯科/卡沙萨/无酒精/其他，不能使用英文或品牌名",
   "suggestedCodexFamily": "Codex六大分类之一，必须使用以下格式之一：古典 Old-Fashioned/马天尼 Martini/大吉利 Daiquiri/边车 Sidecar/高球 Highball/菲兹 Flip，不确定留空",
-  "suggestedVariantOf": "经典变体来源（如：尼格罗尼，不确定留空）",
+  "suggestedVariantOf": "【必填，三选一，禁止留空】：'CLASSIC_ORIGINAL'（本配方本身就是经典原版）| '[母配方名]'（本配方是某经典的变体，如 '尼格罗尼 Negroni'）| 'MODERN_ORIGINAL'（现代创作或无法确认经典来源）",
+  "variantOfDetail": "展开内容（100-200字中文）：CLASSIC_ORIGINAL→历史背景+首次文献记载+年代；[母配方名]→母配方简介+变体关系说明；MODERN_ORIGINAL→创作者/年份/酒吧（若已知）",
+  "variantOfConfidence": "high | medium | low",
   "suggestedMethod": "制作方法，必须从以下中文名称中选择：摇和/搅拌/直调/分层/搅打",
   "suggestedStrength": "烈度，必须从以下中文名称中选择：清爽/适中/浓烈",
   "suggestedIce": "冰块类型，必须从以下中文名称中选择：标准方冰/大方冰/球冰/碎冰/长条冰/无冰",
@@ -722,6 +777,8 @@ ${context}
             suggestedBaseSpirit?: string;
             suggestedCodexFamily?: string;
             suggestedVariantOf?: string;
+            variantOfDetail?: string;
+            variantOfConfidence?: string;
             suggestedMethod?: string;
             suggestedStrength?: string;
             suggestedIce?: string;
@@ -741,8 +798,10 @@ ${context}
             createdYear: typeof p.createdYear === "string" ? p.createdYear.trim() : "",
             suggestedCategories: Array.isArray(p.suggestedCategories) ? p.suggestedCategories.filter((s): s is string => typeof s === "string") : [],
             suggestedBaseSpirit: typeof p.suggestedBaseSpirit === "string" ? p.suggestedBaseSpirit.trim() : "",
-            suggestedCodexFamily: typeof p.suggestedCodexFamily === "string" ? p.suggestedCodexFamily.trim() : "",
-            suggestedVariantOf: typeof p.suggestedVariantOf === "string" ? p.suggestedVariantOf.trim() : "",
+          suggestedCodexFamily: typeof p.suggestedCodexFamily === "string" ? p.suggestedCodexFamily.trim() : "",
+            suggestedVariantOf: typeof p.suggestedVariantOf === "string" && p.suggestedVariantOf.trim() ? p.suggestedVariantOf.trim() : "MODERN_ORIGINAL",
+            variantOfDetail: typeof p.variantOfDetail === "string" ? p.variantOfDetail.trim() : "",
+            variantOfConfidence: validConf(p.variantOfConfidence),
             suggestedMethod: typeof p.suggestedMethod === "string" ? p.suggestedMethod.trim() : "",
             suggestedStrength: typeof p.suggestedStrength === "string" ? p.suggestedStrength.trim() : "",
             suggestedIce: typeof p.suggestedIce === "string" ? p.suggestedIce.trim() : "",
