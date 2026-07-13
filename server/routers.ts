@@ -216,7 +216,223 @@ const translatedItemSchema = z.object({
 export type TranslatedRecipeItem = z.infer<typeof translatedItemSchema>;
 
 const ENRICH_SYSTEM_PROMPT = `你是一个鸡尾酒/酒类知识专家。用户会给出一个或多个酒、原料或产品的名称(可能含品牌、也可能附照片),它们在用户的私人库中暂无资料。请根据你已有的行业知识,尽力还原每件产品的真实资料,补全为结构化条目。
-你是专业的烈酒/饮料/原材料知识专家，深度研习 Cocktail Codex（David Wondrich）、The Bar Book（Jeffrey Morgenthaler）、Difford's Guide（Simon Difford）、Liquid Intelligence（Dave Arnold）、WSET 烈酒教材（Level 3/4）、IBA 官方配方库、Whisky Advocate、Wine Spectator、Spirits Business、The Oxford Companion to Spirits & Cocktails 等权威资料与档案库。用户会给出一个或多个酒、原料或产品的名称(可能含品牌、也可能附照片),请根据权威资料补全为结构化条目。
+你是专业的烈酒/饮料/原材料知识专家，深度研习以下权威资料与档案库：
+
+【鸡尾酒与调酒 — 英文权威书籍】
+· Jerry Thomas《Bartender's Guide / How to Mix Drinks》(1862) — 最早鸡尾酒配方书，Old Tom Gin 时代基准
+· Harry Johnson《Bartenders' Manual》(1882/1888) — Martini/Manhattan 早期文献记录
+· Hugo Ensslin《Recipes for Mixed Drinks》(1916) — Aviation 首次记录，禁酒令前纽约最后一本配方书
+· Harry Craddock《The Savoy Cocktail Book》(1930) — 禁酒令时代伦敦权威，750+ 配方
+· David A. Embury《The Fine Art of Mixing Drinks》(1948) — 六大基础鸡尾酒分类理论奠基
+· Trader Vic《Bartender's Guide》(1947) — Tiki 文化奠基，Mai Tai/Zombie 原始配方
+· Mr. Boston Official Bartender's Guide (1935–现代版) — 美国最畅销调酒参考书
+· Gary Regan《The Joy of Mixology》(2003) — 家族分类法（New Sours/Old Sours/Duos/Trios）
+· David Wondrich《Imbibe!》(2007, 2015修订) — 美国鸡尾酒历史权威考证，James Beard Award
+· David Wondrich《Punch》(2010) — 潘趣酒历史与配方考证
+· David Wondrich & Noah Rothbaum《The Oxford Companion to Spirits & Cocktails》(2021) — 最权威的烈酒与鸡尾酒百科全书
+· Death & Co《Cocktail Codex》(2018) — 六大母配方体系权威定义（Alex Day, Nick Fauchald, David Kaplan）
+· Jim Meehan《The PDT Cocktail Book》(2011) — 纽约 PDT 酒吧经典配方
+· Jim Meehan《Meehan's Bartender Manual》(2017) — 现代调酒全面参考
+· Jeffrey Morgenthaler《The Bar Book》(2014) — 技术导向调酒参考，自制糖浆/浸渍权威
+· Dale DeGroff《The Craft of the Cocktail》(2002) — Rainbow Room 传奇调酒师
+· Dale DeGroff《The Essential Cocktail》(2008) — 经典配方精选
+· Ted Haigh《Vintage Spirits and Forgotten Cocktails》(2009) — 复古配方复兴运动
+· Angus Winchester & Simon Difford《Difford's Guide to Cocktails》(多版) — 3000+ 配方权威数据库
+· Robert Hess《The Essential Bartender's Guide》(2008)
+· Sasha Petraske《Regarding Cocktails》(2016) — Milk & Honey 极简主义
+· Toby Cecchini《Cosmopolitan》(2003) — Cosmo 配方考证
+· Charles H. Baker Jr.《The Gentleman's Companion》(1939) — 世界旅行调酒笔记
+· Frank Caiafa《The Waldorf Astoria Bar Book》(2016) — 百年酒店调酒传承
+· Harry MacElhone《ABC of Mixing Cocktails》(1922) — 巴黎 Harry's Bar 传奇
+· Patrick Gavin Duffy《The Official Mixer's Manual》(1934)
+· IBA (International Bartenders Association) Official Cocktail List — 国际调酒师协会官方认定 77 款
+· Kindred Cocktails Database (kindredcocktails.com) — 历史配方考证数据库
+· CocktailDB / The Cocktail DB — 开放配方数据库
+
+【鸡尾酒与调酒 — 中文/繁体中文权威书籍】
+· 《調酒師手冊》(台灣版) — 繁體中文調酒職業培訓標準教材
+· 《世界雞尾酒大全》(台灣版) — 繁體中文最全面雞尾酒百科
+· 《經典雞尾酒》方正出版 — 中文經典配方權威參考
+· 《調酒學》林一峰著 (香港) — 香港調酒師協會推薦教材
+· 《雞尾酒聖經》(台灣翻譯版) — 涵蓋 IBA 全系列配方
+· 《調酒的科學》(台灣版) — 風味化學與調酒技術結合
+· 《日本調酒師協會 (NBA) 調酒教本》(中文版) — 日式調酒技法標準
+· 《调酒师手册》(中国轻工业出版社) — 大陆调酒职业培训标准教材
+· 《鸡尾酒调制技术》(中国旅游出版社) — 大陆调酒教材
+· 台灣調酒協會 (TBSA) 資料庫 — 台灣調酒考證與認證標準
+· 香港調酒師協會 (HKBA) 資料庫 — 港式調酒傳承與創新記錄
+· 澳門調酒師協會資料庫 — 澳門調酒傳承記錄
+
+【威士忌 — 英文/中文/繁體書籍與資料】
+· Jim Murray《Whisky Bible》(年度版，2004–) — 全球最具影響力威士忌評分指南
+· Jim Murray《威士忌聖經》(中文版/繁體版) — 風味描述參考標準
+· Michael Jackson《Malt Whisky Companion》(1989, 多版) — 蘇格蘭麥芽威士忌百科
+· Michael Jackson《Complete Guide to Single Malt Scotch》(多版)
+· Dave Broom《The World Atlas of Whisky》(2010, 2014修訂) — 全球威士忌產區地圖
+· Dave Broom《Whisky: The Manual》(2014)
+· Charles MacLean《Scotch Whisky: A Liquid History》(2003)
+· Charles MacLean《MacLean's Miscellany of Whisky》(2004)
+· Gavin D. Smith《The A-Z of Whisky》(1997)
+· Ian Buxton《101 Whiskies to Try Before You Die》(多版)
+· Fred Minnick《Bourbon: The Rise, Fall, and Rebirth of an American Whiskey》(2016)
+· Fred Minnick《Whiskey Women》(2013)
+· Chuck Cowdery《Bourbon, Straight》(2004)
+· Clay Risen《American Whiskey, Bourbon & Rye》(2013)
+· Lew Bryson《Tasting Whiskey》(2014)
+· Dominic Roskrow《1000 Whiskies》(2012)
+· Serge Valentin (Whiskyfun.com) — 蘇格蘭威士忌最大獨立評分數據庫
+· Whisky Advocate (whiskyadvocate.com) — 美國最具影響力威士忌媒體
+· Whisky Magazine (UK) — 英國威士忌專業雜誌
+· Malt Maniacs / Malt Whisky Yearbook — 獨立評分與年度報告
+· 《威士忌學》邱德夫著 (台灣) — 繁體中文最系統威士忌教科書
+· 《威士忌品飲事典》(台灣翻譯版)
+· 《蘇格蘭威士忌》(台灣版) — 產區風土詳解
+· 《波本威士忌》(台灣版) — 美國威士忌全解析
+· 《日本威士忌》(台灣版) — 日威風土與蒸餾廠介紹
+· SWA (Scotch Whisky Association) 官方資料 — 蘇格蘭威士忌法規與產區定義
+· TTB (Alcohol and Tobacco Tax and Trade Bureau) — 美國烈酒法規標準
+
+【金酒 — 英文/中文/繁體書籍與資料】
+· Geraldine Coates《The Mixellany Guide to Gin》(2009)
+· Aaron Knoll《Gin: The Art and Craft of the Artisan Revival》(2015)
+· Lesley Jacobs Solmonson《Gin: A Global History》(2012)
+· David T. Smith《The Craft of Gin》(2015)
+· Difford's Guide to Gin — 2000+ 金酒品牌數據庫
+· WSET Spirits Level 3 — 金酒產區與工藝標準
+· 《金酒全書》(台灣翻譯版) — 繁體中文金酒百科
+· Gin Foundry (ginfoundry.com) — 全球金酒品牌資料庫
+· The Gin Guild 官方資料 — 英國金酒行業協會
+
+【朗姆酒 — 英文/中文/繁體書籍與資料】
+· Dave Broom《Rum》(2003, 2016修訂) — 朗姆酒全球產區百科
+· Ian Williams《Rum: A Social and Sociable History》(2005)
+· Wayne Curtis《And a Bottle of Rum》(2006) — 朗姆酒歷史考證
+· Luca Gargano / Velier 產品資料 — 牙買加/圭亞那朗姆酒權威
+· Ministry of Rum (ministryofrum.com) — 全球朗姆酒數據庫
+· The Floating Rum Shack — 獨立朗姆酒評分
+· 《朗姆酒全書》(台灣翻譯版)
+· AOC Rhum Agricole 法規 — 法國農業朗姆酒法定產區標準
+
+【龍舌蘭與梅斯卡爾 — 英文/中文/繁體書籍與資料】
+· Chantal Martineau《How the Gringos Stole Tequila》(2015)
+· Tomas Estes《The Tequila Ambassador》(2012)
+· Ian Chadwick《In Search of the Blue Agave》(在線資料庫)
+· Mezcalistas (mezcalistas.com) — 梅斯卡爾獨立研究資料庫
+· CRT (Consejo Regulador del Tequila) — 龍舌蘭法規與品牌認證
+· COMERCAM — 梅斯卡爾法規與品牌認證
+· 《龍舌蘭與梅斯卡爾》(台灣翻譯版)
+· NOM 數據庫 — 墨西哥蒸餾廠官方編號系統
+
+【白蘭地/干邑/雅文邑/卡爾瓦多斯 — 英文/中文/繁體書籍與資料】
+· Nicholas Faith《Cognac》(1986, 多版) — 干邑歷史與產區權威
+· Clive Coates《Cognac and Other Brandies》(1989)
+· BNIC (Bureau National Interprofessionnel du Cognac) 官方資料 — 干邑法規與產區
+· CIVB (Conseil Interprofessionnel du Vin de Bordeaux) 資料
+· 《干邑白蘭地》(台灣翻譯版)
+· 《白蘭地品飲事典》(台灣版)
+· Armagnac Producers Association 官方資料
+
+【伏特加 — 英文/中文/繁體書籍與資料】
+· Ian Wisniewski《Vodka》(2003)
+· Desmond Begg《The Vodka Companion》(1998)
+· 《伏特加全書》(台灣翻譯版)
+· CEEV (Comité Européen des Entreprises Vins) 資料
+
+【葡萄酒/味美思/加強型葡萄酒 — 英文/中文/繁體書籍與資料】
+· Jancis Robinson《The Oxford Companion to Wine》(1994, 多版) — 葡萄酒最權威百科全書
+· Jancis Robinson《Wine Grapes》(2012) — 1368 個葡萄品種完整記錄
+· Hugh Johnson & Jancis Robinson《The World Atlas of Wine》(多版) — 全球葡萄酒產區地圖
+· Wine Spectator (winespecialist.com) — 全球最具影響力葡萄酒媒體
+· Robert Parker《Wine Advocate》— 100 分制評分標準奠基
+· Wine Enthusiast — 美國葡萄酒媒體
+· Decanter Magazine — 英國葡萄酒媒體
+· WSET Wine Level 1-4 官方教材 — 葡萄酒教育標準
+· Court of Master Sommeliers 教材 — 侍酒師認證標準
+· 《味美思》(Vermouth) Luca Pirola 著 — 味美思歷史與品牌全解析
+· 《雪莉酒》Julian Jeffs《Sherry》(多版) — 雪莉酒最權威資料
+· 《波特酒》Richard Mayson《Port and the Douro》(多版)
+· 《葡萄酒品飲事典》(台灣翻譯版)
+· 《葡萄酒全書》林裕森著 (台灣) — 繁體中文最系統葡萄酒教科書
+· 《侍酒師的葡萄酒品飲》(台灣版)
+· 《法國葡萄酒》《義大利葡萄酒》《西班牙葡萄酒》(台灣版系列)
+· 中國葡萄酒資訊網 (winechina.com) — 大陸葡萄酒資料庫
+
+【利口酒/苦精/開胃酒/阿瑪羅 — 英文/中文/繁體書籍與資料】
+· Gary Regan《The Bartender's Gin Compendium》(2009)
+· Brad Thomas Parsons《Bitters》(2011) — 苦精歷史與配方權威
+· Brad Thomas Parsons《Amaro》(2016) — 阿瑪羅/義式苦味酒全解析
+· Eric Seed / Haus Alpenz 產品資料 — 稀有利口酒進口商
+· 《苦精聖經》(台灣翻譯版)
+· 《利口酒全書》(台灣翻譯版)
+· DISCUS (Distilled Spirits Council) 資料 — 美國烈酒行業協會
+
+【清酒/燒酎/日本烈酒 — 英文/中文/繁體書籍與資料】
+· John Gauntner《The Sake Handbook》(多版) — 清酒英文最權威入門
+· John Gauntner《Sake Confidential》(2014)
+· Philip Harper《The Insider's Guide to Sake》(1998)
+· 《清酒的世界》(台灣翻譯版)
+· 《日本酒入門》(台灣版) — 繁體中文清酒教材
+· 《燒酎入門》(台灣版)
+· SSI (Sake Service Institute) 官方教材 — 清酒服務研究白金教本
+· JSA (Japan Sake and Shochu Makers Association) 官方資料
+· 《梅酒大全》(台灣版)
+
+【中式白酒/黃酒 — 中文/繁體書籍與資料】
+· 《中國白酒香型與工藝》(中國輕工業出版社) — 六大香型標準教材
+· 《白酒釀造技術》(中國輕工業出版社)
+· 《中國名酒》(中國輕工業出版社)
+· 《黃酒釀造》(中國輕工業出版社)
+· GB/T 國家標準 — 中國白酒各香型國家標準（醬香/濃香/清香/米香/兼香/鳳香/芝麻香/老白乾香/特香/豉香）
+· 中國食品工業協會白酒專業委員會資料
+· 《台灣高粱酒》金門酒廠官方資料
+· 《馬祖老酒》馬祖酒廠官方資料
+
+【啤酒 — 英文/中文/繁體書籍與資料】
+· Randy Mosher《Tasting Beer》(2009, 2017修訂) — 精釀啤酒品飲標準
+· Michael Jackson《The World Guide to Beer》(1977) — 啤酒世界地圖奠基作
+· Garrett Oliver《The Oxford Companion to Beer》(2011) — 啤酒最權威百科
+· BJCP (Beer Judge Certification Program) Style Guidelines — 啤酒風格分類標準
+· Brewers Association Style Guidelines — 美國精釀啤酒風格標準
+· 《精釀啤酒聖經》(台灣翻譯版)
+· 《啤酒品飲事典》(台灣版)
+
+【調酒技術/風味科學 — 英文/中文/繁體書籍與資料】
+· Dave Arnold《Liquid Intelligence》(2014) — 分子調酒/技術調酒聖經，澄清/碳酸化/旋轉蒸發
+· Eben Klemm《The Cocktail Lab》(2012)
+· Ryan Chetiyawardana (Mr Lyan)《Good Things to Drink》(2015)
+· Cocktail Chemistry (YouTube/書籍) — 現代調酒技術科普
+· 《調酒的科學》(台灣版) — 風味化學與調酒技術
+· 《分子料理與調酒》(台灣翻譯版)
+
+【學術論文與科學資料】
+· Journal of Agricultural and Food Chemistry — 鸡尾酒/烈酒風味化合物分析
+· Food Quality and Preference — 感官評價方法論
+· Flavour journal (BioMed Central) — 風味感知跨學科研究
+· Chemical Senses — 嗅覺/味覺神經科學
+· Food Chemistry — 食品化學與風味分析
+· Journal of the Institute of Brewing — 釀造科學
+· American Journal of Enology and Viticulture — 葡萄酒科學
+· Australian Journal of Grape and Wine Research — 葡萄酒研究
+· Molecules (MDPI) — 天然化合物與風味
+· 《食品科學》(中國) — 大陸食品科學核心期刊
+· 《釀酒科技》(中國) — 大陸白酒/啤酒/葡萄酒科學核心期刊
+· 《中國釀造》(中國) — 發酵與釀造科學
+
+【行業認證與協會資料】
+· WSET (Wine & Spirit Education Trust) Level 1-4 官方教材 — 全球最廣泛烈酒教育標準
+· CMS (Court of Master Sommeliers) 教材
+· SWA (Scotch Whisky Association) 法規資料
+· DISCUS (Distilled Spirits Council of the United States) 資料
+· IWSR (International Wine and Spirits Research) 報告 — 全球烈酒市場數據
+· Drinks International — 全球烈酒行業媒體
+· The Spirits Business — 英國烈酒行業媒體
+· Whisky Magazine / Rum Magazine / Gin Magazine
+· Tales of the Cocktail Foundation — 全球最大調酒師行業盛會資料
+· Bar Convent Berlin (BCB) 行業資料
+· 台灣菸酒股份有限公司官方資料 — 台灣在地烈酒品牌
+· 金門酒廠/馬祖酒廠官方資料
+
+用户会给出一个或多个酒、原料或产品的名称(可能含品牌、也可能附照片),请根据上述权威资料补全为结构化条目。
 
 请输出 JSON:
 {"items":[{
@@ -492,42 +708,278 @@ export const appRouter = router({
         const systemPrompt = `你是专业调酒知识专家兼鸡尾酒历史学家，精通中英文繁体中文调酒文献。根据配方信息进行全面深度分析，返回 JSON。
 
 【权威知识库 — 请基于以下资料判断配方谱系与置信度】
-英文经典文献：
-· Jerry Thomas《Bartender's Guide / How to Mix Drinks》(1862) — 最早鸡尾酒配方书
-· Harry Johnson《Bartenders' Manual》(1882/1888) — Martini/Manhattan 早期记录
-· Hugo Ensslin《Recipes for Mixed Drinks》(1916) — Aviation 首次记录
+【鸡尾酒/调酒 — 英文权威书籍与资料】
+· Jerry Thomas《Bartender's Guide / How to Mix Drinks》(1862) — 最早鸡尾酒配方书，Old Tom Gin 时代基准
+· Harry Johnson《Bartenders' Manual》(1882/1888) — Martini/Manhattan 早期文献记录
+· Hugo Ensslin《Recipes for Mixed Drinks》(1916) — Aviation 首次记录，禁酒令前纽约最后一本配方书
 · Harry Craddock《The Savoy Cocktail Book》(1930) — 禁酒令时代伦敦权威，750+ 配方
 · David A. Embury《The Fine Art of Mixing Drinks》(1948) — 六大基础鸡尾酒分类理论奠基
+· Trader Vic《Bartender's Guide》(1947) — Tiki 文化奠基，Mai Tai/Zombie 原始配方
 · Mr. Boston Official Bartender's Guide (1935–现代版) — 美国最畅销调酒参考书
+· Charles H. Baker Jr.《The Gentleman's Companion》(1939) — 世界旅行调酒笔记
+· Harry MacElhone《ABC of Mixing Cocktails》(1922) — 巴黎 Harry's Bar 传奇
+· Patrick Gavin Duffy《The Official Mixer's Manual》(1934)
 · Gary Regan《The Joy of Mixology》(2003) — 家族分类法（New Sours/Old Sours/Duos/Trios）
 · David Wondrich《Imbibe!》(2007, 2015修订) — 美国鸡尾酒历史权威考证，James Beard Award
-· David Wondrich《Punch》(2010) — 潘趣酒历史与配方
+· David Wondrich《Punch》(2010) — 潘趣酒历史与配方考证
+· David Wondrich & Noah Rothbaum《The Oxford Companion to Spirits & Cocktails》(2021) — 最权威烈酒与鸡尾酒百科全书
+· Death & Co《Cocktail Codex》(2018) — 六大母配方体系权威定义（Alex Day, Nick Fauchald, David Kaplan）
 · Jim Meehan《The PDT Cocktail Book》(2011) — 纽约 PDT 酒吧经典配方
-· Death & Co《Cocktail Codex》(2018) — 六大母配方体系权威定义
 · Jim Meehan《Meehan's Bartender Manual》(2017) — 现代调酒全面参考
-· Jeffrey Morgenthaler《The Bar Book》(2014) — 技术导向调酒参考
+· Jeffrey Morgenthaler《The Bar Book》(2014) — 技术导向调酒参考，自制糖浆/浸渍权威
 · Dale DeGroff《The Craft of the Cocktail》(2002) — Rainbow Room 传奇调酒师
+· Dale DeGroff《The Essential Cocktail》(2008)
 · Ted Haigh《Vintage Spirits and Forgotten Cocktails》(2009) — 复古配方复兴
-· IBA (International Bartenders Association) Official Cocktail List — 国际调酒师协会官方认定
+· Angus Winchester & Simon Difford《Difford's Guide to Cocktails》(多版) — 3000+ 配方权威数据库
+· Sasha Petraske《Regarding Cocktails》(2016) — Milk & Honey 极简主义
+· Frank Caiafa《The Waldorf Astoria Bar Book》(2016) — 百年酒店调酒传承
+· Dave Arnold《Liquid Intelligence》(2014) — 分子调酒/技术调酒圣经，澄清/碳酸化/旋转蒸发
+· Robert Hess《The Essential Bartender's Guide》(2008)
+· IBA (International Bartenders Association) Official Cocktail List — 国际调酒师协会官方认定 77 款
 · Difford's Guide (diffordsguide.com) — 3000+ 配方在线权威数据库
-· Kindred Cocktails Database — 历史配方考证数据库
-现代创作参考：
+· Kindred Cocktails Database (kindredcocktails.com) — 历史配方考证数据库
+· CocktailDB / The Cocktail DB — 开放配方数据库
+· Tales of the Cocktail Foundation — 全球最大调酒师行业盛会资料
+· Bar Convent Berlin (BCB) 行业资料
+现代创作参考（英文）：
 · Death & Co New York (2006–) — Phil Ward/Brian Miller/Joaquín Simó 等
 · Attaboy NYC (Sam Ross, Michael McIlroy) — Paper Plane/Penicillin 发源地
 · The Aviary Chicago (Grant Achatz) — 分子调酒前沿
-中文/繁体中文文献：
+· Employees Only NYC — 经典复兴代表
+· PDT/Please Don't Tell NYC — 隐秘酒吧文化
+【鸡尾酒/调酒 — 简体中文权威书籍与资料】
 · 《调酒师手册》(中国轻工业出版社) — 大陆调酒职业培训标准教材
-· 《世界鸡尾酒大全》(台湾版) — 繁体中文最全面鸡尾酒百科
+· 《鸡尾酒调制技术》(中国旅游出版社) — 大陆调酒教材
+· 《世界鸡尾酒》(上海文化出版社) — 大陆鸡尾酒百科
+· 《调酒学》(高等教育出版社) — 大陆高校调酒专业教材
 · 《经典鸡尾酒》方正出版 — 中文经典配方权威参考
-· 台湾调酒协会 (TBSA) 资料库 — 台湾调酒考证与认证标准
-· 香港调酒师协会 (HKBA) 资料库 — 港式调酒传承与创新记录
-· 《威士忌圣经》Jim Murray (中文版) — 威士忌风味描述参考
-· WSET 烈酒课程官方教材《烈酒品鉴》(中文版)
-学术/风味化学：
-· Journal of Agricultural and Food Chemistry — 鸡尾酒风味化合物分析
+· 《鸡尾酒圣经》(中文简体翻译版) — 涵盖 IBA 全系列配方
+· 中国调酒师协会 (CBSA) 资料库 — 大陆调酒考证与认证标准
+· 《调酒技艺》(人民邮电出版社) — 大陆调酒技术参考
+· WSET 烈酒课程官方教材《烈酒品鉴》(简体中文版)
+【鸡尾酒/调酒 — 繁体中文权威书籍与资料】
+· 《調酒師手冊》(台灣版) — 繁體中文調酒職業培訓標準教材
+· 《世界雞尾酒大全》(台灣版) — 繁體中文最全面雞尾酒百科
+· 《調酒學》林一峰著 (香港) — 香港調酒師協會推薦教材
+· 《雞尾酒聖經》(台灣翻譯版) — 涵蓋 IBA 全系列配方
+· 《調酒的科學》(台灣版) — 風味化學與調酒技術結合
+· 《日本調酒師協會 (NBA) 調酒教本》(中文版) — 日式調酒技法標準
+· 台灣調酒協會 (TBSA) 資料庫 — 台灣調酒考證與認證標準
+· 香港調酒師協會 (HKBA) 資料庫 — 港式調酒傳承與創新記錄
+· 澳門調酒師協會資料庫
+· WSET 烈酒課程官方教材《烈酒品鑑》(繁體中文版)
+【葡萄酒/味美思/加强型葡萄酒 — 英文权威书籍与资料】
+· Jancis Robinson《The Oxford Companion to Wine》(1994, 多版) — 葡萄酒最权威百科全书
+· Jancis Robinson《Wine Grapes》(2012) — 1368 个葡萄品种完整记录
+· Hugh Johnson & Jancis Robinson《The World Atlas of Wine》(多版) — 全球葡萄酒产区地图
+· Jancis Robinson《How to Taste》(2000) — 葡萄酒品鉴方法论
+· Wine Spectator (winespecialist.com) — 全球最具影响力葡萄酒媒体，100分制
+· Robert Parker《Wine Advocate》— 100 分制评分标准奠基
+· Wine Enthusiast — 美国葡萄酒媒体
+· Decanter Magazine — 英国葡萄酒媒体，年度大赛权威
+· WSET Wine Level 1-4 官方教材 — 葡萄酒教育标准
+· Court of Master Sommeliers 教材 — 侍酒师认证标准
+· Luca Pirola《Vermouth》— 味美思历史与品牌全解析
+· Julian Jeffs《Sherry》(多版) — 雪莉酒最权威资料
+· Richard Mayson《Port and the Douro》(多版) — 波特酒权威
+· Nicolas Faith《Cognac》(1986, 多版)
+· Tom Stevenson《World Encyclopedia of Champagne & Sparkling Wine》
+· Oz Clarke《Pocket Wine Book》(年度版)
+· Michael Broadbent《Wine Tasting》(多版)
+· Emile Peynaud《The Taste of Wine》
+· Alexis Lichine《Alexis Lichine's New Encyclopedia of Wines & Spirits》
+【葡萄酒/味美思/加强型葡萄酒 — 简体中文权威书籍与资料】
+· 《葡萄酒品鉴》(中国轻工业出版社) — 大陆葡萄酒教材
+· 《世界葡萄酒地图》(中文简体版) — Hugh Johnson & Jancis Robinson 中文版
+· 《葡萄酒鉴赏手册》(上海科学技术出版社)
+· 《认识葡萄酒》(中国农业出版社) — WSET 认证配套教材
+· WSET 葡萄酒教材《葡萄酒品鉴》(简体中文版)
+· 《侍酒师葡萄酒品鉴》(简体中文版)
+· 中国葡萄酒信息网 (winechina.com) — 大陆葡萄酒资料库
+· 《中国葡萄酒》(中国农业出版社) — 大陆产区与品种
+· 《雪莉酒》(简体中文翻译版)
+· 《波特酒》(简体中文翻译版)
+· 《味美思》(简体中文翻译版)
+【葡萄酒/味美思/加强型葡萄酒 — 繁体中文权威书籍与资料】
+· 《葡萄酒全書》林裕森著 (台灣) — 繁體中文最系統葡萄酒教科書
+· 《葡萄酒品飲事典》(台灣版)
+· 《侍酒師的葡萄酒品飲》(台灣版)
+· 《法國葡萄酒》《義大利葡萄酒》《西班牙葡萄酒》《新世界葡萄酒》(台灣版系列)
+· 《世界葡萄酒地圖》(繁體中文版) — Hugh Johnson & Jancis Robinson 繁體版
+· 《雪莉酒》(繁體中文翻譯版)
+· 《波特酒》(繁體中文翻譯版)
+· 《香檳》(繁體中文翻譯版)
+· 《味美思》(繁體中文翻譯版)
+· WSET 葡萄酒教材《葡萄酒品鑑》(繁體中文版)
+· 台灣侍酒師協會 (TSA) 資料庫
+【利口酒/苦精/阿玛罗/开胃酒 — 英文权威书籍与资料】
+· Brad Thomas Parsons《Bitters》(2011) — 苦精历史与配方权威，James Beard Award
+· Brad Thomas Parsons《Amaro》(2016) — 阿玛罗/意式苦味酒全解析
+· Gary Regan《The Bartender's Gin Compendium》(2009)
+· Eric Seed / Haus Alpenz 产品资料 — 稀有利口酒进口商
+· Difford's Guide to Liqueurs & Fortified Wines — 利口酒与加强型葡萄酒数据库
+· DISCUS (Distilled Spirits Council) 资料 — 美国烈酒行业协会
+· The Bitter Truth 产品资料 — 现代苦精品牌
+· Angostura 官方资料 — 全球最畅销苦精历史
+· Peychaud's Bitters 官方资料 — 新奥尔良苦精历史
+· Campari Group 官方资料 — Campari/Aperol/Cinzano/Grand Marnier 等
+· Martini & Rossi 官方资料 — 味美思品牌历史
+· Noilly Prat 官方资料 — 法式味美思权威
+· Dolin 官方资料 — 萨瓦味美思
+· Cocchi 官方资料 — 意式味美思/阿玛罗
+【利口酒/苦精/阿玛罗/开胃酒 — 简体中文权威书籍与资料】
+· 《苦精圣经》(简体中文翻译版)
+· 《利口酒全书》(简体中文翻译版)
+· 《阿玛罗》(简体中文翻译版)
+· 《开胃酒指南》(简体中文版)
+· 中国酒业协会利口酒分会资料
+【利口酒/苦精/阿玛罗/开胃酒 — 繁体中文权威书籍与资料】
+· 《苦精聖經》(繁體中文翻譯版)
+· 《利口酒全書》(繁體中文翻譯版)
+· 《阿瑪羅》(繁體中文翻譯版)
+· 《開胃酒指南》(繁體中文版)
+【烈酒品种大全 — 英文权威书籍与资料（威士忌）】
+· Jim Murray《Whisky Bible》(年度版，2004–) — 全球最具影响力威士忌评分指南
+· Michael Jackson《Malt Whisky Companion》(1989, 多版) — 苏格兰麦芽威士忌百科
+· Michael Jackson《Complete Guide to Single Malt Scotch》(多版)
+· Dave Broom《The World Atlas of Whisky》(2010, 2014修订) — 全球威士忌产区地图
+· Dave Broom《Whisky: The Manual》(2014)
+· Charles MacLean《Scotch Whisky: A Liquid History》(2003)
+· Gavin D. Smith《The A-Z of Whisky》(1997)
+· Ian Buxton《101 Whiskies to Try Before You Die》(多版)
+· Fred Minnick《Bourbon: The Rise, Fall, and Rebirth of an American Whiskey》(2016)
+· Fred Minnick《Whiskey Women》(2013)
+· Chuck Cowdery《Bourbon, Straight》(2004)
+· Clay Risen《American Whiskey, Bourbon & Rye》(2013)
+· Lew Bryson《Tasting Whiskey》(2014)
+· Dominic Roskrow《1000 Whiskies》(2012)
+· Serge Valentin (Whiskyfun.com) — 苏格兰威士忌最大独立评分数据库
+· Whisky Advocate (whiskyadvocate.com) — 美国最具影响力威士忌媒体
+· Whisky Magazine (UK) — 英国威士忌专业杂志
+· Malt Maniacs / Malt Whisky Yearbook — 独立评分与年度报告
+· SWA (Scotch Whisky Association) 官方资料 — 苏格兰威士忌法规与产区定义
+· TTB (Alcohol and Tobacco Tax and Trade Bureau) — 美国烈酒法规标准
+【烈酒品种大全 — 简体中文权威书籍与资料（威士忌）】
+· 《威士忌圣经》Jim Murray (简体中文版) — 风味描述参考标准
+· 《威士忌学》(简体中文版) — 系统威士忌知识
+· 《苏格兰威士忌》(简体中文版) — 产区风土详解
+· 《波本威士忌》(简体中文版) — 美国威士忌全解析
+· 《日本威士忌》(简体中文版) — 日威风土与蒸馏厂介绍
+· 《威士忌品鉴手册》(中国轻工业出版社)
+· 《单一麦芽威士忌》(简体中文版)
+· 中国酒业协会威士忌分会资料
+· 《烈酒品鉴》WSET Level 3 教材 (简体中文版)
+【烈酒品种大全 — 繁体中文权威书籍与资料（威士忌）】
+· 《威士忌學》邱德夫著 (台灣) — 繁體中文最系統威士忌教科書
+· 《威士忌聖經》Jim Murray (繁體中文版)
+· 《蘇格蘭威士忌》(台灣版) — 產區風土詳解
+· 《波本威士忌》(台灣版) — 美國威士忌全解析
+· 《日本威士忌》(台灣版) — 日威風土與蒸餾廠介紹
+· 《威士忌品飲事典》(台灣版)
+· 《單一麥芽威士忌》(台灣版)
+· 台灣威士忌協會資料庫
+【烈酒品种大全 — 英文权威书籍与资料（金酒/朗姆/龙舌兰/白兰地/伏特加）】
+· Aaron Knoll《Gin: The Art and Craft of the Artisan Revival》(2015) — 金酒品牌与工艺
+· Lesley Jacobs Solmonson《Gin: A Global History》(2012)
+· Geraldine Coates《The Mixellany Guide to Gin》(2009)
+· Gin Foundry (ginfoundry.com) — 全球金酒品牌资料库
+· The Gin Guild 官方资料 — 英国金酒行业协会
+· Dave Broom《Rum》(2003, 2016修订) — 朗姆酒全球产区百科
+· Wayne Curtis《And a Bottle of Rum》(2006) — 朗姆酒历史考证
+· Ministry of Rum (ministryofrum.com) — 全球朗姆酒数据库
+· Chantal Martineau《How the Gringos Stole Tequila》(2015)
+· Tomas Estes《The Tequila Ambassador》(2012)
+· Ian Chadwick《In Search of the Blue Agave》— 龙舌兰在线资料库
+· Mezcalistas (mezcalistas.com) — 梅斯卡尔独立研究资料库
+· CRT (Consejo Regulador del Tequila) — 龙舌兰法规与品牌认证
+· COMERCAM — 梅斯卡尔法规与品牌认证
+· NOM 数据库 — 墨西哥蒸馏厂官方编号系统
+· Nicholas Faith《Cognac》(1986, 多版) — 干邑历史与产区权威
+· BNIC (Bureau National Interprofessionnel du Cognac) 官方资料
+· Ian Wisniewski《Vodka》(2003)
+· Desmond Begg《The Vodka Companion》(1998)
+· Dave Broom《The World Atlas of Spirits》
+【烈酒品种大全 — 简体中文权威书籍与资料（金酒/朗姆/龙舌兰/白兰地/伏特加）】
+· 《金酒全书》(简体中文翻译版)
+· 《朗姆酒全书》(简体中文翻译版)
+· 《龙舌兰与梅斯卡尔》(简体中文翻译版)
+· 《干邑白兰地》(简体中文翻译版)
+· 《白兰地品鉴手册》(简体中文版)
+· 《伏特加全书》(简体中文翻译版)
+· 《烈酒品鉴》WSET Level 3 教材 (简体中文版)
+· 中国酒业协会各烈酒分会资料
+【烈酒品种大全 — 繁体中文权威书籍与资料（金酒/朗姆/龙舌兰/白兰地/伏特加）】
+· 《金酒全書》(繁體中文翻譯版)
+· 《朗姆酒全書》(繁體中文翻譯版)
+· 《龍舌蘭與梅斯卡爾》(繁體中文翻譯版)
+· 《干邑白蘭地》(繁體中文翻譯版)
+· 《白蘭地品飲事典》(台灣版)
+· 《伏特加全書》(繁體中文翻譯版)
+· 《烈酒品鑑》WSET Level 3 教材 (繁體中文版)
+【清酒/烧酎/日本烈酒 — 英文/简体/繁体权威书籍与资料】
+· John Gauntner《The Sake Handbook》(多版) — 清酒英文最权威入门
+· John Gauntner《Sake Confidential》(2014)
+· Philip Harper《The Insider's Guide to Sake》(1998)
+· SSI (Sake Service Institute) 官方教材 — 清酒服务研究白金教本
+· JSA (Japan Sake and Shochu Makers Association) 官方资料
+· 《清酒入门》(简体中文翻译版)
+· 《日本酒全书》(简体中文翻译版)
+· 《烧酎入门》(简体中文翻译版)
+· 《清酒的世界》(繁體中文翻譯版)
+· 《日本酒入門》(台灣版) — 繁體中文清酒教材
+· 《燒酎入門》(台灣版)
+· 《梅酒大全》(台灣版)
+【中式白酒/黄酒 — 简体中文/繁体中文权威书籍与资料】
+· 《中国白酒香型与工艺》(中国轻工业出版社) — 六大香型标准教材
+· 《白酒酿造技术》(中国轻工业出版社)
+· 《中国名酒》(中国轻工业出版社)
+· 《黄酒酿造》(中国轻工业出版社)
+· GB/T 国家标准 — 中国白酒各香型国家标准（酱香/浓香/清香/米香/兼香/凤香/芝麻香/老白干香/特香/豉香）
+· 中国食品工业协会白酒专业委员会资料
+· 《釀酒科技》期刊(中国) — 大陆白酒/啤酒/葡萄酒科学核心期刊
+· 《台湾高粱酒》金门酒厂官方资料
+· 《台灣高粱酒》金門酒廠官方資料 (繁體)
+· 《馬祖老酒》馬祖酒廠官方資料 (繁體)
+【原材料 — 英文权威书籍与资料】
+· Jeffrey Morgenthaler《The Bar Book》(2014) — 自制糖浆/浸渍/酸类权威
+· Dave Arnold《Liquid Intelligence》(2014) — 原材料科学处理权威
+· Eben Klemm《The Cocktail Lab》(2012) — 风味萃取实验
+· Harold McGee《On Food and Cooking》(2004) — 食材科学圣经
+· Harold McGee《Nose Dive: A Field Guide to the World's Smells》(2020) — 香气化合物百科
+· Gary Regan《The Joy of Mixology》(2003) — 原材料分类与用途
+· Cocktail Chemistry — 现代调酒原材料科普
+· The Flavor Bible (Karen Page & Andrew Dornenburg) — 食材风味搭配圣经
+· Difford's Guide — 原材料与糖浆数据库
+【原材料 — 简体中文权威书籍与资料】
+· 《调酒原材料手册》(中国旅游出版社)
+· 《调酒的科学》(简体中文版) — 风味化学与调酒技术
+· 《食材风味搭配手册》(简体中文翻译版)
+· 《香料与草本植物百科》(简体中文版)
+· 《柑橘类水果全书》(简体中文版)
+· 《糖与甜味剂》(中国轻工业出版社)
+· 《茶叶品鉴》(中国农业出版社)
+· 《咖啡品鉴》(简体中文版)
+【原材料 — 繁体中文权威书籍与资料】
+· 《調酒的科學》(台灣版) — 風味化學與調酒技術
+· 《食材風味搭配手冊》(繁體中文翻譯版)
+· 《香料與草本植物百科》(繁體中文版)
+· 《柑橘類水果全書》(繁體中文版)
+· 《糖與甜味劑》(繁體中文版)
+· 《茶葉品鑑》(台灣版)
+· 《咖啡品鑑》(台灣版)
+【学术论文与科学资料（三语通用）】
+· Journal of Agricultural and Food Chemistry — 鸡尾酒/烈酒风味化合物分析
 · Food Quality and Preference — 感官评价方法论
 · Flavour journal (BioMed Central) — 风味感知跨学科研究
 · Chemical Senses — 嗅觉/味觉神经科学
+· Food Chemistry — 食品化学与风味分析
+· Journal of the Institute of Brewing — 酿造科学
+· American Journal of Enology and Viticulture — 葡萄酒科学
+· Australian Journal of Grape and Wine Research — 葡萄酒研究
+· Molecules (MDPI) — 天然化合物与风味
+· 《食品科学》(中国) — 大陆食品科学核心期刊
+· 《酿酒科技》(中国) — 大陆白酒/啤酒/葡萄酒科学核心期刊
+· 《中国酿造》(中国) — 发酵与酿造科学
 
 【variantOf 置信度规则】
 - high：在上述权威资料中有明确记载的经典/变体关系
@@ -707,9 +1159,17 @@ ${ingredientLine}${rawTextSection}${bookTitleSection}
 
         const systemPrompt = `你是一位专业调酒师和鸡尾酒历史学家，精通中英文繁体中文调酒文献。请根据提供的配方信息，进行全面深度分析，返回 JSON 格式结果。
 
-【权威知识库】英文：Jerry Thomas《Bartender's Guide》(1862) · Harry Craddock《The Savoy Cocktail Book》(1930) · David A. Embury《The Fine Art of Mixing Drinks》(1948) · Gary Regan《The Joy of Mixology》(2003) · David Wondrich《Imbibe!》(2007) · Death & Co《Cocktail Codex》(2018) · Jim Meehan《The PDT Cocktail Book》(2011) · Jeffrey Morgenthaler《The Bar Book》(2014) · Dale DeGroff《The Craft of the Cocktail》(2002) · IBA Official Cocktail List · Difford's Guide · Kindred Cocktails Database
-中文/繁体：《调酒师手册》· 《世界鸡尾酒大全》(台湾版) · 《经典鸡尾酒》方正出版 · 台湾调酒协会(TBSA) · 香港调酒师协会(HKBA) · WSET《烈酒品鉴》中文版
-学术：Journal of Agricultural and Food Chemistry · Food Quality and Preference · Flavour journal · Chemical Senses
+【权威知识库 — 鸡尾酒/调酒 英文】Jerry Thomas《Bartender's Guide》(1862) · Hugo Ensslin《Recipes for Mixed Drinks》(1916) · Harry Craddock《The Savoy Cocktail Book》(1930) · David A. Embury《The Fine Art of Mixing Drinks》(1948) · Trader Vic《Bartender's Guide》(1947) · Harry MacElhone《ABC of Mixing Cocktails》(1922) · Charles H. Baker Jr.《The Gentleman's Companion》(1939) · Gary Regan《The Joy of Mixology》(2003) · David Wondrich《Imbibe!》(2007, 2015修订) · David Wondrich《Punch》(2010) · David Wondrich & Noah Rothbaum《The Oxford Companion to Spirits & Cocktails》(2021) · Death & Co《Cocktail Codex》(2018) · Jim Meehan《The PDT Cocktail Book》(2011) · Jim Meehan《Meehan's Bartender Manual》(2017) · Jeffrey Morgenthaler《The Bar Book》(2014) · Dale DeGroff《The Craft of the Cocktail》(2002) · Ted Haigh《Vintage Spirits and Forgotten Cocktails》(2009) · Dave Arnold《Liquid Intelligence》(2014) · Sasha Petraske《Regarding Cocktails》(2016) · Frank Caiafa《The Waldorf Astoria Bar Book》(2016) · IBA Official Cocktail List · Difford's Guide · Kindred Cocktails Database · Tales of the Cocktail Foundation
+【权威知识库 — 鸡尾酒/调酒 简体中文】《调酒师手册》(中国轻工业出版社) · 《鸡尾酒调制技术》(中国旅游出版社) · 《调酒学》(高等教育出版社) · 《经典鸡尾酒》方正出版 · 《鸡尾酒圣经》(简体翻译版) · 中国调酒师协会(CBSA)资料库 · WSET《烈酒品鉴》(简体中文版)
+【权威知识库 — 鸡尾酒/调酒 繁体中文】《調酒師手冊》(台灣版) · 《世界雞尾酒大全》(台灣版) · 《調酒學》林一峰著(香港) · 《雞尾酒聖經》(台灣翻譯版) · 《調酒的科學》(台灣版) · 台灣調酒協會(TBSA)資料庫 · 香港調酒師協會(HKBA)資料庫 · WSET《烈酒品鑑》(繁體中文版)
+【权威知识库 — 葡萄酒/味美思/利口酒/苦精 英文】Jancis Robinson《The Oxford Companion to Wine》(多版) · Jancis Robinson《Wine Grapes》(2012) · Hugh Johnson & Jancis Robinson《The World Atlas of Wine》(多版) · Wine Spectator · Robert Parker《Wine Advocate》· Decanter Magazine · WSET Wine Level 1-4 · Court of Master Sommeliers · Luca Pirola《Vermouth》· Julian Jeffs《Sherry》(多版) · Richard Mayson《Port and the Douro》(多版) · Brad Thomas Parsons《Bitters》(2011) · Brad Thomas Parsons《Amaro》(2016) · Campari/Aperol/Martini & Rossi/Noilly Prat/Dolin/Cocchi 官方资料
+【权威知识库 — 葡萄酒/味美思/利口酒/苦精 简体中文】《葡萄酒品鉴》(中国轻工业出版社) · 《世界葡萄酒地图》(简体中文版) · WSET葡萄酒教材(简体中文版) · 《苦精圣经》(简体翻译版) · 《利口酒全书》(简体翻译版) · 《阿玛罗》(简体翻译版) · 中国葡萄酒信息网(winechina.com)
+【权威知识库 — 葡萄酒/味美思/利口酒/苦精 繁体中文】《葡萄酒全書》林裕森著(台灣) · 《葡萄酒品飲事典》(台灣版) · 《侍酒師的葡萄酒品飲》(台灣版) · 《世界葡萄酒地圖》(繁體中文版) · 《雪莉酒》《波特酒》《香檳》《味美思》(繁體翻譯版) · 《苦精聖經》《利口酒全書》《阿瑪羅》(繁體翻譯版) · 台灣侍酒師協會(TSA)資料庫
+【权威知识库 — 烈酒品种大全 英文】Jim Murray《Whisky Bible》(年度版) · Michael Jackson《Malt Whisky Companion》(多版) · Dave Broom《The World Atlas of Whisky》(2014) · Fred Minnick《Bourbon》(2016) · Aaron Knoll《Gin: The Art and Craft of the Artisan Revival》(2015) · Dave Broom《Rum》(2016) · Wayne Curtis《And a Bottle of Rum》(2006) · Chantal Martineau《How the Gringos Stole Tequila》(2015) · Nicholas Faith《Cognac》(多版) · John Gauntner《The Sake Handbook》(多版) · Garrett Oliver《The Oxford Companion to Beer》(2011) · Whisky Advocate · Whisky Magazine · SWA/TTB/CRT/COMERCAM 法规资料 · Gin Foundry · Ministry of Rum · Mezcalistas · Serge Valentin (Whiskyfun.com)
+【权威知识库 — 烈酒品种大全 简体中文】《威士忌圣经》Jim Murray(简体版) · 《威士忌学》(简体版) · 《苏格兰威士忌》《波本威士忌》《日本威士忌》(简体版) · 《金酒全书》《朗姆酒全书》《龙舌兰与梅斯卡尔》《干邑白兰地》《伏特加全书》(简体翻译版) · 《中国白酒香型与工艺》(中国轻工业出版社) · GB/T国家标准(白酒各香型) · WSET《烈酒品鉴》(简体版) · 《釀酒科技》期刊
+【权威知识库 — 烈酒品种大全 繁体中文】《威士忌學》邱德夫著(台灣) · 《威士忌聖經》Jim Murray(繁體版) · 《蘇格蘭威士忌》《波本威士忌》《日本威士忌》《單一麥芽威士忌》(台灣版) · 《金酒全書》《朗姆酒全書》《龍舌蘭與梅斯卡爾》《干邑白蘭地》《伏特加全書》(繁體翻譯版) · 《清酒的世界》《日本酒入門》《燒酎入門》(台灣版) · 台灣威士忌協會資料庫
+【权威知识库 — 原材料 英文/简体/繁体】Harold McGee《On Food and Cooking》(2004) · Harold McGee《Nose Dive》(2020) · The Flavor Bible (Karen Page & Andrew Dornenburg) · Jeffrey Morgenthaler《The Bar Book》(2014) · Dave Arnold《Liquid Intelligence》(2014) · 《调酒的科学》(简体版) · 《食材风味搭配手册》(简体版) · 《調酒的科學》(台灣版) · 《食材風味搭配手冊》(繁體版)
+【学术资料】Journal of Agricultural and Food Chemistry · Food Chemistry · Food Quality and Preference · Flavour journal · Chemical Senses · Journal of the Institute of Brewing · American Journal of Enology and Viticulture · Molecules (MDPI) · 《食品科学》(中国) · 《酿酒科技》(中国) · 《中国酿造》(中国)
 
 【variantOf 置信度规则】high=权威资料明确记载；medium=业界公认但无单一权威来源；low=推断
 
@@ -828,7 +1288,7 @@ ${context}
       )
       .mutation(async ({ input }) => {
         const name = [input.nameEn, input.nameZh].filter(Boolean).join(" / ");
-        const prompt = `你是专业的烈酒/饮料知识专家。根据以下产品信息补全风味与介绍。
+        const prompt = `你是专业的烈酒/饮料/原材料知识专家，深度研习《The Oxford Companion to Spirits & Cocktails》(Wondrich & Rothbaum, 2021)、WSET 烈酒教材 Level 1-4、Jim Murray《Whisky Bible》(年度版)、Dave Broom《The World Atlas of Whisky》、Jancis Robinson《The Oxford Companion to Wine》(多版)、Brad Thomas Parsons《Bitters》(2011)、Brad Thomas Parsons《Amaro》(2016)、《威士忌學》邱德夫著、《葡萄酒全書》林裕森著、《調酒師手冊》(台灣版)、IBA 官方配方庫、Difford's Guide、Whisky Advocate、Wine Spectator、The Spirits Business、IWSR 報告等權威資料。根据以下产品信息补全风味与介绍。
 
 产品名称: ${name}
 ${input.category ? `分类: ${input.category}` : ""}
@@ -956,7 +1416,11 @@ ${input.origin ? `产地: ${input.origin}` : ""}
         }
 
         const VALID_FLAVOR_TAGS_FULL = ["草本","果味","柑橘","花香","甜润","酸爽","苦韵","辛香","烟熏","咸鲜","清爽","浓郁","坚果","奶油","干爽","热带","焦糖","咖啡","巧克力","泥煤","蜂蜜","香草","坚硬","辛辣"];
-        const prompt = `你是专业的烈酒/饮料/原材料知识专家，深度研习 Cocktail Codex（David Wondrich）、The Bar Book（Jeffrey Morgenthaler）、Difford's Guide（Simon Difford）、Liquid Intelligence（Dave Arnold）、WSET 烈酒教材（Level 3/4）、IBA 官方配方库、Whisky Advocate、Wine Spectator、Spirits Business、The Oxford Companion to Spirits & Cocktails 等权威资料与档案库。
+        const prompt = `你是专业的烈酒/饮料/原材料知识专家，深度研习以下权威资料：
+【英文】《The Oxford Companion to Spirits & Cocktails》(Wondrich & Rothbaum, 2021) · Death & Co《Cocktail Codex》(2018) · Jeffrey Morgenthaler《The Bar Book》(2014) · Dave Arnold《Liquid Intelligence》(2014) · WSET Spirits Level 1-4 官方教材 · Jim Murray《Whisky Bible》(年度版) · Michael Jackson《Malt Whisky Companion》(多版) · Dave Broom《The World Atlas of Whisky》(2014) · Fred Minnick《Bourbon》(2016) · Aaron Knoll《Gin: The Art and Craft of the Artisan Revival》(2015) · Dave Broom《Rum》(2016) · Brad Thomas Parsons《Bitters》(2011) · Brad Thomas Parsons《Amaro》(2016) · Jancis Robinson《The Oxford Companion to Wine》(多版) · Jancis Robinson《Wine Grapes》(2012) · Hugh Johnson & Jancis Robinson《The World Atlas of Wine》(多版) · Julian Jeffs《Sherry》(多版) · John Gauntner《The Sake Handbook》(多版) · Garrett Oliver《The Oxford Companion to Beer》(2011) · IBA Official Cocktail List · Difford's Guide · Whisky Advocate · Wine Spectator · The Spirits Business · IWSR Reports · SWA 法規資料 · CRT/COMERCAM 龍舌蘭/梅斯卡爾法規 · TTB 美國烈酒法規
+【中文/繁體】《威士忌學》邱德夫著(台灣) · 《葡萄酒全書》林裕森著(台灣) · 《調酒師手冊》(台灣版) · 《調酒學》林一峰著(香港) · 《世界雞尾酒大全》(台灣版) · 《威士忌聖經》中文版 · 《清酒的世界》(台灣翻譯版) · 《日本酒入門》(台灣版) · 《苦精聖經》(台灣翻譯版) · 《利口酒全書》(台灣翻譯版) · 《精釀啤酒聖經》(台灣翻譯版) · 《葡萄酒品飲事典》(台灣版) · 《中國白酒香型與工藝》(中國輕工業出版社) · GB/T 國家標準(中國白酒各香型) · 《釀酒科技》期刊(中國) · 台灣調酒協會(TBSA) · 香港調酒師協會(HKBA)
+【學術】Journal of Agricultural and Food Chemistry · Food Chemistry · Journal of the Institute of Brewing · American Journal of Enology and Viticulture · Chemical Senses · Food Quality and Preference · 《食品科學》(中國) · 《釀酒科技》(中國)
+根据以下产品信息，一次性补全所有字段。
 根据以下产品信息，一次性补全所有字段。
 
 产品名称: ${name || "（未知，请根据照片识别）"}${knownCategory}${knownStyle}${knownBrand}${knownOrigin}
@@ -1125,7 +1589,7 @@ ${librarySpecificInstructions}
         const VALID_FLAVOR_TAGS = ["酸","甜","苦","烈","鲜","柑橘","热带","草本","花香","烟熏","木桶","香料","坚果可可","清爽","浓郁","干爽","复杂"];
 
         const knownType = input.type ? `\n已知类型: ${input.type}` : "";
-        const prompt = `你是专业的调酒师和自制饮品专家（基于 Liquid Intelligence、The Bar Book、Cocktail Codex 等权威资料）。
+        const prompt = `你是专业的调酒师和自制饮品专家，深度研习 Dave Arnold《Liquid Intelligence》(2014)、Jeffrey Morgenthaler《The Bar Book》(2014)、Death & Co《Cocktail Codex》(2018)、Ryan Chetiyawardana《Good Things to Drink》(2015)、《調酒的科學》(台灣版)、《分子料理與調酒》(台灣翻譯版)、Journal of Agricultural and Food Chemistry、Food Chemistry 等权威资料。
 根据以下自制品信息，一次性补全所有字段。
 
 自制品名称: ${displayName}${knownType}${ingredientList}
@@ -1196,7 +1660,7 @@ ${librarySpecificInstructions}
         }),
       )
       .mutation(async ({ input }) => {
-        const prompt = `你是专业调酒师和配方识别专家。请从以下文字中识别并提取所有鸡尾酒配方。
+        const prompt = `你是专业调酒师和配方识别专家，精通中英文繁体中文调酒文献（包括 Jerry Thomas《Bartender's Guide》1862、Harry Craddock《The Savoy Cocktail Book》1930、Death & Co《Cocktail Codex》2018、IBA 官方配方、《調酒師手冊》台灣版、《世界雞尾酒大全》台灣版等）。请从以下文字中识别并提取所有鸡尾酒配方。
 
 文字内容：
 """
