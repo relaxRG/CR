@@ -9,6 +9,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -32,11 +33,8 @@ import { useColors } from "@/hooks/use-colors";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useI18n } from "@/lib/i18n";
 import { filterBottles, useBottleStore } from "@/lib/bottles/store";
-import {
-  applyEnrichedToBottle,
-  enrichQueryName,
-  matchEnrichedItem,
-} from "@/lib/bottles/enrich";
+import { applyEnrichedToBottle } from "@/lib/bottles/enrich";
+import type { BottleDraft } from "@/lib/bottles/store";
 import { trpc } from "@/lib/trpc";
 import { useBottleTaxonomy } from "@/lib/bottles/taxonomy";
 import { groupFormFamilies, type FormFamily } from "@/lib/bottles/form-family";
@@ -102,122 +100,232 @@ export default function BottlesScreen() {
     [bottles, group, groupOf],
   );
 
-  // 联网批量补全:当前分组内零价缺资料条目 → LLM 知识补全并更新入库(每次最多 24 条)
-  // Prevent setState after unmount (batch AI may run async)
+  // ── AI 建议队列状态机 ──────────────────────────────────────────────────────
+  // 三种模式共用同一队列：
+  //   "review"      Banner 逐条确认
+  //   "autofill"    Banner 批量自动填空白
+  //   "sel-review"  多选逐条确认
+  //   "sel-autofill"多选批量自动填空白
+  type QueueMode = "review" | "autofill" | "sel-review" | "sel-autofill";
+  type FullResult = Awaited<ReturnType<typeof enrichBottleFullMutation.mutateAsync>>;
+  type AiField = { key: string; labelZh: string; aiValue: string; currentValue: string; conflict: "new" | "override" | "confirm" | "low" };
+
+  // Prevent setState after unmount
   const isMountedRef = useRef(true);
   useEffect(() => {
     isMountedRef.current = true;
     return () => { isMountedRef.current = false; };
   }, []);
-  const enrichMutation = trpc.lookup.enrich.useMutation();
-  const [enriching, setEnriching] = useState(false);
-  const [enrichMsg, setEnrichMsg] = useState<string | null>(null);
-  const [enrichProgress, setEnrichProgress] = useState<{ done: number; total: number } | null>(null);
-  const [enrichErrors, setEnrichErrors] = useState<string[]>([]);
-  // 多选 AI 批量补全(补全 flavorTags/story/styleDesc)
-  const enrichBottleFullMutation = trpc.lookup.enrichBottleFull.useMutation();
-  const [enrichingSelected, setEnrichingSelected] = useState(false);
-  const [enrichSelectedMsg, setEnrichSelectedMsg] = useState<string | null>(null);
-  const [enrichSelectedProgress, setEnrichSelectedProgress] = useState<{ done: number; total: number } | null>(null);
-  const [enrichSelectedErrors, setEnrichSelectedErrors] = useState<string[]>([]);
-  const missingCount = useMemo(
-    () => groupBottles.filter((b) => b.priceCny <= 0).length,
-    [groupBottles],
-  );
-  const handleBatchEnrich = useCallback(async () => {
-    if (enriching) return;
-    const targets = groupBottles.filter((b) => b.priceCny <= 0).slice(0, 24);
-    if (targets.length === 0) return;
-    setEnriching(true);
-    setEnrichMsg(null);
-    setEnrichProgress({ done: 0, total: targets.length });
-    setEnrichErrors([]);
-    let updated = 0;
-    const errors: string[] = [];
-    try {
-      for (let off = 0; off < targets.length; off += 8) {
-        const batch = targets.slice(off, off + 8);
-        const names = batch.map(enrichQueryName);
-        try {
-          const res = await enrichMutation.mutateAsync({ names });
-          batch.forEach((b, i) => {
-            const item = matchEnrichedItem(res.items, names, i);
-            if (!item || !item.found) {
-              errors.push(names[i] || b.nameEn || b.nameZh);
-              return;
-            }
-            const draft = applyEnrichedToBottle(b, item);
-            if (!draft) return;
-            updateBottle(b.id, draft);
-            updated++;
-          });
-        } catch (batchErr) {
-          batch.forEach((b) => errors.push(b.nameEn || b.nameZh));
-        }
-        if (isMountedRef.current) setEnrichProgress({ done: Math.min(off + 8, targets.length), total: targets.length });
-      }
-      if (!isMountedRef.current) return;
-      if (updated > 0 && Platform.OS !== "web") {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      }
-      setEnrichErrors(errors);
-      setEnrichMsg(updated > 0 ? t("lookup.batchDone", { n: updated }) : t("lookup.enrichNone"));
-    } catch {
-      if (!isMountedRef.current) return;
-      setEnrichMsg(
-        updated > 0 ? t("lookup.batchDone", { n: updated }) : t("smartImport.fail.msg"),
-      );
-    } finally {
-      if (isMountedRef.current) {
-        setEnriching(false);
-        setEnrichProgress(null);
-      }
-    }
-  }, [enriching, groupBottles, enrichMutation, updateBottle, t]);
 
-  const handleBatchEnrichSelected = useCallback(async () => {
-    if (enrichingSelected || selectedIds.length === 0) return;
+  const enrichBottleFullMutation = trpc.lookup.enrichBottleFull.useMutation();
+  const [aiQueue, setAiQueue] = useState<Bottle[]>([]);
+  const [aiQueueIdx, setAiQueueIdx] = useState(0);
+  const [aiQueueMode, setAiQueueMode] = useState<QueueMode>("review");
+  const [aiQueueResult, setAiQueueResult] = useState<FullResult | null>(null);
+  const [aiQueueToggles, setAiQueueToggles] = useState<Record<string, boolean>>({});
+  const [aiQueueFetching, setAiQueueFetching] = useState(false);
+  const [aiQueueDone, setAiQueueDone] = useState<{ applied: number; skipped: number } | null>(null);
+  const [aiQueueError, setAiQueueError] = useState<string | null>(null);
+  const aiQueueDoneTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearAiQueue = useCallback(() => {
+    setAiQueue([]);
+    setAiQueueIdx(0);
+    setAiQueueResult(null);
+    setAiQueueToggles({});
+    setAiQueueFetching(false);
+    setAiQueueDone(null);
+    setAiQueueError(null);
+  }, []);
+
+  // 切换分组时清空队列，防止孤立引用
+  useEffect(() => { clearAiQueue(); }, [group]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 卸载时清除 done timer
+  useEffect(() => {
+    return () => { if (aiQueueDoneTimerRef.current) clearTimeout(aiQueueDoneTimerRef.current); };
+  }, []);
+
+  /** 构建当前条目的 AI 字段对比列表 */
+  const buildQueueFields = useCallback((b: Bottle, res: FullResult): AiField[] => {
+    const conf = (cur: string, ai: string, c: "high" | "medium" | "low"): AiField["conflict"] => {
+      if (!cur.trim()) return "new";
+      if (cur.trim().toLowerCase() === ai.trim().toLowerCase()) return "confirm";
+      if (c === "low") return "low";
+      return "override";
+    };
+    const fields: AiField[] = [];
+    if (res.nameZh) fields.push({ key: "nameZh", labelZh: "中文名", aiValue: res.nameZh, currentValue: b.nameZh, conflict: conf(b.nameZh, res.nameZh, res.confidence) });
+    if (res.nameEn) fields.push({ key: "nameEn", labelZh: "英文名", aiValue: res.nameEn, currentValue: b.nameEn, conflict: conf(b.nameEn, res.nameEn, res.confidence) });
+    if (res.category) fields.push({ key: "category", labelZh: "分类", aiValue: res.category, currentValue: b.category, conflict: conf(b.category, res.category, res.confidence) });
+    if (res.style) fields.push({ key: "style", labelZh: "风格", aiValue: res.style, currentValue: b.style, conflict: conf(b.style, res.style, res.confidence) });
+    if (res.brand) fields.push({ key: "brand", labelZh: "品牌", aiValue: res.brand, currentValue: b.brand, conflict: conf(b.brand, res.brand, res.confidence) });
+    if (res.origin) fields.push({ key: "origin", labelZh: "产地", aiValue: res.origin, currentValue: b.origin, conflict: conf(b.origin, res.origin, res.confidence) });
+    if (res.volume) fields.push({ key: "volume", labelZh: "容量", aiValue: res.volume, currentValue: b.volume, conflict: conf(b.volume, res.volume, res.confidence) });
+    if (res.abv > 0) fields.push({ key: "abv", labelZh: "酒精度", aiValue: `${res.abv}%`, currentValue: b.abv > 0 ? `${b.abv}%` : "", conflict: conf(b.abv > 0 ? String(b.abv) : "", String(res.abv), res.confidence) });
+    if (res.priceCny > 0) fields.push({ key: "price", labelZh: "参考价", aiValue: `¥${res.priceCny}`, currentValue: b.priceCny > 0 ? `¥${b.priceCny}` : "", conflict: conf(b.priceCny > 0 ? String(b.priceCny) : "", String(res.priceCny), res.confidence) });
+    if (res.flavorTags?.length > 0) {
+      const curStr = b.flavorTags?.length > 0 ? b.flavorTags.slice(0, 3).join(" · ") : "";
+      const aiStr = res.flavorTags.slice(0, 4).join(" · ") + (res.flavorTags.length > 4 ? ` +${res.flavorTags.length - 4}` : "");
+      fields.push({ key: "flavorTags", labelZh: "风味标签", aiValue: aiStr, currentValue: curStr, conflict: conf(curStr, aiStr, res.confidence) });
+    }
+    if (res.story) fields.push({ key: "story", labelZh: "故事/介绍", aiValue: res.story.slice(0, 50) + (res.story.length > 50 ? "…" : ""), currentValue: b.story ? b.story.slice(0, 30) + "…" : "", conflict: conf(b.story ?? "", res.story, res.confidence) });
+    if (res.styleDesc) fields.push({ key: "styleDesc", labelZh: "风格描述", aiValue: res.styleDesc.slice(0, 50) + (res.styleDesc.length > 50 ? "…" : ""), currentValue: b.styleDesc ? b.styleDesc.slice(0, 30) + "…" : "", conflict: conf(b.styleDesc ?? "", res.styleDesc, res.confidence) });
+    if (res.distilleryInfo) fields.push({ key: "distilleryInfo", labelZh: "蒸馏厂", aiValue: res.distilleryInfo.slice(0, 50) + (res.distilleryInfo.length > 50 ? "…" : ""), currentValue: b.distilleryInfo ? b.distilleryInfo.slice(0, 30) + "…" : "", conflict: conf(b.distilleryInfo ?? "", res.distilleryInfo, res.confidence) });
+    if (res.pairingNotes) fields.push({ key: "pairingNotes", labelZh: "搭配建议", aiValue: res.pairingNotes.slice(0, 50) + (res.pairingNotes.length > 50 ? "…" : ""), currentValue: b.pairingNotes ? b.pairingNotes.slice(0, 30) + "…" : "", conflict: conf(b.pairingNotes ?? "", res.pairingNotes, res.confidence) });
+    if (res.usageNotes) fields.push({ key: "usageNotes", labelZh: "调酒用途", aiValue: res.usageNotes.slice(0, 50) + (res.usageNotes.length > 50 ? "…" : ""), currentValue: b.usageNotes ? b.usageNotes.slice(0, 30) + "…" : "", conflict: conf(b.usageNotes ?? "", res.usageNotes, res.confidence) });
+    if (res.seasonality) fields.push({ key: "seasonality", labelZh: "季节性", aiValue: res.seasonality, currentValue: b.seasonality ?? "", conflict: conf(b.seasonality ?? "", res.seasonality, res.confidence) });
+    return fields;
+  }, []);
+
+  /** 将 AI 结果中 toggle=true 的字段写入酒款 */
+  const applyQueueFields = useCallback((b: Bottle, res: FullResult, toggles: Record<string, boolean>): BottleDraft => {
+    const get = (key: string) => toggles[key] !== false;
+    return {
+      nameZh: get("nameZh") && res.nameZh ? res.nameZh : b.nameZh,
+      nameEn: get("nameEn") && res.nameEn ? res.nameEn : b.nameEn,
+      category: get("category") && res.category ? res.category : b.category,
+      style: get("style") && res.style ? res.style : b.style,
+      brand: get("brand") && res.brand ? res.brand : b.brand,
+      origin: get("origin") && res.origin ? res.origin : b.origin,
+      volume: get("volume") && res.volume ? res.volume : b.volume,
+      abv: get("abv") && res.abv > 0 ? res.abv : b.abv,
+      priceCny: get("price") && res.priceCny > 0 ? res.priceCny : b.priceCny,
+      notes: b.notes,
+      flavorTags: get("flavorTags") && res.flavorTags?.length > 0 ? res.flavorTags : (b.flavorTags ?? []),
+      story: get("story") && res.story ? res.story : (b.story ?? ""),
+      styleDesc: get("styleDesc") && res.styleDesc ? res.styleDesc : (b.styleDesc ?? ""),
+      distilleryInfo: get("distilleryInfo") && res.distilleryInfo ? res.distilleryInfo : (b.distilleryInfo ?? ""),
+      pairingNotes: get("pairingNotes") && res.pairingNotes ? res.pairingNotes : (b.pairingNotes ?? ""),
+      usageNotes: get("usageNotes") && res.usageNotes ? res.usageNotes : (b.usageNotes ?? ""),
+      seasonality: get("seasonality") && res.seasonality ? res.seasonality : (b.seasonality ?? ""),
+      rating: b.rating,
+    };
+  }, []);
+
+  /** 自动填空白：只填 conflict==="new" 的字段 */
+  const autoFillBlanks = useCallback((b: Bottle, res: FullResult): BottleDraft => {
+    const fields = buildQueueFields(b, res);
+    const blanksOnly: Record<string, boolean> = {};
+    for (const f of fields) blanksOnly[f.key] = f.conflict === "new";
+    return applyQueueFields(b, res, blanksOnly);
+  }, [buildQueueFields, applyQueueFields]);
+
+  /** 拉取队列中第 idx 条的 AI 结果（appliedSoFar 用于完成统计） */
+  const fetchQueueItem = useCallback(async (queue: Bottle[], idx: number, mode: QueueMode, appliedSoFar: number) => {
+    if (idx >= queue.length) {
+      if (isMountedRef.current) {
+        setAiQueueFetching(false);
+        setAiQueueResult(null);
+        setAiQueue([]);
+        setAiQueueDone({ applied: appliedSoFar, skipped: queue.length - appliedSoFar });
+        if (aiQueueDoneTimerRef.current) clearTimeout(aiQueueDoneTimerRef.current);
+        aiQueueDoneTimerRef.current = setTimeout(() => {
+          if (isMountedRef.current) setAiQueueDone(null);
+        }, 6000);
+        if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+      return;
+    }
+    const b = queue[idx];
+    if (!isMountedRef.current) return;
+    setAiQueueFetching(true);
+    setAiQueueError(null);
+    try {
+      const res = await enrichBottleFullMutation.mutateAsync({
+        nameZh: b.nameZh || undefined,
+        nameEn: b.nameEn || undefined,
+        category: b.category || undefined,
+        style: b.style || undefined,
+        brand: b.brand || undefined,
+        origin: b.origin || undefined,
+      });
+      if (!isMountedRef.current) return;
+      setAiQueueFetching(false);
+      if (!res.found && !res.nameZh && !res.nameEn) {
+        // 未找到，自动跳过
+        setAiQueueIdx(idx + 1);
+        fetchQueueItem(queue, idx + 1, mode, appliedSoFar);
+        return;
+      }
+      if (mode === "autofill" || mode === "sel-autofill") {
+        const draft = autoFillBlanks(b, res);
+        updateBottle(b.id, draft);
+        setAiQueueIdx(idx + 1);
+        fetchQueueItem(queue, idx + 1, mode, appliedSoFar + 1);
+      } else {
+        const fields = buildQueueFields(b, res);
+        const defaults: Record<string, boolean> = {};
+        for (const f of fields) defaults[f.key] = f.conflict === "new" || f.conflict === "confirm";
+        setAiQueueToggles(defaults);
+        setAiQueueResult(res);
+      }
+    } catch (err) {
+      if (!isMountedRef.current) return;
+      setAiQueueFetching(false);
+      const msg = err instanceof Error ? err.message : String(err);
+      const isTimeout = msg.includes("timeout") || msg.includes("ETIMEDOUT");
+      setAiQueueError(isTimeout
+        ? (lang === "zh" ? "AI 响应超时，可跳过或重试" : "AI timeout, skip or retry")
+        : (lang === "zh" ? "网络错误，请检查连接" : "Network error, check connection"));
+    }
+  }, [enrichBottleFullMutation, updateBottle, buildQueueFields, autoFillBlanks, lang]);
+
+  /** Banner：启动缺资料条目补全队列 */
+  const handleBatchEnrich = useCallback((mode: QueueMode) => {
+    if (aiQueueFetching || aiQueue.length > 0) return;
+    const isMissing = (b: Bottle) =>
+      b.priceCny <= 0 || !b.origin || !b.brand || !(b.flavorTags?.length > 0) || !b.story;
+    const targets = groupBottles.filter(isMissing).slice(0, 30);
+    if (targets.length === 0) return;
+    clearAiQueue();
+    setAiQueueMode(mode);
+    setAiQueue(targets);
+    setAiQueueIdx(0);
+    fetchQueueItem(targets, 0, mode, 0);
+  }, [aiQueueFetching, aiQueue.length, groupBottles, clearAiQueue, fetchQueueItem]);
+
+  /** 多选：启动已选条目补全队列 */
+  const handleBatchEnrichSelected = useCallback((mode: QueueMode) => {
+    if (aiQueueFetching || aiQueue.length > 0 || selectedIds.length === 0) return;
     const targets = bottles.filter((b) => selectedIds.includes(b.id)).slice(0, 20);
     if (targets.length === 0) return;
-    setEnrichingSelected(true);
-    setEnrichSelectedMsg(null);
-    setEnrichSelectedProgress({ done: 0, total: targets.length });
-    setEnrichSelectedErrors([]);
-    let updated = 0;
-    const errors: string[] = [];
-    for (let i = 0; i < targets.length; i++) {
-      const b = targets[i];
-      try {
-        const res = await enrichBottleFullMutation.mutateAsync({
-          nameZh: b.nameZh || undefined,
-          nameEn: b.nameEn || undefined,
-          category: b.category || undefined,
-          style: b.style || undefined,
-          brand: b.brand || undefined,
-          origin: b.origin || undefined,
-        });
-        if (res.found || res.nameZh || res.nameEn) {
-          const enrichedItem = { ...res, query: b.nameZh || b.nameEn || "" } as Parameters<typeof applyEnrichedToBottle>[1];
-          const draft = applyEnrichedToBottle(b, enrichedItem);
-          if (draft) {
-            updateBottle(b.id, draft);
-            updated++;
-          }
-        }
-      } catch {
-        errors.push(b.nameZh || b.nameEn || `#${i + 1}`);
-      }
-      if (isMountedRef.current) setEnrichSelectedProgress({ done: i + 1, total: targets.length });
-    }
-    if (!isMountedRef.current) return;
-    if (updated > 0 && Platform.OS !== "web") {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }
-    setEnrichSelectedErrors(errors);
-    setEnrichSelectedMsg(updated > 0 ? t("lookup.batchDone", { n: updated }) : t("lookup.enrichNone"));
-    setEnrichingSelected(false);
-    setEnrichSelectedProgress(null);
-  }, [enrichingSelected, selectedIds, bottles, enrichBottleFullMutation, updateBottle, t]);
+    clearAiQueue();
+    setAiQueueMode(mode);
+    setAiQueue(targets);
+    setAiQueueIdx(0);
+    fetchQueueItem(targets, 0, mode, 0);
+  }, [aiQueueFetching, aiQueue.length, selectedIds, bottles, clearAiQueue, fetchQueueItem]);
+
+  /** 队列面板：应用当前条目并推进到下一条 */
+  const handleQueueApply = useCallback(() => {
+    const b = aiQueue[aiQueueIdx];
+    const res = aiQueueResult;
+    if (!b || !res) return;
+    const draft = applyQueueFields(b, res, aiQueueToggles);
+    updateBottle(b.id, draft);
+    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const nextIdx = aiQueueIdx + 1;
+    setAiQueueIdx(nextIdx);
+    setAiQueueResult(null);
+    fetchQueueItem(aiQueue, nextIdx, aiQueueMode, nextIdx);
+  }, [aiQueue, aiQueueIdx, aiQueueResult, aiQueueToggles, aiQueueMode, applyQueueFields, updateBottle, fetchQueueItem]);
+
+  /** 队列面板：跳过当前条目 */
+  const handleQueueSkip = useCallback(() => {
+    const nextIdx = aiQueueIdx + 1;
+    setAiQueueIdx(nextIdx);
+    setAiQueueResult(null);
+    setAiQueueError(null);
+    fetchQueueItem(aiQueue, nextIdx, aiQueueMode, aiQueueIdx);
+  }, [aiQueue, aiQueueIdx, aiQueueMode, fetchQueueItem]);
+
+  const missingCount = useMemo(
+    () => groupBottles.filter((b) =>
+      b.priceCny <= 0 || !b.origin || !b.brand || !(b.flavorTags?.length > 0) || !b.story
+    ).length,
+    [groupBottles],
+  );
 
   // 快捷筛选解析:大分类(类别)与其下细化的风格集合
   const quickCats = Object.keys(quickSel);
@@ -517,7 +625,7 @@ export default function BottlesScreen() {
                       setGroup(g.key);
                       setSelCategories([]);
                       setSelStyles([]);
-                      setEnrichMsg(null);
+                      clearAiQueue();
                       if (Platform.OS !== "web") {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                       }
@@ -623,62 +731,190 @@ export default function BottlesScreen() {
         />
       </View>
 
-      {/* 联网补全:当前分组内零价缺资料条目一键补全 */}
-      {!selectMode && ready && missingCount > 0 ? (
-        <View className="px-5" style={{ marginTop: 8 }}>
-          <Pressable
-            onPress={handleBatchEnrich}
-            disabled={enriching}
-            style={({ pressed }) => [
-              styles.enrichBanner,
-              { backgroundColor: colors.primary + "10", borderWidth: 1, borderColor: colors.primary + "25" },
-              (pressed || enriching) && { opacity: 0.6 },
-            ]}
-          >
-            {enriching ? (
-              <ActivityIndicator size="small" color={colors.primary} />
-            ) : (
+      {/* 联网补全 Banner：三模式（逐条确认 / 批量自动填空白） */}
+      {!selectMode && ready && missingCount > 0 && aiQueue.length === 0 && !aiQueueDone ? (
+        <View className="px-5" style={{ marginTop: 8, gap: 6 }}>
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            <Pressable
+              onPress={() => handleBatchEnrich("review")}
+              disabled={aiQueueFetching}
+              style={({ pressed }) => [
+                styles.enrichBanner,
+                { flex: 1, backgroundColor: colors.primary + "10", borderWidth: 1, borderColor: colors.primary + "25" },
+                (pressed || aiQueueFetching) && { opacity: 0.6 },
+              ]}
+            >
               <IconSymbol name="globe" size={14} color={colors.primary} />
-            )}
-            <Text style={{ fontSize: 13, fontWeight: "600", color: colors.primary }}>
-              {t("lookup.enrichMissing")} ({missingCount})
+              <Text style={{ fontSize: 12, fontWeight: "600", color: colors.primary }}>
+                {lang === "zh" ? `逐条审核 (${missingCount})` : `Review (${missingCount})`}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => handleBatchEnrich("autofill")}
+              disabled={aiQueueFetching}
+              style={({ pressed }) => [
+                styles.enrichBanner,
+                { flex: 1, backgroundColor: colors.success + "12", borderWidth: 1, borderColor: colors.success + "30" },
+                (pressed || aiQueueFetching) && { opacity: 0.6 },
+              ]}
+            >
+              <IconSymbol name="sparkles" size={14} color={colors.success} />
+              <Text style={{ fontSize: 12, fontWeight: "600", color: colors.success }}>
+                {lang === "zh" ? "自动填空白" : "Auto-fill Blanks"}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
+
+      {/* AI 建议队列面板（逐条确认模式） */}
+      {!selectMode && aiQueue.length > 0 ? (
+        <View className="px-5" style={{ marginTop: 8 }}>
+          <View style={{ backgroundColor: colors.surface, borderRadius: 14, borderWidth: 1, borderColor: colors.border, overflow: "hidden" }}>
+            {/* 面板标题 */}
+            <View style={{ flexDirection: "row", alignItems: "center", padding: 12, borderBottomWidth: 1, borderBottomColor: colors.border, gap: 8 }}>
+              <IconSymbol name="sparkles" size={16} color={colors.primary} />
+              <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground, flex: 1 }}>
+                {lang === "zh" ? "AI 建议" : "AI Suggestions"}
+              </Text>
+              {aiQueue[aiQueueIdx] ? (
+                <Text style={{ fontSize: 12, color: colors.muted }}>
+                  {aiQueueIdx + 1}/{aiQueue.length} · {(aiQueue[aiQueueIdx].nameZh || aiQueue[aiQueueIdx].nameEn || "").slice(0, 12)}
+                </Text>
+              ) : null}
+              <Pressable onPress={clearAiQueue} hitSlop={8}>
+                <IconSymbol name="xmark" size={16} color={colors.muted} />
+              </Pressable>
+            </View>
+
+            {/* 加载中 */}
+            {aiQueueFetching && !aiQueueResult ? (
+              <View style={{ padding: 20, alignItems: "center", gap: 8 }}>
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text style={{ fontSize: 13, color: colors.muted }}>
+                  {lang === "zh" ? "AI 分析中…" : "Analyzing…"}
+                </Text>
+              </View>
+            ) : aiQueueError ? (
+              <View style={{ padding: 16, gap: 10 }}>
+                <Text style={{ fontSize: 13, color: colors.error, textAlign: "center" }}>{aiQueueError}</Text>
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  <Pressable
+                    onPress={() => fetchQueueItem(aiQueue, aiQueueIdx, aiQueueMode, aiQueueIdx)}
+                    style={({ pressed }) => [{ flex: 1, padding: 10, borderRadius: 10, backgroundColor: colors.primary, alignItems: "center" }, pressed && { opacity: 0.7 }]}
+                  >
+                    <Text style={{ fontSize: 13, fontWeight: "600", color: "#fff" }}>{lang === "zh" ? "重试" : "Retry"}</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={handleQueueSkip}
+                    style={({ pressed }) => [{ flex: 1, padding: 10, borderRadius: 10, backgroundColor: colors.border, alignItems: "center" }, pressed && { opacity: 0.7 }]}
+                  >
+                    <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>{lang === "zh" ? "跳过" : "Skip"}</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : aiQueueResult ? (
+              <>
+                {/* 快捷操作 */}
+                <View style={{ flexDirection: "row", padding: 10, gap: 6, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                  {[
+                    { label: lang === "zh" ? "全选" : "All", action: () => { const f = buildQueueFields(aiQueue[aiQueueIdx], aiQueueResult!); const t: Record<string,boolean>={}; f.forEach(x=>t[x.key]=true); setAiQueueToggles(t); } },
+                    { label: lang === "zh" ? "只填空白" : "Blanks Only", action: () => { const f = buildQueueFields(aiQueue[aiQueueIdx], aiQueueResult!); const t: Record<string,boolean>={}; f.forEach(x=>t[x.key]=x.conflict==="new"); setAiQueueToggles(t); } },
+                    { label: lang === "zh" ? "全不选" : "None", action: () => { const f = buildQueueFields(aiQueue[aiQueueIdx], aiQueueResult!); const t: Record<string,boolean>={}; f.forEach(x=>t[x.key]=false); setAiQueueToggles(t); } },
+                  ].map((btn) => (
+                    <Pressable key={btn.label} onPress={btn.action} style={({ pressed }) => [{ flex: 1, paddingVertical: 6, borderRadius: 8, backgroundColor: colors.border + "80", alignItems: "center" }, pressed && { opacity: 0.6 }]}>
+                      <Text style={{ fontSize: 12, fontWeight: "600", color: colors.foreground }}>{btn.label}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+                {/* 字段列表 */}
+                {buildQueueFields(aiQueue[aiQueueIdx], aiQueueResult).map((field) => {
+                  const conflictColor = field.conflict === "new" ? colors.success : field.conflict === "override" ? colors.warning : field.conflict === "confirm" ? colors.primary : colors.muted;
+                  const conflictLabel = field.conflict === "new" ? (lang === "zh" ? "新增" : "New") : field.conflict === "override" ? (lang === "zh" ? "覆盖" : "Override") : field.conflict === "confirm" ? (lang === "zh" ? "确认" : "Confirm") : (lang === "zh" ? "低可信" : "Low");
+                  const isOn = aiQueueToggles[field.key] !== false;
+                  return (
+                    <View key={field.key} style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border + "60", gap: 10 }}>
+                      <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: conflictColor + "20" }}>
+                        <Text style={{ fontSize: 10, fontWeight: "700", color: conflictColor }}>{conflictLabel}</Text>
+                      </View>
+                      <View style={{ flex: 1, gap: 2 }}>
+                        <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>{field.labelZh}</Text>
+                        {field.currentValue ? (
+                          <Text style={{ fontSize: 11, color: colors.muted }} numberOfLines={1}>
+                            {field.currentValue} → <Text style={{ color: isOn ? colors.primary : colors.muted }}>{field.aiValue}</Text>
+                          </Text>
+                        ) : (
+                          <Text style={{ fontSize: 11, color: isOn ? colors.primary : colors.muted }} numberOfLines={1}>{field.aiValue}</Text>
+                        )}
+                      </View>
+                      <Switch
+                        value={isOn}
+                        onValueChange={(v) => setAiQueueToggles((prev) => ({ ...prev, [field.key]: v }))}
+                        trackColor={{ false: colors.border, true: colors.primary + "80" }}
+                        thumbColor={isOn ? colors.primary : colors.muted}
+                      />
+                    </View>
+                  );
+                })}
+                {/* 应用 / 跳过 */}
+                <View style={{ flexDirection: "row", padding: 10, gap: 8 }}>
+                  <Pressable
+                    onPress={handleQueueApply}
+                    style={({ pressed }) => [{ flex: 3, padding: 12, borderRadius: 12, backgroundColor: colors.primary, alignItems: "center" }, pressed && { opacity: 0.8 }]}
+                  >
+                    <Text style={{ fontSize: 14, fontWeight: "700", color: "#fff" }}>
+                      {lang === "zh"
+                        ? `应用 ${Object.values(aiQueueToggles).filter(Boolean).length} 项`
+                        : `Apply ${Object.values(aiQueueToggles).filter(Boolean).length}`}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={handleQueueSkip}
+                    style={({ pressed }) => [{ flex: 1, padding: 12, borderRadius: 12, backgroundColor: colors.border, alignItems: "center" }, pressed && { opacity: 0.7 }]}
+                  >
+                    <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>{lang === "zh" ? "跳过" : "Skip"}</Text>
+                  </Pressable>
+                </View>
+              </>
+            ) : null}
+          </View>
+        </View>
+      ) : null}
+
+      {/* 自动填空白进度条（autofill 模式） */}
+      {!selectMode && aiQueueFetching && (aiQueueMode === "autofill" || aiQueueMode === "sel-autofill") ? (
+        <View className="px-5" style={{ marginTop: 8 }}>
+          <View style={{ backgroundColor: colors.surface, borderRadius: 12, borderWidth: 1, borderColor: colors.border, padding: 12, gap: 8 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={{ fontSize: 13, color: colors.foreground, flex: 1 }}>
+                {lang === "zh" ? `自动填空白中… ${aiQueueIdx}/${aiQueue.length}` : `Auto-filling… ${aiQueueIdx}/${aiQueue.length}`}
+              </Text>
+              <Pressable onPress={clearAiQueue} hitSlop={8}>
+                <Text style={{ fontSize: 12, color: colors.muted }}>{lang === "zh" ? "取消" : "Cancel"}</Text>
+              </Pressable>
+            </View>
+            <View style={{ height: 4, backgroundColor: colors.border, borderRadius: 4, overflow: "hidden" }}>
+              <View style={{ height: 4, backgroundColor: colors.primary, borderRadius: 4, width: `${Math.round((aiQueueIdx / Math.max(aiQueue.length, 1)) * 100)}%` }} />
+            </View>
+          </View>
+        </View>
+      ) : null}
+
+      {/* 完成 toast */}
+      {aiQueueDone ? (
+        <View className="px-5" style={{ marginTop: 8 }}>
+          <View style={{ backgroundColor: colors.success + "15", borderRadius: 12, borderWidth: 1, borderColor: colors.success + "30", padding: 12, flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <IconSymbol name="checkmark.circle.fill" size={16} color={colors.success} />
+            <Text style={{ fontSize: 13, color: colors.foreground, flex: 1 }}>
+              {lang === "zh"
+                ? `已补全 ${aiQueueDone.applied} 条${aiQueueDone.skipped > 0 ? `，跳过 ${aiQueueDone.skipped} 条` : ""}`
+                : `Applied ${aiQueueDone.applied}${aiQueueDone.skipped > 0 ? `, skipped ${aiQueueDone.skipped}` : ""}`}
             </Text>
-          </Pressable>
-          {enrichProgress ? (
-            <View className="mt-2 px-1" style={{ gap: 4 }}>
-              <View className="flex-row items-center justify-between">
-                <Text className="text-xs text-muted">
-                  {lang === "zh"
-                    ? `正在补全 ${enrichProgress.done}/${enrichProgress.total}…`
-                    : `Enriching ${enrichProgress.done}/${enrichProgress.total}…`}
-                </Text>
-              </View>
-              <View
-                className="rounded-full overflow-hidden"
-                style={{ height: 4, backgroundColor: colors.border }}
-              >
-                <View
-                  className="rounded-full"
-                  style={{
-                    height: 4,
-                    backgroundColor: colors.primary,
-                    width: `${Math.round((enrichProgress.done / enrichProgress.total) * 100)}%`,
-                  }}
-                />
-              </View>
-            </View>
-          ) : enrichMsg ? (
-            <View className="mt-1" style={{ gap: 3 }}>
-              <Text className="text-xs text-muted text-center">{enrichMsg}</Text>
-              {enrichErrors.length > 0 && (
-                <Text className="text-xs text-center" style={{ color: colors.error, lineHeight: 16 }}>
-                  {lang === "zh" ? "未识别: " : "Not found: "}
-                  {enrichErrors.slice(0, 5).join(" · ")}
-                  {enrichErrors.length > 5 ? ` +${enrichErrors.length - 5}` : ""}
-                </Text>
-              )}
-            </View>
-          ) : null}
+            <Pressable onPress={() => setAiQueueDone(null)} hitSlop={8}>
+              <IconSymbol name="xmark" size={14} color={colors.muted} />
+            </Pressable>
+          </View>
         </View>
       ) : null}
 
@@ -854,10 +1090,17 @@ export default function BottlesScreen() {
               },
               {
                 key: "aiEnrich",
-                label: enrichingSelected ? "…" : t("sel.aiEnrich"),
+                label: lang === "zh" ? "逐条审核" : "Review",
+                icon: "sparkles",
+                disabled: aiQueueFetching || aiQueue.length > 0 || selectedIds.length === 0,
+                onPress: () => handleBatchEnrichSelected("review"),
+              },
+              {
+                key: "aiAutoFill",
+                label: lang === "zh" ? "自动填空白" : "Auto-fill",
                 icon: "globe",
-                disabled: enrichingSelected || selectedIds.length === 0,
-                onPress: handleBatchEnrichSelected,
+                disabled: aiQueueFetching || aiQueue.length > 0 || selectedIds.length === 0,
+                onPress: () => handleBatchEnrichSelected("sel-autofill"),
               },
               {
                 key: "delete",
@@ -889,24 +1132,8 @@ export default function BottlesScreen() {
             allowClear={bulkSheet === "style"}
             count={selectedIds.length}
             onApply={handleBulkApply}
-            onClose={() => setBulkSheet(null)}
+          onClose={() => setBulkSheet(null)}
           />
-          {enrichingSelected && enrichSelectedProgress ? (
-            <View style={{ marginHorizontal: 16, marginBottom: 8, padding: 10, borderRadius: 10, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <ActivityIndicator size="small" color={colors.primary} />
-              <Text style={{ fontSize: 13, color: colors.foreground, flex: 1 }}>AI 补全中… {enrichSelectedProgress.done}/{enrichSelectedProgress.total}</Text>
-            </View>
-          ) : enrichSelectedMsg ? (
-            <View style={{ marginHorizontal: 16, marginBottom: 8, padding: 10, borderRadius: 10, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <Text style={{ fontSize: 13, color: colors.foreground, flex: 1 }}>{enrichSelectedMsg}</Text>
-              {enrichSelectedErrors.length > 0 && (
-                <Text style={{ fontSize: 11, color: colors.warning }}>失败: {enrichSelectedErrors.slice(0, 3).join(", ")}{enrichSelectedErrors.length > 3 ? `…+${enrichSelectedErrors.length - 3}` : ""}</Text>
-              )}
-              <Pressable onPress={() => setEnrichSelectedMsg(null)} hitSlop={8}>
-                <Text style={{ fontSize: 13, color: colors.primary }}>关闭</Text>
-              </Pressable>
-            </View>
-          ) : null}
         </>
       )}
     </ScreenContainer>
