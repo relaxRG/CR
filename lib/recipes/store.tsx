@@ -240,6 +240,18 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
             notifySyncChange(TAGS_KEY);
           }
         }
+        // 老用户升级:注入新增的 GLASSES 标签（尼克诺拉杯、郁金香杯、笛型杯、提基杯、铜杯、红酒杯、朱莉普杯）
+        if (tRaw) {
+          const allDefaults = buildDefaultTags();
+          const missingGlasses = allDefaults.filter(
+            (d) => d.kind === "glass" && !tagList.some((t) => t.kind === "glass" && t.name === d.name),
+          );
+          if (missingGlasses.length > 0) {
+            tagList = [...tagList, ...missingGlasses];
+            await AsyncStorage.setItem(TAGS_KEY, JSON.stringify(tagList));
+            notifySyncChange(TAGS_KEY);
+          }
+        }
         const groupList: TagGroup[] = (gRaw ? (JSON.parse(gRaw) as TagGroup[]) : []).map(
           (g) => migrateTagNameEn(g),
         );
