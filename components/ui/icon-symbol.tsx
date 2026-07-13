@@ -94,6 +94,9 @@ const MAPPING = {
   "arrow.up.right.square": "open-in-new",
   "flask": "science",
   "list.dash": "reorder",
+  "externaldrive.fill": "storage",
+  "square.and.arrow.up": "share",
+  "rectangle.3.group.fill": "grid-view",
 } as IconMapping;
 
 /**
