@@ -330,7 +330,7 @@ export function useRecipeTagRows(
       >
         <View style={[pillStyle, { backgroundColor: tagColor + (small ? "18" : "22") }]}>
           <Text style={[textStyle, { fontWeight: "500", color: tagColor + (small ? "CC" : "") }]}>
-            {f}
+            {localizeField(f, lang)}
           </Text>
         </View>
       </Pressable>
