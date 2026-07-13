@@ -1,6 +1,7 @@
 import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -10,6 +11,39 @@ import { useRecipeStore } from "@/lib/recipes/store";
 import { useBottleStore } from "@/lib/bottles/store";
 import { useHomemadeStore } from "@/lib/homemade/store";
 import { useSync } from "@/lib/sync/provider";
+
+/** 所有需要清除的本地数据 key */
+const ALL_DATA_KEYS = [
+  // 配方
+  "cocktail.recipes", "cocktail.categories", "cocktail.seeded",
+  "cocktail.tags", "cocktail.tagGroups", "cocktail_waldorf_imported_v1",
+  // 酒款
+  "cocktail.bottles", "cocktail.bottles.seeded", "cocktail.bottles.waldorf.v1",
+  "bottles.material.migrated.v8", "bottles.material.migrated.v9",
+  "bottles.taxonomy.categories.v1", "bottles.taxonomy.styles.v1",
+  // 自制
+  "homemade.preps.v1", "homemade.seeded.v1", "homemade.sections.v1",
+  "homemade.types.v1", "homemade.taxonomy.v2",
+  "homemade.waldorf.v1", "homemade.waldorf.v2", "homemade.source.v3",
+  // 实验室
+  "cocktail.lab.projects", "cocktail.lab.batches",
+  // 书籍
+  "cocktail.books.v1",
+  // 菜单 / 购物 / 冰块 / 卡片设置
+  "menu_store_v1", "shopping_store_v1",
+  "cocktail.iceSettings.v2", "card.tag.settings.v2",
+  // 同步时间戳（前缀 sync.ts.）
+  ...["cocktail.recipes","cocktail.categories","cocktail.tags","cocktail.tagGroups",
+    "cocktail.seeded","cocktail_waldorf_imported_v1","cocktail.bottles",
+    "cocktail.bottles.seeded","cocktail.bottles.waldorf.v1","homemade.preps.v1",
+    "homemade.seeded.v1","homemade.sections.v1","homemade.types.v1",
+    "homemade.taxonomy.v2","homemade.waldorf.v1","bottles.taxonomy.categories.v1",
+    "bottles.taxonomy.styles.v1","cocktail.lab.projects","cocktail.lab.batches",
+    "app.lang.v1","cocktail.books.v1","menu_store_v1","shopping_store_v1",
+    "cocktail.iceSettings.v2",
+  ].map((k) => `sync.ts.${k}`),
+  "sync.lastPulledAt",
+];
 
 /** "我的"个人中心页:数据总览、标签管理与批量导入入口、语言设置 */
 export default function MeScreen() {
@@ -23,6 +57,28 @@ export default function MeScreen() {
 
   const tap = () => {
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
+  const handleClearData = () => {
+    tap();
+    const doDelete = async () => {
+      await AsyncStorage.multiRemove(ALL_DATA_KEYS);
+      Alert.alert(t("me.clearData.success"));
+    };
+    if (Platform.OS === "web") {
+      if (typeof window !== "undefined" && window.confirm(t("me.clearData.confirm.message"))) {
+        void doDelete();
+      }
+    } else {
+      Alert.alert(
+        t("me.clearData.confirm.title"),
+        t("me.clearData.confirm.message"),
+        [
+          { text: t("common.cancel"), style: "cancel" },
+          { text: t("me.clearData.confirm.button"), style: "destructive", onPress: () => void doDelete() },
+        ],
+      );
+    }
   };
 
   const syncStatusText = !isAuthenticated
@@ -210,6 +266,23 @@ export default function MeScreen() {
 
         {/* 语言设置 */}
         <View className="px-5 pb-4">
+          {/* 清除所有数据 */}
+          <View style={{ backgroundColor: colors.surface, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, overflow: "hidden", marginBottom: 16 }}>
+            <Pressable
+              onPress={handleClearData}
+              style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
+            >
+              <View style={[styles.iconWrap, { backgroundColor: colors.error }]}>
+                <IconSymbol name="trash.fill" size={18} color="#FFFFFF" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.rowTitle, { color: colors.error }]}>{t("me.clearData")}</Text>
+                <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>
+                  {t("me.clearData.desc")}
+                </Text>
+              </View>
+            </Pressable>
+          </View>
           <View style={{ backgroundColor: colors.surface, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, overflow: "hidden" }}>
             <View style={styles.row}>
               <View style={[styles.iconWrap, { backgroundColor: "#5856D6" }]}>

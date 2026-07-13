@@ -42,6 +42,12 @@ const dict = {
   "me.stats.recipes": { zh: "配方", en: "Recipes" },
   "me.stats.bottles": { zh: "酒款", en: "Bottles" },
   "me.stats.preps": { zh: "自制", en: "Preps" },
+  "me.clearData": { zh: "清除所有数据", en: "Clear All Data" },
+  "me.clearData.desc": { zh: "删除本地所有配方、酒款、自制等数据", en: "Delete all local recipes, bottles, preps & more" },
+  "me.clearData.confirm.title": { zh: "确认清除所有数据？", en: "Clear All Data?" },
+  "me.clearData.confirm.message": { zh: "此操作将永久删除本地所有配方、酒款、自制、书籍等数据，无法恢复。", en: "This will permanently delete all local recipes, bottles, preps, books and more. This cannot be undone." },
+  "me.clearData.confirm.button": { zh: "清除所有数据", en: "Clear All Data" },
+  "me.clearData.success": { zh: "所有数据已清除", en: "All data cleared" },
   // Bulk import
   "bulk.title": { zh: "批量导入", en: "Bulk Import" },
   "smartImport.paste": { zh: "粘贴导入", en: "Paste" },

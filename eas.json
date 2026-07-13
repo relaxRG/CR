@@ -18,10 +18,12 @@
       "autoIncrement": true,
       "ios": {
         "resourceClass": "m-medium",
-        "simulator": false
+        "simulator": false,
+        "scheme": "cocktailr"
       },
       "env": {
-        "EXPO_PLATFORM": "macos"
+        "EXPO_PLATFORM": "macos",
+        "EXPO_PUBLIC_API_BASE_URL": "https://cocktailapp-lr42ivhn.manus.space"
       }
     }
   },
