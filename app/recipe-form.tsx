@@ -802,8 +802,10 @@ export default function RecipeFormScreen() {
     } else if (key === "codexFamily" && aiResult.suggestedCodexFamily) {
       const nf = CODEX_FAMILIES.find((f) => f === aiResult.suggestedCodexFamily || f.startsWith(aiResult.suggestedCodexFamily ?? "") || (aiResult.suggestedCodexFamily ?? "").includes(f.split(" ")[0])) ?? aiResult.suggestedCodexFamily;
       if (nf) setCodexFamily(nf);
-    } else if (key === "variantOf" && aiResult.suggestedVariantOf) {
-      setVariantOf(aiResult.suggestedVariantOf);
+    } else if (key === "variantOf") {
+      // 与 buildAiFields 保持一致：suggestedVariantOf 为空时兜底 MODERN_ORIGINAL
+      const sv = aiResult.suggestedVariantOf ?? "MODERN_ORIGINAL";
+      setVariantOf(sv);
     } else if (key === "drinkDuration" && aiResult.suggestedDrinkDuration) {
       setDrinkDuration(aiResult.suggestedDrinkDuration); setDurationUserOverride(true);
     } else if (key === "occasion" && aiResult.suggestedOccasion) {

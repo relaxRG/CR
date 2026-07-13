@@ -1372,18 +1372,20 @@ ${input.origin ? `产地: ${input.origin}` : ""}
      * 支持基酒库 / 酒款库 / 原材料库三库差异化 prompt，所有标签严格白名单校验。
      */
     enrichBottleFull: publicProcedure
-      .input(
-        z.object({
-          nameZh: z.string().max(200).optional(),
-          nameEn: z.string().max(200).optional(),
-          category: z.string().max(100).optional(),
-          style: z.string().max(100).optional(),
-          brand: z.string().max(200).optional(),
-          origin: z.string().max(200).optional(),
-          imageBase64: z.string().max(14_000_000).optional(),
-          imageMime: z.string().max(64).optional(),
-        }),
-      )
+    .input(
+      z.object({
+        nameZh: z.string().max(200).optional(),
+        nameEn: z.string().max(200).optional(),
+        category: z.string().max(100).optional(),
+        style: z.string().max(100).optional(),
+        brand: z.string().max(200).optional(),
+        origin: z.string().max(200).optional(),
+        imageBase64: z.string().max(14_000_000).optional(),
+        imageMime: z.string().max(64).optional(),
+        /** 用户书库中与该酒款相关的文本片段（最多3段，每段200字以内） */
+        bookSnippets: z.array(z.string().max(300)).max(5).optional(),
+      }),
+    )
       .mutation(async ({ input }) => {
         // ── 白名单常量 ──────────────────────────────────────────────────
         const BOTTLE_STYLES_MAP: Record<string, string[]> = {
@@ -1431,6 +1433,10 @@ ${input.origin ? `产地: ${input.origin}` : ""}
         const knownOrigin = input.origin ? `\n产地: ${input.origin}` : "";
         const knownCategory = cat ? `\n分类: ${cat}` : "";
         const styleOptions = cat && BOTTLE_STYLES_MAP[cat] ? `\n可选风格子标签（必须从中选一，不确定填""）: ${JSON.stringify(BOTTLE_STYLES_MAP[cat])}` : "";
+        // 书库上下文：如果客户端传来了相关段落，注入到 prompt 中
+        const bookContext = (input.bookSnippets && input.bookSnippets.length > 0)
+          ? `\n\n【用户书库参考资料】以下是用户个人书库中与该酒款相关的原文段落，请优先参考这些内容补全 story/notes/styleDesc/distilleryInfo 等描述性字段：\n${input.bookSnippets.map((s, i) => `[段落${i + 1}] ${s}`).join("\n")}`
+          : "";
 
         // ── 三库差异化 prompt ───────────────────────────────────────────
         let librarySpecificInstructions = "";
@@ -1462,9 +1468,8 @@ ${input.origin ? `产地: ${input.origin}` : ""}
 【中文/繁體】《威士忌學》邱德夫著(台灣) · 《葡萄酒全書》林裕森著(台灣) · 《調酒師手冊》(台灣版) · 《調酒學》林一峰著(香港) · 《世界雞尾酒大全》(台灣版) · 《威士忌聖經》中文版 · 《清酒的世界》(台灣翻譯版) · 《日本酒入門》(台灣版) · 《苦精聖經》(台灣翻譯版) · 《利口酒全書》(台灣翻譯版) · 《精釀啤酒聖經》(台灣翻譯版) · 《葡萄酒品飲事典》(台灣版) · 《中國白酒香型與工藝》(中國輕工業出版社) · GB/T 國家標準(中國白酒各香型) · 《釀酒科技》期刊(中國) · 台灣調酒協會(TBSA) · 香港調酒師協會(HKBA)
 【學術】Journal of Agricultural and Food Chemistry · Food Chemistry · Journal of the Institute of Brewing · American Journal of Enology and Viticulture · Chemical Senses · Food Quality and Preference · 《食品科學》(中國) · 《釀酒科技》(中國)
 根据以下产品信息，一次性补全所有字段。
-根据以下产品信息，一次性补全所有字段。
 
-产品名称: ${name || "（未知，请根据照片识别）"}${knownCategory}${knownStyle}${knownBrand}${knownOrigin}
+产品名称: ${name || "（未知，请根据照片识别）"}${knownCategory}${knownStyle}${knownBrand}${knownOrigin}${bookContext}
 ${librarySpecificInstructions}
 
 请输出 JSON（所有字段必须存在，不确定的字符串填 ""，数字填 0）:

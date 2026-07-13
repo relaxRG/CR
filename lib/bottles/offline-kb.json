@@ -1,0 +1,2095 @@
+[
+  {
+    "nameZh": "亨利爵士金酒",
+    "nameEn": "Hendrick's Gin",
+    "category": "金酒",
+    "style": "Contemporary",
+    "brand": "Hendrick's",
+    "origin": "苏格兰",
+    "abv": 41.4,
+    "priceCny": 320,
+    "notes": "黄瓜玫瑰风味，清新花香，苏格兰小批量蒸馏",
+    "flavorTags": [
+      "花香",
+      "清爽",
+      "草本"
+    ],
+    "story": "以黄瓜和玫瑰花瓣浸渍著称，苏格兰威廉格兰特酒厂出品",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "孟买蓝宝石金酒",
+    "nameEn": "Bombay Sapphire",
+    "category": "金酒",
+    "style": "London Dry",
+    "brand": "Bombay Sapphire",
+    "origin": "英国",
+    "abv": 40,
+    "priceCny": 200,
+    "notes": "10种植物蒸汽浸渍，柔和花香，经典伦敦干型",
+    "flavorTags": [
+      "花香",
+      "草本",
+      "清爽"
+    ],
+    "story": "采用独特蒸汽浸渍工艺，10种精选植物赋予复杂香气",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "添加利金酒",
+    "nameEn": "Tanqueray London Dry Gin",
+    "category": "金酒",
+    "style": "London Dry",
+    "brand": "Tanqueray",
+    "origin": "英国",
+    "abv": 43.1,
+    "priceCny": 180,
+    "notes": "四种核心植物，杜松子主导，经典干型金酒",
+    "flavorTags": [
+      "草本",
+      "干爽",
+      "清爽"
+    ],
+    "story": "1830年代查尔斯·坦奎瑞创立，四种植物配方沿用至今",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "必富达金酒",
+    "nameEn": "Beefeater London Dry Gin",
+    "category": "金酒",
+    "style": "London Dry",
+    "brand": "Beefeater",
+    "origin": "英国",
+    "abv": 40,
+    "priceCny": 150,
+    "notes": "9种植物24小时浸泡，杜松子柑橘平衡",
+    "flavorTags": [
+      "草本",
+      "柑橘",
+      "干爽"
+    ],
+    "story": "伦敦唯一仍在市区蒸馏的金酒品牌",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "普利茅斯金酒",
+    "nameEn": "Plymouth Gin",
+    "category": "金酒",
+    "style": "Plymouth",
+    "brand": "Plymouth",
+    "origin": "英国普利茅斯",
+    "abv": 41.2,
+    "priceCny": 220,
+    "notes": "7种植物，土质感，比伦敦干型更柔和",
+    "flavorTags": [
+      "草本",
+      "干爽",
+      "清爽"
+    ],
+    "story": "英国唯一受地理标志保护的金酒，产自普利茅斯",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "四柱金酒",
+    "nameEn": "Four Pillars Gin",
+    "category": "金酒",
+    "style": "Contemporary",
+    "brand": "Four Pillars",
+    "origin": "澳大利亚",
+    "abv": 41.8,
+    "priceCny": 280,
+    "notes": "澳大利亚当代金酒，柑橘姜黄风味突出",
+    "flavorTags": [
+      "柑橘",
+      "草本",
+      "清爽"
+    ],
+    "story": "澳大利亚雅拉谷精品金酒，以新鲜橙皮和姜黄为特色",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "猴子47金酒",
+    "nameEn": "Monkey 47 Schwarzwald Dry Gin",
+    "category": "金酒",
+    "style": "Contemporary",
+    "brand": "Monkey 47",
+    "origin": "德国黑森林",
+    "abv": 47,
+    "priceCny": 450,
+    "notes": "47种植物，黑森林风格，复杂草本蜂蜜",
+    "flavorTags": [
+      "草本",
+      "花香",
+      "蜂蜜"
+    ],
+    "story": "德国黑森林出品，47种植物赋予极致复杂度",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "马丁米勒金酒",
+    "nameEn": "Martin Miller's Gin",
+    "category": "金酒",
+    "style": "Contemporary",
+    "brand": "Martin Miller's",
+    "origin": "英国/冰岛",
+    "abv": 40,
+    "priceCny": 260,
+    "notes": "英国蒸馏冰岛水稀释，清冽花香",
+    "flavorTags": [
+      "花香",
+      "清爽",
+      "草本"
+    ],
+    "story": "英国蒸馏后运至冰岛用纯净水稀释，独特工艺",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "纪凡金酒",
+    "nameEn": "G'Vine Floraison",
+    "category": "金酒",
+    "style": "Contemporary",
+    "brand": "G'Vine",
+    "origin": "法国干邑",
+    "abv": 40,
+    "priceCny": 350,
+    "notes": "葡萄基底，葡萄花浸渍，法式花香风格",
+    "flavorTags": [
+      "花香",
+      "果味",
+      "清爽"
+    ],
+    "story": "法国干邑区葡萄蒸馏，以葡萄花为核心植物",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "希普史密斯金酒",
+    "nameEn": "Sipsmith London Dry Gin",
+    "category": "金酒",
+    "style": "London Dry",
+    "brand": "Sipsmith",
+    "origin": "英国伦敦",
+    "abv": 41.6,
+    "priceCny": 280,
+    "notes": "铜壶小批量蒸馏，杜松子饱满，经典伦敦风格",
+    "flavorTags": [
+      "草本",
+      "干爽",
+      "柑橘"
+    ],
+    "story": "2009年复兴伦敦铜壶蒸馏传统的先驱品牌",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "百加得白朗姆",
+    "nameEn": "Bacardi Superior",
+    "category": "朗姆",
+    "style": "Spanish Style (Blanco)",
+    "brand": "Bacardi",
+    "origin": "波多黎各",
+    "abv": 40,
+    "priceCny": 100,
+    "notes": "清淡干净，轻微甜感，调酒万能基酒",
+    "flavorTags": [
+      "清爽",
+      "甜润",
+      "干爽"
+    ],
+    "story": "1862年古巴创立，现为全球最畅销朗姆品牌",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "哈瓦那俱乐部3年",
+    "nameEn": "Havana Club 3 Años",
+    "category": "朗姆",
+    "style": "Spanish Style (Blanco)",
+    "brand": "Havana Club",
+    "origin": "古巴",
+    "abv": 40,
+    "priceCny": 120,
+    "notes": "古巴风格，轻盈甘蔗香，莫吉托首选",
+    "flavorTags": [
+      "清爽",
+      "甜润",
+      "草本"
+    ],
+    "story": "古巴国宝级朗姆，与百加得并列全球最知名品牌",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "哈瓦那俱乐部7年",
+    "nameEn": "Havana Club 7 Años",
+    "category": "朗姆",
+    "style": "Spanish Style (Añejo)",
+    "brand": "Havana Club",
+    "origin": "古巴",
+    "abv": 40,
+    "priceCny": 180,
+    "notes": "7年陈酿，香草焦糖木质，复杂圆润",
+    "flavorTags": [
+      "焦糖",
+      "香草",
+      "甜润"
+    ],
+    "story": "古巴陈年朗姆代表，7年橡木桶赋予丰富层次",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "阿普尔顿庄园特藏",
+    "nameEn": "Appleton Estate Signature Blend",
+    "category": "朗姆",
+    "style": "English Style (Jamaican)",
+    "brand": "Appleton Estate",
+    "origin": "牙买加",
+    "abv": 40,
+    "priceCny": 150,
+    "notes": "牙买加风格，热带水果酯香，复杂浓郁",
+    "flavorTags": [
+      "果味",
+      "热带",
+      "浓郁"
+    ],
+    "story": "牙买加最古老的朗姆酒庄，1749年建立",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "朗姆之心白朗姆",
+    "nameEn": "Rhum J.M Blanc",
+    "category": "朗姆",
+    "style": "French Style (Agricole Blanc)",
+    "brand": "J.M",
+    "origin": "法国马提尼克",
+    "abv": 50,
+    "priceCny": 280,
+    "notes": "甘蔗汁直接蒸馏，青草甘蔗香，农业朗姆",
+    "flavorTags": [
+      "草本",
+      "清爽",
+      "辛香"
+    ],
+    "story": "马提尼克AOC认证农业朗姆，甘蔗汁直接发酵蒸馏",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "克莱门特白朗姆",
+    "nameEn": "Clément Rhum Blanc",
+    "category": "朗姆",
+    "style": "French Style (Agricole Blanc)",
+    "brand": "Clément",
+    "origin": "法国马提尼克",
+    "abv": 50,
+    "priceCny": 260,
+    "notes": "新鲜甘蔗汁蒸馏，清新草本，法式风格",
+    "flavorTags": [
+      "草本",
+      "清爽",
+      "甜润"
+    ],
+    "story": "马提尼克传统农业朗姆，Homère Clément 1887年创立",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "迈尔斯黑朗姆",
+    "nameEn": "Myers's Dark Rum",
+    "category": "朗姆",
+    "style": "Black Rum",
+    "brand": "Myers's",
+    "origin": "牙买加",
+    "abv": 40,
+    "priceCny": 130,
+    "notes": "深色浓郁，焦糖糖蜜，牙买加传统风格",
+    "flavorTags": [
+      "焦糖",
+      "浓郁",
+      "甜润"
+    ],
+    "story": "牙买加经典黑朗姆，糖蜜发酵浓郁风格",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "唐Q银朗姆",
+    "nameEn": "Don Q Cristal",
+    "category": "朗姆",
+    "style": "Spanish Style (Blanco)",
+    "brand": "Don Q",
+    "origin": "波多黎各",
+    "abv": 40,
+    "priceCny": 110,
+    "notes": "波多黎各清淡风格，干净清爽，调酒佳品",
+    "flavorTags": [
+      "清爽",
+      "干爽",
+      "甜润"
+    ],
+    "story": "波多黎各最大朗姆品牌，Serrallés家族1865年创立",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "朗姆之心XO",
+    "nameEn": "Rhum J.M XO",
+    "category": "朗姆",
+    "style": "French Style (Agricole Ambre)",
+    "brand": "J.M",
+    "origin": "法国马提尼克",
+    "abv": 45,
+    "priceCny": 680,
+    "notes": "6年以上陈酿，香草香料橡木，复杂精致",
+    "flavorTags": [
+      "香草",
+      "焦糖",
+      "浓郁"
+    ],
+    "story": "马提尼克顶级陈年农业朗姆，法国橡木桶陈酿",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "百加得8年",
+    "nameEn": "Bacardi 8 Años",
+    "category": "朗姆",
+    "style": "Spanish Style (Añejo)",
+    "brand": "Bacardi",
+    "origin": "波多黎各",
+    "abv": 40,
+    "priceCny": 200,
+    "notes": "8年陈酿，香草焦糖，圆润顺滑",
+    "flavorTags": [
+      "香草",
+      "焦糖",
+      "甜润"
+    ],
+    "story": "百加得旗舰陈年款，8年精心陈酿",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "绝对伏特加",
+    "nameEn": "Absolut Vodka",
+    "category": "伏特加",
+    "style": "Wheat",
+    "brand": "Absolut",
+    "origin": "瑞典",
+    "abv": 40,
+    "priceCny": 120,
+    "notes": "瑞典冬小麦，纯净顺滑，经典北欧风格",
+    "flavorTags": [
+      "清爽",
+      "干爽"
+    ],
+    "story": "1879年瑞典创立，全球最畅销伏特加之一",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "灰雁伏特加",
+    "nameEn": "Grey Goose",
+    "category": "伏特加",
+    "style": "Wheat",
+    "brand": "Grey Goose",
+    "origin": "法国干邑",
+    "abv": 40,
+    "priceCny": 280,
+    "notes": "法国软冬小麦，干净奶油质感，高端定位",
+    "flavorTags": [
+      "清爽",
+      "奶油",
+      "干爽"
+    ],
+    "story": "1997年法国干邑区创立，以高端定位重塑伏特加市场",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "斯米诺伏特加",
+    "nameEn": "Smirnoff No.21",
+    "category": "伏特加",
+    "style": "Wheat",
+    "brand": "Smirnoff",
+    "origin": "美国",
+    "abv": 40,
+    "priceCny": 80,
+    "notes": "全球最畅销伏特加，中性纯净，调酒百搭",
+    "flavorTags": [
+      "清爽",
+      "干爽"
+    ],
+    "story": "1864年俄罗斯创立，现为全球销量第一伏特加",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "贝利卡伏特加",
+    "nameEn": "Belvedere Vodka",
+    "category": "伏特加",
+    "style": "Rye",
+    "brand": "Belvedere",
+    "origin": "波兰",
+    "abv": 40,
+    "priceCny": 320,
+    "notes": "波兰黑麦，天鹅绒质感，微辛香草",
+    "flavorTags": [
+      "清爽",
+      "辛香",
+      "干爽"
+    ],
+    "story": "波兰皇家传统黑麦伏特加，600年蒸馏历史",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "科纳基伏特加",
+    "nameEn": "Ketel One Vodka",
+    "category": "伏特加",
+    "style": "Wheat",
+    "brand": "Ketel One",
+    "origin": "荷兰",
+    "abv": 40,
+    "priceCny": 200,
+    "notes": "荷兰小麦，铜壶蒸馏，干净清爽柑橘尾",
+    "flavorTags": [
+      "清爽",
+      "柑橘",
+      "干爽"
+    ],
+    "story": "荷兰Nolet家族1691年创立，铜壶蒸馏传统",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "坦奎瑞十号",
+    "nameEn": "Tito's Handmade Vodka",
+    "category": "伏特加",
+    "style": "Corn",
+    "brand": "Tito's",
+    "origin": "美国德克萨斯",
+    "abv": 40,
+    "priceCny": 160,
+    "notes": "美国玉米伏特加，手工蒸馏，无麸质",
+    "flavorTags": [
+      "清爽",
+      "干爽",
+      "甜润"
+    ],
+    "story": "德克萨斯手工伏特加，美国精品烈酒运动先驱",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "雪树伏特加",
+    "nameEn": "Żubrówka Bison Grass Vodka",
+    "category": "伏特加",
+    "style": "Rye",
+    "brand": "Żubrówka",
+    "origin": "波兰",
+    "abv": 40,
+    "priceCny": 130,
+    "notes": "野牛草浸渍，草本香草杏仁风味，独特波兰风格",
+    "flavorTags": [
+      "草本",
+      "香草",
+      "清爽"
+    ],
+    "story": "波兰比亚沃维耶扎森林野牛草浸渍，传统配方",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "斯托利奇纳亚",
+    "nameEn": "Stolichnaya Premium",
+    "category": "伏特加",
+    "style": "Wheat",
+    "brand": "Stolichnaya",
+    "origin": "拉脱维亚",
+    "abv": 40,
+    "priceCny": 130,
+    "notes": "小麦黑麦混合，经典俄式风格，干净纯粹",
+    "flavorTags": [
+      "清爽",
+      "干爽"
+    ],
+    "story": "苏联时代经典品牌，现产自拉脱维亚",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "杰克丹尼",
+    "nameEn": "Jack Daniel's Tennessee Whiskey",
+    "category": "威士忌",
+    "style": "Tennessee",
+    "brand": "Jack Daniel's",
+    "origin": "美国田纳西",
+    "abv": 40,
+    "priceCny": 180,
+    "notes": "林肯郡工艺糖枫木炭过滤，香草焦糖，经典美式",
+    "flavorTags": [
+      "香草",
+      "焦糖",
+      "甜润"
+    ],
+    "story": "1866年田纳西创立，全球最畅销美国威士忌",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "美格波本",
+    "nameEn": "Maker's Mark Bourbon",
+    "category": "威士忌",
+    "style": "Bourbon",
+    "brand": "Maker's Mark",
+    "origin": "美国肯塔基",
+    "abv": 45,
+    "priceCny": 220,
+    "notes": "小麦配方波本，甜润香草焦糖，红蜡封口标志",
+    "flavorTags": [
+      "香草",
+      "焦糖",
+      "甜润"
+    ],
+    "story": "肯塔基小批量波本先驱，以小麦替代黑麦的甜润风格",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "野火鸡101",
+    "nameEn": "Wild Turkey 101",
+    "category": "威士忌",
+    "style": "Bourbon",
+    "brand": "Wild Turkey",
+    "origin": "美国肯塔基",
+    "abv": 50.5,
+    "priceCny": 200,
+    "notes": "高酒精度波本，辛香黑麦，浓郁复杂",
+    "flavorTags": [
+      "辛香",
+      "焦糖",
+      "浓郁"
+    ],
+    "story": "肯塔基经典高度波本，101 proof传统配方",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "四玫瑰波本",
+    "nameEn": "Four Roses Bourbon",
+    "category": "威士忌",
+    "style": "Bourbon",
+    "brand": "Four Roses",
+    "origin": "美国肯塔基",
+    "abv": 40,
+    "priceCny": 180,
+    "notes": "10种配方混合，花果香，圆润易饮",
+    "flavorTags": [
+      "果味",
+      "花香",
+      "甜润"
+    ],
+    "story": "肯塔基独特双酵母十配方系统，花果香风格",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "格兰菲迪12年",
+    "nameEn": "Glenfiddich 12 Year Old",
+    "category": "威士忌",
+    "style": "Scotch Single Malt",
+    "brand": "Glenfiddich",
+    "origin": "苏格兰斯佩塞",
+    "abv": 40,
+    "priceCny": 280,
+    "notes": "梨果香草，雪利桶美国桶混合，入门斯佩塞",
+    "flavorTags": [
+      "果味",
+      "香草",
+      "清爽"
+    ],
+    "story": "全球最畅销单一麦芽威士忌，斯佩塞风格代表",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "麦卡伦12年雪利桶",
+    "nameEn": "The Macallan 12 Year Old Sherry Oak",
+    "category": "威士忌",
+    "style": "Scotch Single Malt",
+    "brand": "The Macallan",
+    "origin": "苏格兰斯佩塞",
+    "abv": 40,
+    "priceCny": 600,
+    "notes": "100%雪利桶陈酿，干果香料，浓郁圆润",
+    "flavorTags": [
+      "焦糖",
+      "浓郁",
+      "辛香"
+    ],
+    "story": "斯佩塞顶级单一麦芽，雪利桶陈酿工艺标杆",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "拉弗格10年",
+    "nameEn": "Laphroaig 10 Year Old",
+    "category": "威士忌",
+    "style": "Islay Single Malt",
+    "brand": "Laphroaig",
+    "origin": "苏格兰艾雷岛",
+    "abv": 40,
+    "priceCny": 380,
+    "notes": "强烈泥煤烟熏，海盐碘味，艾雷岛个性鲜明",
+    "flavorTags": [
+      "烟熏",
+      "泥煤",
+      "咸鲜"
+    ],
+    "story": "艾雷岛最具个性单一麦芽，查尔斯王子御用品牌",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "波摩12年",
+    "nameEn": "Bowmore 12 Year Old",
+    "category": "威士忌",
+    "style": "Islay Single Malt",
+    "brand": "Bowmore",
+    "origin": "苏格兰艾雷岛",
+    "abv": 40,
+    "priceCny": 380,
+    "notes": "温和泥煤，花香蜂蜜，艾雷岛平衡风格",
+    "flavorTags": [
+      "烟熏",
+      "蜂蜜",
+      "花香"
+    ],
+    "story": "艾雷岛最古老酒厂1779年建立，平衡泥煤风格",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "响17年",
+    "nameEn": "Hibiki 17 Year Old",
+    "category": "威士忌",
+    "style": "Japanese",
+    "brand": "Hibiki",
+    "origin": "日本",
+    "abv": 43,
+    "priceCny": 1200,
+    "notes": "日本调和威士忌巅峰，花果蜂蜜，极致精细",
+    "flavorTags": [
+      "花香",
+      "蜂蜜",
+      "果味"
+    ],
+    "story": "三得利旗舰调和威士忌，30种以上原酒精心调配",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "山崎12年",
+    "nameEn": "Yamazaki 12 Year Old",
+    "category": "威士忌",
+    "style": "Japanese",
+    "brand": "Yamazaki",
+    "origin": "日本",
+    "abv": 43,
+    "priceCny": 800,
+    "notes": "日本首款单一麦芽，水蜜桃香草，细腻精致",
+    "flavorTags": [
+      "果味",
+      "香草",
+      "花香"
+    ],
+    "story": "1923年日本第一家麦芽威士忌酒厂，日式精细工艺",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "余市单一麦芽",
+    "nameEn": "Nikka Yoichi Single Malt",
+    "category": "威士忌",
+    "style": "Japanese",
+    "brand": "Nikka",
+    "origin": "日本北海道",
+    "abv": 45,
+    "priceCny": 600,
+    "notes": "北海道泥煤烟熏，海盐矿物，日式艾雷风格",
+    "flavorTags": [
+      "烟熏",
+      "咸鲜",
+      "浓郁"
+    ],
+    "story": "竹鹤政孝1934年在北海道创立，日本泥煤威士忌",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "尊尼获加黑牌",
+    "nameEn": "Johnnie Walker Black Label",
+    "category": "威士忌",
+    "style": "Scotch Blended",
+    "brand": "Johnnie Walker",
+    "origin": "苏格兰",
+    "abv": 40,
+    "priceCny": 200,
+    "notes": "12年调和，烟熏果香，经典苏格兰调和",
+    "flavorTags": [
+      "烟熏",
+      "果味",
+      "甜润"
+    ],
+    "story": "1820年创立，全球最畅销苏格兰威士忌品牌",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "芝华士12年",
+    "nameEn": "Chivas Regal 12 Year Old",
+    "category": "威士忌",
+    "style": "Scotch Blended",
+    "brand": "Chivas Regal",
+    "origin": "苏格兰",
+    "abv": 40,
+    "priceCny": 200,
+    "notes": "12年调和，蜂蜜香草，顺滑易饮",
+    "flavorTags": [
+      "蜂蜜",
+      "香草",
+      "甜润"
+    ],
+    "story": "1801年阿伯丁创立，以奢华顺滑风格著称",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "格兰利威12年",
+    "nameEn": "The Glenlivet 12 Year Old",
+    "category": "威士忌",
+    "style": "Scotch Single Malt",
+    "brand": "The Glenlivet",
+    "origin": "苏格兰斯佩塞",
+    "abv": 40,
+    "priceCny": 280,
+    "notes": "花果清新，美国橡木桶，斯佩塞入门经典",
+    "flavorTags": [
+      "果味",
+      "花香",
+      "清爽"
+    ],
+    "story": "1824年苏格兰第一家合法蒸馏厂，斯佩塞风格奠基者",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "百富12年双桶",
+    "nameEn": "The Balvenie DoubleWood 12",
+    "category": "威士忌",
+    "style": "Scotch Single Malt",
+    "brand": "The Balvenie",
+    "origin": "苏格兰斯佩塞",
+    "abv": 40,
+    "priceCny": 450,
+    "notes": "美国橡木桶+雪利桶，蜂蜜香草干果，圆润复杂",
+    "flavorTags": [
+      "蜂蜜",
+      "香草",
+      "干爽"
+    ],
+    "story": "格兰菲迪姐妹酒厂，双桶工艺代表作",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "唐胡里奥白龙舌兰",
+    "nameEn": "Don Julio Blanco",
+    "category": "龙舌兰",
+    "style": "Tequila Blanco",
+    "brand": "Don Julio",
+    "origin": "墨西哥哈利斯科",
+    "abv": 40,
+    "priceCny": 280,
+    "notes": "蓝色龙舌兰，清新柑橘胡椒，高地风格",
+    "flavorTags": [
+      "柑橘",
+      "辛香",
+      "清爽"
+    ],
+    "story": "1942年哈利斯科高地创立，精品龙舌兰先驱",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "帕特龙银龙舌兰",
+    "nameEn": "Patrón Silver",
+    "category": "龙舌兰",
+    "style": "Tequila Blanco",
+    "brand": "Patrón",
+    "origin": "墨西哥哈利斯科",
+    "abv": 40,
+    "priceCny": 350,
+    "notes": "小批量手工，柑橘草本，清新精致",
+    "flavorTags": [
+      "柑橘",
+      "草本",
+      "清爽"
+    ],
+    "story": "1989年创立，将精品龙舌兰推向高端市场",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "卡萨多雷斯白龙舌兰",
+    "nameEn": "Cazadores Blanco",
+    "category": "龙舌兰",
+    "style": "Tequila Blanco",
+    "brand": "Cazadores",
+    "origin": "墨西哥哈利斯科",
+    "abv": 40,
+    "priceCny": 180,
+    "notes": "高地蓝色龙舌兰，草本柑橘，清爽干净",
+    "flavorTags": [
+      "草本",
+      "柑橘",
+      "清爽"
+    ],
+    "story": "阿尔托斯德哈利斯科高地，传统双蒸工艺",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "阿苏尔雷波萨多",
+    "nameEn": "1800 Reposado",
+    "category": "龙舌兰",
+    "style": "Tequila Reposado",
+    "brand": "1800",
+    "origin": "墨西哥哈利斯科",
+    "abv": 40,
+    "priceCny": 220,
+    "notes": "美国橡木桶陈酿，香草焦糖龙舌兰平衡",
+    "flavorTags": [
+      "香草",
+      "焦糖",
+      "辛香"
+    ],
+    "story": "以1800年龙舌兰首次陈酿年份命名",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "卡波·韦霍安尼霍",
+    "nameEn": "Cabo Wabo Añejo",
+    "category": "龙舌兰",
+    "style": "Tequila Añejo",
+    "brand": "Cabo Wabo",
+    "origin": "墨西哥哈利斯科",
+    "abv": 40,
+    "priceCny": 350,
+    "notes": "14个月橡木桶陈酿，焦糖香草，复杂顺滑",
+    "flavorTags": [
+      "焦糖",
+      "香草",
+      "浓郁"
+    ],
+    "story": "摇滚明星萨米·哈格尔创立，墨西哥海角地区",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "德尔马奎斯梅斯卡尔",
+    "nameEn": "Del Maguey Vida Mezcal",
+    "category": "龙舌兰",
+    "style": "Mezcal Joven",
+    "brand": "Del Maguey",
+    "origin": "墨西哥瓦哈卡",
+    "abv": 42,
+    "priceCny": 450,
+    "notes": "传统地坑烟熏，复杂泥土烟熏，手工单村",
+    "flavorTags": [
+      "烟熏",
+      "草本",
+      "辛香"
+    ],
+    "story": "瓦哈卡州传统单村梅斯卡尔，地坑蒸烤龙舌兰",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "霍赛路易斯梅斯卡尔",
+    "nameEn": "Ilegal Mezcal Joven",
+    "category": "龙舌兰",
+    "style": "Mezcal Joven",
+    "brand": "Ilegal",
+    "origin": "墨西哥瓦哈卡",
+    "abv": 40,
+    "priceCny": 280,
+    "notes": "温和烟熏，柑橘草本，入门梅斯卡尔",
+    "flavorTags": [
+      "烟熏",
+      "柑橘",
+      "草本"
+    ],
+    "story": "危地马拉酒吧走私起家，现为知名梅斯卡尔品牌",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "轩尼诗VSOP",
+    "nameEn": "Hennessy VSOP",
+    "category": "白兰地",
+    "style": "Cognac VSOP",
+    "brand": "Hennessy",
+    "origin": "法国干邑",
+    "abv": 40,
+    "priceCny": 350,
+    "notes": "花果香草，橡木香料，经典干邑风格",
+    "flavorTags": [
+      "果味",
+      "香草",
+      "焦糖"
+    ],
+    "story": "1765年爱尔兰人理查德·轩尼诗创立，全球最大干邑品牌",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "马爹利VSOP",
+    "nameEn": "Martell VSOP",
+    "category": "白兰地",
+    "style": "Cognac VSOP",
+    "brand": "Martell",
+    "origin": "法国干邑",
+    "abv": 40,
+    "priceCny": 320,
+    "notes": "轻盈花果，橡木香草，干邑四大品牌之一",
+    "flavorTags": [
+      "花香",
+      "果味",
+      "香草"
+    ],
+    "story": "1715年创立，干邑最古老主要品牌之一",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "人头马VSOP",
+    "nameEn": "Rémy Martin VSOP",
+    "category": "白兰地",
+    "style": "Cognac VSOP",
+    "brand": "Rémy Martin",
+    "origin": "法国干邑",
+    "abv": 40,
+    "priceCny": 380,
+    "notes": "100%大香槟区，花果香料，优雅复杂",
+    "flavorTags": [
+      "花香",
+      "果味",
+      "辛香"
+    ],
+    "story": "专注大香槟区和小香槟区葡萄，精品干邑代表",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "卡慕VSOP",
+    "nameEn": "Camus VSOP Elegance",
+    "category": "白兰地",
+    "style": "Cognac VSOP",
+    "brand": "Camus",
+    "origin": "法国干邑",
+    "abv": 40,
+    "priceCny": 350,
+    "notes": "波尔多桶陈酿，花果蜂蜜，家族独立品牌",
+    "flavorTags": [
+      "花香",
+      "蜂蜜",
+      "果味"
+    ],
+    "story": "1863年家族创立，干邑唯一主要独立家族品牌",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "卡尔瓦多斯苹果白兰地",
+    "nameEn": "Calvados Pays d'Auge",
+    "category": "白兰地",
+    "style": "Calvados",
+    "brand": "Père Magloire",
+    "origin": "法国诺曼底",
+    "abv": 40,
+    "priceCny": 280,
+    "notes": "苹果蒸馏，苹果花果香，诺曼底特产",
+    "flavorTags": [
+      "果味",
+      "花香",
+      "辛香"
+    ],
+    "story": "法国诺曼底苹果白兰地，AOC认证传统工艺",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "皮斯科苏尔",
+    "nameEn": "Pisco Portón",
+    "category": "白兰地",
+    "style": "Pisco",
+    "brand": "Portón",
+    "origin": "秘鲁",
+    "abv": 43,
+    "priceCny": 280,
+    "notes": "秘鲁葡萄蒸馏，花果香，皮斯科苏尔基酒",
+    "flavorTags": [
+      "花香",
+      "果味",
+      "清爽"
+    ],
+    "story": "秘鲁传统葡萄白兰地，皮斯科苏尔鸡尾酒基酒",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "君度橙酒",
+    "nameEn": "Cointreau",
+    "category": "利口酒",
+    "style": "Orange Liqueur",
+    "brand": "Cointreau",
+    "origin": "法国安茹",
+    "abv": 40,
+    "priceCny": 200,
+    "notes": "甜苦橙皮，清新橙香，边车玛格丽塔必备",
+    "flavorTags": [
+      "柑橘",
+      "甜润",
+      "清爽"
+    ],
+    "story": "1875年法国安茹创立，全球最知名橙味利口酒",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "金万利",
+    "nameEn": "Grand Marnier Cordon Rouge",
+    "category": "利口酒",
+    "style": "Orange Liqueur",
+    "brand": "Grand Marnier",
+    "origin": "法国",
+    "abv": 40,
+    "priceCny": 250,
+    "notes": "干邑基底橙皮，复杂橙香，比君度更浓郁",
+    "flavorTags": [
+      "柑橘",
+      "焦糖",
+      "浓郁"
+    ],
+    "story": "1880年法国创立，干邑与苦橙皮的完美结合",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "卡鲁瓦咖啡利口酒",
+    "nameEn": "Kahlúa",
+    "category": "利口酒",
+    "style": "Coffee Liqueur",
+    "brand": "Kahlúa",
+    "origin": "墨西哥",
+    "abv": 20,
+    "priceCny": 150,
+    "notes": "墨西哥咖啡，甜润咖啡香草，白俄罗斯必备",
+    "flavorTags": [
+      "咖啡",
+      "甜润",
+      "香草"
+    ],
+    "story": "1936年墨西哥创立，全球最畅销咖啡利口酒",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "百利甜酒",
+    "nameEn": "Baileys Original Irish Cream",
+    "category": "利口酒",
+    "style": "Cream Liqueur",
+    "brand": "Baileys",
+    "origin": "爱尔兰",
+    "abv": 17,
+    "priceCny": 180,
+    "notes": "爱尔兰奶油威士忌，甜润奶油巧克力",
+    "flavorTags": [
+      "奶油",
+      "甜润",
+      "巧克力"
+    ],
+    "story": "1974年创立，全球最畅销利口酒之一",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "杏仁利口酒",
+    "nameEn": "Disaronno Originale",
+    "category": "利口酒",
+    "style": "Nut Liqueur",
+    "brand": "Disaronno",
+    "origin": "意大利萨罗诺",
+    "abv": 28,
+    "priceCny": 180,
+    "notes": "杏仁香草，甜润温暖，意大利经典",
+    "flavorTags": [
+      "坚果",
+      "甜润",
+      "香草"
+    ],
+    "story": "意大利萨罗诺传统配方，以杏核和草本浸渍",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "圣杰曼接骨木花利口酒",
+    "nameEn": "St-Germain Elderflower Liqueur",
+    "category": "利口酒",
+    "style": "Floral Liqueur",
+    "brand": "St-Germain",
+    "origin": "法国",
+    "abv": 20,
+    "priceCny": 280,
+    "notes": "法国接骨木花，清新花香，现代调酒宠儿",
+    "flavorTags": [
+      "花香",
+      "清爽",
+      "甜润"
+    ],
+    "story": "2007年推出，以法国阿尔卑斯接骨木花手工采摘",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "夏翠丝绿",
+    "nameEn": "Chartreuse Green",
+    "category": "利口酒",
+    "style": "Herbal Liqueur",
+    "brand": "Chartreuse",
+    "origin": "法国格勒诺布尔",
+    "abv": 55,
+    "priceCny": 350,
+    "notes": "130种草本植物，复杂草本蜂蜜，修道院配方",
+    "flavorTags": [
+      "草本",
+      "蜂蜜",
+      "辛香"
+    ],
+    "story": "1737年法国卡尔特修道院僧侣秘方，130种植物",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "夏翠丝黄",
+    "nameEn": "Chartreuse Yellow",
+    "category": "利口酒",
+    "style": "Herbal Liqueur",
+    "brand": "Chartreuse",
+    "origin": "法国格勒诺布尔",
+    "abv": 40,
+    "priceCny": 320,
+    "notes": "130种草本，比绿色更甜，蜂蜜花香",
+    "flavorTags": [
+      "草本",
+      "蜂蜜",
+      "花香"
+    ],
+    "story": "绿色夏翠丝的温和版，蜂蜜甜度更突出",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "贝内迪克丁",
+    "nameEn": "Bénédictine D.O.M.",
+    "category": "利口酒",
+    "style": "Herbal Liqueur",
+    "brand": "Bénédictine",
+    "origin": "法国费康",
+    "abv": 40,
+    "priceCny": 280,
+    "notes": "27种草本香料，蜂蜜香草，修道院传统",
+    "flavorTags": [
+      "草本",
+      "蜂蜜",
+      "香草"
+    ],
+    "story": "1510年诺曼底修道院配方，27种植物秘方",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "加利安奴",
+    "nameEn": "Galliano L'Autentico",
+    "category": "利口酒",
+    "style": "Herbal Liqueur",
+    "brand": "Galliano",
+    "origin": "意大利",
+    "abv": 42.3,
+    "priceCny": 280,
+    "notes": "香草茴香草本，甜润复杂，哈维撞墙必备",
+    "flavorTags": [
+      "香草",
+      "草本",
+      "甜润"
+    ],
+    "story": "1896年意大利创立，以阿比西尼亚战争英雄命名",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "马拉斯奇诺",
+    "nameEn": "Luxardo Maraschino",
+    "category": "利口酒",
+    "style": "Cherry Liqueur",
+    "brand": "Luxardo",
+    "origin": "意大利",
+    "abv": 32,
+    "priceCny": 200,
+    "notes": "马拉斯卡樱桃，干净樱桃杏仁，航空邮件必备",
+    "flavorTags": [
+      "果味",
+      "坚果",
+      "甜润"
+    ],
+    "story": "1821年意大利创立，以达尔马提亚马拉斯卡樱桃蒸馏",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "黑醋栗利口酒",
+    "nameEn": "Crème de Cassis de Dijon",
+    "category": "利口酒",
+    "style": "Fruit Liqueur",
+    "brand": "Lejay",
+    "origin": "法国第戎",
+    "abv": 20,
+    "priceCny": 150,
+    "notes": "黑醋栗果香，甜润浓郁，基尔皇家必备",
+    "flavorTags": [
+      "果味",
+      "甜润",
+      "浓郁"
+    ],
+    "story": "法国第戎传统黑醋栗利口酒，基尔鸡尾酒基础",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "三重橙皮酒",
+    "nameEn": "Triple Sec",
+    "category": "利口酒",
+    "style": "Orange Liqueur",
+    "brand": "Bols",
+    "origin": "荷兰",
+    "abv": 38,
+    "priceCny": 100,
+    "notes": "甜橙皮，清新橙香，经济实惠橙味利口酒",
+    "flavorTags": [
+      "柑橘",
+      "甜润",
+      "清爽"
+    ],
+    "story": "荷兰博尔斯经典橙皮利口酒，调酒常用",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "蓝橙利口酒",
+    "nameEn": "Blue Curaçao",
+    "category": "利口酒",
+    "style": "Orange Liqueur",
+    "brand": "Bols",
+    "origin": "荷兰",
+    "abv": 24,
+    "priceCny": 120,
+    "notes": "蓝色橙皮利口酒，橙香，视觉效果出众",
+    "flavorTags": [
+      "柑橘",
+      "甜润"
+    ],
+    "story": "以库拉索岛拉哈橙皮制成，蓝色为人工着色",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "中路橙酒",
+    "nameEn": "Midori Melon Liqueur",
+    "category": "利口酒",
+    "style": "Fruit Liqueur",
+    "brand": "Midori",
+    "origin": "日本",
+    "abv": 20,
+    "priceCny": 150,
+    "notes": "日本蜜瓜风味，甜润果香，鲜绿色",
+    "flavorTags": [
+      "果味",
+      "甜润",
+      "热带"
+    ],
+    "story": "1978年三得利推出，以日本蜜瓜为原料",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "香博覆盆子利口酒",
+    "nameEn": "Chambord Black Raspberry Liqueur",
+    "category": "利口酒",
+    "style": "Fruit Liqueur",
+    "brand": "Chambord",
+    "origin": "法国卢瓦尔河谷",
+    "abv": 16.5,
+    "priceCny": 250,
+    "notes": "黑覆盆子蜂蜜香草，甜润浓郁，法式优雅",
+    "flavorTags": [
+      "果味",
+      "甜润",
+      "花香"
+    ],
+    "story": "路易十四时代卢瓦尔河谷配方，覆盆子蜂蜜香草",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "阿玛罗诺尼诺",
+    "nameEn": "Amaro Nonino Quintessentia",
+    "category": "利口酒",
+    "style": "Amaro",
+    "brand": "Nonino",
+    "origin": "意大利弗留利",
+    "abv": 35,
+    "priceCny": 350,
+    "notes": "格拉帕基底，草本橙皮，复杂苦甜平衡",
+    "flavorTags": [
+      "苦韵",
+      "草本",
+      "甜润"
+    ],
+    "story": "弗留利家族酒厂，以格拉帕为基底的精品阿玛罗",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "阿贝罗开胃酒",
+    "nameEn": "Aperol",
+    "category": "利口酒",
+    "style": "Fruit Liqueur",
+    "brand": "Aperol",
+    "origin": "意大利",
+    "abv": 11,
+    "priceCny": 150,
+    "notes": "橙色苦甜，大黄龙胆，阿贝罗斯普里兹必备",
+    "flavorTags": [
+      "苦韵",
+      "柑橘",
+      "甜润"
+    ],
+    "story": "1919年意大利帕多瓦创立，阿贝罗斯普里兹的灵魂",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "安格式苦精",
+    "nameEn": "Angostura Aromatic Bitters",
+    "category": "苦精",
+    "style": "Aromatic",
+    "brand": "Angostura",
+    "origin": "特立尼达",
+    "abv": 44.7,
+    "priceCny": 80,
+    "notes": "草本香料苦味，龙胆肉桂，鸡尾酒必备调味",
+    "flavorTags": [
+      "苦韵",
+      "草本",
+      "辛香"
+    ],
+    "story": "1824年委内瑞拉军医约翰·西格特创制，现产自特立尼达",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "安格式橙味苦精",
+    "nameEn": "Angostura Orange Bitters",
+    "category": "苦精",
+    "style": "Orange",
+    "brand": "Angostura",
+    "origin": "特立尼达",
+    "abv": 28,
+    "priceCny": 80,
+    "notes": "橙皮苦味，柑橘草本，马天尼经典搭配",
+    "flavorTags": [
+      "柑橘",
+      "苦韵",
+      "草本"
+    ],
+    "story": "安格式橙味版本，马天尼和古典鸡尾酒常用",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "佩肖苦精",
+    "nameEn": "Peychaud's Bitters",
+    "category": "苦精",
+    "style": "Aromatic",
+    "brand": "Peychaud's",
+    "origin": "美国新奥尔良",
+    "abv": 35,
+    "priceCny": 80,
+    "notes": "茴香花香，比安格式更甜，萨泽拉克必备",
+    "flavorTags": [
+      "花香",
+      "苦韵",
+      "甜润"
+    ],
+    "story": "1830年代新奥尔良药剂师安托万·佩肖创制",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "雷根橙味苦精",
+    "nameEn": "Regans' Orange Bitters No. 6",
+    "category": "苦精",
+    "style": "Orange",
+    "brand": "Regans'",
+    "origin": "美国",
+    "abv": 45,
+    "priceCny": 100,
+    "notes": "干燥橙皮，草本苦味，马天尼专业选择",
+    "flavorTags": [
+      "柑橘",
+      "苦韵",
+      "草本"
+    ],
+    "story": "调酒师盖里·里根配方，专业调酒师首选橙苦精",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "费氏兄弟芹菜苦精",
+    "nameEn": "Fee Brothers Celery Bitters",
+    "category": "苦精",
+    "style": "Celery",
+    "brand": "Fee Brothers",
+    "origin": "美国",
+    "abv": 17.5,
+    "priceCny": 100,
+    "notes": "芹菜草本，咸鲜，血腥玛丽和蔬菜鸡尾酒",
+    "flavorTags": [
+      "草本",
+      "咸鲜",
+      "清爽"
+    ],
+    "story": "美国费氏兄弟1864年创立，专业调酒苦精品牌",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "莫勒巧克力苦精",
+    "nameEn": "Bittermens Xocolatl Mole Bitters",
+    "category": "苦精",
+    "style": "Chocolate",
+    "brand": "Bittermens",
+    "origin": "美国",
+    "abv": 53,
+    "priceCny": 150,
+    "notes": "可可辣椒肉桂，复杂巧克力苦味",
+    "flavorTags": [
+      "巧克力",
+      "辛香",
+      "苦韵"
+    ],
+    "story": "以墨西哥莫勒酱为灵感，可可辣椒复杂苦精",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "诺瓦利干味美思",
+    "nameEn": "Noilly Prat Extra Dry",
+    "category": "味美思",
+    "style": "Dry Vermouth",
+    "brand": "Noilly Prat",
+    "origin": "法国马赛",
+    "abv": 18,
+    "priceCny": 120,
+    "notes": "法国干型味美思，草本柑橘，马天尼经典搭配",
+    "flavorTags": [
+      "草本",
+      "干爽",
+      "柑橘"
+    ],
+    "story": "1813年法国马赛创立，全球最知名干型味美思",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "马天尼干味美思",
+    "nameEn": "Martini Extra Dry",
+    "category": "味美思",
+    "style": "Dry Vermouth",
+    "brand": "Martini",
+    "origin": "意大利都灵",
+    "abv": 15,
+    "priceCny": 80,
+    "notes": "意大利干型，清淡草本，调酒常用",
+    "flavorTags": [
+      "草本",
+      "干爽",
+      "清爽"
+    ],
+    "story": "1863年意大利都灵创立，全球最畅销味美思品牌",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "马天尼甜味美思",
+    "nameEn": "Martini Rosso",
+    "category": "味美思",
+    "style": "Sweet Vermouth",
+    "brand": "Martini",
+    "origin": "意大利都灵",
+    "abv": 15,
+    "priceCny": 80,
+    "notes": "意大利甜红，香草焦糖，内格罗尼曼哈顿必备",
+    "flavorTags": [
+      "甜润",
+      "香草",
+      "草本"
+    ],
+    "story": "都灵传统甜红味美思，内格罗尼的灵魂成分",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "卡帕诺安提卡配方",
+    "nameEn": "Carpano Antica Formula",
+    "category": "味美思",
+    "style": "Sweet Vermouth",
+    "brand": "Carpano",
+    "origin": "意大利都灵",
+    "abv": 16.5,
+    "priceCny": 280,
+    "notes": "香草干果，复杂浓郁，顶级甜味美思",
+    "flavorTags": [
+      "香草",
+      "浓郁",
+      "甜润"
+    ],
+    "story": "1786年都灵原始配方复刻，顶级甜味美思标杆",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "多林干味美思",
+    "nameEn": "Dolin Dry Vermouth",
+    "category": "味美思",
+    "style": "Dry Vermouth",
+    "brand": "Dolin",
+    "origin": "法国萨瓦",
+    "abv": 17.5,
+    "priceCny": 150,
+    "notes": "法国萨瓦山区，清新花草，精品干型",
+    "flavorTags": [
+      "花香",
+      "草本",
+      "干爽"
+    ],
+    "story": "1821年法国萨瓦创立，精品味美思代表",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "多林白味美思",
+    "nameEn": "Dolin Blanc Vermouth",
+    "category": "味美思",
+    "style": "Blanc/Bianco",
+    "brand": "Dolin",
+    "origin": "法国萨瓦",
+    "abv": 16,
+    "priceCny": 150,
+    "notes": "白色甜型，花香蜂蜜，比干型更甜",
+    "flavorTags": [
+      "花香",
+      "蜂蜜",
+      "甜润"
+    ],
+    "story": "法国萨瓦白色甜型味美思，花香蜂蜜风格",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "科奇美式开胃酒",
+    "nameEn": "Cocchi Americano",
+    "category": "味美思",
+    "style": "Quinquina",
+    "brand": "Cocchi",
+    "origin": "意大利皮埃蒙特",
+    "abv": 16.5,
+    "priceCny": 200,
+    "notes": "金鸡纳树皮，柑橘草本，纸飞机必备",
+    "flavorTags": [
+      "苦韵",
+      "柑橘",
+      "草本"
+    ],
+    "story": "1891年意大利皮埃蒙特创立，纸飞机鸡尾酒必备",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "利莱白",
+    "nameEn": "Lillet Blanc",
+    "category": "味美思",
+    "style": "Quinquina",
+    "brand": "Lillet",
+    "origin": "法国波尔多",
+    "abv": 17,
+    "priceCny": 180,
+    "notes": "波尔多白葡萄酒基底，橙皮金鸡纳，清新花果",
+    "flavorTags": [
+      "花香",
+      "柑橘",
+      "清爽"
+    ],
+    "story": "1872年法国波尔多创立，007马天尼指定味美思",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "金巴利",
+    "nameEn": "Campari",
+    "category": "开胃酒",
+    "style": "Aperitivo",
+    "brand": "Campari",
+    "origin": "意大利米兰",
+    "abv": 25,
+    "priceCny": 150,
+    "notes": "苦橙草本，鲜红色，内格罗尼阿贝罗斯普里兹必备",
+    "flavorTags": [
+      "苦韵",
+      "柑橘",
+      "草本"
+    ],
+    "story": "1860年意大利米兰创立，内格罗尼的灵魂成分",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "阿贝罗",
+    "nameEn": "Aperol",
+    "category": "开胃酒",
+    "style": "Aperitivo",
+    "brand": "Aperol",
+    "origin": "意大利帕多瓦",
+    "abv": 11,
+    "priceCny": 150,
+    "notes": "橙色苦甜，大黄龙胆，阿贝罗斯普里兹必备",
+    "flavorTags": [
+      "苦韵",
+      "柑橘",
+      "甜润"
+    ],
+    "story": "1919年意大利帕多瓦创立，斯普里兹热潮推手",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "菲奈特布兰卡",
+    "nameEn": "Fernet-Branca",
+    "category": "开胃酒",
+    "style": "Fernet",
+    "brand": "Branca",
+    "origin": "意大利米兰",
+    "abv": 39,
+    "priceCny": 200,
+    "notes": "27种草本，强烈苦味薄荷，消化酒经典",
+    "flavorTags": [
+      "苦韵",
+      "草本",
+      "辛香"
+    ],
+    "story": "1845年米兰创立，27种草本秘方，全球最知名菲奈特",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "阿玛罗阿维尔纳",
+    "nameEn": "Amaro Averna",
+    "category": "开胃酒",
+    "style": "Amaro Medio",
+    "brand": "Averna",
+    "origin": "意大利西西里",
+    "abv": 29,
+    "priceCny": 180,
+    "notes": "西西里草本柑橘，甜苦平衡，易饮消化酒",
+    "flavorTags": [
+      "苦韵",
+      "柑橘",
+      "甜润"
+    ],
+    "story": "1868年西西里卡尔塔尼塞塔创立，修道院配方",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "阿玛罗蒙特内格罗",
+    "nameEn": "Amaro Montenegro",
+    "category": "开胃酒",
+    "style": "Amaro Leggero",
+    "brand": "Montenegro",
+    "origin": "意大利博洛尼亚",
+    "abv": 23,
+    "priceCny": 200,
+    "notes": "40种草本，橙皮香草，轻盈甜润阿玛罗",
+    "flavorTags": [
+      "草本",
+      "甜润",
+      "柑橘"
+    ],
+    "story": "1885年博洛尼亚创立，以黑山王国命名",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "苏兹龙胆利口酒",
+    "nameEn": "Suze Gentian Liqueur",
+    "category": "开胃酒",
+    "style": "Gentian",
+    "brand": "Suze",
+    "origin": "法国",
+    "abv": 15,
+    "priceCny": 200,
+    "notes": "龙胆草根，苦涩草本，白色内格罗尼必备",
+    "flavorTags": [
+      "苦韵",
+      "草本",
+      "清爽"
+    ],
+    "story": "1889年法国创立，龙胆草根苦味利口酒",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "普罗塞克",
+    "nameEn": "Prosecco DOC",
+    "category": "起泡酒",
+    "style": "Prosecco",
+    "brand": "Mionetto",
+    "origin": "意大利威尼托",
+    "abv": 11,
+    "priceCny": 120,
+    "notes": "意大利起泡酒，青苹果梨花香，清爽易饮",
+    "flavorTags": [
+      "果味",
+      "花香",
+      "清爽"
+    ],
+    "story": "意大利威尼托DOC产区，格雷拉葡萄，夏尔马法",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "卡瓦起泡酒",
+    "nameEn": "Cava Brut",
+    "category": "起泡酒",
+    "style": "Cava",
+    "brand": "Freixenet",
+    "origin": "西班牙加泰罗尼亚",
+    "abv": 11.5,
+    "priceCny": 100,
+    "notes": "西班牙传统法起泡酒，柑橘烤面包，性价比高",
+    "flavorTags": [
+      "柑橘",
+      "清爽",
+      "干爽"
+    ],
+    "story": "西班牙加泰罗尼亚传统法起泡酒，弗雷克塞内特标志黑瓶",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "香槟",
+    "nameEn": "Champagne Brut",
+    "category": "起泡酒",
+    "style": "Champagne",
+    "brand": "Moët & Chandon",
+    "origin": "法国香槟区",
+    "abv": 12,
+    "priceCny": 400,
+    "notes": "法国香槟区，烤面包酵母，精致复杂",
+    "flavorTags": [
+      "清爽",
+      "干爽",
+      "果味"
+    ],
+    "story": "法国香槟区AOC，传统法二次发酵，全球起泡酒标杆",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "菲诺雪利酒",
+    "nameEn": "Tio Pepe Fino Sherry",
+    "category": "葡萄酒",
+    "style": "Sherry Fino",
+    "brand": "González Byass",
+    "origin": "西班牙赫雷斯",
+    "abv": 15,
+    "priceCny": 150,
+    "notes": "干型雪利，酵母坚果，咸鲜矿物，调酒新宠",
+    "flavorTags": [
+      "干爽",
+      "坚果",
+      "咸鲜"
+    ],
+    "story": "西班牙赫雷斯菲诺雪利，酒花保护陈酿，极干清爽",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "奥罗洛索雪利酒",
+    "nameEn": "Oloroso Sherry",
+    "category": "葡萄酒",
+    "style": "Sherry Oloroso",
+    "brand": "Lustau",
+    "origin": "西班牙赫雷斯",
+    "abv": 18,
+    "priceCny": 180,
+    "notes": "氧化陈酿，坚果干果，浓郁复杂",
+    "flavorTags": [
+      "坚果",
+      "浓郁",
+      "干爽"
+    ],
+    "story": "西班牙赫雷斯氧化陈酿雪利，无酒花保护，浓郁复杂",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "波特酒",
+    "nameEn": "Tawny Port 10 Year",
+    "category": "葡萄酒",
+    "style": "Port",
+    "brand": "Graham's",
+    "origin": "葡萄牙杜罗河谷",
+    "abv": 20,
+    "priceCny": 200,
+    "notes": "10年陈年波特，坚果焦糖，甜润复杂",
+    "flavorTags": [
+      "坚果",
+      "焦糖",
+      "甜润"
+    ],
+    "story": "葡萄牙杜罗河谷加强葡萄酒，茶色波特陈年风格",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "獭祭纯米大吟酿",
+    "nameEen": "Dassai 45 Junmai Daiginjo",
+    "category": "清酒烧酒",
+    "style": "Junmai Daiginjo",
+    "brand": "旭酒造",
+    "origin": "日本山口县",
+    "abv": 16,
+    "priceCny": 200,
+    "notes": "精米步合45%，清新果香花香，精品大吟酿",
+    "flavorTags": [
+      "花香",
+      "果味",
+      "清爽"
+    ],
+    "story": "山口县旭酒造，以精米步合45%的山田锦酿造",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "久保田千寿",
+    "nameEn": "Kubota Senju",
+    "category": "清酒烧酒",
+    "style": "Junmai Ginjo",
+    "brand": "朝日酒造",
+    "origin": "日本新潟县",
+    "abv": 15,
+    "priceCny": 180,
+    "notes": "新潟辛口，清淡干净，淡丽辛口代表",
+    "flavorTags": [
+      "清爽",
+      "干爽"
+    ],
+    "story": "新潟县朝日酒造，淡丽辛口风格代表",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "黑霸王麦烧酎",
+    "nameEn": "Iichiko Silhouette Mugi Shochu",
+    "category": "清酒烧酒",
+    "style": "Mugi Shochu",
+    "brand": "三和酒类",
+    "origin": "日本大分县",
+    "abv": 25,
+    "priceCny": 120,
+    "notes": "大麦烧酎，清爽麦香，加冰或加水饮用",
+    "flavorTags": [
+      "清爽",
+      "干爽",
+      "草本"
+    ],
+    "story": "大分县三和酒类，日本最知名麦烧酎品牌",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "茅台飞天",
+    "nameEn": "Moutai Flying Fairy",
+    "category": "中式白酒",
+    "style": "Sauce Aroma 酱香",
+    "brand": "贵州茅台",
+    "origin": "中国贵州茅台镇",
+    "abv": 53,
+    "priceCny": 1499,
+    "notes": "酱香型，复杂酱香，中国国酒",
+    "flavorTags": [
+      "浓郁",
+      "辛香",
+      "草本"
+    ],
+    "story": "贵州茅台镇赤水河畔，中国最知名白酒品牌",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "五粮液",
+    "nameEn": "Wuliangye",
+    "category": "中式白酒",
+    "style": "Strong Aroma 浓香",
+    "brand": "五粮液",
+    "origin": "中国四川宜宾",
+    "abv": 52,
+    "priceCny": 1000,
+    "notes": "浓香型，五种粮食，复杂浓郁",
+    "flavorTags": [
+      "浓郁",
+      "甜润",
+      "辛香"
+    ],
+    "story": "四川宜宾，五种粮食酿造，浓香型代表",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "汾酒青花30",
+    "nameEn": "Fenjiu Blue and White 30",
+    "category": "中式白酒",
+    "style": "Light Aroma 清香",
+    "brand": "山西汾酒",
+    "origin": "中国山西杏花村",
+    "abv": 53,
+    "priceCny": 500,
+    "notes": "清香型，纯净清爽，中国最古老白酒之一",
+    "flavorTags": [
+      "清爽",
+      "干爽",
+      "辛香"
+    ],
+    "story": "山西杏花村，清香型代表，中国最古老蒸馏酒之一",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "简单糖浆",
+    "nameEn": "Simple Syrup",
+    "category": "糖浆",
+    "style": "Syrup",
+    "brand": "",
+    "origin": "",
+    "abv": 0,
+    "priceCny": 20,
+    "notes": "1:1蔗糖水，中性甜味，调酒万能甜味剂",
+    "flavorTags": [
+      "甜润"
+    ],
+    "story": "等比例糖水，调酒最基础甜味剂",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "丰富糖浆",
+    "nameEn": "Rich Simple Syrup",
+    "category": "糖浆",
+    "style": "Syrup",
+    "brand": "",
+    "origin": "",
+    "abv": 0,
+    "priceCny": 20,
+    "notes": "2:1蔗糖水，浓稠甜味，比简单糖浆更甜",
+    "flavorTags": [
+      "甜润"
+    ],
+    "story": "2:1糖水比例，更浓稠，用量减半",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "杏仁糖浆",
+    "nameEn": "Orgeat",
+    "category": "糖浆",
+    "style": "Syrup",
+    "brand": "Monin",
+    "origin": "法国",
+    "abv": 0,
+    "priceCny": 80,
+    "notes": "杏仁甜味，花香坚果，迈泰必备",
+    "flavorTags": [
+      "坚果",
+      "甜润",
+      "花香"
+    ],
+    "story": "杏仁糖浆，提基鸡尾酒核心成分，迈泰必备",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "石榴糖浆",
+    "nameEn": "Grenadine",
+    "category": "糖浆",
+    "style": "Syrup",
+    "brand": "Monin",
+    "origin": "法国",
+    "abv": 0,
+    "priceCny": 60,
+    "notes": "石榴甜酸，红色，龙舌兰日出必备",
+    "flavorTags": [
+      "果味",
+      "甜润",
+      "酸爽"
+    ],
+    "story": "石榴汁糖浆，龙舌兰日出等经典鸡尾酒必备",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "蜂蜜糖浆",
+    "nameEn": "Honey Syrup",
+    "category": "糖浆",
+    "style": "Syrup",
+    "brand": "",
+    "origin": "",
+    "abv": 0,
+    "priceCny": 30,
+    "notes": "蜂蜜稀释，花香甜味，蜂之膝必备",
+    "flavorTags": [
+      "蜂蜜",
+      "甜润",
+      "花香"
+    ],
+    "story": "蜂蜜与水1:1稀释，蜂之膝等蜂蜜鸡尾酒必备",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "法勒南",
+    "nameEn": "Falernum",
+    "category": "糖浆",
+    "style": "Cordial",
+    "brand": "John D. Taylor's",
+    "origin": "巴巴多斯",
+    "abv": 11,
+    "priceCny": 150,
+    "notes": "青柠杏仁丁香，提基鸡尾酒核心",
+    "flavorTags": [
+      "柑橘",
+      "坚果",
+      "辛香"
+    ],
+    "story": "巴巴多斯传统配方，青柠杏仁丁香，提基必备",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "苏打水",
+    "nameEn": "Soda Water",
+    "category": "软饮",
+    "style": "Soda",
+    "brand": "",
+    "origin": "",
+    "abv": 0,
+    "priceCny": 5,
+    "notes": "碳酸水，无味，调酒稀释增泡",
+    "flavorTags": [
+      "清爽"
+    ],
+    "story": "碳酸水，调酒最基础稀释剂",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "汤力水",
+    "nameEn": "Tonic Water",
+    "category": "软饮",
+    "style": "Tonic",
+    "brand": "Fever-Tree",
+    "origin": "英国",
+    "abv": 0,
+    "priceCny": 20,
+    "notes": "金鸡纳苦味，微甜，金汤力必备",
+    "flavorTags": [
+      "苦韵",
+      "清爽",
+      "甜润"
+    ],
+    "story": "含金鸡纳树皮提取物，金汤力的灵魂成分",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "姜汁啤酒",
+    "nameEn": "Ginger Beer",
+    "category": "软饮",
+    "style": "Ginger Beer",
+    "brand": "Fever-Tree",
+    "origin": "英国",
+    "abv": 0,
+    "priceCny": 20,
+    "notes": "辛辣姜味，莫斯科骡子必备",
+    "flavorTags": [
+      "辛香",
+      "清爽"
+    ],
+    "story": "辛辣姜味碳酸饮料，莫斯科骡子和暗风暴必备",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "姜汁汽水",
+    "nameEn": "Ginger Ale",
+    "category": "软饮",
+    "style": "Ginger Ale",
+    "brand": "Canada Dry",
+    "origin": "加拿大",
+    "abv": 0,
+    "priceCny": 10,
+    "notes": "温和姜味，比姜汁啤酒更甜更温和",
+    "flavorTags": [
+      "辛香",
+      "甜润",
+      "清爽"
+    ],
+    "story": "加拿大干姜汁汽水，比姜汁啤酒更温和甜润",
+    "confidence": "high"
+  },
+  {
+    "nameZh": "可口可乐",
+    "nameEn": "Coca-Cola",
+    "category": "软饮",
+    "style": "Cola",
+    "brand": "Coca-Cola",
+    "origin": "美国",
+    "abv": 0,
+    "priceCny": 5,
+    "notes": "可乐，朗姆可乐必备",
+    "flavorTags": [
+      "甜润",
+      "辛香"
+    ],
+    "story": "1886年美国创立，全球最知名碳酸饮料",
+    "confidence": "high"
+  }
+]
