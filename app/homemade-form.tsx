@@ -97,7 +97,10 @@ export default function HomemadeFormScreen() {
       setAiStatus({ kind: "err", msg: lang === "en" ? "Please enter a name first" : "请先输入名称" });
       return;
     }
-    if (!isOnline) return;
+    if (!isOnline) {
+      setAiStatus({ kind: "err", msg: lang === "en" ? "Offline: AI requires internet connection" : "当前离线，AI 补全需要网络连接" });
+      return;
+    }
     setAiBusy(true);
     setAiStatus(null);
     try {

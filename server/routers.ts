@@ -1373,19 +1373,21 @@ ${input.origin ? `产地: ${input.origin}` : ""}
      */
     enrichBottleFull: publicProcedure
     .input(
-      z.object({
-        nameZh: z.string().max(200).optional(),
-        nameEn: z.string().max(200).optional(),
-        category: z.string().max(100).optional(),
-        style: z.string().max(100).optional(),
-        brand: z.string().max(200).optional(),
-        origin: z.string().max(200).optional(),
-        imageBase64: z.string().max(14_000_000).optional(),
-        imageMime: z.string().max(64).optional(),
-        /** 用户书库中与该酒款相关的文本片段（最多3段，每段200字以内） */
-        bookSnippets: z.array(z.string().max(300)).max(5).optional(),
-      }),
-    )
+  z.object({
+    nameZh: z.string().max(200).optional(),
+    nameEn: z.string().max(200).optional(),
+    category: z.string().max(100).optional(),
+    style: z.string().max(100).optional(),
+    brand: z.string().max(200).optional(),
+    origin: z.string().max(200).optional(),
+    imageBase64: z.string().max(14_000_000).optional(),
+    imageMime: z.string().max(64).optional(),
+    /** 用户书库中与该酒款相关的文本片段（最多3段，每段200字以内） */
+    bookSnippets: z.array(z.string().max(300)).max(5).optional(),
+    /** 用户酒库中同类/相关酒款名称列表（用于跨酒款关联推理） */
+    cellarBottles: z.array(z.string().max(200)).max(20).optional(),
+  }),
+)
       .mutation(async ({ input }) => {
         // ── 白名单常量 ──────────────────────────────────────────────────
         const BOTTLE_STYLES_MAP: Record<string, string[]> = {
@@ -1435,7 +1437,10 @@ ${input.origin ? `产地: ${input.origin}` : ""}
         const styleOptions = cat && BOTTLE_STYLES_MAP[cat] ? `\n可选风格子标签（必须从中选一，不确定填""）: ${JSON.stringify(BOTTLE_STYLES_MAP[cat])}` : "";
         // 书库上下文：如果客户端传来了相关段落，注入到 prompt 中
         const bookContext = (input.bookSnippets && input.bookSnippets.length > 0)
-          ? `\n\n【用户书库参考资料】以下是用户个人书库中与该酒款相关的原文段落，请优先参考这些内容补全 story/notes/styleDesc/distilleryInfo 等描述性字段：\n${input.bookSnippets.map((s, i) => `[段落${i + 1}] ${s}`).join("\n")}`
+        ? `\n\n【用户书库参考资料】以下是用户个人书库中与该酒款相关的原文段落，请优先参考这些内容补全 story/notes/styleDesc/distilleryInfo 等描述性字段：\n${input.bookSnippets.map((s, i) => `[段落${i + 1}] ${s}`).join("\n")}`
+        : "";
+        const cellarContext = (input.cellarBottles && input.cellarBottles.length > 0)
+          ? `\n\n【用户酒库参考】用户当前酒库中有以下相关酒款：${input.cellarBottles.slice(0, 15).join("、")}。请基于此推断：1) 该酒款可替代酒库中的哪款酒（substituteFor）；2) 与酒库中哪款酒搭配效果好（pairsWith）。如无法推断则填""。`
           : "";
 
         // ── 三库差异化 prompt ───────────────────────────────────────────
@@ -1463,13 +1468,13 @@ ${input.origin ? `产地: ${input.origin}` : ""}
         }
 
         const VALID_FLAVOR_TAGS_FULL = ["草本","果味","柑橘","花香","甜润","酸爽","苦韵","辛香","烟熏","咸鲜","清爽","浓郁","坚果","奶油","干爽","热带","焦糖","咖啡","巧克力","泥煤","蜂蜜","香草","坚硬","辛辣"];
-        const prompt = `你是专业的烈酒/饮料/原材料知识专家，深度研习以下权威资料：
+        const prompt = `你是专业的烈酒/饮料/原材料知识专家，深度研习以下权威资料，同时精通中英双语描述：
 【英文】《The Oxford Companion to Spirits & Cocktails》(Wondrich & Rothbaum, 2021) · Death & Co《Cocktail Codex》(2018) · Jeffrey Morgenthaler《The Bar Book》(2014) · Dave Arnold《Liquid Intelligence》(2014) · WSET Spirits Level 1-4 官方教材 · Jim Murray《Whisky Bible》(年度版) · Michael Jackson《Malt Whisky Companion》(多版) · Dave Broom《The World Atlas of Whisky》(2014) · Fred Minnick《Bourbon》(2016) · Aaron Knoll《Gin: The Art and Craft of the Artisan Revival》(2015) · Dave Broom《Rum》(2016) · Brad Thomas Parsons《Bitters》(2011) · Brad Thomas Parsons《Amaro》(2016) · Jancis Robinson《The Oxford Companion to Wine》(多版) · Jancis Robinson《Wine Grapes》(2012) · Hugh Johnson & Jancis Robinson《The World Atlas of Wine》(多版) · Julian Jeffs《Sherry》(多版) · John Gauntner《The Sake Handbook》(多版) · Garrett Oliver《The Oxford Companion to Beer》(2011) · IBA Official Cocktail List · Difford's Guide · Whisky Advocate · Wine Spectator · The Spirits Business · IWSR Reports · SWA 法規資料 · CRT/COMERCAM 龍舌蘭/梅斯卡爾法規 · TTB 美國烈酒法規
 【中文/繁體】《威士忌學》邱德夫著(台灣) · 《葡萄酒全書》林裕森著(台灣) · 《調酒師手冊》(台灣版) · 《調酒學》林一峰著(香港) · 《世界雞尾酒大全》(台灣版) · 《威士忌聖經》中文版 · 《清酒的世界》(台灣翻譯版) · 《日本酒入門》(台灣版) · 《苦精聖經》(台灣翻譯版) · 《利口酒全書》(台灣翻譯版) · 《精釀啤酒聖經》(台灣翻譯版) · 《葡萄酒品飲事典》(台灣版) · 《中國白酒香型與工藝》(中國輕工業出版社) · GB/T 國家標準(中國白酒各香型) · 《釀酒科技》期刊(中國) · 台灣調酒協會(TBSA) · 香港調酒師協會(HKBA)
 【學術】Journal of Agricultural and Food Chemistry · Food Chemistry · Journal of the Institute of Brewing · American Journal of Enology and Viticulture · Chemical Senses · Food Quality and Preference · 《食品科學》(中國) · 《釀酒科技》(中國)
 根据以下产品信息，一次性补全所有字段。
 
-产品名称: ${name || "（未知，请根据照片识别）"}${knownCategory}${knownStyle}${knownBrand}${knownOrigin}${bookContext}
+        产品名称: ${name || "（未知，请根据照片识别）"}${knownCategory}${knownStyle}${knownBrand}${knownOrigin}${bookContext}${cellarContext}
 ${librarySpecificInstructions}
 
 请输出 JSON（所有字段必须存在，不确定的字符串填 ""，数字填 0）:
@@ -1492,7 +1497,11 @@ ${librarySpecificInstructions}
   "pairingNotes": "搭配建议（酒款库专用，中文，40字内），不确定填 \"\"",
   "usageNotes": "调酒用途说明（原材料库专用，中文，60字内），不确定填 \"\"",
   "seasonality": "季节性说明（原材料库专用，中文，20字内），不确定填 \"\"",
-  "confidence": "high"/"medium"/"low"（资料把握程度：知名大牌=high，通用品类=medium，勉强猜测=low）
+  "confidence": "high"/"medium"/"low"（资料把握程度：知名大牌=high，通用品类=medium，勉强猜测=low）,
+  "notesEn": "一句话英文简介（英文，50字内，供国际场合使用），不确定填 \"\"",
+  "storyEn": "英文产品故事/介绍（英文，80字内，描述历史背景与风味特点），不确定填 \"\"",
+  "substituteFor": "可替代用户酒库中的哪款酒（酒款中文名或英文名，如"添加利金酒"），无法推断填 \"\"",
+  "pairsWith": "与用户酒库中哪款酒搭配效果好（酒款中文名或英文名），无法推断填 \"\""
 }
 规则：
 - category 必须严格落在上述枚举中，选最贴切的一个
@@ -1505,6 +1514,46 @@ ${librarySpecificInstructions}
 - 只输出 JSON，不要任何解释文字`;
 
         const parts: MessageContent[] = [];
+        // ── 缓存检查（仅文字请求，图片请求不缓存） ─────────────────────────
+        const cacheKey = !input.imageBase64
+          ? getEnrichCacheKey(input.nameZh, input.nameEn, input.brand, input.category)
+          : null;
+        if (cacheKey) {
+          pruneEnrichCache();
+          const cached = enrichBottleCache.get(cacheKey);
+          if (cached && cached.expireAt > Date.now()) {
+            const cp = cached.result;
+            const resolvedCat2 = VALID_CATEGORIES.includes(cp.category as string) ? (cp.category as string) : (cat || "");
+            const styleList2 = BOTTLE_STYLES_MAP[resolvedCat2] ?? [];
+            const rawStyle2 = typeof cp.style === "string" ? cp.style.trim() : "";
+            const rawFlavors2 = Array.isArray(cp.flavorTags) ? (cp.flavorTags as string[]) : [];
+            return {
+              found: cp.found !== false,
+              nameZh: typeof cp.nameZh === "string" ? cp.nameZh.trim() : "",
+              nameEn: typeof cp.nameEn === "string" ? cp.nameEn.trim() : "",
+              category: resolvedCat2,
+              style: styleList2.includes(rawStyle2) ? rawStyle2 : "",
+              brand: typeof cp.brand === "string" ? cp.brand.trim() : "",
+              origin: typeof cp.origin === "string" ? cp.origin.trim() : "",
+              volume: typeof cp.volume === "string" ? cp.volume.trim() : "",
+              abv: typeof cp.abv === "number" && cp.abv >= 0 ? cp.abv : 0,
+              priceCny: typeof cp.priceCny === "number" && cp.priceCny >= 0 ? cp.priceCny : 0,
+              notes: typeof cp.notes === "string" ? cp.notes.trim() : "",
+              flavorTags: rawFlavors2.filter((f) => VALID_FLAVOR_TAGS_BOTTLE.includes(f)).slice(0, 4),
+              story: typeof cp.story === "string" ? cp.story.trim() : "",
+              styleDesc: typeof cp.styleDesc === "string" ? cp.styleDesc.trim() : "",
+              distilleryInfo: typeof cp.distilleryInfo === "string" ? cp.distilleryInfo.trim() : "",
+              pairingNotes: typeof cp.pairingNotes === "string" ? cp.pairingNotes.trim() : "",
+              usageNotes: typeof cp.usageNotes === "string" ? cp.usageNotes.trim() : "",
+              seasonality: typeof cp.seasonality === "string" ? cp.seasonality.trim() : "",
+              confidence: (["high","medium","low"] as const).includes(cp.confidence as "high") ? cp.confidence as "high"|"medium"|"low" : "medium",
+              notesEn: typeof cp.notesEn === "string" ? cp.notesEn.trim() : "",
+              storyEn: typeof cp.storyEn === "string" ? cp.storyEn.trim() : "",
+              substituteFor: typeof cp.substituteFor === "string" ? cp.substituteFor.trim() : "",
+              pairsWith: typeof cp.pairsWith === "string" ? cp.pairsWith.trim() : "",
+            };
+          }
+        }
         if (input.imageBase64) {
           parts.push({
             type: "image_url",
@@ -1537,6 +1586,11 @@ ${librarySpecificInstructions}
         const rawFlavors = Array.isArray(p.flavorTags) ? (p.flavorTags as string[]) : [];
         const validatedFlavors = rawFlavors.filter((f) => VALID_FLAVOR_TAGS_BOTTLE.includes(f)).slice(0, 4);
 
+        // ── 写入缓存 ────────────────────────────────────────────────────
+        if (cacheKey) {
+          enrichBottleCache.set(cacheKey, { result: p, expireAt: Date.now() + ENRICH_CACHE_TTL_MS });
+        }
+
         return {
           found: p.found !== false,
           nameZh: typeof p.nameZh === "string" ? p.nameZh.trim() : "",
@@ -1557,6 +1611,10 @@ ${librarySpecificInstructions}
           usageNotes: typeof p.usageNotes === "string" ? p.usageNotes.trim() : "",
           seasonality: typeof p.seasonality === "string" ? p.seasonality.trim() : "",
           confidence: (["high","medium","low"] as const).includes(p.confidence as "high") ? p.confidence as "high"|"medium"|"low" : "medium",
+          notesEn: typeof p.notesEn === "string" ? p.notesEn.trim() : "",
+          storyEn: typeof p.storyEn === "string" ? p.storyEn.trim() : "",
+          substituteFor: typeof p.substituteFor === "string" ? p.substituteFor.trim() : "",
+          pairsWith: typeof p.pairsWith === "string" ? p.pairsWith.trim() : "",
         };
       }),
 
@@ -1841,3 +1899,19 @@ ${input.text}
 });
 
 export type AppRouter = typeof appRouter;
+// ── enrichBottleFull 服务端内存缓存（1小时 TTL，按名称+分类 key 缓存） ──────────
+interface EnrichCacheEntry {
+  result: Record<string, unknown>;
+  expireAt: number;
+}
+const enrichBottleCache = new Map<string, EnrichCacheEntry>();
+const ENRICH_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+function getEnrichCacheKey(nameZh?: string, nameEn?: string, brand?: string, category?: string): string {
+  return [nameZh ?? "", nameEn ?? "", brand ?? "", category ?? ""].join("|").toLowerCase().trim();
+}
+function pruneEnrichCache() {
+  const now = Date.now();
+  for (const [k, v] of enrichBottleCache.entries()) {
+    if (v.expireAt < now) enrichBottleCache.delete(k);
+  }
+}

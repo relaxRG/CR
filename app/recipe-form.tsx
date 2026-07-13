@@ -235,6 +235,7 @@ export default function RecipeFormScreen() {
   const { t, lang } = useI18n();
   const { getRecipe, addRecipe, updateRecipe, categories, tagsOf, addTag } = useRecipeStore();
   const enrichRecipeMutation = trpc.lookup.enrichRecipe.useMutation();
+  const deepAnalyzeRecipeMutation = trpc.lookup.deepAnalyzeRecipe.useMutation();
   const { isOnline } = useNetwork();
   const { preps } = useHomemadeStore();
   const { bottles } = useBottleStore();
@@ -518,7 +519,7 @@ export default function RecipeFormScreen() {
   /** 深度解析：联网 + 强模型，补全所有字段 */
   const handleDeepAnalyze = () => {
     const recipeName = name.trim() || nameEn.trim();
-    if (!recipeName || enrichRecipeMutation.isPending) return;
+    if (!recipeName || enrichRecipeMutation.isPending || deepAnalyzeRecipeMutation.isPending) return;
     if (!isOnline) {
       Alert.alert(t("offline.title"), t("offline.aiUnavailable"));
       return;
@@ -526,16 +527,13 @@ export default function RecipeFormScreen() {
     setAiEnriching(true);
     setAiResult(null);
     const ingNames = ingredients.map((i) => i.name).filter(Boolean);
-    enrichRecipeMutation.mutate(
+    deepAnalyzeRecipeMutation.mutate(
       {
         name: name.trim() || nameEn.trim(),
         nameEn: nameEn.trim() || undefined,
-        ingredients: ingNames.length > 0 ? ingNames : undefined,
+        ingredients: ingNames.length > 0 ? ingNames.join(", ") : undefined,
         baseSpirit: baseSpirit || undefined,
         source: source.trim() || undefined,
-        method: method || undefined,
-        existingSpirits: spiritNames,
-        existingGlasses: glassNames,
       },
       {
         onSuccess: (result) => {
@@ -547,23 +545,13 @@ export default function RecipeFormScreen() {
             setAiSuggestedSpirits(spirits);
             setBaseSpirit(resolved);
           }
-          if (!glass && result.suggestedGlass && result.suggestedGlassConfidence === "high") {
+          if (!glass && result.suggestedGlass) {
             const nextName = ensureGlassName(result.suggestedGlass);
             if (nextName) setGlass(nextName);
           }
-          if (!ice && result.suggestedIce && result.suggestedIceConfidence === "high") {
+          if (!ice && result.suggestedIce) {
             const nextName = normalizeIceName(result.suggestedIce);
             if ((ICE_TYPES as readonly string[]).includes(nextName)) setIce(nextName);
-          }
-          // 饮用时长：未 override 且 AI 高/中置信度时写入
-          if (!durationUserOverride && result.suggestedDrinkDuration) {
-            const conf = result.suggestedDurationConfidence ?? "medium";
-            if (conf === "high" || conf === "medium") setDrinkDuration(result.suggestedDrinkDuration);
-          }
-          // 饮用场合：未 override 且 AI 高/中置信度时写入
-          if (!occasionUserOverride && result.suggestedOccasion) {
-            const conf = result.suggestedOccasionConfidence ?? "medium";
-            if (conf === "high" || conf === "medium") setOccasion(result.suggestedOccasion);
           }
           setAiResult({ ...result, isDeepAnalysis: true });
           setAiEnriching(false);
@@ -1167,7 +1155,7 @@ export default function RecipeFormScreen() {
             {/* 统一 AI 补全按钮 — 调用 deepAnalyzeRecipe（全字段，claude-sonnet） */}
             <Pressable
               onPress={handleDeepAnalyze}
-              disabled={enrichRecipeMutation.isPending || aiEnriching || (!name.trim() && !nameEn.trim())}
+              disabled={enrichRecipeMutation.isPending || deepAnalyzeRecipeMutation.isPending || aiEnriching || (!name.trim() && !nameEn.trim())}
               style={({ pressed }) => [
                 {
                   flex: 1,
@@ -1183,7 +1171,7 @@ export default function RecipeFormScreen() {
                 },
               ]}
             >
-              {enrichRecipeMutation.isPending || aiEnriching ? (
+          {enrichRecipeMutation.isPending || deepAnalyzeRecipeMutation.isPending || aiEnriching ? (
                 <>
                   <IconSymbol name="sparkles" size={15} color="#FFFFFF" />
                   <Text style={{ fontSize: 13, fontWeight: "700", color: "#FFFFFF" }}>

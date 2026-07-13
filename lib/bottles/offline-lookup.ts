@@ -195,5 +195,9 @@ export function offlineEntryToEnrichResult(entry: OfflineBottleEntry, bookSnippe
     usageNotes: "",
     seasonality: "",
     confidence: entry.confidence,
+    notesEn: "",
+    storyEn: "",
+    substituteFor: "",
+    pairsWith: "",
   };
 }

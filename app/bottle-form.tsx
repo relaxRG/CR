@@ -89,6 +89,10 @@ export default function BottleFormScreen() {
   const [pairingNotes, setPairingNotes] = useState(editing?.pairingNotes ?? "");
   const [usageNotes, setUsageNotes] = useState(editing?.usageNotes ?? "");
   const [seasonality, setSeasonality] = useState(editing?.seasonality ?? "");
+  const [notesEn, setNotesEn] = useState(editing?.notesEn ?? "");
+  const [storyEn, setStoryEn] = useState(editing?.storyEn ?? "");
+  const [substituteFor, setSubstituteFor] = useState(editing?.substituteFor ?? "");
+  const [pairsWith, setPairsWith] = useState(editing?.pairsWith ?? "");
 
   const canSave = nameZh.trim().length > 0 || nameEn.trim().length > 0;
 
@@ -107,6 +111,7 @@ export default function BottleFormScreen() {
     brand: string; origin: string; volume: string; abv: string; price: string;
     notes: string; flavorTags: string[]; story: string; styleDesc: string;
     distilleryInfo: string; pairingNotes: string; usageNotes: string; seasonality: string;
+    notesEn?: string; storyEn?: string; substituteFor?: string; pairsWith?: string;
   }>(null);
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -143,8 +148,12 @@ export default function BottleFormScreen() {
     if (aiResult.pairingNotes) fields.push({ key: "pairingNotes", labelZh: "搭配建议", labelEn: "Pairing", aiValue: aiResult.pairingNotes.slice(0, 50) + (aiResult.pairingNotes.length > 50 ? "…" : ""), currentValue: pairingNotes ? pairingNotes.slice(0, 30) + "…" : "", conflict: conf(pairingNotes, aiResult.pairingNotes, aiResult.confidence) });
     if (aiResult.usageNotes) fields.push({ key: "usageNotes", labelZh: "调酒用途", labelEn: "Usage", aiValue: aiResult.usageNotes.slice(0, 50) + (aiResult.usageNotes.length > 50 ? "…" : ""), currentValue: usageNotes ? usageNotes.slice(0, 30) + "…" : "", conflict: conf(usageNotes, aiResult.usageNotes, aiResult.confidence) });
     if (aiResult.seasonality) fields.push({ key: "seasonality", labelZh: "季节性", labelEn: "Seasonality", aiValue: aiResult.seasonality, currentValue: seasonality, conflict: conf(seasonality, aiResult.seasonality, aiResult.confidence) });
+    if ((aiResult as { notesEn?: string }).notesEn) fields.push({ key: "notesEn", labelZh: "英文简介", labelEn: "EN Notes", aiValue: ((aiResult as { notesEn?: string }).notesEn ?? "").slice(0, 50) + (((aiResult as { notesEn?: string }).notesEn ?? "").length > 50 ? "…" : ""), currentValue: notesEn ? notesEn.slice(0, 30) + "…" : "", conflict: conf(notesEn, (aiResult as { notesEn?: string }).notesEn ?? "", aiResult.confidence) });
+    if ((aiResult as { storyEn?: string }).storyEn) fields.push({ key: "storyEn", labelZh: "英文故事", labelEn: "EN Story", aiValue: ((aiResult as { storyEn?: string }).storyEn ?? "").slice(0, 50) + (((aiResult as { storyEn?: string }).storyEn ?? "").length > 50 ? "…" : ""), currentValue: storyEn ? storyEn.slice(0, 30) + "…" : "", conflict: conf(storyEn, (aiResult as { storyEn?: string }).storyEn ?? "", aiResult.confidence) });
+    if ((aiResult as { substituteFor?: string }).substituteFor) fields.push({ key: "substituteFor", labelZh: "可替代", labelEn: "Substitute For", aiValue: (aiResult as { substituteFor?: string }).substituteFor ?? "", currentValue: substituteFor, conflict: "new" });
+    if ((aiResult as { pairsWith?: string }).pairsWith) fields.push({ key: "pairsWith", labelZh: "搭配酒款", labelEn: "Pairs With", aiValue: (aiResult as { pairsWith?: string }).pairsWith ?? "", currentValue: pairsWith, conflict: "new" });
     return fields;
-  }, [aiResult, nameZh, nameEn, category, style, brand, origin, volume, abv, price, notes, flavorTags, story, styleDesc, distilleryInfo, pairingNotes, usageNotes, seasonality, taxCategories]);
+  }, [aiResult, nameZh, nameEn, category, style, brand, origin, volume, abv, price, notes, flavorTags, story, styleDesc, distilleryInfo, pairingNotes, usageNotes, seasonality, notesEn, storyEn, substituteFor, pairsWith, taxCategories]);
 
   /** 初始化 toggles：新增/确认字段默认 on，覆盖/低可信默认 off */
   useEffect(() => {
@@ -178,13 +187,17 @@ export default function BottleFormScreen() {
     else if (key === "pairingNotes" && aiResult.pairingNotes) setPairingNotes(aiResult.pairingNotes);
     else if (key === "usageNotes" && aiResult.usageNotes) setUsageNotes(aiResult.usageNotes);
     else if (key === "seasonality" && aiResult.seasonality) setSeasonality(aiResult.seasonality);
+    else if (key === "notesEn" && (aiResult as { notesEn?: string }).notesEn) setNotesEn((aiResult as { notesEn?: string }).notesEn ?? "");
+    else if (key === "storyEn" && (aiResult as { storyEn?: string }).storyEn) setStoryEn((aiResult as { storyEn?: string }).storyEn ?? "");
+    else if (key === "substituteFor" && (aiResult as { substituteFor?: string }).substituteFor) setSubstituteFor((aiResult as { substituteFor?: string }).substituteFor ?? "");
+    else if (key === "pairsWith" && (aiResult as { pairsWith?: string }).pairsWith) setPairsWith((aiResult as { pairsWith?: string }).pairsWith ?? "");
   }, [aiResult]);
 
   /** 应用所有 toggle=true 的字段，保存 undo 快照 */
   const applyAiResult = useCallback(() => {
     if (!aiResult) return;
     const fields = buildAiFields();
-    setUndoSnapshot({ nameZh, nameEn, category, style, brand, origin, volume, abv, price, notes, flavorTags, story, styleDesc, distilleryInfo, pairingNotes, usageNotes, seasonality });
+    setUndoSnapshot({ nameZh, nameEn, category, style, brand, origin, volume, abv, price, notes, flavorTags, story, styleDesc, distilleryInfo, pairingNotes, usageNotes, seasonality, notesEn, storyEn, substituteFor, pairsWith });
     for (const f of fields) {
       if (aiToggles[f.key] !== false) applyField(f.key);
     }
@@ -192,7 +205,7 @@ export default function BottleFormScreen() {
     setAiResult(null);
     if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
     undoTimerRef.current = setTimeout(() => setUndoSnapshot(null), 6000);
-  }, [aiResult, aiToggles, buildAiFields, applyField, nameZh, nameEn, category, style, brand, origin, volume, abv, price, notes, flavorTags, story, styleDesc, distilleryInfo, pairingNotes, usageNotes, seasonality]);
+  }, [aiResult, aiToggles, buildAiFields, applyField, nameZh, nameEn, category, style, brand, origin, volume, abv, price, notes, flavorTags, story, styleDesc, distilleryInfo, pairingNotes, usageNotes, seasonality, notesEn, storyEn, substituteFor, pairsWith]);
 
   /** 撤销 AI 应用 */
   const undoAiApply = useCallback(() => {
@@ -205,6 +218,10 @@ export default function BottleFormScreen() {
     setStory(undoSnapshot.story); setStyleDesc(undoSnapshot.styleDesc);
     setDistilleryInfo(undoSnapshot.distilleryInfo); setPairingNotes(undoSnapshot.pairingNotes);
     setUsageNotes(undoSnapshot.usageNotes); setSeasonality(undoSnapshot.seasonality);
+    if (undoSnapshot.notesEn !== undefined) setNotesEn(undoSnapshot.notesEn);
+    if (undoSnapshot.storyEn !== undefined) setStoryEn(undoSnapshot.storyEn);
+    if (undoSnapshot.substituteFor !== undefined) setSubstituteFor(undoSnapshot.substituteFor);
+    if (undoSnapshot.pairsWith !== undefined) setPairsWith(undoSnapshot.pairsWith);
     setUndoSnapshot(null);
     if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
   }, [undoSnapshot]);
@@ -399,6 +416,10 @@ export default function BottleFormScreen() {
       pairingNotes: pairingNotes.trim(),
       usageNotes: usageNotes.trim(),
       seasonality: seasonality.trim(),
+      notesEn: notesEn.trim(),
+      storyEn: storyEn.trim(),
+      substituteFor: substituteFor.trim(),
+      pairsWith: pairsWith.trim(),
     };
     if (editing) {
       updateBottle(editing.id, draft);

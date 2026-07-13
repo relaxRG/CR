@@ -44,6 +44,7 @@ import { sortPreps, PREP_SORTS, PrepSort } from "@/lib/recipes/sort";
 import { Bottle } from "@/lib/bottles/types";
 import { useCardTagSettings } from "@/lib/settings/card-tags";
 import { trpc } from "@/lib/trpc";
+import { useNetwork } from "@/hooks/use-network";
 import {
   HomemadePrep,
   PREP_GROUPS,
@@ -139,6 +140,7 @@ export default function HomemadeScreen() {
   const enrichHomemadeMutation = trpc.lookup.enrichHomemade.useMutation();
   const [enriching, setEnriching] = useState(false);
   const [enrichMsg, setEnrichMsg] = useState<string | null>(null);
+  const { isOnline } = useNetwork();
   const [enrichProgress, setEnrichProgress] = useState<{ done: number; total: number } | null>(null);
   const [enrichErrors, setEnrichErrors] = useState<string[]>([]);
   // 多选 AI 批量补全(补全 notes/shelfLife/storage)
@@ -153,6 +155,10 @@ export default function HomemadeScreen() {
   );
   const handleBatchEnrich = useCallback(async () => {
     if (enriching) return;
+    if (!isOnline) {
+      setEnrichMsg(lang === "zh" ? "当前离线，AI 补全需要网络连接" : "Offline: AI enrichment requires internet");
+      return;
+    }
     const targets = groupPreps.filter((p) => !p.notes?.trim()).slice(0, 20);
     if (targets.length === 0) return;
     setEnriching(true);
@@ -191,10 +197,14 @@ export default function HomemadeScreen() {
     setEnrichMsg(updated > 0 ? `已补全 ${updated} 条自制品` : "暂无需要补全的自制品");
     setEnriching(false);
     setEnrichProgress(null);
-  }, [enriching, groupPreps, enrichHomemadeMutation, updatePrep]);
+  }, [enriching, isOnline, lang, groupPreps, enrichHomemadeMutation, updatePrep]);
 
   const handleBatchEnrichSelected = useCallback(async () => {
     if (enrichingSelected || selectedIds.length === 0) return;
+    if (!isOnline) {
+      setEnrichSelectedMsg(lang === "zh" ? "当前离线，AI 补全需要网络连接" : "Offline: AI enrichment requires internet");
+      return;
+    }
     const targets = preps.filter((p) => selectedIds.includes(p.id)).slice(0, 20);
     if (targets.length === 0) return;
     setEnrichingSelected(true);
@@ -233,7 +243,7 @@ export default function HomemadeScreen() {
     setEnrichSelectedMsg(updated > 0 ? t("lookup.batchDone", { n: updated }) : t("lookup.enrichNone"));
     setEnrichingSelected(false);
     setEnrichSelectedProgress(null);
-  }, [enrichingSelected, selectedIds, preps, enrichSelectedMutation, updatePrep, t]);
+  }, [enrichingSelected, isOnline, lang, selectedIds, preps, enrichSelectedMutation, updatePrep, t]);
 
   const filtered = useMemo(
     () => {

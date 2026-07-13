@@ -262,6 +262,60 @@ export default function BottleDetailScreen() {
                   </Text>
                 </View>
               ))}
+        </View>
+          </>
+        ) : null}
+
+        {/* 双语描述：英文简介 / 英文故事（国际场合使用） */}
+        {(bottle.notesEn || bottle.storyEn) ? (
+          <>
+            <Text className="text-[13px] text-muted uppercase mt-6 mb-2 px-4" style={{ letterSpacing: 0.4, lineHeight: 18 }}>
+              {lang === "zh" ? "英文描述（国际场合）" : "English Description"}
+            </Text>
+            <View className="bg-surface rounded-xl px-4">
+              {[
+                bottle.notesEn && { label: lang === "zh" ? "英文简介" : "EN Notes", value: bottle.notesEn },
+                bottle.storyEn && { label: lang === "zh" ? "英文故事" : "EN Story", value: bottle.storyEn },
+              ].filter(Boolean).map((row, idx, arr) => row && (
+                <View
+                  key={row.label}
+                  style={idx < arr.length - 1 ? { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, paddingVertical: 12 } : { paddingVertical: 12 }}
+                >
+                  <Text style={{ fontSize: 12, color: colors.muted, fontWeight: "600", marginBottom: 4, letterSpacing: 0.3 }}>
+                    {row.label.toUpperCase()}
+                  </Text>
+                  <Text style={{ fontSize: 14, color: colors.foreground, lineHeight: 22 }}>
+                    {row.value}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </>
+        ) : null}
+
+        {/* 关联推理：可替代酒款 / 搭配酒款 */}
+        {(bottle.substituteFor || bottle.pairsWith) ? (
+          <>
+            <Text className="text-[13px] text-muted uppercase mt-6 mb-2 px-4" style={{ letterSpacing: 0.4, lineHeight: 18 }}>
+              {lang === "zh" ? "酒款关联" : "Bottle Relations"}
+            </Text>
+            <View className="bg-surface rounded-xl px-4">
+              {[
+                bottle.substituteFor && { label: lang === "zh" ? "可替代" : "Substitute For", value: bottle.substituteFor },
+                bottle.pairsWith && { label: lang === "zh" ? "搭配酒款" : "Pairs With", value: bottle.pairsWith },
+              ].filter(Boolean).map((row, idx, arr) => row && (
+                <View
+                  key={row.label}
+                  style={idx < arr.length - 1 ? { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, paddingVertical: 12 } : { paddingVertical: 12 }}
+                >
+                  <Text style={{ fontSize: 12, color: colors.muted, fontWeight: "600", marginBottom: 4, letterSpacing: 0.3 }}>
+                    {row.label.toUpperCase()}
+                  </Text>
+                  <Text style={{ fontSize: 14, color: colors.foreground, lineHeight: 22 }}>
+                    {row.value}
+                  </Text>
+                </View>
+              ))}
             </View>
           </>
         ) : null}

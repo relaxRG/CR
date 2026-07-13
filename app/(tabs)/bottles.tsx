@@ -44,6 +44,12 @@ import {
   Bottle,
 } from "@/lib/bottles/types";
 import { useCardTagSettings } from "@/lib/settings/card-tags";
+import { useNetwork } from "@/hooks/use-network";
+import { useBookStore } from "@/lib/books/store";
+import { lookupInOfflineKb, extractBookSnippets, offlineEntryToEnrichResult } from "@/lib/bottles/offline-lookup";
+import { useRecipeStore } from "@/lib/recipes/store";
+import { smartLinkIngredient } from "@/lib/recipes/smart-link";
+import type { Recipe } from "@/lib/recipes/types";
 
 export default function BottlesScreen() {
   const colors = useColors();
@@ -52,6 +58,7 @@ export default function BottlesScreen() {
   const { t, lang } = useI18n();
   const { ready, bottles, reorderBottles, deleteBottles, bulkUpdateBottles, updateBottle } =
     useBottleStore();
+  const { recipes } = useRecipeStore();
   const {
     categoryLabel,
     stylesOf,
@@ -95,6 +102,9 @@ export default function BottlesScreen() {
   const [sort, setSort] = useState<BottleSort>("default");
   const [sheetOpen, setSheetOpen] = useState(false);
 
+  const { isOnline } = useNetwork();
+  const { books } = useBookStore();
+
   const groupBottles = useMemo(
     () => bottles.filter((b) => groupOf(b.category) === group),
     [bottles, group, groupOf],
@@ -127,6 +137,8 @@ export default function BottlesScreen() {
   const [aiQueueDone, setAiQueueDone] = useState<{ applied: number; skipped: number } | null>(null);
   const [aiQueueError, setAiQueueError] = useState<string | null>(null);
   const aiQueueDoneTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 配方联动提示：当前 AI 结果影响的配方列表
+  const [linkedRecipes, setLinkedRecipes] = useState<Recipe[]>([]);
 
   const clearAiQueue = useCallback(() => {
     setAiQueue([]);
@@ -136,6 +148,7 @@ export default function BottlesScreen() {
     setAiQueueFetching(false);
     setAiQueueDone(null);
     setAiQueueError(null);
+    setLinkedRecipes([]);
   }, []);
 
   // 切换分组时清空队列，防止孤立引用
@@ -175,6 +188,12 @@ export default function BottlesScreen() {
     if (res.pairingNotes) fields.push({ key: "pairingNotes", labelZh: "搭配建议", aiValue: res.pairingNotes.slice(0, 50) + (res.pairingNotes.length > 50 ? "…" : ""), currentValue: b.pairingNotes ? b.pairingNotes.slice(0, 30) + "…" : "", conflict: conf(b.pairingNotes ?? "", res.pairingNotes, res.confidence) });
     if (res.usageNotes) fields.push({ key: "usageNotes", labelZh: "调酒用途", aiValue: res.usageNotes.slice(0, 50) + (res.usageNotes.length > 50 ? "…" : ""), currentValue: b.usageNotes ? b.usageNotes.slice(0, 30) + "…" : "", conflict: conf(b.usageNotes ?? "", res.usageNotes, res.confidence) });
     if (res.seasonality) fields.push({ key: "seasonality", labelZh: "季节性", aiValue: res.seasonality, currentValue: b.seasonality ?? "", conflict: conf(b.seasonality ?? "", res.seasonality, res.confidence) });
+    // 双语字段
+    if ((res as { notesEn?: string }).notesEn) fields.push({ key: "notesEn", labelZh: "英文简介", aiValue: ((res as { notesEn?: string }).notesEn ?? "").slice(0, 50) + (((res as { notesEn?: string }).notesEn ?? "").length > 50 ? "…" : ""), currentValue: (b as { notesEn?: string }).notesEn ? ((b as { notesEn?: string }).notesEn ?? "").slice(0, 30) + "…" : "", conflict: conf((b as { notesEn?: string }).notesEn ?? "", (res as { notesEn?: string }).notesEn ?? "", res.confidence) });
+    if ((res as { storyEn?: string }).storyEn) fields.push({ key: "storyEn", labelZh: "英文故事", aiValue: ((res as { storyEn?: string }).storyEn ?? "").slice(0, 50) + (((res as { storyEn?: string }).storyEn ?? "").length > 50 ? "…" : ""), currentValue: (b as { storyEn?: string }).storyEn ? ((b as { storyEn?: string }).storyEn ?? "").slice(0, 30) + "…" : "", conflict: conf((b as { storyEn?: string }).storyEn ?? "", (res as { storyEn?: string }).storyEn ?? "", res.confidence) });
+    // 关联推理字段
+    if ((res as { substituteFor?: string }).substituteFor) fields.push({ key: "substituteFor", labelZh: "可替代", aiValue: (res as { substituteFor?: string }).substituteFor ?? "", currentValue: (b as { substituteFor?: string }).substituteFor ?? "", conflict: "new" });
+    if ((res as { pairsWith?: string }).pairsWith) fields.push({ key: "pairsWith", labelZh: "搭配酒款", aiValue: (res as { pairsWith?: string }).pairsWith ?? "", currentValue: (b as { pairsWith?: string }).pairsWith ?? "", conflict: "new" });
     return fields;
   }, []);
 
@@ -200,6 +219,10 @@ export default function BottlesScreen() {
       usageNotes: get("usageNotes") && res.usageNotes ? res.usageNotes : (b.usageNotes ?? ""),
       seasonality: get("seasonality") && res.seasonality ? res.seasonality : (b.seasonality ?? ""),
       rating: b.rating,
+      notesEn: get("notesEn") && (res as { notesEn?: string }).notesEn ? (res as { notesEn?: string }).notesEn : ((b as { notesEn?: string }).notesEn ?? ""),
+      storyEn: get("storyEn") && (res as { storyEn?: string }).storyEn ? (res as { storyEn?: string }).storyEn : ((b as { storyEn?: string }).storyEn ?? ""),
+      substituteFor: get("substituteFor") && (res as { substituteFor?: string }).substituteFor ? (res as { substituteFor?: string }).substituteFor : ((b as { substituteFor?: string }).substituteFor ?? ""),
+      pairsWith: get("pairsWith") && (res as { pairsWith?: string }).pairsWith ? (res as { pairsWith?: string }).pairsWith : ((b as { pairsWith?: string }).pairsWith ?? ""),
     };
   }, []);
 
@@ -239,6 +262,12 @@ export default function BottlesScreen() {
         style: b.style || undefined,
         brand: b.brand || undefined,
         origin: b.origin || undefined,
+        // 跨酒款关联推理：传入同类酒款名称列表（最多15条）
+        cellarBottles: bottles
+          .filter((bt) => bt.id !== b.id && (bt.category === b.category || bt.style === b.style))
+          .slice(0, 15)
+          .map((bt) => bt.nameZh || bt.nameEn)
+          .filter(Boolean) as string[],
       });
       if (!isMountedRef.current) return;
       setAiQueueFetching(false);
@@ -259,17 +288,56 @@ export default function BottlesScreen() {
         for (const f of fields) defaults[f.key] = f.conflict === "new" || f.conflict === "confirm";
         setAiQueueToggles(defaults);
         setAiQueueResult(res);
+        // 配方联动：扫描配方库中用到该酒款的配方
+        const impacted = recipes.filter((r) =>
+          r.ingredients.some((ing) => {
+            const link = smartLinkIngredient(ing.name, bottles, []);
+            return link?.kind === "bottle" && link.bottle.id === b.id;
+          })
+        ).slice(0, 5);
+        setLinkedRecipes(impacted);
       }
     } catch (err) {
       if (!isMountedRef.current) return;
       setAiQueueFetching(false);
       const msg = err instanceof Error ? err.message : String(err);
       const isTimeout = msg.includes("timeout") || msg.includes("ETIMEDOUT");
-      setAiQueueError(isTimeout
-        ? (lang === "zh" ? "AI 响应超时，可跳过或重试" : "AI timeout, skip or retry")
-        : (lang === "zh" ? "网络错误，请检查连接" : "Network error, check connection"));
+      // 联网失败时降级到离线知识库
+      const kbResult = lookupInOfflineKb({
+        nameZh: b.nameZh || undefined,
+        nameEn: b.nameEn || undefined,
+        brand: b.brand || undefined,
+        category: b.category || undefined,
+      });
+      const allSections = books.flatMap((bk) => bk.sections ?? []);
+      const bookSnippets = extractBookSnippets({
+        nameZh: b.nameZh || undefined,
+        nameEn: b.nameEn || undefined,
+        brand: b.brand || undefined,
+        bookSections: allSections,
+      });
+      if (kbResult.found && kbResult.entry) {
+        const offlineRes = offlineEntryToEnrichResult(kbResult.entry, bookSnippets);
+        if (mode === "autofill" || mode === "sel-autofill") {
+          const draft = autoFillBlanks(b, offlineRes);
+          updateBottle(b.id, draft);
+          setAiQueueIdx(idx + 1);
+          fetchQueueItem(queue, idx + 1, mode, appliedSoFar + 1);
+        } else {
+          const fields = buildQueueFields(b, offlineRes);
+          const defaults: Record<string, boolean> = {};
+          for (const f of fields) defaults[f.key] = f.conflict === "new" || f.conflict === "confirm";
+          setAiQueueToggles(defaults);
+          setAiQueueResult(offlineRes);
+          setAiQueueError(lang === "zh" ? "AI 服务不可用，已从本地知识库补全（离线模式）" : "AI unavailable, filled from local KB (offline)");
+        }
+      } else {
+        setAiQueueError(isTimeout
+          ? (lang === "zh" ? "AI 响应超时，可跳过或重试" : "AI timeout, skip or retry")
+          : (lang === "zh" ? "网络错误，请检查连接" : "Network error, check connection"));
+      }
     }
-  }, [enrichBottleFullMutation, updateBottle, buildQueueFields, autoFillBlanks, lang]);
+  }, [enrichBottleFullMutation, updateBottle, buildQueueFields, autoFillBlanks, lang, books]);
 
   /** Banner：启动缺资料条目补全队列 */
   const handleBatchEnrich = useCallback((mode: QueueMode) => {
@@ -827,6 +895,30 @@ export default function BottlesScreen() {
                     </Pressable>
                   ))}
                 </View>
+                {/* 高置信度一键应用 */}
+                {aiQueueResult.confidence === "high" ? (
+                  <View style={{ paddingHorizontal: 10, paddingTop: 8, paddingBottom: 4 }}>
+                    <Pressable
+                      onPress={() => {
+                        const f = buildQueueFields(aiQueue[aiQueueIdx], aiQueueResult!);
+                        const t: Record<string, boolean> = {};
+                        f.forEach((x) => { t[x.key] = x.conflict === "new" || x.conflict === "confirm"; });
+                        setAiQueueToggles(t);
+                      }}
+                      style={({ pressed }) => [
+                        { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+                          paddingVertical: 8, borderRadius: 10,
+                          backgroundColor: colors.success + "18", borderWidth: 1, borderColor: colors.success + "40" },
+                        pressed && { opacity: 0.7 },
+                      ]}
+                    >
+                      <IconSymbol name="checkmark.seal.fill" size={14} color={colors.success} />
+                      <Text style={{ fontSize: 12, fontWeight: "700", color: colors.success }}>
+                        {lang === "zh" ? "高置信度：一键选中所有安全字段" : "High Confidence: Select All Safe Fields"}
+                      </Text>
+                    </Pressable>
+                  </View>
+                ) : null}
                 {/* 字段列表 */}
                 {buildQueueFields(aiQueue[aiQueueIdx], aiQueueResult).map((field) => {
                   const conflictColor = field.conflict === "new" ? colors.success : field.conflict === "override" ? colors.warning : field.conflict === "confirm" ? colors.primary : colors.muted;
@@ -875,6 +967,19 @@ export default function BottlesScreen() {
                     <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>{lang === "zh" ? "跳过" : "Skip"}</Text>
                   </Pressable>
                 </View>
+                {/* 配方联动提示：显示用到该酒款的配方 */}
+                {linkedRecipes.length > 0 ? (
+                  <View style={{ borderTopWidth: 1, borderTopColor: colors.border + "60", paddingHorizontal: 12, paddingVertical: 8, gap: 4 }}>
+                    <Text style={{ fontSize: 11, fontWeight: "700", color: colors.muted }}>
+                      {lang === "zh" ? `📋 该酒款用于以下 ${linkedRecipes.length} 个配方：` : `📋 Used in ${linkedRecipes.length} recipe(s):`}
+                    </Text>
+                    {linkedRecipes.map((r) => (
+                      <Text key={r.id} style={{ fontSize: 11, color: colors.muted }} numberOfLines={1}>
+                        · {r.name}{r.nameEn ? ` / ${r.nameEn}` : ""}
+                      </Text>
+                    ))}
+                  </View>
+                ) : null}
               </>
             ) : null}
           </View>

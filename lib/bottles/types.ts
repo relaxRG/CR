@@ -210,6 +210,14 @@ export interface Bottle {
   usageNotes?: string;
   /** 季节性说明（原材料库专用） */
   seasonality?: string;
+  /** 英文简介（双语补全，国际场合使用） */
+  notesEn?: string;
+  /** 英文故事/介绍（双语补全） */
+  storyEn?: string;
+  /** 可替代的酒款（跨酒款关联推理：在用户酒库中可替代的酒款名） */
+  substituteFor?: string;
+  /** 搭配使用的酒款（跨酒款关联推理：与用户酒库中哪些酒款搭配效果好） */
+  pairsWith?: string;
   /** 是否内置数据(内置数据也可编辑/删除) */
   builtin: boolean;
   /** 评分:1-10 整数,null 表示未评分(无半星) */
