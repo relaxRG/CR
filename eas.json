@@ -9,6 +9,9 @@
       "autoIncrement": true,
       "ios": {
         "resourceClass": "m-medium"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://cocktailapp-lr42ivhn.manus.space"
       }
     },
     "production-macos": {
