@@ -344,7 +344,25 @@ export default function BottlesScreen() {
     if (aiQueueFetching || aiQueue.length > 0) return;
     const isMissing = (b: Bottle) =>
       b.priceCny <= 0 || !b.origin || !b.brand || !(b.flavorTags?.length > 0) || !b.story;
-    const targets = groupBottles.filter(isMissing).slice(0, 30);
+    // 计算每个酒款的缺失字段分数（权重：核心字段权重更高）
+    const missingScore = (b: Bottle): number => {
+      let score = 0;
+      if (!b.story) score += 3;
+      if (!(b.flavorTags?.length > 0)) score += 3;
+      if (!b.origin) score += 2;
+      if (!b.brand) score += 2;
+      if (b.priceCny <= 0) score += 2;
+      if (!b.style) score += 1;
+      if (!b.notes) score += 1;
+      if (!b.nameEn) score += 1;
+      if (!b.abv) score += 1;
+      if (!b.notesEn) score += 1;
+      return score;
+    };
+    const targets = groupBottles
+      .filter(isMissing)
+      .sort((a, b) => missingScore(b) - missingScore(a))
+      .slice(0, 30);
     if (targets.length === 0) return;
     clearAiQueue();
     setAiQueueMode(mode);
@@ -356,7 +374,24 @@ export default function BottlesScreen() {
   /** 多选：启动已选条目补全队列 */
   const handleBatchEnrichSelected = useCallback((mode: QueueMode) => {
     if (aiQueueFetching || aiQueue.length > 0 || selectedIds.length === 0) return;
-    const targets = bottles.filter((b) => selectedIds.includes(b.id)).slice(0, 20);
+    const missingScore = (b: Bottle): number => {
+      let score = 0;
+      if (!b.story) score += 3;
+      if (!(b.flavorTags?.length > 0)) score += 3;
+      if (!b.origin) score += 2;
+      if (!b.brand) score += 2;
+      if (b.priceCny <= 0) score += 2;
+      if (!b.style) score += 1;
+      if (!b.notes) score += 1;
+      if (!b.nameEn) score += 1;
+      if (!b.abv) score += 1;
+      if (!b.notesEn) score += 1;
+      return score;
+    };
+    const targets = bottles
+      .filter((b) => selectedIds.includes(b.id))
+      .sort((a, b) => missingScore(b) - missingScore(a))
+      .slice(0, 20);
     if (targets.length === 0) return;
     clearAiQueue();
     setAiQueueMode(mode);

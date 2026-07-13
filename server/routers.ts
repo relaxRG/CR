@@ -1443,6 +1443,17 @@ ${input.origin ? `产地: ${input.origin}` : ""}
           ? `\n\n【用户酒库参考】用户当前酒库中有以下相关酒款：${input.cellarBottles.slice(0, 15).join("、")}。请基于此推断：1) 该酒款可替代酒库中的哪款酒（substituteFor）；2) 与酒库中哪款酒搭配效果好（pairsWith）。如无法推断则填""。`
           : "";
 
+        // ── 实时爬取补全（联网时从公开数据源获取冷门酒款数据） ──────────────────
+        // 注意：fetchWebBottleContext 超时 5 秒，失败静默降级，不影响主流程
+        let webContext = "";
+        if (!input.imageBase64) {
+          try {
+            webContext = await fetchWebBottleContext(input.nameZh, input.nameEn, input.brand);
+          } catch {
+            // 静默降级
+          }
+        }
+
         // ── 三库差异化 prompt ───────────────────────────────────────────
         let librarySpecificInstructions = "";
         if (libraryType === "base") {
@@ -1475,6 +1486,7 @@ ${input.origin ? `产地: ${input.origin}` : ""}
 根据以下产品信息，一次性补全所有字段。
 
         产品名称: ${name || "（未知，请根据照片识别）"}${knownCategory}${knownStyle}${knownBrand}${knownOrigin}${bookContext}${cellarContext}
+${webContext}
 ${librarySpecificInstructions}
 
 请输出 JSON（所有字段必须存在，不确定的字符串填 ""，数字填 0）:
@@ -1914,4 +1926,89 @@ function pruneEnrichCache() {
   for (const [k, v] of enrichBottleCache.entries()) {
     if (v.expireAt < now) enrichBottleCache.delete(k);
   }
+}
+
+// ── 实时爬取补全：从公开免费 API 获取冷门酒款数据 ──────────────────────────────
+/**
+ * 从公开免费数据源获取酒款信息，作为 LLM prompt 的额外上下文。
+ * 数据源：
+ * 1. TheCocktailDB API（免费、无需 API key、无版权问题）
+ * 2. Wikipedia REST API（免费、开放授权）
+ * 超时 5 秒，失败静默降级（不影响主流程）
+ */
+async function fetchWebBottleContext(nameZh?: string, nameEn?: string, brand?: string): Promise<string> {
+  const searchName = nameEn || nameZh || brand || "";
+  if (!searchName || searchName.length < 2) return "";
+
+  const results: string[] = [];
+  const timeout = 5_000;
+
+  // 1. TheCocktailDB — 搜索酒款/配料
+  try {
+    const cocktailUrl = `https://www.thecocktaildb.com/api/json/v1/1/search.php?i=${encodeURIComponent(searchName)}`;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeout);
+    const res = await fetch(cocktailUrl, { signal: ctrl.signal });
+    clearTimeout(timer);
+    if (res.ok) {
+      const data = await res.json() as { ingredients?: Array<Record<string, string | null>> };
+      const items = data.ingredients || [];
+      if (items.length > 0) {
+        const item = items[0];
+        const parts: string[] = [];
+        if (item.strIngredient) parts.push(`Name: ${item.strIngredient}`);
+        if (item.strType) parts.push(`Type: ${item.strType}`);
+        if (item.strAlcohol) parts.push(`Alcohol: ${item.strAlcohol}`);
+        if (item.strABV) parts.push(`ABV: ${item.strABV}%`);
+        if (item.strDescription) parts.push(`Description: ${item.strDescription.slice(0, 300)}`);
+        if (parts.length > 0) {
+          results.push(`[TheCocktailDB] ${parts.join(" | ")}`);
+        }
+      }
+    }
+  } catch {
+    // 静默降级
+  }
+
+  // 2. Wikipedia REST API — 获取词条摘要（英文）
+  try {
+    const wikiName = (nameEn || nameZh || "").replace(/\s+/g, "_");
+    if (wikiName.length >= 2) {
+      const wikiUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(wikiName)}`;
+      const ctrl2 = new AbortController();
+      const timer2 = setTimeout(() => ctrl2.abort(), timeout);
+      const res2 = await fetch(wikiUrl, { signal: ctrl2.signal });
+      clearTimeout(timer2);
+      if (res2.ok) {
+        const data2 = await res2.json() as { title?: string; extract?: string; type?: string };
+        if (data2.extract && data2.type !== "disambiguation") {
+          results.push(`[Wikipedia] ${data2.title}: ${data2.extract.slice(0, 400)}`);
+        }
+      }
+    }
+  } catch {
+    // 静默降级
+  }
+
+  // 3. 如果有品牌名，尝试 Wikipedia 品牌词条
+  if (brand && brand.length >= 2 && brand.toLowerCase() !== (nameEn || "").toLowerCase()) {
+    try {
+      const brandWikiUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(brand.replace(/\s+/g, "_"))}`;
+      const ctrl3 = new AbortController();
+      const timer3 = setTimeout(() => ctrl3.abort(), timeout);
+      const res3 = await fetch(brandWikiUrl, { signal: ctrl3.signal });
+      clearTimeout(timer3);
+      if (res3.ok) {
+        const data3 = await res3.json() as { title?: string; extract?: string; type?: string };
+        if (data3.extract && data3.type !== "disambiguation") {
+          results.push(`[Wikipedia Brand] ${data3.title}: ${data3.extract.slice(0, 300)}`);
+        }
+      }
+    } catch {
+      // 静默降级
+    }
+  }
+
+  if (results.length === 0) return "";
+  return `\n\n【联网参考数据（实时爬取）】以下是从公开数据库实时获取的参考信息，请优先参考这些内容补全各字段：\n${results.join("\n")}`;
 }
