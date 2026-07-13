@@ -539,17 +539,19 @@ export function normalizeTagToZh(raw: string): string {
   if (!s) return "";
   // 1. 已含中文，直接返回
   if (hasCJK(s)) return s;
-  // 2. 精确查反向词典
-  const exact = TAG_NAME_DICT_REV[s.toLowerCase()];
+  // 2. 精确查反向词典（符号标准化：& → and，多空格合并）
+  const sNorm = s.toLowerCase().replace(/&/g, "and").replace(/\s+/g, " ");
+  const exact = TAG_NAME_DICT_REV[sNorm] ?? TAG_NAME_DICT_REV[s.toLowerCase()];
   if (exact) return exact;
   // 3. 去掉常见英文后缀再查
   const stripped = s.replace(/\s*(glass|cup|mug|ice|cubes?|sphere|spear|drink)\s*$/i, "").trim();
   if (stripped && stripped !== s) {
-    const hit = TAG_NAME_DICT_REV[stripped.toLowerCase()];
+    const strippedNorm = stripped.toLowerCase().replace(/&/g, "and").replace(/\s+/g, " ");
+    const hit = TAG_NAME_DICT_REV[strippedNorm] ?? TAG_NAME_DICT_REV[stripped.toLowerCase()];
     if (hit) return hit;
   }
   // 4. 反向词典 key 包含匹配（处理 "coupe glass" → key "coupe glass" 存在）
-  const sLower = s.toLowerCase();
+  const sLower = sNorm;
   for (const [enKey, zhVal] of Object.entries(TAG_NAME_DICT_REV)) {
     if (sLower.includes(enKey) || enKey.includes(sLower)) return zhVal;
   }
@@ -625,6 +627,45 @@ export function localizedTagName(
   }
   if (zh) return zh;
   return en;
+}
+
+/**
+ * 统一本地化函数：将存储的中文键按界面语言转为显示文字。
+ * 适用于 method / ice / duration / occasion / glass / spirit / flavor 等所有固定标签字段。
+ * - lang=zh：直接返回中文值
+ * - lang=en：查 TAG_NAME_DICT 词典，查不到回退原值
+ * 所有显示层都应调用此函数，不再内联翻译字典。
+ */
+export function localizeField(value: string, lang: string): string {
+  if (!value) return value;
+  if (lang !== "en") return value;
+  return TAG_NAME_DICT[value] ?? value;
+}
+
+/**
+ * Server 端辅助：将 AI 返回的任意语言标签规范化到中文白名单。
+ * 策略：精确匹配中文白名单 → normalizeTagToZh 转中文后再匹配 → 模糊包含匹配 → 返回空字符串
+ * 用于 enrichRecipe / deepAnalyzeRecipe 的 suggestedGlass / suggestedBaseSpirit 校验。
+ */
+export function resolveToZhWhitelist(raw: string, whitelist: readonly string[]): string {
+  if (!raw) return "";
+  const trimmed = raw.trim();
+  // 1. 精确匹配中文白名单
+  if (whitelist.includes(trimmed)) return trimmed;
+  // 2. normalizeTagToZh 转中文后匹配
+  const zh = normalizeTagToZh(trimmed);
+  if (whitelist.includes(zh)) return zh;
+  // 3. 模糊包含匹配（处理 "Martini Glass" 匹配 "马天尼杯" 等）
+  const zhLower = zh.toLowerCase();
+  for (const w of whitelist) {
+    const wLower = w.toLowerCase();
+    if (zhLower.includes(wLower) || wLower.includes(zhLower)) return w;
+    // 也用原始英文做模糊匹配
+    const rawLower = trimmed.toLowerCase();
+    if (rawLower.includes(wLower) || wLower.includes(rawLower)) return w;
+  }
+  // 4. 返回空字符串（交给客户端防御层处理）
+  return "";
 }
 
 /** 构建默认标签集合(首次启动时初始化,之后完全由用户管理) */

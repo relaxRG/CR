@@ -5,12 +5,44 @@ import { invokeLLM, type MessageContent } from "./_core/llm";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
+import { normalizeTagToZh } from "../lib/recipes/types";
 import {
   getAppConfigValue,
   getSyncData,
   setAppConfigValue,
   upsertSyncData,
 } from "./db";
+
+/**
+ * Server 端：将 AI 返回的任意语言标签规范化到中文白名单。
+ * 策略：精确匹配 → normalizeTagToZh 转中文后匹配 → 模糊包含匹配 → 返回空字符串
+ */
+function resolveToZhWhitelistServer(raw: string, whitelist: readonly string[]): string {
+  if (!raw) return "";
+  const trimmed = raw.trim();
+  if (whitelist.includes(trimmed)) return trimmed;
+  const zh = normalizeTagToZh(trimmed);
+  if (whitelist.includes(zh)) return zh;
+  const zhLower = zh.toLowerCase();
+  for (const w of whitelist) {
+    const wLower = w.toLowerCase();
+    if (zhLower.includes(wLower) || wLower.includes(zhLower)) return w;
+    const rawLower = trimmed.toLowerCase();
+    if (rawLower.includes(wLower) || wLower.includes(rawLower)) return w;
+  }
+  return "";
+}
+
+/** 服务端用的完整杯型白名单（含用户常用扩展杯型，与 prompt 中 glassList 保持一致） */
+const SERVER_VALID_GLASSES = [
+  "马天尼杯","古典杯","高球杯","柯林杯","库佩杯","飓风杯","子弹杯",
+  "尼克诺拉杯","郁金香杯","笛型杯","提基杯","铜杯","朱莉普杯","红酒杯","其他",
+] as const;
+
+/** 服务端用的基酒白名单 */
+const SERVER_VALID_SPIRITS = [
+  "金酒","朗姆","伏特加","威士忌","龙舌兰","白兰地","梅斯卡尔","卡沙萨","皮斯科","利口酒","无酒精","其他",
+] as const;
 
 const OWNER_KEY = "ownerOpenId";
 
@@ -1105,7 +1137,10 @@ ${ingredientLine}${rawTextSection}${bookTitleSection}
           suggestedBaseSpirit: typeof p.suggestedBaseSpirit === "string" ? p.suggestedBaseSpirit.trim() : "",
           isMultiBaseSpirit: typeof p.suggestedBaseSpirit === "string" && p.suggestedBaseSpirit.includes(","),
           suggestedBaseSpiritConfidence: validConf(p.suggestedBaseSpiritConfidence),
-          suggestedGlass: typeof p.suggestedGlass === "string" ? p.suggestedGlass.trim() : "",
+          suggestedGlass: resolveToZhWhitelistServer(
+            typeof p.suggestedGlass === "string" ? p.suggestedGlass.trim() : "",
+            SERVER_VALID_GLASSES,
+          ),
           suggestedGlassConfidence: validConf(p.suggestedGlassConfidence),
           suggestedIce: validIce,
           suggestedIceConfidence: validConf(p.suggestedIceConfidence),
@@ -1257,7 +1292,10 @@ ${context}
             creator: typeof p.creator === "string" ? p.creator.trim() : "",
             createdYear: typeof p.createdYear === "string" ? p.createdYear.trim() : "",
             suggestedCategories: Array.isArray(p.suggestedCategories) ? p.suggestedCategories.filter((s): s is string => typeof s === "string") : [],
-            suggestedBaseSpirit: typeof p.suggestedBaseSpirit === "string" ? p.suggestedBaseSpirit.trim() : "",
+            suggestedBaseSpirit: resolveToZhWhitelistServer(
+              typeof p.suggestedBaseSpirit === "string" ? p.suggestedBaseSpirit.trim() : "",
+              SERVER_VALID_SPIRITS,
+            ),
           suggestedCodexFamily: typeof p.suggestedCodexFamily === "string" ? p.suggestedCodexFamily.trim() : "",
             suggestedVariantOf: typeof p.suggestedVariantOf === "string" && p.suggestedVariantOf.trim() ? p.suggestedVariantOf.trim() : "MODERN_ORIGINAL",
             variantOfDetail: typeof p.variantOfDetail === "string" ? p.variantOfDetail.trim() : "",
@@ -1265,7 +1303,10 @@ ${context}
             suggestedMethod: typeof p.suggestedMethod === "string" ? p.suggestedMethod.trim() : "",
             suggestedStrength: typeof p.suggestedStrength === "string" ? p.suggestedStrength.trim() : "",
             suggestedIce: typeof p.suggestedIce === "string" ? p.suggestedIce.trim() : "",
-            suggestedGlass: typeof p.suggestedGlass === "string" ? p.suggestedGlass.trim() : "",
+            suggestedGlass: resolveToZhWhitelistServer(
+              typeof p.suggestedGlass === "string" ? p.suggestedGlass.trim() : "",
+              SERVER_VALID_GLASSES,
+            ),
             flavors: Array.isArray(p.flavors) ? p.flavors.filter((s): s is string => typeof s === "string") : [],
             confidence: validConf(p.confidence),
           };

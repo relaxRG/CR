@@ -20,7 +20,7 @@ import {
   codexFamilyLabel,
   localizedTagName,
 } from "@/lib/recipes/types";
-import { DRINK_DURATIONS, OCCASIONS } from "@/lib/recipes/types";
+import { DRINK_DURATIONS, OCCASIONS, localizeField } from "@/lib/recipes/types";
 import {
   useCardTagSettings,
   DEFAULT_CARD_TAG_SETTINGS,
@@ -277,7 +277,7 @@ export function useRecipeTagRows(
       if (!recipe.drinkDuration) return null;
       const color = customColors.duration ?? "#007AFF";
       const durEn: Record<string, string> = { "短饮": "Short", "长饮": "Long" };
-      const label = lang === "en" ? (durEn[recipe.drinkDuration] ?? recipe.drinkDuration) : recipe.drinkDuration;
+      const label = localizeField(recipe.drinkDuration, lang);
       return (
         <Pressable
           key="duration"
@@ -296,7 +296,7 @@ export function useRecipeTagRows(
       if (!recipe.occasion) return null;
       const color = customColors.occasion ?? "#AF52DE";
       const occEn: Record<string, string> = { "餐前酒": "Aperitif", "餐后酒": "Digestif", "全天酒": "All Day", "佐餐酒": "With Dinner", "睡前酒": "Nightcap", "派对酒": "Party" };
-      const label = lang === "en" ? (occEn[recipe.occasion] ?? recipe.occasion) : recipe.occasion;
+      const label = localizeField(recipe.occasion, lang);
       return (
         <Pressable
           key="occasion"
@@ -341,7 +341,10 @@ export function useRecipeTagRows(
   const visibleFlavors = recipe.flavors.filter(
     (f) => getFlavorTagConfig(f, flavorConfigs).visible,
   );
-  const methodLabel = METHOD_LABELS[recipe.method] ?? "";
+  // 优先用 localizeField 处理中文键（摇和/搅拌/直调），兜底用旧 METHOD_LABELS（stirred/shaken/built）
+  const methodLabel = recipe.method
+    ? (localizeField(recipe.method, lang) || METHOD_LABELS[recipe.method] || "")
+    : "";
   const hasRow2 = row2Slots.length > 0 || visibleFlavors.length > 0 || !!methodLabel;
 
   // ── 构建节点数组 ──────────────────────────────────────────────
