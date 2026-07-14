@@ -117,6 +117,8 @@ export async function extractRecipesFromText(params: { text: string; lang?: 'zh'
 }
 
 export async function ocrImages(params: { images?: Array<{ base64: string; mime: string }>; pdfBase64?: string }) {
+  // OCR 走 Worker v3（Qwen-VL-Max 中文主力 + Gemini 2.0 Flash 英文/备用）
+  // 完全脱离 Manus server
   return callAI<{ text: string }>('ocr', params as Record<string, unknown>, { timeoutMs: 90_000 });
 }
 
