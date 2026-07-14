@@ -181,3 +181,19 @@
 - [ ] 协作知识库：用户确认补全后可贡献到公共知识库（众包模式）
 - [ ] 知识库自动更新：app 启动时静默拉取最新知识库版本（差量更新）
 - [ ] 图片识别批量补全：批量补全支持从相册选图，每张图对应一款酒
+
+## 方案 C+ 5D 智能三通道同步架构（2026-07-14）
+- [x] Cloudflare Worker v2 部署（设备配对 + 权限系统 + 云同步 API）
+- [x] Cloudflare D1 数据库建表（8张表：device_groups/devices/pair_codes/sync_data 等）
+- [x] 多角色权限系统（owner/collaborator/guest，allowedKeys 字段级控制）
+- [x] CF SyncProvider 替换 OAuth 登录（lib/cf-sync/provider.tsx）
+- [x] 设备管理页面（app/device-manager.tsx）+ 配对码页面（app/pair-device.tsx）
+- [x] DeepSeek 余额 Cron（每天17:00北京时间，< ¥5 发邮件至 326978666@qq.com）
+- [x] 本地加密备份通道（lib/backup/local-backup.ts：3快照循环，djb2哈希校验）
+- [x] iCloud Drive 自动备份（lib/backup/icloud-backup.ts：5分钟增量，7版本循环）
+- [x] 设备管理页面升级（同步状态脉冲动画 + DeepSeek余额进度条 + 三通道备份状态面板）
+- [x] sync/engine.ts bug 修复（并发 flush 竞争、时间戳边界条件、内存泄漏）
+- [x] CRDT 字段级冲突合并引擎（lib/sync/crdt.ts：LWW per field，数组元素级合并，tombstone）
+- [x] 智能调度器（lib/sync/scheduler.ts：离线队列+断线重连+指数退避+三通道协调）
+- [ ] scheduler.ts 集成到 cf-sync/provider.tsx（替换现有 pushFn/pullFn 调用）
+- [ ] 触发 EAS Build #33（需要新 Expo Token）
