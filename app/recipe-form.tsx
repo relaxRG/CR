@@ -29,6 +29,7 @@ import { useHomemadeStore } from "@/lib/homemade/store";
 import { useBottleStore } from "@/lib/bottles/store";
 import { displayNames } from "@/lib/utils";
 import { suggestIngredients } from "@/lib/suggest";
+import { useBottleTaxonomy } from "@/lib/bottles/taxonomy";
 import { RecipeDraft, useRecipeStore } from "@/lib/recipes/store";
 import { enrichRecipe as enrichRecipeAI, deepAnalyzeRecipe as deepAnalyzeRecipeAI } from "@/lib/api/smart-router";
 import { parseRecipeText } from "@/lib/recipes/parser";
@@ -238,6 +239,7 @@ export default function RecipeFormScreen() {
   const { isOnline } = useNetwork();
   const { preps } = useHomemadeStore();
   const { bottles } = useBottleStore();
+  const { groupOf } = useBottleTaxonomy();
   const editing = getRecipe(id);
   // Parse prefill ingredients from JSON string (from book reader extract)
   const prefillIngredientsArr = useMemo<Ingredient[]>(() => {
@@ -385,7 +387,11 @@ export default function RecipeFormScreen() {
   /** Rows where user picked/dismissed suggestions — suppress until text changes */
   const [pickedIng, setPickedIng] = useState<Record<string, string>>({});
   /** ingId → true: user dismissed the fuzzy link suggestion */
-  const [dismissedLinks, setDismissedLinks] = useState<Record<string, boolean>>({});
+  // Pre-fill dismissed for existing ingredients when editing (avoid noisy fuzzy suggestions on open)
+  const [dismissedLinks, setDismissedLinks] = useState<Record<string, boolean>>(() => {
+    if (!editing?.ingredients?.length) return {};
+    return Object.fromEntries(editing.ingredients.map((i) => [i.id, true]));
+  });
   /** ingId → true: user explicitly accepted a fuzzy link */
   const [acceptedLinks, setAcceptedLinks] = useState<Record<string, boolean>>({});
 
@@ -829,9 +835,10 @@ export default function RecipeFormScreen() {
   const updateIngredient = (iid: string, field: "name" | "amount", value: string) => {
     setIngredients((prev) => prev.map((i) => (i.id === iid ? { ...i, [field]: value } : i)));
     if (field === "name") {
-      // Reset link decisions when user edits the name
+      // Reset link decisions and clear explicit link IDs when user edits the name
       setDismissedLinks((prev) => { const n = { ...prev }; delete n[iid]; return n; });
       setAcceptedLinks((prev) => { const n = { ...prev }; delete n[iid]; return n; });
+      setIngredients((prev) => prev.map((i) => i.id === iid ? { ...i, linkedBottleId: undefined, linkedPrepId: undefined } : i));
     }
   };
 
@@ -849,6 +856,8 @@ export default function RecipeFormScreen() {
 
   const removeIngredientRow = (iid: string) => {
     setIngredients((prev) => (prev.length > 1 ? prev.filter((i) => i.id !== iid) : prev));
+    setDismissedLinks((prev) => { const n = { ...prev }; delete n[iid]; return n; });
+    setAcceptedLinks((prev) => { const n = { ...prev }; delete n[iid]; return n; });
   };
 
   const toggleFlavor = (tag: string) => {
@@ -1674,7 +1683,7 @@ export default function RecipeFormScreen() {
             const showSuggest =
               focusedIng === ing.id && trimmed.length > 0 && pickedIng[ing.id] !== ing.name;
             const liveSuggestions = showSuggest
-              ? suggestIngredients(trimmed, bottles, preps, lang).filter((s) => s.value !== trimmed)
+              ? suggestIngredients(trimmed, bottles, preps, lang, 6, groupOf).filter((s) => s.value !== trimmed)
               : [];
             return (
               <View key={ing.id} className="mb-2">
@@ -1828,7 +1837,11 @@ export default function RecipeFormScreen() {
                           </Pressable>
                         ) : null}
                         <Pressable
-                          onPress={() => setDismissedLinks((prev) => ({ ...prev, [ing.id]: true }))}
+                          onPress={() => {
+                            setDismissedLinks((prev) => ({ ...prev, [ing.id]: true }));
+                            setAcceptedLinks((prev) => { const n = { ...prev }; delete n[ing.id]; return n; });
+                            setIngredients((prev) => prev.map((i) => i.id === ing.id ? { ...i, linkedBottleId: undefined, linkedPrepId: undefined } : i));
+                          }}
                           style={({ pressed }) => [styles.prepHint, pressed && { opacity: 0.6 }, { borderColor: colors.border }]}
                         >
                           <IconSymbol name="xmark" size={11} color={colors.muted} />
@@ -1871,7 +1884,11 @@ export default function RecipeFormScreen() {
                           </Pressable>
                         ) : null}
                         <Pressable
-                          onPress={() => setDismissedLinks((prev) => ({ ...prev, [ing.id]: true }))}
+                          onPress={() => {
+                            setDismissedLinks((prev) => ({ ...prev, [ing.id]: true }));
+                            setAcceptedLinks((prev) => { const n = { ...prev }; delete n[ing.id]; return n; });
+                            setIngredients((prev) => prev.map((i) => i.id === ing.id ? { ...i, linkedBottleId: undefined, linkedPrepId: undefined } : i));
+                          }}
                           style={({ pressed }) => [styles.prepHint, pressed && { opacity: 0.6 }, { borderColor: colors.border }]}
                         >
                           <IconSymbol name="xmark" size={11} color={colors.muted} />
@@ -1893,7 +1910,15 @@ export default function RecipeFormScreen() {
                           {t(fuzzyKey, { name: fuzzyName })}
                         </Text>
                         <Pressable
-                          onPress={() => setAcceptedLinks((prev) => ({ ...prev, [ing.id]: true }))}
+                          onPress={() => {
+                            setAcceptedLinks((prev) => ({ ...prev, [ing.id]: true }));
+                            // Persist the link ID into the ingredient data for cost calculation
+                            if (pendingFuzzyLink?.kind === "bottle") {
+                              setIngredients((prev) => prev.map((i) => i.id === ing.id ? { ...i, linkedBottleId: pendingFuzzyLink.bottle.id, linkedPrepId: undefined } : i));
+                            } else if (pendingFuzzyLink?.kind === "prep") {
+                              setIngredients((prev) => prev.map((i) => i.id === ing.id ? { ...i, linkedPrepId: pendingFuzzyLink.prep.id, linkedBottleId: undefined } : i));
+                            }
+                          }}
                           style={({ pressed }) => [styles.prepHint, pressed && { opacity: 0.6 }, { borderColor: colors.success }]}
                         >
                           <IconSymbol name="checkmark" size={11} color={colors.success} />

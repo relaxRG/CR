@@ -56,6 +56,10 @@ export interface Ingredient {
   id: string;
   name: string;
   amount: string;
+  /** Explicit link to a bottle entry (set when user accepts a fuzzy match) */
+  linkedBottleId?: string;
+  /** Explicit link to a homemade prep entry (set when user accepts a fuzzy match) */
+  linkedPrepId?: string;
 }
 
 export type Strength = "light" | "medium" | "strong";

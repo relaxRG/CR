@@ -3,6 +3,9 @@
 import { Bottle, bottleGroupOf } from "./bottles/types";
 import { HomemadePrep } from "./homemade/types";
 
+/** Optional dynamic group resolver — pass useBottleTaxonomy().groupOf for user-customized grouping */
+export type GroupResolver = (category: string) => "spirits" | "bottles" | "materials";
+
 export interface IngredientSuggestion {
   /** Unique key for list rendering */
   key: string;
@@ -26,6 +29,9 @@ function norm(s: string): string {
  * Search bottles + homemade preps for names containing the query (bilingual).
  * Returns at most `limit` suggestions, homemade preps first (more specific),
  * then bottles; within each group, prefix matches rank before substring matches.
+ *
+ * @param groupResolver  Optional dynamic resolver from useBottleTaxonomy().groupOf.
+ *                       Falls back to the static bottleGroupOf() when omitted.
  */
 export function suggestIngredients(
   query: string,
@@ -33,6 +39,7 @@ export function suggestIngredients(
   preps: HomemadePrep[],
   lang: "zh" | "en",
   limit = 6,
+  groupResolver?: GroupResolver,
 ): IngredientSuggestion[] {
   const q = norm(query);
   if (q.length < 1) return [];
@@ -76,7 +83,7 @@ export function suggestIngredients(
     if (score > 0) {
       const primary = lang === "en" ? b.nameEn || b.nameZh : b.nameZh || b.nameEn;
       const secondary = lang === "en" ? (b.nameEn ? b.nameZh : "") : (b.nameZh ? b.nameEn : "");
-      const group = bottleGroupOf(b.category);
+      const group = groupResolver ? groupResolver(b.category) : bottleGroupOf(b.category);
       const src: IngredientSuggestion["source"] =
         group === "spirits" ? "spirits" : group === "materials" ? "materials" : "bottles";
       out.push({

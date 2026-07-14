@@ -97,7 +97,16 @@ export function estimateIngredientCostSmart(
   bottles: Bottle[],
   preps: HomemadePrep[],
 ): SmartIngredientCost {
-  const link = smartLinkIngredient(ing.name, bottles, preps);
+  // If user explicitly linked this ingredient via ID, resolve directly
+  let link: SmartLink = null;
+  if (ing.linkedBottleId) {
+    const b = bottles.find((bt) => bt.id === ing.linkedBottleId);
+    if (b) link = { kind: "bottle", bottle: b, matchConfidence: "exact" };
+  } else if (ing.linkedPrepId) {
+    const p = preps.find((pr) => pr.id === ing.linkedPrepId);
+    if (p) link = { kind: "prep", prep: p, matchConfidence: "exact" };
+  }
+  if (!link) link = smartLinkIngredient(ing.name, bottles, preps);
   if (!link) {
     return { ingredient: ing, link: null, amountMl: null, cost: null, reason: "no_match" };
   }

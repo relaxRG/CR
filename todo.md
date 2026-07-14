@@ -206,3 +206,14 @@
 - [x] device-manager 设为主设备 UI 改进（方案 A：快捷「设为主设备」橙色按钮）
 - [x] me.tsx 退出同步组选项改进（方案 B：新增「退出并清除数据」选项）
 - [x] icon-symbol.tsx 新增 arrow.counterclockwise → restore 映射
+
+## 智能链接系统升级与 Bug 修复（2026-07-15）
+- [x] 升级 lib/suggest.ts：source 区分 spirits/bottles/materials/homemade 四库
+- [x] 升级 recipe-form.tsx 和 homemade-form.tsx 建议列表：四库不同颜色标签
+- [x] 升级 smart-link.ts：SmartLink 新增 matchConfidence（exact/fuzzy）字段
+- [x] 方案 D：精确匹配自动链接，模糊匹配显示建议（可接受/忽略），已链接可断开
+- [x] Bug 1 修复：删除成分行时清理 dismissedLinks/acceptedLinks 状态
+- [x] Bug 2 修复：编辑模式打开时预填 dismissedLinks，避免弹出干扰提示
+- [x] Bug 3 修复：suggestIngredients 传入 useBottleTaxonomy().groupOf 动态分组 resolver
+- [x] Bug 4 修复：Ingredient 类型新增 linkedBottleId/linkedPrepId，接受模糊链接写入数据，成本计算优先使用链接 ID
+- [x] Bug 5 修复：英文文案区分酒库（Bar Stock）和自制库（Homemade）来源

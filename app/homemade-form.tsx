@@ -29,6 +29,7 @@ import {
 } from "@/lib/homemade/types";
 import { useBottleStore } from "@/lib/bottles/store";
 import { suggestIngredients } from "@/lib/suggest";
+import { useBottleTaxonomy } from "@/lib/bottles/taxonomy";
 import { smartLinkIngredient, smartLinkDisplayName } from "@/lib/recipes/smart-link";
 import { genId } from "@/lib/recipes/types";
 
@@ -36,6 +37,8 @@ interface IngRow {
   id: string;
   name: string;
   amount: string;
+  linkedBottleId?: string;
+  linkedPrepId?: string;
 }
 
 function toRows(lines: string[]): IngRow[] {
@@ -58,6 +61,7 @@ export default function HomemadeFormScreen() {
   }>();
   const { getPrep, addPrep, updatePrep, sections, types: typeList, preps: allPreps } = useHomemadeStore();
   const { bottles } = useBottleStore();
+  const { groupOf } = useBottleTaxonomy();
   const editing = getPrep(id);
 
   const [name, setName] = useState(editing?.name ?? prefillName ?? "");
@@ -70,7 +74,12 @@ export default function HomemadeFormScreen() {
   const [focusedIng, setFocusedIng] = useState<string | null>(null);
   /** Rows where user picked a suggestion — suppress dropdown until text changes */
   const [pickedIng, setPickedIng] = useState<Record<string, string>>({});
-  const [dismissedLinks, setDismissedLinks] = useState<Record<string, boolean>>({});
+  // Pre-fill dismissed for existing ingredients when editing
+  const [dismissedLinks, setDismissedLinks] = useState<Record<string, boolean>>(() => {
+    if (!editing?.ingredients?.length) return {};
+    const rows = toRows(editing.ingredients);
+    return Object.fromEntries(rows.map((r) => [r.id, true]));
+  });
   const [acceptedLinks, setAcceptedLinks] = useState<Record<string, boolean>>({});
   const [recipe, setRecipe] = useState(editing?.recipe ?? "");
   const [yieldStr, setYieldStr] = useState(editing?.yield ?? "");
@@ -147,6 +156,7 @@ export default function HomemadeFormScreen() {
     if (field === "name") {
       setDismissedLinks((prev) => { const n = { ...prev }; delete n[rid]; return n; });
       setAcceptedLinks((prev) => { const n = { ...prev }; delete n[rid]; return n; });
+      setIngRows((prev) => prev.map((r) => r.id === rid ? { ...r, linkedBottleId: undefined, linkedPrepId: undefined } : r));
     }
   };
   const pickSuggestion = (rid: string, value: string) => {
@@ -161,6 +171,8 @@ export default function HomemadeFormScreen() {
   };
   const removeIngRow = (rid: string) => {
     setIngRows((prev) => (prev.length > 1 ? prev.filter((r) => r.id !== rid) : prev));
+    setDismissedLinks((prev) => { const n = { ...prev }; delete n[rid]; return n; });
+    setAcceptedLinks((prev) => { const n = { ...prev }; delete n[rid]; return n; });
   };
 
   const handleSave = () => {
@@ -390,7 +402,7 @@ export default function HomemadeFormScreen() {
             const showSuggest =
               focusedIng === row.id && trimmed.length > 0 && pickedIng[row.id] !== row.name;
             const liveSuggestions = showSuggest
-              ? suggestIngredients(trimmed, bottles, allPreps.filter((p) => p.id !== (editing?.id ?? "")), lang).filter((s) => s.value !== trimmed)
+              ? suggestIngredients(trimmed, bottles, allPreps.filter((p) => p.id !== (editing?.id ?? "")), lang, 6, groupOf).filter((s) => s.value !== trimmed)
               : [];
             const rawLink = trimmed.length >= 2
               ? smartLinkIngredient(trimmed, bottles, allPreps.filter((p) => p.id !== (editing?.id ?? "")))
@@ -565,7 +577,14 @@ export default function HomemadeFormScreen() {
                           {t(fuzzyKey, { name: fuzzyName })}
                         </Text>
                         <Pressable
-                          onPress={() => setAcceptedLinks((prev) => ({ ...prev, [row.id]: true }))}
+                          onPress={() => {
+                            setAcceptedLinks((prev) => ({ ...prev, [row.id]: true }));
+                            if (pendingFuzzyLink?.kind === "bottle") {
+                              setIngRows((prev) => prev.map((r) => r.id === row.id ? { ...r, linkedBottleId: pendingFuzzyLink.bottle.id, linkedPrepId: undefined } : r));
+                            } else if (pendingFuzzyLink?.kind === "prep") {
+                              setIngRows((prev) => prev.map((r) => r.id === row.id ? { ...r, linkedPrepId: pendingFuzzyLink.prep.id, linkedBottleId: undefined } : r));
+                            }
+                          }}
                           style={({ pressed }) => [{ flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 0.5, borderColor: colors.success }, pressed && { opacity: 0.6 }]}
                         >
                           <IconSymbol name="checkmark" size={10} color={colors.success} />
@@ -584,7 +603,11 @@ export default function HomemadeFormScreen() {
                 ) : null}
                 {link ? (
                   <Pressable
-                    onPress={() => setDismissedLinks((prev) => ({ ...prev, [row.id]: true }))}
+                    onPress={() => {
+                      setDismissedLinks((prev) => ({ ...prev, [row.id]: true }));
+                      setAcceptedLinks((prev) => { const n = { ...prev }; delete n[row.id]; return n; });
+                      setIngRows((prev) => prev.map((r) => r.id === row.id ? { ...r, linkedBottleId: undefined, linkedPrepId: undefined } : r));
+                    }}
                     style={({ pressed }) => [{ flexDirection: "row", alignItems: "center", gap: 3, marginTop: 2, paddingHorizontal: 4 }, pressed && { opacity: 0.6 }]}
                   >
                     <IconSymbol name="xmark" size={10} color={colors.muted} />
