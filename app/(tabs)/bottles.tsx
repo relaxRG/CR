@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -870,31 +871,50 @@ export default function BottlesScreen() {
         </View>
       ) : null}
 
-      {/* AI 建议队列面板（逐条确认模式） */}
-      {!selectMode && aiQueue.length > 0 ? (
-        <View className="px-5" style={{ marginTop: 8 }}>
-          <View style={{ backgroundColor: colors.surface, borderRadius: 14, borderWidth: 1, borderColor: colors.border, overflow: "hidden" }}>
-            {/* 面板标题 */}
-            <View style={{ flexDirection: "row", alignItems: "center", padding: 12, borderBottomWidth: 1, borderBottomColor: colors.border, gap: 8 }}>
-              <IconSymbol name="sparkles" size={16} color={colors.primary} />
-              <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground, flex: 1 }}>
-                {lang === "zh" ? "AI 建议" : "AI Suggestions"}
+      {/* AI 建议队列面板 — Modal 底部抽屉（逐条确认模式） */}
+      <Modal
+        visible={!selectMode && aiQueue.length > 0}
+        transparent
+        animationType="slide"
+        onRequestClose={clearAiQueue}
+      >
+        <Pressable style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)" }} onPress={clearAiQueue} />
+        <View style={{
+          backgroundColor: colors.background,
+          borderTopLeftRadius: 20,
+          borderTopRightRadius: 20,
+          paddingBottom: Math.max(insets.bottom, 16),
+          maxHeight: "85%",
+          borderTopWidth: 1,
+          borderTopColor: colors.border,
+        }}>
+          {/* 把手 */}
+          <View style={{ alignItems: "center", paddingTop: 10, paddingBottom: 4 }}>
+            <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border }} />
+          </View>
+          {/* 面板标题 */}
+          <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border, gap: 8 }}>
+            <IconSymbol name="sparkles" size={16} color={colors.primary} />
+            <Text style={{ fontSize: 15, fontWeight: "700", color: colors.foreground, flex: 1 }}>
+              {lang === "zh" ? "AI 建议" : "AI Suggestions"}
+            </Text>
+            {aiQueue[aiQueueIdx] ? (
+              <Text style={{ fontSize: 12, color: colors.muted }}>
+                {aiQueueIdx + 1}/{aiQueue.length} · {(aiQueue[aiQueueIdx].nameZh || aiQueue[aiQueueIdx].nameEn || "").slice(0, 12)}
               </Text>
-              {aiQueue[aiQueueIdx] ? (
-                <Text style={{ fontSize: 12, color: colors.muted }}>
-                  {aiQueueIdx + 1}/{aiQueue.length} · {(aiQueue[aiQueueIdx].nameZh || aiQueue[aiQueueIdx].nameEn || "").slice(0, 12)}
-                </Text>
-              ) : null}
-              <Pressable onPress={clearAiQueue} hitSlop={8}>
-                <IconSymbol name="xmark" size={16} color={colors.muted} />
-              </Pressable>
-            </View>
+            ) : null}
+            <Pressable onPress={clearAiQueue} hitSlop={8} style={({ pressed }) => [pressed && { opacity: 0.6 }]}>
+              <IconSymbol name="xmark.circle.fill" size={22} color={colors.muted} />
+            </Pressable>
+          </View>
 
+          {/* 可滚动内容区 */}
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             {/* 加载中 */}
             {aiQueueFetching && !aiQueueResult ? (
-              <View style={{ padding: 20, alignItems: "center", gap: 8 }}>
-                <ActivityIndicator size="small" color={colors.primary} />
-                <Text style={{ fontSize: 13, color: colors.muted }}>
+              <View style={{ padding: 28, alignItems: "center", gap: 10 }}>
+                <ActivityIndicator size="large" color={colors.primary} />
+                <Text style={{ fontSize: 14, color: colors.muted }}>
                   {lang === "zh" ? "AI 分析中…" : "Analyzing…"}
                 </Text>
               </View>
@@ -919,20 +939,20 @@ export default function BottlesScreen() {
             ) : aiQueueResult ? (
               <>
                 {/* 快捷操作 */}
-                <View style={{ flexDirection: "row", padding: 10, gap: 6, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                <View style={{ flexDirection: "row", paddingHorizontal: 12, paddingVertical: 10, gap: 6, borderBottomWidth: 1, borderBottomColor: colors.border }}>
                   {[
                     { label: lang === "zh" ? "全选" : "All", action: () => { const f = buildQueueFields(aiQueue[aiQueueIdx], aiQueueResult!); const t: Record<string,boolean>={}; f.forEach(x=>t[x.key]=true); setAiQueueToggles(t); } },
                     { label: lang === "zh" ? "只填空白" : "Blanks Only", action: () => { const f = buildQueueFields(aiQueue[aiQueueIdx], aiQueueResult!); const t: Record<string,boolean>={}; f.forEach(x=>t[x.key]=x.conflict==="new"); setAiQueueToggles(t); } },
                     { label: lang === "zh" ? "全不选" : "None", action: () => { const f = buildQueueFields(aiQueue[aiQueueIdx], aiQueueResult!); const t: Record<string,boolean>={}; f.forEach(x=>t[x.key]=false); setAiQueueToggles(t); } },
                   ].map((btn) => (
-                    <Pressable key={btn.label} onPress={btn.action} style={({ pressed }) => [{ flex: 1, paddingVertical: 6, borderRadius: 8, backgroundColor: colors.border + "80", alignItems: "center" }, pressed && { opacity: 0.6 }]}>
+                    <Pressable key={btn.label} onPress={btn.action} style={({ pressed }) => [{ flex: 1, paddingVertical: 7, borderRadius: 8, backgroundColor: colors.border + "80", alignItems: "center" }, pressed && { opacity: 0.6 }]}>
                       <Text style={{ fontSize: 12, fontWeight: "600", color: colors.foreground }}>{btn.label}</Text>
                     </Pressable>
                   ))}
                 </View>
                 {/* 高置信度一键应用 */}
                 {aiQueueResult.confidence === "high" ? (
-                  <View style={{ paddingHorizontal: 10, paddingTop: 8, paddingBottom: 4 }}>
+                  <View style={{ paddingHorizontal: 12, paddingTop: 10, paddingBottom: 4 }}>
                     <Pressable
                       onPress={() => {
                         const f = buildQueueFields(aiQueue[aiQueueIdx], aiQueueResult!);
@@ -942,7 +962,7 @@ export default function BottlesScreen() {
                       }}
                       style={({ pressed }) => [
                         { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
-                          paddingVertical: 8, borderRadius: 10,
+                          paddingVertical: 9, borderRadius: 10,
                           backgroundColor: colors.success + "18", borderWidth: 1, borderColor: colors.success + "40" },
                         pressed && { opacity: 0.7 },
                       ]}
@@ -960,18 +980,18 @@ export default function BottlesScreen() {
                   const conflictLabel = field.conflict === "new" ? (lang === "zh" ? "新增" : "New") : field.conflict === "override" ? (lang === "zh" ? "覆盖" : "Override") : field.conflict === "confirm" ? (lang === "zh" ? "确认" : "Confirm") : (lang === "zh" ? "低可信" : "Low");
                   const isOn = aiQueueToggles[field.key] !== false;
                   return (
-                    <View key={field.key} style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border + "60", gap: 10 }}>
-                      <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: conflictColor + "20" }}>
+                    <View key={field.key} style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border + "60", gap: 10 }}>
+                      <View style={{ paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6, backgroundColor: conflictColor + "20" }}>
                         <Text style={{ fontSize: 10, fontWeight: "700", color: conflictColor }}>{conflictLabel}</Text>
                       </View>
                       <View style={{ flex: 1, gap: 2 }}>
                         <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>{field.labelZh}</Text>
                         {field.currentValue ? (
-                          <Text style={{ fontSize: 11, color: colors.muted }} numberOfLines={1}>
+                          <Text style={{ fontSize: 11, color: colors.muted }} numberOfLines={2}>
                             {field.currentValue} → <Text style={{ color: isOn ? colors.primary : colors.muted }}>{field.aiValue}</Text>
                           </Text>
                         ) : (
-                          <Text style={{ fontSize: 11, color: isOn ? colors.primary : colors.muted }} numberOfLines={1}>{field.aiValue}</Text>
+                          <Text style={{ fontSize: 11, color: isOn ? colors.primary : colors.muted }} numberOfLines={2}>{field.aiValue}</Text>
                         )}
                       </View>
                       <Switch
@@ -983,28 +1003,9 @@ export default function BottlesScreen() {
                     </View>
                   );
                 })}
-                {/* 应用 / 跳过 */}
-                <View style={{ flexDirection: "row", padding: 10, gap: 8 }}>
-                  <Pressable
-                    onPress={handleQueueApply}
-                    style={({ pressed }) => [{ flex: 3, padding: 12, borderRadius: 12, backgroundColor: colors.primary, alignItems: "center" }, pressed && { opacity: 0.8 }]}
-                  >
-                    <Text style={{ fontSize: 14, fontWeight: "700", color: "#fff" }}>
-                      {lang === "zh"
-                        ? `应用 ${Object.values(aiQueueToggles).filter(Boolean).length} 项`
-                        : `Apply ${Object.values(aiQueueToggles).filter(Boolean).length}`}
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={handleQueueSkip}
-                    style={({ pressed }) => [{ flex: 1, padding: 12, borderRadius: 12, backgroundColor: colors.border, alignItems: "center" }, pressed && { opacity: 0.7 }]}
-                  >
-                    <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>{lang === "zh" ? "跳过" : "Skip"}</Text>
-                  </Pressable>
-                </View>
-                {/* 配方联动提示：显示用到该酒款的配方 */}
+                {/* 配方联动提示 */}
                 {linkedRecipes.length > 0 ? (
-                  <View style={{ borderTopWidth: 1, borderTopColor: colors.border + "60", paddingHorizontal: 12, paddingVertical: 8, gap: 4 }}>
+                  <View style={{ paddingHorizontal: 16, paddingVertical: 10, gap: 4 }}>
                     <Text style={{ fontSize: 11, fontWeight: "700", color: colors.muted }}>
                       {lang === "zh" ? `📋 该酒款用于以下 ${linkedRecipes.length} 个配方：` : `📋 Used in ${linkedRecipes.length} recipe(s):`}
                     </Text>
@@ -1017,9 +1018,33 @@ export default function BottlesScreen() {
                 ) : null}
               </>
             ) : null}
-          </View>
+          </ScrollView>
+
+          {/* 底部固定操作栏（仅在有结果时显示） */}
+          {aiQueueResult ? (
+            <View style={{ flexDirection: "row", paddingHorizontal: 12, paddingTop: 10, gap: 8, borderTopWidth: 1, borderTopColor: colors.border }}>
+              <Pressable
+                onPress={handleQueueApply}
+                style={({ pressed }) => [{ flex: 3, padding: 14, borderRadius: 12, backgroundColor: colors.primary, alignItems: "center" }, pressed && { opacity: 0.8 }]}
+              >
+                <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}>
+                  {lang === "zh"
+                    ? `应用 ${Object.values(aiQueueToggles).filter(Boolean).length} 项`
+                    : `Apply ${Object.values(aiQueueToggles).filter(Boolean).length}`}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={handleQueueSkip}
+                style={({ pressed }) => [{ flex: 1, padding: 14, borderRadius: 12, backgroundColor: colors.border, alignItems: "center" }, pressed && { opacity: 0.7 }]}
+              >
+                <Text style={{ fontSize: 15, fontWeight: "600", color: colors.foreground }}>{lang === "zh" ? "跳过" : "Skip"}</Text>
+              </Pressable>
+            </View>
+          ) : null}
         </View>
-      ) : null}
+      </Modal>
+
+
 
       {/* 自动填空白进度条（autofill 模式） */}
       {!selectMode && aiQueueFetching && (aiQueueMode === "autofill" || aiQueueMode === "sel-autofill") ? (

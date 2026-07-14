@@ -398,9 +398,15 @@ export default function BookImportScreen() {
           const resp = await fetch(asset.uri);
           buffer = await resp.arrayBuffer();
         } else {
-          const b64: string = await FileSystem.readAsStringAsync(asset.uri, {
+          // iOS 真机：Document Picker 返回的 URI 可能无法直接读取
+          // 先复制到 App 缓存目录，再读取，确保兼容所有 iOS URI 格式
+          const cacheUri = FileSystem.cacheDirectory + `pdf_${Date.now()}_${asset.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+          await FileSystem.copyAsync({ from: asset.uri, to: cacheUri });
+          const b64: string = await FileSystem.readAsStringAsync(cacheUri, {
             encoding: FileSystem.EncodingType.Base64,
           });
+          // 清理缓存文件（不阻塞主流程）
+          FileSystem.deleteAsync(cacheUri, { idempotent: true }).catch(() => {});
           base64 = b64;
           buffer = base64ToArrayBuffer(b64);
         }
@@ -1091,6 +1097,19 @@ export default function BookImportScreen() {
           </Text>
         </View>
       )}
+      {phase === "loading" && (() => {
+        const m = loadStatus.match(/(\d+)\/(\d+)/);
+        if (!m) return null;
+        const pct = Math.round((parseInt(m[1]) / Math.max(parseInt(m[2]), 1)) * 100);
+        return (
+          <View style={{ position: "absolute", bottom: 80, left: 32, right: 32 }}>
+            <View style={{ height: 4, backgroundColor: colors.border, borderRadius: 2, overflow: "hidden" }}>
+              <View style={{ height: 4, backgroundColor: colors.primary, borderRadius: 2, width: `${pct}%` }} />
+            </View>
+            <Text style={{ fontSize: 11, color: colors.muted, textAlign: "center", marginTop: 6 }}>{pct}%</Text>
+          </View>
+        );
+      })()}
 
       {/* ── Reading ── */}
       {phase === "reading" && (
