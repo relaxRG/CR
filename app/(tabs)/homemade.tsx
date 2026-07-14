@@ -82,6 +82,36 @@ export default function HomemadeScreen() {
   const [bulkSheet, setBulkSheet] = useState<"type" | null>(null);
   const { bottles } = useBottleStore();
   const [query, setQuery] = useState("");
+
+  // ── 将 libraryOverride='homemade' 的酒款条目转换为虚拟 HomemadePrep ──────
+  const overriddenBottlePreps = useMemo<HomemadePrep[]>(() => {
+    return bottles
+      .filter((b) => b.libraryOverride === 'homemade')
+      .map((b): HomemadePrep => ({
+        id: `bottle-override-${b.id}`,
+        name: b.nameEn || b.nameZh,
+        nameAlt: b.nameZh,
+        type: b.homemadeType ?? (b.homemadeGroup === 'garnish' ? 'garnish-misc' : b.homemadeGroup === 'alcoholic' ? 'infusion' : 'juice'),
+        abvGroup: (b.homemadeGroup as PrepGroup) ?? 'non_alcoholic',
+        ingredients: [],
+        recipe: '',
+        yield: b.volume ?? '',
+        shelfLife: '',
+        storage: '',
+        source: '',
+        notes: b.notes ?? '',
+        builtin: false,
+        made: false,
+        rating: null,
+        sortIndex: null,
+        createdAt: b.createdAt ?? Date.now(),
+        updatedAt: b.updatedAt ?? Date.now(),
+        flavorTags: b.flavorTags,
+        // 标记来源为酒款库，用于 UI 区分
+        story: `__from_bottle__${b.id}`,
+      }));
+  }, [bottles]);
+
   // 顶层分组:含酒精 / 无酒精(类似酒库的基酒库/酒款库/原材料库)
   const [group, setGroup] = usePersistedState<PrepGroup>("homemade.group.v1", "alcoholic");
   // 快捷筛选(独立于 Filter 面板,持久化保留):分区 → 类型子分类
@@ -127,8 +157,11 @@ export default function HomemadeScreen() {
 
   // 当前分组内的条目(智能归组:显式 abvGroup 优先,否则按类型→分区推断)
   const groupPreps = useMemo(
-    () => preps.filter((p) => prepGroupOf(p, sections, types) === group),
-    [preps, sections, types, group],
+    () => [
+      ...preps.filter((p) => prepGroupOf(p, sections, types) === group),
+      ...overriddenBottlePreps.filter((p) => (p.abvGroup ?? 'non_alcoholic') === group),
+    ],
+    [preps, sections, types, group, overriddenBottlePreps],
   );
   // Batch AI enrich for homemade preps
   const isMountedRef = useRef(true);
@@ -654,7 +687,7 @@ export default function HomemadeScreen() {
               const active = group === g.key;
               const count = preps.filter(
                 (p) => prepGroupOf(p, sections, types) === g.key,
-              ).length;
+              ).length + overriddenBottlePreps.filter((p) => (p.abvGroup ?? 'non_alcoholic') === g.key).length;
               return (
                 <Pressable
                   key={g.key}
@@ -996,7 +1029,7 @@ function PrepRow({
   const colors = useColors();
   const router = useRouter();
   const { t, lang } = useI18n();
-  const { deletePrep, setPrepRating } = useHomemadeStore();
+  const { deletePrep, setPrepRating, duplicatePrep } = useHomemadeStore();
   const [ratingVisible, setRatingVisible] = useState(false);
 
   const confirmDelete = () => {
@@ -1045,7 +1078,30 @@ function PrepRow({
         },
       ]}
     >
-      <PrepRowInner prep={prep} isFirst={isFirst} isLast={isLast} bottles={bottles} />
+      <PrepRowInner
+        prep={prep}
+        isFirst={isFirst}
+        isLast={isLast}
+        bottles={bottles}
+        onLongPress={() => {
+          if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          const name = displayNames(prep.name, prep.nameAlt, lang).primary;
+          Alert.alert(
+            name,
+            undefined,
+            [
+              {
+                text: "复制条目",
+                onPress: () => {
+                  duplicatePrep(prep.id);
+                  if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                },
+              },
+              { text: "取消", style: "cancel" },
+            ],
+          );
+        }}
+      />
     </SwipeableRow>
     <RatingSheet
       visible={ratingVisible}
@@ -1177,11 +1233,13 @@ function PrepRowInner({
   isFirst,
   isLast,
   bottles,
+  onLongPress,
 }: {
   prep: HomemadePrep;
   isFirst: boolean;
   isLast: boolean;
   bottles: Bottle[];
+  onLongPress?: () => void;
 }) {
   const colors = useColors();
   const router = useRouter();
@@ -1201,7 +1259,16 @@ function PrepRowInner({
   };
   return (
     <Pressable
-      onPress={() => router.push({ pathname: "/homemade/[id]", params: { id: prep.id } })}
+      onPress={() => {
+        if (prep.id.startsWith('bottle-override-')) {
+          const bottleId = prep.id.replace('bottle-override-', '');
+          router.push({ pathname: "/bottle-form", params: { id: bottleId } });
+        } else {
+          router.push({ pathname: "/homemade/[id]", params: { id: prep.id } });
+        }
+      }}
+      onLongPress={onLongPress}
+      delayLongPress={400}
       style={({ pressed }) => [pressed && { opacity: 0.7 }]}
     >
       <View
@@ -1229,6 +1296,13 @@ function PrepRowInner({
                   {prepTypeLabelIn(types, prep.type, lang)}
                 </Text>
               </View>
+              {prep.id.startsWith('bottle-override-') && (
+                <View style={[styles.badge, { backgroundColor: colors.warning + "22" }]}>
+                  <Text style={[styles.badgeText, { color: colors.warning }]}>
+                    {lang === "zh" ? "来自酒款库" : "From Bottles"}
+                  </Text>
+                </View>
+              )}
               {tech ? (
                 <View style={[styles.badge, { backgroundColor: colors.warning + "22" }]}>
                   <Text style={[styles.badgeText, { color: colors.warning }]}>

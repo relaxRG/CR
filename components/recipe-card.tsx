@@ -17,12 +17,15 @@ export function RecipeCard({
   isFirst = true,
   isLast = true,
   onTagPress,
+  onLongPress,
 }: {
   recipe: Recipe;
   isFirst?: boolean;
   isLast?: boolean;
   /** Called when a filterable tag badge is tapped. type = "flavor"|"baseSpirit"|"codexFamily"|"strength"|"category" */
   onTagPress?: (type: string, value: string) => void;
+  /** Called when card is long-pressed (e.g. to show copy/duplicate menu) */
+  onLongPress?: () => void;
 }) {
   const colors = useColors();
   const { lang } = useI18n();
@@ -57,6 +60,8 @@ export function RecipeCard({
   return (
     <Pressable
       onPress={() => router.push(`/recipe/${recipe.id}`)}
+      onLongPress={onLongPress}
+      delayLongPress={400}
       style={({ pressed }) => [styles.pressable, pressed && { opacity: 0.7 }]}
     >
       <View

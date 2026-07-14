@@ -50,26 +50,49 @@ export function smartLinkIngredient(
   rawName: string,
   bottles: Bottle[],
   preps: HomemadePrep[],
+  preferredSource?: "auto" | "spirits" | "bottles" | "materials" | "homemade",
 ): SmartLink {
   const name = rawName.trim();
   if (!name || name.length < 2) return null;
 
-  // 1) 双边精确匹配(原文)——库内若存在同名形态条目(如独立的"柠檬皮"卡片),
-  //    直接精确命中该条目本身,按其自身价格/规格计价;
-  //    只有库内没有该形态条目时,才会走 4.5 的母条目 × 系数换算兜底。
-  const eb = exactBottle(name, bottles);
+  // 按用户指定来源库过滤
+  const SPIRITS_CATS = new Set(["Gin","Vodka","Rum","Whiskey","Agave Spirits","Brandy","Sake & Shochu","Baijiu"]);
+  const MATERIALS_CATS = new Set(["Sugars & Sweeteners","Fruits & Vegetables","Spices & Botanicals",
+    "Flowers & Florals","Tea, Coffee & Cacao","Nuts & Grains","Dairy & Egg","Acids & Additives"]);
+  let filteredBottles = bottles;
+  let filteredPreps = preps;
+  if (preferredSource && preferredSource !== "auto") {
+    if (preferredSource === "homemade") {
+      filteredBottles = [];
+    } else if (preferredSource === "spirits") {
+      filteredPreps = [];
+      filteredBottles = bottles.filter((b) => b.libraryOverride !== 'homemade' && SPIRITS_CATS.has(b.category ?? ""));
+    } else if (preferredSource === "bottles") {
+      filteredPreps = [];
+      filteredBottles = bottles.filter((b) => b.libraryOverride !== 'homemade' && !SPIRITS_CATS.has(b.category ?? "") && !MATERIALS_CATS.has(b.category ?? ""));
+    } else if (preferredSource === "materials") {
+      filteredPreps = [];
+      filteredBottles = bottles.filter((b) => b.libraryOverride !== 'homemade' && MATERIALS_CATS.has(b.category ?? ""));
+    }
+  } else {
+    // auto 模式：排除已归属自制库的酒款条目（它们在自制库中显示）
+    filteredBottles = bottles.filter((b) => b.libraryOverride !== 'homemade');
+  }
+
+  // 1) 双边精确匹配(原文)
+  const eb = exactBottle(name, filteredBottles);
   if (eb) return { kind: "bottle", bottle: eb, matchConfidence: "exact" };
-  const ep = exactPrep(name, preps);
+  const ep = exactPrep(name, filteredPreps);
   if (ep) return { kind: "prep", prep: ep, matchConfidence: "exact" };
 
   // 2) Waldorf 别名规范化 → 双边精确匹配
-  const resolved = resolveIngredientNames(name, bottles, preps);
+  const resolved = resolveIngredientNames(name, filteredBottles, filteredPreps);
   if (resolved) {
     for (const candidate of [resolved.zh, resolved.en]) {
       if (!candidate || norm(candidate) === norm(name)) continue;
-      const b = exactBottle(candidate, bottles);
+      const b = exactBottle(candidate, filteredBottles);
       if (b) return { kind: "bottle", bottle: b, matchConfidence: "exact" };
-      const p = exactPrep(candidate, preps);
+      const p = exactPrep(candidate, filteredPreps);
       if (p) return { kind: "prep", prep: p, matchConfidence: "exact" };
     }
   }
@@ -77,18 +100,16 @@ export function smartLinkIngredient(
   // 3) 同义词规范化(英文类别词 → 中文)后精确匹配
   const normalized = normalizeIngredientName(name);
   if (normalized && norm(normalized) !== norm(name)) {
-    const b = exactBottle(normalized, bottles);
+    const b = exactBottle(normalized, filteredBottles);
     if (b) return { kind: "bottle", bottle: b, matchConfidence: "exact" };
-    const p = exactPrep(normalized, preps);
+    const p = exactPrep(normalized, filteredPreps);
     if (p) return { kind: "prep", prep: p, matchConfidence: "exact" };
   }
 
-  // 4) 模糊匹配:自制优先,其次酒库(matchBottle 含类别兜底)
-  // 4.5) 形态折叠优先于模糊匹配:"柠檬皮"应按"柠檬"母条目+皮系数计价,
-  //      而不是让模糊匹配把"柠檬皮"当普通液体配料命中"柠檬"。
+  // 4) 模糊匹配:自制优先,其次酒库
   const strippedEarly = stripForm(name);
   if (strippedEarly.form && strippedEarly.base && norm(strippedEarly.base) !== norm(name)) {
-    const ebE = exactBottle(strippedEarly.base, bottles);
+    const ebE = exactBottle(strippedEarly.base, filteredBottles);
     if (ebE)
       return {
         kind: "bottle",
@@ -97,14 +118,13 @@ export function smartLinkIngredient(
         matchConfidence: "exact",
       };
   }
-  const fp = matchPrep(name, preps);
+  const fp = matchPrep(name, filteredPreps);
   if (fp) return { kind: "prep", prep: fp, matchConfidence: "fuzzy" };
-  const fb = matchBottle(name, bottles);
+  const fb = matchBottle(name, filteredBottles);
   if (fb) {
-    // 模糊命中但原名带形态词且命中的正是母条目 → 附加形态信息
     if (
       strippedEarly.form &&
-      (norm(fb.nameZh) === norm(strippedEarly.base) || norm(fb.nameEn) === norm(strippedEarly.base))
+      (norm(fb.nameZh ?? "") === norm(strippedEarly.base) || norm(fb.nameEn ?? "") === norm(strippedEarly.base))
     ) {
       return {
         kind: "bottle",
@@ -116,27 +136,27 @@ export function smartLinkIngredient(
     return { kind: "bottle", bottle: fb, matchConfidence: "fuzzy" };
   }
 
-  // 5) 规范名再走一轮模糊(处理 Waldorf 别名下的变体写法)
+  // 5) 规范名再走一轮模糊
   if (resolved) {
     for (const candidate of [resolved.zh, resolved.en]) {
       if (!candidate) continue;
-      const p2 = matchPrep(candidate, preps);
+      const p2 = matchPrep(candidate, filteredPreps);
       if (p2) return { kind: "prep", prep: p2, matchConfidence: "fuzzy" };
-      const b2 = matchBottle(candidate, bottles);
+      const b2 = matchBottle(candidate, filteredBottles);
       if (b2) return { kind: "bottle", bottle: b2, matchConfidence: "fuzzy" };
     }
   }
 
-  // 6) 形态折叠:剥离末尾形态词("柠檬皮"→"柠檬")后重新精确/模糊匹配母条目
+  // 6) 形态折叠
   const stripped = strippedEarly;
   if (stripped.form && stripped.base && norm(stripped.base) !== norm(name)) {
     const normalizedBase = normalizeIngredientName(stripped.base);
     if (normalizedBase && norm(normalizedBase) !== norm(stripped.base)) {
-      const eb3 = exactBottle(normalizedBase, bottles);
+      const eb3 = exactBottle(normalizedBase, filteredBottles);
       if (eb3)
         return { kind: "bottle", bottle: eb3, form: { key: stripped.form, factor: stripped.factor }, matchConfidence: "exact" };
     }
-    const fb2 = matchBottle(stripped.base, bottles);
+    const fb2 = matchBottle(stripped.base, filteredBottles);
     if (fb2)
       return { kind: "bottle", bottle: fb2, form: { key: stripped.form, factor: stripped.factor }, matchConfidence: "fuzzy" };
   }

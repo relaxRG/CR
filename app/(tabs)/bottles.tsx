@@ -59,6 +59,7 @@ export default function BottlesScreen() {
   const { t, lang } = useI18n();
   const { ready, bottles, reorderBottles, deleteBottles, bulkUpdateBottles, updateBottle } =
     useBottleStore();
+  const { duplicateBottle } = useBottleStore();
   const { recipes } = useRecipeStore();
   const {
     categoryLabel,
@@ -107,7 +108,7 @@ export default function BottlesScreen() {
   const { books } = useBookStore();
 
   const groupBottles = useMemo(
-    () => bottles.filter((b) => groupOf(b.category) === group),
+    () => bottles.filter((b) => b.libraryOverride !== 'homemade' && groupOf(b.category) === group),
     [bottles, group, groupOf],
   );
 
@@ -596,6 +597,23 @@ export default function BottlesScreen() {
                 bottle={item}
                 isFirst={index === 0}
                 isLast={index === sorted.length - 1}
+                onLongPress={() => {
+                  if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  Alert.alert(
+                    item.nameZh,
+                    undefined,
+                    [
+                      {
+                        text: "复制条目",
+                        onPress: () => {
+                          duplicateBottle(item.id);
+                          if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                        },
+                      },
+                      { text: "取消", style: "cancel" },
+                    ],
+                  );
+                }}
               />
             </View>
             <Pressable
@@ -1309,12 +1327,14 @@ function BottleCard({
   bottle,
   isFirst,
   isLast,
+  onLongPress,
 }: {
   bottle: Bottle;
   isFirst: boolean;
   isLast: boolean;
+  onLongPress?: () => void;
 }) {
-  return <BottleCardInner bottle={bottle} isFirst={isFirst} isLast={isLast} />;
+  return <BottleCardInner bottle={bottle} isFirst={isFirst} isLast={isLast} onLongPress={onLongPress} />;
 }
 
 /** 形态族卡片:母条目 + 可展开的形态子条目(柠檬 → 柠檬汁/柠檬皮/柠檬片) */
@@ -1441,11 +1461,13 @@ function BottleCardInner({
   isFirst,
   isLast,
   badge,
+  onLongPress,
 }: {
   bottle: Bottle;
   isFirst: boolean;
   isLast: boolean;
   badge?: React.ReactNode;
+  onLongPress?: () => void;
 }) {
   const colors = useColors();
   const router = useRouter();
@@ -1457,6 +1479,8 @@ function BottleCardInner({
   return (
     <Pressable
       onPress={() => router.push({ pathname: "/bottle/[id]", params: { id: bottle.id } })}
+      onLongPress={onLongPress}
+      delayLongPress={400}
       style={({ pressed }) => [pressed && { opacity: 0.7 }]}
     >
       <View

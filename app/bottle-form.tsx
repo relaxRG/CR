@@ -100,6 +100,18 @@ export default function BottleFormScreen() {
     editing?.perishableOnOpen,
   );
 
+  // ── 库归属手动选择 ────────────────────────────────────────────────────────
+  // undefined = 系统自动判断（根据 category）；'homemade' = 用户手动归入自制库
+  const [libraryOverride, setLibraryOverride] = useState<'homemade' | undefined>(
+    editing?.libraryOverride === 'homemade' ? 'homemade' : undefined,
+  );
+  const [homemadeGroup, setHomemadeGroup] = useState<'alcoholic' | 'non_alcoholic' | 'garnish' | 'other'>(
+    editing?.homemadeGroup ?? 'non_alcoholic',
+  );
+  const [homemadeType, setHomemadeType] = useState<string>(
+    editing?.homemadeType ?? '',
+  );
+
   const canSave = nameZh.trim().length > 0 || nameEn.trim().length > 0;
 
   // ── AI 补全 ────────────────────────────────────────────────────────────────
@@ -430,6 +442,16 @@ export default function BottleFormScreen() {
     if (perishableOnOpen !== undefined) {
       draft.perishableOnOpen = perishableOnOpen;
     }
+    if (libraryOverride === 'homemade') {
+      draft.libraryOverride = 'homemade';
+      draft.homemadeGroup = homemadeGroup;
+      if (homemadeType) draft.homemadeType = homemadeType;
+    } else {
+      // 清除之前设置的覆盖
+      draft.libraryOverride = undefined;
+      draft.homemadeGroup = undefined;
+      draft.homemadeType = undefined;
+    }
     if (editing) {
       updateBottle(editing.id, draft);
     } else {
@@ -713,6 +735,93 @@ export default function BottleFormScreen() {
           {/* ── 分区二：分类与风格 ── */}
           {sectionTitle(lang === "zh" ? "分类与风格" : "Category & Style")}
           <View style={{ paddingHorizontal: 20 }}>
+            {/* ── 库归属选择器 ── */}
+            <Text style={[styles.fieldLabel, { color: colors.foreground, marginBottom: 8 }]}>
+              {lang === "zh" ? "所属库" : "Library"}
+            </Text>
+            <View style={{ flexDirection: "row", backgroundColor: colors.border + "55", borderRadius: 10, padding: 2, gap: 2, marginBottom: 16 }}>
+              {[
+                { key: undefined as 'homemade' | undefined, label: lang === "zh" ? "自动判断" : "Auto" },
+                { key: 'homemade' as const, label: lang === "zh" ? "自制库" : "Homemade" },
+              ].map((opt) => {
+                const active = libraryOverride === opt.key;
+                return (
+                  <Pressable
+                    key={opt.label}
+                    onPress={() => setLibraryOverride(opt.key)}
+                    style={[
+                      { flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: "center" as const },
+                      active && { backgroundColor: colors.surface, shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 2 },
+                    ]}
+                  >
+                    <Text style={{ fontSize: 13, fontWeight: active ? "600" : "400", color: active ? colors.foreground : colors.muted }}>
+                      {opt.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {/* 自制库分区选择（仅 libraryOverride = 'homemade' 时显示） */}
+            {libraryOverride === 'homemade' && (
+              <View style={{ marginBottom: 16 }}>
+                <Text style={[styles.fieldLabel, { color: colors.foreground, marginBottom: 8 }]}>
+                  {lang === "zh" ? "自制库分区" : "Homemade Section"}
+                </Text>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+                  {PREP_GROUPS.map((g) => {
+                    const active = homemadeGroup === g.key;
+                    return (
+                      <Pressable
+                        key={g.key}
+                        onPress={() => { setHomemadeGroup(g.key as typeof homemadeGroup); setHomemadeType(''); }}
+                        style={[
+                          styles.chip,
+                          { backgroundColor: active ? colors.primary : colors.surface, borderColor: active ? colors.primary : colors.border },
+                        ]}
+                      >
+                        <Text style={[styles.chipText, { color: active ? "#FFFFFF" : colors.foreground }]}>
+                          {lang === "en" ? g.en : g.zh}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
+                {/* 自制库类型选择（按分区过滤） */}
+                <Text style={[styles.fieldLabel, { color: colors.foreground, marginBottom: 8 }]}>
+                  {lang === "zh" ? "自制类型（可选）" : "Homemade Type (optional)"}
+                </Text>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                  {PREP_TYPES
+                    .filter((pt) => {
+                      if (homemadeGroup === 'alcoholic') return ['infused-spirit','homemade-liqueur','bitters-tincture','modified-spirit','homemade-spirit'].includes(pt.section);
+                      if (homemadeGroup === 'non_alcoholic') return ['homemade-syrup','juice-cordial','shrub-vinegar','zero-proof','na-ferment'].includes(pt.section);
+                      if (homemadeGroup === 'garnish') return pt.section.startsWith('garnish-');
+                      return pt.section === 'misc';
+                    })
+                    .map((pt) => {
+                      const active = homemadeType === pt.key;
+                      return (
+                        <Pressable
+                          key={pt.key}
+                          onPress={() => setHomemadeType(active ? '' : pt.key)}
+                          style={[
+                            styles.chip,
+                            { backgroundColor: active ? colors.primary : colors.surface, borderColor: active ? colors.primary : colors.border },
+                          ]}
+                        >
+                          <Text style={[styles.chipText, { color: active ? "#FFFFFF" : colors.foreground }]}>
+                            {lang === "en" ? pt.en : pt.zh}
+                          </Text>
+                        </Pressable>
+                      );
+                    })
+                  }
+                </View>
+              </View>
+            )}
+
             <Text style={[styles.fieldLabel, { color: colors.foreground, marginBottom: 8 }]}>
               {t("bform.category")}
             </Text>
@@ -1060,3 +1169,4 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
 });
+import { PREP_GROUPS, PREP_TYPES } from "@/lib/homemade/types";

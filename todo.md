@@ -226,3 +226,9 @@
 - [x] app/bottle/[id].tsx：详情页标签行显示「开瓶易失效」chip（手动设置=橙色，自动推断=灰色，手动关闭=「不易失效·手动」）
 - [x] lib/i18n/translations.ts：新增 bform.perishable / bform.perishable.hint.auto/on/off 翻译键
 - [x] TypeScript 零错误
+
+## 四大功能升级（2026-07-15 第二批）
+- [x] 需求 1：自制库装饰分区（garnish）——装饰专属字段（garnishUnit/batchYield/batchCost/costPerUnit/shelfLifeKey/prepMethod）、7 子分类、批次成本折算、homemade-form.tsx 表单 UI、store 迁移支持
+- [x] 需求 2：配方编辑手动选库——Ingredient 新增 preferredSource 字段，成分行库选择器（自动/基酒/酒款/原材料/自制），smart-link.ts 按库过滤，随配方持久化
+- [x] 需求 3：卡片复制——三库（配方/酒款/自制）长按弹出复制 Alert，生成「名称（副本）」条目
+- [x] 需求 4：库归属手动选择——Bottle 新增 libraryOverride/homemadeGroup/homemadeType，bottle-form.tsx 顶部「所属库」选择器，酒款库过滤已归属条目，自制库聚合显示虚拟 prep 并标注「来自酒款库」，smart-link.ts 联动

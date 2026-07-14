@@ -70,6 +70,7 @@ interface BottleStore {
   bottles: Bottle[];
   addBottle: (draft: BottleDraft) => Bottle;
   updateBottle: (id: string, draft: BottleDraft) => void;
+  duplicateBottle: (id: string) => Bottle | null;
   deleteBottle: (id: string) => void;
   deleteBottles: (ids: string[]) => void;
   bulkUpdateBottles: (ids: string[], patch: Partial<Bottle>) => void;
@@ -390,9 +391,31 @@ export function BottleProvider({ children }: { children: React.ReactNode }) {
   );
 
   const getBottle = useCallback(
-    (id: string | undefined) => bottles.find((b) => b.id === id),
-    [bottles],
+  (id: string | undefined) => bottles.find((b) => b.id === id),
+  [bottles],
+);
+
+  const duplicateBottle = useCallback(
+    (id: string): Bottle | null => {
+      const src = bottles.find((b) => b.id === id);
+      if (!src) return null;
+      const now = Date.now();
+      const copy: Bottle = {
+        ...src,
+        id: genId(),
+        nameZh: src.nameZh + "（副本）",
+        nameEn: src.nameEn ? src.nameEn + " (Copy)" : "",
+        rating: null,
+        sortIndex: null,
+        createdAt: now,
+        updatedAt: now,
+      };
+      persist([copy, ...bottlesRef.current]);
+      return copy;
+    },
+    [bottles, persist],
   );
+
 
   const value = useMemo<BottleStore>(
     () => ({
@@ -406,8 +429,9 @@ export function BottleProvider({ children }: { children: React.ReactNode }) {
       setBottleRating,
       reorderBottles,
       getBottle,
+      duplicateBottle,
     }),
-    [ready, bottles, addBottle, updateBottle, deleteBottle, deleteBottles, bulkUpdateBottles, setBottleRating, reorderBottles, getBottle],
+    [ready, bottles, addBottle, updateBottle, deleteBottle, deleteBottles, bulkUpdateBottles, setBottleRating, reorderBottles, getBottle, duplicateBottle],
   );
 
   return <BottleContext.Provider value={value}>{children}</BottleContext.Provider>;

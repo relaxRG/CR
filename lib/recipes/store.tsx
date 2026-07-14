@@ -78,6 +78,7 @@ interface RecipeStore {
   addRecipe: (draft: RecipeDraft) => Recipe;
   addRecipes: (drafts: RecipeDraft[]) => { added: Recipe[]; skippedNames: string[] };
   updateRecipe: (id: string, draft: RecipeDraft) => void;
+  duplicateRecipe: (id: string) => Recipe | null;
   deleteRecipe: (id: string) => void;
   deleteRecipes: (ids: string[]) => void;
   bulkUpdateRecipes: (ids: string[], patch: Partial<Recipe>) => void;
@@ -304,9 +305,9 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
   );
 
   const addRecipes = useCallback(
-    (drafts: RecipeDraft[]): { added: Recipe[]; skippedNames: string[] } => {
-      const now = Date.now();
-      const existing = recipesRef.current;
+  (drafts: RecipeDraft[]): { added: Recipe[]; skippedNames: string[] } => {
+    const now = Date.now();
+    const existing = recipesRef.current;
       const existingNames = new Set(existing.map((r) => r.name.trim().toLowerCase()));
       const added: Recipe[] = [];
       const skippedNames: string[] = [];
@@ -351,6 +352,30 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
     },
     [persistRecipes],
   );
+
+  const duplicateRecipe = useCallback(
+    (id: string): Recipe | null => {
+      const src = recipesRef.current.find((r) => r.id === id);
+      if (!src) return null;
+      const now = Date.now();
+      const copy: Recipe = {
+        ...src,
+        id: genId(),
+        name: src.name + "（副本）",
+        nameEn: src.nameEn ? src.nameEn + " (Copy)" : "",
+        favorite: false,
+        made: false,
+        rating: null,
+        sortIndex: null,
+        createdAt: now,
+        updatedAt: now,
+      };
+      persistRecipes([copy, ...recipesRef.current]);
+      return copy;
+    },
+    [persistRecipes],
+  );
+
 
 
   // keep a ref to latest recipes/categories for stable callbacks
@@ -811,6 +836,7 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
       tagGroupsOf,
       getRecipe,
       getCategory,
+      duplicateRecipe,
     }),
     [
       ready,
@@ -850,6 +876,7 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
       tagGroupsOf,
       getRecipe,
       getCategory,
+      duplicateRecipe,
     ],
   );
 

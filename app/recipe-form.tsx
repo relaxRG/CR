@@ -281,6 +281,15 @@ export default function RecipeFormScreen() {
       ? editing.ingredients
       : [{ id: genId(), name: "", amount: "" }],
   );
+  /** 每个成分行的手动库选择：key=ingredientId, value=preferredSource */
+  const [ingSourceMap, setIngSourceMap] = useState<Record<string, "auto" | "spirits" | "bottles" | "materials" | "homemade">>(() => {
+    if (!editing?.ingredients?.length) return {};
+    return Object.fromEntries(
+      editing.ingredients
+        .filter((i) => i.preferredSource && i.preferredSource !== "auto")
+        .map((i) => [i.id, i.preferredSource as "auto" | "spirits" | "bottles" | "materials" | "homemade"])
+    );
+  });
   // ── Steps: stored as numbered string, edited as dynamic rows ──────────────
   /** Parse "1. xxx\n2. yyy" or plain text into step rows */
   const parseStepRows = (raw: string): { id: string; text: string }[] => {
@@ -1009,10 +1018,12 @@ export default function RecipeFormScreen() {
       source: source.trim(),
       story: story.trim(),
       flavorDesc: flavorDesc.trim(),
-      ingredients: ingredients.filter((i) => i.name.trim().length > 0),
+      ingredients: ingredients
+        .filter((i) => i.name.trim().length > 0)
+        .map((i) => ({ ...i, preferredSource: ingSourceMap[i.id] ?? undefined })),
       steps: steps.trim(),
       garnish: garnish.trim(),
-    notes: notes.trim(),
+      notes: notes.trim(),
       cardTagOrder: null,
       drinkDuration: drinkDuration || undefined,
       occasion: occasion || undefined,
@@ -1703,7 +1714,8 @@ export default function RecipeFormScreen() {
           <Text className="text-sm font-medium text-muted mt-5 mb-1.5">{t("form.ingredients")}</Text>
           {ingredients.map((ing) => {
             const trimmed = ing.name.trim();
-            const rawLink = trimmed.length >= 2 ? smartLinkIngredient(trimmed, bottles, preps) : null;
+            const ingSource = ingSourceMap[ing.id] ?? "auto";
+            const rawLink = trimmed.length >= 2 ? smartLinkIngredient(trimmed, bottles, preps, ingSource) : null;
             // Exact match: always show. Fuzzy match: only show if user accepted, hide if dismissed.
             const isFuzzy = rawLink?.matchConfidence === "fuzzy";
             const link = isFuzzy
@@ -1724,11 +1736,42 @@ export default function RecipeFormScreen() {
             const showSuggest =
               focusedIng === ing.id && trimmed.length > 0 && pickedIng[ing.id] !== ing.name;
             const liveSuggestions = showSuggest
-              ? suggestIngredients(trimmed, bottles, preps, lang, 6, groupOf).filter((s) => s.value !== trimmed)
+              ? suggestIngredients(trimmed, bottles, preps, lang, 6, groupOf)
+                  .filter((s) => s.value !== trimmed)
+                  .filter((s) => {
+                    if (!ingSource || ingSource === "auto") return true;
+                    return s.source === ingSource;
+                  })
               : [];
             return (
               <View key={ing.id} className="mb-2">
                 <View className="flex-row items-center" style={{ gap: 8 }}>
+                  {/* 库选择器：小型下拉按钮 */}
+                  <Pressable
+                    onPress={() => {
+                      const sources: ("auto" | "spirits" | "bottles" | "materials" | "homemade")[] = ["auto", "spirits", "bottles", "materials", "homemade"];
+                      const cur = ingSource;
+                      const next = sources[(sources.indexOf(cur) + 1) % sources.length];
+                      setIngSourceMap((prev) => ({ ...prev, [ing.id]: next }));
+                      // 切换库时重置链接决策
+                      setDismissedLinks((prev) => { const n = { ...prev }; delete n[ing.id]; return n; });
+                      setAcceptedLinks((prev) => { const n = { ...prev }; delete n[ing.id]; return n; });
+                      setIngredients((prev) => prev.map((i) => i.id === ing.id ? { ...i, linkedBottleId: undefined, linkedPrepId: undefined } : i));
+                    }}
+                    hitSlop={6}
+                    style={({ pressed }) => [{
+                      paddingHorizontal: 5,
+                      paddingVertical: 3,
+                      borderRadius: 6,
+                      borderWidth: 1,
+                      borderColor: ingSource === "auto" ? colors.border : colors.primary,
+                      backgroundColor: ingSource === "auto" ? colors.surface : `${colors.primary}20`,
+                    }, pressed && { opacity: 0.7 }]}
+                  >
+                    <Text style={{ fontSize: 10, lineHeight: 14, color: ingSource === "auto" ? colors.muted : colors.primary, fontWeight: "600" }}>
+                      {ingSource === "auto" ? "全" : ingSource === "spirits" ? "基" : ingSource === "bottles" ? "酒" : ingSource === "materials" ? "料" : "制"}
+                    </Text>
+                  </Pressable>
                   <TextInput
                     className="flex-[3] bg-surface border border-border rounded-xl px-3 py-2.5 text-base text-foreground"
                    placeholder={t("form.ingredient.name")}

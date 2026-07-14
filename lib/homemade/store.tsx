@@ -89,6 +89,7 @@ interface HomemadeStore {
   ) => HomemadePrep;
   updatePrep: (id: string, patch: Partial<HomemadePrep>) => void;
   deletePrep: (id: string) => void;
+  duplicatePrep: (id: string) => HomemadePrep | null;
   deletePreps: (ids: string[]) => void;
   bulkUpdatePreps: (ids: string[], patch: Partial<HomemadePrep>) => void;
   togglePrepMade: (id: string) => void;
@@ -141,6 +142,8 @@ function migrateSectionsV2(stored: PrepSection[]): PrepSection[] {
       ? s
       : { ...s, group: classifyPrepGroup({ name: `${s.en} ${s.zh}` }) },
   );
+  // 注意：garnish 分组的自定义分区已在上方 filter 中被 defaultKeys 覆盖（因为 garnish sections 现在是默认值），
+  // 此处保留 garnish 判断以兼容未来用户自定义的 garnish 分区
   return [...defaults, ...migratedCustom];
 }
 
@@ -391,13 +394,37 @@ export function HomemadeProvider({ children }: { children: React.ReactNode }) {
   );
 
   const updatePrep = useCallback<HomemadeStore["updatePrep"]>(
-    (id, patch) => {
-      persist(
-        preps.map((p) => (p.id === id ? { ...p, ...patch, id, updatedAt: Date.now() } : p)),
-      );
+  (id, patch) => {
+    persist(
+      preps.map((p) => (p.id === id ? { ...p, ...patch, id, updatedAt: Date.now() } : p)),
+    );
+  },
+  [preps, persist],
+);
+
+  const duplicatePrep = useCallback(
+    (id: string): HomemadePrep | null => {
+      const src = preps.find((p) => p.id === id);
+      if (!src) return null;
+      const now = Date.now();
+      const copy: HomemadePrep = {
+        ...src,
+        id: `prep-user-${now}-${Math.random().toString(36).slice(2, 7)}`,
+        name: src.name + "（副本）",
+        nameAlt: src.nameAlt ? src.nameAlt + " (Copy)" : "",
+        made: false,
+        rating: null,
+        sortIndex: null,
+        builtin: false,
+        createdAt: now,
+        updatedAt: now,
+      };
+      persist([copy, ...preps]);
+      return copy;
     },
     [preps, persist],
   );
+
 
   const deletePrep = useCallback<HomemadeStore["deletePrep"]>(
     (id) => {
@@ -651,6 +678,7 @@ export function HomemadeProvider({ children }: { children: React.ReactNode }) {
       moveType,
       deleteType,
       reorderTypes,
+      duplicatePrep,
     }),
     [
       ready,
@@ -678,6 +706,7 @@ export function HomemadeProvider({ children }: { children: React.ReactNode }) {
       moveType,
       deleteType,
       reorderTypes,
+      duplicatePrep,
     ],
   );
 

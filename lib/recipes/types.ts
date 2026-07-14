@@ -60,6 +60,11 @@ export interface Ingredient {
   linkedBottleId?: string;
   /** Explicit link to a homemade prep entry (set when user accepts a fuzzy match) */
   linkedPrepId?: string;
+  /**
+   * 用户手动指定的成分来源库（优先级高于自动匹配）
+   * undefined/"auto" = 四库全搜（默认行为）
+   */
+  preferredSource?: "auto" | "spirits" | "bottles" | "materials" | "homemade";
 }
 
 export type Strength = "light" | "medium" | "strong";

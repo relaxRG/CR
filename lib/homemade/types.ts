@@ -5,11 +5,12 @@ import { SourceRef } from "@/lib/recipes/types";
 import { FRAC_CHARS } from "@/lib/units";
 
 /** 自制库顶层分组:含酒精 / 无酒精(类似酒库的基酒库/酒款库/原材料库) */
-export type PrepGroup = "alcoholic" | "non_alcoholic";
+export type PrepGroup = "alcoholic" | "non_alcoholic" | "garnish";
 
 export const PREP_GROUPS: { key: PrepGroup; en: string; zh: string }[] = [
   { key: "alcoholic", en: "Alcoholic Preps", zh: "含酒精自制" },
   { key: "non_alcoholic", en: "Zero-Proof Preps", zh: "无酒精自制" },
+  { key: "garnish", en: "Garnish", zh: "装饰" },
 ];
 
 export function prepGroupLabel(key: string, lang: "zh" | "en"): string {
@@ -31,6 +32,21 @@ export interface HomemadePrep {
    * 显式设置后优先生效(用户可手动调整)。
    */
   abvGroup: PrepGroup | null;
+  // ---- 装饰分区专属字段（仅 abvGroup = "garnish" 的条目使用）----
+  /** 计量单位（片/枝/颗/根/个/克），装饰条目默认按件计 */
+  garnishUnit?: string;
+  /** 一批制作产量（如 20 片），用于折算单件成本 */
+  batchYield?: number;
+  /** 一批制作总成本（元），与 batchYield 配合自动折算单件成本 */
+  batchCost?: number;
+  /** 单件成本（元/件），可直接填写或由 batchCost/batchYield 自动折算 */
+  costPerUnit?: number;
+  /** 保鲜期快捷选项 key（fresh/fridge3/fridge7/fridge14/ambient/custom） */
+  shelfLifeKey?: string;
+  /** 制作方式描述（如「削皮」「脱水 4 小时」「糖渍 48 小时」） */
+  prepMethod?: string;
+  /** 关联原材料库条目 ID 列表（装饰所用原料，成本可自动汇总） */
+  linkedMaterialIds?: string[];
   /** Ingredient list, one per line or comma separated */
   ingredients: string[];
   /** Recipe / method free text */
@@ -90,6 +106,14 @@ export const PREP_SECTIONS: { key: string; en: string; zh: string; group: PrepGr
   { key: "zero-proof", en: "Zero-Proof Alternatives", zh: "零度替代", group: "non_alcoholic" },
   { key: "na-ferment", en: "NA Ferments", zh: "无酒精发酵", group: "non_alcoholic" },
   { key: "misc", en: "Garnish & Other", zh: "装饰与其他", group: "non_alcoholic" },
+  // ---- 装饰 Garnish ----
+  { key: "garnish-citrus", en: "Citrus Garnish", zh: "柑橘类装饰", group: "garnish" },
+  { key: "garnish-herb-flower", en: "Herb & Flower", zh: "香草与花卉", group: "garnish" },
+  { key: "garnish-fruit", en: "Fruit Garnish", zh: "果类装饰", group: "garnish" },
+  { key: "garnish-skewer", en: "Skewer & Pick", zh: "串签类", group: "garnish" },
+  { key: "garnish-rim", en: "Rim & Dust", zh: "杯口装饰", group: "garnish" },
+  { key: "garnish-dehydrated", en: "Dehydrated", zh: "脱水类", group: "garnish" },
+  { key: "garnish-other", en: "Other Garnish", zh: "其他装饰", group: "garnish" },
 ];
 
 /** Prep types (English-first, with zh translation and section grouping) */
@@ -169,6 +193,21 @@ export const PREP_TYPES: { key: string; en: string; zh: string; section: string 
   { key: "spherification-prep", en: "Spherification", zh: "球化", section: "misc" },
   { key: "garnish", en: "Garnish Prep", zh: "装饰预制", section: "misc" },
   { key: "other", en: "Other", zh: "其他", section: "misc" },
+  // ---- 装饰分区专属类型 ----
+  { key: "garnish-citrus-peel", en: "Citrus Peel / Twist", zh: "柑橘皮卷", section: "garnish-citrus" },
+  { key: "garnish-citrus-wheel", en: "Citrus Wheel / Slice", zh: "柑橘片/轮", section: "garnish-citrus" },
+  { key: "garnish-dehydrated-citrus", en: "Dehydrated Citrus", zh: "脱水柑橘", section: "garnish-dehydrated" },
+  { key: "garnish-candied-fruit", en: "Candied / Preserved Fruit", zh: "糖渍/腌渍果类", section: "garnish-fruit" },
+  { key: "garnish-fresh-herb", en: "Fresh Herb Sprig", zh: "新鲜香草枝", section: "garnish-herb-flower" },
+  { key: "garnish-dried-herb", en: "Dried Herb / Spice", zh: "干燥香草/香料", section: "garnish-herb-flower" },
+  { key: "garnish-edible-flower", en: "Edible Flower", zh: "食用花卉", section: "garnish-herb-flower" },
+  { key: "garnish-salt-rim", en: "Salt / Sugar Rim", zh: "盐边/糖边", section: "garnish-rim" },
+  { key: "garnish-spiced-rim", en: "Spiced Rim Mix", zh: "香料杯口", section: "garnish-rim" },
+  { key: "garnish-skewer-olive", en: "Olive / Onion Skewer", zh: "橄榄/洋葱串", section: "garnish-skewer" },
+  { key: "garnish-skewer-fruit", en: "Fruit Skewer", zh: "果类串签", section: "garnish-skewer" },
+  { key: "garnish-ice-sphere", en: "Flavored Ice / Ice Sphere", zh: "风味冰块/冰球", section: "garnish-other" },
+  { key: "garnish-chocolate", en: "Chocolate / Candy", zh: "巧克力/糖果", section: "garnish-other" },
+  { key: "garnish-misc", en: "Other Handmade Garnish", zh: "其他手工装饰", section: "garnish-other" },
 ];
 
 /**
@@ -243,8 +282,9 @@ export function prepSectionLabelIn(
 /** 分区的顶层分组(优先自定义列表,回退默认常量,再回退 non_alcoholic) */
 export function prepGroupOfSection(sections: PrepSection[], sectionKey: string): PrepGroup {
   const custom = sections.find((s) => s.key === sectionKey)?.group;
-  if (custom === "alcoholic" || custom === "non_alcoholic") return custom;
-  return PREP_SECTIONS.find((s) => s.key === sectionKey)?.group ?? "non_alcoholic";
+  if (custom === "alcoholic" || custom === "non_alcoholic" || custom === "garnish") return custom;
+  const found = PREP_SECTIONS.find((s) => s.key === sectionKey)?.group;
+  return found ?? "non_alcoholic";
 }
 
 /** 条目的最终分组:显式 abvGroup 优先,否则按类型→分区推断 */
@@ -253,7 +293,7 @@ export function prepGroupOf(
   sections: PrepSection[],
   types: PrepType[],
 ): PrepGroup {
-  if (prep.abvGroup === "alcoholic" || prep.abvGroup === "non_alcoholic") return prep.abvGroup;
+  if (prep.abvGroup === "alcoholic" || prep.abvGroup === "non_alcoholic" || prep.abvGroup === "garnish") return prep.abvGroup;
   return prepGroupOfSection(sections, prepSectionOfIn(types, prep.type));
 }
 
@@ -393,6 +433,8 @@ export function normalizePrep(p: Partial<HomemadePrep> & { id: string }): Homema
     type: p.type ?? "other",
     abvGroup:
       p.abvGroup === "alcoholic" || p.abvGroup === "non_alcoholic" ? p.abvGroup : null,
+    // 装饰专属字段
+    ...(p.abvGroup === "garnish" ? { abvGroup: "garnish" as PrepGroup } : {}),
     ingredients: Array.isArray(p.ingredients) ? p.ingredients : [],
     recipe: p.recipe ?? "",
     yield: p.yield ?? "",
@@ -410,6 +452,14 @@ export function normalizePrep(p: Partial<HomemadePrep> & { id: string }): Homema
     sortIndex: typeof p.sortIndex === "number" && isFinite(p.sortIndex) ? p.sortIndex : null,
     createdAt: p.createdAt ?? Date.now(),
     updatedAt: p.updatedAt ?? Date.now(),
+    // 装饰专属字段（可选，仅 garnish 分组条目使用）
+    ...(p.garnishUnit !== undefined ? { garnishUnit: p.garnishUnit } : {}),
+    ...(p.batchYield !== undefined ? { batchYield: p.batchYield } : {}),
+    ...(p.batchCost !== undefined ? { batchCost: p.batchCost } : {}),
+    ...(p.costPerUnit !== undefined ? { costPerUnit: p.costPerUnit } : {}),
+    ...(p.shelfLifeKey !== undefined ? { shelfLifeKey: p.shelfLifeKey } : {}),
+    ...(p.prepMethod !== undefined ? { prepMethod: p.prepMethod } : {}),
+    ...(Array.isArray(p.linkedMaterialIds) ? { linkedMaterialIds: p.linkedMaterialIds } : {}),
   };
 }
 
@@ -494,4 +544,33 @@ export function joinPrepIngredient(amount: string, name: string): string {
   const n = name.trim();
   if (a && n) return `${a} ${n}`;
   return a || n;
+}
+
+/**
+ * 计算装饰条目的单件成本：
+ * 优先使用 costPerUnit，其次由 batchCost/batchYield 折算，否则返回 null
+ */
+export function calcGarnishCostPerUnit(prep: HomemadePrep): number | null {
+  if (prep.costPerUnit != null && prep.costPerUnit > 0) return prep.costPerUnit;
+  if (prep.batchCost != null && prep.batchYield != null && prep.batchYield > 0) {
+    return prep.batchCost / prep.batchYield;
+  }
+  return null;
+}
+
+/** 保鲜期快捷选项 */
+export const SHELF_LIFE_OPTIONS: { key: string; en: string; zh: string }[] = [
+  { key: "fresh", en: "Use immediately", zh: "现做现用" },
+  { key: "fridge3", en: "Refrigerate 3 days", zh: "冷藏 3 天" },
+  { key: "fridge7", en: "Refrigerate 7 days", zh: "冷藏 7 天" },
+  { key: "fridge14", en: "Refrigerate 14 days", zh: "冷藏 14 天" },
+  { key: "ambient", en: "Ambient / Room temp", zh: "常温保存" },
+  { key: "custom", en: "Custom", zh: "自定义" },
+];
+
+export function shelfLifeLabel(key: string | undefined, lang: "zh" | "en", custom?: string): string {
+  if (!key || key === "custom") return custom || (lang === "zh" ? "自定义" : "Custom");
+  const opt = SHELF_LIFE_OPTIONS.find((o) => o.key === key);
+  if (!opt) return key;
+  return lang === "zh" ? opt.zh : opt.en;
 }

@@ -233,6 +233,15 @@ export interface Bottle {
   updatedAt: number;
   /** 手动覆盖"开瓶易失效"标记。undefined = 由系统自动判断；true/false = 用户手动设置 */
   perishableOnOpen?: boolean;
+  /**
+   * 手动指定库归属。undefined = 系统自动判断（根据 category）；
+   * 'homemade' = 用户手动归入自制库（条目仍存储在 bottles store，但在列表中显示于自制库）
+   */
+  libraryOverride?: 'homemade' | 'spirits' | 'bottles' | 'materials';
+  /** 当 libraryOverride = 'homemade' 时，指定自制库分区 */
+  homemadeGroup?: 'alcoholic' | 'non_alcoholic' | 'garnish' | 'other';
+  /** 当 libraryOverride = 'homemade' 时，指定自制库类型（对应 PREP_TYPES.key） */
+  homemadeType?: string;
 }
 
 /** 兼容处理:为缺字段的酒款补默认值 */
@@ -263,5 +272,8 @@ export function normalizeBottle(b: Partial<Bottle> & Pick<Bottle, "id" | "nameZh
     flavorTags: Array.isArray(b.flavorTags) ? b.flavorTags : [],
     story: b.story ?? "",
     styleDesc: b.styleDesc ?? "",
+    ...(b.libraryOverride ? { libraryOverride: b.libraryOverride } : {}),
+    ...(b.homemadeGroup ? { homemadeGroup: b.homemadeGroup } : {}),
+    ...(b.homemadeType ? { homemadeType: b.homemadeType } : {}),
   };
 }

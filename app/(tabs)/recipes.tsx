@@ -73,6 +73,7 @@ export function RecipesScreen() {
     deleteRecipes,
     bulkUpdateRecipes,
     updateRecipe,
+    duplicateRecipe,
   } = useRecipeStore();
   const { bottles } = useBottleStore();
   const { preps } = useHomemadeStore();
@@ -203,6 +204,23 @@ export function RecipesScreen() {
                 recipe={item}
                 isFirst={index === 0}
                 isLast={index === sorted.length - 1}
+                onLongPress={() => {
+                  if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  Alert.alert(
+                    item.name,
+                    undefined,
+                    [
+                      {
+                        text: "复制配方",
+                        onPress: () => {
+                          duplicateRecipe(item.id);
+                          if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                        },
+                      },
+                      { text: "取消", style: "cancel" },
+                    ],
+                  );
+                }}
               />
             </View>
             <Pressable
