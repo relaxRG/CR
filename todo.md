@@ -217,3 +217,12 @@
 - [x] Bug 3 修复：suggestIngredients 传入 useBottleTaxonomy().groupOf 动态分组 resolver
 - [x] Bug 4 修复：Ingredient 类型新增 linkedBottleId/linkedPrepId，接受模糊链接写入数据，成本计算优先使用链接 ID
 - [x] Bug 5 修复：英文文案区分酒库（Bar Stock）和自制库（Homemade）来源
+
+## 「开瓶易失效」手动开关功能（2026-07-15）
+- [x] lib/bottles/types.ts：Bottle 接口新增 perishableOnOpen?: boolean 字段（undefined=自动，true/false=手动覆盖）
+- [x] lib/recipes/smart-cost.ts：isPerishableWholeBottle() 优先读取 bottle.perishableOnOpen，未设置时回退关键词逻辑
+- [x] app/bottle-form.tsx：新增 perishableOnOpen state + Toggle 开关 UI（价格字段下方，备注字段上方）
+- [x] app/bottle-form.tsx：Toggle 显示自动推断默认值，用户可手动覆盖或「重置为自动」
+- [x] app/bottle/[id].tsx：详情页标签行显示「开瓶易失效」chip（手动设置=橙色，自动推断=灰色，手动关闭=「不易失效·手动」）
+- [x] lib/i18n/translations.ts：新增 bform.perishable / bform.perishable.hint.auto/on/off 翻译键
+- [x] TypeScript 零错误

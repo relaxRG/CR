@@ -85,6 +85,9 @@ const PERISHABLE_EXCLUDE_RE = /鲜榨|现榨|fresh(ly)?\s*(squeezed|pressed)|自
 
 /** 判断酒库条目是否属于"开瓶易失效、按整瓶计成本"的产品 */
 export function isPerishableWholeBottle(bottle: Bottle): boolean {
+  // 优先使用用户手动设置的值
+  if (bottle.perishableOnOpen !== undefined) return bottle.perishableOnOpen;
+  // 回退到关键词自动判断逻辑
   const name = `${bottle.nameZh} ${bottle.nameEn}`;
   if (PERISHABLE_EXCLUDE_RE.test(name)) return false;
   if (bottle.category === "软饮") return true;

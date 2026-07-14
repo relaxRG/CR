@@ -94,6 +94,12 @@ export default function BottleFormScreen() {
   const [substituteFor, setSubstituteFor] = useState(editing?.substituteFor ?? "");
   const [pairsWith, setPairsWith] = useState(editing?.pairsWith ?? "");
 
+  // ── 开瓶易失效手动开关 ────────────────────────────────────────────────────
+  // undefined = 使用系统自动判断；true/false = 用户手动覆盖
+  const [perishableOnOpen, setPerishableOnOpen] = useState<boolean | undefined>(
+    editing?.perishableOnOpen,
+  );
+
   const canSave = nameZh.trim().length > 0 || nameEn.trim().length > 0;
 
   // ── AI 补全 ────────────────────────────────────────────────────────────────
@@ -421,6 +427,9 @@ export default function BottleFormScreen() {
       substituteFor: substituteFor.trim(),
       pairsWith: pairsWith.trim(),
     };
+    if (perishableOnOpen !== undefined) {
+      draft.perishableOnOpen = perishableOnOpen;
+    }
     if (editing) {
       updateBottle(editing.id, draft);
     } else {
@@ -809,6 +818,58 @@ export default function BottleFormScreen() {
               </View>
             </View>
             {field(t("bform.price"), price, setPrice, lang === "en" ? "e.g. 170 (CNY)" : "例如：170（人民币）", { keyboardType: "numeric" })}
+            {/* ── 开瓶易失效 Toggle ── */}
+            {(() => {
+              // 计算自动推断值（不受 perishableOnOpen 影响）
+              const autoVal = (() => {
+                const name = `${nameZh} ${nameEn}`;
+                const EXCL = /鲜榨|现榨|fresh(ly)?\s*(squeezed|pressed)|自制|homemade|糖浆|syrup|苦精|bitters/i;
+                const MATCH = /可乐|cola|苏打水|soda|汤力|tonic|姜汁汽水|ginger\s*(ale|beer)|干姜水|气泡水|sparkling|七喜|雪碧|sprite|7-?up|柠檬汽水|lemonade|果汁|juice|nectar|苹果汁|橙汁|菠萝汁|蔓越莓汁|西柚汁|葡萄柚汁|番茄汁|椰浆水?|coconut\s*water|奶|milk|cream|红牛|energy/i;
+                if (EXCL.test(name)) return false;
+                if (category === "软饮") return true;
+                return MATCH.test(name);
+              })();
+              const effectiveVal = perishableOnOpen !== undefined ? perishableOnOpen : autoVal;
+              const hintKey = perishableOnOpen === undefined
+                ? "bform.perishable.hint.auto"
+                : perishableOnOpen
+                  ? "bform.perishable.hint.on"
+                  : "bform.perishable.hint.off";
+              return (
+                <View style={{ marginBottom: 12 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                    <Text style={[styles.fieldLabel, { color: colors.foreground }]}>
+                      {t("bform.perishable")}
+                    </Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                      {perishableOnOpen !== undefined && (
+                        <Pressable
+                          onPress={() => {
+                            setPerishableOnOpen(undefined);
+                            if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          }}
+                          style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}
+                        >
+                          <Text style={{ fontSize: 11, color: colors.muted }}>{lang === "zh" ? "重置为自动" : "Reset to Auto"}</Text>
+                        </Pressable>
+                      )}
+                      <Switch
+                        value={effectiveVal}
+                        onValueChange={(v) => {
+                          setPerishableOnOpen(v);
+                          if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                        }}
+                        trackColor={{ false: colors.border, true: colors.primary + "88" }}
+                        thumbColor={effectiveVal ? colors.primary : colors.muted}
+                      />
+                    </View>
+                  </View>
+                  <Text style={{ fontSize: 12, color: perishableOnOpen === undefined ? colors.muted : colors.primary, marginTop: 2 }}>
+                    {t(hintKey)}
+                  </Text>
+                </View>
+              );
+            })()}
             {field(t("bform.notes"), notes, setNotes, lang === "en" ? "Taste, usage, where to buy…" : "口感、用途、购买渠道等", { multiline: true })}
           </View>
 

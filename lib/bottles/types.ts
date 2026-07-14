@@ -231,6 +231,8 @@ export interface Bottle {
   formFactors?: Record<string, number>;
   createdAt: number;
   updatedAt: number;
+  /** 手动覆盖"开瓶易失效"标记。undefined = 由系统自动判断；true/false = 用户手动设置 */
+  perishableOnOpen?: boolean;
 }
 
 /** 兼容处理:为缺字段的酒款补默认值 */

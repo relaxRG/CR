@@ -10,6 +10,7 @@ import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
 import { useBottleStore } from "@/lib/bottles/store";
 import { useBottleTaxonomy } from "@/lib/bottles/taxonomy";
+import { isPerishableWholeBottle } from "@/lib/recipes/smart-cost";
 
 export default function BottleDetailScreen() {
   const colors = useColors();
@@ -135,6 +136,42 @@ export default function BottleDetailScreen() {
           {bottle.style ? (
             <View style={chipStyle(false)}>
               <Text style={chipTextStyle(false)}>{bottle.style}</Text>
+            </View>
+          ) : null}
+          {/* 开瓶易失效标签：手动设置时显示橙色，自动推断为 true 时显示灰色 */}
+          {isPerishableWholeBottle(bottle) ? (
+            <View style={{
+              paddingHorizontal: 10,
+              paddingVertical: 4,
+              borderRadius: 20,
+              marginRight: 6,
+              backgroundColor: bottle.perishableOnOpen !== undefined ? "#F59E0B22" : colors.surface,
+              borderWidth: 1,
+              borderColor: bottle.perishableOnOpen !== undefined ? "#F59E0B88" : colors.border,
+            }}>
+              <Text style={{
+                fontSize: 13,
+                color: bottle.perishableOnOpen !== undefined ? "#F59E0B" : colors.muted,
+                fontWeight: "500",
+              }}>
+                {lang === "zh" ? "开瓶易失效" : "Perishable"}
+                {bottle.perishableOnOpen !== undefined ? (lang === "zh" ? " ·手动" : " ·manual") : ""}
+              </Text>
+            </View>
+          ) : bottle.perishableOnOpen === false ? (
+            // 用户手动关闭了易失效标记，显示灰色「已手动关闭」提示
+            <View style={{
+              paddingHorizontal: 10,
+              paddingVertical: 4,
+              borderRadius: 20,
+              marginRight: 6,
+              backgroundColor: colors.surface,
+              borderWidth: 1,
+              borderColor: colors.border,
+            }}>
+              <Text style={{ fontSize: 13, color: colors.muted, fontWeight: "400" }}>
+                {lang === "zh" ? "不易失效 ·手动" : "Not Perishable ·manual"}
+              </Text>
             </View>
           ) : null}
         </HScrollView>
