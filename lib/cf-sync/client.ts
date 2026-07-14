@@ -142,10 +142,17 @@ async function cfFetch(
     headers["X-Device-Id"] = deviceInfo.deviceId;
     headers["X-Device-Token"] = deviceInfo.deviceToken;
   }
-  return fetch(`${CF_WORKER_URL}${path}`, {
-    ...fetchOptions,
-    headers,
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10000);
+  try {
+    return await fetch(`${CF_WORKER_URL}${path}`, {
+      ...fetchOptions,
+      headers,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 // ─── Registration ─────────────────────────────────────────────────────────────

@@ -90,6 +90,7 @@ const config: ExpoConfig = {
     eas: {
       projectId: "9405b282-3a1f-4451-b0dc-8ee6285f0cd1",
     },
+    cfWorkerUrl: "https://cocktail-ai.kikikong2017.workers.dev",
   },
   plugins: [
     "expo-router",

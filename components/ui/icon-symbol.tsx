@@ -100,6 +100,8 @@ const MAPPING = {
   "laptopcomputer.and.iphone": "devices",
   "rectangle.portrait.and.arrow.right": "logout",
   "cross.vial": "biotech",
+  "checkmark.seal.fill": "verified",
+  "exclamationmark.circle.fill": "error",
 } as IconMapping;
 
 /**
