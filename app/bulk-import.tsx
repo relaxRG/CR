@@ -13,6 +13,7 @@ import {
 import { useRouter } from "expo-router";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
+import { File as FSFile } from "expo-file-system";
 import * as ImagePicker from "expo-image-picker";
 import * as Haptics from "expo-haptics";
 
@@ -151,9 +152,11 @@ export default function BulkImportScreen() {
         reader.readAsDataURL(blob);
       });
     } else {
-      base64 = await FileSystem.readAsStringAsync(asset.uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
+      // iOS: copy to cache first to ensure readable URI, then read as base64
+      const cacheUri = (FileSystem.cacheDirectory ?? "") + "bulk-import-tmp";
+      await FileSystem.copyAsync({ from: asset.uri, to: cacheUri });
+      base64 = await new FSFile(cacheUri).base64();
+      await FileSystem.deleteAsync(cacheUri, { idempotent: true });
     }
     setFileName(asset.name);
     setFileBase64(base64);

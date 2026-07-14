@@ -2,7 +2,7 @@ import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View, Activit
 import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as FileSystem from "expo-file-system/legacy";
+import { File as FSFile, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { useState } from "react";
 
@@ -72,8 +72,9 @@ async function exportBackup(): Promise<void> {
     return;
   }
 
-  const path = `${FileSystem.cacheDirectory}${filename}`;
-  await FileSystem.writeAsStringAsync(path, json, { encoding: FileSystem.EncodingType.UTF8 });
+  const cacheFile = new FSFile(Paths.cache, filename);
+  cacheFile.write(json);
+  const path = cacheFile.uri;
   const canShare = await Sharing.isAvailableAsync();
   if (canShare) {
     await Sharing.shareAsync(path, { mimeType: "application/json", dialogTitle: filename });
@@ -135,7 +136,7 @@ export default function DataManagerScreen() {
     { titleKey: "dataManager.clearRecipes", descKey: "dataManager.clearRecipes.desc", icon: "list.bullet", iconBg: colors.primary, keys: RECIPE_KEYS, confirmKey: "dataManager.confirm.recipes" },
     { titleKey: "dataManager.clearBottles", descKey: "dataManager.clearBottles.desc", icon: "wineglass.fill", iconBg: "#8B5CF6", keys: BOTTLE_KEYS, confirmKey: "dataManager.confirm.bottles" },
     { titleKey: "dataManager.clearPreps", descKey: "dataManager.clearPreps.desc", icon: "flask.fill", iconBg: "#F59E0B", keys: PREP_KEYS, confirmKey: "dataManager.confirm.preps" },
-    { titleKey: "dataManager.clearLab", descKey: "dataManager.clearLab.desc", icon: "testtube.2", iconBg: "#10B981", keys: LAB_KEYS, confirmKey: "dataManager.confirm.lab" },
+    { titleKey: "dataManager.clearLab", descKey: "dataManager.clearLab.desc", icon: "cross.vial", iconBg: "#10B981", keys: LAB_KEYS, confirmKey: "dataManager.confirm.lab" },
     { titleKey: "dataManager.clearBooks", descKey: "dataManager.clearBooks.desc", icon: "book.fill", iconBg: "#EC4899", keys: BOOK_KEYS, confirmKey: "dataManager.confirm.books" },
   ];
 

@@ -97,6 +97,9 @@ const MAPPING = {
   "externaldrive.fill": "storage",
   "square.and.arrow.up": "share",
   "rectangle.3.group.fill": "grid-view",
+  "laptopcomputer.and.iphone": "devices",
+  "rectangle.portrait.and.arrow.right": "logout",
+  "cross.vial": "biotech",
 } as IconMapping;
 
 /**

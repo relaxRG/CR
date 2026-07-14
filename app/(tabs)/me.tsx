@@ -33,35 +33,19 @@ export default function MeScreen() {
         ? t("sync.error")
         : t("sync.on");
 
-  const handleAccountPress = () => {
+  const handleLeaveGroup = () => {
     tap();
-    if (!isAuthenticated) {
-      // Not yet paired — go to pair device screen
-      router.push("/pair-device");
-      return;
-    }
-    // Already in a group — show options
     if (Platform.OS === "web") {
       if (typeof window !== "undefined" && window.confirm(lang === "zh" ? "退出同步组？" : "Leave sync group?")) {
         void logout();
       }
     } else {
       Alert.alert(
-        lang === "zh" ? "设备同步" : "Device Sync",
-        lang === "zh"
-          ? `当前角色：${deviceRole === "owner" ? "主设备" : deviceRole === "collaborator" ? "协作设备" : "访客设备"}`
-          : `Role: ${deviceRole}`,
+        lang === "zh" ? "退出同步组" : "Leave Sync Group",
+        lang === "zh" ? "退出后本设备将停止同步，数据仍保留在本地。" : "You will stop syncing. Local data is kept.",
         [
           { text: lang === "zh" ? "取消" : "Cancel", style: "cancel" },
-          {
-            text: lang === "zh" ? "管理设备" : "Manage Devices",
-            onPress: () => router.push("/device-manager"),
-          },
-          {
-            text: lang === "zh" ? "退出同步组" : "Leave Group",
-            style: "destructive",
-            onPress: () => void logout(),
-          },
+          { text: lang === "zh" ? "退出" : "Leave", style: "destructive", onPress: () => void logout() },
         ],
       );
     }
@@ -81,78 +65,106 @@ export default function MeScreen() {
           <Text className="text-sm text-muted mt-1">{t("me.subtitle")}</Text>
         </View>
 
-        {/* 云端同步账号 */}
+        {/* 云端同步卡片 */}
         <View className="px-5 pb-4">
-          <Pressable
-            onPress={handleAccountPress}
-            style={({ pressed }) => [pressed && { opacity: 0.7 }]}
-          >
-            <View style={{ backgroundColor: colors.surface, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, overflow: "hidden" }}>
-              <View style={styles.row}>
-                <View style={[styles.iconWrap, { backgroundColor: "#0A84FF" }]}>
-                  <IconSymbol name="icloud.fill" size={18} color="#FFFFFF" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.rowTitle} className="text-foreground">
-                    {isAuthenticated && user?.name ? user.name : t("sync.title")}
-                  </Text>
-                  <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>
-                    {syncStatusText}
-                  </Text>
-                </View>
-                <Text style={{ color: colors.primary, fontSize: 15, fontWeight: "600" }}>
-                  {isAuthenticated ? t("sync.logout") : t("sync.login")}
+          <View style={{ backgroundColor: colors.surface, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, overflow: "hidden" }}>
+            {/* 同步状态行 */}
+            <View style={styles.row}>
+              <View style={[styles.iconWrap, { backgroundColor: "#0A84FF" }]}>
+                <IconSymbol name="icloud.fill" size={18} color="#FFFFFF" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowTitle} className="text-foreground">
+                  {isAuthenticated && user?.name ? user.name : t("sync.title")}
+                </Text>
+                <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>
+                  {syncStatusText}
                 </Text>
               </View>
             </View>
-          </Pressable>
-        </View>
-        {/* 设备管理入口（owner 才显示邀请按钮） */}
-        {isAuthenticated && (
-          <View className="px-5 pb-4">
-            <View style={{ backgroundColor: colors.surface, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, overflow: "hidden" }}>
-              <Pressable
-                onPress={() => { tap(); router.push("/device-manager"); }}
-                style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
-              >
-                <View style={[styles.iconWrap, { backgroundColor: "#5856D6" }]}>
-                  <IconSymbol name="icloud.fill" size={18} color="#FFFFFF" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.rowTitle} className="text-foreground">
-                    {lang === "zh" ? "设备管理" : "Device Manager"}
-                  </Text>
-                  <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>
-                    {lang === "zh" ? "管理同步设备、邀请新设备加入" : "Manage sync devices, invite new ones"}
-                  </Text>
-                </View>
-                <IconSymbol name="chevron.right" size={18} color={colors.muted} />
-              </Pressable>
-              {!isAuthenticated && (
-                <>
-                  <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 64 }} />
-                  <Pressable
-                    onPress={() => { tap(); router.push("/pair-device"); }}
-                    style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
-                  >
-                    <View style={[styles.iconWrap, { backgroundColor: "#34C759" }]}>
-                      <IconSymbol name="paperplane.fill" size={18} color="#FFFFFF" />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.rowTitle} className="text-foreground">
-                        {lang === "zh" ? "加入设备组" : "Join Device Group"}
-                      </Text>
-                      <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>
-                        {lang === "zh" ? "输入配对码，与其他设备同步数据" : "Enter pair code to sync with other devices"}
-                      </Text>
-                    </View>
-                    <IconSymbol name="chevron.right" size={18} color={colors.muted} />
-                  </Pressable>
-                </>
-              )}
-            </View>
+            <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 64 }} />
+            {isAuthenticated ? (
+              <>
+                {/* 已登录：设备管理 */}
+                <Pressable
+                  onPress={() => { tap(); router.push("/device-manager"); }}
+                  style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
+                >
+                  <View style={[styles.iconWrap, { backgroundColor: "#5856D6" }]}>
+                    <IconSymbol name="laptopcomputer.and.iphone" size={18} color="#FFFFFF" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.rowTitle} className="text-foreground">
+                      {lang === "zh" ? "设备管理" : "Device Manager"}
+                    </Text>
+                    <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>
+                      {lang === "zh" ? "管理同步设备、邀请新设备加入" : "Manage sync devices, invite new ones"}
+                    </Text>
+                  </View>
+                  <IconSymbol name="chevron.right" size={18} color={colors.muted} />
+                </Pressable>
+                <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 64 }} />
+                {/* 已登录：退出同步组 */}
+                <Pressable
+                  onPress={handleLeaveGroup}
+                  style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
+                >
+                  <View style={[styles.iconWrap, { backgroundColor: colors.error }]}>
+                    <IconSymbol name="rectangle.portrait.and.arrow.right" size={18} color="#FFFFFF" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.rowTitle, { color: colors.error }]}>
+                      {lang === "zh" ? "退出同步组" : "Leave Sync Group"}
+                    </Text>
+                    <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>
+                      {lang === "zh" ? "停止多设备同步" : "Stop multi-device sync"}
+                    </Text>
+                  </View>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                {/* 未登录：创建同步组 */}
+                <Pressable
+                  onPress={() => { tap(); router.push("/device-manager"); }}
+                  style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
+                >
+                  <View style={[styles.iconWrap, { backgroundColor: "#5856D6" }]}>
+                    <IconSymbol name="plus.circle.fill" size={18} color="#FFFFFF" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.rowTitle} className="text-foreground">
+                      {lang === "zh" ? "创建同步组" : "Create Sync Group"}
+                    </Text>
+                    <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>
+                      {lang === "zh" ? "成为主设备，生成配对码邀请其他设备" : "Become owner, generate pair code"}
+                    </Text>
+                  </View>
+                  <IconSymbol name="chevron.right" size={18} color={colors.muted} />
+                </Pressable>
+                <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 64 }} />
+                {/* 未登录：加入设备组 */}
+                <Pressable
+                  onPress={() => { tap(); router.push("/pair-device"); }}
+                  style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
+                >
+                  <View style={[styles.iconWrap, { backgroundColor: "#34C759" }]}>
+                    <IconSymbol name="paperplane.fill" size={18} color="#FFFFFF" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.rowTitle} className="text-foreground">
+                      {lang === "zh" ? "加入设备组" : "Join Device Group"}
+                    </Text>
+                    <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>
+                      {lang === "zh" ? "输入配对码，与其他设备同步数据" : "Enter pair code to sync with other devices"}
+                    </Text>
+                  </View>
+                  <IconSymbol name="chevron.right" size={18} color={colors.muted} />
+                </Pressable>
+              </>
+            )}
           </View>
-        )}
+        </View>
 
         {/* 数据总览 */}
         <View className="px-5 pb-4">

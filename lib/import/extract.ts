@@ -257,11 +257,11 @@ export async function extractEpubToFileSystem(
   // Load ZIP: accept either a file URI (native) or ArrayBuffer (web fallback)
   let zip: JSZip;
   if (typeof fileUriOrData === "string") {
-    // Native: read file as base64 in chunks to avoid OOM on large files
-    const b64 = await FileSystem.readAsStringAsync(fileUriOrData, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
-    // Convert base64 to Uint8Array without creating a full ArrayBuffer copy
+    // Native: use expo-file-system main package File.base64()
+    // expo-file-system/legacy readAsStringAsync is NOT available on iOS real device
+    const { File: FSFile } = await import("expo-file-system");
+    const fsFile = new FSFile(fileUriOrData);
+    const b64 = await fsFile.base64();
     const binaryStr = atob(b64);
     const bytes = new Uint8Array(binaryStr.length);
     for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);

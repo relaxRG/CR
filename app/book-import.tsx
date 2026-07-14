@@ -12,6 +12,7 @@ import {
 import { useRouter } from "expo-router";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
+import { File as FSFile, Paths } from "expo-file-system";
 import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -402,20 +403,37 @@ export default function BookImportScreen() {
           // 先复制到 App 缓存目录，再读取，确保兼容所有 iOS URI 格式
           const cacheUri = FileSystem.cacheDirectory + `pdf_${Date.now()}_${asset.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
           await FileSystem.copyAsync({ from: asset.uri, to: cacheUri });
-          const b64: string = await FileSystem.readAsStringAsync(cacheUri, {
-            encoding: FileSystem.EncodingType.Base64,
-          });
+          // Use expo-file-system main package File.base64() — fully supported on iOS real device
+          // expo-file-system/legacy readAsStringAsync is NOT available on iOS real device
+          const fsFile = new FSFile(cacheUri);
+          const b64 = await fsFile.base64();
           // 清理缓存文件（不阻塞主流程）
           FileSystem.deleteAsync(cacheUri, { idempotent: true }).catch(() => {});
           base64 = b64;
           buffer = base64ToArrayBuffer(b64);
         }
         pendingRef.current = { buffer, base64, isPdf: true, name: asset.name };
-        if (Platform.OS !== "web") {
-          await runOcr();
-        } else {
+        if (Platform.OS === "web") {
           const book = await extractPdf(buffer);
           loadPlainBookIntoReader(book, asset.name, "pdf");
+        } else {
+          // iOS: first try text extraction (pdfjs); if no text found, offer OCR
+          try {
+            const book = await extractPdf(buffer);
+            if (book.sections.length > 0 && book.sections.some((s) => s.text.replace(/\s+/g, "").length > 50)) {
+              loadPlainBookIntoReader(book, asset.name, "pdf");
+            } else {
+              // No meaningful text — offer OCR
+              setOcrOffer(true);
+              setLoadError(zh ? "PDF 中未检测到文字，可尝试 AI 智能识别。" : "No text found in PDF — try AI Smart OCR.");
+              setPhase("idle");
+            }
+          } catch {
+            // pdfjs not available on native — offer OCR directly
+            setOcrOffer(true);
+            setLoadError(zh ? "PDF 文字提取不可用，可尝试 AI 智能识别。" : "PDF text extraction unavailable — try AI Smart OCR.");
+            setPhase("idle");
+          }
         }
       }
     } catch (e) {

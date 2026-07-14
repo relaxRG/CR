@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { WebView } from "react-native-webview";
 import * as FileSystemLegacy from "expo-file-system/legacy";
+import { File as FSFile } from "expo-file-system";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -71,6 +72,21 @@ interface ExtractedRecipe {
 /* ─── Reading CSS injected into HTML renderer ─────────────────────────────── */
 
 /* ─── Inline EPUB images as base64 to bypass WebView sandbox restrictions ───── */
+/** Resolve a relative path against a base directory (handles ../ chains) */
+function resolveRelativePath(baseDir: string, relPath: string): string {
+  if (relPath.startsWith("/") || relPath.startsWith("file://")) return relPath;
+  // Combine base dir + relative path, then normalize
+  const combined = (baseDir.endsWith("/") ? baseDir : baseDir + "/") + relPath;
+  const parts = combined.split("/");
+  const out: string[] = [];
+  for (const p of parts) {
+    if (p === "." || p === "") { if (out.length === 0) out.push(""); continue; }
+    if (p === "..") { if (out.length > 1) out.pop(); }
+    else out.push(p);
+  }
+  return out.join("/");
+}
+
 async function inlineImagesAsBase64(html: string, chapterFilePath: string): Promise<string> {
   // Determine the base directory of the chapter file
   const lastSlash = chapterFilePath.lastIndexOf("/");
@@ -87,15 +103,15 @@ async function inlineImagesAsBase64(html: string, chapterFilePath: string): Prom
     // Skip already-inlined or remote images
     if (src.startsWith("data:") || src.startsWith("http")) continue;
     try {
-      const cleanSrc = src.replace(/^(\.\.\/)+/, "").replace(/^\.\//, "");
       const docDir = FileSystemLegacy.documentDirectory ?? "";
       const booksIdx = baseDir.indexOf("/books/");
       const resolvedBase = booksIdx >= 0 ? docDir + baseDir.slice(booksIdx + 1) : baseDir;
-      const imgPath = resolvedBase + cleanSrc;
+      // Resolve relative path (handles ../ chains correctly)
+      const imgPath = resolveRelativePath(resolvedBase, src);
       const ext = imgPath.split(".").pop()?.toLowerCase() ?? "png";
       const mimeMap: Record<string, string> = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", gif: "image/gif", svg: "image/svg+xml", webp: "image/webp" };
       const mime = mimeMap[ext] ?? "image/png";
-      const b64 = await FileSystemLegacy.readAsStringAsync(imgPath, { encoding: FileSystemLegacy.EncodingType.Base64 });
+      const b64 = await new FSFile(imgPath).base64();
       const dataUri = `data:${mime};base64,${b64}`;
       result = result.replace(full, full.replace(src, dataUri));
     } catch {
@@ -267,7 +283,7 @@ function HtmlChapter({
   const fullHtml = useMemo(() => {
     // eslint-disable-next-line prefer-template
       if (pageFlipMode) {
-      return `<!DOCTYPE html>\n<html>\n<head>\n<meta charset="utf-8"/>\n<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>\n<style>\n${READER_CSS}\n${css}\nhtml {\n  overflow: hidden;\n  height: 100vh;\n  width: 100vw;\n}\nbody {\n  font-size: ${fontSize}px;\n  line-height: ${lineHeight};\n  background: ${bgColor};\n  color: ${textColor};\n  margin: 0;\n  padding: 20px 20px 80px 20px;\n  box-sizing: border-box;\n  height: 100vh;\n  overflow: hidden;\n  -webkit-text-size-adjust: none;\n  word-wrap: break-word;\n  overflow-wrap: break-word;\n  columns: 1;\n  column-width: calc(100vw - 40px);\n  column-gap: 40px;\n}\na { color: ${linkColor}; }\nimg { max-width: 100% !important; height: auto !important; break-inside: avoid; page-break-inside: avoid; max-height: 35vh !important; display: block !important; float: none !important; }\nfigure, div:has(> img), p:has(> img), div:has(> figure), p:has(> figure) { break-inside: avoid; page-break-inside: avoid; float: none !important; clear: both !important; display: block !important; }\n[style*="float"] { float: none !important; clear: both !important; }\n* { max-width: 100% !important; }\npre, code { white-space: pre-wrap; font-size: 0.9em; break-inside: avoid; }\nh1,h2,h3,h4,h5,h6 { break-after: avoid; }\n</style>\n</head>\n<body>${html}</body>\n</html>`;
+      // Page-flip mode: columns layout, respect font/margin/letterSpacing settings
       return `<!DOCTYPE html>\n<html>\n<head>\n<meta charset="utf-8"/>\n<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>\n<style>\n${READER_CSS}\n${css}\nhtml {\n  overflow: hidden;\n  height: 100vh;\n  width: 100vw;\n}\nbody {\n  font-size: ${fontSize}px;\n  line-height: ${lineHeight};\n  font-family: ${fontFamilyCss};\n  letter-spacing: ${letterSpacingCss}px;\n  background: ${bgColor};\n  color: ${textColor};\n  margin: 0;\n  padding: ${marginPx}px ${marginPx}px 80px ${marginPx}px;\n  box-sizing: border-box;\n  height: 100vh;\n  overflow: hidden;\n  -webkit-text-size-adjust: none;\n  word-wrap: break-word;\n  overflow-wrap: break-word;\n  columns: 1;\n  column-width: calc(100vw - ${marginPx * 2}px);\n  column-gap: ${marginPx * 2}px;\n}\na { color: ${linkColor}; }\nimg { max-width: 100% !important; height: auto !important; break-inside: avoid; page-break-inside: avoid; max-height: 35vh !important; display: block !important; float: none !important; }\nfigure, div:has(> img), p:has(> img), div:has(> figure), p:has(> figure) { break-inside: avoid; page-break-inside: avoid; float: none !important; clear: both !important; display: block !important; }\n[style*="float"] { float: none !important; clear: both !important; }\n* { max-width: 100% !important; }\npre, code { white-space: pre-wrap; font-size: 0.9em; break-inside: avoid; }\nh1,h2,h3,h4,h5,h6 { break-after: avoid; }\n</style>\n</head>\n<body>${html}</body>\n</html>`;
     }
     return `<!DOCTYPE html>\n<html>\n<head>\n<meta charset="utf-8"/>\n<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=2.0"/>\n<style>\n${READER_CSS}\n${css}\nhtml, body {\n  font-size: ${fontSize}px;\n  line-height: ${lineHeight};\n  font-family: ${fontFamilyCss};\n  letter-spacing: ${letterSpacingCss}px;\n  background: ${bgColor};\n  color: ${textColor};\n  padding: 0 ${marginPx}px 80px ${marginPx}px;\n  margin: 0;\n  -webkit-text-size-adjust: none;\n  word-wrap: break-word;\n  overflow-wrap: break-word;\n}\na { color: ${linkColor}; }\nimg { max-width: 100% !important; height: auto !important; }\n* { max-width: 100% !important; }\npre, code { white-space: pre-wrap; font-size: 0.9em; }\n</style>\n</head>\n<body>${html}</body>\n</html>`;
@@ -519,6 +535,7 @@ export default function BookReaderScreen() {
   }, []);
 
   const { books, loadChapter, updatePosition } = useBookStore();
+  const { updateBook } = useBookStore();
   const book = books.find((b) => b.id === id);
 
   const { addRecipe, updateRecipe, recipes, tagsOf, addTag, addRecipes } = useRecipeStore();
@@ -721,7 +738,7 @@ export default function BookReaderScreen() {
         const booksIdx = rawPath.indexOf("/books/");
         const resolvedPath = booksIdx >= 0 ? docDir + rawPath.slice(booksIdx + 1) : rawPath;
         const tryRead = (path: string) =>
-          FileSystemLegacy.readAsStringAsync(path, { encoding: FileSystemLegacy.EncodingType.UTF8 })
+          new FSFile(path).text()
             .then((html) => {
               const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
               return bodyMatch ? bodyMatch[1] : html;
@@ -763,7 +780,13 @@ export default function BookReaderScreen() {
 
   /* Persist position when chapter changes */
   useEffect(() => {
-    if (book) updatePosition(book.id, 0, chapterIdx);
+    if (book) {
+      updatePosition(book.id, chapterIdx, chapterIdx);
+      // Mark as "reading" once user has opened the book
+      if ((book.readingStatus ?? "unread") === "unread") {
+        updateBook(book.id, { readingStatus: "reading" });
+      }
+    }
   }, [chapterIdx]);
 
   /* Auto-hide chrome after 4s */

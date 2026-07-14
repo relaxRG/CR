@@ -9,6 +9,7 @@
  * - 支持手动触发导出和导入
  */
 import * as FileSystem from "expo-file-system/legacy";
+import { File as FSFile } from "expo-file-system";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 import { SYNC_KEYS } from "@/lib/sync/engine";
@@ -179,9 +180,7 @@ export async function restoreFromBackup(slot: number): Promise<{ restored: numbe
   if (!dir) throw new Error("Backup directory unavailable");
 
   const filePath = `${dir}backup-v${slot}.json`;
-  const raw = await FileSystem.readAsStringAsync(filePath, {
-    encoding: FileSystem.EncodingType.UTF8,
-  });
+  const raw = await new FSFile(filePath).text();
 
   const backup = JSON.parse(raw) as ICloudBackupFile;
   let restored = 0;
