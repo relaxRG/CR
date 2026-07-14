@@ -30,6 +30,8 @@ import {
   type SyncState,
   triggerStoreReload,
 } from "@/lib/sync/engine";
+import { createSnapshot } from "@/lib/backup/local-backup";
+import { startAutoBackup } from "@/lib/backup/icloud-backup";
 
 // ─── Context type (compatible with original useSync) ─────────────────────────
 type SyncContextValue = {
@@ -95,6 +97,15 @@ export function SyncProvider({
         if (cancelled) return;
         setDeviceInfo(info);
         setAuthLoading(false);
+
+        // ── 5D: Start backup channels ──────────────────────────────────────
+        // 1. Create local snapshot (channel 3)
+        void createSnapshot().catch((e) =>
+          console.warn("[CFSync] local snapshot failed:", e),
+        );
+        // 2. Start iCloud Drive auto-backup every 5 min (channel 2)
+        startAutoBackup(info.deviceName);
+        // ──────────────────────────────────────────────────────────────────
 
         // Guest devices: pull only, no push
         if (info.role === "guest") {
