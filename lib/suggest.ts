@@ -1,6 +1,6 @@
 // Ingredient input suggestions: live search across the bottle library and homemade lab.
 // Display priority follows the UI language (en → English name first; zh → Chinese first).
-import { Bottle } from "./bottles/types";
+import { Bottle, bottleGroupOf } from "./bottles/types";
 import { HomemadePrep } from "./homemade/types";
 
 export interface IngredientSuggestion {
@@ -10,8 +10,8 @@ export interface IngredientSuggestion {
   value: string;
   /** Secondary label shown next to the value (alt-language name) */
   secondary: string;
-  /** Source library */
-  source: "bottle" | "homemade";
+  /** Source library — distinguishes the four sub-libraries */
+  source: "spirits" | "bottles" | "materials" | "homemade";
   /** Category / type label for context */
   context: string;
   /** Navigation id in its library */
@@ -76,12 +76,15 @@ export function suggestIngredients(
     if (score > 0) {
       const primary = lang === "en" ? b.nameEn || b.nameZh : b.nameZh || b.nameEn;
       const secondary = lang === "en" ? (b.nameEn ? b.nameZh : "") : (b.nameZh ? b.nameEn : "");
+      const group = bottleGroupOf(b.category);
+      const src: IngredientSuggestion["source"] =
+        group === "spirits" ? "spirits" : group === "materials" ? "materials" : "bottles";
       out.push({
         s: {
           key: `bt-${b.id}`,
           value: primary,
           secondary: secondary === primary ? "" : secondary,
-          source: "bottle",
+          source: src,
           context: b.category,
           refId: b.id,
         },

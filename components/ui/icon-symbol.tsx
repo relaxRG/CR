@@ -103,6 +103,8 @@ const MAPPING = {
   "checkmark.seal.fill": "verified",
   "exclamationmark.circle.fill": "error",
   "arrow.counterclockwise": "restore",
+  "flame.fill": "local-fire-department",
+  "leaf.fill": "eco",
 } as IconMapping;
 
 /**

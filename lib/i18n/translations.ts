@@ -566,6 +566,8 @@ const dict = {
   "form.smartAdd.material": { zh: "添加到原材料库", en: "Add to Raw Materials" },
   "form.suggest.homemade": { zh: "自制库", en: "Homemade" },
   "form.suggest.bottle": { zh: "酒库", en: "Bottles" },
+  "form.suggest.spirits": { zh: "基酒库", en: "Base Spirits" },
+  "form.suggest.materials": { zh: "原材料库", en: "Raw Materials" },
   "hm.shelfLife": { zh: "保存期限", en: "Shelf Life" },
   "hm.storage": { zh: "储存方式", en: "Storage" },
   "hm.yield": { zh: "产量", en: "Yield" },

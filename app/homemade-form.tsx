@@ -29,6 +29,7 @@ import {
 } from "@/lib/homemade/types";
 import { useBottleStore } from "@/lib/bottles/store";
 import { suggestIngredients } from "@/lib/suggest";
+import { smartLinkIngredient, smartLinkDisplayName } from "@/lib/recipes/smart-link";
 import { genId } from "@/lib/recipes/types";
 
 interface IngRow {
@@ -385,6 +386,9 @@ export default function HomemadeFormScreen() {
             const liveSuggestions = showSuggest
               ? suggestIngredients(trimmed, bottles, allPreps.filter((p) => p.id !== (editing?.id ?? "")), lang).filter((s) => s.value !== trimmed)
               : [];
+            const link = trimmed.length >= 2 && pickedIng[row.id] === row.name
+              ? smartLinkIngredient(trimmed, bottles, allPreps.filter((p) => p.id !== (editing?.id ?? "")))
+              : null;
             return (
               <View key={row.id} style={{ marginBottom: 8 }}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -445,9 +449,25 @@ export default function HomemadeFormScreen() {
                         ]}
                       >
                         <IconSymbol
-                          name={s.source === "homemade" ? "sparkles" : "wineglass.fill"}
+                          name={
+                            s.source === "homemade"
+                              ? "sparkles"
+                              : s.source === "spirits"
+                                ? "flame.fill"
+                                : s.source === "materials"
+                                  ? "leaf.fill"
+                                  : "wineglass.fill"
+                          }
                           size={13}
-                          color={s.source === "homemade" ? colors.primary : colors.muted}
+                          color={
+                            s.source === "homemade"
+                              ? colors.primary
+                              : s.source === "spirits"
+                                ? "#FF9500"
+                                : s.source === "materials"
+                                  ? colors.success
+                                  : "#5AC8FA"
+                          }
                         />
                         <Text
                           className="text-sm text-foreground"
@@ -466,12 +486,59 @@ export default function HomemadeFormScreen() {
                           </Text>
                         ) : null}
                         <View style={{ flex: 1 }} />
-                        <Text className="text-[11px] text-muted" style={{ lineHeight: 14 }}>
-                          {s.source === "homemade" ? t("form.suggest.homemade") : t("form.suggest.bottle")}
+                        <Text
+                          className="text-[11px]"
+                          style={{
+                            lineHeight: 14,
+                            color:
+                              s.source === "homemade"
+                                ? colors.primary
+                                : s.source === "spirits"
+                                  ? "#FF9500"
+                                  : s.source === "materials"
+                                    ? colors.success
+                                    : "#5AC8FA",
+                          }}
+                        >
+                          {s.source === "homemade"
+                            ? t("form.suggest.homemade")
+                            : s.source === "spirits"
+                              ? t("form.suggest.spirits")
+                              : s.source === "materials"
+                                ? t("form.suggest.materials")
+                                : t("form.suggest.bottle")}
                         </Text>
                       </Pressable>
                     ))}
                   </View>
+                ) : null}
+                {link ? (
+                  (() => {
+                    const canon = smartLinkDisplayName(link, lang as "zh" | "en");
+                    const linkLabel = link.kind === "prep"
+                      ? t("form.suggest.homemade")
+                      : t("form.suggest.bottle");
+                    return (
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 4,
+                          marginTop: 3,
+                          paddingHorizontal: 4,
+                        }}
+                      >
+                        <IconSymbol
+                          name={link.kind === "prep" ? "sparkles" : "link"}
+                          size={11}
+                          color={link.kind === "prep" ? colors.primary : colors.muted}
+                        />
+                        <Text style={{ fontSize: 11, lineHeight: 14, color: link.kind === "prep" ? colors.primary : colors.muted }}>
+                          {linkLabel}{canon ? ` · ${canon.primary}` : ""}
+                        </Text>
+                      </View>
+                    );
+                  })()
                 ) : null}
               </View>
             );

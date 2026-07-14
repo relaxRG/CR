@@ -1716,9 +1716,25 @@ export default function RecipeFormScreen() {
                         ]}
                       >
                         <IconSymbol
-                          name={s.source === "homemade" ? "sparkles" : "wineglass.fill"}
+                          name={
+                            s.source === "homemade"
+                              ? "sparkles"
+                              : s.source === "spirits"
+                                ? "flame.fill"
+                                : s.source === "materials"
+                                  ? "leaf.fill"
+                                  : "wineglass.fill"
+                          }
                           size={13}
-                          color={s.source === "homemade" ? colors.primary : colors.muted}
+                          color={
+                            s.source === "homemade"
+                              ? colors.primary
+                              : s.source === "spirits"
+                                ? "#FF9500"
+                                : s.source === "materials"
+                                  ? colors.success
+                                  : "#5AC8FA"
+                          }
                         />
                         <Text
                           className="text-sm text-foreground"
@@ -1737,8 +1753,27 @@ export default function RecipeFormScreen() {
                           </Text>
                         ) : null}
                         <View style={{ flex: 1 }} />
-                        <Text className="text-[11px] text-muted" style={{ lineHeight: 14 }}>
-                          {s.source === "homemade" ? t("form.suggest.homemade") : t("form.suggest.bottle")}
+                        <Text
+                          className="text-[11px]"
+                          style={{
+                            lineHeight: 14,
+                            color:
+                              s.source === "homemade"
+                                ? colors.primary
+                                : s.source === "spirits"
+                                  ? "#FF9500"
+                                  : s.source === "materials"
+                                    ? colors.success
+                                    : "#5AC8FA",
+                          }}
+                        >
+                          {s.source === "homemade"
+                            ? t("form.suggest.homemade")
+                            : s.source === "spirits"
+                              ? t("form.suggest.spirits")
+                              : s.source === "materials"
+                                ? t("form.suggest.materials")
+                                : t("form.suggest.bottle")}
                         </Text>
                       </Pressable>
                     ))}
