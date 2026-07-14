@@ -109,6 +109,7 @@ export default function HomemadeFormScreen() {
         nameAlt: nameAlt.trim() || undefined,
         type: type || undefined,
         ingredients: ingRows.map((r) => r.name).filter(Boolean),
+        lang: lang as 'zh' | 'en',
       });
       if (res.prepType && res.prepType !== "other" && !typeTouched) {
         const matched = typeList.find((t) => t.key === res.prepType);
@@ -387,21 +388,22 @@ export default function HomemadeFormScreen() {
             return (
               <View key={row.id} style={{ marginBottom: 8 }}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                  <TextInput
-                    style={[...inputStyle, { flex: 3 }]}
-                    placeholder={t("hmform.ingredient.name")}
-                    placeholderTextColor={colors.muted}
-                    value={row.name}
-                    onChangeText={(v) => updateIngRow(row.id, "name", v)}
-                    onFocus={() => setFocusedIng(row.id)}
-                    onBlur={() => {
-                      // Delay so suggestion taps register before the list hides
-                      setTimeout(() => {
-                        setFocusedIng((cur) => (cur === row.id ? null : cur));
-                      }, 150);
-                    }}
-                    returnKeyType="done"
-                  />
+                 <TextInput
+                   style={[...inputStyle, { flex: 3 }]}
+                   placeholder={t("hmform.ingredient.name")}
+                   placeholderTextColor={colors.muted}
+                   value={row.name}
+                   onChangeText={(v) => updateIngRow(row.id, "name", v)}
+                   onFocus={() => setFocusedIng(row.id)}
+                   onBlur={() => {
+                     // Delay so suggestion taps register before the list hides
+                     setTimeout(() => {
+                       setFocusedIng((cur) => (cur === row.id ? null : cur));
+                     }, 150);
+                   }}
+                   returnKeyType="done"
+                   autoCapitalize="words"
+                 />
                   <TextInput
                     style={[...inputStyle, { flex: 2 }]}
                     placeholder={t("hmform.ingredient.amount")}

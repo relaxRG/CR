@@ -420,7 +420,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
     textTransform: "uppercase",
     marginBottom: 6,
-    marginLeft: 4,
+    marginLeft: 16,
   },
   group: {
     borderRadius: 14,
@@ -454,7 +454,7 @@ const styles = StyleSheet.create({
   hint: {
     fontSize: 12,
     marginTop: 6,
-    marginLeft: 4,
+    marginLeft: 16,
     lineHeight: 17,
   },
   rowGroupLabel: {
@@ -463,7 +463,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     textTransform: "uppercase",
     marginBottom: 6,
-    marginLeft: 4,
+    marginLeft: 16,
   },
   slotRow: {
     flexDirection: "row",

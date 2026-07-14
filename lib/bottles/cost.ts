@@ -28,14 +28,22 @@ export interface RecipeCostEstimate {
 /** 单位 -> 毫升换算表 */
 const UNIT_TO_ML: [RegExp, number][] = [
   [/(?:ml|毫升|cc)/i, 1],
-  [/(?:oz|盎司|ounce)/i, 30],
-  [/(?:cl)/i, 10],
-  [/(?:dash|抖|滴)/i, 0.9],
-  [/(?:tsp|茶匙|小勺)/i, 5],
-  [/(?:tbsp|汤匙|大勺)/i, 15],
-  [/(?:bar\s*spoon|吧勺)/i, 5],
-  [/(?:shot|杯)/i, 45],
-  [/(?:splash)/i, 5],
+  [/(?:fl\.?\s*oz|fluid\s*oz?)/i, ML_PER_OZ],
+  [/(?:oz|盎司|安士|ounce)/i, ML_PER_OZ],
+  [/(?:cl|厘升)/i, ML_PER_CL],
+  [/(?:dl|分升)/i, 100],
+  [/(?:pints?|pt|品脱)/i, ML_PER_PINT],
+  [/(?:quarts?|qt|夸脱)/i, ML_PER_QUART],
+  [/(?:gallons?|gal|加仑)/i, ML_PER_GALLON],
+  [/(?:shots?|jiggers?)/i, ML_PER_SHOT],
+  [/(?:pony)/i, ML_PER_PONY],
+  [/(?:cups?|杯)/i, ML_PER_CUP],
+  [/(?:tbsp\.?|tablespoons?|汤匙|大勺)/i, ML_PER_TBSP],
+  [/(?:tsp\.?|teaspoons?|茶匙|小勺)/i, ML_PER_TSP],
+  [/(?:bar\s*spoons?|bsp|吧勺)/i, ML_PER_BSP],
+  [/(?:dash(?:es)?|抖)/i, ML_PER_DASH],
+  [/(?:drops?|滴)/i, ML_PER_DROP],
+  [/(?:splash(?:es)?)/i, ML_PER_SPLASH],
 ];
 
 /**
@@ -255,3 +263,8 @@ export function estimateRecipeCost(
     totalCount: ingredients.length,
   };
 }
+import {
+  ML_PER_OZ, ML_PER_CL, ML_PER_TSP, ML_PER_TBSP, ML_PER_BSP,
+  ML_PER_DASH, ML_PER_DROP, ML_PER_SPLASH, ML_PER_SHOT, ML_PER_PONY,
+  ML_PER_CUP, ML_PER_PINT, ML_PER_QUART, ML_PER_GALLON,
+} from "@/lib/units";

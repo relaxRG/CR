@@ -100,7 +100,7 @@ export async function enrichBottle(params: {
 }
 
 export async function enrichHomemade(params: {
-  name: string; nameAlt?: string; type?: string; ingredients?: string[];
+  name: string; nameAlt?: string; type?: string; ingredients?: string[]; lang?: 'zh' | 'en';
 }) {
   return callAI<{
     section: string; prepType: string; techniques: string[]; flavorTags: string[];

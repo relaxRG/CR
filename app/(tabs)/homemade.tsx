@@ -174,6 +174,7 @@ export default function HomemadeScreen() {
           nameAlt: p.nameAlt || undefined,
           type: p.type || undefined,
           ingredients: p.ingredients?.length ? p.ingredients : undefined,
+          lang: lang as 'zh' | 'en',
         });
         const patch: Partial<typeof p> = {};
         if (res.story && !p.notes?.trim()) patch.notes = res.story;
@@ -220,6 +221,7 @@ export default function HomemadeScreen() {
           nameAlt: p.nameAlt || undefined,
           type: p.type || undefined,
           ingredients: p.ingredients?.length ? p.ingredients : undefined,
+          lang: lang as 'zh' | 'en',
         });
         const patch: Partial<typeof p> = {};
         if (res.story && !p.notes?.trim()) patch.notes = res.story;

@@ -2,6 +2,8 @@
 // English-first design with Chinese translations.
 import { SourceRef } from "@/lib/recipes/types";
 
+import { FRAC_CHARS } from "@/lib/units";
+
 /** 自制库顶层分组:含酒精 / 无酒精(类似酒库的基酒库/酒款库/原材料库) */
 export type PrepGroup = "alcoholic" | "non_alcoholic";
 
@@ -417,7 +419,64 @@ export function normalizePrep(p: Partial<HomemadePrep> & { id: string }): Homema
  * Lines without a leading quantity return an empty amount.
  */
 const LEADING_QTY_RE =
-  /^((?:约|~|≈)?\s*\d+(?:[.\/]\d+)?(?:\s*[-–]\s*\d+(?:[.\/]\d+)?)?\s*(?:kg|g|克|千克|公斤|ml|毫升|l|升|oz|盎司|dash(?:es)?|滴|tsp|茶匙|tbsp|汤匙|bar\s?spoons?|吧勺|cups?|杯|drops?|个|枚|颗|粒|根|片|只|条|瓣|把|包|袋|听|罐|瓶)?\.?)\s+(.+)$/i;
+  // Number part: supports integer, decimal, slash fraction, mixed fraction,
+  //   Unicode vulgar fraction alone, integer + Unicode vulgar fraction (e.g. 1¼)
+  // Unit part: all liquid, weight, count, and fuzzy units
+  new RegExp(
+    "^(" +
+      "(?:约|~|≈)?\\s*" +
+      "(?:" +
+        `\\d+\\s*[${FRAC_CHARS}]` + // integer + Unicode fraction e.g. 1¼
+        `|[${FRAC_CHARS}]` +         // pure Unicode fraction e.g. ¼
+        "|\\d+\\s+\\d+\\/\\d+" +     // mixed fraction e.g. 1 1/2
+        "|\\d+\\/\\d+" +             // slash fraction e.g. 1/2
+        "|\\d+(?:[.,]\\d+)?" +       // integer or decimal e.g. 1.5
+      ")" +
+      "(?:\\s*[-–~]\\s*" +           // optional range e.g. 1-2
+        "(?:" +
+          `\\d+\\s*[${FRAC_CHARS}]` +
+          `|[${FRAC_CHARS}]` +
+          "|\\d+\\/\\d+" +
+          "|\\d+(?:[.,]\\d+)?" +
+        ")" +
+      ")?" +
+      "\\s*" +
+      "(?:" +
+        // liquid precise
+        "fl\\.?\\s*oz|fluid\\s*oz?" +
+        "|ml|mL|毫升|cc" +
+        "|cl|cL|厘升" +
+        "|dl|dL|分升" +
+        "|[Ll](?:iter|itre)?|升" +
+        "|shots?|jiggers?" +
+        "|pony" +
+        "|pints?|pt|品脱" +
+        "|quarts?|qt|夸脱" +
+        "|gallons?|gal|加仑" +
+        // spoons
+        "|tbsp\\.?|tablespoons?" +
+        "|tsp\\.?|teaspoons?" +
+        "|bar\\s?spoons?|bsp|吧勺" +
+        "|dash(?:es)?" +
+        "|drops?" +
+        "|splash(?:es)?" +
+        // weight
+        "|kg|千克|公斤" +
+        "|mg|毫克" +
+        "|g|克" +
+        "|lbs?|磅|pounds?" +
+        // count
+        "|个|枚|颗|粒|根|片|只|条|瓣|把|包|袋|听|罐|瓶|块|枝|叶" +
+        "|pieces?|pcs?|sticks?|stalks?|slices?|leaves?|leaf|sprigs?" +
+        "|pods?|cloves?|beans?|cubes?|wedges?|twists?|eggs?" +
+        // cups
+        "|cups?|杯" +
+        // fuzzy (recognise but don't convert)
+        "|pinch(?:es)?|撮|handful|把" +
+      ")?\\.?" +
+    ")\\s+(.+)$",
+    "i",
+  );
 
 export function splitPrepIngredientLine(line: string): { amount: string; name: string } {
   const trimmed = line.trim();

@@ -204,9 +204,25 @@ export function parseQuantity(line: string): { qty: number; unit: "g" | "ml" | "
     "¼": 0.25, "½": 0.5, "¾": 0.75, "⅓": 1 / 3, "⅔": 2 / 3,
     "⅛": 0.125, "⅜": 0.375, "⅝": 0.625, "⅞": 0.875, "⅕": 0.2, "⅖": 0.4, "⅗": 0.6, "⅘": 0.8, "⅙": 1 / 6, "⅚": 5 / 6,
   };
-  const numRe = "(\\d+(?:\\.\\d+)?(?:\\s*[¼½¾⅓⅔⅛⅜⅝⅞⅕⅖⅗⅘⅙⅚])?|[¼½¾⅓⅔⅛⅜⅝⅞⅕⅖⅗⅘⅙⅚]|\\d+\\s+\\d+/\\d+|\\d+/\\d+)";
+  const numRe = `(\\d+(?:\\.\\d+)?(?:\\s*[${FRAC_CHARS}])?|[${FRAC_CHARS}]|\\d+\\s+\\d+/\\d+|\\d+/\\d+)`;
   const unitRe =
-    "(kg|千克|公斤|g|克|ml|毫升|l|升|liter|litre|oz|盎司|cups?|c\\.|tbsp\\.?|tablespoons?|tsp\\.?|teaspoons?|汤匙|茶匙|杯|个|枚|颗|根|片|只|pieces?|pcs?|beans?|pods?)";
+    "(fl\\.?\\s*oz|fluid\\s*oz?" +
+    "|kg|千克|公斤|g|克|ml|毫升|cc|cl|厘升|dl|分升|l|升|liter|litre" +
+    "|oz|盎司|安士" +
+    "|cups?|c\\.|杯" +
+    "|tbsp\\.?|tablespoons?|汤匙|大勺" +
+    "|tsp\\.?|teaspoons?|茶匙|小勺" +
+    "|bar\\s?spoons?|bsp|吧勺" +
+    "|shots?|jiggers?" +
+    "|pony" +
+    "|pints?|pt|品脱" +
+    "|quarts?|qt|夸脱" +
+    "|gallons?|gal|加仑" +
+    "|lbs?|磅|pounds?" +
+    "|mg|毫克" +
+    "|dash(?:es)?|drops?|splash(?:es)?" +
+    "|个|枚|颗|根|片|只|条|瓣|把|包|袋|听|罐|瓶|块|枝|叶" +
+    "|pieces?|pcs?|beans?|pods?|sticks?|stalks?|slices?|leaves?|leaf|sprigs?|cubes?|wedges?|twists?|eggs?)";
   const m = text.match(new RegExp(`${numRe}\\s*${unitRe}?`));
   if (!m) return null;
   const parseNum = (s: string): number => {
@@ -223,15 +239,40 @@ export function parseQuantity(line: string): { qty: number; unit: "g" | "ml" | "
   const value = parseNum(m[1]);
   if (!isFinite(value) || value <= 0) return null;
   const unit = m[2] ?? "";
-  if (/^(kg|千克|公斤)$/.test(unit)) return { qty: value * 1000, unit: "g" };
-  if (/^(g|克)$/.test(unit)) return { qty: value, unit: "g" };
-  if (/^(l|升|liter|litre)$/.test(unit)) return { qty: value * 1000, unit: "ml" };
-  if (/^(ml|毫升)$/.test(unit)) return { qty: value, unit: "ml" };
-  if (/^(oz|盎司)$/.test(unit)) return { qty: value * 30, unit: "ml" };
-  if (/^(cups?|c\.|杯)$/.test(unit)) return { qty: value * 240, unit: "ml" };
-  if (/^(tbsp\.?|tablespoons?|汤匙)$/.test(unit)) return { qty: value * 15, unit: "ml" };
-  if (/^(tsp\.?|teaspoons?|茶匙)$/.test(unit)) return { qty: value * 5, unit: "ml" };
-  if (/^(个|枚|颗|根|片|只|pieces?|pcs?|beans?|pods?)$/.test(unit)) return { qty: value, unit: "piece" };
+  // ── Liquid units → ml ──────────────────────────────────────────────────────
+  if (/^(fl\.?\s*oz|fluid\s*oz?)$/i.test(unit)) return { qty: value * ML_PER_OZ, unit: "ml" };
+  if (/^(ml|毫升|cc)$/i.test(unit)) return { qty: value, unit: "ml" };
+  if (/^(cl|厘升)$/i.test(unit)) return { qty: value * ML_PER_CL, unit: "ml" };
+  if (/^(dl|分升)$/i.test(unit)) return { qty: value * ML_PER_DL, unit: "ml" };
+  if (/^(l|升|liter|litre)$/i.test(unit)) return { qty: value * ML_PER_L, unit: "ml" };
+  if (/^(cups?|c\.|杯)$/i.test(unit)) return { qty: value * ML_PER_CUP, unit: "ml" };
+  if (/^(pints?|pt|品脱)$/i.test(unit)) return { qty: value * ML_PER_PINT, unit: "ml" };
+  if (/^(quarts?|qt|夸脱)$/i.test(unit)) return { qty: value * ML_PER_QUART, unit: "ml" };
+  if (/^(gallons?|gal|加仑)$/i.test(unit)) return { qty: value * ML_PER_GALLON, unit: "ml" };
+  if (/^(shots?|jiggers?)$/i.test(unit)) return { qty: value * ML_PER_SHOT, unit: "ml" };
+  if (/^(pony)$/i.test(unit)) return { qty: value * ML_PER_PONY, unit: "ml" };
+  // ── Spoon units → ml ───────────────────────────────────────────────────────
+  if (/^(tbsp\.?|tablespoons?|汤匙|大勺)$/i.test(unit)) return { qty: value * ML_PER_TBSP, unit: "ml" };
+  if (/^(tsp\.?|teaspoons?|茶匙|小勺)$/i.test(unit)) return { qty: value * ML_PER_TSP, unit: "ml" };
+  if (/^(bar\s?spoons?|bsp|吧勺)$/i.test(unit)) return { qty: value * ML_PER_BSP, unit: "ml" };
+  if (/^(dash(?:es)?)$/i.test(unit)) return { qty: value * ML_PER_DASH, unit: "ml" };
+  if (/^(drops?)$/i.test(unit)) return { qty: value * ML_PER_DROP, unit: "ml" };
+  if (/^(splash(?:es)?)$/i.test(unit)) return { qty: value * ML_PER_SPLASH, unit: "ml" };
+  // ── Weight units → g ───────────────────────────────────────────────────────
+  if (/^(kg|千克|公斤)$/i.test(unit)) return { qty: value * G_PER_KG, unit: "g" };
+  if (/^(g|克)$/i.test(unit)) return { qty: value, unit: "g" };
+  if (/^(mg|毫克)$/i.test(unit)) return { qty: value * G_PER_MG, unit: "g" };
+  if (/^(lbs?|磅|pounds?)$/i.test(unit)) return { qty: value * G_PER_LB, unit: "g" };
+  // ── oz ambiguity: liquid context → ml, solid context → g ──────────────────
+  if (/^(oz|盎司|安士)$/i.test(unit)) {
+    return isLiquidContext(line)
+      ? { qty: value * ML_PER_OZ, unit: "ml" }
+      : { qty: value * G_PER_OZ_SOLID, unit: "g" };
+  }
+  // ── Count units → piece ────────────────────────────────────────────────────
+  if (/^(个|枚|颗|根|片|只|条|瓣|把|包|袋|听|罐|瓶|块|枝|叶|pieces?|pcs?|beans?|pods?|sticks?|stalks?|slices?|leaves?|leaf|sprigs?|cubes?|wedges?|twists?|eggs?)$/i.test(unit)) {
+    return { qty: value, unit: "piece" };
+  }
   // Bare number: ambiguous → treat as piece count only when small
   if (!unit && value <= 20) return { qty: value, unit: "piece" };
   return null;
@@ -517,3 +558,10 @@ export function estimateHomemadeIngredientCost(
     costPer30Ml: est.costPer30Ml,
   };
 }
+import {
+  ML_PER_OZ, ML_PER_CL, ML_PER_DL, ML_PER_L, ML_PER_TSP, ML_PER_TBSP,
+  ML_PER_BSP, ML_PER_DASH, ML_PER_DROP, ML_PER_SPLASH, ML_PER_SHOT, ML_PER_PONY,
+  ML_PER_CUP, ML_PER_PINT, ML_PER_QUART, ML_PER_GALLON,
+  G_PER_KG, G_PER_MG, G_PER_OZ_SOLID, G_PER_LB,
+  FRAC_CHARS, isLiquidContext, isFuzzyUnit,
+} from "@/lib/units";
