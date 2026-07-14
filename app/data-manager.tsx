@@ -73,7 +73,7 @@ async function exportBackup(): Promise<void> {
   }
 
   const cacheFile = new FSFile(Paths.cache, filename);
-  cacheFile.write(json);
+  await cacheFile.write(json);
   const path = cacheFile.uri;
   const canShare = await Sharing.isAvailableAsync();
   if (canShare) {
@@ -87,6 +87,7 @@ export default function DataManagerScreen() {
   const router = useRouter();
   const { t } = useI18n();
   const [exporting, setExporting] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   const tap = () => {
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -222,6 +223,66 @@ export default function DataManagerScreen() {
               <Text style={[styles.rowTitle, { color: colors.error }]}>{t("dataManager.clearAll")}</Text>
               <Text style={[styles.rowDesc, { color: colors.muted }]} numberOfLines={1}>
                 {t("dataManager.clearAll.desc")}
+              </Text>
+            </View>
+          </Pressable>
+        </View>
+
+        {/* Factory Reset Section */}
+        <View style={styles.sectionLabel}>
+          <Text style={[styles.sectionLabelText, { color: colors.muted }]}>{t("dataManager.dangerZone")}</Text>
+        </View>
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Pressable
+            onPress={() => {
+              tap();
+              if (Platform.OS === "web") {
+                if (window.confirm(t("dataManager.confirm.reset"))) {
+                  setResetting(true);
+                  AsyncStorage.clear()
+                    .then(() => {
+                      Alert.alert(t("dataManager.reset.done"));
+                    })
+                    .catch(() => Alert.alert(t("dataManager.export.error")))
+                    .finally(() => setResetting(false));
+                }
+              } else {
+                Alert.alert(
+                  t("dataManager.reset.title"),
+                  t("dataManager.confirm.reset"),
+                  [
+                    { text: t("common.cancel"), style: "cancel" },
+                    {
+                      text: t("dataManager.reset.confirm"),
+                      style: "destructive",
+                      onPress: () => {
+                        setResetting(true);
+                        AsyncStorage.clear()
+                          .then(() => {
+                            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                            Alert.alert(t("dataManager.reset.done"));
+                          })
+                          .catch(() => Alert.alert(t("dataManager.export.error")))
+                          .finally(() => setResetting(false));
+                      },
+                    },
+                  ],
+                );
+              }
+            }}
+            disabled={resetting}
+            style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
+          >
+            <View style={[styles.iconWrap, { backgroundColor: "#FF3B30" }]}>
+              {resetting
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <IconSymbol name="arrow.counterclockwise" size={18} color="#FFFFFF" />
+              }
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.rowTitle, { color: "#FF3B30" }]}>{t("dataManager.reset.title")}</Text>
+              <Text style={[styles.rowDesc, { color: colors.muted }]} numberOfLines={1}>
+                {t("dataManager.reset.desc")}
               </Text>
             </View>
           </Pressable>

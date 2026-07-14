@@ -69,7 +69,6 @@ export default function HomemadeScreen() {
   const {
     ready,
     preps,
-    importSamples,
     sections,
     types,
     reorderPreps,
@@ -544,12 +543,6 @@ export default function HomemadeScreen() {
     router.push("/homemade-form");
   };
 
-  const handleImport = () => {
-    const n = importSamples();
-    if (Platform.OS !== "web" && n > 0) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }
-  };
 
   /** 多选:可见条目 id 与操作回调 */
   const visibleIds = useMemo(() => sorted.map((p) => p.id), [sorted]);
@@ -794,17 +787,6 @@ export default function HomemadeScreen() {
               <Text className="text-sm text-muted text-center mt-2 leading-relaxed">
                 {t("hm.empty.desc")}
               </Text>
-              <Pressable
-                onPress={handleImport}
-                style={({ pressed }) => [
-                  styles.importBtn,
-                  { backgroundColor: colors.primary },
-                  pressed && { opacity: 0.85 },
-                ]}
-              >
-                <IconSymbol name="sparkles" size={16} color="#FFFFFF" />
-                <Text style={styles.importBtnText}>{t("hm.empty.import")}</Text>
-              </Pressable>
             </>
           ) : null}
         </View>

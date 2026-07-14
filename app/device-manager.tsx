@@ -565,8 +565,30 @@ export default function DeviceManagerScreen() {
                       {lang === "zh" ? ROLE_LABELS[item.role].zh : ROLE_LABELS[item.role].en}
                     </Text>
                   </View>
-                  {isOwner && !item.isCurrentDevice && (
-                    <View style={styles.deviceActions}>
+                 {isOwner && !item.isCurrentDevice && (
+                   <View style={styles.deviceActions}>
+                      {item.role !== "owner" && (
+                        <Pressable
+                          onPress={() => {
+                            tap();
+                            Alert.alert(
+                              lang === "zh" ? "设为主设备" : "Set as Owner",
+                              lang === "zh"
+                                ? `将「${item.name}」设为主设备？当前主设备将降级为协作者。`
+                                : `Set "${item.name}" as the owner? The current owner will become a collaborator.`,
+                              [
+                                { text: lang === "zh" ? "取消" : "Cancel", style: "cancel" },
+                                { text: lang === "zh" ? "确认" : "Confirm", style: "destructive", onPress: () => void doChangeRole(item.id, "owner") },
+                              ],
+                            );
+                          }}
+                          style={({ pressed }) => [styles.actionBtn, { borderColor: "#FF9500", borderWidth: 1 }, pressed && { opacity: 0.6 }]}
+                        >
+                          <Text style={[styles.actionBtnText, { color: "#FF9500" }]}>
+                            {lang === "zh" ? "设为主设备" : "Set Owner"}
+                          </Text>
+                        </Pressable>
+                      )}
                       <Pressable
                         onPress={() => { tap(); handleChangeRole(item); }}
                         style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.6 }]}

@@ -75,6 +75,12 @@ const dict = {
   "dataManager.confirm.books": { zh: "确认清除所有书籍？此操作无法恢复。", en: "Clear all books? This cannot be undone." },
   "dataManager.confirm.all": { zh: "确认清除所有数据？此操作将永久删除全部本地数据，无法恢复。", en: "Clear all data? This will permanently delete everything and cannot be undone." },
   "dataManager.cleared": { zh: "已清除", en: "Cleared" },
+  "dataManager.dangerZone": { zh: "危险操作", en: "Danger Zone" },
+  "dataManager.reset.title": { zh: "重置为出厂状态", en: "Factory Reset" },
+  "dataManager.reset.desc": { zh: "清除所有本地数据，App 恢复初始状态", en: "Wipe all local data and restore App to initial state" },
+  "dataManager.reset.confirm": { zh: "重置", en: "Reset" },
+  "dataManager.reset.done": { zh: "已重置为出厂状态", en: "Factory reset complete" },
+  "dataManager.confirm.reset": { zh: "确认重置为出厂状态？这将清除所有本地数据（配方、酒库、自制、书库等），操作不可恢复。", en: "Reset to factory state? This will wipe ALL local data (recipes, bottles, preps, books, etc.) and cannot be undone." },
   // Bulk import
   "bulk.title": { zh: "批量导入", en: "Bulk Import" },
   "smartImport.paste": { zh: "粘贴导入", en: "Paste" },

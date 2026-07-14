@@ -19,12 +19,8 @@ import {
   migrateBottleCategory,
   normalizeBottle,
 } from "./types";
-import { buildWaldorfBottles } from "./waldorf-ingredients";
-
 const BOTTLES_KEY = "cocktail.bottles";
 const BOTTLES_SEEDED_KEY = "cocktail.bottles.seeded";
-/** 《Waldorf》配料数据集导入标记 */
-const WALDORF_BOTTLES_FLAG = "cocktail.bottles.waldorf.v1";
 /** v8 原材料分类拆分迁移标记 */
 const MATERIAL_MIGRATED_V8_FLAG = "bottles.material.migrated.v8";
 /** v9 分类更名(果蔬/茶咖与可可)+复合名条目拆分去重迁移标记 */
@@ -162,29 +158,6 @@ export function BottleProvider({ children }: { children: React.ReactNode }) {
           notifySyncChange(BOTTLES_KEY);
           await AsyncStorage.setItem(BOTTLES_SEEDED_KEY, SEED_VERSION);
           notifySyncChange(BOTTLES_SEEDED_KEY);
-        }
-        // 《Waldorf》配料数据集:首次加载时一次性合入(按中/英名去重,幂等)
-        {
-          const waldorfDone = await AsyncStorage.getItem(WALDORF_BOTTLES_FLAG);
-          if (!waldorfDone) {
-            const names = new Set<string>();
-            for (const b of list) {
-              if (b.nameZh) names.add(b.nameZh.trim().toLowerCase());
-              if (b.nameEn) names.add(b.nameEn.trim().toLowerCase());
-            }
-            const fresh = buildWaldorfBottles().filter(
-              (b) =>
-                !names.has(b.nameZh.trim().toLowerCase()) &&
-                !names.has(b.nameEn.trim().toLowerCase()),
-            );
-            if (fresh.length > 0) {
-              list = [...list, ...fresh];
-              await AsyncStorage.setItem(BOTTLES_KEY, JSON.stringify(list));
-              notifySyncChange(BOTTLES_KEY);
-            }
-            await AsyncStorage.setItem(WALDORF_BOTTLES_FLAG, "1");
-            notifySyncChange(WALDORF_BOTTLES_FLAG);
-          }
         }
         // v8:旧笼统"原材料"条目拆分到 8 个专业材料分类(一次性;后续新条目仍会即时迁移)
         {

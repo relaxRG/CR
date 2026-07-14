@@ -102,6 +102,7 @@ const MAPPING = {
   "cross.vial": "biotech",
   "checkmark.seal.fill": "verified",
   "exclamationmark.circle.fill": "error",
+  "arrow.counterclockwise": "restore",
 } as IconMapping;
 
 /**

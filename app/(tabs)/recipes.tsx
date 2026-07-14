@@ -68,7 +68,6 @@ export function RecipesScreen() {
     ready,
     recipes,
     categories,
-    importSamples,
     tagsOf,
     reorderRecipes,
     deleteRecipes,
@@ -696,13 +695,6 @@ export function RecipesScreen() {
             ]}
           >
             <Text style={styles.primaryBtnText}>{t("home.empty.add")}</Text>
-          </Pressable>
-          <Pressable
-            onPress={importSamples}
-            style={({ pressed }) => [styles.ghostBtn, pressed && { opacity: 0.6 }]}
-          >
-            <IconSymbol name="sparkles" size={16} color={colors.primary} />
-            <Text style={[styles.ghostBtnText, { color: colors.primary }]}>{t("home.empty.import")}</Text>
           </Pressable>
         </View>
       ) : manualMode ? (

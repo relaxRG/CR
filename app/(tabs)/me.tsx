@@ -50,6 +50,28 @@ export default function MeScreen() {
       );
     }
   };
+  const handleLeaveGroupAndClear = () => {
+    tap();
+    Alert.alert(
+      lang === "zh" ? "退出并清除数据" : "Leave & Clear Data",
+      lang === "zh"
+        ? "退出同步组并删除本机所有本地数据（配方、酒库、自制等）。此操作不可恢复。"
+        : "Leave the sync group and delete all local data (recipes, bottles, preps, etc.). This cannot be undone.",
+      [
+        { text: lang === "zh" ? "取消" : "Cancel", style: "cancel" },
+        {
+          text: lang === "zh" ? "退出并清除" : "Leave & Clear",
+          style: "destructive",
+          onPress: async () => {
+            await logout();
+            const AsyncStorage = (await import("@react-native-async-storage/async-storage")).default;
+            await AsyncStorage.clear();
+            if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          },
+        },
+      ],
+    );
+  };
 
   const stats = [
     { key: "recipes", label: t("me.stats.recipes"), value: recipes.length },
@@ -104,20 +126,38 @@ export default function MeScreen() {
                   <IconSymbol name="chevron.right" size={18} color={colors.muted} />
                 </Pressable>
                 <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 64 }} />
-                {/* 已登录：退出同步组 */}
+               {/* 已登录：退出同步组 */}
+               <Pressable
+                 onPress={handleLeaveGroup}
+                 style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
+               >
+                 <View style={[styles.iconWrap, { backgroundColor: colors.error }]}>
+                   <IconSymbol name="rectangle.portrait.and.arrow.right" size={18} color="#FFFFFF" />
+                 </View>
+                 <View style={{ flex: 1 }}>
+                   <Text style={[styles.rowTitle, { color: colors.error }]}>
+                     {lang === "zh" ? "退出同步组" : "Leave Sync Group"}
+                   </Text>
+                   <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>
+                     {lang === "zh" ? "停止多设备同步" : "Stop multi-device sync"}
+                   </Text>
+                 </View>
+               </Pressable>
+                <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 64 }} />
+                {/* 已登录：退出并清除本地数据 */}
                 <Pressable
-                  onPress={handleLeaveGroup}
+                  onPress={handleLeaveGroupAndClear}
                   style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
                 >
-                  <View style={[styles.iconWrap, { backgroundColor: colors.error }]}>
-                    <IconSymbol name="rectangle.portrait.and.arrow.right" size={18} color="#FFFFFF" />
+                  <View style={[styles.iconWrap, { backgroundColor: "#FF3B30" }]}>
+                    <IconSymbol name="trash.fill" size={18} color="#FFFFFF" />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.rowTitle, { color: colors.error }]}>
-                      {lang === "zh" ? "退出同步组" : "Leave Sync Group"}
+                    <Text style={[styles.rowTitle, { color: "#FF3B30" }]}>
+                      {lang === "zh" ? "退出并清除数据" : "Leave & Clear Data"}
                     </Text>
                     <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>
-                      {lang === "zh" ? "停止多设备同步" : "Stop multi-device sync"}
+                      {lang === "zh" ? "退出同步组并删除本机所有本地数据" : "Leave group and wipe all local data"}
                     </Text>
                   </View>
                 </Pressable>

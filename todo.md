@@ -197,3 +197,12 @@
 - [x] 智能调度器（lib/sync/scheduler.ts：离线队列+断线重连+指数退避+三通道协调）
 - [ ] scheduler.ts 集成到 cf-sync/provider.tsx（替换现有 pushFn/pullFn 调用）
 - [ ] 触发 EAS Build #33（需要新 Expo Token）
+
+## 方案 Y 清理与功能改进（2026-07-14）
+- [x] 删除 Waldorf 自动 seeding（lib/recipes/store.tsx + lib/bottles/store.tsx）
+- [x] 删除 recipes.tsx 和 homemade.tsx 中的「导入示例」按钮
+- [x] 修复 data-manager.tsx 导出 Bug（cacheFile.write 缺少 await）
+- [x] data-manager 新增「重置为出厂状态」功能（AsyncStorage.clear，危险操作区）
+- [x] device-manager 设为主设备 UI 改进（方案 A：快捷「设为主设备」橙色按钮）
+- [x] me.tsx 退出同步组选项改进（方案 B：新增「退出并清除数据」选项）
+- [x] icon-symbol.tsx 新增 arrow.counterclockwise → restore 映射

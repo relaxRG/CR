@@ -10,15 +10,10 @@ import React, {
   useState,
 } from "react";
 
-import { buildDefaultCategories, buildSampleRecipes } from "./seed";
+import { buildDefaultCategories } from "./seed";
 import { estimateRecipeAbv } from "./abv";
 import { classifyRecipe, inferDrinkDuration, inferOccasion } from "./classify";
 import { inferVariantOf, inferCodexFamily } from "./lineage";
-import {
-  WALDORF_DATASET_KEY,
-  buildWaldorfCategories,
-  buildWaldorfRecipes,
-} from "./waldorf";
 import {
   Category,
   Recipe,
@@ -110,7 +105,6 @@ interface RecipeStore {
   reorderTagGroups: (kind: TagKind, orderedIds: string[]) => void;
   setTagGroup: (tagId: string, groupId: string | null) => void;
   tagGroupsOf: (kind: TagKind) => TagGroup[];
-  importSamples: () => void;
   getRecipe: (id: string | undefined) => Recipe | undefined;
   getCategory: (id: string | null | undefined) => Category | undefined;
 }
@@ -135,7 +129,6 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
           AsyncStorage.getItem(TAGS_KEY),
           AsyncStorage.getItem(TAG_GROUPS_KEY),
         ]);
-        const waldorfDone = await AsyncStorage.getItem(WALDORF_DATASET_KEY);
         let cats: Category[] = (cRaw ? (JSON.parse(cRaw) as Category[]) : []).map((c) =>
           migrateTagNameEn(c),
         );
@@ -181,28 +174,6 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
           notifySyncChange(CATEGORIES_KEY);
           await AsyncStorage.setItem(SEEDED_KEY, "1");
           notifySyncChange(SEEDED_KEY);
-        }
-        // 《The Waldorf Astoria Bar Book》数据集:首次加载时一次性合入(按英文名去重)
-        if (!waldorfDone) {
-          const existingNames = new Set(
-            recs.map((r) => (r.nameEn || r.name).trim().toLowerCase()).filter(Boolean),
-          );
-          const newRecipes = buildWaldorfRecipes().filter(
-            (r) => !existingNames.has((r.nameEn || r.name).trim().toLowerCase()),
-          );
-          if (newRecipes.length > 0) {
-            recs = [...recs, ...newRecipes];
-            migrated = true;
-          }
-          const existingCatIds = new Set(cats.map((c) => c.id));
-          const newCats = buildWaldorfCategories().filter((c) => !existingCatIds.has(c.id));
-          if (newCats.length > 0) {
-            cats = [...cats, ...newCats];
-            await AsyncStorage.setItem(CATEGORIES_KEY, JSON.stringify(cats));
-            notifySyncChange(CATEGORIES_KEY);
-          }
-          await AsyncStorage.setItem(WALDORF_DATASET_KEY, "1");
-          notifySyncChange(WALDORF_DATASET_KEY);
         }
         if (migrated) {
           AsyncStorage.setItem(RECIPES_KEY, JSON.stringify(recs)).catch(() => {});
@@ -791,14 +762,6 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
     [persistCategories, persistRecipes],
   );
 
-  const importSamples = useCallback(() => {
-    const samples = buildSampleRecipes();
-    const existingNames = new Set(recipesRef.current.map((r) => r.name));
-    const fresh = samples.filter((s) => !existingNames.has(s.name));
-    if (fresh.length === 0) return;
-    persistRecipes([...fresh, ...recipesRef.current]);
-  }, [persistRecipes]);
-
   const getRecipe = useCallback(
     (id: string | undefined) => recipes.find((r) => r.id === id),
     [recipes],
@@ -846,7 +809,6 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
       reorderTagGroups,
       setTagGroup,
       tagGroupsOf,
-      importSamples,
       getRecipe,
       getCategory,
     }),
@@ -886,7 +848,6 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
       reorderTagGroups,
       setTagGroup,
       tagGroupsOf,
-      importSamples,
       getRecipe,
       getCategory,
     ],
