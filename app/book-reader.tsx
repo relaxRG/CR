@@ -41,7 +41,7 @@ import { useRecipeStore } from "@/lib/recipes/store";
 import { useHomemadeStore } from "@/lib/homemade/store";
 import { classifyPrepGroup, guessPrepType } from "@/lib/homemade/types";
 import { normalizeCodexFamilyDecl } from "@/lib/recipes/lineage";
-import { trpc } from "@/lib/trpc";
+import { translateRecipes, enrichRecipe as enrichRecipeAI, deepAnalyzeRecipe as deepAnalyzeRecipeAI, extractRecipesFromText } from "@/lib/api/smart-router";
 
 /* ─── Extracted recipe result types ─────────────────────────────────────────── */
 
@@ -543,10 +543,10 @@ export default function BookReaderScreen() {
     const created = addTag("glass", cleaned, CATEGORY_COLORS[3]);
     return created?.name ?? cleaned;
   };
-  const translateMutation = trpc.bookImport.translate.useMutation();
-  const enrichRecipeMutation = trpc.lookup.enrichRecipe.useMutation();
-  const deepAnalyzeMutation = trpc.lookup.deepAnalyzeRecipe.useMutation();
-  const extractMutation = trpc.lookup.extractRecipesFromText.useMutation();
+
+
+
+
   const { isOnline } = useNetwork();
 
   /* Chapter navigation */
@@ -1006,45 +1006,39 @@ export default function BookReaderScreen() {
     if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     // 串联 enrichRecipe → deepAnalyzeRecipe（后台静默，不阻塞 UI）
     const ingNames = draft.ingredients.map((ing) => ing.name).filter(Boolean);
-    enrichRecipeMutation.mutate(
-      { name: draft.name, nameEn: draft.nameEn || undefined, baseSpirit: draft.baseSpirit || undefined, ingredients: ingNames.length > 0 ? ingNames : undefined, bookTitle: source || undefined },
-      {
-        onSuccess: (result) => {
+    void (async () => {
+      try {
+        const result = await enrichRecipeAI({ name: draft.name, nameEn: draft.nameEn || undefined, baseSpirit: draft.baseSpirit || undefined, ingredients: ingNames.length > 0 ? ingNames : undefined, bookTitle: source || undefined });
+        if (!isMountedRef.current) return;
+        const patch: Record<string, unknown> = {};
+        if (result.flavors.length > 0) patch.flavors = result.flavors;
+        if (result.story) patch.story = result.story;
+        if (result.flavorDesc) patch.flavorDesc = result.flavorDesc;
+        if (result.creator || result.createdYear) {
+          patch.sourceRef = { ...emptySourceRef(), bookTitle: source, sourceConfidence: "high" as const, creator: result.creator || "", createdYear: result.createdYear || "", creatorConfidence: result.creatorConfidence };
+        }
+        if (Object.keys(patch).length > 0) updateRecipe(newRecipe.id, { ...draft, ...patch });
+        try {
+          const deepResult = await deepAnalyzeRecipeAI({ name: draft.name || undefined, nameEn: draft.nameEn || undefined, ingredients: ingNames.length > 0 ? ingNames.join(", ") : undefined, baseSpirit: draft.baseSpirit || undefined, source: draft.source || undefined });
           if (!isMountedRef.current) return;
-          const patch: Record<string, unknown> = {};
-          if (result.flavors.length > 0) patch.flavors = result.flavors;
-          if (result.story) patch.story = result.story;
-          if (result.flavorDesc) patch.flavorDesc = result.flavorDesc;
-          if (result.creator || result.createdYear) {
-            patch.sourceRef = { ...emptySourceRef(), bookTitle: source, sourceConfidence: "high" as const, creator: result.creator || "", createdYear: result.createdYear || "", creatorConfidence: result.creatorConfidence };
+          const deepPatch: Record<string, unknown> = {};
+          if (deepResult.story) deepPatch.story = deepResult.story;
+          if (deepResult.flavorDesc) deepPatch.flavorDesc = deepResult.flavorDesc;
+          if (deepResult.flavors && deepResult.flavors.length > 0 && (result.flavors ?? []).length === 0) deepPatch.flavors = deepResult.flavors;
+          if (deepResult.suggestedCodexFamily && !draft.codexFamily) { const n = normalizeCodexFamilyDecl(deepResult.suggestedCodexFamily); if (n) deepPatch.codexFamily = n; }
+          if (deepResult.suggestedMethod && !draft.method) deepPatch.method = deepResult.suggestedMethod;
+          if (deepResult.suggestedVariantOf && !draft.variantOf) deepPatch.variantOf = deepResult.suggestedVariantOf;
+          if (deepResult.creator || deepResult.createdYear) {
+            const currentRef = (patch.sourceRef as ReturnType<typeof emptySourceRef> | undefined) ?? { ...emptySourceRef(), bookTitle: source, sourceConfidence: "high" as const };
+            if (!currentRef.creator && deepResult.creator) {
+              deepPatch.sourceRef = { ...currentRef, creator: deepResult.creator, createdYear: deepResult.createdYear || currentRef.createdYear, creatorConfidence: "medium" as const };
+            }
           }
-          if (Object.keys(patch).length > 0) updateRecipe(newRecipe.id, { ...draft, ...patch });
-          deepAnalyzeMutation.mutate(
-            { name: draft.name || undefined, nameEn: draft.nameEn || undefined, ingredients: ingNames.length > 0 ? ingNames.join(", ") : undefined, baseSpirit: draft.baseSpirit || undefined, source: draft.source || undefined },
-            {
-              onSuccess: (deepResult) => {
-                if (!isMountedRef.current) return;
-                const deepPatch: Record<string, unknown> = {};
-                if (deepResult.story) deepPatch.story = deepResult.story;
-                if (deepResult.flavorDesc) deepPatch.flavorDesc = deepResult.flavorDesc;
-                if (deepResult.flavors && deepResult.flavors.length > 0 && (result.flavors ?? []).length === 0) deepPatch.flavors = deepResult.flavors;
-                if (deepResult.suggestedCodexFamily && !draft.codexFamily) { const n = normalizeCodexFamilyDecl(deepResult.suggestedCodexFamily); if (n) deepPatch.codexFamily = n; }
-                if (deepResult.suggestedMethod && !draft.method) deepPatch.method = deepResult.suggestedMethod;
-                if (deepResult.suggestedVariantOf && !draft.variantOf) deepPatch.variantOf = deepResult.suggestedVariantOf;
-                if (deepResult.creator || deepResult.createdYear) {
-                  const currentRef = (patch.sourceRef as ReturnType<typeof emptySourceRef> | undefined) ?? { ...emptySourceRef(), bookTitle: source, sourceConfidence: "high" as const };
-                  if (!currentRef.creator && deepResult.creator) {
-                    deepPatch.sourceRef = { ...currentRef, creator: deepResult.creator, createdYear: deepResult.createdYear || currentRef.createdYear, creatorConfidence: "medium" as const };
-                  }
-                }
-                if (Object.keys(deepPatch).length > 0) updateRecipe(newRecipe.id, { ...draft, ...patch, ...deepPatch });
-              },
-            },
-          );
-        },
-      },
-    );
-  }, [book, zh, addRecipe, updateRecipe, enrichRecipeMutation, deepAnalyzeMutation, ensureSpiritNameBook, ensureGlassNameBook]);
+          if (Object.keys(deepPatch).length > 0) updateRecipe(newRecipe.id, { ...draft, ...patch, ...deepPatch });
+        } catch { /* ignore deep analyze errors */ }
+      } catch { /* ignore enrich errors */ }
+    })();
+  }, [book, zh, addRecipe, updateRecipe, ensureSpiritNameBook, ensureGlassNameBook]);
 
   /** Batch import all extracted recipes at once */
   const batchImportAll = useCallback(() => {
@@ -1116,46 +1110,40 @@ export default function BookReaderScreen() {
       const draft = drafts[i];
       if (!newRecipe || !draft) return;
       const ingNames = (draft.ingredients as Array<{ name: string }>).map((ing) => ing.name).filter(Boolean);
-      enrichRecipeMutation.mutate(
-        { name: draft.name, nameEn: draft.nameEn || undefined, baseSpirit: draft.baseSpirit || undefined, ingredients: ingNames.length > 0 ? ingNames : undefined, bookTitle: source || undefined },
-        {
-          onSuccess: (result) => {
+      void (async () => {
+        try {
+          const result = await enrichRecipeAI({ name: draft.name, nameEn: draft.nameEn || undefined, baseSpirit: draft.baseSpirit || undefined, ingredients: ingNames.length > 0 ? ingNames : undefined, bookTitle: source || undefined });
+          if (!isMountedRef.current) return;
+          const patch: Record<string, unknown> = {};
+          if (result.flavors.length > 0) patch.flavors = result.flavors;
+          if (result.story) patch.story = result.story;
+          if (result.flavorDesc) patch.flavorDesc = result.flavorDesc;
+          if (result.creator || result.createdYear) {
+            patch.sourceRef = { ...emptySourceRef(), bookTitle: source, sourceConfidence: "high" as const, creator: result.creator || "", createdYear: result.createdYear || "", creatorConfidence: result.creatorConfidence };
+          }
+          if (Object.keys(patch).length > 0) updateRecipe(newRecipe.id, { ...draft, ...patch });
+          try {
+            const deepResult = await deepAnalyzeRecipeAI({ name: draft.name || undefined, nameEn: draft.nameEn || undefined, ingredients: ingNames.length > 0 ? ingNames.join(", ") : undefined, baseSpirit: draft.baseSpirit || undefined, source: draft.source || undefined });
             if (!isMountedRef.current) return;
-            const patch: Record<string, unknown> = {};
-            if (result.flavors.length > 0) patch.flavors = result.flavors;
-            if (result.story) patch.story = result.story;
-            if (result.flavorDesc) patch.flavorDesc = result.flavorDesc;
-            if (result.creator || result.createdYear) {
-              patch.sourceRef = { ...emptySourceRef(), bookTitle: source, sourceConfidence: "high" as const, creator: result.creator || "", createdYear: result.createdYear || "", creatorConfidence: result.creatorConfidence };
+            const deepPatch: Record<string, unknown> = {};
+            if (deepResult.story) deepPatch.story = deepResult.story;
+            if (deepResult.flavorDesc) deepPatch.flavorDesc = deepResult.flavorDesc;
+            if (deepResult.flavors && deepResult.flavors.length > 0 && (result.flavors ?? []).length === 0) deepPatch.flavors = deepResult.flavors;
+            if (deepResult.suggestedCodexFamily && !draft.codexFamily) { const n = normalizeCodexFamilyDecl(deepResult.suggestedCodexFamily); if (n) deepPatch.codexFamily = n; }
+            if (deepResult.suggestedMethod && !draft.method) deepPatch.method = deepResult.suggestedMethod;
+            if (deepResult.suggestedVariantOf && !draft.variantOf) deepPatch.variantOf = deepResult.suggestedVariantOf;
+            if (deepResult.creator || deepResult.createdYear) {
+              const currentRef = (patch.sourceRef as ReturnType<typeof emptySourceRef> | undefined) ?? { ...emptySourceRef(), bookTitle: source, sourceConfidence: "high" as const };
+              if (!currentRef.creator && deepResult.creator) {
+                deepPatch.sourceRef = { ...currentRef, creator: deepResult.creator, createdYear: deepResult.createdYear || currentRef.createdYear, creatorConfidence: "medium" as const };
+              }
             }
-            if (Object.keys(patch).length > 0) updateRecipe(newRecipe.id, { ...draft, ...patch });
-            deepAnalyzeMutation.mutate(
-              { name: draft.name || undefined, nameEn: draft.nameEn || undefined, ingredients: ingNames.length > 0 ? ingNames.join(", ") : undefined, baseSpirit: draft.baseSpirit || undefined, source: draft.source || undefined },
-              {
-                onSuccess: (deepResult) => {
-                  if (!isMountedRef.current) return;
-                  const deepPatch: Record<string, unknown> = {};
-                  if (deepResult.story) deepPatch.story = deepResult.story;
-                  if (deepResult.flavorDesc) deepPatch.flavorDesc = deepResult.flavorDesc;
-                  if (deepResult.flavors && deepResult.flavors.length > 0 && (result.flavors ?? []).length === 0) deepPatch.flavors = deepResult.flavors;
-                  if (deepResult.suggestedCodexFamily && !draft.codexFamily) { const n = normalizeCodexFamilyDecl(deepResult.suggestedCodexFamily); if (n) deepPatch.codexFamily = n; }
-                  if (deepResult.suggestedMethod && !draft.method) deepPatch.method = deepResult.suggestedMethod;
-                  if (deepResult.suggestedVariantOf && !draft.variantOf) deepPatch.variantOf = deepResult.suggestedVariantOf;
-                  if (deepResult.creator || deepResult.createdYear) {
-                    const currentRef = (patch.sourceRef as ReturnType<typeof emptySourceRef> | undefined) ?? { ...emptySourceRef(), bookTitle: source, sourceConfidence: "high" as const };
-                    if (!currentRef.creator && deepResult.creator) {
-                      deepPatch.sourceRef = { ...currentRef, creator: deepResult.creator, createdYear: deepResult.createdYear || currentRef.createdYear, creatorConfidence: "medium" as const };
-                    }
-                  }
-                  if (Object.keys(deepPatch).length > 0) updateRecipe(newRecipe.id, { ...draft, ...patch, ...deepPatch });
-                },
-              },
-            );
-          },
-        },
-      );
+            if (Object.keys(deepPatch).length > 0) updateRecipe(newRecipe.id, { ...draft, ...patch, ...deepPatch });
+          } catch { /* ignore deep analyze errors */ }
+        } catch { /* ignore enrich errors */ }
+      })();
     });
-  }, [extractResults, importedRecipeIds, batchImporting, extractSelectMode, selectedExtractIds, book, zh, addRecipes, updateRecipe, enrichRecipeMutation, deepAnalyzeMutation, ensureSpiritNameBook, ensureGlassNameBook]);
+  }, [extractResults, importedRecipeIds, batchImporting, extractSelectMode, selectedExtractIds, book, zh, addRecipes, updateRecipe, ensureSpiritNameBook, ensureGlassNameBook]);
 
   const doExtract = useCallback(async () => {
     const text = selectedText.trim();
@@ -1170,7 +1158,7 @@ export default function BookReaderScreen() {
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setExtractError("");
     try {
-      const results = await extractMutation.mutateAsync({ text, lang: zh ? "zh" : "en" });
+      const results = await extractRecipesFromText({ text, lang: zh ? "zh" : "en" });
       if (!results || results.length === 0) {
         setExtractError(zh ? "未识别到配方，请重新选取" : "No recipes found. Try selecting different text.");
         return;
@@ -1181,7 +1169,7 @@ export default function BookReaderScreen() {
     } catch (e) {
       setExtractError((zh ? "提取失败：" : "Extract failed: ") + (e instanceof Error ? e.message : String(e)));
     }
-  }, [selectedText, zh, extractMutation]);
+  }, [selectedText, zh]);
 
   /* ── Confirm phase ── */
   const existingNames = useMemo(() => {
@@ -1224,7 +1212,7 @@ export default function BookReaderScreen() {
   }, []);
 
   const checkedCount = reviewItems.filter((r) => r.checked).length;
-  const translating = translateMutation.isPending;
+  const translating = false;
   const untranslatedChecked = reviewItems.some((r) => r.checked && !r.translated);
   const anyTranslated = reviewItems.some((r) => r.translated);
 
@@ -1246,7 +1234,7 @@ export default function BookReaderScreen() {
     try {
       for (let i = 0; i < untranslated.length; i += 15) {
         const batch = untranslated.slice(i, i + 15);
-        const res = await translateMutation.mutateAsync({
+        const res = await translateRecipes({
           target: zh ? "zh" : "en",
           items: batch.map((r) => ({ id: r.candidate.id, name: r.candidate.parsed.name || r.candidate.name, ingredients: r.candidate.parsed.ingredients.map((ing) => ({ name: ing.name, amount: ing.amount })), steps: r.candidate.parsed.steps, garnish: r.candidate.parsed.garnish, glass: r.candidate.parsed.glass, method: r.candidate.parsed.method })),
         });
@@ -1261,7 +1249,7 @@ export default function BookReaderScreen() {
     } catch (e) {
       setReviewError((zh ? "翻译失败：" : "Translation failed: ") + (e instanceof Error ? e.message : String(e)));
     }
-  }, [reviewItems, zh, translateMutation]);
+  }, [reviewItems, zh]);
 
   const doImport = useCallback(() => {
     tap();
@@ -1283,10 +1271,9 @@ export default function BookReaderScreen() {
         const draft = { name, nameEn: isAscii(name) ? name : isAscii(origName) && origName ? origName : "", categoryId: null, baseSpirit: p.baseSpirit ? ensureSpiritNameBook(p.baseSpirit) : "", glass: p.glass ? ensureGlassNameBook(p.glass) : "", method: p.method || "", strength: "medium" as const, variantOf: p.variantOf || "", codexFamily: normalizeCodexFamilyDecl(p.codexFamily || ""), flavors: [], source: p.source || source, story: "", flavorDesc: "", ingredients: p.ingredients, steps: p.steps, garnish: p.garnish, notes: "" };
         const newRecipe = addRecipe(draft);
         const ingNames = p.ingredients.map((i) => i.name).filter(Boolean);
-        enrichRecipeMutation.mutate(
-          { name: draft.name, nameEn: draft.nameEn || undefined, baseSpirit: draft.baseSpirit || undefined, ingredients: ingNames.length > 0 ? ingNames : undefined },
-          { onSuccess: (result) => { if (result.flavors.length > 0) updateRecipe(newRecipe.id, { ...draft, flavors: result.flavors }); } },
-        );
+        void enrichRecipeAI({ name: draft.name, nameEn: draft.nameEn || undefined, baseSpirit: draft.baseSpirit || undefined, ingredients: ingNames.length > 0 ? ingNames : undefined })
+          .then((result) => { if (result.flavors.length > 0) updateRecipe(newRecipe.id, { ...draft, flavors: result.flavors }); })
+          .catch(() => {});
         recipeCount++;
       }
     }
@@ -1294,7 +1281,7 @@ export default function BookReaderScreen() {
     setReviewItems([]);
     setPhase("done");
     if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  }, [reviewItems, book, zh, addRecipe, updateRecipe, addPrep, sections, types, enrichRecipeMutation, addTag, spiritNamesBook, glassNamesBook]);
+  }, [reviewItems, book, zh, addRecipe, updateRecipe, addPrep, sections, types, addTag, spiritNamesBook, glassNamesBook]);
 
   /* ── Not found ── */
   if (!book) {
@@ -1776,7 +1763,7 @@ export default function BookReaderScreen() {
           )}
           <Pressable
             onPress={doExtract}
-            disabled={extractMutation.isPending || selectedText.trim().length === 0}
+            disabled={false || selectedText.trim().length === 0}
             style={({ pressed }) => [styles.primaryBtn, {
               backgroundColor: selectedText.trim().length === 0 ? colors.border : colors.primary,
               marginTop: 0, alignSelf: "stretch",
@@ -1784,7 +1771,7 @@ export default function BookReaderScreen() {
           >
             <IconSymbol name="sparkles" size={17} color="#FFF" />
             <Text style={styles.primaryBtnText}>
-              {extractMutation.isPending
+              {false
                 ? (zh ? "AI 分析中…" : "Analyzing…")
                 : selectedText.trim().length === 0
                   ? (zh ? "请先长按选取文字" : "Long-press to select text")

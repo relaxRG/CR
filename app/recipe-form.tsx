@@ -30,7 +30,7 @@ import { useBottleStore } from "@/lib/bottles/store";
 import { displayNames } from "@/lib/utils";
 import { suggestIngredients } from "@/lib/suggest";
 import { RecipeDraft, useRecipeStore } from "@/lib/recipes/store";
-import { trpc } from "@/lib/trpc";
+import { enrichRecipe as enrichRecipeAI, deepAnalyzeRecipe as deepAnalyzeRecipeAI } from "@/lib/api/smart-router";
 import { parseRecipeText } from "@/lib/recipes/parser";
 import { estimateRecipeAbv } from "@/lib/recipes/abv";
 import {
@@ -234,8 +234,7 @@ export default function RecipeFormScreen() {
   const insets = useSafeAreaInsets();
   const { t, lang } = useI18n();
   const { getRecipe, addRecipe, updateRecipe, categories, tagsOf, addTag } = useRecipeStore();
-  const enrichRecipeMutation = trpc.lookup.enrichRecipe.useMutation();
-  const deepAnalyzeRecipeMutation = trpc.lookup.deepAnalyzeRecipe.useMutation();
+  // AI 调用通过 smart-router 直接调用，无需 tRPC mutation
   const { isOnline } = useNetwork();
   const { preps } = useHomemadeStore();
   const { bottles } = useBottleStore();
@@ -465,22 +464,12 @@ export default function RecipeFormScreen() {
     setAiResult(null);
     const ingNames = ingredients.map((i) => i.name).filter(Boolean);
     const ingWithAmounts = ingredients.filter((i) => i.name.trim()).map((i) => ({ name: i.name, amount: i.amount }));
-    enrichRecipeMutation.mutate(
-      {
+    enrichRecipeAI({
         name: recipeName,
         nameEn: nameEn.trim() || undefined,
         baseSpirit: baseSpirit || undefined,
-        ingredients: ingNames.length > 0 ? ingNames : undefined,
-        ingredientsWithAmounts: ingWithAmounts.length > 0 ? ingWithAmounts : undefined,
-        source: source.trim() || undefined,
-        story: story.trim() || undefined,
-        flavorDesc: flavorDesc.trim() || undefined,
         method: method || undefined,
-        existingSpirits: spiritNames,
-        existingGlasses: glassNames,
-      },
-      {
-        onSuccess: (result) => {
+      }).then((result) => {
           if (!isMountedRef.current) return;
           if (!baseSpirit && result.suggestedBaseSpirit) {
             const conf = result.suggestedBaseSpiritConfidence ?? "medium";
@@ -502,15 +491,12 @@ export default function RecipeFormScreen() {
           }
           setAiResult(result);
           setAiEnriching(false);
-        },
-        onError: (err: unknown) => {
+        }).catch((err: unknown) => {
           if (!isMountedRef.current) return;
           setAiEnriching(false);
           const msg = err instanceof Error ? err.message : "AI 分析失败，请重试";
           Alert.alert("AI 补全失败", msg);
-        },
-      },
-    );
+        });
   };
   /**
    * 打开表单时自动触发 AI 风味分析（仅一次）。
@@ -519,7 +505,7 @@ export default function RecipeFormScreen() {
   /** 深度解析：联网 + 强模型，补全所有字段 */
   const handleDeepAnalyze = () => {
     const recipeName = name.trim() || nameEn.trim();
-    if (!recipeName || enrichRecipeMutation.isPending || deepAnalyzeRecipeMutation.isPending) return;
+    if (!recipeName || aiEnriching) return;
     if (!isOnline) {
       Alert.alert(t("offline.title"), t("offline.aiUnavailable"));
       return;
@@ -527,16 +513,13 @@ export default function RecipeFormScreen() {
     setAiEnriching(true);
     setAiResult(null);
     const ingNames = ingredients.map((i) => i.name).filter(Boolean);
-    deepAnalyzeRecipeMutation.mutate(
-      {
+    deepAnalyzeRecipeAI({
         name: name.trim() || nameEn.trim(),
         nameEn: nameEn.trim() || undefined,
         ingredients: ingNames.length > 0 ? ingNames.join(", ") : undefined,
         baseSpirit: baseSpirit || undefined,
         source: source.trim() || undefined,
-      },
-      {
-        onSuccess: (result) => {
+      }).then((result) => {
           if (!isMountedRef.current) return;
           if (!baseSpirit && result.suggestedBaseSpirit) {
             const resolved = resolveAiSpirits(result.suggestedBaseSpirit);
@@ -555,15 +538,12 @@ export default function RecipeFormScreen() {
           }
           setAiResult({ ...result, isDeepAnalysis: true });
           setAiEnriching(false);
-        },
-        onError: (err: unknown) => {
+        }).catch((err: unknown) => {
           if (!isMountedRef.current) return;
           setAiEnriching(false);
           const msg = err instanceof Error ? err.message : "AI 补全失败，请重试";
           Alert.alert("AI 补全失败", msg);
-        },
-      },
-    );
+        });
   };
 
   useEffect(() => {
@@ -574,19 +554,12 @@ export default function RecipeFormScreen() {
     autoFlavorDoneRef.current = true;
     const ingNames = ingredients.map((i) => i.name).filter(Boolean);
     const ingWithAmounts = ingredients.filter((i) => i.name.trim()).map((i) => ({ name: i.name, amount: i.amount }));
-    enrichRecipeMutation.mutate(
-      {
+    enrichRecipeAI({
         name: recipeName,
         nameEn: nameEn.trim() || undefined,
         baseSpirit: baseSpirit || undefined,
-        ingredients: ingNames.length > 0 ? ingNames : undefined,
-        ingredientsWithAmounts: ingWithAmounts.length > 0 ? ingWithAmounts : undefined,
         method: method || undefined,
-        existingSpirits: spiritNames,
-        existingGlasses: glassNames,
-      },
-      {
-        onSuccess: (result) => {
+      }).then((result) => {
           if (!isMountedRef.current) return;
           if (result.flavors && result.flavors.length > 0) {
             setFlavors(result.flavors);
@@ -611,38 +584,23 @@ export default function RecipeFormScreen() {
             const nextName = normalizeIceName(result.suggestedIce);
             if ((ICE_TYPES as readonly string[]).includes(nextName)) setIce(nextName);
           }
-          // 自动触发：饮用时长（未 override，高/中置信度）
           if (!durationUserOverride && result.suggestedDrinkDuration) {
             const conf = result.suggestedDurationConfidence ?? "medium";
             if (conf === "high" || conf === "medium") setDrinkDuration(result.suggestedDrinkDuration);
           }
-          // 自动触发：饮用场合（未 override，高/中置信度）
           if (!occasionUserOverride && result.suggestedOccasion) {
             const conf = result.suggestedOccasionConfidence ?? "medium";
             if (conf === "high" || conf === "medium") setOccasion(result.suggestedOccasion);
           }
-          // 同时存入 aiResult，供用户按需应用故事/来源等字段
-          if (
-            result.story ||
-            result.flavorDesc ||
-            result.source ||
-            result.suggestedBaseSpirit ||
-            result.suggestedGlass ||
-            result.suggestedIce ||
-            result.suggestedDrinkDuration ||
-            result.suggestedOccasion
-          ) {
+          if (result.story || result.flavorDesc || result.source || result.suggestedBaseSpirit ||
+              result.suggestedGlass || result.suggestedIce || result.suggestedDrinkDuration || result.suggestedOccasion) {
             setAiResult(result);
           }
-        },
-        onError: (err: unknown) => {
+        }).catch((err: unknown) => {
           if (!isMountedRef.current) return;
           const msg = err instanceof Error ? err.message : "AI 分析失败";
-          // Silently ignore auto-trigger errors (non-blocking)
           console.warn("[AutoFlavor] AI enrich failed:", msg);
-        },
-      },
-    );
+        });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // 仅挂载时触发一次
 
@@ -1011,23 +969,15 @@ export default function RecipeFormScreen() {
       // Auto-tag flavors in background when user didn't manually select any
       if (flavors.length === 0) {
         const ingNames = draft.ingredients.map((i) => i.name).filter(Boolean);
-        enrichRecipeMutation.mutate(
-          {
+        enrichRecipeAI({
             name: draft.name,
             nameEn: draft.nameEn || undefined,
             baseSpirit: draft.baseSpirit || undefined,
-            ingredients: ingNames.length > 0 ? ingNames : undefined,
-            existingSpirits: spiritNames,
-            existingGlasses: glassNames,
-          },
-          {
-            onSuccess: (result) => {
+          }).then((result) => {
               if (result.flavors.length > 0) {
                 updateRecipe(newRecipe.id, { ...draft, flavors: result.flavors });
               }
-            },
-          },
-        );
+            }).catch(() => { /* silent */ });
       }
     }
     if (Platform.OS !== "web") {
@@ -1155,7 +1105,7 @@ export default function RecipeFormScreen() {
             {/* 统一 AI 补全按钮 — 调用 deepAnalyzeRecipe（全字段，claude-sonnet） */}
             <Pressable
               onPress={handleDeepAnalyze}
-              disabled={enrichRecipeMutation.isPending || deepAnalyzeRecipeMutation.isPending || aiEnriching || (!name.trim() && !nameEn.trim())}
+              disabled={aiEnriching || (!name.trim() && !nameEn.trim())}
               style={({ pressed }) => [
                 {
                   flex: 1,
@@ -1171,7 +1121,7 @@ export default function RecipeFormScreen() {
                 },
               ]}
             >
-          {enrichRecipeMutation.isPending || deepAnalyzeRecipeMutation.isPending || aiEnriching ? (
+          {aiEnriching ? (
                 <>
                   <IconSymbol name="sparkles" size={15} color="#FFFFFF" />
                   <Text style={{ fontSize: 13, fontWeight: "700", color: "#FFFFFF" }}>
@@ -1542,7 +1492,7 @@ export default function RecipeFormScreen() {
           {/* Flavor tags */}
           <View className="flex-row items-center justify-between mt-5 mb-1.5">
             <Text className="text-sm font-medium text-muted">{t("form.flavors.multi")}</Text>
-            {enrichRecipeMutation.isPending && (
+            {aiEnriching && (
               <View className="flex-row items-center" style={{ gap: 4 }}>
                 <IconSymbol name="sparkles" size={12} color={colors.primary} />
                 <Text className="text-xs" style={{ color: colors.primary }}>
@@ -1550,7 +1500,7 @@ export default function RecipeFormScreen() {
                 </Text>
               </View>
             )}
-            {!enrichRecipeMutation.isPending && flavorConfidence !== null && (
+            {!aiEnriching && flavorConfidence !== null && (
               <Pressable
                 onPress={() => {
                   setFlavors([]);

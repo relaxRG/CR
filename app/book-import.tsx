@@ -36,7 +36,7 @@ import { useRecipeStore } from "@/lib/recipes/store";
 import { useHomemadeStore } from "@/lib/homemade/store";
 import { classifyPrepGroup, guessPrepType } from "@/lib/homemade/types";
 import { normalizeCodexFamilyDecl } from "@/lib/recipes/lineage";
-import { trpc } from "@/lib/trpc";
+import { ocrImages, translateRecipes, enrichRecipe as enrichRecipeAI, deepAnalyzeRecipe as deepAnalyzeRecipeAI } from "@/lib/api/smart-router";
 import { useBookStore } from "@/lib/books/store";
 
 type Phase = "idle" | "loading" | "reading" | "confirm" | "done";
@@ -201,10 +201,10 @@ export default function BookImportScreen() {
   }, []);
   const { isOnline } = useNetwork();
 
-  const ocrMutation = trpc.bookImport.ocr.useMutation();
-  const translateMutation = trpc.bookImport.translate.useMutation();
-  const enrichRecipeMutation = trpc.lookup.enrichRecipe.useMutation();
-  const deepAnalyzeMutation = trpc.lookup.deepAnalyzeRecipe.useMutation();
+
+
+
+
 
   const { addRecipe, updateRecipe, recipes } = useRecipeStore();
   const { addPrep, preps, sections, types } = useHomemadeStore();
@@ -267,7 +267,7 @@ export default function BookImportScreen() {
         const base64 =
           pending.base64 ?? (Platform.OS === "web" ? arrayBufferToBase64(pending.buffer) : "");
         if (!base64) throw new Error(zh ? "读取文件失败" : "Failed to read file");
-        const res = await ocrMutation.mutateAsync({ pdfBase64: base64 });
+        const res = await ocrImages({ pdfBase64: base64 });
         if (res.text) texts.push(res.text);
       } else if (pending.isPdf) {
         if (Platform.OS !== "web") {
@@ -286,7 +286,7 @@ export default function BookImportScreen() {
           setLoadStatus(
             zh ? `AI 识别中… 第 ${b + 1}/${batches.length} 批` : `AI OCR… batch ${b + 1}/${batches.length}`,
           );
-          const res = await ocrMutation.mutateAsync({ images: batches[b] });
+          const res = await ocrImages({ images: batches[b] });
           if (res.text) texts.push(res.text);
         }
       } else {
@@ -299,7 +299,7 @@ export default function BookImportScreen() {
           setLoadStatus(
             zh ? `AI 识别中… 第 ${b + 1}/${batches.length} 批` : `AI OCR… batch ${b + 1}/${batches.length}`,
           );
-          const res = await ocrMutation.mutateAsync({ images: batches[b] });
+          const res = await ocrImages({ images: batches[b] });
           if (res.text) texts.push(res.text);
         }
       }
@@ -317,7 +317,7 @@ export default function BookImportScreen() {
       );
       setPhase("idle");
     }
-  }, [zh, ocrMutation, loadPlainBookIntoReader]);
+  }, [zh, loadPlainBookIntoReader]);
 
   const pickFile = useCallback(async () => {
     tap();
@@ -615,7 +615,7 @@ export default function BookImportScreen() {
   }, []);
 
   const checkedCount = reviewItems.filter((r) => r.checked).length;
-  const translating = translateMutation.isPending;
+  const translating = false;
   const anyTranslated = reviewItems.some((r) => r.translated);
   const untranslatedChecked = reviewItems.some((r) => r.checked && !r.translated);
 
@@ -637,7 +637,7 @@ export default function BookImportScreen() {
     try {
       for (let i = 0; i < untranslated.length; i += 15) {
         const batch = untranslated.slice(i, i + 15);
-        const res = await translateMutation.mutateAsync({
+        const res = await translateRecipes({
           target: zh ? "zh" : "en",
           items: batch.map((r) => ({
             id: r.candidate.id,
@@ -675,7 +675,7 @@ export default function BookImportScreen() {
       if (!isMountedRef.current) return;
       setReviewError((zh ? "翻译失败：" : "Translation failed: ") + (e instanceof Error ? e.message : String(e)));
     }
-  }, [reviewItems, zh, translateMutation]);
+  }, [reviewItems, zh]);
 
   const doImport = useCallback(() => {
     tap();
@@ -746,76 +746,68 @@ export default function BookImportScreen() {
         };
         const newRecipe = addRecipe(draft);
         const ingNames = p.ingredients.map((i) => i.name).filter(Boolean);
-        enrichRecipeMutation.mutate(
-          {
-            name: draft.name,
-            nameEn: draft.nameEn || undefined,
-            baseSpirit: draft.baseSpirit || undefined,
-            ingredients: ingNames.length > 0 ? ingNames : undefined,
-            rawText: row.candidate.raw ? row.candidate.raw.slice(0, 800) : undefined,
-            bookTitle: bookTitle || undefined,
-          },
-          {
-            onSuccess: (result) => {
-              const patch: Record<string, unknown> = {};
-              if (result.flavors.length > 0) patch.flavors = result.flavors;
-              // 用 AI 补全的创作者/年份更新 sourceRef（置信度由 AI 返回）
-              if (result.creator || result.createdYear) {
-                patch.sourceRef = {
-                  ...draft.sourceRef!,
-                  creator: result.creator || "",
-                  createdYear: result.createdYear || "",
-                  creatorConfidence: result.creatorConfidence,
-                };
+        void (async () => {
+          try {
+            const result = await enrichRecipeAI({
+              name: draft.name,
+              nameEn: draft.nameEn || undefined,
+              baseSpirit: draft.baseSpirit || undefined,
+              ingredients: undefined,
+              rawText: row.candidate.raw ? row.candidate.raw.slice(0, 800) : undefined,
+              bookTitle: bookTitle || undefined,
+            });
+            const patch: Record<string, unknown> = {};
+            if (result.flavors.length > 0) patch.flavors = result.flavors;
+            if (result.creator || result.createdYear) {
+              patch.sourceRef = {
+                ...draft.sourceRef!,
+                creator: result.creator || "",
+                createdYear: result.createdYear || "",
+                creatorConfidence: result.creatorConfidence,
+              };
+            }
+            if (Object.keys(patch).length > 0) {
+              updateRecipe(newRecipe.id, { ...draft, ...patch });
+            }
+            const ingNamesDeep = (draft.ingredients ?? []).map((i) => i.name).filter(Boolean);
+            try {
+              const deepResult = await deepAnalyzeRecipeAI({
+                name: draft.name || undefined,
+                nameEn: draft.nameEn || undefined,
+                ingredients: ingNamesDeep.length > 0 ? ingNamesDeep.join(", ") : undefined,
+                baseSpirit: draft.baseSpirit || undefined,
+                source: draft.source || undefined,
+              });
+              if (!isMountedRef.current) return;
+              const deepPatch: Record<string, unknown> = {};
+              if (deepResult.story) deepPatch.story = deepResult.story;
+              if (deepResult.flavorDesc) deepPatch.flavorDesc = deepResult.flavorDesc;
+              if (deepResult.flavors && deepResult.flavors.length > 0 && (result.flavors ?? []).length === 0) {
+                deepPatch.flavors = deepResult.flavors;
               }
-              if (Object.keys(patch).length > 0) {
-                updateRecipe(newRecipe.id, { ...draft, ...patch });
+              if (deepResult.suggestedCodexFamily && !draft.codexFamily) {
+                const normalized = normalizeCodexFamilyDecl(deepResult.suggestedCodexFamily);
+                if (normalized) deepPatch.codexFamily = normalized;
               }
-              // 自动串联深度解析：在 enrichRecipe 完成后，进一步补全缺少的字段
-              const ingNames = (draft.ingredients ?? []).map((i) => i.name).filter(Boolean);
-              deepAnalyzeMutation.mutate(
-                {
-                  name: draft.name || undefined,
-                  nameEn: draft.nameEn || undefined,
-                  ingredients: ingNames.length > 0 ? ingNames.join(", ") : undefined,
-                  baseSpirit: draft.baseSpirit || undefined,
-                  source: draft.source || undefined,
-                },
-                {
-                  onSuccess: (deepResult) => {
-                    if (!isMountedRef.current) return;
-                    const deepPatch: Record<string, unknown> = {};
-                    if (deepResult.story) deepPatch.story = deepResult.story;
-                    if (deepResult.flavorDesc) deepPatch.flavorDesc = deepResult.flavorDesc;
-                    if (deepResult.flavors && deepResult.flavors.length > 0 && (result.flavors ?? []).length === 0) {
-                      deepPatch.flavors = deepResult.flavors;
-                    }
-                    if (deepResult.suggestedCodexFamily && !draft.codexFamily) {
-                      const normalized = normalizeCodexFamilyDecl(deepResult.suggestedCodexFamily);
-                      if (normalized) deepPatch.codexFamily = normalized;
-                    }
-                    if (deepResult.suggestedMethod && !draft.method) deepPatch.method = deepResult.suggestedMethod;
-                    if (deepResult.suggestedVariantOf && !draft.variantOf) deepPatch.variantOf = deepResult.suggestedVariantOf;
-                    if (deepResult.creator || deepResult.createdYear) {
-                      const currentRef = (patch.sourceRef as typeof draft.sourceRef) ?? draft.sourceRef;
-                      if (currentRef && !currentRef.creator && deepResult.creator) {
-                        deepPatch.sourceRef = {
-                          ...currentRef,
-                          creator: deepResult.creator,
-                          createdYear: deepResult.createdYear || currentRef.createdYear,
-                          creatorConfidence: "medium",
-                        };
-                      }
-                    }
-                    if (Object.keys(deepPatch).length > 0) {
-                      updateRecipe(newRecipe.id, { ...draft, ...patch, ...deepPatch });
-                    }
-                  },
-                },
-              );
-            },
-          },
-        );
+              if (deepResult.suggestedMethod && !draft.method) deepPatch.method = deepResult.suggestedMethod;
+              if (deepResult.suggestedVariantOf && !draft.variantOf) deepPatch.variantOf = deepResult.suggestedVariantOf;
+              if (deepResult.creator || deepResult.createdYear) {
+                const currentRef = (patch.sourceRef as typeof draft.sourceRef) ?? draft.sourceRef;
+                if (currentRef && !currentRef.creator && deepResult.creator) {
+                  deepPatch.sourceRef = {
+                    ...currentRef,
+                    creator: deepResult.creator,
+                    createdYear: deepResult.createdYear || currentRef.createdYear,
+                    creatorConfidence: "medium",
+                  };
+                }
+              }
+              if (Object.keys(deepPatch).length > 0) {
+                updateRecipe(newRecipe.id, { ...draft, ...patch, ...deepPatch });
+              }
+            } catch { /* ignore deep analyze errors */ }
+          } catch { /* ignore enrich errors */ }
+        })();
         recipeCount++;
       }
     }
@@ -845,7 +837,7 @@ export default function BookImportScreen() {
     setImportResult({ recipes: recipeCount, preps: prepCount });
     setPhase("reading");
     if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  }, [reviewItems, bookTitle, zh, addRecipe, updateRecipe, addPrep, sections, types, enrichRecipeMutation, deepAnalyzeMutation]);
+  }, [reviewItems, bookTitle, zh, addRecipe, updateRecipe, addPrep, sections, types]);
 
   // ─── Chapter headings for navigation ────────────────────────────────────────
   const chapterHeadings = useMemo(

@@ -21,7 +21,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useNetwork } from "@/hooks/use-network";
 import { useI18n } from "@/lib/i18n";
-import { trpc } from "@/lib/trpc";
+import { bulkImportExtract } from "@/lib/api/smart-router";
 import { useBottleStore } from "@/lib/bottles/store";
 import { useBottleTaxonomy } from "@/lib/bottles/taxonomy";
 import { useHomemadeStore } from "@/lib/homemade/store";
@@ -85,7 +85,7 @@ export default function BulkImportScreen() {
   const [rows, setRows] = useState<PreviewRow[]>([]);
   const [importedCount, setImportedCount] = useState<number | null>(null);
 
-  const extractMutation = trpc.bulkImport.extract.useMutation();
+
   const { isOnline } = useNetwork();
 
   const { addBottle } = useBottleStore();
@@ -113,7 +113,7 @@ export default function BulkImportScreen() {
     const created = addTag("glass", cleaned, CATEGORY_COLORS[3]);
     return created?.name ?? cleaned;
   };
-  const busy = extractMutation.isPending;
+  const busy = false;
 
   const pickFile = useCallback(async () => {
     const res = await DocumentPicker.getDocumentAsync({
@@ -215,7 +215,7 @@ export default function BulkImportScreen() {
     }
     setImportedCount(null);
     try {
-      const result = await extractMutation.mutateAsync(
+      const result = await bulkImportExtract(
         imageBase64
           ? { imageBase64, imageMime }
           : fileBase64 && fileName
@@ -240,7 +240,7 @@ export default function BulkImportScreen() {
       if (Platform.OS === "web") window.alert(msg);
       else Alert.alert(msg);
     }
-  }, [extractMutation, fileBase64, fileName, imageBase64, imageMime, text, lang]);
+  }, [fileBase64, fileName, imageBase64, imageMime, text, lang]);
 
   const toggleRow = (key: string) =>
     setRows((rs) => rs.map((r) => (r.key === key ? { ...r, checked: !r.checked } : r)));

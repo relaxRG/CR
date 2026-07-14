@@ -7,7 +7,7 @@ import * as Haptics from "expo-haptics";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
-import { trpc } from "@/lib/trpc";
+import { bulkImportExtract } from "@/lib/api/smart-router";
 import type { BulkImportItem } from "@/server/routers";
 
 /**
@@ -24,7 +24,7 @@ export function SmartImportBar({
 }) {
   const colors = useColors();
   const { t } = useI18n();
-  const extractMutation = trpc.bulkImport.extract.useMutation();
+
   const [busyKind, setBusyKind] = useState<"paste" | "camera" | "photo" | null>(null);
   const busy = busyKind !== null;
 
@@ -73,14 +73,14 @@ export function SmartImportBar({
         Alert.alert(t("smartImport.clipboard.empty.title"), t("smartImport.clipboard.empty.msg"));
         return;
       }
-      const res = await extractMutation.mutateAsync({ text });
+      const res = await bulkImportExtract({ text });
       handleResult(res.items as BulkImportItem[]);
     } catch (e) {
       fail(e);
     } finally {
       setBusyKind(null);
     }
-  }, [extractMutation, fail, handleResult, t]);
+  }, [fail, handleResult, t]);
 
   const runImage = useCallback(
     async (kind: "camera" | "photo") => {
@@ -96,7 +96,7 @@ export function SmartImportBar({
               });
         if (res.canceled || !res.assets?.[0]?.base64) return;
         const asset = res.assets[0];
-        const out = await extractMutation.mutateAsync({
+        const out = await bulkImportExtract({
           imageBase64: asset.base64!,
           imageMime: asset.mimeType || "image/jpeg",
         });
@@ -107,7 +107,7 @@ export function SmartImportBar({
         setBusyKind(null);
       }
     },
-    [extractMutation, fail, handleResult],
+    [fail, handleResult],
   );
 
   const buttons: {

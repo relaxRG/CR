@@ -17,7 +17,7 @@ import { SmartImportBar } from "@/components/smart-import-bar";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
-import { trpc } from "@/lib/trpc";
+import { enrichHomemade } from "@/lib/api/smart-router";
 import { useNetwork } from "@/hooks/use-network";
 import { useHomemadeStore } from "@/lib/homemade/store";
 import {
@@ -87,7 +87,7 @@ export default function HomemadeFormScreen() {
 
   // ── AI 补全 ──────────────────────────────────────────────────────────
   const { isOnline } = useNetwork();
-  const enrichHomemadeMutation = trpc.lookup.enrichHomemade.useMutation();
+  
   const [aiBusy, setAiBusy] = useState(false);
   const [aiStatus, setAiStatus] = useState<{ kind: "ok" | "err"; msg: string } | null>(null);
 
@@ -104,7 +104,7 @@ export default function HomemadeFormScreen() {
     setAiBusy(true);
     setAiStatus(null);
     try {
-      const res = await enrichHomemadeMutation.mutateAsync({
+      const res = await enrichHomemade({
         name: name.trim(),
         nameAlt: nameAlt.trim() || undefined,
         type: type || undefined,

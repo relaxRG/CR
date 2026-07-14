@@ -16,7 +16,6 @@ import {
 } from "react-native-safe-area-context";
 import type { EdgeInsets, Metrics, Rect } from "react-native-safe-area-context";
 
-import { trpc, createTRPCClient } from "@/lib/trpc";
 import { initManusRuntime, subscribeSafeAreaInsets } from "@/lib/_core/manus-runtime";
 import { RecipeProvider } from "@/lib/recipes/store";
 import { I18nProvider } from "@/lib/i18n";
@@ -79,8 +78,6 @@ export default function RootLayout() {
         },
       }),
   );
-  const [trpcClient] = useState(() => createTRPCClient());
-
   // Ensure minimum 8px padding for top and bottom on mobile
   const providerInitialMetrics = useMemo(() => {
     const metrics = initialWindowMetrics ?? { insets: initialInsets, frame: initialFrame };
@@ -96,7 +93,6 @@ export default function RootLayout() {
 
   const content = (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <trpc.Provider client={trpcClient} queryClient={queryClient}>
         <QueryClientProvider client={queryClient}>
       <I18nProvider>
       <SyncProvider>
@@ -151,7 +147,6 @@ export default function RootLayout() {
           </SyncProvider>
           </I18nProvider>
         </QueryClientProvider>
-      </trpc.Provider>
     </GestureHandlerRootView>
   );
 

@@ -23,7 +23,7 @@ import { useNetwork } from "@/hooks/use-network";
 import { useI18n } from "@/lib/i18n";
 import { BottleDraft, useBottleStore } from "@/lib/bottles/store";
 import { useBottleTaxonomy } from "@/lib/bottles/taxonomy";
-import { trpc } from "@/lib/trpc";
+import { enrichBottle, OfflineError } from "@/lib/api/smart-router";
 import { lookupInOfflineKb, extractBookSnippets, offlineEntryToEnrichResult } from "@/lib/bottles/offline-lookup";
 import { useBookStore } from "@/lib/books/store";
 import * as ImagePicker from "expo-image-picker";
@@ -97,11 +97,11 @@ export default function BottleFormScreen() {
   const canSave = nameZh.trim().length > 0 || nameEn.trim().length > 0;
 
   // ── AI 补全 ────────────────────────────────────────────────────────────────
-  const enrichBottleFullMutation = trpc.lookup.enrichBottleFull.useMutation();
+  const [enrichBusy, setEnrichBusy] = useState(false);
   const [lookupBusy, setLookupBusy] = useState<"auto" | "manual" | "photo" | null>(null);
   const [lookupStatus, setLookupStatus] = useState<{ kind: "ok" | "err" | "warn"; msg: string } | null>(null);
 
-  type FullResult = Awaited<ReturnType<typeof enrichBottleFullMutation.mutateAsync>>;
+  type FullResult = Awaited<ReturnType<typeof enrichBottle>>;
 
   // ── AI 建议面板 state ──────────────────────────────────────────────────────
   const [aiResult, setAiResult] = useState<FullResult | null>(null);
@@ -305,7 +305,7 @@ export default function BottleFormScreen() {
         imageMime: opts.imageMime,
         bookSnippets: onlineBookSnippets.length > 0 ? onlineBookSnippets : undefined,
       };
-      const res = await enrichBottleFullMutation.mutateAsync(enrichInput);
+      const res = await enrichBottle(enrichInput);
       if (!isMountedRef.current) return;
       if (!res.found) {
         setLookupStatus({ kind: "warn", msg: lang === "zh" ? "未找到该产品资料，已补全通用品类信息" : "Product not found, filled generic info" });
@@ -347,7 +347,7 @@ export default function BottleFormScreen() {
     } finally {
       if (isMountedRef.current) setLookupBusy(null);
     }
-  }, [nameZh, nameEn, brand, category, style, origin, isOnline, lang, t, enrichBottleFullMutation, books]);
+  }, [nameZh, nameEn, brand, category, style, origin, isOnline, lang, t, books]);
 
   /** 打开表单时自动触发一次 AI 补全（仅当有名称且在线） */
   useEffect(() => {

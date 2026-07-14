@@ -43,7 +43,7 @@ import { groupPrepsByName } from "@/lib/recipes/grouping";
 import { sortPreps, PREP_SORTS, PrepSort } from "@/lib/recipes/sort";
 import { Bottle } from "@/lib/bottles/types";
 import { useCardTagSettings } from "@/lib/settings/card-tags";
-import { trpc } from "@/lib/trpc";
+import { enrichHomemade } from "@/lib/api/smart-router";
 import { useNetwork } from "@/hooks/use-network";
 import {
   HomemadePrep,
@@ -137,14 +137,14 @@ export default function HomemadeScreen() {
     isMountedRef.current = true;
     return () => { isMountedRef.current = false; };
   }, []);
-  const enrichHomemadeMutation = trpc.lookup.enrichHomemade.useMutation();
+
   const [enriching, setEnriching] = useState(false);
   const [enrichMsg, setEnrichMsg] = useState<string | null>(null);
   const { isOnline } = useNetwork();
   const [enrichProgress, setEnrichProgress] = useState<{ done: number; total: number } | null>(null);
   const [enrichErrors, setEnrichErrors] = useState<string[]>([]);
   // 多选 AI 批量补全(补全 notes/shelfLife/storage)
-  const enrichSelectedMutation = trpc.lookup.enrichHomemade.useMutation();
+
   const [enrichingSelected, setEnrichingSelected] = useState(false);
   const [enrichSelectedMsg, setEnrichSelectedMsg] = useState<string | null>(null);
   const [enrichSelectedProgress, setEnrichSelectedProgress] = useState<{ done: number; total: number } | null>(null);
@@ -170,7 +170,7 @@ export default function HomemadeScreen() {
     for (let i = 0; i < targets.length; i++) {
       const p = targets[i];
       try {
-        const res = await enrichHomemadeMutation.mutateAsync({
+        const res = await enrichHomemade({
           name: p.name,
           nameAlt: p.nameAlt || undefined,
           type: p.type || undefined,
@@ -197,7 +197,7 @@ export default function HomemadeScreen() {
     setEnrichMsg(updated > 0 ? `已补全 ${updated} 条自制品` : "暂无需要补全的自制品");
     setEnriching(false);
     setEnrichProgress(null);
-  }, [enriching, isOnline, lang, groupPreps, enrichHomemadeMutation, updatePrep]);
+  }, [enriching, isOnline, lang, groupPreps, updatePrep]);
 
   const handleBatchEnrichSelected = useCallback(async () => {
     if (enrichingSelected || selectedIds.length === 0) return;
@@ -216,7 +216,7 @@ export default function HomemadeScreen() {
     for (let i = 0; i < targets.length; i++) {
       const p = targets[i];
       try {
-        const res = await enrichSelectedMutation.mutateAsync({
+        const res = await enrichHomemade({
           name: p.name,
           nameAlt: p.nameAlt || undefined,
           type: p.type || undefined,
@@ -243,7 +243,7 @@ export default function HomemadeScreen() {
     setEnrichSelectedMsg(updated > 0 ? t("lookup.batchDone", { n: updated }) : t("lookup.enrichNone"));
     setEnrichingSelected(false);
     setEnrichSelectedProgress(null);
-  }, [enrichingSelected, isOnline, lang, selectedIds, preps, enrichSelectedMutation, updatePrep, t]);
+  }, [enrichingSelected, isOnline, lang, selectedIds, preps, updatePrep, t]);
 
   const filtered = useMemo(
     () => {

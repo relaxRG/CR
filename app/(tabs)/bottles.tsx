@@ -35,7 +35,7 @@ import { useI18n } from "@/lib/i18n";
 import { filterBottles, useBottleStore } from "@/lib/bottles/store";
 import { applyEnrichedToBottle } from "@/lib/bottles/enrich";
 import type { BottleDraft } from "@/lib/bottles/store";
-import { trpc } from "@/lib/trpc";
+import { enrichBottle } from "@/lib/api/smart-router";
 import { useBottleTaxonomy } from "@/lib/bottles/taxonomy";
 import { groupFormFamilies, type FormFamily } from "@/lib/bottles/form-family";
 import { sortBottles, BOTTLE_SORTS, BottleSort } from "@/lib/recipes/sort";
@@ -117,7 +117,7 @@ export default function BottlesScreen() {
   //   "sel-review"  多选逐条确认
   //   "sel-autofill"多选批量自动填空白
   type QueueMode = "review" | "autofill" | "sel-review" | "sel-autofill";
-  type FullResult = Awaited<ReturnType<typeof enrichBottleFullMutation.mutateAsync>>;
+  type FullResult = Awaited<ReturnType<typeof enrichBottle>>;
   type AiField = { key: string; labelZh: string; aiValue: string; currentValue: string; conflict: "new" | "override" | "confirm" | "low" };
 
   // Prevent setState after unmount
@@ -127,7 +127,7 @@ export default function BottlesScreen() {
     return () => { isMountedRef.current = false; };
   }, []);
 
-  const enrichBottleFullMutation = trpc.lookup.enrichBottleFull.useMutation();
+
   const [aiQueue, setAiQueue] = useState<Bottle[]>([]);
   const [aiQueueIdx, setAiQueueIdx] = useState(0);
   const [aiQueueMode, setAiQueueMode] = useState<QueueMode>("review");
@@ -255,7 +255,7 @@ export default function BottlesScreen() {
     setAiQueueFetching(true);
     setAiQueueError(null);
     try {
-      const res = await enrichBottleFullMutation.mutateAsync({
+      const res = await enrichBottle({
         nameZh: b.nameZh || undefined,
         nameEn: b.nameEn || undefined,
         category: b.category || undefined,
@@ -337,7 +337,7 @@ export default function BottlesScreen() {
           : (lang === "zh" ? "网络错误，请检查连接" : "Network error, check connection"));
       }
     }
-  }, [enrichBottleFullMutation, updateBottle, buildQueueFields, autoFillBlanks, lang, books]);
+  }, [updateBottle, buildQueueFields, autoFillBlanks, lang, books]);
 
   /** Banner：启动缺资料条目补全队列 */
   const handleBatchEnrich = useCallback((mode: QueueMode) => {

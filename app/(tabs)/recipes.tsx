@@ -44,7 +44,7 @@ import { estimateRecipeCostSmart } from "@/lib/recipes/smart-cost";
 import { useBottleStore } from "@/lib/bottles/store";
 import { useHomemadeStore } from "@/lib/homemade/store";
 import { useRecipeStore } from "@/lib/recipes/store";
-import { trpc } from "@/lib/trpc";
+import { enrichRecipe as enrichRecipeAI, deepAnalyzeRecipe as deepAnalyzeRecipeAI } from "@/lib/api/smart-router";
 import { normalizeCodexFamilyDecl } from "@/lib/recipes/lineage";
 import {
   CODEX_FAMILIES,
@@ -90,8 +90,8 @@ export function RecipesScreen() {
     isMountedRef.current = true;
     return () => { isMountedRef.current = false; };
   }, []);
-  const enrichRecipeMutation = trpc.lookup.enrichRecipe.useMutation();
-  const deepAnalyzeMutation = trpc.lookup.deepAnalyzeRecipe.useMutation();
+
+
   const [enrichingRecipes, setEnrichingRecipes] = useState(false);
   const [enrichRecipeMsg, setEnrichRecipeMsg] = useState<string | null>(null);
   const [enrichRecipeProgress, setEnrichRecipeProgress] = useState<{ done: number; total: number } | null>(null);
@@ -420,7 +420,7 @@ export function RecipesScreen() {
       const r = targets[i];
       try {
         const ingNames = (r.ingredients ?? []).map((ing) => ing.name).filter(Boolean);
-        const res = await enrichRecipeMutation.mutateAsync({
+        const res = await enrichRecipeAI({
           name: r.name,
           nameEn: r.nameEn || undefined,
           baseSpirit: r.baseSpirit || undefined,
@@ -452,7 +452,7 @@ export function RecipesScreen() {
     setEnrichRecipeMsg(updated > 0 ? t("lookup.batchDone", { n: updated }) : t("lookup.enrichNone"));
     setEnrichingRecipes(false);
     setEnrichRecipeProgress(null);
-  }, [enrichingRecipes, selectedIds, recipes, enrichRecipeMutation, updateRecipe, t]);
+  }, [enrichingRecipes, selectedIds, recipes, updateRecipe, t]);
 
   const batchDeepTargets = useMemo(
     () =>
@@ -485,7 +485,7 @@ export function RecipesScreen() {
       const r = targets[i];
       try {
         const ingNames = (r.ingredients ?? []).map((ing) => ing.name).filter(Boolean);
-        const res = await deepAnalyzeMutation.mutateAsync({
+        const res = await deepAnalyzeRecipeAI({
           name: r.name || undefined,
           nameEn: r.nameEn || undefined,
           ingredients: ingNames.length > 0 ? ingNames.join(", ") : undefined,
@@ -534,7 +534,7 @@ export function RecipesScreen() {
     );
     setBatchDeepRunning(false);
     setBatchDeepProgress(null);
-  }, [batchDeepTargets, deepAnalyzeMutation, updateRecipe, isMountedRef, t]);
+  }, [batchDeepTargets, updateRecipe, isMountedRef, t]);
 
   const chipStyle = (active: boolean) => [
     styles.chip,

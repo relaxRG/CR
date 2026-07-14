@@ -45,7 +45,7 @@ import {
 } from "@/lib/bottles/enrich";
 import { type Bottle } from "@/lib/bottles/types";
 import { useHomemadeStore } from "@/lib/homemade/store";
-import { trpc } from "@/lib/trpc";
+import { enrichBottles } from "@/lib/api/smart-router";
 import { smartLinkIngredient, smartLinkDisplayName } from "@/lib/recipes/smart-link";
 import { useRecipeStore } from "@/lib/recipes/store";
 import { useMenuStore } from "@/lib/menu/store";
@@ -71,7 +71,7 @@ export default function RecipeDetailScreen() {
   const [menuModalVisible, setMenuModalVisible] = React.useState(false);
 
   // 联网补全:零价空壳条目(多为自动添加)→ LLM 知识补全资料并更新入库
-  const enrichMutation = trpc.lookup.enrich.useMutation();
+  const [enrichPending, setEnrichPending] = React.useState(false);
   const { isOnline } = useNetwork();
   const [enrichMsg, setEnrichMsg] = React.useState<string | null>(null);
 
@@ -148,7 +148,7 @@ export default function RecipeDetailScreen() {
 
   const handleEnrichMissing = async () => {
     const targets = missingBottles.slice(0, 8);
-    if (targets.length === 0 || enrichMutation.isPending) return;
+    if (targets.length === 0 || enrichPending) return;
     if (!isOnline) {
       setEnrichMsg(t("offline.aiUnavailable"));
       return;
@@ -156,7 +156,7 @@ export default function RecipeDetailScreen() {
     setEnrichMsg(null);
     const names = targets.map(enrichQueryName);
     try {
-      const res = await enrichMutation.mutateAsync({ names });
+      const res = await enrichBottles({ names });
       let updated = 0;
       targets.forEach((b, i) => {
         const item = matchEnrichedItem(res.items, names, i);
@@ -670,7 +670,7 @@ export default function RecipeDetailScreen() {
               {missingBottles.length > 0 ? (
                 <Pressable
                   onPress={handleEnrichMissing}
-                  disabled={enrichMutation.isPending}
+                  disabled={enrichPending}
                   style={({ pressed }) => [
                     {
                       flexDirection: "row",
@@ -682,10 +682,10 @@ export default function RecipeDetailScreen() {
                       marginTop: 10,
                       backgroundColor: colors.primary + "14",
                     },
-                    (pressed || enrichMutation.isPending) && { opacity: 0.6 },
+                    (pressed || enrichPending) && { opacity: 0.6 },
                   ]}
                 >
-                  {enrichMutation.isPending ? (
+                  {enrichPending ? (
                     <ActivityIndicator size="small" color={colors.primary} />
                   ) : (
                     <IconSymbol name="globe" size={14} color={colors.primary} />
