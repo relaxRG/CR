@@ -575,7 +575,12 @@ export default function HomemadeScreen() {
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-    router.push("/homemade-form");
+    // 装饰分区新建时预填第一个装饰类型，让装饰专属字段自动显示
+    if (group === "garnish") {
+      router.push({ pathname: "/homemade-form", params: { prefillType: "garnish-citrus-peel" } });
+    } else {
+      router.push("/homemade-form");
+    }
   };
 
 

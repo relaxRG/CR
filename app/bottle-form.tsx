@@ -101,9 +101,9 @@ export default function BottleFormScreen() {
   );
 
   // ── 库归属手动选择 ────────────────────────────────────────────────────────
-  // undefined = 系统自动判断（根据 category）；'homemade' = 用户手动归入自制库
-  const [libraryOverride, setLibraryOverride] = useState<'homemade' | undefined>(
-    editing?.libraryOverride === 'homemade' ? 'homemade' : undefined,
+  // undefined = 系统自动判断（根据 category）；其他值 = 用户手动指定所属库
+  const [libraryOverride, setLibraryOverride] = useState<'spirits' | 'bottles' | 'materials' | 'homemade' | undefined>(
+    editing?.libraryOverride ?? undefined,
   );
   const [homemadeGroup, setHomemadeGroup] = useState<'alcoholic' | 'non_alcoholic' | 'garnish' | 'other'>(
     editing?.homemadeGroup ?? 'non_alcoholic',
@@ -448,7 +448,7 @@ export default function BottleFormScreen() {
       if (homemadeType) draft.homemadeType = homemadeType;
     } else {
       // 清除之前设置的覆盖
-      draft.libraryOverride = undefined;
+      draft.libraryOverride = libraryOverride; // 'spirits'|'bottles'|'materials'|undefined
       draft.homemadeGroup = undefined;
       draft.homemadeType = undefined;
     }
@@ -741,20 +741,23 @@ export default function BottleFormScreen() {
             </Text>
             <View style={{ flexDirection: "row", backgroundColor: colors.border + "55", borderRadius: 10, padding: 2, gap: 2, marginBottom: 16 }}>
               {[
-                { key: undefined as 'homemade' | undefined, label: lang === "zh" ? "自动判断" : "Auto" },
+                { key: undefined as typeof libraryOverride, label: lang === "zh" ? "自动" : "Auto" },
+                { key: 'spirits' as const, label: lang === "zh" ? "基酒库" : "Spirits" },
+                { key: 'bottles' as const, label: lang === "zh" ? "酒款库" : "Bottles" },
+                { key: 'materials' as const, label: lang === "zh" ? "原材料" : "Materials" },
                 { key: 'homemade' as const, label: lang === "zh" ? "自制库" : "Homemade" },
               ].map((opt) => {
                 const active = libraryOverride === opt.key;
                 return (
                   <Pressable
                     key={opt.label}
-                    onPress={() => setLibraryOverride(opt.key)}
+                    onPress={() => setLibraryOverride(opt.key as typeof libraryOverride)}
                     style={[
-                      { flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: "center" as const },
+                      { flex: 1, paddingVertical: 6, borderRadius: 8, alignItems: "center" as const },
                       active && { backgroundColor: colors.surface, shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 2 },
                     ]}
                   >
-                    <Text style={{ fontSize: 13, fontWeight: active ? "600" : "400", color: active ? colors.foreground : colors.muted }}>
+                    <Text style={{ fontSize: 11, fontWeight: active ? "600" : "400", color: active ? colors.foreground : colors.muted }}>
                       {opt.label}
                     </Text>
                   </Pressable>

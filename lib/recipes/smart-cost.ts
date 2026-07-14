@@ -106,8 +106,15 @@ export function estimateIngredientCostSmart(
     const b = bottles.find((bt) => bt.id === ing.linkedBottleId);
     if (b) link = { kind: "bottle", bottle: b, matchConfidence: "exact" };
   } else if (ing.linkedPrepId) {
-    const p = preps.find((pr) => pr.id === ing.linkedPrepId);
-    if (p) link = { kind: "prep", prep: p, matchConfidence: "exact" };
+    if (ing.linkedPrepId.startsWith("bottle-override-")) {
+      // 虚拟 prep：ID 格式为 bottle-override-{bottleId}，回退到酒款成本逻辑
+      const bottleId = ing.linkedPrepId.replace("bottle-override-", "");
+      const b = bottles.find((bt) => bt.id === bottleId);
+      if (b) link = { kind: "bottle", bottle: b, matchConfidence: "exact" };
+    } else {
+      const p = preps.find((pr) => pr.id === ing.linkedPrepId);
+      if (p) link = { kind: "prep", prep: p, matchConfidence: "exact" };
+    }
   }
   if (!link) link = smartLinkIngredient(ing.name, bottles, preps);
   if (!link) {
@@ -163,6 +170,22 @@ export function estimateIngredientCostSmart(
   }
 
   // 自制品:复用现有的自制单位成本估算(内部会汇总自制配方的原料成本)
+  // 装饰类自制品：按件成本 × 件数计算
+  if (link.kind === "prep" && link.prep.abvGroup === "garnish") {
+    const costPerUnit = calcGarnishCostPerUnit(link.prep);
+    if (costPerUnit !== null) {
+      const count = parseGarnishCount(ing.amount);
+      return {
+        ingredient: ing,
+        link,
+        amountMl: null,
+        cost: costPerUnit * count,
+        reason: null,
+      };
+    }
+    return { ingredient: ing, link, amountMl: null, cost: null, reason: "no_price" };
+  }
+  // 普通自制品：按 ml 成本计算
   const hm = estimateHomemadeIngredientCost(ing.name, ing.amount, preps, bottles);
   if (hm && hm.cost !== null) {
     return { ingredient: ing, link, amountMl: amountMl, cost: hm.cost, reason: null };
@@ -184,4 +207,31 @@ export function estimateRecipeCostSmart(
     estimatedCount: estimated.length,
     totalCount: ingredients.length,
   };
+}
+import { calcGarnishCostPerUnit } from "../homemade/types";
+
+/**
+ * 解析装饰类成分的件数：
+ * - 纯数字（"1"、"2"）→ 直接取
+ * - 带单位（"2 片"、"1 枝"、"3 pieces"）→ 提取数字
+ * - 模糊描述（"适量"、"少许"、"as needed"）→ 默认 1 件
+ * - 无法解析 → 默认 1 件
+ */
+function parseGarnishCount(amount: string): number {
+  if (!amount?.trim()) return 1;
+  const a = amount.trim().toLowerCase();
+  // 模糊描述 → 1 件
+  if (/适量|少许|适当|as needed|to taste|garnish|装饰/.test(a)) return 1;
+  // 提取开头数字（含分数 1/2）
+  const m = a.match(/^(\d+(?:[./]\d+)?)/);
+  if (m) {
+    const raw = m[1];
+    if (raw.includes("/")) {
+      const [n, d] = raw.split("/").map(Number);
+      return d > 0 ? Math.max(1, Math.round(n / d)) : 1;
+    }
+    const n = parseFloat(raw);
+    return isNaN(n) || n <= 0 ? 1 : n;
+  }
+  return 1;
 }

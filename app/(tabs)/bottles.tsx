@@ -107,10 +107,19 @@ export default function BottlesScreen() {
   const { isOnline } = useNetwork();
   const { books } = useBookStore();
 
-  const groupBottles = useMemo(
-    () => bottles.filter((b) => b.libraryOverride !== 'homemade' && groupOf(b.category) === group),
-    [bottles, group, groupOf],
-  );
+ const groupBottles = useMemo(
+    () => bottles.filter((b) => {
+      // 归入自制库的条目不在酒款库显示
+      if (b.libraryOverride === 'homemade') return false;
+      // 手动强制路由：libraryOverride 与当前分组匹配则显示
+      if (b.libraryOverride === 'spirits') return group === 'spirits';
+      if (b.libraryOverride === 'bottles') return group === 'bottles';
+      if (b.libraryOverride === 'materials') return group === 'materials';
+      // 未设置 override 时按 category 自动判断
+      return groupOf(b.category) === group;
+    }),
+   [bottles, group, groupOf],
+ );
 
   // ── AI 建议队列状态机 ──────────────────────────────────────────────────────
   // 三种模式共用同一队列：

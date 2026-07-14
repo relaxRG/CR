@@ -1789,11 +1789,17 @@ export default function RecipeFormScreen() {
                     returnKeyType="done"
                     style={{ lineHeight: 20 }}
                   />
-                  <TextInput
-                    className="flex-[2] bg-surface border border-border rounded-xl px-3 py-2.5 text-base text-foreground"
-                    placeholder={t("form.ingredient.amount")}
-                    placeholderTextColor={colors.muted}
-                    value={ing.amount}
+                 <TextInput
+                   className="flex-[2] bg-surface border border-border rounded-xl px-3 py-2.5 text-base text-foreground"
+                    placeholder={
+                      prep?.abvGroup === "garnish"
+                        ? prep.garnishUnit
+                          ? `件数（${prep.garnishUnit}）`
+                          : "件数"
+                        : t("form.ingredient.amount")
+                    }
+                   placeholderTextColor={colors.muted}
+                   value={ing.amount}
                     onChangeText={(v) => updateIngredient(ing.id, "amount", v)}
                     returnKeyType="done"
                     style={{ lineHeight: 20 }}
