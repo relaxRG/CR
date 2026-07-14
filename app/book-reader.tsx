@@ -534,8 +534,7 @@ export default function BookReaderScreen() {
     return () => { isMountedRef.current = false; };
   }, []);
 
-  const { books, loadChapter, updatePosition } = useBookStore();
-  const { updateBook } = useBookStore();
+  const { books, loadChapter, updatePosition, updateBook } = useBookStore();
   const book = books.find((b) => b.id === id);
 
   const { addRecipe, updateRecipe, recipes, tagsOf, addTag, addRecipes } = useRecipeStore();
