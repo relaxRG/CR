@@ -81,6 +81,7 @@ const dict = {
   "dataManager.reset.confirm": { zh: "重置", en: "Reset" },
   "dataManager.reset.done": { zh: "已重置为出厂状态", en: "Factory reset complete" },
   "dataManager.confirm.reset": { zh: "确认重置为出厂状态？这将清除所有本地数据（配方、酒库、自制、书库等），操作不可恢复。", en: "Reset to factory state? This will wipe ALL local data (recipes, bottles, preps, books, etc.) and cannot be undone." },
+  "dataManager.reset.restart": { zh: "请重启 App 使更改完全生效。", en: "Please restart the App for changes to take full effect." },
   // Bulk import
   "bulk.title": { zh: "批量导入", en: "Bulk Import" },
   "smartImport.paste": { zh: "粘贴导入", en: "Paste" },

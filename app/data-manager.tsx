@@ -241,7 +241,7 @@ export default function DataManagerScreen() {
                   setResetting(true);
                   AsyncStorage.clear()
                     .then(() => {
-                      Alert.alert(t("dataManager.reset.done"));
+                      Alert.alert(t("dataManager.reset.done"), t("dataManager.reset.restart"));
                     })
                     .catch(() => Alert.alert(t("dataManager.export.error")))
                     .finally(() => setResetting(false));
@@ -260,7 +260,7 @@ export default function DataManagerScreen() {
                         AsyncStorage.clear()
                           .then(() => {
                             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                            Alert.alert(t("dataManager.reset.done"));
+                            Alert.alert(t("dataManager.reset.done"), t("dataManager.reset.restart"));
                           })
                           .catch(() => Alert.alert(t("dataManager.export.error")))
                           .finally(() => setResetting(false));
