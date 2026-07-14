@@ -128,7 +128,6 @@ export default function RootLayout() {
               <Stack.Screen name="lab/new" options={{ presentation: "modal" }} />
               <Stack.Screen name="lab/batch-form" options={{ presentation: "modal" }} />
               <Stack.Screen name="lab/compare" />
-              <Stack.Screen name="oauth/callback" />
               <Stack.Screen name="book-reader" />
               <Stack.Screen name="card-tag-settings" options={{ presentation: "modal" }} />
               <Stack.Screen name="device-manager" options={{ presentation: "modal" }} />
