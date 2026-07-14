@@ -8,7 +8,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
 import { bulkImportExtract } from "@/lib/api/smart-router";
-import type { BulkImportItem } from "@/server/routers";
+import type { BulkImportItem } from "@/shared/client-types";
 
 /**
  * 表单页顶部的智能导入栏:粘贴导入 / 拍照导入 / 相册导入。

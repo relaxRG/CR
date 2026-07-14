@@ -2,7 +2,7 @@
  * 联网补全结果 → 酒款更新的共享应用逻辑:
  * 只填充空字段,不覆盖用户已有数据;分类仅在自动添加的空壳条目上采用 LLM 归类。
  */
-import type { EnrichedProduct } from "../../server/routers";
+import type { EnrichedProduct } from "@/shared/client-types";
 import type { Bottle } from "./types";
 import { BOTTLE_CATEGORIES } from "./types";
 import type { BottleDraft } from "./store";
