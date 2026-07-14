@@ -32,7 +32,7 @@ import { suggestIngredients } from "@/lib/suggest";
 import { useBottleTaxonomy } from "@/lib/bottles/taxonomy";
 import { RecipeDraft, useRecipeStore } from "@/lib/recipes/store";
 import { enrichRecipe as enrichRecipeAI, deepAnalyzeRecipe as deepAnalyzeRecipeAI } from "@/lib/api/smart-router";
-import { parseRecipeText } from "@/lib/recipes/parser";
+import { parseRecipeText, toTitleCase } from "@/lib/recipes/parser";
 import { estimateRecipeAbv } from "@/lib/recipes/abv";
 import {
   CODEX_FAMILIES,
@@ -281,8 +281,49 @@ export default function RecipeFormScreen() {
       ? editing.ingredients
       : [{ id: genId(), name: "", amount: "" }],
   );
-  const [steps, setSteps] = useState(editing?.steps ?? "");
-  const [garnish, setGarnish] = useState(editing?.garnish ?? "");
+  // ── Steps: stored as numbered string, edited as dynamic rows ──────────────
+  /** Parse "1. xxx\n2. yyy" or plain text into step rows */
+  const parseStepRows = (raw: string): { id: string; text: string }[] => {
+    if (!raw.trim()) return [{ id: genId(), text: "" }];
+    const lines = raw.split("\n").map((l) => l.trim()).filter(Boolean);
+    return lines.map((l) => ({
+      id: genId(),
+      text: l.replace(/^\d+[.、)]\s*/, "").trim(),
+    }));
+  };
+  const serializeStepRows = (rows: { id: string; text: string }[]): string =>
+    rows
+      .filter((r) => r.text.trim())
+      .map((r, i) => `${i + 1}. ${r.text.trim()}`)
+      .join("\n");
+
+  const [stepRows, setStepRows] = useState<{ id: string; text: string }[]>(() =>
+    parseStepRows(editing?.steps ?? ""),
+  );
+  const steps = serializeStepRows(stepRows);
+
+  // ── Garnish: stored as string, edited as linkable rows ────────────────────
+  /** Parse garnish string (comma/semicolon separated or newline) into rows */
+  const parseGarnishRows = (raw: string): { id: string; name: string; linkedBottleId?: string; linkedPrepId?: string }[] => {
+    if (!raw.trim()) return [{ id: genId(), name: "" }];
+    const parts = raw.split(/[,，;；\n]+/).map((p) => p.trim()).filter(Boolean);
+    return parts.map((p) => ({ id: genId(), name: p }));
+  };
+  const serializeGarnishRows = (rows: { id: string; name: string }[]): string =>
+    rows.map((r) => r.name.trim()).filter(Boolean).join(", ");
+
+  const [garnishRows, setGarnishRows] = useState<{ id: string; name: string; linkedBottleId?: string; linkedPrepId?: string }[]>(() =>
+    parseGarnishRows(editing?.garnish ?? ""),
+  );
+  const garnish = serializeGarnishRows(garnishRows);
+  const [focusedGarnish, setFocusedGarnish] = useState<string | null>(null);
+  const [pickedGarnish, setPickedGarnish] = useState<Record<string, string>>({});
+  const [dismissedGarnishLinks, setDismissedGarnishLinks] = useState<Record<string, boolean>>(() => {
+    if (!editing?.garnish?.trim()) return {};
+    const rows = parseGarnishRows(editing.garnish);
+    return Object.fromEntries(rows.map((r) => [r.id, true]));
+  });
+  const [acceptedGarnishLinks, setAcceptedGarnishLinks] = useState<Record<string, boolean>>({});
   const [notes, setNotes] = useState(editing?.notes ?? "");
   const [importHint, setImportHint] = useState("");
   /** AI story/source/flavorDesc completion state */
@@ -373,8 +414,8 @@ export default function RecipeFormScreen() {
         }
       }
     }
-    if (prefillSteps) setSteps(prefillSteps);
-    if (prefillGarnish) setGarnish(prefillGarnish);
+    if (prefillSteps) setStepRows(parseStepRows(prefillSteps));
+    if (prefillGarnish) setGarnishRows(parseGarnishRows(prefillGarnish));
     if (prefillNotes) setNotes(prefillNotes);
     if (prefillIngredientsArr.length > 0) setIngredients(prefillIngredientsArr);
     if (prefillName || prefillNameEn || prefillIngredientsArr.length > 0) {
@@ -869,7 +910,7 @@ export default function RecipeFormScreen() {
 
   /** 将解析结果填充到表单;仅覆盖解析到内容的字段 */
   const applyParsed = (text: string) => {
-    const p = parseRecipeText(text);
+    const p = parseRecipeText(text, lang as "zh" | "en");
     const gotSomething =
       p.name || p.ingredients.length > 0 || p.steps || p.glass || p.garnish || p.source;
     if (!gotSomething) {
@@ -889,8 +930,8 @@ export default function RecipeFormScreen() {
       }
     }
     if (p.ingredients.length > 0) setIngredients(p.ingredients);
-    if (p.steps) setSteps(p.steps);
-    if (p.garnish) setGarnish(p.garnish);
+    if (p.steps) setStepRows(parseStepRows(p.steps));
+    if (p.garnish) setGarnishRows(parseGarnishRows(p.garnish));
     if (p.source) setSource(p.source);
     if (p.variantOf) setVariantOf(p.variantOf);
     // 文本明确声明的 Codex 家族:确认合法(解析器已规范化)即采用;
@@ -1055,8 +1096,8 @@ export default function RecipeFormScreen() {
                   })),
                 );
               }
-              if (item.steps) setSteps(item.steps);
-              if (item.garnish) setGarnish(item.garnish);
+              if (item.steps) setStepRows(parseStepRows(item.steps));
+              if (item.garnish) setGarnishRows(parseGarnishRows(item.garnish));
               if (item.source) setSource(item.source);
               if (item.notes) setNotes(item.notes);
               setImportHint(t("smartImport.filled"));
@@ -1690,11 +1731,12 @@ export default function RecipeFormScreen() {
                 <View className="flex-row items-center" style={{ gap: 8 }}>
                   <TextInput
                     className="flex-[3] bg-surface border border-border rounded-xl px-3 py-2.5 text-base text-foreground"
-                    placeholder={t("form.ingredient.name")}
-                    placeholderTextColor={colors.muted}
-                    value={ing.name}
-                    onChangeText={(v) => updateIngredient(ing.id, "name", v)}
-                    onFocus={() => setFocusedIng(ing.id)}
+                   placeholder={t("form.ingredient.name")}
+                   placeholderTextColor={colors.muted}
+                   value={ing.name}
+                   onChangeText={(v) => updateIngredient(ing.id, "name", v)}
+                   onFocus={() => setFocusedIng(ing.id)}
+                   autoCapitalize="words"
                     onBlur={() => {
                       // Delay so suggestion taps register before the list hides
                       setTimeout(() => {
@@ -2010,27 +2052,145 @@ export default function RecipeFormScreen() {
 
           {/* Steps */}
           <Text className="text-sm font-medium text-muted mt-5 mb-1.5">{t("form.steps")}</Text>
-          <TextInput
-            className="bg-surface border border-border rounded-xl px-4 py-3 text-base text-foreground"
-            placeholder={t("form.steps.placeholder")}
-            placeholderTextColor={colors.muted}
-            value={steps}
-            onChangeText={setSteps}
-            multiline
-            style={{ minHeight: 100, textAlignVertical: "top", lineHeight: 22 }}
-          />
+          {stepRows.map((row, idx) => (
+            <View key={row.id} className="flex-row items-start mb-2" style={{ gap: 8 }}>
+              <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center", marginTop: 10, flexShrink: 0 }}>
+                <Text style={{ fontSize: 12, fontWeight: "700", color: "#FFFFFF", lineHeight: 14 }}>{idx + 1}</Text>
+              </View>
+              <TextInput
+                className="flex-1 bg-surface border border-border rounded-xl px-3 py-2.5 text-base text-foreground"
+                placeholder={lang === "zh" ? `步骤 ${idx + 1}` : `Step ${idx + 1}`}
+                placeholderTextColor={colors.muted}
+                value={row.text}
+                onChangeText={(v) => setStepRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, text: v } : r)))}
+                multiline
+                style={{ minHeight: 44, textAlignVertical: "top", lineHeight: 22 }}
+              />
+              <Pressable
+                onPress={() => setStepRows((prev) => prev.length > 1 ? prev.filter((r) => r.id !== row.id) : prev)}
+                hitSlop={8}
+                style={({ pressed }) => [{ marginTop: 10 }, pressed && { opacity: 0.6 }]}
+              >
+                <IconSymbol name="minus.circle.fill" size={22} color={stepRows.length > 1 ? colors.error : colors.border} />
+              </Pressable>
+            </View>
+          ))}
+          <Pressable
+            onPress={() => setStepRows((prev) => [...prev, { id: genId(), text: "" }])}
+            style={({ pressed }) => [styles.addRow, pressed && { opacity: 0.6 }]}
+          >
+            <IconSymbol name="plus.circle.fill" size={20} color={colors.primary} />
+            <Text className="text-sm font-medium" style={{ color: colors.primary, lineHeight: 20 }}>
+              {lang === "zh" ? "添加步骤" : "Add Step"}
+            </Text>
+          </Pressable>
 
           {/* Garnish */}
           <Text className="text-sm font-medium text-muted mt-5 mb-1.5">{t("form.garnish")}</Text>
-          <TextInput
-            className="bg-surface border border-border rounded-xl px-4 py-3 text-base text-foreground"
-            placeholder={t("form.garnish.placeholder")}
-            placeholderTextColor={colors.muted}
-            value={garnish}
-            onChangeText={setGarnish}
-            returnKeyType="done"
-            style={{ lineHeight: 20 }}
-          />
+          {garnishRows.map((row) => {
+            const trimmed = row.name.trim();
+            const rawGLink = trimmed.length > 1 ? smartLinkIngredient(trimmed, bottles, preps) : null;
+            const isGFuzzy = rawGLink?.matchConfidence === "fuzzy";
+            const activeGLink = rawGLink && !isGFuzzy ? rawGLink : (rawGLink && isGFuzzy && !dismissedGarnishLinks[row.id] && acceptedGarnishLinks[row.id] ? rawGLink : null);
+            const pendingGFuzzyLink = isGFuzzy && !dismissedGarnishLinks[row.id] && !acceptedGarnishLinks[row.id] ? rawGLink : null;
+            const showGSuggest = focusedGarnish === row.id && trimmed.length > 0 && pickedGarnish[row.id] !== row.name;
+            const liveGSuggestions = showGSuggest ? suggestIngredients(trimmed, bottles, preps, lang, 4, groupOf).filter((s) => s.value !== trimmed) : [];
+            return (
+              <View key={row.id} className="mb-2">
+                <View className="flex-row items-center" style={{ gap: 8 }}>
+                  <TextInput
+                    className="flex-1 bg-surface border border-border rounded-xl px-3 py-2.5 text-base text-foreground"
+                    placeholder={lang === "zh" ? "装饰名称" : "Garnish name"}
+                    placeholderTextColor={colors.muted}
+                    value={row.name}
+                    onChangeText={(v) => {
+                      setGarnishRows((prev) => prev.map((r) => r.id === row.id ? { ...r, name: v, linkedBottleId: undefined, linkedPrepId: undefined } : r));
+                      setDismissedGarnishLinks((prev) => { const n = { ...prev }; delete n[row.id]; return n; });
+                      setAcceptedGarnishLinks((prev) => { const n = { ...prev }; delete n[row.id]; return n; });
+                    }}
+                    onFocus={() => setFocusedGarnish(row.id)}
+                    onBlur={() => setTimeout(() => setFocusedGarnish((cur) => (cur === row.id ? null : cur)), 150)}
+                    autoCapitalize="words"
+                    returnKeyType="done"
+                    style={{ lineHeight: 20 }}
+                  />
+                  <Pressable
+                    onPress={() => {
+                      setGarnishRows((prev) => prev.length > 1 ? prev.filter((r) => r.id !== row.id) : [{ id: genId(), name: "" }]);
+                      setDismissedGarnishLinks((prev) => { const n = { ...prev }; delete n[row.id]; return n; });
+                      setAcceptedGarnishLinks((prev) => { const n = { ...prev }; delete n[row.id]; return n; });
+                    }}
+                    hitSlop={8}
+                    style={({ pressed }) => [pressed && { opacity: 0.6 }]}
+                  >
+                    <IconSymbol name="minus.circle.fill" size={24} color={garnishRows.length > 1 ? colors.error : colors.border} />
+                  </Pressable>
+                </View>
+                {liveGSuggestions.length > 0 ? (
+                  <View className="rounded-xl border overflow-hidden mt-1" style={{ backgroundColor: colors.surface, borderColor: colors.border }}>
+                    {liveGSuggestions.map((s, sIdx) => (
+                      <Pressable
+                        key={s.key}
+                        onPress={() => {
+                          setGarnishRows((prev) => prev.map((r) => r.id === row.id ? { ...r, name: s.value } : r));
+                          setPickedGarnish((prev) => ({ ...prev, [row.id]: s.value }));
+                          setFocusedGarnish(null);
+                        }}
+                        style={({ pressed }) => [styles.suggestRow, sIdx > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }, pressed && { opacity: 0.6 }]}
+                      >
+                        <IconSymbol name={s.source === "homemade" ? "sparkles" : s.source === "spirits" ? "flame.fill" : s.source === "materials" ? "leaf.fill" : "wineglass.fill"} size={13} color={s.source === "homemade" ? colors.primary : s.source === "spirits" ? "#FF9500" : s.source === "materials" ? colors.success : "#5AC8FA"} />
+                        <Text className="text-sm text-foreground" numberOfLines={1} style={{ lineHeight: 18, flexShrink: 1 }}>{s.value}</Text>
+                        <View style={{ flex: 1 }} />
+                        <Text className="text-[11px]" style={{ lineHeight: 14, color: s.source === "homemade" ? colors.primary : s.source === "spirits" ? "#FF9500" : s.source === "materials" ? colors.success : "#5AC8FA" }}>
+                          {s.source === "homemade" ? t("form.suggest.homemade") : s.source === "spirits" ? t("form.suggest.spirits") : s.source === "materials" ? t("form.suggest.materials") : t("form.suggest.bottle")}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                ) : null}
+                {activeGLink ? (
+                  <View className="flex-row items-center flex-wrap mt-1" style={{ gap: 6 }}>
+                    <Pressable
+                      onPress={() => { if (activeGLink.kind === "prep") router.push({ pathname: "/homemade/[id]", params: { id: activeGLink.prep.id } }); else router.push({ pathname: "/bottle/[id]", params: { id: activeGLink.bottle.id } }); }}
+                      style={({ pressed }) => [styles.linkTag, pressed && { opacity: 0.7 }]}
+                    >
+                      <IconSymbol name={activeGLink.kind === "prep" ? "sparkles" : "link"} size={11} color={colors.primary} />
+                      <Text className="text-xs" style={{ color: colors.primary, lineHeight: 16 }}>{smartLinkDisplayName(activeGLink, lang as "zh" | "en")?.primary ?? ""}</Text>
+                      <IconSymbol name="chevron.right" size={10} color={colors.primary} />
+                    </Pressable>
+                    <Pressable
+                      onPress={() => { setGarnishRows((prev) => prev.map((r) => r.id === row.id ? { ...r, linkedBottleId: undefined, linkedPrepId: undefined } : r)); setDismissedGarnishLinks((prev) => ({ ...prev, [row.id]: true })); setAcceptedGarnishLinks((prev) => { const n = { ...prev }; delete n[row.id]; return n; }); }}
+                      style={({ pressed }) => [styles.unlinkBtn, pressed && { opacity: 0.7 }]}
+                    >
+                      <IconSymbol name="xmark" size={10} color={colors.muted} />
+                      <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>{t("form.link.break")}</Text>
+                    </Pressable>
+                  </View>
+                ) : pendingGFuzzyLink ? (
+                  <View className="flex-row items-center flex-wrap mt-1" style={{ gap: 6 }}>
+                    <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>
+                      {pendingGFuzzyLink.kind === "prep" ? t("form.link.fuzzy.prep").replace("{name}", smartLinkDisplayName(pendingGFuzzyLink, lang as "zh" | "en")?.primary ?? "") : t("form.link.fuzzy.bottle").replace("{name}", smartLinkDisplayName(pendingGFuzzyLink, lang as "zh" | "en")?.primary ?? "")}
+                    </Text>
+                    <Pressable onPress={() => setAcceptedGarnishLinks((prev) => ({ ...prev, [row.id]: true }))} style={({ pressed }) => [styles.linkTag, pressed && { opacity: 0.7 }]}>
+                      <Text className="text-xs" style={{ color: colors.primary, lineHeight: 16 }}>{t("form.link.accept")}</Text>
+                    </Pressable>
+                    <Pressable onPress={() => setDismissedGarnishLinks((prev) => ({ ...prev, [row.id]: true }))} style={({ pressed }) => [styles.unlinkBtn, pressed && { opacity: 0.7 }]}>
+                      <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>{t("form.link.dismiss")}</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
+              </View>
+            );
+          })}
+          <Pressable
+            onPress={() => setGarnishRows((prev) => [...prev, { id: genId(), name: "" }])}
+            style={({ pressed }) => [styles.addRow, pressed && { opacity: 0.6 }]}
+          >
+            <IconSymbol name="plus.circle.fill" size={20} color={colors.primary} />
+            <Text className="text-sm font-medium" style={{ color: colors.primary, lineHeight: 20 }}>
+              {lang === "zh" ? "添加装饰" : "Add Garnish"}
+            </Text>
+          </Pressable>
 
           {/* Flavor description */}
           <Text className="text-sm font-medium text-muted mt-5 mb-1.5">{t("form.flavorDesc")}</Text>
@@ -2198,8 +2358,26 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   saveBtnText: {
-    fontSize: 17,
-    fontWeight: "600",
+    fontSize: 16,
+    fontWeight: '600',
     lineHeight: 22,
+  },
+  linkTag: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#0a7ea440",
+    backgroundColor: "#0a7ea410",
+  },
+  unlinkBtn: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
   },
 });

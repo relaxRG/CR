@@ -1,6 +1,57 @@
 import { Ingredient, genId } from "./types";
 import { normalizeCodexFamilyDecl } from "./lineage";
 
+// ─── Modifier words (temperature/state/optional) ─────────────────────────────
+/** Words that describe state/temperature/optionality — should NOT be parsed as amount */
+export const MODIFIER_WORDS = [
+  "chilled", "cold", "warm", "hot", "frozen", "iced",
+  "room temperature", "room-temperature",
+  "fresh", "freshly squeezed", "freshly pressed",
+  "dry", "sweet", "extra dry", "extra-dry",
+  "optional", "to taste", "as needed", "as desired",
+  "unsalted", "salted", "smoked", "toasted", "roasted",
+];
+
+/** Regex matching a leading modifier word (case-insensitive, whole-word boundary) */
+const MODIFIER_RE = new RegExp(
+  `^(${MODIFIER_WORDS.map((w) => w.replace(/[-\s]/g, "[-\\s]?")).join("|")})\\b\\s*`,
+  "i",
+);
+
+// ─── Title Case helper ────────────────────────────────────────────────────────
+const LOWERCASE_WORDS = new Set([
+  "a", "an", "the", "and", "but", "or", "nor", "for", "so", "yet",
+  "at", "by", "in", "of", "on", "to", "up", "as", "if",
+  "with", "from", "into", "onto", "over", "than", "that", "via",
+]);
+
+/**
+ * Convert a string to Title Case (English only).
+ * - First and last word always capitalised.
+ * - Articles/prepositions/conjunctions stay lowercase unless first/last.
+ * - Preserves ALL-CAPS abbreviations (e.g. "ABV").
+ * - Preserves brand names with internal uppercase (e.g. "DeKuyper").
+ * - Does NOT touch strings containing CJK characters.
+ */
+export function toTitleCase(str: string): string {
+  if (!str) return str;
+  if (/[\u4e00-\u9fa5\u3040-\u30ff]/.test(str)) return str;
+  const words = str.split(/\s+/);
+  return words
+    .map((word, idx) => {
+      if (!word) return word;
+      if (/^[A-Z]{2,}$/.test(word)) return word;
+      if (/[A-Z]/.test(word.slice(1))) return word;
+      const lower = word.toLowerCase();
+      if (idx === 0 || idx === words.length - 1) {
+        return lower.charAt(0).toUpperCase() + lower.slice(1);
+      }
+      if (LOWERCASE_WORDS.has(lower)) return lower;
+      return lower.charAt(0).toUpperCase() + lower.slice(1);
+    })
+    .join(" ");
+}
+
 /** 解析结果:与表单字段对应,均为可选 */
 export interface ParsedRecipe {
   name: string;
@@ -106,24 +157,43 @@ export function looksLikeIngredientLine(line: string): boolean {
   return AMOUNT_RE.test(t);
 }
 
-/** 从配料行拆出 名称 + 用量 */
-export function splitIngredientLine(line: string): { name: string; amount: string } {
+/** 从配料行拆出 名称 + 用量 + 修饰词 */
+export function splitIngredientLine(
+  line: string,
+  opts?: { lang?: "zh" | "en"; applyTitleCase?: boolean },
+): { name: string; amount: string; modifier?: string } {
+  const lang = opts?.lang ?? "zh";
+  const applyTitleCase = opts?.applyTitleCase ?? (lang === "en");
   let t = line
     .trim()
     .replace(/^[-•·*▪◦●]+\s*/, "") // 去列表符号(不吞行首数字,避免破坏"2 dash xx")
     .replace(/^\d+[.、)]\s+/, "") // 去"1. / 1、/ 1) "式序号(需带分隔符+空格)
     .replace(/\s{2,}/g, " ");
 
-  const m = t.match(AMOUNT_RE);
-  if (!m) return { name: t, amount: "" };
+  // Strip leading modifier words before trying to parse amount
+  let modifier: string | undefined;
+  const modMatch = t.match(MODIFIER_RE);
+  if (modMatch) {
+    modifier = modMatch[1].toLowerCase().replace(/[-\s]+/g, " ").trim();
+    t = t.slice(modMatch[0].length).trim();
+  }
 
+  const m = t.match(AMOUNT_RE);
+  if (!m) {
+    const name = applyTitleCase ? toTitleCase(t) : t;
+    return { name, amount: "", modifier };
+  }
   const amount = m[0].trim();
   // 名称 = 去掉用量后的剩余部分
   let name = t.replace(m[0], "").trim();
   name = name.replace(/^[::\-–—,,]+|[::\-–—,,]+$/g, "").trim();
   // 处理"金酒 45ml"与"45ml 金酒"两种顺序
-  if (!name) return { name: t, amount: "" };
-  return { name, amount };
+  if (!name) {
+    const fallback = applyTitleCase ? toTitleCase(t) : t;
+    return { name: fallback, amount: "", modifier };
+  }
+  if (applyTitleCase) name = toTitleCase(name);
+  return { name, amount, modifier };
 }
 
 /**
@@ -132,7 +202,8 @@ export function splitIngredientLine(line: string): { name: string; amount: strin
  * 1. 有分节标题(配料:/做法:)
  * 2. 无标题——自动把"像配料"的行归为配料,其余归为做法
  */
-export function parseRecipeText(text: string): ParsedRecipe {
+export function parseRecipeText(text: string, lang?: "zh" | "en"): ParsedRecipe {
+  const useTitleCase = lang === "en";
   const result: ParsedRecipe = {
     name: "",
     ingredients: [],
@@ -193,11 +264,12 @@ export function parseRecipeText(text: string): ParsedRecipe {
 
     if (section === "ingredients") {
       if (looksLikeIngredientLine(line)) {
-        const { name, amount } = splitIngredientLine(line);
+        const { name, amount } = splitIngredientLine(line, { lang, applyTitleCase: useTitleCase });
         result.ingredients.push({ id: genId(), name, amount });
       } else {
         // 配料节中不像配料的行,可能是无用量配料(如"薄荷叶")
-        result.ingredients.push({ id: genId(), name: line.replace(/^[-•·*\d]+[.、)\s]*\s*/, ""), amount: "" });
+        const rawName = line.replace(/^[-•·*\d]+[.、)\s]*\s*/, "");
+        result.ingredients.push({ id: genId(), name: useTitleCase ? toTitleCase(rawName) : rawName, amount: "" });
       }
       continue;
     }
@@ -215,7 +287,7 @@ export function parseRecipeText(text: string): ParsedRecipe {
   // 无分节标题时的自动归类
   for (const line of bodyLines) {
     if (looksLikeIngredientLine(line)) {
-      const { name, amount } = splitIngredientLine(line);
+      const { name, amount } = splitIngredientLine(line, { lang, applyTitleCase: useTitleCase });
       result.ingredients.push({ id: genId(), name, amount });
     } else if (!result.name && line.length <= 25 && !/[。;;.]/.test(line)) {
       // 第一条简短且不含句号的行 → 酒名

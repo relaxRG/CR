@@ -81,7 +81,18 @@ export default function HomemadeFormScreen() {
     return Object.fromEntries(rows.map((r) => [r.id, true]));
   });
   const [acceptedLinks, setAcceptedLinks] = useState<Record<string, boolean>>({});
-  const [recipe, setRecipe] = useState(editing?.recipe ?? "");
+  // ── Recipe steps: stored as numbered string, edited as dynamic rows ──────
+  const parseStepRows = (raw: string): { id: string; text: string }[] => {
+    if (!raw.trim()) return [{ id: genId(), text: "" }];
+    const lines = raw.split("\n").map((l) => l.trim()).filter(Boolean);
+    return lines.map((l) => ({ id: genId(), text: l.replace(/^\d+[.、)]\s*/, "").trim() }));
+  };
+  const serializeStepRows = (rows: { id: string; text: string }[]): string =>
+    rows.filter((r) => r.text.trim()).map((r, i) => `${i + 1}. ${r.text.trim()}`).join("\n");
+  const [stepRows, setStepRows] = useState<{ id: string; text: string }[]>(() =>
+    parseStepRows(editing?.recipe ?? ""),
+  );
+  const recipe = serializeStepRows(stepRows);
   const [yieldStr, setYieldStr] = useState(editing?.yield ?? "");
   const [shelfLife, setShelfLife] = useState(editing?.shelfLife ?? "");
   const [storage, setStorage] = useState(editing?.storage ?? "");
@@ -261,7 +272,7 @@ export default function HomemadeFormScreen() {
                   setNameAlt(item.nameZh ? item.nameEn : "");
                 }
                 if (item.prepIngredients?.length) setIngRows(toRows(item.prepIngredients));
-                if (item.prepRecipe) setRecipe(item.prepRecipe);
+                if (item.prepRecipe) setStepRows(parseStepRows(item.prepRecipe));
                 if (item.prepYield) setYieldStr(item.prepYield);
                 if (item.shelfLife) setShelfLife(item.shelfLife);
                 if (item.storage) setStorage(item.storage);
@@ -631,18 +642,37 @@ export default function HomemadeFormScreen() {
           </Pressable>
 
           {fieldLabel(t("hmform.recipe"))}
-          <TextInput
-            style={[...inputStyle, styles.multiline]}
-            value={recipe}
-            onChangeText={setRecipe}
-            placeholder={
-              lang === "en"
-                ? "Method steps…"
-                : "做法步骤…"
-            }
-            placeholderTextColor={colors.muted}
-            multiline
-          />
+          {stepRows.map((row, idx) => (
+            <View key={row.id} style={{ flexDirection: "row", alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
+              <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center", marginTop: 10, flexShrink: 0 }}>
+                <Text style={{ fontSize: 12, fontWeight: "700", color: "#FFFFFF", lineHeight: 14 }}>{idx + 1}</Text>
+              </View>
+              <TextInput
+                style={[{ flex: 1, minHeight: 44, textAlignVertical: "top", lineHeight: 22 }, ...inputStyle]}
+                placeholder={lang === "en" ? `Step ${idx + 1}` : `步骤 ${idx + 1}`}
+                placeholderTextColor={colors.muted}
+                value={row.text}
+                onChangeText={(v) => setStepRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, text: v } : r)))}
+                multiline
+              />
+              <Pressable
+                onPress={() => setStepRows((prev) => prev.length > 1 ? prev.filter((r) => r.id !== row.id) : prev)}
+                hitSlop={8}
+                style={({ pressed }) => [{ marginTop: 10 }, pressed && { opacity: 0.6 }]}
+              >
+                <IconSymbol name="minus.circle.fill" size={22} color={stepRows.length > 1 ? colors.error : colors.border} />
+              </Pressable>
+            </View>
+          ))}
+          <Pressable
+            onPress={() => setStepRows((prev) => [...prev, { id: genId(), text: "" }])}
+            style={({ pressed }) => [styles.addRow, pressed && { opacity: 0.6 }]}
+          >
+            <IconSymbol name="plus.circle.fill" size={20} color={colors.primary} />
+            <Text style={{ fontSize: 14, fontWeight: "500", color: colors.primary, lineHeight: 20 }}>
+              {lang === "zh" ? "添加步骤" : "Add Step"}
+            </Text>
+          </Pressable>
 
           {fieldLabel(t("hmform.yield"))}
           <TextInput
