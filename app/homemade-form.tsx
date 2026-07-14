@@ -70,6 +70,8 @@ export default function HomemadeFormScreen() {
   const [focusedIng, setFocusedIng] = useState<string | null>(null);
   /** Rows where user picked a suggestion — suppress dropdown until text changes */
   const [pickedIng, setPickedIng] = useState<Record<string, string>>({});
+  const [dismissedLinks, setDismissedLinks] = useState<Record<string, boolean>>({});
+  const [acceptedLinks, setAcceptedLinks] = useState<Record<string, boolean>>({});
   const [recipe, setRecipe] = useState(editing?.recipe ?? "");
   const [yieldStr, setYieldStr] = useState(editing?.yield ?? "");
   const [shelfLife, setShelfLife] = useState(editing?.shelfLife ?? "");
@@ -142,6 +144,10 @@ export default function HomemadeFormScreen() {
 
   const updateIngRow = (rid: string, field: "name" | "amount", value: string) => {
     setIngRows((prev) => prev.map((r) => (r.id === rid ? { ...r, [field]: value } : r)));
+    if (field === "name") {
+      setDismissedLinks((prev) => { const n = { ...prev }; delete n[rid]; return n; });
+      setAcceptedLinks((prev) => { const n = { ...prev }; delete n[rid]; return n; });
+    }
   };
   const pickSuggestion = (rid: string, value: string) => {
     updateIngRow(rid, "name", value);
@@ -386,9 +392,18 @@ export default function HomemadeFormScreen() {
             const liveSuggestions = showSuggest
               ? suggestIngredients(trimmed, bottles, allPreps.filter((p) => p.id !== (editing?.id ?? "")), lang).filter((s) => s.value !== trimmed)
               : [];
-            const link = trimmed.length >= 2 && pickedIng[row.id] === row.name
+            const rawLink = trimmed.length >= 2
               ? smartLinkIngredient(trimmed, bottles, allPreps.filter((p) => p.id !== (editing?.id ?? "")))
               : null;
+            const isFuzzy = rawLink?.matchConfidence === "fuzzy";
+            const link = isFuzzy
+              ? dismissedLinks[row.id]
+                ? null
+                : acceptedLinks[row.id]
+                  ? rawLink
+                  : null
+              : rawLink;
+            const pendingFuzzyLink = isFuzzy && !dismissedLinks[row.id] && !acceptedLinks[row.id] ? rawLink : null;
             return (
               <View key={row.id} style={{ marginBottom: 8 }}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -539,6 +554,42 @@ export default function HomemadeFormScreen() {
                       </View>
                     );
                   })()
+                ) : pendingFuzzyLink ? (
+                  (() => {
+                    const fuzzyCanon = smartLinkDisplayName(pendingFuzzyLink, lang as "zh" | "en");
+                    const fuzzyName = fuzzyCanon?.primary ?? (pendingFuzzyLink.kind === "bottle" ? pendingFuzzyLink.bottle.nameZh || pendingFuzzyLink.bottle.nameEn : pendingFuzzyLink.prep.name);
+                    const fuzzyKey = pendingFuzzyLink.kind === "bottle" ? "form.link.fuzzy.bottle" : "form.link.fuzzy.prep";
+                    return (
+                      <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 6, marginTop: 3, paddingHorizontal: 4 }}>
+                        <Text style={{ fontSize: 11, lineHeight: 14, color: colors.muted }}>
+                          {t(fuzzyKey, { name: fuzzyName })}
+                        </Text>
+                        <Pressable
+                          onPress={() => setAcceptedLinks((prev) => ({ ...prev, [row.id]: true }))}
+                          style={({ pressed }) => [{ flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 0.5, borderColor: colors.success }, pressed && { opacity: 0.6 }]}
+                        >
+                          <IconSymbol name="checkmark" size={10} color={colors.success} />
+                          <Text style={{ fontSize: 11, lineHeight: 14, color: colors.success }}>{t("form.link.accept")}</Text>
+                        </Pressable>
+                        <Pressable
+                          onPress={() => setDismissedLinks((prev) => ({ ...prev, [row.id]: true }))}
+                          style={({ pressed }) => [{ flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 0.5, borderColor: colors.border }, pressed && { opacity: 0.6 }]}
+                        >
+                          <IconSymbol name="xmark" size={10} color={colors.muted} />
+                          <Text style={{ fontSize: 11, lineHeight: 14, color: colors.muted }}>{t("form.link.dismiss")}</Text>
+                        </Pressable>
+                      </View>
+                    );
+                  })()
+                ) : null}
+                {link ? (
+                  <Pressable
+                    onPress={() => setDismissedLinks((prev) => ({ ...prev, [row.id]: true }))}
+                    style={({ pressed }) => [{ flexDirection: "row", alignItems: "center", gap: 3, marginTop: 2, paddingHorizontal: 4 }, pressed && { opacity: 0.6 }]}
+                  >
+                    <IconSymbol name="xmark" size={10} color={colors.muted} />
+                    <Text style={{ fontSize: 11, lineHeight: 14, color: colors.muted }}>{t("form.link.break")}</Text>
+                  </Pressable>
                 ) : null}
               </View>
             );

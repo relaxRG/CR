@@ -17,8 +17,8 @@ import { resolveIngredientNames } from "./ingredient-display";
 import { stripForm } from "./form-fold";
 
 export type SmartLink =
-  | { kind: "bottle"; bottle: Bottle; form?: { key: string; factor: number } }
-  | { kind: "prep"; prep: HomemadePrep }
+  | { kind: "bottle"; bottle: Bottle; form?: { key: string; factor: number }; matchConfidence: "exact" | "fuzzy" }
+  | { kind: "prep"; prep: HomemadePrep; matchConfidence: "exact" | "fuzzy" }
   | null;
 
 const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
@@ -58,9 +58,9 @@ export function smartLinkIngredient(
   //    直接精确命中该条目本身,按其自身价格/规格计价;
   //    只有库内没有该形态条目时,才会走 4.5 的母条目 × 系数换算兜底。
   const eb = exactBottle(name, bottles);
-  if (eb) return { kind: "bottle", bottle: eb };
+  if (eb) return { kind: "bottle", bottle: eb, matchConfidence: "exact" };
   const ep = exactPrep(name, preps);
-  if (ep) return { kind: "prep", prep: ep };
+  if (ep) return { kind: "prep", prep: ep, matchConfidence: "exact" };
 
   // 2) Waldorf 别名规范化 → 双边精确匹配
   const resolved = resolveIngredientNames(name, bottles, preps);
@@ -68,9 +68,9 @@ export function smartLinkIngredient(
     for (const candidate of [resolved.zh, resolved.en]) {
       if (!candidate || norm(candidate) === norm(name)) continue;
       const b = exactBottle(candidate, bottles);
-      if (b) return { kind: "bottle", bottle: b };
+      if (b) return { kind: "bottle", bottle: b, matchConfidence: "exact" };
       const p = exactPrep(candidate, preps);
-      if (p) return { kind: "prep", prep: p };
+      if (p) return { kind: "prep", prep: p, matchConfidence: "exact" };
     }
   }
 
@@ -78,9 +78,9 @@ export function smartLinkIngredient(
   const normalized = normalizeIngredientName(name);
   if (normalized && norm(normalized) !== norm(name)) {
     const b = exactBottle(normalized, bottles);
-    if (b) return { kind: "bottle", bottle: b };
+    if (b) return { kind: "bottle", bottle: b, matchConfidence: "exact" };
     const p = exactPrep(normalized, preps);
-    if (p) return { kind: "prep", prep: p };
+    if (p) return { kind: "prep", prep: p, matchConfidence: "exact" };
   }
 
   // 4) 模糊匹配:自制优先,其次酒库(matchBottle 含类别兜底)
@@ -94,10 +94,11 @@ export function smartLinkIngredient(
         kind: "bottle",
         bottle: ebE,
         form: { key: strippedEarly.form, factor: strippedEarly.factor },
+        matchConfidence: "exact",
       };
   }
   const fp = matchPrep(name, preps);
-  if (fp) return { kind: "prep", prep: fp };
+  if (fp) return { kind: "prep", prep: fp, matchConfidence: "fuzzy" };
   const fb = matchBottle(name, bottles);
   if (fb) {
     // 模糊命中但原名带形态词且命中的正是母条目 → 附加形态信息
@@ -109,9 +110,10 @@ export function smartLinkIngredient(
         kind: "bottle",
         bottle: fb,
         form: { key: strippedEarly.form, factor: strippedEarly.factor },
+        matchConfidence: "fuzzy",
       };
     }
-    return { kind: "bottle", bottle: fb };
+    return { kind: "bottle", bottle: fb, matchConfidence: "fuzzy" };
   }
 
   // 5) 规范名再走一轮模糊(处理 Waldorf 别名下的变体写法)
@@ -119,9 +121,9 @@ export function smartLinkIngredient(
     for (const candidate of [resolved.zh, resolved.en]) {
       if (!candidate) continue;
       const p2 = matchPrep(candidate, preps);
-      if (p2) return { kind: "prep", prep: p2 };
+      if (p2) return { kind: "prep", prep: p2, matchConfidence: "fuzzy" };
       const b2 = matchBottle(candidate, bottles);
-      if (b2) return { kind: "bottle", bottle: b2 };
+      if (b2) return { kind: "bottle", bottle: b2, matchConfidence: "fuzzy" };
     }
   }
 
@@ -132,11 +134,11 @@ export function smartLinkIngredient(
     if (normalizedBase && norm(normalizedBase) !== norm(stripped.base)) {
       const eb3 = exactBottle(normalizedBase, bottles);
       if (eb3)
-        return { kind: "bottle", bottle: eb3, form: { key: stripped.form, factor: stripped.factor } };
+        return { kind: "bottle", bottle: eb3, form: { key: stripped.form, factor: stripped.factor }, matchConfidence: "exact" };
     }
     const fb2 = matchBottle(stripped.base, bottles);
     if (fb2)
-      return { kind: "bottle", bottle: fb2, form: { key: stripped.form, factor: stripped.factor } };
+      return { kind: "bottle", bottle: fb2, form: { key: stripped.form, factor: stripped.factor }, matchConfidence: "fuzzy" };
   }
   return null;
 }

@@ -384,6 +384,10 @@ export default function RecipeFormScreen() {
   const [focusedIng, setFocusedIng] = useState<string | null>(null);
   /** Rows where user picked/dismissed suggestions — suppress until text changes */
   const [pickedIng, setPickedIng] = useState<Record<string, string>>({});
+  /** ingId → true: user dismissed the fuzzy link suggestion */
+  const [dismissedLinks, setDismissedLinks] = useState<Record<string, boolean>>({});
+  /** ingId → true: user explicitly accepted a fuzzy link */
+  const [acceptedLinks, setAcceptedLinks] = useState<Record<string, boolean>>({});
 
   const ensureSpiritName = (raw: string) => {
     const cleaned = raw.trim();
@@ -824,6 +828,11 @@ export default function RecipeFormScreen() {
 
   const updateIngredient = (iid: string, field: "name" | "amount", value: string) => {
     setIngredients((prev) => prev.map((i) => (i.id === iid ? { ...i, [field]: value } : i)));
+    if (field === "name") {
+      // Reset link decisions when user edits the name
+      setDismissedLinks((prev) => { const n = { ...prev }; delete n[iid]; return n; });
+      setAcceptedLinks((prev) => { const n = { ...prev }; delete n[iid]; return n; });
+    }
   };
 
   const pickSuggestion = (iid: string, value: string) => {
@@ -1644,12 +1653,22 @@ export default function RecipeFormScreen() {
           <Text className="text-sm font-medium text-muted mt-5 mb-1.5">{t("form.ingredients")}</Text>
           {ingredients.map((ing) => {
             const trimmed = ing.name.trim();
-            const link = trimmed.length >= 2 ? smartLinkIngredient(trimmed, bottles, preps) : null;
+            const rawLink = trimmed.length >= 2 ? smartLinkIngredient(trimmed, bottles, preps) : null;
+            // Exact match: always show. Fuzzy match: only show if user accepted, hide if dismissed.
+            const isFuzzy = rawLink?.matchConfidence === "fuzzy";
+            const link = isFuzzy
+              ? dismissedLinks[ing.id]
+                ? null
+                : acceptedLinks[ing.id]
+                  ? rawLink
+                  : null  // fuzzy but not yet decided → show suggestion UI below
+              : rawLink;
+            const pendingFuzzyLink = isFuzzy && !dismissedLinks[ing.id] && !acceptedLinks[ing.id] ? rawLink : null;
             const prep = link?.kind === "prep" ? link.prep : null;
             const linkedBottle = link?.kind === "bottle" ? link.bottle : null;
-            const suggestion = !link && trimmed.length >= 2 ? suggestPrep(trimmed) : null;
+            const suggestion = !rawLink && trimmed.length >= 2 ? suggestPrep(trimmed) : null;
             const classification =
-              !link && !suggestion && trimmed.length >= 3
+              !rawLink && !suggestion && trimmed.length >= 3
                 ? analyzeUnknownIngredient(trimmed, bottles, preps)
                 : null;
             const showSuggest =
@@ -1808,6 +1827,15 @@ export default function RecipeFormScreen() {
                             </Text>
                           </Pressable>
                         ) : null}
+                        <Pressable
+                          onPress={() => setDismissedLinks((prev) => ({ ...prev, [ing.id]: true }))}
+                          style={({ pressed }) => [styles.prepHint, pressed && { opacity: 0.6 }, { borderColor: colors.border }]}
+                        >
+                          <IconSymbol name="xmark" size={11} color={colors.muted} />
+                          <Text className="text-xs" style={{ color: colors.muted, lineHeight: 16 }}>
+                            {t("form.link.break")}
+                          </Text>
+                        </Pressable>
                       </View>
                     );
                   })()
@@ -1842,6 +1870,46 @@ export default function RecipeFormScreen() {
                             </Text>
                           </Pressable>
                         ) : null}
+                        <Pressable
+                          onPress={() => setDismissedLinks((prev) => ({ ...prev, [ing.id]: true }))}
+                          style={({ pressed }) => [styles.prepHint, pressed && { opacity: 0.6 }, { borderColor: colors.border }]}
+                        >
+                          <IconSymbol name="xmark" size={11} color={colors.muted} />
+                          <Text className="text-xs" style={{ color: colors.muted, lineHeight: 16 }}>
+                            {t("form.link.break")}
+                          </Text>
+                        </Pressable>
+                      </View>
+                    );
+                  })()
+                ) : pendingFuzzyLink ? (
+                  (() => {
+                    const fuzzyCanon = smartLinkDisplayName(pendingFuzzyLink, lang as "zh" | "en");
+                    const fuzzyName = fuzzyCanon?.primary ?? (pendingFuzzyLink.kind === "bottle" ? pendingFuzzyLink.bottle.nameZh || pendingFuzzyLink.bottle.nameEn : pendingFuzzyLink.prep.name);
+                    const fuzzyKey = pendingFuzzyLink.kind === "bottle" ? "form.link.fuzzy.bottle" : "form.link.fuzzy.prep";
+                    return (
+                      <View className="flex-row items-center flex-wrap" style={{ gap: 8 }}>
+                        <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>
+                          {t(fuzzyKey, { name: fuzzyName })}
+                        </Text>
+                        <Pressable
+                          onPress={() => setAcceptedLinks((prev) => ({ ...prev, [ing.id]: true }))}
+                          style={({ pressed }) => [styles.prepHint, pressed && { opacity: 0.6 }, { borderColor: colors.success }]}
+                        >
+                          <IconSymbol name="checkmark" size={11} color={colors.success} />
+                          <Text className="text-xs" style={{ color: colors.success, lineHeight: 16 }}>
+                            {t("form.link.accept")}
+                          </Text>
+                        </Pressable>
+                        <Pressable
+                          onPress={() => setDismissedLinks((prev) => ({ ...prev, [ing.id]: true }))}
+                          style={({ pressed }) => [styles.prepHint, pressed && { opacity: 0.6 }, { borderColor: colors.border }]}
+                        >
+                          <IconSymbol name="xmark" size={11} color={colors.muted} />
+                          <Text className="text-xs" style={{ color: colors.muted, lineHeight: 16 }}>
+                            {t("form.link.dismiss")}
+                          </Text>
+                        </Pressable>
                       </View>
                     );
                   })()
