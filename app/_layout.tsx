@@ -20,7 +20,7 @@ import { trpc, createTRPCClient } from "@/lib/trpc";
 import { initManusRuntime, subscribeSafeAreaInsets } from "@/lib/_core/manus-runtime";
 import { RecipeProvider } from "@/lib/recipes/store";
 import { I18nProvider } from "@/lib/i18n";
-import { SyncProvider } from "@/lib/sync/provider";
+import { SyncProvider } from "@/lib/cf-sync/provider";
 import { BottleProvider } from "@/lib/bottles/store";
 import { BottleTaxonomyProvider } from "@/lib/bottles/taxonomy";
 import { HomemadeProvider } from "@/lib/homemade/store";
@@ -135,6 +135,8 @@ export default function RootLayout() {
               <Stack.Screen name="oauth/callback" />
               <Stack.Screen name="book-reader" />
               <Stack.Screen name="card-tag-settings" options={{ presentation: "modal" }} />
+              <Stack.Screen name="device-manager" options={{ presentation: "modal" }} />
+              <Stack.Screen name="pair-device" options={{ presentation: "modal" }} />
             </Stack>
             <StatusBar style="auto" />
           </ShoppingProvider>

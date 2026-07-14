@@ -11,7 +11,8 @@
         "resourceClass": "m-medium"
       },
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://cocktailapp-lr42ivhn.manus.space"
+        "EXPO_PUBLIC_API_BASE_URL": "https://cocktailapp-lr42ivhn.manus.space",
+        "CF_WORKER_URL": "https://cocktail-ai.kikikong2017.workers.dev"
       }
     },
     "production-macos": {
@@ -23,7 +24,8 @@
       },
       "env": {
         "EXPO_PLATFORM": "macos",
-        "EXPO_PUBLIC_API_BASE_URL": "https://cocktailapp-lr42ivhn.manus.space"
+        "EXPO_PUBLIC_API_BASE_URL": "https://cocktailapp-lr42ivhn.manus.space",
+        "CF_WORKER_URL": "https://cocktail-ai.kikikong2017.workers.dev"
       }
     }
   },
