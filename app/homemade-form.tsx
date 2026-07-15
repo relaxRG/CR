@@ -36,6 +36,7 @@ import { prepSectionOfIn } from "@/lib/homemade/types";
 import { useBottleStore } from "@/lib/bottles/store";
 import { suggestIngredients } from "@/lib/suggest";
 import { useBottleTaxonomy } from "@/lib/bottles/taxonomy";
+import { BOTTLE_GROUPS, BottleGroupKey, categoriesOfGroup } from "@/lib/bottles/types";
 import { smartLinkIngredient, smartLinkDisplayName } from "@/lib/recipes/smart-link";
 import { genId } from "@/lib/recipes/types";
 
@@ -65,9 +66,9 @@ export default function HomemadeFormScreen() {
     prefillNameAlt?: string;
     prefillType?: string;
   }>();
-  const { getPrep, addPrep, updatePrep, sections, types: typeList, preps: allPreps } = useHomemadeStore();
-  const { bottles } = useBottleStore();
-  const { groupOf } = useBottleTaxonomy();
+  const { getPrep, addPrep, updatePrep, deletePrep, sections, types: typeList, preps: allPreps } = useHomemadeStore();
+  const { bottles, addBottle, deleteBottle } = useBottleStore();
+  const { groupOf, categoryLabel } = useBottleTaxonomy();
   const editing = getPrep(id);
 
   const [name, setName] = useState(editing?.name ?? prefillName ?? "");
@@ -127,6 +128,13 @@ export default function HomemadeFormScreen() {
   const [typeTouched, setTypeTouched] = useState(Boolean(editing) || Boolean(prefillType));
 
   // ── 装饰专属字段 ──────────────────────────────────────────────────────────
+  // ── 所属库选择器 ─────────────────────────────────────────────────────────
+  // "auto" = 按 selectedGroup 自动决定（含酒精/无酒精/装饰）
+  // "spirits"/"bottles"/"materials" = 迁移到酒库
+  type LibraryDest = "auto" | BottleGroupKey;
+  const [libraryDest, setLibraryDest] = useState<LibraryDest>("auto");
+  const [bottleCategory, setBottleCategory] = useState<string>("其他");
+
   const [garnishUnit, setGarnishUnit] = useState(editing?.garnishUnit ?? "片");
   const [batchYield, setBatchYield] = useState(editing?.batchYield?.toString() ?? "");
   const [batchCost, setBatchCost] = useState(editing?.batchCost?.toString() ?? "");
@@ -242,6 +250,48 @@ export default function HomemadeFormScreen() {
 
   const handleSave = () => {
     if (!canSave) return;
+
+    // ── 迁移到酒库 ──────────────────────────────────────────────────────────
+    if (libraryDest !== "auto") {
+      const bottleDraft = {
+        nameZh: name.trim(),
+        nameEn: nameAlt.trim(),
+        category: bottleCategory || "其他",
+        style: "",
+        brand: "",
+        origin: "",
+        volume: "",
+        abv: 0,
+        priceCny: 0,
+        notes: notes.trim(),
+        flavorTags,
+        story: story.trim(),
+        styleDesc: styleDesc.trim(),
+        distilleryInfo: "",
+        pairingNotes: "",
+        usageNotes: usageNotes.trim(),
+        seasonality: "",
+        notesEn: "",
+        storyEn: "",
+        substituteFor: "",
+        pairsWith: "",
+        libraryOverride: libraryDest as "spirits" | "bottles" | "materials",
+      };
+      if (editing) {
+        // 迁移：在酒库创建新条目，从自制库删除
+        addBottle(bottleDraft);
+        // 需要引入 deletePrep
+        deletePrep(editing.id);
+      } else {
+        addBottle(bottleDraft);
+      }
+      if (Platform.OS !== "web") {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+      router.back();
+      return;
+    }
+
     const ingredients = ingRows
       .map((r) => joinPrepIngredient(r.amount, r.name))
       .filter(Boolean);
@@ -417,20 +467,59 @@ export default function HomemadeFormScreen() {
 
           {fieldLabel(t("hmform.type"))}
           {/* ── 顶层分组选择器（含酒精 / 无酒精 / 装饰） ── */}
-          <View style={{ flexDirection: "row", backgroundColor: colors.border + "55", borderRadius: 10, padding: 2, gap: 2, marginBottom: 12 }}>
-            {PREP_GROUPS.map((grp) => {
-              const active = selectedGroup === grp.key;
-              const dotColor = grp.key === "alcoholic" ? colors.warning : grp.key === "non_alcoholic" ? colors.success : colors.primary;
+          {/* ── 所属库选择器（七选项，对齐酒款编辑） ── */}
+          <Text style={{ fontSize: 13, fontWeight: "500", color: colors.muted, marginBottom: 6 }}>
+            {lang === "zh" ? "所属库" : "Library"}
+          </Text>
+          {/* 第一行：自制库三分组 */}
+          <View style={{ flexDirection: "row", backgroundColor: colors.border + "55", borderRadius: 10, padding: 2, gap: 2, marginBottom: 4 }}>
+            {[
+              { key: "auto" as const, zhLabel: "自动", enLabel: "Auto" },
+              { key: "auto_alcoholic" as const, zhLabel: "含酒精自制", enLabel: "Alcoholic" },
+              { key: "auto_non_alcoholic" as const, zhLabel: "无酒精自制", enLabel: "Zero-Proof" },
+              { key: "auto_garnish" as const, zhLabel: "装饰", enLabel: "Garnish" },
+            ].map((opt) => {
+              const isActive =
+                opt.key === "auto" ? libraryDest === "auto" && false :
+                opt.key === "auto_alcoholic" ? libraryDest === "auto" && selectedGroup === "alcoholic" :
+                opt.key === "auto_non_alcoholic" ? libraryDest === "auto" && selectedGroup === "non_alcoholic" :
+                libraryDest === "auto" && selectedGroup === "garnish";
+              const isAutoBtn = opt.key === "auto";
+              const active = isAutoBtn ? false : isActive;
               return (
                 <Pressable
-                  key={grp.key}
-                  onPress={() => handleGroupChange(grp.key)}
+                  key={opt.key}
+                  onPress={() => {
+                    setLibraryDest("auto");
+                    if (opt.key === "auto_alcoholic") handleGroupChange("alcoholic");
+                    else if (opt.key === "auto_non_alcoholic") handleGroupChange("non_alcoholic");
+                    else if (opt.key === "auto_garnish") handleGroupChange("garnish");
+                  }}
                   style={[
-                    { flex: 1, paddingVertical: 7, borderRadius: 8, alignItems: "center" as const, flexDirection: "row" as const, justifyContent: "center" as const, gap: 4 },
+                    { flex: 1, paddingVertical: 6, borderRadius: 8, alignItems: "center" as const },
                     active && { backgroundColor: colors.surface, shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 2 },
                   ]}
                 >
-                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: active ? dotColor : colors.muted }} />
+                  <Text style={{ fontSize: 11, fontWeight: active ? "600" : "400", color: active ? colors.foreground : colors.muted }}>
+                    {lang === "en" ? opt.enLabel : opt.zhLabel}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          {/* 第二行：酒库三分组 */}
+          <View style={{ flexDirection: "row", backgroundColor: colors.border + "55", borderRadius: 10, padding: 2, gap: 2, marginBottom: 12 }}>
+            {BOTTLE_GROUPS.map((grp) => {
+              const active = libraryDest === grp.key;
+              return (
+                <Pressable
+                  key={grp.key}
+                  onPress={() => { setLibraryDest(grp.key); }}
+                  style={[
+                    { flex: 1, paddingVertical: 6, borderRadius: 8, alignItems: "center" as const },
+                    active && { backgroundColor: colors.surface, shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 2 },
+                  ]}
+                >
                   <Text style={{ fontSize: 11, fontWeight: active ? "600" : "400", color: active ? colors.foreground : colors.muted }}>
                     {lang === "en" ? grp.en : grp.zh}
                   </Text>
@@ -438,6 +527,33 @@ export default function HomemadeFormScreen() {
               );
             })}
           </View>
+          {/* 选了酒库时显示 Category 标签 */}
+          {libraryDest !== "auto" && (
+            <View style={{ marginBottom: 12 }}>
+              <Text style={{ fontSize: 13, fontWeight: "500", color: colors.muted, marginBottom: 6 }}>
+                {lang === "zh" ? "分类" : "Category"}
+              </Text>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                {categoriesOfGroup(libraryDest).map((cat) => {
+                  const active = bottleCategory === cat;
+                  return (
+                    <Pressable
+                      key={cat}
+                      onPress={() => setBottleCategory(cat)}
+                      style={[
+                        styles.chip,
+                        { backgroundColor: active ? colors.primary : colors.surface, borderColor: active ? colors.primary : colors.border },
+                      ]}
+                    >
+                      <Text style={[styles.chipText, { color: active ? "#FFFFFF" : colors.foreground }]}>
+                        {categoryLabel(cat, lang)}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          )}
           {/* ── 当前分组的类型标签 ── */}
           {(() => {
             const groupSections = sections.filter(
