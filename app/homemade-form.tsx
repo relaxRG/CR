@@ -32,6 +32,7 @@ import {
   calcGarnishCostPerUnit,
   PrepGroup,
 } from "@/lib/homemade/types";
+import { prepSectionOfIn } from "@/lib/homemade/types";
 import { useBottleStore } from "@/lib/bottles/store";
 import { suggestIngredients } from "@/lib/suggest";
 import { useBottleTaxonomy } from "@/lib/bottles/taxonomy";
@@ -74,6 +75,20 @@ export default function HomemadeFormScreen() {
   const [type, setType] = useState(
     editing?.type ?? (prefillType && typeList.some((p) => p.key === prefillType) ? prefillType : "syrup"),
   );
+  // ── 顶层分组选择器 ─────────────────────────────────────────────────────────
+  // 初始值：优先用 editing.abvGroup，否则按 type 推断
+  const inferGroupFromType = (t: string): PrepGroup => {
+    const sec = typeList.find((pt) => pt.key === t)?.section ?? "";
+    const grp = sections.find((s) => s.key === sec)?.group ?? prepGroupOfSection(sections, sec);
+    return grp;
+  };
+  const [selectedGroup, setSelectedGroup] = useState<PrepGroup>(() => {
+    if (editing?.abvGroup === "alcoholic" || editing?.abvGroup === "non_alcoholic" || editing?.abvGroup === "garnish") {
+      return editing.abvGroup;
+    }
+    const t0 = editing?.type ?? (prefillType && typeList.some((p) => p.key === prefillType) ? prefillType : "syrup");
+    return inferGroupFromType(t0);
+  });
   const [ingRows, setIngRows] = useState<IngRow[]>(() => toRows(editing?.ingredients ?? []));
   /** Which ingredient row is focused (shows live suggestions) */
   const [focusedIng, setFocusedIng] = useState<string | null>(null);
@@ -129,6 +144,21 @@ export default function HomemadeFormScreen() {
     const grp = sections.find((s) => s.key === sec)?.group ?? "";
     return grp === "garnish";
   }, [type, typeList, sections]);
+  // selectedGroup 变化时，如果当前 type 不属于新分组，重置到新分组第一个类型
+  const handleGroupChange = (grp: PrepGroup) => {
+    setSelectedGroup(grp);
+    const sec = typeList.find((pt) => pt.key === type)?.section ?? "";
+    const currentGrp = sections.find((s) => s.key === sec)?.group ?? prepGroupOfSection(sections, sec);
+    if (currentGrp !== grp) {
+      // 找新分组的第一个类型
+      const firstSec = sections.find((s) => s.group === grp);
+      const firstType = firstSec ? typeList.find((pt) => pt.section === firstSec.key) : null;
+      if (firstType) {
+        setType(firstType.key);
+        setTypeTouched(true);
+      }
+    }
+  };
 
   const canSave = useMemo(() => name.trim().length > 0, [name]);
 
@@ -232,8 +262,8 @@ export default function HomemadeFormScreen() {
       flavorTags,
       techniques,
     };
-    // 装饰专属字段
-    if (isGarnishType) {
+    // 装饰专属字段：以 selectedGroup 为准（不再依赖 isGarnishType 推断）
+    if (selectedGroup === "garnish") {
       const byNum = parseFloat(batchYield);
       const bcNum = parseFloat(batchCost);
       const cpuNum = parseFloat(costPerUnit);
@@ -254,6 +284,9 @@ export default function HomemadeFormScreen() {
               batchCost: undefined,
             }),
       });
+    } else {
+      // 含酒精/无酒精：直接写入 abvGroup，确保路由正确
+      Object.assign(payload, { abvGroup: selectedGroup as PrepGroup });
     }
     if (editing) {
       updatePrep(editing.id, payload);
@@ -383,76 +416,70 @@ export default function HomemadeFormScreen() {
           />
 
           {fieldLabel(t("hmform.type"))}
-          {PREP_GROUPS.map((grp) => {
-            const groupSections = sections.filter(
-              (sec) => prepGroupOfSection(sections, sec.key) === grp.key,
-            );
-            const hasAny = groupSections.some((sec) =>
-              typeList.some((pt) => pt.section === sec.key),
-            );
-            if (!hasAny) return null;
-            return (
-              <View key={grp.key} style={{ marginBottom: 10 }}>
-                <View className="flex-row items-center mb-1.5" style={{ gap: 6 }}>
-                  <View
-                    style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: 4,
-                      backgroundColor: grp.key === "alcoholic" ? colors.warning : colors.success,
-                    }}
-                  />
-                  <Text className="text-[13px] font-semibold text-foreground" style={{ lineHeight: 18 }}>
+          {/* ── 顶层分组选择器（含酒精 / 无酒精 / 装饰） ── */}
+          <View style={{ flexDirection: "row", backgroundColor: colors.border + "55", borderRadius: 10, padding: 2, gap: 2, marginBottom: 12 }}>
+            {PREP_GROUPS.map((grp) => {
+              const active = selectedGroup === grp.key;
+              const dotColor = grp.key === "alcoholic" ? colors.warning : grp.key === "non_alcoholic" ? colors.success : colors.primary;
+              return (
+                <Pressable
+                  key={grp.key}
+                  onPress={() => handleGroupChange(grp.key)}
+                  style={[
+                    { flex: 1, paddingVertical: 7, borderRadius: 8, alignItems: "center" as const, flexDirection: "row" as const, justifyContent: "center" as const, gap: 4 },
+                    active && { backgroundColor: colors.surface, shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 2 },
+                  ]}
+                >
+                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: active ? dotColor : colors.muted }} />
+                  <Text style={{ fontSize: 11, fontWeight: active ? "600" : "400", color: active ? colors.foreground : colors.muted }}>
                     {lang === "en" ? grp.en : grp.zh}
                   </Text>
-                </View>
-                {groupSections.map((sec) => {
-                  const types = typeList.filter((pt) => pt.section === sec.key);
-                  if (types.length === 0) return null;
-                  return (
-                    <View key={sec.key} style={{ marginBottom: 6 }}>
-                      <Text
-                        className="text-xs text-muted mb-1.5"
-                        style={{ lineHeight: 16 }}
-                      >
-                        {lang === "en" ? sec.en : sec.zh}
-                      </Text>
-                      <View style={styles.chipWrap}>
-                        {types.map((pt) => {
-                          const active = type === pt.key;
-                          return (
-                            <Pressable
-                              key={pt.key}
-                              onPress={() => {
-                                setType(pt.key);
-                                setTypeTouched(true);
-                              }}
-                              style={[
-                                styles.chip,
-                                {
-                                  backgroundColor: active ? colors.primary : colors.surface,
-                                  borderColor: active ? colors.primary : colors.border,
-                                },
-                              ]}
-                            >
-                              <Text
-                                style={[
-                                  styles.chipText,
-                                  { color: active ? "#FFFFFF" : colors.foreground },
-                                ]}
-                              >
-                                {lang === "en" ? pt.en : pt.zh}
-                              </Text>
-                            </Pressable>
-                          );
-                        })}
-                      </View>
-                    </View>
-                  );
-                })}
-              </View>
+                </Pressable>
+              );
+            })}
+          </View>
+          {/* ── 当前分组的类型标签 ── */}
+          {(() => {
+            const groupSections = sections.filter(
+              (sec) => prepGroupOfSection(sections, sec.key) === selectedGroup,
             );
-          })}
+            return groupSections.map((sec) => {
+              const sectionTypes = typeList.filter((pt) => pt.section === sec.key);
+              if (sectionTypes.length === 0) return null;
+              return (
+                <View key={sec.key} style={{ marginBottom: 6 }}>
+                  <Text className="text-xs text-muted mb-1.5" style={{ lineHeight: 16 }}>
+                    {lang === "en" ? sec.en : sec.zh}
+                  </Text>
+                  <View style={styles.chipWrap}>
+                    {sectionTypes.map((pt) => {
+                      const active = type === pt.key;
+                      return (
+                        <Pressable
+                          key={pt.key}
+                          onPress={() => {
+                            setType(pt.key);
+                            setTypeTouched(true);
+                          }}
+                          style={[
+                            styles.chip,
+                            {
+                              backgroundColor: active ? colors.primary : colors.surface,
+                              borderColor: active ? colors.primary : colors.border,
+                            },
+                          ]}
+                        >
+                          <Text style={[styles.chipText, { color: active ? "#FFFFFF" : colors.foreground }]}>
+                            {lang === "en" ? pt.en : pt.zh}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+              );
+            });
+          })()}
 
           {fieldLabel(t("hmform.ingredients"))}
           {ingRows.map((row) => {

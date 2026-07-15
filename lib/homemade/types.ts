@@ -105,8 +105,8 @@ export const PREP_SECTIONS: { key: string; en: string; zh: string; group: PrepGr
   { key: "shrub-vinegar", en: "Shrubs & Vinegars", zh: "醋饮", group: "non_alcoholic" },
   { key: "zero-proof", en: "Zero-Proof Alternatives", zh: "零度替代", group: "non_alcoholic" },
   { key: "na-ferment", en: "NA Ferments", zh: "无酒精发酵", group: "non_alcoholic" },
-  { key: "misc", en: "Garnish & Other", zh: "装饰与其他", group: "non_alcoholic" },
   // ---- 装饰 Garnish ----
+  { key: "misc", en: "Garnish & Other", zh: "装饰与其他", group: "garnish" },
   { key: "garnish-citrus", en: "Citrus Garnish", zh: "柑橘类装饰", group: "garnish" },
   { key: "garnish-herb-flower", en: "Herb & Flower", zh: "香草与花卉", group: "garnish" },
   { key: "garnish-fruit", en: "Fruit Garnish", zh: "果类装饰", group: "garnish" },

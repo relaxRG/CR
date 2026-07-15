@@ -828,54 +828,63 @@ export default function BottleFormScreen() {
             <Text style={[styles.fieldLabel, { color: colors.foreground, marginBottom: 8 }]}>
               {t("bform.category")}
             </Text>
-            {BOTTLE_GROUPS.map((grp) => {
-              const groupCats = categoriesOfGroup(grp.key);
-              if (groupCats.length === 0) return null;
-              return (
-                <View key={grp.key} style={{ marginBottom: 12 }}>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 }}>
-                    <View
-                      style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: 4,
-                        backgroundColor:
-                          grp.key === "spirits"
-                            ? colors.warning
-                            : grp.key === "bottles"
-                              ? colors.primary
-                              : colors.success,
-                      }}
-                    />
-                    <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground, lineHeight: 18 }}>
-                      {lang === "en" ? grp.en : grp.zh}
-                    </Text>
+            {(() => {
+              // libraryOverride 为 undefined（自动）时，全部三组展开；选具体库时只显示该库分组
+              const targetGroups = (libraryOverride && libraryOverride !== 'homemade')
+                ? BOTTLE_GROUPS.filter((g) => g.key === libraryOverride)
+                : BOTTLE_GROUPS;
+              return targetGroups.map((grp) => {
+                const groupCats = categoriesOfGroup(grp.key);
+                if (groupCats.length === 0) return null;
+                return (
+                  <View key={grp.key} style={{ marginBottom: 12 }}>
+                    {/* 仅"自动"模式下显示分组标题 */}
+                    {(!libraryOverride || libraryOverride === 'homemade') && (
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 }}>
+                        <View
+                          style={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: 4,
+                            backgroundColor:
+                              grp.key === "spirits"
+                                ? colors.warning
+                                : grp.key === "bottles"
+                                  ? colors.primary
+                                  : colors.success,
+                          }}
+                        />
+                        <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground, lineHeight: 18 }}>
+                          {lang === "en" ? grp.en : grp.zh}
+                        </Text>
+                      </View>
+                    )}
+                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                      {groupCats.map((cat) => {
+                        const active = category === cat;
+                        return (
+                          <Pressable
+                            key={cat}
+                            onPress={() => setCategory(cat)}
+                            style={[
+                              styles.chip,
+                              {
+                                backgroundColor: active ? colors.primary : colors.surface,
+                                borderColor: active ? colors.primary : colors.border,
+                              },
+                            ]}
+                          >
+                            <Text style={[styles.chipText, { color: active ? "#FFFFFF" : colors.foreground }]}>
+                              {categoryLabel(cat, lang)}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
                   </View>
-                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                    {groupCats.map((cat) => {
-                      const active = category === cat;
-                      return (
-                        <Pressable
-                          key={cat}
-                          onPress={() => setCategory(cat)}
-                          style={[
-                            styles.chip,
-                            {
-                              backgroundColor: active ? colors.primary : colors.surface,
-                              borderColor: active ? colors.primary : colors.border,
-                            },
-                          ]}
-                        >
-                          <Text style={[styles.chipText, { color: active ? "#FFFFFF" : colors.foreground }]}>
-                            {categoryLabel(cat, lang)}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                </View>
-              );
-            })}
+                );
+              });
+            })()}
 
             {stylesOf(category).length > 0 && (
               <>
