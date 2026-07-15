@@ -175,6 +175,7 @@ export default function HomemadeFormScreen() {
   
   const [aiBusy, setAiBusy] = useState(false);
   const [aiStatus, setAiStatus] = useState<{ kind: "ok" | "err"; msg: string } | null>(null);
+  const [aiLibrarySuggestion, setAiLibrarySuggestion] = useState<{ library: "spirits" | "bottles" | "materials"; category: string; style: string } | null>(null);
 
   const handleAiEnrich = async () => {
     const displayName = [name.trim(), nameAlt.trim()].filter(Boolean).join(" / ");
@@ -199,6 +200,21 @@ export default function HomemadeFormScreen() {
       if (res.prepType && res.prepType !== "other" && !typeTouched) {
         const matched = typeList.find((t) => t.key === res.prepType);
         if (matched) { setType(res.prepType); setTypeTouched(true); }
+      }
+      // ── 语义映射：自动预填所属库 ──────────────────────────────────────
+      const validLibs = ["spirits", "bottles", "materials"] as const;
+      const sugLib = validLibs.find((l) => l === (res as Record<string, unknown>).suggestedLibrary);
+      const sugCat = typeof (res as Record<string, unknown>).suggestedCategory === "string" ? (res as Record<string, unknown>).suggestedCategory as string : "";
+      const sugStyle = typeof (res as Record<string, unknown>).suggestedStyle === "string" ? (res as Record<string, unknown>).suggestedStyle as string : "";
+      const mapConf = (res as Record<string, unknown>).mapConfidence as string | undefined;
+      if (sugLib && mapConf) {
+        if (mapConf === "high") {
+          setLibraryDest(sugLib);
+          if (sugCat) setBottleCategory(sugCat);
+          setAiLibrarySuggestion(null);
+        } else if (mapConf === "medium") {
+          setAiLibrarySuggestion({ library: sugLib, category: sugCat, style: sugStyle });
+        }
       }
       if (res.techniques.length > 0 && techniques.length === 0) setTechniques(res.techniques);
       if (res.flavorTags.length > 0 && flavorTags.length === 0) setFlavorTags(res.flavorTags);
@@ -468,6 +484,33 @@ export default function HomemadeFormScreen() {
           {fieldLabel(t("hmform.type"))}
           {/* ── 顶层分组选择器（含酒精 / 无酒精 / 装饰） ── */}
           {/* ── 所属库选择器（七选项，对齐酒款编辑） ── */}
+          {/* ── AI 建议横幅（中置信度时显示） ── */}
+          {aiLibrarySuggestion && (
+            <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: colors.primary + "18", borderRadius: 10, padding: 10, marginBottom: 8, gap: 8 }}>
+              <IconSymbol name="sparkles" size={14} color={colors.primary} />
+              <Text style={{ flex: 1, fontSize: 12, color: colors.foreground }}>
+                {lang === "en"
+                  ? `AI suggests: ${aiLibrarySuggestion.category}${aiLibrarySuggestion.style ? ` · ${aiLibrarySuggestion.style}` : ""} — please confirm`
+                  : `AI 建议归入：${aiLibrarySuggestion.category}${aiLibrarySuggestion.style ? ` · ${aiLibrarySuggestion.style}` : ""}，请确认`}
+              </Text>
+              <Pressable
+                onPress={() => {
+                  setLibraryDest(aiLibrarySuggestion.library);
+                  if (aiLibrarySuggestion.category) setBottleCategory(aiLibrarySuggestion.category);
+                  setAiLibrarySuggestion(null);
+                }}
+                style={{ paddingHorizontal: 10, paddingVertical: 4, backgroundColor: colors.primary, borderRadius: 6 }}
+              >
+                <Text style={{ fontSize: 12, fontWeight: "600", color: "#FFFFFF" }}>{lang === "en" ? "Apply" : "应用"}</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setAiLibrarySuggestion(null)}
+                style={{ paddingHorizontal: 8, paddingVertical: 4, backgroundColor: colors.surface, borderRadius: 6, borderWidth: 1, borderColor: colors.border }}
+              >
+                <Text style={{ fontSize: 12, color: colors.muted }}>{lang === "en" ? "Ignore" : "忽略"}</Text>
+              </Pressable>
+            </View>
+          )}
           <Text style={{ fontSize: 13, fontWeight: "500", color: colors.muted, marginBottom: 6 }}>
             {lang === "zh" ? "所属库" : "Library"}
           </Text>

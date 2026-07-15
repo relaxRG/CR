@@ -105,6 +105,7 @@ export async function enrichHomemade(params: {
   return callAI<{
     section: string; prepType: string; techniques: string[]; flavorTags: string[];
     story: string; styleDesc: string; shelfLife: string; storage: string; usageNotes: string; confidence: string;
+    suggestedLibrary: string; suggestedCategory: string; suggestedStyle: string; mapConfidence: string;
   }>('enrich-homemade', params as Record<string, unknown>);
 }
 

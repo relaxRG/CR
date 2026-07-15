@@ -1704,6 +1704,87 @@ ${librarySpecificInstructions}
         const VALID_SECTIONS = ["infused-spirit","homemade-liqueur","bitters-tincture","modified-spirit","homemade-spirit","homemade-syrup","juice-cordial","shrub-vinegar","zero-proof","na-ferment","misc"];
         const VALID_FLAVOR_TAGS = ["酸","甜","苦","烈","鲜","柑橘","热带","草本","花香","烟熏","木桶","香料","坚果可可","清爽","浓郁","干爽","复杂"];
 
+        // ── 语义映射表（别名/偏移词/品牌 → 标准 category + style） ──────────
+        type SemanticEntry = { category: string; style: string; confidence: "high" | "medium" };
+        const SEMANTIC_MAP: Array<{ keywords: string[]; result: SemanticEntry }> = [
+          // 威士忌
+          { keywords: ["黑麦威士忌","裸麦威士忌","rye whiskey","rye whisky","rye-based","rittenhouse","sazerac rye","whistlepig","bulleit rye","old overholt","pikesville","templeton rye"], result: { category: "威士忌", style: "Rye", confidence: "high" } },
+          { keywords: ["波本威士忌","波旁威士忌","肯塔基威士忌","bourbon","kentucky straight","maker's mark","woodford reserve","buffalo trace","knob creek","four roses","wild turkey","jim beam","evan williams","elijah craig"], result: { category: "威士忌", style: "Bourbon", confidence: "high" } },
+          { keywords: ["艾雷岛威士忌","泥煤威士忌","islay","peated scotch","laphroaig","ardbeg","lagavulin","bruichladdich","bowmore","caol ila","kilchoman","泥煤感","碘味"], result: { category: "威士忌", style: "Islay Single Malt", confidence: "high" } },
+          { keywords: ["苏格兰单一麦芽","highland malt","speyside","glenfiddich","macallan","glenlivet","dalmore","glenmorangie","balvenie","aberlour","highland park"], result: { category: "威士忌", style: "Scotch Single Malt", confidence: "high" } },
+          { keywords: ["苏格兰调和威士忌","blended scotch","johnnie walker","chivas regal","dewar's","famous grouse","ballantine's"], result: { category: "威士忌", style: "Scotch Blended", confidence: "high" } },
+          { keywords: ["爱尔兰威士忌","irish whiskey","jameson","bushmills","redbreast","green spot","tullamore","三次蒸馏爱尔兰"], result: { category: "威士忌", style: "Irish", confidence: "high" } },
+          { keywords: ["日本威士忌","japanese whisky","suntory","nikka","yamazaki","hakushu","hibiki","yoichi","miyagikyo","toki","余市","宫城峡","山崎","白州","响"], result: { category: "威士忌", style: "Japanese", confidence: "high" } },
+          { keywords: ["田纳西威士忌","tennessee whiskey","jack daniel's","george dickel","uncle nearest"], result: { category: "威士忌", style: "Tennessee", confidence: "high" } },
+          { keywords: ["加拿大威士忌","canadian whisky","crown royal","canadian club"], result: { category: "威士忌", style: "Canadian", confidence: "high" } },
+          { keywords: ["威士忌","whiskey","whisky"], result: { category: "威士忌", style: "", confidence: "medium" } },
+          // 金酒
+          { keywords: ["伦敦干金酒","london dry gin","tanqueray","beefeater","gordon's","bombay sapphire","sipsmith","杜松子主导"], result: { category: "金酒", style: "London Dry", confidence: "high" } },
+          { keywords: ["当代金酒","新派金酒","contemporary gin","new western gin","hendrick's","monkey 47","roku","aviation","botanist","黄瓜金酒","茶香金酒","花香主导金酒"], result: { category: "金酒", style: "Contemporary", confidence: "high" } },
+          { keywords: ["老汤姆金酒","old tom gin","hayman's old tom","ransom old tom","微甜金酒"], result: { category: "金酒", style: "Old Tom", confidence: "high" } },
+          { keywords: ["海军强度金酒","navy strength gin","overproof gin","perry's tot","57%金酒"], result: { category: "金酒", style: "Navy Strength", confidence: "high" } },
+          { keywords: ["荷式金酒","genever","bols genever","jenever"], result: { category: "金酒", style: "Genever", confidence: "high" } },
+          { keywords: ["金酒","gin"], result: { category: "金酒", style: "", confidence: "medium" } },
+          // 朗姆
+          { keywords: ["牙买加朗姆","jamaican rum","hampden","appleton","worthy park","wray & nephew","funky rum","高酯朗姆"], result: { category: "朗姆", style: "English Style (Jamaican)", confidence: "high" } },
+          { keywords: ["法式农业朗姆","rhum agricole","martinique rum","clement","saint james","neisson","甘蔗汁朗姆"], result: { category: "朗姆", style: "French Style (Agricole Blanc)", confidence: "high" } },
+          { keywords: ["demerara rum","el dorado","diamond","port mourant","德梅拉拉朗姆"], result: { category: "朗姆", style: "English Style (Demerara)", confidence: "high" } },
+          { keywords: ["高度朗姆","overproof rum","151 rum","wray & nephew overproof"], result: { category: "朗姆", style: "Overproof", confidence: "high" } },
+          { keywords: ["朗姆","rum","rhum"], result: { category: "朗姆", style: "", confidence: "medium" } },
+          // 龙舌兰
+          { keywords: ["梅斯卡尔","mezcal","del maguey","wahaka","banhez","烟熏龙舌兰"], result: { category: "龙舌兰", style: "Mezcal Joven", confidence: "high" } },
+          { keywords: ["白色龙舌兰","银龙舌兰","blanco tequila","silver tequila","patron silver","espolon blanco","未陈年龙舌兰"], result: { category: "龙舌兰", style: "Tequila Blanco", confidence: "high" } },
+          { keywords: ["reposado tequila","reposado龙舌兰","陈年龙舌兰 reposado"], result: { category: "龙舌兰", style: "Tequila Reposado", confidence: "high" } },
+          { keywords: ["añejo tequila","anejo tequila","超陈龙舌兰"], result: { category: "龙舌兰", style: "Tequila Añejo", confidence: "high" } },
+          { keywords: ["龙舌兰","tequila","agave spirit"], result: { category: "龙舌兰", style: "", confidence: "medium" } },
+          // 伏特加
+          { keywords: ["黑麦伏特加","rye vodka","belvedere","chopin rye","stolichnaya","裸麦伏特加"], result: { category: "伏特加", style: "Rye", confidence: "high" } },
+          { keywords: ["土豆伏特加","potato vodka","chopin potato","luksusowa"], result: { category: "伏特加", style: "Potato", confidence: "high" } },
+          { keywords: ["伏特加","vodka"], result: { category: "伏特加", style: "", confidence: "medium" } },
+          // 白兰地
+          { keywords: ["干邑","cognac","hennessy","remy martin","martell","courvoisier","hine","delamain"], result: { category: "白兰地", style: "Cognac VSOP", confidence: "high" } },
+          { keywords: ["雅文邑","armagnac","bas-armagnac","domaine d'ognoas"], result: { category: "白兰地", style: "Armagnac", confidence: "high" } },
+          { keywords: ["卡尔瓦多斯","calvados","apple brandy","苹果白兰地","lemorton","christian drouin"], result: { category: "白兰地", style: "Calvados", confidence: "high" } },
+          { keywords: ["皮斯科","pisco","peruvian pisco","chilean pisco"], result: { category: "白兰地", style: "Pisco", confidence: "high" } },
+          { keywords: ["白兰地","brandy"], result: { category: "白兰地", style: "", confidence: "medium" } },
+          // 利口酒
+          { keywords: ["橙味利口酒","orange liqueur","cointreau","triple sec","grand marnier","combier","柑橘利口酒"], result: { category: "利口酒", style: "Orange Liqueur", confidence: "high" } },
+          { keywords: ["咖啡利口酒","coffee liqueur","kahlúa","kahlua","tia maria","mr black"], result: { category: "利口酒", style: "Coffee Liqueur", confidence: "high" } },
+          { keywords: ["草本利口酒","herbal liqueur","chartreuse","benedictine","strega","galliano"], result: { category: "利口酒", style: "Herbal Liqueur", confidence: "high" } },
+          { keywords: ["阿玛罗","amaro","campari","aperol","cynar","averna","ramazzotti","fernet"], result: { category: "利口酒", style: "Amaro", confidence: "high" } },
+          { keywords: ["奶油利口酒","cream liqueur","baileys","advocaat"], result: { category: "利口酒", style: "Cream Liqueur", confidence: "high" } },
+          { keywords: ["利口酒","liqueur","cordial"], result: { category: "利口酒", style: "", confidence: "medium" } },
+          // 苦精
+          { keywords: ["苦精","bitters","angostura","peychaud's","fee brothers","regans'","aromatic bitters","orange bitters"], result: { category: "苦精", style: "Aromatic", confidence: "high" } },
+          // 清酒烧酒
+          { keywords: ["纯米大吟酿","junmai daiginjo","大吟酿","daiginjo"], result: { category: "清酒烧酒", style: "Junmai Daiginjo", confidence: "high" } },
+          { keywords: ["纯米吟酿","junmai ginjo","吟酿","ginjo"], result: { category: "清酒烧酒", style: "Junmai Ginjo", confidence: "high" } },
+          { keywords: ["梅酒","umeshu","plum wine","梅子酒"], result: { category: "清酒烧酒", style: "Umeshu", confidence: "high" } },
+          { keywords: ["烧酒","shochu","焼酎"], result: { category: "清酒烧酒", style: "Mugi Shochu", confidence: "medium" } },
+          { keywords: ["清酒","sake","日本酒","nihonshu"], result: { category: "清酒烧酒", style: "Junmai", confidence: "medium" } },
+          // 中式白酒
+          { keywords: ["酱香白酒","酱香型","茅台","sauce aroma","moutai","maotai"], result: { category: "中式白酒", style: "Sauce Aroma 酱香", confidence: "high" } },
+          { keywords: ["浓香白酒","浓香型","五粮液","泸州老窖","strong aroma"], result: { category: "中式白酒", style: "Strong Aroma 浓香", confidence: "high" } },
+          { keywords: ["清香白酒","清香型","汾酒","light aroma"], result: { category: "中式白酒", style: "Light Aroma 清香", confidence: "high" } },
+          { keywords: ["白酒","baijiu","中国白酒"], result: { category: "中式白酒", style: "", confidence: "medium" } },
+        ];
+        const BASE_SPIRIT_CATS = new Set(["金酒","朗姆","伏特加","威士忌","龙舌兰","白兰地","清酒烧酒","中式白酒"]);
+        const WINE_SPIRIT_CATS = new Set(["利口酒","苦精","味美思","开胃酒","起泡酒","葡萄酒","糖浆","软饮"]);
+        function resolveLibraryFromText(text: string): { suggestedLibrary: string; suggestedCategory: string; suggestedStyle: string; mapConfidence: "high" | "medium" | "none" } {
+          const lower = text.toLowerCase();
+          for (const entry of SEMANTIC_MAP) {
+            for (const kw of entry.keywords) {
+              if (lower.includes(kw.toLowerCase())) {
+                const lib = BASE_SPIRIT_CATS.has(entry.result.category) ? "spirits"
+                  : WINE_SPIRIT_CATS.has(entry.result.category) ? "bottles"
+                  : "materials";
+                return { suggestedLibrary: lib, suggestedCategory: entry.result.category, suggestedStyle: entry.result.style, mapConfidence: entry.result.confidence };
+              }
+            }
+          }
+          return { suggestedLibrary: "auto", suggestedCategory: "", suggestedStyle: "", mapConfidence: "none" };
+        }
+
         const knownType = input.type ? `\n已知类型: ${input.type}` : "";
         const prompt = `你是专业的调酒师和自制饮品专家，深度研习 Dave Arnold《Liquid Intelligence》(2014)、Jeffrey Morgenthaler《The Bar Book》(2014)、Death & Co《Cocktail Codex》(2018)、Ryan Chetiyawardana《Good Things to Drink》(2015)、《調酒的科學》(台灣版)、《分子料理與調酒》(台灣翻譯版)、Journal of Agricultural and Food Chemistry、Food Chemistry 等权威资料。
 根据以下自制品信息，一次性补全所有字段。
@@ -1716,6 +1797,7 @@ ${librarySpecificInstructions}
   "prepType": "类型key，必须从以下精确选一: ${VALID_PREP_TYPES.join("/")}，不确定填 \"other\"",
   "techniques": 识别到的工艺key数组，从 ${JSON.stringify(VALID_TECHNIQUES)} 中选0-4个，只能选列表中的值,
   "flavorTags": 风味标签数组，从 ${JSON.stringify(VALID_FLAVOR_TAGS)} 中选1-3个，只能选列表中的值,
+  "naturalLanguageDesc": "用英文自然语言描述该自制品的基底烈酒类型（如 'rye whiskey based infusion' 或 'jamaican rum fat wash'），如果不含烈酒基底则填 \"\"",
   "story": "自制品介绍/故事（中文，80字内，描述风味特点和调酒用途），不确定填 \"\"",
   "styleDesc": "风格/口感描述（中文，40字内），不确定填 \"\"",
   "shelfLife": "建议保质期（如'冷藏2周'或'密封常温1个月'），不确定填 \"\"",
@@ -1755,6 +1837,11 @@ ${librarySpecificInstructions}
         const rawFlavors = Array.isArray(p.flavorTags) ? (p.flavorTags as string[]) : [];
         const validatedFlavors = rawFlavors.filter((f) => VALID_FLAVOR_TAGS.includes(f)).slice(0, 3);
 
+        // ── 语义映射：用名称+AI自然语言描述做确定性匹配 ──────────────────
+        const naturalDesc = typeof p.naturalLanguageDesc === "string" ? p.naturalLanguageDesc.trim() : "";
+        const searchText = `${input.name} ${input.nameAlt ?? ""} ${naturalDesc} ${(input.ingredients ?? []).join(" ")}`;
+        const mapped = resolveLibraryFromText(searchText);
+
         return {
           section: validatedSection,
           prepType: validatedPrepType,
@@ -1766,6 +1853,10 @@ ${librarySpecificInstructions}
           storage: typeof p.storage === "string" ? p.storage.trim() : "",
           usageNotes: typeof p.usageNotes === "string" ? p.usageNotes.trim() : "",
           confidence: (["high", "medium", "low"] as const).includes(p.confidence as "high") ? p.confidence as "high" | "medium" | "low" : "medium",
+          suggestedLibrary: mapped.suggestedLibrary,
+          suggestedCategory: mapped.suggestedCategory,
+          suggestedStyle: mapped.suggestedStyle,
+          mapConfidence: mapped.mapConfidence,
         };
       }),
     extractRecipesFromText: publicProcedure
