@@ -529,6 +529,7 @@ export default function RecipeFormScreen() {
         nameEn: nameEn.trim() || undefined,
         baseSpirit: baseSpirit || undefined,
         method: method || undefined,
+        lang: lang as 'zh' | 'en',
       }).then((result) => {
           if (!isMountedRef.current) return;
           if (!baseSpirit && result.suggestedBaseSpirit) {
@@ -579,6 +580,7 @@ export default function RecipeFormScreen() {
         ingredients: ingNames.length > 0 ? ingNames.join(", ") : undefined,
         baseSpirit: baseSpirit || undefined,
         source: source.trim() || undefined,
+        lang: lang as 'zh' | 'en',
       }).then((result) => {
           if (!isMountedRef.current) return;
           if (!baseSpirit && result.suggestedBaseSpirit) {
@@ -619,6 +621,7 @@ export default function RecipeFormScreen() {
         nameEn: nameEn.trim() || undefined,
         baseSpirit: baseSpirit || undefined,
         method: method || undefined,
+        lang: lang as 'zh' | 'en',
       }).then((result) => {
           if (!isMountedRef.current) return;
           if (result.flavors && result.flavors.length > 0) {

@@ -220,10 +220,10 @@ export default function BulkImportScreen() {
     try {
       const result = await bulkImportExtract(
         imageBase64
-          ? { imageBase64, imageMime }
+          ? { imageBase64, imageMime, lang: lang as 'zh' | 'en' }
           : fileBase64 && fileName
-            ? { fileBase64, fileName }
-            : { text: text.trim() },
+            ? { fileBase64, fileName, lang: lang as 'zh' | 'en' }
+            : { text: text.trim(), lang: lang as 'zh' | 'en' },
       );
       const next: PreviewRow[] = (result.items as ExtractedItem[]).map((item, i) => ({
         key: `${Date.now()}-${i}`,

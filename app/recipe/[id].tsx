@@ -156,7 +156,7 @@ export default function RecipeDetailScreen() {
     setEnrichMsg(null);
     const names = targets.map(enrichQueryName);
     try {
-      const res = await enrichBottles({ names });
+      const res = await enrichBottles({ names, lang: lang as 'zh' | 'en' });
       let updated = 0;
       targets.forEach((b, i) => {
         const item = matchEnrichedItem(res.items, names, i);

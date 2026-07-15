@@ -279,6 +279,7 @@ export default function BottlesScreen() {
           .slice(0, 15)
           .map((bt) => bt.nameZh || bt.nameEn)
           .filter(Boolean) as string[],
+        lang: lang as 'zh' | 'en',
       });
       if (!isMountedRef.current) return;
       setAiQueueFetching(false);

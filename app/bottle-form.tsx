@@ -322,6 +322,7 @@ export default function BottleFormScreen() {
         imageBase64: opts.imageBase64,
         imageMime: opts.imageMime,
         bookSnippets: onlineBookSnippets.length > 0 ? onlineBookSnippets : undefined,
+        lang: lang as 'zh' | 'en',
       };
       const res = await enrichBottle(enrichInput);
       if (!isMountedRef.current) return;
