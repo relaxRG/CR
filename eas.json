@@ -31,16 +31,16 @@
     "production": {
       "ios": {
         "ascAppId": "6788653669",
-        "ascApiKeyPath": "/home/ubuntu/.apple-creds/AuthKey_SS7N6Q2U48.p8",
-        "ascApiKeyId": "SS7N6Q2U48",
+        "ascApiKeyPath": "/home/ubuntu/.apple-creds/AuthKey_KBHJGAPDWC.p8",
+        "ascApiKeyId": "KBHJGAPDWC",
         "ascApiKeyIssuerId": "4c2aa939-390b-4d72-afef-7724d6238127"
       }
     },
     "production-macos": {
       "ios": {
         "ascAppId": "6788653669",
-        "ascApiKeyPath": "/home/ubuntu/.apple-creds/AuthKey_SS7N6Q2U48.p8",
-        "ascApiKeyId": "SS7N6Q2U48",
+        "ascApiKeyPath": "/home/ubuntu/.apple-creds/AuthKey_KBHJGAPDWC.p8",
+        "ascApiKeyId": "KBHJGAPDWC",
         "ascApiKeyIssuerId": "4c2aa939-390b-4d72-afef-7724d6238127"
       }
     }

@@ -50,6 +50,7 @@ const config: ExpoConfig = {
   ios: {
     supportsTablet: true,
     bundleIdentifier: env.iosBundleId,
+    buildNumber: "52",
     "infoPlist": {
       "ITSAppUsesNonExemptEncryption": false,
       "UIRequiresFullScreen": false
@@ -85,10 +86,10 @@ const config: ExpoConfig = {
     output: "static",
     favicon: "./assets/images/favicon.png",
   },
-  owner: "rgsh",
+  owner: "rgsd",
   extra: {
     eas: {
-      projectId: "9405b282-3a1f-4451-b0dc-8ee6285f0cd1",
+      projectId: "3ab89cc0-c646-4fb8-bceb-ba24204a8811",
     },
     cfWorkerUrl: "https://cocktail-ai.kikikong2017.workers.dev",
   },
