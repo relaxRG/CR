@@ -491,15 +491,53 @@ export default function RecipeDetailScreen() {
           </>
         ) : null}
 
-        {/* Flavor description */}
-        {recipe.flavorDesc ? (
+      {/* Flavor description - structured display */}
+      {recipe.flavorDesc ? (() => {
+        const raw = recipe.flavorDesc!;
+        const zhLabels = ['核心基调', '风味演变', '整体质感'];
+        const enLabels = ['Core profile', 'Flavor evolution', 'Overall texture'];
+        const labels = lang === 'en' ? enLabels : zhLabels;
+        const lines = raw.split('\n').map((l: string) => l.trim()).filter(Boolean);
+        const parsed: Array<{ label: string; value: string }> = [];
+        for (const line of lines) {
+          const colonIdx = line.indexOf(':');
+          if (colonIdx > 0) {
+            const rawLabel = line.slice(0, colonIdx).trim();
+            const value = line.slice(colonIdx + 1).trim();
+            const zhIdx = zhLabels.indexOf(rawLabel);
+            const enIdx = enLabels.indexOf(rawLabel);
+            const idx = zhIdx >= 0 ? zhIdx : enIdx >= 0 ? enIdx : -1;
+            if (idx >= 0 && value) {
+              parsed.push({ label: labels[idx], value });
+            } else if (value) {
+              parsed.push({ label: rawLabel, value });
+            }
+          }
+        }
+        if (parsed.length === 0) {
+          return (
+            <>
+              <Text className="text-[13px] text-muted uppercase mt-6 mb-2 px-4" style={styles.groupHeader}>{t("detail.flavorDesc")}</Text>
+              <View className="bg-surface rounded-xl p-4">
+                <Text className="text-base text-foreground leading-relaxed">{raw}</Text>
+              </View>
+            </>
+          );
+        }
+        return (
           <>
             <Text className="text-[13px] text-muted uppercase mt-6 mb-2 px-4" style={styles.groupHeader}>{t("detail.flavorDesc")}</Text>
-            <View className="bg-surface rounded-xl p-4">
-              <Text className="text-base text-foreground leading-relaxed">{recipe.flavorDesc}</Text>
+            <View className="bg-surface rounded-xl p-4 gap-3">
+              {parsed.map((item, i) => (
+                <View key={i}>
+                  <Text className="text-[11px] font-semibold text-muted uppercase mb-0.5">{item.label}</Text>
+                  <Text className="text-sm text-foreground leading-relaxed">{item.value}</Text>
+                </View>
+              ))}
             </View>
           </>
-        ) : null}
+        );
+      })() : null}
 
         {/* Notes */}
         {recipe.notes ? (
