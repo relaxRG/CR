@@ -15,18 +15,22 @@ import { UNIT_PRESET_GROUPS } from "@/lib/units";
 interface UnitPickerSheetProps {
   visible: boolean;
   selectedUnit: string;
+  /** Recently used units to show as quick-pick chips at the top */
+  recentUnits?: string[];
   onSelect: (unit: string) => void;
   onClose: () => void;
 }
 
 /**
  * Bottom sheet for selecting a measurement unit.
+ * Shows recently used units at the top for quick access.
  * Groups units by category (liquid, spoon, count, ratio, fuzzy).
  * Tapping a unit calls onSelect and closes the sheet.
  */
 export function UnitPickerSheet({
   visible,
   selectedUnit,
+  recentUnits = [],
   onSelect,
   onClose,
 }: UnitPickerSheetProps) {
@@ -69,6 +73,47 @@ export function UnitPickerSheet({
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 8 }}
         >
+          {/* Recently used units */}
+          {recentUnits.length > 0 && (
+            <View style={styles.groupContainer}>
+              <Text style={[styles.groupLabel, { color: colors.muted }]}>
+                {t("form.ingredient.unit.recent")}
+              </Text>
+              <View style={styles.chipsRow}>
+                {recentUnits.map((unit) => {
+                  const isSelected = selectedUnit === unit;
+                  return (
+                    <Pressable
+                      key={`recent-${unit}`}
+                      onPress={() => { onSelect(unit); onClose(); }}
+                      style={({ pressed }) => [
+                        styles.unitChip,
+                        styles.recentChip,
+                        {
+                          backgroundColor: isSelected ? colors.primary : `${colors.primary}15`,
+                          borderColor: isSelected ? colors.primary : `${colors.primary}40`,
+                        },
+                        pressed && { opacity: 0.7 },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.unitChipText,
+                          {
+                            color: isSelected ? colors.background : colors.primary,
+                            fontWeight: "600",
+                          },
+                        ]}
+                      >
+                        {unit}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
           {/* "No unit" option */}
           <View style={styles.groupContainer}>
             <Pressable
@@ -196,6 +241,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     minWidth: 48,
     alignItems: "center",
+  },
+  recentChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
   unitChipText: {
     fontSize: 14,

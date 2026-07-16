@@ -35,6 +35,7 @@ import { enrichRecipe as enrichRecipeAI, deepAnalyzeRecipe as deepAnalyzeRecipeA
 import { parseRecipeText, toTitleCase } from "@/lib/recipes/parser";
 import { splitAmount, mergeAmount } from "@/lib/units";
 import { UnitPickerSheet } from "@/components/unit-picker-sheet";
+import { useRecentUnits } from "@/hooks/use-recent-units";
 import { estimateRecipeAbv } from "@/lib/recipes/abv";
 import {
   CODEX_FAMILIES,
@@ -214,6 +215,7 @@ function MultiSpiritChipGroup({
 
 export default function RecipeFormScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
+  const { recentUnits, addRecentUnit } = useRecentUnits();
   const {
     prefillName,
     prefillNameEn,
@@ -2410,12 +2412,14 @@ export default function RecipeFormScreen() {
       <UnitPickerSheet
         visible={unitPickerIngId !== null}
         selectedUnit={unitPickerIngId ? splitAmount(ingredients.find((i) => i.id === unitPickerIngId)?.amount ?? "").unit : ""}
+        recentUnits={recentUnits}
         onSelect={(unit) => {
           if (!unitPickerIngId) return;
           const ing = ingredients.find((i) => i.id === unitPickerIngId);
           if (!ing) return;
           const { qty } = splitAmount(ing.amount);
           updateIngredient(unitPickerIngId, "amount", mergeAmount(qty, unit));
+          if (unit) addRecentUnit(unit);
         }}
         onClose={() => setUnitPickerIngId(null)}
       />

@@ -21,6 +21,7 @@ import { enrichHomemade } from "@/lib/api/smart-router";
 import { useNetwork } from "@/hooks/use-network";
 import { splitAmount, mergeAmount } from "@/lib/units";
 import { UnitPickerSheet } from "@/components/unit-picker-sheet";
+import { useRecentUnits } from "@/hooks/use-recent-units";
 import { useHomemadeStore } from "@/lib/homemade/store";
 import {
   PREP_GROUPS,
@@ -149,6 +150,7 @@ export default function HomemadeFormScreen() {
   );
   /** Unit picker: which ingredient row is currently open */
   const [unitPickerIngId, setUnitPickerIngId] = useState<string | null>(null);
+  const { recentUnits, addRecentUnit } = useRecentUnits();
 
   /** 当前选中类型是否属于装饰分组 */
   const isGarnishType = useMemo(() => {
@@ -1202,12 +1204,14 @@ export default function HomemadeFormScreen() {
       <UnitPickerSheet
         visible={unitPickerIngId !== null}
         selectedUnit={unitPickerIngId ? splitAmount(ingRows.find((r) => r.id === unitPickerIngId)?.amount ?? "").unit : ""}
+        recentUnits={recentUnits}
         onSelect={(unit) => {
           if (!unitPickerIngId) return;
           const row = ingRows.find((r) => r.id === unitPickerIngId);
           if (!row) return;
           const { qty } = splitAmount(row.amount);
           updateIngRow(unitPickerIngId, "amount", mergeAmount(qty, unit));
+          if (unit) addRecentUnit(unit);
         }}
         onClose={() => setUnitPickerIngId(null)}
       />

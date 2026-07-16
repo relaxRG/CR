@@ -407,6 +407,7 @@ const dict = {
   "form.ingredient.unit": { zh: "单位", en: "Unit" },
   "form.ingredient.unit.select": { zh: "选择单位", en: "Select Unit" },
   "form.ingredient.unit.none": { zh: "无", en: "None" },
+  "form.ingredient.unit.recent": { zh: "最近使用", en: "Recent" },
   "unit.group.liquid": { zh: "液体", en: "Liquid" },
   "unit.group.spoon": { zh: "量勺", en: "Spoon" },
   "unit.group.count": { zh: "计件", en: "Count" },
