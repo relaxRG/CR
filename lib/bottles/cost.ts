@@ -44,6 +44,12 @@ const UNIT_TO_ML: [RegExp, number][] = [
   [/(?:dash(?:es)?|抖)/i, ML_PER_DASH],
   [/(?:drops?|滴)/i, ML_PER_DROP],
   [/(?:splash(?:es)?)/i, ML_PER_SPLASH],
+  [/(?:dessert[\s-]?spoons?|dsp)/i, ML_PER_DSP],
+  [/(?:scruple[\s-]?spoons?|scsp)/i, ML_PER_SCSP],
+  [/(?:rinse)/i, ML_PER_RINSE],
+  [/(?:pinch(?:es)?|撮)/i, ML_PER_DASH * 2], // 1 pinch ≈ 2 dash ≈ 1.8ml
+  // count/ratio units — not convertible to ml, return null via NaN
+  [/(?:parts?|份|比例)/i, NaN],
 ];
 
 /**
@@ -267,4 +273,5 @@ import {
   ML_PER_OZ, ML_PER_CL, ML_PER_TSP, ML_PER_TBSP, ML_PER_BSP,
   ML_PER_DASH, ML_PER_DROP, ML_PER_SPLASH, ML_PER_SHOT, ML_PER_PONY,
   ML_PER_CUP, ML_PER_PINT, ML_PER_QUART, ML_PER_GALLON,
+  ML_PER_DSP, ML_PER_SCSP, ML_PER_RINSE,
 } from "@/lib/units";

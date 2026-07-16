@@ -41,6 +41,14 @@ export const ML_PER_PINT = 480;
 export const ML_PER_QUART = 960;
 /** 1 gallon = 128 oz = 3840 ml */
 export const ML_PER_GALLON = 3840;
+/** 1 dsp (dessert spoon) = 2 tsp = 10 ml */
+export const ML_PER_DSP = 10;
+/** 1 rinse ≈ 5 ml (absinthe/pastis rinse of a glass) */
+export const ML_PER_RINSE = 5;
+/** 1 scsp (scruple-spoon) = 2 dash = 1.25 ml */
+export const ML_PER_SCSP = 1.25;
+/** 1 part — ratio unit, not convertible to ml (context-dependent) */
+export const ML_PER_PART = NaN;
 
 // ─── Solid weight units → g ───────────────────────────────────────────────────
 /** 1 g = 1 g (base) */
@@ -92,7 +100,7 @@ export function isLiquidContext(line: string): boolean {
  * These should NOT be included in cost calculations.
  */
 export function isFuzzyUnit(text: string): boolean {
-  return /\bto\s+taste\b|适量|少许|酌量|as\s+needed|a\s+bit|一点|若干|some\b/i.test(text);
+  return /\bto\s+taste\b|\bto\s+top\b|\btop\s+up\b|适量|少许|酌量|as\s+needed|a\s+bit|一点|若干|some\b|rinse/i.test(text);
 }
 
 // ─── Unit normalizer ──────────────────────────────────────────────────────────
@@ -120,5 +128,129 @@ export function normalizeUnit(unit: string): string {
   if (/^(gallon|加仑)$/.test(u)) return "gal";
   if (/^(cup|杯)$/.test(u)) return "cup";
   if (/^(shot|jigger)$/.test(u)) return "shot";
+  if (/^(dessert[\s-]?spoon|dsp)$/.test(u)) return "dsp";
+  if (/^(scruple[\s-]?spoon|scsp)$/.test(u)) return "scsp";
+  if (/^(rinse)$/.test(u)) return "rinse";
+  if (/^(parts?|份|比例)$/.test(u)) return "part";
+  if (/^(pinch(?:es)?|撮)$/.test(u)) return "pinch";
+  if (/^(splash(?:es)?)$/.test(u)) return "splash";
+  if (/^(drops?|滴)$/.test(u)) return "drop";
+  if (/^(dash(?:es)?|抖)$/.test(u)) return "dash";
+  if (/^(个|枚|颗|粒|颗粒)$/.test(u)) return "个";
+  if (/^(片|slices?)$/.test(u)) return "片";
+  if (/^(枝|sprigs?)$/.test(u)) return "枝";
+  if (/^(块|cubes?)$/.test(u)) return "块";
+  if (/^(条|strips?)$/.test(u)) return "条";
+  if (/^(圈|wheels?)$/.test(u)) return "圈";
+  if (/^(扭|twists?|peels?)$/.test(u)) return "扭";
+  if (/^(楔|wedges?)$/.test(u)) return "楔";
+  if (/^(叶|leaves?|leaf)$/.test(u)) return "叶";
+  if (/^(只|eggs?)$/.test(u)) return "只";
+  if (/^(适量|to\s+taste|as\s+needed)$/i.test(u)) return "适量";
+  if (/^(少许|a\s+pinch|a\s+bit)$/i.test(u)) return "少许";
+  if (/^(to\s+top|top\s+up)$/i.test(u)) return "to top";
   return unit.trim();
 }
+
+// ─── Amount split / merge ─────────────────────────────────────────────────────
+
+/**
+ * Fuzzy units that don't require a numeric quantity.
+ * When selected, the quantity input should be hidden/disabled.
+ */
+export const FUZZY_UNITS = new Set([
+  "适量", "少许", "to top", "rinse", "酌量",
+]);
+
+/**
+ * Split a stored amount string like "60 ml" or "1.5 oz" into
+ * { qty: "60", unit: "ml" } for structured editing.
+ *
+ * Handles:
+ * - "60 ml" → { qty: "60", unit: "ml" }
+ * - "1.5oz" → { qty: "1.5", unit: "oz" }
+ * - "1/2 oz" → { qty: "1/2", unit: "oz" }
+ * - "1½ oz" → { qty: "1½", unit: "oz" }
+ * - "适量" → { qty: "", unit: "适量" }
+ * - "少许" → { qty: "", unit: "少许" }
+ * - "to top" → { qty: "", unit: "to top" }
+ * - "2 dash" → { qty: "2", unit: "dash" }
+ * - "" → { qty: "", unit: "" }
+ */
+export function splitAmount(amount: string): { qty: string; unit: string } {
+  const text = amount.trim();
+  if (!text) return { qty: "", unit: "" };
+
+  // Check for fuzzy-only units first (no numeric prefix expected)
+  if (/^(适量|少许|酌量|to\s+taste|as\s+needed|to\s+top|top\s+up|rinse)$/i.test(text)) {
+    return { qty: "", unit: normalizeUnit(text) };
+  }
+
+  // Number part: integer, decimal, slash fraction, mixed fraction, Unicode fraction
+  const numPart = `(?:约|~|≈)?\\s*(?:\\d+\\s*[${FRAC_CHARS}]|[${FRAC_CHARS}]|\\d+\\s+\\d+\\/\\d+|\\d+\\/\\d+|\\d+(?:[.,]\\d+)?)`;
+  const m = text.match(new RegExp(`^(${numPart})\\s*(.*)$`, "i"));
+  if (!m) return { qty: "", unit: text };
+
+  const qty = m[1].trim();
+  const unitRaw = m[2].trim();
+  const unit = unitRaw ? normalizeUnit(unitRaw) : "";
+  return { qty, unit };
+}
+
+/**
+ * Merge qty + unit back into a canonical amount string.
+ * Ensures exactly one space between number and unit.
+ *
+ * - ("60", "ml") → "60 ml"
+ * - ("1.5", "oz") → "1.5 oz"
+ * - ("", "适量") → "适量"
+ * - ("2", "") → "2"
+ * - ("", "") → ""
+ */
+export function mergeAmount(qty: string, unit: string): string {
+  const q = qty.trim();
+  const u = unit.trim();
+  if (!q && !u) return "";
+  if (!q) return u;
+  if (!u) return q;
+  return `${q} ${u}`;
+}
+
+// ─── Unit preset list (for UI pickers) ───────────────────────────────────────
+
+export interface UnitPresetGroup {
+  /** Group label key for i18n */
+  labelKey: string;
+  units: string[];
+}
+
+/**
+ * Grouped unit preset list for the unit picker UI.
+ * Ordered from most-common to least-common within each group.
+ * Source: Difford's Guide + Elemental Mixology + common bar practice.
+ */
+export const UNIT_PRESET_GROUPS: UnitPresetGroup[] = [
+  {
+    labelKey: "unit.group.liquid",
+    units: ["ml", "oz", "cl", "dl", "L"],
+  },
+  {
+    labelKey: "unit.group.spoon",
+    units: ["dash", "drop", "tsp", "bsp", "tbsp", "dsp", "splash", "rinse"],
+  },
+  {
+    labelKey: "unit.group.count",
+    units: ["个", "片", "颗", "枝", "块", "条", "圈", "扭", "楔", "叶", "只"],
+  },
+  {
+    labelKey: "unit.group.ratio",
+    units: ["part"],
+  },
+  {
+    labelKey: "unit.group.fuzzy",
+    units: ["适量", "少许", "to top"],
+  },
+];
+
+/** Flat list of all preset units (for quick lookup) */
+export const ALL_PRESET_UNITS: string[] = UNIT_PRESET_GROUPS.flatMap((g) => g.units);

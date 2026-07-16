@@ -19,6 +19,8 @@ import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
 import { enrichHomemade } from "@/lib/api/smart-router";
 import { useNetwork } from "@/hooks/use-network";
+import { splitAmount, mergeAmount } from "@/lib/units";
+import { UnitPickerSheet } from "@/components/unit-picker-sheet";
 import { useHomemadeStore } from "@/lib/homemade/store";
 import {
   PREP_GROUPS,
@@ -145,6 +147,8 @@ export default function HomemadeFormScreen() {
   const [costMode, setCostMode] = useState<"direct" | "batch">(
     editing?.batchYield ? "batch" : "direct",
   );
+  /** Unit picker: which ingredient row is currently open */
+  const [unitPickerIngId, setUnitPickerIngId] = useState<string | null>(null);
 
   /** 当前选中类型是否属于装饰分组 */
   const isGarnishType = useMemo(() => {
@@ -680,13 +684,48 @@ export default function HomemadeFormScreen() {
                    autoCapitalize="words"
                  />
                   <TextInput
-                    style={[...inputStyle, { flex: 2 }]}
-                    placeholder={t("hmform.ingredient.amount")}
-                    placeholderTextColor={colors.muted}
-                    value={row.amount}
-                    onChangeText={(v) => updateIngRow(row.id, "amount", v)}
-                    returnKeyType="done"
-                  />
+                   style={[...inputStyle, { flex: 2 }]}
+                   placeholder={t("hmform.ingredient.amount")}
+                   placeholderTextColor={colors.muted}
+                   value={row.amount}
+                   onChangeText={(v) => updateIngRow(row.id, "amount", v)}
+                   returnKeyType="done"
+                 />
+                  {/* ── Amount: qty + unit picker ── */}
+                  {(() => {
+                    const { qty, unit } = splitAmount(row.amount);
+                    return (
+                      <View style={{ flexDirection: "row", flex: 2, gap: 4 }}>
+                        <TextInput
+                          style={[...inputStyle, { flex: 1 }]}
+                          placeholder={t("form.ingredient.qty")}
+                          placeholderTextColor={colors.muted}
+                          value={qty}
+                          onChangeText={(v) => updateIngRow(row.id, "amount", mergeAmount(v, unit))}
+                          keyboardType="decimal-pad"
+                          returnKeyType="done"
+                        />
+                        <Pressable
+                          onPress={() => setUnitPickerIngId(row.id)}
+                          style={({ pressed }) => [{
+                            flex: 1,
+                            backgroundColor: unit ? `${colors.primary}18` : colors.surface,
+                            borderWidth: 1,
+                            borderColor: unit ? colors.primary : colors.border,
+                            borderRadius: 12,
+                            paddingHorizontal: 8,
+                            paddingVertical: 10,
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }, pressed && { opacity: 0.7 }]}
+                        >
+                          <Text style={{ fontSize: 14, color: unit ? colors.primary : colors.muted, fontWeight: unit ? "600" : "400" }}>
+                            {unit || t("form.ingredient.unit")}
+                          </Text>
+                        </Pressable>
+                      </View>
+                    );
+                  })()}
                   <Pressable
                     onPress={() => removeIngRow(row.id)}
                     hitSlop={8}
@@ -1159,6 +1198,19 @@ export default function HomemadeFormScreen() {
           ) : null}
         </ScrollView>
       </KeyboardAvoidingView>
+      {/* Unit picker sheet */}
+      <UnitPickerSheet
+        visible={unitPickerIngId !== null}
+        selectedUnit={unitPickerIngId ? splitAmount(ingRows.find((r) => r.id === unitPickerIngId)?.amount ?? "").unit : ""}
+        onSelect={(unit) => {
+          if (!unitPickerIngId) return;
+          const row = ingRows.find((r) => r.id === unitPickerIngId);
+          if (!row) return;
+          const { qty } = splitAmount(row.amount);
+          updateIngRow(unitPickerIngId, "amount", mergeAmount(qty, unit));
+        }}
+        onClose={() => setUnitPickerIngId(null)}
+      />
     </ScreenContainer>
   );
 }

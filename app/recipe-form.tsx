@@ -33,6 +33,8 @@ import { useBottleTaxonomy } from "@/lib/bottles/taxonomy";
 import { RecipeDraft, useRecipeStore } from "@/lib/recipes/store";
 import { enrichRecipe as enrichRecipeAI, deepAnalyzeRecipe as deepAnalyzeRecipeAI } from "@/lib/api/smart-router";
 import { parseRecipeText, toTitleCase } from "@/lib/recipes/parser";
+import { splitAmount, mergeAmount } from "@/lib/units";
+import { UnitPickerSheet } from "@/components/unit-picker-sheet";
 import { estimateRecipeAbv } from "@/lib/recipes/abv";
 import {
   CODEX_FAMILIES,
@@ -335,6 +337,8 @@ export default function RecipeFormScreen() {
   const [acceptedGarnishLinks, setAcceptedGarnishLinks] = useState<Record<string, boolean>>({});
   const [notes, setNotes] = useState(editing?.notes ?? "");
   const [importHint, setImportHint] = useState("");
+  /** Unit picker: which ingredient row is currently open */
+  const [unitPickerIngId, setUnitPickerIngId] = useState<string | null>(null);
   /** AI story/source/flavorDesc completion state */
   const [aiEnriching, setAiEnriching] = useState(false);
   const [aiResult, setAiResult] = useState<{
@@ -1792,21 +1796,70 @@ export default function RecipeFormScreen() {
                     returnKeyType="done"
                     style={{ lineHeight: 20 }}
                   />
-                 <TextInput
-                   className="flex-[2] bg-surface border border-border rounded-xl px-3 py-2.5 text-base text-foreground"
-                    placeholder={
-                      prep?.abvGroup === "garnish"
-                        ? prep.garnishUnit
-                          ? `件数（${prep.garnishUnit}）`
-                          : "件数"
-                        : t("form.ingredient.amount")
-                    }
-                   placeholderTextColor={colors.muted}
-                   value={ing.amount}
-                    onChangeText={(v) => updateIngredient(ing.id, "amount", v)}
-                    returnKeyType="done"
-                    style={{ lineHeight: 20 }}
-                  />
+                <TextInput
+                  className="flex-[2] bg-surface border border-border rounded-xl px-3 py-2.5 text-base text-foreground"
+                   placeholder={
+                     prep?.abvGroup === "garnish"
+                       ? prep.garnishUnit
+                         ? `件数（${prep.garnishUnit}）`
+                         : "件数"
+                       : t("form.ingredient.amount")
+                   }
+                  placeholderTextColor={colors.muted}
+                  value={ing.amount}
+                   onChangeText={(v) => updateIngredient(ing.id, "amount", v)}
+                   returnKeyType="done"
+                   style={{ lineHeight: 20 }}
+                 />
+                {/* ── Amount: qty + unit picker ── */}
+                {(() => {
+                  const { qty, unit } = splitAmount(ing.amount);
+                  const isGarnish = prep?.abvGroup === "garnish";
+                  return (
+                    <View style={{ flexDirection: "row", flex: 2, gap: 4 }}>
+                      <TextInput
+                        style={{
+                          flex: 1,
+                          backgroundColor: colors.surface,
+                          borderWidth: 1,
+                          borderColor: colors.border,
+                          borderRadius: 12,
+                          paddingHorizontal: 10,
+                          paddingVertical: 10,
+                          fontSize: 15,
+                          color: colors.foreground,
+                          lineHeight: 20,
+                        }}
+                        placeholder={isGarnish ? (prep?.garnishUnit ? `件数（${prep.garnishUnit}）` : "件数") : t("form.ingredient.qty")}
+                        placeholderTextColor={colors.muted}
+                        value={qty}
+                        onChangeText={(v) => updateIngredient(ing.id, "amount", mergeAmount(v, unit))}
+                        keyboardType="decimal-pad"
+                        returnKeyType="done"
+                      />
+                      {!isGarnish && (
+                        <Pressable
+                          onPress={() => setUnitPickerIngId(ing.id)}
+                          style={({ pressed }) => [{
+                            flex: 1,
+                            backgroundColor: unit ? `${colors.primary}18` : colors.surface,
+                            borderWidth: 1,
+                            borderColor: unit ? colors.primary : colors.border,
+                            borderRadius: 12,
+                            paddingHorizontal: 8,
+                            paddingVertical: 10,
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }, pressed && { opacity: 0.7 }]}
+                        >
+                          <Text style={{ fontSize: 14, color: unit ? colors.primary : colors.muted, fontWeight: unit ? "600" : "400" }}>
+                            {unit || t("form.ingredient.unit")}
+                          </Text>
+                        </Pressable>
+                      )}
+                    </View>
+                  );
+                })()}
                   <Pressable
                     onPress={() => removeIngredientRow(ing.id)}
                     hitSlop={8}
@@ -2353,6 +2406,19 @@ export default function RecipeFormScreen() {
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+      {/* Unit picker sheet */}
+      <UnitPickerSheet
+        visible={unitPickerIngId !== null}
+        selectedUnit={unitPickerIngId ? splitAmount(ingredients.find((i) => i.id === unitPickerIngId)?.amount ?? "").unit : ""}
+        onSelect={(unit) => {
+          if (!unitPickerIngId) return;
+          const ing = ingredients.find((i) => i.id === unitPickerIngId);
+          if (!ing) return;
+          const { qty } = splitAmount(ing.amount);
+          updateIngredient(unitPickerIngId, "amount", mergeAmount(qty, unit));
+        }}
+        onClose={() => setUnitPickerIngId(null)}
+      />
     </ScreenContainer>
   );
 }

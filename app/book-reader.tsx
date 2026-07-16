@@ -1015,7 +1015,7 @@ export default function BookReaderScreen() {
       ingredients: recipe.ingredients.map((ing) => ({
         id: genId(),
         name: ing.name,
-        amount: ing.amount ? `${ing.amount}${ing.unit ?? ""}` : "",
+        amount: ing.amount ? [ing.amount.trim(), (ing.unit ?? "").trim()].filter(Boolean).join(" ") : "",
         unit: "",
         notes: "",
       })),

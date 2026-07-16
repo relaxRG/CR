@@ -523,6 +523,14 @@ const LEADING_QTY_RE =
         "|cups?|杯" +
         // fuzzy (recognise but don't convert)
         "|pinch(?:es)?|撮|handful|把" +
+        // additional industry units
+        "|dessert[\\s-]?spoons?|dsp" +
+        "|scruple[\\s-]?spoons?|scsp" +
+        "|rinse" +
+        "|parts?|份|比例" +
+        "|圈|wheels?" +
+        "|扭|twists?|peels?" +
+        "|楔|wedges?" +
       ")?\\.?" +
     ")\\s+(.+)$",
     "i",
