@@ -779,6 +779,7 @@ export default function BookImportScreen() {
               ingredients: undefined,
               rawText: row.candidate.raw ? row.candidate.raw.slice(0, 800) : undefined,
               bookTitle: bookTitle || undefined,
+              lang: lang as 'zh' | 'en',
             });
             const patch: Record<string, unknown> = {};
             if (result.flavors.length > 0) patch.flavors = result.flavors;
@@ -801,6 +802,7 @@ export default function BookImportScreen() {
                 ingredients: ingNamesDeep.length > 0 ? ingNamesDeep.join(", ") : undefined,
                 baseSpirit: draft.baseSpirit || undefined,
                 source: draft.source || undefined,
+                lang: lang as 'zh' | 'en',
               });
               if (!isMountedRef.current) return;
               const deepPatch: Record<string, unknown> = {};

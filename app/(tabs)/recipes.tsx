@@ -437,14 +437,15 @@ export function RecipesScreen() {
       const r = targets[i];
       try {
         const ingNames = (r.ingredients ?? []).map((ing) => ing.name).filter(Boolean);
-        const res = await enrichRecipeAI({
-          name: r.name,
-          nameEn: r.nameEn || undefined,
-          baseSpirit: r.baseSpirit || undefined,
-          ingredients: ingNames.length > 0 ? ingNames : undefined,
-          method: r.method || undefined,
-          story: r.story || undefined,
-          flavorDesc: r.flavorDesc || undefined,
+       const res = await enrichRecipeAI({
+         name: r.name,
+         nameEn: r.nameEn || undefined,
+         baseSpirit: r.baseSpirit || undefined,
+         ingredients: ingNames.length > 0 ? ingNames : undefined,
+         method: r.method || undefined,
+         story: r.story || undefined,
+         flavorDesc: r.flavorDesc || undefined,
+          lang,
         });
         const patch: Partial<{ story: string; flavorDesc: string; flavors: string[] }> = {};
         if (res.story && !r.story?.trim()) patch.story = res.story;
@@ -502,12 +503,13 @@ export function RecipesScreen() {
       const r = targets[i];
       try {
         const ingNames = (r.ingredients ?? []).map((ing) => ing.name).filter(Boolean);
-        const res = await deepAnalyzeRecipeAI({
-          name: r.name || undefined,
-          nameEn: r.nameEn || undefined,
-          ingredients: ingNames.length > 0 ? ingNames.join(", ") : undefined,
-          baseSpirit: r.baseSpirit || undefined,
-          source: r.source || undefined,
+       const res = await deepAnalyzeRecipeAI({
+         name: r.name || undefined,
+         nameEn: r.nameEn || undefined,
+         ingredients: ingNames.length > 0 ? ingNames.join(", ") : undefined,
+         baseSpirit: r.baseSpirit || undefined,
+         source: r.source || undefined,
+          lang,
         });
         const patch: Partial<Recipe> = {};
         if (res.story && !r.story?.trim()) patch.story = res.story;

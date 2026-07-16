@@ -89,7 +89,7 @@ export function SmartImportBar({
         Alert.alert(t("smartImport.clipboard.empty.title"), t("smartImport.clipboard.empty.msg"));
         return;
       }
-      const res = await bulkImportExtract({ text });
+      const res = await bulkImportExtract({ text, lang: lang as 'zh' | 'en' });
       handleResult(res.items as BulkImportItem[]);
       setPasteExpanded(false);
       setPasteText("");
@@ -169,6 +169,7 @@ export function SmartImportBar({
         const out = await bulkImportExtract({
           imageBase64: asset.base64!,
           imageMime: asset.mimeType || "image/jpeg",
+          lang: lang as 'zh' | 'en',
         });
         handleResult(out.items as BulkImportItem[]);
       } catch (e) {

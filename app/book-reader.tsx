@@ -1030,7 +1030,7 @@ export default function BookReaderScreen() {
     const ingNames = draft.ingredients.map((ing) => ing.name).filter(Boolean);
     void (async () => {
       try {
-        const result = await enrichRecipeAI({ name: draft.name, nameEn: draft.nameEn || undefined, baseSpirit: draft.baseSpirit || undefined, ingredients: ingNames.length > 0 ? ingNames : undefined, bookTitle: source || undefined });
+        const result = await enrichRecipeAI({ name: draft.name, nameEn: draft.nameEn || undefined, baseSpirit: draft.baseSpirit || undefined, ingredients: ingNames.length > 0 ? ingNames : undefined, bookTitle: source || undefined, lang: lang as 'zh' | 'en' });
         if (!isMountedRef.current) return;
         const patch: Record<string, unknown> = {};
         if (result.flavors.length > 0) patch.flavors = result.flavors;
@@ -1041,7 +1041,7 @@ export default function BookReaderScreen() {
         }
         if (Object.keys(patch).length > 0) updateRecipe(newRecipe.id, { ...draft, ...patch });
         try {
-          const deepResult = await deepAnalyzeRecipeAI({ name: draft.name || undefined, nameEn: draft.nameEn || undefined, ingredients: ingNames.length > 0 ? ingNames.join(", ") : undefined, baseSpirit: draft.baseSpirit || undefined, source: draft.source || undefined });
+          const deepResult = await deepAnalyzeRecipeAI({ name: draft.name || undefined, nameEn: draft.nameEn || undefined, ingredients: ingNames.length > 0 ? ingNames.join(", ") : undefined, baseSpirit: draft.baseSpirit || undefined, source: draft.source || undefined, lang: lang as 'zh' | 'en' });
           if (!isMountedRef.current) return;
           const deepPatch: Record<string, unknown> = {};
           if (deepResult.story) deepPatch.story = deepResult.story;
@@ -1134,7 +1134,7 @@ export default function BookReaderScreen() {
       const ingNames = (draft.ingredients as Array<{ name: string }>).map((ing) => ing.name).filter(Boolean);
       void (async () => {
         try {
-          const result = await enrichRecipeAI({ name: draft.name, nameEn: draft.nameEn || undefined, baseSpirit: draft.baseSpirit || undefined, ingredients: ingNames.length > 0 ? ingNames : undefined, bookTitle: source || undefined });
+          const result = await enrichRecipeAI({ name: draft.name, nameEn: draft.nameEn || undefined, baseSpirit: draft.baseSpirit || undefined, ingredients: ingNames.length > 0 ? ingNames : undefined, bookTitle: source || undefined, lang: lang as 'zh' | 'en' });
           if (!isMountedRef.current) return;
           const patch: Record<string, unknown> = {};
           if (result.flavors.length > 0) patch.flavors = result.flavors;
@@ -1145,7 +1145,7 @@ export default function BookReaderScreen() {
           }
           if (Object.keys(patch).length > 0) updateRecipe(newRecipe.id, { ...draft, ...patch });
           try {
-            const deepResult = await deepAnalyzeRecipeAI({ name: draft.name || undefined, nameEn: draft.nameEn || undefined, ingredients: ingNames.length > 0 ? ingNames.join(", ") : undefined, baseSpirit: draft.baseSpirit || undefined, source: draft.source || undefined });
+            const deepResult = await deepAnalyzeRecipeAI({ name: draft.name || undefined, nameEn: draft.nameEn || undefined, ingredients: ingNames.length > 0 ? ingNames.join(", ") : undefined, baseSpirit: draft.baseSpirit || undefined, source: draft.source || undefined, lang: lang as 'zh' | 'en' });
             if (!isMountedRef.current) return;
             const deepPatch: Record<string, unknown> = {};
             if (deepResult.story) deepPatch.story = deepResult.story;
@@ -1293,7 +1293,7 @@ export default function BookReaderScreen() {
         const draft = { name, nameEn: isAscii(name) ? name : isAscii(origName) && origName ? origName : "", categoryId: null, baseSpirit: p.baseSpirit ? ensureSpiritNameBook(p.baseSpirit) : "", glass: p.glass ? ensureGlassNameBook(p.glass) : "", method: p.method || "", strength: "medium" as const, variantOf: p.variantOf || "", codexFamily: normalizeCodexFamilyDecl(p.codexFamily || ""), flavors: [], source: p.source || source, story: "", flavorDesc: "", ingredients: p.ingredients, steps: p.steps, garnish: p.garnish, notes: "" };
         const newRecipe = addRecipe(draft);
         const ingNames = p.ingredients.map((i) => i.name).filter(Boolean);
-        void enrichRecipeAI({ name: draft.name, nameEn: draft.nameEn || undefined, baseSpirit: draft.baseSpirit || undefined, ingredients: ingNames.length > 0 ? ingNames : undefined })
+        void enrichRecipeAI({ name: draft.name, nameEn: draft.nameEn || undefined, baseSpirit: draft.baseSpirit || undefined, ingredients: ingNames.length > 0 ? ingNames : undefined, lang: lang as 'zh' | 'en' })
           .then((result) => { if (result.flavors.length > 0) updateRecipe(newRecipe.id, { ...draft, flavors: result.flavors }); })
           .catch(() => {});
         recipeCount++;
