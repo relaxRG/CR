@@ -218,6 +218,11 @@
 - [x] Bug 4 修复：Ingredient 类型新增 linkedBottleId/linkedPrepId，接受模糊链接写入数据，成本计算优先使用链接 ID
 - [x] Bug 5 修复：英文文案区分酒库（Bar Stock）和自制库（Homemade）来源
 
+## 配料表单交互优化（2026-07-16）
+- [x] recipe-form.tsx：为配料列表添加长按拖拽排序能力（NestableScrollContainer + NestableDraggableFlatList，左侧拖拽手柄）
+- [x] homemade-form.tsx：为配料列表添加长按拖拽排序能力（NestableScrollContainer + NestableDraggableFlatList，左侧拖拽手柄）
+- [x] 清理 recipe-form.tsx / homemade-form.tsx 中重复的 amount 输入框遗留代码
+
 ## 「开瓶易失效」手动开关功能（2026-07-15）
 - [x] lib/bottles/types.ts：Bottle 接口新增 perishableOnOpen?: boolean 字段（undefined=自动，true/false=手动覆盖）
 - [x] lib/recipes/smart-cost.ts：isPerishableWholeBottle() 优先读取 bottle.perishableOnOpen，未设置时回退关键词逻辑

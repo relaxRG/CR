@@ -1,11 +1,10 @@
 import * as Haptics from "expo-haptics";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -22,6 +21,7 @@ import { useNetwork } from "@/hooks/use-network";
 import { splitAmount, mergeAmount } from "@/lib/units";
 import { UnitPickerSheet } from "@/components/unit-picker-sheet";
 import { useRecentUnits } from "@/hooks/use-recent-units";
+import { NestableScrollContainer, NestableDraggableFlatList, RenderItemParams } from "react-native-draggable-flatlist";
 import { useHomemadeStore } from "@/lib/homemade/store";
 import {
   PREP_GROUPS,
@@ -270,6 +270,263 @@ export default function HomemadeFormScreen() {
     setAcceptedLinks((prev) => { const n = { ...prev }; delete n[rid]; return n; });
   };
 
+  const renderIngRow = useCallback(({ item: row, drag, isActive }: RenderItemParams<IngRow>) => {
+    const trimmed = row.name.trim();
+    const showSuggest =
+      focusedIng === row.id && trimmed.length > 0 && pickedIng[row.id] !== row.name;
+    const liveSuggestions = showSuggest
+      ? suggestIngredients(trimmed, bottles, allPreps.filter((p) => p.id !== (editing?.id ?? "")), lang, 6, groupOf).filter((s) => s.value !== trimmed)
+      : [];
+    const rawLink = trimmed.length >= 2
+      ? smartLinkIngredient(trimmed, bottles, allPreps.filter((p) => p.id !== (editing?.id ?? "")))
+      : null;
+    const isFuzzy = rawLink?.matchConfidence === "fuzzy";
+    const link = isFuzzy
+      ? dismissedLinks[row.id]
+        ? null
+        : acceptedLinks[row.id]
+          ? rawLink
+          : null
+      : rawLink;
+    const pendingFuzzyLink = isFuzzy && !dismissedLinks[row.id] && !acceptedLinks[row.id] ? rawLink : null;
+    return (
+      <View key={row.id} style={{ marginBottom: 8, opacity: isActive ? 0.85 : 1 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          {/* 拖拽手柄 */}
+          <Pressable
+            onLongPress={drag}
+            delayLongPress={200}
+            hitSlop={6}
+            style={{ paddingHorizontal: 2, paddingVertical: 4 }}
+          >
+            <IconSymbol name="line.3.horizontal" size={18} color={colors.muted} />
+          </Pressable>
+         <TextInput
+           style={[...inputStyle, { flex: 3 }]}
+           placeholder={t("hmform.ingredient.name")}
+           placeholderTextColor={colors.muted}
+           value={row.name}
+           onChangeText={(v) => updateIngRow(row.id, "name", v)}
+           onFocus={() => setFocusedIng(row.id)}
+           onBlur={() => {
+             setTimeout(() => {
+               setFocusedIng((cur) => (cur === row.id ? null : cur));
+             }, 150);
+           }}
+           returnKeyType="done"
+           autoCapitalize="words"
+         />
+          {/* ── Amount: qty + unit picker ── */}
+          {(() => {
+            const { qty, unit } = splitAmount(row.amount);
+            return (
+              <View style={{ flexDirection: "row", flex: 2, gap: 4 }}>
+                <TextInput
+                  style={[...inputStyle, { flex: 1 }]}
+                  placeholder={t("form.ingredient.qty")}
+                  placeholderTextColor={colors.muted}
+                  value={qty}
+                  onChangeText={(v) => updateIngRow(row.id, "amount", mergeAmount(v, unit))}
+                  keyboardType="decimal-pad"
+                  returnKeyType="done"
+                />
+                <Pressable
+                  onPress={() => setUnitPickerIngId(row.id)}
+                  style={({ pressed }) => [{
+                    flex: 1,
+                    backgroundColor: unit ? `${colors.primary}18` : colors.surface,
+                    borderWidth: 1,
+                    borderColor: unit ? colors.primary : colors.border,
+                    borderRadius: 12,
+                    paddingHorizontal: 8,
+                    paddingVertical: 10,
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }, pressed && { opacity: 0.7 }]}
+                >
+                  <Text style={{ fontSize: 14, color: unit ? colors.primary : colors.muted, fontWeight: unit ? "600" : "400" }}>
+                    {unit || t("form.ingredient.unit")}
+                  </Text>
+                </Pressable>
+              </View>
+            );
+          })()}
+          <Pressable
+            onPress={() => removeIngRow(row.id)}
+            hitSlop={8}
+            style={({ pressed }) => [pressed && { opacity: 0.6 }]}
+          >
+            <IconSymbol
+              name="minus.circle.fill"
+              size={24}
+              color={ingRows.length > 1 ? colors.error : colors.border}
+            />
+          </Pressable>
+        </View>
+        {liveSuggestions.length > 0 ? (
+          <View
+            style={[
+              styles.suggestBox,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            {liveSuggestions.map((s, sIdx) => (
+              <Pressable
+                key={s.key}
+                onPress={() => pickSuggestion(row.id, s.value)}
+                style={({ pressed }) => [
+                  styles.suggestRow,
+                  sIdx > 0 && {
+                    borderTopWidth: StyleSheet.hairlineWidth,
+                    borderTopColor: colors.border,
+                  },
+                  pressed && { opacity: 0.6 },
+                ]}
+              >
+                <IconSymbol
+                  name={
+                    s.source === "homemade"
+                      ? "sparkles"
+                      : s.source === "spirits"
+                        ? "flame.fill"
+                        : s.source === "materials"
+                          ? "leaf.fill"
+                          : "wineglass.fill"
+                  }
+                  size={13}
+                  color={
+                    s.source === "homemade"
+                      ? colors.primary
+                      : s.source === "spirits"
+                        ? "#FF9500"
+                        : s.source === "materials"
+                          ? colors.success
+                          : "#5AC8FA"
+                  }
+                />
+                <Text
+                  className="text-sm text-foreground"
+                  numberOfLines={1}
+                  style={{ lineHeight: 18, flexShrink: 1 }}
+                >
+                  {s.value}
+                </Text>
+                {s.secondary ? (
+                  <Text
+                    className="text-xs text-muted"
+                    numberOfLines={1}
+                    style={{ lineHeight: 16, flexShrink: 1 }}
+                  >
+                    {s.secondary}
+                  </Text>
+                ) : null}
+                <View style={{ flex: 1 }} />
+                <Text
+                  className="text-[11px]"
+                  style={{
+                    lineHeight: 14,
+                    color:
+                      s.source === "homemade"
+                        ? colors.primary
+                        : s.source === "spirits"
+                          ? "#FF9500"
+                          : s.source === "materials"
+                            ? colors.success
+                            : "#5AC8FA",
+                  }}
+                >
+                  {s.source === "homemade"
+                    ? t("form.suggest.homemade")
+                    : s.source === "spirits"
+                      ? t("form.suggest.spirits")
+                      : s.source === "materials"
+                        ? t("form.suggest.materials")
+                        : t("form.suggest.bottle")}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+        {link ? (
+          (() => {
+            const canon = smartLinkDisplayName(link, lang as "zh" | "en");
+            const linkLabel = link.kind === "prep"
+              ? t("form.suggest.homemade")
+              : t("form.suggest.bottle");
+            return (
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 4,
+                  marginTop: 3,
+                  paddingHorizontal: 4,
+                }}
+              >
+                <IconSymbol
+                  name={link.kind === "prep" ? "sparkles" : "link"}
+                  size={11}
+                  color={link.kind === "prep" ? colors.primary : colors.muted}
+                />
+                <Text style={{ fontSize: 11, lineHeight: 14, color: link.kind === "prep" ? colors.primary : colors.muted }}>
+                  {linkLabel}{canon ? ` · ${canon.primary}` : ""}
+                </Text>
+              </View>
+            );
+          })()
+        ) : pendingFuzzyLink ? (
+          (() => {
+            const fuzzyCanon = smartLinkDisplayName(pendingFuzzyLink, lang as "zh" | "en");
+            const fuzzyName = fuzzyCanon?.primary ?? (pendingFuzzyLink.kind === "bottle" ? pendingFuzzyLink.bottle.nameZh || pendingFuzzyLink.bottle.nameEn : pendingFuzzyLink.prep.name);
+            const fuzzyKey = pendingFuzzyLink.kind === "bottle" ? "form.link.fuzzy.bottle" : "form.link.fuzzy.prep";
+            return (
+              <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 6, marginTop: 3, paddingHorizontal: 4 }}>
+                <Text style={{ fontSize: 11, lineHeight: 14, color: colors.muted }}>
+                  {t(fuzzyKey, { name: fuzzyName })}
+                </Text>
+                <Pressable
+                  onPress={() => {
+                    setAcceptedLinks((prev) => ({ ...prev, [row.id]: true }));
+                    if (pendingFuzzyLink?.kind === "bottle") {
+                      setIngRows((prev) => prev.map((r) => r.id === row.id ? { ...r, linkedBottleId: pendingFuzzyLink.bottle.id, linkedPrepId: undefined } : r));
+                    } else if (pendingFuzzyLink?.kind === "prep") {
+                      setIngRows((prev) => prev.map((r) => r.id === row.id ? { ...r, linkedPrepId: pendingFuzzyLink.prep.id, linkedBottleId: undefined } : r));
+                    }
+                  }}
+                  style={({ pressed }) => [{ flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 0.5, borderColor: colors.success }, pressed && { opacity: 0.6 }]}
+                >
+                  <IconSymbol name="checkmark" size={10} color={colors.success} />
+                  <Text style={{ fontSize: 11, lineHeight: 14, color: colors.success }}>{t("form.link.accept")}</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => setDismissedLinks((prev) => ({ ...prev, [row.id]: true }))}
+                  style={({ pressed }) => [{ flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 0.5, borderColor: colors.border }, pressed && { opacity: 0.6 }]}
+                >
+                  <IconSymbol name="xmark" size={10} color={colors.muted} />
+                  <Text style={{ fontSize: 11, lineHeight: 14, color: colors.muted }}>{t("form.link.dismiss")}</Text>
+                </Pressable>
+              </View>
+            );
+          })()
+        ) : null}
+        {link ? (
+          <Pressable
+            onPress={() => {
+              setDismissedLinks((prev) => ({ ...prev, [row.id]: true }));
+              setAcceptedLinks((prev) => { const n = { ...prev }; delete n[row.id]; return n; });
+              setIngRows((prev) => prev.map((r) => r.id === row.id ? { ...r, linkedBottleId: undefined, linkedPrepId: undefined } : r));
+            }}
+            style={({ pressed }) => [{ flexDirection: "row", alignItems: "center", gap: 3, marginTop: 2, paddingHorizontal: 4 }, pressed && { opacity: 0.6 }]}
+          >
+            <IconSymbol name="xmark" size={10} color={colors.muted} />
+            <Text style={{ fontSize: 11, lineHeight: 14, color: colors.muted }}>{t("form.link.break")}</Text>
+          </Pressable>
+        ) : null}
+      </View>
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ingRows, dismissedLinks, acceptedLinks, focusedIng, pickedIng, bottles, allPreps, lang, groupOf, editing, colors, t]);
+
   const handleSave = () => {
     if (!canSave) return;
 
@@ -411,7 +668,7 @@ export default function HomemadeFormScreen() {
           </Pressable>
         </View>
 
-        <ScrollView
+        <NestableScrollContainer
           contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 60 }}
           keyboardShouldPersistTaps="handled"
         >
@@ -647,261 +904,14 @@ export default function HomemadeFormScreen() {
           })()}
 
           {fieldLabel(t("hmform.ingredients"))}
-          {ingRows.map((row) => {
-            const trimmed = row.name.trim();
-            const showSuggest =
-              focusedIng === row.id && trimmed.length > 0 && pickedIng[row.id] !== row.name;
-            const liveSuggestions = showSuggest
-              ? suggestIngredients(trimmed, bottles, allPreps.filter((p) => p.id !== (editing?.id ?? "")), lang, 6, groupOf).filter((s) => s.value !== trimmed)
-              : [];
-            const rawLink = trimmed.length >= 2
-              ? smartLinkIngredient(trimmed, bottles, allPreps.filter((p) => p.id !== (editing?.id ?? "")))
-              : null;
-            const isFuzzy = rawLink?.matchConfidence === "fuzzy";
-            const link = isFuzzy
-              ? dismissedLinks[row.id]
-                ? null
-                : acceptedLinks[row.id]
-                  ? rawLink
-                  : null
-              : rawLink;
-            const pendingFuzzyLink = isFuzzy && !dismissedLinks[row.id] && !acceptedLinks[row.id] ? rawLink : null;
-            return (
-              <View key={row.id} style={{ marginBottom: 8 }}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                 <TextInput
-                   style={[...inputStyle, { flex: 3 }]}
-                   placeholder={t("hmform.ingredient.name")}
-                   placeholderTextColor={colors.muted}
-                   value={row.name}
-                   onChangeText={(v) => updateIngRow(row.id, "name", v)}
-                   onFocus={() => setFocusedIng(row.id)}
-                   onBlur={() => {
-                     // Delay so suggestion taps register before the list hides
-                     setTimeout(() => {
-                       setFocusedIng((cur) => (cur === row.id ? null : cur));
-                     }, 150);
-                   }}
-                   returnKeyType="done"
-                   autoCapitalize="words"
-                 />
-                  <TextInput
-                   style={[...inputStyle, { flex: 2 }]}
-                   placeholder={t("hmform.ingredient.amount")}
-                   placeholderTextColor={colors.muted}
-                   value={row.amount}
-                   onChangeText={(v) => updateIngRow(row.id, "amount", v)}
-                   returnKeyType="done"
-                 />
-                  {/* ── Amount: qty + unit picker ── */}
-                  {(() => {
-                    const { qty, unit } = splitAmount(row.amount);
-                    return (
-                      <View style={{ flexDirection: "row", flex: 2, gap: 4 }}>
-                        <TextInput
-                          style={[...inputStyle, { flex: 1 }]}
-                          placeholder={t("form.ingredient.qty")}
-                          placeholderTextColor={colors.muted}
-                          value={qty}
-                          onChangeText={(v) => updateIngRow(row.id, "amount", mergeAmount(v, unit))}
-                          keyboardType="decimal-pad"
-                          returnKeyType="done"
-                        />
-                        <Pressable
-                          onPress={() => setUnitPickerIngId(row.id)}
-                          style={({ pressed }) => [{
-                            flex: 1,
-                            backgroundColor: unit ? `${colors.primary}18` : colors.surface,
-                            borderWidth: 1,
-                            borderColor: unit ? colors.primary : colors.border,
-                            borderRadius: 12,
-                            paddingHorizontal: 8,
-                            paddingVertical: 10,
-                            alignItems: "center",
-                            justifyContent: "center",
-                          }, pressed && { opacity: 0.7 }]}
-                        >
-                          <Text style={{ fontSize: 14, color: unit ? colors.primary : colors.muted, fontWeight: unit ? "600" : "400" }}>
-                            {unit || t("form.ingredient.unit")}
-                          </Text>
-                        </Pressable>
-                      </View>
-                    );
-                  })()}
-                  <Pressable
-                    onPress={() => removeIngRow(row.id)}
-                    hitSlop={8}
-                    style={({ pressed }) => [pressed && { opacity: 0.6 }]}
-                  >
-                    <IconSymbol
-                      name="minus.circle.fill"
-                      size={24}
-                      color={ingRows.length > 1 ? colors.error : colors.border}
-                    />
-                  </Pressable>
-                </View>
-                {liveSuggestions.length > 0 ? (
-                  <View
-                    style={[
-                      styles.suggestBox,
-                      { backgroundColor: colors.surface, borderColor: colors.border },
-                    ]}
-                  >
-                    {liveSuggestions.map((s, sIdx) => (
-                      <Pressable
-                        key={s.key}
-                        onPress={() => pickSuggestion(row.id, s.value)}
-                        style={({ pressed }) => [
-                          styles.suggestRow,
-                          sIdx > 0 && {
-                            borderTopWidth: StyleSheet.hairlineWidth,
-                            borderTopColor: colors.border,
-                          },
-                          pressed && { opacity: 0.6 },
-                        ]}
-                      >
-                        <IconSymbol
-                          name={
-                            s.source === "homemade"
-                              ? "sparkles"
-                              : s.source === "spirits"
-                                ? "flame.fill"
-                                : s.source === "materials"
-                                  ? "leaf.fill"
-                                  : "wineglass.fill"
-                          }
-                          size={13}
-                          color={
-                            s.source === "homemade"
-                              ? colors.primary
-                              : s.source === "spirits"
-                                ? "#FF9500"
-                                : s.source === "materials"
-                                  ? colors.success
-                                  : "#5AC8FA"
-                          }
-                        />
-                        <Text
-                          className="text-sm text-foreground"
-                          numberOfLines={1}
-                          style={{ lineHeight: 18, flexShrink: 1 }}
-                        >
-                          {s.value}
-                        </Text>
-                        {s.secondary ? (
-                          <Text
-                            className="text-xs text-muted"
-                            numberOfLines={1}
-                            style={{ lineHeight: 16, flexShrink: 1 }}
-                          >
-                            {s.secondary}
-                          </Text>
-                        ) : null}
-                        <View style={{ flex: 1 }} />
-                        <Text
-                          className="text-[11px]"
-                          style={{
-                            lineHeight: 14,
-                            color:
-                              s.source === "homemade"
-                                ? colors.primary
-                                : s.source === "spirits"
-                                  ? "#FF9500"
-                                  : s.source === "materials"
-                                    ? colors.success
-                                    : "#5AC8FA",
-                          }}
-                        >
-                          {s.source === "homemade"
-                            ? t("form.suggest.homemade")
-                            : s.source === "spirits"
-                              ? t("form.suggest.spirits")
-                              : s.source === "materials"
-                                ? t("form.suggest.materials")
-                                : t("form.suggest.bottle")}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                ) : null}
-                {link ? (
-                  (() => {
-                    const canon = smartLinkDisplayName(link, lang as "zh" | "en");
-                    const linkLabel = link.kind === "prep"
-                      ? t("form.suggest.homemade")
-                      : t("form.suggest.bottle");
-                    return (
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          gap: 4,
-                          marginTop: 3,
-                          paddingHorizontal: 4,
-                        }}
-                      >
-                        <IconSymbol
-                          name={link.kind === "prep" ? "sparkles" : "link"}
-                          size={11}
-                          color={link.kind === "prep" ? colors.primary : colors.muted}
-                        />
-                        <Text style={{ fontSize: 11, lineHeight: 14, color: link.kind === "prep" ? colors.primary : colors.muted }}>
-                          {linkLabel}{canon ? ` · ${canon.primary}` : ""}
-                        </Text>
-                      </View>
-                    );
-                  })()
-                ) : pendingFuzzyLink ? (
-                  (() => {
-                    const fuzzyCanon = smartLinkDisplayName(pendingFuzzyLink, lang as "zh" | "en");
-                    const fuzzyName = fuzzyCanon?.primary ?? (pendingFuzzyLink.kind === "bottle" ? pendingFuzzyLink.bottle.nameZh || pendingFuzzyLink.bottle.nameEn : pendingFuzzyLink.prep.name);
-                    const fuzzyKey = pendingFuzzyLink.kind === "bottle" ? "form.link.fuzzy.bottle" : "form.link.fuzzy.prep";
-                    return (
-                      <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 6, marginTop: 3, paddingHorizontal: 4 }}>
-                        <Text style={{ fontSize: 11, lineHeight: 14, color: colors.muted }}>
-                          {t(fuzzyKey, { name: fuzzyName })}
-                        </Text>
-                        <Pressable
-                          onPress={() => {
-                            setAcceptedLinks((prev) => ({ ...prev, [row.id]: true }));
-                            if (pendingFuzzyLink?.kind === "bottle") {
-                              setIngRows((prev) => prev.map((r) => r.id === row.id ? { ...r, linkedBottleId: pendingFuzzyLink.bottle.id, linkedPrepId: undefined } : r));
-                            } else if (pendingFuzzyLink?.kind === "prep") {
-                              setIngRows((prev) => prev.map((r) => r.id === row.id ? { ...r, linkedPrepId: pendingFuzzyLink.prep.id, linkedBottleId: undefined } : r));
-                            }
-                          }}
-                          style={({ pressed }) => [{ flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 0.5, borderColor: colors.success }, pressed && { opacity: 0.6 }]}
-                        >
-                          <IconSymbol name="checkmark" size={10} color={colors.success} />
-                          <Text style={{ fontSize: 11, lineHeight: 14, color: colors.success }}>{t("form.link.accept")}</Text>
-                        </Pressable>
-                        <Pressable
-                          onPress={() => setDismissedLinks((prev) => ({ ...prev, [row.id]: true }))}
-                          style={({ pressed }) => [{ flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 0.5, borderColor: colors.border }, pressed && { opacity: 0.6 }]}
-                        >
-                          <IconSymbol name="xmark" size={10} color={colors.muted} />
-                          <Text style={{ fontSize: 11, lineHeight: 14, color: colors.muted }}>{t("form.link.dismiss")}</Text>
-                        </Pressable>
-                      </View>
-                    );
-                  })()
-                ) : null}
-                {link ? (
-                  <Pressable
-                    onPress={() => {
-                      setDismissedLinks((prev) => ({ ...prev, [row.id]: true }));
-                      setAcceptedLinks((prev) => { const n = { ...prev }; delete n[row.id]; return n; });
-                      setIngRows((prev) => prev.map((r) => r.id === row.id ? { ...r, linkedBottleId: undefined, linkedPrepId: undefined } : r));
-                    }}
-                    style={({ pressed }) => [{ flexDirection: "row", alignItems: "center", gap: 3, marginTop: 2, paddingHorizontal: 4 }, pressed && { opacity: 0.6 }]}
-                  >
-                    <IconSymbol name="xmark" size={10} color={colors.muted} />
-                    <Text style={{ fontSize: 11, lineHeight: 14, color: colors.muted }}>{t("form.link.break")}</Text>
-                  </Pressable>
-                ) : null}
-              </View>
-            );
-          })}
+          <NestableDraggableFlatList
+            data={ingRows}
+            keyExtractor={(item) => item.id}
+            renderItem={renderIngRow}
+            onDragEnd={({ data }) => setIngRows(data)}
+            scrollEnabled={false}
+            activationDistance={10}
+          />
           <Pressable
             onPress={addIngRow}
             style={({ pressed }) => [styles.addRow, pressed && { opacity: 0.6 }]}
@@ -1198,7 +1208,7 @@ export default function HomemadeFormScreen() {
               ) : null}
             </>
           ) : null}
-        </ScrollView>
+        </NestableScrollContainer>
       </KeyboardAvoidingView>
       {/* Unit picker sheet */}
       <UnitPickerSheet
