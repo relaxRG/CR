@@ -138,7 +138,7 @@ function migrateSectionsV2(stored: PrepSection[]): PrepSection[] {
   );
   // 自定义分区保留在末尾,补 group(用分区名智能判定)
   const migratedCustom = custom.map((s) =>
-    s.group === "alcoholic" || s.group === "non_alcoholic"
+    s.group === "alcoholic" || s.group === "non_alcoholic" || s.group === "garnish"
       ? s
       : { ...s, group: classifyPrepGroup({ name: `${s.en} ${s.zh}` }) },
   );

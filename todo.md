@@ -237,3 +237,17 @@
 - [x] 需求 2：配方编辑手动选库——Ingredient 新增 preferredSource 字段，成分行库选择器（自动/基酒/酒款/原材料/自制），smart-link.ts 按库过滤，随配方持久化
 - [x] 需求 3：卡片复制——三库（配方/酒款/自制）长按弹出复制 Alert，生成「名称（副本）」条目
 - [x] 需求 4：库归属手动选择——Bottle 新增 libraryOverride/homemadeGroup/homemadeType，bottle-form.tsx 顶部「所属库」选择器，酒款库过滤已归属条目，自制库聚合显示虚拟 prep 并标注「来自酒款库」，smart-link.ts 联动
+
+## Garnish 功能完善（2026-07-18）
+- [x] Garnish tab 静态分类 chip：无条目时也显示全部装饰分类（homemade.tsx）
+- [x] 条目跨分组移动：长按菜单新增"移动到…"选项（homemade.tsx）
+- [x] 条目跨分组移动：左滑新增"移动"按钮（homemade.tsx）
+- [x] Recipe 详情页 Garnish 区域智能链接：逐项渲染可点击链接（recipe/[id].tsx）
+- [x] Recipe 详情页 Garnish 区域智能链接：逐项渲染可点击链接（recipe/[id].tsx）
+
+## 漏洞修复（2026-07-18 第二批）
+- [x] Bug 1：Garnish tab 快捷筛选状态共享 non_alcoholic tab（quickSelNa）→ 新增独立 quickSelGarnish 状态（quick.homemade.garnish.v1）
+- [x] Bug 2：recipe/[id].tsx 未使用的 garnishDisplayText 导入 → 已清理
+- [x] Bug 3：recipe/[id].tsx Garnish 渲染中 part.name 空值无防护 → 添加 if (!part.name) continue 守卫
+- [x] Bug 4：migrateSectionsV2 自定义分区迁移时未保留 garnish group 值 → 补充 garnish 判断条件
+- [x] Bug 5：classifyPrepGroup 无法识别装饰类关键词（返回 non_alcoholic）→ 新增 GARNISH_HINTS 常量，装饰/garnish/脱水等关键词正确归为 garnish 分组

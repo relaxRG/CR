@@ -301,7 +301,9 @@ export function prepGroupOf(
 const ALCOHOLIC_HINTS =
   /浸渍|浸泡|infus|fat.?wash|油脂洗|奶洗|milk.?wash|milk punch|澄清奶|clarified milk|利口酒|liqueur|cordial liqueur|amaro|苦酒|falernum|法勒南|苦精|bitters(?!.*(无酒精|non|na|zero))|酊剂|tincture|加强酒|fortified|vermouth|味美思|自酿|酿造|brew|米酒|果酒|梅酒|umeshu|预调|batch|batched|伏特加|vodka|威士忌|whisk|朗姆|rum|金酒|\bgin\b|龙舌兰|tequila|白兰地|brandy|烈酒基|酒基|spirit.?based/i;
 const NA_HINTS =
-  /无酒精|non.?alcoholic|zero.?proof|alcohol.?free|\bna\b|糖浆|syrup|orgeat|杏仁糖浆|oleo|油糖|鲜榨|果汁|juice|shrub|醋饮|果醋|康普茶|kombucha|水开菲尔|kefir|盐水|saline|酸液|acid solution|柠檬酸|苏打|soda|装饰|garnish|脱水|dehydrat/i;
+  /无酒精|non.?alcoholic|zero.?proof|alcohol.?free|\bna\b|糖浆|syrup|orgeat|杏仁糖浆|oleo|油糖|鲜榨|果汁|juice|shrub|醋饮|果醋|康普茶|kombucha|水开菲尔|kefir|盐水|saline|酸液|acid solution|柠檬酸|苏打|soda/i;
+const GARNISH_HINTS =
+  /装饰|garnish|脱水|dehydrat|柑橘皮|citrus.?peel|twist|wheel|slice|薄荷枝|mint.?sprig|edible.?flower|食用花|盐边|salt.?rim|sugar.?rim|串签|skewer|橄榄|olive|cherry|樱桃/i;
 
 /**
  * 根据名称/类型/配料/做法智能判断酒精属性分组。
@@ -328,6 +330,7 @@ export function classifyPrepGroup(input: {
   const ingText = (input.ingredients ?? []).join(" ");
   if (ALCOHOLIC_HINTS.test(ingText)) return "alcoholic";
   const nameText = `${input.name ?? ""} ${input.nameAlt ?? ""}`;
+  if (GARNISH_HINTS.test(nameText) && !ALCOHOLIC_HINTS.test(nameText)) return "garnish";
   if (NA_HINTS.test(nameText) && !ALCOHOLIC_HINTS.test(nameText)) return "non_alcoholic";
   if (ALCOHOLIC_HINTS.test(nameText)) return "alcoholic";
   const rest = `${input.recipe ?? ""} ${input.notes ?? ""}`;

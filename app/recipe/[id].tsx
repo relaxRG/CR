@@ -23,7 +23,7 @@ import { useI18n } from "@/lib/i18n";
 import { displayNames } from "@/lib/utils";
 import { formatAmountAsMl } from "@/lib/bottles/cost";
 import { estimateRecipeCostSmart } from "@/lib/recipes/smart-cost";
-import { estimateGarnishCost } from "@/lib/recipes/garnish-split";
+import { estimateGarnishCost, splitGarnish } from "@/lib/recipes/garnish-split";
 import { buildAutoAddDrafts } from "@/lib/recipes/auto-add";
 import { parseSource } from "@/lib/recipes/source-parse";
 import { useIceSettings } from "@/lib/ice/store";
@@ -33,7 +33,6 @@ import { VariantBadge } from "@/components/variant-badge";
 import { CodexFamilyBadge } from "@/components/codex-family-badge";
 import { LabOriginBadge } from "@/components/lab-origin-badge";
 import {
-  garnishDisplayText,
   ingredientDisplayName,
   stepsDisplayText,
 } from "@/lib/recipes/ingredient-display";
@@ -454,10 +453,89 @@ export default function RecipeDetailScreen() {
         {recipe.garnish ? (
           <>
             <Text className="text-[13px] text-muted uppercase mt-6 mb-2 px-4" style={styles.groupHeader}>{t("detail.garnish")}</Text>
-            <View className="bg-surface rounded-xl p-4">
-              <Text className="text-base text-foreground">
-                {garnishDisplayText(recipe.garnish, lang as "zh" | "en", bottles, preps)}
-              </Text>
+            <View className="bg-surface rounded-xl px-4">
+              {(() => {
+                const groups = splitGarnish(recipe.garnish);
+                if (groups.length === 0) {
+                  return (
+                    <View className="py-3">
+                      <Text className="text-base text-foreground">{recipe.garnish}</Text>
+                    </View>
+                  );
+                }
+                const rows: React.ReactElement[] = [];
+                let rowIdx = 0;
+                for (const group of groups) {
+                  for (const part of group.parts) {
+                    if (!part.name) continue;
+                    const link = smartLinkIngredient(part.name, bottles, preps);
+                    const smart = smartLinkDisplayName(link, lang as "zh" | "en");
+                    const displayName = smart?.primary ?? ingredientDisplayName(part.name, lang as "zh" | "en", bottles, preps);
+                    const isOr = group.mode === "or" && group.parts.length > 1;
+                    const inner = (
+                      <View
+                        className="flex-row items-center py-3"
+                        style={
+                          rowIdx > 0
+                            ? { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }
+                            : undefined
+                        }
+                      >
+                        <View className="flex-1 pr-2">
+                          <View className="flex-row items-center" style={{ gap: 5 }}>
+                            {isOr && (
+                              <Text className="text-xs text-muted" style={{ marginRight: 2 }}>
+                                {lang === "en" ? "or" : "或"}
+                              </Text>
+                            )}
+                            {part.amount ? (
+                              <Text className="text-base text-muted">{part.amount} </Text>
+                            ) : null}
+                            <Text
+                              className="text-base"
+                              style={{ color: link ? colors.primary : colors.foreground, flexShrink: 1 }}
+                            >
+                              {displayName}
+                            </Text>
+                            {link ? (
+                              <IconSymbol
+                                name={link.kind === "prep" ? "sparkles" : "chevron.right"}
+                                size={link.kind === "prep" ? 12 : 11}
+                                color={colors.primary}
+                              />
+                            ) : null}
+                          </View>
+                          {smart?.secondary ? (
+                            <Text className="text-xs text-muted mt-0.5" numberOfLines={1}>
+                              {smart.secondary}
+                            </Text>
+                          ) : null}
+                        </View>
+                      </View>
+                    );
+                    const key = `garnish-part-${rowIdx}`;
+                    rows.push(
+                      link ? (
+                        <Pressable
+                          key={key}
+                          onPress={() =>
+                            link.kind === "prep"
+                              ? router.push({ pathname: "/homemade/[id]", params: { id: link.prep.id } })
+                              : router.push({ pathname: "/bottle/[id]", params: { id: link.bottle.id } })
+                          }
+                          style={({ pressed }) => [pressed && { opacity: 0.6 }]}
+                        >
+                          {inner}
+                        </Pressable>
+                      ) : (
+                        <View key={key}>{inner}</View>
+                      )
+                    );
+                    rowIdx++;
+                  }
+                }
+                return rows;
+              })()}
             </View>
           </>
         ) : null}

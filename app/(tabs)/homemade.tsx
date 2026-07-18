@@ -124,8 +124,12 @@ export default function HomemadeScreen() {
     "quick.homemade.na.v1",
     {},
   );
-  const quickSel = group === "alcoholic" ? quickSelAlc : quickSelNa;
-  const setQuickSel = group === "alcoholic" ? setQuickSelAlc : setQuickSelNa;
+  const [quickSelGarnish, setQuickSelGarnish] = usePersistedState<QuickSelection>(
+    "quick.homemade.garnish.v1",
+    {},
+  );
+  const quickSel = group === "alcoholic" ? quickSelAlc : group === "garnish" ? quickSelGarnish : quickSelNa;
+  const setQuickSel = group === "alcoholic" ? setQuickSelAlc : group === "garnish" ? setQuickSelGarnish : setQuickSelNa;
   // Filter 面板多选筛选状态(与快捷筛选相互独立)
   const [selTypes, setSelTypes] = useState<string[]>([]);
   const [selTechniques, setSelTechniques] = useState<string[]>([]);
@@ -382,10 +386,24 @@ export default function HomemadeScreen() {
   /** 快捷筛选大分类:分区;子分类 = 该分区下库内存在的类型 */
   const quickParents: QuickParentOption[] = useMemo(
     () => {
+      const presentTypes = new Set(groupPreps.map((p) => p.type));
+      // Garnish tab: 始终显示所有 Garnish sections（静态），子类型仅显示库内已有的
+      if (group === "garnish") {
+        const allGarnishSections = sections.filter((s) => s.group === "garnish");
+        return allGarnishSections.map((s) => {
+          const children = types
+            .filter((pt) => pt.section === s.key && presentTypes.has(pt.key))
+            .map((pt) => ({ value: pt.key, label: lang === "en" ? pt.en : pt.zh }));
+          return {
+            value: s.key,
+            label: lang === "en" ? s.en : s.zh,
+            children,
+          };
+        });
+      }
       const sectionParents = usedSections.map((s) => {
-        const present = new Set(groupPreps.map((p) => p.type));
         const children = types
-          .filter((pt) => pt.section === s.key && present.has(pt.key))
+          .filter((pt) => pt.section === s.key && presentTypes.has(pt.key))
           .map((pt) => ({ value: pt.key, label: lang === "en" ? pt.en : pt.zh }));
         return {
           value: s.key,
@@ -418,7 +436,7 @@ export default function HomemadeScreen() {
       }
       return [...virtualParents, ...sectionParents];
     },
-    [usedSections, groupPreps, types, lang, group, usedBaseSpirits, usedTechniques, t],
+    [usedSections, groupPreps, types, sections, lang, group, usedBaseSpirits, usedTechniques, t],
   );
 
   /** 筛选面板维度定义:类型 + 工艺(分区保留在快捷 chip 行) */
@@ -1034,7 +1052,7 @@ function PrepRow({
   const colors = useColors();
   const router = useRouter();
   const { t, lang } = useI18n();
-  const { deletePrep, setPrepRating, duplicatePrep } = useHomemadeStore();
+  const { deletePrep, setPrepRating, duplicatePrep, setPrepGroup, sections, types } = useHomemadeStore();
   const [ratingVisible, setRatingVisible] = useState(false);
 
   const confirmDelete = () => {
@@ -1064,6 +1082,31 @@ function PrepRow({
           color: colors.warning,
           onPress: () => setRatingVisible(true),
         },
+        ...(prep.id.startsWith('bottle-override-') ? [] : [{
+          key: "move",
+          label: lang === "en" ? "Move" : "移动",
+          icon: "arrow.right.arrow.left" as const,
+          color: colors.primary,
+          closeOnPress: false,
+          onPress: () => {
+            const currentGroup = prepGroupOf(prep, sections, types);
+            const moveTargets = PREP_GROUPS.filter((g) => g.key !== currentGroup);
+            Alert.alert(
+              lang === "en" ? "Move to…" : "移动到…",
+              lang === "en" ? "Select destination group" : "选择目标分组",
+              [
+                ...moveTargets.map((g) => ({
+                  text: lang === "en" ? g.en : g.zh,
+                  onPress: () => {
+                    setPrepGroup(prep.id, g.key);
+                    if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  },
+                })),
+                { text: lang === "en" ? "Cancel" : "取消", style: "cancel" as const },
+              ],
+            );
+          },
+        }]),
       ]}
       rightActions={[
         {
@@ -1091,18 +1134,30 @@ function PrepRow({
         onLongPress={() => {
           if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
           const name = displayNames(prep.name, prep.nameAlt, lang).primary;
+          const isVirtual = prep.id.startsWith('bottle-override-');
+          const currentGroup = prepGroupOf(prep, sections, types);
+          const moveOptions = isVirtual ? [] : PREP_GROUPS
+            .filter((g) => g.key !== currentGroup)
+            .map((g) => ({
+              text: lang === "en" ? `Move to ${g.en}` : `移动到${g.zh}`,
+              onPress: () => {
+                setPrepGroup(prep.id, g.key);
+                if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              },
+            }));
           Alert.alert(
             name,
             undefined,
             [
               {
-                text: "复制条目",
+                text: lang === "en" ? "Duplicate" : "复制条目",
                 onPress: () => {
                   duplicatePrep(prep.id);
                   if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                 },
               },
-              { text: "取消", style: "cancel" },
+              ...moveOptions,
+              { text: lang === "en" ? "Cancel" : "取消", style: "cancel" },
             ],
           );
         }}
