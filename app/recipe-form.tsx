@@ -33,7 +33,7 @@ import { useBottleTaxonomy } from "@/lib/bottles/taxonomy";
 import { RecipeDraft, useRecipeStore } from "@/lib/recipes/store";
 import { enrichRecipe as enrichRecipeAI, deepAnalyzeRecipe as deepAnalyzeRecipeAI } from "@/lib/api/smart-router";
 import { parseRecipeText, toTitleCase } from "@/lib/recipes/parser";
-import { splitAmount, mergeAmount } from "@/lib/units";
+import { splitAmount, mergeAmount, unitDisplayLabel } from "@/lib/units";
 import { UnitPickerSheet } from "@/components/unit-picker-sheet";
 import { useRecentUnits } from "@/hooks/use-recent-units";
 import { estimateRecipeAbv } from "@/lib/recipes/abv";
@@ -1044,7 +1044,7 @@ export default function RecipeFormScreen() {
                     }, pressed && { opacity: 0.7 }]}
                   >
                     <Text style={{ fontSize: 14, color: unit ? colors.primary : colors.muted, fontWeight: unit ? "600" : "400" }}>
-                      {unit || t("form.ingredient.unit")}
+                      {unit ? unitDisplayLabel(unit, lang as "zh" | "en") : t("form.ingredient.unit")}
                     </Text>
                   </Pressable>
                 )}

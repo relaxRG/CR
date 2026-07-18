@@ -136,18 +136,18 @@ export function normalizeUnit(unit: string): string {
   if (/^(splash(?:es)?)$/.test(u)) return "splash";
   if (/^(drops?|滴)$/.test(u)) return "drop";
   if (/^(dash(?:es)?|抖)$/.test(u)) return "dash";
-  if (/^(个|枚|颗|粒|颗粒)$/.test(u)) return "个";
-  if (/^(片|slices?)$/.test(u)) return "片";
-  if (/^(枝|sprigs?)$/.test(u)) return "枝";
-  if (/^(块|cubes?)$/.test(u)) return "块";
-  if (/^(条|strips?)$/.test(u)) return "条";
-  if (/^(圈|wheels?)$/.test(u)) return "圈";
-  if (/^(扭|twists?|peels?)$/.test(u)) return "扭";
-  if (/^(楔|wedges?)$/.test(u)) return "楔";
+  if (/^(个|枚|颗|粒|颗粒|pcs?|piece|pieces)$/.test(u)) return "个";
+  if (/^(片|slices?|slice)$/.test(u)) return "片";
+  if (/^(枝|sprigs?|sprig)$/.test(u)) return "枝";
+  if (/^(块|cubes?|cube)$/.test(u)) return "块";
+  if (/^(条|strips?|strip)$/.test(u)) return "条";
+  if (/^(圈|wheels?|wheel)$/.test(u)) return "圈";
+  if (/^(扭|twists?|twist|peels?|peel)$/.test(u)) return "扭";
+  if (/^(楔|wedges?|wedge)$/.test(u)) return "楔";
   if (/^(叶|leaves?|leaf)$/.test(u)) return "叶";
-  if (/^(只|eggs?)$/.test(u)) return "只";
+  if (/^(只|eggs?|egg|whole)$/.test(u)) return "只";
   if (/^(适量|to\s+taste|as\s+needed)$/i.test(u)) return "适量";
-  if (/^(少许|a\s+pinch|a\s+bit)$/i.test(u)) return "少许";
+  if (/^(少许|a\s+pinch|a\s+bit|pinch)$/i.test(u)) return "少许";
   if (/^(to\s+top|top\s+up)$/i.test(u)) return "to top";
   return unit.trim();
 }
@@ -159,7 +159,7 @@ export function normalizeUnit(unit: string): string {
  * When selected, the quantity input should be hidden/disabled.
  */
 export const FUZZY_UNITS = new Set([
-  "适量", "少许", "to top", "rinse", "酌量",
+  "适量", "少许", "to top", "rinse", "酌量", "to taste", "a pinch",
 ]);
 
 /**
@@ -182,7 +182,7 @@ export function splitAmount(amount: string): { qty: string; unit: string } {
   if (!text) return { qty: "", unit: "" };
 
   // Check for fuzzy-only units first (no numeric prefix expected)
-  if (/^(适量|少许|酌量|to\s+taste|as\s+needed|to\s+top|top\s+up|rinse)$/i.test(text)) {
+  if (/^(适量|少许|酌量|to\s+taste|as\s+needed|to\s+top|top\s+up|rinse|a\s+pinch|a\s+bit)$/i.test(text)) {
     return { qty: "", unit: normalizeUnit(text) };
   }
 
@@ -221,7 +221,41 @@ export function mergeAmount(qty: string, unit: string): string {
 export interface UnitPresetGroup {
   /** Group label key for i18n */
   labelKey: string;
+  /** Units for Chinese locale */
+  unitsZh: string[];
+  /** Units for English locale (falls back to unitsZh if empty) */
+  unitsEn?: string[];
+  /** @deprecated Use unitsZh/unitsEn via getUnitPresetGroups(lang) */
   units: string[];
+}
+
+/**
+ * Returns unit preset groups with locale-appropriate unit labels.
+ * COUNT units use Chinese characters in zh mode, English abbreviations in en mode.
+ * FUZZY units use Chinese in zh mode, English in en mode.
+ */
+export function getUnitPresetGroups(lang: "zh" | "en"): { labelKey: string; units: string[] }[] {
+  return UNIT_PRESET_GROUPS.map((g) => ({
+    labelKey: g.labelKey,
+    units: lang === "en" && g.unitsEn ? g.unitsEn : g.unitsZh,
+  }));
+}
+
+/** Mapping from internal zh storage key → en display label */
+const ZH_TO_EN_UNIT: Record<string, string> = {
+  "个": "pc", "片": "slice", "颗": "pcs", "枝": "sprig",
+  "块": "cube", "条": "strip", "圈": "wheel", "扭": "twist",
+  "楔": "wedge", "叶": "leaf", "只": "whole",
+  "适量": "to taste", "少许": "a pinch",
+};
+
+/**
+ * Returns the display label for a unit in the given language.
+ * Internal storage uses Chinese keys; this converts them for display.
+ */
+export function unitDisplayLabel(unit: string, lang: "zh" | "en"): string {
+  if (lang === "en" && ZH_TO_EN_UNIT[unit]) return ZH_TO_EN_UNIT[unit];
+  return unit;
 }
 
 /**
@@ -232,25 +266,35 @@ export interface UnitPresetGroup {
 export const UNIT_PRESET_GROUPS: UnitPresetGroup[] = [
   {
     labelKey: "unit.group.liquid",
-    units: ["ml", "oz", "cl", "dl", "L"],
+    unitsZh: ["ml", "oz", "cl", "dl", "L"],
+    get units() { return this.unitsZh; },
   },
   {
     labelKey: "unit.group.spoon",
-    units: ["dash", "drop", "tsp", "bsp", "tbsp", "dsp", "splash", "rinse"],
+    unitsZh: ["dash", "drop", "tsp", "bsp", "tbsp", "dsp", "splash", "rinse"],
+    get units() { return this.unitsZh; },
   },
   {
     labelKey: "unit.group.count",
-    units: ["个", "片", "颗", "枝", "块", "条", "圈", "扭", "楔", "叶", "只"],
+    unitsZh: ["个", "片", "颗", "枝", "块", "条", "圈", "扭", "楔", "叶", "只"],
+    unitsEn: ["pc", "slice", "pcs", "sprig", "cube", "strip", "wheel", "twist", "wedge", "leaf", "whole"],
+    get units() { return this.unitsZh; },
   },
   {
     labelKey: "unit.group.ratio",
-    units: ["part"],
+    unitsZh: ["part"],
+    get units() { return this.unitsZh; },
   },
   {
     labelKey: "unit.group.fuzzy",
-    units: ["适量", "少许", "to top"],
+    unitsZh: ["适量", "少许", "to top"],
+    unitsEn: ["to taste", "a pinch", "to top"],
+    get units() { return this.unitsZh; },
   },
 ];
 
-/** Flat list of all preset units (for quick lookup) */
-export const ALL_PRESET_UNITS: string[] = UNIT_PRESET_GROUPS.flatMap((g) => g.units);
+/** Flat list of all preset units (for quick lookup, includes both zh and en variants) */
+export const ALL_PRESET_UNITS: string[] = [
+  ...UNIT_PRESET_GROUPS.flatMap((g) => g.unitsZh),
+  ...UNIT_PRESET_GROUPS.flatMap((g) => g.unitsEn ?? []),
+];

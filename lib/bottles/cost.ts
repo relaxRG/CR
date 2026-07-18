@@ -93,7 +93,7 @@ export function parseAmountToMl(amount: string): number | null {
 
 /** 非液体计数单位(中/英):水果个数、叶片、方糖等,保留原始呈现 */
 const NON_LIQUID_RE =
-  /片|个|颗|枝|块|条|只|适量|少许|叶|把|抹|圈|针|satsuma|slice|wedge|sprig|lea(f|ves)|piece|cube|egg|pinch|twist|peel|wheel|whole|rind|zest|mint|berr|cherr|olive|clove|small|large|to\s*top|top\s*up|toasted|\blime\b|\blemon\b|\borange\b|青柠(?!汁)|柠檬(?!汁)/i;
+  /片|个|颗|枝|块|条|只|适量|少许|叶|把|抹|圈|针|satsuma|slice|wedge|sprig|lea(f|ves)|piece|pcs?\b|cube|egg|pinch|twist|peel|wheel|whole|rind|zest|mint|berr|cherr|olive|clove|small|large|to\s*top|top\s*up|to\s*taste|a\s*pinch|toasted|\blime\b|\blemon\b|\borange\b|青柠(?!汁)|柠檬(?!汁)/i;
 
 /**
  * 将用量文本统一格式化为 ml 显示。

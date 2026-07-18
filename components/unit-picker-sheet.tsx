@@ -10,7 +10,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
-import { UNIT_PRESET_GROUPS } from "@/lib/units";
+import { getUnitPresetGroups, unitDisplayLabel, normalizeUnit } from "@/lib/units";
 
 interface UnitPickerSheetProps {
   visible: boolean;
@@ -36,7 +36,7 @@ export function UnitPickerSheet({
 }: UnitPickerSheetProps) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
 
   return (
     <Modal
@@ -105,7 +105,7 @@ export function UnitPickerSheet({
                           },
                         ]}
                       >
-                        {unit}
+                        {unitDisplayLabel(unit, lang as "zh" | "en")}
                       </Text>
                     </Pressable>
                   );
@@ -145,7 +145,7 @@ export function UnitPickerSheet({
             </Pressable>
           </View>
 
-          {UNIT_PRESET_GROUPS.map((group) => (
+          {getUnitPresetGroups(lang as "zh" | "en").map((group) => (
             <View key={group.labelKey} style={styles.groupContainer}>
               {/* Group label */}
               <Text style={[styles.groupLabel, { color: colors.muted }]}>
@@ -154,11 +154,12 @@ export function UnitPickerSheet({
               {/* Unit chips */}
               <View style={styles.chipsRow}>
                 {group.units.map((unit) => {
-                  const isSelected = selectedUnit === unit;
+                  const normalizedUnit = normalizeUnit(unit);
+                  const isSelected = selectedUnit === normalizedUnit || selectedUnit === unit;
                   return (
                     <Pressable
                       key={unit}
-                      onPress={() => { onSelect(unit); onClose(); }}
+                      onPress={() => { onSelect(normalizedUnit); onClose(); }}
                       style={({ pressed }) => [
                         styles.unitChip,
                         {
@@ -180,7 +181,7 @@ export function UnitPickerSheet({
                           },
                         ]}
                       >
-                        {unit}
+                        {unitDisplayLabel(unit, lang as "zh" | "en")}
                       </Text>
                     </Pressable>
                   );
