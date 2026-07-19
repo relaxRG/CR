@@ -113,6 +113,7 @@ export async function enrichRecipe(params: {
     suggestedOccasion: string; suggestedOccasionConfidence: "high"|"medium"|"low"; suggestedCodexFamily: string;
     suggestedVariantOf: string; variantOfDetail: string; variantOfConfidence: "high"|"medium"|"low";
     creator: string; creatorConfidence: "high"|"medium"|"low"; createdYear: string; createdYearConfidence: "high"|"medium"|"low"; _cached?: boolean;
+    suggestedNameZh?: string; suggestedNameEn?: string;
   }>('enrich-recipe', params as Record<string, unknown>);
   return {
     ...result,
@@ -243,6 +244,8 @@ export async function deepAnalyzeRecipe(params: {
     flavors: string[];
     confidence: "high"|"medium"|"low";
     isDeepAnalysis: boolean;
+    suggestedNameZh?: string;
+    suggestedNameEn?: string;
   }>('deep-analyze-recipe' as AiRoute, params as Record<string, unknown>, { timeoutMs: 60_000 });
   return {
     ...result,

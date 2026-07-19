@@ -368,6 +368,8 @@ export default function RecipeFormScreen() {
     suggestedDurationConfidence?: "high" | "medium" | "low";
     suggestedOccasion?: string;
     suggestedOccasionConfidence?: "high" | "medium" | "low";
+    suggestedNameZh?: string;
+    suggestedNameEn?: string;
   } | null>(null);
   /** 逐字段 toggle：key = field key, value = true(接受) / false(拒绝) */
   const [aiToggles, setAiToggles] = useState<Record<string, boolean>>({});
@@ -377,6 +379,7 @@ export default function RecipeFormScreen() {
     baseSpirit: string; glass: string; ice: string; codexFamily: string;
     variantOf: string; method: string; drinkDuration: string; occasion: string;
     creator: string; createdYear: string;
+    nameZh?: string; nameEn?: string;
   }>(null);
   /** Undo toast 倒计时 timer ref */
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -784,9 +787,19 @@ export default function RecipeFormScreen() {
         fields.push({ key: "flavors", labelZh: "风味标签", labelEn: "Flavors", aiValue: normalized.slice(0, 4).join(" · ") + (normalized.length > 4 ? ` +${normalized.length - 4}` : ""), currentValue: flavors.length > 0 ? flavors.slice(0, 3).join(" · ") + (flavors.length > 3 ? `…` : "") : "", conflict: conflict(flavors.length > 0 ? "has" : "", "has", c), confidence: c });
       }
     }
+    // Name (Chinese)
+    if (aiResult.suggestedNameZh && aiResult.suggestedNameZh.trim()) {
+      const suggested = aiResult.suggestedNameZh.trim();
+      fields.push({ key: "nameZh", labelZh: "中文名", labelEn: "Chinese Name", aiValue: suggested, currentValue: name, conflict: conflict(name.trim(), suggested, "medium"), confidence: "medium" });
+    }
+    // Name (English)
+    if (aiResult.suggestedNameEn && aiResult.suggestedNameEn.trim()) {
+      const suggested = aiResult.suggestedNameEn.trim();
+      fields.push({ key: "nameEn", labelZh: "英文名", labelEn: "English Name", aiValue: suggested, currentValue: nameEn, conflict: conflict(nameEn.trim(), suggested, "medium"), confidence: "medium" });
+    }
     return fields;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aiResult, baseSpirit, glass, ice, method, codexFamily, variantOf, drinkDuration, occasion, story, flavorDesc, source, sourceRef, flavors]);
+  }, [aiResult, baseSpirit, glass, ice, method, codexFamily, variantOf, drinkDuration, occasion, story, flavorDesc, source, sourceRef, flavors, name, nameEn]);
 
   /** 初始化 toggles：新增字段默认 on，覆盖字段默认 off，低置信默认 off */
   useEffect(() => {
@@ -838,6 +851,11 @@ export default function RecipeFormScreen() {
       const normalized = normalizeTagArrayToZh(aiResult.flavors, FLAVOR_TAGS);
       if (normalized.length > 0) setFlavors(normalized);
     }
+    else if (key === "nameZh" && aiResult.suggestedNameZh) {
+      setName(aiResult.suggestedNameZh.trim());
+    } else if (key === "nameEn" && aiResult.suggestedNameEn) {
+      setNameEn(aiResult.suggestedNameEn.trim());
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aiResult]);
 
@@ -847,7 +865,7 @@ export default function RecipeFormScreen() {
     const toggles = toggleOverride ?? aiToggles;
     const fields = buildAiFields();
     // 保存 undo 快照
-    setUndoSnapshot({ story, flavorDesc, source, flavors, baseSpirit, glass, ice, codexFamily, variantOf, method, drinkDuration, occasion, creator: sourceRef.creator ?? "", createdYear: sourceRef.createdYear ?? "" });
+    setUndoSnapshot({ story, flavorDesc, source, flavors, baseSpirit, glass, ice, codexFamily, variantOf, method, drinkDuration, occasion, creator: sourceRef.creator ?? "", createdYear: sourceRef.createdYear ?? "", nameZh: name, nameEn });
     // 应用选中字段
     for (const f of fields) {
       if (toggles[f.key] !== false) applyField(f.key);
@@ -878,6 +896,8 @@ export default function RecipeFormScreen() {
     if (undoSnapshot.creator || undoSnapshot.createdYear) {
       setSourceRef((prev) => ({ ...prev, creator: undoSnapshot!.creator, createdYear: undoSnapshot!.createdYear }));
     }
+    if (undoSnapshot.nameZh !== undefined) setName(undoSnapshot.nameZh);
+    if (undoSnapshot.nameEn !== undefined) setNameEn(undoSnapshot.nameEn);
     setUndoSnapshot(null);
     if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);

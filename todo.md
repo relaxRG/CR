@@ -261,3 +261,13 @@
 ## 解析与 Garnish 标签修复（2026-07-19）
 - [x] Bug 1：splitPrepIngredientLine 无法解析 "Zest of ¼ pomelo" 等 "X of ¼ Y" 模式 → 新增 OF_FRAC_RE 预处理，提取数量并还原完整名称
 - [x] Bug 2：Garnish 分组在 Library 中没有任何类型标签（老用户 v2Flag 已设置，加载时直接使用旧数据，缺少新增的 garnish sections）→ 修复 store.tsx 加载逻辑，已迁移用户也始终合并最新默认 sections
+
+## AI 补全名称字段修复（2026-07-19）
+- [x] CF Worker enrich-recipe：新增 suggestedNameZh/suggestedNameEn 字段（ZH/EN 双语 prompt，明确指引 AI 何时填写名称）
+- [x] CF Worker deep-analyze-recipe：同步添加 suggestedNameZh/suggestedNameEn 字段
+- [x] recipe-form.tsx aiResult 类型：新增 suggestedNameZh?/suggestedNameEn? 字段
+- [x] recipe-form.tsx buildAiFields：当 suggestedNameZh/suggestedNameEn 非空时，加入 AI 建议面板（中文名/英文名）
+- [x] recipe-form.tsx applyField：key=nameZh/nameEn 时写入 name/nameEn state
+- [x] recipe-form.tsx undoSnapshot：新增 nameZh/nameEn 字段，undo 时同步还原名称
+- [x] smart-router.ts enrichRecipe/deepAnalyzeRecipe 返回类型：新增 suggestedNameZh?/suggestedNameEn? 字段
+- [x] TypeScript 零错误
