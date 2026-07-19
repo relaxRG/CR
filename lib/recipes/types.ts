@@ -275,6 +275,8 @@ export interface Recipe {
   cardTagOrder: CardTagSlot[] | null;
   createdAt: number;
   updatedAt: number;
+  /** 成品照片本地路径（存储在 App documentDirectory 下），undefined 表示无照片 */
+  photoUri?: string;
 }
 
 /** 规范化评分:限制 1-10 的整数,其余返回 null */
@@ -335,6 +337,7 @@ export function normalizeRecipe(r: Partial<Recipe> & Pick<Recipe, "id" | "name">
   base.sortIndex =
     typeof r.sortIndex === "number" && isFinite(r.sortIndex) ? r.sortIndex : null;
   base.cardTagOrder = Array.isArray(r.cardTagOrder) ? r.cardTagOrder as CardTagSlot[] : null;
+  base.photoUri = typeof r.photoUri === "string" && r.photoUri ? r.photoUri : undefined;
   // 旧数据迁移:混写名("尼格罗尼 Negroni")自动拆分为中英字段
   if (!base.nameEn) {
     const split = splitBilingualName(base.name);

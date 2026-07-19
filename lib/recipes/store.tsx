@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { notifySyncChange } from "../sync/engine";
+import * as FileSystem from "expo-file-system/legacy";
 import React, {
   createContext,
   useCallback,
@@ -32,6 +33,17 @@ const CATEGORIES_KEY = "cocktail.categories";
 const SEEDED_KEY = "cocktail.seeded";
 const TAGS_KEY = "cocktail.tags";
 const TAG_GROUPS_KEY = "cocktail.tagGroups";
+
+/** 安全删除配方照片文件（不抛错） */
+async function deleteRecipePhoto(photoUri: string | undefined) {
+  if (!photoUri) return;
+  try {
+    const info = await FileSystem.getInfoAsync(photoUri);
+    if (info.exists) await FileSystem.deleteAsync(photoUri, { idempotent: true });
+  } catch {
+    // 文件不存在或删除失败时静默忽略
+  }
+}
 
 export interface RecipeDraft {
   name: string;
@@ -108,6 +120,7 @@ interface RecipeStore {
   tagGroupsOf: (kind: TagKind) => TagGroup[];
   getRecipe: (id: string | undefined) => Recipe | undefined;
   getCategory: (id: string | null | undefined) => Category | undefined;
+  updateRecipePhoto: (id: string, photoUri: string | undefined) => void;
 }
 
 const RecipeContext = createContext<RecipeStore | null>(null);
@@ -418,8 +431,22 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
     [persistRecipes],
   );
 
+  const updateRecipePhoto = useCallback(
+    (id: string, photoUri: string | undefined) => {
+      persistRecipes(
+        recipesRef.current.map((r) =>
+          r.id === id ? { ...r, photoUri, updatedAt: Date.now() } : r,
+        ),
+      );
+    },
+    [persistRecipes],
+  );
+
+
   const deleteRecipe = useCallback(
     (id: string) => {
+      const target = recipesRef.current.find((r) => r.id === id);
+      if (target?.photoUri) deleteRecipePhoto(target.photoUri);
       persistRecipes(recipesRef.current.filter((r) => r.id !== id));
     },
     [persistRecipes],
@@ -429,6 +456,9 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
   const deleteRecipes = useCallback(
     (ids: string[]) => {
       const set = new Set(ids);
+      recipesRef.current.forEach((r) => {
+        if (set.has(r.id) && r.photoUri) deleteRecipePhoto(r.photoUri);
+      });
       persistRecipes(recipesRef.current.filter((r) => !set.has(r.id)));
     },
     [persistRecipes],
@@ -807,6 +837,7 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
       addRecipe,
       addRecipes,
       updateRecipe,
+      updateRecipePhoto,
       deleteRecipe,
       deleteRecipes,
       bulkUpdateRecipes,
@@ -847,6 +878,7 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
       addRecipe,
       addRecipes,
       updateRecipe,
+      updateRecipePhoto,
       deleteRecipe,
       deleteRecipes,
       bulkUpdateRecipes,

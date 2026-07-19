@@ -274,3 +274,14 @@
 
 ## AI 补全按钮名称提示（2026-07-19）
 - [x] recipe-form.tsx：AI 补全按钮上方动态显示提示文字——只填中文名时显示「✦ 点击可获取英文名建议」，只填英文名时显示「✦ 点击可获取中文名建议」，双语支持，双名均填或均空时不显示
+
+## 配方详情页成品照片功能（2026-07-19）
+- [x] lib/recipes/types.ts：Recipe 接口新增 photoUri?: string 字段，normalizeRecipe 默认 undefined
+- [x] lib/recipes/store.tsx：新增 updateRecipePhoto 函数，deleteRecipe/deleteRecipes 时自动清理照片文件
+- [x] lib/recipes/photo.ts：新建照片工具函数（deletePhoto）
+- [x] lib/i18n/translations.ts：新增 detail.photo.* 翻译键（中英双语）
+- [x] app/recipe/[id].tsx：详情页最下方添加成品照片 Section（拍照/相册选择/删除）
+- [x] 权限处理：相机/相册权限被拒时弹出 Alert 引导去系统设置（Linking.openSettings）
+- [x] iOS 兼容：选照片后立即复制到 documentDirectory，避免 ph:// URI 失效
+- [x] 照片压缩：quality: 0.75，避免原图 4K 占用内存
+- [x] TypeScript 零错误

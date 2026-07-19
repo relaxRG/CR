@@ -47,6 +47,11 @@ import { useHomemadeStore } from "@/lib/homemade/store";
 import { enrichBottles } from "@/lib/api/smart-router";
 import { smartLinkIngredient, smartLinkDisplayName } from "@/lib/recipes/smart-link";
 import { useRecipeStore } from "@/lib/recipes/store";
+import { Image } from "expo-image";
+import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system/legacy";
+import { Linking } from "react-native";
+import { deletePhoto } from "@/lib/recipes/photo";
 import { useMenuStore } from "@/lib/menu/store";
 import {
   STRENGTH_LABELS,
@@ -63,11 +68,99 @@ export default function RecipeDetailScreen() {
   const { t, lang } = useI18n();
   const { getRecipe, getCategory, toggleFavorite, toggleMade, setRating, deleteRecipe, tags } =
     useRecipeStore();
+  const { updateRecipePhoto } = useRecipeStore();
   const { bottles, addBottle, updateBottle } = useBottleStore();
   const { preps } = useHomemadeStore();
   const recipe = getRecipe(id);
   const { groups, addEntry } = useMenuStore();
   const [menuModalVisible, setMenuModalVisible] = React.useState(false);
+
+  // 成品照片
+  const [photoLoading, setPhotoLoading] = React.useState(false);
+
+  const handlePickPhoto = React.useCallback(async (kind: "camera" | "library") => {
+    if (!recipe) return;
+    setPhotoLoading(true);
+    try {
+      if (kind === "camera") {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== "granted") {
+          Alert.alert(
+            t("detail.photo.perm.camera.title"),
+            t("detail.photo.perm.camera.msg"),
+            [
+              { text: t("detail.photo.perm.settings"), onPress: () => Linking.openSettings() },
+              { text: t("detail.photo.perm.cancel"), style: "cancel" },
+            ],
+          );
+          return;
+        }
+      } else {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== "granted") {
+          Alert.alert(
+            t("detail.photo.perm.library.title"),
+            t("detail.photo.perm.library.msg"),
+            [
+              { text: t("detail.photo.perm.settings"), onPress: () => Linking.openSettings() },
+              { text: t("detail.photo.perm.cancel"), style: "cancel" },
+            ],
+          );
+          return;
+        }
+      }
+      const result = kind === "camera"
+        ? await ImagePicker.launchCameraAsync({ quality: 0.75, exif: false })
+        : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.75, exif: false });
+      if (result.canceled || !result.assets?.[0]) return;
+      const sourceUri = result.assets[0].uri;
+      const dir = `${FileSystem.documentDirectory}recipe-photos/`;
+      const dirInfo = await FileSystem.getInfoAsync(dir);
+      if (!dirInfo.exists) await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
+      const ext = sourceUri.split(".").pop()?.split("?")[0] ?? "jpg";
+      const destPath = `${dir}${recipe.id}_${Date.now()}.${ext}`;
+      await FileSystem.copyAsync({ from: sourceUri, to: destPath });
+      if (recipe.photoUri) await deletePhoto(recipe.photoUri);
+      updateRecipePhoto(recipe.id, destPath);
+    } catch {
+      // 静默忽略
+    } finally {
+      setPhotoLoading(false);
+    }
+  }, [recipe, t, updateRecipePhoto]);
+
+  const handlePhotoAction = React.useCallback(() => {
+    if (!recipe) return;
+    const buttons: { text: string; onPress?: () => void; style?: "cancel" | "destructive" }[] = [
+      { text: t("detail.photo.takePhoto"), onPress: () => handlePickPhoto("camera") },
+      { text: t("detail.photo.chooseLibrary"), onPress: () => handlePickPhoto("library") },
+    ];
+    if (recipe.photoUri) {
+      buttons.push({
+        text: t("detail.photo.delete"),
+        style: "destructive",
+        onPress: () => {
+          Alert.alert(
+            t("detail.photo.delete.confirm.title"),
+            t("detail.photo.delete.confirm.msg"),
+            [
+              {
+                text: t("detail.photo.delete"),
+                style: "destructive",
+                onPress: async () => {
+                  await deletePhoto(recipe.photoUri);
+                  updateRecipePhoto(recipe.id, undefined);
+                },
+              },
+              { text: t("detail.photo.cancel"), style: "cancel" },
+            ],
+          );
+        },
+      });
+    }
+    buttons.push({ text: t("detail.photo.cancel"), style: "cancel" });
+    Alert.alert(t("detail.photo.actionTitle"), undefined, buttons);
+  }, [recipe, t, handlePickPhoto, updateRecipePhoto]);
 
   // 联网补全:零价空壳条目(多为自动添加)→ LLM 知识补全资料并更新入库
   const [enrichPending, setEnrichPending] = React.useState(false);
@@ -1036,6 +1129,53 @@ export default function RecipeDetailScreen() {
           </>
         ) : null}
       </ScrollView>
+      {/* 成品照片 Section */}
+      <View style={{ paddingHorizontal: 20, paddingBottom: 24, paddingTop: 8 }}>
+        <Text
+          className="text-xs font-semibold text-muted uppercase mb-3"
+          style={[styles.groupHeader]}
+        >
+          {t("detail.photo.title")}
+        </Text>
+        {recipe?.photoUri ? (
+          <View style={{ borderRadius: 12, overflow: "hidden", position: "relative" }}>
+            <Image
+              source={{ uri: recipe.photoUri }}
+              style={{ width: "100%", aspectRatio: 4 / 3, borderRadius: 12 }}
+              contentFit="cover"
+              transition={200}
+            />
+            <Pressable
+              onPress={handlePhotoAction}
+              style={({ pressed }) => [
+                styles.photoChangeBadge,
+                pressed && { opacity: 0.7 },
+              ]}
+            >
+              <Text style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}>
+                {t("detail.photo.change")}
+              </Text>
+            </Pressable>
+          </View>
+        ) : (
+          <Pressable
+            onPress={handlePhotoAction}
+            style={({ pressed }) => [
+              styles.photoPlaceholder,
+              { borderColor: colors.border },
+              pressed && { opacity: 0.6 },
+            ]}
+          >
+            {photoLoading ? (
+              <ActivityIndicator size="small" color={colors.muted} />
+            ) : (
+              <Text style={{ color: colors.muted, fontSize: 14 }}>
+                {t("detail.photo.add")}
+              </Text>
+            )}
+          </Pressable>
+        )}
+      </View>
     </ScreenContainer>
     {/* 门店酒单分组选择 Modal */}
       {menuModalVisible && (
@@ -1124,6 +1264,23 @@ const styles = StyleSheet.create({
   groupHeader: {
     letterSpacing: 0.4,
     lineHeight: 18,
+  },
+  photoPlaceholder: {
+    height: 120,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderStyle: "dashed",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  photoChangeBadge: {
+    position: "absolute",
+    bottom: 10,
+    right: 10,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
 });
 
