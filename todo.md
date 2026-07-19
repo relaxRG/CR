@@ -425,3 +425,12 @@
 - [x] recipe-form.tsx 表单区块标题统一为 13px 全大写灰色 + letterSpacing 0.4
 - [x] homemade-form.tsx fieldLabel 标题统一为 13px 全大写灰色 + letterSpacing 0.4
 - [x] TypeScript 0 错误，35 项测试全部通过
+
+## 全面代码审计（2026-07-20）
+- [x] 全局扫描：TypeScript 0 错误、35 测试通过、无乱码（U+FFFD/BOM）、无 TODO/FIXME 残留
+- [x] 路由完整性：所有 router.push 目标均有对应文件
+- [x] 清理死文件：lib/_core/auth.ts、components/parallax-scroll-view.tsx、hello-wave.tsx、external-link.tsx、ui/collapsible.tsx、app/prep-sections.tsx（无入口死页面）
+- [x] 移除 lib/theme-provider.tsx 调试 console.log（每次渲染打印主题变量）
+- [x] 后端链路实测：CF Worker AI 路由在线、sync/pull 鉴权正常（401 未注册设备）
+- [ ] 已知缺口：阅读器书签/进度不参与云同步；照片文件不上传云端（仅本地路径同步）；卡片标签设置不同步
+- [ ] EAS Build 57 触发（Cloud PC eas build 报 metro.config.js 无法加载，疑似 eas-cli 20.5.1 与 Node 22 兼容问题，待升级 eas-cli 重试）
