@@ -52,7 +52,6 @@ import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as FileSystem from "expo-file-system/legacy";
 import { Linking } from "react-native";
-import { deletePhoto } from "@/lib/recipes/photo";
 import { useMenuStore } from "@/lib/menu/store";
 import {
   STRENGTH_LABELS,
@@ -113,16 +112,25 @@ export default function RecipeDetailScreen() {
           return;
         }
       }
-      const result = kind === "camera"
+    const result = kind === "camera"
         ? await ImagePicker.launchCameraAsync({ quality: 0.75, exif: false })
         : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.75, exif: false });
       if (result.canceled || !result.assets?.[0]) return;
       const asset = result.assets[0];
-      // 压缩到最大 1600px 宽、JPEG 80%，统一输出 .jpg（消除 HEIC/PNG 扩展名与体积问题）
+      // iOS: ph:// URI 不可直接被 ImageManipulator 读取，需先复制到 cache 目录
       let sourceUri = asset.uri;
+      if (Platform.OS === "ios" && asset.uri.startsWith("ph://")) {
+        const cacheDir = `${FileSystem.cacheDirectory}photo-tmp/`;
+        const cacheDirInfo = await FileSystem.getInfoAsync(cacheDir);
+        if (!cacheDirInfo.exists) await FileSystem.makeDirectoryAsync(cacheDir, { intermediates: true });
+        const tmpPath = `${cacheDir}tmp_${Date.now()}.jpg`;
+        await FileSystem.copyAsync({ from: asset.uri, to: tmpPath });
+        sourceUri = tmpPath;
+      }
+      // 压缩到最大 1600px 宽、JPEG 80%，统一输出 .jpg（消除 HEIC/PNG 扩展名与体积问题）
       try {
         const manipulated = await ImageManipulator.manipulateAsync(
-          asset.uri,
+          sourceUri,
           asset.width && asset.width > 1600 ? [{ resize: { width: 1600 } }] : [],
           { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG },
         );
@@ -163,8 +171,6 @@ export default function RecipeDetailScreen() {
                 text: t("detail.photo.delete"),
                 style: "destructive",
                 onPress: async () => {
-                  for (const uri of (recipe.photoUris ?? [])) { await deletePhoto(uri); }
-                  // remove all photos by calling removeRecipePhoto for each
                   for (const uri of (recipe.photoUris ?? [])) { removeRecipePhoto(recipe.id, uri); }
                 },
               },
@@ -1226,34 +1232,35 @@ export default function RecipeDetailScreen() {
         )}
       </View>
       {/* 照片浮层预览（浮在详情页上方，点击任意处关闭） */}
-      {photoPreviewUri && (
-        <Pressable
-          onPress={() => setPhotoPreviewUri(null)}
-          style={{
-            position: "absolute",
-            top: 0, left: 0, right: 0, bottom: 0,
-            backgroundColor: "rgba(0,0,0,0.75)",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 100,
-          }}
-        >
-          <Image
-            source={{ uri: photoPreviewUri }}
-            style={{
-              width: "92%",
-              height: "72%",
-              borderRadius: 16,
-            }}
-            contentFit="contain"
-            transition={150}
-          />
-          <View style={{ marginTop: 14, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.18)" }}>
-            <Text style={{ color: "#fff", fontSize: 12 }}>{t("detail.photo.tapToClose")}</Text>
-          </View>
-        </Pressable>
-      )}
     </ScreenContainer>
+    {/* 照片全屏预览 Modal（覆盖状态栏，点击任意处关闭） */}
+    <Modal
+      visible={!!photoPreviewUri}
+      transparent
+      animationType="fade"
+      statusBarTranslucent
+      onRequestClose={() => setPhotoPreviewUri(null)}
+    >
+      <Pressable
+        onPress={() => setPhotoPreviewUri(null)}
+        style={{
+          flex: 1,
+          backgroundColor: "rgba(0,0,0,0.88)",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Image
+          source={{ uri: photoPreviewUri ?? "" }}
+          style={{ width: "92%", height: "72%", borderRadius: 16 }}
+          contentFit="contain"
+          transition={150}
+        />
+        <View style={{ marginTop: 14, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.18)" }}>
+          <Text style={{ color: "#fff", fontSize: 12 }}>{t("detail.photo.tapToClose")}</Text>
+        </View>
+      </Pressable>
+    </Modal>
     {/* 门店酒单分组选择 Modal */}
       {menuModalVisible && (
         <Modal
