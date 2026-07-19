@@ -32,6 +32,7 @@ import {
 } from "@/lib/sync/engine";
 import { createSnapshot } from "@/lib/backup/local-backup";
 import { startAutoBackup } from "@/lib/backup/icloud-backup";
+import { syncPhotos } from "@/lib/sync/photo-sync";
 
 // ─── Context type (compatible with original useSync) ─────────────────────────
 type SyncContextValue = {
@@ -114,25 +115,34 @@ export function SyncProvider({
       startAutoBackup(info.deviceName);
       // ───────────────────────────────────────────────────────────────────
 
-      if (info.role === "guest") {
-        // Guest devices: pull only, no push
-        const { entries } = await cfPull();
-        await runInitialSync(entries, async () => {
-          // no-op push for guests
-        });
-      } else {
-        // Owner / collaborator: full sync
-        const { entries } = await cfPull();
-        const overwritten = await runInitialSync(entries, pushFn);
-        if (overwritten && Platform.OS === "web" && typeof window !== "undefined") {
-          window.location.reload();
-        } else if (overwritten && Platform.OS !== "web") {
-          triggerStoreReload();
-        }
-      }
-      setSyncError(null);
-      retryCountRef.current = 0;
-      lastSyncAtRef.current = Date.now();
+     if (info.role === "guest") {
+       // Guest devices: pull only, no push
+       const { entries } = await cfPull();
+       await runInitialSync(entries, async () => {
+         // no-op push for guests
+       });
+     } else {
+       // Owner / collaborator: full sync
+       const { entries } = await cfPull();
+       const overwritten = await runInitialSync(entries, pushFn);
+       if (overwritten && Platform.OS === "web" && typeof window !== "undefined") {
+         window.location.reload();
+       } else if (overwritten && Platform.OS !== "web") {
+         triggerStoreReload();
+       }
+     }
+      // 成品照片同步（非阻塞）：上传本地新照片、下载云端缺失照片并修复路径。
+      // 下载/路径修复发生后触发 store 重载，让详情页立即显示照片。
+      void syncPhotos()
+        .then(({ downloaded, repaired }) => {
+          if ((downloaded > 0 || repaired) && Platform.OS !== "web") {
+            triggerStoreReload();
+          }
+        })
+        .catch(() => {});
+     setSyncError(null);
+     retryCountRef.current = 0;
+     lastSyncAtRef.current = Date.now();
       return true;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

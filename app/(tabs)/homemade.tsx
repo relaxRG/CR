@@ -46,6 +46,7 @@ import { Bottle } from "@/lib/bottles/types";
 import { useCardTagSettings } from "@/lib/settings/card-tags";
 import { enrichHomemade } from "@/lib/api/smart-router";
 import { useNetwork } from "@/hooks/use-network";
+import { fabBottom } from "@/components/floating-tab-bar";
 import {
   HomemadePrep,
   PREP_GROUPS,
@@ -942,7 +943,7 @@ export default function HomemadeScreen() {
         onPress={handleAdd}
         style={({ pressed }) => [
           styles.fab,
-          { backgroundColor: colors.primary, bottom: insets.bottom + 72 },
+          { backgroundColor: colors.primary, bottom: fabBottom(insets.bottom) },
           pressed && { transform: [{ scale: 0.95 }], opacity: 0.9 },
         ]}
       >

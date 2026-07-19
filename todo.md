@@ -434,3 +434,13 @@
 - [x] 后端链路实测：CF Worker AI 路由在线、sync/pull 鉴权正常（401 未注册设备）
 - [ ] 已知缺口：阅读器书签/进度不参与云同步；照片文件不上传云端（仅本地路径同步）；卡片标签设置不同步
 - [ ] EAS Build 57 触发（Cloud PC eas build 报 metro.config.js 无法加载，疑似 eas-cli 20.5.1 与 Node 22 兼容问题，待升级 eas-cli 重试）
+
+## Build 57 收尾：FAB/多选栏统一浮岛 + 照片云端同步（2026-07-20）
+- [x] floating-tab-bar.tsx 新增 tabBarTop()/fabBottom()/bulkBarBottom() 统一布局帮助函数
+- [x] bottles/homemade/recipes/menu 四页 FAB bottom 统一改用 fabBottom(insets.bottom)，不再被浮岛 Tab 栏遮挡
+- [x] BulkActionBar 组件改为浮岛卡片样式（left/right 16、borderRadius 20、shadow、bulkBarBottom 定位）
+- [x] menu.tsx 自定义 batchBar 从顶部条改为底部浮岛卡片（与 BulkActionBar 风格一致）
+- [x] 照片云端同步：lib/sync/photo-sync.ts（上传/下载/photoUris 重写）+ provider.tsx performSync 后非阻塞挂载 + store.tsx deleteRecipePhoto 云端删除
+- [x] CF Worker 照片 API 4 条路由部署验证（upload/list/download/delete，鉴权 401 正常）
+- [x] TypeScript 0 错误，vitest 35 通过
+- [ ] 触发 EAS Build 57 并提交 TestFlight（Cloud PC 先升级 eas-cli）

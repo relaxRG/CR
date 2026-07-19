@@ -19,6 +19,7 @@ import {
 } from "react-native";
 import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { fabBottom, bulkBarBottom } from "@/components/floating-tab-bar";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { RecipeCard } from "@/components/recipe-card";
 import { useColors } from "@/hooks/use-colors";
@@ -691,47 +692,8 @@ export default function MenuScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      {/* 批量操作工具栏 */}
-      {selectionMode ? (
-        <View style={[styles.batchBar, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-          <Pressable onPress={exitSelectionMode} hitSlop={8}>
-            <Text style={[styles.batchBarCancel, { color: colors.primary }]}>取消</Text>
-          </Pressable>
-          <Text style={[styles.batchBarCount, { color: colors.foreground }]}>
-            已选 {selectedIds.size} 款
-          </Text>
-          <View style={styles.batchBarActions}>
-            <Pressable
-              onPress={() => handleBatchAvailable(true)}
-              disabled={selectedIds.size === 0}
-              style={({ pressed }) => [styles.batchBarBtn, { backgroundColor: colors.success + "22", opacity: pressed ? 0.7 : 1 }]}
-            >
-              <Text style={[styles.batchBarBtnText, { color: colors.success }]}>上架</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => handleBatchAvailable(false)}
-              disabled={selectedIds.size === 0}
-              style={({ pressed }) => [styles.batchBarBtn, { backgroundColor: colors.border, opacity: pressed ? 0.7 : 1 }]}
-            >
-              <Text style={[styles.batchBarBtnText, { color: colors.muted }]}>下架</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => setShowBatchPrice(true)}
-              disabled={selectedIds.size === 0}
-              style={({ pressed }) => [styles.batchBarBtn, { backgroundColor: colors.primary + "22", opacity: pressed ? 0.7 : 1 }]}
-            >
-              <Text style={[styles.batchBarBtnText, { color: colors.primary }]}>定价</Text>
-            </Pressable>
-            <Pressable
-              onPress={handleBatchRemove}
-              disabled={selectedIds.size === 0}
-              style={({ pressed }) => [styles.batchBarBtn, { backgroundColor: colors.error + "22", opacity: pressed ? 0.7 : 1 }]}
-            >
-              <Text style={[styles.batchBarBtnText, { color: colors.error }]}>移除</Text>
-            </Pressable>
-          </View>
-        </View>
-      ) : (
+      {/* 普通模式顶部状态栏（多选模式下操作栏改为底部浮岛，见文件末尾） */}
+      {!selectionMode && (
         /* 普通模式顶部状态栏 */
         totalEntries > 0 && (
           <View style={[styles.statusBar, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
@@ -782,11 +744,66 @@ export default function MenuScreen() {
       {/* FAB：无内容时显示添加按钮 */}
       {totalEntries === 0 && !showAddGroup && (
         <Pressable
-          style={({ pressed }) => [styles.fab, { backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1 }]}
+          style={({ pressed }) => [
+            styles.fab,
+            { backgroundColor: colors.primary, bottom: fabBottom(insets.bottom), opacity: pressed ? 0.85 : 1 },
+          ]}
           onPress={() => setAddRecipeTarget({ groupId: null })}
         >
           <IconSymbol name="plus" size={24} color="#fff" />
         </Pressable>
+      )}
+
+      {/* 多选模式底部浮岛操作栏 */}
+      {selectionMode && (
+        <View
+          style={[
+            styles.batchBar,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+              bottom: bulkBarBottom(insets.bottom),
+              shadowColor: "#000",
+            },
+          ]}
+        >
+          <Pressable onPress={exitSelectionMode} hitSlop={8}>
+            <Text style={[styles.batchBarCancel, { color: colors.primary }]}>取消</Text>
+          </Pressable>
+          <Text style={[styles.batchBarCount, { color: colors.foreground }]}>
+            已选 {selectedIds.size} 款
+          </Text>
+          <View style={styles.batchBarActions}>
+            <Pressable
+              onPress={() => handleBatchAvailable(true)}
+              disabled={selectedIds.size === 0}
+              style={({ pressed }) => [styles.batchBarBtn, { backgroundColor: colors.success + "22", opacity: pressed ? 0.7 : 1 }]}
+            >
+              <Text style={[styles.batchBarBtnText, { color: colors.success }]}>上架</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => handleBatchAvailable(false)}
+              disabled={selectedIds.size === 0}
+              style={({ pressed }) => [styles.batchBarBtn, { backgroundColor: colors.border, opacity: pressed ? 0.7 : 1 }]}
+            >
+              <Text style={[styles.batchBarBtnText, { color: colors.muted }]}>下架</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setShowBatchPrice(true)}
+              disabled={selectedIds.size === 0}
+              style={({ pressed }) => [styles.batchBarBtn, { backgroundColor: colors.primary + "22", opacity: pressed ? 0.7 : 1 }]}
+            >
+              <Text style={[styles.batchBarBtnText, { color: colors.primary }]}>定价</Text>
+            </Pressable>
+            <Pressable
+              onPress={handleBatchRemove}
+              disabled={selectedIds.size === 0}
+              style={({ pressed }) => [styles.batchBarBtn, { backgroundColor: colors.error + "22", opacity: pressed ? 0.7 : 1 }]}
+            >
+              <Text style={[styles.batchBarBtnText, { color: colors.error }]}>移除</Text>
+            </Pressable>
+          </View>
+        </View>
       )}
 
       {/* 添加配方 Sheet */}
@@ -848,11 +865,19 @@ const styles = StyleSheet.create({
   },
   // 批量操作栏
   batchBar: {
+    position: "absolute",
+    left: 16,
+    right: 16,
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 12,
+    borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 8,
     gap: 10,
   },
   batchBarCancel: {

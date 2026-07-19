@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { notifySyncChange } from "../sync/engine";
+import { deleteCloudPhoto } from "../sync/photo-sync";
 import * as FileSystem from "expo-file-system/legacy";
 import React, {
   createContext,
@@ -42,6 +43,8 @@ async function deleteRecipePhoto(photoUri: string) {
   } catch {
     // 文件不存在或删除失败时静默忽略
   }
+  // 同步删除云端副本（非阻塞，失败静默）
+  void deleteCloudPhoto(photoUri);
 }
 
 export interface RecipeDraft {

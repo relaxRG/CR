@@ -81,6 +81,30 @@ export function FloatingTabBar({
 /** 各页面需要在底部留出的间距，防止内容被 FloatingTabBar 遮挡 */
 export const FLOATING_TAB_BOTTOM_OFFSET = 90;
 
+/**
+ * 统一布局常量：浮岛 Tab 栏 bottom = max(insets.bottom,8)+8，栏体高度 ≈ 57（icon 28 + label 13 + padding/gap）。
+ * Tab 栏顶部距屏幕底 ≈ max(insets.bottom,8) + 8 + 57。
+ * 所有悬浮元素（FAB、多选操作栏）必须引用以下函数计算 bottom，禁止各页面自行硬编码。
+ */
+const TAB_BAR_BODY_HEIGHT = 57;
+const TAB_BAR_BOTTOM_GAP = 8;
+
+/** 浮岛 Tab 栏顶部到屏幕底部的距离 */
+export function tabBarTop(insetsBottom: number): number {
+  const pad = Platform.OS === "web" ? 12 : Math.max(insetsBottom, 8);
+  return pad + TAB_BAR_BOTTOM_GAP + TAB_BAR_BODY_HEIGHT;
+}
+
+/** FAB 的 bottom：悬浮在 Tab 栏上方 16px */
+export function fabBottom(insetsBottom: number): number {
+  return tabBarTop(insetsBottom) + 16;
+}
+
+/** 浮岛式多选操作栏的 bottom：悬浮在 Tab 栏上方 10px */
+export function bulkBarBottom(insetsBottom: number): number {
+  return tabBarTop(insetsBottom) + 10;
+}
+
 const styles = StyleSheet.create({
   container: {
     position: "absolute",

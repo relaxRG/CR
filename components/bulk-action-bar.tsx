@@ -4,6 +4,7 @@ import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { bulkBarBottom } from "@/components/floating-tab-bar";
 import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
 
@@ -19,6 +20,7 @@ export interface BulkAction {
 /**
  * 底部批量操作栏:多选模式下浮在列表底部,展示已选数量、全选/取消全选与批量操作按钮。
  * 三库列表页共用,操作项由页面注入(批量删除/改分类/改标签/改分区等)。
+ * 浮岛式卡片,悬浮在 FloatingTabBar 上方,与 Tab 栏视觉风格统一。
  */
 export function BulkActionBar({
   count,
@@ -45,7 +47,7 @@ export function BulkActionBar({
         {
           backgroundColor: colors.surface,
           borderColor: colors.border,
-          paddingBottom: Math.max(insets.bottom, 10),
+          bottom: bulkBarBottom(insets.bottom),
         },
       ]}
     >
@@ -197,13 +199,19 @@ export function BulkEditSheet({
 const styles = StyleSheet.create({
   bar: {
     position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    left: 16,
+    right: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 20,
     paddingTop: 10,
+    paddingBottom: 12,
     paddingHorizontal: 16,
     gap: 10,
+    shadowColor: "#000",
+    shadowOpacity: 0.14,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 10,
   },
   topRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   count: { fontSize: 15, fontWeight: "600", lineHeight: 20 },

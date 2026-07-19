@@ -51,6 +51,7 @@ import { lookupInOfflineKb, extractBookSnippets, offlineEntryToEnrichResult } fr
 import { useRecipeStore } from "@/lib/recipes/store";
 import { smartLinkIngredient } from "@/lib/recipes/smart-link";
 import type { Recipe } from "@/lib/recipes/types";
+import { fabBottom } from "@/components/floating-tab-bar";
 
 export default function BottlesScreen() {
   const colors = useColors();
@@ -1219,7 +1220,7 @@ export default function BottlesScreen() {
           styles.fab,
           {
             backgroundColor: colors.primary,
-            bottom: insets.bottom + 72,
+            bottom: fabBottom(insets.bottom),
           },
           pressed && { transform: [{ scale: 0.95 }], opacity: 0.9 },
         ]}

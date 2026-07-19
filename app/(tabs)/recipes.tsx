@@ -58,6 +58,7 @@ import {
 } from "@/lib/recipes/types";
 import { FLAVOR_TAGS, FLAVOR_TAG_EN } from "@/lib/recipes/types";
 import { FLAVOR_TAG_DEFAULT_COLORS } from "@/lib/settings/card-tags";
+import { fabBottom } from "@/components/floating-tab-bar";
 
 type Filter = { type: "all" } | { type: "favorites" };
 
@@ -829,7 +830,7 @@ export function RecipesScreen() {
         onPress={handleAdd}
         style={({ pressed }) => [
           styles.fab,
-          { backgroundColor: colors.primary, bottom: insets.bottom + 72 },
+          { backgroundColor: colors.primary, bottom: fabBottom(insets.bottom) },
           pressed && { transform: [{ scale: 0.95 }], opacity: 0.9 },
         ]}
       >
