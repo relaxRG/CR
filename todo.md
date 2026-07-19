@@ -367,7 +367,24 @@
 - [x] Bug 3: 书内图片问号——iOS 回归 base64 内联（WKWebView html+baseUrl 不认 file://），仅 Android 走 file:// 快路径；>2MB 大图自动压缩 + 失败灰色占位（book-reader.tsx）
 - [x] Bug 4: AI 风格补全——Worker BOTTLE_STYLES_MAP 重建为客户端 taxonomy 值域 + normalizeBottleStyle 模糊归一化 + styleRaw 保留（已部署 Version 4eb6f355，curl 验证 Banks→Gold、Tanqueray→London Dry）；客户端 lib/bottles/style-normalize.ts 兜底映射（bottle-form.tsx + vitest 6 用例）
 - [x] Bug 5: Mac→手机同步——前台激活自动同步（AppState/visibilitychange，60s 节流，provider.tsx）；cfPull 支持 since 增量；Worker push 加 LWW 时间戳守卫（ON CONFLICT WHERE 新者胜，已部署）；设备管理页显示同步组短码 + 单设备配对引导
-- [ ] EAS Build 57 触发（等用户单独指令）
+- [x] EAS Build 57 触发（本次 Build）
+## UI 改动补充（Build 57 随附）
+- [x] 改动①: me.tsx 将同步卡片 + 数据管理入口合并到功能入口区块下方
+- [x] 改动④: 结构公式卡片移到成本卡片后面
+- [x] 改动⑤: 成品照片固定在详情页底部
+- [x] 改动⑥: 风味描述强制三段（核心基调/风味演变/整体质感）
+- [x] 改动⑦: bottles.tsx 卡片宽度与自制库/酒单统一（paddingHorizontal: 20）
+- [x] 改动⑧: bottles.tsx 删除自动显示 Banner（已移入多选）
+- [x] 改动⑨: FAB 底部距离修复（bottles/homemade/recipes 均已 insets.bottom + 72）
+- [x] 改动⑩: recipe/[id].tsx garnish 和 source 文字添加 selectable
+- [x] TypeScript 0 错误，35 项测试通过
+## 底部遮挡修复 & 退出同步组迁移（Build 57 随附）
+- [x] me.tsx paddingBottom 40 → 90 + insets.bottom（FloatingTabBar 遮挡修复）
+- [x] books.tsx paddingBottom 120 → 90 + insets.bottom（添加 useSafeAreaInsets）
+- [x] device-manager.tsx paddingBottom 48 → 48 + insets.bottom（添加 useSafeAreaInsets）
+- [x] 退出同步组/退出并清除数据从 me.tsx 移入 device-manager.tsx 底部危险区
+- [x] 退出同步组/退出并清除文字改为普通前景色（非红色），图标背景改为 #8E8E93（系统灰）
+- [x] me.tsx 清理不再使用的 Alert、AsyncStorage、logout import
 - [x] Bug 6: 成品照片区 iOS 占比过大（固定在 ScrollView 外常驻底部，移入滚动区 + 缩略图化）
 - [x] Bug 7: 配方照片点击浮层查看原图（详情页上方浮层，点击任意处关闭）
 - [x] Bug 8: 建议链接酒库提示点"忽略"后仍强行自动链接（linkDismissed 持久化，表单三按钮+详情页+成本+自动入库全链路尊重）

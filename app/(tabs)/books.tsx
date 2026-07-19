@@ -20,6 +20,7 @@ import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
 import { useBookStore, StoredBook } from "@/lib/books/store";
 import { useIsTablet } from "@/hooks/use-is-tablet";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 /** Decode HTML entities in display strings */
 function decodeHtml(str: string): string {
@@ -57,6 +58,7 @@ export default function BooksScreen() {
   const zh = lang === "zh";
   const { books, ready, deleteBook, updateBook } = useBookStore();
   const isTablet = useIsTablet();
+  const insets = useSafeAreaInsets();
 
   const [sortBy, setSortBy] = useState<"importedAt" | "title" | "progress">("importedAt");
   const [filterStatus, setFilterStatus] = useState<"all" | "unread" | "reading" | "completed">("all");
@@ -365,7 +367,7 @@ export default function BooksScreen() {
           contentContainerStyle={{
             paddingHorizontal: 20,
             paddingTop: 4,
-            paddingBottom: 120,
+            paddingBottom: 90 + insets.bottom,
           }}
           columnWrapperStyle={isTablet ? { gap: 12 } : undefined}
           renderItem={({ item: book, index }) => (

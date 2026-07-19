@@ -427,7 +427,7 @@ export default function HomemadeDetailScreen() {
           <>
             {sectionTitle(t("hm.recipe"))}
             <View className="bg-surface rounded-xl px-4 py-3">
-              <Text className="text-[15px] text-foreground" style={{ lineHeight: 23 }}>
+              <Text className="text-[15px] text-foreground" style={{ lineHeight: 23 }} selectable>
                 {prep.recipe}
               </Text>
             </View>
@@ -438,7 +438,7 @@ export default function HomemadeDetailScreen() {
           <>
             {sectionTitle(t("hmform.notes"))}
             <View className="bg-surface rounded-xl px-4 py-3">
-              <Text className="text-[15px] text-foreground" style={{ lineHeight: 22 }}>
+              <Text className="text-[15px] text-foreground" style={{ lineHeight: 22 }} selectable>
                 {prep.notes}
               </Text>
             </View>
@@ -459,7 +459,7 @@ export default function HomemadeDetailScreen() {
                 ].filter((r) => r.value);
                 if (rows.length === 0) {
                   return (
-                    <Text className="text-sm text-muted" style={{ lineHeight: 20 }}>
+                    <Text selectable className="text-sm text-muted" style={{ lineHeight: 20 }}>
                       {prep.source}
                     </Text>
                   );

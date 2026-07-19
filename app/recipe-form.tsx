@@ -280,6 +280,40 @@ export default function RecipeFormScreen() {
   );
   const [story, setStory] = useState(editing?.story ?? "");
   const [flavorDesc, setFlavorDesc] = useState(editing?.flavorDesc ?? "");
+  // 三段式风味描述解析
+  const parseFlavorDesc = (raw: string) => {
+    const zhLabels = ['核心基调', '风味演变', '整体质感'];
+    const enLabels = ['Core profile', 'Flavor evolution', 'Overall texture'];
+    const result = { tone: '', evolution: '', texture: '' };
+    if (!raw) return result;
+    const lines = raw.split('\n').map((l: string) => l.trim()).filter(Boolean);
+    for (const line of lines) {
+      const colonIdx = line.indexOf(':');
+      if (colonIdx > 0) {
+        const label = line.slice(0, colonIdx).trim();
+        const value = line.slice(colonIdx + 1).trim();
+        const zhIdx = zhLabels.indexOf(label);
+        const enIdx = enLabels.indexOf(label);
+        const idx = zhIdx >= 0 ? zhIdx : enIdx >= 0 ? enIdx : -1;
+        if (idx === 0) result.tone = value;
+        else if (idx === 1) result.evolution = value;
+        else if (idx === 2) result.texture = value;
+      }
+    }
+    return result;
+  };
+  const parsedFlavor = parseFlavorDesc(editing?.flavorDesc ?? "");
+  const [flavorTone, setFlavorTone] = useState(parsedFlavor.tone);
+  const [flavorEvolution, setFlavorEvolution] = useState(parsedFlavor.evolution);
+  const [flavorTexture, setFlavorTexture] = useState(parsedFlavor.texture);
+  // 合并三段为 flavorDesc 字符串
+  const buildFlavorDesc = (tone: string, evolution: string, texture: string) => {
+    const parts: string[] = [];
+    if (tone.trim()) parts.push(`核心基调: \${tone.trim()}`);
+    if (evolution.trim()) parts.push(`风味演变: \${evolution.trim()}`);
+    if (texture.trim()) parts.push(`整体质感: \${texture.trim()}`);
+    return parts.join('\n');
+  };
   const [ingredients, setIngredients] = useState<Ingredient[]>(
     editing?.ingredients?.length
       ? editing.ingredients
@@ -842,6 +876,10 @@ export default function RecipeFormScreen() {
       setStory(aiResult.story);
     } else if (key === "flavorDesc" && aiResult.flavorDesc) {
       setFlavorDesc(aiResult.flavorDesc);
+      const pf = parseFlavorDesc(aiResult.flavorDesc);
+      if (pf.tone) setFlavorTone(pf.tone);
+      if (pf.evolution) setFlavorEvolution(pf.evolution);
+      if (pf.texture) setFlavorTexture(pf.texture);
     } else if (key === "source" && aiResult.source) {
       setSource(aiResult.source);
     } else if (key === "creator" && (aiResult.creator || aiResult.createdYear)) {
@@ -865,7 +903,7 @@ export default function RecipeFormScreen() {
     const toggles = toggleOverride ?? aiToggles;
     const fields = buildAiFields();
     // 保存 undo 快照
-    setUndoSnapshot({ story, flavorDesc, source, flavors, baseSpirit, glass, ice, codexFamily, variantOf, method, drinkDuration, occasion, creator: sourceRef.creator ?? "", createdYear: sourceRef.createdYear ?? "", nameZh: name, nameEn });
+    setUndoSnapshot({ story, flavorDesc: buildFlavorDesc(flavorTone, flavorEvolution, flavorTexture), source, flavors, baseSpirit, glass, ice, codexFamily, variantOf, method, drinkDuration, occasion, creator: sourceRef.creator ?? "", createdYear: sourceRef.createdYear ?? "", nameZh: name, nameEn });
     // 应用选中字段
     for (const f of fields) {
       if (toggles[f.key] !== false) applyField(f.key);
@@ -883,6 +921,8 @@ export default function RecipeFormScreen() {
     if (!undoSnapshot) return;
     setStory(undoSnapshot.story);
     setFlavorDesc(undoSnapshot.flavorDesc);
+    const uf = parseFlavorDesc(undoSnapshot.flavorDesc);
+    setFlavorTone(uf.tone); setFlavorEvolution(uf.evolution); setFlavorTexture(uf.texture);
     setSource(undoSnapshot.source);
     setFlavors(undoSnapshot.flavors);
     setBaseSpirit(undoSnapshot.baseSpirit);
@@ -1293,7 +1333,7 @@ export default function RecipeFormScreen() {
       flavors,
       source: source.trim(),
       story: story.trim(),
-      flavorDesc: flavorDesc.trim(),
+      flavorDesc: buildFlavorDesc(flavorTone, flavorEvolution, flavorTexture),
       ingredients: ingredients
         .filter((i) => i.name.trim().length > 0)
         .map((i) => ({ ...i, preferredSource: ingSourceMap[i.id] ?? undefined })),
@@ -2180,17 +2220,28 @@ export default function RecipeFormScreen() {
             </Text>
           </Pressable>
 
-          {/* Flavor description */}
+          {/* Flavor description — 三段式 */}
           <Text className="text-[13px] text-muted uppercase mt-5 mb-2" style={{ letterSpacing: 0.4 }}>{t("form.flavorDesc")}</Text>
-          <TextInput
-            className="bg-surface border border-border rounded-xl px-4 py-3 text-base text-foreground"
-            placeholder={t("form.flavorDesc.placeholder")}
-            placeholderTextColor={colors.muted}
-            value={flavorDesc}
-            onChangeText={setFlavorDesc}
-            multiline
-            style={{ minHeight: 70, textAlignVertical: "top", lineHeight: 22 }}
-          />
+          <View className="bg-surface border border-border rounded-xl overflow-hidden">
+            {[
+              { label: lang === "zh" ? "核心基调" : "Core Profile", value: flavorTone, onChange: setFlavorTone, placeholder: lang === "zh" ? "主要口感基调，如：清爽酸甜、浓郁烟熏…" : "Main taste profile, e.g. bright citrus…" },
+              { label: lang === "zh" ? "风味演变" : "Flavor Evolution", value: flavorEvolution, onChange: setFlavorEvolution, placeholder: lang === "zh" ? "前中后段的风味变化…" : "How flavors develop from start to finish…" },
+              { label: lang === "zh" ? "整体质感" : "Overall Texture", value: flavorTexture, onChange: setFlavorTexture, placeholder: lang === "zh" ? "口感质地、余韵、整体印象…" : "Mouthfeel, finish, overall impression…" },
+            ].map((seg, i) => (
+              <View key={seg.label} style={i > 0 ? { borderTopWidth: 1, borderTopColor: colors.border } : undefined}>
+                <Text style={{ fontSize: 11, fontWeight: "600", color: colors.muted, letterSpacing: 0.4, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 2, textTransform: "uppercase" }}>{seg.label}</Text>
+                <TextInput
+                  className="text-base text-foreground"
+                  placeholder={seg.placeholder}
+                  placeholderTextColor={colors.muted}
+                  value={seg.value}
+                  onChangeText={seg.onChange}
+                  multiline
+                  style={{ paddingHorizontal: 14, paddingBottom: 10, minHeight: 44, textAlignVertical: "top", lineHeight: 22 }}
+                />
+              </View>
+            ))}
+          </View>
 
           {/* Notes */}
           <Text className="text-[13px] text-muted uppercase mt-5 mb-2" style={{ letterSpacing: 0.4 }}>{t("form.notes")}</Text>

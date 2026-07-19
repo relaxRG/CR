@@ -829,8 +829,7 @@ export function RecipesScreen() {
         onPress={handleAdd}
         style={({ pressed }) => [
           styles.fab,
-          { backgroundColor: colors.primary, bottom: 24 },
-          { backgroundColor: colors.primary, bottom: 90 },
+          { backgroundColor: colors.primary, bottom: insets.bottom + 72 },
           pressed && { transform: [{ scale: 0.95 }], opacity: 0.9 },
         ]}
       >

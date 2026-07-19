@@ -30,6 +30,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ScreenContainer } from "@/components/screen-container";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
@@ -42,6 +43,7 @@ import {
   type RemoteDevice,
 } from "@/lib/cf-sync/client";
 import { useSync } from "@/lib/cf-sync/provider";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { listSnapshots } from "@/lib/backup/local-backup";
 import { getICloudMeta } from "@/lib/backup/icloud-backup";
 
@@ -205,7 +207,8 @@ export default function DeviceManagerScreen() {
   const colors = useColors();
   const router = useRouter();
   const { lang } = useI18n();
-  const { deviceInfo, deviceRole, syncState, syncError, retrySync } = useSync();
+  const insets = useSafeAreaInsets();
+  const { deviceInfo, deviceRole, syncState, syncError, retrySync, logout } = useSync();
   const [manualSyncing, setManualSyncing] = useState(false);
 
   // Devices
@@ -422,7 +425,7 @@ export default function DeviceManagerScreen() {
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 48 }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 48 + insets.bottom }} showsVerticalScrollIndicator={false}>
 
         {/* ── 1. Sync Status Card ── */}
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -674,6 +677,93 @@ export default function DeviceManagerScreen() {
                   : "Only this device is in the sync group. To sync with your Mac or other devices, generate a pair code above and enter it on the new device (Device Manager → Join Group). Independently registered devices do NOT sync with each other."}
               </Text>
             )}
+          </View>
+        )}
+        {/* ── 危险区：退出同步组 / 退出并清除数据 ── */}
+        {deviceInfo && (
+          <View style={{ marginHorizontal: 16, marginTop: 8, marginBottom: 8 }}>
+            <Text style={[styles.listTitle, { color: colors.muted, marginBottom: 8 }]}>
+              {lang === "zh" ? "危险操作" : "Danger Zone"}
+            </Text>
+            <View style={[styles.deviceListCard, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+              {/* 退出同步组 */}
+              <Pressable
+                onPress={() => {
+                  tap();
+                  if (Platform.OS === "web") {
+                    if (typeof window !== "undefined" && window.confirm(lang === "zh" ? "退出同步组？" : "Leave sync group?")) {
+                      void logout();
+                    }
+                  } else {
+                    Alert.alert(
+                      lang === "zh" ? "退出同步组" : "Leave Sync Group",
+                      lang === "zh" ? "退出后本设备将停止同步，数据仍保留在本地。" : "You will stop syncing. Local data is kept.",
+                      [
+                        { text: lang === "zh" ? "取消" : "Cancel", style: "cancel" },
+                        { text: lang === "zh" ? "退出" : "Leave", style: "destructive", onPress: () => void logout() },
+                      ],
+                    );
+                  }
+                }}
+                style={({ pressed }) => [styles.deviceRow, pressed && { opacity: 0.7 }]}
+              >
+                <View style={[styles.deviceIcon, { backgroundColor: "#8E8E93" }]}>
+                  <IconSymbol name="rectangle.portrait.and.arrow.right" size={18} color="#FFFFFF" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.deviceRowName, { color: colors.foreground }]}>
+                    {lang === "zh" ? "退出同步组" : "Leave Sync Group"}
+                  </Text>
+                  <Text style={[styles.deviceRowRole, { color: colors.muted }]}>
+                    {lang === "zh" ? "停止多设备同步，数据保留本地" : "Stop syncing, keep local data"}
+                  </Text>
+                </View>
+              </Pressable>
+              <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 64 }} />
+              {/* 退出并清除数据 */}
+              <Pressable
+                onPress={() => {
+                  tap();
+                  Alert.alert(
+                    lang === "zh" ? "退出并清除数据" : "Leave & Clear Data",
+                    lang === "zh"
+                      ? "退出同步组并删除本机所有本地数据（配方、酒库、自制等）。此操作不可恢复。"
+                      : "Leave the sync group and delete all local data. This cannot be undone.",
+                    [
+                      { text: lang === "zh" ? "取消" : "Cancel", style: "cancel" },
+                      {
+                        text: lang === "zh" ? "退出并清除" : "Leave & Clear",
+                        style: "destructive",
+                        onPress: async () => {
+                          await logout();
+                          await AsyncStorage.clear();
+                          if (Platform.OS !== "web") {
+                            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                          }
+                          Alert.alert(
+                            lang === "zh" ? "已清除" : "Cleared",
+                            lang === "zh" ? "所有本地数据已清除，请重启 App。" : "All local data cleared. Please restart the App.",
+                          );
+                        },
+                      },
+                    ],
+                  );
+                }}
+                style={({ pressed }) => [styles.deviceRow, pressed && { opacity: 0.7 }]}
+              >
+                <View style={[styles.deviceIcon, { backgroundColor: "#8E8E93" }]}>
+                  <IconSymbol name="trash.fill" size={18} color="#FFFFFF" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.deviceRowName, { color: colors.foreground }]}>
+                    {lang === "zh" ? "退出并清除数据" : "Leave & Clear Data"}
+                  </Text>
+                  <Text style={[styles.deviceRowRole, { color: colors.muted }]}>
+                    {lang === "zh" ? "退出同步组并删除本机所有本地数据" : "Leave group and wipe all local data"}
+                  </Text>
+                </View>
+              </Pressable>
+            </View>
           </View>
         )}
       </ScrollView>

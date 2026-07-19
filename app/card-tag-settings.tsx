@@ -1,4 +1,4 @@
-import { Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 
@@ -137,18 +137,38 @@ export default function CardTagSettingsScreen() {
     last?: boolean;
   }) => (
     <>
-      <View style={[styles.row, { height: sub ? 56 : ROW_H }]}>
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.rowLabel, { color: colors.foreground }]}>{label}</Text>
-          {sub ? <Text style={[styles.rowSub, { color: colors.muted }]}>{sub}</Text> : null}
+        <View style={[styles.row, { height: sub ? 56 : ROW_H }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.rowLabel, { color: colors.foreground }]}>{label}</Text>
+            {sub ? <Text style={[styles.rowSub, { color: colors.muted }]}>{sub}</Text> : null}
+          </View>
+          <Pressable
+            onPress={onToggle}
+            style={{
+              width: 51,
+              height: 31,
+              borderRadius: 15.5,
+              backgroundColor: value ? colors.primary : "#D1D5DB",
+              justifyContent: "center",
+              paddingHorizontal: 2,
+            }}
+          >
+            <View
+              style={{
+                width: 27,
+                height: 27,
+                borderRadius: 13.5,
+                backgroundColor: "#FFFFFF",
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.15,
+                shadowRadius: 2,
+                elevation: 2,
+                transform: [{ translateX: value ? 20 : 0 }],
+              }}
+            />
+          </Pressable>
         </View>
-        <Switch
-          value={value}
-          onValueChange={onToggle}
-          trackColor={{ false: colors.border, true: colors.primary }}
-          thumbColor="#FFFFFF"
-        />
-      </View>
       {!last && <View style={[styles.divider, { backgroundColor: colors.border, marginLeft: 16 }]} />}
     </>
   );

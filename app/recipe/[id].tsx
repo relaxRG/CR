@@ -579,7 +579,7 @@ export default function RecipeDetailScreen() {
                 if (groups.length === 0) {
                   return (
                     <View style={{ paddingVertical: 4, paddingHorizontal: 12, borderRadius: 20, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}>
-                      <Text style={{ fontSize: 14, color: colors.foreground }}>{recipe.garnish}</Text>
+                      <Text selectable style={{ fontSize: 14, color: colors.foreground }}>{recipe.garnish}</Text>
                     </View>
                   );
                 }
@@ -639,261 +639,6 @@ export default function RecipeDetailScreen() {
                 }
                 return chips;
               })()}
-            </View>
-          </>
-        ) : null}
-
-        {/* Structural formula (auto-analyzed, after steps & garnish) */}
-        {/* Steps */}
-        {recipe.steps ? (() => {
-          const stepLines = recipe.steps.split("\n").map((s: string) => s.trim()).filter(Boolean);
-          return (
-            <>
-              <Text className="text-[13px] text-muted uppercase mt-6 mb-2 px-4" style={styles.groupHeader}>{t("detail.steps")}</Text>
-              <View className="bg-surface rounded-xl px-4">
-                {stepLines.map((line: string, idx: number) => {
-                  const text = line.replace(/^\d+[.)、]\s*/, "");
-                  return (
-                    <View
-                      key={idx}
-                      className="flex-row items-start py-3"
-                      style={[
-                        { gap: 12 },
-                        idx > 0 ? { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border } : undefined,
-                      ]}
-                    >
-                      <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>
-                        <Text style={{ fontSize: 13, fontWeight: "700", color: "#FFFFFF", lineHeight: 15 }}>{idx + 1}</Text>
-                      </View>
-                      <Text className="text-base text-foreground flex-1" style={{ lineHeight: 24, paddingTop: 1 }}>{text}</Text>
-                    </View>
-                  );
-                })}
-              </View>
-            </>
-          );
-        })() : null}
-
-        {recipe.ingredients.length > 0 ? (
-          <>
-            <Text className="text-[13px] text-muted uppercase mt-6 mb-2 px-4" style={styles.groupHeader}>
-              {t("detail.structure")}
-            </Text>
-            <View className="bg-surface rounded-xl p-4">
-              <Text className="text-base text-foreground font-medium" style={{ lineHeight: 24 }}>
-                {structuralFormula(recipe.ingredients, lang as "zh" | "en", formatAmountAsMl)}
-              </Text>
-              <View className="mt-3 pt-3 border-t border-border" style={{ gap: 6 }}>
-                {analyzeStructure(recipe.ingredients).map((it) => (
-                  <View key={it.ingredient.id} className="flex-row items-center justify-between">
-                    <Text className="text-sm text-muted" numberOfLines={1}>
-                      {lang === "en" ? it.label.en : it.label.zh}
-                    </Text>
-                    <Text className="text-sm text-foreground ml-2 flex-1 text-right" numberOfLines={1}>
-                      {ingredientDisplayName(it.ingredient.name, lang as "zh" | "en")}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-              <Text className="text-xs text-muted mt-3" style={{ lineHeight: 16 }}>
-                {t("detail.structure.hint")}
-              </Text>
-            </View>
-          </>
-        ) : null}
-
-      {/* Flavor description - structured display */}
-      {recipe.flavorDesc ? (() => {
-        const raw = recipe.flavorDesc!;
-        const zhLabels = ['核心基调', '风味演变', '整体质感'];
-        const enLabels = ['Core profile', 'Flavor evolution', 'Overall texture'];
-        const labels = lang === 'en' ? enLabels : zhLabels;
-        const lines = raw.split('\n').map((l: string) => l.trim()).filter(Boolean);
-        const parsed: Array<{ label: string; value: string }> = [];
-        for (const line of lines) {
-          const colonIdx = line.indexOf(':');
-          if (colonIdx > 0) {
-            const rawLabel = line.slice(0, colonIdx).trim();
-            const value = line.slice(colonIdx + 1).trim();
-            const zhIdx = zhLabels.indexOf(rawLabel);
-            const enIdx = enLabels.indexOf(rawLabel);
-            const idx = zhIdx >= 0 ? zhIdx : enIdx >= 0 ? enIdx : -1;
-            if (idx >= 0 && value) {
-              parsed.push({ label: labels[idx], value });
-            } else if (value) {
-              parsed.push({ label: rawLabel, value });
-            }
-          }
-        }
-        if (parsed.length === 0) {
-          return (
-            <>
-              <Text className="text-[13px] text-muted uppercase mt-6 mb-2 px-4" style={styles.groupHeader}>{t("detail.flavorDesc")}</Text>
-              <View className="bg-surface rounded-xl p-4">
-                <Text className="text-base text-foreground leading-relaxed">{raw}</Text>
-              </View>
-            </>
-          );
-        }
-        return (
-          <>
-            <Text className="text-[13px] text-muted uppercase mt-6 mb-2 px-4" style={styles.groupHeader}>{t("detail.flavorDesc")}</Text>
-            <View className="bg-surface rounded-xl p-4 gap-3">
-              {parsed.map((item, i) => (
-                <View key={i}>
-                  <Text className="text-[11px] font-semibold text-muted uppercase mb-0.5">{item.label}</Text>
-                  <Text className="text-sm text-foreground leading-relaxed">{item.value}</Text>
-                </View>
-              ))}
-            </View>
-          </>
-        );
-      })() : null}
-
-        {/* Notes */}
-        {recipe.notes ? (
-          <>
-            <Text className="text-[13px] text-muted uppercase mt-6 mb-2 px-4" style={styles.groupHeader}>{t("detail.notes")}</Text>
-            <View
-              className="rounded-xl p-4"
-              style={{ backgroundColor: colors.primary + "14" }}
-            >
-              <Text className="text-base text-foreground leading-relaxed">{recipe.notes}</Text>
-            </View>
-          </>
-        ) : null}
-
-        {/* Story */}
-        {recipe.story ? (
-          <>
-            <Text className="text-[13px] text-muted uppercase mt-6 mb-2 px-4" style={styles.groupHeader}>{t("detail.story")}</Text>
-            <View className="bg-surface rounded-xl p-4">
-              <Text className="text-base text-foreground leading-relaxed">{recipe.story}</Text>
-            </View>
-          </>
-        ) : null}
-
-        {/* Source */}
-        {recipe.source ? (
-          <>
-            <Text className="text-[13px] text-muted uppercase mt-6 mb-2 px-4" style={styles.groupHeader}>{t("detail.source")}</Text>
-            <View className="bg-surface rounded-xl p-4">
-              {(() => {
-                const ps = parseSource(recipe.source);
-                const rows = [
-                  { label: t("detail.source.venue"), value: ps.venue },
-                  { label: t("detail.source.creator"), value: ps.creator },
-                  { label: t("detail.source.season"), value: ps.season },
-                  { label: t("detail.source.year"), value: ps.year },
-                ].filter((r) => r.value);
-                if (rows.length === 0) {
-                  return <Text className="text-sm text-muted leading-relaxed">{recipe.source}</Text>;
-                }
-                return (
-                  <View style={{ gap: 8 }}>
-                    {rows.map((r) => (
-                      <View key={r.label} className="flex-row items-start justify-between">
-                        <Text className="text-sm text-muted" style={{ width: 110 }}>
-                          {r.label}
-                        </Text>
-                        <Text className="text-sm text-foreground flex-1 text-right" style={{ lineHeight: 19 }}>
-                          {r.value}
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
-                );
-              })()}
-            </View>
-          </>
-        ) : null}
-
-        {/* SourceRef — 结构化引用来源（书库导入 / AI 补全） */}
-        {recipe.sourceRef && (recipe.sourceRef.bookTitle || recipe.sourceRef.creator || recipe.sourceRef.createdYear) ? (
-          <>
-            <Text className="text-[13px] text-muted uppercase mt-6 mb-2 px-4" style={styles.groupHeader}>
-              {lang === "zh" ? "引用来源详情" : "Source Details"}
-            </Text>
-            <View className="bg-surface rounded-xl p-4" style={{ gap: 10 }}>
-              {/* 文字来源（书/网站） */}
-              {(recipe.sourceRef.bookTitle || recipe.sourceRef.chapterTitle) ? (
-                <View>
-                  <View className="flex-row items-center" style={{ gap: 6, marginBottom: 6 }}>
-                    <Text className="text-[11px] font-semibold text-muted uppercase">
-                      {lang === "zh" ? "文字来源" : "Text Source"}
-                    </Text>
-                    <SourceConfidenceBadge confidence={recipe.sourceRef.sourceConfidence} />
-                  </View>
-                  {recipe.sourceRef.bookTitle ? (
-                    <View className="flex-row items-start justify-between">
-                      <Text className="text-sm text-muted" style={{ width: 80 }}>{lang === "zh" ? "书名" : "Book"}</Text>
-                      <Text className="text-sm text-foreground flex-1 text-right" style={{ lineHeight: 19 }}>
-                        {recipe.sourceRef.bookTitle}
-                      </Text>
-                    </View>
-                  ) : null}
-                  {recipe.sourceRef.bookAuthor ? (
-                    <View className="flex-row items-start justify-between" style={{ marginTop: 4 }}>
-                      <Text className="text-sm text-muted" style={{ width: 80 }}>{lang === "zh" ? "作者" : "Author"}</Text>
-                      <Text className="text-sm text-foreground flex-1 text-right" style={{ lineHeight: 19 }}>
-                        {recipe.sourceRef.bookAuthor}
-                      </Text>
-                    </View>
-                  ) : null}
-                  {recipe.sourceRef.publishYear ? (
-                    <View className="flex-row items-start justify-between" style={{ marginTop: 4 }}>
-                      <Text className="text-sm text-muted" style={{ width: 80 }}>{lang === "zh" ? "出版年份" : "Published"}</Text>
-                      <Text className="text-sm text-foreground flex-1 text-right" style={{ lineHeight: 19 }}>
-                        {recipe.sourceRef.publishYear}
-                      </Text>
-                    </View>
-                  ) : null}
-                  {recipe.sourceRef.chapterTitle ? (
-                    <View className="flex-row items-start justify-between" style={{ marginTop: 4 }}>
-                      <Text className="text-sm text-muted" style={{ width: 80 }}>{lang === "zh" ? "章节" : "Chapter"}</Text>
-                      <Text className="text-sm text-foreground flex-1 text-right" style={{ lineHeight: 19 }}>
-                        {recipe.sourceRef.chapterTitle}
-                      </Text>
-                    </View>
-                  ) : null}
-                  {recipe.sourceRef.pageRef ? (
-                    <View className="flex-row items-start justify-between" style={{ marginTop: 4 }}>
-                      <Text className="text-sm text-muted" style={{ width: 80 }}>{lang === "zh" ? "页码" : "Page"}</Text>
-                      <Text className="text-sm text-foreground flex-1 text-right" style={{ lineHeight: 19 }}>
-                        {recipe.sourceRef.pageRef}
-                      </Text>
-                    </View>
-                  ) : null}
-                </View>
-              ) : null}
-
-              {/* 配方创作者（与文字来源分隔） */}
-              {(recipe.sourceRef.creator || recipe.sourceRef.createdYear) ? (
-                <View style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, paddingTop: 10 }}>
-                  <View className="flex-row items-center" style={{ gap: 6, marginBottom: 6 }}>
-                    <Text className="text-[11px] font-semibold text-muted uppercase">
-                      {lang === "zh" ? "配方创作者" : "Creator"}
-                    </Text>
-                    <SourceConfidenceBadge confidence={recipe.sourceRef.creatorConfidence} />
-                  </View>
-                  {recipe.sourceRef.creator ? (
-                    <View className="flex-row items-start justify-between">
-                      <Text className="text-sm text-muted" style={{ width: 80 }}>{lang === "zh" ? "创作者" : "Creator"}</Text>
-                      <Text className="text-sm text-foreground flex-1 text-right" style={{ lineHeight: 19 }}>
-                        {recipe.sourceRef.creator}
-                      </Text>
-                    </View>
-                  ) : null}
-                  {recipe.sourceRef.createdYear ? (
-                    <View className="flex-row items-start justify-between" style={{ marginTop: 4 }}>
-                      <Text className="text-sm text-muted" style={{ width: 80 }}>{lang === "zh" ? "创作年份" : "Created"}</Text>
-                      <Text className="text-sm text-foreground flex-1 text-right" style={{ lineHeight: 19 }}>
-                        {recipe.sourceRef.createdYear}
-                      </Text>
-                    </View>
-                  ) : null}
-                </View>
-              ) : null}
             </View>
           </>
         ) : null}
@@ -1168,23 +913,276 @@ export default function RecipeDetailScreen() {
             </View>
           </>
         ) : null}
-      {/* 成品照片 Section（移入滚动区，缩略图化，点击浮层看原图） */}
-      <View style={{ paddingBottom: 16, paddingTop: 8 }}>
-        <Text
-          className="text-xs font-semibold text-muted uppercase mb-3"
-          style={[styles.groupHeader]}
-        >
-          {t("detail.photo.title")}
-        </Text>
+        {/* Structural formula (auto-analyzed, after steps & garnish) */}
+        {/* Steps */}
+        {recipe.steps ? (() => {
+          const stepLines = recipe.steps.split("\n").map((s: string) => s.trim()).filter(Boolean);
+          return (
+            <>
+              <Text className="text-[13px] text-muted uppercase mt-6 mb-2 px-4" style={styles.groupHeader}>{t("detail.steps")}</Text>
+              <View className="bg-surface rounded-xl px-4">
+                {stepLines.map((line: string, idx: number) => {
+                  const text = line.replace(/^\d+[.)、]\s*/, "");
+                  return (
+                    <View
+                      key={idx}
+                      className="flex-row items-start py-3"
+                      style={[
+                        { gap: 12 },
+                        idx > 0 ? { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border } : undefined,
+                      ]}
+                    >
+                      <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: colors.muted + "55", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>
+                        <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground, lineHeight: 15 }}>{idx + 1}</Text>
+                      </View>
+                      <Text className="text-base text-foreground flex-1" style={{ lineHeight: 24, paddingTop: 1 }} selectable>{text}</Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </>
+          );
+        })() : null}
+
+        {recipe.ingredients.length > 0 ? (
+          <>
+            <Text className="text-[13px] text-muted uppercase mt-6 mb-2 px-4" style={styles.groupHeader}>
+              {t("detail.structure")}
+            </Text>
+            <View className="bg-surface rounded-xl p-4">
+              <Text className="text-base text-foreground font-medium" style={{ lineHeight: 24 }}>
+                {structuralFormula(recipe.ingredients, lang as "zh" | "en", formatAmountAsMl)}
+              </Text>
+              <View className="mt-3 pt-3 border-t border-border" style={{ gap: 6 }}>
+                {analyzeStructure(recipe.ingredients).map((it) => (
+                  <View key={it.ingredient.id} className="flex-row items-center justify-between">
+                    <Text className="text-sm text-muted" numberOfLines={1}>
+                      {lang === "en" ? it.label.en : it.label.zh}
+                    </Text>
+                    <Text className="text-sm text-foreground ml-2 flex-1 text-right" numberOfLines={1}>
+                      {ingredientDisplayName(it.ingredient.name, lang as "zh" | "en")}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+              <Text className="text-xs text-muted mt-3" style={{ lineHeight: 16 }}>
+                {t("detail.structure.hint")}
+              </Text>
+            </View>
+          </>
+        ) : null}
+
+      {/* Flavor description - structured display */}
+      {recipe.flavorDesc ? (() => {
+        const raw = recipe.flavorDesc!;
+        const zhLabels = ['核心基调', '风味演变', '整体质感'];
+        const enLabels = ['Core profile', 'Flavor evolution', 'Overall texture'];
+        const labels = lang === 'en' ? enLabels : zhLabels;
+        const lines = raw.split('\n').map((l: string) => l.trim()).filter(Boolean);
+        const parsed: Array<{ label: string; value: string }> = [];
+        for (const line of lines) {
+          const colonIdx = line.indexOf(':');
+          if (colonIdx > 0) {
+            const rawLabel = line.slice(0, colonIdx).trim();
+            const value = line.slice(colonIdx + 1).trim();
+            const zhIdx = zhLabels.indexOf(rawLabel);
+            const enIdx = enLabels.indexOf(rawLabel);
+            const idx = zhIdx >= 0 ? zhIdx : enIdx >= 0 ? enIdx : -1;
+            if (idx >= 0 && value) {
+              parsed.push({ label: labels[idx], value });
+            } else if (value) {
+              parsed.push({ label: rawLabel, value });
+            }
+          }
+        }
+        if (parsed.length === 0) {
+          return (
+            <>
+              <Text className="text-[13px] text-muted uppercase mt-6 mb-2 px-4" style={styles.groupHeader}>{t("detail.flavorDesc")}</Text>
+              <View className="bg-surface rounded-xl p-4">
+                <Text className="text-base text-foreground leading-relaxed" selectable>{raw}</Text>
+              </View>
+            </>
+          );
+        }
+        return (
+          <>
+            <Text className="text-[13px] text-muted uppercase mt-6 mb-2 px-4" style={styles.groupHeader}>{t("detail.flavorDesc")}</Text>
+            <View className="bg-surface rounded-xl p-4 gap-3">
+              {parsed.map((item, i) => (
+                <View key={i}>
+                  <Text className="text-[11px] font-semibold text-muted uppercase mb-0.5">{item.label}</Text>
+                  <Text className="text-sm text-foreground leading-relaxed" selectable>{item.value}</Text>
+                </View>
+              ))}
+            </View>
+          </>
+        );
+      })() : null}
+
+        {/* Notes */}
+        {recipe.notes ? (
+          <>
+            <Text className="text-[13px] text-muted uppercase mt-6 mb-2 px-4" style={styles.groupHeader}>{t("detail.notes")}</Text>
+            <View
+              className="rounded-xl p-4"
+              style={{ backgroundColor: colors.primary + "14" }}
+            >
+              <Text className="text-base text-foreground leading-relaxed" selectable>{recipe.notes}</Text>
+            </View>
+          </>
+        ) : null}
+
+        {/* Story */}
+        {recipe.story ? (
+          <>
+            <Text className="text-[13px] text-muted uppercase mt-6 mb-2 px-4" style={styles.groupHeader}>{t("detail.story")}</Text>
+            <View className="bg-surface rounded-xl p-4">
+              <Text className="text-base text-foreground leading-relaxed" selectable>{recipe.story}</Text>
+            </View>
+          </>
+        ) : null}
+
+        {/* Source */}
+        {recipe.source ? (
+          <>
+            <Text className="text-[13px] text-muted uppercase mt-6 mb-2 px-4" style={styles.groupHeader}>{t("detail.source")}</Text>
+            <View className="bg-surface rounded-xl p-4">
+              {(() => {
+                const ps = parseSource(recipe.source);
+                const rows = [
+                  { label: t("detail.source.venue"), value: ps.venue },
+                  { label: t("detail.source.creator"), value: ps.creator },
+                  { label: t("detail.source.season"), value: ps.season },
+                  { label: t("detail.source.year"), value: ps.year },
+                ].filter((r) => r.value);
+                if (rows.length === 0) {
+                  return <Text selectable className="text-sm text-muted leading-relaxed">{recipe.source}</Text>;
+                }
+                return (
+                  <View style={{ gap: 8 }}>
+                    {rows.map((r) => (
+                      <View key={r.label} className="flex-row items-start justify-between">
+                        <Text className="text-sm text-muted" style={{ width: 110 }}>
+                          {r.label}
+                        </Text>
+                        <Text className="text-sm text-foreground flex-1 text-right" style={{ lineHeight: 19 }}>
+                          {r.value}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                );
+              })()}
+            </View>
+          </>
+        ) : null}
+
+        {/* SourceRef — 结构化引用来源（书库导入 / AI 补全） */}
+        {recipe.sourceRef && (recipe.sourceRef.bookTitle || recipe.sourceRef.creator || recipe.sourceRef.createdYear) ? (
+          <>
+            <Text className="text-[13px] text-muted uppercase mt-6 mb-2 px-4" style={styles.groupHeader}>
+              {lang === "zh" ? "引用来源详情" : "Source Details"}
+            </Text>
+            <View className="bg-surface rounded-xl p-4" style={{ gap: 10 }}>
+              {/* 文字来源（书/网站） */}
+              {(recipe.sourceRef.bookTitle || recipe.sourceRef.chapterTitle) ? (
+                <View>
+                  <View className="flex-row items-center" style={{ gap: 6, marginBottom: 6 }}>
+                    <Text className="text-[11px] font-semibold text-muted uppercase">
+                      {lang === "zh" ? "文字来源" : "Text Source"}
+                    </Text>
+                    <SourceConfidenceBadge confidence={recipe.sourceRef.sourceConfidence} />
+                  </View>
+                  {recipe.sourceRef.bookTitle ? (
+                    <View className="flex-row items-start justify-between">
+                      <Text className="text-sm text-muted" style={{ width: 80 }}>{lang === "zh" ? "书名" : "Book"}</Text>
+                      <Text className="text-sm text-foreground flex-1 text-right" style={{ lineHeight: 19 }}>
+                        {recipe.sourceRef.bookTitle}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {recipe.sourceRef.bookAuthor ? (
+                    <View className="flex-row items-start justify-between" style={{ marginTop: 4 }}>
+                      <Text className="text-sm text-muted" style={{ width: 80 }}>{lang === "zh" ? "作者" : "Author"}</Text>
+                      <Text className="text-sm text-foreground flex-1 text-right" style={{ lineHeight: 19 }}>
+                        {recipe.sourceRef.bookAuthor}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {recipe.sourceRef.publishYear ? (
+                    <View className="flex-row items-start justify-between" style={{ marginTop: 4 }}>
+                      <Text className="text-sm text-muted" style={{ width: 80 }}>{lang === "zh" ? "出版年份" : "Published"}</Text>
+                      <Text className="text-sm text-foreground flex-1 text-right" style={{ lineHeight: 19 }}>
+                        {recipe.sourceRef.publishYear}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {recipe.sourceRef.chapterTitle ? (
+                    <View className="flex-row items-start justify-between" style={{ marginTop: 4 }}>
+                      <Text className="text-sm text-muted" style={{ width: 80 }}>{lang === "zh" ? "章节" : "Chapter"}</Text>
+                      <Text className="text-sm text-foreground flex-1 text-right" style={{ lineHeight: 19 }}>
+                        {recipe.sourceRef.chapterTitle}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {recipe.sourceRef.pageRef ? (
+                    <View className="flex-row items-start justify-between" style={{ marginTop: 4 }}>
+                      <Text className="text-sm text-muted" style={{ width: 80 }}>{lang === "zh" ? "页码" : "Page"}</Text>
+                      <Text className="text-sm text-foreground flex-1 text-right" style={{ lineHeight: 19 }}>
+                        {recipe.sourceRef.pageRef}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              ) : null}
+
+              {/* 配方创作者（与文字来源分隔） */}
+              {(recipe.sourceRef.creator || recipe.sourceRef.createdYear) ? (
+                <View style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, paddingTop: 10 }}>
+                  <View className="flex-row items-center" style={{ gap: 6, marginBottom: 6 }}>
+                    <Text className="text-[11px] font-semibold text-muted uppercase">
+                      {lang === "zh" ? "配方创作者" : "Creator"}
+                    </Text>
+                    <SourceConfidenceBadge confidence={recipe.sourceRef.creatorConfidence} />
+                  </View>
+                  {recipe.sourceRef.creator ? (
+                    <View className="flex-row items-start justify-between">
+                      <Text className="text-sm text-muted" style={{ width: 80 }}>{lang === "zh" ? "创作者" : "Creator"}</Text>
+                      <Text className="text-sm text-foreground flex-1 text-right" style={{ lineHeight: 19 }}>
+                        {recipe.sourceRef.creator}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {recipe.sourceRef.createdYear ? (
+                    <View className="flex-row items-start justify-between" style={{ marginTop: 4 }}>
+                      <Text className="text-sm text-muted" style={{ width: 80 }}>{lang === "zh" ? "创作年份" : "Created"}</Text>
+                      <Text className="text-sm text-foreground flex-1 text-right" style={{ lineHeight: 19 }}>
+                        {recipe.sourceRef.createdYear}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              ) : null}
+            </View>
+          </>
+        ) : null}
+
+      </ScrollView>
+      {/* 成品照片 Section — 固定在 ScrollView 下方，紧贴底部 */}
+      <View style={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 8, paddingTop: 6, borderTopWidth: 1, borderTopColor: colors.border }}>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+          <Text className="text-[11px] text-muted uppercase" style={styles.groupHeader}>{t("detail.photo.title")}</Text>
+        </View>
         {(recipe?.photoUris ?? []).length > 0 ? (
-          <View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
               {(recipe.photoUris ?? []).map((uri, idx) => (
-                <View key={uri} style={{ marginRight: 8, borderRadius: 12, overflow: "hidden", position: "relative" }}>
+                <View key={uri} style={{ marginRight: 6, borderRadius: 8, overflow: "hidden", position: "relative" }}>
                   <Pressable onPress={() => setPhotoPreviewUri(uri)}>
                     <Image
                       source={{ uri }}
-                      style={{ width: 96, height: 96, borderRadius: 12 }}
+                      style={{ width: 56, height: 56, borderRadius: 8 }}
                       contentFit="cover"
                       transition={200}
                     />
@@ -1202,7 +1200,7 @@ export default function RecipeDetailScreen() {
                     }}
                     style={({ pressed }) => [styles.photoChangeBadge, pressed && { opacity: 0.7 }]}
                   >
-                    <Text style={{ color: "#fff", fontSize: 10, fontWeight: "600" }}>✕</Text>
+                    <Text style={{ color: "#fff", fontSize: 9, fontWeight: "600" }}>✕</Text>
                   </Pressable>
                 </View>
               ))}
@@ -1210,32 +1208,25 @@ export default function RecipeDetailScreen() {
             {(recipe.photoUris ?? []).length < 5 && (
               <Pressable
                 onPress={handlePhotoAction}
-                style={({ pressed }) => [styles.photoAddBtn, pressed && { opacity: 0.7 }]}
+                style={({ pressed }) => [{ width: 56, height: 56, borderRadius: 8, borderWidth: 1, borderColor: colors.border, borderStyle: "dashed", alignItems: "center", justifyContent: "center" }, pressed && { opacity: 0.6 }]}
               >
-                <Text style={styles.photoAddBtnText}>+ {t("detail.photo.add")}</Text>
+                <Text style={{ color: colors.muted, fontSize: 20 }}>+</Text>
               </Pressable>
             )}
           </View>
         ) : (
           <Pressable
             onPress={handlePhotoAction}
-            style={({ pressed }) => [
-              styles.photoPlaceholder,
-              { borderColor: colors.border },
-              pressed && { opacity: 0.6 },
-            ]}
+            style={({ pressed }) => [{ height: 48, borderRadius: 8, borderWidth: 1, borderColor: colors.border, borderStyle: "dashed", alignItems: "center", justifyContent: "center" }, pressed && { opacity: 0.6 }]}
           >
             {photoLoading ? (
               <ActivityIndicator size="small" color={colors.muted} />
             ) : (
-              <Text style={{ color: colors.muted, fontSize: 14 }}>
-                {t("detail.photo.add")}
-              </Text>
+              <Text style={{ color: colors.muted, fontSize: 13 }}>+ {t("detail.photo.add")}</Text>
             )}
           </Pressable>
         )}
       </View>
-      </ScrollView>
       {/* 照片浮层预览（浮在详情页上方，点击任意处关闭） */}
       {photoPreviewUri && (
         <Pressable

@@ -155,7 +155,7 @@ export default function BottleDetailScreen() {
           ) : null}
           {bottle.style ? (
             <View style={chipStyle(false)}>
-              <Text style={chipTextStyle(false)}>{bottle.style}</Text>
+              <Text selectable style={chipTextStyle(false)}>{bottle.style}</Text>
             </View>
           ) : null}
           {/* 开瓶易失效标签：手动设置时显示橙色，自动推断为 true 时显示灰色 */}
@@ -233,7 +233,7 @@ export default function BottleDetailScreen() {
               {t("bottle.notes")}
             </Text>
             <View className="bg-surface rounded-xl px-4 py-3">
-              <Text className="text-[15px] text-foreground" style={{ lineHeight: 22 }}>
+              <Text className="text-[15px] text-foreground" style={{ lineHeight: 22 }} selectable>
                 {bottle.notes}
               </Text>
             </View>
@@ -273,7 +273,7 @@ export default function BottleDetailScreen() {
               {lang === "zh" ? "故事与介绍" : "Story"}
             </Text>
             <View className="bg-surface rounded-xl px-4 py-3">
-              <Text className="text-[15px] text-foreground" style={{ lineHeight: 24 }}>
+              <Text className="text-[15px] text-foreground" style={{ lineHeight: 24 }} selectable>
                 {bottle.story}
               </Text>
             </View>
@@ -287,7 +287,7 @@ export default function BottleDetailScreen() {
               {lang === "zh" ? "风格描述" : "Style Description"}
             </Text>
             <View className="bg-surface rounded-xl px-4 py-3">
-              <Text className="text-[15px] text-foreground" style={{ lineHeight: 24 }}>
+              <Text className="text-[15px] text-foreground" style={{ lineHeight: 24 }} selectable>
                 {bottle.styleDesc}
               </Text>
             </View>
@@ -314,7 +314,7 @@ export default function BottleDetailScreen() {
                   <Text style={{ fontSize: 12, color: colors.muted, fontWeight: "600", marginBottom: 4, letterSpacing: 0.3 }}>
                     {row.label.toUpperCase()}
                   </Text>
-                  <Text style={{ fontSize: 14, color: colors.foreground, lineHeight: 22 }}>
+                  <Text style={{ fontSize: 14, color: colors.foreground, lineHeight: 22 }} selectable>
                     {row.value}
                   </Text>
                 </View>

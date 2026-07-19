@@ -863,41 +863,7 @@ export default function BottlesScreen() {
         />
       </View>
 
-      {/* 联网补全 Banner：三模式（逐条确认 / 批量自动填空白） */}
-      {!selectMode && ready && missingCount > 0 && aiQueue.length === 0 && !aiQueueDone ? (
-        <View className="px-5" style={{ marginTop: 8, gap: 6 }}>
-          <View style={{ flexDirection: "row", gap: 8 }}>
-            <Pressable
-              onPress={() => handleBatchEnrich("review")}
-              disabled={aiQueueFetching}
-              style={({ pressed }) => [
-                styles.enrichBanner,
-                { flex: 1, backgroundColor: colors.primary + "10", borderWidth: 1, borderColor: colors.primary + "25" },
-                (pressed || aiQueueFetching) && { opacity: 0.6 },
-              ]}
-            >
-              <IconSymbol name="globe" size={14} color={colors.primary} />
-              <Text style={{ fontSize: 12, fontWeight: "600", color: colors.primary }}>
-                {lang === "zh" ? `逐条审核 (${missingCount})` : `Review (${missingCount})`}
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={() => handleBatchEnrich("autofill")}
-              disabled={aiQueueFetching}
-              style={({ pressed }) => [
-                styles.enrichBanner,
-                { flex: 1, backgroundColor: colors.success + "12", borderWidth: 1, borderColor: colors.success + "30" },
-                (pressed || aiQueueFetching) && { opacity: 0.6 },
-              ]}
-            >
-              <IconSymbol name="sparkles" size={14} color={colors.success} />
-              <Text style={{ fontSize: 12, fontWeight: "600", color: colors.success }}>
-                {lang === "zh" ? "自动填空白" : "Auto-fill Blanks"}
-              </Text>
-            </Pressable>
-          </View>
-        </View>
-      ) : null}
+      {null /* Banner 已移入多选操作栏 */}
 
       {/* AI 建议队列面板 — Modal 底部抽屉（逐条确认模式） */}
       <Modal
@@ -1253,7 +1219,7 @@ export default function BottlesScreen() {
           styles.fab,
           {
             backgroundColor: colors.primary,
-            bottom: 90,
+            bottom: insets.bottom + 72,
           },
           pressed && { transform: [{ scale: 0.95 }], opacity: 0.9 },
         ]}
@@ -1494,7 +1460,7 @@ function BottleCardInner({
       style={({ pressed }) => [pressed && { opacity: 0.7 }]}
     >
       <View
-        className="bg-surface px-4 mx-4"
+        className="bg-surface px-4"
         style={[
           { paddingVertical: 14 },
           isFirst && { borderTopLeftRadius: 12, borderTopRightRadius: 12 },
