@@ -1446,6 +1446,21 @@ export default function RecipeFormScreen() {
 
           {/* AI Fill button — prominent, right below name fields */}
           {/* AI action buttons row */}
+          {(() => {
+            const hasZh = name.trim().length > 0 && /[\u4e00-\u9fa5]/.test(name.trim());
+            const hasEn = nameEn.trim().length > 0;
+            const hintText = hasZh && !hasEn
+              ? (lang === "zh" ? "✦ 点击可获取英文名建议" : "✦ Tap to get English name suggestion")
+              : !hasZh && hasEn
+                ? (lang === "zh" ? "✦ 点击可获取中文名建议" : "✦ Tap to get Chinese name suggestion")
+              : null;
+            if (!hintText) return null;
+            return (
+              <Text style={{ fontSize: 11, color: colors.primary, fontWeight: "500", textAlign: "center", marginTop: 8, marginBottom: -4 }}>
+                {hintText}
+              </Text>
+            );
+          })()}
           <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
             {/* 统一 AI 补全按钮 — 调用 deepAnalyzeRecipe（全字段，claude-sonnet） */}
             <Pressable

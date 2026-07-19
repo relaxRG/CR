@@ -271,3 +271,6 @@
 - [x] recipe-form.tsx undoSnapshot：新增 nameZh/nameEn 字段，undo 时同步还原名称
 - [x] smart-router.ts enrichRecipe/deepAnalyzeRecipe 返回类型：新增 suggestedNameZh?/suggestedNameEn? 字段
 - [x] TypeScript 零错误
+
+## AI 补全按钮名称提示（2026-07-19）
+- [x] recipe-form.tsx：AI 补全按钮上方动态显示提示文字——只填中文名时显示「✦ 点击可获取英文名建议」，只填英文名时显示「✦ 点击可获取中文名建议」，双语支持，双名均填或均空时不显示
