@@ -1494,7 +1494,7 @@ function BottleCardInner({
       style={({ pressed }) => [pressed && { opacity: 0.7 }]}
     >
       <View
-        className="bg-surface px-4"
+        className="bg-surface px-4 mx-4"
         style={[
           { paddingVertical: 14 },
           isFirst && { borderTopLeftRadius: 12, borderTopRightRadius: 12 },

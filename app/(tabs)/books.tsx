@@ -98,7 +98,7 @@ export default function BooksScreen() {
       } else {
         return (b.importedAt || 0) - (a.importedAt || 0);
       }
-    });
+});
 
     return result;
   }, [books, sortBy, filterStatus, searchQuery, showFavoriteOnly]);
@@ -381,14 +381,7 @@ export default function BooksScreen() {
                 style={[
                   styles.bookCard,
                   { backgroundColor: colors.surface },
-                  isTablet
-                    ? { borderRadius: 14, marginBottom: 12 }
-                    : {
-                        borderTopLeftRadius: index === 0 ? 14 : 0,
-                        borderTopRightRadius: index === 0 ? 14 : 0,
-                        borderBottomLeftRadius: index === filteredAndSorted.length - 1 ? 14 : 0,
-                        borderBottomRightRadius: index === filteredAndSorted.length - 1 ? 14 : 0,
-                      },
+                  styles.bookCardShape,
                 ]}
               >
                 {/* Cover icon */}
@@ -620,6 +613,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   bookCard: {
+    marginHorizontal: 16,
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
@@ -757,5 +751,14 @@ const styles = StyleSheet.create({
   cancelBtnText: {
     fontSize: 16,
     fontWeight: "600",
+  },
+  bookCardShape: {
+    borderRadius: 20,
+    marginBottom: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
   },
 });

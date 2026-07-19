@@ -915,8 +915,13 @@ const styles = StyleSheet.create({
   },
   // 条目卡片
   itemCard: {
-    borderRadius: 12,
+    borderRadius: 20,
     overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
   },
   itemHeader: {
     flexDirection: "row",

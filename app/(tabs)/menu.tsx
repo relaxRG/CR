@@ -923,9 +923,15 @@ const styles = StyleSheet.create({
   },
   // 配方卡片行
   entryCardWrap: {
-    borderRadius: 12,
+    borderRadius: 20,
     overflow: "hidden",
-    marginBottom: 6,
+    marginBottom: 8,
+    marginHorizontal: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
   },
   entryMainRow: {
     flexDirection: "row",

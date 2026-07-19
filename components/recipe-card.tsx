@@ -167,4 +167,12 @@ const styles = StyleSheet.create({
   pressable: {
     marginBottom: 0,
   },
+  cardShape: {
+    borderRadius: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
+  },
 });

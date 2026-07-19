@@ -1205,7 +1205,7 @@ function PrepGroupRow({
     <View>
       <Pressable onPress={handleToggle} style={({ pressed }) => [pressed && { opacity: 0.7 }]}>
         <View
-          className="bg-surface px-4 py-3"
+          className="bg-surface px-4 py-3 mx-4"
           style={[
             isFirst && { borderTopLeftRadius: 12, borderTopRightRadius: 12 },
             isLast && !expanded && { borderBottomLeftRadius: 12, borderBottomRightRadius: 12 },
