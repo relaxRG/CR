@@ -105,6 +105,8 @@ export default function HomemadeFormScreen() {
     return Object.fromEntries(rows.map((r) => [r.id, true]));
   });
   const [acceptedLinks, setAcceptedLinks] = useState<Record<string, boolean>>({});
+  // 每行配料的来源筛选（全/基/酒/料/制），与配方表单一致
+  const [ingSourceMap, setIngSourceMap] = useState<Record<string, "auto" | "spirits" | "bottles" | "materials" | "homemade">>({});
   // ── Recipe steps: stored as numbered string, edited as dynamic rows ──────
   const parseStepRows = (raw: string): { id: string; text: string }[] => {
     if (!raw.trim()) return [{ id: genId(), text: "" }];
@@ -272,23 +274,25 @@ export default function HomemadeFormScreen() {
 
   const renderIngRow = useCallback(({ item: row, drag, isActive }: RenderItemParams<IngRow>) => {
     const trimmed = row.name.trim();
+    const ingSource = ingSourceMap[row.id] ?? "auto";
     const showSuggest =
       focusedIng === row.id && trimmed.length > 0 && pickedIng[row.id] !== row.name;
     const liveSuggestions = showSuggest
-      ? suggestIngredients(trimmed, bottles, allPreps.filter((p) => p.id !== (editing?.id ?? "")), lang, 6, groupOf).filter((s) => s.value !== trimmed)
+      ? suggestIngredients(trimmed, bottles, allPreps.filter((p) => p.id !== (editing?.id ?? "")), lang, 6, groupOf)
+          .filter((s) => s.value !== trimmed)
+          .filter((s) => {
+            if (!ingSource || ingSource === "auto") return true;
+            return s.source === ingSource;
+          })
       : [];
     const rawLink = trimmed.length >= 2
-      ? smartLinkIngredient(trimmed, bottles, allPreps.filter((p) => p.id !== (editing?.id ?? "")))
+      ? smartLinkIngredient(trimmed, bottles, allPreps.filter((p) => p.id !== (editing?.id ?? "")), ingSource)
       : null;
     const isFuzzy = rawLink?.matchConfidence === "fuzzy";
-    const link = isFuzzy
-      ? dismissedLinks[row.id]
-        ? null
-        : acceptedLinks[row.id]
-          ? rawLink
-          : null
-      : rawLink;
-    const pendingFuzzyLink = isFuzzy && !dismissedLinks[row.id] && !acceptedLinks[row.id] ? rawLink : null;
+    // 断开/忽略持久化：dismissed 屏蔽所有匹配（含 exact），修复精确匹配断不开的问题
+    const rDismissed = dismissedLinks[row.id] === true;
+    const link = rDismissed ? null : isFuzzy ? (acceptedLinks[row.id] ? rawLink : null) : rawLink;
+    const pendingFuzzyLink = !rDismissed && isFuzzy && !acceptedLinks[row.id] ? rawLink : null;
     return (
       <View key={row.id} style={{ marginBottom: 8, opacity: isActive ? 0.85 : 1 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -300,6 +304,29 @@ export default function HomemadeFormScreen() {
             style={{ paddingHorizontal: 2, paddingVertical: 4 }}
           >
             <IconSymbol name="line.3.horizontal" size={18} color={colors.muted} />
+          </Pressable>
+          {/* 库选择器：小型下拉按钮（与配方表单一致） */}
+          <Pressable
+            onPress={() => {
+              const sources: ("auto" | "spirits" | "bottles" | "materials" | "homemade")[] = ["auto", "spirits", "bottles", "materials", "homemade"];
+              const next = sources[(sources.indexOf(ingSource) + 1) % sources.length];
+              setIngSourceMap((prev) => ({ ...prev, [row.id]: next }));
+              setDismissedLinks((prev) => { const n = { ...prev }; delete n[row.id]; return n; });
+              setAcceptedLinks((prev) => { const n = { ...prev }; delete n[row.id]; return n; });
+            }}
+            hitSlop={6}
+            style={({ pressed }) => [{
+              paddingHorizontal: 5,
+              paddingVertical: 3,
+              borderRadius: 6,
+              borderWidth: 1,
+              borderColor: ingSource === "auto" ? colors.border : colors.primary,
+              backgroundColor: ingSource === "auto" ? colors.surface : `${colors.primary}20`,
+            }, pressed && { opacity: 0.7 }]}
+          >
+            <Text style={{ fontSize: 10, lineHeight: 14, color: ingSource === "auto" ? colors.muted : colors.primary, fontWeight: "600" }}>
+              {ingSource === "auto" ? "全" : ingSource === "spirits" ? "基" : ingSource === "bottles" ? "酒" : ingSource === "materials" ? "料" : "制"}
+            </Text>
           </Pressable>
          <TextInput
            style={[...inputStyle, { flex: 3 }]}
@@ -521,11 +548,23 @@ export default function HomemadeFormScreen() {
             <IconSymbol name="xmark" size={10} color={colors.muted} />
             <Text style={{ fontSize: 11, lineHeight: 14, color: colors.muted }}>{t("form.link.break")}</Text>
           </Pressable>
+        ) : rDismissed && trimmed.length >= 2 ? (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2, paddingHorizontal: 4 }}>
+            <Text style={{ fontSize: 11, lineHeight: 14, color: colors.muted }}>{t("form.link.dismissed")}</Text>
+            <Pressable
+              onPress={() => {
+                setDismissedLinks((prev) => { const n = { ...prev }; delete n[row.id]; return n; });
+              }}
+              style={({ pressed }) => [pressed && { opacity: 0.6 }]}
+            >
+              <Text style={{ fontSize: 11, lineHeight: 14, color: colors.primary }}>{t("form.link.relink")}</Text>
+            </Pressable>
+          </View>
         ) : null}
       </View>
     );
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ingRows, dismissedLinks, acceptedLinks, focusedIng, pickedIng, bottles, allPreps, lang, groupOf, editing, colors, t]);
+  }, [ingRows, ingSourceMap, dismissedLinks, acceptedLinks, focusedIng, pickedIng, bottles, allPreps, lang, groupOf, editing, colors, t]);
 
   const handleSave = () => {
     if (!canSave) return;

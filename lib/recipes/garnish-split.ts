@@ -155,7 +155,34 @@ export function estimateGarnishCost(
   garnish: string,
   bottles: Bottle[],
   preps: HomemadePrep[],
+  /** 结构化装饰（可选）：提供时优先使用其显式链接 ID 与忽略标记 */
+  garnishItems?: { id: string; name: string; linkedBottleId?: string; linkedPrepId?: string; linkDismissed?: boolean }[],
 ): GarnishCost {
+  // 结构化通道：每个 item 视为独立 and 组，尊重显式 ID 与忽略标记
+  if (garnishItems && garnishItems.length > 0) {
+    const out: GarnishGroupCost[] = [];
+    const unmatched: string[] = [];
+    for (const gi of garnishItems) {
+      const name = gi.name.trim();
+      if (!name) continue;
+      const est = estimateIngredientCostSmart(
+        { id: `garnish-${gi.id}`, name, amount: "", linkedBottleId: gi.linkedBottleId, linkedPrepId: gi.linkedPrepId, linkDismissed: gi.linkDismissed },
+        bottles,
+        preps,
+      );
+      // 已忽略的装饰不计入未匹配（用户明确不要链接，不触发自动入库）
+      if (!est.link && !gi.linkDismissed) unmatched.push(name);
+      const group: GarnishGroup = { mode: "and", parts: [{ name, amount: "", raw: name }] };
+      const cost = est.cost ?? null;
+      out.push({
+        group,
+        items: [{ part: group.parts[0], est, chosen: true }],
+        subtotal: cost ?? 0,
+        estimated: cost !== null,
+      });
+    }
+    return { groups: out, total: out.reduce((s, g) => s + g.subtotal, 0), unmatchedNames: unmatched };
+  }
   const groups = splitGarnish(garnish);
   const out: GarnishGroupCost[] = [];
   const unmatched: string[] = [];

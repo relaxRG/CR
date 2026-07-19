@@ -72,6 +72,19 @@ export interface Ingredient {
   preferredSource?: "auto" | "spirits" | "bottles" | "materials" | "homemade";
 }
 
+/** 结构化装饰条目：与 Ingredient 的链接语义对齐（无分量字段） */
+export interface GarnishItem {
+  id: string;
+  /** 用户填写的原文，永远保留 */
+  name: string;
+  /** 显式链接到酒库条目（手动选择或接受匹配后写入） */
+  linkedBottleId?: string;
+  /** 显式链接到自制库条目 */
+  linkedPrepId?: string;
+  /** 用户明确忽略/断开了链接：任何页面不得再自动匹配 */
+  linkDismissed?: boolean;
+}
+
 export type Strength = "light" | "medium" | "strong";
 
 /** 全部烈度值(筛选面板等场景使用) */
@@ -267,6 +280,8 @@ export interface Recipe {
   ingredients: Ingredient[];
   steps: string;
   garnish: string;
+  /** 结构化装饰（优先于 garnish 字符串；旧数据从 garnish 解析迁移） */
+  garnishItems?: GarnishItem[];
   /** 注意事项(原 notes) */
   notes: string;
   favorite: boolean;
@@ -359,9 +374,42 @@ export function normalizeRecipe(r: Partial<Recipe> & Pick<Recipe, "id" | "name">
       base.nameEn = split.en;
     }
   }
+  // 装饰结构化迁移：无 garnishItems 时从 garnish 字符串解析；有则校验并同步 garnish 字符串
+  if (Array.isArray(r.garnishItems) && r.garnishItems.length > 0) {
+    base.garnishItems = r.garnishItems
+      .filter((g): g is GarnishItem => !!g && typeof g.name === "string")
+      .map((g) => ({
+        id: g.id || `g_${Math.random().toString(36).slice(2, 10)}`,
+        name: g.name,
+        linkedBottleId: g.linkedBottleId || undefined,
+        linkedPrepId: g.linkedPrepId || undefined,
+        linkDismissed: g.linkDismissed === true ? true : undefined,
+      }));
+    base.garnish = serializeGarnishItems(base.garnishItems);
+  } else if (base.garnish.trim()) {
+    base.garnishItems = parseGarnishToItems(base.garnish);
+  } else {
+    base.garnishItems = [];
+  }
   // 一致性保护:档位与大类不一致时,以档位为准修正大类
   if (base.strengthBand) base.strength = strengthOfBand(base.strengthBand);
   return base;
+}
+
+/** 从旧的逗号/分号/换行分隔字符串解析出结构化装饰条目 */
+export function parseGarnishToItems(raw: string): GarnishItem[] {
+  if (!raw?.trim()) return [];
+  return raw
+    .split(/[,，;；\n]+/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p, i) => ({ id: `g_${i}_${Math.random().toString(36).slice(2, 8)}`, name: p }));
+}
+
+/** 将结构化装饰序列化回兼容字符串（云同步/导出/旧版本共用） */
+export function serializeGarnishItems(items: GarnishItem[] | undefined): string {
+  if (!items?.length) return "";
+  return items.map((g) => g.name.trim()).filter(Boolean).join(", ");
 }
 
 /**

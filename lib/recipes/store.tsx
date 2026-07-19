@@ -76,6 +76,8 @@ export interface RecipeDraft {
   ingredients: Recipe["ingredients"];
   steps: string;
   garnish: string;
+  /** 结构化装饰（可选；保存时与 garnish 字符串双写） */
+  garnishItems?: Recipe["garnishItems"];
   notes: string;
   /** 卡片标签顺序与可见性(null 使用默认全显示) */
   cardTagOrder?: Recipe["cardTagOrder"];

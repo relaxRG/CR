@@ -25,6 +25,7 @@ import { useI18n } from "@/lib/i18n";
 import { suggestPrep } from "@/lib/homemade/match";
 import { smartLinkIngredient, smartLinkDisplayName } from "@/lib/recipes/smart-link";
 import { analyzeUnknownIngredient } from "@/lib/classify";
+import { LinkPickerSheet } from "@/components/link-picker-sheet";
 import { useHomemadeStore } from "@/lib/homemade/store";
 import { useBottleStore } from "@/lib/bottles/store";
 import { displayNames } from "@/lib/utils";
@@ -61,6 +62,9 @@ import {
   normalizeTagArrayToZh,
   DRINK_DURATIONS,
   OCCASIONS,
+  type GarnishItem,
+  parseGarnishToItems,
+  serializeGarnishItems,
 } from "@/lib/recipes/types";
 import { FLAVOR_TAG_DEFAULT_COLORS } from "@/lib/settings/card-tags";
 
@@ -350,27 +354,24 @@ export default function RecipeFormScreen() {
   const steps = serializeStepRows(stepRows);
 
   // ── Garnish: stored as string, edited as linkable rows ────────────────────
-  /** Parse garnish string (comma/semicolon separated or newline) into rows */
-  const parseGarnishRows = (raw: string): { id: string; name: string; linkedBottleId?: string; linkedPrepId?: string }[] => {
-    if (!raw.trim()) return [{ id: genId(), name: "" }];
-    const parts = raw.split(/[,，;；\n]+/).map((p) => p.trim()).filter(Boolean);
-    return parts.map((p) => ({ id: genId(), name: p }));
+  /** Parse garnish string (comma/semicolon separated or newline) into structured rows */
+  const parseGarnishRows = (raw: string): GarnishItem[] => {
+    const items = parseGarnishToItems(raw);
+    return items.length > 0 ? items.map((g) => ({ ...g, id: genId() })) : [{ id: genId(), name: "" }];
   };
-  const serializeGarnishRows = (rows: { id: string; name: string }[]): string =>
-    rows.map((r) => r.name.trim()).filter(Boolean).join(", ");
-
-  const [garnishRows, setGarnishRows] = useState<{ id: string; name: string; linkedBottleId?: string; linkedPrepId?: string }[]>(() =>
-    parseGarnishRows(editing?.garnish ?? ""),
-  );
-  const garnish = serializeGarnishRows(garnishRows);
+  const [garnishRows, setGarnishRows] = useState<GarnishItem[]>(() => {
+    // 优先结构化字段（保留链接与忽略状态），旧数据从字符串解析
+    if (editing?.garnishItems?.length) return editing.garnishItems.map((g) => ({ ...g }));
+    return parseGarnishRows(editing?.garnish ?? "");
+  });
+  const garnish = serializeGarnishItems(garnishRows);
   const [focusedGarnish, setFocusedGarnish] = useState<string | null>(null);
   const [pickedGarnish, setPickedGarnish] = useState<Record<string, string>>({});
-  const [dismissedGarnishLinks, setDismissedGarnishLinks] = useState<Record<string, boolean>>(() => {
-    if (!editing?.garnish?.trim()) return {};
-    const rows = parseGarnishRows(editing.garnish);
-    return Object.fromEntries(rows.map((r) => [r.id, true]));
-  });
+  /** 会话内 fuzzy 建议的忽略记录（持久化的忽略在 row.linkDismissed） */
+  const [dismissedGarnishLinks, setDismissedGarnishLinks] = useState<Record<string, boolean>>({});
   const [acceptedGarnishLinks, setAcceptedGarnishLinks] = useState<Record<string, boolean>>({});
+  /** 多候选选择器：当前正在为哪一行（装饰 g:/配料 i: 前缀）选择链接 */
+  const [linkPickerTarget, setLinkPickerTarget] = useState<{ scope: "garnish" | "ingredient"; id: string; query: string } | null>(null);
   const [notes, setNotes] = useState(editing?.notes ?? "");
   const [importHint, setImportHint] = useState("");
   /** Unit picker: which ingredient row is currently open */
@@ -982,21 +983,24 @@ export default function RecipeFormScreen() {
   const renderIngredientItem = useCallback(({ item: ing, drag, isActive }: RenderItemParams<Ingredient>) => {
     const trimmed = ing.name.trim();
     const ingSource = ingSourceMap[ing.id] ?? "auto";
-    const rawLink = trimmed.length >= 2 ? smartLinkIngredient(trimmed, bottles, preps, ingSource) : null;
+    // ── 四状态判定：已忽略 > 显式 ID 链接 > 自动匹配（exact 自动链接 / fuzzy 待确认）──
+    const iDismissed = ing.linkDismissed === true || dismissedLinks[ing.id] === true;
+    const explicitIngBottle = !iDismissed && ing.linkedBottleId ? bottles.find((b) => b.id === ing.linkedBottleId) : undefined;
+    const explicitIngPrep = !iDismissed && !explicitIngBottle && ing.linkedPrepId ? preps.find((p) => p.id === ing.linkedPrepId) : undefined;
+    const explicitLink = explicitIngBottle
+      ? ({ kind: "bottle", bottle: explicitIngBottle, matchConfidence: "exact" } as const)
+      : explicitIngPrep
+        ? ({ kind: "prep", prep: explicitIngPrep, matchConfidence: "exact" } as const)
+        : null;
+    const rawLink = !iDismissed && !explicitLink && trimmed.length >= 2 ? smartLinkIngredient(trimmed, bottles, preps, ingSource) : null;
     const isFuzzy = rawLink?.matchConfidence === "fuzzy";
-    const link = isFuzzy
-      ? dismissedLinks[ing.id]
-        ? null
-        : acceptedLinks[ing.id]
-          ? rawLink
-          : null
-      : rawLink;
-    const pendingFuzzyLink = isFuzzy && !dismissedLinks[ing.id] && !acceptedLinks[ing.id] ? rawLink : null;
+    const link = explicitLink ?? (rawLink && (!isFuzzy || acceptedLinks[ing.id]) ? rawLink : null);
+    const pendingFuzzyLink = !explicitLink && isFuzzy && !acceptedLinks[ing.id] ? rawLink : null;
     const prep = link?.kind === "prep" ? link.prep : null;
     const linkedBottle = link?.kind === "bottle" ? link.bottle : null;
-    const suggestion = !rawLink && trimmed.length >= 2 ? suggestPrep(trimmed) : null;
+    const suggestion = !rawLink && !explicitLink && !iDismissed && trimmed.length >= 2 ? suggestPrep(trimmed) : null;
     const classification =
-      !rawLink && !suggestion && trimmed.length >= 3
+      !rawLink && !explicitLink && !iDismissed && !suggestion && trimmed.length >= 3
         ? analyzeUnknownIngredient(trimmed, bottles, preps)
         : null;
     const showSuggest =
@@ -1160,6 +1164,9 @@ export default function RecipeFormScreen() {
                     <Text className="text-xs" style={{ color: colors.success, lineHeight: 16 }}>{t("form.replaceCanonical", { name: canon!.primary })}</Text>
                   </Pressable>
                 ) : null}
+                <Pressable onPress={() => setLinkPickerTarget({ scope: "ingredient", id: ing.id, query: trimmed })} style={({ pressed }) => [styles.prepHint, pressed && { opacity: 0.6 }, { borderColor: colors.border }]}>
+                  <Text className="text-xs" style={{ color: colors.muted, lineHeight: 16 }}>{t("form.link.rebind")}</Text>
+                </Pressable>
                 <Pressable onPress={() => { setDismissedLinks((prev) => ({ ...prev, [ing.id]: true })); setAcceptedLinks((prev) => { const n = { ...prev }; delete n[ing.id]; return n; }); setIngredients((prev) => prev.map((i) => i.id === ing.id ? { ...i, linkedBottleId: undefined, linkedPrepId: undefined, linkDismissed: true } : i)); }} style={({ pressed }) => [styles.prepHint, pressed && { opacity: 0.6 }, { borderColor: colors.border }]}>
                   <IconSymbol name="xmark" size={11} color={colors.muted} />
                   <Text className="text-xs" style={{ color: colors.muted, lineHeight: 16 }}>{t("form.link.break")}</Text>
@@ -1184,6 +1191,9 @@ export default function RecipeFormScreen() {
                     <Text className="text-xs" style={{ color: colors.success, lineHeight: 16 }}>{t("form.replaceCanonical", { name: canon!.primary })}</Text>
                   </Pressable>
                 ) : null}
+                <Pressable onPress={() => setLinkPickerTarget({ scope: "ingredient", id: ing.id, query: trimmed })} style={({ pressed }) => [styles.prepHint, pressed && { opacity: 0.6 }, { borderColor: colors.border }]}>
+                  <Text className="text-xs" style={{ color: colors.muted, lineHeight: 16 }}>{t("form.link.rebind")}</Text>
+                </Pressable>
                 <Pressable onPress={() => { setDismissedLinks((prev) => ({ ...prev, [ing.id]: true })); setAcceptedLinks((prev) => { const n = { ...prev }; delete n[ing.id]; return n; }); setIngredients((prev) => prev.map((i) => i.id === ing.id ? { ...i, linkedBottleId: undefined, linkedPrepId: undefined, linkDismissed: true } : i)); }} style={({ pressed }) => [styles.prepHint, pressed && { opacity: 0.6 }, { borderColor: colors.border }]}>
                   <IconSymbol name="xmark" size={11} color={colors.muted} />
                   <Text className="text-xs" style={{ color: colors.muted, lineHeight: 16 }}>{t("form.link.break")}</Text>
@@ -1203,6 +1213,9 @@ export default function RecipeFormScreen() {
                   <IconSymbol name="checkmark" size={11} color={colors.success} />
                   <Text className="text-xs" style={{ color: colors.success, lineHeight: 16 }}>{t("form.link.accept")}</Text>
                 </Pressable>
+                <Pressable onPress={() => setLinkPickerTarget({ scope: "ingredient", id: ing.id, query: trimmed })} style={({ pressed }) => [styles.prepHint, pressed && { opacity: 0.6 }, { borderColor: colors.border }]}>
+                  <Text className="text-xs" style={{ color: colors.muted, lineHeight: 16 }}>{t("form.link.more")}</Text>
+                </Pressable>
                 <Pressable onPress={() => { setDismissedLinks((prev) => ({ ...prev, [ing.id]: true })); setIngredients((prev) => prev.map((i) => i.id === ing.id ? { ...i, linkDismissed: true } : i)); }} style={({ pressed }) => [styles.prepHint, pressed && { opacity: 0.6 }, { borderColor: colors.border }]}>
                   <IconSymbol name="xmark" size={11} color={colors.muted} />
                   <Text className="text-xs" style={{ color: colors.muted, lineHeight: 16 }}>{t("form.link.dismiss")}</Text>
@@ -1210,6 +1223,13 @@ export default function RecipeFormScreen() {
               </View>
             );
           })()
+        ) : iDismissed && trimmed.length > 1 ? (
+          <View className="flex-row items-center flex-wrap" style={{ gap: 8 }}>
+            <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>{t("form.link.dismissed")}</Text>
+            <Pressable onPress={() => setLinkPickerTarget({ scope: "ingredient", id: ing.id, query: trimmed })} style={({ pressed }) => [styles.prepHint, pressed && { opacity: 0.6 }]}>
+              <Text className="text-xs" style={{ color: colors.primary, lineHeight: 16 }}>{t("form.link.relink")}</Text>
+            </Pressable>
+          </View>
         ) : suggestion ? (
           <Pressable onPress={() => router.push({ pathname: "/homemade-form", params: { prefillName: suggestion.name, prefillNameAlt: suggestion.nameAlt, prefillType: suggestion.type } })} style={({ pressed }) => [styles.prepHint, pressed && { opacity: 0.6 }]}>
             <IconSymbol name="plus.circle.fill" size={12} color={colors.success} />
@@ -1339,6 +1359,15 @@ export default function RecipeFormScreen() {
         .map((i) => ({ ...i, preferredSource: ingSourceMap[i.id] ?? undefined })),
       steps: steps.trim(),
       garnish: garnish.trim(),
+      garnishItems: garnishRows
+        .filter((g) => g.name.trim().length > 0)
+        .map((g) => ({
+          id: g.id,
+          name: g.name.trim(),
+          linkedBottleId: g.linkedBottleId || undefined,
+          linkedPrepId: g.linkedPrepId || undefined,
+          linkDismissed: g.linkDismissed === true ? true : undefined,
+        })),
       notes: notes.trim(),
       cardTagOrder: null,
       drinkDuration: drinkDuration || undefined,
@@ -2082,10 +2111,20 @@ export default function RecipeFormScreen() {
           <Text className="text-[13px] text-muted uppercase mt-5 mb-2" style={{ letterSpacing: 0.4 }}>{t("form.garnish")}</Text>
           {garnishRows.map((row) => {
             const trimmed = row.name.trim();
-            const rawGLink = trimmed.length > 1 ? smartLinkIngredient(trimmed, bottles, preps) : null;
+            // ── 四状态判定：已忽略 > 显式 ID 链接 > 自动匹配（exact 自动链接 / fuzzy 待确认）──
+            const gDismissed = row.linkDismissed === true;
+            // 显式链接：按 ID 精确解析（改名不断链）
+            const explicitBottle = !gDismissed && row.linkedBottleId ? bottles.find((b) => b.id === row.linkedBottleId) : undefined;
+            const explicitPrep = !gDismissed && !explicitBottle && row.linkedPrepId ? preps.find((p) => p.id === row.linkedPrepId) : undefined;
+            const explicitGLink = explicitBottle
+              ? ({ kind: "bottle", bottle: explicitBottle, matchConfidence: "exact" } as const)
+              : explicitPrep
+                ? ({ kind: "prep", prep: explicitPrep, matchConfidence: "exact" } as const)
+                : null;
+            const rawGLink = !gDismissed && !explicitGLink && trimmed.length > 1 ? smartLinkIngredient(trimmed, bottles, preps) : null;
             const isGFuzzy = rawGLink?.matchConfidence === "fuzzy";
-            const activeGLink = rawGLink && !isGFuzzy ? rawGLink : (rawGLink && isGFuzzy && !dismissedGarnishLinks[row.id] && acceptedGarnishLinks[row.id] ? rawGLink : null);
-            const pendingGFuzzyLink = isGFuzzy && !dismissedGarnishLinks[row.id] && !acceptedGarnishLinks[row.id] ? rawGLink : null;
+            const activeGLink = explicitGLink ?? (rawGLink && (!isGFuzzy || acceptedGarnishLinks[row.id]) && !dismissedGarnishLinks[row.id] ? rawGLink : null);
+            const pendingGFuzzyLink = !explicitGLink && isGFuzzy && !dismissedGarnishLinks[row.id] && !acceptedGarnishLinks[row.id] ? rawGLink : null;
             const showGSuggest = focusedGarnish === row.id && trimmed.length > 0 && pickedGarnish[row.id] !== row.name;
             const liveGSuggestions = showGSuggest ? suggestIngredients(trimmed, bottles, preps, lang, 4, groupOf).filter((s) => s.value !== trimmed) : [];
             return (
@@ -2097,7 +2136,7 @@ export default function RecipeFormScreen() {
                     placeholderTextColor={colors.muted}
                     value={row.name}
                     onChangeText={(v) => {
-                      setGarnishRows((prev) => prev.map((r) => r.id === row.id ? { ...r, name: v, linkedBottleId: undefined, linkedPrepId: undefined } : r));
+                      setGarnishRows((prev) => prev.map((r) => r.id === row.id ? { ...r, name: v, linkedBottleId: undefined, linkedPrepId: undefined, linkDismissed: undefined } : r));
                       setDismissedGarnishLinks((prev) => { const n = { ...prev }; delete n[row.id]; return n; });
                       setAcceptedGarnishLinks((prev) => { const n = { ...prev }; delete n[row.id]; return n; });
                     }}
@@ -2152,7 +2191,14 @@ export default function RecipeFormScreen() {
                       <IconSymbol name="chevron.right" size={10} color={colors.primary} />
                     </Pressable>
                     <Pressable
-                      onPress={() => { setGarnishRows((prev) => prev.map((r) => r.id === row.id ? { ...r, linkedBottleId: undefined, linkedPrepId: undefined } : r)); setDismissedGarnishLinks((prev) => ({ ...prev, [row.id]: true })); setAcceptedGarnishLinks((prev) => { const n = { ...prev }; delete n[row.id]; return n; }); }}
+                      onPress={() => setLinkPickerTarget({ scope: "garnish", id: row.id, query: trimmed })}
+                      style={({ pressed }) => [styles.unlinkBtn, pressed && { opacity: 0.7 }]}
+                    >
+                      <IconSymbol name="arrow.triangle.2.circlepath" size={10} color={colors.muted} />
+                      <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>{t("form.link.rebind")}</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => { setGarnishRows((prev) => prev.map((r) => r.id === row.id ? { ...r, linkedBottleId: undefined, linkedPrepId: undefined, linkDismissed: true } : r)); setDismissedGarnishLinks((prev) => ({ ...prev, [row.id]: true })); setAcceptedGarnishLinks((prev) => { const n = { ...prev }; delete n[row.id]; return n; }); }}
                       style={({ pressed }) => [styles.unlinkBtn, pressed && { opacity: 0.7 }]}
                     >
                       <IconSymbol name="xmark" size={10} color={colors.muted} />
@@ -2164,11 +2210,42 @@ export default function RecipeFormScreen() {
                     <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>
                       {pendingGFuzzyLink.kind === "prep" ? t("form.link.fuzzy.prep").replace("{name}", smartLinkDisplayName(pendingGFuzzyLink, lang as "zh" | "en")?.primary ?? "") : t("form.link.fuzzy.bottle").replace("{name}", smartLinkDisplayName(pendingGFuzzyLink, lang as "zh" | "en")?.primary ?? "")}
                     </Text>
-                    <Pressable onPress={() => setAcceptedGarnishLinks((prev) => ({ ...prev, [row.id]: true }))} style={({ pressed }) => [styles.linkTag, pressed && { opacity: 0.7 }]}>
+                    <Pressable
+                      onPress={() => {
+                        // 接受 = 写入显式 ID 链接（持久化）
+                        setGarnishRows((prev) => prev.map((r) => r.id === row.id
+                          ? { ...r, linkedBottleId: pendingGFuzzyLink.kind === "bottle" ? pendingGFuzzyLink.bottle.id : undefined, linkedPrepId: pendingGFuzzyLink.kind === "prep" ? pendingGFuzzyLink.prep.id : undefined, linkDismissed: undefined }
+                          : r));
+                        setAcceptedGarnishLinks((prev) => ({ ...prev, [row.id]: true }));
+                      }}
+                      style={({ pressed }) => [styles.linkTag, pressed && { opacity: 0.7 }]}
+                    >
                       <Text className="text-xs" style={{ color: colors.primary, lineHeight: 16 }}>{t("form.link.accept")}</Text>
                     </Pressable>
-                    <Pressable onPress={() => setDismissedGarnishLinks((prev) => ({ ...prev, [row.id]: true }))} style={({ pressed }) => [styles.unlinkBtn, pressed && { opacity: 0.7 }]}>
+                    <Pressable
+                      onPress={() => setLinkPickerTarget({ scope: "garnish", id: row.id, query: trimmed })}
+                      style={({ pressed }) => [styles.unlinkBtn, pressed && { opacity: 0.7 }]}
+                    >
+                      <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>{t("form.link.more")}</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => {
+                        setGarnishRows((prev) => prev.map((r) => r.id === row.id ? { ...r, linkedBottleId: undefined, linkedPrepId: undefined, linkDismissed: true } : r));
+                        setDismissedGarnishLinks((prev) => ({ ...prev, [row.id]: true }));
+                      }}
+                      style={({ pressed }) => [styles.unlinkBtn, pressed && { opacity: 0.7 }]}
+                    >
                       <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>{t("form.link.dismiss")}</Text>
+                    </Pressable>
+                  </View>
+                ) : gDismissed && trimmed.length > 1 ? (
+                  <View className="flex-row items-center flex-wrap mt-1" style={{ gap: 6 }}>
+                    <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>{t("form.link.dismissed")}</Text>
+                    <Pressable
+                      onPress={() => setLinkPickerTarget({ scope: "garnish", id: row.id, query: trimmed })}
+                      style={({ pressed }) => [styles.linkTag, pressed && { opacity: 0.7 }]}
+                    >
+                      <Text className="text-xs" style={{ color: colors.primary, lineHeight: 16 }}>{t("form.link.relink")}</Text>
                     </Pressable>
                   </View>
                 ) : null}
@@ -2354,6 +2431,45 @@ export default function RecipeFormScreen() {
           if (unit) addRecentUnit(unit);
         }}
         onClose={() => setUnitPickerIngId(null)}
+      />
+      {/* 多候选链接选择器（装饰/配料共用） */}
+      <LinkPickerSheet
+        visible={linkPickerTarget !== null}
+        initialQuery={linkPickerTarget?.query ?? ""}
+        bottles={bottles}
+        preps={preps}
+        groupOf={groupOf}
+        onPick={(result) => {
+          const target = linkPickerTarget;
+          setLinkPickerTarget(null);
+          if (!target) return;
+          if (target.scope === "garnish") {
+            if (result.kind === "none") {
+              setGarnishRows((prev) => prev.map((r) => r.id === target.id ? { ...r, linkedBottleId: undefined, linkedPrepId: undefined, linkDismissed: true } : r));
+              setDismissedGarnishLinks((prev) => ({ ...prev, [target.id]: true }));
+              setAcceptedGarnishLinks((prev) => { const n = { ...prev }; delete n[target.id]; return n; });
+            } else {
+              setGarnishRows((prev) => prev.map((r) => r.id === target.id
+                ? { ...r, linkedBottleId: result.kind === "bottle" ? result.bottleId : undefined, linkedPrepId: result.kind === "prep" ? result.prepId : undefined, linkDismissed: undefined }
+                : r));
+              setDismissedGarnishLinks((prev) => { const n = { ...prev }; delete n[target.id]; return n; });
+              setAcceptedGarnishLinks((prev) => ({ ...prev, [target.id]: true }));
+            }
+          } else {
+            if (result.kind === "none") {
+              setIngredients((prev) => prev.map((i) => i.id === target.id ? { ...i, linkedBottleId: undefined, linkedPrepId: undefined, linkDismissed: true } : i));
+              setDismissedLinks((prev) => ({ ...prev, [target.id]: true }));
+              setAcceptedLinks((prev) => { const n = { ...prev }; delete n[target.id]; return n; });
+            } else {
+              setIngredients((prev) => prev.map((i) => i.id === target.id
+                ? { ...i, linkedBottleId: result.kind === "bottle" ? result.bottleId : undefined, linkedPrepId: result.kind === "prep" ? result.prepId : undefined, linkDismissed: undefined }
+                : i));
+              setDismissedLinks((prev) => { const n = { ...prev }; delete n[target.id]; return n; });
+              setAcceptedLinks((prev) => ({ ...prev, [target.id]: true }));
+            }
+          }
+        }}
+        onClose={() => setLinkPickerTarget(null)}
       />
     </ScreenContainer>
   );

@@ -195,7 +195,7 @@ export default function RecipeDetailScreen() {
     if (!recipe || autoAddedRef.current === recipe.id) return;
     const names: string[] = [];
     if (recipe.garnish) {
-      names.push(...estimateGarnishCost(recipe.garnish, bottles, preps).unmatchedNames);
+      names.push(...estimateGarnishCost(recipe.garnish, bottles, preps, recipe.garnishItems).unmatchedNames);
     }
     for (const ing of recipe.ingredients) {
       // 用户明确忽略过链接建议的配料不再触发自动入库（Bug 8）
@@ -242,7 +242,7 @@ export default function RecipeDetailScreen() {
   const iceCost = estimateIceCost(recipe.method, recipe.ice, iceSettings);
   // 装饰成本:连接词智能拆分(「或」取高、「与/及」累加),形态折叠计价
   const garnishCost = recipe.garnish
-    ? estimateGarnishCost(recipe.garnish, bottles, preps)
+    ? estimateGarnishCost(recipe.garnish, bottles, preps, recipe.garnishItems)
     : null;
   const grandTotal = costEst.total + iceCost.total + (garnishCost?.total ?? 0);
 
@@ -578,71 +578,94 @@ export default function RecipeDetailScreen() {
         {recipe.garnish ? (
           <>
             <Text className="text-[13px] text-muted uppercase mt-6 mb-2 px-4" style={styles.groupHeader}>{t("detail.garnish")}</Text>
-            <View className="px-4 flex-row flex-wrap" style={{ gap: 8 }}>
+            <View className="bg-surface rounded-xl px-4">
               {(() => {
-                const groups = splitGarnish(recipe.garnish);
-                if (groups.length === 0) {
-                  return (
-                    <View style={{ paddingVertical: 4, paddingHorizontal: 12, borderRadius: 20, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}>
-                      <Text selectable style={{ fontSize: 14, color: colors.foreground }}>{recipe.garnish}</Text>
-                    </View>
-                  );
-                }
-                const chips: React.ReactElement[] = [];
-                let chipIdx = 0;
-                for (const group of groups) {
-                  for (const part of group.parts) {
-                    if (!part.name) continue;
-                    const link = smartLinkIngredient(part.name, bottles, preps);
-                    const smart = smartLinkDisplayName(link, lang as "zh" | "en");
-                    const displayName = smart?.primary ?? ingredientDisplayName(part.name, lang as "zh" | "en", bottles, preps);
-                    const isOr = group.mode === "or" && group.parts.length > 1;
-                    const label = [isOr ? (lang === "en" ? "or " : "或") : null, part.amount ? `${part.amount} ` : null, displayName].filter(Boolean).join("");
-                    const chipContent = (
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          paddingVertical: 6,
-                          paddingHorizontal: 12,
-                          borderRadius: 20,
-                          backgroundColor: link ? (colors.primary + "12") : colors.surface,
-                          borderWidth: 1,
-                          borderColor: link ? (colors.primary + "40") : colors.border,
-                          gap: 4,
-                        }}
-                      >
-                        {link?.kind === "prep" ? (
-                          <IconSymbol name="sparkles" size={11} color={colors.aiAccent} />
-                        ) : null}
-                        <Text style={{ fontSize: 14, color: link ? colors.primary : colors.foreground, fontWeight: link ? "500" : "400" }} numberOfLines={1}>{label}</Text>
-                        {link && link.kind !== "prep" ? (
-                          <IconSymbol name="chevron.right" size={10} color={colors.primary} />
-                        ) : null}
-                      </View>
-                    );
-                    const key = `garnish-chip-${chipIdx}`;
-                    chips.push(
-                      link ? (
-                        <Pressable
-                          key={key}
-                          onPress={() =>
-                            link.kind === "prep"
-                              ? router.push({ pathname: "/homemade/[id]", params: { id: link.prep.id } })
-                              : router.push({ pathname: "/bottle/[id]", params: { id: link.bottle.id } })
-                          }
-                          style={({ pressed }) => [pressed && { opacity: 0.6 }]}
-                        >
-                          {chipContent}
-                        </Pressable>
-                      ) : (
-                        <View key={key}>{chipContent}</View>
-                      )
-                    );
-                    chipIdx++;
+                // 统一为与配料一致的列表行卡片样式。
+                // 优先读结构化 garnishItems（含显式链接 ID / 忽略标记）；
+                // 旧数据回退到 garnish 字符串解析。
+                type GRow = { key: string; name: string; amount?: string; orPrefix: boolean; linkedBottleId?: string; linkedPrepId?: string; linkDismissed?: boolean };
+                const rows: GRow[] = [];
+                const items = recipe.garnishItems;
+                if (items && items.length > 0) {
+                  items.forEach((g, i) => {
+                    if (g.name.trim()) rows.push({ key: `gi-${g.id || i}`, name: g.name.trim(), orPrefix: false, linkedBottleId: g.linkedBottleId, linkedPrepId: g.linkedPrepId, linkDismissed: g.linkDismissed });
+                  });
+                } else {
+                  const groups = splitGarnish(recipe.garnish);
+                  if (groups.length === 0) {
+                    rows.push({ key: "g-raw", name: recipe.garnish, orPrefix: false });
+                  } else {
+                    let idx0 = 0;
+                    for (const group of groups) {
+                      group.parts.forEach((part, pi) => {
+                        if (!part.name) return;
+                        rows.push({ key: `g-${idx0++}`, name: part.name, amount: part.amount, orPrefix: group.mode === "or" && group.parts.length > 1 && pi > 0 });
+                      });
+                    }
                   }
                 }
-                return chips;
+                return rows.map((row, idx) => {
+                  // 四状态：忽略 > 显式 ID > 自动匹配
+                  let link: ReturnType<typeof smartLinkIngredient> = null;
+                  if (!row.linkDismissed) {
+                    if (row.linkedBottleId) {
+                      const b = bottles.find((bt) => bt.id === row.linkedBottleId);
+                      if (b) link = { kind: "bottle", bottle: b, matchConfidence: "exact" };
+                    } else if (row.linkedPrepId) {
+                      const p = preps.find((pr) => pr.id === row.linkedPrepId);
+                      if (p) link = { kind: "prep", prep: p, matchConfidence: "exact" };
+                    }
+                    if (!link) link = smartLinkIngredient(row.name, bottles, preps);
+                  }
+                  const smart = smartLinkDisplayName(link, lang as "zh" | "en");
+                  // 已链接：第一行规范名 + 第二行小字原文（用户确认的呈现方式）
+                  const primaryName = smart?.primary ?? ingredientDisplayName(row.name, lang as "zh" | "en", bottles, preps);
+                  const secondaryText = smart?.secondary
+                    ? smart.secondary
+                    : link && smart?.primary && smart.primary !== row.name
+                      ? row.name
+                      : null;
+                  const prefix = [row.orPrefix ? (lang === "en" ? "or " : "或 ") : null, row.amount ? `${row.amount} ` : null].filter(Boolean).join("");
+                  const inner = (
+                    <View
+                      className="flex-row items-center justify-between py-3"
+                      style={idx > 0 ? { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border } : undefined}
+                    >
+                      <View className="flex-1 pr-3">
+                        <View className="flex-row items-center" style={{ gap: 5 }}>
+                          <Text className="text-base" style={{ color: colors.foreground, flexShrink: 1 }}>
+                            {prefix}{primaryName}
+                          </Text>
+                          {link ? (
+                            <IconSymbol
+                              name={link.kind === "prep" ? "sparkles" : "chevron.right"}
+                              size={link.kind === "prep" ? 12 : 11}
+                              color={link.kind === "prep" ? colors.aiAccent : colors.muted}
+                            />
+                          ) : null}
+                        </View>
+                        {secondaryText ? (
+                          <Text className="text-xs text-muted mt-0.5" numberOfLines={1}>{secondaryText}</Text>
+                        ) : null}
+                      </View>
+                    </View>
+                  );
+                  return link ? (
+                    <Pressable
+                      key={row.key}
+                      onPress={() =>
+                        link.kind === "prep"
+                          ? router.push({ pathname: "/homemade/[id]", params: { id: link.prep.id } })
+                          : router.push({ pathname: "/bottle/[id]", params: { id: link.bottle.id } })
+                      }
+                      style={({ pressed }) => [pressed && { opacity: 0.5 }]}
+                    >
+                      {inner}
+                    </Pressable>
+                  ) : (
+                    <View key={row.key}>{inner}</View>
+                  );
+                });
               })()}
             </View>
           </>
