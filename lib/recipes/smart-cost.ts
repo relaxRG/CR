@@ -116,7 +116,8 @@ export function estimateIngredientCostSmart(
       if (p) link = { kind: "prep", prep: p, matchConfidence: "exact" };
     }
   }
-  if (!link) link = smartLinkIngredient(ing.name, bottles, preps);
+  // 用户明确忽略过链接建议（Bug 8）：不再自动匹配，仅显示原文
+  if (!link && !ing.linkDismissed) link = smartLinkIngredient(ing.name, bottles, preps);
   if (!link) {
     return { ingredient: ing, link: null, amountMl: null, cost: null, reason: "no_match" };
   }

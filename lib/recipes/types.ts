@@ -61,6 +61,11 @@ export interface Ingredient {
   /** Explicit link to a homemade prep entry (set when user accepts a fuzzy match) */
   linkedPrepId?: string;
   /**
+   * 用户明确忽略了模糊链接建议（点"忽略"后持久化）
+   * true = 详情页/成本计算不得再对该配料自动匹配链接
+   */
+  linkDismissed?: boolean;
+  /**
    * 用户手动指定的成分来源库（优先级高于自动匹配）
    * undefined/"auto" = 四库全搜（默认行为）
    */

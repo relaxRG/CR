@@ -8,7 +8,16 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
 import { bulkImportExtract } from "@/lib/api/smart-router";
+import { parseAppleBooksExcerpt, type AppleBooksExcerpt } from "@/lib/import/apple-books";
 import type { BulkImportItem } from "@/shared/client-types";
+
+/** 导入来源元数据（Apple Books 摘录尾注解析结果等） */
+export interface ImportSourceMeta {
+  bookTitle: string;
+  bookAuthor: string;
+  /** 原始粘贴文本（含尾注），供 sourceRef.rawText 留档 */
+  rawText: string;
+}
 
 /**
  * 表单页顶部的智能导入栏：粘贴/拍照/相册导入。
@@ -21,7 +30,7 @@ export function SmartImportBar({
   onExtracted,
 }: {
   targetType: "bottle" | "prep" | "recipe";
-  onExtracted: (item: BulkImportItem, all: BulkImportItem[]) => void;
+  onExtracted: (item: BulkImportItem, all: BulkImportItem[], sourceMeta?: ImportSourceMeta) => void;
 }) {
   const colors = useColors();
   const { t, lang } = useI18n();
@@ -45,7 +54,7 @@ export function SmartImportBar({
   );
 
   const handleResult = useCallback(
-    (items: BulkImportItem[]) => {
+    (items: BulkImportItem[], sourceMeta?: ImportSourceMeta) => {
       const item = pickItem(items);
       if (!item) {
         Alert.alert(t("smartImport.empty.title"), t("smartImport.empty.msg"));
@@ -54,7 +63,7 @@ export function SmartImportBar({
       if (Platform.OS !== "web") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
-      onExtracted(item, items);
+      onExtracted(item, items, sourceMeta);
     },
     [onExtracted, pickItem, t],
   );
@@ -89,8 +98,14 @@ export function SmartImportBar({
         Alert.alert(t("smartImport.clipboard.empty.title"), t("smartImport.clipboard.empty.msg"));
         return;
       }
-      const res = await bulkImportExtract({ text, lang: lang as 'zh' | 'en' });
-      handleResult(res.items as BulkImportItem[]);
+      // Apple Books 摘录尾注：本地正则解析书名/作者，剥离尾注后再发 AI（Bug 9）
+      const excerpt: AppleBooksExcerpt | null = parseAppleBooksExcerpt(text);
+      const aiText = excerpt ? excerpt.cleanText : text;
+      const res = await bulkImportExtract({ text: aiText, lang: lang as 'zh' | 'en' });
+      const meta: ImportSourceMeta | undefined = excerpt
+        ? { bookTitle: excerpt.bookTitle, bookAuthor: excerpt.bookAuthor, rawText: excerpt.rawText }
+        : undefined;
+      handleResult(res.items as BulkImportItem[], meta);
       setPasteExpanded(false);
       setPasteText("");
     } catch (e) {
@@ -98,7 +113,7 @@ export function SmartImportBar({
     } finally {
       setBusyKind(null);
     }
-  }, [fail, handleResult, pasteText, t]);
+  }, [fail, handleResult, pasteText, t, lang]);
 
   const handlePastePress = useCallback(() => {
     if (!pasteExpanded) {

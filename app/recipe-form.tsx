@@ -917,7 +917,7 @@ export default function RecipeFormScreen() {
       // Reset link decisions and clear explicit link IDs when user edits the name
       setDismissedLinks((prev) => { const n = { ...prev }; delete n[iid]; return n; });
       setAcceptedLinks((prev) => { const n = { ...prev }; delete n[iid]; return n; });
-      setIngredients((prev) => prev.map((i) => i.id === iid ? { ...i, linkedBottleId: undefined, linkedPrepId: undefined } : i));
+      setIngredients((prev) => prev.map((i) => i.id === iid ? { ...i, linkedBottleId: undefined, linkedPrepId: undefined, linkDismissed: undefined } : i));
     }
   };
 
@@ -1119,7 +1119,7 @@ export default function RecipeFormScreen() {
                     <Text className="text-xs" style={{ color: colors.success, lineHeight: 16 }}>{t("form.replaceCanonical", { name: canon!.primary })}</Text>
                   </Pressable>
                 ) : null}
-                <Pressable onPress={() => { setDismissedLinks((prev) => ({ ...prev, [ing.id]: true })); setAcceptedLinks((prev) => { const n = { ...prev }; delete n[ing.id]; return n; }); setIngredients((prev) => prev.map((i) => i.id === ing.id ? { ...i, linkedBottleId: undefined, linkedPrepId: undefined } : i)); }} style={({ pressed }) => [styles.prepHint, pressed && { opacity: 0.6 }, { borderColor: colors.border }]}>
+                <Pressable onPress={() => { setDismissedLinks((prev) => ({ ...prev, [ing.id]: true })); setAcceptedLinks((prev) => { const n = { ...prev }; delete n[ing.id]; return n; }); setIngredients((prev) => prev.map((i) => i.id === ing.id ? { ...i, linkedBottleId: undefined, linkedPrepId: undefined, linkDismissed: true } : i)); }} style={({ pressed }) => [styles.prepHint, pressed && { opacity: 0.6 }, { borderColor: colors.border }]}>
                   <IconSymbol name="xmark" size={11} color={colors.muted} />
                   <Text className="text-xs" style={{ color: colors.muted, lineHeight: 16 }}>{t("form.link.break")}</Text>
                 </Pressable>
@@ -1143,7 +1143,7 @@ export default function RecipeFormScreen() {
                     <Text className="text-xs" style={{ color: colors.success, lineHeight: 16 }}>{t("form.replaceCanonical", { name: canon!.primary })}</Text>
                   </Pressable>
                 ) : null}
-                <Pressable onPress={() => { setDismissedLinks((prev) => ({ ...prev, [ing.id]: true })); setAcceptedLinks((prev) => { const n = { ...prev }; delete n[ing.id]; return n; }); setIngredients((prev) => prev.map((i) => i.id === ing.id ? { ...i, linkedBottleId: undefined, linkedPrepId: undefined } : i)); }} style={({ pressed }) => [styles.prepHint, pressed && { opacity: 0.6 }, { borderColor: colors.border }]}>
+                <Pressable onPress={() => { setDismissedLinks((prev) => ({ ...prev, [ing.id]: true })); setAcceptedLinks((prev) => { const n = { ...prev }; delete n[ing.id]; return n; }); setIngredients((prev) => prev.map((i) => i.id === ing.id ? { ...i, linkedBottleId: undefined, linkedPrepId: undefined, linkDismissed: true } : i)); }} style={({ pressed }) => [styles.prepHint, pressed && { opacity: 0.6 }, { borderColor: colors.border }]}>
                   <IconSymbol name="xmark" size={11} color={colors.muted} />
                   <Text className="text-xs" style={{ color: colors.muted, lineHeight: 16 }}>{t("form.link.break")}</Text>
                 </Pressable>
@@ -1158,11 +1158,11 @@ export default function RecipeFormScreen() {
             return (
               <View className="flex-row items-center flex-wrap" style={{ gap: 8 }}>
                 <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>{t(fuzzyKey, { name: fuzzyName })}</Text>
-                <Pressable onPress={() => { setAcceptedLinks((prev) => ({ ...prev, [ing.id]: true })); if (pendingFuzzyLink?.kind === "bottle") { setIngredients((prev) => prev.map((i) => i.id === ing.id ? { ...i, linkedBottleId: pendingFuzzyLink.bottle.id, linkedPrepId: undefined } : i)); } else if (pendingFuzzyLink?.kind === "prep") { setIngredients((prev) => prev.map((i) => i.id === ing.id ? { ...i, linkedPrepId: pendingFuzzyLink.prep.id, linkedBottleId: undefined } : i)); } }} style={({ pressed }) => [styles.prepHint, pressed && { opacity: 0.6 }, { borderColor: colors.success }]}>
+                <Pressable onPress={() => { setAcceptedLinks((prev) => ({ ...prev, [ing.id]: true })); if (pendingFuzzyLink?.kind === "bottle") { setIngredients((prev) => prev.map((i) => i.id === ing.id ? { ...i, linkedBottleId: pendingFuzzyLink.bottle.id, linkedPrepId: undefined, linkDismissed: undefined } : i)); } else if (pendingFuzzyLink?.kind === "prep") { setIngredients((prev) => prev.map((i) => i.id === ing.id ? { ...i, linkedPrepId: pendingFuzzyLink.prep.id, linkedBottleId: undefined, linkDismissed: undefined } : i)); } }} style={({ pressed }) => [styles.prepHint, pressed && { opacity: 0.6 }, { borderColor: colors.success }]}>
                   <IconSymbol name="checkmark" size={11} color={colors.success} />
                   <Text className="text-xs" style={{ color: colors.success, lineHeight: 16 }}>{t("form.link.accept")}</Text>
                 </Pressable>
-                <Pressable onPress={() => setDismissedLinks((prev) => ({ ...prev, [ing.id]: true }))} style={({ pressed }) => [styles.prepHint, pressed && { opacity: 0.6 }, { borderColor: colors.border }]}>
+                <Pressable onPress={() => { setDismissedLinks((prev) => ({ ...prev, [ing.id]: true })); setIngredients((prev) => prev.map((i) => i.id === ing.id ? { ...i, linkDismissed: true } : i)); }} style={({ pressed }) => [styles.prepHint, pressed && { opacity: 0.6 }, { borderColor: colors.border }]}>
                   <IconSymbol name="xmark" size={11} color={colors.muted} />
                   <Text className="text-xs" style={{ color: colors.muted, lineHeight: 16 }}>{t("form.link.dismiss")}</Text>
                 </Pressable>
@@ -1359,7 +1359,7 @@ export default function RecipeFormScreen() {
           {/* Smart import: paste / camera / photos */}
           <SmartImportBar
             targetType="recipe"
-            onExtracted={(item) => {
+            onExtracted={(item, _all, sourceMeta) => {
               if (item.nameZh || item.nameEn) {
                 setName(item.nameZh || item.nameEn);
                 setNameEn(item.nameEn);
@@ -1386,6 +1386,23 @@ export default function RecipeFormScreen() {
               if (item.garnish) setGarnishRows(parseGarnishRows(item.garnish));
               if (item.source) setSource(item.source);
               if (item.notes) setNotes(item.notes);
+              // Apple Books 摘录尾注：本地解析的书名/作者写入结构化引用来源（Bug 9）
+              if (sourceMeta?.bookTitle) {
+                setSourceRef((prev) => ({
+                  ...prev,
+                  bookTitle: sourceMeta.bookTitle,
+                  bookAuthor: sourceMeta.bookAuthor || prev.bookAuthor,
+                  rawText: sourceMeta.rawText || prev.rawText,
+                  sourceConfidence: "high",
+                }));
+                if (!item.source) {
+                  setSource(
+                    sourceMeta.bookAuthor
+                      ? `${sourceMeta.bookTitle} — ${sourceMeta.bookAuthor}`
+                      : sourceMeta.bookTitle,
+                  );
+                }
+              }
               setImportHint(t("smartImport.filled"));
             }}
           />

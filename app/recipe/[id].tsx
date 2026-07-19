@@ -192,6 +192,8 @@ export default function RecipeDetailScreen() {
       names.push(...estimateGarnishCost(recipe.garnish, bottles, preps).unmatchedNames);
     }
     for (const ing of recipe.ingredients) {
+      // 用户明确忽略过链接建议的配料不再触发自动入库（Bug 8）
+      if (ing.linkDismissed) continue;
       if (!smartLinkIngredient(ing.name, bottles, preps)) names.push(ing.name);
     }
     if (names.length === 0) {
@@ -499,7 +501,16 @@ export default function RecipeDetailScreen() {
           ) : (
             recipe.ingredients.map((ing, idx) => (
               (() => {
-                const link = smartLinkIngredient(ing.name, bottles, preps);
+                // 优先直连 ID；用户忽略过的配料不再自动匹配（Bug 8）
+                let link: ReturnType<typeof smartLinkIngredient> = null;
+                if (ing.linkedBottleId) {
+                  const b = bottles.find((bt) => bt.id === ing.linkedBottleId);
+                  if (b) link = { kind: "bottle", bottle: b, matchConfidence: "exact" };
+                } else if (ing.linkedPrepId && !ing.linkedPrepId.startsWith("bottle-override-")) {
+                  const p = preps.find((pr) => pr.id === ing.linkedPrepId);
+                  if (p) link = { kind: "prep", prep: p, matchConfidence: "exact" };
+                }
+                if (!link && !ing.linkDismissed) link = smartLinkIngredient(ing.name, bottles, preps);
                 const smart = smartLinkDisplayName(link, lang as "zh" | "en");
                 const primaryName =
                   smart?.primary ?? ingredientDisplayName(ing.name, lang as "zh" | "en", bottles, preps);
