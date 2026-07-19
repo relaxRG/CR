@@ -526,6 +526,14 @@ export default function DeviceManagerScreen() {
             <Text style={[styles.deviceDesc, { color: colors.muted }]}>
               {lang === "zh" ? ROLE_DESC[deviceInfo.role].zh : ROLE_DESC[deviceInfo.role].en}
             </Text>
+            {/* Bug 5：显示同步组短码，便于跨设备核对是否在同一组 */}
+            <Text style={[styles.deviceDesc, { color: colors.muted, marginTop: 4 }]}>
+              {lang === "zh" ? "同步组 " : "Sync group "}
+              <Text style={{ fontWeight: "600", color: colors.foreground }}>
+                {deviceInfo.groupId.slice(0, 8).toUpperCase()}
+              </Text>
+              {lang === "zh" ? "（各设备需一致才互相同步）" : " (must match across devices)"}
+            </Text>
           </View>
         )}
 
@@ -657,6 +665,13 @@ export default function DeviceManagerScreen() {
             {devices.length === 0 && (
               <Text style={[styles.emptyText, { color: colors.muted }]}>
                 {lang === "zh" ? "暂无其他设备" : "No other devices"}
+              </Text>
+            )}
+            {devices.length === 1 && (
+              <Text style={[styles.emptyText, { color: colors.muted, paddingHorizontal: 16 }]}>
+                {lang === "zh"
+                  ? "当前同步组只有本机一台设备。若想让 Mac / 其他设备同步数据，请在上方生成配对码，并在新设备的「设备管理 → 加入设备组」中输入。各自独立注册的设备不会互相同步。"
+                  : "Only this device is in the sync group. To sync with your Mac or other devices, generate a pair code above and enter it on the new device (Device Manager → Join Group). Independently registered devices do NOT sync with each other."}
               </Text>
             )}
           </View>

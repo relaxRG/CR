@@ -104,6 +104,10 @@ function rewriteImagesToFileUris(html: string, chapterFilePath: string): string 
   });
 }
 
+/** Max image size to inline as base64 (bytes). Larger raster images are
+    downscaled via expo-image-manipulator before inlining to bound memory. */
+const MAX_INLINE_IMAGE_BYTES = 2 * 1024 * 1024;
+
 async function inlineImagesAsBase64(html: string, chapterFilePath: string): Promise<string> {
   // Determine the base directory of the chapter file
   const lastSlash = chapterFilePath.lastIndexOf("/");
@@ -128,11 +132,35 @@ async function inlineImagesAsBase64(html: string, chapterFilePath: string): Prom
       const ext = imgPath.split(".").pop()?.toLowerCase() ?? "png";
       const mimeMap: Record<string, string> = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", gif: "image/gif", svg: "image/svg+xml", webp: "image/webp" };
       const mime = mimeMap[ext] ?? "image/png";
-      const b64 = await new FSFile(imgPath).base64();
-      const dataUri = `data:${mime};base64,${b64}`;
+      const file = new FSFile(imgPath);
+      let dataUri: string;
+      let fileSize = 0;
+      try { fileSize = file.size ?? 0; } catch { fileSize = 0; }
+      if (fileSize > MAX_INLINE_IMAGE_BYTES && mime !== "image/svg+xml" && mime !== "image/gif") {
+        // Oversized raster image: downscale + re-encode to JPEG to bound memory
+        try {
+          const ImageManipulator = await import("expo-image-manipulator");
+          const srcUri = imgPath.startsWith("file://") ? imgPath : "file://" + (imgPath.startsWith("/") ? imgPath : "/" + imgPath);
+          const manipulated = await ImageManipulator.manipulateAsync(
+            srcUri,
+            [{ resize: { width: 1200 } }],
+            { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG, base64: true },
+          );
+          dataUri = `data:image/jpeg;base64,${manipulated.base64}`;
+        } catch {
+          const b64 = await file.base64();
+          dataUri = `data:${mime};base64,${b64}`;
+        }
+      } else {
+        const b64 = await file.base64();
+        dataUri = `data:${mime};base64,${b64}`;
+      }
       result = result.replace(full, full.replace(src, dataUri));
     } catch {
-      // Silently skip unreadable images — never block rendering
+      // Unreadable image: swap in a lightweight placeholder so the chapter
+      // still renders instead of showing a broken-image mark.
+      const placeholder = `<span style="display:inline-block;padding:8px 12px;border:1px dashed #999;border-radius:6px;color:#999;font-size:12px;">图片加载失败</span>`;
+      result = result.replace(full, placeholder);
     }
   }
   return result;
@@ -948,9 +976,13 @@ export default function BookReaderScreen() {
         });
       try {
         const html = await tryRead(resolvedPath).catch(() => tryRead(rawPath));
-        // P3 image fast path: rewrite to file:// URIs (native decode, no base64 memory bloat).
-        // iOS WKWebView honors these when loaded with a file:// baseUrl + allowFileAccess.
-        if (Platform.OS === "ios" || Platform.OS === "android") {
+        // Android fast path: file:// URIs decode natively (allowFileAccess works with
+        // loadDataWithBaseURL on Android WebView).
+        // iOS: WKWebView loaded via HTML string + baseUrl does NOT honor
+        // allowingReadAccessToURL (it only applies to loadFileURL), so file://
+        // subresources are blocked by the sandbox → broken-image marks. Use base64
+        // inlining instead (Build 55 proven path; chapter LRU cache avoids re-encoding).
+        if (Platform.OS === "android") {
           return rewriteImagesToFileUris(html, b.sections[idx].text);
         }
         return await inlineImagesAsBase64(html, b.sections[idx].text);

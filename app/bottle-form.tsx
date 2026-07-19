@@ -23,6 +23,7 @@ import { useNetwork } from "@/hooks/use-network";
 import { useI18n } from "@/lib/i18n";
 import { BottleDraft, useBottleStore } from "@/lib/bottles/store";
 import { useBottleTaxonomy } from "@/lib/bottles/taxonomy";
+import { normalizeStyleToTaxonomy } from "@/lib/bottles/style-normalize";
 import { enrichBottle, OfflineError } from "@/lib/api/smart-router";
 import { lookupInOfflineKb, extractBookSnippets, offlineEntryToEnrichResult } from "@/lib/bottles/offline-lookup";
 import { useBookStore } from "@/lib/books/store";
@@ -191,7 +192,13 @@ export default function BottleFormScreen() {
     if (key === "nameZh" && aiResult.nameZh) setNameZh(aiResult.nameZh);
     else if (key === "nameEn" && aiResult.nameEn) setNameEn(aiResult.nameEn);
     else if (key === "category" && aiResult.category) setCategory(aiResult.category);
-    else if (key === "style" && aiResult.style) setStyle(aiResult.style);
+    else if (key === "style" && aiResult.style) {
+      // Bug 4 修复：AI 返回的风格值可能与 taxonomy chip 值域存在大小写/斜杠/别名差异，
+      // 先归一化到当前分类的规范值；未命中则保留原值（落入自定义风格输入框），不丢信息。
+      const cat = aiResult.category && taxCategories.some((c) => c.zh === aiResult.category) ? aiResult.category : category;
+      const normalized = normalizeStyleToTaxonomy(aiResult.style, stylesOf(cat));
+      setStyle(normalized ?? aiResult.style);
+    }
     else if (key === "brand" && aiResult.brand) setBrand(aiResult.brand);
     else if (key === "origin" && aiResult.origin) setOrigin(aiResult.origin);
     else if (key === "volume" && aiResult.volume) setVolume(aiResult.volume);
@@ -209,7 +216,7 @@ export default function BottleFormScreen() {
     else if (key === "storyEn" && (aiResult as { storyEn?: string }).storyEn) setStoryEn((aiResult as { storyEn?: string }).storyEn ?? "");
     else if (key === "substituteFor" && (aiResult as { substituteFor?: string }).substituteFor) setSubstituteFor((aiResult as { substituteFor?: string }).substituteFor ?? "");
     else if (key === "pairsWith" && (aiResult as { pairsWith?: string }).pairsWith) setPairsWith((aiResult as { pairsWith?: string }).pairsWith ?? "");
-  }, [aiResult]);
+  }, [aiResult, taxCategories, category, stylesOf]);
 
   /** 应用所有 toggle=true 的字段，保存 undo 快照 */
   const applyAiResult = useCallback(() => {

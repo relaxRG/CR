@@ -331,7 +331,7 @@ export type SyncEntry = {
   clientUpdatedAt: number;
 };
 
-export async function cfPull(): Promise<{
+export async function cfPull(since?: number): Promise<{
   entries: SyncEntry[];
   role: DeviceRole;
   allowedKeys: string[] | null;
@@ -339,7 +339,11 @@ export async function cfPull(): Promise<{
   const deviceInfo = await getDeviceInfo();
   if (!deviceInfo) throw new Error("Device not registered");
 
-  const res = await cfFetch("/api/sync/pull", { method: "POST", deviceInfo, body: "{}" });
+  const res = await cfFetch("/api/sync/pull", {
+    method: "POST",
+    deviceInfo,
+    body: JSON.stringify(since ? { since } : {}),
+  });
   if (!res.ok) {
     const body = await res.json() as { error?: string };
     throw new Error(body.error ?? `Pull failed: ${res.status}`);

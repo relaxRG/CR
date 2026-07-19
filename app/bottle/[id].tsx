@@ -133,6 +133,26 @@ export default function BottleDetailScreen() {
               {categoryLabel(bottle.category, lang)}
             </Text>
           </View>
+          {/* 归属徽章：所属库=自制库的酒款条目，可点跳自制库列表（Bug 1 修复） */}
+          {bottle.libraryOverride === "homemade" ? (
+            <Pressable
+              onPress={() => router.push("/(tabs)/homemade")}
+              hitSlop={4}
+              style={({ pressed }) => [{
+                paddingHorizontal: 10,
+                paddingVertical: 4,
+                borderRadius: 20,
+                marginRight: 6,
+                backgroundColor: "#34C75922",
+                borderWidth: 1,
+                borderColor: "#34C75988",
+              }, pressed && { opacity: 0.6 }]}
+            >
+              <Text style={{ fontSize: 13, color: "#34C759", fontWeight: "500" }}>
+                {lang === "zh" ? "自制库 ›" : "Homemade ›"}
+              </Text>
+            </Pressable>
+          ) : null}
           {bottle.style ? (
             <View style={chipStyle(false)}>
               <Text style={chipTextStyle(false)}>{bottle.style}</Text>

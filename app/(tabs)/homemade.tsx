@@ -1322,7 +1322,10 @@ function PrepRowInner({
       onPress={() => {
         if (prep.id.startsWith('bottle-override-')) {
           const bottleId = prep.id.replace('bottle-override-', '');
-          router.push({ pathname: "/bottle-form", params: { id: bottleId } });
+          // Virtual homemade entry backed by a Bottle (libraryOverride='homemade'):
+          // open the bottle DETAIL page like any other item; editing stays behind
+          // the pencil button on the detail screen (Bug 2 fix).
+          router.push({ pathname: "/bottle/[id]", params: { id: bottleId } });
         } else {
           router.push({ pathname: "/homemade/[id]", params: { id: prep.id } });
         }

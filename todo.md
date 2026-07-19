@@ -360,3 +360,11 @@
 - [x] 双页触发宽度 900px（按 iOS 图书规格）
 - [x] 翻页动画：slide 滑动（iOS 16 图书默认规格）
 - [x] 完成后暂不触发 EAS Build，先 checkpoint 交付验证
+- [x] EAS Build 56 触发并提交 TestFlight（build dc8ca4d9，submission 178ed821，FINISHED）
+## Build 57 修复（2026-07-20，方案经用户确认，全部完成）
+- [x] Bug 1: 装饰行智能链接——auto 模式放开 libraryOverride='homemade' 排除，同名 prep 精确优先（smart-link.ts + vitest 回归）
+- [x] Bug 2: 自制库虚拟条目点击改跳酒款详情页（homemade.tsx）；详情页加「自制库›」归属徽章（bottle/[id].tsx）
+- [x] Bug 3: 书内图片问号——iOS 回归 base64 内联（WKWebView html+baseUrl 不认 file://），仅 Android 走 file:// 快路径；>2MB 大图自动压缩 + 失败灰色占位（book-reader.tsx）
+- [x] Bug 4: AI 风格补全——Worker BOTTLE_STYLES_MAP 重建为客户端 taxonomy 值域 + normalizeBottleStyle 模糊归一化 + styleRaw 保留（已部署 Version 4eb6f355，curl 验证 Banks→Gold、Tanqueray→London Dry）；客户端 lib/bottles/style-normalize.ts 兜底映射（bottle-form.tsx + vitest 6 用例）
+- [x] Bug 5: Mac→手机同步——前台激活自动同步（AppState/visibilitychange，60s 节流，provider.tsx）；cfPull 支持 since 增量；Worker push 加 LWW 时间戳守卫（ON CONFLICT WHERE 新者胜，已部署）；设备管理页显示同步组短码 + 单设备配对引导
+- [ ] EAS Build 57 触发（等用户单独指令）

@@ -75,8 +75,16 @@ export function smartLinkIngredient(
       filteredBottles = bottles.filter((b) => b.libraryOverride !== 'homemade' && MATERIALS_CATS.has(b.category ?? ""));
     }
   } else {
-    // auto 模式：排除已归属自制库的酒款条目（它们在自制库中显示）
-    filteredBottles = bottles.filter((b) => b.libraryOverride !== 'homemade');
+    // auto 模式（Bug 1 修复）：不再排除 libraryOverride='homemade' 的酒款。
+    // 这类条目（如"脱水菠萝"）虽然展示在自制库，但数据上仍是酒款，装饰行/配料行
+    // 应能匹配到本尊并跳转到酒款详情页。同名歧义处理：若存在 override 酒款，
+    // 先对真实自制品(prep)做一轮精确匹配，命中则优先返回 prep。
+    const hasOverride = bottles.some((b) => b.libraryOverride === 'homemade');
+    if (hasOverride) {
+      const priorityPrep = exactPrep(name, preps);
+      if (priorityPrep) return { kind: "prep", prep: priorityPrep, matchConfidence: "exact" };
+    }
+    filteredBottles = bottles;
   }
 
   // 1) 双边精确匹配(原文)

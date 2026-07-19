@@ -12,7 +12,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Platform } from "react-native";
+import { AppState, Platform } from "react-native";
 import {
   cfPull,
   cfPush,
@@ -80,6 +80,7 @@ export function SyncProvider({
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryCountRef = useRef(0);
   const syncingRef = useRef(false);
+  const lastSyncAtRef = useRef(0);
 
   useEffect(() => subscribeSyncState(setSyncState), []);
 
@@ -131,6 +132,7 @@ export function SyncProvider({
       }
       setSyncError(null);
       retryCountRef.current = 0;
+      lastSyncAtRef.current = Date.now();
       return true;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -180,6 +182,34 @@ export function SyncProvider({
       if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
     };
   }, [performSync, scheduleRetry]);
+
+  // Bug 5 修复：前台激活自动同步。
+  // 此前 pull 只在冷启动执行一次，iOS App 常驻后台多天时永远拉不到其它设备
+  // （如 Mac）推送的更新。现在监听 AppState：每次回到前台（active）且距上次
+  // 成功同步超过 60 秒时，自动执行一轮完整同步（pull → LWW merge → push）。
+  // Web 端用 visibilitychange + focus 实现同等行为。
+  useEffect(() => {
+    const syncIfStale = () => {
+      if (Date.now() - lastSyncAtRef.current < 60_000) return;
+      void performSync();
+    };
+    if (Platform.OS === "web") {
+      if (typeof document === "undefined") return;
+      const onVisible = () => {
+        if (document.visibilityState === "visible") syncIfStale();
+      };
+      document.addEventListener("visibilitychange", onVisible);
+      window.addEventListener("focus", syncIfStale);
+      return () => {
+        document.removeEventListener("visibilitychange", onVisible);
+        window.removeEventListener("focus", syncIfStale);
+      };
+    }
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") syncIfStale();
+    });
+    return () => sub.remove();
+  }, [performSync]);
 
   // "login" = enter pair code to join an existing group
   const login = useCallback(() => {
