@@ -79,6 +79,7 @@ export default function RecipeDetailScreen() {
 
   // 成品照片
   const [photoLoading, setPhotoLoading] = React.useState(false);
+  const [photoPreviewUri, setPhotoPreviewUri] = React.useState<string | null>(null);
 
   const handlePickPhoto = React.useCallback(async (kind: "camera" | "library") => {
     if (!recipe) return;
@@ -1154,9 +1155,8 @@ export default function RecipeDetailScreen() {
             </View>
           </>
         ) : null}
-      </ScrollView>
-      {/* 成品照片 Section */}
-      <View style={{ paddingHorizontal: 20, paddingBottom: 24, paddingTop: 8 }}>
+      {/* 成品照片 Section（移入滚动区，缩略图化，点击浮层看原图） */}
+      <View style={{ paddingBottom: 16, paddingTop: 8 }}>
         <Text
           className="text-xs font-semibold text-muted uppercase mb-3"
           style={[styles.groupHeader]}
@@ -1168,12 +1168,14 @@ export default function RecipeDetailScreen() {
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
               {(recipe.photoUris ?? []).map((uri, idx) => (
                 <View key={uri} style={{ marginRight: 8, borderRadius: 12, overflow: "hidden", position: "relative" }}>
-                  <Image
-                    source={{ uri }}
-                    style={{ width: 240, aspectRatio: 4 / 3, borderRadius: 12 }}
-                    contentFit="cover"
-                    transition={200}
-                  />
+                  <Pressable onPress={() => setPhotoPreviewUri(uri)}>
+                    <Image
+                      source={{ uri }}
+                      style={{ width: 96, height: 96, borderRadius: 12 }}
+                      contentFit="cover"
+                      transition={200}
+                    />
+                  </Pressable>
                   <Pressable
                     onPress={() => {
                       Alert.alert(
@@ -1187,7 +1189,7 @@ export default function RecipeDetailScreen() {
                     }}
                     style={({ pressed }) => [styles.photoChangeBadge, pressed && { opacity: 0.7 }]}
                   >
-                    <Text style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}>🗑</Text>
+                    <Text style={{ color: "#fff", fontSize: 10, fontWeight: "600" }}>✕</Text>
                   </Pressable>
                 </View>
               ))}
@@ -1220,6 +1222,35 @@ export default function RecipeDetailScreen() {
           </Pressable>
         )}
       </View>
+      </ScrollView>
+      {/* 照片浮层预览（浮在详情页上方，点击任意处关闭） */}
+      {photoPreviewUri && (
+        <Pressable
+          onPress={() => setPhotoPreviewUri(null)}
+          style={{
+            position: "absolute",
+            top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: "rgba(0,0,0,0.75)",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 100,
+          }}
+        >
+          <Image
+            source={{ uri: photoPreviewUri }}
+            style={{
+              width: "92%",
+              height: "72%",
+              borderRadius: 16,
+            }}
+            contentFit="contain"
+            transition={150}
+          />
+          <View style={{ marginTop: 14, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.18)" }}>
+            <Text style={{ color: "#fff", fontSize: 12 }}>{t("detail.photo.tapToClose")}</Text>
+          </View>
+        </Pressable>
+      )}
     </ScreenContainer>
     {/* 门店酒单分组选择 Modal */}
       {menuModalVisible && (

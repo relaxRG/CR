@@ -358,6 +358,7 @@ const dict = {
   "detail.photo.cancel": { zh: "取消", en: "Cancel" },
   "detail.photo.delete.confirm.title": { zh: "删除照片", en: "Remove Photo" },
   "detail.photo.delete.confirm.msg": { zh: "确定删除这张成品照片吗？", en: "Remove this photo?" },
+  "detail.photo.tapToClose": { zh: "点击任意处关闭", en: "Tap anywhere to close" },
   "detail.photo.perm.camera.title": { zh: "需要相机权限", en: "Camera Permission Required" },
   "detail.photo.perm.camera.msg": { zh: "请在系统设置中开启相机权限，以便拍照。", en: "Please enable camera access in Settings." },
   "detail.photo.perm.library.title": { zh: "需要相册权限", en: "Photo Library Permission Required" },

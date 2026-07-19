@@ -368,3 +368,5 @@
 - [x] Bug 4: AI 风格补全——Worker BOTTLE_STYLES_MAP 重建为客户端 taxonomy 值域 + normalizeBottleStyle 模糊归一化 + styleRaw 保留（已部署 Version 4eb6f355，curl 验证 Banks→Gold、Tanqueray→London Dry）；客户端 lib/bottles/style-normalize.ts 兜底映射（bottle-form.tsx + vitest 6 用例）
 - [x] Bug 5: Mac→手机同步——前台激活自动同步（AppState/visibilitychange，60s 节流，provider.tsx）；cfPull 支持 since 增量；Worker push 加 LWW 时间戳守卫（ON CONFLICT WHERE 新者胜，已部署）；设备管理页显示同步组短码 + 单设备配对引导
 - [ ] EAS Build 57 触发（等用户单独指令）
+- [x] Bug 6: 成品照片区 iOS 占比过大（固定在 ScrollView 外常驻底部，移入滚动区 + 缩略图化）
+- [x] Bug 7: 配方照片点击浮层查看原图（详情页上方浮层，点击任意处关闭）
