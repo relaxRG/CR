@@ -395,3 +395,16 @@
 - [x] P2: 表单页圆角与间距对齐 radius.control
 - [x] P2: 按压反馈统一（列表卡片 opacity 0.7，主按钮 scale 0.97）
 - [x] FINAL: TypeScript 0 错误 + 35 项测试通过 + 全局设计规范检查 + 截图走查
+- [x] FINAL: TypeScript 0 错误 + 35 项测试通过 + 全局设计规范检查 + 截图走查
+## 第三阶段视觉升级（2026-07-20 继续）
+- [x] 详情页步骤改为蓝色圆形序号列表（直径26，蓝色底白字）
+- [x] 详情页装饰移到步骤前面
+- [x] 详情页结构公式在最底部
+- [x] 编辑页（recipe-form.tsx）步骤序号改为灰色（#E5E7EB 底 #6B7280 文字）
+- [x] 编辑页装饰/步骤顺序对调（装饰先、步骤后）
+- [x] homemade-form.tsx 步骤序号同步改为灰色
+- [x] 详情页装饰改为小胶囊 chip 样式（有链接蓝底可点击）
+- [x] 配料分量列固定宽度 60px 右对齐
+- [x] recipe-form.tsx 表单区块标题统一为 13px 全大写灰色 + letterSpacing 0.4
+- [x] homemade-form.tsx fieldLabel 标题统一为 13px 全大写灰色 + letterSpacing 0.4
+- [x] TypeScript 0 错误，35 项测试全部通过

@@ -545,7 +545,7 @@ export default function RecipeDetailScreen() {
                         </Text>
                       ) : null}
                     </View>
-                    <Text className="text-base text-muted">{formatAmountAsMl(ing.amount)}</Text>
+                    <Text className="text-base text-muted text-right" style={{ width: 60 }} numberOfLines={1}>{formatAmountAsMl(ing.amount)}</Text>
                   </View>
                 );
                 return link ? (
@@ -569,33 +569,22 @@ export default function RecipeDetailScreen() {
         </View>
 
         {/* Steps */}
-        {recipe.steps ? (
-          <>
-            <Text className="text-[13px] text-muted uppercase mt-6 mb-2 px-4" style={styles.groupHeader}>{t("detail.steps")}</Text>
-            <View className="bg-surface rounded-xl p-4">
-              <Text className="text-base text-foreground leading-relaxed">
-                {stepsDisplayText(recipe.steps, lang as "zh" | "en")}
-              </Text>
-            </View>
-          </>
-        ) : null}
-
         {/* Garnish */}
         {recipe.garnish ? (
           <>
             <Text className="text-[13px] text-muted uppercase mt-6 mb-2 px-4" style={styles.groupHeader}>{t("detail.garnish")}</Text>
-            <View className="bg-surface rounded-xl px-4">
+            <View className="px-4 flex-row flex-wrap" style={{ gap: 8 }}>
               {(() => {
                 const groups = splitGarnish(recipe.garnish);
                 if (groups.length === 0) {
                   return (
-                    <View className="py-3">
-                      <Text className="text-base text-foreground">{recipe.garnish}</Text>
+                    <View style={{ paddingVertical: 4, paddingHorizontal: 12, borderRadius: 20, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}>
+                      <Text style={{ fontSize: 14, color: colors.foreground }}>{recipe.garnish}</Text>
                     </View>
                   );
                 }
-                const rows: React.ReactElement[] = [];
-                let rowIdx = 0;
+                const chips: React.ReactElement[] = [];
+                let chipIdx = 0;
                 for (const group of groups) {
                   for (const part of group.parts) {
                     if (!part.name) continue;
@@ -603,49 +592,32 @@ export default function RecipeDetailScreen() {
                     const smart = smartLinkDisplayName(link, lang as "zh" | "en");
                     const displayName = smart?.primary ?? ingredientDisplayName(part.name, lang as "zh" | "en", bottles, preps);
                     const isOr = group.mode === "or" && group.parts.length > 1;
-                    const inner = (
+                    const label = [isOr ? (lang === "en" ? "or " : "或") : null, part.amount ? `${part.amount} ` : null, displayName].filter(Boolean).join("");
+                    const chipContent = (
                       <View
-                        className="flex-row items-center py-3"
-                        style={
-                          rowIdx > 0
-                            ? { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }
-                            : undefined
-                        }
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          paddingVertical: 6,
+                          paddingHorizontal: 12,
+                          borderRadius: 20,
+                          backgroundColor: link ? (colors.primary + "12") : colors.surface,
+                          borderWidth: 1,
+                          borderColor: link ? (colors.primary + "40") : colors.border,
+                          gap: 4,
+                        }}
                       >
-                        <View className="flex-1 pr-2">
-                          <View className="flex-row items-center" style={{ gap: 5 }}>
-                            {isOr && (
-                              <Text className="text-xs text-muted" style={{ marginRight: 2 }}>
-                                {lang === "en" ? "or" : "或"}
-                              </Text>
-                            )}
-                            {part.amount ? (
-                              <Text className="text-base text-muted">{part.amount} </Text>
-                            ) : null}
-                            <Text
-                              className="text-base"
-                              style={{ color: colors.foreground, flexShrink: 1 }}
-                            >
-                              {displayName}
-                            </Text>
-                            {link ? (
-                              <IconSymbol
-                                name={link.kind === "prep" ? "sparkles" : "chevron.right"}
-                                size={link.kind === "prep" ? 12 : 11}
-                                color={link.kind === "prep" ? colors.aiAccent : colors.muted}
-                              />
-                            ) : null}
-                          </View>
-                          {smart?.secondary ? (
-                            <Text className="text-xs text-muted mt-0.5" numberOfLines={1}>
-                              {smart.secondary}
-                            </Text>
-                          ) : null}
-                        </View>
+                        {link?.kind === "prep" ? (
+                          <IconSymbol name="sparkles" size={11} color={colors.aiAccent} />
+                        ) : null}
+                        <Text style={{ fontSize: 14, color: link ? colors.primary : colors.foreground, fontWeight: link ? "500" : "400" }} numberOfLines={1}>{label}</Text>
+                        {link && link.kind !== "prep" ? (
+                          <IconSymbol name="chevron.right" size={10} color={colors.primary} />
+                        ) : null}
                       </View>
                     );
-                    const key = `garnish-part-${rowIdx}`;
-                    rows.push(
+                    const key = `garnish-chip-${chipIdx}`;
+                    chips.push(
                       link ? (
                         <Pressable
                           key={key}
@@ -654,24 +626,54 @@ export default function RecipeDetailScreen() {
                               ? router.push({ pathname: "/homemade/[id]", params: { id: link.prep.id } })
                               : router.push({ pathname: "/bottle/[id]", params: { id: link.bottle.id } })
                           }
-                          style={({ pressed }) => [pressed && { opacity: 0.5 }]}
+                          style={({ pressed }) => [pressed && { opacity: 0.6 }]}
                         >
-                          {inner}
+                          {chipContent}
                         </Pressable>
                       ) : (
-                        <View key={key}>{inner}</View>
+                        <View key={key}>{chipContent}</View>
                       )
                     );
-                    rowIdx++;
+                    chipIdx++;
                   }
                 }
-                return rows;
+                return chips;
               })()}
             </View>
           </>
         ) : null}
 
         {/* Structural formula (auto-analyzed, after steps & garnish) */}
+        {/* Steps */}
+        {recipe.steps ? (() => {
+          const stepLines = recipe.steps.split("\n").map((s: string) => s.trim()).filter(Boolean);
+          return (
+            <>
+              <Text className="text-[13px] text-muted uppercase mt-6 mb-2 px-4" style={styles.groupHeader}>{t("detail.steps")}</Text>
+              <View className="bg-surface rounded-xl px-4">
+                {stepLines.map((line: string, idx: number) => {
+                  const text = line.replace(/^\d+[.)、]\s*/, "");
+                  return (
+                    <View
+                      key={idx}
+                      className="flex-row items-start py-3"
+                      style={[
+                        { gap: 12 },
+                        idx > 0 ? { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border } : undefined,
+                      ]}
+                    >
+                      <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>
+                        <Text style={{ fontSize: 13, fontWeight: "700", color: "#FFFFFF", lineHeight: 15 }}>{idx + 1}</Text>
+                      </View>
+                      <Text className="text-base text-foreground flex-1" style={{ lineHeight: 24, paddingTop: 1 }}>{text}</Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </>
+          );
+        })() : null}
+
         {recipe.ingredients.length > 0 ? (
           <>
             <Text className="text-[13px] text-muted uppercase mt-6 mb-2 px-4" style={styles.groupHeader}>

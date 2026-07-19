@@ -1416,7 +1416,7 @@ export default function RecipeFormScreen() {
           {/* Name: bilingual fields, primary language first (aligned with bottle library) */}
           {lang === "en" ? (
             <>
-              <Text className="text-sm font-medium text-muted mt-3 mb-1.5">{t("form.nameEn.required")}</Text>
+              <Text className="text-[13px] text-muted uppercase mt-3 mb-2" style={{ letterSpacing: 0.4 }}>{t("form.nameEn.required")}</Text>
               <TextInput
                 className="bg-surface border border-border rounded-xl px-4 py-3 text-base text-foreground"
                 placeholder={t("form.nameEn.placeholder")}
@@ -1426,7 +1426,7 @@ export default function RecipeFormScreen() {
                 returnKeyType="done"
                 style={{ lineHeight: 20 }}
               />
-              <Text className="text-sm font-medium text-muted mt-3 mb-1.5">{t("form.nameZh.label")}</Text>
+              <Text className="text-[13px] text-muted uppercase mt-3 mb-2" style={{ letterSpacing: 0.4 }}>{t("form.nameZh.label")}</Text>
               <TextInput
                 className="bg-surface border border-border rounded-xl px-4 py-3 text-base text-foreground"
                 placeholder={t("form.nameZh.placeholder")}
@@ -1439,7 +1439,7 @@ export default function RecipeFormScreen() {
             </>
           ) : (
             <>
-              <Text className="text-sm font-medium text-muted mt-3 mb-1.5">{t("form.nameZh.required")}</Text>
+              <Text className="text-[13px] text-muted uppercase mt-3 mb-2" style={{ letterSpacing: 0.4 }}>{t("form.nameZh.required")}</Text>
               <TextInput
                 className="bg-surface border border-border rounded-xl px-4 py-3 text-base text-foreground"
                 placeholder={t("form.nameZh.placeholder")}
@@ -1449,7 +1449,7 @@ export default function RecipeFormScreen() {
                 returnKeyType="done"
                 style={{ lineHeight: 20 }}
               />
-              <Text className="text-sm font-medium text-muted mt-3 mb-1.5">{t("form.nameEn.label")}</Text>
+              <Text className="text-[13px] text-muted uppercase mt-3 mb-2" style={{ letterSpacing: 0.4 }}>{t("form.nameEn.label")}</Text>
               <TextInput
                 className="bg-surface border border-border rounded-xl px-4 py-3 text-base text-foreground"
                 placeholder={t("form.nameEn.placeholder")}
@@ -1660,7 +1660,7 @@ export default function RecipeFormScreen() {
           )}
 
           {/* Category */}
-          <Text className="text-sm font-medium text-muted mt-5 mb-1.5">{t("form.category")}</Text>
+          <Text className="text-[13px] text-muted uppercase mt-5 mb-2" style={{ letterSpacing: 0.4 }}>{t("form.category")}</Text>
           <View style={styles.chipWrap}>
             <Pressable
               onPress={() => setCategoryId(null)}
@@ -1702,7 +1702,7 @@ export default function RecipeFormScreen() {
 
           {/* Base spirit */}
           <View className="flex-row items-center justify-between mt-5 mb-1.5">
-            <Text className="text-sm font-medium text-muted">{t("form.spirit")}</Text>
+            <Text className="text-[13px] text-muted">{t("form.spirit")}</Text>
             {spiritConfidence !== null && (
               <View className="flex-row items-center" style={{ gap: 4 }}>
                 <IconSymbol
@@ -1775,7 +1775,7 @@ export default function RecipeFormScreen() {
           )}
 
           {/* Codex family */}
-          <Text className="text-sm font-medium text-muted mt-5 mb-1.5">
+          <Text className="text-[13px] text-muted uppercase mt-5 mb-2" style={{ letterSpacing: 0.4 }}>
             {t("form.codex")}
           </Text>
           <Text className="text-xs text-muted mb-2" style={{ lineHeight: 16 }}>
@@ -1805,7 +1805,7 @@ export default function RecipeFormScreen() {
           </View>
 
           {/* Variant of */}
-          <Text className="text-sm font-medium text-muted mt-5 mb-1.5">{t("form.variantOf")}</Text>
+          <Text className="text-[13px] text-muted uppercase mt-5 mb-2" style={{ letterSpacing: 0.4 }}>{t("form.variantOf")}</Text>
           <TextInput
             className="bg-surface border border-border rounded-xl px-4 py-3 text-base text-foreground"
             placeholder={t("form.variantOf.placeholder")}
@@ -1817,7 +1817,7 @@ export default function RecipeFormScreen() {
           />
 
           {/* Drink Duration — chip 选择（与 Strength 同风格） */}
-          <Text className="text-sm font-medium text-muted mt-5 mb-1.5">{t("form.duration")}</Text>
+          <Text className="text-[13px] text-muted uppercase mt-5 mb-2" style={{ letterSpacing: 0.4 }}>{t("form.duration")}</Text>
           <View style={[styles.chipWrap, { marginTop: 4 }]}>
             {(DRINK_DURATIONS as readonly string[]).map((dur) => {
               const active = drinkDuration === dur;
@@ -1842,7 +1842,7 @@ export default function RecipeFormScreen() {
           </View>
 
           {/* Occasion — chip 选择（与 Strength 同风格） */}
-          <Text className="text-sm font-medium text-muted mt-5 mb-1.5">{t("form.occasion")}</Text>
+          <Text className="text-[13px] text-muted uppercase mt-5 mb-2" style={{ letterSpacing: 0.4 }}>{t("form.occasion")}</Text>
           <View style={[styles.chipWrap, { marginTop: 4 }]}>
             {(OCCASIONS as readonly string[]).map((occ) => {
               const active = occasion === occ;
@@ -1869,7 +1869,7 @@ export default function RecipeFormScreen() {
 
           {/* Flavor tags */}
           <View className="flex-row items-center justify-between mt-5 mb-1.5">
-            <Text className="text-sm font-medium text-muted">{t("form.flavors.multi")}</Text>
+            <Text className="text-[13px] text-muted">{t("form.flavors.multi")}</Text>
             {aiEnriching && (
               <View className="flex-row items-center" style={{ gap: 4 }}>
                 <IconSymbol name="sparkles" size={12} color={colors.primary} />
@@ -1952,7 +1952,7 @@ export default function RecipeFormScreen() {
           ))}
 
           {/* Method */}
-          <Text className="text-sm font-medium text-muted mt-5 mb-1.5">{t("form.method")}</Text>
+          <Text className="text-[13px] text-muted uppercase mt-5 mb-2" style={{ letterSpacing: 0.4 }}>{t("form.method")}</Text>
           <ChipGroup
             options={METHODS}
             value={method}
@@ -1961,7 +1961,7 @@ export default function RecipeFormScreen() {
           />
 
           {/* Strength: auto-computed from ingredients + method */}
-          <Text className="text-sm font-medium text-muted mt-5 mb-1.5">{t("form.strength")}</Text>
+          <Text className="text-[13px] text-muted uppercase mt-5 mb-2" style={{ letterSpacing: 0.4 }}>{t("form.strength")}</Text>
           <View
             className="bg-surface border border-border rounded-xl px-3 py-2.5"
             style={{ gap: 2 }}
@@ -1992,7 +1992,7 @@ export default function RecipeFormScreen() {
           </View>
 
           {/* Glass */}
-          <Text className="text-sm font-medium text-muted mt-5 mb-1.5">{t("form.glass")}</Text>
+          <Text className="text-[13px] text-muted uppercase mt-5 mb-2" style={{ letterSpacing: 0.4 }}>{t("form.glass")}</Text>
           {glassNames.length > 0 ? (
             <ChipGroup
               options={glassNames}
@@ -2010,7 +2010,7 @@ export default function RecipeFormScreen() {
           )}
 
           {/* Ice type */}
-          <Text className="text-sm font-medium text-muted mt-5 mb-1.5">{t("form.ice")}</Text>
+          <Text className="text-[13px] text-muted uppercase mt-5 mb-2" style={{ letterSpacing: 0.4 }}>{t("form.ice")}</Text>
           <ChipGroup
             options={ICE_TYPES}
             value={ice}
@@ -2019,7 +2019,7 @@ export default function RecipeFormScreen() {
           />
 
           {/* Ingredients */}
-          <Text className="text-sm font-medium text-muted mt-5 mb-1.5">{t("form.ingredients")}</Text>
+          <Text className="text-[13px] text-muted uppercase mt-5 mb-2" style={{ letterSpacing: 0.4 }}>{t("form.ingredients")}</Text>
           <NestableDraggableFlatList
             data={ingredients}
             keyExtractor={(item) => item.id}
@@ -2038,43 +2038,8 @@ export default function RecipeFormScreen() {
             </Text>
           </Pressable>
 
-          {/* Steps */}
-          <Text className="text-sm font-medium text-muted mt-5 mb-1.5">{t("form.steps")}</Text>
-          {stepRows.map((row, idx) => (
-            <View key={row.id} className="flex-row items-start mb-2" style={{ gap: 8 }}>
-              <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center", marginTop: 10, flexShrink: 0 }}>
-                <Text style={{ fontSize: 12, fontWeight: "700", color: "#FFFFFF", lineHeight: 14 }}>{idx + 1}</Text>
-              </View>
-              <TextInput
-                className="flex-1 bg-surface border border-border rounded-xl px-3 py-2.5 text-base text-foreground"
-                placeholder={lang === "zh" ? `步骤 ${idx + 1}` : `Step ${idx + 1}`}
-                placeholderTextColor={colors.muted}
-                value={row.text}
-                onChangeText={(v) => setStepRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, text: v } : r)))}
-                multiline
-                style={{ minHeight: 44, textAlignVertical: "top", lineHeight: 22 }}
-              />
-              <Pressable
-                onPress={() => setStepRows((prev) => prev.length > 1 ? prev.filter((r) => r.id !== row.id) : prev)}
-                hitSlop={8}
-                style={({ pressed }) => [{ marginTop: 10 }, pressed && { opacity: 0.6 }]}
-              >
-                <IconSymbol name="minus.circle.fill" size={22} color={stepRows.length > 1 ? colors.error : colors.border} />
-              </Pressable>
-            </View>
-          ))}
-          <Pressable
-            onPress={() => setStepRows((prev) => [...prev, { id: genId(), text: "" }])}
-            style={({ pressed }) => [styles.addRow, pressed && { opacity: 0.6 }]}
-          >
-            <IconSymbol name="plus.circle.fill" size={20} color={colors.primary} />
-            <Text className="text-sm font-medium" style={{ color: colors.primary, lineHeight: 20 }}>
-              {lang === "zh" ? "添加步骤" : "Add Step"}
-            </Text>
-          </Pressable>
-
           {/* Garnish */}
-          <Text className="text-sm font-medium text-muted mt-5 mb-1.5">{t("form.garnish")}</Text>
+          <Text className="text-[13px] text-muted uppercase mt-5 mb-2" style={{ letterSpacing: 0.4 }}>{t("form.garnish")}</Text>
           {garnishRows.map((row) => {
             const trimmed = row.name.trim();
             const rawGLink = trimmed.length > 1 ? smartLinkIngredient(trimmed, bottles, preps) : null;
@@ -2180,8 +2145,43 @@ export default function RecipeFormScreen() {
             </Text>
           </Pressable>
 
+          {/* Steps */}
+          <Text className="text-[13px] text-muted uppercase mt-5 mb-2" style={{ letterSpacing: 0.4 }}>{t("form.steps")}</Text>
+          {stepRows.map((row, idx) => (
+            <View key={row.id} className="flex-row items-start mb-2" style={{ gap: 8 }}>
+              <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: "#E5E7EB", alignItems: "center", justifyContent: "center", marginTop: 10, flexShrink: 0 }}>
+                <Text style={{ fontSize: 12, fontWeight: "600", color: "#6B7280", lineHeight: 14 }}>{idx + 1}</Text>
+              </View>
+              <TextInput
+                className="flex-1 bg-surface border border-border rounded-xl px-3 py-2.5 text-base text-foreground"
+                placeholder={lang === "zh" ? `步骤 ${idx + 1}` : `Step ${idx + 1}`}
+                placeholderTextColor={colors.muted}
+                value={row.text}
+                onChangeText={(v) => setStepRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, text: v } : r)))}
+                multiline
+                style={{ minHeight: 44, textAlignVertical: "top", lineHeight: 22 }}
+              />
+              <Pressable
+                onPress={() => setStepRows((prev) => prev.length > 1 ? prev.filter((r) => r.id !== row.id) : prev)}
+                hitSlop={8}
+                style={({ pressed }) => [{ marginTop: 10 }, pressed && { opacity: 0.6 }]}
+              >
+                <IconSymbol name="minus.circle.fill" size={22} color={stepRows.length > 1 ? colors.error : colors.border} />
+              </Pressable>
+            </View>
+          ))}
+          <Pressable
+            onPress={() => setStepRows((prev) => [...prev, { id: genId(), text: "" }])}
+            style={({ pressed }) => [styles.addRow, pressed && { opacity: 0.6 }]}
+          >
+            <IconSymbol name="plus.circle.fill" size={20} color={colors.primary} />
+            <Text className="text-sm font-medium" style={{ color: colors.primary, lineHeight: 20 }}>
+              {lang === "zh" ? "添加步骤" : "Add Step"}
+            </Text>
+          </Pressable>
+
           {/* Flavor description */}
-          <Text className="text-sm font-medium text-muted mt-5 mb-1.5">{t("form.flavorDesc")}</Text>
+          <Text className="text-[13px] text-muted uppercase mt-5 mb-2" style={{ letterSpacing: 0.4 }}>{t("form.flavorDesc")}</Text>
           <TextInput
             className="bg-surface border border-border rounded-xl px-4 py-3 text-base text-foreground"
             placeholder={t("form.flavorDesc.placeholder")}
@@ -2193,7 +2193,7 @@ export default function RecipeFormScreen() {
           />
 
           {/* Notes */}
-          <Text className="text-sm font-medium text-muted mt-5 mb-1.5">{t("form.notes")}</Text>
+          <Text className="text-[13px] text-muted uppercase mt-5 mb-2" style={{ letterSpacing: 0.4 }}>{t("form.notes")}</Text>
           <TextInput
             className="bg-surface border border-border rounded-xl px-4 py-3 text-base text-foreground"
             placeholder={t("form.notes.placeholder")}
@@ -2205,7 +2205,7 @@ export default function RecipeFormScreen() {
           />
 
           {/* Story */}
-          <Text className="text-sm font-medium text-muted mt-5 mb-1.5">{t("form.story")}</Text>
+          <Text className="text-[13px] text-muted uppercase mt-5 mb-2" style={{ letterSpacing: 0.4 }}>{t("form.story")}</Text>
           <TextInput
             className="bg-surface border border-border rounded-xl px-4 py-3 text-base text-foreground"
             placeholder={t("form.story.placeholder")}
@@ -2217,7 +2217,7 @@ export default function RecipeFormScreen() {
           />
 
           {/* Source */}
-          <Text className="text-sm font-medium text-muted mt-5 mb-1.5">{t("form.source")}</Text>
+          <Text className="text-[13px] text-muted uppercase mt-5 mb-2" style={{ letterSpacing: 0.4 }}>{t("form.source")}</Text>
           <TextInput
             className="bg-surface border border-border rounded-xl px-4 py-3 text-base text-foreground"
             placeholder={t("form.source.placeholder")}

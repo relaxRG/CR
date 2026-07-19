@@ -629,7 +629,7 @@ export default function HomemadeFormScreen() {
   };
 
   const fieldLabel = (label: string) => (
-    <Text className="text-[13px] font-medium text-muted mt-4 mb-1.5">{label}</Text>
+    <Text className="text-[13px] text-muted uppercase mt-4 mb-2" style={{ letterSpacing: 0.4 }}>{label}</Text>
   );
 
   const inputStyle = [
@@ -928,8 +928,8 @@ export default function HomemadeFormScreen() {
           {fieldLabel(t("hmform.recipe"))}
           {stepRows.map((row, idx) => (
             <View key={row.id} style={{ flexDirection: "row", alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
-              <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center", marginTop: 10, flexShrink: 0 }}>
-                <Text style={{ fontSize: 12, fontWeight: "700", color: "#FFFFFF", lineHeight: 14 }}>{idx + 1}</Text>
+              <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: "#E5E7EB", alignItems: "center", justifyContent: "center", marginTop: 10, flexShrink: 0 }}>
+                <Text style={{ fontSize: 12, fontWeight: "600", color: "#6B7280", lineHeight: 14 }}>{idx + 1}</Text>
               </View>
               <TextInput
                 style={[{ flex: 1, minHeight: 44, textAlignVertical: "top", lineHeight: 22 }, ...inputStyle]}
