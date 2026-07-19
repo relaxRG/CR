@@ -1051,19 +1051,20 @@ export default function RecipeFormScreen() {
                 {!isGarnish && (
                   <Pressable
                     onPress={() => setUnitPickerIngId(ing.id)}
-                    style={({ pressed }) => [{
-                      flex: 1,
+                   style={({ pressed }) => [{
+                      width: 72,
                       backgroundColor: unit ? `${colors.primary}18` : colors.surface,
                       borderWidth: 1,
                       borderColor: unit ? colors.primary : colors.border,
                       borderRadius: 12,
-                      paddingHorizontal: 8,
+                      paddingHorizontal: 6,
                       paddingVertical: 10,
                       alignItems: "center",
                       justifyContent: "center",
+                      minHeight: 44,
                     }, pressed && { opacity: 0.7 }]}
                   >
-                    <Text style={{ fontSize: 14, color: unit ? colors.primary : colors.muted, fontWeight: unit ? "600" : "400" }}>
+                    <Text style={{ fontSize: 13, color: unit ? colors.primary : colors.muted, fontWeight: unit ? "600" : "400", textAlign: "center" }} numberOfLines={1}>
                       {unit ? unitDisplayLabel(unit, lang as "zh" | "en") : t("form.ingredient.unit")}
                     </Text>
                   </Pressable>
