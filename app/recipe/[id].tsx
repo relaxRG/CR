@@ -568,7 +568,6 @@ export default function RecipeDetailScreen() {
           )}
         </View>
 
-        {/* Steps */}
         {/* Garnish */}
         {recipe.garnish ? (
           <>
@@ -642,6 +641,36 @@ export default function RecipeDetailScreen() {
             </View>
           </>
         ) : null}
+
+        {/* Steps */}
+        {recipe.steps ? (() => {
+          const stepLines = recipe.steps.split("\n").map((s: string) => s.trim()).filter(Boolean);
+          return (
+            <>
+              <Text className="text-[13px] text-muted uppercase mt-6 mb-2 px-4" style={styles.groupHeader}>{t("detail.steps")}</Text>
+              <View className="bg-surface rounded-xl px-4">
+                {stepLines.map((line: string, idx: number) => {
+                  const text = line.replace(/^\d+[.)、]\s*/, "");
+                  return (
+                    <View
+                      key={idx}
+                      className="flex-row items-start py-3"
+                      style={[
+                        { gap: 12 },
+                        idx > 0 ? { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border } : undefined,
+                      ]}
+                    >
+                      <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: colors.muted + "55", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>
+                        <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground, lineHeight: 15 }}>{idx + 1}</Text>
+                      </View>
+                      <Text className="text-base text-foreground flex-1" style={{ lineHeight: 24, paddingTop: 1 }} selectable>{text}</Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </>
+          );
+        })() : null}
 
       {/* Flavor description - structured display */}
       {recipe.flavorDesc ? (() => {
@@ -1109,37 +1138,6 @@ export default function RecipeDetailScreen() {
             </View>
           </>
         ) : null}
-        {/* Structural formula (auto-analyzed, after steps & garnish) */}
-        {/* Steps */}
-        {recipe.steps ? (() => {
-          const stepLines = recipe.steps.split("\n").map((s: string) => s.trim()).filter(Boolean);
-          return (
-            <>
-              <Text className="text-[13px] text-muted uppercase mt-6 mb-2 px-4" style={styles.groupHeader}>{t("detail.steps")}</Text>
-              <View className="bg-surface rounded-xl px-4">
-                {stepLines.map((line: string, idx: number) => {
-                  const text = line.replace(/^\d+[.)、]\s*/, "");
-                  return (
-                    <View
-                      key={idx}
-                      className="flex-row items-start py-3"
-                      style={[
-                        { gap: 12 },
-                        idx > 0 ? { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border } : undefined,
-                      ]}
-                    >
-                      <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: colors.muted + "55", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>
-                        <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground, lineHeight: 15 }}>{idx + 1}</Text>
-                      </View>
-                      <Text className="text-base text-foreground flex-1" style={{ lineHeight: 24, paddingTop: 1 }} selectable>{text}</Text>
-                    </View>
-                  );
-                })}
-              </View>
-            </>
-          );
-        })() : null}
-
         {recipe.ingredients.length > 0 ? (
           <>
             <Text className="text-[13px] text-muted uppercase mt-6 mb-2 px-4" style={styles.groupHeader}>
