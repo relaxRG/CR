@@ -301,6 +301,68 @@ export default function HomemadeDetailScreen() {
     </>
   ) : null}
 
+        {prep.recipe ? (
+          <>
+            {sectionTitle(t("hm.recipe"))}
+            <View className="bg-surface rounded-xl px-4 py-3">
+              <Text className="text-[15px] text-foreground" style={{ lineHeight: 23 }} selectable>
+                {prep.recipe}
+              </Text>
+            </View>
+          </>
+        ) : null}
+
+        {prep.notes ? (
+          <>
+            {sectionTitle(t("hmform.notes"))}
+            <View className="bg-surface rounded-xl px-4 py-3">
+              <Text className="text-[15px] text-foreground" style={{ lineHeight: 22 }} selectable>
+                {prep.notes}
+              </Text>
+            </View>
+          </>
+        ) : null}
+
+        {prep.source ? (
+          <>
+            {sectionTitle(t("hmform.source"))}
+            <View className="bg-surface rounded-xl px-4 py-3">
+              {(() => {
+                const ps = parseSource(prep.source);
+                const rows = [
+                  { label: t("detail.source.venue"), value: ps.venue },
+                  { label: t("detail.source.creator"), value: ps.creator },
+                  { label: t("detail.source.season"), value: ps.season },
+                  { label: t("detail.source.year"), value: ps.year },
+                ].filter((r) => r.value);
+                if (rows.length === 0) {
+                  return (
+                    <Text selectable className="text-sm text-muted" style={{ lineHeight: 20 }}>
+                      {prep.source}
+                    </Text>
+                  );
+                }
+                return (
+                  <View style={{ gap: 8 }}>
+                    {rows.map((r) => (
+                      <View key={r.label} className="flex-row items-start justify-between">
+                        <Text className="text-sm text-muted" style={{ width: 110 }}>
+                          {r.label}
+                        </Text>
+                        <Text
+                          className="text-sm text-foreground flex-1 text-right"
+                          style={{ lineHeight: 19 }}
+                        >
+                          {r.value}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                );
+              })()}
+            </View>
+          </>
+        ) : null}
         {/* Cost estimate card */}
         {prep.ingredients.length > 0 ? (
           <>
@@ -423,68 +485,6 @@ export default function HomemadeDetailScreen() {
           </>
         ) : null}
 
-        {prep.recipe ? (
-          <>
-            {sectionTitle(t("hm.recipe"))}
-            <View className="bg-surface rounded-xl px-4 py-3">
-              <Text className="text-[15px] text-foreground" style={{ lineHeight: 23 }} selectable>
-                {prep.recipe}
-              </Text>
-            </View>
-          </>
-        ) : null}
-
-        {prep.notes ? (
-          <>
-            {sectionTitle(t("hmform.notes"))}
-            <View className="bg-surface rounded-xl px-4 py-3">
-              <Text className="text-[15px] text-foreground" style={{ lineHeight: 22 }} selectable>
-                {prep.notes}
-              </Text>
-            </View>
-          </>
-        ) : null}
-
-        {prep.source ? (
-          <>
-            {sectionTitle(t("hmform.source"))}
-            <View className="bg-surface rounded-xl px-4 py-3">
-              {(() => {
-                const ps = parseSource(prep.source);
-                const rows = [
-                  { label: t("detail.source.venue"), value: ps.venue },
-                  { label: t("detail.source.creator"), value: ps.creator },
-                  { label: t("detail.source.season"), value: ps.season },
-                  { label: t("detail.source.year"), value: ps.year },
-                ].filter((r) => r.value);
-                if (rows.length === 0) {
-                  return (
-                    <Text selectable className="text-sm text-muted" style={{ lineHeight: 20 }}>
-                      {prep.source}
-                    </Text>
-                  );
-                }
-                return (
-                  <View style={{ gap: 8 }}>
-                    {rows.map((r) => (
-                      <View key={r.label} className="flex-row items-start justify-between">
-                        <Text className="text-sm text-muted" style={{ width: 110 }}>
-                          {r.label}
-                        </Text>
-                        <Text
-                          className="text-sm text-foreground flex-1 text-right"
-                          style={{ lineHeight: 19 }}
-                        >
-                          {r.value}
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
-                );
-              })()}
-            </View>
-          </>
-        ) : null}
       </ScrollView>
     </ScreenContainer>
   );
