@@ -19,7 +19,10 @@ async function ensurePhotoDir() {
  */
 async function persistPhoto(sourceUri: string, recipeId: string): Promise<string> {
   await ensurePhotoDir();
-  const ext = sourceUri.split(".").pop()?.split("?")[0] ?? "jpg";
+  // 从 URI 最后一段提取合法扩展名；无法识别时回退 jpg（避免 ext 变成整个 URI 导致复制失败）
+  const lastSegment = sourceUri.split("/").pop() ?? "";
+  const extMatch = /\.([a-zA-Z0-9]{2,5})(?:\?.*)?$/.exec(lastSegment);
+  const ext = extMatch ? extMatch[1].toLowerCase() : "jpg";
   const destPath = `${PHOTO_DIR}${recipeId}_${Date.now()}.${ext}`;
   await FileSystem.copyAsync({ from: sourceUri, to: destPath });
   return destPath;

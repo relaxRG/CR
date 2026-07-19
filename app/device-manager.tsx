@@ -68,7 +68,7 @@ type BalanceInfo = {
 
 async function fetchBalance(): Promise<BalanceInfo> {
   try {
-    const res = await fetch(`${CF_WORKER_URL}/api/balance/check`, {
+    const res = await fetch(`${CF_WORKER_URL}/api/balance`, {
       method: "GET",
       headers: { "Content-Type": "application/json" },
     });
@@ -205,7 +205,8 @@ export default function DeviceManagerScreen() {
   const colors = useColors();
   const router = useRouter();
   const { lang } = useI18n();
-  const { deviceInfo, deviceRole, syncState } = useSync();
+  const { deviceInfo, deviceRole, syncState, syncError, retrySync } = useSync();
+  const [manualSyncing, setManualSyncing] = useState(false);
 
   // Devices
   const [devices, setDevices] = useState<RemoteDevice[]>([]);
@@ -343,10 +344,37 @@ export default function DeviceManagerScreen() {
     }
   };
 
+  // Manual "Sync Now"
+  const handleSyncNow = async () => {
+    if (manualSyncing) return;
+    tap();
+    setManualSyncing(true);
+    try {
+      const ok = await retrySync();
+      if (ok) {
+        if (Platform.OS !== "web") {
+          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
+        void loadDevices();
+        void loadBackupStatus();
+      } else {
+        Alert.alert(
+          lang === "zh" ? "同步失败" : "Sync Failed",
+          lang === "zh"
+            ? "无法完成同步，请检查网络后重试。"
+            : "Could not complete sync. Check your network and try again.",
+        );
+      }
+    } finally {
+      setManualSyncing(false);
+    }
+  };
+
   const isOwner = deviceRole === "owner";
-  const isSyncing = syncState.syncing;
-  const syncColor = syncState.error ? "#FF3B30" : isSyncing ? "#0A84FF" : "#34C759";
-  const syncLabel = syncState.error
+  const isSyncing = syncState.syncing || manualSyncing;
+  const combinedError = syncState.error || syncError;
+  const syncColor = combinedError ? "#FF3B30" : isSyncing ? "#0A84FF" : "#34C759";
+  const syncLabel = combinedError
     ? (lang === "zh" ? "同步出错" : "Sync Error")
     : isSyncing
     ? (lang === "zh" ? "同步中..." : "Syncing...")
@@ -408,12 +436,28 @@ export default function DeviceManagerScreen() {
               <Text style={[styles.syncDetail, { color: colors.muted }]}>
                 {lang === "zh" ? "上次同步：" : "Last sync: "}{lastSyncLabel}
               </Text>
-              {syncState.error && (
+              {combinedError && (
                 <Text style={[styles.syncError, { color: "#FF3B30" }]} numberOfLines={2}>
-                  {syncState.error}
+                  {combinedError}
                 </Text>
               )}
             </View>
+            <Pressable
+              onPress={() => void handleSyncNow()}
+              disabled={isSyncing}
+              style={({ pressed }) => [
+                styles.syncNowBtn,
+                { backgroundColor: colors.primary, opacity: isSyncing ? 0.5 : pressed ? 0.7 : 1 },
+              ]}
+            >
+              {manualSyncing ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={styles.syncNowText}>
+                  {lang === "zh" ? "立即同步" : "Sync Now"}
+                </Text>
+              )}
+            </Pressable>
           </View>
 
           {/* Three-channel status */}
@@ -430,9 +474,9 @@ export default function DeviceManagerScreen() {
           />
           <ChannelRow
             icon="📁"
-            label={lang === "zh" ? "iCloud Drive" : "iCloud Drive"}
+            label={lang === "zh" ? "本机文档备份" : "Local Documents"}
             status={icloudLastBackup ? (lang === "zh" ? "已备份" : "Backed up") : (lang === "zh" ? "等待" : "Pending")}
-            detail={`${lang === "zh" ? "5分钟自动 · 7版本 · 上次：" : "Auto 5min · 7ver · Last: "}${icloudLabel}`}
+            detail={`${lang === "zh" ? "5分钟自动 · 7版本 · 随iCloud整机备份 · 上次：" : "Auto 5min · 7ver · in iCloud device backup · Last: "}${icloudLabel}`}
             statusColor={icloudLastBackup ? "#34C759" : "#FF9500"}
           />
           <ChannelRow
@@ -654,6 +698,15 @@ const styles = StyleSheet.create({
   syncLabel: { fontSize: 16, fontWeight: "600", lineHeight: 21 },
   syncDetail: { fontSize: 13, lineHeight: 18, marginTop: 2 },
   syncError: { fontSize: 12, lineHeight: 17, marginTop: 4 },
+  syncNowBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 76,
+  },
+  syncNowText: { fontSize: 13, lineHeight: 18, fontWeight: "600", color: "#FFFFFF" },
   divider: { height: StyleSheet.hairlineWidth, marginVertical: 12 },
   channelTitle: { fontSize: 12, fontWeight: "500", lineHeight: 17, marginBottom: 8 },
   channelRow: { flexDirection: "row", alignItems: "center", paddingVertical: 6, gap: 10 },

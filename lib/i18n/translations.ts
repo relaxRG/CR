@@ -364,6 +364,8 @@ const dict = {
   "detail.photo.perm.library.msg": { zh: "请在系统设置中开启相册权限，以便选择照片。", en: "Please enable photo library access in Settings." },
   "detail.photo.perm.settings": { zh: "去设置", en: "Open Settings" },
   "detail.photo.perm.cancel": { zh: "取消", en: "Cancel" },
+  "detail.photo.error.title": { zh: "照片保存失败", en: "Photo Save Failed" },
+  "detail.photo.error.msg": { zh: "无法保存照片，请重试。错误信息：", en: "Could not save the photo. Please try again. Error: " },
   // Bottle detail
   "bottle.notFound": { zh: "酒款不存在或已被删除", en: "Bottle not found or deleted" },
   "bottle.info": { zh: "基本信息", en: "Info" },

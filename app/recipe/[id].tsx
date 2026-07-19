@@ -49,6 +49,7 @@ import { smartLinkIngredient, smartLinkDisplayName } from "@/lib/recipes/smart-l
 import { useRecipeStore } from "@/lib/recipes/store";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
+import * as ImageManipulator from "expo-image-manipulator";
 import * as FileSystem from "expo-file-system/legacy";
 import { Linking } from "react-native";
 import { deletePhoto } from "@/lib/recipes/photo";
@@ -96,7 +97,8 @@ export default function RecipeDetailScreen() {
           );
           return;
         }
-      } else {
+      } else if (Platform.OS === "android") {
+        // iOS 14+ 的 PHPicker 无需相册权限；仅 Android 需要
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== "granted") {
           Alert.alert(
@@ -114,16 +116,28 @@ export default function RecipeDetailScreen() {
         ? await ImagePicker.launchCameraAsync({ quality: 0.75, exif: false })
         : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.75, exif: false });
       if (result.canceled || !result.assets?.[0]) return;
-      const sourceUri = result.assets[0].uri;
+      const asset = result.assets[0];
+      // 压缩到最大 1600px 宽、JPEG 80%，统一输出 .jpg（消除 HEIC/PNG 扩展名与体积问题）
+      let sourceUri = asset.uri;
+      try {
+        const manipulated = await ImageManipulator.manipulateAsync(
+          asset.uri,
+          asset.width && asset.width > 1600 ? [{ resize: { width: 1600 } }] : [],
+          { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG },
+        );
+        sourceUri = manipulated.uri;
+      } catch {
+        // 压缩失败时回退使用原图
+      }
       const dir = `${FileSystem.documentDirectory}recipe-photos/`;
       const dirInfo = await FileSystem.getInfoAsync(dir);
       if (!dirInfo.exists) await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
-      const ext = sourceUri.split(".").pop()?.split("?")[0] ?? "jpg";
-      const destPath = `${dir}${recipe.id}_${Date.now()}.${ext}`;
+      const destPath = `${dir}${recipe.id}_${Date.now()}.jpg`;
       await FileSystem.copyAsync({ from: sourceUri, to: destPath });
       updateRecipePhoto(recipe.id, "add", destPath);
-    } catch {
-      // 静默忽略
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      Alert.alert(t("detail.photo.error.title"), `${t("detail.photo.error.msg")}${msg}`);
     } finally {
       setPhotoLoading(false);
     }

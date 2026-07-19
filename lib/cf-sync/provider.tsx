@@ -47,6 +47,10 @@ type SyncContextValue = {
   /** CF-specific extras */
   deviceInfo: DeviceInfo | null;
   deviceRole: DeviceRole | null;
+  /** Last sync error message (registration or pull/push failure), null when healthy */
+  syncError: string | null;
+  /** Manually retry full sync (register if needed → pull → merge → push) */
+  retrySync: () => Promise<boolean>;
   /** Trigger pair code flow (owner generates code for new device) */
   openPairModal: () => void;
   /** Open device management screen */
@@ -71,7 +75,11 @@ export function SyncProvider({
   const [syncState, setSyncState] = useState<SyncState>(getSyncState());
   const [deviceInfo, setDeviceInfo] = useState<DeviceInfo | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [syncError, setSyncError] = useState<string | null>(null);
   const startedRef = useRef(false);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retryCountRef = useRef(0);
+  const syncingRef = useRef(false);
 
   useEffect(() => subscribeSyncState(setSyncState), []);
 
@@ -83,60 +91,95 @@ export function SyncProvider({
     [],
   );
 
-  // Initialize: get or create device, then run initial sync
-  useEffect(() => {
-    if (startedRef.current) return;
-    startedRef.current = true;
+  // Full sync pipeline: register (if needed) → pull → merge → push.
+  // Returns true on success. Safe to call repeatedly (guarded by syncingRef).
+  const performSync = useCallback(async (): Promise<boolean> => {
+    if (syncingRef.current) return false;
+    syncingRef.current = true;
+    try {
+      // Get or create device identity (auto-registers as owner on first run)
+      const info = await getOrCreateDevice();
+      setDeviceInfo(info);
+      setAuthLoading(false);
 
-    let cancelled = false;
+      // ── Backup channels ────────────────────────────────────────────────
+      // 1. Create local snapshot (channel 3)
+      void createSnapshot().catch((e) =>
+        console.warn("[CFSync] local snapshot failed:", e),
+      );
+      // 2. Start local-documents auto-backup every 5 min (channel 2).
+      //    Note: writes to app documentDirectory (included in iCloud device
+      //    backup, NOT cross-device iCloud Drive sync).
+      startAutoBackup(info.deviceName);
+      // ───────────────────────────────────────────────────────────────────
 
-    (async () => {
-      try {
-        // Get or create device identity (auto-registers as owner on first run)
-        const info = await getOrCreateDevice();
-        if (cancelled) return;
-        setDeviceInfo(info);
-        setAuthLoading(false);
-
-        // ── 5D: Start backup channels ──────────────────────────────────────
-        // 1. Create local snapshot (channel 3)
-        void createSnapshot().catch((e) =>
-          console.warn("[CFSync] local snapshot failed:", e),
-        );
-        // 2. Start iCloud Drive auto-backup every 5 min (channel 2)
-        startAutoBackup(info.deviceName);
-        // ──────────────────────────────────────────────────────────────────
-
+      if (info.role === "guest") {
         // Guest devices: pull only, no push
-        if (info.role === "guest") {
-          const { entries } = await cfPull();
-          if (cancelled) return;
-          // For guests, just write remote data locally without enabling push
-          await runInitialSync(entries, async () => {
-            // no-op push for guests
-          });
-          return;
-        }
-
+        const { entries } = await cfPull();
+        await runInitialSync(entries, async () => {
+          // no-op push for guests
+        });
+      } else {
         // Owner / collaborator: full sync
         const { entries } = await cfPull();
-        if (cancelled) return;
         const overwritten = await runInitialSync(entries, pushFn);
         if (overwritten && Platform.OS === "web" && typeof window !== "undefined") {
           window.location.reload();
         } else if (overwritten && Platform.OS !== "web") {
           triggerStoreReload();
         }
-      } catch (err) {
-        if (cancelled) return;
-        console.warn("[CFSync] initial sync failed:", err);
-        // Non-blocking: app works offline
-        setAuthLoading(false);
       }
-    })();
-
-    return () => { cancelled = true; };
+      setSyncError(null);
+      retryCountRef.current = 0;
+      return true;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn("[CFSync] sync failed:", msg);
+      setSyncError(msg);
+      // Non-blocking: app works offline
+      setAuthLoading(false);
+      return false;
+    } finally {
+      syncingRef.current = false;
+    }
   }, [pushFn]);
+
+  // Auto-retry with exponential backoff: 30s * 2^n, capped at 10 min, max 8 attempts
+  const scheduleRetry = useCallback(() => {
+    if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+    if (retryCountRef.current >= 8) return;
+    const delay = Math.min(30_000 * 2 ** retryCountRef.current, 600_000);
+    retryCountRef.current += 1;
+    retryTimerRef.current = setTimeout(async () => {
+      const ok = await performSync();
+      if (!ok) scheduleRetry();
+    }, delay);
+  }, [performSync]);
+
+  // Manual retry exposed to UI (e.g. device manager "Sync Now" button)
+  const retrySync = useCallback(async (): Promise<boolean> => {
+    if (retryTimerRef.current) {
+      clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+    retryCountRef.current = 0;
+    const ok = await performSync();
+    if (!ok) scheduleRetry();
+    return ok;
+  }, [performSync, scheduleRetry]);
+
+  // Initialize on mount
+  useEffect(() => {
+    if (startedRef.current) return;
+    startedRef.current = true;
+    void (async () => {
+      const ok = await performSync();
+      if (!ok) scheduleRetry();
+    })();
+    return () => {
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+    };
+  }, [performSync, scheduleRetry]);
 
   // "login" = enter pair code to join an existing group
   const login = useCallback(() => {
@@ -148,6 +191,12 @@ export function SyncProvider({
     disableSync();
     await clearDeviceInfo();
     setDeviceInfo(null);
+    setSyncError(null);
+    retryCountRef.current = 0;
+    if (retryTimerRef.current) {
+      clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
     startedRef.current = false;
   }, []);
 
@@ -180,6 +229,8 @@ export function SyncProvider({
         logout,
         deviceInfo,
         deviceRole: deviceInfo?.role ?? null,
+        syncError,
+        retrySync,
         openPairModal,
         openDeviceManager,
       }}

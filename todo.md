@@ -41,6 +41,31 @@
 ## 待完成
 - [ ] 书籍卡片滑动操作（删除、分享、标记已读）
 
+## Build 55 三大问题修复（2026-07-19）
+### 云同步完整修复（D1 从未真正工作过）
+- [x] CF Worker initDB：自动建表 + ALTER TABLE 迁移（补 owner_device_id/device_id/token/platform/is_active 列，建 sync_tombstones/kv_cache/balance_history/ai_usage_log 表）
+- [x] CF Worker register/pair：尊重客户端传入 deviceId；响应同时返回 token + deviceToken
+- [x] CF Worker pull：响应字段改驼峰（storageKey/clientUpdatedAt），匹配客户端期望
+- [x] CF Worker list：返回映射字段（id/isCurrentDevice），匹配 RemoteDevice 类型
+- [x] CF Worker verifyDevice：d.id → d.device_id SQL 修复
+- [x] CF Worker balance：响应加 checkedAt 字段
+- [x] Worker E2E 全链路验证 30/30 通过（双设备互通、配对码防重用、坏 token 拒绝、余额 9.68 CNY）
+- [x] 临时 debug/schema 端点已移除并重新部署（Version 63df4c0c）
+- [x] provider.tsx：performSync 管道提取 + 注册失败自动重试（指数退避 30s~10min，最多8次）
+- [x] provider.tsx：暴露 retrySync/syncError 到 context
+- [x] device-manager.tsx：「立即同步」按钮 + combinedError 错误可见
+### iCloud 通道诚实化
+- [x] device-manager.tsx：「iCloud Drive」改名「本机文档备份/Local Documents」，注明随 iCloud 整机备份
+### 照片选择修复
+- [x] recipe/[id].tsx：expo-image-manipulator 压缩（最大1600px/JPEG 0.8/统一 .jpg），消除扩展名缺陷
+- [x] recipe/[id].tsx：iOS PHPicker 免相册权限（仅 Android 请求）；失败 Alert 可见（新增 i18n 键）
+- [x] photo.ts persistPhoto：扩展名正则防御性提取，无法识别回退 jpg
+### 余额查询修复
+- [x] device-manager.tsx：/api/balance/check → /api/balance（原 404）
+### 工程
+- [x] vitest.config.ts：@/ 别名解析修复（19 单测全部通过，此前 2 个套件加载失败）
+- [x] TypeScript 零错误
+
 ## 基酒标签体系重构（2026-07-12）
 - [x] BASE_SPIRITS 扩展到 12 个：新增梅斯卡尔、卡沙萨、皮斯科（基于 IBA 官方配方和专业文献）
 - [x] TAG_NAME_DICT 添加新基酒的英文映射
