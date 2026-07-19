@@ -251,3 +251,13 @@
 - [x] Bug 3：recipe/[id].tsx Garnish 渲染中 part.name 空值无防护 → 添加 if (!part.name) continue 守卫
 - [x] Bug 4：migrateSectionsV2 自定义分区迁移时未保留 garnish group 值 → 补充 garnish 判断条件
 - [x] Bug 5：classifyPrepGroup 无法识别装饰类关键词（返回 non_alcoholic）→ 新增 GARNISH_HINTS 常量，装饰/garnish/脱水等关键词正确归为 garnish 分组
+
+## 中英文混用修复（2026-07-18 第三批）
+- [x] SELECT UNIT 面板 COUNT/FUZZY 单位双语化（getUnitPresetGroups(lang)）
+- [x] 新增 unitDisplayLabel(unit, lang) 函数，内部中文存储键转换为当前语言显示标签
+- [x] recipe-form.tsx / homemade-form.tsx 单位按钮显示使用 unitDisplayLabel
+- [x] NON_LIQUID_RE 新增英文计件单位识别（pc/pcs/to taste/a pinch 等）
+
+## 解析与 Garnish 标签修复（2026-07-19）
+- [x] Bug 1：splitPrepIngredientLine 无法解析 "Zest of ¼ pomelo" 等 "X of ¼ Y" 模式 → 新增 OF_FRAC_RE 预处理，提取数量并还原完整名称
+- [x] Bug 2：Garnish 分组在 Library 中没有任何类型标签（老用户 v2Flag 已设置，加载时直接使用旧数据，缺少新增的 garnish sections）→ 修复 store.tsx 加载逻辑，已迁移用户也始终合并最新默认 sections

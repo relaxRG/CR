@@ -178,7 +178,16 @@ export function HomemadeProvider({ children }: { children: React.ReactNode }) {
         if (sRaw) {
           const parsed: PrepSection[] = JSON.parse(sRaw);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            nextSections = needMigrate ? migrateSectionsV2(parsed) : parsed;
+            if (needMigrate) {
+              nextSections = migrateSectionsV2(parsed);
+            } else {
+              // Always merge latest default sections so newly added groups (e.g. garnish)
+              // are visible for existing users who already have v2 flag set.
+              const defaults = buildDefaultPrepSections();
+              const defaultKeys = new Set(defaults.map((s) => s.key));
+              const customOnly = parsed.filter((s) => !defaultKeys.has(s.key));
+              nextSections = [...defaults, ...customOnly];
+            }
           }
         }
         if (tRaw) {

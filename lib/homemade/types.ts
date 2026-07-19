@@ -542,9 +542,33 @@ const LEADING_QTY_RE =
 export function splitPrepIngredientLine(line: string): { amount: string; name: string } {
   const trimmed = line.trim();
   if (!trimmed) return { amount: "", name: "" };
-  const m = trimmed.match(LEADING_QTY_RE);
+  // Handle "X of ¼ Y" pattern (e.g. "Zest of ¼ pomelo", "Juice of ½ lemon")
+  // Rewrite to "¼ X of Y" so LEADING_QTY_RE can parse the quantity at the start
+  const OF_FRAC_RE = new RegExp(
+    `^(.+?)\\s+of\\s+([${FRAC_CHARS}]|\\d+[${FRAC_CHARS}]|\\d+\\/\\d+|\\d+\\s+\\d+\\/\\d+)\\s+(.+)$`,
+    "i",
+  );
+  const ofMatch = trimmed.match(OF_FRAC_RE);
+  let candidate = trimmed;
+  if (ofMatch) {
+    const [, prefix, qty, rest] = ofMatch;
+    // Rewrite: "Zest of ¼ pomelo, cut into strips" → "¼ pomelo, cut into strips"
+    // We'll use qty as amount and reconstruct name as "prefix of rest"
+    candidate = `${qty} ${rest}`;
+  }
+  const m = candidate.match(LEADING_QTY_RE);
   if (m && m[2]) {
+    if (ofMatch) {
+      // Restore full name: "prefix of rest"
+      const [, prefix, , rest] = ofMatch;
+      return { amount: m[1].trim(), name: `${prefix} of ${m[2].trim()}` };
+    }
     return { amount: m[1].trim(), name: m[2].trim() };
+  }
+  // Fallback for "X of ¼ Y" when unit part doesn't match: still extract quantity
+  if (ofMatch) {
+    const [, prefix, qty, rest] = ofMatch;
+    return { amount: qty, name: `${prefix} of ${rest}` };
   }
   return { amount: "", name: trimmed };
 }
