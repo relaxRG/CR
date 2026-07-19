@@ -35,8 +35,7 @@ const TAGS_KEY = "cocktail.tags";
 const TAG_GROUPS_KEY = "cocktail.tagGroups";
 
 /** 安全删除配方照片文件（不抛错） */
-async function deleteRecipePhoto(photoUri: string | undefined) {
-  if (!photoUri) return;
+async function deleteRecipePhoto(photoUri: string) {
   try {
     const info = await FileSystem.getInfoAsync(photoUri);
     if (info.exists) await FileSystem.deleteAsync(photoUri, { idempotent: true });
@@ -79,6 +78,8 @@ export interface RecipeDraft {
   cardTagOrder?: Recipe["cardTagOrder"];
   /** 结构化引用来源（可选，书库导入 / AI 补全 / 手动填写） */
   sourceRef?: Recipe["sourceRef"];
+  /** 成品照片本地路径列表（可选，新建时默认空数组） */
+  photoUris?: string[];
 }
 
 interface RecipeStore {
@@ -120,7 +121,9 @@ interface RecipeStore {
   tagGroupsOf: (kind: TagKind) => TagGroup[];
   getRecipe: (id: string | undefined) => Recipe | undefined;
   getCategory: (id: string | null | undefined) => Category | undefined;
-  updateRecipePhoto: (id: string, photoUri: string | undefined) => void;
+  /** 添加一张照片（最多 5 张）或删除指定照片（传 null 表示删除指定 uri） */
+  updateRecipePhoto: (id: string, action: "add", uri: string) => void;
+  removeRecipePhoto: (id: string, uri: string) => void;
 }
 
 const RecipeContext = createContext<RecipeStore | null>(null);
@@ -302,6 +305,7 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
         ...(draft.abv === undefined ? { abv: null } : {}),
         ...(draft.nameEn === undefined ? { nameEn: "" } : {}),
         ...(draft.rating === undefined ? { rating: null } : {}),
+      photoUris: [],
       };
       // 四层优先级融合：draft（AI/用户手动）> 启发式推断 > ""
       // draft 中有值（AI 或用户手动选择）时直接保留，否则启发式推断保底
@@ -350,6 +354,7 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
           ...(draft.abv === undefined ? { abv: null } : {}),
           ...(draft.nameEn === undefined ? { nameEn: "" } : {}),
           ...(draft.rating === undefined ? { rating: null } : {}),
+          photoUris: [],
         };
         recipe.drinkDuration = inferDrinkDuration(recipe);
         recipe.occasion = inferOccasion(recipe);
@@ -382,6 +387,7 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
         sortIndex: null,
         createdAt: now,
         updatedAt: now,
+        photoUris: [],
       };
       persistRecipes([copy, ...recipesRef.current]);
       return copy;
@@ -432,10 +438,34 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
   );
 
   const updateRecipePhoto = useCallback(
-    (id: string, photoUri: string | undefined) => {
+    (id: string, _action: "add", uri: string) => {
+      persistRecipes(
+        recipesRef.current.map((r) => {
+          if (r.id !== id) return r;
+          const existing = r.photoUris ?? [];
+          if (existing.includes(uri) || existing.length >= 5) return r;
+          return { ...r, photoUris: [...existing, uri], updatedAt: Date.now() };
+        }),
+      );
+    },
+    [persistRecipes],
+  );
+
+  const removeRecipePhoto = useCallback(
+    (id: string, uri: string) => {
+      const target = recipesRef.current.find((r) => r.id === id);
+      if (target) {
+        // 只有该 uri 不再被其他配方引用时才删除文件
+        const usedElsewhere = recipesRef.current.some(
+          (r) => r.id !== id && (r.photoUris ?? []).includes(uri),
+        );
+        if (!usedElsewhere) deleteRecipePhoto(uri);
+      }
       persistRecipes(
         recipesRef.current.map((r) =>
-          r.id === id ? { ...r, photoUri, updatedAt: Date.now() } : r,
+          r.id === id
+            ? { ...r, photoUris: (r.photoUris ?? []).filter((u) => u !== uri), updatedAt: Date.now() }
+            : r,
         ),
       );
     },
@@ -446,7 +476,7 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
   const deleteRecipe = useCallback(
     (id: string) => {
       const target = recipesRef.current.find((r) => r.id === id);
-      if (target?.photoUri) deleteRecipePhoto(target.photoUri);
+      (target?.photoUris ?? []).forEach((uri) => deleteRecipePhoto(uri));
       persistRecipes(recipesRef.current.filter((r) => r.id !== id));
     },
     [persistRecipes],
@@ -457,7 +487,7 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
     (ids: string[]) => {
       const set = new Set(ids);
       recipesRef.current.forEach((r) => {
-        if (set.has(r.id) && r.photoUri) deleteRecipePhoto(r.photoUri);
+        if (set.has(r.id)) (r.photoUris ?? []).forEach((uri) => deleteRecipePhoto(uri));
       });
       persistRecipes(recipesRef.current.filter((r) => !set.has(r.id)));
     },
@@ -841,6 +871,7 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
       deleteRecipe,
       deleteRecipes,
       bulkUpdateRecipes,
+      removeRecipePhoto,
       toggleFavorite,
       toggleMade,
       setRating,
@@ -869,6 +900,7 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
       getCategory,
       duplicateRecipe,
     }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       ready,
       recipes,
@@ -879,6 +911,7 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
       addRecipes,
       updateRecipe,
       updateRecipePhoto,
+      removeRecipePhoto,
       deleteRecipe,
       deleteRecipes,
       bulkUpdateRecipes,

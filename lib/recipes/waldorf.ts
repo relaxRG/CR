@@ -81,5 +81,6 @@ export function buildWaldorfRecipes(): Recipe[] {
     cardTagOrder: null,
     createdAt: now + i,
     updatedAt: now + i,
+    photoUris: [],
   }));
 }

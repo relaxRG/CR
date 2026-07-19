@@ -69,6 +69,7 @@ export default function RecipeDetailScreen() {
   const { getRecipe, getCategory, toggleFavorite, toggleMade, setRating, deleteRecipe, tags } =
     useRecipeStore();
   const { updateRecipePhoto } = useRecipeStore();
+  const { removeRecipePhoto } = useRecipeStore();
   const { bottles, addBottle, updateBottle } = useBottleStore();
   const { preps } = useHomemadeStore();
   const recipe = getRecipe(id);
@@ -120,8 +121,7 @@ export default function RecipeDetailScreen() {
       const ext = sourceUri.split(".").pop()?.split("?")[0] ?? "jpg";
       const destPath = `${dir}${recipe.id}_${Date.now()}.${ext}`;
       await FileSystem.copyAsync({ from: sourceUri, to: destPath });
-      if (recipe.photoUri) await deletePhoto(recipe.photoUri);
-      updateRecipePhoto(recipe.id, destPath);
+      updateRecipePhoto(recipe.id, "add", destPath);
     } catch {
       // 静默忽略
     } finally {
@@ -135,7 +135,7 @@ export default function RecipeDetailScreen() {
       { text: t("detail.photo.takePhoto"), onPress: () => handlePickPhoto("camera") },
       { text: t("detail.photo.chooseLibrary"), onPress: () => handlePickPhoto("library") },
     ];
-    if (recipe.photoUri) {
+    if ((recipe.photoUris ?? []).length > 0) {
       buttons.push({
         text: t("detail.photo.delete"),
         style: "destructive",
@@ -148,8 +148,9 @@ export default function RecipeDetailScreen() {
                 text: t("detail.photo.delete"),
                 style: "destructive",
                 onPress: async () => {
-                  await deletePhoto(recipe.photoUri);
-                  updateRecipePhoto(recipe.id, undefined);
+                  for (const uri of (recipe.photoUris ?? [])) { await deletePhoto(uri); }
+                  // remove all photos by calling removeRecipePhoto for each
+                  for (const uri of (recipe.photoUris ?? [])) { removeRecipePhoto(recipe.id, uri); }
                 },
               },
               { text: t("detail.photo.cancel"), style: "cancel" },
@@ -1137,25 +1138,43 @@ export default function RecipeDetailScreen() {
         >
           {t("detail.photo.title")}
         </Text>
-        {recipe?.photoUri ? (
-          <View style={{ borderRadius: 12, overflow: "hidden", position: "relative" }}>
-            <Image
-              source={{ uri: recipe.photoUri }}
-              style={{ width: "100%", aspectRatio: 4 / 3, borderRadius: 12 }}
-              contentFit="cover"
-              transition={200}
-            />
-            <Pressable
-              onPress={handlePhotoAction}
-              style={({ pressed }) => [
-                styles.photoChangeBadge,
-                pressed && { opacity: 0.7 },
-              ]}
-            >
-              <Text style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}>
-                {t("detail.photo.change")}
-              </Text>
-            </Pressable>
+        {(recipe?.photoUris ?? []).length > 0 ? (
+          <View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
+              {(recipe.photoUris ?? []).map((uri, idx) => (
+                <View key={uri} style={{ marginRight: 8, borderRadius: 12, overflow: "hidden", position: "relative" }}>
+                  <Image
+                    source={{ uri }}
+                    style={{ width: 240, aspectRatio: 4 / 3, borderRadius: 12 }}
+                    contentFit="cover"
+                    transition={200}
+                  />
+                  <Pressable
+                    onPress={() => {
+                      Alert.alert(
+                        t("detail.photo.delete"),
+                        t("detail.photo.delete.confirm.msg"),
+                        [
+                          { text: t("detail.photo.delete"), style: "destructive", onPress: () => removeRecipePhoto(recipe.id, uri) },
+                          { text: t("detail.photo.cancel"), style: "cancel" },
+                        ],
+                      );
+                    }}
+                    style={({ pressed }) => [styles.photoChangeBadge, pressed && { opacity: 0.7 }]}
+                  >
+                    <Text style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}>🗑</Text>
+                  </Pressable>
+                </View>
+              ))}
+            </ScrollView>
+            {(recipe.photoUris ?? []).length < 5 && (
+              <Pressable
+                onPress={handlePhotoAction}
+                style={({ pressed }) => [styles.photoAddBtn, pressed && { opacity: 0.7 }]}
+              >
+                <Text style={styles.photoAddBtnText}>+ {t("detail.photo.add")}</Text>
+              </Pressable>
+            )}
           </View>
         ) : (
           <Pressable
@@ -1281,6 +1300,18 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 5,
+  },
+  photoAddBtn: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.15)",
+    paddingVertical: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  photoAddBtnText: {
+    fontSize: 14,
+    fontWeight: "500",
   },
 });
 

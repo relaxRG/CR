@@ -15,7 +15,7 @@ export function buildSampleRecipes(): Recipe[] {
   const mk = (
     partial: Omit<
       Recipe,
-      "id" | "createdAt" | "updatedAt" | "favorite" | "notes" | "variantOf" | "codexFamily" | "flavors" | "drinkDuration" | "occasion" | "source" | "story" | "flavorDesc" | "strengthBand" | "abv" | "nameEn" | "made" | "rating" | "sortIndex" | "cardTagOrder"
+      "id" | "createdAt" | "updatedAt" | "favorite" | "notes" | "variantOf" | "codexFamily" | "flavors" | "drinkDuration" | "occasion" | "source" | "story" | "flavorDesc" | "strengthBand" | "abv" | "nameEn" | "made" | "rating" | "sortIndex" | "cardTagOrder" | "photoUris"
     > & {
       notes?: string;
       favorite?: boolean;
@@ -33,6 +33,7 @@ export function buildSampleRecipes(): Recipe[] {
       strengthBand?: Recipe["strengthBand"];
       abv?: Recipe["abv"];
       nameEn?: string;
+      photoUris?: string[];
     },
     offset: number,
   ): Recipe => {
@@ -60,6 +61,7 @@ export function buildSampleRecipes(): Recipe[] {
       createdAt: now + offset,
       updatedAt: now + offset,
       ...partial,
+      photoUris: partial.photoUris ?? [],
       ...(partial.rating === undefined ? { rating: null } : {}),
       ...(partial.sortIndex === undefined ? { sortIndex: null } : {}),
       ...(split ? { name: split.zh } : {}),

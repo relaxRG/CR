@@ -275,8 +275,8 @@ export interface Recipe {
   cardTagOrder: CardTagSlot[] | null;
   createdAt: number;
   updatedAt: number;
-  /** 成品照片本地路径（存储在 App documentDirectory 下），undefined 表示无照片 */
-  photoUri?: string;
+  /** 成品照片本地路径列表（最多 5 张，存储在 App documentDirectory 下），空数组表示无照片 */
+  photoUris: string[];
 }
 
 /** 规范化评分:限制 1-10 的整数,其余返回 null */
@@ -317,6 +317,7 @@ export function normalizeRecipe(r: Partial<Recipe> & Pick<Recipe, "id" | "name">
     cardTagOrder: null,
     createdAt: Date.now(),
     updatedAt: Date.now(),
+    photoUris: [],
     ...r,
   };
   base.variantOf = r.variantOf ?? "";
@@ -337,7 +338,14 @@ export function normalizeRecipe(r: Partial<Recipe> & Pick<Recipe, "id" | "name">
   base.sortIndex =
     typeof r.sortIndex === "number" && isFinite(r.sortIndex) ? r.sortIndex : null;
   base.cardTagOrder = Array.isArray(r.cardTagOrder) ? r.cardTagOrder as CardTagSlot[] : null;
-  base.photoUri = typeof r.photoUri === "string" && r.photoUri ? r.photoUri : undefined;
+  // 迁移旧 photoUri（单张）→ photoUris（多张数组）
+  if (Array.isArray(r.photoUris)) {
+    base.photoUris = r.photoUris.filter((u: unknown) => typeof u === "string" && u);
+  } else if (typeof (r as Record<string, unknown>).photoUri === "string" && (r as Record<string, unknown>).photoUri) {
+    base.photoUris = [(r as Record<string, unknown>).photoUri as string];
+  } else {
+    base.photoUris = [];
+  }
   // 旧数据迁移:混写名("尼格罗尼 Negroni")自动拆分为中英字段
   if (!base.nameEn) {
     const split = splitBilingualName(base.name);

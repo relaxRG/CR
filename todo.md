@@ -276,8 +276,13 @@
 - [x] recipe-form.tsx：AI 补全按钮上方动态显示提示文字——只填中文名时显示「✦ 点击可获取英文名建议」，只填英文名时显示「✦ 点击可获取中文名建议」，双语支持，双名均填或均空时不显示
 
 ## 配方详情页成品照片功能（2026-07-19）
-- [x] lib/recipes/types.ts：Recipe 接口新增 photoUri?: string 字段，normalizeRecipe 默认 undefined
-- [x] lib/recipes/store.tsx：新增 updateRecipePhoto 函数，deleteRecipe/deleteRecipes 时自动清理照片文件
+- [x] lib/recipes/types.ts：Recipe 接口新增 photoUri?: string 字段（后升级为 photoUris: string[]），normalizeRecipe 默认 []，兼容旧单照片数据迁移
+- [x] lib/recipes/store.tsx：新增 updateRecipePhoto(id, action, uri)（add/remove 双模式）、removeRecipePhoto(id, uri)，deleteRecipe/deleteRecipes 自动清理所有 photoUris 文件
+- [x] app/recipe/[id].tsx：多照片 Section（最多5张），横向 ScrollView 展示，每张照片独立删除按钮，添加按钮（相机/相册），空状态虚线占位区
+- [x] lib/i18n/translations.ts：新增 detail.photo.* 翻译键（add/change/delete/title/takePhoto/chooseLibrary/cancel/delete.confirm.title/delete.confirm.msg）
+- [x] lib/recipes/seed.ts：mk 函数参数类型新增 photoUris?: string[]，return 对象默认 photoUris: []
+- [x] Workers AI 降级：CF Worker 新增 @cf/meta/llama-3.3-70b-instruct-fp8-fast 作为 DeepSeek 失败时的免费降级方案
+- [x] TypeScript 零错误
 - [x] lib/recipes/photo.ts：新建照片工具函数（deletePhoto）
 - [x] lib/i18n/translations.ts：新增 detail.photo.* 翻译键（中英双语）
 - [x] app/recipe/[id].tsx：详情页最下方添加成品照片 Section（拍照/相册选择/删除）
