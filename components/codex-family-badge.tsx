@@ -96,13 +96,13 @@ export function CodexFamilyBadge({ family }: { family: string }) {
         style={({ pressed }) => [pressed && doc ? { opacity: 0.6 } : null]}
       >
         <View
-          className="px-2.5 py-1 rounded-full border flex-row items-center"
-          style={{ borderColor: colors.primary, backgroundColor: colors.primary + "15", gap: 3 }}
+          className="px-3 py-1.5 rounded-full border flex-row items-center"
+          style={{ borderColor: colors.border, backgroundColor: colors.surface, gap: 4 }}
         >
-          <Text className="text-xs font-medium" style={{ color: colors.primary }}>
+          <Text className="text-sm font-semibold" style={{ color: colors.foreground }}>
             {label}
           </Text>
-          {doc ? <IconSymbol name="info.circle.fill" size={11} color={colors.primary} /> : null}
+          {doc ? <IconSymbol name="info.circle.fill" size={13} color={colors.muted} /> : null}
         </View>
       </Pressable>
 

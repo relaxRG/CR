@@ -246,7 +246,7 @@ export default function HomemadeDetailScreen() {
                   {ing}
                 </Text>
                 {link ? (
-                  <Text className="text-xs mt-0.5" style={{ color: colors.primary }} numberOfLines={1}>
+                  <Text className="text-xs mt-0.5" style={{ color: colors.muted }} numberOfLines={1}>
                     {link.kind === "bottle"
                       ? (lang === "zh" ? (link.bottle.nameZh || link.bottle.nameEn) : (link.bottle.nameEn || link.bottle.nameZh))
                       : (lang === "zh"
@@ -261,7 +261,7 @@ export default function HomemadeDetailScreen() {
                 <IconSymbol
                   name={link.kind === "prep" ? "sparkles" : "chevron.right"}
                   size={14}
-                  color={colors.primary}
+                  color={link.kind === "prep" ? colors.aiAccent : colors.muted}
                   style={{ marginLeft: 6 }}
                 />
               ) : null}
@@ -275,7 +275,7 @@ export default function HomemadeDetailScreen() {
                   if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   router.push({ pathname: "/bottle/[id]", params: { id: link.bottle.id } });
                 }}
-                style={({ pressed }) => [pressed && { opacity: 0.7 }]}
+                style={({ pressed }) => [pressed && { opacity: 0.5 }]}
               >
                 {rowContent}
               </Pressable>
@@ -289,7 +289,7 @@ export default function HomemadeDetailScreen() {
                   if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   router.push({ pathname: "/homemade/[id]", params: { id: link.prep.id } });
                 }}
-                style={({ pressed }) => [pressed && { opacity: 0.7 }]}
+                style={({ pressed }) => [pressed && { opacity: 0.5 }]}
               >
                 {rowContent}
               </Pressable>
@@ -342,7 +342,7 @@ export default function HomemadeDetailScreen() {
                           <Text
                             className="text-xs"
                             numberOfLines={1}
-                            style={{ color: item.bottleId ? colors.primary : colors.muted }}
+                            style={{ color: colors.muted }}
                           >
                             {matName}
                             {item.ref ? ` ${item.ref}` : ""}
@@ -351,7 +351,7 @@ export default function HomemadeDetailScreen() {
                             <IconSymbol
                               name="chevron.right"
                               size={11}
-                              color={colors.primary}
+                              color={colors.muted}
                               style={{ marginLeft: 2 }}
                             />
                           ) : null}

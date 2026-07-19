@@ -20,7 +20,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useNetwork } from "@/hooks/use-network";
 import { useI18n } from "@/lib/i18n";
-import { displayNames } from "@/lib/utils";
+import { cn, displayNames } from "@/lib/utils";
 import { formatAmountAsMl } from "@/lib/bottles/cost";
 import { estimateRecipeCostSmart } from "@/lib/recipes/smart-cost";
 import { estimateGarnishCost, splitGarnish } from "@/lib/recipes/garnish-split";
@@ -414,35 +414,46 @@ export default function RecipeDetailScreen() {
           );
         })()}
         {(category || recipe.codexFamily || recipe.flavors.length > 0 || recipe.drinkDuration || recipe.occasion) ? (
-          <View className="flex-row flex-wrap mt-2" style={{ gap: 6 }}>
-            {category ? (
-              <View className="px-2.5 py-1 rounded-full" style={{ backgroundColor: category.color + "22" }}>
-                <Text className="text-xs font-medium" style={{ color: category.color }}>
-                  {displayNames(category.nameEn ?? "", category.name, lang).primary}
-                </Text>
+          <View className="mt-2">
+            {(category || recipe.codexFamily || recipe.drinkDuration || recipe.occasion) ? (
+              <View className="flex-row flex-wrap" style={{ gap: 8 }}>
+                {category ? (
+                  <View className="px-3 py-1.5 rounded-full" style={{ backgroundColor: category.color + "22" }}>
+                    <Text className="text-sm font-medium" style={{ color: category.color }}>
+                      {displayNames(category.nameEn ?? "", category.name, lang).primary}
+                    </Text>
+                  </View>
+                ) : null}
+                {recipe.codexFamily ? (
+                  <CodexFamilyBadge family={recipe.codexFamily} />
+                ) : null}
+                {recipe.drinkDuration ? (
+                  <View className="px-3 py-1.5 rounded-full bg-surface border border-border">
+                    <Text className="text-sm text-muted">{tagLabel("duration", recipe.drinkDuration)}</Text>
+                  </View>
+                ) : null}
+                {recipe.occasion ? (
+                  <View className="px-3 py-1.5 rounded-full bg-surface border border-border">
+                    <Text className="text-sm text-muted">{tagLabel("occasion", recipe.occasion)}</Text>
+                  </View>
+                ) : null}
               </View>
             ) : null}
-            {recipe.codexFamily ? (
-              <CodexFamilyBadge family={recipe.codexFamily} />
-            ) : null}
-            {recipe.drinkDuration ? (
-              <View className="px-2.5 py-1 rounded-full bg-surface border border-border">
-                <Text className="text-xs text-muted">{tagLabel("duration", recipe.drinkDuration)}</Text>
-              </View>
-            ) : null}
-            {recipe.occasion ? (
-              <View className="px-2.5 py-1 rounded-full bg-surface border border-border">
-                <Text className="text-xs text-muted">{tagLabel("occasion", recipe.occasion)}</Text>
-              </View>
-            ) : null}
-            {recipe.flavors.map((tag) => (
+            {recipe.flavors.length > 0 ? (
               <View
-                key={tag}
-                className="px-2.5 py-1 rounded-full bg-surface border border-border"
+                className={cn("flex-row flex-wrap", (category || recipe.codexFamily || recipe.drinkDuration || recipe.occasion) ? "mt-2" : "")}
+                style={{ gap: 8 }}
               >
-                <Text className="text-xs text-muted">{tagLabel("flavor", tag)}</Text>
+                {recipe.flavors.map((tag) => (
+                  <View
+                    key={tag}
+                    className="px-3 py-1.5 rounded-full bg-surface border border-border"
+                  >
+                    <Text className="text-sm text-muted">{tagLabel("flavor", tag)}</Text>
+                  </View>
+                ))}
               </View>
-            ))}
+            ) : null}
           </View>
         ) : null}
         {/* Variant of 经典标注:点按弹出完整谱系论证资料浮层 */}
@@ -504,7 +515,7 @@ export default function RecipeDetailScreen() {
                       <View className="flex-row items-center" style={{ gap: 5 }}>
                         <Text
                           className="text-base"
-                          style={{ color: link ? colors.primary : colors.foreground, flexShrink: 1 }}
+                          style={{ color: colors.foreground, flexShrink: 1 }}
                         >
                           {primaryName}
                         </Text>
@@ -512,7 +523,7 @@ export default function RecipeDetailScreen() {
                           <IconSymbol
                             name={link.kind === "prep" ? "sparkles" : "chevron.right"}
                             size={link.kind === "prep" ? 12 : 11}
-                            color={colors.primary}
+                            color={link.kind === "prep" ? colors.aiAccent : colors.muted}
                           />
                         ) : null}
                       </View>
@@ -533,7 +544,7 @@ export default function RecipeDetailScreen() {
                         ? router.push({ pathname: "/homemade/[id]", params: { id: link.prep.id } })
                         : router.push({ pathname: "/bottle/[id]", params: { id: link.bottle.id } })
                     }
-                    style={({ pressed }) => [pressed && { opacity: 0.6 }]}
+                    style={({ pressed }) => [pressed && { opacity: 0.5 }]}
                   >
                     {inner}
                   </Pressable>
@@ -601,7 +612,7 @@ export default function RecipeDetailScreen() {
                             ) : null}
                             <Text
                               className="text-base"
-                              style={{ color: link ? colors.primary : colors.foreground, flexShrink: 1 }}
+                              style={{ color: colors.foreground, flexShrink: 1 }}
                             >
                               {displayName}
                             </Text>
@@ -609,7 +620,7 @@ export default function RecipeDetailScreen() {
                               <IconSymbol
                                 name={link.kind === "prep" ? "sparkles" : "chevron.right"}
                                 size={link.kind === "prep" ? 12 : 11}
-                                color={colors.primary}
+                                color={link.kind === "prep" ? colors.aiAccent : colors.muted}
                               />
                             ) : null}
                           </View>
@@ -631,7 +642,7 @@ export default function RecipeDetailScreen() {
                               ? router.push({ pathname: "/homemade/[id]", params: { id: link.prep.id } })
                               : router.push({ pathname: "/bottle/[id]", params: { id: link.bottle.id } })
                           }
-                          style={({ pressed }) => [pressed && { opacity: 0.6 }]}
+                          style={({ pressed }) => [pressed && { opacity: 0.5 }]}
                         >
                           {inner}
                         </Pressable>
@@ -944,12 +955,12 @@ export default function RecipeDetailScreen() {
                       <Text
                         className="text-sm"
                         numberOfLines={1}
-                        style={{ color: cLink ? colors.primary : colors.foreground, flexShrink: 1 }}
+                        style={{ color: colors.foreground, flexShrink: 1 }}
                       >
                         {cName}
                       </Text>
                       {cLink ? (
-                        <IconSymbol name="chevron.right" size={10} color={colors.primary} />
+                        <IconSymbol name="chevron.right" size={10} color={colors.muted} />
                       ) : null}
                     </View>
                     {linkedBottle && item.cost !== null ? (
@@ -959,7 +970,7 @@ export default function RecipeDetailScreen() {
                           : `${displayNames(linkedBottle.nameEn, linkedBottle.nameZh, lang).primary} ¥${linkedBottle.priceCny}/${linkedBottle.volume} × ${item.amountMl?.toFixed(0)}ml`}
                       </Text>
                     ) : linkedPrep && item.cost !== null ? (
-                      <Text className="text-xs mt-0.5" numberOfLines={1} style={{ color: colors.primary }}>
+                      <Text className="text-xs mt-0.5" numberOfLines={1} style={{ color: colors.aiAccent }}>
                         {t("detail.cost.homemade", {
                           name: displayNames(linkedPrep.name, linkedPrep.nameAlt, lang).primary,
                           p: item.amountMl && item.amountMl > 0 ? ((item.cost / item.amountMl) * 30).toFixed(1) : item.cost.toFixed(1),
@@ -993,7 +1004,7 @@ export default function RecipeDetailScreen() {
                         ? router.push({ pathname: "/homemade/[id]", params: { id: cLink.prep.id } })
                         : router.push({ pathname: "/bottle/[id]", params: { id: cLink.bottle.id } })
                     }
-                    style={({ pressed }) => [pressed && { opacity: 0.6 }]}
+                    style={({ pressed }) => [pressed && { opacity: 0.5 }]}
                   >
                     {row}
                   </Pressable>
@@ -1033,13 +1044,13 @@ export default function RecipeDetailScreen() {
                               <Text
                                 className="text-sm"
                                 numberOfLines={1}
-                                style={{ color: gLink ? colors.primary : colors.foreground, flexShrink: 1 }}
+                                style={{ color: colors.foreground, flexShrink: 1 }}
                               >
                                 {it.part.amount ? `${it.part.amount} ` : ""}
                                 {gName}
                               </Text>
                               {gLink ? (
-                                <IconSymbol name="chevron.right" size={10} color={colors.primary} />
+                                <IconSymbol name="chevron.right" size={10} color={colors.muted} />
                               ) : null}
                             </View>
                             {fi && gBottle ? (
@@ -1096,7 +1107,7 @@ export default function RecipeDetailScreen() {
                               ? router.push({ pathname: "/homemade/[id]", params: { id: gLink.prep.id } })
                               : router.push({ pathname: "/bottle/[id]", params: { id: gLink.bottle.id } })
                           }
-                          style={({ pressed }) => [pressed && { opacity: 0.6 }]}
+                          style={({ pressed }) => [pressed && { opacity: 0.5 }]}
                         >
                           {inner}
                         </Pressable>
@@ -1110,7 +1121,7 @@ export default function RecipeDetailScreen() {
                 <Pressable
                   key={`ice-${it.use}-${idx2}`}
                   onPress={() => router.push("/ice-settings")}
-                  style={({ pressed }) => [pressed && { opacity: 0.6 }]}
+                  style={({ pressed }) => [pressed && { opacity: 0.5 }]}
                 >
                   <View
                     className="flex-row items-center justify-between py-2.5"
@@ -1118,10 +1129,10 @@ export default function RecipeDetailScreen() {
                   >
                     <View className="flex-1 pr-3">
                       <View className="flex-row items-center" style={{ gap: 4 }}>
-                        <Text className="text-sm" numberOfLines={1} style={{ color: colors.primary }}>
+                        <Text className="text-sm" numberOfLines={1} style={{ color: colors.foreground }}>
                           {displayNames(it.kind.nameEn, it.kind.nameZh, lang).primary}
                         </Text>
-                        <IconSymbol name="chevron.right" size={10} color={colors.primary} />
+                        <IconSymbol name="chevron.right" size={10} color={colors.muted} />
                       </View>
                       <Text className="text-xs text-muted mt-0.5" numberOfLines={1}>
                         {t(

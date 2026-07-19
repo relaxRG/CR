@@ -31,15 +31,15 @@ export function LabOriginBadge({ recipeId }: { recipeId: string }) {
       }
       style={({ pressed }) => [
         styles.badge,
-        { backgroundColor: "#8B5CF614", borderColor: "#8B5CF655" },
-        pressed && { opacity: 0.7 },
+        { backgroundColor: colors.aiAccent + "14", borderColor: colors.aiAccent + "55" },
+        pressed && { opacity: 0.5 },
       ]}
     >
-      <IconSymbol name="flask.fill" size={13} color="#8B5CF6" />
-      <Text className="text-xs font-medium" style={{ color: "#8B5CF6", lineHeight: 16, flexShrink: 1 }} numberOfLines={1}>
+      <IconSymbol name="flask.fill" size={13} color={colors.aiAccent} />
+      <Text className="text-xs font-medium" style={{ color: colors.aiAccent, lineHeight: 16, flexShrink: 1 }} numberOfLines={1}>
         {t("lab.origin.badge")} · {t("lab.origin.detail", { name: origin.project.name, n: origin.batchCount })}
       </Text>
-      <IconSymbol name="chevron.right" size={10} color="#8B5CF6" />
+      <IconSymbol name="chevron.right" size={10} color={colors.muted} />
     </Pressable>
   );
 }

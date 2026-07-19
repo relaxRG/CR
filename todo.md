@@ -315,3 +315,18 @@
 - [x] iOS 兼容：选照片后立即复制到 documentDirectory，避免 ph:// URI 失效
 - [x] 照片压缩：quality: 0.75，避免原图 4K 占用内存
 - [x] TypeScript 零错误
+
+## 详情页视觉升级（Build 55 一同发布，暂不 EAS Build）
+- [x] theme.config.js / theme.config.d.ts：添加 aiAccent 淡紫 token（#9F7AEA / #B794F4）
+- [x] recipe/[id].tsx：标签放大（text-xs→text-sm, px-3 py-1.5, gap 8）
+- [x] recipe/[id].tsx：风味标签独立成排（第一排分类/时长/场合，第二排风味）
+- [x] recipe/[id].tsx：智能链接去蓝（配料/装饰/成本/冰块行：黑字+灰箭头+淡紫✦+0.5透明度按压）
+- [x] homemade/[id].tsx：配料智能链接同规则去蓝（副标题灰、sparkles淡紫、箭头灰）
+- [x] codex-family-badge.tsx：去蓝（灰边框+深灰semibold+surface背景+灰ⓘ13px，尺寸与标签一致）
+- [x] variant-badge.tsx：变体归属行去蓝（黑字+灰图标+灰箭头，经典绿色保留）
+- [x] lab-origin-badge.tsx：硬编码紫改为 aiAccent token，箭头灰
+- [x] SourceConfidenceBadge：确认使用语义色（绿/橙/红），无蓝色，无需改动
+- [x] 蓝色白名单保留：收藏星、成本总价、联网补全按钮、编辑按钮、Notes背景
+- [x] TypeScript 0 错误 + vitest 19/19 通过
+- [x] 截图预览验证（标签分排、去蓝、徽章统一均符合预期）
+- [ ] checkpoint

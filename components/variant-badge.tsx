@@ -112,7 +112,7 @@ export function VariantBadge({ recipe, mode = "full", aiDetail }: VariantBadgePr
       ? "#22C55E"
       : manual === VARIANT_MODERN_ORIGINAL
         ? colors.muted
-        : colors.primary;
+        : colors.foreground;
 
   // 展开内容：AI 详情优先，兜底本地引擎 narrative
   const detailText = aiDetail || resolved.verdict?.narrative || "";
@@ -147,13 +147,13 @@ export function VariantBadge({ recipe, mode = "full", aiDetail }: VariantBadgePr
       <Pressable
         onPress={openSheet}
         hitSlop={8}
-        style={({ pressed }) => [styles.badgeRow, pressed && { opacity: 0.6 }]}
+        style={({ pressed }) => [styles.badgeRow, pressed && { opacity: 0.5 }]}
       >
-        <IconSymbol name="book.fill" size={13} color={badgeColor} />
+        <IconSymbol name="book.fill" size={13} color={manual === VARIANT_CLASSIC_ORIGINAL ? badgeColor : colors.muted} />
         <Text className="text-sm font-medium" style={{ color: badgeColor }}>
           {displayText}
         </Text>
-        <IconSymbol name="chevron.right" size={12} color={badgeColor} />
+        <IconSymbol name="chevron.right" size={12} color={colors.muted} />
       </Pressable>
 
       <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>

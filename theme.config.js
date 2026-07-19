@@ -9,6 +9,7 @@ const themeColors = {
   success: { light: '#34C759', dark: '#30D158' },
   warning: { light: '#FF9500', dark: '#FF9F0A' },
   error: { light: '#FF3B30', dark: '#FF453A' },
+  aiAccent: { light: '#9F7AEA', dark: '#B794F4' },
 };
 
 module.exports = { themeColors };
