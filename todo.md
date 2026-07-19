@@ -372,3 +372,26 @@
 - [x] Bug 7: 配方照片点击浮层查看原图（详情页上方浮层，点击任意处关闭）
 - [x] Bug 8: 建议链接酒库提示点"忽略"后仍强行自动链接（linkDismissed 持久化，表单三按钮+详情页+成本+自动入库全链路尊重）
 - [x] Bug 9: iOS 无法识别 Apple Books"摘录来自…"引用来源格式（本地正则解析书名/作者→sourceRef，剥离尾注后发 AI）
+- [x] UI: 标签管理页参考截图重构（彩色 chip 墙 + 可折叠分组 + 添加抽屉与颜色选择器）
+- [x] UI: 卡片标签显示页与标签管理页风格统一
+- [x] UI: 颜色选择器升级为 iOS 系统风格（网格/光谱/滑块+Hex + 常用色收藏）
+
+## 全 App UI/UX 系统性升级（2026-07-20 用户确认全做）
+- [x] STEP1: 建立 9 个共享组件（IOSColorPicker/AppCard/SearchBar/LargeTitle/FloatingTabBar/Fab/EmptyState/DangerRow/TagChipWall）
+- [x] P0: me.tsx 危险操作移入 device-manager.tsx 底部危险区，改 DangerRow 样式
+- [x] P0: bottles.tsx 霸屏双按钮 Banner 改为筛选行胶囊 + 底部抽屉
+- [x] P0: homemade.tsx 补全 Banner 改为同款胶囊 + 抽屉，搜索框换 SearchBar
+- [x] P1: 浮岛式底部 Tab 栏（FloatingTabBar），各页底部 padding 适配
+- [x] P1: 四个 Tab 首屏 LargeTitle 统一 34px
+- [x] P1: 全部列表卡片换 AppCard（去边框、圆角 20、轻阴影）
+- [x] P1: 配方/书库/购物清单搜索框换 SearchBar
+- [x] P1: FAB 三处合并为统一 Fab 组件
+- [x] P1: device-manager/data-manager 危险红收敛为 DangerRow
+- [x] 专项A: tags.tsx 重构为彩色 chip 墙 + 可折叠分组 + 添加抽屉
+- [x] 专项A: card-tag-settings.tsx 同步对齐新视觉
+- [x] 专项B: color-picker.tsx 升级为 iOS 三模式（网格/光谱/滑块+Hex + 常用色）
+- [x] P2: 空状态 EmptyState 接入（酒单/配方/酒库/书库）
+- [x] P2: 详情页分组卡片 AppCard 质感
+- [x] P2: 表单页圆角与间距对齐 radius.control
+- [x] P2: 按压反馈统一（列表卡片 opacity 0.7，主按钮 scale 0.97）
+- [x] FINAL: TypeScript 0 错误 + 35 项测试通过 + 全局设计规范检查 + 截图走查

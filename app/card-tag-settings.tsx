@@ -2,7 +2,7 @@ import { Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 
-import { ColorPickerPanel } from "@/components/color-picker";
+import { IOSColorPickerSheet } from "@/components/ios-color-picker";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
@@ -247,12 +247,13 @@ export default function CardTagSettingsScreen() {
 
         {/* Color picker (inline expand) */}
         {pickerOpen ? (
-          <View style={[styles.colorPickerWrap, { borderTopColor: colors.border, backgroundColor: colors.surface }]}>
-            <ColorPickerPanel
-              value={color ?? "#007AFF"}
-              onChange={(hex) => setSlotColor(slot, hex)}
-            />
-          </View>
+          <IOSColorPickerSheet
+            visible={pickerOpen}
+            value={color ?? "#007AFF"}
+            onChange={(hex) => setSlotColor(slot, hex)}
+            onClose={() => setExpandedColorSlot(null)}
+            title={zh ? "选择颜色" : "Choose Color"}
+          />
         ) : null}
 
         {!isLast && <View style={[styles.divider, { backgroundColor: colors.border, marginLeft: 48 }]} />}
@@ -493,10 +494,5 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 11,
     borderWidth: 1.5,
-  },
-  colorPickerWrap: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderTopWidth: StyleSheet.hairlineWidth,
   },
 });

@@ -10,6 +10,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { SearchBar } from "@/components/search-bar";
 import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 
@@ -183,7 +184,7 @@ export default function BooksScreen() {
       <View className="px-5 pt-4 pb-3">
         <View className="flex-row items-end justify-between">
           <View>
-            <Text className="text-3xl font-bold text-foreground">
+            <Text style={{ fontSize: 34, fontWeight: "700", lineHeight: 41, color: colors.foreground }}>
               {zh ? "书库" : "Book Library"}
             </Text>
             <Text className="text-sm text-muted mt-1">
@@ -212,24 +213,11 @@ export default function BooksScreen() {
       {/* 搜索栏 */}
       {books.length > 0 && (
         <View className="px-5 pb-3">
-          <View
-            className="flex-row items-center bg-surface border border-border rounded-lg px-3 py-2"
-            style={{ gap: 8 }}
-          >
-            <IconSymbol name="magnifyingglass" size={16} color={colors.muted} />
-            <TextInput
-              placeholder={zh ? "搜索书名、作者..." : "Search title, author..."}
-              placeholderTextColor={colors.muted}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              style={[styles.searchInput, { color: colors.foreground }]}
-            />
-            {searchQuery ? (
-              <Pressable onPress={() => setSearchQuery("")} hitSlop={8}>
-                <IconSymbol name="xmark.circle.fill" size={16} color={colors.muted} />
-              </Pressable>
-            ) : null}
-          </View>
+          <SearchBar
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder={zh ? "搜索书名、作者…" : "Search title, author…"}
+          />
         </View>
       )}
 
@@ -377,7 +365,7 @@ export default function BooksScreen() {
           contentContainerStyle={{
             paddingHorizontal: 20,
             paddingTop: 4,
-            paddingBottom: 100,
+            paddingBottom: 120,
           }}
           columnWrapperStyle={isTablet ? { gap: 12 } : undefined}
           renderItem={({ item: book, index }) => (

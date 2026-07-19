@@ -1253,7 +1253,7 @@ export default function BottlesScreen() {
           styles.fab,
           {
             backgroundColor: colors.primary,
-            bottom: 20 + (Platform.OS === "web" ? 0 : 0),
+            bottom: 90,
           },
           pressed && { transform: [{ scale: 0.95 }], opacity: 0.9 },
         ]}

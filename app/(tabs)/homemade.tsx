@@ -30,6 +30,7 @@ import {
 import { SwipeableRow } from "@/components/swipeable-row";
 import { RatingSheet } from "@/components/rating-sheet";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { SearchBar } from "@/components/search-bar";
 import { useColors } from "@/hooks/use-colors";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useI18n } from "@/lib/i18n";
@@ -764,26 +765,12 @@ export default function HomemadeScreen() {
 
       {/* Search */}
       <View className="px-5 mt-2">
-        <View
-          className="flex-row items-center bg-surface border border-border rounded-xl px-3"
-          style={{ height: 44 }}
-        >
-          <IconSymbol name="magnifyingglass" size={18} color={colors.muted} />
-          <TextInput
-            className="flex-1 ml-2 text-base text-foreground"
-            placeholder={t("hm.search.placeholder")}
-            placeholderTextColor={colors.muted}
-            value={query}
-            onChangeText={setQuery}
-            returnKeyType="search"
-            style={{ lineHeight: 20 }}
-          />
-          {query ? (
-            <Pressable onPress={() => setQuery("")} hitSlop={8}>
-              <IconSymbol name="xmark.circle.fill" size={18} color={colors.muted} />
-            </Pressable>
-          ) : null}
-        </View>
+        <SearchBar
+          value={query}
+          onChangeText={setQuery}
+          placeholder={t("hm.search.placeholder")}
+          returnKeyType="search"
+        />
       </View>
 
       {/* Section filter */}
@@ -956,6 +943,7 @@ export default function HomemadeScreen() {
         style={({ pressed }) => [
           styles.fab,
           { backgroundColor: colors.primary, bottom: 20 },
+          { backgroundColor: colors.primary, bottom: 90 },
           pressed && { transform: [{ scale: 0.95 }], opacity: 0.9 },
         ]}
       >

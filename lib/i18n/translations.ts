@@ -230,6 +230,10 @@ const dict = {
   "common.delete": { zh: "删除", en: "Delete" },
   "common.save": { zh: "保存", en: "Save" },
   "common.edit": { zh: "编辑", en: "Edit" },
+  "common.add": { zh: "添加", en: "Add" },
+  "tags.color.title": { zh: "选择颜色", en: "Choose Color" },
+  "tags.add.tag": { zh: "添加{s}标签", en: "Add {s} Tag" },
+  "tags.add.category": { zh: "添加分类", en: "Add Category" },
   "made.badge": { zh: "已做", en: "Made" },
   "made.mark": { zh: "做过", en: "Made" },
   "made.unmark": { zh: "未做", en: "Not yet" },
@@ -691,6 +695,7 @@ const dict = {
   },
   "tg.assignHint": { zh: "移动到分组", en: "Move to group" },
   "tg.tagCount": { zh: "{n} 个标签", en: "{n} tags" },
+  "tg.addGroup": { zh: "添加分组", en: "Add Group" },
   // R&D Lab 研发测试板块
   "lab.entry": { zh: "研发", en: "R&D" },
   "lab.title": { zh: "研发测试", en: "R&D Lab" },
