@@ -73,7 +73,7 @@ export function useRecipeTagRows(
 ) {
   const colors = useColors();
   const { t, lang } = useI18n();
-  const { getCategory } = useRecipeStore();
+  const { getCategory, tags } = useRecipeStore();
   const { bottles } = useBottleStore();
   const { preps } = useHomemadeStore();
   const [cardTagSettings] = useCardTagSettings();
@@ -155,7 +155,8 @@ export function useRecipeTagRows(
 
     if (slot === "baseSpirit") {
       if (!recipe.baseSpirit) return null;
-      const color = customColors.baseSpirit;
+      const spiritTag = tags.find((tg) => tg.kind === "spirit" && tg.name === recipe.baseSpirit);
+      const color = customColors.baseSpirit ?? spiritTag?.color;
       if (color) {
         return (
           <Pressable
@@ -275,7 +276,8 @@ export function useRecipeTagRows(
 
     if (slot === "duration") {
       if (!recipe.drinkDuration) return null;
-      const color = customColors.duration ?? "#007AFF";
+      const dTag = tags.find((tg) => tg.kind === "duration" && tg.name === recipe.drinkDuration);
+      const color = dTag?.color ?? customColors.duration ?? "#007AFF";
       const durEn: Record<string, string> = { "短饮": "Short", "长饮": "Long" };
       const label = localizeField(recipe.drinkDuration, lang);
       return (
@@ -294,7 +296,8 @@ export function useRecipeTagRows(
 
     if (slot === "occasion") {
       if (!recipe.occasion) return null;
-      const color = customColors.occasion ?? "#AF52DE";
+      const oTag = tags.find((tg) => tg.kind === "occasion" && tg.name === recipe.occasion);
+      const color = oTag?.color ?? customColors.occasion ?? "#AF52DE";
       const occEn: Record<string, string> = { "餐前酒": "Aperitif", "餐后酒": "Digestif", "全天酒": "All Day", "佐餐酒": "With Dinner", "睡前酒": "Nightcap", "派对酒": "Party" };
       const label = localizeField(recipe.occasion, lang);
       return (
@@ -317,8 +320,9 @@ export function useRecipeTagRows(
   /** 渲染风味标签 badge */
   const renderFlavorBadge = (f: string, small = false) => {
     const cfg = getFlavorTagConfig(f, flavorConfigs);
+    const flavorTag = tags.find((tg) => tg.kind === "flavor" && tg.name === f);
     const tagColor =
-      customColors.flavors ?? cfg.color ?? FLAVOR_TAG_DEFAULT_COLORS[f] ?? "#FF9500";
+      customColors.flavors ?? flavorTag?.color ?? cfg.color ?? FLAVOR_TAG_DEFAULT_COLORS[f] ?? "#FF9500";
     const pillStyle = small ? tagStyles.pillSmall : tagStyles.pill;
     const textStyle = small ? tagStyles.pillTextSmall : tagStyles.pillText;
     return (

@@ -242,7 +242,7 @@ export default function RecipeFormScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { t, lang } = useI18n();
-  const { getRecipe, addRecipe, updateRecipe, categories, tagsOf, addTag } = useRecipeStore();
+  const { getRecipe, addRecipe, updateRecipe, categories, tagsOf, addTag, tags } = useRecipeStore();
   // AI 调用通过 smart-router 直接调用，无需 tRPC mutation
   const { isOnline } = useNetwork();
   const { preps } = useHomemadeStore();
@@ -1890,6 +1890,8 @@ export default function RecipeFormScreen() {
           <View style={[styles.chipWrap, { marginTop: 4 }]}>
             {(DRINK_DURATIONS as readonly string[]).map((dur) => {
               const active = drinkDuration === dur;
+              const dTag = tags.find((tg) => tg.kind === "duration" && tg.name === dur);
+              const dColor = dTag?.color ?? "#007AFF";
               return (
                 <Pressable
                   key={dur}
@@ -1897,8 +1899,8 @@ export default function RecipeFormScreen() {
                   style={[
                     styles.chip,
                     {
-                      backgroundColor: active ? "#007AFF" : colors.surface,
-                      borderColor: active ? "#007AFF" : colors.border,
+                      backgroundColor: active ? dColor : colors.surface,
+                      borderColor: active ? dColor : colors.border,
                     },
                   ]}
                 >
@@ -1916,6 +1918,8 @@ export default function RecipeFormScreen() {
             {(OCCASIONS as readonly string[]).map((occ) => {
               const active = occasion === occ;
               const occEn: Record<string, string> = { "餐前酒": "Aperitif", "餐后酒": "Digestif", "全天酒": "All Day", "佐餐酒": "With Dinner", "睡前酒": "Nightcap", "派对酒": "Party" };
+              const oTag = tags.find((tg) => tg.kind === "occasion" && tg.name === occ);
+              const oColor = oTag?.color ?? "#AF52DE";
               return (
                 <Pressable
                   key={occ}
@@ -1923,8 +1927,8 @@ export default function RecipeFormScreen() {
                   style={[
                     styles.chip,
                     {
-                      backgroundColor: active ? "#AF52DE" : colors.surface,
-                      borderColor: active ? "#AF52DE" : colors.border,
+                      backgroundColor: active ? oColor : colors.surface,
+                      borderColor: active ? oColor : colors.border,
                     },
                   ]}
                 >
@@ -1989,15 +1993,16 @@ export default function RecipeFormScreen() {
               { key: "aroma",   tags: FLAVOR_AROMA_TAGS },
               { key: "texture", tags: FLAVOR_TEXTURE_TAGS },
             ] as const
-          ).map(({ key, tags }) => (
+          ).map(({ key, tags: flavorTagList }) => (
             <View key={key} style={{ marginBottom: 6 }}>
               <Text className="text-xs text-muted mb-1.5" style={{ lineHeight: 16 }}>
                 {lang === "zh" ? FLAVOR_LAYER_LABELS[key].zh : FLAVOR_LAYER_LABELS[key].en}
               </Text>
               <View style={styles.chipWrap}>
-                {tags.map((tag) => {
+                {flavorTagList.map((tag) => {
                   const active = flavors.includes(tag);
-                  const tint = FLAVOR_TAG_DEFAULT_COLORS[tag] ?? "#007AFF";
+                  const storeTag = tags.find((tg) => tg.kind === "flavor" && tg.name === tag);
+                  const tint = storeTag?.color ?? FLAVOR_TAG_DEFAULT_COLORS[tag] ?? "#007AFF";
                   return (
                     <Pressable
                       key={tag}

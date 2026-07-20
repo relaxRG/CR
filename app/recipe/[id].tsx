@@ -60,6 +60,7 @@ import {
   localizedTagName,
   type SourceRef,
 } from "@/lib/recipes/types";
+import { FLAVOR_TAG_DEFAULT_COLORS } from "@/lib/settings/card-tags";
 
 export default function RecipeDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -436,16 +437,24 @@ export default function RecipeDetailScreen() {
                 {recipe.codexFamily ? (
                   <CodexFamilyBadge family={recipe.codexFamily} />
                 ) : null}
-                {recipe.drinkDuration ? (
-                  <View className="px-3 py-1.5 rounded-full bg-surface border border-border">
-                    <Text className="text-sm text-muted">{tagLabel("duration", recipe.drinkDuration)}</Text>
-                  </View>
-                ) : null}
-                {recipe.occasion ? (
-                  <View className="px-3 py-1.5 rounded-full bg-surface border border-border">
-                    <Text className="text-sm text-muted">{tagLabel("occasion", recipe.occasion)}</Text>
-                  </View>
-                ) : null}
+                {recipe.drinkDuration ? (() => {
+                  const dTag = tags.find((tg) => tg.kind === "duration" && tg.name === recipe.drinkDuration);
+                  const dColor = dTag?.color ?? "#007AFF";
+                  return (
+                    <View className="px-3 py-1.5 rounded-full" style={{ backgroundColor: dColor + "22" }}>
+                      <Text className="text-sm font-medium" style={{ color: dColor }}>{tagLabel("duration", recipe.drinkDuration)}</Text>
+                    </View>
+                  );
+                })() : null}
+                {recipe.occasion ? (() => {
+                  const oTag = tags.find((tg) => tg.kind === "occasion" && tg.name === recipe.occasion);
+                  const oColor = oTag?.color ?? "#AF52DE";
+                  return (
+                    <View className="px-3 py-1.5 rounded-full" style={{ backgroundColor: oColor + "22" }}>
+                      <Text className="text-sm font-medium" style={{ color: oColor }}>{tagLabel("occasion", recipe.occasion)}</Text>
+                    </View>
+                  );
+                })() : null}
               </View>
             ) : null}
             {recipe.flavors.length > 0 ? (
@@ -453,14 +462,18 @@ export default function RecipeDetailScreen() {
                 className={cn("flex-row flex-wrap", (category || recipe.codexFamily || recipe.drinkDuration || recipe.occasion) ? "mt-2" : "")}
                 style={{ gap: 8 }}
               >
-                {recipe.flavors.map((tag) => (
-                  <View
-                    key={tag}
-                    className="px-3 py-1.5 rounded-full bg-surface border border-border"
-                  >
-                    <Text className="text-sm text-muted">{tagLabel("flavor", tag)}</Text>
-                  </View>
-                ))}
+                {recipe.flavors.map((tag) => {
+                  const flavorTag = tags.find((tg) => tg.kind === "flavor" && tg.name === tag);
+                  const tint = flavorTag?.color ?? FLAVOR_TAG_DEFAULT_COLORS[tag] ?? "#FF9500";
+                  return (
+                    <View
+                      key={tag}
+                      style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: tint + "22" }}
+                    >
+                      <Text style={{ fontSize: 14, color: tint }}>{tagLabel("flavor", tag)}</Text>
+                    </View>
+                  );
+                })}
               </View>
             ) : null}
           </View>

@@ -28,12 +28,17 @@ import {
   migrateTagNameEn,
   normalizeRecipe,
 } from "./types";
-
+import {
+  CategoryGroup,
+  FLAVOR_LAYER_LABELS,
+  flavorTagLayer,
+} from "./types";
 const RECIPES_KEY = "cocktail.recipes";
 const CATEGORIES_KEY = "cocktail.categories";
 const SEEDED_KEY = "cocktail.seeded";
 const TAGS_KEY = "cocktail.tags";
 const TAG_GROUPS_KEY = "cocktail.tagGroups";
+const CATEGORY_GROUPS_KEY = "cocktail.categoryGroups";
 
 /** 安全删除配方照片文件（不抛错） */
 async function deleteRecipePhoto(photoUri: string) {
@@ -93,6 +98,7 @@ interface RecipeStore {
   categories: Category[];
   tags: TagItem[];
   tagGroups: TagGroup[];
+  categoryGroups: CategoryGroup[];
   addRecipe: (draft: RecipeDraft) => Recipe;
   addRecipes: (drafts: RecipeDraft[]) => { added: Recipe[]; skippedNames: string[] };
   updateRecipe: (id: string, draft: RecipeDraft) => void;
@@ -126,6 +132,16 @@ interface RecipeStore {
   tagGroupsOf: (kind: TagKind) => TagGroup[];
   getRecipe: (id: string | undefined) => Recipe | undefined;
   getCategory: (id: string | null | undefined) => Category | undefined;
+  addCategoryGroup: (name: string) => CategoryGroup | null;
+  renameCategoryGroup: (id: string, name: string) => void;
+  setCategoryGroupNameEn: (id: string, nameEn: string) => void;
+  deleteCategoryGroup: (id: string) => void;
+  reorderCategoryGroups: (orderedIds: string[]) => void;
+  setCategoryGroup: (categoryId: string, groupId: string | null) => void;
+  toggleTagLocked: (id: string) => void;
+  toggleTagGroupLocked: (id: string) => void;
+  toggleCategoryLocked: (id: string) => void;
+  toggleCategoryGroupLocked: (id: string) => void;
   /** 添加一张照片（最多 5 张）或删除指定照片（传 null 表示删除指定 uri） */
   updateRecipePhoto: (id: string, action: "add", uri: string) => void;
   removeRecipePhoto: (id: string, uri: string) => void;
@@ -139,6 +155,7 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [tags, setTags] = useState<TagItem[]>([]);
   const [tagGroups, setTagGroups] = useState<TagGroup[]>([]);
+  const [categoryGroups, setCategoryGroups] = useState<CategoryGroup[]>([]);
   const loadedRef = useRef(false);
 
   useEffect(() => {
@@ -221,6 +238,14 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
             notifySyncChange(TAGS_KEY);
           }
         }
+        // 老用户升级:为已存在的 duration/occasion 标签补 isSystem: true
+        if (tRaw && tagList.some((t) => (t.kind === "duration" || t.kind === "occasion") && !t.isSystem)) {
+          tagList = tagList.map((t) =>
+            (t.kind === "duration" || t.kind === "occasion") ? { ...t, isSystem: true } : t,
+          );
+          await AsyncStorage.setItem(TAGS_KEY, JSON.stringify(tagList));
+          notifySyncChange(TAGS_KEY);
+        }
         // 老用户升级:注入新增的 BASE_SPIRITS 标签（如梅斯卡尔、卡沙萨、皮斯科）
         if (tRaw) {
           const allDefaults = buildDefaultTags();
@@ -248,10 +273,67 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
         const groupList: TagGroup[] = (gRaw ? (JSON.parse(gRaw) as TagGroup[]) : []).map(
           (g) => migrateTagNameEn(g),
         );
-        setTagGroups(groupList);
+        // ── flavor 默认三分组初始化 ──────────────────────────────────────
+        const buildDefaultFlavorGroups = (): TagGroup[] => {
+          const now = Date.now();
+          return [
+            { id: "tg-flavor-taste",   kind: "flavor" as const, name: FLAVOR_LAYER_LABELS.taste.zh,   nameEn: FLAVOR_LAYER_LABELS.taste.en,   createdAt: now,     locked: true, flavorLayer: "taste"   as const },
+            { id: "tg-flavor-aroma",   kind: "flavor" as const, name: FLAVOR_LAYER_LABELS.aroma.zh,   nameEn: FLAVOR_LAYER_LABELS.aroma.en,   createdAt: now + 1, locked: true, flavorLayer: "aroma"   as const },
+            { id: "tg-flavor-texture", kind: "flavor" as const, name: FLAVOR_LAYER_LABELS.texture.zh, nameEn: FLAVOR_LAYER_LABELS.texture.en, createdAt: now + 2, locked: true, flavorLayer: "texture" as const },
+          ];
+        };
+        const FLAVOR_GROUP_IDS: Record<string, string> = { taste: "tg-flavor-taste", aroma: "tg-flavor-aroma", texture: "tg-flavor-texture" };
+        let mutableGroupList = groupList;
+        if (!gRaw) {
+          // 首次安装：创建三个 flavor 默认分组
+          mutableGroupList = buildDefaultFlavorGroups();
+          await AsyncStorage.setItem(TAG_GROUPS_KEY, JSON.stringify(mutableGroupList));
+          notifySyncChange(TAG_GROUPS_KEY);
+        } else {
+          // 老用户升级：补充缺失的 flavor 分组
+          const missingFlavorGroups = buildDefaultFlavorGroups().filter(
+            (dg) => !mutableGroupList.some((g) => g.id === dg.id),
+          );
+          if (missingFlavorGroups.length > 0) {
+            mutableGroupList = [...mutableGroupList, ...missingFlavorGroups];
+            await AsyncStorage.setItem(TAG_GROUPS_KEY, JSON.stringify(mutableGroupList));
+            notifySyncChange(TAG_GROUPS_KEY);
+          }
+          // 确保已有 flavor 分组的 locked/flavorLayer 字段正确
+          const needsFlavorGroupFix = mutableGroupList.some(
+            (g) => (g.id === "tg-flavor-taste" || g.id === "tg-flavor-aroma" || g.id === "tg-flavor-texture") && (!g.locked || !g.flavorLayer),
+          );
+          if (needsFlavorGroupFix) {
+            const defaults = buildDefaultFlavorGroups();
+            mutableGroupList = mutableGroupList.map((g) => {
+              const def = defaults.find((d) => d.id === g.id);
+              return def ? { ...g, locked: true, flavorLayer: def.flavorLayer } : g;
+            });
+            await AsyncStorage.setItem(TAG_GROUPS_KEY, JSON.stringify(mutableGroupList));
+            notifySyncChange(TAG_GROUPS_KEY);
+          }
+        }
+        // 老用户升级：为 flavor 标签分配默认分组（无 groupId 的标签）
+        const flavorTagsNeedGroup = tagList.filter((t) => t.kind === "flavor" && !t.groupId);
+        if (flavorTagsNeedGroup.length > 0) {
+          tagList = tagList.map((t) => {
+            if (t.kind !== "flavor" || t.groupId) return t;
+            const layer = flavorTagLayer(t.name);
+            if (!layer) return t;
+            return { ...t, groupId: FLAVOR_GROUP_IDS[layer] };
+          });
+          await AsyncStorage.setItem(TAGS_KEY, JSON.stringify(tagList));
+          notifySyncChange(TAGS_KEY);
+        }
+        setTagGroups(mutableGroupList);
         setTags(tagList);
         setCategories(cats);
         setRecipes(recs);
+        const cgRaw = await AsyncStorage.getItem(CATEGORY_GROUPS_KEY);
+        const catGroupList: CategoryGroup[] = cgRaw
+          ? (JSON.parse(cgRaw) as CategoryGroup[]).map((g) => migrateTagNameEn(g))
+          : [];
+        setCategoryGroups(catGroupList);
       } catch (e) {
         console.warn("Failed to load store", e);
       } finally {
@@ -285,6 +367,13 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
     setTagGroups(next);
     AsyncStorage.setItem(TAG_GROUPS_KEY, JSON.stringify(next)).catch(() => {});
     notifySyncChange(TAG_GROUPS_KEY);
+  }, []);
+  const categoryGroupsRef = useRef<CategoryGroup[]>([]);
+  categoryGroupsRef.current = categoryGroups;
+  const persistCategoryGroups = useCallback((next: CategoryGroup[]) => {
+    setCategoryGroups(next);
+    AsyncStorage.setItem(CATEGORY_GROUPS_KEY, JSON.stringify(next)).catch(() => {});
+    notifySyncChange(CATEGORY_GROUPS_KEY);
   }, []);
 
   const addRecipe = useCallback(
@@ -618,6 +707,8 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
     (kind: TagKind, name: string, color: string): TagItem | null => {
       const trimmed = name.trim();
       if (!trimmed) return null;
+      // 系统标签类型不允许手动新增
+      if (kind === "duration" || kind === "occasion") return null;
       const filled = autoFillTagNames(trimmed);
       if (
         tagsRef.current.some(
@@ -649,6 +740,8 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
       if (!trimmed) return;
       const target = tagsRef.current.find((t) => t.id === id);
       if (!target) return;
+      // 系统标签不允许改名
+      if (target.isSystem) return;
       const oldName = target.name;
       persistTags(
         tagsRef.current.map((t) => (t.id === id ? { ...t, name: trimmed } : t)),
@@ -696,6 +789,10 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
   const deleteTag = useCallback(
     (id: string) => {
       const target = tagsRef.current.find((t) => t.id === id);
+      // 系统标签不允许删除
+      if (target?.isSystem) return;
+      // 锁定标签不允许删除
+      if (target?.locked) return;
       persistTags(tagsRef.current.filter((t) => t.id !== id));
       if (!target) return;
       // 从已有配方中移除该风味标签;基酒/杯型保留原文字(仅失去颜色标记)
@@ -765,6 +862,9 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
 
   const deleteTagGroup = useCallback(
     (id: string) => {
+      const tgt = tagGroupsRef.current.find((g) => g.id === id);
+      // 锁定分组不允许删除
+      if (tgt?.locked) return;
       persistTagGroups(tagGroupsRef.current.filter((g) => g.id !== id));
       // 组内标签回到未分组,标签本身保留
       persistTags(
@@ -841,6 +941,9 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
 
   const deleteCategory = useCallback(
     (id: string) => {
+      const catTarget = categoriesRef.current.find((c) => c.id === id);
+      // 锁定分类不允许删除
+      if (catTarget?.locked) return;
       persistCategories(categoriesRef.current.filter((c) => c.id !== id));
       // Recipes in this category become uncategorized
       persistRecipes(
@@ -862,6 +965,122 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
     [categories],
   );
 
+
+  // ── CategoryGroup CRUD ──────────────────────────────────────────────────────
+  const addCategoryGroup = useCallback(
+    (name: string): CategoryGroup | null => {
+      const trimmed = name.trim();
+      if (!trimmed) return null;
+      const filled = autoFillTagNames(trimmed);
+      if (categoryGroupsRef.current.some((g) => g.name === filled.name)) return null;
+      const group: CategoryGroup = {
+        id: genId(),
+        name: filled.name,
+        nameEn: filled.nameEn,
+        createdAt: Date.now(),
+      };
+      persistCategoryGroups([...categoryGroupsRef.current, group]);
+      return group;
+    },
+    [persistCategoryGroups],
+  );
+
+  const renameCategoryGroup = useCallback(
+    (id: string, name: string) => {
+      const trimmed = name.trim();
+      if (!trimmed) return;
+      persistCategoryGroups(
+        categoryGroupsRef.current.map((g) => (g.id === id ? { ...g, name: trimmed } : g)),
+      );
+    },
+    [persistCategoryGroups],
+  );
+
+  const setCategoryGroupNameEn = useCallback(
+    (id: string, nameEn: string) => {
+      persistCategoryGroups(
+        categoryGroupsRef.current.map((g) =>
+          g.id === id ? { ...g, nameEn: nameEn.trim() } : g,
+        ),
+      );
+    },
+    [persistCategoryGroups],
+  );
+
+  const deleteCategoryGroup = useCallback(
+    (id: string) => {
+      const target = categoryGroupsRef.current.find((g) => g.id === id);
+      if (target?.locked) return;
+      persistCategoryGroups(categoryGroupsRef.current.filter((g) => g.id !== id));
+      persistCategories(
+        categoriesRef.current.map((c) => (c.groupId === id ? { ...c, groupId: null } : c)),
+      );
+    },
+    [persistCategoryGroups, persistCategories],
+  );
+
+  const reorderCategoryGroups = useCallback(
+    (orderedIds: string[]) => {
+      const map = new Map(categoryGroupsRef.current.map((g) => [g.id, g]));
+      const next: CategoryGroup[] = [];
+      for (const id of orderedIds) {
+        const item = map.get(id);
+        if (item) { next.push(item); map.delete(id); }
+      }
+      for (const rest of map.values()) next.push(rest);
+      persistCategoryGroups(next);
+    },
+    [persistCategoryGroups],
+  );
+
+  const setCategoryGroup = useCallback(
+    (categoryId: string, groupId: string | null) => {
+      persistCategories(
+        categoriesRef.current.map((c) => (c.id === categoryId ? { ...c, groupId } : c)),
+      );
+    },
+    [persistCategories],
+  );
+
+  // ── 锁定/解锁 toggle ────────────────────────────────────────────────────────
+  const toggleTagLocked = useCallback(
+    (id: string) => {
+      persistTags(
+        tagsRef.current.map((t) => (t.id === id ? { ...t, locked: !t.locked } : t)),
+      );
+    },
+    [persistTags],
+  );
+
+  const toggleTagGroupLocked = useCallback(
+    (id: string) => {
+      const target = tagGroupsRef.current.find((g) => g.id === id);
+      if (target?.flavorLayer) return;
+      persistTagGroups(
+        tagGroupsRef.current.map((g) => (g.id === id ? { ...g, locked: !g.locked } : g)),
+      );
+    },
+    [persistTagGroups],
+  );
+
+  const toggleCategoryLocked = useCallback(
+    (id: string) => {
+      persistCategories(
+        categoriesRef.current.map((c) => (c.id === id ? { ...c, locked: !c.locked } : c)),
+      );
+    },
+    [persistCategories],
+  );
+
+  const toggleCategoryGroupLocked = useCallback(
+    (id: string) => {
+      persistCategoryGroups(
+        categoryGroupsRef.current.map((g) => (g.id === id ? { ...g, locked: !g.locked } : g)),
+      );
+    },
+    [persistCategoryGroups],
+  );
+
   const value = useMemo<RecipeStore>(
     () => ({
       ready,
@@ -869,6 +1088,7 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
       categories,
       tags,
       tagGroups,
+      categoryGroups,
       addRecipe,
       addRecipes,
       updateRecipe,
@@ -904,6 +1124,16 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
       getRecipe,
       getCategory,
       duplicateRecipe,
+      addCategoryGroup,
+      renameCategoryGroup,
+      setCategoryGroupNameEn,
+      deleteCategoryGroup,
+      reorderCategoryGroups,
+      setCategoryGroup,
+      toggleTagLocked,
+      toggleTagGroupLocked,
+      toggleCategoryLocked,
+      toggleCategoryGroupLocked,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
@@ -912,6 +1142,7 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
       categories,
       tags,
       tagGroups,
+      categoryGroups,
       addRecipe,
       addRecipes,
       updateRecipe,
@@ -947,6 +1178,16 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
       getRecipe,
       getCategory,
       duplicateRecipe,
+      addCategoryGroup,
+      renameCategoryGroup,
+      setCategoryGroupNameEn,
+      deleteCategoryGroup,
+      reorderCategoryGroups,
+      setCategoryGroup,
+      toggleTagLocked,
+      toggleTagGroupLocked,
+      toggleCategoryLocked,
+      toggleCategoryGroupLocked,
     ],
   );
 
