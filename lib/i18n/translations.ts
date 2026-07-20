@@ -544,6 +544,7 @@ const dict = {
   "hm.type.all": { zh: "全部类型", en: "All Types" },
   // Same-name grouping & comparison
   "group.versions": { zh: "{n} 个版本", en: "{n} versions" },
+  "group.variants": { zh: "{n} 种形态", en: "{n} variants" },
   "group.compare": { zh: "对比", en: "Compare" },
   "compare.title": { zh: "对比分析", en: "Compare" },
   "compare.empty": { zh: "没有可对比的条目", en: "Nothing to compare" },

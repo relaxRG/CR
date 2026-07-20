@@ -40,7 +40,7 @@ import { useBottleStore } from "@/lib/bottles/store";
 import { estimatePrepCostFull } from "@/lib/homemade/cost";
 import { primaryTechnique, techniqueLabel, TECHNIQUES, detectPrepTechniques } from "@/lib/homemade/technique";
 import { BASE_SPIRITS, detectPrepBaseSpirits } from "@/lib/homemade/base-spirit";
-import { groupPrepsByName } from "@/lib/recipes/grouping";
+import { groupPrepsByName, groupPrepsByFamily } from "@/lib/recipes/grouping";
 import { sortPreps, PREP_SORTS, PrepSort } from "@/lib/recipes/sort";
 import { Bottle } from "@/lib/bottles/types";
 import { useCardTagSettings } from "@/lib/settings/card-tags";
@@ -61,7 +61,17 @@ import {
 type ListRow =
   | { kind: "header"; key: string; sectionKey: string; count: number }
   | { kind: "item"; key: string; prep: HomemadePrep; isFirst: boolean; isLast: boolean }
-  | { kind: "group"; key: string; preps: HomemadePrep[]; isFirst: boolean; isLast: boolean };
+  | {
+      kind: "group";
+      key: string;
+      preps: HomemadePrep[];
+      isFirst: boolean;
+      isLast: boolean;
+      /** "family" = 按 sourceFamilyKey 聚合；"name" = 按名称聚合 */
+      groupKind: "family" | "name";
+      /** 家族 key（仅 groupKind="family" 时有值） */
+      familyKey?: string;
+    };
 
 export default function HomemadeScreen() {
   const colors = useColors();
@@ -552,8 +562,8 @@ export default function HomemadeScreen() {
     for (const s of groupSections) {
       const items = sorted.filter((p) => prepSectionOfIn(types, p.type) === s.key);
       if (items.length === 0) continue;
-      // 同名折叠:分区内同名自制品折叠为一组
-      const groups = groupPrepsByName(items);
+      // 同名折叠 + 家族折叠：分区内同源/同名自制品折叠为一组
+      const groups = groupPrepsByFamily(items);
       out.push({ kind: "header", key: `h-${s.key}`, sectionKey: s.key, count: items.length });
       groups.forEach((g, idx) => {
         const isFirst = idx === 0;
@@ -565,6 +575,8 @@ export default function HomemadeScreen() {
             preps: g.items,
             isFirst,
             isLast,
+            groupKind: g.groupKind,
+            familyKey: g.familyKey,
           });
         } else {
           out.push({ kind: "item", key: g.items[0].id, prep: g.items[0], isFirst, isLast });
@@ -886,6 +898,8 @@ export default function HomemadeScreen() {
                 preps={item.preps}
                 isFirst={item.isFirst}
                 isLast={item.isLast}
+                groupKind={item.groupKind}
+                familyKey={item.familyKey}
                 expanded={expandedGroups.has(item.key)}
                 onToggle={() =>
                   setExpandedGroups((prev) => {
@@ -1033,11 +1047,13 @@ function PrepRow({
   isFirst,
   isLast,
   bottles,
+  variantSubtitle,
 }: {
   prep: HomemadePrep;
   isFirst: boolean;
   isLast: boolean;
   bottles: Bottle[];
+  variantSubtitle?: string;
 }) {
   const colors = useColors();
   const router = useRouter();
@@ -1121,6 +1137,7 @@ function PrepRow({
         isFirst={isFirst}
         isLast={isLast}
         bottles={bottles}
+        variantSubtitle={variantSubtitle}
         onLongPress={() => {
           if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
           const name = displayNames(prep.name, prep.nameAlt, lang).primary;
@@ -1164,7 +1181,7 @@ function PrepRow({
   );
 }
 
-/** 同名自制品折叠组:组头显示名称与版本数,可展开;提供对比入口 */
+/** 同名/家族自制品折叠组:组头显示名称与版本数/形态数,可展开;提供对比入口 */
 function PrepGroupRow({
   preps,
   isFirst,
@@ -1172,6 +1189,8 @@ function PrepGroupRow({
   expanded,
   onToggle,
   bottles,
+  groupKind,
+  familyKey,
 }: {
   preps: HomemadePrep[];
   isFirst: boolean;
@@ -1179,12 +1198,25 @@ function PrepGroupRow({
   expanded: boolean;
   onToggle: () => void;
   bottles: Bottle[];
+  groupKind?: "family" | "name";
+  familyKey?: string;
 }) {
   const colors = useColors();
   const router = useRouter();
   const { t, lang } = useI18n();
   const head = preps[0];
-  const names = displayNames(head.name, head.nameAlt, lang);
+  // 家族组：显示名取第一条去掉变体标签后缀的名称；同名组：取第一条名称
+  const familyDisplayName = (() => {
+    if (groupKind !== "family") return null;
+    // 尝试从 familyKey 推断显示名（取第一条 name，去掉 variantLabel 后缀）
+    const firstName = head.name ?? "";
+    const vl = head.variantLabel ?? "";
+    const cleaned = vl && firstName.endsWith(vl)
+      ? firstName.slice(0, -vl.length).trim()
+      : firstName;
+    return displayNames(cleaned || firstName, head.nameAlt, lang);
+  })();
+  const names = familyDisplayName ?? displayNames(head.name, head.nameAlt, lang);
 
   const handleToggle = () => {
     if (Platform.OS !== "web") {
@@ -1224,7 +1256,9 @@ function PrepGroupRow({
               <View className="flex-row items-center mt-1.5" style={{ gap: 6 }}>
                 <View style={[styles.badge, { backgroundColor: colors.primary + "18" }]}>
                   <Text style={[styles.badgeText, { color: colors.primary }]}>
-                    {t("group.versions", { n: preps.length })}
+                    {groupKind === "family"
+                      ? t("group.variants", { n: preps.length })
+                      : t("group.versions", { n: preps.length })}
                   </Text>
                 </View>
                 <Pressable
@@ -1265,6 +1299,7 @@ function PrepGroupRow({
               isFirst={false}
               isLast={i === preps.length - 1 && isLast}
               bottles={bottles}
+              variantSubtitle={groupKind === "family" ? (p.variantLabel ?? undefined) : undefined}
             />
           ))}
         </View>
@@ -1284,12 +1319,14 @@ function PrepRowInner({
   isLast,
   bottles,
   onLongPress,
+  variantSubtitle,
 }: {
   prep: HomemadePrep;
   isFirst: boolean;
   isLast: boolean;
   bottles: Bottle[];
   onLongPress?: () => void;
+  variantSubtitle?: string;
 }) {
   const colors = useColors();
   const router = useRouter();
@@ -1338,7 +1375,7 @@ function PrepRowInner({
                 {names.primary}
               </Text>
               <Text className="text-xs text-muted mt-0.5" numberOfLines={1}>
-                {names.secondary || " "}
+                {variantSubtitle ?? names.secondary ?? " "}
               </Text>
             </View>
             <View className="flex-row items-center mt-1.5" style={{ gap: 6, height: 24, overflow: "hidden" }}>

@@ -159,6 +159,10 @@ export default function HomemadeFormScreen() {
   const [costMode, setCostMode] = useState<"direct" | "batch">(
     editing?.batchYield ? "batch" : "direct",
   );
+  /** 原料家族 key：同源衍生品填写相同 key，用于列表页家族折叠 */
+  const [sourceFamilyKey, setSourceFamilyKey] = useState(editing?.sourceFamilyKey ?? "");
+  /** 变体标签：在折叠卡片内区分同家族或同名的不同形态（如"皮卷"/"角形"/"薄片"） */
+  const [variantLabel, setVariantLabel] = useState(editing?.variantLabel ?? "");
   /** Unit picker: which ingredient row is currently open */
   const [unitPickerIngId, setUnitPickerIngId] = useState<string | null>(null);
   const { recentUnits, addRecentUnit } = useRecentUnits();
@@ -652,6 +656,8 @@ export default function HomemadeFormScreen() {
         garnishUnit: garnishUnit.trim() || "片",
         shelfLifeKey: shelfLifeKey || undefined,
         prepMethod: prepMethod.trim() || undefined,
+        sourceFamilyKey: sourceFamilyKey.trim() || undefined,
+        variantLabel: variantLabel.trim() || undefined,
         ...(costMode === "batch"
           ? {
               batchYield: isFinite(byNum) && byNum > 0 ? byNum : undefined,
@@ -1151,6 +1157,28 @@ export default function HomemadeFormScreen() {
                   returnKeyType="done"
                 />
               </View>
+
+              {fieldLabel(lang === "en" ? "Source Family (optional)" : "原料家族（可选）")}
+              <TextInput
+                style={inputStyle}
+                value={sourceFamilyKey}
+                onChangeText={setSourceFamilyKey}
+                placeholder={lang === "en" ? "e.g. yellow-lemon  (group related garnishes)" : "如: yellow-lemon（同源装饰品填相同值）"}
+                placeholderTextColor={colors.muted}
+                returnKeyType="done"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+
+              {fieldLabel(lang === "en" ? "Variant Label (optional)" : "形态标签（可选）")}
+              <TextInput
+                style={inputStyle}
+                value={variantLabel}
+                onChangeText={setVariantLabel}
+                placeholder={lang === "en" ? "e.g. Peel / Wedge / Slice" : "如: 皮卷 / 角形 / 薄片"}
+                placeholderTextColor={colors.muted}
+                returnKeyType="done"
+              />
 
               {fieldLabel(lang === "en" ? "Cost" : "成本")}
               {/* 成本录入方式切换 */}

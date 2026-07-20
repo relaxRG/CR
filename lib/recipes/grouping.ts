@@ -74,3 +74,69 @@ export function groupRecipesByName(recipes: Recipe[]): NameGroup<Recipe>[] {
 export function groupPrepsByName(preps: HomemadePrep[]): NameGroup<HomemadePrep>[] {
   return groupByNames(preps, (p) => ({ zh: p.name ?? "", en: p.nameAlt ?? "" }));
 }
+
+/**
+ * 自制品家族分组：先按 sourceFamilyKey 聚合同源衍生品，再对无家族 key 的条目做同名分组。
+ * 家族组的 key 前缀为 "family:"，同名组的 key 前缀为 "name:"，便于渲染层区分展示方式。
+ *
+ * 规则：
+ * - 有 sourceFamilyKey 的条目：按 key 聚合为家族组（≥2 条时折叠，1 条时降级为普通条目）
+ * - 无 sourceFamilyKey 的条目：走原有 groupPrepsByName 同名折叠逻辑
+ */
+export interface FamilyGroup<T> extends NameGroup<T> {
+  /** "family" = 按 sourceFamilyKey 聚合；"name" = 按名称聚合（原有逻辑） */
+  groupKind: "family" | "name";
+  /** 家族 key（仅 groupKind="family" 时有值） */
+  familyKey?: string;
+}
+
+export function groupPrepsByFamily(preps: HomemadePrep[]): FamilyGroup<HomemadePrep>[] {
+  const out: FamilyGroup<HomemadePrep>[] = [];
+
+  // 1. 按 sourceFamilyKey 聚合
+  const familyMap = new Map<string, HomemadePrep[]>();
+  const noFamily: HomemadePrep[] = [];
+
+  for (const p of preps) {
+    if (p.sourceFamilyKey) {
+      const arr = familyMap.get(p.sourceFamilyKey) ?? [];
+      arr.push(p);
+      familyMap.set(p.sourceFamilyKey, arr);
+    } else {
+      noFamily.push(p);
+    }
+  }
+
+  // 2. 家族组（≥2 条折叠，1 条降级为无家族处理）
+  for (const [fKey, items] of familyMap) {
+    if (items.length >= 2) {
+      // 家族显示名：取第一条的 name（去掉变体标签后缀）
+      const head = items[0];
+      out.push({
+        key: `family:${fKey}`,
+        items,
+        groupKind: "family",
+        familyKey: fKey,
+      });
+    } else {
+      // 只有 1 条，降级为无家族
+      noFamily.push(items[0]);
+    }
+  }
+
+  // 3. 无家族条目走同名分组逻辑
+  const nameGroups = groupPrepsByName(noFamily);
+  for (const g of nameGroups) {
+    out.push({ ...g, key: `name:${g.key}`, groupKind: "name" });
+  }
+
+  // 4. 保持原始顺序（家族组按第一条成员的位置排序）
+  const orderMap = new Map(preps.map((p, i) => [p.id, i]));
+  out.sort((a, b) => {
+    const aIdx = orderMap.get(a.items[0].id) ?? 9999;
+    const bIdx = orderMap.get(b.items[0].id) ?? 9999;
+    return aIdx - bIdx;
+  });
+
+  return out;
+}

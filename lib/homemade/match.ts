@@ -20,6 +20,21 @@ function stripQualifiers(s: string): string {
 }
 
 /**
+ * 从配料名中提取变体暗示词：检查 preps 中所有 variantLabel，
+ * 若配料名包含某个 variantLabel，返回该 label（用于同名变体精细匹配）。
+ */
+export function extractVariantHint(name: string, preps: HomemadePrep[]): string | undefined {
+  const n = norm(name);
+  for (const p of preps) {
+    if (p.variantLabel) {
+      const label = norm(p.variantLabel);
+      if (label && n.includes(label)) return p.variantLabel;
+    }
+  }
+  return undefined;
+}
+
+/**
  * 同物异名别名表(《Waldorf》书内确证):
  * 配料名匹配左侧正则时,直接链接到英文名含右侧关键词的自制条目。
  */
@@ -36,7 +51,15 @@ const PREP_ALIASES: [RegExp, string][] = [
  * Match an ingredient name against homemade preps.
  * Checks both name (English-first) and nameAlt (Chinese) with bidirectional containment.
  */
-export function matchPrep(ingredientName: string, preps: HomemadePrep[]): HomemadePrep | null {
+/**
+ * Match an ingredient name against homemade preps.
+ * @param variantHint 可选变体暗示词，用于同名变体的第二轮精细匹配
+ */
+export function matchPrep(
+  ingredientName: string,
+  preps: HomemadePrep[],
+  variantHint?: string,
+): HomemadePrep | null {
   const raw = norm(ingredientName);
   if (!raw || raw.length < 2) return null;
   for (const [re, target] of PREP_ALIASES) {
@@ -50,6 +73,7 @@ export function matchPrep(ingredientName: string, preps: HomemadePrep[]): Homema
 
   let best: HomemadePrep | null = null;
   let bestScore = 0;
+  const scored: { prep: HomemadePrep; score: number }[] = [];
   for (const p of preps) {
     const candidates = [p.name, p.nameAlt]
       .map(norm)
@@ -69,11 +93,32 @@ export function matchPrep(ingredientName: string, preps: HomemadePrep[]): Homema
           bestScore = score;
           best = p;
         }
+        if (score > 0) scored.push({ prep: p, score });
       }
     }
   }
-  // Require a reasonable overlap to avoid weak short matches
-  return bestScore >= 54 ? best : null;
+  if (bestScore < 54) return null;
+
+  // 收集接近最高分的候选（90% 阈值），检查是否有同名变体需要区分
+  const threshold = bestScore * 0.9;
+  const topCandidates = scored.filter((s) => s.score >= threshold);
+  const uniquePreps = [...new Map(topCandidates.map((s) => [s.prep.id, s.prep])).values()];
+
+  // 只有一个候选，直接返回（现有行为）
+  if (uniquePreps.length === 1) return uniquePreps[0];
+
+  // 多个同名变体：用 variantHint 做第二轮精细匹配
+  const hint = variantHint ?? extractVariantHint(ingredientName, uniquePreps);
+  if (hint) {
+    const hintNorm = norm(hint);
+    const byLabel = uniquePreps.find(
+      (p) => p.variantLabel && norm(p.variantLabel).includes(hintNorm),
+    );
+    if (byLabel) return byLabel;
+  }
+
+  // 无法区分：优先返回无 variantLabel 的（"默认版本"语义），否则返回最高分
+  return uniquePreps.find((p) => !p.variantLabel) ?? best;
 }
 
 export interface PrepSuggestion {

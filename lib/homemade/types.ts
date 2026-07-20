@@ -28,6 +28,17 @@ export interface HomemadePrep {
   /** Type key, see PREP_TYPES */
   type: string;
   /**
+   * 原料家族标识：同一原材料来源的衍生品填写相同的 key（如 "yellow-lemon"）。
+   * 仅用于列表页家族折叠展示，不影响分组/分区/成本计算/智能链接等任何其他逻辑。
+   * 可选字段，旧数据不填即不参与家族折叠。
+   */
+  sourceFamilyKey?: string;
+  /**
+   * 变体副标题：在折叠卡片内区分同家族或同名的不同形态（如"皮卷"/"角形"/"薄片"）。
+   * 同时用于智能链接的第二轮精细匹配，帮助区分同名变体。
+   */
+  variantLabel?: string;
+  /**
    * 酒精属性分组覆盖:null 表示跟随类型/分区推断结果,
    * 显式设置后优先生效(用户可手动调整)。
    */
@@ -485,6 +496,9 @@ export function normalizePrep(p: Partial<HomemadePrep> & { id: string }): Homema
     ...(typeof p.yieldQty === "number" && isFinite(p.yieldQty) && p.yieldQty > 0 ? { yieldQty: p.yieldQty } : {}),
     ...(p.yieldUnit ? { yieldUnit: p.yieldUnit } : {}),
     ...(typeof p.batchCostTotal === "number" && isFinite(p.batchCostTotal) && p.batchCostTotal > 0 ? { batchCostTotal: p.batchCostTotal } : {}),
+    // 家族折叠字段（可选，旧数据不填即不参与折叠）
+    ...(p.sourceFamilyKey ? { sourceFamilyKey: p.sourceFamilyKey } : {}),
+    ...(p.variantLabel ? { variantLabel: p.variantLabel } : {}),
   };
 }
 

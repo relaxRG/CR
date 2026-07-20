@@ -501,3 +501,13 @@
 - [x] 原料库编辑页价格区重写：三模式 UI（按毫升/按克/按件数）+ 按件多 chip（个/听/罐/瓶/袋/盒）+ 实时单位成本预览 + 保存时自动同步 volume 字段
 - [x] 修复自制库成本引擎 Bug：matchMaterialBottle + estimatePrepCost 优先读 packQty+packUnit，回退到 volume 解析
 - [x] 原料库详情页新增单位成本展示行（每ml/每g/每件）
+
+## 自制库家族折叠（方案 A）
+
+- [x] types.ts 新增 sourceFamilyKey + variantLabel 字段，normalizePrep 兼容
+- [x] match.ts 新增 extractVariantHint + matchPrep 同名变体精细匹配
+- [x] smart-link.ts 新增 variantHint 感知逻辑，exactPrep/smartLinkDisplayName 支持变体区分
+- [x] grouping.ts 新增 groupPrepsByFamily 函数（家族折叠 + 同名折叠统一入口）
+- [x] homemade.tsx 列表页：家族折叠 rows 组装 + PrepGroupRow 展示「X 种形态」徽章 + 展开行显示 variantLabel
+- [x] homemade-form.tsx 装饰分区：新增原料家族 + 变体标签输入框，save payload 持久化
+- [x] translations.ts 新增 group.variants 翻译键

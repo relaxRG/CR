@@ -12,7 +12,7 @@
 import type { Bottle } from "../bottles/types";
 import type { HomemadePrep } from "../homemade/types";
 import { matchBottle, normalizeIngredientName } from "../bottles/cost";
-import { matchPrep } from "../homemade/match";
+import { matchPrep, extractVariantHint } from "../homemade/match";
 import { resolveIngredientNames } from "./ingredient-display";
 import { stripForm } from "./form-fold";
 
@@ -34,11 +34,25 @@ function exactBottle(name: string, bottles: Bottle[]): Bottle | null {
   );
 }
 
-/** 精确匹配自制库(中/英名全等) */
-function exactPrep(name: string, preps: HomemadePrep[]): HomemadePrep | null {
+/** 精确匹配自制库(中/英名全等)，支持同名变体区分 */
+function exactPrep(
+  name: string,
+  preps: HomemadePrep[],
+  variantHint?: string,
+): HomemadePrep | null {
   const key = norm(name);
   if (!key) return null;
-  return preps.find((p) => norm(p.name) === key || norm(p.nameAlt) === key) ?? null;
+  const matches = preps.filter((p) => norm(p.name) === key || norm(p.nameAlt) === key);
+  if (matches.length === 0) return null;
+  if (matches.length === 1) return matches[0];
+  // 多个同名变体：用 variantHint 区分
+  if (variantHint) {
+    const hint = norm(variantHint);
+    const byLabel = matches.find((p) => p.variantLabel && norm(p.variantLabel).includes(hint));
+    if (byLabel) return byLabel;
+  }
+  // 无法区分：优先返回无 variantLabel 的（"默认版本"语义）
+  return matches.find((p) => !p.variantLabel) ?? matches[0];
 }
 
 /**
@@ -54,6 +68,9 @@ export function smartLinkIngredient(
 ): SmartLink {
   const name = rawName.trim();
   if (!name || name.length < 2) return null;
+
+  // 提取变体暗示词（用于同名变体精细匹配）
+  const variantHint = extractVariantHint(name, preps);
 
   // 按用户指定来源库过滤
   const SPIRITS_CATS = new Set(["Gin","Vodka","Rum","Whiskey","Agave Spirits","Brandy","Sake & Shochu","Baijiu"]);
@@ -81,7 +98,7 @@ export function smartLinkIngredient(
     // 先对真实自制品(prep)做一轮精确匹配，命中则优先返回 prep。
     const hasOverride = bottles.some((b) => b.libraryOverride === 'homemade');
     if (hasOverride) {
-      const priorityPrep = exactPrep(name, preps);
+      const priorityPrep = exactPrep(name, preps, variantHint);
       if (priorityPrep) return { kind: "prep", prep: priorityPrep, matchConfidence: "exact" };
     }
     filteredBottles = bottles;
@@ -90,7 +107,7 @@ export function smartLinkIngredient(
   // 1) 双边精确匹配(原文)
   const eb = exactBottle(name, filteredBottles);
   if (eb) return { kind: "bottle", bottle: eb, matchConfidence: "exact" };
-  const ep = exactPrep(name, filteredPreps);
+  const ep = exactPrep(name, filteredPreps, variantHint);
   if (ep) return { kind: "prep", prep: ep, matchConfidence: "exact" };
 
   // 2) Waldorf 别名规范化 → 双边精确匹配
@@ -100,7 +117,7 @@ export function smartLinkIngredient(
       if (!candidate || norm(candidate) === norm(name)) continue;
       const b = exactBottle(candidate, filteredBottles);
       if (b) return { kind: "bottle", bottle: b, matchConfidence: "exact" };
-      const p = exactPrep(candidate, filteredPreps);
+      const p = exactPrep(candidate, filteredPreps, variantHint);
       if (p) return { kind: "prep", prep: p, matchConfidence: "exact" };
     }
   }
@@ -110,7 +127,7 @@ export function smartLinkIngredient(
   if (normalized && norm(normalized) !== norm(name)) {
     const b = exactBottle(normalized, filteredBottles);
     if (b) return { kind: "bottle", bottle: b, matchConfidence: "exact" };
-    const p = exactPrep(normalized, filteredPreps);
+    const p = exactPrep(normalized, filteredPreps, variantHint);
     if (p) return { kind: "prep", prep: p, matchConfidence: "exact" };
   }
 
@@ -126,7 +143,7 @@ export function smartLinkIngredient(
         matchConfidence: "exact",
       };
   }
-  const fp = matchPrep(name, filteredPreps);
+  const fp = matchPrep(name, filteredPreps, variantHint);
   if (fp) return { kind: "prep", prep: fp, matchConfidence: "fuzzy" };
   const fb = matchBottle(name, filteredBottles);
   if (fb) {
@@ -214,7 +231,11 @@ export function smartLinkDisplayName(
     }
   }
   const primary = lang === "zh" ? zh || en : en || zh;
-  const secondary = lang === "zh" ? (zh ? en : "") : en ? zh : "";
+  let secondary = lang === "zh" ? (zh ? en : "") : en ? zh : "";
+  // 若有变体标签，追加到副标题（如 "Lemon Peel · 皮卷"）
+  if (link.kind === "prep" && link.prep.variantLabel) {
+    secondary = [secondary, link.prep.variantLabel].filter(Boolean).join(" · ");
+  }
   if (!primary) return null;
   return { primary, secondary: secondary === primary ? "" : secondary };
 }
