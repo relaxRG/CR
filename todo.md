@@ -495,3 +495,9 @@
 - [x] i18n：tab.library 改为「资料库」，新增 tab.lab 翻译 key（研发/R&D）
 - [x] _layout.tsx：index tab 标签改为「研发」，图标改为 flask；library tab 图标改为 wineglass
 - [x] TypeScript 0 错误
+
+## 原料库全面升级（2026-07-21）
+- [x] 原材料库改名为原料库（translations.ts 全局替换，内部 key 不变）
+- [x] 原料库编辑页价格区重写：三模式 UI（按毫升/按克/按件数）+ 按件多 chip（个/听/罐/瓶/袋/盒）+ 实时单位成本预览 + 保存时自动同步 volume 字段
+- [x] 修复自制库成本引擎 Bug：matchMaterialBottle + estimatePrepCost 优先读 packQty+packUnit，回退到 volume 解析
+- [x] 原料库详情页新增单位成本展示行（每ml/每g/每件）

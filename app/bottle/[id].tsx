@@ -97,6 +97,29 @@ export default function BottleDetailScreen() {
     },
   ];
 
+  // 原料库专属：单位成本展示行
+  if (effectiveGroup === "materials" && bottle.priceCny > 0 && bottle.packQty && bottle.packQty > 0 && bottle.packUnit) {
+    const u = bottle.packUnit.toLowerCase();
+    const baseUnit: "ml" | "g" | "piece" =
+      ["ml", "cl", "l", "dl", "oz"].includes(u) ? "ml"
+      : ["g", "kg", "斤", "两"].includes(u) ? "g"
+      : "piece";
+    let qty = bottle.packQty;
+    if (u === "cl") qty *= 10;
+    else if (u === "l") qty *= 1000;
+    else if (u === "kg") qty *= 1000;
+    const unitCost = bottle.priceCny / qty;
+    if (isFinite(unitCost) && unitCost > 0) {
+      const unitLabel = baseUnit === "ml"
+        ? (lang === "zh" ? "每毫升成本" : "Cost per ml")
+        : baseUnit === "g"
+          ? (lang === "zh" ? "每克成本" : "Cost per g")
+          : (lang === "zh" ? `每${bottle.packUnit}成本` : `Cost per ${bottle.packUnit}`);
+      const decimals = baseUnit === "piece" ? 2 : 4;
+      rows.push({ label: unitLabel, value: `¥${unitCost.toFixed(decimals)}` });
+    }
+  }
+
   return (
     <ScreenContainer>
       {/* Header */}

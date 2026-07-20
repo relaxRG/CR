@@ -385,7 +385,9 @@ export function matchMaterialBottle(line: string, bottles: Bottle[]): Bottle | n
         if (!re.test(l)) continue;
       }
       {
-        if (parsePackToUnit(b.volume)) {
+        // 优先用 packQty+packUnit 判断是否可定价，回退到 volume 字段
+        const hasStructuredPricing = b.packQty && b.packQty > 0 && b.packUnit;
+        if (hasStructuredPricing || parsePackToUnit(b.volume)) {
           best = b;
           bestLen = cl.length;
         }
@@ -439,7 +441,26 @@ export function estimatePrepCost(
     if (parsed) {
       const mat = matchMaterialBottle(line, bottles);
       if (mat) {
-        const pack = parsePackToUnit(mat.volume)!;
+        // 优先读 packQty+packUnit（方案A三模式），回退到 volume 字段解析
+        let pack: { qty: number; unit: "g" | "ml" | "piece" } | null = null;
+        if (mat.packQty && mat.packQty > 0 && mat.packUnit) {
+          const u = mat.packUnit.toLowerCase();
+          const baseUnit: "g" | "ml" | "piece" =
+            ["ml", "cl", "l", "dl", "oz"].includes(u) ? "ml"
+            : ["g", "kg", "斤", "两"].includes(u) ? "g"
+            : "piece";
+          // 规格化到基础单位（cl→ml, kg→g, L→ml）
+          let qty = mat.packQty;
+          if (u === "cl") qty *= 10;
+          else if (u === "l") qty *= 1000;
+          else if (u === "kg") qty *= 1000;
+          pack = { qty, unit: baseUnit };
+        } else {
+          pack = parsePackToUnit(mat.volume);
+        }
+        if (!pack) {
+          // 无法解析规格，跳过此条目
+        } else {
         const pricePerUnit = mat.priceCny / pack.qty;
         const converted = convertQty(parsed.qty, parsed.unit, pack.unit, gpp);
         if (converted !== null) {
@@ -454,6 +475,7 @@ export function estimatePrepCost(
             bottleId: mat.id,
             homemadeId: null,
           };
+        }
         }
       }
     }

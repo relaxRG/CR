@@ -210,7 +210,7 @@ const dict = {
   "tags.bottleCount": { zh: "{n} 款", en: "{n} bottles" },
   "tags.prepCount": { zh: "{n} 份自制", en: "{n} preps" },
   "tags.group.bottles": { zh: "酒款库", en: "Bottles" },
-  "tags.group.materials": { zh: "原材料库", en: "Raw Materials" },
+  "tags.group.materials": { zh: "原料库", en: "Raw Materials" },
   "tags.group.spirits": { zh: "基酒库", en: "Base Spirits" },
   "bottles.subtitle.spirits": {
     zh: "{n} 款基酒 · 中英文名、度数与参考价",
@@ -309,7 +309,7 @@ const dict = {
     en: "{name} ¥{p}/pc × {f} × {c}",
   },
   "detail.cost.autoAdded": {
-    zh: "已自动添加到原材料库(待补价格)",
+    zh: "已自动添加到原料库(待补价格)",
     en: "Auto-added to ingredient library (price pending)",
   },
   // Ice settings
@@ -624,14 +624,14 @@ const dict = {
   "form.link.pickTitle": { zh: "选择链接目标", en: "Choose Link Target" },
   "form.link.keepText": { zh: "不链接（保留原文）", en: "Don't link (keep text)" },
   "form.link.noResults": { zh: "没有找到相似条目", en: "No similar entries found" },
-  "form.link.searchPlaceholder": { zh: "搜索酒库 / 自制库 / 原材料…", en: "Search bottles / homemade / materials…" },
+  "form.link.searchPlaceholder": { zh: "搜索酒库 / 自制库 / 原料…", en: "Search bottles / homemade / materials…" },
   "form.homemade.add": { zh: "添加到自制库", en: "Add to Homemade Lab" },
   "form.smartAdd.bottle": { zh: "添加到酒库", en: "Add to Bottles" },
-  "form.smartAdd.material": { zh: "添加到原材料库", en: "Add to Raw Materials" },
+  "form.smartAdd.material": { zh: "添加到原料库", en: "Add to Raw Materials" },
   "form.suggest.homemade": { zh: "自制库", en: "Homemade" },
   "form.suggest.bottle": { zh: "酒库", en: "Bottles" },
   "form.suggest.spirits": { zh: "基酒库", en: "Base Spirits" },
-  "form.suggest.materials": { zh: "原材料库", en: "Raw Materials" },
+  "form.suggest.materials": { zh: "原料库", en: "Raw Materials" },
   "hm.shelfLife": { zh: "保存期限", en: "Shelf Life" },
   "hm.storage": { zh: "储存方式", en: "Storage" },
   "hm.yield": { zh: "产量", en: "Yield" },
@@ -650,11 +650,11 @@ const dict = {
   "hm.cost.perUnit": { zh: "¥{n}/30ml", en: "¥{n}/30ml" },
   "hm.cost.noEstimate": { zh: "暂无法估算", en: "No estimate" },
   "hm.cost.tapHint": {
-    zh: "点击蓝色明细行可跳转原材料/酒款修改参考价;估算仅供参考。",
+    zh: "点击蓝色明细行可跳转原料/酒款修改参考价;估算仅供参考。",
     en: "Tap blue rows to edit reference prices in the library. Estimates are for reference only.",
   },
   "bottles.subtitle.materials": {
-    zh: "{n} 种原材料 · 中国电商参考价,可编辑",
+    zh: "{n} 种原料 · 中国电商参考价,可编辑",
     en: "{n} raw materials · China market prices, editable",
   },
   "detail.cost.homemade": {

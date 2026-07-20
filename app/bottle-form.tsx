@@ -88,6 +88,25 @@ export default function BottleFormScreen() {
   );
   const [packUnit, setPackUnit] = useState(editing?.packUnit ?? "");
   const [notes, setNotes] = useState(editing?.notes ?? "");
+
+  // ── 原料库专属：计价模式 ──────────────────────────────────────────────────
+  const inferMatMode = (): "ml" | "g" | "piece" | null => {
+    const u = (editing?.packUnit ?? "").toLowerCase();
+    if (["ml", "cl", "l", "dl", "oz"].includes(u)) return "ml";
+    if (["g", "kg", "斤", "两"].includes(u)) return "g";
+    if (["个", "听", "瓶", "袋", "罐", "盒", "箱", "打"].includes(u)) return "piece";
+    const v = (editing?.volume ?? "").toLowerCase();
+    if (/\d+(ml|毫升|cl|l|升)/.test(v)) return "ml";
+    if (/\d+(g|克|kg)/.test(v)) return "g";
+    if (/\d+(个|枚|颗|根|只|听|罐|盒|袋)/.test(v)) return "piece";
+    return null;
+  };
+  const [matPricingMode, setMatPricingMode] = useState<"ml" | "g" | "piece" | null>(inferMatMode);
+  const inferPieceUnit = (): string => {
+    const u = editing?.packUnit ?? "";
+    return ["个", "听", "罐", "瓶", "袋", "盒"].includes(u) ? u : "个";
+  };
+  const [matPieceUnit, setMatPieceUnit] = useState<string>(inferPieceUnit);
   const [flavorTags, setFlavorTags] = useState<string[]>(editing?.flavorTags ?? []);
   const [story, setStory] = useState(editing?.story ?? "");
   const [styleDesc, setStyleDesc] = useState(editing?.styleDesc ?? "");
@@ -465,7 +484,15 @@ export default function BottleFormScreen() {
       style: style.trim(),
       brand: brand.trim(),
       origin: origin.trim(),
-      volume: volume.trim(),
+      volume: (() => {
+        if (effectiveGroup === "materials" && matPricingMode) {
+          const qty = parseFloat(packQty) || 1;
+          if (matPricingMode === "ml") return `${qty}ml`;
+          if (matPricingMode === "g") return `${qty}g`;
+          if (matPricingMode === "piece") return `${qty}${matPieceUnit}`;
+        }
+        return volume.trim();
+      })(),
       abv: Math.max(0, Math.min(100, parseFloat(abv) || 0)),
       priceCny: Math.max(0, parseFloat(price) || 0),
       packQty: packQty.trim() ? Math.max(0, parseFloat(packQty) || 0) : undefined,
@@ -813,7 +840,7 @@ export default function BottleFormScreen() {
                 { key: 'spirits' as const, label: lang === "zh" ? "基酒库" : "Spirits" },
                 { key: 'bottles' as const, label: lang === "zh" ? "酒款库" : "Bottles" },
                 { key: 'softdrinks' as const, label: lang === "zh" ? "软饮库" : "Soft Drinks" },
-                { key: 'materials' as const, label: lang === "zh" ? "原材料" : "Materials" },
+                { key: 'materials' as const, label: lang === "zh" ? "原料库" : "Materials" },
                 { key: 'homemade' as const, label: lang === "zh" ? "自制库" : "Homemade" },
               ].map((opt) => {
                 const active = libraryOverride === opt.key;
@@ -1153,56 +1180,132 @@ export default function BottleFormScreen() {
                 })()}
               </>
             ) : (
-              /* 原材料库：计量单位 chip + 包装数量 + 总价（保持原有逻辑） */
+              /* 原料库：三模式价格区 */
               <>
                 <Text style={[styles.fieldLabel, { color: colors.foreground, marginBottom: 4 }]}>
                   {lang === "zh" ? "参考价格" : "Reference Price"}
                 </Text>
-                <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 8 }}>
-                  {lang === "zh"
-                    ? "填写进货规格和对应总价，例如：10个 → ¥8，或 1箱(24听) → ¥60"
-                    : "Enter pack size and total price, e.g. 10 pcs → ¥8, or 1 case (24 cans) → ¥60"}
+                <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 10 }}>
+                  {lang === "zh" ? "选择计价方式，系统自动计算单位成本" : "Choose pricing mode; unit cost is auto-calculated"}
                 </Text>
-                {/* 计量单位 chip 勾选（仅原材料库） */}
-                <Text style={[styles.fieldLabel, { color: colors.foreground, marginBottom: 6 }]}>
-                  {lang === "zh" ? "计量单位" : "Unit"}
-                </Text>
-                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-                  {unitOptions.map((u) => {
-                    const active = packUnit === u;
+                {/* 一级模式选择 */}
+                <View style={{ flexDirection: "row", gap: 8, marginBottom: 14 }}>
+                  {(["ml", "g", "piece"] as const).map((mode) => {
+                    const modeLabel = mode === "ml"
+                      ? (lang === "zh" ? "按毫升" : "By ml")
+                      : mode === "g"
+                        ? (lang === "zh" ? "按克" : "By g")
+                        : (lang === "zh" ? "按件数" : "By piece");
+                    const active = matPricingMode === mode;
                     return (
                       <Pressable
-                        key={u}
+                        key={mode}
                         onPress={() => {
-                          setPackUnit(active ? "" : u);
+                          setMatPricingMode(mode);
+                          if (mode === "ml") setPackUnit("ml");
+                          else if (mode === "g") setPackUnit("g");
+                          else setPackUnit(matPieceUnit);
                           if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                         }}
                         style={[
                           styles.chip,
-                          { backgroundColor: active ? colors.primary : colors.surface, borderColor: active ? colors.primary : colors.border },
+                          { flex: 1, alignItems: "center" as const, paddingVertical: 8,
+                            backgroundColor: active ? colors.primary : colors.surface,
+                            borderColor: active ? colors.primary : colors.border },
                         ]}
                       >
-                        <Text style={[styles.chipText, { color: active ? "#FFFFFF" : colors.foreground }]}>{u}</Text>
+                        <Text style={[styles.chipText, { color: active ? "#FFFFFF" : colors.foreground }]}>
+                          {modeLabel}
+                        </Text>
                       </Pressable>
                     );
                   })}
                 </View>
-                {!unitOptions.includes(packUnit) && (
-                  <View style={{ marginBottom: 8 }}>
-                    {field(lang === "zh" ? "或填写自定义单位" : "Or custom unit", packUnit, setPackUnit,
-                      lang === "zh" ? "例：桶、罐、袋…" : "e.g. barrel, keg…")}
+                {/* 按件模式：二级单位 chip */}
+                {matPricingMode === "piece" && (
+                  <View style={{ marginBottom: 12 }}>
+                    <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 6 }}>
+                      {lang === "zh" ? "单位类型" : "Unit type"}
+                    </Text>
+                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                      {(["个", "听", "罐", "瓶", "袋", "盒"] as const).map((u) => {
+                        const active = matPieceUnit === u;
+                        return (
+                          <Pressable
+                            key={u}
+                            onPress={() => {
+                              setMatPieceUnit(u);
+                              setPackUnit(u);
+                              if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            }}
+                            style={[
+                              styles.chip,
+                              { backgroundColor: active ? (colors.primary + "22") : colors.surface,
+                                borderColor: active ? colors.primary : colors.border },
+                            ]}
+                          >
+                            <Text style={[styles.chipText, {
+                              color: active ? colors.primary : colors.foreground,
+                              fontWeight: active ? "600" : "400",
+                            }]}>{u}</Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
                   </View>
                 )}
-                <View style={{ flexDirection: "row", gap: 8, marginBottom: 4 }}>
-                  <View style={{ flex: 1.2 }}>
-                    {field(lang === "zh" ? "包装数量" : "Pack Qty", packQty, setPackQty,
-                      lang === "zh" ? "例：10 / 24" : "e.g. 10 / 24", { keyboardType: "numeric" })}
-                  </View>
-                  <View style={{ flex: 1.5 }}>
-                    {field(lang === "zh" ? "总价(¥)" : "Total(¥)", price, setPrice,
-                      lang === "zh" ? "例：8 / 60" : "e.g. 8 / 60", { keyboardType: "numeric" })}
-                  </View>
-                </View>
+                {/* 数量 + 总价输入 */}
+                {matPricingMode ? (
+                  <>
+                    <View style={{ flexDirection: "row", gap: 10, marginBottom: 4 }}>
+                      <View style={{ flex: 1.2 }}>
+                        {field(
+                          matPricingMode === "ml"
+                            ? (lang === "zh" ? "总量 (ml)" : "Total (ml)")
+                            : matPricingMode === "g"
+                              ? (lang === "zh" ? "总量 (g)" : "Total (g)")
+                              : (lang === "zh" ? `包装数量 (${matPieceUnit})` : `Pack qty (${matPieceUnit})`),
+                          packQty,
+                          setPackQty,
+                          matPricingMode === "piece"
+                            ? (lang === "zh" ? "例：10 / 24" : "e.g. 10 / 24")
+                            : (lang === "zh" ? "例：500 / 1000" : "e.g. 500 / 1000"),
+                          { keyboardType: "numeric" },
+                        )}
+                      </View>
+                      <View style={{ flex: 1.5 }}>
+                        {field(lang === "zh" ? "进货总价 (¥)" : "Total Price (¥)", price, setPrice,
+                          lang === "zh" ? "例：8 / 60" : "e.g. 8 / 60", { keyboardType: "numeric" })}
+                      </View>
+                    </View>
+                    {/* 单位成本预览 */}
+                    {price && packQty && (() => {
+                      const priceNum = parseFloat(price);
+                      const qty = parseFloat(packQty);
+                      if (!priceNum || !qty || qty <= 0) return null;
+                      const unitCost = priceNum / qty;
+                      if (!isFinite(unitCost) || unitCost <= 0) return null;
+                      const unitLabel = matPricingMode === "ml"
+                        ? (lang === "zh" ? "每毫升" : "per ml")
+                        : matPricingMode === "g"
+                          ? (lang === "zh" ? "每克" : "per g")
+                          : (lang === "zh" ? `每${matPieceUnit}` : `per ${matPieceUnit}`);
+                      const decimals = matPricingMode === "piece" ? 2 : 4;
+                      return (
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 10, paddingHorizontal: 4 }}>
+                          <Text style={{ fontSize: 12, color: colors.muted }}>{unitLabel}：</Text>
+                          <Text style={{ fontSize: 13, fontWeight: "600", color: colors.primary }}>
+                            ¥{unitCost.toFixed(decimals)}
+                          </Text>
+                        </View>
+                      );
+                    })()}
+                  </>
+                ) : (
+                  <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 8, fontStyle: "italic" }}>
+                    {lang === "zh" ? "请先选择计价方式，再填写数量和价格" : "Select a pricing mode above, then enter quantity and price"}
+                  </Text>
+                )}
               </>
             )}
           </View>
