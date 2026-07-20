@@ -1,5 +1,5 @@
 import { Lang, TranslationKey } from "@/lib/i18n/translations";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   ActionSheetIOS,
   Alert,
@@ -119,6 +119,63 @@ function DraggableRow({
   );
 }
 
+
+// ─── 可拖拽 Chip（长按后跟随手指，松手触发跨分组回调）─────────────────────────
+function DraggableChip({
+  children,
+  onDragStart,
+  onDragEnd,
+  onDragMove,
+  disabled,
+}: {
+  children: React.ReactNode;
+  onDragStart: () => void;
+  onDragEnd: (absoluteY: number) => void;
+  onDragMove: (absoluteY: number) => void;
+  disabled?: boolean;
+}) {
+  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
+  const active = useSharedValue(false);
+  const pan = Gesture.Pan()
+    .activateAfterLongPress(350)
+    .enabled(!disabled)
+    .onStart(() => {
+      active.value = true;
+      runOnJS(onDragStart)();
+    })
+    .onUpdate((e) => {
+      translateX.value = e.translationX;
+      translateY.value = e.translationY;
+      runOnJS(onDragMove)(e.absoluteY);
+    })
+    .onEnd((e) => {
+      translateX.value = withTiming(0, { duration: 150 });
+      translateY.value = withTiming(0, { duration: 150 });
+      active.value = false;
+      runOnJS(onDragEnd)(e.absoluteY);
+    })
+    .onFinalize(() => {
+      translateX.value = withTiming(0, { duration: 150 });
+      translateY.value = withTiming(0, { duration: 150 });
+      active.value = false;
+    });
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: translateX.value },
+      { translateY: translateY.value },
+      { scale: withTiming(active.value ? 1.08 : 1, { duration: 120 }) },
+    ],
+    zIndex: active.value ? 999 : 1,
+    opacity: withTiming(active.value ? 0.85 : 1, { duration: 120 }),
+  }));
+  return (
+    <GestureDetector gesture={pan}>
+      <Animated.View style={animatedStyle}>{children}</Animated.View>
+    </GestureDetector>
+  );
+}
+
 // ─── 标签 Chip（彩色淡底 + 同色文字）─────────────────────────────────────────
 function TagChip({
   name,
@@ -187,6 +244,11 @@ function GroupCard({
   onDeleteGroup,
   onToggleLockGroup,
   onToggleLockTag,
+  onChipDragStart,
+  onChipDragMove,
+  onChipDragEnd,
+  isDragOver,
+  groupRef,
 }: {
   group: TagGroup | null;
   items: RowData[];
@@ -216,6 +278,11 @@ function GroupCard({
   onDeleteGroup: (g: TagGroup) => void;
   onToggleLockGroup?: (g: TagGroup) => void;
   onToggleLockTag?: (item: RowData) => void;
+  onChipDragStart?: (item: RowData) => void;
+  onChipDragMove?: (item: RowData, absoluteY: number) => void;
+  onChipDragEnd?: (item: RowData, absoluteY: number) => void;
+  isDragOver?: boolean;
+  groupRef?: React.RefObject<View | null>;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [colorPickerId, setColorPickerId] = useState<string | null>(null);
@@ -227,7 +294,20 @@ function GroupCard({
   const isGroupLocked = group?.locked ?? false;
 
   return (
-    <View style={[styles.groupCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+    <View
+      ref={groupRef as any}
+      onLayout={() => {
+        if (groupRef?.current) {
+          (groupRef.current as any).measure((_x: number, _y: number, _w: number, h: number, _px: number, py: number) => {
+            // py is absolute Y on screen; store it via a callback if needed
+            // We use a workaround: store in the ref itself
+            (groupRef.current as any).__absY = py;
+            (groupRef.current as any).__height = h;
+          });
+        }
+      }}
+      style={[styles.groupCard, { backgroundColor: colors.surface, borderColor: isDragOver ? colors.primary : colors.border, borderWidth: isDragOver ? 2 : StyleSheet.hairlineWidth }]}
+    >
       {/* 卡头 */}
       {isRenaming && group ? (
         <View style={[styles.groupCardHead, { gap: 8 }]}>
@@ -346,7 +426,13 @@ function GroupCard({
           {items.map((item) => {
             const isItemLocked = (item as any).locked ?? false;
             return (
-              <View key={item.id} style={{ position: "relative" }}>
+              <DraggableChip
+                key={item.id}
+                disabled={isItemLocked}
+                onDragStart={() => onChipDragStart?.(item)}
+                onDragMove={(y) => onChipDragMove?.(item, y)}
+                onDragEnd={(y) => onChipDragEnd?.(item, y)}
+              >
                 <TagChip
                   name={displayNames(item.nameEn, item.name, lang).primary}
                   color={item.color}
@@ -363,7 +449,7 @@ function GroupCard({
                     setColorPickerId(colorPickerId === item.id ? null : item.id);
                   }}
                 />
-              </View>
+              </DraggableChip>
             );
           })}
           {/* 添加虚线 chip */}
@@ -555,6 +641,11 @@ export default function CategoriesScreen() {
   const [addTagColorPickerOpen, setAddTagColorPickerOpen] = useState(false);
   // 添加分组 sheet（category 专用）
   const [showAddCategoryGroup, setShowAddCategoryGroup] = useState(false);
+  // ── 跨分组拖拽状态 ──────────────────────────────────────────────────────────
+  const [draggingChipId, setDraggingChipId] = useState<string | null>(null);
+  const [dragOverGroupId, setDragOverGroupId] = useState<string | null | undefined>(undefined);
+  // groupRef map: groupId (or "ungrouped") -> { ref, y, height }
+  const groupLayoutMap = useRef<Map<string, { ref: React.RefObject<View | null>; y: number; height: number }>>(new Map());
 
   // ── 行数据 ──────────────────────────────────────────────────────────────────
   const rows: RowData[] = useMemo(() => {
@@ -720,6 +811,59 @@ export default function CategoriesScreen() {
     else setTagColor(rowId, color);
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
+
+
+  // 根据绝对 Y 坐标找到对应的分组 key
+  const findGroupAtY = useCallback((absoluteY: number): string | null | undefined => {
+    let best: string | null | undefined = undefined;
+    let bestDist = Infinity;
+    groupLayoutMap.current.forEach((info, key) => {
+      if (info.y <= absoluteY && absoluteY <= info.y + info.height) {
+        const dist = Math.abs(absoluteY - (info.y + info.height / 2));
+        if (dist < bestDist) {
+          bestDist = dist;
+          best = key === "ungrouped" ? null : key;
+        }
+      }
+    });
+    return best;
+  }, []);
+
+  const handleChipDragStart = useCallback((item: RowData) => {
+    setDraggingChipId(item.id);
+    setDragOverGroupId(item.groupId ?? null);
+    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  }, []);
+
+  const refreshGroupLayouts = useCallback(() => {
+    groupLayoutMap.current.forEach((info) => {
+      if (info.ref.current) {
+        (info.ref.current as any).measure((_x: number, _y: number, _w: number, h: number, _px: number, py: number) => {
+          info.y = py;
+          info.height = h;
+        });
+      }
+    });
+  }, []);
+
+  const handleChipDragMove = useCallback((_item: RowData, absoluteY: number) => {
+    refreshGroupLayouts();
+    const found = findGroupAtY(absoluteY);
+    if (found !== undefined) setDragOverGroupId(found);
+  }, [findGroupAtY, refreshGroupLayouts]);
+
+  const handleChipDragEnd = useCallback((item: RowData, absoluteY: number) => {
+    refreshGroupLayouts();
+    const targetGroupId = findGroupAtY(absoluteY);
+    const currentGroupId = item.groupId ?? null;
+    const resolvedTarget = targetGroupId !== undefined ? targetGroupId : currentGroupId;
+    if (resolvedTarget !== currentGroupId) {
+      setTagGroup(item.id, resolvedTarget);
+      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+    setDraggingChipId(null);
+    setDragOverGroupId(undefined);
+  }, [findGroupAtY, setTagGroup, refreshGroupLayouts]);
 
   const commitGroupEdit = () => {
     if (editingGroupId && editingGroupName.trim()) {
@@ -1095,7 +1239,7 @@ export default function CategoriesScreen() {
       <ScrollView
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 + insets.bottom }}
         keyboardShouldPersistTaps="handled"
-        scrollEnabled={draggingId === null}
+        scrollEnabled={draggingId === null && draggingChipId === null}
       >
         {section === "bottleCat" ? (
           <BottleTaxonomyManager />
@@ -1288,39 +1432,54 @@ export default function CategoriesScreen() {
             ) : isTagKind(section) && groupedBlocks ? (
               // spirit/glass/flavor 分组卡片
               <View>
-                {(groupedBlocks as { group: TagGroup | null; items: RowData[] }[]).map((block) => (
-                  <GroupCard
-                    key={block.group?.id ?? "ungrouped"}
-                    group={block.group}
-                    items={block.items}
-                    rows={rows}
-                    section={section}
-                    lang={lang}
-                    colors={colors}
-                    t={t}
-                    editingId={editingId}
-                    editingName={editingName}
-                    editingNameEn={editingNameEn}
-                    draggingId={draggingId}
-                    groupPickerId={groupPickerId}
-                    groups={groups}
-                    setEditingId={setEditingId}
-                    setEditingName={setEditingName}
-                    setEditingNameEn={setEditingNameEn}
-                    setDraggingId={setDraggingId}
-                    setGroupPickerId={setGroupPickerId}
-                    commitEdit={commitEdit}
-                    confirmDelete={confirmDelete}
-                    pickColor={pickColor}
-                    moveRowInBlock={moveRowInBlock}
-                    setTagGroup={setTagGroup}
-                    onAddTag={(gid) => setAddTagGroupId(gid)}
-                    onEditGroup={(g) => { setEditingGroupId(g.id); setEditingGroupName(g.name); setEditingGroupNameEn(g.nameEn ?? ""); }}
-                    onDeleteGroup={(g) => confirmDeleteGroup(g)}
-                    onToggleLockGroup={(g) => handleToggleLockGroup(g)}
-                    onToggleLockTag={(item) => { toggleTagLocked(item.id); if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); }}
-                  />
-                ))}
+                {(groupedBlocks as { group: TagGroup | null; items: RowData[] }[]).map((block) => {
+                  const gKey = block.group?.id ?? "ungrouped";
+                  if (!groupLayoutMap.current.has(gKey)) {
+                    groupLayoutMap.current.set(gKey, { ref: React.createRef<View | null>(), y: 0, height: 0 });
+                  }
+                  const gInfo = groupLayoutMap.current.get(gKey)!;
+                  const isDragOver = draggingChipId != null && (
+                    dragOverGroupId === (block.group?.id ?? null)
+                  );
+                  return (
+                    <GroupCard
+                      key={gKey}
+                      group={block.group}
+                      items={block.items}
+                      rows={rows}
+                      section={section}
+                      lang={lang}
+                      colors={colors}
+                      t={t}
+                      editingId={editingId}
+                      editingName={editingName}
+                      editingNameEn={editingNameEn}
+                      draggingId={draggingId}
+                      groupPickerId={groupPickerId}
+                      groups={groups}
+                      setEditingId={setEditingId}
+                      setEditingName={setEditingName}
+                      setEditingNameEn={setEditingNameEn}
+                      setDraggingId={setDraggingId}
+                      setGroupPickerId={setGroupPickerId}
+                      commitEdit={commitEdit}
+                      confirmDelete={confirmDelete}
+                      pickColor={pickColor}
+                      moveRowInBlock={moveRowInBlock}
+                      setTagGroup={setTagGroup}
+                      onAddTag={(gid) => setAddTagGroupId(gid)}
+                      onEditGroup={(g) => { setEditingGroupId(g.id); setEditingGroupName(g.name); setEditingGroupNameEn(g.nameEn ?? ""); }}
+                      onDeleteGroup={(g) => confirmDeleteGroup(g)}
+                      onToggleLockGroup={(g) => handleToggleLockGroup(g)}
+                      onToggleLockTag={(item) => { toggleTagLocked(item.id); if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); }}
+                      onChipDragStart={handleChipDragStart}
+                      onChipDragMove={handleChipDragMove}
+                      onChipDragEnd={handleChipDragEnd}
+                      isDragOver={isDragOver}
+                      groupRef={gInfo.ref}
+                    />
+                  );
+                })}
               </View>
             ) : null}
 
