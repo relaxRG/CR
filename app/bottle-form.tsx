@@ -82,6 +82,11 @@ export default function BottleFormScreen() {
   const [price, setPrice] = useState(
     editing && editing.priceCny > 0 ? String(editing.priceCny) : "",
   );
+  // 三段式定价：包装数量 + 包装单位（与 price 配合使用）
+  const [packQty, setPackQty] = useState(
+    editing?.packQty ? String(editing.packQty) : "",
+  );
+  const [packUnit, setPackUnit] = useState(editing?.packUnit ?? "");
   const [notes, setNotes] = useState(editing?.notes ?? "");
   const [flavorTags, setFlavorTags] = useState<string[]>(editing?.flavorTags ?? []);
   const [story, setStory] = useState(editing?.story ?? "");
@@ -128,6 +133,7 @@ export default function BottleFormScreen() {
   const [undoSnapshot, setUndoSnapshot] = useState<null | {
     nameZh: string; nameEn: string; category: string; style: string;
     brand: string; origin: string; volume: string; abv: string; price: string;
+    packQty?: string; packUnit?: string;
     notes: string; flavorTags: string[]; story: string; styleDesc: string;
     distilleryInfo: string; pairingNotes: string; usageNotes: string; seasonality: string;
     notesEn?: string; storyEn?: string; substituteFor?: string; pairsWith?: string;
@@ -222,7 +228,7 @@ export default function BottleFormScreen() {
   const applyAiResult = useCallback(() => {
     if (!aiResult) return;
     const fields = buildAiFields();
-    setUndoSnapshot({ nameZh, nameEn, category, style, brand, origin, volume, abv, price, notes, flavorTags, story, styleDesc, distilleryInfo, pairingNotes, usageNotes, seasonality, notesEn, storyEn, substituteFor, pairsWith });
+    setUndoSnapshot({ nameZh, nameEn, category, style, brand, origin, volume, abv, price, packQty, packUnit, notes, flavorTags, story, styleDesc, distilleryInfo, pairingNotes, usageNotes, seasonality, notesEn, storyEn, substituteFor, pairsWith });
     for (const f of fields) {
       if (aiToggles[f.key] !== false) applyField(f.key);
     }
@@ -230,7 +236,7 @@ export default function BottleFormScreen() {
     setAiResult(null);
     if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
     undoTimerRef.current = setTimeout(() => setUndoSnapshot(null), 6000);
-  }, [aiResult, aiToggles, buildAiFields, applyField, nameZh, nameEn, category, style, brand, origin, volume, abv, price, notes, flavorTags, story, styleDesc, distilleryInfo, pairingNotes, usageNotes, seasonality, notesEn, storyEn, substituteFor, pairsWith]);
+  }, [aiResult, aiToggles, buildAiFields, applyField, nameZh, nameEn, category, style, brand, origin, volume, abv, price, packQty, packUnit, notes, flavorTags, story, styleDesc, distilleryInfo, pairingNotes, usageNotes, seasonality, notesEn, storyEn, substituteFor, pairsWith]);
 
   /** 撤销 AI 应用 */
   const undoAiApply = useCallback(() => {
@@ -239,6 +245,8 @@ export default function BottleFormScreen() {
     setCategory(undoSnapshot.category); setStyle(undoSnapshot.style);
     setBrand(undoSnapshot.brand); setOrigin(undoSnapshot.origin);
     setVolume(undoSnapshot.volume); setAbv(undoSnapshot.abv); setPrice(undoSnapshot.price);
+    if (undoSnapshot.packQty !== undefined) setPackQty(undoSnapshot.packQty);
+    if (undoSnapshot.packUnit !== undefined) setPackUnit(undoSnapshot.packUnit);
     setNotes(undoSnapshot.notes); setFlavorTags(undoSnapshot.flavorTags);
     setStory(undoSnapshot.story); setStyleDesc(undoSnapshot.styleDesc);
     setDistilleryInfo(undoSnapshot.distilleryInfo); setPairingNotes(undoSnapshot.pairingNotes);
@@ -434,6 +442,8 @@ export default function BottleFormScreen() {
       volume: volume.trim(),
       abv: Math.max(0, Math.min(100, parseFloat(abv) || 0)),
       priceCny: Math.max(0, parseFloat(price) || 0),
+      packQty: packQty.trim() ? Math.max(0, parseFloat(packQty) || 0) : undefined,
+      packUnit: packUnit.trim() || undefined,
       notes: notes.trim(),
       flavorTags,
       story: story.trim(),
@@ -553,6 +563,8 @@ export default function BottleFormScreen() {
                   if (item.volume) setVolume(item.volume);
                   if (item.abv) setAbv(String(item.abv));
                   if (item.priceCny) setPrice(String(item.priceCny));
+                  if (item.packQty) setPackQty(String(item.packQty));
+                  if (item.packUnit) setPackUnit(item.packUnit);
                   if (item.notes || item.source) {
                     setNotes([item.notes, item.source].filter(Boolean).join(" · "));
                   }
@@ -946,7 +958,36 @@ export default function BottleFormScreen() {
                 {field(t("bform.abv"), abv, setAbv, lang === "en" ? "e.g. 40" : "例如：40", { keyboardType: "numeric" })}
               </View>
             </View>
-            {field(t("bform.price"), price, setPrice, lang === "en" ? "e.g. 170 (CNY)" : "例如：170（人民币）", { keyboardType: "numeric" })}
+            {/* ── 三段式定价：包装数量 + 单位 + 价格 ── */}
+            <Text style={[styles.fieldLabel, { color: colors.foreground, marginBottom: 4 }]}>
+              {lang === "zh" ? "参考价格" : "Reference Price"}
+            </Text>
+            <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 8 }}>
+              {lang === "zh"
+                ? "填写进货规格和对应总价，例如：10个 → ¥8，或 1箱(24听) → ¥60"
+                : "Enter pack size and total price, e.g. 10 pcs → ¥8, or 1 case (24 cans) → ¥60"}
+            </Text>
+            <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>
+              <View style={{ flex: 1.2 }}>
+                {field(lang === "zh" ? "包装数量" : "Pack Qty", packQty, setPackQty,
+                  lang === "zh" ? "例：10 / 24 / 1" : "e.g. 10 / 24 / 1",
+                  { keyboardType: "numeric" })}
+              </View>
+              <View style={{ flex: 1.5 }}>
+                {field(lang === "zh" ? "单位" : "Unit", packUnit, setPackUnit,
+                  lang === "zh" ? "个/听/瓶/g/kg/斤/ml" : "pcs/can/bottle/g/kg/ml")}
+              </View>
+              <View style={{ flex: 1.5 }}>
+                {field(lang === "zh" ? "总价(¥)" : "Total(¥)", price, setPrice,
+                  lang === "zh" ? "例：8 / 60 / 170" : "e.g. 8 / 60 / 170",
+                  { keyboardType: "numeric" })}
+              </View>
+            </View>
+            <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 4, marginTop: -8 }}>
+              {lang === "zh"
+                ? "如仍按整瓶/整包计价，可只填总价，留空包装数量和单位"
+                : "If pricing per whole bottle/pack, leave pack qty & unit empty and just fill total price"}
+            </Text>
             {/* ── 开瓶易失效 Toggle ── */}
             {(() => {
               // 计算自动推断值（不受 perishableOnOpen 影响）

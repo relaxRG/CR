@@ -11,7 +11,7 @@ import { useI18n } from "@/lib/i18n";
 import { displayNames } from "@/lib/utils";
 import { useHomemadeStore } from "@/lib/homemade/store";
 import { useBottleStore } from "@/lib/bottles/store";
-import { estimatePrepCost } from "@/lib/homemade/cost";
+import { estimatePrepCostFull } from "@/lib/homemade/cost";
 import { smartLinkIngredient } from "@/lib/recipes/smart-link";
 import { prepTypeLabelIn, prepSectionLabelIn, prepSectionOfIn } from "@/lib/homemade/types";
 import { detectPrepTechniques, techniqueDesc, techniqueLabel } from "@/lib/homemade/technique";
@@ -69,14 +69,19 @@ export default function HomemadeDetailScreen() {
           ]
         : [];
     })(),
-    ...(prep.yield ? [{ label: t("hm.yield"), value: prep.yield }] : []),
+    ...((() => {
+      const yieldDisplay = (prep.yieldQty && prep.yieldUnit)
+        ? `${prep.yieldQty} ${prep.yieldUnit}`
+        : prep.yield;
+      return yieldDisplay ? [{ label: t("hm.yield"), value: yieldDisplay }] : [];
+    })()),
     ...(prep.shelfLife ? [{ label: t("hm.shelfLife"), value: prep.shelfLife }] : []),
     ...(prep.storage ? [{ label: t("hm.storage"), value: prep.storage }] : []),
   ];
 
   const names = displayNames(prep.name, prep.nameAlt, lang);
   const otherPreps = preps.filter((p) => p.id !== prep.id);
-  const cost = estimatePrepCost(prep, bottles, otherPreps);
+  const cost = estimatePrepCostFull(prep, bottles);
   const techs = detectPrepTechniques(prep);
   const primaryTechDesc = techs.length > 0 ? techniqueDesc(techs[0], lang) : "";
 
@@ -458,8 +463,26 @@ export default function HomemadeDetailScreen() {
                   <View key={`${item.line}-${idx}`}>{row}</View>
                 );
               })}
-              {/* Unit costs */}
-              {cost.costPer100Ml !== null || cost.costPer30Ml !== null ? (
+              {/* Unit costs — 通用单位成本 */}
+              {cost.costPerBaseUnit !== null ? (
+                <View
+                  className="flex-row items-center justify-between py-2.5"
+                  style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}
+                >
+                  {/* 每单位成本（通用） */}
+                  <Text className="text-xs font-semibold" style={{ color: colors.primary }}>
+                    {lang === "zh"
+                      ? `每${cost.baseUnit ?? "份"} ¥${cost.costPerBaseUnit.toFixed(2)}`
+                      : `¥${cost.costPerBaseUnit.toFixed(2)} / ${cost.baseUnit ?? "unit"}`}
+                  </Text>
+                  {/* 兼容：如果是 ml 单位，额外显示 per30ml */}
+                  {cost.costPer30Ml !== null && cost.baseUnit === "ml" ? (
+                    <Text className="text-xs text-muted">
+                      {t("hm.cost.per30")} ¥{cost.costPer30Ml.toFixed(2)}
+                    </Text>
+                  ) : null}
+                </View>
+              ) : (cost.costPer100Ml !== null || cost.costPer30Ml !== null) ? (
                 <View
                   className="flex-row items-center justify-between py-2.5"
                   style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}
@@ -468,9 +491,7 @@ export default function HomemadeDetailScreen() {
                     <Text className="text-xs text-muted">
                       {t("hm.cost.per100")} ¥{cost.costPer100Ml.toFixed(2)}
                     </Text>
-                  ) : (
-                    <View />
-                  )}
+                  ) : <View />}
                   {cost.costPer30Ml !== null ? (
                     <Text className="text-xs font-semibold" style={{ color: colors.primary }}>
                       {t("hm.cost.per30")} ¥{cost.costPer30Ml.toFixed(2)}
@@ -479,7 +500,9 @@ export default function HomemadeDetailScreen() {
                 </View>
               ) : null}
               <Text className="text-[11px] text-muted py-2.5" style={{ lineHeight: 15 }}>
-                {cost.yieldMl === null ? t("hm.cost.noYield") : t("hm.cost.tapHint")}
+                {(cost.yieldMl === null && cost.baseQty === null)
+                  ? (lang === "zh" ? "填写产量和批次成本后自动计算" : "Fill in yield & batch cost to calculate")
+                  : t("hm.cost.tapHint")}
               </Text>
             </View>
           </>

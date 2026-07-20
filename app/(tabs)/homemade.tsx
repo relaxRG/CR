@@ -37,7 +37,7 @@ import { useI18n } from "@/lib/i18n";
 import { displayNames } from "@/lib/utils";
 import { filterPreps, useHomemadeStore } from "@/lib/homemade/store";
 import { useBottleStore } from "@/lib/bottles/store";
-import { estimatePrepCost } from "@/lib/homemade/cost";
+import { estimatePrepCostFull } from "@/lib/homemade/cost";
 import { primaryTechnique, techniqueLabel, TECHNIQUES, detectPrepTechniques } from "@/lib/homemade/technique";
 import { BASE_SPIRITS, detectPrepBaseSpirits } from "@/lib/homemade/base-spirit";
 import { groupPrepsByName } from "@/lib/recipes/grouping";
@@ -334,9 +334,11 @@ export default function HomemadeScreen() {
     const cache = new Map<string, number | null>();
     return (p: HomemadePrep): number | null => {
       if (cache.has(p.id)) return cache.get(p.id)!;
-      const est = estimatePrepCost(p, bottles);
-      const v =
-        est && est.estimatedCount > 0 ? (est.costPer30Ml ?? est.batchCost ?? null) : null;
+      const est = estimatePrepCostFull(p, bottles);
+      // 优先用通用单位成本，回退到 per30ml，再回退到 batchCost
+      const v = est && est.estimatedCount > 0
+        ? (est.costPerBaseUnit ?? est.costPer30Ml ?? est.batchCost ?? null)
+        : null;
       cache.set(p.id, v);
       return v;
     };
@@ -1295,7 +1297,7 @@ function PrepRowInner({
   const { types, togglePrepMade } = useHomemadeStore();
   const [cardSettings] = useCardTagSettings();
   const names = displayNames(prep.name, prep.nameAlt, lang);
-  const cost = useMemo(() => estimatePrepCost(prep, bottles), [prep, bottles]);
+  const cost = useMemo(() => estimatePrepCostFull(prep, bottles), [prep, bottles]);
   const tech = useMemo(() => primaryTechnique(prep), [prep]);
   const handleMade = () => {
     if (Platform.OS !== "web") {
@@ -1368,10 +1370,12 @@ function PrepRowInner({
                   {prep.shelfLife}
                 </Text>
               ) : null}
-              {cost.costPer30Ml !== null && cost.estimatedCount > 0 ? (
+              {cost.estimatedCount > 0 && (cost.costPerBaseUnit !== null || cost.costPer30Ml !== null) ? (
                 <View style={[styles.badge, { backgroundColor: colors.success + "22" }]}>
                   <Text style={[styles.badgeText, { color: colors.success }]}>
-                    {t("hm.cost.perUnit", { n: cost.costPer30Ml.toFixed(1) })}
+                    {cost.costPerBaseUnit !== null
+                      ? `¥${cost.costPerBaseUnit.toFixed(1)}/${cost.baseUnit ?? "份"}`
+                      : t("hm.cost.perUnit", { n: cost.costPer30Ml!.toFixed(1) })}
                   </Text>
                 </View>
               ) : null}

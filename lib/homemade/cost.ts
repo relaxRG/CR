@@ -166,6 +166,15 @@ export interface PrepCostEstimate {
   costPer30Ml: number | null;
 }
 
+export interface PrepCostEstimateFull extends PrepCostEstimate {
+  /** 通用：每单位成本（元/yieldUnit），null 表示无法计算 */
+  costPerBaseUnit: number | null;
+  /** 通用：产量单位（如 "ml"、"g"、"个"），null 表示未知 */
+  baseUnit: string | null;
+  /** 通用：产量数量，null 表示未知 */
+  baseQty: number | null;
+}
+
 /**
  * Parse a quantity from an ingredient line: supports g/kg/ml/L/oz/piece counts.
  * e.g. "500g white sugar 白砂糖" → { qty: 500, unit: "g" }
@@ -263,6 +272,11 @@ export function parseQuantity(line: string): { qty: number; unit: "g" | "ml" | "
   if (/^(g|克)$/i.test(unit)) return { qty: value, unit: "g" };
   if (/^(mg|毫克)$/i.test(unit)) return { qty: value * G_PER_MG, unit: "g" };
   if (/^(lbs?|磅|pounds?)$/i.test(unit)) return { qty: value * G_PER_LB, unit: "g" };
+  if (/^(斤|市斤)$/i.test(unit)) return { qty: value * G_PER_JIN, unit: "g" };
+  if (/^(两|市两)$/i.test(unit)) return { qty: value * G_PER_LIANG, unit: "g" };
+  if (/^(钱|市钱)$/i.test(unit)) return { qty: value * G_PER_QIAN, unit: "g" };
+  if (/^(stone|英石)$/i.test(unit)) return { qty: value * G_PER_STONE, unit: "g" };
+  if (/^(tonne|公吨)$/i.test(unit)) return { qty: value * G_PER_TONNE, unit: "g" };
   // ── oz ambiguity: liquid context → ml, solid context → g ──────────────────
   if (/^(oz|盎司|安士)$/i.test(unit)) {
     return isLiquidContext(line)
@@ -514,6 +528,70 @@ export function parseYieldToMl(text: string): number | null {
   return value;
 }
 
+
+/**
+ * 解析产量文本为通用结构 { qty, unit }，支持液体/重量/计件。
+ */
+export function parseYieldToBase(text: string): { qty: number; unit: string } | null {
+  const t = (text || "").trim().toLowerCase().replace(/^[~约≈\s]+/, "");
+  if (!t) return null;
+  const m = t.match(/^(\d+(?:\.\d+)?)\s*(.*)$/);
+  if (!m) return null;
+  const value = Number(m[1]);
+  if (!isFinite(value) || value <= 0) return null;
+  const u = m[2].trim();
+  if (/^(ml|毫升|cc)$/i.test(u)) return { qty: value, unit: "ml" };
+  if (/^(cl|厘升)$/i.test(u)) return { qty: value * 10, unit: "ml" };
+  if (/^(dl|分升)$/i.test(u)) return { qty: value * 100, unit: "ml" };
+  if (/^(l|升|liter|litre)$/i.test(u)) return { qty: value * 1000, unit: "ml" };
+  if (/^(oz|fl\s*oz)$/i.test(u)) return { qty: value * 30, unit: "ml" };
+  if (/^(g|克)$/i.test(u)) return { qty: value, unit: "g" };
+  if (/^(kg|千克|公斤)$/i.test(u)) return { qty: value * 1000, unit: "g" };
+  if (/^(斤|市斤)$/i.test(u)) return { qty: value * 500, unit: "g" };
+  if (/^(两|市两)$/i.test(u)) return { qty: value * 50, unit: "g" };
+  if (/^(钱|市钱)$/i.test(u)) return { qty: value * 5, unit: "g" };
+  if (/^(lb|磅|pounds?)$/i.test(u)) return { qty: value * 454, unit: "g" };
+  if (/^(oz_s|oz\s*solid)$/i.test(u)) return { qty: value * 28, unit: "g" };
+  if (/^(stone|英石)$/i.test(u)) return { qty: value * 6350, unit: "g" };
+  if (/^(tonne|公吨)$/i.test(u)) return { qty: value * 1_000_000, unit: "g" };
+  if (/^(个|枚|颗|根|片|只|条|块|枝|叶|听|罐|瓶|袋|盒|pcs?|pieces?|bottles?|cans?)$/i.test(u)) {
+    return { qty: value, unit: u };
+  }
+  if (!u) return { qty: value, unit: "个" };
+  return null;
+}
+
+/**
+ * 扩展版成本估算：支持三段式产量（yieldQty+yieldUnit）和批次总成本（batchCostTotal）。
+ * 成本核算：batchCostTotal（或自动估算）/ yieldQty = 每单位成本
+ */
+export function estimatePrepCostFull(prep: HomemadePrep, bottles: Bottle[]): PrepCostEstimateFull {
+  const base = estimatePrepCost(prep, bottles);
+  let baseQty: number | null = null;
+  let baseUnit: string | null = null;
+  if (prep.yieldQty && prep.yieldQty > 0 && prep.yieldUnit) {
+    baseQty = prep.yieldQty;
+    baseUnit = prep.yieldUnit;
+  } else {
+    const parsed = parseYieldToBase(prep.yield);
+    baseQty = parsed?.qty ?? null;
+    baseUnit = parsed?.unit ?? null;
+  }
+  const effectiveBatchCost = (prep.batchCostTotal && prep.batchCostTotal > 0)
+    ? prep.batchCostTotal
+    : base.batchCost;
+  const costPerBaseUnit = (effectiveBatchCost > 0 && baseQty && baseQty > 0)
+    ? effectiveBatchCost / baseQty
+    : null;
+  return {
+    ...base,
+    batchCost: effectiveBatchCost,
+    costPerBaseUnit,
+    baseUnit,
+    baseQty,
+  };
+}
+
 /** Loose bottle match for prep ingredient lines (spirits only, avoids false hits on sugar etc.) */
 function matchBottleForPrepLine(line: string, bottles: Bottle[]): Bottle | null {
   const l = line.toLowerCase();
@@ -563,5 +641,6 @@ import {
   ML_PER_BSP, ML_PER_DASH, ML_PER_DROP, ML_PER_SPLASH, ML_PER_SHOT, ML_PER_PONY,
   ML_PER_CUP, ML_PER_PINT, ML_PER_QUART, ML_PER_GALLON,
   G_PER_KG, G_PER_MG, G_PER_OZ_SOLID, G_PER_LB,
+  G_PER_JIN, G_PER_LIANG, G_PER_QIAN, G_PER_STONE, G_PER_TONNE,
   FRAC_CHARS, isLiquidContext, isFuzzyUnit,
 } from "@/lib/units";

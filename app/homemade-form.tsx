@@ -120,6 +120,15 @@ export default function HomemadeFormScreen() {
   );
   const recipe = serializeStepRows(stepRows);
   const [yieldStr, setYieldStr] = useState(editing?.yield ?? "");
+  // 结构化产量：数量 + 单位（优先于 yieldStr 字符串）
+  const [yieldQty, setYieldQty] = useState(
+    editing?.yieldQty ? String(editing.yieldQty) : "",
+  );
+  const [yieldUnit, setYieldUnit] = useState(editing?.yieldUnit ?? "");
+  // 非装饰类批次总成本（用于"总成本/产量"核算）
+  const [normalBatchCost, setNormalBatchCost] = useState(
+    editing?.batchCostTotal ? String(editing.batchCostTotal) : "",
+  );
   const [shelfLife, setShelfLife] = useState(editing?.shelfLife ?? "");
   const [storage, setStorage] = useState(editing?.storage ?? "");
   const [source, setSource] = useState(editing?.source ?? "");
@@ -620,6 +629,9 @@ export default function HomemadeFormScreen() {
       ingredients,
       recipe: recipe.trim(),
       yield: yieldStr.trim(),
+      yieldQty: yieldQty.trim() ? (parseFloat(yieldQty) || undefined) : undefined,
+      yieldUnit: yieldUnit.trim() || undefined,
+      batchCostTotal: normalBatchCost.trim() ? (parseFloat(normalBatchCost) || undefined) : undefined,
       shelfLife: shelfLife.trim(),
       storage: storage.trim(),
       source: source.trim(),
@@ -998,14 +1010,66 @@ export default function HomemadeFormScreen() {
           </Pressable>
 
           {fieldLabel(t("hmform.yield"))}
+          {/* 结构化产量：数量 + 单位 */}
+          <View style={{ flexDirection: "row", gap: 8, marginBottom: 4 }}>
+            <View style={{ flex: 1.2 }}>
+              <TextInput
+                style={inputStyle}
+                value={yieldQty}
+                onChangeText={setYieldQty}
+                placeholder={lang === "zh" ? "数量，如：300" : "Qty, e.g. 300"}
+                placeholderTextColor={colors.muted}
+                keyboardType="numeric"
+                returnKeyType="done"
+              />
+            </View>
+            <View style={{ flex: 1.5 }}>
+              <TextInput
+                style={inputStyle}
+                value={yieldUnit}
+                onChangeText={setYieldUnit}
+                placeholder={lang === "zh" ? "单位：ml/g/个/斤/片" : "Unit: ml/g/pcs/lb"}
+                placeholderTextColor={colors.muted}
+                returnKeyType="done"
+              />
+            </View>
+          </View>
+          <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 8 }}>
+            {lang === "zh"
+              ? "例：300 ml（糖浆）、20 个（装饰）、500 g（腌制原料）"
+              : "e.g. 300 ml (syrup), 20 pcs (garnish), 500 g (marinated)"}
+          </Text>
+          {/* 兼容旧版：仍保留文本产量字段（可选） */}
           <TextInput
-            style={inputStyle}
+            style={[inputStyle, { marginBottom: 4 }]}
             value={yieldStr}
             onChangeText={setYieldStr}
-            placeholder={lang === "en" ? "e.g. ~300ml" : "如:约300ml"}
+            placeholder={lang === "en" ? "Or text: ~300ml (legacy)" : "或文本：约300ml（旧版兼容）"}
             placeholderTextColor={colors.muted}
             returnKeyType="done"
           />
+          {/* 非装饰类：批次总成本 */}
+          {selectedGroup !== "garnish" && (
+            <View style={{ marginBottom: 8 }}>
+              {fieldLabel(lang === "zh" ? "批次总成本（¥）" : "Batch Total Cost (¥)")}
+              <TextInput
+                style={inputStyle}
+                value={normalBatchCost}
+                onChangeText={setNormalBatchCost}
+                placeholder={lang === "zh"
+                  ? "填写原料总花费，系统将自动 ÷ 产量"
+                  : "Total ingredient cost; system divides by yield"}
+                placeholderTextColor={colors.muted}
+                keyboardType="numeric"
+                returnKeyType="done"
+              />
+              <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>
+                {lang === "zh"
+                  ? "成本核算 = 批次总成本 ÷ 产量，如：¥40 ÷ 300ml = ¥0.13/ml"
+                  : "Cost = batch total ÷ yield, e.g. ¥40 ÷ 300ml = ¥0.13/ml"}
+              </Text>
+            </View>
+          )}
 
           {fieldLabel(t("hmform.shelfLife"))}
           {isGarnishType ? (

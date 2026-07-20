@@ -10,7 +10,7 @@ import { displayNames } from "@/lib/utils";
 import { useRecipeStore } from "@/lib/recipes/store";
 import { useBottleStore } from "@/lib/bottles/store";
 import { useHomemadeStore } from "@/lib/homemade/store";
-import { estimatePrepCost } from "@/lib/homemade/cost";
+import { estimatePrepCostFull } from "@/lib/homemade/cost";
 import { estimateRecipeCostSmart } from "@/lib/recipes/smart-cost";
 import { formatAmountAsMl } from "@/lib/bottles/cost";
 import { detectPrepTechniques, techniqueLabel } from "@/lib/homemade/technique";
@@ -102,7 +102,7 @@ export default function CompareScreen() {
         subtitle: displayNames(p.name, p.nameAlt, lang).secondary ?? "",
         route: { pathname: "/homemade/[id]" as const, params: { id: p.id } },
       }));
-      const costs = items.map((p) => estimatePrepCost(p, bottles));
+      const costs = items.map((p) => estimatePrepCostFull(p, bottles));
       const sections: CompareSection[] = [
         {
           title: t("compare.section.basic"),
@@ -118,7 +118,13 @@ export default function CompareScreen() {
                 return ks.length > 0 ? ks.map((k) => techniqueLabel(k, lang)).join(" · ") : null;
               }),
             },
-            { label: t("compare.row.yield"), values: items.map((p) => p.yield || null) },
+            {
+              label: t("compare.row.yield"),
+              values: items.map((p) => {
+                if (p.yieldQty && p.yieldUnit) return `${p.yieldQty} ${p.yieldUnit}`;
+                return p.yield || null;
+              }),
+            },
             { label: t("compare.row.shelfLife"), values: items.map((p) => p.shelfLife || null) },
             { label: t("compare.row.storage"), values: items.map((p) => p.storage || null) },
           ],
@@ -200,11 +206,13 @@ export default function CompareScreen() {
               highlightMin: true,
             },
             {
-              label: t("compare.row.per30"),
+              label: lang === "zh" ? "每单位成本" : "Cost/Unit",
               values: costs.map((c) =>
-                c.costPer30Ml !== null ? `¥${c.costPer30Ml.toFixed(2)}` : null,
+                c.costPerBaseUnit !== null
+                  ? `¥${c.costPerBaseUnit.toFixed(2)}/${c.baseUnit ?? "份"}`
+                  : (c.costPer30Ml !== null ? `¥${c.costPer30Ml.toFixed(2)}/30ml` : null),
               ),
-              numeric: costs.map((c) => c.costPer30Ml),
+              numeric: costs.map((c) => c.costPerBaseUnit ?? c.costPer30Ml),
               highlightMin: true,
             },
           ],

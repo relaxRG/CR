@@ -242,6 +242,18 @@ export interface Bottle {
   homemadeGroup?: 'alcoholic' | 'non_alcoholic' | 'garnish' | 'other';
   /** 当 libraryOverride = 'homemade' 时，指定自制库类型（对应 PREP_TYPES.key） */
   homemadeType?: string;
+  /**
+   * 三段式定价 — 包装数量（纯数字）。
+   * 与 packUnit 配合使用：packQty + packUnit → priceCny
+   * 例：packQty=10, packUnit="个", priceCny=8 → 每个 ¥0.8
+   * 若未填，计算引擎回退到解析 volume 字符串（兼容旧数据）。
+   */
+  packQty?: number;
+  /**
+   * 三段式定价 — 包装单位。
+   * 支持：ml/cl/L（液体）、g/kg/斤/两/lb（重量）、个/听/瓶/袋/罐（计件）
+   */
+  packUnit?: string;
 }
 
 /** 兼容处理:为缺字段的酒款补默认值 */
@@ -275,5 +287,7 @@ export function normalizeBottle(b: Partial<Bottle> & Pick<Bottle, "id" | "nameZh
     ...(b.libraryOverride ? { libraryOverride: b.libraryOverride } : {}),
     ...(b.homemadeGroup ? { homemadeGroup: b.homemadeGroup } : {}),
     ...(b.homemadeType ? { homemadeType: b.homemadeType } : {}),
+    ...(typeof b.packQty === "number" && isFinite(b.packQty) && b.packQty > 0 ? { packQty: b.packQty } : {}),
+    ...(b.packUnit ? { packUnit: b.packUnit } : {}),
   };
 }

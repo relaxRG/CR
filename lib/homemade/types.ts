@@ -53,6 +53,24 @@ export interface HomemadePrep {
   recipe: string;
   /** e.g. "~750ml" */
   yield: string;
+  /**
+   * 结构化产量 — 数量（纯数字）。
+   * 与 yieldUnit 配合使用：yieldQty + yieldUnit 构成完整产量描述。
+   * 例：yieldQty=750, yieldUnit="ml" → 产量 750ml
+   * 若未填，计算引擎回退到解析 yield 字符串（兼容旧数据）。
+   */
+  yieldQty?: number;
+  /**
+   * 结构化产量 — 单位。
+   * 支持：ml/L（液体）、g/kg/斤（重量）、个/听/瓶（计件）
+   */
+  yieldUnit?: string;
+  /**
+   * 批次原料总成本（元）。
+   * 用户手动填写，优先于自动估算。
+   * 成本核算：batchCostTotal / yieldQty = 每单位成本
+   */
+  batchCostTotal?: number;
   /** e.g. "2 weeks refrigerated" */
   shelfLife: string;
   /** e.g. "Refrigerate in sealed bottle" */
@@ -463,6 +481,10 @@ export function normalizePrep(p: Partial<HomemadePrep> & { id: string }): Homema
     ...(p.shelfLifeKey !== undefined ? { shelfLifeKey: p.shelfLifeKey } : {}),
     ...(p.prepMethod !== undefined ? { prepMethod: p.prepMethod } : {}),
     ...(Array.isArray(p.linkedMaterialIds) ? { linkedMaterialIds: p.linkedMaterialIds } : {}),
+    // 结构化产量与批次成本（非装饰类）
+    ...(typeof p.yieldQty === "number" && isFinite(p.yieldQty) && p.yieldQty > 0 ? { yieldQty: p.yieldQty } : {}),
+    ...(p.yieldUnit ? { yieldUnit: p.yieldUnit } : {}),
+    ...(typeof p.batchCostTotal === "number" && isFinite(p.batchCostTotal) && p.batchCostTotal > 0 ? { batchCostTotal: p.batchCostTotal } : {}),
   };
 }
 

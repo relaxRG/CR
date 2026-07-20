@@ -61,6 +61,16 @@ export const G_PER_MG = 0.001;
 export const G_PER_OZ_SOLID = 28;
 /** 1 lb = 16 solid oz = 454 g (rounded from 453.592) */
 export const G_PER_LB = 454;
+/** 1 中国市斤 = 500 g */
+export const G_PER_JIN = 500;
+/** 1 中国两 = 50 g (1斤=10两) */
+export const G_PER_LIANG = 50;
+/** 1 中国钱 = 5 g (1两=10钱) */
+export const G_PER_QIAN = 5;
+/** 1 stone = 14 lb = 6350 g (英石) */
+export const G_PER_STONE = 6350;
+/** 1 tonne = 1,000,000 g (公吨，大宗进货) */
+export const G_PER_TONNE = 1_000_000;
 
 // ─── Unicode fraction map ─────────────────────────────────────────────────────
 /** Map of Unicode vulgar fraction characters to their decimal values */
@@ -119,6 +129,11 @@ export function normalizeUnit(unit: string): string {
   if (/^(gram|克)$/.test(u)) return "g";
   if (/^(pound|磅)$/.test(u)) return "lb";
   if (/^(fluid\s*ounce|fl\.?\s*oz)$/.test(u)) return "fl oz";
+  if (/^(斤|市斤|jin)$/.test(u)) return "斤";
+  if (/^(两|市两|liang)$/.test(u)) return "两";
+  if (/^(钱|市钱|qian)$/.test(u)) return "钱";
+  if (/^(stone|英石)$/.test(u)) return "stone";
+  if (/^(tonne|公吨|metric\s*ton)$/.test(u)) return "tonne";
   if (/^(ounce|盎司|安士)$/.test(u)) return "oz";
   if (/^(tablespoon|汤匙|大勺)$/.test(u)) return "tbsp";
   if (/^(teaspoon|茶匙|小勺)$/.test(u)) return "tsp";
@@ -247,6 +262,8 @@ const ZH_TO_EN_UNIT: Record<string, string> = {
   "块": "cube", "条": "strip", "圈": "wheel", "扭": "twist",
   "楔": "wedge", "叶": "leaf", "只": "whole",
   "适量": "to taste", "少许": "a pinch",
+  "斤": "jin(500g)", "两": "liang(50g)", "钱": "qian(5g)",
+  "stone": "stone", "tonne": "tonne",
 };
 
 /**
@@ -267,6 +284,12 @@ export const UNIT_PRESET_GROUPS: UnitPresetGroup[] = [
   {
     labelKey: "unit.group.liquid",
     unitsZh: ["ml", "oz", "cl", "dl", "L"],
+    get units() { return this.unitsZh; },
+  },
+  {
+    labelKey: "unit.group.weight",
+    unitsZh: ["g", "kg", "斤", "两", "钱", "oz_s", "lb", "stone", "tonne"],
+    unitsEn: ["g", "kg", "jin(500g)", "liang(50g)", "qian(5g)", "oz(solid)", "lb", "stone", "tonne"],
     get units() { return this.unitsZh; },
   },
   {

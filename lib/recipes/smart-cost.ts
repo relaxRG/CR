@@ -68,6 +68,33 @@ export function parseAmountLoose(amount: string): number | null {
 /** 酒库条目的每毫升单价;价格或容量缺失返回 null */
 function bottleUnitPrice(bottle: Bottle): number | null {
   if (!bottle.priceCny || bottle.priceCny <= 0) return null;
+  // 优先读取三段式定价（packQty + packUnit）
+  if (bottle.packQty && bottle.packQty > 0 && bottle.packUnit) {
+    const unit = bottle.packUnit.toLowerCase();
+    // 液体单位 → 返回每 ml 单价（正数）
+    const liquidMap: Record<string, number> = {
+      ml: 1, cl: 10, dl: 100, l: 1000, oz: 30, "fl oz": 30,
+    };
+    if (liquidMap[unit] !== undefined) {
+      const totalMl = bottle.packQty * liquidMap[unit];
+      return totalMl > 0 ? bottle.priceCny / totalMl : null;
+    }
+    // 重量单位 → 返回负数（绝对值 = 每克单价），调用方需特殊处理
+    const weightMap: Record<string, number> = {
+      g: 1, kg: 1000, "斤": 500, "两": 50, "钱": 5,
+      lb: 454, oz_s: 28, stone: 6350, tonne: 1_000_000,
+    };
+    if (weightMap[unit] !== undefined) {
+      const totalG = bottle.packQty * weightMap[unit];
+      return totalG > 0 ? -(bottle.priceCny / totalG) : null; // 负数表示每克单价
+    }
+    // 计件单位 → 返回 NaN（调用方需特殊处理）
+    const countUnits = new Set(["个", "听", "瓶", "袋", "罐", "盒", "箱", "打", "pc", "pcs", "piece", "pieces", "can", "bottle", "box", "case"]);
+    if (countUnits.has(unit)) {
+      return NaN; // 标记为计件，调用方用 packQty/priceCny 直接算单件价
+    }
+  }
+  // 回退：解析 volume 字符串（旧数据兼容）
   const vol = parseVolumeToMl(bottle.volume);
   if (!vol) return null;
   return bottle.priceCny / vol;
@@ -164,6 +191,37 @@ export function estimateIngredientCostSmart(
         reason: link.bottle.priceCny > 0 ? "no_volume" : "no_price",
       };
     }
+    // 计件模式（bottleUnitPrice 返回 NaN）
+    if (isNaN(unit)) {
+      const packQty = link.bottle.packQty ?? 1;
+      const piecePrice = link.bottle.priceCny / packQty;
+      // 从用量字符串解析件数（如 "0.25 个" → 0.25）
+      const countRaw = ing.amount?.trim() ?? "";
+      const countMatch = countRaw.match(/^(\d+(?:[./]\d+)?)/);
+      let count = 1;
+      if (countMatch) {
+        const raw = countMatch[1];
+        if (raw.includes("/")) {
+          const [n, d] = raw.split("/").map(Number);
+          count = d > 0 ? n / d : 1;
+        } else {
+          count = parseFloat(raw) || 1;
+        }
+      }
+      return { ingredient: ing, link, amountMl, cost: piecePrice * count, reason: null };
+    }
+    // 重量模式（bottleUnitPrice 返回负数，绝对值 = 每克单价）
+    if (unit < 0) {
+      const pricePerG = -unit;
+      // 尝试从用量字符串解析克重
+      const amountG = parseWeightToG(ing.amount);
+      if (amountG !== null && amountG > 0) {
+        return { ingredient: ing, link, amountMl, cost: pricePerG * amountG, reason: null };
+      }
+      // 用量无法解析为重量 → 无法计算
+      return { ingredient: ing, link, amountMl, cost: null, reason: "no_amount" };
+    }
+    // 液体模式（unit = 每 ml 单价）
     if (amountMl === null) {
       return { ingredient: ing, link, amountMl: null, cost: null, reason: "no_amount" };
     }
@@ -212,6 +270,34 @@ export function estimateRecipeCostSmart(
 import { calcGarnishCostPerUnit } from "../homemade/types";
 
 /**
+ * 解析用量字符串中的克重值（用于重量计价的原料）。
+ * 支持：g/kg/斤/两/钱/lb/oz_s/stone/tonne
+ * 返回 null 表示无法解析为重量。
+ */
+function parseWeightToG(amount: string): number | null {
+  if (!amount?.trim()) return null;
+  const a = amount.trim().toLowerCase();
+  const m = a.match(/^(\d+(?:[./]\d+)?)\s*(.*)$/);
+  if (!m) return null;
+  const num = parseFloat(m[1]);
+  if (isNaN(num) || num <= 0) return null;
+  const u = m[2].trim();
+  const weightMap: Record<string, number> = {
+    g: 1, "克": 1,
+    kg: 1000, "千克": 1000, "公斤": 1000,
+    "斤": 500, "市斤": 500,
+    "两": 50, "市两": 50,
+    "钱": 5, "市钱": 5,
+    lb: 454, "磅": 454,
+    oz_s: 28, "oz solid": 28,
+    stone: 6350, "英石": 6350,
+    tonne: 1_000_000, "公吨": 1_000_000,
+  };
+  if (weightMap[u] !== undefined) return num * weightMap[u];
+  return null;
+}
+
+/**
  * 解析装饰类成分的件数：
  * - 纯数字（"1"、"2"）→ 直接取
  * - 带单位（"2 片"、"1 枝"、"3 pieces"）→ 提取数字
@@ -229,7 +315,8 @@ function parseGarnishCount(amount: string): number {
     const raw = m[1];
     if (raw.includes("/")) {
       const [n, d] = raw.split("/").map(Number);
-      return d > 0 ? Math.max(1, Math.round(n / d)) : 1;
+      // Bug B1 修复：允许分数 < 1（如 0.25 个柠檬），不再强制 Math.max(1, ...)
+      return d > 0 ? n / d : 1;
     }
     const n = parseFloat(raw);
     return isNaN(n) || n <= 0 ? 1 : n;

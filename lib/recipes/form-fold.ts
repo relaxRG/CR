@@ -95,6 +95,25 @@ function parsePackPieces(volume: string, pieceGrams: number): number | null {
   if (m) return (Number(m[1]) * 1000) / pieceGrams;
   m = v.match(/(\d+(?:\.\d+)?)\s*(g|克)/);
   if (m) return Number(m[1]) / pieceGrams;
+  // 中国市斤/两/钱
+  m = v.match(/(\d+(?:\.\d+)?)\s*(斤|市斤)/);
+  if (m) return (Number(m[1]) * 500) / pieceGrams;
+  m = v.match(/(\d+(?:\.\d+)?)\s*(两|市两)/);
+  if (m) return (Number(m[1]) * 50) / pieceGrams;
+  m = v.match(/(\d+(?:\.\d+)?)\s*(钱|市钱)/);
+  if (m) return (Number(m[1]) * 5) / pieceGrams;
+  // 国际重量单位
+  m = v.match(/(\d+(?:\.\d+)?)\s*(lb|磅)/);
+  if (m) return (Number(m[1]) * 454) / pieceGrams;
+  m = v.match(/(\d+(?:\.\d+)?)\s*(oz_s|oz\s*solid|固体盎司)/);
+  if (m) return (Number(m[1]) * 28) / pieceGrams;
+  m = v.match(/(\d+(?:\.\d+)?)\s*(stone|英石)/);
+  if (m) return (Number(m[1]) * 6350) / pieceGrams;
+  m = v.match(/(\d+(?:\.\d+)?)\s*(tonne|公吨)/);
+  if (m) return (Number(m[1]) * 1_000_000) / pieceGrams;
+  // 纯数字（无单位）→ 视为件数，例如 "10" 表示 10 个
+  m = v.match(/^(\d+(?:\.\d+)?)$/);
+  if (m) return Number(m[1]);
   return null;
 }
 

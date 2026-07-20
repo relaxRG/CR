@@ -857,6 +857,23 @@ const dict = {
   "menu.addRecipe.selectGroup": { zh: "选择分组", en: "Select Group" },
   "menu.addRecipe.added": { zh: "已在门店酒单中", en: "In menu" },
   "menu.addRecipe.success": { zh: "已加入\"{g}\"", en: "Added to \"{g}\"" },
+  // ── 单位组 ──
+  "unit.group.weight": { zh: "重量", en: "Weight" },
+  // ── 酒库/原料库三段式定价 ──
+  "bform.packQty": { zh: "包装数量", en: "Pack Qty" },
+  "bform.packUnit": { zh: "包装单位", en: "Pack Unit" },
+  "bform.packPrice": { zh: "参考价（元）", en: "Price (CNY)" },
+  "bform.packHint": { zh: "例：10个 → ¥8，即每个¥0.8", en: "e.g. 10 pcs → ¥8, i.e. ¥0.8/pc" },
+  "bform.packUnitHint": { zh: "选择单位", en: "Select unit" },
+  // ── 自制原料结构化产量 ──
+  "hmform.yieldQty": { zh: "产量数量", en: "Yield Qty" },
+  "hmform.yieldUnit": { zh: "产量单位", en: "Yield Unit" },
+  "hmform.batchCostTotal": { zh: "原料总成本（元）", en: "Total Material Cost (CNY)" },
+  "hmform.batchCostHint": { zh: "填写本批次所有原料总花费，系统自动折算每单位成本", en: "Enter total material cost for this batch; cost per unit is calculated automatically" },
+  "hmform.costPerUnitCalc": { zh: "每{unit}成本：¥{cost}", en: "Cost per {unit}: ¥{cost}" },
+  // ── 成本展示（通用单位） ──
+  "hm.cost.perUnitGeneric": { zh: "¥{cost}/{unit}", en: "¥{cost}/{unit}" },
+  "hm.cost.fromBatchTotal": { zh: "原料总成本 ÷ 产量", en: "Total material cost ÷ yield" },
 } as const;
 
 export type TranslationKey = keyof typeof dict;

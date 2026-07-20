@@ -34,6 +34,8 @@ export type BulkImportItem = {
   abv: number;
   priceCny: number;
   prepIngredients: string[];
+  packQty?: number;
+  packUnit?: string;
   prepRecipe: string;
   prepYield: string;
   shelfLife: string;
