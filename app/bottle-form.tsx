@@ -28,7 +28,7 @@ import { enrichBottle, OfflineError } from "@/lib/api/smart-router";
 import { lookupInOfflineKb, extractBookSnippets, offlineEntryToEnrichResult } from "@/lib/bottles/offline-lookup";
 import { useBookStore } from "@/lib/books/store";
 import * as ImagePicker from "expo-image-picker";
-import { BOTTLE_GROUPS } from "@/lib/bottles/types";
+import { BOTTLE_GROUPS, bottleGroupOf } from "@/lib/bottles/types";
 
 const FLAVOR_TAGS_ALL = ["草本","果味","柑橘","花香","甜润","酸爽","苦韵","辛香","烟熏","咸鲜","清爽","浓郁","坚果","奶油","干爽","热带","焦糖","咖啡","巧克力","泥煤","蜂蜜","香草","坚硬","辛辣"];
 
@@ -1045,7 +1045,7 @@ export default function BottleFormScreen() {
           </View>
 
           {/* ── 分区四：风味与描述 ── */}
-          {sectionTitle(lang === "zh" ? "风味与描述" : "Flavor & Description")}
+          {sectionTitle(lang === "zh" ? "风味标签与介绍" : "Flavor & Description")}
           <View style={{ paddingHorizontal: 20 }}>
             {/* 风味标签 */}
             <Text style={[styles.fieldLabel, { color: colors.foreground, marginBottom: 8 }]}>
@@ -1081,56 +1081,141 @@ export default function BottleFormScreen() {
             {field(lang === "zh" ? "故事 / 介绍" : "Story", story, setStory,
               lang === "en" ? "Brief product story or description…" : "产品故事或简介…",
               { multiline: true })}
-            {field(lang === "zh" ? "风格描述" : "Style Description", styleDesc, setStyleDesc,
-              lang === "en" ? "Style characteristics…" : "风格特点描述…")}
+            {/* 风格描述：仅在原材料库或软饮库中显示（基酒库/酒款库已在分区五有专属字段） */}
+            {(() => {
+              const eg = (libraryOverride && libraryOverride !== 'homemade')
+                ? libraryOverride
+                : bottleGroupOf(category);
+              if (eg === "spirits" || eg === "bottles") return null;
+              return field(
+                lang === "zh" ? "风格描述" : "Style Description",
+                styleDesc, setStyleDesc,
+                lang === "en" ? "Style characteristics…" : "风格特点描述…"
+              );
+            })()}
           </View>
 
           {/* ── 分区五：深度资料（按库类型条件显示） ── */}
           {(() => {
-            const BASE_SPIRITS = ["金酒","朗姆","伏特加","威士忌","龙舌兰","白兰地","清酒烧酒","中式白酒"];
-            const WINE_SPIRITS = ["利口酒","苦精","味美思","开胃酒","起泡酒","葡萄酒","糖浆","软饮"];
-            const RAW_MATERIALS = ["糖与甜味剂","果蔬","香料与草本","花卉","茶咖与可可","坚果与谷物","乳蛋","酸类与添加剂"];
-            const isBase = BASE_SPIRITS.includes(category);
-            const isWine = WINE_SPIRITS.includes(category);
-            const isMaterial = RAW_MATERIALS.includes(category);
-            if (!isBase && !isWine && !isMaterial) return null;
-            const deepSectionTitle = lang === "zh"
-              ? isBase ? "蒸馏厂资料" : isWine ? "搭配建议" : "调酒用途"
-              : isBase ? "Distillery Info" : isWine ? "Pairing Notes" : "Usage Notes";
-            return (
-              <>
-                {sectionTitle(deepSectionTitle)}
-                <View style={{ paddingHorizontal: 20 }}>
-                  {isBase && field(
-                    lang === "zh" ? "蒸馏厂 / 酒厂简介" : "Distillery Info",
-                    distilleryInfo, setDistilleryInfo,
-                    lang === "en" ? "e.g. Copper pot still, Highland Scotland…" : "例如：铜壶蒸馏，苏格兰高地产区…",
-                    { multiline: true }
-                  )}
-                  {isWine && field(
-                    lang === "zh" ? "搭配建议" : "Pairing Notes",
-                    pairingNotes, setPairingNotes,
-                    lang === "en" ? "e.g. Great in Negroni, Aperol Spritz…" : "例如：适合 Negroni、Aperol Spritz…",
-                    { multiline: true }
-                  )}
-                  {isMaterial && (
-                    <>
-                      {field(
-                        lang === "zh" ? "调酒用途" : "Usage Notes",
-                        usageNotes, setUsageNotes,
-                        lang === "en" ? "e.g. Citrus peel for Martini garnish…" : "例如：皮油常用于 Martini 装饰…",
-                        { multiline: true }
-                      )}
-                      {field(
-                        lang === "zh" ? "季节性" : "Seasonality",
-                        seasonality, setSeasonality,
-                        lang === "en" ? "e.g. Best in spring…" : "例如：春季最佳"
-                      )}
-                    </>
-                  )}
-                </View>
-              </>
-            );
+            // 计算当前条目实际所属库（libraryOverride 优先，否则按 category 推断）
+            const effectiveGroup = (libraryOverride && libraryOverride !== 'homemade')
+              ? libraryOverride
+              : bottleGroupOf(category);
+
+            if (effectiveGroup === "spirits") {
+              // ── 基酒库专属深度资料 ──────────────────────────────────────────
+              return (
+                <>
+                  {sectionTitle(lang === "zh" ? "蒸馏厂与工艺" : "Distillery & Craft")}
+                  <View style={{ paddingHorizontal: 20 }}>
+                    {field(
+                      lang === "zh" ? "蒸馏厂 / 酒厂简介" : "Distillery Info",
+                      distilleryInfo, setDistilleryInfo,
+                      lang === "en"
+                        ? "e.g. Copper pot still, Highland Scotland…"
+                        : "例如：铜壶蒸馏，苏格兰高地产区…",
+                      { multiline: true }
+                    )}
+                    {field(
+                      lang === "zh" ? "桶型与陈年工艺" : "Cask & Aging",
+                      styleDesc, setStyleDesc,
+                      lang === "en"
+                        ? "e.g. Ex-Bourbon Cask, 12yr, Sherry Finish…"
+                        : "例如：Ex-Bourbon 桶，12年，Sherry 过桶…"
+                    )}
+                    {field(
+                      lang === "zh" ? "可替代酒款" : "Substitute For",
+                      substituteFor, setSubstituteFor,
+                      lang === "en"
+                        ? "e.g. Mezcal can replace Tequila in Margarita"
+                        : "例如：梅斯卡尔可替代玛格丽特中的龙舌兰"
+                    )}
+                    {field(
+                      lang === "zh" ? "搭配使用的酒款" : "Pairs Well With",
+                      pairsWith, setPairsWith,
+                      lang === "en"
+                        ? "e.g. Campari, Sweet Vermouth"
+                        : "例如：金巴利、甜味美思"
+                    )}
+                  </View>
+                </>
+              );
+            }
+
+            if (effectiveGroup === "bottles") {
+              // ── 酒款库专属深度资料 ──────────────────────────────────────────
+              return (
+                <>
+                  {sectionTitle(lang === "zh" ? "口感与调酒用途" : "Taste & Usage")}
+                  <View style={{ paddingHorizontal: 20 }}>
+                    {field(
+                      lang === "zh" ? "甜度与口感描述" : "Sweetness & Taste",
+                      styleDesc, setStyleDesc,
+                      lang === "en"
+                        ? "e.g. Dry, Off-Dry, Semi-Sweet, herbal bitterness…"
+                        : "例如：干型、微甜、草本苦韵、柑橘酸爽…"
+                    )}
+                    {field(
+                      lang === "zh" ? "调酒用途" : "Cocktail Usage",
+                      usageNotes, setUsageNotes,
+                      lang === "en"
+                        ? "e.g. Base for Negroni, modifier in Spritz…"
+                        : "例如：Negroni 基底，Spritz 调味剂…",
+                      { multiline: true }
+                    )}
+                    {field(
+                      lang === "zh" ? "搭配建议" : "Pairing Notes",
+                      pairingNotes, setPairingNotes,
+                      lang === "en"
+                        ? "e.g. Great in Aperol Spritz, Negroni…"
+                        : "例如：适合 Aperol Spritz、Negroni…",
+                      { multiline: true }
+                    )}
+                    {field(
+                      lang === "zh" ? "可替代酒款" : "Substitute For",
+                      substituteFor, setSubstituteFor,
+                      lang === "en"
+                        ? "e.g. Aperol can replace Campari for a milder Negroni"
+                        : "例如：Aperol 可替代金巴利做更温和的 Negroni"
+                    )}
+                    {field(
+                      lang === "zh" ? "搭配使用的酒款" : "Pairs Well With",
+                      pairsWith, setPairsWith,
+                      lang === "en"
+                        ? "e.g. Gin, Prosecco, Sweet Vermouth"
+                        : "例如：金酒、普罗塞克、甜味美思"
+                    )}
+                  </View>
+                </>
+              );
+            }
+
+            if (effectiveGroup === "materials") {
+              // ── 原材料库专属深度资料 ────────────────────────────────────────
+              return (
+                <>
+                  {sectionTitle(lang === "zh" ? "调酒用途" : "Usage Notes")}
+                  <View style={{ paddingHorizontal: 20 }}>
+                    {field(
+                      lang === "zh" ? "调酒用途" : "Usage Notes",
+                      usageNotes, setUsageNotes,
+                      lang === "en"
+                        ? "e.g. Citrus peel for Martini garnish…"
+                        : "例如：皮油常用于 Martini 装饰…",
+                      { multiline: true }
+                    )}
+                    {field(
+                      lang === "zh" ? "季节性" : "Seasonality",
+                      seasonality, setSeasonality,
+                      lang === "en" ? "e.g. Best in spring…" : "例如：春季最佳"
+                    )}
+                  </View>
+                </>
+              );
+            }
+
+            // softdrinks / 其他：无深度资料区
+            return null;
           })()}
         </ScrollView>
 
