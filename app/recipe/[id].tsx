@@ -60,6 +60,7 @@ import {
   localizedTagName,
   type SourceRef,
 } from "@/lib/recipes/types";
+import { FLAVOR_TAG_DEFAULT_COLORS } from "@/lib/settings/card-tags";
 
 export default function RecipeDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -461,14 +462,18 @@ export default function RecipeDetailScreen() {
                 className={cn("flex-row flex-wrap", (category || recipe.codexFamily || recipe.drinkDuration || recipe.occasion) ? "mt-2" : "")}
                 style={{ gap: 8 }}
               >
-                {recipe.flavors.map((tag) => (
-                  <View
-                    key={tag}
-                    className="px-3 py-1.5 rounded-full bg-surface border border-border"
-                  >
-                    <Text className="text-sm text-muted">{tagLabel("flavor", tag)}</Text>
-                  </View>
-                ))}
+                {recipe.flavors.map((tag) => {
+                  const flavorTag = tags.find((tg) => tg.kind === "flavor" && tg.name === tag);
+                  const tint = flavorTag?.color ?? FLAVOR_TAG_DEFAULT_COLORS[tag] ?? "#FF9500";
+                  return (
+                    <View
+                      key={tag}
+                      style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: tint + "22" }}
+                    >
+                      <Text style={{ fontSize: 14, color: tint }}>{tagLabel("flavor", tag)}</Text>
+                    </View>
+                  );
+                })}
               </View>
             ) : null}
           </View>

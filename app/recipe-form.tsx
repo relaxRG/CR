@@ -1993,15 +1993,16 @@ export default function RecipeFormScreen() {
               { key: "aroma",   tags: FLAVOR_AROMA_TAGS },
               { key: "texture", tags: FLAVOR_TEXTURE_TAGS },
             ] as const
-          ).map(({ key, tags }) => (
+          ).map(({ key, tags: flavorTagList }) => (
             <View key={key} style={{ marginBottom: 6 }}>
               <Text className="text-xs text-muted mb-1.5" style={{ lineHeight: 16 }}>
                 {lang === "zh" ? FLAVOR_LAYER_LABELS[key].zh : FLAVOR_LAYER_LABELS[key].en}
               </Text>
               <View style={styles.chipWrap}>
-                {tags.map((tag) => {
+                {flavorTagList.map((tag) => {
                   const active = flavors.includes(tag);
-                  const tint = FLAVOR_TAG_DEFAULT_COLORS[tag] ?? "#007AFF";
+                  const storeTag = tags.find((tg) => tg.kind === "flavor" && tg.name === tag);
+                  const tint = storeTag?.color ?? FLAVOR_TAG_DEFAULT_COLORS[tag] ?? "#007AFF";
                   return (
                     <Pressable
                       key={tag}

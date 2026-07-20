@@ -155,7 +155,8 @@ export function useRecipeTagRows(
 
     if (slot === "baseSpirit") {
       if (!recipe.baseSpirit) return null;
-      const color = customColors.baseSpirit;
+      const spiritTag = tags.find((tg) => tg.kind === "spirit" && tg.name === recipe.baseSpirit);
+      const color = customColors.baseSpirit ?? spiritTag?.color;
       if (color) {
         return (
           <Pressable
@@ -319,8 +320,9 @@ export function useRecipeTagRows(
   /** 渲染风味标签 badge */
   const renderFlavorBadge = (f: string, small = false) => {
     const cfg = getFlavorTagConfig(f, flavorConfigs);
+    const flavorTag = tags.find((tg) => tg.kind === "flavor" && tg.name === f);
     const tagColor =
-      customColors.flavors ?? cfg.color ?? FLAVOR_TAG_DEFAULT_COLORS[f] ?? "#FF9500";
+      customColors.flavors ?? flavorTag?.color ?? cfg.color ?? FLAVOR_TAG_DEFAULT_COLORS[f] ?? "#FF9500";
     const pillStyle = small ? tagStyles.pillSmall : tagStyles.pill;
     const textStyle = small ? tagStyles.pillTextSmall : tagStyles.pillText;
     return (

@@ -31,7 +31,7 @@ import { useColors } from "@/hooks/use-colors";
 import { displayNames } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 import { useRecipeStore } from "@/lib/recipes/store";
-import { CATEGORY_COLORS, TagGroup, TagKind } from "@/lib/recipes/types";
+import { CATEGORY_COLORS, CategoryGroup, TagGroup, TagKind } from "@/lib/recipes/types";
 
 type SectionKey = "category" | TagKind | "bottleCat" | "prepSec";
 
@@ -125,11 +125,13 @@ function TagChip({
   color,
   onPress,
   onColorPress,
+  locked,
 }: {
   name: string;
   color: string;
   onPress: () => void;
   onColorPress?: () => void;
+  locked?: boolean;
 }) {
   const bg = color + "22";
   return (
@@ -148,6 +150,9 @@ function TagChip({
       <Text style={[styles.chipText, { color }]} numberOfLines={1}>
         {name}
       </Text>
+      {locked ? (
+        <IconSymbol name="lock.fill" size={10} color={color} />
+      ) : null}
     </Pressable>
   );
 }
@@ -180,6 +185,8 @@ function GroupCard({
   onAddTag,
   onEditGroup,
   onDeleteGroup,
+  onToggleLockGroup,
+  onToggleLockTag,
 }: {
   group: TagGroup | null;
   items: RowData[];
@@ -207,6 +214,8 @@ function GroupCard({
   onAddTag: (groupId: string | null) => void;
   onEditGroup: (g: TagGroup) => void;
   onDeleteGroup: (g: TagGroup) => void;
+  onToggleLockGroup?: (g: TagGroup) => void;
+  onToggleLockTag?: (item: RowData) => void;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [colorPickerId, setColorPickerId] = useState<string | null>(null);
@@ -214,6 +223,8 @@ function GroupCard({
   const groupName = group
     ? displayNames(group.nameEn ?? "", group.name, lang).primary
     : t("tg.ungrouped");
+  const isFlavorFixed = group?.flavorLayer != null;
+  const isGroupLocked = group?.locked ?? false;
 
   return (
     <View style={[styles.groupCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -250,73 +261,111 @@ function GroupCard({
           onPress={() => setCollapsed((v) => !v)}
           style={({ pressed }) => [styles.groupCardHead, pressed && { opacity: 0.7 }]}
         >
-        <Text style={[styles.groupCardTitle, { color: colors.foreground }]} numberOfLines={1}>
-          {groupName}
-          <Text style={[styles.groupCardCount, { color: colors.muted }]}>
-            {"  "}{items.length}
-          </Text>
-        </Text>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          {group ? (
-            <Pressable
-              hitSlop={8}
-              onPress={() => {
-                if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                if (Platform.OS === "ios") {
-                  ActionSheetIOS.showActionSheetWithOptions(
-                    {
-                      options: [t("common.cancel"), t("tags.edit.zh"), t("common.delete")],
-                      cancelButtonIndex: 0,
-                      destructiveButtonIndex: 2,
-                    },
-                    (idx) => {
-                      if (idx === 1) { onEditGroup(group); setIsRenaming(true); }
-                      if (idx === 2) onDeleteGroup(group);
-                    },
-                  );
-                } else {
-                  Alert.alert(groupName, undefined, [
-                    { text: t("common.cancel"), style: "cancel" },
-                    { text: t("tags.edit.zh"), onPress: () => { onEditGroup(group); setIsRenaming(true); } },
-                    { text: t("common.delete"), style: "destructive", onPress: () => onDeleteGroup(group) },
-                  ]);
-                }
-              }}
-              style={({ pressed }) => [pressed && { opacity: 0.6 }]}
-            >
-              <IconSymbol name="ellipsis.circle" size={20} color={colors.muted} />
-            </Pressable>
-          ) : null}
-          <IconSymbol
-            name={collapsed ? "chevron.right" : "chevron.down"}
-            size={16}
-            color={colors.muted}
-          />
-        </View>
-      </Pressable>
+          <View style={{ flexDirection: "row", alignItems: "center", flex: 1, gap: 6 }}>
+            {isGroupLocked ? (
+              <IconSymbol name="lock.fill" size={14} color={colors.muted} />
+            ) : null}
+            <Text style={[styles.groupCardTitle, { color: colors.foreground }]} numberOfLines={1}>
+              {groupName}
+              <Text style={[styles.groupCardCount, { color: colors.muted }]}>
+                {"  "}{items.length}
+              </Text>
+            </Text>
+          </View>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            {group && !isFlavorFixed ? (
+              <Pressable
+                hitSlop={8}
+                onPress={() => {
+                  if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  const lockOpt = isGroupLocked ? t("tg.unlock") : t("tg.lock");
+                  if (Platform.OS === "ios") {
+                    const opts = isGroupLocked
+                      ? [t("common.cancel"), lockOpt, t("tags.edit.zh")]
+                      : [t("common.cancel"), lockOpt, t("tags.edit.zh"), t("common.delete")];
+                    ActionSheetIOS.showActionSheetWithOptions(
+                      {
+                        options: opts,
+                        cancelButtonIndex: 0,
+                        destructiveButtonIndex: isGroupLocked ? undefined : opts.length - 1,
+                      },
+                      (idx) => {
+                        if (idx === 1) onToggleLockGroup?.(group);
+                        if (idx === 2) { onEditGroup(group); setIsRenaming(true); }
+                        if (!isGroupLocked && idx === 3) onDeleteGroup(group);
+                      },
+                    );
+                  } else {
+                    const btns: any[] = [
+                      { text: t("common.cancel"), style: "cancel" },
+                      { text: lockOpt, onPress: () => onToggleLockGroup?.(group) },
+                      { text: t("tags.edit.zh"), onPress: () => { onEditGroup(group); setIsRenaming(true); } },
+                    ];
+                    if (!isGroupLocked) btns.push({ text: t("common.delete"), style: "destructive", onPress: () => onDeleteGroup(group) });
+                    Alert.alert(groupName, undefined, btns);
+                  }
+                }}
+                style={({ pressed }) => [pressed && { opacity: 0.6 }]}
+              >
+                <IconSymbol name="ellipsis.circle" size={20} color={colors.muted} />
+              </Pressable>
+            ) : group && isFlavorFixed ? (
+              <Pressable
+                hitSlop={8}
+                onPress={() => {
+                  if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  if (Platform.OS === "ios") {
+                    ActionSheetIOS.showActionSheetWithOptions(
+                      { options: [t("common.cancel"), t("tags.edit.zh")], cancelButtonIndex: 0 },
+                      (idx) => { if (idx === 1) { onEditGroup(group); setIsRenaming(true); } },
+                    );
+                  } else {
+                    Alert.alert(groupName, t("tg.flavorFixed"), [
+                      { text: t("common.cancel"), style: "cancel" },
+                      { text: t("tags.edit.zh"), onPress: () => { onEditGroup(group); setIsRenaming(true); } },
+                    ]);
+                  }
+                }}
+                style={({ pressed }) => [pressed && { opacity: 0.6 }]}
+              >
+                <IconSymbol name="ellipsis.circle" size={20} color={colors.muted} />
+              </Pressable>
+            ) : null}
+            <IconSymbol
+              name={collapsed ? "chevron.right" : "chevron.down"}
+              size={16}
+              color={colors.muted}
+            />
+          </View>
+        </Pressable>
       )}
 
       {/* Chip 墙 */}
       {!collapsed ? (
         <View style={styles.chipWall}>
-          {items.map((item) => (
-            <TagChip
-              key={item.id}
-              name={displayNames(item.nameEn, item.name, lang).primary}
-              color={item.color}
-              onPress={() => {
-                if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setEditingId(editingId === item.id ? null : item.id);
-                setEditingName(item.name);
-                setEditingNameEn(item.nameEn);
-                setColorPickerId(editingId === item.id ? null : item.id);
-              }}
-              onColorPress={() => {
-                if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setColorPickerId(colorPickerId === item.id ? null : item.id);
-              }}
-            />
-          ))}
+          {items.map((item) => {
+            const isItemLocked = (item as any).locked ?? false;
+            return (
+              <View key={item.id} style={{ position: "relative" }}>
+                <TagChip
+                  name={displayNames(item.nameEn, item.name, lang).primary}
+                  color={item.color}
+                  locked={isItemLocked}
+                  onPress={() => {
+                    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setEditingId(editingId === item.id ? null : item.id);
+                    setEditingName(item.name);
+                    setEditingNameEn(item.nameEn);
+                    setColorPickerId(editingId === item.id ? null : item.id);
+                  }}
+                  onColorPress={() => {
+                    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setColorPickerId(colorPickerId === item.id ? null : item.id);
+                  }}
+                />
+              </View>
+            );
+          })}
           {/* 添加虚线 chip */}
           <Pressable
             onPress={() => onAddTag(group?.id ?? null)}
@@ -340,9 +389,9 @@ function GroupCard({
       {/* 编辑抽屉（点击 chip 后展开） */}
       {editingId && items.some((i) => i.id === editingId) && colorPickerId ? (
         <View style={[styles.editDrawer, { borderTopColor: colors.border }]}>
-          {/* 颜色选择器 — 通过 Sheet 弹出 */}
           {(() => {
             const item = items.find((i) => i.id === editingId)!;
+            const isItemLocked = (item as any).locked ?? false;
             return (
               <>
                 <View style={{ flexDirection: "row", gap: 8, marginBottom: 8 }}>
@@ -394,9 +443,19 @@ function GroupCard({
                   <Pressable onPress={commitEdit} hitSlop={8} style={({ pressed }) => [pressed && { opacity: 0.6 }]}>
                     <IconSymbol name="checkmark" size={22} color={colors.primary} />
                   </Pressable>
-                  <Pressable onPress={() => confirmDelete(item)} hitSlop={8} style={({ pressed }) => [pressed && { opacity: 0.6 }]}>
-                    <IconSymbol name="trash.fill" size={20} color={colors.error} />
+                  {/* 锁定/解锁按钮 */}
+                  <Pressable
+                    onPress={() => { onToggleLockTag?.(item); if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); }}
+                    hitSlop={8}
+                    style={({ pressed }) => [pressed && { opacity: 0.6 }]}
+                  >
+                    <IconSymbol name={isItemLocked ? "lock.fill" : "lock.open.fill"} size={18} color={isItemLocked ? colors.primary : colors.muted} />
                   </Pressable>
+                  {!isItemLocked ? (
+                    <Pressable onPress={() => confirmDelete(item)} hitSlop={8} style={({ pressed }) => [pressed && { opacity: 0.6 }]}>
+                      <IconSymbol name="trash.fill" size={20} color={colors.error} />
+                    </Pressable>
+                  ) : null}
                 </View>
                 {/* 分组选择 */}
                 {groupPickerId === item.id ? (
@@ -440,6 +499,7 @@ export default function CategoriesScreen() {
   const { t, lang } = useI18n();
   const {
     categories,
+    categoryGroups,
     recipes,
     tags,
     tagGroups,
@@ -449,6 +509,12 @@ export default function CategoriesScreen() {
     setCategoryColor,
     deleteCategory,
     reorderCategories,
+    addCategoryGroup,
+    renameCategoryGroup,
+    setCategoryGroupNameEn,
+    deleteCategoryGroup,
+    reorderCategoryGroups,
+    setCategoryGroup,
     addTag,
     renameTag,
     setTagNameEn,
@@ -462,6 +528,10 @@ export default function CategoriesScreen() {
     reorderTagGroups,
     setTagGroup,
     tagGroupsOf,
+    toggleTagLocked,
+    toggleTagGroupLocked,
+    toggleCategoryLocked,
+    toggleCategoryGroupLocked,
   } = useRecipeStore();
 
   const [section, setSection] = useState<SectionKey>("category");
@@ -483,11 +553,10 @@ export default function CategoriesScreen() {
   const [addTagName, setAddTagName] = useState("");
   const [addTagColor, setAddTagColor] = useState<string>(CATEGORY_COLORS[0]);
   const [addTagColorPickerOpen, setAddTagColorPickerOpen] = useState(false);
+  // 添加分组 sheet（category 专用）
+  const [showAddCategoryGroup, setShowAddCategoryGroup] = useState(false);
 
-  // 系统标签颜色选择器（独立 state，与普通 colorPickerId 隔离）
-  const [systemColorPickerId, setSystemColorPickerId] = useState<string | null>(null);
-  const [systemCollapsed, setSystemCollapsed] = useState(false);
-
+  // ── 行数据 ──────────────────────────────────────────────────────────────────
   const rows: RowData[] = useMemo(() => {
     if (section === "category") {
       return categories.map((c) => ({
@@ -496,6 +565,8 @@ export default function CategoriesScreen() {
         nameEn: c.nameEn ?? "",
         color: c.color,
         count: recipes.filter((r) => r.categoryId === c.id).length,
+        groupId: c.groupId ?? null,
+        locked: c.locked,
       }));
     }
     if (!isTagKind(section)) return [];
@@ -507,25 +578,37 @@ export default function CategoriesScreen() {
         nameEn: t.nameEn ?? "",
         color: t.color,
         groupId: t.groupId ?? null,
+        locked: t.locked,
         count:
           section === "spirit"
             ? recipes.filter((r) => r.baseSpirit === t.name).length
             : section === "glass"
               ? recipes.filter((r) => r.glass === t.name).length
-              : section === "duration"
-                ? recipes.filter((r) => r.drinkDuration === t.name).length
-                : section === "occasion"
-                  ? recipes.filter((r) => r.occasion === t.name).length
-                  : recipes.filter((r) => r.flavors.includes(t.name)).length,
+              : recipes.filter((r) => r.flavors.includes(t.name)).length,
       }));
   }, [section, categories, tags, recipes]);
 
+  // ── 分组数据 ────────────────────────────────────────────────────────────────
   const groups: TagGroup[] = useMemo(
     () => (isTagKind(section) ? tagGroupsOf(section) : []),
     [section, tagGroupsOf],
   );
 
+  const catGroups: CategoryGroup[] = useMemo(
+    () => (section === "category" ? categoryGroups : []),
+    [section, categoryGroups],
+  );
+
   const groupedBlocks = useMemo(() => {
+    if (section === "category") {
+      const blocks: { group: CategoryGroup | null; items: RowData[] }[] = [];
+      for (const g of catGroups) {
+        blocks.push({ group: g, items: rows.filter((r) => r.groupId === g.id) });
+      }
+      const grouped = new Set(catGroups.map((g) => g.id));
+      blocks.push({ group: null, items: rows.filter((r) => !r.groupId || !grouped.has(r.groupId)) });
+      return blocks;
+    }
     if (!isTagKind(section)) return null;
     const blocks: { group: TagGroup | null; items: RowData[] }[] = [];
     for (const g of groups) {
@@ -534,7 +617,7 @@ export default function CategoriesScreen() {
     const grouped = new Set(groups.map((g) => g.id));
     blocks.push({ group: null, items: rows.filter((r) => !r.groupId || !grouped.has(r.groupId)) });
     return blocks;
-  }, [section, groups, rows]);
+  }, [section, catGroups, groups, rows]);
 
   const sectionLabel = t(SECTION_LABEL_KEY[section]);
 
@@ -586,6 +669,11 @@ export default function CategoriesScreen() {
   };
 
   const confirmDelete = (row: RowData) => {
+    // locked 检查
+    if ((row as any).locked) {
+      Alert.alert(t("tg.locked.hint"), undefined, [{ text: t("common.cancel"), style: "cancel" }]);
+      return;
+    }
     let message = t("tags.delete.confirm", { name: row.name });
     if (section === "category" && row.count > 0) {
       message = lang === "zh"
@@ -633,156 +721,317 @@ export default function CategoriesScreen() {
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
-  const handleAddGroup = () => {
-    if (!isTagKind(section)) return;
-    const created = addTagGroup(section, newGroupName);
-    if (created) {
-      setNewGroupName("");
-      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }
-  };
-
   const commitGroupEdit = () => {
-    if (editingGroupId && editingGroupName.trim()) renameTagGroup(editingGroupId, editingGroupName);
-    if (editingGroupId) setTagGroupNameEn(editingGroupId, editingGroupNameEn);
+    if (editingGroupId && editingGroupName.trim()) {
+      if (section === "category") renameCategoryGroup(editingGroupId, editingGroupName);
+      else renameTagGroup(editingGroupId, editingGroupName);
+    }
+    if (editingGroupId) {
+      if (section === "category") setCategoryGroupNameEn(editingGroupId, editingGroupNameEn);
+      else setTagGroupNameEn(editingGroupId, editingGroupNameEn);
+    }
     setEditingGroupId(null);
     setEditingGroupName("");
     setEditingGroupNameEn("");
   };
 
-  const confirmDeleteGroup = (g: TagGroup) => {
+  const confirmDeleteGroup = (g: TagGroup | CategoryGroup) => {
+    if (g.locked) {
+      Alert.alert(t("tg.locked.hint"), undefined, [{ text: t("common.cancel"), style: "cancel" }]);
+      return;
+    }
     const message = t("tg.deleteGroup.confirm", { name: g.name });
     if (Platform.OS === "web") {
-      if (typeof window !== "undefined" && window.confirm(message)) deleteTagGroup(g.id);
+      if (typeof window !== "undefined" && window.confirm(message)) {
+        if (section === "category") deleteCategoryGroup(g.id);
+        else deleteTagGroup(g.id);
+      }
       return;
     }
     Alert.alert(t("tg.deleteGroup"), message, [
       { text: t("common.cancel"), style: "cancel" },
-      { text: t("common.delete"), style: "destructive", onPress: () => deleteTagGroup(g.id) },
+      {
+        text: t("common.delete"), style: "destructive",
+        onPress: () => section === "category" ? deleteCategoryGroup(g.id) : deleteTagGroup(g.id),
+      },
     ]);
+  };
+
+  const handleToggleLockGroup = (g: TagGroup | CategoryGroup) => {
+    if (section === "category") toggleCategoryGroupLocked(g.id);
+    else toggleTagGroupLocked(g.id);
+    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   };
 
   // 顶部右侧「＋」ActionSheet
   const handleTopAdd = () => {
     if (MANAGER_SECTIONS.includes(section)) return;
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (Platform.OS === "ios" && isTagKind(section)) {
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options: [t("common.cancel"), t("tags.add.tag", { s: sectionLabel }), t("tg.addGroup")],
-          cancelButtonIndex: 0,
-        },
-        (idx) => {
-          if (idx === 1) setAddTagGroupId(null);
-          if (idx === 2) {
-            // 弹出添加分组 inline
-            setNewGroupName("");
-          }
-        },
-      );
+    const isFlavor = section === "flavor";
+    if (Platform.OS === "ios") {
+      if (section === "category") {
+        ActionSheetIOS.showActionSheetWithOptions(
+          {
+            options: [t("common.cancel"), t("tags.add.category"), t("tg.addGroup")],
+            cancelButtonIndex: 0,
+          },
+          (idx) => {
+            if (idx === 1) setAddTagGroupId(null);
+            if (idx === 2) setShowAddCategoryGroup(true);
+          },
+        );
+      } else if (isTagKind(section) && !isFlavor) {
+        ActionSheetIOS.showActionSheetWithOptions(
+          {
+            options: [t("common.cancel"), t("tags.add.tag", { s: sectionLabel }), t("tg.addGroup")],
+            cancelButtonIndex: 0,
+          },
+          (idx) => {
+            if (idx === 1) setAddTagGroupId(null);
+            if (idx === 2) setNewGroupName("");
+          },
+        );
+      } else {
+        // flavor: 只能添加标签，分组固定
+        setAddTagGroupId(null);
+      }
     } else {
       setAddTagGroupId(null);
     }
   };
 
-  // category 页面：旧式列表行（保留拖拽功能）
-  const renderCategoryRows = () => (
-    <View style={[styles.groupCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      {rows.map((item, index) => {
-        const isEditing = editingId === item.id;
-        const showPicker = colorPickerId === item.id;
-        return (
-          <DraggableRow
-            key={item.id}
-            index={index}
-            total={rows.length}
-            onMove={moveRow}
-            onDragStateChange={(dragging) => setDraggingId(dragging ? item.id : null)}
-          >
-            <View
-              style={[
-                styles.catRow,
-                { borderBottomColor: colors.border },
-                draggingId === item.id ? { backgroundColor: colors.primary + "14" } : { backgroundColor: colors.surface },
-                index === rows.length - 1 ? { borderBottomWidth: 0 } : null,
-              ]}
-            >
-              <View style={{ flexDirection: "row", alignItems: "center" }}>
-                <View style={{ marginRight: 10 }}>
-                  <IconSymbol name="line.3.horizontal" size={18} color={colors.muted} />
-                </View>
-                <Pressable onPress={() => setColorPickerId(showPicker ? null : item.id)} hitSlop={6}>
-                  <View style={[styles.colorDot, { backgroundColor: item.color, marginRight: 12 }]} />
-                </Pressable>
-                {isEditing ? (
-                  <View style={{ flex: 1, gap: 6 }}>
-                    <TextInput
-                      style={[styles.editInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
-                      value={editingName}
-                      onChangeText={setEditingName}
-                      autoFocus
-                      returnKeyType="done"
-                      placeholder={t("tags.edit.zh")}
-                      placeholderTextColor={colors.muted}
-                      onSubmitEditing={commitEdit}
-                    />
-                    <TextInput
-                      style={[styles.editInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
-                      value={editingNameEn}
-                      onChangeText={setEditingNameEn}
-                      returnKeyType="done"
-                      placeholder={t("tags.edit.en")}
-                      placeholderTextColor={colors.muted}
-                      onSubmitEditing={commitEdit}
-                    />
-                  </View>
-                ) : (
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 16, fontWeight: "500", color: colors.foreground }}>
-                      {displayNames(item.nameEn, item.name, lang).primary}
-                    </Text>
-                    <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>
-                      {displayNames(item.nameEn, item.name, lang).secondary
-                        ? `${displayNames(item.nameEn, item.name, lang).secondary} · `
-                        : ""}
-                      {t("tags.count", { n: item.count })}
-                    </Text>
-                  </View>
-                )}
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 16, marginLeft: 8 }}>
-                  {isEditing ? (
-                    <Pressable onPress={commitEdit} hitSlop={8} style={({ pressed }) => [pressed && { opacity: 0.6 }]}>
-                      <IconSymbol name="checkmark" size={22} color={colors.primary} />
-                    </Pressable>
-                  ) : (
-                    <Pressable
-                      onPress={() => { setEditingId(item.id); setEditingName(item.name); setEditingNameEn(item.nameEn); }}
-                      hitSlop={8}
-                      style={({ pressed }) => [pressed && { opacity: 0.6 }]}
-                    >
-                      <IconSymbol name="pencil" size={20} color={colors.muted} />
-                    </Pressable>
-                  )}
-                  <Pressable onPress={() => confirmDelete(item)} hitSlop={8} style={({ pressed }) => [pressed && { opacity: 0.6 }]}>
-                    <IconSymbol name="trash.fill" size={20} color={colors.error} />
-                  </Pressable>
-                </View>
-              </View>
-              {showPicker ? (
-                <IOSColorPickerSheet
-                  visible={showPicker}
-                  value={item.color}
-                  onChange={(c) => pickColor(item.id, c)}
-                  onClose={() => setColorPickerId(null)}
-                  title={t("tags.color.title")}
-                />
-              ) : null}
+  // ── category 分组卡片渲染 ───────────────────────────────────────────────────
+  const renderCategoryGroupCard = (group: CategoryGroup | null, items: RowData[]) => {
+    const groupName = group
+      ? displayNames(group.nameEn ?? "", group.name, lang).primary
+      : t("tg.ungrouped");
+    const isGroupLocked = group?.locked ?? false;
+    const [localCollapsed, setLocalCollapsed] = React.useState(false);
+    const [localRenaming, setLocalRenaming] = React.useState(false);
+
+    return (
+      <View key={group?.id ?? "ungrouped"} style={[styles.groupCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        {/* 卡头 */}
+        {localRenaming && group ? (
+          <View style={[styles.groupCardHead, { gap: 8 }]}>
+            <View style={{ flex: 1, gap: 4 }}>
+              <TextInput
+                style={[styles.editInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
+                value={editingGroupName}
+                onChangeText={setEditingGroupName}
+                autoFocus
+                returnKeyType="done"
+                placeholder={t("tags.edit.zh")}
+                placeholderTextColor={colors.muted}
+                onSubmitEditing={() => { commitGroupEdit(); setLocalRenaming(false); }}
+              />
+              <TextInput
+                style={[styles.editInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
+                value={editingGroupNameEn}
+                onChangeText={setEditingGroupNameEn}
+                returnKeyType="done"
+                placeholder={t("tags.edit.en")}
+                placeholderTextColor={colors.muted}
+                onSubmitEditing={() => { commitGroupEdit(); setLocalRenaming(false); }}
+              />
             </View>
-          </DraggableRow>
-        );
-      })}
-    </View>
-  );
+            <Pressable onPress={() => { commitGroupEdit(); setLocalRenaming(false); }} hitSlop={8} style={({ pressed }) => [pressed && { opacity: 0.6 }]}>
+              <IconSymbol name="checkmark" size={22} color={colors.primary} />
+            </Pressable>
+          </View>
+        ) : (
+          <Pressable
+            onPress={() => setLocalCollapsed((v) => !v)}
+            style={({ pressed }) => [styles.groupCardHead, pressed && { opacity: 0.7 }]}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", flex: 1, gap: 6 }}>
+              {isGroupLocked ? <IconSymbol name="lock.fill" size={14} color={colors.muted} /> : null}
+              <Text style={[styles.groupCardTitle, { color: colors.foreground }]} numberOfLines={1}>
+                {groupName}
+                <Text style={[styles.groupCardCount, { color: colors.muted }]}>{"  "}{items.length}</Text>
+              </Text>
+            </View>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              {group ? (
+                <Pressable
+                  hitSlop={8}
+                  onPress={() => {
+                    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    const lockOpt = isGroupLocked ? t("tg.unlock") : t("tg.lock");
+                    if (Platform.OS === "ios") {
+                      const opts = isGroupLocked
+                        ? [t("common.cancel"), lockOpt, t("tags.edit.zh")]
+                        : [t("common.cancel"), lockOpt, t("tags.edit.zh"), t("common.delete")];
+                      ActionSheetIOS.showActionSheetWithOptions(
+                        { options: opts, cancelButtonIndex: 0, destructiveButtonIndex: isGroupLocked ? undefined : opts.length - 1 },
+                        (idx) => {
+                          if (idx === 1) { handleToggleLockGroup(group); }
+                          if (idx === 2) { setEditingGroupId(group.id); setEditingGroupName(group.name); setEditingGroupNameEn(group.nameEn ?? ""); setLocalRenaming(true); }
+                          if (!isGroupLocked && idx === 3) confirmDeleteGroup(group);
+                        },
+                      );
+                    } else {
+                      const btns: any[] = [
+                        { text: t("common.cancel"), style: "cancel" },
+                        { text: lockOpt, onPress: () => handleToggleLockGroup(group) },
+                        { text: t("tags.edit.zh"), onPress: () => { setEditingGroupId(group.id); setEditingGroupName(group.name); setEditingGroupNameEn(group.nameEn ?? ""); setLocalRenaming(true); } },
+                      ];
+                      if (!isGroupLocked) btns.push({ text: t("common.delete"), style: "destructive", onPress: () => confirmDeleteGroup(group) });
+                      Alert.alert(groupName, undefined, btns);
+                    }
+                  }}
+                  style={({ pressed }) => [pressed && { opacity: 0.6 }]}
+                >
+                  <IconSymbol name="ellipsis.circle" size={20} color={colors.muted} />
+                </Pressable>
+              ) : null}
+              <IconSymbol name={localCollapsed ? "chevron.right" : "chevron.down"} size={16} color={colors.muted} />
+            </View>
+          </Pressable>
+        )}
+        {/* 分类行列表 */}
+        {!localCollapsed ? (
+          <View>
+            {items.map((item, index) => {
+              const isEditing = editingId === item.id;
+              const showPicker = colorPickerId === item.id;
+              const isItemLocked = (item as any).locked ?? false;
+              return (
+                <DraggableRow
+                  key={item.id}
+                  index={index}
+                  total={items.length}
+                  onMove={(from, to) => moveRowInBlock(items, from, to)}
+                  onDragStateChange={(dragging) => setDraggingId(dragging ? item.id : null)}
+                >
+                  <View style={[
+                    styles.catRow,
+                    { borderBottomColor: colors.border },
+                    draggingId === item.id ? { backgroundColor: colors.primary + "14" } : { backgroundColor: colors.surface },
+                    index === items.length - 1 ? { borderBottomWidth: 0 } : null,
+                  ]}>
+                    <View style={{ flexDirection: "row", alignItems: "center" }}>
+                      <View style={{ marginRight: 10 }}>
+                        <IconSymbol name="line.3.horizontal" size={18} color={colors.muted} />
+                      </View>
+                      <Pressable onPress={() => setColorPickerId(showPicker ? null : item.id)} hitSlop={6}>
+                        <View style={[styles.colorDot, { backgroundColor: item.color, marginRight: 12 }]} />
+                      </Pressable>
+                      {isEditing ? (
+                        <View style={{ flex: 1, gap: 6 }}>
+                          <TextInput
+                            style={[styles.editInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
+                            value={editingName}
+                            onChangeText={setEditingName}
+                            autoFocus
+                            returnKeyType="done"
+                            placeholder={t("tags.edit.zh")}
+                            placeholderTextColor={colors.muted}
+                            onSubmitEditing={commitEdit}
+                          />
+                          <TextInput
+                            style={[styles.editInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
+                            value={editingNameEn}
+                            onChangeText={setEditingNameEn}
+                            returnKeyType="done"
+                            placeholder={t("tags.edit.en")}
+                            placeholderTextColor={colors.muted}
+                            onSubmitEditing={commitEdit}
+                          />
+                          {/* 分组选择 */}
+                          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
+                            <Text style={{ fontSize: 12, color: colors.muted, width: "100%", marginBottom: 2 }}>{t("tg.assignHint")}</Text>
+                            <Pressable
+                              onPress={() => setCategoryGroup(item.id, null)}
+                              style={[styles.groupChip, { backgroundColor: !item.groupId ? colors.primary : colors.background, borderColor: !item.groupId ? colors.primary : colors.border }]}
+                            >
+                              <Text style={[styles.groupChipText, { color: !item.groupId ? "#FFFFFF" : colors.foreground }]}>{t("tg.ungrouped")}</Text>
+                            </Pressable>
+                            {catGroups.map((g) => (
+                              <Pressable
+                                key={g.id}
+                                onPress={() => setCategoryGroup(item.id, g.id)}
+                                style={[styles.groupChip, { backgroundColor: item.groupId === g.id ? colors.primary : colors.background, borderColor: item.groupId === g.id ? colors.primary : colors.border }]}
+                              >
+                                <Text style={[styles.groupChipText, { color: item.groupId === g.id ? "#FFFFFF" : colors.foreground }]}>
+                                  {displayNames(g.nameEn ?? "", g.name, lang).primary}
+                                </Text>
+                              </Pressable>
+                            ))}
+                          </View>
+                        </View>
+                      ) : (
+                        <View style={{ flex: 1 }}>
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                            {isItemLocked ? <IconSymbol name="lock.fill" size={12} color={colors.muted} /> : null}
+                            <Text style={{ fontSize: 16, fontWeight: "500", color: colors.foreground }}>
+                              {displayNames(item.nameEn, item.name, lang).primary}
+                            </Text>
+                          </View>
+                          <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>
+                            {displayNames(item.nameEn, item.name, lang).secondary
+                              ? `${displayNames(item.nameEn, item.name, lang).secondary} · `
+                              : ""}
+                            {t("tags.count", { n: item.count })}
+                          </Text>
+                        </View>
+                      )}
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 12, marginLeft: 8 }}>
+                        {isEditing ? (
+                          <Pressable onPress={commitEdit} hitSlop={8} style={({ pressed }) => [pressed && { opacity: 0.6 }]}>
+                            <IconSymbol name="checkmark" size={22} color={colors.primary} />
+                          </Pressable>
+                        ) : (
+                          <>
+                            <Pressable
+                              onPress={() => { setEditingId(item.id); setEditingName(item.name); setEditingNameEn(item.nameEn); }}
+                              hitSlop={8}
+                              style={({ pressed }) => [pressed && { opacity: 0.6 }]}
+                            >
+                              <IconSymbol name="pencil" size={20} color={colors.muted} />
+                            </Pressable>
+                            <Pressable
+                              onPress={() => toggleCategoryLocked(item.id)}
+                              hitSlop={8}
+                              style={({ pressed }) => [pressed && { opacity: 0.6 }]}
+                            >
+                              <IconSymbol name={isItemLocked ? "lock.fill" : "lock.open.fill"} size={18} color={isItemLocked ? colors.primary : colors.muted} />
+                            </Pressable>
+                            {!isItemLocked ? (
+                              <Pressable onPress={() => confirmDelete(item)} hitSlop={8} style={({ pressed }) => [pressed && { opacity: 0.6 }]}>
+                                <IconSymbol name="trash.fill" size={20} color={colors.error} />
+                              </Pressable>
+                            ) : null}
+                          </>
+                        )}
+                      </View>
+                    </View>
+                    {showPicker ? (
+                      <IOSColorPickerSheet
+                        visible={showPicker}
+                        value={item.color}
+                        onChange={(c) => pickColor(item.id, c)}
+                        onClose={() => setColorPickerId(null)}
+                        title={t("tags.color.title")}
+                      />
+                    ) : null}
+                  </View>
+                </DraggableRow>
+              );
+            })}
+            {/* 添加分类按钮（在分组内） */}
+            <Pressable
+              onPress={() => setAddTagGroupId(group?.id ?? null)}
+              style={({ pressed }) => [styles.catRow, { borderBottomWidth: 0, flexDirection: "row", alignItems: "center", gap: 8, opacity: pressed ? 0.6 : 1 }]}
+            >
+              <IconSymbol name="plus" size={16} color={colors.primary} />
+              <Text style={{ fontSize: 14, color: colors.primary, fontWeight: "500" }}>{t("tags.add.category")}</Text>
+            </Pressable>
+          </View>
+        ) : null}
+      </View>
+    );
+  };
 
   return (
     <ScreenContainer>
@@ -827,6 +1076,7 @@ export default function CategoriesScreen() {
                   setEditingId(null);
                   setColorPickerId(null);
                   setAddTagGroupId(undefined);
+                  setShowAddCategoryGroup(false);
                 }}
                 style={[
                   styles.segment,
@@ -853,8 +1103,16 @@ export default function CategoriesScreen() {
           <PrepTaxonomyManager />
         ) : (
           <>
+            {/* flavor 固定分组提示 */}
+            {section === "flavor" ? (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 10, paddingHorizontal: 4 }}>
+                <IconSymbol name="info.circle" size={14} color={colors.muted} />
+                <Text style={{ fontSize: 12, color: colors.muted, lineHeight: 16 }}>{t("tg.flavorFixed")}</Text>
+              </View>
+            ) : null}
+
             {/* 新增标签 / 分类 的内联表单 */}
-            {addTagGroupId !== undefined || section === "category" ? (
+            {addTagGroupId !== undefined ? (
               <View style={[styles.addCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 <Text style={[styles.addCardTitle, { color: colors.muted }]}>
                   {section === "category" ? t("tags.add.category") : t("tags.add.tag", { s: sectionLabel })}
@@ -869,18 +1127,16 @@ export default function CategoriesScreen() {
                     returnKeyType="done"
                     onSubmitEditing={section === "category" ? handleAdd : () => {
                       if (!isTagKind(section)) return;
-                      const created = addTag(section, addTagName, addTagColor);
+                      const n = addTagName.trim();
+                      if (!n) return;
+                      const created = addTag(section, n, addTagColor);
                       if (created) {
                         setAddTagName("");
                         setAddTagGroupId(undefined);
-                        if (addTagGroupId !== null && addTagGroupId !== undefined) {
-                          // assign group after creation
-                        }
                         if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                       }
                     }}
                   />
-                  {/* 颜色预览 */}
                   <Pressable
                     onPress={() => section === "category" ? setNewColorPickerOpen(true) : setAddTagColorPickerOpen(true)}
                     style={({ pressed }) => [styles.colorPreviewBtn, { backgroundColor: section === "category" ? newColor : addTagColor, opacity: pressed ? 0.7 : 1 }]}
@@ -913,6 +1169,92 @@ export default function CategoriesScreen() {
               </View>
             ) : null}
 
+            {/* 新增分组表单（category 专用） */}
+            {showAddCategoryGroup ? (
+              <View style={[styles.addCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <Text style={[styles.addCardTitle, { color: colors.muted }]}>{t("tg.addGroup")}</Text>
+                <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
+                  <TextInput
+                    style={[styles.editInput, { flex: 1, color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
+                    placeholder={t("tg.newGroup")}
+                    placeholderTextColor={colors.muted}
+                    value={newGroupName}
+                    onChangeText={setNewGroupName}
+                    returnKeyType="done"
+                    autoFocus
+                    onSubmitEditing={() => {
+                      const n = newGroupName.trim();
+                      if (!n) return;
+                      addCategoryGroup(n);
+                      setNewGroupName("");
+                      setShowAddCategoryGroup(false);
+                      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                    }}
+                  />
+                  <Pressable
+                    onPress={() => {
+                      const n = newGroupName.trim();
+                      if (!n) return;
+                      addCategoryGroup(n);
+                      setNewGroupName("");
+                      setShowAddCategoryGroup(false);
+                      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                    }}
+                    disabled={!newGroupName.trim()}
+                    style={({ pressed }) => [
+                      styles.addBtn,
+                      { backgroundColor: newGroupName.trim() ? colors.primary : colors.border },
+                      pressed && { opacity: 0.85 },
+                    ]}
+                  >
+                    <IconSymbol name="plus" size={22} color={newGroupName.trim() ? "#FFFFFF" : colors.muted} />
+                  </Pressable>
+                </View>
+              </View>
+            ) : null}
+
+            {/* 新增 TagGroup 表单（spirit/glass 专用） */}
+            {isTagKind(section) && section !== "flavor" && newGroupName !== undefined && !showAddCategoryGroup && addTagGroupId === undefined ? (
+              <View style={[styles.addCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <Text style={[styles.addCardTitle, { color: colors.muted }]}>{t("tg.addGroup")}</Text>
+                <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
+                  <TextInput
+                    style={[styles.editInput, { flex: 1, color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
+                    placeholder={t("tg.newGroup")}
+                    placeholderTextColor={colors.muted}
+                    value={newGroupName}
+                    onChangeText={setNewGroupName}
+                    returnKeyType="done"
+                    autoFocus
+                    onSubmitEditing={() => {
+                      const n = newGroupName.trim();
+                      if (!n) return;
+                      if (isTagKind(section)) addTagGroup(section, n);
+                      setNewGroupName("");
+                      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                    }}
+                  />
+                  <Pressable
+                    onPress={() => {
+                      const n = newGroupName.trim();
+                      if (!n) return;
+                      if (isTagKind(section)) addTagGroup(section, n);
+                      setNewGroupName("");
+                      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                    }}
+                    disabled={!newGroupName.trim()}
+                    style={({ pressed }) => [
+                      styles.addBtn,
+                      { backgroundColor: newGroupName.trim() ? colors.primary : colors.border },
+                      pressed && { opacity: 0.85 },
+                    ]}
+                  >
+                    <IconSymbol name="plus" size={22} color={newGroupName.trim() ? "#FFFFFF" : colors.muted} />
+                  </Pressable>
+                </View>
+              </View>
+            ) : null}
+
             {/* 颜色选择器 Sheet（新增时） */}
             <IOSColorPickerSheet
               visible={newColorPickerOpen}
@@ -929,154 +1271,62 @@ export default function CategoriesScreen() {
               title={t("tags.color.title")}
             />
 
-            {/* 分组管理（tag 类型）：内联添加分组 */}
-            {isTagKind(section) ? (
-              <View style={[styles.addCard, { backgroundColor: colors.surface, borderColor: colors.border, marginBottom: 8 }]}>
-                <Text style={[styles.addCardTitle, { color: colors.muted }]}>{t("tg.groups")}</Text>
-                <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
-                  <TextInput
-                    style={[styles.editInput, { flex: 1, color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
-                    placeholder={t("tg.newGroup")}
-                    placeholderTextColor={colors.muted}
-                    value={newGroupName}
-                    onChangeText={setNewGroupName}
-                    returnKeyType="done"
-                    onSubmitEditing={handleAddGroup}
-                  />
-                  <Pressable
-                    onPress={handleAddGroup}
-                    disabled={!newGroupName.trim()}
-                    style={({ pressed }) => [
-                      styles.addBtnSm,
-                      { backgroundColor: newGroupName.trim() ? colors.primary : colors.border },
-                      pressed && { opacity: 0.85 },
-                    ]}
-                  >
-                    <IconSymbol name="plus" size={18} color={newGroupName.trim() ? "#FFFFFF" : colors.muted} />
-                  </Pressable>
-                </View>
-
-
             {/* 标签列表 */}
-              </View>
-            ) : null}
-
-            {/* 标签列表 */}
-            {rows.length === 0 ? (
+            {rows.length === 0 && section !== "category" ? (
               <View style={{ alignItems: "center", paddingTop: 48, paddingHorizontal: 32 }}>
                 <Text style={{ fontSize: 16, color: colors.muted, textAlign: "center" }}>
                   {t("tags.empty", { s: sectionLabel })}
                 </Text>
               </View>
-            ) : section === "category" || !groupedBlocks ? (
-              renderCategoryRows()
-            ) : (
+            ) : section === "category" ? (
+              // category 分组卡片
               <View>
-                {groupedBlocks.map((block) => {
-                  if (block.items.length === 0) return null;
-                  return (
-                    <GroupCard
-                      key={block.group?.id ?? "ungrouped"}
-                      group={block.group}
-                      items={block.items}
-                      rows={rows}
-                      section={section}
-                      lang={lang}
-                      colors={colors}
-                      t={t}
-                      editingId={editingId}
-                      editingName={editingName}
-                      editingNameEn={editingNameEn}
-                      draggingId={draggingId}
-                      groupPickerId={groupPickerId}
-                      groups={groups}
-                      setEditingId={setEditingId}
-                      setEditingName={setEditingName}
-                      setEditingNameEn={setEditingNameEn}
-                      setDraggingId={setDraggingId}
-                      setGroupPickerId={setGroupPickerId}
-                      commitEdit={commitEdit}
-                      confirmDelete={confirmDelete}
-                      pickColor={pickColor}
-                      moveRowInBlock={moveRowInBlock}
-                      setTagGroup={setTagGroup}
-                      onAddTag={(groupId) => setAddTagGroupId(groupId)}
-                      onEditGroup={(g) => { setEditingGroupId(g.id); setEditingGroupName(g.name); setEditingGroupNameEn(g.nameEn ?? ""); }}
-                      onDeleteGroup={confirmDeleteGroup}
-                    />
-                  );
-                })}
+                {(groupedBlocks as { group: CategoryGroup | null; items: RowData[] }[]).map((block) =>
+                  renderCategoryGroupCard(block.group, block.items)
+                )}
               </View>
-            )}
+            ) : isTagKind(section) && groupedBlocks ? (
+              // spirit/glass/flavor 分组卡片
+              <View>
+                {(groupedBlocks as { group: TagGroup | null; items: RowData[] }[]).map((block) => (
+                  <GroupCard
+                    key={block.group?.id ?? "ungrouped"}
+                    group={block.group}
+                    items={block.items}
+                    rows={rows}
+                    section={section}
+                    lang={lang}
+                    colors={colors}
+                    t={t}
+                    editingId={editingId}
+                    editingName={editingName}
+                    editingNameEn={editingNameEn}
+                    draggingId={draggingId}
+                    groupPickerId={groupPickerId}
+                    groups={groups}
+                    setEditingId={setEditingId}
+                    setEditingName={setEditingName}
+                    setEditingNameEn={setEditingNameEn}
+                    setDraggingId={setDraggingId}
+                    setGroupPickerId={setGroupPickerId}
+                    commitEdit={commitEdit}
+                    confirmDelete={confirmDelete}
+                    pickColor={pickColor}
+                    moveRowInBlock={moveRowInBlock}
+                    setTagGroup={setTagGroup}
+                    onAddTag={(gid) => setAddTagGroupId(gid)}
+                    onEditGroup={(g) => { setEditingGroupId(g.id); setEditingGroupName(g.name); setEditingGroupNameEn(g.nameEn ?? ""); }}
+                    onDeleteGroup={(g) => confirmDeleteGroup(g)}
+                    onToggleLockGroup={(g) => handleToggleLockGroup(g)}
+                    onToggleLockTag={(item) => { toggleTagLocked(item.id); if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); }}
+                  />
+                ))}
+              </View>
+            ) : null}
 
             <Text style={{ fontSize: 12, color: colors.muted, marginTop: 8, paddingHorizontal: 4, lineHeight: 18 }}>
               {t("tags.hint")}
             </Text>
-            {/* ── 系统标签区块（始终显示，不受 section 影响） ── */}
-            <View style={{ marginTop: 24 }}>
-              <Pressable
-                onPress={() => setSystemCollapsed((v) => !v)}
-                style={({ pressed }) => [{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 4, paddingVertical: 6, opacity: pressed ? 0.7 : 1 }]}
-              >
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                  <IconSymbol name="lock.fill" size={14} color={colors.muted} />
-                  <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, textTransform: "uppercase", letterSpacing: 0.5 }}>
-                    {t("tags.system.title")}
-                  </Text>
-                </View>
-                <IconSymbol name={systemCollapsed ? "chevron.right" : "chevron.down"} size={14} color={colors.muted} />
-              </Pressable>
-              {!systemCollapsed && (
-                <View style={[styles.groupCard, { backgroundColor: colors.surface, borderColor: colors.border, marginTop: 4 }]}>
-                  {(["duration", "occasion"] as SystemSection[]).map((kind) => {
-                    const kindLabel = kind === "duration" ? t("tags.system.duration") : t("tags.system.occasion");
-                    const kindTags = tags.filter((tg) => tg.kind === kind);
-                    return (
-                      <View key={kind} style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 }}>
-                        <Text style={{ fontSize: 11, fontWeight: "600", color: colors.muted, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 8 }}>
-                          {kindLabel}
-                        </Text>
-                        {kindTags.map((tg) => {
-                          const showPicker = systemColorPickerId === tg.id;
-                          const usageCount = kind === "duration"
-                            ? recipes.filter((r) => r.drinkDuration === tg.name).length
-                            : recipes.filter((r) => r.occasion === tg.name).length;
-                          const displayName = lang === "en" && tg.nameEn ? tg.nameEn : tg.name;
-                          return (
-                            <View key={tg.id} style={{ marginBottom: 8 }}>
-                              <View style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 4 }}>
-                                <Pressable
-                                  onPress={() => setSystemColorPickerId(showPicker ? null : tg.id)}
-                                  hitSlop={8}
-                                  style={({ pressed }) => [{ width: 28, height: 28, borderRadius: 14, backgroundColor: tg.color, borderWidth: 2, borderColor: tg.color + "66", opacity: pressed ? 0.7 : 1 }]}
-                                />
-                                <Text style={{ flex: 1, fontSize: 15, color: colors.foreground }}>{displayName}</Text>
-                                {usageCount > 0 ? (
-                                  <Text style={{ fontSize: 12, color: colors.muted }}>{usageCount}</Text>
-                                ) : null}
-                                <IconSymbol name="lock.fill" size={13} color={colors.border} />
-                              </View>
-                              {showPicker ? (
-                                <IOSColorPickerSheet
-                                  visible={showPicker}
-                                  value={tg.color}
-                                  onChange={(c) => { setTagColor(tg.id, c); if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
-                                  onClose={() => setSystemColorPickerId(null)}
-                                  title={t("tags.color.title")}
-                                />
-                              ) : null}
-                            </View>
-                          );
-                        })}
-                      </View>
-                    );
-                  })}
-                  <Text style={{ fontSize: 12, color: colors.muted, marginHorizontal: 16, marginBottom: 12, lineHeight: 18 }}>
-                    {t("tags.system.hint")}
-                  </Text>
-                </View>
-              )}
-            </View>
           </>
         )}
       </ScrollView>

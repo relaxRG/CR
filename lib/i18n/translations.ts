@@ -711,6 +711,10 @@ const dict = {
   "tg.assignHint": { zh: "移动到分组", en: "Move to group" },
   "tg.tagCount": { zh: "{n} 个标签", en: "{n} tags" },
   "tg.addGroup": { zh: "添加分组", en: "Add Group" },
+  "tg.lock": { zh: "锁定", en: "Lock" },
+  "tg.unlock": { zh: "解锁", en: "Unlock" },
+  "tg.locked.hint": { zh: "已锁定，不可删除", en: "Locked, cannot be deleted" },
+  "tg.flavorFixed": { zh: "风味分组固定，不可增减", en: "Flavor groups are fixed" },
   // R&D Lab 研发测试板块
   "lab.entry": { zh: "研发", en: "R&D" },
   "lab.title": { zh: "研发测试", en: "R&D Lab" },

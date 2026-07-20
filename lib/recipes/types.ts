@@ -434,6 +434,10 @@ export interface Category {
   nameEn?: string;
   color: string;
   createdAt: number;
+  /** 所属分组 id(可选,未分组时为空) */
+  groupId?: string | null;
+  /** 锁定:锁定的分类不可删除 */
+  locked?: boolean;
 }
 
 /** 可自定义标签的种类:基酒 / 杯型 / 风味 / 饮用时长 / 饮用场合 */
@@ -452,6 +456,8 @@ export interface TagItem {
   createdAt: number;
   /** 系统内置标签:不可增删改名,仅允许修改颜色 */
   isSystem?: boolean;
+  /** 锁定:锁定的标签不可删除 */
+  locked?: boolean;
 }
 
 /** 标签分组:每个标签种类下可自定义分组并排序 */
@@ -462,6 +468,21 @@ export interface TagGroup {
   /** 英文名(独立字段,按界面语言优先展示) */
   nameEn?: string;
   createdAt: number;
+  /** 锁定:锁定的分组不可删除 */
+  locked?: boolean;
+  /** 风味分组固定层级标识(taste/aroma/texture),仅 flavor 分组使用 */
+  flavorLayer?: "taste" | "aroma" | "texture";
+}
+
+/** 分类分组:category 下可自定义分组并排序 */
+export interface CategoryGroup {
+  id: string;
+  name: string;
+  /** 英文名(独立字段,按界面语言优先展示) */
+  nameEn?: string;
+  createdAt: number;
+  /** 锁定:锁定的分组不可删除 */
+  locked?: boolean;
 }
 
 export const TAG_KIND_LABELS: Record<TagKind, string> = {
