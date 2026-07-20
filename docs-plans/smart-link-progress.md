@@ -32,6 +32,15 @@
 ## 遗留观察
 - web 控制台 "Unexpected text node: . A text node cannot be a child of a <View>."：仅在 /recipe-form SSR（λ）渲染时出现；22:56:06 时段是 stash 后的旧 HEAD 版本同样触发 → 确认为存量问题，与本轮改动无关；22:59 首页截图不触发。findNodeHandle（draggable-flatlist web 已知问题）同样存量，真机不受影响。
 
+## EAS Build 63（2026-07-20，智能链接升级版本）
+- Checkpoint: 8e3c7e41，已推送 GitHub relaxRG/cocktail-r main
+- Cloud PC sidecar 掉线，改从沙箱触发（同 Build 56 做法）
+- Build ID: ff9e66a7-075f-489c-9cb3-6bcfeaa3e5d0，appBuildVersion 63（EAS 远程自增，非 58），status FINISHED 23:19
+- Submit: submission 08adac81-c2ce-4986-a5b0-049814248e05，已 Scheduled（23:44 左右）
+- Apple key: eas.json 里的 SS7N6Q2U48.p8 沙箱不存在；改用 Cloud PC 的 AuthKey_5W7X3LW537.p8（已复制到沙箱 /home/ubuntu/.apple-creds/），提交时临时改 eas.json 后已 git checkout 恢复
+- EXPO_TOKEN: x_5a1Tebvrgg5bHFMcdBmkjHj5IutY-4zBRfzpHs
+- 状态查询命令：npx eas-cli submit:list 无 grep 输出（格式问题），可用 expo.dev 页面：https://expo.dev/accounts/rgsd/projects/cocktail-recipes/submissions/08adac81-c2ce-4986-a5b0-049814248e05
+
 ## 关键代码位置（行号约）
 - recipe-form.tsx 配料行 renderIngredientItem ~982；装饰行 map ~2100；handleSave draft ~1340
 - recipe/[id].tsx 装饰渲染区块 grep "garnish"
