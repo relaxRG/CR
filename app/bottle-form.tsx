@@ -217,6 +217,12 @@ export default function BottleFormScreen() {
     if (key === "nameZh" && aiResult.nameZh) setNameZh(aiResult.nameZh);
     else if (key === "nameEn" && aiResult.nameEn) setNameEn(aiResult.nameEn);
     else if (key === "category" && aiResult.category) setCategory(aiResult.category);
+    // 应用分类后，若 AI 同时返回了 style 且当前 style 为空，自动归一化并填入
+    // 这样用户点击「应用分类」时，风格字段也一并同步，无需再手动点击「应用风格」
+    if (key === "category" && aiResult.category && aiResult.style && !style) {
+      const normalized = normalizeStyleToTaxonomy(aiResult.style, stylesOf(aiResult.category));
+      setStyle(normalized ?? aiResult.style);
+    }
     else if (key === "style" && aiResult.style) {
       // Bug 4 修复：AI 返回的风格值可能与 taxonomy chip 值域存在大小写/斜杠/别名差异，
       // 先归一化到当前分类的规范值；未命中则保留原值（落入自定义风格输入框），不丢信息。
