@@ -489,3 +489,9 @@
 - [x] P5 自制分区双语重命名：分区和类型的新增/编辑均改为双字段（中文 + 英文），handler 同时写入两个语言字段
 - [x] P7 setTagGroup kind 校验：目标分组不存在或 kind 不匹配时不执行赋值，防止跨 kind 数据污染
 - [x] TypeScript 0 错误，Metro bundler 正常
+## 酒单迁移到资料库（2026-07-20）
+- [x] library.tsx：添加「酒单」子页（三段式 Segmented：酒单/酒库/自制库），改名为「资料库」
+- [x] index.tsx：移除「酒单」子页，只保留研发/门店两个子页，大标题改为「研发」
+- [x] i18n：tab.library 改为「资料库」，新增 tab.lab 翻译 key（研发/R&D）
+- [x] _layout.tsx：index tab 标签改为「研发」，图标改为 flask；library tab 图标改为 wineglass
+- [x] TypeScript 0 错误

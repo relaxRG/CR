@@ -1,7 +1,7 @@
 /**
- * 酒单 Tab 主容器
- * 大标题 + iOS 原生 pill 主切换器（酒单 / 研发 / 门店）
- * 三个子页面始终挂载（保留筛选/滚动状态），用 display:none 切换可见性。
+ * 研发 Tab 主容器（原酒单 Tab，酒单已迁移至资料库 Tab）
+ * 大标题 + iOS 原生 pill 主切换器（研发 / 门店）
+ * 两个子页面始终挂载（保留筛选/滚动状态），用 display:none 切换可见性。
  * 门店分区内部再有 门店酒单 / 采购清单 两个子切换器。
  */
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
@@ -10,26 +10,23 @@ import { useSafeAreaInsets, SafeAreaInsetsContext } from "react-native-safe-area
 import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
 import { usePersistedState } from "@/hooks/use-persisted-state";
-import { useRecipeStore } from "@/lib/recipes/store";
 import { useLabStore } from "@/lib/lab/store";
 import { useMenuStore } from "@/lib/menu/store";
-import { RecipesScreen } from "./recipes";
 import { LabIndexScreen } from "../lab/index";
 import MenuScreen from "./menu";
 import ShoppingScreen from "./shopping";
 
-type RecipesTab = "recipes" | "lab" | "menu";
+type RecipesTab = "lab" | "menu";
 type StoreSubTab = "menu" | "shopping";
 
 export default function RecipesTabScreen() {
   const colors = useColors();
   const { lang } = useI18n();
   const insets = useSafeAreaInsets();
-  const [tab, setTab] = usePersistedState<RecipesTab>("recipes.tab.v1", "recipes");
+  const [tab, setTab] = usePersistedState<RecipesTab>("recipes.tab.v2", "lab");
   const [storeSubTab, setStoreSubTab] = usePersistedState<StoreSubTab>("store.subtab.v1", "menu");
 
   // 副标题数量
-  const { recipes } = useRecipeStore();
   const { projects } = useLabStore();
   const { groups, ungroupedEntries } = useMenuStore();
   const menuEntries = groups.reduce((sum, g) => sum + g.entries.length, 0) + ungroupedEntries.length;
@@ -39,7 +36,6 @@ export default function RecipesTabScreen() {
   ].filter((e) => e.available).length;
 
   const TABS: { key: RecipesTab; zh: string; en: string }[] = [
-    { key: "recipes", zh: "酒单", en: "Recipes" },
     { key: "lab", zh: "研发", en: "R&D" },
     { key: "menu", zh: "门店", en: "Store" },
   ];
@@ -58,25 +54,19 @@ export default function RecipesTabScreen() {
 
   // 副标题
   const subtitle =
-    tab === "recipes"
+    tab === "lab"
       ? lang === "en"
-        ? recipes.length > 0 ? `${recipes.length} recipes` : "Record every drink you make"
-        : recipes.length > 0 ? `共 ${recipes.length} 份配方` : "记录属于你的每一杯"
-      : tab === "lab"
-        ? lang === "en"
-          ? projects.length > 0 ? `${projects.length} projects in progress` : "Experiment and iterate"
-          : projects.length > 0 ? `${projects.length} 个研发项目` : "实验与迭代"
-        : lang === "en"
-          ? menuEntries > 0 ? `${onSaleCount} on sale · ${menuEntries} total` : "Set up your store menu"
-          : menuEntries > 0 ? `在售 ${onSaleCount} 款 · 共 ${menuEntries} 款` : "设置门店酒单";
+        ? projects.length > 0 ? `${projects.length} projects in progress` : "Experiment and iterate"
+        : projects.length > 0 ? `${projects.length} 个研发项目` : "实验与迭代"
+      : lang === "en"
+        ? menuEntries > 0 ? `${onSaleCount} on sale · ${menuEntries} total` : "Set up your store menu"
+        : menuEntries > 0 ? `在售 ${onSaleCount} 款 · 共 ${menuEntries} 款` : "设置门店酒单";
 
   // 大标题
   const title =
-    tab === "recipes"
-      ? lang === "en" ? "Recipes" : "酒单"
-      : tab === "lab"
-        ? lang === "en" ? "R&D Lab" : "研发"
-        : lang === "en" ? "Store" : "门店";
+    tab === "lab"
+      ? lang === "en" ? "R&D Lab" : "研发"
+      : lang === "en" ? "Store" : "门店";
 
   // Override top inset to 0 for child screens
   const childInsets = { ...insets, top: 0 };
@@ -174,9 +164,6 @@ export default function RecipesTabScreen() {
 
       {/* 子屏：始终挂载，display:none 切换 */}
       <SafeAreaInsetsContext.Provider value={childInsets}>
-        <View style={[{ flex: 1 }, tab !== "recipes" && styles.hidden]}>
-          <RecipesScreen />
-        </View>
         <View style={[{ flex: 1 }, tab !== "lab" && styles.hidden]}>
           <LabIndexScreen embedded />
         </View>

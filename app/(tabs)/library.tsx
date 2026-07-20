@@ -1,8 +1,7 @@
 /**
- * 酒库 + 自制一体化标签页
- * 顶部：大标题 + iOS 原生 Segmented（酒库/自制库）
- * 下方：各子页面保留自己的二级分组切换器
- * 两个子视图始终挂载（保留筛选/滚动状态），用 display:none 切换可见性。
+ * 资料库 Tab（酒单 + 酒库 + 自制库）
+ * 顶部：大标题 + iOS 原生 Segmented（酒单/酒库/自制库）
+ * 三个子视图始终挂载（保留筛选/滚动状态），用 display:none 切换可见性。
  */
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import * as Haptics from "expo-haptics";
@@ -12,16 +11,22 @@ import { useI18n } from "@/lib/i18n";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useBottleStore } from "@/lib/bottles/store";
 import { useHomemadeStore } from "@/lib/homemade/store";
+import { useRecipeStore } from "@/lib/recipes/store";
 import BottlesScreen from "./bottles";
 import HomemadeScreen from "./homemade";
+import { RecipesScreen } from "./recipes";
 
-type LibTab = "bottles" | "homemade";
+type LibTab = "recipes" | "bottles" | "homemade";
 
 export default function LibraryScreen() {
   const colors = useColors();
   const { t, lang } = useI18n();
   const insets = useSafeAreaInsets();
-  const [tab, setTab] = usePersistedState<LibTab>("library.tab.v1", "bottles");
+  const [tab, setTab] = usePersistedState<LibTab>("library.tab.v2", "recipes");
+
+  // 酒单数量
+  const { recipes } = useRecipeStore();
+  const recipeCount = recipes.length;
 
   // 酒库数量
   const { bottles } = useBottleStore();
@@ -32,6 +37,7 @@ export default function LibraryScreen() {
   const prepCount = preps.length;
 
   const TABS: { key: LibTab; zh: string; en: string }[] = [
+    { key: "recipes", zh: "酒单", en: "Recipes" },
     { key: "bottles", zh: "酒库", en: "Bar" },
     { key: "homemade", zh: "自制库", en: "Homemade" },
   ];
@@ -44,19 +50,25 @@ export default function LibraryScreen() {
 
   // 副标题
   const subtitle =
-    tab === "bottles"
+    tab === "recipes"
       ? lang === "en"
-        ? `${bottleCount} bottles · names, ABV & prices`
-        : `${bottleCount} 款酒 · 中英文名、度数与参考价`
-      : lang === "en"
-        ? `${prepCount} homemade preps · syrups, liqueurs & more`
-        : `${prepCount} 个自制原料 · 糖浆、利口酒、风味液体与自制酒`;
+        ? recipeCount > 0 ? `${recipeCount} recipes` : "Record every drink you make"
+        : recipeCount > 0 ? `共 ${recipeCount} 份配方` : "记录属于你的每一杯"
+      : tab === "bottles"
+        ? lang === "en"
+          ? `${bottleCount} bottles · names, ABV & prices`
+          : `${bottleCount} 款酒 · 中英文名、度数与参考价`
+        : lang === "en"
+          ? `${prepCount} homemade preps · syrups, liqueurs & more`
+          : `${prepCount} 个自制原料 · 糖浆、利口酒、风味液体与自制酒`;
 
   // 大标题
   const title =
-    tab === "bottles"
-      ? lang === "en" ? "Bar" : "酒库"
-      : lang === "en" ? "Homemade Lab" : "自制库";
+    tab === "recipes"
+      ? lang === "en" ? "Recipes" : "酒单"
+      : tab === "bottles"
+        ? lang === "en" ? "Bar" : "酒库"
+        : lang === "en" ? "Homemade Lab" : "自制库";
 
   // Override top inset to 0 for child screens — this screen manages the safe-area top itself
   const childInsets = { ...insets, top: 0 };
@@ -115,6 +127,9 @@ export default function LibraryScreen() {
 
       {/* 子屏：用 SafeAreaInsetsContext.Provider 覆盖 top=0，避免双重 safe-area */}
       <SafeAreaInsetsContext.Provider value={childInsets}>
+        <View style={[{ flex: 1 }, tab !== "recipes" && styles.hidden]}>
+          <RecipesScreen />
+        </View>
         <View style={[{ flex: 1 }, tab !== "bottles" && styles.hidden]}>
           <BottlesScreen />
         </View>

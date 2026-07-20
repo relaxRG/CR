@@ -4,6 +4,7 @@ export type Lang = "zh" | "en";
 const dict = {
   // Tabs
   "tab.recipes": { zh: "酒单", en: "Recipes" },
+  "tab.lab": { zh: "研发", en: "R&D" },
   // 私密访问门与云端同步
   "gate.title": { zh: "cocktail R", en: "cocktail R" },
   "gate.subtitle": { zh: "私人调酒工作台 · 配方、酒库与自制库云端同步", en: "Your private bartending workspace with cloud sync" },
@@ -21,7 +22,7 @@ const dict = {
   "sync.logout": { zh: "退出登录", en: "Sign Out" },
   "sync.error": { zh: "同步遇到问题,稍后自动重试", en: "Sync issue, will retry automatically" },
   "tab.bottles": { zh: "酒库", en: "Bottles" },
-  "tab.library": { zh: "酒库", en: "Library" },
+  "tab.library": { zh: "资料库", en: "Library" },
   "tab.books": { zh: "书库", en: "Books" },
   "tab.tags": { zh: "分类", en: "Tags" },
   "tab.me": { zh: "我的", en: "Me" },

@@ -20,15 +20,15 @@ export default function TabLayout() {
   const TAB_ITEMS: FloatingTabItem[] = [
     {
       key: "index",
-      label: t("tab.recipes"),
-      icon: <IconSymbol size={26} name="wineglass.fill" color={colors.muted} />,
-      activeIcon: <IconSymbol size={26} name="wineglass.fill" color={colors.primary} />,
+      label: t("tab.lab"),
+      icon: <IconSymbol size={26} name="flask.fill" color={colors.muted} />,
+      activeIcon: <IconSymbol size={26} name="flask.fill" color={colors.primary} />,
     },
     {
       key: "library",
       label: t("tab.library"),
-      icon: <IconSymbol size={26} name="books.vertical.fill" color={colors.muted} />,
-      activeIcon: <IconSymbol size={26} name="books.vertical.fill" color={colors.primary} />,
+      icon: <IconSymbol size={26} name="wineglass.fill" color={colors.muted} />,
+      activeIcon: <IconSymbol size={26} name="wineglass.fill" color={colors.primary} />,
     },
     {
       key: "books",
@@ -63,7 +63,7 @@ export default function TabLayout() {
         />
       )}
     >
-      <Tabs.Screen name="index" options={{ title: t("tab.recipes") }} />
+      <Tabs.Screen name="index" options={{ title: t("tab.lab") }} />
       <Tabs.Screen name="library" options={{ title: t("tab.library") }} />
       <Tabs.Screen name="books" options={{ title: t("tab.books") }} />
       <Tabs.Screen name="me" options={{ title: t("tab.me") }} />
