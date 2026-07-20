@@ -221,6 +221,7 @@ function GroupCard({
     : t("tg.ungrouped");
   const isFlavorFixed = group?.flavorLayer != null;
   const isGroupLocked = group?.locked ?? false;
+  const sectionLabel = t(SECTION_LABEL_KEY[section]);
 
   return (
     <View
@@ -338,150 +339,150 @@ function GroupCard({
         </Pressable>
       )}
 
-      {/* Chip 墙 */}
+      {/* 标签列表行 */}
       {!collapsed ? (
-        <View style={styles.chipWall}>
-          {items.map((item) => {
+        <View>
+          {items.map((item, index) => {
             const isItemLocked = (item as any).locked ?? false;
+            const isEditing = editingId === item.id;
+            const showPicker = colorPickerId === item.id;
             return (
-              <TagChip
+              <DraggableRow
                 key={item.id}
-                name={displayNames(item.nameEn, item.name, lang).primary}
-                color={item.color}
-                locked={isItemLocked}
-                onPress={() => {
-                  if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  setEditingId(editingId === item.id ? null : item.id);
-                  setEditingName(item.name);
-                  setEditingNameEn(item.nameEn);
-                  setColorPickerId(editingId === item.id ? null : item.id);
-                }}
-                onColorPress={() => {
-                  if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  setColorPickerId(colorPickerId === item.id ? null : item.id);
-                }}
-              />
-            );
-          })}
-          {/* 添加虚线 chip */}
-          <Pressable
-            onPress={() => onAddTag(group?.id ?? null)}
-            style={({ pressed }) => [styles.chipAdd, { borderColor: colors.border, opacity: pressed ? 0.6 : 1 }]}
-          >
-            <IconSymbol name="plus" size={14} color={colors.muted} />
-          </Pressable>
-        </View>
-      ) : null}
-
-      {/* 直接颜色选择器（点色点触发，不需要编辑抽屉） */}
-      {colorPickerId && items.some((i) => i.id === colorPickerId) && !editingId ? (
-        <IOSColorPickerSheet
-          visible={true}
-          value={items.find((i) => i.id === colorPickerId)?.color ?? "#888888"}
-          onChange={(c) => pickColor(colorPickerId, c)}
-          onClose={() => setColorPickerId(null)}
-          title={t("tags.color.title")}
-        />
-      ) : null}
-      {/* 编辑抽屉（点击 chip 后展开） */}
-      {editingId && items.some((i) => i.id === editingId) && colorPickerId ? (
-        <View style={[styles.editDrawer, { borderTopColor: colors.border }]}>
-          {(() => {
-            const item = items.find((i) => i.id === editingId)!;
-            const isItemLocked = (item as any).locked ?? false;
-            return (
-              <>
-                <View style={{ flexDirection: "row", gap: 8, marginBottom: 8 }}>
-                  <TextInput
-                    style={[styles.editInput, { flex: 1, color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
-                    value={editingName}
-                    onChangeText={setEditingName}
-                    autoFocus
-                    returnKeyType="done"
-                    placeholder={t("tags.edit.zh")}
-                    placeholderTextColor={colors.muted}
-                    onSubmitEditing={commitEdit}
-                  />
-                  <TextInput
-                    style={[styles.editInput, { flex: 1, color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
-                    value={editingNameEn}
-                    onChangeText={setEditingNameEn}
-                    returnKeyType="done"
-                    placeholder={t("tags.edit.en")}
-                    placeholderTextColor={colors.muted}
-                    onSubmitEditing={commitEdit}
-                  />
-                </View>
-                <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
-                  {/* 颜色预览 + 打开选色器 */}
-                  <Pressable
-                    onPress={() => setColorPickerId(colorPickerId ? null : item.id)}
-                    style={({ pressed }) => [
-                      styles.colorPreviewBtn,
-                      { backgroundColor: item.color, opacity: pressed ? 0.7 : 1 },
-                    ]}
-                  />
-                  <IOSColorPickerSheet
-                    visible={colorPickerId === item.id}
-                    value={item.color}
-                    onChange={(c) => pickColor(item.id, c)}
-                    onClose={() => setColorPickerId(null)}
-                    title={t("tags.color.title")}
-                  />
-                  <View style={{ flex: 1 }} />
-                  {/* 分组 */}
-                  <Pressable
-                    onPress={() => setGroupPickerId(groupPickerId === item.id ? null : item.id)}
-                    hitSlop={8}
-                    style={({ pressed }) => [pressed && { opacity: 0.6 }]}
-                  >
-                    <IconSymbol name="folder.fill" size={20} color={groupPickerId === item.id ? colors.primary : colors.muted} />
-                  </Pressable>
-                  <Pressable onPress={commitEdit} hitSlop={8} style={({ pressed }) => [pressed && { opacity: 0.6 }]}>
-                    <IconSymbol name="checkmark" size={22} color={colors.primary} />
-                  </Pressable>
-                  {/* 锁定/解锁按钮 */}
-                  <Pressable
-                    onPress={() => { onToggleLockTag?.(item); if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); }}
-                    hitSlop={8}
-                    style={({ pressed }) => [pressed && { opacity: 0.6 }]}
-                  >
-                    <IconSymbol name={isItemLocked ? "lock.fill" : "lock.open.fill"} size={18} color={isItemLocked ? colors.primary : colors.muted} />
-                  </Pressable>
-                  {!isItemLocked ? (
-                    <Pressable onPress={() => confirmDelete(item)} hitSlop={8} style={({ pressed }) => [pressed && { opacity: 0.6 }]}>
-                      <IconSymbol name="trash.fill" size={20} color={colors.error} />
+                index={index}
+                total={items.length}
+                onMove={(from, to) => moveRowInBlock(items, from, to)}
+                onDragStateChange={(dragging) => setDraggingId(dragging ? item.id : null)}
+              >
+                <View style={[
+                  styles.catRow,
+                  { borderBottomColor: colors.border },
+                  draggingId === item.id ? { backgroundColor: colors.primary + "14" } : { backgroundColor: colors.surface },
+                  index === items.length - 1 ? { borderBottomWidth: 0 } : null,
+                ]}>
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <View style={{ marginRight: 10 }}>
+                      <IconSymbol name="line.3.horizontal" size={18} color={colors.muted} />
+                    </View>
+                    <Pressable onPress={() => {
+                      if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setColorPickerId(showPicker ? null : item.id);
+                    }} hitSlop={6}>
+                      <View style={[styles.colorDot, { backgroundColor: item.color, marginRight: 12 }]} />
                     </Pressable>
-                  ) : null}
-                </View>
-                {/* 分组选择 */}
-                {groupPickerId === item.id ? (
-                  <View style={{ marginTop: 10 }}>
-                    <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 6 }}>{t("tg.assignHint")}</Text>
-                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                      <Pressable
-                        onPress={() => { setTagGroup(item.id, null); setGroupPickerId(null); }}
-                        style={[styles.groupChip, { backgroundColor: !item.groupId ? colors.primary : colors.background, borderColor: !item.groupId ? colors.primary : colors.border }]}
-                      >
-                        <Text style={[styles.groupChipText, { color: !item.groupId ? "#FFFFFF" : colors.foreground }]}>{t("tg.ungrouped")}</Text>
-                      </Pressable>
-                      {groups.map((g) => (
-                        <Pressable
-                          key={g.id}
-                          onPress={() => { setTagGroup(item.id, g.id); setGroupPickerId(null); }}
-                          style={[styles.groupChip, { backgroundColor: item.groupId === g.id ? colors.primary : colors.background, borderColor: item.groupId === g.id ? colors.primary : colors.border }]}
-                        >
-                          <Text style={[styles.groupChipText, { color: item.groupId === g.id ? "#FFFFFF" : colors.foreground }]}>
-                            {displayNames(g.nameEn ?? "", g.name, lang).primary}
+                    {isEditing ? (
+                      <View style={{ flex: 1, gap: 6 }}>
+                        <TextInput
+                          style={[styles.editInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
+                          value={editingName}
+                          onChangeText={setEditingName}
+                          autoFocus
+                          returnKeyType="done"
+                          placeholder={t("tags.edit.zh")}
+                          placeholderTextColor={colors.muted}
+                          onSubmitEditing={commitEdit}
+                        />
+                        <TextInput
+                          style={[styles.editInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
+                          value={editingNameEn}
+                          onChangeText={setEditingNameEn}
+                          returnKeyType="done"
+                          placeholder={t("tags.edit.en")}
+                          placeholderTextColor={colors.muted}
+                          onSubmitEditing={commitEdit}
+                        />
+                        {/* 分组选择 */}
+                        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
+                          <Text style={{ fontSize: 12, color: colors.muted, width: "100%", marginBottom: 2 }}>{t("tg.assignHint")}</Text>
+                          <Pressable
+                            onPress={() => { setTagGroup(item.id, null); setGroupPickerId(null); }}
+                            style={[styles.groupChip, { backgroundColor: !item.groupId ? colors.primary : colors.background, borderColor: !item.groupId ? colors.primary : colors.border }]}
+                          >
+                            <Text style={[styles.groupChipText, { color: !item.groupId ? "#FFFFFF" : colors.foreground }]}>{t("tg.ungrouped")}</Text>
+                          </Pressable>
+                          {groups.map((g) => (
+                            <Pressable
+                              key={g.id}
+                              onPress={() => { setTagGroup(item.id, g.id); setGroupPickerId(null); }}
+                              style={[styles.groupChip, { backgroundColor: item.groupId === g.id ? colors.primary : colors.background, borderColor: item.groupId === g.id ? colors.primary : colors.border }]}
+                            >
+                              <Text style={[styles.groupChipText, { color: item.groupId === g.id ? "#FFFFFF" : colors.foreground }]}>
+                                {displayNames(g.nameEn ?? "", g.name, lang).primary}
+                              </Text>
+                            </Pressable>
+                          ))}
+                        </View>
+                      </View>
+                    ) : (
+                      <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                          {isItemLocked ? <IconSymbol name="lock.fill" size={12} color={colors.muted} /> : null}
+                          <Text style={{ fontSize: 15, fontWeight: "600", color: colors.foreground }} numberOfLines={1}>
+                            {item.name}
                           </Text>
+                        </View>
+                        <Text style={{ fontSize: 12, color: colors.muted, marginTop: 1 }} numberOfLines={1}>
+                          {item.nameEn ? `${item.nameEn} · ` : ""}
+                          {t("tags.count", { n: item.count })}
+                        </Text>
+                      </View>
+                    )}
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 12, marginLeft: 8 }}>
+                      {isEditing ? (
+                        <Pressable onPress={commitEdit} hitSlop={8} style={({ pressed }) => [pressed && { opacity: 0.6 }]}>
+                          <IconSymbol name="checkmark" size={22} color={colors.primary} />
                         </Pressable>
-                      ))}
+                      ) : (
+                        <>
+                          <Pressable
+                            onPress={() => {
+                              if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                              setEditingId(item.id);
+                              setEditingName(item.name);
+                              setEditingNameEn(item.nameEn);
+                            }}
+                            hitSlop={8}
+                            style={({ pressed }) => [pressed && { opacity: 0.6 }]}
+                          >
+                            <IconSymbol name="pencil" size={20} color={colors.muted} />
+                          </Pressable>
+                          <Pressable
+                            onPress={() => { onToggleLockTag?.(item); if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); }}
+                            hitSlop={8}
+                            style={({ pressed }) => [pressed && { opacity: 0.6 }]}
+                          >
+                            <IconSymbol name={isItemLocked ? "lock.fill" : "lock.open.fill"} size={18} color={isItemLocked ? colors.primary : colors.muted} />
+                          </Pressable>
+                          {!isItemLocked ? (
+                            <Pressable onPress={() => confirmDelete(item)} hitSlop={8} style={({ pressed }) => [pressed && { opacity: 0.6 }]}>
+                              <IconSymbol name="trash.fill" size={20} color={colors.error} />
+                            </Pressable>
+                          ) : null}
+                        </>
+                      )}
                     </View>
                   </View>
-                ) : null}
-              </>
+                  {showPicker ? (
+                    <IOSColorPickerSheet
+                      visible={showPicker}
+                      value={item.color}
+                      onChange={(c) => pickColor(item.id, c)}
+                      onClose={() => setColorPickerId(null)}
+                      title={t("tags.color.title")}
+                    />
+                  ) : null}
+                </View>
+              </DraggableRow>
             );
-          })()}
+          })}
+          {/* 添加标签按钮 */}
+          <Pressable
+            onPress={() => onAddTag(group?.id ?? null)}
+            style={({ pressed }) => [styles.catRow, { borderBottomWidth: 0, flexDirection: "row", alignItems: "center", gap: 8, opacity: pressed ? 0.6 : 1 }]}
+          >
+            <IconSymbol name="plus" size={16} color={colors.primary} />
+            <Text style={{ fontSize: 14, color: colors.primary, fontWeight: "500" }}>{t("tags.add.tag", { s: sectionLabel })}</Text>
+          </Pressable>
         </View>
       ) : null}
     </View>
