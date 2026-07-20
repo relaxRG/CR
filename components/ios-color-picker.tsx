@@ -9,7 +9,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   GestureResponderEvent,
   LayoutChangeEvent,
-  Modal,
   NativeSyntheticEvent,
   Platform,
   Pressable,
@@ -80,6 +79,10 @@ const GRID_COLORS: string[] = (() => {
   }
   return cols;
 })();
+
+// 网格单元固定尺寸
+const GRID_CELL_SIZE = 24;
+const GRID_GAP = 5;
 
 // ─── 常用色存储 key ──────────────────────────────────────────────────────────
 const RECENT_KEY = "iosColorPicker.recent.v1";
@@ -282,6 +285,7 @@ export function IOSColorPicker({ value, onChange }: IOSColorPickerProps) {
   const colors = useColors();
   const [mode, setMode] = useState<Mode>("grid");
   const [recent, setRecent] = useState<string[]>([]);
+  const [, setGridWidth] = useState(0);
 
   // HSV state（滑块/光谱模式用）
   const initHsv = useMemo(() => {
@@ -378,14 +382,21 @@ export function IOSColorPicker({ value, onChange }: IOSColorPickerProps) {
 
       {/* 内容区 */}
       {mode === "grid" && (
-        <View style={pickerStyles.gridWrap}>
+        <View
+          style={pickerStyles.gridWrap}
+          onLayout={(e) => setGridWidth(e.nativeEvent.layout.width)}
+        >
           {GRID_COLORS.map((c) => (
             <Pressable
               key={c}
               onPress={() => commit(c)}
               style={[
-                pickerStyles.gridCell,
-                { backgroundColor: c },
+                {
+                  width: GRID_CELL_SIZE,
+                  height: GRID_CELL_SIZE,
+                  borderRadius: 5,
+                  backgroundColor: c,
+                },
                 value.toUpperCase() === c && pickerStyles.gridCellActive,
               ]}
             />
@@ -471,25 +482,45 @@ export function IOSColorPickerSheet({
   title?: string;
 }) {
   const colors = useColors();
+  if (!visible) return null;
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={sheetStyles.backdrop} onPress={onClose} />
-      <View style={[sheetStyles.sheet, { backgroundColor: colors.surface }]}>
-        {/* 标题栏 */}
-        <View style={[sheetStyles.header, { borderBottomColor: colors.border }]}>
-          <View style={{ width: 60 }} />
-          <Text style={[sheetStyles.headerTitle, { color: colors.foreground }]}>{title}</Text>
-          <Pressable onPress={onClose} style={({ pressed }) => [sheetStyles.closeBtn, pressed && { opacity: 0.6 }]}>
-            <Text style={[sheetStyles.closeBtnText, { color: colors.primary }]}>完成</Text>
-          </Pressable>
-        </View>
-        <View style={sheetStyles.body}>
-          <IOSColorPicker value={value} onChange={onChange} />
-        </View>
+    <View style={[inlineStyles.container, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <View style={[inlineStyles.header, { borderBottomColor: colors.border }]}>
+        <Text style={[inlineStyles.headerTitle, { color: colors.foreground }]}>{title}</Text>
+        <Pressable
+          onPress={onClose}
+          style={({ pressed }) => [inlineStyles.closeBtn, pressed && { opacity: 0.6 }]}
+        >
+          <Text style={[inlineStyles.closeBtnText, { color: colors.primary }]}>完成</Text>
+        </Pressable>
       </View>
-    </Modal>
+      <View style={inlineStyles.body}>
+        <IOSColorPicker value={value} onChange={onChange} />
+      </View>
+    </View>
   );
 }
+
+const inlineStyles = StyleSheet.create({
+  container: {
+    marginTop: 10,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: "hidden",
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  headerTitle: { fontSize: 15, fontWeight: "600", lineHeight: 20 },
+  closeBtn: { paddingVertical: 4, paddingHorizontal: 2 },
+  closeBtnText: { fontSize: 15, fontWeight: "500" },
+  body: { padding: 14 },
+});
 
 const pickerStyles = StyleSheet.create({
   root: { gap: 16 },
@@ -509,12 +540,7 @@ const pickerStyles = StyleSheet.create({
   gridWrap: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 6,
-  },
-  gridCell: {
-    width: "7%",
-    aspectRatio: 1,
-    borderRadius: 6,
+    gap: GRID_GAP,
   },
   gridCellActive: {
     borderWidth: 2.5,
@@ -567,23 +593,3 @@ const pickerStyles = StyleSheet.create({
   saveBtnText: { fontSize: 16, lineHeight: 20 },
 });
 
-const sheetStyles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)" },
-  sheet: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingBottom: 32,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  headerTitle: { fontSize: 16, fontWeight: "600", lineHeight: 22 },
-  closeBtn: { width: 60, alignItems: "flex-end" },
-  closeBtnText: { fontSize: 16, fontWeight: "500" },
-  body: { padding: 16 },
-});

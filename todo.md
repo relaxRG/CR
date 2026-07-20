@@ -444,3 +444,32 @@
 - [x] CF Worker 照片 API 4 条路由部署验证（upload/list/download/delete，鉴权 401 正常）
 - [x] TypeScript 0 错误，vitest 35 通过
 - [ ] 触发 EAS Build 57 并提交 TestFlight（Cloud PC 先升级 eas-cli）
+
+## 标签管理系统升级（2026-07-20 确认）
+- [ ] 数据层：types.ts 新增 CategoryGroup 接口、Category 加 groupId、TagGroup/TagItem 加 locked 字段
+- [ ] 数据层：store.tsx 新增 categoryGroups state + CRUD + 持久化
+- [ ] 数据层：store.tsx flavor 默认三分组初始化（基础味觉/香气特征/口感维度）
+- [ ] 数据层：store.tsx 老用户升级迁移（flavor 标签自动分配分组）
+- [ ] 数据层：store.tsx 锁定功能（locked 标签/分组不可删除）
+- [ ] UI：tags.tsx 分类 category 支持分组 UI（CategoryGroup）
+- [ ] UI：tags.tsx spirit/glass/flavor 启用 groupedBlocks + GroupCard 渲染
+- [ ] UI：tags.tsx flavor 分组固定三个（不可增减），分组名可改
+- [ ] UI：tags.tsx 锁定/解锁按钮（标签和分组）
+- [ ] 颜色同步：recipe-tag-renderer.tsx baseSpirit 颜色改为从 tags 读取
+- [ ] 颜色同步：recipe-form.tsx flavor chip 颜色改为从 tags 读取
+- [ ] 颜色同步：recipe/[id].tsx flavor chip 颜色改为从 tags 读取
+- [ ] i18n：新增 lock/unlock/categoryGroup 相关翻译 key
+- [ ] icon-symbol.tsx：新增 lock.open.fill 图标映射
+
+## 标签管理系统升级（2026-07-20）
+
+- [x] 风味标签三个固定分组：基础味觉 / 香气特征 / 口感维度（不可增减，可改名）
+- [x] 分类/基酒/杯型/风味 标签颜色全局同步（recipe-form、recipe/[id]、recipe-tag-renderer）
+- [x] 分类/基酒/杯型/风味 全部支持分组功能（GroupCard + CategoryGroupCard）
+- [x] 分组名字可以更改（GroupCard 内改名 UI）
+- [x] 锁定功能：分组锁定/解锁（ellipsis 按钮）
+- [x] 锁定功能：标签锁定/解锁（编辑抽屉内 lock 按钮）
+- [x] 锁定的分组和标签不能被删除（confirmDelete/confirmDeleteGroup 检查）
+- [x] flavor 老用户迁移：自动分配三个默认分组
+- [x] CategoryGroup 接口新增（types.ts + store.tsx）
+- [x] icon-symbol.tsx 添加 lock.open.fill 图标映射
