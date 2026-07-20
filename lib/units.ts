@@ -321,3 +321,36 @@ export const ALL_PRESET_UNITS: string[] = [
   ...UNIT_PRESET_GROUPS.flatMap((g) => g.unitsZh),
   ...UNIT_PRESET_GROUPS.flatMap((g) => g.unitsEn ?? []),
 ];
+
+/**
+ * Unit preset groups specifically for yield/output fields in homemade prep forms.
+ * Simpler than ingredient units — focused on container/batch output scenarios.
+ */
+export const YIELD_UNIT_PRESET_GROUPS: { labelKey: string; units: string[] }[] = [
+  {
+    labelKey: "unit.group.liquid",
+    units: ["ml", "L", "oz", "cl"],
+  },
+  {
+    labelKey: "unit.group.weight",
+    units: ["g", "kg", "斤"],
+  },
+  {
+    labelKey: "unit.group.count",
+    units: ["个", "份", "批", "罐", "瓶", "袋", "盒"],
+  },
+];
+
+/** Flat list of all yield preset units */
+export const ALL_YIELD_UNITS: string[] = YIELD_UNIT_PRESET_GROUPS.flatMap((g) => g.units);
+
+/** Returns the base dimension of a yield unit: "liquid" | "weight" | "count" | "unknown" */
+export function yieldUnitDimension(unit: string): "liquid" | "weight" | "count" | "unknown" {
+  const LIQUID = new Set(["ml", "L", "oz", "cl", "dl"]);
+  const WEIGHT = new Set(["g", "kg", "斤", "两", "钱", "oz_s", "lb"]);
+  const COUNT = new Set(["个", "份", "批", "罐", "瓶", "袋", "盒", "听", "杯"]);
+  if (LIQUID.has(unit)) return "liquid";
+  if (WEIGHT.has(unit)) return "weight";
+  if (COUNT.has(unit)) return "count";
+  return "unknown";
+}

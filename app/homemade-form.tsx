@@ -182,6 +182,8 @@ export default function HomemadeFormScreen() {
   }, [sourceFamilyKey, existingFamilyKeys]);
   /** Unit picker: which ingredient row is currently open */
   const [unitPickerIngId, setUnitPickerIngId] = useState<string | null>(null);
+  /** Yield unit picker open state */
+  const [yieldUnitPickerOpen, setYieldUnitPickerOpen] = useState(false);
   const { recentUnits, addRecentUnit } = useRecentUnits();
 
   /** 当前选中类型是否属于装饰分组 */
@@ -261,8 +263,27 @@ export default function HomemadeFormScreen() {
       if (!shelfLife.trim() && res.shelfLife) setShelfLife(res.shelfLife);
       if (!storage.trim() && res.storage) setStorage(res.storage);
       if (!usageNotes.trim() && res.usageNotes) setUsageNotes(res.usageNotes);
+      // ── 新增全字段回填 ────────────────────────────────────────────────────
+      // 中英文名称：仅在对应字段为空时回填
+      if (!name.trim() && res.nameZh) setName(res.nameZh);
+      if (!nameAlt.trim() && res.nameEn) setNameAlt(res.nameEn);
+      // 制作步骤：仅在步骤为空时回填（将换行分割为步骤行）
+      if (stepRows.every((r) => !r.text.trim()) && res.steps) {
+        const lines = res.steps.split("\n").map((l) => l.replace(/^\d+\.?\s*/, "").trim()).filter(Boolean);
+        if (lines.length > 0) {
+          setStepRows(lines.map((text) => ({ id: genId(), text })));
+        }
+      }
+      // 产量：仅在产量为空时回填
+      if (!yieldQty.trim() && res.yieldQty && res.yieldQty > 0) setYieldQty(String(res.yieldQty));
+      if (!yieldUnit.trim() && res.yieldUnit) setYieldUnit(res.yieldUnit);
+      // 装饰家族 key 和变体标签（仅装饰类）
+      if (!sourceFamilyKey.trim() && res.sourceFamilyKey) setSourceFamilyKey(res.sourceFamilyKey);
+      if (!variantLabel.trim() && res.variantLabel) setVariantLabel(res.variantLabel);
       if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setAiStatus({ kind: "ok", msg: lang === "en" ? "AI filled in fields" : "AI 已补全字段" });
+      // 统计回填字段数量，给用户明确反馈
+      const filledFields = [res.story, res.styleDesc, res.shelfLife, res.storage, res.usageNotes, res.steps, res.yieldQty, res.sourceFamilyKey].filter(Boolean).length;
+      setAiStatus({ kind: "ok", msg: lang === "en" ? `AI filled ${filledFields} fields` : `AI 已补全 ${filledFields} 个字段` });
     } catch {
       setAiStatus({ kind: "err", msg: lang === "en" ? "AI analysis failed" : "AI 分析失败，请重试" });
     } finally {
@@ -1033,7 +1054,7 @@ export default function HomemadeFormScreen() {
           </Pressable>
 
           {fieldLabel(t("hmform.yield"))}
-          {/* 结构化产量：数量 + 单位 */}
+          {/* 结构化产量：数量 + 单位选择器 */}
           <View style={{ flexDirection: "row", gap: 8, marginBottom: 4 }}>
             <View style={{ flex: 1.2 }}>
               <TextInput
@@ -1046,53 +1067,67 @@ export default function HomemadeFormScreen() {
                 returnKeyType="done"
               />
             </View>
-            <View style={{ flex: 1.5 }}>
-              <TextInput
-                style={inputStyle}
-                value={yieldUnit}
-                onChangeText={setYieldUnit}
-                placeholder={lang === "zh" ? "单位：ml/g/个/斤/片" : "Unit: ml/g/pcs/lb"}
-                placeholderTextColor={colors.muted}
-                returnKeyType="done"
-              />
-            </View>
-          </View>
-          <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 8 }}>
-            {lang === "zh"
-              ? "例：300 ml（糖浆）、20 个（装饰）、500 g（腌制原料）"
-              : "e.g. 300 ml (syrup), 20 pcs (garnish), 500 g (marinated)"}
-          </Text>
-          {/* 兼容旧版：仍保留文本产量字段（可选） */}
-          <TextInput
-            style={[inputStyle, { marginBottom: 4 }]}
-            value={yieldStr}
-            onChangeText={setYieldStr}
-            placeholder={lang === "en" ? "Or text: ~300ml (legacy)" : "或文本：约300ml（旧版兼容）"}
-            placeholderTextColor={colors.muted}
-            returnKeyType="done"
-          />
-          {/* 非装饰类：批次总成本 */}
-          {selectedGroup !== "garnish" && (
-            <View style={{ marginBottom: 8 }}>
-              {fieldLabel(lang === "zh" ? "批次总成本（¥）" : "Batch Total Cost (¥)")}
-              <TextInput
-                style={inputStyle}
-                value={normalBatchCost}
-                onChangeText={setNormalBatchCost}
-                placeholder={lang === "zh"
-                  ? "填写原料总花费，系统将自动 ÷ 产量"
-                  : "Total ingredient cost; system divides by yield"}
-                placeholderTextColor={colors.muted}
-                keyboardType="numeric"
-                returnKeyType="done"
-              />
-              <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>
-                {lang === "zh"
-                  ? "成本核算 = 批次总成本 ÷ 产量，如：¥40 ÷ 300ml = ¥0.13/ml"
-                  : "Cost = batch total ÷ yield, e.g. ¥40 ÷ 300ml = ¥0.13/ml"}
+            <Pressable
+              style={({ pressed }) => [
+                inputStyle,
+                { flex: 1.5, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+                pressed && { opacity: 0.7 },
+              ]}
+              onPress={() => setYieldUnitPickerOpen(true)}
+            >
+              <Text style={{ color: yieldUnit ? colors.foreground : colors.muted, fontSize: 15 }}>
+                {yieldUnit || (lang === "zh" ? "选择单位" : "Unit")}
               </Text>
-            </View>
-          )}
+              <IconSymbol name="chevron.right" size={14} color={colors.muted} />
+            </Pressable>
+          </View>
+          {/* 实时成本预览 */}
+          {(() => {
+            const qty = parseFloat(yieldQty);
+            const cost = parseFloat(normalBatchCost);
+            if (qty > 0 && cost > 0 && yieldUnit) {
+              const perUnit = cost / qty;
+              const unitLabel = yieldUnit;
+              const isLiquid = ["ml","L","oz","cl"].includes(yieldUnit);
+              const isWeight = ["g","kg","斤"].includes(yieldUnit);
+              let preview = `¥${perUnit.toFixed(4)}/${unitLabel}`;
+              if (isLiquid && yieldUnit === "ml") preview += `  ·  ¥${(perUnit * 30).toFixed(3)}/30ml`;
+              if (isWeight && yieldUnit === "g") preview += `  ·  ¥${(perUnit * 100).toFixed(3)}/100g`;
+              return (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6, paddingHorizontal: 4 }}>
+                  <IconSymbol name="checkmark.circle.fill" size={14} color={colors.success} />
+                  <Text style={{ fontSize: 12, color: colors.success, fontWeight: "600" }}>{preview}</Text>
+                </View>
+              );
+            }
+            return (
+              <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 8 }}>
+                {lang === "zh"
+                  ? "例：300 ml（糖浆）、20 个（装饰）、500 g（腌制原料）"
+                  : "e.g. 300 ml (syrup), 20 pcs (garnish), 500 g (marinated)"}
+              </Text>
+            );
+          })()}
+          {/* 批次总成本（所有分区均显示，装饰类也需要成本核算） */}
+          <View style={{ marginBottom: 8 }}>
+            {fieldLabel(lang === "zh" ? "批次总成本（¥）" : "Batch Total Cost (¥)")}
+            <TextInput
+              style={inputStyle}
+              value={normalBatchCost}
+              onChangeText={setNormalBatchCost}
+              placeholder={lang === "zh"
+                ? "填写原料总花费，系统将自动 ÷ 产量"
+                : "Total ingredient cost; system divides by yield"}
+              placeholderTextColor={colors.muted}
+              keyboardType="numeric"
+              returnKeyType="done"
+            />
+            <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>
+              {lang === "zh"
+                ? "成本核算 = 批次总成本 ÷ 产量，如：¥40 ÷ 300ml = ¥0.13/ml"
+                : "Cost = batch total ÷ yield, e.g. ¥40 ÷ 300ml = ¥0.13/ml"}
+            </Text>
+          </View>
 
           {fieldLabel(t("hmform.shelfLife"))}
           {isGarnishType ? (
@@ -1418,6 +1453,17 @@ export default function HomemadeFormScreen() {
         }}
         onClose={() => setUnitPickerIngId(null)}
       />
+      {/* 产量单位选择器 */}
+      <UnitPickerSheet
+        visible={yieldUnitPickerOpen}
+        selectedUnit={yieldUnit}
+        recentUnits={[]}
+        onSelect={(unit) => {
+          setYieldUnit(unit);
+          setYieldUnitPickerOpen(false);
+        }}
+        onClose={() => setYieldUnitPickerOpen(false)}
+      />
     </ScreenContainer>
   );
 }
@@ -1473,3 +1519,4 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
 });
+import { YIELD_UNIT_PRESET_GROUPS } from "@/lib/units";

@@ -173,6 +173,12 @@ export interface PrepCostEstimateFull extends PrepCostEstimate {
   baseUnit: string | null;
   /** 通用：产量数量，null 表示未知 */
   baseQty: number | null;
+  /** 每 100g 成本（仅重量产出有效），null 表示不适用 */
+  costPer100g: number | null;
+  /** 每件成本（仅计件产出有效），null 表示不适用 */
+  costPerPiece: number | null;
+  /** 产量维度：liquid / weight / count / unknown */
+  yieldDimension: "liquid" | "weight" | "count" | "unknown";
 }
 
 /**
@@ -605,12 +611,47 @@ export function estimatePrepCostFull(prep: HomemadePrep, bottles: Bottle[]): Pre
   const costPerBaseUnit = (effectiveBatchCost > 0 && baseQty && baseQty > 0)
     ? effectiveBatchCost / baseQty
     : null;
+
+  // ── 维度判断 ──────────────────────────────────────────────────────────────
+  const LIQUID_UNITS = new Set(["ml", "l", "oz", "cl", "dl"]);
+  const WEIGHT_UNITS = new Set(["g", "kg", "斤", "两", "钱", "oz_s", "lb"]);
+  const COUNT_UNITS = new Set(["个", "份", "批", "罐", "瓶", "袋", "盒", "听", "杯", "枚", "颗", "只"]);
+  const unitLower = (baseUnit ?? "").toLowerCase();
+  const yieldDimension: "liquid" | "weight" | "count" | "unknown" =
+    LIQUID_UNITS.has(unitLower) ? "liquid"
+    : WEIGHT_UNITS.has(unitLower) ? "weight"
+    : COUNT_UNITS.has(baseUnit ?? "") ? "count"
+    : "unknown";
+
+  // ── 多维度成本 ─────────────────────────────────────────────────────────────
+  // costPer30Ml 仅液体产出有意义，固体/计件时返回 null
+  const liquidCostPer30Ml = yieldDimension === "liquid" ? base.costPer30Ml : null;
+  const liquidCostPer100Ml = yieldDimension === "liquid" ? base.costPer100Ml : null;
+
+  // 重量产出：每 100g 成本
+  let costPer100g: number | null = null;
+  if (yieldDimension === "weight" && effectiveBatchCost > 0 && baseQty && baseQty > 0) {
+    // baseQty 已归一化到 g（parseYieldToBase 已处理 kg/斤 → g）
+    costPer100g = (effectiveBatchCost / baseQty) * 100;
+  }
+
+  // 计件产出：每件成本
+  let costPerPiece: number | null = null;
+  if (yieldDimension === "count" && effectiveBatchCost > 0 && baseQty && baseQty > 0) {
+    costPerPiece = effectiveBatchCost / baseQty;
+  }
+
   return {
     ...base,
     batchCost: effectiveBatchCost,
+    costPer30Ml: liquidCostPer30Ml,
+    costPer100Ml: liquidCostPer100Ml,
     costPerBaseUnit,
     baseUnit,
     baseQty,
+    costPer100g,
+    costPerPiece,
+    yieldDimension,
   };
 }
 

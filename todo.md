@@ -511,3 +511,13 @@
 - [x] homemade.tsx 列表页：家族折叠 rows 组装 + PrepGroupRow 展示「X 种形态」徽章 + 展开行显示 variantLabel
 - [x] homemade-form.tsx 装饰分区：新增原料家族 + 变体标签输入框，save payload 持久化
 - [x] translations.ts 新增 group.variants 翻译键
+
+## 自制库成本与 AI 补全全面升级（2026-07-21）
+- [x] lib/units.ts 新增 YIELD_UNIT_PRESET_GROUPS 产量专用单位组（液体/重量/计件/批次）
+- [x] lib/homemade/cost.ts 引擎升级：新增 costPer100g、costPerPiece、yieldDimension 三维度
+- [x] server/routers.ts enrichHomemade prompt 升级：全字段覆盖（中英文名、产量、步骤、家族key、变体标签）
+- [x] lib/api/smart-router.ts 客户端类型定义同步升级
+- [x] homemade-form.tsx 产量区重构：自由文本改为 UnitPickerSheet 选择器
+- [x] homemade-form.tsx 成本区升级：实时预览单位成本（液体/重量/计件三维度）
+- [x] homemade-form.tsx AI 回填升级：新增中英文名、步骤、产量、家族key、变体标签全字段回填
+- [x] app/homemade/[id].tsx 详情页成本卡片：根据 yieldDimension 自动切换展示维度

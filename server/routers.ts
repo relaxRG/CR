@@ -1698,6 +1698,7 @@ ${librarySpecificInstructions}
           nameAlt: z.string().max(200).optional(),
           type: z.string().max(100).optional(),
           ingredients: z.array(z.string().max(200)).max(20).optional(),
+          lang: z.enum(["zh", "en"]).optional(),
         }),
       )
       .mutation(async ({ input }) => {
@@ -1793,10 +1794,12 @@ ${librarySpecificInstructions}
         }
 
         const knownType = input.type ? `\n已知类型: ${input.type}` : "";
+        const isEn = input.lang === "en";
         const prompt = `你是专业的调酒师和自制饮品专家，深度研习 Dave Arnold《Liquid Intelligence》(2014)、Jeffrey Morgenthaler《The Bar Book》(2014)、Death & Co《Cocktail Codex》(2018)、Ryan Chetiyawardana《Good Things to Drink》(2015)、《調酒的科學》(台灣版)、《分子料理與調酒》(台灣翻譯版)、Journal of Agricultural and Food Chemistry、Food Chemistry 等权威资料。
 根据以下自制品信息，一次性补全所有字段。
 
 自制品名称: ${displayName}${knownType}${ingredientList}
+输出语言偏好: ${isEn ? "英文优先（nameAlt/story/styleDesc/usageNotes/steps 用英文）" : "中文优先（nameAlt 用英文，其余用中文）"}
 
 请输出 JSON（所有字段必须存在，不确定的字符串填 ""，数组填 []）:
 {
@@ -1805,17 +1808,27 @@ ${librarySpecificInstructions}
   "techniques": 识别到的工艺key数组，从 ${JSON.stringify(VALID_TECHNIQUES)} 中选0-4个，只能选列表中的值,
   "flavorTags": 风味标签数组，从 ${JSON.stringify(VALID_FLAVOR_TAGS)} 中选1-3个，只能选列表中的值,
   "naturalLanguageDesc": "用英文自然语言描述该自制品的基底烈酒类型（如 'rye whiskey based infusion' 或 'jamaican rum fat wash'），如果不含烈酒基底则填 \"\"",
-  "story": "自制品介绍/故事（中文，80字内，描述风味特点和调酒用途），不确定填 \"\"",
-  "styleDesc": "风格/口感描述（中文，40字内），不确定填 \"\"",
+  "nameZh": "中文名称（如输入已是中文则原样返回，否则翻译/推断）",
+  "nameEn": "英文名称（如输入已是英文则原样返回，否则翻译/推断，首字母大写）",
+  "story": "自制品介绍/故事（${isEn ? "英文" : "中文"}，80字内，描述风味特点和调酒用途），不确定填 \"\"",
+  "styleDesc": "风格/口感描述（${isEn ? "英文" : "中文"}，40字内），不确定填 \"\"",
   "shelfLife": "建议保质期（如'冷藏2周'或'密封常温1个月'），不确定填 \"\"",
   "storage": "储存建议（如'冷藏密封保存，使用前摇匀'），不确定填 \"\"",
-  "usageNotes": "调酒用途说明（中文，50字内，如'可替代 Cointreau，适合 Margarita'），不确定填 \"\"",
+  "usageNotes": "调酒用途说明（${isEn ? "英文" : "中文"}，50字内，如'可替代 Cointreau，适合 Margarita'），不确定填 \"\"",
+  "yieldQty": 预期产量数值（纯数字，如 750），不确定填 0,
+  "yieldUnit": "预期产量单位（如 ml/L/g/kg/个/份/批），不确定填 \"\"",
+  "steps": "制作步骤（${isEn ? "英文" : "中文"}，分步骤描述，如 '1. 将...\n2. 加入...\n3. 过滤...'），不确定填 \"\"",
+  "sourceFamilyKey": "原料家族key（仅装饰类填写，如 'yellow-lemon'/'lime'/'orange'，其他类型填 \"\"）",
+  "variantLabel": "形态标签（仅装饰类且有家族key时填写，如 '皮卷'/'角形'/'薄片'，其他类型填 \"\"）",
   "confidence": "high"/"medium"/"low"
 }
 规则：
 - section 和 prepType 必须严格落在上述枚举中
 - techniques 只能从给定列表中选，不能自造新key
 - flavorTags 只能从给定列表中选
+- nameZh 和 nameEn 必须填写，不能为空
+- yieldQty 为 0 表示不确定，不要填写虚假数值
+- steps 应包含具体操作步骤，不确定时填 ""
 - 只输出 JSON，不要任何解释文字`;
         const signal = AbortSignal.timeout(30_000);
         let response;
@@ -1849,16 +1862,32 @@ ${librarySpecificInstructions}
         const searchText = `${input.name} ${input.nameAlt ?? ""} ${naturalDesc} ${(input.ingredients ?? []).join(" ")}`;
         const mapped = resolveLibraryFromText(searchText);
 
+        // ── 产量字段校验 ──────────────────────────────────────────────────
+        const rawYieldQty = typeof p.yieldQty === "number" ? p.yieldQty : 0;
+        const validatedYieldQty = rawYieldQty > 0 ? rawYieldQty : null;
+        const rawYieldUnit = typeof p.yieldUnit === "string" ? p.yieldUnit.trim() : "";
+        const VALID_YIELD_UNITS = ["ml","L","g","kg","斤","个","份","批","罐","瓶","袋","盒","听","杯"];
+        const validatedYieldUnit = VALID_YIELD_UNITS.includes(rawYieldUnit) ? rawYieldUnit : "";
+        // ── 装饰家族字段校验 ──────────────────────────────────────────────
+        const rawFamilyKey = typeof p.sourceFamilyKey === "string" ? p.sourceFamilyKey.trim().toLowerCase().replace(/[^a-z0-9-]/g, "") : "";
+        const rawVariantLabel = typeof p.variantLabel === "string" ? p.variantLabel.trim() : "";
         return {
           section: validatedSection,
           prepType: validatedPrepType,
           techniques: validatedTechniques,
           flavorTags: validatedFlavors,
+          nameZh: typeof p.nameZh === "string" ? p.nameZh.trim() : "",
+          nameEn: typeof p.nameEn === "string" ? p.nameEn.trim() : "",
           story: typeof p.story === "string" ? p.story.trim() : "",
           styleDesc: typeof p.styleDesc === "string" ? p.styleDesc.trim() : "",
           shelfLife: typeof p.shelfLife === "string" ? p.shelfLife.trim() : "",
           storage: typeof p.storage === "string" ? p.storage.trim() : "",
           usageNotes: typeof p.usageNotes === "string" ? p.usageNotes.trim() : "",
+          steps: typeof p.steps === "string" ? p.steps.trim() : "",
+          yieldQty: validatedYieldQty,
+          yieldUnit: validatedYieldUnit,
+          sourceFamilyKey: rawFamilyKey,
+          variantLabel: rawVariantLabel,
           confidence: (["high", "medium", "low"] as const).includes(p.confidence as "high") ? p.confidence as "high" | "medium" | "low" : "medium",
           suggestedLibrary: mapped.suggestedLibrary,
           suggestedCategory: mapped.suggestedCategory,

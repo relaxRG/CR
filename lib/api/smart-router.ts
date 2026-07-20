@@ -153,14 +153,26 @@ export async function enrichHomemade(params: {
 }) {
   const result = await callAI<{
     section: string; prepType: string; techniques: string[]; flavorTags: string[];
-    story: string; styleDesc: string; shelfLife: string; storage: string; usageNotes: string; confidence: string;
+    nameZh: string; nameEn: string;
+    story: string; styleDesc: string; shelfLife: string; storage: string; usageNotes: string;
+    steps: string; yieldQty: number | null; yieldUnit: string;
+    sourceFamilyKey: string; variantLabel: string;
+    confidence: string;
     suggestedLibrary: string; suggestedCategory: string; suggestedStyle: string; mapConfidence: string;
   }>('enrich-homemade', params as Record<string, unknown>);
   return {
     ...result,
     flavorTags: normalizeEnumArrayForLang(result.flavorTags),
+    nameZh: result.nameZh ?? '',
+    nameEn: result.nameEn ?? '',
+    steps: result.steps ?? '',
+    yieldQty: result.yieldQty ?? null,
+    yieldUnit: result.yieldUnit ?? '',
+    sourceFamilyKey: result.sourceFamilyKey ?? '',
+    variantLabel: result.variantLabel ?? '',
   };
 }
+export type EnrichHomemadeResult = Awaited<ReturnType<typeof enrichHomemade>>;
 
 export async function extractRecipesFromText(params: { text: string; lang?: 'zh' | 'en' | 'auto' }) {
   const results = await callAI<Array<{

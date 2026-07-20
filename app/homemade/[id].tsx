@@ -516,40 +516,69 @@ export default function HomemadeDetailScreen() {
               })}
               {/* Unit costs — 通用单位成本 */}
               {cost.costPerBaseUnit !== null ? (
-                <View
-                  className="flex-row items-center justify-between py-2.5"
-                  style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}
-                >
-                  {/* 每单位成本（通用） */}
-                  <Text className="text-xs font-semibold" style={{ color: colors.primary }}>
-                    {lang === "zh"
-                      ? `每${cost.baseUnit ?? "份"} ¥${cost.costPerBaseUnit.toFixed(2)}`
-                      : `¥${cost.costPerBaseUnit.toFixed(2)} / ${cost.baseUnit ?? "unit"}`}
+              <View
+                className="flex-row items-center justify-between py-2.5"
+                style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}
+              >
+                {/* 每单位成本（通用） */}
+                <Text className="text-xs font-semibold" style={{ color: colors.primary }}>
+                  {lang === "zh"
+                    ? `每${cost.baseUnit ?? "份"} ¥${cost.costPerBaseUnit.toFixed(2)}`
+                    : `¥${cost.costPerBaseUnit.toFixed(2)} / ${cost.baseUnit ?? "unit"}`}
+                </Text>
+                {/* 兼容：如果是 ml 单位，额外显示 per30ml */}
+                {cost.costPer30Ml !== null && cost.baseUnit === "ml" ? (
+                  <Text className="text-xs text-muted">
+                    {t("hm.cost.per30")} ¥{cost.costPer30Ml.toFixed(2)}
                   </Text>
-                  {/* 兼容：如果是 ml 单位，额外显示 per30ml */}
-                  {cost.costPer30Ml !== null && cost.baseUnit === "ml" ? (
-                    <Text className="text-xs text-muted">
-                      {t("hm.cost.per30")} ¥{cost.costPer30Ml.toFixed(2)}
-                    </Text>
-                  ) : null}
-                </View>
-              ) : (cost.costPer100Ml !== null || cost.costPer30Ml !== null) ? (
-                <View
-                  className="flex-row items-center justify-between py-2.5"
-                  style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}
-                >
-                  {cost.costPer100Ml !== null ? (
-                    <Text className="text-xs text-muted">
-                      {t("hm.cost.per100")} ¥{cost.costPer100Ml.toFixed(2)}
-                    </Text>
-                  ) : <View />}
-                  {cost.costPer30Ml !== null ? (
-                    <Text className="text-xs font-semibold" style={{ color: colors.primary }}>
-                      {t("hm.cost.per30")} ¥{cost.costPer30Ml.toFixed(2)}
-                    </Text>
-                  ) : null}
-                </View>
-              ) : null}
+                ) : null}
+              </View>
+            ) : (cost.costPer100Ml !== null || cost.costPer30Ml !== null) ? (
+              <View
+                className="flex-row items-center justify-between py-2.5"
+                style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}
+              >
+                {cost.costPer100Ml !== null ? (
+                  <Text className="text-xs text-muted">
+                    {t("hm.cost.per100")} ¥{cost.costPer100Ml.toFixed(2)}
+                  </Text>
+                ) : <View />}
+                {cost.costPer30Ml !== null ? (
+                  <Text className="text-xs font-semibold" style={{ color: colors.primary }}>
+                    {t("hm.cost.per30")} ¥{cost.costPer30Ml.toFixed(2)}
+                  </Text>
+                ) : null}
+              </View>
+            ) : null}
+            {/* 维度自适应：重量产出 */}
+            {cost.yieldDimension === "weight" && cost.costPer100g !== null ? (
+              <View
+                className="flex-row items-center justify-between py-2.5"
+                style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}
+              >
+                <Text className="text-xs font-semibold" style={{ color: colors.primary }}>
+                  {lang === "zh" ? `每100g ¥${cost.costPer100g.toFixed(3)}` : `¥${cost.costPer100g.toFixed(3)} / 100g`}
+                </Text>
+                {cost.costPerBaseUnit !== null ? (
+                  <Text className="text-xs text-muted">
+                    {lang === "zh" ? `每g ¥${cost.costPerBaseUnit.toFixed(4)}` : `¥${cost.costPerBaseUnit.toFixed(4)}/g`}
+                  </Text>
+                ) : null}
+              </View>
+            ) : null}
+            {/* 维度自适应：计件产出 */}
+            {cost.yieldDimension === "count" && cost.costPerPiece !== null ? (
+              <View
+                className="flex-row items-center justify-between py-2.5"
+                style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}
+              >
+                <Text className="text-xs font-semibold" style={{ color: colors.primary }}>
+                  {lang === "zh"
+                    ? `每${cost.baseUnit ?? "个"} ¥${cost.costPerPiece.toFixed(2)}`
+                    : `¥${cost.costPerPiece.toFixed(2)} / ${cost.baseUnit ?? "pc"}`}
+                </Text>
+              </View>
+            ) : null}
               <Text className="text-[11px] text-muted py-2.5" style={{ lineHeight: 15 }}>
                 {(cost.yieldMl === null && cost.baseQty === null)
                   ? (lang === "zh" ? "填写产量和批次成本后自动计算" : "Fill in yield & batch cost to calculate")
