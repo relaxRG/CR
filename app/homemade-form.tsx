@@ -10,6 +10,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { FlatList } from "react-native";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { SmartImportBar } from "@/components/smart-import-bar";
@@ -163,6 +164,22 @@ export default function HomemadeFormScreen() {
   const [sourceFamilyKey, setSourceFamilyKey] = useState(editing?.sourceFamilyKey ?? "");
   /** 变体标签：在折叠卡片内区分同家族或同名的不同形态（如"皮卷"/"角形"/"薄片"） */
   const [variantLabel, setVariantLabel] = useState(editing?.variantLabel ?? "");
+  const [showFamilySuggestions, setShowFamilySuggestions] = useState(false);
+
+  /** 从所有自制品中提取已使用的 sourceFamilyKey，去重排序 */
+  const existingFamilyKeys = useMemo(() => {
+    const keys = allPreps
+      .map((p) => p.sourceFamilyKey)
+      .filter((k): k is string => !!k && k.trim().length > 0);
+    return Array.from(new Set(keys)).sort();
+  }, [allPreps]);
+
+  /** 根据当前输入过滤建议列表 */
+  const familyKeySuggestions = useMemo(() => {
+    const q = sourceFamilyKey.trim().toLowerCase();
+    if (!q) return existingFamilyKeys;
+    return existingFamilyKeys.filter((k) => k.toLowerCase().includes(q));
+  }, [sourceFamilyKey, existingFamilyKeys]);
   /** Unit picker: which ingredient row is currently open */
   const [unitPickerIngId, setUnitPickerIngId] = useState<string | null>(null);
   const { recentUnits, addRecentUnit } = useRecentUnits();
@@ -1159,16 +1176,61 @@ export default function HomemadeFormScreen() {
               </View>
 
               {fieldLabel(lang === "en" ? "Source Family (optional)" : "原料家族（可选）")}
-              <TextInput
-                style={inputStyle}
-                value={sourceFamilyKey}
-                onChangeText={setSourceFamilyKey}
-                placeholder={lang === "en" ? "e.g. yellow-lemon  (group related garnishes)" : "如: yellow-lemon（同源装饰品填相同值）"}
-                placeholderTextColor={colors.muted}
-                returnKeyType="done"
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
+              <View style={{ position: "relative", zIndex: 10 }}>
+                <TextInput
+                  style={inputStyle}
+                  value={sourceFamilyKey}
+                  onChangeText={(v) => { setSourceFamilyKey(v); setShowFamilySuggestions(true); }}
+                  onFocus={() => setShowFamilySuggestions(true)}
+                  onBlur={() => setTimeout(() => setShowFamilySuggestions(false), 150)}
+                  placeholder={lang === "en" ? "e.g. yellow-lemon  (group related garnishes)" : "如: yellow-lemon（同源装饰品填相同值）"}
+                  placeholderTextColor={colors.muted}
+                  returnKeyType="done"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                {showFamilySuggestions && familyKeySuggestions.length > 0 && (
+                  <View
+                    style={{
+                      position: "absolute",
+                      top: "100%",
+                      left: 0,
+                      right: 0,
+                      backgroundColor: colors.surface,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                      borderRadius: 8,
+                      maxHeight: 160,
+                      overflow: "hidden",
+                      shadowColor: "#000",
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.08,
+                      shadowRadius: 4,
+                      elevation: 4,
+                    }}
+                  >
+                    <FlatList
+                      data={familyKeySuggestions}
+                      keyExtractor={(item) => item}
+                      keyboardShouldPersistTaps="always"
+                      renderItem={({ item, index }) => (
+                        <Pressable
+                          onPress={() => { setSourceFamilyKey(item); setShowFamilySuggestions(false); }}
+                          style={({ pressed }) => ({
+                            paddingHorizontal: 14,
+                            paddingVertical: 10,
+                            backgroundColor: pressed ? colors.primary + "18" : "transparent",
+                            borderTopWidth: index === 0 ? 0 : 0.5,
+                            borderTopColor: colors.border,
+                          })}
+                        >
+                          <Text style={{ fontSize: 14, color: colors.foreground }}>{item}</Text>
+                        </Pressable>
+                      )}
+                    />
+                  </View>
+                )}
+              </View>
 
               {fieldLabel(lang === "en" ? "Variant Label (optional)" : "形态标签（可选）")}
               <TextInput

@@ -85,6 +85,13 @@ export default function HomemadeDetailScreen() {
   const techs = detectPrepTechniques(prep);
   const primaryTechDesc = techs.length > 0 ? techniqueDesc(techs[0], lang) : "";
 
+  // 同族形态：同 sourceFamilyKey 的其他变体（排除自身）
+  const familySiblings = prep.sourceFamilyKey
+    ? preps.filter(
+        (p) => p.id !== prep.id && p.sourceFamilyKey === prep.sourceFamilyKey
+      )
+    : [];
+
   // 标签分区数据
   const sectionKey = prepSectionOfIn(types, prep.type);
   const sectionLabelText = prepSectionLabelIn(sections, sectionKey, lang);
@@ -228,6 +235,50 @@ export default function HomemadeDetailScreen() {
               {t("hm.technique.auto")}
             </Text>
           </View>
+        ) : null}
+
+        {familySiblings.length > 0 ? (
+          <>
+            {sectionTitle(lang === "en" ? "Same Family" : "同族形态")}
+            <View className="bg-surface rounded-xl px-4">
+              {familySiblings.map((sibling, idx) => {
+                const sibNames = displayNames(sibling.name, sibling.nameAlt, lang);
+                const isLast = idx === familySiblings.length - 1;
+                return (
+                  <Pressable
+                    key={sibling.id}
+                    onPress={() => {
+                      if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      router.push({ pathname: "/homemade/[id]", params: { id: sibling.id } });
+                    }}
+                    style={({ pressed }) => [pressed && { opacity: 0.6 }]}
+                  >
+                    <View
+                      className="flex-row items-center py-3"
+                      style={[
+                        !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+                      ]}
+                    >
+                      <View className="flex-1">
+                        <Text className="text-[15px] text-foreground" numberOfLines={1}>
+                          {sibNames.primary}
+                          {sibling.variantLabel ? (
+                            <Text className="text-xs text-muted">{"  "}{sibling.variantLabel}</Text>
+                          ) : null}
+                        </Text>
+                        {sibNames.secondary ? (
+                          <Text className="text-xs text-muted mt-0.5" numberOfLines={1}>
+                            {sibNames.secondary}
+                          </Text>
+                        ) : null}
+                      </View>
+                      <IconSymbol name="chevron.right" size={16} color={colors.muted} />
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </>
         ) : null}
 
   {prep.ingredients.length > 0 ? (
