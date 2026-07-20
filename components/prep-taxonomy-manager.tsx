@@ -41,12 +41,16 @@ export function PrepTaxonomyManager() {
   } = useHomemadeStore();
 
   const [newSecName, setNewSecName] = useState("");
+  const [newSecNameEn, setNewSecNameEn] = useState("");
   const [newSecGroup, setNewSecGroup] = useState<PrepGroup>("non_alcoholic");
   const [editingSec, setEditingSec] = useState<string | null>(null);
   const [editSecName, setEditSecName] = useState("");
+  const [editSecNameEn, setEditSecNameEn] = useState("");
   const [newTypeName, setNewTypeName] = useState<Record<string, string>>({});
+  const [newTypeNameEn, setNewTypeNameEn] = useState<Record<string, string>>({});
   const [editingType, setEditingType] = useState<string | null>(null);
   const [editTypeName, setEditTypeName] = useState("");
+  const [editTypeNameEn, setEditTypeNameEn] = useState("");
   const [movePickerType, setMovePickerType] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
@@ -68,23 +72,24 @@ export function PrepTaxonomyManager() {
   };
 
   const handleAddSection = () => {
-    const name = newSecName.trim();
-    if (!name) return;
-    const created =
-      lang === "en" ? addSection(name, "", newSecGroup) : addSection("", name, newSecGroup);
+    const zh = newSecName.trim();
+    const en = newSecNameEn.trim();
+    if (!zh && !en) return;
+    const created = addSection(en, zh, newSecGroup);
     if (created) {
       setNewSecName("");
+      setNewSecNameEn("");
       haptic();
     }
   };
 
   const commitSecEdit = () => {
-    if (editingSec && editSecName.trim()) {
-      if (lang === "en") renameSection(editingSec, editSecName, "");
-      else renameSection(editingSec, "", editSecName);
+    if (editingSec && (editSecName.trim() || editSecNameEn.trim())) {
+      renameSection(editingSec, editSecNameEn.trim(), editSecName.trim());
     }
     setEditingSec(null);
     setEditSecName("");
+    setEditSecNameEn("");
   };
 
   const moveSectionOrder = (index: number, dir: -1 | 1) => {
@@ -98,23 +103,24 @@ export function PrepTaxonomyManager() {
   };
 
   const handleAddType = (sectionKey: string) => {
-    const name = (newTypeName[sectionKey] ?? "").trim();
-    if (!name) return;
-    const created =
-      lang === "en" ? addType(name, "", sectionKey) : addType("", name, sectionKey);
+    const zh = (newTypeName[sectionKey] ?? "").trim();
+    const en = (newTypeNameEn[sectionKey] ?? "").trim();
+    if (!zh && !en) return;
+    const created = addType(en, zh, sectionKey);
     if (created) {
       setNewTypeName((prev) => ({ ...prev, [sectionKey]: "" }));
+      setNewTypeNameEn((prev) => ({ ...prev, [sectionKey]: "" }));
       haptic();
     }
   };
 
   const commitTypeEdit = () => {
-    if (editingType && editTypeName.trim()) {
-      if (lang === "en") renameType(editingType, editTypeName, "");
-      else renameType(editingType, "", editTypeName);
+    if (editingType && (editTypeName.trim() || editTypeNameEn.trim())) {
+      renameType(editingType, editTypeNameEn.trim(), editTypeName.trim());
     }
     setEditingType(null);
     setEditTypeName("");
+    setEditTypeNameEn("");
   };
 
   const moveTypeRow = (sectionKey: string, index: number, dir: -1 | 1) => {
@@ -135,10 +141,22 @@ export function PrepTaxonomyManager() {
         <View className="flex-row items-center" style={{ gap: 8 }}>
           <TextInput
             className="flex-1 bg-background border border-border rounded-xl px-3 py-2.5 text-base text-foreground"
-            placeholder={t("psm.newSection")}
+            placeholder="中文名"
             placeholderTextColor={colors.muted}
             value={newSecName}
             onChangeText={setNewSecName}
+            returnKeyType="done"
+            onSubmitEditing={handleAddSection}
+            style={{ lineHeight: 20 }}
+          />
+          </View>
+          <View className="flex-row items-center" style={{ gap: 8 }}>
+          <TextInput
+            className="flex-1 bg-background border border-border rounded-xl px-3 py-2.5 text-base text-foreground"
+            placeholder="English name"
+            placeholderTextColor={colors.muted}
+            value={newSecNameEn}
+            onChangeText={setNewSecNameEn}
             returnKeyType="done"
             onSubmitEditing={handleAddSection}
             style={{ lineHeight: 20 }}
@@ -217,45 +235,56 @@ export function PrepTaxonomyManager() {
                 />
               </Pressable>
               {editingSec === sec.key ? (
-                <TextInput
-                  className="flex-1 bg-background border border-border rounded-lg px-2 py-1.5 text-base text-foreground"
-                  value={editSecName}
-                  onChangeText={setEditSecName}
-                  autoFocus
-                  returnKeyType="done"
-                  onSubmitEditing={commitSecEdit}
-                  onBlur={commitSecEdit}
-                  style={{ lineHeight: 20 }}
-                />
+                <View style={{ flex: 1, gap: 4 }}>
+                  <TextInput
+                    className="flex-1 bg-background border border-border rounded-lg px-2 py-1.5 text-base text-foreground"
+                    value={editSecName}
+                    onChangeText={setEditSecName}
+                    autoFocus
+                    returnKeyType="done"
+                    placeholder="中文名"
+                    onSubmitEditing={commitSecEdit}
+                    style={{ lineHeight: 20 }}
+                  />
+                  <TextInput
+                    className="flex-1 bg-background border border-border rounded-lg px-2 py-1.5 text-sm text-foreground"
+                    value={editSecNameEn}
+                    onChangeText={setEditSecNameEn}
+                    returnKeyType="done"
+                    placeholder="English name"
+                    onSubmitEditing={commitSecEdit}
+                    style={{ lineHeight: 18 }}
+                  />
+                </View>
               ) : (
                 <View className="flex-1">
                   <View className="flex-row items-center" style={{ gap: 6 }}>
                     <Text className="text-base font-semibold text-foreground">{secLabel}</Text>
                     <Pressable
                       onPress={() => {
-                        const next: PrepGroup =
-                          secGroup === "alcoholic" ? "non_alcoholic" : "alcoholic";
-                        moveSectionGroup(sec.key, next);
-                        haptic();
-                      }}
-                      hitSlop={6}
-                      style={({ pressed }) => [
-                        styles.secGroupTag,
-                        {
-                          backgroundColor:
-                            (secGroup === "alcoholic" ? colors.warning : colors.success) + "22",
-                        },
-                        pressed && { opacity: 0.6 },
-                      ]}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 10,
-                          lineHeight: 14,
-                          fontWeight: "600",
-                          color: secGroup === "alcoholic" ? colors.warning : colors.success,
-                        }}
-                      >
+                       const next: PrepGroup =
+                         secGroup === "alcoholic" ? "non_alcoholic" : "alcoholic";
+                       moveSectionGroup(sec.key, next);
+                       haptic();
+                     }}
+                     hitSlop={6}
+                     style={({ pressed }) => [
+                       styles.secGroupTag,
+                       {
+                         backgroundColor:
+                           (secGroup === "alcoholic" ? colors.warning : colors.success) + "22",
+                       },
+                       pressed && { opacity: 0.6 },
+                     ]}
+                   >
+                     <Text
+                       style={{
+                         fontSize: 10,
+                         lineHeight: 14,
+                         fontWeight: "600",
+                         color: secGroup === "alcoholic" ? colors.warning : colors.success,
+                       }}
+                      > 
                         {lang === "en"
                           ? PREP_GROUPS.find((g) => g.key === secGroup)?.en
                           : PREP_GROUPS.find((g) => g.key === secGroup)?.zh}
@@ -296,7 +325,8 @@ export function PrepTaxonomyManager() {
                   <Pressable
                     onPress={() => {
                       setEditingSec(sec.key);
-                      setEditSecName(secLabel);
+                      setEditSecName(sec.zh);
+                      setEditSecNameEn(sec.en);
                     }}
                     hitSlop={6}
                     style={({ pressed }) => [pressed && { opacity: 0.6 }]}
@@ -335,16 +365,27 @@ export function PrepTaxonomyManager() {
                       <View className="px-4 py-2.5">
                         <View className="flex-row items-center">
                           {editingType === typ.key ? (
-                            <TextInput
-                              className="flex-1 bg-background border border-border rounded-lg px-2 py-1.5 text-sm text-foreground"
-                              value={editTypeName}
-                              onChangeText={setEditTypeName}
-                              autoFocus
-                              returnKeyType="done"
-                              onSubmitEditing={commitTypeEdit}
-                              onBlur={commitTypeEdit}
-                              style={{ lineHeight: 18 }}
-                            />
+                            <View style={{ flex: 1, gap: 4 }}>
+                              <TextInput
+                                className="flex-1 bg-background border border-border rounded-lg px-2 py-1.5 text-sm text-foreground"
+                                value={editTypeName}
+                                onChangeText={setEditTypeName}
+                                autoFocus
+                                returnKeyType="done"
+                                placeholder="中文名"
+                                onSubmitEditing={commitTypeEdit}
+                                style={{ lineHeight: 18 }}
+                              />
+                              <TextInput
+                                className="flex-1 bg-background border border-border rounded-lg px-2 py-1.5 text-xs text-foreground"
+                                value={editTypeNameEn}
+                                onChangeText={setEditTypeNameEn}
+                                returnKeyType="done"
+                                placeholder="English name"
+                                onSubmitEditing={commitTypeEdit}
+                                style={{ lineHeight: 16 }}
+                              />
+                            </View>
                           ) : (
                             <View className="flex-1">
                               <Text className="text-sm font-medium text-foreground">{typLabel}</Text>
@@ -391,7 +432,8 @@ export function PrepTaxonomyManager() {
                               <Pressable
                                 onPress={() => {
                                   setEditingType(typ.key);
-                                  setEditTypeName(typLabel);
+                                  setEditTypeName(typ.zh);
+                                  setEditTypeNameEn(typ.en);
                                 }}
                                 hitSlop={6}
                                 style={({ pressed }) => [pressed && { opacity: 0.6 }]}
@@ -450,10 +492,22 @@ export function PrepTaxonomyManager() {
                 <View className="flex-row items-center px-4 py-2.5" style={{ gap: 8 }}>
                   <TextInput
                     className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground"
-                    placeholder={t("psm.newType")}
+                    placeholder="中文名"
                     placeholderTextColor={colors.muted}
                     value={newTypeName[sec.key] ?? ""}
                     onChangeText={(v) => setNewTypeName((prev) => ({ ...prev, [sec.key]: v }))}
+                    returnKeyType="done"
+                    onSubmitEditing={() => handleAddType(sec.key)}
+                    style={{ lineHeight: 18 }}
+                  />
+                  </View>
+                  <View className="flex-row items-center px-4 py-1.5" style={{ gap: 8 }}>
+                  <TextInput
+                    className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                    placeholder="English name"
+                    placeholderTextColor={colors.muted}
+                    value={newTypeNameEn[sec.key] ?? ""}
+                    onChangeText={(v) => setNewTypeNameEn((prev) => ({ ...prev, [sec.key]: v }))}
                     returnKeyType="done"
                     onSubmitEditing={() => handleAddType(sec.key)}
                     style={{ lineHeight: 18 }}

@@ -479,3 +479,13 @@
 - [x] 临时修复：禁用 DraggableChip 手势（disabled 固定为 true），移除 GroupCard 中 onLayout 内的 measure 调用，消除 iOS crash 根因
 - [x] TypeScript 0 错误，vitest 全部通过
 - [ ] 后续：用 onLayout event.nativeEvent.layout + ScrollView scrollOffset 重新实现稳定的跨分组拖拽（不依赖 measure）
+
+## 标签管理深度修复（2026-07-20）
+- [x] P0 iOS measure crash：彻底移除 refreshGroupLayouts 和 measure 调用，GroupCard 不再持有 native ref
+- [x] P1 Hooks 规则违反：将 renderCategoryGroupCard 提取为真正的 CategoryGroupCard React 组件（移出主屏函数体）
+- [x] P2 新增分组表单触发逻辑：添加 showAddTagGroup state，修复 section 切换时重置表单，修复 TagGroup 表单显示条件
+- [x] P3 跨分组拖拽：彻底删除 DraggableChip 组件、拖拽 state、拖拽回调、groupLayoutMap，移除 GroupCard 拖拽 props
+- [x] P4 自制分区三态切换：分区 group 标签支持 alcoholic → non_alcoholic → garnish 三态循环，颜色区分（warning/success/primary）
+- [x] P5 自制分区双语重命名：分区和类型的新增/编辑均改为双字段（中文 + 英文），handler 同时写入两个语言字段
+- [x] P7 setTagGroup kind 校验：目标分组不存在或 kind 不匹配时不执行赋值，防止跨 kind 数据污染
+- [x] TypeScript 0 错误，Metro bundler 正常

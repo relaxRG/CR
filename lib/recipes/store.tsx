@@ -895,6 +895,13 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
 
   const setTagGroup = useCallback(
     (tagId: string, groupId: string | null) => {
+      // P7: 校验 kind 一致性，防止跨 kind 分组赋值
+      const tag = tagsRef.current.find((t) => t.id === tagId);
+      if (!tag) return;
+      if (groupId !== null) {
+        const targetGroup = tagGroupsRef.current.find((g) => g.id === groupId);
+        if (!targetGroup || targetGroup.kind !== tag.kind) return;
+      }
       persistTags(
         tagsRef.current.map((t) => (t.id === tagId ? { ...t, groupId } : t)),
       );
