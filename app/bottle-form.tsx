@@ -150,6 +150,19 @@ export default function BottleFormScreen() {
       return "override";
     };
     const fields: AiField[] = [];
+    // 计算当前条目实际所属库（libraryOverride 优先，否则按 category 推断）
+    const eg = (libraryOverride && libraryOverride !== 'homemade')
+      ? libraryOverride
+      : bottleGroupOf(category);
+    // styleDesc 标签按库类型动态化
+    const styleDescLabelZh = eg === "spirits" ? "桶型与陈年工艺"
+      : eg === "bottles" ? "甜度与口感描述" : "风格描述";
+    const styleDescLabelEn = eg === "spirits" ? "Cask & Aging"
+      : eg === "bottles" ? "Sweetness & Taste" : "Style Desc";
+    // distilleryInfo 标签
+    const distilleryLabelZh = "蒸馏厂与工艺";
+    const distilleryLabelEn = "Distillery & Craft";
+
     if (aiResult.nameZh) fields.push({ key: "nameZh", labelZh: "中文名", labelEn: "Chinese Name", aiValue: aiResult.nameZh, currentValue: nameZh, conflict: conf(nameZh, aiResult.nameZh, aiResult.confidence) });
     if (aiResult.nameEn) fields.push({ key: "nameEn", labelZh: "英文名", labelEn: "English Name", aiValue: aiResult.nameEn, currentValue: nameEn, conflict: conf(nameEn, aiResult.nameEn, aiResult.confidence) });
     if (aiResult.category && taxCategories.some((c) => c.zh === aiResult.category)) {
@@ -162,23 +175,29 @@ export default function BottleFormScreen() {
     if (aiResult.abv > 0) fields.push({ key: "abv", labelZh: "酒精度", labelEn: "ABV", aiValue: `${aiResult.abv}%`, currentValue: abv ? `${abv}%` : "", conflict: conf(abv, String(aiResult.abv), aiResult.confidence) });
     if (aiResult.priceCny > 0) fields.push({ key: "price", labelZh: "参考价", labelEn: "Price", aiValue: `¥${aiResult.priceCny}`, currentValue: price ? `¥${price}` : "", conflict: conf(price, String(aiResult.priceCny), aiResult.confidence) });
     if (aiResult.notes) fields.push({ key: "notes", labelZh: "备注", labelEn: "Notes", aiValue: aiResult.notes.slice(0, 50) + (aiResult.notes.length > 50 ? "…" : ""), currentValue: notes ? notes.slice(0, 30) + (notes.length > 30 ? "…" : "") : "", conflict: conf(notes, aiResult.notes, aiResult.confidence) });
+    if (aiResult.notesEn) fields.push({ key: "notesEn", labelZh: "英文备注", labelEn: "EN Notes", aiValue: aiResult.notesEn.slice(0, 50) + (aiResult.notesEn.length > 50 ? "…" : ""), currentValue: notesEn ? notesEn.slice(0, 30) + "…" : "", conflict: conf(notesEn, aiResult.notesEn, aiResult.confidence) });
     if (aiResult.flavorTags.length > 0) {
       const curStr = flavorTags.length > 0 ? flavorTags.slice(0, 3).join(" · ") + (flavorTags.length > 3 ? "…" : "") : "";
       const aiStr = aiResult.flavorTags.slice(0, 4).join(" · ") + (aiResult.flavorTags.length > 4 ? ` +${aiResult.flavorTags.length - 4}` : "");
       fields.push({ key: "flavorTags", labelZh: "风味标签", labelEn: "Flavor Tags", aiValue: aiStr, currentValue: curStr, conflict: conf(curStr, aiStr, aiResult.confidence) });
     }
     if (aiResult.story) fields.push({ key: "story", labelZh: "故事/介绍", labelEn: "Story", aiValue: aiResult.story.slice(0, 50) + (aiResult.story.length > 50 ? "…" : ""), currentValue: story ? story.slice(0, 30) + (story.length > 30 ? "…" : "") : "", conflict: conf(story, aiResult.story, aiResult.confidence) });
-    if (aiResult.styleDesc) fields.push({ key: "styleDesc", labelZh: "风格描述", labelEn: "Style Desc", aiValue: aiResult.styleDesc.slice(0, 50) + (aiResult.styleDesc.length > 50 ? "…" : ""), currentValue: styleDesc ? styleDesc.slice(0, 30) + (styleDesc.length > 30 ? "…" : "") : "", conflict: conf(styleDesc, aiResult.styleDesc, aiResult.confidence) });
-    if (aiResult.distilleryInfo) fields.push({ key: "distilleryInfo", labelZh: "蒸馏厂", labelEn: "Distillery", aiValue: aiResult.distilleryInfo.slice(0, 50) + (aiResult.distilleryInfo.length > 50 ? "…" : ""), currentValue: distilleryInfo ? distilleryInfo.slice(0, 30) + "…" : "", conflict: conf(distilleryInfo, aiResult.distilleryInfo, aiResult.confidence) });
-    if (aiResult.pairingNotes) fields.push({ key: "pairingNotes", labelZh: "搭配建议", labelEn: "Pairing", aiValue: aiResult.pairingNotes.slice(0, 50) + (aiResult.pairingNotes.length > 50 ? "…" : ""), currentValue: pairingNotes ? pairingNotes.slice(0, 30) + "…" : "", conflict: conf(pairingNotes, aiResult.pairingNotes, aiResult.confidence) });
-    if (aiResult.usageNotes) fields.push({ key: "usageNotes", labelZh: "调酒用途", labelEn: "Usage", aiValue: aiResult.usageNotes.slice(0, 50) + (aiResult.usageNotes.length > 50 ? "…" : ""), currentValue: usageNotes ? usageNotes.slice(0, 30) + "…" : "", conflict: conf(usageNotes, aiResult.usageNotes, aiResult.confidence) });
-    if (aiResult.seasonality) fields.push({ key: "seasonality", labelZh: "季节性", labelEn: "Seasonality", aiValue: aiResult.seasonality, currentValue: seasonality, conflict: conf(seasonality, aiResult.seasonality, aiResult.confidence) });
-    if ((aiResult as { notesEn?: string }).notesEn) fields.push({ key: "notesEn", labelZh: "英文简介", labelEn: "EN Notes", aiValue: ((aiResult as { notesEn?: string }).notesEn ?? "").slice(0, 50) + (((aiResult as { notesEn?: string }).notesEn ?? "").length > 50 ? "…" : ""), currentValue: notesEn ? notesEn.slice(0, 30) + "…" : "", conflict: conf(notesEn, (aiResult as { notesEn?: string }).notesEn ?? "", aiResult.confidence) });
-    if ((aiResult as { storyEn?: string }).storyEn) fields.push({ key: "storyEn", labelZh: "英文故事", labelEn: "EN Story", aiValue: ((aiResult as { storyEn?: string }).storyEn ?? "").slice(0, 50) + (((aiResult as { storyEn?: string }).storyEn ?? "").length > 50 ? "…" : ""), currentValue: storyEn ? storyEn.slice(0, 30) + "…" : "", conflict: conf(storyEn, (aiResult as { storyEn?: string }).storyEn ?? "", aiResult.confidence) });
-    if ((aiResult as { substituteFor?: string }).substituteFor) fields.push({ key: "substituteFor", labelZh: "可替代", labelEn: "Substitute For", aiValue: (aiResult as { substituteFor?: string }).substituteFor ?? "", currentValue: substituteFor, conflict: "new" });
-    if ((aiResult as { pairsWith?: string }).pairsWith) fields.push({ key: "pairsWith", labelZh: "搭配酒款", labelEn: "Pairs With", aiValue: (aiResult as { pairsWith?: string }).pairsWith ?? "", currentValue: pairsWith, conflict: "new" });
+    if (aiResult.storyEn) fields.push({ key: "storyEn", labelZh: "英文故事", labelEn: "EN Story", aiValue: aiResult.storyEn.slice(0, 50) + (aiResult.storyEn.length > 50 ? "…" : ""), currentValue: storyEn ? storyEn.slice(0, 30) + "…" : "", conflict: conf(storyEn, aiResult.storyEn, aiResult.confidence) });
+    // styleDesc：按库类型动态标签，软饮库/其他也显示
+    if (aiResult.styleDesc) fields.push({ key: "styleDesc", labelZh: styleDescLabelZh, labelEn: styleDescLabelEn, aiValue: aiResult.styleDesc.slice(0, 50) + (aiResult.styleDesc.length > 50 ? "…" : ""), currentValue: styleDesc ? styleDesc.slice(0, 30) + (styleDesc.length > 30 ? "…" : "") : "", conflict: conf(styleDesc, aiResult.styleDesc, aiResult.confidence) });
+    // distilleryInfo：仅基酒库显示
+    if (eg === "spirits" && aiResult.distilleryInfo) fields.push({ key: "distilleryInfo", labelZh: distilleryLabelZh, labelEn: distilleryLabelEn, aiValue: aiResult.distilleryInfo.slice(0, 50) + (aiResult.distilleryInfo.length > 50 ? "…" : ""), currentValue: distilleryInfo ? distilleryInfo.slice(0, 30) + "…" : "", conflict: conf(distilleryInfo, aiResult.distilleryInfo, aiResult.confidence) });
+    // pairingNotes：基酒库不显示（基酒库用 pairsWith 替代），酒款库/原材料库显示
+    if (eg !== "spirits" && aiResult.pairingNotes) fields.push({ key: "pairingNotes", labelZh: "搭配建议", labelEn: "Pairing Notes", aiValue: aiResult.pairingNotes.slice(0, 50) + (aiResult.pairingNotes.length > 50 ? "…" : ""), currentValue: pairingNotes ? pairingNotes.slice(0, 30) + "…" : "", conflict: conf(pairingNotes, aiResult.pairingNotes, aiResult.confidence) });
+    // usageNotes：酒款库/原材料库显示
+    if ((eg === "bottles" || eg === "materials") && aiResult.usageNotes) fields.push({ key: "usageNotes", labelZh: "调酒用途", labelEn: "Cocktail Usage", aiValue: aiResult.usageNotes.slice(0, 50) + (aiResult.usageNotes.length > 50 ? "…" : ""), currentValue: usageNotes ? usageNotes.slice(0, 30) + "…" : "", conflict: conf(usageNotes, aiResult.usageNotes, aiResult.confidence) });
+    // seasonality：仅原材料库显示
+    if (eg === "materials" && aiResult.seasonality) fields.push({ key: "seasonality", labelZh: "季节性", labelEn: "Seasonality", aiValue: aiResult.seasonality, currentValue: seasonality, conflict: conf(seasonality, aiResult.seasonality, aiResult.confidence) });
+    // substituteFor/pairsWith：基酒库和酒款库显示
+    if ((eg === "spirits" || eg === "bottles") && aiResult.substituteFor) fields.push({ key: "substituteFor", labelZh: "可替代酒款", labelEn: "Substitute For", aiValue: aiResult.substituteFor, currentValue: substituteFor, conflict: conf(substituteFor, aiResult.substituteFor, aiResult.confidence) });
+    if ((eg === "spirits" || eg === "bottles") && aiResult.pairsWith) fields.push({ key: "pairsWith", labelZh: "搭配使用的酒款", labelEn: "Pairs Well With", aiValue: aiResult.pairsWith, currentValue: pairsWith, conflict: conf(pairsWith, aiResult.pairsWith, aiResult.confidence) });
     return fields;
-  }, [aiResult, nameZh, nameEn, category, style, brand, origin, volume, abv, price, notes, flavorTags, story, styleDesc, distilleryInfo, pairingNotes, usageNotes, seasonality, notesEn, storyEn, substituteFor, pairsWith, taxCategories]);
+  }, [aiResult, nameZh, nameEn, category, style, brand, origin, volume, abv, price, notes, flavorTags, story, styleDesc, distilleryInfo, pairingNotes, usageNotes, seasonality, notesEn, storyEn, substituteFor, pairsWith, taxCategories, libraryOverride]);
 
   /** 初始化 toggles：新增/确认字段默认 on，覆盖/低可信默认 off */
   useEffect(() => {
@@ -218,10 +237,10 @@ export default function BottleFormScreen() {
     else if (key === "pairingNotes" && aiResult.pairingNotes) setPairingNotes(aiResult.pairingNotes);
     else if (key === "usageNotes" && aiResult.usageNotes) setUsageNotes(aiResult.usageNotes);
     else if (key === "seasonality" && aiResult.seasonality) setSeasonality(aiResult.seasonality);
-    else if (key === "notesEn" && (aiResult as { notesEn?: string }).notesEn) setNotesEn((aiResult as { notesEn?: string }).notesEn ?? "");
-    else if (key === "storyEn" && (aiResult as { storyEn?: string }).storyEn) setStoryEn((aiResult as { storyEn?: string }).storyEn ?? "");
-    else if (key === "substituteFor" && (aiResult as { substituteFor?: string }).substituteFor) setSubstituteFor((aiResult as { substituteFor?: string }).substituteFor ?? "");
-    else if (key === "pairsWith" && (aiResult as { pairsWith?: string }).pairsWith) setPairsWith((aiResult as { pairsWith?: string }).pairsWith ?? "");
+    else if (key === "notesEn" && aiResult.notesEn) setNotesEn(aiResult.notesEn);
+    else if (key === "storyEn" && aiResult.storyEn) setStoryEn(aiResult.storyEn);
+    else if (key === "substituteFor" && aiResult.substituteFor) setSubstituteFor(aiResult.substituteFor);
+    else if (key === "pairsWith" && aiResult.pairsWith) setPairsWith(aiResult.pairsWith);
   }, [aiResult, taxCategories, category, stylesOf]);
 
   /** 应用所有 toggle=true 的字段，保存 undo 快照 */

@@ -135,8 +135,11 @@ export async function enrichBottle(params: {
   const result = await callAI<{
     found: boolean; nameZh: string; nameEn: string; category: string; style: string; brand: string;
     origin: string; volume: string; abv: number; priceCny: number; notes: string; flavorTags: string[];
-    story: string; styleDesc: string; distilleryInfo: string; pairingNotes: string; usageNotes: string;
-    seasonality: string; confidence: "high"|"medium"|"low"; notesEn: string; storyEn: string; substituteFor: string; pairsWith: string; _cached?: boolean;
+    story: string; styleDesc: string; distilleryInfo: string; pairingNotes: string; usageNotes: string; seasonality: string;
+    confidence: "high"|"medium"|"low";
+    notesEn: string; storyEn: string;
+    substituteFor: string; pairsWith: string;
+    _cached?: boolean;
   }>('enrich-bottle', params as Record<string, unknown>);
   return {
     ...result,
