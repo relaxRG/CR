@@ -1027,44 +1027,6 @@ export default function BottleFormScreen() {
               </View>
             </View>
 
-            {/* ── 单位选择（chip 勾选）── */}
-            <Text style={[styles.fieldLabel, { color: colors.foreground, marginBottom: 6 }]}>
-              {lang === "zh" ? "计量单位" : "Unit"}
-            </Text>
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-              {unitOptions.map((u) => {
-                const active = packUnit === u;
-                return (
-                  <Pressable
-                    key={u}
-                    onPress={() => {
-                      setPackUnit(active ? "" : u);
-                      if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    }}
-                    style={[
-                      styles.chip,
-                      { backgroundColor: active ? colors.primary : colors.surface, borderColor: active ? colors.primary : colors.border },
-                    ]}
-                  >
-                    <Text style={[styles.chipText, { color: active ? "#FFFFFF" : colors.foreground }]}>{u}</Text>
-                  </Pressable>
-                );
-              })}
-              {/* 自定义单位输入 */}
-              {!unitOptions.includes(packUnit) && packUnit.trim() !== "" && (
-                <View style={[styles.chip, { backgroundColor: colors.primary, borderColor: colors.primary }]}>
-                  <Text style={[styles.chipText, { color: "#FFFFFF" }]}>{packUnit}</Text>
-                </View>
-              )}
-            </View>
-            {/* 自定义单位输入框（仅当未选中预设单位时显示） */}
-            {!unitOptions.includes(packUnit) && (
-              <View style={{ marginBottom: 12 }}>
-                {field(lang === "zh" ? "或填写自定义单位" : "Or custom unit", packUnit, setPackUnit,
-                  lang === "zh" ? "例：桶、罐、袋…" : "e.g. barrel, keg…")}
-              </View>
-            )}
-
             {/* ── 价格区（按库类型差异化）── */}
             {effectiveGroup === "spirits" ? (
               /* 基酒库：进货价（整瓶）+ 包装数量（可选）→ 自动计算每毫升成本 */
@@ -1135,7 +1097,7 @@ export default function BottleFormScreen() {
                 </View>
               </>
             ) : (
-              /* 原材料库 / 软饮库：三列布局（包装数量 + 单位已在上方 + 总价）*/
+              /* 原材料库 / 软饮库：计量单位 chip + 包装数量 + 总价 */
               <>
                 <Text style={[styles.fieldLabel, { color: colors.foreground, marginBottom: 4 }]}>
                   {lang === "zh" ? "参考价格" : "Reference Price"}
@@ -1145,6 +1107,37 @@ export default function BottleFormScreen() {
                     ? "填写进货规格和对应总价，例如：10个 → ¥8，或 1箱(24听) → ¥60"
                     : "Enter pack size and total price, e.g. 10 pcs → ¥8, or 1 case (24 cans) → ¥60"}
                 </Text>
+                {/* 计量单位 chip 勾选（仅原材料/软饮库） */}
+                <Text style={[styles.fieldLabel, { color: colors.foreground, marginBottom: 6 }]}>
+                  {lang === "zh" ? "计量单位" : "Unit"}
+                </Text>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+                  {unitOptions.map((u) => {
+                    const active = packUnit === u;
+                    return (
+                      <Pressable
+                        key={u}
+                        onPress={() => {
+                          setPackUnit(active ? "" : u);
+                          if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        }}
+                        style={[
+                          styles.chip,
+                          { backgroundColor: active ? colors.primary : colors.surface, borderColor: active ? colors.primary : colors.border },
+                        ]}
+                      >
+                        <Text style={[styles.chipText, { color: active ? "#FFFFFF" : colors.foreground }]}>{u}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                {/* 自定义单位（未选中预设时显示） */}
+                {!unitOptions.includes(packUnit) && (
+                  <View style={{ marginBottom: 8 }}>
+                    {field(lang === "zh" ? "或填写自定义单位" : "Or custom unit", packUnit, setPackUnit,
+                      lang === "zh" ? "例：桶、罐、袋…" : "e.g. barrel, keg…")}
+                  </View>
+                )}
                 <View style={{ flexDirection: "row", gap: 8, marginBottom: 4 }}>
                   <View style={{ flex: 1.2 }}>
                     {field(lang === "zh" ? "包装数量" : "Pack Qty", packQty, setPackQty,
