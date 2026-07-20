@@ -1029,24 +1029,24 @@ export default function BottleFormScreen() {
 
             {/* ── 价格区（按库类型差异化）── */}
             {effectiveGroup === "spirits" ? (
-              /* 基酒库：进货价（整瓶）+ 包装数量（可选）→ 自动计算每毫升成本 */
+              /* 基酒库：进货总价 + 包装数量（瓶）→ 自动计算单瓶价 + 每毫升成本 */
               <>
                 <Text style={[styles.fieldLabel, { color: colors.foreground, marginBottom: 4 }]}>
-                  {lang === "zh" ? "进货价格" : "Purchase Price"}
+                  {lang === "zh" ? "进货价格" : "Purchase Pricing"}
                 </Text>
                 <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 8 }}>
                   {lang === "zh"
-                    ? "填写整瓶进货价（¥），系统自动计算每毫升成本"
-                    : "Enter per-bottle purchase price (¥), cost-per-ml auto-calculated"}
+                    ? "填写进货总价和包装数量，系统自动计算单瓶价和每毫升成本"
+                    : "Enter total purchase price and pack quantity, per-bottle and per-ml cost auto-calculated"}
                 </Text>
                 <View style={{ flexDirection: "row", gap: 12, marginBottom: 4 }}>
                   <View style={{ flex: 1 }}>
-                    {field(lang === "zh" ? "整瓶价格 (¥)" : "Bottle Price (¥)", price, setPrice,
-                      lang === "zh" ? "例：180" : "e.g. 180", { keyboardType: "numeric" })}
+                    {field(lang === "zh" ? "进货总价 (¥)" : "Total Purchase (¥)", price, setPrice,
+                      lang === "zh" ? "例：180 / 1080" : "e.g. 180 / 1080", { keyboardType: "numeric" })}
                   </View>
                   <View style={{ flex: 1 }}>
-                    {field(lang === "zh" ? "包装数量（可选）" : "Pack Qty (opt.)", packQty, setPackQty,
-                      lang === "zh" ? "例：6（箱装）" : "e.g. 6 (case)", { keyboardType: "numeric" })}
+                    {field(lang === "zh" ? "包装数量（瓶）" : "Bottles in Pack", packQty, setPackQty,
+                      lang === "zh" ? "例：6（留空=1瓶）" : "e.g. 6 (blank=1)", { keyboardType: "numeric" })}
                   </View>
                 </View>
                 {/* 每毫升成本预览 */}
@@ -1059,45 +1059,101 @@ export default function BottleFormScreen() {
                   if (unit === "cl") volMl *= 10;
                   if (unit === "l") volMl *= 1000;
                   const qty = parseFloat(packQty) || 1;
-                  const costPerMl = priceNum / (volMl * qty);
+                  const perBottle = priceNum / qty;
+                  const costPerMl = perBottle / volMl;
                   if (!isFinite(costPerMl) || costPerMl <= 0) return null;
                   return (
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 12, paddingHorizontal: 4 }}>
-                      <Text style={{ fontSize: 12, color: colors.muted }}>
-                        {lang === "zh" ? "每毫升成本：" : "Cost/ml: "}
-                      </Text>
-                      <Text style={{ fontSize: 13, fontWeight: "600", color: colors.primary }}>
-                        ¥{costPerMl < 0.1 ? costPerMl.toFixed(4) : costPerMl.toFixed(3)}
-                      </Text>
-                      <Text style={{ fontSize: 11, color: colors.muted }}>/ ml</Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 12, paddingHorizontal: 4, flexWrap: "wrap" }}>
+                      {qty > 1 && (
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                          <Text style={{ fontSize: 12, color: colors.muted }}>{lang === "zh" ? "单瓶：" : "Per bottle: "}</Text>
+                          <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>¥{perBottle.toFixed(2)}</Text>
+                        </View>
+                      )}
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                        <Text style={{ fontSize: 12, color: colors.muted }}>{lang === "zh" ? "每毫升：" : "Per ml: "}</Text>
+                        <Text style={{ fontSize: 13, fontWeight: "600", color: colors.primary }}>
+                          ¥{costPerMl < 0.1 ? costPerMl.toFixed(4) : costPerMl.toFixed(3)}
+                        </Text>
+                      </View>
                     </View>
                   );
                 })()}
               </>
             ) : effectiveGroup === "bottles" ? (
-              /* 酒款库：进货价 + 建议售价（可选）→ 自动计算毛利率 */
+              /* 酒款库：进货总价 + 包装数量（瓶/罐）→ 自动计算单瓶价 */
               <>
                 <Text style={[styles.fieldLabel, { color: colors.foreground, marginBottom: 4 }]}>
                   {lang === "zh" ? "价格信息" : "Pricing"}
                 </Text>
                 <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 8 }}>
                   {lang === "zh"
-                    ? "填写进货价和建议售价，系统自动计算毛利率"
-                    : "Enter purchase and suggested retail price, margin auto-calculated"}
+                    ? "填写进货总价和包装数量，系统自动计算单瓶/罐成本"
+                    : "Enter total purchase price and pack quantity, per-unit cost auto-calculated"}
                 </Text>
                 <View style={{ flexDirection: "row", gap: 12, marginBottom: 4 }}>
                   <View style={{ flex: 1 }}>
-                    {field(lang === "zh" ? "进货价 (¥)" : "Purchase (¥)", price, setPrice,
-                      lang === "zh" ? "例：45" : "e.g. 45", { keyboardType: "numeric" })}
+                    {field(lang === "zh" ? "进货总价 (¥)" : "Total Purchase (¥)", price, setPrice,
+                      lang === "zh" ? "例：45 / 1080" : "e.g. 45 / 1080", { keyboardType: "numeric" })}
                   </View>
                   <View style={{ flex: 1 }}>
-                    {field(lang === "zh" ? "包装数量（可选）" : "Pack Qty (opt.)", packQty, setPackQty,
-                      lang === "zh" ? "例：24（箱）" : "e.g. 24 (case)", { keyboardType: "numeric" })}
+                    {field(lang === "zh" ? "包装数量（瓶/罐）" : "Units in Pack", packQty, setPackQty,
+                      lang === "zh" ? "例：24（留空=1件）" : "e.g. 24 (blank=1)", { keyboardType: "numeric" })}
                   </View>
                 </View>
+                {/* 单瓶/罐成本预览 */}
+                {price && (() => {
+                  const priceNum = parseFloat(price);
+                  const qty = parseFloat(packQty) || 1;
+                  if (!priceNum || qty <= 1) return null;
+                  const perUnit = priceNum / qty;
+                  if (!isFinite(perUnit) || perUnit <= 0) return null;
+                  return (
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 12, paddingHorizontal: 4 }}>
+                      <Text style={{ fontSize: 12, color: colors.muted }}>{lang === "zh" ? "单瓶/罐成本：" : "Per unit cost: "}</Text>
+                      <Text style={{ fontSize: 13, fontWeight: "600", color: colors.primary }}>¥{perUnit.toFixed(2)}</Text>
+                    </View>
+                  );
+                })()}
+              </>
+            ) : effectiveGroup === "softdrinks" ? (
+              /* 软饮库：进货总价 + 包装数量（罐/瓶）→ 自动计算单罐/瓶成本 */
+              <>
+                <Text style={[styles.fieldLabel, { color: colors.foreground, marginBottom: 4 }]}>
+                  {lang === "zh" ? "价格信息" : "Pricing"}
+                </Text>
+                <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 8 }}>
+                  {lang === "zh"
+                    ? "填写进货总价和包装数量，系统自动计算单罐/瓶成本"
+                    : "Enter total purchase price and pack quantity, per-unit cost auto-calculated"}
+                </Text>
+                <View style={{ flexDirection: "row", gap: 8, marginBottom: 4 }}>
+                  <View style={{ flex: 1.2 }}>
+                    {field(lang === "zh" ? "进货总价 (¥)" : "Total Purchase (¥)", price, setPrice,
+                      lang === "zh" ? "例：60 / 120" : "e.g. 60 / 120", { keyboardType: "numeric" })}
+                  </View>
+                  <View style={{ flex: 1.5 }}>
+                    {field(lang === "zh" ? "包装数量（罐/瓶）" : "Units in Pack", packQty, setPackQty,
+                      lang === "zh" ? "例：24（留空=1件）" : "e.g. 24 (blank=1)", { keyboardType: "numeric" })}
+                  </View>
+                </View>
+                {/* 单罐/瓶成本预览 */}
+                {price && (() => {
+                  const priceNum = parseFloat(price);
+                  const qty = parseFloat(packQty) || 1;
+                  if (!priceNum || qty <= 1) return null;
+                  const perUnit = priceNum / qty;
+                  if (!isFinite(perUnit) || perUnit <= 0) return null;
+                  return (
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 12, paddingHorizontal: 4 }}>
+                      <Text style={{ fontSize: 12, color: colors.muted }}>{lang === "zh" ? "单罐/瓶成本：" : "Per unit cost: "}</Text>
+                      <Text style={{ fontSize: 13, fontWeight: "600", color: colors.primary }}>¥{perUnit.toFixed(2)}</Text>
+                    </View>
+                  );
+                })()}
               </>
             ) : (
-              /* 原材料库 / 软饮库：计量单位 chip + 包装数量 + 总价 */
+              /* 原材料库：计量单位 chip + 包装数量 + 总价（保持原有逻辑） */
               <>
                 <Text style={[styles.fieldLabel, { color: colors.foreground, marginBottom: 4 }]}>
                   {lang === "zh" ? "参考价格" : "Reference Price"}
@@ -1107,7 +1163,7 @@ export default function BottleFormScreen() {
                     ? "填写进货规格和对应总价，例如：10个 → ¥8，或 1箱(24听) → ¥60"
                     : "Enter pack size and total price, e.g. 10 pcs → ¥8, or 1 case (24 cans) → ¥60"}
                 </Text>
-                {/* 计量单位 chip 勾选（仅原材料/软饮库） */}
+                {/* 计量单位 chip 勾选（仅原材料库） */}
                 <Text style={[styles.fieldLabel, { color: colors.foreground, marginBottom: 6 }]}>
                   {lang === "zh" ? "计量单位" : "Unit"}
                 </Text>
@@ -1131,7 +1187,6 @@ export default function BottleFormScreen() {
                     );
                   })}
                 </View>
-                {/* 自定义单位（未选中预设时显示） */}
                 {!unitOptions.includes(packUnit) && (
                   <View style={{ marginBottom: 8 }}>
                     {field(lang === "zh" ? "或填写自定义单位" : "Or custom unit", packUnit, setPackUnit,

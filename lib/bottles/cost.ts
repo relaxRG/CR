@@ -1,5 +1,6 @@
 import { Ingredient } from "../recipes/types";
 import { Bottle } from "./types";
+import { bottleGroupOf } from "./types";
 
 /** 单项配料的成本估算结果 */
 export interface IngredientCost {
@@ -257,7 +258,14 @@ export function estimateRecipeCost(
     if (!volumeMl) {
       return { ingredient: ing, bottle, amountMl, cost: null, reason: "no_volume" };
     }
-    const cost = (bottle.priceCny / volumeMl) * amountMl;
+    // 方案 B：基酒库/酒款库/软饮库 → 进货总价 ÷ 包装数量 = 单瓶价
+    // 原材料库 → 保持原有逻辑（priceCny 直接作为参考价）
+    const group = bottle.libraryOverride ?? bottleGroupOf(bottle.category);
+    const usesPackQtyLogic = group === "spirits" || group === "bottles" || group === "softdrinks";
+    const perBottlePrice = usesPackQtyLogic && bottle.packQty && bottle.packQty > 1
+      ? bottle.priceCny / bottle.packQty
+      : bottle.priceCny;
+    const cost = (perBottlePrice / volumeMl) * amountMl;
     return { ingredient: ing, bottle, amountMl, cost, reason: null };
   });
 
