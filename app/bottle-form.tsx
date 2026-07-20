@@ -921,7 +921,12 @@ export default function BottleFormScreen() {
                         return (
                           <Pressable
                             key={cat}
-                            onPress={() => setCategory(cat)}
+                            onPress={() => {
+                              if (cat !== category) {
+                                setCategory(cat);
+                                setStyle(""); // 分类变化时清空风格，避免旧标签残留
+                              }
+                            }}
                             style={[
                               styles.chip,
                               {

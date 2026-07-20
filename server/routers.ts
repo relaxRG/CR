@@ -1462,13 +1462,20 @@ ${input.origin ? `产地: ${input.origin}` : ""}
 - 蒸馏工艺与产区特征（如"铜壶蒸馏，苏格兰高地产区"）
 - 陈年方式（如"波本桶陈12年"）
 - 代表性鸡尾酒用途（如"适合 Negroni、Martini"）
-- distilleryInfo: 蒸馏厂/酒厂简介（中文，60字内，不确定填""）`;
+- distilleryInfo: 蒸馏厂/酒厂简介（中文，60字内，不确定填""）
+- styleDesc: 重点描述桶型与陈年工艺（如"Ex-Bourbon桶陈12年，Sherry桶过桶6个月"，50字内）
+- substituteFor: 该基酒可替代哪款酒（如"可用梅斯卡尔替代龙舌兰"，给出具体酒款名）
+- pairsWith: 与哪款酒搭配效果好（如"与甜味美思搭配组成 Negroni"，给出具体酒款名）`;
         } else if (libraryType === "wine") {
           librarySpecificInstructions = `
 重点补全方向（酒款库）：
 - 风格流派与苦味/甜度来源（如"以龙胆草为主苦味来源"）
 - 常见调酒用途与搭配（如"适合 Aperol Spritz、Negroni"）
-- pairingNotes: 搭配建议（中文，40字内，不确定填""）`;
+- styleDesc: 重点描述甜度与口感层次（如"半甜型，苦韵明显，草本香气突出"，50字内）
+- pairingNotes: 搭配建议（中文，40字内，不确定填""）
+- usageNotes: 调酒用途（如"常用于 Spritz 类鸡尾酒，可作为 Vermouth 替代品"，60字内）
+- substituteFor: 该酒款可替代哪款酒（如"可替代 Campari 用于 Negroni"，给出具体酒款名）
+- pairsWith: 与哪款酒搭配效果好（如"与 Prosecco 搭配组成 Aperol Spritz"，给出具体酒款名）`;
         } else {
           librarySpecificInstructions = `
 重点补全方向（原材料库）：
@@ -1505,10 +1512,10 @@ ${librarySpecificInstructions}
   "flavorTags": 从 ${JSON.stringify(VALID_FLAVOR_TAGS_FULL)} 中选最合适的2-4个（数组），只能选列表中的值,
   "story": "产品故事/介绍（中文，80字内，描述历史背景与风味特点），不确定填 \"\"",
   "styleDesc": "风格特点详细描述（中文，50字内，区别于 style 子标签），不确定填 \"\"",
-  "distilleryInfo": "蒸馏厂/酒厂简介（基酒库专用，中文，60字内），不确定填 \"\"",
-  "pairingNotes": "搭配建议（酒款库专用，中文，40字内），不确定填 \"\"",
-  "usageNotes": "调酒用途说明（原材料库专用，中文，60字内），不确定填 \"\"",
-  "seasonality": "季节性说明（原材料库专用，中文，20字内），不确定填 \"\"",
+  "distilleryInfo": "蒸馏厂/酒厂简介（基酒库专用，中文，60字内，不确定填 \"\"）",
+  "pairingNotes": "搭配建议（酒款库专用，中文，40字内，不确定填 \"\"）",
+  "usageNotes": "调酒用途说明（酒款库/原材料库专用，中文，60字内，不确定填 \"\"）",
+  "seasonality": "季节性说明（原材料库专用，中文，20字内，不确定填 \"\"）",
   "confidence": "high"/"medium"/"low"（资料把握程度：知名大牌=high，通用品类=medium，勉强猜测=low）,
   "notesEn": "一句话英文简介（英文，50字内，供国际场合使用），不确定填 \"\"",
   "storyEn": "英文产品故事/介绍（英文，80字内，描述历史背景与风味特点），不确定填 \"\"",
