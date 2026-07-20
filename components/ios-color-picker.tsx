@@ -250,7 +250,7 @@ function SpectrumPicker({
 }
 const specStyles = StyleSheet.create({
   svPanel: {
-    height: 180,
+    height: 220,
     borderRadius: 12,
     overflow: "hidden",
   },
@@ -286,6 +286,7 @@ export function IOSColorPicker({ value, onChange }: IOSColorPickerProps) {
   const [mode, setMode] = useState<Mode>("grid");
   const [recent, setRecent] = useState<string[]>([]);
   const [, setGridWidth] = useState(0);
+  const [deletingRecent, setDeletingRecent] = useState<string | null>(null);
 
   // HSV state（滑块/光谱模式用）
   const initHsv = useMemo(() => {
@@ -337,6 +338,13 @@ export function IOSColorPicker({ value, onChange }: IOSColorPickerProps) {
     await saveRecent(next);
   }, [currentHex, recent]);
 
+  const deleteFromRecent = useCallback(async (color: string) => {
+    const next = recent.filter((c) => c !== color);
+    setRecent(next);
+    setDeletingRecent(null);
+    await saveRecent(next);
+  }, [recent]);
+
   const commitHex = useCallback((raw: string) => {
     const clean = raw.replace("#", "").toUpperCase();
     if (clean.length === 6 && /^[0-9A-F]+$/.test(clean)) {
@@ -381,77 +389,99 @@ export function IOSColorPicker({ value, onChange }: IOSColorPickerProps) {
       </View>
 
       {/* 内容区 */}
-      {mode === "grid" && (
-        <View
-          style={pickerStyles.gridWrap}
-          onLayout={(e) => setGridWidth(e.nativeEvent.layout.width)}
-        >
-          {GRID_COLORS.map((c) => (
-            <Pressable
-              key={c}
-              onPress={() => commit(c)}
-              style={[
-                {
-                  width: GRID_CELL_SIZE,
-                  height: GRID_CELL_SIZE,
-                  borderRadius: 5,
-                  backgroundColor: c,
-                },
-                value.toUpperCase() === c && pickerStyles.gridCellActive,
-              ]}
-            />
-          ))}
-        </View>
-      )}
+      <View style={pickerStyles.modeContainer}>
+        {mode === "grid" && (
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            onLayout={(e) => setGridWidth(e.nativeEvent.layout.width)}
+          >
+            <View style={pickerStyles.gridWrap}>
+              {GRID_COLORS.map((c) => (
+                <Pressable
+                  key={c}
+                  onPress={() => commit(c)}
+                  style={[
+                    {
+                      width: GRID_CELL_SIZE,
+                      height: GRID_CELL_SIZE,
+                      borderRadius: 5,
+                      backgroundColor: c,
+                    },
+                    value.toUpperCase() === c && pickerStyles.gridCellActive,
+                  ]}
+                />
+              ))}
+            </View>
+          </ScrollView>
+        )}
 
-      {mode === "spectrum" && (
-        <SpectrumPicker h={h} s={s} v={v} onHsvChange={applyHsv} />
-      )}
+        {mode === "spectrum" && (
+          <SpectrumPicker h={h} s={s} v={v} onHsvChange={applyHsv} />
+        )}
 
-      {mode === "sliders" && (
-        <View style={{ gap: 10 }}>
-          {/* Hex 输入 */}
-          <View style={pickerStyles.hexRow}>
-            <View style={[pickerStyles.swatch, { backgroundColor: currentHex, borderColor: colors.border }]} />
-            <TextInput
-              value={hexInput}
-              onChangeText={setHexInput}
-              onEndEditing={(e: NativeSyntheticEvent<TextInputEndEditingEventData>) => commitHex(e.nativeEvent.text)}
-              onSubmitEditing={() => commitHex(hexInput)}
-              autoCapitalize="characters"
-              autoCorrect={false}
-              returnKeyType="done"
-              placeholder="#RRGGBB"
-              placeholderTextColor={colors.muted}
-              style={[pickerStyles.hexInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
-            />
+        {mode === "sliders" && (
+          <View style={{ gap: 10 }}>
+            {/* Hex 输入 */}
+            <View style={pickerStyles.hexRow}>
+              <View style={[pickerStyles.swatch, { backgroundColor: currentHex, borderColor: colors.border }]} />
+              <TextInput
+                value={hexInput}
+                onChangeText={setHexInput}
+                onEndEditing={(e: NativeSyntheticEvent<TextInputEndEditingEventData>) => commitHex(e.nativeEvent.text)}
+                onSubmitEditing={() => commitHex(hexInput)}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                returnKeyType="done"
+                placeholder="#RRGGBB"
+                placeholderTextColor={colors.muted}
+                style={[pickerStyles.hexInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
+              />
+            </View>
+            {/* R 滑块 */}
+            <Text style={[pickerStyles.sliderLabel, { color: colors.muted }]}>R  {currentRgb.r}</Text>
+            <SliderRow value={currentRgb.r / 255} onChange={(x) => { const nr = Math.round(x * 255); applyHsv(...Object.values(rgbToHsv(nr, currentRgb.g, currentRgb.b)) as [number, number, number]); }} trackColors={rTrack} thumbColor={currentHex} />
+            {/* G 滑块 */}
+            <Text style={[pickerStyles.sliderLabel, { color: colors.muted }]}>G  {currentRgb.g}</Text>
+            <SliderRow value={currentRgb.g / 255} onChange={(x) => { const ng = Math.round(x * 255); applyHsv(...Object.values(rgbToHsv(currentRgb.r, ng, currentRgb.b)) as [number, number, number]); }} trackColors={gTrack} thumbColor={currentHex} />
+            {/* B 滑块 */}
+            <Text style={[pickerStyles.sliderLabel, { color: colors.muted }]}>B  {currentRgb.b}</Text>
+            <SliderRow value={currentRgb.b / 255} onChange={(x) => { const nb = Math.round(x * 255); applyHsv(...Object.values(rgbToHsv(currentRgb.r, currentRgb.g, nb)) as [number, number, number]); }} trackColors={bTrack} thumbColor={currentHex} />
           </View>
-          {/* R 滑块 */}
-          <Text style={[pickerStyles.sliderLabel, { color: colors.muted }]}>R  {currentRgb.r}</Text>
-          <SliderRow value={currentRgb.r / 255} onChange={(x) => { const nr = Math.round(x * 255); applyHsv(...Object.values(rgbToHsv(nr, currentRgb.g, currentRgb.b)) as [number, number, number]); }} trackColors={rTrack} thumbColor={currentHex} />
-          {/* G 滑块 */}
-          <Text style={[pickerStyles.sliderLabel, { color: colors.muted }]}>G  {currentRgb.g}</Text>
-          <SliderRow value={currentRgb.g / 255} onChange={(x) => { const ng = Math.round(x * 255); applyHsv(...Object.values(rgbToHsv(currentRgb.r, ng, currentRgb.b)) as [number, number, number]); }} trackColors={gTrack} thumbColor={currentHex} />
-          {/* B 滑块 */}
-          <Text style={[pickerStyles.sliderLabel, { color: colors.muted }]}>B  {currentRgb.b}</Text>
-          <SliderRow value={currentRgb.b / 255} onChange={(x) => { const nb = Math.round(x * 255); applyHsv(...Object.values(rgbToHsv(currentRgb.r, currentRgb.g, nb)) as [number, number, number]); }} trackColors={bTrack} thumbColor={currentHex} />
-        </View>
-      )}
+        )}
+      </View>
 
       {/* 底部：常用色 + 预览 + 保存 */}
       <View style={[pickerStyles.footer, { borderTopColor: colors.border }]}>
         <View style={[pickerStyles.previewSwatch, { backgroundColor: currentHex, borderColor: colors.border }]} />
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ gap: 8, paddingHorizontal: 4 }}>
           {recent.map((c) => (
-            <Pressable
-              key={c}
-              onPress={() => commit(c)}
-              style={[
-                pickerStyles.recentDot,
-                { backgroundColor: c },
-                value.toUpperCase() === c.toUpperCase() && { borderWidth: 2.5, borderColor: colors.foreground },
-              ]}
-            />
+            <View key={c} style={{ position: "relative" }}>
+              <Pressable
+                onPress={() => {
+                  if (deletingRecent === c) {
+                    setDeletingRecent(null);
+                  } else {
+                    commit(c);
+                  }
+                }}
+                onLongPress={() => setDeletingRecent(c)}
+                delayLongPress={400}
+                style={[
+                  pickerStyles.recentDot,
+                  { backgroundColor: c },
+                  value.toUpperCase() === c.toUpperCase() && deletingRecent !== c && { borderWidth: 2.5, borderColor: colors.foreground },
+                  deletingRecent === c && { borderWidth: 2.5, borderColor: colors.error, opacity: 0.7 },
+                ]}
+              />
+              {deletingRecent === c && (
+                <Pressable
+                  onPress={() => deleteFromRecent(c)}
+                  style={pickerStyles.recentDeleteBtn}
+                >
+                  <Text style={pickerStyles.recentDeleteText}>×</Text>
+                </Pressable>
+              )}
+            </View>
           ))}
         </ScrollView>
         <Pressable
@@ -524,6 +554,10 @@ const inlineStyles = StyleSheet.create({
 
 const pickerStyles = StyleSheet.create({
   root: { gap: 16 },
+  modeContainer: {
+    height: 280,
+    overflow: "hidden",
+  },
   seg: {
     flexDirection: "row",
     borderRadius: 10,
@@ -581,6 +615,23 @@ const pickerStyles = StyleSheet.create({
     height: 28,
     borderRadius: 14,
   },
+  recentDeleteBtn: {
+    position: "absolute",
+    top: -6,
+    right: -6,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: "#EF4444",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  recentDeleteText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    lineHeight: 14,
+    fontWeight: "700",
+  },
   saveBtn: {
     width: 28,
     height: 28,
@@ -592,4 +643,3 @@ const pickerStyles = StyleSheet.create({
   },
   saveBtnText: { fontSize: 16, lineHeight: 20 },
 });
-
