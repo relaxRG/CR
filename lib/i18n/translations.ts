@@ -223,6 +223,13 @@ const dict = {
     zh: "点击色点可换颜色;长按标签行上下拖动可调整顺序,排序会同步到表单与筛选。",
     en: "Tap the dot to change color. Long-press and drag rows to reorder; order syncs to forms and filters.",
   },
+  "tags.system.title": { zh: "系统标签", en: "System Tags" },
+  "tags.system.hint": {
+    zh: "系统标签不可增删改名，点击色点可修改颜色，颜色会同步到配方卡片和表单。",
+    en: "System tags cannot be added, removed, or renamed. Tap the color dot to change color; it syncs to recipe cards and forms.",
+  },
+  "tags.system.duration": { zh: "饮用时长", en: "Drink Duration" },
+  "tags.system.occasion": { zh: "饮用场合", en: "Occasion" },
   "tags.delete.title": { zh: "删除{s}", en: "Delete {s}" },
   "tags.delete.confirm": { zh: "确定删除「{name}」吗?", en: "Delete \"{name}\"?" },
   // Common

@@ -436,16 +436,24 @@ export default function RecipeDetailScreen() {
                 {recipe.codexFamily ? (
                   <CodexFamilyBadge family={recipe.codexFamily} />
                 ) : null}
-                {recipe.drinkDuration ? (
-                  <View className="px-3 py-1.5 rounded-full bg-surface border border-border">
-                    <Text className="text-sm text-muted">{tagLabel("duration", recipe.drinkDuration)}</Text>
-                  </View>
-                ) : null}
-                {recipe.occasion ? (
-                  <View className="px-3 py-1.5 rounded-full bg-surface border border-border">
-                    <Text className="text-sm text-muted">{tagLabel("occasion", recipe.occasion)}</Text>
-                  </View>
-                ) : null}
+                {recipe.drinkDuration ? (() => {
+                  const dTag = tags.find((tg) => tg.kind === "duration" && tg.name === recipe.drinkDuration);
+                  const dColor = dTag?.color ?? "#007AFF";
+                  return (
+                    <View className="px-3 py-1.5 rounded-full" style={{ backgroundColor: dColor + "22" }}>
+                      <Text className="text-sm font-medium" style={{ color: dColor }}>{tagLabel("duration", recipe.drinkDuration)}</Text>
+                    </View>
+                  );
+                })() : null}
+                {recipe.occasion ? (() => {
+                  const oTag = tags.find((tg) => tg.kind === "occasion" && tg.name === recipe.occasion);
+                  const oColor = oTag?.color ?? "#AF52DE";
+                  return (
+                    <View className="px-3 py-1.5 rounded-full" style={{ backgroundColor: oColor + "22" }}>
+                      <Text className="text-sm font-medium" style={{ color: oColor }}>{tagLabel("occasion", recipe.occasion)}</Text>
+                    </View>
+                  );
+                })() : null}
               </View>
             ) : null}
             {recipe.flavors.length > 0 ? (

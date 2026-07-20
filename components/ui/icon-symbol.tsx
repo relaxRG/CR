@@ -105,6 +105,7 @@ const MAPPING = {
   "arrow.counterclockwise": "restore",
   "flame.fill": "local-fire-department",
   "leaf.fill": "eco",
+  "lock.fill": "lock",
 } as IconMapping;
 
 /**

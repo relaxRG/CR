@@ -450,6 +450,8 @@ export interface TagItem {
   /** 所属分组 id(可选,未分组时为空) */
   groupId?: string | null;
   createdAt: number;
+  /** 系统内置标签:不可增删改名,仅允许修改颜色 */
+  isSystem?: boolean;
 }
 
 /** 标签分组:每个标签种类下可自定义分组并排序 */
@@ -847,6 +849,10 @@ export function buildDefaultTags(): TagItem[] {
     color,
     createdAt: now + i++,
   });
+  const mkSystem = (kind: TagKind, name: string, color: string): TagItem => ({
+    ...mk(kind, name, color),
+    isSystem: true,
+  });
   return [
     ...BASE_SPIRITS.map((n, idx) =>
       mk("spirit", n, CATEGORY_COLORS[idx % CATEGORY_COLORS.length]),
@@ -858,10 +864,10 @@ export function buildDefaultTags(): TagItem[] {
       mk("flavor", n, CATEGORY_COLORS[(idx + 5) % CATEGORY_COLORS.length]),
     ),
     ...DRINK_DURATIONS.map((n, idx) =>
-      mk("duration", n, CATEGORY_COLORS[(idx + 1) % CATEGORY_COLORS.length]),
+      mkSystem("duration", n, CATEGORY_COLORS[(idx + 1) % CATEGORY_COLORS.length]),
     ),
     ...OCCASIONS.map((n, idx) =>
-      mk("occasion", n, CATEGORY_COLORS[(idx + 4) % CATEGORY_COLORS.length]),
+      mkSystem("occasion", n, CATEGORY_COLORS[(idx + 4) % CATEGORY_COLORS.length]),
     ),
   ];
 }

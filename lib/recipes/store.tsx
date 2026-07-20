@@ -221,6 +221,14 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
             notifySyncChange(TAGS_KEY);
           }
         }
+        // 老用户升级:为已存在的 duration/occasion 标签补 isSystem: true
+        if (tRaw && tagList.some((t) => (t.kind === "duration" || t.kind === "occasion") && !t.isSystem)) {
+          tagList = tagList.map((t) =>
+            (t.kind === "duration" || t.kind === "occasion") ? { ...t, isSystem: true } : t,
+          );
+          await AsyncStorage.setItem(TAGS_KEY, JSON.stringify(tagList));
+          notifySyncChange(TAGS_KEY);
+        }
         // 老用户升级:注入新增的 BASE_SPIRITS 标签（如梅斯卡尔、卡沙萨、皮斯科）
         if (tRaw) {
           const allDefaults = buildDefaultTags();
@@ -618,6 +626,8 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
     (kind: TagKind, name: string, color: string): TagItem | null => {
       const trimmed = name.trim();
       if (!trimmed) return null;
+      // 系统标签类型不允许手动新增
+      if (kind === "duration" || kind === "occasion") return null;
       const filled = autoFillTagNames(trimmed);
       if (
         tagsRef.current.some(
@@ -649,6 +659,8 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
       if (!trimmed) return;
       const target = tagsRef.current.find((t) => t.id === id);
       if (!target) return;
+      // 系统标签不允许改名
+      if (target.isSystem) return;
       const oldName = target.name;
       persistTags(
         tagsRef.current.map((t) => (t.id === id ? { ...t, name: trimmed } : t)),
@@ -696,6 +708,8 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
   const deleteTag = useCallback(
     (id: string) => {
       const target = tagsRef.current.find((t) => t.id === id);
+      // 系统标签不允许删除
+      if (target?.isSystem) return;
       persistTags(tagsRef.current.filter((t) => t.id !== id));
       if (!target) return;
       // 从已有配方中移除该风味标签;基酒/杯型保留原文字(仅失去颜色标记)

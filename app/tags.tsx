@@ -35,10 +35,13 @@ import { CATEGORY_COLORS, TagGroup, TagKind } from "@/lib/recipes/types";
 
 type SectionKey = "category" | TagKind | "bottleCat" | "prepSec";
 
-const SECTION_KEYS: SectionKey[] = ["category", "spirit", "glass", "flavor", "duration", "occasion", "bottleCat", "prepSec"];
+const SECTION_KEYS: SectionKey[] = ["category", "spirit", "glass", "flavor", "bottleCat", "prepSec"];
 const MANAGER_SECTIONS: SectionKey[] = ["bottleCat", "prepSec"];
 const isTagKind = (s: SectionKey): s is TagKind =>
-  s === "spirit" || s === "glass" || s === "flavor" || s === "duration" || s === "occasion";
+  s === "spirit" || s === "glass" || s === "flavor";
+/** 系统标签分组（固定，不可增删改名） */
+const SYSTEM_SECTIONS = ["duration", "occasion"] as const;
+type SystemSection = (typeof SYSTEM_SECTIONS)[number];
 const SECTION_LABEL_KEY = {
   category: "tags.section.category",
   spirit: "tags.section.spirit",
@@ -431,6 +434,10 @@ export default function CategoriesScreen() {
   const [addTagName, setAddTagName] = useState("");
   const [addTagColor, setAddTagColor] = useState<string>(CATEGORY_COLORS[0]);
   const [addTagColorPickerOpen, setAddTagColorPickerOpen] = useState(false);
+
+  // 系统标签颜色选择器（独立 state，与普通 colorPickerId 隔离）
+  const [systemColorPickerId, setSystemColorPickerId] = useState<string | null>(null);
+  const [systemCollapsed, setSystemCollapsed] = useState(false);
 
   const rows: RowData[] = useMemo(() => {
     if (section === "category") {
@@ -1011,6 +1018,71 @@ export default function CategoriesScreen() {
             <Text style={{ fontSize: 12, color: colors.muted, marginTop: 8, paddingHorizontal: 4, lineHeight: 18 }}>
               {t("tags.hint")}
             </Text>
+            {/* ── 系统标签区块（始终显示，不受 section 影响） ── */}
+            <View style={{ marginTop: 24 }}>
+              <Pressable
+                onPress={() => setSystemCollapsed((v) => !v)}
+                style={({ pressed }) => [{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 4, paddingVertical: 6, opacity: pressed ? 0.7 : 1 }]}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <IconSymbol name="lock.fill" size={14} color={colors.muted} />
+                  <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                    {t("tags.system.title")}
+                  </Text>
+                </View>
+                <IconSymbol name={systemCollapsed ? "chevron.right" : "chevron.down"} size={14} color={colors.muted} />
+              </Pressable>
+              {!systemCollapsed && (
+                <View style={[styles.groupCard, { backgroundColor: colors.surface, borderColor: colors.border, marginTop: 4 }]}>
+                  {(["duration", "occasion"] as SystemSection[]).map((kind) => {
+                    const kindLabel = kind === "duration" ? t("tags.system.duration") : t("tags.system.occasion");
+                    const kindTags = tags.filter((tg) => tg.kind === kind);
+                    return (
+                      <View key={kind} style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 }}>
+                        <Text style={{ fontSize: 11, fontWeight: "600", color: colors.muted, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 8 }}>
+                          {kindLabel}
+                        </Text>
+                        {kindTags.map((tg) => {
+                          const showPicker = systemColorPickerId === tg.id;
+                          const usageCount = kind === "duration"
+                            ? recipes.filter((r) => r.drinkDuration === tg.name).length
+                            : recipes.filter((r) => r.occasion === tg.name).length;
+                          const displayName = lang === "en" && tg.nameEn ? tg.nameEn : tg.name;
+                          return (
+                            <View key={tg.id} style={{ marginBottom: 8 }}>
+                              <View style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 4 }}>
+                                <Pressable
+                                  onPress={() => setSystemColorPickerId(showPicker ? null : tg.id)}
+                                  hitSlop={8}
+                                  style={({ pressed }) => [{ width: 28, height: 28, borderRadius: 14, backgroundColor: tg.color, borderWidth: 2, borderColor: tg.color + "66", opacity: pressed ? 0.7 : 1 }]}
+                                />
+                                <Text style={{ flex: 1, fontSize: 15, color: colors.foreground }}>{displayName}</Text>
+                                {usageCount > 0 ? (
+                                  <Text style={{ fontSize: 12, color: colors.muted }}>{usageCount}</Text>
+                                ) : null}
+                                <IconSymbol name="lock.fill" size={13} color={colors.border} />
+                              </View>
+                              {showPicker ? (
+                                <IOSColorPickerSheet
+                                  visible={showPicker}
+                                  value={tg.color}
+                                  onChange={(c) => { setTagColor(tg.id, c); if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+                                  onClose={() => setSystemColorPickerId(null)}
+                                  title={t("tags.color.title")}
+                                />
+                              ) : null}
+                            </View>
+                          );
+                        })}
+                      </View>
+                    );
+                  })}
+                  <Text style={{ fontSize: 12, color: colors.muted, marginHorizontal: 16, marginBottom: 12, lineHeight: 18 }}>
+                    {t("tags.system.hint")}
+                  </Text>
+                </View>
+              )}
+            </View>
           </>
         )}
       </ScrollView>
