@@ -124,10 +124,12 @@ function TagChip({
   name,
   color,
   onPress,
+  onColorPress,
 }: {
   name: string;
   color: string;
   onPress: () => void;
+  onColorPress?: () => void;
 }) {
   const bg = color + "22";
   return (
@@ -138,7 +140,11 @@ function TagChip({
         { backgroundColor: pressed ? color + "33" : bg },
       ]}
     >
-      <View style={[styles.chipDot, { backgroundColor: color }]} />
+      <Pressable
+        onPress={() => { onColorPress?.(); }}
+        hitSlop={6}
+        style={[styles.chipDot, { backgroundColor: color }]}
+      />
       <Text style={[styles.chipText, { color }]} numberOfLines={1}>
         {name}
       </Text>
@@ -204,6 +210,7 @@ function GroupCard({
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [colorPickerId, setColorPickerId] = useState<string | null>(null);
+  const [isRenaming, setIsRenaming] = useState(false);
   const groupName = group
     ? displayNames(group.nameEn ?? "", group.name, lang).primary
     : t("tg.ungrouped");
@@ -211,10 +218,38 @@ function GroupCard({
   return (
     <View style={[styles.groupCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       {/* 卡头 */}
-      <Pressable
-        onPress={() => setCollapsed((v) => !v)}
-        style={({ pressed }) => [styles.groupCardHead, pressed && { opacity: 0.7 }]}
-      >
+      {isRenaming && group ? (
+        <View style={[styles.groupCardHead, { gap: 8 }]}>
+          <View style={{ flex: 1, gap: 4 }}>
+            <TextInput
+              style={[styles.editInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
+              value={editingName}
+              onChangeText={setEditingName}
+              autoFocus
+              returnKeyType="done"
+              placeholder={t("tags.edit.zh")}
+              placeholderTextColor={colors.muted}
+              onSubmitEditing={() => { commitEdit(); setIsRenaming(false); }}
+            />
+            <TextInput
+              style={[styles.editInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
+              value={editingNameEn}
+              onChangeText={setEditingNameEn}
+              returnKeyType="done"
+              placeholder={t("tags.edit.en")}
+              placeholderTextColor={colors.muted}
+              onSubmitEditing={() => { commitEdit(); setIsRenaming(false); }}
+            />
+          </View>
+          <Pressable onPress={() => { commitEdit(); setIsRenaming(false); }} hitSlop={8} style={({ pressed }) => [pressed && { opacity: 0.6 }]}>
+            <IconSymbol name="checkmark" size={22} color={colors.primary} />
+          </Pressable>
+        </View>
+      ) : (
+        <Pressable
+          onPress={() => setCollapsed((v) => !v)}
+          style={({ pressed }) => [styles.groupCardHead, pressed && { opacity: 0.7 }]}
+        >
         <Text style={[styles.groupCardTitle, { color: colors.foreground }]} numberOfLines={1}>
           {groupName}
           <Text style={[styles.groupCardCount, { color: colors.muted }]}>
@@ -235,14 +270,14 @@ function GroupCard({
                       destructiveButtonIndex: 2,
                     },
                     (idx) => {
-                      if (idx === 1) onEditGroup(group);
+                      if (idx === 1) { onEditGroup(group); setIsRenaming(true); }
                       if (idx === 2) onDeleteGroup(group);
                     },
                   );
                 } else {
                   Alert.alert(groupName, undefined, [
                     { text: t("common.cancel"), style: "cancel" },
-                    { text: t("tags.edit.zh"), onPress: () => onEditGroup(group) },
+                    { text: t("tags.edit.zh"), onPress: () => { onEditGroup(group); setIsRenaming(true); } },
                     { text: t("common.delete"), style: "destructive", onPress: () => onDeleteGroup(group) },
                   ]);
                 }
@@ -259,6 +294,7 @@ function GroupCard({
           />
         </View>
       </Pressable>
+      )}
 
       {/* Chip 墙 */}
       {!collapsed ? (
@@ -270,11 +306,14 @@ function GroupCard({
               color={item.color}
               onPress={() => {
                 if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                // 打开编辑抽屉：设置 editingId
                 setEditingId(editingId === item.id ? null : item.id);
                 setEditingName(item.name);
                 setEditingNameEn(item.nameEn);
                 setColorPickerId(editingId === item.id ? null : item.id);
+              }}
+              onColorPress={() => {
+                if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setColorPickerId(colorPickerId === item.id ? null : item.id);
               }}
             />
           ))}
@@ -288,6 +327,16 @@ function GroupCard({
         </View>
       ) : null}
 
+      {/* 直接颜色选择器（点色点触发，不需要编辑抽屉） */}
+      {colorPickerId && items.some((i) => i.id === colorPickerId) && !editingId ? (
+        <IOSColorPickerSheet
+          visible={true}
+          value={items.find((i) => i.id === colorPickerId)?.color ?? "#888888"}
+          onChange={(c) => pickColor(colorPickerId, c)}
+          onClose={() => setColorPickerId(null)}
+          title={t("tags.color.title")}
+        />
+      ) : null}
       {/* 编辑抽屉（点击 chip 后展开） */}
       {editingId && items.some((i) => i.id === editingId) && colorPickerId ? (
         <View style={[styles.editDrawer, { borderTopColor: colors.border }]}>
@@ -906,64 +955,9 @@ export default function CategoriesScreen() {
                     <IconSymbol name="plus" size={18} color={newGroupName.trim() ? "#FFFFFF" : colors.muted} />
                   </Pressable>
                 </View>
-                {/* 已有分组列表（可编辑/删除） */}
-                {groups.map((g, gi) => {
-                  const isEditingG = editingGroupId === g.id;
-                  const tagCount = rows.filter((r) => r.groupId === g.id).length;
-                  return (
-                    <View key={g.id} style={{ flexDirection: "row", alignItems: "center", marginTop: 10, gap: 8 }}>
-                      <IconSymbol name="folder.fill" size={16} color={colors.primary} />
-                      {isEditingG ? (
-                        <View style={{ flex: 1, gap: 4 }}>
-                          <TextInput
-                            style={[styles.editInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
-                            value={editingGroupName}
-                            onChangeText={setEditingGroupName}
-                            autoFocus
-                            returnKeyType="done"
-                            placeholder={t("tags.edit.zh")}
-                            placeholderTextColor={colors.muted}
-                            onSubmitEditing={commitGroupEdit}
-                          />
-                          <TextInput
-                            style={[styles.editInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
-                            value={editingGroupNameEn}
-                            onChangeText={setEditingGroupNameEn}
-                            returnKeyType="done"
-                            placeholder={t("tags.edit.en")}
-                            placeholderTextColor={colors.muted}
-                            onSubmitEditing={commitGroupEdit}
-                          />
-                        </View>
-                      ) : (
-                        <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 15, fontWeight: "500", color: colors.foreground }} numberOfLines={1}>
-                            {displayNames(g.nameEn ?? "", g.name, lang).primary}
-                            <Text style={{ fontSize: 12, color: colors.muted }}>
-                              {"  "}{t("tg.tagCount", { n: tagCount })}
-                            </Text>
-                          </Text>
-                        </View>
-                      )}
-                      {isEditingG ? (
-                        <Pressable onPress={commitGroupEdit} hitSlop={6} style={({ pressed }) => [pressed && { opacity: 0.6 }]}>
-                          <IconSymbol name="checkmark" size={18} color={colors.primary} />
-                        </Pressable>
-                      ) : (
-                        <Pressable
-                          onPress={() => { setEditingGroupId(g.id); setEditingGroupName(g.name); setEditingGroupNameEn(g.nameEn ?? ""); }}
-                          hitSlop={6}
-                          style={({ pressed }) => [pressed && { opacity: 0.6 }]}
-                        >
-                          <IconSymbol name="pencil" size={17} color={colors.muted} />
-                        </Pressable>
-                      )}
-                      <Pressable onPress={() => confirmDeleteGroup(g)} hitSlop={6} style={({ pressed }) => [pressed && { opacity: 0.6 }]}>
-                        <IconSymbol name="trash.fill" size={17} color={colors.error} />
-                      </Pressable>
-                    </View>
-                  );
-                })}
+
+
+            {/* 标签列表 */}
               </View>
             ) : null}
 
