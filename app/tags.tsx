@@ -295,17 +295,6 @@ function GroupCard({
 
   return (
     <View
-      ref={groupRef as any}
-      onLayout={() => {
-        if (groupRef?.current) {
-          (groupRef.current as any).measure((_x: number, _y: number, _w: number, h: number, _px: number, py: number) => {
-            // py is absolute Y on screen; store it via a callback if needed
-            // We use a workaround: store in the ref itself
-            (groupRef.current as any).__absY = py;
-            (groupRef.current as any).__height = h;
-          });
-        }
-      }}
       style={[styles.groupCard, { backgroundColor: colors.surface, borderColor: isDragOver ? colors.primary : colors.border, borderWidth: isDragOver ? 2 : StyleSheet.hairlineWidth }]}
     >
       {/* 卡头 */}
@@ -428,7 +417,7 @@ function GroupCard({
             return (
               <DraggableChip
                 key={item.id}
-                disabled={isItemLocked}
+                disabled
                 onDragStart={() => onChipDragStart?.(item)}
                 onDragMove={(y) => onChipDragMove?.(item, y)}
                 onDragEnd={(y) => onChipDragEnd?.(item, y)}

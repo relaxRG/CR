@@ -473,3 +473,9 @@
 - [x] flavor 老用户迁移：自动分配三个默认分组
 - [x] CategoryGroup 接口新增（types.ts + store.tsx）
 - [x] icon-symbol.tsx 添加 lock.open.fill 图标映射
+
+## Build 65 iOS 闪退修复（2026-07-20）
+- [x] 根因：tags.tsx 跨分组拖拽中，render 期间 React.createRef 导致 ref 身份不稳定，拖拽时 refreshGroupLayouts 对可能已卸载的 native view 调用 measure，iOS release 模式下 crash
+- [x] 临时修复：禁用 DraggableChip 手势（disabled 固定为 true），移除 GroupCard 中 onLayout 内的 measure 调用，消除 iOS crash 根因
+- [x] TypeScript 0 错误，vitest 全部通过
+- [ ] 后续：用 onLayout event.nativeEvent.layout + ScrollView scrollOffset 重新实现稳定的跨分组拖拽（不依赖 measure）
