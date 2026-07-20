@@ -540,6 +540,10 @@ export default function BottleFormScreen() {
       <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{title}</Text>
     </View>
   );
+  // 计算当前条目实际所属库（顶层，供所有分区使用）
+  const effectiveGroup = (libraryOverride && libraryOverride !== 'homemade')
+    ? libraryOverride
+    : bottleGroupOf(category);
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -593,7 +597,13 @@ export default function BottleFormScreen() {
           )}
 
           {/* ── 分区一：基本信息 ── */}
-          {sectionTitle(lang === "zh" ? "基本信息" : "Basic Info")}
+          {sectionTitle(
+            effectiveGroup === "spirits"
+              ? (lang === "zh" ? "基本信息 · 基酒" : "Basic Info · Spirit")
+              : effectiveGroup === "bottles"
+                ? (lang === "zh" ? "基本信息 · 酒款" : "Basic Info · Bottle")
+                : (lang === "zh" ? "基本信息" : "Basic Info")
+          )}
           <View style={{ paddingHorizontal: 20 }}>
             {field(t("bform.nameZh"), nameZh, setNameZh, lang === "en" ? "e.g. 君度橙酒" : "例如：君度橙酒")}
             {field(t("bform.nameEn"), nameEn, setNameEn, "e.g. Cointreau")}
@@ -772,7 +782,13 @@ export default function BottleFormScreen() {
           </View>
 
           {/* ── 分区二：分类与风格 ── */}
-          {sectionTitle(lang === "zh" ? "分类与风格" : "Category & Style")}
+          {sectionTitle(
+            effectiveGroup === "spirits"
+              ? (lang === "zh" ? "分类与蒸馏风格" : "Category & Distillation Style")
+              : effectiveGroup === "bottles"
+                ? (lang === "zh" ? "分类与产品风格" : "Category & Product Style")
+                : (lang === "zh" ? "分类与风格" : "Category & Style")
+          )}
           <View style={{ paddingHorizontal: 20 }}>
             {/* ── 库归属选择器 ── */}
             <Text style={[styles.fieldLabel, { color: colors.foreground, marginBottom: 8 }]}>
@@ -928,9 +944,23 @@ export default function BottleFormScreen() {
 
             {stylesOf(category).length > 0 && (
               <>
-                <Text style={[styles.fieldLabel, { color: colors.foreground, marginTop: 4, marginBottom: 8 }]}>
-                  {t("bform.style")}
+                <Text style={[styles.fieldLabel, { color: colors.foreground, marginTop: 4, marginBottom: 4 }]}>
+                  {effectiveGroup === "spirits"
+                    ? (lang === "zh" ? "蒸馏风格" : "Distillation Style")
+                    : effectiveGroup === "bottles"
+                      ? (lang === "zh" ? "产品风格" : "Product Style")
+                      : t("bform.style")}
                 </Text>
+                {effectiveGroup === "spirits" && (
+                  <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 8 }}>
+                    {lang === "zh" ? "选择或填写蒸馏工艺风格，如 Single Malt、Blended、Pot Still 等" : "Select or type distillation style, e.g. Single Malt, Blended, Pot Still"}
+                  </Text>
+                )}
+                {effectiveGroup === "bottles" && (
+                  <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 8 }}>
+                    {lang === "zh" ? "选择或填写产品风格，如 Dry、Sweet、Bitter、Herbal 等" : "Select or type product style, e.g. Dry, Sweet, Bitter, Herbal"}
+                  </Text>
+                )}
                 <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
                   {stylesOf(category).map((d) => {
                     const s = d.name;
@@ -1064,11 +1094,26 @@ export default function BottleFormScreen() {
           </View>
 
           {/* ── 分区四：风味与描述 ── */}
-          {sectionTitle(lang === "zh" ? "风味标签与介绍" : "Flavor & Description")}
+          {sectionTitle(
+            effectiveGroup === "spirits"
+              ? (lang === "zh" ? "风味特征与介绍" : "Flavor Profile & Description")
+              : effectiveGroup === "bottles"
+                ? (lang === "zh" ? "风味特征与介绍" : "Flavor Profile & Description")
+                : (lang === "zh" ? "风味标签与介绍" : "Flavor & Description")
+          )}
           <View style={{ paddingHorizontal: 20 }}>
             {/* 风味标签 */}
-            <Text style={[styles.fieldLabel, { color: colors.foreground, marginBottom: 8 }]}>
-              {lang === "zh" ? "风味标签" : "Flavor Tags"}
+            <Text style={[styles.fieldLabel, { color: colors.foreground, marginBottom: 4 }]}>
+              {effectiveGroup === "spirits" || effectiveGroup === "bottles"
+                ? (lang === "zh" ? "风味特征标签" : "Flavor Profile Tags")
+                : (lang === "zh" ? "风味标签" : "Flavor Tags")}
+            </Text>
+            <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 8 }}>
+              {effectiveGroup === "spirits"
+                ? (lang === "zh" ? "描述该基酒的风味特征，可多选" : "Select flavor characteristics for this spirit")
+                : effectiveGroup === "bottles"
+                  ? (lang === "zh" ? "描述该酒款的风味特征，可多选" : "Select flavor characteristics for this bottle")
+                  : (lang === "zh" ? "可多选" : "Multiple selection allowed")}
             </Text>
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
               {FLAVOR_TAGS_ALL.map((tag) => {
@@ -1097,15 +1142,23 @@ export default function BottleFormScreen() {
               })}
             </View>
 
-            {field(lang === "zh" ? "故事 / 介绍" : "Story", story, setStory,
-              lang === "en" ? "Brief product story or description…" : "产品故事或简介…",
-              { multiline: true })}
+            {field(
+              effectiveGroup === "spirits"
+                ? (lang === "zh" ? "背景故事 / 品牌介绍" : "Story / Brand Background")
+                : effectiveGroup === "bottles"
+                  ? (lang === "zh" ? "产品介绍 / 品鉴笔记" : "Product Notes / Tasting Notes")
+                  : (lang === "zh" ? "故事 / 介绍" : "Story"),
+              story, setStory,
+              effectiveGroup === "spirits"
+                ? (lang === "en" ? "e.g. Founded in 1824, this distillery…" : "例如：创立于1824年，这家酒厂…")
+                : effectiveGroup === "bottles"
+                  ? (lang === "en" ? "e.g. Complex herbal liqueur with 27 botanicals…" : "例如：含27种草本植物的复杂利口酒…")
+                  : (lang === "en" ? "Brief product story or description…" : "产品故事或简介…"),
+              { multiline: true }
+            )}
             {/* 风格描述：仅在原材料库或软饮库中显示（基酒库/酒款库已在分区五有专属字段） */}
             {(() => {
-              const eg = (libraryOverride && libraryOverride !== 'homemade')
-                ? libraryOverride
-                : bottleGroupOf(category);
-              if (eg === "spirits" || eg === "bottles") return null;
+              if (effectiveGroup === "spirits" || effectiveGroup === "bottles") return null;
               return field(
                 lang === "zh" ? "风格描述" : "Style Description",
                 styleDesc, setStyleDesc,
@@ -1116,11 +1169,6 @@ export default function BottleFormScreen() {
 
           {/* ── 分区五：深度资料（按库类型条件显示） ── */}
           {(() => {
-            // 计算当前条目实际所属库（libraryOverride 优先，否则按 category 推断）
-            const effectiveGroup = (libraryOverride && libraryOverride !== 'homemade')
-              ? libraryOverride
-              : bottleGroupOf(category);
-
             if (effectiveGroup === "spirits") {
               // ── 基酒库专属深度资料 ──────────────────────────────────────────
               return (

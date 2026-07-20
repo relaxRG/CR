@@ -11,6 +11,7 @@ import { useI18n } from "@/lib/i18n";
 import { useBottleStore } from "@/lib/bottles/store";
 import { useBottleTaxonomy } from "@/lib/bottles/taxonomy";
 import { isPerishableWholeBottle } from "@/lib/recipes/smart-cost";
+import { bottleGroupOf } from "@/lib/bottles/types";
 
 export default function BottleDetailScreen() {
   const colors = useColors();
@@ -20,6 +21,13 @@ export default function BottleDetailScreen() {
   const { getBottle, deleteBottle, setBottleRating } = useBottleStore();
   const { categoryLabel } = useBottleTaxonomy();
   const bottle = getBottle(id);
+
+  // 计算当前条目实际所属库
+  const effectiveGroup = bottle
+    ? (bottle.libraryOverride && bottle.libraryOverride !== "homemade"
+        ? bottle.libraryOverride
+        : bottleGroupOf(bottle.category))
+    : "bottles";
 
   const chipStyle = (primary?: boolean) => ({
     paddingHorizontal: 10,
@@ -71,7 +79,14 @@ export default function BottleDetailScreen() {
       label: t("bottle.category"),
       value: categoryLabel(bottle.category, lang),
     },
-    ...(bottle.style ? [{ label: t("bottle.style"), value: bottle.style }] : []),
+    ...(bottle.style ? [{
+      label: effectiveGroup === "spirits"
+        ? (lang === "zh" ? "蒸馏风格" : "Distillation Style")
+        : effectiveGroup === "bottles"
+          ? (lang === "zh" ? "产品风格" : "Product Style")
+          : t("bottle.style"),
+      value: bottle.style,
+    }] : []),
     { label: t("bottle.brand"), value: bottle.brand || "—" },
     { label: t("bottle.origin"), value: bottle.origin || "—" },
     { label: t("bottle.volume"), value: bottle.volume || "—" },
@@ -244,7 +259,9 @@ export default function BottleDetailScreen() {
         {bottle.flavorTags && bottle.flavorTags.length > 0 ? (
           <>
             <Text className="text-[13px] text-muted uppercase mt-6 mb-2 px-4" style={{ letterSpacing: 0.4, lineHeight: 18 }}>
-              {lang === "zh" ? "风味" : "Flavor"}
+              {effectiveGroup === "spirits" || effectiveGroup === "bottles"
+                ? (lang === "zh" ? "风味特征" : "Flavor Profile")
+                : (lang === "zh" ? "风味" : "Flavor")}
             </Text>
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, paddingHorizontal: 4 }}>
               {bottle.flavorTags.map((tag) => (
@@ -284,7 +301,11 @@ export default function BottleDetailScreen() {
         {bottle.styleDesc ? (
           <>
             <Text className="text-[13px] text-muted uppercase mt-6 mb-2 px-4" style={{ letterSpacing: 0.4, lineHeight: 18 }}>
-              {lang === "zh" ? "风格描述" : "Style Description"}
+              {effectiveGroup === "spirits"
+                ? (lang === "zh" ? "桶型与陈年工艺" : "Cask & Aging")
+                : effectiveGroup === "bottles"
+                  ? (lang === "zh" ? "甜度与口感描述" : "Sweetness & Taste")
+                  : (lang === "zh" ? "风格描述" : "Style Description")}
             </Text>
             <View className="bg-surface rounded-xl px-4 py-3">
               <Text className="text-[15px] text-foreground" style={{ lineHeight: 24 }} selectable>
@@ -295,16 +316,72 @@ export default function BottleDetailScreen() {
         ) : null}
 
         {/* 深度资料：蒸馏厂 / 搭配 / 用途 / 季节 */}
-        {(bottle.distilleryInfo || bottle.pairingNotes || bottle.usageNotes || bottle.seasonality) ? (
+        {/* 基酒库深度资料：蒸馏厂/可替代/搭配 */}
+        {effectiveGroup === "spirits" && (bottle.distilleryInfo || bottle.substituteFor || bottle.pairsWith) ? (
           <>
             <Text className="text-[13px] text-muted uppercase mt-6 mb-2 px-4" style={{ letterSpacing: 0.4, lineHeight: 18 }}>
-              {lang === "zh" ? "深度资料" : "Deep Info"}
+              {lang === "zh" ? "蒸馏厂与工艺" : "Distillery & Craft"}
             </Text>
             <View className="bg-surface rounded-xl px-4">
               {[
-                bottle.distilleryInfo && { label: lang === "zh" ? "蒸馏厂" : "Distillery", value: bottle.distilleryInfo },
-                bottle.pairingNotes && { label: lang === "zh" ? "搭配建议" : "Pairing", value: bottle.pairingNotes },
-                bottle.usageNotes && { label: lang === "zh" ? "调酒用途" : "Usage", value: bottle.usageNotes },
+                bottle.distilleryInfo && { label: lang === "zh" ? "蒸馏厂与工艺" : "Distillery & Craft", value: bottle.distilleryInfo },
+                bottle.substituteFor && { label: lang === "zh" ? "可替代酒款" : "Substitute For", value: bottle.substituteFor },
+                bottle.pairsWith && { label: lang === "zh" ? "搭配使用的酒款" : "Pairs Well With", value: bottle.pairsWith },
+              ].filter(Boolean).map((row, idx, arr) => row && (
+                <View
+                  key={row.label}
+                  style={idx < arr.length - 1 ? { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, paddingVertical: 12 } : { paddingVertical: 12 }}
+                >
+                  <Text style={{ fontSize: 12, color: colors.muted, fontWeight: "600", marginBottom: 4, letterSpacing: 0.3 }}>
+                    {row.label.toUpperCase()}
+                  </Text>
+                  <Text style={{ fontSize: 14, color: colors.foreground, lineHeight: 22 }} selectable>
+                    {row.value}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </>
+        ) : null}
+
+        {/* 酒款库深度资料：调酒用途/搭配建议/可替代/搭配酒款 */}
+        {effectiveGroup === "bottles" && (bottle.usageNotes || bottle.pairingNotes || bottle.substituteFor || bottle.pairsWith) ? (
+          <>
+            <Text className="text-[13px] text-muted uppercase mt-6 mb-2 px-4" style={{ letterSpacing: 0.4, lineHeight: 18 }}>
+              {lang === "zh" ? "口感与调酒用途" : "Taste & Usage"}
+            </Text>
+            <View className="bg-surface rounded-xl px-4">
+              {[
+                bottle.usageNotes && { label: lang === "zh" ? "调酒用途" : "Cocktail Usage", value: bottle.usageNotes },
+                bottle.pairingNotes && { label: lang === "zh" ? "搭配建议" : "Pairing Notes", value: bottle.pairingNotes },
+                bottle.substituteFor && { label: lang === "zh" ? "可替代酒款" : "Substitute For", value: bottle.substituteFor },
+                bottle.pairsWith && { label: lang === "zh" ? "搭配使用的酒款" : "Pairs Well With", value: bottle.pairsWith },
+              ].filter(Boolean).map((row, idx, arr) => row && (
+                <View
+                  key={row.label}
+                  style={idx < arr.length - 1 ? { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, paddingVertical: 12 } : { paddingVertical: 12 }}
+                >
+                  <Text style={{ fontSize: 12, color: colors.muted, fontWeight: "600", marginBottom: 4, letterSpacing: 0.3 }}>
+                    {row.label.toUpperCase()}
+                  </Text>
+                  <Text style={{ fontSize: 14, color: colors.foreground, lineHeight: 22 }} selectable>
+                    {row.value}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </>
+        ) : null}
+
+        {/* 原材料库/软饮库深度资料：调酒用途/季节性 */}
+        {(effectiveGroup === "materials" || effectiveGroup === "softdrinks") && (bottle.usageNotes || bottle.seasonality) ? (
+          <>
+            <Text className="text-[13px] text-muted uppercase mt-6 mb-2 px-4" style={{ letterSpacing: 0.4, lineHeight: 18 }}>
+              {lang === "zh" ? "调酒用途" : "Usage Notes"}
+            </Text>
+            <View className="bg-surface rounded-xl px-4">
+              {[
+                bottle.usageNotes && { label: lang === "zh" ? "调酒用途" : "Usage Notes", value: bottle.usageNotes },
                 bottle.seasonality && { label: lang === "zh" ? "季节性" : "Seasonality", value: bottle.seasonality },
               ].filter(Boolean).map((row, idx, arr) => row && (
                 <View
@@ -319,7 +396,7 @@ export default function BottleDetailScreen() {
                   </Text>
                 </View>
               ))}
-        </View>
+            </View>
           </>
         ) : null}
 
@@ -350,32 +427,7 @@ export default function BottleDetailScreen() {
           </>
         ) : null}
 
-        {/* 关联推理：可替代酒款 / 搭配酒款 */}
-        {(bottle.substituteFor || bottle.pairsWith) ? (
-          <>
-            <Text className="text-[13px] text-muted uppercase mt-6 mb-2 px-4" style={{ letterSpacing: 0.4, lineHeight: 18 }}>
-              {lang === "zh" ? "酒款关联" : "Bottle Relations"}
-            </Text>
-            <View className="bg-surface rounded-xl px-4">
-              {[
-                bottle.substituteFor && { label: lang === "zh" ? "可替代" : "Substitute For", value: bottle.substituteFor },
-                bottle.pairsWith && { label: lang === "zh" ? "搭配酒款" : "Pairs With", value: bottle.pairsWith },
-              ].filter(Boolean).map((row, idx, arr) => row && (
-                <View
-                  key={row.label}
-                  style={idx < arr.length - 1 ? { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, paddingVertical: 12 } : { paddingVertical: 12 }}
-                >
-                  <Text style={{ fontSize: 12, color: colors.muted, fontWeight: "600", marginBottom: 4, letterSpacing: 0.3 }}>
-                    {row.label.toUpperCase()}
-                  </Text>
-                  <Text style={{ fontSize: 14, color: colors.foreground, lineHeight: 22 }}>
-                    {row.value}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          </>
-        ) : null}
+
 
         <Text className="text-xs text-muted mt-4 px-1" style={{ lineHeight: 18 }}>
           {t("bottle.priceNote")}
