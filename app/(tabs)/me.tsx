@@ -112,6 +112,20 @@ export default function MeScreen() {
             </Pressable>
             <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 64 }} />
             <Pressable
+              onPress={() => { tap(); router.push("/system-tags"); }}
+              style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
+            >
+              <View style={[styles.iconWrap, { backgroundColor: "#00C7BE" }]}>
+                <IconSymbol name="tag.fill" size={18} color="#FFFFFF" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowTitle} className="text-foreground">{t("me.systemTags")}</Text>
+                <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>{t("me.systemTags.desc")}</Text>
+              </View>
+              <IconSymbol name="chevron.right" size={18} color={colors.muted} />
+            </Pressable>
+            <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 64 }} />
+            <Pressable
               onPress={() => { tap(); router.push("/card-tag-settings"); }}
               style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
             >
