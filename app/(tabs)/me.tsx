@@ -98,6 +98,20 @@ export default function MeScreen() {
             </Pressable>
             <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 64 }} />
             <Pressable
+              onPress={() => { tap(); router.push("/taxonomy-manager"); }}
+              style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
+            >
+              <View style={[styles.iconWrap, { backgroundColor: "#AF52DE" }]}>
+                <IconSymbol name="tray.2.fill" size={18} color="#FFFFFF" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowTitle} className="text-foreground">{t("me.taxonomy")}</Text>
+                <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>{t("me.taxonomy.desc")}</Text>
+              </View>
+              <IconSymbol name="chevron.right" size={18} color={colors.muted} />
+            </Pressable>
+            <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 64 }} />
+            <Pressable
               onPress={() => { tap(); router.push("/card-tag-settings"); }}
               style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
             >

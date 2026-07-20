@@ -23,8 +23,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 
 import { ScreenContainer } from "@/components/screen-container";
-import { BottleTaxonomyManager } from "@/components/bottle-taxonomy-manager";
-import { PrepTaxonomyManager } from "@/components/prep-taxonomy-manager";
 import { IOSColorPickerSheet } from "@/components/ios-color-picker";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
@@ -33,10 +31,9 @@ import { useI18n } from "@/lib/i18n";
 import { useRecipeStore } from "@/lib/recipes/store";
 import { CATEGORY_COLORS, CategoryGroup, TagGroup, TagKind } from "@/lib/recipes/types";
 
-type SectionKey = "category" | TagKind | "bottleCat" | "prepSec";
+type SectionKey = "category" | TagKind;
 
-const SECTION_KEYS: SectionKey[] = ["category", "spirit", "glass", "flavor", "bottleCat", "prepSec"];
-const MANAGER_SECTIONS: SectionKey[] = ["bottleCat", "prepSec"];
+const SECTION_KEYS: SectionKey[] = ["category", "spirit", "glass", "flavor"];
 const isTagKind = (s: SectionKey): s is TagKind =>
   s === "spirit" || s === "glass" || s === "flavor";
 /** 系统标签分组（固定，不可增删改名） */
@@ -49,8 +46,6 @@ const SECTION_LABEL_KEY = {
   flavor: "tags.section.flavor",
   duration: "tags.section.duration",
   occasion: "tags.section.occasion",
-  bottleCat: "tags.section.bottleCat",
-  prepSec: "tags.section.prepSection",
 } as const;
 
 interface RowData {
@@ -1064,7 +1059,6 @@ export default function CategoriesScreen() {
 
   // 顶部右侧「＋」ActionSheet
   const handleTopAdd = () => {
-    if (MANAGER_SECTIONS.includes(section)) return;
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const isFlavor = section === "flavor";
     if (Platform.OS === "ios") {
@@ -1114,15 +1108,13 @@ export default function CategoriesScreen() {
           <Text style={[styles.title, { color: colors.foreground }]}>{t("tags.title")}</Text>
         </View>
         {/* 右上「＋添加」胶囊 */}
-        {!MANAGER_SECTIONS.includes(section) ? (
-          <Pressable
+        <Pressable
             onPress={handleTopAdd}
             style={({ pressed }) => [styles.addCapsule, { backgroundColor: colors.primary, opacity: pressed ? 0.8 : 1 }]}
           >
             <IconSymbol name="plus" size={14} color="#FFFFFF" />
             <Text style={styles.addCapsuleText}>{t("common.add")}</Text>
           </Pressable>
-        ) : null}
       </View>
 
       {/* Section switcher */}
@@ -1166,12 +1158,7 @@ export default function CategoriesScreen() {
         keyboardShouldPersistTaps="handled"
         scrollEnabled={draggingId === null}
       >
-        {section === "bottleCat" ? (
-          <BottleTaxonomyManager />
-        ) : section === "prepSec" ? (
-          <PrepTaxonomyManager />
-        ) : (
-          <>
+        <>
             {/* flavor 固定分组提示 */}
             {section === "flavor" ? (
               <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 10, paddingHorizontal: 4 }}>
@@ -1431,8 +1418,7 @@ export default function CategoriesScreen() {
             <Text style={{ fontSize: 12, color: colors.muted, marginTop: 8, paddingHorizontal: 4, lineHeight: 18 }}>
               {t("tags.hint")}
             </Text>
-          </>
-        )}
+        </>
       </ScrollView>
     </ScreenContainer>
   );

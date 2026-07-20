@@ -107,6 +107,7 @@ const MAPPING = {
   "leaf.fill": "eco",
   "lock.fill": "lock",
   "lock.open.fill": "lock-open",
+  "tray.2.fill": "category",
 } as IconMapping;
 
 /**
