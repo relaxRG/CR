@@ -23,7 +23,7 @@ import React, {
  */
 
 /** 顶层分组:基酒库 / 酒款库 / 原材料库 */
-export type BottleGroup = "spirits" | "bottles" | "materials";
+export type BottleGroup = "spirits" | "bottles" | "softdrinks" | "materials";
 
 export interface BottleCategoryDef {
   /** 稳定 id */
@@ -32,7 +32,7 @@ export interface BottleCategoryDef {
   zh: string;
   /** 英文名(界面英文时优先显示) */
   en: string;
-  /** 顶层分组:基酒库 / 酒款库 / 原材料库 */
+  /** 顶层分组:基酒库 / 酒款库 / 软饮库 / 原材料库 */
   group: BottleGroup;
 }
 
@@ -69,8 +69,8 @@ export const DEFAULT_BOTTLE_CATEGORY_DEFS: Omit<BottleCategoryDef, "id">[] = [
   { zh: "起泡酒", en: "Sparkling Wine", group: "bottles" },
   { zh: "葡萄酒", en: "Wine", group: "bottles" },
   // Non-alcoholic mixers
-  { zh: "果汁", en: "Juice", group: "bottles" },
-  { zh: "软饮", en: "Soft Drinks & Mixers", group: "bottles" },
+  { zh: "果汁", en: "Juice", group: "softdrinks" },
+  { zh: "软饮", en: "Soft Drinks & Mixers", group: "softdrinks" },
   { zh: "糖浆", en: "Syrups & Cordials", group: "bottles" },
   // Raw materials
   { zh: "糖与甜味剂", en: "Sugars & Sweeteners", group: "materials" },
@@ -355,6 +355,37 @@ function migrateStylesV8(list: BottleStyleDef[]): {
   return { next, changed };
 }
 
+/** v10:将「果汁」和「软饮」两个分类从 bottles 迁移到 softdrinks，并补充缺失的「果汁」分类 */
+function migrateCategoriesV10(list: BottleCategoryDef[]): {
+  next: BottleCategoryDef[];
+  changed: boolean;
+} {
+  const SOFTDRINKS_ZH = new Set(["果汁", "软饮"]);
+  let changed = false;
+  let next = list.map((c) => {
+    if (c.group === "bottles" && SOFTDRINKS_ZH.has(c.zh)) {
+      changed = true;
+      return { ...c, group: "softdrinks" as const };
+    }
+    return c;
+  });
+  // 若「果汁」分类不存在（老用户），补充插入到「软饮」之前
+  if (!next.some((c) => c.zh === "果汁")) {
+    const juiceDef = DEFAULT_BOTTLE_CATEGORY_DEFS.find((c) => c.zh === "果汁");
+    if (juiceDef) {
+      const softdrinkIdx = next.findIndex((c) => c.zh === "软饮");
+      const insert: BottleCategoryDef = { id: `bcat-v10-${Date.now()}`, ...juiceDef };
+      if (softdrinkIdx >= 0) {
+        next = [...next.slice(0, softdrinkIdx), insert, ...next.slice(softdrinkIdx)];
+      } else {
+        next = [...next, insert];
+      }
+      changed = true;
+    }
+  }
+  return { next, changed };
+}
+
 function buildDefaultCategories(): BottleCategoryDef[] {
   return DEFAULT_BOTTLE_CATEGORY_DEFS.map((c, i) => ({ id: `bcat-${i}`, ...c }));
 }
@@ -546,9 +577,10 @@ export function BottleTaxonomyProvider({ children }: { children: React.ReactNode
           const v7 = migrateCategoriesV7(parsed);
           const v8 = migrateCategoriesV8(v7.next);
           const v9 = migrateCategoriesV9(v8.next);
-          setCategories(v9.next);
-          if (v7.changed || v8.changed || v9.changed)
-            AsyncStorage.setItem(CATS_KEY, JSON.stringify(v9.next)).catch(() => {});
+          const v10 = migrateCategoriesV10(v9.next);
+          setCategories(v10.next);
+          if (v7.changed || v8.changed || v9.changed || v10.changed)
+            AsyncStorage.setItem(CATS_KEY, JSON.stringify(v10.next)).catch(() => {});
           notifySyncChange(CATS_KEY);
         }
         if (rawS) {

@@ -4,7 +4,7 @@ import { Bottle, bottleGroupOf } from "./bottles/types";
 import { HomemadePrep } from "./homemade/types";
 
 /** Optional dynamic group resolver — pass useBottleTaxonomy().groupOf for user-customized grouping */
-export type GroupResolver = (category: string) => "spirits" | "bottles" | "materials";
+export type GroupResolver = (category: string) => "spirits" | "bottles" | "softdrinks" | "materials";
 
 export interface IngredientSuggestion {
   /** Unique key for list rendering */
@@ -14,7 +14,7 @@ export interface IngredientSuggestion {
   /** Secondary label shown next to the value (alt-language name) */
   secondary: string;
   /** Source library — distinguishes the four sub-libraries */
-  source: "spirits" | "bottles" | "materials" | "homemade";
+  source: "spirits" | "bottles" | "softdrinks" | "materials" | "homemade";
   /** Category / type label for context */
   context: string;
   /** Navigation id in its library */
@@ -85,7 +85,7 @@ export function suggestIngredients(
       const secondary = lang === "en" ? (b.nameEn ? b.nameZh : "") : (b.nameZh ? b.nameEn : "");
       const group = groupResolver ? groupResolver(b.category) : bottleGroupOf(b.category);
       const src: IngredientSuggestion["source"] =
-        group === "spirits" ? "spirits" : group === "materials" ? "materials" : "bottles";
+        group === "spirits" ? "spirits" : group === "materials" ? "materials" : group === "softdrinks" ? "softdrinks" : "bottles";
       out.push({
         s: {
           key: `bt-${b.id}`,

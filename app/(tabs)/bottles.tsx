@@ -69,7 +69,7 @@ export default function BottlesScreen() {
     groupOf,
   } = useBottleTaxonomy();
   const [query, setQuery] = useState("");
-  const [group, setGroup] = useState<"spirits" | "bottles" | "materials">("spirits");
+  const [group, setGroup] = useState<"spirits" | "bottles" | "softdrinks" | "materials">("spirits");
   // 多选模式:批量删除/批量改分类/风格
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -87,18 +87,26 @@ export default function BottlesScreen() {
     "quick.bottles.materials.v1",
     {},
   );
+  const [quickSelSoftdrinks, setQuickSelSoftdrinks] = usePersistedState<QuickSelection>(
+    "quick.bottles.softdrinks.v1",
+    {},
+  );
   const quickSel =
     group === "materials"
       ? quickSelMaterials
       : group === "spirits"
         ? quickSelSpirits
-        : quickSelBottles;
+        : group === "softdrinks"
+          ? quickSelSoftdrinks
+          : quickSelBottles;
   const setQuickSel =
     group === "materials"
       ? setQuickSelMaterials
       : group === "spirits"
         ? setQuickSelSpirits
-        : setQuickSelBottles;
+        : group === "softdrinks"
+          ? setQuickSelSoftdrinks
+          : setQuickSelBottles;
   // Filter 面板多选筛选状态(与快捷筛选相互独立)
   const [selCategories, setSelCategories] = useState<string[]>([]);
   const [selStyles, setSelStyles] = useState<string[]>([]);
@@ -111,11 +119,12 @@ export default function BottlesScreen() {
  const groupBottles = useMemo(
     () => bottles.filter((b) => {
       // 归入自制库的条目不在酒款库显示
-      if (b.libraryOverride === 'homemade') return false;
-      // 手动强制路由：libraryOverride 与当前分组匹配则显示
-      if (b.libraryOverride === 'spirits') return group === 'spirits';
-      if (b.libraryOverride === 'bottles') return group === 'bottles';
-      if (b.libraryOverride === 'materials') return group === 'materials';
+  if (b.libraryOverride === 'homemade') return false;
+  // 手动强制路由：libraryOverride 与当前分组匹配则显示
+  if (b.libraryOverride === 'spirits') return group === 'spirits';
+  if (b.libraryOverride === 'bottles') return group === 'bottles';
+      if (b.libraryOverride === 'softdrinks') return group === 'softdrinks';
+  if (b.libraryOverride === 'materials') return group === 'materials';
       // 未设置 override 时按 category 自动判断
       return groupOf(b.category) === group;
     }),
@@ -1674,3 +1683,4 @@ const styles = StyleSheet.create({
   selRow: { flexDirection: "row", alignItems: "center" },
   selCheckWrap: { width: 34, alignItems: "flex-start", justifyContent: "center" },
 });
+      {/* 二级分组切换器：基酒库 / 酒款库 / 软饮库 / 原材料库 + 多选按钮 */}

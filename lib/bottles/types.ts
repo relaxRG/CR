@@ -16,6 +16,7 @@ export const BOTTLE_CATEGORIES = [
   "中式白酒",
   "糖浆",
   "软饮",
+  "果汁",
   "糖与甜味剂",
   "果蔬",
   "香料与草本",
@@ -29,14 +30,15 @@ export const BOTTLE_CATEGORIES = [
 export type BottleCategory = (typeof BOTTLE_CATEGORIES)[number];
 
 /**
- * 顶层分组:基酒库(base spirits)、酒款库(modifiers & mixers)与原材料库(raw materials)。
+ * 顶层分组:基酒库(base spirits)、酒款库(modifiers & mixers)、软饮库(soft drinks & juices)与原材料库(raw materials)。
  * 动态归属以 lib/bottles/taxonomy 为准,此处为静态默认(旧代码/测试兼容)。
  */
-export type BottleGroupKey = "spirits" | "bottles" | "materials";
+export type BottleGroupKey = "spirits" | "bottles" | "softdrinks" | "materials";
 
 export const BOTTLE_GROUPS: { key: BottleGroupKey; zh: string; en: string }[] = [
   { key: "spirits", zh: "基酒库", en: "Base Spirits" },
   { key: "bottles", zh: "酒款库", en: "Bottles" },
+  { key: "softdrinks", zh: "软饮库", en: "Soft Drinks" },
   { key: "materials", zh: "原材料库", en: "Raw Materials" },
 ];
 
@@ -63,10 +65,14 @@ export const DEFAULT_MATERIAL_CATEGORIES = [
   "酸类与添加剂",
 ];
 
+/** v9 软饮库分类(静态默认;动态归属以 taxonomy 为准) */
+export const DEFAULT_SOFTDRINKS_CATEGORIES = ["软饮", "果汁"];
+
 export function bottleGroupOf(category: string): BottleGroupKey {
   if (category === "原材料" || DEFAULT_MATERIAL_CATEGORIES.includes(category))
     return "materials";
   if (DEFAULT_SPIRIT_CATEGORIES.includes(category)) return "spirits";
+  if (DEFAULT_SOFTDRINKS_CATEGORIES.includes(category)) return "softdrinks";
   return "bottles";
 }
 
@@ -76,6 +82,8 @@ export function categoriesOfGroup(group: BottleGroupKey): string[] {
     return BOTTLE_CATEGORIES.filter((c) => DEFAULT_MATERIAL_CATEGORIES.includes(c));
   if (group === "spirits")
     return BOTTLE_CATEGORIES.filter((c) => DEFAULT_SPIRIT_CATEGORIES.includes(c));
+  if (group === "softdrinks")
+    return BOTTLE_CATEGORIES.filter((c) => DEFAULT_SOFTDRINKS_CATEGORIES.includes(c));
   return BOTTLE_CATEGORIES.filter(
     (c) =>
       !DEFAULT_MATERIAL_CATEGORIES.includes(c) && !DEFAULT_SPIRIT_CATEGORIES.includes(c),
@@ -237,7 +245,7 @@ export interface Bottle {
    * 手动指定库归属。undefined = 系统自动判断（根据 category）；
    * 'homemade' = 用户手动归入自制库（条目仍存储在 bottles store，但在列表中显示于自制库）
    */
-  libraryOverride?: 'homemade' | 'spirits' | 'bottles' | 'materials';
+  libraryOverride?: 'homemade' | 'spirits' | 'bottles' | 'softdrinks' | 'materials';
   /** 当 libraryOverride = 'homemade' 时，指定自制库分区 */
   homemadeGroup?: 'alcoholic' | 'non_alcoholic' | 'garnish' | 'other';
   /** 当 libraryOverride = 'homemade' 时，指定自制库类型（对应 PREP_TYPES.key） */

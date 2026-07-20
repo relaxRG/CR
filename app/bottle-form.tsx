@@ -108,7 +108,7 @@ export default function BottleFormScreen() {
 
   // ── 库归属手动选择 ────────────────────────────────────────────────────────
   // undefined = 系统自动判断（根据 category）；其他值 = 用户手动指定所属库
-  const [libraryOverride, setLibraryOverride] = useState<'spirits' | 'bottles' | 'materials' | 'homemade' | undefined>(
+  const [libraryOverride, setLibraryOverride] = useState<'spirits' | 'bottles' | 'softdrinks' | 'materials' | 'homemade' | undefined>(
     editing?.libraryOverride ?? undefined,
   );
   const [homemadeGroup, setHomemadeGroup] = useState<'alcoholic' | 'non_alcoholic' | 'garnish' | 'other'>(
@@ -764,6 +764,7 @@ export default function BottleFormScreen() {
                 { key: undefined as typeof libraryOverride, label: lang === "zh" ? "自动" : "Auto" },
                 { key: 'spirits' as const, label: lang === "zh" ? "基酒库" : "Spirits" },
                 { key: 'bottles' as const, label: lang === "zh" ? "酒款库" : "Bottles" },
+                { key: 'softdrinks' as const, label: lang === "zh" ? "软饮库" : "Soft Drinks" },
                 { key: 'materials' as const, label: lang === "zh" ? "原材料" : "Materials" },
                 { key: 'homemade' as const, label: lang === "zh" ? "自制库" : "Homemade" },
               ].map((opt) => {
