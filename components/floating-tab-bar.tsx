@@ -55,7 +55,7 @@ export function FloatingTabBar({
             }}
             style={({ pressed }) => [
               styles.tab,
-              active && { backgroundColor: colors.primary + "18" },
+              active && { backgroundColor: colors.border },
               pressed && !active && { opacity: 0.6 },
             ]}
           >
@@ -130,8 +130,8 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   iconWrap: {
-    width: 28,
-    height: 28,
+    width: 24,
+    height: 24,
     alignItems: "center",
     justifyContent: "center",
   },

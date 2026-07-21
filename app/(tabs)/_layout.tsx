@@ -21,26 +21,26 @@ export default function TabLayout() {
     {
       key: "index",
       label: t("tab.lab"),
-      icon: <IconSymbol size={26} name="flask.fill" color={colors.muted} />,
-      activeIcon: <IconSymbol size={26} name="flask.fill" color={colors.primary} />,
+      icon: <IconSymbol size={24} name="flask.fill" color={colors.muted} />,
+      activeIcon: <IconSymbol size={24} name="flask.fill" color={colors.primary} />,
     },
     {
       key: "library",
       label: t("tab.library"),
-      icon: <IconSymbol size={26} name="wineglass.fill" color={colors.muted} />,
-      activeIcon: <IconSymbol size={26} name="wineglass.fill" color={colors.primary} />,
+      icon: <IconSymbol size={24} name="wineglass.fill" color={colors.muted} />,
+      activeIcon: <IconSymbol size={24} name="wineglass.fill" color={colors.primary} />,
     },
     {
       key: "books",
       label: t("tab.books"),
-      icon: <IconSymbol size={26} name="book.fill" color={colors.muted} />,
-      activeIcon: <IconSymbol size={26} name="book.fill" color={colors.primary} />,
+      icon: <IconSymbol size={24} name="book.fill" color={colors.muted} />,
+      activeIcon: <IconSymbol size={24} name="book.fill" color={colors.primary} />,
     },
     {
       key: "me",
       label: t("tab.me"),
-      icon: <IconSymbol size={26} name="person.crop.circle.fill" color={colors.muted} />,
-      activeIcon: <IconSymbol size={26} name="person.crop.circle.fill" color={colors.primary} />,
+      icon: <IconSymbol size={24} name="person.crop.circle.fill" color={colors.muted} />,
+      activeIcon: <IconSymbol size={24} name="person.crop.circle.fill" color={colors.primary} />,
     },
   ];
 
