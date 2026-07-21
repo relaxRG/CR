@@ -520,4 +520,13 @@
 - [x] homemade-form.tsx 产量区重构：自由文本改为 UnitPickerSheet 选择器
 - [x] homemade-form.tsx 成本区升级：实时预览单位成本（液体/重量/计件三维度）
 - [x] homemade-form.tsx AI 回填升级：新增中英文名、步骤、产量、家族key、变体标签全字段回填
-- [x] app/homemade/[id].tsx 详情页成本卡片：根据 yieldDimension 自动切换展示维度
+  - [x] app/homemade/[id].tsx 详情页成本卡片：根据 yieldDimension 自动切换展示维度
+
+## 配方编辑页建议列表 Bug 修复（方案四：双重保护）（2026-07-21）
+- [x] Bug 1：配料行 onBlur 加 pressingIngSuggestRef 检查，防止建议列表被 onBlur 抢先关闭
+- [x] Bug 2：装饰行 onBlur 加 pressingGarnishSuggestRef 检查，同等修复
+- [x] Bug 3：pickSuggestion 加 setFocusedIng(null)，选中后立即关闭建议列表
+- [x] Bug 4：suggestRow 样式加 minHeight: 44，扩大点击热区
+- [x] Bug 5：updateIngredient name 分支加 setPickedIng 清除，避免状态歧义
+- [x] 配料行/装饰行建议 Pressable 改为 onPressIn/onPressOut/onPress 三件套
+- [x] TypeScript 0 错误

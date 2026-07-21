@@ -418,6 +418,9 @@ export default function RecipeFormScreen() {
   }>(null);
   /** Undo toast 倒计时 timer ref */
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** 方案四：防止建议列表 onPressIn 被 onBlur 抢先关闭 */
+  const pressingIngSuggestRef = useRef(false);
+  const pressingGarnishSuggestRef = useRef(false);
   /** Which ingredient row is focused (shows live suggestions) */
   /** 风味标签专属置信度（来自自动 AI 分析） */
   const [flavorConfidence, setFlavorConfidence] = useState<"high" | "medium" | "low" | null>(null);
@@ -959,12 +962,15 @@ export default function RecipeFormScreen() {
       setDismissedLinks((prev) => { const n = { ...prev }; delete n[iid]; return n; });
       setAcceptedLinks((prev) => { const n = { ...prev }; delete n[iid]; return n; });
       setIngredients((prev) => prev.map((i) => i.id === iid ? { ...i, linkedBottleId: undefined, linkedPrepId: undefined, linkDismissed: undefined } : i));
+      // Bug 5: 用户手动修改输入时清除 pickedIng，避免建议列表状态歧义
+      setPickedIng((prev) => { const n = { ...prev }; delete n[iid]; return n; });
     }
   };
 
   const pickSuggestion = (iid: string, value: string) => {
     updateIngredient(iid, "name", value);
     setPickedIng((prev) => ({ ...prev, [iid]: value }));
+    setFocusedIng(null);
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
@@ -1059,9 +1065,11 @@ export default function RecipeFormScreen() {
             onFocus={() => setFocusedIng(ing.id)}
             autoCapitalize="words"
             onBlur={() => {
-              setTimeout(() => {
-                setFocusedIng((cur) => (cur === ing.id ? null : cur));
-              }, 150);
+              if (!pressingIngSuggestRef.current) {
+                setTimeout(() => {
+                  setFocusedIng((cur) => (cur === ing.id ? null : cur));
+                }, 150);
+              }
             }}
             returnKeyType="done"
             style={{ lineHeight: 20 }}
@@ -1133,7 +1141,9 @@ export default function RecipeFormScreen() {
             {liveSuggestions.map((s, sIdx) => (
               <Pressable
                 key={s.key}
-                onPress={() => pickSuggestion(ing.id, s.value)}
+                onPressIn={() => { pressingIngSuggestRef.current = true; }}
+                onPressOut={() => { pressingIngSuggestRef.current = false; }}
+                onPress={() => { pickSuggestion(ing.id, s.value); pressingIngSuggestRef.current = false; }}
                 style={({ pressed }) => [styles.suggestRow, sIdx > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }, pressed && { opacity: 0.6 }]}
               >
                 <IconSymbol name={s.source === "homemade" ? "sparkles" : s.source === "spirits" ? "flame.fill" : s.source === "materials" ? "leaf.fill" : "wineglass.fill"} size={13} color={s.source === "homemade" ? colors.primary : s.source === "spirits" ? "#FF9500" : s.source === "materials" ? colors.success : "#5AC8FA"} />
@@ -2146,7 +2156,11 @@ export default function RecipeFormScreen() {
                       setAcceptedGarnishLinks((prev) => { const n = { ...prev }; delete n[row.id]; return n; });
                     }}
                     onFocus={() => setFocusedGarnish(row.id)}
-                    onBlur={() => setTimeout(() => setFocusedGarnish((cur) => (cur === row.id ? null : cur)), 150)}
+                    onBlur={() => {
+                      if (!pressingGarnishSuggestRef.current) {
+                        setTimeout(() => setFocusedGarnish((cur) => (cur === row.id ? null : cur)), 150);
+                      }
+                    }}
                     autoCapitalize="words"
                     returnKeyType="done"
                     style={{ lineHeight: 20 }}
@@ -2168,7 +2182,10 @@ export default function RecipeFormScreen() {
                     {liveGSuggestions.map((s, sIdx) => (
                       <Pressable
                         key={s.key}
+                        onPressIn={() => { pressingGarnishSuggestRef.current = true; }}
+                        onPressOut={() => { pressingGarnishSuggestRef.current = false; }}
                         onPress={() => {
+                          pressingGarnishSuggestRef.current = false;
                           setGarnishRows((prev) => prev.map((r) => r.id === row.id ? { ...r, name: s.value } : r));
                           setPickedGarnish((prev) => ({ ...prev, [row.id]: s.value }));
                           setFocusedGarnish(null);
@@ -2516,6 +2533,7 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 9,
+    minHeight: 44,
   },
   importBtn: {
     flexDirection: "row",
