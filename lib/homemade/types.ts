@@ -58,8 +58,8 @@ export interface HomemadePrep {
   prepMethod?: string;
   /** 关联原材料库条目 ID 列表（装饰所用原料，成本可自动汇总） */
   linkedMaterialIds?: string[];
-  /** Ingredient list, one per line or comma separated */
-  ingredients: string[];
+  /** Structured ingredient list — name + amount pair */
+  ingredients: { name: string; amount: string }[];
   /** Recipe / method free text */
   recipe: string;
   /** e.g. "~750ml" */
@@ -343,7 +343,7 @@ export function classifyPrepGroup(input: {
   name?: string;
   nameAlt?: string;
   type?: string;
-  ingredients?: string[];
+  ingredients?: (string | { name: string; amount: string })[];
   recipe?: string;
   notes?: string;
   sections?: PrepSection[];
@@ -356,7 +356,7 @@ export function classifyPrepGroup(input: {
     return prepGroupOfSection(secList, prepSectionOfIn(typList, input.type));
   }
   // 2) 文本关键词判定:配料表权重最高(是否含烈酒/酒基)
-  const ingText = (input.ingredients ?? []).join(" ");
+  const ingText = (input.ingredients ?? []).map((i) => typeof i === "string" ? i : `${i.name} ${i.amount}`).join(" ");
   if (ALCOHOLIC_HINTS.test(ingText)) return "alcoholic";
   const nameText = `${input.name ?? ""} ${input.nameAlt ?? ""}`;
   if (GARNISH_HINTS.test(nameText) && !ALCOHOLIC_HINTS.test(nameText)) return "garnish";
@@ -467,7 +467,25 @@ export function normalizePrep(p: Partial<HomemadePrep> & { id: string }): Homema
       p.abvGroup === "alcoholic" || p.abvGroup === "non_alcoholic" ? p.abvGroup : null,
     // 装饰专属字段
     ...(p.abvGroup === "garnish" ? { abvGroup: "garnish" as PrepGroup } : {}),
-    ingredients: Array.isArray(p.ingredients) ? p.ingredients : [],
+    ingredients: Array.isArray(p.ingredients)
+      ? p.ingredients.map((item) => {
+          // Migration compat: old data stored as plain strings
+          if (typeof item === "string") {
+            // Simple inline split: "3 oz name" → {amount:"3 oz", name:"name"}
+            // Full parse happens in splitPrepIngredientLine; here we just preserve the text
+            const str = (item as string).trim();
+            const spaceIdx = str.search(/\s/);
+            if (spaceIdx > 0) {
+              return { amount: str.slice(0, spaceIdx).trim(), name: str.slice(spaceIdx).trim() };
+            }
+            return { name: str, amount: "" };
+          }
+          return {
+            name: typeof (item as {name?:unknown}).name === "string" ? (item as {name:string}).name : "",
+            amount: typeof (item as {amount?:unknown}).amount === "string" ? (item as {amount:string}).amount : "",
+          };
+        })
+      : [],
     recipe: p.recipe ?? "",
     yield: p.yield ?? "",
     shelfLife: p.shelfLife ?? "",

@@ -415,7 +415,10 @@ export function estimatePrepCost(
 ): PrepCostEstimate {
   // Exclude self to prevent circular references
   const otherPreps = allPreps.filter((p) => p.id !== prep.id);
-  const items: PrepIngredientCost[] = prep.ingredients.map((line) => {
+  const items: PrepIngredientCost[] = prep.ingredients.map((ingItem) => {
+    const line = typeof ingItem === "string"
+      ? ingItem
+      : (ingItem.amount ? `${ingItem.amount} ${ingItem.name}` : ingItem.name);
     const parsed = parseQuantity(line);
     const gpp = gramsPerPieceOf(line);
     // 果皮行:成本按整果价折减(取皮通常不足整果价值的 1/3)

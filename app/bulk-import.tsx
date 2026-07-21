@@ -44,7 +44,7 @@ interface ExtractedItem {
   volume: string;
   abv: number;
   priceCny: number;
-  prepIngredients: string[];
+  prepIngredients: { name: string; amount: string }[];
   prepRecipe: string;
   prepYield: string;
   shelfLife: string;
@@ -225,9 +225,14 @@ export default function BulkImportScreen() {
             ? { fileBase64, fileName, lang: lang as 'zh' | 'en' }
             : { text: text.trim(), lang: lang as 'zh' | 'en' },
       );
-      const next: PreviewRow[] = (result.items as ExtractedItem[]).map((item, i) => ({
+      const parseIngStr = (s: string): { name: string; amount: string } => {
+        const idx = s.trim().search(/\s/);
+        if (idx > 0) return { amount: s.trim().slice(0, idx).trim(), name: s.trim().slice(idx).trim() };
+        return { name: s.trim(), amount: "" };
+      };
+      const next: PreviewRow[] = (result.items as (Omit<ExtractedItem, "prepIngredients"> & { prepIngredients: string[] })[]).map((raw, i) => ({
         key: `${Date.now()}-${i}`,
-        item,
+        item: { ...raw, prepIngredients: (raw.prepIngredients ?? []).map(parseIngStr) } as ExtractedItem,
         checked: true,
       }));
       setRows(next);
@@ -280,7 +285,7 @@ export default function BulkImportScreen() {
 
   const matchPrepType = useCallback(
     (item: ExtractedItem): string => {
-      const hint = `${item.category} ${item.nameZh} ${item.nameEn} ${item.notes} ${(item.prepIngredients ?? []).join(" ")}`;
+      const hint = `${item.category} ${item.nameZh} ${item.nameEn} ${item.notes} ${(item.prepIngredients ?? []).map((i) => typeof i === "string" ? i : `${i.name} ${i.amount}`).join(" ")}`;
       const guessed = guessPrepType(hint, types);
       if (guessed) return guessed;
       const hit = types.find((tp) => hint.includes(tp.zh.toLowerCase()) || hint.includes(tp.en.toLowerCase()));

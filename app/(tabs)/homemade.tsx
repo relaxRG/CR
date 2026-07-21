@@ -222,7 +222,7 @@ export default function HomemadeScreen() {
           name: p.name,
           nameAlt: p.nameAlt || undefined,
           type: p.type || undefined,
-          ingredients: p.ingredients?.length ? p.ingredients : undefined,
+          ingredients: p.ingredients?.length ? p.ingredients.map((i) => [i.amount, i.name].filter(Boolean).join(" ")) : undefined,
           lang: lang as 'zh' | 'en',
         });
         const patch: Partial<typeof p> = {};
@@ -269,7 +269,7 @@ export default function HomemadeScreen() {
           name: p.name,
           nameAlt: p.nameAlt || undefined,
           type: p.type || undefined,
-          ingredients: p.ingredients?.length ? p.ingredients : undefined,
+          ingredients: p.ingredients?.length ? p.ingredients.map((i) => [i.amount, i.name].filter(Boolean).join(" ")) : undefined,
           lang: lang as 'zh' | 'en',
         });
         const patch: Partial<typeof p> = {};

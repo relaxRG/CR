@@ -53,10 +53,14 @@ interface IngRow {
   linkedPrepId?: string;
 }
 
-function toRows(lines: string[]): IngRow[] {
-  const rows = lines.map((line) => {
-    const { amount, name } = splitPrepIngredientLine(line);
-    return { id: genId(), name, amount };
+type PrepIngItem = { name: string; amount: string } | string;
+function toRows(items: PrepIngItem[]): IngRow[] {
+  const rows = items.map((item) => {
+    if (typeof item === "string") {
+      const { amount, name } = splitPrepIngredientLine(item);
+      return { id: genId(), name, amount };
+    }
+    return { id: genId(), name: item.name, amount: item.amount };
   });
   return rows.length > 0 ? rows : [{ id: genId(), name: "", amount: "" }];
 }
@@ -105,7 +109,7 @@ export default function HomemadeFormScreen() {
   // Pre-fill dismissed for existing ingredients when editing
   const [dismissedLinks, setDismissedLinks] = useState<Record<string, boolean>>(() => {
     if (!editing?.ingredients?.length) return {};
-    const rows = toRows(editing.ingredients);
+    const rows = toRows(editing.ingredients as PrepIngItem[]);
     return Object.fromEntries(rows.map((r) => [r.id, true]));
   });
   const [acceptedLinks, setAcceptedLinks] = useState<Record<string, boolean>>({});
@@ -688,8 +692,8 @@ export default function HomemadeFormScreen() {
     }
 
     const ingredients = ingRows
-      .map((r) => joinPrepIngredient(r.amount, r.name))
-      .filter(Boolean);
+      .filter((r) => r.name.trim() || r.amount.trim())
+      .map((r) => ({ name: r.name.trim(), amount: r.amount.trim() }));
     const payload = {
       name: name.trim(),
       nameAlt: nameAlt.trim(),

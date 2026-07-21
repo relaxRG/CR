@@ -308,11 +308,12 @@ export default function HomemadeDetailScreen() {
     <>
       {sectionTitle(t("hmform.ingredients"))}
       <View className="bg-surface rounded-xl px-4">
-        {prep.ingredients.map((ing, idx) => {
-          // Strip leading quantity for smart-link matching
-          const ingNameOnly = ing.replace(/^\d[\d\s./]*(?:ml|g|oz|cl|dash|drop|piece|个|克|毫升|升|勺|茶匙|大匙)?[\s,，]*/i, "").trim();
-          const link = ingNameOnly.length >= 2
-            ? smartLinkIngredient(ingNameOnly, bottles, otherPreps)
+        {prep.ingredients.map((ingItem, idx) => {
+          // Support both legacy string and new {name,amount} format
+          const ingName = typeof ingItem === "string" ? ingItem : ingItem.name;
+          const ingAmount = typeof ingItem === "string" ? "" : ingItem.amount;
+          const link = ingName.length >= 2
+            ? smartLinkIngredient(ingName, bottles, otherPreps)
             : null;
           const isLast = idx === prep.ingredients.length - 1;
           const rowContent = (
@@ -322,7 +323,7 @@ export default function HomemadeDetailScreen() {
             >
               <View className="flex-1">
                 <Text className="text-[15px] text-foreground" style={{ lineHeight: 21 }}>
-                  {ing}
+                  {ingName}
                 </Text>
                 {link ? (
                   <Text className="text-xs mt-0.5" style={{ color: colors.muted }} numberOfLines={1}>
@@ -336,12 +337,17 @@ export default function HomemadeDetailScreen() {
                   </Text>
                 ) : null}
               </View>
+              {ingAmount ? (
+                <Text className="text-[15px] text-muted ml-3" style={{ lineHeight: 21 }}>
+                  {ingAmount}
+                </Text>
+              ) : null}
               {link ? (
                 <IconSymbol
                   name={link.kind === "prep" ? "sparkles" : "chevron.right"}
                   size={14}
                   color={link.kind === "prep" ? colors.aiAccent : colors.muted}
-                  style={{ marginLeft: 6 }}
+                  style={{ marginLeft: ingAmount ? 4 : 6 }}
                 />
               ) : null}
             </View>
@@ -349,7 +355,7 @@ export default function HomemadeDetailScreen() {
           if (link?.kind === "bottle") {
             return (
               <Pressable
-                key={`${ing}-${idx}`}
+                key={`${ingName}-${idx}`}
                 onPress={() => {
                   if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   router.push({ pathname: "/bottle/[id]", params: { id: link.bottle.id } });
@@ -363,7 +369,7 @@ export default function HomemadeDetailScreen() {
           if (link?.kind === "prep") {
             return (
               <Pressable
-                key={`${ing}-${idx}`}
+                key={`${ingName}-${idx}`}
                 onPress={() => {
                   if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   router.push({ pathname: "/homemade/[id]", params: { id: link.prep.id } });
@@ -374,7 +380,7 @@ export default function HomemadeDetailScreen() {
               </Pressable>
             );
           }
-          return <View key={`${ing}-${idx}`}>{rowContent}</View>;
+          return <View key={`${ingName}-${idx}`}>{rowContent}</View>;
         })}
       </View>
     </>

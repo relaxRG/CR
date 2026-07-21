@@ -731,7 +731,7 @@ export default function BookImportScreen() {
       if (row.kind === "prep") {
         const prepText = `${name} ${row.candidate.raw}`;
         const prepType = guessPrepType(prepText, types) ?? types[0]?.key ?? "syrup";
-        const prepIngredients = p.ingredients.map((i) => (i.amount ? `${i.name} ${i.amount}` : i.name));
+        const prepIngredients: { name: string; amount: string }[] = p.ingredients.map((i) => ({ name: i.name, amount: i.amount || "" }));
         addPrep({
           name,
           nameAlt: name !== origName ? origName : "",

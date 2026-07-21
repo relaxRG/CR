@@ -1622,7 +1622,7 @@ export default function BookReaderScreen() {
       const name = p.name || origName || (zh ? "未命名配方" : "Untitled recipe");
       if (row.kind === "prep") {
         const prepType = guessPrepType(`${name} ${row.candidate.raw}`, types) ?? types[0]?.key ?? "syrup";
-        const prepIngredients = p.ingredients.map((i) => (i.amount ? `${i.name} ${i.amount}` : i.name));
+        const prepIngredients: { name: string; amount: string }[] = p.ingredients.map((i) => ({ name: i.name, amount: i.amount || "" }));
         addPrep({ name, nameAlt: name !== origName ? origName : "", type: prepType, abvGroup: classifyPrepGroup({ name, type: prepType, ingredients: prepIngredients, recipe: p.steps, sections, types }), ingredients: prepIngredients, recipe: p.steps, yield: "", shelfLife: "", storage: "", source, notes: "" });
         prepCount++;
       } else {

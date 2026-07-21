@@ -37,7 +37,7 @@ interface WaldorfFullPrepRow {
   nameEn: string;
   nameZh: string;
   type: string;
-  ingredients: string[];
+  ingredients: (string | { name: string; amount: string })[];
   recipe: string;
   yield: string;
   shelfLife: string;
@@ -192,7 +192,15 @@ export function buildWaldorfPreps(): HomemadePrep[] {
     nameAlt: p.nameZh,
     type: p.type,
     abvGroup: null,
-    ingredients: p.ingredients,
+    ingredients: p.ingredients.map((item) => {
+      if (typeof item === "string") {
+        const str = item.trim();
+        const spaceIdx = str.search(/\s/);
+        if (spaceIdx > 0) return { amount: str.slice(0, spaceIdx).trim(), name: str.slice(spaceIdx).trim() };
+        return { name: str, amount: "" };
+      }
+      return { name: (item as { name: string }).name ?? "", amount: (item as { amount: string }).amount ?? "" };
+    }),
     recipe: p.recipe,
     yield: p.yield,
     shelfLife: p.shelfLife,

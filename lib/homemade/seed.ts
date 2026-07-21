@@ -11,7 +11,7 @@ export function buildSamplePreps(): HomemadePrep[] {
     name: string,
     nameAlt: string,
     type: string,
-    ingredients: string[],
+    ingredients: { name: string; amount: string }[],
     recipe: string,
     yieldStr: string,
     shelfLife: string,
@@ -43,7 +43,10 @@ export function buildSamplePreps(): HomemadePrep[] {
       "Simple Syrup (1:1)",
       "单糖浆(1:1)",
       "syrup",
-      ["200g white sugar 白砂糖", "200g hot water 热水"],
+      [
+        { name: "white sugar 白砂糖", amount: "200g" },
+        { name: "hot water 热水", amount: "200g" }
+      ],
       "Stir sugar into hot water until fully dissolved. Cool and bottle.\n将糖倒入热水中搅拌至完全溶解,放凉装瓶。",
       "~300ml",
       "2 weeks refrigerated 冷藏2周",
@@ -54,7 +57,10 @@ export function buildSamplePreps(): HomemadePrep[] {
       "Rich Simple Syrup (2:1)",
       "浓糖浆(2:1)",
       "syrup",
-      ["400g white sugar 白砂糖", "200g hot water 热水"],
+      [
+        { name: "white sugar 白砂糖", amount: "400g" },
+        { name: "hot water 热水", amount: "200g" }
+      ],
       "Stir sugar into hot water until dissolved. Cool and bottle.\n糖与热水2:1搅拌至溶解,放凉装瓶。",
       "~450ml",
       "1 month refrigerated 冷藏1个月",
@@ -65,7 +71,10 @@ export function buildSamplePreps(): HomemadePrep[] {
       "Honey Syrup (3:1)",
       "蜂蜜糖浆(3:1)",
       "syrup",
-      ["300g honey 蜂蜜", "100g warm water 温水"],
+      [
+        { name: "honey 蜂蜜", amount: "300g" },
+        { name: "warm water 温水", amount: "100g" }
+      ],
       "Whisk honey with warm water until combined. Cool and bottle.\n蜂蜜与温水3:1搅匀,放凉装瓶。",
       "~350ml",
       "1 month refrigerated 冷藏1个月",
@@ -76,7 +85,10 @@ export function buildSamplePreps(): HomemadePrep[] {
       "Demerara Syrup (2:1)",
       "德梅拉拉糖浆(2:1)",
       "syrup",
-      ["400g demerara sugar 德梅拉拉蔗糖", "200g hot water 热水"],
+      [
+        { name: "demerara sugar 德梅拉拉蔗糖", amount: "400g" },
+        { name: "hot water 热水", amount: "200g" }
+      ],
       "Stir sugar into hot water until dissolved. Cool and bottle.\n蔗糖与热水2:1搅拌溶解,放凉装瓶。",
       "~450ml",
       "1 month refrigerated 冷藏1个月",
@@ -88,10 +100,10 @@ export function buildSamplePreps(): HomemadePrep[] {
       "红石榴糖浆",
       "syrup",
       [
-        "200ml pomegranate juice 石榴汁",
-        "200g white sugar 白砂糖",
-        "1 tsp pomegranate molasses 石榴糖蜜(可选)",
-        "2 drops orange blossom water 橙花水(可选)",
+        { name: "pomegranate juice 石榴汁", amount: "200ml" },
+        { name: "white sugar 白砂糖", amount: "200g" },
+        { name: "pomegranate molasses 石榴糖蜜(可选)", amount: "1 tsp" },
+        { name: "orange blossom water 橙花水(可选)", amount: "2 drops" }
       ],
       "Warm juice gently (do not boil), stir in sugar until dissolved. Add molasses and orange blossom water. Cool and bottle.\n轻微加热石榴汁(不要煮沸),加糖搅拌溶解,加入糖蜜与橙花水,放凉装瓶。",
       "~350ml",
@@ -104,11 +116,11 @@ export function buildSamplePreps(): HomemadePrep[] {
       "杏仁糖浆",
       "syrup",
       [
-        "200g blanched almonds 去皮杏仁",
-        "300ml water 水",
-        "300g sugar 糖",
-        "15ml brandy or vodka 白兰地或伏特加",
-        "1/4 tsp orange blossom water 橙花水",
+        { name: "blanched almonds 去皮杏仁", amount: "200g" },
+        { name: "water 水", amount: "300ml" },
+        { name: "sugar 糖", amount: "300g" },
+        { name: "brandy or vodka 白兰地或伏特加", amount: "15ml" },
+        { name: "orange blossom water 橙花水", amount: "1/4 tsp" }
       ],
       "Toast almonds lightly, blend with water, steep 3h, strain through cheesecloth. Warm the almond milk, dissolve sugar, add brandy & orange blossom water. Bottle.\n杏仁轻烤后与水打碎浸泡3小时,纱布过滤取杏仁奶,加热溶糖,加白兰地与橙花水装瓶。",
       "~500ml",
@@ -120,7 +132,10 @@ export function buildSamplePreps(): HomemadePrep[] {
       "Ginger Syrup",
       "姜糖浆",
       "syrup",
-      ["100g fresh ginger juice 鲜姜汁", "150g white sugar 白砂糖"],
+      [
+        { name: "fresh ginger juice 鲜姜汁", amount: "100g" },
+        { name: "white sugar 白砂糖", amount: "150g" }
+      ],
       "Juice fresh ginger (or blend & strain). Whisk with sugar until dissolved, no heat needed.\n鲜姜榨汁(或打碎过滤),与糖搅拌至溶解,无需加热。",
       "~200ml",
       "2 weeks refrigerated 冷藏2周",
@@ -131,7 +146,11 @@ export function buildSamplePreps(): HomemadePrep[] {
       "Raspberry Syrup",
       "覆盆子糖浆",
       "syrup",
-      ["200g raspberries 覆盆子", "200g sugar 糖", "100ml water 水"],
+      [
+        { name: "raspberries 覆盆子", amount: "200g" },
+        { name: "sugar 糖", amount: "200g" },
+        { name: "water 水", amount: "100ml" }
+      ],
       "Combine over low heat ~10 min until berries break down. Strain fine, cool, bottle.\n小火煮约10分钟至果肉软烂,细滤后放凉装瓶。",
       "~300ml",
       "2 weeks refrigerated 冷藏2周",
@@ -142,7 +161,11 @@ export function buildSamplePreps(): HomemadePrep[] {
       "Passion Fruit Syrup",
       "百香果糖浆",
       "syrup",
-      ["150g passion fruit pulp 百香果肉", "150g sugar 糖", "50ml water 水"],
+      [
+        { name: "passion fruit pulp 百香果肉", amount: "150g" },
+        { name: "sugar 糖", amount: "150g" },
+        { name: "water 水", amount: "50ml" }
+      ],
       "Warm gently, stir until sugar dissolves, strain seeds if desired. Cool and bottle.\n轻微加热搅拌至糖溶解,可滤籽,放凉装瓶。",
       "~300ml",
       "2 weeks refrigerated 冷藏2周",
@@ -153,7 +176,11 @@ export function buildSamplePreps(): HomemadePrep[] {
       "Vanilla Syrup",
       "香草糖浆",
       "syrup",
-      ["1 vanilla bean 香草荚", "200g sugar 糖", "200ml water 水"],
+      [
+        { name: "vanilla bean 香草荚", amount: "1" },
+        { name: "sugar 糖", amount: "200g" },
+        { name: "water 水", amount: "200ml" }
+      ],
       "Split & scrape vanilla bean, simmer with sugar and water 5 min, steep 1h, strain and bottle.\n香草荚剖开刮籽,与糖水小火煮5分钟,浸1小时后过滤装瓶。",
       "~300ml",
       "3 weeks refrigerated 冷藏3周",
@@ -164,7 +191,11 @@ export function buildSamplePreps(): HomemadePrep[] {
       "Cinnamon Syrup",
       "肉桂糖浆",
       "syrup",
-      ["4 cinnamon sticks 肉桂棒", "200g demerara sugar 德梅拉拉糖", "200ml water 水"],
+      [
+        { name: "cinnamon sticks 肉桂棒", amount: "4" },
+        { name: "demerara sugar 德梅拉拉糖", amount: "200g" },
+        { name: "water 水", amount: "200ml" }
+      ],
       "Crush cinnamon sticks, simmer with sugar & water 5 min, steep 2h, strain and bottle.\n肉桂棒压碎与糖水煮5分钟,浸2小时后过滤装瓶。",
       "~300ml",
       "1 month refrigerated 冷藏1个月",
@@ -176,13 +207,13 @@ export function buildSamplePreps(): HomemadePrep[] {
       "法勒南香料糖浆",
       "cordial",
       [
-        "8 cloves 丁香",
-        "40g fresh ginger 鲜姜",
-        "zest of 8 limes 青柠皮",
-        "60ml overproof rum 高度朗姆",
-        "300ml simple syrup 单糖浆",
-        "30ml fresh lime juice 青柠汁",
-        "1/4 tsp almond extract 杏仁精(可选)",
+        { name: "cloves 丁香", amount: "8" },
+        { name: "fresh ginger 鲜姜", amount: "40g" },
+        { name: "zest of 8 limes 青柠皮", amount: "" },
+        { name: "overproof rum 高度朗姆", amount: "60ml" },
+        { name: "simple syrup 单糖浆", amount: "300ml" },
+        { name: "fresh lime juice 青柠汁", amount: "30ml" },
+        { name: "almond extract 杏仁精(可选)", amount: "1/4 tsp" }
       ],
       "Infuse cloves, ginger & lime zest in rum 24h. Strain, mix with syrup, lime juice and almond extract. Rest 1 day.\n丁香、姜、青柠皮浸朗姆24小时,过滤后与糖浆、青柠汁、杏仁精混合,静置1天。",
       "~400ml",
@@ -195,10 +226,10 @@ export function buildSamplePreps(): HomemadePrep[] {
       "青柠康迪奥",
       "cordial",
       [
-        "zest of 6 limes 青柠皮屑",
-        "200ml fresh lime juice 鲜青柠汁",
-        "200g sugar 糖",
-        "1/2 tsp citric acid 柠檬酸(可选)",
+        { name: "zest of 6 limes 青柠皮屑", amount: "" },
+        { name: "fresh lime juice 鲜青柠汁", amount: "200ml" },
+        { name: "sugar 糖", amount: "200g" },
+        { name: "citric acid 柠檬酸(可选)", amount: "1/2 tsp" }
       ],
       "Muddle zest with sugar, rest 1h (oleo). Add lime juice & citric acid, stir until dissolved, fine strain.\n皮屑与糖混合静置1小时出油,加青柠汁与柠檬酸搅拌溶解后细滤。",
       "~350ml",
@@ -210,7 +241,10 @@ export function buildSamplePreps(): HomemadePrep[] {
       "Chili-Infused Tequila",
       "辣椒浸渍龙舌兰",
       "infusion",
-      ["700ml blanco tequila 银龙舌兰", "2-3 fresh jalapeños 新鲜墨西哥辣椒"],
+      [
+        { name: "blanco tequila 银龙舌兰", amount: "700ml" },
+        { name: "fresh jalapeños 新鲜墨西哥辣椒", amount: "2-3" }
+      ],
       "Slice chilies (seeds in for more heat), infuse in tequila 30-60 min, taste every 15 min, strain when spicy enough.\n辣椒切片(留籽更辣)浸入龙舌兰30-60分钟,每15分钟尝味,达到辣度后过滤。",
       "~700ml",
       "3 months+ 常温3个月以上",
@@ -221,7 +255,10 @@ export function buildSamplePreps(): HomemadePrep[] {
       "Earl Grey-Infused Gin",
       "伯爵茶浸渍金酒",
       "infusion",
-      ["700ml London dry gin 伦敦干金", "12g Earl Grey tea 伯爵茶叶"],
+      [
+        { name: "London dry gin 伦敦干金", amount: "700ml" },
+        { name: "Earl Grey tea 伯爵茶叶", amount: "12g" }
+      ],
       "Add loose tea to gin, steep 2h at room temp, strain through fine mesh.\n茶叶入金酒常温浸2小时,细滤。",
       "~700ml",
       "3 months+ 常温3个月以上",
@@ -232,7 +269,10 @@ export function buildSamplePreps(): HomemadePrep[] {
       "Saline Solution (20%)",
       "盐溶液(20%)",
       "solution",
-      ["20g sea salt 海盐", "80g warm water 温水"],
+      [
+        { name: "sea salt 海盐", amount: "20g" },
+        { name: "warm water 温水", amount: "80g" }
+      ],
       "Dissolve salt in warm water, cool and bottle with dropper.\n盐溶于温水,放凉装滴瓶。",
       "~100ml",
       "Indefinite 长期",
@@ -243,7 +283,11 @@ export function buildSamplePreps(): HomemadePrep[] {
       "Raspberry Shrub",
       "覆盆子果醋饮",
       "shrub",
-      ["200g raspberries 覆盆子", "200g sugar 糖", "200ml apple cider vinegar 苹果醋"],
+      [
+        { name: "raspberries 覆盆子", amount: "200g" },
+        { name: "sugar 糖", amount: "200g" },
+        { name: "apple cider vinegar 苹果醋", amount: "200ml" }
+      ],
       "Macerate berries with sugar 24h refrigerated. Add vinegar, rest 2 days, strain and bottle.\n覆盆子与糖冷藏渍24小时,加醋静置2天后过滤装瓶。",
       "~400ml",
       "2 months refrigerated 冷藏2个月",
@@ -255,9 +299,9 @@ export function buildSamplePreps(): HomemadePrep[] {
       "柠檬切罗利口酒",
       "liqueur",
       [
-        "zest of 10 lemons 柠檬皮(只取黄色部分)",
-        "500ml vodka or grain spirit 伏特加或食用酒精",
-        "400ml simple syrup 单糖浆",
+        { name: "zest of 10 lemons 柠檬皮(只取黄色部分)", amount: "" },
+        { name: "vodka or grain spirit 伏特加或食用酒精", amount: "500ml" },
+        { name: "simple syrup 单糖浆", amount: "400ml" }
       ],
       "Infuse lemon zest in spirit 7-14 days in a sealed jar, shaking daily. Strain, mix with syrup, rest 1 week before serving.\n柠檬皮浸入烈酒密封7-14天,每天摇晃;过滤后与糖浆混合,静置1周风味更圆润。",
       "~900ml",
@@ -270,10 +314,10 @@ export function buildSamplePreps(): HomemadePrep[] {
       "自制咖啡利口酒",
       "liqueur",
       [
-        "250ml cold brew concentrate 冷萃咖啡浓缩液",
-        "250ml vodka or aged rum 伏特加或陈年朗姆",
-        "200g demerara sugar 德梅拉拉糖",
-        "1/2 vanilla bean 香草荚(可选)",
+        { name: "cold brew concentrate 冷萃咖啡浓缩液", amount: "250ml" },
+        { name: "vodka or aged rum 伏特加或陈年朗姆", amount: "250ml" },
+        { name: "demerara sugar 德梅拉拉糖", amount: "200g" },
+        { name: "vanilla bean 香草荚(可选)", amount: "1/2" }
       ],
       "Dissolve sugar in warm cold brew, cool, combine with spirit and vanilla. Rest 3-5 days, remove vanilla, bottle.\n糖溶入温热冷萃咖啡,放凉后与酒和香草荚混合,静置3-5天后取出香草装瓶。",
       "~650ml",
@@ -286,10 +330,10 @@ export function buildSamplePreps(): HomemadePrep[] {
       "自制橙味苦精",
       "bitters",
       [
-        "zest of 4 oranges (dried) 干橙皮",
-        "10g gentian root 龙胆根",
-        "5g cardamom & coriander 小豆蔻与芫荽籽",
-        "250ml high-proof spirit 高度烈酒(50%+)",
+        { name: "zest of 4 oranges (dried) 干橙皮", amount: "" },
+        { name: "gentian root 龙胆根", amount: "10g" },
+        { name: "cardamom & coriander 小豆蔻与芫荽籽", amount: "5g" },
+        { name: "high-proof spirit 高度烈酒(50%+)", amount: "250ml" }
       ],
       "Combine all in a jar, infuse 2 weeks shaking daily, strain through coffee filter, bottle with dropper.\n所有材料入罐浸2周,每日摇晃,咖啡滤纸过滤后装滴瓶。",
       "~250ml",
@@ -302,9 +346,9 @@ export function buildSamplePreps(): HomemadePrep[] {
       "奶洗朗姆",
       "redistilled",
       [
-        "500ml aged rum 陈年朗姆",
-        "150ml whole milk 全脂牛奶",
-        "60ml fresh lemon juice 鲜柠檬汁",
+        { name: "aged rum 陈年朗姆", amount: "500ml" },
+        { name: "whole milk 全脂牛奶", amount: "150ml" },
+        { name: "fresh lemon juice 鲜柠檬汁", amount: "60ml" }
       ],
       "Pour rum + lemon into milk (not reverse), let curdle 1h, strain through coffee filter until clear.\n朗姆与柠檬汁倒入牛奶(顺序勿反),静置1小时凝乳,咖啡滤纸过滤至澄清。",
       "~550ml",
@@ -317,11 +361,11 @@ export function buildSamplePreps(): HomemadePrep[] {
       "自酿姜汁啤酒",
       "fermented",
       [
-        "100g fresh ginger, grated 鲜姜蓉",
-        "150g sugar 糖",
-        "1L water 水",
-        "juice of 1 lime 青柠汁",
-        "1/4 tsp dry yeast 干酵母",
+        { name: "fresh ginger, grated 鲜姜蓉", amount: "100g" },
+        { name: "sugar 糖", amount: "150g" },
+        { name: "water 水", amount: "1L" },
+        { name: "juice of 1 lime 青柠汁", amount: "" },
+        { name: "dry yeast 干酵母", amount: "1/4 tsp" }
       ],
       "Dissolve sugar in warm water, add ginger, lime and yeast. Bottle in plastic, ferment 24-48h at room temp until firm, refrigerate.\n糖溶温水后加姜蓉、青柠汁和酵母,装塑料瓶常温发酵24-48小时至瓶身变硬,转冷藏。",
       "~1L",
@@ -334,10 +378,10 @@ export function buildSamplePreps(): HomemadePrep[] {
       "快手甜味美思",
       "fortified",
       [
-        "500ml dry red wine 干红葡萄酒",
-        "100ml brandy 白兰地",
-        "80g sugar (caramelized) 焦糖化砂糖",
-        "5g wormwood & botanicals 苦艾草与香料(丁香/橙皮/肉桂)",
+        { name: "dry red wine 干红葡萄酒", amount: "500ml" },
+        { name: "brandy 白兰地", amount: "100ml" },
+        { name: "sugar (caramelized) 焦糖化砂糖", amount: "80g" },
+        { name: "wormwood & botanicals 苦艾草与香料(丁香/橙皮/肉桂)", amount: "5g" }
       ],
       "Simmer botanicals in a cup of wine 10 min, strain into remaining wine. Add caramel syrup and brandy, rest 2 days.\n香料在一杯酒中小火煮10分钟,滤入剩余酒液,加焦糖浆与白兰地,静置2天。",
       "~650ml",
@@ -349,7 +393,7 @@ export function buildSamplePreps(): HomemadePrep[] {
       "Fresh Lime Juice",
       "青柠汁(鲜榨)",
       "juice",
-      ["500g fresh limes 青柠(约8-10个)"],
+      [{ name: "fresh limes 青柠(约8-10个)", amount: "500g" }],
       "Roll limes to soften, halve and press with a citrus juicer. Fine-strain to remove pulp.\n青柠先滚压软化,对半切开用压汁器压榨,细滤去果肉。",
       "~240ml",
       "Best within 12h, max 24h refrigerated 12小时内最佳,冷藏不超过24小时",
@@ -360,7 +404,7 @@ export function buildSamplePreps(): HomemadePrep[] {
       "Fresh Lemon Juice",
       "柠檬汁(鲜榨)",
       "juice",
-      ["500g fresh lemons 柠檬(约4-5个)"],
+      [{ name: "fresh lemons 柠檬(约4-5个)", amount: "500g" }],
       "Halve lemons and press with a citrus juicer. Fine-strain to remove pulp.\n柠檬对半切开压榨,细滤去果肉。",
       "~220ml",
       "Best within 12h, max 24h refrigerated 12小时内最佳,冷藏不超过24小时",
@@ -371,7 +415,7 @@ export function buildSamplePreps(): HomemadePrep[] {
       "Fresh Orange Juice",
       "橙汁(鲜榨)",
       "juice",
-      ["1000g fresh oranges 橙子(约4-6个)"],
+      [{ name: "fresh oranges 橙子(约4-6个)", amount: "1000g" }],
       "Halve oranges and press with a citrus juicer. Strain if a clearer texture is preferred.\n橙子对半切开压榨,如需更清爽口感可过滤。",
       "~400ml",
       "Best within 12h, max 24h refrigerated 12小时内最佳,冷藏不超过24小时",

@@ -748,7 +748,7 @@ export function filterPreps(
       p.name.toLowerCase().includes(q) ||
       p.nameAlt.toLowerCase().includes(q) ||
       p.type.toLowerCase().includes(q) ||
-      p.ingredients.some((ing) => ing.toLowerCase().includes(q)) ||
+      p.ingredients.some((ing) => (typeof ing === "string" ? ing : `${ing.name} ${ing.amount}`).toLowerCase().includes(q)) ||
       p.notes.toLowerCase().includes(q)
     );
   });

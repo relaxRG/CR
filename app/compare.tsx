@@ -146,9 +146,10 @@ export default function CompareScreen() {
               };
               const maps = items.map((p) => {
                 const m = new Map<string, string>();
-                for (const line of p.ingredients) {
-                  const [n, a] = parse(line);
-                  if (n) m.set(n, a);
+               for (const line of p.ingredients) {
+                  const raw = typeof line === "string" ? line : `${line.amount} ${line.name}`.trim();
+                  const [n, a] = parse(raw);
+                 if (n) m.set(n, a);
                 }
                 return m;
               });
