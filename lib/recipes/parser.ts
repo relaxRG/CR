@@ -158,7 +158,10 @@ const SPIRIT_WORDS: [RegExp, string][] = [
 /** 判断一行是否像配料行(名称 + 用量) */
 export function looksLikeIngredientLine(line: string): boolean {
   const t = line.trim();
-  if (!t || t.length > 60) return false;
+  if (!t) return false;
+  // 如果行以数字/分数/unicode分数开头（典型配料行格式），不受长度限制
+  const startsWithQty = /^[\d\u00BC-\u00BE\u2150-\u215E]/.test(t);
+  if (!startsWithQty && t.length > 60) return false;
   return AMOUNT_RE.test(t);
 }
 
@@ -191,7 +194,8 @@ export function splitIngredientLine(
   const amount = m[0].trim();
   // 名称 = 去掉用量后的剩余部分
   let name = t.replace(m[0], "").trim();
-  name = name.replace(/^[::\-–—,,]+|[::\-–—,,]+$/g, "").trim();
+  // 清理前导分隔符：冒号、破折号、逗号、句点（如 "oz." 后剩余的 ". name"）
+  name = name.replace(/^[.::\-–—,,]+\s*|[.::\-–—,,]+$/g, "").trim();
   // 处理"金酒 45ml"与"45ml 金酒"两种顺序
   if (!name) {
     const fallback = applyTitleCase ? toTitleCase(t) : t;

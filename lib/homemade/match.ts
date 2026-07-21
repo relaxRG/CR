@@ -158,6 +158,13 @@ const KNOWN_PREPS: { re: RegExp; name: string; nameAlt: string; type: string }[]
   { re: /milk[- ]?washed|奶洗/, name: "", nameAlt: "", type: "redistilled" },
   { re: /ginger beer|姜汁啤酒/, name: "Ginger Beer (Homebrew)", nameAlt: "自酿姜汁啤酒", type: "fermented" },
   { re: /oleo[- ]?saccharum|油糖/, name: "Oleo Saccharum", nameAlt: "柑橘油糖", type: "syrup" },
+  // ── 苦精通用规则（顺序：具体 → 通用，避免 citrus-bitters 被 bitters 通用规则吞掉）──
+  { re: /citrus bitters|柑橘苦精/, name: "Citrus Bitters", nameAlt: "柑橘苦精", type: "citrus-bitters" },
+  { re: /aromatic bitters|芳香苦精/, name: "Aromatic Bitters", nameAlt: "芳香苦精", type: "aromatic-bitters" },
+  { re: /herbal bitters|草本苦精/, name: "Herbal Bitters", nameAlt: "草本苦精", type: "herbal-bitters" },
+  { re: /pepsin bitters|胃蛋白酶苦精/, name: "Pepsin Bitters", nameAlt: "胃蛋白酶苦精", type: "bitters" },
+  // 通用 bitters 兜底（不含 orange，orange 已在上方单独处理）
+  { re: /\bbitters\b|苦精/, name: "", nameAlt: "", type: "bitters" },
 ];
 
 /**
