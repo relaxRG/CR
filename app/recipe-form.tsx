@@ -430,8 +430,6 @@ export default function RecipeFormScreen() {
   const [aiSuggestedSpirits, setAiSuggestedSpirits] = useState<string[]>([]);
   const [newSpiritTags, setNewSpiritTags] = useState<string[]>([]);
   const [newGlassTags, setNewGlassTags] = useState<string[]>([]);
-  /** 防止重复触发自动 AI 风味分析 */
-  const autoFlavorDoneRef = useRef(false);
   // Track mount state to prevent setState after unmount
   const isMountedRef = useRef(true);
   useEffect(() => {
@@ -654,65 +652,6 @@ export default function RecipeFormScreen() {
           Alert.alert("AI 补全失败", msg);
         });
   };
-
-  useEffect(() => {
-    if (autoFlavorDoneRef.current) return;
-    const recipeName = name.trim() || nameEn.trim();
-    if (!recipeName) return;
-    if (!isOnline) return; // Skip auto AI analysis when offline
-    autoFlavorDoneRef.current = true;
-    const ingNames = ingredients.map((i) => i.name).filter(Boolean);
-    const ingWithAmounts = ingredients.filter((i) => i.name.trim()).map((i) => ({ name: i.name, amount: i.amount }));
-    enrichRecipeAI({
-        name: recipeName,
-        nameEn: nameEn.trim() || undefined,
-        baseSpirit: baseSpirit || undefined,
-        method: method || undefined,
-        lang: lang as 'zh' | 'en',
-      }).then((result) => {
-          if (!isMountedRef.current) return;
-          if (result.flavors && result.flavors.length > 0) {
-            setFlavors(result.flavors);
-            const conf = result.flavorConfidence ?? result.confidence ?? "medium";
-            setFlavorConfidence(conf);
-          }
-          if (!baseSpirit && result.suggestedBaseSpirit) {
-            const conf = result.suggestedBaseSpiritConfidence ?? "medium";
-            const resolved = resolveAiSpirits(result.suggestedBaseSpirit);
-            const spirits = resolved.split(",").map(s => s.trim()).filter(Boolean);
-            setSpiritConfidence(conf);
-            setAiSuggestedSpirits(spirits);
-            if (conf === "high") {
-              setBaseSpirit(resolved);
-            }
-          }
-          if (!glass && result.suggestedGlass && result.suggestedGlassConfidence === "high") {
-            const nextName = ensureGlassName(result.suggestedGlass);
-            if (nextName) setGlass(nextName);
-          }
-          if (!ice && result.suggestedIce && result.suggestedIceConfidence === "high") {
-            const nextName = normalizeIceName(result.suggestedIce);
-            if ((ICE_TYPES as readonly string[]).includes(nextName)) setIce(nextName);
-          }
-          if (!durationUserOverride && result.suggestedDrinkDuration) {
-            const conf = result.suggestedDurationConfidence ?? "medium";
-            if (conf === "high" || conf === "medium") setDrinkDuration(result.suggestedDrinkDuration);
-          }
-          if (!occasionUserOverride && result.suggestedOccasion) {
-            const conf = result.suggestedOccasionConfidence ?? "medium";
-            if (conf === "high" || conf === "medium") setOccasion(result.suggestedOccasion);
-          }
-          if (result.story || result.flavorDesc || result.source || result.suggestedBaseSpirit ||
-              result.suggestedGlass || result.suggestedIce || result.suggestedDrinkDuration || result.suggestedOccasion) {
-            setAiResult(result);
-          }
-        }).catch((err: unknown) => {
-          if (!isMountedRef.current) return;
-          const msg = err instanceof Error ? err.message : "AI 分析失败";
-          console.warn("[AutoFlavor] AI enrich failed:", msg);
-        });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // 仅挂载时触发一次
 
   /** ─── AI Fill 字段定义 ─────────────────────────────────────────────── */
   type AiConflict = "new" | "override" | "confirm" | "low";

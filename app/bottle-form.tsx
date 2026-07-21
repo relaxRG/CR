@@ -57,7 +57,6 @@ export default function BottleFormScreen() {
   const { categories: taxCategories, categoryLabel, stylesOf, categoriesOfGroup } = useBottleTaxonomy();
   const editing = getBottle(id);
   const isMountedRef = useRef(true);
-  const autoEnrichDoneRef = useRef(false);
   useEffect(() => {
     isMountedRef.current = true;
     return () => { isMountedRef.current = false; };
@@ -427,17 +426,6 @@ export default function BottleFormScreen() {
       if (isMountedRef.current) setLookupBusy(null);
     }
   }, [nameZh, nameEn, brand, category, style, origin, isOnline, lang, t, books]);
-
-  /** 打开表单时自动触发一次 AI 补全（仅当有名称且在线） */
-  useEffect(() => {
-    if (autoEnrichDoneRef.current) return;
-    const query = [nameZh.trim(), nameEn.trim()].filter(Boolean).join(" ");
-    if (!query) return;
-    if (!isOnline) return;
-    autoEnrichDoneRef.current = true;
-    runEnrich({ mode: "auto" });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   /** 手动 AI 补全（覆盖模式，重新分析） */
   const handleLookup = () => {
