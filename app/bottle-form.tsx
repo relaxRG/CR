@@ -130,7 +130,12 @@ export default function BottleFormScreen() {
     editing?.libraryOverride ?? undefined,
   );
   const [homemadeGroup, setHomemadeGroup] = useState<'alcoholic' | 'non_alcoholic' | 'garnish' | 'other'>(
-    editing?.homemadeGroup ?? 'non_alcoholic',
+    editing?.homemadeGroup ?? (() => {
+      // 若是新建且分类属于装饰类（果蔬/香料与草本/花卉），默认 garnish
+      const cat = editing?.category ?? '';
+      if (['果蔬', '香料与草本', '花卉'].includes(cat)) return 'garnish';
+      return 'non_alcoholic';
+    })(),
   );
   const [homemadeType, setHomemadeType] = useState<string>(
     editing?.homemadeType ?? '',
@@ -835,7 +840,15 @@ export default function BottleFormScreen() {
                 return (
                   <Pressable
                     key={opt.label}
-                    onPress={() => setLibraryOverride(opt.key as typeof libraryOverride)}
+                    onPress={() => {
+                      setLibraryOverride(opt.key as typeof libraryOverride);
+                      // 切换到自制库时，根据当前分类自动推断默认分组
+                      if (opt.key === 'homemade' && !editing?.homemadeGroup) {
+                        if (['果蔬', '香料与草本', '花卉'].includes(category)) {
+                          setHomemadeGroup('garnish');
+                        }
+                      }
+                    }}
                     style={[
                       { flex: 1, paddingVertical: 6, borderRadius: 8, alignItems: "center" as const },
                       active && { backgroundColor: colors.surface, shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 2 },

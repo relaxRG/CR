@@ -535,3 +535,17 @@
 - [x] homemade-form.tsx：同等应用方案四（双重保护），修复配料行建议列表无法点击的 5 个 Bug
 - [x] batch-form.tsx：同等应用方案四（双重保护），修复配料行建议列表无法点击的 5 个 Bug
 - [x] TypeScript 0 错误
+
+## 虚拟条目机制重构（四阶段）
+
+- [x] 阶段1：自制库编辑页加风味标签 UI（FLAVOR_TAGS chip 选择器）+ 详情页展示风味标签区块
+ - [ ] 阶段2：HomemadePrep 加 unitCost/unitCostUnit 字段 + 更新成本计算逻辑
+ - [ ] 阶段3：实现跨 store 迁移函数（含配方 id 替换 + 成本字段写入 + 原子性保护）
+ - [ ] 阶段4：历史数据清理入口 UI（带备份提示的批量迁移）+ bottle-form.tsx 改为真正迁移
+
+## 库移动 Bug 修复（2026-07-21）
+- [x] Bug 1：homemade.tsx 虚拟条目（bottle-override-*）删除静默失败 → confirmDelete 区分虚拟/真实，虚拟条目调用 deleteBottle
+- [x] Bug 2：homemade.tsx 虚拟条目移动按钮被隐藏 → 移除隐藏条件，虚拟条目移动调用 updateBottle({homemadeGroup})
+- [x] Bug 3：homemade.tsx 批量删除不处理虚拟条目 → 分离 virtualIds/realIds，分别调用 deleteBottles/deletePreps
+- [x] Bug 4：bottle-form.tsx homemadeGroup 默认值错误 → 新建时根据分类（果蔬/香料与草本/花卉）推断 garnish，切换到自制库时同步推断
+- [x] Bug 5：homemade-form.tsx 迁移到酒库时不更新配方引用 → 迁移后遍历所有配方，清除 linkedPrepId 引用

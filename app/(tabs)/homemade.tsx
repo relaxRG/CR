@@ -92,7 +92,7 @@ export default function HomemadeScreen() {
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkSheet, setBulkSheet] = useState<"type" | null>(null);
-  const { bottles } = useBottleStore();
+  const { bottles, deleteBottle, deleteBottles, updateBottle } = useBottleStore();
   const [query, setQuery] = useState("");
 
   // ── 将 libraryOverride='homemade' 的酒款条目转换为虚拟 HomemadePrep ──────
@@ -636,7 +636,15 @@ export default function HomemadeScreen() {
     const n = selectedIds.length;
     if (n === 0) return;
     const doDelete = () => {
-      deletePreps(selectedIds);
+      // 区分虚拟条目（bottle-override-*）和真实自制品分别删除
+      const virtualIds = selectedIds.filter((id) => id.startsWith('bottle-override-'));
+      const realIds = selectedIds.filter((id) => !id.startsWith('bottle-override-'));
+      if (virtualIds.length > 0) {
+        deleteBottles(virtualIds.map((id) => id.replace('bottle-override-', '')));
+      }
+      if (realIds.length > 0) {
+        deletePreps(realIds);
+      }
       if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       exitSelectMode();
     };
@@ -1059,11 +1067,14 @@ function PrepRow({
   const router = useRouter();
   const { t, lang } = useI18n();
   const { deletePrep, setPrepRating, duplicatePrep, setPrepGroup, sections, types } = useHomemadeStore();
+  const { deleteBottle, updateBottle } = useBottleStore();
   const [ratingVisible, setRatingVisible] = useState(false);
 
   const confirmDelete = () => {
     const name = displayNames(prep.name, prep.nameAlt, lang).primary;
-    const doDelete = () => deletePrep(prep.id);
+    const isVirtual = prep.id.startsWith('bottle-override-');
+    const bottleId = isVirtual ? prep.id.replace('bottle-override-', '') : '';
+    const doDelete = () => isVirtual ? deleteBottle(bottleId) : deletePrep(prep.id);
     if (Platform.OS === "web") {
       // eslint-disable-next-line no-alert
       if (typeof window !== "undefined" && window.confirm(t("tags.delete.confirm", { name }))) {
@@ -1088,7 +1099,7 @@ function PrepRow({
           color: colors.warning,
           onPress: () => setRatingVisible(true),
         },
-        ...(prep.id.startsWith('bottle-override-') ? [] : [{
+        ...[{
           key: "move",
           label: lang === "en" ? "Move" : "移动",
           icon: "arrow.right.arrow.left" as const,
@@ -1104,7 +1115,12 @@ function PrepRow({
                 ...moveTargets.map((g) => ({
                   text: lang === "en" ? g.en : g.zh,
                   onPress: () => {
-                    setPrepGroup(prep.id, g.key);
+                    if (prep.id.startsWith('bottle-override-')) {
+                      const bid = prep.id.replace('bottle-override-', '');
+                      updateBottle(bid, { homemadeGroup: g.key } as Parameters<typeof updateBottle>[1]);
+                    } else {
+                      setPrepGroup(prep.id, g.key);
+                    }
                     if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                   },
                 })),
@@ -1112,7 +1128,7 @@ function PrepRow({
               ],
             );
           },
-        }]),
+        }],
       ]}
       rightActions={[
         {
@@ -1143,12 +1159,17 @@ function PrepRow({
           const name = displayNames(prep.name, prep.nameAlt, lang).primary;
           const isVirtual = prep.id.startsWith('bottle-override-');
           const currentGroup = prepGroupOf(prep, sections, types);
-          const moveOptions = isVirtual ? [] : PREP_GROUPS
+          const moveOptions = PREP_GROUPS
             .filter((g) => g.key !== currentGroup)
             .map((g) => ({
               text: lang === "en" ? `Move to ${g.en}` : `移动到${g.zh}`,
               onPress: () => {
-                setPrepGroup(prep.id, g.key);
+                if (isVirtual) {
+                  const bid = prep.id.replace('bottle-override-', '');
+                  updateBottle(bid, { homemadeGroup: g.key } as Parameters<typeof updateBottle>[1]);
+                } else {
+                  setPrepGroup(prep.id, g.key);
+                }
                 if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               },
             }));

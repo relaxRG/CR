@@ -280,6 +280,29 @@ export default function HomemadeDetailScreen() {
             </View>
           </>
         ) : null}
+        {/* ── 风味标签 ── */}
+        {prep.flavorTags && prep.flavorTags.length > 0 ? (
+          <>
+            {sectionTitle(lang === "en" ? "Flavor Tags" : "风味标签")}
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, paddingHorizontal: 4, marginBottom: 8 }}>
+              {prep.flavorTags.map((tag) => (
+                <View
+                  key={tag}
+                  style={{
+                    paddingHorizontal: 10,
+                    paddingVertical: 4,
+                    borderRadius: 20,
+                    backgroundColor: colors.primary + "18",
+                    borderWidth: 1,
+                    borderColor: colors.primary + "55",
+                  }}
+                >
+                  <Text style={{ fontSize: 13, color: colors.primary, fontWeight: "500" }}>{tag}</Text>
+                </View>
+              ))}
+            </View>
+          </>
+        ) : null}
 
   {prep.ingredients.length > 0 ? (
     <>

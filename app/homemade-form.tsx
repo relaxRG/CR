@@ -42,7 +42,8 @@ import { suggestIngredients } from "@/lib/suggest";
 import { useBottleTaxonomy } from "@/lib/bottles/taxonomy";
 import { BOTTLE_GROUPS, BottleGroupKey, categoriesOfGroup } from "@/lib/bottles/types";
 import { smartLinkIngredient, smartLinkDisplayName } from "@/lib/recipes/smart-link";
-import { genId } from "@/lib/recipes/types";
+import { genId, FLAVOR_TAGS } from "@/lib/recipes/types";
+import { useRecipeStore } from "@/lib/recipes/store";
 
 interface IngRow {
   id: string;
@@ -71,7 +72,8 @@ export default function HomemadeFormScreen() {
     prefillType?: string;
   }>();
   const { getPrep, addPrep, updatePrep, deletePrep, sections, types: typeList, preps: allPreps } = useHomemadeStore();
-  const { bottles, addBottle, deleteBottle } = useBottleStore();
+  const { bottles, addBottle, deleteBottle: _deleteBottle } = useBottleStore();
+  const { recipes, updateRecipe } = useRecipeStore();
   const { groupOf, categoryLabel } = useBottleTaxonomy();
   const editing = getPrep(id);
 
@@ -656,8 +658,25 @@ export default function HomemadeFormScreen() {
       if (editing) {
         // 迁移：在酒库创建新条目，从自制库删除
         addBottle(bottleDraft);
-        // 需要引入 deletePrep
         deletePrep(editing.id);
+        // ── 更新配方中引用该自制品的 linkedPrepId ──────────────────────────
+        // 迁移后 prep 不再存在，清除所有配方中对该 prep 的显式链接
+        const prepId = editing.id;
+        for (const recipe of recipes) {
+          const hasIngLink = recipe.ingredients.some((ing) => ing.linkedPrepId === prepId);
+          const hasGarnishLink = recipe.garnishItems?.some((g) => g.linkedPrepId === prepId);
+          if (hasIngLink || hasGarnishLink) {
+            updateRecipe(recipe.id, {
+              ...recipe,
+              ingredients: recipe.ingredients.map((ing) =>
+                ing.linkedPrepId === prepId ? { ...ing, linkedPrepId: undefined } : ing,
+              ),
+              garnishItems: recipe.garnishItems?.map((g) =>
+                g.linkedPrepId === prepId ? { ...g, linkedPrepId: undefined } : g,
+              ),
+            });
+          }
+        }
       } else {
         addBottle(bottleDraft);
       }
@@ -1395,6 +1414,37 @@ export default function HomemadeFormScreen() {
           />
 
           {fieldLabel(t("hmform.notes"))}
+          {/* ── 风味标签 ── */}
+          {fieldLabel(lang === "en" ? "Flavor Tags" : "风味标签")}
+          <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 8 }}>
+            {lang === "en" ? "Select flavor characteristics (optional)" : "描述风味特征，可多选（可选）"}
+          </Text>
+          <View style={[styles.chipWrap, { marginBottom: 12 }]}>
+            {FLAVOR_TAGS.map((tag) => {
+              const active = flavorTags.includes(tag);
+              return (
+                <Pressable
+                  key={tag}
+                  onPress={() =>
+                    setFlavorTags((prev) =>
+                      active ? prev.filter((t) => t !== tag) : [...prev, tag],
+                    )
+                  }
+                  style={[
+                    styles.chip,
+                    {
+                      backgroundColor: active ? colors.primary + "18" : colors.surface,
+                      borderColor: active ? colors.primary + "66" : colors.border,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.chipText, { color: active ? colors.primary : colors.foreground }]}>
+                    {tag}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
           <TextInput
             style={[...inputStyle, styles.multiline, { minHeight: 60 }]}
             value={notes}
