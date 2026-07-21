@@ -225,14 +225,9 @@ export default function BulkImportScreen() {
             ? { fileBase64, fileName, lang: lang as 'zh' | 'en' }
             : { text: text.trim(), lang: lang as 'zh' | 'en' },
       );
-      const parseIngStr = (s: string): { name: string; amount: string } => {
-        const idx = s.trim().search(/\s/);
-        if (idx > 0) return { amount: s.trim().slice(0, idx).trim(), name: s.trim().slice(idx).trim() };
-        return { name: s.trim(), amount: "" };
-      };
-      const next: PreviewRow[] = (result.items as (Omit<ExtractedItem, "prepIngredients"> & { prepIngredients: string[] })[]).map((raw, i) => ({
+      const next: PreviewRow[] = result.items.map((raw, i) => ({
         key: `${Date.now()}-${i}`,
-        item: { ...raw, prepIngredients: (raw.prepIngredients ?? []).map(parseIngStr) } as ExtractedItem,
+        item: raw as ExtractedItem,
         checked: true,
       }));
       setRows(next);
@@ -285,7 +280,7 @@ export default function BulkImportScreen() {
 
   const matchPrepType = useCallback(
     (item: ExtractedItem): string => {
-      const hint = `${item.category} ${item.nameZh} ${item.nameEn} ${item.notes} ${(item.prepIngredients ?? []).map((i) => typeof i === "string" ? i : `${i.name} ${i.amount}`).join(" ")}`;
+      const hint = `${item.category} ${item.nameZh} ${item.nameEn} ${item.notes} ${(item.prepIngredients ?? []).map((i) => `${i.name} ${i.amount}`).join(" ")}`;
       const guessed = guessPrepType(hint, types);
       if (guessed) return guessed;
       const hit = types.find((tp) => hint.includes(tp.zh.toLowerCase()) || hint.includes(tp.en.toLowerCase()));

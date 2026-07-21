@@ -105,7 +105,7 @@ const EXTRACT_SYSTEM_PROMPT = `你是一个鸡尾酒应用的数据导入助手�
   "type":"bottle"|"prep"|"recipe"|"material",
   "nameZh":"中文名(没有则译)","nameEn":"英文名(没有则译或拼音)",
   "category":"bottle分类,如 金酒/威士忌/利口酒/苦精/糖浆/果汁/软饮;material固定为 原材料","style":"风格子分类,如 London Dry/Bourbon;material如 Fruit & Citrus","brand":"品牌","origin":"产地","volume":"规格如 700ml/500g/1斤","abv":40,"priceCny":0,
-  "prepIngredients":["prep配料一行一条"],"prepRecipe":"做法","prepYield":"产量如 ~750ml","shelfLife":"保质期","storage":"储存方式",
+  "prepIngredients":[{"name":"配料名","amount":"用量如 45ml"}],"prepRecipe":"做法","prepYield":"产量如 ~750ml","shelfLife":"保质期","storage":"储存方式",
   "baseSpirit":"recipe基酒,如 金酒","glass":"杯型","method":"调制法,如 摇和/搅拌","ingredients":[{"name":"配料名","amount":"用量如 45ml"}],"steps":"步骤(可多行)","garnish":"装饰","source":"出处",
   "variantOf":"文本明确写明的经典变体来源(如 '尼格罗尼的变体'/'Variant of Sidecar'),没写则空","codexFamily":"文本明确写明的 Codex 六大家族/母配方归属(如 'Family: Sidecar'/'六大家族:大吉利'),仅在文本明确声明时填写原文,没写则空",
   "notes":"备注"
@@ -131,7 +131,7 @@ const bulkItemSchema = z.object({
   volume: z.string().catch(""),
   abv: z.number().catch(0),
   priceCny: z.number().catch(0),
-  prepIngredients: z.array(z.string()).catch([]),
+  prepIngredients: z.array(z.object({ name: z.string(), amount: z.string() })).catch([]),
   prepRecipe: z.string().catch(""),
   prepYield: z.string().catch(""),
   shelfLife: z.string().catch(""),
@@ -1697,14 +1697,14 @@ ${librarySpecificInstructions}
           name: z.string().max(200),
           nameAlt: z.string().max(200).optional(),
           type: z.string().max(100).optional(),
-          ingredients: z.array(z.string().max(200)).max(20).optional(),
+          ingredients: z.array(z.object({ name: z.string().max(200), amount: z.string().max(100) })).max(20).optional(),
           lang: z.enum(["zh", "en"]).optional(),
         }),
       )
       .mutation(async ({ input }) => {
         const displayName = [input.name, input.nameAlt].filter(Boolean).join(" / ");
         const ingredientList = input.ingredients?.length
-          ? `\n配方原料: ${input.ingredients.join(", ")}`
+          ? `\n配方原料: ${input.ingredients.map(i => i.amount ? `${i.name} ${i.amount}` : i.name).join(", ")}`
           : "";
         // ── 白名单常量 ──────────────────────────────────────────────────
         const VALID_PREP_TYPES = ["infusion","fat-wash","butter-wash","oil-wash","rapid-infusion","sous-vide-infusion","ultrasonic-infusion","rotovap","cold-brew-spirit","smoke-infusion","liqueur","fruit-liqueur","herbal-liqueur","nut-liqueur","cream-liqueur","amaro","falernum","bitters","aromatic-bitters","citrus-bitters","herbal-bitters","tincture","spice-tincture","citrus-tincture","redistilled","batch","bottled-cocktail","barrel-aged","fortified","fermented","homebrew-beer","homebrew-wine","syrup","rich-syrup","spiced-syrup","herbal-syrup","floral-syrup","fruit-syrup","caramel-syrup","coffee-tea-syrup","orgeat","oleo","juice","clarified-juice","super-juice","cordial","solution","acid-adjusted","shrub","lacto-ferment-drink","zero-spirit","na-bitters","na-liqueur","kombucha","water-kefir","ginger-beer","tepache","jun","foam","spherification-prep","garnish","other"];
@@ -1820,6 +1820,7 @@ ${librarySpecificInstructions}
   "steps": "制作步骤（${isEn ? "英文" : "中文"}，分步骤描述，如 '1. 将...\n2. 加入...\n3. 过滤...'），不确定填 \"\"",
   "sourceFamilyKey": "原料家族key（仅装饰类填写，如 'yellow-lemon'/'lime'/'orange'，其他类型填 \"\"）",
   "variantLabel": "形态标签（仅装饰类且有家族key时填写，如 '皮卷'/'角形'/'薄片'，其他类型填 \"\"）",
+  "prepIngredients": 原料列表（如输入中已提供原料则原样返回，否则根据 prepType 推断常见原料，不确定时填 []）格式为 [{"name":"配料名","amount":"用量如 45ml，不确定填 \"\"""}],
   "confidence": "high"/"medium"/"low"
 }
 规则：
@@ -1829,6 +1830,7 @@ ${librarySpecificInstructions}
 - nameZh 和 nameEn 必须填写，不能为空
 - yieldQty 为 0 表示不确定，不要填写虚假数值
 - steps 应包含具体操作步骤，不确定时填 ""
+- prepIngredients 如输入中已提供原料则原样返回，否则根据 prepType/story 推断常见原料，不确定时填 []
 - 只输出 JSON，不要任何解释文字`;
         const signal = AbortSignal.timeout(30_000);
         let response;
@@ -1859,7 +1861,7 @@ ${librarySpecificInstructions}
 
         // ── 语义映射：用名称+AI自然语言描述做确定性匹配 ──────────────────
         const naturalDesc = typeof p.naturalLanguageDesc === "string" ? p.naturalLanguageDesc.trim() : "";
-        const searchText = `${input.name} ${input.nameAlt ?? ""} ${naturalDesc} ${(input.ingredients ?? []).join(" ")}`;
+        const searchText = `${input.name} ${input.nameAlt ?? ""} ${naturalDesc} ${(input.ingredients ?? []).map(i => i.name).join(" ")}`;
         const mapped = resolveLibraryFromText(searchText);
 
         // ── 产量字段校验 ──────────────────────────────────────────────────
@@ -1888,6 +1890,12 @@ ${librarySpecificInstructions}
           yieldUnit: validatedYieldUnit,
           sourceFamilyKey: rawFamilyKey,
           variantLabel: rawVariantLabel,
+          prepIngredients: Array.isArray(p.prepIngredients)
+            ? (p.prepIngredients as Record<string, unknown>[]).map(ing => ({
+                name: typeof ing?.name === "string" ? ing.name.trim() : "",
+                amount: typeof ing?.amount === "string" ? ing.amount.trim() : "",
+              })).filter(ing => ing.name)
+            : [],
           confidence: (["high", "medium", "low"] as const).includes(p.confidence as "high") ? p.confidence as "high" | "medium" | "low" : "medium",
           suggestedLibrary: mapped.suggestedLibrary,
           suggestedCategory: mapped.suggestedCategory,

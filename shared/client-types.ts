@@ -33,7 +33,7 @@ export type BulkImportItem = {
   volume: string;
   abv: number;
   priceCny: number;
-  prepIngredients: string[];
+  prepIngredients: Array<{ name: string; amount: string }>;
   packQty?: number;
   packUnit?: string;
   prepRecipe: string;

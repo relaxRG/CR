@@ -241,7 +241,7 @@ export default function HomemadeFormScreen() {
         name: name.trim(),
         nameAlt: nameAlt.trim() || undefined,
         type: type || undefined,
-        ingredients: ingRows.map((r) => r.name).filter(Boolean),
+        ingredients: ingRows.filter((r) => r.name.trim()),
         lang: lang as 'zh' | 'en',
       });
       if (res.prepType && res.prepType !== "other" && !typeTouched) {
@@ -287,6 +287,10 @@ export default function HomemadeFormScreen() {
       // 装饰家族 key 和变体标签（仅装饰类）
       if (!sourceFamilyKey.trim() && res.sourceFamilyKey) setSourceFamilyKey(res.sourceFamilyKey);
       if (!variantLabel.trim() && res.variantLabel) setVariantLabel(res.variantLabel);
+      // 原料：仅在原料列表为空时回填 AI 推断的结构化原料
+      if (ingRows.every((r) => !r.name.trim()) && res.prepIngredients && res.prepIngredients.length > 0) {
+        setIngRows(res.prepIngredients.map((ing) => ({ id: genId(), name: ing.name, amount: ing.amount })));
+      }
       if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       // 统计回填字段数量，给用户明确反馈
       const filledFields = [res.story, res.styleDesc, res.shelfLife, res.storage, res.usageNotes, res.steps, res.yieldQty, res.sourceFamilyKey].filter(Boolean).length;

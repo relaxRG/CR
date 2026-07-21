@@ -149,7 +149,9 @@ export async function enrichBottle(params: {
 }
 
 export async function enrichHomemade(params: {
-  name: string; nameAlt?: string; type?: string; ingredients?: string[]; lang?: 'zh' | 'en';
+  name: string; nameAlt?: string; type?: string;
+  ingredients?: Array<{ name: string; amount: string }>;
+  lang?: 'zh' | 'en';
 }) {
   const result = await callAI<{
     section: string; prepType: string; techniques: string[]; flavorTags: string[];
@@ -157,6 +159,7 @@ export async function enrichHomemade(params: {
     story: string; styleDesc: string; shelfLife: string; storage: string; usageNotes: string;
     steps: string; yieldQty: number | null; yieldUnit: string;
     sourceFamilyKey: string; variantLabel: string;
+    prepIngredients: Array<{ name: string; amount: string }>;
     confidence: string;
     suggestedLibrary: string; suggestedCategory: string; suggestedStyle: string; mapConfidence: string;
   }>('enrich-homemade', params as Record<string, unknown>);
@@ -170,6 +173,7 @@ export async function enrichHomemade(params: {
     yieldUnit: result.yieldUnit ?? '',
     sourceFamilyKey: result.sourceFamilyKey ?? '',
     variantLabel: result.variantLabel ?? '',
+    prepIngredients: result.prepIngredients ?? [],
   };
 }
 export type EnrichHomemadeResult = Awaited<ReturnType<typeof enrichHomemade>>;
@@ -210,7 +214,7 @@ export async function bulkImportExtract(params: {
     items: Array<{
       type: 'bottle' | 'prep' | 'recipe' | 'material'; nameZh: string; nameEn: string; category: string;
       style: string; brand: string; origin: string; volume: string; abv: number; priceCny: number;
-      prepIngredients: string[]; prepRecipe: string; prepYield: string; shelfLife: string; storage: string;
+      prepIngredients: Array<{ name: string; amount: string }>; prepRecipe: string; prepYield: string; shelfLife: string; storage: string;
       baseSpirit: string; glass: string; method: string; ingredients: Array<{ name: string; amount: string }>;
       steps: string; garnish: string; source: string; variantOf: string; codexFamily: string; notes: string;
     }>;

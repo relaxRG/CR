@@ -550,7 +550,8 @@ const LEADING_QTY_RE =
       "\\s*" +
       "(?:" +
         // liquid precise
-        "fl\\.?\\s*oz|fluid\\s*oz?" +
+        "fl\.?\s*oz\.?|fluid\s*oz?\.?" +
+        "|oz\.?" +
         "|ml|mL|毫升|cc" +
         "|cl|cL|厘升" +
         "|dl|dL|分升" +
@@ -593,6 +594,12 @@ const LEADING_QTY_RE =
     "i",
   );
 
+/** Matches a bare unit word at the start of a line with no leading number, e.g. "oz name" */
+const UNIT_ONLY_RE = new RegExp(
+  "^(fl\.?\\s*oz\.?|fluid\\s*oz?\.|oz\.?|ml|mL|cl|dl|[Ll](?:iter|itre)?|shots?|jiggers?|pony|pints?|pt|quarts?|qt|gallons?|gal|tbsp\.?|tablespoons?|tsp\.?|teaspoons?|bar\\s?spoons?|bsp|dash(?:es)?|drops?|splash(?:es)?|kg|mg|g|lbs?|pounds?|pieces?|pcs?|sticks?|stalks?|slices?|leaves?|leaf|sprigs?|pods?|cloves?|beans?|cubes?|wedges?|twists?|eggs?|cups?|pinch(?:es)?|handful|dsp|rinse|parts?)\\s+(.+)$",
+  "i",
+);
+
 export function splitPrepIngredientLine(line: string): { amount: string; name: string } {
   const trimmed = line.trim();
   if (!trimmed) return { amount: "", name: "" };
@@ -623,6 +630,11 @@ export function splitPrepIngredientLine(line: string): { amount: string; name: s
   if (ofMatch) {
     const [, prefix, qty, rest] = ofMatch;
     return { amount: qty, name: `${prefix} of ${rest}` };
+  }
+  // Fallback: bare unit word with no leading number, e.g. "oz Peychaud's bitters"
+  const unitOnly = trimmed.match(UNIT_ONLY_RE);
+  if (unitOnly) {
+    return { amount: unitOnly[1].trim(), name: unitOnly[2].trim() };
   }
   return { amount: "", name: trimmed };
 }

@@ -549,3 +549,17 @@
 - [x] Bug 3：homemade.tsx 批量删除不处理虚拟条目 → 分离 virtualIds/realIds，分别调用 deleteBottles/deletePreps
 - [x] Bug 4：bottle-form.tsx homemadeGroup 默认值错误 → 新建时根据分类（果蔬/香料与草本/花卉）推断 garnish，切换到自制库时同步推断
 - [x] Bug 5：homemade-form.tsx 迁移到酒库时不更新配方引用 → 迁移后遍历所有配方，清除 linkedPrepId 引用
+
+## 自制库原料识别系统全面强化（层次1+层次2）（2026-07-21）
+- [x] 层次1（规则层）：lib/homemade/types.ts 升级 LEADING_QTY_RE 正则，支持 oz/tsp/tbsp 等单位词，添加 UNIT_ONLY_RE fallback
+- [x] 层次2（AI prompt 层）：server/routers.ts bulkItemSchema.prepIngredients 从 string[] 改为 {name,amount}[]
+- [x] 层次2（AI prompt 层）：server/routers.ts bulk import prompt 中 prepIngredients 格式改为结构化 JSON
+- [x] 层次2（AI prompt 层）：server/routers.ts enrichHomemade input schema ingredients 改为 {name,amount}[]
+- [x] 层次2（AI prompt 层）：server/routers.ts enrichHomemade prompt 添加 prepIngredients 输出字段
+- [x] 层次2（AI prompt 层）：server/routers.ts enrichHomemade return 添加 prepIngredients 字段
+- [x] 同步更新 shared/client-types.ts：BulkImportItem.prepIngredients 类型从 string[] 改为 {name,amount}[]
+- [x] 同步更新 lib/api/smart-router.ts：enrichHomemade 参数/返回类型 + bulkImportExtract 类型
+- [x] 同步更新 app/homemade-form.tsx：enrichHomemade 调用传结构化 ingredients，回填 prepIngredients
+- [x] 同步更新 app/(tabs)/homemade.tsx：enrichHomemade 调用直接传 {name,amount}[]
+- [x] 同步更新 app/bulk-import.tsx：移除 parseIngStr 转换逻辑，直接使用服务端结构化数据
+- [x] TypeScript 0 错误
