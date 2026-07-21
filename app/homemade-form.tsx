@@ -932,6 +932,27 @@ export default function HomemadeFormScreen() {
               }}
             />
           )}
+          {fieldLabel(t("hmform.name"))}
+          <TextInput
+            style={inputStyle}
+            value={name}
+            onChangeText={setName}
+            onBlur={autoGuessType}
+            placeholder={lang === "en" ? "e.g. Ginger Syrup" : "如:姜糖浆 Ginger Syrup"}
+            placeholderTextColor={colors.muted}
+            returnKeyType="done"
+          />
+
+          {fieldLabel(t("hmform.nameAlt"))}
+          <TextInput
+            style={inputStyle}
+            value={nameAlt}
+            onChangeText={setNameAlt}
+            onBlur={autoGuessType}
+            placeholder={lang === "en" ? "e.g. 姜糖浆" : "如:Ginger Syrup"}
+            placeholderTextColor={colors.muted}
+            returnKeyType="done"
+          />
           {/* AI 补全按钮 */}
           <Pressable
             onPress={handleAiEnrich}
@@ -1044,27 +1065,6 @@ export default function HomemadeFormScreen() {
               </Pressable>
             </View>
           )}
-          {fieldLabel(t("hmform.name"))}
-          <TextInput
-            style={inputStyle}
-            value={name}
-            onChangeText={setName}
-            onBlur={autoGuessType}
-            placeholder={lang === "en" ? "e.g. Ginger Syrup" : "如:姜糖浆 Ginger Syrup"}
-            placeholderTextColor={colors.muted}
-            returnKeyType="done"
-          />
-
-          {fieldLabel(t("hmform.nameAlt"))}
-          <TextInput
-            style={inputStyle}
-            value={nameAlt}
-            onChangeText={setNameAlt}
-            onBlur={autoGuessType}
-            placeholder={lang === "en" ? "e.g. 姜糖浆" : "如:Ginger Syrup"}
-            placeholderTextColor={colors.muted}
-            returnKeyType="done"
-          />
 
           {fieldLabel(t("hmform.type"))}
           {/* ── 顶层分组选择器（含酒精 / 无酒精 / 装饰） ── */}
