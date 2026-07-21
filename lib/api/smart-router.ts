@@ -12,6 +12,7 @@
 
 import Constants from 'expo-constants';
 import { normalizeTagToZh } from '@/lib/recipes/types';
+import { getApiBaseUrl } from '@/constants/oauth';
 
 const CF_WORKER_URL = (Constants.expoConfig?.extra?.cfWorkerUrl as string)
   || 'https://cocktail-ai.kikikong2017.workers.dev';
@@ -153,7 +154,7 @@ export async function enrichHomemade(params: {
   ingredients?: Array<{ name: string; amount: string }>;
   lang?: 'zh' | 'en';
 }) {
-  const result = await callAI<{
+  type HomemadeRaw = {
     section: string; prepType: string; techniques: string[]; flavorTags: string[];
     nameZh: string; nameEn: string;
     story: string; styleDesc: string; shelfLife: string; storage: string; usageNotes: string;
@@ -162,18 +163,86 @@ export async function enrichHomemade(params: {
     prepIngredients: Array<{ name: string; amount: string }>;
     confidence: string;
     suggestedLibrary: string; suggestedCategory: string; suggestedStyle: string; mapConfidence: string;
-  }>('enrich-homemade', params as Record<string, unknown>);
+  };
+
+  // 尝试 CF Worker，若返回结果缺少 nameZh/nameEn（旧版 Worker），则回落到本地 tRPC server
+  let cfResult: HomemadeRaw | null = null;
+  try {
+    cfResult = await callAI<HomemadeRaw>('enrich-homemade', params as Record<string, unknown>);
+  } catch {
+    // CF Worker 不可用，直接走本地 server
+  }
+
+  // 如果 CF Worker 返回了完整字段（有 nameZh 或 nameEn），直接使用
+  if (cfResult && (cfResult.nameZh || cfResult.nameEn)) {
+    return {
+      ...cfResult,
+      flavorTags: normalizeEnumArrayForLang(cfResult.flavorTags),
+      nameZh: cfResult.nameZh ?? '',
+      nameEn: cfResult.nameEn ?? '',
+      steps: cfResult.steps ?? '',
+      yieldQty: cfResult.yieldQty ?? null,
+      yieldUnit: cfResult.yieldUnit ?? '',
+      sourceFamilyKey: cfResult.sourceFamilyKey ?? '',
+      variantLabel: cfResult.variantLabel ?? '',
+      prepIngredients: cfResult.prepIngredients ?? [],
+    };
+  }
+
+  // 回落到本地 tRPC server（lookup.enrichHomemade）
+  const apiBase = getApiBaseUrl();
+  const trpcUrl = `${apiBase}/api/trpc/lookup.enrichHomemade`;
+  const trpcRes = await fetchWithTimeout(trpcUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ json: params }),
+  }, 35_000);
+  if (!trpcRes.ok) {
+    throw new Error(`本地 AI 服务返回错误: HTTP ${trpcRes.status}`);
+  }
+  const trpcData = await trpcRes.json() as { result?: { data?: { json?: HomemadeRaw } } };
+  const localResult: HomemadeRaw = trpcData?.result?.data?.json ?? {} as HomemadeRaw;
+
+  // 如果 CF Worker 有部分字段，合并（CF Worker 的字段优先，本地补充缺失的）
+  const merged: HomemadeRaw = cfResult ? {
+    ...localResult,
+    // CF Worker 已有的字段保留
+    section: cfResult.section || localResult.section || '',
+    prepType: cfResult.prepType || localResult.prepType || 'other',
+    techniques: cfResult.techniques?.length ? cfResult.techniques : (localResult.techniques ?? []),
+    flavorTags: cfResult.flavorTags?.length ? cfResult.flavorTags : (localResult.flavorTags ?? []),
+    story: cfResult.story || localResult.story || '',
+    styleDesc: cfResult.styleDesc || localResult.styleDesc || '',
+    shelfLife: cfResult.shelfLife || localResult.shelfLife || '',
+    storage: cfResult.storage || localResult.storage || '',
+    usageNotes: cfResult.usageNotes || localResult.usageNotes || '',
+    confidence: cfResult.confidence || localResult.confidence || 'medium',
+    // 本地补充的字段
+    nameZh: localResult.nameZh ?? '',
+    nameEn: localResult.nameEn ?? '',
+    steps: localResult.steps ?? '',
+    yieldQty: localResult.yieldQty ?? null,
+    yieldUnit: localResult.yieldUnit ?? '',
+    sourceFamilyKey: localResult.sourceFamilyKey ?? '',
+    variantLabel: localResult.variantLabel ?? '',
+    prepIngredients: localResult.prepIngredients ?? [],
+    suggestedLibrary: localResult.suggestedLibrary || cfResult.suggestedLibrary || '',
+    suggestedCategory: localResult.suggestedCategory || cfResult.suggestedCategory || '',
+    suggestedStyle: localResult.suggestedStyle || cfResult.suggestedStyle || '',
+    mapConfidence: localResult.mapConfidence || cfResult.mapConfidence || 'none',
+  } : localResult;
+
   return {
-    ...result,
-    flavorTags: normalizeEnumArrayForLang(result.flavorTags),
-    nameZh: result.nameZh ?? '',
-    nameEn: result.nameEn ?? '',
-    steps: result.steps ?? '',
-    yieldQty: result.yieldQty ?? null,
-    yieldUnit: result.yieldUnit ?? '',
-    sourceFamilyKey: result.sourceFamilyKey ?? '',
-    variantLabel: result.variantLabel ?? '',
-    prepIngredients: result.prepIngredients ?? [],
+    ...merged,
+    flavorTags: normalizeEnumArrayForLang(merged.flavorTags),
+    nameZh: merged.nameZh ?? '',
+    nameEn: merged.nameEn ?? '',
+    steps: merged.steps ?? '',
+    yieldQty: merged.yieldQty ?? null,
+    yieldUnit: merged.yieldUnit ?? '',
+    sourceFamilyKey: merged.sourceFamilyKey ?? '',
+    variantLabel: merged.variantLabel ?? '',
+    prepIngredients: merged.prepIngredients ?? [],
   };
 }
 export type EnrichHomemadeResult = Awaited<ReturnType<typeof enrichHomemade>>;
