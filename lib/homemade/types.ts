@@ -15,6 +15,12 @@ import {
   G_PER_STONE, G_PER_TONNE,
   isLiquidContext,
 } from "@/lib/units";
+import {
+  canonicalizeUnit,
+  CANONICAL_TO_ML,
+  CANONICAL_TO_G,
+  buildUnitPattern,
+} from "@/lib/units";
 
 /** 自制库顶层分组:含酒精 / 无酒精(类似酒库的基酒库/酒款库/原材料库) */
 export type PrepGroup = "alcoholic" | "non_alcoholic" | "garnish";
@@ -537,78 +543,35 @@ export function normalizePrep(p: Partial<HomemadePrep> & { id: string }): Homema
  * { amount: "200g", name: "white sugar 白砂糖" } for structured editing.
  * Lines without a leading quantity return an empty amount.
  */
-const LEADING_QTY_RE =
-  // Number part: supports integer, decimal, slash fraction, mixed fraction,
-  //   Unicode vulgar fraction alone, integer + Unicode vulgar fraction (e.g. 1¼)
-  // Unit part: all liquid, weight, count, and fuzzy units
-  new RegExp(
-    "^(" +
-      "(?:约|~|≈)?\\s*" +
+// LEADING_QTY_RE is built automatically from the master alias table so that
+// adding a new unit alias to UNIT_ALIAS_MAP is the only change required.
+const _unitPattern = buildUnitPattern();
+const LEADING_QTY_RE = new RegExp(
+  "^(" +
+    "(?:约|~|≈)?\\s*" +
+    "(?:" +
+      `\\d+\\s*[${FRAC_CHARS}]` +
+      `|[${FRAC_CHARS}]` +
+      "|\\d+\\s+\\d+\\/\\d+" +
+      "|\\d+\\/\\d+" +
+      "|\\d+(?:[.,]\\d+)?" +
+    ")" +
+    "(?:\\s*[-–~]\\s*" +
       "(?:" +
-        `\\d+\\s*[${FRAC_CHARS}]` + // integer + Unicode fraction e.g. 1¼
-        `|[${FRAC_CHARS}]` +         // pure Unicode fraction e.g. ¼
-        "|\\d+\\s+\\d+\\/\\d+" +     // mixed fraction e.g. 1 1/2
-        "|\\d+\\/\\d+" +             // slash fraction e.g. 1/2
-        "|\\d+(?:[.,]\\d+)?" +       // integer or decimal e.g. 1.5
+        `\\d+\\s*[${FRAC_CHARS}]` +
+        `|[${FRAC_CHARS}]` +
+        "|\\d+\\/\\d+" +
+        "|\\d+(?:[.,]\\d+)?" +
       ")" +
-      "(?:\\s*[-–~]\\s*" +           // optional range e.g. 1-2
-        "(?:" +
-          `\\d+\\s*[${FRAC_CHARS}]` +
-          `|[${FRAC_CHARS}]` +
-          "|\\d+\\/\\d+" +
-          "|\\d+(?:[.,]\\d+)?" +
-        ")" +
-      ")?" +
-      "\\s*" +
-      "(?:" +
-        // liquid precise
-        "fl\.?\s*oz\.?|fluid\s*oz?\.?" +
-        "|oz\.?" +
-        "|ml|mL|毫升|cc" +
-        "|cl|cL|厘升" +
-        "|dl|dL|分升" +
-        "|[Ll](?:iter|itre)?|升" +
-        "|shots?|jiggers?" +
-        "|pony" +
-        "|pints?|pt|品脱" +
-        "|quarts?|qt|夸脱" +
-        "|gallons?|gal|加仑" +
-        // spoons
-        "|tbsp\\.?|tablespoons?" +
-        "|tsp\\.?|teaspoons?" +
-        "|bar\\s?spoons?|bsp|吧勺" +
-        "|dash(?:es)?" +
-        "|drops?" +
-        "|splash(?:es)?" +
-        // weight
-        "|kg|千克|公斤" +
-        "|mg|毫克" +
-        "|g|克" +
-        "|lbs?|磅|pounds?" +
-        // count
-        "|个|枚|颗|粒|根|片|只|条|瓣|把|包|袋|听|罐|瓶|块|枝|叶" +
-        "|pieces?|pcs?|sticks?|stalks?|slices?|leaves?|leaf|sprigs?" +
-        "|pods?|cloves?|beans?|cubes?|wedges?|twists?|eggs?" +
-        // cups
-        "|cups?|杯" +
-        // fuzzy (recognise but don't convert)
-        "|pinch(?:es)?|撮|handful|把" +
-        // additional industry units
-        "|dessert[\\s-]?spoons?|dsp" +
-        "|scruple[\\s-]?spoons?|scsp" +
-        "|rinse" +
-        "|parts?|份|比例" +
-        "|圈|wheels?" +
-        "|扭|twists?|peels?" +
-        "|楔|wedges?" +
-      ")?\\.?" +
-    ")\\s+(.+)$",
-    "i",
-  );
+    ")?" +
+    `\\s*(?:${_unitPattern})?` +
+  ")\\s+(.+)$",
+  "i",
+);
 
 /** Matches a bare unit word at the start of a line with no leading number, e.g. "oz name" */
 const UNIT_ONLY_RE = new RegExp(
-  "^(fl\.?\\s*oz\.?|fluid\\s*oz?\.|oz\.?|ml|mL|cl|dl|[Ll](?:iter|itre)?|shots?|jiggers?|pony|pints?|pt|quarts?|qt|gallons?|gal|tbsp\.?|tablespoons?|tsp\.?|teaspoons?|bar\\s?spoons?|bsp|dash(?:es)?|drops?|splash(?:es)?|kg|mg|g|lbs?|pounds?|pieces?|pcs?|sticks?|stalks?|slices?|leaves?|leaf|sprigs?|pods?|cloves?|beans?|cubes?|wedges?|twists?|eggs?|cups?|pinch(?:es)?|handful|dsp|rinse|parts?)\\s+(.+)$",
+  `^(${_unitPattern})\\s+(.+)$`,
   "i",
 );
 
@@ -682,8 +645,17 @@ export function normalizeIngredientAmount(amount: string, name?: string): string
   const unitRaw = working.trim().replace(/\.$/, "").toLowerCase();
 
   // ── Count / ratio / fuzzy units: preserve original ───────────────────────
-  const TRULY_COUNT_RE = /^(个|枚|颗|粒|根|片|只|条|瓣|把|包|袋|听|罐|瓶|块|枝|叶|pieces?|pcs?|sticks?|stalks?|slices?|leaves?|leaf|sprigs?|pods?|cloves?|beans?|cubes?|wedges?|twists?|eggs?|parts?|份|比例|pinch(?:es)?|撮|handful|圈|wheels?|扭|peels?|楔)$/i;
-  if (TRULY_COUNT_RE.test(unitRaw)) return text;
+  const canonical = canonicalizeUnit(working.trim());
+  // Count / container / fuzzy units: preserve original
+  const COUNT_CANONICALS = new Set([
+    "pc", "slice", "sprig", "cube", "strip", "wheel", "twist", "wedge",
+    "leaf", "whole", "root", "clove_c", "handful", "stalk", "pod",
+    "drop_c", "bunch", "sheet", "can", "bottle_c", "bag", "box",
+    "part", "fuzzy_taste", "fuzzy_pinch", "fuzzy_top",
+  ]);
+  if (canonical !== "unknown" && COUNT_CANONICALS.has(canonical)) return text;
+  // Legacy count words not yet in alias map
+  if (/^(sticks?|stalks?|beans?|eggs?|pinch(?:es)?|撮|handful)$/i.test(unitRaw)) return text;
   // No unit: bare number — preserve for count-like small values
   if (!unitRaw) {
     if (value <= 20) return text; // likely a count (e.g. "3 lemons")
@@ -702,50 +674,31 @@ export function normalizeIngredientAmount(amount: string, name?: string): string
     return `${s}g`;
   };
 
-  // ── Liquid units → ml ────────────────────────────────────────────────────
-  if (/^(ml|毫升|cc)$/.test(unitRaw)) return fmtMl(value);
-  if (/^(cl|厘升)$/.test(unitRaw)) return fmtMl(value * ML_PER_CL);
-  if (/^(dl|分升)$/.test(unitRaw)) return fmtMl(value * ML_PER_DL);
-  if (/^(l|升|liter|litre)$/.test(unitRaw)) return fmtMl(value * ML_PER_L);
-  if (/^(fl\.?\s*oz|fluid\s*oz?)$/.test(unitRaw)) return fmtMl(value * ML_PER_OZ);
-  if (/^(cups?|杯)$/.test(unitRaw)) return fmtMl(value * ML_PER_CUP);
-  if (/^(pints?|pt|品脱)$/.test(unitRaw)) return fmtMl(value * ML_PER_PINT);
-  if (/^(quarts?|qt|夸脱)$/.test(unitRaw)) return fmtMl(value * ML_PER_QUART);
-  if (/^(gallons?|gal|加仑)$/.test(unitRaw)) return fmtMl(value * ML_PER_GALLON);
-  if (/^(shots?|jiggers?)$/.test(unitRaw)) return fmtMl(value * ML_PER_SHOT);
-  if (/^(pony)$/.test(unitRaw)) return fmtMl(value * ML_PER_PONY);
-  // Spoon units
-  if (/^(tbsp\.?|tablespoons?|汤匙|大勺)$/.test(unitRaw)) return fmtMl(value * ML_PER_TBSP);
-  if (/^(tsp\.?|teaspoons?|茶匙|小勺)$/.test(unitRaw)) return fmtMl(value * ML_PER_TSP);
-  if (/^(bar\s?spoons?|bsp|吧勺)$/.test(unitRaw)) return fmtMl(value * ML_PER_BSP);
-  if (/^(dsp|dessert[\s-]?spoons?)$/.test(unitRaw)) return fmtMl(value * ML_PER_DSP);
-  if (/^(scsp|scruple[\s-]?spoons?)$/.test(unitRaw)) return fmtMl(value * ML_PER_SCSP);
-  // Micro liquid units
-  if (/^(dash(?:es)?)$/.test(unitRaw)) return fmtMl(value * ML_PER_DASH);
-  if (/^(drops?)$/.test(unitRaw)) return fmtMl(value * ML_PER_DROP);
-  if (/^(splash(?:es)?)$/.test(unitRaw)) return fmtMl(value * ML_PER_SPLASH);
-  if (/^(rinse)$/.test(unitRaw)) return fmtMl(value * ML_PER_RINSE);
+  // ── Unified lookup via canonicalizeUnit() ────────────────────────────────
+  // Use the raw unit string (preserving original case) for case-sensitive lookup (T. vs t.)
+  const canonicalRaw = canonicalizeUnit(working.trim());
 
-  // ── Weight units → g ─────────────────────────────────────────────────────
-  if (/^(g|克)$/.test(unitRaw)) return fmtG(value);
-  if (/^(kg|千克|公斤)$/.test(unitRaw)) return fmtG(value * G_PER_KG);
-  if (/^(mg|毫克)$/.test(unitRaw)) return fmtG(value * G_PER_MG);
-  if (/^(lbs?|磅|pounds?)$/.test(unitRaw)) return fmtG(value * G_PER_LB);
-  if (/^(斤|市斤)$/.test(unitRaw)) return fmtG(value * G_PER_JIN);
-  if (/^(两|市两)$/.test(unitRaw)) return fmtG(value * G_PER_LIANG);
-  if (/^(钱|市钱)$/.test(unitRaw)) return fmtG(value * G_PER_QIAN);
-  if (/^(stone|英石)$/.test(unitRaw)) return fmtG(value * G_PER_STONE);
-  if (/^(tonne|公吨)$/.test(unitRaw)) return fmtG(value * G_PER_TONNE);
+  // Liquid units → ml
+  if (canonicalRaw !== "unknown" && CANONICAL_TO_ML[canonicalRaw] !== undefined) {
+    const factor = CANONICAL_TO_ML[canonicalRaw]!;
+    if (isNaN(factor)) return text; // ratio unit
+    return fmtMl(value * factor);
+  }
 
-  // ── oz ambiguity: liquid context → ml, solid context → g ─────────────────
-  if (/^(oz|盎司|安士|ounce)$/.test(unitRaw)) {
+  // Weight units → g
+  if (canonicalRaw !== "unknown" && CANONICAL_TO_G[canonicalRaw] !== undefined) {
+    return fmtG(value * CANONICAL_TO_G[canonicalRaw]!);
+  }
+
+  // oz ambiguity: liquid context → ml, solid context → g
+  if (canonicalRaw === "oz") {
     const ctx = `${name ?? ""} ${text}`;
     return isLiquidContext(ctx)
       ? fmtMl(value * ML_PER_OZ)
-      : fmtG(value * 28); // solid oz ≈ 28g
+      : fmtG(value * 28);
   }
 
-  // ── Unrecognized unit: return original ───────────────────────────────────
+  // Unrecognized unit: return original
   return text;
 }
 

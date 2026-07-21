@@ -1,6 +1,13 @@
 import { Ingredient } from "../recipes/types";
 import { Bottle } from "./types";
 import { bottleGroupOf } from "./types";
+import {
+  ML_PER_OZ, ML_PER_CL, ML_PER_TSP, ML_PER_TBSP, ML_PER_BSP,
+  ML_PER_DASH, ML_PER_DROP, ML_PER_SPLASH, ML_PER_SHOT, ML_PER_PONY,
+  ML_PER_CUP, ML_PER_PINT, ML_PER_QUART, ML_PER_GALLON,
+  ML_PER_DSP, ML_PER_SCSP, ML_PER_RINSE,
+  canonicalizeUnit, CANONICAL_TO_ML, UNICODE_FRACTIONS,
+} from "@/lib/units";
 
 /** 单项配料的成本估算结果 */
 export interface IngredientCost {
@@ -26,32 +33,6 @@ export interface RecipeCostEstimate {
   totalCount: number;
 }
 
-/** 单位 -> 毫升换算表 */
-const UNIT_TO_ML: [RegExp, number][] = [
-  [/(?:ml|毫升|cc)/i, 1],
-  [/(?:fl\.?\s*oz|fluid\s*oz?)/i, ML_PER_OZ],
-  [/(?:oz|盎司|安士|ounce)/i, ML_PER_OZ],
-  [/(?:cl|厘升)/i, ML_PER_CL],
-  [/(?:dl|分升)/i, 100],
-  [/(?:pints?|pt|品脱)/i, ML_PER_PINT],
-  [/(?:quarts?|qt|夸脱)/i, ML_PER_QUART],
-  [/(?:gallons?|gal|加仑)/i, ML_PER_GALLON],
-  [/(?:shots?|jiggers?)/i, ML_PER_SHOT],
-  [/(?:pony)/i, ML_PER_PONY],
-  [/(?:cups?|杯)/i, ML_PER_CUP],
-  [/(?:tbsp\.?|tablespoons?|汤匙|大勺)/i, ML_PER_TBSP],
-  [/(?:tsp\.?|teaspoons?|茶匙|小勺)/i, ML_PER_TSP],
-  [/(?:bar\s*spoons?|bsp|吧勺)/i, ML_PER_BSP],
-  [/(?:dash(?:es)?|抖)/i, ML_PER_DASH],
-  [/(?:drops?|滴)/i, ML_PER_DROP],
-  [/(?:splash(?:es)?)/i, ML_PER_SPLASH],
-  [/(?:dessert[\s-]?spoons?|dsp)/i, ML_PER_DSP],
-  [/(?:scruple[\s-]?spoons?|scsp)/i, ML_PER_SCSP],
-  [/(?:rinse)/i, ML_PER_RINSE],
-  [/(?:pinch(?:es)?|撮)/i, ML_PER_DASH * 2], // 1 pinch ≈ 2 dash ≈ 1.8ml
-  // count/ratio units — not convertible to ml, return null via NaN
-  [/(?:parts?|份|比例)/i, NaN],
-];
 
 /**
  * 从用量文本解析出毫升数。
@@ -62,9 +43,8 @@ export function parseAmountToMl(amount: string): number | null {
   if (!text) return null;
 
   // 数字部分:支持小数、分数(1/2)、混合分数(1 1/2)与常见 Unicode 分数
-  const vulgar: Record<string, number> = { "½": 0.5, "¼": 0.25, "¾": 0.75, "⅓": 1 / 3, "⅔": 2 / 3 };
   let normalized = text;
-  for (const [ch, val] of Object.entries(vulgar)) {
+  for (const [ch, val] of Object.entries(UNICODE_FRACTIONS)) {
     normalized = normalized.replace(new RegExp(`(\\d+)\\s*${ch}`, "g"), (_, n) => String(Number(n) + val));
     normalized = normalized.replace(new RegExp(ch, "g"), String(val));
   }
@@ -85,8 +65,18 @@ export function parseAmountToMl(amount: string): number | null {
   }
   if (value === null || !isFinite(value)) return null;
 
-  for (const [re, ml] of UNIT_TO_ML) {
-    if (re.test(normalized)) return value * ml;
+  // Extract unit token from normalized string
+  const unitMatch = normalized.match(/[a-zA-Z\u4e00-\u9fa5][a-zA-Z\u4e00-\u9fa5\s\-\.]*$/);
+  if (unitMatch) {
+    const unitToken = unitMatch[0].trim();
+    const canonical = canonicalizeUnit(unitToken);
+    if (canonical !== "unknown") {
+      const mlFactor = CANONICAL_TO_ML[canonical];
+      if (mlFactor !== undefined) {
+        if (isNaN(mlFactor)) return null; // ratio/count unit
+        return value * mlFactor;
+      }
+    }
   }
   // 无单位默认视为 ml(常见简写如 "45")
   return value;
@@ -277,9 +267,3 @@ export function estimateRecipeCost(
     totalCount: ingredients.length,
   };
 }
-import {
-  ML_PER_OZ, ML_PER_CL, ML_PER_TSP, ML_PER_TBSP, ML_PER_BSP,
-  ML_PER_DASH, ML_PER_DROP, ML_PER_SPLASH, ML_PER_SHOT, ML_PER_PONY,
-  ML_PER_CUP, ML_PER_PINT, ML_PER_QUART, ML_PER_GALLON,
-  ML_PER_DSP, ML_PER_SCSP, ML_PER_RINSE,
-} from "@/lib/units";
