@@ -292,7 +292,8 @@ export default function RecipeFormScreen() {
     if (!raw) return result;
     const lines = raw.split('\n').map((l: string) => l.trim()).filter(Boolean);
     for (const line of lines) {
-      const colonIdx = line.indexOf(':');
+      // 同时支持全角冒号「：」和半角冒号「:」
+      const colonIdx = line.search(/[：:]/);
       if (colonIdx > 0) {
         const label = line.slice(0, colonIdx).trim();
         const value = line.slice(colonIdx + 1).trim();
