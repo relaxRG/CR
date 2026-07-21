@@ -573,3 +573,15 @@
   - 数字格式：整数不加小数点，小数保留1位（如 2.7ml、0.5ml）
 - [x] lib/homemade/types.ts splitPrepIngredientLine 所有 return 路径调用 normalizeIngredientAmount
 - [x] TypeScript 0 错误
+
+## 2026-07-21 Bug 修复 + AI 补全统一
+
+- [x] Bug1: dismissedLinks ID 与 ingRows ID 不匹配（使用 initialIngRowsRef 共享 ID）
+- [x] Bug2: removeIngRow 不清理 pickedIng/ingSourceMap（同步清理）
+- [x] Bug3: 末尾孤立 import YIELD_UNIT_PRESET_GROUPS（已删除）
+- [x] Bug4: auto 按钮永不激活（修复 isActive 逻辑）
+- [x] Bug5: story/styleDesc/usageNotes 条件渲染（改为始终渲染，带 placeholder）
+- [x] Bug6: SmartImportBar 不填 yieldQty/yieldUnit（解析 prepYield 并填充结构化字段）
+- [x] Bug7: isGarnishType 与 selectedGroup 不同步（统一使用 selectedGroup === "garnish"）
+- [x] AI 补全升级：自制库 AI 补全统一为建议面板模式（aiResult/aiToggles/undoSnapshot + buildAiFields + applyField + applyAiResult + undoAiApply）
+- [x] AI 建议面板 UI：可信度徽章、全选/只填空白/全不选、逐字段 toggle、应用/忽略、Undo toast

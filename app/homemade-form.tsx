@@ -18,6 +18,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
 import { enrichHomemade } from "@/lib/api/smart-router";
+import type { EnrichHomemadeResult } from "@/lib/api/smart-router";
 import { useNetwork } from "@/hooks/use-network";
 import { splitAmount, mergeAmount, unitDisplayLabel } from "@/lib/units";
 import { UnitPickerSheet } from "@/components/unit-picker-sheet";
@@ -44,6 +45,7 @@ import { BOTTLE_GROUPS, BottleGroupKey, categoriesOfGroup } from "@/lib/bottles/
 import { smartLinkIngredient, smartLinkDisplayName } from "@/lib/recipes/smart-link";
 import { genId, FLAVOR_TAGS } from "@/lib/recipes/types";
 import { useRecipeStore } from "@/lib/recipes/store";
+import { Switch } from "react-native";
 
 interface IngRow {
   id: string;
@@ -64,6 +66,16 @@ function toRows(items: PrepIngItem[]): IngRow[] {
   });
   return rows.length > 0 ? rows : [{ id: genId(), name: "", amount: "" }];
 }
+
+/** AiField：单个字段的 AI 建议 diff 描述 */
+type AiField = {
+  key: string;
+  labelZh: string;
+  labelEn: string;
+  aiValue: string;
+  currentValue: string;
+  conflict: "new" | "override" | "confirm" | "low";
+};
 
 export default function HomemadeFormScreen() {
   const colors = useColors();
@@ -100,17 +112,18 @@ export default function HomemadeFormScreen() {
     const t0 = editing?.type ?? (prefillType && typeList.some((p) => p.key === prefillType) ? prefillType : "syrup");
     return inferGroupFromType(t0);
   });
-  const [ingRows, setIngRows] = useState<IngRow[]>(() => toRows(editing?.ingredients ?? []));
+  /** Bug1 修复：共享同一批 ingRows ID，避免 dismissedLinks key 与 ingRows ID 不匹配 */
+  const initialIngRowsRef = useRef(toRows(editing?.ingredients ?? []));
+  const [ingRows, setIngRows] = useState<IngRow[]>(initialIngRowsRef.current);
   /** Which ingredient row is focused (shows live suggestions) */
   const [focusedIng, setFocusedIng] = useState<string | null>(null);
   const pressingIngSuggestRef = useRef(false);
   /** Rows where user picked a suggestion — suppress dropdown until text changes */
   const [pickedIng, setPickedIng] = useState<Record<string, string>>({});
-  // Pre-fill dismissed for existing ingredients when editing
+  // Pre-fill dismissed for existing ingredients when editing（使用与 ingRows 相同的 ID）
   const [dismissedLinks, setDismissedLinks] = useState<Record<string, boolean>>(() => {
     if (!editing?.ingredients?.length) return {};
-    const rows = toRows(editing.ingredients as PrepIngItem[]);
-    return Object.fromEntries(rows.map((r) => [r.id, true]));
+    return Object.fromEntries(initialIngRowsRef.current.map((r) => [r.id, true]));
   });
   const [acceptedLinks, setAcceptedLinks] = useState<Record<string, boolean>>({});
   // 每行配料的来源筛选（全/基/酒/料/制），与配方表单一致
@@ -221,21 +234,144 @@ export default function HomemadeFormScreen() {
   const { isOnline } = useNetwork();
   
   const [aiBusy, setAiBusy] = useState(false);
-  const [aiStatus, setAiStatus] = useState<{ kind: "ok" | "err"; msg: string } | null>(null);
+  const [aiResult, setAiResult] = useState<EnrichHomemadeResult | null>(null);
+  const [aiToggles, setAiToggles] = useState<Record<string, boolean>>({});
+  const [undoSnapshot, setUndoSnapshot] = useState<null | {
+    name: string; nameAlt: string; type: string;
+    techniques: string[]; flavorTags: string[];
+    story: string; styleDesc: string; shelfLife: string; storage: string; usageNotes: string;
+    stepRows: { id: string; text: string }[];
+    yieldQty: string; yieldUnit: string;
+    sourceFamilyKey: string; variantLabel: string;
+    ingRows: IngRow[];
+  }>(null);
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [aiLibrarySuggestion, setAiLibrarySuggestion] = useState<{ library: "spirits" | "bottles" | "materials"; category: string; style: string } | null>(null);
+
+  /** 构建 AI 字段 diff 列表 */
+  const buildAiFields = useCallback((): AiField[] => {
+    if (!aiResult) return [];
+    const conf = (cur: string, ai: string, c: "high" | "medium" | "low"): AiField["conflict"] => {
+      if (!cur.trim()) return "new";
+      if (cur.trim().toLowerCase() === ai.trim().toLowerCase()) return "confirm";
+      if (c === "low") return "low";
+      return "override";
+    };
+    const c = (aiResult.confidence === "high" || aiResult.confidence === "medium" || aiResult.confidence === "low") ? aiResult.confidence as "high" | "medium" | "low" : "medium";
+    const fields: AiField[] = [];
+    if (aiResult.nameZh) fields.push({ key: "nameZh", labelZh: "中文名", labelEn: "Chinese Name", aiValue: aiResult.nameZh, currentValue: name, conflict: conf(name, aiResult.nameZh, c) });
+    if (aiResult.nameEn) fields.push({ key: "nameEn", labelZh: "英文名", labelEn: "English Name", aiValue: aiResult.nameEn, currentValue: nameAlt, conflict: conf(nameAlt, aiResult.nameEn, c) });
+    if (aiResult.techniques.length > 0) {
+      const aiStr = aiResult.techniques.slice(0, 3).join(" · ") + (aiResult.techniques.length > 3 ? ` +${aiResult.techniques.length - 3}` : "");
+      const curStr = techniques.length > 0 ? techniques.slice(0, 3).join(" · ") : "";
+      fields.push({ key: "techniques", labelZh: "技法", labelEn: "Techniques", aiValue: aiStr, currentValue: curStr, conflict: conf(curStr, aiStr, c) });
+    }
+    if (aiResult.flavorTags.length > 0) {
+      const aiStr = aiResult.flavorTags.slice(0, 4).join(" · ") + (aiResult.flavorTags.length > 4 ? ` +${aiResult.flavorTags.length - 4}` : "");
+      const curStr = flavorTags.length > 0 ? flavorTags.slice(0, 3).join(" · ") : "";
+      fields.push({ key: "flavorTags", labelZh: "风味标签", labelEn: "Flavor Tags", aiValue: aiStr, currentValue: curStr, conflict: conf(curStr, aiStr, c) });
+    }
+    if (aiResult.story) fields.push({ key: "story", labelZh: "介绍/故事", labelEn: "Story", aiValue: aiResult.story.slice(0, 50) + (aiResult.story.length > 50 ? "…" : ""), currentValue: story ? story.slice(0, 30) + (story.length > 30 ? "…" : "") : "", conflict: conf(story, aiResult.story, c) });
+    if (aiResult.styleDesc) fields.push({ key: "styleDesc", labelZh: "风格/口感", labelEn: "Style/Taste", aiValue: aiResult.styleDesc.slice(0, 50) + (aiResult.styleDesc.length > 50 ? "…" : ""), currentValue: styleDesc ? styleDesc.slice(0, 30) + (styleDesc.length > 30 ? "…" : "") : "", conflict: conf(styleDesc, aiResult.styleDesc, c) });
+    if (aiResult.shelfLife) fields.push({ key: "shelfLife", labelZh: "保鲜期", labelEn: "Shelf Life", aiValue: aiResult.shelfLife, currentValue: shelfLife, conflict: conf(shelfLife, aiResult.shelfLife, c) });
+    if (aiResult.storage) fields.push({ key: "storage", labelZh: "储存方式", labelEn: "Storage", aiValue: aiResult.storage, currentValue: storage, conflict: conf(storage, aiResult.storage, c) });
+    if (aiResult.usageNotes) fields.push({ key: "usageNotes", labelZh: "调酒用途", labelEn: "Usage Notes", aiValue: aiResult.usageNotes.slice(0, 50) + (aiResult.usageNotes.length > 50 ? "…" : ""), currentValue: usageNotes ? usageNotes.slice(0, 30) + (usageNotes.length > 30 ? "…" : "") : "", conflict: conf(usageNotes, aiResult.usageNotes, c) });
+    if (aiResult.steps) {
+      const curEmpty = stepRows.every((r) => !r.text.trim());
+      const preview = aiResult.steps.split("\n").filter(Boolean).slice(0, 2).join(" / ") + (aiResult.steps.split("\n").filter(Boolean).length > 2 ? " …" : "");
+      fields.push({ key: "steps", labelZh: "制作步骤", labelEn: "Steps", aiValue: preview, currentValue: curEmpty ? "" : `${stepRows.filter((r) => r.text.trim()).length} 步`, conflict: curEmpty ? "new" : "override" });
+    }
+    if (aiResult.yieldQty && aiResult.yieldQty > 0) {
+      const aiYield = `${aiResult.yieldQty}${aiResult.yieldUnit || ""}`;
+      const curYield = yieldQty ? `${yieldQty}${yieldUnit || ""}` : "";
+      fields.push({ key: "yield", labelZh: "产量", labelEn: "Yield", aiValue: aiYield, currentValue: curYield, conflict: conf(curYield, aiYield, c) });
+    }
+    if (aiResult.sourceFamilyKey && selectedGroup === "garnish") {
+      fields.push({ key: "sourceFamilyKey", labelZh: "原料家族", labelEn: "Source Family", aiValue: aiResult.sourceFamilyKey, currentValue: sourceFamilyKey, conflict: conf(sourceFamilyKey, aiResult.sourceFamilyKey, "low") });
+    }
+    if (aiResult.variantLabel && selectedGroup === "garnish") {
+      fields.push({ key: "variantLabel", labelZh: "形态标签", labelEn: "Variant Label", aiValue: aiResult.variantLabel, currentValue: variantLabel, conflict: conf(variantLabel, aiResult.variantLabel, "low") });
+    }
+    if (aiResult.prepIngredients.length > 0 && ingRows.every((r) => !r.name.trim())) {
+      const preview = aiResult.prepIngredients.slice(0, 4).map((i) => `${i.name}${i.amount ? " " + i.amount : ""}`).join(" · ") + (aiResult.prepIngredients.length > 4 ? ` +${aiResult.prepIngredients.length - 4}` : "");
+      fields.push({ key: "prepIngredients", labelZh: "原料列表", labelEn: "Ingredients", aiValue: preview, currentValue: "", conflict: "new" });
+    }
+    return fields;
+  }, [aiResult, name, nameAlt, techniques, flavorTags, story, styleDesc, shelfLife, storage, usageNotes, stepRows, yieldQty, yieldUnit, sourceFamilyKey, variantLabel, ingRows, selectedGroup]);
+
+  React.useEffect(() => {
+    if (!aiResult) { setAiToggles({}); return; }
+    const fields = buildAiFields();
+    const defaults: Record<string, boolean> = {};
+    for (const f of fields) {
+      if (f.key === "sourceFamilyKey" || f.key === "variantLabel") {
+        defaults[f.key] = false;
+      } else {
+        defaults[f.key] = f.conflict === "new" || f.conflict === "confirm";
+      }
+    }
+    setAiToggles(defaults);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aiResult]);
+
+  const applyField = useCallback((key: string) => {
+    if (!aiResult) return;
+    if (key === "nameZh" && aiResult.nameZh) setName(aiResult.nameZh);
+    else if (key === "nameEn" && aiResult.nameEn) setNameAlt(aiResult.nameEn);
+    else if (key === "techniques" && aiResult.techniques.length > 0) setTechniques(aiResult.techniques);
+    else if (key === "flavorTags" && aiResult.flavorTags.length > 0) setFlavorTags(aiResult.flavorTags);
+    else if (key === "story" && aiResult.story) setStory(aiResult.story);
+    else if (key === "styleDesc" && aiResult.styleDesc) setStyleDesc(aiResult.styleDesc);
+    else if (key === "shelfLife" && aiResult.shelfLife) setShelfLife(aiResult.shelfLife);
+    else if (key === "storage" && aiResult.storage) setStorage(aiResult.storage);
+    else if (key === "usageNotes" && aiResult.usageNotes) setUsageNotes(aiResult.usageNotes);
+    else if (key === "steps" && aiResult.steps) {
+      const lines = aiResult.steps.split("\n").map((l) => l.replace(/^\d+\.?\s*/, "").trim()).filter(Boolean);
+      if (lines.length > 0) setStepRows(lines.map((text) => ({ id: genId(), text })));
+    }
+    else if (key === "yield") {
+      if (aiResult.yieldQty && aiResult.yieldQty > 0) setYieldQty(String(aiResult.yieldQty));
+      if (aiResult.yieldUnit) setYieldUnit(aiResult.yieldUnit);
+    }
+    else if (key === "sourceFamilyKey" && aiResult.sourceFamilyKey) setSourceFamilyKey(aiResult.sourceFamilyKey);
+    else if (key === "variantLabel" && aiResult.variantLabel) setVariantLabel(aiResult.variantLabel);
+    else if (key === "prepIngredients" && aiResult.prepIngredients.length > 0) {
+      setIngRows(aiResult.prepIngredients.map((ing) => ({ id: genId(), name: ing.name, amount: ing.amount })));
+    }
+  }, [aiResult]);
+
+  const applyAiResult = useCallback(() => {
+    if (!aiResult) return;
+    const fields = buildAiFields();
+    setUndoSnapshot({ name, nameAlt, type, techniques: [...techniques], flavorTags: [...flavorTags], story, styleDesc, shelfLife, storage, usageNotes, stepRows: stepRows.map((r) => ({ ...r })), yieldQty, yieldUnit, sourceFamilyKey, variantLabel, ingRows: ingRows.map((r) => ({ ...r })) });
+    for (const f of fields) {
+      if (aiToggles[f.key] !== false) applyField(f.key);
+    }
+    if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setAiResult(null);
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    undoTimerRef.current = setTimeout(() => setUndoSnapshot(null), 5000);
+  }, [aiResult, aiToggles, buildAiFields, applyField, name, nameAlt, type, techniques, flavorTags, story, styleDesc, shelfLife, storage, usageNotes, stepRows, yieldQty, yieldUnit, sourceFamilyKey, variantLabel, ingRows]);
+
+  const undoAiApply = useCallback(() => {
+    if (!undoSnapshot) return;
+    setName(undoSnapshot.name); setNameAlt(undoSnapshot.nameAlt); setType(undoSnapshot.type);
+    setTechniques(undoSnapshot.techniques); setFlavorTags(undoSnapshot.flavorTags);
+    setStory(undoSnapshot.story); setStyleDesc(undoSnapshot.styleDesc);
+    setShelfLife(undoSnapshot.shelfLife); setStorage(undoSnapshot.storage);
+    setUsageNotes(undoSnapshot.usageNotes); setStepRows(undoSnapshot.stepRows);
+    setYieldQty(undoSnapshot.yieldQty); setYieldUnit(undoSnapshot.yieldUnit);
+    setSourceFamilyKey(undoSnapshot.sourceFamilyKey); setVariantLabel(undoSnapshot.variantLabel);
+    setIngRows(undoSnapshot.ingRows);
+    setUndoSnapshot(null);
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+  }, [undoSnapshot]);
 
   const handleAiEnrich = async () => {
     const displayName = [name.trim(), nameAlt.trim()].filter(Boolean).join(" / ");
-    if (!displayName) {
-      setAiStatus({ kind: "err", msg: lang === "en" ? "Please enter a name first" : "请先输入名称" });
-      return;
-    }
-    if (!isOnline) {
-      setAiStatus({ kind: "err", msg: lang === "en" ? "Offline: AI requires internet connection" : "当前离线，AI 补全需要网络连接" });
-      return;
-    }
+    if (!displayName) return;
+    if (!isOnline) return;
     setAiBusy(true);
-    setAiStatus(null);
     try {
       const res = await enrichHomemade({
         name: name.trim(),
@@ -244,11 +380,6 @@ export default function HomemadeFormScreen() {
         ingredients: ingRows.filter((r) => r.name.trim()),
         lang: lang as 'zh' | 'en',
       });
-      if (res.prepType && res.prepType !== "other" && !typeTouched) {
-        const matched = typeList.find((t) => t.key === res.prepType);
-        if (matched) { setType(res.prepType); setTypeTouched(true); }
-      }
-      // ── 语义映射：自动预填所属库 ──────────────────────────────────────
       const validLibs = ["spirits", "bottles", "materials"] as const;
       const sugLib = validLibs.find((l) => l === (res as Record<string, unknown>).suggestedLibrary);
       const sugCat = typeof (res as Record<string, unknown>).suggestedCategory === "string" ? (res as Record<string, unknown>).suggestedCategory as string : "";
@@ -263,40 +394,13 @@ export default function HomemadeFormScreen() {
           setAiLibrarySuggestion({ library: sugLib, category: sugCat, style: sugStyle });
         }
       }
-      if (res.techniques.length > 0 && techniques.length === 0) setTechniques(res.techniques);
-      if (res.flavorTags.length > 0 && flavorTags.length === 0) setFlavorTags(res.flavorTags);
-      if (!story.trim() && res.story) setStory(res.story);
-      if (!styleDesc.trim() && res.styleDesc) setStyleDesc(res.styleDesc);
-      if (!shelfLife.trim() && res.shelfLife) setShelfLife(res.shelfLife);
-      if (!storage.trim() && res.storage) setStorage(res.storage);
-      if (!usageNotes.trim() && res.usageNotes) setUsageNotes(res.usageNotes);
-      // ── 新增全字段回填 ────────────────────────────────────────────────────
-      // 中英文名称：仅在对应字段为空时回填
-      if (!name.trim() && res.nameZh) setName(res.nameZh);
-      if (!nameAlt.trim() && res.nameEn) setNameAlt(res.nameEn);
-      // 制作步骤：仅在步骤为空时回填（将换行分割为步骤行）
-      if (stepRows.every((r) => !r.text.trim()) && res.steps) {
-        const lines = res.steps.split("\n").map((l) => l.replace(/^\d+\.?\s*/, "").trim()).filter(Boolean);
-        if (lines.length > 0) {
-          setStepRows(lines.map((text) => ({ id: genId(), text })));
-        }
+      if (res.prepType && res.prepType !== "other" && !typeTouched) {
+        const matched = typeList.find((t) => t.key === res.prepType);
+        if (matched) { setType(res.prepType); setTypeTouched(true); }
       }
-      // 产量：仅在产量为空时回填
-      if (!yieldQty.trim() && res.yieldQty && res.yieldQty > 0) setYieldQty(String(res.yieldQty));
-      if (!yieldUnit.trim() && res.yieldUnit) setYieldUnit(res.yieldUnit);
-      // 装饰家族 key 和变体标签（仅装饰类）
-      if (!sourceFamilyKey.trim() && res.sourceFamilyKey) setSourceFamilyKey(res.sourceFamilyKey);
-      if (!variantLabel.trim() && res.variantLabel) setVariantLabel(res.variantLabel);
-      // 原料：仅在原料列表为空时回填 AI 推断的结构化原料
-      if (ingRows.every((r) => !r.name.trim()) && res.prepIngredients && res.prepIngredients.length > 0) {
-        setIngRows(res.prepIngredients.map((ing) => ({ id: genId(), name: ing.name, amount: ing.amount })));
-      }
-      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      // 统计回填字段数量，给用户明确反馈
-      const filledFields = [res.story, res.styleDesc, res.shelfLife, res.storage, res.usageNotes, res.steps, res.yieldQty, res.sourceFamilyKey].filter(Boolean).length;
-      setAiStatus({ kind: "ok", msg: lang === "en" ? `AI filled ${filledFields} fields` : `AI 已补全 ${filledFields} 个字段` });
+      setAiResult(res);
     } catch {
-      setAiStatus({ kind: "err", msg: lang === "en" ? "AI analysis failed" : "AI 分析失败，请重试" });
+      // 静默失败
     } finally {
       setAiBusy(false);
     }
@@ -334,6 +438,9 @@ export default function HomemadeFormScreen() {
     setIngRows((prev) => (prev.length > 1 ? prev.filter((r) => r.id !== rid) : prev));
     setDismissedLinks((prev) => { const n = { ...prev }; delete n[rid]; return n; });
     setAcceptedLinks((prev) => { const n = { ...prev }; delete n[rid]; return n; });
+    // Bug2 修复：同步清理 pickedIng 和 ingSourceMap，防止状态污染
+    setPickedIng((prev) => { const n = { ...prev }; delete n[rid]; return n; });
+    setIngSourceMap((prev) => { const n = { ...prev }; delete n[rid]; return n; });
   };
 
   const renderIngRow = useCallback(({ item: row, drag, isActive }: RenderItemParams<IngRow>) => {
@@ -811,7 +918,13 @@ export default function HomemadeFormScreen() {
                 }
                 if (item.prepIngredients?.length) setIngRows(toRows(item.prepIngredients));
                 if (item.prepRecipe) setStepRows(parseStepRows(item.prepRecipe));
-                if (item.prepYield) setYieldStr(item.prepYield);
+                if (item.prepYield) {
+                  setYieldStr(item.prepYield);
+                  // Bug6 修复：解析 yieldStr 并填充结构化产量字段
+                  const { qty: pqty, unit: punit } = splitAmount(item.prepYield);
+                  if (pqty) setYieldQty(pqty);
+                  if (punit) setYieldUnit(punit);
+                }
                 if (item.shelfLife) setShelfLife(item.shelfLife);
                 if (item.storage) setStorage(item.storage);
                 if (item.source) setSource(item.source);
@@ -840,16 +953,96 @@ export default function HomemadeFormScreen() {
             })}
           >
             <IconSymbol name="sparkles" size={16} color={colors.primary} />
-            <Text style={{ fontSize: 14, fontWeight: "600", color: colors.primary }}>
-              {aiBusy
-                ? (lang === "en" ? "Analyzing…" : "AI 分析中…")
-                : (lang === "en" ? "AI Auto-fill" : "AI 自动补全")}
-            </Text>
+          <Text style={{ fontSize: 14, fontWeight: "600", color: colors.primary }}>
+            {aiBusy
+              ? (lang === "en" ? "Analyzing…" : "AI 分析中…")
+              : (lang === "en" ? "AI Lookup" : "AI 识别补全")}
+          </Text>
           </Pressable>
-          {aiStatus && (
-            <Text style={{ fontSize: 12, textAlign: "center", marginBottom: 4, color: aiStatus.kind === "ok" ? colors.success : colors.error }}>
-              {aiStatus.msg}
-            </Text>
+          {/* ── AI 建议面板 ── */}
+          {aiResult && (() => {
+            const fields = buildAiFields();
+            const onCount = fields.filter((f) => aiToggles[f.key] !== false).length;
+            const conf = aiResult.confidence;
+            const confColor = conf === "high" ? colors.success : conf === "low" ? colors.warning : colors.primary;
+            const confLabel = conf === "high" ? (lang === "en" ? "High" : "高可信") : conf === "low" ? (lang === "en" ? "Low" : "低可信") : (lang === "en" ? "Medium" : "中可信");
+            return (
+              <View style={{ marginTop: 8, marginBottom: 4, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, overflow: "hidden" }}>
+                {/* 面板头部 */}
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <IconSymbol name="sparkles" size={14} color={colors.primary} />
+                    <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>{lang === "en" ? "AI Suggestions" : "✦ AI 建议"}</Text>
+                    <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: confColor + "22" }}>
+                      <Text style={{ fontSize: 11, fontWeight: "600", color: confColor }}>{confLabel}</Text>
+                    </View>
+                    <Text style={{ fontSize: 12, color: colors.muted }}>{fields.length} {lang === "en" ? "fields" : "个字段"}</Text>
+                  </View>
+                  <Pressable onPress={() => setAiResult(null)} style={{ padding: 4 }}>
+                    <Text style={{ fontSize: 16, color: colors.muted }}>×</Text>
+                  </Pressable>
+                </View>
+                {/* 快捷操作 */}
+                <View style={{ flexDirection: "row", gap: 8, paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                  {[
+                    { label: lang === "en" ? "All" : "全选", action: () => setAiToggles(Object.fromEntries(fields.map((f) => [f.key, true]))) },
+                    { label: lang === "en" ? "Empty only" : "只填空白", action: () => setAiToggles(Object.fromEntries(fields.map((f) => [f.key, f.conflict === "new"]))) },
+                    { label: lang === "en" ? "None" : "全不选", action: () => setAiToggles(Object.fromEntries(fields.map((f) => [f.key, false]))) },
+                  ].map((btn) => (
+                    <Pressable key={btn.label} onPress={btn.action} style={({ pressed }) => ({ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, backgroundColor: pressed ? colors.border : colors.background, borderWidth: 1, borderColor: colors.border })}>
+                      <Text style={{ fontSize: 12, color: colors.foreground }}>{btn.label}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+                {/* 字段列表 */}
+                {fields.map((f) => {
+                  const on = aiToggles[f.key] !== false;
+                  const conflictColors: Record<string, string> = { new: colors.success, override: colors.warning, confirm: colors.muted, low: colors.error };
+                  const conflictLabels: Record<string, string> = { new: lang === "en" ? "new" : "新增", override: lang === "en" ? "override" : "覆盖", confirm: lang === "en" ? "same" : "确认", low: lang === "en" ? "low" : "低可信" };
+                  return (
+                    <View key={f.key} style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border + "66", opacity: on ? 1 : 0.45 }}>
+                      <View style={{ flex: 1, gap: 2 }}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                          <Text style={{ fontSize: 12, fontWeight: "600", color: colors.foreground }}>{lang === "en" ? f.labelEn : f.labelZh}</Text>
+                          <View style={{ paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, backgroundColor: (conflictColors[f.conflict] ?? colors.muted) + "22" }}>
+                            <Text style={{ fontSize: 10, color: conflictColors[f.conflict] ?? colors.muted }}>{conflictLabels[f.conflict]}</Text>
+                          </View>
+                        </View>
+                        {f.currentValue ? (
+                          <Text style={{ fontSize: 11, color: colors.muted }} numberOfLines={1}>{f.currentValue} → <Text style={{ color: colors.primary }}>{f.aiValue}</Text></Text>
+                        ) : (
+                          <Text style={{ fontSize: 11, color: colors.primary }} numberOfLines={1}>{f.aiValue}</Text>
+                        )}
+                      </View>
+                      <Switch
+                        value={on}
+                        onValueChange={(v) => setAiToggles((prev) => ({ ...prev, [f.key]: v }))}
+                        trackColor={{ false: colors.border, true: colors.primary + "88" }}
+                        thumbColor={on ? colors.primary : colors.muted}
+                      />
+                    </View>
+                  );
+                })}
+                {/* 底部操作 */}
+                <View style={{ flexDirection: "row", gap: 8, padding: 12 }}>
+                  <Pressable onPress={applyAiResult} style={({ pressed }) => ({ flex: 1, paddingVertical: 10, borderRadius: 8, backgroundColor: onCount > 0 ? colors.primary : colors.border, opacity: pressed ? 0.8 : 1, alignItems: "center" })}>
+                    <Text style={{ fontSize: 14, fontWeight: "600", color: onCount > 0 ? colors.background : colors.muted }}>{lang === "en" ? `Apply ${onCount}` : `应用 ${onCount} 项`}</Text>
+                  </Pressable>
+                  <Pressable onPress={() => setAiResult(null)} style={({ pressed }) => ({ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, borderWidth: 1, borderColor: colors.border, opacity: pressed ? 0.7 : 1, alignItems: "center" })}>
+                    <Text style={{ fontSize: 14, color: colors.muted }}>{lang === "en" ? "Dismiss" : "忽略"}</Text>
+                  </Pressable>
+                </View>
+              </View>
+            );
+          })()}
+          {/* ── Undo toast ── */}
+          {undoSnapshot && (
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}>
+              <Text style={{ fontSize: 13, color: colors.foreground }}>✓ {lang === "en" ? "AI suggestions applied" : "AI 建议已应用"}</Text>
+              <Pressable onPress={undoAiApply} style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, backgroundColor: colors.primary + "22" }}>
+                <Text style={{ fontSize: 13, fontWeight: "600", color: colors.primary }}>{lang === "en" ? "Undo" : "撤销"}</Text>
+              </Pressable>
+            </View>
           )}
           {fieldLabel(t("hmform.name"))}
           <TextInput
@@ -915,12 +1108,11 @@ export default function HomemadeFormScreen() {
               { key: "auto_garnish" as const, zhLabel: "装饰", enLabel: "Garnish" },
             ].map((opt) => {
               const isActive =
-                opt.key === "auto" ? libraryDest === "auto" && false :
+                opt.key === "auto" ? libraryDest === "auto" :
                 opt.key === "auto_alcoholic" ? libraryDest === "auto" && selectedGroup === "alcoholic" :
                 opt.key === "auto_non_alcoholic" ? libraryDest === "auto" && selectedGroup === "non_alcoholic" :
                 libraryDest === "auto" && selectedGroup === "garnish";
-              const isAutoBtn = opt.key === "auto";
-              const active = isAutoBtn ? false : isActive;
+              const active = isActive;
               return (
                 <Pressable
                   key={opt.key}
@@ -1164,7 +1356,7 @@ export default function HomemadeFormScreen() {
           </View>
 
           {fieldLabel(t("hmform.shelfLife"))}
-          {isGarnishType ? (
+          {selectedGroup === "garnish" ? (
             /* 装饰：保鲜期快捷选项 */
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
               {SHELF_LIFE_OPTIONS.map((opt) => {
@@ -1200,7 +1392,7 @@ export default function HomemadeFormScreen() {
           )}
 
           {/* ── 装饰专属字段区块 ── */}
-          {isGarnishType && (
+          {selectedGroup === "garnish" && (
             <>
               {fieldLabel(lang === "en" ? "Prep Method" : "制作方式")}
               <TextInput
@@ -1461,46 +1653,34 @@ export default function HomemadeFormScreen() {
             placeholderTextColor={colors.muted}
             multiline
           />
-          {(story || styleDesc || usageNotes) ? (
-            <>
-              {story ? (
-                <>
-                  {fieldLabel(lang === "en" ? "Story / Introduction" : "介绍/故事")}
-                  <TextInput
-                    style={[...inputStyle, styles.multiline, { minHeight: 60 }]}
-                    value={story}
-                    onChangeText={setStory}
-                    multiline
-                    placeholderTextColor={colors.muted}
-                  />
-                </>
-              ) : null}
-              {styleDesc ? (
-                <>
-                  {fieldLabel(lang === "en" ? "Style / Taste" : "风格/口感")}
-                  <TextInput
-                    style={inputStyle}
-                    value={styleDesc}
-                    onChangeText={setStyleDesc}
-                    placeholderTextColor={colors.muted}
-                    returnKeyType="done"
-                  />
-                </>
-              ) : null}
-              {usageNotes ? (
-                <>
-                  {fieldLabel(lang === "en" ? "Usage Notes" : "调酒用途")}
-                  <TextInput
-                    style={inputStyle}
-                    value={usageNotes}
-                    onChangeText={setUsageNotes}
-                    placeholderTextColor={colors.muted}
-                    returnKeyType="done"
-                  />
-                </>
-              ) : null}
-            </>
-          ) : null}
+          {/* Bug5 修复：story/styleDesc/usageNotes 始终渲染，不做条件隐藏 */}
+          {fieldLabel(lang === "en" ? "Story / Introduction" : "介绍/故事")}
+          <TextInput
+            style={[...inputStyle, styles.multiline, { minHeight: 60 }]}
+            value={story}
+            onChangeText={setStory}
+            multiline
+            placeholder={lang === "en" ? "Background, inspiration, or history…" : "背景、灵感或历史…"}
+            placeholderTextColor={colors.muted}
+          />
+          {fieldLabel(lang === "en" ? "Style / Taste" : "风格/口感")}
+          <TextInput
+            style={inputStyle}
+            value={styleDesc}
+            onChangeText={setStyleDesc}
+            placeholder={lang === "en" ? "e.g. Sweet, spicy, aromatic" : "如：甜润、辛辣、芳香"}
+            placeholderTextColor={colors.muted}
+            returnKeyType="done"
+          />
+          {fieldLabel(lang === "en" ? "Usage Notes" : "调酒用途")}
+          <TextInput
+            style={inputStyle}
+            value={usageNotes}
+            onChangeText={setUsageNotes}
+            placeholder={lang === "en" ? "e.g. Use in Mule, Sour, Fizz" : "如：用于 Mule、Sour、Fizz"}
+            placeholderTextColor={colors.muted}
+            returnKeyType="done"
+          />
         </NestableScrollContainer>
       </KeyboardAvoidingView>
       {/* Unit picker sheet */}
@@ -1585,4 +1765,3 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
 });
-import { YIELD_UNIT_PRESET_GROUPS } from "@/lib/units";
