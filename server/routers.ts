@@ -34,6 +34,30 @@ function resolveToZhWhitelistServer(raw: string, whitelist: readonly string[]): 
 }
 
 /** 服务端用的完整杯型白名单（含用户常用扩展杯型，与 prompt 中 glassList 保持一致） */
+
+/**
+ * Server 端：将 AI 返回的配料名拆分 or 备选。
+ * - "Rye Whiskey or Bourbon" → { name: "Rye Whiskey", alternatives: ["Bourbon"] }
+ * - "fresh or frozen cranberries" → { name: "cranberries" }（形容词 or，合并为名词）
+ */
+const STATE_ADJ_RE_SERVER = /^(?:fresh|frozen|dried|canned|bottled|fresh-squeezed|homemade|house-made|store-bought|organic|raw|cooked|roasted|toasted|ground|whole|sliced|diced|chopped|minced|peeled|zested|squeezed)$/i;
+function splitIngredientOrServer(name: string): { name: string; alternatives?: string[] } {
+  const OR_RE = /\s+or\s+/i;
+  if (!OR_RE.test(name)) return { name };
+  const parts = name.split(OR_RE).map((p: string) => p.trim()).filter(Boolean);
+  if (parts.length < 2) return { name };
+  const allAdj = parts.every((p: string) => {
+    const words = p.split(/\s+/);
+    return words.length >= 1 && STATE_ADJ_RE_SERVER.test(words[0]);
+  });
+  if (allAdj) {
+    const lastPart = parts[parts.length - 1];
+    const noun = lastPart.replace(STATE_ADJ_RE_SERVER, "").trim();
+    return { name: noun || lastPart };
+  }
+  return { name: parts[0], alternatives: parts.slice(1) };
+}
+
 const SERVER_VALID_GLASSES = [
   "马天尼杯","古典杯","高球杯","柯林杯","库佩杯","飓风杯","子弹杯",
   "尼克诺拉杯","郁金香杯","笛型杯","提基杯","铜杯","朱莉普杯","红酒杯","其他",
@@ -106,7 +130,7 @@ const EXTRACT_SYSTEM_PROMPT = `你是一个鸡尾酒应用的数据导入助手�
   "nameZh":"中文名(没有则译)","nameEn":"英文名(没有则译或拼音)",
   "category":"bottle分类,如 金酒/威士忌/利口酒/苦精/糖浆/果汁/软饮;material固定为 原材料","style":"风格子分类,如 London Dry/Bourbon;material如 Fruit & Citrus","brand":"品牌","origin":"产地","volume":"规格如 700ml/500g/1斤","abv":40,"priceCny":0,
   "prepIngredients":[{"name":"配料名","amount":"用量如 45ml"}],"prepRecipe":"做法","prepYield":"产量如 ~750ml","shelfLife":"保质期","storage":"储存方式",
-  "baseSpirit":"recipe基酒,如 金酒","glass":"杯型","method":"调制法,如 摇和/搅拌","ingredients":[{"name":"配料名","amount":"用量如 45ml"}],"steps":"步骤(可多行)","garnish":"装饰","source":"出处",
+  "baseSpirit":"recipe基酒,如 金酒","glass":"杯型","method":"调制法,如 摇和/搅拌","ingredients":[{"name":"配料名（若原文有备选写法如 'Rye Whiskey or Bourbon' 则 name 原样保留含 or）","amount":"用量如 45ml"}],"steps":"步骤(可多行)","garnish":"装饰","source":"出处",
   "variantOf":"文本明确写明的经典变体来源(如 '尼格罗尼的变体'/'Variant of Sidecar'),没写则空","codexFamily":"文本明确写明的 Codex 六大家族/母配方归属(如 'Family: Sidecar'/'六大家族:大吉利'),仅在文本明确声明时填写原文,没写则空",
   "notes":"备注"
 }]}
@@ -118,6 +142,7 @@ const EXTRACT_SYSTEM_PROMPT = `你是一个鸡尾酒应用的数据导入助手�
 - nameZh 与 nameEn 必须都给出:缺英文名时给出通用英文译名(如 柠檬→Lemon,百香果→Passion Fruit),缺中文名时给出通用中文译名
 - 不要编造文本中不存在的条目;表格中每一行通常是一个条目
 - 类型判断:有配料+步骤的是 recipe;有做法/保质期且是自制物的是 prep;新鲜水果/香草/糖/蛋奶等非瓶装酒水原料是 material;其余瓶装商品是 bottle
+- ingredients/prepIngredients 的 name：若原文配料有备选写法（如 "Rye Whiskey or Bourbon"），原样保留含 or 的完整文本；若是形容词备选（如 "fresh or frozen cranberries"），只保留名词主体（cranberries）
 - 最多提取 60 条`;
 
 const bulkItemSchema = z.object({
@@ -1820,7 +1845,7 @@ ${librarySpecificInstructions}
   "steps": "制作步骤（${isEn ? "英文" : "中文"}，分步骤描述，如 '1. 将...\n2. 加入...\n3. 过滤...'），不确定填 \"\"",
   "sourceFamilyKey": "原料家族key（仅装饰类填写，如 'yellow-lemon'/'lime'/'orange'，其他类型填 \"\"）",
   "variantLabel": "形态标签（仅装饰类且有家族key时填写，如 '皮卷'/'角形'/'薄片'，其他类型填 \"\"）",
-  "prepIngredients": 原料列表（如输入中已提供原料则原样返回，否则根据 prepType 推断常见原料，不确定时填 []）格式为 [{"name":"配料名","amount":"用量如 45ml，不确定填 \"\"""}],
+  "prepIngredients": 原料列表（如输入中已提供原料则原样返回，否则根据 prepType 推断常见原料，不确定时填 []）格式为 [{"name":"配料名（若原文有品牌/产品备选写法如 'house-made Citrus Bitters or Regans Orange Bitters' 则原样保留含 or；若是形容词备选如 'fresh or frozen cranberries' 则只保留名词主体 cranberries）","amount":"用量如 45ml，不确定填 \"\""}],
   "confidence": "high"/"medium"/"low"
 }
 规则：
@@ -1830,7 +1855,7 @@ ${librarySpecificInstructions}
 - nameZh 和 nameEn 必须填写，不能为空
 - yieldQty 为 0 表示不确定，不要填写虚假数值
 - steps 应包含具体操作步骤，不确定时填 ""
-- prepIngredients 如输入中已提供原料则原样返回，否则根据 prepType/story 推断常见原料，不确定时填 []
+- prepIngredients 如输入中已提供原料则原样返回（含 or 的品牌/产品备选写法原样保留，如 "house-made Citrus Bitters or Regans' Orange Bitters No. 6"；形容词备选如 "fresh or frozen cranberries" 只保留名词主体 cranberries）；否则根据 prepType/story 推断常见原料，不确定时填 []
 - 只输出 JSON，不要任何解释文字`;
         const signal = AbortSignal.timeout(30_000);
         let response;
@@ -1892,7 +1917,7 @@ ${librarySpecificInstructions}
           variantLabel: rawVariantLabel,
           prepIngredients: Array.isArray(p.prepIngredients)
             ? (p.prepIngredients as Record<string, unknown>[]).map(ing => ({
-                name: typeof ing?.name === "string" ? ing.name.trim() : "",
+                ...splitIngredientOrServer(typeof ing?.name === "string" ? ing.name.trim() : ""),
                 amount: typeof ing?.amount === "string" ? ing.amount.trim() : "",
               })).filter(ing => ing.name)
             : [],
@@ -1933,7 +1958,8 @@ ${input.text}
       "author": "作者/来源（如有，否则空字符串）",
       "year": "年份（如有，否则空字符串）",
       "ingredients": [
-        { "text": "2 oz Rye Whiskey", "amount": "2", "unit": "oz", "name": "Rye Whiskey", "confidence": "high" }
+        { "text": "2 oz Rye Whiskey", "amount": "2", "unit": "oz", "name": "Rye Whiskey", "confidence": "high" },
+        { "text": "1 oz Rye Whiskey or Bourbon", "amount": "1", "unit": "oz", "name": "Rye Whiskey or Bourbon", "confidence": "high" }
       ],
       "steps": "完整步骤说明（原文，如无则空字符串）",
       "garnish": "装饰物（如有，否则空字符串）",
@@ -1946,7 +1972,10 @@ ${input.text}
   ]
 }
 
-只输出 JSON，不要任何解释文字。`;
+只输出 JSON，不要任何解释文字。
+
+识别规则补充：
+- ingredients 的 name 字段：若原文配料有品牌/产品备选写法（如 "Rye Whiskey or Bourbon"），原样保留含 or 的完整文本；若是形容词备选（如 "fresh or frozen cranberries"），只保留名词主体（cranberries）`;
         const signal = AbortSignal.timeout(30_000);
         let response;
         try {
