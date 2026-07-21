@@ -585,3 +585,5 @@
 - [x] Bug7: isGarnishType 与 selectedGroup 不同步（统一使用 selectedGroup === "garnish"）
 - [x] AI 补全升级：自制库 AI 补全统一为建议面板模式（aiResult/aiToggles/undoSnapshot + buildAiFields + applyField + applyAiResult + undoAiApply）
 - [x] AI 建议面板 UI：可信度徽章、全选/只填空白/全不选、逐字段 toggle、应用/忽略、Undo toast
+
+- [x] 方案A：自制库实时成本估算面板（debounce+循环引用防护+Map索引+折叠明细+手动覆盖+来源标注，处理全部7个风险）

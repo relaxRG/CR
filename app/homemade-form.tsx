@@ -1,6 +1,6 @@
 import * as Haptics from "expo-haptics";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -39,6 +39,7 @@ import {
 } from "@/lib/homemade/types";
 import { prepSectionOfIn } from "@/lib/homemade/types";
 import { useBottleStore } from "@/lib/bottles/store";
+import { estimatePrepCost, type PrepCostEstimate } from "@/lib/homemade/cost";
 import { suggestIngredients } from "@/lib/suggest";
 import { useBottleTaxonomy } from "@/lib/bottles/taxonomy";
 import { BOTTLE_GROUPS, BottleGroupKey, categoriesOfGroup } from "@/lib/bottles/types";
@@ -229,6 +230,52 @@ export default function HomemadeFormScreen() {
   };
 
   const canSave = useMemo(() => name.trim().length > 0, [name]);
+
+  // ── 实时成本估算（方案A）──────────────────────────────────────────────
+  // 风险1：debounce 300ms，避免每次按键触发全量重算
+  const [debouncedIngRows, setDebouncedIngRows] = useState(ingRows);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(() => setDebouncedIngRows(ingRows), 300);
+    return () => { if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current); };
+  }, [ingRows]);
+
+  // 风险2：过滤当前编辑项防止循环引用；风险6：补全 tempPrep 所有必填字段
+  const liveEstimate = useMemo((): PrepCostEstimate | null => {
+    const validRows = debouncedIngRows.filter((r) => r.name.trim());
+    if (!validRows.length) return null;
+    const tempPrep = {
+      id: editing?.id ?? "__preview__",
+      name: name || "__preview__",
+      nameAlt: "",
+      type: type || "syrup",
+      abvGroup: selectedGroup,
+      yield: yieldQty && yieldUnit ? `${yieldQty}${yieldUnit}` : "",
+      yieldQty: parseFloat(yieldQty) || undefined,
+      yieldUnit: yieldUnit || undefined,
+      batchCostTotal: undefined,
+      ingredients: validRows.map((r) => ({ name: r.name, amount: r.amount })),
+      recipe: "", notes: "", shelfLife: "", storage: "", usageNotes: "",
+      story: "", styleDesc: "", flavorTags: [], techniques: [],
+      sourceFamilyKey: "", variantLabel: "",
+    } as unknown as Parameters<typeof estimatePrepCost>[0];
+    const safePreps = allPreps.filter((p) => p.id !== (editing?.id ?? "__preview__"));
+    return estimatePrepCost(tempPrep, bottles, safePreps);
+  }, [debouncedIngRows, bottles, allPreps, editing?.id, name, type, selectedGroup, yieldQty, yieldUnit]);
+
+  // 风险3：用 Map<rowId, item> 建立 ingRow → 估算结果的映射，避免空行索引错位
+  const liveEstimateMap = useMemo(() => {
+    const map = new Map<string, NonNullable<typeof liveEstimate>["items"][0]>();
+    if (!liveEstimate) return map;
+    const validRows = debouncedIngRows.filter((r) => r.name.trim());
+    validRows.forEach((row, i) => { if (liveEstimate.items[i]) map.set(row.id, liveEstimate.items[i]); });
+    return map;
+  }, [liveEstimate, debouncedIngRows]);
+
+  // 风险7：成本明细默认折叠；风险4：有手动值时自动展开批次总成本输入框
+  const [costDetailOpen, setCostDetailOpen] = useState(false);
+  const [costOverrideOpen, setCostOverrideOpen] = useState(() => !!(editing?.batchCostTotal));
 
   // ── AI 补全 ──────────────────────────────────────────────────────────
   const { isOnline } = useNetwork();
@@ -1246,6 +1293,128 @@ export default function HomemadeFormScreen() {
             </Text>
           </Pressable>
 
+          {/* ── 实时成本估算面板（方案A）──────────────────────────────────── */}
+          {liveEstimate && (
+            <View style={{ marginTop: 8, marginBottom: 4, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, overflow: "hidden" }}>
+              {/* 汇总行 */}
+              <Pressable
+                onPress={() => setCostDetailOpen((v) => !v)}
+                style={({ pressed }) => [{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, paddingVertical: 10 }, pressed && { opacity: 0.7 }]}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <IconSymbol name="sparkles" size={14} color={colors.primary} />
+                  <Text style={{ fontSize: 13, fontWeight: "600", color: colors.primary }}>
+                    {lang === "zh" ? "系统估算" : "Est. Cost"}
+                  </Text>
+                  {parseFloat(normalBatchCost) > 0 ? (
+                    <Text style={{ fontSize: 13, color: colors.muted, textDecorationLine: "line-through" }}>
+                      {"¥" + liveEstimate.batchCost.toFixed(1)}
+                    </Text>
+                  ) : (
+                    <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>
+                      {"¥" + liveEstimate.batchCost.toFixed(1)}
+                    </Text>
+                  )}
+                  {parseFloat(normalBatchCost) > 0 && (
+                    <View style={{ backgroundColor: colors.warning + "22", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                      <Text style={{ fontSize: 11, color: colors.warning, fontWeight: "600" }}>
+                        {lang === "zh" ? ("手动 ¥" + normalBatchCost) : ("Manual ¥" + normalBatchCost)}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                  <Text style={{ fontSize: 11, color: colors.muted }}>
+                    {liveEstimate.estimatedCount + "/" + liveEstimate.totalCount + " " + (lang === "zh" ? "已识别" : "matched")}
+                  </Text>
+                  <IconSymbol name={costDetailOpen ? "chevron.up" : "chevron.down"} size={12} color={colors.muted} />
+                </View>
+              </Pressable>
+              {/* 风险7：明细默认折叠 */}
+              {costDetailOpen && (
+                <View style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
+                  {liveEstimate.items.slice(0, 8).map((item, idx) => (
+                    <View key={idx} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, paddingVertical: 7, borderTopWidth: idx > 0 ? StyleSheet.hairlineWidth : 0, borderTopColor: colors.border }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1 }}>
+                        <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: item.cost != null ? colors.success : colors.muted }} />
+                        <Text style={{ fontSize: 12, color: colors.foreground, flex: 1 }} numberOfLines={1}>
+                          {item.line}
+                        </Text>
+                        {item.bottleId ? (
+                          <View style={{ backgroundColor: colors.primary + "18", borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1 }}>
+                            <Text style={{ fontSize: 10, color: colors.primary }}>{lang === "zh" ? "酒库" : "Lib"}</Text>
+                          </View>
+                        ) : item.cost != null ? (
+                          <View style={{ backgroundColor: colors.success + "18", borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1 }}>
+                            <Text style={{ fontSize: 10, color: colors.success }}>{lang === "zh" ? "内置" : "Ref"}</Text>
+                          </View>
+                        ) : (
+                          <View style={{ backgroundColor: colors.muted + "18", borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1 }}>
+                            <Text style={{ fontSize: 10, color: colors.muted }}>{"?"}</Text>
+                          </View>
+                        )}
+                      </View>
+                      <Text style={{ fontSize: 12, color: item.cost != null ? colors.foreground : colors.muted, marginLeft: 8, minWidth: 48, textAlign: "right" }}>
+                        {item.cost != null ? ("≈ ¥" + item.cost.toFixed(2)) : (lang === "zh" ? "未识别" : "—")}
+                      </Text>
+                    </View>
+                  ))}
+                  {liveEstimate.items.length > 8 && (
+                    <View style={{ paddingHorizontal: 12, paddingVertical: 6 }}>
+                      <Text style={{ fontSize: 11, color: colors.muted }}>{("+" + (liveEstimate.items.length - 8) + " " + (lang === "zh" ? "条" : "more"))}</Text>
+                    </View>
+                  )}
+                </View>
+              )}
+              {/* 风险4+5：手动覆盖折叠区 */}
+              <Pressable
+                onPress={() => setCostOverrideOpen((v) => !v)}
+                style={({ pressed }) => [{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, paddingVertical: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }, pressed && { opacity: 0.7 }]}
+              >
+                <Text style={{ fontSize: 12, color: colors.muted }}>
+                  {parseFloat(normalBatchCost) > 0
+                    ? (lang === "zh" ? ("✎ 手动填写 ¥" + normalBatchCost + "（已覆盖估算）") : ("✎ Manual ¥" + normalBatchCost + " (overrides estimate)"))
+                    : (lang === "zh" ? "手动精确填写批次总成本 ▾" : "Enter exact batch cost ▾")}
+                </Text>
+                <IconSymbol name={costOverrideOpen ? "chevron.up" : "chevron.down"} size={12} color={colors.muted} />
+              </Pressable>
+              {costOverrideOpen && (
+                <View style={{ paddingHorizontal: 12, paddingBottom: 12 }}>
+                  <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 6 }}>
+                    {lang === "zh" ? "手动填写将覆盖系统估算，适用于已知实际采购成本" : "Manual entry overrides estimate; use when you know actual cost"}
+                  </Text>
+                  <TextInput
+                    style={inputStyle}
+                    value={normalBatchCost}
+                    onChangeText={setNormalBatchCost}
+                    placeholder={lang === "zh" ? "批次总成本（¥），如：40" : "Batch total cost (¥), e.g. 40"}
+                    placeholderTextColor={colors.muted}
+                    keyboardType="numeric"
+                    returnKeyType="done"
+                  />
+                </View>
+              )}
+            </View>
+          )}
+          {/* 无原料时仍显示批次总成本输入框（保持原有行为） */}
+          {!liveEstimate && (
+            <View style={{ marginBottom: 8 }}>
+              {fieldLabel(lang === "zh" ? "批次总成本（¥）" : "Batch Total Cost (¥)")}
+              <TextInput
+                style={inputStyle}
+                value={normalBatchCost}
+                onChangeText={setNormalBatchCost}
+                placeholder={lang === "zh" ? "填写原料总花费，系统将自动 ÷ 产量" : "Total ingredient cost; system divides by yield"}
+                placeholderTextColor={colors.muted}
+                keyboardType="numeric"
+                returnKeyType="done"
+              />
+              <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>
+                {lang === "zh" ? "成本核算 = 批次总成本 ÷ 产量，如：¥40 ÷ 300ml = ¥0.13/ml" : "Cost = batch total ÷ yield, e.g. ¥40 ÷ 300ml = ¥0.13/ml"}
+              </Text>
+            </View>
+          )}
+
           {fieldLabel(t("hmform.recipe"))}
           {stepRows.map((row, idx) => (
             <View key={row.id} style={{ flexDirection: "row", alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
@@ -1307,22 +1476,30 @@ export default function HomemadeFormScreen() {
               <IconSymbol name="chevron.right" size={14} color={colors.muted} />
             </Pressable>
           </View>
-          {/* 实时成本预览 */}
+          {/* 实时成本预览（升级版：标注来源，支持估算/手动） */}
           {(() => {
             const qty = parseFloat(yieldQty);
-            const cost = parseFloat(normalBatchCost);
-            if (qty > 0 && cost > 0 && yieldUnit) {
-              const perUnit = cost / qty;
-              const unitLabel = yieldUnit;
+            const manualCost = parseFloat(normalBatchCost);
+            const estimatedCost = liveEstimate?.batchCost ?? null;
+            // 优先手动，其次估算
+            const effectiveCost = manualCost > 0 ? manualCost : estimatedCost;
+            const isManual = manualCost > 0;
+            if (qty > 0 && effectiveCost != null && effectiveCost > 0 && yieldUnit) {
+              const perUnit = effectiveCost / qty;
               const isLiquid = ["ml","L","oz","cl"].includes(yieldUnit);
               const isWeight = ["g","kg","斤"].includes(yieldUnit);
-              let preview = `¥${perUnit.toFixed(4)}/${unitLabel}`;
-              if (isLiquid && yieldUnit === "ml") preview += `  ·  ¥${(perUnit * 30).toFixed(3)}/30ml`;
-              if (isWeight && yieldUnit === "g") preview += `  ·  ¥${(perUnit * 100).toFixed(3)}/100g`;
+              let preview = "¥" + perUnit.toFixed(4) + "/" + yieldUnit;
+              if (isLiquid && yieldUnit === "ml") preview += "  ·  ¥" + (perUnit * 30).toFixed(3) + "/30ml";
+              if (isWeight && yieldUnit === "g") preview += "  ·  ¥" + (perUnit * 100).toFixed(3) + "/100g";
               return (
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6, paddingHorizontal: 4 }}>
                   <IconSymbol name="checkmark.circle.fill" size={14} color={colors.success} />
                   <Text style={{ fontSize: 12, color: colors.success, fontWeight: "600" }}>{preview}</Text>
+                  <View style={{ backgroundColor: (isManual ? colors.warning : colors.primary) + "22", borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 }}>
+                    <Text style={{ fontSize: 10, color: isManual ? colors.warning : colors.primary, fontWeight: "600" }}>
+                      {isManual ? (lang === "zh" ? "手动" : "Manual") : (lang === "zh" ? "估算" : "Est.")}
+                    </Text>
+                  </View>
                 </View>
               );
             }
@@ -1334,26 +1511,28 @@ export default function HomemadeFormScreen() {
               </Text>
             );
           })()}
-          {/* 批次总成本（所有分区均显示，装饰类也需要成本核算） */}
-          <View style={{ marginBottom: 8 }}>
-            {fieldLabel(lang === "zh" ? "批次总成本（¥）" : "Batch Total Cost (¥)")}
-            <TextInput
-              style={inputStyle}
-              value={normalBatchCost}
-              onChangeText={setNormalBatchCost}
-              placeholder={lang === "zh"
-                ? "填写原料总花费，系统将自动 ÷ 产量"
-                : "Total ingredient cost; system divides by yield"}
-              placeholderTextColor={colors.muted}
-              keyboardType="numeric"
-              returnKeyType="done"
-            />
-            <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>
-              {lang === "zh"
-                ? "成本核算 = 批次总成本 ÷ 产量，如：¥40 ÷ 300ml = ¥0.13/ml"
-                : "Cost = batch total ÷ yield, e.g. ¥40 ÷ 300ml = ¥0.13/ml"}
-            </Text>
-          </View>
+          {/* 批次总成本：仅在无原料（无 liveEstimate）时显示独立输入框；有原料时已集成在估算面板中 */}
+          {!liveEstimate && (
+            <View style={{ marginBottom: 8 }}>
+              {fieldLabel(lang === "zh" ? "批次总成本（¥）" : "Batch Total Cost (¥)")}
+              <TextInput
+                style={inputStyle}
+                value={normalBatchCost}
+                onChangeText={setNormalBatchCost}
+                placeholder={lang === "zh"
+                  ? "填写原料总花费，系统将自动 ÷ 产量"
+                  : "Total ingredient cost; system divides by yield"}
+                placeholderTextColor={colors.muted}
+                keyboardType="numeric"
+                returnKeyType="done"
+              />
+              <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>
+                {lang === "zh"
+                  ? "成本核算 = 批次总成本 ÷ 产量，如：¥40 ÷ 300ml = ¥0.13/ml"
+                  : "Cost = batch total ÷ yield, e.g. ¥40 ÷ 300ml = ¥0.13/ml"}
+              </Text>
+            </View>
+          )}
 
           {fieldLabel(t("hmform.shelfLife"))}
           {selectedGroup === "garnish" ? (
