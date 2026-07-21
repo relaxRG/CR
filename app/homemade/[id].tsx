@@ -337,10 +337,29 @@ export default function HomemadeDetailScreen() {
                   </Text>
                 ) : null}
                 {typeof ingItem !== "string" && ingItem.alternatives && ingItem.alternatives.length > 0 ? (
-                  <Text className="text-xs mt-0.5" style={{ color: colors.muted }} numberOfLines={2}>
-                    {ingItem.alternatives.map((alt: string) => `${lang === "zh" ? "或" : "or"} ${alt}`).join("  ")}
-                  </Text>
-                ) : null}
+                  <View className="flex-row flex-wrap mt-0.5" style={{ gap: 4 }}>
+                    {ingItem.alternatives.map((alt: string, altIdx: number) => (
+                      <Pressable
+                        key={`alt-${idx}-${altIdx}`}
+                        onPress={() => {
+                          if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          const newAlts = [ingItem.name, ...(ingItem.alternatives ?? []).filter((_, i) => i !== altIdx)];
+                          const newIngredients = prep.ingredients.map((item, i) =>
+                            i === idx && typeof item !== "string"
+                              ? { ...item, name: alt, alternatives: newAlts }
+                              : item
+                          );
+                          updatePrep(prep.id, { ingredients: newIngredients });
+                        }}
+                        style={({ pressed }) => [{ opacity: pressed ? 0.5 : 1 }]}
+                      >
+                        <Text className="text-xs" style={{ color: colors.muted }}>
+                          {lang === "zh" ? "或 " : "or "}{alt}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+) : null}
               </View>
               {ingAmount ? (
                 <Text className="text-[15px] text-muted ml-3" style={{ lineHeight: 21 }}>
@@ -626,3 +645,4 @@ export default function HomemadeDetailScreen() {
     </ScreenContainer>
   );
 }
+  const { updatePrep } = useHomemadeStore();

@@ -69,8 +69,7 @@ export default function RecipeDetailScreen() {
   const { t, lang } = useI18n();
   const { getRecipe, getCategory, toggleFavorite, toggleMade, setRating, deleteRecipe, tags } =
     useRecipeStore();
-  const { updateRecipePhoto } = useRecipeStore();
-  const { removeRecipePhoto } = useRecipeStore();
+  const { updateRecipePhoto, updateRecipe, removeRecipePhoto } = useRecipeStore();
   const { bottles, addBottle, updateBottle } = useBottleStore();
   const { preps } = useHomemadeStore();
   const recipe = getRecipe(id);
@@ -564,10 +563,29 @@ export default function RecipeDetailScreen() {
                         </Text>
                       ) : null}
                       {ing.alternatives && ing.alternatives.length > 0 ? (
-                        <Text className="text-xs mt-0.5" style={{ color: colors.muted }} numberOfLines={2}>
-                          {ing.alternatives.map((alt) => `${lang === "zh" ? "或" : "or"} ${alt}`).join("  ")}
-                        </Text>
-                      ) : null}
+                        <View className="flex-row flex-wrap mt-0.5" style={{ gap: 4 }}>
+                          {ing.alternatives.map((alt, altIdx) => (
+                            <Pressable
+                              key={`${ing.id}-alt-${altIdx}`}
+                              onPress={() => {
+                                if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                const newAlts = [ing.name, ...ing.alternatives!.filter((_, i) => i !== altIdx)];
+                                const newIngredients = recipe.ingredients.map((item) =>
+                                  item.id === ing.id
+                                    ? { ...item, name: alt, alternatives: newAlts, linkedBottleId: undefined, linkedPrepId: undefined, linkDismissed: false }
+                                    : item
+                                );
+                                updateRecipe(recipe.id, { ...recipe, ingredients: newIngredients });
+                              }}
+                              style={({ pressed }) => [{ opacity: pressed ? 0.5 : 1 }]}
+                            >
+                              <Text className="text-xs" style={{ color: colors.muted }}>
+                                {lang === "zh" ? "或 " : "or "}{alt}
+                              </Text>
+                            </Pressable>
+                          ))}
+                        </View>
+) : null}
                     </View>
                     <Text className="text-base text-muted text-right" style={{ width: 60 }} numberOfLines={1}>{formatAmountAsMl(ing.amount)}</Text>
                   </View>
