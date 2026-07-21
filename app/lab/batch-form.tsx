@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -120,6 +120,7 @@ export default function LabBatchFormScreen() {
   const [score, setScore] = useState<number | null>(editing?.score ?? null);
   const [verdict, setVerdict] = useState<LabVerdict>(editing?.verdict ?? "");
   const [focusedIng, setFocusedIng] = useState<string | null>(null);
+  const pressingIngSuggestRef = useRef(false);
   const [pickedIng, setPickedIng] = useState<Record<string, string>>({});
 
   const glassTags = tagsOf("glass");
@@ -151,10 +152,14 @@ export default function LabBatchFormScreen() {
 
   const updateIngredient = (iid: string, field: "name" | "amount", value: string) => {
     setIngredients((prev) => prev.map((i) => (i.id === iid ? { ...i, [field]: value } : i)));
+    if (field === "name") {
+      setPickedIng((prev) => { const n = { ...prev }; delete n[iid]; return n; });
+    }
   };
   const pickSuggestion = (iid: string, value: string) => {
     updateIngredient(iid, "name", value);
     setPickedIng((prev) => ({ ...prev, [iid]: value }));
+    setFocusedIng(null);
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
   const addIngredientRow = () => {
@@ -277,9 +282,11 @@ export default function LabBatchFormScreen() {
                     onChangeText={(v) => updateIngredient(ing.id, "name", v)}
                     onFocus={() => setFocusedIng(ing.id)}
                     onBlur={() => {
-                      setTimeout(() => {
-                        setFocusedIng((cur) => (cur === ing.id ? null : cur));
-                      }, 150);
+                      if (!pressingIngSuggestRef.current) {
+                        setTimeout(() => {
+                          setFocusedIng((cur) => (cur === ing.id ? null : cur));
+                        }, 150);
+                      }
                     }}
                     returnKeyType="done"
                     style={{ lineHeight: 20 }}
@@ -313,7 +320,9 @@ export default function LabBatchFormScreen() {
                     {liveSuggestions.map((s, sIdx) => (
                       <Pressable
                         key={s.key}
-                        onPress={() => pickSuggestion(ing.id, s.value)}
+                        onPressIn={() => { pressingIngSuggestRef.current = true; }}
+                        onPressOut={() => { pressingIngSuggestRef.current = false; }}
+                        onPress={() => { pickSuggestion(ing.id, s.value); pressingIngSuggestRef.current = false; }}
                         style={({ pressed }) => [
                           styles.suggestRow,
                           sIdx > 0 && {
@@ -610,6 +619,7 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 9,
+    minHeight: 44,
   },
   prepHint: {
     flexDirection: "row",

@@ -1,6 +1,6 @@
 import * as Haptics from "expo-haptics";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -97,6 +97,7 @@ export default function HomemadeFormScreen() {
   const [ingRows, setIngRows] = useState<IngRow[]>(() => toRows(editing?.ingredients ?? []));
   /** Which ingredient row is focused (shows live suggestions) */
   const [focusedIng, setFocusedIng] = useState<string | null>(null);
+  const pressingIngSuggestRef = useRef(false);
   /** Rows where user picked a suggestion — suppress dropdown until text changes */
   const [pickedIng, setPickedIng] = useState<Record<string, string>>({});
   // Pre-fill dismissed for existing ingredients when editing
@@ -305,11 +306,13 @@ export default function HomemadeFormScreen() {
       setDismissedLinks((prev) => { const n = { ...prev }; delete n[rid]; return n; });
       setAcceptedLinks((prev) => { const n = { ...prev }; delete n[rid]; return n; });
       setIngRows((prev) => prev.map((r) => r.id === rid ? { ...r, linkedBottleId: undefined, linkedPrepId: undefined } : r));
+      setPickedIng((prev) => { const n = { ...prev }; delete n[rid]; return n; });
     }
   };
   const pickSuggestion = (rid: string, value: string) => {
     updateIngRow(rid, "name", value);
     setPickedIng((prev) => ({ ...prev, [rid]: value }));
+    setFocusedIng(null);
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
@@ -385,12 +388,14 @@ export default function HomemadeFormScreen() {
            placeholderTextColor={colors.muted}
            value={row.name}
            onChangeText={(v) => updateIngRow(row.id, "name", v)}
-           onFocus={() => setFocusedIng(row.id)}
-           onBlur={() => {
-             setTimeout(() => {
-               setFocusedIng((cur) => (cur === row.id ? null : cur));
-             }, 150);
-           }}
+          onFocus={() => setFocusedIng(row.id)}
+          onBlur={() => {
+            if (!pressingIngSuggestRef.current) {
+              setTimeout(() => {
+                setFocusedIng((cur) => (cur === row.id ? null : cur));
+              }, 150);
+            }
+          }}
            returnKeyType="done"
            autoCapitalize="words"
          />
@@ -451,7 +456,9 @@ export default function HomemadeFormScreen() {
             {liveSuggestions.map((s, sIdx) => (
               <Pressable
                 key={s.key}
-                onPress={() => pickSuggestion(row.id, s.value)}
+                onPressIn={() => { pressingIngSuggestRef.current = true; }}
+                onPressOut={() => { pressingIngSuggestRef.current = false; }}
+                onPress={() => { pickSuggestion(row.id, s.value); pressingIngSuggestRef.current = false; }}
                 style={({ pressed }) => [
                   styles.suggestRow,
                   sIdx > 0 && {
@@ -1511,6 +1518,7 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 9,
+    minHeight: 44,
   },
   addRow: {
     flexDirection: "row",

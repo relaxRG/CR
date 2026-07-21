@@ -528,5 +528,10 @@
 - [x] Bug 3：pickSuggestion 加 setFocusedIng(null)，选中后立即关闭建议列表
 - [x] Bug 4：suggestRow 样式加 minHeight: 44，扩大点击热区
 - [x] Bug 5：updateIngredient name 分支加 setPickedIng 清除，避免状态歧义
-- [x] 配料行/装饰行建议 Pressable 改为 onPressIn/onPressOut/onPress 三件套
+  - [x] 配料行/装饰行建议 Pressable 改为 onPressIn/onPressOut/onPress 三件套
+  - [x] TypeScript 0 错误
+
+## 自制库编辑页 + 研发批次编辑页建议列表 Bug 修复（2026-07-21）
+- [x] homemade-form.tsx：同等应用方案四（双重保护），修复配料行建议列表无法点击的 5 个 Bug
+- [x] batch-form.tsx：同等应用方案四（双重保护），修复配料行建议列表无法点击的 5 个 Bug
 - [x] TypeScript 0 错误
