@@ -563,6 +563,11 @@ export default function RecipeDetailScreen() {
                           {smart.secondary}
                         </Text>
                       ) : null}
+                      {ing.alternatives && ing.alternatives.length > 0 ? (
+                        <Text className="text-xs mt-0.5" style={{ color: colors.muted }} numberOfLines={2}>
+                          {ing.alternatives.map((alt) => `${lang === "zh" ? "或" : "or"} ${alt}`).join("  ")}
+                        </Text>
+                      ) : null}
                     </View>
                     <Text className="text-base text-muted text-right" style={{ width: 60 }} numberOfLines={1}>{formatAmountAsMl(ing.amount)}</Text>
                   </View>

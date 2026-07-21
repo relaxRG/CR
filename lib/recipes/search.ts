@@ -74,7 +74,18 @@ export function filterRecipes(
       if (n.includes(q)) return true;
       if (qZh !== q && n.includes(qZh)) return true;
       const nZh = normalizeIngredientName(i.name).toLowerCase();
-      return nZh !== n && (nZh.includes(q) || nZh.includes(qZh));
+      if (nZh !== n && (nZh.includes(q) || nZh.includes(qZh))) return true;
+      // 同时搜索 or 备选名称
+      if (i.alternatives && i.alternatives.length > 0) {
+        return i.alternatives.some((alt) => {
+          const a = alt.toLowerCase();
+          if (a.includes(q)) return true;
+          if (qZh !== q && a.includes(qZh)) return true;
+          const aZh = normalizeIngredientName(alt).toLowerCase();
+          return aZh !== a && (aZh.includes(q) || aZh.includes(qZh));
+        });
+      }
+      return false;
     });
   });
 }

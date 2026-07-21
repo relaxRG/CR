@@ -420,6 +420,24 @@ export function estimatePrepCost(
       ? ingItem
       : (ingItem.amount ? `${ingItem.amount} ${ingItem.name}` : ingItem.name);
     const parsed = parseQuantity(line);
+    // or 备选：对每个选项分别估算，取成本最高项
+    if (typeof ingItem !== "string" && ingItem.alternatives && ingItem.alternatives.length > 0) {
+      const allNames = [ingItem.name, ...ingItem.alternatives];
+      const results = allNames.map((n) => {
+        const altLine = ingItem.amount ? `${ingItem.amount} ${n}` : n;
+        // 递归调用单条估算逻辑：构造临时 prep 只含这一条
+        const tempPrep: HomemadePrep = { ...prep, ingredients: [{ name: n, amount: ingItem.amount }] };
+        const tempResult = estimatePrepCost(tempPrep, bottles, allPreps);
+        return tempResult.items[0] ? { ...tempResult.items[0], line: altLine } : null;
+      }).filter((r): r is PrepIngredientCost => r !== null);
+      const withCost = results.filter((r) => r.cost !== null);
+      if (withCost.length > 0) {
+        const best = withCost.reduce((a, b) => (b.cost! > a.cost! ? b : a));
+        return { ...best, line }; // 保留原始 line（含 or 文本）
+      }
+      if (results.length > 0) return { ...results[0], line };
+    }
+
     const gpp = gramsPerPieceOf(line);
     // 果皮行:成本按整果价折减(取皮通常不足整果价值的 1/3)
     const peelFactor = /peels?|rinds?|zests?|果皮|(?<![果])皮\b/i.test(line) ? 0.35 : 1;

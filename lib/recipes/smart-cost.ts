@@ -129,6 +129,20 @@ export function estimateIngredientCostSmart(
 ): SmartIngredientCost {
   // If user explicitly linked this ingredient via ID, resolve directly
   let link: SmartLink = null;
+  // or 备选：对每个选项分别估算，取成本最高项（与装饰 or 逻辑一致）
+  if (!ing.linkedBottleId && !ing.linkedPrepId && ing.alternatives && ing.alternatives.length > 0) {
+    const allNames = [ing.name, ...ing.alternatives];
+    const results = allNames.map((n) =>
+      estimateIngredientCostSmart({ ...ing, name: n, alternatives: undefined }, bottles, preps),
+    );
+    // 取成本最高项（有成本的优先，无成本时取第一项）
+    const withCost = results.filter((r) => r.cost !== null);
+    const best = withCost.length > 0
+      ? withCost.reduce((a, b) => (b.cost! > a.cost! ? b : a))
+      : results[0];
+    return { ...best, ingredient: ing };
+  }
+
   if (ing.linkedBottleId) {
     const b = bottles.find((bt) => bt.id === ing.linkedBottleId);
     if (b) link = { kind: "bottle", bottle: b, matchConfidence: "exact" };

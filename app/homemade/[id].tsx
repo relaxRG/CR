@@ -336,6 +336,11 @@ export default function HomemadeDetailScreen() {
                     }
                   </Text>
                 ) : null}
+                {typeof ingItem !== "string" && ingItem.alternatives && ingItem.alternatives.length > 0 ? (
+                  <Text className="text-xs mt-0.5" style={{ color: colors.muted }} numberOfLines={2}>
+                    {ingItem.alternatives.map((alt: string) => `${lang === "zh" ? "或" : "or"} ${alt}`).join("  ")}
+                  </Text>
+                ) : null}
               </View>
               {ingAmount ? (
                 <Text className="text-[15px] text-muted ml-3" style={{ lineHeight: 21 }}>

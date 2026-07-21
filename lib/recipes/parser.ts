@@ -166,7 +166,7 @@ export function looksLikeIngredientLine(line: string): boolean {
 export function splitIngredientLine(
   line: string,
   opts?: { lang?: "zh" | "en"; applyTitleCase?: boolean },
-): { name: string; amount: string; modifier?: string } {
+): { name: string; amount: string; modifier?: string; alternatives?: string[] } {
   const lang = opts?.lang ?? "zh";
   const applyTitleCase = opts?.applyTitleCase ?? (lang === "en");
   let t = line
@@ -186,7 +186,7 @@ export function splitIngredientLine(
   const m = t.match(AMOUNT_RE);
   if (!m) {
     const name = applyTitleCase ? toTitleCase(t) : t;
-    return { name, amount: "", modifier };
+    return normalizeOrSplit({ name, amount: "", modifier }, applyTitleCase);
   }
   const amount = m[0].trim();
   // 名称 = 去掉用量后的剩余部分
@@ -195,10 +195,78 @@ export function splitIngredientLine(
   // 处理"金酒 45ml"与"45ml 金酒"两种顺序
   if (!name) {
     const fallback = applyTitleCase ? toTitleCase(t) : t;
-    return { name: fallback, amount: "", modifier };
+    return normalizeOrSplit({ name: fallback, amount: "", modifier }, applyTitleCase);
   }
   if (applyTitleCase) name = toTitleCase(name);
-  return { name, amount, modifier };
+  return normalizeOrSplit({ name, amount, modifier }, applyTitleCase);
+}
+
+// ─── or 备选识别 ──────────────────────────────────────────────────────────────
+
+/**
+ * 形容词状态词列表：这类词出现在 or 两侧时，表示同一食材的不同状态，
+ * 不应产生 alternatives，而是剥离形容词后合并为同一食材名称。
+ * 例："fresh or frozen cranberries" → "cranberries"（不产生备选）
+ */
+const STATE_ADJ_RE = /^(fresh|frozen|dried|canned|bottled|fresh-squeezed|freshly\s+squeezed|homemade|house-made|house\s+made|roasted|toasted|smoked|unsalted|salted|raw|cooked|whole|ground|crushed|powdered|pitted|peeled|sliced|diced|chopped|minced|grated|zested)$/i;
+
+/**
+ * 检测 or 两侧是否都是形容词（同一食材的不同状态）。
+ * 例："fresh or frozen" → true（都是状态形容词）
+ * 例："Rye Whiskey or Bourbon" → false（不同食材）
+ */
+function isStateAdjectivePair(parts: string[]): boolean {
+  // 每个 part 的第一个词是形容词，且最后一个 part 有名词尾部
+  return parts.slice(0, -1).every((p) => {
+    const words = p.trim().split(/\s+/);
+    return words.length === 1 && STATE_ADJ_RE.test(words[0]);
+  });
+}
+
+/**
+ * 对解析结果进行 or 备选规范化：
+ * 1. 检测名称中是否含有 " or " / " 或 "
+ * 2. 若两侧都是状态形容词 → 剥离形容词，合并为同一食材
+ * 3. 否则 → 拆分为 name + alternatives
+ */
+function normalizeOrSplit(
+  parsed: { name: string; amount: string; modifier?: string },
+  applyTitleCase: boolean,
+): { name: string; amount: string; modifier?: string; alternatives?: string[] } {
+  const { name, amount, modifier } = parsed;
+  // 检测 or / 或
+  const OR_RE = /\s+(?:or|或)\s+/i;
+  if (!OR_RE.test(name)) return parsed;
+
+  const parts = name.split(OR_RE).map((s) => s.trim()).filter(Boolean);
+  if (parts.length < 2) return parsed;
+
+  // 形容词 or 检测：如 "fresh or frozen cranberries"
+  if (isStateAdjectivePair(parts)) {
+    // 取最后一个 part（含名词），剥离其开头的形容词
+    const lastPart = parts[parts.length - 1];
+    const lastWords = lastPart.split(/\s+/);
+    const cleanName = STATE_ADJ_RE.test(lastWords[0])
+      ? lastWords.slice(1).join(" ")
+      : lastPart;
+    const finalName = applyTitleCase ? toTitleCase(cleanName) : cleanName;
+    return { name: finalName, amount, modifier };
+  }
+
+  // 普通 or 备选：name = 第一项，alternatives = 其余项
+  const primaryName = applyTitleCase ? toTitleCase(parts[0]) : parts[0];
+  const alts = parts.slice(1).map((p) => (applyTitleCase ? toTitleCase(p) : p));
+  return { name: primaryName, amount, modifier, alternatives: alts };
+}
+
+/**
+ * 对已存储的 Ingredient 进行 or 规范化（兼容旧数据）。
+ * 旧数据中 name 可能含有 " or "，此函数自动拆分。
+ */
+export function normalizeIngredient(ing: { name: string; amount: string; alternatives?: string[] }): { name: string; amount: string; alternatives?: string[] } {
+  if (ing.alternatives) return ing; // 已规范化，直接返回
+  const result = normalizeOrSplit({ name: ing.name, amount: ing.amount }, false);
+  return { name: result.name, amount: result.amount, alternatives: result.alternatives };
 }
 
 /**
@@ -269,10 +337,10 @@ export function parseRecipeText(text: string, lang?: "zh" | "en"): ParsedRecipe 
 
     if (section === "ingredients") {
       if (looksLikeIngredientLine(line)) {
-        const { name, amount } = splitIngredientLine(line, { lang, applyTitleCase: useTitleCase });
-        result.ingredients.push({ id: genId(), name, amount });
+        const { name, amount, alternatives } = splitIngredientLine(line, { lang, applyTitleCase: useTitleCase });
+        result.ingredients.push({ id: genId(), name, amount, ...(alternatives ? { alternatives } : {}) });
       } else {
-        // 配料节中不像配料的行,可能是无用量配料(如"薄荷叶")
+        // 配料节中不像配料的行，可能是无用量配料（如"薄荷叶"）
         const rawName = line.replace(/^[-•·*\d]+[.、)\s]*\s*/, "");
         result.ingredients.push({ id: genId(), name: useTitleCase ? toTitleCase(rawName) : rawName, amount: "" });
       }
@@ -292,8 +360,8 @@ export function parseRecipeText(text: string, lang?: "zh" | "en"): ParsedRecipe 
   // 无分节标题时的自动归类
   for (const line of bodyLines) {
     if (looksLikeIngredientLine(line)) {
-      const { name, amount } = splitIngredientLine(line, { lang, applyTitleCase: useTitleCase });
-      result.ingredients.push({ id: genId(), name, amount });
+      const { name, amount, alternatives } = splitIngredientLine(line, { lang, applyTitleCase: useTitleCase });
+      result.ingredients.push({ id: genId(), name, amount, ...(alternatives ? { alternatives } : {}) });
     } else if (!result.name && line.length <= 25 && !/[。;;.]/.test(line)) {
       // 第一条简短且不含句号的行 → 酒名
       result.name = line.replace(/^[##\s]+/, "");

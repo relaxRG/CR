@@ -54,16 +54,17 @@ interface IngRow {
   amount: string;
   linkedBottleId?: string;
   linkedPrepId?: string;
+  alternatives?: string[];
 }
 
 type PrepIngItem = { name: string; amount: string } | string;
 function toRows(items: PrepIngItem[]): IngRow[] {
   const rows = items.map((item) => {
     if (typeof item === "string") {
-      const { amount, name } = splitPrepIngredientLine(item);
-      return { id: genId(), name, amount };
+      const { amount, name, alternatives } = splitPrepIngredientLine(item);
+      return { id: genId(), name, amount, ...(alternatives ? { alternatives } : {}) };
     }
-    return { id: genId(), name: item.name, amount: item.amount };
+    return { id: genId(), name: item.name, amount: item.amount, ...(('alternatives' in item && item.alternatives) ? { alternatives: (item as { alternatives?: string[] }).alternatives } : {}) };
   });
   return rows.length > 0 ? rows : [{ id: genId(), name: "", amount: "" }];
 }
@@ -906,7 +907,11 @@ export default function HomemadeFormScreen() {
 
     const ingredients = ingRows
       .filter((r) => r.name.trim() || r.amount.trim())
-      .map((r) => ({ name: r.name.trim(), amount: r.amount.trim() }));
+      .map((r) => ({
+        name: r.name.trim(),
+        amount: r.amount.trim(),
+        ...(r.alternatives && r.alternatives.length > 0 ? { alternatives: r.alternatives } : {}),
+      }));
     const payload = {
       name: name.trim(),
       nameAlt: nameAlt.trim(),

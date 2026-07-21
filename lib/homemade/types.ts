@@ -77,7 +77,7 @@ export interface HomemadePrep {
   /** 关联原材料库条目 ID 列表（装饰所用原料，成本可自动汇总） */
   linkedMaterialIds?: string[];
   /** Structured ingredient list — name + amount pair */
-  ingredients: { name: string; amount: string }[];
+  ingredients: { name: string; amount: string; alternatives?: string[] }[];
   /** Recipe / method free text */
   recipe: string;
   /** e.g. "~750ml" */
@@ -702,7 +702,29 @@ export function normalizeIngredientAmount(amount: string, name?: string): string
   return text;
 }
 
-export function splitPrepIngredientLine(line: string): { amount: string; name: string } {
+/** or 备选状态形容词 */
+const PREP_STATE_ADJ_RE = /^(fresh|frozen|dried|canned|bottled|fresh-squeezed|freshly\s+squeezed|homemade|house-made|house\s+made|roasted|toasted|smoked|unsalted|salted|raw|cooked|whole|ground|crushed|powdered|pitted|peeled|sliced|diced|chopped|minced|grated|zested)$/i;
+
+/** 对名称进行 or 备选规范化（与 parser.ts 逻辑一致） */
+function splitOrAlternatives(name: string): { name: string; alternatives?: string[] } {
+  const OR_RE = /\s+(?:or|或)\s+/i;
+  if (!OR_RE.test(name)) return { name };
+  const parts = name.split(OR_RE).map((s) => s.trim()).filter(Boolean);
+  if (parts.length < 2) return { name };
+  const isStateAdj = parts.slice(0, -1).every((p) => {
+    const words = p.trim().split(/\s+/);
+    return words.length === 1 && PREP_STATE_ADJ_RE.test(words[0]);
+  });
+  if (isStateAdj) {
+    const lastPart = parts[parts.length - 1];
+    const lastWords = lastPart.split(/\s+/);
+    const cleanName = PREP_STATE_ADJ_RE.test(lastWords[0]) ? lastWords.slice(1).join(" ") : lastPart;
+    return { name: cleanName };
+  }
+  return { name: parts[0], alternatives: parts.slice(1) };
+}
+
+export function splitPrepIngredientLine(line: string): { amount: string; name: string; alternatives?: string[] } {
   const trimmed = line.trim();
   if (!trimmed) return { amount: "", name: "" };
   // Handle "X of ¼ Y" pattern (e.g. "Zest of ¼ pomelo", "Juice of ½ lemon")
@@ -724,21 +746,23 @@ export function splitPrepIngredientLine(line: string): { amount: string; name: s
     if (ofMatch) {
       // Restore full name: "prefix of rest"
       const [, prefix, , rest] = ofMatch;
-      return { amount: normalizeIngredientAmount(m[1].trim(), `${prefix} of ${m[2].trim()}`), name: `${prefix} of ${m[2].trim()}` };
+      const n = `${prefix} of ${m[2].trim()}`;
+      return { amount: normalizeIngredientAmount(m[1].trim(), n), ...splitOrAlternatives(n) };
     }
-    return { amount: normalizeIngredientAmount(m[1].trim(), m[2].trim()), name: m[2].trim() };
+    return { amount: normalizeIngredientAmount(m[1].trim(), m[2].trim()), ...splitOrAlternatives(m[2].trim()) };
   }
   // Fallback for "X of ¼ Y" when unit part doesn't match: still extract quantity
   if (ofMatch) {
     const [, prefix, qty, rest] = ofMatch;
-    return { amount: normalizeIngredientAmount(qty, `${prefix} of ${rest}`), name: `${prefix} of ${rest}` };
+    const n = `${prefix} of ${rest}`;
+    return { amount: normalizeIngredientAmount(qty, n), ...splitOrAlternatives(n) };
   }
   // Fallback: bare unit word with no leading number, e.g. "oz Peychaud's bitters"
   const unitOnly = trimmed.match(UNIT_ONLY_RE);
   if (unitOnly) {
-    return { amount: normalizeIngredientAmount(unitOnly[1].trim(), unitOnly[2].trim()), name: unitOnly[2].trim() };
+    return { amount: normalizeIngredientAmount(unitOnly[1].trim(), unitOnly[2].trim()), ...splitOrAlternatives(unitOnly[2].trim()) };
   }
-  return { amount: "", name: trimmed };
+  return { amount: "", ...splitOrAlternatives(trimmed) };
 }
 
 /** Re-join a structured ingredient row into the stored line format. */

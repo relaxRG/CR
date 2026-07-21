@@ -70,6 +70,12 @@ export interface Ingredient {
    * undefined/"auto" = 四库全搜（默认行为）
    */
   preferredSource?: "auto" | "spirits" | "bottles" | "materials" | "homemade";
+  /**
+   * or 备选项：当配料有多个可互换选项时（如 "Rye or Bourbon"），
+   * name 存第一个选项，alternatives 存其余选项。
+   * 成本计算取所有选项中最高项；详情页显示「或 xxx」标签。
+   */
+  alternatives?: string[];
 }
 
 /** 结构化装饰条目：与 Ingredient 的链接语义对齐（无分量字段） */

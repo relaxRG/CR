@@ -69,6 +69,12 @@ export function smartLinkIngredient(
   const name = rawName.trim();
   if (!name || name.length < 2) return null;
 
+  // 0) 剥离修饰前缀（house-made / homemade / fresh / fresh-squeezed 等）
+  // 这类前缀描述食材的来源或状态，不是食材名称本身
+  const PREP_PREFIX_RE = /^(?:house[-\s]made|homemade|home[-\s]made|fresh(?:[-\s]squeezed)?|freshly\s+squeezed|house\s+made|self[-\s]made)\s+/i;
+  const strippedPrefixName = name.replace(PREP_PREFIX_RE, "").trim();
+  const hasPrefix = strippedPrefixName !== name && strippedPrefixName.length >= 2;
+
   // 提取变体暗示词（用于同名变体精细匹配）
   const variantHint = extractVariantHint(name, preps);
 
@@ -109,6 +115,15 @@ export function smartLinkIngredient(
   if (eb) return { kind: "bottle", bottle: eb, matchConfidence: "exact" };
   const ep = exactPrep(name, filteredPreps, variantHint);
   if (ep) return { kind: "prep", prep: ep, matchConfidence: "exact" };
+
+  // 2) Waldorf 别名规范化 → 双边精确匹配
+  // 1.5) 修饰前缀剥离后精确匹配（house-made Citrus Bitters → Citrus Bitters）
+  if (hasPrefix) {
+    const eb2 = exactBottle(strippedPrefixName, filteredBottles);
+    if (eb2) return { kind: "bottle", bottle: eb2, matchConfidence: "exact" };
+    const ep2 = exactPrep(strippedPrefixName, filteredPreps, variantHint);
+    if (ep2) return { kind: "prep", prep: ep2, matchConfidence: "exact" };
+  }
 
   // 2) Waldorf 别名规范化 → 双边精确匹配
   const resolved = resolveIngredientNames(name, filteredBottles, filteredPreps);

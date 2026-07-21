@@ -155,7 +155,7 @@ export function normalizePrepName(name: string): string {
     .toLowerCase()
     .replace(/\(.*?\)/g, " ")
     .replace(/\b(house-?made|homemade|chilled|cooled|brewed)\b/g, " ")
-    .replace(/\bor\b.*$/g, " ") // "simple syrup or gomme syrup" → simple syrup
+    .replace(/\s+or\s+.*$/i, " ") // "simple syrup or gomme syrup" → "simple syrup"（保留第一选项，丢弃 or 后内容）
     .replace(/[^a-z\u4e00-\u9fff]+/g, " ")
     .trim()
     .replace(/\s+/g, " ");
