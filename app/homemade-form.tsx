@@ -88,7 +88,7 @@ export default function HomemadeFormScreen() {
     prefillNameAlt?: string;
     prefillType?: string;
   }>();
-  const { getPrep, addPrep, updatePrep, deletePrep, sections, types: typeList, preps: allPreps } = useHomemadeStore();
+  const { ready, getPrep, addPrep, updatePrep, deletePrep, sections, types: typeList, preps: allPreps } = useHomemadeStore();
   const { bottles, addBottle, deleteBottle: _deleteBottle } = useBottleStore();
   const { recipes, updateRecipe } = useRecipeStore();
   const { groupOf, categoryLabel } = useBottleTaxonomy();
@@ -230,6 +230,61 @@ export default function HomemadeFormScreen() {
   };
 
   const canSave = useMemo(() => name.trim().length > 0, [name]);
+
+  // ── 编辑模式：store 异步加载完成后重新同步所有字段 ────────────────────────
+  // useState 初始值只在首次渲染时生效；若 store 尚未 ready，editing 为 undefined，
+  // 导致 type/selectedGroup 等字段锁定在默认值。ready 变为 true 后重新同步一次。
+  const storeHydratedRef = useRef(false);
+  useEffect(() => {
+    if (!ready || !id || storeHydratedRef.current) return;
+    storeHydratedRef.current = true;
+    const e = getPrep(id);
+    if (!e) return;
+    // 基础字段
+    setName(e.name ?? "");
+    setNameAlt(e.nameAlt ?? "");
+    setType(e.type ?? "syrup");
+    setTypeTouched(true);
+    // 分组
+    const grp: PrepGroup =
+      e.abvGroup === "alcoholic" || e.abvGroup === "non_alcoholic" || e.abvGroup === "garnish"
+        ? e.abvGroup
+        : inferGroupFromType(e.type ?? "syrup");
+    setSelectedGroup(grp);
+    // 原料行
+    const rows = toRows(e.ingredients ?? []);
+    setIngRows(rows);
+    setDismissedLinks(Object.fromEntries(rows.map((r) => [r.id, true])));
+    // 步骤
+    setStepRows(parseStepRows(e.recipe ?? ""));
+    // 产量
+    setYieldStr(e.yield ?? "");
+    setYieldQty(e.yieldQty ? String(e.yieldQty) : "");
+    setYieldUnit(e.yieldUnit ?? "");
+    // 成本
+    setNormalBatchCost(e.batchCostTotal ? String(e.batchCostTotal) : "");
+    setGarnishUnit(e.garnishUnit ?? "片");
+    setBatchYield(e.batchYield?.toString() ?? "");
+    setBatchCost(e.batchCost?.toString() ?? "");
+    setCostPerUnit(e.costPerUnit?.toString() ?? "");
+    setCostMode(e.batchYield ? "batch" : "direct");
+    setCostOverrideOpen(!!(e.batchCostTotal));
+    // 其他字段
+    setShelfLife(e.shelfLife ?? "");
+    setShelfLifeKey(e.shelfLifeKey ?? "");
+    setStorage(e.storage ?? "");
+    setSource(e.source ?? "");
+    setNotes(e.notes ?? "");
+    setStory(e.story ?? "");
+    setStyleDesc(e.styleDesc ?? "");
+    setUsageNotes(e.usageNotes ?? "");
+    setFlavorTags(e.flavorTags ?? []);
+    setTechniques(e.techniques ?? []);
+    setSourceFamilyKey(e.sourceFamilyKey ?? "");
+    setVariantLabel(e.variantLabel ?? "");
+    setPrepMethod(e.prepMethod ?? "");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, id]);
 
   // ── 实时成本估算（方案A）──────────────────────────────────────────────
   // 风险1：debounce 300ms，避免每次按键触发全量重算
