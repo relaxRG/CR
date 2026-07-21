@@ -563,3 +563,13 @@
 - [x] 同步更新 app/(tabs)/homemade.tsx：enrichHomemade 调用直接传 {name,amount}[]
 - [x] 同步更新 app/bulk-import.tsx：移除 parseIngStr 转换逻辑，直接使用服务端结构化数据
 - [x] TypeScript 0 错误
+
+## 自制库原料用量单位标准化（层次3）（2026-07-21）
+- [x] lib/homemade/types.ts 新增 normalizeIngredientAmount(amount, name?) 函数
+  - 液体单位 → ml：oz(30)/tsp(5)/tbsp(15)/dash(0.9)/drop(0.05)/shot(45)/cup(240)/pint(480)/cl/dl/L/dsp/scsp/rinse/splash
+  - 重量单位 → g：kg/mg/lb/斤/两/钱/stone/tonne
+  - oz 歧义：通过 isLiquidContext(name+amount) 自动判断液体(→ml) vs 固体(→g)
+  - 计数/比例/模糊单位（个/片/枝/parts/pinch/适量等）原样保留
+  - 数字格式：整数不加小数点，小数保留1位（如 2.7ml、0.5ml）
+- [x] lib/homemade/types.ts splitPrepIngredientLine 所有 return 路径调用 normalizeIngredientAmount
+- [x] TypeScript 0 错误

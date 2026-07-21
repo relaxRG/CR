@@ -2,7 +2,19 @@
 // English-first design with Chinese translations.
 import { SourceRef } from "@/lib/recipes/types";
 
-import { FRAC_CHARS } from "@/lib/units";
+import {
+  FRAC_CHARS, UNICODE_FRACTIONS,
+  ML_PER_OZ, ML_PER_CL, ML_PER_DL, ML_PER_L,
+  ML_PER_TSP, ML_PER_TBSP, ML_PER_BSP,
+  ML_PER_DASH, ML_PER_DROP, ML_PER_SPLASH,
+  ML_PER_SHOT, ML_PER_PONY, ML_PER_CUP,
+  ML_PER_PINT, ML_PER_QUART, ML_PER_GALLON,
+  ML_PER_DSP, ML_PER_RINSE, ML_PER_SCSP,
+  G_PER_KG, G_PER_MG, G_PER_LB,
+  G_PER_JIN, G_PER_LIANG, G_PER_QIAN,
+  G_PER_STONE, G_PER_TONNE,
+  isLiquidContext,
+} from "@/lib/units";
 
 /** 自制库顶层分组:含酒精 / 无酒精(类似酒库的基酒库/酒款库/原材料库) */
 export type PrepGroup = "alcoholic" | "non_alcoholic" | "garnish";
@@ -600,6 +612,143 @@ const UNIT_ONLY_RE = new RegExp(
   "i",
 );
 
+
+/**
+ * Normalize a bartender-style amount string to canonical ml or g form.
+ *
+ * Converts industry shorthand units (oz, tsp, tbsp, dash, drop, shot, etc.)
+ * to ml so the cost engine can match against bottle/material prices.
+ * Weight units are normalized to g. Count/ratio/fuzzy units are preserved as-is.
+ *
+ * Examples:
+ *   "1.5 oz"  → "45ml"
+ *   "2 tsp"   → "10ml"
+ *   "3 dash"  → "2.7ml"
+ *   "500g"    → "500g"    (already canonical, unchanged)
+ *   "1 kg"    → "1000g"
+ *   "2 個"    → "2 個"    (count unit, preserved)
+ *   "适量"    → "适量"    (fuzzy, preserved)
+ *   ""        → ""
+ *
+ * @param amount  Raw amount string from user input or AI output
+ * @param name    Optional ingredient name for oz liquid/solid disambiguation
+ * @returns Normalized amount string; original string if no conversion applies
+ */
+export function normalizeIngredientAmount(amount: string, name?: string): string {
+  const text = amount.trim();
+  if (!text) return text;
+
+  // ── Fuzzy / qualitative amounts: preserve as-is ──────────────────────────
+  if (/^(适量|少许|酌量|to\s+taste|as\s+needed|to\s+top|top\s+up|a\s+pinch|a\s+bit|some\b|若干|一点)$/i.test(text)) {
+    return text;
+  }
+  // Ranges with "or/或" — don't convert, ambiguous
+  if (/\bor\b|或/i.test(text)) return text;
+
+  // ── Parse numeric value ───────────────────────────────────────────────────
+  let working = text;
+  // Expand Unicode vulgar fractions: "1½" → "1.5", "¼" → "0.25"
+  for (const [ch, val] of Object.entries(UNICODE_FRACTIONS)) {
+    working = working.replace(new RegExp(`(\\d+)\\s*${ch}`, "g"), (_, n) => String(Number(n) + val));
+    working = working.replace(new RegExp(ch, "g"), String(val));
+  }
+  // Strip leading approximation markers
+  working = working.replace(/^(?:约|~|≈)\s*/, "");
+
+  let value: number | null = null;
+  // Mixed fraction: "1 1/2"
+  const mixedM = working.match(/^(\d+)\s+(\d+)\s*\/\s*(\d+)\s*/);
+  if (mixedM) {
+    value = Number(mixedM[1]) + Number(mixedM[2]) / Number(mixedM[3]);
+    working = working.slice(mixedM[0].length);
+  } else {
+    // Slash fraction: "1/2"
+    const fracM = working.match(/^(\d+)\s*\/\s*(\d+)\s*/);
+    if (fracM) {
+      value = Number(fracM[1]) / Number(fracM[2]);
+      working = working.slice(fracM[0].length);
+    } else {
+      // Integer or decimal: "1.5", "30"
+      const numM = working.match(/^(\d+(?:[.,]\d+)?)\s*/);
+      if (numM) {
+        value = Number(numM[1].replace(",", "."));
+        working = working.slice(numM[0].length);
+      }
+    }
+  }
+  if (value === null || !isFinite(value) || value <= 0) return text;
+
+  // ── Remaining string is the unit ─────────────────────────────────────────
+  const unitRaw = working.trim().replace(/\.$/, "").toLowerCase();
+
+  // ── Count / ratio / fuzzy units: preserve original ───────────────────────
+  const TRULY_COUNT_RE = /^(个|枚|颗|粒|根|片|只|条|瓣|把|包|袋|听|罐|瓶|块|枝|叶|pieces?|pcs?|sticks?|stalks?|slices?|leaves?|leaf|sprigs?|pods?|cloves?|beans?|cubes?|wedges?|twists?|eggs?|parts?|份|比例|pinch(?:es)?|撮|handful|圈|wheels?|扭|peels?|楔)$/i;
+  if (TRULY_COUNT_RE.test(unitRaw)) return text;
+  // No unit: bare number — preserve for count-like small values
+  if (!unitRaw) {
+    if (value <= 20) return text; // likely a count (e.g. "3 lemons")
+    return `${value}ml`; // large bare number treated as ml shorthand
+  }
+
+  // ── Helper: format ml/g result ────────────────────────────────────────────
+  const fmtMl = (ml: number): string => {
+    const r = Math.round(ml * 10) / 10;
+    const s = Number.isInteger(r) ? String(r) : r.toFixed(1);
+    return `${s}ml`;
+  };
+  const fmtG = (g: number): string => {
+    const r = Math.round(g * 10) / 10;
+    const s = Number.isInteger(r) ? String(r) : r.toFixed(1);
+    return `${s}g`;
+  };
+
+  // ── Liquid units → ml ────────────────────────────────────────────────────
+  if (/^(ml|毫升|cc)$/.test(unitRaw)) return fmtMl(value);
+  if (/^(cl|厘升)$/.test(unitRaw)) return fmtMl(value * ML_PER_CL);
+  if (/^(dl|分升)$/.test(unitRaw)) return fmtMl(value * ML_PER_DL);
+  if (/^(l|升|liter|litre)$/.test(unitRaw)) return fmtMl(value * ML_PER_L);
+  if (/^(fl\.?\s*oz|fluid\s*oz?)$/.test(unitRaw)) return fmtMl(value * ML_PER_OZ);
+  if (/^(cups?|杯)$/.test(unitRaw)) return fmtMl(value * ML_PER_CUP);
+  if (/^(pints?|pt|品脱)$/.test(unitRaw)) return fmtMl(value * ML_PER_PINT);
+  if (/^(quarts?|qt|夸脱)$/.test(unitRaw)) return fmtMl(value * ML_PER_QUART);
+  if (/^(gallons?|gal|加仑)$/.test(unitRaw)) return fmtMl(value * ML_PER_GALLON);
+  if (/^(shots?|jiggers?)$/.test(unitRaw)) return fmtMl(value * ML_PER_SHOT);
+  if (/^(pony)$/.test(unitRaw)) return fmtMl(value * ML_PER_PONY);
+  // Spoon units
+  if (/^(tbsp\.?|tablespoons?|汤匙|大勺)$/.test(unitRaw)) return fmtMl(value * ML_PER_TBSP);
+  if (/^(tsp\.?|teaspoons?|茶匙|小勺)$/.test(unitRaw)) return fmtMl(value * ML_PER_TSP);
+  if (/^(bar\s?spoons?|bsp|吧勺)$/.test(unitRaw)) return fmtMl(value * ML_PER_BSP);
+  if (/^(dsp|dessert[\s-]?spoons?)$/.test(unitRaw)) return fmtMl(value * ML_PER_DSP);
+  if (/^(scsp|scruple[\s-]?spoons?)$/.test(unitRaw)) return fmtMl(value * ML_PER_SCSP);
+  // Micro liquid units
+  if (/^(dash(?:es)?)$/.test(unitRaw)) return fmtMl(value * ML_PER_DASH);
+  if (/^(drops?)$/.test(unitRaw)) return fmtMl(value * ML_PER_DROP);
+  if (/^(splash(?:es)?)$/.test(unitRaw)) return fmtMl(value * ML_PER_SPLASH);
+  if (/^(rinse)$/.test(unitRaw)) return fmtMl(value * ML_PER_RINSE);
+
+  // ── Weight units → g ─────────────────────────────────────────────────────
+  if (/^(g|克)$/.test(unitRaw)) return fmtG(value);
+  if (/^(kg|千克|公斤)$/.test(unitRaw)) return fmtG(value * G_PER_KG);
+  if (/^(mg|毫克)$/.test(unitRaw)) return fmtG(value * G_PER_MG);
+  if (/^(lbs?|磅|pounds?)$/.test(unitRaw)) return fmtG(value * G_PER_LB);
+  if (/^(斤|市斤)$/.test(unitRaw)) return fmtG(value * G_PER_JIN);
+  if (/^(两|市两)$/.test(unitRaw)) return fmtG(value * G_PER_LIANG);
+  if (/^(钱|市钱)$/.test(unitRaw)) return fmtG(value * G_PER_QIAN);
+  if (/^(stone|英石)$/.test(unitRaw)) return fmtG(value * G_PER_STONE);
+  if (/^(tonne|公吨)$/.test(unitRaw)) return fmtG(value * G_PER_TONNE);
+
+  // ── oz ambiguity: liquid context → ml, solid context → g ─────────────────
+  if (/^(oz|盎司|安士|ounce)$/.test(unitRaw)) {
+    const ctx = `${name ?? ""} ${text}`;
+    return isLiquidContext(ctx)
+      ? fmtMl(value * ML_PER_OZ)
+      : fmtG(value * 28); // solid oz ≈ 28g
+  }
+
+  // ── Unrecognized unit: return original ───────────────────────────────────
+  return text;
+}
+
 export function splitPrepIngredientLine(line: string): { amount: string; name: string } {
   const trimmed = line.trim();
   if (!trimmed) return { amount: "", name: "" };
@@ -622,19 +771,19 @@ export function splitPrepIngredientLine(line: string): { amount: string; name: s
     if (ofMatch) {
       // Restore full name: "prefix of rest"
       const [, prefix, , rest] = ofMatch;
-      return { amount: m[1].trim(), name: `${prefix} of ${m[2].trim()}` };
+      return { amount: normalizeIngredientAmount(m[1].trim(), `${prefix} of ${m[2].trim()}`), name: `${prefix} of ${m[2].trim()}` };
     }
-    return { amount: m[1].trim(), name: m[2].trim() };
+    return { amount: normalizeIngredientAmount(m[1].trim(), m[2].trim()), name: m[2].trim() };
   }
   // Fallback for "X of ¼ Y" when unit part doesn't match: still extract quantity
   if (ofMatch) {
     const [, prefix, qty, rest] = ofMatch;
-    return { amount: qty, name: `${prefix} of ${rest}` };
+    return { amount: normalizeIngredientAmount(qty, `${prefix} of ${rest}`), name: `${prefix} of ${rest}` };
   }
   // Fallback: bare unit word with no leading number, e.g. "oz Peychaud's bitters"
   const unitOnly = trimmed.match(UNIT_ONLY_RE);
   if (unitOnly) {
-    return { amount: unitOnly[1].trim(), name: unitOnly[2].trim() };
+    return { amount: normalizeIngredientAmount(unitOnly[1].trim(), unitOnly[2].trim()), name: unitOnly[2].trim() };
   }
   return { amount: "", name: trimmed };
 }
