@@ -664,6 +664,8 @@ export default function RecipeFormScreen() {
     currentValue: string;
     conflict: AiConflict;
     confidence: "high" | "medium" | "low";
+    /** 可选：多行预览内容，用于风味描述等多段字段 */
+    aiValueLines?: { label: string; value: string }[];
   };
 
   /** 根据当前 aiResult 构建字段 diff 列表 */
@@ -745,7 +747,14 @@ export default function RecipeFormScreen() {
     // Flavor Desc
     if (aiResult.flavorDesc) {
       const c = conf(aiResult.confidence);
-      fields.push({ key: "flavorDesc", labelZh: "风味描述", labelEn: "Flavor Desc", aiValue: aiResult.flavorDesc.slice(0, 60) + (aiResult.flavorDesc.length > 60 ? "…" : ""), currentValue: flavorDesc ? flavorDesc.slice(0, 30) + "…" : "", conflict: conflict(flavorDesc.trim(), aiResult.flavorDesc, c), confidence: c });
+      const pf = parseFlavorDesc(aiResult.flavorDesc);
+      const aiValueLines = [
+        pf.tone ? { label: lang === "zh" ? "核心基调" : "Core", value: pf.tone } : null,
+        pf.evolution ? { label: lang === "zh" ? "风味演变" : "Evolution", value: pf.evolution } : null,
+        pf.texture ? { label: lang === "zh" ? "整体质感" : "Texture", value: pf.texture } : null,
+      ].filter(Boolean) as { label: string; value: string }[];
+      const aiValueFallback = aiResult.flavorDesc.slice(0, 60) + (aiResult.flavorDesc.length > 60 ? "…" : "");
+      fields.push({ key: "flavorDesc", labelZh: "风味描述", labelEn: "Flavor Desc", aiValue: aiValueFallback, currentValue: flavorDesc ? flavorDesc.slice(0, 30) + "…" : "", conflict: conflict(flavorDesc.trim(), aiResult.flavorDesc, c), confidence: c, aiValueLines: aiValueLines.length > 0 ? aiValueLines : undefined });
     }
     // Source
     if (aiResult.source) {
@@ -1622,7 +1631,16 @@ export default function RecipeFormScreen() {
                             <Text style={{ fontSize: 11, fontWeight: "600", color: colors.foreground, lineHeight: 15 }}>
                               {lang === "zh" ? f.labelZh : f.labelEn}
                             </Text>
-                            {f.currentValue ? (
+                            {f.aiValueLines ? (
+                              <View style={{ gap: 2, marginTop: 1 }}>
+                                {f.aiValueLines.map((line) => (
+                                  <Text key={line.label} style={{ fontSize: 10, lineHeight: 14, color: colors.muted }} numberOfLines={2}>
+                                    <Text style={{ fontWeight: "600", color: colors.foreground }}>{line.label}：</Text>
+                                    <Text style={{ color: cc }}>{line.value}</Text>
+                                  </Text>
+                                ))}
+                              </View>
+                            ) : f.currentValue ? (
                               <Text style={{ fontSize: 10, color: colors.muted, lineHeight: 14 }} numberOfLines={1}>
                                 {f.currentValue} → <Text style={{ color: cc, fontWeight: "500" }}>{f.aiValue}</Text>
                               </Text>
