@@ -740,79 +740,6 @@ export default function HomemadeFormScreen() {
             or
           </Text>
         </Pressable>
-       {/* ── or 备选标签 ── */}
-       {row.alternatives && row.alternatives.length > 0 ? (
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 2, paddingHorizontal: 4 }}>
-            {row.alternatives.map((alt, altIdx) => (
-              <Pressable
-                key={`${row.id}-alt-${altIdx}`}
-                onPress={() => {
-                  if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  const newAlts = [row.name, ...(row.alternatives ?? []).filter((_, i) => i !== altIdx)];
-                  setIngRows((prev) => prev.map((r) =>
-                    r.id === row.id
-                      ? { ...r, name: alt, alternatives: newAlts, linkedBottleId: undefined, linkedPrepId: undefined }
-                      : r
-                  ));
-                  setDismissedLinks((prev) => { const n = { ...prev }; delete n[row.id]; return n; });
-                  setAcceptedLinks((prev) => { const n = { ...prev }; delete n[row.id]; return n; });
-                }}
-                style={({ pressed }) => [{ opacity: pressed ? 0.5 : 1 }]}
-              >
-                <Text style={{ fontSize: 11, lineHeight: 16, color: colors.muted }}>
-                  {lang === "zh" ? "或 " : "or "}{alt}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        ) : null}
-        {/* ── 添加备选输入框（临时显示） ── */}
-        {addAltRowId === row.id ? (
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4, paddingLeft: 2 }}>
-            <Text style={{ fontSize: 11, color: colors.muted, minWidth: 20 }}>{lang === "zh" ? "或" : "or"}</Text>
-            <TextInput
-              autoFocus
-              style={[...inputStyle, { flex: 1 }]}
-              placeholder={lang === "zh" ? "输入备选名称" : "Enter alternative name"}
-              placeholderTextColor={colors.muted}
-              value={addAltValue}
-              onChangeText={setAddAltValue}
-              returnKeyType="done"
-              autoCapitalize="words"
-              onSubmitEditing={() => {
-                const v = addAltValue.trim();
-                if (v) {
-                  setIngRows((prev) => prev.map((r) =>
-                    r.id === row.id
-                      ? { ...r, alternatives: [...(r.alternatives ?? []), v] }
-                      : r
-                  ));
-                }
-                setAddAltRowId(null);
-                setAddAltValue("");
-              }}
-              onBlur={() => {
-                const v = addAltValue.trim();
-                if (v) {
-                  setIngRows((prev) => prev.map((r) =>
-                    r.id === row.id
-                      ? { ...r, alternatives: [...(r.alternatives ?? []), v] }
-                      : r
-                  ));
-                }
-                setAddAltRowId(null);
-                setAddAltValue("");
-              }}
-            />
-            <Pressable
-              onPress={() => { setAddAltRowId(null); setAddAltValue(""); }}
-              hitSlop={8}
-              style={({ pressed }) => [{ opacity: pressed ? 0.5 : 1 }]}
-            >
-              <IconSymbol name="xmark.circle.fill" size={20} color={colors.muted} />
-            </Pressable>
-          </View>
-        ) : null}
          {/* ── Amount: qty + unit picker ── */}
           {(() => {
             const { qty, unit } = splitAmount(row.amount);
@@ -860,6 +787,79 @@ export default function HomemadeFormScreen() {
             />
           </Pressable>
         </View>
+        {/* ── or 备选标签（主行下方独立行） ── */}
+        {row.alternatives && row.alternatives.length > 0 ? (
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 4, paddingLeft: 36 }}>
+            {row.alternatives.map((alt, altIdx) => (
+              <Pressable
+                key={`${row.id}-alt-${altIdx}`}
+                onPress={() => {
+                  if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  const newAlts = [row.name, ...(row.alternatives ?? []).filter((_, i) => i !== altIdx)];
+                  setIngRows((prev) => prev.map((r) =>
+                    r.id === row.id
+                      ? { ...r, name: alt, alternatives: newAlts, linkedBottleId: undefined, linkedPrepId: undefined }
+                      : r
+                  ));
+                  setDismissedLinks((prev) => { const n = { ...prev }; delete n[row.id]; return n; });
+                  setAcceptedLinks((prev) => { const n = { ...prev }; delete n[row.id]; return n; });
+                }}
+                style={({ pressed }) => [{ opacity: pressed ? 0.5 : 1 }]}
+              >
+                <Text style={{ fontSize: 11, lineHeight: 16, color: colors.muted }}>
+                  {lang === "zh" ? "或 " : "or "}{alt}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+        {/* ── 添加备选输入框（主行下方独立行） ── */}
+        {addAltRowId === row.id ? (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4, paddingLeft: 36 }}>
+            <Text style={{ fontSize: 11, color: colors.muted, minWidth: 20 }}>{lang === "zh" ? "或" : "or"}</Text>
+            <TextInput
+              autoFocus
+              style={[...inputStyle, { flex: 1 }]}
+              placeholder={lang === "zh" ? "输入备选名称" : "Enter alternative name"}
+              placeholderTextColor={colors.muted}
+              value={addAltValue}
+              onChangeText={setAddAltValue}
+              returnKeyType="done"
+              autoCapitalize="words"
+              onSubmitEditing={() => {
+                const v = addAltValue.trim();
+                if (v) {
+                  setIngRows((prev) => prev.map((r) =>
+                    r.id === row.id
+                      ? { ...r, alternatives: [...(r.alternatives ?? []), v] }
+                      : r
+                  ));
+                }
+                setAddAltRowId(null);
+                setAddAltValue("");
+              }}
+              onBlur={() => {
+                const v = addAltValue.trim();
+                if (v) {
+                  setIngRows((prev) => prev.map((r) =>
+                    r.id === row.id
+                      ? { ...r, alternatives: [...(r.alternatives ?? []), v] }
+                      : r
+                  ));
+                }
+                setAddAltRowId(null);
+                setAddAltValue("");
+              }}
+            />
+            <Pressable
+              onPress={() => { setAddAltRowId(null); setAddAltValue(""); }}
+              hitSlop={8}
+              style={({ pressed }) => [{ opacity: pressed ? 0.5 : 1 }]}
+            >
+              <IconSymbol name="xmark.circle.fill" size={20} color={colors.muted} />
+            </Pressable>
+          </View>
+        ) : null}
         {liveSuggestions.length > 0 ? (
           <View
             style={[
@@ -1036,7 +1036,7 @@ export default function HomemadeFormScreen() {
       </View>
     );
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ingRows, ingSourceMap, dismissedLinks, acceptedLinks, focusedIng, pickedIng, bottles, allPreps, lang, groupOf, editing, colors, t]);
+  }, [ingRows, ingSourceMap, dismissedLinks, acceptedLinks, focusedIng, pickedIng, bottles, allPreps, lang, groupOf, editing, colors, t, addAltRowId, addAltValue]);
 
   const handleSave = () => {
     if (!canSave) return;
