@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
+  ActionSheetIOS,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -339,6 +340,9 @@ export default function HomemadeFormScreen() {
   
   const [aiBusy, setAiBusy] = useState(false);
   const [aiResult, setAiResult] = useState<EnrichHomemadeResult | null>(null);
+  /** 正在添加备选项的成分行 id → 临时输入值 */
+  const [addAltRowId, setAddAltRowId] = useState<string | null>(null);
+  const [addAltValue, setAddAltValue] = useState("");
   const [aiToggles, setAiToggles] = useState<Record<string, boolean>>({});
   const [undoSnapshot, setUndoSnapshot] = useState<null | {
     name: string; nameAlt: string; type: string;
@@ -647,11 +651,67 @@ export default function HomemadeFormScreen() {
             }
           }}
           onSubmitEditing={() => commitIngRowName(row.id, row.name)}
-           returnKeyType="done"
-           autoCapitalize="words"
-         />
-        {/* ── or 备选标签 ── */}
-        {row.alternatives && row.alternatives.length > 0 ? (
+          returnKeyType="done"
+          autoCapitalize="words"
+        />
+        {/* ── or 操作按钮 ── */}
+        <Pressable
+          onPress={() => {
+            if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            const OR_RE = /\s+(?:or|或|\/|\|)\s+/i;
+            if (OR_RE.test(row.name.trim())) {
+              // 名称中已有 or，直接拆分
+              commitIngRowName(row.id, row.name);
+            } else {
+              // 弹出选项：添加备选 or 提示拆分
+              ActionSheetIOS
+                ? ActionSheetIOS.showActionSheetWithOptions(
+                    {
+                      options: [
+                        lang === "zh" ? "添加备选项" : "Add Alternative",
+                        lang === "zh" ? "取消" : "Cancel",
+                      ],
+                      cancelButtonIndex: 1,
+                      title: lang === "zh" ? "or 备选" : "Alternative",
+                      message: lang === "zh" ? "为此成分添加一个备选项（点击可切换优先级）" : "Add an alternative ingredient (tap to swap priority)",
+                    },
+                    (idx) => {
+                      if (idx === 0) {
+                        setAddAltRowId(row.id);
+                        setAddAltValue("");
+                      }
+                    }
+                  )
+                : Alert.alert(
+                    lang === "zh" ? "or 备选" : "Alternative",
+                    lang === "zh" ? "为此成分添加一个备选项（点击可切换优先级）" : "Add an alternative ingredient",
+                    [
+                      {
+                        text: lang === "zh" ? "添加备选项" : "Add Alternative",
+                        onPress: () => { setAddAltRowId(row.id); setAddAltValue(""); },
+                      },
+                      { text: lang === "zh" ? "取消" : "Cancel", style: "cancel" },
+                    ]
+                  );
+            }
+          }}
+          hitSlop={8}
+          style={({ pressed }) => [{
+            paddingHorizontal: 7,
+            paddingVertical: 4,
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: (row.alternatives && row.alternatives.length > 0) ? colors.primary : colors.border,
+            backgroundColor: (row.alternatives && row.alternatives.length > 0) ? `${colors.primary}18` : colors.surface,
+            opacity: pressed ? 0.6 : 1,
+          }]}
+        >
+          <Text style={{ fontSize: 11, fontWeight: "600", color: (row.alternatives && row.alternatives.length > 0) ? colors.primary : colors.muted }}>
+            or
+          </Text>
+        </Pressable>
+       {/* ── or 备选标签 ── */}
+       {row.alternatives && row.alternatives.length > 0 ? (
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 2, paddingHorizontal: 4 }}>
             {row.alternatives.map((alt, altIdx) => (
               <Pressable
@@ -676,7 +736,54 @@ export default function HomemadeFormScreen() {
             ))}
           </View>
         ) : null}
-          {/* ── Amount: qty + unit picker ── */}
+        {/* ── 添加备选输入框（临时显示） ── */}
+        {addAltRowId === row.id ? (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4, paddingLeft: 2 }}>
+            <Text style={{ fontSize: 11, color: colors.muted, minWidth: 20 }}>{lang === "zh" ? "或" : "or"}</Text>
+            <TextInput
+              autoFocus
+              style={[...inputStyle, { flex: 1 }]}
+              placeholder={lang === "zh" ? "输入备选名称" : "Enter alternative name"}
+              placeholderTextColor={colors.muted}
+              value={addAltValue}
+              onChangeText={setAddAltValue}
+              returnKeyType="done"
+              autoCapitalize="words"
+              onSubmitEditing={() => {
+                const v = addAltValue.trim();
+                if (v) {
+                  setIngRows((prev) => prev.map((r) =>
+                    r.id === row.id
+                      ? { ...r, alternatives: [...(r.alternatives ?? []), v] }
+                      : r
+                  ));
+                }
+                setAddAltRowId(null);
+                setAddAltValue("");
+              }}
+              onBlur={() => {
+                const v = addAltValue.trim();
+                if (v) {
+                  setIngRows((prev) => prev.map((r) =>
+                    r.id === row.id
+                      ? { ...r, alternatives: [...(r.alternatives ?? []), v] }
+                      : r
+                  ));
+                }
+                setAddAltRowId(null);
+                setAddAltValue("");
+              }}
+            />
+            <Pressable
+              onPress={() => { setAddAltRowId(null); setAddAltValue(""); }}
+              hitSlop={8}
+              style={({ pressed }) => [{ opacity: pressed ? 0.5 : 1 }]}
+            >
+              <IconSymbol name="xmark.circle.fill" size={20} color={colors.muted} />
+            </Pressable>
+          </View>
+        ) : null}
+         {/* ── Amount: qty + unit picker ── */}
           {(() => {
             const { qty, unit } = splitAmount(row.amount);
             return (
