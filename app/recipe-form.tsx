@@ -790,7 +790,7 @@ export default function RecipeFormScreen() {
     }
     return fields;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aiResult, baseSpirit, glass, ice, method, codexFamily, variantOf, drinkDuration, occasion, story, flavorDesc, source, sourceRef, flavors, name, nameEn]);
+  }, [aiResult, baseSpirit, glass, ice, method, codexFamily, variantOf, drinkDuration, occasion, story, flavorDesc, source, sourceRef, flavors, name, nameEn, lang]);
 
   /** 初始化 toggles：新增字段默认 on，覆盖字段默认 off，低置信默认 off */
   useEffect(() => {
@@ -801,8 +801,7 @@ export default function RecipeFormScreen() {
       defaults[f.key] = f.conflict === "new" || f.conflict === "confirm";
     }
     setAiToggles(defaults);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aiResult]);
+  }, [aiResult, buildAiFields]);
 
   /** 实际写入单个字段 */
   const applyField = useCallback((key: string) => {
@@ -870,8 +869,7 @@ export default function RecipeFormScreen() {
     // 5 秒后自动清除 undo
     if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
     undoTimerRef.current = setTimeout(() => setUndoSnapshot(null), 5000);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aiResult, aiToggles, buildAiFields, applyField, story, flavorDesc, source, flavors, baseSpirit, glass, ice, codexFamily, variantOf, method, drinkDuration, occasion, sourceRef]);
+  }, [aiResult, aiToggles, buildAiFields, applyField, story, flavorTone, flavorEvolution, flavorTexture, source, flavors, baseSpirit, glass, ice, codexFamily, variantOf, method, drinkDuration, occasion, sourceRef, name, nameEn]);
 
   /** 撤销 AI 应用 */
   const undoAiApply = useCallback(() => {

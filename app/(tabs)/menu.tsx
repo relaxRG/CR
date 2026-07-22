@@ -207,28 +207,33 @@ interface GroupHeaderProps {
 function GroupHeader({ group, onAddRecipe }: GroupHeaderProps) {
   const colors = useColors();
   const { toggleCollapse, renameGroup, deleteGroup } = useMenuStore();
+  const { lang } = useI18n();
 
   const handleOptions = () => {
     Alert.alert(group.name, undefined, [
       {
-        text: "重命名",
+        text: lang === "en" ? "Rename" : "重命名",
         onPress: () => {
-          Alert.prompt("重命名分组", undefined, (newName) => {
+          Alert.prompt(lang === "en" ? "Rename Group" : "重命名分组", undefined, (newName) => {
             if (newName?.trim()) renameGroup(group.id, newName.trim());
           }, "plain-text", group.name);
         },
       },
       {
-        text: "删除分组",
+        text: lang === "en" ? "Delete Group" : "删除分组",
         style: "destructive",
         onPress: () => {
-          Alert.alert("删除分组", "删除后分组内配方引用将一并移除（配方本身不受影响）", [
-            { text: "取消", style: "cancel" },
-            { text: "删除", style: "destructive", onPress: () => deleteGroup(group.id) },
-          ]);
+          Alert.alert(
+            lang === "en" ? "Delete Group" : "删除分组",
+            lang === "en" ? "Recipes in this group will be unlinked (recipes themselves will not be deleted)." : "删除后分组内配方引用将一并移除（配方本身不受影响）",
+            [
+              { text: lang === "en" ? "Cancel" : "取消", style: "cancel" },
+              { text: lang === "en" ? "Delete" : "删除", style: "destructive", onPress: () => deleteGroup(group.id) },
+            ]
+          );
         },
       },
-      { text: "取消", style: "cancel" },
+      { text: lang === "en" ? "Cancel" : "取消", style: "cancel" },
     ]);
   };
 

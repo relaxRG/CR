@@ -969,7 +969,7 @@ export function RecipesScreen() {
         >
           <Pressable
             style={{ backgroundColor: colors.surface, borderRadius: 16, padding: 24, marginHorizontal: 32, width: "85%", gap: 12 }}
-            onPress={() => {}}
+            onStartShouldSetResponder={() => true}
           >
             <Text style={{ fontSize: 17, fontWeight: "700", color: colors.foreground }}>
               {t("sel.batchDeepAnalyze.confirm.title")}

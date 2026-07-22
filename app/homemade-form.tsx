@@ -80,6 +80,8 @@ type AiField = {
   aiValue: string;
   currentValue: string;
   conflict: "new" | "override" | "confirm" | "low";
+  /** 可选：多行预览内容，用于步骤、风格描述等多段字段 */
+  aiValueLines?: { label: string; value: string }[];
 };
 
 export default function HomemadeFormScreen() {
@@ -401,9 +403,10 @@ export default function HomemadeFormScreen() {
     if (aiResult.variantLabel && selectedGroup === "garnish") {
       fields.push({ key: "variantLabel", labelZh: "形态标签", labelEn: "Variant Label", aiValue: aiResult.variantLabel, currentValue: variantLabel, conflict: conf(variantLabel, aiResult.variantLabel, "low") });
     }
-    if (aiResult.prepIngredients.length > 0 && ingRows.every((r) => !r.name.trim())) {
-      const preview = aiResult.prepIngredients.slice(0, 4).map((i) => `${i.name}${i.amount ? " " + i.amount : ""}`).join(" · ") + (aiResult.prepIngredients.length > 4 ? ` +${aiResult.prepIngredients.length - 4}` : "");
-      fields.push({ key: "prepIngredients", labelZh: "原料列表", labelEn: "Ingredients", aiValue: preview, currentValue: "", conflict: "new" });
+    if (aiResult.prepIngredients.length > 0) {
+      const ingPreview = aiResult.prepIngredients.slice(0, 4).map((i) => `${i.name}${i.amount ? " " + i.amount : ""}`).join(" · ") + (aiResult.prepIngredients.length > 4 ? ` +${aiResult.prepIngredients.length - 4}` : "");
+      const hasExistingIngs = ingRows.some((r) => r.name.trim());
+      fields.push({ key: "prepIngredients", labelZh: "原料列表", labelEn: "Ingredients", aiValue: ingPreview, currentValue: hasExistingIngs ? `${ingRows.filter((r) => r.name.trim()).length} 条` : "", conflict: hasExistingIngs ? "override" : "new" });
     }
     return fields;
   }, [aiResult, name, nameAlt, techniques, flavorTags, story, styleDesc, shelfLife, storage, usageNotes, stepRows, yieldQty, yieldUnit, sourceFamilyKey, variantLabel, ingRows, selectedGroup]);
@@ -455,7 +458,7 @@ export default function HomemadeFormScreen() {
       const firstIngExt = (aiResult.prepIngredients as Array<{ name: string; amount: string; alternatives?: string[]; suggestedSection?: string; suggestedType?: string; garnishUnit?: string }>)[0];
       if (firstIngExt?.suggestedSection) {
         const grp = prepGroupOfSection(sections, firstIngExt.suggestedSection);
-        if (grp === "garnish" && selectedGroup !== "garnish") {
+        if (grp !== selectedGroup) {
           handleGroupChange(grp);
         }
         if (firstIngExt.garnishUnit) setGarnishUnit(firstIngExt.garnishUnit);
@@ -521,8 +524,9 @@ export default function HomemadeFormScreen() {
         const matched = typeList.find((t) => t.key === res.prepType);
         if (matched) { setType(res.prepType); setTypeTouched(true); }
       }
-      // 自动预填 section → selectedGroup（仅在用户未手动选择类型时）
-      if (res.section && !typeTouched) {
+      // 自动预填 section → selectedGroup（用局部变量避免同轮次 prepType 设置后的竞态）
+      const prepTypeWasApplied = !!(res.prepType && res.prepType !== "other" && !typeTouched && typeList.find((t) => t.key === res.prepType));
+      if (res.section && !typeTouched && !prepTypeWasApplied) {
         const suggestedGrp = prepGroupOfSection(sections, res.section);
         if (suggestedGrp !== selectedGroup) {
           handleGroupChange(suggestedGrp);
@@ -1330,7 +1334,16 @@ export default function HomemadeFormScreen() {
                         {/* 字段名 + 值 */}
                         <View style={{ flex: 1, gap: 1 }}>
                           <Text style={{ fontSize: 11, fontWeight: "600", color: colors.foreground, lineHeight: 15 }}>{lang === "en" ? f.labelEn : f.labelZh}</Text>
-                          {f.currentValue ? (
+                          {f.aiValueLines ? (
+                            <View style={{ gap: 2, marginTop: 1 }}>
+                              {f.aiValueLines.map((line) => (
+                                <Text key={line.label} style={{ fontSize: 10, lineHeight: 14, color: colors.muted }} numberOfLines={2}>
+                                  <Text style={{ fontWeight: "600", color: colors.foreground }}>{line.label}：</Text>
+                                  <Text style={{ color: cc }}>{line.value}</Text>
+                                </Text>
+                              ))}
+                            </View>
+                          ) : f.currentValue ? (
                             <Text style={{ fontSize: 10, color: colors.muted, lineHeight: 14 }} numberOfLines={1}>{f.currentValue} → <Text style={{ color: cc, fontWeight: "500" }}>{f.aiValue}</Text></Text>
                           ) : (
                             <Text style={{ fontSize: 10, color: cc, fontWeight: "500", lineHeight: 14 }} numberOfLines={1}>{f.aiValue}</Text>

@@ -437,7 +437,7 @@ function HtmlChapter({
               var range = document.createRange();
               range.setStart(node, idx); range.setEnd(node, idx + text.length);
               var span = document.createElement('span'); span.className = cls;
-              try { range.surroundContents(span); } catch(e) {}
+              try { range.surroundContents(span); } catch(e) { console.warn('[book-reader] highlight failed:', e); }
               break;
             }
           }
