@@ -1270,27 +1270,52 @@ export default function RecipeFormScreen() {
         ) : null}
         {/* ── or 备选标签 ── */}
         {ing.alternatives && ing.alternatives.length > 0 ? (
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 2, paddingHorizontal: 4 }}>
+          <View style={{ flexDirection: "column", gap: 6, marginTop: 6, paddingLeft: 2 }}>
             {ing.alternatives.map((alt, altIdx) => (
-              <Pressable
+              <View
                 key={`${ing.id}-alt-${altIdx}`}
-                onPress={() => {
-                  if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  const newAlts = [ing.name, ...(ing.alternatives ?? []).filter((_, i) => i !== altIdx)];
-                  setIngredients((prev) => prev.map((i) =>
-                    i.id === ing.id
-                      ? { ...i, name: alt, alternatives: newAlts, linkedBottleId: undefined, linkedPrepId: undefined, linkDismissed: undefined }
-                      : i
-                  ));
-                  setDismissedLinks((prev) => { const n = { ...prev }; delete n[ing.id]; return n; });
-                  setAcceptedLinks((prev) => { const n = { ...prev }; delete n[ing.id]; return n; });
-                }}
-                style={({ pressed }) => [{ opacity: pressed ? 0.5 : 1 }]}
+                style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
               >
-                <Text style={{ fontSize: 11, lineHeight: 16, color: colors.muted }}>
-                  {lang === "zh" ? "或 " : "or "}{alt}
-                </Text>
-              </Pressable>
+                <Text style={{ fontSize: 12, color: colors.muted, minWidth: 20 }}>{lang === "zh" ? "或" : "or"}</Text>
+                <Pressable
+                  onPress={() => {
+                    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    const newAlts = [ing.name, ...(ing.alternatives ?? []).filter((_, i) => i !== altIdx)];
+                    setIngredients((prev) => prev.map((i) =>
+                      i.id === ing.id
+                        ? { ...i, name: alt, alternatives: newAlts, linkedBottleId: undefined, linkedPrepId: undefined, linkDismissed: undefined }
+                        : i
+                    ));
+                    setDismissedLinks((prev) => { const n = { ...prev }; delete n[ing.id]; return n; });
+                    setAcceptedLinks((prev) => { const n = { ...prev }; delete n[ing.id]; return n; });
+                  }}
+                  style={({ pressed }) => [{
+                    flex: 1,
+                    backgroundColor: colors.surface,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    borderRadius: 12,
+                    paddingHorizontal: 12,
+                    paddingVertical: 12,
+                    opacity: pressed ? 0.6 : 1,
+                  }]}
+                >
+                  <Text style={{ fontSize: 15, lineHeight: 20, color: colors.foreground }}>{alt}</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => {
+                    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    const newAlts = (ing.alternatives ?? []).filter((_, i) => i !== altIdx);
+                    setIngredients((prev) => prev.map((i) =>
+                      i.id === ing.id ? { ...i, alternatives: newAlts } : i
+                    ));
+                  }}
+                  hitSlop={8}
+                  style={({ pressed }) => [{ opacity: pressed ? 0.5 : 1 }]}
+                >
+                  <IconSymbol name="minus.circle.fill" size={24} color={colors.error} />
+                </Pressable>
+              </View>
             ))}
           </View>
         ) : null}
