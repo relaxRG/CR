@@ -1262,14 +1262,12 @@ export default function HomemadeFormScreen() {
               paddingVertical: 10,
               paddingHorizontal: 16,
               borderRadius: 10,
-              backgroundColor: colors.surface,
-              borderWidth: 1,
-              borderColor: colors.border,
+              backgroundColor: (!name.trim() && !nameAlt.trim()) ? colors.surface : colors.primary,
               opacity: (aiBusy || !isOnline) ? 0.5 : pressed ? 0.7 : 1,
             })}
           >
-            <IconSymbol name="sparkles" size={16} color={colors.primary} />
-          <Text style={{ fontSize: 14, fontWeight: "600", color: colors.primary }}>
+            <IconSymbol name="sparkles" size={15} color={(!name.trim() && !nameAlt.trim()) ? colors.muted : "#FFFFFF"} />
+          <Text style={{ fontSize: 14, fontWeight: "600", color: (!name.trim() && !nameAlt.trim()) ? colors.muted : "#FFFFFF" }}>
             {aiBusy
               ? (lang === "en" ? "Analyzing…" : "AI 分析中…")
               : (lang === "en" ? "AI Lookup" : "AI 识别补全")}
@@ -1280,72 +1278,82 @@ export default function HomemadeFormScreen() {
             const fields = buildAiFields();
             const onCount = fields.filter((f) => aiToggles[f.key] !== false).length;
             const conf = aiResult.confidence;
-            const confColor = conf === "high" ? colors.success : conf === "low" ? colors.warning : colors.primary;
-            const confLabel = conf === "high" ? (lang === "en" ? "High" : "高可信") : conf === "low" ? (lang === "en" ? "Low" : "低可信") : (lang === "en" ? "Medium" : "中可信");
+            const conflictColor = (c: "new" | "override" | "confirm" | "low") =>
+              c === "new" ? colors.primary : c === "override" ? "#FF9500" : c === "confirm" ? colors.success : colors.muted;
+            const conflictLabel = (c: "new" | "override" | "confirm" | "low") =>
+              lang === "en"
+                ? c === "new" ? "New" : c === "override" ? "Override" : c === "confirm" ? "Match" : "Low"
+                : c === "new" ? "新增" : c === "override" ? "覆盖" : c === "confirm" ? "确认" : "低可信";
             return (
-              <View style={{ marginTop: 8, marginBottom: 4, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, overflow: "hidden" }}>
+              <View style={{ marginTop: 8, marginBottom: 4, borderRadius: 12, borderWidth: 1, borderColor: colors.primary + "44", backgroundColor: colors.primary + "0A" }}>
                 {/* 面板头部 */}
-                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, paddingTop: 12, paddingBottom: 8 }}>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                    <IconSymbol name="sparkles" size={14} color={colors.primary} />
-                    <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>{lang === "en" ? "AI Suggestions" : "✦ AI 建议"}</Text>
-                    <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: confColor + "22" }}>
-                      <Text style={{ fontSize: 11, fontWeight: "600", color: confColor }}>{confLabel}</Text>
+                    <IconSymbol name="sparkles" size={13} color={colors.primary} />
+                    <Text style={{ fontSize: 12, fontWeight: "600", color: colors.primary }}>{lang === "en" ? "AI Suggestion" : "AI 建议"}</Text>
+                    <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 99, backgroundColor: conf === "high" ? colors.success + "22" : conf === "medium" ? "#FF950022" : colors.border }}>
+                      <Text style={{ fontSize: 10, fontWeight: "600", color: conf === "high" ? colors.success : conf === "medium" ? "#FF9500" : colors.muted }}>
+                        {conf === "high" ? (lang === "en" ? "High" : "高可信") : conf === "medium" ? (lang === "en" ? "Medium" : "中可信") : (lang === "en" ? "Low" : "低可信")}
+                      </Text>
                     </View>
-                    <Text style={{ fontSize: 12, color: colors.muted }}>{fields.length} {lang === "en" ? "fields" : "个字段"}</Text>
+                    <Text style={{ fontSize: 10, color: colors.muted }}>{lang === "en" ? `${fields.length} fields` : `${fields.length} 个字段`}</Text>
                   </View>
-                  <Pressable onPress={() => setAiResult(null)} style={{ padding: 4 }}>
-                    <Text style={{ fontSize: 16, color: colors.muted }}>×</Text>
+                  <Pressable onPress={() => setAiResult(null)} hitSlop={8}>
+                    <IconSymbol name="xmark" size={14} color={colors.muted} />
                   </Pressable>
                 </View>
                 {/* 快捷操作 */}
-                <View style={{ flexDirection: "row", gap: 8, paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                  {[
-                    { label: lang === "en" ? "All" : "全选", action: () => setAiToggles(Object.fromEntries(fields.map((f) => [f.key, true]))) },
-                    { label: lang === "en" ? "Empty only" : "只填空白", action: () => setAiToggles(Object.fromEntries(fields.map((f) => [f.key, f.conflict === "new"]))) },
-                    { label: lang === "en" ? "None" : "全不选", action: () => setAiToggles(Object.fromEntries(fields.map((f) => [f.key, false]))) },
-                  ].map((btn) => (
-                    <Pressable key={btn.label} onPress={btn.action} style={({ pressed }) => ({ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, backgroundColor: pressed ? colors.border : colors.background, borderWidth: 1, borderColor: colors.border })}>
-                      <Text style={{ fontSize: 12, color: colors.foreground }}>{btn.label}</Text>
-                    </Pressable>
-                  ))}
+                <View style={{ flexDirection: "row", paddingHorizontal: 12, paddingBottom: 8, gap: 6 }}>
+                  <Pressable onPress={() => { const all: Record<string, boolean> = {}; for (const f of fields) all[f.key] = true; setAiToggles(all); }} style={({ pressed }) => ({ flex: 1, paddingVertical: 5, borderRadius: 7, alignItems: "center" as const, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, opacity: pressed ? 0.6 : 1 })}>
+                    <Text style={{ fontSize: 11, fontWeight: "500", color: colors.foreground }}>{lang === "en" ? "Select All" : "全选"}</Text>
+                  </Pressable>
+                  <Pressable onPress={() => { const blanks: Record<string, boolean> = {}; for (const f of fields) blanks[f.key] = f.conflict === "new"; setAiToggles(blanks); }} style={({ pressed }) => ({ flex: 1, paddingVertical: 5, borderRadius: 7, alignItems: "center" as const, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, opacity: pressed ? 0.6 : 1 })}>
+                    <Text style={{ fontSize: 11, fontWeight: "500", color: colors.primary }}>{lang === "en" ? "Blanks Only" : "只填空白"}</Text>
+                  </Pressable>
+                  <Pressable onPress={() => { const none: Record<string, boolean> = {}; for (const f of fields) none[f.key] = false; setAiToggles(none); }} style={({ pressed }) => ({ flex: 1, paddingVertical: 5, borderRadius: 7, alignItems: "center" as const, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, opacity: pressed ? 0.6 : 1 })}>
+                    <Text style={{ fontSize: 11, fontWeight: "500", color: colors.muted }}>{lang === "en" ? "Deselect" : "全不选"}</Text>
+                  </Pressable>
                 </View>
                 {/* 字段列表 */}
-                {fields.map((f) => {
-                  const on = aiToggles[f.key] !== false;
-                  const conflictColors: Record<string, string> = { new: colors.success, override: colors.warning, confirm: colors.muted, low: colors.error };
-                  const conflictLabels: Record<string, string> = { new: lang === "en" ? "new" : "新增", override: lang === "en" ? "override" : "覆盖", confirm: lang === "en" ? "same" : "确认", low: lang === "en" ? "low" : "低可信" };
-                  return (
-                    <View key={f.key} style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border + "66", opacity: on ? 1 : 0.45 }}>
-                      <View style={{ flex: 1, gap: 2 }}>
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                          <Text style={{ fontSize: 12, fontWeight: "600", color: colors.foreground }}>{lang === "en" ? f.labelEn : f.labelZh}</Text>
-                          <View style={{ paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, backgroundColor: (conflictColors[f.conflict] ?? colors.muted) + "22" }}>
-                            <Text style={{ fontSize: 10, color: conflictColors[f.conflict] ?? colors.muted }}>{conflictLabels[f.conflict]}</Text>
+                <View style={{ borderTopWidth: 0.5, borderTopColor: colors.border + "88" }}>
+                  {fields.map((f, idx) => {
+                    const isOn = aiToggles[f.key] !== false;
+                    const cc = conflictColor(f.conflict);
+                    return (
+                      <View key={f.key} style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 9, borderBottomWidth: idx < fields.length - 1 ? 0.5 : 0, borderBottomColor: colors.border + "66", gap: 8, opacity: isOn ? 1 : 0.45 }}>
+                        {/* conflict badge 独立左列 */}
+                        <View style={{ width: 36, alignItems: "center" }}>
+                          <View style={{ paddingHorizontal: 4, paddingVertical: 2, borderRadius: 4, backgroundColor: cc + "22" }}>
+                            <Text style={{ fontSize: 9, fontWeight: "700", color: cc }}>{conflictLabel(f.conflict)}</Text>
                           </View>
                         </View>
-                        {f.currentValue ? (
-                          <Text style={{ fontSize: 11, color: colors.muted }} numberOfLines={1}>{f.currentValue} → <Text style={{ color: colors.primary }}>{f.aiValue}</Text></Text>
-                        ) : (
-                          <Text style={{ fontSize: 11, color: colors.primary }} numberOfLines={1}>{f.aiValue}</Text>
-                        )}
+                        {/* 字段名 + 值 */}
+                        <View style={{ flex: 1, gap: 1 }}>
+                          <Text style={{ fontSize: 11, fontWeight: "600", color: colors.foreground, lineHeight: 15 }}>{lang === "en" ? f.labelEn : f.labelZh}</Text>
+                          {f.currentValue ? (
+                            <Text style={{ fontSize: 10, color: colors.muted, lineHeight: 14 }} numberOfLines={1}>{f.currentValue} → <Text style={{ color: cc, fontWeight: "500" }}>{f.aiValue}</Text></Text>
+                          ) : (
+                            <Text style={{ fontSize: 10, color: cc, fontWeight: "500", lineHeight: 14 }} numberOfLines={1}>{f.aiValue}</Text>
+                          )}
+                        </View>
+                        <Switch
+                          value={isOn}
+                          onValueChange={(v) => setAiToggles((prev) => ({ ...prev, [f.key]: v }))}
+                          trackColor={{ false: colors.border, true: colors.primary + "88" }}
+                          thumbColor={isOn ? colors.primary : colors.muted}
+                          style={{ transform: [{ scaleX: 0.75 }, { scaleY: 0.75 }] }}
+                        />
                       </View>
-                      <Switch
-                        value={on}
-                        onValueChange={(v) => setAiToggles((prev) => ({ ...prev, [f.key]: v }))}
-                        trackColor={{ false: colors.border, true: colors.primary + "88" }}
-                        thumbColor={on ? colors.primary : colors.muted}
-                      />
-                    </View>
-                  );
-                })}
+                    );
+                  })}
+                </View>
                 {/* 底部操作 */}
-                <View style={{ flexDirection: "row", gap: 8, padding: 12 }}>
-                  <Pressable onPress={applyAiResult} style={({ pressed }) => ({ flex: 1, paddingVertical: 10, borderRadius: 8, backgroundColor: onCount > 0 ? colors.primary : colors.border, opacity: pressed ? 0.8 : 1, alignItems: "center" })}>
-                    <Text style={{ fontSize: 14, fontWeight: "600", color: onCount > 0 ? colors.background : colors.muted }}>{lang === "en" ? `Apply ${onCount}` : `应用 ${onCount} 项`}</Text>
+                <View style={{ flexDirection: "row", paddingHorizontal: 12, paddingTop: 8, paddingBottom: 12, gap: 8 }}>
+                  <Pressable onPress={applyAiResult} style={({ pressed }) => ({ flex: 1, paddingVertical: 8, borderRadius: 9, alignItems: "center" as const, backgroundColor: onCount > 0 ? colors.primary : colors.border, opacity: pressed ? 0.8 : 1 })}>
+                    <Text style={{ fontSize: 13, fontWeight: "600", color: onCount > 0 ? "#FFFFFF" : colors.muted }}>{lang === "en" ? `Apply ${onCount} fields` : `应用 ${onCount} 项`}</Text>
                   </Pressable>
-                  <Pressable onPress={() => setAiResult(null)} style={({ pressed }) => ({ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, borderWidth: 1, borderColor: colors.border, opacity: pressed ? 0.7 : 1, alignItems: "center" })}>
-                    <Text style={{ fontSize: 14, color: colors.muted }}>{lang === "en" ? "Dismiss" : "忽略"}</Text>
+                  <Pressable onPress={() => setAiResult(null)} style={({ pressed }) => ({ paddingVertical: 8, paddingHorizontal: 14, borderRadius: 9, alignItems: "center" as const, borderWidth: 1, borderColor: colors.border, opacity: pressed ? 0.6 : 1 })}>
+                    <Text style={{ fontSize: 13, color: colors.muted }}>{lang === "en" ? "Dismiss" : "忽略"}</Text>
                   </Pressable>
                 </View>
               </View>
@@ -1353,10 +1361,13 @@ export default function HomemadeFormScreen() {
           })()}
           {/* ── Undo toast ── */}
           {undoSnapshot && (
-            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}>
-              <Text style={{ fontSize: 13, color: colors.foreground }}>✓ {lang === "en" ? "AI suggestions applied" : "AI 建议已应用"}</Text>
-              <Pressable onPress={undoAiApply} style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, backgroundColor: colors.primary + "22" }}>
-                <Text style={{ fontSize: 13, fontWeight: "600", color: colors.primary }}>{lang === "en" ? "Undo" : "撤销"}</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: colors.success + "18", borderWidth: 1, borderColor: colors.success + "44" }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <IconSymbol name="checkmark.circle.fill" size={14} color={colors.success} />
+                <Text style={{ fontSize: 12, fontWeight: "500", color: colors.success }}>{lang === "en" ? "AI suggestions applied" : "AI 建议已应用"}</Text>
+              </View>
+              <Pressable onPress={undoAiApply} hitSlop={8} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
+                <Text style={{ fontSize: 12, fontWeight: "600", color: colors.primary }}>{lang === "en" ? "Undo" : "撤销"}</Text>
               </Pressable>
             </View>
           )}
