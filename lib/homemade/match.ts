@@ -128,13 +128,15 @@ export interface PrepSuggestion {
   type: string;
   /** Suggested section in the homemade library */
   section: string;
+  /** Default garnish unit for garnish-type preps (片/枝/颗/根/个/份/克) */
+  garnishUnit?: string;
 }
 
 /**
  * Well-known homemade products: if an ingredient looks like one of these
  * but has no match in the library, offer a one-tap "add to homemade" action.
  */
-const KNOWN_PREPS: { re: RegExp; name: string; nameAlt: string; type: string; section: string }[] = [
+const KNOWN_PREPS: { re: RegExp; name: string; nameAlt: string; type: string; section: string; garnishUnit?: string }[] = [
   // ── 糖浆 Syrups ──────────────────────────────────────────────────────
   { re: /simple syrup|单糖浆|糖浆.*1:1|1:1.*糖浆/, name: "Simple Syrup (1:1)", nameAlt: "单糖浆(1:1)", type: "syrup", section: "homemade-syrup" },
   { re: /rich (simple )?syrup|浓糖浆|2:1.*糖浆/, name: "Rich Simple Syrup (2:1)", nameAlt: "浓糖浆(2:1)", type: "syrup", section: "homemade-syrup" },
@@ -241,29 +243,29 @@ const KNOWN_PREPS: { re: RegExp; name: string; nameAlt: string; type: string; se
   { re: /na liqueur|non[- ]?alcoholic liqueur|无酒精利口酒/, name: "", nameAlt: "", type: "na-liqueur", section: "zero-proof" },
   { re: /zero[- ]?proof (spirit|gin|rum|whiskey)|无酒精烈酒替代/, name: "", nameAlt: "", type: "zero-spirit", section: "zero-proof" },
   // ── 装饰 Garnish ──────────────────────────────────────────────────────
-  { re: /foam|air (cocktail|drink)|泡沫/, name: "", nameAlt: "", type: "foam", section: "misc" },
-  { re: /spherification|球化/, name: "", nameAlt: "", type: "spherification-prep", section: "misc" },
+  { re: /foam|air (cocktail|drink)|泡沫/, name: "", nameAlt: "", type: "foam", section: "misc", garnishUnit: "份" },
+  { re: /spherification|球化/, name: "", nameAlt: "", type: "spherification-prep", section: "misc", garnishUnit: "颗" },
   // 柑橘类装饰 → garnish-citrus
-  { re: /dehydrated (citrus|lemon|orange|lime|grapefruit)|脱水柑橘|脱水橙|脱水柠檬/, name: "", nameAlt: "", type: "garnish-dehydrated-citrus", section: "garnish-dehydrated" },
-  { re: /(lemon|orange|lime|grapefruit|citrus) (peel|twist|zest|curl)|柑橘皮卷|橙皮卷|柠檬皮卷|青柠皮/, name: "", nameAlt: "", type: "garnish-citrus-peel", section: "garnish-citrus" },
-  { re: /(lemon|orange|lime|grapefruit|citrus) (wheel|slice|round|half.wheel)|柑橘片|橙片|柠檬片|柠檬轮/, name: "", nameAlt: "", type: "garnish-citrus-wheel", section: "garnish-citrus" },
+  { re: /dehydrated (citrus|lemon|orange|lime|grapefruit)|脱水柑橘|脱水橙|脱水柠檬/, name: "", nameAlt: "", type: "garnish-dehydrated-citrus", section: "garnish-dehydrated", garnishUnit: "片" },
+  { re: /(lemon|orange|lime|grapefruit|citrus) (peel|twist|zest|curl)|柑橘皮卷|橙皮卷|柠檬皮卷|青柠皮/, name: "", nameAlt: "", type: "garnish-citrus-peel", section: "garnish-citrus", garnishUnit: "片" },
+  { re: /(lemon|orange|lime|grapefruit|citrus) (wheel|slice|round|half.wheel)|柑橘片|橙片|柠檬片|柠檬轮/, name: "", nameAlt: "", type: "garnish-citrus-wheel", section: "garnish-citrus", garnishUnit: "片" },
   // 香草与花卉 → garnish-herb-flower
-  { re: /edible flower|花卉|食用花|玫瑰花瓣|薰衣草/, name: "", nameAlt: "", type: "garnish-edible-flower", section: "garnish-herb-flower" },
-  { re: /(fresh|mint|rosemary|thyme|basil|sage|tarragon) (sprig|leaf|garnish)|新鲜香草枝|薄荷枝|迷迭香/, name: "", nameAlt: "", type: "garnish-fresh-herb", section: "garnish-herb-flower" },
-  { re: /dried (herb|lavender|chamomile|rose)|干燥香草|干香料|干花/, name: "", nameAlt: "", type: "garnish-dried-herb", section: "garnish-herb-flower" },
+  { re: /edible flower|花卉|食用花|玫瑰花瓣|薰衣草/, name: "", nameAlt: "", type: "garnish-edible-flower", section: "garnish-herb-flower", garnishUnit: "朵" },
+  { re: /(fresh|mint|rosemary|thyme|basil|sage|tarragon) (sprig|leaf|garnish)|新鲜香草枝|薄荷枝|迷迭香/, name: "", nameAlt: "", type: "garnish-fresh-herb", section: "garnish-herb-flower", garnishUnit: "枝" },
+  { re: /dried (herb|lavender|chamomile|rose)|干燥香草|干香料|干花/, name: "", nameAlt: "", type: "garnish-dried-herb", section: "garnish-herb-flower", garnishUnit: "枝" },
   // 杯口装饰 → garnish-rim
-  { re: /salt (rim|edge|crust)|sugar (rim|edge|crust)|盐边|糖边|盐口|糖口/, name: "", nameAlt: "", type: "garnish-salt-rim", section: "garnish-rim" },
-  { re: /spiced rim|tajin rim|chili (rim|salt)|香料杯口|辣椒盐边/, name: "", nameAlt: "", type: "garnish-spiced-rim", section: "garnish-rim" },
+  { re: /salt (rim|edge|crust)|sugar (rim|edge|crust)|盐边|糖边|盐口|糖口/, name: "", nameAlt: "", type: "garnish-salt-rim", section: "garnish-rim", garnishUnit: "份" },
+  { re: /spiced rim|tajin rim|chili (rim|salt)|香料杯口|辣椒盐边/, name: "", nameAlt: "", type: "garnish-spiced-rim", section: "garnish-rim", garnishUnit: "份" },
   // 串签类 → garnish-skewer
-  { re: /olive (skewer|pick|garnish)|cocktail onion|洋葱串|橄榄串|橄榄/, name: "", nameAlt: "", type: "garnish-skewer-olive", section: "garnish-skewer" },
-  { re: /fruit (skewer|pick|kebab)|cherry (skewer|pick)|果类串签|樱桃串/, name: "", nameAlt: "", type: "garnish-skewer-olive", section: "garnish-skewer" },
+  { re: /olive (skewer|pick|garnish)|cocktail onion|洋葱串|橄榄串|橄榄/, name: "", nameAlt: "", type: "garnish-skewer-olive", section: "garnish-skewer", garnishUnit: "颗" },
+  { re: /fruit (skewer|pick|kebab)|cherry (skewer|pick)|果类串签|樱桃串/, name: "", nameAlt: "", type: "garnish-skewer-olive", section: "garnish-skewer", garnishUnit: "根" },
   // 果类装饰 → garnish-fruit
-  { re: /candied (fruit|cherry|orange|pineapple)|maraschino cherry|糖渍|腌渍|糖渍樱桃/, name: "", nameAlt: "", type: "garnish-candied-fruit", section: "garnish-fruit" },
+  { re: /candied (fruit|cherry|orange|pineapple)|maraschino cherry|糖渍|腌渍|糖渍樱桃/, name: "", nameAlt: "", type: "garnish-candied-fruit", section: "garnish-fruit", garnishUnit: "颗" },
   // 其他装饰 → garnish-other
-  { re: /flavored ice|ice sphere|ice ball|风味冰块|冰球|冰块/, name: "", nameAlt: "", type: "garnish", section: "garnish-other" },
-  { re: /chocolate (garnish|decoration|shaving)|candy garnish|巧克力装饰|糖果装饰/, name: "", nameAlt: "", type: "garnish", section: "garnish-other" },
+  { re: /flavored ice|ice sphere|ice ball|风味冰块|冰球|冰块/, name: "", nameAlt: "", type: "garnish", section: "garnish-other", garnishUnit: "个" },
+  { re: /chocolate (garnish|decoration|shaving)|candy garnish|巧克力装饰|糖果装饰/, name: "", nameAlt: "", type: "garnish", section: "garnish-other", garnishUnit: "片" },
   // 通用装饰兜底 → misc
-  { re: /garnish|装饰/, name: "", nameAlt: "", type: "garnish", section: "misc" },
+  { re: /garnish|装饰/, name: "", nameAlt: "", type: "garnish", section: "misc", garnishUnit: "个" },
 ];
 
 /**
@@ -280,6 +282,7 @@ export function suggestPrep(ingredientName: string): PrepSuggestion | null {
         nameAlt: k.nameAlt,
         type: k.type,
         section: k.section,
+        ...(k.garnishUnit ? { garnishUnit: k.garnishUnit } : {}),
       };
     }
   }

@@ -161,7 +161,7 @@ export async function enrichHomemade(params: {
     story: string; styleDesc: string; shelfLife: string; storage: string; usageNotes: string;
     steps: string; yieldQty: number | null; yieldUnit: string;
     sourceFamilyKey: string; variantLabel: string;
-    prepIngredients: Array<{ name: string; amount: string; alternatives?: string[] }>;
+    prepIngredients: Array<{ name: string; amount: string; alternatives?: string[]; suggestedSection?: string; suggestedType?: string; garnishUnit?: string }>;
     confidence: string;
     suggestedLibrary: string; suggestedCategory: string; suggestedStyle: string; mapConfidence: string;
   };
@@ -200,7 +200,14 @@ export async function enrichHomemade(params: {
       mapConfidence: cfResult!.mapConfidence ?? 'none',
       prepIngredients: (cfResult!.prepIngredients ?? []).map(ing => {
         const split = splitOrAlternativesClient(ing.name);
-        return { name: split.name, amount: ing.amount, ...(split.alternatives?.length ? { alternatives: split.alternatives } : {}) };
+        return {
+          name: split.name,
+          amount: ing.amount,
+          ...(split.alternatives?.length ? { alternatives: split.alternatives } : {}),
+          ...(ing.suggestedSection ? { suggestedSection: ing.suggestedSection } : {}),
+          ...(ing.suggestedType ? { suggestedType: ing.suggestedType } : {}),
+          ...(ing.garnishUnit ? { garnishUnit: ing.garnishUnit } : {}),
+        };
       }),
     };
   }

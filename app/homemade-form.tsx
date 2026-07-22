@@ -21,6 +21,7 @@ import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
 import { enrichHomemade } from "@/lib/api/smart-router";
 import type { EnrichHomemadeResult } from "@/lib/api/smart-router";
+import { suggestPrep } from "@/lib/homemade/match";
 import { useNetwork } from "@/hooks/use-network";
 import { splitAmount, mergeAmount, unitDisplayLabel } from "@/lib/units";
 import { UnitPickerSheet } from "@/components/unit-picker-sheet";
@@ -450,6 +451,15 @@ export default function HomemadeFormScreen() {
         amount: ing.amount,
         ...(ing.alternatives && ing.alternatives.length > 0 ? { alternatives: ing.alternatives } : {}),
       })));
+      // 装饰类：若 prepIngredients 第一条有 suggestedSection 属于 garnish，自动切换分组
+      const firstIngExt = (aiResult.prepIngredients as Array<{ name: string; amount: string; alternatives?: string[]; suggestedSection?: string; suggestedType?: string; garnishUnit?: string }>)[0];
+      if (firstIngExt?.suggestedSection) {
+        const grp = prepGroupOfSection(sections, firstIngExt.suggestedSection);
+        if (grp === "garnish" && selectedGroup !== "garnish") {
+          handleGroupChange(grp);
+        }
+        if (firstIngExt.garnishUnit) setGarnishUnit(firstIngExt.garnishUnit);
+      }
     }
   }, [aiResult]);
 
@@ -511,7 +521,21 @@ export default function HomemadeFormScreen() {
         const matched = typeList.find((t) => t.key === res.prepType);
         if (matched) { setType(res.prepType); setTypeTouched(true); }
       }
-    setAiResult(res);
+      // 自动预填 section → selectedGroup（仅在用户未手动选择类型时）
+      if (res.section && !typeTouched) {
+        const suggestedGrp = prepGroupOfSection(sections, res.section);
+        if (suggestedGrp !== selectedGroup) {
+          handleGroupChange(suggestedGrp);
+        }
+      }
+      // 装饰类：若 AI 识别为装饰分组，自动预填 garnishUnit（优先从 prepIngredients 第一条推断）
+      if (res.section && prepGroupOfSection(sections, res.section) === "garnish") {
+        // 从第一条 prepIngredient 的 garnishUnit 推断，或从 suggestPrep 推断
+        const firstIng = (res.prepIngredients as Array<{ name: string; amount: string; alternatives?: string[]; suggestedSection?: string; suggestedType?: string; garnishUnit?: string }>)[0];
+        const aiGarnishUnit = firstIng?.garnishUnit ?? suggestPrep(name.trim())?.garnishUnit;
+        if (aiGarnishUnit) setGarnishUnit(aiGarnishUnit);
+      }
+      setAiResult(res);
     } catch {
       // 显示错误提示
       Alert.alert(

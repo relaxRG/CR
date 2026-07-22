@@ -6,6 +6,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { normalizeTagToZh } from "../lib/recipes/types";
+import { suggestPrep } from "../lib/homemade/match";
 import {
   getAppConfigValue,
   getSyncData,
@@ -1876,7 +1877,7 @@ ${librarySpecificInstructions}
 
         // ── 严格白名单校验 ──────────────────────────────────────────────
         const rawSection = typeof p.section === "string" ? p.section.trim() : "";
-        const validatedSection = VALID_SECTIONS.includes(rawSection) ? rawSection : "";
+        const validatedSection = VALID_SECTIONS.includes(rawSection) ? rawSection : (suggestPrep(input.name)?.section ?? "");
         const rawPrepType = typeof p.prepType === "string" ? p.prepType.trim() : "";
         const validatedPrepType = VALID_PREP_TYPES.includes(rawPrepType) ? rawPrepType : "other";
         const rawTechniques = Array.isArray(p.techniques) ? (p.techniques as string[]) : [];
@@ -1919,6 +1920,15 @@ ${librarySpecificInstructions}
             ? (p.prepIngredients as Record<string, unknown>[]).map(ing => ({
                 ...splitIngredientOrServer(typeof ing?.name === "string" ? ing.name.trim() : ""),
                 amount: typeof ing?.amount === "string" ? ing.amount.trim() : "",
+                ...((() => {
+                  const ingName = typeof ing?.name === "string" ? ing.name.trim() : "";
+                  const suggestion = ingName ? suggestPrep(ingName) : null;
+                  return suggestion ? {
+                    suggestedSection: suggestion.section,
+                    suggestedType: suggestion.type,
+                    ...(suggestion.garnishUnit ? { garnishUnit: suggestion.garnishUnit } : {}),
+                  } : {};
+                })()),
               })).filter(ing => ing.name)
             : [],
           confidence: (["high", "medium", "low"] as const).includes(p.confidence as "high") ? p.confidence as "high" | "medium" | "low" : "medium",
