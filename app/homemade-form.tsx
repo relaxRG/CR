@@ -2,6 +2,7 @@ import * as Haptics from "expo-haptics";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -506,9 +507,14 @@ export default function HomemadeFormScreen() {
         const matched = typeList.find((t) => t.key === res.prepType);
         if (matched) { setType(res.prepType); setTypeTouched(true); }
       }
-      setAiResult(res);
+    setAiResult(res);
     } catch {
-      // 静默失败
+      // 显示错误提示
+      Alert.alert(
+        lang === "en" ? "AI Lookup Failed" : "AI 识别失败",
+        lang === "en" ? "AI service is temporarily unavailable. Please check your network and try again." : "AI 服务暂时不可用，请检查网络后重试。",
+        [{ text: lang === "en" ? "OK" : "好的" }]
+      );
     } finally {
       setAiBusy(false);
     }

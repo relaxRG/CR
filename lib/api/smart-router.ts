@@ -174,19 +174,31 @@ export async function enrichHomemade(params: {
     // CF Worker 不可用，直接走本地 server
   }
 
-  // 如果 CF Worker 返回了完整字段（有 nameZh 或 nameEn），直接使用
-  if (cfResult && (cfResult.nameZh || cfResult.nameEn)) {
+  // CF Worker 返回了任意有效字段（含旧版只有 section/prepType 的情况），直接使用
+  const cfHasData = cfResult && (cfResult.nameZh || cfResult.nameEn || cfResult.section || cfResult.prepType);
+  if (cfHasData) {
     return {
       ...cfResult,
-      flavorTags: normalizeEnumArrayForLang(cfResult.flavorTags),
-      nameZh: cfResult.nameZh ?? '',
-      nameEn: cfResult.nameEn ?? '',
-      steps: cfResult.steps ?? '',
-      yieldQty: cfResult.yieldQty ?? null,
-      yieldUnit: cfResult.yieldUnit ?? '',
-      sourceFamilyKey: cfResult.sourceFamilyKey ?? '',
-      variantLabel: cfResult.variantLabel ?? '',
-      prepIngredients: (cfResult.prepIngredients ?? []).map(ing => {
+      flavorTags: normalizeEnumArrayForLang(cfResult!.flavorTags ?? []),
+      nameZh: cfResult!.nameZh ?? '',
+      nameEn: cfResult!.nameEn ?? '',
+      story: cfResult!.story ?? '',
+      styleDesc: cfResult!.styleDesc ?? '',
+      shelfLife: cfResult!.shelfLife ?? '',
+      storage: cfResult!.storage ?? '',
+      usageNotes: cfResult!.usageNotes ?? '',
+      techniques: cfResult!.techniques ?? [],
+      steps: cfResult!.steps ?? '',
+      yieldQty: cfResult!.yieldQty ?? null,
+      yieldUnit: cfResult!.yieldUnit ?? '',
+      sourceFamilyKey: cfResult!.sourceFamilyKey ?? '',
+      variantLabel: cfResult!.variantLabel ?? '',
+      confidence: (cfResult!.confidence as 'high' | 'medium' | 'low') ?? 'low',
+      suggestedLibrary: cfResult!.suggestedLibrary ?? '',
+      suggestedCategory: cfResult!.suggestedCategory ?? '',
+      suggestedStyle: cfResult!.suggestedStyle ?? '',
+      mapConfidence: cfResult!.mapConfidence ?? 'none',
+      prepIngredients: (cfResult!.prepIngredients ?? []).map(ing => {
         const split = splitOrAlternativesClient(ing.name);
         return { name: split.name, amount: ing.amount, ...(split.alternatives?.length ? { alternatives: split.alternatives } : {}) };
       }),
@@ -196,16 +208,24 @@ export async function enrichHomemade(params: {
   // 回落到本地 tRPC server（lookup.enrichHomemade）
   const apiBase = getApiBaseUrl();
   const trpcUrl = `${apiBase}/api/trpc/lookup.enrichHomemade`;
-  const trpcRes = await fetchWithTimeout(trpcUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ json: params }),
-  }, 35_000);
-  if (!trpcRes.ok) {
-    throw new Error(`本地 AI 服务返回错误: HTTP ${trpcRes.status}`);
+  let localResult: HomemadeRaw | null = null;
+  try {
+    const trpcRes = await fetchWithTimeout(trpcUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ json: params }),
+    }, 35_000);
+    if (trpcRes.ok) {
+      const trpcData = await trpcRes.json() as { result?: { data?: { json?: HomemadeRaw } } };
+      localResult = trpcData?.result?.data?.json ?? null;
+    }
+  } catch {
+    // tRPC 不可用
   }
-  const trpcData = await trpcRes.json() as { result?: { data?: { json?: HomemadeRaw } } };
-  const localResult: HomemadeRaw = trpcData?.result?.data?.json ?? {} as HomemadeRaw;
+  // 两者都失败
+  if (!localResult) {
+    throw new Error('AI 服务暂时不可用，请稍后重试');
+  }
 
   // 如果 CF Worker 有部分字段，合并（CF Worker 的字段优先，本地补充缺失的）
   const merged: HomemadeRaw = cfResult ? {
