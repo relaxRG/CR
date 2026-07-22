@@ -339,38 +339,84 @@ export default function HomemadeDetailScreen() {
                   </Text>
                 ) : null}
                 {typeof ingItem !== "string" && ingItem.alternatives && ingItem.alternatives.length > 0 ? (
-                  <View className="flex-row flex-wrap mt-0.5" style={{ gap: 4 }}>
+                  <View style={{ flexDirection: "column", gap: 4, marginTop: 4 }}>
                     {ingItem.alternatives.map((alt: string, altIdx: number) => (
-                      <Pressable
+                      <View
                         key={`alt-${idx}-${altIdx}`}
-                        onPress={() => {
-                          if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                          const newAlts = [ingItem.name, ...(ingItem.alternatives ?? []).filter((_, i) => i !== altIdx)];
-                          const newIngredients = prep.ingredients.map((item, i) =>
-                            i === idx && typeof item !== "string"
-                              ? { ...item, name: alt, alternatives: newAlts }
-                              : item
-                          );
-                          updatePrep(prep.id, { ingredients: newIngredients });
-                        }}
-                        style={({ pressed }) => [{ opacity: pressed ? 0.5 : 1 }]}
+                        style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
                       >
-                        <Text className="text-xs" style={{ color: colors.muted }}>
-                          {lang === "zh" ? "或 " : "or "}{alt}
-                        </Text>
-                      </Pressable>
+                        <Text style={{ fontSize: 12, color: colors.muted, minWidth: 20 }}>{lang === "zh" ? "或" : "or"}</Text>
+                        <Pressable
+                          onPress={() => {
+                            if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            const newAlts = [ingItem.name, ...(ingItem.alternatives ?? []).filter((_, i) => i !== altIdx)];
+                            const newIngredients = prep.ingredients.map((item, i) =>
+                              i === idx && typeof item !== "string"
+                                ? { ...item, name: alt, alternatives: newAlts }
+                                : item
+                            );
+                            updatePrep(prep.id, { ingredients: newIngredients });
+                          }}
+                          style={({ pressed }) => [{
+                            flex: 1,
+                            backgroundColor: colors.surface,
+                            borderWidth: 1,
+                            borderColor: colors.border,
+                            borderRadius: 10,
+                            paddingHorizontal: 10,
+                            paddingVertical: 8,
+                            opacity: pressed ? 0.6 : 1,
+                          }]}
+                        >
+                          <Text style={{ fontSize: 14, lineHeight: 18, color: colors.foreground }}>{alt}</Text>
+                        </Pressable>
+                        {/* 上移按钮 */}
+                        <Pressable
+                          onPress={() => {
+                            if (altIdx === 0) return;
+                            if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            const alts = [...(ingItem.alternatives ?? [])];
+                            [alts[altIdx - 1], alts[altIdx]] = [alts[altIdx], alts[altIdx - 1]];
+                            const newIngredients = prep.ingredients.map((item, i) =>
+                              i === idx && typeof item !== "string" ? { ...item, alternatives: alts } : item
+                            );
+                            updatePrep(prep.id, { ingredients: newIngredients });
+                          }}
+                          hitSlop={8}
+                          style={({ pressed }) => [{ opacity: altIdx === 0 ? 0.2 : pressed ? 0.5 : 1 }]}
+                        >
+                          <IconSymbol name="chevron.up" size={18} color={colors.muted} />
+                        </Pressable>
+                        {/* 下移按钮 */}
+                        <Pressable
+                          onPress={() => {
+                            if (altIdx === (ingItem.alternatives ?? []).length - 1) return;
+                            if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            const alts = [...(ingItem.alternatives ?? [])];
+                            [alts[altIdx], alts[altIdx + 1]] = [alts[altIdx + 1], alts[altIdx]];
+                            const newIngredients = prep.ingredients.map((item, i) =>
+                              i === idx && typeof item !== "string" ? { ...item, alternatives: alts } : item
+                            );
+                            updatePrep(prep.id, { ingredients: newIngredients });
+                          }}
+                          hitSlop={8}
+                          style={({ pressed }) => [{ opacity: altIdx === (ingItem.alternatives ?? []).length - 1 ? 0.2 : pressed ? 0.5 : 1 }]}
+                        >
+                          <IconSymbol name="chevron.down" size={18} color={colors.muted} />
+                        </Pressable>
+                      </View>
                     ))}
-                      <Pressable
-                        onPress={() => {
-                          if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                          ActionSheetIOS
-                            ? ActionSheetIOS.showActionSheetWithOptions({ options: [lang === "zh" ? "添加备选项" : "Add Alternative", lang === "zh" ? "取消" : "Cancel"], cancelButtonIndex: 1 }, (i) => { if (i === 0) { setAddAltIngId(idx); setAddAltIngValue(""); } })
-                            : Alert.alert(lang === "zh" ? "or 备选" : "Alternative", "", [{ text: lang === "zh" ? "添加备选项" : "Add Alternative", onPress: () => { setAddAltIngId(idx); setAddAltIngValue(""); } }, { text: lang === "zh" ? "取消" : "Cancel", style: "cancel" }]);
-                        }}
-                        style={({ pressed }) => [{ opacity: pressed ? 0.5 : 1 }]}
-                      >
-                        <Text style={{ fontSize: 11, lineHeight: 16, color: colors.primary }}>+ or</Text>
-                      </Pressable>
+                    <Pressable
+                      onPress={() => {
+                        if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        ActionSheetIOS
+                          ? ActionSheetIOS.showActionSheetWithOptions({ options: [lang === "zh" ? "添加备选项" : "Add Alternative", lang === "zh" ? "取消" : "Cancel"], cancelButtonIndex: 1 }, (i) => { if (i === 0) { setAddAltIngId(idx); setAddAltIngValue(""); } })
+                          : Alert.alert(lang === "zh" ? "or 备选" : "Alternative", "", [{ text: lang === "zh" ? "添加备选项" : "Add Alternative", onPress: () => { setAddAltIngId(idx); setAddAltIngValue(""); } }, { text: lang === "zh" ? "取消" : "Cancel", style: "cancel" }]);
+                      }}
+                      style={({ pressed }) => [{ opacity: pressed ? 0.5 : 1, marginTop: 2 }]}
+                    >
+                      <Text style={{ fontSize: 11, lineHeight: 16, color: colors.primary }}>+ or</Text>
+                    </Pressable>
                   </View>
 ) : null}
                 {typeof ingItem !== "string" && (!ingItem.alternatives || ingItem.alternatives.length === 0) ? (
