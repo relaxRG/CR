@@ -821,6 +821,39 @@ export default function HomemadeFormScreen() {
                 >
                   <Text style={{ fontSize: 15, lineHeight: 20, color: colors.foreground }}>{alt}</Text>
                 </Pressable>
+                {/* 上移按钮 */}
+                <Pressable
+                  onPress={() => {
+                    if (altIdx === 0) return;
+                    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    const alts = [...(row.alternatives ?? [])];
+                    [alts[altIdx - 1], alts[altIdx]] = [alts[altIdx], alts[altIdx - 1]];
+                    setIngRows((prev) => prev.map((r) =>
+                      r.id === row.id ? { ...r, alternatives: alts } : r
+                    ));
+                  }}
+                  hitSlop={8}
+                  style={({ pressed }) => [{ opacity: altIdx === 0 ? 0.2 : pressed ? 0.5 : 1 }]}
+                >
+                  <IconSymbol name="chevron.up" size={20} color={colors.muted} />
+                </Pressable>
+                {/* 下移按钮 */}
+                <Pressable
+                  onPress={() => {
+                    if (altIdx === (row.alternatives ?? []).length - 1) return;
+                    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    const alts = [...(row.alternatives ?? [])];
+                    [alts[altIdx], alts[altIdx + 1]] = [alts[altIdx + 1], alts[altIdx]];
+                    setIngRows((prev) => prev.map((r) =>
+                      r.id === row.id ? { ...r, alternatives: alts } : r
+                    ));
+                  }}
+                  hitSlop={8}
+                  style={({ pressed }) => [{ opacity: altIdx === (row.alternatives ?? []).length - 1 ? 0.2 : pressed ? 0.5 : 1 }]}
+                >
+                  <IconSymbol name="chevron.down" size={20} color={colors.muted} />
+                </Pressable>
+                {/* 删除按钮 */}
                 <Pressable
                   onPress={() => {
                     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
