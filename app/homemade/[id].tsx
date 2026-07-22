@@ -362,13 +362,13 @@ export default function HomemadeDetailScreen() {
                             backgroundColor: colors.surface,
                             borderWidth: 1,
                             borderColor: colors.border,
-                            borderRadius: 10,
-                            paddingHorizontal: 10,
-                            paddingVertical: 8,
+                            borderRadius: 12,
+                            paddingHorizontal: 12,
+                            paddingVertical: 10,
                             opacity: pressed ? 0.6 : 1,
                           }]}
                         >
-                          <Text style={{ fontSize: 14, lineHeight: 18, color: colors.foreground }}>{alt}</Text>
+                          <Text style={{ fontSize: 16, lineHeight: 22, color: colors.foreground }}>{alt}</Text>
                         </Pressable>
                         {/* 上移按钮 */}
                         <Pressable
