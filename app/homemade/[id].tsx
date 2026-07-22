@@ -1,7 +1,7 @@
 import * as Haptics from "expo-haptics";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React from "react";
-import { Alert, Platform, Pressable, ScrollView, ScrollView as HScrollView, StyleSheet, Text, View } from "react-native";
+import { ActionSheetIOS, Alert, Platform, Pressable, ScrollView, ScrollView as HScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { StarRating } from "@/components/star-rating";
@@ -26,6 +26,8 @@ export default function HomemadeDetailScreen() {
   const { preps } = useHomemadeStore();
   const { bottles } = useBottleStore();
   const prep = getPrep(id);
+  const [addAltIngId, setAddAltIngId] = React.useState<number | null>(null);
+  const [addAltIngValue, setAddAltIngValue] = React.useState("");
 
   if (!prep) {
     return (
@@ -358,8 +360,70 @@ export default function HomemadeDetailScreen() {
                         </Text>
                       </Pressable>
                     ))}
+                      <Pressable
+                        onPress={() => {
+                          if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          ActionSheetIOS
+                            ? ActionSheetIOS.showActionSheetWithOptions({ options: [lang === "zh" ? "添加备选项" : "Add Alternative", lang === "zh" ? "取消" : "Cancel"], cancelButtonIndex: 1 }, (i) => { if (i === 0) { setAddAltIngId(idx); setAddAltIngValue(""); } })
+                            : Alert.alert(lang === "zh" ? "or 备选" : "Alternative", "", [{ text: lang === "zh" ? "添加备选项" : "Add Alternative", onPress: () => { setAddAltIngId(idx); setAddAltIngValue(""); } }, { text: lang === "zh" ? "取消" : "Cancel", style: "cancel" }]);
+                        }}
+                        style={({ pressed }) => [{ opacity: pressed ? 0.5 : 1 }]}
+                      >
+                        <Text style={{ fontSize: 11, lineHeight: 16, color: colors.primary }}>+ or</Text>
+                      </Pressable>
                   </View>
 ) : null}
+                {typeof ingItem !== "string" && (!ingItem.alternatives || ingItem.alternatives.length === 0) ? (
+                  <Pressable
+                    onPress={() => {
+                      if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      ActionSheetIOS
+                        ? ActionSheetIOS.showActionSheetWithOptions({ options: [lang === "zh" ? "添加备选项" : "Add Alternative", lang === "zh" ? "取消" : "Cancel"], cancelButtonIndex: 1 }, (i) => { if (i === 0) { setAddAltIngId(idx); setAddAltIngValue(""); } })
+                        : Alert.alert(lang === "zh" ? "or 备选" : "Alternative", "", [{ text: lang === "zh" ? "添加备选项" : "Add Alternative", onPress: () => { setAddAltIngId(idx); setAddAltIngValue(""); } }, { text: lang === "zh" ? "取消" : "Cancel", style: "cancel" }]);
+                    }}
+                    style={({ pressed }) => [{ opacity: pressed ? 0.5 : 1, marginTop: 2 }]}
+                  >
+                    <Text style={{ fontSize: 11, lineHeight: 16, color: colors.muted }}>+ or</Text>
+                  </Pressable>
+                ) : null}
+                {addAltIngId === idx ? (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 }}>
+                    <Text style={{ fontSize: 11, color: colors.muted }}>{lang === "zh" ? "或" : "or"}</Text>
+                    <TextInput
+                      autoFocus
+                      style={{ flex: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 6, fontSize: 14, color: colors.foreground }}
+                      placeholder={lang === "zh" ? "输入备选名称" : "Enter alternative name"}
+                      placeholderTextColor={colors.muted}
+                      value={addAltIngValue}
+                      onChangeText={setAddAltIngValue}
+                      returnKeyType="done"
+                      autoCapitalize="words"
+                      onSubmitEditing={() => {
+                        const v = addAltIngValue.trim();
+                        if (v && typeof ingItem !== "string") {
+                          const newIngredients = prep.ingredients.map((item, i) =>
+                            i === idx && typeof item !== "string" ? { ...item, alternatives: [...(item.alternatives ?? []), v] } : item
+                          );
+                          updatePrep(prep.id, { ingredients: newIngredients });
+                        }
+                        setAddAltIngId(null); setAddAltIngValue("");
+                      }}
+                      onBlur={() => {
+                        const v = addAltIngValue.trim();
+                        if (v && typeof ingItem !== "string") {
+                          const newIngredients = prep.ingredients.map((item, i) =>
+                            i === idx && typeof item !== "string" ? { ...item, alternatives: [...(item.alternatives ?? []), v] } : item
+                          );
+                          updatePrep(prep.id, { ingredients: newIngredients });
+                        }
+                        setAddAltIngId(null); setAddAltIngValue("");
+                      }}
+                    />
+                    <Pressable onPress={() => { setAddAltIngId(null); setAddAltIngValue(""); }} hitSlop={8} style={({ pressed }) => [{ opacity: pressed ? 0.5 : 1 }]}>
+                      <IconSymbol name="xmark.circle.fill" size={18} color={colors.muted} />
+                    </Pressable>
+                  </View>
+                ) : null}
               </View>
               {ingAmount ? (
                 <Text className="text-[15px] text-muted ml-3" style={{ lineHeight: 21 }}>

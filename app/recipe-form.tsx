@@ -2,6 +2,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
+  ActionSheetIOS,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -480,6 +481,9 @@ export default function RecipeFormScreen() {
   }, []);
   /** Which ingredient row is focused (shows live suggestions) */
   const [focusedIng, setFocusedIng] = useState<string | null>(null);
+  /** 正在添加备选项的成分行 id → 临时输入值 */
+  const [addAltIngId, setAddAltIngId] = useState<string | null>(null);
+  const [addAltIngValue, setAddAltIngValue] = useState("");
   /** Rows where user picked/dismissed suggestions — suppress until text changes */
   const [pickedIng, setPickedIng] = useState<Record<string, string>>({});
   /** ingId → true: user dismissed the fuzzy link suggestion */
@@ -915,6 +919,25 @@ export default function RecipeFormScreen() {
       setPickedIng((prev) => { const n = { ...prev }; delete n[iid]; return n; });
     }
   };
+  /** Done 键提交时拆分 or 备选 */
+  const commitIngredientName = (iid: string, rawName: string) => {
+    const OR_RE = /\s+(?:or|或|\/|\|)\s+/i;
+    const STATE_ADJ_RE = /^(?:fresh|frozen|dried|canned|bottled|house-made|homemade|store-bought|organic|raw|cooked|roasted|toasted|ground|whole|sliced|diced|chopped|minced|peeled|zested|squeezed)$/i;
+    if (!OR_RE.test(rawName.trim())) return;
+    const parts = rawName.trim().split(OR_RE).map((s) => s.trim()).filter(Boolean);
+    if (parts.length < 2) return;
+    const allAdj = parts.slice(0, -1).every((p) => {
+      const words = p.split(/\s+/);
+      return words.length === 1 && STATE_ADJ_RE.test(words[0]);
+    });
+    if (allAdj) return;
+    const [primary, ...alts] = parts;
+    setIngredients((prev) => prev.map((i) =>
+      i.id === iid ? { ...i, name: primary, alternatives: alts, linkedBottleId: undefined, linkedPrepId: undefined, linkDismissed: undefined } : i
+    ));
+    setDismissedLinks((prev) => { const n = { ...prev }; delete n[iid]; return n; });
+    setAcceptedLinks((prev) => { const n = { ...prev }; delete n[iid]; return n; });
+  };
 
   const pickSuggestion = (iid: string, value: string) => {
     updateIngredient(iid, "name", value);
@@ -1022,7 +1045,54 @@ export default function RecipeFormScreen() {
             }}
             returnKeyType="done"
             style={{ lineHeight: 20 }}
+            onSubmitEditing={() => commitIngredientName(ing.id, ing.name)}
           />
+          {/* ── or 操作按钮 ── */}
+          <Pressable
+            onPress={() => {
+              if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              const OR_RE = /\s+(?:or|或|\/|\|)\s+/i;
+              if (OR_RE.test(ing.name.trim())) {
+                commitIngredientName(ing.id, ing.name);
+              } else {
+                ActionSheetIOS
+                  ? ActionSheetIOS.showActionSheetWithOptions(
+                      {
+                        options: [
+                          lang === "zh" ? "添加备选项" : "Add Alternative",
+                          lang === "zh" ? "取消" : "Cancel",
+                        ],
+                        cancelButtonIndex: 1,
+                        title: lang === "zh" ? "or 备选" : "Alternative",
+                        message: lang === "zh" ? "为此成分添加一个备选项（点击可切换优先级）" : "Add an alternative ingredient (tap to swap priority)",
+                      },
+                      (idx) => {
+                        if (idx === 0) { setAddAltIngId(ing.id); setAddAltIngValue(""); }
+                      }
+                    )
+                  : Alert.alert(
+                      lang === "zh" ? "or 备选" : "Alternative",
+                      lang === "zh" ? "为此成分添加一个备选项（点击可切换优先级）" : "Add an alternative ingredient",
+                      [
+                        { text: lang === "zh" ? "添加备选项" : "Add Alternative", onPress: () => { setAddAltIngId(ing.id); setAddAltIngValue(""); } },
+                        { text: lang === "zh" ? "取消" : "Cancel", style: "cancel" },
+                      ]
+                    );
+              }
+            }}
+            hitSlop={8}
+            style={({ pressed }) => [{
+              paddingHorizontal: 7,
+              paddingVertical: 4,
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: (ing.alternatives && ing.alternatives.length > 0) ? colors.primary : colors.border,
+              backgroundColor: (ing.alternatives && ing.alternatives.length > 0) ? `${colors.primary}18` : colors.surface,
+              opacity: pressed ? 0.6 : 1,
+            }]}
+          >
+            <Text style={{ fontSize: 11, fontWeight: "600", color: (ing.alternatives && ing.alternatives.length > 0) ? colors.primary : colors.muted }}>or</Text>
+          </Pressable>
           {/* ── Amount: qty + unit picker ── */}
           {(() => {
             const { qty, unit } = splitAmount(ing.amount);
@@ -1200,10 +1270,65 @@ export default function RecipeFormScreen() {
             <Text className="text-xs" style={{ color: colors.success, lineHeight: 16 }}>{classification.library === "homemade" ? t("form.homemade.add") : classification.library === "material" ? t("form.smartAdd.material") : t("form.smartAdd.bottle")}{" · "}{displayNames(classification.name, classification.nameAlt, lang).primary}</Text>
           </Pressable>
         ) : null}
+        {/* ── or 备选标签 ── */}
+        {ing.alternatives && ing.alternatives.length > 0 ? (
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 2, paddingHorizontal: 4 }}>
+            {ing.alternatives.map((alt, altIdx) => (
+              <Pressable
+                key={`${ing.id}-alt-${altIdx}`}
+                onPress={() => {
+                  if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  const newAlts = [ing.name, ...(ing.alternatives ?? []).filter((_, i) => i !== altIdx)];
+                  setIngredients((prev) => prev.map((i) =>
+                    i.id === ing.id
+                      ? { ...i, name: alt, alternatives: newAlts, linkedBottleId: undefined, linkedPrepId: undefined, linkDismissed: undefined }
+                      : i
+                  ));
+                  setDismissedLinks((prev) => { const n = { ...prev }; delete n[ing.id]; return n; });
+                  setAcceptedLinks((prev) => { const n = { ...prev }; delete n[ing.id]; return n; });
+                }}
+                style={({ pressed }) => [{ opacity: pressed ? 0.5 : 1 }]}
+              >
+                <Text style={{ fontSize: 11, lineHeight: 16, color: colors.muted }}>
+                  {lang === "zh" ? "或 " : "or "}{alt}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+        {/* ── 添加备选输入框（临时显示） ── */}
+        {addAltIngId === ing.id ? (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4, paddingLeft: 2 }}>
+            <Text style={{ fontSize: 11, color: colors.muted, minWidth: 20 }}>{lang === "zh" ? "或" : "or"}</Text>
+            <TextInput
+              autoFocus
+              style={{ flex: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 8, fontSize: 15, color: colors.foreground, lineHeight: 20 }}
+              placeholder={lang === "zh" ? "输入备选名称" : "Enter alternative name"}
+              placeholderTextColor={colors.muted}
+              value={addAltIngValue}
+              onChangeText={setAddAltIngValue}
+              returnKeyType="done"
+              autoCapitalize="words"
+              onSubmitEditing={() => {
+                const v = addAltIngValue.trim();
+                if (v) setIngredients((prev) => prev.map((i) => i.id === ing.id ? { ...i, alternatives: [...(i.alternatives ?? []), v] } : i));
+                setAddAltIngId(null); setAddAltIngValue("");
+              }}
+              onBlur={() => {
+                const v = addAltIngValue.trim();
+                if (v) setIngredients((prev) => prev.map((i) => i.id === ing.id ? { ...i, alternatives: [...(i.alternatives ?? []), v] } : i));
+                setAddAltIngId(null); setAddAltIngValue("");
+              }}
+            />
+            <Pressable onPress={() => { setAddAltIngId(null); setAddAltIngValue(""); }} hitSlop={8} style={({ pressed }) => [{ opacity: pressed ? 0.5 : 1 }]}>
+              <IconSymbol name="xmark.circle.fill" size={20} color={colors.muted} />
+            </Pressable>
+          </View>
+        ) : null}
       </View>
     );
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ingredients, ingSourceMap, dismissedLinks, acceptedLinks, focusedIng, pickedIng, bottles, preps, lang, groupOf, colors, t]);
+  }, [ingredients, ingSourceMap, dismissedLinks, acceptedLinks, focusedIng, pickedIng, bottles, preps, lang, groupOf, colors, t, addAltIngId, addAltIngValue]);
 
   const toggleFlavor = (tag: string) => {
     setFlavors((prev) =>
