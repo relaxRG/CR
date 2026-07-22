@@ -573,7 +573,7 @@ export default function HomemadeFormScreen() {
   };
   // 手动输入 onBlur 时拆分 or 备选
   const commitIngRowName = (rid: string, rawName: string) => {
-    const OR_RE = /\s+(?:or|或)\s+/i;
+    const OR_RE = /\s+(?:or|或|\/|\|)\s+/i;
     const STATE_ADJ_RE = /^(?:fresh|frozen|dried|canned|bottled|house-made|homemade|store-bought|organic|raw|cooked|roasted|toasted|ground|whole|sliced|diced|chopped|minced|peeled|zested|squeezed)$/i;
     if (!OR_RE.test(rawName.trim())) return; // 无 or，不处理
     const parts = rawName.trim().split(OR_RE).map((s) => s.trim()).filter(Boolean);
@@ -815,11 +815,11 @@ export default function HomemadeFormScreen() {
                     borderColor: colors.border,
                     borderRadius: 12,
                     paddingHorizontal: 12,
-                    paddingVertical: 12,
+                    paddingVertical: 10,
                     opacity: pressed ? 0.6 : 1,
                   }]}
                 >
-                  <Text style={{ fontSize: 15, lineHeight: 20, color: colors.foreground }}>{alt}</Text>
+                  <Text style={{ fontSize: 16, lineHeight: 22, color: colors.foreground }}>{alt}</Text>
                 </Pressable>
                 {/* 上移按钮 */}
                 <Pressable
@@ -2229,9 +2229,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 12,
     paddingHorizontal: 12,
-    paddingVertical: 12,
-    fontSize: 15,
-    lineHeight: 20,
+    paddingVertical: 10,
+    fontSize: 16,
+    lineHeight: 22,
   },
   multiline: {
     minHeight: 90,

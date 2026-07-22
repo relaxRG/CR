@@ -1296,11 +1296,11 @@ export default function RecipeFormScreen() {
                     borderColor: colors.border,
                     borderRadius: 12,
                     paddingHorizontal: 12,
-                    paddingVertical: 12,
+                    paddingVertical: 10,
                     opacity: pressed ? 0.6 : 1,
                   }]}
                 >
-                  <Text style={{ fontSize: 15, lineHeight: 20, color: colors.foreground }}>{alt}</Text>
+                  <Text style={{ fontSize: 16, lineHeight: 22, color: colors.foreground }}>{alt}</Text>
                 </Pressable>
                 {/* 上移按钮 */}
                 <Pressable
@@ -1358,7 +1358,7 @@ export default function RecipeFormScreen() {
             <Text style={{ fontSize: 11, color: colors.muted, minWidth: 20 }}>{lang === "zh" ? "或" : "or"}</Text>
             <TextInput
               autoFocus
-              style={{ flex: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 8, fontSize: 15, color: colors.foreground, lineHeight: 20 }}
+              style={{ flex: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, fontSize: 16, color: colors.foreground, lineHeight: 22 }}
               placeholder={lang === "zh" ? "输入备选名称" : "Enter alternative name"}
               placeholderTextColor={colors.muted}
               value={addAltIngValue}
