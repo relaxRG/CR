@@ -1229,7 +1229,10 @@ function PrepGroupRow({
   // 家族组：显示名取第一条去掉变体标签后缀的名称；同名组：取第一条名称
   const familyDisplayName = (() => {
     if (groupKind !== "family") return null;
-    // 尝试从 familyKey 推断显示名（取第一条 name，去掉 variantLabel 后缀）
+    // 直接用 sourceFamilyKey 作为显示名（即用户填写的原料家族名，如"橙子"/"柠檬"）
+    const fk = familyKey ?? head.sourceFamilyKey ?? "";
+    if (fk) return displayNames(fk, "", lang);
+    // 回退：从 head.name 去掉 variantLabel 后缀
     const firstName = head.name ?? "";
     const vl = head.variantLabel ?? "";
     const cleaned = vl && firstName.endsWith(vl)
@@ -1258,9 +1261,9 @@ function PrepGroupRow({
 
   return (
     <View>
-      <Pressable onPress={handleToggle} style={({ pressed }) => [pressed && { opacity: 0.7 }]}>
+     <Pressable onPress={handleToggle} style={({ pressed }) => [pressed && { opacity: 0.7 }]}>
         <View
-          className="bg-surface px-4 py-3 mx-4"
+          className="bg-surface px-4 py-3"
           style={[
             isFirst && { borderTopLeftRadius: 12, borderTopRightRadius: 12 },
             isLast && !expanded && { borderBottomLeftRadius: 12, borderBottomRightRadius: 12 },

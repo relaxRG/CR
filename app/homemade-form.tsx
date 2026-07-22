@@ -1916,37 +1916,6 @@ export default function HomemadeFormScreen() {
               />
 
               {fieldLabel(lang === "en" ? "Unit (per piece)" : "计量单位（每件）")}
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
-                {["片", "枝", "颗", "根", "个", "克", "piece", "sprig", "slice"].map((u) => {
-                  const active = garnishUnit === u;
-                  return (
-                    <Pressable
-                      key={u}
-                      onPress={() => setGarnishUnit(u)}
-                      style={[
-                        styles.chip,
-                        {
-                          backgroundColor: active ? colors.primary : colors.surface,
-                          borderColor: active ? colors.primary : colors.border,
-                        },
-                      ]}
-                    >
-                      <Text style={[styles.chipText, { color: active ? "#fff" : colors.foreground }]}>
-                        {u}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-                <TextInput
-                  style={[styles.chip, { borderColor: colors.border, backgroundColor: colors.surface, minWidth: 60 }]}
-                  value={["片","枝","颗","根","个","克","piece","sprig","slice"].includes(garnishUnit) ? "" : garnishUnit}
-                  onChangeText={setGarnishUnit}
-                  placeholder={lang === "en" ? "custom" : "自定义"}
-                  placeholderTextColor={colors.muted}
-                  returnKeyType="done"
-                />
-              </View>
-
               {fieldLabel(lang === "en" ? "Source Family (optional)" : "原料家族（可选）")}
               <View style={{ position: "relative", zIndex: 10 }}>
                 <TextInput
@@ -2015,88 +1984,6 @@ export default function HomemadeFormScreen() {
               />
 
               {fieldLabel(lang === "en" ? "Cost" : "成本")}
-              {/* 成本录入方式切换 */}
-              <View style={{ flexDirection: "row", gap: 8, marginBottom: 10 }}>
-                {(["direct", "batch"] as const).map((mode) => {
-                  const active = costMode === mode;
-                  const label = mode === "direct"
-                    ? (lang === "en" ? "Direct" : "直接录入")
-                    : (lang === "en" ? "Batch calc" : "批次折算");
-                  return (
-                    <Pressable
-                      key={mode}
-                      onPress={() => setCostMode(mode)}
-                      style={[
-                        styles.chip,
-                        {
-                          backgroundColor: active ? colors.primary : colors.surface,
-                          borderColor: active ? colors.primary : colors.border,
-                        },
-                      ]}
-                    >
-                      <Text style={[styles.chipText, { color: active ? "#fff" : colors.foreground }]}>
-                        {label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-              {costMode === "direct" ? (
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                  <Text style={{ color: colors.muted, fontSize: 13 }}>¥</Text>
-                  <TextInput
-                    style={[inputStyle, { flex: 1 }]}
-                    value={costPerUnit}
-                    onChangeText={setCostPerUnit}
-                    placeholder={lang === "en" ? "Cost per piece" : "每件成本（元）"}
-                    placeholderTextColor={colors.muted}
-                    keyboardType="decimal-pad"
-                    returnKeyType="done"
-                  />
-                  <Text style={{ color: colors.muted, fontSize: 13 }}>/{garnishUnit}</Text>
-                </View>
-              ) : (
-                <>
-                  <View style={{ flexDirection: "row", gap: 8 }}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ color: colors.muted, fontSize: 12, marginBottom: 4 }}>
-                        {lang === "en" ? "Batch cost (¥)" : "制作总成本（¥）"}
-                      </Text>
-                      <TextInput
-                        style={inputStyle}
-                        value={batchCost}
-                        onChangeText={setBatchCost}
-                        placeholder="0.00"
-                        placeholderTextColor={colors.muted}
-                        keyboardType="decimal-pad"
-                        returnKeyType="done"
-                      />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ color: colors.muted, fontSize: 12, marginBottom: 4 }}>
-                        {lang === "en" ? `Yield (${garnishUnit})` : `产量（${garnishUnit}）`}
-                      </Text>
-                      <TextInput
-                        style={inputStyle}
-                        value={batchYield}
-                        onChangeText={setBatchYield}
-                        placeholder="20"
-                        placeholderTextColor={colors.muted}
-                        keyboardType="decimal-pad"
-                        returnKeyType="done"
-                      />
-                    </View>
-                  </View>
-                  {/* 实时折算预览 */}
-                  {batchCost && batchYield && parseFloat(batchCost) > 0 && parseFloat(batchYield) > 0 && (
-                    <View style={{ marginTop: 6, padding: 8, backgroundColor: colors.surface, borderRadius: 8 }}>
-                      <Text style={{ color: colors.primary, fontSize: 13 }}>
-                        = ¥{(parseFloat(batchCost) / parseFloat(batchYield)).toFixed(2)} / {garnishUnit}
-                      </Text>
-                    </View>
-                  )}
-                </>
-              )}
             </>
           )}
 
