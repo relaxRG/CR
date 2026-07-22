@@ -243,19 +243,27 @@ const KNOWN_PREPS: { re: RegExp; name: string; nameAlt: string; type: string; se
   // ── 装饰 Garnish ──────────────────────────────────────────────────────
   { re: /foam|air (cocktail|drink)|泡沫/, name: "", nameAlt: "", type: "foam", section: "misc" },
   { re: /spherification|球化/, name: "", nameAlt: "", type: "spherification-prep", section: "misc" },
-  { re: /dehydrated citrus|脱水柑橘/, name: "", nameAlt: "", type: "garnish", section: "misc" },
-  { re: /candied (fruit|cherry|orange)|糖渍|腌渍/, name: "", nameAlt: "", type: "garnish", section: "misc" },
-  { re: /citrus (peel|twist|zest)|柑橘皮卷|橙皮卷|柠檬皮卷/, name: "", nameAlt: "", type: "garnish", section: "misc" },
-  { re: /citrus (wheel|slice|round)|柑橘片|橙片|柠檬片/, name: "", nameAlt: "", type: "garnish", section: "misc" },
-  { re: /edible flower|食用花卉/, name: "", nameAlt: "", type: "garnish", section: "misc" },
-  { re: /fresh herb (sprig|garnish)|新鲜香草枝/, name: "", nameAlt: "", type: "garnish", section: "misc" },
-  { re: /dried herb|干燥香草|干香料/, name: "", nameAlt: "", type: "garnish", section: "misc" },
-  { re: /salt rim|sugar rim|盐边|糖边/, name: "", nameAlt: "", type: "garnish", section: "misc" },
-  { re: /spiced rim|香料杯口/, name: "", nameAlt: "", type: "garnish", section: "misc" },
-  { re: /olive (skewer|pick)|洋葱串|橄榄串/, name: "", nameAlt: "", type: "garnish", section: "misc" },
-  { re: /fruit skewer|果类串签/, name: "", nameAlt: "", type: "garnish", section: "misc" },
-  { re: /flavored ice|ice sphere|风味冰块|冰球/, name: "", nameAlt: "", type: "garnish", section: "misc" },
-  { re: /chocolate (garnish|decoration)|candy garnish|巧克力装饰|糖果装饰/, name: "", nameAlt: "", type: "garnish", section: "misc" },
+  // 柑橘类装饰 → garnish-citrus
+  { re: /dehydrated (citrus|lemon|orange|lime|grapefruit)|脱水柑橘|脱水橙|脱水柠檬/, name: "", nameAlt: "", type: "garnish-dehydrated-citrus", section: "garnish-dehydrated" },
+  { re: /(lemon|orange|lime|grapefruit|citrus) (peel|twist|zest|curl)|柑橘皮卷|橙皮卷|柠檬皮卷|青柠皮/, name: "", nameAlt: "", type: "garnish-citrus-peel", section: "garnish-citrus" },
+  { re: /(lemon|orange|lime|grapefruit|citrus) (wheel|slice|round|half.wheel)|柑橘片|橙片|柠檬片|柠檬轮/, name: "", nameAlt: "", type: "garnish-citrus-wheel", section: "garnish-citrus" },
+  // 香草与花卉 → garnish-herb-flower
+  { re: /edible flower|花卉|食用花|玫瑰花瓣|薰衣草/, name: "", nameAlt: "", type: "garnish-edible-flower", section: "garnish-herb-flower" },
+  { re: /(fresh|mint|rosemary|thyme|basil|sage|tarragon) (sprig|leaf|garnish)|新鲜香草枝|薄荷枝|迷迭香/, name: "", nameAlt: "", type: "garnish-fresh-herb", section: "garnish-herb-flower" },
+  { re: /dried (herb|lavender|chamomile|rose)|干燥香草|干香料|干花/, name: "", nameAlt: "", type: "garnish-dried-herb", section: "garnish-herb-flower" },
+  // 杯口装饰 → garnish-rim
+  { re: /salt (rim|edge|crust)|sugar (rim|edge|crust)|盐边|糖边|盐口|糖口/, name: "", nameAlt: "", type: "garnish-salt-rim", section: "garnish-rim" },
+  { re: /spiced rim|tajin rim|chili (rim|salt)|香料杯口|辣椒盐边/, name: "", nameAlt: "", type: "garnish-spiced-rim", section: "garnish-rim" },
+  // 串签类 → garnish-skewer
+  { re: /olive (skewer|pick|garnish)|cocktail onion|洋葱串|橄榄串|橄榄/, name: "", nameAlt: "", type: "garnish-skewer-olive", section: "garnish-skewer" },
+  { re: /fruit (skewer|pick|kebab)|cherry (skewer|pick)|果类串签|樱桃串/, name: "", nameAlt: "", type: "garnish-skewer-olive", section: "garnish-skewer" },
+  // 果类装饰 → garnish-fruit
+  { re: /candied (fruit|cherry|orange|pineapple)|maraschino cherry|糖渍|腌渍|糖渍樱桃/, name: "", nameAlt: "", type: "garnish-candied-fruit", section: "garnish-fruit" },
+  // 其他装饰 → garnish-other
+  { re: /flavored ice|ice sphere|ice ball|风味冰块|冰球|冰块/, name: "", nameAlt: "", type: "garnish", section: "garnish-other" },
+  { re: /chocolate (garnish|decoration|shaving)|candy garnish|巧克力装饰|糖果装饰/, name: "", nameAlt: "", type: "garnish", section: "garnish-other" },
+  // 通用装饰兜底 → misc
+  { re: /garnish|装饰/, name: "", nameAlt: "", type: "garnish", section: "misc" },
 ];
 
 /**
