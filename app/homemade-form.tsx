@@ -467,6 +467,8 @@ export default function HomemadeFormScreen() {
   }, [aiResult]);
 
   const applyAiResult = useCallback(() => {
+  // applyField intentionally uses [aiResult] only; sections/selectedGroup/handleGroupChange
+  // are stable (useState/useCallback) and safe to omit from deps to avoid stale-closure loops
     if (!aiResult) return;
     const fields = buildAiFields();
     setUndoSnapshot({ name, nameAlt, type, techniques: [...techniques], flavorTags: [...flavorTags], story, styleDesc, shelfLife, storage, usageNotes, stepRows: stepRows.map((r) => ({ ...r })), yieldQty, yieldUnit, sourceFamilyKey, variantLabel, ingRows: ingRows.map((r) => ({ ...r })) });

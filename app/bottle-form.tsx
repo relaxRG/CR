@@ -39,7 +39,9 @@ type AiField = {
   aiValue: string;
   currentValue: string;
   conflict: "new" | "override" | "confirm" | "low";
+  aiValueLines?: { label: string; value: string }[];
 };
+// aiValueLines 字段已在上方 AiField 类型中添加（与 recipe-form/homemade-form 保持一致）
 
 export default function BottleFormScreen() {
   const colors = useColors();
@@ -758,7 +760,16 @@ export default function BottleFormScreen() {
                             <Text style={{ fontSize: 11, fontWeight: "600", color: colors.foreground, lineHeight: 15 }}>
                               {lang === "zh" ? f.labelZh : f.labelEn}
                             </Text>
-                            {f.currentValue ? (
+                            {f.aiValueLines ? (
+                              <View style={{ gap: 2, marginTop: 1 }}>
+                                {f.aiValueLines.map((line) => (
+                                  <Text key={line.label} style={{ fontSize: 10, lineHeight: 14, color: colors.muted }} numberOfLines={2}>
+                                    <Text style={{ fontWeight: "600", color: colors.foreground }}>{line.label}：</Text>
+                                    <Text style={{ color: cc }}>{line.value}</Text>
+                                  </Text>
+                                ))}
+                              </View>
+                            ) : f.currentValue ? (
                               <Text style={{ fontSize: 10, color: colors.muted, lineHeight: 14 }} numberOfLines={1}>
                                 {f.currentValue}{" → "}<Text style={{ color: cc, fontWeight: "500" }}>{f.aiValue}</Text>
                               </Text>
