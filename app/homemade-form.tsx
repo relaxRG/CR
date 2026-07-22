@@ -439,7 +439,12 @@ export default function HomemadeFormScreen() {
     else if (key === "sourceFamilyKey" && aiResult.sourceFamilyKey) setSourceFamilyKey(aiResult.sourceFamilyKey);
     else if (key === "variantLabel" && aiResult.variantLabel) setVariantLabel(aiResult.variantLabel);
     else if (key === "prepIngredients" && aiResult.prepIngredients.length > 0) {
-      setIngRows(aiResult.prepIngredients.map((ing) => ({ id: genId(), name: ing.name, amount: ing.amount })));
+      setIngRows(aiResult.prepIngredients.map((ing) => ({
+        id: genId(),
+        name: ing.name,
+        amount: ing.amount,
+        ...(ing.alternatives && ing.alternatives.length > 0 ? { alternatives: ing.alternatives } : {}),
+      })));
     }
   }, [aiResult]);
 
@@ -525,6 +530,25 @@ export default function HomemadeFormScreen() {
       setIngRows((prev) => prev.map((r) => r.id === rid ? { ...r, linkedBottleId: undefined, linkedPrepId: undefined } : r));
       setPickedIng((prev) => { const n = { ...prev }; delete n[rid]; return n; });
     }
+  };
+  // 手动输入 onBlur 时拆分 or 备选
+  const commitIngRowName = (rid: string, rawName: string) => {
+    const OR_RE = /\s+(?:or|或)\s+/i;
+    const STATE_ADJ_RE = /^(?:fresh|frozen|dried|canned|bottled|house-made|homemade|store-bought|organic|raw|cooked|roasted|toasted|ground|whole|sliced|diced|chopped|minced|peeled|zested|squeezed)$/i;
+    if (!OR_RE.test(rawName.trim())) return; // 无 or，不处理
+    const parts = rawName.trim().split(OR_RE).map((s) => s.trim()).filter(Boolean);
+    if (parts.length < 2) return;
+    const allAdj = parts.slice(0, -1).every((p) => {
+      const words = p.split(/\s+/);
+      return words.length === 1 && STATE_ADJ_RE.test(words[0]);
+    });
+    if (allAdj) return; // 形容词 or，不拆分
+    const [primary, ...alts] = parts;
+    setIngRows((prev) => prev.map((r) =>
+      r.id === rid ? { ...r, name: primary, alternatives: alts } : r
+    ));
+    setDismissedLinks((prev) => { const n = { ...prev }; delete n[rid]; return n; });
+    setAcceptedLinks((prev) => { const n = { ...prev }; delete n[rid]; return n; });
   };
   const pickSuggestion = (rid: string, value: string) => {
     updateIngRow(rid, "name", value);
@@ -616,9 +640,36 @@ export default function HomemadeFormScreen() {
               }, 150);
             }
           }}
+          onSubmitEditing={() => commitIngRowName(row.id, row.name)}
            returnKeyType="done"
            autoCapitalize="words"
          />
+        {/* ── or 备选标签 ── */}
+        {row.alternatives && row.alternatives.length > 0 ? (
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 2, paddingHorizontal: 4 }}>
+            {row.alternatives.map((alt, altIdx) => (
+              <Pressable
+                key={`${row.id}-alt-${altIdx}`}
+                onPress={() => {
+                  if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  const newAlts = [row.name, ...(row.alternatives ?? []).filter((_, i) => i !== altIdx)];
+                  setIngRows((prev) => prev.map((r) =>
+                    r.id === row.id
+                      ? { ...r, name: alt, alternatives: newAlts, linkedBottleId: undefined, linkedPrepId: undefined }
+                      : r
+                  ));
+                  setDismissedLinks((prev) => { const n = { ...prev }; delete n[row.id]; return n; });
+                  setAcceptedLinks((prev) => { const n = { ...prev }; delete n[row.id]; return n; });
+                }}
+                style={({ pressed }) => [{ opacity: pressed ? 0.5 : 1 }]}
+              >
+                <Text style={{ fontSize: 11, lineHeight: 16, color: colors.muted }}>
+                  {lang === "zh" ? "或 " : "or "}{alt}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
           {/* ── Amount: qty + unit picker ── */}
           {(() => {
             const { qty, unit } = splitAmount(row.amount);

@@ -13,6 +13,7 @@
 import Constants from 'expo-constants';
 import { normalizeTagToZh } from '@/lib/recipes/types';
 import { getApiBaseUrl } from '@/constants/oauth';
+import { splitOrAlternativesClient } from '@/lib/homemade/types';
 
 const CF_WORKER_URL = (Constants.expoConfig?.extra?.cfWorkerUrl as string)
   || 'https://cocktail-ai.kikikong2017.workers.dev';
@@ -160,7 +161,7 @@ export async function enrichHomemade(params: {
     story: string; styleDesc: string; shelfLife: string; storage: string; usageNotes: string;
     steps: string; yieldQty: number | null; yieldUnit: string;
     sourceFamilyKey: string; variantLabel: string;
-    prepIngredients: Array<{ name: string; amount: string }>;
+    prepIngredients: Array<{ name: string; amount: string; alternatives?: string[] }>;
     confidence: string;
     suggestedLibrary: string; suggestedCategory: string; suggestedStyle: string; mapConfidence: string;
   };
@@ -185,7 +186,10 @@ export async function enrichHomemade(params: {
       yieldUnit: cfResult.yieldUnit ?? '',
       sourceFamilyKey: cfResult.sourceFamilyKey ?? '',
       variantLabel: cfResult.variantLabel ?? '',
-      prepIngredients: cfResult.prepIngredients ?? [],
+      prepIngredients: (cfResult.prepIngredients ?? []).map(ing => {
+        const split = splitOrAlternativesClient(ing.name);
+        return { name: split.name, amount: ing.amount, ...(split.alternatives?.length ? { alternatives: split.alternatives } : {}) };
+      }),
     };
   }
 

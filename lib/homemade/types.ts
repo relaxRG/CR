@@ -706,7 +706,7 @@ export function normalizeIngredientAmount(amount: string, name?: string): string
 const PREP_STATE_ADJ_RE = /^(fresh|frozen|dried|canned|bottled|fresh-squeezed|freshly\s+squeezed|homemade|house-made|house\s+made|roasted|toasted|smoked|unsalted|salted|raw|cooked|whole|ground|crushed|powdered|pitted|peeled|sliced|diced|chopped|minced|grated|zested)$/i;
 
 /** 对名称进行 or 备选规范化（与 parser.ts 逻辑一致） */
-function splitOrAlternatives(name: string): { name: string; alternatives?: string[] } {
+export function splitOrAlternativesClient(name: string): { name: string; alternatives?: string[] } {
   const OR_RE = /\s+(?:or|或)\s+/i;
   if (!OR_RE.test(name)) return { name };
   const parts = name.split(OR_RE).map((s) => s.trim()).filter(Boolean);
@@ -747,22 +747,22 @@ export function splitPrepIngredientLine(line: string): { amount: string; name: s
       // Restore full name: "prefix of rest"
       const [, prefix, , rest] = ofMatch;
       const n = `${prefix} of ${m[2].trim()}`;
-      return { amount: normalizeIngredientAmount(m[1].trim(), n), ...splitOrAlternatives(n) };
+      return { amount: normalizeIngredientAmount(m[1].trim(), n), ...splitOrAlternativesClient(n) };
     }
-    return { amount: normalizeIngredientAmount(m[1].trim(), m[2].trim()), ...splitOrAlternatives(m[2].trim()) };
+    return { amount: normalizeIngredientAmount(m[1].trim(), m[2].trim()), ...splitOrAlternativesClient(m[2].trim()) };
   }
   // Fallback for "X of ¼ Y" when unit part doesn't match: still extract quantity
   if (ofMatch) {
     const [, prefix, qty, rest] = ofMatch;
     const n = `${prefix} of ${rest}`;
-    return { amount: normalizeIngredientAmount(qty, n), ...splitOrAlternatives(n) };
+    return { amount: normalizeIngredientAmount(qty, n), ...splitOrAlternativesClient(n) };
   }
   // Fallback: bare unit word with no leading number, e.g. "oz Peychaud's bitters"
   const unitOnly = trimmed.match(UNIT_ONLY_RE);
   if (unitOnly) {
-    return { amount: normalizeIngredientAmount(unitOnly[1].trim(), unitOnly[2].trim()), ...splitOrAlternatives(unitOnly[2].trim()) };
+    return { amount: normalizeIngredientAmount(unitOnly[1].trim(), unitOnly[2].trim()), ...splitOrAlternativesClient(unitOnly[2].trim()) };
   }
-  return { amount: "", ...splitOrAlternatives(trimmed) };
+  return { amount: "", ...splitOrAlternativesClient(trimmed) };
 }
 
 /** Re-join a structured ingredient row into the stored line format. */
