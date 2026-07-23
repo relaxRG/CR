@@ -66,7 +66,6 @@ export type InvokeParams = {
   model?: string;
   thinking?: Record<string, unknown>;
   reasoning?: Record<string, unknown>;
-  signal?: AbortSignal;
 };
 
 export type ToolCall = {
@@ -212,8 +211,7 @@ const resolveApiUrl = () =>
 
 const assertApiKey = () => {
   if (!ENV.forgeApiKey) {
-    // When Manus key is missing, we'll fall back to Cloudflare Worker (no key needed)
-    console.warn("[LLM] Manus API key not configured, will use Cloudflare Worker fallback");
+    throw new Error("OPENAI_API_KEY is not configured");
   }
 };
 
@@ -320,6 +318,8 @@ const fetchWithBackoff = async (url: string, init: FetchInit): Promise<Response>
 };
 
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
+  assertApiKey();
+
   const {
     messages,
     tools,
@@ -376,50 +376,21 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     payload.response_format = normalizedResponseFormat;
   }
 
-  // Try Manus LLM first (if API key is available), then fall back to Cloudflare Worker (DeepSeek)
-  if (ENV.forgeApiKey) {
-    try {
-      const response = await fetchWithBackoff(resolveApiUrl(), {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          authorization: `Bearer ${ENV.forgeApiKey}`,
-        },
-        body: JSON.stringify(payload),
-      });
-      if (response.ok) {
-        return (await response.json()) as InvokeResult;
-      }
-      const errorText = await response.text();
-      console.warn(`[LLM] Manus LLM failed (${response.status}), falling back to Cloudflare Worker: ${errorText.slice(0, 200)}`);
-    } catch (err) {
-      console.warn(`[LLM] Manus LLM error, falling back to Cloudflare Worker:`, err instanceof Error ? err.message : err);
-    }
+  const response = await fetchWithBackoff(resolveApiUrl(), {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${ENV.forgeApiKey}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`LLM invoke failed: ${response.status} ${response.statusText} – ${errorText}`);
   }
 
-  // Fallback: Cloudflare Worker (DeepSeek)
-  const cfUrl = `${ENV.cfWorkerUrl.replace(/\/$/, "")}/v1/chat/completions`;
-  // DeepSeek doesn't support response_format json_schema or tools — strip unsupported fields
-  const cfPayload: Record<string, unknown> = {
-    messages: payload.messages,
-    model: "deepseek-chat",
-    temperature: 0.7,
-  };
-  if (typeof payload.max_tokens === "number") {
-    cfPayload.max_tokens = Math.min(payload.max_tokens as number, 4096);
-  } else {
-    cfPayload.max_tokens = 2048;
-  }
-  const cfResponse = await fetch(cfUrl, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(cfPayload),
-  });
-  if (!cfResponse.ok) {
-    const errorText = await cfResponse.text();
-    throw new Error(`LLM invoke failed (CF Worker): ${cfResponse.status} ${cfResponse.statusText} – ${errorText}`);
-  }
-  return (await cfResponse.json()) as InvokeResult;
+  return (await response.json()) as InvokeResult;
 }
 
 export type ModelInfo = {

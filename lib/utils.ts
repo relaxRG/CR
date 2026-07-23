@@ -13,38 +13,3 @@ import { twMerge } from "tailwind-merge";
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
-
-/**
- * Bilingual display priority: return [primary, secondary] name pair
- * following the UI language (en → English first, zh → Chinese first).
- * Falls back to the other name when the preferred one is empty.
- */
-/** Detect CJK characters (Chinese/Japanese/Korean) */
-function hasCJK(s: string): boolean {
-  return /[\u4e00-\u9fff\u3400-\u4dbf\uff00-\uffef]/.test(s);
-}
-
-/**
- * Bilingual display priority: return [primary, secondary] name pair
- * following the UI language (en → English first, zh → Chinese first).
- * Falls back to the other name when the preferred one is empty.
- *
- * Auto-corrects swapped parameters: if `en` contains CJK characters but `zh`
- * does not, the caller likely passed (zhName, enName) — parameters are swapped
- * automatically so the correct language always shows as primary.
- */
-export function displayNames(
-  en: string,
-  zh: string,
-  lang: "zh" | "en",
-): { primary: string; secondary: string } {
-  let e = (en || "").trim();
-  let z = (zh || "").trim();
-  // Auto-correct: if en looks like Chinese and zh looks like English, swap them
-  if (e && z && hasCJK(e) && !hasCJK(z)) {
-    [e, z] = [z, e];
-  }
-  const primary = lang === "en" ? e || z : z || e;
-  const secondaryRaw = lang === "en" ? (e ? z : "") : (z ? e : "");
-  return { primary, secondary: secondaryRaw === primary ? "" : secondaryRaw };
-}

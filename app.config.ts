@@ -6,7 +6,7 @@ import type { ExpoConfig } from "expo/config";
 // e.g., "my-app" created at 2024-01-15 10:30:45 -> "space.manus.my.app.t20240115103045"
 // Bundle ID can only contain letters, numbers, and dots
 // Android requires each dot-separated segment to start with a letter
-const rawBundleId = "com.app.cocktailrecipes";
+const rawBundleId = "com.app.cocktailr";
 const bundleId =
   rawBundleId
     .replace(/[-_]/g, ".") // Replace hyphens/underscores with dots
@@ -29,10 +29,10 @@ const schemeFromBundleId = `manus${timestamp}`;
 const env = {
   // App branding - update these values directly (do not use env vars)
   appName: "cocktail R",
-  appSlug: "cocktail-recipes",
+  appSlug: "cocktail-r",
   // S3 URL of the app logo - set this to the URL returned by generate_image when creating custom logo
   // Leave empty to use the default icon from assets/images/icon.png
-  logoUrl: "/manus-storage/cocktail-r-icon-white_fa4c6b9d.png",
+  logoUrl: "",
   scheme: schemeFromBundleId,
   iosBundleId: bundleId,
   androidPackage: bundleId,
@@ -50,15 +50,13 @@ const config: ExpoConfig = {
   ios: {
     supportsTablet: true,
     bundleIdentifier: env.iosBundleId,
-    buildNumber: "74",
     "infoPlist": {
-      "ITSAppUsesNonExemptEncryption": false,
-      "UIRequiresFullScreen": false
-    },
+        "ITSAppUsesNonExemptEncryption": false
+      }
   },
   android: {
     adaptiveIcon: {
-      backgroundColor: "#FFFFFF",
+      backgroundColor: "#E6F4FE",
       foregroundImage: "./assets/images/android-icon-foreground.png",
       backgroundImage: "./assets/images/android-icon-background.png",
       monochromeImage: "./assets/images/android-icon-monochrome.png",
@@ -86,22 +84,8 @@ const config: ExpoConfig = {
     output: "static",
     favicon: "./assets/images/favicon.png",
   },
-  owner: "rgsd",
-  extra: {
-    eas: {
-      projectId: "3ab89cc0-c646-4fb8-bceb-ba24204a8811",
-    },
-    cfWorkerUrl: "https://cocktail-ai.kikikong2017.workers.dev",
-  },
   plugins: [
     "expo-router",
-    [
-      "expo-image-picker",
-      {
-        photosPermission: "Allow $(PRODUCT_NAME) to access your photos to import recipes from images.",
-        cameraPermission: "Allow $(PRODUCT_NAME) to take photos to import recipes.",
-      },
-    ],
     [
       "expo-audio",
       {
@@ -121,9 +105,9 @@ const config: ExpoConfig = {
         image: "./assets/images/splash-icon.png",
         imageWidth: 200,
         resizeMode: "contain",
-        backgroundColor: "#FFFFFF",
+        backgroundColor: "#ffffff",
         dark: {
-          backgroundColor: "#F7F7F7",
+          backgroundColor: "#000000",
         },
       },
     ],
