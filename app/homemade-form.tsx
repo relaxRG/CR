@@ -7,6 +7,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -961,60 +962,7 @@ export default function HomemadeFormScreen() {
               </View>
             );
           })()}
-          {/* ── 分数快捷按钮（用量框聚焦时显示） ── */}
-          {focusedQtyId === row.id && (() => {
-            const { qty, unit } = splitAmount(row.amount);
-            const FRACS = ["¼", "⅓", "½", "¾"];
-            const DECIMALS = ["1.5", "2.5"];
-            const FRAC_RE = /[¼⅓½¾⅔¾⅛⅜⅝⅞]/g;
-            return (
-              <View style={{ flexDirection: "row", gap: 6, marginTop: 4 }}>
-                {FRACS.map((f) => (
-                  <Pressable
-                    key={f}
-                    onPress={() => {
-                      const base = qty.replace(FRAC_RE, "").trimEnd();
-                      const newQty = base ? base + f : f;
-                      updateIngRow(row.id, "amount", mergeAmount(newQty, unit));
-                      if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    }}
-                    style={({ pressed }) => [{
-                      paddingHorizontal: 12,
-                      paddingVertical: 6,
-                      borderRadius: 8,
-                      borderWidth: 1,
-                      borderColor: colors.border,
-                      backgroundColor: colors.surface,
-                      opacity: pressed ? 0.6 : 1,
-                    }]}
-                  >
-                    <Text style={{ fontSize: 16, color: colors.foreground, fontWeight: "500" }}>{f}</Text>
-                  </Pressable>
-                ))}
-
-                {DECIMALS.map((d) => (
-                  <Pressable
-                    key={d}
-                    onPress={() => {
-                      updateIngRow(row.id, "amount", mergeAmount(d, unit));
-                      if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    }}
-                    style={({ pressed }) => [{
-                      paddingHorizontal: 12,
-                      paddingVertical: 6,
-                      borderRadius: 8,
-                      borderWidth: 1,
-                      borderColor: colors.border,
-                      backgroundColor: colors.surface,
-                      opacity: pressed ? 0.6 : 1,
-                    }]}
-                  >
-                    <Text style={{ fontSize: 14, color: colors.foreground, fontWeight: "500" }}>{d}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            );
-          })()}
+         {/* ── 分数快捷按钮（用量框聚焦时显示） ── */}
           <Pressable
             onPress={() => removeIngRow(row.id)}
             hitSlop={8}
@@ -1027,6 +975,65 @@ export default function HomemadeFormScreen() {
             />
           </Pressable>
         </View>
+        {/* ── 分数快捷按钮（用量框聚焦时显示，独立行） ── */}
+        {focusedQtyId === row.id && (() => {
+          const { qty, unit } = splitAmount(row.amount);
+          const FRACS = ["¼", "⅓", "½", "¾"];
+          const DECIMALS = ["1.5", "2.5"];
+          const FRAC_RE = /[¼⅓½¾⅔¾⅛⅜⅝⅞]/g;
+          return (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ flexDirection: "row", gap: 6, paddingVertical: 4, paddingHorizontal: 2 }}
+              style={{ marginTop: 2 }}
+            >
+              {FRACS.map((f) => (
+                <Pressable
+                  key={f}
+                  onPress={() => {
+                    const base = qty.replace(FRAC_RE, "").trimEnd();
+                    const newQty = base ? base + f : f;
+                    updateIngRow(row.id, "amount", mergeAmount(newQty, unit));
+                    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  }}
+                  style={({ pressed }) => [{
+                    paddingHorizontal: 14,
+                    paddingVertical: 7,
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    backgroundColor: colors.surface,
+                    opacity: pressed ? 0.6 : 1,
+                  }]}
+                >
+                  <Text style={{ fontSize: 16, color: colors.foreground, fontWeight: "500" }}>{f}</Text>
+                </Pressable>
+              ))}
+              {DECIMALS.map((d) => (
+                <Pressable
+                  key={d}
+                  onPress={() => {
+                    updateIngRow(row.id, "amount", mergeAmount(d, unit));
+                    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  }}
+                  style={({ pressed }) => [{
+                    paddingHorizontal: 14,
+                    paddingVertical: 7,
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    backgroundColor: colors.surface,
+                    opacity: pressed ? 0.6 : 1,
+                  }]}
+                >
+                  <Text style={{ fontSize: 14, color: colors.foreground, fontWeight: "500" }}>{d}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          );
+        })()}
         {/* ── or 备选标签（主行下方独立行） ── */}
         {row.alternatives && row.alternatives.length > 0 ? (
           <View style={{ flexDirection: "column", gap: 6, marginTop: 6, paddingLeft: 36 }}>
