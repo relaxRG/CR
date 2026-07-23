@@ -22,8 +22,7 @@ export default function HomemadeDetailScreen() {
   const router = useRouter();
   const { t, lang } = useI18n();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { getPrep, deletePrep, togglePrepMade, setPrepRating, types, sections } = useHomemadeStore();
-  const { preps } = useHomemadeStore();
+  const { getPrep, deletePrep, togglePrepMade, setPrepRating, updatePrep, types, sections, preps } = useHomemadeStore();
   const { bottles } = useBottleStore();
   const prep = getPrep(id);
   const [addAltIngId, setAddAltIngId] = React.useState<number | null>(null);
@@ -755,4 +754,3 @@ export default function HomemadeDetailScreen() {
     </ScreenContainer>
   );
 }
-  const { updatePrep } = useHomemadeStore();
