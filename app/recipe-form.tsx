@@ -493,8 +493,10 @@ export default function RecipeFormScreen() {
     if (!editing?.ingredients?.length) return {};
     return Object.fromEntries(editing.ingredients.map((i) => [i.id, true]));
   });
-  /** ingId → true: user explicitly accepted a fuzzy link */
-  const [acceptedLinks, setAcceptedLinks] = useState<Record<string, boolean>>({});
+ /** ingId → true: user explicitly accepted a fuzzy link */
+ const [acceptedLinks, setAcceptedLinks] = useState<Record<string, boolean>>({});
+  /** ingId → true: 已自动填入过规范名（防止循环触发）*/
+  const autoFilledLinksRef = useRef<Record<string, boolean>>({});
 
   const ensureSpiritName = (raw: string) => {
     const cleaned = raw.trim();
@@ -907,17 +909,19 @@ export default function RecipeFormScreen() {
     [ingredients, method, bottles, preps],
   );
 
-  const updateIngredient = (iid: string, field: "name" | "amount", value: string) => {
-    setIngredients((prev) => prev.map((i) => (i.id === iid ? { ...i, [field]: value } : i)));
-    if (field === "name") {
-      // Reset link decisions and clear explicit link IDs when user edits the name
-      setDismissedLinks((prev) => { const n = { ...prev }; delete n[iid]; return n; });
-      setAcceptedLinks((prev) => { const n = { ...prev }; delete n[iid]; return n; });
-      setIngredients((prev) => prev.map((i) => i.id === iid ? { ...i, linkedBottleId: undefined, linkedPrepId: undefined, linkDismissed: undefined } : i));
-      // Bug 5: 用户手动修改输入时清除 pickedIng，避免建议列表状态歧义
-      setPickedIng((prev) => { const n = { ...prev }; delete n[iid]; return n; });
-    }
-  };
+ const updateIngredient = (iid: string, field: "name" | "amount", value: string) => {
+   setIngredients((prev) => prev.map((i) => (i.id === iid ? { ...i, [field]: value } : i)));
+   if (field === "name") {
+     // Reset link decisions and clear explicit link IDs when user edits the name
+     setDismissedLinks((prev) => { const n = { ...prev }; delete n[iid]; return n; });
+     setAcceptedLinks((prev) => { const n = { ...prev }; delete n[iid]; return n; });
+     setIngredients((prev) => prev.map((i) => i.id === iid ? { ...i, linkedBottleId: undefined, linkedPrepId: undefined, linkDismissed: undefined } : i));
+     // Bug 5: 用户手动修改输入时清除 pickedIng，避免建议列表状态歧义
+     setPickedIng((prev) => { const n = { ...prev }; delete n[iid]; return n; });
+      // 用户手动修改名称时，重置自动填入标记，允许下次失焦时再次自动填入
+      delete autoFilledLinksRef.current[iid];
+   }
+ };
   /** Done 键提交时拆分 or 备选 */
   const commitIngredientName = (iid: string, rawName: string) => {
     const OR_RE = /\s+(?:or|或|(?<!\d)\/(?!\d)|\|)\s+/i;
@@ -1055,12 +1059,32 @@ export default function RecipeFormScreen() {
             onChangeText={(v) => updateIngredient(ing.id, "name", v)}
             onFocus={() => setFocusedIng(ing.id)}
             autoCapitalize="words"
-            onBlur={() => {
-              if (!pressingIngSuggestRef.current) {
-                setTimeout(() => {
-                  setFocusedIng((cur) => (cur === ing.id ? null : cur));
-                }, 150);
-              }
+           onBlur={() => {
+             if (!pressingIngSuggestRef.current) {
+               setTimeout(() => {
+                 setFocusedIng((cur) => (cur === ing.id ? null : cur));
+               }, 150);
+             }
+           }}
+            onEndEditing={() => {
+              // 自动填入规范名：仅在 exact match 且规范名与输入不同时触发
+              const t2 = ing.name.trim();
+              if (t2.length < 2) return;
+              const isDismissed = ing.linkDismissed === true || dismissedLinks[ing.id] === true;
+              if (isDismissed) return;
+              const hasExplicit = !!(ing.linkedBottleId || ing.linkedPrepId);
+              if (hasExplicit) return; // 已有显式链接，不覆盖
+              const autoLink = smartLinkIngredient(t2, bottles, preps, ingSourceMap[ing.id] ?? "auto");
+              if (!autoLink || autoLink.matchConfidence !== "exact") return;
+              const autoCanon = smartLinkDisplayName(autoLink, lang as "zh" | "en");
+              if (!autoCanon || autoCanon.primary === t2) return;
+              // 防止循环：已自动填入过则跳过
+              if (autoFilledLinksRef.current[ing.id] === true) return;
+              autoFilledLinksRef.current[ing.id] = true;
+              // 构造 suggestion 对象，保留链接 ID
+              const refId = autoLink.kind === "prep" ? autoLink.prep.id : autoLink.bottle.id;
+              const source = autoLink.kind === "prep" ? "homemade" : "bottles";
+              pickSuggestion(ing.id, { key: "auto-canon", value: autoCanon.primary, secondary: "", source: source as import("@/lib/suggest").IngredientSuggestion["source"], context: "", refId });
             }}
             returnKeyType="done"
             style={{ lineHeight: 20 }}

@@ -58,6 +58,7 @@ interface IngRow {
   linkedBottleId?: string;
   linkedPrepId?: string;
   alternatives?: string[];
+  linkDismissed?: boolean;
 }
 
 type PrepIngItem = { name: string; amount: string } | string;
@@ -133,9 +134,11 @@ export default function HomemadeFormScreen() {
     if (!editing?.ingredients?.length) return {};
     return Object.fromEntries(initialIngRowsRef.current.map((r) => [r.id, true]));
   });
-  const [acceptedLinks, setAcceptedLinks] = useState<Record<string, boolean>>({});
-  // 每行配料的来源筛选（全/基/酒/料/制），与配方表单一致
-  const [ingSourceMap, setIngSourceMap] = useState<Record<string, "auto" | "spirits" | "bottles" | "materials" | "homemade">>({});
+ const [acceptedLinks, setAcceptedLinks] = useState<Record<string, boolean>>({});
+ // 每行配料的来源筛选（全/基/酒/料/制），与配方表单一致
+ const [ingSourceMap, setIngSourceMap] = useState<Record<string, "auto" | "spirits" | "bottles" | "materials" | "homemade">>({});
+  /** rowId → true: 已自动填入过规范名（防止循环触发）*/
+  const autoFilledLinksRef = useRef<Record<string, boolean>>({});
   // ── Recipe steps: stored as numbered string, edited as dynamic rows ──────
   const parseStepRows = (raw: string): { id: string; text: string }[] => {
     if (!raw.trim()) return [{ id: genId(), text: "" }];
@@ -564,14 +567,16 @@ export default function HomemadeFormScreen() {
   };
 
   const updateIngRow = (rid: string, field: "name" | "amount", value: string) => {
-    setIngRows((prev) => prev.map((r) => (r.id === rid ? { ...r, [field]: value } : r)));
-    if (field === "name") {
-      setDismissedLinks((prev) => { const n = { ...prev }; delete n[rid]; return n; });
-      setAcceptedLinks((prev) => { const n = { ...prev }; delete n[rid]; return n; });
-      setIngRows((prev) => prev.map((r) => r.id === rid ? { ...r, linkedBottleId: undefined, linkedPrepId: undefined } : r));
-      setPickedIng((prev) => { const n = { ...prev }; delete n[rid]; return n; });
-    }
-  };
+   setIngRows((prev) => prev.map((r) => (r.id === rid ? { ...r, [field]: value } : r)));
+   if (field === "name") {
+     setDismissedLinks((prev) => { const n = { ...prev }; delete n[rid]; return n; });
+     setAcceptedLinks((prev) => { const n = { ...prev }; delete n[rid]; return n; });
+     setIngRows((prev) => prev.map((r) => r.id === rid ? { ...r, linkedBottleId: undefined, linkedPrepId: undefined } : r));
+     setPickedIng((prev) => { const n = { ...prev }; delete n[rid]; return n; });
+      // 用户手动修改名称时，重置自动填入标记，允许下次失焦时再次自动填入
+      delete autoFilledLinksRef.current[rid];
+   }
+ };
   // 手动输入 onBlur 时拆分 or 备选
   const commitIngRowName = (rid: string, rawName: string) => {
     const OR_RE = /\s+(?:or|或|(?<!\d)\/(?!\d)|\|)\s+/i;
@@ -686,24 +691,44 @@ export default function HomemadeFormScreen() {
               {ingSource === "auto" ? "全" : ingSource === "spirits" ? "基" : ingSource === "bottles" ? "酒" : ingSource === "materials" ? "料" : "制"}
             </Text>
           </Pressable>
-         <TextInput
-           style={[...inputStyle, { flex: 3 }]}
-           placeholder={t("hmform.ingredient.name")}
-           placeholderTextColor={colors.muted}
-           value={row.name}
-           onChangeText={(v) => updateIngRow(row.id, "name", v)}
-          onFocus={() => setFocusedIng(row.id)}
-          onBlur={() => {
-            if (!pressingIngSuggestRef.current) {
-              setTimeout(() => {
-                setFocusedIng((cur) => (cur === row.id ? null : cur));
-              }, 150);
-            }
+        <TextInput
+          style={[...inputStyle, { flex: 3 }]}
+          placeholder={t("hmform.ingredient.name")}
+          placeholderTextColor={colors.muted}
+          value={row.name}
+          onChangeText={(v) => updateIngRow(row.id, "name", v)}
+         onFocus={() => setFocusedIng(row.id)}
+         onBlur={() => {
+           if (!pressingIngSuggestRef.current) {
+             setTimeout(() => {
+               setFocusedIng((cur) => (cur === row.id ? null : cur));
+             }, 150);
+           }
+         }}
+          onEndEditing={() => {
+            // 自动填入规范名：仅在 exact match 且规范名与输入不同时触发
+            const t2 = row.name.trim();
+            if (t2.length < 2) return;
+            const isDismissed = row.linkDismissed === true || dismissedLinks[row.id] === true;
+            if (isDismissed) return;
+            const hasExplicit = !!(row.linkedBottleId || row.linkedPrepId);
+            if (hasExplicit) return; // 已有显式链接，不覆盖
+            const autoLink = smartLinkIngredient(t2, bottles, allPreps.filter((p) => p.id !== (editing?.id ?? "")), ingSourceMap[row.id] ?? "auto");
+            if (!autoLink || autoLink.matchConfidence !== "exact") return;
+            const autoCanon = smartLinkDisplayName(autoLink, lang as "zh" | "en");
+            if (!autoCanon || autoCanon.primary === t2) return;
+            // 防止循环：已自动填入过则跳过
+            if (autoFilledLinksRef.current[row.id] === true) return;
+            autoFilledLinksRef.current[row.id] = true;
+            // 构造 suggestion 对象，保留链接 ID
+            const refId = autoLink.kind === "prep" ? autoLink.prep.id : autoLink.bottle.id;
+            const source = autoLink.kind === "prep" ? "homemade" : "bottles";
+            pickSuggestion(row.id, { key: "auto-canon", value: autoCanon.primary, secondary: "", source: source as import("@/lib/suggest").IngredientSuggestion["source"], context: "", refId });
           }}
-          onSubmitEditing={() => commitIngRowName(row.id, row.name)}
-          returnKeyType="done"
-          autoCapitalize="words"
-        />
+         onSubmitEditing={() => commitIngRowName(row.id, row.name)}
+         returnKeyType="done"
+         autoCapitalize="words"
+       />
         {/* ── or 操作按钮 ── */}
         <Pressable
           onPress={() => {
