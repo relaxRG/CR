@@ -100,11 +100,11 @@ export function RecipeGroupCard({
                 style={{ height: 24 }}
                 contentContainerStyle={{ alignItems: "baseline", gap: 6 }}
               >
-                <Text className="text-base font-semibold text-foreground" style={{ lineHeight: 22 }}>
+                <Text style={{ fontSize: 17, fontWeight: "600", lineHeight: 24 }} className="text-foreground">
                   {dn.primary}
                 </Text>
                 {dn.secondary ? (
-                  <Text className="text-xs text-muted" style={{ lineHeight: 22 }}>
+                  <Text className="text-sm text-muted" style={{ lineHeight: 24 }}>
                     {dn.secondary}
                   </Text>
                 ) : null}
