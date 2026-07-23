@@ -1132,10 +1132,13 @@ export default function RecipeFormScreen() {
                   placeholder={isGarnish ? (prep?.garnishUnit ? `件数（${prep.garnishUnit}）` : "件数") : t("form.ingredient.qty")}
                   placeholderTextColor={colors.muted}
                   value={qty}
-                  onChangeText={(v) => updateIngredient(ing.id, "amount", mergeAmount(v, unit))}
+                  onChangeText={(v) => {
+                    const filtered = v.replace(/[^\d.,½⅓⅔¼¾⅛⅜⅝⅞约~≈\s/]/g, "");
+                    updateIngredient(ing.id, "amount", mergeAmount(filtered, unit));
+                  }}
                   onFocus={() => setFocusedQtyId(ing.id)}
                   onBlur={() => setFocusedQtyId((cur) => cur === ing.id ? null : cur)}
-                  keyboardType="decimal-pad"
+                  keyboardType="numeric"
                   returnKeyType="done"
                 />
                 {!isGarnish && (
@@ -1166,6 +1169,7 @@ export default function RecipeFormScreen() {
           {focusedQtyId === ing.id && (() => {
             const { qty, unit } = splitAmount(ing.amount);
             const FRACS = ["¼", "⅓", "½", "¾"];
+            const DECIMALS = ["1.5", "2.5"];
             const FRAC_RE = /[¼⅓½¾⅔¾⅛⅜⅝⅞]/g;
             return (
               <View style={{ flexDirection: "row", gap: 6, marginTop: 4, marginLeft: 0 }}>
@@ -1189,6 +1193,27 @@ export default function RecipeFormScreen() {
                     }]}
                   >
                     <Text style={{ fontSize: 16, color: colors.foreground, fontWeight: "500" }}>{f}</Text>
+                  </Pressable>
+                ))}
+
+                {DECIMALS.map((d) => (
+                  <Pressable
+                    key={d}
+                    onPress={() => {
+                      updateIngredient(ing.id, "amount", mergeAmount(d, unit));
+                      if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    }}
+                    style={({ pressed }) => [{
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                      backgroundColor: colors.surface,
+                      opacity: pressed ? 0.6 : 1,
+                    }]}
+                  >
+                    <Text style={{ fontSize: 14, color: colors.foreground, fontWeight: "500" }}>{d}</Text>
                   </Pressable>
                 ))}
               </View>

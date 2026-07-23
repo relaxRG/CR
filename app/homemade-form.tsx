@@ -931,10 +931,13 @@ export default function HomemadeFormScreen() {
                   placeholder={t("form.ingredient.qty")}
                   placeholderTextColor={colors.muted}
                   value={qty}
-                  onChangeText={(v) => updateIngRow(row.id, "amount", mergeAmount(v, unit))}
+                  onChangeText={(v) => {
+                    const filtered = v.replace(/[^\d.,½⅓⅔¼¾⅛⅜⅝⅞约~≈\s/]/g, "");
+                    updateIngRow(row.id, "amount", mergeAmount(filtered, unit));
+                  }}
                   onFocus={() => setFocusedQtyId(row.id)}
                   onBlur={() => setFocusedQtyId((cur) => cur === row.id ? null : cur)}
-                  keyboardType="decimal-pad"
+                  keyboardType="numeric"
                   returnKeyType="done"
                 />
                 <Pressable
@@ -962,6 +965,7 @@ export default function HomemadeFormScreen() {
           {focusedQtyId === row.id && (() => {
             const { qty, unit } = splitAmount(row.amount);
             const FRACS = ["¼", "⅓", "½", "¾"];
+            const DECIMALS = ["1.5", "2.5"];
             const FRAC_RE = /[¼⅓½¾⅔¾⅛⅜⅝⅞]/g;
             return (
               <View style={{ flexDirection: "row", gap: 6, marginTop: 4 }}>
@@ -985,6 +989,27 @@ export default function HomemadeFormScreen() {
                     }]}
                   >
                     <Text style={{ fontSize: 16, color: colors.foreground, fontWeight: "500" }}>{f}</Text>
+                  </Pressable>
+                ))}
+
+                {DECIMALS.map((d) => (
+                  <Pressable
+                    key={d}
+                    onPress={() => {
+                      updateIngRow(row.id, "amount", mergeAmount(d, unit));
+                      if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    }}
+                    style={({ pressed }) => [{
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                      backgroundColor: colors.surface,
+                      opacity: pressed ? 0.6 : 1,
+                    }]}
+                  >
+                    <Text style={{ fontSize: 14, color: colors.foreground, fontWeight: "500" }}>{d}</Text>
                   </Pressable>
                 ))}
               </View>
