@@ -394,3 +394,44 @@ export async function enrichBottles(params: { names: string[]; lang?: 'zh' | 'en
     })),
   };
 }
+
+/** 酒款深度解析（强模型，补全所有字段） */
+export async function deepAnalyzeBottle(input: {
+  nameZh?: string;
+  nameEn?: string;
+  category?: string;
+  style?: string;
+  brand?: string;
+  origin?: string;
+  abv?: number;
+}) {
+  const apiBase = getApiBaseUrl();
+  const trpcUrl = `${apiBase}/api/trpc/lookup.deepAnalyzeBottle`;
+  const res = await fetchWithTimeout(trpcUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ json: input }),
+  }, 60_000);
+  if (!res.ok) throw new Error(`deepAnalyzeBottle failed: HTTP ${res.status}`);
+  const data = await res.json() as { result?: { data?: { json?: unknown } } };
+  return (data?.result?.data?.json ?? {}) as Record<string, unknown>;
+}
+
+/** 自制品深度解析（强模型，补全所有字段） */
+export async function deepAnalyzeHomemade(input: {
+  name?: string;
+  nameAlt?: string;
+  type?: string;
+  ingredients?: string;
+}) {
+  const apiBase = getApiBaseUrl();
+  const trpcUrl = `${apiBase}/api/trpc/lookup.deepAnalyzeHomemade`;
+  const res = await fetchWithTimeout(trpcUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ json: input }),
+  }, 60_000);
+  if (!res.ok) throw new Error(`deepAnalyzeHomemade failed: HTTP ${res.status}`);
+  const data = await res.json() as { result?: { data?: { json?: unknown } } };
+  return (data?.result?.data?.json ?? {}) as Record<string, unknown>;
+}

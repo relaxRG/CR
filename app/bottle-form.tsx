@@ -22,9 +22,11 @@ import { useColors } from "@/hooks/use-colors";
 import { useNetwork } from "@/hooks/use-network";
 import { useI18n } from "@/lib/i18n";
 import { BottleDraft, useBottleStore } from "@/lib/bottles/store";
+import { useHomemadeStore } from "@/lib/homemade/store";
+import { useRecipeStore } from "@/lib/recipes/store";
 import { useBottleTaxonomy } from "@/lib/bottles/taxonomy";
 import { normalizeStyleToTaxonomy } from "@/lib/bottles/style-normalize";
-import { enrichBottle, OfflineError } from "@/lib/api/smart-router";
+import { enrichBottle, deepAnalyzeBottle, OfflineError } from "@/lib/api/smart-router";
 import { lookupInOfflineKb, extractBookSnippets, offlineEntryToEnrichResult } from "@/lib/bottles/offline-lookup";
 import { useBookStore } from "@/lib/books/store";
 import * as ImagePicker from "expo-image-picker";
@@ -55,7 +57,9 @@ export default function BottleFormScreen() {
       prefillNameAlt?: string;
       prefillStyle?: string;
     }>();
-  const { getBottle, addBottle, updateBottle } = useBottleStore();
+  const { getBottle, addBottle, updateBottle, deleteBottle } = useBottleStore();
+  const { addPrep } = useHomemadeStore();
+  const { recipes, updateRecipe } = useRecipeStore();
   const { categories: taxCategories, categoryLabel, stylesOf, categoriesOfGroup } = useBottleTaxonomy();
   const editing = getBottle(id);
   const isMountedRef = useRef(true);
@@ -434,6 +438,39 @@ export default function BottleFormScreen() {
     }
   }, [nameZh, nameEn, brand, category, style, origin, isOnline, lang, t, books]);
 
+  /** 深度解析：使用强模型（claude-sonnet）补全所有字段 */
+  const handleDeepAnalyze = () => {
+    const query = [nameZh.trim(), nameEn.trim(), brand.trim()].filter(Boolean).join(" ");
+    if (!query) {
+      setLookupStatus({ kind: "err", msg: t("lookup.needName") });
+      return;
+    }
+    if (!isOnline) {
+      Alert.alert(t("offline.title"), t("offline.aiUnavailable"));
+      return;
+    }
+    setLookupBusy("manual");
+    setLookupStatus(null);
+    setAiResult(null);
+    deepAnalyzeBottle({
+      nameZh: nameZh.trim() || undefined,
+      nameEn: nameEn.trim() || undefined,
+      category: category || undefined,
+      style: style.trim() || undefined,
+      brand: brand.trim() || undefined,
+      origin: origin.trim() || undefined,
+      abv: abv ? parseFloat(abv) : undefined,
+    }).then((res) => {
+      if (!isMountedRef.current) return;
+      setAiResult(res as unknown as typeof aiResult);
+      setLookupStatus({ kind: "ok", msg: lang === "zh" ? "深度解析完成" : "Deep analysis done" });
+    }).catch(() => {
+      if (!isMountedRef.current) return;
+      setLookupStatus({ kind: "err", msg: lang === "zh" ? "深度解析失败，请重试" : "Deep analysis failed, please retry" });
+    }).finally(() => {
+      if (isMountedRef.current) setLookupBusy(null);
+    });
+  };
   /** 手动 AI 补全（覆盖模式，重新分析） */
   const handleLookup = () => {
     const query = [nameZh.trim(), nameEn.trim(), brand.trim()].filter(Boolean).join(" ");
@@ -517,6 +554,84 @@ export default function BottleFormScreen() {
       draft.libraryOverride = libraryOverride; // 'spirits'|'bottles'|'materials'|undefined
       draft.homemadeGroup = undefined;
       draft.homemadeType = undefined;
+    }
+    // ── 彻底迁移到自制库（编辑模式 + libraryOverride === 'homemade'） ──
+    if (editing && libraryOverride === 'homemade') {
+      // 1. 在自制库创建对应的 prep 条目
+      // 根据 homemadeGroup 推断 abvGroup
+      const abvGroupMap: Record<string, 'alcoholic' | 'non_alcoholic' | 'garnish'> = {
+        alcoholic: 'alcoholic',
+        non_alcoholic: 'non_alcoholic',
+        garnish: 'garnish',
+        other: 'non_alcoholic',
+      };
+      const newPrep = addPrep({
+        name: draft.nameZh || draft.nameEn,
+        nameAlt: draft.nameEn || '',
+        type: homemadeType || 'homemade-syrup',
+        abvGroup: abvGroupMap[homemadeGroup] ?? null,
+        ingredients: [],
+        recipe: '',
+        yield: '',
+        shelfLife: '',
+        storage: '',
+        source: '',
+        notes: draft.notes ?? '',
+        flavorTags: draft.flavorTags ?? [],
+        story: draft.story ?? '',
+        styleDesc: draft.styleDesc ?? '',
+        usageNotes: draft.usageNotes ?? '',
+      });
+      // 2. 将所有配方中引用该 bottle 的 linkedBottleId 替换为 linkedPrepId
+      for (const recipe of recipes) {
+        const updatedIngs = recipe.ingredients?.map((ing) =>
+          ing.linkedBottleId === editing.id
+            ? { ...ing, linkedBottleId: undefined, linkedPrepId: newPrep.id }
+            : ing
+        );
+        const updatedGarnishItems = recipe.garnishItems?.map((g) =>
+          g.linkedBottleId === editing.id
+            ? { ...g, linkedBottleId: undefined as string | undefined, linkedPrepId: newPrep.id }
+            : g
+        );
+        const changed =
+          updatedIngs?.some((ing, i) => ing !== recipe.ingredients?.[i]) ||
+          updatedGarnishItems?.some((g, i) => g !== recipe.garnishItems?.[i]);
+        if (changed) {
+          // Build a full RecipeDraft from the existing recipe, only updating changed fields
+          const garnishStr = updatedGarnishItems
+            ? updatedGarnishItems.map((g) => g.name).filter(Boolean).join("、")
+            : recipe.garnish ?? "";
+          updateRecipe(recipe.id, {
+            name: recipe.name,
+            nameEn: recipe.nameEn,
+            categoryId: recipe.categoryId ?? null,
+            baseSpirit: recipe.baseSpirit ?? "",
+            glass: recipe.glass ?? "",
+            method: recipe.method ?? "",
+            ice: recipe.ice,
+            strength: recipe.strength ?? "medium",
+            variantOf: recipe.variantOf ?? "",
+            codexFamily: recipe.codexFamily ?? "",
+            flavors: recipe.flavors ?? [],
+            source: recipe.source ?? "",
+            story: recipe.story ?? "",
+            flavorDesc: recipe.flavorDesc ?? "",
+            ingredients: updatedIngs ?? recipe.ingredients ?? [],
+            steps: recipe.steps ?? "",
+            garnish: garnishStr,
+            garnishItems: updatedGarnishItems,
+            notes: recipe.notes ?? "",
+          });
+        }
+      }
+      // 3. 从酒库删除原条目
+      deleteBottle(editing.id);
+      if (Platform.OS !== "web") {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+      router.back();
+      return;
     }
     if (editing) {
       updateBottle(editing.id, draft);
@@ -684,6 +799,41 @@ export default function BottleFormScreen() {
                 </Text>
               </Pressable>
             </View>
+            {/* 深度解析按钮 */}
+            <Pressable
+              onPress={handleDeepAnalyze}
+              disabled={isAiBusy || (!nameZh.trim() && !nameEn.trim())}
+              style={({ pressed }) => [
+                {
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 6,
+                  paddingVertical: 10,
+                  paddingHorizontal: 14,
+                  borderRadius: 12,
+                  backgroundColor: (!nameZh.trim() && !nameEn.trim()) ? colors.surface : colors.primary,
+                  opacity: (pressed || isAiBusy) ? 0.7 : 1,
+                  marginTop: 6,
+                },
+              ]}
+            >
+              {lookupBusy === "manual" && aiResult === null ? (
+                <>
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: "#FFFFFF" }}>
+                    {lang === "zh" ? "深度解析中…" : "Analyzing…"}
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <IconSymbol name="sparkles" size={15} color={(!nameZh.trim() && !nameEn.trim()) ? colors.muted : "#FFFFFF"} />
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: (!nameZh.trim() && !nameEn.trim()) ? colors.muted : "#FFFFFF" }}>
+                    {lang === "zh" ? "✦ 深度解析（强模型）" : "✦ Deep Analysis"}
+                  </Text>
+                </>
+              )}
+            </Pressable>
 
             {/* AI 错误/加载状态提示（仅在无建议面板时显示） */}
             {lookupStatus && !aiResult && (
@@ -1321,6 +1471,43 @@ export default function BottleFormScreen() {
               </>
             )}
           </View>
+
+          {/* ── 开瓶易失效开关（所有库均可见） ── */}
+          <View style={{ paddingHorizontal: 20, paddingBottom: 4 }}>
+            {/* ── 开瓶易失效手动开关 ── */}
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16, paddingVertical: 8, paddingHorizontal: 4, borderRadius: 10, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}>
+              <View style={{ flex: 1, paddingHorizontal: 8 }}>
+                <Text style={{ fontSize: 14, fontWeight: "500", color: colors.foreground, lineHeight: 20 }}>
+                  {lang === "zh" ? "开瓶易失效" : "Perishable After Opening"}
+                </Text>
+                <Text style={{ fontSize: 11, color: colors.muted, lineHeight: 16, marginTop: 1 }}>
+                  {perishableOnOpen === undefined
+                    ? (lang === "zh" ? "系统自动判断（基于分类）" : "Auto-detected by category")
+                    : perishableOnOpen
+                      ? (lang === "zh" ? "已手动标记：开瓶后易失效" : "Manually set: perishable after opening")
+                      : (lang === "zh" ? "已手动标记：开瓶后不易失效" : "Manually set: not perishable after opening")}
+                </Text>
+              </View>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 8 }}>
+                {perishableOnOpen !== undefined && (
+                  <Pressable
+                    onPress={() => setPerishableOnOpen(undefined)}
+                    hitSlop={8}
+                    style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
+                  >
+                    <Text style={{ fontSize: 11, color: colors.muted }}>{lang === "zh" ? "重置" : "Reset"}</Text>
+                  </Pressable>
+                )}
+                <Switch
+                  value={perishableOnOpen ?? false}
+                  onValueChange={(v) => setPerishableOnOpen(v)}
+                  trackColor={{ false: colors.border, true: colors.primary + "88" }}
+                  thumbColor={perishableOnOpen ? colors.primary : colors.muted}
+                />
+              </View>
+            </View>
+          </View>
+
 
           {/* ── 分区四：风味与描述 ── */}
           {sectionTitle(

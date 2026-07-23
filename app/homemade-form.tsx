@@ -19,7 +19,9 @@ import { SmartImportBar } from "@/components/smart-import-bar";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
-import { enrichHomemade } from "@/lib/api/smart-router";
+import { enrichHomemade, deepAnalyzeHomemade } from "@/lib/api/smart-router";
+import { analyzeUnknownIngredient } from "@/lib/classify";
+import * as Clipboard from "expo-clipboard";
 import type { EnrichHomemadeResult } from "@/lib/api/smart-router";
 import { suggestPrep } from "@/lib/homemade/match";
 import { useNetwork } from "@/hooks/use-network";
@@ -348,6 +350,7 @@ export default function HomemadeFormScreen() {
   
   const [aiBusy, setAiBusy] = useState(false);
   const [aiResult, setAiResult] = useState<EnrichHomemadeResult | null>(null);
+  const [linkPickerTarget, setLinkPickerTarget] = useState<{ id: string; query: string } | null>(null);
   /** 正在添加备选项的成分行 id → 临时输入值 */
   const [addAltRowId, setAddAltRowId] = useState<string | null>(null);
   const [addAltValue, setAddAltValue] = useState("");
@@ -500,6 +503,58 @@ export default function HomemadeFormScreen() {
     if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
   }, [undoSnapshot]);
 
+  /** 深度解析：使用强模型（claude-sonnet）补全所有字段 */
+  const handleDeepAnalyze = async () => {
+    const displayName = [name.trim(), nameAlt.trim()].filter(Boolean).join(" / ");
+    if (!displayName) return;
+    if (!isOnline) {
+      Alert.alert(lang === "zh" ? "网络不可用" : "Offline", lang === "zh" ? "深度解析需要网络连接" : "Deep analysis requires network");
+      return;
+    }
+    setAiBusy(true);
+    try {
+      const ingStr = ingRows.filter((r) => r.name.trim()).map((r) => r.name.trim()).join(", ");
+      const res = await deepAnalyzeHomemade({
+        name: name.trim() || undefined,
+        nameAlt: nameAlt.trim() || undefined,
+        type: type || undefined,
+        ingredients: ingStr || undefined,
+      });
+      const r = res as Record<string, unknown>;
+      // 自动应用步骤（若当前为空）
+      if (typeof r.steps === "string" && r.steps && !recipe.trim()) {
+        setStepRows(parseStepRows(r.steps));
+      }
+      // 自动应用产量（若当前为空）
+      if (typeof r.yieldQty === "number" && r.yieldQty > 0 && !yieldQty) {
+        setYieldQty(String(r.yieldQty));
+        if (typeof r.yieldUnit === "string" && r.yieldUnit) setYieldUnit(r.yieldUnit);
+      }
+      // 自动预填成分行（若当前为空）
+      if (Array.isArray(r.prepIngredients) && (r.prepIngredients as {name:string;amount:string}[]).length > 0 && ingRows.every((row) => !row.name.trim())) {
+        const newRows = (r.prepIngredients as {name:string;amount:string}[]).map((ing) => ({
+          id: `ai-${Math.random().toString(36).slice(2)}`,
+          name: ing.name,
+          amount: ing.amount,
+          linkedBottleId: undefined,
+          linkedPrepId: undefined,
+          linkDismissed: false,
+        }));
+        setIngRows([...newRows, { id: `blank-${Date.now()}`, name: "", amount: "", linkedBottleId: undefined, linkedPrepId: undefined, linkDismissed: false }]);
+      }
+      // 将深度解析结果合并到 aiResult 供建议面板显示
+      setAiResult({ ...((aiResult ?? {}) as typeof aiResult), ...r } as unknown as typeof aiResult);
+      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {
+      Alert.alert(
+        lang === "zh" ? "深度解析失败" : "Deep Analysis Failed",
+        lang === "zh" ? "AI 服务暂时不可用，请稍后重试" : "AI service unavailable, please retry",
+        [{ text: lang === "zh" ? "好的" : "OK" }]
+      );
+    } finally {
+      setAiBusy(false);
+    }
+  };
   const handleAiEnrich = async () => {
     const displayName = [name.trim(), nameAlt.trim()].filter(Boolean).join(" / ");
     if (!displayName) return;
@@ -559,6 +614,80 @@ export default function HomemadeFormScreen() {
     }
   };
 
+  /** 文字配方解析（粘贴导入） */
+  const applyParsedPrep = (text: string) => {
+    const lang2 = lang as "zh" | "en";
+    // 简单解析：提取名称、配料、步骤
+    const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+    let parsedName = "";
+    let parsedSteps = "";
+    const parsedIngs: { name: string; amount: string }[] = [];
+    let inSteps = false;
+    for (const line of lines) {
+      if (!parsedName && line.length < 60 && !/^[\d\-•·]/.test(line)) {
+        parsedName = line;
+        continue;
+      }
+      const ingMatch = line.match(/^([\d.]+\s*(?:ml|g|oz|tsp|tbsp|个|片|颗|枝|条|块|份|滴|dash|drop|barspoon|bsp)?)\s+(.+)$/) ||
+                       line.match(/^(.+?)[：:]\s*([\d.]+\s*(?:ml|g|oz|tsp|tbsp|个|片|颗|枝|条|块|份|滴|dash|drop|barspoon|bsp)?)$/);
+      if (ingMatch) {
+        const isAmountFirst = /^[\d.]/.test(line);
+        parsedIngs.push(isAmountFirst
+          ? { amount: ingMatch[1].trim(), name: ingMatch[2].trim() }
+          : { amount: ingMatch[2].trim(), name: ingMatch[1].trim() }
+        );
+        continue;
+      }
+      if (/^(步骤|做法|制作|method|steps|instructions)/i.test(line)) { inSteps = true; continue; }
+      if (inSteps || /^[\d]+[.、。]/.test(line) || /^[-•·]/.test(line)) {
+        inSteps = true;
+        parsedSteps += (parsedSteps ? "\n" : "") + line.replace(/^[\d]+[.、。]\s*/, "").replace(/^[-•·]\s*/, "");
+      }
+    }
+    if (parsedName && !name.trim()) {
+      setName(parsedName);
+    }
+    if (parsedIngs.length > 0 && ingRows.every((r) => !r.name.trim())) {
+      const newRows = parsedIngs.map((ing) => ({
+        id: `paste-${Math.random().toString(36).slice(2)}`,
+        name: ing.name,
+        amount: ing.amount,
+        linkedBottleId: undefined as string | undefined,
+        linkedPrepId: undefined as string | undefined,
+        linkDismissed: false,
+      }));
+      setIngRows([...newRows, { id: `blank-${Date.now()}`, name: "", amount: "", linkedBottleId: undefined, linkedPrepId: undefined, linkDismissed: false }]);
+    }
+    if (parsedSteps && !recipe.trim()) {
+      setStepRows(parseStepRows(parsedSteps));
+    }
+    void lang2;
+  };
+  const handlePasteImport = async () => {
+    try {
+      const text = await Clipboard.getStringAsync();
+      if (!text || !text.trim()) {
+        Alert.alert(lang === "zh" ? "剪贴板为空" : "Clipboard Empty", lang === "zh" ? "请先复制配方文字" : "Please copy recipe text first");
+        return;
+      }
+      const hasContent = name.trim() || ingRows.some((r) => r.name.trim()) || recipe.trim();
+      if (hasContent) {
+        Alert.alert(
+          lang === "zh" ? "粘贴导入" : "Paste Import",
+          lang === "zh" ? "当前已有内容，是否覆盖？" : "Current content will be overwritten. Continue?",
+          [
+            { text: lang === "zh" ? "取消" : "Cancel", style: "cancel" },
+            { text: lang === "zh" ? "覆盖导入" : "Import", onPress: () => applyParsedPrep(text) },
+          ]
+        );
+        return;
+      }
+      applyParsedPrep(text);
+      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {
+      Alert.alert(lang === "zh" ? "读取失败" : "Read Failed", lang === "zh" ? "无法读取剪贴板" : "Cannot read clipboard");
+    }
+  };
   /** 名称/配料变化后智能推断类型(仅在用户未手动选择时) */
   const autoGuessType = () => {
     if (typeTouched) return;
@@ -657,6 +786,10 @@ export default function HomemadeFormScreen() {
     const rDismissed = dismissedLinks[row.id] === true;
     const link = rDismissed ? null : isFuzzy ? (acceptedLinks[row.id] ? rawLink : null) : rawLink;
     const pendingFuzzyLink = !rDismissed && isFuzzy && !acceptedLinks[row.id] ? rawLink : null;
+    const classification =
+      !rawLink && !rDismissed && trimmed.length >= 3
+        ? analyzeUnknownIngredient(trimmed, bottles, allPreps.filter((p) => p.id !== (editing?.id ?? "")))
+        : null;
     return (
       <View key={row.id} style={{ marginBottom: 8, opacity: isActive ? 0.85 : 1 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -1173,6 +1306,22 @@ export default function HomemadeFormScreen() {
               <Text style={{ fontSize: 11, lineHeight: 14, color: colors.muted }}>{t("form.link.break")}</Text>
             </Pressable>
           </View>
+        ) : classification ? (
+          <Pressable
+            onPress={() => {
+              if (classification.library === "homemade") {
+                router.push({ pathname: "/homemade-form", params: { prefillName: classification.name, prefillNameAlt: classification.nameAlt, prefillType: classification.category } });
+              } else {
+                router.push({ pathname: "/bottle-form", params: { category: classification.category, prefillName: classification.name, prefillNameAlt: classification.nameAlt, ...(classification.style ? { prefillStyle: classification.style } : {}) } });
+              }
+            }}
+            style={({ pressed }) => [{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2, paddingHorizontal: 4 }, pressed && { opacity: 0.6 }]}
+          >
+            <IconSymbol name="plus.circle.fill" size={12} color={colors.success} />
+            <Text style={{ fontSize: 11, lineHeight: 14, color: colors.success }}>
+              {classification.library === "homemade" ? t("form.homemade.add") : classification.library === "material" ? t("form.smartAdd.material") : t("form.smartAdd.bottle")}{" · "}{[classification.name, classification.nameAlt].filter(Boolean).join(" / ")}
+            </Text>
+          </Pressable>
         ) : rDismissed && trimmed.length >= 2 ? (
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2, paddingHorizontal: 4 }}>
             <Text style={{ fontSize: 11, lineHeight: 14, color: colors.muted }}>{t("form.link.dismissed")}</Text>
@@ -2307,4 +2456,3 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
 });
-  const [linkPickerTarget, setLinkPickerTarget] = useState<{ id: string; query: string } | null>(null);
