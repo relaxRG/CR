@@ -592,15 +592,25 @@ export default function HomemadeFormScreen() {
     setAcceptedLinks((prev) => { const n = { ...prev }; delete n[rid]; return n; });
   };
   const pickSuggestion = (rid: string, s: import("@/lib/suggest").IngredientSuggestion) => {
-    updateIngRow(rid, "name", s.value);
+    // 单次原子更新：名称 + 链接一起写入，避免 updateIngRow 内部清除链接
+    if (s.refId && s.source === "homemade") {
+      setIngRows((prev) => prev.map((r) => r.id === rid
+        ? { ...r, name: s.value, linkedPrepId: s.refId, linkedBottleId: undefined, linkDismissed: undefined }
+        : r));
+    } else if (s.refId) {
+      setIngRows((prev) => prev.map((r) => r.id === rid
+        ? { ...r, name: s.value, linkedBottleId: s.refId, linkedPrepId: undefined, linkDismissed: undefined }
+        : r));
+    } else {
+      setIngRows((prev) => prev.map((r) => r.id === rid
+        ? { ...r, name: s.value, linkedBottleId: undefined, linkedPrepId: undefined, linkDismissed: undefined }
+        : r));
+    }
+    setDismissedLinks((prev) => { const n = { ...prev }; delete n[rid]; return n; });
     if (s.refId) {
-      if (s.source === "homemade") {
-        setIngRows((prev) => prev.map((r) => r.id === rid ? { ...r, name: s.value, linkedPrepId: s.refId, linkedBottleId: undefined, linkDismissed: undefined } : r));
-      } else {
-        setIngRows((prev) => prev.map((r) => r.id === rid ? { ...r, name: s.value, linkedBottleId: s.refId, linkedPrepId: undefined, linkDismissed: undefined } : r));
-      }
-      setDismissedLinks((prev) => { const n = { ...prev }; delete n[rid]; return n; });
       setAcceptedLinks((prev) => ({ ...prev, [rid]: true }));
+    } else {
+      setAcceptedLinks((prev) => { const n = { ...prev }; delete n[rid]; return n; });
     }
     setPickedIng((prev) => ({ ...prev, [rid]: s.value }));
     setFocusedIng(null);

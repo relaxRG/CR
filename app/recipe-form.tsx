@@ -939,17 +939,26 @@ export default function RecipeFormScreen() {
   };
 
   const pickSuggestion = (iid: string, s: import("@/lib/suggest").IngredientSuggestion) => {
-    // 更新名称
-    updateIngredient(iid, "name", s.value);
-    // 同时设置显式链接，避免只依赖自动匹配
+    // 单次原子更新：名称 + 链接一起写入，避免 updateIngredient 内部清除链接
+    if (s.refId && s.source === "homemade") {
+      setIngredients((prev) => prev.map((i) => i.id === iid
+        ? { ...i, name: s.value, linkedPrepId: s.refId, linkedBottleId: undefined, linkDismissed: undefined }
+        : i));
+    } else if (s.refId) {
+      setIngredients((prev) => prev.map((i) => i.id === iid
+        ? { ...i, name: s.value, linkedBottleId: s.refId, linkedPrepId: undefined, linkDismissed: undefined }
+        : i));
+    } else {
+      // 无 refId（如 canon 规范名替换），只更新名称并清除旧链接
+      setIngredients((prev) => prev.map((i) => i.id === iid
+        ? { ...i, name: s.value, linkedBottleId: undefined, linkedPrepId: undefined, linkDismissed: undefined }
+        : i));
+    }
+    setDismissedLinks((prev) => { const n = { ...prev }; delete n[iid]; return n; });
     if (s.refId) {
-      if (s.source === "homemade") {
-        setIngredients((prev) => prev.map((i) => i.id === iid ? { ...i, name: s.value, linkedPrepId: s.refId, linkedBottleId: undefined, linkDismissed: undefined } : i));
-      } else {
-        setIngredients((prev) => prev.map((i) => i.id === iid ? { ...i, name: s.value, linkedBottleId: s.refId, linkedPrepId: undefined, linkDismissed: undefined } : i));
-      }
-      setDismissedLinks((prev) => { const n = { ...prev }; delete n[iid]; return n; });
       setAcceptedLinks((prev) => ({ ...prev, [iid]: true }));
+    } else {
+      setAcceptedLinks((prev) => { const n = { ...prev }; delete n[iid]; return n; });
     }
     setPickedIng((prev) => ({ ...prev, [iid]: s.value }));
     setFocusedIng(null);
