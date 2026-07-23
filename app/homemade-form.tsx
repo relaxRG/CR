@@ -124,6 +124,7 @@ export default function HomemadeFormScreen() {
   const [ingRows, setIngRows] = useState<IngRow[]>(initialIngRowsRef.current);
   /** Which ingredient row is focused (shows live suggestions) */
   const [focusedIng, setFocusedIng] = useState<string | null>(null);
+  const [focusedQtyId, setFocusedQtyId] = useState<string | null>(null);
   const pressingIngSuggestRef = useRef(false);
   /** Rows where user picked a suggestion — suppress dropdown until text changes */
   const [pickedIng, setPickedIng] = useState<Record<string, string>>({});
@@ -751,6 +752,8 @@ export default function HomemadeFormScreen() {
                   placeholderTextColor={colors.muted}
                   value={qty}
                   onChangeText={(v) => updateIngRow(row.id, "amount", mergeAmount(v, unit))}
+                  onFocus={() => setFocusedQtyId(row.id)}
+                  onBlur={() => setFocusedQtyId((cur) => cur === row.id ? null : cur)}
                   keyboardType="decimal-pad"
                   returnKeyType="done"
                 />
@@ -772,6 +775,38 @@ export default function HomemadeFormScreen() {
                     {unit ? unitDisplayLabel(unit, lang as "zh" | "en") : t("form.ingredient.unit")}
                   </Text>
                 </Pressable>
+              </View>
+            );
+          })()}
+          {/* ── 分数快捷按钮（用量框聚焦时显示） ── */}
+          {focusedQtyId === row.id && (() => {
+            const { qty, unit } = splitAmount(row.amount);
+            const FRACS = ["¼", "⅓", "½", "¾"];
+            const FRAC_RE = /[¼⅓½¾⅔¾⅛⅜⅝⅞]/g;
+            return (
+              <View style={{ flexDirection: "row", gap: 6, marginTop: 4 }}>
+                {FRACS.map((f) => (
+                  <Pressable
+                    key={f}
+                    onPress={() => {
+                      const base = qty.replace(FRAC_RE, "").trimEnd();
+                      const newQty = base ? base + f : f;
+                      updateIngRow(row.id, "amount", mergeAmount(newQty, unit));
+                      if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    }}
+                    style={({ pressed }) => [{
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                      backgroundColor: colors.surface,
+                      opacity: pressed ? 0.6 : 1,
+                    }]}
+                  >
+                    <Text style={{ fontSize: 16, color: colors.foreground, fontWeight: "500" }}>{f}</Text>
+                  </Pressable>
+                ))}
               </View>
             );
           })()}
