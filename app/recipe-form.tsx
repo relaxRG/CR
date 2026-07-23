@@ -938,9 +938,20 @@ export default function RecipeFormScreen() {
     setAcceptedLinks((prev) => { const n = { ...prev }; delete n[iid]; return n; });
   };
 
-  const pickSuggestion = (iid: string, value: string) => {
-    updateIngredient(iid, "name", value);
-    setPickedIng((prev) => ({ ...prev, [iid]: value }));
+  const pickSuggestion = (iid: string, s: import("@/lib/suggest").IngredientSuggestion) => {
+    // 更新名称
+    updateIngredient(iid, "name", s.value);
+    // 同时设置显式链接，避免只依赖自动匹配
+    if (s.refId) {
+      if (s.source === "homemade") {
+        setIngredients((prev) => prev.map((i) => i.id === iid ? { ...i, name: s.value, linkedPrepId: s.refId, linkedBottleId: undefined, linkDismissed: undefined } : i));
+      } else {
+        setIngredients((prev) => prev.map((i) => i.id === iid ? { ...i, name: s.value, linkedBottleId: s.refId, linkedPrepId: undefined, linkDismissed: undefined } : i));
+      }
+      setDismissedLinks((prev) => { const n = { ...prev }; delete n[iid]; return n; });
+      setAcceptedLinks((prev) => ({ ...prev, [iid]: true }));
+    }
+    setPickedIng((prev) => ({ ...prev, [iid]: s.value }));
     setFocusedIng(null);
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -1195,7 +1206,7 @@ export default function RecipeFormScreen() {
                 key={s.key}
                 onPressIn={() => { pressingIngSuggestRef.current = true; }}
                 onPressOut={() => { pressingIngSuggestRef.current = false; }}
-                onPress={() => { pickSuggestion(ing.id, s.value); pressingIngSuggestRef.current = false; }}
+                onPress={() => { pickSuggestion(ing.id, s); pressingIngSuggestRef.current = false; }}
                 style={({ pressed }) => [styles.suggestRow, sIdx > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }, pressed && { opacity: 0.6 }]}
               >
                 <IconSymbol name={s.source === "homemade" ? "sparkles" : s.source === "spirits" ? "flame.fill" : s.source === "materials" ? "leaf.fill" : "wineglass.fill"} size={13} color={s.source === "homemade" ? colors.primary : s.source === "spirits" ? "#FF9500" : s.source === "materials" ? colors.success : "#5AC8FA"} />
@@ -1221,7 +1232,7 @@ export default function RecipeFormScreen() {
                   <IconSymbol name="chevron.right" size={11} color={colors.primary} />
                 </Pressable>
                 {differs ? (
-                  <Pressable onPress={() => pickSuggestion(ing.id, canon!.primary)} style={({ pressed }) => [styles.prepHint, pressed && { opacity: 0.6 }]}>
+                  <Pressable onPress={() => pickSuggestion(ing.id, { key: "canon", value: canon!.primary, secondary: "", source: "bottles", context: "", refId: "" })} style={({ pressed }) => [styles.prepHint, pressed && { opacity: 0.6 }]}>
                     <IconSymbol name="arrow.triangle.2.circlepath" size={12} color={colors.success} />
                     <Text className="text-xs" style={{ color: colors.success, lineHeight: 16 }}>{t("form.replaceCanonical", { name: canon!.primary })}</Text>
                   </Pressable>
@@ -1248,7 +1259,7 @@ export default function RecipeFormScreen() {
                   <IconSymbol name="chevron.right" size={11} color={colors.primary} />
                 </Pressable>
                 {differs ? (
-                  <Pressable onPress={() => pickSuggestion(ing.id, canon!.primary)} style={({ pressed }) => [styles.prepHint, pressed && { opacity: 0.6 }]}>
+                  <Pressable onPress={() => pickSuggestion(ing.id, { key: "canon", value: canon!.primary, secondary: "", source: "bottles", context: "", refId: "" })} style={({ pressed }) => [styles.prepHint, pressed && { opacity: 0.6 }]}>
                     <IconSymbol name="arrow.triangle.2.circlepath" size={12} color={colors.success} />
                     <Text className="text-xs" style={{ color: colors.success, lineHeight: 16 }}>{t("form.replaceCanonical", { name: canon!.primary })}</Text>
                   </Pressable>

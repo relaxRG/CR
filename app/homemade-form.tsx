@@ -591,9 +591,18 @@ export default function HomemadeFormScreen() {
     setDismissedLinks((prev) => { const n = { ...prev }; delete n[rid]; return n; });
     setAcceptedLinks((prev) => { const n = { ...prev }; delete n[rid]; return n; });
   };
-  const pickSuggestion = (rid: string, value: string) => {
-    updateIngRow(rid, "name", value);
-    setPickedIng((prev) => ({ ...prev, [rid]: value }));
+  const pickSuggestion = (rid: string, s: import("@/lib/suggest").IngredientSuggestion) => {
+    updateIngRow(rid, "name", s.value);
+    if (s.refId) {
+      if (s.source === "homemade") {
+        setIngRows((prev) => prev.map((r) => r.id === rid ? { ...r, name: s.value, linkedPrepId: s.refId, linkedBottleId: undefined, linkDismissed: undefined } : r));
+      } else {
+        setIngRows((prev) => prev.map((r) => r.id === rid ? { ...r, name: s.value, linkedBottleId: s.refId, linkedPrepId: undefined, linkDismissed: undefined } : r));
+      }
+      setDismissedLinks((prev) => { const n = { ...prev }; delete n[rid]; return n; });
+      setAcceptedLinks((prev) => ({ ...prev, [rid]: true }));
+    }
+    setPickedIng((prev) => ({ ...prev, [rid]: s.value }));
     setFocusedIng(null);
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -965,7 +974,7 @@ export default function HomemadeFormScreen() {
                 key={s.key}
                 onPressIn={() => { pressingIngSuggestRef.current = true; }}
                 onPressOut={() => { pressingIngSuggestRef.current = false; }}
-                onPress={() => { pickSuggestion(row.id, s.value); pressingIngSuggestRef.current = false; }}
+                onPress={() => { pickSuggestion(row.id, s); pressingIngSuggestRef.current = false; }}
                 style={({ pressed }) => [
                   styles.suggestRow,
                   sIdx > 0 && {
