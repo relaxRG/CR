@@ -573,7 +573,7 @@ export default function HomemadeFormScreen() {
   };
   // 手动输入 onBlur 时拆分 or 备选
   const commitIngRowName = (rid: string, rawName: string) => {
-    const OR_RE = /\s+(?:or|或|\/|\|)\s+/i;
+    const OR_RE = /\s+(?:or|或|(?<!\d)\/(?!\d)|\|)\s+/i;
     const STATE_ADJ_RE = /^(?:fresh|frozen|dried|canned|bottled|house-made|homemade|store-bought|organic|raw|cooked|roasted|toasted|ground|whole|sliced|diced|chopped|minced|peeled|zested|squeezed)$/i;
     if (!OR_RE.test(rawName.trim())) return; // 无 or，不处理
     const parts = rawName.trim().split(OR_RE).map((s) => s.trim()).filter(Boolean);
@@ -688,7 +688,7 @@ export default function HomemadeFormScreen() {
         <Pressable
           onPress={() => {
             if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            const OR_RE = /\s+(?:or|或|\/|\|)\s+/i;
+            const OR_RE = /\s+(?:or|或|(?<!\d)\/(?!\d)|\|)\s+/i;
             if (OR_RE.test(row.name.trim())) {
               // 名称中已有 or，直接拆分
               commitIngRowName(row.id, row.name);
