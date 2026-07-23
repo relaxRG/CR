@@ -68,6 +68,7 @@ import {
   serializeGarnishItems,
 } from "@/lib/recipes/types";
 import { FLAVOR_TAG_DEFAULT_COLORS } from "@/lib/settings/card-tags";
+import { parseFlavorDesc, buildFlavorDesc } from "@/lib/recipes/flavor-desc";
 
 function ChipGroup({
   options,
@@ -285,41 +286,12 @@ export default function RecipeFormScreen() {
   );
   const [story, setStory] = useState(editing?.story ?? "");
   const [flavorDesc, setFlavorDesc] = useState(editing?.flavorDesc ?? "");
-  // 三段式风味描述解析
-  const parseFlavorDesc = (raw: string) => {
-    const zhLabels = ['核心基调', '风味演变', '整体质感'];
-    const enLabels = ['Core profile', 'Flavor evolution', 'Overall texture'];
-    const result = { tone: '', evolution: '', texture: '' };
-    if (!raw) return result;
-    const lines = raw.split('\n').map((l: string) => l.trim()).filter(Boolean);
-    for (const line of lines) {
-      // 同时支持全角冒号「：」和半角冒号「:」
-      const colonIdx = line.search(/[：:]/);
-      if (colonIdx > 0) {
-        const label = line.slice(0, colonIdx).trim();
-        const value = line.slice(colonIdx + 1).trim();
-        const zhIdx = zhLabels.indexOf(label);
-        const enIdx = enLabels.indexOf(label);
-        const idx = zhIdx >= 0 ? zhIdx : enIdx >= 0 ? enIdx : -1;
-        if (idx === 0) result.tone = value;
-        else if (idx === 1) result.evolution = value;
-        else if (idx === 2) result.texture = value;
-      }
-    }
-    return result;
-  };
+  // parseFlavorDesc / buildFlavorDesc 已提取到 lib/recipes/flavor-desc.ts
   const parsedFlavor = parseFlavorDesc(editing?.flavorDesc ?? "");
   const [flavorTone, setFlavorTone] = useState(parsedFlavor.tone);
   const [flavorEvolution, setFlavorEvolution] = useState(parsedFlavor.evolution);
   const [flavorTexture, setFlavorTexture] = useState(parsedFlavor.texture);
-  // 合并三段为 flavorDesc 字符串
-  const buildFlavorDesc = (tone: string, evolution: string, texture: string) => {
-    const parts: string[] = [];
-    if (tone.trim()) parts.push(`核心基调: ${tone.trim()}`);
-    if (evolution.trim()) parts.push(`风味演变: ${evolution.trim()}`);
-    if (texture.trim()) parts.push(`整体质感: ${texture.trim()}`);
-    return parts.join('\n');
-  };
+
   const [ingredients, setIngredients] = useState<Ingredient[]>(
     editing?.ingredients?.length
       ? editing.ingredients
