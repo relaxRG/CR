@@ -1,8 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
-import type { Lang } from "@/lib/i18n/translations";
-
 /**
  * Combines class names using clsx and tailwind-merge.
  * This ensures Tailwind classes are properly merged without conflicts.
@@ -17,24 +15,36 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
- * Returns { primary, secondary } display names based on language.
- * For zh: primary=zh name, secondary=en name (if different)
- * For en: primary=en name (if exists), secondary=zh name (if different)
+ * Bilingual display priority: return [primary, secondary] name pair
+ * following the UI language (en → English first, zh → Chinese first).
+ * Falls back to the other name when the preferred one is empty.
+ */
+/** Detect CJK characters (Chinese/Japanese/Korean) */
+function hasCJK(s: string): boolean {
+  return /[\u4e00-\u9fff\u3400-\u4dbf\uff00-\uffef]/.test(s);
+}
+
+/**
+ * Bilingual display priority: return [primary, secondary] name pair
+ * following the UI language (en → English first, zh → Chinese first).
+ * Falls back to the other name when the preferred one is empty.
+ *
+ * Auto-corrects swapped parameters: if `en` contains CJK characters but `zh`
+ * does not, the caller likely passed (zhName, enName) — parameters are swapped
+ * automatically so the correct language always shows as primary.
  */
 export function displayNames(
-  nameEn: string | undefined | null,
-  nameZh: string | undefined | null,
-  lang: Lang,
-): { primary: string; secondary: string | null } {
-  const zh = nameZh?.trim() || "";
-  const en = nameEn?.trim() || "";
-  if (lang === "en") {
-    const primary = en || zh;
-    const secondary = en && zh && en !== zh ? zh : null;
-    return { primary, secondary };
+  en: string,
+  zh: string,
+  lang: "zh" | "en",
+): { primary: string; secondary: string } {
+  let e = (en || "").trim();
+  let z = (zh || "").trim();
+  // Auto-correct: if en looks like Chinese and zh looks like English, swap them
+  if (e && z && hasCJK(e) && !hasCJK(z)) {
+    [e, z] = [z, e];
   }
-  // zh
-  const primary = zh || en;
-  const secondary = zh && en && zh !== en ? en : null;
-  return { primary, secondary };
+  const primary = lang === "en" ? e || z : z || e;
+  const secondaryRaw = lang === "en" ? (e ? z : "") : (z ? e : "");
+  return { primary, secondary: secondaryRaw === primary ? "" : secondaryRaw };
 }

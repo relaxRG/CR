@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { InsertUser, users, appConfig, syncData } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -90,3 +90,76 @@ export async function getUserByOpenId(openId: string) {
 }
 
 // TODO: add feature queries here as your schema grows.
+
+/* ===================== 云端同步 ===================== */
+
+/** 拉取用户全部同步键值 */
+export async function getSyncData(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({
+      storageKey: syncData.storageKey,
+      value: syncData.value,
+      clientUpdatedAt: syncData.clientUpdatedAt,
+    })
+    .from(syncData)
+    .where(eq(syncData.userId, userId));
+}
+
+/** 批量 upsert 同步键值(last-write-wins:仅当传入的 clientUpdatedAt 更新时覆盖) */
+export async function upsertSyncData(
+  userId: number,
+  entries: { storageKey: string; value: string; clientUpdatedAt: number }[],
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  for (const entry of entries) {
+    const existing = await db
+      .select({ id: syncData.id, clientUpdatedAt: syncData.clientUpdatedAt })
+      .from(syncData)
+      .where(and(eq(syncData.userId, userId), eq(syncData.storageKey, entry.storageKey)))
+      .limit(1);
+    if (existing.length === 0) {
+      await db.insert(syncData).values({
+        userId,
+        storageKey: entry.storageKey,
+        value: entry.value,
+        clientUpdatedAt: entry.clientUpdatedAt,
+      });
+    } else if (entry.clientUpdatedAt >= existing[0].clientUpdatedAt) {
+      await db
+        .update(syncData)
+        .set({ value: entry.value, clientUpdatedAt: entry.clientUpdatedAt })
+        .where(eq(syncData.id, existing[0].id));
+    }
+  }
+}
+
+/* ===================== 访问控制(owner) ===================== */
+
+export async function getAppConfigValue(key: string): Promise<string | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db
+    .select({ configValue: appConfig.configValue })
+    .from(appConfig)
+    .where(eq(appConfig.configKey, key))
+    .limit(1);
+  return rows.length > 0 ? rows[0].configValue : null;
+}
+
+export async function setAppConfigValue(key: string, value: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const existing = await db
+    .select({ id: appConfig.id })
+    .from(appConfig)
+    .where(eq(appConfig.configKey, key))
+    .limit(1);
+  if (existing.length === 0) {
+    await db.insert(appConfig).values({ configKey: key, configValue: value });
+  } else {
+    await db.update(appConfig).set({ configValue: value }).where(eq(appConfig.id, existing[0].id));
+  }
+}

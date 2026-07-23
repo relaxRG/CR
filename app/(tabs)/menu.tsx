@@ -298,7 +298,7 @@ function AddRecipeSheet({ targetGroupId, onClose }: AddRecipeSheetProps) {
     return recipes.filter((r) => {
       if (!q) return true;
       const { primary, secondary } = displayNames(r.nameEn, r.name, lang);
-      return primary.toLowerCase().includes(q) || (secondary ?? "").toLowerCase().includes(q);
+      return primary.toLowerCase().includes(q) || secondary.toLowerCase().includes(q);
     });
   }, [recipes, query, lang]);
 

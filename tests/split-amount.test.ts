@@ -76,6 +76,23 @@ describe("splitAmount", () => {
     expect(typeof result.qty).toBe("string");
     expect(typeof result.unit).toBe("string");
   });
+
+  // Partial fraction input regression (user typing "1/3" step by step)
+  it("bare slash after digit stays in qty, unit is empty (regression: unit picker must not pop)", () => {
+    const r = splitAmount("2/");
+    expect(r.unit).toBe("");
+    expect(r.qty).toContain("2");
+  });
+
+  it("partial fraction /3 stays in qty, unit is empty", () => {
+    const r = splitAmount("2/3");
+    expect(r.unit).toBe("");
+  });
+
+  it("triple slash does not leak into unit (regression: /// display bug)", () => {
+    const r = splitAmount("2///");
+    expect(r.unit).toBe("");
+  });
 });
 
 describe("mergeAmount", () => {
