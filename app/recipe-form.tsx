@@ -495,8 +495,10 @@ export default function RecipeFormScreen() {
   });
  /** ingId → true: user explicitly accepted a fuzzy link */
  const [acceptedLinks, setAcceptedLinks] = useState<Record<string, boolean>>({});
-  /** ingId → true: 已自动填入过规范名（防止循环触发）*/
-  const autoFilledLinksRef = useRef<Record<string, boolean>>({});
+ /** ingId → true: 已自动填入过规范名（防止循环触发）*/
+ const autoFilledLinksRef = useRef<Record<string, boolean>>({});
+  /** garnishRowId → true: 已自动填入过规范名（防止循环触发）*/
+  const autoFilledGarnishLinksRef = useRef<Record<string, boolean>>({});
 
   const ensureSpiritName = (raw: string) => {
     const cleaned = raw.trim();
@@ -2368,20 +2370,55 @@ export default function RecipeFormScreen() {
                     placeholder={lang === "zh" ? "装饰名称" : "Garnish name"}
                     placeholderTextColor={colors.muted}
                     value={row.name}
-                    onChangeText={(v) => {
-                      setGarnishRows((prev) => prev.map((r) => r.id === row.id ? { ...r, name: v, linkedBottleId: undefined, linkedPrepId: undefined, linkDismissed: undefined } : r));
+                   onChangeText={(v) => {
+                     setGarnishRows((prev) => prev.map((r) => r.id === row.id ? { ...r, name: v, linkedBottleId: undefined, linkedPrepId: undefined, linkDismissed: undefined } : r));
+                     setDismissedGarnishLinks((prev) => { const n = { ...prev }; delete n[row.id]; return n; });
+                     setAcceptedGarnishLinks((prev) => { const n = { ...prev }; delete n[row.id]; return n; });
+                      // 用户手动修改名称时，重置自动填入标记，允许下次失焦时再次自动填入
+                      delete autoFilledGarnishLinksRef.current[row.id];
+                   }}
+                   onFocus={() => setFocusedGarnish(row.id)}
+                   onBlur={() => {
+                     if (!pressingGarnishSuggestRef.current) {
+                       setTimeout(() => setFocusedGarnish((cur) => (cur === row.id ? null : cur)), 150);
+                     }
+                   }}
+                    onEndEditing={() => {
+                      // 自动填入规范名：仅在 exact match 且规范名与输入不同时触发
+                      const t2 = row.name.trim();
+                      if (t2.length < 2) return;
+                      if (row.linkDismissed === true) return;
+                      const hasExplicit = !!(row.linkedBottleId || row.linkedPrepId);
+                      if (hasExplicit) return; // 已有显式链接，不覆盖
+                      const autoGLink = smartLinkIngredient(t2, bottles, preps);
+                      if (!autoGLink || autoGLink.matchConfidence !== "exact") return;
+                      const autoGCanon = smartLinkDisplayName(autoGLink, lang as "zh" | "en");
+                      if (!autoGCanon || autoGCanon.primary === t2) return;
+                      // 防止循环：已自动填入过则跳过
+                      if (autoFilledGarnishLinksRef.current[row.id] === true) return;
+                      autoFilledGarnishLinksRef.current[row.id] = true;
+                      // 写入规范名 + 链接 ID
+                      const refId = autoGLink.kind === "prep" ? autoGLink.prep.id : autoGLink.bottle.id;
+                      if (autoGLink.kind === "prep") {
+                        setGarnishRows((prev) => prev.map((r) => r.id === row.id
+                          ? { ...r, name: autoGCanon.primary, linkedPrepId: refId, linkedBottleId: undefined, linkDismissed: undefined }
+                          : r));
+                      } else {
+                        setGarnishRows((prev) => prev.map((r) => r.id === row.id
+                          ? { ...r, name: autoGCanon.primary, linkedBottleId: refId, linkedPrepId: undefined, linkDismissed: undefined }
+                          : r));
+                      }
                       setDismissedGarnishLinks((prev) => { const n = { ...prev }; delete n[row.id]; return n; });
-                      setAcceptedGarnishLinks((prev) => { const n = { ...prev }; delete n[row.id]; return n; });
-                    }}
-                    onFocus={() => setFocusedGarnish(row.id)}
-                    onBlur={() => {
-                      if (!pressingGarnishSuggestRef.current) {
-                        setTimeout(() => setFocusedGarnish((cur) => (cur === row.id ? null : cur)), 150);
+                      setAcceptedGarnishLinks((prev) => ({ ...prev, [row.id]: true }));
+                      setPickedGarnish((prev) => ({ ...prev, [row.id]: autoGCanon.primary }));
+                      setFocusedGarnish(null);
+                      if (Platform.OS !== "web") {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                       }
                     }}
-                    autoCapitalize="words"
-                    returnKeyType="done"
-                    style={{ lineHeight: 20 }}
+                   autoCapitalize="words"
+                   returnKeyType="done"
+                   style={{ lineHeight: 20 }}
                   />
                   <Pressable
                     onPress={() => {
