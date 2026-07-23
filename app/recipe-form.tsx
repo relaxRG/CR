@@ -315,9 +315,9 @@ export default function RecipeFormScreen() {
   // 合并三段为 flavorDesc 字符串
   const buildFlavorDesc = (tone: string, evolution: string, texture: string) => {
     const parts: string[] = [];
-    if (tone.trim()) parts.push(`核心基调: \${tone.trim()}`);
-    if (evolution.trim()) parts.push(`风味演变: \${evolution.trim()}`);
-    if (texture.trim()) parts.push(`整体质感: \${texture.trim()}`);
+    if (tone.trim()) parts.push(`核心基调: ${tone.trim()}`);
+    if (evolution.trim()) parts.push(`风味演变: ${evolution.trim()}`);
+    if (texture.trim()) parts.push(`整体质感: ${texture.trim()}`);
     return parts.join('\n');
   };
   const [ingredients, setIngredients] = useState<Ingredient[]>(
