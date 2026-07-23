@@ -1267,7 +1267,7 @@ export default function RecipeFormScreen() {
                   <IconSymbol name="chevron.right" size={11} color={colors.primary} />
                 </Pressable>
                 {differs ? (
-                  <Pressable onPress={() => pickSuggestion(ing.id, { key: "canon", value: canon!.primary, secondary: "", source: "bottles", context: "", refId: "" })} style={({ pressed }) => [styles.prepHint, pressed && { opacity: 0.6 }]}>
+                  <Pressable onPress={() => pickSuggestion(ing.id, { key: "canon", value: canon!.primary, secondary: "", source: "homemade", context: "", refId: prep.id })} style={({ pressed }) => [styles.prepHint, pressed && { opacity: 0.6 }]}>
                     <IconSymbol name="arrow.triangle.2.circlepath" size={12} color={colors.success} />
                     <Text className="text-xs" style={{ color: colors.success, lineHeight: 16 }}>{t("form.replaceCanonical", { name: canon!.primary })}</Text>
                   </Pressable>
@@ -1294,7 +1294,7 @@ export default function RecipeFormScreen() {
                   <IconSymbol name="chevron.right" size={11} color={colors.primary} />
                 </Pressable>
                 {differs ? (
-                  <Pressable onPress={() => pickSuggestion(ing.id, { key: "canon", value: canon!.primary, secondary: "", source: "bottles", context: "", refId: "" })} style={({ pressed }) => [styles.prepHint, pressed && { opacity: 0.6 }]}>
+                  <Pressable onPress={() => pickSuggestion(ing.id, { key: "canon", value: canon!.primary, secondary: "", source: "bottles", context: "", refId: linkedBottle.id })} style={({ pressed }) => [styles.prepHint, pressed && { opacity: 0.6 }]}>
                     <IconSymbol name="arrow.triangle.2.circlepath" size={12} color={colors.success} />
                     <Text className="text-xs" style={{ color: colors.success, lineHeight: 16 }}>{t("form.replaceCanonical", { name: canon!.primary })}</Text>
                   </Pressable>
@@ -2441,9 +2441,20 @@ export default function RecipeFormScreen() {
                         onPressOut={() => { pressingGarnishSuggestRef.current = false; }}
                         onPress={() => {
                           pressingGarnishSuggestRef.current = false;
-                          setGarnishRows((prev) => prev.map((r) => r.id === row.id ? { ...r, name: s.value } : r));
+                          // B1 fix: 写入链接 ID（与成分行 pickSuggestion 对齐）
+                          if (s.refId && s.source === "homemade") {
+                            setGarnishRows((prev) => prev.map((r) => r.id === row.id ? { ...r, name: s.value, linkedPrepId: s.refId, linkedBottleId: undefined, linkDismissed: undefined } : r));
+                          } else if (s.refId) {
+                            setGarnishRows((prev) => prev.map((r) => r.id === row.id ? { ...r, name: s.value, linkedBottleId: s.refId, linkedPrepId: undefined, linkDismissed: undefined } : r));
+                          } else {
+                            setGarnishRows((prev) => prev.map((r) => r.id === row.id ? { ...r, name: s.value, linkedBottleId: undefined, linkedPrepId: undefined, linkDismissed: undefined } : r));
+                          }
+                          setDismissedGarnishLinks((prev) => { const n = { ...prev }; delete n[row.id]; return n; });
+                          if (s.refId) setAcceptedGarnishLinks((prev) => ({ ...prev, [row.id]: true }));
+                          else setAcceptedGarnishLinks((prev) => { const n = { ...prev }; delete n[row.id]; return n; });
                           setPickedGarnish((prev) => ({ ...prev, [row.id]: s.value }));
                           setFocusedGarnish(null);
+                          if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                         }}
                         style={({ pressed }) => [styles.suggestRow, sIdx > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }, pressed && { opacity: 0.6 }]}
                       >
@@ -2726,8 +2737,26 @@ export default function RecipeFormScreen() {
               setDismissedGarnishLinks((prev) => ({ ...prev, [target.id]: true }));
               setAcceptedGarnishLinks((prev) => { const n = { ...prev }; delete n[target.id]; return n; });
             } else {
+              // B3 fix: 同时更新显示名称为所选条目的规范名
+              const pickedGLink = result.kind === "bottle"
+                ? bottles.find((b) => b.id === result.bottleId)
+                : preps.find((p) => p.id === result.prepId);
+              const pickedGCanon = pickedGLink
+                ? smartLinkDisplayName(
+                    result.kind === "bottle"
+                      ? { kind: "bottle", bottle: pickedGLink as import("@/lib/bottles/types").Bottle, matchConfidence: "exact" }
+                      : { kind: "prep", prep: pickedGLink as import("@/lib/homemade/types").HomemadePrep, matchConfidence: "exact" },
+                    lang as "zh" | "en"
+                  )
+                : null;
               setGarnishRows((prev) => prev.map((r) => r.id === target.id
-                ? { ...r, linkedBottleId: result.kind === "bottle" ? result.bottleId : undefined, linkedPrepId: result.kind === "prep" ? result.prepId : undefined, linkDismissed: undefined }
+                ? {
+                    ...r,
+                    name: pickedGCanon?.primary ?? r.name,
+                    linkedBottleId: result.kind === "bottle" ? result.bottleId : undefined,
+                    linkedPrepId: result.kind === "prep" ? result.prepId : undefined,
+                    linkDismissed: undefined,
+                  }
                 : r));
               setDismissedGarnishLinks((prev) => { const n = { ...prev }; delete n[target.id]; return n; });
               setAcceptedGarnishLinks((prev) => ({ ...prev, [target.id]: true }));
@@ -2738,8 +2767,26 @@ export default function RecipeFormScreen() {
               setDismissedLinks((prev) => ({ ...prev, [target.id]: true }));
               setAcceptedLinks((prev) => { const n = { ...prev }; delete n[target.id]; return n; });
             } else {
+              // B3 fix: 同时更新显示名称为所选条目的规范名
+              const pickedILink = result.kind === "bottle"
+                ? bottles.find((b) => b.id === result.bottleId)
+                : preps.find((p) => p.id === result.prepId);
+              const pickedICanon = pickedILink
+                ? smartLinkDisplayName(
+                    result.kind === "bottle"
+                      ? { kind: "bottle", bottle: pickedILink as import("@/lib/bottles/types").Bottle, matchConfidence: "exact" }
+                      : { kind: "prep", prep: pickedILink as import("@/lib/homemade/types").HomemadePrep, matchConfidence: "exact" },
+                    lang as "zh" | "en"
+                  )
+                : null;
               setIngredients((prev) => prev.map((i) => i.id === target.id
-                ? { ...i, linkedBottleId: result.kind === "bottle" ? result.bottleId : undefined, linkedPrepId: result.kind === "prep" ? result.prepId : undefined, linkDismissed: undefined }
+                ? {
+                    ...i,
+                    name: pickedICanon?.primary ?? i.name,
+                    linkedBottleId: result.kind === "bottle" ? result.bottleId : undefined,
+                    linkedPrepId: result.kind === "prep" ? result.prepId : undefined,
+                    linkDismissed: undefined,
+                  }
                 : i));
               setDismissedLinks((prev) => { const n = { ...prev }; delete n[target.id]; return n; });
               setAcceptedLinks((prev) => ({ ...prev, [target.id]: true }));

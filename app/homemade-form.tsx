@@ -676,6 +676,8 @@ export default function HomemadeFormScreen() {
               setIngSourceMap((prev) => ({ ...prev, [row.id]: next }));
               setDismissedLinks((prev) => { const n = { ...prev }; delete n[row.id]; return n; });
               setAcceptedLinks((prev) => { const n = { ...prev }; delete n[row.id]; return n; });
+              // B4 fix: 切换库时清除显式链接 ID（与 recipe-form 对齐）
+              setIngRows((prev) => prev.map((r) => r.id === row.id ? { ...r, linkedBottleId: undefined, linkedPrepId: undefined } : r));
             }}
             hitSlop={6}
             style={({ pressed }) => [{
@@ -1123,10 +1125,12 @@ export default function HomemadeFormScreen() {
                 <Pressable
                   onPress={() => {
                     setAcceptedLinks((prev) => ({ ...prev, [row.id]: true }));
+                    setDismissedLinks((prev) => { const n = { ...prev }; delete n[row.id]; return n; });
                     if (pendingFuzzyLink?.kind === "bottle") {
-                      setIngRows((prev) => prev.map((r) => r.id === row.id ? { ...r, linkedBottleId: pendingFuzzyLink.bottle.id, linkedPrepId: undefined } : r));
+                      // B5 fix: 清除 linkDismissed 字段，确保链接不被屏蔽
+                      setIngRows((prev) => prev.map((r) => r.id === row.id ? { ...r, linkedBottleId: pendingFuzzyLink.bottle.id, linkedPrepId: undefined, linkDismissed: undefined } : r));
                     } else if (pendingFuzzyLink?.kind === "prep") {
-                      setIngRows((prev) => prev.map((r) => r.id === row.id ? { ...r, linkedPrepId: pendingFuzzyLink.prep.id, linkedBottleId: undefined } : r));
+                      setIngRows((prev) => prev.map((r) => r.id === row.id ? { ...r, linkedPrepId: pendingFuzzyLink.prep.id, linkedBottleId: undefined, linkDismissed: undefined } : r));
                     }
                   }}
                   style={({ pressed }) => [{ flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 0.5, borderColor: colors.success }, pressed && { opacity: 0.6 }]}
@@ -1150,7 +1154,8 @@ export default function HomemadeFormScreen() {
             onPress={() => {
               setDismissedLinks((prev) => ({ ...prev, [row.id]: true }));
               setAcceptedLinks((prev) => { const n = { ...prev }; delete n[row.id]; return n; });
-              setIngRows((prev) => prev.map((r) => r.id === row.id ? { ...r, linkedBottleId: undefined, linkedPrepId: undefined } : r));
+              // B6 fix: 同时持久化 linkDismissed 到 row 对象，防止重渲染后重新匹配
+              setIngRows((prev) => prev.map((r) => r.id === row.id ? { ...r, linkedBottleId: undefined, linkedPrepId: undefined, linkDismissed: true } : r));
             }}
             style={({ pressed }) => [{ flexDirection: "row", alignItems: "center", gap: 3, marginTop: 2, paddingHorizontal: 4 }, pressed && { opacity: 0.6 }]}
           >
