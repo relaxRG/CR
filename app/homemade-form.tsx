@@ -50,6 +50,7 @@ import { smartLinkIngredient, smartLinkDisplayName } from "@/lib/recipes/smart-l
 import { genId, FLAVOR_TAGS } from "@/lib/recipes/types";
 import { useRecipeStore } from "@/lib/recipes/store";
 import { Switch } from "react-native";
+import { LinkPickerSheet } from "@/components/link-picker-sheet";
 
 interface IngRow {
   id: string;
@@ -1150,18 +1151,28 @@ export default function HomemadeFormScreen() {
           })()
         ) : null}
         {link ? (
-          <Pressable
-            onPress={() => {
-              setDismissedLinks((prev) => ({ ...prev, [row.id]: true }));
-              setAcceptedLinks((prev) => { const n = { ...prev }; delete n[row.id]; return n; });
-              // B6 fix: 同时持久化 linkDismissed 到 row 对象，防止重渲染后重新匹配
-              setIngRows((prev) => prev.map((r) => r.id === row.id ? { ...r, linkedBottleId: undefined, linkedPrepId: undefined, linkDismissed: true } : r));
-            }}
-            style={({ pressed }) => [{ flexDirection: "row", alignItems: "center", gap: 3, marginTop: 2, paddingHorizontal: 4 }, pressed && { opacity: 0.6 }]}
-          >
-            <IconSymbol name="xmark" size={10} color={colors.muted} />
-            <Text style={{ fontSize: 11, lineHeight: 14, color: colors.muted }}>{t("form.link.break")}</Text>
-          </Pressable>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginTop: 2, paddingHorizontal: 4 }}>
+            {/* 换绑按钮 */}
+            <Pressable
+              onPress={() => setLinkPickerTarget({ id: row.id, query: trimmed })}
+              style={({ pressed }) => [{ flexDirection: "row", alignItems: "center", gap: 3 }, pressed && { opacity: 0.6 }]}
+            >
+              <IconSymbol name="arrow.triangle.2.circlepath" size={10} color={colors.primary} />
+              <Text style={{ fontSize: 11, lineHeight: 14, color: colors.primary }}>{t("form.link.rebind")}</Text>
+            </Pressable>
+            {/* 断开链接按钮 */}
+            <Pressable
+              onPress={() => {
+                setDismissedLinks((prev) => ({ ...prev, [row.id]: true }));
+                setAcceptedLinks((prev) => { const n = { ...prev }; delete n[row.id]; return n; });
+                setIngRows((prev) => prev.map((r) => r.id === row.id ? { ...r, linkedBottleId: undefined, linkedPrepId: undefined, linkDismissed: true } : r));
+              }}
+              style={({ pressed }) => [{ flexDirection: "row", alignItems: "center", gap: 3 }, pressed && { opacity: 0.6 }]}
+            >
+              <IconSymbol name="xmark" size={10} color={colors.muted} />
+              <Text style={{ fontSize: 11, lineHeight: 14, color: colors.muted }}>{t("form.link.break")}</Text>
+            </Pressable>
+          </View>
         ) : rDismissed && trimmed.length >= 2 ? (
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2, paddingHorizontal: 4 }}>
             <Text style={{ fontSize: 11, lineHeight: 14, color: colors.muted }}>{t("form.link.dismissed")}</Text>
@@ -1172,6 +1183,13 @@ export default function HomemadeFormScreen() {
               style={({ pressed }) => [pressed && { opacity: 0.6 }]}
             >
               <Text style={{ fontSize: 11, lineHeight: 14, color: colors.primary }}>{t("form.link.relink")}</Text>
+            </Pressable>
+            {/* 换绑：dismissed 状态下也可直接打开选择器 */}
+            <Pressable
+              onPress={() => setLinkPickerTarget({ id: row.id, query: trimmed })}
+              style={({ pressed }) => [pressed && { opacity: 0.6 }]}
+            >
+              <Text style={{ fontSize: 11, lineHeight: 14, color: colors.primary }}>{t("form.link.rebind")}</Text>
             </Pressable>
           </View>
         ) : null}
@@ -2191,6 +2209,48 @@ export default function HomemadeFormScreen() {
         }}
         onClose={() => setYieldUnitPickerOpen(false)}
       />
+      {/* 成分行手动换绑选择器 */}
+      <LinkPickerSheet
+        visible={linkPickerTarget !== null}
+        initialQuery={linkPickerTarget?.query ?? ""}
+        bottles={bottles}
+        preps={allPreps.filter((p) => p.id !== (editing?.id ?? ""))}
+        groupOf={groupOf}
+        onPick={(result) => {
+          const target = linkPickerTarget;
+          setLinkPickerTarget(null);
+          if (!target) return;
+          if (result.kind === "none") {
+            setIngRows((prev) => prev.map((r) => r.id === target.id ? { ...r, linkedBottleId: undefined, linkedPrepId: undefined, linkDismissed: true } : r));
+            setDismissedLinks((prev) => ({ ...prev, [target.id]: true }));
+            setAcceptedLinks((prev) => { const n = { ...prev }; delete n[target.id]; return n; });
+          } else {
+            const pickedItem = result.kind === "bottle"
+              ? bottles.find((b) => b.id === result.bottleId)
+              : allPreps.find((p) => p.id === result.prepId);
+            const pickedCanon = pickedItem
+              ? smartLinkDisplayName(
+                  result.kind === "bottle"
+                    ? { kind: "bottle", bottle: pickedItem as import("@/lib/bottles/types").Bottle, matchConfidence: "exact" }
+                    : { kind: "prep", prep: pickedItem as import("@/lib/homemade/types").HomemadePrep, matchConfidence: "exact" },
+                  lang as "zh" | "en"
+                )
+              : null;
+            setIngRows((prev) => prev.map((r) => r.id === target.id
+              ? {
+                  ...r,
+                  name: pickedCanon?.primary ?? r.name,
+                  linkedBottleId: result.kind === "bottle" ? result.bottleId : undefined,
+                  linkedPrepId: result.kind === "prep" ? result.prepId : undefined,
+                  linkDismissed: undefined,
+                }
+              : r));
+            setDismissedLinks((prev) => { const n = { ...prev }; delete n[target.id]; return n; });
+            setAcceptedLinks((prev) => ({ ...prev, [target.id]: true }));
+          }
+        }}
+        onClose={() => setLinkPickerTarget(null)}
+      />
     </ScreenContainer>
   );
 }
@@ -2247,3 +2307,4 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
 });
+  const [linkPickerTarget, setLinkPickerTarget] = useState<{ id: string; query: string } | null>(null);
