@@ -474,7 +474,9 @@ export function splitAmount(amount: string): { qty: string; unit: string } {
   }
 
   // Number part
-  const numPart = `(?:约|~|≈)?\\s*(?:\\d+\\s*[${FRAC_CHARS}]|[${FRAC_CHARS}]|\\d+\\s+\\d+\\/\\d+|\\d+\\/\\d+|\\d+(?:[.,]\\d+)?)`;
+  // Allow trailing decimal point (e.g. "1." while user is still typing "1.5")
+  // Pattern: \d+[.,]\d* covers both "1.5" and "1." (zero or more digits after separator)
+  const numPart = `(?:约|~|≈)?\\s*(?:\\d+\\s*[${FRAC_CHARS}]|[${FRAC_CHARS}]|\\d+\\s+\\d+\\/\\d+|\\d+\\/\\d+|\\d+[.,]\\d*|\\d+)`;
   const m = text.match(new RegExp(`^(${numPart})\\s*(.*)$`, "i"));
   if (!m) return { qty: "", unit: text };
 
