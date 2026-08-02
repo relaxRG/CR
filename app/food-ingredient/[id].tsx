@@ -1,8 +1,8 @@
 /**
  * 食材详情页
  */
-import React from "react";
-import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { useMemo, useState } from "react";
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from "react-native";
 import * as Haptics from "expo-haptics";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -11,6 +11,7 @@ import { useFoodIngredientStore } from "@/lib/food/ingredient-store";
 import { INGREDIENT_CATEGORY_LABELS } from "@/lib/food/types";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
+import { PriceHistoryChart, SupplierPriceCompare } from "@/components/price-history-chart";
 
 export default function FoodIngredientDetailScreen() {
   const colors = useColors();
@@ -20,6 +21,29 @@ export default function FoodIngredientDetailScreen() {
   const { ingredients, updateIngredient, deleteIngredient } = useFoodIngredientStore();
   const item = ingredients.find((i) => i.id === id);
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
+  const { width: screenWidth } = useWindowDimensions();
+  const chartWidth = screenWidth - 64; // 16px padding * 2 + 16px card padding * 2
+
+  // 从 ingredient-store 的 priceHistory map 中取当前原料的价格历史
+  const { priceHistory: priceHistoryMap } = useFoodIngredientStore();
+  const priceHistory = useMemo(
+    () => (priceHistoryMap[id] ?? []).slice().sort((a, b) => a.date.localeCompare(b.date)),
+    [priceHistoryMap, id]
+  );
+
+  // 供应商最新价格对比
+  const supplierPrices = useMemo(() => {
+    const map: Record<string, { latestPrice: number; date: string; count: number }> = {};
+    for (const entry of priceHistory) {
+      if (!map[entry.supplier] || entry.date > map[entry.supplier].date) {
+        map[entry.supplier] = { latestPrice: entry.price, date: entry.date, count: 0 };
+      }
+      map[entry.supplier].count++;
+    }
+    return Object.entries(map).map(([supplier, v]) => ({ supplier, ...v }));
+  }, [priceHistory]);
+
+  const [priceTab, setPriceTab] = useState<"chart" | "compare">("chart");
 
   if (!item) {
     return (
@@ -121,6 +145,73 @@ export default function FoodIngredientDetailScreen() {
           </View>
         ) : null}
 
+        {/* 价格历史 & 供应商对比 */}
+        {priceHistory.length > 0 && (
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            {/* Tab 切换 */}
+            <View style={[styles.tabRow, { backgroundColor: colors.border + "33" }]}>
+              {(["chart", "compare"] as const).map((tab) => (
+                <TouchableOpacity
+                  key={tab}
+                  onPress={() => { tap(); setPriceTab(tab); }}
+                  style={[styles.tabBtn, priceTab === tab && { backgroundColor: colors.background }]}
+                >
+                  <Text style={[styles.tabText, { color: priceTab === tab ? colors.foreground : colors.muted, fontWeight: priceTab === tab ? "600" : "400" }]}>
+                    {tab === "chart" ? "价格走势" : "供应商对比"}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {priceTab === "chart" ? (
+              <View style={{ marginTop: 8 }}>
+                <PriceHistoryChart
+                  history={priceHistory}
+                  width={chartWidth}
+                  height={160}
+                  unit={item.unit}
+                  showLegend={true}
+                />
+                {/* 最近一次涨跌 */}
+                {priceHistory.length >= 2 && (() => {
+                  const last = priceHistory[priceHistory.length - 1];
+                  const prev = priceHistory[priceHistory.length - 2];
+                  const delta = last.price - prev.price;
+                  const pct = prev.price > 0 ? (delta / prev.price * 100).toFixed(1) : "0";
+                  return (
+                    <View style={[styles.deltaRow, { backgroundColor: delta > 0 ? "#EF444411" : delta < 0 ? "#22C55E11" : colors.border + "22" }]}>
+                      <Text style={{ fontSize: 12, color: delta > 0 ? "#EF4444" : delta < 0 ? "#22C55E" : colors.muted }}>
+                        {delta > 0 ? "▲" : delta < 0 ? "▼" : "—"} 最近一次
+                        {delta > 0 ? "涨价" : delta < 0 ? "降价" : "持平"}
+                        {delta !== 0 ? ` ¥${Math.abs(delta).toFixed(2)} (${Math.abs(Number(pct))}%)` : ""}
+                        {" · "}{last.date} · {last.supplier}
+                      </Text>
+                    </View>
+                  );
+                })()}
+              </View>
+            ) : (
+              <View style={{ marginTop: 12 }}>
+                <SupplierPriceCompare
+                  supplierPrices={supplierPrices}
+                  unit={item.unit}
+                  width={chartWidth}
+                />
+                {/* 进货次数统计 */}
+                <View style={{ marginTop: 12, gap: 4 }}>
+                  {supplierPrices.map((s) => (
+                    <View key={s.supplier} style={[styles.supplierStatRow, { borderColor: colors.border }]}>
+                      <Text style={[styles.supplierStatName, { color: colors.foreground }]}>{s.supplier}</Text>
+                      <Text style={[styles.supplierStatCount, { color: colors.muted }]}>进货 {s.count} 次</Text>
+                      <Text style={[styles.supplierStatDate, { color: colors.muted }]}>最近 {s.date}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+          </View>
+        )}
+
         {/* 备注 */}
         {item.notes ? (
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -154,5 +245,12 @@ const styles = StyleSheet.create({
   detailValue: { fontSize: 14, fontWeight: "500" },
   sectionTitle: { fontSize: 13, fontWeight: "600", marginBottom: 8 },
   bodyText: { fontSize: 15, lineHeight: 22 },
+  tabRow: { flexDirection: "row", borderRadius: 10, padding: 2, gap: 2 },
+  tabBtn: { flex: 1, height: 30, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  tabText: { fontSize: 13, lineHeight: 18 },
+  deltaRow: { marginTop: 8, padding: 8, borderRadius: 8 },
+  supplierStatRow: { flexDirection: "row", alignItems: "center", paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth },
+  supplierStatName: { flex: 1, fontSize: 13, fontWeight: "500" },
+  supplierStatCount: { fontSize: 12, marginRight: 12 },
+  supplierStatDate: { fontSize: 11 },
 });
-

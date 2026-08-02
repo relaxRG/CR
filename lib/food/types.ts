@@ -52,6 +52,8 @@ export const INGREDIENT_CATEGORY_LABELS: Record<IngredientCategory, string> = {
 export interface FoodIngredient {
   id: string;
   name: string;
+  /** 英文名（从供应商 Excel 中拆分出的英文部分） */
+  nameEn?: string;
   category: IngredientCategory;
   /** 规格（如：500g/袋） */
   spec: string;
@@ -67,6 +69,8 @@ export interface FoodIngredient {
   supplier: string;
   /** 备注 */
   notes: string;
+  /** 价格历史（每次进货时追加） */
+  priceHistory?: PriceHistoryEntry[];
   createdAt: string;
   updatedAt: string;
 }
