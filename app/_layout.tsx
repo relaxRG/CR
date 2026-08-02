@@ -38,6 +38,11 @@ import { LabPlanProvider } from "@/lib/lab/plan-store";
 import { SpiritsProvider } from "@/lib/spirits/store";
 import { MonthlyReportProvider } from "@/lib/store/monthly-report/store";
 import { LaborProvider } from "@/lib/labor/store";
+import { SalaryAdvanceProvider } from "@/lib/labor/advance-store";
+import { PettyCategoryProvider } from "@/lib/store/petty-category-store";
+import { PettyInventoryLinkProvider } from "@/lib/store/petty-inventory-link-store";
+import { BeerProvider } from "@/lib/beer/store";
+import { IceInventoryProvider } from "@/lib/ice/inventory-store";
 import { startAutoBackup, stopAutoBackup } from "@/lib/backup/icloud-backup";
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
@@ -135,6 +140,11 @@ export default function RootLayout() {
           <SpiritsProvider>
           <MonthlyReportProvider>
           <LaborProvider>
+          <SalaryAdvanceProvider>
+          <PettyCategoryProvider>
+          <PettyInventoryLinkProvider>
+          <BeerProvider>
+          <IceInventoryProvider>
             <Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="recipe/[id]" />
@@ -183,8 +193,16 @@ export default function RootLayout() {
               <Stack.Screen name="labor-employee-form" options={{ presentation: "modal" }} />
               <Stack.Screen name="labor-schedule" />
               <Stack.Screen name="labor-attendance" />
+              <Stack.Screen name="labor-advances" />
+              <Stack.Screen name="petty-category-settings" options={{ presentation: "modal" }} />
+              <Stack.Screen name="beer-ice-inventory" />
             </Stack>
             <StatusBar style="auto" />
+          </IceInventoryProvider>
+          </BeerProvider>
+          </PettyInventoryLinkProvider>
+          </PettyCategoryProvider>
+          </SalaryAdvanceProvider>
           </LaborProvider>
           </MonthlyReportProvider>
           </SpiritsProvider>

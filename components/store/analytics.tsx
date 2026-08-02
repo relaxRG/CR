@@ -136,6 +136,23 @@ export default function StoreAnalyticsScreen() {
           </View>
           <IconSymbol name="chevron.right" size={14} color="#FF9500" />
         </Pressable>
+        {/* 啤酒冰块进销存入口 */}
+        <Pressable
+          onPress={() => { tap(); router.push("/beer-ice-inventory" as any); }}
+          style={({ pressed }) => ({
+            flexDirection: "row", alignItems: "center", gap: 10,
+            backgroundColor: "#F4A300" + "0e", borderColor: "#F4A300" + "33",
+            borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12,
+            opacity: pressed ? 0.7 : 1, marginTop: 8,
+          })}
+        >
+          <Text style={{ fontSize: 18 }}>🍺</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 14, fontWeight: "700", color: "#F4A300" }}>啤酒 & 冰块进销存</Text>
+            <Text style={{ fontSize: 11, color: colors.muted, marginTop: 1 }}>自采备用金 B1/B2/B3 自动识别 · 库存预警</Text>
+          </View>
+          <IconSymbol name="chevron.right" size={14} color="#F4A300" />
+        </Pressable>
       </View>
       {/* 时间段 + 对比 */}
       <View style={[styles.subHeader, { backgroundColor: colors.background }]}>

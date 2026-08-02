@@ -68,6 +68,13 @@ export default function LaborScreen() {
       color: colors.success,
       onPress: () => { router.push("/labor-attendance" as any); },
     },
+    {
+      icon: "creditcard.fill" as const,
+      title: "薪资预支",
+      desc: "长期兼职预支记录 · 自动扣除",
+      color: "#5856D6",
+      onPress: () => router.push("/labor-advances" as any),
+    },
   ];
 
   return (

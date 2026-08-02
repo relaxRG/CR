@@ -5,13 +5,30 @@
 
 // ─── 员工部门 / 类型 ──────────────────────────────────────────────────────────
 export type EmployeeDept = "front" | "kitchen" | "parttime" | "other";
-export type EmployeeType = "fulltime" | "parttime";
+/**
+ * fulltime = 全职
+ * longterm_parttime = 长期兼职（固定排班，有月度薪资，支持薪资预支）
+ * parttime = 临时兼职（按次/按小时，无固定排班）
+ */
+export type EmployeeType = "fulltime" | "longterm_parttime" | "parttime";
 
 export const DEPT_LABELS: Record<EmployeeDept, string> = {
   front: "前厅",
   kitchen: "后厨",
   parttime: "兼职",
   other: "其他",
+};
+
+export const EMPLOYEE_TYPE_LABELS: Record<EmployeeType, string> = {
+  fulltime: "全职",
+  longterm_parttime: "长期兼职",
+  parttime: "临时兼职",
+};
+
+export const EMPLOYEE_TYPE_COLORS: Record<EmployeeType, string> = {
+  fulltime: "#007AFF",
+  longterm_parttime: "#5856D6",
+  parttime: "#FF9500",
 };
 
 export const DEPT_COLORS: Record<EmployeeDept, string> = {
@@ -50,6 +67,11 @@ export interface Employee {
   notes: string;
   /** 是否在职 */
   active: boolean;
+  /**
+   * 长期兼职专用：月度固定薪资（若设置，则按月结算而非纯按小时）
+   * 0 = 不设置，仍按工时计算
+   */
+  monthlyFixedSalary: number;
   /** 创建时间 */
   createdAt: string;
 }

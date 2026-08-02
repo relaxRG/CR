@@ -15,13 +15,15 @@ import { ScreenContainer } from "@/components/screen-container";
 import { useEmployeeStore } from "@/lib/labor/store";
 import {
   Employee, EmployeeDept, EmployeeType, DEPT_LABELS, DEPT_COLORS,
+  EMPLOYEE_TYPE_LABELS, EMPLOYEE_TYPE_COLORS,
   calcDailyRate, getDaysInMonth
 } from "@/lib/labor/types";
 
 const DEPT_OPTIONS: EmployeeDept[] = ["front", "kitchen", "parttime", "other"];
-const TYPE_OPTIONS: { key: EmployeeType; label: string }[] = [
-  { key: "fulltime", label: "全职" },
-  { key: "parttime", label: "兼职" },
+const TYPE_OPTIONS: { key: EmployeeType; label: string; desc: string }[] = [
+  { key: "fulltime", label: "全职", desc: "底薪+加班，按月结算" },
+  { key: "longterm_parttime", label: "长期兼职", desc: "固定排班，支持薪资预支" },
+  { key: "parttime", label: "临时兼职", desc: "按次/按小时，无预支" },
 ];
 const HOLIDAY_MULTIPLIERS = [1.0, 1.5, 2.0, 3.0];
 
@@ -48,6 +50,7 @@ export default function LaborEmployeeFormScreen() {
   const [overtimeRate, setOvertimeRate] = useState(String(existing?.overtimeHourlyRate ?? "35"));
   const [holidayMult, setHolidayMult] = useState(existing?.holidayMultiplier ?? 1.5);
   const [notes, setNotes] = useState(existing?.notes ?? "");
+  const [monthlyFixedSalary, setMonthlyFixedSalary] = useState(String(existing?.monthlyFixedSalary ?? "0"));
   const [active, setActive] = useState(existing?.active ?? true);
 
   // 日薪预览（自动计算）
@@ -80,6 +83,7 @@ export default function LaborEmployeeFormScreen() {
       hourlyRate: Number(hourlyRate) || 35,
       overtimeHourlyRate: Number(overtimeRate) || Number(hourlyRate) || 35,
       holidayMultiplier: holidayMult,
+      monthlyFixedSalary: Number(monthlyFixedSalary) || 0,
       notes: notes.trim(),
       active,
     };
@@ -147,24 +151,44 @@ export default function LaborEmployeeFormScreen() {
               </View>
             </FormRow>
             <FormRow label="类型" colors={colors}>
-              <View style={{ flexDirection: "row", gap: 8 }}>
-                {TYPE_OPTIONS.map((t) => (
-                  <TouchableOpacity key={t.key} onPress={() => { tap(); setType(t.key); }}
-                    style={[S.optionChip, {
-                      backgroundColor: type === t.key ? colors.primary : colors.surface,
-                      borderColor: type === t.key ? colors.primary : colors.border,
-                    }]}>
-                    <Text style={{ fontSize: 13, fontWeight: "600", color: type === t.key ? "#fff" : colors.muted }}>
-                      {t.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+              <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+                {TYPE_OPTIONS.map((t) => {
+                  const tColor = EMPLOYEE_TYPE_COLORS[t.key];
+                  const selected = type === t.key;
+                  return (
+                    <TouchableOpacity key={t.key} onPress={() => { tap(); setType(t.key); }}
+                      style={[S.optionChip, {
+                        backgroundColor: selected ? tColor : colors.surface,
+                        borderColor: selected ? tColor : colors.border,
+                      }]}>
+                      <Text style={{ fontSize: 13, fontWeight: "600", color: selected ? "#fff" : tColor }}>
+                        {t.label}
+                      </Text>
+                      <Text style={{ fontSize: 10, color: selected ? "#ffffff99" : colors.muted }}>
+                        {t.desc}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </FormRow>
           </SectionCard>
 
           {/* 工资设置 */}
           <SectionCard title="工资设置" colors={colors}>
+            {type === "longterm_parttime" && (
+              <FormRow label="月度固定薪资（长期兼职）" colors={colors}>
+                <View style={{ gap: 4 }}>
+                  <TextInput value={monthlyFixedSalary} onChangeText={setMonthlyFixedSalary}
+                    placeholder="0 = 不设置，仍按小时计算" placeholderTextColor={colors.muted}
+                    keyboardType="decimal-pad"
+                    style={[S.input, { color: colors.foreground, borderColor: colors.border }]} />
+                  <Text style={{ fontSize: 11, color: colors.muted }}>
+                    设置后按月结算，支持薪资预支功能。不设置则仍按工时×时薪计算。
+                  </Text>
+                </View>
+              </FormRow>
+            )}
             {isFulltime && (
               <>
                 <FormRow label="底薪（月）" required colors={colors}>
