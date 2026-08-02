@@ -1,13 +1,14 @@
 /**
  * 备用金记录（A1-N5 分类）
  */
-import React, { useMemo, useState } from "react";
-import { Alert, FlatList, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import React, { useMemo, useState, useCallback } from "react";
+import { ActivityIndicator, Alert, FlatList, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
 import { usePettyCashStore, PETTY_CODE_LABELS, PETTY_GROUPS, PettyCode } from "@/lib/store/petty-store";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { importIcostExcel } from "@/lib/store/icost-import";
 
 export default function StorePettyCashScreen() {
   const colors = useColors();
@@ -20,7 +21,31 @@ export default function StorePettyCashScreen() {
   const [addDate, setAddDate] = useState(new Date().toISOString().slice(0, 10));
   const [addDesc, setAddDesc] = useState("");
   const [addPayment, setAddPayment] = useState("微信");
+  const [importing, setImporting] = useState(false);
+
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
+
+  const handleImportExcel = useCallback(async () => {
+    tap();
+    setImporting(true);
+    try {
+      const result = await importIcostExcel();
+      if (!result) { setImporting(false); return; }
+      if (result.records.length === 0) {
+        Alert.alert("导入结果", `未找到可导入的记录。\n跳过 ${result.skipped} 行（无法识别分类）。`);
+        setImporting(false);
+        return;
+      }
+      for (const rec of result.records) { addRecord(rec); }
+      const msg = `成功导入 ${result.imported} 条记录${result.skipped > 0 ? `\n跳过 ${result.skipped} 行（分类未匹配）` : ""}`;
+      Alert.alert("导入成功 ✓", msg);
+    } catch (e: unknown) {
+      Alert.alert("导入失败", e instanceof Error ? e.message : "请重试");
+    } finally {
+      setImporting(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [addRecord]);
 
   const filtered = useMemo(() => {
     if (!selectedGroup) return records;
@@ -53,11 +78,25 @@ export default function StorePettyCashScreen() {
             </Pressable>
           ))}
         </ScrollView>
-        {/* 合计 + 添加按钮 */}
+        {/* 合计 + 操作按钮 */}
         <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingBottom: 8 }}>
           <Text style={[styles.totalText, { color: colors.muted }]}>合计：</Text>
           <Text style={[styles.totalAmount, { color: colors.error }]}>¥{totalAmount.toFixed(2)}</Text>
           <View style={{ flex: 1 }} />
+          {/* 导入 Excel 按钮 */}
+          <Pressable
+            onPress={handleImportExcel}
+            disabled={importing}
+            style={[styles.importBtn, { backgroundColor: colors.surface, borderColor: colors.border, marginRight: 8 }]}
+          >
+            {importing
+              ? <ActivityIndicator size="small" color={colors.primary} />
+              : <IconSymbol name="arrow.down.doc.fill" size={15} color={colors.primary} />
+            }
+            <Text style={{ color: colors.primary, fontSize: 13, fontWeight: "600", marginLeft: 4 }}>
+              {importing ? "导入中…" : "导入 Excel"}
+            </Text>
+          </Pressable>
           <Pressable onPress={() => { tap(); setShowAdd(true); }} style={[styles.addBtn, { backgroundColor: colors.primary }]}>
             <IconSymbol name="plus" size={18} color="#fff" />
           </Pressable>
@@ -92,14 +131,14 @@ export default function StorePettyCashScreen() {
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={[styles.emptyTitle, { color: colors.foreground }]}>暂无记录</Text>
-            <Text style={[styles.emptyDesc, { color: colors.muted }]}>点击右上角 + 添加备用金记录</Text>
+            <Text style={[styles.emptyDesc, { color: colors.muted }]}>点击「导入 Excel」导入 iCost 账单，或点击 + 手动添加</Text>
           </View>
         }
       />
 
       <Modal visible={showAdd} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowAdd(false)}>
         <View style={[styles.sheet, { backgroundColor: colors.background }]}>
-          <View style={styles.sheetHeader}>
+          <View style={[styles.sheetHeader, { borderBottomColor: colors.border }]}>
             <Pressable onPress={() => setShowAdd(false)}><Text style={[styles.sheetCancel, { color: colors.primary }]}>取消</Text></Pressable>
             <Text style={[styles.sheetTitle, { color: colors.foreground }]}>添加备用金记录</Text>
             <Pressable onPress={handleAdd}><Text style={[styles.sheetDone, { color: colors.primary }]}>添加</Text></Pressable>
@@ -162,6 +201,7 @@ const styles = StyleSheet.create({
   groupChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1 },
   totalText: { fontSize: 14 },
   totalAmount: { fontSize: 16, fontWeight: "700" },
+  importBtn: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 7, borderRadius: 16, borderWidth: 1 },
   addBtn: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" },
   card: { flexDirection: "row", alignItems: "center", borderRadius: 12, borderWidth: 1, padding: 14, marginBottom: 10, gap: 12 },
   codeBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
@@ -171,7 +211,7 @@ const styles = StyleSheet.create({
   cardAmount: { fontSize: 16, fontWeight: "700" },
   empty: { flex: 1, alignItems: "center", justifyContent: "center", gap: 8, paddingTop: 80 },
   emptyTitle: { fontSize: 17, fontWeight: "600" },
-  emptyDesc: { fontSize: 14 },
+  emptyDesc: { fontSize: 14, textAlign: "center" },
   sheet: { flex: 1 },
   sheetHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 16, borderBottomWidth: StyleSheet.hairlineWidth },
   sheetTitle: { fontSize: 17, fontWeight: "600" },

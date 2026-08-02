@@ -60,6 +60,7 @@ const MAPPING = {
   "person.crop.circle.fill": "account-circle",
   "tag.fill": "label",
   "square.and.arrow.down.fill": "download",
+  "arrow.down.doc.fill": "file-download",
   "globe": "language",
   "icloud.fill": "cloud",
   "icloud.and.arrow.down.fill": "cloud-download",
