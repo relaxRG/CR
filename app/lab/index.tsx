@@ -18,6 +18,7 @@ import { LabChangeChips } from "@/components/lab-change-chips";
 import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
 import { useLabStore } from "@/lib/lab/store";
+import { useGuestGuard } from "@/hooks/use-guest-guard";
 import { getLabTemplate } from "@/lib/lab/templates";
 import { LAB_STATUS_ORDER, LabProject, LabProjectStatus } from "@/lib/lab/types";
 
@@ -36,6 +37,7 @@ export function LabIndexScreen({ embedded = false }: { embedded?: boolean }) {
   const colors = useColors();
   const router = useRouter();
   const { t, lang } = useI18n();
+  const { guardWrite } = useGuestGuard();
   const { projects, batchesOf } = useLabStore();
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<LabProjectStatus | null>(null);
@@ -92,10 +94,11 @@ export function LabIndexScreen({ embedded = false }: { embedded?: boolean }) {
         </View>
         <Pressable
           onPress={() => {
+            if (!guardWrite()) return;
             if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             router.push("/lab/new");
           }}
-          style={({ pressed }) => [
+          style={({ pressed }: { pressed: boolean }) => [
             styles.newBtn,
             { backgroundColor: colors.primary },
             pressed && { transform: [{ scale: 0.97 }], opacity: 0.9 },
@@ -117,8 +120,8 @@ export function LabIndexScreen({ embedded = false }: { embedded?: boolean }) {
             {t("lab.empty.desc")}
           </Text>
           <Pressable
-            onPress={() => router.push("/lab/new")}
-            style={({ pressed }) => [
+            onPress={() => { if (guardWrite()) router.push("/lab/new"); }}
+            style={({ pressed }: { pressed: boolean }) => [
               styles.emptyBtn,
               { backgroundColor: colors.primary },
               pressed && { transform: [{ scale: 0.97 }], opacity: 0.9 },

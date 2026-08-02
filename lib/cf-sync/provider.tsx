@@ -373,6 +373,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // ─── 权限变更检测 ─────────────────────────────────────────────────────────────
 const PREV_ALLOWED_KEYS_STORAGE = "cf.sync.prevAllowedKeys.v1";
+const LANG_STORAGE_KEY = "app.lang.v1";
 async function checkAndNotifyPermissionChange(newAllowedKeys: string[] | null): Promise<void> {
   try {
     const raw = await AsyncStorage.getItem(PREV_ALLOWED_KEYS_STORAGE);
@@ -385,7 +386,15 @@ async function checkAndNotifyPermissionChange(newAllowedKeys: string[] | null): 
     const newJson = JSON.stringify(newAllowedKeys?.slice().sort() ?? null);
     if (prevJson !== newJson) {
       await AsyncStorage.setItem(PREV_ALLOWED_KEYS_STORAGE, JSON.stringify(newAllowedKeys));
-      Alert.alert("权限已更新", "管理员已修改您的设备权限，部分功能可能受限或已开放。如有疑问请联系主设备管理员。", [{ text: "知道了" }]);
+      const lang = await AsyncStorage.getItem(LANG_STORAGE_KEY).catch(() => null);
+      const isEn = lang === "en";
+      Alert.alert(
+        isEn ? "Permissions Updated" : "权限已更新",
+        isEn
+          ? "The administrator has updated your device permissions. Some features may be restricted or newly available. Contact the owner device if you have questions."
+          : "管理员已修改您的设备权限，部分功能可能受限或已开放。如有疑问请联系主设备管理员。",
+        [{ text: isEn ? "OK" : "知道了" }],
+      );
     }
   } catch {}
 }
