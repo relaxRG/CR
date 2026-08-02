@@ -8,6 +8,7 @@ import { StarRating } from "@/components/star-rating";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
+import { useGuestGuard } from "@/hooks/use-guest-guard";
 import { displayNames } from "@/lib/utils";
 import { useHomemadeStore } from "@/lib/homemade/store";
 import { useBottleStore } from "@/lib/bottles/store";
@@ -21,6 +22,7 @@ export default function HomemadeDetailScreen() {
   const colors = useColors();
   const router = useRouter();
   const { t, lang } = useI18n();
+  const { isGuest } = useGuestGuard();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { getPrep, deletePrep, togglePrepMade, setPrepRating, updatePrep, types, sections, preps } = useHomemadeStore();
   const { bottles } = useBottleStore();
@@ -150,20 +152,24 @@ export default function HomemadeDetailScreen() {
             color={prep.made ? colors.success : colors.muted}
           />
         </Pressable>
-        <Pressable
-          onPress={() => router.push({ pathname: "/homemade-form", params: { id: prep.id } })}
-          hitSlop={8}
-          style={({ pressed }) => [pressed && { opacity: 0.6 }, { marginRight: 18 }]}
-        >
-          <IconSymbol name="pencil" size={22} color={colors.primary} />
-        </Pressable>
-        <Pressable
-          onPress={handleDelete}
-          hitSlop={8}
-          style={({ pressed }) => [pressed && { opacity: 0.6 }]}
-        >
-          <IconSymbol name="trash.fill" size={22} color={colors.error} />
-        </Pressable>
+        {!isGuest && (
+          <>
+            <Pressable
+              onPress={() => router.push({ pathname: "/homemade-form", params: { id: prep.id } })}
+              hitSlop={8}
+              style={({ pressed }) => [pressed && { opacity: 0.6 }, { marginRight: 18 }]}
+            >
+              <IconSymbol name="pencil" size={22} color={colors.primary} />
+            </Pressable>
+            <Pressable
+              onPress={handleDelete}
+              hitSlop={8}
+              style={({ pressed }) => [pressed && { opacity: 0.6 }]}
+            >
+              <IconSymbol name="trash.fill" size={22} color={colors.error} />
+            </Pressable>
+          </>
+        )}
       </View>
 
       <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}>

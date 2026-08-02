@@ -18,6 +18,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
+import { useGuestGuard } from "@/hooks/use-guest-guard";
 import { useBookStore, StoredBook } from "@/lib/books/store";
 import { useIsTablet } from "@/hooks/use-is-tablet";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -55,6 +56,7 @@ export default function BooksScreen() {
   const colors = useColors();
   const router = useRouter();
   const { lang } = useI18n();
+  const { isGuest, guardWrite } = useGuestGuard();
   const zh = lang === "zh";
   const { books, ready, deleteBook, updateBook } = useBookStore();
   const isTablet = useIsTablet();
@@ -197,6 +199,7 @@ export default function BooksScreen() {
           </View>
           <Pressable
             onPress={() => {
+              if (!guardWrite()) return;
               tap();
               router.push("/book-import");
             }}
@@ -333,6 +336,7 @@ export default function BooksScreen() {
           </Text>
           <Pressable
             onPress={() => {
+              if (!guardWrite()) return;
               tap();
               router.push("/book-import");
             }}

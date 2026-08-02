@@ -50,6 +50,7 @@ import { enrichBottles } from "@/lib/api/smart-router";
 import { smartLinkIngredient, smartLinkDisplayName } from "@/lib/recipes/smart-link";
 import { useRecipeStore } from "@/lib/recipes/store";
 import { Image } from "expo-image";
+import { useGuestGuard } from "@/hooks/use-guest-guard";
 import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as FileSystem from "expo-file-system/legacy";
@@ -69,6 +70,7 @@ export default function RecipeDetailScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { t, lang } = useI18n();
+  const { isGuest } = useGuestGuard();
   const { getRecipe, getCategory, toggleFavorite, toggleMade, setRating, deleteRecipe, tags } =
     useRecipeStore();
   const { updateRecipePhoto, updateRecipe, removeRecipePhoto } = useRecipeStore();
@@ -397,20 +399,24 @@ export default function RecipeDetailScreen() {
               color={recipe.favorite ? colors.primary : colors.muted}
             />
           </Pressable>
-          <Pressable
-            onPress={() => router.push({ pathname: "/recipe-form", params: { id: recipe.id } })}
-            hitSlop={8}
-            style={({ pressed }) => [pressed && { opacity: 0.6 }]}
-          >
-            <IconSymbol name="pencil" size={23} color={colors.foreground} />
-          </Pressable>
-          <Pressable
-            onPress={confirmDelete}
-            hitSlop={8}
-            style={({ pressed }) => [pressed && { opacity: 0.6 }]}
-          >
-            <IconSymbol name="trash.fill" size={22} color={colors.error} />
-          </Pressable>
+        {!isGuest && (
+          <>
+            <Pressable
+              onPress={() => router.push({ pathname: "/recipe-form", params: { id: recipe.id } })}
+              hitSlop={8}
+              style={({ pressed }) => [pressed && { opacity: 0.6 }]}
+            >
+              <IconSymbol name="pencil" size={23} color={colors.foreground} />
+            </Pressable>
+            <Pressable
+              onPress={confirmDelete}
+              hitSlop={8}
+              style={({ pressed }) => [pressed && { opacity: 0.6 }]}
+            >
+              <IconSymbol name="trash.fill" size={22} color={colors.error} />
+            </Pressable>
+          </>
+        )}
         </View>
       </View>
 

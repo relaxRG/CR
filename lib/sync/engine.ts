@@ -36,6 +36,7 @@ export const SYNC_KEYS = [
   "menu_store_v1",
   "shopping_store_v1",
   "cocktail.iceSettings.v2",
+  "cocktail.prefs.v1",
 ] as const;
 
 const TS_PREFIX = "sync.ts.";

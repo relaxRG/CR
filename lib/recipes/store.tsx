@@ -41,16 +41,37 @@ async function reloadAllFromStorage(
   setTags: (t: TagItem[]) => void,
   setTagGroups: (g: TagGroup[]) => void,
   setCategoryGroups: (g: CategoryGroup[]) => void,
+  setPrefs?: (p: RecipePrefs) => void,
 ) {
   try {
-    const [rRaw, cRaw, tRaw, gRaw, cgRaw] = await Promise.all([
+    const [rRaw, cRaw, tRaw, gRaw, cgRaw, prefsRaw] = await Promise.all([
       AsyncStorage.getItem(RECIPES_KEY),
       AsyncStorage.getItem(CATEGORIES_KEY),
       AsyncStorage.getItem(TAGS_KEY),
       AsyncStorage.getItem(TAG_GROUPS_KEY),
       AsyncStorage.getItem(CATEGORY_GROUPS_KEY),
+      AsyncStorage.getItem(PREFS_KEY),
     ]);
-    if (rRaw) { try { setRecipes(JSON.parse(rRaw) as Recipe[]); } catch {} }
+    if (rRaw) {
+      try {
+        let recs = JSON.parse(rRaw) as Recipe[];
+        // 同步后合并 prefs 到 recipes（prefs 优先）
+        if (prefsRaw) {
+          const p: RecipePrefs = JSON.parse(prefsRaw);
+          recs = recs.map((r) => {
+            const pref = p[r.id];
+            if (!pref) return r;
+            return {
+              ...r,
+              favorite: pref.favorite ?? r.favorite,
+              rating: pref.rating !== undefined ? pref.rating : r.rating,
+            };
+          });
+          if (setPrefs) setPrefs(p);
+        }
+        setRecipes(recs);
+      } catch {}
+    }
     if (cRaw) { try { setCategories((JSON.parse(cRaw) as Category[]).map((c) => migrateTagNameEn(c))); } catch {} }
     if (tRaw) { try { setTags((JSON.parse(tRaw) as TagItem[]).map((t) => migrateTagNameEn(t))); } catch {} }
     if (gRaw) { try { setTagGroups((JSON.parse(gRaw) as TagGroup[]).map((g) => migrateTagNameEn(g))); } catch {} }
@@ -60,6 +81,9 @@ async function reloadAllFromStorage(
   }
 }
 const RECIPES_KEY = "cocktail.recipes";
+/** 收藏/评分独立存储键：按设备角色隔离，owner 组内同步，不同角色各自独立 */
+const PREFS_KEY = "cocktail.prefs.v1";
+type RecipePrefs = Record<string, { favorite?: boolean; rating?: number | null }>;
 const CATEGORIES_KEY = "cocktail.categories";
 const SEEDED_KEY = "cocktail.seeded";
 const TAGS_KEY = "cocktail.tags";
@@ -182,6 +206,7 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
   const [tags, setTags] = useState<TagItem[]>([]);
   const [tagGroups, setTagGroups] = useState<TagGroup[]>([]);
   const [categoryGroups, setCategoryGroups] = useState<CategoryGroup[]>([]);
+  const [prefs, setPrefs] = useState<RecipePrefs>({});
   const loadedRef = useRef(false);
 
   useEffect(() => {
@@ -354,6 +379,33 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
         setTagGroups(mutableGroupList);
         setTags(tagList);
         setCategories(cats);
+        // 加载收藏/评分偏好（独立键），合并覆盖到 recipe 对象
+        const prefsRaw = await AsyncStorage.getItem(PREFS_KEY);
+        let loadedPrefs: RecipePrefs = prefsRaw ? JSON.parse(prefsRaw) : {};
+        // 迁移：将 recipes 中已有的 favorite/rating 写入 prefs（首次迁移）
+        let prefsMigrated = false;
+        recs = recs.map((r) => {
+          const p = loadedPrefs[r.id];
+          if (!p) {
+            // 如果 recipe 有 favorite 或 rating，迁移到 prefs
+            if (r.favorite || r.rating != null) {
+              loadedPrefs[r.id] = { favorite: r.favorite, rating: r.rating };
+              prefsMigrated = true;
+            }
+            return r;
+          }
+          // prefs 优先覆盖 recipe 中的 favorite/rating
+          return {
+            ...r,
+            favorite: p.favorite ?? r.favorite,
+            rating: p.rating !== undefined ? p.rating : r.rating,
+          };
+        });
+        if (prefsMigrated) {
+          AsyncStorage.setItem(PREFS_KEY, JSON.stringify(loadedPrefs)).catch(() => {});
+          notifySyncChange(PREFS_KEY);
+        }
+        setPrefs(loadedPrefs);
         setRecipes(recs);
         const cgRaw = await AsyncStorage.getItem(CATEGORY_GROUPS_KEY);
         const catGroupList: CategoryGroup[] = cgRaw
@@ -380,6 +432,7 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
         setTags,
         setTagGroups,
         setCategoryGroups,
+        setPrefs,
       );
     });
   }, []);
@@ -535,6 +588,8 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
   // keep a ref to latest recipes/categories for stable callbacks
   const recipesRef = useRef(recipes);
   recipesRef.current = recipes;
+  const prefsRef = useRef(prefs);
+  prefsRef.current = prefs;
   const categoriesRef = useRef(categories);
   categoriesRef.current = categories;
   const tagsRef = useRef(tags);
@@ -642,13 +697,23 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
     [persistRecipes],
   );
 
+  const persistPrefs = useCallback((next: RecipePrefs) => {
+    setPrefs(next);
+    AsyncStorage.setItem(PREFS_KEY, JSON.stringify(next)).catch(() => {});
+    notifySyncChange(PREFS_KEY);
+  }, []);
   const toggleFavorite = useCallback(
     (id: string) => {
+      const cur = recipesRef.current.find((r) => r.id === id);
+      const newFav = !(cur?.favorite ?? false);
+      // 双写：recipe 保持向后兼容，prefs 独立存储
       persistRecipes(
         recipesRef.current.map((r) =>
-          r.id === id ? { ...r, favorite: !r.favorite, updatedAt: Date.now() } : r,
+          r.id === id ? { ...r, favorite: newFav, updatedAt: Date.now() } : r,
         ),
       );
+      const nextPrefs = { ...prefsRef.current, [id]: { ...prefsRef.current[id], favorite: newFav } };
+      persistPrefs(nextPrefs);
     },
     [persistRecipes],
   );
@@ -672,11 +737,14 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
         typeof rating === "number" && isFinite(rating)
           ? Math.min(10, Math.max(1, Math.round(rating)))
           : null;
+      // 双写：recipe 保持向后兼容，prefs 独立存储
       persistRecipes(
         recipesRef.current.map((r) =>
           r.id === id ? { ...r, rating: v, updatedAt: Date.now() } : r,
         ),
       );
+      const nextPrefs = { ...prefsRef.current, [id]: { ...prefsRef.current[id], rating: v } };
+      persistPrefs(nextPrefs);
     },
     [persistRecipes],
   );

@@ -8,6 +8,7 @@ import { StarRating } from "@/components/star-rating";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
+import { useGuestGuard } from "@/hooks/use-guest-guard";
 import { useBottleStore } from "@/lib/bottles/store";
 import { useBottleTaxonomy } from "@/lib/bottles/taxonomy";
 import { isPerishableWholeBottle } from "@/lib/recipes/smart-cost";
@@ -17,6 +18,7 @@ export default function BottleDetailScreen() {
   const colors = useColors();
   const router = useRouter();
   const { t, lang } = useI18n();
+  const { isGuest } = useGuestGuard();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { getBottle, deleteBottle, setBottleRating } = useBottleStore();
   const { categoryLabel } = useBottleTaxonomy();
@@ -132,22 +134,26 @@ export default function BottleDetailScreen() {
           <IconSymbol name="chevron.left" size={26} color={colors.foreground} />
         </Pressable>
         <View className="flex-1" />
-        <Pressable
-          onPress={() =>
-            router.push({ pathname: "/bottle-form", params: { id: bottle.id } })
-          }
-          hitSlop={8}
-          style={({ pressed }) => [pressed && { opacity: 0.6 }, { marginRight: 18 }]}
-        >
-          <IconSymbol name="pencil" size={22} color={colors.primary} />
-        </Pressable>
-        <Pressable
-          onPress={handleDelete}
-          hitSlop={8}
-          style={({ pressed }) => [pressed && { opacity: 0.6 }]}
-        >
-          <IconSymbol name="trash.fill" size={22} color={colors.error} />
-        </Pressable>
+        {!isGuest && (
+          <>
+            <Pressable
+              onPress={() =>
+                router.push({ pathname: "/bottle-form", params: { id: bottle.id } })
+              }
+              hitSlop={8}
+              style={({ pressed }) => [pressed && { opacity: 0.6 }, { marginRight: 18 }]}
+            >
+              <IconSymbol name="pencil" size={22} color={colors.primary} />
+            </Pressable>
+            <Pressable
+              onPress={handleDelete}
+              hitSlop={8}
+              style={({ pressed }) => [pressed && { opacity: 0.6 }]}
+            >
+              <IconSymbol name="trash.fill" size={22} color={colors.error} />
+            </Pressable>
+          </>
+        )}
       </View>
 
       <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}>

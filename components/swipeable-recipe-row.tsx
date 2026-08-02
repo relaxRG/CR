@@ -9,6 +9,7 @@ import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
 import { displayNames } from "@/lib/utils";
 import { useRecipeStore } from "@/lib/recipes/store";
+import { useGuestGuard } from "@/hooks/use-guest-guard";
 import { Recipe } from "@/lib/recipes/types";
 
 /** 酒单行:左滑=编辑/删除,右滑=评分(iOS 邮件式交互) */
@@ -26,6 +27,7 @@ export function SwipeableRecipeRow({
   const colors = useColors();
   const { t, lang } = useI18n();
   const { setRating, deleteRecipe } = useRecipeStore();
+  const { isGuest } = useGuestGuard();
   const [ratingVisible, setRatingVisible] = useState(false);
 
   const confirmDelete = () => {
@@ -56,7 +58,7 @@ export function SwipeableRecipeRow({
           onPress: () => setRatingVisible(true),
         },
       ]}
-      rightActions={[
+      rightActions={isGuest ? [] : [
         {
           key: "edit",
           label: t("common.edit"),
