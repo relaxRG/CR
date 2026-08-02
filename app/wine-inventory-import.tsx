@@ -2,6 +2,7 @@
  * 葡萄酒进销存 Excel 导入页
  * 解析「葡萄酒盘点」「进货汇总」「进货总单」「Summary」四个工作表
  * 生成 WineMonthlySnapshot 并存入 store
+ * 导入后自动同步 WineBottle 资料库（新增款 addBottle，已有款 updateBottle 更新库存和进价）
  */
 import React, { useState } from "react";
 import {
@@ -15,7 +16,7 @@ import { useRouter } from "expo-router";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
-import { useWineSnapshotStore } from "@/lib/wine/store";
+import { useWineSnapshotStore, useWineStore } from "@/lib/wine/store";
 import { WineInventoryItem, WinePurchaseOrderItem, WineMonthlySnapshot } from "@/lib/wine/types";
 import { utils, read as xlsxRead } from "xlsx";
 
@@ -148,6 +149,7 @@ export default function WineInventoryImportScreen() {
   const colors = useColors();
   const router = useRouter();
   const { addSnapshot } = useWineSnapshotStore();
+  const { bottles, addBottle, updateBottle } = useWineStore();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
   const [loading, setLoading] = useState(false);
@@ -180,15 +182,66 @@ export default function WineInventoryImportScreen() {
     }
   };
 
+  /**
+   * 同步 WineBottle 资料库：
+   * - 已有款（按名称精确匹配）：updateBottle 更新库存和进价
+   * - 新款：addBottle 新增
+   */
+  const syncBottleLibrary = (items: WineInventoryItem[]) => {
+    let added = 0;
+    let updated = 0;
+    items.forEach((item) => {
+      const existing = bottles.find(
+        (b) => b.name.trim() === item.name.trim()
+      );
+      if (existing) {
+        // 更新库存和进价
+        updateBottle(existing.id, {
+          stock: item.endQty,
+          ...(item.unitCost > 0 ? { costPrice: item.unitCost } : {}),
+        });
+        updated++;
+      } else {
+        // 新增款
+        addBottle({
+          name: item.name,
+          nameEn: "",
+          vintage: "",
+          region: "",
+          grape: "",
+          winery: "",
+          style: "other",
+          abv: null,
+          costPrice: item.unitCost > 0 ? item.unitCost : null,
+          salePrice: null,
+          stock: item.endQty,
+          rating: null,
+          notes: "",
+          photoUri: "",
+          supplier: item.supplier,
+        });
+        added++;
+      }
+    });
+    return { added, updated };
+  };
+
   const handleConfirm = () => {
     if (!preview) return;
+    // 1. 存入快照
     addSnapshot(preview);
+    // 2. 同步 WineBottle 资料库
+    const { added, updated } = syncBottleLibrary(preview.items);
     setShowPreview(false);
     setPreview(null);
-    Alert.alert("导入成功", `已导入 ${preview.monthLabel}，共 ${preview.items.length} 款葡萄酒`, [
-      { text: "查看进销存", onPress: () => router.replace("/wine-inventory" as any) },
-      { text: "继续导入" },
-    ]);
+    Alert.alert(
+      "导入成功",
+      `已导入 ${preview.monthLabel}，共 ${preview.items.length} 款葡萄酒\n酒款库：新增 ${added} 款，更新 ${updated} 款`,
+      [
+        { text: "查看进销存", onPress: () => router.replace("/wine-inventory" as any) },
+        { text: "继续导入" },
+      ]
+    );
   };
 
   return (
@@ -212,6 +265,12 @@ export default function WineInventoryImportScreen() {
           <Text style={[PS.infoText, { color: colors.muted, marginTop: 6 }]}>
             工作表「进货总单」：行号 / 日期 / 供应商 / 商品名称 / 单价 / 数量 / 应收增加
           </Text>
+          <View style={[PS.syncNote, { backgroundColor: colors.success + "18", borderColor: colors.success + "44" }]}>
+            <IconSymbol name="arrow.triangle.2.circlepath" size={12} color={colors.success} />
+            <Text style={[PS.syncNoteText, { color: colors.success }]}>
+              导入后自动同步葡萄酒资料库（更新库存/进价，新款自动入库）
+            </Text>
+          </View>
         </View>
 
         {/* 导入按钮 */}
@@ -300,6 +359,8 @@ const PS = StyleSheet.create({
   infoCard: { borderRadius: 14, borderWidth: 1, padding: 16, marginBottom: 20 },
   infoTitle: { fontSize: 14, fontWeight: "700", marginBottom: 8 },
   infoText: { fontSize: 12, lineHeight: 18 },
+  syncNote: { flexDirection: "row", alignItems: "flex-start", gap: 6, borderRadius: 8, borderWidth: 1, padding: 8, marginTop: 10 },
+  syncNoteText: { flex: 1, fontSize: 11, lineHeight: 16 },
   pickBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, borderRadius: 14, paddingVertical: 16, marginBottom: 12 },
   pickBtnText: { color: "#fff", fontSize: 17, fontWeight: "600" },
   hint: { fontSize: 12, textAlign: "center", lineHeight: 18 },

@@ -816,6 +816,22 @@ export default function BottlesScreen() {
         </View>
       </View>
 
+      {/* 烈酒进销存入口 */}
+      <View style={{ paddingHorizontal: 20, marginTop: 6, marginBottom: 2 }}>
+        <Pressable
+          onPress={() => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push("/spirits-inventory" as any); }}
+          style={({ pressed }) => ({
+            flexDirection: "row", alignItems: "center", gap: 8,
+            backgroundColor: colors.primary + "0e", borderColor: colors.primary + "33",
+            borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8,
+            opacity: pressed ? 0.7 : 1,
+          })}
+        >
+          <IconSymbol name="chart.bar.fill" size={14} color={colors.primary} />
+          <Text style={{ fontSize: 13, fontWeight: "600", color: colors.primary, flex: 1 }}>烈酒进销存</Text>
+          <IconSymbol name="chevron.right" size={12} color={colors.primary} />
+        </Pressable>
+      </View>
       {/* Search */}
       <View className="px-5 mt-2">
         <View
