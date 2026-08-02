@@ -45,7 +45,6 @@ import { BeerProvider } from "@/lib/beer/store";
 import { IceInventoryProvider } from "@/lib/ice/inventory-store";
 import { PeriodAnalysisProvider } from "@/lib/store/period-analysis/store";
 import { MonthlySummaryProvider } from "@/lib/store/monthly-summary/store";
-import { startAutoBackup, stopAutoBackup } from "@/lib/backup/icloud-backup";
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
@@ -64,13 +63,6 @@ export default function RootLayout() {
   // Initialize Manus runtime for cookie injection from parent container
   useEffect(() => {
     initManusRuntime();
-  }, []);
-
-  // 启动 iCloud 自动备份（仅 iOS/macOS，App 启动后 30 秒开始，每 5 分钟一次）
-  useEffect(() => {
-    if (Platform.OS === "web") return;
-    startAutoBackup("cocktail-r-device");
-    return () => stopAutoBackup();
   }, []);
 
   const handleSafeAreaUpdate = useCallback((metrics: Metrics) => {
@@ -189,9 +181,6 @@ export default function RootLayout() {
               <Stack.Screen name="lab/plan" />
               <Stack.Screen name="supplier-import" options={{ presentation: "modal" }} />
               <Stack.Screen name="backup" options={{ presentation: "modal" }} />
-              <Stack.Screen name="bottle-form" options={{ presentation: "modal" }} />
-              <Stack.Screen name="homemade-form" options={{ presentation: "modal" }} />
-              <Stack.Screen name="recipe-form" options={{ presentation: "modal" }} />
               <Stack.Screen name="role-guide" options={{ presentation: "modal" }} />
               <Stack.Screen name="sync-log" options={{ presentation: "modal" }} />
               <Stack.Screen name="system-tags" options={{ presentation: "modal" }} />

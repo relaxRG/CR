@@ -20,7 +20,6 @@
  *   com.apple.developer.ubiquity-container-identifiers: [iCloud.com.app.cocktailrecipes]
  */
 import * as FileSystem from "expo-file-system/legacy";
-import { File as FSFile } from "expo-file-system";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 import { SYNC_KEYS } from "@/lib/sync/engine";
@@ -224,7 +223,7 @@ export async function readBackupVersion(slot: number): Promise<ICloudBackupFile 
     const filePath = `${dir}backup-v${slot}.json`;
     const info = await FileSystem.getInfoAsync(filePath);
     if (!info.exists) return null;
-    const raw = await new FSFile(filePath).text();
+    const raw = await FileSystem.readAsStringAsync(filePath);
     return JSON.parse(raw) as ICloudBackupFile;
   } catch {
     return null;
@@ -237,7 +236,7 @@ export async function restoreFromBackup(slot: number): Promise<{ restored: numbe
   if (!dir) throw new Error("Backup directory unavailable");
 
   const filePath = `${dir}backup-v${slot}.json`;
-  const raw = await new FSFile(filePath).text();
+  const raw = await FileSystem.readAsStringAsync(filePath);
 
   const backup = JSON.parse(raw) as ICloudBackupFile;
   let restored = 0;
