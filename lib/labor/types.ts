@@ -72,8 +72,25 @@ export interface Employee {
    * 0 = 不设置，仍按工时计算
    */
   monthlyFixedSalary: number;
+  /** 銀行卡信息（用于薪资发放） */
+  bankAccounts?: EmployeeBankAccount[];
   /** 创建时间 */
   createdAt: string;
+}
+
+// ─── 员工銀行卡 ───────────────────────────────────────────────────────────────────────────────────────
+export interface EmployeeBankAccount {
+  id: string;
+  /** 账户名（通常是真实姓名） */
+  accountName: string;
+  /** 銀行名称 */
+  bankName: string;
+  /** 銀行卡号 */
+  cardNumber: string;
+  /** 备注 */
+  note: string;
+  /** 是否为默认账户 */
+  isDefault: boolean;
 }
 
 // ─── 排班单元格值 ─────────────────────────────────────────────────────────────

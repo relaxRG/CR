@@ -44,6 +44,7 @@ import { PettyInventoryLinkProvider } from "@/lib/store/petty-inventory-link-sto
 import { BeerProvider } from "@/lib/beer/store";
 import { IceInventoryProvider } from "@/lib/ice/inventory-store";
 import { PeriodAnalysisProvider } from "@/lib/store/period-analysis/store";
+import { MonthlySummaryProvider } from "@/lib/store/monthly-summary/store";
 import { startAutoBackup, stopAutoBackup } from "@/lib/backup/icloud-backup";
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
@@ -147,6 +148,7 @@ export default function RootLayout() {
           <BeerProvider>
           <IceInventoryProvider>
           <PeriodAnalysisProvider>
+          <MonthlySummaryProvider>
             <Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="recipe/[id]" />
@@ -199,8 +201,11 @@ export default function RootLayout() {
               <Stack.Screen name="petty-category-settings" options={{ presentation: "modal" }} />
               <Stack.Screen name="beer-ice-inventory" />
               <Stack.Screen name="period-analysis" />
+              <Stack.Screen name="monthly-summary" />
+              <Stack.Screen name="suppliers" />
             </Stack>
             <StatusBar style="auto" />
+          </MonthlySummaryProvider>
           </PeriodAnalysisProvider>
           </IceInventoryProvider>
           </BeerProvider>
