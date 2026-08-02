@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { notifySyncChange } from "../sync/engine";
+import { notifySyncChange, registerStoreReload } from "../sync/engine";
 import React, {
   createContext,
   useCallback,
@@ -366,6 +366,21 @@ export function HomemadeProvider({ children }: { children: React.ReactNode }) {
         setReady(true);
       }
     })();
+  }, []);
+
+  // 云端同步覆盖本地后，重新加载自制库数据到内存
+  useEffect(() => {
+    return registerStoreReload(() => {
+      Promise.all([
+        AsyncStorage.getItem(PREPS_KEY),
+        AsyncStorage.getItem(SECTIONS_KEY),
+        AsyncStorage.getItem(TYPES_KEY),
+      ]).then(([pRaw, sRaw, tRaw]) => {
+        if (pRaw) { try { setPreps(JSON.parse(pRaw)); } catch {} }
+        if (sRaw) { try { setSections(JSON.parse(sRaw)); } catch {} }
+        if (tRaw) { try { setTypes(JSON.parse(tRaw)); } catch {} }
+      });
+    });
   }, []);
 
   const persist = useCallback((list: HomemadePrep[]) => {

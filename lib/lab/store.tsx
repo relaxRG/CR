@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { notifySyncChange } from "../sync/engine";
+import { notifySyncChange, registerStoreReload } from "../sync/engine";
 import React, {
   createContext,
   useCallback,
@@ -80,6 +80,19 @@ export function LabProvider({ children }: { children: React.ReactNode }) {
         setReady(true);
       }
     })();
+  }, []);
+
+  // 云端同步覆盖本地后，重新加载研发实验室数据到内存
+  useEffect(() => {
+    return registerStoreReload(() => {
+      Promise.all([
+        AsyncStorage.getItem(PROJECTS_KEY),
+        AsyncStorage.getItem(BATCHES_KEY),
+      ]).then(([pRaw, bRaw]) => {
+        if (pRaw) { try { setProjects((JSON.parse(pRaw) as LabProject[]).map(normalizeLabProject)); } catch {} }
+        if (bRaw) { try { setBatches((JSON.parse(bRaw) as LabBatch[]).map(normalizeLabBatch)); } catch {} }
+      });
+    });
   }, []);
 
   const persistProjects = useCallback((next: LabProject[]) => {

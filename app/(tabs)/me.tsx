@@ -1,8 +1,7 @@
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
@@ -11,6 +10,8 @@ import { useRecipeStore } from "@/lib/recipes/store";
 import { useBottleStore } from "@/lib/bottles/store";
 import { useHomemadeStore } from "@/lib/homemade/store";
 import { useSync } from "@/lib/cf-sync/provider";
+import React, { useEffect, useState } from "react";
+import { getBackupInfo, restoreFromBackup, backupLocalData } from "@/lib/sync/engine";
 
 /** "我的"个人中心页:数据总览、标签管理与批量导入入口、语言设置 */
 export default function MeScreen() {
@@ -21,11 +22,60 @@ export default function MeScreen() {
   const { bottles } = useBottleStore();
   const { preps } = useHomemadeStore();
   const { syncState, isAuthenticated, user, login, deviceInfo, deviceRole } = useSync();
-
   const insets = useSafeAreaInsets();
   const tap = () => {
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
+
+  const [backupTime, setBackupTime] = useState<number | null>(null);
+  const [restoring, setRestoring] = useState(false);
+
+  useEffect(() => {
+    getBackupInfo().then((info) => setBackupTime(info?.time ?? null));
+  }, [syncState.lastSyncedAt]);
+
+  const handleRestore = () => {
+    if (!backupTime) return;
+    const timeStr = new Date(backupTime).toLocaleString();
+    Alert.alert(
+      lang === "zh" ? "恢复备份" : "Restore Backup",
+      lang === "zh"
+        ? `确定要恢复至 ${timeStr} 的备份吗？\n\n当前所有数据将被替换为备份内容。`
+        : `Restore to backup from ${timeStr}?\n\nAll current data will be replaced.`,
+      [
+        { text: lang === "zh" ? "取消" : "Cancel", style: "cancel" },
+        {
+          text: lang === "zh" ? "确认恢复" : "Restore",
+          style: "destructive",
+          onPress: async () => {
+            setRestoring(true);
+            const ok = await restoreFromBackup();
+            setRestoring(false);
+            Alert.alert(
+              ok
+                ? (lang === "zh" ? "恢复成功" : "Restored")
+                : (lang === "zh" ? "恢复失败" : "Failed"),
+              ok
+                ? (lang === "zh" ? "数据已恢复，请重启应用生效。" : "Data restored. Please restart the app.")
+                : (lang === "zh" ? "未找到备份数据。" : "No backup found."),
+            );
+          },
+        },
+      ],
+    );
+  };
+
+  const handleManualBackup = async () => {
+    tap();
+    await backupLocalData();
+    const info = await getBackupInfo();
+    setBackupTime(info?.time ?? null);
+    Alert.alert(
+      lang === "zh" ? "备份成功" : "Backup Created",
+      lang === "zh" ? "当前数据已备份，同步异常时可一键恢复。" : "Current data backed up. You can restore it if sync goes wrong.",
+    );
+  };
+
 
   const syncStatusText = !isAuthenticated
     ? t("sync.off")
@@ -268,6 +318,77 @@ export default function MeScreen() {
         </View>
 
         {/* 语言设置 */}
+        {/* 数据备份与恢复 */}
+        <View className="px-5 pb-4">
+          <View style={{ backgroundColor: colors.surface, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, overflow: "hidden" }}>
+            {/* 手动备份 */}
+            <Pressable
+              onPress={handleManualBackup}
+              style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
+            >
+              <View style={[styles.iconWrap, { backgroundColor: "#FF9500" }]}>
+                <IconSymbol name="arrow.down.circle.fill" size={18} color="#FFFFFF" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowTitle} className="text-foreground">
+                  {lang === "zh" ? "立即备份" : "Backup Now"}
+                </Text>
+                <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>
+                  {backupTime
+                    ? (lang === "zh" ? `上次备份：${new Date(backupTime).toLocaleString()}` : `Last: ${new Date(backupTime).toLocaleString()}`)
+                    : (lang === "zh" ? "备份当前所有数据" : "Backup all current data")}
+                </Text>
+              </View>
+            </Pressable>
+            {backupTime != null && (
+              <>
+                <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 64 }} />
+                {/* 恢复备份 */}
+                <Pressable
+                  onPress={handleRestore}
+                  style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
+                  disabled={restoring}
+                >
+                  <View style={[styles.iconWrap, { backgroundColor: "#FF3B30" }]}>
+                    <IconSymbol name="arrow.counterclockwise.circle.fill" size={18} color="#FFFFFF" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.rowTitle} className="text-foreground">
+                      {restoring
+                        ? (lang === "zh" ? "恢复中…" : "Restoring…")
+                        : (lang === "zh" ? "恢复备份" : "Restore Backup")}
+                    </Text>
+                    <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>
+                      {lang === "zh"
+                        ? `恢复至 ${new Date(backupTime).toLocaleString()} 的快照`
+                        : `Restore snapshot from ${new Date(backupTime).toLocaleString()}`}
+                    </Text>
+                  </View>
+                </Pressable>
+              </>
+            )}
+            <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 64 }} />
+            {/* 同步日志 */}
+            <Pressable
+              onPress={() => { tap(); router.push("/sync-log"); }}
+              style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
+            >
+              <View style={[styles.iconWrap, { backgroundColor: "#34C759" }]}>
+                <IconSymbol name="list.bullet.rectangle.fill" size={18} color="#FFFFFF" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowTitle} className="text-foreground">
+                  {lang === "zh" ? "同步日志" : "Sync Log"}
+                </Text>
+                <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>
+                  {lang === "zh" ? "查看每次同步的详细记录" : "View detailed sync history"}
+                </Text>
+              </View>
+              <IconSymbol name="chevron.right" size={18} color={colors.muted} />
+            </Pressable>
+          </View>
+        </View>
+
         <View className="px-5 pb-4">
           <View style={{ backgroundColor: colors.surface, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, overflow: "hidden" }}>
             <View style={styles.row}>

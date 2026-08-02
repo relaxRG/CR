@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { notifySyncChange } from "../sync/engine";
+import { notifySyncChange, registerStoreReload } from "../sync/engine";
 import { bottleGroupOf as staticBottleGroupOf } from "./types";
 import React, {
   createContext,
@@ -597,6 +597,19 @@ export function BottleTaxonomyProvider({ children }: { children: React.ReactNode
         setReady(true);
       }
     })();
+  }, []);
+
+  // 云端同步覆盖本地后，重新加载酒款分类体系到内存
+  useEffect(() => {
+    return registerStoreReload(() => {
+      Promise.all([
+        AsyncStorage.getItem(CATS_KEY),
+        AsyncStorage.getItem(STYLES_KEY),
+      ]).then(([rawC, rawS]) => {
+        if (rawC) { try { setCategories(JSON.parse(rawC) as BottleCategoryDef[]); } catch {} }
+        if (rawS) { try { setStyles(JSON.parse(rawS) as BottleStyleDef[]); } catch {} }
+      });
+    });
   }, []);
 
   const catsRef = useRef(categories);

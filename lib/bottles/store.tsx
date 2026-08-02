@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { notifySyncChange } from "../sync/engine";
+import { notifySyncChange, registerStoreReload } from "../sync/engine";
 import React, {
   createContext,
   useCallback,
@@ -289,6 +289,17 @@ export function BottleProvider({ children }: { children: React.ReactNode }) {
         setReady(true);
       }
     })();
+  }, []);
+
+  // 云端同步覆盖本地后，重新加载酒款数据到内存
+  useEffect(() => {
+    return registerStoreReload(() => {
+      AsyncStorage.getItem(BOTTLES_KEY).then((raw) => {
+        if (raw) {
+          try { setBottles(JSON.parse(raw) as Bottle[]); } catch {}
+        }
+      });
+    });
   }, []);
 
   const bottlesRef = useRef(bottles);

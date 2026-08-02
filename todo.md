@@ -593,3 +593,19 @@
 - [x] 修复：RecipeProvider 缺少 registerStoreReload 回调，导致同步后标签/分类消失
 - [x] 修复：SYNC_KEYS 缺少 cocktail.categoryGroups，分类分组不参与同步
 - [x] 修复：runInitialSync 合并策略边界条件，本地有数据无时间戳时不被云端覆盖
+
+## 同步功能全面加固（Build 76）
+
+- [x] 修复：bottles/store.tsx 缺少 registerStoreReload，同步后酒款数据不刷新
+- [x] 修复：bottles/taxonomy.tsx 缺少 registerStoreReload，同步后分类体系不刷新
+- [x] 修复：homemade/store.tsx 缺少 registerStoreReload，同步后自制库数据不刷新
+- [x] 修复：lab/store.tsx 缺少 registerStoreReload，同步后研发项目数据不刷新
+- [x] 升级：engine.ts 添加同步前自动备份（backupLocalData）
+- [x] 升级：engine.ts 添加备份恢复功能（restoreFromBackup）
+- [x] 升级：engine.ts 添加同步日志（appendLog / getSyncLog，最多50条）
+- [x] 升级：engine.ts 添加 initSyncState 初始化备份和日志状态
+- [x] UI：me.tsx 添加「立即备份」按钮（橙色）
+- [x] UI：me.tsx 添加「恢复备份」按钮（红色，有备份时显示）
+- [x] UI：me.tsx 添加「同步日志」入口（绿色）
+- [x] 新增：app/sync-log.tsx 同步日志详情页
+- [x] 新增：icon-symbol.tsx 添加备份/恢复/日志图标映射
