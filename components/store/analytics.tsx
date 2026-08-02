@@ -136,6 +136,23 @@ export default function StoreAnalyticsScreen() {
           </View>
           <IconSymbol name="chevron.right" size={14} color="#FF9500" />
         </Pressable>
+        {/* 时段分析入口 */}
+        <Pressable
+          onPress={() => { tap(); router.push("/period-analysis" as any); }}
+          style={({ pressed }) => ({
+            flexDirection: "row", alignItems: "center", gap: 10,
+            backgroundColor: "#007AFF" + "0e", borderColor: "#007AFF" + "33",
+            borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12,
+            opacity: pressed ? 0.7 : 1, marginTop: 8,
+          })}
+        >
+          <Text style={{ fontSize: 18 }}>🕐</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 14, fontWeight: "700", color: "#007AFF" }}>时段营业分析</Text>
+            <Text style={{ fontSize: 11, color: colors.muted, marginTop: 1 }}>凌晨开台 · 加班性价比提醒 · 半小时热力图</Text>
+          </View>
+          <IconSymbol name="chevron.right" size={14} color="#007AFF" />
+        </Pressable>
         {/* 啤酒冰块进销存入口 */}
         <Pressable
           onPress={() => { tap(); router.push("/beer-ice-inventory" as any); }}
