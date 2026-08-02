@@ -1,6 +1,7 @@
 # Project TODO
 
 ## 核心功能（已完成）
+- [x] Build 96：实时推送同步（ws-sync.ts 智能轮询 + provider.tsx 接入 + 推送后通知 + 增量 pull）
 - [x] 从 GitHub 仓库 relaxRG/cocktail-recipes 完整迁移代码
 - [x] 安装所有依赖（react-native-draggable-flatlist、fflate、mammoth、pdfjs-dist 等）
 - [x] 主题配色：iOS 系统色（systemBlue、系统灰阶背景）+ 深色模式适配

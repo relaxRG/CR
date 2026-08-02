@@ -35,6 +35,7 @@ import { createSnapshot } from "@/lib/backup/local-backup";
 import { startAutoBackup } from "@/lib/backup/icloud-backup";
 import { syncPhotos } from "@/lib/sync/photo-sync";
 import { useI18n } from "@/lib/i18n";
+import { startRealtimeSync, notifyPushDone, resetRealtimeSync } from "./ws-sync";
 
 // ─── Context type (compatible with original useSync) ─────────────────────────
 type SyncContextValue = {
@@ -92,6 +93,7 @@ export function SyncProvider({
   const retryCountRef = useRef(0);
   const syncingRef = useRef(false);
   const lastSyncAtRef = useRef(0);
+  const stopRealtimeRef = useRef<(() => void) | null>(null);
 
   useEffect(() => subscribeSyncState(setSyncState), []);
 
@@ -99,6 +101,8 @@ export function SyncProvider({
   const pushFn = useCallback(
     async (entries: { storageKey: string; value: string; clientUpdatedAt: number }[]) => {
       await cfPush(entries);
+      // 推送成功后通知其他设备（非阻塞）
+      void notifyPushDone();
     },
     [],
   );
@@ -247,9 +251,35 @@ export function SyncProvider({
     void (async () => {
       const ok = await performSync();
       if (!ok) scheduleRetry();
+      else {
+        // 首次同步成功后启动实时推送监听
+        stopRealtimeRef.current?.();
+        stopRealtimeRef.current = startRealtimeSync((since) => {
+          // 检测到其他设备有新数据 → 触发增量 pull
+          void (async () => {
+            if (syncingRef.current) return;
+            syncingRef.current = true;
+            try {
+              const { entries } = await cfPull(since > 0 ? since : undefined);
+              if (entries.length > 0) {
+                const { overwritten, conflicts } = await runInitialSync(entries, pushFn);
+                if (overwritten && Platform.OS !== "web") triggerStoreReload();
+                if (conflicts.length > 0) setPendingConflicts(conflicts);
+                lastSyncAtRef.current = Date.now();
+              }
+            } catch (err) {
+              console.warn("[Realtime] incremental pull failed:", err);
+            } finally {
+              syncingRef.current = false;
+            }
+          })();
+        });
+      }
     })();
     return () => {
       if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+      stopRealtimeRef.current?.();
+      stopRealtimeRef.current = null;
     };
   }, [performSync, scheduleRetry]);
 
@@ -298,6 +328,10 @@ export function SyncProvider({
       retryTimerRef.current = null;
     }
     startedRef.current = false;
+    // 登出时停止实时监听并重置时间戳
+    stopRealtimeRef.current?.();
+    stopRealtimeRef.current = null;
+    resetRealtimeSync();
   }, []);
 
   const openPairModal = useCallback(() => {
