@@ -5,7 +5,10 @@ import React, { useMemo, useState } from "react";
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 import { useColors } from "@/hooks/use-colors";
+import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useMonthlyReportStore } from "@/lib/store/monthly-report/store";
 import { useRevenueStore, REVENUE_CATEGORY_LABELS, RevenueCategory } from "@/lib/store/revenue-store";
 import { usePettyCashStore, PETTY_GROUPS } from "@/lib/store/petty-store";
 
@@ -45,8 +48,9 @@ export default function StoreAnalyticsScreen() {
   const insets = useSafeAreaInsets();
   const [period, setPeriod] = useState<Period>("month");
   const [compare, setCompare] = useState<CompareMode>("prev");
-  const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
-
+    const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
+  const router = useRouter();
+  const { reports: monthlyReports } = useMonthlyReportStore();
   const { records } = useRevenueStore();
   const { records: pettyRecords } = usePettyCashStore();
 
@@ -83,6 +87,29 @@ export default function StoreAnalyticsScreen() {
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.background }} contentContainerStyle={{ paddingBottom: 40 + insets.bottom }}>
+      {/* 月度经营分析入口 */}
+      <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 }}>
+        <Pressable
+          onPress={() => { tap(); router.push("/monthly-report" as any); }}
+          style={({ pressed }) => ({
+            flexDirection: "row", alignItems: "center", gap: 10,
+            backgroundColor: colors.primary + "0e", borderColor: colors.primary + "33",
+            borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12,
+            opacity: pressed ? 0.7 : 1,
+          })}
+        >
+          <IconSymbol name="chart.bar.fill" size={18} color={colors.primary} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 14, fontWeight: "700", color: colors.primary }}>店铺月度经营分析</Text>
+            <Text style={{ fontSize: 11, color: colors.muted, marginTop: 1 }}>
+              {monthlyReports.length > 0
+                ? `已有 ${monthlyReports.length} 份月度报告 · 最新：${monthlyReports[0].monthLabel}`
+                : "导入美团收银报表，查看完整经营分析"}
+            </Text>
+          </View>
+          <IconSymbol name="chevron.right" size={14} color={colors.primary} />
+        </Pressable>
+      </View>
       {/* 时间段 + 对比 */}
       <View style={[styles.subHeader, { backgroundColor: colors.background }]}>
         <View style={[styles.segContainer, { backgroundColor: colors.border + "55" }]}>

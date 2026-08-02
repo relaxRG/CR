@@ -36,6 +36,7 @@ import { PettyCashProvider } from "@/lib/store/petty-store";
 import { InventoryProvider } from "@/lib/store/inventory-store";
 import { LabPlanProvider } from "@/lib/lab/plan-store";
 import { SpiritsProvider } from "@/lib/spirits/store";
+import { MonthlyReportProvider } from "@/lib/store/monthly-report/store";
 import { startAutoBackup, stopAutoBackup } from "@/lib/backup/icloud-backup";
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
@@ -131,6 +132,7 @@ export default function RootLayout() {
           <LabPlanProvider>
           <SupplierPurchaseProvider>
           <SpiritsProvider>
+          <MonthlyReportProvider>
             <Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="recipe/[id]" />
@@ -172,8 +174,11 @@ export default function RootLayout() {
               <Stack.Screen name="supplier-import" options={{ presentation: "modal" }} />
               <Stack.Screen name="spirits-inventory" />
               <Stack.Screen name="spirits-inventory-import" options={{ presentation: "modal" }} />
+              <Stack.Screen name="monthly-report" />
+              <Stack.Screen name="monthly-report-import" options={{ presentation: "modal" }} />
             </Stack>
             <StatusBar style="auto" />
+          </MonthlyReportProvider>
           </SpiritsProvider>
           </SupplierPurchaseProvider>
           </LabPlanProvider>
