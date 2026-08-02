@@ -10,6 +10,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useColors } from "@/hooks/use-colors";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useRouter } from "expo-router";
 
 type PurchaseCat = "cocktail" | "wine" | "food";
 type PurchaseType = "supplier" | "self";
@@ -143,6 +144,7 @@ export default function StorePurchaseScreen() {
   const [showAdd, setShowAdd] = useState(false);
   const { items, addItem, toggleDone, deleteItem } = usePurchaseStore();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
+  const router = useRouter();
 
   const filtered = useMemo(() => items.filter((i) => i.category === cat), [items, cat]);
   const pending = filtered.filter((i) => !i.done);
@@ -163,10 +165,26 @@ export default function StorePurchaseScreen() {
               );
             })}
           </View>
-          <Pressable onPress={() => { tap(); setShowAdd(true); }} style={[styles.addBtn, { backgroundColor: colors.primary, marginLeft: 10 }]}>
-            <IconSymbol name="plus" size={18} color="#fff" />
-          </Pressable>
+          <View style={{ flexDirection: "row", gap: 8, marginLeft: 10 }}>
+            {/* 供应商 Excel 导入 */}
+            <Pressable onPress={() => { tap(); router.push("/supplier-import" as any); }}
+              style={[styles.addBtn, { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }]}>
+              <IconSymbol name="square.and.arrow.down.fill" size={16} color={colors.primary} />
+            </Pressable>
+            <Pressable onPress={() => { tap(); setShowAdd(true); }} style={[styles.addBtn, { backgroundColor: colors.primary }]}>
+              <IconSymbol name="plus" size={18} color="#fff" />
+            </Pressable>
+          </View>
         </View>
+        {/* 供应商导入提示条 */}
+        <Pressable onPress={() => { tap(); router.push("/supplier-import" as any); }}
+          style={[styles.importBanner, { backgroundColor: colors.primary + "12", borderColor: colors.primary + "33" }]}>
+          <IconSymbol name="tray.2.fill" size={14} color={colors.primary} />
+          <Text style={[styles.importBannerText, { color: colors.primary }]}>
+            导入供应商进货单（支持创略商贸 Excel 格式）
+          </Text>
+          <IconSymbol name="chevron.right" size={14} color={colors.primary} />
+        </Pressable>
       </View>
 
       <FlatList
@@ -217,6 +235,8 @@ const styles = StyleSheet.create({
   segItem: { flex: 1, height: 32, borderRadius: 8, alignItems: "center", justifyContent: "center" },
   segText: { fontSize: 14, lineHeight: 19 },
   addBtn: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" },
+  importBanner: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1 },
+  importBannerText: { flex: 1, fontSize: 13, fontWeight: "500" },
   card: { flexDirection: "row", alignItems: "center", borderRadius: 12, borderWidth: 1, padding: 14, marginBottom: 10, gap: 12 },
   checkbox: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, alignItems: "center", justifyContent: "center" },
   cardName: { fontSize: 15, fontWeight: "600", lineHeight: 21 },

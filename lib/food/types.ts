@@ -70,3 +70,40 @@ export interface FoodIngredient {
   createdAt: string;
   updatedAt: string;
 }
+
+/** 价格历史记录条目 */
+export interface PriceHistoryEntry {
+  price: number;
+  date: string;       // YYYY-MM-DD
+  supplier: string;
+  source: "manual" | "import";
+}
+
+/** 供应商进货记录（每次导入生成一批） */
+export interface SupplierPurchaseRecord {
+  id: string;
+  supplierName: string;
+  importDate: string;
+  periodLabel: string;  // 如 "2026年6月"
+  items: SupplierPurchaseItem[];
+  totalAmount: number;
+}
+
+export interface SupplierPurchaseItem {
+  /** 原始商品名（来自 Excel） */
+  rawName: string;
+  unit: string;
+  quantity: number;
+  unitPrice: number;
+  amount: number;
+  date: string;
+  orderNo: string;
+  /** 匹配到的 FoodIngredient id（null=未匹配） */
+  matchedIngredientId: string | null;
+  /** 匹配置信度 0-100 */
+  matchScore: number;
+  /** 价格变动：正=涨价，负=降价，0=持平，null=首次 */
+  priceDelta: number | null;
+  /** 上次价格 */
+  prevPrice: number | null;
+}

@@ -30,7 +30,7 @@ import { MenuProvider } from "@/lib/menu/store";
 import { ShoppingProvider } from "@/lib/shopping/store";
 import { WineProvider } from "@/lib/wine/store";
 import { FoodMenuProvider } from "@/lib/food/menu-store";
-import { FoodIngredientProvider } from "@/lib/food/ingredient-store";
+import { FoodIngredientProvider, SupplierPurchaseProvider } from "@/lib/food/ingredient-store";
 import { RevenueProvider } from "@/lib/store/revenue-store";
 import { PettyCashProvider } from "@/lib/store/petty-store";
 import { InventoryProvider } from "@/lib/store/inventory-store";
@@ -128,6 +128,7 @@ export default function RootLayout() {
           <PettyCashProvider>
           <InventoryProvider>
           <LabPlanProvider>
+          <SupplierPurchaseProvider>
             <Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="recipe/[id]" />
@@ -166,8 +167,10 @@ export default function RootLayout() {
               <Stack.Screen name="food/[id]" />
               <Stack.Screen name="food-ingredient/[id]" />
               <Stack.Screen name="lab/plan" />
+              <Stack.Screen name="supplier-import" options={{ presentation: "modal" }} />
             </Stack>
             <StatusBar style="auto" />
+          </SupplierPurchaseProvider>
           </LabPlanProvider>
           </InventoryProvider>
           </PettyCashProvider>
