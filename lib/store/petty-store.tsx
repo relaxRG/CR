@@ -67,31 +67,59 @@ export const PETTY_GROUPS: { label: string; codes: PettyCode[] }[] = [
 
 export interface PettyRecord {
   id: string;
-  date: string;         // YYYY-MM-DD
+  date: string;          // YYYY-MM-DD
   code: PettyCode;
-  amount: number;       // 元
+  amount: number;        // 元
   description: string;
   paymentMethod: string; // 现金/微信/支付宝/银行卡
-  receiptUri: string;   // 收据照片
+  receiptUri: string;
   createdAt: string;
 }
 
-export interface PettyState { records: PettyRecord[] }
+/** 每月账期：存储期初备用金（手动覆盖值）*/
+export interface PettyPeriod {
+  month: string;           // YYYY-MM
+  openingBalance: number;  // 期初备用金，-1 表示未手动设置（自动使用上月期末）
+  note: string;
+}
+
+/** 月度账期汇总 */
+export interface PeriodSummary {
+  month: string;
+  openingBalance: number;    // 期初
+  inflow: number;            // 备用金转入 N0+N1+N2
+  otherIncome: number;       // 其他收入 N3+N4+N5
+  expense: number;           // 本期支出 A1-M2
+  closingBalance: number;    // 期末 = 期初 + 转入 + 其他收入 - 支出
+  groupExpenses: Record<string, number>; // 各大类支出（A/B/C…）
+  openingOverridden: boolean;  // 是否手动覆盖了期初
+  openingAutoValue: number;    // 自动计算的期初（上月期末）
+}
+
+export interface PettyState { records: PettyRecord[]; periods: PettyPeriod[] }
 
 type Action =
   | { type: "LOAD"; payload: PettyState }
   | { type: "ADD"; record: PettyRecord }
   | { type: "UPDATE"; id: string; updates: Partial<PettyRecord> }
-  | { type: "DELETE"; id: string };
+  | { type: "DELETE"; id: string }
+  | { type: "SET_PERIOD"; period: PettyPeriod };
 
 function uuid(): string { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
 
 function reducer(state: PettyState, action: Action): PettyState {
   switch (action.type) {
     case "LOAD": return action.payload;
-    case "ADD": return { records: [action.record, ...state.records] };
-    case "UPDATE": return { records: state.records.map((r) => r.id === action.id ? { ...r, ...action.updates } : r) };
-    case "DELETE": return { records: state.records.filter((r) => r.id !== action.id) };
+    case "ADD": return { ...state, records: [action.record, ...state.records] };
+    case "UPDATE": return { ...state, records: state.records.map((r) => r.id === action.id ? { ...r, ...action.updates } : r) };
+    case "DELETE": return { ...state, records: state.records.filter((r) => r.id !== action.id) };
+    case "SET_PERIOD": {
+      const idx = state.periods.findIndex((p) => p.month === action.period.month);
+      const periods = idx >= 0
+        ? state.periods.map((p, i) => i === idx ? action.period : p)
+        : [...state.periods, action.period];
+      return { ...state, periods };
+    }
     default: return state;
   }
 }
@@ -100,22 +128,56 @@ interface PettyContextValue extends PettyState {
   addRecord: (data: Omit<PettyRecord, "id" | "createdAt">) => void;
   updateRecord: (id: string, updates: Partial<PettyRecord>) => void;
   deleteRecord: (id: string) => void;
+  setPeriod: (period: PettyPeriod) => void;
+  calcPeriod: (month: string) => PeriodSummary;
+  /** 计算某月的期末（供下月自动带入）*/
+  calcClosing: (month: string, allRecords: PettyRecord[], allPeriods: PettyPeriod[]) => number;
 }
 
 const PettyContext = createContext<PettyContextValue | null>(null);
 
+/** 纯函数：计算某月期末备用金（可递归） */
+function calcClosingPure(
+  month: string,
+  allRecords: PettyRecord[],
+  allPeriods: PettyPeriod[],
+  depth = 0
+): number {
+  if (depth > 24) return 0; // 防止无限递归
+  const monthRecords = allRecords.filter((r) => r.date.startsWith(month));
+  let expense = 0, inflow = 0, otherIncome = 0;
+  for (const r of monthRecords) {
+    if (["N0","N1","N2"].includes(r.code)) inflow += r.amount;
+    else if (["N3","N4","N5"].includes(r.code)) otherIncome += r.amount;
+    else expense += r.amount;
+  }
+  const periodData = allPeriods.find((p) => p.month === month);
+  let opening: number;
+  if (periodData && periodData.openingBalance >= 0) {
+    opening = periodData.openingBalance;
+  } else {
+    // 自动：上月期末
+    const [y, m] = month.split("-").map(Number);
+    const prevMonth = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
+    opening = calcClosingPure(prevMonth, allRecords, allPeriods, depth + 1);
+  }
+  return opening + inflow + otherIncome - expense;
+}
+
 export function PettyCashProvider({ children }: { children: React.ReactNode }) {
-  const [state, dispatch] = useReducer(reducer, { records: [] });
+  const [state, dispatch] = useReducer(reducer, { records: [], periods: [] });
 
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY).then((raw) => {
-      if (raw) { try { dispatch({ type: "LOAD", payload: JSON.parse(raw) }); } catch {} }
-    });
-    registerStoreReload(() => {
-      AsyncStorage.getItem(STORAGE_KEY).then((raw) => {
-        if (raw) { try { dispatch({ type: "LOAD", payload: JSON.parse(raw) }); } catch {} }
-      });
-    });
+    const load = (raw: string | null) => {
+      if (!raw) return;
+      try {
+        const parsed = JSON.parse(raw) as Partial<PettyState>;
+        if (!parsed.periods) parsed.periods = [];
+        dispatch({ type: "LOAD", payload: parsed as PettyState });
+      } catch {}
+    };
+    AsyncStorage.getItem(STORAGE_KEY).then(load);
+    registerStoreReload(() => AsyncStorage.getItem(STORAGE_KEY).then(load));
   }, []);
 
   useEffect(() => {
@@ -128,9 +190,49 @@ export function PettyCashProvider({ children }: { children: React.ReactNode }) {
   }, []);
   const updateRecord = useCallback((id: string, updates: Partial<PettyRecord>) => dispatch({ type: "UPDATE", id, updates }), []);
   const deleteRecord = useCallback((id: string) => dispatch({ type: "DELETE", id }), []);
+  const setPeriod = useCallback((period: PettyPeriod) => dispatch({ type: "SET_PERIOD", period }), []);
+
+  const calcClosing = useCallback((month: string, allRecords: PettyRecord[], allPeriods: PettyPeriod[]) => {
+    return calcClosingPure(month, allRecords, allPeriods);
+  }, []);
+
+  const calcPeriod = useCallback((month: string): PeriodSummary => {
+    const monthRecords = state.records.filter((r) => r.date.startsWith(month));
+    const groupExpenses: Record<string, number> = {};
+    let expense = 0, inflow = 0, otherIncome = 0;
+    for (const r of monthRecords) {
+      if (["N0","N1","N2"].includes(r.code)) {
+        inflow += r.amount;
+      } else if (["N3","N4","N5"].includes(r.code)) {
+        otherIncome += r.amount;
+      } else {
+        expense += r.amount;
+        const g = r.code[0];
+        groupExpenses[g] = (groupExpenses[g] ?? 0) + r.amount;
+      }
+    }
+    // 自动期初 = 上月期末
+    const [y, m] = month.split("-").map(Number);
+    const prevMonth = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
+    const openingAutoValue = calcClosingPure(prevMonth, state.records, state.periods);
+    const periodData = state.periods.find((p) => p.month === month);
+    const openingOverridden = !!(periodData && periodData.openingBalance >= 0);
+    const openingBalance = openingOverridden ? periodData!.openingBalance : openingAutoValue;
+    return {
+      month,
+      openingBalance,
+      inflow,
+      otherIncome,
+      expense,
+      closingBalance: openingBalance + inflow + otherIncome - expense,
+      groupExpenses,
+      openingOverridden,
+      openingAutoValue,
+    };
+  }, [state]);
 
   return (
-    <PettyContext.Provider value={{ ...state, addRecord, updateRecord, deleteRecord }}>
+    <PettyContext.Provider value={{ ...state, addRecord, updateRecord, deleteRecord, setPeriod, calcPeriod, calcClosing }}>
       {children}
     </PettyContext.Provider>
   );
