@@ -100,11 +100,18 @@ export function SyncProvider({
   // Build push function using CF API
   const pushFn = useCallback(
     async (entries: { storageKey: string; value: string; clientUpdatedAt: number }[]) => {
-      await cfPush(entries);
+      // Collaborator devices: filter entries to only allowed keys
+      const info = deviceInfo;
+      const filtered =
+        info && info.role === "collaborator" && Array.isArray(info.allowedKeys)
+          ? entries.filter((e) => (info.allowedKeys as string[]).includes(e.storageKey))
+          : entries;
+      if (filtered.length === 0) return;
+      await cfPush(filtered);
       // 推送成功后通知其他设备（非阻塞）
       void notifyPushDone();
     },
-    [],
+    [deviceInfo],
   );
 
   // 冲突解决：逐个弹出 Alert 让用户选择

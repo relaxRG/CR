@@ -144,7 +144,8 @@ export function BookStoreProvider({ children }: { children: React.ReactNode }) {
       chapters: { title: string; html: string }[],
     ): Promise<StoredBook> => {
       const id = genId();
-      // Save each chapter HTML separately
+      // Save each chapter HTML both in per-key storage (fast local read)
+      // AND inline in sections[i].text (enables cross-device sync via cocktail.books.v1)
       await Promise.all(
         chapters.map((ch, i) =>
           AsyncStorage.setItem(chapterKey(id, i), ch.html).catch(() => {}),
@@ -154,7 +155,8 @@ export function BookStoreProvider({ children }: { children: React.ReactNode }) {
         ...meta,
         id,
         hasHtml: true,
-        sections: chapters.map((ch) => ({ title: ch.title, text: "" })),
+        // Store HTML inline so it syncs with the books metadata key
+        sections: chapters.map((ch) => ({ title: ch.title, text: ch.html })),
         importedAt: Date.now(),
         lastReadAt: Date.now(),
         lastPosition: 0,
@@ -172,7 +174,21 @@ export function BookStoreProvider({ children }: { children: React.ReactNode }) {
 
   const loadChapter = useCallback(async (bookId: string, idx: number): Promise<string | null> => {
     try {
-      return await AsyncStorage.getItem(chapterKey(bookId, idx));
+      // Primary: per-key storage (fast, always up-to-date on the device that imported)
+      const fromKey = await AsyncStorage.getItem(chapterKey(bookId, idx));
+      if (fromKey) return fromKey;
+      // Fallback: inline sections.text (populated on other devices via sync)
+      const booksRaw = await AsyncStorage.getItem(BOOKS_KEY);
+      if (booksRaw) {
+        const books: StoredBook[] = JSON.parse(booksRaw);
+        const book = books.find((b) => b.id === bookId);
+        if (book?.sections?.[idx]?.text) {
+          // Backfill per-key storage so future reads are fast
+          AsyncStorage.setItem(chapterKey(bookId, idx), book.sections[idx].text).catch(() => {});
+          return book.sections[idx].text;
+        }
+      }
+      return null;
     } catch {
       return null;
     }

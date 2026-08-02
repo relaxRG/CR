@@ -27,6 +27,8 @@ export const SYNC_KEYS = [
   "homemade.types.v1",
   "homemade.taxonomy.v2",
   "homemade.waldorf.v1",
+  "homemade.waldorf.v2",
+  "homemade.source.v3",
   "bottles.taxonomy.categories.v1",
   "bottles.taxonomy.styles.v1",
   "cocktail.lab.projects",
@@ -107,6 +109,100 @@ function mergePrefs(localJson: string, remoteJson: string): { merged: string; ch
 
 /** 是否为需要有利优先合并的 prefs 键 */
 const PREFS_MERGE_KEYS = new Set<string>(["cocktail.prefs.v1"]);
+
+// ─── ID 级别列表合并 ──────────────────────────────────────────────────────────
+/**
+ * 对「数组型」键执行 ID 级别合并：两端各自新增的条目取并集，不丢数据。
+ */
+function mergeIdList(
+  localJson: string,
+  remoteJson: string,
+): { merged: string; changed: boolean } {
+  try {
+    type Item = { id: string; updatedAt?: number; clientUpdatedAt?: number; [k: string]: unknown };
+    const local: Item[] = JSON.parse(localJson);
+    const remote: Item[] = JSON.parse(remoteJson);
+    if (!Array.isArray(local) || !Array.isArray(remote)) {
+      return { merged: localJson, changed: false };
+    }
+    const map = new Map<string, Item>();
+    for (const item of local) {
+      if (item?.id) map.set(item.id, item);
+    }
+    for (const item of remote) {
+      if (!item?.id) continue;
+      const existing = map.get(item.id);
+      if (!existing) {
+        map.set(item.id, item);
+      } else {
+        const localTs = (existing.updatedAt ?? existing.clientUpdatedAt ?? 0) as number;
+        const remoteTs = (item.updatedAt ?? item.clientUpdatedAt ?? 0) as number;
+        if (remoteTs > localTs) map.set(item.id, item);
+      }
+    }
+    const mergedJson = JSON.stringify(Array.from(map.values()));
+    return { merged: mergedJson, changed: mergedJson !== localJson };
+  } catch {
+    return { merged: localJson, changed: false };
+  }
+}
+
+function mergeStoreObject(
+  localJson: string,
+  remoteJson: string,
+  arrayFields: string[],
+): { merged: string; changed: boolean } {
+  try {
+    const local: Record<string, unknown> = JSON.parse(localJson);
+    const remote: Record<string, unknown> = JSON.parse(remoteJson);
+    if (typeof local !== "object" || typeof remote !== "object") {
+      return { merged: localJson, changed: false };
+    }
+    const merged: Record<string, unknown> = { ...remote };
+    let anyChanged = false;
+    for (const field of arrayFields) {
+      const localArr = local[field];
+      const remoteArr = remote[field];
+      if (!Array.isArray(localArr) || !Array.isArray(remoteArr)) continue;
+      const { merged: mergedField, changed } = mergeIdList(
+        JSON.stringify(localArr),
+        JSON.stringify(remoteArr),
+      );
+      if (changed) {
+        merged[field] = JSON.parse(mergedField);
+        anyChanged = true;
+      }
+    }
+    return { merged: JSON.stringify(merged), changed: anyChanged };
+  } catch {
+    return { merged: localJson, changed: false };
+  }
+}
+
+const ID_LIST_KEYS = new Set<string>([
+  "cocktail.recipes",
+  "cocktail.bottles",
+  "homemade.preps.v1",
+  "cocktail.lab.projects",
+  "cocktail.lab.batches",
+]);
+
+const STORE_OBJECT_KEYS = new Map<string, string[]>([
+  ["menu_store_v1", ["groups"]],
+  ["shopping_store_v1", ["items"]],
+]);
+
+function mergeByKey(
+  key: string,
+  localJson: string,
+  remoteJson: string,
+): { merged: string; changed: boolean } {
+  if (PREFS_MERGE_KEYS.has(key)) return mergePrefs(localJson, remoteJson);
+  if (ID_LIST_KEYS.has(key)) return mergeIdList(localJson, remoteJson);
+  const storeFields = STORE_OBJECT_KEYS.get(key);
+  if (storeFields) return mergeStoreObject(localJson, remoteJson, storeFields);
+  return { merged: remoteJson, changed: remoteJson !== localJson };
+}
 
 type PushFn = (
   entries: { storageKey: string; value: string; clientUpdatedAt: number }[],
@@ -404,13 +500,11 @@ export async function runInitialSync(
       }
 
       if (remote && (!localValue || (localTs > 0 && remote.clientUpdatedAt > localTs))) {
-        // 云端更新 → 覆盖本地
-        // prefs 键使用有利优先合并，其余键直接覆盖
+        // 云端更新 → 按键类型选择合并策略
         let mergedValue = remote.value;
-        if (PREFS_MERGE_KEYS.has(key) && localValue) {
-          const { merged, changed } = mergePrefs(localValue, remote.value);
+        if (localValue) {
+          const { merged, changed } = mergeByKey(key, localValue, remote.value);
           mergedValue = merged;
-          // 合并结果比本地更有利 → 主动推送回云端，让其他设备也能受益
           if (changed) {
             const now2 = Date.now();
             toUpload.push({ storageKey: key, value: merged, clientUpdatedAt: now2 });
