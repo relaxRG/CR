@@ -423,7 +423,7 @@ export default function CompareScreen() {
           hitSlop={8}
           style={({ pressed }) => [pressed && { opacity: 0.6 }]}
         >
-          <IconSymbol name="chevron.left" size={26} color={colors.foreground} />
+          <IconSymbol name="chevron.left" size={22} color={colors.primary} />
         </Pressable>
         <Text className="text-lg font-semibold text-foreground ml-2">{t("compare.title")}</Text>
       </View>

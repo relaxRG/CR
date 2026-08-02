@@ -399,7 +399,7 @@ export default function BulkImportScreen() {
             onPress={() => router.back()}
             style={({ pressed }) => [{ padding: 4, marginLeft: -8 }, pressed && { opacity: 0.6 }]}
           >
-            <IconSymbol name="chevron.left" size={26} color={colors.primary} />
+            <IconSymbol name="chevron.left" size={22} color={colors.primary} />
           </Pressable>
           <View className="flex-1">
             <Text className="text-3xl font-bold text-foreground">{t("bulk.title")}</Text>

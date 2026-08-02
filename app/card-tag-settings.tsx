@@ -286,7 +286,7 @@ export default function CardTagSettingsScreen() {
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <Pressable onPress={() => router.back()} hitSlop={8} style={({ pressed }) => [pressed && { opacity: 0.6 }]}>
-          <IconSymbol name="chevron.left" size={20} color={colors.foreground} />
+          <IconSymbol name="chevron.left" size={22} color={colors.primary} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>
           {zh ? "卡片标签显示" : "Card Tag Display"}

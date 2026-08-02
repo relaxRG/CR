@@ -21,6 +21,7 @@ import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
 import { pairWithCode } from "@/lib/cf-sync/client";
 import { QRScanner } from "@/components/qr-scanner";
+import { IconSymbol } from "@/components/ui/icon-symbol";
 
 export default function PairDeviceScreen() {
   const colors = useColors();
@@ -136,9 +137,7 @@ export default function PairDeviceScreen() {
           onPress={() => { tap(); router.back(); }}
           style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
         >
-          <Text style={{ color: colors.primary, fontSize: 16 }}>
-            {lang === "zh" ? "取消" : "Cancel"}
-          </Text>
+          <IconSymbol name="chevron.left" size={22} color={colors.primary} />
         </Pressable>
         <Text style={[styles.title, { color: colors.foreground }]}>
           {lang === "zh" ? "加入设备组" : "Join Device Group"}

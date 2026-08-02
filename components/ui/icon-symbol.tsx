@@ -113,6 +113,7 @@ const MAPPING = {
   "lock.fill": "lock",
   "lock.open.fill": "lock-open",
   "tray.2.fill": "category",
+  "qrcode": "qr-code",
 } as IconMapping;
 
 /**

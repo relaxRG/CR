@@ -529,9 +529,7 @@ export default function DeviceManagerScreen() {
             onPress={() => { tap(); router.push("/role-guide"); }}
             style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
           >
-            <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "500" }}>
-              {lang === "zh" ? "权限说明" : "Roles"}
-            </Text>
+            <IconSymbol name="info.circle" size={22} color={colors.primary} />
           </Pressable>
 
         </View>
@@ -901,9 +899,27 @@ export default function DeviceManagerScreen() {
               </View>
             ))}
             {devices.length === 0 && (
-              <Text style={[styles.emptyText, { color: colors.muted }]}>
-                {lang === "zh" ? "暂无其他设备" : "No other devices"}
-              </Text>
+              <View style={{
+                marginHorizontal: 16,
+                marginVertical: 8,
+                backgroundColor: colors.surface,
+                borderRadius: 14,
+                borderWidth: 1,
+                borderColor: colors.border,
+                padding: 20,
+                alignItems: "center",
+                gap: 8,
+              }}>
+                <IconSymbol name="qrcode" size={36} color={colors.muted} />
+                <Text style={{ fontSize: 15, fontWeight: "600", color: colors.foreground, textAlign: "center" }}>
+                  {lang === "zh" ? "暂无其他设备" : "No other devices yet"}
+                </Text>
+                <Text style={{ fontSize: 13, color: colors.muted, textAlign: "center", lineHeight: 19 }}>
+                  {lang === "zh"
+                    ? "在上方生成配对码，在新设备的设备管理中输入即可加入同步组"
+                    : "Generate a pair code above and enter it on the new device to join the sync group"}
+                </Text>
+              </View>
             )}
             {devices.length === 1 && (
               <Text style={[styles.emptyText, { color: colors.muted, paddingHorizontal: 16 }]}>

@@ -37,7 +37,7 @@ export default function SystemTagsScreen() {
           onPress={() => router.back()}
           style={({ pressed }) => [{ padding: 4, marginLeft: -8 }, pressed && { opacity: 0.6 }]}
         >
-          <IconSymbol name="chevron.left" size={26} color={colors.primary} />
+          <IconSymbol name="chevron.left" size={22} color={colors.primary} />
         </Pressable>
         <Text style={[styles.title, { color: colors.foreground }]}>
           {t("me.systemTags")}
