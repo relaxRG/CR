@@ -62,6 +62,7 @@ const MAPPING = {
   "square.and.arrow.down.fill": "download",
   "globe": "language",
   "icloud.fill": "cloud",
+  "icloud.and.arrow.down.fill": "cloud-download",
   "info.circle.fill": "info",
   "info.circle": "info-outline",
   "exclamationmark.triangle": "warning-amber",

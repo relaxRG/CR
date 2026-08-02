@@ -5,6 +5,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
 import { getSyncLog, type SyncLogEntry } from "@/lib/sync/engine";
+import { useSync } from "@/lib/cf-sync/provider";
 
 function typeLabel(type: SyncLogEntry["type"], lang: string) {
   const map: Record<SyncLogEntry["type"], [string, string]> = {
@@ -33,10 +34,13 @@ export default function SyncLogScreen() {
   const colors = useColors();
   const { lang } = useI18n();
   const [log, setLog] = useState<SyncLogEntry[]>([]);
+  const { dismissSyncError } = useSync();
 
   useEffect(() => {
     getSyncLog().then(setLog);
-  }, []);
+    // 用户进入同步日志页面，视为已知晓错误，清除红点角标
+    dismissSyncError();
+  }, [dismissSyncError]);
 
   return (
     <ScreenContainer edges={["top", "left", "right"]}>

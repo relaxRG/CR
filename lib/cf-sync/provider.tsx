@@ -30,7 +30,7 @@ import {
   type SyncState,
   triggerStoreReload,
 } from "@/lib/sync/engine";
-import { resolveConflict, type SyncConflict } from "@/lib/sync/engine";
+import { resolveConflict, clearSyncError, type SyncConflict } from "@/lib/sync/engine";
 import { createSnapshot } from "@/lib/backup/local-backup";
 import { startAutoBackup } from "@/lib/backup/icloud-backup";
 import { syncPhotos } from "@/lib/sync/photo-sync";
@@ -57,6 +57,8 @@ type SyncContextValue = {
   openPairModal: () => void;
   /** Open device management screen */
   openDeviceManager: () => void;
+  /** 用户查看同步日志后调用，清除错误状态（消除红点角标） */
+  dismissSyncError: () => void;
 };
 
 const SyncContext = createContext<SyncContextValue | null>(null);
@@ -293,6 +295,11 @@ export function SyncProvider({
     onRequestDeviceManager?.();
   }, [onRequestDeviceManager]);
 
+  const dismissSyncError = useCallback(() => {
+    setSyncError(null);
+    clearSyncError();
+  }, []);
+
   // Build a user-like object for compatibility with existing UI
   const user = deviceInfo
     ? {
@@ -318,6 +325,7 @@ export function SyncProvider({
         retrySync,
         openPairModal,
         openDeviceManager,
+        dismissSyncError,
       }}
     >
       {children}

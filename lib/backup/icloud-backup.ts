@@ -2,7 +2,7 @@
  * iCloud Drive 自动备份通道（5D 方案 - 通道 2）
  *
  * 功能：
- * - 每 5 分钟自动将全量数据写入 iCloud Drive（静默，无需用户操作）
+ * - App 启动后每 1 小时自动将全量数据写入 iCloud Drive（静默，无需用户操作）
  * - 保留最近 7 个版本（backup-v0.json ~ backup-v6.json，循环覆盖）
  * - 任何设备打开 app 时检测 iCloud Drive 是否有更新版本，提示合并
  * - iOS/macOS 使用 iCloud Drive 路径，Android/Web 使用本地文档目录
@@ -15,8 +15,8 @@ import { Platform } from "react-native";
 import { SYNC_KEYS } from "@/lib/sync/engine";
 
 const MAX_VERSIONS = 7;
-const AUTO_BACKUP_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 const ICLOUD_META_KEY = "backup.icloud.meta";
+const AUTO_BACKUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 const APP_FOLDER = "CocktailR";
 
 export type ICloudBackupMeta = {
@@ -204,36 +204,38 @@ export async function restoreFromBackup(slot: number): Promise<{ restored: numbe
 
 let autoBackupTimer: ReturnType<typeof setInterval> | null = null;
 
-/** 启动自动备份定时器（每 5 分钟） */
+/** 启动自动备份定时器（App 启动 30 秒后首次执行，之后每 1 小时一次） */
 export function startAutoBackup(deviceName: string): void {
-  if (autoBackupTimer) return; // already running
-  // Initial backup after 30 seconds (let app settle)
+  if (autoBackupTimer) return;
+  // 30 秒后首次备份（让 App 完成初始化）
   const initialTimer = setTimeout(() => {
     void performBackup(deviceName).catch((e) =>
       console.warn("[iCloudBackup] Auto backup failed:", e),
     );
   }, 30_000);
 
-  // Then every 5 minutes
+  // 之后每 1 小时备份一次
   autoBackupTimer = setInterval(() => {
     void performBackup(deviceName).catch((e) =>
       console.warn("[iCloudBackup] Auto backup failed:", e),
     );
   }, AUTO_BACKUP_INTERVAL_MS);
 
-  // Store initial timer ref for cleanup (not ideal but works for our use case)
+  // 保存 initialTimer ref 以便 stopAutoBackup 清理
   (autoBackupTimer as unknown as { _initial: ReturnType<typeof setTimeout> })._initial = initialTimer;
 }
 
 /** 停止自动备份定时器 */
 export function stopAutoBackup(): void {
   if (autoBackupTimer) {
+    const t = autoBackupTimer as unknown as { _initial?: ReturnType<typeof setTimeout> };
+    if (t._initial) clearTimeout(t._initial);
     clearInterval(autoBackupTimer);
     autoBackupTimer = null;
   }
 }
 
-/** 检查是否需要备份（距上次备份超过 5 分钟） */
+/** 检查是否需要备份（距上次备份超过 1 小时） */
 export async function shouldBackup(): Promise<boolean> {
   const meta = await getICloudMeta();
   if (!meta.lastBackupAt) return true;

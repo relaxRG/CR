@@ -192,6 +192,11 @@ export async function getSyncLog(): Promise<SyncLogEntry[]> {
   }
 }
 
+/** 用户主动查看同步日志后调用，清除错误状态（消除红点角标） */
+export function clearSyncError(): void {
+  setState({ error: null });
+}
+
 /** store 持久化后调用:标记键为脏并调度推送 */
 export function notifySyncChange(key: string) {
   if (!(SYNC_KEYS as readonly string[]).includes(key)) return;

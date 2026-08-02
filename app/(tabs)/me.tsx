@@ -11,9 +11,9 @@ import { useBottleStore } from "@/lib/bottles/store";
 import { useHomemadeStore } from "@/lib/homemade/store";
 import { useSync } from "@/lib/cf-sync/provider";
 import React, { useEffect, useState } from "react";
-import { getBackupInfo, restoreFromBackup, backupLocalData } from "@/lib/sync/engine";
+import { getBackupInfo, restoreFromBackup, backupLocalData, triggerStoreReload } from "@/lib/sync/engine";
 import { exportCurrentDataToFile, importFromJsonFile } from "@/lib/backup/local-backup";
-import { performBackup, getICloudMeta } from "@/lib/backup/icloud-backup";
+import { performBackup, getICloudMeta, listBackupVersions, restoreFromBackup as restoreFromICloud } from "@/lib/backup/icloud-backup";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
 
@@ -35,6 +35,7 @@ export default function MeScreen() {
   const [restoring, setRestoring] = useState(false);
   const [icloudBacking, setIcloudBacking] = useState(false);
   const [icloudLastAt, setIcloudLastAt] = useState<number | null>(null);
+  const [icloudRestoring, setIcloudRestoring] = useState(false);
 
   useEffect(() => {
     getBackupInfo().then((info) => setBackupTime(info?.time ?? null));
@@ -81,6 +82,70 @@ export default function MeScreen() {
       lang === "zh" ? "备份成功" : "Backup Created",
       lang === "zh" ? "当前数据已备份，同步异常时可一键恢复。" : "Current data backed up. You can restore it if sync goes wrong.",
     );
+  };
+
+  const handleICloudRestore = async () => {
+    setIcloudRestoring(true);
+    try {
+      const versions = await listBackupVersions();
+      if (versions.length === 0) {
+        Alert.alert(
+          lang === "zh" ? "无可用备份" : "No Backups Available",
+          lang === "zh" ? "iCloud Drive 中暂无备份文件，请先执行备份。" : "No backup files found in iCloud Drive. Please back up first.",
+        );
+        return;
+      }
+      // 构建选项列表
+      const buttons = versions.map((v) => ({
+        text: `${v.label}  (${v.keyCount} 项)`,
+        onPress: () => {
+          Alert.alert(
+            lang === "zh" ? "确认恢复" : "Confirm Restore",
+            lang === "zh"
+              ? `确定要恢复 ${v.label} 的备份吗？\n\n当前所有数据将被替换，此操作不可撤销。`
+              : `Restore backup from ${v.label}?\n\nAll current data will be replaced. This cannot be undone.`,
+            [
+              { text: lang === "zh" ? "取消" : "Cancel", style: "cancel" },
+              {
+                text: lang === "zh" ? "确认恢复" : "Restore",
+                style: "destructive",
+                onPress: async () => {
+                  try {
+                    const result = await restoreFromICloud(v.slot);
+                    triggerStoreReload();
+                    Alert.alert(
+                      lang === "zh" ? "恢复成功" : "Restore Complete",
+                      lang === "zh"
+                        ? `已成功恢复 ${result.restored} 项数据。`
+                        : `Successfully restored ${result.restored} items.`,
+                    );
+                  } catch (e) {
+                    Alert.alert(
+                      lang === "zh" ? "恢复失败" : "Restore Failed",
+                      lang === "zh" ? "无法读取备份文件，请重试。" : "Could not read backup file. Please try again.",
+                    );
+                  }
+                },
+              },
+            ],
+          );
+        },
+      }));
+      buttons.push({ text: lang === "zh" ? "取消" : "Cancel", onPress: () => {} });
+      Alert.alert(
+        lang === "zh" ? "选择恢复版本" : "Select Backup Version",
+        lang === "zh" ? "选择要恢复的 iCloud 备份版本：" : "Choose a backup version to restore:",
+        buttons as any,
+        { cancelable: true },
+      );
+    } catch (e) {
+      Alert.alert(
+        lang === "zh" ? "读取失败" : "Load Failed",
+        lang === "zh" ? "无法读取 iCloud 备份列表，请检查 iCloud 设置。" : "Could not load iCloud backups. Check your iCloud settings.",
+      );
+    } finally {
+      setIcloudRestoring(false);
+    }
   };
 
   const handleICloudBackup = async () => {
@@ -579,6 +644,28 @@ export default function MeScreen() {
                     : (lang === "zh" ? "自动保存到 iCloud Drive，7 个版本循环保留" : "Auto-saved to iCloud Drive, 7 rotating versions")}
                 </Text>
               </View>
+            </Pressable>
+            <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 64 }} />
+            {/* 从 iCloud 恢复 */}
+            <Pressable
+              onPress={handleICloudRestore}
+              disabled={icloudRestoring}
+              style={({ pressed }) => [styles.row, (pressed || icloudRestoring) && { opacity: 0.7 }]}
+            >
+              <View style={[styles.iconWrap, { backgroundColor: "#34C759" }]}>
+                <IconSymbol name="icloud.and.arrow.down.fill" size={18} color="#FFFFFF" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowTitle} className="text-foreground">
+                  {icloudRestoring
+                    ? (lang === "zh" ? "加载中…" : "Loading…")
+                    : (lang === "zh" ? "从 iCloud 恢复" : "Restore from iCloud")}
+                </Text>
+                <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>
+                  {lang === "zh" ? "从 iCloud Drive 中选择历史版本恢复数据" : "Choose a version from iCloud Drive to restore"}
+                </Text>
+              </View>
+              <IconSymbol name="chevron.right" size={18} color={colors.muted} />
             </Pressable>
           </View>
         </View>
