@@ -50,6 +50,7 @@ import { useSync } from "@/lib/cf-sync/provider";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { listSnapshots } from "@/lib/backup/local-backup";
 import { getICloudMeta } from "@/lib/backup/icloud-backup";
+import { syncPhotos } from "@/lib/sync/photo-sync";
 import { QRCode } from "@/components/qr-code";
 
 const CF_WORKER_URL = "https://cocktail-ai.kikikong2017.workers.dev";
@@ -256,6 +257,12 @@ export default function DeviceManagerScreen() {
   const [manualSyncing, setManualSyncing] = useState(false);
   const [renamingDevice, setRenamingDevice] = useState(false);
   const [renameInput, setRenameInput] = useState("");
+  // 照片同步进度
+  const [photoProgress, setPhotoProgress] = useState<{
+    phase: "upload" | "download" | "repair";
+    done: number;
+    total: number;
+  } | null>(null);
 
   // Devices
   const [devices, setDevices] = useState<RemoteDevice[]>([]);
@@ -437,6 +444,7 @@ export default function DeviceManagerScreen() {
     if (manualSyncing) return;
     tap();
     setManualSyncing(true);
+    setPhotoProgress(null);
     try {
       const ok = await retrySync();
       if (ok) {
@@ -445,6 +453,16 @@ export default function DeviceManagerScreen() {
         }
         void loadDevices();
         void loadBackupStatus();
+        // 触发照片同步并显示进度
+        if (Platform.OS !== "web") {
+          void syncPhotos((phase, done, total) => {
+            if (phase === "upload" || phase === "download") {
+              setPhotoProgress({ phase, done, total });
+            }
+          }).then(() => {
+            setPhotoProgress(null);
+          });
+        }
       } else {
         Alert.alert(
           lang === "zh" ? "同步失败" : "Sync Failed",
@@ -556,6 +574,18 @@ export default function DeviceManagerScreen() {
                 </Text>
               )}
             </Pressable>
+            {/* 照片同步进度 */}
+            {photoProgress && photoProgress.total > 0 && (
+              <Text style={[styles.photoProgressText, { color: colors.muted }]}>
+                {photoProgress.phase === "upload"
+                  ? (lang === "zh"
+                    ? `上传照片 ${photoProgress.done}/${photoProgress.total} 张`
+                    : `Uploading ${photoProgress.done}/${photoProgress.total} photos`)
+                  : (lang === "zh"
+                    ? `下载照片 ${photoProgress.done}/${photoProgress.total} 张`
+                    : `Downloading ${photoProgress.done}/${photoProgress.total} photos`)}
+              </Text>
+            )}
           </View>
 
           {/* Three-channel status */}
@@ -1066,5 +1096,6 @@ const styles = StyleSheet.create({
   actionBtn: { paddingHorizontal: 10, paddingVertical: 6 },
   actionBtnText: { fontSize: 13, fontWeight: "600", lineHeight: 18 },
   emptyText: { fontSize: 14, lineHeight: 20, textAlign: "center", paddingVertical: 24 },
+  photoProgressText: { fontSize: 12, lineHeight: 16, marginTop: 6, textAlign: "center" },
 });
 import { getCustomRoleName } from "./role-settings";

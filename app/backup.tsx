@@ -11,13 +11,15 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
 import { getBackupInfo, restoreFromBackup, backupLocalData, triggerStoreReload } from "@/lib/sync/engine";
-import { exportCurrentDataToFile, importFromJsonFile } from "@/lib/backup/local-backup";
+import { exportCurrentDataToFile, importFromJsonFile, listSnapshots, computeSnapshotDiff, computeBackupFileDiff } from "@/lib/backup/local-backup";
 import {
   performBackup,
   getICloudMeta,
   listBackupVersions,
   restoreFromBackup as restoreFromICloud,
 } from "@/lib/backup/icloud-backup";
+import { readBackupVersion } from "@/lib/backup/icloud-backup";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function BackupScreen() {
   const colors = useColors();
@@ -35,11 +37,115 @@ export default function BackupScreen() {
   const [icloudLastAt, setIcloudLastAt] = useState<number | null>(null);
   const [icloudRestoring, setIcloudRestoring] = useState(false);
   const [importing, setImporting] = useState(false);
+  // 本地快照列表（含 diff）
+  const [snapshots, setSnapshots] = useState<Array<{
+    slot: number; label: string; keyCount: number; createdAt: number; isValid: boolean;
+    diff?: { snapshot: { recipes: number; bottles: number; homemade: number }; current: { recipes: number; bottles: number; homemade: number } } | null;
+  }>>([]);
+  // iCloud 版本列表（含 diff）
+  const [icloudVersions, setIcloudVersions] = useState<Array<{
+    slot: number; label: string; keyCount: number; sizeBytes: number; createdAt: number; exists: boolean;
+    diff?: { snapshot: { recipes: number; bottles: number; homemade: number }; current: { recipes: number; bottles: number; homemade: number } } | null;
+  }>>([]);
+  const [icloudVersionsExpanded, setIcloudVersionsExpanded] = useState(false);
+  const [icloudVersionsLoading, setIcloudVersionsLoading] = useState(false);
 
   useEffect(() => {
     getBackupInfo().then((info) => setBackupTime(info?.time ?? null));
     getICloudMeta().then((meta) => setIcloudLastAt(meta.lastBackupAt));
+    void loadSnapshots();
   }, []);
+
+  const loadSnapshots = async () => {
+    const list = await listSnapshots();
+    const withDiff = await Promise.all(
+      list.map(async (s) => ({ ...s, diff: await computeSnapshotDiff(s.slot) })),
+    );
+    setSnapshots(withDiff);
+  };
+
+  const loadICloudVersions = async () => {
+    setIcloudVersionsLoading(true);
+    try {
+      const versions = await listBackupVersions();
+      const currentPairs = await AsyncStorage.multiGet(["cocktail.recipes", "cocktail.bottles", "homemade.preps.v1"]);
+      const currentData: Record<string, string | null> = {};
+      for (const [k, v] of currentPairs) currentData[k] = v;
+      const withDiff = await Promise.all(
+        versions.map(async (v) => {
+          if (!v.exists) return { ...v, diff: null };
+          const file = await readBackupVersion(v.slot);
+          if (!file) return { ...v, diff: null };
+          return { ...v, diff: computeBackupFileDiff(file.data, currentData) };
+        }),
+      );
+      setIcloudVersions(withDiff);
+    } finally {
+      setIcloudVersionsLoading(false);
+    }
+  };
+
+  const handleICloudVersionRestore = (slot: number, label: string) => {
+    Alert.alert(
+      lang === "zh" ? "确认恢复" : "Confirm Restore",
+      lang === "zh"
+        ? `确定要恢复 ${label} 的备份吗？\n\n当前所有数据将被替换，此操作不可撤销。`
+        : `Restore backup from ${label}?\n\nAll current data will be replaced. This cannot be undone.`,
+      [
+        { text: lang === "zh" ? "取消" : "Cancel", style: "cancel" },
+        {
+          text: lang === "zh" ? "确认恢复" : "Restore",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const result = await restoreFromICloud(slot);
+              triggerStoreReload();
+              getICloudMeta().then((meta) => setIcloudLastAt(meta.lastBackupAt));
+              Alert.alert(
+                lang === "zh" ? "恢复成功" : "Restore Complete",
+                lang === "zh"
+                  ? `已成功恢复 ${result.restored} 项数据。`
+                  : `Restored ${result.restored} items.`,
+              );
+            } catch {
+              Alert.alert(
+                lang === "zh" ? "恢复失败" : "Restore Failed",
+                lang === "zh" ? "无法读取备份文件，请重试。" : "Could not read backup file. Please try again.",
+              );
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleSnapshotRestore = (slot: number, label: string) => {
+    Alert.alert(
+      lang === "zh" ? "恢复快照" : "Restore Snapshot",
+      lang === "zh"
+        ? `确定要恢复至「${label}」的快照吗？\n\n当前所有数据将被替换。`
+        : `Restore snapshot "${label}"?\n\nAll current data will be replaced.`,
+      [
+        { text: lang === "zh" ? "取消" : "Cancel", style: "cancel" },
+        {
+          text: lang === "zh" ? "确认恢复" : "Restore",
+          style: "destructive",
+          onPress: async () => {
+            setRestoring(true);
+            const ok = await restoreFromBackup();
+            setRestoring(false);
+            if (ok) triggerStoreReload();
+            Alert.alert(
+              ok ? (lang === "zh" ? "恢复成功" : "Restored") : (lang === "zh" ? "恢复失败" : "Failed"),
+              ok
+                ? (lang === "zh" ? "数据已恢复。" : "Data restored.")
+                : (lang === "zh" ? "未找到快照数据。" : "Snapshot not found."),
+            );
+          },
+        },
+      ],
+    );
+  };
 
   // ─── 本地快照恢复 ─────────────────────────────────────────────────────────
   const handleRestore = () => {
@@ -326,22 +432,53 @@ export default function BackupScreen() {
             <IconSymbol name="chevron.right" size={16} color={colors.muted} />
           </Pressable>
           <View style={styles.divider} />
-          {/* 从 iCloud 恢复 */}
+          {/* 从 iCloud 恢复 — 展开版本列表 */}
           <Pressable
-            onPress={handleICloudRestore}
-            disabled={icloudRestoring}
-            style={({ pressed }) => [styles.row, (pressed || icloudRestoring) && { opacity: 0.7 }]}
+            onPress={() => {
+              tap();
+              if (!icloudVersionsExpanded) void loadICloudVersions();
+              setIcloudVersionsExpanded((v) => !v);
+            }}
+            disabled={icloudVersionsLoading}
+            style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
           >
             <View style={{ flex: 1 }}>
               <Text style={styles.rowTitle} className="text-foreground">
-                {icloudRestoring ? (lang === "zh" ? "加载中…" : "Loading…") : (lang === "zh" ? "从 iCloud 恢复" : "Restore from iCloud")}
+                {icloudVersionsLoading ? (lang === "zh" ? "加载中…" : "Loading…") : (lang === "zh" ? "从 iCloud 恢复" : "Restore from iCloud")}
               </Text>
               <Text style={styles.rowDesc} className="text-muted">
-                {lang === "zh" ? "选择历史版本恢复数据（最多 7 个版本）" : "Choose a version to restore (up to 7 versions)"}
+                {lang === "zh" ? "点击展开版本列表，查看各版本数据差异" : "Tap to expand versions with data diff"}
               </Text>
             </View>
-            <IconSymbol name="chevron.right" size={16} color={colors.muted} />
+            <IconSymbol name={icloudVersionsExpanded ? "chevron.right" : "chevron.right"} size={16} color={colors.muted} />
           </Pressable>
+          {icloudVersionsExpanded && icloudVersions.map((v) => (
+            <React.Fragment key={v.slot}>
+              <View style={[styles.divider, { marginLeft: 16 }]} />
+              <Pressable
+                onPress={() => { tap(); handleICloudVersionRestore(v.slot, v.label); }}
+                style={({ pressed }) => [styles.versionRow, pressed && { opacity: 0.7 }]}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.versionLabel, { color: colors.foreground }]}>{v.label}</Text>
+                  {v.diff ? (
+                    <Text style={[styles.diffText, { color: colors.muted }]}>
+                      {lang === "zh"
+                        ? `配方 ${v.diff.snapshot.recipes}（当前 ${v.diff.current.recipes}）· 酒款 ${v.diff.snapshot.bottles}（当前 ${v.diff.current.bottles}）· 自制 ${v.diff.snapshot.homemade}（当前 ${v.diff.current.homemade}）`
+                        : `Recipes ${v.diff.snapshot.recipes} (now ${v.diff.current.recipes}) · Bottles ${v.diff.snapshot.bottles} (now ${v.diff.current.bottles}) · Homemade ${v.diff.snapshot.homemade} (now ${v.diff.current.homemade})`}
+                    </Text>
+                  ) : (
+                    <Text style={[styles.diffText, { color: colors.muted }]}>
+                      {v.exists ? (lang === "zh" ? "无法读取差异" : "Diff unavailable") : (lang === "zh" ? "文件不存在" : "File missing")}
+                    </Text>
+                  )}
+                </View>
+                <Text style={[styles.restoreBtn, { color: colors.primary }]}>
+                  {lang === "zh" ? "恢复" : "Restore"}
+                </Text>
+              </Pressable>
+            </React.Fragment>
+          ))}
         </View>
 
         {/* 本地快照卡片 */}
@@ -398,6 +535,45 @@ export default function BackupScreen() {
                 </View>
                 <IconSymbol name="chevron.right" size={16} color={colors.muted} />
               </Pressable>
+            </>
+          )}
+          {/* 历史快照列表（含 diff） */}
+          {snapshots.length > 0 && (
+            <>
+              <View style={styles.divider} />
+              <View style={[styles.row, { paddingVertical: 8 }]}>
+                <Text style={[styles.rowDesc, { color: colors.muted, flex: 1 }]}>
+                  {lang === "zh" ? "历史快照版本" : "Snapshot History"}
+                </Text>
+              </View>
+              {snapshots.map((s) => (
+                <React.Fragment key={s.slot}>
+                  <View style={[styles.divider, { marginLeft: 16 }]} />
+                  <Pressable
+                    onPress={() => { tap(); handleSnapshotRestore(s.slot, s.label); }}
+                    disabled={restoring}
+                    style={({ pressed }) => [styles.versionRow, pressed && { opacity: 0.7 }]}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.versionLabel, { color: colors.foreground }]}>{s.label}</Text>
+                      {s.diff ? (
+                        <Text style={[styles.diffText, { color: colors.muted }]}>
+                          {lang === "zh"
+                            ? `配方 ${s.diff.snapshot.recipes}（当前 ${s.diff.current.recipes}）· 酒款 ${s.diff.snapshot.bottles}（当前 ${s.diff.current.bottles}）· 自制 ${s.diff.snapshot.homemade}（当前 ${s.diff.current.homemade}）`
+                            : `Recipes ${s.diff.snapshot.recipes} (now ${s.diff.current.recipes}) · Bottles ${s.diff.snapshot.bottles} (now ${s.diff.current.bottles}) · Homemade ${s.diff.snapshot.homemade} (now ${s.diff.current.homemade})`}
+                        </Text>
+                      ) : (
+                        <Text style={[styles.diffText, { color: colors.muted }]}>
+                          {s.isValid ? (lang === "zh" ? "无法计算差异" : "Diff unavailable") : (lang === "zh" ? "快照已损坏" : "Snapshot corrupted")}
+                        </Text>
+                      )}
+                    </View>
+                    <Text style={[styles.restoreBtn, { color: colors.primary }]}>
+                      {lang === "zh" ? "恢复" : "Restore"}
+                    </Text>
+                  </Pressable>
+                </React.Fragment>
+              ))}
             </>
           )}
         </View>
@@ -553,5 +729,26 @@ const styles = StyleSheet.create({
   rowDesc: {
     fontSize: 12,
     marginTop: 2,
+  },
+  versionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: "rgba(0,0,0,0.02)",
+  },
+  versionLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  diffText: {
+    fontSize: 11,
+    marginTop: 2,
+    lineHeight: 15,
+  },
+  restoreBtn: {
+    fontSize: 14,
+    fontWeight: "600",
   },
 });

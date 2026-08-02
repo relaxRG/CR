@@ -152,6 +152,56 @@ export async function restoreFromSnapshot(slot: number): Promise<{ restored: num
   return { restored, failed };
 }
 
+/** 从 data 记录中解析各类数据的条目数量 */
+function parseDataCounts(data: Record<string, string | null>): {
+  recipes: number;
+  bottles: number;
+  homemade: number;
+} {
+  const parse = (key: string): number => {
+    const raw = data[key];
+    if (!raw) return 0;
+    try {
+      const arr = JSON.parse(raw);
+      return Array.isArray(arr) ? arr.length : 0;
+    } catch {
+      return 0;
+    }
+  };
+  return {
+    recipes: parse("cocktail.recipes"),
+    bottles: parse("cocktail.bottles"),
+    homemade: parse("homemade.preps.v1"),
+  };
+}
+
+/** 计算本地快照与当前 AsyncStorage 数据的差异摘要 */
+export async function computeSnapshotDiff(slot: number): Promise<{
+  snapshot: { recipes: number; bottles: number; homemade: number };
+  current: { recipes: number; bottles: number; homemade: number };
+} | null> {
+  const snapshot = await readSnapshot(slot);
+  if (!snapshot) return null;
+  const currentPairs = await AsyncStorage.multiGet(["cocktail.recipes", "cocktail.bottles", "homemade.preps.v1"]);
+  const currentData: Record<string, string | null> = {};
+  for (const [k, v] of currentPairs) currentData[k] = v;
+  return {
+    snapshot: parseDataCounts(snapshot.data),
+    current: parseDataCounts(currentData),
+  };
+}
+
+/** 从任意 data 字段计算差异摘要（用于 iCloud 备份 diff） */
+export function computeBackupFileDiff(
+  backupData: Record<string, string | null>,
+  currentData: Record<string, string | null>,
+): { snapshot: { recipes: number; bottles: number; homemade: number }; current: { recipes: number; bottles: number; homemade: number } } {
+  return {
+    snapshot: parseDataCounts(backupData),
+    current: parseDataCounts(currentData),
+  };
+}
+
 /** 获取所有有效快照的摘要（用于 UI 展示） */
 export async function listSnapshots(): Promise<Array<{
   slot: number;

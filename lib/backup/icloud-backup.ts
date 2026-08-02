@@ -174,6 +174,21 @@ export async function listBackupVersions(): Promise<Array<{
   return results.sort((a, b) => b.createdAt - a.createdAt);
 }
 
+/** 读取指定槽位的备份文件原始数据（不恢复，仅用于 diff 对比） */
+export async function readBackupVersion(slot: number): Promise<ICloudBackupFile | null> {
+  const dir = await ensureBackupDir();
+  if (!dir) return null;
+  try {
+    const filePath = `${dir}backup-v${slot}.json`;
+    const info = await FileSystem.getInfoAsync(filePath);
+    if (!info.exists) return null;
+    const raw = await new FSFile(filePath).text();
+    return JSON.parse(raw) as ICloudBackupFile;
+  } catch {
+    return null;
+  }
+}
+
 /** 从备份文件恢复 */
 export async function restoreFromBackup(slot: number): Promise<{ restored: number; failed: number }> {
   const dir = await ensureBackupDir();
