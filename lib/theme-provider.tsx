@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { Appearance, View, useColorScheme as useSystemColorScheme } from "react-native";
+import { Appearance, View, useColorScheme as useSystemColorScheme, AppState } from "react-native";
 import { colorScheme as nativewindColorScheme, vars } from "nativewind";
 
 import { SchemeColors, type ColorScheme } from "@/constants/theme";
@@ -14,6 +14,8 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const systemScheme = useSystemColorScheme() ?? "light";
   const [colorScheme, setColorSchemeState] = useState<ColorScheme>(systemScheme);
+  // 用户是否手动覆盖了主题
+  const [userOverride, setUserOverride] = useState(false);
 
   const applyScheme = useCallback((scheme: ColorScheme) => {
     nativewindColorScheme.set(scheme);
@@ -32,11 +34,31 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const setColorScheme = useCallback((scheme: ColorScheme) => {
     setColorSchemeState(scheme);
     applyScheme(scheme);
+    setUserOverride(true);
   }, [applyScheme]);
 
   useEffect(() => {
     applyScheme(colorScheme);
   }, [applyScheme, colorScheme]);
+
+  // 自动跟随系统主题（未手动覆盖时）
+  useEffect(() => {
+    if (userOverride) return;
+    const sub = Appearance.addChangeListener(({ colorScheme: sys }) => {
+      const next = (sys ?? "light") as ColorScheme;
+      setColorSchemeState(next);
+      applyScheme(next);
+    });
+    return () => sub.remove();
+  }, [userOverride, applyScheme]);
+
+  // 当系统主题变化时（通过 useColorScheme hook 检测），同步更新
+  useEffect(() => {
+    if (!userOverride) {
+      setColorSchemeState(systemScheme);
+      applyScheme(systemScheme);
+    }
+  }, [systemScheme, userOverride, applyScheme]);
 
   const themeVariables = useMemo(
     () =>
