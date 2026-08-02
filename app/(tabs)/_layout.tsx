@@ -4,6 +4,7 @@ import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
 import { FloatingTabBar, FloatingTabItem } from "@/components/floating-tab-bar";
 import { useRouter, usePathname } from "expo-router";
+import { useSync } from "@/lib/cf-sync/provider";
 
 export default function TabLayout() {
   const colors = useColors();
@@ -16,6 +17,10 @@ export default function TabLayout() {
     : pathname.startsWith("/books") ? "books"
     : pathname.startsWith("/me") ? "me"
     : "index";
+
+  const { syncState, syncError } = useSync();
+  // 有同步失败（syncState.error）或 provider 级别错误时显示红点
+  const syncBadge = !!syncError || !!syncState.error;
 
   const TAB_ITEMS: FloatingTabItem[] = [
     {
@@ -41,6 +46,7 @@ export default function TabLayout() {
       label: t("tab.me"),
       icon: <IconSymbol size={24} name="person.crop.circle.fill" color={colors.muted} />,
       activeIcon: <IconSymbol size={24} name="person.crop.circle.fill" color={colors.primary} />,
+      badge: syncBadge,
     },
   ];
 

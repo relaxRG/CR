@@ -9,6 +9,8 @@ export interface FloatingTabItem {
   label: string;
   icon: React.ReactNode;
   activeIcon?: React.ReactNode;
+  /** 是否显示红点角标（如同步冲突/失败提醒） */
+  badge?: boolean;
 }
 
 /**
@@ -60,6 +62,9 @@ export function FloatingTabBar({
             ]}
           >
             <View style={styles.iconWrap}>
+              {item.badge && (
+                <View style={styles.badgeDot} />
+              )}
               {active ? (item.activeIcon ?? item.icon) : item.icon}
             </View>
             <Text
@@ -139,5 +144,14 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "600",
     lineHeight: 13,
+  },
+  badgeDot: {
+    position: "absolute",
+    top: -2,
+    right: -2,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#FF3B30",
   },
 });

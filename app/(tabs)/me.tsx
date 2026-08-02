@@ -13,6 +13,7 @@ import { useSync } from "@/lib/cf-sync/provider";
 import React, { useEffect, useState } from "react";
 import { getBackupInfo, restoreFromBackup, backupLocalData } from "@/lib/sync/engine";
 import { exportCurrentDataToFile, importFromJsonFile } from "@/lib/backup/local-backup";
+import { performBackup, getICloudMeta } from "@/lib/backup/icloud-backup";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
 
@@ -32,9 +33,12 @@ export default function MeScreen() {
 
   const [backupTime, setBackupTime] = useState<number | null>(null);
   const [restoring, setRestoring] = useState(false);
+  const [icloudBacking, setIcloudBacking] = useState(false);
+  const [icloudLastAt, setIcloudLastAt] = useState<number | null>(null);
 
   useEffect(() => {
     getBackupInfo().then((info) => setBackupTime(info?.time ?? null));
+    getICloudMeta().then((meta) => setIcloudLastAt(meta.lastBackupAt));
   }, [syncState.lastSyncedAt]);
 
   const handleRestore = () => {
@@ -77,6 +81,27 @@ export default function MeScreen() {
       lang === "zh" ? "备份成功" : "Backup Created",
       lang === "zh" ? "当前数据已备份，同步异常时可一键恢复。" : "Current data backed up. You can restore it if sync goes wrong.",
     );
+  };
+
+  const handleICloudBackup = async () => {
+    setIcloudBacking(true);
+    try {
+      const meta = await performBackup("手动备份");
+      setIcloudLastAt(meta.lastBackupAt);
+      Alert.alert(
+        lang === "zh" ? "iCloud 备份成功" : "iCloud Backup Complete",
+        lang === "zh"
+          ? `数据已保存到 iCloud Drive，共 ${meta.slots.filter(Boolean).length} 个版本可用。`
+          : `Data saved to iCloud Drive. ${meta.slots.filter(Boolean).length} version(s) available.`,
+      );
+    } catch (e) {
+      Alert.alert(
+        lang === "zh" ? "备份失败" : "Backup Failed",
+        lang === "zh" ? "无法写入 iCloud Drive，请检查 iCloud 设置。" : "Could not write to iCloud Drive. Check your iCloud settings.",
+      );
+    } finally {
+      setIcloudBacking(false);
+    }
   };
 
   const handleExportFile = async () => {
@@ -510,8 +535,6 @@ export default function MeScreen() {
               </View>
               <IconSymbol name="chevron.right" size={18} color={colors.muted} />
             </Pressable>
-          </View>
-        </View>
             <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 64 }} />
             {/* 从文件导入备份 */}
             <Pressable
@@ -534,6 +557,31 @@ export default function MeScreen() {
               </View>
               <IconSymbol name="chevron.right" size={18} color={colors.muted} />
             </Pressable>
+            <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 64 }} />
+            {/* iCloud 自动备份 */}
+            <Pressable
+              onPress={handleICloudBackup}
+              disabled={icloudBacking}
+              style={({ pressed }) => [styles.row, (pressed || icloudBacking) && { opacity: 0.7 }]}
+            >
+              <View style={[styles.iconWrap, { backgroundColor: "#007AFF" }]}>
+                <IconSymbol name="icloud.fill" size={18} color="#FFFFFF" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowTitle} className="text-foreground">
+                  {icloudBacking
+                    ? (lang === "zh" ? "备份中…" : "Backing up…")
+                    : (lang === "zh" ? "备份到 iCloud" : "Backup to iCloud")}
+                </Text>
+                <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>
+                  {icloudLastAt
+                    ? (lang === "zh" ? `上次 iCloud 备份：${new Date(icloudLastAt).toLocaleString()}` : `Last iCloud backup: ${new Date(icloudLastAt).toLocaleString()}`)
+                    : (lang === "zh" ? "自动保存到 iCloud Drive，7 个版本循环保留" : "Auto-saved to iCloud Drive, 7 rotating versions")}
+                </Text>
+              </View>
+            </Pressable>
+          </View>
+        </View>
 
         <View className="px-5 pb-4">
           <View style={{ backgroundColor: colors.surface, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, overflow: "hidden" }}>
