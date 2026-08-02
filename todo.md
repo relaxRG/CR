@@ -620,3 +620,14 @@
 - [x] importFromJsonFile：从 JSON 文件导入数据恢复备份
 - [x] 「我的」页面新增「导出备份文件」按钮（紫色图标）
 - [x] sync-log.tsx 新增 conflict 类型显示（橙色）
+
+## Build 78 - 备份文件导入功能
+
+- [x] 「我的」页面新增「从文件导入备份」按钮（橙色图标）
+- [x] 使用 expo-document-picker 选择 JSON 文件（仅显示 JSON 类型）
+- [x] 使用 expo-file-system 读取文件内容
+- [x] 预检：验证 appId 是否为 cocktail-r，防止导入错误文件
+- [x] 确认弹框：显示备份时间、数据条目数，提示不可撤销
+- [x] 导入后自动调用 triggerStoreReload() 刷新所有 store 内存状态
+- [x] 导入成功提示：显示恢复条目数，提示重启 App
+- [x] 导入中状态：按钮显示「导入中…」并禁用，防止重复操作

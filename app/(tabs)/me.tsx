@@ -12,6 +12,9 @@ import { useHomemadeStore } from "@/lib/homemade/store";
 import { useSync } from "@/lib/cf-sync/provider";
 import React, { useEffect, useState } from "react";
 import { getBackupInfo, restoreFromBackup, backupLocalData } from "@/lib/sync/engine";
+import { exportCurrentDataToFile, importFromJsonFile } from "@/lib/backup/local-backup";
+import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system/legacy";
 
 /** "我的"个人中心页:数据总览、标签管理与批量导入入口、语言设置 */
 export default function MeScreen() {
@@ -82,6 +85,97 @@ export default function MeScreen() {
     } catch (e) {
       Alert.alert(
         lang === "zh" ? "导出失败" : "Export Failed",
+        e instanceof Error ? e.message : String(e),
+      );
+    }
+  };
+
+  const [importing, setImporting] = useState(false);
+
+  const handleImportFile = async () => {
+    if (Platform.OS === "web") {
+      Alert.alert(
+        lang === "zh" ? "不支持" : "Not Supported",
+        lang === "zh" ? "请在移动设备上使用此功能" : "Please use this feature on a mobile device",
+      );
+      return;
+    }
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: "application/json",
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+      if (result.canceled || !result.assets?.[0]) return;
+
+      const asset = result.assets[0];
+      // 读取文件内容
+      const jsonString = await FileSystem.readAsStringAsync(asset.uri, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+
+      // 解析并预检
+      let parsed: { appId?: string; keyCount?: number; snapshotCreatedAt?: string };
+      try {
+        parsed = JSON.parse(jsonString);
+      } catch {
+        Alert.alert(
+          lang === "zh" ? "文件无效" : "Invalid File",
+          lang === "zh" ? "所选文件不是有效的 JSON 格式" : "The selected file is not valid JSON",
+        );
+        return;
+      }
+      if (parsed.appId !== "cocktail-r") {
+        Alert.alert(
+          lang === "zh" ? "文件不匹配" : "Wrong File",
+          lang === "zh" ? "该文件不是 cocktail R 的备份文件" : "This file is not a cocktail R backup",
+        );
+        return;
+      }
+
+      const dateStr = parsed.snapshotCreatedAt
+        ? new Date(parsed.snapshotCreatedAt).toLocaleString()
+        : lang === "zh" ? "未知时间" : "unknown time";
+      const keyCount = parsed.keyCount ?? "?";
+
+      Alert.alert(
+        lang === "zh" ? "确认导入" : "Confirm Import",
+        lang === "zh"
+          ? `将从备份文件恢复数据：\n\n备份时间：${dateStr}\n数据条目：${keyCount} 项\n\n⚠️ 当前所有数据将被替换为备份内容，此操作不可撤销。`
+          : `Restore from backup file:\n\nBackup time: ${dateStr}\nData entries: ${keyCount}\n\n⚠️ All current data will be replaced. This cannot be undone.`,
+        [
+          { text: lang === "zh" ? "取消" : "Cancel", style: "cancel" },
+          {
+            text: lang === "zh" ? "确认导入" : "Import",
+            style: "destructive",
+            onPress: async () => {
+              setImporting(true);
+              try {
+                const { restored, failed } = await importFromJsonFile(jsonString);
+                // 触发所有 store 重新加载
+                const { triggerStoreReload } = await import("@/lib/sync/engine");
+                triggerStoreReload();
+                Alert.alert(
+                  lang === "zh" ? "导入成功" : "Import Successful",
+                  lang === "zh"
+                    ? `已成功恢复 ${restored} 条数据${failed > 0 ? `，${failed} 条失败` : ""}。\n\n请重启 App 以确保所有界面刷新。`
+                    : `Restored ${restored} entries${failed > 0 ? `, ${failed} failed` : ""}.\n\nPlease restart the app to refresh all screens.`,
+                );
+              } catch (e) {
+                Alert.alert(
+                  lang === "zh" ? "导入失败" : "Import Failed",
+                  e instanceof Error ? e.message : String(e),
+                );
+              } finally {
+                setImporting(false);
+              }
+            },
+          },
+        ],
+      );
+    } catch (e) {
+      Alert.alert(
+        lang === "zh" ? "选择文件失败" : "File Selection Failed",
         e instanceof Error ? e.message : String(e),
       );
     }
@@ -418,6 +512,28 @@ export default function MeScreen() {
             </Pressable>
           </View>
         </View>
+            <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 64 }} />
+            {/* 从文件导入备份 */}
+            <Pressable
+              onPress={handleImportFile}
+              disabled={importing}
+              style={({ pressed }) => [styles.row, (pressed || importing) && { opacity: 0.7 }]}
+            >
+              <View style={[styles.iconWrap, { backgroundColor: "#FF9F0A" }]}>
+                <IconSymbol name="square.and.arrow.down.fill" size={18} color="#FFFFFF" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowTitle} className="text-foreground">
+                  {importing
+                    ? (lang === "zh" ? "导入中…" : "Importing…")
+                    : (lang === "zh" ? "从文件导入备份" : "Import Backup File")}
+                </Text>
+                <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>
+                  {lang === "zh" ? "从 JSON 备份文件恢复数据，支持跨设备迁移" : "Restore from JSON backup, supports cross-device migration"}
+                </Text>
+              </View>
+              <IconSymbol name="chevron.right" size={18} color={colors.muted} />
+            </Pressable>
 
         <View className="px-5 pb-4">
           <View style={{ backgroundColor: colors.surface, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, overflow: "hidden" }}>
@@ -483,4 +599,3 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
 });
-import { exportCurrentDataToFile } from "@/lib/backup/local-backup";
