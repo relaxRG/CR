@@ -14,6 +14,8 @@ export interface QRScannerProps {
   onScanned: (code: string) => void;
   onClose: () => void;
   lang?: "zh" | "en";
+  /** 摄像头权限被拒时触发，调用方可切换回手动输入模式 */
+  onFallback?: () => void;
 }
 
 // ─── 仅在原生平台加载 expo-camera ────────────────────────────────────────────
@@ -41,16 +43,25 @@ if (Platform.OS !== "web") {
 }
 
 // ─── 原生扫码器内部组件 ────────────────────────────────────────────────────
-function NativeScanner({ onScanned, onClose, lang }: QRScannerProps & { lang: "zh" | "en" }) {
+function NativeScanner({ onScanned, onClose, lang, onFallback }: QRScannerProps & { lang: "zh" | "en" }) {
   const [permission, requestPermission] = useCameraPermissions!();
+  const [permDenied, setPermDenied] = useState(false);
   const [scanned, setScanned] = useState(false);
   const scannedRef = useRef(false);
 
   useEffect(() => {
     if (!permission?.granted) {
-      void requestPermission();
+      void requestPermission().then((result) => {
+        if (!result.granted) {
+          setPermDenied(true);
+          setTimeout(() => {
+            onFallback?.();
+            onClose();
+          }, 1500);
+        }
+      });
     }
-  }, [permission, requestPermission]);
+  }, [permission, requestPermission, onFallback, onClose]);
 
   const handleBarcode = ({ data }: { data: string }) => {
     if (scannedRef.current) return;
@@ -67,17 +78,23 @@ function NativeScanner({ onScanned, onClose, lang }: QRScannerProps & { lang: "z
         <View style={styles.permissionContainer}>
           <Text style={styles.permissionText}>
             {lang === "zh"
-              ? "需要摄像头权限才能扫描二维码"
-              : "Camera permission is required to scan QR codes"}
+              ? permDenied
+                ? "摄像头权限已被拒绝，即将切换为手动输入…"
+                : "需要摄像头权限才能扫描二维码"
+              : permDenied
+                ? "Camera permission denied, switching to manual input…"
+                : "Camera permission is required to scan QR codes"}
           </Text>
-          <Pressable
-            onPress={() => void requestPermission()}
-            style={({ pressed }) => [styles.permissionBtn, pressed && { opacity: 0.7 }]}
-          >
-            <Text style={styles.permissionBtnText}>
-              {lang === "zh" ? "授权摄像头" : "Grant Camera Access"}
-            </Text>
-          </Pressable>
+          {!permDenied && (
+            <Pressable
+              onPress={() => void requestPermission()}
+              style={({ pressed }) => [styles.permissionBtn, pressed && { opacity: 0.7 }]}
+            >
+              <Text style={styles.permissionBtnText}>
+                {lang === "zh" ? "授权摄像头" : "Grant Camera Access"}
+              </Text>
+            </Pressable>
+          )}
           <Pressable
             onPress={onClose}
             style={({ pressed }) => [styles.cancelBtn, pressed && { opacity: 0.7 }]}
@@ -138,9 +155,9 @@ function NativeScanner({ onScanned, onClose, lang }: QRScannerProps & { lang: "z
 }
 
 // ─── 公开组件：Web 平台返回 null ──────────────────────────────────────────
-export function QRScanner({ onScanned, onClose, lang = "zh" }: QRScannerProps) {
+export function QRScanner({ onScanned, onClose, lang = "zh", onFallback }: QRScannerProps) {
   if (Platform.OS === "web") return null;
-  return <NativeScanner onScanned={onScanned} onClose={onClose} lang={lang} />;
+  return <NativeScanner onScanned={onScanned} onClose={onClose} lang={lang} onFallback={onFallback} />;
 }
 
 const CORNER_SIZE = 24;

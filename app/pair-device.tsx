@@ -123,6 +123,10 @@ export default function PairDeviceScreen() {
           lang={lang}
           onScanned={handleScanned}
           onClose={() => setShowScanner(false)}
+          onFallback={() => {
+            setShowScanner(false);
+            setTimeout(() => inputRef.current?.focus(), 100);
+          }}
         />
       )}
 

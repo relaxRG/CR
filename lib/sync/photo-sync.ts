@@ -11,6 +11,7 @@
  */
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as FileSystem from "expo-file-system/legacy";
+import * as ImageManipulator from "expo-image-manipulator";
 import { Platform } from "react-native";
 
 import { CF_WORKER_URL, getDeviceInfo, type DeviceInfo } from "@/lib/cf-sync/client";
@@ -20,6 +21,11 @@ const UPLOADED_SET_KEY = "cf.photoSync.uploaded";
 const RECIPES_KEY = "cocktail.recipes";
 /** 单张照片 base64 上限（Worker 端 1.5M 字符限制，留余量） */
 const MAX_BASE64_LEN = 1_400_000;
+
+/** 触发压缩的阈值（1MB base64 ≈ 750KB 文件） */
+const COMPRESS_THRESHOLD = 1_000_000;
+/** 最低压缩质量，低于此值直接放弃 */
+const MIN_QUALITY = 0.3;
 
 let running = false;
 
@@ -35,6 +41,30 @@ function contentTypeOf(name: string): string {
   if (ext === "webp") return "image/webp";
   if (ext === "heic" || ext === "heif") return "image/heic";
   return "image/jpeg";
+}
+
+/**
+ * 迭代压缩照片直到 base64 长度 ≤ MAX_BASE64_LEN。
+ * 返回压缩后的 base64 字符串，若压缩失败则返回 null。
+ */
+async function compressToLimit(uri: string): Promise<string | null> {
+  let quality = 0.8;
+  while (quality >= MIN_QUALITY) {
+    try {
+      const result = await ImageManipulator.manipulateAsync(
+        uri,
+        [],
+        { compress: quality, format: ImageManipulator.SaveFormat.JPEG, base64: true },
+      );
+      if (result.base64 && result.base64.length <= MAX_BASE64_LEN) {
+        return result.base64;
+      }
+      quality = Math.round((quality - 0.15) * 100) / 100;
+    } catch {
+      return null;
+    }
+  }
+  return null;
 }
 
 async function loadUploadedSet(): Promise<Set<string>> {
@@ -125,7 +155,27 @@ async function uploadPendingPhotos(
           encoding: FileSystem.EncodingType.Base64,
         });
         if (base64.length > MAX_BASE64_LEN) {
-          // 超大照片跳过并标记，避免每轮重试
+          // 超大照片先尝试压缩再上传
+          if (base64.length > COMPRESS_THRESHOLD) {
+            const compressed = await compressToLimit(localPath);
+            if (compressed) {
+              // 压缩成功，用压缩后的 base64 继续上传
+              const res = await photoFetch("/api/photos/upload", deviceInfo, {
+                photoId: name,
+                recipeId: recipe?.id ?? "",
+                dataBase64: compressed,
+                contentType: "image/jpeg",
+              });
+              if (res.ok) {
+                uploaded.add(name);
+                count++;
+              }
+              done++;
+              onProgress?.("upload", done, pendingNames.length);
+              continue;
+            }
+          }
+          // 压缩失败或仍超限，跳过并标记
           uploaded.add(name);
           oversizedCount++;
           done++;

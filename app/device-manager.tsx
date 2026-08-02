@@ -263,6 +263,8 @@ export default function DeviceManagerScreen() {
     done: number;
     total: number;
   } | null>(null);
+  // 超大照片警告（压缩后仍超限，已跳过的数量）
+  const [oversizedWarn, setOversizedWarn] = useState(0);
 
   // Devices
   const [devices, setDevices] = useState<RemoteDevice[]>([]);
@@ -459,8 +461,9 @@ export default function DeviceManagerScreen() {
             if (phase === "upload" || phase === "download") {
               setPhotoProgress({ phase, done, total });
             }
-          }).then(() => {
+          }).then((result) => {
             setPhotoProgress(null);
+            if (result.oversized > 0) setOversizedWarn(result.oversized);
           });
         }
       } else {
@@ -584,6 +587,13 @@ export default function DeviceManagerScreen() {
                   : (lang === "zh"
                     ? `下载照片 ${photoProgress.done}/${photoProgress.total} 张`
                     : `Downloading ${photoProgress.done}/${photoProgress.total} photos`)}
+              </Text>
+            )}
+            {oversizedWarn > 0 && (
+              <Text style={[styles.photoProgressText, { color: "#FF9500" }]}>
+                {lang === "zh"
+                  ? `${oversizedWarn} 张照片压缩后仍超限，已跳过`
+                  : `${oversizedWarn} photo(s) still oversized after compression, skipped`}
               </Text>
             )}
           </View>

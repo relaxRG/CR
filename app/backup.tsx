@@ -462,7 +462,11 @@ export default function BackupScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.versionLabel, { color: colors.foreground }]}>{v.label}</Text>
                   {v.diff ? (
-                    <Text style={[styles.diffText, { color: colors.muted }]}>
+                    <Text style={[styles.diffText, { color: (() => {
+                      const d = v.diff;
+                      const gain = (d.snapshot.recipes - d.current.recipes) + (d.snapshot.bottles - d.current.bottles) + (d.snapshot.homemade - d.current.homemade);
+                      return gain > 0 ? "#34C759" : gain < 0 ? "#FF9500" : colors.muted;
+                    })() }]}>
                       {lang === "zh"
                         ? `配方 ${v.diff.snapshot.recipes}（当前 ${v.diff.current.recipes}）· 酒款 ${v.diff.snapshot.bottles}（当前 ${v.diff.current.bottles}）· 自制 ${v.diff.snapshot.homemade}（当前 ${v.diff.current.homemade}）`
                         : `Recipes ${v.diff.snapshot.recipes} (now ${v.diff.current.recipes}) · Bottles ${v.diff.snapshot.bottles} (now ${v.diff.current.bottles}) · Homemade ${v.diff.snapshot.homemade} (now ${v.diff.current.homemade})`}
@@ -557,7 +561,11 @@ export default function BackupScreen() {
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.versionLabel, { color: colors.foreground }]}>{s.label}</Text>
                       {s.diff ? (
-                        <Text style={[styles.diffText, { color: colors.muted }]}>
+                        <Text style={[styles.diffText, { color: (() => {
+                          const d = s.diff;
+                          const gain = (d.snapshot.recipes - d.current.recipes) + (d.snapshot.bottles - d.current.bottles) + (d.snapshot.homemade - d.current.homemade);
+                          return gain > 0 ? "#34C759" : gain < 0 ? "#FF9500" : colors.muted;
+                        })() }]}>
                           {lang === "zh"
                             ? `配方 ${s.diff.snapshot.recipes}（当前 ${s.diff.current.recipes}）· 酒款 ${s.diff.snapshot.bottles}（当前 ${s.diff.current.bottles}）· 自制 ${s.diff.snapshot.homemade}（当前 ${s.diff.current.homemade}）`
                             : `Recipes ${s.diff.snapshot.recipes} (now ${s.diff.current.recipes}) · Bottles ${s.diff.snapshot.bottles} (now ${s.diff.current.bottles}) · Homemade ${s.diff.snapshot.homemade} (now ${s.diff.current.homemade})`}
