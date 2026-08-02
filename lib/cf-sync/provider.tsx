@@ -34,6 +34,7 @@ import { resolveConflict, clearSyncError, type SyncConflict } from "@/lib/sync/e
 import { createSnapshot } from "@/lib/backup/local-backup";
 import { startAutoBackup } from "@/lib/backup/icloud-backup";
 import { syncPhotos } from "@/lib/sync/photo-sync";
+import { useI18n } from "@/lib/i18n";
 
 // ─── Context type (compatible with original useSync) ─────────────────────────
 type SyncContextValue = {
@@ -83,6 +84,7 @@ export function SyncProvider({
   const [authLoading, setAuthLoading] = useState(true);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [pendingConflicts, setPendingConflicts] = useState<SyncConflict[]>([]);
+  const { lang } = useI18n();
   const startedRef = useRef(false);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryCountRef = useRef(0);
@@ -106,12 +108,15 @@ export function SyncProvider({
     const label = STORAGE_KEY_LABELS[conflict.storageKey] ?? conflict.storageKey;
     const localTime = new Date(conflict.localTs).toLocaleTimeString();
     const remoteTime = new Date(conflict.remoteTs).toLocaleTimeString();
+    const isEn = lang === "en";
     Alert.alert(
-      "同步冲突",
-      `「${label}」在两台设备上几乎同时被修改：\n\n本机版本：${localTime}\n云端版本：${remoteTime}\n\n请选择保留哪一方：`,
+      isEn ? "Sync Conflict" : "同步冲突",
+      isEn
+        ? `"${label}" was modified on two devices at nearly the same time:\n\nLocal: ${localTime}\nCloud: ${remoteTime}\n\nWhich version would you like to keep?`
+        : `「${label}」在两台设备上几乎同时被修改：\n\n本机版本：${localTime}\n云端版本：${remoteTime}\n\n请选择保留哪一方：`,
       [
         {
-          text: "保留本机",
+          text: isEn ? "Keep Local" : "保留本机",
           style: "default",
           onPress: () => {
             void resolveConflict(conflict, true, pushFn ?? (async () => {}));
@@ -119,7 +124,7 @@ export function SyncProvider({
           },
         },
         {
-          text: "采用云端",
+          text: isEn ? "Use Cloud" : "采用云端",
           style: "destructive",
           onPress: () => {
             void resolveConflict(conflict, false, pushFn ?? (async () => {}));
@@ -129,7 +134,7 @@ export function SyncProvider({
       ],
       { cancelable: false },
     );
-  }, [pendingConflicts, pushFn]);
+  }, [pendingConflicts, pushFn, lang]);
 
   // Full sync pipeline: register (if needed) → pull → merge → push.
   // Returns true on success. Safe to call repeatedly (guarded by syncingRef).

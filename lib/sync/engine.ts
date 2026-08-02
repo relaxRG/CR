@@ -57,9 +57,9 @@ type PrefsMap = Record<string, PrefEntry>;
  * 将两个 cocktail.prefs.v1 JSON 字符串按「有利优先」策略合并：
  * - favorite / made: 任一为 true 则保留 true（any-true-wins）
  * - rating: 取较高值；若一方为 null/undefined 则保留另一方的非空值
- * 返回合并后的 JSON 字符串。
+ * 返回合并后的 JSON 字符串，以及是否比本地原始值「更有利」（用于决定是否主动推送）。
  */
-function mergePrefs(localJson: string, remoteJson: string): string {
+function mergePrefs(localJson: string, remoteJson: string): { merged: string; changed: boolean } {
   try {
     const local: PrefsMap = JSON.parse(localJson);
     const remote: PrefsMap = JSON.parse(remoteJson);
@@ -95,10 +95,13 @@ function mergePrefs(localJson: string, remoteJson: string): string {
       }
       merged[id] = entry;
     }
-    return JSON.stringify(merged);
+    const mergedJson = JSON.stringify(merged);
+    // 若合并结果与本地原始值不同，说明云端带来了更有利的数据，需要推送回去
+    const changed = mergedJson !== localJson;
+    return { merged: mergedJson, changed };
   } catch {
     // 解析失败时回退到本地值（保守策略）
-    return localJson;
+    return { merged: localJson, changed: false };
   }
 }
 
@@ -372,9 +375,16 @@ export async function runInitialSync(
       if (remote && (!localValue || (localTs > 0 && remote.clientUpdatedAt > localTs))) {
         // 云端更新 → 覆盖本地
         // prefs 键使用有利优先合并，其余键直接覆盖
-        const mergedValue = (PREFS_MERGE_KEYS.has(key) && localValue)
-          ? mergePrefs(localValue, remote.value)
-          : remote.value;
+        let mergedValue = remote.value;
+        if (PREFS_MERGE_KEYS.has(key) && localValue) {
+          const { merged, changed } = mergePrefs(localValue, remote.value);
+          mergedValue = merged;
+          // 合并结果比本地更有利 → 主动推送回云端，让其他设备也能受益
+          if (changed) {
+            const now2 = Date.now();
+            toUpload.push({ storageKey: key, value: merged, clientUpdatedAt: now2 });
+          }
+        }
         await AsyncStorage.setItem(key, mergedValue);
         await AsyncStorage.setItem(TS_PREFIX + key, String(remote.clientUpdatedAt));
         localOverwritten = true;
@@ -434,10 +444,19 @@ export async function resolveConflict(
   } else {
     // prefs 键：有利优先合并（不丢弃任何一方的正向数据）
     const valueToWrite = PREFS_MERGE_KEYS.has(conflict.storageKey)
-      ? mergePrefs(conflict.localValue, conflict.remoteValue)
+      ? mergePrefs(conflict.localValue, conflict.remoteValue).merged
       : conflict.remoteValue;
     await AsyncStorage.setItem(conflict.storageKey, valueToWrite);
     await AsyncStorage.setItem(TS_PREFIX + conflict.storageKey, String(conflict.remoteTs));
+    // 若合并结果比云端更有利，主动推送回去
+    if (PREFS_MERGE_KEYS.has(conflict.storageKey)) {
+      const { merged, changed } = mergePrefs(conflict.localValue, conflict.remoteValue);
+      if (changed) {
+        const now = Date.now();
+        void push([{ storageKey: conflict.storageKey, value: merged, clientUpdatedAt: now }])
+          .catch(() => {});
+      }
+    }
     triggerStoreReload();
     await appendLog({ time: Date.now(), type: "pull", keys: [conflict.storageKey], message: `冲突解决：采用云端版本` });
   }
