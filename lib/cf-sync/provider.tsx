@@ -116,12 +116,17 @@ export function SyncProvider({
       // ───────────────────────────────────────────────────────────────────
 
      if (info.role === "guest") {
-       // Guest devices: pull only, no push
-       const { entries } = await cfPull();
-       await runInitialSync(entries, async () => {
-         // no-op push for guests
+      // Guest devices: pull only, no push
+      const { entries } = await cfPull();
+       const guestOverwritten = await runInitialSync(entries, async () => {
+         // no-op push for guests — read-only devices don't push
        });
-     } else {
+       if (guestOverwritten && Platform.OS === "web" && typeof window !== "undefined") {
+         window.location.reload();
+       } else if (guestOverwritten && Platform.OS !== "web") {
+         triggerStoreReload();
+       }
+    } else {
        // Owner / collaborator: full sync
        const { entries } = await cfPull();
        const overwritten = await runInitialSync(entries, pushFn);
