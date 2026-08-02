@@ -9,6 +9,9 @@
  */
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SYNC_KEYS } from "@/lib/sync/engine";
+import * as FileSystem from "expo-file-system/legacy";
+import * as Sharing from "expo-sharing";
+import { Platform } from "react-native";
 
 const SNAPSHOT_PREFIX = "backup.snapshot.";
 const SNAPSHOT_META_KEY = "backup.meta";
@@ -160,7 +163,6 @@ export async function listSnapshots(): Promise<Array<{
 }>> {
   const meta = await getSnapshotMeta();
   const results = [];
-
   for (let i = 0; i < MAX_SNAPSHOTS; i++) {
     const slotMeta = meta.slots[i];
     if (!slotMeta) continue;
@@ -174,7 +176,125 @@ export async function listSnapshots(): Promise<Array<{
       isValid,
     });
   }
-
   // 按时间倒序
   return results.sort((a, b) => b.createdAt - a.createdAt);
+}
+
+/**
+ * 将指定槽位的快照导出为 JSON 文件并通过系统分享面板分享
+ * 支持保存到 Files、发送到邮件/AirDrop 等
+ */
+export async function exportSnapshotToFile(slot: number): Promise<void> {
+  if (Platform.OS === "web") {
+    throw new Error("Web 平台不支持文件导出，请使用移动设备");
+  }
+  const snapshot = await readSnapshot(slot);
+  if (!snapshot) throw new Error(`快照槽位 ${slot} 不存在`);
+
+  const meta = await getSnapshotMeta();
+  const slotMeta = meta.slots[slot];
+  const label = slotMeta?.label ?? new Date(snapshot.createdAt).toISOString().slice(0, 16).replace("T", "_");
+  const safeLabel = label.replace(/[: ]/g, "-");
+
+  const exportData = {
+    version: 1,
+    appId: "cocktail-r",
+    exportedAt: new Date().toISOString(),
+    snapshotCreatedAt: new Date(snapshot.createdAt).toISOString(),
+    hash: snapshot.hash,
+    keyCount: Object.keys(snapshot.data).filter((k) => snapshot.data[k] !== null).length,
+    data: snapshot.data,
+  };
+
+  const json = JSON.stringify(exportData, null, 2);
+  const filename = `cocktail-r-backup-${safeLabel}.json`;
+  const fileUri = `${FileSystem.cacheDirectory}${filename}`;
+
+  await FileSystem.writeAsStringAsync(fileUri, json, { encoding: FileSystem.EncodingType.UTF8 });
+
+  const canShare = await Sharing.isAvailableAsync();
+  if (!canShare) throw new Error("当前设备不支持文件分享");
+
+  await Sharing.shareAsync(fileUri, {
+    mimeType: "application/json",
+    dialogTitle: "导出 cocktail R 备份",
+    UTI: "public.json",
+  });
+}
+
+/**
+ * 将当前所有数据（实时读取，不依赖快照）导出为 JSON 文件
+ * 适合在没有快照时直接导出当前状态
+ */
+export async function exportCurrentDataToFile(): Promise<void> {
+  if (Platform.OS === "web") {
+    throw new Error("Web 平台不支持文件导出，请使用移动设备");
+  }
+
+  const pairs = await AsyncStorage.multiGet([...SYNC_KEYS]);
+  const data: Record<string, string | null> = {};
+  for (const [key, value] of pairs) {
+    data[key] = value;
+  }
+
+  const now = Date.now();
+  const label = new Date(now).toISOString().slice(0, 16).replace("T", "_").replace(/:/g, "-");
+
+  const exportData = {
+    version: 1,
+    appId: "cocktail-r",
+    exportedAt: new Date(now).toISOString(),
+    snapshotCreatedAt: new Date(now).toISOString(),
+    keyCount: Object.keys(data).filter((k) => data[k] !== null).length,
+    data,
+  };
+
+  const json = JSON.stringify(exportData, null, 2);
+  const filename = `cocktail-r-backup-${label}.json`;
+  const fileUri = `${FileSystem.cacheDirectory}${filename}`;
+
+  await FileSystem.writeAsStringAsync(fileUri, json, { encoding: FileSystem.EncodingType.UTF8 });
+
+  const canShare = await Sharing.isAvailableAsync();
+  if (!canShare) throw new Error("当前设备不支持文件分享");
+
+  await Sharing.shareAsync(fileUri, {
+    mimeType: "application/json",
+    dialogTitle: "导出 cocktail R 备份",
+    UTI: "public.json",
+  });
+}
+
+/**
+ * 从 JSON 文件导入数据（恢复备份）
+ * @param jsonString 从文件读取的 JSON 字符串
+ */
+export async function importFromJsonFile(jsonString: string): Promise<{ restored: number; failed: number }> {
+  let parsed: { version?: number; appId?: string; data?: Record<string, string | null> };
+  try {
+    parsed = JSON.parse(jsonString);
+  } catch {
+    throw new Error("文件格式无效，请选择正确的 cocktail R 备份文件");
+  }
+
+  if (parsed.appId !== "cocktail-r") {
+    throw new Error("该文件不是 cocktail R 的备份文件");
+  }
+  if (!parsed.data || typeof parsed.data !== "object") {
+    throw new Error("备份文件数据损坏");
+  }
+
+  let restored = 0;
+  let failed = 0;
+  for (const [key, value] of Object.entries(parsed.data)) {
+    try {
+      if (value !== null && (SYNC_KEYS as readonly string[]).includes(key)) {
+        await AsyncStorage.setItem(key, value);
+        restored++;
+      }
+    } catch {
+      failed++;
+    }
+  }
+  return { restored, failed };
 }

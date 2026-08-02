@@ -76,6 +76,17 @@ export default function MeScreen() {
     );
   };
 
+  const handleExportFile = async () => {
+    try {
+      await exportCurrentDataToFile();
+    } catch (e) {
+      Alert.alert(
+        lang === "zh" ? "导出失败" : "Export Failed",
+        e instanceof Error ? e.message : String(e),
+      );
+    }
+  };
+
 
   const syncStatusText = !isAuthenticated
     ? t("sync.off")
@@ -386,6 +397,25 @@ export default function MeScreen() {
               </View>
               <IconSymbol name="chevron.right" size={18} color={colors.muted} />
             </Pressable>
+            <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 64 }} />
+            {/* 导出备份文件 */}
+            <Pressable
+              onPress={handleExportFile}
+              style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
+            >
+              <View style={[styles.iconWrap, { backgroundColor: "#5856D6" }]}>
+                <IconSymbol name="square.and.arrow.up.fill" size={18} color="#FFFFFF" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowTitle} className="text-foreground">
+                  {lang === "zh" ? "导出备份文件" : "Export Backup File"}
+                </Text>
+                <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>
+                  {lang === "zh" ? "将所有数据导出为 JSON 文件保存到本地" : "Export all data as JSON file to device"}
+                </Text>
+              </View>
+              <IconSymbol name="chevron.right" size={18} color={colors.muted} />
+            </Pressable>
           </View>
         </View>
 
@@ -453,3 +483,4 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
 });
+import { exportCurrentDataToFile } from "@/lib/backup/local-backup";

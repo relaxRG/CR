@@ -6,6 +6,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
  * - 登录后 initialSync: 云端有数据 → 按键比较时间戳合并;首次 → 上传本地全量
  * - 脏键 debounce 3s 批量 push,last-write-wins per key
  * - 同步前自动备份本地数据，出错可一键恢复
+ * - 60秒内双端都修改同一键 → 冲突，弹框让用户决策
  */
 
 /** 参与云端同步的全部 AsyncStorage 键 */
@@ -37,15 +38,27 @@ export const SYNC_KEYS = [
   "cocktail.iceSettings.v2",
 ] as const;
 
-const TS_PREFIX = "sync.ts."; // 每个键的本地最后修改时间戳
+const TS_PREFIX = "sync.ts.";
 const LAST_SYNC_KEY = "sync.lastPulledAt";
-const BACKUP_KEY = "sync.backup.v1"; // 同步前快照备份
-const SYNC_LOG_KEY = "sync.log.v1";  // 同步操作日志
+const BACKUP_KEY = "sync.backup.v1";
+const SYNC_LOG_KEY = "sync.log.v1";
 const MAX_LOG_ENTRIES = 50;
+
+/** 冲突判定窗口：60 秒内双端都有修改则视为冲突 */
+const CONFLICT_WINDOW_MS = 60_000;
 
 type PushFn = (
   entries: { storageKey: string; value: string; clientUpdatedAt: number }[],
 ) => Promise<unknown>;
+
+/** 同步冲突：两端在 CONFLICT_WINDOW_MS 内都修改了同一个键 */
+export type SyncConflict = {
+  storageKey: string;
+  localValue: string;
+  localTs: number;
+  remoteValue: string;
+  remoteTs: number;
+};
 
 const dirtyKeys = new Set<string>();
 let pushTimer: ReturnType<typeof setTimeout> | null = null;
@@ -55,7 +68,7 @@ const listeners = new Set<(state: SyncState) => void>();
 
 export type SyncLogEntry = {
   time: number;
-  type: "push" | "pull" | "backup" | "restore" | "error";
+  type: "push" | "pull" | "backup" | "restore" | "error" | "conflict";
   keys?: string[];
   message?: string;
 };
@@ -97,7 +110,6 @@ export function subscribeSyncState(fn: (s: SyncState) => void) {
   };
 }
 
-/** 追加同步日志（最多保留 MAX_LOG_ENTRIES 条）*/
 async function appendLog(entry: SyncLogEntry) {
   try {
     const raw = await AsyncStorage.getItem(SYNC_LOG_KEY);
@@ -109,7 +121,6 @@ async function appendLog(entry: SyncLogEntry) {
   } catch {}
 }
 
-/** 初始化时从 AsyncStorage 加载日志和备份状态 */
 export async function initSyncState() {
   try {
     const [logRaw, backupRaw] = await Promise.all([
@@ -121,10 +132,6 @@ export async function initSyncState() {
   } catch {}
 }
 
-/**
- * 同步前备份所有本地数据快照。
- * 备份存储在 BACKUP_KEY，包含时间戳和所有键值。
- */
 export async function backupLocalData(): Promise<void> {
   try {
     const snapshot: Record<string, string | null> = {};
@@ -140,10 +147,6 @@ export async function backupLocalData(): Promise<void> {
   }
 }
 
-/**
- * 从备份恢复所有本地数据。
- * 恢复后触发所有 store 重载。
- */
 export async function restoreFromBackup(): Promise<boolean> {
   try {
     const raw = await AsyncStorage.getItem(BACKUP_KEY);
@@ -169,7 +172,6 @@ export async function restoreFromBackup(): Promise<boolean> {
   }
 }
 
-/** 获取备份信息（时间戳）*/
 export async function getBackupInfo(): Promise<{ time: number } | null> {
   try {
     const raw = await AsyncStorage.getItem(BACKUP_KEY);
@@ -181,7 +183,6 @@ export async function getBackupInfo(): Promise<{ time: number } | null> {
   }
 }
 
-/** 获取同步日志 */
 export async function getSyncLog(): Promise<SyncLogEntry[]> {
   try {
     const raw = await AsyncStorage.getItem(SYNC_LOG_KEY);
@@ -233,7 +234,6 @@ async function flushDirtyKeys() {
       setState({ syncing: false });
     }
   } catch (err) {
-    // 推送失败:键重新标脏,等待下次调度
     keys.forEach((k) => dirtyKeys.add(k));
     const msg = err instanceof Error ? err.message : "sync push failed";
     setState({ error: msg, syncing: false });
@@ -242,25 +242,26 @@ async function flushDirtyKeys() {
 }
 
 /**
- * 登录后初始同步。
- * @param remoteEntries 云端全部键值
- * @param push 推送函数
- * @returns 是否有云端数据覆盖了本地(需要 reload store)
+ * 带冲突检测的初始同步。
+ * 冲突定义：本地和云端都在 CONFLICT_WINDOW_MS 内修改了同一个键。
+ * 冲突键不会自动覆盖，而是收集后返回给调用方，由 UI 弹框让用户选择。
  */
 export async function runInitialSync(
   remoteEntries: { storageKey: string; value: string; clientUpdatedAt: number }[],
   push: PushFn,
-): Promise<boolean> {
+): Promise<{ overwritten: boolean; conflicts: SyncConflict[] }> {
   pushFn = push;
   syncEnabled = true;
   setState({ enabled: true, syncing: true, error: null });
   let localOverwritten = false;
+  const conflicts: SyncConflict[] = [];
+
   try {
     const remoteMap = new Map(remoteEntries.map((e) => [e.storageKey, e]));
     const toUpload: { storageKey: string; value: string; clientUpdatedAt: number }[] = [];
     const pulledKeys: string[] = [];
 
-    // 检查是否会有云端覆盖本地的情况，如果有则先备份
+    // 预扫描：是否需要备份
     let willOverwrite = false;
     for (const key of SYNC_KEYS) {
       const [localValue, localTsRaw] = await Promise.all([
@@ -269,17 +270,19 @@ export async function runInitialSync(
       ]);
       const localTs = localTsRaw ? Number(localTsRaw) : 0;
       const remote = remoteMap.get(key);
-      if (remote && localValue && (localTs === 0 || remote.clientUpdatedAt > localTs)) {
-        willOverwrite = true;
-        break;
+      if (remote && localValue && localTs > 0 && remote.clientUpdatedAt > localTs) {
+        const diff = Math.abs(remote.clientUpdatedAt - localTs);
+        if (diff >= CONFLICT_WINDOW_MS) {
+          willOverwrite = true;
+          break;
+        }
       }
     }
-
-    // 有覆盖风险时，先备份当前本地数据
     if (willOverwrite) {
       await backupLocalData();
     }
 
+    // 主同步循环
     for (const key of SYNC_KEYS) {
       const [localValue, localTsRaw] = await Promise.all([
         AsyncStorage.getItem(key),
@@ -288,17 +291,29 @@ export async function runInitialSync(
       const localTs = localTsRaw ? Number(localTsRaw) : 0;
       const remote = remoteMap.get(key);
 
+      if (remote && localValue && localTs > 0 && remote.clientUpdatedAt !== localTs) {
+        const diff = Math.abs(remote.clientUpdatedAt - localTs);
+        if (diff < CONFLICT_WINDOW_MS) {
+          // 冲突：60秒内双端都有修改，不自动覆盖，交给用户决定
+          conflicts.push({
+            storageKey: key,
+            localValue,
+            localTs,
+            remoteValue: remote.value,
+            remoteTs: remote.clientUpdatedAt,
+          });
+          continue;
+        }
+      }
+
       if (remote && (!localValue || (localTs > 0 && remote.clientUpdatedAt > localTs))) {
         // 云端更新 → 覆盖本地
-        // 条件：本地无数据，或本地有时间戳且云端更新时间更新
-        // 注意：localTs === 0 且本地有数据时，说明是本地新建但未同步过，
-        // 此时不应直接被云端覆盖，而应上传本地数据（走下面的 else if 分支）
         await AsyncStorage.setItem(key, remote.value);
         await AsyncStorage.setItem(TS_PREFIX + key, String(remote.clientUpdatedAt));
         localOverwritten = true;
         pulledKeys.push(key);
       } else if (localValue != null && (!remote || localTs > remote.clientUpdatedAt)) {
-        // 本地更新（或云端没有，或本地有数据但无时间戳）→ 上传
+        // 本地更新 → 上传
         toUpload.push({
           storageKey: key,
           value: localValue,
@@ -308,37 +323,53 @@ export async function runInitialSync(
     }
 
     if (toUpload.length > 0) {
-      // 分批上传,避免单请求过大
       for (let i = 0; i < toUpload.length; i += 8) {
         await push(toUpload.slice(i, i + 8));
       }
     }
+
     const now = Date.now();
     await AsyncStorage.setItem(LAST_SYNC_KEY, String(now));
     setState({ syncing: false, lastSyncedAt: now });
 
     if (pulledKeys.length > 0) {
-      await appendLog({
-        time: now,
-        type: "pull",
-        keys: pulledKeys,
-        message: `从云端拉取 ${pulledKeys.length} 个键`,
-      });
+      await appendLog({ time: now, type: "pull", keys: pulledKeys, message: `从云端拉取 ${pulledKeys.length} 个键` });
     }
     if (toUpload.length > 0) {
-      await appendLog({
-        time: now,
-        type: "push",
-        keys: toUpload.map((e) => e.storageKey),
-        message: `上传本地 ${toUpload.length} 个键`,
-      });
+      await appendLog({ time: now, type: "push", keys: toUpload.map((e) => e.storageKey), message: `上传本地 ${toUpload.length} 个键` });
+    }
+    if (conflicts.length > 0) {
+      await appendLog({ time: now, type: "conflict", keys: conflicts.map((c) => c.storageKey), message: `检测到 ${conflicts.length} 个冲突，等待用户决策` });
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : "sync failed";
     setState({ syncing: false, error: msg });
     await appendLog({ time: Date.now(), type: "error", message: msg });
   }
-  return localOverwritten;
+  return { overwritten: localOverwritten, conflicts };
+}
+
+/**
+ * 解决冲突：用户选择保留本地或云端数据后调用。
+ * keepLocal=true → 将本地数据上传覆盖云端
+ * keepLocal=false → 将云端数据写入本地并触发 store 重载
+ */
+export async function resolveConflict(
+  conflict: SyncConflict,
+  keepLocal: boolean,
+  push: PushFn,
+): Promise<void> {
+  if (keepLocal) {
+    const now = Date.now();
+    await push([{ storageKey: conflict.storageKey, value: conflict.localValue, clientUpdatedAt: now }]);
+    await AsyncStorage.setItem(TS_PREFIX + conflict.storageKey, String(now));
+    await appendLog({ time: now, type: "push", keys: [conflict.storageKey], message: `冲突解决：保留本地版本` });
+  } else {
+    await AsyncStorage.setItem(conflict.storageKey, conflict.remoteValue);
+    await AsyncStorage.setItem(TS_PREFIX + conflict.storageKey, String(conflict.remoteTs));
+    triggerStoreReload();
+    await appendLog({ time: Date.now(), type: "pull", keys: [conflict.storageKey], message: `冲突解决：采用云端版本` });
+  }
 }
 
 /** 登出或权限被拒时停用同步 */
@@ -350,11 +381,6 @@ export function disableSync() {
   setState({ enabled: false, syncing: false });
 }
 
-/**
- * 原生端 store 重载机制:
- * 初始同步覆盖本地 AsyncStorage 后,各 store 需要重新从 AsyncStorage 加载。
- * 通过注册/取消注册回调实现,避免在 engine 里直接依赖 React。
- */
 const reloadCallbacks = new Set<() => void>();
 
 export function registerStoreReload(fn: () => void): () => void {

@@ -96,6 +96,7 @@ const MAPPING = {
   "list.dash": "reorder",
   "externaldrive.fill": "storage",
   "square.and.arrow.up": "share",
+  "square.and.arrow.up.fill": "share",
   "rectangle.3.group.fill": "grid-view",
   "laptopcomputer.and.iphone": "devices",
   "rectangle.portrait.and.arrow.right": "logout",

@@ -13,6 +13,7 @@ function typeLabel(type: SyncLogEntry["type"], lang: string) {
     backup:  ["备份", "Backup"],
     restore: ["恢复", "Restore"],
     error:   ["错误", "Error"],
+    conflict: ["冲突", "Conflict"],
   };
   return lang === "zh" ? map[type][0] : map[type][1];
 }
@@ -24,6 +25,7 @@ function typeColor(type: SyncLogEntry["type"]) {
     backup:  "#FF9500",
     restore: "#FF3B30",
     error:   "#FF3B30",
+    conflict: "#FF6B00",
   }[type];
 }
 

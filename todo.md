@@ -609,3 +609,14 @@
 - [x] UI：me.tsx 添加「同步日志」入口（绿色）
 - [x] 新增：app/sync-log.tsx 同步日志详情页
 - [x] 新增：icon-symbol.tsx 添加备份/恢复/日志图标映射
+
+## Build 77 - 同步冲突提示 + 备份导出文件
+
+- [x] 同步冲突检测：60秒内双端修改同一键时弹出 Alert 让用户选择保留哪一方
+- [x] 冲突解决函数 resolveConflict：支持保留本机或采用云端，并推送结果
+- [x] STORAGE_KEY_LABELS：冲突弹框显示用户可读的数据名称（配方库、标签、门店酒单等）
+- [x] exportCurrentDataToFile：将当前所有数据导出为 JSON 文件，通过系统分享面板保存到 Files
+- [x] exportSnapshotToFile：将指定快照槽位导出为 JSON 文件
+- [x] importFromJsonFile：从 JSON 文件导入数据恢复备份
+- [x] 「我的」页面新增「导出备份文件」按钮（紫色图标）
+- [x] sync-log.tsx 新增 conflict 类型显示（橙色）

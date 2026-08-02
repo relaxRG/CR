@@ -12,7 +12,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { AppState, Platform } from "react-native";
+import { Alert, AppState, Platform } from "react-native";
 import {
   cfPull,
   cfPush,
@@ -30,6 +30,7 @@ import {
   type SyncState,
   triggerStoreReload,
 } from "@/lib/sync/engine";
+import { resolveConflict, type SyncConflict } from "@/lib/sync/engine";
 import { createSnapshot } from "@/lib/backup/local-backup";
 import { startAutoBackup } from "@/lib/backup/icloud-backup";
 import { syncPhotos } from "@/lib/sync/photo-sync";
@@ -77,6 +78,7 @@ export function SyncProvider({
   const [deviceInfo, setDeviceInfo] = useState<DeviceInfo | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [pendingConflicts, setPendingConflicts] = useState<SyncConflict[]>([]);
   const startedRef = useRef(false);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryCountRef = useRef(0);
@@ -92,6 +94,38 @@ export function SyncProvider({
     },
     [],
   );
+
+  // 冲突解决：逐个弹出 Alert 让用户选择
+  useEffect(() => {
+    if (pendingConflicts.length === 0) return;
+    const conflict = pendingConflicts[0];
+    const label = STORAGE_KEY_LABELS[conflict.storageKey] ?? conflict.storageKey;
+    const localTime = new Date(conflict.localTs).toLocaleTimeString();
+    const remoteTime = new Date(conflict.remoteTs).toLocaleTimeString();
+    Alert.alert(
+      "同步冲突",
+      `「${label}」在两台设备上几乎同时被修改：\n\n本机版本：${localTime}\n云端版本：${remoteTime}\n\n请选择保留哪一方：`,
+      [
+        {
+          text: "保留本机",
+          style: "default",
+          onPress: () => {
+            void resolveConflict(conflict, true, pushFn ?? (async () => {}));
+            setPendingConflicts((prev) => prev.slice(1));
+          },
+        },
+        {
+          text: "采用云端",
+          style: "destructive",
+          onPress: () => {
+            void resolveConflict(conflict, false, pushFn ?? (async () => {}));
+            setPendingConflicts((prev) => prev.slice(1));
+          },
+        },
+      ],
+      { cancelable: false },
+    );
+  }, [pendingConflicts, pushFn]);
 
   // Full sync pipeline: register (if needed) → pull → merge → push.
   // Returns true on success. Safe to call repeatedly (guarded by syncingRef).
@@ -118,24 +152,30 @@ export function SyncProvider({
      if (info.role === "guest") {
       // Guest devices: pull only, no push
       const { entries } = await cfPull();
-       const guestOverwritten = await runInitialSync(entries, async () => {
-         // no-op push for guests — read-only devices don't push
-       });
-       if (guestOverwritten && Platform.OS === "web" && typeof window !== "undefined") {
-         window.location.reload();
-       } else if (guestOverwritten && Platform.OS !== "web") {
-         triggerStoreReload();
-       }
+       const { overwritten: guestOverwritten, conflicts: guestConflicts } = await runInitialSync(entries, async () => {
+        // no-op push for guests — read-only devices don't push
+      });
+      if (guestOverwritten && Platform.OS === "web" && typeof window !== "undefined") {
+        window.location.reload();
+      } else if (guestOverwritten && Platform.OS !== "web") {
+        triggerStoreReload();
+      }
+      if (guestConflicts.length > 0) {
+        setPendingConflicts(guestConflicts);
+      }
     } else {
-       // Owner / collaborator: full sync
-       const { entries } = await cfPull();
-       const overwritten = await runInitialSync(entries, pushFn);
+      // Owner / collaborator: full sync
+      const { entries } = await cfPull();
+       const { overwritten, conflicts } = await runInitialSync(entries, pushFn);
        if (overwritten && Platform.OS === "web" && typeof window !== "undefined") {
-         window.location.reload();
-       } else if (overwritten && Platform.OS !== "web") {
-         triggerStoreReload();
-       }
-     }
+        window.location.reload();
+      } else if (overwritten && Platform.OS !== "web") {
+        triggerStoreReload();
+      }
+      if (conflicts.length > 0) {
+        setPendingConflicts(conflicts);
+      }
+    }
       // 成品照片同步（非阻塞）：上传本地新照片、下载云端缺失照片并修复路径。
       // 下载/路径修复发生后触发 store 重载，让详情页立即显示照片。
       void syncPhotos()
@@ -294,3 +334,26 @@ export function useSync() {
 export function useCFSync() {
   return useSync();
 }
+
+/** 存储键 → 用户可读名称（用于冲突弹框） */
+const STORAGE_KEY_LABELS: Record<string, string> = {
+  "cocktail.recipes": "配方库",
+  "cocktail.categories": "分类",
+  "cocktail.tags": "标签",
+  "cocktail.tagGroups": "标签分组",
+  "cocktail.categoryGroups": "分类分组",
+  "cocktail.bottles": "酒款库",
+  "homemade.preps.v1": "自制库",
+  "homemade.sections.v1": "自制分区",
+  "homemade.types.v1": "自制类型",
+  "homemade.taxonomy.v2": "自制分类体系",
+  "bottles.taxonomy.categories.v1": "酒款分类",
+  "bottles.taxonomy.styles.v1": "酒款风格",
+  "cocktail.lab.projects": "研发项目",
+  "cocktail.lab.batches": "研发批次",
+  "cocktail.books.v1": "书库",
+  "menu_store_v1": "门店酒单",
+  "shopping_store_v1": "采购清单",
+  "cocktail.iceSettings.v2": "冰块设置",
+  "app.lang.v1": "语言设置",
+};
