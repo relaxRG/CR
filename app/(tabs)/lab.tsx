@@ -8,7 +8,7 @@ import { useColors } from "@/hooks/use-colors";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useLabStore } from "@/lib/lab/store";
 import { useLabPlanStore } from "@/lib/lab/plan-store";
-import { LabIndexScreen } from "../lab/index";
+import { LabIndexScreen } from "../lab/projects";
 import BooksScreen from "./books";
 import LabPlanScreen from "../lab/plan";
 
@@ -89,4 +89,3 @@ const styles = StyleSheet.create({
   segText: { fontSize: 14, lineHeight: 19 },
   hidden: { display: "none" },
 });
-

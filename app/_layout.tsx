@@ -146,7 +146,7 @@ export default function RootLayout() {
                 options={{ presentation: "modal" }}
               />
               <Stack.Screen name="ice-settings" options={{ presentation: "modal" }} />
-              <Stack.Screen name="lab/index" />
+              <Stack.Screen name="lab/projects" />
               <Stack.Screen name="lab/[id]" />
               <Stack.Screen name="lab/new" options={{ presentation: "modal" }} />
               <Stack.Screen name="lab/batch-form" options={{ presentation: "modal" }} />
@@ -161,6 +161,11 @@ export default function RootLayout() {
               <Stack.Screen name="me" options={{ presentation: "modal" }} />
               <Stack.Screen name="wine-form" options={{ presentation: "modal" }} />
               <Stack.Screen name="wine/[id]" />
+              <Stack.Screen name="food-form" options={{ presentation: "modal" }} />
+              <Stack.Screen name="food-ingredient-form" options={{ presentation: "modal" }} />
+              <Stack.Screen name="food/[id]" />
+              <Stack.Screen name="food-ingredient/[id]" />
+              <Stack.Screen name="lab/plan" />
             </Stack>
             <StatusBar style="auto" />
           </LabPlanProvider>
