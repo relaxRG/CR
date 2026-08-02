@@ -327,12 +327,12 @@ export default function BulkImportScreen() {
       } else if (item.type === "prep") {
         const prepType = matchPrepType(item);
         addPrep({
-          name: item.nameEn || item.nameZh,
-          nameAlt: item.nameZh,
+          name: item.nameZh || item.nameEn,
+          nameAlt: item.nameEn,
           type: prepType,
           abvGroup: classifyPrepGroup({
-            name: item.nameEn,
-            nameAlt: item.nameZh,
+            name: item.nameZh || item.nameEn,
+            nameAlt: item.nameEn,
             type: prepType,
             ingredients: item.prepIngredients,
             recipe: item.prepRecipe || item.steps,
@@ -544,10 +544,7 @@ export default function BulkImportScreen() {
               </View>
               {rows.map((r) => {
                 const label = TYPE_LABEL[r.item.type][lang === "zh" ? "zh" : "en"];
-                const title =
-                  lang === "zh"
-                    ? r.item.nameZh || r.item.nameEn
-                    : r.item.nameEn || r.item.nameZh;
+                const title = r.item.nameZh || r.item.nameEn;
                 const sub = [
                   r.item.type === "bottle"
                     ? [r.item.category, r.item.brand, r.item.abv ? `${r.item.abv}%` : ""]

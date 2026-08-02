@@ -1436,7 +1436,6 @@ export default function RecipeFormScreen() {
         setName(p.name);
       } else {
         setNameEn(p.name);
-        if (!name.trim()) setName(p.name);
       }
     }
     if (p.ingredients.length > 0) setIngredients(p.ingredients);
