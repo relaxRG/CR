@@ -11,11 +11,7 @@ import { useBottleStore } from "@/lib/bottles/store";
 import { useHomemadeStore } from "@/lib/homemade/store";
 import { useSync } from "@/lib/cf-sync/provider";
 import React, { useEffect, useState } from "react";
-import { getBackupInfo, restoreFromBackup, backupLocalData, triggerStoreReload } from "@/lib/sync/engine";
-import { exportCurrentDataToFile, importFromJsonFile } from "@/lib/backup/local-backup";
-import { performBackup, getICloudMeta, listBackupVersions, restoreFromBackup as restoreFromICloud } from "@/lib/backup/icloud-backup";
-import * as DocumentPicker from "expo-document-picker";
-import * as FileSystem from "expo-file-system/legacy";
+import { getICloudMeta } from "@/lib/backup/icloud-backup";
 
 /** "我的"个人中心页:数据总览、标签管理与批量导入入口、语言设置 */
 export default function MeScreen() {
@@ -31,263 +27,31 @@ export default function MeScreen() {
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
-  const [backupTime, setBackupTime] = useState<number | null>(null);
-  const [restoring, setRestoring] = useState(false);
-  const [icloudBacking, setIcloudBacking] = useState(false);
   const [icloudLastAt, setIcloudLastAt] = useState<number | null>(null);
-  const [icloudRestoring, setIcloudRestoring] = useState(false);
-  const [backupExpanded, setBackupExpanded] = useState(false);
 
   useEffect(() => {
-    getBackupInfo().then((info) => setBackupTime(info?.time ?? null));
     getICloudMeta().then((meta) => setIcloudLastAt(meta.lastBackupAt));
   }, [syncState.lastSyncedAt]);
 
-  const handleRestore = () => {
-    if (!backupTime) return;
-    const timeStr = new Date(backupTime).toLocaleString();
-    Alert.alert(
-      lang === "zh" ? "恢复备份" : "Restore Backup",
-      lang === "zh"
-        ? `确定要恢复至 ${timeStr} 的备份吗？\n\n当前所有数据将被替换为备份内容。`
-        : `Restore to backup from ${timeStr}?\n\nAll current data will be replaced.`,
-      [
-        { text: lang === "zh" ? "取消" : "Cancel", style: "cancel" },
-        {
-          text: lang === "zh" ? "确认恢复" : "Restore",
-          style: "destructive",
-          onPress: async () => {
-            setRestoring(true);
-            const ok = await restoreFromBackup();
-            setRestoring(false);
-            Alert.alert(
-              ok
-                ? (lang === "zh" ? "恢复成功" : "Restored")
-                : (lang === "zh" ? "恢复失败" : "Failed"),
-              ok
-                ? (lang === "zh" ? "数据已恢复，配方/酒款/自制品统计已自动更新。" : "Data restored. Stats updated automatically.")
-                : (lang === "zh" ? "未找到备份数据。" : "No backup found."),
-            );
-          },
-        },
-      ],
-    );
-  };
-
-  const handleManualBackup = async () => {
-    tap();
-    await backupLocalData();
-    const info = await getBackupInfo();
-    setBackupTime(info?.time ?? null);
-    Alert.alert(
-      lang === "zh" ? "备份成功" : "Backup Created",
-      lang === "zh" ? "当前数据已备份，同步异常时可一键恢复。" : "Current data backed up. You can restore it if sync goes wrong.",
-    );
-  };
-
-  const handleICloudRestore = async () => {
-    setIcloudRestoring(true);
-    try {
-      const versions = await listBackupVersions();
-      if (versions.length === 0) {
-        Alert.alert(
-          lang === "zh" ? "无可用备份" : "No Backups Available",
-          lang === "zh" ? "iCloud Drive 中暂无备份文件，请先执行备份。" : "No backup files found in iCloud Drive. Please back up first.",
-        );
-        return;
-      }
-      // 构建选项列表
-      const buttons = versions.map((v) => ({
-        text: `${v.label}  ·  ${v.keyCount} 项  ·  ${(v.sizeBytes / 1024).toFixed(1)} KB`,
-        onPress: () => {
-          Alert.alert(
-            lang === "zh" ? "确认恢复" : "Confirm Restore",
-            lang === "zh"
-              ? `确定要恢复 ${v.label} 的备份吗？\n\n当前所有数据将被替换，此操作不可撤销。`
-              : `Restore backup from ${v.label}?\n\nAll current data will be replaced. This cannot be undone.`,
-            [
-              { text: lang === "zh" ? "取消" : "Cancel", style: "cancel" },
-              {
-                text: lang === "zh" ? "确认恢复" : "Restore",
-                style: "destructive",
-                onPress: async () => {
-                  try {
-                    const result = await restoreFromICloud(v.slot);
-                    triggerStoreReload();
-                    // 刷新 iCloud 元数据显示
-                    getICloudMeta().then((meta) => setIcloudLastAt(meta.lastBackupAt));
-                    Alert.alert(
-                      lang === "zh" ? "恢复成功" : "Restore Complete",
-                      lang === "zh"
-                        ? `已成功恢复 ${result.restored} 项数据，配方/酒款/自制品统计已自动更新。`
-                        : `Restored ${result.restored} items. Stats updated automatically.`,
-                    );
-                  } catch (e) {
-                    Alert.alert(
-                      lang === "zh" ? "恢复失败" : "Restore Failed",
-                      lang === "zh" ? "无法读取备份文件，请重试。" : "Could not read backup file. Please try again.",
-                    );
-                  }
-                },
-              },
-            ],
-          );
-        },
-      }));
-      buttons.push({ text: lang === "zh" ? "取消" : "Cancel", onPress: () => {} });
-      Alert.alert(
-        lang === "zh" ? "选择恢复版本" : "Select Backup Version",
-        lang === "zh" ? "选择要恢复的 iCloud 备份版本：" : "Choose a backup version to restore:",
-        buttons as any,
-        { cancelable: true },
-      );
-    } catch (e) {
-      Alert.alert(
-        lang === "zh" ? "读取失败" : "Load Failed",
-        lang === "zh" ? "无法读取 iCloud 备份列表，请检查 iCloud 设置。" : "Could not load iCloud backups. Check your iCloud settings.",
-      );
-    } finally {
-      setIcloudRestoring(false);
-    }
-  };
-
-  const handleICloudBackup = async () => {
-    setIcloudBacking(true);
-    try {
-      const meta = await performBackup("手动备份");
-      setIcloudLastAt(meta.lastBackupAt);
-      Alert.alert(
-        lang === "zh" ? "iCloud 备份成功" : "iCloud Backup Complete",
-        lang === "zh"
-          ? `数据已保存到 iCloud Drive，共 ${meta.slots.filter(Boolean).length} 个版本可用。`
-          : `Data saved to iCloud Drive. ${meta.slots.filter(Boolean).length} version(s) available.`,
-      );
-    } catch (e) {
-      Alert.alert(
-        lang === "zh" ? "备份失败" : "Backup Failed",
-        lang === "zh" ? "无法写入 iCloud Drive，请检查 iCloud 设置。" : "Could not write to iCloud Drive. Check your iCloud settings.",
-      );
-    } finally {
-      setIcloudBacking(false);
-    }
-  };
-
-  const handleExportFile = async () => {
-    try {
-      await exportCurrentDataToFile();
-    } catch (e) {
-      Alert.alert(
-        lang === "zh" ? "导出失败" : "Export Failed",
-        e instanceof Error ? e.message : String(e),
-      );
-    }
-  };
-
-  const [importing, setImporting] = useState(false);
-
-  const handleImportFile = async () => {
-    if (Platform.OS === "web") {
-      Alert.alert(
-        lang === "zh" ? "不支持" : "Not Supported",
-        lang === "zh" ? "请在移动设备上使用此功能" : "Please use this feature on a mobile device",
-      );
-      return;
-    }
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: "application/json",
-        copyToCacheDirectory: true,
-        multiple: false,
-      });
-      if (result.canceled || !result.assets?.[0]) return;
-
-      const asset = result.assets[0];
-      // 读取文件内容
-      const jsonString = await FileSystem.readAsStringAsync(asset.uri, {
-        encoding: FileSystem.EncodingType.UTF8,
-      });
-
-      // 解析并预检
-      let parsed: { appId?: string; keyCount?: number; snapshotCreatedAt?: string };
-      try {
-        parsed = JSON.parse(jsonString);
-      } catch {
-        Alert.alert(
-          lang === "zh" ? "文件无效" : "Invalid File",
-          lang === "zh" ? "所选文件不是有效的 JSON 格式" : "The selected file is not valid JSON",
-        );
-        return;
-      }
-      if (parsed.appId !== "cocktail-r") {
-        Alert.alert(
-          lang === "zh" ? "文件不匹配" : "Wrong File",
-          lang === "zh" ? "该文件不是 cocktail R 的备份文件" : "This file is not a cocktail R backup",
-        );
-        return;
-      }
-
-      const dateStr = parsed.snapshotCreatedAt
-        ? new Date(parsed.snapshotCreatedAt).toLocaleString()
-        : lang === "zh" ? "未知时间" : "unknown time";
-      const keyCount = parsed.keyCount ?? "?";
-
-      Alert.alert(
-        lang === "zh" ? "确认导入" : "Confirm Import",
-        lang === "zh"
-          ? `将从备份文件恢复数据：\n\n备份时间：${dateStr}\n数据条目：${keyCount} 项\n\n⚠️ 当前所有数据将被替换为备份内容，此操作不可撤销。`
-          : `Restore from backup file:\n\nBackup time: ${dateStr}\nData entries: ${keyCount}\n\n⚠️ All current data will be replaced. This cannot be undone.`,
-        [
-          { text: lang === "zh" ? "取消" : "Cancel", style: "cancel" },
-          {
-            text: lang === "zh" ? "确认导入" : "Import",
-            style: "destructive",
-            onPress: async () => {
-              setImporting(true);
-              try {
-                const { restored, failed } = await importFromJsonFile(jsonString);
-                // 触发所有 store 重新加载
-                const { triggerStoreReload } = await import("@/lib/sync/engine");
-                triggerStoreReload();
-                Alert.alert(
-                  lang === "zh" ? "导入成功" : "Import Successful",
-                  lang === "zh"
-                    ? `已成功恢复 ${restored} 条数据${failed > 0 ? `，${failed} 条失败` : ""}。\n\n请重启 App 以确保所有界面刷新。`
-                    : `Restored ${restored} entries${failed > 0 ? `, ${failed} failed` : ""}.\n\nPlease restart the app to refresh all screens.`,
-                );
-              } catch (e) {
-                Alert.alert(
-                  lang === "zh" ? "导入失败" : "Import Failed",
-                  e instanceof Error ? e.message : String(e),
-                );
-              } finally {
-                setImporting(false);
-              }
-            },
-          },
-        ],
-      );
-    } catch (e) {
-      Alert.alert(
-        lang === "zh" ? "选择文件失败" : "File Selection Failed",
-        e instanceof Error ? e.message : String(e),
-      );
-    }
-  };
-
-
-  const syncStatusText = !isAuthenticated
-    ? t("sync.off")
-    : syncState.syncing
-      ? t("sync.syncing")
-      : syncState.error
-        ? t("sync.error")
-        : t("sync.on");
-
+  // 数据总览
   const stats = [
-    { key: "recipes", label: t("me.stats.recipes"), value: recipes.length },
-    { key: "bottles", label: t("me.stats.bottles"), value: bottles.length },
-    { key: "preps", label: t("me.stats.preps"), value: preps.length },
+    { key: "recipes", value: recipes.length, label: t("me.stats.recipes") },
+    { key: "bottles", value: bottles.length, label: t("me.stats.bottles") },
+    { key: "preps", value: preps.length, label: t("me.stats.preps") },
   ];
+
+  // 同步状态文字
+  const syncStatusText = (() => {
+    if (syncState.syncing) return lang === "zh" ? "同步中…" : "Syncing…";
+    if (syncState.error) return lang === "zh" ? `同步失败：${syncState.error}` : `Sync failed: ${syncState.error}`;
+    if (syncState.lastSyncedAt) {
+      const diff = Date.now() - syncState.lastSyncedAt;
+      if (diff < 60000) return lang === "zh" ? "刚刚同步" : "Just synced";
+      if (diff < 3600000) return lang === "zh" ? `${Math.floor(diff / 60000)} 分钟前` : `${Math.floor(diff / 60000)}m ago`;
+      return lang === "zh" ? `${Math.floor(diff / 3600000)} 小时前` : `${Math.floor(diff / 3600000)}h ago`;
+    }
+    return lang === "zh" ? "尚未同步" : "Not synced yet";
+  })();
 
   return (
     <ScreenContainer>
@@ -516,12 +280,11 @@ export default function MeScreen() {
         </View>
 
         {/* 语言设置 */}
-        {/* 数据备份与恢复（折叠卡片） */}
+        {/* 数据备份与恢复（进入式） */}
         <View className="px-5 pb-4">
           <View style={{ backgroundColor: colors.surface, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, overflow: "hidden" }}>
-            {/* 折叠入口行 */}
             <Pressable
-              onPress={() => { tap(); setBackupExpanded((v) => !v); }}
+              onPress={() => { tap(); router.push("/backup"); }}
               style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
             >
               <View style={[styles.iconWrap, { backgroundColor: "#FF9500" }]}>
@@ -545,202 +308,8 @@ export default function MeScreen() {
                   marginRight: 6,
                 }} />
               ) : null}
-              <IconSymbol
-                name={backupExpanded ? "chevron.down" : "chevron.right"}
-                size={16}
-                color={colors.muted}
-              />
+              <IconSymbol name="chevron.right" size={16} color={colors.muted} />
             </Pressable>
-
-            {/* 展开内容 */}
-            {backupExpanded && (
-              <>
-                <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 64 }} />
-                {/* 立即备份 */}
-                <Pressable
-                  onPress={handleManualBackup}
-                  style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
-                >
-                  <View style={[styles.iconWrap, { backgroundColor: "#FF9500" }]}>
-                    <IconSymbol name="arrow.down.circle.fill" size={18} color="#FFFFFF" />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.rowTitle} className="text-foreground">
-                      {lang === "zh" ? "立即备份" : "Backup Now"}
-                    </Text>
-                    <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>
-                      {backupTime
-                        ? (lang === "zh" ? `上次备份：${new Date(backupTime).toLocaleString()}` : `Last: ${new Date(backupTime).toLocaleString()}`)
-                        : (lang === "zh" ? "备份当前所有数据" : "Backup all current data")}
-                    </Text>
-                  </View>
-                </Pressable>
-                {backupTime != null && (
-                  <>
-                    <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 64 }} />
-                    {/* 恢复备份 */}
-                    <Pressable
-                      onPress={handleRestore}
-                      style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
-                      disabled={restoring}
-                    >
-                      <View style={[styles.iconWrap, { backgroundColor: "#FF3B30" }]}>
-                        <IconSymbol name="arrow.counterclockwise.circle.fill" size={18} color="#FFFFFF" />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.rowTitle} className="text-foreground">
-                          {restoring
-                            ? (lang === "zh" ? "恢复中…" : "Restoring…")
-                            : (lang === "zh" ? "恢复备份" : "Restore Backup")}
-                        </Text>
-                        <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>
-                          {lang === "zh"
-                            ? `恢复至 ${new Date(backupTime).toLocaleString()} 的快照`
-                            : `Restore snapshot from ${new Date(backupTime).toLocaleString()}`}
-                        </Text>
-                      </View>
-                    </Pressable>
-                  </>
-                )}
-                <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 64 }} />
-                {/* 同步日志 */}
-                <Pressable
-                  onPress={() => { tap(); router.push("/sync-log"); }}
-                  style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
-                >
-                  <View style={[styles.iconWrap, { backgroundColor: "#34C759" }]}>
-                    <IconSymbol name="list.bullet.rectangle.fill" size={18} color="#FFFFFF" />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.rowTitle} className="text-foreground">
-                      {lang === "zh" ? "同步日志" : "Sync Log"}
-                    </Text>
-                    <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>
-                      {lang === "zh" ? "查看每次同步的详细记录" : "View detailed sync history"}
-                    </Text>
-                  </View>
-                  <IconSymbol name="chevron.right" size={18} color={colors.muted} />
-                </Pressable>
-                <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 64 }} />
-                {/* 导出备份文件 */}
-                <Pressable
-                  onPress={handleExportFile}
-                  style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
-                >
-                  <View style={[styles.iconWrap, { backgroundColor: "#5856D6" }]}>
-                    <IconSymbol name="square.and.arrow.up.fill" size={18} color="#FFFFFF" />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.rowTitle} className="text-foreground">
-                      {lang === "zh" ? "导出备份文件" : "Export Backup File"}
-                    </Text>
-                    <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>
-                      {lang === "zh" ? "将所有数据导出为 JSON 文件保存到本地" : "Export all data as JSON file to device"}
-                    </Text>
-                  </View>
-                  <IconSymbol name="chevron.right" size={18} color={colors.muted} />
-                </Pressable>
-                <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 64 }} />
-                {/* 从文件导入备份 */}
-                <Pressable
-                  onPress={handleImportFile}
-                  disabled={importing}
-                  style={({ pressed }) => [styles.row, (pressed || importing) && { opacity: 0.7 }]}
-                >
-                  <View style={[styles.iconWrap, { backgroundColor: "#FF9F0A" }]}>
-                    <IconSymbol name="square.and.arrow.down.fill" size={18} color="#FFFFFF" />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.rowTitle} className="text-foreground">
-                      {importing
-                        ? (lang === "zh" ? "导入中…" : "Importing…")
-                        : (lang === "zh" ? "从文件导入备份" : "Import Backup File")}
-                    </Text>
-                    <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>
-                      {lang === "zh" ? "从 JSON 备份文件恢复数据，支持跨设备迁移" : "Restore from JSON backup, supports cross-device migration"}
-                    </Text>
-                  </View>
-                  <IconSymbol name="chevron.right" size={18} color={colors.muted} />
-                </Pressable>
-                <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 64 }} />
-                {/* iCloud 备份 */}
-                <Pressable
-                  onPress={handleICloudBackup}
-                  disabled={icloudBacking}
-                  style={({ pressed }) => [styles.row, (pressed || icloudBacking) && { opacity: 0.7 }]}
-                >
-                  <View style={[styles.iconWrap, { backgroundColor: "#007AFF" }]}>
-                    <IconSymbol name="icloud.fill" size={18} color="#FFFFFF" />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.rowTitle} className="text-foreground">
-                      {icloudBacking
-                        ? (lang === "zh" ? "备份中…" : "Backing up…")
-                        : (lang === "zh" ? "备份到 iCloud" : "Backup to iCloud")}
-                    </Text>
-                    <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>
-                      {icloudLastAt
-                        ? (lang === "zh" ? `上次 iCloud 备份：${new Date(icloudLastAt).toLocaleString()}` : `Last iCloud backup: ${new Date(icloudLastAt).toLocaleString()}`)
-                        : (lang === "zh" ? "自动保存到 iCloud Drive，7 个版本循环保留" : "Auto-saved to iCloud Drive, 7 rotating versions")}
-                    </Text>
-                  </View>
-                  {/* 备份新鲜度角标 */}
-                  {icloudLastAt ? (
-                    <View style={{
-                      width: 10, height: 10, borderRadius: 5,
-                      backgroundColor: Date.now() - icloudLastAt < 24 * 60 * 60 * 1000 ? "#34C759" : "#FF9F0A",
-                      marginRight: 4,
-                    }} />
-                  ) : null}
-                </Pressable>
-                <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 64 }} />
-                {/* 从 iCloud 恢复 */}
-                <Pressable
-                  onPress={handleICloudRestore}
-                  disabled={icloudRestoring}
-                  style={({ pressed }) => [styles.row, (pressed || icloudRestoring) && { opacity: 0.7 }]}
-                >
-                  <View style={[styles.iconWrap, { backgroundColor: "#34C759" }]}>
-                    <IconSymbol name="icloud.and.arrow.down.fill" size={18} color="#FFFFFF" />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.rowTitle} className="text-foreground">
-                      {icloudRestoring
-                        ? (lang === "zh" ? "加载中…" : "Loading…")
-                        : (lang === "zh" ? "从 iCloud 恢复" : "Restore from iCloud")}
-                    </Text>
-                    <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>
-                      {lang === "zh" ? "从 iCloud Drive 中选择历史版本恢复数据" : "Choose a version from iCloud Drive to restore"}
-                    </Text>
-                  </View>
-                  <IconSymbol name="chevron.right" size={18} color={colors.muted} />
-                </Pressable>
-              </>
-            )}
-          </View>
-        </View>
-
-        <View className="px-5 pb-4">
-          <View style={{ backgroundColor: colors.surface, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, overflow: "hidden" }}>
-            <View style={styles.row}>
-              <View style={[styles.iconWrap, { backgroundColor: "#5856D6" }]}>
-                <IconSymbol name="globe" size={18} color="#FFFFFF" />
-              </View>
-              <Text style={[styles.rowTitle, { flex: 1 }]} className="text-foreground">{t("me.language")}</Text>
-              <View style={{ flexDirection: "row", backgroundColor: colors.background, borderRadius: 8, padding: 2, gap: 2 }}>
-                {(["zh", "en"] as const).map((l) => (
-                  <Pressable
-                    key={l}
-                    onPress={() => { tap(); setLang(l); }}
-                    style={[styles.langSeg, lang === l && { backgroundColor: colors.primary }]}
-                  >
-                    <Text style={[styles.langSegText, { color: lang === l ? "#FFFFFF" : colors.muted }]}>
-                      {l === "zh" ? "中文" : "English"}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
           </View>
         </View>
       </ScrollView>
