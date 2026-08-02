@@ -683,6 +683,15 @@ export default function DeviceManagerScreen() {
                 colors={colors}
               />
             )}
+            {/* 权限说明链接 */}
+            <Pressable
+              onPress={() => { tap(); router.push("/role-guide"); }}
+              style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1, marginTop: 14, alignSelf: "flex-start" })}
+            >
+              <Text style={{ fontSize: 13, color: colors.primary }}>
+                {lang === "zh" ? "各角色权限说明 →" : "Role permissions guide →"}
+              </Text>
+            </Pressable>
           </View>
         )}
 

@@ -48,6 +48,63 @@ const MAX_LOG_ENTRIES = 50;
 /** 冲突判定窗口：60 秒内双端都有修改则视为冲突 */
 const CONFLICT_WINDOW_MS = 60_000;
 
+// ─── prefs 有利优先合并 ────────────────────────────────────────────────────────
+/** 单条 pref 记录的类型 */
+type PrefEntry = { favorite?: boolean; rating?: number | null; made?: boolean };
+type PrefsMap = Record<string, PrefEntry>;
+
+/**
+ * 将两个 cocktail.prefs.v1 JSON 字符串按「有利优先」策略合并：
+ * - favorite / made: 任一为 true 则保留 true（any-true-wins）
+ * - rating: 取较高值；若一方为 null/undefined 则保留另一方的非空值
+ * 返回合并后的 JSON 字符串。
+ */
+function mergePrefs(localJson: string, remoteJson: string): string {
+  try {
+    const local: PrefsMap = JSON.parse(localJson);
+    const remote: PrefsMap = JSON.parse(remoteJson);
+    const allIds = new Set([...Object.keys(local), ...Object.keys(remote)]);
+    const merged: PrefsMap = {};
+    for (const id of allIds) {
+      const l = local[id] ?? {};
+      const r = remote[id] ?? {};
+      const entry: PrefEntry = {};
+      // favorite: any-true-wins
+      if (l.favorite === true || r.favorite === true) {
+        entry.favorite = true;
+      } else if (l.favorite === false || r.favorite === false) {
+        entry.favorite = false;
+      }
+      // made: any-true-wins
+      if (l.made === true || r.made === true) {
+        entry.made = true;
+      } else if (l.made === false || r.made === false) {
+        entry.made = false;
+      }
+      // rating: keep higher non-null value
+      const lRating = typeof l.rating === "number" ? l.rating : null;
+      const rRating = typeof r.rating === "number" ? r.rating : null;
+      if (lRating !== null && rRating !== null) {
+        entry.rating = Math.max(lRating, rRating);
+      } else if (lRating !== null) {
+        entry.rating = lRating;
+      } else if (rRating !== null) {
+        entry.rating = rRating;
+      } else {
+        entry.rating = null;
+      }
+      merged[id] = entry;
+    }
+    return JSON.stringify(merged);
+  } catch {
+    // 解析失败时回退到本地值（保守策略）
+    return localJson;
+  }
+}
+
+/** 是否为需要有利优先合并的 prefs 键 */
+const PREFS_MERGE_KEYS = new Set<string>(["cocktail.prefs.v1"]);
+
 type PushFn = (
   entries: { storageKey: string; value: string; clientUpdatedAt: number }[],
 ) => Promise<unknown>;
@@ -314,7 +371,11 @@ export async function runInitialSync(
 
       if (remote && (!localValue || (localTs > 0 && remote.clientUpdatedAt > localTs))) {
         // 云端更新 → 覆盖本地
-        await AsyncStorage.setItem(key, remote.value);
+        // prefs 键使用有利优先合并，其余键直接覆盖
+        const mergedValue = (PREFS_MERGE_KEYS.has(key) && localValue)
+          ? mergePrefs(localValue, remote.value)
+          : remote.value;
+        await AsyncStorage.setItem(key, mergedValue);
         await AsyncStorage.setItem(TS_PREFIX + key, String(remote.clientUpdatedAt));
         localOverwritten = true;
         pulledKeys.push(key);
@@ -371,7 +432,11 @@ export async function resolveConflict(
     await AsyncStorage.setItem(TS_PREFIX + conflict.storageKey, String(now));
     await appendLog({ time: now, type: "push", keys: [conflict.storageKey], message: `冲突解决：保留本地版本` });
   } else {
-    await AsyncStorage.setItem(conflict.storageKey, conflict.remoteValue);
+    // prefs 键：有利优先合并（不丢弃任何一方的正向数据）
+    const valueToWrite = PREFS_MERGE_KEYS.has(conflict.storageKey)
+      ? mergePrefs(conflict.localValue, conflict.remoteValue)
+      : conflict.remoteValue;
+    await AsyncStorage.setItem(conflict.storageKey, valueToWrite);
     await AsyncStorage.setItem(TS_PREFIX + conflict.storageKey, String(conflict.remoteTs));
     triggerStoreReload();
     await appendLog({ time: Date.now(), type: "pull", keys: [conflict.storageKey], message: `冲突解决：采用云端版本` });

@@ -63,9 +63,23 @@ async function reloadAllFromStorage(
             if (!pref) return r;
             return {
               ...r,
-              favorite: pref.favorite ?? r.favorite,
-              rating: pref.rating !== undefined ? pref.rating : r.rating,
-              made: pref.made ?? r.made,
+              // 有利优先：favorite/made 任一为 true 则保留 true；rating 取较高值
+              favorite: (pref.favorite === true || r.favorite === true)
+                ? true
+                : (pref.favorite === false || r.favorite === false)
+                ? false
+                : r.favorite,
+              rating: (() => {
+                const pr = typeof pref.rating === "number" ? pref.rating : null;
+                const rr = typeof r.rating === "number" ? r.rating : null;
+                if (pr !== null && rr !== null) return Math.max(pr, rr);
+                return pr ?? rr;
+              })(),
+              made: (pref.made === true || r.made === true)
+                ? true
+                : (pref.made === false || r.made === false)
+                ? false
+                : r.made,
             };
           });
           if (setPrefs) setPrefs(p);
