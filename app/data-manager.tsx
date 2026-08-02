@@ -10,6 +10,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
+import { createSnapshot } from "@/lib/backup/local-backup";
 
 // ── Key groups ──────────────────────────────────────────────────────────────
 const RECIPE_KEYS = [
@@ -85,7 +86,7 @@ async function exportBackup(): Promise<void> {
 export default function DataManagerScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [exporting, setExporting] = useState(false);
   const [resetting, setResetting] = useState(false);
 
@@ -108,9 +109,17 @@ export default function DataManagerScreen() {
   const confirmClear = (keys: string[], messageKey: string) => {
     tap();
     const doDelete = async () => {
+      // Auto-backup before destructive operation
+      try { await createSnapshot(); } catch { /* snapshot failure is non-blocking */ }
       await AsyncStorage.multiRemove(keys);
       if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert(t("dataManager.cleared"));
+      const cleared = keys.length;
+      Alert.alert(
+        lang === "zh" ? "已清除" : "Cleared",
+        lang === "zh"
+          ? `已删除 ${cleared} 个数据键，已自动创建本地快照备份。`
+          : `Removed ${cleared} data keys. A local snapshot was created automatically.`,
+      );
     };
     if (Platform.OS === "web") {
       if (window.confirm(t(messageKey as any))) void doDelete();

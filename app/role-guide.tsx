@@ -1,4 +1,6 @@
-import { ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
@@ -68,15 +70,26 @@ export default function RoleGuideScreen() {
   const colors = useColors();
   const { lang } = useI18n();
   const isEn = lang === "en";
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   return (
     <ScreenContainer>
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
-        {/* 标题 */}
-        <Text style={{ fontSize: 22, fontWeight: "700", color: colors.foreground, marginBottom: 4 }}>
+      {/* 手动 header */}
+      <View style={[rgStyles.header, { paddingTop: Math.max(insets.top, 8) }]}>
+        <Pressable style={rgStyles.backBtn} onPress={() => router.back()}>
+          <Text style={[rgStyles.backText, { color: colors.primary }]}>
+            {isEn ? "‹ Back" : "‹ 返回"}
+          </Text>
+        </Pressable>
+        <Text style={[rgStyles.title, { color: colors.foreground }]} numberOfLines={1}>
           {isEn ? "Role Permissions" : "角色权限说明"}
         </Text>
-        <Text style={{ fontSize: 13, color: colors.muted, marginBottom: 20 }}>
+        <View style={{ width: 64 }} />
+      </View>
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+        {/* 标题 */}
+        <Text style={{ fontSize: 13, color: colors.muted, marginBottom: 20, marginTop: 4 }}>
           {isEn
             ? "Choose the right role when inviting a new device."
             : "邀请新设备时，根据用途选择合适的角色。"}
@@ -208,3 +221,27 @@ export default function RoleGuideScreen() {
     </ScreenContainer>
   );
 }
+
+const rgStyles = StyleSheet.create({
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    gap: 8,
+  },
+  backBtn: {
+    width: 64,
+    paddingVertical: 4,
+  },
+  backText: {
+    fontSize: 17,
+    fontWeight: "400",
+  },
+  title: {
+    flex: 1,
+    fontSize: 17,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+});

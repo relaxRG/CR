@@ -1,6 +1,7 @@
 import { FlatList, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useEffect, useMemo, useState } from "react";
-import { Stack } from "expo-router";
+import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
@@ -38,6 +39,8 @@ export default function SyncLogScreen() {
   const [log, setLog] = useState<SyncLogEntry[]>([]);
   const [filter, setFilter] = useState<FilterKey>("all");
   const { dismissSyncError } = useSync();
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     getSyncLog().then(setLog);
@@ -62,7 +65,18 @@ export default function SyncLogScreen() {
 
   return (
     <ScreenContainer edges={["top", "left", "right"]}>
-      <Stack.Screen options={{ title: lang === "zh" ? "同步日志" : "Sync Log", headerBackTitle: "" }} />
+      {/* 手动 header */}
+      <View style={[styles.manualHeader, { paddingTop: Math.max(insets.top, 8) }]}>
+        <Pressable style={styles.backBtn} onPress={() => router.back()}>
+          <Text style={[styles.backText, { color: colors.primary }]}>
+            {lang === "zh" ? "‹ 返回" : "‹ Back"}
+          </Text>
+        </Pressable>
+        <Text style={[styles.headerTitle, { color: colors.foreground }]} numberOfLines={1}>
+          {lang === "zh" ? "同步日志" : "Sync Log"}
+        </Text>
+        <View style={{ width: 64 }} />
+      </View>
 
       {/* 筛选 Chips */}
       <ScrollView
@@ -135,6 +149,27 @@ export default function SyncLogScreen() {
 }
 
 const styles = StyleSheet.create({
+  manualHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    gap: 8,
+  },
+  backBtn: {
+    width: 64,
+    paddingVertical: 4,
+  },
+  backText: {
+    fontSize: 17,
+    fontWeight: "400",
+  },
+  headerTitle: {
+    flex: 1,
+    fontSize: 17,
+    fontWeight: "600",
+    textAlign: "center",
+  },
   chip: {
     borderRadius: 20,
     borderWidth: 1,

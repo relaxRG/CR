@@ -91,13 +91,26 @@ async function readRecipesRaw(): Promise<{ raw: string; list: any[] } | null> {
 // ─── upload ───────────────────────────────────────────────────────────────────
 
 /** 扫描本地 photoUris，上传尚未上传的照片文件 */
-async function uploadPendingPhotos(deviceInfo: DeviceInfo): Promise<number> {
+async function uploadPendingPhotos(
+  deviceInfo: DeviceInfo,
+  onProgress?: (phase: "upload" | "download" | "repair", done: number, total: number) => void,
+): Promise<number> {
   if (deviceInfo.role === "guest") return 0;
   const data = await readRecipesRaw();
   if (!data) return 0;
 
   const uploaded = await loadUploadedSet();
   let count = 0;
+  let oversizedCount = 0;
+  const pendingNames: string[] = [];
+  for (const recipe of data.list) {
+    const uris: string[] = Array.isArray(recipe?.photoUris) ? recipe.photoUris : [];
+    for (const uri of uris) {
+      const name = fileNameOf(uri);
+      if (name && !uploaded.has(name)) pendingNames.push(name);
+    }
+  }
+  let done = 0;
 
   for (const recipe of data.list) {
     const uris: string[] = Array.isArray(recipe?.photoUris) ? recipe.photoUris : [];
@@ -114,6 +127,9 @@ async function uploadPendingPhotos(deviceInfo: DeviceInfo): Promise<number> {
         if (base64.length > MAX_BASE64_LEN) {
           // 超大照片跳过并标记，避免每轮重试
           uploaded.add(name);
+          oversizedCount++;
+          done++;
+          onProgress?.("upload", done, pendingNames.length);
           continue;
         }
         const res = await photoFetch("/api/photos/upload", deviceInfo, {
@@ -129,11 +145,13 @@ async function uploadPendingPhotos(deviceInfo: DeviceInfo): Promise<number> {
       } catch {
         // 单张失败不影响其它照片，下轮重试
       }
+      done++;
+      onProgress?.("upload", done, pendingNames.length);
     }
   }
 
   if (count > 0) await saveUploadedSet(uploaded);
-  return count;
+  return oversizedCount;
 }
 
 // ─── download ─────────────────────────────────────────────────────────────────
@@ -260,19 +278,22 @@ export async function deleteCloudPhoto(photoUri: string): Promise<void> {
  * 完整照片同步：上传本地新照片 → 下载云端缺失照片 → 修复路径。
  * 返回是否有下载/路径修复（调用方可据此触发 store 重载）。
  */
-export async function syncPhotos(): Promise<{ downloaded: number; repaired: boolean }> {
-  if (Platform.OS === "web") return { downloaded: 0, repaired: false };
-  if (running) return { downloaded: 0, repaired: false };
+export async function syncPhotos(
+  onProgress?: (phase: "upload" | "download" | "repair", done: number, total: number) => void,
+): Promise<{ downloaded: number; repaired: boolean; oversized: number }> {
+  if (Platform.OS === "web") return { downloaded: 0, repaired: false, oversized: 0 };
+  if (running) return { downloaded: 0, repaired: false, oversized: 0 };
   running = true;
   try {
     const deviceInfo = await getDeviceInfo();
-    if (!deviceInfo) return { downloaded: 0, repaired: false };
-    await uploadPendingPhotos(deviceInfo);
+    if (!deviceInfo) return { downloaded: 0, repaired: false, oversized: 0 };
+    const oversized = await uploadPendingPhotos(deviceInfo, onProgress);
     const downloaded = await downloadMissingPhotos(deviceInfo);
     const repaired = await repairPhotoUriPaths();
-    return { downloaded, repaired };
+    onProgress?.("repair", 1, 1);
+    return { downloaded, repaired, oversized };
   } catch {
-    return { downloaded: 0, repaired: false };
+    return { downloaded: 0, repaired: false, oversized: 0 };
   } finally {
     running = false;
   }

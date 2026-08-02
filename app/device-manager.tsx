@@ -16,6 +16,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -39,6 +40,7 @@ import {
   kickDevice,
   listDevices,
   updateDeviceRole,
+  renameCurrentDevice,
   type DeviceRole,
   type RemoteDevice,
 } from "@/lib/cf-sync/client";
@@ -48,6 +50,7 @@ import { useSync } from "@/lib/cf-sync/provider";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { listSnapshots } from "@/lib/backup/local-backup";
 import { getICloudMeta } from "@/lib/backup/icloud-backup";
+import { QRCode } from "@/components/qr-code";
 
 const CF_WORKER_URL = "https://cocktail-ai.kikikong2017.workers.dev";
 
@@ -249,8 +252,10 @@ export default function DeviceManagerScreen() {
   const router = useRouter();
   const { lang } = useI18n();
   const insets = useSafeAreaInsets();
-  const { deviceInfo, deviceRole, syncState, syncError, retrySync, logout } = useSync();
+  const { deviceInfo, deviceRole, syncState, syncError, retrySync, logout, refreshDeviceInfo } = useSync();
   const [manualSyncing, setManualSyncing] = useState(false);
+  const [renamingDevice, setRenamingDevice] = useState(false);
+  const [renameInput, setRenameInput] = useState("");
 
   // Devices
   const [devices, setDevices] = useState<RemoteDevice[]>([]);
@@ -615,7 +620,69 @@ export default function DeviceManagerScreen() {
                 {lang === "zh" ? ROLE_LABELS[deviceInfo.role].zh : ROLE_LABELS[deviceInfo.role].en}
               </Text>
             </View>
-            <Text style={[styles.deviceName, { color: colors.foreground }]}>{deviceInfo.deviceName}</Text>
+            {renamingDevice ? (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginVertical: 4 }}>
+                <TextInput
+                  value={renameInput}
+                  onChangeText={setRenameInput}
+                  placeholder={deviceInfo.deviceName}
+                  placeholderTextColor={colors.muted}
+                  style={{
+                    flex: 1,
+                    fontSize: 16,
+                    color: colors.foreground,
+                    borderBottomWidth: 1,
+                    borderBottomColor: colors.primary,
+                    paddingVertical: 4,
+                  }}
+                  autoFocus
+                  returnKeyType="done"
+                  onSubmitEditing={async () => {
+                    if (renameInput.trim()) {
+                      await renameCurrentDevice(renameInput.trim());
+                      await refreshDeviceInfo();
+                    }
+                    setRenamingDevice(false);
+                    setRenameInput("");
+                  }}
+                />
+                <Pressable
+                  onPress={async () => {
+                    if (renameInput.trim()) {
+                      await renameCurrentDevice(renameInput.trim());
+                      await refreshDeviceInfo();
+                    }
+                    setRenamingDevice(false);
+                    setRenameInput("");
+                  }}
+                  style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+                >
+                  <Text style={{ fontSize: 14, color: colors.primary, fontWeight: "600" }}>
+                    {lang === "zh" ? "保存" : "Save"}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => { setRenamingDevice(false); setRenameInput(""); }}
+                  style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+                >
+                  <Text style={{ fontSize: 14, color: colors.muted }}>
+                    {lang === "zh" ? "取消" : "Cancel"}
+                  </Text>
+                </Pressable>
+              </View>
+            ) : (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Text style={[styles.deviceName, { color: colors.foreground, flex: 1 }]}>{deviceInfo.deviceName}</Text>
+                <Pressable
+                  onPress={() => { tap(); setRenameInput(deviceInfo.deviceName); setRenamingDevice(true); }}
+                  style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+                >
+                  <Text style={{ fontSize: 13, color: colors.primary }}>
+                    {lang === "zh" ? "重命名" : "Rename"}
+                  </Text>
+                </Pressable>
+              </View>
+            )}
             <Text style={[styles.deviceDesc, { color: colors.muted }]}>
               {lang === "zh" ? ROLE_DESC[deviceInfo.role].zh : ROLE_DESC[deviceInfo.role].en}
             </Text>
@@ -642,6 +709,13 @@ export default function DeviceManagerScreen() {
                 <Text style={[styles.codeExpiry, { color: colors.muted }]}>
                   {lang === "zh" ? `${countdown} 秒后失效` : `Expires in ${countdown}s`}
                 </Text>
+                {/* QR Code */}
+                <View style={{ alignItems: "center", marginTop: 12 }}>
+                  <QRCode value={pairCode} size={160} backgroundColor="#FFFFFF" foregroundColor="#000000" />
+                  <Text style={{ fontSize: 11, color: colors.muted, marginTop: 6 }}>
+                    {lang === "zh" ? "扫描二维码或手动输入上方数字" : "Scan QR or enter the code manually"}
+                  </Text>
+                </View>
               </View>
             ) : (
               <View style={styles.roleButtons}>

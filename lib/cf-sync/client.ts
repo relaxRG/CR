@@ -324,6 +324,14 @@ export async function updateDeviceRole(
   }
 }
 
+/** 重命名本机设备（仅更新本地存储，下次同步时服务端会收到新 deviceName） */
+export async function renameCurrentDevice(newName: string): Promise<void> {
+  const deviceInfo = await getDeviceInfo();
+  if (!deviceInfo) throw new Error("Device not registered");
+  const updated: DeviceInfo = { ...deviceInfo, deviceName: newName.trim() || deviceInfo.deviceName };
+  await saveDeviceInfo(updated);
+}
+
 // ─── Sync ─────────────────────────────────────────────────────────────────────
 export type SyncEntry = {
   storageKey: string;

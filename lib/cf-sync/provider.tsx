@@ -62,6 +62,8 @@ type SyncContextValue = {
   dismissSyncError: () => void;
   /** 是否有未解决的同步冲突（用于角标显示） */
   hasPendingConflicts: boolean;
+  /** 刷新本地设备信息（重命名后调用） */
+  refreshDeviceInfo: () => Promise<void>;
 };
 
 const SyncContext = createContext<SyncContextValue | null>(null);
@@ -189,9 +191,12 @@ export function SyncProvider({
       // 成品照片同步（非阻塞）：上传本地新照片、下载云端缺失照片并修复路径。
       // 下载/路径修复发生后触发 store 重载，让详情页立即显示照片。
       void syncPhotos()
-        .then(({ downloaded, repaired }) => {
+        .then(({ downloaded, repaired, oversized }) => {
           if ((downloaded > 0 || repaired) && Platform.OS !== "web") {
             triggerStoreReload();
+          }
+          if (oversized > 0) {
+            console.warn(`[CFSync] ${oversized} photo(s) skipped (too large to sync)`);
           }
         })
         .catch(() => {});
@@ -335,6 +340,10 @@ export function SyncProvider({
         openDeviceManager,
         dismissSyncError,
         hasPendingConflicts: pendingConflicts.length > 0,
+        refreshDeviceInfo: async () => {
+          const info = await getDeviceInfo();
+          setDeviceInfo(info);
+        },
       }}
     >
       {children}

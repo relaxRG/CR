@@ -127,6 +127,31 @@ let pushFn: PushFn | null = null;
 let syncEnabled = false;
 const listeners = new Set<(state: SyncState) => void>();
 
+const DIRTY_KEYS_PERSIST_KEY = "sync.dirtyKeys.pending";
+
+async function persistDirtyKeys(): Promise<void> {
+  const arr = Array.from(dirtyKeys);
+  if (arr.length === 0) {
+    await AsyncStorage.removeItem(DIRTY_KEYS_PERSIST_KEY).catch(() => {});
+  } else {
+    await AsyncStorage.setItem(DIRTY_KEYS_PERSIST_KEY, JSON.stringify(arr)).catch(() => {});
+  }
+}
+
+async function loadPersistedDirtyKeys(): Promise<void> {
+  try {
+    const raw = await AsyncStorage.getItem(DIRTY_KEYS_PERSIST_KEY);
+    if (!raw) return;
+    const arr: unknown = JSON.parse(raw);
+    if (!Array.isArray(arr)) return;
+    for (const k of arr) {
+      if (typeof k === "string" && (SYNC_KEYS as readonly string[]).includes(k)) {
+        dirtyKeys.add(k);
+      }
+    }
+  } catch { /* ignore */ }
+}
+
 export type SyncLogEntry = {
   time: number;
   type: "push" | "pull" | "backup" | "restore" | "error" | "conflict";
@@ -265,6 +290,7 @@ export function notifySyncChange(key: string) {
   AsyncStorage.setItem(TS_PREFIX + key, String(now)).catch(() => {});
   if (!syncEnabled || !pushFn) return;
   dirtyKeys.add(key);
+  void persistDirtyKeys();
   if (pushTimer) clearTimeout(pushTimer);
   pushTimer = setTimeout(() => {
     void flushDirtyKeys();
@@ -275,6 +301,7 @@ async function flushDirtyKeys() {
   if (!syncEnabled || !pushFn || dirtyKeys.size === 0) return;
   const keys = Array.from(dirtyKeys);
   dirtyKeys.clear();
+  void persistDirtyKeys(); // clear persisted queue
   setState({ syncing: true });
   try {
     const entries: { storageKey: string; value: string; clientUpdatedAt: number }[] = [];
@@ -301,6 +328,7 @@ async function flushDirtyKeys() {
     }
   } catch (err) {
     keys.forEach((k) => dirtyKeys.add(k));
+    void persistDirtyKeys(); // re-persist failed keys
     const msg = err instanceof Error ? err.message : "sync push failed";
     setState({ error: msg, syncing: false });
     await appendLog({ time: Date.now(), type: "error", message: msg });
@@ -321,6 +349,9 @@ export async function runInitialSync(
   setState({ enabled: true, syncing: true, error: null });
   let localOverwritten = false;
   const conflicts: SyncConflict[] = [];
+
+  // 加载上次会话中未推送的脏键
+  await loadPersistedDirtyKeys();
 
   try {
     const remoteMap = new Map(remoteEntries.map((e) => [e.storageKey, e]));

@@ -284,6 +284,32 @@ export async function importFromJsonFile(jsonString: string): Promise<{ restored
     throw new Error("备份文件数据损坏");
   }
 
+  // 版本兼容性检查（当前支持 version 1）
+  const fileVersion = typeof parsed.version === "number" ? parsed.version : 1;
+  if (fileVersion > 1) {
+    throw new Error(`备份文件版本 (v${fileVersion}) 高于当前应用支持版本 (v1)，请升级应用后再导入`);
+  }
+
+  // 数据结构深度校验：每个值必须是字符串或 null，且值本身应为合法 JSON
+  const dataEntries = Object.entries(parsed.data);
+  if (dataEntries.length === 0) {
+    throw new Error("备份文件不包含任何数据");
+  }
+  let validCount = 0;
+  for (const [, value] of dataEntries) {
+    if (value === null) continue;
+    if (typeof value !== "string") {
+      throw new Error("备份文件数据格式错误：数据值必须为字符串或 null");
+    }
+    // 验证每个值是否为合法 JSON（cocktail R 所有存储值均为 JSON 序列化字符串）
+    try {
+      JSON.parse(value);
+      validCount++;
+    } catch {
+      throw new Error(`备份文件数据损坏：键 "${Object.keys(parsed.data ?? {})[validCount]}" 的值不是合法的 JSON`);
+    }
+  }
+
   let restored = 0;
   let failed = 0;
   for (const [key, value] of Object.entries(parsed.data)) {
