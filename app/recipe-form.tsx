@@ -454,7 +454,7 @@ export default function RecipeFormScreen() {
   }, []);
   /** Which ingredient row is focused (shows live suggestions) */
   const [focusedIng, setFocusedIng] = useState<string | null>(null);
-  const [focusedQtyId, setFocusedQtyId] = useState<string | null>(null);
+
   /** 正在添加备选项的成分行 id → 临时输入值 */
   const [addAltIngId, setAddAltIngId] = useState<string | null>(null);
   const [addAltIngValue, setAddAltIngValue] = useState("");
@@ -1137,9 +1137,7 @@ export default function RecipeFormScreen() {
                     const filtered = v.replace(/[^\d.,½⅓⅔¼¾⅛⅜⅝⅞约~≈\s/]/g, "");
                     updateIngredient(ing.id, "amount", mergeAmount(filtered, unit));
                   }}
-                  onFocus={() => setFocusedQtyId(ing.id)}
-                  onBlur={() => setFocusedQtyId((cur) => cur === ing.id ? null : cur)}
-                  keyboardType="numeric"
+                  keyboardType="default"
                   returnKeyType="done"
                 />
                 {!isGarnish && (
@@ -1179,65 +1177,7 @@ export default function RecipeFormScreen() {
             />
           </Pressable>
         </View>
-        {/* ── 分数快捷按钮（用量框聚焦时显示，独立行） ── */}
-        {focusedQtyId === ing.id && (() => {
-          const { qty, unit } = splitAmount(ing.amount);
-          const FRACS = ["¼", "⅓", "½", "¾"];
-          const DECIMALS = ["1.5", "2.5"];
-          const FRAC_RE = /[¼⅓½¾⅔¾⅛⅜⅝⅞]/g;
-          return (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              contentContainerStyle={{ flexDirection: "row", gap: 6, paddingVertical: 4, paddingHorizontal: 2 }}
-              style={{ marginTop: 2 }}
-            >
-              {FRACS.map((f) => (
-                <Pressable
-                  key={f}
-                  onPress={() => {
-                    const base = qty.replace(FRAC_RE, "").trimEnd();
-                    const newQty = base ? base + f : f;
-                    updateIngredient(ing.id, "amount", mergeAmount(newQty, unit));
-                    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  }}
-                  style={({ pressed }) => [{
-                    paddingHorizontal: 14,
-                    paddingVertical: 7,
-                    borderRadius: 8,
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                    backgroundColor: colors.surface,
-                    opacity: pressed ? 0.6 : 1,
-                  }]}
-                >
-                  <Text style={{ fontSize: 16, color: colors.foreground, fontWeight: "500" }}>{f}</Text>
-                </Pressable>
-              ))}
-              {DECIMALS.map((d) => (
-                <Pressable
-                  key={d}
-                  onPress={() => {
-                    updateIngredient(ing.id, "amount", mergeAmount(d, unit));
-                    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  }}
-                  style={({ pressed }) => [{
-                    paddingHorizontal: 14,
-                    paddingVertical: 7,
-                    borderRadius: 8,
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                    backgroundColor: colors.surface,
-                    opacity: pressed ? 0.6 : 1,
-                  }]}
-                >
-                  <Text style={{ fontSize: 14, color: colors.foreground, fontWeight: "500" }}>{d}</Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-          );
-        })()}
+        {/* 快速选择按钮已移除 — 用户可直接输入 1.5 / 1/3 等 */}
         {liveSuggestions.length > 0 ? (
           <View className="rounded-xl border overflow-hidden mt-1" style={{ backgroundColor: colors.surface, borderColor: colors.border }}>
             {liveSuggestions.map((s, sIdx) => (
