@@ -55,19 +55,8 @@ const config: ExpoConfig = {
       "ITSAppUsesNonExemptEncryption": false,
       "UIRequiresFullScreen": false
     },
-    usesIcloudStorage: true,
-    entitlements: {
-      "com.apple.developer.icloud-container-identifiers": [
-        "iCloud.com.app.cocktailrecipes"
-      ],
-      "com.apple.developer.icloud-services": [
-        "CloudDocuments"
-      ],
-      "com.apple.developer.ubiquity-container-identifiers": [
-        "iCloud.com.app.cocktailrecipes"
-      ],
-      "com.apple.developer.ubiquity-kvstore-identifier": "$(TeamIdentifierPrefix)com.app.cocktailrecipes"
-    },
+    // iCloud entitlements removed (Build 119+): App ID not configured for iCloud
+    // Backup falls back to local documentDirectory automatically
   },
   android: {
     adaptiveIcon: {
@@ -111,7 +100,7 @@ const config: ExpoConfig = {
     [
       "expo-document-picker",
       {
-        "iCloudContainerEnvironment": "Production"
+        // iCloudContainerEnvironment removed
       }
     ],
     [
