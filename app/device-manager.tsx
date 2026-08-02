@@ -497,12 +497,22 @@ export default function DeviceManagerScreen() {
         <Text style={[styles.title, { color: colors.foreground }]}>
           {lang === "zh" ? "设备管理" : "Device Manager"}
         </Text>
-        <Pressable
-          onPress={() => { tap(); void loadDevices(); void loadBalance(); void loadBackupStatus(); }}
-          style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
-        >
-          <IconSymbol name="paperplane.fill" size={18} color={colors.muted} />
-        </Pressable>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+          <Pressable
+            onPress={() => { tap(); router.push("/role-guide"); }}
+            style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
+          >
+            <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "500" }}>
+              {lang === "zh" ? "权限说明" : "Roles"}
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => { tap(); void loadDevices(); void loadBalance(); void loadBackupStatus(); }}
+            style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
+          >
+            <IconSymbol name="paperplane.fill" size={18} color={colors.muted} />
+          </Pressable>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: 48 + insets.bottom }} showsVerticalScrollIndicator={false}>

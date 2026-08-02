@@ -65,6 +65,7 @@ async function reloadAllFromStorage(
               ...r,
               favorite: pref.favorite ?? r.favorite,
               rating: pref.rating !== undefined ? pref.rating : r.rating,
+              made: pref.made ?? r.made,
             };
           });
           if (setPrefs) setPrefs(p);
@@ -83,7 +84,7 @@ async function reloadAllFromStorage(
 const RECIPES_KEY = "cocktail.recipes";
 /** 收藏/评分独立存储键：按设备角色隔离，owner 组内同步，不同角色各自独立 */
 const PREFS_KEY = "cocktail.prefs.v1";
-type RecipePrefs = Record<string, { favorite?: boolean; rating?: number | null }>;
+type RecipePrefs = Record<string, { favorite?: boolean; rating?: number | null; made?: boolean }>;
 const CATEGORIES_KEY = "cocktail.categories";
 const SEEDED_KEY = "cocktail.seeded";
 const TAGS_KEY = "cocktail.tags";
@@ -382,23 +383,24 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
         // 加载收藏/评分偏好（独立键），合并覆盖到 recipe 对象
         const prefsRaw = await AsyncStorage.getItem(PREFS_KEY);
         let loadedPrefs: RecipePrefs = prefsRaw ? JSON.parse(prefsRaw) : {};
-        // 迁移：将 recipes 中已有的 favorite/rating 写入 prefs（首次迁移）
+        // 迁移：将 recipes 中已有的 favorite/rating/made 写入 prefs（首次迁移）
         let prefsMigrated = false;
         recs = recs.map((r) => {
           const p = loadedPrefs[r.id];
           if (!p) {
-            // 如果 recipe 有 favorite 或 rating，迁移到 prefs
-            if (r.favorite || r.rating != null) {
-              loadedPrefs[r.id] = { favorite: r.favorite, rating: r.rating };
+            // 如果 recipe 有个人偏好字段，迁移到 prefs
+            if (r.favorite || r.rating != null || r.made) {
+              loadedPrefs[r.id] = { favorite: r.favorite, rating: r.rating, made: r.made };
               prefsMigrated = true;
             }
             return r;
           }
-          // prefs 优先覆盖 recipe 中的 favorite/rating
+          // prefs 优先覆盖 recipe 中的个人偏好字段
           return {
             ...r,
             favorite: p.favorite ?? r.favorite,
             rating: p.rating !== undefined ? p.rating : r.rating,
+            made: p.made ?? r.made,
           };
         });
         if (prefsMigrated) {
@@ -721,11 +723,16 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
   /** 切换"做过/未做过"状态 */
   const toggleMade = useCallback(
     (id: string) => {
+      const cur = recipesRef.current.find((r) => r.id === id);
+      const newMade = !(cur?.made ?? false);
+      // 双写：recipe 保持向后兼容，prefs 独立存储
       persistRecipes(
         recipesRef.current.map((r) =>
-          r.id === id ? { ...r, made: !r.made, updatedAt: Date.now() } : r,
+          r.id === id ? { ...r, made: newMade, updatedAt: Date.now() } : r,
         ),
       );
+      const nextPrefs = { ...prefsRef.current, [id]: { ...prefsRef.current[id], made: newMade } };
+      persistPrefs(nextPrefs);
     },
     [persistRecipes],
   );
