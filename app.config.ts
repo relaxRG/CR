@@ -55,6 +55,19 @@ const config: ExpoConfig = {
       "ITSAppUsesNonExemptEncryption": false,
       "UIRequiresFullScreen": false
     },
+    usesIcloudStorage: true,
+    entitlements: {
+      "com.apple.developer.icloud-container-identifiers": [
+        "iCloud.com.app.cocktailrecipes"
+      ],
+      "com.apple.developer.icloud-services": [
+        "CloudDocuments"
+      ],
+      "com.apple.developer.ubiquity-container-identifiers": [
+        "iCloud.com.app.cocktailrecipes"
+      ],
+      "com.apple.developer.ubiquity-kvstore-identifier": "$(TeamIdentifierPrefix)com.app.cocktailrecipes"
+    },
   },
   android: {
     adaptiveIcon: {
@@ -95,6 +108,12 @@ const config: ExpoConfig = {
   },
   plugins: [
     "expo-router",
+    [
+      "expo-document-picker",
+      {
+        "iCloudContainerEnvironment": "Production"
+      }
+    ],
     [
       "expo-image-picker",
       {

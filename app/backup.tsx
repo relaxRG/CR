@@ -19,6 +19,7 @@ import {
   restoreFromBackup as restoreFromICloud,
 } from "@/lib/backup/icloud-backup";
 import { readBackupVersion } from "@/lib/backup/icloud-backup";
+import { isUsingICloudDrive } from "@/lib/backup/icloud-backup";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function BackupScreen() {
@@ -402,13 +403,22 @@ export default function BackupScreen() {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.cardTitle} className="text-foreground">
-                {lang === "zh" ? "iCloud Drive 备份" : "iCloud Drive Backup"}
+                {lang === "zh"
+                  ? (isUsingICloudDrive() ? "iCloud Drive 备份" : "本机文档备份")
+                  : (isUsingICloudDrive() ? "iCloud Drive Backup" : "Local Documents Backup")}
               </Text>
               <Text style={styles.cardDesc} className="text-muted">
                 {icloudLastAt
                   ? (lang === "zh" ? `上次备份：${new Date(icloudLastAt).toLocaleString()}` : `Last backup: ${new Date(icloudLastAt).toLocaleString()}`)
-                  : (lang === "zh" ? "尚未备份到 iCloud" : "Not backed up to iCloud yet")}
+                  : (lang === "zh"
+                      ? (isUsingICloudDrive() ? "尚未备份到 iCloud Drive" : "尚未备份到本地")
+                      : (isUsingICloudDrive() ? "Not backed up to iCloud Drive yet" : "Not backed up locally yet"))}
               </Text>
+              {isUsingICloudDrive() && (
+                <Text style={[styles.cardDesc, { color: "#34C759", marginTop: 2 }]}>
+                  {lang === "zh" ? "📂 文件 App → iCloud Drive → CocktailR 可见" : "📂 Visible in Files app → iCloud Drive → CocktailR"}
+                </Text>
+              )}
             </View>
             {icloudLastAt ? (
               <View style={[styles.freshDot, { backgroundColor: icloudFresh ? "#34C759" : "#FF9F0A" }]} />
@@ -423,10 +433,16 @@ export default function BackupScreen() {
           >
             <View style={{ flex: 1 }}>
               <Text style={styles.rowTitle} className="text-foreground">
-                {icloudBacking ? (lang === "zh" ? "备份中…" : "Backing up…") : (lang === "zh" ? "立即备份到 iCloud" : "Backup to iCloud Now")}
+                {icloudBacking
+                  ? (lang === "zh" ? "备份中…" : "Backing up…")
+                  : (lang === "zh"
+                      ? (isUsingICloudDrive() ? "立即备份到 iCloud Drive" : "立即备份到本地")
+                      : (isUsingICloudDrive() ? "Backup to iCloud Drive Now" : "Backup Locally Now"))}
               </Text>
               <Text style={styles.rowDesc} className="text-muted">
-                {lang === "zh" ? "7 个版本循环保留，自动每小时备份一次" : "7 rotating versions, auto-backup every hour"}
+                {lang === "zh"
+                  ? (isUsingICloudDrive() ? "7 版本循环 · 每小时自动 · 跨设备同步" : "7 版本循环 · 每小时自动 · 本地存储")
+                  : (isUsingICloudDrive() ? "7 rotating versions · auto hourly · cross-device sync" : "7 rotating versions · auto hourly · local storage")}
               </Text>
             </View>
             <IconSymbol name="chevron.right" size={16} color={colors.muted} />
@@ -444,7 +460,11 @@ export default function BackupScreen() {
           >
             <View style={{ flex: 1 }}>
               <Text style={styles.rowTitle} className="text-foreground">
-                {icloudVersionsLoading ? (lang === "zh" ? "加载中…" : "Loading…") : (lang === "zh" ? "从 iCloud 恢复" : "Restore from iCloud")}
+                {icloudVersionsLoading
+                  ? (lang === "zh" ? "加载中…" : "Loading…")
+                  : (lang === "zh"
+                      ? (isUsingICloudDrive() ? "从 iCloud Drive 恢复" : "从本地备份恢复")
+                      : (isUsingICloudDrive() ? "Restore from iCloud Drive" : "Restore from Local Backup"))}
               </Text>
               <Text style={styles.rowDesc} className="text-muted">
                 {lang === "zh" ? "点击展开版本列表，查看各版本数据差异" : "Tap to expand versions with data diff"}

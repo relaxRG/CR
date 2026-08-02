@@ -612,9 +612,9 @@ export default function DeviceManagerScreen() {
           />
           <ChannelRow
             icon="📁"
-            label={lang === "zh" ? "本机文档备份" : "Local Documents"}
+            label={lang === "zh" ? (isUsingICloudDrive() ? "iCloud Drive 备份" : "本机文档备份") : (isUsingICloudDrive() ? "iCloud Drive Backup" : "Local Documents")}
             status={icloudLastBackup ? (lang === "zh" ? "已备份" : "Backed up") : (lang === "zh" ? "等待" : "Pending")}
-            detail={`${lang === "zh" ? "5分钟自动 · 7版本 · 随iCloud整机备份 · 上次：" : "Auto 5min · 7ver · in iCloud device backup · Last: "}${icloudLabel}`}
+            detail={`${lang === "zh" ? (isUsingICloudDrive() ? "1小时自动 · 7版本 · 跨设备可见 · 上次：" : "1小时自动 · 7版本 · 本地存储 · 上次：") : (isUsingICloudDrive() ? "Auto 1h · 7ver · visible in Files app · Last: " : "Auto 1h · 7ver · local storage · Last: ")}${icloudLabel}`}
             statusColor={icloudLastBackup ? "#34C759" : "#FF9500"}
           />
           <ChannelRow
@@ -1109,3 +1109,4 @@ const styles = StyleSheet.create({
   photoProgressText: { fontSize: 12, lineHeight: 16, marginTop: 6, textAlign: "center" },
 });
 import { getCustomRoleName } from "./role-settings";
+import { isUsingICloudDrive } from "@/lib/backup/icloud-backup";
