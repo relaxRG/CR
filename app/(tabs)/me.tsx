@@ -646,6 +646,14 @@ export default function MeScreen() {
                     : (lang === "zh" ? "自动保存到 iCloud Drive，7 个版本循环保留" : "Auto-saved to iCloud Drive, 7 rotating versions")}
                 </Text>
               </View>
+              {/* 备份新鲜度角标：绿 < 24h，黄 ≥ 24h，无色 = 未备份 */}
+              {icloudLastAt ? (
+                <View style={{
+                  width: 10, height: 10, borderRadius: 5,
+                  backgroundColor: Date.now() - icloudLastAt < 24 * 60 * 60 * 1000 ? "#34C759" : "#FF9F0A",
+                  marginRight: 4,
+                }} />
+              ) : null}
             </Pressable>
             <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 64 }} />
             {/* 从 iCloud 恢复 */}
