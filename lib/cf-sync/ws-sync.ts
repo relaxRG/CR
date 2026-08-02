@@ -29,6 +29,9 @@ let lastKnownServerTs = 0;
 let onPushDetectedCb: PushDetectedCallback | null = null;
 let appStateSubscription: ReturnType<typeof AppState.addEventListener> | null = null;
 let isActive = true;
+/** 上次通知 Worker 的时间戳（用于节流，30s 内不重复通知） */
+let lastNotifiedAt = 0;
+const NOTIFY_THROTTLE_MS = 30_000;
 
 /** 轮询间隔（毫秒）：前台 5s，后台 30s */
 const POLL_INTERVAL_FOREGROUND = 5_000;
@@ -42,6 +45,10 @@ const POLL_INTERVAL_BACKGROUND = 30_000;
 export async function notifyPushDone(): Promise<void> {
   if (Platform.OS === "web") return;
   try {
+    // 节流：30s 内同一设备不重复通知，避免短时间多次推送产生冗余 HTTP 请求
+    const now = Date.now();
+    if (now - lastNotifiedAt < NOTIFY_THROTTLE_MS) return;
+    lastNotifiedAt = now;
     const deviceInfo = await getDeviceInfo();
     if (!deviceInfo) return;
     await fetch(`${CF_WORKER_URL}/api/sync/notify`, {
@@ -51,7 +58,6 @@ export async function notifyPushDone(): Promise<void> {
         "X-Device-Id": deviceInfo.deviceId,
         "X-Device-Token": deviceInfo.deviceToken,
       },
-      body: JSON.stringify({ pushedAt: Date.now() }),
       signal: AbortSignal.timeout(5000),
     });
   } catch {
@@ -69,18 +75,16 @@ async function checkForUpdates(): Promise<number | null> {
     const deviceInfo = await getDeviceInfo();
     if (!deviceInfo) return null;
     const res = await fetch(`${CF_WORKER_URL}/api/sync/check`, {
-      method: "POST",
+      method: "GET",
       headers: {
-        "Content-Type": "application/json",
         "X-Device-Id": deviceInfo.deviceId,
         "X-Device-Token": deviceInfo.deviceToken,
       },
-      body: JSON.stringify({ since: lastKnownServerTs }),
       signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) return null;
-    const data = await res.json() as { latestAt?: number; hasNew?: boolean };
-    if (data.latestAt) return data.latestAt;
+    const data = await res.json() as { ts?: number };
+    if (data.ts && data.ts > 0) return data.ts;
     return null;
   } catch {
     return null;
@@ -163,4 +167,5 @@ export function resetRealtimeSync(): void {
   stopPolling();
   lastKnownServerTs = 0;
   onPushDetectedCb = null;
+  lastNotifiedAt = 0;
 }

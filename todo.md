@@ -632,3 +632,4 @@
 - [x] 导入后自动调用 triggerStoreReload() 刷新所有 store 内存状态
 - [x] 导入成功提示：显示恢复条目数，提示重启 App
 - [x] 导入中状态：按钮显示「导入中…」并禁用，防止重复操作
+- [x] Build 97：Worker 端 /api/sync/notify + /api/sync/check 端点上线（group_ts 表 + D1 持久化）+ 客户端节流优化（30s 内不重复通知）
