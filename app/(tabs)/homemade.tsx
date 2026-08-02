@@ -78,6 +78,7 @@ export default function HomemadeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { t, lang } = useI18n();
+  const { guardWrite } = useGuestGuard();
   const {
     ready,
     preps,
@@ -606,6 +607,7 @@ export default function HomemadeScreen() {
   }, [sorted, sections, types, group]);
 
   const handleAdd = () => {
+    if (!guardWrite()) return;
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
@@ -1645,3 +1647,4 @@ const styles = StyleSheet.create({
   selRow: { flexDirection: "row", alignItems: "center" },
   selCheckWrap: { width: 34, alignItems: "flex-start", justifyContent: "center" },
 });
+import { useGuestGuard } from "@/hooks/use-guest-guard";

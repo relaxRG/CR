@@ -66,6 +66,7 @@ export function RecipesScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { t, lang } = useI18n();
+  const { guardWrite } = useGuestGuard();
   const {
     ready,
     recipes,
@@ -366,6 +367,7 @@ export function RecipesScreen() {
   }, []);
 
   const handleAdd = () => {
+    if (!guardWrite()) return;
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
@@ -1110,3 +1112,4 @@ const styles = StyleSheet.create({
 });
 
 export default RecipesScreen;
+import { useGuestGuard } from "@/hooks/use-guest-guard";

@@ -267,6 +267,7 @@ export default function DeviceManagerScreen() {
   // Backup channels
   const [localSnapshotCount, setLocalSnapshotCount] = useState(0);
   const [icloudLastBackup, setIcloudLastBackup] = useState<number | null>(null);
+  const [customRoleNames, setCustomRoleNames] = useState<Record<string, string>>({});
 
   // 邀请时预设功能权限
   const [inviteFeatures, setInviteFeatures] = useState<Set<FeatureKey>>(
@@ -294,6 +295,12 @@ export default function DeviceManagerScreen() {
       setLoading(true);
       const list = await listDevices();
       setDevices(list);
+      const names: Record<string, string> = {};
+      for (const d of list) {
+        const n = await getCustomRoleName(d.id);
+        if (n) names[d.id] = n;
+      }
+      setCustomRoleNames(names);
     } catch (e) {
       console.warn("[DeviceManager] load failed:", e);
     } finally {
@@ -701,6 +708,7 @@ export default function DeviceManagerScreen() {
                     </Text>
                     <Text style={[styles.deviceRowRole, { color: ROLE_LABELS[item.role].color }]}>
                       {lang === "zh" ? ROLE_LABELS[item.role].zh : ROLE_LABELS[item.role].en}
+                      {customRoleNames[item.id] ? `（${customRoleNames[item.id]}）` : ""}
                     </Text>
                   </View>
                  {isOwner && !item.isCurrentDevice && (
@@ -966,3 +974,4 @@ const styles = StyleSheet.create({
   actionBtnText: { fontSize: 13, fontWeight: "600", lineHeight: 18 },
   emptyText: { fontSize: 14, lineHeight: 20, textAlign: "center", paddingVertical: 24 },
 });
+import { getCustomRoleName } from "./role-settings";
