@@ -18,9 +18,9 @@ export default function TabLayout() {
     : pathname.startsWith("/me") ? "me"
     : "index";
 
-  const { syncState, syncError } = useSync();
+  const { syncState, syncError, hasPendingConflicts } = useSync();
   // 有同步失败（syncState.error）或 provider 级别错误时显示红点
-  const syncBadge = !!syncError || !!syncState.error;
+  const syncBadge = !!syncError || !!syncState.error || hasPendingConflicts;
 
   const TAB_ITEMS: FloatingTabItem[] = [
     {

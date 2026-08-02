@@ -97,7 +97,7 @@ export default function MeScreen() {
       }
       // 构建选项列表
       const buttons = versions.map((v) => ({
-        text: `${v.label}  (${v.keyCount} 项)`,
+        text: `${v.label}  ·  ${v.keyCount} 项  ·  ${(v.sizeBytes / 1024).toFixed(1)} KB`,
         onPress: () => {
           Alert.alert(
             lang === "zh" ? "确认恢复" : "Confirm Restore",
@@ -113,11 +113,13 @@ export default function MeScreen() {
                   try {
                     const result = await restoreFromICloud(v.slot);
                     triggerStoreReload();
+                    // 刷新 iCloud 元数据显示
+                    getICloudMeta().then((meta) => setIcloudLastAt(meta.lastBackupAt));
                     Alert.alert(
                       lang === "zh" ? "恢复成功" : "Restore Complete",
                       lang === "zh"
-                        ? `已成功恢复 ${result.restored} 项数据。`
-                        : `Successfully restored ${result.restored} items.`,
+                        ? `已成功恢复 ${result.restored} 项数据，配方/酒款/自制品统计已自动更新。`
+                        : `Restored ${result.restored} items. Stats updated automatically.`,
                     );
                   } catch (e) {
                     Alert.alert(

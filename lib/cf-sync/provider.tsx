@@ -59,6 +59,8 @@ type SyncContextValue = {
   openDeviceManager: () => void;
   /** 用户查看同步日志后调用，清除错误状态（消除红点角标） */
   dismissSyncError: () => void;
+  /** 是否有未解决的同步冲突（用于角标显示） */
+  hasPendingConflicts: boolean;
 };
 
 const SyncContext = createContext<SyncContextValue | null>(null);
@@ -326,6 +328,7 @@ export function SyncProvider({
         openPairModal,
         openDeviceManager,
         dismissSyncError,
+        hasPendingConflicts: pendingConflicts.length > 0,
       }}
     >
       {children}
