@@ -1396,13 +1396,15 @@ function PrepRowInner({
       >
         <View className="flex-row items-center">
           <View className="flex-1 pr-2">
-            <View style={{ height: 40, justifyContent: "center" }}>
+            <View style={{ justifyContent: "center" }}>
               <Text style={{ fontSize: 17, fontWeight: "600", lineHeight: 24 }} className="text-foreground" numberOfLines={1}>
                 {names.primary}
               </Text>
-              <Text className="text-xs text-muted mt-0.5" numberOfLines={1}>
-                {variantSubtitle ?? names.secondary ?? " "}
-              </Text>
+              {(variantSubtitle ?? names.secondary) ? (
+                <Text className="text-xs text-muted mt-0.5" numberOfLines={1}>
+                  {variantSubtitle ?? names.secondary}
+                </Text>
+              ) : null}
             </View>
             <View className="flex-row items-center mt-1.5" style={{ gap: 6, height: 24, overflow: "hidden" }}>
               {cardSettings.showHomemadeTags && (
