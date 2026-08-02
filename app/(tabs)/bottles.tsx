@@ -1403,9 +1403,9 @@ function FamilyCard({
               style={({ pressed }) => [pressed && { opacity: 0.7 }]}
             >
               <View
-                className="bg-surface"
+                className="bg-surface px-4"
                 style={[
-                  { paddingLeft: 32, paddingRight: 16, paddingVertical: 10 },
+                  { paddingVertical: 12, borderLeftWidth: 3, borderLeftColor: colors.primary + "55" },
                   isLast && i === children.length - 1 && {
                     borderBottomLeftRadius: 12,
                     borderBottomRightRadius: 12,
@@ -1413,29 +1413,25 @@ function FamilyCard({
                 ]}
               >
                 <View className="flex-row items-center">
-                  <View
-                    style={{
-                      width: 5,
-                      height: 5,
-                      borderRadius: 3,
-                      backgroundColor: colors.muted + "88",
-                      marginRight: 10,
-                    }}
-                  />
-                  <View className="flex-1 pr-2" style={{ height: 36, justifyContent: "center" }}>
-                    <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
+                  <View className="flex-1 pr-2">
+                    <Text style={{ fontSize: 16, fontWeight: "600", lineHeight: 22 }} className="text-foreground" numberOfLines={1}>
                       {lang === "en" && v.nameEn ? v.nameEn : v.nameZh || v.nameEn}
                     </Text>
-                    <Text className="text-[11px] text-muted mt-0.5" numberOfLines={1}>
-                      {v.volume || " "}
-                    </Text>
+                    {(lang === "en" ? v.nameZh : v.nameEn) ? (
+                      <Text className="text-xs text-muted mt-0.5" numberOfLines={1}>
+                        {lang === "en" ? v.nameZh : v.nameEn}
+                      </Text>
+                    ) : null}
+                    {v.volume ? (
+                      <Text className="text-xs text-muted" style={{ marginTop: 2 }} numberOfLines={1}>
+                        {v.volume}
+                      </Text>
+                    ) : null}
                   </View>
                   {v.priceCny > 0 ? (
-                    <Text className="text-sm font-semibold text-foreground">¥{v.priceCny}</Text>
+                    <Text className="text-sm font-semibold text-foreground" style={{ marginRight: 6 }}>¥{v.priceCny}</Text>
                   ) : null}
-                  <View style={{ marginLeft: 8 }}>
-                    <IconSymbol name="chevron.right" size={14} color={colors.border} />
-                  </View>
+                  <IconSymbol name="chevron.right" size={14} color={colors.border} />
                 </View>
               </View>
             </Pressable>
