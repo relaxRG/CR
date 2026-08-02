@@ -9,6 +9,7 @@ import { useRouter } from "expo-router";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useMonthlyReportStore } from "@/lib/store/monthly-report/store";
+import { useEmployeeStore, usePaySlipStore } from "@/lib/labor/store";
 import { useRevenueStore, REVENUE_CATEGORY_LABELS, RevenueCategory } from "@/lib/store/revenue-store";
 import { usePettyCashStore, PETTY_GROUPS } from "@/lib/store/petty-store";
 
@@ -51,6 +52,11 @@ export default function StoreAnalyticsScreen() {
     const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
   const router = useRouter();
   const { reports: monthlyReports } = useMonthlyReportStore();
+  const { employees } = useEmployeeStore();
+  const { paySlips } = usePaySlipStore();
+  const now = new Date();
+  const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const monthLaborCost = paySlips.filter((s) => s.month === currentMonthStr).reduce((sum, s) => sum + s.finalSalary, 0);
   const { records } = useRevenueStore();
   const { records: pettyRecords } = usePettyCashStore();
 
@@ -108,6 +114,27 @@ export default function StoreAnalyticsScreen() {
             </Text>
           </View>
           <IconSymbol name="chevron.right" size={14} color={colors.primary} />
+        </Pressable>
+        {/* 人工成本入口 */}
+        <Pressable
+          onPress={() => { tap(); router.push("/labor" as any); }}
+          style={({ pressed }) => ({
+            flexDirection: "row", alignItems: "center", gap: 10,
+            backgroundColor: "#FF9500" + "0e", borderColor: "#FF9500" + "33",
+            borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12,
+            opacity: pressed ? 0.7 : 1, marginTop: 8,
+          })}
+        >
+          <IconSymbol name="person.2.fill" size={18} color="#FF9500" />
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 14, fontWeight: "700", color: "#FF9500" }}>人工成本管理</Text>
+            <Text style={{ fontSize: 11, color: colors.muted, marginTop: 1 }}>
+              {employees.filter((e) => e.active).length > 0
+                ? `${employees.filter((e) => e.active).length} 名员工 · 本月薪资${monthLaborCost > 0 ? ` ¥${monthLaborCost.toFixed(0)}` : "未填写"}`
+                : "排班表 / 考勤工资 / 薪资汇总"}
+            </Text>
+          </View>
+          <IconSymbol name="chevron.right" size={14} color="#FF9500" />
         </Pressable>
       </View>
       {/* 时间段 + 对比 */}

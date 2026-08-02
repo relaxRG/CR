@@ -37,6 +37,7 @@ import { InventoryProvider } from "@/lib/store/inventory-store";
 import { LabPlanProvider } from "@/lib/lab/plan-store";
 import { SpiritsProvider } from "@/lib/spirits/store";
 import { MonthlyReportProvider } from "@/lib/store/monthly-report/store";
+import { LaborProvider } from "@/lib/labor/store";
 import { startAutoBackup, stopAutoBackup } from "@/lib/backup/icloud-backup";
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
@@ -133,6 +134,7 @@ export default function RootLayout() {
           <SupplierPurchaseProvider>
           <SpiritsProvider>
           <MonthlyReportProvider>
+          <LaborProvider>
             <Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="recipe/[id]" />
@@ -176,8 +178,14 @@ export default function RootLayout() {
               <Stack.Screen name="spirits-inventory-import" options={{ presentation: "modal" }} />
               <Stack.Screen name="monthly-report" />
               <Stack.Screen name="monthly-report-import" options={{ presentation: "modal" }} />
+              <Stack.Screen name="labor" />
+              <Stack.Screen name="labor-employees" />
+              <Stack.Screen name="labor-employee-form" options={{ presentation: "modal" }} />
+              <Stack.Screen name="labor-schedule" />
+              <Stack.Screen name="labor-attendance" />
             </Stack>
             <StatusBar style="auto" />
+          </LaborProvider>
           </MonthlyReportProvider>
           </SpiritsProvider>
           </SupplierPurchaseProvider>
