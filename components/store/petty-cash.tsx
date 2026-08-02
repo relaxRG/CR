@@ -281,16 +281,14 @@ export default function StorePettyCashScreen() {
             <View style={[S.summaryDot, { backgroundColor: DARK.red }]} />
             <Text style={S.summaryHalfTitle}>总支出</Text>
           </View>
-          <Text style={[S.summaryBigAmt, { color: DARK.red }]}>¥{fmtAmt(summary.expense)}</Text>
+          <Text style={S.summaryBigAmt}>¥{fmtAmt(summary.expense)}</Text>
           <View style={S.summarySubRow}>
             <Text style={S.summarySub}>总收入</Text>
-            <Text style={[S.summarySub, { color: DARK.green }]}>¥{fmtAmt(summary.inflow + summary.otherIncome)}</Text>
+            <Text style={S.summarySub}>¥{fmtAmt(summary.inflow + summary.otherIncome)}</Text>
           </View>
           <View style={S.summarySubRow}>
             <Text style={S.summarySub}>结余</Text>
-            <Text style={[S.summarySub, { color: summary.closingBalance >= 0 ? DARK.green : DARK.red }]}>
-              {summary.closingBalance >= 0 ? "" : "-"}¥{fmtAmt(Math.abs(summary.closingBalance))}
-            </Text>
+            <Text style={S.summarySub}>{summary.closingBalance >= 0 ? "" : "-"}¥{fmtAmt(Math.abs(summary.closingBalance))}</Text>
           </View>
         </View>
         <View style={S.summaryHalf}>
@@ -299,15 +297,15 @@ export default function StorePettyCashScreen() {
             <Text style={S.summaryHalfTitle}>备用金</Text>
           </View>
           <Pressable onPress={() => { tap(); setOpeningInput(summary.openingBalance.toFixed(2)); setShowOpeningEdit(true); }}>
-            <Text style={[S.summaryBigAmt, { color: DARK.text }]}>¥{fmtAmt(summary.closingBalance)}</Text>
+            <Text style={S.summaryBigAmt}>¥{fmtAmt(summary.closingBalance)}</Text>
           </Pressable>
           <View style={S.summarySubRow}>
             <Text style={S.summarySub}>期初</Text>
-            <Text style={[S.summarySub, { color: DARK.text }]}>¥{fmtAmt(summary.openingBalance)}</Text>
+            <Text style={S.summarySub}>¥{fmtAmt(summary.openingBalance)}</Text>
           </View>
           <View style={S.summarySubRow}>
             <Text style={S.summarySub}>转入</Text>
-            <Text style={[S.summarySub, { color: DARK.green }]}>+¥{fmtAmt(summary.inflow)}</Text>
+            <Text style={S.summarySub}>+¥{fmtAmt(summary.inflow)}</Text>
           </View>
         </View>
       </View>
@@ -320,17 +318,17 @@ export default function StorePettyCashScreen() {
         <Text style={S.periodArrow}>›</Text>
         <View style={S.periodItem}>
           <Text style={S.periodLabel}>转入</Text>
-          <Text style={[S.periodValue, { color: DARK.green }]}>+¥{fmtAmt(summary.inflow)}</Text>
+          <Text style={S.periodValue}>+¥{fmtAmt(summary.inflow)}</Text>
         </View>
         <Text style={S.periodArrow}>›</Text>
         <View style={S.periodItem}>
           <Text style={S.periodLabel}>其他收入</Text>
-          <Text style={[S.periodValue, { color: DARK.green }]}>+¥{fmtAmt(summary.otherIncome)}</Text>
+          <Text style={S.periodValue}>+¥{fmtAmt(summary.otherIncome)}</Text>
         </View>
         <Text style={S.periodArrow}>›</Text>
         <View style={S.periodItem}>
           <Text style={S.periodLabel}>期末备用金</Text>
-          <Text style={[S.periodValue, { color: DARK.blue }]}>¥{fmtAmt(summary.closingBalance)}</Text>
+          <Text style={S.periodValue}>¥{fmtAmt(summary.closingBalance)}</Text>
         </View>
       </View>
     </View>
@@ -347,8 +345,8 @@ export default function StorePettyCashScreen() {
           <View style={S.dayHeader}>
             <Text style={S.dayHeaderDate}>{group.date.slice(5).replace("-", "/")}</Text>
             <View style={{ flex: 1 }} />
-            {group.dayExpense > 0 && <Text style={[S.dayHeaderAmt, { color: DARK.red }]}>支出 ¥{fmtShort(group.dayExpense)}</Text>}
-            {group.dayIncome > 0 && <Text style={[S.dayHeaderAmt, { color: DARK.green, marginLeft: 10 }]}>收入 ¥{fmtShort(group.dayIncome)}</Text>}
+            {group.dayExpense > 0 && <Text style={S.dayHeaderAmt}>支出 ¥{fmtShort(group.dayExpense)}</Text>}
+            {group.dayIncome > 0 && <Text style={[S.dayHeaderAmt, { marginLeft: 10 }]}>收入 ¥{fmtShort(group.dayIncome)}</Text>}
           </View>
           {group.records.map(item => (
             <Pressable key={item.id}
@@ -371,13 +369,13 @@ export default function StorePettyCashScreen() {
                 )}
               </View>
               <Text style={[S.recordAmt, { color: INCOME_CODES.includes(item.code) ? DARK.green : DARK.red }]}>
-                {INCOME_CODES.includes(item.code) ? "+" : "-"}¥{item.amount.toFixed(3)}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      )}
-      ListEmptyComponent={
+              {INCOME_CODES.includes(item.code) ? "+" : "-"}¥{item.amount.toFixed(3)}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+    )}
+    ListEmptyComponent={
         <View style={S.empty}>
           <Text style={S.emptyTitle}>本月暂无记录</Text>
           <Text style={S.emptyDesc}>点击右下角 + 手动添加，或点击下载图标导入 Excel</Text>
@@ -415,8 +413,8 @@ export default function StorePettyCashScreen() {
                     <Text style={[S.calDayNum, { color: isToday ? DARK.blue : day ? DARK.text : "transparent", fontWeight: isToday ? "700" : "400" }]}>
                       {day ?? ""}
                     </Text>
-                    {data?.expense ? <Text style={[S.calAmt, { color: DARK.red }]}>{fmtShort(data.expense)}</Text> : null}
-                    {data?.income ? <Text style={[S.calAmt, { color: DARK.green }]}>{fmtShort(data.income)}</Text> : null}
+                    {data?.expense ? <Text style={S.calAmt}>{fmtShort(data.expense)}</Text> : null}
+                    {data?.income ? <Text style={[S.calAmt, { opacity: 0.55 }]}>{fmtShort(data.income)}</Text> : null}
                   </Pressable>
                 );
               })}
@@ -441,9 +439,9 @@ export default function StorePettyCashScreen() {
                     {item.description ? <Text style={S.recordSub}>{item.description}</Text> : null}
                   </View>
                   <Text style={[S.recordAmt, { color: INCOME_CODES.includes(item.code) ? DARK.green : DARK.red }]}>
-                    {INCOME_CODES.includes(item.code) ? "+" : "-"}¥{item.amount.toFixed(3)}
-                  </Text>
-                </Pressable>
+                  {INCOME_CODES.includes(item.code) ? "+" : "-"}¥{item.amount.toFixed(3)}
+                </Text>
+              </Pressable>
               )))}
           </View>
         )}
@@ -670,12 +668,12 @@ const S = StyleSheet.create({
   summaryDot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
   summaryHalfTitle: { fontSize: 13, color: DARK.sub, fontWeight: "500" },
   summaryBigAmt: { fontSize: 22, fontWeight: "700", color: DARK.text, marginBottom: 6, lineHeight: 28 },
-  summarySubRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 2 },
-  summarySub: { fontSize: 12, color: DARK.sub },
+  summarySubRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 2, gap: 4 },
+  summarySub: { fontSize: 12, color: DARK.sub, flex: 1 },
   periodRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: DARK.border },
   periodItem: { flex: 1, alignItems: "center" },
   periodLabel: { fontSize: 10, color: DARK.sub, marginBottom: 3 },
-  periodValue: { fontSize: 12, fontWeight: "600", color: DARK.text },
+  periodValue: { fontSize: 12, fontWeight: "600", color: DARK.text, textAlign: "center" },
   periodArrow: { fontSize: 16, color: DARK.sub, marginHorizontal: 2 },
   // 账本
   dayHeader: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 6, backgroundColor: DARK.bg },
