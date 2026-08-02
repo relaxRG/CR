@@ -13,6 +13,7 @@ import {
   FlatList,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -518,7 +519,7 @@ export default function DeviceManagerScreen() {
           onPress={() => { tap(); router.back(); }}
           style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
         >
-          <IconSymbol name="chevron.left.forwardslash.chevron.right" size={20} color={colors.primary} />
+          <IconSymbol name="chevron.left" size={22} color={colors.primary} />
         </Pressable>
         <Text style={[styles.title, { color: colors.foreground }]}>
           {lang === "zh" ? "设备管理" : "Device Manager"}
@@ -532,16 +533,26 @@ export default function DeviceManagerScreen() {
               {lang === "zh" ? "权限说明" : "Roles"}
             </Text>
           </Pressable>
-          <Pressable
-            onPress={() => { tap(); void loadDevices(); void loadBalance(); void loadBackupStatus(); }}
-            style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
-          >
-            <IconSymbol name="paperplane.fill" size={18} color={colors.muted} />
-          </Pressable>
+
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 48 + insets.bottom }} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: 48 + insets.bottom }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={false}
+            onRefresh={() => {
+              tap();
+              void loadDevices();
+              void loadBalance();
+              void loadBackupStatus();
+            }}
+            tintColor={colors.primary}
+          />
+        }
+      >
 
         {/* ── 1. Sync Status Card ── */}
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
