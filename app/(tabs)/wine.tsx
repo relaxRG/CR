@@ -117,16 +117,24 @@ export default function WineScreen() {
       {/* 顶部 */}
       <View style={[styles.header, { paddingTop: insets.top + 10, backgroundColor: colors.background }]}>
         <View style={{ flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" }}>
-          <View>
-            <Text style={[styles.title, { color: colors.foreground }]}>葡萄酒</Text>
-            <Text style={[styles.subtitle, { color: colors.muted }]}>{subtitle}</Text>
-          </View>
-          <Pressable
-            onPress={() => { tap(); router.push("/wine-form" as any); }}
-            style={({ pressed }) => [styles.addBtn, { backgroundColor: colors.primary, opacity: pressed ? 0.8 : 1 }]}
-          >
-            <IconSymbol name="plus" size={20} color="#fff" />
-          </Pressable>
+            <View>
+              <Text style={[styles.title, { color: colors.foreground }]}>葡萄酒</Text>
+              <Text style={[styles.subtitle, { color: colors.muted }]}>{subtitle}</Text>
+            </View>
+            <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+              <Pressable
+                onPress={() => { tap(); router.push("/wine-inventory" as any); }}
+                style={({ pressed }) => [styles.addBtn, { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, opacity: pressed ? 0.8 : 1 }]}
+              >
+                <IconSymbol name="chart.bar.fill" size={18} color={colors.primary} />
+              </Pressable>
+              <Pressable
+                onPress={() => { tap(); router.push("/wine-form" as any); }}
+                style={({ pressed }) => [styles.addBtn, { backgroundColor: colors.primary, opacity: pressed ? 0.8 : 1 }]}
+              >
+                <IconSymbol name="plus" size={20} color="#fff" />
+              </Pressable>
+            </View>
         </View>
         {/* 搜索框 */}
         <View style={[styles.searchBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>

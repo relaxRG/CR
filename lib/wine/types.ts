@@ -40,6 +40,86 @@ export interface WineBottle {
   updatedAt: string;
 }
 
+// ─── 进销存台账字段 ─────────────────────────────────────────────────────────
+
+/** 葡萄酒进销存台账条目（对应 Excel 葡萄酒盘点表的一行） */
+export interface WineInventoryItem {
+  /** 产品序号（来自 Excel） */
+  seq: number;
+  /** 酒类（Red / White / Rose / Sparkling / Natural Wine 等） */
+  wineType: string;
+  /** 盘点分类（即供应商名称，如：甘澧、Interprocom） */
+  supplier: string;
+  /** 中文名 */
+  name: string;
+  /** 期初单位成本 */
+  initUnitCost: number;
+  /** 期初库存量（瓶） */
+  initQty: number;
+  /** 期初库存成本 */
+  initCost: number;
+  /** 本月进货量 */
+  purchaseQty: number;
+  /** 本月进货成本 */
+  purchaseCost: number;
+  /** 期末库存量 */
+  endQty: number;
+  /** 期末单位成本 */
+  unitCost: number;
+  /** 期末库存成本 */
+  endCost: number;
+  /** 消耗瓶数 */
+  consumeBottles: number;
+  /** 本期消耗量（成本） */
+  consumeQty: number;
+}
+
+/** 进货总单明细条目（对应 Excel 进货总单表的一行） */
+export interface WinePurchaseOrderItem {
+  date: string;          // YYYY-MM-DD
+  supplier: string;
+  productName: string;   // 原始商品名（中英混合）
+  unitPrice: number;
+  quantity: number;
+  amount: number;
+}
+
+/** 一次 Excel 导入生成的月度进销存快照 */
+export interface WineMonthlySnapshot {
+  id: string;
+  /** 月份标签，如 "2026年2月" */
+  monthLabel: string;
+  /** 导入时间 */
+  importedAt: string;
+  /** 台账数据 */
+  items: WineInventoryItem[];
+  /** 进货总单明细 */
+  purchaseOrders: WinePurchaseOrderItem[];
+  /** 供应商本月进货额汇总 { supplierName: amount } */
+  supplierTotals: Record<string, number>;
+  /** 月总进货额 */
+  totalPurchase: number;
+  /** 月总消耗成本 */
+  totalConsume: number;
+  /** 期末总库存成本 */
+  totalEndCost: number;
+}
+
+/** 手动进货录入记录 */
+export interface WineManualPurchase {
+  id: string;
+  date: string;          // YYYY-MM-DD
+  supplier: string;
+  /** 对应 WineBottle.id（若已匹配） */
+  bottleId: string | null;
+  productName: string;
+  unitPrice: number;
+  quantity: number;
+  amount: number;
+  notes: string;
+  createdAt: string;
+}
+
 export const WINE_STYLE_LABELS: Record<WineStyle, string> = {
   red: "红葡萄酒",
   white: "白葡萄酒",

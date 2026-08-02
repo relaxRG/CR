@@ -114,6 +114,7 @@ const MAPPING = {
   "lock.fill": "lock",
   "lock.open.fill": "lock-open",
   "tray.2.fill": "category",
+  "square.and.pencil": "edit",
   "qrcode": "qr-code",
   "fork.knife": "restaurant",
   "fork.knife.circle.fill": "restaurant",

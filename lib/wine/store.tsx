@@ -1,12 +1,22 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useReducer } from "react";
 import { notifySyncChange, registerStoreReload } from "../sync/engine";
-import { WineBottle } from "./types";
+import { WineBottle, WineMonthlySnapshot, WineManualPurchase } from "./types";
 
 const STORAGE_KEY = "wine.bottles.v1";
+const SNAPSHOT_KEY = "wine.snapshots.v2";
+const MANUAL_PURCHASE_KEY = "wine.manual_purchases.v1";
 
 export interface WineState {
   bottles: WineBottle[];
+}
+
+export interface WineSnapshotState {
+  snapshots: WineMonthlySnapshot[];
+}
+
+export interface WineManualPurchaseState {
+  purchases: WineManualPurchase[];
 }
 
 type Action =
@@ -16,11 +26,24 @@ type Action =
   | { type: "DELETE"; id: string }
   | { type: "UPDATE_STOCK"; id: string; delta: number };
 
+type SnapshotAction =
+  | { type: "LOAD"; payload: WineSnapshotState }
+  | { type: "ADD_SNAPSHOT"; snapshot: WineMonthlySnapshot }
+  | { type: "DELETE_SNAPSHOT"; id: string };
+
+type ManualPurchaseAction =
+  | { type: "LOAD"; payload: WineManualPurchaseState }
+  | { type: "ADD"; purchase: WineManualPurchase }
+  | { type: "DELETE"; id: string };
+
 function uuid(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
+export { uuid as wineUuid };
 
 const initialState: WineState = { bottles: [] };
+const initialSnapshotState: WineSnapshotState = { snapshots: [] };
+const initialManualState: WineManualPurchaseState = { purchases: [] };
 
 function reducer(state: WineState, action: Action): WineState {
   switch (action.type) {
@@ -43,6 +66,24 @@ function reducer(state: WineState, action: Action): WineState {
   }
 }
 
+function snapshotReducer(state: WineSnapshotState, action: SnapshotAction): WineSnapshotState {
+  switch (action.type) {
+    case "LOAD": return action.payload;
+    case "ADD_SNAPSHOT": return { snapshots: [action.snapshot, ...state.snapshots] };
+    case "DELETE_SNAPSHOT": return { snapshots: state.snapshots.filter((s) => s.id !== action.id) };
+    default: return state;
+  }
+}
+
+function manualReducer(state: WineManualPurchaseState, action: ManualPurchaseAction): WineManualPurchaseState {
+  switch (action.type) {
+    case "LOAD": return action.payload;
+    case "ADD": return { purchases: [action.purchase, ...state.purchases] };
+    case "DELETE": return { purchases: state.purchases.filter((p) => p.id !== action.id) };
+    default: return state;
+  }
+}
+
 interface WineContextValue extends WineState {
   addBottle: (data: Omit<WineBottle, "id" | "createdAt" | "updatedAt">) => void;
   updateBottle: (id: string, updates: Partial<WineBottle>) => void;
@@ -50,10 +91,24 @@ interface WineContextValue extends WineState {
   updateStock: (id: string, delta: number) => void;
 }
 
+interface WineSnapshotContextValue extends WineSnapshotState {
+  addSnapshot: (snapshot: WineMonthlySnapshot) => void;
+  deleteSnapshot: (id: string) => void;
+}
+
+interface WineManualPurchaseContextValue extends WineManualPurchaseState {
+  addManualPurchase: (data: Omit<WineManualPurchase, "id" | "createdAt">) => void;
+  deleteManualPurchase: (id: string) => void;
+}
+
 const WineContext = createContext<WineContextValue | null>(null);
+const WineSnapshotContext = createContext<WineSnapshotContextValue | null>(null);
+const WineManualPurchaseContext = createContext<WineManualPurchaseContextValue | null>(null);
 
 export function WineProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
+  const [snapshotState, snapshotDispatch] = useReducer(snapshotReducer, initialSnapshotState);
+  const [manualState, manualDispatch] = useReducer(manualReducer, initialManualState);
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY).then((raw) => {
@@ -69,9 +124,29 @@ export function WineProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    AsyncStorage.getItem(SNAPSHOT_KEY).then((raw) => {
+      if (raw) { try { snapshotDispatch({ type: "LOAD", payload: JSON.parse(raw) }); } catch {} }
+    });
+  }, []);
+
+  useEffect(() => {
+    AsyncStorage.getItem(MANUAL_PURCHASE_KEY).then((raw) => {
+      if (raw) { try { manualDispatch({ type: "LOAD", payload: JSON.parse(raw) }); } catch {} }
+    });
+  }, []);
+
+  useEffect(() => {
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state)).catch(() => {});
     notifySyncChange(STORAGE_KEY);
   }, [state]);
+
+  useEffect(() => {
+    AsyncStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshotState)).catch(() => {});
+  }, [snapshotState]);
+
+  useEffect(() => {
+    AsyncStorage.setItem(MANUAL_PURCHASE_KEY, JSON.stringify(manualState)).catch(() => {});
+  }, [manualState]);
 
   const addBottle = useCallback((data: Omit<WineBottle, "id" | "createdAt" | "updatedAt">) => {
     const now = new Date().toISOString();
@@ -90,9 +165,30 @@ export function WineProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: "UPDATE_STOCK", id, delta });
   }, []);
 
+  const addSnapshot = useCallback((snapshot: WineMonthlySnapshot) => {
+    snapshotDispatch({ type: "ADD_SNAPSHOT", snapshot });
+  }, []);
+
+  const deleteSnapshot = useCallback((id: string) => {
+    snapshotDispatch({ type: "DELETE_SNAPSHOT", id });
+  }, []);
+
+  const addManualPurchase = useCallback((data: Omit<WineManualPurchase, "id" | "createdAt">) => {
+    const now = new Date().toISOString();
+    manualDispatch({ type: "ADD", purchase: { ...data, id: uuid(), createdAt: now } });
+  }, []);
+
+  const deleteManualPurchase = useCallback((id: string) => {
+    manualDispatch({ type: "DELETE", id });
+  }, []);
+
   return (
     <WineContext.Provider value={{ ...state, addBottle, updateBottle, deleteBottle, updateStock }}>
-      {children}
+      <WineSnapshotContext.Provider value={{ ...snapshotState, addSnapshot, deleteSnapshot }}>
+        <WineManualPurchaseContext.Provider value={{ ...manualState, addManualPurchase, deleteManualPurchase }}>
+          {children}
+        </WineManualPurchaseContext.Provider>
+      </WineSnapshotContext.Provider>
     </WineContext.Provider>
   );
 }
@@ -100,5 +196,17 @@ export function WineProvider({ children }: { children: React.ReactNode }) {
 export function useWineStore(): WineContextValue {
   const ctx = useContext(WineContext);
   if (!ctx) throw new Error("useWineStore must be used within WineProvider");
+  return ctx;
+}
+
+export function useWineSnapshotStore(): WineSnapshotContextValue {
+  const ctx = useContext(WineSnapshotContext);
+  if (!ctx) throw new Error("useWineSnapshotStore must be used within WineProvider");
+  return ctx;
+}
+
+export function useWineManualPurchaseStore(): WineManualPurchaseContextValue {
+  const ctx = useContext(WineManualPurchaseContext);
+  if (!ctx) throw new Error("useWineManualPurchaseStore must be used within WineProvider");
   return ctx;
 }
