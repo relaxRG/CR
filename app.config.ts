@@ -55,7 +55,7 @@ const config: ExpoConfig = {
       "ITSAppUsesNonExemptEncryption": false,
       "UIRequiresFullScreen": false
     },
-    // iCloud entitlements removed (Build 119+): App ID not configured for iCloud
+    // iCloud entitlements removed: App ID not configured for iCloud in Apple Developer Portal
     // Backup falls back to local documentDirectory automatically
   },
   android: {
@@ -100,7 +100,7 @@ const config: ExpoConfig = {
     [
       "expo-document-picker",
       {
-        // iCloudContainerEnvironment removed
+        // iCloudContainerEnvironment removed (iCloud not configured)
       }
     ],
     [

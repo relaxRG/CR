@@ -817,21 +817,17 @@ export default function BottlesScreen() {
       </View>
 
       {/* 烈酒进销存入口 */}
-      <View style={{ paddingHorizontal: 20, marginTop: 6, marginBottom: 2 }}>
+      <View className="px-5 mt-3 mb-1">
         <Pressable
-          onPress={() => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push("/spirits-inventory" as any); }}
-          style={({ pressed }) => ({
-            flexDirection: "row", alignItems: "center", gap: 8,
-            backgroundColor: colors.primary + "0e", borderColor: colors.primary + "33",
-            borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8,
-            opacity: pressed ? 0.7 : 1,
-          })}
+          onPress={() => router.push("/spirits-inventory")}
+          style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: "#007AFF" + "18", borderRadius: 12, borderWidth: 1, borderColor: "#007AFF" + "44" }}
         >
-          <IconSymbol name="chart.bar.fill" size={14} color={colors.primary} />
-          <Text style={{ fontSize: 13, fontWeight: "600", color: colors.primary, flex: 1 }}>烈酒进销存</Text>
-          <IconSymbol name="chevron.right" size={12} color={colors.primary} />
+          <IconSymbol name="chart.bar.fill" size={18} color="#007AFF" />
+          <Text style={{ flex: 1, fontSize: 14, fontWeight: "600", color: "#007AFF" }}>烈酒进销存</Text>
+          <IconSymbol name="chevron.right" size={14} color="#007AFF" />
         </Pressable>
       </View>
+
       {/* Search */}
       <View className="px-5 mt-2">
         <View

@@ -8,10 +8,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { useMonthlyReportStore } from "@/lib/store/monthly-report/store";
-import { useEmployeeStore, usePaySlipStore } from "@/lib/labor/store";
 import { useRevenueStore, REVENUE_CATEGORY_LABELS, RevenueCategory } from "@/lib/store/revenue-store";
 import { usePettyCashStore, PETTY_GROUPS } from "@/lib/store/petty-store";
+import { useMonthlyReportStore } from "@/lib/store/monthly-report/store";
+import { useEmployeeStore, usePaySlipStore } from "@/lib/labor/store";
 
 type Period = "day" | "week" | "month" | "year";
 type CompareMode = "none" | "prev";
@@ -47,16 +47,17 @@ function getRange(period: Period, offset = 0): { start: Date; end: Date } {
 export default function StoreAnalyticsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const [period, setPeriod] = useState<Period>("month");
   const [compare, setCompare] = useState<CompareMode>("prev");
-    const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
-  const router = useRouter();
-  const { reports: monthlyReports } = useMonthlyReportStore();
+  const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
+
+  const { reports } = useMonthlyReportStore();
   const { employees } = useEmployeeStore();
   const { paySlips } = usePaySlipStore();
-  const now = new Date();
-  const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const currentMonthStr = new Date().toISOString().slice(0, 7);
   const monthLaborCost = paySlips.filter((s) => s.month === currentMonthStr).reduce((sum, s) => sum + s.finalSalary, 0);
+
   const { records } = useRevenueStore();
   const { records: pettyRecords } = usePettyCashStore();
 
@@ -93,101 +94,6 @@ export default function StoreAnalyticsScreen() {
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.background }} contentContainerStyle={{ paddingBottom: 40 + insets.bottom }}>
-      {/* 月度经营分析入口 */}
-      <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 }}>
-        <Pressable
-          onPress={() => { tap(); router.push("/monthly-report" as any); }}
-          style={({ pressed }) => ({
-            flexDirection: "row", alignItems: "center", gap: 10,
-            backgroundColor: colors.primary + "0e", borderColor: colors.primary + "33",
-            borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12,
-            opacity: pressed ? 0.7 : 1,
-          })}
-        >
-          <IconSymbol name="chart.bar.fill" size={18} color={colors.primary} />
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 14, fontWeight: "700", color: colors.primary }}>店铺月度经营分析</Text>
-            <Text style={{ fontSize: 11, color: colors.muted, marginTop: 1 }}>
-              {monthlyReports.length > 0
-                ? `已有 ${monthlyReports.length} 份月度报告 · 最新：${monthlyReports[0].monthLabel}`
-                : "导入美团收银报表，查看完整经营分析"}
-            </Text>
-          </View>
-          <IconSymbol name="chevron.right" size={14} color={colors.primary} />
-        </Pressable>
-        {/* 人工成本入口 */}
-        <Pressable
-          onPress={() => { tap(); router.push("/labor" as any); }}
-          style={({ pressed }) => ({
-            flexDirection: "row", alignItems: "center", gap: 10,
-            backgroundColor: "#FF9500" + "0e", borderColor: "#FF9500" + "33",
-            borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12,
-            opacity: pressed ? 0.7 : 1, marginTop: 8,
-          })}
-        >
-          <IconSymbol name="person.2.fill" size={18} color="#FF9500" />
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 14, fontWeight: "700", color: "#FF9500" }}>人工成本管理</Text>
-            <Text style={{ fontSize: 11, color: colors.muted, marginTop: 1 }}>
-              {employees.filter((e) => e.active).length > 0
-                ? `${employees.filter((e) => e.active).length} 名员工 · 本月薪资${monthLaborCost > 0 ? ` ¥${monthLaborCost.toFixed(0)}` : "未填写"}`
-                : "排班表 / 考勤工资 / 薪资汇总"}
-            </Text>
-          </View>
-          <IconSymbol name="chevron.right" size={14} color="#FF9500" />
-        </Pressable>
-        {/* 时段分析入口 */}
-        <Pressable
-          onPress={() => { tap(); router.push("/period-analysis" as any); }}
-          style={({ pressed }) => ({
-            flexDirection: "row", alignItems: "center", gap: 10,
-            backgroundColor: "#007AFF" + "0e", borderColor: "#007AFF" + "33",
-            borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12,
-            opacity: pressed ? 0.7 : 1, marginTop: 8,
-          })}
-        >
-          <Text style={{ fontSize: 18 }}>🕐</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 14, fontWeight: "700", color: "#007AFF" }}>时段营业分析</Text>
-            <Text style={{ fontSize: 11, color: colors.muted, marginTop: 1 }}>凌晨开台 · 加班性价比提醒 · 半小时热力图</Text>
-          </View>
-          <IconSymbol name="chevron.right" size={14} color="#007AFF" />
-        </Pressable>
-        {/* 啤酒冰块进销存入口 */}
-        <Pressable
-          onPress={() => { tap(); router.push("/beer-ice-inventory" as any); }}
-          style={({ pressed }) => ({
-            flexDirection: "row", alignItems: "center", gap: 10,
-            backgroundColor: "#F4A300" + "0e", borderColor: "#F4A300" + "33",
-            borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12,
-            opacity: pressed ? 0.7 : 1, marginTop: 8,
-          })}
-        >
-          <Text style={{ fontSize: 18 }}>🍺</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 14, fontWeight: "700", color: "#F4A300" }}>啤酒 & 冰块进销存</Text>
-            <Text style={{ fontSize: 11, color: colors.muted, marginTop: 1 }}>自采备用金 B1/B2/B3 自动识别 · 库存预警</Text>
-          </View>
-          <IconSymbol name="chevron.right" size={14} color="#F4A300" />
-        </Pressable>
-        {/* 月度总报表入口 */}
-        <Pressable
-          onPress={() => { tap(); router.push("/monthly-summary" as any); }}
-          style={({ pressed }) => ({
-            flexDirection: "row", alignItems: "center", gap: 10,
-            backgroundColor: "#34C759" + "0e", borderColor: "#34C759" + "33",
-            borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12,
-            opacity: pressed ? 0.7 : 1, marginTop: 8,
-          })}
-        >
-          <Text style={{ fontSize: 18 }}>📊</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 14, fontWeight: "700", color: "#34C759" }}>月度总报表</Text>
-            <Text style={{ fontSize: 11, color: colors.muted, marginTop: 1 }}>科目树 · 净利润 · 薄资发放 · 货款支付 · 四账户余额</Text>
-          </View>
-          <IconSymbol name="chevron.right" size={14} color="#34C759" />
-        </Pressable>
-      </View>
       {/* 时间段 + 对比 */}
       <View style={[styles.subHeader, { backgroundColor: colors.background }]}>
         <View style={[styles.segContainer, { backgroundColor: colors.border + "55" }]}>
@@ -239,6 +145,79 @@ export default function StoreAnalyticsScreen() {
               </React.Fragment>
             );
           })}
+        </View>
+      </View>
+
+      {/* 快捷入口 */}
+      <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
+        <Text style={[styles.sectionTitle, { color: colors.muted }]}>功能入口</Text>
+        <View style={{ gap: 10 }}>
+          {/* 月度经营分析 */}
+          <Pressable onPress={() => { tap(); router.push("/monthly-report"); }}
+            style={[styles.entryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={[styles.entryIcon, { backgroundColor: "#007AFF" + "22" }]}>
+              <IconSymbol name="chart.bar.fill" size={20} color="#007AFF" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.entryTitle, { color: colors.foreground }]}>店铺月度经营分析</Text>
+              <Text style={[styles.entrySub, { color: colors.muted }]}>
+                {reports.length > 0 ? `已有 ${reports.length} 份报告 · 最新 ${reports[0].monthLabel}` : "导入报表数据开始分析"}
+              </Text>
+            </View>
+            <IconSymbol name="chevron.right" size={16} color={colors.muted} />
+          </Pressable>
+          {/* 时段营业分析 */}
+          <Pressable onPress={() => { tap(); router.push("/period-analysis"); }}
+            style={[styles.entryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={[styles.entryIcon, { backgroundColor: "#5856D6" + "22" }]}>
+              <IconSymbol name="clock.fill" size={20} color="#5856D6" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.entryTitle, { color: colors.foreground }]}>时段营业分析</Text>
+              <Text style={[styles.entrySub, { color: colors.muted }]}>午/晚/深夜/凌晨时段对比 · 加班性价比提醒</Text>
+            </View>
+            <IconSymbol name="chevron.right" size={16} color={colors.muted} />
+          </Pressable>
+          {/* 人工成本 */}
+          <Pressable onPress={() => { tap(); router.push("/labor"); }}
+            style={[styles.entryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={[styles.entryIcon, { backgroundColor: "#FF9500" + "22" }]}>
+              <IconSymbol name="person.2.fill" size={20} color="#FF9500" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.entryTitle, { color: colors.foreground }]}>人工成本管理</Text>
+              <Text style={[styles.entrySub, { color: colors.muted }]}>
+                {employees.filter((e) => e.active).length > 0
+                  ? `${employees.filter((e) => e.active).length} 名员工 · 本月薪资${monthLaborCost > 0 ? ` ¥${monthLaborCost.toFixed(0)}` : "未填写"}`
+                  : "排班 · 考勤 · 薪资结算"}
+              </Text>
+            </View>
+            <IconSymbol name="chevron.right" size={16} color={colors.muted} />
+          </Pressable>
+          {/* 啤酒冰块进销存 */}
+          <Pressable onPress={() => { tap(); router.push("/beer-ice-inventory"); }}
+            style={[styles.entryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={[styles.entryIcon, { backgroundColor: "#34C759" + "22" }]}>
+              <IconSymbol name="cart.fill" size={20} color="#34C759" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.entryTitle, { color: colors.foreground }]}>啤酒 & 冰块进销存</Text>
+              <Text style={[styles.entrySub, { color: colors.muted }]}>库存追踪 · 进货记录 · 备用金联动</Text>
+            </View>
+            <IconSymbol name="chevron.right" size={16} color={colors.muted} />
+          </Pressable>
+          {/* 月度总报表 */}
+          <Pressable onPress={() => { tap(); router.push("/monthly-summary"); }}
+            style={[styles.entryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={[styles.entryIcon, { backgroundColor: "#30D158" + "22" }]}>
+              <IconSymbol name="doc.text.fill" size={20} color="#30D158" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.entryTitle, { color: colors.foreground }]}>月度总报表</Text>
+              <Text style={[styles.entrySub, { color: colors.muted }]}>收入/成本/工资/货款 · 账户余额追踪</Text>
+            </View>
+            <IconSymbol name="chevron.right" size={16} color={colors.muted} />
+          </Pressable>
         </View>
       </View>
 
@@ -297,4 +276,8 @@ const styles = StyleSheet.create({
   detailPrev: { fontSize: 12 },
   detailPct: { fontSize: 12, fontWeight: "600" },
   emptyText: { padding: 16, fontSize: 14 },
+  entryCard: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: 14, borderWidth: 1 },
+  entryIcon: { width: 40, height: 40, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  entryTitle: { fontSize: 15, fontWeight: "600", marginBottom: 2 },
+  entrySub: { fontSize: 12 },
 });

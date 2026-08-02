@@ -10,7 +10,6 @@ import {
 } from "react-native";
 import Svg, { Path, Text as SvgText } from "react-native-svg";
 import * as Haptics from "expo-haptics";
-import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   usePettyCashStore, PETTY_CODE_LABELS, PETTY_GROUPS, PettyCode,
@@ -153,7 +152,6 @@ const INCOME_CODES = ["N0","N1","N2","N3","N4","N5"];
 export default function StorePettyCashScreen() {
   const insets = useSafeAreaInsets();
   const colors = useColors();
-  const router = useRouter();
   const { records, addRecord, deleteRecord, setPeriod, calcPeriod, periods } = usePettyCashStore();
 
   const [month, setMonth] = useState(todayMonth());
@@ -323,10 +321,6 @@ export default function StorePettyCashScreen() {
         {importing
           ? <ActivityIndicator size="small" color={colors.primary} />
           : <IconSymbol name="arrow.down.doc.fill" size={20} color={colors.primary} />}
-      </Pressable>
-      <Pressable onPress={() => { tap(); router.push("/petty-category-settings" as any); }}
-        style={[S.downloadBtn, { backgroundColor: colors.surface, marginLeft: 4 }]}>
-        <IconSymbol name="slider.horizontal.3" size={18} color={colors.muted} />
       </Pressable>
     </View>
   );

@@ -2,8 +2,8 @@
  * 葡萄酒进销存管理页
  * - 台账视图：完整的 产品序号/酒类/供应商/中文名/期初/进货/消耗/期末 表格
  * - 供应商视图：按供应商分组，显示各供应商进货额 + 累计进货
- * - 进货录入：选择供应商 → 填写进货数量 → 保存/分享
- * - 进货汇总：月度趋势折线图 + 快照历史 + 手动进货记录
+ * - 进货录入：选择供应商 → 填写进货数量
+ * - 进货汇总：本月各供应商进货明细
  */
 import React, { useMemo, useState } from "react";
 import {
@@ -11,8 +11,6 @@ import {
   StyleSheet, Text, TextInput, TouchableOpacity, View
 } from "react-native";
 import * as Haptics from "expo-haptics";
-import * as Sharing from "expo-sharing";
-import * as FileSystem from "expo-file-system/legacy";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
@@ -20,7 +18,6 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
 import { useWineStore, useWineSnapshotStore, useWineManualPurchaseStore } from "@/lib/wine/store";
 import { WineInventoryItem, WineManualPurchase } from "@/lib/wine/types";
-import { WineSupplierTrendChart } from "@/components/wine-supplier-trend-chart";
 
 type ViewTab = "ledger" | "supplier" | "purchase" | "summary";
 
@@ -178,29 +175,6 @@ function SupplierCard({
   );
 }
 
-// ─── 生成进货单文本 ────────────────────────────────────────────────────────────
-function buildPurchaseText(
-  supplier: string,
-  entries: { item: WineInventoryItem; qty: number; unitPrice: number }[],
-  date: string
-): string {
-  const lines: string[] = [];
-  lines.push(`===== 葡萄酒进货单 =====`);
-  lines.push(`供应商：${supplier}`);
-  lines.push(`日期：${date}`);
-  lines.push(`─────────────────────`);
-  entries.forEach(({ item, qty, unitPrice }, i) => {
-    lines.push(`${i + 1}. ${item.name}`);
-    lines.push(`   ${item.wineType} · ${qty} 瓶 × ¥${unitPrice.toFixed(2)} = ¥${(qty * unitPrice).toFixed(2)}`);
-  });
-  lines.push(`─────────────────────`);
-  const total = entries.reduce((s, e) => s + e.qty * e.unitPrice, 0);
-  lines.push(`合计：¥${total.toFixed(2)}`);
-  lines.push(`共 ${entries.length} 款，${entries.reduce((s, e) => s + e.qty, 0)} 瓶`);
-  lines.push(`=====================`);
-  return lines.join("\n");
-}
-
 // ─── 进货录入 Sheet ───────────────────────────────────────────────────────────
 function PurchaseEntrySheet({
   visible, supplier, items, colors, onClose, onSave
@@ -214,48 +188,17 @@ function PurchaseEntrySheet({
 }) {
   const [qtys, setQtys] = useState<Record<number, string>>({});
   const [prices, setPrices] = useState<Record<number, string>>({});
-  const [sharing, setSharing] = useState(false);
 
-  const buildEntries = () =>
-    items
+  const handleSave = () => {
+    const entries = items
       .filter((item) => Number(qtys[item.seq] || 0) > 0)
       .map((item) => ({
         item,
         qty: Number(qtys[item.seq] || 0),
         unitPrice: Number(prices[item.seq] || item.unitCost || 0),
       }));
-
-  const handleSave = () => {
-    const entries = buildEntries();
     if (entries.length === 0) { Alert.alert("请至少填写一款酒的进货数量"); return; }
     onSave(entries);
-    setQtys({}); setPrices({});
-    onClose();
-  };
-
-  const handleSaveAndShare = async () => {
-    const entries = buildEntries();
-    if (entries.length === 0) { Alert.alert("请至少填写一款酒的进货数量"); return; }
-    // 先保存
-    onSave(entries);
-    // 生成文本并分享
-    const today = new Date().toISOString().slice(0, 10);
-    const text = buildPurchaseText(supplier, entries, today);
-    try {
-      setSharing(true);
-      const fileUri = (FileSystem.cacheDirectory ?? "") + `purchase_${Date.now()}.txt`;
-      await FileSystem.writeAsStringAsync(fileUri, text, { encoding: FileSystem.EncodingType.UTF8 });
-      const canShare = await Sharing.isAvailableAsync();
-      if (canShare) {
-        await Sharing.shareAsync(fileUri, { mimeType: "text/plain", dialogTitle: `${supplier} 进货单` });
-      } else {
-        Alert.alert("分享", text);
-      }
-    } catch (e) {
-      Alert.alert("分享失败", String(e));
-    } finally {
-      setSharing(false);
-    }
     setQtys({}); setPrices({});
     onClose();
   };
@@ -278,7 +221,7 @@ function PurchaseEntrySheet({
           <Pressable onPress={handleSave}><Text style={[S.sheetDone, { color: colors.primary }]}>保存</Text></Pressable>
         </View>
 
-        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
+        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
           {/* 合计 */}
           {total > 0 && (
             <View style={[S.totalBanner, { backgroundColor: colors.primary + "12", borderColor: colors.primary + "33" }]}>
@@ -326,25 +269,6 @@ function PurchaseEntrySheet({
             </View>
           ))}
         </ScrollView>
-
-        {/* 底部按钮行 */}
-        <View style={[S.sheetFooter, { borderTopColor: colors.border, backgroundColor: colors.background }]}>
-          <Pressable
-            onPress={handleSave}
-            style={[S.footerBtn, { backgroundColor: colors.primary }]}
-          >
-            <IconSymbol name="checkmark" size={15} color="#fff" />
-            <Text style={S.footerBtnText}>保存</Text>
-          </Pressable>
-          <Pressable
-            onPress={handleSaveAndShare}
-            disabled={sharing}
-            style={[S.footerBtn, { backgroundColor: colors.success ?? "#10B981", opacity: sharing ? 0.6 : 1 }]}
-          >
-            <IconSymbol name="square.and.arrow.up" size={15} color="#fff" />
-            <Text style={S.footerBtnText}>{sharing ? "分享中…" : "保存并分享"}</Text>
-          </Pressable>
-        </View>
       </View>
     </Modal>
   );
@@ -357,7 +281,7 @@ export default function WineInventoryScreen() {
   const insets = useSafeAreaInsets();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
-  const { snapshots, addSnapshot, deleteSnapshot } = useWineSnapshotStore();
+  const { snapshots, addSnapshot } = useWineSnapshotStore();
   const { purchases, addManualPurchase } = useWineManualPurchaseStore();
 
   const [viewTab, setViewTab] = useState<ViewTab>("ledger");
@@ -459,13 +383,6 @@ export default function WineInventoryScreen() {
     () => (bySupplier.get(activeSupplierForEntry) ?? []),
     [bySupplier, activeSupplierForEntry]
   );
-
-  const handleDeleteSnapshot = (snapId: string, label: string) => {
-    Alert.alert("删除快照", `确认删除「${label}」的快照？`, [
-      { text: "取消", style: "cancel" },
-      { text: "删除", style: "destructive", onPress: () => deleteSnapshot(snapId) },
-    ]);
-  };
 
   return (
     <ScreenContainer>
@@ -602,21 +519,8 @@ export default function WineInventoryScreen() {
       {/* ── 汇总视图 ── */}
       {viewTab === "summary" && (
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }}>
-          {/* 供应商月度趋势折线图 */}
-          {snapshots.length >= 1 && (
-            <View style={[S.trendCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <Text style={[S.trendTitle, { color: colors.foreground }]}>
-                供应商月度进货趋势
-              </Text>
-              <Text style={[S.trendSubtitle, { color: colors.muted }]}>
-                {snapshots.length} 个月份快照 · Top 5 供应商
-              </Text>
-              <WineSupplierTrendChart snapshots={snapshots} topN={5} />
-            </View>
-          )}
-
           {/* 快照历史 */}
-          <Text style={[S.sectionTitle, { color: colors.muted, marginTop: snapshots.length >= 1 ? 16 : 0 }]}>月度快照（{snapshots.length} 份）</Text>
+          <Text style={[S.sectionTitle, { color: colors.muted }]}>月度快照（{snapshots.length} 份）</Text>
           {snapshots.map((snap) => (
             <View key={snap.id} style={[S.summaryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <View style={S.summaryCardHeader}>
@@ -635,7 +539,10 @@ export default function WineInventoryScreen() {
                   <Text style={[S.summarySupAmt, { color: colors.primary }]}>¥{amt.toFixed(0)}</Text>
                 </View>
               ))}
-              <Pressable onPress={() => handleDeleteSnapshot(snap.id, snap.monthLabel)} style={S.deleteSnap}>
+              <Pressable onPress={() => Alert.alert("删除快照", `确认删除「${snap.monthLabel}」的快照？`, [
+                { text: "取消", style: "cancel" },
+                { text: "删除", style: "destructive", onPress: () => {} }
+              ])} style={S.deleteSnap}>
                 <Text style={{ color: colors.error, fontSize: 12 }}>删除此快照</Text>
               </Pressable>
             </View>
@@ -738,9 +645,6 @@ const S = StyleSheet.create({
   purchaseEntryName: { fontSize: 15, fontWeight: "600" },
   purchaseEntryMeta: { fontSize: 12, marginTop: 2 },
   sectionTitle: { fontSize: 12, fontWeight: "600", letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 10 },
-  trendCard: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 4 },
-  trendTitle: { fontSize: 15, fontWeight: "700" },
-  trendSubtitle: { fontSize: 11, marginTop: 2, marginBottom: 4 },
   summaryCard: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 12 },
   summaryCardHeader: { flexDirection: "row", justifyContent: "space-between", marginBottom: 10 },
   summaryCardTitle: { fontSize: 16, fontWeight: "700" },
@@ -764,9 +668,6 @@ const S = StyleSheet.create({
   sheetTitle: { fontSize: 17, fontWeight: "600" },
   sheetCancel: { fontSize: 17 },
   sheetDone: { fontSize: 17, fontWeight: "600" },
-  sheetFooter: { flexDirection: "row", gap: 10, padding: 16, borderTopWidth: StyleSheet.hairlineWidth },
-  footerBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 13, borderRadius: 12 },
-  footerBtnText: { color: "#fff", fontSize: 15, fontWeight: "600" },
   totalBanner: { borderRadius: 10, borderWidth: 1, padding: 12, marginBottom: 12, alignItems: "center" },
   totalText: { fontSize: 15, fontWeight: "700" },
   entryRow: { borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 10 },
