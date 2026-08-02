@@ -28,6 +28,13 @@ import { LabProvider } from "@/lib/lab/store";
 import { BookStoreProvider } from "@/lib/books/store";
 import { MenuProvider } from "@/lib/menu/store";
 import { ShoppingProvider } from "@/lib/shopping/store";
+import { WineProvider } from "@/lib/wine/store";
+import { FoodMenuProvider } from "@/lib/food/menu-store";
+import { FoodIngredientProvider } from "@/lib/food/ingredient-store";
+import { RevenueProvider } from "@/lib/store/revenue-store";
+import { PettyCashProvider } from "@/lib/store/petty-store";
+import { InventoryProvider } from "@/lib/store/inventory-store";
+import { LabPlanProvider } from "@/lib/lab/plan-store";
 import { startAutoBackup, stopAutoBackup } from "@/lib/backup/icloud-backup";
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
@@ -114,6 +121,13 @@ export default function RootLayout() {
           <BookStoreProvider>
           <MenuProvider>
           <ShoppingProvider>
+          <WineProvider>
+          <FoodMenuProvider>
+          <FoodIngredientProvider>
+          <RevenueProvider>
+          <PettyCashProvider>
+          <InventoryProvider>
+          <LabPlanProvider>
             <Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="recipe/[id]" />
@@ -144,8 +158,18 @@ export default function RootLayout() {
               <Stack.Screen name="book-import" options={{ presentation: "modal" }} />
               <Stack.Screen name="bulk-import" options={{ presentation: "modal" }} />
               <Stack.Screen name="data-manager" options={{ presentation: "modal" }} />
+              <Stack.Screen name="me" options={{ presentation: "modal" }} />
+              <Stack.Screen name="wine-form" options={{ presentation: "modal" }} />
+              <Stack.Screen name="wine/[id]" />
             </Stack>
             <StatusBar style="auto" />
+          </LabPlanProvider>
+          </InventoryProvider>
+          </PettyCashProvider>
+          </RevenueProvider>
+          </FoodIngredientProvider>
+          </FoodMenuProvider>
+          </WineProvider>
           </ShoppingProvider>
           </MenuProvider>
           </BookStoreProvider>

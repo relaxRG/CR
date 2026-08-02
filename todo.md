@@ -633,3 +633,47 @@
 - [x] 导入成功提示：显示恢复条目数，提示重启 App
 - [x] 导入中状态：按钮显示「导入中…」并禁用，防止重复操作
 - [x] Build 97：Worker 端 /api/sync/notify + /api/sync/check 端点上线（group_ts 表 + D1 持久化）+ 客户端节流优化（30s 内不重复通知）
+
+## Build 102 - 大架构升级
+
+### Phase A: Tab 框架重构 + 现有功能迁移
+- [ ] 更新翻译键（tab.cocktail/wine/lab/food/store）
+- [ ] 重构 _layout.tsx：5个新 Tab（鸡尾酒/葡萄酒/研发/餐食/门店）
+- [ ] 新建 app/(tabs)/cocktail.tsx（原 library.tsx 改名迁移）
+- [ ] 新建 app/(tabs)/lab.tsx（原 index.tsx 研发部分 + 书库整合）
+- [ ] 重构 app/(tabs)/store.tsx（门店 Tab，含我的入口）
+- [ ] 「我的」改为独立页面入口（门店顶部右上角图标）
+- [ ] icon-symbol.tsx 添加 fork.knife 等新图标映射
+
+### Phase B: 葡萄酒模块
+- [ ] 新建 lib/wine/types.ts（WineBottle 数据类型）
+- [ ] 新建 lib/wine/store.tsx（独立 AsyncStorage，键 wine.bottles.v1）
+- [ ] 新建 app/(tabs)/wine.tsx（葡萄酒 Tab 主页面）
+- [ ] 新建 app/wine-form.tsx（葡萄酒录入/编辑表单）
+- [ ] 新建 app/wine/[id].tsx（葡萄酒详情页）
+- [ ] 添加 wine.bottles.v1 到 SYNC_KEYS
+
+### Phase C: 餐食模块
+- [ ] 新建 lib/food/types.ts（FoodItem + FoodIngredient 类型）
+- [ ] 新建 lib/food/menu-store.tsx（菜单 store，键 food.menu.v1）
+- [ ] 新建 lib/food/ingredient-store.tsx（原料库 store，键 food.ingredients.v1）
+- [ ] 新建 app/(tabs)/food.tsx（餐食 Tab 主页面）
+- [ ] 新建 app/food-form.tsx（菜品录入/编辑）
+- [ ] 新建 app/food-ingredient-form.tsx（食材录入/编辑）
+- [ ] 添加 food.* 到 SYNC_KEYS
+
+### Phase D: 研发模块升级
+- [ ] 新建 lib/lab/plan-store.tsx（计划清单 store，键 lab.plan.v1）
+- [ ] 新建 app/lab/plan.tsx（计划清单页面：鸡尾酒/餐食 计划产品+采购）
+- [ ] 重构 lab Tab：计划清单 / 研发计划 / 书库 三段切换
+
+### Phase E: 门店模块升级
+- [ ] 新建 lib/store/revenue-store.tsx（营业状况，键 store.revenue.v1）
+- [ ] 新建 lib/store/petty-store.tsx（备用金 A-N，键 store.petty.v1）
+- [ ] 新建 lib/store/inventory-store.tsx（进销存，键 store.inventory.v1）
+- [ ] 新建 app/store/revenue.tsx（营业状况页面）
+- [ ] 新建 app/store/petty.tsx（备用金记录页面，A-N 分类）
+- [ ] 新建 app/store/analytics.tsx（经营分析页面）
+- [ ] 新建 app/store/inventory.tsx（进销存页面）
+- [ ] 门店在售清单升级（引用三模块数据）
+- [ ] 门店采购清单升级（供应商+自购链接）

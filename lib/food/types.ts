@@ -1,0 +1,72 @@
+/** 菜品分类 */
+export type FoodCategory = "cold" | "hot" | "soup" | "dessert" | "drink" | "staple" | "other";
+
+export const FOOD_CATEGORY_LABELS: Record<FoodCategory, string> = {
+  cold: "凉菜",
+  hot: "热菜",
+  soup: "汤品",
+  dessert: "甜点",
+  drink: "饮品",
+  staple: "主食",
+  other: "其他",
+};
+
+/** 菜品 */
+export interface FoodItem {
+  id: string;
+  name: string;
+  category: FoodCategory;
+  /** 售价（元） */
+  price: number | null;
+  /** 成本（元） */
+  cost: number | null;
+  /** 描述/做法简介 */
+  description: string;
+  /** 照片 URI */
+  photoUri: string;
+  /** 是否在售 */
+  available: boolean;
+  /** 过敏原标注 */
+  allergens: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 食材/原料分类 */
+export type IngredientCategory = "meat" | "seafood" | "vegetable" | "fruit" | "grain" | "dairy" | "spice" | "sauce" | "frozen" | "other";
+
+export const INGREDIENT_CATEGORY_LABELS: Record<IngredientCategory, string> = {
+  meat: "肉类",
+  seafood: "海鲜",
+  vegetable: "蔬菜",
+  fruit: "水果",
+  grain: "米面粮油",
+  dairy: "乳制品",
+  spice: "香料调味",
+  sauce: "酱料",
+  frozen: "冻品",
+  other: "其他",
+};
+
+/** 食材/原料条目 */
+export interface FoodIngredient {
+  id: string;
+  name: string;
+  category: IngredientCategory;
+  /** 规格（如：500g/袋） */
+  spec: string;
+  /** 单位（如：袋、kg、个） */
+  unit: string;
+  /** 采购价 */
+  costPrice: number | null;
+  /** 当前库存数量 */
+  stock: number;
+  /** 库存预警线 */
+  alertThreshold: number;
+  /** 供应商 */
+  supplier: string;
+  /** 备注 */
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}

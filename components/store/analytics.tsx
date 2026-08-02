@@ -1,0 +1,195 @@
+/**
+ * 经营分析（成本对比：烈酒/葡萄酒/餐食/备用金，支持天/周/月/年/上期对比）
+ */
+import React, { useMemo, useState } from "react";
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import * as Haptics from "expo-haptics";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useColors } from "@/hooks/use-colors";
+import { useRevenueStore, REVENUE_CATEGORY_LABELS, RevenueCategory } from "@/lib/store/revenue-store";
+import { usePettyCashStore, PETTY_GROUPS } from "@/lib/store/petty-store";
+
+type Period = "day" | "week" | "month" | "year";
+type CompareMode = "none" | "prev";
+
+const PERIODS: { key: Period; label: string }[] = [
+  { key: "day", label: "今日" },
+  { key: "week", label: "本周" },
+  { key: "month", label: "本月" },
+  { key: "year", label: "今年" },
+];
+
+function getRange(period: Period, offset = 0): { start: Date; end: Date } {
+  const now = new Date();
+  const s = new Date(now);
+  const e = new Date(now);
+  if (period === "day") {
+    s.setDate(now.getDate() - offset); s.setHours(0, 0, 0, 0);
+    e.setDate(now.getDate() - offset); e.setHours(23, 59, 59, 999);
+  } else if (period === "week") {
+    const dow = now.getDay();
+    s.setDate(now.getDate() - dow - offset * 7); s.setHours(0, 0, 0, 0);
+    e.setDate(s.getDate() + 6); e.setHours(23, 59, 59, 999);
+  } else if (period === "month") {
+    s.setMonth(now.getMonth() - offset, 1); s.setHours(0, 0, 0, 0);
+    e.setMonth(s.getMonth() + 1, 0); e.setHours(23, 59, 59, 999);
+  } else {
+    s.setFullYear(now.getFullYear() - offset, 0, 1); s.setHours(0, 0, 0, 0);
+    e.setFullYear(s.getFullYear(), 11, 31); e.setHours(23, 59, 59, 999);
+  }
+  return { start: s, end: e };
+}
+
+export default function StoreAnalyticsScreen() {
+  const colors = useColors();
+  const insets = useSafeAreaInsets();
+  const [period, setPeriod] = useState<Period>("month");
+  const [compare, setCompare] = useState<CompareMode>("prev");
+  const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
+
+  const { records } = useRevenueStore();
+  const { records: pettyRecords } = usePettyCashStore();
+
+  const { start: curStart, end: curEnd } = useMemo(() => getRange(period, 0), [period]);
+  const { start: prevStart, end: prevEnd } = useMemo(() => getRange(period, 1), [period]);
+
+  const calcSummary = (start: Date, end: Date) => {
+    const map: Partial<Record<RevenueCategory, number>> = {};
+    records.filter((r) => { const d = new Date(r.date); return d >= start && d <= end; })
+      .forEach((r) => { map[r.category] = (map[r.category] ?? 0) + r.amount; });
+    const pettyTotal = pettyRecords.filter((r) => { const d = new Date(r.date); return d >= start && d <= end; })
+      .reduce((s, r) => s + r.amount, 0);
+    map.petty_cash = (map.petty_cash ?? 0) + pettyTotal;
+    return map;
+  };
+
+  const cur = useMemo(() => calcSummary(curStart, curEnd), [records, pettyRecords, curStart, curEnd]);
+  const prev = useMemo(() => calcSummary(prevStart, prevEnd), [records, pettyRecords, prevStart, prevEnd]);
+
+  const totalRevCur = cur.revenue ?? 0;
+  const totalCostCur = Object.entries(cur).filter(([k]) => k !== "revenue").reduce((s, [, v]) => s + (v ?? 0), 0);
+  const profitCur = totalRevCur - totalCostCur;
+
+  const totalRevPrev = prev.revenue ?? 0;
+  const totalCostPrev = Object.entries(prev).filter(([k]) => k !== "revenue").reduce((s, [, v]) => s + (v ?? 0), 0);
+  const profitPrev = totalRevPrev - totalCostPrev;
+
+  const costCategories: RevenueCategory[] = ["food_cost", "spirit_cost", "wine_cost", "petty_cash", "labor_cost", "rent", "utilities", "operations"];
+
+  const pctChange = (cur: number, prev: number) => {
+    if (prev === 0) return null;
+    return ((cur - prev) / prev * 100).toFixed(1);
+  };
+
+  return (
+    <ScrollView style={{ flex: 1, backgroundColor: colors.background }} contentContainerStyle={{ paddingBottom: 40 + insets.bottom }}>
+      {/* 时间段 + 对比 */}
+      <View style={[styles.subHeader, { backgroundColor: colors.background }]}>
+        <View style={[styles.segContainer, { backgroundColor: colors.border + "55" }]}>
+          {PERIODS.map((p) => {
+            const active = period === p.key;
+            return (
+              <Pressable key={p.key} onPress={() => { tap(); setPeriod(p.key); }}
+                style={[styles.segItem, active && { backgroundColor: colors.background, shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 2 }]}>
+                <Text style={[styles.segText, { color: active ? colors.foreground : colors.muted, fontWeight: active ? "600" : "400" }]}>{p.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
+          {(["none", "prev"] as CompareMode[]).map((m) => (
+            <Pressable key={m} onPress={() => { tap(); setCompare(m); }}
+              style={[styles.compareChip, { borderColor: compare === m ? colors.primary : colors.border, backgroundColor: compare === m ? colors.primary + "22" : colors.surface }]}>
+              <Text style={{ color: compare === m ? colors.primary : colors.muted, fontSize: 13, fontWeight: "600" }}>
+                {m === "none" ? "不对比" : "与上期对比"}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+
+      {/* 总览卡片 */}
+      <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
+        <View style={[styles.overviewCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          {[
+            { label: "营收", cur: totalRevCur, prev: totalRevPrev, isRevenue: true },
+            { label: "总成本", cur: totalCostCur, prev: totalCostPrev, isRevenue: false },
+            { label: "利润", cur: profitCur, prev: profitPrev, isRevenue: profitCur >= 0 },
+          ].map((item, i, arr) => {
+            const pct = compare === "prev" ? pctChange(item.cur, item.prev) : null;
+            return (
+              <React.Fragment key={item.label}>
+                <View style={styles.overviewItem}>
+                  <Text style={[styles.overviewLabel, { color: colors.muted }]}>{item.label}</Text>
+                  <Text style={[styles.overviewValue, { color: item.isRevenue ? colors.success : colors.error }]}>
+                    ¥{item.cur.toFixed(0)}
+                  </Text>
+                  {pct !== null && (
+                    <Text style={[styles.overviewPct, { color: parseFloat(pct) > 0 ? colors.success : colors.error }]}>
+                      {parseFloat(pct) > 0 ? "▲" : "▼"}{Math.abs(parseFloat(pct))}%
+                    </Text>
+                  )}
+                </View>
+                {i < arr.length - 1 && <View style={{ width: StyleSheet.hairlineWidth, backgroundColor: colors.border, alignSelf: "stretch" }} />}
+              </React.Fragment>
+            );
+          })}
+        </View>
+      </View>
+
+      {/* 成本明细 */}
+      <View style={{ paddingHorizontal: 16 }}>
+        <Text style={[styles.sectionTitle, { color: colors.muted }]}>成本明细</Text>
+        <View style={[styles.detailCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          {costCategories.map((cat, i) => {
+            const curVal = cur[cat] ?? 0;
+            const prevVal = prev[cat] ?? 0;
+            const pct = compare === "prev" ? pctChange(curVal, prevVal) : null;
+            if (curVal === 0 && prevVal === 0) return null;
+            return (
+              <React.Fragment key={cat}>
+                <View style={styles.detailRow}>
+                  <Text style={[styles.detailLabel, { color: colors.foreground }]}>{REVENUE_CATEGORY_LABELS[cat]}</Text>
+                  <Text style={[styles.detailValue, { color: colors.error }]}>¥{curVal.toFixed(0)}</Text>
+                  {compare === "prev" && (
+                    <Text style={[styles.detailPrev, { color: colors.muted }]}>上期 ¥{prevVal.toFixed(0)}</Text>
+                  )}
+                  {pct !== null && (
+                    <Text style={[styles.detailPct, { color: parseFloat(pct) > 0 ? colors.error : colors.success }]}>
+                      {parseFloat(pct) > 0 ? "▲" : "▼"}{Math.abs(parseFloat(pct))}%
+                    </Text>
+                  )}
+                </View>
+                <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 16 }} />
+              </React.Fragment>
+            );
+          })}
+          {costCategories.every((cat) => (cur[cat] ?? 0) === 0) && (
+            <Text style={[styles.emptyText, { color: colors.muted }]}>暂无数据</Text>
+          )}
+        </View>
+      </View>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  subHeader: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8 },
+  segContainer: { flexDirection: "row", borderRadius: 10, padding: 2, gap: 2 },
+  segItem: { flex: 1, height: 32, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  segText: { fontSize: 14, lineHeight: 19 },
+  compareChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1 },
+  overviewCard: { borderRadius: 16, borderWidth: 1, padding: 16, flexDirection: "row", justifyContent: "space-around" },
+  overviewItem: { alignItems: "center", gap: 4 },
+  overviewLabel: { fontSize: 13 },
+  overviewValue: { fontSize: 20, fontWeight: "700" },
+  overviewPct: { fontSize: 12, fontWeight: "600" },
+  sectionTitle: { fontSize: 13, fontWeight: "500", marginBottom: 8, marginLeft: 4 },
+  detailCard: { borderRadius: 16, borderWidth: 1, overflow: "hidden" },
+  detailRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12, gap: 8 },
+  detailLabel: { flex: 1, fontSize: 15, fontWeight: "500" },
+  detailValue: { fontSize: 15, fontWeight: "600" },
+  detailPrev: { fontSize: 12 },
+  detailPct: { fontSize: 12, fontWeight: "600" },
+  emptyText: { padding: 16, fontSize: 14 },
+});

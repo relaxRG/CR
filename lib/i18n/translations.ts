@@ -5,6 +5,11 @@ const dict = {
   // Tabs
   "tab.recipes": { zh: "酒单", en: "Recipes" },
   "tab.lab": { zh: "研发", en: "R&D" },
+  "tab.cocktail": { zh: "鸡尾酒", en: "Cocktail" },
+  "tab.wine": { zh: "葡萄酒", en: "Wine" },
+  "tab.food": { zh: "餐食", en: "Food" },
+  "tab.store": { zh: "门店", en: "Store" },
+  "tab.labNew": { zh: "研发", en: "R&D" },
   // 私密访问门与云端同步
   "gate.title": { zh: "cocktail R", en: "cocktail R" },
   "gate.subtitle": { zh: "私人调酒工作台 · 配方、酒库与自制库云端同步", en: "Your private bartending workspace with cloud sync" },
