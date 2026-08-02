@@ -233,7 +233,7 @@ function SupplierDetail({ supplier, colors, onEdit, onBack, onAddBank, onEditBan
         </View>
         {supplier.contactName ? (
           <View style={{ flexDirection: "row", gap: 6, marginTop: 10 }}>
-            <IconSymbol name="person.fill" size={14} color={colors.muted} />
+            <IconSymbol name="person.crop.circle.fill" size={14} color={colors.muted} />
             <Text style={{ fontSize: 13, color: colors.muted }}>{supplier.contactName}</Text>
             {supplier.contactPhone ? <Text style={{ fontSize: 13, color: colors.muted }}>· {supplier.contactPhone}</Text> : null}
           </View>
@@ -346,12 +346,12 @@ function BankCard({ account, colors, onEdit, onDelete, onCopy }: {
         ) : (
           <>
             <TouchableOpacity onPress={() => onCopy()} style={[S.copyBtn, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }]}>
-              <IconSymbol name="doc.on.doc" size={13} color={colors.muted} />
+              <IconSymbol name="doc.on.clipboard" size={13} color={colors.muted} />
               <Text style={{ fontSize: 12, color: colors.muted }}>复制账户信息</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => setShowCopyAmount(true)}
               style={[S.copyBtn, { backgroundColor: colors.primary }]}>
-              <IconSymbol name="doc.on.doc.fill" size={13} color="#fff" />
+              <IconSymbol name="doc.on.clipboard" size={13} color="#fff" />
               <Text style={{ fontSize: 12, color: "#fff", fontWeight: "600" }}>含金额复制</Text>
             </TouchableOpacity>
           </>

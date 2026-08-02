@@ -709,7 +709,7 @@ export default function BottleFormScreen() {
             hitSlop={8}
             style={({ pressed }) => [pressed && { opacity: 0.6 }]}
           >
-            <IconSymbol name="xmark" size={22} color={colors.foreground} />
+            <IconSymbol name="xmark.circle.fill" size={22} color={colors.foreground} />
           </Pressable>
           <Text style={[styles.headerTitle, { color: colors.foreground }]}>
             {editing ? t("bform.title.edit") : t("bform.title.new")}
@@ -879,7 +879,7 @@ export default function BottleFormScreen() {
                       <Text style={{ fontSize: 10, color: colors.muted }}>{lang === "zh" ? `${aiFields.length} 个字段` : `${aiFields.length} fields`}</Text>
                     </View>
                     <Pressable onPress={() => setAiResult(null)} hitSlop={8}>
-                      <IconSymbol name="xmark" size={14} color={colors.muted} />
+                      <IconSymbol name="xmark.circle.fill" size={14} color={colors.muted} />
                     </Pressable>
                   </View>
                   {/* Quick actions */}

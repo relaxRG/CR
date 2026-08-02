@@ -4,6 +4,7 @@
  * 按钮：下载图标（Tab 行右侧）+ 蓝色 FAB（右下角）
  */
 import React, { useMemo, useState, useCallback } from "react";
+import { useRouter } from "expo-router";
 import {
   ActivityIndicator, Alert, FlatList, Modal, Platform, Pressable,
   ScrollView, StyleSheet, Text, TextInput, View,
@@ -176,6 +177,7 @@ export default function StorePettyCashScreen() {
   const [importing, setImporting] = useState(false);
 
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
+  const router = useRouter();
 
   // ── 当月数据 ──────────────────────────────────────────────────────────────
   const summary = useMemo(() => calcPeriod(month), [calcPeriod, month, records, periods]);
@@ -321,6 +323,10 @@ export default function StorePettyCashScreen() {
         {importing
           ? <ActivityIndicator size="small" color={colors.primary} />
           : <IconSymbol name="arrow.down.doc.fill" size={20} color={colors.primary} />}
+      </Pressable>
+      <Pressable onPress={() => { tap(); router.push("/petty-category-settings" as any); }}
+        style={[S.downloadBtn, { backgroundColor: colors.surface, marginLeft: 4 }]}>
+        <IconSymbol name="slider.horizontal.3" size={20} color={colors.muted} />
       </Pressable>
     </View>
   );

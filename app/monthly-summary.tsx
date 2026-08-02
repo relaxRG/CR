@@ -616,7 +616,7 @@ export default function MonthlySummaryScreen() {
                       });
                       handleCopy(text);
                     }} style={[S.copyBtn, { backgroundColor: colors.primary }]}>
-                      <IconSymbol name="doc.on.doc.fill" size={12} color="#fff" />
+                      <IconSymbol name="doc.on.clipboard" size={12} color="#fff" />
                       <Text style={{ fontSize: 11, color: "#fff", fontWeight: "600" }}>复制付款信息</Text>
                     </TouchableOpacity>
                   </View>
@@ -624,7 +624,7 @@ export default function MonthlySummaryScreen() {
               ) : (
                 <TouchableOpacity onPress={() => router.push(`/labor-employee-form?id=${emp.id}` as any)}
                   style={[S.addBankHint, { borderColor: colors.border }]}>
-                  <IconSymbol name="creditcard" size={14} color={colors.muted} />
+                  <IconSymbol name="creditcard.fill" size={14} color={colors.muted} />
                   <Text style={{ fontSize: 12, color: colors.muted }}>未设置银行卡 · 点击前往员工档案添加</Text>
                 </TouchableOpacity>
               )}
@@ -729,14 +729,14 @@ export default function MonthlySummaryScreen() {
                     });
                     handleCopy(text);
                   }} style={[S.copyBtn, { backgroundColor: colors.primary }]}>
-                    <IconSymbol name="doc.on.doc.fill" size={12} color="#fff" />
+                    <IconSymbol name="doc.on.clipboard" size={12} color="#fff" />
                     <Text style={{ fontSize: 11, color: "#fff", fontWeight: "600" }}>复制付款信息</Text>
                   </TouchableOpacity>
                 </View>
               ) : (
                 <TouchableOpacity onPress={() => router.push("/suppliers" as any)}
                   style={[S.addBankHint, { borderColor: colors.border }]}>
-                  <IconSymbol name="creditcard" size={14} color={colors.muted} />
+                  <IconSymbol name="creditcard.fill" size={14} color={colors.muted} />
                   <Text style={{ fontSize: 12, color: colors.muted }}>未设置银行卡 · 前往供应商档案添加</Text>
                 </TouchableOpacity>
               )}

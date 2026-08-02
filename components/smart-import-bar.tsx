@@ -334,7 +334,7 @@ export function SmartImportBar({
               hitSlop={8}
               style={({ pressed }) => [pressed && { opacity: 0.6 }]}
             >
-              <IconSymbol name="xmark" size={14} color={colors.muted} />
+              <IconSymbol name="xmark.circle.fill" size={14} color={colors.muted} />
             </Pressable>
           </View>
           {/* 多行文本输入框 */}

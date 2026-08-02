@@ -309,7 +309,7 @@ function AddRecipeSheet({ targetGroupId, onClose }: AddRecipeSheetProps) {
           {targetGroupId === null ? "添加到无分组" : "添加到分组"}
         </Text>
         <Pressable onPress={onClose} hitSlop={8}>
-          <IconSymbol name="xmark" size={20} color={colors.muted} />
+          <IconSymbol name="xmark.circle.fill" size={20} color={colors.muted} />
         </Pressable>
       </View>
       <View style={[styles.searchWrap, { backgroundColor: colors.surface }]}>
@@ -391,7 +391,7 @@ function BatchPriceSheet({ count, onConfirm, onClose }: BatchPriceSheetProps) {
           批量设置售价（{count} 款）
         </Text>
         <Pressable onPress={onClose} hitSlop={8}>
-          <IconSymbol name="xmark" size={20} color={colors.muted} />
+          <IconSymbol name="xmark.circle.fill" size={20} color={colors.muted} />
         </Pressable>
       </View>
       <View style={{ padding: 20, gap: 16 }}>
@@ -684,7 +684,7 @@ export default function MenuScreen() {
               <Text style={styles.addGroupBtnText}>创建</Text>
             </Pressable>
             <Pressable onPress={() => setShowAddGroup(false)} hitSlop={8}>
-              <IconSymbol name="xmark" size={18} color={colors.muted} />
+              <IconSymbol name="xmark.circle.fill" size={18} color={colors.muted} />
             </Pressable>
           </View>
         </View>

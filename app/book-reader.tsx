@@ -1729,7 +1729,7 @@ export default function BookReaderScreen() {
       {phase === "select" && (
         <View style={[styles.topBar, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
           <Pressable onPress={() => { tap(); setPhase("reading"); setBlocks([]); }} hitSlop={8} style={({ pressed }) => [pressed && { opacity: 0.6 }]}>
-            <IconSymbol name="xmark" size={20} color={colors.foreground} />
+            <IconSymbol name="xmark.circle.fill" size={20} color={colors.foreground} />
           </Pressable>
           <Text style={[styles.topBarTitle, { color: colors.foreground }]} numberOfLines={1}>
             {zh ? "选取配方段落" : "Select recipe paragraphs"}
@@ -2196,7 +2196,7 @@ export default function BookReaderScreen() {
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10 }}>
               <Text style={[styles.tocTitle, { color: colors.foreground }]}>{zh ? "阅读设置" : "Reader Settings"}</Text>
               <Pressable onPress={() => setShowReaderSettings(false)} hitSlop={8}>
-                <IconSymbol name="xmark" size={18} color={colors.muted} />
+                <IconSymbol name="xmark.circle.fill" size={18} color={colors.muted} />
               </Pressable>
             </View>
             <ScrollView style={{ flex: 1 }}>
@@ -2331,7 +2331,7 @@ export default function BookReaderScreen() {
                 </Text>
               </View>
               <Pressable onPress={() => setTocOpen(false)} hitSlop={8} style={({ pressed }) => [{ width: 28, height: 28, borderRadius: 14, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center" }, pressed && { opacity: 0.6 }]}>
-                <IconSymbol name="xmark" size={14} color={colors.muted} />
+                <IconSymbol name="xmark.circle.fill" size={14} color={colors.muted} />
               </Pressable>
             </View>
             <ScrollView style={{ flex: 1 }}>
@@ -2468,7 +2468,7 @@ export default function BookReaderScreen() {
               }}
               hitSlop={8}
             >
-              <IconSymbol name="xmark" size={20} color={colors.muted} />
+              <IconSymbol name="xmark.circle.fill" size={20} color={colors.muted} />
             </Pressable>
           </View>
           {/* Results list */}

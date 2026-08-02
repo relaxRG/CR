@@ -1095,7 +1095,7 @@ export default function BottlesScreen() {
                 : `Applied ${aiQueueDone.applied}${aiQueueDone.skipped > 0 ? `, skipped ${aiQueueDone.skipped}` : ""}`}
             </Text>
             <Pressable onPress={() => setAiQueueDone(null)} hitSlop={8}>
-              <IconSymbol name="xmark" size={14} color={colors.muted} />
+              <IconSymbol name="xmark.circle.fill" size={14} color={colors.muted} />
             </Pressable>
           </View>
         </View>

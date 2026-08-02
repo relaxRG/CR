@@ -1280,7 +1280,7 @@ export default function RecipeFormScreen() {
                   <Text className="text-xs" style={{ color: colors.muted, lineHeight: 16 }}>{t("form.link.rebind")}</Text>
                 </Pressable>
                 <Pressable onPress={() => { setDismissedLinks((prev) => ({ ...prev, [ing.id]: true })); setAcceptedLinks((prev) => { const n = { ...prev }; delete n[ing.id]; return n; }); setIngredients((prev) => prev.map((i) => i.id === ing.id ? { ...i, linkedBottleId: undefined, linkedPrepId: undefined, linkDismissed: true } : i)); }} style={({ pressed }) => [styles.prepHint, pressed && { opacity: 0.6 }, { borderColor: colors.border }]}>
-                  <IconSymbol name="xmark" size={11} color={colors.muted} />
+                  <IconSymbol name="xmark.circle.fill" size={11} color={colors.muted} />
                   <Text className="text-xs" style={{ color: colors.muted, lineHeight: 16 }}>{t("form.link.break")}</Text>
                 </Pressable>
               </View>
@@ -1307,7 +1307,7 @@ export default function RecipeFormScreen() {
                   <Text className="text-xs" style={{ color: colors.muted, lineHeight: 16 }}>{t("form.link.rebind")}</Text>
                 </Pressable>
                 <Pressable onPress={() => { setDismissedLinks((prev) => ({ ...prev, [ing.id]: true })); setAcceptedLinks((prev) => { const n = { ...prev }; delete n[ing.id]; return n; }); setIngredients((prev) => prev.map((i) => i.id === ing.id ? { ...i, linkedBottleId: undefined, linkedPrepId: undefined, linkDismissed: true } : i)); }} style={({ pressed }) => [styles.prepHint, pressed && { opacity: 0.6 }, { borderColor: colors.border }]}>
-                  <IconSymbol name="xmark" size={11} color={colors.muted} />
+                  <IconSymbol name="xmark.circle.fill" size={11} color={colors.muted} />
                   <Text className="text-xs" style={{ color: colors.muted, lineHeight: 16 }}>{t("form.link.break")}</Text>
                 </Pressable>
               </View>
@@ -1329,7 +1329,7 @@ export default function RecipeFormScreen() {
                   <Text className="text-xs" style={{ color: colors.muted, lineHeight: 16 }}>{t("form.link.more")}</Text>
                 </Pressable>
                 <Pressable onPress={() => { setDismissedLinks((prev) => ({ ...prev, [ing.id]: true })); setIngredients((prev) => prev.map((i) => i.id === ing.id ? { ...i, linkDismissed: true } : i)); }} style={({ pressed }) => [styles.prepHint, pressed && { opacity: 0.6 }, { borderColor: colors.border }]}>
-                  <IconSymbol name="xmark" size={11} color={colors.muted} />
+                  <IconSymbol name="xmark.circle.fill" size={11} color={colors.muted} />
                   <Text className="text-xs" style={{ color: colors.muted, lineHeight: 16 }}>{t("form.link.dismiss")}</Text>
                 </Pressable>
               </View>
@@ -1635,7 +1635,7 @@ export default function RecipeFormScreen() {
           hitSlop={10}
           style={({ pressed }) => [pressed && { opacity: 0.6 }]}
         >
-          <IconSymbol name="xmark" size={24} color={colors.foreground} />
+          <IconSymbol name="xmark.circle.fill" size={24} color={colors.foreground} />
         </Pressable>
         <Text className="text-lg font-semibold text-foreground">
           {editing ? t("form.title.edit") : t("form.title.new")}
@@ -1840,7 +1840,7 @@ export default function RecipeFormScreen() {
                       <Text style={{ fontSize: 10, color: colors.muted }}>{lang === "zh" ? `${aiFields.length} 个字段` : `${aiFields.length} fields`}</Text>
                     </View>
                     <Pressable onPress={() => setAiResult(null)} hitSlop={8}>
-                      <IconSymbol name="xmark" size={14} color={colors.muted} />
+                      <IconSymbol name="xmark.circle.fill" size={14} color={colors.muted} />
                     </Pressable>
                   </View>
                   {/* ── Quick actions ── */}
@@ -2050,7 +2050,7 @@ export default function RecipeFormScreen() {
                   : "No reliable info found. Please select base spirit manually."}
               </Text>
               <Pressable onPress={() => setSpiritConfidence(null)} hitSlop={8}>
-                <IconSymbol name="xmark" size={12} color="#FF6B35" />
+                <IconSymbol name="xmark.circle.fill" size={12} color="#FF6B35" />
               </Pressable>
             </View>
           )}
@@ -2217,7 +2217,7 @@ export default function RecipeFormScreen() {
                   : "Low AI confidence — tags are inferred from ingredients. Please review and adjust."}
               </Text>
               <Pressable onPress={() => setFlavorConfidence("medium")} hitSlop={8}>
-                <IconSymbol name="xmark" size={12} color="#FF9500" />
+                <IconSymbol name="xmark.circle.fill" size={12} color="#FF9500" />
               </Pressable>
             </View>
           )}
@@ -2493,7 +2493,7 @@ export default function RecipeFormScreen() {
                       onPress={() => { setGarnishRows((prev) => prev.map((r) => r.id === row.id ? { ...r, linkedBottleId: undefined, linkedPrepId: undefined, linkDismissed: true } : r)); setDismissedGarnishLinks((prev) => ({ ...prev, [row.id]: true })); setAcceptedGarnishLinks((prev) => { const n = { ...prev }; delete n[row.id]; return n; }); }}
                       style={({ pressed }) => [styles.unlinkBtn, pressed && { opacity: 0.7 }]}
                     >
-                      <IconSymbol name="xmark" size={10} color={colors.muted} />
+                      <IconSymbol name="xmark.circle.fill" size={10} color={colors.muted} />
                       <Text className="text-xs text-muted" style={{ lineHeight: 16 }}>{t("form.link.break")}</Text>
                     </Pressable>
                   </View>

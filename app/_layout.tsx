@@ -188,6 +188,17 @@ export default function RootLayout() {
               <Stack.Screen name="food-ingredient/[id]" />
               <Stack.Screen name="lab/plan" />
               <Stack.Screen name="supplier-import" options={{ presentation: "modal" }} />
+              <Stack.Screen name="backup" options={{ presentation: "modal" }} />
+              <Stack.Screen name="bottle-form" options={{ presentation: "modal" }} />
+              <Stack.Screen name="homemade-form" options={{ presentation: "modal" }} />
+              <Stack.Screen name="recipe-form" options={{ presentation: "modal" }} />
+              <Stack.Screen name="role-guide" options={{ presentation: "modal" }} />
+              <Stack.Screen name="sync-log" options={{ presentation: "modal" }} />
+              <Stack.Screen name="system-tags" options={{ presentation: "modal" }} />
+              <Stack.Screen name="tags" options={{ presentation: "modal" }} />
+              <Stack.Screen name="taxonomy-manager" options={{ presentation: "modal" }} />
+              <Stack.Screen name="wine-inventory" />
+              <Stack.Screen name="wine-inventory-import" options={{ presentation: "modal" }} />
               <Stack.Screen name="spirits-inventory" />
               <Stack.Screen name="spirits-inventory-import" options={{ presentation: "modal" }} />
               <Stack.Screen name="monthly-report" />

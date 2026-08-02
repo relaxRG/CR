@@ -1308,7 +1308,7 @@ export default function HomemadeFormScreen() {
                   onPress={() => setDismissedLinks((prev) => ({ ...prev, [row.id]: true }))}
                   style={({ pressed }) => [{ flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 0.5, borderColor: colors.border }, pressed && { opacity: 0.6 }]}
                 >
-                  <IconSymbol name="xmark" size={10} color={colors.muted} />
+                  <IconSymbol name="xmark.circle.fill" size={10} color={colors.muted} />
                   <Text style={{ fontSize: 11, lineHeight: 14, color: colors.muted }}>{t("form.link.dismiss")}</Text>
                 </Pressable>
               </View>
@@ -1334,7 +1334,7 @@ export default function HomemadeFormScreen() {
               }}
               style={({ pressed }) => [{ flexDirection: "row", alignItems: "center", gap: 3 }, pressed && { opacity: 0.6 }]}
             >
-              <IconSymbol name="xmark" size={10} color={colors.muted} />
+              <IconSymbol name="xmark.circle.fill" size={10} color={colors.muted} />
               <Text style={{ fontSize: 11, lineHeight: 14, color: colors.muted }}>{t("form.link.break")}</Text>
             </Pressable>
           </View>
@@ -1528,7 +1528,7 @@ export default function HomemadeFormScreen() {
        {/* Header */}
         <View className="flex-row items-center justify-between px-4 pt-3 pb-2">
           <Pressable onPress={() => router.back()} hitSlop={8}>
-            <IconSymbol name="xmark" size={24} color={colors.muted} />
+            <IconSymbol name="xmark.circle.fill" size={24} color={colors.muted} />
           </Pressable>
           <Text className="text-lg font-semibold text-foreground">
             {editing ? t("hmform.title.edit") : t("hmform.title.new")}
@@ -1646,7 +1646,7 @@ export default function HomemadeFormScreen() {
                     <Text style={{ fontSize: 10, color: colors.muted }}>{lang === "en" ? `${fields.length} fields` : `${fields.length} 个字段`}</Text>
                   </View>
                   <Pressable onPress={() => setAiResult(null)} hitSlop={8}>
-                    <IconSymbol name="xmark" size={14} color={colors.muted} />
+                    <IconSymbol name="xmark.circle.fill" size={14} color={colors.muted} />
                   </Pressable>
                 </View>
                 {/* 快捷操作 */}

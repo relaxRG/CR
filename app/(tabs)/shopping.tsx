@@ -196,7 +196,7 @@ function OnlineLinkEditor({ link, onSave, onClose }: OnlineLinkEditorProps) {
           {link ? "编辑链接" : "添加购买链接"}
         </Text>
         <Pressable onPress={onClose} hitSlop={8}>
-          <IconSymbol name="xmark" size={20} color={colors.muted} />
+          <IconSymbol name="xmark.circle.fill" size={20} color={colors.muted} />
         </Pressable>
       </View>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, gap: 16 }}>
@@ -291,7 +291,7 @@ function OfflineNoteEditor({ note, onSave, onClose }: OfflineNoteEditorProps) {
       <View style={[styles.sheetHeader, { borderBottomColor: colors.border }]}>
         <Text style={[styles.sheetTitle, { color: colors.foreground }]}>酒商采购备注</Text>
         <Pressable onPress={onClose} hitSlop={8}>
-          <IconSymbol name="xmark" size={20} color={colors.muted} />
+          <IconSymbol name="xmark.circle.fill" size={20} color={colors.muted} />
         </Pressable>
       </View>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, gap: 14 }}>
@@ -559,7 +559,7 @@ function ManualAddSheet({ onClose, onAdd }: ManualAddSheetProps) {
       <View style={[styles.sheetHeader, { borderBottomColor: colors.border }]}>
         <Text style={[styles.sheetTitle, { color: colors.foreground }]}>手动添加采购项</Text>
         <Pressable onPress={onClose} hitSlop={8}>
-          <IconSymbol name="xmark" size={20} color={colors.muted} />
+          <IconSymbol name="xmark.circle.fill" size={20} color={colors.muted} />
         </Pressable>
       </View>
       <ScrollView contentContainerStyle={{ padding: 16, gap: 14 }}>
