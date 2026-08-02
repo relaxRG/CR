@@ -42,6 +42,8 @@ import {
   type DeviceRole,
   type RemoteDevice,
 } from "@/lib/cf-sync/client";
+import { FEATURE_MODULES, allowedKeysToFeatures, featuresToAllowedKeys, type FeatureKey } from "./role-settings";
+import { Switch } from "react-native";
 import { useSync } from "@/lib/cf-sync/provider";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { listSnapshots } from "@/lib/backup/local-backup";
@@ -60,6 +62,45 @@ const ROLE_DESC: Record<DeviceRole, { zh: string; en: string }> = {
   collaborator: { zh: "读全部，写指定分类", en: "Read all, write allowed keys" },
   guest: { zh: "只读，不同步回主设备", en: "Read-only, no push back" },
 };
+
+// ─── 邀请权限预设 Sheet ────────────────────────────────────────────────────────
+function InvitePermissionSheet({
+  role,
+  features,
+  onToggle,
+  lang,
+  colors,
+}: {
+  role: DeviceRole;
+  features: Set<FeatureKey>;
+  onToggle: (key: FeatureKey) => void;
+  lang: string;
+  colors: ReturnType<typeof import("@/hooks/use-colors").useColors>;
+}) {
+  if (role === "owner") return null;
+  return (
+    <View style={{ marginTop: 12 }}>
+      <Text style={{ fontSize: 13, color: colors.muted, marginBottom: 8 }}>
+        {lang === "zh" ? "预设功能权限（可邀请后再调整）" : "Pre-set permissions (adjustable later)"}
+      </Text>
+      {FEATURE_MODULES.map((mod) => (
+        <View key={mod.key} style={{ flexDirection: "row", alignItems: "center", paddingVertical: 6, gap: 10 }}>
+          <Text style={{ fontSize: 18, width: 24, textAlign: "center" }}>{mod.icon}</Text>
+          <Text style={{ flex: 1, fontSize: 14, color: colors.foreground }}>
+            {lang === "zh" ? mod.labelZh : mod.labelEn}
+          </Text>
+          <Switch
+            value={features.has(mod.key)}
+            onValueChange={() => { if (role !== "guest") onToggle(mod.key); }}
+            disabled={role === "guest"}
+            trackColor={{ false: colors.border, true: mod.color + "80" }}
+            thumbColor={features.has(mod.key) ? mod.color : colors.muted}
+          />
+        </View>
+      ))}
+    </View>
+  );
+}
 
 // ─── DeepSeek Balance ─────────────────────────────────────────────────────────
 type BalanceInfo = {
@@ -227,6 +268,22 @@ export default function DeviceManagerScreen() {
   const [localSnapshotCount, setLocalSnapshotCount] = useState(0);
   const [icloudLastBackup, setIcloudLastBackup] = useState<number | null>(null);
 
+  // 邀请时预设功能权限
+  const [inviteFeatures, setInviteFeatures] = useState<Set<FeatureKey>>(
+    new Set(FEATURE_MODULES.map((m) => m.key)),
+  );
+  const toggleInviteFeature = (key: FeatureKey) => {
+    setInviteFeatures((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        if (next.size > 1) next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
   const tap = () => {
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
@@ -284,7 +341,9 @@ export default function DeviceManagerScreen() {
   const handleGenerateCode = async (role: DeviceRole) => {
     try {
       setGeneratingCode(true);
-      const result = await generatePairCode(role, null);
+      // 邀请时携带预设功能权限
+      const allowedKeys = featuresToAllowedKeys(inviteFeatures);
+      const result = await generatePairCode(role, allowedKeys);
       setPairCode(result.code);
       setPairExpiry(result.expiresAt);
       tap();
@@ -336,6 +395,20 @@ export default function DeviceManagerScreen() {
       device.name,
       [...options, { text: lang === "zh" ? "取消" : "Cancel", style: "cancel" as const }],
     );
+  };
+
+  // 跳转到权限配置页
+  const handleOpenRoleSettings = (device: RemoteDevice) => {
+    tap();
+    router.push({
+      pathname: "/role-settings",
+      params: {
+        deviceId: device.id,
+        deviceName: device.name,
+        deviceRole: device.role,
+        allowedKeys: device.allowedKeys ? JSON.stringify(device.allowedKeys) : "",
+      },
+    });
   };
 
   const doChangeRole = async (targetId: string, role: DeviceRole) => {
@@ -583,6 +656,16 @@ export default function DeviceManagerScreen() {
                 ? "在新设备上打开「我的」→「加入设备组」，输入上方 6 位数字"
                 : "On the new device, go to Me → Join Device Group and enter the 6-digit code above"}
             </Text>
+            {/* 邀请权限预设（生成配对码前可调整） */}
+            {!pairCode && (
+              <InvitePermissionSheet
+                role={"collaborator"}
+                features={inviteFeatures}
+                onToggle={toggleInviteFeature}
+                lang={lang}
+                colors={colors}
+              />
+            )}
           </View>
         )}
 
@@ -645,11 +728,11 @@ export default function DeviceManagerScreen() {
                         </Pressable>
                       )}
                       <Pressable
-                        onPress={() => { tap(); handleChangeRole(item); }}
+                        onPress={() => handleOpenRoleSettings(item)}
                         style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.6 }]}
                       >
                         <Text style={[styles.actionBtnText, { color: colors.primary }]}>
-                          {lang === "zh" ? "改权限" : "Role"}
+                          {lang === "zh" ? "权限" : "Perms"}
                         </Text>
                       </Pressable>
                       <Pressable
