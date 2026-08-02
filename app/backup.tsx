@@ -1,10 +1,10 @@
-import { Alert, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import React, { useEffect, useState } from "react";
 import { Stack, useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
-import { Pressable } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -23,6 +23,7 @@ export default function BackupScreen() {
   const colors = useColors();
   const router = useRouter();
   const { lang } = useI18n();
+  const insets = useSafeAreaInsets();
 
   const tap = () => {
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -268,8 +269,24 @@ export default function BackupScreen() {
 
   return (
     <ScreenContainer edges={["top", "left", "right"]}>
-      <Stack.Screen options={{ title: lang === "zh" ? "数据备份" : "Data Backup", headerBackTitle: "" }} />
-      <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
+      <Stack.Screen options={{ headerShown: false }} />
+      {/* 手动 Header */}
+      <View style={styles.header}>
+        <Pressable
+          onPress={() => { tap(); router.back(); }}
+          style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
+        >
+          <IconSymbol name="chevron.left" size={20} color={colors.primary} />
+          <Text style={[styles.backText, { color: colors.primary }]}>
+            {lang === "zh" ? "返回" : "Back"}
+          </Text>
+        </Pressable>
+        <Text style={[styles.pageTitle, { color: colors.foreground }]}>
+          {lang === "zh" ? "数据备份" : "Data Backup"}
+        </Text>
+        <View style={{ width: 60 }} />
+      </View>
+      <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 40 + insets.bottom }}>
 
         {/* iCloud 状态卡片 */}
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -462,6 +479,28 @@ export default function BackupScreen() {
 }
 
 const styles = StyleSheet.create({
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 8,
+    paddingVertical: 10,
+  },
+  backBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    minWidth: 60,
+  },
+  backText: {
+    fontSize: 16,
+    marginLeft: 2,
+  },
+  pageTitle: {
+    fontSize: 17,
+    fontWeight: "600",
+  },
   card: {
     borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
