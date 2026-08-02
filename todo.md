@@ -587,3 +587,9 @@
 - [x] AI 建议面板 UI：可信度徽章、全选/只填空白/全不选、逐字段 toggle、应用/忽略、Undo toast
 
 - [x] 方案A：自制库实时成本估算面板（debounce+循环引用防护+Map索引+折叠明细+手动覆盖+来源标注，处理全部7个风险）
+
+## Bug 修复 - 多设备同步
+
+- [x] 修复：RecipeProvider 缺少 registerStoreReload 回调，导致同步后标签/分类消失
+- [x] 修复：SYNC_KEYS 缺少 cocktail.categoryGroups，分类分组不参与同步
+- [x] 修复：runInitialSync 合并策略边界条件，本地有数据无时间戳时不被云端覆盖

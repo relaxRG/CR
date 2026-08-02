@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { notifySyncChange } from "../sync/engine";
+import { notifySyncChange, registerStoreReload } from "../sync/engine";
 import { deleteCloudPhoto } from "../sync/photo-sync";
 import * as FileSystem from "expo-file-system/legacy";
 import React, {
@@ -33,6 +33,32 @@ import {
   FLAVOR_LAYER_LABELS,
   flavorTagLayer,
 } from "./types";
+
+/** 从 AsyncStorage 重新加载所有 RecipeProvider 数据（供同步引擎在覆盖本地后调用） */
+async function reloadAllFromStorage(
+  setRecipes: (r: Recipe[]) => void,
+  setCategories: (c: Category[]) => void,
+  setTags: (t: TagItem[]) => void,
+  setTagGroups: (g: TagGroup[]) => void,
+  setCategoryGroups: (g: CategoryGroup[]) => void,
+) {
+  try {
+    const [rRaw, cRaw, tRaw, gRaw, cgRaw] = await Promise.all([
+      AsyncStorage.getItem(RECIPES_KEY),
+      AsyncStorage.getItem(CATEGORIES_KEY),
+      AsyncStorage.getItem(TAGS_KEY),
+      AsyncStorage.getItem(TAG_GROUPS_KEY),
+      AsyncStorage.getItem(CATEGORY_GROUPS_KEY),
+    ]);
+    if (rRaw) { try { setRecipes(JSON.parse(rRaw) as Recipe[]); } catch {} }
+    if (cRaw) { try { setCategories((JSON.parse(cRaw) as Category[]).map((c) => migrateTagNameEn(c))); } catch {} }
+    if (tRaw) { try { setTags((JSON.parse(tRaw) as TagItem[]).map((t) => migrateTagNameEn(t))); } catch {} }
+    if (gRaw) { try { setTagGroups((JSON.parse(gRaw) as TagGroup[]).map((g) => migrateTagNameEn(g))); } catch {} }
+    if (cgRaw) { try { setCategoryGroups((JSON.parse(cgRaw) as CategoryGroup[]).map((g) => migrateTagNameEn(g))); } catch {} }
+  } catch {
+    // 静默忽略
+  }
+}
 const RECIPES_KEY = "cocktail.recipes";
 const CATEGORIES_KEY = "cocktail.categories";
 const SEEDED_KEY = "cocktail.seeded";
@@ -341,6 +367,21 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
         setReady(true);
       }
     })();
+  }, []);
+
+  // 云端同步覆盖本地 AsyncStorage 后，重新加载所有数据到内存
+  // 这是修复"标签/分类/配方同步后消失"的关键：没有此回调，
+  // 内存中的旧状态会在下次写操作时覆盖掉刚同步的云端数据
+  useEffect(() => {
+    return registerStoreReload(() => {
+      void reloadAllFromStorage(
+        setRecipes,
+        setCategories,
+        setTags,
+        setTagGroups,
+        setCategoryGroups,
+      );
+    });
   }, []);
 
   const persistRecipes = useCallback((next: Recipe[]) => {

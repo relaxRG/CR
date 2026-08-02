@@ -13,6 +13,7 @@ export const SYNC_KEYS = [
   "cocktail.categories",
   "cocktail.tags",
   "cocktail.tagGroups",
+  "cocktail.categoryGroups",
   "cocktail.seeded",
   "cocktail_waldorf_imported_v1",
   "cocktail.bottles",
@@ -146,13 +147,16 @@ export async function runInitialSync(
       const localTs = localTsRaw ? Number(localTsRaw) : 0;
       const remote = remoteMap.get(key);
 
-      if (remote && (!localValue || remote.clientUpdatedAt > localTs)) {
+      if (remote && (!localValue || (localTs > 0 && remote.clientUpdatedAt > localTs))) {
         // 云端更新 → 覆盖本地
+        // 条件：本地无数据，或本地有时间戳且云端更新时间更新
+        // 注意：localTs === 0 且本地有数据时，说明是本地新建但未同步过，
+        // 此时不应直接被云端覆盖，而应上传本地数据（走下面的 else if 分支）
         await AsyncStorage.setItem(key, remote.value);
         await AsyncStorage.setItem(TS_PREFIX + key, String(remote.clientUpdatedAt));
         localOverwritten = true;
       } else if (localValue != null && (!remote || localTs > remote.clientUpdatedAt)) {
-        // 本地更新(或云端没有) → 上传
+        // 本地更新（或云端没有，或本地有数据但无时间戳）→ 上传
         toUpload.push({
           storageKey: key,
           value: localValue,
