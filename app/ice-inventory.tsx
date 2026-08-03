@@ -5,6 +5,7 @@
 import React from "react";
 import { BaseInventoryScreen } from "@/components/inventory/BaseInventoryScreen";
 import { useIceNewInventoryStore, ICE_CATEGORIES, ICE_EXCEL_HINT, parseIceInventoryExcel } from "@/lib/ice/new-inventory-store";
+import IceCostLinkTab from "@/components/inventory/IceCostLinkTab";
 
 const ICE_COLOR = "#00BCD4";
 
@@ -23,6 +24,11 @@ export default function IceInventoryScreen() {
       defaultUnit="袋"
       parseExcel={parseIceInventoryExcel}
       excelFormatHint={ICE_EXCEL_HINT}
+      extraTabs={[{ key: "costLink", label: "💡 成本联动" }]}
+      renderExtraTabContent={(tab) => {
+        if (tab === "costLink") return <IceCostLinkTab />;
+        return null;
+      }}
     />
   );
 }

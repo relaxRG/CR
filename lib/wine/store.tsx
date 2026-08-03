@@ -24,6 +24,8 @@ type Action =
   | { type: "ADD"; bottle: WineBottle }
   | { type: "UPDATE"; id: string; updates: Partial<WineBottle> }
   | { type: "DELETE"; id: string }
+  | { type: "BATCH_DELETE"; ids: string[] }
+  | { type: "REORDER"; bottles: WineBottle[] }
   | { type: "UPDATE_STOCK"; id: string; delta: number };
 
 type SnapshotAction =
@@ -56,6 +58,8 @@ function reducer(state: WineState, action: Action): WineState {
       ),
     };
     case "DELETE": return { ...state, bottles: state.bottles.filter((b) => b.id !== action.id) };
+    case "BATCH_DELETE": return { ...state, bottles: state.bottles.filter((b) => !action.ids.includes(b.id)) };
+    case "REORDER": return { ...state, bottles: action.bottles };
     case "UPDATE_STOCK": return {
       ...state,
       bottles: state.bottles.map((b) =>
@@ -88,6 +92,8 @@ interface WineContextValue extends WineState {
   addBottle: (data: Omit<WineBottle, "id" | "createdAt" | "updatedAt">) => void;
   updateBottle: (id: string, updates: Partial<WineBottle>) => void;
   deleteBottle: (id: string) => void;
+  batchDeleteBottles: (ids: string[]) => void;
+  reorderBottles: (bottles: WineBottle[]) => void;
   updateStock: (id: string, delta: number) => void;
 }
 
@@ -161,6 +167,14 @@ export function WineProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: "DELETE", id });
   }, []);
 
+  const batchDeleteBottles = useCallback((ids: string[]) => {
+    dispatch({ type: "BATCH_DELETE", ids });
+  }, []);
+
+  const reorderBottles = useCallback((bottles: WineBottle[]) => {
+    dispatch({ type: "REORDER", bottles });
+  }, []);
+
   const updateStock = useCallback((id: string, delta: number) => {
     dispatch({ type: "UPDATE_STOCK", id, delta });
   }, []);
@@ -183,7 +197,7 @@ export function WineProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <WineContext.Provider value={{ ...state, addBottle, updateBottle, deleteBottle, updateStock }}>
+    <WineContext.Provider value={{ ...state, addBottle, updateBottle, deleteBottle, batchDeleteBottles, reorderBottles, updateStock }}>
       <WineSnapshotContext.Provider value={{ ...snapshotState, addSnapshot, deleteSnapshot }}>
         <WineManualPurchaseContext.Provider value={{ ...manualState, addManualPurchase, deleteManualPurchase }}>
           {children}

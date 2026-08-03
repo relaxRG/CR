@@ -1,6 +1,6 @@
 /**
  * 通用进销存基础页面模板
- * 包含：台账 / 进货录入 / 月结汇总 三个 Tab
+ * 三个子页面：总结（分析对比）/ 库存管理（台账+期初+月结）/ 当月进货（录入+记录）
  * 各品类通过 props 定制颜色、分组方式、特有功能
  */
 import React, { useMemo, useState } from "react";
@@ -24,7 +24,7 @@ import { OpeningStockModal } from "./OpeningStockModal";
 import { PurchaseEntryModal } from "./PurchaseEntryModal";
 import { ItemEditModal, CategoryOption, FieldConfig } from "./ItemEditModal";
 
-type Tab = "ledger" | "purchase" | "summary";
+type Tab = "summary" | "ledger" | "purchase";
 
 export interface BaseInventoryScreenProps {
   store: GenericInventoryContextValue;
@@ -69,7 +69,7 @@ export function BaseInventoryScreen({
   const insets = useSafeAreaInsets();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
-  const [tab, setTab] = useState<string>("ledger");
+  const [tab, setTab] = useState<string>("summary");
   const [showPurchase, setShowPurchase] = useState(false);
   const [purchaseMode, setPurchaseMode] = useState<"in" | "out">("in");
   const [preselectedId, setPreselectedId] = useState<string | undefined>();
@@ -135,6 +135,7 @@ export function BaseInventoryScreen({
   }, [activeItems, store, currentMonth, getGroupLabel]);
 
   const totalClosingCost = useMemo(() => ledgerItems.reduce((s, i) => s + i.closingCost, 0), [ledgerItems]);
+  const totalOpeningCost = useMemo(() => ledgerItems.reduce((s, i) => s + i.openingCost, 0), [ledgerItems]);
 
   // 按分组展示
   const groupedLedger = useMemo(() => {
@@ -174,9 +175,9 @@ export function BaseInventoryScreen({
   };
 
   const allTabs: { key: string; label: string }[] = [
-    { key: "ledger", label: "台账" },
-    { key: "purchase", label: "进货录入" },
-    { key: "summary", label: "月结汇总" },
+    { key: "summary", label: "📊 总结" },
+    { key: "ledger", label: "📋 库存管理" },
+    { key: "purchase", label: "📦 当月进货" },
     ...extraTabs,
   ];
 
@@ -216,116 +217,96 @@ export function BaseInventoryScreen({
         ))}
       </ScrollView>
 
-      {/* 汇总行 */}
-      <View style={[S.summaryRow, { borderBottomColor: colors.border }]}>
-        <SummaryCell label="品种" value={`${activeItems.length}`} unit="款" color={accentColor} />
-        <SummaryCell label="本月进货" value={`¥${totalMonthPurchase.toFixed(0)}`} unit="" color={accentColor} />
-        <SummaryCell label="期末库存成本" value={`¥${totalClosingCost.toFixed(0)}`} unit="" color={colors.foreground} />
-        {lowStockItems.length > 0 && (
-          <SummaryCell label="库存预警" value={`${lowStockItems.length}`} unit="种" color={colors.error} />
-        )}
-      </View>
-
-      {/* 快捷操作按钮 */}
-      <View style={[S.actionRow, { borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => { tap(); setShowOpening(true); }}
-          style={[S.actionBtn, { backgroundColor: accentColor + "15", borderColor: accentColor + "33" }]}>
-          <Text style={{ fontSize: 12, color: accentColor, fontWeight: "600" }}>📋 期初录入</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => { tap(); setPurchaseMode("in"); setPreselectedId(undefined); setShowPurchase(true); }}
-          style={[S.actionBtn, { backgroundColor: accentColor + "15", borderColor: accentColor + "33" }]}>
-          <Text style={{ fontSize: 12, color: accentColor, fontWeight: "600" }}>📦 入库</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => { tap(); setPurchaseMode("out"); setPreselectedId(undefined); setShowPurchase(true); }}
-          style={[S.actionBtn, { backgroundColor: colors.error + "15", borderColor: colors.error + "33" }]}>
-          <Text style={{ fontSize: 12, color: colors.error, fontWeight: "600" }}>📤 出库</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => { tap(); setShowMonthClose(true); }}
-          style={[S.actionBtn, { backgroundColor: colors.warning + "15", borderColor: colors.warning + "33" }]}>
-          <Text style={{ fontSize: 12, color: colors.warning, fontWeight: "600" }}>🔒 月结</Text>
-        </TouchableOpacity>
-      </View>
-
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }}>
-        {/* 台账 Tab */}
-        {tab === "ledger" && (
-          activeItems.length === 0 ? (
-            <EmptyState emoji={emoji} accentColor={accentColor} excelFormatHint={excelFormatHint} colors={colors} />
-          ) : getGroupLabel ? (
-            Object.entries(groupedLedger).map(([group, items]) => (
-              <View key={group} style={{ marginBottom: 16 }}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                  <View style={{ width: 4, height: 16, borderRadius: 2, backgroundColor: accentColor }} />
-                  <Text style={{ fontSize: 14, fontWeight: "700", color: accentColor }}>{group}</Text>
-                  <Text style={{ fontSize: 12, color: colors.muted }}>({items.length} 款)</Text>
-                </View>
-                {items.map((item) => (
-                  <MonthlyLedgerRow key={item.itemId} item={item} accentColor={accentColor} showLoss={showLoss} />
-                ))}
-              </View>
-            ))
-          ) : (
-            ledgerItems.map((item) => (
-              <MonthlyLedgerRow key={item.itemId} item={item} accentColor={accentColor} showLoss={showLoss} />
-            ))
-          )
-        )}
 
-        {/* 进货录入 Tab */}
-        {tab === "purchase" && (
-          <View style={{ gap: 8 }}>
-            <View style={{ flexDirection: "row", gap: 8, marginBottom: 8 }}>
-              <TouchableOpacity onPress={() => { tap(); setPurchaseMode("in"); setPreselectedId(undefined); setShowPurchase(true); }}
-                style={[S.bigBtn, { backgroundColor: accentColor }]}>
-                <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}>+ 录入进货</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => { tap(); setPurchaseMode("out"); setPreselectedId(undefined); setShowPurchase(true); }}
-                style={[S.bigBtn, { backgroundColor: colors.error }]}>
-                <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}>- 录入出库</Text>
-              </TouchableOpacity>
-            </View>
-            {/* 本月进货记录 */}
-            <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 4 }}>本月进货记录（{currentMonth}）</Text>
-            {monthPurchases.length === 0 ? (
-              <Text style={{ fontSize: 13, color: colors.muted, textAlign: "center", padding: 20 }}>本月暂无进货记录</Text>
-            ) : (
-              monthPurchases.map((r) => (
-                <View key={r.id} style={[S.recordCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>{r.itemName}</Text>
-                    <Text style={{ fontSize: 12, color: colors.muted }}>{r.date} · {r.supplier || "自采"}</Text>
-                  </View>
-                  <View style={{ alignItems: "flex-end" }}>
-                    <Text style={{ fontSize: 15, fontWeight: "700", color: accentColor }}>+{r.quantity} 单位</Text>
-                    <Text style={{ fontSize: 12, color: colors.muted }}>¥{r.totalAmount.toFixed(2)}</Text>
-                  </View>
-                </View>
-              ))
-            )}
-          </View>
-        )}
-
-        {/* 月结汇总 Tab */}
+        {/* ── 总结 Tab ─────────────────────────────────────────────────────── */}
         {tab === "summary" && (
-          <View style={{ gap: 12 }}>
+          <View style={{ gap: 14 }}>
+            {/* 本月核心指标卡 */}
             <View style={[S.summaryCard, { backgroundColor: accentColor + "0a", borderColor: accentColor + "22" }]}>
-              <Text style={{ fontSize: 14, fontWeight: "700", color: accentColor, marginBottom: 8 }}>{currentMonth} 当月概况</Text>
+              <Text style={{ fontSize: 15, fontWeight: "700", color: accentColor, marginBottom: 10 }}>
+                {currentMonth} 月度概况
+              </Text>
               {[
-                { label: "本月进货总额", value: `¥${totalMonthPurchase.toFixed(2)}`, color: accentColor },
-                { label: "本月消耗总成本", value: `¥${totalMonthConsume.toFixed(2)}`, color: colors.warning },
-                { label: "期末库存总成本", value: `¥${totalClosingCost.toFixed(2)}`, color: colors.foreground },
+                { label: "品种数量", value: `${activeItems.length} 款`, color: colors.foreground },
+                { label: "期初库存成本", value: `¥${totalOpeningCost.toFixed(0)}`, color: colors.muted },
+                { label: "本月进货总额", value: `¥${totalMonthPurchase.toFixed(0)}`, color: accentColor },
+                { label: "本月消耗成本", value: `¥${totalMonthConsume.toFixed(0)}`, color: colors.warning },
+                { label: "期末库存成本", value: `¥${totalClosingCost.toFixed(0)}`, color: colors.foreground },
               ].map((row, i) => (
-                <View key={i} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 4 }}>
+                <View key={i} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 5, borderTopWidth: i > 0 ? StyleSheet.hairlineWidth : 0, borderTopColor: colors.border }}>
                   <Text style={{ fontSize: 13, color: colors.muted }}>{row.label}</Text>
-                  <Text style={{ fontSize: 13, fontWeight: "600", color: row.color }}>{row.value}</Text>
+                  <Text style={{ fontSize: 14, fontWeight: "600", color: row.color }}>{row.value}</Text>
                 </View>
               ))}
             </View>
 
-            {/* 历史快照 */}
+            {/* 库存预警 */}
+            {lowStockItems.length > 0 && (
+              <View style={[S.summaryCard, { backgroundColor: colors.error + "0a", borderColor: colors.error + "22" }]}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 }}>
+                  <IconSymbol name="exclamationmark.triangle.fill" size={15} color={colors.error} />
+                  <Text style={{ fontSize: 14, fontWeight: "700", color: colors.error }}>库存预警（{lowStockItems.length} 款）</Text>
+                </View>
+                {lowStockItems.map((item) => (
+                  <View key={item.id} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 4 }}>
+                    <Text style={{ fontSize: 13, color: colors.foreground }}>{item.name}</Text>
+                    <Text style={{ fontSize: 13, color: colors.error }}>库存 {item.currentStock} {item.unit}（预警线 {item.alertThreshold}）</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* 与上月对比 */}
+            {lastSnapshot && (
+              <View style={[S.summaryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground, marginBottom: 8 }}>
+                  与上月对比（{lastSnapshot.month}）
+                </Text>
+                {[
+                  {
+                    label: "进货额",
+                    cur: totalMonthPurchase,
+                    prev: lastSnapshot.totalPurchaseCost,
+                  },
+                  {
+                    label: "消耗成本",
+                    cur: totalMonthConsume,
+                    prev: lastSnapshot.totalConsumeCost,
+                  },
+                  {
+                    label: "期末库存成本",
+                    cur: totalClosingCost,
+                    prev: lastSnapshot.totalClosingCost,
+                  },
+                ].map((row, i) => {
+                  const diff = row.cur - row.prev;
+                  const pct = row.prev > 0 ? (diff / row.prev) * 100 : 0;
+                  const sign = diff > 0 ? "▲" : diff < 0 ? "▼" : "—";
+                  const color = diff > 0 ? colors.error : diff < 0 ? colors.success : colors.muted;
+                  return (
+                    <View key={i} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 5, borderTopWidth: i > 0 ? StyleSheet.hairlineWidth : 0, borderTopColor: colors.border }}>
+                      <Text style={{ fontSize: 13, color: colors.muted }}>{row.label}</Text>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                        <Text style={{ fontSize: 13, color: colors.foreground }}>¥{row.cur.toFixed(0)}</Text>
+                        <Text style={{ fontSize: 12, color }}>{sign} {Math.abs(pct).toFixed(1)}%</Text>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+
+            {/* 历史月结记录 */}
             <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted }}>历史月结记录</Text>
             {store.snapshots.length === 0 ? (
-              <Text style={{ fontSize: 13, color: colors.muted, textAlign: "center", padding: 20 }}>暂无月结记录</Text>
+              <View style={{ alignItems: "center", paddingVertical: 20 }}>
+                <Text style={{ fontSize: 13, color: colors.muted }}>暂无月结记录</Text>
+                <TouchableOpacity onPress={() => { tap(); setShowMonthClose(true); }}
+                  style={{ marginTop: 10, backgroundColor: accentColor, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 8 }}>
+                  <Text style={{ fontSize: 13, fontWeight: "600", color: "#fff" }}>立即月结</Text>
+                </TouchableOpacity>
+              </View>
             ) : (
               [...store.snapshots].sort((a, b) => b.month.localeCompare(a.month)).map((snap) => (
                 <View key={snap.id} style={[S.recordCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -341,6 +322,140 @@ export function BaseInventoryScreen({
                   </View>
                 </View>
               ))
+            )}
+          </View>
+        )}
+
+        {/* ── 库存管理 Tab ──────────────────────────────────────────────────── */}
+        {tab === "ledger" && (
+          <View style={{ gap: 10 }}>
+            {/* 快捷操作 */}
+            <View style={{ flexDirection: "row", gap: 8, marginBottom: 4 }}>
+              <TouchableOpacity onPress={() => { tap(); setShowOpening(true); }}
+                style={[S.actionBtn, { backgroundColor: accentColor + "15", borderColor: accentColor + "33" }]}>
+                <Text style={{ fontSize: 12, color: accentColor, fontWeight: "600" }}>📋 期初录入</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => { tap(); setShowMonthClose(true); }}
+                style={[S.actionBtn, { backgroundColor: colors.warning + "15", borderColor: colors.warning + "33" }]}>
+                <Text style={{ fontSize: 12, color: colors.warning, fontWeight: "600" }}>🔒 月结</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => { tap(); setEditingItem(null); setShowEditItem(true); }}
+                style={[S.actionBtn, { backgroundColor: colors.primary + "15", borderColor: colors.primary + "33" }]}>
+                <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "600" }}>+ 新增品类</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* 台账列表 */}
+            {activeItems.length === 0 ? (
+              <EmptyState emoji={emoji} accentColor={accentColor} excelFormatHint={excelFormatHint} colors={colors} />
+            ) : getGroupLabel ? (
+              Object.entries(groupedLedger).map(([group, items]) => (
+                <View key={group} style={{ marginBottom: 16 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <View style={{ width: 4, height: 16, borderRadius: 2, backgroundColor: accentColor }} />
+                    <Text style={{ fontSize: 14, fontWeight: "700", color: accentColor }}>{group}</Text>
+                    <Text style={{ fontSize: 12, color: colors.muted }}>({items.length} 款)</Text>
+                  </View>
+                  {items.map((item) => (
+                    <MonthlyLedgerRow key={item.itemId} item={item} accentColor={accentColor} showLoss={showLoss} />
+                  ))}
+                </View>
+              ))
+            ) : (
+              ledgerItems.map((item) => (
+                <MonthlyLedgerRow key={item.itemId} item={item} accentColor={accentColor} showLoss={showLoss} />
+              ))
+            )}
+          </View>
+        )}
+
+        {/* ── 当月进货 Tab ──────────────────────────────────────────────────── */}
+        {tab === "purchase" && (
+          <View style={{ gap: 10 }}>
+            {/* 录入按钮 */}
+            <View style={{ flexDirection: "row", gap: 8, marginBottom: 4 }}>
+              <TouchableOpacity onPress={() => { tap(); setPurchaseMode("in"); setPreselectedId(undefined); setShowPurchase(true); }}
+                style={[S.bigBtn, { backgroundColor: accentColor }]}>
+                <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}>+ 录入进货</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => { tap(); setPurchaseMode("out"); setPreselectedId(undefined); setShowPurchase(true); }}
+                style={[S.bigBtn, { backgroundColor: colors.error }]}>
+                <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}>- 录入出库</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* 当月进货汇总 */}
+            <View style={[S.summaryCard, { backgroundColor: accentColor + "0a", borderColor: accentColor + "22" }]}>
+              <Text style={{ fontSize: 13, fontWeight: "700", color: accentColor, marginBottom: 6 }}>
+                {currentMonth} 进货汇总
+              </Text>
+              <View style={{ flexDirection: "row", gap: 12 }}>
+                <View style={{ flex: 1, alignItems: "center" }}>
+                  <Text style={{ fontSize: 11, color: colors.muted }}>进货笔数</Text>
+                  <Text style={{ fontSize: 18, fontWeight: "700", color: accentColor }}>{monthPurchases.length}</Text>
+                </View>
+                <View style={{ width: 1, backgroundColor: colors.border }} />
+                <View style={{ flex: 1, alignItems: "center" }}>
+                  <Text style={{ fontSize: 11, color: colors.muted }}>进货总额</Text>
+                  <Text style={{ fontSize: 18, fontWeight: "700", color: accentColor }}>¥{totalMonthPurchase.toFixed(0)}</Text>
+                </View>
+                <View style={{ width: 1, backgroundColor: colors.border }} />
+                <View style={{ flex: 1, alignItems: "center" }}>
+                  <Text style={{ fontSize: 11, color: colors.muted }}>出库笔数</Text>
+                  <Text style={{ fontSize: 18, fontWeight: "700", color: colors.error }}>{monthConsumes.length}</Text>
+                </View>
+              </View>
+              {pettyHint && (
+                <Text style={{ fontSize: 11, color: colors.muted, marginTop: 8 }}>
+                  💡 备用金关联：{pettyHint}
+                </Text>
+              )}
+            </View>
+
+            {/* 进货记录列表 */}
+            <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted }}>本月进货记录（{monthPurchases.length} 笔）</Text>
+            {monthPurchases.length === 0 ? (
+              <View style={{ alignItems: "center", paddingVertical: 20 }}>
+                <Text style={{ fontSize: 13, color: colors.muted }}>本月暂无进货记录</Text>
+                <TouchableOpacity onPress={() => { tap(); setPurchaseMode("in"); setShowPurchase(true); }}
+                  style={{ marginTop: 10, backgroundColor: accentColor, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 8 }}>
+                  <Text style={{ fontSize: 13, fontWeight: "600", color: "#fff" }}>立即录入进货</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              monthPurchases.map((r) => (
+                <View key={r.id} style={[S.recordCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>{r.itemName}</Text>
+                    <Text style={{ fontSize: 12, color: colors.muted }}>{r.date} · {r.supplier || "自采"}</Text>
+                  </View>
+                  <View style={{ alignItems: "flex-end" }}>
+                    <Text style={{ fontSize: 15, fontWeight: "700", color: accentColor }}>+{r.quantity}</Text>
+                    <Text style={{ fontSize: 12, color: colors.muted }}>¥{r.totalAmount.toFixed(2)}</Text>
+                  </View>
+                </View>
+              ))
+            )}
+
+            {/* 出库记录列表 */}
+            {monthConsumes.length > 0 && (
+              <>
+                <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginTop: 8 }}>本月出库记录（{monthConsumes.length} 笔）</Text>
+                {monthConsumes.map((r) => (
+                  <View key={r.id} style={[S.recordCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>{r.itemName}</Text>
+                      <Text style={{ fontSize: 12, color: colors.muted }}>
+                        {r.date} · {r.reason === "loss" ? "损耗" : r.reason === "adjust" ? "盘点调整" : "消耗"}
+                      </Text>
+                    </View>
+                    <View style={{ alignItems: "flex-end" }}>
+                      <Text style={{ fontSize: 15, fontWeight: "700", color: colors.error }}>-{r.quantity}</Text>
+                      <Text style={{ fontSize: 12, color: colors.muted }}>¥{r.totalCost.toFixed(2)}</Text>
+                    </View>
+                  </View>
+                ))}
+              </>
             )}
           </View>
         )}
@@ -405,15 +520,6 @@ export function BaseInventoryScreen({
   );
 }
 
-function SummaryCell({ label, value, unit, color }: { label: string; value: string; unit: string; color: string }) {
-  return (
-    <View style={{ flex: 1, alignItems: "center" }}>
-      <Text style={{ fontSize: 10, color: "#888" }}>{label}</Text>
-      <Text style={{ fontSize: 15, fontWeight: "700", color }}>{value}{unit}</Text>
-    </View>
-  );
-}
-
 function EmptyState({ emoji, accentColor, excelFormatHint, colors }: any) {
   return (
     <View>
@@ -438,8 +544,6 @@ const S = StyleSheet.create({
   navbar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   navTitle: { fontSize: 17, fontWeight: "600" },
   tabChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
-  summaryRow: { flexDirection: "row", paddingVertical: 10, paddingHorizontal: 8, borderBottomWidth: StyleSheet.hairlineWidth },
-  actionRow: { flexDirection: "row", paddingHorizontal: 12, paddingVertical: 8, gap: 8, borderBottomWidth: StyleSheet.hairlineWidth },
   actionBtn: { flex: 1, paddingVertical: 8, borderRadius: 10, borderWidth: 1, alignItems: "center" },
   bigBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: "center" },
   recordCard: { flexDirection: "row", alignItems: "center", borderRadius: 12, borderWidth: 1, padding: 12, gap: 10 },

@@ -12,7 +12,10 @@ type Action =
   | { type: "ADD"; item: FoodItem }
   | { type: "UPDATE"; id: string; updates: Partial<FoodItem> }
   | { type: "DELETE"; id: string }
-  | { type: "TOGGLE_AVAILABLE"; id: string };
+  | { type: "BATCH_DELETE"; ids: string[] }
+  | { type: "REORDER"; items: FoodItem[] }
+  | { type: "TOGGLE_AVAILABLE"; id: string }
+  | { type: "BATCH_TOGGLE"; ids: string[]; available: boolean };
 
 function uuid(): string { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
 
@@ -22,7 +25,10 @@ function reducer(state: FoodMenuState, action: Action): FoodMenuState {
     case "ADD": return { items: [action.item, ...state.items] };
     case "UPDATE": return { items: state.items.map((i) => i.id === action.id ? { ...i, ...action.updates, updatedAt: new Date().toISOString() } : i) };
     case "DELETE": return { items: state.items.filter((i) => i.id !== action.id) };
+    case "BATCH_DELETE": return { items: state.items.filter((i) => !action.ids.includes(i.id)) };
+    case "REORDER": return { items: action.items };
     case "TOGGLE_AVAILABLE": return { items: state.items.map((i) => i.id === action.id ? { ...i, available: !i.available, updatedAt: new Date().toISOString() } : i) };
+    case "BATCH_TOGGLE": return { items: state.items.map((i) => action.ids.includes(i.id) ? { ...i, available: action.available, updatedAt: new Date().toISOString() } : i) };
     default: return state;
   }
 }
@@ -31,7 +37,10 @@ interface FoodMenuContextValue extends FoodMenuState {
   addItem: (data: Omit<FoodItem, "id" | "createdAt" | "updatedAt">) => void;
   updateItem: (id: string, updates: Partial<FoodItem>) => void;
   deleteItem: (id: string) => void;
+  batchDeleteItems: (ids: string[]) => void;
+  reorderItems: (items: FoodItem[]) => void;
   toggleAvailable: (id: string) => void;
+  batchToggleAvailable: (ids: string[], available: boolean) => void;
 }
 
 const FoodMenuContext = createContext<FoodMenuContextValue | null>(null);
@@ -65,10 +74,13 @@ export function FoodMenuProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const deleteItem = useCallback((id: string) => dispatch({ type: "DELETE", id }), []);
+  const batchDeleteItems = useCallback((ids: string[]) => dispatch({ type: "BATCH_DELETE", ids }), []);
+  const reorderItems = useCallback((items: FoodItem[]) => dispatch({ type: "REORDER", items }), []);
   const toggleAvailable = useCallback((id: string) => dispatch({ type: "TOGGLE_AVAILABLE", id }), []);
+  const batchToggleAvailable = useCallback((ids: string[], available: boolean) => dispatch({ type: "BATCH_TOGGLE", ids, available }), []);
 
   return (
-    <FoodMenuContext.Provider value={{ ...state, addItem, updateItem, deleteItem, toggleAvailable }}>
+    <FoodMenuContext.Provider value={{ ...state, addItem, updateItem, deleteItem, batchDeleteItems, reorderItems, toggleAvailable, batchToggleAvailable }}>
       {children}
     </FoodMenuContext.Provider>
   );

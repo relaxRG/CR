@@ -1,126 +1,220 @@
 /**
- * 经营分析（成本对比：烈酒/葡萄酒/餐食/备用金，支持天/周/月/年/上期对比）
+ * 经营分析（成本对比：烈酒/葡萄酒/餐食/备用金，支持天/月/年/自定义时间段）
  */
 import React, { useMemo, useState } from "react";
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  Alert, Modal, Platform, Pressable, ScrollView, StyleSheet,
+  Text, TextInput, TouchableOpacity, View
+} from "react-native";
 import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useRevenueStore, REVENUE_CATEGORY_LABELS, RevenueCategory } from "@/lib/store/revenue-store";
-import { usePettyCashStore, PETTY_GROUPS } from "@/lib/store/petty-store";
+import { usePettyCashStore } from "@/lib/store/petty-store";
 import { useMonthlyReportStore } from "@/lib/store/monthly-report/store";
 import { useEmployeeStore, usePaySlipStore } from "@/lib/labor/store";
 
-type Period = "day" | "week" | "month" | "year";
+type PeriodMode = "day" | "month" | "year" | "custom";
 type CompareMode = "none" | "prev";
 
-const PERIODS: { key: Period; label: string }[] = [
-  { key: "day", label: "今日" },
-  { key: "week", label: "本周" },
-  { key: "month", label: "本月" },
-  { key: "year", label: "今年" },
+const PERIOD_MODES: { key: PeriodMode; label: string }[] = [
+  { key: "day", label: "某天" },
+  { key: "month", label: "某月" },
+  { key: "year", label: "某年" },
+  { key: "custom", label: "时间段" },
 ];
 
-function getRange(period: Period, offset = 0): { start: Date; end: Date } {
-  const now = new Date();
-  const s = new Date(now);
-  const e = new Date(now);
-  if (period === "day") {
-    s.setDate(now.getDate() - offset); s.setHours(0, 0, 0, 0);
-    e.setDate(now.getDate() - offset); e.setHours(23, 59, 59, 999);
-  } else if (period === "week") {
-    const dow = now.getDay();
-    s.setDate(now.getDate() - dow - offset * 7); s.setHours(0, 0, 0, 0);
-    e.setDate(s.getDate() + 6); e.setHours(23, 59, 59, 999);
-  } else if (period === "month") {
-    s.setMonth(now.getMonth() - offset, 1); s.setHours(0, 0, 0, 0);
-    e.setMonth(s.getMonth() + 1, 0); e.setHours(23, 59, 59, 999);
-  } else {
-    s.setFullYear(now.getFullYear() - offset, 0, 1); s.setHours(0, 0, 0, 0);
-    e.setFullYear(s.getFullYear(), 11, 31); e.setHours(23, 59, 59, 999);
-  }
+function fmtDate(d: Date): string { return d.toISOString().slice(0, 10); }
+function parseDate(s: string): Date { const d = new Date(s + "T00:00:00"); return isNaN(d.getTime()) ? new Date() : d; }
+
+function dayRange(dateStr: string): { start: Date; end: Date } {
+  const s = parseDate(dateStr); s.setHours(0, 0, 0, 0);
+  const e = new Date(s); e.setHours(23, 59, 59, 999);
   return { start: s, end: e };
+}
+function monthRange(monthStr: string): { start: Date; end: Date } {
+  const [y, m] = monthStr.split("-").map(Number);
+  return { start: new Date(y, m - 1, 1, 0, 0, 0), end: new Date(y, m, 0, 23, 59, 59, 999) };
+}
+function yearRange(yearStr: string): { start: Date; end: Date } {
+  const y = parseInt(yearStr, 10);
+  return { start: new Date(y, 0, 1, 0, 0, 0), end: new Date(y, 11, 31, 23, 59, 59, 999) };
+}
+function prevRange(mode: PeriodMode, day: string, month: string, year: string, cStart: string, cEnd: string): { start: Date; end: Date } {
+  if (mode === "day") { const d = parseDate(day); d.setDate(d.getDate() - 1); return dayRange(fmtDate(d)); }
+  if (mode === "month") { const [y, m] = month.split("-").map(Number); const pm = m === 1 ? 12 : m - 1; const py = m === 1 ? y - 1 : y; return monthRange(`${py}-${String(pm).padStart(2, "0")}`); }
+  if (mode === "year") { return yearRange(String(parseInt(year, 10) - 1)); }
+  const s = parseDate(cStart); const e = parseDate(cEnd); const len = e.getTime() - s.getTime();
+  return { start: new Date(s.getTime() - len - 86400000), end: new Date(s.getTime() - 86400000) };
+}
+function periodLabel(mode: PeriodMode, day: string, month: string, year: string, cStart: string, cEnd: string): string {
+  if (mode === "day") return day === fmtDate(new Date()) ? "今天" : day;
+  if (mode === "month") return `${Number(month.slice(5, 7))}月${month.slice(0, 4) !== String(new Date().getFullYear()) ? ` ${month.slice(0, 4)}年` : ""}`;
+  if (mode === "year") return `${year}年`;
+  return `${cStart} ~ ${cEnd}`;
+}
+
+function CustomRangePicker({ visible, start, end, onConfirm, onClose, colors }: { visible: boolean; start: string; end: string; onConfirm: (s: string, e: string) => void; onClose: () => void; colors: any }) {
+  const [s, setS] = useState(start); const [e, setE] = useState(end);
+  React.useEffect(() => { if (visible) { setS(start); setE(end); } }, [visible]);
+  return (
+    <Modal visible={visible} transparent animationType="slide">
+      <View style={{ flex: 1, backgroundColor: "#00000066", justifyContent: "flex-end" }}>
+        <View style={{ backgroundColor: colors.background, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 14 }}>
+          <Text style={{ fontSize: 17, fontWeight: "600", color: colors.foreground, textAlign: "center" }}>选择时间段</Text>
+          {[{ label: "开始日期", value: s, onChange: setS }, { label: "结束日期", value: e, onChange: setE }].map((f) => (
+            <View key={f.label}>
+              <Text style={{ fontSize: 13, color: colors.muted, marginBottom: 4 }}>{f.label}</Text>
+              <TextInput value={f.value} onChangeText={f.onChange} placeholder="YYYY-MM-DD" placeholderTextColor={colors.muted}
+                style={{ borderRadius: 10, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, color: colors.foreground, backgroundColor: colors.surface }} keyboardType="numbers-and-punctuation" />
+            </View>
+          ))}
+          <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+            {[{ label: "近7天", days: 7 }, { label: "近30天", days: 30 }, { label: "近90天", days: 90 }, { label: "近180天", days: 180 }].map((q) => (
+              <TouchableOpacity key={q.label} onPress={() => { const ed = new Date(); const sd = new Date(); sd.setDate(ed.getDate() - q.days + 1); setS(fmtDate(sd)); setE(fmtDate(ed)); }}
+                style={{ backgroundColor: colors.primary + "22", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}>
+                <Text style={{ fontSize: 13, color: colors.primary }}>{q.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            <TouchableOpacity onPress={onClose} style={{ flex: 1, borderRadius: 12, borderWidth: 1, borderColor: colors.border, paddingVertical: 12, alignItems: "center" }}>
+              <Text style={{ fontSize: 15, color: colors.muted }}>取消</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => { if (!s || !e) { Alert.alert("请填写完整日期"); return; } if (parseDate(s) > parseDate(e)) { Alert.alert("开始日期不能晚于结束日期"); return; } onConfirm(s, e); }}
+              style={{ flex: 1, borderRadius: 12, backgroundColor: colors.primary, paddingVertical: 12, alignItems: "center" }}>
+              <Text style={{ fontSize: 15, fontWeight: "600", color: "#fff" }}>确认</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function MonthPicker({ value, onChange, colors }: { value: string; onChange: (v: string) => void; colors: any }) {
+  const months = useMemo(() => { const r: string[] = []; const now = new Date(); for (let i = 0; i < 24; i++) { const d = new Date(now.getFullYear(), now.getMonth() - i, 1); r.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); } return r; }, []);
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingHorizontal: 2 }}>
+      {months.map((m) => (
+        <TouchableOpacity key={m} onPress={() => onChange(m)} style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: value === m ? colors.primary : colors.border, backgroundColor: value === m ? colors.primary : colors.surface }}>
+          <Text style={{ fontSize: 13, fontWeight: value === m ? "600" : "400", color: value === m ? "#fff" : colors.muted }}>{Number(m.slice(5, 7))}月{m.slice(0, 4) !== String(new Date().getFullYear()) ? ` ${m.slice(0, 4)}` : ""}</Text>
+        </TouchableOpacity>
+      ))}
+    </ScrollView>
+  );
+}
+
+function YearPicker({ value, onChange, colors }: { value: string; onChange: (v: string) => void; colors: any }) {
+  const years = useMemo(() => { const cur = new Date().getFullYear(); return Array.from({ length: 5 }, (_, i) => String(cur - i)); }, []);
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingHorizontal: 2 }}>
+      {years.map((y) => (
+        <TouchableOpacity key={y} onPress={() => onChange(y)} style={{ paddingHorizontal: 14, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: value === y ? colors.primary : colors.border, backgroundColor: value === y ? colors.primary : colors.surface }}>
+          <Text style={{ fontSize: 13, fontWeight: value === y ? "600" : "400", color: value === y ? "#fff" : colors.muted }}>{y}年</Text>
+        </TouchableOpacity>
+      ))}
+    </ScrollView>
+  );
+}
+
+function DayPicker({ value, onChange, colors }: { value: string; onChange: (v: string) => void; colors: any }) {
+  const days = useMemo(() => { const r: string[] = []; const now = new Date(); for (let i = 0; i < 30; i++) { const d = new Date(now); d.setDate(now.getDate() - i); r.push(fmtDate(d)); } return r; }, []);
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingHorizontal: 2 }}>
+      {days.map((d) => (
+        <TouchableOpacity key={d} onPress={() => onChange(d)} style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: value === d ? colors.primary : colors.border, backgroundColor: value === d ? colors.primary : colors.surface }}>
+          <Text style={{ fontSize: 12, fontWeight: value === d ? "600" : "400", color: value === d ? "#fff" : colors.muted }}>{d === fmtDate(new Date()) ? "今天" : d.slice(5)}</Text>
+        </TouchableOpacity>
+      ))}
+    </ScrollView>
+  );
 }
 
 export default function StoreAnalyticsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [period, setPeriod] = useState<Period>("month");
-  const [compare, setCompare] = useState<CompareMode>("prev");
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
-
   const { reports } = useMonthlyReportStore();
   const { employees } = useEmployeeStore();
   const { paySlips } = usePaySlipStore();
-  const currentMonthStr = new Date().toISOString().slice(0, 7);
-  const monthLaborCost = paySlips.filter((s) => s.month === currentMonthStr).reduce((sum, s) => sum + s.finalSalary, 0);
-
   const { records } = useRevenueStore();
   const { records: pettyRecords } = usePettyCashStore();
-
-  const { start: curStart, end: curEnd } = useMemo(() => getRange(period, 0), [period]);
-  const { start: prevStart, end: prevEnd } = useMemo(() => getRange(period, 1), [period]);
-
+  const [mode, setMode] = useState<PeriodMode>("month");
+  const [compare, setCompare] = useState<CompareMode>("prev");
+  const [selectedDay, setSelectedDay] = useState(fmtDate(new Date()));
+  const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [selectedYear, setSelectedYear] = useState(() => String(new Date().getFullYear()));
+  const [customStart, setCustomStart] = useState(() => { const d = new Date(); d.setDate(d.getDate() - 29); return fmtDate(d); });
+  const [customEnd, setCustomEnd] = useState(fmtDate(new Date()));
+  const [showCustomPicker, setShowCustomPicker] = useState(false);
+  const currentMonthStr = new Date().toISOString().slice(0, 7);
+  const monthLaborCost = paySlips.filter((s) => s.month === currentMonthStr).reduce((sum, s) => sum + s.finalSalary, 0);
+  const costCategories: RevenueCategory[] = ["food_cost", "spirit_cost", "wine_cost", "petty_cash", "labor_cost", "rent", "utilities", "operations"];
+  const currentRange = useMemo((): { start: Date; end: Date } => {
+    if (mode === "day") return dayRange(selectedDay);
+    if (mode === "month") return monthRange(selectedMonth);
+    if (mode === "year") return yearRange(selectedYear);
+    return { start: parseDate(customStart), end: parseDate(customEnd) };
+  }, [mode, selectedDay, selectedMonth, selectedYear, customStart, customEnd]);
+  const previousRange = useMemo(() => prevRange(mode, selectedDay, selectedMonth, selectedYear, customStart, customEnd), [mode, selectedDay, selectedMonth, selectedYear, customStart, customEnd]);
   const calcSummary = (start: Date, end: Date) => {
     const map: Partial<Record<RevenueCategory, number>> = {};
-    records.filter((r) => { const d = new Date(r.date); return d >= start && d <= end; })
-      .forEach((r) => { map[r.category] = (map[r.category] ?? 0) + r.amount; });
-    const pettyTotal = pettyRecords.filter((r) => { const d = new Date(r.date); return d >= start && d <= end; })
-      .reduce((s, r) => s + r.amount, 0);
+    records.filter((r) => { const d = new Date(r.date); return d >= start && d <= end; }).forEach((r) => { map[r.category] = (map[r.category] ?? 0) + r.amount; });
+    const pettyTotal = pettyRecords.filter((r) => { const d = new Date(r.date); return d >= start && d <= end; }).reduce((s, r) => s + r.amount, 0);
     map.petty_cash = (map.petty_cash ?? 0) + pettyTotal;
     return map;
   };
-
-  const cur = useMemo(() => calcSummary(curStart, curEnd), [records, pettyRecords, curStart, curEnd]);
-  const prev = useMemo(() => calcSummary(prevStart, prevEnd), [records, pettyRecords, prevStart, prevEnd]);
-
+  const cur = useMemo(() => calcSummary(currentRange.start, currentRange.end), [records, pettyRecords, currentRange]);
+  const prev = useMemo(() => calcSummary(previousRange.start, previousRange.end), [records, pettyRecords, previousRange]);
   const totalRevCur = cur.revenue ?? 0;
   const totalCostCur = Object.entries(cur).filter(([k]) => k !== "revenue").reduce((s, [, v]) => s + (v ?? 0), 0);
   const profitCur = totalRevCur - totalCostCur;
-
   const totalRevPrev = prev.revenue ?? 0;
   const totalCostPrev = Object.entries(prev).filter(([k]) => k !== "revenue").reduce((s, [, v]) => s + (v ?? 0), 0);
   const profitPrev = totalRevPrev - totalCostPrev;
-
-  const costCategories: RevenueCategory[] = ["food_cost", "spirit_cost", "wine_cost", "petty_cash", "labor_cost", "rent", "utilities", "operations"];
-
-  const pctChange = (cur: number, prev: number) => {
-    if (prev === 0) return null;
-    return ((cur - prev) / prev * 100).toFixed(1);
-  };
-
+  const pctChange = (cur: number, prev: number) => { if (prev === 0) return null; return ((cur - prev) / prev * 100).toFixed(1); };
+  const label = periodLabel(mode, selectedDay, selectedMonth, selectedYear, customStart, customEnd);
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.background }} contentContainerStyle={{ paddingBottom: 40 + insets.bottom }}>
-      {/* 时间段 + 对比 */}
       <View style={[styles.subHeader, { backgroundColor: colors.background }]}>
         <View style={[styles.segContainer, { backgroundColor: colors.border + "55" }]}>
-          {PERIODS.map((p) => {
-            const active = period === p.key;
+          {PERIOD_MODES.map((p) => {
+            const active = mode === p.key;
             return (
-              <Pressable key={p.key} onPress={() => { tap(); setPeriod(p.key); }}
+              <Pressable key={p.key} onPress={() => { tap(); setMode(p.key); if (p.key === "custom") setShowCustomPicker(true); }}
                 style={[styles.segItem, active && { backgroundColor: colors.background, shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 2 }]}>
                 <Text style={[styles.segText, { color: active ? colors.foreground : colors.muted, fontWeight: active ? "600" : "400" }]}>{p.label}</Text>
               </Pressable>
             );
           })}
         </View>
+        <View style={{ marginTop: 8 }}>
+          {mode === "day" && <DayPicker value={selectedDay} onChange={setSelectedDay} colors={colors} />}
+          {mode === "month" && <MonthPicker value={selectedMonth} onChange={setSelectedMonth} colors={colors} />}
+          {mode === "year" && <YearPicker value={selectedYear} onChange={setSelectedYear} colors={colors} />}
+          {mode === "custom" && (
+            <TouchableOpacity onPress={() => setShowCustomPicker(true)} style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.surface, borderRadius: 10, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, paddingVertical: 8 }}>
+              <IconSymbol name="calendar" size={15} color={colors.primary} />
+              <Text style={{ fontSize: 13, color: colors.foreground, flex: 1 }}>{customStart} ~ {customEnd}</Text>
+              <IconSymbol name="chevron.right" size={13} color={colors.muted} />
+            </TouchableOpacity>
+          )}
+        </View>
         <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
           {(["none", "prev"] as CompareMode[]).map((m) => (
             <Pressable key={m} onPress={() => { tap(); setCompare(m); }}
               style={[styles.compareChip, { borderColor: compare === m ? colors.primary : colors.border, backgroundColor: compare === m ? colors.primary + "22" : colors.surface }]}>
-              <Text style={{ color: compare === m ? colors.primary : colors.muted, fontSize: 13, fontWeight: "600" }}>
-                {m === "none" ? "不对比" : "与上期对比"}
-              </Text>
+              <Text style={{ color: compare === m ? colors.primary : colors.muted, fontSize: 13, fontWeight: "600" }}>{m === "none" ? "不对比" : "与上期对比"}</Text>
             </Pressable>
           ))}
         </View>
       </View>
-
-      {/* 总览卡片 */}
       <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
+        <Text style={[styles.sectionTitle, { color: colors.muted }]}>{label} 总览</Text>
         <View style={[styles.overviewCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           {[
             { label: "营收", cur: totalRevCur, prev: totalRevPrev, isRevenue: true },
@@ -132,14 +226,8 @@ export default function StoreAnalyticsScreen() {
               <React.Fragment key={item.label}>
                 <View style={styles.overviewItem}>
                   <Text style={[styles.overviewLabel, { color: colors.muted }]}>{item.label}</Text>
-                  <Text style={[styles.overviewValue, { color: item.isRevenue ? colors.success : colors.error }]}>
-                    ¥{item.cur.toFixed(0)}
-                  </Text>
-                  {pct !== null && (
-                    <Text style={[styles.overviewPct, { color: parseFloat(pct) > 0 ? colors.success : colors.error }]}>
-                      {parseFloat(pct) > 0 ? "▲" : "▼"}{Math.abs(parseFloat(pct))}%
-                    </Text>
-                  )}
+                  <Text style={[styles.overviewValue, { color: item.isRevenue ? colors.success : colors.error }]}>¥{item.cur.toFixed(0)}</Text>
+                  {pct !== null && <Text style={[styles.overviewPct, { color: parseFloat(pct) > 0 ? colors.success : colors.error }]}>{parseFloat(pct) > 0 ? "▲" : "▼"}{Math.abs(parseFloat(pct))}%</Text>}
                 </View>
                 {i < arr.length - 1 && <View style={{ width: StyleSheet.hairlineWidth, backgroundColor: colors.border, alignSelf: "stretch" }} />}
               </React.Fragment>
@@ -147,87 +235,11 @@ export default function StoreAnalyticsScreen() {
           })}
         </View>
       </View>
-
-      {/* 快捷入口 */}
       <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
-        <Text style={[styles.sectionTitle, { color: colors.muted }]}>功能入口</Text>
-        <View style={{ gap: 10 }}>
-          {/* 月度经营分析 */}
-          <Pressable onPress={() => { tap(); router.push("/monthly-report"); }}
-            style={[styles.entryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <View style={[styles.entryIcon, { backgroundColor: "#007AFF" + "22" }]}>
-              <IconSymbol name="chart.bar.fill" size={20} color="#007AFF" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.entryTitle, { color: colors.foreground }]}>店铺月度经营分析</Text>
-              <Text style={[styles.entrySub, { color: colors.muted }]}>
-                {reports.length > 0 ? `已有 ${reports.length} 份报告 · 最新 ${reports[0].monthLabel}` : "导入报表数据开始分析"}
-              </Text>
-            </View>
-            <IconSymbol name="chevron.right" size={16} color={colors.muted} />
-          </Pressable>
-          {/* 时段营业分析 */}
-          <Pressable onPress={() => { tap(); router.push("/period-analysis"); }}
-            style={[styles.entryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <View style={[styles.entryIcon, { backgroundColor: "#5856D6" + "22" }]}>
-              <IconSymbol name="clock.fill" size={20} color="#5856D6" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.entryTitle, { color: colors.foreground }]}>时段营业分析</Text>
-              <Text style={[styles.entrySub, { color: colors.muted }]}>午/晚/深夜/凌晨时段对比 · 加班性价比提醒</Text>
-            </View>
-            <IconSymbol name="chevron.right" size={16} color={colors.muted} />
-          </Pressable>
-          {/* 人工成本 */}
-          <Pressable onPress={() => { tap(); router.push("/labor"); }}
-            style={[styles.entryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <View style={[styles.entryIcon, { backgroundColor: "#FF9500" + "22" }]}>
-              <IconSymbol name="person.2.fill" size={20} color="#FF9500" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.entryTitle, { color: colors.foreground }]}>人工成本管理</Text>
-              <Text style={[styles.entrySub, { color: colors.muted }]}>
-                {employees.filter((e) => e.active).length > 0
-                  ? `${employees.filter((e) => e.active).length} 名员工 · 本月薪资${monthLaborCost > 0 ? ` ¥${monthLaborCost.toFixed(0)}` : "未填写"}`
-                  : "排班 · 考勤 · 薪资结算"}
-              </Text>
-            </View>
-            <IconSymbol name="chevron.right" size={16} color={colors.muted} />
-          </Pressable>
-          {/* 啤酒冰块进销存 */}
-          <Pressable onPress={() => { tap(); router.push("/beer-ice-inventory"); }}
-            style={[styles.entryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <View style={[styles.entryIcon, { backgroundColor: "#34C759" + "22" }]}>
-              <IconSymbol name="cart.fill" size={20} color="#34C759" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.entryTitle, { color: colors.foreground }]}>啤酒 & 冰块进销存</Text>
-              <Text style={[styles.entrySub, { color: colors.muted }]}>库存追踪 · 进货记录 · 备用金联动</Text>
-            </View>
-            <IconSymbol name="chevron.right" size={16} color={colors.muted} />
-          </Pressable>
-          {/* 月度总报表 */}
-          <Pressable onPress={() => { tap(); router.push("/monthly-summary"); }}
-            style={[styles.entryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <View style={[styles.entryIcon, { backgroundColor: "#30D158" + "22" }]}>
-              <IconSymbol name="doc.text.fill" size={20} color="#30D158" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.entryTitle, { color: colors.foreground }]}>{`${new Date().getMonth() + 1}月报表`}</Text>
-              <Text style={[styles.entrySub, { color: colors.muted }]}>收入/成本/工资/货款 · 账户余额追踪</Text>
-            </View>
-            <IconSymbol name="chevron.right" size={16} color={colors.muted} />
-          </Pressable>
-        </View>
-      </View>
-
-      {/* 成本明细 */}
-      <View style={{ paddingHorizontal: 16 }}>
         <Text style={[styles.sectionTitle, { color: colors.muted }]}>成本明细</Text>
         <View style={[styles.detailCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           {costCategories.map((cat, i) => {
-            const curVal = cur[cat] ?? 0;
-            const prevVal = prev[cat] ?? 0;
+            const curVal = cur[cat] ?? 0; const prevVal = prev[cat] ?? 0;
             const pct = compare === "prev" ? pctChange(curVal, prevVal) : null;
             if (curVal === 0 && prevVal === 0) return null;
             return (
@@ -235,24 +247,42 @@ export default function StoreAnalyticsScreen() {
                 <View style={styles.detailRow}>
                   <Text style={[styles.detailLabel, { color: colors.foreground }]}>{REVENUE_CATEGORY_LABELS[cat]}</Text>
                   <Text style={[styles.detailValue, { color: colors.error }]}>¥{curVal.toFixed(0)}</Text>
-                  {compare === "prev" && (
-                    <Text style={[styles.detailPrev, { color: colors.muted }]}>上期 ¥{prevVal.toFixed(0)}</Text>
-                  )}
-                  {pct !== null && (
-                    <Text style={[styles.detailPct, { color: parseFloat(pct) > 0 ? colors.error : colors.success }]}>
-                      {parseFloat(pct) > 0 ? "▲" : "▼"}{Math.abs(parseFloat(pct))}%
-                    </Text>
-                  )}
+                  {compare === "prev" && <Text style={[styles.detailPrev, { color: colors.muted }]}>上期 ¥{prevVal.toFixed(0)}</Text>}
+                  {pct !== null && <Text style={[styles.detailPct, { color: parseFloat(pct) > 0 ? colors.error : colors.success }]}>{parseFloat(pct) > 0 ? "▲" : "▼"}{Math.abs(parseFloat(pct))}%</Text>}
                 </View>
                 <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 16 }} />
               </React.Fragment>
             );
           })}
-          {costCategories.every((cat) => (cur[cat] ?? 0) === 0) && (
-            <Text style={[styles.emptyText, { color: colors.muted }]}>暂无数据</Text>
-          )}
+          {costCategories.every((cat) => (cur[cat] ?? 0) === 0) && <Text style={[styles.emptyText, { color: colors.muted }]}>{label} 暂无数据</Text>}
         </View>
       </View>
+      <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
+        <Text style={[styles.sectionTitle, { color: colors.muted }]}>功能入口</Text>
+        <View style={{ gap: 10 }}>
+          {[
+            { icon: "chart.bar.fill", color: "#007AFF", title: "店铺月度经营分析", sub: reports.length > 0 ? `已有 ${reports.length} 份报告 · 最新 ${reports[0].monthLabel}` : "导入报表数据开始分析", route: "/monthly-report" },
+            { icon: "clock.fill", color: "#5856D6", title: "时段营业分析", sub: "午/晚/深夜/凌晨时段对比 · 加班性价比提醒", route: "/period-analysis" },
+            { icon: "person.2.fill", color: "#FF9500", title: "人工成本管理", sub: employees.filter((e) => e.active).length > 0 ? `${employees.filter((e) => e.active).length} 名员工 · 本月薪资${monthLaborCost > 0 ? ` ¥${monthLaborCost.toFixed(0)}` : "未填写"}` : "排班 · 考勤 · 薪资结算", route: "/labor" },
+            { icon: "doc.text.fill", color: "#30D158", title: `${new Date().getMonth() + 1}月报表`, sub: "收入/成本/工资/货款 · 账户余额追踪", route: "/monthly-summary" },
+          ].map((item) => (
+            <Pressable key={item.route} onPress={() => { tap(); router.push(item.route as any); }}
+              style={[styles.entryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <View style={[styles.entryIcon, { backgroundColor: item.color + "22" }]}>
+                <IconSymbol name={item.icon as any} size={20} color={item.color} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.entryTitle, { color: colors.foreground }]}>{item.title}</Text>
+                <Text style={[styles.entrySub, { color: colors.muted }]}>{item.sub}</Text>
+              </View>
+              <IconSymbol name="chevron.right" size={16} color={colors.muted} />
+            </Pressable>
+          ))}
+        </View>
+      </View>
+      <CustomRangePicker visible={showCustomPicker} start={customStart} end={customEnd}
+        onConfirm={(s, e) => { setCustomStart(s); setCustomEnd(e); setShowCustomPicker(false); }}
+        onClose={() => setShowCustomPicker(false)} colors={colors} />
     </ScrollView>
   );
 }
@@ -261,7 +291,7 @@ const styles = StyleSheet.create({
   subHeader: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8 },
   segContainer: { flexDirection: "row", borderRadius: 10, padding: 2, gap: 2 },
   segItem: { flex: 1, height: 32, borderRadius: 8, alignItems: "center", justifyContent: "center" },
-  segText: { fontSize: 14, lineHeight: 19 },
+  segText: { fontSize: 13, lineHeight: 19 },
   compareChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1 },
   overviewCard: { borderRadius: 16, borderWidth: 1, padding: 16, flexDirection: "row", justifyContent: "space-around" },
   overviewItem: { alignItems: "center", gap: 4 },

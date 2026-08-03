@@ -179,9 +179,15 @@ export default function StoreSaleScreen() {
 
   const { groups, ungroupedEntries } = useMenuStore();
   const { recipes } = useRecipeStore();
-  const { bottles: wineBottles } = useWineStore();
-  const { items: foodItems } = useFoodMenuStore();
+  const { bottles: wineBottles, deleteBottle, batchDeleteBottles, reorderBottles } = useWineStore();
+  const { items: foodItems, deleteItem: deleteFoodItem, batchDeleteItems, reorderItems, batchToggleAvailable } = useFoodMenuStore();
   const { packages, addPackage, updatePackage, deletePackage, toggleAvailable } = useMenuPackageStore();
+  // 葡萄酒多选
+  const [wineSelectMode, setWineSelectMode] = useState(false);
+  const [wineSelectedIds, setWineSelectedIds] = useState<string[]>([]);
+  // 餐食多选
+  const [foodSelectMode, setFoodSelectMode] = useState(false);
+  const [foodSelectedIds, setFoodSelectedIds] = useState<string[]>([]);
 
   const recipeMap = useMemo(() => new Map(recipes.map((r) => [r.id, r])), [recipes]);
   const cocktailItems = useMemo(() => [
@@ -251,52 +257,188 @@ export default function StoreSaleScreen() {
 
       {/* 葡萄酒 */}
       {cat === "wine" && (
-        wineItems.length === 0 ? (
-          <View style={S.empty}>
-            <Text style={{ fontSize: 48 }}>🍷</Text>
-            <Text style={[S.emptyTitle, { color: colors.foreground }]}>暂无在售葡萄酒</Text>
-            <Text style={[S.emptyDesc, { color: colors.muted }]}>在葡萄酒库中添加库存</Text>
-          </View>
-        ) : (
-          <FlatList data={wineItems} keyExtractor={(b) => b.id}
-            renderItem={({ item }) => (
-              <Pressable onPress={() => { tap(); router.push(`/bottle/${item.id}` as any); }}
-                style={({ pressed }) => [S.card, { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.8 : 1 }]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={[S.cardName, { color: colors.foreground }]} numberOfLines={1}>{item.name}{item.vintage ? ` ${item.vintage}` : ""}</Text>
-                  <Text style={[S.cardSub, { color: colors.muted }]} numberOfLines={1}>{[WINE_STYLE_LABELS[item.style], item.region].filter(Boolean).join(" · ")}</Text>
-                </View>
-                <View style={{ alignItems: "flex-end", gap: 4 }}>
-                  {item.salePrice != null && <Text style={[S.cardPrice, { color: "#9F1239" }]}>¥{item.salePrice}</Text>}
-                  <Text style={{ fontSize: 12, color: colors.muted }}>库存 {item.stock}</Text>
-                </View>
-              </Pressable>
+        <View style={{ flex: 1 }}>
+          {/* 操作栏 */}
+          <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 8, gap: 8 }}>
+            <Text style={{ flex: 1, fontSize: 13, color: colors.muted }}>
+              {wineSelectMode ? `已选 ${wineSelectedIds.length} / ${wineItems.length}` : `共 ${wineItems.length} 款`}
+            </Text>
+            {wineSelectMode ? (
+              <>
+                <TouchableOpacity onPress={() => setWineSelectedIds(wineItems.map((b) => b.id))}
+                  style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: colors.primary + "22" }}>
+                  <Text style={{ fontSize: 12, color: colors.primary }}>全选</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => {
+                  if (wineSelectedIds.length === 0) { Alert.alert("请先选择"); return; }
+                  Alert.alert(`删除 ${wineSelectedIds.length} 款`, "确认删除选中的葡萄酒？", [
+                    { text: "取消", style: "cancel" },
+                    { text: "删除", style: "destructive", onPress: () => { batchDeleteBottles(wineSelectedIds); setWineSelectedIds([]); setWineSelectMode(false); } },
+                  ]);
+                }} style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: colors.error + "22" }}>
+                  <Text style={{ fontSize: 12, color: colors.error }}>删除</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => { setWineSelectMode(false); setWineSelectedIds([]); }}
+                  style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}>
+                  <Text style={{ fontSize: 12, color: colors.muted }}>完成</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <TouchableOpacity onPress={() => { tap(); setWineSelectMode(true); }}
+                style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}>
+                <Text style={{ fontSize: 12, color: colors.muted }}>编辑</Text>
+              </TouchableOpacity>
             )}
-            contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }} />
-        )
+          </View>
+          {wineItems.length === 0 ? (
+            <View style={S.empty}>
+              <Text style={{ fontSize: 48 }}>🍷</Text>
+              <Text style={[S.emptyTitle, { color: colors.foreground }]}>暂无在售葡萄酒</Text>
+              <Text style={[S.emptyDesc, { color: colors.muted }]}>在葡萄酒库中添加库存</Text>
+            </View>
+          ) : (
+            <FlatList data={wineItems} keyExtractor={(b) => b.id}
+              renderItem={({ item }) => {
+                const isSelected = wineSelectedIds.includes(item.id);
+                return (
+                  <Pressable
+                    onPress={() => {
+                      tap();
+                      if (wineSelectMode) {
+                        setWineSelectedIds((prev) => isSelected ? prev.filter((id) => id !== item.id) : [...prev, item.id]);
+                      } else {
+                        router.push(`/bottle/${item.id}` as any);
+                      }
+                    }}
+                    onLongPress={() => { tap(); setWineSelectMode(true); setWineSelectedIds([item.id]); }}
+                    style={({ pressed }) => [S.card, {
+                      backgroundColor: isSelected ? "#9F123922" : colors.surface,
+                      borderColor: isSelected ? "#9F1239" : colors.border,
+                      opacity: pressed ? 0.8 : 1,
+                    }]}>
+                    {wineSelectMode && (
+                      <View style={{ width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: isSelected ? "#9F1239" : colors.muted, backgroundColor: isSelected ? "#9F1239" : "transparent", alignItems: "center", justifyContent: "center", marginRight: 4 }}>
+                        {isSelected && <IconSymbol name="checkmark" size={12} color="#fff" />}
+                      </View>
+                    )}
+                    <View style={{ flex: 1 }}>
+                      <Text style={[S.cardName, { color: colors.foreground }]} numberOfLines={1}>{item.name}{item.vintage ? ` ${item.vintage}` : ""}</Text>
+                      <Text style={[S.cardSub, { color: colors.muted }]} numberOfLines={1}>{[WINE_STYLE_LABELS[item.style], item.region].filter(Boolean).join(" · ")}</Text>
+                    </View>
+                    <View style={{ alignItems: "flex-end", gap: 4 }}>
+                      {item.salePrice != null && <Text style={[S.cardPrice, { color: "#9F1239" }]}>¥{item.salePrice}</Text>}
+                      <Text style={{ fontSize: 12, color: colors.muted }}>库存 {item.stock}</Text>
+                    </View>
+                  </Pressable>
+                );
+              }}
+              contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }} />
+          )}
+        </View>
       )}
 
       {/* 餐食 */}
       {cat === "food" && (
-        foodOnSale.length === 0 ? (
-          <View style={S.empty}>
-            <Text style={{ fontSize: 48 }}>🍽️</Text>
-            <Text style={[S.emptyTitle, { color: colors.foreground }]}>暂无在售餐食</Text>
-            <Text style={[S.emptyDesc, { color: colors.muted }]}>在餐食 → 菜单中设置在售状态</Text>
-          </View>
-        ) : (
-          <FlatList data={foodOnSale} keyExtractor={(i) => i.id}
-            renderItem={({ item }) => (
-              <View style={[S.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={[S.cardName, { color: colors.foreground }]} numberOfLines={1}>{item.name}</Text>
-                  <Text style={[S.cardSub, { color: colors.muted }]} numberOfLines={1}>{FOOD_CATEGORY_LABELS[item.category]}</Text>
-                </View>
-                {item.price != null && <Text style={[S.cardPrice, { color: "#10B981" }]}>¥{item.price}</Text>}
-              </View>
+        <View style={{ flex: 1 }}>
+          {/* 操作栏 */}
+          <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 8, gap: 8 }}>
+            <Text style={{ flex: 1, fontSize: 13, color: colors.muted }}>
+              {foodSelectMode ? `已选 ${foodSelectedIds.length} / ${foodItems.length}` : `共 ${foodItems.length} 项，${foodOnSale.length} 项在售`}
+            </Text>
+            {foodSelectMode ? (
+              <>
+                <TouchableOpacity onPress={() => setFoodSelectedIds(foodItems.map((i) => i.id))}
+                  style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: colors.primary + "22" }}>
+                  <Text style={{ fontSize: 12, color: colors.primary }}>全选</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => {
+                  if (foodSelectedIds.length === 0) { Alert.alert("请先选择"); return; }
+                  batchToggleAvailable(foodSelectedIds, true);
+                }} style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: "#10B98122" }}>
+                  <Text style={{ fontSize: 12, color: "#10B981" }}>上架</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => {
+                  if (foodSelectedIds.length === 0) { Alert.alert("请先选择"); return; }
+                  batchToggleAvailable(foodSelectedIds, false);
+                }} style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: colors.warning + "22" }}>
+                  <Text style={{ fontSize: 12, color: colors.warning }}>下架</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => {
+                  if (foodSelectedIds.length === 0) { Alert.alert("请先选择"); return; }
+                  Alert.alert(`删除 ${foodSelectedIds.length} 项`, "确认删除选中的餐食？", [
+                    { text: "取消", style: "cancel" },
+                    { text: "删除", style: "destructive", onPress: () => { batchDeleteItems(foodSelectedIds); setFoodSelectedIds([]); setFoodSelectMode(false); } },
+                  ]);
+                }} style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: colors.error + "22" }}>
+                  <Text style={{ fontSize: 12, color: colors.error }}>删除</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => { setFoodSelectMode(false); setFoodSelectedIds([]); }}
+                  style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}>
+                  <Text style={{ fontSize: 12, color: colors.muted }}>完成</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <TouchableOpacity onPress={() => { tap(); setFoodSelectMode(true); }}
+                style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}>
+                <Text style={{ fontSize: 12, color: colors.muted }}>编辑</Text>
+              </TouchableOpacity>
             )}
-            contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }} />
-        )
+          </View>
+          {foodItems.length === 0 ? (
+            <View style={S.empty}>
+              <Text style={{ fontSize: 48 }}>🍽️</Text>
+              <Text style={[S.emptyTitle, { color: colors.foreground }]}>暂无餐食</Text>
+              <Text style={[S.emptyDesc, { color: colors.muted }]}>在餐食 → 菜单中添加餐食</Text>
+            </View>
+          ) : (
+            <FlatList data={foodItems} keyExtractor={(i) => i.id}
+              renderItem={({ item }) => {
+                const isSelected = foodSelectedIds.includes(item.id);
+                return (
+                  <Pressable
+                    onPress={() => {
+                      tap();
+                      if (foodSelectMode) {
+                        setFoodSelectedIds((prev) => isSelected ? prev.filter((id) => id !== item.id) : [...prev, item.id]);
+                      }
+                    }}
+                    onLongPress={() => { tap(); setFoodSelectMode(true); setFoodSelectedIds([item.id]); }}
+                    style={({ pressed }) => [S.card, {
+                      backgroundColor: isSelected ? "#10B98122" : colors.surface,
+                      borderColor: isSelected ? "#10B981" : colors.border,
+                      opacity: pressed ? 0.8 : item.available ? 1 : 0.5,
+                    }]}>
+                    {foodSelectMode && (
+                      <View style={{ width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: isSelected ? "#10B981" : colors.muted, backgroundColor: isSelected ? "#10B981" : "transparent", alignItems: "center", justifyContent: "center", marginRight: 4 }}>
+                        {isSelected && <IconSymbol name="checkmark" size={12} color="#fff" />}
+                      </View>
+                    )}
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <Text style={[S.cardName, { color: colors.foreground }]} numberOfLines={1}>{item.name}</Text>
+                        {!item.available && (
+                          <View style={{ backgroundColor: colors.muted + "33", paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
+                            <Text style={{ fontSize: 10, color: colors.muted }}>已下架</Text>
+                          </View>
+                        )}
+                      </View>
+                      <Text style={[S.cardSub, { color: colors.muted }]} numberOfLines={1}>{FOOD_CATEGORY_LABELS[item.category]}</Text>
+                    </View>
+                    <View style={{ alignItems: "flex-end", gap: 4 }}>
+                      {item.price != null && <Text style={[S.cardPrice, { color: "#10B981" }]}>¥{item.price}</Text>}
+                      {!foodSelectMode && (
+                        <Pressable onPress={() => { tap(); deleteFoodItem(item.id); }}
+                          style={{ padding: 4 }}>
+                          <IconSymbol name="trash" size={14} color={colors.muted} />
+                        </Pressable>
+                      )}
+                    </View>
+                  </Pressable>
+                );
+              }}
+              contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }} />
+          )}
+        </View>
       )}
 
       {/* 套餐 */}
