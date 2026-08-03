@@ -32,7 +32,10 @@ import {
   MonthlySummaryReport, SummaryLineItem, AccountBalance, MonthlyPaymentRecord,
   AccountType, ACCOUNT_TYPE_LABELS, ACCOUNT_TYPE_COLORS,
   maskCardNumber, generatePaymentCopyText, SUPPLIER_CATEGORY_COLORS,
+  PettyCodeConfig, InventoryReportConfig,
+  DEFAULT_PETTY_CODE_CONFIGS, DEFAULT_INVENTORY_CONFIGS,
 } from "@/lib/store/monthly-summary/types";
+import { PETTY_CODE_LABELS, PETTY_GROUPS } from "@/lib/store/petty-store";
 
 function uuid(): string { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
 
@@ -288,7 +291,14 @@ export default function MonthlySummaryScreen() {
   const insets = useSafeAreaInsets();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
-  const { reports, upsertReport, getReport, getPaymentsForMonth, getBalancesForMonth, upsertBalance, upsertPayment, addPaymentEntry, suppliers } = useMonthlySummaryStore();
+  const {
+    reports, upsertReport, getReport, getPaymentsForMonth, getBalancesForMonth,
+    upsertBalance, upsertPayment, addPaymentEntry, deletePayment, suppliers,
+    pettyCodeConfigs, inventoryConfigs,
+    upsertPettyCodeConfig, deletePettyCodeConfig, resetPettyCodeConfigs,
+    upsertInventoryConfig, resetInventoryConfigs,
+    getPettyCodeConfig, getInventoryConfig,
+  } = useMonthlySummaryStore();
   const { employees } = useEmployeeStore();
   const paySlipStore = usePaySlipStore();
   const spiritsStore = useSpiritsInventoryStore();
@@ -310,6 +320,21 @@ export default function MonthlySummaryScreen() {
   const [editingBalance, setEditingBalance] = useState<AccountBalance | null>(null);
   const [copyToast, setCopyToast] = useState("");
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  // 部分付款 Modal
+  const [showPartialPayModal, setShowPartialPayModal] = useState(false);
+  const [partialPayTarget, setPartialPayTarget] = useState<MonthlyPaymentRecord | null>(null);
+  const [partialPayAmount, setPartialPayAmount] = useState("");
+  const [partialPayMethod, setPartialPayMethod] = useState("转账");
+  const [partialPayAccountType, setPartialPayAccountType] = useState<"company" | "personal" | "petty" | "pos">("company");
+  const [partialPayNotes, setPartialPayNotes] = useState("");
+  // 月报设置 Modal
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<"petty" | "inventory">("petty");
+  // 手工新增货款卡片 Modal
+  const [showAddPaymentModal, setShowAddPaymentModal] = useState(false);
+  const [addPaymentLabel, setAddPaymentLabel] = useState("");
+  const [addPaymentAmount, setAddPaymentAmount] = useState("");
+  const [addPaymentNotes, setAddPaymentNotes] = useState("");
 
   const report = useMemo(() => getReport(selectedMonth), [reports, selectedMonth]);
   const payments = useMemo(() => getPaymentsForMonth(selectedMonth), [selectedMonth]);
@@ -409,7 +434,7 @@ export default function MonthlySummaryScreen() {
     const allEmployees = employees
       .filter((e: any) => e.active)
       .map((e: any) => ({ id: e.id, realName: e.realName, code: e.code }));
-    // 调用聚合器
+    // 调用聚合器（传入用户配置）
     const aggregated = aggregateMonthlyReport({
       month: selectedMonth,
       monthlyReport,
@@ -422,6 +447,8 @@ export default function MonthlySummaryScreen() {
       wineManualPurchases,
       allWineSupplierNames,
       allEmployees,
+      pettyCodeConfigs,
+      inventoryConfigs,
     });
     // 确认后写入月报
     Alert.alert(
@@ -591,11 +618,44 @@ export default function MonthlySummaryScreen() {
               </View>
               {sec.items.map((item) => (
                 <TouchableOpacity key={item.id} onLongPress={() => {
-                  if (item.isManual) Alert.alert("操作", item.label, [
-                    { text: "编辑", onPress: () => { setEditingItem(item); setShowManualModal(true); } },
-                    { text: "删除", style: "destructive", onPress: () => handleDeleteManualItem(item.id) },
-                    { text: "取消", style: "cancel" },
-                  ]);
+                  const effectiveDup = item.manualDuplicate !== undefined ? item.manualDuplicate : item.isDuplicate;
+                  const menuOptions: any[] = [];
+                  // 所有行都可以标记/取消重复叠加
+                  if (!effectiveDup) {
+                    menuOptions.push({ text: "标记为已在其他科目计入（不重复叠加）", onPress: () => {
+                      const r = getOrCreateReport();
+                      const updatedItems = r.lineItems.map((i) => i.id === item.id ? { ...i, manualDuplicate: true } : i);
+                      upsertReport({ ...r, lineItems: updatedItems, updatedAt: new Date().toISOString() });
+                      tap();
+                    }});
+                  } else {
+                    menuOptions.push({ text: "取消重复标记（恢复计入）", onPress: () => {
+                      const r = getOrCreateReport();
+                      const updatedItems = r.lineItems.map((i) => i.id === item.id ? { ...i, manualDuplicate: false } : i);
+                      upsertReport({ ...r, lineItems: updatedItems, updatedAt: new Date().toISOString() });
+                      tap();
+                    }});
+                  }
+                  // 手工录入行额外支持编辑/删除
+                  if (item.isManual) {
+                    menuOptions.push({ text: "编辑", onPress: () => { setEditingItem(item); setShowManualModal(true); } });
+                    menuOptions.push({ text: "删除", style: "destructive", onPress: () => handleDeleteManualItem(item.id) });
+                  }
+                  // 备用金汇总行支持拆分
+                  if (item.code === "petty_other") {
+                    menuOptions.push({ text: "拆分为独立科目（选择备用金分类）", onPress: () => {
+                      Alert.alert(
+                        "拆分备用金其他费用",
+                        "选择要单独显示的备用金分类，该分类将从「备用金其他费用」中拆出，独立显示为科目行。\n\n请前往「月报设置」→「备用金分类配置」进行设置。",
+                        [
+                          { text: "前往设置", onPress: () => { setSettingsTab("petty"); setShowSettingsModal(true); } },
+                          { text: "取消", style: "cancel" },
+                        ]
+                      );
+                    }});
+                  }
+                  menuOptions.push({ text: "取消", style: "cancel" });
+                  Alert.alert("科目操作", item.label, menuOptions);
                 }}><LineItemRow item={item} colors={colors} /></TouchableOpacity>
               ))}
               {sec.items.length === 0 && (
@@ -791,16 +851,21 @@ export default function MonthlySummaryScreen() {
         })}
 
         {/* 操作按钮区 */}
-        <View style={{ flexDirection: "row", gap: 10, marginBottom: 4 }}>
+        <View style={{ flexDirection: "row", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
           <TouchableOpacity onPress={handleAutoAggregate}
-            style={[S.addItemBtn, { flex: 1, borderColor: "#10B981" + "44", backgroundColor: "#10B981" + "10" }]}>
+            style={[S.addItemBtn, { flex: 1, minWidth: 120, borderColor: "#10B981" + "44", backgroundColor: "#10B981" + "10" }]}>
             <IconSymbol name="arrow.triangle.2.circlepath" size={16} color="#10B981" />
             <Text style={{ fontSize: 13, color: "#10B981", fontWeight: "700" }}>一键自动汇总</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => { tap(); setEditingItem(null); setShowManualModal(true); }}
-            style={[S.addItemBtn, { flex: 1, borderColor: colors.primary + "44", backgroundColor: colors.primary + "08" }]}>
+            style={[S.addItemBtn, { flex: 1, minWidth: 120, borderColor: colors.primary + "44", backgroundColor: colors.primary + "08" }]}>
             <IconSymbol name="plus.circle.fill" size={16} color={colors.primary} />
             <Text style={{ fontSize: 13, color: colors.primary, fontWeight: "600" }}>手动录入科目</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => { tap(); setShowSettingsModal(true); }}
+            style={[S.addItemBtn, { borderColor: colors.muted + "44", backgroundColor: colors.surface }]}>
+            <IconSymbol name="gearshape.fill" size={16} color={colors.muted} />
+            <Text style={{ fontSize: 13, color: colors.muted, fontWeight: "600" }}>月报设置</Text>
           </TouchableOpacity>
         </View>
 
@@ -1040,36 +1105,14 @@ export default function MonthlySummaryScreen() {
     const handleMarkPaid = (payment: MonthlyPaymentRecord, emp: any) => {
       if (payment.status === "paid") return;
       const advAmt = payment.advanceAmount ?? 0;
-      const actualRemaining = payment.totalAmount - advAmt - payment.paidAmount;
-      Alert.alert(
-        "标记已发放",
-        `确认已向 ${emp.realName} 发放薪资？\n实发金额：¥${actualRemaining.toFixed(2)}`,
-        [
-          { text: "取消", style: "cancel" },
-          {
-            text: "确认已发放", onPress: () => {
-              const now = new Date().toISOString();
-              const updated: MonthlyPaymentRecord = {
-                ...payment,
-                advanceAmount: payment.advanceAmount ?? 0,
-                paidAmount: payment.totalAmount,
-                remainingAmount: 0,
-                status: "paid",
-                payments: [...payment.payments, {
-                  id: uuid(), date: now.slice(0, 10),
-                  amount: actualRemaining,
-                  bankAccountId: "", paymentMethod: "转账",
-                  notes: `${selectedMonth} 薪资发放`,
-                  paidAt: now,
-                }],
-                updatedAt: now,
-              };
-              upsertPayment(updated);
-              tap();
-            }
-          },
-        ]
-      );
+      const actualRemaining = Math.max(0, payment.totalAmount - advAmt - payment.paidAmount);
+      // 使用部分付款 Modal
+      setPartialPayTarget(payment);
+      setPartialPayAmount(actualRemaining.toFixed(2));
+      setPartialPayMethod("转账");
+      setPartialPayAccountType("company");
+      setPartialPayNotes(`${emp.realName} ${selectedMonth} 薪资`);
+      setShowPartialPayModal(true);
     };
 
     return (
@@ -1280,21 +1323,25 @@ export default function MonthlySummaryScreen() {
                 </TouchableOpacity>
                 {status !== "paid" && payment.totalAmount > 0 && (
                   <TouchableOpacity onPress={() => {
-                    Alert.alert("标记已付款", `确认已向 ${sup.name} 付款？\n实付：¥${actualRemaining.toFixed(2)}`, [
-                      { text: "取消", style: "cancel" },
-                      { text: "确认已付款", onPress: () => {
-                        const now2 = new Date().toISOString();
-                        upsertPayment({ ...payment, advanceAmount: advAmt, paidAmount: payment.totalAmount, remainingAmount: 0, status: "paid",
-                          payments: [...payment.payments, { id: uuid(), date: now2.slice(0, 10), amount: actualRemaining, bankAccountId: "", paymentMethod: "转账", notes: `${selectedMonth} 货款`, paidAt: now2 }],
-                          updatedAt: now2 });
-                        tap();
-                      }},
-                    ]);
+                    setPartialPayTarget(payment);
+                    setPartialPayAmount(actualRemaining > 0 ? actualRemaining.toFixed(2) : payment.totalAmount.toFixed(2));
+                    setPartialPayMethod("转账");
+                    setPartialPayAccountType("company");
+                    setPartialPayNotes(`${sup.name} ${selectedMonth} 货款`);
+                    setShowPartialPayModal(true);
                   }} style={[S.copyBtn, { backgroundColor: "#34C759" }]}>
                     <IconSymbol name="checkmark.circle.fill" size={12} color="#fff" />
-                    <Text style={{ fontSize: 11, color: "#fff", fontWeight: "600" }}>已付</Text>
+                    <Text style={{ fontSize: 11, color: "#fff", fontWeight: "600" }}>录入付款</Text>
                   </TouchableOpacity>
                 )}
+                <TouchableOpacity onPress={() => {
+                  Alert.alert("删除货款记录", `确认删除 ${sup.name} 的货款记录？`, [
+                    { text: "取消", style: "cancel" },
+                    { text: "删除", style: "destructive", onPress: () => { deletePayment(payment.id); tap(); } },
+                  ]);
+                }} style={[S.copyBtn, { backgroundColor: colors.error + "20" }]}>
+                  <IconSymbol name="trash.fill" size={12} color={colors.error} />
+                </TouchableOpacity>
               </View>
             </View>
           ) : (
@@ -1423,6 +1470,47 @@ export default function MonthlySummaryScreen() {
           </View>
         )}
 
+        {/* 备用金已付科目卡片（从月报 lineItems 中提取） */}
+        {(() => {
+          const pettyItems = [...(report?.lineItems ?? []), ...(report?.manualItems ?? [])]
+            .filter((i) => i.source === "petty_cash" && !i.isManual && i.amount !== 0 && !(i.manualDuplicate !== undefined ? i.manualDuplicate : i.isDuplicate));
+          if (pettyItems.length === 0) return null;
+          return (
+            <View style={{ marginBottom: 4 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4, marginTop: 8 }}>
+                <View style={{ width: 3, height: 14, borderRadius: 2, backgroundColor: "#FF9500" }} />
+                <Text style={{ fontSize: 12, fontWeight: "700", color: colors.muted }}>备用金已付项目</Text>
+              </View>
+              {pettyItems.map((item) => (
+                <View key={item.id} style={[S.payrollCard, {
+                  backgroundColor: colors.surface, borderColor: colors.border,
+                  borderLeftColor: "#34C759", borderLeftWidth: 3,
+                }]}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <Text style={{ flex: 1, fontSize: 14, fontWeight: "600", color: colors.foreground }}>{item.label}</Text>
+                    <View style={[S.statusTag, { backgroundColor: "#34C75915" }]}>
+                      <Text style={{ fontSize: 10, fontWeight: "700", color: "#34C759" }}>
+                        {item.paymentNote || "已付(备用金)"}
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>
+                      {Math.abs(item.amount) === 0 ? "—" : `¥${Math.abs(item.amount).toFixed(0)}`}
+                    </Text>
+                  </View>
+                  {item.notes ? <Text style={{ fontSize: 11, color: colors.muted, marginTop: 4 }}>{item.notes}</Text> : null}
+                </View>
+              ))}
+            </View>
+          );
+        })()}
+
+        {/* 手工新增货款卡片按钮 */}
+        <TouchableOpacity onPress={() => { tap(); setAddPaymentLabel(""); setAddPaymentAmount(""); setAddPaymentNotes(""); setShowAddPaymentModal(true); }}
+          style={[S.addItemBtn, { marginTop: 8, borderColor: colors.primary + "44", backgroundColor: colors.primary + "08" }]}>
+          <IconSymbol name="plus.circle.fill" size={16} color={colors.primary} />
+          <Text style={{ fontSize: 13, color: colors.primary, fontWeight: "600" }}>新增货款卡片</Text>
+        </TouchableOpacity>
+
         {supplierPayments.length === 0 && employeePayments.length === 0 && (
           <View style={{ alignItems: "center", padding: 40 }}>
             <Text style={{ fontSize: 36 }}>💳</Text>
@@ -1507,6 +1595,214 @@ export default function MonthlySummaryScreen() {
         onSave={(b) => upsertBalance(b)}
         onClose={() => { setShowBalanceModal(false); setEditingBalance(null); }}
       />
+
+      {/* ── 部分付款 Modal ── */}
+      <Modal visible={showPartialPayModal} animationType="slide" presentationStyle="formSheet"
+        onRequestClose={() => setShowPartialPayModal(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+          <View style={{ flex: 1, backgroundColor: colors.background }}>
+            <View style={[S.navbar, { borderBottomColor: colors.border }]}>
+              <Pressable onPress={() => setShowPartialPayModal(false)} style={{ padding: 8 }}>
+                <Text style={{ fontSize: 17, color: colors.error }}>取消</Text>
+              </Pressable>
+              <Text style={[S.navTitle, { color: colors.foreground }]}>录入付款</Text>
+              <Pressable onPress={() => {
+                if (!partialPayTarget) return;
+                const amt = parseFloat(partialPayAmount) || 0;
+                if (amt <= 0) { Alert.alert("请输入有效金额"); return; }
+                addPaymentEntry(partialPayTarget.id, {
+                  date: new Date().toISOString().slice(0, 10),
+                  amount: amt,
+                  bankAccountId: "",
+                  paymentMethod: partialPayMethod,
+                  accountType: partialPayAccountType,
+                  notes: partialPayNotes,
+                });
+                setShowPartialPayModal(false);
+                tap();
+              }} style={{ padding: 8 }}>
+                <Text style={{ fontSize: 17, fontWeight: "600", color: colors.primary }}>确认</Text>
+              </Pressable>
+            </View>
+            <ScrollView contentContainerStyle={{ padding: 16 }}>
+              <View style={[S.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 4 }}>本次付款金额</Text>
+                <TextInput value={partialPayAmount} onChangeText={setPartialPayAmount}
+                  keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={colors.muted}
+                  style={{ fontSize: 28, fontWeight: "700", color: colors.foreground, padding: 12, borderWidth: 1, borderColor: colors.border, borderRadius: 8, marginBottom: 12 }} />
+                <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 4 }}>付款方式</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, marginBottom: 12 }}>
+                  {["转账", "现金", "微信", "支付宝"].map((m) => (
+                    <TouchableOpacity key={m} onPress={() => setPartialPayMethod(m)}
+                      style={[S.statusTag, { paddingHorizontal: 14, paddingVertical: 8, backgroundColor: partialPayMethod === m ? colors.primary : colors.surface, borderColor: partialPayMethod === m ? colors.primary : colors.border, borderWidth: 1 }]}>
+                      <Text style={{ fontSize: 13, fontWeight: "600", color: partialPayMethod === m ? "#fff" : colors.foreground }}>{m}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 4 }}>付款账户</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, marginBottom: 12 }}>
+                  {(["company", "personal", "petty", "pos"] as const).map((t) => (
+                    <TouchableOpacity key={t} onPress={() => setPartialPayAccountType(t)}
+                      style={[S.statusTag, { paddingHorizontal: 14, paddingVertical: 8, backgroundColor: partialPayAccountType === t ? ACCOUNT_TYPE_COLORS[t] : colors.surface, borderColor: partialPayAccountType === t ? ACCOUNT_TYPE_COLORS[t] : colors.border, borderWidth: 1 }]}>
+                      <Text style={{ fontSize: 13, fontWeight: "600", color: partialPayAccountType === t ? "#fff" : colors.foreground }}>{ACCOUNT_TYPE_LABELS[t]}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 4 }}>备注</Text>
+                <TextInput value={partialPayNotes} onChangeText={setPartialPayNotes}
+                  placeholder="付款备注" placeholderTextColor={colors.muted}
+                  style={{ fontSize: 14, color: colors.foreground, padding: 10, borderWidth: 1, borderColor: colors.border, borderRadius: 8 }} />
+              </View>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ── 手工新增货款卡片 Modal ── */}
+      <Modal visible={showAddPaymentModal} animationType="slide" presentationStyle="formSheet"
+        onRequestClose={() => setShowAddPaymentModal(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+          <View style={{ flex: 1, backgroundColor: colors.background }}>
+            <View style={[S.navbar, { borderBottomColor: colors.border }]}>
+              <Pressable onPress={() => setShowAddPaymentModal(false)} style={{ padding: 8 }}>
+                <Text style={{ fontSize: 17, color: colors.error }}>取消</Text>
+              </Pressable>
+              <Text style={[S.navTitle, { color: colors.foreground }]}>新增货款卡片</Text>
+              <Pressable onPress={() => {
+                if (!addPaymentLabel.trim()) { Alert.alert("请填写名称"); return; }
+                const amt = parseFloat(addPaymentAmount) || 0;
+                const now = new Date().toISOString();
+                upsertPayment({
+                  id: uuid(), month: selectedMonth,
+                  payeeId: `manual_${uuid()}`, payeeType: "supplier",
+                  sourceType: "manual", displayLabel: addPaymentLabel.trim(),
+                  totalAmount: amt, paidAmount: 0, remainingAmount: amt,
+                  status: "unpaid", payments: [], advanceAmount: 0,
+                  notes: addPaymentNotes.trim(),
+                  createdAt: now, updatedAt: now,
+                });
+                setShowAddPaymentModal(false);
+                tap();
+              }} style={{ padding: 8 }}>
+                <Text style={{ fontSize: 17, fontWeight: "600", color: colors.primary }}>保存</Text>
+              </Pressable>
+            </View>
+            <ScrollView contentContainerStyle={{ padding: 16 }}>
+              <View style={[S.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 4 }}>名称 *</Text>
+                <TextInput value={addPaymentLabel} onChangeText={setAddPaymentLabel}
+                  placeholder="如 房租、冰块供应商" placeholderTextColor={colors.muted}
+                  style={{ fontSize: 15, color: colors.foreground, padding: 10, borderWidth: 1, borderColor: colors.border, borderRadius: 8, marginBottom: 12 }} />
+                <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 4 }}>应付金额</Text>
+                <TextInput value={addPaymentAmount} onChangeText={setAddPaymentAmount}
+                  keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={colors.muted}
+                  style={{ fontSize: 15, color: colors.foreground, padding: 10, borderWidth: 1, borderColor: colors.border, borderRadius: 8, marginBottom: 12 }} />
+                <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 4 }}>备注</Text>
+                <TextInput value={addPaymentNotes} onChangeText={setAddPaymentNotes}
+                  placeholder="备注信息" placeholderTextColor={colors.muted}
+                  style={{ fontSize: 14, color: colors.foreground, padding: 10, borderWidth: 1, borderColor: colors.border, borderRadius: 8 }} />
+              </View>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ── 月报设置 Modal ── */}
+      <Modal visible={showSettingsModal} animationType="slide" presentationStyle="pageSheet"
+        onRequestClose={() => setShowSettingsModal(false)}>
+        <View style={{ flex: 1, backgroundColor: colors.background }}>
+          <View style={[S.navbar, { borderBottomColor: colors.border }]}>
+            <View style={{ width: 44 }} />
+            <Text style={[S.navTitle, { color: colors.foreground }]}>月报设置</Text>
+            <Pressable onPress={() => setShowSettingsModal(false)} style={{ padding: 8 }}>
+              <Text style={{ fontSize: 17, color: colors.primary }}>完成</Text>
+            </Pressable>
+          </View>
+          <View style={{ flexDirection: "row", borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
+            {(["petty", "inventory"] as const).map((k) => (
+              <TouchableOpacity key={k} onPress={() => setSettingsTab(k)}
+                style={{ flex: 1, paddingVertical: 12, alignItems: "center", borderBottomWidth: 2, borderBottomColor: settingsTab === k ? colors.primary : "transparent" }}>
+                <Text style={{ fontSize: 13, fontWeight: "600", color: settingsTab === k ? colors.primary : colors.muted }}>
+                  {k === "petty" ? "备用金分类" : "库存模块"}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+            {settingsTab === "petty" && (
+              <View>
+                <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 12 }}>
+                  配置每个备用金分类是否在月报中单独显示。开启后，该分类将生成独立科目行；关闭后归入「备用金其他费用」汇总。
+                </Text>
+                <TouchableOpacity onPress={() => Alert.alert("重置", "确认重置所有备用金分类配置为默认值？", [{ text: "取消", style: "cancel" }, { text: "重置", style: "destructive", onPress: () => { resetPettyCodeConfigs(); tap(); } }])}
+                  style={[S.addItemBtn, { marginBottom: 12, borderColor: colors.error + "44", backgroundColor: colors.error + "08" }]}>
+                  <Text style={{ fontSize: 13, color: colors.error }}>重置为默认配置</Text>
+                </TouchableOpacity>
+                {PETTY_GROUPS.map((group) => (
+                  <View key={group.label} style={{ marginBottom: 16 }}>
+                    <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground, marginBottom: 8 }}>{group.label}</Text>
+                    {group.codes.map((code) => {
+                      const cfg = getPettyCodeConfig(code) ?? { code, inventoryModule: null, isLabor: false, showInReport: false, customLabel: null, reportCategory: null };
+                      return (
+                        <View key={code} style={[S.payrollCard, { backgroundColor: colors.surface, borderColor: colors.border, borderLeftWidth: 0 }]}>
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>
+                                {cfg.customLabel ?? (PETTY_CODE_LABELS as any)[code] ?? code}
+                              </Text>
+                              <Text style={{ fontSize: 11, color: colors.muted }}>
+                                {cfg.inventoryModule ? `归属：${cfg.inventoryModule}` : cfg.isLabor ? "归属：人工" : "归属：备用金汇总"}
+                              </Text>
+                            </View>
+                            <TouchableOpacity onPress={() => { upsertPettyCodeConfig({ ...cfg, showInReport: !cfg.showInReport }); tap(); }}
+                              style={[S.statusTag, { backgroundColor: cfg.showInReport ? colors.primary + "15" : colors.surface, borderColor: cfg.showInReport ? colors.primary : colors.border, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6 }]}>
+                              <Text style={{ fontSize: 11, fontWeight: "700", color: cfg.showInReport ? colors.primary : colors.muted }}>
+                                {cfg.showInReport ? "单独显示 ✓" : "归入汇总"}
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                ))}
+              </View>
+            )}
+            {settingsTab === "inventory" && (
+              <View>
+                <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 12 }}>
+                  配置每个库存模块是否在月报中单独显示。关闭后，该模块的进货金额将归入「备用金其他费用」，但库存分析仍然使用该数据。
+                </Text>
+                <TouchableOpacity onPress={() => Alert.alert("重置", "确认重置所有库存模块配置为默认值？", [{ text: "取消", style: "cancel" }, { text: "重置", style: "destructive", onPress: () => { resetInventoryConfigs(); tap(); } }])}
+                  style={[S.addItemBtn, { marginBottom: 12, borderColor: colors.error + "44", backgroundColor: colors.error + "08" }]}>
+                  <Text style={{ fontSize: 13, color: colors.error }}>重置为默认配置</Text>
+                </TouchableOpacity>
+                {DEFAULT_INVENTORY_CONFIGS.map((defaultCfg) => {
+                  const cfg = getInventoryConfig(defaultCfg.module) ?? defaultCfg;
+                  return (
+                    <View key={cfg.module} style={[S.payrollCard, { backgroundColor: colors.surface, borderColor: colors.border, borderLeftWidth: 0 }]}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>{cfg.groupLabel}</Text>
+                          <Text style={{ fontSize: 11, color: colors.muted }}>
+                            {cfg.showInReport ? "在月报中单独显示供应商科目行" : "进货金额归入备用金汇总（库存分析仍使用）"}
+                          </Text>
+                        </View>
+                        <TouchableOpacity onPress={() => { upsertInventoryConfig({ ...cfg, showInReport: !cfg.showInReport }); tap(); }}
+                          style={[S.statusTag, { backgroundColor: cfg.showInReport ? colors.primary + "15" : colors.surface, borderColor: cfg.showInReport ? colors.primary : colors.border, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6 }]}>
+                          <Text style={{ fontSize: 11, fontWeight: "700", color: cfg.showInReport ? colors.primary : colors.muted }}>
+                            {cfg.showInReport ? "单独显示 ✓" : "归入汇总"}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+          </ScrollView>
+        </View>
+      </Modal>
     </ScreenContainer>
   );
 }
