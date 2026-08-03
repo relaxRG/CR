@@ -585,7 +585,6 @@ export default function PeriodAnalysisScreen() {
           const isAlert = dr.overtimeAlert;
           // 联动排班表的加班预警
           const scheduleAlert = overtimeAlertMap.get(dr.date);
-          const hasScheduleOvertime = !!scheduleAlert;
           const borderColor = scheduleAlert === "poor" ? colors.error + "66" :
             scheduleAlert === "ok" ? "#FF9500" + "66" :
             isAlert ? colors.error + "44" : colors.border;

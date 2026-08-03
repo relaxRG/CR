@@ -373,7 +373,7 @@ export default function DishAnalysisScreen() {
           const compareData = compareMonths.map((m) => snapshots.find((s) => s.month === m)).filter(Boolean);
           // 收集所有大类
           const allCats = new Set<string>();
-          compareData.forEach((s) => s!.categories.forEach((c) => allCats.add(c.name)));
+          compareData.forEach((s) => s?.categories?.forEach((c) => allCats.add(c.name)));
 
           return (
             <View style={[{ backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: 14, padding: 14 }]}>
@@ -397,7 +397,7 @@ export default function DishAnalysisScreen() {
                       <Text style={{ fontSize: 12, color: colors.foreground }}>{cat}</Text>
                     </View>
                     {compareMonths.map((m) => {
-                      const snap = compareData.find((s) => s!.month === m);
+                      const snap = compareData.find((s) => s?.month === m);
                       const catData = snap?.categories.find((c) => c.name === cat);
                       return (
                         <Text key={m} style={{ width: 70, fontSize: 12, fontWeight: "600", color: catData ? color : colors.muted, textAlign: "right" }}>
@@ -412,7 +412,7 @@ export default function DishAnalysisScreen() {
               <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 8, borderTopWidth: 1, borderTopColor: colors.border, marginTop: 4 }}>
                 <Text style={{ flex: 1, fontSize: 13, fontWeight: "700", color: colors.foreground }}>合计</Text>
                 {compareMonths.map((m) => {
-                  const snap = compareData.find((s) => s!.month === m);
+                  const snap = compareData.find((s) => s?.month === m);
                   const total = snap?.categories.reduce((s, c) => s + c.salesAmount, 0) ?? 0;
                   return (
                     <Text key={m} style={{ width: 70, fontSize: 13, fontWeight: "700", color: colors.primary, textAlign: "right" }}>

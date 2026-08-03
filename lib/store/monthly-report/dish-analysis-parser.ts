@@ -112,31 +112,36 @@ export function parseDishCategories(base64: string): {
   categories: DishCategoryData[];
   month: string;
 } {
-  const wb = XLSX.read(base64, { type: "base64" });
-  const ws = wb.Sheets[wb.SheetNames[0]];
-  const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+  try {
+    const wb = XLSX.read(base64, { type: "base64" });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    if (!ws) return { categories: [], month: "" };
+    const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
 
-  const month = extractMonthFromRow1(safeStr(rows[1]?.[0]));
-  const categories: DishCategoryData[] = [];
+    const month = extractMonthFromRow1(safeStr(rows[1]?.[0]));
+    const categories: DishCategoryData[] = [];
 
-  // 表头在第3行（index 2），数据从第5行（index 4）开始
-  for (let i = 4; i < rows.length; i++) {
-    const row = rows[i];
-    if (!row || !row[0]) continue;
-    const name = safeStr(row[0]);
-    if (!name || name === "合计") continue;
-    categories.push({
-      name,
-      salesQty: safeNum(row[1]),
-      salesQtyPct: safeNum(row[2]),
-      salesAmount: safeNum(row[3]),
-      salesAmountPct: safeNum(row[4]),
-      revenue: safeNum(row[5]),
-      revenuePct: safeNum(row[6]),
-      discount: safeNum(row[7]),
-    });
+    // 表头在第3行（index 2），数据从第5行（index 4）开始
+    for (let i = 4; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row || !row[0]) continue;
+      const name = safeStr(row[0]);
+      if (!name || name === "合计") continue;
+      categories.push({
+        name,
+        salesQty: safeNum(row[1]),
+        salesQtyPct: safeNum(row[2]),
+        salesAmount: safeNum(row[3]),
+        salesAmountPct: safeNum(row[4]),
+        revenue: safeNum(row[5]),
+        revenuePct: safeNum(row[6]),
+        discount: safeNum(row[7]),
+      });
+    }
+    return { categories, month };
+  } catch {
+    return { categories: [], month: "" };
   }
-  return { categories, month };
 }
 
 // ─── 解析菜品小类 ──────────────────────────────────────────────────────────────
@@ -144,32 +149,37 @@ export function parseDishSubCategories(base64: string): {
   subCategories: DishSubCategoryData[];
   month: string;
 } {
-  const wb = XLSX.read(base64, { type: "base64" });
-  const ws = wb.Sheets[wb.SheetNames[0]];
-  const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+  try {
+    const wb = XLSX.read(base64, { type: "base64" });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    if (!ws) return { subCategories: [], month: "" };
+    const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
 
-  const month = extractMonthFromRow1(safeStr(rows[1]?.[0]));
-  const subCategories: DishSubCategoryData[] = [];
+    const month = extractMonthFromRow1(safeStr(rows[1]?.[0]));
+    const subCategories: DishSubCategoryData[] = [];
 
-  for (let i = 4; i < rows.length; i++) {
-    const row = rows[i];
-    if (!row || !row[0]) continue;
-    const category = safeStr(row[0]);
-    const subCategory = safeStr(row[1]);
-    if (!category || !subCategory || category === "合计") continue;
-    subCategories.push({
-      category,
-      subCategory,
-      salesQty: safeNum(row[2]),
-      salesQtyPct: safeNum(row[3]),
-      salesAmount: safeNum(row[4]),
-      salesAmountPct: safeNum(row[5]),
-      revenue: safeNum(row[6]),
-      revenuePct: safeNum(row[7]),
-      discount: safeNum(row[8]),
-    });
+    for (let i = 4; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row || !row[0]) continue;
+      const category = safeStr(row[0]);
+      const subCategory = safeStr(row[1]);
+      if (!category || !subCategory || category === "合计") continue;
+      subCategories.push({
+        category,
+        subCategory,
+        salesQty: safeNum(row[2]),
+        salesQtyPct: safeNum(row[3]),
+        salesAmount: safeNum(row[4]),
+        salesAmountPct: safeNum(row[5]),
+        revenue: safeNum(row[6]),
+        revenuePct: safeNum(row[7]),
+        discount: safeNum(row[8]),
+      });
+    }
+    return { subCategories, month };
+  } catch {
+    return { subCategories: [], month: "" };
   }
-  return { subCategories, month };
 }
 
 // ─── 解析菜品明细（菜品名称） ──────────────────────────────────────────────────
@@ -177,33 +187,38 @@ export function parseDishItems(base64: string): {
   items: DishItemData[];
   month: string;
 } {
-  const wb = XLSX.read(base64, { type: "base64" });
-  const ws = wb.Sheets[wb.SheetNames[0]];
-  const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+  try {
+    const wb = XLSX.read(base64, { type: "base64" });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    if (!ws) return { items: [], month: "" };
+    const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
 
-  const month = extractMonthFromRow1(safeStr(rows[1]?.[0]));
-  const items: DishItemData[] = [];
+    const month = extractMonthFromRow1(safeStr(rows[1]?.[0]));
+    const items: DishItemData[] = [];
 
-  // 表头跨两行（第3、4行），数据从第5行开始
-  for (let i = 4; i < rows.length; i++) {
-    const row = rows[i];
-    if (!row || !row[0]) continue;
-    const name = safeStr(row[0]);
-    if (!name || name === "合计") continue;
-    items.push({
-      name,
-      itemType: safeStr(row[1]) || undefined,
-      saleStatus: safeStr(row[2]) || undefined,
-      salesQty: safeNum(row[3]),
-      salesQtyPct: safeNum(row[4]),
-      salesAmount: safeNum(row[5]),
-      salesAmountPct: safeNum(row[6]),
-      revenue: safeNum(row[7]),
-      revenuePct: safeNum(row[8]),
-      discount: safeNum(row[9]),
-    });
+    // 表头跨两行（第3、4行），数据从第5行开始
+    for (let i = 4; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row || !row[0]) continue;
+      const name = safeStr(row[0]);
+      if (!name || name === "合计") continue;
+      items.push({
+        name,
+        itemType: safeStr(row[1]) || undefined,
+        saleStatus: safeStr(row[2]) || undefined,
+        salesQty: safeNum(row[3]),
+        salesQtyPct: safeNum(row[4]),
+        salesAmount: safeNum(row[5]),
+        salesAmountPct: safeNum(row[6]),
+        revenue: safeNum(row[7]),
+        revenuePct: safeNum(row[8]),
+        discount: safeNum(row[9]),
+      });
+    }
+    return { items, month };
+  } catch {
+    return { items: [], month: "" };
   }
-  return { items, month };
 }
 
 // ─── 解析菜品规格（菜品名称+规格） ────────────────────────────────────────────
@@ -211,31 +226,36 @@ export function parseDishSpecs(base64: string): {
   specs: DishSpecData[];
   month: string;
 } {
-  const wb = XLSX.read(base64, { type: "base64" });
-  const ws = wb.Sheets[wb.SheetNames[0]];
-  const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+  try {
+    const wb = XLSX.read(base64, { type: "base64" });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    if (!ws) return { specs: [], month: "" };
+    const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
 
-  const month = extractMonthFromRow1(safeStr(rows[1]?.[0]));
-  const specs: DishSpecData[] = [];
+    const month = extractMonthFromRow1(safeStr(rows[1]?.[0]));
+    const specs: DishSpecData[] = [];
 
-  for (let i = 4; i < rows.length; i++) {
-    const row = rows[i];
-    if (!row || !row[0]) continue;
-    const name = safeStr(row[0]);
-    if (!name || name === "合计") continue;
-    specs.push({
-      name,
-      spec: safeStr(row[1]) || "--",
-      salesQty: safeNum(row[2]),
-      salesQtyPct: safeNum(row[3]),
-      salesAmount: safeNum(row[4]),
-      salesAmountPct: safeNum(row[5]),
-      revenue: safeNum(row[6]),
-      revenuePct: safeNum(row[7]),
-      discount: safeNum(row[8]),
-    });
+    for (let i = 4; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row || !row[0]) continue;
+      const name = safeStr(row[0]);
+      if (!name || name === "合计") continue;
+      specs.push({
+        name,
+        spec: safeStr(row[1]) || "--",
+        salesQty: safeNum(row[2]),
+        salesQtyPct: safeNum(row[3]),
+        salesAmount: safeNum(row[4]),
+        salesAmountPct: safeNum(row[5]),
+        revenue: safeNum(row[6]),
+        revenuePct: safeNum(row[7]),
+        discount: safeNum(row[8]),
+      });
+    }
+    return { specs, month };
+  } catch {
+    return { specs: [], month: "" };
   }
-  return { specs, month };
 }
 
 // ─── 解析营业收入与收款统计 ────────────────────────────────────────────────────
@@ -243,8 +263,10 @@ export function parseRevenueStatement(base64: string): {
   statement: RevenueStatement;
   month: string;
 } {
+  try {
   const wb = XLSX.read(base64, { type: "base64" });
   const ws = wb.Sheets[wb.SheetNames[0]];
+  if (!ws) return { statement: {} as RevenueStatement, month: "" };
   const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
 
   const month = extractMonthFromRow1(safeStr(rows[1]?.[0]));
@@ -273,6 +295,9 @@ export function parseRevenueStatement(base64: string): {
   };
 
   return { statement, month };
+  } catch {
+    return { statement: {} as RevenueStatement, month: "" };
+  }
 }
 
 // ─── 解析综合收款统计（日度，含套餐明细） ─────────────────────────────────────
@@ -280,8 +305,10 @@ export function parseDailyPayments(base64: string): {
   dailyPayments: DailyPaymentDetail[];
   month: string;
 } {
+  try {
   const wb = XLSX.read(base64, { type: "base64" });
   const ws = wb.Sheets[wb.SheetNames[0]];
+  if (!ws) return { dailyPayments: [], month: "" };
   const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
 
   const month = extractMonthFromRow1(safeStr(rows[1]?.[0]));
@@ -356,6 +383,9 @@ export function parseDailyPayments(base64: string): {
   }
 
   return { dailyPayments: Array.from(dateMap.values()).sort((a, b) => a.date.localeCompare(b.date)), month };
+  } catch {
+    return { dailyPayments: [], month: "" };
+  }
 }
 
 // ─── 主解析函数：根据类型分发 ──────────────────────────────────────────────────
