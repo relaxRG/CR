@@ -477,6 +477,17 @@ const STORAGE_KEY_LABELS: Record<string, string> = {
   "labor_payslips_v1":             "薪资单",
   "labor_month_configs_v1":        "月度薪资配置",
   "labor.salary_advances.v1":      "员工预支记录",
+  // ★ 新增：烈酒进销存
+  "spirits.items.v3":               "烈酒酒款档案",
+  "spirits.purchases.v3":           "烈酒进货流水",
+  "spirits.ledger.v3":              "烈酒台账",
+  "spirits.refPrices.v1":           "烈酒参考单价",
+  "spirits.suppliers.v1":           "烈酒供应商",
+  "spirits.groups.v1":              "品牌集团",
+  "spirits.matchMemory.v1":         "商品匹配记忆",
+  "spirits.selfBuyConfig.v1":       "自采配置",
+  "spirits.customCategories.v1":    "自定义分类",
+  "spirits.groupMatchMemory.v1":    "集团匹配记忆",
 };
 
 /** ★ 获取数据预览（条目数量） */

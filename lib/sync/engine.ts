@@ -82,6 +82,17 @@ export const SYNC_KEYS = [
   "labor_payslips_v1",
   "labor_month_configs_v1",
   "labor.salary_advances.v1",
+  // ── 烈酒进销存（新增）──────────────────────────────────────────────────────────────────────────────
+  "spirits.items.v3",
+  "spirits.purchases.v3",
+  "spirits.ledger.v3",
+  "spirits.refPrices.v1",
+  "spirits.suppliers.v1",
+  "spirits.groups.v1",
+  "spirits.matchMemory.v1",
+  "spirits.selfBuyConfig.v1",
+  "spirits.customCategories.v1",
+  "spirits.groupMatchMemory.v1",
 ] as const;
 
 const TS_PREFIX = "sync.ts.";
@@ -270,6 +281,16 @@ const ID_LIST_KEYS = new Set<string>([
   "labor_payslips_v1",
   "monthly_summary.suppliers.v1",
   "monthly_summary.payments.v1",
+  // 烈酒进销存
+  "spirits.items.v3",
+  "spirits.purchases.v3",
+  "spirits.ledger.v3",
+  "spirits.refPrices.v1",
+  "spirits.suppliers.v1",
+  "spirits.groups.v1",
+  "spirits.matchMemory.v1",
+  "spirits.customCategories.v1",
+  "spirits.groupMatchMemory.v1",
 ]);
 
 const STORE_OBJECT_KEYS = new Map<string, string[]>([
