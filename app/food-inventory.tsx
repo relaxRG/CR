@@ -194,9 +194,9 @@ export default function FoodInventoryScreen() {
   };
 
   const TABS: { key: Tab; label: string }[] = [
-    { key: "ledger", label: "台账" },
-    { key: "purchase", label: "进货录入" },
-    { key: "summary", label: "月度汇总" },
+    { key: "summary", label: "📊 总结" },
+    { key: "ledger", label: "📋 库存管理" },
+    { key: "purchase", label: "📦 当月进货" },
   ];
 
   return (

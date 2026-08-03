@@ -25,10 +25,10 @@ import { WineSupplierTrendChart } from "@/components/wine-supplier-trend-chart";
 type ViewTab = "ledger" | "supplier" | "purchase" | "summary";
 
 const VIEW_TABS: { key: ViewTab; label: string }[] = [
-  { key: "ledger", label: "台账" },
-  { key: "supplier", label: "供应商" },
-  { key: "purchase", label: "进货录入" },
-  { key: "summary", label: "汇总" },
+  { key: "summary", label: "📊 总结" },
+  { key: "ledger", label: "📋 库存管理" },
+  { key: "purchase", label: "📦 当月进货" },
+  { key: "supplier", label: "🏢 供应商" },
 ];
 
 // ─── 台账行 ──────────────────────────────────────────────────────────────────
