@@ -1,11 +1,17 @@
 /**
- * 月度总报表聚合引擎
+ * 月度总报表聚合引擎 (Build 126)
  * 从各模块自动读取数据，生成科目行，防止重复叠加
+ *
+ * 新增：
+ *   - 烈酒进货成本自动联动（来自烈酒库存管理）
+ *   - 食材进货成本自动联动（来自供应商采购管理）
+ *   - 重复检测：与备用金 B2/B3/A 类重叠时自动标记
  */
 import { SummaryLineItem, MonthlySummaryReport, PETTY_EXCLUDED_FROM_OTHER } from "./types";
 import type { PeriodSummary, PettyRecord } from "../../store/petty-store";
 import type { MonthlyReport } from "../../store/monthly-report/types";
 import type { PaySlip } from "../../labor/types";
+import type { SupplierPurchaseRecord } from "../../food/types";
 
 function uuid(): string { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
 
@@ -22,6 +28,14 @@ function makeItem(overrides: Partial<SummaryLineItem> & Pick<SummaryLineItem, "c
   };
 }
 
+/** 烈酒进货按供应商汇总 */
+export interface SpiritPurchaseSupplierSummary {
+  supplier: string;
+  totalAmount: number;
+  itemCount: number;
+  isPaid?: boolean;
+}
+
 export interface AggregatorInput {
   month: string;
   /** 月度经营分析报告（菜品大类数据） */
@@ -34,6 +48,10 @@ export interface AggregatorInput {
   paySlips?: PaySlip[];
   /** 手动录入项（房租/外卖/活动收入等） */
   manualItems?: SummaryLineItem[];
+  /** 烈酒当月进货汇总（按供应商分组）——来自烈酒库存管理 */
+  spiritPurchaseSummary?: SpiritPurchaseSupplierSummary[];
+  /** 食材当月进货记录——来自供应商采购管理 */
+  foodPurchaseRecords?: SupplierPurchaseRecord[];
 }
 
 export function aggregateMonthlyReport(input: AggregatorInput): Partial<MonthlySummaryReport> {
@@ -194,7 +212,64 @@ export function aggregateMonthlyReport(input: AggregatorInput): Partial<MonthlyS
     }
   }
 
-  // ── 7. 手动录入项 ────────────────────────────────────────────────────────────
+  // ── 7. 烈酒进货成本（来自烈酒库存管理） ──────────────────────────────────────
+  if (input.spiritPurchaseSummary && input.spiritPurchaseSummary.length > 0) {
+    // 检测是否与备用金 B2/B3 重复
+    const pettyBevTotal = input.pettyRecords
+      ? input.pettyRecords.filter((r) => r.code === "B2" || r.code === "B3").reduce((s, r) => s + r.amount, 0)
+      : 0;
+    const hasPettyBev = pettyBevTotal > 0;
+
+    for (const sup of input.spiritPurchaseSummary) {
+      if (sup.totalAmount <= 0) continue;
+      items.push(makeItem({
+        code: `cogs_bev_spirit_${sup.supplier.replace(/\s/g, "_").slice(0, 20)}`,
+        label: `烈酒进货·${sup.supplier}`,
+        category: "cogs_beverage",
+        amount: -sup.totalAmount,
+        source: "spirits_inventory",
+        linkedModule: "spirits-inventory",
+        isPaid: sup.isPaid ?? false,
+        paymentNote: sup.isPaid ? "已付" : "待付货款",
+        notes: `${sup.itemCount} 款烈酒`,
+        // 若备用金已有 B2/B3 数据，标记为可能重复，提示用户核对
+        isDuplicate: hasPettyBev,
+        duplicateNote: hasPettyBev
+          ? "备用金 B2/B3 已包含部分酒水成本，请核对后保留其中一项"
+          : "",
+      }));
+    }
+  }
+
+  // ── 8. 食材进货成本（来自供应商采购管理） ────────────────────────────────────
+  if (input.foodPurchaseRecords && input.foodPurchaseRecords.length > 0) {
+    // 检测是否与备用金 A 类重复
+    const pettyFoodTotal = input.pettyRecords
+      ? input.pettyRecords.filter((r) => r.code.startsWith("A")).reduce((s, r) => s + r.amount, 0)
+      : 0;
+    const hasPettyFood = pettyFoodTotal > 0;
+
+    for (const rec of input.foodPurchaseRecords) {
+      if (rec.totalAmount <= 0) continue;
+      items.push(makeItem({
+        code: `cogs_food_supplier_${rec.id.slice(-8)}`,
+        label: `食材进货·${rec.supplierName}`,
+        category: "cogs_food",
+        amount: -rec.totalAmount,
+        source: "supplier_purchase",
+        linkedModule: "supplier-import",
+        isPaid: false,
+        paymentNote: "待付货款",
+        notes: `${rec.items.length} 款食材`,
+        isDuplicate: hasPettyFood,
+        duplicateNote: hasPettyFood
+          ? "备用金 A 类已包含部分食材成本，请核对后保留其中一项"
+          : "",
+      }));
+    }
+  }
+
+  // ── 9. 手动录入项 ────────────────────────────────────────────────────────────
   const manualItems = input.manualItems ?? [];
 
   // ── 计算各小计 ───────────────────────────────────────────────────────────────

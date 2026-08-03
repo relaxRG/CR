@@ -20,9 +20,13 @@ import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
 import { useMonthlySummaryStore } from "@/lib/store/monthly-summary/store";
-import { useEmployeeStore } from "@/lib/labor/store";
+import { useEmployeeStore, usePaySlipStore } from "@/lib/labor/store";
 import { useSpiritsInventoryStore } from "@/lib/spirits/crud-store";
 import { calcMonthlyPourCost, pourCostColor } from "@/lib/spirits/pour-cost";
+import { usePettyCashStore } from "@/lib/store/petty-store";
+import { useMonthlyReportStore } from "@/lib/store/monthly-report/store";
+import { useSupplierPurchaseStore } from "@/lib/food/ingredient-store";
+import { aggregateMonthlyReport } from "@/lib/store/monthly-summary/aggregator";
 import {
   MonthlySummaryReport, SummaryLineItem, AccountBalance, MonthlyPaymentRecord,
   AccountType, ACCOUNT_TYPE_LABELS, ACCOUNT_TYPE_COLORS,
@@ -285,7 +289,11 @@ export default function MonthlySummaryScreen() {
 
   const { reports, upsertReport, getReport, getPaymentsForMonth, getBalancesForMonth, upsertBalance, upsertPayment, addPaymentEntry, suppliers } = useMonthlySummaryStore();
   const { employees } = useEmployeeStore();
+  const paySlipStore = usePaySlipStore();
   const spiritsStore = useSpiritsInventoryStore();
+  const pettyStore = usePettyCashStore();
+  const monthlyReportStore = useMonthlyReportStore();
+  const supplierPurchaseStore = useSupplierPurchaseStore();
 
   const [tab, setTab] = useState<MainTab>("report");
   const [selectedMonth, setSelectedMonth] = useState<string>(() => {
@@ -336,6 +344,76 @@ export default function MonthlySummaryScreen() {
   const handleDeleteManualItem = (id: string) => {
     const r = getOrCreateReport();
     upsertReport({ ...r, manualItems: r.manualItems.filter((i) => i.id !== id), updatedAt: new Date().toISOString() });
+  };
+
+  // 一键自动汇总：调用 aggregator 从各模块拉取数据并写入 lineItems
+  const handleAutoAggregate = () => {
+    tap();
+    // 备用金原始记录
+    const pettyRecords = pettyStore?.records?.filter((r: any) => r.date?.startsWith(selectedMonth)) ?? [];
+    // 月度经营分析报告
+    const monthlyReport = monthlyReportStore?.reports?.find((r: any) => r.month === selectedMonth);
+    // 薪资单
+    const paySlips = paySlipStore?.paySlips?.filter((s: any) => s.month === selectedMonth) ?? [];
+    // 烈酒进货汇总（按供应商分组）
+    const monthPurchases = spiritsStore.getMonthPurchases(selectedMonth);
+    const spiritSupplierMap: Record<string, { totalAmount: number; itemCount: number }> = {};
+    monthPurchases.forEach((p: any) => {
+      const sup = p.supplier ?? "未知";
+      if (!spiritSupplierMap[sup]) spiritSupplierMap[sup] = { totalAmount: 0, itemCount: 0 };
+      spiritSupplierMap[sup].totalAmount += p.amount;
+      spiritSupplierMap[sup].itemCount += 1;
+    });
+    const spiritPurchaseSummary = Object.entries(spiritSupplierMap).map(([supplier, v]) => ({
+      supplier,
+      totalAmount: v.totalAmount,
+      itemCount: v.itemCount,
+      isPaid: false,
+    }));
+    // 食材进货记录（当月）
+    const foodPurchaseRecords = supplierPurchaseStore?.records?.filter((r: any) => {
+      // periodLabel 格式如 "2026年6月"，需要匹配当月
+      const [y, m] = selectedMonth.split("-");
+      return r.periodLabel?.includes(`${parseInt(y)}年`) && r.periodLabel?.includes(`${parseInt(m)}月`);
+    }) ?? [];
+    // 调用聚合器
+    const aggregated = aggregateMonthlyReport({
+      month: selectedMonth,
+      monthlyReport,
+      pettyRecords,
+      paySlips,
+      spiritPurchaseSummary,
+      foodPurchaseRecords,
+    });
+    // 确认后写入月报
+    Alert.alert(
+      "自动汇总",
+      `将自动从以下模块拉取数据：\n\n` +
+      `• 备用金：${pettyRecords.length} 条记录\n` +
+      `• 烈酒进货：${monthPurchases.length} 条（${Object.keys(spiritSupplierMap).length} 供应商）\n` +
+      `• 食材进货：${foodPurchaseRecords.length} 条记录\n` +
+      `• 薪资单：${paySlips.length} 人\n\n` +
+      `将生成 ${(aggregated.lineItems?.length ?? 0)} 个科目行。是否覆盖当前科目？`,
+      [
+        { text: "取消", style: "cancel" },
+        {
+          text: "覆盖并保存",
+          onPress: () => {
+            const r = getOrCreateReport();
+            const now = new Date().toISOString();
+            upsertReport({
+              ...r,
+              ...aggregated,
+              id: r.id,
+              month: r.month,
+              manualItems: r.manualItems, // 保留手动录入项
+              updatedAt: now,
+            });
+            tap();
+          },
+        },
+      ]
+    );
   };
 
   // ── 单页滚动视图（主入口） ────────────────────────────────────────────────────
@@ -621,12 +699,19 @@ export default function MonthlySummaryScreen() {
           );
         })}
 
-        {/* 手动录入按钮 */}
-        <TouchableOpacity onPress={() => { tap(); setEditingItem(null); setShowManualModal(true); }}
-          style={[S.addItemBtn, { borderColor: colors.primary + "44", backgroundColor: colors.primary + "08" }]}>
-          <IconSymbol name="plus.circle.fill" size={18} color={colors.primary} />
-          <Text style={{ fontSize: 14, color: colors.primary, fontWeight: "600" }}>手动录入科目</Text>
-        </TouchableOpacity>
+        {/* 操作按钮区 */}
+        <View style={{ flexDirection: "row", gap: 10, marginBottom: 4 }}>
+          <TouchableOpacity onPress={handleAutoAggregate}
+            style={[S.addItemBtn, { flex: 1, borderColor: "#10B981" + "44", backgroundColor: "#10B981" + "10" }]}>
+            <IconSymbol name="arrow.triangle.2.circlepath" size={16} color="#10B981" />
+            <Text style={{ fontSize: 13, color: "#10B981", fontWeight: "700" }}>一键自动汇总</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => { tap(); setEditingItem(null); setShowManualModal(true); }}
+            style={[S.addItemBtn, { flex: 1, borderColor: colors.primary + "44", backgroundColor: colors.primary + "08" }]}>
+            <IconSymbol name="plus.circle.fill" size={16} color={colors.primary} />
+            <Text style={{ fontSize: 13, color: colors.primary, fontWeight: "600" }}>手动录入科目</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* 历史报表 Modal */}
         <Modal visible={showHistoryModal} animationType="slide" presentationStyle="formSheet" onRequestClose={() => setShowHistoryModal(false)}>

@@ -318,6 +318,74 @@ export default function PeriodAnalysisScreen() {
             <IconSymbol name="chevron.right" size={14} color={colors.error} />
           </TouchableOpacity>
         )}
+
+        {/* 成本维度卡片 */}
+        {(() => {
+          const month = report.month;
+          const spiritPurchases = spiritsStore.getMonthPurchases(month);
+          const spiritCost = spiritPurchases.reduce((s: number, p: any) => s + p.amount, 0);
+          const [y, mo] = month.split("-");
+          const foodRecords = supplierPurchaseStore?.records?.filter((r: any) =>
+            r.periodLabel?.includes(`${parseInt(y)}年`) && r.periodLabel?.includes(`${parseInt(mo)}月`)
+          ) ?? [];
+          const foodCost = foodRecords.reduce((s: number, r: any) => s + r.totalAmount, 0);
+          if (spiritCost === 0 && foodCost === 0) return null;
+          const beverageCostPct = totalRevenue > 0 && spiritCost > 0 ? (spiritCost / totalRevenue * 100) : null;
+          const foodCostPct = totalRevenue > 0 && foodCost > 0 ? (foodCost / totalRevenue * 100) : null;
+          const totalCostPct = totalRevenue > 0 && (spiritCost + foodCost) > 0
+            ? ((spiritCost + foodCost) / totalRevenue * 100) : null;
+          return (
+            <View style={[S.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground, marginBottom: 12 }}>
+                📊 成本分析
+              </Text>
+              {spiritCost > 0 && (
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <View>
+                    <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>烈酒进货成本</Text>
+                    <Text style={{ fontSize: 11, color: colors.muted }}>{spiritPurchases.length}条记录</Text>
+                  </View>
+                  <View style={{ alignItems: "flex-end" }}>
+                    <Text style={{ fontSize: 16, fontWeight: "700", color: "#EF4444" }}>¥{spiritCost.toFixed(0)}</Text>
+                    {beverageCostPct !== null && (
+                      <Text style={{ fontSize: 11, fontWeight: "600", color: pourCostColor(beverageCostPct) }}>
+                        酒水成本率 {beverageCostPct.toFixed(1)}%
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              )}
+              {foodCost > 0 && (
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <View>
+                    <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>食材进货成本</Text>
+                    <Text style={{ fontSize: 11, color: colors.muted }}>{foodRecords.length}条记录</Text>
+                  </View>
+                  <View style={{ alignItems: "flex-end" }}>
+                    <Text style={{ fontSize: 16, fontWeight: "700", color: "#F59E0B" }}>¥{foodCost.toFixed(0)}</Text>
+                    {foodCostPct !== null && (
+                      <Text style={{ fontSize: 11, fontWeight: "600", color: foodCostPct < 30 ? "#10B981" : "#EF4444" }}>
+                        食材成本率 {foodCostPct.toFixed(1)}%
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              )}
+              {totalCostPct !== null && spiritCost > 0 && foodCost > 0 && (
+                <View style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, paddingTop: 8,
+                  flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>综合成本率</Text>
+                  <Text style={{ fontSize: 18, fontWeight: "800", color: pourCostColor(totalCostPct) }}>
+                    {totalCostPct.toFixed(1)}%
+                  </Text>
+                </View>
+              )}
+              <Text style={{ fontSize: 10, color: colors.muted, marginTop: 8 }}>
+                行业参考：酒水成本率 &lt;20% 优秀 / 20-30% 正常 / &gt;30% 偏高
+              </Text>
+            </View>
+          );
+        })()}
       </ScrollView>
     );
   };

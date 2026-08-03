@@ -20,7 +20,7 @@ import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
 import {
-  useSpiritsInventoryStore, getCurrentMonth, SpiritGroupDef,
+  useSpiritsInventoryStore, getCurrentMonth, SpiritGroupDef, fuzzyMatchScore,
 } from "@/lib/spirits/crud-store";
 import {
   SpiritItem, SpiritPurchaseRecord, SpiritLedgerEntry,
@@ -792,6 +792,36 @@ export default function SpiritsInventoryScreen() {
             ))}
           </View>
         </View>
+
+        {/* 未匹配汇总提示条 */}
+        {(() => {
+          const unmatchedList = monthPurchases.filter((p) => !p.itemId);
+          if (unmatchedList.length === 0) return null;
+          return (
+            <TouchableOpacity
+              onPress={() => {
+                tap();
+                // 展示未匹配列表：找到第一个未匹配记录并弹出操作卡片
+                const first = unmatchedList[0];
+                setUnmatchedPurchase(first);
+                setShowUnmatchedModal(true);
+              }}
+              style={{ flexDirection: "row", alignItems: "center", gap: 8, padding: 12,
+                backgroundColor: "#FEF3C7", borderRadius: 10, borderWidth: 1,
+                borderColor: "#FCD34D", marginBottom: 12 }}>
+              <Text style={{ fontSize: 16 }}>⚠️</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 13, fontWeight: "700", color: "#92400E" }}>
+                  {unmatchedList.length} 条进货记录未匹配到酒款档案
+                </Text>
+                <Text style={{ fontSize: 11, color: "#B45309" }}>
+                  点击处理 · 匹配后可参与库存计算和采购分析
+                </Text>
+              </View>
+              <Text style={{ fontSize: 11, color: "#92400E", fontWeight: "600" }}>逐一处理 ›</Text>
+            </TouchableOpacity>
+          );
+        })()}
 
         {/* 供应商列表 */}
         {allSupplierNames.map((sup) => {
@@ -1849,97 +1879,231 @@ function SupplierDetailScreen({
       </Modal>
 
       {/* 未匹配商品操作 Modal */}
-      {showUnmatchedModal && unmatchedPurchase && (
-        <Modal visible={showUnmatchedModal} transparent animationType="slide">
-          <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.5)" }}>
-            <View style={{ backgroundColor: colors.background, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 32 }}>
-              <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: "center", marginBottom: 16 }} />
-              <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 4 }}>
-                未匹配到酒款档案
-              </Text>
-              <Text style={{ fontSize: 13, color: colors.muted, marginBottom: 20 }} numberOfLines={2}>
-                「{unmatchedPurchase.rawName}」
-              </Text>
-              {/* 操作选项 */}
-              {[
-                {
-                  icon: "magnifyingglass",
-                  title: "从现有酒款中选择匹配",
-                  desc: "将此条进货记录关联到已有酒款档案",
-                  color: "#3B82F6",
-                  onPress: () => {
-                    setShowUnmatchedModal(false);
-                    // 弹出酒款选择器
-                    Alert.alert(
-                      "选择匹配酒款",
-                      "请选择要关联的酒款档案",
-                      [
-                        ...items.slice(0, 8).map((it) => ({
-                          text: it.name,
-                          onPress: () => {
-                            updatePurchase(unmatchedPurchase.id, { itemId: it.id });
-                            setMatchMemory(unmatchedPurchase.rawName, it.id, it.name, "manual");
-                            syncLedgerFromPurchases(month);
-                            Alert.alert("匹配成功", `「${unmatchedPurchase.rawName}」 → 「${it.name}」`);
+      {showUnmatchedModal && unmatchedPurchase && (() => {
+        // 模糊匹配候选（相似度 >= 0.35，最多 5 个）
+        const candidates = items
+          .map((it) => ({
+            item: it,
+            score: Math.max(
+              fuzzyMatchScore(unmatchedPurchase.rawName, it.name),
+              fuzzyMatchScore(unmatchedPurchase.rawName, it.nameEn ?? "")
+            ),
+          }))
+          .filter((c) => c.score >= 0.35)
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 5);
+
+        // 当月剩余未匹配数
+        const remainingUnmatched = monthPurchases.filter((p) => !p.itemId && p.id !== unmatchedPurchase.id);
+
+        const doMatch = (itemId: string, itemName: string) => {
+          updatePurchase(unmatchedPurchase.id, { itemId });
+          setMatchMemory(unmatchedPurchase.rawName, itemId, itemName, "manual");
+          syncLedgerFromPurchases(month);
+          // 自动跳到下一条未匹配
+          if (remainingUnmatched.length > 0) {
+            setUnmatchedPurchase(remainingUnmatched[0]);
+          } else {
+            setShowUnmatchedModal(false);
+            setUnmatchedPurchase(null);
+          }
+        };
+
+        return (
+          <Modal visible={showUnmatchedModal} transparent animationType="slide">
+            <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.5)" }}>
+              <View style={{ backgroundColor: colors.background, borderTopLeftRadius: 24, borderTopRightRadius: 24,
+                padding: 20, paddingBottom: 32, maxHeight: "85%" }}>
+                <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: "center", marginBottom: 12 }} />
+                {/* 标题和进度 */}
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
+                  <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, flex: 1 }}>
+                    未匹配到酒款档案
+                  </Text>
+                  {remainingUnmatched.length > 0 && (
+                    <Text style={{ fontSize: 11, color: "#F59E0B", fontWeight: "600" }}>
+                      还剩 {remainingUnmatched.length} 条未处理
+                    </Text>
+                  )}
+                </View>
+                <View style={{ backgroundColor: colors.surface, borderRadius: 10, padding: 10, marginBottom: 14,
+                  borderWidth: 1, borderColor: colors.border }}>
+                  <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }} numberOfLines={2}>
+                    {unmatchedPurchase.rawName}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>
+                    {unmatchedPurchase.supplier ?? ""} · ¥{unmatchedPurchase.unitPrice} × {unmatchedPurchase.quantity}{unmatchedPurchase.unit}
+                  </Text>
+                </View>
+
+                {/* 模糊匹配候选 */}
+                {candidates.length > 0 && (
+                  <View style={{ marginBottom: 14 }}>
+                    <Text style={{ fontSize: 12, fontWeight: "700", color: "#3B82F6", marginBottom: 8 }}>
+                      智能匹配候选（点击直接关联）
+                    </Text>
+                    {candidates.map((c, i) => (
+                      <TouchableOpacity key={i} onPress={() => { tap(); doMatch(c.item.id, c.item.name); }}
+                        style={{ flexDirection: "row", alignItems: "center", padding: 10,
+                          backgroundColor: "#EFF6FF", borderRadius: 10, marginBottom: 6,
+                          borderWidth: 1, borderColor: "#BFDBFE" }}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 13, fontWeight: "700", color: "#1D4ED8" }}>{c.item.name}</Text>
+                          {c.item.nameEn ? <Text style={{ fontSize: 11, color: "#3B82F6" }}>{c.item.nameEn}</Text> : null}
+                        </View>
+                        <View style={{ alignItems: "flex-end" }}>
+                          <Text style={{ fontSize: 10, color: "#3B82F6", fontWeight: "600" }}>
+                            相似度 {Math.round(c.score * 100)}%
+                          </Text>
+                          <Text style={{ fontSize: 10, color: "#60A5FA" }}>{c.item.category}</Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+
+                {/* 其他操作 */}
+                {[
+                  {
+                    icon: "magnifyingglass",
+                    title: "搜索其他酒款匹配",
+                    desc: "从全部酒款档案中搜索选择",
+                    color: "#3B82F6",
+                    onPress: () => {
+                      setShowUnmatchedModal(false);
+                      Alert.alert(
+                        "选择匹配酒款",
+                        `为「${unmatchedPurchase.rawName}」选择匹配酒款`,
+                        [
+                          ...items.slice(0, 8).map((it) => ({
+                            text: it.name,
+                            onPress: () => doMatch(it.id, it.name),
+                          })),
+                          { text: "取消", style: "cancel" as const },
+                        ]
+                      );
+                    },
+                  },
+                  {
+                    icon: "plus.circle.fill",
+                    title: "新建酒款档案并关联",
+                    desc: "以此名称创建新酒款档案",
+                    color: "#10B981",
+                    onPress: () => {
+                      const newItem = addItem({
+                        name: unmatchedPurchase.rawName,
+                        category: "Other",
+                        unit: unmatchedPurchase.unit || "瓶",
+                        refPrice: unmatchedPurchase.unitPrice,
+                        supplier: unmatchedPurchase.supplier,
+                        active: true,
+                      });
+                      doMatch(newItem.id, newItem.name);
+                    },
+                  },
+                  {
+                    icon: "sparkles",
+                    title: "AI 智能识别品类",
+                    desc: "调用 AI 识别品牌、分类和集团归属",
+                    color: "#8B5CF6",
+                    onPress: async () => {
+                      try {
+                        const token = await Auth.getSessionToken();
+                        const apiBase = getApiBaseUrl();
+                        Alert.alert("AI 识别中", `正在识别「${unmatchedPurchase.rawName}」...`);
+                        const res = await fetch(`${apiBase}/api/trpc/spirits.identifyProduct`, {
+                          method: "POST",
+                          headers: {
+                            "Content-Type": "application/json",
+                            ...(token ? { Authorization: `Bearer ${token}` } : {}),
                           },
-                        })),
-                        { text: "取消", style: "cancel" as const },
-                      ]
-                    );
+                          body: JSON.stringify({
+                            json: {
+                              rawName: unmatchedPurchase.rawName,
+                              unitPrice: unmatchedPurchase.unitPrice,
+                              unit: unmatchedPurchase.unit,
+                            },
+                          }),
+                        });
+                        if (!res.ok) {
+                          Alert.alert("识别失败", `服务器错误 (${res.status})，请手动匹配`);
+                          return;
+                        }
+                        const data = await res.json() as { result?: { data?: { json?: any } } };
+                        const result = data?.result?.data?.json;
+                        if (result?.zhName) {
+                          // AI 识别成功，显示结果并提供选择
+                          Alert.alert(
+                            "AI 识别结果",
+                            `品牌：${result.zhName}${result.enName ? ` / ${result.enName}` : ""}\n` +
+                            `分类：${result.category ?? "未知"}\n` +
+                            `集团：${result.group ?? "未知"}\n\n` +
+                            `是否以此信息新建酒款档案？`,
+                            [
+                              { text: "取消", style: "cancel" },
+                              {
+                                text: "新建并关联",
+                                onPress: () => {
+                                  const newItem = addItem({
+                                    name: result.zhName,
+                                    nameEn: result.enName,
+                                    category: result.category ?? "Other",
+                                    group: result.group,
+                                    unit: unmatchedPurchase.unit || "瓶",
+                                    refPrice: unmatchedPurchase.unitPrice,
+                                    supplier: unmatchedPurchase.supplier,
+                                    active: true,
+                                  });
+                                  doMatch(newItem.id, newItem.name);
+                                },
+                              },
+                            ]
+                          );
+                        } else {
+                          Alert.alert("AI 识别失败", "AI 未能识别此商品，请手动匹配或新建档案");
+                        }
+                      } catch (e) {
+                        Alert.alert("错误", `AI 识别失败: ${String(e)}`);
+                      }
+                    },
                   },
-                },
-                {
-                  icon: "plus.circle.fill",
-                  title: "新建酒款档案",
-                  desc: "以此名称创建新的酒款档案并关联",
-                  color: "#10B981",
-                  onPress: () => {
-                    setShowUnmatchedModal(false);
-                    // 预填名称，弹出新建表单
-                    const newItem = addItem({
-                      name: unmatchedPurchase.rawName,
-                      category: "Other",
-                      unit: unmatchedPurchase.unit || "瓶",
-                      refPrice: unmatchedPurchase.unitPrice,
-                      supplier: unmatchedPurchase.supplier,
-                      active: true,
-                    });
-                    updatePurchase(unmatchedPurchase.id, { itemId: newItem.id });
-                    setMatchMemory(unmatchedPurchase.rawName, newItem.id, newItem.name, "manual");
-                    syncLedgerFromPurchases(month);
-                    Alert.alert(
-                      "新建成功 ✅",
-                      `「${newItem.name}」已加入酒款档案并关联到该进货记录。\n\n可在「库存管理」 Tab 编辑分类和详细信息。`
-                    );
+                  {
+                    icon: "forward.end",
+                    title: remainingUnmatched.length > 0 ? `跳过，处理下一条` : "跳过，关闭",
+                    desc: remainingUnmatched.length > 0
+                      ? `还剩 ${remainingUnmatched.length} 条未匹配`
+                      : "本条不关联到酒款档案",
+                    color: colors.muted,
+                    onPress: () => {
+                      if (remainingUnmatched.length > 0) {
+                        setUnmatchedPurchase(remainingUnmatched[0]);
+                      } else {
+                        setShowUnmatchedModal(false);
+                        setUnmatchedPurchase(null);
+                      }
+                    },
                   },
-                },
-                {
-                  icon: "xmark.circle",
-                  title: "跳过，不关联",
-                  desc: "保留此条记录不关联到酒款档案",
-                  color: colors.muted,
-                  onPress: () => setShowUnmatchedModal(false),
-                },
-              ].map((opt, i) => (
-                <TouchableOpacity key={i} onPress={() => { tap(); opt.onPress(); }}
-                  style={{ flexDirection: "row", alignItems: "center", gap: 14, padding: 14,
-                    backgroundColor: colors.surface, borderRadius: 14, marginBottom: 10,
-                    borderWidth: 1, borderColor: colors.border }}>
-                  <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: opt.color + "20",
-                    alignItems: "center", justifyContent: "center" }}>
-                    <IconSymbol name={opt.icon as any} size={20} color={opt.color} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>{opt.title}</Text>
-                    <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>{opt.desc}</Text>
-                  </View>
-                  <IconSymbol name="chevron.right" size={14} color={colors.muted} />
-                </TouchableOpacity>
-              ))}
+                ].map((opt, i) => (
+                  <TouchableOpacity key={i} onPress={() => { tap(); opt.onPress(); }}
+                    style={{ flexDirection: "row", alignItems: "center", gap: 14, padding: 12,
+                      backgroundColor: colors.surface, borderRadius: 14, marginBottom: 8,
+                      borderWidth: 1, borderColor: colors.border }}>
+                    <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: (opt.color as string) + "20",
+                      alignItems: "center", justifyContent: "center" }}>
+                      <IconSymbol name={opt.icon as any} size={18} color={opt.color as string} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>{opt.title}</Text>
+                      <Text style={{ fontSize: 11, color: colors.muted, marginTop: 1 }}>{opt.desc}</Text>
+                    </View>
+                    <IconSymbol name="chevron.right" size={13} color={colors.muted} />
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
-          </View>
-        </Modal>
-      )}
+          </Modal>
+        );
+      })()}
 
       {/* 集团管理 Modal */}
       <GroupManagerModal
