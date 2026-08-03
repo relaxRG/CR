@@ -21,6 +21,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
 import { useMonthlySummaryStore } from "@/lib/store/monthly-summary/store";
 import { useEmployeeStore } from "@/lib/labor/store";
+import { useSpiritsInventoryStore } from "@/lib/spirits/crud-store";
 import {
   MonthlySummaryReport, SummaryLineItem, AccountBalance, MonthlyPaymentRecord,
   AccountType, ACCOUNT_TYPE_LABELS, ACCOUNT_TYPE_COLORS,
@@ -283,6 +284,7 @@ export default function MonthlySummaryScreen() {
 
   const { reports, upsertReport, getReport, getPaymentsForMonth, getBalancesForMonth, upsertBalance, upsertPayment, addPaymentEntry, suppliers } = useMonthlySummaryStore();
   const { employees } = useEmployeeStore();
+  const spiritsStore = useSpiritsInventoryStore();
 
   const [tab, setTab] = useState<MainTab>("report");
   const [selectedMonth, setSelectedMonth] = useState<string>(() => {
@@ -487,6 +489,66 @@ export default function MonthlySummaryScreen() {
                   })}
                 </View>
               )}
+              {/* 进货成本科目：内嵌烈酒库存成本卡片 */}
+              {sec.key === "cogs_beverage" && (() => {
+                const monthLedger = spiritsStore.getMonthLedger(selectedMonth);
+                const totalClosingCost = monthLedger.reduce((s, e) => s + (e.closingCost ?? 0), 0);
+                const totalPurchaseCost = monthLedger.reduce((s, e) => s + (e.purchaseCost ?? 0), 0);
+                // 价格涨跌分析：对比当月进货单价与参考单价
+                const priceChanges: { name: string; diff: number; pct: number }[] = [];
+                spiritsStore.purchases
+                  .filter((p) => p.month === selectedMonth && p.itemId)
+                  .forEach((p) => {
+                    const item = spiritsStore.items.find((i) => i.id === p.itemId);
+                    if (!item) return;
+                    const refPrice = spiritsStore.getRefPrice(item.id, selectedMonth);
+                    if (refPrice > 0 && p.unitPrice !== refPrice) {
+                      const diff = p.unitPrice - refPrice;
+                      const pct = Math.round(diff / refPrice * 100);
+                      const existing = priceChanges.find((c) => c.name === item.name);
+                      if (!existing) priceChanges.push({ name: item.name, diff, pct });
+                    }
+                  });
+                if (monthLedger.length === 0 && priceChanges.length === 0) return null;
+                return (
+                  <View style={{ padding: 10, gap: 6, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                      <Text style={{ fontSize: 11, fontWeight: "700", color: colors.muted }}>烈酒库存摘要</Text>
+                      <Text style={{ fontSize: 11, color: "#5856D6", fontWeight: "600" }}>期未成本 ¥{totalClosingCost.toFixed(0)}</Text>
+                    </View>
+                    <View style={{ flexDirection: "row", gap: 8 }}>
+                      <View style={[S.amtBlock, { flex: 1 }]}>
+                        <Text style={S.amtLabel}>当月进货</Text>
+                        <Text style={[S.amtValue, { color: colors.foreground }]}>¥{totalPurchaseCost.toFixed(0)}</Text>
+                      </View>
+                      <View style={[S.amtBlock, { flex: 1 }]}>
+                        <Text style={S.amtLabel}>库存款数</Text>
+                        <Text style={[S.amtValue, { color: colors.foreground }]}>{monthLedger.length} 款</Text>
+                      </View>
+                    </View>
+                    {priceChanges.length > 0 && (
+                      <View style={{ marginTop: 4 }}>
+                        <Text style={{ fontSize: 11, fontWeight: "700", color: colors.muted, marginBottom: 4 }}>当月单价变动</Text>
+                        {priceChanges.slice(0, 5).map((c, i) => (
+                          <View key={i} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 3,
+                            borderBottomWidth: i < priceChanges.slice(0, 5).length - 1 ? StyleSheet.hairlineWidth : 0,
+                            borderBottomColor: colors.border }}>
+                            <Text style={{ fontSize: 11, color: colors.foreground, flex: 1 }} numberOfLines={1}>{c.name}</Text>
+                            <Text style={{ fontSize: 11, fontWeight: "700",
+                              color: c.diff > 0 ? "#EF4444" : "#10B981" }}>
+                              {c.diff > 0 ? "↑" : "↓"}¥{Math.abs(c.diff).toFixed(0)} ({c.pct > 0 ? "+" : ""}{c.pct}%)
+                            </Text>
+                          </View>
+                        ))}
+                        {priceChanges.length > 5 && (
+                          <Text style={{ fontSize: 10, color: colors.muted, textAlign: "center", marginTop: 4 }}>还有 {priceChanges.length - 5} 款商品价格变动</Text>
+                        )}
+                      </View>
+                    )}
+                  </View>
+                );
+              })()}
+
               {/* 进货成本科目：内嵌供应商货款卡片 */}
               {isCogs && supplierPayments.length > 0 && (
                 <View style={{ padding: 10, gap: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>

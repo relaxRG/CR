@@ -11,6 +11,10 @@ export interface MenuEntry {
   available: boolean;  // 兼容性保留，UI 已不展示
   sortIndex: number;
   addedAt: string;     // ISO date
+  /** 单杯分量（ml），用于计算倒酒成本 */
+  servingSize?: number;
+  /** 关联的主酒酒款档案 ID（用于计算 Pour Cost） */
+  linkedSpiritItemId?: string;
 }
 
 export interface MenuGroup {
@@ -49,7 +53,10 @@ type Action =
   | { type: "REORDER_UNGROUPED"; entries: MenuEntry[] }
   // 批量定价
   | { type: "BATCH_SET_PRICE"; entryIds: string[]; price: number | null }
-  | { type: "TOGGLE_UNGROUPED_AVAILABLE"; entryId: string };
+  | { type: "TOGGLE_UNGROUPED_AVAILABLE"; entryId: string }
+  // 分量和关联酒款
+  | { type: "SET_SERVING_SIZE"; entryId: string; groupId: string | null; servingSize: number | undefined }
+  | { type: "SET_LINKED_SPIRIT"; entryId: string; groupId: string | null; linkedSpiritItemId: string | undefined };
 
 function uuid(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -246,6 +253,34 @@ function reducer(state: MenuState, action: Action): MenuState {
       };
     }
 
+    case "SET_SERVING_SIZE": {
+      const updateEntry = (e: MenuEntry) =>
+        e.id === action.entryId ? { ...e, servingSize: action.servingSize } : e;
+      if (action.groupId) {
+        return {
+          ...state,
+          groups: state.groups.map((g) =>
+            g.id === action.groupId ? { ...g, entries: g.entries.map(updateEntry) } : g
+          ),
+        };
+      }
+      return { ...state, ungroupedEntries: state.ungroupedEntries.map(updateEntry) };
+    }
+
+    case "SET_LINKED_SPIRIT": {
+      const updateEntry = (e: MenuEntry) =>
+        e.id === action.entryId ? { ...e, linkedSpiritItemId: action.linkedSpiritItemId } : e;
+      if (action.groupId) {
+        return {
+          ...state,
+          groups: state.groups.map((g) =>
+            g.id === action.groupId ? { ...g, entries: g.entries.map(updateEntry) } : g
+          ),
+        };
+      }
+      return { ...state, ungroupedEntries: state.ungroupedEntries.map(updateEntry) };
+    }
+
     default:
       return state;
   }
@@ -278,6 +313,10 @@ interface MenuContextValue {
   // 批量定价
   batchSetPrice: (entryIds: string[], price: number | null) => void;
   toggleUngroupedAvailable: (entryId: string) => void;
+  /** 设置单杯分量（ml） */
+  setServingSize: (entryId: string, groupId: string | null, servingSize: number | undefined) => void;
+  /** 设置关联酒款档案 ID */
+  setLinkedSpirit: (entryId: string, groupId: string | null, linkedSpiritItemId: string | undefined) => void;
   /** 返回某 recipeId 所在的所有 groupId */
   groupsContaining: (recipeId: string) => string[];
   /** 返回整个门店酒单中的配方 id 集合（去重，含无分组） */
@@ -342,6 +381,10 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
   const reorderUngrouped = useCallback((entries: MenuEntry[]) => dispatch({ type: "REORDER_UNGROUPED", entries }), []);
   const batchSetPrice = useCallback((entryIds: string[], price: number | null) => dispatch({ type: "BATCH_SET_PRICE", entryIds, price }), []);
   const toggleUngroupedAvailable = useCallback((entryId: string) => dispatch({ type: "TOGGLE_UNGROUPED_AVAILABLE", entryId }), []);
+  const setServingSize = useCallback((entryId: string, groupId: string | null, servingSize: number | undefined) =>
+    dispatch({ type: "SET_SERVING_SIZE", entryId, groupId, servingSize }), []);
+  const setLinkedSpirit = useCallback((entryId: string, groupId: string | null, linkedSpiritItemId: string | undefined) =>
+    dispatch({ type: "SET_LINKED_SPIRIT", entryId, groupId, linkedSpiritItemId }), []);
 
   const groupsContaining = useCallback(
     (recipeId: string) =>
@@ -380,6 +423,8 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
         reorderUngrouped,
         batchSetPrice,
         toggleUngroupedAvailable,
+        setServingSize,
+        setLinkedSpirit,
         groupsContaining,
         allRecipeIds,
       }}
