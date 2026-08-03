@@ -337,8 +337,8 @@ export default function SpiritsInventoryScreen() {
         </ScrollView>
       </View>
 
-      {/* 进货汇总表（每供应商 2 列） */}
-      {purchaseSummaryRows.rows.length > 0 && (
+      {/* 进货汇总表（按供应商）已移除 */}
+      {false && purchaseSummaryRows.rows.length > 0 && (
         <View style={[S.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Text style={[S.cardTitle, { color: colors.foreground }]}>进货汇总（按供应商）</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator style={{ flexGrow: 0 }}>
@@ -623,7 +623,9 @@ export default function SpiritsInventoryScreen() {
               {/* 表头 */}
               <View style={[S.tableHeader, { backgroundColor: "#991B1B" }]}>
                 <Text style={[S.thCell, { width: 36 }]}>序</Text>
-                <Text style={[S.thCell, { width: 110 }]}>中文名</Text>
+                <Text style={[S.thCell, { width: 56 }]}>分类</Text>
+                <Text style={[S.thCell, { width: 130 }]}>中文名</Text>
+                <Text style={[S.thCell, { width: 70 }]}>参考价</Text>
                 <Text style={[S.thCell, { width: 70 }]}>期初库存量</Text>
                 <Text style={[S.thCell, { width: 60 }]}>期初单价</Text>
                 <Text style={[S.thCell, { width: 70 }]}>期初成本</Text>
@@ -635,39 +637,124 @@ export default function SpiritsInventoryScreen() {
                 <Text style={[S.thCell, { width: 60 }]}>消耗瓶数</Text>
                 <Text style={[S.thCell, { width: 70 }]}>本期消耗量</Text>
               </View>
-              {/* 按分类分组 */}
-              {SPIRIT_CATEGORIES.map((cat) => {
-                const catItems = items.filter((i) => i.category === cat && i.active);
-                if (catItems.length === 0) return null;
-                return (
-                  <React.Fragment key={cat}>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: catColor(cat) + "20" }}>
-                      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: catColor(cat) }} />
-                      <Text style={{ fontSize: 11, fontWeight: "700", color: catColor(cat) }}>{cat}</Text>
-                    </View>
-                    {catItems.map((item, idx) => {
-                      const entry = getItemLedger(item.id, selectedMonth);
-                      const isNeg = entry && entry.closingQty < 0;
-                      const isOverride = entry?.openingManualOverride;
-                      const editKey = `${item.id}:${selectedMonth}`;
-                      return (
-                        <TouchableOpacity key={item.id}
-                          onLongPress={() => {
-                            tap();
-                            Alert.alert(item.name, "选择操作", [
-                              { text: "编辑酒款", onPress: () => { setEditingItem(item); setShowItemForm(true); } },
-                              { text: "删除酒款", style: "destructive", onPress: () => {
-                                Alert.alert("确认删除", `删除「${item.name}」？`, [
-                                  { text: "取消", style: "cancel" },
-                                  { text: "删除", style: "destructive", onPress: () => deleteItem(item.id) },
+              {/* 按分类分组（动态，未分类置顶） */}
+              {(() => {
+                const allCats = getAllCategories();
+                const unclassified = items.filter((i) => i.active && (!i.category || i.category === "" || (!SPIRIT_CATEGORIES.includes(i.category as any) && !allCats.find((c) => c.name === i.category))));
+                const catGroups: Array<{ cat: string; catItems: SpiritItem[] }> = [];
+                // 未分类置顶
+                if (unclassified.length > 0) catGroups.push({ cat: "__unclassified__", catItems: unclassified });
+                // 内置分类
+                SPIRIT_CATEGORIES.forEach((cat) => {
+                  const catItems = items.filter((i) => i.category === cat && i.active);
+                  if (catItems.length > 0) catGroups.push({ cat, catItems });
+                });
+                // 自定义分类
+                allCats.filter((c) => !SPIRIT_CATEGORIES.includes(c.name as any)).forEach((c) => {
+                  const catItems = items.filter((i) => i.category === c.name && i.active);
+                  if (catItems.length > 0) catGroups.push({ cat: c.name, catItems });
+                });
+                return catGroups.map(({ cat, catItems }) => {
+                  const isUnclassified = cat === "__unclassified__";
+                  const displayCat = isUnclassified ? "⚠️ 未分类" : cat;
+                  const color = isUnclassified ? "#F59E0B" : catColor(cat);
+                  return (
+                    <React.Fragment key={cat}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: color + "20" }}>
+                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />
+                        <Text style={{ fontSize: 11, fontWeight: "700", color }}>{displayCat}</Text>
+                        {isUnclassified && <Text style={{ fontSize: 10, color: "#F59E0B" }}>（请补充分类）</Text>}
+                      </View>
+                      {catItems.map((item, idx) => {
+                        const entry = getItemLedger(item.id, selectedMonth);
+                        const isNeg = entry && entry.closingQty < 0;
+                        const isOverride = entry?.openingManualOverride;
+                        const editKey = `${item.id}:${selectedMonth}`;
+                        return (
+                          <TouchableOpacity key={item.id}
+                            onLongPress={() => {
+                              tap();
+                              Alert.alert(item.name, "选择操作", [
+                                { text: "编辑酒款", onPress: () => { setEditingItem(item); setShowItemForm(true); } },
+                                { text: "修改分类", onPress: () => {
+                                  const catOptions = getAllCategories().map((c) => ({
+                                    text: c.name,
+                                    onPress: () => updateItem(item.id, { category: c.name, categorySource: "manual" }),
+                                  }));
+                                  Alert.alert("修改分类", `「${item.name}」当前分类：${item.category || "未分类"}`, [
+                                    ...catOptions,
+                                    { text: "取消", style: "cancel" as const },
+                                  ]);
+                                }},
+                                ...(item.bottleId ? [
+                                  { text: "查看酒库档案 →", onPress: () => router.push(`/bottle/${item.bottleId}` as any) },
+                                  { text: "更换酒库链接", onPress: () => { setEditingItem(item); setShowItemForm(true); } },
+                                  { text: "取消酒库链接", onPress: () => updateItem(item.id, { bottleId: undefined, bottleLinkConfidence: "none" }) },
+                                ] : [
+                                  { text: "关联酒库档案", onPress: () => { setEditingItem(item); setShowItemForm(true); } },
+                                ]),
+                                { text: "删除酒款", style: "destructive" as const, onPress: () => {
+                                  Alert.alert("确认删除", `删除「${item.name}」？`, [
+                                    { text: "取消", style: "cancel" },
+                                    { text: "删除", style: "destructive", onPress: () => deleteItem(item.id) },
+                                  ]);
+                                }},
+                                { text: "取消", style: "cancel" as const },
+                              ]);
+                            }}
+                            style={[S.tableRow, { backgroundColor: isNeg ? "#FEF2F2" : idx % 2 === 0 ? colors.surface : colors.background }]}>
+                            <Text style={[S.tdCell, { width: 36, textAlign: "center", fontSize: 11, color: colors.muted }]}>{idx + 1}</Text>
+                            {/* 分类列（固定） */}
+                            <TouchableOpacity style={[S.tdCell, { width: 56, alignItems: "center" }]}
+                              onPress={() => {
+                                const catOptions = getAllCategories().map((c) => ({
+                                  text: c.name,
+                                  onPress: () => updateItem(item.id, { category: c.name, categorySource: "manual" }),
+                                }));
+                                Alert.alert("修改分类", `「${item.name}」`, [
+                                  ...catOptions,
+                                  { text: "取消", style: "cancel" as const },
                                 ]);
-                              }},
-                              { text: "取消", style: "cancel" },
-                            ]);
-                          }}
-                          style={[S.tableRow, { backgroundColor: isNeg ? "#FEF2F2" : idx % 2 === 0 ? colors.surface : colors.background }]}>
-                          <Text style={[S.tdCell, { width: 36, textAlign: "center", fontSize: 11, color: colors.muted }]}>{idx + 1}</Text>
-                          <Text style={[S.tdCell, { width: 110, fontSize: 11, color: colors.foreground }]} numberOfLines={2}>{item.name}</Text>
+                              }}>
+                              <View style={{ backgroundColor: (isUnclassified ? "#F59E0B" : catColor(item.category)) + "25",
+                                borderRadius: 4, paddingHorizontal: 3, paddingVertical: 2, maxWidth: 52 }}>
+                                <Text style={{ fontSize: 9, fontWeight: "700",
+                                  color: isUnclassified ? "#F59E0B" : catColor(item.category) }}
+                                  numberOfLines={2}>
+                                  {isUnclassified ? "未分类" : (item.category.length > 8 ? item.category.slice(0, 8) + "…" : item.category)}
+                                </Text>
+                              </View>
+                            </TouchableOpacity>
+                            <Text style={[S.tdCell, { width: 130, fontSize: 11, color: colors.foreground }]} numberOfLines={2}>{item.name}</Text>
+                          {/* 参考价列（可点击编辑） */}
+                          {(() => {
+                            const rp = getRefPrice(item.id, selectedMonth);
+                            return (
+                              <TouchableOpacity style={[S.tdCell, { width: 70, alignItems: "flex-end" }]}
+                                onPress={() => {
+                                  tap();
+                                  Alert.prompt(
+                                    "修改参考价",
+                                    `「${item.name}」当前参考价：¥${rp > 0 ? rp.toFixed(0) : "未设置"}`,
+                                    (val) => {
+                                      const n = parseFloat(val ?? "");
+                                      if (!isNaN(n) && n >= 0) {
+                                        setRefPrice(item.id, selectedMonth, n);
+                                      } else if (val) {
+                                        Alert.alert("请输入有效价格");
+                                      }
+                                    },
+                                    "plain-text",
+                                    rp > 0 ? String(rp.toFixed(0)) : "",
+                                    "decimal-pad"
+                                  );
+                                }}>
+                                <Text style={{ fontSize: 11, color: rp > 0 ? "#EF4444" : colors.muted, fontWeight: rp > 0 ? "600" : "400" }}>
+                                  {rp > 0 ? `¥${rp.toFixed(0)}` : "—"}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })()}
                           {/* 期初库存量（内联编辑） */}
                           <View style={[S.tdCell, { width: 70, alignItems: "flex-end" }]}>
                             {ledgerEditMode ? (
@@ -725,12 +812,15 @@ export default function SpiritsInventoryScreen() {
                     <View style={{ height: 4, backgroundColor: colors.border + "40" }} />
                   </React.Fragment>
                 );
-              })}
+              });
+              })()}
               {/* 合计行 */}
               {monthLedger.length > 0 && (
                 <View style={[S.tableRow, { backgroundColor: "#FEF2F2" }]}>
                   <Text style={[S.tdCell, { width: 36 }]} />
-                  <Text style={[S.tdCell, { width: 110, fontWeight: "700", color: "#991B1B", fontSize: 12 }]}>合计</Text>
+                  <Text style={[S.tdCell, { width: 56 }]} />
+                  <Text style={[S.tdCell, { width: 130, fontWeight: "700", color: "#991B1B", fontSize: 12 }]}>合计</Text>
+                  <Text style={[S.tdCell, { width: 70 }]} />
                   <Text style={[S.tdCell, { width: 70, textAlign: "right", fontWeight: "700", color: "#991B1B", fontSize: 11 }]}>
                     {monthLedger.reduce((s, e) => s + e.openingQty, 0).toFixed(2)}
                   </Text>
@@ -1392,7 +1482,7 @@ function SupplierDetailScreen({
 }) {
   const {
     addPurchase, deletePurchase, batchAddPurchases, batchDeletePurchases,
-    updatePurchase,
+    updatePurchase, updateItem,
     setRefPrice, getRefPrice, setMatchMemory, matchPettyToItem,
     selfBuyConfig, syncLedgerFromPurchases,
     getMonthLedger,
@@ -1401,6 +1491,7 @@ function SupplierDetailScreen({
     addItem,
     getMonthPurchases,
   } = store;
+  const router2 = useRouter();
   const monthPurchases = useMemo(() => getMonthPurchases(month), [purchases, month]);
   const isSelfBuy = supplier === "自采";
   const [y, m] = month.split("-").map(Number);
@@ -1630,6 +1721,61 @@ function SupplierDetailScreen({
         </TouchableOpacity>
         <TouchableOpacity onPress={() => {
           tap();
+          if (selectedIds.size === 0) { Alert.alert("提示", "请先勾选要修改的记录"); return; }
+          const catOptions = store.getAllCategories().map((c: any) => ({
+            text: c.name,
+            onPress: () => {
+              [...selectedIds].forEach((id) => updatePurchase(id, { category: c.name }));
+              syncLedgerFromPurchases(month);
+              setSelectedIds(new Set()); setSelectMode(false);
+              Alert.alert("修改成功", `已更新 ${selectedIds.size} 条记录的分类`);
+            },
+          }));
+          Alert.alert("批量修改分类", `选中 ${selectedIds.size} 条记录`, [
+            ...catOptions,
+            { text: "取消", style: "cancel" as const },
+          ]);
+        }} style={[S.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={{ fontSize: 12, color: colors.muted, fontWeight: "600" }}>修改分类</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => {
+          tap();
+          if (selectedIds.size === 0) { Alert.alert("提示", "请先勾选要修改的记录"); return; }
+          Alert.prompt("批量修改数量", `将选中的 ${selectedIds.size} 条记录数量改为：`, (val) => {
+            const n = parseFloat(val ?? "");
+            if (!isNaN(n) && n > 0) {
+              [...selectedIds].forEach((id) => {
+                const p = supPurchases.find((x) => x.id === id);
+                if (p) updatePurchase(id, { quantity: n, amount: n * p.unitPrice });
+              });
+              syncLedgerFromPurchases(month);
+              setSelectedIds(new Set()); setSelectMode(false);
+              Alert.alert("修改成功", `已更新 ${selectedIds.size} 条记录的数量`);
+            } else if (val) { Alert.alert("请输入有效数量"); }
+          }, "plain-text", "", "decimal-pad");
+        }} style={[S.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={{ fontSize: 12, color: colors.muted, fontWeight: "600" }}>修改数量</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => {
+          tap();
+          if (selectedIds.size === 0) { Alert.alert("提示", "请先勾选要修改的记录"); return; }
+          Alert.prompt("批量修改单价", `将选中的 ${selectedIds.size} 条记录单价改为：`, (val) => {
+            const n = parseFloat(val ?? "");
+            if (!isNaN(n) && n >= 0) {
+              [...selectedIds].forEach((id) => {
+                const p = supPurchases.find((x) => x.id === id);
+                if (p) updatePurchase(id, { unitPrice: n, amount: n * p.quantity });
+              });
+              syncLedgerFromPurchases(month);
+              setSelectedIds(new Set()); setSelectMode(false);
+              Alert.alert("修改成功", `已更新 ${selectedIds.size} 条记录的单价`);
+            } else if (val) { Alert.alert("请输入有效单价"); }
+          }, "plain-text", "", "decimal-pad");
+        }} style={[S.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={{ fontSize: 12, color: colors.muted, fontWeight: "600" }}>修改单价</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => {
+          tap();
           if (selectedIds.size === 0) { Alert.alert("提示", "请先勾选要删除的记录"); return; }
           Alert.alert("批量删除", `删除选中的 ${selectedIds.size} 条记录？`, [
             { text: "取消", style: "cancel" },
@@ -1667,13 +1813,14 @@ function SupplierDetailScreen({
               <View style={[S.tableHeader, { backgroundColor: "#991B1B" }]}>
                 {selectMode && <Text style={[S.thCell, { width: 32 }]} />}
                 <Text style={[S.thCell, { width: 36 }]}>行号</Text>
+                <Text style={[S.thCell, { width: 56 }]}>分类</Text>
                 <Text style={[S.thCell, { width: 90 }]}>日期</Text>
-                <Text style={[S.thCell, { width: 180 }]}>商品名称</Text>
+                <Text style={[S.thCell, { width: 160 }]}>商品名称</Text>
                 <Text style={[S.thCell, { width: 80 }]}>集团</Text>
                 <Text style={[S.thCell, { width: 40 }]}>规格</Text>
                 <Text style={[S.thCell, { width: 50 }]}>数量</Text>
-                <Text style={[S.thCell, { width: 70 }]}>单价</Text>
-                <Text style={[S.thCell, { width: 80 }]}>应收增加</Text>
+                <Text style={[S.thCell, { width: 90 }]}>单价</Text>
+                <Text style={[S.thCell, { width: 90 }]}>应收增加</Text>
               </View>
               {/* 数据行 */}
               {supPurchases.map((p, idx) => {
@@ -1716,8 +1863,62 @@ function SupplierDetailScreen({
                       </View>
                     )}
                     <Text style={[S.tdCell, { width: 36, textAlign: "center", fontSize: 11, color: colors.muted }]}>{idx + 1}</Text>
-                    <Text style={[S.tdCell, { width: 90, fontSize: 11, color: colors.foreground }]}>{p.date}</Text>
-                    <TouchableOpacity style={[S.tdCell, { width: 180 }]}
+                    {/* 分类列 */}
+                    {(() => {
+                      const linkedItem = items.find((i) => i.id === p.itemId);
+                      const catName = p.category || linkedItem?.category || "";
+                      const catColor2 = catName ? store.getCategoryColor(catName) : "#9CA3AF";
+                      return (
+                        <TouchableOpacity style={[S.tdCell, { width: 56, alignItems: "center" }]}
+                          onPress={() => {
+                            if (selectMode) return;
+                            tap();
+                            const catOptions = store.getAllCategories().map((c: any) => ({
+                              text: c.name,
+                              onPress: () => {
+                                updatePurchase(p.id, { category: c.name });
+                                if (linkedItem) {
+                                  Alert.alert("同步分类？", "是否同步修改酒款档案的分类？", [
+                                    { text: "仅此记录", style: "cancel" },
+                                    { text: "同步档案", onPress: () => store.updateItem(linkedItem.id, { category: c.name, categorySource: "manual" }) },
+                                  ]);
+                                }
+                              },
+                            }));
+                            Alert.alert("修改分类", `「${p.rawName}」`, [
+                              ...catOptions,
+                              { text: "取消", style: "cancel" as const },
+                            ]);
+                          }}>
+                          {catName ? (
+                            <View style={{ backgroundColor: catColor2 + "25", borderRadius: 4, paddingHorizontal: 3, paddingVertical: 2, maxWidth: 52 }}>
+                              <Text style={{ fontSize: 9, fontWeight: "700", color: catColor2, textAlign: "center" }} numberOfLines={2}>
+                                {catName.length > 6 ? catName.slice(0, 6) + "…" : catName}
+                              </Text>
+                            </View>
+                          ) : (
+                            <Text style={{ fontSize: 9, color: "#F59E0B", fontWeight: "600" }}>待分类</Text>
+                          )}
+                        </TouchableOpacity>
+                      );
+                    })()}
+                    {/* 日期列（可点击编辑） */}
+                    <TouchableOpacity style={[S.tdCell, { width: 90 }]}
+                      onPress={() => {
+                        if (selectMode) return;
+                        tap();
+                        Alert.prompt("修改日期", "格式：YYYY-MM-DD", (val) => {
+                          if (val && /^\d{4}-\d{2}-\d{2}$/.test(val)) {
+                            updatePurchase(p.id, { date: val, month: val.slice(0, 7) });
+                            syncLedgerFromPurchases(month);
+                          } else if (val) {
+                            Alert.alert("格式错误", "请输入 YYYY-MM-DD 格式");
+                          }
+                        }, "plain-text", p.date, "numbers-and-punctuation");
+                      }}>
+                      <Text style={{ fontSize: 11, color: colors.foreground }}>{p.date}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[S.tdCell, { width: 160 }]}
                       onPress={() => {
                         if (!selectMode) {
                           tap();
@@ -1777,8 +1978,38 @@ function SupplierDetailScreen({
                       )}
                     </TouchableOpacity>
                     <Text style={[S.tdCell, { width: 40, textAlign: "center", fontSize: 11, color: colors.muted }]}>{p.unit}</Text>
-                    <Text style={[S.tdCell, { width: 50, textAlign: "right", fontSize: 11, color: colors.foreground }]}>{p.quantity}</Text>
-                    <View style={[S.tdCell, { width: 70, alignItems: "flex-end" }]}>
+                    {/* 数量列（可点击编辑） */}
+                    <TouchableOpacity style={[S.tdCell, { width: 50, alignItems: "flex-end" }]}
+                      onPress={() => {
+                        if (selectMode) return;
+                        tap();
+                        Alert.prompt("修改数量", "", (val) => {
+                          const n = parseFloat(val ?? "");
+                          if (!isNaN(n) && n > 0) {
+                            updatePurchase(p.id, { quantity: n, amount: n * p.unitPrice });
+                            syncLedgerFromPurchases(month);
+                          } else if (val) {
+                            Alert.alert("请输入有效数量");
+                          }
+                        }, "plain-text", String(p.quantity), "decimal-pad");
+                      }}>
+                      <Text style={{ fontSize: 11, color: colors.foreground }}>{p.quantity}</Text>
+                    </TouchableOpacity>
+                    {/* 单价列（可点击编辑，90pt，价格涨跌独占第二行） */}
+                    <TouchableOpacity style={[S.tdCell, { width: 90, alignItems: "flex-end" }]}
+                      onPress={() => {
+                        if (selectMode) return;
+                        tap();
+                        Alert.prompt("修改单价", "修改后自动重算应收增加", (val) => {
+                          const n = parseFloat(val ?? "");
+                          if (!isNaN(n) && n >= 0) {
+                            updatePurchase(p.id, { unitPrice: n, amount: n * p.quantity });
+                            syncLedgerFromPurchases(month);
+                          } else if (val) {
+                            Alert.alert("请输入有效单价");
+                          }
+                        }, "plain-text", String(p.unitPrice), "decimal-pad");
+                      }}>
                       <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
                         {isPriceAlert && <Text style={{ fontSize: 9 }}>⚠️</Text>}
                         <Text style={{ fontSize: 11, color: isPriceAlert ? "#F59E0B" : colors.foreground, fontWeight: isPriceAlert ? "700" : "400" }}>
@@ -1790,15 +2021,30 @@ function SupplierDetailScreen({
                           {priceDiff > 0 ? "↑" : "↓"}¥{Math.abs(priceDiff).toFixed(0)}({priceDiffPct.toFixed(0)}%)
                         </Text>
                       )}
-                    </View>
-                    <View style={[S.tdCell, { width: 80, alignItems: "flex-end" }]}>
+                    </TouchableOpacity>
+                    {/* 应收增加列（可点击编辑，90pt） */}
+                    <TouchableOpacity style={[S.tdCell, { width: 90, alignItems: "flex-end" }]}
+                      onPress={() => {
+                        if (selectMode) return;
+                        tap();
+                        Alert.prompt("修改应收增加", "修改后自动反算单价", (val) => {
+                          const n = parseFloat(val ?? "");
+                          if (!isNaN(n) && n >= 0) {
+                            const newUnitPrice = p.quantity > 0 ? n / p.quantity : p.unitPrice;
+                            updatePurchase(p.id, { amount: n, unitPrice: newUnitPrice });
+                            syncLedgerFromPurchases(month);
+                          } else if (val) {
+                            Alert.alert("请输入有效金额");
+                          }
+                        }, "plain-text", String(p.amount.toFixed(0)), "decimal-pad");
+                      }}>
                       <Text style={{ fontSize: 12, fontWeight: "700", color: "#EF4444" }}>¥{p.amount.toFixed(0)}</Text>
                       {priceDiff !== 0 && refPrice > 0 && (
                         <Text style={{ fontSize: 9, fontWeight: "700", color: priceDiff > 0 ? "#EF4444" : "#10B981" }}>
                           {priceDiff > 0 ? "↑" : "↓"}¥{Math.abs(priceDiff * p.quantity).toFixed(0)}
                         </Text>
                       )}
-                    </View>
+                    </TouchableOpacity>
                   </TouchableOpacity>
                 );
               })}
@@ -1806,15 +2052,16 @@ function SupplierDetailScreen({
               <View style={[S.tableRow, { backgroundColor: "#FEF2F2" }]}>
                 {selectMode && <Text style={[S.tdCell, { width: 32 }]} />}
                 <Text style={[S.tdCell, { width: 36 }]} />
+                <Text style={[S.tdCell, { width: 56 }]} />
                 <Text style={[S.tdCell, { width: 90 }]} />
-                <Text style={[S.tdCell, { width: 180, fontWeight: "700", color: "#991B1B", fontSize: 12 }]}>合计</Text>
+                <Text style={[S.tdCell, { width: 160, fontWeight: "700", color: "#991B1B", fontSize: 12 }]}>合计</Text>
                 <Text style={[S.tdCell, { width: 80 }]} />
                 <Text style={[S.tdCell, { width: 40 }]} />
                 <Text style={[S.tdCell, { width: 50, textAlign: "right", fontWeight: "700", color: "#991B1B", fontSize: 11 }]}>
                   {supPurchases.reduce((s, p) => s + p.quantity, 0)}
                 </Text>
-                <Text style={[S.tdCell, { width: 70 }]} />
-                <Text style={[S.tdCell, { width: 80, textAlign: "right", fontWeight: "700", color: "#991B1B", fontSize: 12 }]}>
+                <Text style={[S.tdCell, { width: 90 }]} />
+                <Text style={[S.tdCell, { width: 90, textAlign: "right", fontWeight: "700", color: "#991B1B", fontSize: 12 }]}>
                   ¥{totalAmt.toFixed(0)}
                 </Text>
               </View>
@@ -1899,10 +2146,22 @@ function SupplierDetailScreen({
               <View style={{ flexDirection: "row", gap: 10, padding: 16, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
                 <TouchableOpacity onPress={() => {
                   setPreviewItem(null);
-                  // 跳转到库存管理 Tab 查看详情
-                  onBack();
+                  if (previewItem?.bottleId) {
+                    router2.push(("/bottle/" + previewItem.bottleId) as any);
+                  } else {
+                    Alert.alert(
+                      "酒库档案",
+                      `「${previewItem?.name}」暂未关联酒库档案`,
+                      [
+                        { text: "取消", style: "cancel" },
+                        { text: "新建酒库档案", onPress: () => router2.push(("/bottle-form?name=" + encodeURIComponent(previewItem?.name ?? "")) as any) },
+                      ]
+                    );
+                  }
                 }} style={{ flex: 1, padding: 13, borderRadius: 12, borderWidth: 1, borderColor: colors.border, alignItems: "center" }}>
-                  <Text style={{ fontSize: 14, color: colors.foreground, fontWeight: "600" }}>查看详情页 →</Text>
+                  <Text style={{ fontSize: 14, color: colors.foreground, fontWeight: "600" }}>
+                    {previewItem?.bottleId ? "查看酒库档案 →" : "新建酒库档案 →"}
+                  </Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => setPreviewItem(null)}
                   style={{ flex: 1, padding: 13, backgroundColor: "#EF4444", borderRadius: 12, alignItems: "center" }}>
@@ -2306,61 +2565,97 @@ function ItemFormModal({ visible, item, colors, allCategories, onSave, onClose }
   }, [item, visible]);
 
   return (
-    <Modal visible={visible} transparent animationType="slide">
-      <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.4)" }}>
-        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
-          <ScrollView style={{ backgroundColor: colors.background, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "85%" }}>
-            <View style={{ padding: 20 }}>
-              <Text style={{ fontSize: 17, fontWeight: "700", color: colors.foreground, marginBottom: 16 }}>
-                {item ? "编辑酒款" : "新增酒款"}
-              </Text>
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+        <View style={{ flex: 1, backgroundColor: colors.background }}>
+          {/* 导航栏 */}
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+            paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
+            <TouchableOpacity onPress={onClose} style={{ padding: 4 }}>
+              <Text style={{ fontSize: 16, color: colors.muted }}>取消</Text>
+            </TouchableOpacity>
+            <Text style={{ fontSize: 17, fontWeight: "700", color: colors.foreground }}>
+              {item ? "编辑酒款" : "新增酒款"}
+            </Text>
+            <TouchableOpacity onPress={() => {
+              if (!name.trim()) { Alert.alert("提示", "请填写中文名"); return; }
+              const alertPct = priceAlertPct.trim() !== "" ? parseFloat(priceAlertPct) : undefined;
+              const specMlVal = specMl.trim() !== "" ? parseFloat(specMl) : undefined;
+              onSave({ name: name.trim(), nameEn: nameEn.trim() || undefined, category, unit, refPrice: parseFloat(refPrice) || 0, supplier: supplier.trim() || undefined, priceAlertPct: alertPct, specMl: specMlVal, active: true });
+              onClose();
+            }} style={{ padding: 4 }}>
+              <Text style={{ fontSize: 16, color: "#EF4444", fontWeight: "700" }}>保存</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }}>
+            {/* 区块一：基本信息 */}
+            <View style={{ backgroundColor: colors.surface, borderRadius: 14, padding: 16, marginBottom: 16,
+              borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border }}>
+              <Text style={{ fontSize: 13, fontWeight: "700", color: colors.muted, marginBottom: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>基本信息</Text>
               {[
                 { label: "中文名 *", value: name, onChange: setName, placeholder: "如：添加利金酒" },
                 { label: "英文名", value: nameEn, onChange: setNameEn, placeholder: "如：Tanqueray Gin" },
                 { label: "单位", value: unit, onChange: setUnit, placeholder: "瓶/箱/cl" },
-                { label: "参考单价", value: refPrice, onChange: setRefPrice, placeholder: "¥", keyboardType: "decimal-pad" as const },
                 { label: "供应商", value: supplier, onChange: setSupplier, placeholder: "如：至缘" },
-                { label: "价格预警阈值 (%)", value: priceAlertPct, onChange: setPriceAlertPct, placeholder: "默认 0，即只要有涨跌就提示", keyboardType: "decimal-pad" as const },
-                { label: "规格容量 (ml)", value: specMl, onChange: setSpecMl, placeholder: "如 700（用于计算 Pour Cost）", keyboardType: "decimal-pad" as const },
               ].map((f) => (
-                <View key={f.label} style={{ marginBottom: 14 }}>
-                  <Text style={{ fontSize: 13, color: colors.muted, marginBottom: 6 }}>{f.label}</Text>
+                <View key={f.label} style={{ marginBottom: 12 }}>
+                  <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 4 }}>{f.label}</Text>
                   <TextInput
-                    style={[S.input, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.surface }]}
+                    style={[S.input, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
                     value={f.value} onChangeText={f.onChange} placeholder={f.placeholder}
-                    placeholderTextColor={colors.muted} keyboardType={(f as any).keyboardType ?? "default"}
+                    placeholderTextColor={colors.muted}
                   />
                 </View>
               ))}
-              <Text style={{ fontSize: 13, color: colors.muted, marginBottom: 6 }}>分类</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginBottom: 14 }}
-                contentContainerStyle={{ gap: 8, paddingVertical: 4, alignItems: "center" }}>
+            </View>
+            {/* 区块二：价格与规格 */}
+            <View style={{ backgroundColor: colors.surface, borderRadius: 14, padding: 16, marginBottom: 16,
+              borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border }}>
+              <Text style={{ fontSize: 13, fontWeight: "700", color: colors.muted, marginBottom: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>价格与规格</Text>
+              <View style={{ flexDirection: "row", gap: 12 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 4 }}>参考单价</Text>
+                  <TextInput
+                    style={[S.input, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
+                    value={refPrice} onChangeText={setRefPrice} placeholder="¥"
+                    placeholderTextColor={colors.muted} keyboardType="decimal-pad"
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 4 }}>规格容量 (ml)</Text>
+                  <TextInput
+                    style={[S.input, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
+                    value={specMl} onChangeText={setSpecMl} placeholder="如 700"
+                    placeholderTextColor={colors.muted} keyboardType="decimal-pad"
+                  />
+                </View>
+              </View>
+              <View style={{ marginTop: 12 }}>
+                <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 4 }}>价格预警阈值 (%)</Text>
+                <TextInput
+                  style={[S.input, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
+                  value={priceAlertPct} onChangeText={setPriceAlertPct} placeholder="默认 0，即只要有涨跌就提示"
+                  placeholderTextColor={colors.muted} keyboardType="decimal-pad"
+                />
+              </View>
+            </View>
+            {/* 区块三：进销存分类 */}
+            <View style={{ backgroundColor: colors.surface, borderRadius: 14, padding: 16, marginBottom: 16,
+              borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border }}>
+              <Text style={{ fontSize: 13, fontWeight: "700", color: colors.muted, marginBottom: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>进销存分类</Text>
+              <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 10 }}>此分类用于成本报表分析，独立于酒库分类</Text>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
                 {allCategories.map((cat) => (
                   <TouchableOpacity key={cat.id} onPress={() => setCategory(cat.name)}
                     style={[S.catChip, { backgroundColor: category === cat.name ? cat.color : colors.surface, borderColor: cat.color }]}>
                     <Text style={{ fontSize: 11, color: category === cat.name ? "#fff" : cat.color, fontWeight: "600" }}>{cat.name}</Text>
                   </TouchableOpacity>
                 ))}
-              </ScrollView>
-              <View style={{ flexDirection: "row", gap: 12 }}>
-                <TouchableOpacity onPress={onClose}
-                  style={{ flex: 1, padding: 14, backgroundColor: colors.surface, borderRadius: 12, alignItems: "center" }}>
-                  <Text style={{ fontSize: 15, color: colors.muted }}>取消</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => {
-                  if (!name.trim()) { Alert.alert("提示", "请填写中文名"); return; }
-                  const alertPct = priceAlertPct.trim() !== "" ? parseFloat(priceAlertPct) : undefined;
-                  const specMlVal = specMl.trim() !== "" ? parseFloat(specMl) : undefined;
-                  onSave({ name: name.trim(), nameEn: nameEn.trim() || undefined, category, unit, refPrice: parseFloat(refPrice) || 0, supplier: supplier.trim() || undefined, priceAlertPct: alertPct, specMl: specMlVal, active: true });
-                  onClose();
-                }} style={{ flex: 1, padding: 14, backgroundColor: "#EF4444", borderRadius: 12, alignItems: "center" }}>
-                  <Text style={{ fontSize: 15, color: "#fff", fontWeight: "700" }}>保存</Text>
-                </TouchableOpacity>
               </View>
             </View>
           </ScrollView>
-        </KeyboardAvoidingView>
-      </View>
+        </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

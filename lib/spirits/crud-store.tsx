@@ -227,7 +227,8 @@ type Action =
   | { type: "UPDATE_SELF_BUY_CONFIG"; config: SelfBuyConfig }
   | { type: "UPSERT_CUSTOM_CATEGORY"; category: SpiritCustomCategory }
   | { type: "DELETE_CUSTOM_CATEGORY"; id: string }
-  | { type: "SET_GROUP_MATCH_MEMORY"; memory: GroupMatchMemory };
+  | { type: "SET_GROUP_MATCH_MEMORY"; memory: GroupMatchMemory }
+  | { type: "BATCH_UPDATE_PURCHASES_CATEGORY"; itemId: string; category: string };
 
 function reducer(state: SpiritsState, action: Action): SpiritsState {
   switch (action.type) {
@@ -317,6 +318,12 @@ function reducer(state: SpiritsState, action: Action): SpiritsState {
       return { ...state, matchMemory: [...filtered, action.memory] };
     }
     case "UPDATE_SELF_BUY_CONFIG": return { ...state, selfBuyConfig: action.config };
+    case "BATCH_UPDATE_PURCHASES_CATEGORY": return {
+      ...state,
+      purchases: state.purchases.map((p) =>
+        p.itemId === action.itemId ? { ...p, category: action.category } : p
+      ),
+    };
     default: return state;
   }
 }
@@ -443,6 +450,10 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
 
   const updateItem = (id: string, patch: Partial<SpiritItem>) => {
     dispatch({ type: "UPDATE_ITEM", id, patch });
+    // ★ 分类传播：当酒款分类被修改时，自动同步到该酒款的所有进货记录
+    if (patch.category !== undefined) {
+      dispatch({ type: "BATCH_UPDATE_PURCHASES_CATEGORY", itemId: id, category: patch.category });
+    }
   };
 
   const deleteItem = (id: string) => {
@@ -456,7 +467,15 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
   };
 
   const updatePurchase = (id: string, patch: Partial<SpiritPurchaseRecord>) => {
-    dispatch({ type: "UPDATE_PURCHASE", id, patch });
+    // ★ 匹配关联：当进货记录关联到酒款时，自动同步分类
+    let finalPatch = { ...patch };
+    if (patch.itemId !== undefined) {
+      const item = state.items.find((i) => i.id === patch.itemId);
+      if (item?.category && !patch.category) {
+        finalPatch = { ...finalPatch, category: item.category };
+      }
+    }
+    dispatch({ type: "UPDATE_PURCHASE", id, patch: finalPatch });
   };
 
   const deletePurchase = (id: string) => {

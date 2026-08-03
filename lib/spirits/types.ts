@@ -292,7 +292,10 @@ export interface SpiritItem {
   id: string;
   name: string;
   nameEn?: string;
+  /** 进销存分类（用于成本报表分析，独立于酒库分类） */
   category: string;
+  /** 分类来源：manual=人工设置，bottle=从酒库同步，auto=自动推断 */
+  categorySource?: "manual" | "bottle" | "auto";
   /** 所属集团（品牌归属） */
   group?: string;
   unit: string;
@@ -308,6 +311,10 @@ export interface SpiritItem {
    * 默认为 0，即只要有涨跌（哪怕 1%）就显示涨跌金额和百分比。
    * 设置为 30 则仅当偏差超过 30% 时才标记异常。 */
   priceAlertPct?: number;
+  /** 关联酒库档案 ID（可选，用于跳转酒库详情页） */
+  bottleId?: string;
+  /** 酒库关联置信度：confirmed=人工确认，auto=自动匹配，none=未关联 */
+  bottleLinkConfidence?: "confirmed" | "auto" | "none";
   createdAt: string;
   updatedAt: string;
 }
@@ -326,6 +333,8 @@ export interface SpiritPurchaseRecord {
   supplier?: string;
   /** 品牌集团归属（自动识别或手动填写） */
   group?: string;
+  /** 进销存分类（从关联 SpiritItem 同步，可单独覆盖） */
+  category?: string;
   notes?: string;
   source: "manual" | "excel" | "pdf";
   createdAt: string;
