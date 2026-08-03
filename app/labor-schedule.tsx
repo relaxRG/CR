@@ -9,7 +9,7 @@
 import React, { useCallback, useMemo, useState } from "react";
 import {
   Modal, Platform, Pressable, ScrollView, StyleSheet,
-  Text, TextInput, TouchableOpacity, View
+  Text, TextInput, TouchableOpacity, View, useWindowDimensions
 } from "react-native";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
@@ -40,26 +40,48 @@ const SESSION_OPTIONS: { value: ShiftSessionValue; label: string; color?: string
 ];
 
 // ─── 格子显示 ─────────────────────────────────────────────────────────────────
-function CellDisplay({ entry, viewMode, deptColor, colors, shiftType }: {
+function CellDisplay({ entry, viewMode, deptColor, colors, shiftType, overtimeAlert }: {
   entry: ShiftEntry | null; viewMode: ViewMode; deptColor: string; colors: any; shiftType: ShiftType;
+  overtimeAlert?: "poor" | "ok" | null;
 }) {
   const shiftColor = shiftType === "day" ? "#FF9500" : deptColor;
-  if (!entry) return <Text style={{ fontSize: 10, color: colors.border + "88" }}>·</Text>;
-  if (viewMode === "hours") {
-    const h = entry.hoursValue;
-    if (h === "休") return <Text style={[CS.cellSpecial, { color: "#FF3B30" }]}>休</Text>;
-    if (h === "无早") return <Text style={[CS.cellSpecial, { color: "#FF3B30" }]}>无早</Text>;
-    if (typeof h === "number" && h > 0) return <Text style={[CS.cellHours, { color: shiftColor }]}>{h}h</Text>;
-    return <Text style={{ fontSize: 10, color: colors.border + "88" }}>·</Text>;
-  } else {
-    const s = entry.sessionValue;
-    if (s === "休") return <Text style={[CS.cellSpecial, { color: "#FF3B30" }]}>休</Text>;
-    if (s === "无早") return <Text style={[CS.cellSpecial, { color: "#FF3B30" }]}>无早</Text>;
-    if (s === "午") return <Text style={[CS.cellSession, { color: "#FF9500" }]}>午</Text>;
-    if (s === "晚") return <Text style={[CS.cellSession, { color: deptColor }]}>晚</Text>;
-    if (s === "午晚") return <Text style={[CS.cellSession, { color: deptColor }]}>午晚</Text>;
-    return <Text style={{ fontSize: 10, color: colors.border + "88" }}>·</Text>;
-  }
+  const alertColor = overtimeAlert === "poor" ? "#FF3B30" : overtimeAlert === "ok" ? "#FF9500" : null;
+
+  const renderContent = () => {
+    if (!entry) return <Text style={{ fontSize: 10, color: colors.border + "88" }}>·</Text>;
+    if (viewMode === "hours") {
+      const h = entry.hoursValue;
+      if (h === "休") return <Text style={[CS.cellSpecial, { color: "#FF3B30" }]}>休</Text>;
+      if (h === "无早") return <Text style={[CS.cellSpecial, { color: "#FF3B30" }]}>无早</Text>;
+      if (typeof h === "number" && h > 0) {
+        // 超过8小时橙色显示
+        const isOvertime = h > 8;
+        return <Text style={[CS.cellHours, { color: isOvertime ? "#FF3B30" : shiftColor }]}>{h}h</Text>;
+      }
+      return <Text style={{ fontSize: 10, color: colors.border + "88" }}>·</Text>;
+    } else {
+      const s = entry.sessionValue;
+      if (s === "休") return <Text style={[CS.cellSpecial, { color: "#FF3B30" }]}>休</Text>;
+      if (s === "无早") return <Text style={[CS.cellSpecial, { color: "#FF3B30" }]}>无早</Text>;
+      if (s === "午") return <Text style={[CS.cellSession, { color: "#FF9500" }]}>午</Text>;
+      if (s === "晚") return <Text style={[CS.cellSession, { color: deptColor }]}>晚</Text>;
+      if (s === "午晚") return <Text style={[CS.cellSession, { color: deptColor }]}>午晚</Text>;
+      return <Text style={{ fontSize: 10, color: colors.border + "88" }}>·</Text>;
+    }
+  };
+
+  return (
+    <View style={{ position: "relative", alignItems: "center", justifyContent: "center" }}>
+      {renderContent()}
+      {alertColor && (
+        <View style={{
+          position: "absolute", top: -4, right: -4,
+          width: 7, height: 7, borderRadius: 3.5,
+          backgroundColor: alertColor,
+        }} />
+      )}
+    </View>
+  );
 }
 
 // ─── 编辑 Modal ───────────────────────────────────────────────────────────────
@@ -385,8 +407,10 @@ export default function LaborScheduleScreen() {
   const prevMonth = () => { const [y, m] = currentMonth.split("-").map(Number); const d = new Date(y, m - 2, 1); setCurrentMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); };
   const nextMonth = () => { const [y, m] = currentMonth.split("-").map(Number); const d = new Date(y, m, 1); setCurrentMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); };
 
-  const CELL_W = 40;
+  const { width: screenWidth } = useWindowDimensions();
+  // 自适应列宽：姓名列固定56，剩余空间均分7列，最小36，最大52
   const NAME_W = 56;
+  const CELL_W = Math.max(36, Math.min(52, Math.floor((screenWidth - NAME_W - 2) / 7)));
   const tableWidth = NAME_W + CELL_W * 7;
 
   const filterLabel = selectedEmployeeIds.size === 0
@@ -484,8 +508,8 @@ export default function LaborScheduleScreen() {
               if (!firstDate) return null;
               return (
                 <View key={wi}>
-                  {/* 日期行 */}
-                  <View style={[S.dateRow, { backgroundColor: "#FF9500" + "15", borderBottomColor: "#FF9500" + "33" }]}>
+                  {/* 日期行（橙色背景，与 Excel 一致） */}
+                  <View style={[S.dateRow, { backgroundColor: "#FF9500" + "22", borderBottomColor: "#FF9500" + "55" }]}>
                     <View style={{ width: NAME_W, paddingLeft: 8 }}>
                       <Text style={[S.dateCell, { color: "#FF9500" }]}>日期</Text>
                     </View>
@@ -511,10 +535,10 @@ export default function LaborScheduleScreen() {
                     const isLastEmp = empIdx === deptEmployees.length - 1;
                     return (
                       <View key={emp.id} style={{ borderBottomWidth: isLastEmp ? 0 : StyleSheet.hairlineWidth, borderBottomColor: colors.border + "88" }}>
-                        {/* 白班行 */}
+                        {/* 白班行（浅蓝背景，与 Excel 一致） */}
                         {(showBothShifts || true) && (
-                          <View style={[S.empRow, { borderBottomWidth: showBothShifts ? StyleSheet.hairlineWidth : 0, borderBottomColor: colors.border + "44" }]}>
-                            <View style={[S.nameCell, { width: NAME_W, backgroundColor: deptColor + "08" }]}>
+                          <View style={[S.empRow, { borderBottomWidth: showBothShifts ? StyleSheet.hairlineWidth : 0, borderBottomColor: colors.border + "44", backgroundColor: "#007AFF" + "06" }]}>
+                            <View style={[S.nameCell, { width: NAME_W, backgroundColor: "#007AFF" + "10" }]}>
                               {showBothShifts ? (
                                 <>
                                   <Text style={[S.empName, { color: deptColor }]} numberOfLines={1}>{emp.code}</Text>
@@ -531,7 +555,7 @@ export default function LaborScheduleScreen() {
                               const isWeekend = d ? (getDayOfWeek(d) === 0 || getDayOfWeek(d) === 6) : false;
                               return (
                                 <TouchableOpacity key={di} onPress={() => d && handleCellPress(emp, d, "day")} disabled={!d}
-                                  style={[S.cell, { width: CELL_W, backgroundColor: d ? (isWeekend ? "#FF9500" + "08" : colors.background) : colors.surface + "44", borderRightColor: colors.border + "44" }]}>
+                                  style={[S.cell, { width: CELL_W, backgroundColor: d ? (isWeekend ? "#FF9500" + "0C" : "#007AFF" + "05") : colors.surface + "44", borderRightColor: colors.border + "44" }]}>
                                   <CellDisplay entry={entry} viewMode={viewMode} deptColor={deptColor} colors={colors} shiftType="day" />
                                 </TouchableOpacity>
                               );
@@ -551,7 +575,7 @@ export default function LaborScheduleScreen() {
                               const isWeekend = d ? (getDayOfWeek(d) === 0 || getDayOfWeek(d) === 6) : false;
                               return (
                                 <TouchableOpacity key={di} onPress={() => d && handleCellPress(emp, d, "evening")} disabled={!d}
-                                  style={[S.cell, { width: CELL_W, backgroundColor: d ? (isWeekend ? deptColor + "08" : colors.background) : colors.surface + "44", borderRightColor: colors.border + "44" }]}>
+                                  style={[S.cell, { width: CELL_W, backgroundColor: d ? (isWeekend ? deptColor + "0C" : colors.background) : colors.surface + "44", borderRightColor: colors.border + "44" }]}>
                                   <CellDisplay entry={entry} viewMode={viewMode} deptColor={deptColor} colors={colors} shiftType="evening" />
                                 </TouchableOpacity>
                               );

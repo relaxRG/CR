@@ -29,6 +29,12 @@ import {
   PeriodKey, PERIOD_LABELS, PERIOD_TIME_RANGE, PERIOD_COLORS,
   fmtRevenue, slotToMinutes,
 } from "@/lib/store/period-analysis/types";
+import { useScheduleStore } from "@/lib/store/period-analysis/schedule-store";
+import {
+  calcOvertimeJudgment, minutesToDisplayStr,
+  OVERTIME_ALERT_COLORS, OVERTIME_ALERT_LABELS,
+} from "@/lib/store/period-analysis/schedule-types";
+import { useShiftStore, useEmployeeStore } from "@/lib/labor/store";
 
 type MainTab = "overview" | "periods" | "latenight" | "alerts";
 
@@ -189,9 +195,13 @@ export default function PeriodAnalysisScreen() {
   const { reports, settings, latestReport, addReport, deleteReport, updateSettings } = usePeriodAnalysisStore();
   const spiritsStore = useSpiritsInventoryStore();
   const supplierPurchaseStore = useSupplierPurchaseStore();
+  const { businessHours, shiftTemplates, addDateOverride, removeDateOverride, updateBusinessHours } = useScheduleStore();
+  const { shifts, getShifts } = useShiftStore();
+  const { employees } = useEmployeeStore();
   const [tab, setTab] = useState<MainTab>("overview");
   const [selectedMonth, setSelectedMonth] = useState<string>(latestReport?.month ?? "");
   const [showSettings, setShowSettings] = useState(false);
+  const [showBizHoursModal, setShowBizHoursModal] = useState(false);
   const [importing, setImporting] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodKey>("dinner");
 
@@ -199,6 +209,44 @@ export default function PeriodAnalysisScreen() {
     reports.find((r) => r.month === selectedMonth) ?? latestReport,
     [reports, selectedMonth, latestReport]
   );
+
+  // 计算当月加班预警（联动排班表 + 时段数据）
+  const overtimeAlertMap = useMemo(() => {
+    if (!report) return new Map<string, "poor" | "ok">();
+    const month = report.month; // "2026-07"
+    const monthShifts = getShifts(month);
+    const alertMap = new Map<string, "poor" | "ok">();
+    for (const shift of monthShifts) {
+      if (shift.shift !== "evening") continue;
+      const judgment = calcOvertimeJudgment({
+        employeeId: shift.employeeId,
+        date: shift.date,
+        shift: shift.shift,
+        actualHours: shift.hoursValue,
+        shiftTemplates,
+        businessHours,
+      });
+      if (!judgment || !judgment.isOvertime) continue;
+      // 查找该日加班时段的营业额
+      const dailyRecord = report.dailyRecords.find((dr) => dr.date === shift.date);
+      if (!dailyRecord) continue;
+      // 加班时段 = 关门时间后的时段
+      const closingMin = judgment.closingMinutes;
+      const overtimeRevenue = dailyRecord.slots
+        .filter((s) => {
+          const startMin = s.startHour * 60 + s.startMin;
+          return startMin >= (closingMin % 1440);
+        })
+        .reduce((sum, s) => sum + s.revenue, 0);
+      const key = shift.date;
+      const level: "poor" | "ok" = overtimeRevenue < settings.overtimeThreshold ? "poor" : "ok";
+      // 取最严重的预警级别
+      if (!alertMap.has(key) || (alertMap.get(key) === "ok" && level === "poor")) {
+        alertMap.set(key, level);
+      }
+    }
+    return alertMap;
+  }, [report, shifts, shiftTemplates, businessHours, settings.overtimeThreshold]);
 
   React.useEffect(() => {
     if (latestReport && !selectedMonth) setSelectedMonth(latestReport.month);
@@ -535,18 +583,40 @@ export default function PeriodAnalysisScreen() {
         {/* 逐日凌晨记录 */}
         {lateNightDays.map((dr) => {
           const isAlert = dr.overtimeAlert;
+          // 联动排班表的加班预警
+          const scheduleAlert = overtimeAlertMap.get(dr.date);
+          const hasScheduleOvertime = !!scheduleAlert;
+          const borderColor = scheduleAlert === "poor" ? colors.error + "66" :
+            scheduleAlert === "ok" ? "#FF9500" + "66" :
+            isAlert ? colors.error + "44" : colors.border;
+          const borderLeftColor = scheduleAlert === "poor" ? colors.error :
+            scheduleAlert === "ok" ? "#FF9500" :
+            isAlert ? colors.error : color;
           return (
             <View key={dr.date} style={[S.lateCard, {
               backgroundColor: colors.surface,
-              borderColor: isAlert ? colors.error + "44" : colors.border,
-              borderLeftColor: isAlert ? colors.error : color,
+              borderColor: borderColor,
+              borderLeftColor: borderLeftColor,
               borderLeftWidth: 3,
             }]}>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
                 <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>
-                  {dr.date.slice(5)} {["日","一","二","三","四","五","六"][new Date(dr.date).getDay()]}
+                  {dr.date.slice(5)} {["\u65e5","\u4e00","\u4e8c","\u4e09","\u56db","\u4e94","\u516d"][new Date(dr.date).getDay()]}
                 </Text>
-                {isAlert && (
+                {/* 排班加班预警标签（优先显示） */}
+                {scheduleAlert === "poor" && (
+                  <View style={[S.alertTag, { backgroundColor: colors.error + "15" }]}>
+                    <IconSymbol name="exclamationmark.triangle.fill" size={10} color={colors.error} />
+                    <Text style={{ fontSize: 10, color: colors.error, fontWeight: "700" }}>加班性价比不佳</Text>
+                  </View>
+                )}
+                {scheduleAlert === "ok" && (
+                  <View style={[S.alertTag, { backgroundColor: "#FF9500" + "15" }]}>
+                    <IconSymbol name="checkmark.circle.fill" size={10} color="#FF9500" />
+                    <Text style={{ fontSize: 10, color: "#FF9500", fontWeight: "700" }}>加班有效</Text>
+                  </View>
+                )}
+                {!scheduleAlert && isAlert && (
                   <View style={[S.alertTag, { backgroundColor: colors.error + "15" }]}>
                     <IconSymbol name="exclamationmark.triangle.fill" size={10} color={colors.error} />
                     <Text style={{ fontSize: 10, color: colors.error, fontWeight: "700" }}>加班提醒</Text>
@@ -723,6 +793,9 @@ export default function PeriodAnalysisScreen() {
         </Pressable>
         <Text style={[S.navTitle, { color: colors.foreground }]}>时段营业分析</Text>
         <View style={{ flexDirection: "row", gap: 8 }}>
+          <Pressable onPress={() => { tap(); setShowBizHoursModal(true); }} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+            <IconSymbol name="clock.badge.fill" size={20} color={colors.muted} />
+          </Pressable>
           <Pressable onPress={() => { tap(); setShowSettings(true); }} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
             <IconSymbol name="slider.horizontal.3" size={20} color={colors.muted} />
           </Pressable>
@@ -767,6 +840,68 @@ export default function PeriodAnalysisScreen() {
         onSave={(threshold, alertStart) => updateSettings({ overtimeThreshold: threshold, alertStartTime: alertStart })}
         onClose={() => setShowSettings(false)}
       />
+
+      {/* 营业时间设置 Modal */}
+      <Modal visible={showBizHoursModal} animationType="slide" presentationStyle="formSheet" onRequestClose={() => setShowBizHoursModal(false)}>
+        <View style={{ flex: 1, backgroundColor: colors.background }}>
+          <View style={[SM.header, { borderBottomColor: colors.border }]}>
+            <Pressable onPress={() => setShowBizHoursModal(false)}><Text style={{ fontSize: 17, color: colors.error }}>取消</Text></Pressable>
+            <Text style={[SM.title, { color: colors.foreground }]}>营业时间设置</Text>
+            <View style={{ width: 40 }} />
+          </View>
+          <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
+            <Text style={{ fontSize: 12, color: colors.muted, lineHeight: 18 }}>
+              设定每天的正常关门时间。当晚班员工实际下班时间超过关门时间时，自动判定为加班并进行营业额对比。
+            </Text>
+            {[["周一", 1], ["周二", 2], ["周三", 3], ["周四", 4], ["周五", 5], ["周六", 6], ["周日", 0]].map(([label, weekday]) => {
+              const wday = weekday as 0|1|2|3|4|5|6;
+              const current = businessHours.weekdayClosingTimes.find((w) => w.weekday === wday);
+              const timeStr = current?.closingTime ?? "24:00";
+              return (
+                <View key={wday} style={[SM.section, { borderColor: colors.border, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
+                  <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>{label}</Text>
+                  <Pressable onPress={() => {
+                    Alert.prompt(
+                      `设定${label}关门时间`,
+                      '格式 HH:MM，跨日用 25:00 表示次日 01:00',
+                      (val) => {
+                        if (!val) return;
+                        const updated = {
+                          ...businessHours,
+                          weekdayClosingTimes: businessHours.weekdayClosingTimes.map((w) =>
+                            w.weekday === wday ? { ...w, closingTime: val } : w
+                          ),
+                          updatedAt: new Date().toISOString(),
+                        };
+                        updateBusinessHours(updated);
+                      },
+                      'plain-text', timeStr
+                    );
+                  }}>
+                    <Text style={{ fontSize: 14, color: colors.primary, fontWeight: "600" }}>{timeStr}</Text>
+                  </Pressable>
+                </View>
+              );
+            })}
+            {businessHours.dateOverrides.length > 0 && (
+              <View style={[SM.section, { borderColor: colors.border }]}>
+                <Text style={[SM.sectionTitle, { color: colors.muted }]}>按日期覆盖</Text>
+                {businessHours.dateOverrides.map((ov) => (
+                  <View key={ov.date} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 6 }}>
+                    <Text style={{ fontSize: 13, color: colors.foreground }}>{ov.date} {ov.note ? `(· ${ov.note})` : ""}</Text>
+                    <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
+                      <Text style={{ fontSize: 13, color: colors.primary }}>{ov.closingTime}</Text>
+                      <Pressable onPress={() => removeDateOverride(ov.date)}>
+                        <IconSymbol name="xmark.circle.fill" size={16} color={colors.muted} />
+                      </Pressable>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+          </ScrollView>
+        </View>
+      </Modal>
     </ScreenContainer>
   );
 }

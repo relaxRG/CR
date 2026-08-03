@@ -288,10 +288,16 @@ export default function MonthlyReportScreen() {
             <Text style={{ fontSize: 11, color: colors.muted }}>predawn</Text>
           )}
         </View>
-        <Pressable onPress={() => { tap(); router.push("/monthly-report-import" as any); }}
-          style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
-          <IconSymbol name="square.and.arrow.down.fill" size={20} color={colors.primary} />
-        </Pressable>
+        <View style={{ flexDirection: "row", gap: 10 }}>
+          <Pressable onPress={() => { tap(); router.push("/dish-analysis" as any); }}
+            style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+            <IconSymbol name="square.grid.2x2.fill" size={20} color={colors.muted} />
+          </Pressable>
+          <Pressable onPress={() => { tap(); router.push("/monthly-report-import" as any); }}
+            style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+            <IconSymbol name="square.and.arrow.down.fill" size={20} color={colors.primary} />
+          </Pressable>
+        </View>
       </View>
 
       {/* 月份选择器 */}
@@ -526,6 +532,34 @@ export default function MonthlyReportScreen() {
               {insights.map((ins, i) => (
                 <InsightCard key={i} insight={ins} colors={colors} />
               ))}
+            </View>
+          )}
+
+          {/* ── 9b. 多月对比 ── */}
+          {reports.length >= 2 && (
+            <View style={[S.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <View style={S.sectionHeader}>
+                <Text style={[S.sectionTitle, { color: colors.foreground }]}>多月趋势对比</Text>
+                <Pressable onPress={() => { tap(); router.push("/dish-analysis" as any); }}
+                  style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                  <Text style={{ fontSize: 12, color: colors.primary }}>菜品对比</Text>
+                  <IconSymbol name="chevron.right" size={12} color={colors.primary} />
+                </Pressable>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  {reports.slice().sort((a, b) => a.monthLabel.localeCompare(b.monthLabel)).map((r) => (
+                    <TouchableOpacity key={r.id} onPress={() => { tap(); setSelectedId(r.id); }}
+                      style={[{ borderRadius: 10, borderWidth: 1, padding: 10, minWidth: 110,
+                        borderColor: r.id === report.id ? colors.primary : colors.border,
+                        backgroundColor: r.id === report.id ? colors.primary + "0a" : colors.background }]}>
+                      <Text style={{ fontSize: 11, color: r.id === report.id ? colors.primary : colors.muted, marginBottom: 4 }}>{r.monthLabel}</Text>
+                      <Text style={{ fontSize: 15, fontWeight: "700", color: r.id === report.id ? colors.primary : colors.foreground }}>¥{(r.kpi.revenue / 10000).toFixed(1)}w</Text>
+                      <Text style={{ fontSize: 10, color: colors.muted, marginTop: 2 }}>{r.kpi.orderCount}单 · 均¥{r.kpi.avgSpendPerPerson.toFixed(0)}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </ScrollView>
             </View>
           )}
 

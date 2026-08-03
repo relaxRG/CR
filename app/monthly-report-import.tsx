@@ -1,8 +1,6 @@
 /**
- * 月度经营报表导入页
- * 支持同时上传最多4个报表文件（营业概览/综合收款统计/菜品销售统计大类/菜品销售统计明细）
- * 自动识别文件类型（按文件名关键词）
- * 导入后预览 KPI 摘要，确认后存入 MonthlyReportStore
+ * 月度经营报表导入页 (Build 135)
+ * 支持9种报表类型自动识别 + 缺失检测 + 多文件同时导入
  */
 import React, { useState } from "react";
 import {
@@ -19,38 +17,45 @@ import { ScreenContainer } from "@/components/screen-container";
 import { useMonthlyReportStore } from "@/lib/store/monthly-report/store";
 import { parseMonthlyReport } from "@/lib/store/monthly-report/excel-parser";
 import { MonthlyReport } from "@/lib/store/monthly-report/types";
+import { useDishAnalysisStore } from "@/lib/store/monthly-report/dish-analysis-store";
+import {
+  detectReportTypeByFilename,
+  detectReportTypeByContent,
+  parseDishAnalysis,
+} from "@/lib/store/monthly-report/dish-analysis-parser";
+import {
+  ReportFileType,
+  REPORT_FILE_TYPE_LABELS,
+  REPORT_FILE_TYPE_DESC,
+  REQUIRED_REPORT_TYPES,
+  OPTIONAL_REPORT_TYPES,
+} from "@/lib/store/monthly-report/dish-analysis-types";
 
-// ─── 文件类型识别 ─────────────────────────────────────────────────────────────
-type ReportFileType = "overview" | "daily" | "dishItems" | "dishCats" | "unknown";
-
-function detectFileType(filename: string): ReportFileType {
-  const n = filename.toLowerCase();
-  if (n.includes("营业概览")) return "overview";
-  if (n.includes("综合收款")) return "daily";
-  // 两个菜品销售统计文件，按时间戳区分（较早的是大类，较晚的是明细）
-  // 或按文件名中的关键词
-  if (n.includes("菜品销售统计")) {
-    // 文件名中含有更大时间戳的是大类（0340），含更小时间戳的是明细（0337）
-    // 实际上用文件内容区分更可靠，这里先都标为 dishItems，解析时自动区分
-    return "dishItems";
-  }
-  return "unknown";
-}
-
-const FILE_TYPE_LABELS: Record<ReportFileType, string> = {
-  overview: "营业概览",
-  daily: "综合收款统计",
-  dishItems: "菜品销售统计",
-  dishCats: "菜品大类统计",
-  unknown: "未知类型",
-};
-
+// ─── 文件类型图标映射 ──────────────────────────────────────────────────────────
 const FILE_TYPE_ICONS: Record<ReportFileType, string> = {
   overview: "chart.bar.fill",
-  daily: "calendar",
-  dishItems: "list.bullet",
-  dishCats: "square.grid.2x2.fill",
+  daily_payment: "calendar",
+  dish_by_name: "list.bullet",
+  dish_by_category: "square.grid.2x2.fill",
+  dish_by_subcategory: "square.grid.3x3.fill",
+  dish_by_spec: "list.number",
+  time_slot_order: "clock.fill",
+  time_slot_checkout: "clock.arrow.circlepath",
+  revenue_statement: "dollarsign.circle.fill",
   unknown: "doc.fill",
+};
+
+const FILE_TYPE_COLORS: Record<ReportFileType, string> = {
+  overview: "#007AFF",
+  daily_payment: "#34C759",
+  dish_by_name: "#FF9500",
+  dish_by_category: "#5856D6",
+  dish_by_subcategory: "#AF52DE",
+  dish_by_spec: "#FF6B35",
+  time_slot_order: "#00C7BE",
+  time_slot_checkout: "#30B0C7",
+  revenue_statement: "#FF2D55",
+  unknown: "#8E8E93",
 };
 
 interface UploadedFile {
@@ -58,7 +63,22 @@ interface UploadedFile {
   uri: string;
   type: ReportFileType;
   base64?: string;
+  /** 是否正在识别内容 */
+  detecting?: boolean;
 }
+
+// ─── 所有支持的报表（用于说明卡片） ───────────────────────────────────────────
+const ALL_REPORT_TYPES: ReportFileType[] = [
+  "overview",
+  "daily_payment",
+  "dish_by_category",
+  "dish_by_subcategory",
+  "dish_by_name",
+  "dish_by_spec",
+  "time_slot_order",
+  "time_slot_checkout",
+  "revenue_statement",
+];
 
 // ─── 主页面 ───────────────────────────────────────────────────────────────────
 export default function MonthlyReportImportScreen() {
@@ -66,12 +86,15 @@ export default function MonthlyReportImportScreen() {
   const router = useRouter();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
   const { addReport } = useMonthlyReportStore();
+  const { upsertSnapshot } = useDishAnalysisStore();
 
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<MonthlyReport | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const [missingTypes, setMissingTypes] = useState<ReportFileType[]>([]);
 
+  // ─── 文件选择 ──────────────────────────────────────────────────────────────
   const handlePickFiles = async () => {
     tap();
     try {
@@ -87,11 +110,15 @@ export default function MonthlyReportImportScreen() {
       const newFiles: UploadedFile[] = [];
       for (const asset of result.assets) {
         const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 });
-        const type = detectFileType(asset.name);
+        // 先按文件名识别，再按内容精确识别
+        let type = detectReportTypeByFilename(asset.name);
+        if (type === "unknown" || type === "dish_by_name" || type === "time_slot_order") {
+          const contentType = detectReportTypeByContent(base64);
+          if (contentType !== "unknown") type = contentType;
+        }
         newFiles.push({ name: asset.name, uri: asset.uri, type, base64 });
       }
       setFiles((prev) => {
-        // 去重（按文件名）
         const existing = new Set(prev.map((f) => f.name));
         return [...prev, ...newFiles.filter((f) => !existing.has(f.name))];
       });
@@ -110,33 +137,27 @@ export default function MonthlyReportImportScreen() {
     setFiles((prev) => prev.map((f) => f.name === name ? { ...f, type } : f));
   };
 
+  // ─── 计算缺失报表 ──────────────────────────────────────────────────────────
+  const detectedTypes = new Set(files.map((f) => f.type));
+  const missing = REQUIRED_REPORT_TYPES.filter((t) => !detectedTypes.has(t));
+
+  // ─── 解析并预览 ────────────────────────────────────────────────────────────
   const handleParse = async () => {
     if (files.length === 0) { Alert.alert("请先选择文件"); return; }
     tap();
     setLoading(true);
     try {
-      // 按类型分配文件
-      // 两个菜品销售统计文件：按文件名中的时间戳区分大类（较大时间戳）和明细（较小时间戳）
+      // 1. 解析营业概览（传统路径，写入 MonthlyReport）
       const overviewFile = files.find((f) => f.type === "overview");
-      const dailyFile = files.find((f) => f.type === "daily");
-      const dishFiles = files.filter((f) => f.type === "dishItems" || f.type === "dishCats");
-
-      // 两个菜品文件：按文件名排序，时间戳较大的是大类（0340），较小的是明细（0337）
-      let dishItemsFile: UploadedFile | undefined;
-      let dishCatsFile: UploadedFile | undefined;
-      if (dishFiles.length >= 2) {
-        const sorted = [...dishFiles].sort((a, b) => a.name.localeCompare(b.name));
-        dishItemsFile = sorted[0]; // 较早（0337）= 菜品名称
-        dishCatsFile = sorted[1];  // 较晚（0340）= 菜品大类
-      } else if (dishFiles.length === 1) {
-        dishItemsFile = dishFiles[0];
-      }
+      const dailyFile = files.find((f) => f.type === "daily_payment");
+      const dishNameFile = files.find((f) => f.type === "dish_by_name");
+      const dishCatFile = files.find((f) => f.type === "dish_by_category");
 
       const { report, error } = parseMonthlyReport({
         overviewBase64: overviewFile?.base64,
         dailyBase64: dailyFile?.base64,
-        dishItemsBase64: dishItemsFile?.base64,
-        dishCatsBase64: dishCatsFile?.base64,
+        dishItemsBase64: dishNameFile?.base64,
+        dishCatsBase64: dishCatFile?.base64,
       });
 
       setLoading(false);
@@ -144,6 +165,22 @@ export default function MonthlyReportImportScreen() {
         Alert.alert("解析失败", error ?? "未能识别报表数据");
         return;
       }
+
+      // 2. 解析菜品分析（新路径，写入 DishAnalysisSnapshot）
+      const dishFiles = files
+        .filter((f) => f.base64 && f.type !== "overview")
+        .map((f) => ({ base64: f.base64!, filename: f.name }));
+
+      if (dishFiles.length > 0) {
+        const { snapshot } = parseDishAnalysis({ files: dishFiles });
+        if (snapshot.month) {
+          upsertSnapshot(snapshot);
+        }
+      }
+
+      // 3. 检测缺失报表
+      const missing = REQUIRED_REPORT_TYPES.filter((t) => !detectedTypes.has(t));
+      setMissingTypes(missing);
       setPreview(report);
       setShowPreview(true);
     } catch (e) {
@@ -158,14 +195,26 @@ export default function MonthlyReportImportScreen() {
     setShowPreview(false);
     setPreview(null);
     setFiles([]);
-    Alert.alert(
-      "导入成功",
-      `${preview.monthLabel} 经营报告已导入\n营业收入 ¥${preview.kpi.revenue.toFixed(0)}\n订单量 ${preview.kpi.orderCount} 单`,
-      [
-        { text: "查看分析", onPress: () => router.replace("/monthly-report" as any) },
-        { text: "继续导入" },
-      ]
-    );
+
+    if (missingTypes.length > 0) {
+      Alert.alert(
+        "导入成功（部分）",
+        `${preview.monthLabel} 报告已导入\n\n⚠️ 以下报表尚未导入：\n${missingTypes.map((t) => `• ${REPORT_FILE_TYPE_LABELS[t]}`).join("\n")}\n\n可稍后补充导入。`,
+        [
+          { text: "查看分析", onPress: () => router.replace("/monthly-report" as any) },
+          { text: "继续导入" },
+        ]
+      );
+    } else {
+      Alert.alert(
+        "导入成功",
+        `${preview.monthLabel} 经营报告已完整导入\n营业收入 ¥${preview.kpi.revenue.toFixed(0)}\n订单量 ${preview.kpi.orderCount} 单`,
+        [
+          { text: "查看分析", onPress: () => router.replace("/monthly-report" as any) },
+          { text: "继续导入" },
+        ]
+      );
+    }
   };
 
   return (
@@ -183,18 +232,30 @@ export default function MonthlyReportImportScreen() {
         {/* 说明卡片 */}
         <View style={[S.infoCard, { backgroundColor: colors.primary + "0e", borderColor: colors.primary + "33" }]}>
           <Text style={[S.infoTitle, { color: colors.primary }]}>支持的报表文件（美团收银系统导出）</Text>
-          <View style={{ gap: 6, marginTop: 8 }}>
-            {[
-              { icon: "chart.bar.fill", label: "营业概览.xlsx", desc: "KPI/收款/菜品/顾客 4个工作表" },
-              { icon: "calendar", label: "综合收款统计.xlsx", desc: "日度收款明细（31天）" },
-              { icon: "list.bullet", label: "菜品销售统计（菜品名称）.xlsx", desc: "按菜品名称排行" },
-              { icon: "square.grid.2x2.fill", label: "菜品销售统计（菜品大类）.xlsx", desc: "按大类汇总" },
-            ].map((item, i) => (
-              <View key={i} style={{ flexDirection: "row", alignItems: "flex-start", gap: 8 }}>
-                <IconSymbol name={item.icon as any} size={14} color={colors.primary} />
-                <View>
-                  <Text style={{ fontSize: 12, fontWeight: "600", color: colors.foreground }}>{item.label}</Text>
-                  <Text style={{ fontSize: 11, color: colors.muted }}>{item.desc}</Text>
+          <View style={{ gap: 8, marginTop: 10 }}>
+            {/* 必要报表 */}
+            <Text style={{ fontSize: 11, color: colors.muted, fontWeight: "600" }}>必要报表</Text>
+            {REQUIRED_REPORT_TYPES.map((type) => (
+              <View key={type} style={{ flexDirection: "row", alignItems: "flex-start", gap: 8 }}>
+                <View style={[S.typeIconBadge, { backgroundColor: FILE_TYPE_COLORS[type] + "22" }]}>
+                  <IconSymbol name={FILE_TYPE_ICONS[type] as any} size={12} color={FILE_TYPE_COLORS[type]} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 12, fontWeight: "600", color: colors.foreground }}>{REPORT_FILE_TYPE_LABELS[type]}.xlsx</Text>
+                  <Text style={{ fontSize: 11, color: colors.muted }}>{REPORT_FILE_TYPE_DESC[type]}</Text>
+                </View>
+              </View>
+            ))}
+            {/* 可选报表 */}
+            <Text style={{ fontSize: 11, color: colors.muted, fontWeight: "600", marginTop: 4 }}>可选报表</Text>
+            {OPTIONAL_REPORT_TYPES.map((type) => (
+              <View key={type} style={{ flexDirection: "row", alignItems: "flex-start", gap: 8 }}>
+                <View style={[S.typeIconBadge, { backgroundColor: FILE_TYPE_COLORS[type] + "15" }]}>
+                  <IconSymbol name={FILE_TYPE_ICONS[type] as any} size={12} color={FILE_TYPE_COLORS[type] + "99"} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 12, color: colors.muted }}>{REPORT_FILE_TYPE_LABELS[type]}.xlsx</Text>
+                  <Text style={{ fontSize: 11, color: colors.muted + "99" }}>{REPORT_FILE_TYPE_DESC[type]}</Text>
                 </View>
               </View>
             ))}
@@ -214,26 +275,38 @@ export default function MonthlyReportImportScreen() {
         {/* 已选文件列表 */}
         {files.length > 0 && (
           <View style={[S.fileList, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={[S.fileListTitle, { color: colors.foreground }]}>已选文件（{files.length}个）</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+              <Text style={[S.fileListTitle, { color: colors.foreground }]}>已选文件（{files.length}个）</Text>
+              {missing.length > 0 && (
+                <View style={[S.missingBadge, { backgroundColor: colors.warning + "22" }]}>
+                  <Text style={{ fontSize: 10, color: colors.warning, fontWeight: "600" }}>
+                    缺失 {missing.length} 种
+                  </Text>
+                </View>
+              )}
+            </View>
+
             {files.map((f) => (
               <View key={f.name} style={[S.fileRow, { borderBottomColor: colors.border }]}>
-                <IconSymbol name={FILE_TYPE_ICONS[f.type] as any} size={16} color={f.type === "unknown" ? colors.muted : colors.primary} />
+                <View style={[S.typeIconBadge, { backgroundColor: FILE_TYPE_COLORS[f.type] + "22" }]}>
+                  <IconSymbol name={FILE_TYPE_ICONS[f.type] as any} size={14} color={FILE_TYPE_COLORS[f.type]} />
+                </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[S.fileName, { color: colors.foreground }]} numberOfLines={1}>{f.name}</Text>
-                  <Text style={[S.fileType, { color: f.type === "unknown" ? colors.warning : colors.success }]}>
-                    {FILE_TYPE_LABELS[f.type]}
+                  <Text style={[S.fileType, { color: f.type === "unknown" ? colors.warning : FILE_TYPE_COLORS[f.type] }]}>
+                    {f.type === "unknown" ? "⚠️ 未识别" : `✓ ${REPORT_FILE_TYPE_LABELS[f.type]}`}
                   </Text>
                 </View>
                 {/* 手动修正类型 */}
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxWidth: 120 }}>
-                  {(["overview", "daily", "dishItems", "dishCats"] as ReportFileType[]).map((t) => (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxWidth: 130 }}>
+                  {ALL_REPORT_TYPES.map((t) => (
                     <TouchableOpacity key={t} onPress={() => handleSetType(f.name, t)}
                       style={[S.typeChip, {
-                        backgroundColor: f.type === t ? colors.primary : colors.border + "44",
-                        marginRight: 4,
+                        backgroundColor: f.type === t ? FILE_TYPE_COLORS[t] : colors.border + "44",
+                        marginRight: 3,
                       }]}>
-                      <Text style={{ fontSize: 9, color: f.type === t ? "#fff" : colors.muted }}>
-                        {FILE_TYPE_LABELS[t].slice(0, 4)}
+                      <Text style={{ fontSize: 8, color: f.type === t ? "#fff" : colors.muted }}>
+                        {REPORT_FILE_TYPE_LABELS[t].slice(0, 4)}
                       </Text>
                     </TouchableOpacity>
                   ))}
@@ -243,15 +316,32 @@ export default function MonthlyReportImportScreen() {
                 </Pressable>
               </View>
             ))}
+
+            {/* 缺失报表提示 */}
+            {missing.length > 0 && (
+              <View style={[S.missingSection, { backgroundColor: colors.warning + "11", borderColor: colors.warning + "33" }]}>
+                <Text style={{ fontSize: 12, fontWeight: "700", color: colors.warning, marginBottom: 4 }}>
+                  ⚠️ 以下必要报表尚未选择
+                </Text>
+                {missing.map((t) => (
+                  <Text key={t} style={{ fontSize: 11, color: colors.warning }}>
+                    • {REPORT_FILE_TYPE_LABELS[t]}
+                  </Text>
+                ))}
+                <Text style={{ fontSize: 11, color: colors.muted, marginTop: 4 }}>
+                  可以先解析已有文件，稍后补充导入缺失报表。
+                </Text>
+              </View>
+            )}
           </View>
         )}
 
         {/* 解析按钮 */}
         {files.length > 0 && (
           <TouchableOpacity onPress={handleParse} disabled={loading}
-            style={[S.parseBtn, { backgroundColor: loading ? colors.border : colors.success ?? "#10B981" }]}>
+            style={[S.parseBtn, { backgroundColor: loading ? colors.border : "#10B981" }]}>
             {loading ? <ActivityIndicator color="#fff" /> : <IconSymbol name="checkmark.circle.fill" size={20} color="#fff" />}
-            <Text style={S.parseBtnText}>{loading ? "解析中…" : "解析并预览"}</Text>
+            <Text style={S.parseBtnText}>{loading ? "解析中…" : `解析 ${files.length} 个文件`}</Text>
           </TouchableOpacity>
         )}
       </ScrollView>
@@ -265,7 +355,9 @@ export default function MonthlyReportImportScreen() {
             </Pressable>
             <View style={{ alignItems: "center" }}>
               <Text style={[S.previewTitle, { color: colors.foreground }]}>{preview?.monthLabel}</Text>
-              <Text style={{ fontSize: 12, color: colors.muted }}>预览导入数据</Text>
+              <Text style={{ fontSize: 12, color: colors.muted }}>
+                {missingTypes.length === 0 ? "✓ 数据完整" : `⚠️ 缺失 ${missingTypes.length} 种报表`}
+              </Text>
             </View>
             <Pressable onPress={handleConfirm}>
               <Text style={[S.sheetDone, { color: colors.primary }]}>确认导入</Text>
@@ -274,6 +366,31 @@ export default function MonthlyReportImportScreen() {
 
           {preview && (
             <ScrollView contentContainerStyle={{ padding: 20 }}>
+              {/* 导入状态总览 */}
+              <View style={[S.importStatusCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground, marginBottom: 8 }}>
+                  已识别报表
+                </Text>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                  {files.filter((f) => f.type !== "unknown").map((f) => (
+                    <View key={f.name} style={[S.importedBadge, { backgroundColor: FILE_TYPE_COLORS[f.type] + "22" }]}>
+                      <IconSymbol name={FILE_TYPE_ICONS[f.type] as any} size={10} color={FILE_TYPE_COLORS[f.type]} />
+                      <Text style={{ fontSize: 10, color: FILE_TYPE_COLORS[f.type], fontWeight: "600" }}>
+                        {REPORT_FILE_TYPE_LABELS[f.type]}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+                {missingTypes.length > 0 && (
+                  <View style={{ marginTop: 8 }}>
+                    <Text style={{ fontSize: 11, color: colors.warning, fontWeight: "600" }}>缺失：</Text>
+                    {missingTypes.map((t) => (
+                      <Text key={t} style={{ fontSize: 11, color: colors.warning }}>• {REPORT_FILE_TYPE_LABELS[t]}</Text>
+                    ))}
+                  </View>
+                )}
+              </View>
+
               {/* KPI 摘要 */}
               <View style={[S.previewKpiCard, { backgroundColor: colors.primary + "0a", borderColor: colors.primary + "22" }]}>
                 <Text style={[S.previewKpiTitle, { color: colors.primary }]}>营业收入</Text>
@@ -303,7 +420,7 @@ export default function MonthlyReportImportScreen() {
                   <Text style={[S.previewSectionTitle, { color: colors.foreground }]}>
                     菜品大类（{preview.dishCategories.length}类）
                   </Text>
-                  {preview.dishCategories.slice(0, 5).map((cat, i) => (
+                  {preview.dishCategories.slice(0, 6).map((cat, i) => (
                     <View key={i} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 4 }}>
                       <Text style={{ fontSize: 12, color: colors.muted }}>{cat.name}</Text>
                       <Text style={{ fontSize: 12, fontWeight: "600", color: colors.foreground }}>
@@ -311,11 +428,6 @@ export default function MonthlyReportImportScreen() {
                       </Text>
                     </View>
                   ))}
-                  {preview.dishCategories.length > 5 && (
-                    <Text style={{ fontSize: 11, color: colors.muted, marginTop: 4 }}>
-                      …还有 {preview.dishCategories.length - 5} 类
-                    </Text>
-                  )}
                 </View>
               )}
 
@@ -323,7 +435,7 @@ export default function MonthlyReportImportScreen() {
               {preview.paymentMethods.length > 0 && (
                 <View style={[S.previewSection, { borderColor: colors.border }]}>
                   <Text style={[S.previewSectionTitle, { color: colors.foreground }]}>
-                    收款方式（{preview.paymentMethods.length}种）
+                    收款方式（{preview.paymentMethods.filter((p) => p.amount > 0).length}种）
                   </Text>
                   {preview.paymentMethods.filter((p) => p.amount > 0).slice(0, 5).map((p, i) => (
                     <View key={i} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 4 }}>
@@ -380,14 +492,17 @@ const S = StyleSheet.create({
   infoCard: { borderRadius: 14, borderWidth: 1, padding: 16, marginBottom: 20 },
   infoTitle: { fontSize: 14, fontWeight: "700" },
   infoHint: { fontSize: 11, marginTop: 10, lineHeight: 16 },
+  typeIconBadge: { width: 24, height: 24, borderRadius: 6, alignItems: "center", justifyContent: "center" },
   pickBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, borderRadius: 14, paddingVertical: 16, marginBottom: 16 },
   pickBtnText: { color: "#fff", fontSize: 17, fontWeight: "600" },
   fileList: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 16 },
-  fileListTitle: { fontSize: 14, fontWeight: "700", marginBottom: 10 },
+  fileListTitle: { fontSize: 14, fontWeight: "700" },
+  missingBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
   fileRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth },
   fileName: { fontSize: 12, fontWeight: "500" },
   fileType: { fontSize: 11, marginTop: 1 },
-  typeChip: { paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6 },
+  typeChip: { paddingHorizontal: 5, paddingVertical: 3, borderRadius: 5 },
+  missingSection: { borderRadius: 10, borderWidth: 1, padding: 10, marginTop: 10 },
   parseBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, borderRadius: 14, paddingVertical: 16 },
   parseBtnText: { color: "#fff", fontSize: 17, fontWeight: "600" },
   previewSheet: { flex: 1 },
@@ -395,6 +510,8 @@ const S = StyleSheet.create({
   previewTitle: { fontSize: 17, fontWeight: "700" },
   sheetCancel: { fontSize: 17 },
   sheetDone: { fontSize: 17, fontWeight: "600" },
+  importStatusCard: { borderRadius: 12, borderWidth: 1, padding: 14, marginBottom: 12 },
+  importedBadge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
   previewKpiCard: { borderRadius: 12, borderWidth: 1, padding: 14, marginBottom: 12 },
   previewKpiTitle: { fontSize: 12 },
   previewKpiValue: { fontSize: 28, fontWeight: "800" },

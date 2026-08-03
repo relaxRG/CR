@@ -48,6 +48,8 @@ import { IceInventoryProvider } from "@/lib/ice/inventory-store";
 import { FruitProvider } from "@/lib/fruit/store";
 import { PeriodAnalysisProvider } from "@/lib/store/period-analysis/store";
 import { MonthlySummaryProvider } from "@/lib/store/monthly-summary/store";
+import { DishAnalysisProvider } from "@/lib/store/monthly-report/dish-analysis-store";
+import { ScheduleProvider } from "@/lib/store/period-analysis/schedule-store";
 import { BeerInventoryProvider } from "@/lib/beer/inventory-store";
 import { IceNewInventoryProvider } from "@/lib/ice/new-inventory-store";
 import { FruitNewInventoryProvider } from "@/lib/fruit/new-inventory-store";
@@ -159,6 +161,8 @@ export default function RootLayout() {
           <TablewareInventoryProvider>
           <DailyInventoryProvider>
           <EquipmentInventoryProvider>
+          <DishAnalysisProvider>
+          <ScheduleProvider>
           <PeriodAnalysisProvider>
           <MonthlySummaryProvider>
             <Stack screenOptions={{ headerShown: false }}>
@@ -235,10 +239,13 @@ export default function RootLayout() {
               <Stack.Screen name="period-analysis" />
               <Stack.Screen name="monthly-summary" />
               <Stack.Screen name="suppliers" />
+              <Stack.Screen name="dish-analysis" />
             </Stack>
             <StatusBar style="auto" />
           </MonthlySummaryProvider>
           </PeriodAnalysisProvider>
+          </ScheduleProvider>
+          </DishAnalysisProvider>
           </EquipmentInventoryProvider>
           </DailyInventoryProvider>
           </TablewareInventoryProvider>
