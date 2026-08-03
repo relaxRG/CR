@@ -14,6 +14,7 @@
 
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
+import * as Print from "expo-print";
 import { SpiritItem, SpiritPurchaseRecord, SpiritLedgerEntry } from "./types";
 
 // ─── 类型定义 ─────────────────────────────────────────────────────────────────
@@ -44,7 +45,8 @@ function now() {
 
 // ─── Excel 导出 ───────────────────────────────────────────────────────────────
 export async function exportToExcel(data: ExportData): Promise<void> {
-  const XLSX = require("xlsx");
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const XLSX = require("xlsx") as typeof import("xlsx");
   const { month, items, purchases, ledger, getRefPrice, categorySummary, supplierSummary } = data;
   const monthPurchases = purchases.filter((p) => p.month === month);
   const monthLedger = ledger.filter((e) => e.month === month);
@@ -209,7 +211,8 @@ export async function exportToExcel(data: ExportData): Promise<void> {
   // ── 写入文件并分享 ────────────────────────────────────────────────────────────
   const base64 = XLSX.write(wb, { type: "base64", bookType: "xlsx" });
   const fileName = `烈酒库存_${month}_${now()}.xlsx`;
-  const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
+  const cacheDir = FileSystem.cacheDirectory ?? "file://tmp/";
+  const fileUri = `${cacheDir}${fileName}`;
   await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: FileSystem.EncodingType.Base64 });
 
   const canShare = await Sharing.isAvailableAsync();
@@ -223,7 +226,6 @@ export async function exportToExcel(data: ExportData): Promise<void> {
 
 // ─── PDF 导出 ─────────────────────────────────────────────────────────────────
 export async function exportToPdf(data: ExportData): Promise<void> {
-  const Print = require("expo-print");
   const { month, items, purchases, ledger, getRefPrice, categorySummary, supplierSummary } = data;
   const monthPurchases = purchases.filter((p) => p.month === month);
   const monthLedger = ledger.filter((e) => e.month === month);
@@ -386,15 +388,12 @@ export async function exportToPdf(data: ExportData): Promise<void> {
 </html>`;
 
   // ── 生成 PDF 文件并分享 ────────────────────────────────────────────────────────
-  const { uri } = await Print.printToFileAsync({ html, base64: false });
-  // expo-print 生成的文件在缓存目录，重命名为有意义的文件名
-  const fileName = `烈酒库存_${month}_${now()}.pdf`;
-  const destUri = `${FileSystem.cacheDirectory}${fileName}`;
-  await FileSystem.moveAsync({ from: uri, to: destUri });
-
+  const { uri } = await Print.printToFileAsync({ html });
+  // expo-print 生成的文件已在缓存目录，直接分享该 uri
+  // （避免 moveAsync 在部分设备上失败）
   const canShare = await Sharing.isAvailableAsync();
   if (!canShare) throw new Error("当前设备不支持文件分享");
-  await Sharing.shareAsync(destUri, {
+  await Sharing.shareAsync(uri, {
     mimeType: "application/pdf",
     dialogTitle: `导出 ${monthLabel(month)} 烈酒库存报告`,
     UTI: "com.adobe.pdf",
