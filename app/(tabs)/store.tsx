@@ -51,7 +51,8 @@ function ReportModule({ insets }: { insets: any }) {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 8, gap: 8 }}>
+        style={{ flexGrow: 0 }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 8, gap: 8, alignItems: "center" }}>
         {REPORT_TABS.map((t) => {
           const active = reportTab === t.key;
           return (
@@ -161,7 +162,8 @@ export default function StoreScreen() {
         {/* 清单模块子 Tab */}
         {mainTab === "list" && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingVertical: 8, gap: 8 }}>
+            style={{ flexGrow: 0 }}
+            contentContainerStyle={{ paddingVertical: 8, gap: 8, alignItems: "center" }}>
             {LIST_TABS.map((t) => {
               const active = listTab === t.key;
               return (

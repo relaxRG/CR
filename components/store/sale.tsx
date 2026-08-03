@@ -211,7 +211,8 @@ export default function StoreSaleScreen() {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       {/* 分类 Tab */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 8, gap: 8 }}>
+        style={{ flexGrow: 0 }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 8, gap: 8, alignItems: "center" }}>
         {CATS.map((item) => {
           const active = cat === item.key;
           return (

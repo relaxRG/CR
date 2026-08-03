@@ -297,7 +297,8 @@ export default function MonthlyReportScreen() {
       {/* 月份选择器 */}
       {reports.length > 1 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 8, gap: 8 }}>
+          style={{ flexGrow: 0 }}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 8, gap: 8, alignItems: "center" }}>
           {reports.map((r) => (
             <TouchableOpacity key={r.id} onPress={() => { tap(); setSelectedId(r.id); }}
               style={[S.monthChip, {

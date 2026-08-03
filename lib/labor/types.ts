@@ -74,6 +74,25 @@ export interface Employee {
   monthlyFixedSalary: number;
   /** 銀行卡信息（用于薪资发放） */
   bankAccounts?: EmployeeBankAccount[];
+  // ─── 详细档案信息 ───────────────────────────────────────────────────────────
+  /** 身份证号 */
+  idNumber?: string;
+  /** 住址 */
+  address?: string;
+  /** 紧急联系人姓名 */
+  emergencyContactName?: string;
+  /** 紧急联系人电话 */
+  emergencyContactPhone?: string;
+  /** 紧急联系人关系 */
+  emergencyContactRelation?: string;
+  /** 身份证件图片 URI（本地或 base64） */
+  idCardImageUri?: string;
+  /** 健康证件图片 URI */
+  healthCertImageUri?: string;
+  /** 健康证到期日期 YYYY-MM-DD */
+  healthCertExpiry?: string;
+  /** 入职日期 YYYY-MM-DD */
+  joinDate?: string;
   /** 创建时间 */
   createdAt: string;
 }

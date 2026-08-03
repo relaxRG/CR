@@ -214,7 +214,8 @@ export default function FoodInventoryScreen() {
 
       {/* Tab */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 8, gap: 8 }}>
+        style={{ flexGrow: 0 }}
+        contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 8, gap: 8, alignItems: "center" }}>
         {TABS.map((t) => (
           <TouchableOpacity key={t.key} onPress={() => { tap(); setTab(t.key); }}
             style={[S.tabChip, {

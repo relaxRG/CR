@@ -281,7 +281,7 @@ export default function MonthlySummaryScreen() {
   const insets = useSafeAreaInsets();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
-  const { reports, upsertReport, getReport, getPaymentsForMonth, getBalancesForMonth, upsertBalance, addPaymentEntry, suppliers } = useMonthlySummaryStore();
+  const { reports, upsertReport, getReport, getPaymentsForMonth, getBalancesForMonth, upsertBalance, upsertPayment, addPaymentEntry, suppliers } = useMonthlySummaryStore();
   const { employees } = useEmployeeStore();
 
   const [tab, setTab] = useState<MainTab>("report");
@@ -295,6 +295,7 @@ export default function MonthlySummaryScreen() {
   const [balanceAccountType, setBalanceAccountType] = useState<AccountType>("company");
   const [editingBalance, setEditingBalance] = useState<AccountBalance | null>(null);
   const [copyToast, setCopyToast] = useState("");
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
 
   const report = useMemo(() => getReport(selectedMonth), [reports, selectedMonth]);
   const payments = useMemo(() => getPaymentsForMonth(selectedMonth), [selectedMonth]);
@@ -332,6 +333,251 @@ export default function MonthlySummaryScreen() {
   const handleDeleteManualItem = (id: string) => {
     const r = getOrCreateReport();
     upsertReport({ ...r, manualItems: r.manualItems.filter((i) => i.id !== id), updatedAt: new Date().toISOString() });
+  };
+
+  // ── 单页滚动视图（主入口） ────────────────────────────────────────────────────
+  const renderSinglePage = () => {
+    const allItems = [...(report?.lineItems ?? []), ...(report?.manualItems ?? [])];
+    const sections = CATEGORY_SECTIONS.map((cs) => ({
+      ...cs,
+      items: allItems.filter((i) => i.category === cs.key),
+      subtotal: allItems.filter((i) => i.category === cs.key && !i.isDuplicate).reduce((s, i) => s + i.amount, 0),
+    }));
+    const totalRevenue = sections.find((s) => s.key === "revenue")?.subtotal ?? 0;
+    const totalExpenses = sections.filter((s) => s.key !== "revenue").reduce((s, sec) => s + sec.subtotal, 0);
+    const netProfit = totalRevenue + totalExpenses;
+    const accountTypes: AccountType[] = ["company", "personal", "petty", "pos"];
+    const payrollPayments = payments.filter((p) => p.payeeType === "employee");
+    const supplierPayments = payments.filter((p) => p.payeeType === "supplier");
+
+    const handleMarkSupplierPaid = (payment: MonthlyPaymentRecord, supName: string) => {
+      if (payment.status === "paid") return;
+      const advAmt = payment.advanceAmount ?? 0;
+      const actualRemaining = payment.totalAmount - advAmt - payment.paidAmount;
+      Alert.alert("标记已付款", `确认已向 ${supName} 付款？\n实付：¥${actualRemaining.toFixed(2)}`, [
+        { text: "取消", style: "cancel" },
+        { text: "确认已付款", onPress: () => {
+          const now = new Date().toISOString();
+          upsertPayment({ ...payment, advanceAmount: payment.advanceAmount ?? 0, paidAmount: payment.totalAmount, remainingAmount: 0, status: "paid",
+            payments: [...payment.payments, { id: uuid(), date: now.slice(0, 10), amount: actualRemaining, bankAccountId: "", paymentMethod: "转账", notes: `${selectedMonth} 货款`, paidAt: now }],
+            updatedAt: now });
+          tap();
+        }},
+      ]);
+    };
+
+    return (
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }}>
+        <MonthSelector selectedMonth={selectedMonth} onSelect={setSelectedMonth} colors={colors} />
+
+        {/* 净利润大卡 */}
+        <View style={[S.profitCard, { backgroundColor: netProfit >= 0 ? "#34C75908" : colors.error + "08", borderColor: netProfit >= 0 ? "#34C75933" : colors.error + "33" }]}>
+          <Text style={{ fontSize: 12, color: colors.muted }}>本月净利润</Text>
+          <Text style={{ fontSize: 32, fontWeight: "800", color: netProfit >= 0 ? "#34C759" : colors.error }}>{netProfit >= 0 ? "+" : ""}¥{netProfit.toFixed(2)}</Text>
+          <View style={{ flexDirection: "row", gap: 16, marginTop: 8 }}>
+            <View><Text style={{ fontSize: 10, color: colors.muted }}>总收入</Text><Text style={{ fontSize: 14, fontWeight: "600", color: "#34C759" }}>+¥{totalRevenue.toFixed(2)}</Text></View>
+            <View><Text style={{ fontSize: 10, color: colors.muted }}>总支出</Text><Text style={{ fontSize: 14, fontWeight: "600", color: colors.error }}>-¥{Math.abs(totalExpenses).toFixed(2)}</Text></View>
+          </View>
+        </View>
+
+        {/* 四账户格子 2×2 */}
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+          {accountTypes.map((at) => {
+            const bal = balances.find((b) => b.accountType === at);
+            const color = ACCOUNT_TYPE_COLORS[at];
+            return (
+              <TouchableOpacity key={at} onPress={() => { tap(); setBalanceAccountType(at); setEditingBalance(bal ?? null); setShowBalanceModal(true); }}
+                style={[S.accountMini, { backgroundColor: color + "0a", borderColor: color + "33" }]}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 4 }}>
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />
+                  <Text style={{ fontSize: 11, fontWeight: "700", color }}>{ACCOUNT_TYPE_LABELS[at]}</Text>
+                  {bal?.isReconciled && <IconSymbol name="checkmark.circle.fill" size={10} color="#34C759" />}
+                </View>
+                {bal ? (
+                  <><Text style={{ fontSize: 16, fontWeight: "800", color: colors.foreground }}>¥{bal.closingBalance.toFixed(0)}</Text>
+                  <Text style={{ fontSize: 10, color: colors.muted }}>{bal.accountName}</Text></>
+                ) : (
+                  <Text style={{ fontSize: 12, color: colors.muted }}>未录入 · 点击录入</Text>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* 各科目分组 */}
+        {sections.map((sec) => {
+          const isLabor = sec.key === "labor";
+          const isCogs = sec.key === "cogs_food" || sec.key === "cogs_beverage";
+          return (
+            <View key={sec.key} style={[S.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <View style={[S.sectionHeader, { borderBottomColor: colors.border }]}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <View style={{ width: 4, height: 16, borderRadius: 2, backgroundColor: sec.color }} />
+                  <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>{sec.label}</Text>
+                </View>
+                <Text style={{ fontSize: 14, fontWeight: "700", color: sec.sign > 0 ? "#34C759" : colors.error }}>{sec.sign > 0 ? "+" : ""}¥{sec.subtotal.toFixed(2)}</Text>
+              </View>
+              {sec.items.map((item) => (
+                <TouchableOpacity key={item.id} onLongPress={() => {
+                  if (item.isManual) Alert.alert("操作", item.label, [
+                    { text: "编辑", onPress: () => { setEditingItem(item); setShowManualModal(true); } },
+                    { text: "删除", style: "destructive", onPress: () => handleDeleteManualItem(item.id) },
+                    { text: "取消", style: "cancel" },
+                  ]);
+                }}><LineItemRow item={item} colors={colors} /></TouchableOpacity>
+              ))}
+              {sec.items.length === 0 && (
+                <View style={{ padding: 12, alignItems: "center" }}>
+                  <Text style={{ fontSize: 12, color: colors.muted }}>暂无数据 · 长按手动录入行可编辑</Text>
+                </View>
+              )}
+              {/* 工资科目：内嵌员工薪资卡片 */}
+              {isLabor && payrollPayments.length > 0 && (
+                <View style={{ padding: 10, gap: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                    <Text style={{ fontSize: 11, fontWeight: "700", color: colors.muted }}>工资发放明细</Text>
+                    <Text style={{ fontSize: 11, color: colors.error }}>待发 ¥{payrollPayments.reduce((s, p) => s + p.remainingAmount, 0).toFixed(0)}</Text>
+                  </View>
+                  {employees.filter((e) => e.active).map((emp) => {
+                    const payment = payrollPayments.find((p) => p.payeeId === emp.id);
+                    const defaultBank = emp.bankAccounts?.find((b) => b.isDefault) ?? emp.bankAccounts?.[0];
+                    const totalAmt = payment?.totalAmount ?? 0;
+                    const advAmt = payment?.advanceAmount ?? 0;
+                    const paidAmt = payment?.paidAmount ?? 0;
+                    const actualRemaining = Math.max(0, totalAmt - advAmt - paidAmt);
+                    const status = payment?.status ?? "unpaid";
+                    const statusColor = status === "paid" ? "#34C759" : status === "partial" ? colors.warning : colors.error;
+                    if (totalAmt === 0 && !payment) return null;
+                    return (
+                      <View key={emp.id} style={[S.inlineCard, { borderLeftColor: statusColor }]}>
+                        <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 4 }}>
+                          <Text style={{ flex: 1, fontSize: 13, fontWeight: "700", color: colors.foreground }}>{emp.realName} <Text style={{ fontSize: 11, color: colors.muted }}>（{emp.code}）</Text></Text>
+                          <View style={[S.statusTag, { backgroundColor: statusColor + "18" }]}>
+                            <Text style={{ fontSize: 10, fontWeight: "700", color: statusColor }}>{status === "paid" ? "✓ 已发" : status === "partial" ? "部分" : "待发"}</Text>
+                          </View>
+                        </View>
+                        <View style={{ flexDirection: "row", gap: 10, marginBottom: 6 }}>
+                          <View style={S.amtBlock}><Text style={S.amtLabel}>应发</Text><Text style={[S.amtValue, { color: colors.foreground }]}>¥{totalAmt.toFixed(0)}</Text></View>
+                          {advAmt > 0 && <View style={S.amtBlock}><Text style={S.amtLabel}>预支</Text><Text style={[S.amtValue, { color: colors.warning }]}>-¥{advAmt.toFixed(0)}</Text></View>}
+                          {paidAmt > 0 && <View style={S.amtBlock}><Text style={S.amtLabel}>已发</Text><Text style={[S.amtValue, { color: "#34C759" }]}>¥{paidAmt.toFixed(0)}</Text></View>}
+                          <View style={S.amtBlock}><Text style={S.amtLabel}>{advAmt > 0 ? "实发" : "待发"}</Text><Text style={[S.amtValue, { color: actualRemaining > 0 ? colors.error : "#34C759", fontWeight: "800" }]}>¥{actualRemaining.toFixed(0)}</Text></View>
+                        </View>
+                        {defaultBank && (
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                            <Text style={{ flex: 1, fontSize: 11, color: colors.muted }}>{defaultBank.bankName} {maskCardNumber(defaultBank.cardNumber)}</Text>
+                            <TouchableOpacity onPress={() => handleCopy([`收款人：${defaultBank.accountName}`, `开户行：${defaultBank.bankName}`, `卡号：${defaultBank.cardNumber}`, `金额：¥${(actualRemaining > 0 ? actualRemaining : totalAmt).toFixed(2)}`, `备注：${emp.realName} ${selectedMonth} 薪资`].join("\n"))} style={[S.miniBtn, { backgroundColor: colors.primary }]}>
+                              <IconSymbol name="doc.on.clipboard" size={10} color="#fff" /><Text style={{ fontSize: 10, color: "#fff", fontWeight: "600" }}>复制</Text>
+                            </TouchableOpacity>
+                            {status !== "paid" && payment && (
+                              <TouchableOpacity onPress={() => {
+                                const now = new Date().toISOString();
+                                const actualRem2 = payment.totalAmount - (payment.advanceAmount ?? 0) - payment.paidAmount;
+                                Alert.alert("标记已发放", `确认已向 ${emp.realName} 发放薪资？\n实发：¥${actualRem2.toFixed(2)}`, [
+                                  { text: "取消", style: "cancel" },
+                                  { text: "确认已发放", onPress: () => { upsertPayment({ ...payment, advanceAmount: payment.advanceAmount ?? 0, paidAmount: payment.totalAmount, remainingAmount: 0, status: "paid", payments: [...payment.payments, { id: uuid(), date: now.slice(0, 10), amount: actualRem2, bankAccountId: "", paymentMethod: "转账", notes: `${selectedMonth} 薪资`, paidAt: now }], updatedAt: now }); tap(); }},
+                                ]);
+                              }} style={[S.miniBtn, { backgroundColor: "#34C759" }]}>
+                                <IconSymbol name="checkmark.circle.fill" size={10} color="#fff" /><Text style={{ fontSize: 10, color: "#fff", fontWeight: "600" }}>已发</Text>
+                              </TouchableOpacity>
+                            )}
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+              {/* 进货成本科目：内嵌供应商货款卡片 */}
+              {isCogs && supplierPayments.length > 0 && (
+                <View style={{ padding: 10, gap: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                    <Text style={{ fontSize: 11, fontWeight: "700", color: colors.muted }}>货款付款明细</Text>
+                    <Text style={{ fontSize: 11, color: colors.error }}>待付 ¥{supplierPayments.reduce((s, p) => s + p.remainingAmount, 0).toFixed(0)}</Text>
+                  </View>
+                  {supplierPayments.map((payment) => {
+                    const sup = suppliers.find((s) => s.id === payment.payeeId);
+                    if (!sup) return null;
+                    const defaultBank = sup.bankAccounts.find((b) => b.isDefault) ?? sup.bankAccounts[0];
+                    const advAmt = payment.advanceAmount ?? 0;
+                    const actualRemaining = Math.max(0, payment.totalAmount - advAmt - payment.paidAmount);
+                    const status = payment.status;
+                    const statusColor = status === "paid" ? "#34C759" : status === "partial" ? colors.warning : colors.error;
+                    return (
+                      <View key={payment.id} style={[S.inlineCard, { borderLeftColor: statusColor }]}>
+                        <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 4 }}>
+                          <Text style={{ flex: 1, fontSize: 13, fontWeight: "700", color: colors.foreground }}>{sup.name}</Text>
+                          <View style={[S.statusTag, { backgroundColor: statusColor + "18" }]}>
+                            <Text style={{ fontSize: 10, fontWeight: "700", color: statusColor }}>{status === "paid" ? "✓ 已付" : status === "partial" ? "部分" : "待付"}</Text>
+                          </View>
+                        </View>
+                        <View style={{ flexDirection: "row", gap: 10, marginBottom: 6 }}>
+                          <View style={S.amtBlock}><Text style={S.amtLabel}>应付</Text><Text style={[S.amtValue, { color: colors.foreground }]}>¥{payment.totalAmount.toFixed(0)}</Text></View>
+                          {advAmt > 0 && <View style={S.amtBlock}><Text style={S.amtLabel}>定金</Text><Text style={[S.amtValue, { color: colors.warning }]}>-¥{advAmt.toFixed(0)}</Text></View>}
+                          {payment.paidAmount > 0 && <View style={S.amtBlock}><Text style={S.amtLabel}>已付</Text><Text style={[S.amtValue, { color: "#34C759" }]}>¥{payment.paidAmount.toFixed(0)}</Text></View>}
+                          <View style={S.amtBlock}><Text style={S.amtLabel}>待付</Text><Text style={[S.amtValue, { color: actualRemaining > 0 ? colors.error : "#34C759", fontWeight: "800" }]}>¥{actualRemaining.toFixed(0)}</Text></View>
+                        </View>
+                        {defaultBank && (
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                            <Text style={{ flex: 1, fontSize: 11, color: colors.muted }}>{defaultBank.bankName} {maskCardNumber(defaultBank.cardNumber)}</Text>
+                            <TouchableOpacity onPress={() => handleCopy([`收款人：${defaultBank.accountName}`, `开户行：${defaultBank.bankName}`, `卡号：${defaultBank.cardNumber}`, `金额：¥${(actualRemaining > 0 ? actualRemaining : payment.totalAmount).toFixed(2)}`, `备注：${sup.name} ${selectedMonth} 货款`].join("\n"))} style={[S.miniBtn, { backgroundColor: colors.primary }]}>
+                              <IconSymbol name="doc.on.clipboard" size={10} color="#fff" /><Text style={{ fontSize: 10, color: "#fff", fontWeight: "600" }}>复制</Text>
+                            </TouchableOpacity>
+                            {status !== "paid" && (
+                              <TouchableOpacity onPress={() => handleMarkSupplierPaid(payment, sup.name)} style={[S.miniBtn, { backgroundColor: "#34C759" }]}>
+                                <IconSymbol name="checkmark.circle.fill" size={10} color="#fff" /><Text style={{ fontSize: 10, color: "#fff", fontWeight: "600" }}>已付</Text>
+                              </TouchableOpacity>
+                            )}
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
+          );
+        })}
+
+        {/* 手动录入按钮 */}
+        <TouchableOpacity onPress={() => { tap(); setEditingItem(null); setShowManualModal(true); }}
+          style={[S.addItemBtn, { borderColor: colors.primary + "44", backgroundColor: colors.primary + "08" }]}>
+          <IconSymbol name="plus.circle.fill" size={18} color={colors.primary} />
+          <Text style={{ fontSize: 14, color: colors.primary, fontWeight: "600" }}>手动录入科目</Text>
+        </TouchableOpacity>
+
+        {/* 历史报表 Modal */}
+        <Modal visible={showHistoryModal} animationType="slide" presentationStyle="formSheet" onRequestClose={() => setShowHistoryModal(false)}>
+          <View style={{ flex: 1, backgroundColor: colors.background }}>
+            <View style={[S.navbar, { borderBottomColor: colors.border }]}>
+              <View style={{ width: 44 }} />
+              <Text style={[S.navTitle, { color: colors.foreground }]}>历史报表</Text>
+              <Pressable onPress={() => setShowHistoryModal(false)} style={{ padding: 8 }}>
+                <Text style={{ fontSize: 17, color: colors.primary }}>关闭</Text>
+              </Pressable>
+            </View>
+            <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+              {[...reports].sort((a, b) => b.month.localeCompare(a.month)).map((r) => (
+                <TouchableOpacity key={r.id} onPress={() => { tap(); setSelectedMonth(r.month); setShowHistoryModal(false); }}
+                  style={[S.historyRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>{r.month}</Text>
+                    <Text style={{ fontSize: 12, color: colors.muted }}>净利润</Text>
+                  </View>
+                  <Text style={{ fontSize: 18, fontWeight: "800", color: r.netProfit >= 0 ? "#34C759" : colors.error }}>{r.netProfit >= 0 ? "+" : ""}¥{r.netProfit.toFixed(0)}</Text>
+                  <IconSymbol name="chevron.right" size={14} color={colors.muted} style={{ marginLeft: 8 }} />
+                </TouchableOpacity>
+              ))}
+              {reports.length === 0 && (
+                <View style={{ alignItems: "center", padding: 40 }}>
+                  <Text style={{ fontSize: 36 }}>📊</Text>
+                  <Text style={{ fontSize: 15, color: colors.muted, marginTop: 12 }}>暂无历史报表</Text>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </Modal>
+      </ScrollView>
+    );
   };
 
   // ── 总报表 Tab ────────────────────────────────────────────────────────────
@@ -527,22 +773,62 @@ export default function MonthlySummaryScreen() {
   const renderPayroll = () => {
     const payrollPayments = payments.filter((p) => p.payeeType === "employee");
     const totalPayroll = payrollPayments.reduce((s, p) => s + p.totalAmount, 0);
+    const totalAdvance = payrollPayments.reduce((s, p) => s + (p.advanceAmount ?? 0), 0);
     const totalPaid = payrollPayments.reduce((s, p) => s + p.paidAmount, 0);
     const totalRemaining = payrollPayments.reduce((s, p) => s + p.remainingAmount, 0);
+    const totalActual = totalPayroll - totalAdvance; // 实发总额
+
+    const handleMarkPaid = (payment: MonthlyPaymentRecord, emp: any) => {
+      if (payment.status === "paid") return;
+      const advAmt = payment.advanceAmount ?? 0;
+      const actualRemaining = payment.totalAmount - advAmt - payment.paidAmount;
+      Alert.alert(
+        "标记已发放",
+        `确认已向 ${emp.realName} 发放薪资？\n实发金额：¥${actualRemaining.toFixed(2)}`,
+        [
+          { text: "取消", style: "cancel" },
+          {
+            text: "确认已发放", onPress: () => {
+              const now = new Date().toISOString();
+              const updated: MonthlyPaymentRecord = {
+                ...payment,
+                advanceAmount: payment.advanceAmount ?? 0,
+                paidAmount: payment.totalAmount,
+                remainingAmount: 0,
+                status: "paid",
+                payments: [...payment.payments, {
+                  id: uuid(), date: now.slice(0, 10),
+                  amount: actualRemaining,
+                  bankAccountId: "", paymentMethod: "转账",
+                  notes: `${selectedMonth} 薪资发放`,
+                  paidAt: now,
+                }],
+                updatedAt: now,
+              };
+              upsertPayment(updated);
+              tap();
+            }
+          },
+        ]
+      );
+    };
 
     return (
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }}>
         <MonthSelector selectedMonth={selectedMonth} onSelect={setSelectedMonth} colors={colors} />
 
-        {/* 汇总 */}
+        {/* 汇总卡片 */}
         <View style={[S.payrollSummary, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 12, color: colors.muted }}>本月薪资总额</Text>
+            <Text style={{ fontSize: 11, color: colors.muted }}>本月薪资总额</Text>
             <Text style={{ fontSize: 22, fontWeight: "800", color: colors.foreground }}>¥{totalPayroll.toFixed(2)}</Text>
           </View>
-          <View style={{ alignItems: "flex-end" }}>
+          <View style={{ gap: 4, alignItems: "flex-end" }}>
+            {totalAdvance > 0 && (
+              <Text style={{ fontSize: 11, color: colors.warning }}>预支 ¥{totalAdvance.toFixed(2)}</Text>
+            )}
             <Text style={{ fontSize: 11, color: "#34C759" }}>已发 ¥{totalPaid.toFixed(2)}</Text>
-            <Text style={{ fontSize: 11, color: colors.error }}>待发 ¥{totalRemaining.toFixed(2)}</Text>
+            <Text style={{ fontSize: 12, fontWeight: "700", color: colors.error }}>待发 ¥{totalRemaining.toFixed(2)}</Text>
           </View>
         </View>
 
@@ -551,82 +837,106 @@ export default function MonthlySummaryScreen() {
           const payment = payrollPayments.find((p) => p.payeeId === emp.id);
           const defaultBank = emp.bankAccounts?.find((b) => b.isDefault) ?? emp.bankAccounts?.[0];
           const totalAmt = payment?.totalAmount ?? 0;
+          const advAmt = payment?.advanceAmount ?? 0;
           const paidAmt = payment?.paidAmount ?? 0;
           const remaining = payment?.remainingAmount ?? totalAmt;
+          const actualRemaining = totalAmt - advAmt - paidAmt; // 实际待发
           const status = payment?.status ?? "unpaid";
+          const statusColor = status === "paid" ? "#34C759" : status === "partial" ? colors.warning : colors.error;
+          const statusLabel = status === "paid" ? "✓ 已发放" : status === "partial" ? "部分已发" : "待发放";
 
           return (
             <View key={emp.id} style={[S.payrollCard, {
               backgroundColor: colors.surface, borderColor: colors.border,
-              borderLeftColor: status === "paid" ? "#34C759" : status === "partial" ? colors.warning : colors.error,
-              borderLeftWidth: 3,
+              borderLeftColor: statusColor, borderLeftWidth: 3,
             }]}>
-              <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+              {/* 头部：姓名 + 代号 + 状态标签 */}
+              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
                 <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                     <Text style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>{emp.realName}</Text>
                     <Text style={{ fontSize: 12, color: colors.muted }}>（{emp.code}）</Text>
-                    <View style={[S.statusTag, {
-                      backgroundColor: status === "paid" ? "#34C75915" : status === "partial" ? colors.warning + "15" : colors.error + "15",
-                    }]}>
-                      <Text style={{ fontSize: 10, fontWeight: "700", color: status === "paid" ? "#34C759" : status === "partial" ? colors.warning : colors.error }}>
-                        {status === "paid" ? "已发" : status === "partial" ? "部分已发" : "待发"}
-                      </Text>
-                    </View>
                   </View>
-                  <View style={{ flexDirection: "row", gap: 16, marginTop: 6 }}>
-                    <View>
-                      <Text style={{ fontSize: 10, color: colors.muted }}>应发金额</Text>
-                      <Text style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>¥{totalAmt.toFixed(2)}</Text>
-                    </View>
-                    {paidAmt > 0 && (
-                      <View>
-                        <Text style={{ fontSize: 10, color: colors.muted }}>已发</Text>
-                        <Text style={{ fontSize: 14, fontWeight: "600", color: "#34C759" }}>¥{paidAmt.toFixed(2)}</Text>
-                      </View>
-                    )}
-                    {remaining > 0 && (
-                      <View>
-                        <Text style={{ fontSize: 10, color: colors.muted }}>待发</Text>
-                        <Text style={{ fontSize: 14, fontWeight: "700", color: colors.error }}>¥{remaining.toFixed(2)}</Text>
-                      </View>
-                    )}
-                  </View>
+                  <Text style={{ fontSize: 11, color: colors.muted, marginTop: 1 }}>{emp.type === "fulltime" ? "全职" : "兴趣工"} · {emp.dept === "front" ? "前厅" : emp.dept === "kitchen" ? "后厨" : "其他"}</Text>
+                </View>
+                <View style={[S.statusTag, { backgroundColor: statusColor + "18" }]}>
+                  <Text style={{ fontSize: 11, fontWeight: "700", color: statusColor }}>{statusLabel}</Text>
                 </View>
               </View>
 
-              {/* 银行卡信息 */}
+              {/* 金额明细行 */}
+              <View style={{ flexDirection: "row", gap: 12, marginBottom: 10 }}>
+                <View style={S.amtBlock}>
+                  <Text style={S.amtLabel}>应发</Text>
+                  <Text style={[S.amtValue, { color: colors.foreground }]}>¥{totalAmt.toFixed(0)}</Text>
+                </View>
+                {advAmt > 0 && (
+                  <View style={S.amtBlock}>
+                    <Text style={S.amtLabel}>预支</Text>
+                    <Text style={[S.amtValue, { color: colors.warning }]}>-¥{advAmt.toFixed(0)}</Text>
+                  </View>
+                )}
+                {paidAmt > 0 && (
+                  <View style={S.amtBlock}>
+                    <Text style={S.amtLabel}>已发</Text>
+                    <Text style={[S.amtValue, { color: "#34C759" }]}>¥{paidAmt.toFixed(0)}</Text>
+                  </View>
+                )}
+                <View style={S.amtBlock}>
+                  <Text style={S.amtLabel}>{advAmt > 0 ? "实发" : "待发"}</Text>
+                  <Text style={[S.amtValue, { color: actualRemaining > 0 ? colors.error : "#34C759", fontWeight: "800" }]}>
+                    ¥{Math.max(0, actualRemaining).toFixed(0)}
+                  </Text>
+                </View>
+              </View>
+
+              {/* 銀行卡信息 + 操作按鈕 */}
               {defaultBank ? (
                 <View style={[S.bankInfo, { backgroundColor: "#007AFF08", borderColor: "#007AFF22" }]}>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 12, fontWeight: "600", color: colors.foreground }}>{defaultBank.accountName}</Text>
+                    <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>{defaultBank.accountName}</Text>
                     <Text style={{ fontSize: 11, color: colors.muted }}>{defaultBank.bankName}</Text>
-                    <Text style={{ fontSize: 12, fontWeight: "600", color: colors.foreground, letterSpacing: 1 }}>
-                      {maskCardNumber(defaultBank.cardNumber)}
-                    </Text>
+                    <Text style={{ fontSize: 12, color: colors.foreground, letterSpacing: 1 }}>{maskCardNumber(defaultBank.cardNumber)}</Text>
                   </View>
                   <View style={{ gap: 6 }}>
+                    {/* 一键复制 */}
                     <TouchableOpacity onPress={() => {
-                      const text = generatePaymentCopyText({
-                        recipientName: defaultBank.accountName,
-                        bankName: defaultBank.bankName,
-                        cardNumber: defaultBank.cardNumber,
-                        amount: remaining > 0 ? remaining : totalAmt,
-                        note: `${emp.realName} ${selectedMonth} 薪资`,
-                      });
+                      const copyAmt = actualRemaining > 0 ? actualRemaining : totalAmt;
+                      const text = [
+                        `收款人：${defaultBank.accountName}`,
+                        `开户行：${defaultBank.bankName}`,
+                        `卡号：${defaultBank.cardNumber}`,
+                        `金额：¥${copyAmt.toFixed(2)}`,
+                        `备注：${emp.realName} ${selectedMonth} 薪资`,
+                      ].join("\n");
                       handleCopy(text);
                     }} style={[S.copyBtn, { backgroundColor: colors.primary }]}>
                       <IconSymbol name="doc.on.clipboard" size={12} color="#fff" />
                       <Text style={{ fontSize: 11, color: "#fff", fontWeight: "600" }}>复制付款信息</Text>
                     </TouchableOpacity>
+                    {/* 标记已发放 */}
+                    {status !== "paid" && payment && (
+                      <TouchableOpacity onPress={() => handleMarkPaid(payment, emp)}
+                        style={[S.copyBtn, { backgroundColor: "#34C759" }]}>
+                        <IconSymbol name="checkmark.circle.fill" size={12} color="#fff" />
+                        <Text style={{ fontSize: 11, color: "#fff", fontWeight: "600" }}>标记已发放</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </View>
               ) : (
                 <TouchableOpacity onPress={() => router.push(`/labor-employee-form?id=${emp.id}` as any)}
                   style={[S.addBankHint, { borderColor: colors.border }]}>
                   <IconSymbol name="creditcard.fill" size={14} color={colors.muted} />
-                  <Text style={{ fontSize: 12, color: colors.muted }}>未设置银行卡 · 点击前往员工档案添加</Text>
+                  <Text style={{ fontSize: 12, color: colors.muted }}>未设置銀行卡 · 点击前往员工档案添加</Text>
                 </TouchableOpacity>
+              )}
+
+              {/* 预支记录 */}
+              {advAmt > 0 && (
+                <View style={{ marginTop: 6, paddingTop: 6, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
+                  <Text style={{ fontSize: 11, color: colors.warning }}>⚠️ 已预支 ¥{advAmt.toFixed(2)}，实发金额已自动扣除</Text>
+                </View>
               )}
             </View>
           );
@@ -803,37 +1113,28 @@ export default function MonthlySummaryScreen() {
 
   return (
     <ScreenContainer>
+      {/* 导航栏：左返回 + 标题 + 右上角历史/供应商 */}
       <View style={[S.navbar, { borderBottomColor: colors.border }]}>
         <Pressable onPress={() => router.back()} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
           <IconSymbol name="chevron.left" size={22} color={colors.primary} />
         </Pressable>
         <Text style={[S.navTitle, { color: colors.foreground }]}>{`${Number(selectedMonth.slice(5, 7))}月报表`}</Text>
-        <Pressable onPress={() => router.push("/suppliers" as any)} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
-          <IconSymbol name="building.2.fill" size={20} color={colors.muted} />
-        </Pressable>
+        <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
+          {/* 历史报表入口 */}
+          <Pressable onPress={() => { tap(); setShowHistoryModal(true); }}
+            style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+            <IconSymbol name="clock.arrow.circlepath" size={20} color={colors.muted} />
+          </Pressable>
+          {/* 供应商档案入口 */}
+          <Pressable onPress={() => router.push("/suppliers" as any)}
+            style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+            <IconSymbol name="building.2.fill" size={20} color={colors.muted} />
+          </Pressable>
+        </View>
       </View>
 
-      {/* Tab 栏 */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 8, paddingVertical: 6, gap: 4 }}>
-        {TABS.map((t) => (
-          <TouchableOpacity key={t.key} onPress={() => { tap(); setTab(t.key); }}
-            style={[S.tabBtn, {
-              backgroundColor: tab === t.key ? colors.primary : colors.surface,
-              borderColor: tab === t.key ? colors.primary : colors.border,
-            }]}>
-            <Text style={{ fontSize: 13, fontWeight: "600", color: tab === t.key ? "#fff" : colors.muted }}>
-              {t.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      {tab === "report" && renderReport()}
-      {tab === "accounts" && renderAccounts()}
-      {tab === "payroll" && renderPayroll()}
-      {tab === "payments" && renderPayments()}
-      {tab === "history" && renderHistory()}
+      {/* 单页滚动视图 */}
+      {renderSinglePage()}
 
       {copyToast ? (
         <View style={[S.toast, { backgroundColor: colors.foreground }]}>
@@ -903,6 +1204,12 @@ const S = StyleSheet.create({
   copyBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8 },
   addBankHint: { flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 8, borderWidth: 1, borderStyle: "dashed", padding: 10, marginTop: 10 },
   historyRow: { flexDirection: "row", alignItems: "center", borderRadius: 12, borderWidth: 1, padding: 14, marginBottom: 8 },
+  accountMini: { borderRadius: 12, borderWidth: 1, padding: 12, flex: 1, minWidth: "45%" },
+  inlineCard: { borderRadius: 10, borderWidth: 1, borderLeftWidth: 3, borderColor: "transparent", padding: 10, backgroundColor: "transparent" },
+  miniBtn: { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 7 },
+  amtBlock: { alignItems: "center", minWidth: 48 },
+  amtLabel: { fontSize: 10, color: "#999", marginBottom: 2 },
+  amtValue: { fontSize: 13, fontWeight: "600" },
   toast: { position: "absolute", bottom: 40, alignSelf: "center", paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
 });
 

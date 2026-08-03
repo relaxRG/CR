@@ -29,6 +29,7 @@ import {
 } from "@/lib/labor/types";
 
 type ViewTab = "attendance" | "payslip";
+type CompareMode = "none" | "lastMonth" | "lastYear";
 
 // ─── 考勤工资编辑 Modal ───────────────────────────────────────────────────────
 function AttendanceEditModal({
@@ -401,6 +402,8 @@ export default function LaborAttendanceScreen() {
     `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
   );
   const [viewTab, setViewTab] = useState<ViewTab>("attendance");
+  const [compareMode, setCompareMode] = useState<CompareMode>("none");
+  const [showComparePanel, setShowComparePanel] = useState(false);
 
   // 编辑状态
   const [attendEditEmp, setAttendEditEmp] = useState<Employee | null>(null);
@@ -419,6 +422,14 @@ export default function LaborAttendanceScreen() {
 
   // 当月排班数据
   const monthShifts = useMemo(() => getShifts(currentMonth), [attendances, currentMonth]);
+
+  // 对比月份
+  const compareMonth = useMemo(() => {
+    const [y, m] = currentMonth.split("-").map(Number);
+    if (compareMode === "lastMonth") { const d = new Date(y, m - 2, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; }
+    if (compareMode === "lastYear") return `${y - 1}-${String(m).padStart(2, "0")}`;
+    return null;
+  }, [currentMonth, compareMode]);
 
   // 活跃员工（按部门分组）
   const activeEmployees = useMemo(() => employees.filter((e) => e.active), [employees]);
@@ -522,17 +533,39 @@ export default function LaborAttendanceScreen() {
         </Pressable>
       </View>
 
-      {/* Tab 切换 */}
-      <View style={[S.tabBar, { backgroundColor: colors.border + "33" }]}>
-        {([["attendance", "考勤工资"], ["payslip", "最终薪资"]] as [ViewTab, string][]).map(([v, label]) => (
-          <TouchableOpacity key={v} onPress={() => { tap(); setViewTab(v); }}
-            style={[S.tabBtn, viewTab === v && { backgroundColor: colors.background }]}>
-            <Text style={[S.tabText, { color: viewTab === v ? colors.foreground : colors.muted, fontWeight: viewTab === v ? "600" : "400" }]}>
-              {label}
-            </Text>
+      {/* Tab 切换 + 对比开关 */}
+      <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingTop: 8, gap: 8 }}>
+        <View style={[S.tabBar, { backgroundColor: colors.border + "33", flex: 1, margin: 0 }]}>
+          {(["attendance", "payslip"] as ViewTab[]).map((v) => (
+            <TouchableOpacity key={v} onPress={() => { tap(); setViewTab(v); }}
+              style={[S.tabBtn, viewTab === v && { backgroundColor: colors.background }]}>
+              <Text style={[S.tabText, { color: viewTab === v ? colors.foreground : colors.muted, fontWeight: viewTab === v ? "600" : "400" }]}>
+                {v === "attendance" ? "考勤工资" : "最终薪资"}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        {viewTab === "payslip" && (
+          <TouchableOpacity onPress={() => { tap(); setShowComparePanel((v) => !v); }}
+            style={{ backgroundColor: showComparePanel ? colors.primary + "22" : colors.surface, borderRadius: 8, borderWidth: 1, borderColor: showComparePanel ? colors.primary + "44" : colors.border, paddingHorizontal: 8, paddingVertical: 6, flexDirection: "row", alignItems: "center", gap: 4 }}>
+            <IconSymbol name="chart.bar.xaxis" size={12} color={showComparePanel ? colors.primary : colors.muted} />
+            <Text style={{ fontSize: 11, color: showComparePanel ? colors.primary : colors.muted, fontWeight: "600" }}>对比</Text>
           </TouchableOpacity>
-        ))}
+        )}
       </View>
+      {/* 对比选择面板 */}
+      {viewTab === "payslip" && showComparePanel && (
+        <View style={{ flexDirection: "row", gap: 6, paddingHorizontal: 12, paddingVertical: 6 }}>
+          {(["none", "lastMonth", "lastYear"] as CompareMode[]).map((m) => (
+            <TouchableOpacity key={m} onPress={() => { tap(); setCompareMode(m); }}
+              style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: compareMode === m ? colors.primary : colors.border, backgroundColor: compareMode === m ? colors.primary : colors.surface }}>
+              <Text style={{ fontSize: 12, fontWeight: "600", color: compareMode === m ? "#fff" : colors.muted }}>
+                {m === "none" ? "不对比" : m === "lastMonth" ? "与上月" : "与去年同期"}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
 
       {/* 月度汇总卡片 */}
       <View style={[S.summaryCard, { backgroundColor: colors.primary + "0a", borderColor: colors.primary + "22" }]}>
@@ -582,6 +615,9 @@ export default function LaborAttendanceScreen() {
               const att = getAttendance(emp.id, currentMonth);
               const slip = getPaySlip(emp.id, currentMonth);
               const deptColor = g.color;
+              // 对比数据
+              const compareSlip = compareMonth ? getPaySlip(emp.id, compareMonth) : null;
+              const compareAtt = compareMonth ? getAttendance(emp.id, compareMonth) : null;
 
               if (viewTab === "attendance") {
                 return (
@@ -620,29 +656,46 @@ export default function LaborAttendanceScreen() {
               } else {
                 const totalAllowance = (slip?.mealAllowance ?? 0) + (slip?.transportAllowance ?? 0) + (slip?.otherAllowance ?? 0);
                 const totalBonus = (slip?.performanceBonus ?? 0) + (slip?.salesCommission ?? 0);
+                const diffSalary = slip && compareSlip ? slip.finalSalary - compareSlip.finalSalary : null;
                 return (
-                  <TouchableOpacity key={emp.id}
-                    onPress={() => { tap(); setPaySlipEditEmp(emp); }}
-                    style={[S.empRow, { borderBottomColor: colors.border }]}>
-                    <View style={{ flex: 1.2 }}>
-                      <Text style={[S.empCode, { color: deptColor }]}>{emp.code}</Text>
-                      <Text style={[S.empName, { color: colors.muted }]}>{emp.realName}</Text>
+                  <TouchableOpacity key={emp.id} onPress={() => { tap(); setPaySlipEditEmp(emp); }}
+                    style={[SC.slipCard, { backgroundColor: colors.surface, borderColor: deptColor + "33" }]}>
+                    {/* 头部 */}
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                      <View style={[SC.avatar, { backgroundColor: deptColor + "22" }]}>
+                        <Text style={{ fontSize: 12, fontWeight: "700", color: deptColor }}>{emp.code.slice(0, 2)}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>{emp.code} · {emp.realName}</Text>
+                        <Text style={{ fontSize: 11, color: colors.muted }}>{emp.type === "fulltime" ? "全职" : "兼职"} · {att ? `出勤${att.attendanceDays}天` : "考勤未填"}</Text>
+                      </View>
+                      <View style={{ alignItems: "flex-end" }}>
+                        <Text style={{ fontSize: 20, fontWeight: "800", color: slip ? deptColor : colors.muted }}>
+                          {slip ? `¥${slip.finalSalary.toFixed(0)}` : "未填写"}
+                        </Text>
+                        {/* 对比浮动 */}
+                        {diffSalary !== null && (
+                          <Text style={{ fontSize: 11, fontWeight: "600", color: diffSalary > 0 ? colors.error : diffSalary < 0 ? colors.success : colors.muted }}>
+                            {diffSalary > 0 ? "▲" : diffSalary < 0 ? "▼" : "—"} ¥{Math.abs(diffSalary).toFixed(0)}
+                          </Text>
+                        )}
+                      </View>
                     </View>
-                    <Text style={[S.td, { flex: 1, color: colors.foreground }]}>
-                      {att ? `¥${att.attendanceSalary.toFixed(0)}` : "—"}
-                    </Text>
-                    <Text style={[S.td, { flex: 0.8, color: totalBonus > 0 ? colors.success : colors.muted }]}>
-                      {totalBonus > 0 ? `+¥${totalBonus.toFixed(0)}` : "—"}
-                    </Text>
-                    <Text style={[S.td, { flex: 0.8, color: totalAllowance > 0 ? colors.primary : colors.muted }]}>
-                      {totalAllowance > 0 ? `+¥${totalAllowance.toFixed(0)}` : "—"}
-                    </Text>
-                    <Text style={[S.salaryCell, { flex: 1.2, color: slip ? colors.primary : colors.muted }]}>
-                      {slip ? `¥${slip.finalSalary.toFixed(0)}` : "未填写"}
-                    </Text>
-                    <TouchableOpacity onPress={() => { tap(); setPaySlipEditEmp(emp); }} style={{ width: 28, alignItems: "center" }}>
-                      <IconSymbol name="pencil" size={14} color={colors.muted} />
-                    </TouchableOpacity>
+                    {/* 明细 */}
+                    {(att || slip) && (
+                      <View style={[SC.detailRow, { borderTopColor: colors.border }]}>
+                        {att && <SlipDetailItem label="考勤" value={`¥${att.attendanceSalary.toFixed(0)}`} color={colors.foreground} />}
+                        {totalBonus > 0 && <SlipDetailItem label="绩效+提点" value={`+¥${totalBonus.toFixed(0)}`} color={colors.success} />}
+                        {totalAllowance > 0 && <SlipDetailItem label="补贴" value={`+¥${totalAllowance.toFixed(0)}`} color={colors.primary} />}
+                        {slip && slip.rewardPenalty !== 0 && <SlipDetailItem label="奖惩" value={`${slip.rewardPenalty > 0 ? "+" : ""}¥${slip.rewardPenalty.toFixed(0)}`} color={slip.rewardPenalty > 0 ? colors.success : colors.error} />}
+                        {compareSlip && <SlipDetailItem label={compareMode === "lastMonth" ? "上月" : "去年"} value={`¥${compareSlip.finalSalary.toFixed(0)}`} color={colors.muted} />}
+                      </View>
+                    )}
+                    {slip?.notes ? <Text style={{ fontSize: 11, color: colors.muted, marginTop: 4 }}>备注：{slip.notes}</Text> : null}
+                    {/* 编辑按鈕 */}
+                    <View style={{ position: "absolute", top: 10, right: 10 }}>
+                      <IconSymbol name="pencil" size={13} color={colors.muted} />
+                    </View>
                   </TouchableOpacity>
                 );
               }
@@ -743,6 +796,22 @@ const S = StyleSheet.create({
   td: { fontSize: 13 },
   salaryCell: { fontSize: 14, fontWeight: "700" },
   addBtn: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12, marginTop: 16 },
+});
+
+// ─── 薪水条辅助组件 ─────────────────────────────────────────────────────────────
+function SlipDetailItem({ label, value, color }: { label: string; value: string; color: string }) {
+  return (
+    <View style={{ alignItems: "center", minWidth: 52 }}>
+      <Text style={{ fontSize: 10, color: "#999", marginBottom: 2 }}>{label}</Text>
+      <Text style={{ fontSize: 12, fontWeight: "600", color }}>{value}</Text>
+    </View>
+  );
+}
+
+const SC = StyleSheet.create({
+  slipCard: { borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 8, position: "relative" },
+  avatar: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  detailRow: { flexDirection: "row", flexWrap: "wrap", gap: 10, paddingTop: 8, marginTop: 8, borderTopWidth: StyleSheet.hairlineWidth },
 });
 
 const AM = StyleSheet.create({

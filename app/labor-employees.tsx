@@ -60,7 +60,8 @@ export default function LaborEmployeesScreen() {
 
       {/* 部门筛选 */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 8, gap: 8 }}>
+        style={{ flexGrow: 0 }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 8, gap: 8, alignItems: "center" }}>
         {DEPT_FILTERS.map((f) => (
           <TouchableOpacity key={f.key} onPress={() => { tap(); setDeptFilter(f.key); }}
             style={[S.filterChip, {

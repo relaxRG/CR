@@ -187,6 +187,8 @@ export interface MonthlyPaymentRecord {
     notes: string;
     paidAt: string;
   }[];
+  /** 预支金额（已提前支付的部分，如工资预支、货款定金） */
+  advanceAmount: number;
   /** 备注 */
   notes: string;
   createdAt: string;

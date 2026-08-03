@@ -288,7 +288,8 @@ export default function LaborAdvancesScreen() {
 
       {/* 筛选 */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 8, gap: 8 }}>
+        style={{ flexGrow: 0 }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 8, gap: 8, alignItems: "center" }}>
         <TouchableOpacity onPress={() => { tap(); setFilterEmpId("all"); }}
           style={[S.filterChip, { backgroundColor: filterEmpId === "all" ? "#5856D6" : colors.surface, borderColor: filterEmpId === "all" ? "#5856D6" : colors.border }]}>
           <Text style={{ fontSize: 12, fontWeight: "600", color: filterEmpId === "all" ? "#fff" : colors.muted }}>全部员工</Text>

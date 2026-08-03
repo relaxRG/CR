@@ -525,7 +525,7 @@ export default function WineInventoryScreen() {
             <StatCell label="本月消耗" value={`${ledgerStats.totalConsumeBottles}瓶`} color={colors.warning} />
           </View>
           {/* 供应商筛选 */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[S.filterScroll, { borderBottomColor: colors.border }]} contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[S.filterScroll, { borderBottomColor: colors.border, flexGrow: 0 }]} contentContainerStyle={{ paddingHorizontal: 16, gap: 8, alignItems: "center" }}>
             <TouchableOpacity onPress={() => setFilterSupplier(null)}
               style={[S.filterChip, { backgroundColor: !filterSupplier ? colors.primary : colors.surface, borderColor: !filterSupplier ? colors.primary : colors.border }]}>
               <Text style={[S.filterChipText, { color: !filterSupplier ? "#fff" : colors.muted }]}>全部</Text>

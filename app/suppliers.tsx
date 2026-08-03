@@ -466,7 +466,8 @@ export default function SuppliersScreen() {
 
       {/* 品类筛选 */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 8, gap: 8 }}>
+        style={{ flexGrow: 0 }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 8, gap: 8, alignItems: "center" }}>
         {(["all", ...CATEGORY_OPTIONS] as (SupplierCategory | "all")[]).map((c) => {
           const sel = filterCat === c;
           const color = c === "all" ? colors.primary : SUPPLIER_CATEGORY_COLORS[c];
