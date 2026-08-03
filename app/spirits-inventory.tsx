@@ -2193,6 +2193,9 @@ function ImportPreviewModal({
   // 供应商编辑
   const [batchSupplier, setBatchSupplier] = useState(supplier);
   const [showBatchSupplier, setShowBatchSupplier] = useState(false);
+  // 多选模式
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIdxs, setSelectedIdxs] = useState<Set<number>>(new Set());
 
   // 每次打开重置
   React.useEffect(() => {
@@ -2201,8 +2204,18 @@ function ImportPreviewModal({
       setEditingIdx(null);
       setShowBatchDate(false); setBatchDate("");
       setShowBatchSupplier(false); setBatchSupplier(supplier);
+      setSelectMode(false); setSelectedIdxs(new Set());
     }
   }, [visible, initialRows, supplier]);
+
+  const toggleSelectIdx = (idx: number) => {
+    setSelectedIdxs((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx); else next.add(idx);
+      return next;
+    });
+  };
+  const exitSelectMode = () => { setSelectMode(false); setSelectedIdxs(new Set()); };
 
   const totalAmt = rows.reduce((s, r) => s + r.amount, 0);
 
@@ -2244,16 +2257,26 @@ function ImportPreviewModal({
     const dateOk = /^\d{4}-\d{2}-\d{2}$/.test(batchDate);
     if (!dateOk) { Alert.alert("格式错误", "请输入 YYYY-MM-DD 格式，如：2026-07-15"); return; }
     const newMonth = batchDate.slice(0, 7);
-    setRows((prev) => prev.map((r) => ({ ...r, date: batchDate, month: newMonth })));
+    // 多选模式下只修改选中的，普通模式下修改全部
+    setRows((prev) => prev.map((r, i) => {
+      if (selectMode && !selectedIdxs.has(i)) return r;
+      return { ...r, date: batchDate, month: newMonth };
+    }));
     setShowBatchDate(false);
     setBatchDate("");
+    if (selectMode) exitSelectMode();
   };
 
   const applyBatchSupplier = () => {
     const name = batchSupplier.trim();
     if (!name) { Alert.alert("提示", "供应商名称不能为空"); return; }
-    setRows((prev) => prev.map((r) => ({ ...r, supplier: name })));
+    // 多选模式下只修改选中的，普通模式下修改全部
+    setRows((prev) => prev.map((r, i) => {
+      if (selectMode && !selectedIdxs.has(i)) return r;
+      return { ...r, supplier: name };
+    }));
     setShowBatchSupplier(false);
+    if (selectMode) exitSelectMode();
   };
 
   return (
@@ -2278,27 +2301,84 @@ function ImportPreviewModal({
         </View>
 
         {/* 批量操作栏 */}
-        <View style={{ flexDirection: "row", gap: 8, padding: 10, backgroundColor: colors.surface, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, flexWrap: "wrap" }}>
-          {/* 供应商显示区 */}
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1, minWidth: 160 }}>
-            <Text style={{ fontSize: 11, color: colors.muted }}>供应商：</Text>
-            <TouchableOpacity onPress={() => { setShowBatchSupplier(!showBatchSupplier); setShowBatchDate(false); }}
-              style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 5,
-                backgroundColor: showBatchSupplier ? "#EF444420" : colors.background,
-                borderRadius: 8, borderWidth: 1, borderColor: showBatchSupplier ? "#EF4444" : colors.border }}>
-              <Text style={{ fontSize: 12, fontWeight: "700", color: showBatchSupplier ? "#EF4444" : colors.foreground }}>
-                {rows[0]?.supplier || supplier}
-              </Text>
-              <IconSymbol name="pencil" size={11} color={showBatchSupplier ? "#EF4444" : colors.muted} />
+        {!selectMode ? (
+          // 普通模式
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}
+            style={{ flexGrow: 0, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}
+            contentContainerStyle={{ flexDirection: "row", gap: 8, padding: 10, alignItems: "center" }}>
+            {/* 供应商显示区 */}
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+              <Text style={{ fontSize: 11, color: colors.muted }}>供应商：</Text>
+              <TouchableOpacity onPress={() => { setShowBatchSupplier(!showBatchSupplier); setShowBatchDate(false); }}
+                style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 5,
+                  backgroundColor: showBatchSupplier ? "#EF444420" : colors.background,
+                  borderRadius: 8, borderWidth: 1, borderColor: showBatchSupplier ? "#EF4444" : colors.border }}>
+                <Text style={{ fontSize: 12, fontWeight: "700", color: showBatchSupplier ? "#EF4444" : colors.foreground }}>
+                  {rows[0]?.supplier || supplier}
+                </Text>
+                <IconSymbol name="pencil" size={11} color={showBatchSupplier ? "#EF4444" : colors.muted} />
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity onPress={() => { setShowBatchDate(!showBatchDate); setShowBatchSupplier(false); }}
+              style={[S.actionBtn, { backgroundColor: showBatchDate ? "#EF444420" : colors.background, borderColor: showBatchDate ? "#EF4444" : colors.border }]}>
+              <IconSymbol name="calendar" size={13} color={showBatchDate ? "#EF4444" : colors.muted} />
+              <Text style={{ fontSize: 12, color: showBatchDate ? "#EF4444" : colors.muted, fontWeight: "600" }}>批量改日期</Text>
             </TouchableOpacity>
-          </View>
-          <TouchableOpacity onPress={() => { setShowBatchDate(!showBatchDate); setShowBatchSupplier(false); }}
-            style={[S.actionBtn, { backgroundColor: showBatchDate ? "#EF444420" : colors.background, borderColor: showBatchDate ? "#EF4444" : colors.border }]}>
-            <IconSymbol name="calendar" size={13} color={showBatchDate ? "#EF4444" : colors.muted} />
-            <Text style={{ fontSize: 12, color: showBatchDate ? "#EF4444" : colors.muted, fontWeight: "600" }}>批量改日期</Text>
-          </TouchableOpacity>
-          <Text style={{ fontSize: 11, color: colors.muted, alignSelf: "center" }}>点击行编辑</Text>
-        </View>
+            <TouchableOpacity onPress={() => { setSelectMode(true); setShowBatchDate(false); setShowBatchSupplier(false); }}
+              style={[S.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <IconSymbol name="checkmark.circle" size={13} color={colors.muted} />
+              <Text style={{ fontSize: 12, color: colors.muted, fontWeight: "600" }}>多选</Text>
+            </TouchableOpacity>
+            <Text style={{ fontSize: 11, color: colors.muted }}>点击行编辑</Text>
+          </ScrollView>
+        ) : (
+          // 多选模式
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}
+            style={{ flexGrow: 0, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, backgroundColor: "#FEF2F2" }}
+            contentContainerStyle={{ flexDirection: "row", gap: 8, padding: 10, alignItems: "center" }}>
+            <Text style={{ fontSize: 12, color: "#EF4444", fontWeight: "700" }}>
+              已选 {selectedIdxs.size}/{rows.length}
+            </Text>
+            <TouchableOpacity onPress={() => setSelectedIdxs(new Set(rows.map((_, i) => i)))}
+              style={[S.actionBtn, { backgroundColor: colors.background, borderColor: colors.border }]}>
+              <Text style={{ fontSize: 12, color: colors.muted, fontWeight: "600" }}>全选</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setSelectedIdxs(new Set())}
+              style={[S.actionBtn, { backgroundColor: colors.background, borderColor: colors.border }]}>
+              <Text style={{ fontSize: 12, color: colors.muted, fontWeight: "600" }}>取消全选</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => {
+              if (selectedIdxs.size === 0) { Alert.alert("提示", "请先勾选记录"); return; }
+              setBatchSupplier(rows[0]?.supplier || supplier);
+              setShowBatchSupplier(true); setShowBatchDate(false);
+            }} style={[S.actionBtn, { backgroundColor: colors.background, borderColor: colors.border }]}>
+              <Text style={{ fontSize: 12, color: colors.muted, fontWeight: "600" }}>改供应商</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => {
+              if (selectedIdxs.size === 0) { Alert.alert("提示", "请先勾选记录"); return; }
+              setShowBatchDate(true); setShowBatchSupplier(false);
+            }} style={[S.actionBtn, { backgroundColor: colors.background, borderColor: colors.border }]}>
+              <Text style={{ fontSize: 12, color: colors.muted, fontWeight: "600" }}>改日期</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => {
+              if (selectedIdxs.size === 0) { Alert.alert("提示", "请先勾选记录"); return; }
+              Alert.alert("删除", `删除选中的 ${selectedIdxs.size} 条记录？`, [
+                { text: "取消", style: "cancel" },
+                { text: "删除", style: "destructive", onPress: () => {
+                  setRows((prev) => prev.filter((_, i) => !selectedIdxs.has(i)));
+                  exitSelectMode();
+                }},
+              ]);
+            }} style={[S.actionBtn, { backgroundColor: "#FEF2F2", borderColor: "#FECACA" }]}>
+              <IconSymbol name="trash" size={13} color="#EF4444" />
+              <Text style={{ fontSize: 12, color: "#EF4444", fontWeight: "600" }}>删除</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={exitSelectMode}
+              style={[S.actionBtn, { backgroundColor: colors.background, borderColor: "#EF4444" }]}>
+              <Text style={{ fontSize: 12, color: "#EF4444", fontWeight: "700" }}>取消多选</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        )}
 
         {/* 批量日期输入 */}
         {showBatchDate && (
@@ -2403,37 +2483,61 @@ function ImportPreviewModal({
               <Text style={{ color: colors.muted }}>所有记录已删除</Text>
             </View>
           )}
-          {rows.map((row, idx) => (
-            <View key={idx} style={{ flexDirection: "row", alignItems: "center",
-              borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border,
-              backgroundColor: editingIdx === idx ? "#EFF6FF" : (idx % 2 === 0 ? colors.surface : colors.background) }}>
-              {/* 主内容 */}
-              <TouchableOpacity onPress={() => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); openEdit(idx); }}
-                style={{ flex: 1, padding: 12 }}>
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground, flex: 1, marginRight: 8 }} numberOfLines={2}>
-                    {row.rawName}
-                  </Text>
-                  <Text style={{ fontSize: 13, fontWeight: "700", color: "#EF4444" }}>¥{row.amount.toFixed(0)}</Text>
+          {rows.map((row, idx) => {
+            const isSelected = selectedIdxs.has(idx);
+            return (
+              <TouchableOpacity key={idx}
+                onPress={() => {
+                  if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  if (selectMode) { toggleSelectIdx(idx); }
+                  else { openEdit(idx); }
+                }}
+                style={{ flexDirection: "row", alignItems: "center",
+                  borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border,
+                  backgroundColor: isSelected ? "#FEF2F2" : editingIdx === idx ? "#EFF6FF" : (idx % 2 === 0 ? colors.surface : colors.background) }}>
+                {/* 多选模式复选框 */}
+                {selectMode && (
+                  <View style={{ paddingLeft: 12, paddingRight: 4 }}>
+                    <View style={{ width: 20, height: 20, borderRadius: 10, borderWidth: 2,
+                      borderColor: isSelected ? "#EF4444" : colors.border,
+                      backgroundColor: isSelected ? "#EF4444" : "transparent",
+                      alignItems: "center", justifyContent: "center" }}>
+                      {isSelected && <IconSymbol name="checkmark" size={12} color="#fff" />}
+                    </View>
+                  </View>
+                )}
+                {/* 主内容 */}
+                <View style={{ flex: 1, padding: 12 }}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground, flex: 1, marginRight: 8 }} numberOfLines={2}>
+                      {row.rawName}
+                    </Text>
+                    <Text style={{ fontSize: 13, fontWeight: "700", color: "#EF4444" }}>¥{row.amount.toFixed(0)}</Text>
+                  </View>
+                  <View style={{ flexDirection: "row", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
+                    <Text style={{ fontSize: 11, color: colors.muted }}>{row.date}</Text>
+                    <Text style={{ fontSize: 11, color: colors.muted }}>{row.quantity} {row.unit}</Text>
+                    <Text style={{ fontSize: 11, color: colors.muted }}>¥{row.unitPrice.toFixed(0)}/瓶</Text>
+                    {row.supplier && row.supplier !== supplier && (
+                      <Text style={{ fontSize: 11, color: "#F59E0B", fontWeight: "600" }}>{row.supplier}</Text>
+                    )}
+                    {row.category && <Text style={{ fontSize: 11, color: colors.primary }}>{row.category}</Text>}
+                  </View>
                 </View>
-                <View style={{ flexDirection: "row", gap: 12, marginTop: 4 }}>
-                  <Text style={{ fontSize: 11, color: colors.muted }}>{row.date}</Text>
-                  <Text style={{ fontSize: 11, color: colors.muted }}>{row.quantity} {row.unit}</Text>
-                  <Text style={{ fontSize: 11, color: colors.muted }}>¥{row.unitPrice.toFixed(0)}/瓶</Text>
-                  {row.category && <Text style={{ fontSize: 11, color: colors.primary }}>{row.category}</Text>}
-                </View>
+                {/* 删除按鈕（普通模式才显示） */}
+                {!selectMode && (
+                  <TouchableOpacity onPress={() => {
+                    Alert.alert("删除", `删除「${row.rawName}」？`, [
+                      { text: "取消", style: "cancel" },
+                      { text: "删除", style: "destructive", onPress: () => deleteRow(idx) },
+                    ]);
+                  }} style={{ padding: 12 }}>
+                    <IconSymbol name="trash" size={16} color="#EF4444" />
+                  </TouchableOpacity>
+                )}
               </TouchableOpacity>
-              {/* 删除按钮 */}
-              <TouchableOpacity onPress={() => {
-                Alert.alert("删除", `删除「${row.rawName}」？`, [
-                  { text: "取消", style: "cancel" },
-                  { text: "删除", style: "destructive", onPress: () => deleteRow(idx) },
-                ]);
-              }} style={{ padding: 12 }}>
-                <IconSymbol name="trash" size={16} color="#EF4444" />
-              </TouchableOpacity>
-            </View>
-          ))}
+            );
+          })}
         </ScrollView>
 
         {/* 底部确认栏 */}
