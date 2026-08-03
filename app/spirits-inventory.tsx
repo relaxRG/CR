@@ -2006,7 +2006,7 @@ function SupplierDetailScreen({
               fuzzyMatchScore(unmatchedPurchase.rawName, it.nameEn ?? "")
             ),
           }))
-          .filter((c) => c.score >= 0.35)
+          .filter((c) => c.score >= 0.2)
           .sort((a, b) => b.score - a.score)
           .slice(0, 5);
 
@@ -2032,16 +2032,24 @@ function SupplierDetailScreen({
               <View style={{ backgroundColor: colors.background, borderTopLeftRadius: 24, borderTopRightRadius: 24,
                 padding: 20, paddingBottom: 32, maxHeight: "85%" }}>
                 <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: "center", marginBottom: 12 }} />
-                {/* 标题和进度 */}
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
+                {/* 标题、进度和关闭按钮 */}
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
                   <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, flex: 1 }}>
                     未匹配到酒款档案
                   </Text>
-                  {remainingUnmatched.length > 0 && (
-                    <Text style={{ fontSize: 11, color: "#F59E0B", fontWeight: "600" }}>
-                      还剩 {remainingUnmatched.length} 条未处理
-                    </Text>
-                  )}
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    {remainingUnmatched.length > 0 && (
+                      <Text style={{ fontSize: 11, color: "#F59E0B", fontWeight: "600" }}>
+                        还剩 {remainingUnmatched.length} 条
+                      </Text>
+                    )}
+                    <TouchableOpacity
+                      onPress={() => { setShowUnmatchedModal(false); setUnmatchedPurchase(null); }}
+                      style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: colors.surface,
+                        alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.border }}>
+                      <Text style={{ fontSize: 14, color: colors.muted, fontWeight: "600", lineHeight: 16 }}>×</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
                 <View style={{ backgroundColor: colors.surface, borderRadius: 10, padding: 10, marginBottom: 14,
                   borderWidth: 1, borderColor: colors.border }}>
@@ -2069,8 +2077,9 @@ function SupplierDetailScreen({
                           {c.item.nameEn ? <Text style={{ fontSize: 11, color: "#3B82F6" }}>{c.item.nameEn}</Text> : null}
                         </View>
                         <View style={{ alignItems: "flex-end" }}>
-                          <Text style={{ fontSize: 10, color: "#3B82F6", fontWeight: "600" }}>
-                            相似度 {Math.round(c.score * 100)}%
+                          <Text style={{ fontSize: 10, fontWeight: "700",
+                            color: c.score >= 0.8 ? "#16A34A" : c.score >= 0.5 ? "#D97706" : "#6B7280" }}>
+                            {c.score >= 0.8 ? "高匹配" : c.score >= 0.5 ? "部分匹配" : "低匹配"} {Math.round(c.score * 100)}%
                           </Text>
                           <Text style={{ fontSize: 10, color: "#60A5FA" }}>{c.item.category}</Text>
                         </View>

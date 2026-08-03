@@ -33,13 +33,60 @@ export function getCurrentMonth() {
 
 /** 模糊匹配分数（0-1），用于备用金描述与酒款名称的匹配 */
 export function fuzzyMatchScore(query: string, target: string): number {
-  const q = query.toLowerCase().replace(/[（）()\/\s]/g, "");
-  const t = target.toLowerCase().replace(/[（）()\/\s]/g, "");
-  if (t.includes(q) || q.includes(t)) return 0.9;
-  // 计算公共字符比例
-  let common = 0;
-  for (const ch of q) { if (t.includes(ch)) common++; }
-  return common / Math.max(q.length, t.length);
+  if (!query || !target) return 0;
+  // 归一化：小写 + 去除括号/空格/斜杠
+  const normalize = (s: string) => s.toLowerCase()
+    .replace(/[（）()\[\]\/\\\s·・\-_,，。]/g, "");
+  const q = normalize(query);
+  const t = normalize(target);
+  if (!q || !t) return 0;
+
+  // 1. 完全相同 → 1.0
+  if (q === t) return 1.0;
+
+  // 2. 提取关键词（去掉常见单位/容量词后的核心词）
+  const stripUnits = (s: string) => s
+    .replace(/\d+(\.\d+)?(ml|cl|l|oz|年|yr|year|yo|岁|瓶|箱|桶|杯|g|kg)/gi, "")
+    .replace(/(limited|edition|reserve|special|premium|classic|original|extra|ultra|super|deluxe)/gi, "");
+  const qCore = stripUnits(q);
+  const tCore = stripUnits(t);
+
+  // 3. 核心词完全包含（双向）→ 高分
+  if (qCore.length >= 3 && tCore.includes(qCore)) return 0.92;
+  if (tCore.length >= 3 && qCore.includes(tCore)) return 0.88;
+
+  // 4. 原始词完全包含（双向）→ 中高分
+  if (q.length >= 3 && t.includes(q)) return 0.82;
+  if (t.length >= 3 && q.includes(t)) return 0.78;
+
+  // 5. 分词匹配：把 query 拆成 2-4 字的词块，检查 target 包含几个
+  const chunks: string[] = [];
+  for (let len = 4; len >= 2; len--) {
+    for (let i = 0; i <= qCore.length - len; i++) {
+      chunks.push(qCore.slice(i, i + len));
+    }
+  }
+  const uniqueChunks = [...new Set(chunks)];
+  const matchedChunks = uniqueChunks.filter((c) => tCore.includes(c));
+  if (uniqueChunks.length > 0) {
+    const chunkScore = matchedChunks.length / uniqueChunks.length;
+    if (chunkScore >= 0.5) return Math.min(0.75, 0.4 + chunkScore * 0.4);
+  }
+
+  // 6. 字符级 bigram 相似度（2-gram overlap）
+  const bigrams = (s: string): Set<string> => {
+    const set = new Set<string>();
+    for (let i = 0; i < s.length - 1; i++) set.add(s.slice(i, i + 2));
+    return set;
+  };
+  const qBi = bigrams(qCore);
+  const tBi = bigrams(tCore);
+  if (qBi.size === 0 || tBi.size === 0) return 0;
+  let bigramIntersect = 0;
+  qBi.forEach((b) => { if (tBi.has(b)) bigramIntersect++; });
+  const bigramScore = (2 * bigramIntersect) / (qBi.size + tBi.size);
+
+  return bigramScore;
 }
 
 /** 根据描述自动检测是否为酒水采购（用于备用金智能过滤） */
