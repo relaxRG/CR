@@ -8,7 +8,7 @@ import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
-import { useSpiritsSnapshotStore } from "@/lib/spirits/store";
+import { useSpiritsInventoryStore } from "@/lib/spirits/crud-store";  // ✅ 新 crud-store
 import { useWineSnapshotStore } from "@/lib/wine/store";
 import { useFoodIngredientStore } from "@/lib/food/ingredient-store";
 import { useBeerInventoryStore } from "@/lib/beer/inventory-store";
@@ -25,7 +25,8 @@ export default function StoreInventoryScreen() {
   const insets = useSafeAreaInsets();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
-  const spiritsStore = useSpiritsSnapshotStore();
+  // ✅ 烈酒改用新的 crud-store
+  const spiritsStore = useSpiritsInventoryStore();
   const wineStore = useWineSnapshotStore();
   const foodStore = useFoodIngredientStore();
   const beerStore = useBeerInventoryStore();
@@ -39,7 +40,13 @@ export default function StoreInventoryScreen() {
   const currentMonth = new Date().toISOString().slice(0, 7);
 
   const categories = useMemo(() => {
-    const spiritsSnap = spiritsStore.snapshots[0];
+    // ✅ 烈酒：从新 crud-store 读取当前月台账数据
+    const spiritsItems = spiritsStore.items.filter((i) => i.active);
+    const spiritsMonthLedger = spiritsStore.getMonthLedger(currentMonth);
+    const spiritsEndCost = spiritsMonthLedger.reduce((s, e) => s + e.closingCost, 0);
+    const spiritsMonthPurchases = spiritsStore.getMonthPurchases(currentMonth);
+    const spiritsMonthAmt = spiritsMonthPurchases.reduce((s, p) => s + p.amount, 0);
+
     const wineSnap = wineStore.snapshots[0];
     const beerItems = beerStore.items.filter((i) => i.active);
     const iceItems = iceStore.items.filter((i) => i.active);
@@ -50,10 +57,17 @@ export default function StoreInventoryScreen() {
     const equipItems = equipmentStore.items.filter((i) => i.active);
     const foodLow = foodStore.ingredients.filter((i) => i.alertThreshold > 0 && i.stock <= i.alertThreshold).length;
 
+    // 烈酒副标题：有台账数据显示期末成本，有进货显示本月进货额，否则提示录入
+    const spiritsSub = spiritsItems.length > 0
+      ? spiritsEndCost > 0
+        ? `${spiritsItems.length} 款 · 期末¥${spiritsEndCost.toFixed(0)}${spiritsMonthAmt > 0 ? ` · 本月进货¥${spiritsMonthAmt.toFixed(0)}` : ""}`
+        : `${spiritsItems.length} 款已建档 · 点击录入台账`
+      : "点击录入烈酒库存";
+
     return [
       { emoji: "🥃", label: "烈酒", color: "#6B7280", route: "/spirits-inventory",
-        sub: spiritsSnap ? `${spiritsSnap.monthLabel} · ${spiritsSnap.items.length} 款 · 期末¥${spiritsSnap.totalEndCost.toFixed(0)}` : "导入 Excel 开始使用",
-        badge: spiritsSnap ? `${spiritsSnap.items.length}款` : undefined },
+        sub: spiritsSub,
+        badge: spiritsItems.length > 0 ? `${spiritsItems.length}款` : undefined },
       { emoji: "🍷", label: "葡萄酒", color: "#9F1239", route: "/wine-inventory",
         sub: wineSnap ? `${wineSnap.monthLabel} · ${wineSnap.items.length} 款 · 期末¥${wineSnap.totalEndCost.toFixed(0)}` : "导入 Excel 开始使用",
         badge: wineSnap ? `${wineSnap.items.length}款` : undefined },
@@ -90,7 +104,7 @@ export default function StoreInventoryScreen() {
       contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }}
     >
       <View style={{ marginBottom: 16 }}>
-        <Text style={{ fontSize: 22, fontWeight: "700", color: colors.foreground }}>进销存管理</Text>
+        <Text style={{ fontSize: 22, fontWeight: "700", color: colors.foreground }}>库存管理</Text>
         <Text style={{ fontSize: 13, color: colors.muted, marginTop: 2 }}>
           共 {categories.filter((c) => c.badge).length} 个品类已有数据
         </Text>

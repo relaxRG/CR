@@ -29,6 +29,9 @@ import {
 import {
   parseSpiritsExcel, ParsedPurchaseRow, previewSheets, parseSheetFromWorkbook,
 } from "@/lib/spirits/excel-import";
+import { parseSpiritInventoryExcel } from "@/lib/spirits/excel-parser";
+import { SpiritMonthlySnapshot, SpiritInventoryItem, SpiritPriceChange } from "@/lib/spirits/types";
+import { normalizeLLMRows } from "@/lib/spirits/pdf-import";
 import { usePettyCashStore } from "@/lib/store/petty-store";
 import { getApiBaseUrl } from "@/constants/oauth";
 import * as Auth from "@/lib/_core/auth";
@@ -388,17 +391,88 @@ export default function SpiritsInventoryScreen() {
     });
   };
 
+  // 库存管理 Tab：复合 Excel 导入（解析「烈酒盘点」sheet → 写入 SpiritItem + SpiritLedgerEntry）
+  const [ledgerImportPreview, setLedgerImportPreview] = useState<SpiritMonthlySnapshot | null>(null);
+  const [ledgerImportPriceChanges, setLedgerImportPriceChanges] = useState<SpiritPriceChange[]>([]);
+  const [showLedgerPreview, setShowLedgerPreview] = useState(false);
+
   const handleLedgerExcelImport = async () => {
     try {
       setLedgerImporting(true);
-      const result = await DocumentPicker.getDocumentAsync({ type: "*/*", copyToCacheDirectory: true });
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-excel", "*/*"],
+        copyToCacheDirectory: true,
+      });
       if (result.canceled || !result.assets?.[0]) { setLedgerImporting(false); return; }
-      Alert.alert("提示", "台账 Excel 导入（复合多 sheet）功能正在完善中，请使用「当月进货」Tab 导入进货流水");
+      const asset = result.assets[0];
+      const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 });
+      const { snapshot, priceChanges: changes, error } = parseSpiritInventoryExcel(base64);
+      if (!snapshot || snapshot.items.length === 0) {
+        Alert.alert("解析失败", error ?? "未能识别烈酒盘点数据\n\n请确认 Excel 包含「烈酒盘点」工作表，格式为：产品序号/盘点分类/中文名/期初库存量/期初单位成本/期初库存成本/本月进货量/本月进货成本/期末库存量/单位成本/期末库存成本/消耗瓶数/本期消耗量");
+        setLedgerImporting(false); return;
+      }
+      setLedgerImportPreview(snapshot);
+      setLedgerImportPriceChanges(changes);
+      setShowLedgerPreview(true);
     } catch (e) {
-      Alert.alert("错误", "文件读取失败");
+      Alert.alert("导入失败", `文件解析错误: ${String(e)}`);
     } finally {
       setLedgerImporting(false);
     }
+  };
+
+  const handleLedgerImportConfirm = () => {
+    if (!ledgerImportPreview) return;
+    const snapshot = ledgerImportPreview;
+    // 推断月份（从进货记录日期，或默认当前月）
+    const importMonth = snapshot.purchaseOrders.find((po) => po.date)?.date.slice(0, 7) ?? selectedMonth;
+    let addedItems = 0, updatedItems = 0, addedLedger = 0;
+    snapshot.items.forEach((inv: SpiritInventoryItem) => {
+      // 1. 查找或创建 SpiritItem
+      let existing = items.find((i) => i.name.trim() === inv.name.trim());
+      if (!existing) {
+        existing = addItem({
+          name: inv.name,
+          category: inv.category,
+          unit: "瓶",
+          refPrice: inv.unitCost > 0 ? inv.unitCost : 0,
+          active: true,
+        });
+        addedItems++;
+      } else {
+        // 更新参考单价（如果有新单价）
+        if (inv.unitCost > 0 && Math.abs(inv.unitCost - existing.refPrice) > 0.01) {
+          setRefPrice(existing.id, importMonth, inv.unitCost, "import");
+        }
+        updatedItems++;
+      }
+      // 2. 写入台账（upsertLedger）
+      const prevEntry = getItemLedger(existing.id, importMonth);
+      upsertLedger({
+        id: prevEntry?.id,
+        month: importMonth,
+        itemId: existing.id,
+        openingQty: inv.initQty,
+        openingUnitCost: inv.initUnitCost > 0 ? inv.initUnitCost : inv.unitCost,
+        purchaseQty: inv.purchaseQty,
+        purchaseCost: inv.purchaseCost,
+        consumeQty: inv.consumeQty,
+        closingQty: inv.endQty,
+        closingUnitCost: inv.unitCost,
+        closingCost: inv.endCost,
+        isClosed: false,
+      });
+      addedLedger++;
+    });
+    setShowLedgerPreview(false);
+    setLedgerImportPreview(null);
+    Alert.alert(
+      "导入成功 ✅",
+      `${snapshot.monthLabel}\n` +
+      `台账：${addedLedger} 款已写入\n` +
+      `酒款档案：新增 ${addedItems} 款，更新 ${updatedItems} 款` +
+      (ledgerImportPriceChanges.length > 0 ? `\n⚠️ ${ledgerImportPriceChanges.length} 款价格有变动` : "")
+    );
   };
 
   const renderLedger = () => (
@@ -937,6 +1011,103 @@ export default function SpiritsInventoryScreen() {
           onClose={() => { setShowAddItem(false); setShowItemForm(false); setEditingItem(null); }}
         />
       )}
+
+      {/* 库存管理 Excel 导入预览 Modal */}
+      <Modal visible={showLedgerPreview} animationType="slide" transparent={false}>
+        <View style={{ flex: 1, backgroundColor: colors.background }}>
+          {/* 头部 */}
+          <View style={[S.navbar, { borderBottomColor: colors.border, paddingTop: insets.top + 12 }]}>
+            <TouchableOpacity onPress={() => { setShowLedgerPreview(false); setLedgerImportPreview(null); }}>
+              <Text style={{ fontSize: 15, color: "#EF4444", fontWeight: "600" }}>取消</Text>
+            </TouchableOpacity>
+            <View style={{ alignItems: "center" }}>
+              <Text style={[S.navTitle, { color: colors.foreground }]}>{ledgerImportPreview?.monthLabel ?? "导入预览"}</Text>
+              <Text style={{ fontSize: 11, color: colors.muted }}>{ledgerImportPreview?.items.length} 款烈酒</Text>
+            </View>
+            <TouchableOpacity onPress={handleLedgerImportConfirm}>
+              <Text style={{ fontSize: 15, color: colors.primary, fontWeight: "700" }}>确认导入</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* 汇总统计 */}
+          {ledgerImportPreview && (
+            <View style={{ flexDirection: "row", padding: 12, backgroundColor: colors.surface, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
+              {[
+                { label: "本月进货", value: `¥${ledgerImportPreview.totalPurchase.toFixed(0)}`, color: "#EF4444" },
+                { label: "本月消耗", value: ledgerImportPreview.totalConsume.toFixed(1), color: colors.foreground },
+                { label: "期末成本", value: `¥${ledgerImportPreview.totalEndCost.toFixed(0)}`, color: colors.primary },
+                { label: "进货记录", value: `${ledgerImportPreview.purchaseOrders.length}笔`, color: colors.foreground },
+              ].map((s, i) => (
+                <View key={i} style={{ flex: 1, alignItems: "center" }}>
+                  <Text style={{ fontSize: 14, fontWeight: "700", color: s.color }}>{s.value}</Text>
+                  <Text style={{ fontSize: 10, color: colors.muted }}>{s.label}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* 价格变动提示 */}
+          {ledgerImportPriceChanges.length > 0 && (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, padding: 10, backgroundColor: "#FEF3C7", borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "#FCD34D" }}>
+              <IconSymbol name="exclamationmark.triangle.fill" size={14} color="#D97706" />
+              <Text style={{ fontSize: 12, color: "#D97706", fontWeight: "600" }}>
+                {ledgerImportPriceChanges.length} 款商品价格有变动
+              </Text>
+            </View>
+          )}
+
+          {/* 台账预览列表 */}
+          <ScrollView contentContainerStyle={{ paddingBottom: 40 + insets.bottom }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator style={{ flexGrow: 0 }}>
+              <View>
+                {/* 表头 */}
+                <View style={[S.tableHeader, { backgroundColor: "#991B1B" }]}>
+                  <Text style={[S.thCell, { width: 130 }]}>中文名</Text>
+                  <Text style={[S.thCell, { width: 60 }]}>分类</Text>
+                  <Text style={[S.thCell, { width: 60 }]}>期初量</Text>
+                  <Text style={[S.thCell, { width: 60 }]}>进货量</Text>
+                  <Text style={[S.thCell, { width: 60 }]}>消耗量</Text>
+                  <Text style={[S.thCell, { width: 60 }]}>期末量</Text>
+                  <Text style={[S.thCell, { width: 70 }]}>单位成本</Text>
+                  <Text style={[S.thCell, { width: 80 }]}>期末成本</Text>
+                </View>
+                {ledgerImportPreview?.items.map((inv, idx) => (
+                  <View key={idx} style={[S.tableRow, { backgroundColor: idx % 2 === 0 ? colors.surface : colors.background }]}>
+                    <Text style={[S.tdCell, { width: 130, fontSize: 11, color: colors.foreground }]} numberOfLines={2}>{inv.name}</Text>
+                    <Text style={[S.tdCell, { width: 60, fontSize: 10, color: colors.muted }]} numberOfLines={1}>{inv.category}</Text>
+                    <Text style={[S.tdCell, { width: 60, textAlign: "right", fontSize: 11, color: colors.foreground }]}>{inv.initQty}</Text>
+                    <Text style={[S.tdCell, { width: 60, textAlign: "right", fontSize: 11, color: inv.purchaseQty > 0 ? colors.primary : colors.muted }]}>
+                      {inv.purchaseQty > 0 ? `+${inv.purchaseQty}` : "—"}
+                    </Text>
+                    <Text style={[S.tdCell, { width: 60, textAlign: "right", fontSize: 11, color: colors.muted }]}>{inv.consumeQty > 0 ? inv.consumeQty.toFixed(1) : "—"}</Text>
+                    <Text style={[S.tdCell, { width: 60, textAlign: "right", fontSize: 12, fontWeight: "700", color: inv.endQty < 0 ? "#EF4444" : colors.foreground }]}>
+                      {inv.endQty < 0 ? `⚠️${inv.endQty}` : inv.endQty}
+                    </Text>
+                    <Text style={[S.tdCell, { width: 70, textAlign: "right", fontSize: 11, color: colors.foreground }]}>¥{inv.unitCost.toFixed(0)}</Text>
+                    <Text style={[S.tdCell, { width: 80, textAlign: "right", fontSize: 11, color: "#EF4444" }]}>¥{inv.endCost.toFixed(0)}</Text>
+                  </View>
+                ))}
+              </View>
+            </ScrollView>
+
+            {/* 价格变动列表 */}
+            {ledgerImportPriceChanges.length > 0 && (
+              <View style={{ margin: 12 }}>
+                <Text style={{ fontSize: 13, fontWeight: "700", color: "#D97706", marginBottom: 8 }}>⚠️ 价格变动明细</Text>
+                {ledgerImportPriceChanges.map((c, i) => (
+                  <View key={i} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
+                    <Text style={{ fontSize: 12, color: colors.foreground, flex: 1 }} numberOfLines={1}>{c.name}</Text>
+                    <Text style={{ fontSize: 12, color: colors.muted, marginHorizontal: 8 }}>¥{c.prevPrice.toFixed(0)} → ¥{c.currPrice.toFixed(0)}</Text>
+                    <Text style={{ fontSize: 12, fontWeight: "700", color: c.changeAmt > 0 ? "#EF4444" : "#10B981" }}>
+                      {c.changeAmt > 0 ? "↑" : "↓"}¥{Math.abs(c.changeAmt).toFixed(0)}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </ScrollView>
+        </View>
+      </Modal>
     </ScreenContainer>
   );
 }
@@ -972,6 +1143,7 @@ function SupplierDetailScreen({
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [importing, setImporting] = useState(false);
+  const [pdfImporting, setPdfImporting] = useState(false);
 
   // 备用金导入
   const pettyRecords = useMemo(() => {
@@ -988,6 +1160,76 @@ function SupplierDetailScreen({
     const kw = ["酒", "gin", "whisky", "rum", "vodka", "tequila", "brandy", "liqueur", "vermouth", "bitters", "syrup", "ml", "瓶", "箱"];
     return kw.some((k) => desc.toLowerCase().includes(k));
   }
+
+  const handlePdfImport = async () => {
+    try {
+      setPdfImporting(true);
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["application/pdf", "*/*"],
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled || !result.assets?.[0]) { setPdfImporting(false); return; }
+      const asset = result.assets[0];
+      const fileName = asset.name ?? "invoice.pdf";
+      Alert.alert("AI 解析中", `正在识别 PDF 进货单内容...\n文件：${fileName}\n\n通常需要 10-20 秒，请稍候`);
+      const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 });
+      const token = await Auth.getSessionToken();
+      const apiBase = getApiBaseUrl();
+      const trpcUrl = `${apiBase}/api/trpc/parseInvoice.parse`;
+      const trpcRes = await fetch(trpcUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          json: { pdfBase64: base64, fileName, supplierHint: supplier },
+        }),
+      });
+      if (!trpcRes.ok) {
+        Alert.alert("解析失败", `服务器错误 (${trpcRes.status})，请检查网络连接`);
+        setPdfImporting(false); return;
+      }
+      const trpcData = await trpcRes.json() as { result?: { data?: { json?: any } } };
+      const llmResult = trpcData?.result?.data?.json;
+      if (!llmResult) {
+        Alert.alert("解析失败", "AI 未能识别进货单内容，请尝试 Excel 导入或手动录入");
+        setPdfImporting(false); return;
+      }
+      const normalized = normalizeLLMRows(llmResult, supplier);
+      if (!normalized.rows.length) {
+        Alert.alert("提示", `AI 解析完成但未找到有效记录\n\n${normalized.errors.join("\n") || "请确认 PDF 包含进货单表格数据"}`);
+        setPdfImporting(false); return;
+      }
+      Alert.alert(
+        "PDF 解析预览",
+        `AI 识别到 ${normalized.rows.length} 条记录\n合计 ¥${normalized.totalAmount.toFixed(0)}\n供应商：${normalized.supplier ?? supplier}\n\n确认导入到「${supplier}」？`,
+        [
+          { text: "取消", style: "cancel" },
+          { text: "确认导入", onPress: () => {
+            batchAddPurchases(normalized.rows.map((r) => ({
+              month: r.month ?? month,
+              date: r.date,
+              rawName: r.rawName,
+              itemId: undefined as string | undefined,
+              supplier,
+              quantity: r.quantity,
+              unit: r.unit,
+              unitPrice: r.unitPrice,
+              amount: r.amount,
+              source: "pdf" as const,
+            })));
+            syncLedgerFromPurchases(month);
+            Alert.alert("导入成功", `已导入 ${normalized.rows.length} 条进货记录（来自 PDF）`);
+          }},
+        ]
+      );
+    } catch (e) {
+      Alert.alert("错误", `PDF 解析失败: ${String(e)}`);
+    } finally {
+      setPdfImporting(false);
+    }
+  };
 
   const handleExcelImport = async () => {
     try {
@@ -1060,6 +1302,11 @@ function SupplierDetailScreen({
           style={[S.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           {importing ? <ActivityIndicator size="small" color={colors.primary} /> : <IconSymbol name="square.and.arrow.down" size={13} color={colors.primary} />}
           <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "600" }}>导入Excel</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={handlePdfImport}
+          style={[S.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          {pdfImporting ? <ActivityIndicator size="small" color="#EF4444" /> : <IconSymbol name="doc.fill" size={13} color="#EF4444" />}
+          <Text style={{ fontSize: 12, color: "#EF4444", fontWeight: "600" }}>导入PDF</Text>
         </TouchableOpacity>
         {isSelfBuy && (
           <TouchableOpacity onPress={() => { tap(); setShowPettyImport(true); }}
