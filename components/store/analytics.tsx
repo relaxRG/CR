@@ -213,7 +213,7 @@ export default function StoreAnalyticsScreen() {
               <IconSymbol name="doc.text.fill" size={20} color="#30D158" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.entryTitle, { color: colors.foreground }]}>月度总报表</Text>
+              <Text style={[styles.entryTitle, { color: colors.foreground }]}>{`${new Date().getMonth() + 1}月报表`}</Text>
               <Text style={[styles.entrySub, { color: colors.muted }]}>收入/成本/工资/货款 · 账户余额追踪</Text>
             </View>
             <IconSymbol name="chevron.right" size={16} color={colors.muted} />

@@ -477,10 +477,15 @@ export default function WineInventoryScreen() {
         <Text style={[S.navTitle, { color: colors.foreground }]}>
           葡萄酒进销存{latestSnapshot ? ` · ${latestSnapshot.monthLabel}` : ""}
         </Text>
-        <Pressable onPress={() => { tap(); router.push("/wine-inventory-import" as any); }}
-          style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
-          <IconSymbol name="square.and.arrow.down.fill" size={20} color={colors.primary} />
-        </Pressable>
+        <View style={{ flexDirection: "row", gap: 12 }}>
+          <Pressable onPress={() => Alert.alert("期初录入", "葡萄酒进销存的期初数据通过 Excel 导入自动带入（initQty/initUnitCost 字段）。\n\n如需手动调整，请在导入后通过 Excel 重新导入修正后的数据。")} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+            <IconSymbol name="calendar.badge.plus" size={20} color={colors.primary} />
+          </Pressable>
+          <Pressable onPress={() => { tap(); router.push("/wine-inventory-import" as any); }}
+            style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+            <IconSymbol name="square.and.arrow.down.fill" size={20} color={colors.primary} />
+          </Pressable>
+        </View>
       </View>
 
       {/* Tab 切换 */}

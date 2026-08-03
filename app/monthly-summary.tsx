@@ -807,7 +807,7 @@ export default function MonthlySummaryScreen() {
         <Pressable onPress={() => router.back()} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
           <IconSymbol name="chevron.left" size={22} color={colors.primary} />
         </Pressable>
-        <Text style={[S.navTitle, { color: colors.foreground }]}>月度总报表</Text>
+        <Text style={[S.navTitle, { color: colors.foreground }]}>{`${Number(selectedMonth.slice(5, 7))}月报表`}</Text>
         <Pressable onPress={() => router.push("/suppliers" as any)} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
           <IconSymbol name="building.2.fill" size={20} color={colors.muted} />
         </Pressable>

@@ -153,7 +153,7 @@ const INCOME_CODES = ["N0","N1","N2","N3","N4","N5"];
 export default function StorePettyCashScreen() {
   const insets = useSafeAreaInsets();
   const colors = useColors();
-  const { records, addRecord, deleteRecord, setPeriod, calcPeriod, periods } = usePettyCashStore();
+  const { records, addRecord, updateRecord, deleteRecord, setPeriod, calcPeriod, periods } = usePettyCashStore();
 
   const [month, setMonth] = useState(todayMonth());
   const [viewMode, setViewMode] = useState<ViewMode>("ledger");
@@ -161,8 +161,9 @@ export default function StorePettyCashScreen() {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
 
-  // 添加记录弹窗
+  // 添加/编辑记录弹窗
   const [showAdd, setShowAdd] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [addCode, setAddCode] = useState<PettyCode>("A1");
   const [periodMode, setPeriodMode] = useState<PeriodMode>("month");
   const [showPeriodMenu, setShowPeriodMenu] = useState(false);
@@ -266,10 +267,21 @@ export default function StorePettyCashScreen() {
     } finally { setImporting(false); }
   }, [addRecord]);
 
+  const openEdit = (item: PettyRecord) => {
+    setEditingId(item.id);
+    setAddCode(item.code);
+    setAddAmount(String(item.amount));
+    setAddDate(item.date);
+    setAddDesc(item.description || "");
+    setAddPayment(item.paymentMethod || "微信");
+    setAddType(["N0","N1","N2"].includes(item.code) ? "inflow" : ["N3","N4","N5"].includes(item.code) ? "other" : "expense");
+    setShowAdd(true);
+  };
   const handleAdd = () => {
     if (!addAmount || isNaN(parseFloat(addAmount))) { Alert.alert("请输入金额"); return; }
-    addRecord({ date: addDate, code: addCode, amount: parseFloat(addAmount), description: addDesc, paymentMethod: addPayment, receiptUri: "" });
-    setAddAmount(""); setAddDesc(""); setShowAdd(false);
+    const payload = { date: addDate, code: addCode, amount: parseFloat(addAmount), description: addDesc, paymentMethod: addPayment, receiptUri: "" };
+    if (editingId) { updateRecord(editingId, payload); } else { addRecord(payload); }
+    setAddAmount(""); setAddDesc(""); setEditingId(null); setShowAdd(false);
     tap();
   };
 
@@ -408,6 +420,7 @@ export default function StorePettyCashScreen() {
           </View>
           {group.records.map(item => (
             <Pressable key={item.id}
+              onPress={() => { tap(); openEdit(item); }}
               onLongPress={() => Alert.alert("删除", "确认删除？", [{ text: "取消", style: "cancel" }, { text: "删除", style: "destructive", onPress: () => deleteRecord(item.id) }])}
               style={[S.recordRow, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
               <View style={[S.codeBadge, { backgroundColor: INCOME_CODES.includes(item.code) ? colors.success + "33" : colors.primary + "33" }]}>
@@ -498,6 +511,7 @@ export default function StorePettyCashScreen() {
               ? <Text style={[S.emptyDesc, { textAlign: "center", marginTop: 20, color: colors.muted }]}>当日无记录</Text>
               : calendarGroups.map(group => group.records.map(item => (
                 <Pressable key={item.id}
+                  onPress={() => { tap(); openEdit(item); }}
                   onLongPress={() => Alert.alert("删除", "确认删除？", [{ text: "取消", style: "cancel" }, { text: "删除", style: "destructive", onPress: () => deleteRecord(item.id) }])}
                   style={[S.recordRow, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
                   <View style={[S.codeBadge, { backgroundColor: colors.primary + "33" }]}>
@@ -622,12 +636,12 @@ export default function StorePettyCashScreen() {
       : addType === "inflow" ? [{ label: "N 备用金转入", codes: inflowCodes }]
       : [{ label: "N 其他收入", codes: otherCodes }];
     return (
-      <Modal visible={showAdd} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowAdd(false)}>
+      <Modal visible={showAdd} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => { setShowAdd(false); setEditingId(null); }}>
         <View style={[S.sheet, { backgroundColor: colors.background }]}>
           <View style={[S.sheetHeader, { borderBottomColor: colors.border }]}>
-            <Pressable onPress={() => setShowAdd(false)}><Text style={[S.sheetAction, { color: colors.primary }]}>取消</Text></Pressable>
-            <Text style={[S.sheetTitle, { color: colors.foreground }]}>添加记录</Text>
-            <Pressable onPress={handleAdd}><Text style={[S.sheetAction, { color: colors.primary, fontWeight: "700" }]}>添加</Text></Pressable>
+            <Pressable onPress={() => { setShowAdd(false); setEditingId(null); }}><Text style={[S.sheetAction, { color: colors.primary }]}>取消</Text></Pressable>
+            <Text style={[S.sheetTitle, { color: colors.foreground }]}>{editingId ? "编辑记录" : "添加记录"}</Text>
+            <Pressable onPress={handleAdd}><Text style={[S.sheetAction, { color: colors.primary, fontWeight: "700" }]}>{editingId ? "保存" : "添加"}</Text></Pressable>
           </View>
           <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }}>
             <View style={{ flexDirection: "row", gap: 8 }}>
@@ -722,7 +736,7 @@ export default function StorePettyCashScreen() {
       {viewMode === "stats" && renderStats()}
       {/* FAB：蓝色 + 按钮（右下角，iCost 位置）*/}
       <Pressable
-        onPress={() => { tap(); setShowAdd(true); }}
+        onPress={() => { tap(); setEditingId(null); setAddCode("A1"); setAddAmount(""); setAddDate(new Date().toISOString().slice(0, 10)); setAddDesc(""); setAddPayment("微信"); setAddType("expense"); setShowAdd(true); }}
         style={[S.fab, { bottom: 20 + insets.bottom, backgroundColor: colors.primary, shadowColor: colors.primary }]}>
         <Text style={S.fabIcon}>+</Text>
       </Pressable>

@@ -19,6 +19,7 @@ export type ExtendedInventoryCategory =
   | InventoryCategory
   | "beer"
   | "ice"
+  | "fruit"
   | "none";
 
 export const EXTENDED_INVENTORY_LABELS: Record<ExtendedInventoryCategory, string> = {
@@ -30,6 +31,7 @@ export const EXTENDED_INVENTORY_LABELS: Record<ExtendedInventoryCategory, string
   daily: "日用品",
   beer: "啤酒",
   ice: "冰块",
+  fruit: "水果",
   none: "不关联",
 };
 
@@ -42,6 +44,7 @@ export const EXTENDED_INVENTORY_COLORS: Record<ExtendedInventoryCategory, string
   daily: "#8E8E93",
   beer: "#F4A300",
   ice: "#00BCD4",
+  fruit: "#22C55E",
   none: "#C7C7CC",
 };
 
@@ -85,7 +88,7 @@ export const DEFAULT_PETTY_CATEGORIES: PettyCategory[] = [
   { code: "A2", label: "A2 新鲜海鲜", group: "A", groupLabel: "A 食材采购", isIncome: false, isTransfer: false, inventoryCategory: "food", isDefault: true, sortOrder: 2, enabled: true },
   { code: "A3", label: "A3 各种冻品", group: "A", groupLabel: "A 食材采购", isIncome: false, isTransfer: false, inventoryCategory: "food", isDefault: true, sortOrder: 3, enabled: true },
   { code: "A4", label: "A4 米面粮油", group: "A", groupLabel: "A 食材采购", isIncome: false, isTransfer: false, inventoryCategory: "food", isDefault: true, sortOrder: 4, enabled: true },
-  { code: "A5", label: "A5 蔬菜水果", group: "A", groupLabel: "A 食材采购", isIncome: false, isTransfer: false, inventoryCategory: "food", isDefault: true, sortOrder: 5, enabled: true },
+  { code: "A5", label: "A5 蔬菜水果", group: "A", groupLabel: "A 食材采购", isIncome: false, isTransfer: false, inventoryCategory: "fruit", isDefault: true, sortOrder: 5, enabled: true },
   { code: "A6", label: "A6 牛排", group: "A", groupLabel: "A 食材采购", isIncome: false, isTransfer: false, inventoryCategory: "food", isDefault: true, sortOrder: 6, enabled: true },
   { code: "A7", label: "A7 火腿", group: "A", groupLabel: "A 食材采购", isIncome: false, isTransfer: false, inventoryCategory: "food", isDefault: true, sortOrder: 7, enabled: true },
   { code: "A8", label: "A8 三文鱼", group: "A", groupLabel: "A 食材采购", isIncome: false, isTransfer: false, inventoryCategory: "food", isDefault: true, sortOrder: 8, enabled: true },

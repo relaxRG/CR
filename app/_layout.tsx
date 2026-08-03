@@ -30,6 +30,7 @@ import { MenuProvider } from "@/lib/menu/store";
 import { ShoppingProvider } from "@/lib/shopping/store";
 import { WineProvider } from "@/lib/wine/store";
 import { FoodMenuProvider } from "@/lib/food/menu-store";
+import { MenuPackageProvider } from "@/lib/menu/package-store";
 import { FoodIngredientProvider, SupplierPurchaseProvider } from "@/lib/food/ingredient-store";
 import { RevenueProvider } from "@/lib/store/revenue-store";
 import { PettyCashProvider } from "@/lib/store/petty-store";
@@ -43,8 +44,16 @@ import { PettyCategoryProvider } from "@/lib/store/petty-category-store";
 import { PettyInventoryLinkProvider } from "@/lib/store/petty-inventory-link-store";
 import { BeerProvider } from "@/lib/beer/store";
 import { IceInventoryProvider } from "@/lib/ice/inventory-store";
+import { FruitProvider } from "@/lib/fruit/store";
 import { PeriodAnalysisProvider } from "@/lib/store/period-analysis/store";
 import { MonthlySummaryProvider } from "@/lib/store/monthly-summary/store";
+import { BeerInventoryProvider } from "@/lib/beer/inventory-store";
+import { IceNewInventoryProvider } from "@/lib/ice/new-inventory-store";
+import { FruitNewInventoryProvider } from "@/lib/fruit/new-inventory-store";
+import { GlasswareInventoryProvider } from "@/lib/glassware/inventory-store";
+import { TablewareInventoryProvider } from "@/lib/tableware/inventory-store";
+import { DailyInventoryProvider } from "@/lib/daily/inventory-store";
+import { EquipmentInventoryProvider } from "@/lib/equipment/inventory-store";
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
@@ -121,6 +130,7 @@ export default function RootLayout() {
           <IceSettingsProvider>
           <LabProvider>
           <BookStoreProvider>
+          <MenuPackageProvider>
           <MenuProvider>
           <ShoppingProvider>
           <WineProvider>
@@ -139,6 +149,14 @@ export default function RootLayout() {
           <PettyInventoryLinkProvider>
           <BeerProvider>
           <IceInventoryProvider>
+          <FruitProvider>
+          <BeerInventoryProvider>
+          <IceNewInventoryProvider>
+          <FruitNewInventoryProvider>
+          <GlasswareInventoryProvider>
+          <TablewareInventoryProvider>
+          <DailyInventoryProvider>
+          <EquipmentInventoryProvider>
           <PeriodAnalysisProvider>
           <MonthlySummaryProvider>
             <Stack screenOptions={{ headerShown: false }}>
@@ -200,6 +218,14 @@ export default function RootLayout() {
               <Stack.Screen name="labor-advances" />
               <Stack.Screen name="petty-category-settings" options={{ presentation: "modal" }} />
               <Stack.Screen name="beer-ice-inventory" />
+              <Stack.Screen name="beer-inventory" />
+              <Stack.Screen name="ice-inventory" />
+              <Stack.Screen name="fruit-inventory" />
+              <Stack.Screen name="food-inventory" />
+              <Stack.Screen name="glassware-inventory" />
+              <Stack.Screen name="tableware-inventory" />
+              <Stack.Screen name="daily-inventory" />
+              <Stack.Screen name="equipment-inventory" />
               <Stack.Screen name="period-analysis" />
               <Stack.Screen name="monthly-summary" />
               <Stack.Screen name="suppliers" />
@@ -207,6 +233,14 @@ export default function RootLayout() {
             <StatusBar style="auto" />
           </MonthlySummaryProvider>
           </PeriodAnalysisProvider>
+          </EquipmentInventoryProvider>
+          </DailyInventoryProvider>
+          </TablewareInventoryProvider>
+          </GlasswareInventoryProvider>
+          </FruitNewInventoryProvider>
+          </IceNewInventoryProvider>
+          </BeerInventoryProvider>
+          </FruitProvider>
           </IceInventoryProvider>
           </BeerProvider>
           </PettyInventoryLinkProvider>
@@ -225,6 +259,7 @@ export default function RootLayout() {
           </WineProvider>
           </ShoppingProvider>
           </MenuProvider>
+          </MenuPackageProvider>
           </BookStoreProvider>
           </LabProvider>
           </IceSettingsProvider>
