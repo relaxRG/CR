@@ -717,3 +717,29 @@
 ### ✅ P2 同步日志升级
 - [x] 日志上限：50 → 200 条
 - [x] `sync-log.tsx` 实时刷新：订阅 `subscribeSyncState`，同步时自动更新
+
+## Build 132 完成（2026-08-04）
+
+### ✅ 烈酒库存管理 UI/UX 全面升级
+
+#### Phase 2：数据层升级
+- [x] SpiritItem 新增 bottleId/bottleLinkConfidence/categorySource 字段
+- [x] SpiritPurchaseRecord 新增 category 字段（进销存独立分类）
+- [x] crud-store 新增 BATCH_UPDATE_PURCHASES_CATEGORY action，分类传播规则
+
+#### Phase 3：台账（库存管理Tab）升级
+- [x] 台账分类分组改为动态，未分类置顶显示橙色警告
+- [x] 台账新增分类列（56pt），点击可修改分类
+- [x] 长按菜单新增：修改分类、查看酒库档案、更换/取消酒库链接
+
+#### Phase 4：进货页升级 + 台账参考价列
+- [x] 台账新增参考价列（中文名后，70pt），点击可手工编辑（setRefPrice）
+- [x] 进货页新增分类列（56pt），点击可修改分类（可选同步酒款档案）
+- [x] 日期/数量/单价/应收增加均可点击编辑
+- [x] 单价列扩至 90pt，价格涨跌独占第二行（不再错位）
+- [x] 批量操作扩展：批量修改分类、数量、单价
+
+#### Phase 5：详情页跳转、总结Tab清理、编辑表单升级
+- [x] 查看详情页跳转修正：有 bottleId → /bottle/[id]；无 → 引导新建酒库档案
+- [x] 总结Tab删除「进货汇总（按供应商）」卡片
+- [x] ItemFormModal 升级为全屏 pageSheet（三区块：基本信息/价格规格/进销存分类）
