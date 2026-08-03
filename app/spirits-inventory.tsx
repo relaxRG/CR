@@ -1195,8 +1195,10 @@ function SupplierDetailScreen({
 }) {
   const {
     addPurchase, deletePurchase, batchAddPurchases, batchDeletePurchases,
+    updatePurchase,
     setRefPrice, getRefPrice, setMatchMemory, matchPettyToItem,
     selfBuyConfig, syncLedgerFromPurchases,
+    getMonthLedger,
   } = store;
   const isSelfBuy = supplier === "自采";
   const [y, m] = month.split("-").map(Number);
@@ -1219,6 +1221,14 @@ function SupplierDetailScreen({
   const [showImportPreview, setShowImportPreview] = useState(false);
   const [importPreviewRows, setImportPreviewRows] = useState<ParsedPurchaseRow[]>([]);
   const [importPreviewSource, setImportPreviewSource] = useState<"excel" | "pdf">("excel");
+  // 商品名点击预览卡片
+  const [previewItem, setPreviewItem] = useState<SpiritItem | null>(null);
+  // 批量修改供应商 Modal
+  const [showBatchSupplier, setShowBatchSupplier] = useState(false);
+  const [batchSupplierInput, setBatchSupplierInput] = useState("");
+  // 批量修改日期 Modal
+  const [showBatchDate, setShowBatchDate] = useState(false);
+  const [batchDateInput, setBatchDateInput] = useState("");
 
   // 备用金导入
   const pettyRecords = useMemo(() => {
@@ -1376,6 +1386,55 @@ function SupplierDetailScreen({
         )}
       </ScrollView>
 
+      {/* 第二行操作栏：多选操作 */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}
+        style={{ flexGrow: 0, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}
+        contentContainerStyle={{ gap: 8, paddingHorizontal: 12, paddingVertical: 6, alignItems: "center" }}>
+        <TouchableOpacity onPress={() => {
+          tap();
+          const allIds = new Set(supPurchases.map((p) => p.id));
+          setSelectedIds(allIds);
+          setSelectMode(true);
+        }} style={[S.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={{ fontSize: 12, color: colors.muted, fontWeight: "600" }}>全选</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => { tap(); setSelectedIds(new Set()); setSelectMode(false); }}
+          style={[S.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={{ fontSize: 12, color: colors.muted, fontWeight: "600" }}>取消全选</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => {
+          tap();
+          if (selectedIds.size === 0) { Alert.alert("提示", "请先勾选要修改的记录"); return; }
+          setBatchSupplierInput(supplier);
+          setShowBatchSupplier(true);
+        }} style={[S.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={{ fontSize: 12, color: colors.muted, fontWeight: "600" }}>修改供应商</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => {
+          tap();
+          if (selectedIds.size === 0) { Alert.alert("提示", "请先勾选要修改的记录"); return; }
+          setBatchDateInput("");
+          setShowBatchDate(true);
+        }} style={[S.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={{ fontSize: 12, color: colors.muted, fontWeight: "600" }}>修改日期</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => {
+          tap();
+          if (selectedIds.size === 0) { Alert.alert("提示", "请先勾选要删除的记录"); return; }
+          Alert.alert("批量删除", `删除选中的 ${selectedIds.size} 条记录？`, [
+            { text: "取消", style: "cancel" },
+            { text: "删除", style: "destructive", onPress: () => {
+              batchDeletePurchases([...selectedIds]);
+              setSelectedIds(new Set());
+              setSelectMode(false);
+            }},
+          ]);
+        }} style={[S.actionBtn, { backgroundColor: "#FEF2F2", borderColor: "#FECACA" }]}>
+          <IconSymbol name="trash" size={13} color="#EF4444" />
+          <Text style={{ fontSize: 12, color: "#EF4444", fontWeight: "600" }}>删除{selectedIds.size > 0 ? `(${selectedIds.size})` : ""}</Text>
+        </TouchableOpacity>
+      </ScrollView>
+
       {/* 供应商信息头 */}
       <View style={{ paddingHorizontal: 16, paddingVertical: 8, backgroundColor: colors.surface, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
         <Text style={{ fontSize: 12, color: colors.muted }}>
@@ -1443,10 +1502,21 @@ function SupplierDetailScreen({
                     )}
                     <Text style={[S.tdCell, { width: 36, textAlign: "center", fontSize: 11, color: colors.muted }]}>{idx + 1}</Text>
                     <Text style={[S.tdCell, { width: 90, fontSize: 11, color: colors.foreground }]}>{p.date}</Text>
-                    <View style={[S.tdCell, { width: 180 }]}>
+                    <TouchableOpacity style={[S.tdCell, { width: 180 }]}
+                      onPress={() => {
+                        if (!selectMode) {
+                          tap();
+                          const matched = items.find((i) => i.id === p.itemId) ??
+                            items.find((i) => i.name === p.rawName || i.nameEn === p.rawName ||
+                              p.rawName.includes(i.name) || (i.nameEn && p.rawName.includes(i.nameEn)));
+                          if (matched) setPreviewItem(matched);
+                          else Alert.alert("提示", `「${p.rawName}」尚未匹配到库存酒款档案`);
+                        } else {
+                          toggleSelect(p.id);
+                        }
+                      }}>
                       <Text style={{ fontSize: 11, color: colors.foreground }} numberOfLines={2}>{p.rawName}</Text>
-                      {p.source === "excel" && <Text style={{ fontSize: 9, color: colors.primary }}>Excel</Text>}
-                    </View>
+                    </TouchableOpacity>
                     <Text style={[S.tdCell, { width: 40, textAlign: "center", fontSize: 11, color: colors.muted }]}>{p.unit}</Text>
                     <Text style={[S.tdCell, { width: 50, textAlign: "right", fontSize: 11, color: colors.foreground }]}>{p.quantity}</Text>
                     <View style={[S.tdCell, { width: 70, alignItems: "flex-end" }]}>
@@ -1519,6 +1589,141 @@ function SupplierDetailScreen({
           onClose={() => setShowPettyImport(false)}
         />
       )}
+
+      {/* 商品预览卡片 Modal */}
+      {previewItem && (
+        <Modal visible={!!previewItem} transparent animationType="fade">
+          <TouchableOpacity style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center", paddingHorizontal: 20 }}
+            activeOpacity={1} onPress={() => setPreviewItem(null)}>
+            <TouchableOpacity activeOpacity={1} style={{ width: "100%", borderRadius: 20, backgroundColor: colors.background,
+              shadowColor: "#000", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.25, shadowRadius: 20, elevation: 20 }}>
+              {/* 标题区 */}
+              <View style={{ padding: 20, paddingBottom: 12, alignItems: "center", borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
+                <Text style={{ fontSize: 20, fontWeight: "800", color: colors.foreground, textAlign: "center", marginBottom: 4 }}>{previewItem.name}</Text>
+                {previewItem.nameEn ? <Text style={{ fontSize: 13, color: colors.muted, textAlign: "center" }}>{previewItem.nameEn}</Text> : null}
+              </View>
+              {/* 数据格 */}
+              {(() => {
+                const ledgerEntry = getMonthLedger(month).find((e) => e.itemId === previewItem.id);
+                const refPrice = getRefPrice(previewItem.id, month);
+                const rows = [
+                  [{ label: "分类", value: previewItem.category, color: colors.foreground }, { label: "单位", value: previewItem.unit, color: colors.foreground }],
+                  [{ label: "参考单价", value: refPrice > 0 ? `¥${refPrice}` : "未设置", color: refPrice > 0 ? "#EF4444" : colors.muted }, { label: "供应商", value: previewItem.supplier || "-", color: colors.foreground }],
+                  [{ label: "本月进货", value: ledgerEntry ? `${ledgerEntry.purchaseQty}瓶` : "0瓶", color: colors.foreground }, { label: "本月消耗", value: ledgerEntry ? `${ledgerEntry.consumeQty}瓶` : "0瓶", color: colors.foreground }],
+                  [{ label: "期末库存", value: ledgerEntry ? `${ledgerEntry.closingQty}瓶` : "0瓶", color: (ledgerEntry?.closingQty ?? 0) < 0 ? "#EF4444" : "#10B981" }, { label: "期末成本", value: ledgerEntry ? `¥${ledgerEntry.closingCost.toFixed(0)}` : "-", color: colors.foreground }],
+                ];
+                return rows.map((row, ri) => (
+                  <View key={ri} style={{ flexDirection: "row", borderBottomWidth: ri < rows.length - 1 ? StyleSheet.hairlineWidth : 0, borderBottomColor: colors.border }}>
+                    {row.map((cell, ci) => (
+                      <View key={ci} style={{ flex: 1, padding: 14,
+                        borderRightWidth: ci === 0 ? StyleSheet.hairlineWidth : 0,
+                        borderRightColor: colors.border }}>
+                        <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 6 }}>{cell.label}</Text>
+                        <Text style={{ fontSize: 17, fontWeight: "700", color: cell.color }}>{cell.value}</Text>
+                      </View>
+                    ))}
+                  </View>
+                ));
+              })()}
+              {/* 底部按鈕 */}
+              <View style={{ flexDirection: "row", gap: 10, padding: 16, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
+                <TouchableOpacity onPress={() => {
+                  setPreviewItem(null);
+                  // 跳转到库存管理 Tab 查看详情
+                  onBack();
+                }} style={{ flex: 1, padding: 13, borderRadius: 12, borderWidth: 1, borderColor: colors.border, alignItems: "center" }}>
+                  <Text style={{ fontSize: 14, color: colors.foreground, fontWeight: "600" }}>查看详情页 →</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setPreviewItem(null)}
+                  style={{ flex: 1, padding: 13, backgroundColor: "#EF4444", borderRadius: 12, alignItems: "center" }}>
+                  <Text style={{ fontSize: 14, color: "#fff", fontWeight: "700" }}>关闭</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Modal>
+      )}
+
+      {/* 批量修改供应商 Modal */}
+      <Modal visible={showBatchSupplier} transparent animationType="slide">
+        <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.4)" }}>
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
+            <View style={{ backgroundColor: colors.background, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20 }}>
+              <Text style={{ fontSize: 17, fontWeight: "700", color: colors.foreground, marginBottom: 4 }}>修改供应商</Text>
+              <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 12 }}>将选中的 {selectedIds.size} 条记录的供应商改为：</Text>
+              <TextInput
+                style={[S.input, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.surface }]}
+                value={batchSupplierInput}
+                onChangeText={setBatchSupplierInput}
+                placeholder="供应商名称"
+                placeholderTextColor={colors.muted}
+                autoFocus
+              />
+              <View style={{ flexDirection: "row", gap: 10, marginTop: 12 }}>
+                <TouchableOpacity onPress={() => setShowBatchSupplier(false)}
+                  style={{ flex: 1, padding: 14, backgroundColor: colors.surface, borderRadius: 12, alignItems: "center", borderWidth: 1, borderColor: colors.border }}>
+                  <Text style={{ color: colors.muted, fontWeight: "600" }}>取消</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => {
+                  if (!batchSupplierInput.trim()) { Alert.alert("提示", "请输入供应商名称"); return; }
+                  [...selectedIds].forEach((id) => {
+                    const p = supPurchases.find((x) => x.id === id);
+                    if (p) updatePurchase(id, { supplier: batchSupplierInput.trim() });
+                  });
+                  syncLedgerFromPurchases(month);
+                  setShowBatchSupplier(false);
+                  setSelectedIds(new Set());
+                  setSelectMode(false);
+                  Alert.alert("修改成功", `已更新 ${selectedIds.size} 条记录的供应商`);
+                }} style={{ flex: 2, padding: 14, backgroundColor: "#EF4444", borderRadius: 12, alignItems: "center" }}>
+                  <Text style={{ color: "#fff", fontWeight: "700" }}>确认修改</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+
+      {/* 批量修改日期 Modal */}
+      <Modal visible={showBatchDate} transparent animationType="slide">
+        <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.4)" }}>
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
+            <View style={{ backgroundColor: colors.background, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20 }}>
+              <Text style={{ fontSize: 17, fontWeight: "700", color: colors.foreground, marginBottom: 4 }}>修改日期</Text>
+              <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 12 }}>将选中的 {selectedIds.size} 条记录的日期改为：</Text>
+              <TextInput
+                style={[S.input, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.surface }]}
+                value={batchDateInput}
+                onChangeText={setBatchDateInput}
+                placeholder="YYYY-MM-DD，如 2026-08-15"
+                placeholderTextColor={colors.muted}
+                keyboardType="numbers-and-punctuation"
+                autoFocus
+              />
+              <View style={{ flexDirection: "row", gap: 10, marginTop: 12 }}>
+                <TouchableOpacity onPress={() => setShowBatchDate(false)}
+                  style={{ flex: 1, padding: 14, backgroundColor: colors.surface, borderRadius: 12, alignItems: "center", borderWidth: 1, borderColor: colors.border }}>
+                  <Text style={{ color: colors.muted, fontWeight: "600" }}>取消</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => {
+                  if (!/^\d{4}-\d{2}-\d{2}$/.test(batchDateInput)) { Alert.alert("格式错误", "请输入 YYYY-MM-DD 格式"); return; }
+                  const newMonth = batchDateInput.slice(0, 7);
+                  [...selectedIds].forEach((id) => {
+                    updatePurchase(id, { date: batchDateInput, month: newMonth });
+                  });
+                  syncLedgerFromPurchases(month);
+                  setShowBatchDate(false);
+                  setSelectedIds(new Set());
+                  setSelectMode(false);
+                  Alert.alert("修改成功", `已更新 ${selectedIds.size} 条记录的日期`);
+                }} style={{ flex: 2, padding: 14, backgroundColor: "#EF4444", borderRadius: 12, alignItems: "center" }}>
+                  <Text style={{ color: "#fff", fontWeight: "700" }}>确认修改</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
 
       {/* Excel/PDF 导入预览 Modal */}
       {showImportPreview && (
