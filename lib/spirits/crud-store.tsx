@@ -1,14 +1,23 @@
 /**
- * 烈酒进销存 CRUD Store（新版）
- * 支持：手动增删改酒款、月份切换、进货流水录入、Excel 导入、台账月结
+ * 烈酒进销存 CRUD Store（升级版）
+ * 支持：手动增删改酒款、月份切换、进货流水录入、Excel/PDF 导入、台账月结
+ * 新增：参考单价按月生效、品牌集团管理、供应商信息卡、备用金匹配记忆、自采分类配置
  */
 import React, { createContext, useContext, useEffect, useReducer } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { SpiritItem, SpiritPurchaseRecord, SpiritLedgerEntry } from "./types";
+import {
+  SpiritItem, SpiritPurchaseRecord, SpiritLedgerEntry,
+  SpiritRefPrice, SpiritSupplierInfo, GROUP_BRAND_KEYWORDS,
+} from "./types";
 
-const ITEMS_KEY = "spirits.items.v2";
-const PURCHASES_KEY = "spirits.purchases.v2";
-const LEDGER_KEY = "spirits.ledger.v2";
+const ITEMS_KEY = "spirits.items.v3";
+const PURCHASES_KEY = "spirits.purchases.v3";
+const LEDGER_KEY = "spirits.ledger.v3";
+const REF_PRICES_KEY = "spirits.refPrices.v1";
+const SUPPLIERS_KEY = "spirits.suppliers.v1";
+const GROUPS_KEY = "spirits.groups.v1";
+const MATCH_MEMORY_KEY = "spirits.matchMemory.v1";
+const SELF_BUY_CONFIG_KEY = "spirits.selfBuyConfig.v1";
 
 // ─── 工具函数 ─────────────────────────────────────────────────────────────────
 function uuid() {
@@ -19,29 +28,141 @@ export function getCurrentMonth() {
   return new Date().toISOString().slice(0, 7);
 }
 
+/** 模糊匹配分数（0-1），用于备用金描述与酒款名称的匹配 */
+export function fuzzyMatchScore(query: string, target: string): number {
+  const q = query.toLowerCase().replace(/[（）()\/\s]/g, "");
+  const t = target.toLowerCase().replace(/[（）()\/\s]/g, "");
+  if (t.includes(q) || q.includes(t)) return 0.9;
+  // 计算公共字符比例
+  let common = 0;
+  for (const ch of q) { if (t.includes(ch)) common++; }
+  return common / Math.max(q.length, t.length);
+}
+
+/** 根据描述自动检测是否为酒水采购（用于备用金智能过滤） */
+export function isLikelyAlcoholPurchase(description: string): boolean {
+  const keywords = [
+    "酒", "gin", "whisky", "whiskey", "rum", "vodka", "tequila", "brandy",
+    "liqueur", "vermouth", "bitters", "syrup", "ml", "瓶", "箱", "cl",
+    "beer", "wine", "champagne", "cognac", "mezcal", "absinthe",
+  ];
+  const lower = description.toLowerCase();
+  return keywords.some((k) => lower.includes(k));
+}
+
+/** 自动识别酒款所属集团 */
+export function autoDetectGroup(name: string, nameEn?: string): string {
+  const combined = `${name} ${nameEn ?? ""}`.toLowerCase();
+  for (const [group, keywords] of Object.entries(GROUP_BRAND_KEYWORDS)) {
+    if (keywords.some((k) => combined.includes(k.toLowerCase()))) {
+      return group;
+    }
+  }
+  return "独立品牌";
+}
+
+// ─── 品牌集团类型 ─────────────────────────────────────────────────────────────
+export interface SpiritGroupDef {
+  id: string;
+  name: string;
+  /** 旗下品牌关键词（用于自动匹配） */
+  keywords: string[];
+  color: string;
+  builtin: boolean;  // 内置集团不可删除，但可修改关键词
+  createdAt: string;
+}
+
+/** 备用金匹配记忆：记住「描述X → 酒款ID Y」的映射 */
+export interface PettyMatchMemory {
+  /** 备用金描述（归一化后） */
+  description: string;
+  /** 匹配到的酒款 ID */
+  itemId: string;
+  /** 匹配到的酒款名称（用于显示） */
+  itemName: string;
+  /** 置信度 */
+  confidence: "high" | "medium" | "manual";
+  /** 最后确认时间 */
+  confirmedAt: string;
+}
+
+/** 自采配置：哪些备用金分类代码视为酒水自采 */
+export interface SelfBuyConfig {
+  /** 勾选的备用金分类代码，如 ["B1", "B2"] */
+  pettyCodes: string[];
+  /** 是否启用 AI 关键词二次过滤（description 中含酒水关键词才导入） */
+  useKeywordFilter: boolean;
+  /** 更新时间 */
+  updatedAt: string;
+}
+
+const DEFAULT_SELF_BUY_CONFIG: SelfBuyConfig = {
+  pettyCodes: ["B1"],
+  useKeywordFilter: true,
+  updatedAt: new Date().toISOString(),
+};
+
+// ─── 内置品牌集团 ─────────────────────────────────────────────────────────────
+const BUILTIN_GROUPS: SpiritGroupDef[] = [
+  { id: "group_pernod", name: "保乐力加 (Pernod Ricard)", color: "#1D4ED8",
+    keywords: ["芝华士","chivas","百龄坛","ballantine","必富达","beefeater","哈瓦那","havana","马爹利","martell","甘露","kahlua","马利宝","malibu","三得利响","hibiki","皇家礼炮","royal salute","绝对","absolut"],
+    builtin: true, createdAt: new Date().toISOString() },
+  { id: "group_campari", name: "金巴利集团 (Campari Group)", color: "#DC2626",
+    keywords: ["金巴利","campari","阿佩罗","aperol","深蓝","skyy","野火鸡","wild turkey","大马利尼","grand marnier","古贝塔","courvoisier","appleton"],
+    builtin: true, createdAt: new Date().toISOString() },
+  { id: "group_diageo", name: "帝亚吉欧 (Diageo)", color: "#7C3AED",
+    keywords: ["尊尼获加","johnnie walker","添加利","tanqueray","贝利","baileys","摩根船长","captain morgan","斯米诺","smirnoff","尊美醇","jameson"],
+    builtin: true, createdAt: new Date().toISOString() },
+  { id: "group_brownforman", name: "百富门 (Brown-Forman)", color: "#92400E",
+    keywords: ["杰克丹尼","jack daniel","白占边","jim beam","美格","maker","老福斯特","old forester","伍德福德","woodford"],
+    builtin: true, createdAt: new Date().toISOString() },
+  { id: "group_beamsuntory", name: "宾三得利 (Beam Suntory)", color: "#B45309",
+    keywords: ["山崎","yamazaki","白州","hakushu","知多","chita","角瓶","kakubin","三得利","suntory","响","hibiki","乐加维林","laphroaig"],
+    builtin: true, createdAt: new Date().toISOString() },
+  { id: "group_remy", name: "人头马君度 (Rémy Cointreau)", color: "#059669",
+    keywords: ["人头马","remy martin","君度","cointreau","路易十三","louis xiii","圣哲曼","st germain","metaxa"],
+    builtin: true, createdAt: new Date().toISOString() },
+];
+
 // ─── State 定义 ───────────────────────────────────────────────────────────────
 interface SpiritsState {
   items: SpiritItem[];
   purchases: SpiritPurchaseRecord[];
   ledger: SpiritLedgerEntry[];
+  refPrices: SpiritRefPrice[];
+  suppliers: SpiritSupplierInfo[];
+  groups: SpiritGroupDef[];
+  matchMemory: PettyMatchMemory[];
+  selfBuyConfig: SelfBuyConfig;
 }
 
-const initial: SpiritsState = { items: [], purchases: [], ledger: [] };
+const initial: SpiritsState = {
+  items: [], purchases: [], ledger: [],
+  refPrices: [], suppliers: [],
+  groups: BUILTIN_GROUPS,
+  matchMemory: [],
+  selfBuyConfig: DEFAULT_SELF_BUY_CONFIG,
+};
 
 type Action =
   | { type: "LOAD"; payload: SpiritsState }
-  // 酒款档案
   | { type: "ADD_ITEM"; item: SpiritItem }
   | { type: "UPDATE_ITEM"; id: string; patch: Partial<SpiritItem> }
   | { type: "DELETE_ITEM"; id: string }
-  // 进货流水
   | { type: "ADD_PURCHASE"; record: SpiritPurchaseRecord }
   | { type: "UPDATE_PURCHASE"; id: string; patch: Partial<SpiritPurchaseRecord> }
   | { type: "DELETE_PURCHASE"; id: string }
   | { type: "BATCH_ADD_PURCHASES"; records: SpiritPurchaseRecord[] }
-  // 台账
+  | { type: "BATCH_DELETE_PURCHASES"; ids: string[] }
   | { type: "UPSERT_LEDGER"; entry: SpiritLedgerEntry }
-  | { type: "DELETE_LEDGER"; id: string };
+  | { type: "DELETE_LEDGER"; id: string }
+  | { type: "SET_REF_PRICE"; entry: SpiritRefPrice }
+  | { type: "UPSERT_SUPPLIER"; supplier: SpiritSupplierInfo }
+  | { type: "DELETE_SUPPLIER"; id: string }
+  | { type: "UPSERT_GROUP"; group: SpiritGroupDef }
+  | { type: "DELETE_GROUP"; id: string }
+  | { type: "SET_MATCH_MEMORY"; memory: PettyMatchMemory }
+  | { type: "UPDATE_SELF_BUY_CONFIG"; config: SelfBuyConfig };
 
 function reducer(state: SpiritsState, action: Action): SpiritsState {
   switch (action.type) {
@@ -59,6 +180,7 @@ function reducer(state: SpiritsState, action: Action): SpiritsState {
     };
     case "DELETE_PURCHASE": return { ...state, purchases: state.purchases.filter((p) => p.id !== action.id) };
     case "BATCH_ADD_PURCHASES": return { ...state, purchases: [...state.purchases, ...action.records] };
+    case "BATCH_DELETE_PURCHASES": return { ...state, purchases: state.purchases.filter((p) => !action.ids.includes(p.id)) };
     case "UPSERT_LEDGER": {
       const idx = state.ledger.findIndex((e) => e.id === action.entry.id);
       if (idx >= 0) {
@@ -69,6 +191,36 @@ function reducer(state: SpiritsState, action: Action): SpiritsState {
       return { ...state, ledger: [...state.ledger, action.entry] };
     }
     case "DELETE_LEDGER": return { ...state, ledger: state.ledger.filter((e) => e.id !== action.id) };
+    case "SET_REF_PRICE": {
+      // 同一 itemId + month 只保留一条
+      const filtered = state.refPrices.filter((r) => !(r.itemId === action.entry.itemId && r.month === action.entry.month));
+      return { ...state, refPrices: [...filtered, action.entry] };
+    }
+    case "UPSERT_SUPPLIER": {
+      const idx = state.suppliers.findIndex((s) => s.id === action.supplier.id);
+      if (idx >= 0) {
+        const next = [...state.suppliers];
+        next[idx] = action.supplier;
+        return { ...state, suppliers: next };
+      }
+      return { ...state, suppliers: [...state.suppliers, action.supplier] };
+    }
+    case "DELETE_SUPPLIER": return { ...state, suppliers: state.suppliers.filter((s) => s.id !== action.id) };
+    case "UPSERT_GROUP": {
+      const idx = state.groups.findIndex((g) => g.id === action.group.id);
+      if (idx >= 0) {
+        const next = [...state.groups];
+        next[idx] = action.group;
+        return { ...state, groups: next };
+      }
+      return { ...state, groups: [...state.groups, action.group] };
+    }
+    case "DELETE_GROUP": return { ...state, groups: state.groups.filter((g) => g.id !== action.id && !g.builtin) };
+    case "SET_MATCH_MEMORY": {
+      const filtered = state.matchMemory.filter((m) => m.description !== action.memory.description);
+      return { ...state, matchMemory: [...filtered, action.memory] };
+    }
+    case "UPDATE_SELF_BUY_CONFIG": return { ...state, selfBuyConfig: action.config };
     default: return state;
   }
 }
@@ -84,17 +236,37 @@ interface SpiritsContextValue extends SpiritsState {
   updatePurchase: (id: string, patch: Partial<SpiritPurchaseRecord>) => void;
   deletePurchase: (id: string) => void;
   batchAddPurchases: (records: Omit<SpiritPurchaseRecord, "id" | "createdAt">[]) => void;
+  batchDeletePurchases: (ids: string[]) => void;
   // 台账
   upsertLedger: (entry: Omit<SpiritLedgerEntry, "id" | "updatedAt"> & { id?: string }) => void;
   deleteLedger: (id: string) => void;
+  // 参考单价（按月生效）
+  setRefPrice: (itemId: string, month: string, price: number, by?: "manual" | "import") => void;
+  getRefPrice: (itemId: string, month: string) => number;
+  // 供应商信息卡
+  upsertSupplier: (supplier: Omit<SpiritSupplierInfo, "id" | "createdAt" | "updatedAt"> & { id?: string }) => SpiritSupplierInfo;
+  deleteSupplier: (id: string) => void;
+  getSupplierByName: (name: string) => SpiritSupplierInfo | undefined;
+  // 品牌集团
+  upsertGroup: (group: Omit<SpiritGroupDef, "id" | "createdAt"> & { id?: string }) => void;
+  deleteGroup: (id: string) => void;
+  getItemGroup: (item: SpiritItem) => string;
+  // 备用金匹配记忆
+  setMatchMemory: (description: string, itemId: string, itemName: string, confidence: PettyMatchMemory["confidence"]) => void;
+  findMatchMemory: (description: string) => PettyMatchMemory | undefined;
+  matchPettyToItem: (description: string) => { item: SpiritItem; score: number; source: "memory" | "fuzzy" } | null;
+  // 自采配置
+  updateSelfBuyConfig: (config: Partial<SelfBuyConfig>) => void;
   // 查询
   getMonthPurchases: (month: string) => SpiritPurchaseRecord[];
+  getSupplierMonthPurchases: (supplier: string, month: string) => SpiritPurchaseRecord[];
   getMonthLedger: (month: string) => SpiritLedgerEntry[];
   getItemLedger: (itemId: string, month: string) => SpiritLedgerEntry | undefined;
   getAvailableMonths: () => string[];
-  // 月结：将本月期末带入下月期初
+  getPurchaseSummaryByCategory: (month: string) => Record<string, { openingQty: number; purchaseQty: number; consumeQty: number; closingQty: number }>;
+  getPurchaseSummaryBySupplier: (month: string) => Record<string, { qty: number; amount: number; items: number }>;
+  // 月结
   closeMonth: (month: string) => void;
-  // 从进货流水自动更新台账进货数据
   syncLedgerFromPurchases: (month: string) => void;
 }
 
@@ -103,25 +275,50 @@ const SpiritsContext = createContext<SpiritsContextValue | null>(null);
 export function SpiritsInventoryProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initial);
 
+  // 加载持久化数据
   useEffect(() => {
     Promise.all([
       AsyncStorage.getItem(ITEMS_KEY),
       AsyncStorage.getItem(PURCHASES_KEY),
       AsyncStorage.getItem(LEDGER_KEY),
-    ]).then(([itemsRaw, purchasesRaw, ledgerRaw]) => {
+      AsyncStorage.getItem(REF_PRICES_KEY),
+      AsyncStorage.getItem(SUPPLIERS_KEY),
+      AsyncStorage.getItem(GROUPS_KEY),
+      AsyncStorage.getItem(MATCH_MEMORY_KEY),
+      AsyncStorage.getItem(SELF_BUY_CONFIG_KEY),
+    ]).then(([itemsRaw, purchasesRaw, ledgerRaw, refPricesRaw, suppliersRaw, groupsRaw, matchMemoryRaw, selfBuyRaw]) => {
       const items = itemsRaw ? JSON.parse(itemsRaw) : [];
       const purchases = purchasesRaw ? JSON.parse(purchasesRaw) : [];
       const ledger = ledgerRaw ? JSON.parse(ledgerRaw) : [];
-      dispatch({ type: "LOAD", payload: { items, purchases, ledger } });
+      const refPrices = refPricesRaw ? JSON.parse(refPricesRaw) : [];
+      const suppliers = suppliersRaw ? JSON.parse(suppliersRaw) : [];
+      // 合并内置集团与用户自定义集团（内置集团以存储版本为准，保留用户修改的关键词）
+      const storedGroups: SpiritGroupDef[] = groupsRaw ? JSON.parse(groupsRaw) : [];
+      const mergedGroups = BUILTIN_GROUPS.map((bg) => {
+        const stored = storedGroups.find((g) => g.id === bg.id);
+        return stored ? { ...bg, keywords: stored.keywords } : bg;
+      });
+      const customGroups = storedGroups.filter((g) => !g.builtin);
+      const groups = [...mergedGroups, ...customGroups];
+      const matchMemory = matchMemoryRaw ? JSON.parse(matchMemoryRaw) : [];
+      const selfBuyConfig = selfBuyRaw ? JSON.parse(selfBuyRaw) : DEFAULT_SELF_BUY_CONFIG;
+      dispatch({ type: "LOAD", payload: { items, purchases, ledger, refPrices, suppliers, groups, matchMemory, selfBuyConfig } });
     });
   }, []);
 
+  // 持久化
   useEffect(() => {
     AsyncStorage.setItem(ITEMS_KEY, JSON.stringify(state.items));
     AsyncStorage.setItem(PURCHASES_KEY, JSON.stringify(state.purchases));
     AsyncStorage.setItem(LEDGER_KEY, JSON.stringify(state.ledger));
+    AsyncStorage.setItem(REF_PRICES_KEY, JSON.stringify(state.refPrices));
+    AsyncStorage.setItem(SUPPLIERS_KEY, JSON.stringify(state.suppliers));
+    AsyncStorage.setItem(GROUPS_KEY, JSON.stringify(state.groups));
+    AsyncStorage.setItem(MATCH_MEMORY_KEY, JSON.stringify(state.matchMemory));
+    AsyncStorage.setItem(SELF_BUY_CONFIG_KEY, JSON.stringify(state.selfBuyConfig));
   }, [state]);
 
+  // ── 酒款档案 ──────────────────────────────────────────────────────────────
   const addItem = (data: Omit<SpiritItem, "id" | "createdAt" | "updatedAt">): SpiritItem => {
     const now = new Date().toISOString();
     const item: SpiritItem = { ...data, id: uuid(), createdAt: now, updatedAt: now };
@@ -137,6 +334,7 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
     dispatch({ type: "DELETE_ITEM", id });
   };
 
+  // ── 进货流水 ──────────────────────────────────────────────────────────────
   const addPurchase = (data: Omit<SpiritPurchaseRecord, "id" | "createdAt">) => {
     const record: SpiritPurchaseRecord = { ...data, id: uuid(), createdAt: new Date().toISOString() };
     dispatch({ type: "ADD_PURCHASE", record });
@@ -156,6 +354,11 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
     dispatch({ type: "BATCH_ADD_PURCHASES", records: full });
   };
 
+  const batchDeletePurchases = (ids: string[]) => {
+    dispatch({ type: "BATCH_DELETE_PURCHASES", ids });
+  };
+
+  // ── 台账 ──────────────────────────────────────────────────────────────────
   const upsertLedger = (entry: Omit<SpiritLedgerEntry, "id" | "updatedAt"> & { id?: string }) => {
     const full: SpiritLedgerEntry = {
       ...entry,
@@ -169,8 +372,121 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
     dispatch({ type: "DELETE_LEDGER", id });
   };
 
+  // ── 参考单价（按月生效） ──────────────────────────────────────────────────
+  const setRefPrice = (itemId: string, month: string, price: number, by: "manual" | "import" = "manual") => {
+    dispatch({
+      type: "SET_REF_PRICE",
+      entry: { itemId, month, price, setAt: new Date().toISOString(), setBy: by },
+    });
+    // 同步更新 item.refPrice（最新值）
+    updateItem(itemId, { refPrice: price });
+  };
+
+  /** 获取某款酒在某月的参考单价（取该月及之前最近一次设置的价格） */
+  const getRefPrice = (itemId: string, month: string): number => {
+    const relevant = state.refPrices
+      .filter((r) => r.itemId === itemId && r.month <= month)
+      .sort((a, b) => b.month.localeCompare(a.month));
+    if (relevant.length > 0) return relevant[0].price;
+    // 回退到 item.refPrice
+    return state.items.find((i) => i.id === itemId)?.refPrice ?? 0;
+  };
+
+  // ── 供应商信息卡 ──────────────────────────────────────────────────────────
+  const upsertSupplier = (data: Omit<SpiritSupplierInfo, "id" | "createdAt" | "updatedAt"> & { id?: string }): SpiritSupplierInfo => {
+    const now = new Date().toISOString();
+    const supplier: SpiritSupplierInfo = {
+      ...data,
+      id: data.id ?? uuid(),
+      createdAt: data.id ? (state.suppliers.find((s) => s.id === data.id)?.createdAt ?? now) : now,
+      updatedAt: now,
+    };
+    dispatch({ type: "UPSERT_SUPPLIER", supplier });
+    return supplier;
+  };
+
+  const deleteSupplier = (id: string) => {
+    dispatch({ type: "DELETE_SUPPLIER", id });
+  };
+
+  const getSupplierByName = (name: string) =>
+    state.suppliers.find((s) => s.name === name);
+
+  // ── 品牌集团 ──────────────────────────────────────────────────────────────
+  const upsertGroup = (data: Omit<SpiritGroupDef, "id" | "createdAt"> & { id?: string }) => {
+    const now = new Date().toISOString();
+    const group: SpiritGroupDef = {
+      ...data,
+      id: data.id ?? uuid(),
+      createdAt: data.id ? (state.groups.find((g) => g.id === data.id)?.createdAt ?? now) : now,
+    };
+    dispatch({ type: "UPSERT_GROUP", group });
+  };
+
+  const deleteGroup = (id: string) => {
+    dispatch({ type: "DELETE_GROUP", id });
+  };
+
+  /** 获取酒款所属集团名称 */
+  const getItemGroup = (item: SpiritItem): string => {
+    if (item.group) return item.group;
+    const combined = `${item.name} ${item.nameEn ?? ""}`.toLowerCase();
+    for (const group of state.groups) {
+      if (group.keywords.some((k) => combined.includes(k.toLowerCase()))) {
+        return group.name;
+      }
+    }
+    return "独立品牌";
+  };
+
+  // ── 备用金匹配记忆 ────────────────────────────────────────────────────────
+  const setMatchMemory = (description: string, itemId: string, itemName: string, confidence: PettyMatchMemory["confidence"]) => {
+    dispatch({
+      type: "SET_MATCH_MEMORY",
+      memory: { description: description.toLowerCase().trim(), itemId, itemName, confidence, confirmedAt: new Date().toISOString() },
+    });
+  };
+
+  const findMatchMemory = (description: string): PettyMatchMemory | undefined => {
+    const key = description.toLowerCase().trim();
+    return state.matchMemory.find((m) => m.description === key);
+  };
+
+  /** 智能匹配备用金描述到酒款 */
+  const matchPettyToItem = (description: string): { item: SpiritItem; score: number; source: "memory" | "fuzzy" } | null => {
+    // 1. 先查记忆
+    const memory = findMatchMemory(description);
+    if (memory) {
+      const item = state.items.find((i) => i.id === memory.itemId);
+      if (item) return { item, score: 1.0, source: "memory" };
+    }
+    // 2. 模糊匹配
+    let best: { item: SpiritItem; score: number } | null = null;
+    for (const item of state.items) {
+      const score = Math.max(
+        fuzzyMatchScore(description, item.name),
+        fuzzyMatchScore(description, item.nameEn ?? ""),
+      );
+      if (!best || score > best.score) best = { item, score };
+    }
+    if (best && best.score >= 0.5) return { ...best, source: "fuzzy" };
+    return null;
+  };
+
+  // ── 自采配置 ──────────────────────────────────────────────────────────────
+  const updateSelfBuyConfig = (config: Partial<SelfBuyConfig>) => {
+    dispatch({
+      type: "UPDATE_SELF_BUY_CONFIG",
+      config: { ...state.selfBuyConfig, ...config, updatedAt: new Date().toISOString() },
+    });
+  };
+
+  // ── 查询 ──────────────────────────────────────────────────────────────────
   const getMonthPurchases = (month: string) =>
     state.purchases.filter((p) => p.month === month);
+
+  const getSupplierMonthPurchases = (supplier: string, month: string) =>
+    state.purchases.filter((p) => p.month === month && (p.supplier ?? "") === supplier);
 
   const getMonthLedger = (month: string) =>
     state.ledger.filter((e) => e.month === month);
@@ -182,14 +498,73 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
     const months = new Set<string>();
     state.purchases.forEach((p) => months.add(p.month));
     state.ledger.forEach((e) => months.add(e.month));
-    // Always include current month
     months.add(getCurrentMonth());
     return [...months].sort().reverse();
   };
 
+  /** 按分类汇总台账数据（用于总结 Tab 分类汇总表） */
+  const getPurchaseSummaryByCategory = (month: string): Record<string, { openingQty: number; purchaseQty: number; consumeQty: number; closingQty: number }> => {
+    const result: Record<string, { openingQty: number; purchaseQty: number; consumeQty: number; closingQty: number }> = {};
+    const monthLedger = getMonthLedger(month);
+    for (const entry of monthLedger) {
+      const item = state.items.find((i) => i.id === entry.itemId);
+      if (!item) continue;
+      const cat = item.category;
+      if (!result[cat]) result[cat] = { openingQty: 0, purchaseQty: 0, consumeQty: 0, closingQty: 0 };
+      result[cat].openingQty += entry.openingQty;
+      result[cat].purchaseQty += entry.purchaseQty;
+      result[cat].consumeQty += entry.consumeQty;
+      result[cat].closingQty += entry.closingQty;
+    }
+    return result;
+  };
+
+  /** 按供应商汇总进货数据 */
+  const getPurchaseSummaryBySupplier = (month: string): Record<string, { qty: number; amount: number; items: number }> => {
+    const result: Record<string, { qty: number; amount: number; items: number }> = {};
+    const monthPurchases = getMonthPurchases(month);
+    const itemIds = new Set<string>();
+    for (const p of monthPurchases) {
+      const sup = p.supplier ?? "未知供应商";
+      if (!result[sup]) result[sup] = { qty: 0, amount: 0, items: 0 };
+      result[sup].qty += p.quantity;
+      result[sup].amount += p.amount;
+      const key = `${sup}:${p.itemId ?? p.rawName}`;
+      if (!itemIds.has(key)) { result[sup].items++; itemIds.add(key); }
+    }
+    return result;
+  };
+
+  // ── 月结 ──────────────────────────────────────────────────────────────────
+  const closeMonth = (month: string) => {
+    const [y, m] = month.split("-").map(Number);
+    const nextMonth = m === 12
+      ? `${y + 1}-01`
+      : `${y}-${String(m + 1).padStart(2, "0")}`;
+    const monthLedger = getMonthLedger(month);
+    for (const entry of monthLedger) {
+      const existing = getItemLedger(entry.itemId, nextMonth);
+      if (!existing) {
+        upsertLedger({
+          month: nextMonth,
+          itemId: entry.itemId,
+          openingQty: entry.closingQty,
+          openingUnitCost: entry.closingUnitCost,
+          prevClosingQty: entry.closingQty,
+          purchaseQty: 0,
+          purchaseCost: 0,
+          consumeQty: 0,
+          closingQty: entry.closingQty,
+          closingUnitCost: entry.closingUnitCost,
+          closingCost: entry.closingCost,
+          isClosed: false,
+        });
+      }
+    }
+  };
+
   const syncLedgerFromPurchases = (month: string) => {
     const monthPurchases = state.purchases.filter((p) => p.month === month);
-    // Group by itemId
     const byItem: Record<string, SpiritPurchaseRecord[]> = {};
     monthPurchases.forEach((p) => {
       const key = p.itemId ?? `raw:${p.rawName}`;
@@ -197,73 +572,58 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
       byItem[key].push(p);
     });
     Object.entries(byItem).forEach(([key, records]) => {
-      if (!key.startsWith("raw:")) {
-        const itemId = key;
-        const purchaseQty = records.reduce((s, r) => s + r.quantity, 0);
-        const purchaseCost = records.reduce((s, r) => s + r.amount, 0);
-        const existing = state.ledger.find((e) => e.itemId === itemId && e.month === month);
-        const avgUnitCost = purchaseQty > 0 ? purchaseCost / purchaseQty : 0;
-        const openingQty = existing?.openingQty ?? 0;
-        const openingUnitCost = existing?.openingUnitCost ?? avgUnitCost;
-        const consumeQty = existing?.consumeQty ?? 0;
-        const closingQty = openingQty + purchaseQty - consumeQty;
-        const closingUnitCost = avgUnitCost > 0 ? avgUnitCost : openingUnitCost;
+      if (key.startsWith("raw:")) return;
+      const itemId = key;
+      const purchaseQty = records.reduce((s, r) => s + r.quantity, 0);
+      const purchaseCost = records.reduce((s, r) => s + r.amount, 0);
+      const existing = getItemLedger(itemId, month);
+      if (existing) {
+        const closingQty = existing.openingQty + purchaseQty - existing.consumeQty;
+        const closingUnitCost = closingQty > 0 ? (existing.openingQty * existing.openingUnitCost + purchaseCost) / (existing.openingQty + purchaseQty) : existing.openingUnitCost;
         upsertLedger({
-          id: existing?.id,
-          month,
-          itemId,
-          openingQty,
-          openingUnitCost,
+          ...existing,
           purchaseQty,
           purchaseCost,
-          consumeQty,
           closingQty,
           closingUnitCost,
           closingCost: closingQty * closingUnitCost,
-          isClosed: existing?.isClosed ?? false,
+        });
+      } else {
+        const refPrice = getRefPrice(itemId, month);
+        upsertLedger({
+          month,
+          itemId,
+          openingQty: 0,
+          openingUnitCost: refPrice,
+          purchaseQty,
+          purchaseCost,
+          consumeQty: 0,
+          closingQty: purchaseQty,
+          closingUnitCost: purchaseQty > 0 ? purchaseCost / purchaseQty : refPrice,
+          closingCost: purchaseCost,
+          isClosed: false,
         });
       }
     });
   };
 
-  const closeMonth = (month: string) => {
-    // Calculate next month
-    const [y, m] = month.split("-").map(Number);
-    const nextDate = new Date(y, m, 1); // m is already 1-based, so this gives next month
-    const nextMonth = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, "0")}`;
-
-    const monthLedger = state.ledger.filter((e) => e.month === month);
-    monthLedger.forEach((entry) => {
-      // Mark current month as closed
-      upsertLedger({ ...entry, isClosed: true });
-      // Create or update next month's opening stock from this month's closing
-      const nextExisting = state.ledger.find((e) => e.itemId === entry.itemId && e.month === nextMonth);
-      upsertLedger({
-        id: nextExisting?.id,
-        month: nextMonth,
-        itemId: entry.itemId,
-        openingQty: entry.closingQty,
-        openingUnitCost: entry.closingUnitCost,
-        purchaseQty: nextExisting?.purchaseQty ?? 0,
-        purchaseCost: nextExisting?.purchaseCost ?? 0,
-        consumeQty: nextExisting?.consumeQty ?? 0,
-        closingQty: entry.closingQty + (nextExisting?.purchaseQty ?? 0) - (nextExisting?.consumeQty ?? 0),
-        closingUnitCost: entry.closingUnitCost,
-        closingCost: (entry.closingQty + (nextExisting?.purchaseQty ?? 0) - (nextExisting?.consumeQty ?? 0)) * entry.closingUnitCost,
-        isClosed: false,
-      });
-    });
+  const value: SpiritsContextValue = {
+    ...state,
+    addItem, updateItem, deleteItem,
+    addPurchase, updatePurchase, deletePurchase, batchAddPurchases, batchDeletePurchases,
+    upsertLedger, deleteLedger,
+    setRefPrice, getRefPrice,
+    upsertSupplier, deleteSupplier, getSupplierByName,
+    upsertGroup, deleteGroup, getItemGroup,
+    setMatchMemory, findMatchMemory, matchPettyToItem,
+    updateSelfBuyConfig,
+    getMonthPurchases, getSupplierMonthPurchases, getMonthLedger, getItemLedger,
+    getAvailableMonths, getPurchaseSummaryByCategory, getPurchaseSummaryBySupplier,
+    closeMonth, syncLedgerFromPurchases,
   };
 
   return (
-    <SpiritsContext.Provider value={{
-      ...state,
-      addItem, updateItem, deleteItem,
-      addPurchase, updatePurchase, deletePurchase, batchAddPurchases,
-      upsertLedger, deleteLedger,
-      getMonthPurchases, getMonthLedger, getItemLedger,
-      getAvailableMonths, closeMonth, syncLedgerFromPurchases,
-    }}>
+    <SpiritsContext.Provider value={value}>
       {children}
     </SpiritsContext.Provider>
   );

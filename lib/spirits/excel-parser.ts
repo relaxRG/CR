@@ -160,6 +160,7 @@ function parsePurchaseSummarySheet(ws: any): SpiritPriceChange[] {
       prevPrice: refPrice - diff, // 上期价格 = 参考价 - 变动
       currPrice: avgPrice > 0 ? avgPrice : refPrice,
       changePct: refPrice > 0 ? (diff / refPrice) * 100 : 0,
+      changeAmt: diff,
       supplier: "至缘", // 进货汇总主要来自至缘
     });
   }
