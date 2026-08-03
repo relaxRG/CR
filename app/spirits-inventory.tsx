@@ -736,6 +736,12 @@ export default function SpiritsInventoryScreen() {
   // ── 当月进货 Tab ─────────────────────────────────────────────────────────────
   const [showAddSupplier, setShowAddSupplier] = useState(false);
   const [newSupplierName, setNewSupplierName] = useState("");
+  // 未匹配商品操作 Modal（供应商列表页提示条使用）
+  const [unmatchedPurchase, setUnmatchedPurchase] = useState<SpiritPurchaseRecord | null>(null);
+  const [showUnmatchedModal, setShowUnmatchedModal] = useState(false);
+  // 集团管理 Modal（采购分析 Tab 使用）
+  const [showGroupManager, setShowGroupManager] = useState(false);
+  const [editingGroup, setEditingGroup] = useState<SpiritGroupDef | null>(null);
 
   const allSupplierNames = useMemo(() => {
     const fromPurchases = [...new Set(purchases.map((p) => p.supplier ?? "未知供应商"))];
@@ -801,10 +807,9 @@ export default function SpiritsInventoryScreen() {
             <TouchableOpacity
               onPress={() => {
                 tap();
-                // 展示未匹配列表：找到第一个未匹配记录并弹出操作卡片
-                const first = unmatchedList[0];
-                setUnmatchedPurchase(first);
-                setShowUnmatchedModal(true);
+                // 跳转到第一个有未匹配记录的供应商，在供应商详情页处理
+                const firstSupplier = unmatchedList[0]?.supplier ?? "未知供应商";
+                setActiveSupplier(firstSupplier);
               }}
               style={{ flexDirection: "row", alignItems: "center", gap: 8, padding: 12,
                 backgroundColor: "#FEF3C7", borderRadius: 10, borderWidth: 1,
@@ -1264,6 +1269,20 @@ export default function SpiritsInventoryScreen() {
           </ScrollView>
         </View>
       </Modal>
+
+      {/* 集团管理 Modal（采购分析 Tab 使用） */}
+      <GroupManagerModal
+        visible={showGroupManager}
+        groups={groups}
+        editingGroup={editingGroup}
+        colors={colors}
+        onUpsert={upsertGroup}
+        onDelete={deleteGroup}
+        onMerge={mergeGroup}
+        onClose={() => { setShowGroupManager(false); setEditingGroup(null); }}
+      />
+
+
     </ScreenContainer>
   );
 }
@@ -1284,7 +1303,12 @@ function SupplierDetailScreen({
     setRefPrice, getRefPrice, setMatchMemory, matchPettyToItem,
     selfBuyConfig, syncLedgerFromPurchases,
     getMonthLedger,
+    groups, detectPurchaseGroup, getItemGroup, rememberGroupMatch,
+    upsertGroup, deleteGroup, mergeGroup,
+    addItem,
+    getMonthPurchases,
   } = store;
+  const monthPurchases = useMemo(() => getMonthPurchases(month), [purchases, month]);
   const isSelfBuy = supplier === "自采";
   const [y, m] = month.split("-").map(Number);
   const prevMonth = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;

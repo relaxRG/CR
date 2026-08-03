@@ -22,6 +22,9 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
 import { usePeriodAnalysisStore } from "@/lib/store/period-analysis/store";
 import { parsePeriodAnalysisExcel } from "@/lib/store/period-analysis/excel-parser";
+import { useSpiritsInventoryStore } from "@/lib/spirits/crud-store";
+import { pourCostColor } from "@/lib/spirits/pour-cost";
+import { useSupplierPurchaseStore } from "@/lib/food/ingredient-store";
 import {
   PeriodKey, PERIOD_LABELS, PERIOD_TIME_RANGE, PERIOD_COLORS,
   fmtRevenue, slotToMinutes,
@@ -184,6 +187,8 @@ export default function PeriodAnalysisScreen() {
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
   const { reports, settings, latestReport, addReport, deleteReport, updateSettings } = usePeriodAnalysisStore();
+  const spiritsStore = useSpiritsInventoryStore();
+  const supplierPurchaseStore = useSupplierPurchaseStore();
   const [tab, setTab] = useState<MainTab>("overview");
   const [selectedMonth, setSelectedMonth] = useState<string>(latestReport?.month ?? "");
   const [showSettings, setShowSettings] = useState(false);

@@ -54,6 +54,7 @@ export type DataSource =
   | "ice_inventory"     // 冰块进销存
   | "labor"             // 人工成本
   | "manual"            // 手动录入
+  | "supplier_purchase" // 食材供应商采购
   | "computed";         // 自动计算
 
 /** 付款状态 */
