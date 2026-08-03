@@ -2190,11 +2190,19 @@ function ImportPreviewModal({
   const [editPrice, setEditPrice] = useState("");
   const [batchDate, setBatchDate] = useState("");
   const [showBatchDate, setShowBatchDate] = useState(false);
+  // 供应商编辑
+  const [batchSupplier, setBatchSupplier] = useState(supplier);
+  const [showBatchSupplier, setShowBatchSupplier] = useState(false);
 
   // 每次打开重置
   React.useEffect(() => {
-    if (visible) { setRows(initialRows); setEditingIdx(null); setShowBatchDate(false); setBatchDate(""); }
-  }, [visible, initialRows]);
+    if (visible) {
+      setRows(initialRows.map((r) => ({ ...r, supplier: r.supplier || supplier })));
+      setEditingIdx(null);
+      setShowBatchDate(false); setBatchDate("");
+      setShowBatchSupplier(false); setBatchSupplier(supplier);
+    }
+  }, [visible, initialRows, supplier]);
 
   const totalAmt = rows.reduce((s, r) => s + r.amount, 0);
 
@@ -2241,6 +2249,13 @@ function ImportPreviewModal({
     setBatchDate("");
   };
 
+  const applyBatchSupplier = () => {
+    const name = batchSupplier.trim();
+    if (!name) { Alert.alert("提示", "供应商名称不能为空"); return; }
+    setRows((prev) => prev.map((r) => ({ ...r, supplier: name })));
+    setShowBatchSupplier(false);
+  };
+
   return (
     <Modal visible={visible} animationType="slide" transparent={false}>
       <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -2263,15 +2278,26 @@ function ImportPreviewModal({
         </View>
 
         {/* 批量操作栏 */}
-        <View style={{ flexDirection: "row", gap: 8, padding: 10, backgroundColor: colors.surface, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
-          <TouchableOpacity onPress={() => setShowBatchDate(!showBatchDate)}
+        <View style={{ flexDirection: "row", gap: 8, padding: 10, backgroundColor: colors.surface, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, flexWrap: "wrap" }}>
+          {/* 供应商显示区 */}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1, minWidth: 160 }}>
+            <Text style={{ fontSize: 11, color: colors.muted }}>供应商：</Text>
+            <TouchableOpacity onPress={() => { setShowBatchSupplier(!showBatchSupplier); setShowBatchDate(false); }}
+              style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 5,
+                backgroundColor: showBatchSupplier ? "#EF444420" : colors.background,
+                borderRadius: 8, borderWidth: 1, borderColor: showBatchSupplier ? "#EF4444" : colors.border }}>
+              <Text style={{ fontSize: 12, fontWeight: "700", color: showBatchSupplier ? "#EF4444" : colors.foreground }}>
+                {rows[0]?.supplier || supplier}
+              </Text>
+              <IconSymbol name="pencil" size={11} color={showBatchSupplier ? "#EF4444" : colors.muted} />
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity onPress={() => { setShowBatchDate(!showBatchDate); setShowBatchSupplier(false); }}
             style={[S.actionBtn, { backgroundColor: showBatchDate ? "#EF444420" : colors.background, borderColor: showBatchDate ? "#EF4444" : colors.border }]}>
             <IconSymbol name="calendar" size={13} color={showBatchDate ? "#EF4444" : colors.muted} />
             <Text style={{ fontSize: 12, color: showBatchDate ? "#EF4444" : colors.muted, fontWeight: "600" }}>批量改日期</Text>
           </TouchableOpacity>
-          <Text style={{ fontSize: 12, color: colors.muted, alignSelf: "center" }}>
-            点击行可单独编辑 · 左滑删除
-          </Text>
+          <Text style={{ fontSize: 11, color: colors.muted, alignSelf: "center" }}>点击行编辑</Text>
         </View>
 
         {/* 批量日期输入 */}
@@ -2287,6 +2313,25 @@ function ImportPreviewModal({
             />
             <TouchableOpacity onPress={applyBatchDate}
               style={{ paddingHorizontal: 14, paddingVertical: 10, backgroundColor: "#D97706", borderRadius: 10 }}>
+              <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>应用全部</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* 供应商输入块 */}
+        {showBatchSupplier && (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, padding: 10, backgroundColor: "#FEF2F2", borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "#FECACA" }}>
+            <TextInput
+              style={[S.input, { flex: 1, color: colors.foreground, borderColor: "#FECACA", backgroundColor: colors.background, paddingVertical: 8 }]}
+              value={batchSupplier}
+              onChangeText={setBatchSupplier}
+              placeholder="输入供应商名称"
+              placeholderTextColor={colors.muted}
+              autoFocus
+              selectTextOnFocus
+            />
+            <TouchableOpacity onPress={applyBatchSupplier}
+              style={{ paddingHorizontal: 14, paddingVertical: 10, backgroundColor: "#EF4444", borderRadius: 10 }}>
               <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>应用全部</Text>
             </TouchableOpacity>
           </View>
