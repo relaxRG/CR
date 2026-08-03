@@ -325,6 +325,12 @@ interface SpiritsContextValue extends SpiritsState {
   // 月结
   closeMonth: (month: string) => void;
   syncLedgerFromPurchases: (month: string) => void;
+  /** ★ 月末盘点：录入实际期末库存量，自动反推消耗量 */
+  setActualClosing: (itemId: string, month: string, actualQty: number) => void;
+  /** ★ 批量月末盘点：一次性录入所有酒款的实际期末库存量 */
+  batchSetActualClosing: (month: string, entries: { itemId: string; actualQty: number }[]) => void;
+  /** ★ 检查上月是否需要月结（切换月份时调用） */
+  checkPrevMonthClosed: (currentMonth: string) => { needsClose: boolean; prevMonth: string };
 }
 
 const SpiritsContext = createContext<SpiritsContextValue | null>(null);
@@ -414,6 +420,20 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
     const now = new Date().toISOString();
     const full = records.map((r) => ({ ...r, id: uuid(), createdAt: now }));
     dispatch({ type: "BATCH_ADD_PURCHASES", records: full });
+    // ★ 自动更新参考单价：每款酒取该月最新单价更新 refPrice
+    const byItemMonth: Record<string, { itemId: string; month: string; unitPrice: number }> = {};
+    for (const r of records) {
+      if (!r.itemId || !r.month) continue;
+      const key = `${r.itemId}:${r.month}`;
+      const unitPrice = r.quantity > 0 ? r.amount / r.quantity : 0;
+      if (unitPrice <= 0) continue;
+      if (!byItemMonth[key] || unitPrice > byItemMonth[key].unitPrice) {
+        byItemMonth[key] = { itemId: r.itemId, month: r.month, unitPrice };
+      }
+    }
+    Object.values(byItemMonth).forEach(({ itemId, month, unitPrice }) => {
+      setRefPrice(itemId, month, unitPrice, "import");
+    });
   };
 
   const batchDeletePurchases = (ids: string[]) => {
@@ -726,6 +746,40 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
     });
   };
 
+  // ★ 月末盘点：录入实际期末库存量，自动反推消耗量
+  const setActualClosing = (itemId: string, month: string, actualQty: number) => {
+    const existing = getItemLedger(itemId, month);
+    if (!existing) return;
+    const consumeQty = Math.max(0, existing.openingQty + existing.purchaseQty - actualQty);
+    const closingUnitCost = actualQty > 0
+      ? (existing.openingQty * existing.openingUnitCost + existing.purchaseCost) / (existing.openingQty + existing.purchaseQty)
+      : existing.openingUnitCost;
+    upsertLedger({
+      ...existing,
+      consumeQty,
+      closingQty: actualQty,
+      closingUnitCost,
+      closingCost: actualQty * closingUnitCost,
+    });
+  };
+
+  // ★ 批量月末盘点
+  const batchSetActualClosing = (month: string, entries: { itemId: string; actualQty: number }[]) => {
+    entries.forEach(({ itemId, actualQty }) => setActualClosing(itemId, month, actualQty));
+  };
+
+  // ★ 检查上月是否需要月结
+  const checkPrevMonthClosed = (currentMonth: string): { needsClose: boolean; prevMonth: string } => {
+    const [y, m] = currentMonth.split("-").map(Number);
+    const prevM = m === 1 ? 12 : m - 1;
+    const prevY = m === 1 ? y - 1 : y;
+    const prevMonth = `${prevY}-${String(prevM).padStart(2, "0")}`;
+    const prevLedger = getMonthLedger(prevMonth);
+    if (prevLedger.length === 0) return { needsClose: false, prevMonth };
+    const allClosed = prevLedger.every((e) => e.isClosed);
+    return { needsClose: !allClosed, prevMonth };
+  };
+
   const value: SpiritsContextValue = {
     ...state,
     addItem, updateItem, deleteItem,
@@ -740,6 +794,7 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
     getMonthPurchases, getSupplierMonthPurchases, getMonthLedger, getItemLedger,
     getAvailableMonths, getPurchaseSummaryByCategory, getPurchaseSummaryBySupplier,
     closeMonth, syncLedgerFromPurchases,
+    setActualClosing, batchSetActualClosing, checkPrevMonthClosed,
   };
 
   return (

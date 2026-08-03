@@ -26,6 +26,7 @@ import { calcMonthlyPourCost, pourCostColor } from "@/lib/spirits/pour-cost";
 import { usePettyCashStore } from "@/lib/store/petty-store";
 import { useMonthlyReportStore } from "@/lib/store/monthly-report/store";
 import { useSupplierPurchaseStore } from "@/lib/food/ingredient-store";
+import { useWineSnapshotStore, useWineManualPurchaseStore } from "@/lib/wine/store";
 import { aggregateMonthlyReport } from "@/lib/store/monthly-summary/aggregator";
 import {
   MonthlySummaryReport, SummaryLineItem, AccountBalance, MonthlyPaymentRecord,
@@ -294,6 +295,8 @@ export default function MonthlySummaryScreen() {
   const pettyStore = usePettyCashStore();
   const monthlyReportStore = useMonthlyReportStore();
   const supplierPurchaseStore = useSupplierPurchaseStore();
+  const wineSnapshotStore = useWineSnapshotStore();
+  const wineManualPurchaseStore = useWineManualPurchaseStore();
 
   const [tab, setTab] = useState<MainTab>("report");
   const [selectedMonth, setSelectedMonth] = useState<string>(() => {
@@ -376,6 +379,17 @@ export default function MonthlySummaryScreen() {
       const [y, m] = selectedMonth.split("-");
       return r.periodLabel?.includes(`${parseInt(y)}年`) && r.periodLabel?.includes(`${parseInt(m)}月`);
     }) ?? [];
+    // ★ 葡萄酒进货数据
+    const wineSnap = wineSnapshotStore.snapshots.find((s: any) => {
+      const [y, m] = selectedMonth.split("-");
+      return s.monthLabel?.includes(`${parseInt(y)}年`) && s.monthLabel?.includes(`${parseInt(m)}月`);
+    });
+    const wineSnapshotSupplierTotals = wineSnap?.supplierTotals ?? {};
+    const wineManualPurchases = wineManualPurchaseStore.getMonthPurchases(selectedMonth).map((p: any) => ({
+      supplier: p.supplier,
+      amount: p.amount,
+      productName: p.productName,
+    }));
     // 调用聚合器
     const aggregated = aggregateMonthlyReport({
       month: selectedMonth,
@@ -384,6 +398,8 @@ export default function MonthlySummaryScreen() {
       paySlips,
       spiritPurchaseSummary,
       foodPurchaseRecords,
+      wineSnapshotSupplierTotals,
+      wineManualPurchases,
     });
     // 确认后写入月报
     Alert.alert(
@@ -391,6 +407,7 @@ export default function MonthlySummaryScreen() {
       `将自动从以下模块拉取数据：\n\n` +
       `• 备用金：${pettyRecords.length} 条记录\n` +
       `• 烈酒进货：${monthPurchases.length} 条（${Object.keys(spiritSupplierMap).length} 供应商）\n` +
+      `• 葡萄酒进货：${Object.keys(wineSnapshotSupplierTotals).length} 供应商 + 手动 ${wineManualPurchases.length} 条\n` +
       `• 食材进货：${foodPurchaseRecords.length} 条记录\n` +
       `• 薪资单：${paySlips.length} 人\n\n` +
       `将生成 ${(aggregated.lineItems?.length ?? 0)} 个科目行。是否覆盖当前科目？`,

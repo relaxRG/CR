@@ -46,12 +46,17 @@ export interface AggregatorInput {
   pettyRecords?: PettyRecord[];
   /** 薪资单列表 */
   paySlips?: PaySlip[];
+
   /** 手动录入项（房租/外卖/活动收入等） */
   manualItems?: SummaryLineItem[];
   /** 烈酒当月进货汇总（按供应商分组）——来自烈酒库存管理 */
   spiritPurchaseSummary?: SpiritPurchaseSupplierSummary[];
   /** 食材当月进货记录——来自供应商采购管理 */
   foodPurchaseRecords?: SupplierPurchaseRecord[];
+  /** 葡萄酒当月进货快照供应商汇总——来自葡萄酒库存管理 */
+  wineSnapshotSupplierTotals?: Record<string, number>;
+  /** 葡萄酒当月手动进货记录 */
+  wineManualPurchases?: { supplier: string; amount: number; productName: string }[];
 }
 
 export function aggregateMonthlyReport(input: AggregatorInput): Partial<MonthlySummaryReport> {
@@ -270,6 +275,51 @@ export function aggregateMonthlyReport(input: AggregatorInput): Partial<MonthlyS
   }
 
   // ── 9. 手动录入项 ────────────────────────────────────────────────────────────
+
+  // ── 9. 葡萄酒进货成本（来自葡萄酒库存管理） ────────────────────────────────────
+  if (input.wineSnapshotSupplierTotals) {
+    const hasPettyBev = input.pettyRecords
+      ? input.pettyRecords.filter((r) => r.code === "B2" || r.code === "B3").reduce((s, r) => s + r.amount, 0) > 0
+      : false;
+    for (const [sup, amt] of Object.entries(input.wineSnapshotSupplierTotals)) {
+      if (amt <= 0) continue;
+      items.push(makeItem({
+        code: `cogs_bev_wine_snap_${sup.replace(/\s/g, "_").slice(0, 20)}`,
+        label: `葡萄酒进货·${sup}`,
+        category: "cogs_beverage",
+        amount: -amt,
+        source: "spirits_inventory",
+        linkedModule: "wine-inventory",
+        isPaid: false,
+        paymentNote: "待付货款",
+        notes: "葡萄酒库存快照进货",
+        isDuplicate: hasPettyBev,
+        duplicateNote: hasPettyBev ? "备用金 B2/B3 已包含部分酒水成本，请核对后保留其中一项" : "",
+      }));
+    }
+  }
+  if (input.wineManualPurchases && input.wineManualPurchases.length > 0) {
+    const wineBySupplier: Record<string, number> = {};
+    for (const p of input.wineManualPurchases) {
+      wineBySupplier[p.supplier] = (wineBySupplier[p.supplier] ?? 0) + p.amount;
+    }
+    for (const [sup, amt] of Object.entries(wineBySupplier)) {
+      if (amt <= 0) continue;
+      items.push(makeItem({
+        code: `cogs_bev_wine_manual_${sup.replace(/\s/g, "_").slice(0, 20)}`,
+        label: `葡萄酒手动进货·${sup}`,
+        category: "cogs_beverage",
+        amount: -amt,
+        source: "spirits_inventory",
+        linkedModule: "wine-inventory",
+        isPaid: false,
+        paymentNote: "待付货款",
+        notes: `葡萄酒手动进货 ${input.wineManualPurchases.filter((p) => p.supplier === sup).length} 条`,
+      }));
+    }
+  }
+
+
   const manualItems = input.manualItems ?? [];
 
   // ── 计算各小计 ───────────────────────────────────────────────────────────────

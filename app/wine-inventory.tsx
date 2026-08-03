@@ -1,9 +1,9 @@
 /**
- * 葡萄酒进销存管理页
- * - 台账视图：完整的 产品序号/酒类/供应商/中文名/期初/进货/消耗/期末 表格
+ * 葡萄酒进销存管理页 v2.0
+ * - 台账视图：完整的 产品序号/酒类/供应商/中文名/期初/进货/消耗/期末 表格 + 月末盘点
  * - 供应商视图：按供应商分组，显示各供应商进货额 + 累计进货
- * - 进货录入：选择供应商 → 填写进货数量 → 保存/分享
- * - 进货汇总：月度趋势折线图 + 快照历史 + 手动进货记录
+ * - 当月进货：筛选酒商 + 手动录入 + 批量操作（修改日期/删除）+ 价格涨跌显示
+ * - 总结：月度趋势折线图 + 快照历史 + Pour Cost 卡片
  */
 import React, { useMemo, useState } from "react";
 import {
@@ -31,9 +31,15 @@ const VIEW_TABS: { key: ViewTab; label: string }[] = [
   { key: "supplier", label: "🏢 供应商" },
 ];
 
+function getCurrentMonth(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
 // ─── 台账行 ──────────────────────────────────────────────────────────────────
 function LedgerRow({ item, colors }: { item: WineInventoryItem; colors: any }) {
   const [expanded, setExpanded] = useState(false);
+  const hasActualEndQty = item.actualEndQty !== undefined;
   return (
     <TouchableOpacity
       onPress={() => setExpanded(!expanded)}
@@ -48,6 +54,11 @@ function LedgerRow({ item, colors }: { item: WineInventoryItem; colors: any }) {
             <View style={[S.typeTag, { backgroundColor: typeColor(item.wineType) + "22" }]}>
               <Text style={[S.typeTagText, { color: typeColor(item.wineType) }]}>{item.wineType}</Text>
             </View>
+            {hasActualEndQty && (
+              <View style={{ backgroundColor: "#10B98122", paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
+                <Text style={{ fontSize: 9, color: "#10B981", fontWeight: "700" }}>已盘点</Text>
+              </View>
+            )}
           </View>
           <Text style={[S.ledgerName, { color: colors.foreground }]} numberOfLines={expanded ? undefined : 1}>
             {item.name}
@@ -69,11 +80,11 @@ function LedgerRow({ item, colors }: { item: WineInventoryItem; colors: any }) {
           <DetailRow label="期初库存成本" value={`¥${item.initCost}`} colors={colors} />
           <DetailRow label="本月进货量" value={`${item.purchaseQty} 瓶`} colors={colors} />
           <DetailRow label="本月进货成本" value={`¥${item.purchaseCost}`} colors={colors} />
-          <DetailRow label="期末库存量" value={`${item.endQty} 瓶`} colors={colors} />
+          <DetailRow label="期末库存量" value={`${item.endQty} 瓶${hasActualEndQty ? " (实盘)" : ""}`} colors={colors} />
           <DetailRow label="期末单位成本" value={`¥${item.unitCost}`} colors={colors} />
           <DetailRow label="期末库存成本" value={`¥${item.endCost}`} colors={colors} />
           <DetailRow label="消耗瓶数" value={`${item.consumeBottles} 瓶`} colors={colors} />
-          <DetailRow label="本期消耗量" value={`¥${item.consumeQty}`} colors={colors} />
+          <DetailRow label="本期消耗量" value={`¥${item.consumeQty.toFixed(0)}`} colors={colors} />
         </View>
       )}
     </TouchableOpacity>
@@ -107,6 +118,72 @@ function typeColor(type: string): string {
   if (t.includes("sparkling") || t.includes("prosecco")) return "#8B5CF6";
   if (t.includes("natural")) return "#22C55E";
   return "#0a7ea4";
+}
+
+// ─── 进货记录行 ───────────────────────────────────────────────────────────────
+function PurchaseRow({
+  purchase, prevUnitPrice, colors, selected, onSelect, onEdit, onDelete
+}: {
+  purchase: WineManualPurchase;
+  prevUnitPrice: number | null;
+  colors: any;
+  selected: boolean;
+  onSelect: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const delta = prevUnitPrice !== null ? purchase.unitPrice - prevUnitPrice : (purchase.unitPriceDelta ?? null);
+  const alertPct = 0; // 默认全部显示涨跌
+  const showAlert = delta !== null && Math.abs(delta) > 0 && Math.abs(delta / (prevUnitPrice || purchase.unitPrice)) * 100 > alertPct;
+
+  return (
+    <TouchableOpacity
+      onLongPress={onSelect}
+      onPress={selected ? onSelect : onEdit}
+      activeOpacity={0.8}
+      style={[S.purchaseRow, {
+        backgroundColor: selected ? colors.primary + "15" : colors.surface,
+        borderColor: selected ? colors.primary : colors.border,
+      }]}
+    >
+      {/* 左侧选择圆圈 */}
+      <TouchableOpacity onPress={onSelect} style={{ marginRight: 10 }}>
+        <View style={{
+          width: 22, height: 22, borderRadius: 11,
+          borderWidth: 2, borderColor: selected ? colors.primary : colors.border,
+          backgroundColor: selected ? colors.primary : "transparent",
+          alignItems: "center", justifyContent: "center",
+        }}>
+          {selected && <IconSymbol name="checkmark" size={12} color="#fff" />}
+        </View>
+      </TouchableOpacity>
+
+      {/* 内容 */}
+      <View style={{ flex: 1 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 2 }}>
+          <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }} numberOfLines={1}>
+            {purchase.productName}
+          </Text>
+          {showAlert && delta !== null && (
+            <View style={{ backgroundColor: (delta > 0 ? "#EF4444" : "#10B981") + "20", paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4 }}>
+              <Text style={{ fontSize: 10, fontWeight: "700", color: delta > 0 ? "#EF4444" : "#10B981" }}>
+                {delta > 0 ? "↑" : "↓"}¥{Math.abs(delta).toFixed(2)}
+              </Text>
+            </View>
+          )}
+        </View>
+        <Text style={{ fontSize: 11, color: colors.muted }}>
+          {purchase.supplier} · {purchase.date} · {purchase.quantity}瓶
+        </Text>
+      </View>
+
+      {/* 右侧金额 */}
+      <View style={{ alignItems: "flex-end" }}>
+        <Text style={{ fontSize: 15, fontWeight: "700", color: colors.primary }}>¥{purchase.amount.toFixed(0)}</Text>
+        <Text style={{ fontSize: 11, color: colors.muted }}>¥{purchase.unitPrice}/瓶</Text>
+      </View>
+    </TouchableOpacity>
+  );
 }
 
 // ─── 供应商卡片 ───────────────────────────────────────────────────────────────
@@ -236,9 +313,7 @@ function PurchaseEntrySheet({
   const handleSaveAndShare = async () => {
     const entries = buildEntries();
     if (entries.length === 0) { Alert.alert("请至少填写一款酒的进货数量"); return; }
-    // 先保存
     onSave(entries);
-    // 生成文本并分享
     const today = new Date().toISOString().slice(0, 10);
     const text = buildPurchaseText(supplier, entries, today);
     try {
@@ -279,7 +354,6 @@ function PurchaseEntrySheet({
         </View>
 
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
-          {/* 合计 */}
           {total > 0 && (
             <View style={[S.totalBanner, { backgroundColor: colors.primary + "12", borderColor: colors.primary + "33" }]}>
               <Text style={[S.totalText, { color: colors.primary }]}>本次进货合计：¥{total.toFixed(2)}</Text>
@@ -327,12 +401,8 @@ function PurchaseEntrySheet({
           ))}
         </ScrollView>
 
-        {/* 底部按钮行 */}
         <View style={[S.sheetFooter, { borderTopColor: colors.border, backgroundColor: colors.background }]}>
-          <Pressable
-            onPress={handleSave}
-            style={[S.footerBtn, { backgroundColor: colors.primary }]}
-          >
+          <Pressable onPress={handleSave} style={[S.footerBtn, { backgroundColor: colors.primary }]}>
             <IconSymbol name="checkmark" size={15} color="#fff" />
             <Text style={S.footerBtnText}>保存</Text>
           </Pressable>
@@ -357,14 +427,27 @@ export default function WineInventoryScreen() {
   const insets = useSafeAreaInsets();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
-  const { snapshots, addSnapshot, deleteSnapshot } = useWineSnapshotStore();
-  const { purchases, addManualPurchase } = useWineManualPurchaseStore();
+  const { snapshots, addSnapshot, deleteSnapshot, setActualEndQty, batchSetActualEndQty } = useWineSnapshotStore();
+  const { purchases, addManualPurchase, deleteManualPurchase, batchDeleteManualPurchases, batchUpdateManualPurchaseDate, getMonthPurchases } = useWineManualPurchaseStore();
 
   const [viewTab, setViewTab] = useState<ViewTab>("ledger");
   const [filterSupplier, setFilterSupplier] = useState<string | null>(null);
   const [showPurchaseSheet, setShowPurchaseSheet] = useState(false);
   const [activeSupplierForEntry, setActiveSupplierForEntry] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth());
+
+  // ★ 当月进货多选状态
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // ★ 当月进货筛选酒商
+  const [purchaseFilterSupplier, setPurchaseFilterSupplier] = useState<string | null>(null);
+  // ★ 批量修改日期 Modal
+  const [showBatchDateModal, setShowBatchDateModal] = useState(false);
+  const [batchDate, setBatchDate] = useState(new Date().toISOString().slice(0, 10));
+  // ★ 月末盘点状态
+  const [showStocktakeModal, setShowStocktakeModal] = useState(false);
+  const [stocktakeValues, setStocktakeValues] = useState<Record<number, string>>({});
 
   // 最新快照
   const latestSnapshot = snapshots[0] ?? null;
@@ -397,7 +480,6 @@ export default function WineInventoryScreen() {
         map[sup] = (map[sup] ?? 0) + amt;
       });
     });
-    // 加上手动进货
     purchases.forEach((p) => {
       map[p.supplier] = (map[p.supplier] ?? 0) + p.amount;
     });
@@ -415,12 +497,34 @@ export default function WineInventoryScreen() {
     return list;
   }, [items, filterSupplier, searchQuery]);
 
-  // 本月进货汇总（手动 + 快照）
-  const thisMonthPurchases = useMemo(() => {
-    const now = new Date();
-    const prefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-    return purchases.filter((p) => p.date.startsWith(prefix));
-  }, [purchases]);
+  // ★ 当月进货记录（含筛选）
+  const monthPurchaseRecords = useMemo(() => {
+    let list = getMonthPurchases(selectedMonth);
+    if (purchaseFilterSupplier) list = list.filter((p) => p.supplier === purchaseFilterSupplier);
+    return list.sort((a, b) => b.date.localeCompare(a.date));
+  }, [purchases, selectedMonth, purchaseFilterSupplier]);
+
+  // ★ 当月进货的所有供应商（用于筛选栏）
+  const purchaseSuppliers = useMemo(() => {
+    const all = getMonthPurchases(selectedMonth);
+    return Array.from(new Set(all.map((p) => p.supplier))).sort();
+  }, [purchases, selectedMonth]);
+
+  // ★ 构建价格历史 Map（用于显示涨跌）
+  const prevUnitPriceMap = useMemo(() => {
+    const map: Record<string, number | null> = {};
+    const sorted = [...purchases].sort((a, b) => a.date.localeCompare(b.date));
+    for (const p of sorted) {
+      const key = `${p.supplier}:${p.productName}`;
+      if (p.date.startsWith(selectedMonth)) {
+        // 当月的记录：找上一条同款记录的单价
+        if (!(key in map)) map[key] = null; // 还没有历史价格
+      } else {
+        map[key] = p.unitPrice; // 记录历史价格
+      }
+    }
+    return map;
+  }, [purchases, selectedMonth]);
 
   // 台账统计
   const ledgerStats = useMemo(() => ({
@@ -440,6 +544,10 @@ export default function WineInventoryScreen() {
   const handleSavePurchase = (entries: { item: WineInventoryItem; qty: number; unitPrice: number }[]) => {
     const today = new Date().toISOString().slice(0, 10);
     entries.forEach(({ item, qty, unitPrice }) => {
+      // ★ 计算与上次进货单价的差值
+      const key = `${item.supplier}:${item.name}`;
+      const prevPrice = prevUnitPriceMap[key] ?? null;
+      const unitPriceDelta = prevPrice !== null ? unitPrice - prevPrice : undefined;
       addManualPurchase({
         date: today,
         supplier: item.supplier,
@@ -449,6 +557,8 @@ export default function WineInventoryScreen() {
         quantity: qty,
         amount: qty * unitPrice,
         notes: "",
+        unitPriceDelta,
+        priceAlertTriggered: unitPriceDelta !== undefined && Math.abs(unitPriceDelta) > 0,
       });
     });
     const total = entries.reduce((s, e) => s + e.qty * e.unitPrice, 0);
@@ -467,6 +577,37 @@ export default function WineInventoryScreen() {
     ]);
   };
 
+  // ★ 多选操作
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleBatchDelete = () => {
+    if (selectedIds.size === 0) return;
+    Alert.alert("批量删除", `确认删除选中的 ${selectedIds.size} 条进货记录？`, [
+      { text: "取消", style: "cancel" },
+      { text: "删除", style: "destructive", onPress: () => {
+        batchDeleteManualPurchases(Array.from(selectedIds));
+        setSelectedIds(new Set());
+        setSelectMode(false);
+      }},
+    ]);
+  };
+
+  const handleBatchUpdateDate = () => {
+    if (selectedIds.size === 0) return;
+    batchUpdateManualPurchaseDate(Array.from(selectedIds), batchDate);
+    setShowBatchDateModal(false);
+    setSelectedIds(new Set());
+    setSelectMode(false);
+    Alert.alert("完成", `已将 ${selectedIds.size} 条记录的日期修改为 ${batchDate}`);
+  };
+
   return (
     <ScreenContainer>
       {/* 导航栏 */}
@@ -478,9 +619,6 @@ export default function WineInventoryScreen() {
           葡萄酒进销存{latestSnapshot ? ` · ${latestSnapshot.monthLabel}` : ""}
         </Text>
         <View style={{ flexDirection: "row", gap: 12 }}>
-          <Pressable onPress={() => Alert.alert("期初录入", "葡萄酒进销存的期初数据通过 Excel 导入自动带入（initQty/initUnitCost 字段）。\n\n如需手动调整，请在导入后通过 Excel 重新导入修正后的数据。")} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
-            <IconSymbol name="calendar.badge.plus" size={20} color={colors.primary} />
-          </Pressable>
           <Pressable onPress={() => { tap(); router.push("/wine-inventory-import" as any); }}
             style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
             <IconSymbol name="square.and.arrow.down.fill" size={20} color={colors.primary} />
@@ -501,7 +639,7 @@ export default function WineInventoryScreen() {
       </View>
 
       {/* 无数据提示 */}
-      {items.length === 0 && (
+      {items.length === 0 && viewTab !== "purchase" && viewTab !== "summary" && (
         <View style={S.emptyWrap}>
           <IconSymbol name="tray.2.fill" size={48} color={colors.border} />
           <Text style={[S.emptyTitle, { color: colors.foreground }]}>暂无进销存数据</Text>
@@ -524,6 +662,19 @@ export default function WineInventoryScreen() {
             <StatCell label="本月进货" value={`¥${ledgerStats.totalPurchaseCost.toFixed(0)}`} color={colors.primary} />
             <StatCell label="本月消耗" value={`${ledgerStats.totalConsumeBottles}瓶`} color={colors.warning} />
           </View>
+          {/* 工具栏 */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }} contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 8, gap: 8, alignItems: "center" }}>
+            <TouchableOpacity onPress={() => {
+              tap();
+              const initVals: Record<number, string> = {};
+              items.forEach((i) => { initVals[i.seq] = String(i.endQty); });
+              setStocktakeValues(initVals);
+              setShowStocktakeModal(true);
+            }} style={[S.actionBtn, { backgroundColor: "#F59E0B22", borderColor: "#F59E0B" }]}>
+              <IconSymbol name="checklist" size={13} color="#F59E0B" />
+              <Text style={{ fontSize: 12, color: "#F59E0B", fontWeight: "600" }}>月末盘点</Text>
+            </TouchableOpacity>
+          </ScrollView>
           {/* 供应商筛选 */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[S.filterScroll, { borderBottomColor: colors.border, flexGrow: 0 }]} contentContainerStyle={{ paddingHorizontal: 16, gap: 8, alignItems: "center" }}>
             <TouchableOpacity onPress={() => setFilterSupplier(null)}
@@ -582,26 +733,148 @@ export default function WineInventoryScreen() {
         />
       )}
 
-      {/* ── 进货录入视图 ── */}
+      {/* ── 当月进货视图（全面升级）── */}
       {viewTab === "purchase" && (
-        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }}>
-          <Text style={[S.sectionTitle, { color: colors.muted }]}>选择供应商录入进货</Text>
-          {allSuppliers.map((sup) => (
-            <TouchableOpacity key={sup} onPress={() => handlePurchaseEntry(sup)}
-              style={[S.purchaseEntryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <View style={{ flex: 1 }}>
-                <Text style={[S.purchaseEntryName, { color: colors.foreground }]}>{sup}</Text>
-                <Text style={[S.purchaseEntryMeta, { color: colors.muted }]}>
-                  {bySupplier.get(sup)?.length ?? 0} 款 · 本月进货 ¥{(supplierMonthTotals[sup] ?? 0).toFixed(0)}
-                </Text>
-              </View>
-              <IconSymbol name="chevron.right" size={16} color={colors.muted} />
+        <>
+          {/* 月份选择 */}
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, gap: 16 }}>
+            <TouchableOpacity onPress={() => {
+              const [y, m] = selectedMonth.split("-").map(Number);
+              const prev = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
+              setSelectedMonth(prev);
+            }}>
+              <IconSymbol name="chevron.left" size={18} color={colors.foreground} />
             </TouchableOpacity>
-          ))}
-          {allSuppliers.length === 0 && (
-            <Text style={[S.emptyDesc, { color: colors.muted, textAlign: "center", marginTop: 40 }]}>请先导入 Excel 数据</Text>
+            <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground }}>
+              {selectedMonth.slice(0, 4)}年{Number(selectedMonth.slice(5, 7))}月
+            </Text>
+            <TouchableOpacity onPress={() => {
+              const [y, m] = selectedMonth.split("-").map(Number);
+              const next = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`;
+              if (next <= getCurrentMonth()) setSelectedMonth(next);
+            }}>
+              <IconSymbol name="chevron.right" size={18} color={selectedMonth >= getCurrentMonth() ? colors.border : colors.foreground} />
+            </TouchableOpacity>
+          </View>
+
+          {/* ★ 酒商筛选栏 */}
+          {purchaseSuppliers.length > 0 && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }} contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 8, gap: 8, alignItems: "center" }}>
+              <TouchableOpacity onPress={() => setPurchaseFilterSupplier(null)}
+                style={[S.filterChip, { backgroundColor: !purchaseFilterSupplier ? colors.primary : colors.surface, borderColor: !purchaseFilterSupplier ? colors.primary : colors.border }]}>
+                <Text style={[S.filterChipText, { color: !purchaseFilterSupplier ? "#fff" : colors.muted }]}>全部</Text>
+              </TouchableOpacity>
+              {purchaseSuppliers.map((s) => (
+                <TouchableOpacity key={s} onPress={() => setPurchaseFilterSupplier(purchaseFilterSupplier === s ? null : s)}
+                  style={[S.filterChip, { backgroundColor: purchaseFilterSupplier === s ? colors.primary : colors.surface, borderColor: purchaseFilterSupplier === s ? colors.primary : colors.border }]}>
+                  <Text style={[S.filterChipText, { color: purchaseFilterSupplier === s ? "#fff" : colors.muted }]}>{s}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           )}
-        </ScrollView>
+
+          {/* ★ 工具栏 */}
+          <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 8, gap: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
+            {/* 手动录入按钮 */}
+            <TouchableOpacity onPress={() => {
+              tap();
+              if (allSuppliers.length > 0) {
+                setActiveSupplierForEntry(purchaseFilterSupplier ?? allSuppliers[0]);
+                setShowPurchaseSheet(true);
+              } else {
+                Alert.alert("提示", "请先导入 Excel 数据，或在供应商 Tab 中录入进货");
+              }
+            }} style={[S.actionBtn, { backgroundColor: colors.primary, borderColor: colors.primary, flex: 1 }]}>
+              <IconSymbol name="plus" size={13} color="#fff" />
+              <Text style={{ fontSize: 12, color: "#fff", fontWeight: "600" }}>手动录入</Text>
+            </TouchableOpacity>
+
+            {/* 多选模式切换 */}
+            <TouchableOpacity onPress={() => {
+              tap();
+              setSelectMode(!selectMode);
+              if (selectMode) setSelectedIds(new Set());
+            }} style={[S.actionBtn, { backgroundColor: selectMode ? "#EF4444" : colors.surface, borderColor: selectMode ? "#EF4444" : colors.border }]}>
+              <IconSymbol name="checkmark.circle" size={13} color={selectMode ? "#fff" : colors.muted} />
+              <Text style={{ fontSize: 12, color: selectMode ? "#fff" : colors.muted, fontWeight: "600" }}>
+                {selectMode ? `已选 ${selectedIds.size}` : "多选"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* ★ 批量操作工具栏（多选模式下显示） */}
+          {selectMode && selectedIds.size > 0 && (
+            <View style={{ flexDirection: "row", gap: 8, paddingHorizontal: 16, paddingVertical: 8, backgroundColor: colors.primary + "10", borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
+              <TouchableOpacity onPress={() => setShowBatchDateModal(true)}
+                style={[S.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border, flex: 1 }]}>
+                <IconSymbol name="calendar" size={13} color={colors.primary} />
+                <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "600" }}>修改日期</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleBatchDelete}
+                style={[S.actionBtn, { backgroundColor: "#FEF2F2", borderColor: "#EF4444", flex: 1 }]}>
+                <IconSymbol name="trash" size={13} color="#EF4444" />
+                <Text style={{ fontSize: 12, color: "#EF4444", fontWeight: "600" }}>删除</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* 进货记录列表 */}
+          {monthPurchaseRecords.length === 0 ? (
+            <View style={{ alignItems: "center", padding: 40 }}>
+              <Text style={{ fontSize: 32 }}>🍷</Text>
+              <Text style={{ fontSize: 15, color: colors.muted, marginTop: 12 }}>
+                {selectedMonth.slice(0, 4)}年{Number(selectedMonth.slice(5, 7))}月暂无进货记录
+              </Text>
+              <TouchableOpacity onPress={() => {
+                if (allSuppliers.length > 0) {
+                  setActiveSupplierForEntry(allSuppliers[0]);
+                  setShowPurchaseSheet(true);
+                }
+              }} style={[S.importBtn, { backgroundColor: colors.primary, marginTop: 16 }]}>
+                <IconSymbol name="plus" size={14} color="#fff" />
+                <Text style={S.importBtnText}>手动录入进货</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <FlatList
+              data={monthPurchaseRecords}
+              keyExtractor={(p) => p.id}
+              renderItem={({ item: p }) => {
+                const key = `${p.supplier}:${p.productName}`;
+                const prevPrice = prevUnitPriceMap[key] ?? null;
+                return (
+                  <PurchaseRow
+                    purchase={p}
+                    prevUnitPrice={prevPrice}
+                    colors={colors}
+                    selected={selectedIds.has(p.id)}
+                    onSelect={() => toggleSelect(p.id)}
+                    onEdit={() => {
+                      Alert.alert(p.productName, `供应商：${p.supplier}\n日期：${p.date}\n数量：${p.quantity}瓶\n单价：¥${p.unitPrice}\n金额：¥${p.amount.toFixed(2)}`, [
+                        { text: "关闭" },
+                        { text: "删除", style: "destructive", onPress: () => {
+                          Alert.alert("确认删除", `删除「${p.productName}」这条进货记录？`, [
+                            { text: "取消", style: "cancel" },
+                            { text: "删除", style: "destructive", onPress: () => deleteManualPurchase(p.id) },
+                          ]);
+                        }},
+                      ]);
+                    }}
+                    onDelete={() => deleteManualPurchase(p.id)}
+                  />
+                );
+              }}
+              contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }}
+              ListHeaderComponent={
+                <View style={{ marginBottom: 12 }}>
+                  <Text style={{ fontSize: 13, color: colors.muted }}>
+                    共 {monthPurchaseRecords.length} 条 · 合计 ¥{monthPurchaseRecords.reduce((s, p) => s + p.amount, 0).toFixed(0)}
+                  </Text>
+                </View>
+              }
+            />
+          )}
+        </>
       )}
 
       {/* ── 汇总视图 ── */}
@@ -610,9 +883,7 @@ export default function WineInventoryScreen() {
           {/* 供应商月度趋势折线图 */}
           {snapshots.length >= 1 && (
             <View style={[S.trendCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <Text style={[S.trendTitle, { color: colors.foreground }]}>
-                供应商月度进货趋势
-              </Text>
+              <Text style={[S.trendTitle, { color: colors.foreground }]}>供应商月度进货趋势</Text>
               <Text style={[S.trendSubtitle, { color: colors.muted }]}>
                 {snapshots.length} 个月份快照 · Top 5 供应商
               </Text>
@@ -633,7 +904,6 @@ export default function WineInventoryScreen() {
                 <SummaryStatCell label="月消耗" value={`¥${snap.totalConsume.toFixed(0)}`} color={colors.warning} />
                 <SummaryStatCell label="期末成本" value={`¥${snap.totalEndCost.toFixed(0)}`} color={colors.foreground} />
               </View>
-              {/* 供应商明细 */}
               {Object.entries(snap.supplierTotals).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).map(([sup, amt]) => (
                 <View key={sup} style={[S.summarySupRow, { borderTopColor: colors.border }]}>
                   <Text style={[S.summarySupName, { color: colors.muted }]}>{sup}</Text>
@@ -649,11 +919,11 @@ export default function WineInventoryScreen() {
             <Text style={[S.emptyDesc, { color: colors.muted, textAlign: "center", marginTop: 20 }]}>暂无月度快照，请先导入 Excel</Text>
           )}
 
-          {/* 手动进货记录 */}
-          {thisMonthPurchases.length > 0 && (
+          {/* 手动进货记录（本月） */}
+          {getMonthPurchases(getCurrentMonth()).length > 0 && (
             <>
-              <Text style={[S.sectionTitle, { color: colors.muted, marginTop: 20 }]}>本月手动进货（{thisMonthPurchases.length} 条）</Text>
-              {thisMonthPurchases.map((p) => (
+              <Text style={[S.sectionTitle, { color: colors.muted, marginTop: 20 }]}>本月手动进货（{getMonthPurchases(getCurrentMonth()).length} 条）</Text>
+              {getMonthPurchases(getCurrentMonth()).map((p) => (
                 <View key={p.id} style={[S.manualRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                   <View style={{ flex: 1 }}>
                     <Text style={[S.manualName, { color: colors.foreground }]} numberOfLines={1}>{p.productName}</Text>
@@ -676,6 +946,92 @@ export default function WineInventoryScreen() {
         onClose={() => setShowPurchaseSheet(false)}
         onSave={handleSavePurchase}
       />
+
+      {/* ★ 批量修改日期 Modal */}
+      <Modal visible={showBatchDateModal} transparent animationType="fade" onRequestClose={() => setShowBatchDateModal(false)}>
+        <View style={{ flex: 1, backgroundColor: "#00000066", alignItems: "center", justifyContent: "center" }}>
+          <View style={{ backgroundColor: colors.background, borderRadius: 16, padding: 24, width: 300 }}>
+            <Text style={{ fontSize: 17, fontWeight: "700", color: colors.foreground, marginBottom: 16 }}>批量修改日期</Text>
+            <Text style={{ fontSize: 13, color: colors.muted, marginBottom: 8 }}>将 {selectedIds.size} 条记录的日期修改为：</Text>
+            <TextInput
+              value={batchDate}
+              onChangeText={setBatchDate}
+              placeholder="YYYY-MM-DD"
+              placeholderTextColor={colors.muted}
+              style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 12, fontSize: 16, color: colors.foreground, backgroundColor: colors.surface, marginBottom: 20 }}
+            />
+            <View style={{ flexDirection: "row", gap: 12 }}>
+              <Pressable onPress={() => setShowBatchDateModal(false)} style={{ flex: 1, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: colors.border, alignItems: "center" }}>
+                <Text style={{ color: colors.muted }}>取消</Text>
+              </Pressable>
+              <Pressable onPress={handleBatchUpdateDate} style={{ flex: 1, padding: 12, borderRadius: 10, backgroundColor: colors.primary, alignItems: "center" }}>
+                <Text style={{ color: "#fff", fontWeight: "600" }}>确认</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ★ 月末盘点 Modal */}
+      <Modal visible={showStocktakeModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowStocktakeModal(false)}>
+        <View style={{ flex: 1, backgroundColor: colors.background }}>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
+            <Pressable onPress={() => setShowStocktakeModal(false)}>
+              <Text style={{ fontSize: 16, color: colors.primary }}>取消</Text>
+            </Pressable>
+            <View style={{ alignItems: "center" }}>
+              <Text style={{ fontSize: 17, fontWeight: "700", color: colors.foreground }}>月末盘点</Text>
+              <Text style={{ fontSize: 12, color: colors.muted }}>填入实际期末库存量，自动测算消耗</Text>
+            </View>
+            <Pressable onPress={() => {
+              if (!latestSnapshot) return;
+              const entries = items
+                .filter((item) => stocktakeValues[item.seq] !== undefined && stocktakeValues[item.seq] !== "")
+                .map((item) => ({ seq: item.seq, actualQty: parseFloat(stocktakeValues[item.seq] ?? "0") || 0 }));
+              if (entries.length === 0) { Alert.alert("请至少填写一款酒的期末库存量"); return; }
+              batchSetActualEndQty(latestSnapshot.id, entries);
+              setShowStocktakeModal(false);
+              Alert.alert("盘点完成", `已更新 ${entries.length} 款酒的期末库存量，消耗量已自动测算`);
+            }}>
+              <Text style={{ fontSize: 16, color: colors.primary, fontWeight: "600" }}>保存</Text>
+            </Pressable>
+          </View>
+          <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
+            <View style={{ backgroundColor: "#F59E0B11", borderRadius: 10, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: "#F59E0B44" }}>
+              <Text style={{ fontSize: 13, color: "#92400E" }}>💡 填入实际盘点到的期末库存量，系统自动计算：消耗 = 期初 + 进货 - 期末。空白表示不修改该款酒。</Text>
+            </View>
+            {items.map((item) => {
+              const expectedClosing = item.initQty + item.purchaseQty;
+              const actualVal = stocktakeValues[item.seq] ?? "";
+              const actualQty = parseFloat(actualVal) || 0;
+              const consumeBottles = actualVal !== "" ? Math.max(0, item.initQty + item.purchaseQty - actualQty) : null;
+              return (
+                <View key={item.seq} style={{ backgroundColor: colors.surface, borderRadius: 12, borderWidth: 1, borderColor: colors.border, padding: 12, marginBottom: 8 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }} numberOfLines={1}>{item.name}</Text>
+                      <Text style={{ fontSize: 11, color: colors.muted }}>{item.wineType} · 理论期末 {expectedClosing} 瓶</Text>
+                    </View>
+                    <TextInput
+                      value={actualVal}
+                      onChangeText={(v) => setStocktakeValues((prev) => ({ ...prev, [item.seq]: v }))}
+                      placeholder={String(expectedClosing)}
+                      placeholderTextColor={colors.muted}
+                      keyboardType="decimal-pad"
+                      style={{ width: 80, borderWidth: 1, borderColor: actualVal !== "" ? "#F59E0B" : colors.border, borderRadius: 8, padding: 8, fontSize: 15, fontWeight: "700", color: colors.foreground, backgroundColor: colors.background, textAlign: "center" }}
+                    />
+                  </View>
+                  {consumeBottles !== null && (
+                    <Text style={{ fontSize: 11, color: consumeBottles > 0 ? colors.warning : colors.muted }}>
+                      自动测算消耗：{consumeBottles} 瓶
+                    </Text>
+                  )}
+                </View>
+              );
+            })}
+          </ScrollView>
+        </View>
+      </Modal>
     </ScreenContainer>
   );
 }
@@ -710,6 +1066,7 @@ const S = StyleSheet.create({
   filterChipText: { fontSize: 13, fontWeight: "500" },
   searchBox: { flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 7 },
   searchInput: { flex: 1, fontSize: 14, lineHeight: 19 },
+  actionBtn: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, borderWidth: 1 },
   ledgerRow: { borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 8 },
   ledgerMain: { flexDirection: "row", alignItems: "center", gap: 8 },
   ledgerSeq: { fontSize: 11, fontWeight: "600" },
@@ -722,6 +1079,7 @@ const S = StyleSheet.create({
   detailRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 },
   detailLabel: { fontSize: 12 },
   detailValue: { fontSize: 12, fontWeight: "500" },
+  purchaseRow: { flexDirection: "row", alignItems: "center", borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 8 },
   supplierCard: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 12 },
   supplierHeader: { flexDirection: "row", alignItems: "flex-start", marginBottom: 10 },
   supplierName: { fontSize: 16, fontWeight: "700" },
@@ -739,9 +1097,6 @@ const S = StyleSheet.create({
   supplierSummaryRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 4 },
   supplierSummaryName: { fontSize: 13 },
   supplierSummaryAmt: { fontSize: 13, fontWeight: "600" },
-  purchaseEntryCard: { flexDirection: "row", alignItems: "center", borderRadius: 12, borderWidth: 1, padding: 14, marginBottom: 10 },
-  purchaseEntryName: { fontSize: 15, fontWeight: "600" },
-  purchaseEntryMeta: { fontSize: 12, marginTop: 2 },
   sectionTitle: { fontSize: 12, fontWeight: "600", letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 10 },
   trendCard: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 4 },
   trendTitle: { fontSize: 15, fontWeight: "700" },
@@ -750,34 +1105,34 @@ const S = StyleSheet.create({
   summaryCardHeader: { flexDirection: "row", justifyContent: "space-between", marginBottom: 10 },
   summaryCardTitle: { fontSize: 16, fontWeight: "700" },
   summaryCardDate: { fontSize: 12 },
-  summaryCardStats: { flexDirection: "row", marginBottom: 10 },
-  summarySupRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 5, borderTopWidth: StyleSheet.hairlineWidth },
-  summarySupName: { fontSize: 13 },
-  summarySupAmt: { fontSize: 13, fontWeight: "600" },
-  deleteSnap: { marginTop: 8, alignItems: "center", paddingVertical: 6 },
+  summaryCardStats: { flexDirection: "row", marginBottom: 8 },
+  summarySupRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 4, borderTopWidth: StyleSheet.hairlineWidth },
+  summarySupName: { fontSize: 12 },
+  summarySupAmt: { fontSize: 12, fontWeight: "600" },
+  deleteSnap: { alignItems: "center", paddingTop: 10, marginTop: 4 },
   manualRow: { flexDirection: "row", alignItems: "center", borderRadius: 10, borderWidth: 1, padding: 12, marginBottom: 8 },
   manualName: { fontSize: 13, fontWeight: "500" },
   manualMeta: { fontSize: 11, marginTop: 2 },
   manualAmt: { fontSize: 14, fontWeight: "700" },
-  emptyWrap: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10 },
-  emptyTitle: { fontSize: 18, fontWeight: "600" },
-  emptyDesc: { fontSize: 14 },
-  importBtn: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12, marginTop: 8 },
+  emptyWrap: { flex: 1, alignItems: "center", justifyContent: "center", padding: 40 },
+  emptyTitle: { fontSize: 18, fontWeight: "700", marginTop: 16 },
+  emptyDesc: { fontSize: 14, marginTop: 8, textAlign: "center" },
+  importBtn: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12, marginTop: 20 },
   importBtnText: { color: "#fff", fontSize: 15, fontWeight: "600" },
   sheet: { flex: 1 },
   sheetHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 16, borderBottomWidth: StyleSheet.hairlineWidth },
-  sheetTitle: { fontSize: 17, fontWeight: "600" },
-  sheetCancel: { fontSize: 17 },
-  sheetDone: { fontSize: 17, fontWeight: "600" },
-  sheetFooter: { flexDirection: "row", gap: 10, padding: 16, borderTopWidth: StyleSheet.hairlineWidth },
+  sheetTitle: { fontSize: 17, fontWeight: "700" },
+  sheetCancel: { fontSize: 16 },
+  sheetDone: { fontSize: 16, fontWeight: "600" },
+  sheetFooter: { flexDirection: "row", gap: 12, padding: 16, borderTopWidth: StyleSheet.hairlineWidth },
   footerBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 13, borderRadius: 12 },
   footerBtnText: { color: "#fff", fontSize: 15, fontWeight: "600" },
   totalBanner: { borderRadius: 10, borderWidth: 1, padding: 12, marginBottom: 12, alignItems: "center" },
   totalText: { fontSize: 15, fontWeight: "700" },
   entryRow: { borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 10 },
   entryName: { fontSize: 14, fontWeight: "600", lineHeight: 20 },
-  entryMeta: { fontSize: 11, marginTop: 2, marginBottom: 8 },
-  entryFieldLabel: { fontSize: 11, fontWeight: "500", marginBottom: 4 },
-  entryInput: { borderRadius: 8, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 8, fontSize: 15 },
-  entrySubtotal: { fontSize: 12, fontWeight: "600", marginTop: 6, textAlign: "right" },
+  entryMeta: { fontSize: 11, marginTop: 2 },
+  entryFieldLabel: { fontSize: 11, marginBottom: 4 },
+  entryInput: { borderWidth: 1, borderRadius: 8, padding: 10, fontSize: 15 },
+  entrySubtotal: { fontSize: 13, fontWeight: "600", marginTop: 6, textAlign: "right" },
 });

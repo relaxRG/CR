@@ -20,7 +20,7 @@ export interface WineBottle {
   style: WineStyle;
   /** 酒精度（%） */
   abv: number | null;
-  /** 进价（元） */
+  /** 进价（元）— 最新参考进价 */
   costPrice: number | null;
   /** 售价（元） */
   salePrice: number | null;
@@ -38,6 +38,15 @@ export interface WineBottle {
   createdAt: string;
   /** 更新时间 */
   updatedAt: string;
+  // ★ 新增字段
+  /** 规格容量（ml），用于 Pour Cost 计算，默认 750 */
+  specMl?: number;
+  /** 单杯分量（ml），用于 Pour Cost 计算 */
+  servingSize?: number;
+  /** 价格预警阈值（%），超过此涨幅显示 ⚠️，默认 0（全部显示） */
+  priceAlertPct?: number;
+  /** 历史参考单价 { "YYYY-MM": price } */
+  refPrices?: Record<string, number>;
 }
 
 // ─── 进销存台账字段 ─────────────────────────────────────────────────────────
@@ -72,6 +81,8 @@ export interface WineInventoryItem {
   consumeBottles: number;
   /** 本期消耗量（成本） */
   consumeQty: number;
+  // ★ 新增：实际盘点期末库存量（月末盘点后填入）
+  actualEndQty?: number;
 }
 
 /** 进货总单明细条目（对应 Excel 进货总单表的一行） */
@@ -118,6 +129,11 @@ export interface WineManualPurchase {
   amount: number;
   notes: string;
   createdAt: string;
+  // ★ 新增字段
+  /** 与上次进货单价的差值（正=涨价，负=降价） */
+  unitPriceDelta?: number;
+  /** 是否触发价格预警 */
+  priceAlertTriggered?: boolean;
 }
 
 export const WINE_STYLE_LABELS: Record<WineStyle, string> = {

@@ -7,7 +7,7 @@
  */
 import React, { useMemo, useState } from "react";
 import {
-  Alert, Dimensions, KeyboardAvoidingView, Modal, Platform,
+  Alert, Dimensions, KeyboardAvoidingView, Modal, Platform, Pressable,
   ScrollView, StyleSheet, Text, TextInput, TouchableOpacity,
   View, ActivityIndicator,
 } from "react-native";
@@ -73,6 +73,7 @@ export default function SpiritsInventoryScreen() {
     getMonthPurchases, getMonthLedger, getItemLedger,
     getAvailableMonths, getPurchaseSummaryByCategory, getPurchaseSummaryBySupplier,
     closeMonth, syncLedgerFromPurchases,
+    setActualClosing, batchSetActualClosing, checkPrevMonthClosed,
   } = store;
   const pettyStore = usePettyCashStore();
 
@@ -80,6 +81,26 @@ export default function SpiritsInventoryScreen() {
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth());
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [activeSupplier, setActiveSupplier] = useState<string | null>(null);
+  // ★ 月末盘点状态
+  const [showStocktakeModal, setShowStocktakeModal] = useState(false);
+  const [stocktakeValues, setStocktakeValues] = useState<Record<string, string>>({});
+
+  // ★ 月份切换时自动检查上月月结
+  const handleMonthChange = (newMonth: string) => {
+    const { needsClose, prevMonth } = checkPrevMonthClosed(newMonth);
+    if (needsClose) {
+      Alert.alert(
+        "月结提示",
+        `${prevMonth.slice(0, 4)}年${Number(prevMonth.slice(5, 7))}月尚未月结，建议先完成月结再切换。是否立即月结？`,
+        [
+          { text: "稍后再说", style: "cancel", onPress: () => setSelectedMonth(newMonth) },
+          { text: "立即月结", onPress: () => { closeMonth(prevMonth); setSelectedMonth(newMonth); Alert.alert("月结完成", `${prevMonth} 期末库存已带入下月期初`); } },
+        ]
+      );
+    } else {
+      setSelectedMonth(newMonth);
+    }
+  };
 
   // 月份列表：有数据的历史月份 + 当前月往前12个月，去重后最多显示24个
   const availableMonths = useMemo(() => {
@@ -574,6 +595,18 @@ export default function SpiritsInventoryScreen() {
             {ledgerEditMode ? "完成" : "编辑期初"}
           </Text>
         </TouchableOpacity>
+        {/* ★ 月末盘点按钮 */}
+        <TouchableOpacity onPress={() => {
+          tap();
+          // 预填当前期末库存量
+          const initVals: Record<string, string> = {};
+          monthLedger.forEach((e) => { initVals[e.itemId] = String(e.closingQty); });
+          setStocktakeValues(initVals);
+          setShowStocktakeModal(true);
+        }} style={[S.actionBtn, { backgroundColor: "#F59E0B22", borderColor: "#F59E0B" }]}>
+          <IconSymbol name="checklist" size={13} color="#F59E0B" />
+          <Text style={{ fontSize: 12, color: "#F59E0B", fontWeight: "600" }}>月末盘点</Text>
+        </TouchableOpacity>
       </ScrollView>
 
       {/* 横向滚动表格 */}
@@ -1015,7 +1048,7 @@ export default function SpiritsInventoryScreen() {
               tap();
               const [y, m] = selectedMonth.split("-").map(Number);
               const prev = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
-              setSelectedMonth(prev);
+              handleMonthChange(prev);
             }}>
               <IconSymbol name="chevron.left" size={18} color={colors.foreground} />
             </TouchableOpacity>
@@ -1032,7 +1065,7 @@ export default function SpiritsInventoryScreen() {
               const [y, m] = selectedMonth.split("-").map(Number);
               const next = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`;
               // 不允许跳过当前月
-              if (next <= getCurrentMonth()) setSelectedMonth(next);
+              if (next <= getCurrentMonth()) handleMonthChange(next);
               else tap();
             }}>
               <IconSymbol name="chevron.right" size={18}
@@ -1091,7 +1124,7 @@ export default function SpiritsInventoryScreen() {
                 const isCurrent = mo === getCurrentMonth();
                 const isSelected = mo === selectedMonth;
                 return (
-                  <TouchableOpacity key={mo} onPress={() => { tap(); setSelectedMonth(mo); setShowMonthPicker(false); }}
+                  <TouchableOpacity key={mo} onPress={() => { tap(); handleMonthChange(mo); setShowMonthPicker(false); }}
                     style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between",
                       paddingVertical: 13, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border,
                       backgroundColor: isSelected ? "#EF444410" : "transparent",
@@ -1282,6 +1315,66 @@ export default function SpiritsInventoryScreen() {
         onClose={() => { setShowGroupManager(false); setEditingGroup(null); }}
       />
 
+      {/* ★ 月末盘点 Modal */}
+      <Modal visible={showStocktakeModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowStocktakeModal(false)}>
+        <View style={{ flex: 1, backgroundColor: colors.background }}>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
+            <Pressable onPress={() => setShowStocktakeModal(false)}>
+              <Text style={{ fontSize: 16, color: colors.primary }}>取消</Text>
+            </Pressable>
+            <View style={{ alignItems: "center" }}>
+              <Text style={{ fontSize: 17, fontWeight: "700", color: colors.foreground }}>月末盘点</Text>
+              <Text style={{ fontSize: 12, color: colors.muted }}>{selectedMonth.slice(0, 4)}年{Number(selectedMonth.slice(5, 7))}月 · 填入实际期末库存量</Text>
+            </View>
+            <Pressable onPress={() => {
+              const entries = items
+                .filter((item) => stocktakeValues[item.id] !== undefined && stocktakeValues[item.id] !== "")
+                .map((item) => ({ itemId: item.id, actualQty: parseFloat(stocktakeValues[item.id] ?? "0") || 0 }));
+              if (entries.length === 0) { Alert.alert("请至少填写一款酒的期末库存量"); return; }
+              batchSetActualClosing(selectedMonth, entries);
+              setShowStocktakeModal(false);
+              Alert.alert("盘点完成", `已更新 ${entries.length} 款酒的期末库存量，消耗量已自动测算`);
+            }}>
+              <Text style={{ fontSize: 16, color: colors.primary, fontWeight: "600" }}>保存</Text>
+            </Pressable>
+          </View>
+          <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
+            <View style={{ backgroundColor: "#F59E0B11", borderRadius: 10, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: "#F59E0B44" }}>
+              <Text style={{ fontSize: 13, color: "#92400E" }}>💡 填入实际盘点到的期末库存量，系统自动计算：消耗 = 期初 + 进货 - 期末。空白表示不修改该款酒。</Text>
+            </View>
+            {items.map((item) => {
+              const entry = monthLedger.find((e) => e.itemId === item.id);
+              const expectedClosing = entry ? entry.openingQty + entry.purchaseQty : 0;
+              const actualVal = stocktakeValues[item.id] ?? "";
+              const actualQty = parseFloat(actualVal) || 0;
+              const consumeQty = actualVal !== "" ? Math.max(0, (entry?.openingQty ?? 0) + (entry?.purchaseQty ?? 0) - actualQty) : null;
+              return (
+                <View key={item.id} style={{ backgroundColor: colors.surface, borderRadius: 12, borderWidth: 1, borderColor: colors.border, padding: 12, marginBottom: 8 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }} numberOfLines={1}>{item.name}</Text>
+                      <Text style={{ fontSize: 11, color: colors.muted }}>{item.category} · 理论期末 {expectedClosing.toFixed(1)} 瓶</Text>
+                    </View>
+                    <TextInput
+                      value={actualVal}
+                      onChangeText={(v) => setStocktakeValues((prev) => ({ ...prev, [item.id]: v }))}
+                      placeholder={String(expectedClosing.toFixed(1))}
+                      placeholderTextColor={colors.muted}
+                      keyboardType="decimal-pad"
+                      style={{ width: 80, borderWidth: 1, borderColor: actualVal !== "" ? "#F59E0B" : colors.border, borderRadius: 8, padding: 8, fontSize: 15, fontWeight: "700", color: colors.foreground, backgroundColor: colors.background, textAlign: "center" }}
+                    />
+                  </View>
+                  {consumeQty !== null && (
+                    <Text style={{ fontSize: 11, color: consumeQty > 0 ? colors.warning : colors.muted }}>
+                      自动测算消耗：{consumeQty.toFixed(1)} 瓶
+                    </Text>
+                  )}
+                </View>
+              );
+            })}
+          </ScrollView>
+        </View>
+      </Modal>
 
     </ScreenContainer>
   );
