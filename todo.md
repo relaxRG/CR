@@ -677,3 +677,43 @@
 - [ ] 新建 app/store/inventory.tsx（进销存页面）
 - [ ] 门店在售清单升级（引用三模块数据）
 - [ ] 门店采购清单升级（供应商+自购链接）
+
+---
+
+## Build 121 — 同步引擎 v2.0 全面升级（2026-08-03）
+
+### ✅ P0 数据安全修复（核心）
+- [x] `flushDirtyKeys` 加锁：`initialSync` 完成前禁止任何推送，防止旧设备/空设备覆盖云端新数据
+- [x] 空设备安全拉取：`localTs=0` 时无条件拉取云端，绝不推送本地空数据
+- [x] `localTs=0` 推送守卫：无时间戳的键在 `flushDirtyKeys` 中跳过推送，重新入队
+- [x] `SYNC_KEYS` 扩展：新增 26 个键，覆盖葡萄酒/餐食/人工成本/月度报表/备用金/营业状况/套餐/经营分析/预支记录
+
+### ✅ P1 合并策略升级
+- [x] 字段级合并：同一条记录两端修改不同字段时各自保留（LWW per field）
+- [x] `ID_LIST_KEYS` 扩展：新增 8 个模块（葡萄酒/餐食/计划/员工/薪资/供应商/货款）
+- [x] 新建 `lib/sync/record-history.ts`：配方/酒款/自制品最近 5 个版本历史
+
+### ✅ P1 各模块 Store 补全
+- [x] `lib/labor/store.tsx`：`usePersisted` hook 升级，5 个键全部接入同步
+- [x] `lib/labor/advance-store.tsx`：预支记录接入同步
+- [x] `lib/wine/store.tsx`：快照键和手动进货键接入同步
+- [x] `lib/store/monthly-summary/store.tsx`：4 个键全部通知同步引擎
+- [x] `lib/store/monthly-report/store.tsx`：接入同步
+- [x] `lib/store/period-analysis/store.tsx`：settings 键补全
+- [x] `lib/menu/package-store.tsx`：套餐接入同步
+- [x] `lib/food/ingredient-store.tsx`：采购记录键接入同步
+
+### ✅ P1 备份系统升级
+- [x] 本地快照：3 → 7 个循环（向后兼容自动扩展）
+- [x] 备份摘要：扩展为全模块统计（葡萄酒/餐食/人工/月报等）
+- [x] 分片存储：>1.5MB 自动分片，防 AsyncStorage 2MB 上限
+
+### ✅ P1 冲突处理升级
+- [x] 冲突弹框显示数据预览（本机 N 条 vs 云端 M 条）
+- [x] 自动推荐：时间更新且数据更多的版本标注「✓推荐」
+- [x] 剩余冲突数量提示
+- [x] `STORAGE_KEY_LABELS` 补全 26 个新模块标签
+
+### ✅ P2 同步日志升级
+- [x] 日志上限：50 → 200 条
+- [x] `sync-log.tsx` 实时刷新：订阅 `subscribeSyncState`，同步时自动更新
