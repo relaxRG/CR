@@ -7,7 +7,8 @@ import React, { createContext, useContext, useEffect, useReducer } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   SpiritItem, SpiritPurchaseRecord, SpiritLedgerEntry,
-  SpiritRefPrice, SpiritSupplierInfo, GROUP_BRAND_KEYWORDS,
+  SpiritRefPrice, SpiritSupplierInfo, SpiritCustomCategory,
+  GROUP_BRAND_KEYWORDS, SPIRIT_CATEGORIES, SPIRIT_CATEGORY_COLORS,
 } from "./types";
 
 const ITEMS_KEY = "spirits.items.v3";
@@ -18,6 +19,8 @@ const SUPPLIERS_KEY = "spirits.suppliers.v1";
 const GROUPS_KEY = "spirits.groups.v1";
 const MATCH_MEMORY_KEY = "spirits.matchMemory.v1";
 const SELF_BUY_CONFIG_KEY = "spirits.selfBuyConfig.v1";
+const CUSTOM_CATEGORIES_KEY = "spirits.customCategories.v1";
+const GROUP_MATCH_MEMORY_KEY = "spirits.groupMatchMemory.v1";
 
 // ─── 工具函数 ─────────────────────────────────────────────────────────────────
 function uuid() {
@@ -86,6 +89,13 @@ export interface PettyMatchMemory {
   confirmedAt: string;
 }
 
+/** 集团匹配记忆：rawName → groupName */
+export interface GroupMatchMemory {
+  rawName: string;
+  groupName: string;
+  confirmedAt: string;
+}
+
 /** 自采配置：哪些备用金分类代码视为酒水自采 */
 export interface SelfBuyConfig {
   /** 勾选的备用金分类代码，如 ["B1", "B2"] */
@@ -134,6 +144,8 @@ interface SpiritsState {
   groups: SpiritGroupDef[];
   matchMemory: PettyMatchMemory[];
   selfBuyConfig: SelfBuyConfig;
+  customCategories: SpiritCustomCategory[];
+  groupMatchMemory: GroupMatchMemory[];
 }
 
 const initial: SpiritsState = {
@@ -142,6 +154,8 @@ const initial: SpiritsState = {
   groups: BUILTIN_GROUPS,
   matchMemory: [],
   selfBuyConfig: DEFAULT_SELF_BUY_CONFIG,
+  customCategories: [],
+  groupMatchMemory: [],
 };
 
 type Action =
@@ -161,8 +175,12 @@ type Action =
   | { type: "DELETE_SUPPLIER"; id: string }
   | { type: "UPSERT_GROUP"; group: SpiritGroupDef }
   | { type: "DELETE_GROUP"; id: string }
+  | { type: "MERGE_GROUP"; fromId: string; toId: string }
   | { type: "SET_MATCH_MEMORY"; memory: PettyMatchMemory }
-  | { type: "UPDATE_SELF_BUY_CONFIG"; config: SelfBuyConfig };
+  | { type: "UPDATE_SELF_BUY_CONFIG"; config: SelfBuyConfig }
+  | { type: "UPSERT_CUSTOM_CATEGORY"; category: SpiritCustomCategory }
+  | { type: "DELETE_CUSTOM_CATEGORY"; id: string }
+  | { type: "SET_GROUP_MATCH_MEMORY"; memory: GroupMatchMemory };
 
 function reducer(state: SpiritsState, action: Action): SpiritsState {
   switch (action.type) {
@@ -215,7 +233,38 @@ function reducer(state: SpiritsState, action: Action): SpiritsState {
       }
       return { ...state, groups: [...state.groups, action.group] };
     }
-    case "DELETE_GROUP": return { ...state, groups: state.groups.filter((g) => g.id !== action.id && !g.builtin) };
+    case "DELETE_GROUP": return { ...state, groups: state.groups.filter((g) => !(g.id === action.id && !g.builtin)) };
+    case "MERGE_GROUP": {
+      const toGroup = state.groups.find((g) => g.id === action.toId);
+      if (!toGroup) return state;
+      const fromGroup = state.groups.find((g) => g.id === action.fromId);
+      if (!fromGroup) return state;
+      const updatedItems = state.items.map((item) =>
+        item.group === fromGroup.name ? { ...item, group: toGroup.name, updatedAt: new Date().toISOString() } : item
+      );
+      const updatedPurchases = state.purchases.map((p) =>
+        p.group === fromGroup.name ? { ...p, group: toGroup.name } : p
+      );
+      const filteredGroups = state.groups.filter((g) => !(g.id === action.fromId && !g.builtin));
+      return { ...state, items: updatedItems, purchases: updatedPurchases, groups: filteredGroups };
+    }
+    case "UPSERT_CUSTOM_CATEGORY": {
+      const idx = state.customCategories.findIndex((c) => c.id === action.category.id);
+      if (idx >= 0) {
+        const next = [...state.customCategories];
+        next[idx] = action.category;
+        return { ...state, customCategories: next };
+      }
+      return { ...state, customCategories: [...state.customCategories, action.category] };
+    }
+    case "DELETE_CUSTOM_CATEGORY": return {
+      ...state,
+      customCategories: state.customCategories.filter((c) => !(c.id === action.id && !c.builtin)),
+    };
+    case "SET_GROUP_MATCH_MEMORY": {
+      const filtered = state.groupMatchMemory.filter((m) => m.rawName !== action.memory.rawName);
+      return { ...state, groupMatchMemory: [...filtered, action.memory] };
+    }
     case "SET_MATCH_MEMORY": {
       const filtered = state.matchMemory.filter((m) => m.description !== action.memory.description);
       return { ...state, matchMemory: [...filtered, action.memory] };
@@ -250,7 +299,15 @@ interface SpiritsContextValue extends SpiritsState {
   // 品牌集团
   upsertGroup: (group: Omit<SpiritGroupDef, "id" | "createdAt"> & { id?: string }) => void;
   deleteGroup: (id: string) => void;
+  mergeGroup: (fromId: string, toId: string) => void;
   getItemGroup: (item: SpiritItem) => string;
+  detectPurchaseGroup: (rawName: string) => string;
+  rememberGroupMatch: (rawName: string, groupName: string) => void;
+  // 自定义分类
+  getAllCategories: () => { name: string; color: string; builtin: boolean; id: string }[];
+  upsertCustomCategory: (data: Omit<SpiritCustomCategory, "id" | "createdAt"> & { id?: string }) => void;
+  deleteCustomCategory: (id: string) => void;
+  getCategoryColor: (catName: string) => string;
   // 备用金匹配记忆
   setMatchMemory: (description: string, itemId: string, itemName: string, confidence: PettyMatchMemory["confidence"]) => void;
   findMatchMemory: (description: string) => PettyMatchMemory | undefined;
@@ -286,23 +343,26 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
       AsyncStorage.getItem(GROUPS_KEY),
       AsyncStorage.getItem(MATCH_MEMORY_KEY),
       AsyncStorage.getItem(SELF_BUY_CONFIG_KEY),
-    ]).then(([itemsRaw, purchasesRaw, ledgerRaw, refPricesRaw, suppliersRaw, groupsRaw, matchMemoryRaw, selfBuyRaw]) => {
+      AsyncStorage.getItem(CUSTOM_CATEGORIES_KEY),
+      AsyncStorage.getItem(GROUP_MATCH_MEMORY_KEY),
+    ]).then(([itemsRaw, purchasesRaw, ledgerRaw, refPricesRaw, suppliersRaw, groupsRaw, matchMemoryRaw, selfBuyRaw, customCatsRaw, groupMatchRaw]) => {
       const items = itemsRaw ? JSON.parse(itemsRaw) : [];
       const purchases = purchasesRaw ? JSON.parse(purchasesRaw) : [];
       const ledger = ledgerRaw ? JSON.parse(ledgerRaw) : [];
       const refPrices = refPricesRaw ? JSON.parse(refPricesRaw) : [];
       const suppliers = suppliersRaw ? JSON.parse(suppliersRaw) : [];
-      // 合并内置集团与用户自定义集团（内置集团以存储版本为准，保留用户修改的关键词）
       const storedGroups: SpiritGroupDef[] = groupsRaw ? JSON.parse(groupsRaw) : [];
       const mergedGroups = BUILTIN_GROUPS.map((bg) => {
         const stored = storedGroups.find((g) => g.id === bg.id);
-        return stored ? { ...bg, keywords: stored.keywords } : bg;
+        return stored ? { ...bg, keywords: stored.keywords, name: stored.name ?? bg.name } : bg;
       });
       const customGroups = storedGroups.filter((g) => !g.builtin);
       const groups = [...mergedGroups, ...customGroups];
       const matchMemory = matchMemoryRaw ? JSON.parse(matchMemoryRaw) : [];
       const selfBuyConfig = selfBuyRaw ? JSON.parse(selfBuyRaw) : DEFAULT_SELF_BUY_CONFIG;
-      dispatch({ type: "LOAD", payload: { items, purchases, ledger, refPrices, suppliers, groups, matchMemory, selfBuyConfig } });
+      const customCategories: SpiritCustomCategory[] = customCatsRaw ? JSON.parse(customCatsRaw) : [];
+      const groupMatchMemory: GroupMatchMemory[] = groupMatchRaw ? JSON.parse(groupMatchRaw) : [];
+      dispatch({ type: "LOAD", payload: { items, purchases, ledger, refPrices, suppliers, groups, matchMemory, selfBuyConfig, customCategories, groupMatchMemory } });
     });
   }, []);
 
@@ -316,6 +376,8 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
     AsyncStorage.setItem(GROUPS_KEY, JSON.stringify(state.groups));
     AsyncStorage.setItem(MATCH_MEMORY_KEY, JSON.stringify(state.matchMemory));
     AsyncStorage.setItem(SELF_BUY_CONFIG_KEY, JSON.stringify(state.selfBuyConfig));
+    AsyncStorage.setItem(CUSTOM_CATEGORIES_KEY, JSON.stringify(state.customCategories));
+    AsyncStorage.setItem(GROUP_MATCH_MEMORY_KEY, JSON.stringify(state.groupMatchMemory));
   }, [state]);
 
   // ── 酒款档案 ──────────────────────────────────────────────────────────────
@@ -427,6 +489,10 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
     dispatch({ type: "DELETE_GROUP", id });
   };
 
+  const mergeGroup = (fromId: string, toId: string) => {
+    dispatch({ type: "MERGE_GROUP", fromId, toId });
+  };
+
   /** 获取酒款所属集团名称 */
   const getItemGroup = (item: SpiritItem): string => {
     if (item.group) return item.group;
@@ -437,6 +503,59 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
       }
     }
     return "独立品牌";
+  };
+
+  const detectPurchaseGroup = (rawName: string): string => {
+    const key = rawName.toLowerCase().trim();
+    const mem = state.groupMatchMemory.find((m) => m.rawName === key);
+    if (mem) return mem.groupName;
+    for (const group of state.groups) {
+      if (group.keywords.some((k) => key.includes(k.toLowerCase()))) return group.name;
+    }
+    return "";
+  };
+
+  const rememberGroupMatch = (rawName: string, groupName: string) => {
+    dispatch({
+      type: "SET_GROUP_MATCH_MEMORY",
+      memory: { rawName: rawName.toLowerCase().trim(), groupName, confirmedAt: new Date().toISOString() },
+    });
+  };
+
+  // ── 自定义分类管理 ───────────────────────────────────────────────────────────────
+  const getAllCategories = (): { name: string; color: string; builtin: boolean; id: string }[] => {
+    const builtinList = (SPIRIT_CATEGORIES as readonly string[]).map((cat) => {
+      const override = state.customCategories.find((c) => c.originalName === cat || c.id === cat);
+      return {
+        id: cat,
+        name: override ? override.name : cat,
+        color: override ? override.color : (SPIRIT_CATEGORY_COLORS[cat] ?? "#6B7280"),
+        builtin: true,
+      };
+    });
+    const customList = state.customCategories
+      .filter((c) => !c.builtin)
+      .map((c) => ({ id: c.id, name: c.name, color: c.color, builtin: false }));
+    return [...builtinList, ...customList];
+  };
+
+  const upsertCustomCategory = (data: Omit<SpiritCustomCategory, "id" | "createdAt"> & { id?: string }) => {
+    const now = new Date().toISOString();
+    const category: SpiritCustomCategory = {
+      ...data,
+      id: data.id ?? uuid(),
+      createdAt: data.id ? (state.customCategories.find((c) => c.id === data.id)?.createdAt ?? now) : now,
+    };
+    dispatch({ type: "UPSERT_CUSTOM_CATEGORY", category });
+  };
+
+  const deleteCustomCategory = (id: string) => {
+    dispatch({ type: "DELETE_CUSTOM_CATEGORY", id });
+  };
+
+  const getCategoryColor = (catName: string): string => {
+    const all = getAllCategories();
+    return all.find((c) => c.name === catName || c.id === catName)?.color ?? "#6B7280";
   };
 
   // ── 备用金匹配记忆 ────────────────────────────────────────────────────────
@@ -614,7 +733,8 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
     upsertLedger, deleteLedger,
     setRefPrice, getRefPrice,
     upsertSupplier, deleteSupplier, getSupplierByName,
-    upsertGroup, deleteGroup, getItemGroup,
+    upsertGroup, deleteGroup, mergeGroup, getItemGroup, detectPurchaseGroup, rememberGroupMatch,
+    getAllCategories, upsertCustomCategory, deleteCustomCategory, getCategoryColor,
     setMatchMemory, findMatchMemory, matchPettyToItem,
     updateSelfBuyConfig,
     getMonthPurchases, getSupplierMonthPurchases, getMonthLedger, getItemLedger,

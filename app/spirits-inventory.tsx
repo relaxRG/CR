@@ -20,7 +20,7 @@ import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
 import {
-  useSpiritsInventoryStore, getCurrentMonth,
+  useSpiritsInventoryStore, getCurrentMonth, SpiritGroupDef,
 } from "@/lib/spirits/crud-store";
 import {
   SpiritItem, SpiritPurchaseRecord, SpiritLedgerEntry,
@@ -66,7 +66,8 @@ export default function SpiritsInventoryScreen() {
     upsertLedger,
     setRefPrice, getRefPrice,
     upsertSupplier, deleteSupplier, getSupplierByName,
-    upsertGroup, deleteGroup, getItemGroup,
+    upsertGroup, deleteGroup, mergeGroup, getItemGroup, detectPurchaseGroup, rememberGroupMatch,
+    getAllCategories, upsertCustomCategory, deleteCustomCategory, getCategoryColor,
     setMatchMemory, matchPettyToItem,
     selfBuyConfig, updateSelfBuyConfig,
     getMonthPurchases, getMonthLedger, getItemLedger,
@@ -915,31 +916,34 @@ export default function SpiritsInventoryScreen() {
 
         {/* 集团管理 */}
         <View style={[S.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[S.cardTitle, { color: colors.foreground }]}>集团管理</Text>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <Text style={[S.cardTitle, { color: colors.foreground, marginBottom: 0 }]}>集团管理</Text>
+            <TouchableOpacity onPress={() => { tap(); setShowGroupManager(true); }}
+              style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 5,
+                backgroundColor: colors.primary + "15", borderRadius: 8 }}>
+              <IconSymbol name="square.and.pencil" size={12} color={colors.primary} />
+              <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "600" }}>管理</Text>
+            </TouchableOpacity>
+          </View>
           {groups.map((g) => (
-            <View key={g.id} style={[S.supplierRow, { borderBottomColor: colors.border }]}>
+            <TouchableOpacity key={g.id}
+              onPress={() => { tap(); setEditingGroup(g); setShowGroupManager(true); }}
+              style={[S.supplierRow, { borderBottomColor: colors.border }]}>
               <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: g.color, marginRight: 8 }} />
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>{g.name}</Text>
                 <Text style={{ fontSize: 11, color: colors.muted }} numberOfLines={1}>
-                  {g.keywords.slice(0, 5).join(" · ")}
+                  {g.keywords.slice(0, 6).join(" · ")}
                 </Text>
               </View>
-              <TouchableOpacity onPress={() => {
-                tap();
-                Alert.alert(g.name, "选择操作", [
-                  ...(g.builtin ? [] : [{ text: "删除集团", style: "destructive" as const, onPress: () => deleteGroup(g.id) }]),
-                  { text: "取消", style: "cancel" },
-                ]);
-              }}>
-                <IconSymbol name="ellipsis" size={16} color={colors.muted} />
-              </TouchableOpacity>
-            </View>
+              <View style={{ alignItems: "flex-end" }}>
+                <Text style={{ fontSize: 10, color: colors.muted }}>{g.keywords.length} 个关键词</Text>
+                {!g.builtin && <Text style={{ fontSize: 9, color: "#10B981" }}>自定义</Text>}
+              </View>
+            </TouchableOpacity>
           ))}
-          <TouchableOpacity onPress={() => {
-            tap();
-            Alert.alert("新增集团", "功能开发中，请联系开发者");
-          }} style={[S.actionBtn, { marginTop: 8, borderColor: colors.border }]}>
+          <TouchableOpacity onPress={() => { tap(); setEditingGroup(null); setShowGroupManager(true); }}
+            style={[S.actionBtn, { marginTop: 8, borderColor: colors.border }]}>
             <IconSymbol name="plus" size={13} color={colors.primary} />
             <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "600" }}>新增集团</Text>
           </TouchableOpacity>
@@ -1122,6 +1126,7 @@ export default function SpiritsInventoryScreen() {
           visible={showAddItem || showItemForm}
           item={editingItem}
           colors={colors}
+          allCategories={getAllCategories()}
           onSave={(data) => {
             if (editingItem) updateItem(editingItem.id, data);
             else addItem(data);
@@ -1273,6 +1278,14 @@ function SupplierDetailScreen({
   const [importPreviewSource, setImportPreviewSource] = useState<"excel" | "pdf">("excel");
   // 商品名点击预览卡片
   const [previewItem, setPreviewItem] = useState<SpiritItem | null>(null);
+  // 未匹配商品操作 Modal
+  const [unmatchedPurchase, setUnmatchedPurchase] = useState<SpiritPurchaseRecord | null>(null);
+  const [showUnmatchedModal, setShowUnmatchedModal] = useState(false);
+  // 集团管理 Modal
+  const [showGroupManager, setShowGroupManager] = useState(false);
+  const [editingGroup, setEditingGroup] = useState<SpiritGroupDef | null>(null);
+  // 分类管理 Modal
+  const [showCategoryManager, setShowCategoryManager] = useState(false);
   // 批量修改供应商 Modal
   const [showBatchSupplier, setShowBatchSupplier] = useState(false);
   const [batchSupplierInput, setBatchSupplierInput] = useState("");
@@ -1509,6 +1522,7 @@ function SupplierDetailScreen({
                 <Text style={[S.thCell, { width: 36 }]}>行号</Text>
                 <Text style={[S.thCell, { width: 90 }]}>日期</Text>
                 <Text style={[S.thCell, { width: 180 }]}>商品名称</Text>
+                <Text style={[S.thCell, { width: 80 }]}>集团</Text>
                 <Text style={[S.thCell, { width: 40 }]}>规格</Text>
                 <Text style={[S.thCell, { width: 50 }]}>数量</Text>
                 <Text style={[S.thCell, { width: 70 }]}>单价</Text>
@@ -1519,6 +1533,10 @@ function SupplierDetailScreen({
                 const item = items.find((i) => i.id === p.itemId);
                 const refPrice = item ? getRefPrice(item.id, month) : 0;
                 const priceDiff = refPrice > 0 ? p.unitPrice - refPrice : 0;
+                const priceDiffPct = refPrice > 0 ? Math.abs(priceDiff / refPrice * 100) : 0;
+                const isPriceAlert = refPrice > 0 && priceDiffPct > (item?.priceAlertPct ?? 30);
+                // 集团归属：优先用记录上的 group 字段，否则实时检测
+                const purchaseGroup = p.group || detectPurchaseGroup(p.rawName) || (item ? getItemGroup(item) : "");
                 const isSelected = selectedIds.has(p.id);
                 return (
                   <TouchableOpacity key={p.id}
@@ -1559,27 +1577,81 @@ function SupplierDetailScreen({
                           const matched = items.find((i) => i.id === p.itemId) ??
                             items.find((i) => i.name === p.rawName || i.nameEn === p.rawName ||
                               p.rawName.includes(i.name) || (i.nameEn && p.rawName.includes(i.nameEn)));
-                          if (matched) setPreviewItem(matched);
-                          else Alert.alert("提示", `「${p.rawName}」尚未匹配到库存酒款档案`);
+                          if (matched) {
+                            setPreviewItem(matched);
+                          } else {
+                            // 弹出操作卡片：从现有酒款选择 / 新建酒款档案
+                            setUnmatchedPurchase(p);
+                            setShowUnmatchedModal(true);
+                          }
                         } else {
                           toggleSelect(p.id);
                         }
                       }}>
-                      <Text style={{ fontSize: 11, color: colors.foreground }} numberOfLines={2}>{p.rawName}</Text>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                        <Text style={{ fontSize: 11, color: colors.foreground, flex: 1 }} numberOfLines={2}>{p.rawName}</Text>
+                        {!p.itemId && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: "#F59E0B" }} />}
+                      </View>
+                    </TouchableOpacity>
+                    {/* 集团列 */}
+                    <TouchableOpacity style={[S.tdCell, { width: 80 }]}
+                      onPress={() => {
+                        if (selectMode) return;
+                        tap();
+                        // 弹出集团选择器
+                        const groupNames = groups.map((g) => g.name);
+                        Alert.alert(
+                          "设置集团归属",
+                          `「${p.rawName}」`,
+                          [
+                            ...groupNames.map((gn) => ({
+                              text: gn,
+                              onPress: () => {
+                                updatePurchase(p.id, { group: gn });
+                                rememberGroupMatch(p.rawName, gn);
+                              },
+                            })),
+                            { text: "清除", style: "destructive" as const, onPress: () => updatePurchase(p.id, { group: undefined }) },
+                            { text: "取消", style: "cancel" as const },
+                          ]
+                        );
+                      }}>
+                      {purchaseGroup ? (
+                        <View style={{ backgroundColor: (groups.find((g) => g.name === purchaseGroup)?.color ?? "#6B7280") + "20",
+                          borderRadius: 6, paddingHorizontal: 4, paddingVertical: 2 }}>
+                          <Text style={{ fontSize: 9, fontWeight: "700",
+                            color: groups.find((g) => g.name === purchaseGroup)?.color ?? "#6B7280" }}
+                            numberOfLines={2}>
+                            {purchaseGroup.replace(/ \(.*\)/, "")}
+                          </Text>
+                        </View>
+                      ) : (
+                        <Text style={{ fontSize: 9, color: "#F59E0B", fontWeight: "600" }}>待填</Text>
+                      )}
                     </TouchableOpacity>
                     <Text style={[S.tdCell, { width: 40, textAlign: "center", fontSize: 11, color: colors.muted }]}>{p.unit}</Text>
                     <Text style={[S.tdCell, { width: 50, textAlign: "right", fontSize: 11, color: colors.foreground }]}>{p.quantity}</Text>
                     <View style={[S.tdCell, { width: 70, alignItems: "flex-end" }]}>
-                      <Text style={{ fontSize: 11, color: colors.foreground }}>¥{p.unitPrice.toFixed(2)}</Text>
-                      {priceDiff !== 0 && (
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
+                        {isPriceAlert && <Text style={{ fontSize: 9 }}>⚠️</Text>}
+                        <Text style={{ fontSize: 11, color: isPriceAlert ? "#F59E0B" : colors.foreground, fontWeight: isPriceAlert ? "700" : "400" }}>
+                          ¥{p.unitPrice.toFixed(0)}
+                        </Text>
+                      </View>
+                      {priceDiff !== 0 && refPrice > 0 && (
                         <Text style={{ fontSize: 9, fontWeight: "700", color: priceDiff > 0 ? "#EF4444" : "#10B981" }}>
-                          {priceDiff > 0 ? "↑" : "↓"}¥{Math.abs(priceDiff).toFixed(0)}
+                          {priceDiff > 0 ? "↑" : "↓"}¥{Math.abs(priceDiff).toFixed(0)}({priceDiffPct.toFixed(0)}%)
                         </Text>
                       )}
                     </View>
-                    <Text style={[S.tdCell, { width: 80, textAlign: "right", fontSize: 12, fontWeight: "700", color: "#EF4444" }]}>
-                      ¥{p.amount.toFixed(1)}
-                    </Text>
+                    <View style={[S.tdCell, { width: 80, alignItems: "flex-end" }]}>
+                      <Text style={{ fontSize: 12, fontWeight: "700", color: "#EF4444" }}>¥{p.amount.toFixed(0)}</Text>
+                      {priceDiff !== 0 && refPrice > 0 && (
+                        <Text style={{ fontSize: 9, fontWeight: "700", color: priceDiff > 0 ? "#EF4444" : "#10B981" }}>
+                          {priceDiff > 0 ? "↑" : "↓"}¥{Math.abs(priceDiff * p.quantity).toFixed(0)}
+                        </Text>
+                      )}
+                    </View>
                   </TouchableOpacity>
                 );
               })}
@@ -1589,13 +1661,14 @@ function SupplierDetailScreen({
                 <Text style={[S.tdCell, { width: 36 }]} />
                 <Text style={[S.tdCell, { width: 90 }]} />
                 <Text style={[S.tdCell, { width: 180, fontWeight: "700", color: "#991B1B", fontSize: 12 }]}>合计</Text>
+                <Text style={[S.tdCell, { width: 80 }]} />
                 <Text style={[S.tdCell, { width: 40 }]} />
                 <Text style={[S.tdCell, { width: 50, textAlign: "right", fontWeight: "700", color: "#991B1B", fontSize: 11 }]}>
                   {supPurchases.reduce((s, p) => s + p.quantity, 0)}
                 </Text>
                 <Text style={[S.tdCell, { width: 70 }]} />
                 <Text style={[S.tdCell, { width: 80, textAlign: "right", fontWeight: "700", color: "#991B1B", fontSize: 12 }]}>
-                  ¥{totalAmt.toFixed(1)}
+                  ¥{totalAmt.toFixed(0)}
                 </Text>
               </View>
             </View>
@@ -1775,6 +1848,111 @@ function SupplierDetailScreen({
         </View>
       </Modal>
 
+      {/* 未匹配商品操作 Modal */}
+      {showUnmatchedModal && unmatchedPurchase && (
+        <Modal visible={showUnmatchedModal} transparent animationType="slide">
+          <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.5)" }}>
+            <View style={{ backgroundColor: colors.background, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 32 }}>
+              <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: "center", marginBottom: 16 }} />
+              <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 4 }}>
+                未匹配到酒款档案
+              </Text>
+              <Text style={{ fontSize: 13, color: colors.muted, marginBottom: 20 }} numberOfLines={2}>
+                「{unmatchedPurchase.rawName}」
+              </Text>
+              {/* 操作选项 */}
+              {[
+                {
+                  icon: "magnifyingglass",
+                  title: "从现有酒款中选择匹配",
+                  desc: "将此条进货记录关联到已有酒款档案",
+                  color: "#3B82F6",
+                  onPress: () => {
+                    setShowUnmatchedModal(false);
+                    // 弹出酒款选择器
+                    Alert.alert(
+                      "选择匹配酒款",
+                      "请选择要关联的酒款档案",
+                      [
+                        ...items.slice(0, 8).map((it) => ({
+                          text: it.name,
+                          onPress: () => {
+                            updatePurchase(unmatchedPurchase.id, { itemId: it.id });
+                            setMatchMemory(unmatchedPurchase.rawName, it.id, it.name, "manual");
+                            syncLedgerFromPurchases(month);
+                            Alert.alert("匹配成功", `「${unmatchedPurchase.rawName}」 → 「${it.name}」`);
+                          },
+                        })),
+                        { text: "取消", style: "cancel" as const },
+                      ]
+                    );
+                  },
+                },
+                {
+                  icon: "plus.circle.fill",
+                  title: "新建酒款档案",
+                  desc: "以此名称创建新的酒款档案并关联",
+                  color: "#10B981",
+                  onPress: () => {
+                    setShowUnmatchedModal(false);
+                    // 预填名称，弹出新建表单
+                    const newItem = addItem({
+                      name: unmatchedPurchase.rawName,
+                      category: "Other",
+                      unit: unmatchedPurchase.unit || "瓶",
+                      refPrice: unmatchedPurchase.unitPrice,
+                      supplier: unmatchedPurchase.supplier,
+                      active: true,
+                    });
+                    updatePurchase(unmatchedPurchase.id, { itemId: newItem.id });
+                    setMatchMemory(unmatchedPurchase.rawName, newItem.id, newItem.name, "manual");
+                    syncLedgerFromPurchases(month);
+                    Alert.alert(
+                      "新建成功 ✅",
+                      `「${newItem.name}」已加入酒款档案并关联到该进货记录。\n\n可在「库存管理」 Tab 编辑分类和详细信息。`
+                    );
+                  },
+                },
+                {
+                  icon: "xmark.circle",
+                  title: "跳过，不关联",
+                  desc: "保留此条记录不关联到酒款档案",
+                  color: colors.muted,
+                  onPress: () => setShowUnmatchedModal(false),
+                },
+              ].map((opt, i) => (
+                <TouchableOpacity key={i} onPress={() => { tap(); opt.onPress(); }}
+                  style={{ flexDirection: "row", alignItems: "center", gap: 14, padding: 14,
+                    backgroundColor: colors.surface, borderRadius: 14, marginBottom: 10,
+                    borderWidth: 1, borderColor: colors.border }}>
+                  <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: opt.color + "20",
+                    alignItems: "center", justifyContent: "center" }}>
+                    <IconSymbol name={opt.icon as any} size={20} color={opt.color} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>{opt.title}</Text>
+                    <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>{opt.desc}</Text>
+                  </View>
+                  <IconSymbol name="chevron.right" size={14} color={colors.muted} />
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* 集团管理 Modal */}
+      <GroupManagerModal
+        visible={showGroupManager}
+        groups={groups}
+        editingGroup={editingGroup}
+        colors={colors}
+        onUpsert={upsertGroup}
+        onDelete={deleteGroup}
+        onMerge={mergeGroup}
+        onClose={() => { setShowGroupManager(false); setEditingGroup(null); }}
+      />
+
       {/* Excel/PDF 导入预览 Modal */}
       {showImportPreview && (
         <ImportPreviewModal
@@ -1790,6 +1968,8 @@ function SupplierDetailScreen({
               date: r.date,
               rawName: r.rawName,
               itemId: undefined as string | undefined,
+              // 导入时自动检测集团
+              group: detectPurchaseGroup(r.rawName) || undefined,
               supplier,
               quantity: r.quantity,
               unit: r.unit,
@@ -1809,14 +1989,15 @@ function SupplierDetailScreen({
 }
 
 // ─── 酒款表单 Modal ────────────────────────────────────────────────────────────
-function ItemFormModal({ visible, item, colors, onSave, onClose }: {
+function ItemFormModal({ visible, item, colors, allCategories, onSave, onClose }: {
   visible: boolean; item: SpiritItem | null; colors: any;
+  allCategories: { name: string; color: string; builtin: boolean; id: string }[];
   onSave: (data: Omit<SpiritItem, "id" | "createdAt" | "updatedAt">) => void;
   onClose: () => void;
 }) {
   const [name, setName] = useState(item?.name ?? "");
   const [nameEn, setNameEn] = useState(item?.nameEn ?? "");
-  const [category, setCategory] = useState(item?.category ?? SPIRIT_CATEGORIES[0]);
+  const [category, setCategory] = useState(item?.category ?? (allCategories[0]?.name ?? "Other"));
   const [unit, setUnit] = useState(item?.unit ?? "瓶");
   const [refPrice, setRefPrice] = useState(String(item?.refPrice ?? ""));
   const [supplier, setSupplier] = useState(item?.supplier ?? "");
@@ -1826,7 +2007,7 @@ function ItemFormModal({ visible, item, colors, onSave, onClose }: {
       setName(item.name); setNameEn(item.nameEn ?? ""); setCategory(item.category);
       setUnit(item.unit); setRefPrice(String(item.refPrice)); setSupplier(item.supplier ?? "");
     } else {
-      setName(""); setNameEn(""); setCategory(SPIRIT_CATEGORIES[0]); setUnit("瓶"); setRefPrice(""); setSupplier("");
+      setName(""); setNameEn(""); setCategory(allCategories[0]?.name ?? "Other"); setUnit("瓶"); setRefPrice(""); setSupplier("");
     }
   }, [item, visible]);
 
@@ -1858,10 +2039,10 @@ function ItemFormModal({ visible, item, colors, onSave, onClose }: {
               <Text style={{ fontSize: 13, color: colors.muted, marginBottom: 6 }}>分类</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginBottom: 14 }}
                 contentContainerStyle={{ gap: 8, paddingVertical: 4, alignItems: "center" }}>
-                {SPIRIT_CATEGORIES.map((cat) => (
-                  <TouchableOpacity key={cat} onPress={() => setCategory(cat)}
-                    style={[S.catChip, { backgroundColor: category === cat ? catColor(cat) : colors.surface, borderColor: catColor(cat) }]}>
-                    <Text style={{ fontSize: 11, color: category === cat ? "#fff" : catColor(cat), fontWeight: "600" }}>{cat}</Text>
+                {allCategories.map((cat) => (
+                  <TouchableOpacity key={cat.id} onPress={() => setCategory(cat.name)}
+                    style={[S.catChip, { backgroundColor: category === cat.name ? cat.color : colors.surface, borderColor: cat.color }]}>
+                    <Text style={{ fontSize: 11, color: category === cat.name ? "#fff" : cat.color, fontWeight: "600" }}>{cat.name}</Text>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
@@ -2551,6 +2732,218 @@ function ImportPreviewModal({
             </TouchableOpacity>
           </View>
         )}
+      </View>
+    </Modal>
+  );
+}
+
+// ─── 集团管理 Modal ────────────────────────────────────────────────────────────
+function GroupManagerModal({ visible, groups, editingGroup, colors, onUpsert, onDelete, onMerge, onClose }: {
+  visible: boolean;
+  groups: SpiritGroupDef[];
+  editingGroup: SpiritGroupDef | null;
+  colors: any;
+  onUpsert: (data: Omit<SpiritGroupDef, "id" | "createdAt"> & { id?: string }) => void;
+  onDelete: (id: string) => void;
+  onMerge: (fromId: string, toId: string) => void;
+  onClose: () => void;
+}) {
+  const [mode, setMode] = useState<"list" | "edit">("list");
+  const [editId, setEditId] = useState<string | undefined>(undefined);
+  const [editName, setEditName] = useState("");
+  const [editColor, setEditColor] = useState("#6B7280");
+  const [editBuiltin, setEditBuiltin] = useState(false);
+  const [keywords, setKeywords] = useState<string[]>([]);
+  const [newKeyword, setNewKeyword] = useState("");
+
+  const PRESET_COLORS = ["#1D4ED8","#DC2626","#7C3AED","#92400E","#B45309","#059669","#0891B2","#BE185D","#6B7280","#EF4444","#10B981","#F59E0B"];
+
+  React.useEffect(() => {
+    if (editingGroup) {
+      setMode("edit");
+      setEditId(editingGroup.id);
+      setEditName(editingGroup.name);
+      setEditColor(editingGroup.color);
+      setEditBuiltin(editingGroup.builtin);
+      setKeywords([...editingGroup.keywords]);
+    } else {
+      setMode("list");
+      setEditId(undefined);
+      setEditName("");
+      setEditColor("#6B7280");
+      setEditBuiltin(false);
+      setKeywords([]);
+    }
+  }, [editingGroup, visible]);
+
+  const startNew = () => {
+    setMode("edit");
+    setEditId(undefined);
+    setEditName("");
+    setEditColor("#6B7280");
+    setEditBuiltin(false);
+    setKeywords([]);
+  };
+
+  const handleSave = () => {
+    if (!editName.trim()) { Alert.alert("提示", "请填写集团名称"); return; }
+    onUpsert({ id: editId, name: editName.trim(), color: editColor, keywords, builtin: editBuiltin });
+    setMode("list");
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide">
+      <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.5)" }}>
+        <View style={{ backgroundColor: colors.background, borderTopLeftRadius: 24, borderTopRightRadius: 24,
+          maxHeight: "92%", paddingBottom: 20 }}>
+          {/* 标题栏 */}
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center",
+            padding: 20, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
+            <TouchableOpacity onPress={() => mode === "edit" ? setMode("list") : onClose()}>
+              <Text style={{ fontSize: 15, color: "#EF4444", fontWeight: "600" }}>
+                {mode === "edit" ? "← 返回" : "关闭"}
+              </Text>
+            </TouchableOpacity>
+            <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground }}>
+              {mode === "list" ? "集团管理" : (editId ? "编辑集团" : "新增集团")}
+            </Text>
+            {mode === "list" ? (
+              <TouchableOpacity onPress={startNew}>
+                <IconSymbol name="plus" size={20} color={colors.primary} />
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity onPress={handleSave}>
+                <Text style={{ fontSize: 15, color: "#10B981", fontWeight: "700" }}>保存</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+            {mode === "list" ? (
+              // 集团列表
+              groups.map((g) => (
+                <View key={g.id} style={{ flexDirection: "row", alignItems: "center", gap: 12,
+                  padding: 14, backgroundColor: colors.surface, borderRadius: 14, marginBottom: 10,
+                  borderWidth: 1, borderColor: colors.border }}>
+                  <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: g.color }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>{g.name}</Text>
+                    <Text style={{ fontSize: 11, color: colors.muted }} numberOfLines={1}>
+                      {g.keywords.slice(0, 5).join(" · ")}
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: "row", gap: 8 }}>
+                    <TouchableOpacity onPress={() => {
+                      setMode("edit");
+                      setEditId(g.id);
+                      setEditName(g.name);
+                      setEditColor(g.color);
+                      setEditBuiltin(g.builtin);
+                      setKeywords([...g.keywords]);
+                    }} style={{ padding: 6, backgroundColor: colors.primary + "15", borderRadius: 8 }}>
+                      <IconSymbol name="pencil" size={14} color={colors.primary} />
+                    </TouchableOpacity>
+                    {!g.builtin && (
+                      <TouchableOpacity onPress={() => {
+                        Alert.alert("删除集团", `确认删除「${g.name}」？`, [
+                          { text: "取消", style: "cancel" },
+                          { text: "删除", style: "destructive", onPress: () => { onDelete(g.id); } },
+                        ]);
+                      }} style={{ padding: 6, backgroundColor: "#EF444415", borderRadius: 8 }}>
+                        <IconSymbol name="trash" size={14} color="#EF4444" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              ))
+            ) : (
+              // 编辑表单
+              <>
+                {/* 集团名称 */}
+                <Text style={{ fontSize: 13, color: colors.muted, marginBottom: 6 }}>集团名称</Text>
+                <TextInput
+                  style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 12,
+                    color: colors.foreground, backgroundColor: colors.surface, fontSize: 14, marginBottom: 16 }}
+                  value={editName}
+                  onChangeText={setEditName}
+                  placeholder="如：保乐力加 (Pernod Ricard)"
+                  placeholderTextColor={colors.muted}
+                />
+                {/* 颜色选择 */}
+                <Text style={{ fontSize: 13, color: colors.muted, marginBottom: 8 }}>标识颜色</Text>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
+                  {PRESET_COLORS.map((c) => (
+                    <TouchableOpacity key={c} onPress={() => setEditColor(c)}
+                      style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: c,
+                        borderWidth: editColor === c ? 3 : 0, borderColor: "#fff",
+                        shadowColor: editColor === c ? c : "transparent", shadowOpacity: 0.6, shadowRadius: 4, elevation: 3 }} />
+                  ))}
+                </View>
+                {/* 品牌关键词 */}
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <Text style={{ fontSize: 13, color: colors.muted }}>品牌关键词（{keywords.length} 个）</Text>
+                  <TouchableOpacity onPress={() => {
+                    Alert.alert("批量删除", "确认清空所有关键词？", [
+                      { text: "取消", style: "cancel" },
+                      { text: "清空", style: "destructive", onPress: () => setKeywords([]) },
+                    ]);
+                  }}>
+                    <Text style={{ fontSize: 11, color: "#EF4444" }}>清空全部</Text>
+                  </TouchableOpacity>
+                </View>
+                {/* 关键词 Chips */}
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+                  {keywords.map((kw, i) => (
+                    <TouchableOpacity key={i} onPress={() => setKeywords(keywords.filter((_, j) => j !== i))}
+                      style={{ flexDirection: "row", alignItems: "center", gap: 4,
+                        backgroundColor: editColor + "20", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5,
+                        borderWidth: 1, borderColor: editColor + "60" }}>
+                      <Text style={{ fontSize: 12, color: editColor, fontWeight: "600" }}>{kw}</Text>
+                      <IconSymbol name="xmark" size={10} color={editColor} />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                {/* 新增关键词输入 */}
+                <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
+                  <TextInput
+                    style={{ flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 10,
+                      color: colors.foreground, backgroundColor: colors.surface, fontSize: 13 }}
+                    value={newKeyword}
+                    onChangeText={setNewKeyword}
+                    placeholder="输入品牌名或关键词，如：tanqueray"
+                    placeholderTextColor={colors.muted}
+                    onSubmitEditing={() => {
+                      if (newKeyword.trim() && !keywords.includes(newKeyword.trim())) {
+                        setKeywords([...keywords, newKeyword.trim().toLowerCase()]);
+                        setNewKeyword("");
+                      }
+                    }}
+                  />
+                  <TouchableOpacity onPress={() => {
+                    if (newKeyword.trim() && !keywords.includes(newKeyword.trim())) {
+                      setKeywords([...keywords, newKeyword.trim().toLowerCase()]);
+                      setNewKeyword("");
+                    }
+                  }} style={{ padding: 10, backgroundColor: editColor, borderRadius: 10, alignItems: "center", justifyContent: "center" }}>
+                    <IconSymbol name="plus" size={16} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+                {/* 删除集团（非内置） */}
+                {editId && !editBuiltin && (
+                  <TouchableOpacity onPress={() => {
+                    Alert.alert("删除集团", `确认删除「${editName}」？此操作不可撤销。`, [
+                      { text: "取消", style: "cancel" },
+                      { text: "删除", style: "destructive", onPress: () => { onDelete(editId); onClose(); } },
+                    ]);
+                  }} style={{ padding: 14, backgroundColor: "#FEF2F2", borderRadius: 12, alignItems: "center",
+                    borderWidth: 1, borderColor: "#FECACA", marginTop: 8 }}>
+                    <Text style={{ fontSize: 14, color: "#EF4444", fontWeight: "700" }}>删除此集团</Text>
+                  </TouchableOpacity>
+                )}
+              </>
+            )}
+          </ScrollView>
+        </View>
       </View>
     </Modal>
   );
