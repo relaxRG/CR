@@ -32,6 +32,7 @@ import {
 import { parseSpiritInventoryExcel } from "@/lib/spirits/excel-parser";
 import { SpiritMonthlySnapshot, SpiritInventoryItem, SpiritPriceChange } from "@/lib/spirits/types";
 import { normalizeLLMRows } from "@/lib/spirits/pdf-import";
+import { exportToExcel, exportToPdf, ExportData } from "@/lib/spirits/export";
 import { usePettyCashStore } from "@/lib/store/petty-store";
 import { getApiBaseUrl } from "@/constants/oauth";
 import * as Auth from "@/lib/_core/auth";
@@ -110,6 +111,33 @@ export default function SpiritsInventoryScreen() {
   // ── 总结 Tab ────────────────────────────────────────────────────────────────
   const [showComparison, setShowComparison] = useState(false);
   const [chartDimension, setChartDimension] = useState<"category" | "group" | "supplier">("category");
+  const [exporting, setExporting] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+
+  const handleExport = async (format: "excel" | "pdf") => {
+    setShowExportMenu(false);
+    setExporting(true);
+    try {
+      const exportData: ExportData = {
+        month: selectedMonth,
+        items,
+        purchases,
+        ledger,
+        getRefPrice,
+        categorySummary,
+        supplierSummary,
+      };
+      if (format === "excel") {
+        await exportToExcel(exportData);
+      } else {
+        await exportToPdf(exportData);
+      }
+    } catch (e) {
+      Alert.alert("导出失败", String(e));
+    } finally {
+      setExporting(false);
+    }
+  };
 
   // 进货汇总表（每款酒 × 每供应商 2 列）
   const purchaseSummaryRows = useMemo(() => {
@@ -160,6 +188,28 @@ export default function SpiritsInventoryScreen() {
 
   const renderSummary = () => (
     <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }}>
+      {/* 导出按鈕行 */}
+      <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>
+        <TouchableOpacity
+          onPress={() => handleExport("excel")}
+          disabled={exporting}
+          style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+            paddingVertical: 10, borderRadius: 12, borderWidth: 1,
+            backgroundColor: "#F0FDF4", borderColor: "#86EFAC" }}>
+          {exporting ? <ActivityIndicator size="small" color="#16A34A" /> : <IconSymbol name="square.and.arrow.up" size={14} color="#16A34A" />}
+          <Text style={{ fontSize: 13, color: "#16A34A", fontWeight: "700" }}>Excel 导出</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => handleExport("pdf")}
+          disabled={exporting}
+          style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+            paddingVertical: 10, borderRadius: 12, borderWidth: 1,
+            backgroundColor: "#FEF2F2", borderColor: "#FECACA" }}>
+          {exporting ? <ActivityIndicator size="small" color="#EF4444" /> : <IconSymbol name="doc.fill" size={14} color="#EF4444" />}
+          <Text style={{ fontSize: 13, color: "#EF4444", fontWeight: "700" }}>PDF 导出</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* 核心指标卡 */}
       <View style={[S.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <Text style={[S.cardTitle, { color: colors.foreground }]}>
