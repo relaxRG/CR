@@ -301,7 +301,9 @@ export interface SpiritItem {
   supplier?: string;
   spec?: string;
   active: boolean;
-  /** 价格异常阈值（%），进货单价偏差超过此值时标记异常，默认 30 */
+  /** 价格异常阈值（%），进货单价偏差超过此值时标记异常。
+   * 默认为 0，即只要有涨跌（哪怕 1%）就显示涨跌金额和百分比。
+   * 设置为 30 则仅当偏差超过 30% 时才标记异常。 */
   priceAlertPct?: number;
   createdAt: string;
   updatedAt: string;

@@ -1534,7 +1534,7 @@ function SupplierDetailScreen({
                 const refPrice = item ? getRefPrice(item.id, month) : 0;
                 const priceDiff = refPrice > 0 ? p.unitPrice - refPrice : 0;
                 const priceDiffPct = refPrice > 0 ? Math.abs(priceDiff / refPrice * 100) : 0;
-                const isPriceAlert = refPrice > 0 && priceDiffPct > (item?.priceAlertPct ?? 30);
+                const isPriceAlert = refPrice > 0 && priceDiffPct > (item?.priceAlertPct ?? 0);
                 // 集团归属：优先用记录上的 group 字段，否则实时检测
                 const purchaseGroup = p.group || detectPurchaseGroup(p.rawName) || (item ? getItemGroup(item) : "");
                 const isSelected = selectedIds.has(p.id);
@@ -2001,13 +2001,15 @@ function ItemFormModal({ visible, item, colors, allCategories, onSave, onClose }
   const [unit, setUnit] = useState(item?.unit ?? "瓶");
   const [refPrice, setRefPrice] = useState(String(item?.refPrice ?? ""));
   const [supplier, setSupplier] = useState(item?.supplier ?? "");
+  const [priceAlertPct, setPriceAlertPct] = useState(String(item?.priceAlertPct ?? ""));
 
   React.useEffect(() => {
     if (item) {
       setName(item.name); setNameEn(item.nameEn ?? ""); setCategory(item.category);
       setUnit(item.unit); setRefPrice(String(item.refPrice)); setSupplier(item.supplier ?? "");
+      setPriceAlertPct(item.priceAlertPct != null ? String(item.priceAlertPct) : "");
     } else {
-      setName(""); setNameEn(""); setCategory(allCategories[0]?.name ?? "Other"); setUnit("瓶"); setRefPrice(""); setSupplier("");
+      setName(""); setNameEn(""); setCategory(allCategories[0]?.name ?? "Other"); setUnit("瓶"); setRefPrice(""); setSupplier(""); setPriceAlertPct("");
     }
   }, [item, visible]);
 
@@ -2026,6 +2028,7 @@ function ItemFormModal({ visible, item, colors, allCategories, onSave, onClose }
                 { label: "单位", value: unit, onChange: setUnit, placeholder: "瓶/箱/cl" },
                 { label: "参考单价", value: refPrice, onChange: setRefPrice, placeholder: "¥", keyboardType: "decimal-pad" as const },
                 { label: "供应商", value: supplier, onChange: setSupplier, placeholder: "如：至缘" },
+                { label: "价格预警阈值 (%)", value: priceAlertPct, onChange: setPriceAlertPct, placeholder: "默认 0，即只要有涨跌就提示", keyboardType: "decimal-pad" as const },
               ].map((f) => (
                 <View key={f.label} style={{ marginBottom: 14 }}>
                   <Text style={{ fontSize: 13, color: colors.muted, marginBottom: 6 }}>{f.label}</Text>
@@ -2053,7 +2056,8 @@ function ItemFormModal({ visible, item, colors, allCategories, onSave, onClose }
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => {
                   if (!name.trim()) { Alert.alert("提示", "请填写中文名"); return; }
-                  onSave({ name: name.trim(), nameEn: nameEn.trim() || undefined, category, unit, refPrice: parseFloat(refPrice) || 0, supplier: supplier.trim() || undefined, active: true });
+                  const alertPct = priceAlertPct.trim() !== "" ? parseFloat(priceAlertPct) : undefined;
+                  onSave({ name: name.trim(), nameEn: nameEn.trim() || undefined, category, unit, refPrice: parseFloat(refPrice) || 0, supplier: supplier.trim() || undefined, priceAlertPct: alertPct, active: true });
                   onClose();
                 }} style={{ flex: 1, padding: 14, backgroundColor: "#EF4444", borderRadius: 12, alignItems: "center" }}>
                   <Text style={{ fontSize: 15, color: "#fff", fontWeight: "700" }}>保存</Text>
