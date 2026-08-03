@@ -79,7 +79,22 @@ export default function SpiritsInventoryScreen() {
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [activeSupplier, setActiveSupplier] = useState<string | null>(null);
 
-  const availableMonths = useMemo(() => getAvailableMonths(), [purchases, ledger]);
+  // 月份列表：有数据的历史月份 + 当前月往前12个月，去重后最多显示24个
+  const availableMonths = useMemo(() => {
+    const dataMonths = getAvailableMonths(); // 有数据的月份
+    // 生成当前月往前12个月的列表
+    const cur = getCurrentMonth();
+    const [cy, cm] = cur.split("-").map(Number);
+    const recentMonths: string[] = [];
+    for (let i = 0; i < 12; i++) {
+      let my = cy, mm = cm - i;
+      if (mm <= 0) { my -= 1; mm += 12; }
+      recentMonths.push(`${my}-${String(mm).padStart(2, "0")}`);
+    }
+    // 合并：有数据的月份优先，再加上近12个月，去重、降序、最多24个
+    const merged = [...new Set([...dataMonths, ...recentMonths])].sort().reverse().slice(0, 24);
+    return merged;
+  }, [purchases, ledger]);
   const monthPurchases = useMemo(() => getMonthPurchases(selectedMonth), [purchases, selectedMonth]);
   const monthLedger = useMemo(() => getMonthLedger(selectedMonth), [ledger, selectedMonth]);
 
@@ -941,21 +956,44 @@ export default function SpiritsInventoryScreen() {
       {/* 月份选择 Modal */}
       <Modal visible={showMonthPicker} transparent animationType="slide">
         <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.4)" }}>
-          <View style={{ backgroundColor: colors.background, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: "60%" }}>
-            <Text style={{ fontSize: 17, fontWeight: "700", color: colors.foreground, marginBottom: 16 }}>选择月份</Text>
-            <ScrollView>
-              {availableMonths.map((mo) => (
-                <TouchableOpacity key={mo} onPress={() => { tap(); setSelectedMonth(mo); setShowMonthPicker(false); }}
-                  style={{ paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
-                  <Text style={{ fontSize: 15, color: mo === selectedMonth ? "#EF4444" : colors.foreground, fontWeight: mo === selectedMonth ? "700" : "400" }}>
-                    {mo.slice(0, 4)}年{Number(mo.slice(5, 7))}月
-                    {mo === getCurrentMonth() ? " (当前月)" : ""}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+          <View style={{ backgroundColor: colors.background, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: "70%" }}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <Text style={{ fontSize: 17, fontWeight: "700", color: colors.foreground }}>选择月份</Text>
+              <Text style={{ fontSize: 12, color: colors.muted }}>共 {availableMonths.length} 个月</Text>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {availableMonths.map((mo) => {
+                const hasPurchase = purchases.some((p) => p.month === mo);
+                const hasLedger = ledger.some((e) => e.month === mo);
+                const hasData = hasPurchase || hasLedger;
+                const isCurrent = mo === getCurrentMonth();
+                const isSelected = mo === selectedMonth;
+                return (
+                  <TouchableOpacity key={mo} onPress={() => { tap(); setSelectedMonth(mo); setShowMonthPicker(false); }}
+                    style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+                      paddingVertical: 13, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border,
+                      backgroundColor: isSelected ? "#EF444410" : "transparent",
+                      paddingHorizontal: 4, borderRadius: 6 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                      {isSelected && <View style={{ width: 4, height: 16, borderRadius: 2, backgroundColor: "#EF4444" }} />}
+                      <Text style={{ fontSize: 15, color: isSelected ? "#EF4444" : colors.foreground, fontWeight: isSelected ? "700" : "400" }}>
+                        {mo.slice(0, 4)}年{Number(mo.slice(5, 7))}月
+                      </Text>
+                      {isCurrent && <View style={{ paddingHorizontal: 6, paddingVertical: 2, backgroundColor: "#EF444420", borderRadius: 6 }}>
+                        <Text style={{ fontSize: 10, color: "#EF4444", fontWeight: "600" }}>当前</Text>
+                      </View>}
+                    </View>
+                    {hasData && (
+                      <Text style={{ fontSize: 11, color: colors.primary }}>
+                        {hasPurchase ? `${purchases.filter((p) => p.month === mo).length}笔进货` : "有台账"}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
             <TouchableOpacity onPress={() => setShowMonthPicker(false)}
-              style={{ marginTop: 16, padding: 14, backgroundColor: colors.surface, borderRadius: 12, alignItems: "center" }}>
+              style={{ marginTop: 12, padding: 14, backgroundColor: colors.surface, borderRadius: 12, alignItems: "center" }}>
               <Text style={{ fontSize: 15, color: colors.muted }}>取消</Text>
             </TouchableOpacity>
           </View>
@@ -1144,6 +1182,10 @@ function SupplierDetailScreen({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [importing, setImporting] = useState(false);
   const [pdfImporting, setPdfImporting] = useState(false);
+  // 导入预览 Modal
+  const [showImportPreview, setShowImportPreview] = useState(false);
+  const [importPreviewRows, setImportPreviewRows] = useState<ParsedPurchaseRow[]>([]);
+  const [importPreviewSource, setImportPreviewSource] = useState<"excel" | "pdf">("excel");
 
   // 备用金导入
   const pettyRecords = useMemo(() => {
@@ -1201,29 +1243,10 @@ function SupplierDetailScreen({
         Alert.alert("提示", `AI 解析完成但未找到有效记录\n\n${normalized.errors.join("\n") || "请确认 PDF 包含进货单表格数据"}`);
         setPdfImporting(false); return;
       }
-      Alert.alert(
-        "PDF 解析预览",
-        `AI 识别到 ${normalized.rows.length} 条记录\n合计 ¥${normalized.totalAmount.toFixed(0)}\n供应商：${normalized.supplier ?? supplier}\n\n确认导入到「${supplier}」？`,
-        [
-          { text: "取消", style: "cancel" },
-          { text: "确认导入", onPress: () => {
-            batchAddPurchases(normalized.rows.map((r) => ({
-              month: r.month ?? month,
-              date: r.date,
-              rawName: r.rawName,
-              itemId: undefined as string | undefined,
-              supplier,
-              quantity: r.quantity,
-              unit: r.unit,
-              unitPrice: r.unitPrice,
-              amount: r.amount,
-              source: "pdf" as const,
-            })));
-            syncLedgerFromPurchases(month);
-            Alert.alert("导入成功", `已导入 ${normalized.rows.length} 条进货记录（来自 PDF）`);
-          }},
-        ]
-      );
+      // 打开全屏预览 Modal（可编辑）
+      setImportPreviewRows(normalized.rows);
+      setImportPreviewSource("pdf");
+      setShowImportPreview(true);
     } catch (e) {
       Alert.alert("错误", `PDF 解析失败: ${String(e)}`);
     } finally {
@@ -1251,29 +1274,10 @@ function SupplierDetailScreen({
       }
       const parsed = parseSheetFromWorkbook(workbook, targetSheet, { supplierHint: supplier, fileName: asset.name ?? "import.xlsx" });
       if (!parsed.rows.length) { Alert.alert("提示", "未解析到有效数据，请检查文件格式"); setImporting(false); return; }
-      Alert.alert(
-        "导入预览",
-        `解析到 ${parsed.rows.length} 条记录\n合计 ¥${parsed.totalAmount.toFixed(0)}\n\n确认导入到「${supplier}」？`,
-        [
-          { text: "取消", style: "cancel" },
-          { text: "确认导入", onPress: () => {
-            batchAddPurchases(parsed.rows.map((r) => ({
-              month: r.month ?? month,
-              date: r.date,
-              rawName: r.rawName,
-              itemId: undefined as string | undefined,
-              supplier,
-              quantity: r.quantity,
-              unit: r.unit,
-              unitPrice: r.unitPrice,
-              amount: r.amount,
-              source: "excel" as const,
-            })));
-            syncLedgerFromPurchases(month);
-            Alert.alert("导入成功", `已导入 ${parsed.rows.length} 条进货记录`);
-          }},
-        ]
-      );
+      // 打开全屏预览 Modal（可编辑）
+      setImportPreviewRows(parsed.rows);
+      setImportPreviewSource("excel");
+      setShowImportPreview(true);
     } catch (e) {
       Alert.alert("错误", `Excel 解析失败: ${String(e)}`);
     } finally {
@@ -1480,6 +1484,36 @@ function SupplierDetailScreen({
             setShowPettyImport(false);
           }}
           onClose={() => setShowPettyImport(false)}
+        />
+      )}
+
+      {/* Excel/PDF 导入预览 Modal */}
+      {showImportPreview && (
+        <ImportPreviewModal
+          visible={showImportPreview}
+          rows={importPreviewRows}
+          source={importPreviewSource}
+          supplier={supplier}
+          month={month}
+          colors={colors}
+          onConfirm={(rows) => {
+            batchAddPurchases(rows.map((r) => ({
+              month: r.month ?? month,
+              date: r.date,
+              rawName: r.rawName,
+              itemId: undefined as string | undefined,
+              supplier,
+              quantity: r.quantity,
+              unit: r.unit,
+              unitPrice: r.unitPrice,
+              amount: r.amount,
+              source: importPreviewSource,
+            })));
+            syncLedgerFromPurchases(month);
+            setShowImportPreview(false);
+            Alert.alert("导入成功 ✅", `已导入 ${rows.length} 条进货记录`);
+          }}
+          onClose={() => setShowImportPreview(false)}
         />
       )}
     </View>
@@ -1846,3 +1880,241 @@ const S = StyleSheet.create({
   input: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15 },
   catChip: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 14, borderWidth: 1 },
 });
+
+// ─── 导入预览 Modal（Excel/PDF 通用，支持单条编辑 + 批量改日期 + 删除）─────────
+function ImportPreviewModal({
+  visible, rows: initialRows, source, supplier, month, colors, onConfirm, onClose,
+}: {
+  visible: boolean;
+  rows: ParsedPurchaseRow[];
+  source: "excel" | "pdf";
+  supplier: string;
+  month: string;
+  colors: any;
+  onConfirm: (rows: ParsedPurchaseRow[]) => void;
+  onClose: () => void;
+}) {
+  const [rows, setRows] = useState<ParsedPurchaseRow[]>(initialRows);
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
+  const [editDate, setEditDate] = useState("");
+  const [editName, setEditName] = useState("");
+  const [editQty, setEditQty] = useState("");
+  const [editPrice, setEditPrice] = useState("");
+  const [batchDate, setBatchDate] = useState("");
+  const [showBatchDate, setShowBatchDate] = useState(false);
+
+  // 每次打开重置
+  React.useEffect(() => {
+    if (visible) { setRows(initialRows); setEditingIdx(null); setShowBatchDate(false); setBatchDate(""); }
+  }, [visible, initialRows]);
+
+  const totalAmt = rows.reduce((s, r) => s + r.amount, 0);
+
+  const openEdit = (idx: number) => {
+    const r = rows[idx];
+    setEditDate(r.date);
+    setEditName(r.rawName);
+    setEditQty(String(r.quantity));
+    setEditPrice(String(r.unitPrice));
+    setEditingIdx(idx);
+  };
+
+  const saveEdit = () => {
+    if (editingIdx === null) return;
+    const qty = parseFloat(editQty) || rows[editingIdx].quantity;
+    const price = parseFloat(editPrice) || rows[editingIdx].unitPrice;
+    // 验证日期格式
+    const dateOk = /^\d{4}-\d{2}-\d{2}$/.test(editDate);
+    const newDate = dateOk ? editDate : rows[editingIdx].date;
+    const newMonth = newDate.slice(0, 7);
+    setRows((prev) => prev.map((r, i) => i === editingIdx ? {
+      ...r,
+      date: newDate,
+      month: newMonth,
+      rawName: editName || r.rawName,
+      nameZh: editName || r.rawName,
+      quantity: qty,
+      unitPrice: price,
+      amount: qty * price,
+    } : r));
+    setEditingIdx(null);
+  };
+
+  const deleteRow = (idx: number) => {
+    setRows((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const applyBatchDate = () => {
+    const dateOk = /^\d{4}-\d{2}-\d{2}$/.test(batchDate);
+    if (!dateOk) { Alert.alert("格式错误", "请输入 YYYY-MM-DD 格式，如：2026-07-15"); return; }
+    const newMonth = batchDate.slice(0, 7);
+    setRows((prev) => prev.map((r) => ({ ...r, date: batchDate, month: newMonth })));
+    setShowBatchDate(false);
+    setBatchDate("");
+  };
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent={false}>
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        {/* 头部 */}
+        <View style={[S.navbar, { borderBottomColor: colors.border, paddingTop: 52 }]}>
+          <TouchableOpacity onPress={onClose}>
+            <Text style={{ fontSize: 15, color: "#EF4444", fontWeight: "600" }}>取消</Text>
+          </TouchableOpacity>
+          <View style={{ alignItems: "center" }}>
+            <Text style={[S.navTitle, { color: colors.foreground }]}>
+              {source === "pdf" ? "PDF 解析预览" : "Excel 导入预览"}
+            </Text>
+            <Text style={{ fontSize: 11, color: colors.muted }}>
+              {rows.length} 条记录 · 合计 ¥{totalAmt.toFixed(0)} · {supplier}
+            </Text>
+          </View>
+          <TouchableOpacity onPress={() => { if (rows.length === 0) { Alert.alert("提示", "没有可导入的记录"); return; } onConfirm(rows); }}>
+            <Text style={{ fontSize: 15, color: colors.primary, fontWeight: "700" }}>确认导入</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* 批量操作栏 */}
+        <View style={{ flexDirection: "row", gap: 8, padding: 10, backgroundColor: colors.surface, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
+          <TouchableOpacity onPress={() => setShowBatchDate(!showBatchDate)}
+            style={[S.actionBtn, { backgroundColor: showBatchDate ? "#EF444420" : colors.background, borderColor: showBatchDate ? "#EF4444" : colors.border }]}>
+            <IconSymbol name="calendar" size={13} color={showBatchDate ? "#EF4444" : colors.muted} />
+            <Text style={{ fontSize: 12, color: showBatchDate ? "#EF4444" : colors.muted, fontWeight: "600" }}>批量改日期</Text>
+          </TouchableOpacity>
+          <Text style={{ fontSize: 12, color: colors.muted, alignSelf: "center" }}>
+            点击行可单独编辑 · 左滑删除
+          </Text>
+        </View>
+
+        {/* 批量日期输入 */}
+        {showBatchDate && (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, padding: 10, backgroundColor: "#FEF3C7", borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "#FCD34D" }}>
+            <TextInput
+              style={[S.input, { flex: 1, color: colors.foreground, borderColor: "#FCD34D", backgroundColor: colors.background, paddingVertical: 8 }]}
+              value={batchDate}
+              onChangeText={setBatchDate}
+              placeholder="YYYY-MM-DD，如 2026-07-15"
+              placeholderTextColor={colors.muted}
+              keyboardType="numbers-and-punctuation"
+            />
+            <TouchableOpacity onPress={applyBatchDate}
+              style={{ paddingHorizontal: 14, paddingVertical: 10, backgroundColor: "#D97706", borderRadius: 10 }}>
+              <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>应用全部</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* 单条编辑区 */}
+        {editingIdx !== null && (
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
+            <View style={{ padding: 12, backgroundColor: "#EFF6FF", borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "#BFDBFE" }}>
+              <Text style={{ fontSize: 13, fontWeight: "700", color: "#1D4ED8", marginBottom: 8 }}>
+                编辑第 {editingIdx + 1} 条
+              </Text>
+              <View style={{ flexDirection: "row", gap: 8, marginBottom: 8 }}>
+                <View style={{ flex: 2 }}>
+                  <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 3 }}>日期 (YYYY-MM-DD)</Text>
+                  <TextInput
+                    style={[S.input, { color: colors.foreground, borderColor: "#BFDBFE", backgroundColor: colors.background, paddingVertical: 7 }]}
+                    value={editDate}
+                    onChangeText={setEditDate}
+                    placeholder="2026-07-15"
+                    keyboardType="numbers-and-punctuation"
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 3 }}>数量</Text>
+                  <TextInput
+                    style={[S.input, { color: colors.foreground, borderColor: "#BFDBFE", backgroundColor: colors.background, paddingVertical: 7 }]}
+                    value={editQty}
+                    onChangeText={setEditQty}
+                    keyboardType="decimal-pad"
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 3 }}>单价</Text>
+                  <TextInput
+                    style={[S.input, { color: colors.foreground, borderColor: "#BFDBFE", backgroundColor: colors.background, paddingVertical: 7 }]}
+                    value={editPrice}
+                    onChangeText={setEditPrice}
+                    keyboardType="decimal-pad"
+                  />
+                </View>
+              </View>
+              <View style={{ marginBottom: 8 }}>
+                <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 3 }}>商品名称</Text>
+                <TextInput
+                  style={[S.input, { color: colors.foreground, borderColor: "#BFDBFE", backgroundColor: colors.background, paddingVertical: 7 }]}
+                  value={editName}
+                  onChangeText={setEditName}
+                />
+              </View>
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                <TouchableOpacity onPress={() => setEditingIdx(null)}
+                  style={{ flex: 1, padding: 10, backgroundColor: colors.surface, borderRadius: 10, alignItems: "center", borderWidth: 1, borderColor: colors.border }}>
+                  <Text style={{ color: colors.muted, fontWeight: "600" }}>取消</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={saveEdit}
+                  style={{ flex: 2, padding: 10, backgroundColor: "#1D4ED8", borderRadius: 10, alignItems: "center" }}>
+                  <Text style={{ color: "#fff", fontWeight: "700" }}>保存修改</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        )}
+
+        {/* 记录列表 */}
+        <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+          {rows.length === 0 && (
+            <View style={{ alignItems: "center", padding: 40 }}>
+              <Text style={{ color: colors.muted }}>所有记录已删除</Text>
+            </View>
+          )}
+          {rows.map((row, idx) => (
+            <View key={idx} style={{ flexDirection: "row", alignItems: "center",
+              borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border,
+              backgroundColor: editingIdx === idx ? "#EFF6FF" : (idx % 2 === 0 ? colors.surface : colors.background) }}>
+              {/* 主内容 */}
+              <TouchableOpacity onPress={() => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); openEdit(idx); }}
+                style={{ flex: 1, padding: 12 }}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground, flex: 1, marginRight: 8 }} numberOfLines={2}>
+                    {row.rawName}
+                  </Text>
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: "#EF4444" }}>¥{row.amount.toFixed(0)}</Text>
+                </View>
+                <View style={{ flexDirection: "row", gap: 12, marginTop: 4 }}>
+                  <Text style={{ fontSize: 11, color: colors.muted }}>{row.date}</Text>
+                  <Text style={{ fontSize: 11, color: colors.muted }}>{row.quantity} {row.unit}</Text>
+                  <Text style={{ fontSize: 11, color: colors.muted }}>¥{row.unitPrice.toFixed(0)}/瓶</Text>
+                  {row.category && <Text style={{ fontSize: 11, color: colors.primary }}>{row.category}</Text>}
+                </View>
+              </TouchableOpacity>
+              {/* 删除按钮 */}
+              <TouchableOpacity onPress={() => {
+                Alert.alert("删除", `删除「${row.rawName}」？`, [
+                  { text: "取消", style: "cancel" },
+                  { text: "删除", style: "destructive", onPress: () => deleteRow(idx) },
+                ]);
+              }} style={{ padding: 12 }}>
+                <IconSymbol name="trash" size={16} color="#EF4444" />
+              </TouchableOpacity>
+            </View>
+          ))}
+        </ScrollView>
+
+        {/* 底部确认栏 */}
+        {rows.length > 0 && (
+          <View style={{ padding: 16, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, backgroundColor: colors.background }}>
+            <TouchableOpacity onPress={() => onConfirm(rows)}
+              style={{ padding: 16, backgroundColor: "#EF4444", borderRadius: 14, alignItems: "center" }}>
+              <Text style={{ fontSize: 16, color: "#fff", fontWeight: "700" }}>
+                确认导入 {rows.length} 条 · 合计 ¥{totalAmt.toFixed(0)}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+    </Modal>
+  );
+}
