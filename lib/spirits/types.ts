@@ -159,6 +159,57 @@ export interface SpiritMatchRecord {
   updatedAt: string;
 }
 
+// ─── 新版 CRUD 类型（手动增删改+月份切换+进货流水） ────────────────────────
+
+/** 酒款档案（品类目录），独立于月份存在 */
+export interface SpiritItem {
+  id: string;
+  name: string;
+  nameEn?: string;
+  category: string;
+  unit: string;
+  refPrice: number;
+  supplier?: string;
+  spec?: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 每一笔进货流水（对应 Excel 一行：日期/品名/单位/数量/单价/金额） */
+export interface SpiritPurchaseRecord {
+  id: string;
+  month: string;        // YYYY-MM
+  date: string;         // YYYY-MM-DD
+  itemId?: string;      // 关联酒款 ID
+  rawName: string;      // 原始商品名
+  unit: string;
+  quantity: number;
+  unitPrice: number;
+  amount: number;
+  supplier?: string;
+  notes?: string;
+  source: "manual" | "excel";
+  createdAt: string;
+}
+
+/** 某月某款酒的台账数据（期初/进货/消耗/期末） */
+export interface SpiritLedgerEntry {
+  id: string;
+  month: string;           // YYYY-MM
+  itemId: string;
+  openingQty: number;      // 期初库存量
+  openingUnitCost: number; // 期初单价
+  purchaseQty: number;     // 本月进货量（自动汇总）
+  purchaseCost: number;    // 本月进货成本（自动汇总）
+  consumeQty: number;      // 本月消耗量（手动录入）
+  closingQty: number;      // 期末库存量 = 期初+进货-消耗
+  closingUnitCost: number; // 期末单价
+  closingCost: number;     // 期末库存成本
+  isClosed: boolean;
+  updatedAt: string;
+}
+
 // ─── 价格变动记录 ────────────────────────────────────────────────────────────
 export interface SpiritPriceChange {
   /** 商品名 */

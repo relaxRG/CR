@@ -541,6 +541,9 @@ export default function BottleFormScreen() {
       storyEn: storyEn.trim(),
       substituteFor: substituteFor.trim(),
       pairsWith: pairsWith.trim(),
+      // 保留供货渠道数据（通过供货渠道管理页编辑，表单不覆盖）
+      supplierChannels: editing?.supplierChannels,
+      costChannelId: editing?.costChannelId,
     };
     if (perishableOnOpen !== undefined) {
       draft.perishableOnOpen = perishableOnOpen;

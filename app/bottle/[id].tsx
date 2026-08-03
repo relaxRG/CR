@@ -137,6 +137,13 @@ export default function BottleDetailScreen() {
         {!isGuest && (
           <>
             <Pressable
+              onPress={() => router.push({ pathname: "/bottle-channels", params: { id: bottle.id } })}
+              hitSlop={8}
+              style={({ pressed }) => [pressed && { opacity: 0.6 }, { marginRight: 18 }]}
+            >
+              <IconSymbol name="building.2" size={22} color="#F59E0B" />
+            </Pressable>
+            <Pressable
               onPress={() =>
                 router.push({ pathname: "/bottle-form", params: { id: bottle.id } })
               }
@@ -458,6 +465,59 @@ export default function BottleDetailScreen() {
 
 
 
+        {/* 供货渠道展示 */}
+        {(bottle.supplierChannels ?? []).length > 0 && (
+          <>
+            <Text className="text-[13px] text-muted uppercase mt-6 mb-2 px-4" style={{ letterSpacing: 0.4, lineHeight: 18 }}>
+              {lang === "zh" ? "供货渠道" : "Supplier Channels"}
+            </Text>
+            <View className="bg-surface rounded-xl px-4">
+              {(bottle.supplierChannels ?? []).map((ch, idx, arr) => (
+                <View key={ch.id}
+                  style={idx < arr.length - 1
+                    ? { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, paddingVertical: 12 }
+                    : { paddingVertical: 12 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                        <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>{ch.name}</Text>
+                        {ch.isCostBasis && (
+                          <View style={{ backgroundColor: colors.primary + "22", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                            <Text style={{ fontSize: 10, fontWeight: "700", color: colors.primary }}>成本基准</Text>
+                          </View>
+                        )}
+                        {ch.type === "self" && (
+                          <View style={{ backgroundColor: "#F59E0B22", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                            <Text style={{ fontSize: 10, fontWeight: "700", color: "#F59E0B" }}>自采</Text>
+                          </View>
+                        )}
+                      </View>
+                      {ch.supplierProductName && (
+                        <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 2 }}>商品名：{ch.supplierProductName}</Text>
+                      )}
+                      <Text style={{ fontSize: 16, fontWeight: "700", color: colors.primary }}>
+                        ¥{ch.latestPrice.toFixed(2)}
+                        <Text style={{ fontSize: 12, fontWeight: "400", color: colors.muted }}>/{ch.unit}</Text>
+                      </Text>
+                      {(ch.priceHistory ?? []).length > 1 && (
+                        <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>
+                          历史：{(ch.priceHistory ?? []).slice(0, 3).map((h) => `¥${h.price}(${h.date.slice(0, 7)})`).join(" → ")}
+                        </Text>
+                      )}
+                    </View>
+                    {ch.purchaseUrl ? (
+                      <Pressable
+                        onPress={() => { const { Linking } = require("react-native"); Linking.openURL(ch.purchaseUrl!); }}
+                        style={({ pressed }) => [{ backgroundColor: "#F59E0B", paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, marginLeft: 12, opacity: pressed ? 0.7 : 1 }]}>
+                        <Text style={{ fontSize: 12, fontWeight: "700", color: "#fff" }}>一键购买</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                </View>
+              ))}
+            </View>
+          </>
+        )}
         <Text className="text-xs text-muted mt-4 px-1" style={{ lineHeight: 18 }}>
           {t("bottle.priceNote")}
         </Text>

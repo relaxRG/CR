@@ -37,6 +37,7 @@ import { PettyCashProvider } from "@/lib/store/petty-store";
 import { InventoryProvider } from "@/lib/store/inventory-store";
 import { LabPlanProvider } from "@/lib/lab/plan-store";
 import { SpiritsProvider } from "@/lib/spirits/store";
+import { SpiritsInventoryProvider } from "@/lib/spirits/crud-store";
 import { MonthlyReportProvider } from "@/lib/store/monthly-report/store";
 import { LaborProvider } from "@/lib/labor/store";
 import { SalaryAdvanceProvider } from "@/lib/labor/advance-store";
@@ -142,6 +143,7 @@ export default function RootLayout() {
           <LabPlanProvider>
           <SupplierPurchaseProvider>
           <SpiritsProvider>
+          <SpiritsInventoryProvider>
           <MonthlyReportProvider>
           <LaborProvider>
           <SalaryAdvanceProvider>
@@ -170,6 +172,10 @@ export default function RootLayout() {
               <Stack.Screen
                 name="bottle-form"
                 options={{ presentation: "modal" }}
+              />
+              <Stack.Screen
+                name="bottle-channels"
+                options={{ presentation: "modal", headerShown: false }}
               />
               <Stack.Screen name="homemade/[id]" />
               <Stack.Screen
@@ -248,6 +254,7 @@ export default function RootLayout() {
           </SalaryAdvanceProvider>
           </LaborProvider>
           </MonthlyReportProvider>
+          </SpiritsInventoryProvider>
           </SpiritsProvider>
           </SupplierPurchaseProvider>
           </LabPlanProvider>

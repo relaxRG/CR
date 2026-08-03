@@ -1,7 +1,7 @@
 import { COOKIE_NAME } from "../shared/const.js";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { z } from "zod";
-import { invokeLLM, type MessageContent } from "./_core/llm";
+import { invokeLLM, type MessageContent, type TextContent, type FileContent } from "./_core/llm";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
@@ -2294,6 +2294,177 @@ ${ctx}${styleOpts}
         if (!allowed) throw new TRPCError({ code: "FORBIDDEN", message: "Private app" });
         await upsertSyncData(ctx.user.id, input.entries);
         return { success: true, count: input.entries.length } as const;
+      }),
+  }),
+
+  // ── 进货单智能解析（PDF / Excel 文本内容） ───────────────────────────────────
+  parseInvoice: router({
+    /**
+     * 从 PDF 或文本内容解析进货单
+     * 支持：PDF base64、文本内容
+     * 返回结构化的进货记录列表
+     */
+    parse: publicProcedure
+      .input(
+        z.object({
+          pdfBase64: z.string().max(20_000_000).optional(),
+          textContent: z.string().max(100_000).optional(),
+          fileName: z.string().max(255).optional(),
+          supplierHint: z.string().max(100).optional(),
+        }),
+      )
+      .mutation(async ({ input }) => {
+        const systemPrompt = `你是一个专业的进货单数据提取助手，专门处理中国酒吧/餐厅的酒类进货单。
+
+你的任务是从进货单中提取所有进货记录，输出严格的 JSON 格式。
+
+进货单通常包含：
+- 供应商/客户名称（第一行或标题）
+- 表格数据：日期、商品名称、单位、数量、单价、金额
+
+商品名称格式（常见）：
+- "中文名/英文名"（如：添加利金酒Tanqueray Gin）
+- "中文名（备注）英文名"（如：白占边（金宾波本）/Jim Beam White）
+- 纯中文名或纯英文名
+
+输出格式（严格 JSON）：
+{
+  "supplier": "供应商名称（如果能识别）",
+  "rows": [
+    {
+      "date": "YYYY-MM-DD",
+      "rawName": "完整原始商品名",
+      "nameZh": "中文名",
+      "nameEn": "英文名",
+      "unit": "单位（瓶/筱/罐等）",
+      "quantity": 数量,
+      "unitPrice": 单价,
+      "amount": 金额
+    }
+  ],
+  "totalAmount": 总金额
+}
+
+规则：
+1. 跳过合计行、空行、表头行
+2. 日期格式统一为 YYYY-MM-DD
+3. 如果某行日期缺失，使用最近一行的日期
+4. 数量、单价、金额必须是数字（不含货币符号）
+5. 如果金额=0但有数量和单价，自动计算金额=数量×单价
+6. 保留完整的原始商品名（rawName），不要截断
+7. 如果无法识别供应商，supplier 设为 null`;
+
+        let messages: Parameters<typeof invokeLLM>[0]["messages"];
+
+        if (input.pdfBase64) {
+          // PDF 输入：使用 Gemini 视觉模型（支持 PDF 直接输入）
+          messages = [
+            { role: "system", content: systemPrompt },
+            {
+              role: "user",
+              content: [
+                {
+                  type: "file_url" as const,
+                  file_url: {
+                    url: `data:application/pdf;base64,${input.pdfBase64}`,
+                    mime_type: "application/pdf" as const,
+                  },
+                } as FileContent,
+                {
+                  type: "text" as const,
+                  text: `请从这份 PDF 进货单中提取所有进货记录。${input.supplierHint ? `供应商可能是：${input.supplierHint}` : ""}`,
+                } as TextContent,
+              ],
+            },
+          ];
+        } else if (input.textContent) {
+          // 文本输入：直接解析文本
+          messages = [
+            { role: "system", content: systemPrompt },
+            {
+              role: "user",
+              content: `请从以下进货单文本中提取所有进货记录：\n\n${input.textContent}`,
+            },
+          ];
+        } else {
+          return { success: false, rows: [], month: "", totalAmount: 0, errors: ["请提供 PDF 或文本内容"], warnings: [] };
+        }
+
+        try {
+          const response = await invokeLLM({
+            model: "gemini-3-flash-preview",  // 支持 PDF 输入，成本低
+            messages,
+            max_tokens: 8192,
+            response_format: {
+              type: "json_schema" as const,
+              json_schema: {
+                name: "invoice_parse_result",
+                strict: true,
+                schema: {
+                  type: "object",
+                  properties: {
+                    supplier: { type: ["string", "null"] },
+                    rows: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          date: { type: "string" },
+                          rawName: { type: "string" },
+                          nameZh: { type: "string" },
+                          nameEn: { type: "string" },
+                          unit: { type: "string" },
+                          quantity: { type: "number" },
+                          unitPrice: { type: "number" },
+                          amount: { type: "number" },
+                        },
+                        required: ["date", "rawName", "nameZh", "nameEn", "unit", "quantity", "unitPrice", "amount"],
+                        additionalProperties: false,
+                      },
+                    },
+                    totalAmount: { type: "number" },
+                  },
+                  required: ["supplier", "rows", "totalAmount"],
+                  additionalProperties: false,
+                },
+              },
+            },
+          });
+
+                    const rawContent = response.choices[0]?.message?.content;
+          if (!rawContent) throw new Error("模型返回空内容");
+          const content = typeof rawContent === "string" ? rawContent : JSON.stringify(rawContent);
+          const parsed = JSON.parse(content);
+          const supplier = parsed.supplier ?? input.supplierHint;
+
+          // 处理解析结果
+          const rows = (parsed.rows ?? []).map((item: any) => {
+            const quantity = Number(item.quantity) || 1;
+            const unitPrice = Number(item.unitPrice) || 0;
+            let amount = Number(item.amount) || 0;
+            if (amount === 0 && quantity > 0 && unitPrice > 0) amount = quantity * unitPrice;
+            const date = String(item.date ?? "").slice(0, 10) || new Date().toISOString().slice(0, 10);
+            return {
+              date,
+              month: date.slice(0, 7),
+              rawName: String(item.rawName ?? "").trim(),
+              nameZh: String(item.nameZh ?? "").trim(),
+              nameEn: String(item.nameEn ?? "").trim(),
+              unit: String(item.unit ?? "瓶").trim() || "瓶",
+              quantity, unitPrice, amount, supplier,
+            };
+          }).filter((r: any) => r.rawName);
+
+          const monthCounts: Record<string, number> = {};
+          rows.forEach((r: any) => { monthCounts[r.month] = (monthCounts[r.month] ?? 0) + 1; });
+          const mainMonth = Object.entries(monthCounts).sort((a, b) => (b[1] as number) - (a[1] as number))[0]?.[0]
+            ?? new Date().toISOString().slice(0, 7);
+          const totalAmount = rows.reduce((s: number, r: any) => s + r.amount, 0);
+
+          return { success: true, rows, month: mainMonth, supplier, totalAmount, errors: [], warnings: [] };
+        } catch (e) {
+          return { success: false, rows: [], month: "", totalAmount: 0, errors: [`解析失败: ${String(e)}`], warnings: [] };
+        }
       }),
   }),
 });

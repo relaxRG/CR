@@ -262,6 +262,10 @@ export interface Bottle {
    * 支持：ml/cl/L（液体）、g/kg/斤/两/lb（重量）、个/听/瓶/袋/罐（计件）
    */
   packUnit?: string;
+  /** 多供货渠道列表（供应商/自采电商） */
+  supplierChannels?: SupplierChannel[];
+  /** 当前成本计算基准渠道 ID，对应 supplierChannels 中某个 channel.id */
+  costChannelId?: string;
 }
 
 /** 兼容处理:为缺字段的酒款补默认值 */
@@ -298,4 +302,60 @@ export function normalizeBottle(b: Partial<Bottle> & Pick<Bottle, "id" | "nameZh
     ...(typeof b.packQty === "number" && isFinite(b.packQty) && b.packQty > 0 ? { packQty: b.packQty } : {}),
     ...(b.packUnit ? { packUnit: b.packUnit } : {}),
   };
+}
+
+// ─── 供货渠道 ─────────────────────────────────────────────────────────────────
+
+/** 一个供货渠道（供应商或自采电商） */
+export interface SupplierChannel {
+  id: string;
+  /** 渠道类型：supplier=供应商, self=自采电商 */
+  type: "supplier" | "self";
+  /** 供应商/渠道名称，如「至缘」「京东自采」「1919」 */
+  name: string;
+  /** 供应商给这款酒的商品名（可能与官方名不同） */
+  supplierProductName?: string;
+  /** 最新进货价（元/瓶或元/箱等） */
+  latestPrice: number;
+  /** 进货单位，如「瓶」「箱」 */
+  unit: string;
+  /** 购买链接（自采渠道，如京东/淘宝/1919 链接，支持一键跳转） */
+  purchaseUrl?: string;
+  /** 是否为成本计算基准渠道（只能有一个为 true） */
+  isCostBasis: boolean;
+  /** 历史进货价记录 */
+  priceHistory?: SupplierPriceRecord[];
+  /** 备注 */
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 历史进货价记录 */
+export interface SupplierPriceRecord {
+  date: string;       // YYYY-MM-DD
+  price: number;
+  quantity?: number;
+  source?: string;    // 来源说明，如「Excel导入」「手动录入」
+}
+
+/**
+ * 获取某 Bottle 的有效成本价：
+ * 1. 若有 costChannelId 对应的渠道，使用该渠道的 latestPrice
+ * 2. 否则使用 isCostBasis=true 的渠道价格
+ * 3. 否则回退到 priceCny
+ */
+export function getEffectiveCostPrice(bottle: Bottle): number {
+  const channels = bottle.supplierChannels ?? [];
+  if (channels.length === 0) return bottle.priceCny;
+  // 优先使用指定的成本基准渠道
+  if (bottle.costChannelId) {
+    const ch = channels.find((c) => c.id === bottle.costChannelId);
+    if (ch && ch.latestPrice > 0) return ch.latestPrice;
+  }
+  // 其次找 isCostBasis=true 的渠道
+  const basisCh = channels.find((c) => c.isCostBasis);
+  if (basisCh && basisCh.latestPrice > 0) return basisCh.latestPrice;
+  // 回退到 priceCny
+  return bottle.priceCny;
 }
