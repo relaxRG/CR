@@ -300,6 +300,9 @@ export interface SpiritItem {
   refPrice: number;
   supplier?: string;
   spec?: string;
+  /** 规格容量（ml），用于计算每 ml 单价。
+   * 优先使用此字段；未设置时自动从 spec 字段解析（如 "700ML" → 700）。 */
+  specMl?: number;
   active: boolean;
   /** 价格异常阈值（%），进货单价偏差超过此值时标记异常。
    * 默认为 0，即只要有涨跌（哪怕 1%）就显示涨跌金额和百分比。

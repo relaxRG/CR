@@ -2002,14 +2002,16 @@ function ItemFormModal({ visible, item, colors, allCategories, onSave, onClose }
   const [refPrice, setRefPrice] = useState(String(item?.refPrice ?? ""));
   const [supplier, setSupplier] = useState(item?.supplier ?? "");
   const [priceAlertPct, setPriceAlertPct] = useState(String(item?.priceAlertPct ?? ""));
+  const [specMl, setSpecMl] = useState(item?.specMl != null ? String(item.specMl) : "");
 
   React.useEffect(() => {
     if (item) {
       setName(item.name); setNameEn(item.nameEn ?? ""); setCategory(item.category);
       setUnit(item.unit); setRefPrice(String(item.refPrice)); setSupplier(item.supplier ?? "");
       setPriceAlertPct(item.priceAlertPct != null ? String(item.priceAlertPct) : "");
+      setSpecMl(item.specMl != null ? String(item.specMl) : "");
     } else {
-      setName(""); setNameEn(""); setCategory(allCategories[0]?.name ?? "Other"); setUnit("瓶"); setRefPrice(""); setSupplier(""); setPriceAlertPct("");
+      setName(""); setNameEn(""); setCategory(allCategories[0]?.name ?? "Other"); setUnit("瓶"); setRefPrice(""); setSupplier(""); setPriceAlertPct(""); setSpecMl("");
     }
   }, [item, visible]);
 
@@ -2029,6 +2031,7 @@ function ItemFormModal({ visible, item, colors, allCategories, onSave, onClose }
                 { label: "参考单价", value: refPrice, onChange: setRefPrice, placeholder: "¥", keyboardType: "decimal-pad" as const },
                 { label: "供应商", value: supplier, onChange: setSupplier, placeholder: "如：至缘" },
                 { label: "价格预警阈值 (%)", value: priceAlertPct, onChange: setPriceAlertPct, placeholder: "默认 0，即只要有涨跌就提示", keyboardType: "decimal-pad" as const },
+                { label: "规格容量 (ml)", value: specMl, onChange: setSpecMl, placeholder: "如 700（用于计算 Pour Cost）", keyboardType: "decimal-pad" as const },
               ].map((f) => (
                 <View key={f.label} style={{ marginBottom: 14 }}>
                   <Text style={{ fontSize: 13, color: colors.muted, marginBottom: 6 }}>{f.label}</Text>
@@ -2057,7 +2060,8 @@ function ItemFormModal({ visible, item, colors, allCategories, onSave, onClose }
                 <TouchableOpacity onPress={() => {
                   if (!name.trim()) { Alert.alert("提示", "请填写中文名"); return; }
                   const alertPct = priceAlertPct.trim() !== "" ? parseFloat(priceAlertPct) : undefined;
-                  onSave({ name: name.trim(), nameEn: nameEn.trim() || undefined, category, unit, refPrice: parseFloat(refPrice) || 0, supplier: supplier.trim() || undefined, priceAlertPct: alertPct, active: true });
+                  const specMlVal = specMl.trim() !== "" ? parseFloat(specMl) : undefined;
+                  onSave({ name: name.trim(), nameEn: nameEn.trim() || undefined, category, unit, refPrice: parseFloat(refPrice) || 0, supplier: supplier.trim() || undefined, priceAlertPct: alertPct, specMl: specMlVal, active: true });
                   onClose();
                 }} style={{ flex: 1, padding: 14, backgroundColor: "#EF4444", borderRadius: 12, alignItems: "center" }}>
                   <Text style={{ fontSize: 15, color: "#fff", fontWeight: "700" }}>保存</Text>

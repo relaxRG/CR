@@ -22,6 +22,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { useMonthlySummaryStore } from "@/lib/store/monthly-summary/store";
 import { useEmployeeStore } from "@/lib/labor/store";
 import { useSpiritsInventoryStore } from "@/lib/spirits/crud-store";
+import { calcMonthlyPourCost, pourCostColor } from "@/lib/spirits/pour-cost";
 import {
   MonthlySummaryReport, SummaryLineItem, AccountBalance, MonthlyPaymentRecord,
   AccountType, ACCOUNT_TYPE_LABELS, ACCOUNT_TYPE_COLORS,
@@ -545,6 +546,26 @@ export default function MonthlySummaryScreen() {
                         )}
                       </View>
                     )}
+                    {/* 整体月度 Pour Cost */}
+                    {(() => {
+                      const totalRevenue = sections.find((s) => s.key === "revenue")?.subtotal ?? 0;
+                      const pourResult = calcMonthlyPourCost(totalPurchaseCost, totalRevenue);
+                      if (pourResult.pourCostPct === null) return null;
+                      const color = pourCostColor(pourResult.pourCostPct);
+                      return (
+                        <View style={{ marginTop: 8, padding: 10, borderRadius: 8, backgroundColor: color + "12", borderWidth: 1, borderColor: color + "44" }}>
+                          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                            <Text style={{ fontSize: 12, fontWeight: "700", color }}>整体酒水 Pour Cost</Text>
+                            <Text style={{ fontSize: 20, fontWeight: "800", color }}>{pourResult.pourCostPct.toFixed(1)}%</Text>
+                          </View>
+                          <View style={{ flexDirection: "row", gap: 12, marginTop: 6 }}>
+                            <Text style={{ fontSize: 10, color: colors.muted }}>酒水进货 ¥{pourResult.totalPurchaseCost.toFixed(0)}</Text>
+                            <Text style={{ fontSize: 10, color: colors.muted }}>酒水收入 ¥{pourResult.totalRevenue.toFixed(0)}</Text>
+                          </View>
+                          <Text style={{ fontSize: 9, color: colors.muted, marginTop: 2 }}>行业标准：绿色 &lt;20% / 橙色 20-30% / 红色 &gt;30%</Text>
+                        </View>
+                      );
+                    })()}
                   </View>
                 );
               })()}

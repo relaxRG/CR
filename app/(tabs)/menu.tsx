@@ -31,18 +31,8 @@ import { useHomemadeStore } from "@/lib/homemade/store";
 import { estimateRecipeCostSmart } from "@/lib/recipes/smart-cost";
 import { displayNames } from "@/lib/utils";
 import { Recipe } from "@/lib/recipes/types";
-
-// ─── 工具：利润率计算 ─────────────────────────────────────────────────────────
-
-function useCostForRecipe(recipe: Recipe | undefined) {
-  const { bottles } = useBottleStore();
-  const { preps } = useHomemadeStore();
-  return useMemo(() => {
-    if (!recipe || recipe.ingredients.length === 0) return null;
-    const est = estimateRecipeCostSmart(recipe.ingredients, bottles, preps);
-    return est.estimatedCount > 0 ? est.total : null;
-  }, [recipe, bottles, preps]);
-}
+import { useSpiritsInventoryStore } from "@/lib/spirits/crud-store";
+import { calcDirectPourCost, calcRecipePourCost, pourCostColor, confidenceLabel } from "@/lib/spirits/pour-cost";
 
 // ─── 售价行（内联编辑） ───────────────────────────────────────────────────────
 
@@ -50,12 +40,18 @@ interface PriceRowProps {
   entry: MenuEntry;
   cost: number | null;
   onSetPrice: (price: number | null) => void;
+  onSetServingSize?: (size: number | undefined) => void;
+  matchedCount?: number;
+  totalCount?: number;
 }
 
-function PriceRow({ entry, cost, onSetPrice }: PriceRowProps) {
+function PriceRow({ entry, cost, onSetPrice, onSetServingSize, matchedCount, totalCount }: PriceRowProps) {
   const colors = useColors();
+  const spiritsStore = useSpiritsInventoryStore();
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(entry.price != null ? String(entry.price) : "");
+  const [editingServing, setEditingServing] = useState(false);
+  const [servingText, setServingText] = useState(entry.servingSize != null ? String(entry.servingSize) : "");
 
   const commit = () => {
     const val = parseFloat(text);
@@ -63,10 +59,30 @@ function PriceRow({ entry, cost, onSetPrice }: PriceRowProps) {
     setEditing(false);
   };
 
+  const commitServing = () => {
+    const val = parseFloat(servingText);
+    onSetServingSize?.(isNaN(val) || val <= 0 ? undefined : val);
+    setEditingServing(false);
+  };
+
   const profit = entry.price != null && cost != null ? entry.price - cost : null;
   const profitPct = profit != null && cost != null && cost > 0
     ? Math.round((profit / entry.price!) * 100)
     : null;
+
+  // Pour Cost 计算
+  const pourCostResult = useMemo(() => {
+    // 纯饮/直饮：有关联酒款 + servingSize
+    if (entry.linkedSpiritItemId && entry.servingSize) {
+      const item = spiritsStore.items.find((i) => i.id === entry.linkedSpiritItemId);
+      if (item) return calcDirectPourCost(item, entry);
+    }
+    // 配方：有 cost（来自 smart-cost）
+    if (cost != null && entry.price != null) {
+      return calcRecipePourCost(cost, matchedCount ?? 0, totalCount ?? 1, entry.price);
+    }
+    return null;
+  }, [entry, cost, spiritsStore.items, matchedCount, totalCount]);
 
   return (
     <View style={styles.priceRow}>
@@ -103,6 +119,39 @@ function PriceRow({ entry, cost, onSetPrice }: PriceRowProps) {
           </Text>
         </View>
       )}
+      {/* Pour Cost 显示 */}
+      {pourCostResult?.pourCostPct != null && (
+        <View style={[styles.profitBadge, { backgroundColor: pourCostColor(pourCostResult.pourCostPct) + "22" }]}>
+          <Text style={[styles.profitText, { color: pourCostColor(pourCostResult.pourCostPct) }]}>
+            PC {pourCostResult.pourCostPct.toFixed(1)}%
+            {pourCostResult.confidence !== "exact" && ` (${confidenceLabel(pourCostResult.confidence)})`}
+          </Text>
+        </View>
+      )}
+      {/* 纯饮分量设置 */}
+      {onSetServingSize && (
+        editingServing ? (
+          <TextInput
+            style={[styles.priceInput, { color: colors.foreground, borderColor: colors.primary, width: 90 }]}
+            value={servingText}
+            onChangeText={setServingText}
+            keyboardType="decimal-pad"
+            autoFocus
+            onBlur={commitServing}
+            onSubmitEditing={commitServing}
+            returnKeyType="done"
+            placeholder="分量 ml"
+            placeholderTextColor={colors.muted}
+          />
+        ) : (
+          <Pressable onPress={() => setEditingServing(true)} style={[styles.priceBadge, { borderColor: colors.border }]}>
+            <IconSymbol name="drop" size={11} color={entry.servingSize != null ? "#5856D6" : colors.muted} />
+            <Text style={[styles.priceText, { color: entry.servingSize != null ? "#5856D6" : colors.muted }]}>
+              {entry.servingSize != null ? `${entry.servingSize}ml` : "设置分量"}
+            </Text>
+          </Pressable>
+        )
+      )}
     </View>
   );
 }
@@ -132,8 +181,18 @@ function MenuEntryCard({
 }: MenuEntryCardProps) {
   const colors = useColors();
   const { recipes } = useRecipeStore();
+  const { bottles } = useBottleStore();
+  const { preps } = useHomemadeStore();
+  const { setServingSize } = useMenuStore();
   const recipe = recipes.find((r) => r.id === entry.recipeId);
-  const cost = useCostForRecipe(recipe);
+  const costResult = useMemo(() => {
+    if (!recipe || recipe.ingredients.length === 0) return null;
+    const est = estimateRecipeCostSmart(recipe.ingredients, bottles, preps);
+    return est;
+  }, [recipe, bottles, preps]);
+  const cost = costResult && costResult.estimatedCount > 0 ? costResult.total : null;
+  const matchedCount = costResult?.items.filter((i) => i.link !== null).length ?? 0;
+  const totalCount = costResult?.totalCount ?? 0;
 
   if (!recipe) return null;
 
@@ -191,7 +250,14 @@ function MenuEntryCard({
 
       {/* 售价 + 利润率行 */}
       <View style={[styles.priceRowWrap, { borderTopColor: colors.border }]}>
-        <PriceRow entry={entry} cost={cost} onSetPrice={onSetPrice} />
+        <PriceRow
+          entry={entry}
+          cost={cost}
+          onSetPrice={onSetPrice}
+          onSetServingSize={(size) => setServingSize(entry.id, groupId, size)}
+          matchedCount={matchedCount}
+          totalCount={totalCount}
+        />
       </View>
     </View>
   );
