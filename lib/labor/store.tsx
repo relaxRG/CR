@@ -4,6 +4,7 @@
  */
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { notifySyncChange, registerStoreReload } from "../sync/engine";
 import {
   Employee, ShiftEntry, MonthlyAttendance, PaySlip, MonthConfig,
   calcDailyRate, calcAttendanceSalary, calcFinalSalary, getDaysInMonth, parseMonth,
@@ -95,18 +96,23 @@ function usePersisted<T>(key: string) {
   const ref = useRef<T[]>([]);
 
   useEffect(() => {
-    AsyncStorage.getItem(key).then((raw) => {
+    const load = () => AsyncStorage.getItem(key).then((raw) => {
       if (raw) {
         try { const parsed = JSON.parse(raw) as T[]; ref.current = parsed; setData(parsed); } catch {}
       }
       setReady(true);
     });
+    load();
+    // ★ 注册同步重载回调：其他设备同步后自动刷新
+    return registerStoreReload(load);
   }, [key]);
 
   const persist = useCallback((next: T[]) => {
     ref.current = next;
     setData(next);
     AsyncStorage.setItem(key, JSON.stringify(next)).catch(console.error);
+    // ★ 通知同步引擎：数据已变更，需要推送
+    notifySyncChange(key);
   }, [key]);
 
   return { data, ref, persist, ready };

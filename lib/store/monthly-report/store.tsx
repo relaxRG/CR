@@ -4,6 +4,7 @@
  */
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { notifySyncChange, registerStoreReload } from "../../sync/engine";
 import { MonthlyReport } from "./types";
 
 const STORAGE_KEY = "monthly_reports_v1";
@@ -30,7 +31,7 @@ export function MonthlyReportProvider({ children }: { children: React.ReactNode 
   const reportsRef = useRef<MonthlyReport[]>([]);
 
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY).then((raw) => {
+    const load = () => AsyncStorage.getItem(STORAGE_KEY).then((raw) => {
       if (raw) {
         try {
           const parsed = JSON.parse(raw) as MonthlyReport[];
@@ -40,12 +41,17 @@ export function MonthlyReportProvider({ children }: { children: React.ReactNode 
       }
       setReady(true);
     });
+    load();
+    // ★ 注册同步重载回调
+    return registerStoreReload(load);
   }, []);
 
   const persist = useCallback((next: MonthlyReport[]) => {
     reportsRef.current = next;
     setReports(next);
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)).catch(console.error);
+    // ★ 通知同步引擎
+    notifySyncChange(STORAGE_KEY);
   }, []);
 
   const addReport = useCallback((report: MonthlyReport) => {

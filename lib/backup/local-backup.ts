@@ -15,7 +15,9 @@ import { Platform } from "react-native";
 
 const SNAPSHOT_PREFIX = "backup.snapshot.";
 const SNAPSHOT_META_KEY = "backup.meta";
-const MAX_SNAPSHOTS = 3;
+const MAX_SNAPSHOTS = 7; // ★ 升级：3 → 7 个循环快照
+const CHUNK_SIZE_LIMIT = 1.5 * 1024 * 1024; // ★ 1.5MB 分片阈値（防 AsyncStorage 2MB 上限）
+const CHUNK_SUFFIX = ".chunks";
 
 export type SnapshotMeta = {
   /** 当前写入槽位（0-2 循环） */
@@ -62,9 +64,14 @@ function formatLabel(ts: number): string {
 export async function getSnapshotMeta(): Promise<SnapshotMeta> {
   try {
     const raw = await AsyncStorage.getItem(SNAPSHOT_META_KEY);
-    if (raw) return JSON.parse(raw) as SnapshotMeta;
+    if (raw) {
+      const meta = JSON.parse(raw) as SnapshotMeta;
+      // ★ 兼容升级：老用户 slots 可能只有3个，自动扩展到 7 个
+      while (meta.slots.length < MAX_SNAPSHOTS) meta.slots.push(null);
+      return meta;
+    }
   } catch {}
-  return { currentSlot: 0, slots: [null, null, null] };
+  return { currentSlot: 0, slots: Array(MAX_SNAPSHOTS).fill(null) };
 }
 
 /** 创建新快照（循环覆盖最旧的槽位） */
@@ -85,8 +92,15 @@ export async function createSnapshot(): Promise<SnapshotMeta> {
 
   const snapshot: Snapshot = { createdAt: now, hash, data };
 
-  // 写入快照
-  await AsyncStorage.setItem(`${SNAPSHOT_PREFIX}${slot}`, JSON.stringify(snapshot));
+  // ★ 分片写入：超过 1.5MB 时自动分片存储，防止 AsyncStorage 2MB 上限
+  const snapshotJson = JSON.stringify(snapshot);
+  if (snapshotJson.length > CHUNK_SIZE_LIMIT) {
+    await saveSnapshotChunked(slot, snapshotJson);
+  } else {
+    // 如果之前有分片，先清除它们
+    await clearSnapshotChunks(slot);
+    await AsyncStorage.setItem(`${SNAPSHOT_PREFIX}${slot}`, snapshotJson);
+  }
 
   // 更新元数据
   const newMeta: SnapshotMeta = {
@@ -105,9 +119,56 @@ export async function createSnapshot(): Promise<SnapshotMeta> {
   return newMeta;
 }
 
-/** 读取指定槽位的快照 */
+/** ★ 分片写入快照 */
+async function saveSnapshotChunked(slot: number, json: string): Promise<void> {
+  const chunkSize = Math.floor(CHUNK_SIZE_LIMIT);
+  const chunks = Math.ceil(json.length / chunkSize);
+  // 先清除旧单条存储
+  await AsyncStorage.removeItem(`${SNAPSHOT_PREFIX}${slot}`).catch(() => {});
+  for (let i = 0; i < chunks; i++) {
+    const chunk = json.slice(i * chunkSize, (i + 1) * chunkSize);
+    await AsyncStorage.setItem(`${SNAPSHOT_PREFIX}${slot}.chunk.${i}`, chunk);
+  }
+  await AsyncStorage.setItem(`${SNAPSHOT_PREFIX}${slot}${CHUNK_SUFFIX}`, String(chunks));
+}
+
+/** ★ 清除分片数据 */
+async function clearSnapshotChunks(slot: number): Promise<void> {
+  try {
+    const chunksRaw = await AsyncStorage.getItem(`${SNAPSHOT_PREFIX}${slot}${CHUNK_SUFFIX}`);
+    if (!chunksRaw) return;
+    const chunks = Number(chunksRaw);
+    const keys = [`${SNAPSHOT_PREFIX}${slot}${CHUNK_SUFFIX}`];
+    for (let i = 0; i < chunks; i++) keys.push(`${SNAPSHOT_PREFIX}${slot}.chunk.${i}`);
+    await AsyncStorage.multiRemove(keys);
+  } catch {}
+}
+
+/** ★ 分片读取快照 */
+async function readSnapshotChunked(slot: number): Promise<string | null> {
+  try {
+    const chunksRaw = await AsyncStorage.getItem(`${SNAPSHOT_PREFIX}${slot}${CHUNK_SUFFIX}`);
+    if (!chunksRaw) return null;
+    const chunks = Number(chunksRaw);
+    let json = "";
+    for (let i = 0; i < chunks; i++) {
+      const chunk = await AsyncStorage.getItem(`${SNAPSHOT_PREFIX}${slot}.chunk.${i}`);
+      if (!chunk) return null; // 分片不完整，放弃
+      json += chunk;
+    }
+    return json;
+  } catch {
+    return null;
+  }
+}
+
+/** 读取指定槽位的快照（自动处理分片） */
 export async function readSnapshot(slot: number): Promise<Snapshot | null> {
   try {
+    // 先尝试分片读取
+    const chunked = await readSnapshotChunked(slot);
+    if (chunked) return JSON.parse(chunked) as Snapshot;
+    // 常规单条读取
     const raw = await AsyncStorage.getItem(`${SNAPSHOT_PREFIX}${slot}`);
     if (!raw) return null;
     return JSON.parse(raw) as Snapshot;
@@ -152,37 +213,72 @@ export async function restoreFromSnapshot(slot: number): Promise<{ restored: num
   return { restored, failed };
 }
 
-/** 从 data 记录中解析各类数据的条目数量 */
-function parseDataCounts(data: Record<string, string | null>): {
+/** ★ 升级：全模块数据摘要统计 */
+export type DataCounts = {
   recipes: number;
   bottles: number;
   homemade: number;
-} {
+  wine: number;
+  foodMenu: number;
+  foodIngredients: number;
+  labProjects: number;
+  labPlan: number;
+  books: number;
+  employees: number;
+  paySlips: number;
+  monthlyReports: number;
+  pettyRecords: number;
+};
+
+function parseDataCounts(data: Record<string, string | null>): DataCounts {
   const parse = (key: string): number => {
     const raw = data[key];
     if (!raw) return 0;
     try {
-      const arr = JSON.parse(raw);
-      return Array.isArray(arr) ? arr.length : 0;
+      const val = JSON.parse(raw);
+      if (Array.isArray(val)) return val.length;
+      // 对象类型（如 { records: [] }）取第一个数组字段的长度
+      if (val && typeof val === "object") {
+        const firstArr = Object.values(val).find(Array.isArray);
+        return firstArr ? (firstArr as unknown[]).length : 0;
+      }
+      return 0;
     } catch {
       return 0;
     }
   };
   return {
-    recipes: parse("cocktail.recipes"),
-    bottles: parse("cocktail.bottles"),
-    homemade: parse("homemade.preps.v1"),
+    recipes:        parse("cocktail.recipes"),
+    bottles:        parse("cocktail.bottles"),
+    homemade:       parse("homemade.preps.v1"),
+    wine:           parse("wine.bottles.v1"),
+    foodMenu:       parse("food.menu.v1"),
+    foodIngredients: parse("food.ingredients.v2"),
+    labProjects:    parse("cocktail.lab.projects"),
+    labPlan:        parse("lab.plan.v1"),
+    books:          parse("cocktail.books.v1"),
+    employees:      parse("labor_employees_v1"),
+    paySlips:       parse("labor_payslips_v1"),
+    monthlyReports: parse("monthly_summary.reports.v1"),
+    pettyRecords:   parse("store.petty.v1"),
   };
 }
 
-/** 计算本地快照与当前 AsyncStorage 数据的差异摘要 */
+/** ★ 升级：计算快照与当前数据的差异摘要（全模块） */
 export async function computeSnapshotDiff(slot: number): Promise<{
-  snapshot: { recipes: number; bottles: number; homemade: number };
-  current: { recipes: number; bottles: number; homemade: number };
+  snapshot: DataCounts;
+  current: DataCounts;
 } | null> {
   const snapshot = await readSnapshot(slot);
   if (!snapshot) return null;
-  const currentPairs = await AsyncStorage.multiGet(["cocktail.recipes", "cocktail.bottles", "homemade.preps.v1"]);
+  const SUMMARY_KEYS = [
+    "cocktail.recipes", "cocktail.bottles", "homemade.preps.v1",
+    "wine.bottles.v1", "food.menu.v1", "food.ingredients.v2",
+    "cocktail.lab.projects", "lab.plan.v1", "cocktail.books.v1",
+    "labor_employees_v1", "labor_payslips_v1",
+    "monthly_summary.reports.v1", "store.petty.v1",
+  ];
+  const currentPairs = await AsyncStorage.multiGet(SUMMARY_KEYS);
   const currentData: Record<string, string | null> = {};
   for (const [k, v] of currentPairs) currentData[k] = v;
   return {
@@ -191,11 +287,11 @@ export async function computeSnapshotDiff(slot: number): Promise<{
   };
 }
 
-/** 从任意 data 字段计算差异摘要（用于 iCloud 备份 diff） */
+/** ★ 升级：从任意 data 字段计算差异摘要（用于 iCloud 备份 diff） */
 export function computeBackupFileDiff(
   backupData: Record<string, string | null>,
   currentData: Record<string, string | null>,
-): { snapshot: { recipes: number; bottles: number; homemade: number }; current: { recipes: number; bottles: number; homemade: number } } {
+): { snapshot: DataCounts; current: DataCounts } {
   return {
     snapshot: parseDataCounts(backupData),
     current: parseDataCounts(currentData),

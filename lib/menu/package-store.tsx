@@ -4,6 +4,7 @@
  */
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useReducer } from "react";
+import { notifySyncChange, registerStoreReload } from "../sync/engine";
 
 const STORAGE_KEY = "menu.packages.v1";
 
@@ -67,15 +68,20 @@ export function MenuPackageProvider({ children }: { children: React.ReactNode })
   const [ready, setReady] = React.useState(false);
 
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY).then((raw) => {
+    const load = () => AsyncStorage.getItem(STORAGE_KEY).then((raw) => {
       if (raw) { try { dispatch({ type: "LOAD", payload: JSON.parse(raw) }); } catch {} }
       setReady(true);
     });
+    load();
+    // ★ 注册同步重载回调
+    return registerStoreReload(load);
   }, []);
 
   useEffect(() => {
     if (!ready) return;
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(packages)).catch(() => {});
+    // ★ 通知同步引擎
+    notifySyncChange(STORAGE_KEY);
   }, [packages, ready]);
 
   const addPackage = useCallback((data: Omit<MenuPackage, "id" | "createdAt" | "updatedAt">): string => {

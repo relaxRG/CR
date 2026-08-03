@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
-import { getSyncLog, type SyncLogEntry } from "@/lib/sync/engine";
+import { getSyncLog, subscribeSyncState, type SyncLogEntry } from "@/lib/sync/engine";
 import { useSync } from "@/lib/cf-sync/provider";
 
 type FilterKey = "all" | "error" | "conflict" | "backup" | "push" | "pull";
@@ -43,9 +43,15 @@ export default function SyncLogScreen() {
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
+    // ★ 初始加载
     getSyncLog().then(setLog);
+    // ★ 订阅实时刷新：每次同步状态变化时自动更新日志
+    const unsub = subscribeSyncState((s) => {
+      if (s.log && s.log.length > 0) setLog(s.log);
+    });
     // 用户进入同步日志页面，视为已知晓错误，清除红点角标
     dismissSyncError();
+    return unsub;
   }, [dismissSyncError]);
 
   const filteredLog = useMemo(() => {

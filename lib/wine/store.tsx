@@ -117,28 +117,29 @@ export function WineProvider({ children }: { children: React.ReactNode }) {
   const [manualState, manualDispatch] = useReducer(manualReducer, initialManualState);
 
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY).then((raw) => {
-      if (raw) {
-        try { dispatch({ type: "LOAD", payload: JSON.parse(raw) }); } catch {}
-      }
+    const loadBottles = () => AsyncStorage.getItem(STORAGE_KEY).then((raw) => {
+      if (raw) { try { dispatch({ type: "LOAD", payload: JSON.parse(raw) }); } catch {} }
     });
-    registerStoreReload(() => {
-      AsyncStorage.getItem(STORAGE_KEY).then((raw) => {
-        if (raw) { try { dispatch({ type: "LOAD", payload: JSON.parse(raw) }); } catch {} }
-      });
-    });
+    loadBottles();
+    return registerStoreReload(loadBottles);
   }, []);
 
   useEffect(() => {
-    AsyncStorage.getItem(SNAPSHOT_KEY).then((raw) => {
+    const loadSnap = () => AsyncStorage.getItem(SNAPSHOT_KEY).then((raw) => {
       if (raw) { try { snapshotDispatch({ type: "LOAD", payload: JSON.parse(raw) }); } catch {} }
     });
+    loadSnap();
+    // ★ 注册同步重载回调
+    return registerStoreReload(loadSnap);
   }, []);
 
   useEffect(() => {
-    AsyncStorage.getItem(MANUAL_PURCHASE_KEY).then((raw) => {
+    const loadManual = () => AsyncStorage.getItem(MANUAL_PURCHASE_KEY).then((raw) => {
       if (raw) { try { manualDispatch({ type: "LOAD", payload: JSON.parse(raw) }); } catch {} }
     });
+    loadManual();
+    // ★ 注册同步重载回调
+    return registerStoreReload(loadManual);
   }, []);
 
   useEffect(() => {
@@ -148,10 +149,14 @@ export function WineProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     AsyncStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshotState)).catch(() => {});
+    // ★ 通知同步引擎
+    notifySyncChange(SNAPSHOT_KEY);
   }, [snapshotState]);
 
   useEffect(() => {
     AsyncStorage.setItem(MANUAL_PURCHASE_KEY, JSON.stringify(manualState)).catch(() => {});
+    // ★ 通知同步引擎
+    notifySyncChange(MANUAL_PURCHASE_KEY);
   }, [manualState]);
 
   const addBottle = useCallback((data: Omit<WineBottle, "id" | "createdAt" | "updatedAt">) => {

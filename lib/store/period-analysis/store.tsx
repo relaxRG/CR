@@ -73,13 +73,16 @@ export function PeriodAnalysisProvider({ children }: { children: React.ReactNode
       } catch {}
     };
     load();
-    registerStoreReload(load);
+    // ★ 注册同步重载回调，返回清理函数
+    return registerStoreReload(load);
   }, []);
 
   useEffect(() => {
     AsyncStorage.setItem(REPORTS_KEY, JSON.stringify(state.reports)).catch(() => {});
     AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings)).catch(() => {});
+    // ★ 两个键都要通知同步引擎
     notifySyncChange(REPORTS_KEY);
+    notifySyncChange(SETTINGS_KEY);
   }, [state]);
 
   const addReport = useCallback((report: PeriodAnalysisReport) => dispatch({ type: "ADD_REPORT", report }), []);

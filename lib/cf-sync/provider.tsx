@@ -114,31 +114,50 @@ export function SyncProvider({
     [deviceInfo],
   );
 
-  // 冲突解决：逐个弹出 Alert 让用户选择
+  // ★ 冲突解决：升级版—显示数据预览和自动推荐
   useEffect(() => {
     if (pendingConflicts.length === 0) return;
     const conflict = pendingConflicts[0];
     const label = STORAGE_KEY_LABELS[conflict.storageKey] ?? conflict.storageKey;
     const localTime = new Date(conflict.localTs).toLocaleTimeString();
     const remoteTime = new Date(conflict.remoteTs).toLocaleTimeString();
+    const localPreview = getDataPreview(conflict.localValue, conflict.storageKey);
+    const remotePreview = getDataPreview(conflict.remoteValue, conflict.storageKey);
+    const rec = getConflictRecommendation(
+      conflict.localValue, conflict.localTs,
+      conflict.remoteValue, conflict.remoteTs,
+    );
+    const remaining = pendingConflicts.length;
     const isEn = lang === "en";
+    const recHint = rec === "remote"
+      ? (isEn ? "\n\n💡 Recommended: Use Cloud (newer & more data)" : "\n\n💡 建议：采用云端版本（更新且数据更多）")
+      : rec === "local"
+      ? (isEn ? "\n\n💡 Recommended: Keep Local (newer & more data)" : "\n\n💡 建议：保留本机版本（更新且数据更多）")
+      : "";
+    const countHint = remaining > 1
+      ? (isEn ? `\n(${remaining} conflicts remaining)` : `\n（还有 ${remaining} 个冲突需要处理）`)
+      : "";
     Alert.alert(
-      isEn ? "Sync Conflict" : "同步冲突",
+      isEn ? `Sync Conflict` : `同步冲突`,
       isEn
-        ? `"${label}" was modified on two devices at nearly the same time:\n\nLocal: ${localTime}\nCloud: ${remoteTime}\n\nWhich version would you like to keep?`
-        : `「${label}」在两台设备上几乎同时被修改：\n\n本机版本：${localTime}\n云端版本：${remoteTime}\n\n请选择保留哪一方：`,
+        ? `"${label}" was modified on two devices:\n\nLocal (${localTime}): ${localPreview}\nCloud (${remoteTime}): ${remotePreview}${recHint}${countHint}`
+        : `「${label}」在两台设备上被修改：\n\n本机（${localTime}）：${localPreview}\n云端（${remoteTime}）：${remotePreview}${recHint}${countHint}`,
       [
         {
-          text: isEn ? "Keep Local" : "保留本机",
-          style: "default",
+          text: isEn
+            ? `Keep Local${rec === "local" ? " ✓" : ""}`
+            : `保留本机${rec === "local" ? " ✓推荐" : ""}`,
+          style: rec === "remote" ? "destructive" : "default",
           onPress: () => {
             void resolveConflict(conflict, true, pushFn ?? (async () => {}));
             setPendingConflicts((prev) => prev.slice(1));
           },
         },
         {
-          text: isEn ? "Use Cloud" : "采用云端",
-          style: "destructive",
+          text: isEn
+            ? `Use Cloud${rec === "remote" ? " ✓" : ""}`
+            : `采用云端${rec === "remote" ? " ✓推荐" : ""}`,
+          style: rec === "local" ? "destructive" : "default",
           onPress: () => {
             void resolveConflict(conflict, false, pushFn ?? (async () => {}));
             setPendingConflicts((prev) => prev.slice(1));
@@ -402,28 +421,108 @@ export function useCFSync() {
   return useSync();
 }
 
-/** 存储键 → 用户可读名称（用于冲突弹框） */
+/** ★ 存储键 → 用户可读名称（用于冲突弹框）—全面补全 */
 const STORAGE_KEY_LABELS: Record<string, string> = {
-  "cocktail.recipes": "配方库",
-  "cocktail.categories": "分类",
-  "cocktail.tags": "标签",
-  "cocktail.tagGroups": "标签分组",
-  "cocktail.categoryGroups": "分类分组",
-  "cocktail.bottles": "酒款库",
-  "homemade.preps.v1": "自制库",
-  "homemade.sections.v1": "自制分区",
-  "homemade.types.v1": "自制类型",
-  "homemade.taxonomy.v2": "自制分类体系",
-  "bottles.taxonomy.categories.v1": "酒款分类",
-  "bottles.taxonomy.styles.v1": "酒款风格",
-  "cocktail.lab.projects": "研发项目",
-  "cocktail.lab.batches": "研发批次",
-  "cocktail.books.v1": "书库",
-  "menu_store_v1": "门店酒单",
-  "shopping_store_v1": "采购清单",
-  "cocktail.iceSettings.v2": "冰块设置",
-  "app.lang.v1": "语言设置",
+  // 鸡尾酒核心
+  "cocktail.recipes":              "配方库",
+  "cocktail.categories":           "分类",
+  "cocktail.tags":                 "标签",
+  "cocktail.tagGroups":            "标签分组",
+  "cocktail.categoryGroups":       "分类分组",
+  "cocktail.bottles":              "酒款库",
+  "homemade.preps.v1":             "自制库",
+  "homemade.sections.v1":          "自制分区",
+  "homemade.types.v1":             "自制类型",
+  "homemade.taxonomy.v2":          "自制分类体系",
+  "bottles.taxonomy.categories.v1":"酒款分类",
+  "bottles.taxonomy.styles.v1":    "酒款风格",
+  "cocktail.lab.projects":         "研发项目",
+  "cocktail.lab.batches":          "研发批次",
+  "cocktail.books.v1":             "书库",
+  "menu_store_v1":                 "门店酒单",
+  "shopping_store_v1":             "采购清单",
+  "cocktail.iceSettings.v2":       "冰块设置",
+  "app.lang.v1":                   "语言设置",
+  "cocktail.prefs.v1":             "偏好设置",
+  // ★ 新增：葡萄酒模块
+  "wine.bottles.v1":               "葡萄酒库",
+  "wine.snapshots.v2":             "葡萄酒库存快照",
+  "wine.manual_purchases.v1":      "葡萄酒进货记录",
+  // ★ 新增：餐食模块
+  "food.menu.v1":                  "餐食菜单",
+  "food.ingredients.v2":           "食材库",
+  "food.purchases.v1":             "食材采购记录",
+  // ★ 新增：研发计划
+  "lab.plan.v1":                   "研发计划清单",
+  // ★ 新增：门店模块
+  "store.revenue.v1":              "营业状况",
+  "store.petty.v1":                "备用金记录",
+  "store.petty_categories.v1":     "备用金分类",
+  "store.petty_inv_links.v1":      "备用金库存联动",
+  "store.inventory.v1":            "门店库存",
+  "menu.packages.v1":              "套餐管理",
+  // ★ 新增：月度报表
+  "monthly_summary.reports.v1":    "月度总报表",
+  "monthly_summary.suppliers.v1":  "供应商档案",
+  "monthly_summary.payments.v1":   "货款记录",
+  "monthly_summary.balances.v1":   "账户余额",
+  "monthly_reports_v1":            "月度报表导入",
+  // ★ 新增：经营分析
+  "period_analysis.reports.v1":    "经营分析报表",
+  "period_analysis.settings.v1":   "经营分析设置",
+  // ★ 新增：人工成本
+  "labor_employees_v1":            "员工档案",
+  "labor_shifts_v1":               "排班记录",
+  "labor_attendance_v1":           "考勤记录",
+  "labor_payslips_v1":             "薪资单",
+  "labor_month_configs_v1":        "月度薪资配置",
+  "labor.salary_advances.v1":      "员工预支记录",
 };
+
+/** ★ 获取数据预览（条目数量） */
+function getDataPreview(value: string, _key: string): string {
+  try {
+    const data = JSON.parse(value);
+    if (Array.isArray(data)) return `${data.length} 条记录`;
+    if (data && typeof data === "object") {
+      const firstArr = Object.values(data).find(Array.isArray);
+      if (firstArr) return `${(firstArr as unknown[]).length} 条记录`;
+      return "数据已修改";
+    }
+    return "数据已修改";
+  } catch {
+    return "数据已修改";
+  }
+}
+
+/** ★ 自动推荐冲突解决方案：时间更新且数据更多的版本 */
+function getConflictRecommendation(
+  localValue: string,
+  localTs: number,
+  remoteValue: string,
+  remoteTs: number,
+): "local" | "remote" | null {
+  const getCount = (v: string): number => {
+    try {
+      const d = JSON.parse(v);
+      if (Array.isArray(d)) return d.length;
+      if (d && typeof d === "object") {
+        const arr = Object.values(d).find(Array.isArray);
+        return arr ? (arr as unknown[]).length : 0;
+      }
+      return 0;
+    } catch { return 0; }
+  };
+  const localCount = getCount(localValue);
+  const remoteCount = getCount(remoteValue);
+  const remoteNewer = remoteTs > localTs;
+  const localNewer = localTs > remoteTs;
+  if (remoteNewer && remoteCount >= localCount) return "remote";
+  if (localNewer && localCount >= remoteCount) return "local";
+  if (remoteCount > localCount + 2) return "remote";
+  if (localCount > remoteCount + 2) return "local";
+  return null;
+}
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // ─── 权限变更检测 ─────────────────────────────────────────────────────────────

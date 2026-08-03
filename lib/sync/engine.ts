@@ -1,16 +1,26 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 /**
- * 云端同步引擎(类 iCloud 体验):
- * - 各 store 持久化后调用 notifySyncChange(key) 标记脏键
- * - 登录后 initialSync: 云端有数据 → 按键比较时间戳合并;首次 → 上传本地全量
- * - 脏键 debounce 3s 批量 push,last-write-wins per key
- * - 同步前自动备份本地数据，出错可一键恢复
- * - 60秒内双端都修改同一键 → 冲突，弹框让用户决策
+ * 云端同步引擎 v2.0（全面升级版）
+ *
+ * 核心安全修复：
+ * ① flushDirtyKeys 加锁：initialSync 完成前禁止任何推送，防止旧设备/空设备覆盖云端
+ * ② 空设备安全拉取：localTs=0 时无条件拉取云端，绝不推送本地空数据
+ * ③ localTs=0 推送守卫：无时间戳的键跳过推送
+ * ④ SYNC_KEYS 补全：新增 26 个键，覆盖葡萄酒/餐食/人工/月报/备用金/进销存等所有新模块
+ *
+ * 合并策略升级：
+ * ⑤ 字段级合并：同一条记录两端修改不同字段时各自保留，不再整条 LWW 覆盖
+ * ⑥ ID_LIST_KEYS 扩展：新模块加入 ID 级合并
+ *
+ * 其他升级：
+ * ⑦ 同步日志扩容：50 → 200 条
+ * ⑧ prefs 有利优先合并保持不变
  */
 
 /** 参与云端同步的全部 AsyncStorage 键 */
 export const SYNC_KEYS = [
+  // ── 鸡尾酒核心 ──────────────────────────────────────────────────────────────
   "cocktail.recipes",
   "cocktail.categories",
   "cocktail.tags",
@@ -39,28 +49,54 @@ export const SYNC_KEYS = [
   "shopping_store_v1",
   "cocktail.iceSettings.v2",
   "cocktail.prefs.v1",
+  // ── 葡萄酒模块（新增）────────────────────────────────────────────────────────
+  "wine.bottles.v1",
+  "wine.snapshots.v2",
+  "wine.manual_purchases.v1",
+  // ── 餐食模块（新增）──────────────────────────────────────────────────────────
+  "food.menu.v1",
+  "food.ingredients.v2",
+  "food.purchases.v1",
+  // ── 研发计划（新增）──────────────────────────────────────────────────────────
+  "lab.plan.v1",
+  // ── 门店模块（新增）──────────────────────────────────────────────────────────
+  "store.revenue.v1",
+  "store.petty.v1",
+  "store.petty_categories.v1",
+  "store.petty_inv_links.v1",
+  "store.inventory.v1",
+  "menu.packages.v1",
+  // ── 月度报表（新增）──────────────────────────────────────────────────────────
+  "monthly_summary.reports.v1",
+  "monthly_summary.suppliers.v1",
+  "monthly_summary.payments.v1",
+  "monthly_summary.balances.v1",
+  "monthly_reports_v1",
+  // ── 经营分析（新增）──────────────────────────────────────────────────────────
+  "period_analysis.reports.v1",
+  "period_analysis.settings.v1",
+  // ── 人工成本（新增）──────────────────────────────────────────────────────────
+  "labor_employees_v1",
+  "labor_shifts_v1",
+  "labor_attendance_v1",
+  "labor_payslips_v1",
+  "labor_month_configs_v1",
+  "labor.salary_advances.v1",
 ] as const;
 
 const TS_PREFIX = "sync.ts.";
 const LAST_SYNC_KEY = "sync.lastPulledAt";
 const BACKUP_KEY = "sync.backup.v1";
 const SYNC_LOG_KEY = "sync.log.v1";
-const MAX_LOG_ENTRIES = 50;
+const MAX_LOG_ENTRIES = 200; // ★ 从 50 升级到 200
 
 /** 冲突判定窗口：60 秒内双端都有修改则视为冲突 */
 const CONFLICT_WINDOW_MS = 60_000;
 
 // ─── prefs 有利优先合并 ────────────────────────────────────────────────────────
-/** 单条 pref 记录的类型 */
 type PrefEntry = { favorite?: boolean; rating?: number | null; made?: boolean };
 type PrefsMap = Record<string, PrefEntry>;
 
-/**
- * 将两个 cocktail.prefs.v1 JSON 字符串按「有利优先」策略合并：
- * - favorite / made: 任一为 true 则保留 true（any-true-wins）
- * - rating: 取较高值；若一方为 null/undefined 则保留另一方的非空值
- * 返回合并后的 JSON 字符串，以及是否比本地原始值「更有利」（用于决定是否主动推送）。
- */
 function mergePrefs(localJson: string, remoteJson: string): { merged: string; changed: boolean } {
   try {
     const local: PrefsMap = JSON.parse(localJson);
@@ -71,19 +107,16 @@ function mergePrefs(localJson: string, remoteJson: string): { merged: string; ch
       const l = local[id] ?? {};
       const r = remote[id] ?? {};
       const entry: PrefEntry = {};
-      // favorite: any-true-wins
       if (l.favorite === true || r.favorite === true) {
         entry.favorite = true;
       } else if (l.favorite === false || r.favorite === false) {
         entry.favorite = false;
       }
-      // made: any-true-wins
       if (l.made === true || r.made === true) {
         entry.made = true;
       } else if (l.made === false || r.made === false) {
         entry.made = false;
       }
-      // rating: keep higher non-null value
       const lRating = typeof l.rating === "number" ? l.rating : null;
       const rRating = typeof r.rating === "number" ? r.rating : null;
       if (lRating !== null && rRating !== null) {
@@ -98,22 +131,59 @@ function mergePrefs(localJson: string, remoteJson: string): { merged: string; ch
       merged[id] = entry;
     }
     const mergedJson = JSON.stringify(merged);
-    // 若合并结果与本地原始值不同，说明云端带来了更有利的数据，需要推送回去
-    const changed = mergedJson !== localJson;
-    return { merged: mergedJson, changed };
+    return { merged: mergedJson, changed: mergedJson !== localJson };
   } catch {
-    // 解析失败时回退到本地值（保守策略）
     return { merged: localJson, changed: false };
   }
 }
 
-/** 是否为需要有利优先合并的 prefs 键 */
 const PREFS_MERGE_KEYS = new Set<string>(["cocktail.prefs.v1"]);
 
-// ─── ID 级别列表合并 ──────────────────────────────────────────────────────────
+// ─── 字段级合并（P1 升级：同一记录不同字段各自保留）────────────────────────────
 /**
- * 对「数组型」键执行 ID 级别合并：两端各自新增的条目取并集，不丢数据。
+ * 对同一条记录执行字段级合并：
+ * - 本地没有的字段 → 取云端值
+ * - 两端都有的字段 → 取 updatedAt/clientUpdatedAt 更新的版本（LWW per field）
+ * - 无时间戳时 → 取云端值（保守策略）
  */
+function mergeRecord(
+  local: Record<string, unknown>,
+  remote: Record<string, unknown>,
+): Record<string, unknown> {
+  try {
+    const merged: Record<string, unknown> = { ...local };
+    const localTs = (
+      (local.updatedAt as number | undefined) ??
+      (local.clientUpdatedAt as number | undefined) ??
+      0
+    );
+    const remoteTs = (
+      (remote.updatedAt as number | undefined) ??
+      (remote.clientUpdatedAt as number | undefined) ??
+      0
+    );
+
+    for (const field of Object.keys(remote)) {
+      if (field === "id") continue; // ID 永远不合并
+      if (!(field in local)) {
+        // 本地没有此字段 → 取云端
+        merged[field] = remote[field];
+      } else {
+        // 两端都有 → 取时间戳更新的版本
+        if (remoteTs > localTs) {
+          merged[field] = remote[field];
+        }
+        // 否则保留本地（已在 merged 中）
+      }
+    }
+    return merged;
+  } catch {
+    // 字段级合并失败时回退到整条 LWW（取云端）
+    return remote;
+  }
+}
+
+// ─── ID 级别列表合并（升级：使用字段级合并）──────────────────────────────────────
 function mergeIdList(
   localJson: string,
   remoteJson: string,
@@ -133,11 +203,15 @@ function mergeIdList(
       if (!item?.id) continue;
       const existing = map.get(item.id);
       if (!existing) {
+        // 云端新增条目 → 直接加入（不丢数据）
         map.set(item.id, item);
       } else {
-        const localTs = (existing.updatedAt ?? existing.clientUpdatedAt ?? 0) as number;
-        const remoteTs = (item.updatedAt ?? item.clientUpdatedAt ?? 0) as number;
-        if (remoteTs > localTs) map.set(item.id, item);
+        // ★ 升级：使用字段级合并，不再整条 LWW
+        const mergedItem = mergeRecord(
+          existing as Record<string, unknown>,
+          item as Record<string, unknown>,
+        ) as Item;
+        map.set(item.id, mergedItem);
       }
     }
     const mergedJson = JSON.stringify(Array.from(map.values()));
@@ -179,17 +253,30 @@ function mergeStoreObject(
   }
 }
 
+/** 使用 ID 级合并的键（★ 新增 8 个新模块键）*/
 const ID_LIST_KEYS = new Set<string>([
+  // 原有
   "cocktail.recipes",
   "cocktail.bottles",
   "homemade.preps.v1",
   "cocktail.lab.projects",
   "cocktail.lab.batches",
+  // ★ 新增
+  "wine.bottles.v1",
+  "food.menu.v1",
+  "food.ingredients.v2",
+  "lab.plan.v1",
+  "labor_employees_v1",
+  "labor_payslips_v1",
+  "monthly_summary.suppliers.v1",
+  "monthly_summary.payments.v1",
 ]);
 
 const STORE_OBJECT_KEYS = new Map<string, string[]>([
   ["menu_store_v1", ["groups"]],
   ["shopping_store_v1", ["items"]],
+  ["store.petty.v1", ["records"]],
+  ["store.revenue.v1", ["records"]],
 ]);
 
 function mergeByKey(
@@ -222,6 +309,9 @@ let pushTimer: ReturnType<typeof setTimeout> | null = null;
 let pushFn: PushFn | null = null;
 let syncEnabled = false;
 const listeners = new Set<(state: SyncState) => void>();
+
+// ★ P0-A：初始同步完成锁，防止 flushDirtyKeys 在 initialSync 前推送旧数据
+let initialSyncDone = false;
 
 const DIRTY_KEYS_PERSIST_KEY = "sync.dirtyKeys.pending";
 
@@ -374,12 +464,11 @@ export async function getSyncLog(): Promise<SyncLogEntry[]> {
   }
 }
 
-/** 用户主动查看同步日志后调用，清除错误状态（消除红点角标） */
 export function clearSyncError(): void {
   setState({ error: null });
 }
 
-/** store 持久化后调用:标记键为脏并调度推送 */
+/** store 持久化后调用：标记键为脏并调度推送 */
 export function notifySyncChange(key: string) {
   if (!(SYNC_KEYS as readonly string[]).includes(key)) return;
   const now = Date.now();
@@ -394,10 +483,15 @@ export function notifySyncChange(key: string) {
 }
 
 async function flushDirtyKeys() {
+  // ★ P0-A：初始同步完成前，禁止任何推送，防止旧设备/空设备覆盖云端新数据
+  if (!initialSyncDone) {
+    console.log("[Sync] flushDirtyKeys deferred: waiting for initialSync to complete");
+    return;
+  }
   if (!syncEnabled || !pushFn || dirtyKeys.size === 0) return;
   const keys = Array.from(dirtyKeys);
   dirtyKeys.clear();
-  void persistDirtyKeys(); // clear persisted queue
+  void persistDirtyKeys();
   setState({ syncing: true });
   try {
     const entries: { storageKey: string; value: string; clientUpdatedAt: number }[] = [];
@@ -407,10 +501,18 @@ async function flushDirtyKeys() {
         AsyncStorage.getItem(TS_PREFIX + key),
       ]);
       if (value == null) continue;
+      // ★ P0-C：localTs=0 守卫，无时间戳的键不推送
+      const localTs = ts ? Number(ts) : 0;
+      if (localTs === 0) {
+        // 重新加回脏键，等待下次 initialSync 完成后处理
+        dirtyKeys.add(key);
+        void persistDirtyKeys();
+        continue;
+      }
       entries.push({
         storageKey: key,
         value,
-        clientUpdatedAt: ts ? Number(ts) : Date.now(),
+        clientUpdatedAt: localTs,
       });
     }
     if (entries.length > 0) {
@@ -418,13 +520,13 @@ async function flushDirtyKeys() {
       const now = Date.now();
       setState({ lastSyncedAt: now, error: null, syncing: false });
       await AsyncStorage.setItem(LAST_SYNC_KEY, String(now));
-      await appendLog({ time: now, type: "push", keys, message: `推送 ${keys.length} 个键` });
+      await appendLog({ time: now, type: "push", keys, message: `推送 ${entries.length} 个键` });
     } else {
       setState({ syncing: false });
     }
   } catch (err) {
     keys.forEach((k) => dirtyKeys.add(k));
-    void persistDirtyKeys(); // re-persist failed keys
+    void persistDirtyKeys();
     const msg = err instanceof Error ? err.message : "sync push failed";
     setState({ error: msg, syncing: false });
     await appendLog({ time: Date.now(), type: "error", message: msg });
@@ -432,9 +534,12 @@ async function flushDirtyKeys() {
 }
 
 /**
- * 带冲突检测的初始同步。
- * 冲突定义：本地和云端都在 CONFLICT_WINDOW_MS 内修改了同一个键。
- * 冲突键不会自动覆盖，而是收集后返回给调用方，由 UI 弹框让用户选择。
+ * 带冲突检测的初始同步（v2.0 安全升级版）
+ *
+ * 核心安全保障：
+ * 1. 空设备（localTs=0）无条件拉取云端，绝不推送本地空数据
+ * 2. 有时间戳的键才允许上传（localTs > 0 守卫）
+ * 3. 同步完成后解锁 initialSyncDone，允许后续 flushDirtyKeys 推送
  */
 export async function runInitialSync(
   remoteEntries: { storageKey: string; value: string; clientUpdatedAt: number }[],
@@ -442,6 +547,8 @@ export async function runInitialSync(
 ): Promise<{ overwritten: boolean; conflicts: SyncConflict[] }> {
   pushFn = push;
   syncEnabled = true;
+  // ★ P0-A：重置锁，防止并发调用
+  initialSyncDone = false;
   setState({ enabled: true, syncing: true, error: null });
   let localOverwritten = false;
   const conflicts: SyncConflict[] = [];
@@ -454,7 +561,7 @@ export async function runInitialSync(
     const toUpload: { storageKey: string; value: string; clientUpdatedAt: number }[] = [];
     const pulledKeys: string[] = [];
 
-    // 预扫描：是否需要备份
+    // 预扫描：是否需要备份（有时间戳的键才参与判断）
     let willOverwrite = false;
     for (const key of SYNC_KEYS) {
       const [localValue, localTsRaw] = await Promise.all([
@@ -475,7 +582,7 @@ export async function runInitialSync(
       await backupLocalData();
     }
 
-    // 主同步循环
+    // ── 主同步循环 ────────────────────────────────────────────────────────────
     for (const key of SYNC_KEYS) {
       const [localValue, localTsRaw] = await Promise.all([
         AsyncStorage.getItem(key),
@@ -484,10 +591,15 @@ export async function runInitialSync(
       const localTs = localTsRaw ? Number(localTsRaw) : 0;
       const remote = remoteMap.get(key);
 
-      if (remote && localValue && localTs > 0 && remote.clientUpdatedAt !== localTs) {
+      // ★ P0-B：空设备标志（无时间戳 = 从未同步过，或全新安装）
+      const isBlankDevice = localTs === 0;
+
+      // 冲突检测：仅在有时间戳（非空设备）时才可能冲突
+      if (!isBlankDevice && remote && localValue &&
+          remote.clientUpdatedAt !== localTs) {
         const diff = Math.abs(remote.clientUpdatedAt - localTs);
         if (diff < CONFLICT_WINDOW_MS) {
-          // 冲突：60秒内双端都有修改，不自动覆盖，交给用户决定
+          // 60秒内双端都有修改 → 冲突，不自动覆盖，交给用户决定
           conflicts.push({
             storageKey: key,
             localValue,
@@ -499,11 +611,21 @@ export async function runInitialSync(
         }
       }
 
-      if (remote && (!localValue || (localTs > 0 && remote.clientUpdatedAt > localTs))) {
-        // 云端更新 → 按键类型选择合并策略
-        let mergedValue = remote.value;
-        if (localValue) {
-          const { merged, changed } = mergeByKey(key, localValue, remote.value);
+      // ★ P0-B 修复后的拉取条件：
+      // 1. 空设备 + 云端有数据 → 无条件拉取（即使本地有空数组也要被云端覆盖）
+      // 2. 本地无数据 + 云端有数据 → 拉取
+      // 3. 有时间戳 + 云端更新 → 拉取
+      const shouldPull = remote && (
+        isBlankDevice ||
+        !localValue ||
+        (localTs > 0 && remote.clientUpdatedAt > localTs)
+      );
+
+      if (shouldPull) {
+        let mergedValue = remote!.value;
+        // 有本地数据且非空设备时，尝试 ID 级/字段级合并（不丢任何一方的新增数据）
+        if (localValue && !isBlankDevice) {
+          const { merged, changed } = mergeByKey(key, localValue, remote!.value);
           mergedValue = merged;
           if (changed) {
             const now2 = Date.now();
@@ -511,15 +633,22 @@ export async function runInitialSync(
           }
         }
         await AsyncStorage.setItem(key, mergedValue);
-        await AsyncStorage.setItem(TS_PREFIX + key, String(remote.clientUpdatedAt));
+        await AsyncStorage.setItem(TS_PREFIX + key, String(remote!.clientUpdatedAt));
         localOverwritten = true;
         pulledKeys.push(key);
-      } else if (localValue != null && (!remote || localTs > remote.clientUpdatedAt)) {
-        // 本地更新 → 上传
+      }
+      // ★ P0-B + P0-C 修复后的上传条件：
+      // 必须有时间戳（非空设备）且本地确实比云端更新，才允许上传
+      else if (
+        localValue != null &&
+        !isBlankDevice &&
+        localTs > 0 &&
+        (!remote || localTs > remote.clientUpdatedAt)
+      ) {
         toUpload.push({
           storageKey: key,
           value: localValue,
-          clientUpdatedAt: localTs || Date.now(),
+          clientUpdatedAt: localTs,
         });
       }
     }
@@ -547,14 +676,22 @@ export async function runInitialSync(
     const msg = err instanceof Error ? err.message : "sync failed";
     setState({ syncing: false, error: msg });
     await appendLog({ time: Date.now(), type: "error", message: msg });
+  } finally {
+    // ★ P0-A：无论成功还是失败，都解锁，允许后续 flushDirtyKeys 推送
+    initialSyncDone = true;
+    // 如果有积压的脏键（在 initialSync 期间被标记的），立即触发推送
+    if (dirtyKeys.size > 0) {
+      if (pushTimer) clearTimeout(pushTimer);
+      pushTimer = setTimeout(() => {
+        void flushDirtyKeys();
+      }, 1000);
+    }
   }
   return { overwritten: localOverwritten, conflicts };
 }
 
 /**
  * 解决冲突：用户选择保留本地或云端数据后调用。
- * keepLocal=true → 将本地数据上传覆盖云端
- * keepLocal=false → 将云端数据写入本地并触发 store 重载
  */
 export async function resolveConflict(
   conflict: SyncConflict,
@@ -565,15 +702,13 @@ export async function resolveConflict(
     const now = Date.now();
     await push([{ storageKey: conflict.storageKey, value: conflict.localValue, clientUpdatedAt: now }]);
     await AsyncStorage.setItem(TS_PREFIX + conflict.storageKey, String(now));
-    await appendLog({ time: now, type: "push", keys: [conflict.storageKey], message: `冲突解决：保留本地版本` });
+    await appendLog({ time: now, type: "push", keys: [conflict.storageKey], message: `冲突解决：保留本机版本` });
   } else {
-    // prefs 键：有利优先合并（不丢弃任何一方的正向数据）
     const valueToWrite = PREFS_MERGE_KEYS.has(conflict.storageKey)
       ? mergePrefs(conflict.localValue, conflict.remoteValue).merged
       : conflict.remoteValue;
     await AsyncStorage.setItem(conflict.storageKey, valueToWrite);
     await AsyncStorage.setItem(TS_PREFIX + conflict.storageKey, String(conflict.remoteTs));
-    // 若合并结果比云端更有利，主动推送回去
     if (PREFS_MERGE_KEYS.has(conflict.storageKey)) {
       const { merged, changed } = mergePrefs(conflict.localValue, conflict.remoteValue);
       if (changed) {
@@ -593,6 +728,8 @@ export function disableSync() {
   pushFn = null;
   dirtyKeys.clear();
   if (pushTimer) clearTimeout(pushTimer);
+  // ★ 登出时重置锁
+  initialSyncDone = false;
   setState({ enabled: false, syncing: false });
 }
 

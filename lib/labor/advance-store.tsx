@@ -5,6 +5,7 @@
  */
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useReducer } from "react";
+import { notifySyncChange, registerStoreReload } from "../sync/engine";
 
 const STORAGE_KEY = "labor.salary_advances.v1";
 
@@ -84,13 +85,18 @@ export function SalaryAdvanceProvider({ children }: { children: React.ReactNode 
   const [state, dispatch] = useReducer(reducer, { advances: [] });
 
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY).then((raw) => {
+    const load = () => AsyncStorage.getItem(STORAGE_KEY).then((raw) => {
       if (raw) { try { dispatch({ type: "LOAD", payload: JSON.parse(raw) }); } catch {} }
     });
+    load();
+    // ★ 注册同步重载回调
+    return registerStoreReload(load);
   }, []);
 
   useEffect(() => {
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state)).catch(() => {});
+    // ★ 通知同步引擎
+    notifySyncChange(STORAGE_KEY);
   }, [state]);
 
   const addAdvance = useCallback((data: Omit<SalaryAdvance, "id" | "createdAt" | "updatedAt">): string => {

@@ -213,13 +213,18 @@ export function SupplierPurchaseProvider({ children }: { children: React.ReactNo
   const [state, dispatch] = useReducer(purchaseReducer, { records: [] });
 
   useEffect(() => {
-    AsyncStorage.getItem(PURCHASE_KEY).then((raw) => {
+    const load = () => AsyncStorage.getItem(PURCHASE_KEY).then((raw) => {
       if (raw) { try { dispatch({ type: "LOAD", payload: JSON.parse(raw) }); } catch {} }
     });
+    load();
+    // ★ 注册同步重载回调
+    return registerStoreReload(load);
   }, []);
 
   useEffect(() => {
     AsyncStorage.setItem(PURCHASE_KEY, JSON.stringify(state)).catch(() => {});
+    // ★ 通知同步引擎
+    notifySyncChange(PURCHASE_KEY);
   }, [state]);
 
   const addRecord = useCallback((record: SupplierPurchaseRecord) => {

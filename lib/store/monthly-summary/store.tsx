@@ -144,7 +144,11 @@ export function MonthlySummaryProvider({ children }: { children: React.ReactNode
     AsyncStorage.setItem(SUPPLIERS_KEY, JSON.stringify(state.suppliers)).catch(() => {});
     AsyncStorage.setItem(PAYMENTS_KEY, JSON.stringify(state.payments)).catch(() => {});
     AsyncStorage.setItem(BALANCES_KEY, JSON.stringify(state.balances)).catch(() => {});
+    // ★ 四个键全部通知同步引擎
     notifySyncChange(REPORTS_KEY);
+    notifySyncChange(SUPPLIERS_KEY);
+    notifySyncChange(PAYMENTS_KEY);
+    notifySyncChange(BALANCES_KEY);
   }, [state]);
 
   const upsertReport = useCallback((report: MonthlySummaryReport) =>
