@@ -902,24 +902,57 @@ export default function SpiritsInventoryScreen() {
   return (
     <ScreenContainer>
       {/* 导航栏 */}
-      <View style={[S.navbar, { borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => {
-          tap();
-          if (activeSupplier !== null) { setActiveSupplier(null); return; }
-          router.back();
-        }}>
-          <IconSymbol name="chevron.left" size={20} color="#EF4444" />
-        </TouchableOpacity>
-        <Text style={[S.navTitle, { color: colors.foreground }]}>
-          {activeSupplier ? activeSupplier : "烈酒库存管理"}
-        </Text>
-        <TouchableOpacity onPress={() => { tap(); setShowMonthPicker(true); }}
-          style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-          <Text style={{ fontSize: 13, color: colors.primary, fontWeight: "600" }}>
-            {selectedMonth.slice(0, 4)}年{Number(selectedMonth.slice(5, 7))}月
+      <View style={{ borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, paddingBottom: 8 }}>
+        {/* 上行：标题小字 */}
+        <View style={{ alignItems: "center", paddingTop: 6, paddingBottom: 2 }}>
+          <Text style={{ fontSize: 11, color: colors.muted, fontWeight: "500" }}>
+            {activeSupplier ? activeSupplier : "烈酒库存管理"}
           </Text>
-          <IconSymbol name="calendar" size={14} color={colors.primary} />
-        </TouchableOpacity>
+        </View>
+        {/* 下行：返回 + 月份居中 + 左右切换 */}
+        <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 12 }}>
+          {/* 返回按鈕 */}
+          <TouchableOpacity onPress={() => {
+            tap();
+            if (activeSupplier !== null) { setActiveSupplier(null); return; }
+            router.back();
+          }} style={{ width: 36, alignItems: "flex-start" }}>
+            <IconSymbol name="chevron.left" size={20} color="#EF4444" />
+          </TouchableOpacity>
+          {/* 月份居中区域 */}
+          <View style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12 }}>
+            {/* 上一个月 */}
+            <TouchableOpacity onPress={() => {
+              tap();
+              const [y, m] = selectedMonth.split("-").map(Number);
+              const prev = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
+              setSelectedMonth(prev);
+            }}>
+              <IconSymbol name="chevron.left" size={18} color={colors.foreground} />
+            </TouchableOpacity>
+            {/* 月份文字（点击弹出选择器） */}
+            <TouchableOpacity onPress={() => { tap(); setShowMonthPicker(true); }}
+              style={{ paddingHorizontal: 8, paddingVertical: 4 }}>
+              <Text style={{ fontSize: 17, fontWeight: "700", color: colors.foreground }}>
+                {selectedMonth.slice(0, 4)}年{Number(selectedMonth.slice(5, 7))}月
+              </Text>
+            </TouchableOpacity>
+            {/* 下一个月 */}
+            <TouchableOpacity onPress={() => {
+              tap();
+              const [y, m] = selectedMonth.split("-").map(Number);
+              const next = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`;
+              // 不允许跳过当前月
+              if (next <= getCurrentMonth()) setSelectedMonth(next);
+              else tap();
+            }}>
+              <IconSymbol name="chevron.right" size={18}
+                color={selectedMonth >= getCurrentMonth() ? colors.border : colors.foreground} />
+            </TouchableOpacity>
+          </View>
+          {/* 右侧占位（对称布局） */}
+          <View style={{ width: 36 }} />
+        </View>
       </View>
 
       {/* Tab 选择器（供应商子界面时隐藏） */}
