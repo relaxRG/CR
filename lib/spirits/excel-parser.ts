@@ -52,14 +52,22 @@ export function parseSupplierName(raw: string): { nameZh: string; nameEn: string
  */
 function parseExcelDate(val: any): string {
   if (!val) return "";
-  if (val instanceof Date) return val.toISOString().slice(0, 10);
+  if (val instanceof Date) {
+    if (isNaN(val.getTime())) return "";
+    // 必须用 UTC 方法，避免 UTC+8 时区导致日期少一天
+    const y = val.getUTCFullYear();
+    const mo = String(val.getUTCMonth() + 1).padStart(2, "0");
+    const d = String(val.getUTCDate()).padStart(2, "0");
+    return `${y}-${mo}-${d}`;
+  }
   if (typeof val === "string") {
     // 处理 "2026-02-01 00:00:00" 格式
     return val.slice(0, 10);
   }
   if (typeof val === "number") {
+    // Excel 日期序列号，用 UTC 避免时区偏移
     const d = new Date((val - 25569) * 86400 * 1000);
-    return d.toISOString().slice(0, 10);
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
   }
   return "";
 }
@@ -210,11 +218,18 @@ export function parseSpiritInventoryExcel(base64: string): {
       return { snapshot: null, infoItems: [], priceChanges: [], error: "未找到「烈酒盘点」工作表或数据为空" };
     }
 
-    // ── 供应商工作表（至缘/戎恒/自采） ──
+    // ── 供应商工作表（动态识别：排除已知非供应商 Sheet） ──
     const purchaseOrders: SpiritPurchaseOrderItem[] = [];
-    const SUPPLIER_SHEETS = ["至缘", "戎恒", "自采"];
-    SUPPLIER_SHEETS.forEach((sup) => {
-      if (wb.Sheets[sup]) {
+    // 排除已知的非供应商 Sheet
+    const NON_SUPPLIER_SHEETS = new Set(["烈酒盘点", "进货汇总", "酒类信息", "汇总", "Sheet1", "Sheet2", "Sheet3"]);
+    const supplierSheetNames = wb.SheetNames.filter((name: string) => !NON_SUPPLIER_SHEETS.has(name));
+    supplierSheetNames.forEach((sup: string) => {
+      const sheetRows = utils.sheet_to_json<any[]>(wb.Sheets[sup], { header: 1, defval: null });
+      // 判断是否是供应商进货单（包含商品名称列）
+      const hasProductCol = sheetRows.slice(0, 5).some((r: any[]) =>
+        r && r.some((c: any) => /商品名称|品名|名称|货品/.test(String(c ?? "")))
+      );
+      if (hasProductCol) {
         purchaseOrders.push(...parseSupplierSheet(wb.Sheets[sup], sup));
       }
     });

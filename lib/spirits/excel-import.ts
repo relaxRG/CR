@@ -112,8 +112,19 @@ function parseDate(val: any): string | null {
   if (m1) return `${m1[1]}-${m1[2].padStart(2, "0")}-${m1[3].padStart(2, "0")}`;
 
   // ⑥ DD/MM/YYYY 或 MM/DD/YYYY（末尾是4位年份）
+  // 注意：xlsx raw:false 可能输出 "2/1/2026" (M/D/YYYY) 格式
   const m2 = s.match(/^(\d{1,2})[-\/\.](\d{1,2})[-\/\.](\d{4})/);
-  if (m2) return `${m2[3]}-${m2[2].padStart(2, "0")}-${m2[1].padStart(2, "0")}`;
+  if (m2) {
+    // 如果第一个数字 > 12，则必然是 DD/MM/YYYY；否则假设是 MM/DD/YYYY（与 xlsx 输出匹配）
+    const first = Number(m2[1]), second = Number(m2[2]);
+    if (first > 12) {
+      // DD/MM/YYYY
+      return `${m2[3]}-${m2[2].padStart(2, "0")}-${m2[1].padStart(2, "0")}`;
+    } else {
+      // MM/DD/YYYY
+      return `${m2[3]}-${m2[1].padStart(2, "0")}-${m2[2].padStart(2, "0")}`;
+    }
+  }
 
   // ⑦ 中文完整日期：2026年2月1日 / 2026年02月01日
   const m3 = s.match(/(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日?/);
