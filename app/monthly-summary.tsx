@@ -62,9 +62,10 @@ const CATEGORY_SECTIONS = [
 ];
 
 // ─── 科目行组件 ───────────────────────────────────────────────────────────────
-function LineItemRow({ item, colors }: { item: SummaryLineItem; colors: any }) {
+function LineItemRow({ item, colors, linkedModule }: { item: SummaryLineItem; colors: any; linkedModule?: string }) {
   const isPositive = item.amount > 0;
   const amtColor = item.isDuplicate ? colors.muted : isPositive ? colors.success ?? "#34C759" : colors.error;
+  const isNavigable = !item.isManual && !!linkedModule;
 
   return (
     <View style={[LI.row, { borderBottomColor: colors.border, opacity: item.isDuplicate ? 0.5 : 1 }]}>
@@ -94,9 +95,14 @@ function LineItemRow({ item, colors }: { item: SummaryLineItem; colors: any }) {
           <Text style={{ fontSize: 10, color: colors.muted, marginTop: 1, fontStyle: "italic" }}>{item.duplicateNote}</Text>
         ) : null}
       </View>
-      <Text style={{ fontSize: 14, fontWeight: "700", color: amtColor, minWidth: 80, textAlign: "right" }}>
-        {item.amount === 0 ? "—" : `${isPositive ? "+" : ""}¥${Math.abs(item.amount).toFixed(2)}`}
-      </Text>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+        <Text style={{ fontSize: 14, fontWeight: "700", color: amtColor, minWidth: 80, textAlign: "right" }}>
+          {item.amount === 0 ? "—" : `${isPositive ? "+" : ""}¥${Math.abs(item.amount).toFixed(2)}`}
+        </Text>
+        {isNavigable && (
+          <IconSymbol name="chevron.right" size={12} color={colors.muted} />
+        )}
+      </View>
     </View>
   );
 }
@@ -590,16 +596,30 @@ export default function MonthlySummaryScreen() {
               </Text>
             </View>
             {sec.items.map((item) => (
-              <TouchableOpacity key={item.id} onLongPress={() => {
-                if (item.isManual) {
-                  Alert.alert("操作", item.label, [
-                    { text: "编辑", onPress: () => { setEditingItem(item); setShowManualModal(true); } },
-                    { text: "删除", style: "destructive", onPress: () => handleDeleteManualItem(item.id) },
-                    { text: "取消", style: "cancel" },
-                  ]);
-                }
-              }}>
-                <LineItemRow item={item} colors={colors} />
+              <TouchableOpacity key={item.id}
+                onPress={() => {
+                  if (!item.isManual && item.linkedModule) {
+                    const moduleRoutes: Record<string, string> = {
+                      "labor-attendance": "/labor",
+                      "monthly-report": "/monthly-report",
+                      "spirits-inventory": "/spirits-inventory",
+                      "wine-inventory": "/wine-inventory",
+                      "supplier-import": "/suppliers",
+                    };
+                    const route = moduleRoutes[item.linkedModule];
+                    if (route) router.push(route as any);
+                  }
+                }}
+                onLongPress={() => {
+                  if (item.isManual) {
+                    Alert.alert("操作", item.label, [
+                      { text: "编辑", onPress: () => { setEditingItem(item); setShowManualModal(true); } },
+                      { text: "删除", style: "destructive", onPress: () => handleDeleteManualItem(item.id) },
+                      { text: "取消", style: "cancel" },
+                    ]);
+                  }
+                }}>
+                <LineItemRow item={item} colors={colors} linkedModule={item.linkedModule} />
               </TouchableOpacity>
             ))}
             {sec.items.length === 0 && (
@@ -609,12 +629,17 @@ export default function MonthlySummaryScreen() {
             )}
 
             {/* 工资科目：内嵌员工薪资卡片 */}
-            {sec.key === "labor" && payrollPaymentsR.length > 0 && (
+            {sec.key === "labor" && (
               <View style={{ padding: 10, gap: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
-                <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                  <Text style={{ fontSize: 11, fontWeight: "700", color: colors.muted }}>工资发放明细</Text>
-                  <Text style={{ fontSize: 11, color: colors.error }}>待发 ¥{payrollPaymentsR.reduce((s, p) => s + p.remainingAmount, 0).toFixed(0)}</Text>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <Text style={{ fontSize: 11, fontWeight: "700", color: colors.muted }}>{payrollPaymentsR.length > 0 ? "工资发放明细" : "薪资管理"}</Text>
+                  <TouchableOpacity onPress={() => router.push("/labor" as any)}
+                    style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: colors.primary + "15", borderWidth: 1, borderColor: colors.primary + "33" }}>
+                    <Text style={{ fontSize: 10, color: colors.primary, fontWeight: "600" }}>前往薪资管理</Text>
+                    <IconSymbol name="chevron.right" size={10} color={colors.primary} />
+                  </TouchableOpacity>
                 </View>
+                {payrollPaymentsR.length > 0 && <Text style={{ fontSize: 10, color: colors.error, marginTop: -4 }}>待发 ¥{payrollPaymentsR.reduce((s, p) => s + p.remainingAmount, 0).toFixed(0)}</Text>}
                 {employees.filter((e) => e.active).map((emp) => {
                   const payment = payrollPaymentsR.find((p) => p.payeeId === emp.id);
                   const defaultBank = emp.bankAccounts?.find((b: any) => b.isDefault) ?? emp.bankAccounts?.[0];
