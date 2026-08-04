@@ -1,12 +1,12 @@
 /**
- * 员工管理主界面 v2
+ * 员工管理主界面 v3
  * 横滑三页：排班表 / 员工档案（含发薪卡片）/ 薪资预支
- * 顶部：总览卡片（本月人力成本 / 在职人数 / 出勤人数）
- * 员工档案：自定义分组 + 拖拽排序（长按移动）
+ * 顶部：总览卡片（含对比开关：上月 / 去年同期）
+ * 员工档案：自定义分组 + 每人发薪卡片（含对比开关）
  */
 import React, { useMemo, useRef, useState } from "react";
 import {
-  Alert, Dimensions, Modal, Platform, Pressable, ScrollView,
+  Dimensions, Platform, Pressable, ScrollView,
   StyleSheet, Text, TouchableOpacity, View
 } from "react-native";
 import * as Haptics from "expo-haptics";
@@ -17,18 +17,19 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
 import {
   useEmployeeStore, useEmployeeGroupStore, useAttendanceStore,
-  usePaySlipStore, useShiftStore,
+  usePaySlipStore,
 } from "@/lib/labor/store";
 import { useSalaryAdvanceStore } from "@/lib/labor/advance-store";
 import { usePettyCashStore } from "@/lib/store/petty-store";
 import {
   Employee, EmployeeGroup, DEPT_COLORS, DEPT_LABELS, monthLabel,
-  DEFAULT_EMPLOYEE_GROUPS,
 } from "@/lib/labor/types";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 const NOON_COLOR = "#FF9500";
 const EVE_COLOR = "#5856D6";
+
+type CompareMode = "none" | "lastMonth" | "lastYear";
 
 // ─── 月份工具 ─────────────────────────────────────────────────────────────────
 function currentMonthStr() {
@@ -36,11 +37,67 @@ function currentMonthStr() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 }
 
+function getCompareMonth(base: string, mode: CompareMode): string | null {
+  if (mode === "none") return null;
+  const [y, m] = base.split("-").map(Number);
+  if (mode === "lastMonth") {
+    const d = new Date(y, m - 2, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  }
+  return `${y - 1}-${String(m).padStart(2, "0")}`;
+}
+
+function compareModeLabel(mode: CompareMode) {
+  if (mode === "lastMonth") return "上月";
+  if (mode === "lastYear") return "去年同期";
+  return "不对比";
+}
+
+// ─── 对比按钮组件 ─────────────────────────────────────────────────────────────
+function CompareToggle({ mode, onChange, colors }: {
+  mode: CompareMode;
+  onChange: (m: CompareMode) => void;
+  colors: any;
+}) {
+  const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
+  const [open, setOpen] = useState(false);
+
+  return (
+    <View>
+      <TouchableOpacity onPress={() => { tap(); setOpen((v) => !v); }}
+        style={[CT.btn, {
+          backgroundColor: mode !== "none" ? colors.primary + "22" : colors.surface,
+          borderColor: mode !== "none" ? colors.primary + "44" : colors.border,
+        }]}>
+        <IconSymbol name="chart.bar.xaxis" size={12} color={mode !== "none" ? colors.primary : colors.muted} />
+        <Text style={{ fontSize: 11, fontWeight: "600", color: mode !== "none" ? colors.primary : colors.muted }}>
+          {mode !== "none" ? compareModeLabel(mode) : "对比"}
+        </Text>
+      </TouchableOpacity>
+      {open && (
+        <View style={[CT.panel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          {(["none", "lastMonth", "lastYear"] as CompareMode[]).map((m) => (
+            <TouchableOpacity key={m} onPress={() => { tap(); onChange(m); setOpen(false); }}
+              style={[CT.option, { backgroundColor: mode === m ? colors.primary : "transparent" }]}>
+              <Text style={{ fontSize: 12, fontWeight: "600", color: mode === m ? "#fff" : colors.foreground }}>
+                {compareModeLabel(m)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
 // ─── 总览卡片 ─────────────────────────────────────────────────────────────────
 function OverviewCard({ month, colors }: { month: string; colors: any }) {
   const { employees } = useEmployeeStore();
   const { paySlips } = usePaySlipStore();
   const { records: attendances } = useAttendanceStore();
+  const [compareMode, setCompareMode] = useState<CompareMode>("none");
+
+  const compareMonth = getCompareMonth(month, compareMode);
 
   const activeEmployees = useMemo(() => employees.filter((e) => e.active), [employees]);
   const monthSlips = useMemo(() => paySlips.filter((s) => s.month === month), [paySlips, month]);
@@ -48,9 +105,20 @@ function OverviewCard({ month, colors }: { month: string; colors: any }) {
   const totalPending = useMemo(() => monthSlips.reduce((s, p) => s + Math.max(0, p.finalSalary - p.advanceAmount), 0), [monthSlips]);
   const attendCount = useMemo(() => attendances.filter((a) => a.month === month).length, [attendances, month]);
 
+  // 对比月数据
+  const compareSlips = useMemo(() => compareMonth ? paySlips.filter((s) => s.month === compareMonth) : [], [paySlips, compareMonth]);
+  const compareTotalSalary = useMemo(() => compareSlips.reduce((s, p) => s + p.finalSalary, 0), [compareSlips]);
+  const diffSalary = compareMonth && totalSalary > 0 && compareTotalSalary > 0 ? totalSalary - compareTotalSalary : null;
+
   return (
     <View style={[OV.card, { backgroundColor: colors.primary + "0a", borderColor: colors.primary + "22" }]}>
-      <Text style={[OV.title, { color: colors.primary }]}>{monthLabel(month)} 人力总览</Text>
+      {/* 标题行 + 对比开关 */}
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+        <Text style={[OV.title, { color: colors.primary }]}>{monthLabel(month)} 人力总览</Text>
+        <CompareToggle mode={compareMode} onChange={setCompareMode} colors={colors} />
+      </View>
+
+      {/* 核心数字行 */}
       <View style={OV.row}>
         <View style={OV.item}>
           <Text style={[OV.label, { color: colors.muted }]}>在职人数</Text>
@@ -67,6 +135,11 @@ function OverviewCard({ month, colors }: { month: string; colors: any }) {
           <Text style={[OV.value, { color: colors.primary }]}>
             {totalSalary > 0 ? `¥${totalSalary.toFixed(0)}` : "—"}
           </Text>
+          {diffSalary !== null && (
+            <Text style={{ fontSize: 10, fontWeight: "600", color: diffSalary > 0 ? "#FF3B30" : "#34C759" }}>
+              {diffSalary > 0 ? "▲" : "▼"} ¥{Math.abs(diffSalary).toFixed(0)}
+            </Text>
+          )}
         </View>
         <View style={[OV.divider, { backgroundColor: colors.border }]} />
         <View style={OV.item}>
@@ -76,12 +149,31 @@ function OverviewCard({ month, colors }: { month: string; colors: any }) {
           </Text>
         </View>
       </View>
+
+      {/* 对比详情行 */}
+      {compareMonth && compareTotalSalary > 0 && (
+        <View style={[OV.compareRow, { borderTopColor: colors.border }]}>
+          <Text style={{ fontSize: 11, color: colors.muted }}>{compareModeLabel(compareMode)}薪资合计：</Text>
+          <Text style={{ fontSize: 12, fontWeight: "700", color: colors.muted }}>¥{compareTotalSalary.toFixed(0)}</Text>
+          {diffSalary !== null && (
+            <Text style={{ fontSize: 11, color: diffSalary > 0 ? "#FF3B30" : "#34C759", marginLeft: 8 }}>
+              {diffSalary > 0 ? "增加" : "减少"} ¥{Math.abs(diffSalary).toFixed(0)}（{((Math.abs(diffSalary) / compareTotalSalary) * 100).toFixed(1)}%）
+            </Text>
+          )}
+        </View>
+      )}
     </View>
   );
 }
 
 // ─── 个人发薪卡片（嵌入员工档案页） ──────────────────────────────────────────
-function PaySlipMiniCard({ employee, month, colors }: { employee: Employee; month: string; colors: any }) {
+function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors }: {
+  employee: Employee;
+  month: string;
+  compareMonth: string | null;
+  compareMode: CompareMode;
+  colors: any;
+}) {
   const { getPaySlip } = usePaySlipStore();
   const { getAttendance } = useAttendanceStore();
   const router = useRouter();
@@ -89,7 +181,10 @@ function PaySlipMiniCard({ employee, month, colors }: { employee: Employee; mont
 
   const slip = getPaySlip(employee.id, month);
   const att = getAttendance(employee.id, month);
+  const compareSlip = compareMonth ? getPaySlip(employee.id, compareMonth) : null;
   const deptColor = DEPT_COLORS[employee.dept];
+
+  const diffSalary = slip && compareSlip ? slip.finalSalary - compareSlip.finalSalary : null;
 
   return (
     <TouchableOpacity
@@ -118,7 +213,13 @@ function PaySlipMiniCard({ employee, month, colors }: { employee: Employee; mont
           {slip ? (
             <>
               <Text style={{ fontSize: 16, fontWeight: "800", color: deptColor }}>¥{slip.finalSalary.toFixed(0)}</Text>
-              <Text style={{ fontSize: 10, color: colors.muted }}>最终薪资</Text>
+              {/* 对比差额 */}
+              {diffSalary !== null && (
+                <Text style={{ fontSize: 10, fontWeight: "600", color: diffSalary > 0 ? "#FF3B30" : "#34C759" }}>
+                  {diffSalary > 0 ? "▲" : "▼"} ¥{Math.abs(diffSalary).toFixed(0)}
+                </Text>
+              )}
+              {!diffSalary && <Text style={{ fontSize: 10, color: colors.muted }}>最终薪资</Text>}
             </>
           ) : att ? (
             <>
@@ -142,6 +243,13 @@ function PaySlipMiniCard({ employee, month, colors }: { employee: Employee; mont
             <Text style={PC.detailLabel}>待发</Text>
             <Text style={[PC.detailValue, { color: deptColor }]}>¥{Math.max(0, slip.finalSalary - slip.advanceAmount).toFixed(0)}</Text>
           </View>
+          {/* 对比月薪资 */}
+          {compareSlip && (
+            <View style={PC.detailItem}>
+              <Text style={PC.detailLabel}>{compareModeLabel(compareMode)}</Text>
+              <Text style={[PC.detailValue, { color: colors.muted }]}>¥{compareSlip.finalSalary.toFixed(0)}</Text>
+            </View>
+          )}
         </View>
       )}
     </TouchableOpacity>
@@ -151,13 +259,16 @@ function PaySlipMiniCard({ employee, month, colors }: { employee: Employee; mont
 // ─── 员工档案页（第二页） ─────────────────────────────────────────────────────
 function EmployeeRosterPage({ month, colors }: { month: string; colors: any }) {
   const { employees } = useEmployeeStore();
-  const { groups, toggleCollapse, moveEmployeeToGroup } = useEmployeeGroupStore();
+  const { groups, toggleCollapse } = useEmployeeGroupStore();
   const router = useRouter();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
+  // 薪资对比开关（统一控制所有卡片）
+  const [compareMode, setCompareMode] = useState<CompareMode>("none");
+  const compareMonth = getCompareMonth(month, compareMode);
+
   const activeEmployees = useMemo(() => employees.filter((e) => e.active), [employees]);
 
-  // 将员工按分组排列（未分组的放最后）
   const sortedGroups = useMemo(() =>
     [...groups].sort((a, b) => a.sortOrder - b.sortOrder),
     [groups]
@@ -176,12 +287,19 @@ function EmployeeRosterPage({ month, colors }: { month: string; colors: any }) {
 
   return (
     <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 40 }}>
-      {/* 添加员工按钮 */}
-      <TouchableOpacity onPress={() => { tap(); router.push("/labor-employee-form" as any); }}
-        style={[{ flexDirection: "row", alignItems: "center", gap: 8, padding: 14, borderRadius: 14, borderWidth: 1, borderStyle: "dashed", borderColor: colors.primary + "66", backgroundColor: colors.primary + "08" }]}>
-        <IconSymbol name="plus.circle.fill" size={20} color={colors.primary} />
-        <Text style={{ fontSize: 15, fontWeight: "600", color: colors.primary }}>添加员工</Text>
-      </TouchableOpacity>
+      {/* 工具栏：添加员工 + 对比开关 */}
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+        <TouchableOpacity onPress={() => { tap(); router.push("/labor-employee-form" as any); }}
+          style={[{ flex: 1, flexDirection: "row", alignItems: "center", gap: 8, padding: 12, borderRadius: 12, borderWidth: 1, borderStyle: "dashed", borderColor: colors.primary + "66", backgroundColor: colors.primary + "08" }]}>
+          <IconSymbol name="plus.circle.fill" size={18} color={colors.primary} />
+          <Text style={{ fontSize: 14, fontWeight: "600", color: colors.primary }}>添加员工</Text>
+        </TouchableOpacity>
+        {/* 薪资对比开关 */}
+        <View style={{ alignItems: "flex-end" }}>
+          <Text style={{ fontSize: 10, color: colors.muted, marginBottom: 3 }}>薪资对比</Text>
+          <CompareToggle mode={compareMode} onChange={setCompareMode} colors={colors} />
+        </View>
+      </View>
 
       {/* 分组列表 */}
       {sortedGroups.map((group) => {
@@ -200,7 +318,7 @@ function EmployeeRosterPage({ month, colors }: { month: string; colors: any }) {
             {/* 员工卡片 */}
             {!group.collapsed && empList.map((emp) => (
               <View key={emp.id} style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
-                <PaySlipMiniCard employee={emp} month={month} colors={colors} />
+                <PaySlipMiniCard employee={emp} month={month} compareMonth={compareMonth} compareMode={compareMode} colors={colors} />
               </View>
             ))}
           </View>
@@ -216,7 +334,7 @@ function EmployeeRosterPage({ month, colors }: { month: string; colors: any }) {
           </View>
           {ungroupedEmployees.map((emp) => (
             <View key={emp.id} style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
-              <PaySlipMiniCard employee={emp} month={month} colors={colors} />
+              <PaySlipMiniCard employee={emp} month={month} compareMonth={compareMonth} compareMode={compareMode} colors={colors} />
             </View>
           ))}
         </View>
@@ -238,17 +356,15 @@ function EmployeeRosterPage({ month, colors }: { month: string; colors: any }) {
 // ─── 薪资预支页（第三页） ─────────────────────────────────────────────────────
 function AdvancePage({ month, colors }: { month: string; colors: any }) {
   const { employees } = useEmployeeStore();
-  const { advances, addAdvance, updateAdvance, deleteAdvance, getAdvancesForMonth } = useSalaryAdvanceStore();
+  const { advances } = useSalaryAdvanceStore();
   const { records: pettyRecords } = usePettyCashStore();
   const router = useRouter();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
-  // 本月预支记录（含备用金 K1 自动匹配）
   const monthAdvances = useMemo(() => {
     return advances.filter((a) => a.deductMonth === month || a.date.startsWith(month));
   }, [advances, month]);
 
-  // 从备用金 K1 记录中自动识别预支（description 包含员工代号）
   const pettyK1Records = useMemo(() => {
     return pettyRecords.filter((r) => r.code === "K1" && r.date.startsWith(month));
   }, [pettyRecords, month]);
@@ -259,7 +375,6 @@ function AdvancePage({ month, colors }: { month: string; colors: any }) {
 
   return (
     <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 40 }}>
-      {/* 汇总卡片 */}
       <View style={[{ borderRadius: 14, padding: 16, borderWidth: 1, borderColor: "#AF52DE" + "33", backgroundColor: "#AF52DE" + "08" }]}>
         <Text style={{ fontSize: 14, fontWeight: "700", color: "#AF52DE" }}>{monthLabel(month)} 薪资预支</Text>
         <Text style={{ fontSize: 28, fontWeight: "800", color: "#AF52DE", marginTop: 4 }}>
@@ -268,7 +383,6 @@ function AdvancePage({ month, colors }: { month: string; colors: any }) {
         <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>{monthAdvances.length} 笔预支记录</Text>
       </View>
 
-      {/* 备用金 K1 自动识别提示 */}
       {pettyK1Records.length > 0 && (
         <View style={[{ borderRadius: 12, padding: 12, borderWidth: 1, borderColor: "#FF9500" + "44", backgroundColor: "#FF9500" + "08" }]}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 }}>
@@ -284,7 +398,6 @@ function AdvancePage({ month, colors }: { month: string; colors: any }) {
         </View>
       )}
 
-      {/* 预支记录列表 */}
       {monthAdvances.length > 0 ? (
         <View style={[{ borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, overflow: "hidden" }]}>
           {monthAdvances.map((adv, i) => {
@@ -319,7 +432,6 @@ function AdvancePage({ month, colors }: { month: string; colors: any }) {
         </View>
       )}
 
-      {/* 跳转到完整预支管理 */}
       <TouchableOpacity onPress={() => { tap(); router.push("/labor-advances" as any); }}
         style={[{ flexDirection: "row", alignItems: "center", gap: 8, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: "#AF52DE" + "44", backgroundColor: "#AF52DE" + "08" }]}>
         <IconSymbol name="creditcard.fill" size={18} color="#AF52DE" />
@@ -332,7 +444,7 @@ function AdvancePage({ month, colors }: { month: string; colors: any }) {
 
 // ─── 主页面 ───────────────────────────────────────────────────────────────────
 const PAGES = [
-  { key: "schedule", label: "排班表", icon: "calendar.badge.clock" },
+  { key: "schedule", label: "排班表",  icon: "calendar.badge.clock" },
   { key: "roster",   label: "员工档案", icon: "person.2.fill" },
   { key: "advances", label: "薪资预支", icon: "creditcard.fill" },
 ] as const;
@@ -354,8 +466,6 @@ export default function LaborScreen() {
   const [activePage, setActivePage] = useState<PageKey>("schedule");
   const scrollRef = useRef<ScrollView>(null);
 
-  const pageIndex = PAGES.findIndex((p) => p.key === activePage);
-
   const handleTabPress = (key: PageKey) => {
     tap();
     setActivePage(key);
@@ -368,8 +478,6 @@ export default function LaborScreen() {
     const key = PAGES[idx]?.key;
     if (key && key !== activePage) setActivePage(key);
   };
-
-  const activeColor = PAGE_COLORS[activePage];
 
   return (
     <ScreenContainer>
@@ -389,7 +497,7 @@ export default function LaborScreen() {
         </View>
       </View>
 
-      {/* 总览卡片 */}
+      {/* 总览卡片（含对比开关） */}
       <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 }}>
         <OverviewCard month={month} colors={colors} />
       </View>
@@ -420,7 +528,7 @@ export default function LaborScreen() {
         onMomentumScrollEnd={handleScroll}
         style={{ flex: 1 }}
         contentContainerStyle={{ flexDirection: "row" }}>
-        {/* 第一页：排班表（跳转） */}
+        {/* 第一页：排班表入口 */}
         <View style={{ width: SCREEN_W, flex: 1 }}>
           <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 40 }}>
             <View style={[{ borderRadius: 14, borderWidth: 1, borderColor: "#34C759" + "44", backgroundColor: "#34C759" + "08", padding: 20, alignItems: "center", gap: 12 }]}>
@@ -435,13 +543,12 @@ export default function LaborScreen() {
                 <IconSymbol name="chevron.right" size={14} color="#fff" />
               </TouchableOpacity>
             </View>
-            {/* 快捷入口 */}
             <View style={[{ borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, overflow: "hidden" }]}>
               {[
-                { icon: "clock.fill", color: "#FF9500", title: "考勤记录", sub: "查看打卡 · 加班记录", route: "/labor-attendance" },
-                { icon: "chart.bar.fill", color: "#007AFF", title: "薪资核算", sub: "考勤工资 · 最终薪资", route: "/labor-attendance" },
+                { icon: "clock.fill",      color: "#FF9500", title: "考勤记录", sub: "查看打卡 · 加班记录", route: "/labor-attendance" },
+                { icon: "chart.bar.fill",  color: "#007AFF", title: "薪资核算", sub: "考勤工资 · 最终薪资",  route: "/labor-attendance" },
               ].map((item, i, arr) => (
-                <Pressable key={item.route + item.title} onPress={() => { tap(); router.push(item.route as any); }}
+                <Pressable key={item.title} onPress={() => { tap(); router.push(item.route as any); }}
                   style={({ pressed }) => [{ flexDirection: "row" as const, alignItems: "center" as const, gap: 12, padding: 14, opacity: pressed ? 0.7 : 1 }, i < arr.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }]}>
                   <View style={[{ width: 40, height: 40, borderRadius: 10, alignItems: "center", justifyContent: "center", backgroundColor: item.color + "22" }]}>
                     <IconSymbol name={item.icon as any} size={20} color={item.color} />
@@ -457,7 +564,7 @@ export default function LaborScreen() {
           </ScrollView>
         </View>
 
-        {/* 第二页：员工档案 */}
+        {/* 第二页：员工档案（含对比开关） */}
         <View style={{ width: SCREEN_W, flex: 1 }}>
           <EmployeeRosterPage month={month} colors={colors} />
         </View>
@@ -480,13 +587,14 @@ const S = StyleSheet.create({
 
 const OV = StyleSheet.create({
   card: { borderRadius: 14, borderWidth: 1, padding: 14 },
-  title: { fontSize: 13, fontWeight: "700", marginBottom: 10 },
+  title: { fontSize: 13, fontWeight: "700" },
   row: { flexDirection: "row", alignItems: "center" },
   item: { flex: 1, alignItems: "center" },
   divider: { width: StyleSheet.hairlineWidth, height: 32 },
   label: { fontSize: 10, marginBottom: 3 },
   value: { fontSize: 18, fontWeight: "800" },
   unit: { fontSize: 12, fontWeight: "400" },
+  compareRow: { flexDirection: "row", alignItems: "center", paddingTop: 8, marginTop: 8, borderTopWidth: StyleSheet.hairlineWidth },
 });
 
 const PC = StyleSheet.create({
@@ -496,4 +604,10 @@ const PC = StyleSheet.create({
   detailItem: { alignItems: "center", minWidth: 52 },
   detailLabel: { fontSize: 10, color: "#999", marginBottom: 2 },
   detailValue: { fontSize: 13, fontWeight: "600" },
+});
+
+const CT = StyleSheet.create({
+  btn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 6, borderRadius: 8, borderWidth: 1 },
+  panel: { position: "absolute", right: 0, top: 34, borderRadius: 10, borderWidth: 1, zIndex: 100, minWidth: 110, overflow: "hidden", shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 8, elevation: 4 },
+  option: { paddingHorizontal: 12, paddingVertical: 9 },
 });
