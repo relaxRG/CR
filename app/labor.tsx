@@ -23,7 +23,7 @@ import {
   useHolidayConfigStore,
   useSpecialStatusStore, useGlobalPayrollSettingsStore,
   useCompOffBalanceEntryStore, useHolidayCompOffStore, useUnexplainedRestAlertStore,
-  useCustomDeptStore,
+  useCustomDeptStore, useBusinessHoursStore, useShiftGroupStore,
 } from "@/lib/labor/store";
 import { useSalaryAdvanceStore } from "@/lib/labor/advance-store";
 import { usePettyCashStore } from "@/lib/store/petty-store";
@@ -33,7 +33,8 @@ import {
   DEPT_COLORS, DEPT_LABELS, EMPLOYEE_TYPE_LABELS, monthLabel,
   getMonthDates, getDayOfWeek, getContractHoursForDate,
   DEFAULT_SHIFT_TEMPLATES, DEFAULT_SPECIAL_STATUSES, SHIFT_COLOR_PRESETS, calcAllowance,
-  calcCompOffExpiresMonth,
+  calcCompOffExpiresMonth, BusinessHoursEntry, ShiftGroup, WEEKDAY_SHORT,
+  DEFAULT_BUSINESS_HOURS, DEFAULT_SHIFT_GROUPS,
 } from "@/lib/labor/types";
 
 const { width: SCREEN_W } = Dimensions.get("window");
@@ -1076,12 +1077,13 @@ function SchCellDisplay({ entry, contractHours, tplColor, colors }: {
 }
 
 // ─── 排班表单元格编辑 Modal ────────────────────────────────────────────────────
-function SchEditModal({ visible, date, employee, session, sessionColor, existing, contractHours, defaultHours, colors, shiftTemplates, specialStatuses, onSave, onClear, onClose }: {
+function SchEditModal({ visible, date, employee, session, sessionColor, existing, contractHours, colors, shiftTemplates, specialStatuses, shiftGroups, onSave, onClear, onClose }: {
   visible: boolean; date: string; employee: Employee | null; session: string;
   sessionColor: string; existing: ShiftEntry | null; contractHours: number;
-  defaultHours: number; colors: any;
+  colors: any;
   shiftTemplates: ShiftTemplate[];
   specialStatuses: SpecialStatus[];
+  shiftGroups: ShiftGroup[];
   onSave: (e: ShiftEntry) => void; onClear: () => void; onClose: () => void;
 }) {
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
@@ -1090,6 +1092,9 @@ function SchEditModal({ visible, date, employee, session, sessionColor, existing
   const [hoursInput, setHoursInput] = useState("");
   const [selectedSpecialId, setSelectedSpecialId] = useState<string | null>(null);
   const [selectedShiftSession, setSelectedShiftSession] = useState<string | null>(null);
+
+  // 工时从员工档案自动带入
+  const autoHours = employee ? getContractHoursForDate(employee, date || new Date().toISOString().slice(0, 10)) : 8;
 
   React.useEffect(() => {
     if (visible) {
@@ -1104,10 +1109,11 @@ function SchEditModal({ visible, date, employee, session, sessionColor, existing
       } else {
         setSelectedSpecialId(null);
         setSelectedShiftSession(session);
-        setHoursInput(String(defaultHours));
+        // 工时从员工档案自动带入
+        setHoursInput(String(autoHours));
       }
     }
-  }, [visible, existing, session, defaultHours]);
+  }, [visible, existing, session, autoHours]);
 
   if (!employee || !date) return null;
 
@@ -1117,19 +1123,26 @@ function SchEditModal({ visible, date, employee, session, sessionColor, existing
 
   const selectedSpecial = selectedSpecialId ? specialStatuses.find((s) => s.id === selectedSpecialId) : null;
 
+  // 点击班次标签：带入员工档案工时
+  const handleSelectShift = (tpl: ShiftTemplate) => {
+    tap();
+    setSelectedShiftSession(tpl.session);
+    setSelectedSpecialId(null);
+    // 工时优先从员工档案带入，如果已有手动输入则保留
+    setHoursInput(String(autoHours));
+  };
+
   const handleSave = () => {
     if (selectedSpecialId) {
-      // 特殊状态
       const ss = specialStatuses.find((s) => s.id === selectedSpecialId);
       onSave({
         employeeId: employee.id, date,
         shift: ss?.name ?? selectedSpecialId,
-        hoursValue: ss?.category === "work_day" ? (Number(hoursInput) || defaultHours) : null,
+        hoursValue: ss?.category === "work_day" ? (Number(hoursInput) || autoHours) : null,
         sessionValue: ss?.name ?? selectedSpecialId,
         specialStatusId: selectedSpecialId,
       });
     } else {
-      // 工作班次
       const hv: ShiftHoursValue = hoursInput ? (Number(hoursInput) || null) : null;
       onSave({
         employeeId: employee.id, date,
@@ -1144,7 +1157,21 @@ function SchEditModal({ visible, date, employee, session, sessionColor, existing
 
   const absenceStatuses = specialStatuses.filter((s) => s.category === "absence");
   const workDayStatuses = specialStatuses.filter((s) => s.category === "work_day");
-  const compOffStatuses = specialStatuses.filter((s) => s.category === "comp_off");
+  // 调休换休三种：过滤掉旧版 ss_comp_off（保留向后兼容）中的重复
+  const compOffStatuses = specialStatuses.filter((s) => s.category === "comp_off" && s.id !== "ss_comp_off");
+  // 如果没有新三种，回落旧版
+  const displayCompOffStatuses = compOffStatuses.length > 0
+    ? compOffStatuses
+    : specialStatuses.filter((s) => s.category === "comp_off");
+
+  // 班次按分组展示
+  const groupedShifts = shiftGroups.length > 0
+    ? shiftGroups.map((grp) => ({
+        group: grp,
+        templates: shiftTemplates.filter((t) => grp.templateIds.includes(t.id)),
+      })).filter((g) => g.templates.length > 0)
+    : [{ group: null as ShiftGroup | null, templates: shiftTemplates }];
+  const ungroupedShifts = shiftTemplates.filter((t) => !shiftGroups.some((g) => g.templateIds.includes(t.id)));
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
@@ -1159,27 +1186,62 @@ function SchEditModal({ visible, date, employee, session, sessionColor, existing
         </View>
         <ScrollView contentContainerStyle={{ padding: 16, gap: 14 }}>
 
-          {/* 工作班次区 */}
+          {/* 工作班次区（标签化，点击即带入） */}
           <View style={[SCHEM.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={[SCHEM.label, { color: colors.foreground }]}>工作班次</Text>
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
-              {shiftTemplates.map((tpl) => {
-                const sel = !selectedSpecialId && selectedShiftSession === tpl.session;
-                return (
-                  <TouchableOpacity key={tpl.id} onPress={() => { tap(); setSelectedShiftSession(tpl.session); setSelectedSpecialId(null); if (!hoursInput) setHoursInput(String(tpl.defaultHours)); }}
-                    style={[SCHEM.chip, { backgroundColor: sel ? tpl.color : colors.surface, borderColor: tpl.color }]}>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: sel ? "#fff" : tpl.color }} />
-                      <Text style={{ fontSize: 13, fontWeight: "600", color: sel ? "#fff" : tpl.color }}>{tpl.session}</Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+              <Text style={[SCHEM.label, { color: colors.foreground }]}>工作班次</Text>
+              <Text style={{ fontSize: 11, color: colors.muted }}>工时自动带入员工档案 {autoHours}h</Text>
             </View>
+            {/* 按分组展示班次标签 */}
+            {groupedShifts.map(({ group, templates }) => (
+              <View key={group?.id ?? "ungrouped"} style={{ marginTop: 10 }}>
+                {group && (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: group.color }} />
+                    <Text style={{ fontSize: 11, color: group.color, fontWeight: "600" }}>{group.name}</Text>
+                  </View>
+                )}
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                  {templates.map((tpl) => {
+                    const sel = !selectedSpecialId && selectedShiftSession === tpl.session;
+                    const chipColor = group ? group.color : tpl.color;
+                    return (
+                      <TouchableOpacity key={tpl.id} onPress={() => handleSelectShift(tpl)}
+                        style={[SCHEM.chip, { backgroundColor: sel ? chipColor : colors.surface, borderColor: chipColor }]}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: sel ? "#fff" : chipColor }} />
+                          <Text style={{ fontSize: 13, fontWeight: "600", color: sel ? "#fff" : chipColor }}>{tpl.session}</Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            ))}
+            {/* 未分组班次 */}
+            {ungroupedShifts.length > 0 && shiftGroups.length > 0 && (
+              <View style={{ marginTop: 10 }}>
+                <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 6 }}>未分组</Text>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                  {ungroupedShifts.map((tpl) => {
+                    const sel = !selectedSpecialId && selectedShiftSession === tpl.session;
+                    return (
+                      <TouchableOpacity key={tpl.id} onPress={() => handleSelectShift(tpl)}
+                        style={[SCHEM.chip, { backgroundColor: sel ? tpl.color : colors.surface, borderColor: tpl.color }]}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: sel ? "#fff" : tpl.color }} />
+                          <Text style={{ fontSize: 13, fontWeight: "600", color: sel ? "#fff" : tpl.color }}>{tpl.session}</Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
             {!selectedSpecialId && (
               <View style={{ flexDirection: "row", gap: 8, alignItems: "center", marginTop: 10 }}>
                 <TextInput value={hoursInput} onChangeText={setHoursInput}
-                  placeholder={`工时 ${defaultHours}h`} placeholderTextColor={colors.muted} keyboardType="decimal-pad"
+                  placeholder={`工时 ${autoHours}h`} placeholderTextColor={colors.muted} keyboardType="decimal-pad"
                   style={[SCHEM.input, { color: colors.foreground, borderColor: colors.border, flex: 1 }]} />
                 <Text style={{ color: colors.muted }}>h</Text>
                 {contractHours > 0 && <Text style={{ fontSize: 11, color: isOT ? colors.warning : colors.muted }}>合同 {contractHours}h{isOT ? ` · 加班+${otAmt.toFixed(1)}h` : ""}</Text>}
@@ -1187,8 +1249,8 @@ function SchEditModal({ visible, date, employee, session, sessionColor, existing
             )}
           </View>
 
-          {/* 特殊状态区（缺席类） */}
-          {absenceStatuses.length > 0 && (
+          {/* 特殊状态区（缺席类 + 工作日类） */}
+          {(absenceStatuses.length > 0 || workDayStatuses.length > 0) && (
             <View style={[SCHEM.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <Text style={[SCHEM.label, { color: colors.foreground }]}>特殊状态</Text>
               <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
@@ -1218,7 +1280,7 @@ function SchEditModal({ visible, date, employee, session, sessionColor, existing
               {selectedSpecial?.category === "work_day" && (
                 <View style={{ flexDirection: "row", gap: 8, alignItems: "center", marginTop: 10 }}>
                   <TextInput value={hoursInput} onChangeText={setHoursInput}
-                    placeholder={`工时 ${defaultHours}h`} placeholderTextColor={colors.muted} keyboardType="decimal-pad"
+                    placeholder={`工时 ${autoHours}h`} placeholderTextColor={colors.muted} keyboardType="decimal-pad"
                     style={[SCHEM.input, { color: colors.foreground, borderColor: selectedSpecial.color, flex: 1 }]} />
                   <Text style={{ color: colors.muted }}>h</Text>
                 </View>
@@ -1236,12 +1298,12 @@ function SchEditModal({ visible, date, employee, session, sessionColor, existing
             </View>
           )}
 
-          {/* 加班换休区 */}
-          {compOffStatuses.length > 0 && (
+          {/* 调休换休区（拆分三种） */}
+          {displayCompOffStatuses.length > 0 && (
             <View style={[SCHEM.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <Text style={[SCHEM.label, { color: colors.foreground }]}>加班换休</Text>
+              <Text style={[SCHEM.label, { color: colors.foreground }]}>调休换休</Text>
               <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
-                {compOffStatuses.map((ss) => {
+                {displayCompOffStatuses.map((ss) => {
                   const sel = selectedSpecialId === ss.id;
                   return (
                     <TouchableOpacity key={ss.id} onPress={() => { tap(); setSelectedSpecialId(sel ? null : ss.id); setSelectedShiftSession(null); setHoursInput(""); }}
@@ -1251,7 +1313,27 @@ function SchEditModal({ visible, date, employee, session, sessionColor, existing
                   );
                 })}
               </View>
-              <Text style={{ fontSize: 11, color: colors.muted, marginTop: 6 }}>不扣薪，从当月累积加班时数里扣除对应小时</Text>
+              {/* 调休换休说明 */}
+              {selectedSpecialId && (() => {
+                const sel = displayCompOffStatuses.find((s) => s.id === selectedSpecialId);
+                if (!sel) return null;
+                const hints: Record<string, string> = {
+                  ss_comp_off_overtime: "优先扣加班时间，不扣薪",
+                  ss_comp_off_balance:  "优先扣调休余额，不扣薪",
+                  ss_comp_off_holiday:  "优先匹配当月节假日多倍，无则提醒",
+                  ss_comp_off:          "不扣薪，从当月累积加班时数里扣除",
+                };
+                return (
+                  <Text style={{ fontSize: 11, color: colors.muted, marginTop: 6 }}>
+                    {hints[sel.id] ?? "不扣薪"}
+                  </Text>
+                );
+              })()}
+              {!selectedSpecialId && (
+                <Text style={{ fontSize: 11, color: colors.muted, marginTop: 6 }}>
+                  加班换休：优先扣加班时间 | 调休余额：优先扣余额 | 节假日调休：优先匹配节假日
+                </Text>
+              )}
             </View>
           )}
 
@@ -1267,42 +1349,159 @@ function SchEditModal({ visible, date, employee, session, sessionColor, existing
   );
 }
 
-// ─── 排班设置 Modal（班次 + 特殊状态两个 Tab） ─────────────────────────────────────────────────────────────────────────────
-function SchTemplateModal({ visible, templates, specialStatuses, colors, onSaveShift, onDeleteShift, onSaveStatus, onDeleteStatus, onClose }: {
-  visible: boolean; templates: ShiftTemplate[]; specialStatuses: SpecialStatus[]; colors: any;
-  onSaveShift: (t: ShiftTemplate) => void; onDeleteShift: (id: string) => void;
-  onSaveStatus: (s: SpecialStatus) => void; onDeleteStatus: (id: string) => void;
+// ─── 排班设置 Modal（四个 Tab：工作班次 / 班次分组 / 店铺经营时间 / 特殊状态） ────
+function SchTemplateModal({ visible, templates, specialStatuses, businessHours, shiftGroups, colors,
+  onSaveShift, onDeleteShift, onSaveStatus, onDeleteStatus,
+  onSaveBusinessHours, onSaveShiftGroups, onClose }: {
+  visible: boolean;
+  templates: ShiftTemplate[];
+  specialStatuses: SpecialStatus[];
+  businessHours: BusinessHoursEntry[];
+  shiftGroups: ShiftGroup[];
+  colors: any;
+  onSaveShift: (t: ShiftTemplate) => void;
+  onDeleteShift: (id: string) => void;
+  onSaveStatus: (s: SpecialStatus) => void;
+  onDeleteStatus: (id: string) => void;
+  onSaveBusinessHours: (entries: BusinessHoursEntry[]) => void;
+  onSaveShiftGroups: (groups: ShiftGroup[]) => void;
   onClose: () => void;
 }) {
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
-  const [activeTab, setActiveTab] = useState<"shifts" | "statuses">("shifts");
+  const [activeTab, setActiveTab] = useState<"shifts" | "groups" | "hours" | "statuses">("shifts");
   const [localShifts, setLocalShifts] = useState<ShiftTemplate[]>([]);
   const [localStatuses, setLocalStatuses] = useState<SpecialStatus[]>([]);
+  const [localHours, setLocalHours] = useState<BusinessHoursEntry[]>([]);
+  const [localGroups, setLocalGroups] = useState<ShiftGroup[]>([]);
+
   React.useEffect(() => {
     if (visible) {
       setLocalShifts([...templates].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)));
       setLocalStatuses([...specialStatuses].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)));
+      setLocalHours([...businessHours]);
+      setLocalGroups([...shiftGroups].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)));
     }
-  }, [visible, templates, specialStatuses]);
-  const updShift = (id: string, p: Partial<ShiftTemplate>) => setLocalShifts((prev) => prev.map((t) => t.id === id ? { ...t, ...p } : t));
-  const addNewShift = () => { tap(); setLocalShifts((prev) => [...prev, { id: `tpl_${Date.now()}`, session: "新班次", startTime: "09:00", endTime: "18:00", defaultHours: 8, color: SHIFT_COLOR_PRESETS[prev.length % SHIFT_COLOR_PRESETS.length], sortOrder: prev.length }]); };
-  const removeShift = (id: string) => { tap(); Alert.alert("删除班次", "删除后该班次历史排班记录不受影响。", [{ text: "取消", style: "cancel" }, { text: "删除", style: "destructive", onPress: () => setLocalShifts((prev) => prev.filter((t) => t.id !== id)) }]); };
-  const updStatus = (id: string, p: Partial<SpecialStatus>) => setLocalStatuses((prev) => prev.map((s) => s.id === id ? { ...s, ...p } : s));
-  const addNewStatus = () => { tap(); setLocalStatuses((prev) => [...prev, { id: `ss_${Date.now()}`, name: "自定义", category: "absence" as const, direction: "negative" as const, countAsAttendance: false, salaryMultiplier: 1, color: SHIFT_COLOR_PRESETS[prev.length % SHIFT_COLOR_PRESETS.length], sortOrder: prev.length }]); };
-  const removeStatus = (id: string) => { const t = localStatuses.find((s) => s.id === id); if (t?.isBuiltin) { Alert.alert("内置状态", "内置状态不可删除，但可修改名称和倍率。"); return; } tap(); Alert.alert("删除状态", "确认删除？", [{ text: "取消", style: "cancel" }, { text: "删除", style: "destructive", onPress: () => setLocalStatuses((prev) => prev.filter((s) => s.id !== id)) }]); };
+  }, [visible, templates, specialStatuses, businessHours, shiftGroups]);
+
+  // ── 班次操作 ──
+  const updShift = (id: string, p: Partial<ShiftTemplate>) =>
+    setLocalShifts((prev) => prev.map((t) => t.id === id ? { ...t, ...p } : t));
+  const addNewShift = () => {
+    tap();
+    setLocalShifts((prev) => [...prev, {
+      id: `tpl_${Date.now()}`, session: "新班次", startTime: "09:00", endTime: "18:00",
+      defaultHours: 8, color: SHIFT_COLOR_PRESETS[prev.length % SHIFT_COLOR_PRESETS.length],
+      sortOrder: prev.length,
+    }]);
+  };
+  const removeShift = (id: string) => {
+    tap();
+    Alert.alert("删除班次", "删除后该班次历史排班记录不受影响。", [
+      { text: "取消", style: "cancel" },
+      { text: "删除", style: "destructive", onPress: () => setLocalShifts((prev) => prev.filter((t) => t.id !== id)) },
+    ]);
+  };
+
+  // ── 特殊状态操作 ──
+  const updStatus = (id: string, p: Partial<SpecialStatus>) =>
+    setLocalStatuses((prev) => prev.map((s) => s.id === id ? { ...s, ...p } : s));
+  const addNewStatus = () => {
+    tap();
+    setLocalStatuses((prev) => [...prev, {
+      id: `ss_${Date.now()}`, name: "自定义", category: "absence" as const,
+      direction: "negative" as const, countAsAttendance: false,
+      salaryMultiplier: 1, color: SHIFT_COLOR_PRESETS[prev.length % SHIFT_COLOR_PRESETS.length],
+      sortOrder: prev.length,
+    }]);
+  };
+  const removeStatus = (id: string) => {
+    const t = localStatuses.find((s) => s.id === id);
+    if (t?.isBuiltin) { Alert.alert("内置状态", "内置状态不可删除，但可修改名称和倍率。"); return; }
+    tap();
+    Alert.alert("删除状态", "确认删除？", [
+      { text: "取消", style: "cancel" },
+      { text: "删除", style: "destructive", onPress: () => setLocalStatuses((prev) => prev.filter((s) => s.id !== id)) },
+    ]);
+  };
+
+  // ── 店铺经营时间操作 ──
+  const updHours = (id: string, p: Partial<BusinessHoursEntry>) =>
+    setLocalHours((prev) => prev.map((e) => e.id === id ? { ...e, ...p } : e));
+  const addNewHours = () => {
+    tap();
+    setLocalHours((prev) => [...prev, {
+      id: `bh_${Date.now()}`, fromDay: 1, toDay: 5, openTime: "10:00", closeTime: "22:00",
+    }]);
+  };
+  const removeHours = (id: string) => {
+    tap();
+    Alert.alert("删除时间段", "确认删除？", [
+      { text: "取消", style: "cancel" },
+      { text: "删除", style: "destructive", onPress: () => setLocalHours((prev) => prev.filter((e) => e.id !== id)) },
+    ]);
+  };
+
+  // ── 班次分组操作 ──
+  const updGroup = (id: string, p: Partial<ShiftGroup>) =>
+    setLocalGroups((prev) => prev.map((g) => g.id === id ? { ...g, ...p } : g));
+  const addNewGroup = () => {
+    tap();
+    setLocalGroups((prev) => [...prev, {
+      id: `sg_${Date.now()}`, name: "新分组",
+      color: SHIFT_COLOR_PRESETS[prev.length % SHIFT_COLOR_PRESETS.length],
+      sortOrder: prev.length, templateIds: [],
+    }]);
+  };
+  const removeGroup = (id: string) => {
+    tap();
+    Alert.alert("删除分组", "确认删除？班次不会被删除。", [
+      { text: "取消", style: "cancel" },
+      { text: "删除", style: "destructive", onPress: () => setLocalGroups((prev) => prev.filter((g) => g.id !== id)) },
+    ]);
+  };
+  const toggleTemplateInGroup = (groupId: string, templateId: string) => {
+    tap();
+    setLocalGroups((prev) => prev.map((g) => {
+      if (g.id !== groupId) {
+        // 从其他分组移除
+        return { ...g, templateIds: g.templateIds.filter((id) => id !== templateId) };
+      }
+      // 当前分组：切换
+      const has = g.templateIds.includes(templateId);
+      return { ...g, templateIds: has ? g.templateIds.filter((id) => id !== templateId) : [...g.templateIds, templateId] };
+    }));
+  };
+
+  // ── 保存 ──
   const handleSave = () => {
-    const eShiftIds = templates.map((t) => t.id); const lShiftIds = localShifts.map((t) => t.id);
+    // 班次
+    const eShiftIds = templates.map((t) => t.id);
+    const lShiftIds = localShifts.map((t) => t.id);
     eShiftIds.filter((id) => !lShiftIds.includes(id)).forEach((id) => onDeleteShift(id));
     localShifts.forEach((t, i) => onSaveShift({ ...t, sortOrder: i }));
-    const eStatusIds = specialStatuses.map((s) => s.id); const lStatusIds = localStatuses.map((s) => s.id);
+    // 特殊状态
+    const eStatusIds = specialStatuses.map((s) => s.id);
+    const lStatusIds = localStatuses.map((s) => s.id);
     eStatusIds.filter((id) => !lStatusIds.includes(id)).forEach((id) => onDeleteStatus(id));
     localStatuses.forEach((s, i) => onSaveStatus({ ...s, sortOrder: i }));
+    // 店铺经营时间
+    onSaveBusinessHours(localHours);
+    // 班次分组
+    onSaveShiftGroups(localGroups.map((g, i) => ({ ...g, sortOrder: i })));
     onClose();
   };
-  const CATEGORY_LABELS: Record<string, string> = { absence: "缺席类", work_day: "工作日类", comp_off: "加班换休" };
+
+  const CATEGORY_LABELS: Record<string, string> = { absence: "缺席类", work_day: "工作日类", comp_off: "调休换休" };
   const DIRECTION_LABELS: Record<string, string> = { positive: "正向（加钱）", negative: "负向（扣钱）", neutral: "中性（不加不扣）" };
   const DIRECTION_COLORS: Record<string, string> = { positive: colors.success, negative: colors.error, neutral: colors.muted };
   const MULTIPLIER_PRESETS = [0, 0.5, 1, 1.5, 2, 3];
+  const TABS = [
+    { key: "shifts",   label: "班次" },
+    { key: "groups",   label: "分组" },
+    { key: "hours",    label: "营业时间" },
+    { key: "statuses", label: "特殊状态" },
+  ] as const;
+
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
       <View style={[SCHEM.sheet, { backgroundColor: colors.background }]}>
@@ -1311,47 +1510,209 @@ function SchTemplateModal({ visible, templates, specialStatuses, colors, onSaveS
           <Text style={[SCHEM.title, { color: colors.foreground }]}>排班设置</Text>
           <Pressable onPress={handleSave}><Text style={{ fontSize: 17, fontWeight: "600", color: colors.primary }}>保存</Text></Pressable>
         </View>
+
+        {/* Tab 栏 */}
         <View style={{ flexDirection: "row", marginHorizontal: 16, marginVertical: 8, backgroundColor: colors.border + "44", borderRadius: 10, padding: 2 }}>
-          {(["shifts", "statuses"] as const).map((tab) => (
-            <TouchableOpacity key={tab} onPress={() => { tap(); setActiveTab(tab); }}
-              style={{ flex: 1, paddingVertical: 7, borderRadius: 8, alignItems: "center", backgroundColor: activeTab === tab ? colors.surface : "transparent" }}>
-              <Text style={{ fontSize: 13, fontWeight: activeTab === tab ? "700" : "400", color: activeTab === tab ? colors.foreground : colors.muted }}>{tab === "shifts" ? "工作班次" : "特殊状态"}</Text>
+          {TABS.map((tab) => (
+            <TouchableOpacity key={tab.key} onPress={() => { tap(); setActiveTab(tab.key); }}
+              style={{ flex: 1, paddingVertical: 6, borderRadius: 8, alignItems: "center", backgroundColor: activeTab === tab.key ? colors.surface : "transparent" }}>
+              <Text style={{ fontSize: 12, fontWeight: activeTab === tab.key ? "700" : "400", color: activeTab === tab.key ? colors.foreground : colors.muted }}>{tab.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
+
         <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
-          {activeTab === "shifts" ? (
+
+          {/* ── Tab: 工作班次 ── */}
+          {activeTab === "shifts" && (
             <>
-              {localShifts.map((tpl) => (
-                <View key={tpl.id} style={{ backgroundColor: tpl.color + "10", borderRadius: 14, padding: 14, gap: 10, borderWidth: 1, borderColor: tpl.color + "44" }}>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                    <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: tpl.color }} />
-                    <TextInput value={tpl.session} onChangeText={(v) => updShift(tpl.id, { session: v })} placeholder="班次名称" placeholderTextColor={colors.muted} style={{ flex: 1, fontSize: 15, fontWeight: "700", color: tpl.color, paddingVertical: 2 }} />
-                    <TouchableOpacity onPress={() => removeShift(tpl.id)} style={{ padding: 4 }}><IconSymbol name="trash" size={16} color={colors.error} /></TouchableOpacity>
+              {localShifts.map((tpl) => {
+                // 找到所属分组
+                const grp = localGroups.find((g) => g.templateIds.includes(tpl.id));
+                const displayColor = grp ? grp.color : tpl.color;
+                return (
+                  <View key={tpl.id} style={{ backgroundColor: displayColor + "10", borderRadius: 14, padding: 14, gap: 10, borderWidth: 1, borderColor: displayColor + "44" }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                      <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: displayColor }} />
+                      <TextInput value={tpl.session} onChangeText={(v) => updShift(tpl.id, { session: v })}
+                        placeholder="班次名称" placeholderTextColor={colors.muted}
+                        style={{ flex: 1, fontSize: 15, fontWeight: "700", color: displayColor, paddingVertical: 2 }} />
+                      {grp && (
+                        <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, backgroundColor: grp.color + "22" }}>
+                          <Text style={{ fontSize: 10, color: grp.color, fontWeight: "600" }}>{grp.name}</Text>
+                        </View>
+                      )}
+                      <TouchableOpacity onPress={() => removeShift(tpl.id)} style={{ padding: 4 }}>
+                        <IconSymbol name="trash" size={16} color={colors.error} />
+                      </TouchableOpacity>
+                    </View>
+                    <View style={{ flexDirection: "row", gap: 8 }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 10, color: colors.muted, marginBottom: 3 }}>开始时间</Text>
+                        <TextInput value={tpl.startTime} onChangeText={(v) => updShift(tpl.id, { startTime: v })}
+                          placeholder="10:30" placeholderTextColor={colors.muted}
+                          style={[SCHEM.inputSmall, { color: colors.foreground, borderColor: colors.border, width: "100%" }]} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 10, color: colors.muted, marginBottom: 3 }}>结束时间</Text>
+                        <TextInput value={tpl.endTime} onChangeText={(v) => updShift(tpl.id, { endTime: v })}
+                          placeholder="17:00" placeholderTextColor={colors.muted}
+                          style={[SCHEM.inputSmall, { color: colors.foreground, borderColor: colors.border, width: "100%" }]} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 10, color: colors.muted, marginBottom: 3 }}>营业额预警</Text>
+                        <TextInput value={tpl.revenueWarning ? String(tpl.revenueWarning) : ""}
+                          onChangeText={(v) => updShift(tpl.id, { revenueWarning: Number(v) || 0 })}
+                          placeholder="0=关闭" placeholderTextColor={colors.muted} keyboardType="decimal-pad"
+                          style={[SCHEM.inputSmall, { color: colors.foreground, borderColor: colors.border, width: "100%" }]} />
+                      </View>
+                    </View>
+                    <Text style={{ fontSize: 10, color: colors.muted }}>工时由员工档案 stdHoursPerDay 自动带入，无需在此设置</Text>
                   </View>
-                  <View style={{ flexDirection: "row", gap: 8 }}>
-                    <View style={{ flex: 1 }}><Text style={{ fontSize: 10, color: colors.muted, marginBottom: 3 }}>开始</Text><TextInput value={tpl.startTime} onChangeText={(v) => updShift(tpl.id, { startTime: v })} placeholder="10:30" placeholderTextColor={colors.muted} style={[SCHEM.inputSmall, { color: colors.foreground, borderColor: colors.border, width: "100%" }]} /></View>
-                    <View style={{ flex: 1 }}><Text style={{ fontSize: 10, color: colors.muted, marginBottom: 3 }}>结束</Text><TextInput value={tpl.endTime} onChangeText={(v) => updShift(tpl.id, { endTime: v })} placeholder="17:00" placeholderTextColor={colors.muted} style={[SCHEM.inputSmall, { color: colors.foreground, borderColor: colors.border, width: "100%" }]} /></View>
-                    <View style={{ flex: 1 }}><Text style={{ fontSize: 10, color: colors.muted, marginBottom: 3 }}>默认工时</Text><TextInput value={String(tpl.defaultHours)} onChangeText={(v) => updShift(tpl.id, { defaultHours: Number(v) || tpl.defaultHours })} keyboardType="decimal-pad" style={[SCHEM.inputSmall, { color: colors.foreground, borderColor: tpl.color, width: "100%" }]} /></View>
-                  </View>
-                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>{SHIFT_COLOR_PRESETS.map((c) => (<TouchableOpacity key={c} onPress={() => { tap(); updShift(tpl.id, { color: c }); }} style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: c, borderWidth: tpl.color === c ? 3 : 1, borderColor: tpl.color === c ? colors.foreground : c + "44" }} />))}</View>
-                </View>
-              ))}
+                );
+              })}
               <TouchableOpacity onPress={addNewShift} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, padding: 14, borderRadius: 12, borderWidth: 1.5, borderStyle: "dashed", borderColor: colors.primary + "66" }}>
                 <IconSymbol name="plus.circle.fill" size={18} color={colors.primary} />
                 <Text style={{ fontSize: 14, fontWeight: "600", color: colors.primary }}>添加班次</Text>
               </TouchableOpacity>
             </>
-          ) : (
+          )}
+
+          {/* ── Tab: 班次分组 ── */}
+          {activeTab === "groups" && (
+            <>
+              <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 4 }}>每个分组设颜色，班次归属分组后员工左侧竖条显示分组颜色</Text>
+              {localGroups.map((grp) => (
+                <View key={grp.id} style={{ backgroundColor: grp.color + "10", borderRadius: 14, padding: 14, gap: 10, borderWidth: 1, borderColor: grp.color + "44" }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: grp.color }} />
+                    <TextInput value={grp.name} onChangeText={(v) => updGroup(grp.id, { name: v })}
+                      placeholder="分组名称" placeholderTextColor={colors.muted}
+                      style={{ flex: 1, fontSize: 15, fontWeight: "700", color: grp.color, paddingVertical: 2 }} />
+                    <TouchableOpacity onPress={() => removeGroup(grp.id)} style={{ padding: 4 }}>
+                      <IconSymbol name="trash" size={16} color={colors.error} />
+                    </TouchableOpacity>
+                  </View>
+                  {/* 颜色选择 */}
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                    {SHIFT_COLOR_PRESETS.map((c) => (
+                      <TouchableOpacity key={c} onPress={() => { tap(); updGroup(grp.id, { color: c }); }}
+                        style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: c, borderWidth: grp.color === c ? 3 : 1, borderColor: grp.color === c ? colors.foreground : c + "44" }} />
+                    ))}
+                  </View>
+                  {/* 班次归属 */}
+                  <View>
+                    <Text style={{ fontSize: 10, color: colors.muted, marginBottom: 6 }}>归属班次（点击切换）</Text>
+                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                      {localShifts.map((tpl) => {
+                        const inGroup = grp.templateIds.includes(tpl.id);
+                        return (
+                          <TouchableOpacity key={tpl.id} onPress={() => toggleTemplateInGroup(grp.id, tpl.id)}
+                            style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1.5,
+                              backgroundColor: inGroup ? grp.color : colors.surface,
+                              borderColor: inGroup ? grp.color : colors.border }}>
+                            <Text style={{ fontSize: 12, fontWeight: "600", color: inGroup ? "#fff" : colors.muted }}>{tpl.session}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                      {localShifts.length === 0 && (
+                        <Text style={{ fontSize: 12, color: colors.muted }}>请先在「班次」Tab 添加班次</Text>
+                      )}
+                    </View>
+                  </View>
+                </View>
+              ))}
+              <TouchableOpacity onPress={addNewGroup} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, padding: 14, borderRadius: 12, borderWidth: 1.5, borderStyle: "dashed", borderColor: colors.primary + "66" }}>
+                <IconSymbol name="plus.circle.fill" size={18} color={colors.primary} />
+                <Text style={{ fontSize: 14, fontWeight: "600", color: colors.primary }}>添加分组</Text>
+              </TouchableOpacity>
+            </>
+          )}
+
+          {/* ── Tab: 店铺经营时间 ── */}
+          {activeTab === "hours" && (
+            <>
+              <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 4 }}>设置每周各时段的营业时间，可添加多条规则</Text>
+              {localHours.map((entry) => (
+                <View key={entry.id} style={{ backgroundColor: colors.surface, borderRadius: 14, padding: 14, gap: 10, borderWidth: 1, borderColor: colors.border }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                    <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>
+                      {WEEKDAY_SHORT[entry.fromDay]}
+                      {entry.fromDay !== entry.toDay ? ` — ${WEEKDAY_SHORT[entry.toDay]}` : ""}
+                    </Text>
+                    <TouchableOpacity onPress={() => removeHours(entry.id)} style={{ padding: 4 }}>
+                      <IconSymbol name="trash" size={16} color={colors.error} />
+                    </TouchableOpacity>
+                  </View>
+                  {/* 星期范围 */}
+                  <View style={{ gap: 6 }}>
+                    <Text style={{ fontSize: 10, color: colors.muted }}>开始星期</Text>
+                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                      {([1, 2, 3, 4, 5, 6, 0] as const).map((d) => (
+                        <TouchableOpacity key={d} onPress={() => { tap(); updHours(entry.id, { fromDay: d }); }}
+                          style={{ width: 36, height: 28, borderRadius: 8, alignItems: "center", justifyContent: "center", borderWidth: 1,
+                            backgroundColor: entry.fromDay === d ? colors.primary : colors.surface,
+                            borderColor: entry.fromDay === d ? colors.primary : colors.border }}>
+                          <Text style={{ fontSize: 11, fontWeight: "600", color: entry.fromDay === d ? "#fff" : colors.muted }}>{WEEKDAY_SHORT[d]}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                    <Text style={{ fontSize: 10, color: colors.muted }}>结束星期</Text>
+                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                      {([1, 2, 3, 4, 5, 6, 0] as const).map((d) => (
+                        <TouchableOpacity key={d} onPress={() => { tap(); updHours(entry.id, { toDay: d }); }}
+                          style={{ width: 36, height: 28, borderRadius: 8, alignItems: "center", justifyContent: "center", borderWidth: 1,
+                            backgroundColor: entry.toDay === d ? colors.primary : colors.surface,
+                            borderColor: entry.toDay === d ? colors.primary : colors.border }}>
+                          <Text style={{ fontSize: 11, fontWeight: "600", color: entry.toDay === d ? "#fff" : colors.muted }}>{WEEKDAY_SHORT[d]}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                  {/* 时间段 */}
+                  <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 10, color: colors.muted, marginBottom: 3 }}>开门时间</Text>
+                      <TextInput value={entry.openTime} onChangeText={(v) => updHours(entry.id, { openTime: v })}
+                        placeholder="10:00" placeholderTextColor={colors.muted}
+                        style={[SCHEM.inputSmall, { color: colors.foreground, borderColor: colors.border, width: "100%", textAlign: "left" }]} />
+                    </View>
+                    <Text style={{ color: colors.muted, marginTop: 14 }}>—</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 10, color: colors.muted, marginBottom: 3 }}>关门时间</Text>
+                      <TextInput value={entry.closeTime} onChangeText={(v) => updHours(entry.id, { closeTime: v })}
+                        placeholder="22:00" placeholderTextColor={colors.muted}
+                        style={[SCHEM.inputSmall, { color: colors.foreground, borderColor: colors.border, width: "100%", textAlign: "left" }]} />
+                    </View>
+                  </View>
+                  {/* 备注 */}
+                  <TextInput value={entry.notes ?? ""} onChangeText={(v) => updHours(entry.id, { notes: v })}
+                    placeholder="备注（可选）" placeholderTextColor={colors.muted}
+                    style={[SCHEM.inputSmall, { color: colors.foreground, borderColor: colors.border, textAlign: "left" }]} />
+                </View>
+              ))}
+              <TouchableOpacity onPress={addNewHours} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, padding: 14, borderRadius: 12, borderWidth: 1.5, borderStyle: "dashed", borderColor: colors.primary + "66" }}>
+                <IconSymbol name="plus.circle.fill" size={18} color={colors.primary} />
+                <Text style={{ fontSize: 14, fontWeight: "600", color: colors.primary }}>添加时间段</Text>
+              </TouchableOpacity>
+            </>
+          )}
+
+          {/* ── Tab: 特殊状态 ── */}
+          {activeTab === "statuses" && (
             <>
               {localStatuses.map((ss) => (
                 <View key={ss.id} style={{ backgroundColor: ss.color + "10", borderRadius: 14, padding: 14, gap: 10, borderWidth: 1, borderColor: ss.color + "44" }}>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                     <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: ss.color }} />
-                    <TextInput value={ss.name} onChangeText={(v) => updStatus(ss.id, { name: v })} placeholder="状态名称" placeholderTextColor={colors.muted} style={{ flex: 1, fontSize: 15, fontWeight: "700", color: ss.color, paddingVertical: 2 }} />
-                    <TouchableOpacity onPress={() => removeStatus(ss.id)} style={{ padding: 4 }}><IconSymbol name="trash" size={16} color={ss.isBuiltin ? colors.muted : colors.error} /></TouchableOpacity>
+                    <TextInput value={ss.name} onChangeText={(v) => updStatus(ss.id, { name: v })}
+                      placeholder="状态名称" placeholderTextColor={colors.muted}
+                      style={{ flex: 1, fontSize: 15, fontWeight: "700", color: ss.color, paddingVertical: 2 }} />
+                    <TouchableOpacity onPress={() => removeStatus(ss.id)} style={{ padding: 4 }}>
+                      <IconSymbol name="trash" size={16} color={ss.isBuiltin ? colors.muted : colors.error} />
+                    </TouchableOpacity>
                   </View>
-                  {/* 方向选择（核心字段） */}
+                  {/* 方向选择 */}
                   <View>
                     <Text style={{ fontSize: 10, color: colors.muted, marginBottom: 4 }}>薪资方向</Text>
                     <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
@@ -1376,7 +1737,7 @@ function SchTemplateModal({ visible, templates, specialStatuses, colors, onSaveS
                       <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: "#fff", alignSelf: (ss.countAsAttendance ?? false) ? "flex-end" : "flex-start" }} />
                     </TouchableOpacity>
                   </View>
-                  {/* 是否节假日（可换休） */}
+                  {/* 是否节假日 */}
                   <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
                     <View>
                       <Text style={{ fontSize: 13, color: colors.foreground }}>节假日性质</Text>
@@ -1391,22 +1752,19 @@ function SchTemplateModal({ visible, templates, specialStatuses, colors, onSaveS
                   {ss.category !== "comp_off" && (
                     <View>
                       <Text style={{ fontSize: 10, color: colors.muted, marginBottom: 6 }}>
-                        薪资倍率：{ss.salaryMultiplier}x
-                        {" · "}
-                        {(() => {
+                        薪资倍率：{ss.salaryMultiplier}x · {(() => {
                           const dir = ss.direction ?? "negative";
                           const m = ss.salaryMultiplier;
                           if (dir === "neutral") return "不加不扣";
                           if (dir === "positive") {
                             if (!ss.countAsAttendance) return m === 1 ? "不扣薪（退回1天）" : `退回${m}天日薪`;
-                            return m <= 1 ? "正常日薪" : `额外补偿${(m-1).toFixed(1)}倍日薪`;
+                            return m <= 1 ? "正常日薪" : `额外补偿${(m - 1).toFixed(1)}倍日薪`;
                           }
-                          // negative
                           if (!ss.countAsAttendance) {
                             if (m === 0) return "不扣薪";
-                            if (m < 1) return `只扣${m}天日薪（退回${(1-m).toFixed(1)}天）`;
+                            if (m < 1) return `只扣${m}天日薪（退回${(1 - m).toFixed(1)}天）`;
                             if (m === 1) return "扣1天日薪";
-                            return `扣${m}天日薪（额外惩罚${(m-1).toFixed(1)}天）`;
+                            return `扣${m}天日薪（额外惩罚${(m - 1).toFixed(1)}天）`;
                           }
                           return `扣${m}倍日薪（上班但违规）`;
                         })()}
@@ -1414,27 +1772,39 @@ function SchTemplateModal({ visible, templates, specialStatuses, colors, onSaveS
                       <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
                         {MULTIPLIER_PRESETS.map((m) => (
                           <TouchableOpacity key={m} onPress={() => updStatus(ss.id, { salaryMultiplier: m })}
-                            style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, backgroundColor: ss.salaryMultiplier === m ? ss.color : colors.surface, borderColor: ss.salaryMultiplier === m ? ss.color : colors.border }}>
+                            style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1,
+                              backgroundColor: ss.salaryMultiplier === m ? ss.color : colors.surface,
+                              borderColor: ss.salaryMultiplier === m ? ss.color : colors.border }}>
                             <Text style={{ fontSize: 12, color: ss.salaryMultiplier === m ? "#fff" : colors.muted }}>{m}x</Text>
                           </TouchableOpacity>
                         ))}
-                        <TextInput value={MULTIPLIER_PRESETS.includes(ss.salaryMultiplier) ? "" : String(ss.salaryMultiplier)} onChangeText={(v) => updStatus(ss.id, { salaryMultiplier: Number(v) || ss.salaryMultiplier })} placeholder="自定义" placeholderTextColor={colors.muted} keyboardType="decimal-pad" style={[SCHEM.inputSmall, { color: colors.foreground, borderColor: colors.border, width: 60 }]} />
+                        <TextInput value={MULTIPLIER_PRESETS.includes(ss.salaryMultiplier) ? "" : String(ss.salaryMultiplier)}
+                          onChangeText={(v) => updStatus(ss.id, { salaryMultiplier: Number(v) || ss.salaryMultiplier })}
+                          placeholder="自定义" placeholderTextColor={colors.muted} keyboardType="decimal-pad"
+                          style={[SCHEM.inputSmall, { color: colors.foreground, borderColor: colors.border, width: 60 }]} />
                       </View>
                     </View>
                   )}
-                  {/* 分类（仅用于 UI 分组） */}
+                  {/* 分类 */}
                   <View>
                     <Text style={{ fontSize: 10, color: colors.muted, marginBottom: 4 }}>UI 分类（仅分组显示）</Text>
                     <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
                       {(["absence", "work_day", "comp_off"] as const).map((cat) => (
                         <TouchableOpacity key={cat} onPress={() => updStatus(ss.id, { category: cat })}
-                          style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, backgroundColor: ss.category === cat ? ss.color : colors.surface, borderColor: ss.category === cat ? ss.color : colors.border }}>
+                          style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1,
+                            backgroundColor: ss.category === cat ? ss.color : colors.surface,
+                            borderColor: ss.category === cat ? ss.color : colors.border }}>
                           <Text style={{ fontSize: 11, fontWeight: "600", color: ss.category === cat ? "#fff" : colors.muted }}>{CATEGORY_LABELS[cat]}</Text>
                         </TouchableOpacity>
                       ))}
                     </View>
                   </View>
-                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>{SHIFT_COLOR_PRESETS.map((c) => (<TouchableOpacity key={c} onPress={() => { tap(); updStatus(ss.id, { color: c }); }} style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: c, borderWidth: ss.color === c ? 3 : 1, borderColor: ss.color === c ? colors.foreground : c + "44" }} />))}</View>
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                    {SHIFT_COLOR_PRESETS.map((c) => (
+                      <TouchableOpacity key={c} onPress={() => { tap(); updStatus(ss.id, { color: c }); }}
+                        style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: c, borderWidth: ss.color === c ? 3 : 1, borderColor: ss.color === c ? colors.foreground : c + "44" }} />
+                    ))}
+                  </View>
                 </View>
               ))}
               <TouchableOpacity onPress={addNewStatus} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, padding: 14, borderRadius: 12, borderWidth: 1.5, borderStyle: "dashed", borderColor: colors.primary + "66" }}>
@@ -1444,6 +1814,7 @@ function SchTemplateModal({ visible, templates, specialStatuses, colors, onSaveS
               <Text style={{ fontSize: 11, color: colors.muted, textAlign: "center" }}>内置状态可修改名称和倍率，不可删除</Text>
             </>
           )}
+
         </ScrollView>
       </View>
     </Modal>
@@ -1468,6 +1839,8 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   const { getAvailableDays: getCompOffAvailDays, addEntry: addCompOffEntry, updateEntry: updateCompOffEntry, getEntries: getCompOffEntries, expireOldEntries: expireCompOff, cashOutEntry: cashOutCompOff } = useCompOffBalanceEntryStore();
   const { getAvailableDays: getHolidayCompOffAvailDays, updateEntry: updateHolidayCompOff, getEntries: getHolidayCompOffEntries, addEntry: addHolidayCompOff, expireOldEntries: expireHolidayCompOff } = useHolidayCompOffStore();
   const { upsertAlert } = useUnexplainedRestAlertStore();
+  const { businessHours, setBusinessHours } = useBusinessHoursStore();
+  const { shiftGroups, upsertShiftGroup, deleteShiftGroup, setShiftGroups, getGroupForTemplate } = useShiftGroupStore();
 
   const now = new Date();
   const todayStr = now.toISOString().slice(0, 10);
@@ -1535,6 +1908,39 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
     }
     return map;
   }, [allDeptEmployees, sortedTemplates]);
+
+  // 班次分组排序：按 ShiftGroup 分组显示员工
+  const sortedShiftGroups = useMemo(() =>
+    [...(shiftGroups.length > 0 ? shiftGroups : DEFAULT_SHIFT_GROUPS)].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)),
+    [shiftGroups]
+  );
+
+  // 构建分组展示数据：{ group, tpl, empList, groupColor }
+  const groupedScheduleRows = useMemo(() => {
+    const rows: Array<{ groupId: string; groupName: string; groupColor: string; tpl: ShiftTemplate; empList: Employee[] }> = [];
+    const coveredTplIds = new Set<string>();
+
+    for (const grp of sortedShiftGroups) {
+      for (const tplId of grp.templateIds) {
+        const tpl = sortedTemplates.find((t) => t.id === tplId);
+        if (!tpl) continue;
+        coveredTplIds.add(tpl.id);
+        const empList = employeesBySession[tpl.session] ?? [];
+        if (empList.length > 0) {
+          rows.push({ groupId: grp.id, groupName: grp.name, groupColor: grp.color, tpl, empList });
+        }
+      }
+    }
+    // 未分组班次
+    for (const tpl of sortedTemplates) {
+      if (coveredTplIds.has(tpl.id)) continue;
+      const empList = employeesBySession[tpl.session] ?? [];
+      if (empList.length > 0) {
+        rows.push({ groupId: "__ungrouped", groupName: "未分组", groupColor: tpl.color, tpl, empList });
+      }
+    }
+    return rows;
+  }, [sortedShiftGroups, sortedTemplates, employeesBySession]);
 
   const getEntry = useCallback((employeeId: string, date: string, session: string): ShiftEntry | null =>
     monthShifts.find((s) => s.employeeId === employeeId && s.date === date && s.shift === session) ?? null,
@@ -1839,21 +2245,20 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
           })}
         </View>
 
-        {/* 各班次员工行（无多余细线） */}
-        {sortedTemplates.map((tpl, tplIdx) => {
-          const empList = employeesBySession[tpl.session] ?? [];
+        {/* 各班次员工行（按分组排序，左侧竖条用分组额色） */}
+        {groupedScheduleRows.map(({ groupId, groupName, groupColor, tpl, empList }, rowIdx) => {
           if (empList.length === 0) return null;
           return (
-            <View key={tpl.session}>
-              {tplIdx > 0 && <View style={{ height: 6, backgroundColor: colors.border + "44" }} />}
+            <View key={`${groupId}_${tpl.id}`}>
+              {rowIdx > 0 && <View style={{ height: 6, backgroundColor: colors.border + "44" }} />}
               {empList.map((emp, empIdx) => {
                 const isLast = empIdx === empList.length - 1;
                 return (
                   <View key={emp.id} style={[EXL.empRow,
                     !isLast && { borderBottomColor: colors.border + "33", borderBottomWidth: StyleSheet.hairlineWidth }
                   ]}>
-                    {/* 班次色左竖条 */}
-                    <View style={{ width: 3, height: 34, backgroundColor: tpl.color + "CC" }} />
+                    {/* 分组色左竖条（颜色由分组决定） */}
+                    <View style={{ width: 3, height: 34, backgroundColor: groupColor + "CC" }} />
                     <TouchableOpacity onLongPress={() => handleFillRow(emp)}
                       style={[EXL.nameCol, { backgroundColor: "transparent", width: EXL_NAME_W - 3 }]}>
                       <Text style={{ fontSize: 11, fontWeight: "600", color: colors.foreground }} numberOfLines={1}>{emp.code}</Text>
@@ -2120,18 +2525,28 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
         visible={editModal} date={editDate} employee={editEmployee}
         session={editSession} sessionColor={editTpl?.color ?? "#5856D6"}
         existing={editEmployee && editDate ? getEntry(editEmployee.id, editDate, editSession) : null}
-        contractHours={editContractH} defaultHours={editTpl?.defaultHours ?? 8}
+        contractHours={editContractH}
         colors={colors}
         shiftTemplates={sortedTemplates}
         specialStatuses={specialStatuses}
+        shiftGroups={shiftGroups}
         onSave={(entry) => upsertShift(entry)}
         onClear={() => { if (editEmployee && editDate) deleteShift(editEmployee.id, editDate, editSession); }}
         onClose={() => setEditModal(false)}
       />
       <SchTemplateModal
-        visible={showTplModal} templates={sortedTemplates} specialStatuses={specialStatuses} colors={colors}
-        onSaveShift={upsertTemplate} onDeleteShift={deleteTemplate}
-        onSaveStatus={upsertStatus} onDeleteStatus={deleteStatus}
+        visible={showTplModal}
+        templates={sortedTemplates}
+        specialStatuses={specialStatuses}
+        businessHours={businessHours}
+        shiftGroups={shiftGroups}
+        colors={colors}
+        onSaveShift={upsertTemplate}
+        onDeleteShift={deleteTemplate}
+        onSaveStatus={upsertStatus}
+        onDeleteStatus={deleteStatus}
+        onSaveBusinessHours={setBusinessHours}
+        onSaveShiftGroups={setShiftGroups}
         onClose={() => setShowTplModal(false)}
       />
     </View>

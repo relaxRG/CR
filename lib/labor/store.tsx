@@ -11,12 +11,13 @@ import {
   ShiftTemplate, HolidayConfig,
   EmployeeGroup, CompOffBalance, SpecialStatus, GlobalPayrollSettings,
   CompOffBalanceEntry, HolidayCompOffEntry, UnexplainedRestAlert,
-  CustomDept,
+  CustomDept, BusinessHoursEntry, ShiftGroup,
   calcDailyRate, calcAllowance, calcSocialInsurance, calcIncomeTax, calcFinalSalary,
   getDaysInMonth, parseMonth, getContractHoursForDate,
   calcCompOffExpiresMonth, getAvailableCompOffDays,
   DEFAULT_SHIFT_TEMPLATES, DEFAULT_EMPLOYEE_GROUPS, DEFAULT_SPECIAL_STATUSES,
   DEFAULT_GLOBAL_PAYROLL_SETTINGS, DEFAULT_CUSTOM_DEPTS,
+  DEFAULT_BUSINESS_HOURS, DEFAULT_SHIFT_GROUPS,
 } from "./types";
 
 function uuid() { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
@@ -1102,6 +1103,88 @@ function HolidayCompOffProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+// ─── 店铺经营时间 Store ──────────────────────────────────────────────────────
+interface BusinessHoursStore {
+  businessHours: BusinessHoursEntry[];
+  upsertBusinessHours: (entry: BusinessHoursEntry) => void;
+  deleteBusinessHours: (id: string) => void;
+  setBusinessHours: (entries: BusinessHoursEntry[]) => void;
+  ready: boolean;
+}
+
+const BusinessHoursContext = createContext<BusinessHoursStore>({
+  businessHours: DEFAULT_BUSINESS_HOURS,
+  upsertBusinessHours: () => {}, deleteBusinessHours: () => {}, setBusinessHours: () => {}, ready: false,
+});
+
+function BusinessHoursProvider({ children }: { children: React.ReactNode }) {
+  const { data: businessHours, ref, persist, ready } = usePersisted<BusinessHoursEntry>("labor_business_hours_v1", DEFAULT_BUSINESS_HOURS);
+
+  const upsertBusinessHours = useCallback((entry: BusinessHoursEntry) => {
+    const idx = ref.current.findIndex((e) => e.id === entry.id);
+    if (idx >= 0) { const next = [...ref.current]; next[idx] = entry; persist(next); }
+    else persist([...ref.current, entry]);
+  }, [persist, ref]);
+
+  const deleteBusinessHours = useCallback((id: string) => {
+    persist(ref.current.filter((e) => e.id !== id));
+  }, [persist, ref]);
+
+  const setBusinessHours = useCallback((entries: BusinessHoursEntry[]) => {
+    persist(entries);
+  }, [persist]);
+
+  return (
+    <BusinessHoursContext.Provider value={{ businessHours, upsertBusinessHours, deleteBusinessHours, setBusinessHours, ready }}>
+      {children}
+    </BusinessHoursContext.Provider>
+  );
+}
+
+// ─── 班次分组 Store ───────────────────────────────────────────────────────────
+interface ShiftGroupStore {
+  shiftGroups: ShiftGroup[];
+  upsertShiftGroup: (group: ShiftGroup) => void;
+  deleteShiftGroup: (id: string) => void;
+  setShiftGroups: (groups: ShiftGroup[]) => void;
+  getGroupForTemplate: (templateId: string) => ShiftGroup | undefined;
+  ready: boolean;
+}
+
+const ShiftGroupContext = createContext<ShiftGroupStore>({
+  shiftGroups: DEFAULT_SHIFT_GROUPS,
+  upsertShiftGroup: () => {}, deleteShiftGroup: () => {}, setShiftGroups: () => {},
+  getGroupForTemplate: () => undefined, ready: false,
+});
+
+function ShiftGroupProvider({ children }: { children: React.ReactNode }) {
+  const { data: shiftGroups, ref, persist, ready } = usePersisted<ShiftGroup>("labor_shift_groups_v1", DEFAULT_SHIFT_GROUPS);
+
+  const upsertShiftGroup = useCallback((group: ShiftGroup) => {
+    const idx = ref.current.findIndex((g) => g.id === group.id);
+    if (idx >= 0) { const next = [...ref.current]; next[idx] = group; persist(next); }
+    else persist([...ref.current, group]);
+  }, [persist, ref]);
+
+  const deleteShiftGroup = useCallback((id: string) => {
+    persist(ref.current.filter((g) => g.id !== id));
+  }, [persist, ref]);
+
+  const setShiftGroups = useCallback((groups: ShiftGroup[]) => {
+    persist(groups);
+  }, [persist]);
+
+  const getGroupForTemplate = useCallback((templateId: string): ShiftGroup | undefined => {
+    return ref.current.find((g) => g.templateIds.includes(templateId));
+  }, [ref]);
+
+  return (
+    <ShiftGroupContext.Provider value={{ shiftGroups, upsertShiftGroup, deleteShiftGroup, setShiftGroups, getGroupForTemplate, ready }}>
+      {children}
+    </ShiftGroupContext.Provider>
+  );
+}
+
 // ─── 无来源多休提醒 Store ─────────────────────────────────────────────────────
 interface UnexplainedRestAlertStore {
   alerts: UnexplainedRestAlert[];
@@ -1151,6 +1234,8 @@ export function LaborProvider({ children }: { children: React.ReactNode }) {
       <EmployeeProvider>
         <CustomDeptProvider>
         <EmployeeGroupProvider>
+          <BusinessHoursProvider>
+          <ShiftGroupProvider>
           <ShiftTemplateProvider>
             <SpecialStatusProvider>
               <HolidayConfigProvider>
@@ -1174,6 +1259,8 @@ export function LaborProvider({ children }: { children: React.ReactNode }) {
               </HolidayConfigProvider>
             </SpecialStatusProvider>
           </ShiftTemplateProvider>
+          </ShiftGroupProvider>
+          </BusinessHoursProvider>
         </EmployeeGroupProvider>
         </CustomDeptProvider>
       </EmployeeProvider>
@@ -1196,3 +1283,5 @@ export function useGlobalPayrollSettingsStore() { return useContext(GlobalPayrol
 export function useCompOffBalanceEntryStore() { return useContext(CompOffBalanceEntryContext); }
 export function useHolidayCompOffStore() { return useContext(HolidayCompOffContext); }
 export function useUnexplainedRestAlertStore() { return useContext(UnexplainedRestAlertContext); }
+export function useBusinessHoursStore() { return useContext(BusinessHoursContext); }
+export function useShiftGroupStore() { return useContext(ShiftGroupContext); }

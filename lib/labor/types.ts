@@ -670,11 +670,67 @@ export const DEFAULT_SPECIAL_STATUSES: SpecialStatus[] = [
   { id: "ss_personal", name: "事假",     category: "absence",  direction: "negative", countAsAttendance: false, salaryMultiplier: 1,   color: "#5856D6", sortOrder: 3, isBuiltin: true },
   { id: "ss_absent",   name: "旷工",     category: "absence",  direction: "negative", countAsAttendance: false, salaryMultiplier: 2,   color: "#FF3B30", sortOrder: 4, isBuiltin: true },
   { id: "ss_holiday",  name: "节日上班", category: "work_day", direction: "positive", countAsAttendance: true,  salaryMultiplier: 3,   color: "#FF2D55", sortOrder: 5, isBuiltin: true, isHoliday: true },
-  { id: "ss_comp_off", name: "加班换休", category: "comp_off", direction: "neutral",  countAsAttendance: true,  salaryMultiplier: 0,   color: "#007AFF", sortOrder: 6, isBuiltin: true },
-  { id: "ss_penalty",  name: "违规扣款", category: "absence",  direction: "negative", countAsAttendance: true,  salaryMultiplier: 1,   color: "#FF6B00", sortOrder: 7, isBuiltin: true },
+  /**
+   * 调休换休三种（拆分自旧版 ss_comp_off）
+   * ss_comp_off_overtime  = 加班换休（优先扣加班时间）
+   * ss_comp_off_balance   = 调休余额（优先扣调休余额）
+   * ss_comp_off_holiday   = 节假日调休（优先匹配当月节假日多倍）
+   * 保留旧 id ss_comp_off 向后兼容
+   */
+  { id: "ss_comp_off",         name: "加班换休",   category: "comp_off", direction: "neutral", countAsAttendance: true, salaryMultiplier: 0, color: "#007AFF", sortOrder: 6, isBuiltin: true },
+  { id: "ss_comp_off_overtime", name: "加班换休",   category: "comp_off", direction: "neutral", countAsAttendance: true, salaryMultiplier: 0, color: "#007AFF", sortOrder: 7, isBuiltin: true },
+  { id: "ss_comp_off_balance",  name: "调休余额",   category: "comp_off", direction: "neutral", countAsAttendance: true, salaryMultiplier: 0, color: "#5AC8FA", sortOrder: 8, isBuiltin: true },
+  { id: "ss_comp_off_holiday",  name: "节假日调休", category: "comp_off", direction: "neutral", countAsAttendance: true, salaryMultiplier: 0, color: "#34C759", sortOrder: 9, isBuiltin: true },
+  { id: "ss_penalty",  name: "违规扣款", category: "absence",  direction: "negative", countAsAttendance: true,  salaryMultiplier: 1,   color: "#FF6B00", sortOrder: 10, isBuiltin: true },
 ];
 
 // ─── 旧绩效系统已移除，由 WorkKPIRule + RevenueKPIRule 替代 ─────────────────────
+
+// ─── 店铺经营时间 ─────────────────────────────────────────────────────────────
+/**
+ * 店铺经营时间条目
+ * 描述某个星期范围内的营业时间段
+ * fromDay/toDay: 0=周日, 1=周一, ..., 6=周六
+ */
+export interface BusinessHoursEntry {
+  id: string;
+  /** 开始星期（0=周日, 1=周一, ..., 6=周六） */
+  fromDay: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  /** 结束星期（0=周日, 1=周一, ..., 6=周六） */
+  toDay: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  /** 开始时间，如 "10:00" */
+  openTime: string;
+  /** 结束时间，如 "23:00" */
+  closeTime: string;
+  /** 备注（可选） */
+  notes?: string;
+}
+
+export const DEFAULT_BUSINESS_HOURS: BusinessHoursEntry[] = [
+  { id: "bh_weekday", fromDay: 1, toDay: 5, openTime: "10:00", closeTime: "22:00" },
+  { id: "bh_weekend", fromDay: 6, toDay: 0, openTime: "10:00", closeTime: "23:00" },
+];
+
+export const WEEKDAY_SHORT = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+
+// ─── 班次分组 ─────────────────────────────────────────────────────────────────
+/**
+ * 班次分组（如午班组/晚班组）
+ * 每个分组有颜色，班次卡片归属分组，员工左侧竖条颜色由分组决定
+ */
+export interface ShiftGroup {
+  id: string;
+  name: string;
+  color: string;
+  sortOrder: number;
+  /** 属于该分组的班次模板 ID 列表 */
+  templateIds: string[];
+}
+
+export const DEFAULT_SHIFT_GROUPS: ShiftGroup[] = [
+  { id: "sg_noon",    name: "午班组", color: "#FF9500", sortOrder: 0, templateIds: ["tpl_noon"] },
+  { id: "sg_evening", name: "晚班组", color: "#5856D6", sortOrder: 1, templateIds: ["tpl_evening"] },
+];
 
 // ─── 班次模板 ─────────────────────────────────────────────────────────────────
 export type ShiftSession = string;
@@ -687,6 +743,10 @@ export interface ShiftTemplate {
   defaultHours: number;
   color: string;
   sortOrder: number;
+  /** 所属班次分组 ID（可选） */
+  groupId?: string;
+  /** 营业额预警阈值（元，0=不预警） */
+  revenueWarning?: number;
 }
 
 export const DEFAULT_SHIFT_TEMPLATES: ShiftTemplate[] = [
