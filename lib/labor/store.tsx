@@ -8,7 +8,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { notifySyncChange, registerStoreReload } from "../sync/engine";
 import {
   Employee, ShiftEntry, MonthlyAttendance, PaySlip, MonthConfig,
-  ShiftTemplate, HolidayConfig, PerformanceTemplate, PerformanceRecord,
+  ShiftTemplate, HolidayConfig,
   EmployeeGroup, CompOffBalance, SpecialStatus, GlobalPayrollSettings,
   CompOffBalanceEntry, HolidayCompOffEntry, UnexplainedRestAlert,
   CustomDept,
@@ -700,81 +700,7 @@ function CompOffProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ─── 绩效模板 Store ───────────────────────────────────────────────────────────
-interface PerformanceTemplateStore {
-  templates: PerformanceTemplate[];
-  upsertTemplate: (tpl: PerformanceTemplate) => void;
-  deleteTemplate: (id: string) => void;
-  getTemplate: (employeeId: string) => PerformanceTemplate | null;
-  ready: boolean;
-}
-
-const PerformanceTemplateContext = createContext<PerformanceTemplateStore>({
-  templates: [], upsertTemplate: () => {}, deleteTemplate: () => {},
-  getTemplate: () => null, ready: false,
-});
-
-function PerformanceTemplateProvider({ children }: { children: React.ReactNode }) {
-  const { data: templates, ref, persist, ready } = usePersisted<PerformanceTemplate>("labor_performance_templates_v1");
-
-  const upsertTemplate = useCallback((tpl: PerformanceTemplate) => {
-    const idx = ref.current.findIndex((t) => t.employeeId === tpl.employeeId);
-    if (idx >= 0) { const next = [...ref.current]; next[idx] = { ...tpl, updatedAt: new Date().toISOString() }; persist(next); }
-    else persist([...ref.current, { ...tpl, updatedAt: new Date().toISOString() }]);
-  }, [persist, ref]);
-
-  const deleteTemplate = useCallback((id: string) => {
-    persist(ref.current.filter((t) => t.id !== id));
-  }, [persist, ref]);
-
-  const getTemplate = useCallback((employeeId: string): PerformanceTemplate | null => {
-    return ref.current.find((t) => t.employeeId === employeeId) ?? null;
-  }, [ref]);
-
-  return (
-    <PerformanceTemplateContext.Provider value={{ templates, upsertTemplate, deleteTemplate, getTemplate, ready }}>
-      {children}
-    </PerformanceTemplateContext.Provider>
-  );
-}
-
-// ─── 绩效月度记录 Store ───────────────────────────────────────────────────────
-interface PerformanceRecordStore {
-  records: PerformanceRecord[];
-  upsertRecord: (record: PerformanceRecord) => void;
-  deleteRecord: (id: string) => void;
-  getRecord: (employeeId: string, month: string) => PerformanceRecord | null;
-  ready: boolean;
-}
-
-const PerformanceRecordContext = createContext<PerformanceRecordStore>({
-  records: [], upsertRecord: () => {}, deleteRecord: () => {},
-  getRecord: () => null, ready: false,
-});
-
-function PerformanceRecordProvider({ children }: { children: React.ReactNode }) {
-  const { data: records, ref, persist, ready } = usePersisted<PerformanceRecord>("labor_performance_records_v1");
-
-  const upsertRecord = useCallback((record: PerformanceRecord) => {
-    const idx = ref.current.findIndex((r) => r.employeeId === record.employeeId && r.month === record.month);
-    if (idx >= 0) { const next = [...ref.current]; next[idx] = { ...record, updatedAt: new Date().toISOString() }; persist(next); }
-    else persist([...ref.current, { ...record, updatedAt: new Date().toISOString() }]);
-  }, [persist, ref]);
-
-  const deleteRecord = useCallback((id: string) => {
-    persist(ref.current.filter((r) => r.id !== id));
-  }, [persist, ref]);
-
-  const getRecord = useCallback((employeeId: string, month: string): PerformanceRecord | null => {
-    return ref.current.find((r) => r.employeeId === employeeId && r.month === month) ?? null;
-  }, [ref]);
-
-  return (
-    <PerformanceRecordContext.Provider value={{ records, upsertRecord, deleteRecord, getRecord, ready }}>
-      {children}
-    </PerformanceRecordContext.Provider>
-  );
-}
+// ─── 旧绩效 Store 已移除，由 Employee.workKPIRules + Employee.revenueKPIRules 替代 ─────
 
 // ─── 薪资单 Store ─────────────────────────────────────────────────────────────
 interface PaySlipStore {
@@ -1235,13 +1161,9 @@ export function LaborProvider({ children }: { children: React.ReactNode }) {
                         <HolidayCompOffProvider>
                           <UnexplainedRestAlertProvider>
                             <PaySlipProvider>
-                              <PerformanceTemplateProvider>
-                                <PerformanceRecordProvider>
                                   <GlobalPayrollSettingsProvider>
                                     {children}
                                   </GlobalPayrollSettingsProvider>
-                                </PerformanceRecordProvider>
-                              </PerformanceTemplateProvider>
                             </PaySlipProvider>
                           </UnexplainedRestAlertProvider>
                         </HolidayCompOffProvider>
@@ -1269,8 +1191,6 @@ export function useHolidayConfigStore() { return useContext(HolidayConfigContext
 export function useAttendanceStore() { return useContext(AttendanceContext); }
 export function useCompOffStore() { return useContext(CompOffContext); }
 export function usePaySlipStore() { return useContext(PaySlipContext); }
-export function usePerformanceTemplateStore() { return useContext(PerformanceTemplateContext); }
-export function usePerformanceRecordStore() { return useContext(PerformanceRecordContext); }
 export function useMonthConfigStore() { return useContext(MonthConfigContext); }
 export function useGlobalPayrollSettingsStore() { return useContext(GlobalPayrollSettingsContext); }
 export function useCompOffBalanceEntryStore() { return useContext(CompOffBalanceEntryContext); }

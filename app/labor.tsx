@@ -20,7 +20,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import {
   useEmployeeStore, useEmployeeGroupStore, useAttendanceStore,
   usePaySlipStore, useShiftStore, useShiftTemplateStore,
-  usePerformanceRecordStore, useHolidayConfigStore,
+  useHolidayConfigStore,
   useSpecialStatusStore, useGlobalPayrollSettingsStore,
   useCompOffBalanceEntryStore, useHolidayCompOffStore, useUnexplainedRestAlertStore,
   useCustomDeptStore,
@@ -615,7 +615,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors }:
 
           {/* 操作按钮行：绩效设置 + 历史 + 编辑薪资 */}
           <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
-            <TouchableOpacity onPress={() => { tap(); router.push({ pathname: "/labor-performance", params: { employeeId: employee.id } } as any); }}
+            <TouchableOpacity onPress={() => { tap(); router.push({ pathname: "/labor-employee-form", params: { employeeId: employee.id } } as any); }}
               style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, paddingVertical: 7, borderRadius: 8, backgroundColor: colors.success + "15", borderWidth: 1, borderColor: colors.success + "44" }}>
               <IconSymbol name="chart.bar.fill" size={12} color={colors.success} />
               <Text style={{ fontSize: 12, color: colors.success, fontWeight: "600" }}>绩效设置</Text>
@@ -1461,7 +1461,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   const { statuses: specialStatuses, upsertStatus, deleteStatus } = useSpecialStatusStore();
   const { paySlips, getPaySlip, upsertPaySlip, buildPaySlipDraft } = usePaySlipStore();
   const { getAttendance, upsertAttendance, calcFromShifts } = useAttendanceStore();
-  const { getRecord: getPerfRecord } = usePerformanceRecordStore();
+  // 旧绩效 Store 已移除，performanceTotal 从新 KPI 系统计算
   const { getHolidayForDate } = useHolidayConfigStore();
   const { advances } = useSalaryAdvanceStore();
   const { settings: globalSettings } = useGlobalPayrollSettingsStore();
@@ -1697,8 +1697,8 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
             }
           : baseAtt;
         upsertAttendance(att);
-        const perfRecord = getPerfRecord(emp.id, currentMonth);
-        const performanceTotal = perfRecord?.totalPerformance ?? 0;
+        // 从新 KPI 系统计算绩效（暂时为 0，后续在薪资统计 Tab 中勾选后计入）
+        const performanceTotal = 0; // TODO: 从 emp.workKPIRules + emp.revenueKPIRules 计算
         const advanceTotal = advances
           .filter((a) => a.employeeId === emp.id && (a.deductMonth === currentMonth || a.date.startsWith(currentMonth)))
           .reduce((s, a) => s + a.amount, 0);
@@ -1776,7 +1776,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
     } finally {
       setGenerating(false);
     }
-  }, [employees, getShifts, currentMonth, getHolidayForDate, calcFromShifts, specialStatuses, getPaySlip, getCompOffEntries, addCompOffEntry, updateCompOffEntry, upsertAttendance, getPerfRecord, advances, paySlips, expireCompOff, expireHolidayCompOff, getHolidayCompOffEntries, updateHolidayCompOff, upsertAlert, buildPaySlipDraft, globalSettings, upsertPaySlip]);
+  }, [employees, getShifts, currentMonth, getHolidayForDate, calcFromShifts, specialStatuses, getPaySlip, getCompOffEntries, addCompOffEntry, updateCompOffEntry, upsertAttendance, advances, paySlips, expireCompOff, expireHolidayCompOff, getHolidayCompOffEntries, updateHolidayCompOff, upsertAlert, buildPaySlipDraft, globalSettings, upsertPaySlip]);
 
   const editTpl = sortedTemplates.find((t) => t.session === editSession) ?? sortedTemplates[0] ?? DEFAULT_SHIFT_TEMPLATES[0];
   const editContractH = editEmployee && editDate ? getContractHoursForDate(editEmployee, editDate) : 0;

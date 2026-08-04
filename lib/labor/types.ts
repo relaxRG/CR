@@ -674,66 +674,7 @@ export const DEFAULT_SPECIAL_STATUSES: SpecialStatus[] = [
   { id: "ss_penalty",  name: "违规扣款", category: "absence",  direction: "negative", countAsAttendance: true,  salaryMultiplier: 1,   color: "#FF6B00", sortOrder: 7, isBuiltin: true },
 ];
 
-// ─── 绩效条目数据源类型 ───────────────────────────────────────────────────────
-export type PerformanceDataSource =
-  | "manual"            // 纯手动
-  | "revenue"           // 营业额（从月报读取）
-  | "net_profit"        // 净利润（从月报读取）
-  | "attendance_days";  // 出勤天数（从排班表读取）
-
-// ─── 绩效条目（模板级别） ─────────────────────────────────────────────────────
-export interface PerformanceItem {
-  id: string;
-  /** 编号（A1/B2/C1...） */
-  code: string;
-  /** 条目名称 */
-  title: string;
-  /** 详细说明/备注 */
-  description: string;
-  /** 最高可得金额（0=无上限） */
-  maxAmount: number;
-  /** 是否固定金额（固定则 actualAmount = maxAmount，不需填写） */
-  isFixed: boolean;
-  /** 数据来源 */
-  dataSource: PerformanceDataSource;
-  /**
-   * 阶梯规则（用于营业额提点、好评数等）
-   * 例：[{ threshold: 50000, rate: 0.04 }, { threshold: 90000, rate: 0.05 }]
-   */
-  tiers?: Array<{ threshold: number; rate: number; label?: string }>;
-  /** 排序权重 */
-  sortOrder: number;
-}
-
-// ─── 绩效分组（模板级别） ─────────────────────────────────────────────────────
-export interface PerformanceGroup {
-  id: string;
-  title: string;
-  description: string;
-  items: PerformanceItem[];
-  sortOrder: number;
-}
-
-// ─── 绩效模板（每位员工一个） ─────────────────────────────────────────────────
-export interface PerformanceTemplate {
-  id: string;
-  employeeId: string;
-  name: string;
-  groups: PerformanceGroup[];
-  updatedAt: string;
-}
-
-// ─── 绩效月度记录（每月填写实际完成情况） ────────────────────────────────────
-export interface PerformanceRecord {
-  id: string;
-  employeeId: string;
-  month: string;
-  actuals: Record<string, number>;
-  overrides: Record<string, boolean>;
-  autoNotes: Record<string, string>;
-  totalPerformance: number;
-  updatedAt: string;
-}
+// ─── 旧绩效系统已移除，由 WorkKPIRule + RevenueKPIRule 替代 ─────────────────────
 
 // ─── 班次模板 ─────────────────────────────────────────────────────────────────
 export type ShiftSession = string;
