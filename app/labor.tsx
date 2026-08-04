@@ -1936,7 +1936,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
       <Text style={{ fontSize: 9, color: colors.muted, paddingHorizontal: 12, paddingBottom: 2 }}>长按姓名快速填充</Text>
 
       {/* 排班表主体 */}
-      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 8, gap: 10, paddingBottom: 40 }}>
+      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 8, gap: 10, paddingBottom: 120 }}>
         {calendarWeeks.map((week, wi) => renderWeekBlock(week, wi))}
       </ScrollView>
 
@@ -2059,7 +2059,7 @@ export default function LaborScreen({ embedded = false }: { embedded?: boolean }
   };
 
   return (
-    <ScreenContainer>
+    <ScreenContainer edges={embedded ? [] : ["top", "left", "right"]}>
       {/* 导航栏：嵌入模式下隐藏 */}
       {!embedded && (
         <View style={[S.navbar, { borderBottomColor: colors.border }]}>
