@@ -1575,8 +1575,47 @@ export default function MonthlySummaryScreen() {
         </View>
       </View>
 
-      {/* 单页滚动视图 */}
-      {renderSinglePage()}
+      {/* ── Tab 切换栏 ── */}
+      <View style={{
+        flexDirection: "row",
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: colors.border,
+        backgroundColor: colors.surface,
+      }}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 6, gap: 6, flexDirection: "row" }}
+        >
+          {TABS.map((t) => (
+            <TouchableOpacity
+              key={t.key}
+              onPress={() => { tap(); setTab(t.key); }}
+              style={[
+                S.tabBtn,
+                {
+                  backgroundColor: tab === t.key ? colors.primary : "transparent",
+                  borderColor: tab === t.key ? colors.primary : colors.border,
+                },
+              ]}
+            >
+              <Text style={{
+                fontSize: 13,
+                fontWeight: tab === t.key ? "700" : "400",
+                color: tab === t.key ? "#FFFFFF" : colors.foreground,
+              }}>
+                {t.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+      {/* ── Tab 内容区 ── */}
+      {tab === "report" && renderReport()}
+      {tab === "accounts" && renderAccounts()}
+      {tab === "payroll" && renderPayroll()}
+      {tab === "payments" && renderPayments()}
+      {tab === "history" && renderHistory()}
 
       {copyToast ? (
         <View style={[S.toast, { backgroundColor: colors.foreground }]}>
