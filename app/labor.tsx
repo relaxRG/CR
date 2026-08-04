@@ -1473,6 +1473,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   const todayStr = now.toISOString().slice(0, 10);
   const currentMonth = month;
   const { depts: customDepts, resolveEmployeeDept } = useCustomDeptStore();
+  const schPageWidth = SCREEN_W;
   const [deptCategory, setDeptCategory] = useState<DeptCategory>("front");
   // 班次/时长切换
   const [viewMode, setViewMode] = useState<"session" | "hours">("hours");
@@ -1963,11 +1964,53 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
           </View>
         ))}
       </View>
-      <Text style={{ fontSize: 9, color: colors.muted, paddingHorizontal: 12, paddingBottom: 2 }}>长按姓名快速填充</Text>
+      <Text style={{ fontSize: 9, color: colors.muted, paddingHorizontal: 12, paddingBottom: 2 }}>长按姓名快速填充 · 右滑查看考勤</Text>
 
-      {/* 排班表主体 */}
-      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 8, gap: 10, paddingBottom: 120 }}>
-        {calendarWeeks.map((week, wi) => renderWeekBlock(week, wi))}
+      {/* 排班表主体 + 考勤卡片（左右滑动） */}
+      <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
+        {/* 左页：排班表 */}
+        <ScrollView style={{ width: schPageWidth, flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 8, gap: 10, paddingBottom: 120 }}>
+          {calendarWeeks.map((week, wi) => renderWeekBlock(week, wi))}
+        </ScrollView>
+        {/* 右页：考勤卡片 */}
+        <ScrollView style={{ width: schPageWidth, flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 12, gap: 10, paddingBottom: 120 }}>
+          <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground, marginBottom: 4 }}>考勤概况（{monthLabel(currentMonth)}）</Text>
+          <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 8 }}>← 左滑返回排班表</Text>
+          {allDeptEmployees.map((emp) => {
+            const att = getAttendance(emp.id, currentMonth);
+            const compOffEntries = getCompOffEntries(emp.id);
+            const compOffBalance = compOffEntries.filter((e: any) => e.status === "available").length;
+            const currentMonthStr = currentMonth;
+            return (
+              <View key={emp.id} style={{ backgroundColor: colors.surface, borderRadius: 10, borderWidth: 1, borderColor: colors.border, padding: 10 }}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>{emp.realName}</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <Text style={{ fontSize: 11, color: colors.muted }}>调休 {compOffBalance} 天</Text>
+                    <TouchableOpacity onPress={() => { tap(); Alert.alert("调休操作", `${emp.realName} 当前调休余额 ${compOffBalance} 天\n\n存入：手动存入1天调休\n兑换：将1天调休兑换为现金`, [{ text: "取消", style: "cancel" }, { text: "存入", onPress: () => { addCompOffEntry({ employeeId: emp.id, earnedMonth: currentMonthStr, source: "overtime", days: 1, expiresMonth: "", status: "available" }); } }, { text: "兑换", style: "destructive", onPress: () => { const avail = compOffEntries.filter((e: any) => e.status === "available"); if (avail.length === 0) { Alert.alert("无可用余额"); return; } cashOutCompOff(avail[0].id, att?.dailyRate ?? 200, currentMonthStr); } }]); }}
+                      style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: colors.primary + "15", borderWidth: 1, borderColor: colors.primary + "33" }}>
+                      <Text style={{ fontSize: 10, color: colors.primary, fontWeight: "600" }}>存入/兑换</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+                {att ? (
+                  <View style={{ gap: 4 }}>
+                    <View style={{ flexDirection: "row", gap: 12, flexWrap: "wrap" }}>
+                      <Text style={{ fontSize: 11, color: colors.muted }}>出勤 <Text style={{ color: colors.foreground, fontWeight: "500" }}>{att.attendanceDays}/{att.expectedAttendanceDays}</Text></Text>
+                      <Text style={{ fontSize: 11, color: colors.muted }}>加班 <Text style={{ color: colors.foreground, fontWeight: "500" }}>{(att.paidOvertimeHours ?? 0).toFixed(1)}h</Text></Text>
+                      {att.underRestDays < 0 && <Text style={{ fontSize: 11, color: colors.success }}>少休 {Math.abs(att.underRestDays)}天</Text>}
+                      {att.holidayBonus > 0 && <Text style={{ fontSize: 11, color: colors.success }}>节假日+¥{att.holidayBonus.toFixed(0)}</Text>}
+                      {att.totalSpecialDeduction > 0 && <Text style={{ fontSize: 11, color: colors.error }}>扣薪-¥{att.totalSpecialDeduction.toFixed(0)}</Text>}
+                    </View>
+                    <Text style={{ fontSize: 12, fontWeight: "600", color: colors.foreground }}>考勤工资 ¥{att.attendanceSalary.toFixed(0)}</Text>
+                  </View>
+                ) : (
+                  <Text style={{ fontSize: 11, color: colors.muted }}>暂无考勤数据</Text>
+                )}
+              </View>
+            );
+          })}
+        </ScrollView>
       </ScrollView>
 
       <Modal visible={showHolidayDecisionModal} transparent animationType="fade" onRequestClose={() => setShowHolidayDecisionModal(false)}>
