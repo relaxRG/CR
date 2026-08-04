@@ -21,6 +21,7 @@ import {
   calcPettyExcludedCodes,
 } from "./types";
 import type { PettyRecord } from "../../store/petty-store";
+import { PETTY_CODE_LABELS } from "../../store/petty-store";
 import type { MonthlyReport } from "../../store/monthly-report/types";
 import type { PaySlip } from "../../labor/types";
 import type { SupplierPurchaseRecord } from "../../food/types";
@@ -221,7 +222,7 @@ export function aggregateMonthlyReport(input: AggregatorInput): Partial<MonthlyS
       }
 
       const displayLabel = cfg?.customLabel
-        ?? (code + " " + (recs[0]?.description?.slice(0, 10) ?? code));
+        ?? (PETTY_CODE_LABELS[code as keyof typeof PETTY_CODE_LABELS] ?? code);
 
       items.push(makeItem({
         code: `petty_${code}`,
@@ -417,14 +418,14 @@ export function aggregateMonthlyReport(input: AggregatorInput): Partial<MonthlyS
   const nonDuplicate = items.filter((i) => !effectiveDuplicate(i));
   const totalRevenue = nonDuplicate.filter((i) => i.category === "revenue" && i.amount > 0).reduce((s, i) => s + i.amount, 0);
   const revenueDeductions = nonDuplicate.filter((i) => i.category === "revenue" && i.amount < 0).reduce((s, i) => s + i.amount, 0);
-  const totalCOGS = nonDuplicate.filter((i) => ["cogs_food","cogs_beverage"].includes(i.category)).reduce((s, i) => s + i.amount, 0);
+  const totalCOGS = nonDuplicate.filter((i) => ["cogs_food","cogs_beverage","cogs_wine"].includes(i.category)).reduce((s, i) => s + i.amount, 0);
   const totalLabor = nonDuplicate.filter((i) => i.category === "labor").reduce((s, i) => s + i.amount, 0);
   const totalRent = [...nonDuplicate, ...manualItems.filter((i) => !effectiveDuplicate(i))].filter((i) => i.category === "rent").reduce((s, i) => s + i.amount, 0);
   const totalUtilities = nonDuplicate.filter((i) => i.category === "utilities").reduce((s, i) => s + i.amount, 0);
   const totalPettyOther = nonDuplicate.filter((i) => i.category === "petty_other").reduce((s, i) => s + i.amount, 0);
   const totalExtra = manualItems.filter((i) => i.category === "extra" && !effectiveDuplicate(i)).reduce((s, i) => s + i.amount, 0);
   const manualRevenue = manualItems.filter((i) => i.category === "revenue" && !effectiveDuplicate(i)).reduce((s, i) => s + i.amount, 0);
-  const manualCOGS = manualItems.filter((i) => ["cogs_food","cogs_beverage"].includes(i.category) && !effectiveDuplicate(i)).reduce((s, i) => s + i.amount, 0);
+  const manualCOGS = manualItems.filter((i) => ["cogs_food","cogs_beverage","cogs_wine"].includes(i.category) && !effectiveDuplicate(i)).reduce((s, i) => s + i.amount, 0);
   const manualLabor = manualItems.filter((i) => i.category === "labor" && !effectiveDuplicate(i)).reduce((s, i) => s + i.amount, 0);
 
   const netProfit = (totalRevenue + revenueDeductions + manualRevenue)

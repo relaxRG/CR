@@ -31,7 +31,8 @@
 export type AccountCategory =
   | "revenue"          // 本月收入
   | "cogs_food"        // 进货成本-食材
-  | "cogs_beverage"    // 进货成本-酒水
+  | "cogs_beverage"    // 进货成本-酒水（烈酒/啤酒/冰块）
+  | "cogs_wine"        // 进货成本-葡萄酒
   | "labor"            // 工资
   | "rent"             // 房租
   | "utilities"        // 水电
@@ -158,7 +159,7 @@ export interface InventoryReportConfig {
 /** 库存模块默认配置 */
 export const DEFAULT_INVENTORY_CONFIGS: InventoryReportConfig[] = [
   { module: "spirits", showInReport: true, groupLabel: "烈酒", reportCategory: "cogs_beverage" },
-  { module: "wine",    showInReport: true, groupLabel: "葡萄酒", reportCategory: "cogs_beverage" },
+  { module: "wine",    showInReport: true, groupLabel: "葡萄酒", reportCategory: "cogs_wine" },
   { module: "food",    showInReport: true, groupLabel: "食材", reportCategory: "cogs_food" },
   { module: "beer",    showInReport: true, groupLabel: "啤酒", reportCategory: "cogs_beverage" },
   { module: "ice",     showInReport: true, groupLabel: "冰块", reportCategory: "cogs_beverage" },

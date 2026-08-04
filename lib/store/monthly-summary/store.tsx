@@ -7,7 +7,7 @@ import React, { createContext, useCallback, useContext, useEffect, useReducer } 
 import { notifySyncChange, registerStoreReload } from "../../sync/engine";
 import {
   MonthlySummaryReport, Supplier, MonthlyPaymentRecord, AccountBalance,
-  PaymentStatus, PettyCodeConfig, InventoryReportConfig,
+  PaymentStatus, PettyCodeConfig, InventoryReportConfig, AccountCategory,
   DEFAULT_PETTY_CODE_CONFIGS, DEFAULT_INVENTORY_CONFIGS,
 } from "./types";
 
@@ -190,7 +190,21 @@ export function MonthlySummaryProvider({ children }: { children: React.ReactNode
             payments:          pRaw  ? JSON.parse(pRaw)  : [],
             balances:          bRaw  ? JSON.parse(bRaw)  : [],
             pettyCodeConfigs:  pcRaw ? JSON.parse(pcRaw) : [...DEFAULT_PETTY_CODE_CONFIGS],
-            inventoryConfigs:  icRaw ? JSON.parse(icRaw) : [...DEFAULT_INVENTORY_CONFIGS],
+            inventoryConfigs:  icRaw ? (() => {
+              const saved: InventoryReportConfig[] = JSON.parse(icRaw);
+              // 合并新增的默认条目（旧数据中没有的 module 补充进来，已有的保留用户配置）
+              const savedModules = new Set(saved.map((c) => c.module));
+              const merged = [...saved];
+              for (const def of DEFAULT_INVENTORY_CONFIGS) {
+                if (!savedModules.has(def.module)) merged.push(def);
+              }
+              // 同时将旧 cogs_beverage 中的 wine 迁移到 cogs_wine
+              return merged.map((c) =>
+                c.module === "wine" && c.reportCategory === "cogs_beverage"
+                  ? { ...c, reportCategory: "cogs_wine" as AccountCategory }
+                  : c
+              );
+            })() : [...DEFAULT_INVENTORY_CONFIGS],
           },
         });
       } catch {}
