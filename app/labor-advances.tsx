@@ -104,7 +104,7 @@ function AddAdvanceModal({
                       <Text style={{ fontSize: 13, fontWeight: "700", color: selected ? "#fff" : typeColor }}>
                         {emp.code}
                       </Text>
-                      <Text style={{ fontSize: 11, color: selected ? "#fff99" : colors.muted }}>
+                      <Text style={{ fontSize: 11, color: selected ? colors.surface : colors.muted }}>
                         {emp.realName} · {EMPLOYEE_TYPE_LABELS[emp.type]}
                       </Text>
                     </TouchableOpacity>
@@ -322,7 +322,7 @@ export default function LaborAdvancesScreen() {
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }}>
         {filtered.map((advance) => {
           const emp = empMap.get(advance.employeeId);
-          const typeColor = emp ? EMPLOYEE_TYPE_COLORS[emp.type] : "#8E8E93";
+          const typeColor = emp ? EMPLOYEE_TYPE_COLORS[emp.type] : colors.muted;
           const statusColor = STATUS_COLORS[advance.status];
           return (
             <View key={advance.id} style={[S.advanceCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>

@@ -1361,7 +1361,7 @@ export default function MonthlySummaryScreen() {
               <Text style={{
                 fontSize: 13,
                 fontWeight: tab === t.key ? "700" : "400",
-                color: tab === t.key ? "#FFFFFF" : colors.foreground,
+                color: tab === t.key ? colors.surface : colors.foreground,
               }}>
                 {t.label}
               </Text>
@@ -1656,7 +1656,7 @@ const S = StyleSheet.create({
   inlineCard: { borderRadius: 10, borderWidth: 1, borderLeftWidth: 3, borderColor: "transparent", padding: 10, backgroundColor: "transparent" },
   miniBtn: { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 7 },
   amtBlock: { alignItems: "center", minWidth: 48 },
-  amtLabel: { fontSize: 10, color: "#999", marginBottom: 2 },
+  amtLabel: { fontSize: 10, color: "#8E8E93", marginBottom: 2 },
   amtValue: { fontSize: 13, fontWeight: "600" },
   toast: { position: "absolute", bottom: 40, alignSelf: "center", paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
 });

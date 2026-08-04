@@ -1298,7 +1298,7 @@ function SchTemplateModal({ visible, templates, specialStatuses, colors, onSaveS
   };
   const CATEGORY_LABELS: Record<string, string> = { absence: "缺席类", work_day: "工作日类", comp_off: "加班换休" };
   const DIRECTION_LABELS: Record<string, string> = { positive: "正向（加钱）", negative: "负向（扣钱）", neutral: "中性（不加不扣）" };
-  const DIRECTION_COLORS: Record<string, string> = { positive: colors.success, negative: colors.error, neutral: "#8E8E93" };
+  const DIRECTION_COLORS: Record<string, string> = { positive: colors.success, negative: colors.error, neutral: colors.muted };
   const MULTIPLIER_PRESETS = [0, 0.5, 1, 1.5, 2, 3];
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
@@ -1312,7 +1312,7 @@ function SchTemplateModal({ visible, templates, specialStatuses, colors, onSaveS
           {(["shifts", "statuses"] as const).map((tab) => (
             <TouchableOpacity key={tab} onPress={() => { tap(); setActiveTab(tab); }}
               style={{ flex: 1, paddingVertical: 7, borderRadius: 8, alignItems: "center", backgroundColor: activeTab === tab ? colors.surface : "transparent" }}>
-              <Text style={{ fontSize: 13, fontWeight: activeTab === tab ? "700" : "400", color: activeTab === tab ? "#1C1C1E" : colors.muted }}>{tab === "shifts" ? "工作班次" : "特殊状态"}</Text>
+              <Text style={{ fontSize: 13, fontWeight: activeTab === tab ? "700" : "400", color: activeTab === tab ? colors.foreground : colors.muted }}>{tab === "shifts" ? "工作班次" : "特殊状态"}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -1864,7 +1864,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
           {DEPT_OPTIONS_SCH.map((d) => (
             <TouchableOpacity key={d} onPress={() => { tap(); setDept(d); }}
               style={[EXL.segItem, dept === d && { backgroundColor: colors.surface, shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 3, elevation: 1 }]}>
-              <Text style={{ fontSize: 12, fontWeight: dept === d ? "700" : "400", color: dept === d ? "#1C1C1E" : colors.muted }}>{DEPT_LABELS[d]}</Text>
+              <Text style={{ fontSize: 12, fontWeight: dept === d ? "700" : "400", color: dept === d ? colors.foreground : colors.muted }}>{DEPT_LABELS[d]}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -1873,7 +1873,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
           {(["session", "hours"] as const).map((mode) => (
             <TouchableOpacity key={mode} onPress={() => { tap(); setViewMode(mode); }}
               style={[EXL.segItem, viewMode === mode && { backgroundColor: colors.surface, shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 3, elevation: 1 }]}>
-              <Text style={{ fontSize: 12, fontWeight: viewMode === mode ? "700" : "400", color: viewMode === mode ? "#1C1C1E" : colors.muted }}>
+              <Text style={{ fontSize: 12, fontWeight: viewMode === mode ? "700" : "400", color: viewMode === mode ? colors.foreground : colors.muted }}>
                 {mode === "session" ? "班次" : "时长"}
               </Text>
             </TouchableOpacity>
@@ -2082,12 +2082,12 @@ export default function LaborScreen({ embedded = false }: { embedded?: boolean }
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 8, paddingHorizontal: 16, gap: 12 }}>
         <Pressable onPress={() => { tap(); const [y, m] = currentMonth.split("-").map(Number); const d = new Date(y, m - 2, 1); setCurrentMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); }}
           style={({ pressed }) => [{ width: 32, height: 32, borderRadius: 10, backgroundColor: colors.border + "55", alignItems: "center", justifyContent: "center", opacity: pressed ? 0.5 : 1 }]}>
-          <IconSymbol name="chevron.left" size={15} color="#3C3C43" />
+          <IconSymbol name="chevron.left" size={15} color={colors.muted} />
         </Pressable>
         <Text style={{ flex: 1, textAlign: "center", fontSize: 16, fontWeight: "600", color: colors.foreground, letterSpacing: -0.3 }}>{monthLabel(currentMonth)}</Text>
         <Pressable onPress={() => { tap(); const [y, m] = currentMonth.split("-").map(Number); const d = new Date(y, m, 1); setCurrentMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); }}
           style={({ pressed }) => [{ width: 32, height: 32, borderRadius: 10, backgroundColor: colors.border + "55", alignItems: "center", justifyContent: "center", opacity: pressed ? 0.5 : 1 }]}>
-          <IconSymbol name="chevron.right" size={15} color="#3C3C43" />
+          <IconSymbol name="chevron.right" size={15} color={colors.muted} />
         </Pressable>
       </View>
 
@@ -2106,7 +2106,7 @@ export default function LaborScreen({ embedded = false }: { embedded?: boolean }
                 style={[{ flex: 1, alignItems: "center", paddingVertical: 7, borderRadius: 10 },
                   active && { backgroundColor: colors.surface, shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 4, elevation: 2 }
                 ]}>
-                <Text style={{ fontSize: 13, fontWeight: active ? "700" : "400", color: active ? "#1C1C1E" : colors.muted }}>
+                <Text style={{ fontSize: 13, fontWeight: active ? "700" : "400", color: active ? colors.foreground : colors.muted }}>
                   {p.label}
                 </Text>
               </TouchableOpacity>
