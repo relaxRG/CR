@@ -51,7 +51,6 @@ function AttendanceEditModal({
   const [totalHours, setTotalHours] = useState(String(existing?.totalHours ?? ""));
   const [overtimeHours, setOvertimeHours] = useState(String(existing?.overtimeHours ?? ""));
   const [underRestDays, setUnderRestDays] = useState(String(existing?.underRestDays ?? "0"));
-  const [holidayDays, setHolidayDays] = useState("0"); // legacy field removed
   const [dailyRateInput, setDailyRateInput] = useState(String(existing?.dailyRate ?? ""));
   const [dailyRateOverride, setDailyRateOverride] = useState(existing?.dailyRateOverride ?? false);
   const [notes, setNotes] = useState(existing?.notes ?? "");
@@ -61,18 +60,16 @@ function AttendanceEditModal({
   const autoDailyRate = calcDailyRate(employee.baseSalary, daysInMonth, employee.restDaysPerMonth);
   const effectiveDailyRate = dailyRateOverride ? Number(dailyRateInput) : autoDailyRate;
 
-  // 实时计算（兼容新引擎）
+  // 实时计算（v5 引擎：节假日补偿由排班表自动推算，此处不再手动输入）
   const calc = useMemo(() => {
     const stdH = (Number(attendanceDays) || 0) * employee.stdHoursPerDay;
     const rawOT = Math.max(0, (Number(totalHours) || 0) - stdH);
     const overtimePay = Math.round(rawOT * employee.overtimeHourlyRate * 100) / 100;
-    const underRestDeduction = 0; // 新引擎通过特殊状态处理，此处保留为0
-    const holidayBonus = Math.round((Number(holidayDays) || 0) * effectiveDailyRate * (employee.holidayMultiplier - 1) * 100) / 100;
     const attendanceSalary = employee.type === "parttime"
       ? Math.round((Number(totalHours) || 0) * employee.overtimeHourlyRate * 100) / 100
-      : Math.round((employee.baseSalary + overtimePay - underRestDeduction + holidayBonus) * 100) / 100;
-    return { overtimeHours: rawOT, overtimePay, underRestDeduction, holidayBonus, attendanceSalary };
-  }, [employee, effectiveDailyRate, totalHours, attendanceDays, underRestDays, holidayDays]);
+      : Math.round((employee.baseSalary + overtimePay) * 100) / 100;
+    return { overtimeHours: rawOT, overtimePay, attendanceSalary };
+  }, [employee, effectiveDailyRate, totalHours, attendanceDays, underRestDays]);
 
   const handleSave = () => {
     if (!attendanceDays) { Alert.alert("请填写出勤天数"); return; }
@@ -92,7 +89,7 @@ function AttendanceEditModal({
       underRestDays: Number(underRestDays) || 0,
       specialStatusDeductions: existing?.specialStatusDeductions ?? {},
       totalSpecialDeduction: 0,
-      holidayBonus: calc.holidayBonus,
+      holidayBonus: existing?.holidayBonus ?? 0, // 由排班表 calcFromShifts 自动写入，手动编辑时保留原值
       dailyRate: effectiveDailyRate,
       dailyRateOverride,
       overtimePay: calc.overtimePay,
@@ -178,18 +175,18 @@ function AttendanceEditModal({
               </View>
             </View>
 
-            {/* 少休/节假日（全职） */}
+            {/* 少休（全职） */}
             {employee.type === "fulltime" && (
               <View style={[AM.section, { borderColor: colors.border }]}>
-                <Text style={[AM.sectionTitle, { color: colors.muted }]}>少休 / 节假日</Text>
+                <Text style={[AM.sectionTitle, { color: colors.muted }]}>少休</Text>
                 <View style={{ flexDirection: "row", gap: 12, flexWrap: "wrap" }}>
                   <FieldInput label="少休天数" value={underRestDays} onChange={setUnderRestDays}
                     suffix="天" colors={colors}
                     hint="负数=少休扣款，0=正常" />
-                  <FieldInput label="节假日加班天数" value={holidayDays} onChange={setHolidayDays}
-                    suffix="天" colors={colors}
-                    hint={`${employee.holidayMultiplier}x 倍率`} />
                 </View>
+                <Text style={{ fontSize: 11, color: colors.muted, marginTop: 6 }}>
+                  💡 节假日补偿由排班表自动计算（v5 引擎），无需手动填写
+                </Text>
               </View>
             )}
 
@@ -203,13 +200,9 @@ function AttendanceEditModal({
                     <CalcRow label={`加班工资 (${calc.overtimeHours.toFixed(1)}h × ¥${employee.overtimeHourlyRate})`}
                       value={`+¥${calc.overtimePay.toFixed(2)}`} colors={colors} positive />
                   )}
-                  {calc.underRestDeduction > 0 && (
-                    <CalcRow label={`少休扣款 (${Math.abs(Number(underRestDays))}天 × ¥${effectiveDailyRate.toFixed(2)})`}
-                      value={`-¥${calc.underRestDeduction.toFixed(2)}`} colors={colors} negative />
-                  )}
-                  {calc.holidayBonus > 0 && (
-                    <CalcRow label={`节假日补偿 (${holidayDays}天 × ${employee.holidayMultiplier}x)`}
-                      value={`+¥${calc.holidayBonus.toFixed(2)}`} colors={colors} positive />
+                  {existing?.holidayBonus != null && existing.holidayBonus > 0 && (
+                    <CalcRow label="节假日补偿（排班表自动计算）"
+                      value={`+¥${existing.holidayBonus.toFixed(2)}`} colors={colors} positive />
                   )}
                 </>
               ) : (

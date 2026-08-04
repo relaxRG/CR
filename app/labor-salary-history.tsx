@@ -5,6 +5,7 @@
 import React, { useMemo, useState } from "react";
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -56,6 +57,7 @@ export default function LaborSalaryHistoryScreen() {
   }, [empSlips]);
 
   const [viewMode, setViewMode] = useState<"employee" | "employer">("employee");
+  const insets = useSafeAreaInsets();
 
   if (!employee) {
     return (
@@ -81,7 +83,7 @@ export default function LaborSalaryHistoryScreen() {
         <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 40 }}>
+      <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 40 + insets.bottom }}>
         {/* 年度汇总卡片 */}
         <View style={[S.card, { backgroundColor: colors.surface, borderColor: deptColor + "44", borderLeftWidth: 3, borderLeftColor: deptColor }]}>
           <Text style={[S.sectionTitle, { color: colors.muted }]}>{new Date().getFullYear()}年度汇总</Text>
@@ -92,7 +94,7 @@ export default function LaborSalaryHistoryScreen() {
               <Text style={{ fontSize: 12, fontWeight: "600", color: viewMode === "employee" ? "#fff" : colors.muted }}>员工视角</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => setViewMode("employer")}
-              style={{ flex: 1, paddingVertical: 6, borderRadius: 8, backgroundColor: viewMode === "employer" ? "#FF9500" : colors.background, alignItems: "center" }}>
+              style={{ flex: 1, paddingVertical: 6, borderRadius: 8, backgroundColor: viewMode === "employer" ? colors.warning : colors.background, alignItems: "center" }}>
               <Text style={{ fontSize: 12, fontWeight: "600", color: viewMode === "employer" ? "#fff" : colors.muted }}>公司视角</Text>
             </TouchableOpacity>
           </View>
@@ -101,9 +103,9 @@ export default function LaborSalaryHistoryScreen() {
             <View style={{ gap: 6, marginTop: 10 }}>
               {[
                 { label: "年度应发合计", value: `¥${yearSummary.totalGross.toFixed(0)}`, color: colors.foreground },
-                { label: "社保/公积金代扣", value: yearSummary.totalSI > 0 ? `-¥${yearSummary.totalSI.toFixed(0)}` : "—", color: "#FF3B30" },
-                { label: "个人所得税", value: yearSummary.totalTax > 0 ? `-¥${yearSummary.totalTax.toFixed(0)}` : "—", color: "#FF3B30" },
-                { label: "预支扣除", value: yearSummary.totalAdvance > 0 ? `-¥${yearSummary.totalAdvance.toFixed(0)}` : "—", color: "#FF9500" },
+                { label: "社保/公积金代扣", value: yearSummary.totalSI > 0 ? `-¥${yearSummary.totalSI.toFixed(0)}` : "—", color: colors.error },
+                { label: "个人所得税", value: yearSummary.totalTax > 0 ? `-¥${yearSummary.totalTax.toFixed(0)}` : "—", color: colors.error },
+                { label: "预支扣除", value: yearSummary.totalAdvance > 0 ? `-¥${yearSummary.totalAdvance.toFixed(0)}` : "—", color: colors.warning },
                 { label: "年度实发合计", value: `¥${yearSummary.totalFinal.toFixed(0)}`, color: deptColor, bold: true },
               ].map(({ label, value, color, bold }) => (
                 <View key={label} style={{ flexDirection: "row", justifyContent: "space-between" }}>
@@ -116,8 +118,8 @@ export default function LaborSalaryHistoryScreen() {
             <View style={{ gap: 6, marginTop: 10 }}>
               {[
                 { label: "年度应发合计", value: `¥${yearSummary.totalGross.toFixed(0)}`, color: colors.foreground },
-                { label: "公司社保/公积金", value: yearSummary.totalEmployerCost > 0 ? `+¥${(yearSummary.totalEmployerCost - yearSummary.totalGross).toFixed(0)}` : "—", color: "#FF9500" },
-                { label: "公司总人力成本", value: yearSummary.totalEmployerCost > 0 ? `¥${yearSummary.totalEmployerCost.toFixed(0)}` : `¥${yearSummary.totalGross.toFixed(0)}`, color: "#FF9500", bold: true },
+                { label: "公司社保/公积金", value: yearSummary.totalEmployerCost > 0 ? `+¥${(yearSummary.totalEmployerCost - yearSummary.totalGross).toFixed(0)}` : "—", color: colors.warning },
+                { label: "公司总人力成本", value: yearSummary.totalEmployerCost > 0 ? `¥${yearSummary.totalEmployerCost.toFixed(0)}` : `¥${yearSummary.totalGross.toFixed(0)}`, color: colors.warning, bold: true },
                 { label: "月均人力成本", value: yearSummary.count > 0 ? `¥${(yearSummary.totalEmployerCost / yearSummary.count || yearSummary.totalGross / yearSummary.count).toFixed(0)}/月` : "—", color: colors.muted },
               ].map(({ label, value, color, bold }) => (
                 <View key={label} style={{ flexDirection: "row", justifyContent: "space-between" }}>
@@ -142,7 +144,7 @@ export default function LaborSalaryHistoryScreen() {
               }), 1);
               const barH = Math.max(4, (val / maxVal) * 72);
               const isCurrent = mo === months[0];
-              const barColor = viewMode === "employer" ? "#FF9500" : deptColor;
+              const barColor = viewMode === "employer" ? colors.warning : deptColor;
               return (
                 <View key={mo} style={{ flex: 1, alignItems: "center", gap: 2 }}>
                   <View style={{ width: "100%", height: barH, borderRadius: 3, backgroundColor: isCurrent ? barColor : barColor + "55" }} />
@@ -183,7 +185,7 @@ export default function LaborSalaryHistoryScreen() {
                   <>
                     <Text style={{ fontSize: 14, fontWeight: "700", color: deptColor }}>¥{slip.finalSalary.toFixed(0)}</Text>
                     {(slip.totalEmployerCost ?? 0) > 0 && (
-                      <Text style={{ fontSize: 10, color: "#FF9500" }}>公司¥{(slip.totalEmployerCost ?? 0).toFixed(0)}</Text>
+                      <Text style={{ fontSize: 10, color: colors.warning }}>公司¥{(slip.totalEmployerCost ?? 0).toFixed(0)}</Text>
                     )}
                     {(slip.incomeTax ?? 0) > 0 && (
                       <Text style={{ fontSize: 10, color: colors.muted }}>税¥{(slip.incomeTax ?? 0).toFixed(0)}</Text>

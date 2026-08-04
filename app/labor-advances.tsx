@@ -282,7 +282,7 @@ export default function LaborAdvancesScreen() {
       <View style={[S.infoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <Text style={{ fontSize: 12, color: colors.muted, lineHeight: 18 }}>
           <Text style={{ fontWeight: "700", color: "#5856D6" }}>长期兼职</Text>：有固定排班和月度薪资，支持薪资预支。预支金额在指定月份薪资结算时自动扣除。{"\n"}
-          <Text style={{ fontWeight: "700", color: "#FF9500" }}>临时兼职</Text>：按次/按小时结算，无预支功能，直接在薪资单中录入实际工时。
+          <Text style={{ fontWeight: "700", color: colors.warning }}>临时兼职</Text>：按次/按小时结算，无预支功能，直接在薪资单中录入实际工时。
         </Text>
       </View>
 

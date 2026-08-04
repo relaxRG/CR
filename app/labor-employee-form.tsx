@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import * as Haptics from "expo-haptics";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
@@ -251,6 +252,7 @@ export default function LaborEmployeeFormScreen() {
     ]);
   };
 
+  const insets = useSafeAreaInsets();
   return (
     <ScreenContainer>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
@@ -264,7 +266,7 @@ export default function LaborEmployeeFormScreen() {
           </Pressable>
         </View>
 
-        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }}>
 
           {/* ── 基本信息 ── */}
           <SectionCard title="基本信息" colors={colors}>
@@ -715,7 +717,7 @@ export default function LaborEmployeeFormScreen() {
                       <Text style={{ fontSize: 11, color: colors.muted }}>按基数 ¥{base} 预览（不含公积金）</Text>
                       <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
                         <Text style={{ fontSize: 12, color: colors.foreground }}>个人代扣：¥{empTotal.toFixed(0)}</Text>
-                        <Text style={{ fontSize: 12, color: "#FF9500" }}>公司承担：¥{erTotal.toFixed(0)}</Text>
+                        <Text style={{ fontSize: 12, color: colors.warning }}>公司承担：¥{erTotal.toFixed(0)}</Text>
                       </View>
                     </View>
                   );

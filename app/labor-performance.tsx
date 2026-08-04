@@ -365,9 +365,9 @@ export default function LaborPerformanceScreen() {
           {!editMode && (
             <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
               <TouchableOpacity onPress={() => { tap(); handleAutoFill(); }}
-                style={[S.actionBtn, { backgroundColor: "#34C759" + "22", borderColor: "#34C759" + "44" }]}>
-                <IconSymbol name="bolt.fill" size={14} color="#34C759" />
-                <Text style={{ fontSize: 13, fontWeight: "600", color: "#34C759" }}>智能填充</Text>
+                style={[S.actionBtn, { backgroundColor: colors.success + "22", borderColor: colors.success + "44" }]}>
+                <IconSymbol name="bolt.fill" size={14} color={colors.success} />
+                <Text style={{ fontSize: 13, fontWeight: "600", color: colors.success }}>智能填充</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => { tap(); handleSyncToPaySlip(); }}
                 style={[S.actionBtn, { backgroundColor: deptColor + "22", borderColor: deptColor + "44" }]}>
@@ -422,7 +422,7 @@ export default function LaborPerformanceScreen() {
                         <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>{item.title}</Text>
                         {item.isFixed && (
                           <View style={{ backgroundColor: "#34C75922", paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
-                            <Text style={{ fontSize: 9, color: "#34C759", fontWeight: "700" }}>固定</Text>
+                            <Text style={{ fontSize: 9, color: colors.success, fontWeight: "700" }}>固定</Text>
                           </View>
                         )}
                         {item.dataSource !== "manual" && (

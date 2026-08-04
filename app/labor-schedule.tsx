@@ -55,8 +55,8 @@ function CellDisplay({ entry, contractHours, tplColor, colors }: {
   if (!entry) return null;
   const h = entry.hoursValue;
   if (h === "休") return (
-    <View style={[CS.badge, { backgroundColor: "#FF3B30" + "22" }]}>
-      <Text style={[CS.badgeText, { color: "#FF3B30" }]}>休</Text>
+    <View style={[CS.badge, { backgroundColor: colors.error + "22" }]}>
+      <Text style={[CS.badgeText, { color: colors.error }]}>休</Text>
     </View>
   );
   if (h === "无早") return (
@@ -67,7 +67,7 @@ function CellDisplay({ entry, contractHours, tplColor, colors }: {
   if (typeof h === "number" && h > 0) {
     const isOvertime = contractHours > 0 && h > contractHours;
     const isCompOff = entry.overtimeType === "comp_off";
-    const dotColor = isCompOff ? "#34C759" : "#FF3B30";
+    const dotColor = isCompOff ? colors.success : colors.error;
     return (
       <View style={{ alignItems: "center" }}>
         <Text style={[CS.hours, {
@@ -149,7 +149,7 @@ function EditShiftModal({ visible, date, employee, session, sessionColor, existi
             <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
               {(["休", "无早"] as const).map((s) => (
                 <TouchableOpacity key={s} onPress={() => { tap(); setHoursSpecial(hoursSpecial === s ? null : s); setHoursInput(""); }}
-                  style={[EM.chip, { backgroundColor: hoursSpecial === s ? (s === "休" ? "#FF3B30" : colors.muted) : colors.surface, borderColor: s === "休" ? "#FF3B30" : colors.muted }]}>
+                  style={[EM.chip, { backgroundColor: hoursSpecial === s ? (s === "休" ? colors.error : colors.muted) : colors.surface, borderColor: s === "休" ? colors.error : colors.muted }]}>
                   <Text style={{ fontSize: 13, color: hoursSpecial === s ? "#fff" : colors.muted }}>{s}</Text>
                 </TouchableOpacity>
               ))}
@@ -587,8 +587,8 @@ export default function LaborScheduleScreen() {
                         <View style={[PSC.detailRow, { borderTopColor: colors.border }]}>
                           <View style={PSC.di}><Text style={PSC.dl}>出勤</Text><Text style={[PSC.dv, { color: colors.foreground }]}>{att.attendanceDays}天</Text></View>
                           <View style={PSC.di}><Text style={PSC.dl}>工时</Text><Text style={[PSC.dv, { color: colors.foreground }]}>{att.totalHours}h</Text></View>
-                          {att.overtimeHours > 0 && <View style={PSC.di}><Text style={PSC.dl}>加班</Text><Text style={[PSC.dv, { color: "#FF3B30" }]}>+{att.overtimeHours.toFixed(1)}h</Text></View>}
-                          {((att.compOffCount ?? 0) * (att.hoursPerCompOff ?? 8)) > 0 && <View style={PSC.di}><Text style={PSC.dl}>换休</Text><Text style={[PSC.dv, { color: "#34C759" }]}>{((att.compOffCount ?? 0) * (att.hoursPerCompOff ?? 8)).toFixed(1)}h</Text></View>}
+                          {att.overtimeHours > 0 && <View style={PSC.di}><Text style={PSC.dl}>加班</Text><Text style={[PSC.dv, { color: colors.error }]}>+{att.overtimeHours.toFixed(1)}h</Text></View>}
+                          {((att.compOffCount ?? 0) * (att.hoursPerCompOff ?? 8)) > 0 && <View style={PSC.di}><Text style={PSC.dl}>换休</Text><Text style={[PSC.dv, { color: colors.success }]}>{((att.compOffCount ?? 0) * (att.hoursPerCompOff ?? 8)).toFixed(1)}h</Text></View>}
                         </View>
                       )}
                     </View>

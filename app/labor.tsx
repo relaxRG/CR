@@ -228,7 +228,7 @@ function OverviewCard({ month, colors }: { month: string; colors: any }) {
             {totalSalary > 0 ? `¥${totalSalary.toFixed(0)}` : "—"}
           </Text>
           {diffSalary !== null && (
-            <Text style={{ fontSize: 10, color: diffSalary > 0 ? "#FF3B30" : "#34C759" }}>
+            <Text style={{ fontSize: 10, color: diffSalary > 0 ? colors.error : colors.success }}>
               {diffSalary > 0 ? "▲" : "▼"} ¥{Math.abs(diffSalary).toFixed(0)}
             </Text>
           )}
@@ -243,7 +243,7 @@ function OverviewCard({ month, colors }: { month: string; colors: any }) {
         <View style={[OV.divider, { backgroundColor: colors.border }]} />
         <View style={OV.item}>
           <Text style={[OV.label, { color: colors.muted }]}>待发</Text>
-          <Text style={[OV.value, { color: totalPending > 0 ? "#FF3B30" : colors.muted }]}>
+          <Text style={[OV.value, { color: totalPending > 0 ? colors.error : colors.muted }]}>
             {totalPending > 0 ? `¥${totalPending.toFixed(0)}` : "—"}
           </Text>
         </View>
@@ -255,7 +255,7 @@ function OverviewCard({ month, colors }: { month: string; colors: any }) {
           <Text style={{ fontSize: 11, color: colors.muted }}>{compareModeLabel(compareMode, customMonth)}薪资合计：</Text>
           <Text style={{ fontSize: 12, fontWeight: "700", color: colors.muted }}>¥{compareTotalSalary.toFixed(0)}</Text>
           {diffSalary !== null && (
-            <Text style={{ fontSize: 11, color: diffSalary > 0 ? "#FF3B30" : "#34C759", marginLeft: 8 }}>
+            <Text style={{ fontSize: 11, color: diffSalary > 0 ? colors.error : colors.success, marginLeft: 8 }}>
               {diffSalary > 0 ? "增加" : "减少"} ¥{Math.abs(diffSalary).toFixed(0)}（{((Math.abs(diffSalary) / compareTotalSalary) * 100).toFixed(1)}%）
             </Text>
           )}
@@ -371,8 +371,8 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors }:
             </Text>
             <Text style={{ fontSize: 12, color: colors.muted }}>({employee.realName})</Text>
             {isParttime && (
-              <View style={{ backgroundColor: "#FF9500" + "22", paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
-                <Text style={{ fontSize: 9, fontWeight: "700", color: "#FF9500" }}>兼职</Text>
+              <View style={{ backgroundColor: colors.warning + "22", paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
+                <Text style={{ fontSize: 9, fontWeight: "700", color: colors.warning }}>兼职</Text>
               </View>
             )}
           </View>
@@ -388,19 +388,19 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors }:
             </View>
             <View style={{ alignItems: "flex-end" }}>
               <Text style={{ fontSize: 10, color: colors.muted }}>待发</Text>
-              <Text style={{ fontSize: 15, fontWeight: "700", color: pending && pending > 0 ? "#34C759" : colors.muted }}>
+              <Text style={{ fontSize: 15, fontWeight: "700", color: pending && pending > 0 ? colors.success : colors.muted }}>
                 {pending !== null ? `¥${pending.toFixed(0)}` : "—"}
               </Text>
             </View>
           </View>
           {diffSalary !== null && (
-            <Text style={{ fontSize: 10, color: diffSalary > 0 ? "#FF3B30" : "#34C759" }}>
+            <Text style={{ fontSize: 10, color: diffSalary > 0 ? colors.error : colors.success }}>
               {diffSalary > 0 ? "▲" : "▼"} ¥{Math.abs(diffSalary).toFixed(0)}
             </Text>
           )}
           {!slip && (
-            <View style={{ backgroundColor: "#FF9500" + "22", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
-              <Text style={{ fontSize: 10, fontWeight: "600", color: "#FF9500" }}>待录入</Text>
+            <View style={{ backgroundColor: colors.warning + "22", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+              <Text style={{ fontSize: 10, fontWeight: "600", color: colors.warning }}>待录入</Text>
             </View>
           )}
         </View>
@@ -414,11 +414,11 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors }:
             { label: "出勤天数", value: att ? `${att.attendanceDays}天（应${att.expectedAttendanceDays ?? "—"}天）` : "—", color: colors.foreground },
             { label: "加班时长", value: att ? `${att.overtimeHours.toFixed(1)}h（计费${att.paidOvertimeHours?.toFixed(1) ?? att.overtimeHours.toFixed(1)}h）` : "—", color: colors.foreground },
             { label: "考勤工资", value: attendanceSalary > 0 ? `¥${attendanceSalary.toFixed(0)}` : "—", color: colors.foreground },
-            { label: "绩效奖金", value: slip?.performanceBonus ? `+¥${slip.performanceBonus.toFixed(0)}` : "—", color: slip?.performanceBonus ? "#34C759" : colors.muted },
+            { label: "绩效奖金", value: slip?.performanceBonus ? `+¥${slip.performanceBonus.toFixed(0)}` : "—", color: slip?.performanceBonus ? colors.success : colors.muted },
             { label: "补贴合计", value: (slip && (slip.mealAllowance + slip.transportAllowance + slip.otherAllowance) > 0) ? `+¥${(slip.mealAllowance + slip.transportAllowance + slip.otherAllowance).toFixed(0)}` : "—", color: (slip && (slip.mealAllowance + slip.transportAllowance + slip.otherAllowance) > 0) ? "#007AFF" : colors.muted },
-            { label: "奖惩小计", value: slip?.rewardPenalty ? (slip.rewardPenalty > 0 ? `+¥${slip.rewardPenalty.toFixed(0)}` : `-¥${Math.abs(slip.rewardPenalty).toFixed(0)}`) : "—", color: slip?.rewardPenalty ? (slip.rewardPenalty > 0 ? "#34C759" : "#FF3B30") : colors.muted },
+            { label: "奖惩小计", value: slip?.rewardPenalty ? (slip.rewardPenalty > 0 ? `+¥${slip.rewardPenalty.toFixed(0)}` : `-¥${Math.abs(slip.rewardPenalty).toFixed(0)}`) : "—", color: slip?.rewardPenalty ? (slip.rewardPenalty > 0 ? colors.success : colors.error) : colors.muted },
             { label: "业绩提点", value: slip?.salesCommission ? `+¥${slip.salesCommission.toFixed(0)}` : "—", color: slip?.salesCommission ? "#007AFF" : colors.muted },
-            { label: "预支小计", value: slip?.advanceAmount ? `-¥${slip.advanceAmount.toFixed(0)}` : "—", color: slip?.advanceAmount ? "#FF9500" : colors.muted },
+            { label: "预支小计", value: slip?.advanceAmount ? `-¥${slip.advanceAmount.toFixed(0)}` : "—", color: slip?.advanceAmount ? colors.warning : colors.muted },
           ].map(({ label, value, color }) => (
             <View key={label} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
               <Text style={{ fontSize: 12, color: colors.muted }}>{label}</Text>
@@ -431,7 +431,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors }:
               {Object.values(att.specialStatusDeductions).map((d) => (
                 <View key={d.name} style={{ flexDirection: "row", justifyContent: "space-between" }}>
                   <Text style={{ fontSize: 11, color: colors.muted }}>{d.name}（{d.count}天）</Text>
-                  <Text style={{ fontSize: 11, color: d.deduction > 0 ? "#FF3B30" : d.deduction < 0 ? "#34C759" : colors.muted }}>
+                  <Text style={{ fontSize: 11, color: d.deduction > 0 ? colors.error : d.deduction < 0 ? colors.success : colors.muted }}>
                     {d.deduction > 0 ? `-¥${d.deduction.toFixed(0)}` : d.deduction < 0 ? `+¥${Math.abs(d.deduction).toFixed(0)}` : "不扣薪"}
                   </Text>
                 </View>
@@ -444,19 +444,19 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors }:
               {slip.socialInsuranceDeduction > 0 && (
                 <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
                   <Text style={{ fontSize: 11, color: colors.muted }}>社保代扣</Text>
-                  <Text style={{ fontSize: 11, color: "#FF3B30" }}>-¥{slip.socialInsuranceDeduction.toFixed(0)}</Text>
+                  <Text style={{ fontSize: 11, color: colors.error }}>-¥{slip.socialInsuranceDeduction.toFixed(0)}</Text>
                 </View>
               )}
               {slip.housingFundDeduction > 0 && (
                 <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
                   <Text style={{ fontSize: 11, color: colors.muted }}>公积金代扣</Text>
-                  <Text style={{ fontSize: 11, color: "#FF3B30" }}>-¥{slip.housingFundDeduction.toFixed(0)}</Text>
+                  <Text style={{ fontSize: 11, color: colors.error }}>-¥{slip.housingFundDeduction.toFixed(0)}</Text>
                 </View>
               )}
               {slip.incomeTax > 0 && (
                 <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
                   <Text style={{ fontSize: 11, color: colors.muted }}>个人所得税</Text>
-                  <Text style={{ fontSize: 11, color: "#FF3B30" }}>-¥{slip.incomeTax.toFixed(0)}</Text>
+                  <Text style={{ fontSize: 11, color: colors.error }}>-¥{slip.incomeTax.toFixed(0)}</Text>
                 </View>
               )}
             </View>
@@ -491,7 +491,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors }:
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 6, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border + "44" }}>
               <Text style={{ fontSize: 11, color: colors.muted }}>公司总人力成本</Text>
               <View style={{ alignItems: "flex-end" }}>
-                <Text style={{ fontSize: 12, fontWeight: "700", color: "#FF9500" }}>¥{(slip.totalEmployerCost ?? 0).toFixed(0)}</Text>
+                <Text style={{ fontSize: 12, fontWeight: "700", color: colors.warning }}>¥{(slip.totalEmployerCost ?? 0).toFixed(0)}</Text>
                 {(slip.employerSocialInsurance ?? 0) + (slip.employerHousingFund ?? 0) > 0 && (
                   <Text style={{ fontSize: 10, color: colors.muted }}>含公司社保¥{((slip.employerSocialInsurance ?? 0) + (slip.employerHousingFund ?? 0)).toFixed(0)}</Text>
                 )}
@@ -503,34 +503,34 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors }:
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 4 }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
               <Text style={{ fontSize: 11, color: colors.muted }}>调休余额</Text>
-              <View style={{ backgroundColor: totalCompOffDays > 0 ? "#34C759" + "22" : colors.border + "44", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
-                <Text style={{ fontSize: 10, fontWeight: "700", color: totalCompOffDays > 0 ? "#34C759" : colors.muted }}>{totalCompOffDays}天</Text>
+              <View style={{ backgroundColor: totalCompOffDays > 0 ? colors.success + "22" : colors.border + "44", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                <Text style={{ fontSize: 10, fontWeight: "700", color: totalCompOffDays > 0 ? colors.success : colors.muted }}>{totalCompOffDays}天</Text>
               </View>
             </View>
             <View style={{ flexDirection: "row", gap: 6 }}>
               {totalCompOffDays > 0 && (
                 <TouchableOpacity onPress={() => { tap(); setCashOutDailyRate(String(att?.dailyRate ?? 0)); setShowCashOutModal(true); }}
-                  style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, backgroundColor: "#FF9500" + "15", borderWidth: 1, borderColor: "#FF9500" + "44" }}>
-                  <Text style={{ fontSize: 11, color: "#FF9500", fontWeight: "600" }}>兑现</Text>
+                  style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, backgroundColor: colors.warning + "15", borderWidth: 1, borderColor: colors.warning + "44" }}>
+                  <Text style={{ fontSize: 11, color: colors.warning, fontWeight: "600" }}>兑现</Text>
                 </TouchableOpacity>
               )}
               <TouchableOpacity onPress={() => { tap(); setShowCompOffModal(!showCompOffModal); }}
-                style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, backgroundColor: "#34C759" + "15", borderWidth: 1, borderColor: "#34C759" + "44" }}>
-                <IconSymbol name="plus" size={11} color="#34C759" />
-                <Text style={{ fontSize: 11, color: "#34C759", fontWeight: "600" }}>存入</Text>
+                style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, backgroundColor: colors.success + "15", borderWidth: 1, borderColor: colors.success + "44" }}>
+                <IconSymbol name="plus" size={11} color={colors.success} />
+                <Text style={{ fontSize: 11, color: colors.success, fontWeight: "600" }}>存入</Text>
               </TouchableOpacity>
             </View>
           </View>
 
           {/* 存入换休余额内嵌表单 */}
           {showCompOffModal && (
-            <View style={{ backgroundColor: colors.background, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: "#34C759" + "44", gap: 10 }}>
+            <View style={{ backgroundColor: colors.background, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: colors.success + "44", gap: 10 }}>
               <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>存入换休余额</Text>
               <Text style={{ fontSize: 11, color: colors.muted }}>当月加班：{att?.overtimeHours?.toFixed(1) ?? 0}h · 已计费：{att?.paidOvertimeHours?.toFixed(1) ?? 0}h</Text>
               <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
                 {[4, 8].map((h) => (
                   <TouchableOpacity key={h} onPress={() => setCompOffHoursInput(String(h))}
-                    style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 7, backgroundColor: compOffHoursInput === String(h) ? "#34C759" : colors.surface, borderWidth: 1, borderColor: compOffHoursInput === String(h) ? "#34C759" : colors.border }}>
+                    style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 7, backgroundColor: compOffHoursInput === String(h) ? colors.success : colors.surface, borderWidth: 1, borderColor: compOffHoursInput === String(h) ? colors.success : colors.border }}>
                     <Text style={{ fontSize: 12, color: compOffHoursInput === String(h) ? "#fff" : colors.muted }}>{h}h={h >= 8 ? 1 : 0.5}天</Text>
                   </TouchableOpacity>
                 ))}
@@ -544,7 +544,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors }:
                   <Text style={{ fontSize: 12, color: colors.muted }}>取消</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={handleAddCompOff}
-                  style={{ flex: 1, paddingVertical: 7, borderRadius: 7, backgroundColor: "#34C759", alignItems: "center" }}>
+                  style={{ flex: 1, paddingVertical: 7, borderRadius: 7, backgroundColor: colors.success, alignItems: "center" }}>
                   <Text style={{ fontSize: 12, fontWeight: "600", color: "#fff" }}>确认存入</Text>
                 </TouchableOpacity>
               </View>
@@ -553,10 +553,10 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors }:
 
           {/* 无来源多休提醒 */}
           {restAlert && restAlert.resolution === "pending" && (
-            <View style={{ backgroundColor: "#FF9500" + "15", borderRadius: 8, padding: 8, gap: 6, borderWidth: 1, borderColor: "#FF9500" + "44" }}>
-              <Text style={{ fontSize: 11, fontWeight: "600", color: "#FF9500" }}>⚠️ 本月多休{restAlert.unexplainedDays}天，无换休余额可抵扣</Text>
+            <View style={{ backgroundColor: colors.warning + "15", borderRadius: 8, padding: 8, gap: 6, borderWidth: 1, borderColor: colors.warning + "44" }}>
+              <Text style={{ fontSize: 11, fontWeight: "600", color: colors.warning }}>⚠️ 本月多休{restAlert.unexplainedDays}天，无换休余额可抵扣</Text>
               <View style={{ flexDirection: "row", gap: 8 }}>
-                {[{ label: "扣薪", res: "deduct" as const, color: "#FF3B30" }, { label: "不扣薪", res: "waive" as const, color: "#34C759" }].map((opt) => (
+                {[{ label: "扣薪", res: "deduct" as const, color: colors.error }, { label: "不扣薪", res: "waive" as const, color: colors.success }].map((opt) => (
                   <TouchableOpacity key={opt.res} onPress={() => resolveAlert(employee.id, month, opt.res)}
                     style={{ flex: 1, paddingVertical: 5, borderRadius: 6, backgroundColor: opt.color + "15", alignItems: "center" }}>
                     <Text style={{ fontSize: 11, color: opt.color, fontWeight: "600" }}>{opt.label}</Text>
@@ -592,7 +592,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors }:
                           setShowCashOutModal(false);
                           Alert.alert("兑现成功", `已将 ${entry.days} 天调休余额兑现 ¥${amount.toFixed(2)}，请重新生成薪资单`);
                         }}
-                          style={{ backgroundColor: "#34C759", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 }}>
+                          style={{ backgroundColor: colors.success, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 }}>
                           <Text style={{ fontSize: 12, fontWeight: "700", color: "#fff" }}>兑现 ¥{amount.toFixed(0)}</Text>
                         </TouchableOpacity>
                       </View>
@@ -615,9 +615,9 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors }:
           {/* 操作按钮行：绩效设置 + 历史 + 编辑薪资 */}
           <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
             <TouchableOpacity onPress={() => { tap(); router.push({ pathname: "/labor-performance", params: { employeeId: employee.id } } as any); }}
-              style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, paddingVertical: 7, borderRadius: 8, backgroundColor: "#34C759" + "15", borderWidth: 1, borderColor: "#34C759" + "44" }}>
-              <IconSymbol name="chart.bar.fill" size={12} color="#34C759" />
-              <Text style={{ fontSize: 12, color: "#34C759", fontWeight: "600" }}>绩效设置</Text>
+              style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, paddingVertical: 7, borderRadius: 8, backgroundColor: colors.success + "15", borderWidth: 1, borderColor: colors.success + "44" }}>
+              <IconSymbol name="chart.bar.fill" size={12} color={colors.success} />
+              <Text style={{ fontSize: 12, color: colors.success, fontWeight: "600" }}>绩效设置</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => { tap(); router.push({ pathname: "/labor-salary-history", params: { employeeId: employee.id } } as any); }}
               style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, paddingVertical: 7, paddingHorizontal: 10, borderRadius: 8, backgroundColor: "#5856D6" + "15", borderWidth: 1, borderColor: "#5856D6" + "44" }}>
@@ -930,8 +930,8 @@ function AdvancePage({ month, colors }: { month: string; colors: any }) {
               <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: "#AF52DE" + "22" }}>
                 <Text style={{ fontSize: 11, color: "#AF52DE" }}>固定兼职 ¥{totalFixedK1.toFixed(0)}</Text>
               </View>
-              <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: "#FF9500" + "22" }}>
-                <Text style={{ fontSize: 11, color: "#FF9500" }}>临时兼职 ¥{totalTempK1.toFixed(0)}</Text>
+              <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: colors.warning + "22" }}>
+                <Text style={{ fontSize: 11, color: colors.warning }}>临时兼职 ¥{totalTempK1.toFixed(0)}</Text>
               </View>
             </View>
           </View>
@@ -941,7 +941,7 @@ function AdvancePage({ month, colors }: { month: string; colors: any }) {
         <PettyK1Card title="固定兼职 · 备用金 K1" records={fixedK1Records} total={totalFixedK1} color="#AF52DE" />
 
         {/* 临时兼职备用金卡片 */}
-        <PettyK1Card title="临时兼职 · 备用金 K1" records={tempK1Records} total={totalTempK1} color="#FF9500" />
+        <PettyK1Card title="临时兼职 · 备用金 K1" records={tempK1Records} total={totalTempK1} color={colors.warning} />
 
         {/* 手动录入的预支记录 */}
         {manualAdvances.length > 0 && (
@@ -975,7 +975,7 @@ function AdvancePage({ month, colors }: { month: string; colors: any }) {
                     <Text style={{ fontSize: 15, fontWeight: "700", color: "#AF52DE" }}>¥{adv.amount.toFixed(0)}</Text>
                     <TouchableOpacity onPress={() => { tap(); updateAdvance(adv.id, { status: adv.status === "deducted" ? "pending" : "deducted" }); }}
                       style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: adv.status === "deducted" ? "#34C75922" : "#FF950022" }}>
-                      <Text style={{ fontSize: 10, fontWeight: "600", color: adv.status === "deducted" ? "#34C759" : "#FF9500" }}>
+                      <Text style={{ fontSize: 10, fontWeight: "600", color: adv.status === "deducted" ? colors.success : colors.warning }}>
                         {adv.status === "deducted" ? "已扣除" : "待扣除"}
                       </Text>
                     </TouchableOpacity>
@@ -1057,11 +1057,11 @@ function SchCellDisplay({ entry, contractHours, tplColor, colors }: {
 }) {
   if (!entry) return null;
   const h = entry.hoursValue;
-  if (h === "休") return <View style={[SCH.badge, { backgroundColor: "#FF3B30" + "22" }]}><Text style={[SCH.badgeText, { color: "#FF3B30" }]}>休</Text></View>;
+  if (h === "休") return <View style={[SCH.badge, { backgroundColor: colors.error + "22" }]}><Text style={[SCH.badgeText, { color: colors.error }]}>休</Text></View>;
   if (h === "无早") return <View style={[SCH.badge, { backgroundColor: colors.muted + "22" }]}><Text style={[SCH.badgeText, { color: colors.muted }]}>无早</Text></View>;
   if (typeof h === "number" && h > 0) {
     const isOT = contractHours > 0 && h > contractHours;
-    const dotColor = entry.overtimeType === "comp_off" ? "#34C759" : "#FF3B30";
+    const dotColor = entry.overtimeType === "comp_off" ? colors.success : colors.error;
     return (
       <View style={{ alignItems: "center" }}>
         <Text style={{ fontSize: 12, fontWeight: isOT ? "800" : "600", color: isOT ? dotColor : tplColor }}>{h}</Text>
@@ -1179,7 +1179,7 @@ function SchEditModal({ visible, date, employee, session, sessionColor, existing
                   placeholder={`工时 ${defaultHours}h`} placeholderTextColor={colors.muted} keyboardType="decimal-pad"
                   style={[SCHEM.input, { color: colors.foreground, borderColor: colors.border, flex: 1 }]} />
                 <Text style={{ color: colors.muted }}>h</Text>
-                {contractHours > 0 && <Text style={{ fontSize: 11, color: isOT ? "#FF9500" : colors.muted }}>合同 {contractHours}h{isOT ? ` · 加班+${otAmt.toFixed(1)}h` : ""}</Text>}
+                {contractHours > 0 && <Text style={{ fontSize: 11, color: isOT ? colors.warning : colors.muted }}>合同 {contractHours}h{isOT ? ` · 加班+${otAmt.toFixed(1)}h` : ""}</Text>}
               </View>
             )}
           </View>
@@ -1298,7 +1298,7 @@ function SchTemplateModal({ visible, templates, specialStatuses, colors, onSaveS
   };
   const CATEGORY_LABELS: Record<string, string> = { absence: "缺席类", work_day: "工作日类", comp_off: "加班换休" };
   const DIRECTION_LABELS: Record<string, string> = { positive: "正向（加钱）", negative: "负向（扣钱）", neutral: "中性（不加不扣）" };
-  const DIRECTION_COLORS: Record<string, string> = { positive: "#34C759", negative: "#FF3B30", neutral: "#8E8E93" };
+  const DIRECTION_COLORS: Record<string, string> = { positive: colors.success, negative: colors.error, neutral: "#8E8E93" };
   const MULTIPLIER_PRESETS = [0, 0.5, 1, 1.5, 2, 3];
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
@@ -1369,7 +1369,7 @@ function SchTemplateModal({ visible, templates, specialStatuses, colors, onSaveS
                       <Text style={{ fontSize: 10, color: colors.muted }}>该天是否有实际上班工时</Text>
                     </View>
                     <TouchableOpacity onPress={() => updStatus(ss.id, { countAsAttendance: !(ss.countAsAttendance ?? false) })}
-                      style={{ width: 44, height: 26, borderRadius: 13, backgroundColor: (ss.countAsAttendance ?? false) ? "#34C759" : colors.border, justifyContent: "center", paddingHorizontal: 2 }}>
+                      style={{ width: 44, height: 26, borderRadius: 13, backgroundColor: (ss.countAsAttendance ?? false) ? colors.success : colors.border, justifyContent: "center", paddingHorizontal: 2 }}>
                       <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: "#fff", alignSelf: (ss.countAsAttendance ?? false) ? "flex-end" : "flex-start" }} />
                     </TouchableOpacity>
                   </View>
@@ -1853,7 +1853,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   };
 
   // 部门主色：前厅绿色，后厨橙色
-  const deptAccent = dept === "front" ? "#34C759" : "#FF9500";
+  const deptAccent = dept === "front" ? colors.success : colors.warning;
 
   return (
     <View style={{ flex: 1 }}>
@@ -1907,18 +1907,18 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
               ]
             );
           }}
-          style={[EXL.gearBtn, { backgroundColor: "#34C759" + "22", width: "auto", paddingHorizontal: 10 }]}>
+          style={[EXL.gearBtn, { backgroundColor: colors.success + "22", width: "auto", paddingHorizontal: 10 }]}>
           {generating
-            ? <Text style={{ fontSize: 11, fontWeight: "700", color: "#34C759" }}>计算中...</Text>
-            : <Text style={{ fontSize: 11, fontWeight: "700", color: "#34C759" }}>生成薪资单</Text>
+            ? <Text style={{ fontSize: 11, fontWeight: "700", color: colors.success }}>计算中...</Text>
+            : <Text style={{ fontSize: 11, fontWeight: "700", color: colors.success }}>生成薪资单</Text>
           }
         </TouchableOpacity>
       </View>
 
       {/* 生成结果提示 */}
       {genResult && (
-        <View style={{ backgroundColor: "#34C759" + "15", paddingHorizontal: 16, paddingVertical: 6 }}>
-          <Text style={{ fontSize: 12, color: "#34C759", fontWeight: "600", textAlign: "center" }}>{genResult}</Text>
+        <View style={{ backgroundColor: colors.success + "15", paddingHorizontal: 16, paddingVertical: 6 }}>
+          <Text style={{ fontSize: 12, color: colors.success, fontWeight: "600", textAlign: "center" }}>{genResult}</Text>
         </View>
       )}
 
@@ -1966,9 +1966,9 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                             paddingVertical: 10,
                             borderRadius: 10,
                             alignItems: "center",
-                            backgroundColor: selected ? (mode === "cash" ? "#34C759" : "#007AFF") : colors.background,
+                            backgroundColor: selected ? (mode === "cash" ? colors.success : "#007AFF") : colors.background,
                             borderWidth: 1,
-                            borderColor: selected ? (mode === "cash" ? "#34C759" : "#007AFF") : colors.border,
+                            borderColor: selected ? (mode === "cash" ? colors.success : "#007AFF") : colors.border,
                           }}>
                           <Text style={{ fontSize: 13, fontWeight: "700", color: selected ? "#fff" : colors.foreground }}>{mode === "cash" ? "拿钱" : "换休"}</Text>
                         </TouchableOpacity>
