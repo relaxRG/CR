@@ -613,22 +613,22 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors }:
             </View>
           </Modal>
 
-          {/* 操作按钮行：绩效设置 + 历史 + 编辑薪资 */}
+          {/* 操作按钮行：绩效补贴 | 编辑薪资 | 历史 */}
           <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
-            <TouchableOpacity onPress={() => { tap(); router.push({ pathname: "/labor-employee-form", params: { employeeId: employee.id } } as any); }}
+            <TouchableOpacity onPress={() => { tap(); router.push({ pathname: "/labor-kpi-allowance", params: { employeeId: employee.id, month } } as any); }}
               style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, paddingVertical: 7, borderRadius: 8, backgroundColor: colors.success + "15", borderWidth: 1, borderColor: colors.success + "44" }}>
               <IconSymbol name="chart.bar.fill" size={12} color={colors.success} />
-              <Text style={{ fontSize: 12, color: colors.success, fontWeight: "600" }}>绩效设置</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => { tap(); router.push({ pathname: "/labor-salary-history", params: { employeeId: employee.id } } as any); }}
-              style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, paddingVertical: 7, paddingHorizontal: 10, borderRadius: 8, backgroundColor: "#5856D6" + "15", borderWidth: 1, borderColor: "#5856D6" + "44" }}>
-              <IconSymbol name="clock.fill" size={12} color="#5856D6" />
-              <Text style={{ fontSize: 12, color: "#5856D6", fontWeight: "600" }}>历史</Text>
+              <Text style={{ fontSize: 12, color: colors.success, fontWeight: "600" }}>绩效补贴</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => { tap(); router.push({ pathname: "/labor-attendance", params: { employeeId: employee.id, month } } as any); }}
               style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, paddingVertical: 7, borderRadius: 8, backgroundColor: colors.primary + "15", borderWidth: 1, borderColor: colors.primary + "44" }}>
               <IconSymbol name="pencil" size={12} color={colors.primary} />
               <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "600" }}>编辑薪资</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => { tap(); router.push({ pathname: "/labor-salary-history", params: { employeeId: employee.id } } as any); }}
+              style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, paddingVertical: 7, paddingHorizontal: 10, borderRadius: 8, backgroundColor: "#5856D6" + "15", borderWidth: 1, borderColor: "#5856D6" + "44" }}>
+              <IconSymbol name="clock.fill" size={12} color="#5856D6" />
+              <Text style={{ fontSize: 12, color: "#5856D6", fontWeight: "600" }}>历史</Text>
             </TouchableOpacity>
           </View>
         </View>
