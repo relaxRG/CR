@@ -12,11 +12,11 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
-import { useEmployeeStore } from "@/lib/labor/store";
+import { useEmployeeStore, useShiftTemplateStore } from "@/lib/labor/store";
 import {
   Employee, EmployeeDept, EmployeeType, EmployeeBankAccount,
   DEPT_LABELS, DEPT_COLORS, EMPLOYEE_TYPE_LABELS, EMPLOYEE_TYPE_COLORS,
-  calcDailyRate, getDaysInMonth
+  calcDailyRate, getDaysInMonth, DEFAULT_SHIFT_TEMPLATES,
 } from "@/lib/labor/types";
 
 const DEPT_OPTIONS: EmployeeDept[] = ["front", "kitchen", "parttime", "other"];
@@ -32,6 +32,9 @@ export default function LaborEmployeeFormScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const { employees, addEmployee, updateEmployee } = useEmployeeStore();
+  const { templates: shiftTemplates } = useShiftTemplateStore();
+  const availableSessions = (shiftTemplates.length > 0 ? shiftTemplates : DEFAULT_SHIFT_TEMPLATES)
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
   const existing = id ? employees.find((e) => e.id === id) : null;
@@ -46,7 +49,7 @@ export default function LaborEmployeeFormScreen() {
   const [joinDate, setJoinDate] = useState(existing?.joinDate ?? "");
   const [active, setActive] = useState(existing?.active ?? true);
   const [notes, setNotes] = useState(existing?.notes ?? "");
-  const [defaultSession, setDefaultSession] = useState<"午" | "晚" | undefined>(existing?.defaultSession);
+  const [defaultSession, setDefaultSession] = useState<string | undefined>(existing?.defaultSession);
 
   // ── 工资设置 ──
   const [baseSalary, setBaseSalary] = useState(String(existing?.baseSalary ?? ""));
@@ -222,11 +225,14 @@ export default function LaborEmployeeFormScreen() {
               </View>
             </FormRow>
                       <FormRow label="默认班次（排班表分组）" colors={colors}>
-              <View style={{ flexDirection: "row", gap: 8 }}>
-                {([["午", "#FF9500"], ["晚", "#5856D6"]] as const).map(([session, color]) => (
-                  <TouchableOpacity key={session} onPress={() => { tap(); setDefaultSession(defaultSession === session ? undefined : session); }}
-                    style={[S.optionChip, { backgroundColor: defaultSession === session ? color : colors.surface, borderColor: defaultSession === session ? color : colors.border }]}>
-                    <Text style={{ fontSize: 13, fontWeight: "600", color: defaultSession === session ? "#fff" : colors.muted }}>{session}班</Text>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                {availableSessions.map((tpl) => (
+                  <TouchableOpacity key={tpl.id} onPress={() => { tap(); setDefaultSession(defaultSession === tpl.session ? undefined : tpl.session); }}
+                    style={[S.optionChip, { backgroundColor: defaultSession === tpl.session ? tpl.color : colors.surface, borderColor: defaultSession === tpl.session ? tpl.color : colors.border }]}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: defaultSession === tpl.session ? "#fff" : tpl.color }} />
+                      <Text style={{ fontSize: 13, fontWeight: "600", color: defaultSession === tpl.session ? "#fff" : colors.muted }}>{tpl.session}</Text>
+                    </View>
                   </TouchableOpacity>
                 ))}
                 <TouchableOpacity onPress={() => { tap(); setDefaultSession(undefined); }}

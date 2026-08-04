@@ -165,7 +165,7 @@ interface ShiftTemplateStore {
   templates: ShiftTemplate[];
   upsertTemplate: (tpl: ShiftTemplate) => void;
   deleteTemplate: (id: string) => void;
-  getTemplate: (session: "午" | "晚") => ShiftTemplate | undefined;
+  getTemplate: (session: string) => ShiftTemplate | undefined;
   ready: boolean;
 }
 
@@ -191,7 +191,7 @@ function ShiftTemplateProvider({ children }: { children: React.ReactNode }) {
     persist(ref.current.filter((t) => t.id !== id));
   }, [persist, ref]);
 
-  const getTemplate = useCallback((session: "午" | "晚") => {
+  const getTemplate = useCallback((session: string) => {
     return ref.current.find((t) => t.session === session);
   }, [ref]);
 

@@ -1,13 +1,13 @@
 /**
- * 排班表页面 v2
- * - 午班行 / 晚班行分组显示（按 employee.defaultSession 归属）
- * - 班次模板（午/晚各自设置默认工时和时间段）
- * - 快速填充整行（长按姓名格 → 批量填充本月所有工作日）
+ * 排班表页面 v3
+ * - 动态班次分行（按 ShiftTemplate 列表，不再硬编码午/晚）
+ * - 班次模板支持增删改任意数量班次（名称/时间/工时/颜色）
+ * - 快速填充整行（长按姓名格 → 批量填充本月所有工作日/全月）
  * - Mac 宽屏布局修复（tableWidth 上限 520）
- * - 移除多余的"白/晚"切换按键
  * - 节假日配置入口
  * - 加班预警（超出合同工时标红）
  * - 调休标记（overtime type = comp_off）
+ * - 旧数据自动迁移（"day"→"午班"，"evening"→"晚班"）
  */
 import React, { useCallback, useMemo, useState } from "react";
 import {
@@ -25,16 +25,22 @@ import {
   useAttendanceStore, usePaySlipStore,
 } from "@/lib/labor/store";
 import {
-  Employee, EmployeeDept, ShiftEntry, ShiftHoursValue, ShiftSessionValue,
-  ShiftTemplate, ShiftSession,
-  DEPT_LABELS, DEPT_COLORS, WEEKDAY_LABELS,
+  Employee, EmployeeDept, ShiftEntry, ShiftHoursValue,
+  ShiftTemplate,
+  DEPT_LABELS, DEPT_COLORS,
   getMonthDates, getDayOfWeek, monthLabel, getContractHoursForDate,
-  DEFAULT_SHIFT_TEMPLATES,
+  DEFAULT_SHIFT_TEMPLATES, SHIFT_COLOR_PRESETS,
 } from "@/lib/labor/types";
 
 const DEPT_OPTIONS: EmployeeDept[] = ["front", "kitchen"];
-const NOON_COLOR = "#FF9500";
-const EVE_COLOR = "#5856D6";
+
+/** 旧数据迁移：将 "day"/"evening"/"both" 映射到班次名称 */
+function migrateShiftName(shift: string): string {
+  if (shift === "day") return "午班";
+  if (shift === "evening") return "晚班";
+  if (shift === "both") return "午班"; // both 拆成两条，这里取午班
+  return shift;
+}
 
 // ─── 单元格显示 ───────────────────────────────────────────────────────────────
 function CellDisplay({ entry, contractHours, colors }: {
@@ -52,9 +58,11 @@ function CellDisplay({ entry, contractHours, colors }: {
     const isCompOff = entry.overtimeType === "comp_off";
     return (
       <View style={{ alignItems: "center" }}>
-        <Text style={[CS.cellHours, { color: isOvertime ? "#FF3B30" : colors.foreground }]}>{h}h</Text>
-        {isCompOff && <Text style={{ fontSize: 8, color: "#34C759", fontWeight: "700" }}>换休</Text>}
-        {isOvertime && !isCompOff && <Text style={{ fontSize: 8, color: "#FF3B30", fontWeight: "700" }}>+{(h - contractHours).toFixed(1)}</Text>}
+        <Text style={[CS.cellHours, {
+          color: isOvertime ? (isCompOff ? "#34C759" : "#FF3B30") : colors.foreground,
+          fontWeight: isOvertime ? "700" : "400",
+        }]}>{h}</Text>
+        {isOvertime && <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: isCompOff ? "#34C759" : "#FF3B30", marginTop: 1 }} />}
       </View>
     );
   }
@@ -62,11 +70,12 @@ function CellDisplay({ entry, contractHours, colors }: {
 }
 
 // ─── 单元格编辑 Modal ─────────────────────────────────────────────────────────
-function EditShiftModal({ visible, date, employee, session, existing, contractHours, defaultHours, colors, onSave, onClear, onClose }: {
+function EditShiftModal({ visible, date, employee, session, sessionColor, existing, contractHours, defaultHours, colors, onSave, onClear, onClose }: {
   visible: boolean;
   date: string;
   employee: Employee | null;
-  session: ShiftSession;
+  session: string;
+  sessionColor: string;
   existing: ShiftEntry | null;
   contractHours: number;
   defaultHours: number;
@@ -76,7 +85,6 @@ function EditShiftModal({ visible, date, employee, session, existing, contractHo
   onClose: () => void;
 }) {
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
-  const sessionColor = session === "午" ? NOON_COLOR : EVE_COLOR;
   const dow = date ? getDayOfWeek(date) : 1;
 
   const [hoursInput, setHoursInput] = useState(
@@ -107,125 +115,148 @@ function EditShiftModal({ visible, date, employee, session, existing, contractHo
     let hoursValue: ShiftHoursValue = null;
     if (hoursSpecial) { hoursValue = hoursSpecial; }
     else if (hoursInput) { hoursValue = Number(hoursInput) || null; }
-    const shift = session === "午" ? "day" : "evening";
     onSave({
-      employeeId: employee.id, date, shift,
+      employeeId: employee.id, date,
+      shift: session,          // 直接存班次名称
       hoursValue,
-      sessionValue: session as ShiftSessionValue,
+      sessionValue: session,
       overtimeType: isOvertime ? overtimeType : "pay",
     });
     onClose();
   };
 
+  const WEEKDAY_LABELS = ["日", "一", "二", "三", "四", "五", "六"];
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
       <View style={[EM.sheet, { backgroundColor: colors.background }]}>
         <View style={[EM.header, { borderBottomColor: colors.border }]}>
           <Pressable onPress={onClose}><Text style={{ fontSize: 17, color: colors.error }}>取消</Text></Pressable>
           <View style={{ alignItems: "center" }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <View style={{ backgroundColor: sessionColor + "22", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
-                <Text style={{ fontSize: 12, fontWeight: "700", color: sessionColor }}>{session}班</Text>
-              </View>
-              <Text style={[EM.title, { color: colors.foreground }]}>{employee.code}</Text>
-            </View>
-            <Text style={{ fontSize: 12, color: colors.muted }}>{date.slice(5)} {WEEKDAY_LABELS[dow]}</Text>
+            <Text style={[EM.title, { color: colors.foreground }]}>{employee.code} · {session}</Text>
+            <Text style={{ fontSize: 12, color: colors.muted }}>{date} 周{WEEKDAY_LABELS[dow]}</Text>
           </View>
           <Pressable onPress={handleSave}><Text style={{ fontSize: 17, fontWeight: "600", color: sessionColor }}>保存</Text></Pressable>
         </View>
         <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }}>
-          <View>
-            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-              <Text style={[EM.sectionLabel, { color: colors.muted }]}>工时（小时）</Text>
-              {contractHours > 0 && (
-                <Text style={{ fontSize: 11, color: colors.muted }}>合同工时：{contractHours}h</Text>
-              )}
+          {/* 工时输入 */}
+          <View style={[EM.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[EM.sectionTitle, { color: colors.foreground }]}>工时（小时）</Text>
+            <View style={{ flexDirection: "row", gap: 8, alignItems: "center", marginTop: 8 }}>
+              <TextInput
+                value={hoursInput}
+                onChangeText={(t) => { setHoursInput(t); setHoursSpecial(null); }}
+                placeholder={`默认 ${defaultHours}h`}
+                placeholderTextColor={colors.muted}
+                keyboardType="decimal-pad"
+                style={[EM.input, { color: colors.foreground, borderColor: sessionColor, flex: 1 }]}
+              />
+              <Text style={{ color: colors.muted }}>h</Text>
             </View>
-            <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
-              {[defaultHours, ...([5, 6, 7, 8, 9, 10, 11, 12].filter((h) => h !== defaultHours))].map((h) => (
-                <TouchableOpacity key={h} onPress={() => { tap(); setHoursInput(String(h)); setHoursSpecial(null); }}
-                  style={[EM.chip, {
-                    backgroundColor: hoursInput === String(h) && !hoursSpecial
-                      ? (h > contractHours && contractHours > 0 ? "#FF3B30" : sessionColor)
-                      : colors.surface,
-                    borderColor: hoursInput === String(h) && !hoursSpecial
-                      ? (h > contractHours && contractHours > 0 ? "#FF3B30" : sessionColor)
-                      : colors.border,
-                  }]}>
-                  <Text style={{ fontSize: 14, fontWeight: "600", color: hoursInput === String(h) && !hoursSpecial ? "#fff" : colors.muted }}>
-                    {h}h{h === defaultHours ? " ★" : ""}
-                  </Text>
+            {contractHours > 0 && (
+              <Text style={{ fontSize: 11, color: colors.muted, marginTop: 4 }}>
+                合同工时：{contractHours}h/天
+                {isOvertime ? `  ·  加班 +${overtimeAmt.toFixed(1)}h` : ""}
+              </Text>
+            )}
+          </View>
+          {/* 特殊标注 */}
+          <View style={[EM.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[EM.sectionTitle, { color: colors.foreground }]}>特殊标注</Text>
+            <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
+              {(["休", "无早"] as const).map((s) => (
+                <TouchableOpacity key={s} onPress={() => { tap(); setHoursSpecial(hoursSpecial === s ? null : s); setHoursInput(""); }}
+                  style={[EM.chip, { backgroundColor: hoursSpecial === s ? (s === "休" ? "#FF3B30" : colors.muted) : colors.surface, borderColor: s === "休" ? "#FF3B30" : colors.muted }]}>
+                  <Text style={{ fontSize: 13, color: hoursSpecial === s ? "#fff" : colors.muted }}>{s}</Text>
                 </TouchableOpacity>
               ))}
-              <TextInput value={hoursInput} onChangeText={(v) => { setHoursInput(v); setHoursSpecial(null); }}
-                placeholder="自定义" placeholderTextColor={colors.muted} keyboardType="decimal-pad"
-                style={[EM.inputSmall, { color: colors.foreground, borderColor: colors.border }]} />
             </View>
           </View>
-
+          {/* 加班处理 */}
           {isOvertime && (
-            <View style={{ backgroundColor: "#FF3B3010", borderRadius: 10, padding: 12, gap: 8 }}>
-              <Text style={{ fontSize: 13, fontWeight: "700", color: "#FF3B30" }}>
-                ⚠️ 加班 +{overtimeAmt.toFixed(1)}h（超出合同工时 {contractHours}h）
-              </Text>
-              <Text style={{ fontSize: 12, color: colors.muted }}>加班处理方式：</Text>
-              <View style={{ flexDirection: "row", gap: 8 }}>
+            <View style={[EM.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Text style={[EM.sectionTitle, { color: colors.foreground }]}>加班处理（+{overtimeAmt.toFixed(1)}h）</Text>
+              <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
                 {([["pay", "计加班费"], ["comp_off", "换调休"]] as const).map(([v, label]) => (
                   <TouchableOpacity key={v} onPress={() => { tap(); setOvertimeType(v); }}
-                    style={[EM.chip, {
-                      backgroundColor: overtimeType === v ? (v === "pay" ? "#FF3B30" : "#34C759") : colors.surface,
-                      borderColor: overtimeType === v ? (v === "pay" ? "#FF3B30" : "#34C759") : colors.border,
-                    }]}>
-                    <Text style={{ fontSize: 13, fontWeight: "600", color: overtimeType === v ? "#fff" : colors.muted }}>{label}</Text>
+                    style={[EM.chip, { backgroundColor: overtimeType === v ? sessionColor : colors.surface, borderColor: sessionColor }]}>
+                    <Text style={{ fontSize: 13, color: overtimeType === v ? "#fff" : sessionColor }}>{label}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
             </View>
           )}
-
-          <View>
-            <Text style={[EM.sectionLabel, { color: colors.muted }]}>特殊标注</Text>
-            <View style={{ flexDirection: "row", gap: 8 }}>
-              {(["休", "无早"] as const).map((s) => (
-                <TouchableOpacity key={s} onPress={() => { tap(); setHoursSpecial(s); setHoursInput(""); }}
-                  style={[EM.chip, { backgroundColor: hoursSpecial === s ? "#FF3B30" : colors.surface, borderColor: hoursSpecial === s ? "#FF3B30" : colors.border }]}>
-                  <Text style={{ fontSize: 13, fontWeight: "600", color: hoursSpecial === s ? "#fff" : "#FF3B30" }}>（{s}）</Text>
-                </TouchableOpacity>
-              ))}
-              <TouchableOpacity onPress={() => { tap(); onClear(); onClose(); }}
-                style={[EM.chip, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <Text style={{ fontSize: 13, color: colors.muted }}>清空</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+          {/* 清除 */}
+          {existing && (
+            <TouchableOpacity onPress={() => { tap(); onClear(); onClose(); }}
+              style={[EM.chip, { borderColor: colors.error, alignSelf: "center", paddingHorizontal: 24 }]}>
+              <Text style={{ color: colors.error }}>清除此排班</Text>
+            </TouchableOpacity>
+          )}
         </ScrollView>
       </View>
     </Modal>
   );
 }
 
-// ─── 班次模板设置 Modal ───────────────────────────────────────────────────────
-function ShiftTemplateModal({ visible, templates, colors, onSave, onClose }: {
+// ─── 班次模板设置 Modal（支持增删改任意班次） ────────────────────────────────
+function ShiftTemplateModal({ visible, templates, colors, onSave, onDelete, onClose }: {
   visible: boolean;
   templates: ShiftTemplate[];
   colors: any;
   onSave: (tpl: ShiftTemplate) => void;
+  onDelete: (id: string) => void;
   onClose: () => void;
 }) {
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
-  const noonTpl = templates.find((t) => t.session === "午") ?? DEFAULT_SHIFT_TEMPLATES[0];
-  const eveTpl = templates.find((t) => t.session === "晚") ?? DEFAULT_SHIFT_TEMPLATES[1];
 
-  const [noonStart, setNoonStart] = useState(noonTpl.startTime);
-  const [noonEnd, setNoonEnd] = useState(noonTpl.endTime);
-  const [noonHours, setNoonHours] = useState(String(noonTpl.defaultHours));
-  const [eveStart, setEveStart] = useState(eveTpl.startTime);
-  const [eveEnd, setEveEnd] = useState(eveTpl.endTime);
-  const [eveHours, setEveHours] = useState(String(eveTpl.defaultHours));
+  // 本地编辑状态（以 templates 为初始值）
+  const [localTemplates, setLocalTemplates] = useState<ShiftTemplate[]>(() =>
+    [...templates].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+  );
+  const [showColorPicker, setShowColorPicker] = useState<string | null>(null); // tpl.id
+
+  React.useEffect(() => {
+    if (visible) {
+      setLocalTemplates([...templates].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)));
+    }
+  }, [visible, templates]);
+
+  const updateLocal = (id: string, patch: Partial<ShiftTemplate>) => {
+    setLocalTemplates((prev) => prev.map((t) => t.id === id ? { ...t, ...patch } : t));
+  };
+
+  const addNew = () => {
+    tap();
+    const newTpl: ShiftTemplate = {
+      id: `tpl_${Date.now()}`,
+      session: "新班次",
+      startTime: "09:00",
+      endTime: "18:00",
+      defaultHours: 8,
+      color: SHIFT_COLOR_PRESETS[localTemplates.length % SHIFT_COLOR_PRESETS.length],
+      sortOrder: localTemplates.length,
+    };
+    setLocalTemplates((prev) => [...prev, newTpl]);
+  };
+
+  const removeLocal = (id: string) => {
+    tap();
+    Alert.alert("删除班次", "删除后该班次的历史排班记录不受影响，但新排班将无法选择此班次。", [
+      { text: "取消", style: "cancel" },
+      { text: "删除", style: "destructive", onPress: () => {
+        setLocalTemplates((prev) => prev.filter((t) => t.id !== id));
+      }},
+    ]);
+  };
 
   const handleSave = () => {
-    onSave({ ...noonTpl, startTime: noonStart, endTime: noonEnd, defaultHours: Number(noonHours) || 6 });
-    onSave({ ...eveTpl, startTime: eveStart, endTime: eveEnd, defaultHours: Number(eveHours) || 7 });
+    // 保存所有本地模板
+    const existingIds = templates.map((t) => t.id);
+    const localIds = localTemplates.map((t) => t.id);
+    // 删除已移除的模板
+    existingIds.filter((id) => !localIds.includes(id)).forEach((id) => onDelete(id));
+    // 保存/更新所有本地模板
+    localTemplates.forEach((tpl, i) => onSave({ ...tpl, sortOrder: i }));
     onClose();
   };
 
@@ -237,37 +268,72 @@ function ShiftTemplateModal({ visible, templates, colors, onSave, onClose }: {
           <Text style={[EM.title, { color: colors.foreground }]}>班次模板设置</Text>
           <Pressable onPress={handleSave}><Text style={{ fontSize: 17, fontWeight: "600", color: colors.primary }}>保存</Text></Pressable>
         </View>
-        <ScrollView contentContainerStyle={{ padding: 20, gap: 20 }}>
-          {[
-            { label: "午班", color: NOON_COLOR, start: noonStart, setStart: setNoonStart, end: noonEnd, setEnd: setNoonEnd, hours: noonHours, setHours: setNoonHours },
-            { label: "晚班", color: EVE_COLOR, start: eveStart, setStart: setEveStart, end: eveEnd, setEnd: setEveEnd, hours: eveHours, setHours: setEveHours },
-          ].map((item) => (
-            <View key={item.label} style={{ backgroundColor: item.color + "10", borderRadius: 14, padding: 16, gap: 12, borderWidth: 1, borderColor: item.color + "33" }}>
-              <Text style={{ fontSize: 15, fontWeight: "700", color: item.color }}>{item.label}</Text>
-              <View style={{ flexDirection: "row", gap: 12, alignItems: "flex-end" }}>
+        <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }}>
+          {localTemplates.map((tpl, idx) => (
+            <View key={tpl.id} style={{ backgroundColor: tpl.color + "10", borderRadius: 14, padding: 16, gap: 12, borderWidth: 1, borderColor: tpl.color + "44" }}>
+              {/* 班次名称 + 删除 */}
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: tpl.color }} />
+                <TextInput
+                  value={tpl.session}
+                  onChangeText={(v) => updateLocal(tpl.id, { session: v })}
+                  placeholder="班次名称"
+                  placeholderTextColor={colors.muted}
+                  style={{ flex: 1, fontSize: 15, fontWeight: "700", color: tpl.color, paddingVertical: 2 }}
+                />
+                <TouchableOpacity onPress={() => removeLocal(tpl.id)} style={{ padding: 4 }}>
+                  <IconSymbol name="trash" size={16} color={colors.error} />
+                </TouchableOpacity>
+              </View>
+              {/* 时间段 + 工时 */}
+              <View style={{ flexDirection: "row", gap: 10, alignItems: "flex-end" }}>
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 4 }}>开始时间</Text>
-                  <TextInput value={item.start} onChangeText={item.setStart} placeholder="11:00"
-                    placeholderTextColor={colors.muted}
+                  <TextInput value={tpl.startTime} onChangeText={(v) => updateLocal(tpl.id, { startTime: v })}
+                    placeholder="10:30" placeholderTextColor={colors.muted}
                     style={[EM.inputSmall, { color: colors.foreground, borderColor: colors.border, width: "100%" }]} />
                 </View>
-                <Text style={{ color: colors.muted, paddingBottom: 8 }}>—</Text>
+                <Text style={{ color: colors.muted, paddingBottom: 10 }}>—</Text>
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 4 }}>结束时间</Text>
-                  <TextInput value={item.end} onChangeText={item.setEnd} placeholder="17:00"
-                    placeholderTextColor={colors.muted}
+                  <TextInput value={tpl.endTime} onChangeText={(v) => updateLocal(tpl.id, { endTime: v })}
+                    placeholder="17:00" placeholderTextColor={colors.muted}
                     style={[EM.inputSmall, { color: colors.foreground, borderColor: colors.border, width: "100%" }]} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 4 }}>默认工时</Text>
-                  <TextInput value={item.hours} onChangeText={item.setHours} placeholder="6"
-                    placeholderTextColor={colors.muted} keyboardType="decimal-pad"
-                    style={[EM.inputSmall, { color: colors.foreground, borderColor: item.color, width: "100%" }]} />
+                  <TextInput value={String(tpl.defaultHours)} onChangeText={(v) => updateLocal(tpl.id, { defaultHours: Number(v) || tpl.defaultHours })}
+                    placeholder="8" placeholderTextColor={colors.muted} keyboardType="decimal-pad"
+                    style={[EM.inputSmall, { color: colors.foreground, borderColor: tpl.color, width: "100%" }]} />
                 </View>
               </View>
-              <Text style={{ fontSize: 11, color: colors.muted }}>添加排班时自动带入 {item.hours}h，可单独修改</Text>
+              {/* 颜色选择 */}
+              <View>
+                <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 6 }}>班次颜色</Text>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                  {SHIFT_COLOR_PRESETS.map((c) => (
+                    <TouchableOpacity key={c} onPress={() => { tap(); updateLocal(tpl.id, { color: c }); }}
+                      style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: c,
+                        borderWidth: tpl.color === c ? 3 : 1,
+                        borderColor: tpl.color === c ? colors.foreground : c + "44" }} />
+                  ))}
+                </View>
+              </View>
+              <Text style={{ fontSize: 11, color: colors.muted }}>
+                添加排班时自动带入 {tpl.defaultHours}h，可单独修改
+              </Text>
             </View>
           ))}
+          {/* 新增班次按钮 */}
+          <TouchableOpacity onPress={addNew}
+            style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+              padding: 14, borderRadius: 12, borderWidth: 1.5, borderStyle: "dashed", borderColor: colors.primary + "66" }}>
+            <IconSymbol name="plus.circle.fill" size={18} color={colors.primary} />
+            <Text style={{ fontSize: 14, fontWeight: "600", color: colors.primary }}>添加班次</Text>
+          </TouchableOpacity>
+          <Text style={{ fontSize: 12, color: colors.muted, textAlign: "center" }}>
+            参考：早班 / 午班 / 晚班 / 大夜班 / 全天班 / 中班
+          </Text>
         </ScrollView>
       </View>
     </Modal>
@@ -325,7 +391,7 @@ export default function LaborScheduleScreen() {
 
   const { employees } = useEmployeeStore();
   const { shifts, upsertShift, batchUpsertShifts, deleteShift, getShifts } = useShiftStore();
-  const { templates, upsertTemplate, getTemplate } = useShiftTemplateStore();
+  const { templates, upsertTemplate, deleteTemplate } = useShiftTemplateStore();
 
   const now = new Date();
   const [currentMonth, setCurrentMonth] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
@@ -336,7 +402,7 @@ export default function LaborScheduleScreen() {
   const [editModal, setEditModal] = useState(false);
   const [editDate, setEditDate] = useState("");
   const [editEmployee, setEditEmployee] = useState<Employee | null>(null);
-  const [editSession, setEditSession] = useState<ShiftSession>("晚");
+  const [editSession, setEditSession] = useState<string>("晚班");
 
   const { width: screenWidth } = useWindowDimensions();
   const MAX_TABLE_W = 520;
@@ -347,6 +413,13 @@ export default function LaborScheduleScreen() {
 
   const deptColor = DEPT_COLORS[dept];
   const dates = useMemo(() => getMonthDates(currentMonth), [currentMonth]);
+
+  // 按 sortOrder 排序的班次模板列表（动态）
+  const sortedTemplates = useMemo(() =>
+    [...(templates.length > 0 ? templates : DEFAULT_SHIFT_TEMPLATES)]
+      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)),
+    [templates]
+  );
 
   const weeks = useMemo(() => {
     const result: (string | null)[][] = [];
@@ -366,23 +439,34 @@ export default function LaborScheduleScreen() {
     [employees, dept]
   );
 
-  const noonEmployees = useMemo(() =>
-    allDeptEmployees.filter((e) => e.defaultSession === "午"),
-    [allDeptEmployees]
-  );
-  const eveEmployees = useMemo(() =>
-    allDeptEmployees.filter((e) => e.defaultSession === "晚" || !e.defaultSession),
-    [allDeptEmployees]
-  );
+  // 按班次分组员工（动态，不再硬编码午/晚）
+  const employeesBySession = useMemo(() => {
+    const map: Record<string, Employee[]> = {};
+    for (const tpl of sortedTemplates) {
+      map[tpl.session] = allDeptEmployees.filter((e) => e.defaultSession === tpl.session);
+    }
+    // 未分配班次的员工放到第一个班次
+    const unassigned = allDeptEmployees.filter((e) => !e.defaultSession || !sortedTemplates.find((t) => t.session === e.defaultSession));
+    if (sortedTemplates.length > 0) {
+      const firstSession = sortedTemplates[sortedTemplates.length - 1].session;
+      map[firstSession] = [...(map[firstSession] ?? []), ...unassigned];
+    }
+    return map;
+  }, [allDeptEmployees, sortedTemplates]);
 
-  const monthShifts = useMemo(() => getShifts(currentMonth), [shifts, currentMonth]);
+  const monthShifts = useMemo(() => {
+    // 自动迁移旧数据
+    return getShifts(currentMonth).map((s) => ({
+      ...s,
+      shift: migrateShiftName(s.shift),
+    }));
+  }, [shifts, currentMonth]);
 
-  const getEntry = useCallback((employeeId: string, date: string, session: ShiftSession): ShiftEntry | null => {
-    const shift = session === "午" ? "day" : "evening";
-    return monthShifts.find((s) => s.employeeId === employeeId && s.date === date && s.shift === shift) ?? null;
+  const getEntry = useCallback((employeeId: string, date: string, session: string): ShiftEntry | null => {
+    return monthShifts.find((s) => s.employeeId === employeeId && s.date === date && s.shift === session) ?? null;
   }, [monthShifts]);
 
-  const handleCellPress = (employee: Employee, date: string, session: ShiftSession) => {
+  const handleCellPress = (employee: Employee, date: string, session: string) => {
     tap();
     setEditEmployee(employee);
     setEditDate(date);
@@ -390,13 +474,12 @@ export default function LaborScheduleScreen() {
     setEditModal(true);
   };
 
-  const handleFillRow = (employee: Employee, session: ShiftSession) => {
+  const handleFillRow = (employee: Employee, session: string) => {
     tap();
-    const tpl = getTemplate(session);
-    const defaultHours = tpl?.defaultHours ?? (session === "午" ? 6 : 7);
-    const shift = session === "午" ? "day" : "evening";
+    const tpl = sortedTemplates.find((t) => t.session === session) ?? sortedTemplates[0];
+    const defaultHours = tpl?.defaultHours ?? 8;
     Alert.alert(
-      `快速填充 ${employee.code} ${session}班`,
+      `快速填充 ${employee.code} ${session}`,
       `将本月所有工作日（周一~周五）填入 ${defaultHours}h，已有数据不覆盖。`,
       [
         { text: "取消", style: "cancel" },
@@ -406,7 +489,7 @@ export default function LaborScheduleScreen() {
             const entries: ShiftEntry[] = dates
               .filter((d) => { const dow = getDayOfWeek(d); return dow !== 0 && dow !== 6; })
               .filter((d) => !getEntry(employee.id, d, session))
-              .map((d) => ({ employeeId: employee.id, date: d, shift, hoursValue: defaultHours, sessionValue: session as ShiftSessionValue, overtimeType: "pay" as const }));
+              .map((d) => ({ employeeId: employee.id, date: d, shift: session, hoursValue: defaultHours, sessionValue: session, overtimeType: "pay" as const }));
             if (entries.length > 0) batchUpsertShifts(entries);
           },
         },
@@ -415,7 +498,7 @@ export default function LaborScheduleScreen() {
           onPress: () => {
             const entries: ShiftEntry[] = dates
               .filter((d) => !getEntry(employee.id, d, session))
-              .map((d) => ({ employeeId: employee.id, date: d, shift, hoursValue: defaultHours, sessionValue: session as ShiftSessionValue, overtimeType: "pay" as const }));
+              .map((d) => ({ employeeId: employee.id, date: d, shift: session, hoursValue: defaultHours, sessionValue: session, overtimeType: "pay" as const }));
             if (entries.length > 0) batchUpsertShifts(entries);
           },
         },
@@ -426,44 +509,39 @@ export default function LaborScheduleScreen() {
   const prevMonth = () => { const [y, m] = currentMonth.split("-").map(Number); const d = new Date(y, m - 2, 1); setCurrentMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); };
   const nextMonth = () => { const [y, m] = currentMonth.split("-").map(Number); const d = new Date(y, m, 1); setCurrentMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); };
 
-  const noonTpl = getTemplate("午") ?? DEFAULT_SHIFT_TEMPLATES[0];
-  const eveTpl = getTemplate("晚") ?? DEFAULT_SHIFT_TEMPLATES[1];
-
-  const renderSessionGroup = (session: ShiftSession, empList: Employee[]) => {
+  const renderSessionGroup = (tpl: ShiftTemplate, empList: Employee[]) => {
     if (empList.length === 0) return null;
-    const sessionColor = session === "午" ? NOON_COLOR : EVE_COLOR;
-    const tpl = session === "午" ? noonTpl : eveTpl;
     const allDates = weeks.flat();
 
     return (
-      <View key={session} style={{ marginBottom: 4 }}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 8, paddingVertical: 6, backgroundColor: sessionColor + "12" }}>
-          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: sessionColor }} />
-          <Text style={{ fontSize: 12, fontWeight: "700", color: sessionColor }}>
-            {session}班 · {tpl.startTime}–{tpl.endTime} · 默认{tpl.defaultHours}h
+      <View key={tpl.session} style={{ marginBottom: 4 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 8, paddingVertical: 6, backgroundColor: tpl.color + "12" }}>
+          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: tpl.color }} />
+          <Text style={{ fontSize: 12, fontWeight: "700", color: tpl.color }}>
+            {tpl.session} · {tpl.startTime}–{tpl.endTime} · 默认{tpl.defaultHours}h
           </Text>
           <Text style={{ fontSize: 11, color: colors.muted, marginLeft: 4 }}>({empList.length}人)</Text>
         </View>
         {empList.map((emp) => (
           <View key={emp.id} style={[S.empRow, { borderBottomColor: colors.border + "33", borderBottomWidth: StyleSheet.hairlineWidth }]}>
             <TouchableOpacity
-              onLongPress={() => handleFillRow(emp, session)}
-              style={[S.nameCell, { width: NAME_W, backgroundColor: sessionColor + "08" }]}>
-              <Text style={[S.empName, { color: sessionColor }]} numberOfLines={1}>{emp.code}</Text>
+              onLongPress={() => handleFillRow(emp, tpl.session)}
+              style={[S.nameCell, { width: NAME_W, backgroundColor: tpl.color + "08" }]}>
+              <Text style={[S.empName, { color: tpl.color }]} numberOfLines={1}>{emp.code}</Text>
               <Text style={{ fontSize: 9, color: colors.muted }} numberOfLines={1}>{emp.realName.slice(0, 3)}</Text>
             </TouchableOpacity>
             {allDates.map((d, idx) => {
-              const entry = d ? getEntry(emp.id, d, session) : null;
+              const entry = d ? getEntry(emp.id, d, tpl.session) : null;
               const contractH = d ? getContractHoursForDate(emp, d) : 0;
               const isWeekend = d ? (getDayOfWeek(d) === 0 || getDayOfWeek(d) === 6) : false;
               const isToday = d === new Date().toISOString().slice(0, 10);
               return (
-                <TouchableOpacity key={idx} onPress={() => d && handleCellPress(emp, d, session)} disabled={!d}
+                <TouchableOpacity key={idx} onPress={() => d && handleCellPress(emp, d, tpl.session)} disabled={!d}
                   style={[S.cell, {
                     width: CELL_W,
                     backgroundColor: !d ? colors.surface + "44"
-                      : isToday ? sessionColor + "15"
-                      : isWeekend ? sessionColor + "08"
+                      : isToday ? tpl.color + "15"
+                      : isWeekend ? tpl.color + "08"
                       : colors.background,
                     borderRightColor: colors.border + "33",
                   }]}>
@@ -477,8 +555,10 @@ export default function LaborScheduleScreen() {
     );
   };
 
-  const editTpl = editSession === "午" ? noonTpl : eveTpl;
+  const editTpl = sortedTemplates.find((t) => t.session === editSession) ?? sortedTemplates[0] ?? DEFAULT_SHIFT_TEMPLATES[0];
   const editContractH = editEmployee && editDate ? getContractHoursForDate(editEmployee, editDate) : 0;
+
+  const WEEKDAY_LABELS = ["日", "一", "二", "三", "四", "五", "六"];
 
   return (
     <ScreenContainer>
@@ -528,6 +608,7 @@ export default function LaborScheduleScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 + insets.bottom }}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <View style={{ width: tableWidth }}>
+            {/* 表头：星期 */}
             <View style={[S.tableHeaderRow, { backgroundColor: deptColor + "18", borderBottomColor: deptColor + "44" }]}>
               <View style={{ width: NAME_W, paddingLeft: 8 }}>
                 <Text style={[S.headerCell, { color: deptColor }]}>姓名</Text>
@@ -535,7 +616,7 @@ export default function LaborScheduleScreen() {
               {weeks.map((week, wi) =>
                 week.map((d, di) => {
                   const dow = d ? getDayOfWeek(d) : ((wi * 7 + di + 1) % 7);
-                  const dayLabel = ["日", "一", "二", "三", "四", "五", "六"][dow];
+                  const dayLabel = WEEKDAY_LABELS[dow];
                   return (
                     <View key={`h-${wi}-${di}`} style={{ width: CELL_W, alignItems: "center" }}>
                       <Text style={[S.headerCell, { color: dow === 0 || dow === 6 ? colors.error : deptColor }]}>周{dayLabel}</Text>
@@ -545,9 +626,10 @@ export default function LaborScheduleScreen() {
               )}
             </View>
 
-            <View style={[S.dateRow, { backgroundColor: "#FF9500" + "22", borderBottomColor: "#FF9500" + "55" }]}>
+            {/* 日期行 */}
+            <View style={[S.dateRow, { backgroundColor: deptColor + "22", borderBottomColor: deptColor + "55" }]}>
               <View style={{ width: NAME_W, paddingLeft: 8 }}>
-                <Text style={[S.dateCell, { color: "#FF9500" }]}>日期</Text>
+                <Text style={[S.dateCell, { color: deptColor }]}>日期</Text>
               </View>
               {weeks.map((week, wi) =>
                 week.map((d, di) => {
@@ -557,7 +639,7 @@ export default function LaborScheduleScreen() {
                       {d ? (
                         <View style={isToday ? { backgroundColor: deptColor, borderRadius: 10, width: 22, height: 22, alignItems: "center", justifyContent: "center" } : undefined}>
                           <Text style={[S.dateCell, {
-                            color: isToday ? "#fff" : (getDayOfWeek(d) === 0 || getDayOfWeek(d) === 6 ? colors.error : "#FF9500"),
+                            color: isToday ? "#fff" : (getDayOfWeek(d) === 0 || getDayOfWeek(d) === 6 ? colors.error : deptColor),
                             fontWeight: isToday ? "800" : "700",
                           }]}>{Number(d.slice(8))}</Text>
                         </View>
@@ -568,8 +650,8 @@ export default function LaborScheduleScreen() {
               )}
             </View>
 
-            {renderSessionGroup("午", noonEmployees)}
-            {renderSessionGroup("晚", eveEmployees)}
+            {/* 动态班次分行 */}
+            {sortedTemplates.map((tpl) => renderSessionGroup(tpl, employeesBySession[tpl.session] ?? []))}
           </View>
         </ScrollView>
 
@@ -579,10 +661,13 @@ export default function LaborScheduleScreen() {
               <View style={{ width: 4, height: 16, borderRadius: 2, backgroundColor: deptColor }} />
               <Text style={{ fontSize: 14, fontWeight: "700", color: deptColor }}>{monthLabel(currentMonth)} 薪水条</Text>
             </View>
-            {[...noonEmployees, ...eveEmployees].map((emp) => (
-              <PaySlipCard key={emp.id} employee={emp} month={currentMonth}
-                sessionColor={emp.defaultSession === "午" ? NOON_COLOR : EVE_COLOR} colors={colors} />
-            ))}
+            {allDeptEmployees.map((emp) => {
+              const tpl = sortedTemplates.find((t) => t.session === emp.defaultSession) ?? sortedTemplates[sortedTemplates.length - 1] ?? DEFAULT_SHIFT_TEMPLATES[1];
+              return (
+                <PaySlipCard key={emp.id} employee={emp} month={currentMonth}
+                  sessionColor={tpl?.color ?? "#5856D6"} colors={colors} />
+              );
+            })}
           </View>
         )}
       </ScrollView>
@@ -592,14 +677,15 @@ export default function LaborScheduleScreen() {
         date={editDate}
         employee={editEmployee}
         session={editSession}
+        sessionColor={editTpl?.color ?? "#5856D6"}
         existing={editEmployee && editDate ? getEntry(editEmployee.id, editDate, editSession) : null}
         contractHours={editContractH}
-        defaultHours={editTpl.defaultHours}
+        defaultHours={editTpl?.defaultHours ?? 8}
         colors={colors}
         onSave={(entry) => upsertShift(entry)}
         onClear={() => {
           if (editEmployee && editDate) {
-            deleteShift(editEmployee.id, editDate, editSession === "午" ? "day" : "evening");
+            deleteShift(editEmployee.id, editDate, editSession);
           }
         }}
         onClose={() => setEditModal(false)}
@@ -607,9 +693,10 @@ export default function LaborScheduleScreen() {
 
       <ShiftTemplateModal
         visible={showTplModal}
-        templates={templates}
+        templates={sortedTemplates}
         colors={colors}
         onSave={upsertTemplate}
+        onDelete={deleteTemplate}
         onClose={() => setShowTplModal(false)}
       />
     </ScreenContainer>
@@ -618,41 +705,43 @@ export default function LaborScheduleScreen() {
 
 const S = StyleSheet.create({
   navbar: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
-  navTitle: { fontSize: 17, fontWeight: "600" },
-  monthBar: { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth, gap: 16 },
-  monthLabel: { fontSize: 16, fontWeight: "700", minWidth: 90, textAlign: "center" },
-  controlBar: { flexDirection: "row", alignItems: "center", paddingHorizontal: 10, paddingVertical: 8, gap: 6, borderBottomWidth: StyleSheet.hairlineWidth, flexWrap: "wrap" },
-  segGroup: { flexDirection: "row", borderRadius: 8, padding: 2, gap: 2 },
-  segBtn: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6 },
-  tableHeaderRow: { flexDirection: "row", borderBottomWidth: 1, paddingVertical: 7 },
-  headerCell: { fontSize: 11, fontWeight: "700", textAlign: "center" },
-  dateRow: { flexDirection: "row", borderBottomWidth: 1, paddingVertical: 5 },
+  navTitle: { fontSize: 17, fontWeight: "700" },
+  monthBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 8, paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth },
+  monthLabel: { fontSize: 17, fontWeight: "700" },
+  controlBar: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 8, gap: 8, borderBottomWidth: StyleSheet.hairlineWidth },
+  segGroup: { flexDirection: "row", borderRadius: 8, overflow: "hidden", padding: 2 },
+  segBtn: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 6 },
+  tableHeaderRow: { flexDirection: "row", alignItems: "center", paddingVertical: 4, borderBottomWidth: 1 },
+  dateRow: { flexDirection: "row", alignItems: "center", paddingVertical: 4, borderBottomWidth: 1 },
+  headerCell: { fontSize: 10, fontWeight: "700", textAlign: "center" },
   dateCell: { fontSize: 11, fontWeight: "700", textAlign: "center" },
-  empRow: { flexDirection: "row", minHeight: 34 },
-  nameCell: { justifyContent: "center", alignItems: "center", paddingHorizontal: 4, gap: 1 },
-  empName: { fontSize: 11, fontWeight: "700", textAlign: "center" },
-  cell: { alignItems: "center", justifyContent: "center", minHeight: 34, borderRightWidth: StyleSheet.hairlineWidth },
+  empRow: { flexDirection: "row", alignItems: "center" },
+  nameCell: { justifyContent: "center", alignItems: "center", paddingVertical: 6 },
+  empName: { fontSize: 11, fontWeight: "700" },
+  cell: { alignItems: "center", justifyContent: "center", height: 36, borderRightWidth: StyleSheet.hairlineWidth },
 });
 
 const CS = StyleSheet.create({
-  cellHours: { fontSize: 12, fontWeight: "700" },
-  cellSpecial: { fontSize: 9, fontWeight: "600" },
+  cellHours: { fontSize: 12, textAlign: "center" },
+  cellSpecial: { fontSize: 10, fontWeight: "700" },
 });
 
 const EM = StyleSheet.create({
   sheet: { flex: 1 },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 16, borderBottomWidth: StyleSheet.hairlineWidth },
-  title: { fontSize: 16, fontWeight: "700" },
-  sectionLabel: { fontSize: 11, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 8 },
-  chip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center" },
-  inputSmall: { borderRadius: 8, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 7, fontSize: 14, textAlign: "center" },
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth },
+  title: { fontSize: 17, fontWeight: "700" },
+  card: { borderRadius: 12, padding: 14, borderWidth: StyleSheet.hairlineWidth },
+  sectionTitle: { fontSize: 13, fontWeight: "600" },
+  input: { borderWidth: 1.5, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, fontSize: 16, textAlign: "center" },
+  inputSmall: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 6, fontSize: 14, textAlign: "center" },
+  chip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5 },
 });
 
 const PSC = StyleSheet.create({
-  card: { borderRadius: 12, borderWidth: 1, padding: 12, marginHorizontal: 12 },
+  card: { borderRadius: 12, padding: 12, borderWidth: 1 },
   avatar: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
-  detailRow: { flexDirection: "row", flexWrap: "wrap", gap: 12, paddingTop: 8, marginTop: 8, borderTopWidth: StyleSheet.hairlineWidth },
-  detailItem: { alignItems: "center", minWidth: 48 },
-  detailLabel: { fontSize: 10, color: "#999", marginBottom: 2 },
-  detailValue: { fontSize: 13, fontWeight: "600" },
+  detailRow: { flexDirection: "row", paddingTop: 8, marginTop: 8, borderTopWidth: StyleSheet.hairlineWidth },
+  detailItem: { flex: 1, alignItems: "center" },
+  detailLabel: { fontSize: 10, color: "#8E8E93" },
+  detailValue: { fontSize: 13, fontWeight: "700" },
 });

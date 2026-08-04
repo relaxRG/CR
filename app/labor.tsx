@@ -4,7 +4,9 @@
  * 顶部：总览卡片（含对比开关：上月 / 去年同期）
  * 员工档案：自定义分组 + 每人发薪卡片（含对比开关）
  */
-import React, { useMemo, useRef, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
+import { useShiftTemplateStore } from "@/lib/labor/store";
+import { DEFAULT_SHIFT_TEMPLATES } from "@/lib/labor/types";
 import {
   Dimensions, Platform, Pressable, ScrollView,
   StyleSheet, Text, TouchableOpacity, View
@@ -227,6 +229,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors }:
 }) {
   const { getPaySlip } = usePaySlipStore();
   const { getAttendance } = useAttendanceStore();
+  const { templates: shiftTpls } = useShiftTemplateStore();
   const router = useRouter();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
@@ -234,6 +237,12 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors }:
   const att = getAttendance(employee.id, month);
   const compareSlip = compareMonth ? getPaySlip(employee.id, compareMonth) : null;
   const deptColor = DEPT_COLORS[employee.dept];
+
+  const getSessionColor = (session: string | undefined): string => {
+    if (!session) return colors.muted;
+    const tpl = (shiftTpls.length > 0 ? shiftTpls : DEFAULT_SHIFT_TEMPLATES).find((t) => t.session === session);
+    return tpl?.color ?? colors.primary;
+  };
 
   const diffSalary = slip && compareSlip ? slip.finalSalary - compareSlip.finalSalary : null;
 
@@ -250,9 +259,9 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors }:
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
             <Text style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>{employee.code}</Text>
             <Text style={{ fontSize: 12, color: colors.muted }}>{employee.realName}</Text>
-            {employee.defaultSession && (
-              <View style={{ backgroundColor: (employee.defaultSession === "午" ? NOON_COLOR : EVE_COLOR) + "22", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
-                <Text style={{ fontSize: 10, fontWeight: "700", color: employee.defaultSession === "午" ? NOON_COLOR : EVE_COLOR }}>{employee.defaultSession}班</Text>
+              {employee.defaultSession && (
+              <View style={{ backgroundColor: getSessionColor(employee.defaultSession) + "22", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                <Text style={{ fontSize: 10, fontWeight: "700", color: getSessionColor(employee.defaultSession) }}>{employee.defaultSession}</Text>
               </View>
             )}
           </View>
@@ -311,8 +320,16 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors }:
 function EmployeeRosterPage({ month, colors }: { month: string; colors: any }) {
   const { employees } = useEmployeeStore();
   const { groups, toggleCollapse } = useEmployeeGroupStore();
+  const { templates: shiftTemplates } = useShiftTemplateStore();
   const router = useRouter();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
+
+  // 班次颜色查找辅助函数（动态读取模板）
+  const getSessionColor = useCallback((session: string | undefined): string => {
+    if (!session) return colors.muted;
+    const tpl = (shiftTemplates.length > 0 ? shiftTemplates : DEFAULT_SHIFT_TEMPLATES).find((t) => t.session === session);
+    return tpl?.color ?? colors.primary;
+  }, [shiftTemplates, colors]);
 
   // 薪资对比开关（统一控制所有卡片）
   const [compareMode, setCompareMode] = useState<CompareMode>("none");

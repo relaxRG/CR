@@ -158,27 +158,55 @@ export interface PerformanceRecord {
 }
 
 // ─── 班次模板 ─────────────────────────────────────────────────────────────────
-export type ShiftSession = "午" | "晚";
+/**
+ * 班次名称：任意字符串，完全由用户自定义。
+ * 参考餐饮行业常见班次：早班、午班、晚班、大夜班、全天班、中班等。
+ * 不再限定为固定少数选项，支持增删改任意数量班次。
+ */
+export type ShiftSession = string;
 
 export interface ShiftTemplate {
   id: string;
-  /** 班次类型 */
-  session: ShiftSession;
+  /**
+   * 班次名称（任意自定义，如"午班"、"晚班"、"早班"、"大夜班"等）
+   * 排班表按此字段动态分行展示
+   */
+  session: string;
   /** 开始时间（如 "11:00"） */
   startTime: string;
-  /** 结束时间（如 "17:00"） */
+  /** 结束时间（如 "17:00"，跨午夜写 "02:00"） */
   endTime: string;
-  /** 默认工时（小时） */
+  /** 默认工时（小时）——添加排班时自动带入，可单独修改 */
   defaultHours: number;
-  /** 显示颜色 */
+  /** 显示颜色（十六进制，如 "#FF9500"） */
   color: string;
+  /** 排序权重（决定排班表中班次行的显示顺序，数字越小越靠前） */
+  sortOrder: number;
 }
 
-/** 默认班次模板 */
+/**
+ * 默认班次模板（参考餐饮行业常见设置）
+ * 用户可在班次模板设置页全量增删改
+ */
 export const DEFAULT_SHIFT_TEMPLATES: ShiftTemplate[] = [
-  { id: "tpl_noon",    session: "午", startTime: "11:00", endTime: "17:00", defaultHours: 6, color: "#FF9500" },
-  { id: "tpl_evening", session: "晚", startTime: "17:00", endTime: "24:00", defaultHours: 7, color: "#5856D6" },
+  { id: "tpl_noon",    session: "午班", startTime: "10:30", endTime: "17:00", defaultHours: 6,  color: "#FF9500", sortOrder: 0 },
+  { id: "tpl_evening", session: "晚班", startTime: "17:00", endTime: "24:00", defaultHours: 7,  color: "#5856D6", sortOrder: 1 },
 ];
+
+/** 班次颜色预设（新建班次时供选择） */
+export const SHIFT_COLOR_PRESETS = [
+  "#FF9500", // 橙色（午班）
+  "#5856D6", // 紫色（晚班）
+  "#34C759", // 绿色（早班）
+  "#FF3B30", // 红色（大夜班）
+  "#007AFF", // 蓝色（全天班）
+  "#AF52DE", // 紫红（中班）
+  "#5AC8FA", // 浅蓝（早午班）
+  "#FF2D55", // 玫红（大夜班）
+  "#FFCC00", // 黄色
+  "#8E8E93", // 灰色
+];
+
 
 // ─── 节假日配置 ───────────────────────────────────────────────────────────────
 export interface HolidayConfig {
@@ -319,8 +347,11 @@ export interface EmployeeBankAccount {
 /** 时长版本：数字（工时）或特殊标注 */
 export type ShiftHoursValue = number | "休" | "无早" | null;
 
-/** 午/晚版本：班次类型 */
-export type ShiftSessionValue = "午" | "晚" | "午晚" | "休" | "无早" | null;
+/**
+ * 班次标注值：任意班次名称字符串，或特殊值"休"/"无早"，或 null（未排班）
+ * 不再限定为固定的午/晚选项
+ */
+export type ShiftSessionValue = string | "休" | "无早" | null;
 
 // ─── 排班记录（每月每员工每天） ───────────────────────────────────────────────
 export interface ShiftEntry {
@@ -328,11 +359,15 @@ export interface ShiftEntry {
   employeeId: string;
   /** 日期 "2026-02-01" */
   date: string;
-  /** 班次：白/晚 */
-  shift: "day" | "evening" | "both";
-  /** 时长版本：工时（小时），null=未排班，-1=休，-2=无早 */
+  /**
+   * 班次名称（与 ShiftTemplate.session 对应，如"午班"、"晚班"、"早班"等）
+   * 同一员工同一天可有多条不同班次的记录（如同时有午班和晚班）
+   * @deprecated 旧值 "day"/"evening"/"both" 会在读取时自动迁移
+   */
+  shift: string;
+  /** 时长版本：工时（小时），null=未排班 */
   hoursValue: ShiftHoursValue;
-  /** 午晚版本：班次标注 */
+  /** 班次标注（与 shift 相同，保留用于向后兼容） */
   sessionValue: ShiftSessionValue;
   /**
    * 加班处理方式（针对超出合同工时的部分）
