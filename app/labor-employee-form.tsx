@@ -46,6 +46,7 @@ export default function LaborEmployeeFormScreen() {
   const [joinDate, setJoinDate] = useState(existing?.joinDate ?? "");
   const [active, setActive] = useState(existing?.active ?? true);
   const [notes, setNotes] = useState(existing?.notes ?? "");
+  const [defaultSession, setDefaultSession] = useState<"午" | "晚" | undefined>(existing?.defaultSession);
 
   // ── 工资设置 ──
   const [baseSalary, setBaseSalary] = useState(String(existing?.baseSalary ?? ""));
@@ -109,6 +110,7 @@ export default function LaborEmployeeFormScreen() {
       emergencyContactRelation: emergencyRelation.trim() || undefined,
       healthCertExpiry: healthCertExpiry.trim() || undefined,
       joinDate: joinDate.trim() || undefined,
+      defaultSession,
     };
 
     if (isEdit && existing) updateEmployee(existing.id, draft);
@@ -219,8 +221,21 @@ export default function LaborEmployeeFormScreen() {
                 })}
               </View>
             </FormRow>
+                      <FormRow label="默认班次（排班表分组）" colors={colors}>
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                {([["午", "#FF9500"], ["晚", "#5856D6"]] as const).map(([session, color]) => (
+                  <TouchableOpacity key={session} onPress={() => { tap(); setDefaultSession(defaultSession === session ? undefined : session); }}
+                    style={[S.optionChip, { backgroundColor: defaultSession === session ? color : colors.surface, borderColor: defaultSession === session ? color : colors.border }]}>
+                    <Text style={{ fontSize: 13, fontWeight: "600", color: defaultSession === session ? "#fff" : colors.muted }}>{session}班</Text>
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity onPress={() => { tap(); setDefaultSession(undefined); }}
+                  style={[S.optionChip, { backgroundColor: !defaultSession ? colors.primary + "22" : colors.surface, borderColor: !defaultSession ? colors.primary : colors.border }]}>
+                  <Text style={{ fontSize: 13, color: !defaultSession ? colors.primary : colors.muted }}>未设置</Text>
+                </TouchableOpacity>
+              </View>
+            </FormRow>
           </SectionCard>
-
           {/* ── 工资设置 ── */}
           <SectionCard title="工资设置" colors={colors}>
             {type === "longterm_parttime" && (

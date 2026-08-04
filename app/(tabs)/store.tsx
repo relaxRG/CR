@@ -124,12 +124,30 @@ function OperationsModule({ insets }: { insets: any }) {
       )}
       {opsTab === "labor" && (
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom, gap: 12 }}>
+          {/* 员工管理主入口（直通） */}
+          <Pressable onPress={() => { tap(); router.push("/labor" as any); }}
+            style={({ pressed }) => [{
+              borderRadius: 14, borderWidth: 1, borderColor: "#007AFF" + "44",
+              backgroundColor: "#007AFF" + "08", padding: 16, opacity: pressed ? 0.8 : 1,
+              flexDirection: "row" as const, alignItems: "center" as const, gap: 12,
+            }]}>
+            <View style={[S.entryIcon, { backgroundColor: "#007AFF" + "22", width: 48, height: 48, borderRadius: 14 }]}>
+              <IconSymbol name="person.2.fill" size={24} color="#007AFF" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 17, fontWeight: "700", color: colors.foreground }}>员工管理</Text>
+              <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>排班 · 档案 · 薪资 · 绩效 · 预支</Text>
+            </View>
+            <IconSymbol name="chevron.right" size={18} color="#007AFF" />
+          </Pressable>
+
+          {/* 快捷入口 */}
           <View style={{ borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, overflow: "hidden" }}>
             {[
-              { icon: "person.2.fill",        color: "#007AFF", title: "员工管理",   sub: "员工档案 · 薪资核算",    route: "/labor" },
-              { icon: "calendar.badge.clock", color: "#34C759", title: "排班管理",   sub: "月度排班 · 出勤记录",    route: "/labor-schedule" },
-              { icon: "clock.fill",           color: "#FF9500", title: "考勤记录",   sub: "打卡 · 迟到早退 · 加班", route: "/labor-attendance" },
-              { icon: "creditcard.fill",      color: "#AF52DE", title: "预支管理",   sub: "员工预支记录",           route: "/labor-advances" },
+              { icon: "calendar.badge.clock", color: "#34C759", title: "排班管理",     sub: "月度排班 · 午晚分行",      route: "/labor-schedule" },
+              { icon: "clock.fill",           color: "#FF9500", title: "考勤记录",     sub: "打卡 · 加班 · 调休",      route: "/labor-attendance" },
+              { icon: "creditcard.fill",      color: "#AF52DE", title: "预支管理",     sub: "员工预支记录",             route: "/labor-advances" },
+              { icon: "clock.badge.exclamationmark", color: "#FF3B30", title: "营业时间设置", sub: "临近关门预警 · 加班分析", route: "/store-hours" },
             ].map((item, i, arr) => (
               <Pressable key={item.route} onPress={() => { tap(); router.push(item.route as any); }}
                 style={({ pressed }) => [{
