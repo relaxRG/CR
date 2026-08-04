@@ -588,7 +588,7 @@ export default function LaborScheduleScreen() {
                           <View style={PSC.di}><Text style={PSC.dl}>出勤</Text><Text style={[PSC.dv, { color: colors.foreground }]}>{att.attendanceDays}天</Text></View>
                           <View style={PSC.di}><Text style={PSC.dl}>工时</Text><Text style={[PSC.dv, { color: colors.foreground }]}>{att.totalHours}h</Text></View>
                           {att.overtimeHours > 0 && <View style={PSC.di}><Text style={PSC.dl}>加班</Text><Text style={[PSC.dv, { color: "#FF3B30" }]}>+{att.overtimeHours.toFixed(1)}h</Text></View>}
-                          {att.compOffHours > 0 && <View style={PSC.di}><Text style={PSC.dl}>换休</Text><Text style={[PSC.dv, { color: "#34C759" }]}>{att.compOffHours.toFixed(1)}h</Text></View>}
+                          {((att.compOffCount ?? 0) * (att.hoursPerCompOff ?? 8)) > 0 && <View style={PSC.di}><Text style={PSC.dl}>换休</Text><Text style={[PSC.dv, { color: "#34C759" }]}>{((att.compOffCount ?? 0) * (att.hoursPerCompOff ?? 8)).toFixed(1)}h</Text></View>}
                         </View>
                       )}
                     </View>

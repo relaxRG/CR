@@ -19,14 +19,16 @@ import {
   useEmployeeStore, useEmployeeGroupStore, useAttendanceStore,
   usePaySlipStore, useShiftStore, useShiftTemplateStore,
   usePerformanceRecordStore, useHolidayConfigStore,
+  useSpecialStatusStore, useGlobalPayrollSettingsStore,
 } from "@/lib/labor/store";
 import { useSalaryAdvanceStore } from "@/lib/labor/advance-store";
 import { usePettyCashStore } from "@/lib/store/petty-store";
 import {
   Employee, EmployeeDept, EmployeeGroup, ShiftEntry, ShiftHoursValue, ShiftTemplate,
-  DEPT_COLORS, DEPT_LABELS, monthLabel,
+  SpecialStatus,
+  DEPT_COLORS, DEPT_LABELS, EMPLOYEE_TYPE_LABELS, monthLabel,
   getMonthDates, getDayOfWeek, getContractHoursForDate,
-  DEFAULT_SHIFT_TEMPLATES, SHIFT_COLOR_PRESETS, calcAllowance,
+  DEFAULT_SHIFT_TEMPLATES, DEFAULT_SPECIAL_STATUSES, SHIFT_COLOR_PRESETS, calcAllowance,
 } from "@/lib/labor/types";
 
 const { width: SCREEN_W } = Dimensions.get("window");
@@ -160,6 +162,8 @@ function OverviewCard({ month, colors }: { month: string; colors: any }) {
   const { records: attendances } = useAttendanceStore();
   const [compareMode, setCompareMode] = useState<CompareMode>("none");
   const [customMonth, setCustomMonth] = useState<string | undefined>();
+  const [showTrend, setShowTrend] = useState(false);
+  const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
   const compareMonth = getCompareMonth(month, compareMode, customMonth);
 
@@ -173,6 +177,20 @@ function OverviewCard({ month, colors }: { month: string; colors: any }) {
   const compareSlips = useMemo(() => compareMonth ? paySlips.filter((s) => s.month === compareMonth) : [], [paySlips, compareMonth]);
   const compareTotalSalary = useMemo(() => compareSlips.reduce((s, p) => s + p.finalSalary, 0), [compareSlips]);
   const diffSalary = compareMonth && totalSalary > 0 && compareTotalSalary > 0 ? totalSalary - compareTotalSalary : null;
+
+  // 趋势图数据：近12个月的人力总成本
+  const trendData = useMemo(() => {
+    const [y, m] = month.split("-").map(Number);
+    return Array.from({ length: 12 }, (_, i) => {
+      const d = new Date(y, m - 1 - (11 - i), 1);
+      const mo = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const slips = paySlips.filter((s) => s.month === mo);
+      const total = slips.reduce((s, p) => s + p.finalSalary, 0);
+      return { month: mo, label: `${d.getMonth() + 1}月`, total };
+    });
+  }, [paySlips, month]);
+
+  const maxTrend = useMemo(() => Math.max(...trendData.map((d) => d.total), 1), [trendData]);
 
   return (
     <View style={[OV.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -226,6 +244,36 @@ function OverviewCard({ month, colors }: { month: string; colors: any }) {
               {diffSalary > 0 ? "增加" : "减少"} ¥{Math.abs(diffSalary).toFixed(0)}（{((Math.abs(diffSalary) / compareTotalSalary) * 100).toFixed(1)}%）
             </Text>
           )}
+        </View>
+      )}
+
+      {/* 趋势图展开按鈕 */}
+      <TouchableOpacity onPress={() => { tap(); setShowTrend((v) => !v); }}
+        style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border + "44", marginTop: 8 }}>
+        <IconSymbol name={showTrend ? "chevron.up" : "chart.line.uptrend.xyaxis"} size={12} color={colors.muted} />
+        <Text style={{ fontSize: 11, color: colors.muted }}>{showTrend ? "收起趋势图" : "近12月薪资趋势"}</Text>
+      </TouchableOpacity>
+
+      {/* 趋势图内容：简单柱状图 */}
+      {showTrend && (
+        <View style={{ marginTop: 10, gap: 6 }}>
+          <Text style={{ fontSize: 11, fontWeight: "600", color: colors.muted }}>近12个月人力总成本</Text>
+          <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 3, height: 80 }}>
+            {trendData.map((d, i) => {
+              const barH = maxTrend > 0 ? Math.max(4, (d.total / maxTrend) * 72) : 4;
+              const isCurrent = d.month === month;
+              return (
+                <View key={d.month} style={{ flex: 1, alignItems: "center", gap: 2 }}>
+                  <View style={{ width: "100%", height: barH, borderRadius: 3, backgroundColor: isCurrent ? colors.primary : colors.primary + "44" }} />
+                  <Text style={{ fontSize: 8, color: isCurrent ? colors.primary : colors.muted, fontWeight: isCurrent ? "700" : "400" }}>{d.label}</Text>
+                </View>
+              );
+            })}
+          </View>
+          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+            <Text style={{ fontSize: 10, color: colors.muted }}>最高：¥{maxTrend.toFixed(0)}</Text>
+            <Text style={{ fontSize: 10, color: colors.primary, fontWeight: "600" }}>本月：¥{totalSalary.toFixed(0)}</Text>
+          </View>
         </View>
       )}
     </View>
@@ -312,8 +360,8 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors }:
         <View style={{ marginTop: 10, gap: 4, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border + "55", paddingTop: 10 }}>
           {/* 明细表格 */}
           {[
-            { label: "出勤天数", value: att ? `${att.attendanceDays}天` : "—", color: colors.foreground },
-            { label: "加班时长", value: att?.overtimeHours ? `+${att.overtimeHours.toFixed(1)}h` : "—", color: colors.foreground },
+            { label: "出勤天数", value: att ? `${att.attendanceDays}天（应${att.expectedAttendanceDays ?? "—"}天）` : "—", color: colors.foreground },
+            { label: "加班时长", value: att ? `${att.overtimeHours.toFixed(1)}h（计费${att.paidOvertimeHours?.toFixed(1) ?? att.overtimeHours.toFixed(1)}h）` : "—", color: colors.foreground },
             { label: "考勤工资", value: attendanceSalary > 0 ? `¥${attendanceSalary.toFixed(0)}` : "—", color: colors.foreground },
             { label: "绩效奖金", value: slip?.performanceBonus ? `+¥${slip.performanceBonus.toFixed(0)}` : "—", color: slip?.performanceBonus ? "#34C759" : colors.muted },
             { label: "补贴合计", value: (slip && (slip.mealAllowance + slip.transportAllowance + slip.otherAllowance) > 0) ? `+¥${(slip.mealAllowance + slip.transportAllowance + slip.otherAllowance).toFixed(0)}` : "—", color: (slip && (slip.mealAllowance + slip.transportAllowance + slip.otherAllowance) > 0) ? "#007AFF" : colors.muted },
@@ -326,15 +374,58 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors }:
               <Text style={{ fontSize: 12, fontWeight: "600", color }}>{value}</Text>
             </View>
           ))}
+          {/* 特殊状态扣薪明细 */}
+          {att && Object.keys(att.specialStatusDeductions ?? {}).length > 0 && (
+            <View style={{ gap: 2 }}>
+              {Object.values(att.specialStatusDeductions).map((d) => (
+                <View key={d.name} style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                  <Text style={{ fontSize: 11, color: colors.muted }}>{d.name}（{d.count}天）</Text>
+                  <Text style={{ fontSize: 11, color: d.deduction > 0 ? "#FF3B30" : d.deduction < 0 ? "#34C759" : colors.muted }}>
+                    {d.deduction > 0 ? `-¥${d.deduction.toFixed(0)}` : d.deduction < 0 ? `+¥${Math.abs(d.deduction).toFixed(0)}` : "不扣薪"}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+          {/* 社保/公积金/个税 */}
+          {slip && (slip.socialInsuranceDeduction > 0 || slip.housingFundDeduction > 0 || slip.incomeTax > 0) && (
+            <View style={{ gap: 2 }}>
+              {slip.socialInsuranceDeduction > 0 && (
+                <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                  <Text style={{ fontSize: 11, color: colors.muted }}>社保代扣</Text>
+                  <Text style={{ fontSize: 11, color: "#FF3B30" }}>-¥{slip.socialInsuranceDeduction.toFixed(0)}</Text>
+                </View>
+              )}
+              {slip.housingFundDeduction > 0 && (
+                <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                  <Text style={{ fontSize: 11, color: colors.muted }}>公积金代扣</Text>
+                  <Text style={{ fontSize: 11, color: "#FF3B30" }}>-¥{slip.housingFundDeduction.toFixed(0)}</Text>
+                </View>
+              )}
+              {slip.incomeTax > 0 && (
+                <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                  <Text style={{ fontSize: 11, color: colors.muted }}>个人所得税</Text>
+                  <Text style={{ fontSize: 11, color: "#FF3B30" }}>-¥{slip.incomeTax.toFixed(0)}</Text>
+                </View>
+              )}
+            </View>
+          )}
+          {/* 应发（税前）→ 实发（税后） */}
+          {slip && (slip.socialInsuranceDeduction > 0 || slip.incomeTax > 0) && (
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+              <Text style={{ fontSize: 11, color: colors.muted }}>应发（税前）</Text>
+              <Text style={{ fontSize: 12, color: colors.muted }}>¥{(slip.grossSalary ?? slip.finalSalary).toFixed(0)}</Text>
+            </View>
+          )}
           {/* 分隔线 + 最终薪资 */}
           <View style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, paddingTop: 6, flexDirection: "row", justifyContent: "space-between" }}>
-            <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>最终薪资</Text>
+            <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>实发薪资</Text>
             <Text style={{ fontSize: 15, fontWeight: "800", color: deptColor }}>{slip ? `¥${slip.finalSalary.toFixed(0)}` : "—"}</Text>
           </View>
           {/* 对比数据 */}
           {compareSlip && (
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 2 }}>
-              <Text style={{ fontSize: 11, color: colors.muted }}>{compareModeLabel(compareMode)}最终薪资</Text>
+              <Text style={{ fontSize: 11, color: colors.muted }}>{compareModeLabel(compareMode)}实发薪资</Text>
               <Text style={{ fontSize: 12, color: colors.muted }}>¥{compareSlip.finalSalary.toFixed(0)}</Text>
             </View>
           )}
@@ -344,12 +435,19 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors }:
               <Text style={{ fontSize: 11, color: colors.muted }}>备注：{slip.notes}</Text>
             </View>
           )}
-          {/* 前往详情按鈕 */}
-          <TouchableOpacity onPress={() => { tap(); router.push({ pathname: "/labor-attendance", params: { employeeId: employee.id, month } } as any); }}
-            style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, paddingVertical: 6 }}>
-            <Text style={{ fontSize: 12, color: colors.primary }}>查看详情 / 编辑薪资</Text>
-            <IconSymbol name="chevron.right" size={12} color={colors.primary} />
-          </TouchableOpacity>
+          {/* 操作按钮行：绩效设置 + 查看详情 */}
+          <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
+            <TouchableOpacity onPress={() => { tap(); router.push({ pathname: "/labor-performance", params: { employeeId: employee.id } } as any); }}
+              style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, paddingVertical: 7, borderRadius: 8, backgroundColor: "#34C759" + "15", borderWidth: 1, borderColor: "#34C759" + "44" }}>
+              <IconSymbol name="chart.bar.fill" size={12} color="#34C759" />
+              <Text style={{ fontSize: 12, color: "#34C759", fontWeight: "600" }}>绩效设置</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => { tap(); router.push({ pathname: "/labor-attendance", params: { employeeId: employee.id, month } } as any); }}
+              style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, paddingVertical: 7, borderRadius: 8, backgroundColor: colors.primary + "15", borderWidth: 1, borderColor: colors.primary + "44" }}>
+              <IconSymbol name="pencil" size={12} color={colors.primary} />
+              <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "600" }}>编辑薪资</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
     </TouchableOpacity>
@@ -361,8 +459,69 @@ function EmployeeRosterPage({ month, colors }: { month: string; colors: any }) {
   const { employees } = useEmployeeStore();
   const { groups, toggleCollapse } = useEmployeeGroupStore();
   const { templates: shiftTemplates } = useShiftTemplateStore();
+  const { paySlips } = usePaySlipStore();
+  const { records: attendances } = useAttendanceStore();
   const router = useRouter();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
+
+  // 导出 CSV
+  const handleExport = useCallback(async () => {
+    tap();
+    try {
+      const monthSlips = paySlips.filter((s) => s.month === month);
+      const monthAtts = attendances.filter((a) => a.month === month);
+      const activeEmps = employees.filter((e) => e.active);
+
+      const header = ["姓名", "代号", "部门", "类型", "出勤天", "总工时", "加班时", "考勤工资", "绩效", "补贴", "奖惩", "社保", "公积金", "个税", "预支", "应发", "实发"];
+      const rows = activeEmps.map((emp) => {
+        const slip = monthSlips.find((s) => s.employeeId === emp.id);
+        const att = monthAtts.find((a) => a.employeeId === emp.id);
+        return [
+          emp.realName, emp.code,
+          DEPT_LABELS[emp.dept], EMPLOYEE_TYPE_LABELS[emp.type],
+          att?.attendanceDays ?? "",
+          att?.totalHours?.toFixed(1) ?? "",
+          att?.paidOvertimeHours?.toFixed(1) ?? "",
+          slip?.attendanceSalary?.toFixed(2) ?? "",
+          slip?.performanceBonus?.toFixed(2) ?? "",
+          ((slip?.mealAllowance ?? 0) + (slip?.transportAllowance ?? 0) + (slip?.otherAllowance ?? 0)).toFixed(2),
+          slip?.rewardPenalty?.toFixed(2) ?? "",
+          slip?.socialInsuranceDeduction?.toFixed(2) ?? "",
+          slip?.housingFundDeduction?.toFixed(2) ?? "",
+          slip?.incomeTax?.toFixed(2) ?? "",
+          slip?.advanceAmount?.toFixed(2) ?? "",
+          (slip?.grossSalary ?? slip?.finalSalary ?? 0).toFixed(2),
+          slip?.finalSalary?.toFixed(2) ?? "",
+        ];
+      });
+
+      const csvContent = [header, ...rows]
+        .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+        .join("\n");
+      const csvWithBOM = "\uFEFF" + csvContent; // UTF-8 BOM for Excel
+
+      const fileName = `薪资表_${month}.csv`;
+
+      // 尝试使用 expo-file-system 导出
+      try {
+        const FileSystem = require("expo-file-system");
+        const Sharing = require("expo-sharing");
+        const fileUri = FileSystem.cacheDirectory + fileName;
+        await FileSystem.writeAsStringAsync(fileUri, csvWithBOM, { encoding: FileSystem.EncodingType.UTF8 });
+        const canShare = await Sharing.isAvailableAsync();
+        if (canShare) {
+          await Sharing.shareAsync(fileUri, { mimeType: "text/csv", dialogTitle: `导出${month}薪资表` });
+        } else {
+          Alert.alert("导出完成", `文件已保存到：${fileUri}`);
+        }
+      } catch {
+        // 降级：直接分享文本
+        Alert.alert(`薪资表 ${month}`, csvContent.slice(0, 500) + "...");
+      }
+    } catch (e) {
+      Alert.alert("导出失败", String(e));
+    }
+  }, [paySlips, attendances, employees, month]);
 
   // 班次颜色查找辅助函数（动态读取模板）
   const getSessionColor = useCallback((session: string | undefined): string => {
@@ -413,10 +572,10 @@ function EmployeeRosterPage({ month, colors }: { month: string; colors: any }) {
         <View style={{ flex: 1 }} />
         {/* 薪资对比开关 */}
         <CompareToggle mode={compareMode} customMonth={customMonth} baseMonth={month} onChange={setCompareMode} onCustomMonthChange={setCustomMonth} colors={colors} />
-        {/* 设置入口 */}
-        <TouchableOpacity onPress={() => { tap(); router.push("/labor-performance" as any); }}
+        {/* 导出按鈕 */}
+        <TouchableOpacity onPress={handleExport}
           style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: colors.border + "44", alignItems: "center", justifyContent: "center" }}>
-          <IconSymbol name="gearshape.fill" size={16} color={colors.muted} />
+          <IconSymbol name="square.and.arrow.up" size={16} color={colors.muted} />
         </TouchableOpacity>
       </View>
 
@@ -736,82 +895,185 @@ function SchCellDisplay({ entry, contractHours, tplColor, colors }: {
 }
 
 // ─── 排班表单元格编辑 Modal ────────────────────────────────────────────────────
-function SchEditModal({ visible, date, employee, session, sessionColor, existing, contractHours, defaultHours, colors, onSave, onClear, onClose }: {
+function SchEditModal({ visible, date, employee, session, sessionColor, existing, contractHours, defaultHours, colors, shiftTemplates, specialStatuses, onSave, onClear, onClose }: {
   visible: boolean; date: string; employee: Employee | null; session: string;
   sessionColor: string; existing: ShiftEntry | null; contractHours: number;
   defaultHours: number; colors: any;
+  shiftTemplates: ShiftTemplate[];
+  specialStatuses: SpecialStatus[];
   onSave: (e: ShiftEntry) => void; onClear: () => void; onClose: () => void;
 }) {
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
   const DOW = ["日", "一", "二", "三", "四", "五", "六"];
   const dow = date ? getDayOfWeek(date) : 1;
   const [hoursInput, setHoursInput] = useState("");
-  const [hoursSpecial, setHoursSpecial] = useState<"休" | "无早" | null>(null);
-  const [overtimeType, setOvertimeType] = useState<"pay" | "comp_off">("pay");
+  const [selectedSpecialId, setSelectedSpecialId] = useState<string | null>(null);
+  const [selectedShiftSession, setSelectedShiftSession] = useState<string | null>(null);
+
   React.useEffect(() => {
     if (visible) {
-      setHoursInput(existing && typeof existing.hoursValue === "number" ? String(existing.hoursValue) : "");
-      setHoursSpecial(existing?.hoursValue === "休" ? "休" : existing?.hoursValue === "无早" ? "无早" : null);
-      setOvertimeType(existing?.overtimeType ?? "pay");
+      if (existing?.specialStatusId) {
+        setSelectedSpecialId(existing.specialStatusId);
+        setSelectedShiftSession(null);
+        setHoursInput("");
+      } else if (existing) {
+        setSelectedSpecialId(null);
+        setSelectedShiftSession(existing.shift);
+        setHoursInput(typeof existing.hoursValue === "number" ? String(existing.hoursValue) : "");
+      } else {
+        setSelectedSpecialId(null);
+        setSelectedShiftSession(session);
+        setHoursInput(String(defaultHours));
+      }
     }
-  }, [visible, existing]);
+  }, [visible, existing, session, defaultHours]);
+
   if (!employee || !date) return null;
+
   const curH = Number(hoursInput) || 0;
-  const isOT = contractHours > 0 && curH > contractHours && !hoursSpecial;
+  const isOT = contractHours > 0 && curH > contractHours && !selectedSpecialId;
   const otAmt = isOT ? curH - contractHours : 0;
+
+  const selectedSpecial = selectedSpecialId ? specialStatuses.find((s) => s.id === selectedSpecialId) : null;
+
   const handleSave = () => {
-    let hv: ShiftHoursValue = null;
-    if (hoursSpecial) hv = hoursSpecial;
-    else if (hoursInput) hv = Number(hoursInput) || null;
-    onSave({ employeeId: employee.id, date, shift: session, hoursValue: hv, sessionValue: session, overtimeType: isOT ? overtimeType : "pay" });
+    if (selectedSpecialId) {
+      // 特殊状态
+      const ss = specialStatuses.find((s) => s.id === selectedSpecialId);
+      onSave({
+        employeeId: employee.id, date,
+        shift: ss?.name ?? selectedSpecialId,
+        hoursValue: ss?.category === "work_day" ? (Number(hoursInput) || defaultHours) : null,
+        sessionValue: ss?.name ?? selectedSpecialId,
+        specialStatusId: selectedSpecialId,
+      });
+    } else {
+      // 工作班次
+      const hv: ShiftHoursValue = hoursInput ? (Number(hoursInput) || null) : null;
+      onSave({
+        employeeId: employee.id, date,
+        shift: selectedShiftSession ?? session,
+        hoursValue: hv,
+        sessionValue: selectedShiftSession ?? session,
+        specialStatusId: undefined,
+      });
+    }
     onClose();
   };
+
+  const absenceStatuses = specialStatuses.filter((s) => s.category === "absence");
+  const workDayStatuses = specialStatuses.filter((s) => s.category === "work_day");
+  const compOffStatuses = specialStatuses.filter((s) => s.category === "comp_off");
+
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
       <View style={[SCHEM.sheet, { backgroundColor: colors.background }]}>
         <View style={[SCHEM.header, { borderBottomColor: colors.border }]}>
           <Pressable onPress={onClose}><Text style={{ fontSize: 17, color: colors.error }}>取消</Text></Pressable>
           <View style={{ alignItems: "center" }}>
-            <Text style={[SCHEM.title, { color: colors.foreground }]}>{employee.code} · {session}</Text>
+            <Text style={[SCHEM.title, { color: colors.foreground }]}>{employee.code}</Text>
             <Text style={{ fontSize: 12, color: colors.muted }}>{date} 周{DOW[dow]}</Text>
           </View>
-          <Pressable onPress={handleSave}><Text style={{ fontSize: 17, fontWeight: "600", color: sessionColor }}>保存</Text></Pressable>
+          <Pressable onPress={handleSave}><Text style={{ fontSize: 17, fontWeight: "600", color: colors.primary }}>保存</Text></Pressable>
         </View>
-        <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }}>
+        <ScrollView contentContainerStyle={{ padding: 16, gap: 14 }}>
+
+          {/* 工作班次区 */}
           <View style={[SCHEM.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={[SCHEM.label, { color: colors.foreground }]}>工时（小时）</Text>
-            <View style={{ flexDirection: "row", gap: 8, alignItems: "center", marginTop: 8 }}>
-              <TextInput value={hoursInput} onChangeText={(t) => { setHoursInput(t); setHoursSpecial(null); }}
-                placeholder={`默认 ${defaultHours}h`} placeholderTextColor={colors.muted} keyboardType="decimal-pad"
-                style={[SCHEM.input, { color: colors.foreground, borderColor: sessionColor, flex: 1 }]} />
-              <Text style={{ color: colors.muted }}>h</Text>
-            </View>
-            {contractHours > 0 && <Text style={{ fontSize: 11, color: colors.muted, marginTop: 4 }}>合同工时：{contractHours}h/天{isOT ? `  ·  加班 +${otAmt.toFixed(1)}h` : ""}</Text>}
-          </View>
-          <View style={[SCHEM.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={[SCHEM.label, { color: colors.foreground }]}>特殊标注</Text>
-            <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
-              {(["休", "无早"] as const).map((s) => (
-                <TouchableOpacity key={s} onPress={() => { tap(); setHoursSpecial(hoursSpecial === s ? null : s); setHoursInput(""); }}
-                  style={[SCHEM.chip, { backgroundColor: hoursSpecial === s ? (s === "休" ? "#FF3B30" : colors.muted) : colors.surface, borderColor: s === "休" ? "#FF3B30" : colors.muted }]}>
-                  <Text style={{ fontSize: 13, color: hoursSpecial === s ? "#fff" : colors.muted }}>{s}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-          {isOT && (
-            <View style={[SCHEM.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <Text style={[SCHEM.label, { color: colors.foreground }]}>加班处理（+{otAmt.toFixed(1)}h）</Text>
-              <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
-                {(["pay", "comp_off"] as const).map((v) => (
-                  <TouchableOpacity key={v} onPress={() => { tap(); setOvertimeType(v); }}
-                    style={[SCHEM.chip, { backgroundColor: overtimeType === v ? sessionColor : colors.surface, borderColor: sessionColor }]}>
-                    <Text style={{ fontSize: 13, color: overtimeType === v ? "#fff" : sessionColor }}>{v === "pay" ? "计加班费" : "换调休"}</Text>
+            <Text style={[SCHEM.label, { color: colors.foreground }]}>工作班次</Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
+              {shiftTemplates.map((tpl) => {
+                const sel = !selectedSpecialId && selectedShiftSession === tpl.session;
+                return (
+                  <TouchableOpacity key={tpl.id} onPress={() => { tap(); setSelectedShiftSession(tpl.session); setSelectedSpecialId(null); if (!hoursInput) setHoursInput(String(tpl.defaultHours)); }}
+                    style={[SCHEM.chip, { backgroundColor: sel ? tpl.color : colors.surface, borderColor: tpl.color }]}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: sel ? "#fff" : tpl.color }} />
+                      <Text style={{ fontSize: 13, fontWeight: "600", color: sel ? "#fff" : tpl.color }}>{tpl.session}</Text>
+                    </View>
                   </TouchableOpacity>
-                ))}
+                );
+              })}
+            </View>
+            {!selectedSpecialId && (
+              <View style={{ flexDirection: "row", gap: 8, alignItems: "center", marginTop: 10 }}>
+                <TextInput value={hoursInput} onChangeText={setHoursInput}
+                  placeholder={`工时 ${defaultHours}h`} placeholderTextColor={colors.muted} keyboardType="decimal-pad"
+                  style={[SCHEM.input, { color: colors.foreground, borderColor: colors.border, flex: 1 }]} />
+                <Text style={{ color: colors.muted }}>h</Text>
+                {contractHours > 0 && <Text style={{ fontSize: 11, color: isOT ? "#FF9500" : colors.muted }}>合同 {contractHours}h{isOT ? ` · 加班+${otAmt.toFixed(1)}h` : ""}</Text>}
               </View>
+            )}
+          </View>
+
+          {/* 特殊状态区（缺席类） */}
+          {absenceStatuses.length > 0 && (
+            <View style={[SCHEM.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Text style={[SCHEM.label, { color: colors.foreground }]}>特殊状态</Text>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
+                {absenceStatuses.map((ss) => {
+                  const sel = selectedSpecialId === ss.id;
+                  return (
+                    <TouchableOpacity key={ss.id} onPress={() => { tap(); setSelectedSpecialId(sel ? null : ss.id); setSelectedShiftSession(null); setHoursInput(""); }}
+                      style={[SCHEM.chip, { backgroundColor: sel ? ss.color : colors.surface, borderColor: ss.color }]}>
+                      <Text style={{ fontSize: 13, fontWeight: "600", color: sel ? "#fff" : ss.color }}>
+                        {ss.name}{ss.salaryMultiplier !== 1 ? ` ${ss.salaryMultiplier}x` : ""}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+                {workDayStatuses.map((ss) => {
+                  const sel = selectedSpecialId === ss.id;
+                  return (
+                    <TouchableOpacity key={ss.id} onPress={() => { tap(); setSelectedSpecialId(sel ? null : ss.id); setSelectedShiftSession(null); }}
+                      style={[SCHEM.chip, { backgroundColor: sel ? ss.color : colors.surface, borderColor: ss.color }]}>
+                      <Text style={{ fontSize: 13, fontWeight: "600", color: sel ? "#fff" : ss.color }}>
+                        {ss.name} {ss.salaryMultiplier}x
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              {selectedSpecial?.category === "work_day" && (
+                <View style={{ flexDirection: "row", gap: 8, alignItems: "center", marginTop: 10 }}>
+                  <TextInput value={hoursInput} onChangeText={setHoursInput}
+                    placeholder={`工时 ${defaultHours}h`} placeholderTextColor={colors.muted} keyboardType="decimal-pad"
+                    style={[SCHEM.input, { color: colors.foreground, borderColor: selectedSpecial.color, flex: 1 }]} />
+                  <Text style={{ color: colors.muted }}>h</Text>
+                </View>
+              )}
+              {selectedSpecial && (
+                <Text style={{ fontSize: 11, color: colors.muted, marginTop: 6 }}>
+                  {selectedSpecial.category === "absence"
+                    ? selectedSpecial.salaryMultiplier === 0 ? "不扣薪"
+                      : selectedSpecial.salaryMultiplier <= 1 ? `扣除 ${selectedSpecial.salaryMultiplier} 天日薪`
+                      : `额外惩罚 ${selectedSpecial.salaryMultiplier - 1} 天日薪`
+                    : `当天薪资 × ${selectedSpecial.salaryMultiplier}`
+                  }
+                </Text>
+              )}
             </View>
           )}
+
+          {/* 加班换休区 */}
+          {compOffStatuses.length > 0 && (
+            <View style={[SCHEM.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Text style={[SCHEM.label, { color: colors.foreground }]}>加班换休</Text>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
+                {compOffStatuses.map((ss) => {
+                  const sel = selectedSpecialId === ss.id;
+                  return (
+                    <TouchableOpacity key={ss.id} onPress={() => { tap(); setSelectedSpecialId(sel ? null : ss.id); setSelectedShiftSession(null); setHoursInput(""); }}
+                      style={[SCHEM.chip, { backgroundColor: sel ? ss.color : colors.surface, borderColor: ss.color }]}>
+                      <Text style={{ fontSize: 13, fontWeight: "600", color: sel ? "#fff" : ss.color }}>{ss.name}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              <Text style={{ fontSize: 11, color: colors.muted, marginTop: 6 }}>不扣薪，从当月累积加班时数里扣除对应小时</Text>
+            </View>
+          )}
+
           {existing && (
             <TouchableOpacity onPress={() => { tap(); onClear(); onClose(); }}
               style={[SCHEM.chip, { borderColor: colors.error, alignSelf: "center", paddingHorizontal: 24 }]}>
@@ -824,49 +1086,121 @@ function SchEditModal({ visible, date, employee, session, sessionColor, existing
   );
 }
 
-// ─── 班次模板设置 Modal ────────────────────────────────────────────────────────
-function SchTemplateModal({ visible, templates, colors, onSave, onDelete, onClose }: {
-  visible: boolean; templates: ShiftTemplate[]; colors: any;
-  onSave: (t: ShiftTemplate) => void; onDelete: (id: string) => void; onClose: () => void;
+// ─── 排班设置 Modal（班次 + 特殊状态两个 Tab） ─────────────────────────────────────────────────────────────────────────────
+function SchTemplateModal({ visible, templates, specialStatuses, colors, onSaveShift, onDeleteShift, onSaveStatus, onDeleteStatus, onClose }: {
+  visible: boolean; templates: ShiftTemplate[]; specialStatuses: SpecialStatus[]; colors: any;
+  onSaveShift: (t: ShiftTemplate) => void; onDeleteShift: (id: string) => void;
+  onSaveStatus: (s: SpecialStatus) => void; onDeleteStatus: (id: string) => void;
+  onClose: () => void;
 }) {
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
-  const [local, setLocal] = useState<ShiftTemplate[]>(() => [...templates].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)));
-  React.useEffect(() => { if (visible) setLocal([...templates].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))); }, [visible, templates]);
-  const upd = (id: string, p: Partial<ShiftTemplate>) => setLocal((prev) => prev.map((t) => t.id === id ? { ...t, ...p } : t));
-  const addNew = () => { tap(); setLocal((prev) => [...prev, { id: `tpl_${Date.now()}`, session: "新班次", startTime: "09:00", endTime: "18:00", defaultHours: 8, color: SHIFT_COLOR_PRESETS[prev.length % SHIFT_COLOR_PRESETS.length], sortOrder: prev.length }]); };
-  const removeLocal = (id: string) => { tap(); Alert.alert("删除班次", "删除后该班次历史排班记录不受影响。", [{ text: "取消", style: "cancel" }, { text: "删除", style: "destructive", onPress: () => setLocal((prev) => prev.filter((t) => t.id !== id)) }]); };
-  const handleSave = () => { const eIds = templates.map((t) => t.id); const lIds = local.map((t) => t.id); eIds.filter((id) => !lIds.includes(id)).forEach((id) => onDelete(id)); local.forEach((t, i) => onSave({ ...t, sortOrder: i })); onClose(); };
+  const [activeTab, setActiveTab] = useState<"shifts" | "statuses">("shifts");
+  const [localShifts, setLocalShifts] = useState<ShiftTemplate[]>([]);
+  const [localStatuses, setLocalStatuses] = useState<SpecialStatus[]>([]);
+  React.useEffect(() => {
+    if (visible) {
+      setLocalShifts([...templates].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)));
+      setLocalStatuses([...specialStatuses].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)));
+    }
+  }, [visible, templates, specialStatuses]);
+  const updShift = (id: string, p: Partial<ShiftTemplate>) => setLocalShifts((prev) => prev.map((t) => t.id === id ? { ...t, ...p } : t));
+  const addNewShift = () => { tap(); setLocalShifts((prev) => [...prev, { id: `tpl_${Date.now()}`, session: "新班次", startTime: "09:00", endTime: "18:00", defaultHours: 8, color: SHIFT_COLOR_PRESETS[prev.length % SHIFT_COLOR_PRESETS.length], sortOrder: prev.length }]); };
+  const removeShift = (id: string) => { tap(); Alert.alert("删除班次", "删除后该班次历史排班记录不受影响。", [{ text: "取消", style: "cancel" }, { text: "删除", style: "destructive", onPress: () => setLocalShifts((prev) => prev.filter((t) => t.id !== id)) }]); };
+  const updStatus = (id: string, p: Partial<SpecialStatus>) => setLocalStatuses((prev) => prev.map((s) => s.id === id ? { ...s, ...p } : s));
+  const addNewStatus = () => { tap(); setLocalStatuses((prev) => [...prev, { id: `ss_${Date.now()}`, name: "自定义", category: "absence" as const, salaryMultiplier: 1, color: SHIFT_COLOR_PRESETS[prev.length % SHIFT_COLOR_PRESETS.length], sortOrder: prev.length }]); };
+  const removeStatus = (id: string) => { const t = localStatuses.find((s) => s.id === id); if (t?.isBuiltin) { Alert.alert("内置状态", "内置状态不可删除，但可修改名称和倍率。"); return; } tap(); Alert.alert("删除状态", "确认删除？", [{ text: "取消", style: "cancel" }, { text: "删除", style: "destructive", onPress: () => setLocalStatuses((prev) => prev.filter((s) => s.id !== id)) }]); };
+  const handleSave = () => {
+    const eShiftIds = templates.map((t) => t.id); const lShiftIds = localShifts.map((t) => t.id);
+    eShiftIds.filter((id) => !lShiftIds.includes(id)).forEach((id) => onDeleteShift(id));
+    localShifts.forEach((t, i) => onSaveShift({ ...t, sortOrder: i }));
+    const eStatusIds = specialStatuses.map((s) => s.id); const lStatusIds = localStatuses.map((s) => s.id);
+    eStatusIds.filter((id) => !lStatusIds.includes(id)).forEach((id) => onDeleteStatus(id));
+    localStatuses.forEach((s, i) => onSaveStatus({ ...s, sortOrder: i }));
+    onClose();
+  };
+  const CATEGORY_LABELS: Record<string, string> = { absence: "缺席类", work_day: "工作日类", comp_off: "加班换休" };
+  const MULTIPLIER_PRESETS = [0, 0.5, 1, 1.5, 2, 3];
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
       <View style={[SCHEM.sheet, { backgroundColor: colors.background }]}>
         <View style={[SCHEM.header, { borderBottomColor: colors.border }]}>
           <Pressable onPress={onClose}><Text style={{ fontSize: 17, color: colors.error }}>取消</Text></Pressable>
-          <Text style={[SCHEM.title, { color: colors.foreground }]}>班次模板设置</Text>
+          <Text style={[SCHEM.title, { color: colors.foreground }]}>排班设置</Text>
           <Pressable onPress={handleSave}><Text style={{ fontSize: 17, fontWeight: "600", color: colors.primary }}>保存</Text></Pressable>
         </View>
-        <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }}>
-          {local.map((tpl) => (
-            <View key={tpl.id} style={{ backgroundColor: tpl.color + "10", borderRadius: 14, padding: 16, gap: 12, borderWidth: 1, borderColor: tpl.color + "44" }}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: tpl.color }} />
-                <TextInput value={tpl.session} onChangeText={(v) => upd(tpl.id, { session: v })} placeholder="班次名称" placeholderTextColor={colors.muted} style={{ flex: 1, fontSize: 15, fontWeight: "700", color: tpl.color, paddingVertical: 2 }} />
-                <TouchableOpacity onPress={() => removeLocal(tpl.id)} style={{ padding: 4 }}><IconSymbol name="trash" size={16} color={colors.error} /></TouchableOpacity>
-              </View>
-              <View style={{ flexDirection: "row", gap: 10, alignItems: "flex-end" }}>
-                <View style={{ flex: 1 }}><Text style={{ fontSize: 11, color: colors.muted, marginBottom: 4 }}>开始时间</Text><TextInput value={tpl.startTime} onChangeText={(v) => upd(tpl.id, { startTime: v })} placeholder="10:30" placeholderTextColor={colors.muted} style={[SCHEM.inputSmall, { color: colors.foreground, borderColor: colors.border, width: "100%" }]} /></View>
-                <Text style={{ color: colors.muted, paddingBottom: 10 }}>—</Text>
-                <View style={{ flex: 1 }}><Text style={{ fontSize: 11, color: colors.muted, marginBottom: 4 }}>结束时间</Text><TextInput value={tpl.endTime} onChangeText={(v) => upd(tpl.id, { endTime: v })} placeholder="17:00" placeholderTextColor={colors.muted} style={[SCHEM.inputSmall, { color: colors.foreground, borderColor: colors.border, width: "100%" }]} /></View>
-                <View style={{ flex: 1 }}><Text style={{ fontSize: 11, color: colors.muted, marginBottom: 4 }}>默认工时</Text><TextInput value={String(tpl.defaultHours)} onChangeText={(v) => upd(tpl.id, { defaultHours: Number(v) || tpl.defaultHours })} placeholder="8" placeholderTextColor={colors.muted} keyboardType="decimal-pad" style={[SCHEM.inputSmall, { color: colors.foreground, borderColor: tpl.color, width: "100%" }]} /></View>
-              </View>
-              <View><Text style={{ fontSize: 11, color: colors.muted, marginBottom: 6 }}>班次颜色</Text><View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>{SHIFT_COLOR_PRESETS.map((c) => (<TouchableOpacity key={c} onPress={() => { tap(); upd(tpl.id, { color: c }); }} style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: c, borderWidth: tpl.color === c ? 3 : 1, borderColor: tpl.color === c ? colors.foreground : c + "44" }} />))}</View></View>
-              <Text style={{ fontSize: 11, color: colors.muted }}>添加排班时自动带入 {tpl.defaultHours}h，可单独修改</Text>
-            </View>
+        <View style={{ flexDirection: "row", marginHorizontal: 16, marginVertical: 8, backgroundColor: colors.border + "44", borderRadius: 10, padding: 2 }}>
+          {(["shifts", "statuses"] as const).map((tab) => (
+            <TouchableOpacity key={tab} onPress={() => { tap(); setActiveTab(tab); }}
+              style={{ flex: 1, paddingVertical: 7, borderRadius: 8, alignItems: "center", backgroundColor: activeTab === tab ? colors.surface : "transparent" }}>
+              <Text style={{ fontSize: 13, fontWeight: activeTab === tab ? "700" : "400", color: activeTab === tab ? "#1C1C1E" : colors.muted }}>{tab === "shifts" ? "工作班次" : "特殊状态"}</Text>
+            </TouchableOpacity>
           ))}
-          <TouchableOpacity onPress={addNew} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, padding: 14, borderRadius: 12, borderWidth: 1.5, borderStyle: "dashed", borderColor: colors.primary + "66" }}>
-            <IconSymbol name="plus.circle.fill" size={18} color={colors.primary} />
-            <Text style={{ fontSize: 14, fontWeight: "600", color: colors.primary }}>添加班次</Text>
-          </TouchableOpacity>
-          <Text style={{ fontSize: 12, color: colors.muted, textAlign: "center" }}>参考：早班 / 午班 / 晚班 / 大夜班 / 全天班 / 中班</Text>
+        </View>
+        <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
+          {activeTab === "shifts" ? (
+            <>
+              {localShifts.map((tpl) => (
+                <View key={tpl.id} style={{ backgroundColor: tpl.color + "10", borderRadius: 14, padding: 14, gap: 10, borderWidth: 1, borderColor: tpl.color + "44" }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: tpl.color }} />
+                    <TextInput value={tpl.session} onChangeText={(v) => updShift(tpl.id, { session: v })} placeholder="班次名称" placeholderTextColor={colors.muted} style={{ flex: 1, fontSize: 15, fontWeight: "700", color: tpl.color, paddingVertical: 2 }} />
+                    <TouchableOpacity onPress={() => removeShift(tpl.id)} style={{ padding: 4 }}><IconSymbol name="trash" size={16} color={colors.error} /></TouchableOpacity>
+                  </View>
+                  <View style={{ flexDirection: "row", gap: 8 }}>
+                    <View style={{ flex: 1 }}><Text style={{ fontSize: 10, color: colors.muted, marginBottom: 3 }}>开始</Text><TextInput value={tpl.startTime} onChangeText={(v) => updShift(tpl.id, { startTime: v })} placeholder="10:30" placeholderTextColor={colors.muted} style={[SCHEM.inputSmall, { color: colors.foreground, borderColor: colors.border, width: "100%" }]} /></View>
+                    <View style={{ flex: 1 }}><Text style={{ fontSize: 10, color: colors.muted, marginBottom: 3 }}>结束</Text><TextInput value={tpl.endTime} onChangeText={(v) => updShift(tpl.id, { endTime: v })} placeholder="17:00" placeholderTextColor={colors.muted} style={[SCHEM.inputSmall, { color: colors.foreground, borderColor: colors.border, width: "100%" }]} /></View>
+                    <View style={{ flex: 1 }}><Text style={{ fontSize: 10, color: colors.muted, marginBottom: 3 }}>默认工时</Text><TextInput value={String(tpl.defaultHours)} onChangeText={(v) => updShift(tpl.id, { defaultHours: Number(v) || tpl.defaultHours })} keyboardType="decimal-pad" style={[SCHEM.inputSmall, { color: colors.foreground, borderColor: tpl.color, width: "100%" }]} /></View>
+                  </View>
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>{SHIFT_COLOR_PRESETS.map((c) => (<TouchableOpacity key={c} onPress={() => { tap(); updShift(tpl.id, { color: c }); }} style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: c, borderWidth: tpl.color === c ? 3 : 1, borderColor: tpl.color === c ? colors.foreground : c + "44" }} />))}</View>
+                </View>
+              ))}
+              <TouchableOpacity onPress={addNewShift} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, padding: 14, borderRadius: 12, borderWidth: 1.5, borderStyle: "dashed", borderColor: colors.primary + "66" }}>
+                <IconSymbol name="plus.circle.fill" size={18} color={colors.primary} />
+                <Text style={{ fontSize: 14, fontWeight: "600", color: colors.primary }}>添加班次</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              {localStatuses.map((ss) => (
+                <View key={ss.id} style={{ backgroundColor: ss.color + "10", borderRadius: 14, padding: 14, gap: 10, borderWidth: 1, borderColor: ss.color + "44" }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: ss.color }} />
+                    <TextInput value={ss.name} onChangeText={(v) => updStatus(ss.id, { name: v })} placeholder="状态名称" placeholderTextColor={colors.muted} style={{ flex: 1, fontSize: 15, fontWeight: "700", color: ss.color, paddingVertical: 2 }} />
+                    <TouchableOpacity onPress={() => removeStatus(ss.id)} style={{ padding: 4 }}><IconSymbol name="trash" size={16} color={ss.isBuiltin ? colors.muted : colors.error} /></TouchableOpacity>
+                  </View>
+                  <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
+                    {(["absence", "work_day", "comp_off"] as const).map((cat) => (
+                      <TouchableOpacity key={cat} onPress={() => updStatus(ss.id, { category: cat })}
+                        style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, backgroundColor: ss.category === cat ? ss.color : colors.surface, borderColor: ss.category === cat ? ss.color : colors.border }}>
+                        <Text style={{ fontSize: 11, fontWeight: "600", color: ss.category === cat ? "#fff" : colors.muted }}>{CATEGORY_LABELS[cat]}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  {ss.category !== "comp_off" && (
+                    <View>
+                      <Text style={{ fontSize: 10, color: colors.muted, marginBottom: 6 }}>薪资倍率：{ss.salaryMultiplier}x</Text>
+                      <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
+                        {MULTIPLIER_PRESETS.map((m) => (
+                          <TouchableOpacity key={m} onPress={() => updStatus(ss.id, { salaryMultiplier: m })}
+                            style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, backgroundColor: ss.salaryMultiplier === m ? ss.color : colors.surface, borderColor: ss.salaryMultiplier === m ? ss.color : colors.border }}>
+                            <Text style={{ fontSize: 12, color: ss.salaryMultiplier === m ? "#fff" : colors.muted }}>{m}x</Text>
+                          </TouchableOpacity>
+                        ))}
+                        <TextInput value={MULTIPLIER_PRESETS.includes(ss.salaryMultiplier) ? "" : String(ss.salaryMultiplier)} onChangeText={(v) => updStatus(ss.id, { salaryMultiplier: Number(v) || ss.salaryMultiplier })} placeholder="自定义" placeholderTextColor={colors.muted} keyboardType="decimal-pad" style={[SCHEM.inputSmall, { color: colors.foreground, borderColor: colors.border, width: 60 }]} />
+                      </View>
+                      <Text style={{ fontSize: 10, color: colors.muted, marginTop: 4 }}>{ss.category === "absence" ? (ss.salaryMultiplier === 0 ? "不扣薪" : ss.salaryMultiplier <= 1 ? `扣除 ${ss.salaryMultiplier} 天日薪` : `额外惩罚 ${ss.salaryMultiplier - 1} 天日薪`) : `当天薪资 × ${ss.salaryMultiplier}`}</Text>
+                    </View>
+                  )}
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>{SHIFT_COLOR_PRESETS.map((c) => (<TouchableOpacity key={c} onPress={() => { tap(); updStatus(ss.id, { color: c }); }} style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: c, borderWidth: ss.color === c ? 3 : 1, borderColor: ss.color === c ? colors.foreground : c + "44" }} />))}</View>
+                </View>
+              ))}
+              <TouchableOpacity onPress={addNewStatus} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, padding: 14, borderRadius: 12, borderWidth: 1.5, borderStyle: "dashed", borderColor: colors.primary + "66" }}>
+                <IconSymbol name="plus.circle.fill" size={18} color={colors.primary} />
+                <Text style={{ fontSize: 14, fontWeight: "600", color: colors.primary }}>添加特殊状态</Text>
+              </TouchableOpacity>
+              <Text style={{ fontSize: 11, color: colors.muted, textAlign: "center" }}>内置状态可修改名称和倍率，不可删除</Text>
+            </>
+          )}
         </ScrollView>
       </View>
     </Modal>
@@ -881,6 +1215,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   const { employees } = useEmployeeStore();
   const { shifts, upsertShift, batchUpsertShifts, deleteShift, getShifts } = useShiftStore();
   const { templates, upsertTemplate, deleteTemplate } = useShiftTemplateStore();
+  const { statuses: specialStatuses, upsertStatus, deleteStatus } = useSpecialStatusStore();
   const { getPaySlip, upsertPaySlip, buildPaySlipDraft } = usePaySlipStore();
   const { getAttendance, upsertAttendance, calcFromShifts } = useAttendanceStore();
   const { getRecord: getPerfRecord } = usePerformanceRecordStore();
@@ -1132,7 +1467,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                             return hc ? { date: s.date, multiplier: hc.multiplier } : null;
                           })
                           .filter((x): x is { date: string; multiplier: number } => x !== null);
-                        const att = calcFromShifts(emp.id, currentMonth, emp, empShifts, holidayDaysList);
+                        const att = calcFromShifts(emp.id, currentMonth, emp, empShifts, specialStatuses, holidayDaysList);
                         upsertAttendance(att);
                         // 2. 计算绩效总额
                         const perfRecord = getPerfRecord(emp.id, currentMonth);
@@ -1198,13 +1533,16 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
         existing={editEmployee && editDate ? getEntry(editEmployee.id, editDate, editSession) : null}
         contractHours={editContractH} defaultHours={editTpl?.defaultHours ?? 8}
         colors={colors}
+        shiftTemplates={sortedTemplates}
+        specialStatuses={specialStatuses}
         onSave={(entry) => upsertShift(entry)}
         onClear={() => { if (editEmployee && editDate) deleteShift(editEmployee.id, editDate, editSession); }}
         onClose={() => setEditModal(false)}
       />
       <SchTemplateModal
-        visible={showTplModal} templates={sortedTemplates} colors={colors}
-        onSave={upsertTemplate} onDelete={deleteTemplate}
+        visible={showTplModal} templates={sortedTemplates} specialStatuses={specialStatuses} colors={colors}
+        onSaveShift={upsertTemplate} onDeleteShift={deleteTemplate}
+        onSaveStatus={upsertStatus} onDeleteStatus={deleteStatus}
         onClose={() => setShowTplModal(false)}
       />
     </View>

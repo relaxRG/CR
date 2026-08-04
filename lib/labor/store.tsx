@@ -1,6 +1,7 @@
 /**
- * 人工成本管理 Store v2
- * 新增：差异化工时、调休、节假日配置、绩效模板、绩效记录、员工分组、班次模板
+ * 人工成本管理 Store v3
+ * 新增：特殊状态系统、加班换休逻辑、社保/公积金/个税、全局薪资设置
+ * 修复：少休天数自动计算、考勤工资闭环
  */
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -8,10 +9,11 @@ import { notifySyncChange, registerStoreReload } from "../sync/engine";
 import {
   Employee, ShiftEntry, MonthlyAttendance, PaySlip, MonthConfig,
   ShiftTemplate, HolidayConfig, PerformanceTemplate, PerformanceRecord,
-  EmployeeGroup, CompOffBalance,
-  calcDailyRate, calcAttendanceSalary, calcAllowance, getDaysInMonth, parseMonth,
-  getContractHoursForDate,
-  DEFAULT_SHIFT_TEMPLATES, DEFAULT_EMPLOYEE_GROUPS,
+  EmployeeGroup, CompOffBalance, SpecialStatus, GlobalPayrollSettings,
+  calcDailyRate, calcAllowance, calcSocialInsurance, calcIncomeTax, calcFinalSalary,
+  getDaysInMonth, parseMonth, getContractHoursForDate,
+  DEFAULT_SHIFT_TEMPLATES, DEFAULT_EMPLOYEE_GROUPS, DEFAULT_SPECIAL_STATUSES,
+  DEFAULT_GLOBAL_PAYROLL_SETTINGS,
 } from "./types";
 
 function uuid() { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
@@ -43,9 +45,31 @@ function usePersisted<T>(key: string, defaultValue: T[] = []) {
   return { data, ref, persist, ready };
 }
 
-// ─── 员工档案 Store ───────────────────────────────────────────────────────────
-const EMP_KEY = "labor_employees_v1";
+// ─── 通用单值持久化 Hook ──────────────────────────────────────────────────────
+function usePersistedValue<T>(key: string, defaultValue: T) {
+  const [data, setData] = useState<T>(defaultValue);
+  const [ready, setReady] = useState(false);
+  const ref = useRef<T>(defaultValue);
 
+  useEffect(() => {
+    AsyncStorage.getItem(key).then((raw) => {
+      if (raw) {
+        try { const parsed = JSON.parse(raw) as T; ref.current = parsed; setData(parsed); } catch {}
+      }
+      setReady(true);
+    });
+  }, [key]);
+
+  const persist = useCallback((next: T) => {
+    ref.current = next;
+    setData(next);
+    AsyncStorage.setItem(key, JSON.stringify(next)).catch(console.error);
+  }, [key]);
+
+  return { data, ref, persist, ready };
+}
+
+// ─── 员工档案 Store ───────────────────────────────────────────────────────────
 interface EmployeeStore {
   employees: Employee[];
   addEmployee: (draft: Omit<Employee, "id" | "createdAt">) => string;
@@ -59,12 +83,11 @@ const EmployeeContext = createContext<EmployeeStore>({
 });
 
 function EmployeeProvider({ children }: { children: React.ReactNode }) {
-  const { data: employees, ref, persist, ready } = usePersisted<Employee>(EMP_KEY);
+  const { data: employees, ref, persist, ready } = usePersisted<Employee>("labor_employees_v1");
 
   const addEmployee = useCallback((draft: Omit<Employee, "id" | "createdAt">): string => {
     const id = uuid();
-    const emp: Employee = { ...draft, id, createdAt: new Date().toISOString() };
-    persist([...ref.current, emp]);
+    persist([...ref.current, { ...draft, id, createdAt: new Date().toISOString() }]);
     return id;
   }, [persist, ref]);
 
@@ -84,20 +107,14 @@ function EmployeeProvider({ children }: { children: React.ReactNode }) {
 }
 
 // ─── 员工分组 Store ───────────────────────────────────────────────────────────
-const EMP_GROUP_KEY = "labor_employee_groups_v1";
-
 interface EmployeeGroupStore {
   groups: EmployeeGroup[];
   addGroup: (draft: Omit<EmployeeGroup, "id">) => string;
   updateGroup: (id: string, patch: Partial<EmployeeGroup>) => void;
   deleteGroup: (id: string) => void;
-  /** 将员工移入某分组（自动从其他分组移除） */
   moveEmployeeToGroup: (employeeId: string, groupId: string) => void;
-  /** 在分组内重新排序员工 */
   reorderEmployeesInGroup: (groupId: string, orderedIds: string[]) => void;
-  /** 重新排序分组 */
   reorderGroups: (orderedIds: string[]) => void;
-  /** 切换分组折叠状态 */
   toggleCollapse: (groupId: string) => void;
   ready: boolean;
 }
@@ -110,7 +127,7 @@ const EmployeeGroupContext = createContext<EmployeeGroupStore>({
 });
 
 function EmployeeGroupProvider({ children }: { children: React.ReactNode }) {
-  const { data: groups, ref, persist, ready } = usePersisted<EmployeeGroup>(EMP_GROUP_KEY, DEFAULT_EMPLOYEE_GROUPS);
+  const { data: groups, ref, persist, ready } = usePersisted<EmployeeGroup>("labor_employee_groups_v1", DEFAULT_EMPLOYEE_GROUPS);
 
   const addGroup = useCallback((draft: Omit<EmployeeGroup, "id">): string => {
     const id = uuid();
@@ -128,9 +145,7 @@ function EmployeeGroupProvider({ children }: { children: React.ReactNode }) {
 
   const moveEmployeeToGroup = useCallback((employeeId: string, groupId: string) => {
     persist(ref.current.map((g) => {
-      if (g.id === groupId) {
-        return { ...g, employeeIds: g.employeeIds.includes(employeeId) ? g.employeeIds : [...g.employeeIds, employeeId] };
-      }
+      if (g.id === groupId) return { ...g, employeeIds: g.employeeIds.includes(employeeId) ? g.employeeIds : [...g.employeeIds, employeeId] };
       return { ...g, employeeIds: g.employeeIds.filter((id) => id !== employeeId) };
     }));
   }, [persist, ref]);
@@ -159,8 +174,6 @@ function EmployeeGroupProvider({ children }: { children: React.ReactNode }) {
 }
 
 // ─── 班次模板 Store ───────────────────────────────────────────────────────────
-const SHIFT_TPL_KEY = "labor_shift_templates_v1";
-
 interface ShiftTemplateStore {
   templates: ShiftTemplate[];
   upsertTemplate: (tpl: ShiftTemplate) => void;
@@ -176,24 +189,19 @@ const ShiftTemplateContext = createContext<ShiftTemplateStore>({
 });
 
 function ShiftTemplateProvider({ children }: { children: React.ReactNode }) {
-  const { data: templates, ref, persist, ready } = usePersisted<ShiftTemplate>(SHIFT_TPL_KEY, DEFAULT_SHIFT_TEMPLATES);
+  const { data: templates, ref, persist, ready } = usePersisted<ShiftTemplate>("labor_shift_templates_v1", DEFAULT_SHIFT_TEMPLATES);
 
   const upsertTemplate = useCallback((tpl: ShiftTemplate) => {
     const idx = ref.current.findIndex((t) => t.id === tpl.id);
-    if (idx >= 0) {
-      const next = [...ref.current]; next[idx] = tpl; persist(next);
-    } else {
-      persist([...ref.current, tpl]);
-    }
+    if (idx >= 0) { const next = [...ref.current]; next[idx] = tpl; persist(next); }
+    else persist([...ref.current, tpl]);
   }, [persist, ref]);
 
   const deleteTemplate = useCallback((id: string) => {
     persist(ref.current.filter((t) => t.id !== id));
   }, [persist, ref]);
 
-  const getTemplate = useCallback((session: string) => {
-    return ref.current.find((t) => t.session === session);
-  }, [ref]);
+  const getTemplate = useCallback((session: string) => ref.current.find((t) => t.session === session), [ref]);
 
   return (
     <ShiftTemplateContext.Provider value={{ templates, upsertTemplate, deleteTemplate, getTemplate, ready }}>
@@ -202,17 +210,53 @@ function ShiftTemplateProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ─── 节假日配置 Store ─────────────────────────────────────────────────────────
-const HOLIDAY_KEY = "labor_holiday_configs_v1";
+// ─── 特殊状态 Store ───────────────────────────────────────────────────────────
+interface SpecialStatusStore {
+  statuses: SpecialStatus[];
+  upsertStatus: (status: SpecialStatus) => void;
+  deleteStatus: (id: string) => void;
+  getStatus: (id: string) => SpecialStatus | undefined;
+  ready: boolean;
+}
 
+const SpecialStatusContext = createContext<SpecialStatusStore>({
+  statuses: DEFAULT_SPECIAL_STATUSES,
+  upsertStatus: () => {}, deleteStatus: () => {},
+  getStatus: () => undefined, ready: false,
+});
+
+function SpecialStatusProvider({ children }: { children: React.ReactNode }) {
+  const { data: statuses, ref, persist, ready } = usePersisted<SpecialStatus>("labor_special_statuses_v1", DEFAULT_SPECIAL_STATUSES);
+
+  const upsertStatus = useCallback((status: SpecialStatus) => {
+    const idx = ref.current.findIndex((s) => s.id === status.id);
+    if (idx >= 0) { const next = [...ref.current]; next[idx] = status; persist(next); }
+    else persist([...ref.current, status]);
+  }, [persist, ref]);
+
+  const deleteStatus = useCallback((id: string) => {
+    // 内置状态不可删除
+    const target = ref.current.find((s) => s.id === id);
+    if (target?.isBuiltin) return;
+    persist(ref.current.filter((s) => s.id !== id));
+  }, [persist, ref]);
+
+  const getStatus = useCallback((id: string) => ref.current.find((s) => s.id === id), [ref]);
+
+  return (
+    <SpecialStatusContext.Provider value={{ statuses, upsertStatus, deleteStatus, getStatus, ready }}>
+      {children}
+    </SpecialStatusContext.Provider>
+  );
+}
+
+// ─── 节假日配置 Store ─────────────────────────────────────────────────────────
 interface HolidayConfigStore {
   holidays: HolidayConfig[];
   addHoliday: (draft: Omit<HolidayConfig, "id">) => string;
   updateHoliday: (id: string, patch: Partial<HolidayConfig>) => void;
   deleteHoliday: (id: string) => void;
-  /** 获取某日期适用的节假日配置（某员工） */
   getHolidayForDate: (date: string, employeeId: string) => HolidayConfig | null;
-  /** 获取某月某员工的节假日天数和倍率 */
   getMonthHolidayDays: (month: string, employeeId: string) => Array<{ date: string; multiplier: number }>;
   ready: boolean;
 }
@@ -223,7 +267,7 @@ const HolidayConfigContext = createContext<HolidayConfigStore>({
 });
 
 function HolidayConfigProvider({ children }: { children: React.ReactNode }) {
-  const { data: holidays, ref, persist, ready } = usePersisted<HolidayConfig>(HOLIDAY_KEY);
+  const { data: holidays, ref, persist, ready } = usePersisted<HolidayConfig>("labor_holiday_configs_v1");
 
   const addHoliday = useCallback((draft: Omit<HolidayConfig, "id">): string => {
     const id = uuid();
@@ -268,14 +312,11 @@ function HolidayConfigProvider({ children }: { children: React.ReactNode }) {
 }
 
 // ─── 排班 Store ───────────────────────────────────────────────────────────────
-const SHIFT_KEY = "labor_shifts_v1";
-
 interface ShiftStore {
   shifts: ShiftEntry[];
   upsertShift: (entry: ShiftEntry) => void;
-  /** 批量保存（快速填充整行使用） */
   batchUpsertShifts: (entries: ShiftEntry[]) => void;
-  deleteShift: (employeeId: string, date: string, shift: ShiftEntry["shift"]) => void;
+  deleteShift: (employeeId: string, date: string, shift: string) => void;
   getShifts: (month: string) => ShiftEntry[];
   ready: boolean;
 }
@@ -286,17 +327,14 @@ const ShiftContext = createContext<ShiftStore>({
 });
 
 function ShiftProvider({ children }: { children: React.ReactNode }) {
-  const { data: shifts, ref, persist, ready } = usePersisted<ShiftEntry>(SHIFT_KEY);
+  const { data: shifts, ref, persist, ready } = usePersisted<ShiftEntry>("labor_shifts_v1");
 
   const upsertShift = useCallback((entry: ShiftEntry) => {
     const existing = ref.current.findIndex(
       (s) => s.employeeId === entry.employeeId && s.date === entry.date && s.shift === entry.shift
     );
-    if (existing >= 0) {
-      const next = [...ref.current]; next[existing] = entry; persist(next);
-    } else {
-      persist([...ref.current, entry]);
-    }
+    if (existing >= 0) { const next = [...ref.current]; next[existing] = entry; persist(next); }
+    else persist([...ref.current, entry]);
   }, [persist, ref]);
 
   const batchUpsertShifts = useCallback((entries: ShiftEntry[]) => {
@@ -310,7 +348,7 @@ function ShiftProvider({ children }: { children: React.ReactNode }) {
     persist(next);
   }, [persist, ref]);
 
-  const deleteShift = useCallback((employeeId: string, date: string, shift: ShiftEntry["shift"]) => {
+  const deleteShift = useCallback((employeeId: string, date: string, shift: string) => {
     persist(ref.current.filter((s) => !(s.employeeId === employeeId && s.date === date && s.shift === shift)));
   }, [persist, ref]);
 
@@ -326,22 +364,21 @@ function ShiftProvider({ children }: { children: React.ReactNode }) {
 }
 
 // ─── 考勤汇总 Store ───────────────────────────────────────────────────────────
-const ATTEND_KEY = "labor_attendance_v1";
-
 interface AttendanceStore {
   records: MonthlyAttendance[];
   upsertAttendance: (record: MonthlyAttendance) => void;
   deleteAttendance: (id: string) => void;
   getAttendance: (employeeId: string, month: string) => MonthlyAttendance | null;
   /**
-   * 从排班数据自动计算考勤汇总（支持差异化工时、调休、节假日）
-   * @param holidayDays 节假日天数列表（来自 HolidayConfigStore）
+   * 从排班数据自动计算考勤汇总
+   * 支持：差异化工时、特殊状态扣薪、加班换休、节假日、少休自动计算
    */
   calcFromShifts: (
     employeeId: string,
     month: string,
     employee: Employee,
     shifts: ShiftEntry[],
+    specialStatuses: SpecialStatus[],
     holidayDays?: Array<{ date: string; multiplier: number }>
   ) => MonthlyAttendance;
   ready: boolean;
@@ -353,15 +390,12 @@ const AttendanceContext = createContext<AttendanceStore>({
 });
 
 function AttendanceProvider({ children }: { children: React.ReactNode }) {
-  const { data: records, ref, persist, ready } = usePersisted<MonthlyAttendance>(ATTEND_KEY);
+  const { data: records, ref, persist, ready } = usePersisted<MonthlyAttendance>("labor_attendance_v1");
 
   const upsertAttendance = useCallback((record: MonthlyAttendance) => {
     const idx = ref.current.findIndex((r) => r.employeeId === record.employeeId && r.month === record.month);
-    if (idx >= 0) {
-      const next = [...ref.current]; next[idx] = record; persist(next);
-    } else {
-      persist([...ref.current, record]);
-    }
+    if (idx >= 0) { const next = [...ref.current]; next[idx] = record; persist(next); }
+    else persist([...ref.current, record]);
   }, [persist, ref]);
 
   const deleteAttendance = useCallback((id: string) => {
@@ -377,60 +411,110 @@ function AttendanceProvider({ children }: { children: React.ReactNode }) {
     month: string,
     employee: Employee,
     shifts: ShiftEntry[],
+    specialStatuses: SpecialStatus[],
     holidayDaysList: Array<{ date: string; multiplier: number }> = []
   ): MonthlyAttendance => {
     const { year, month: m } = parseMonth(month);
     const daysInMonth = getDaysInMonth(year, m);
     const empShifts = shifts.filter((s) => s.employeeId === employeeId && s.date.startsWith(month));
 
-    // 计算出勤天数、总工时、合同工时（差异化）、加班时间
+    // 应出勤天数（自动计算）
+    const expectedAttendanceDays = Math.max(0, daysInMonth - employee.restDaysPerMonth);
+
+    // 加班换休配置
+    const hoursPerCompOff = employee.compOffRule?.hoursPerDay ?? 8;
+
+    // 遍历排班记录，分类处理
     const daysSet = new Set<string>();
     let totalHours = 0;
     let stdHoursTotal = 0;
-    let compOffHours = 0; // 换调休的加班时间
+    let compOffCount = 0;
+    let holidayBonus = 0;
+
+    // 特殊状态扣薪明细
+    const specialStatusDeductions: Record<string, { count: number; deduction: number; name: string; multiplier: number }> = {};
+
+    // 先计算日薪（用于特殊状态扣薪）
+    const dailyRate = calcDailyRate(employee.baseSalary, daysInMonth, employee.restDaysPerMonth);
 
     empShifts.forEach((s) => {
-      const h = s.hoursValue;
-      if (typeof h === "number" && h > 0) {
-        daysSet.add(s.date);
-        totalHours += h;
-        // 该天的合同工时
-        const contractH = getContractHoursForDate(employee, s.date);
-        stdHoursTotal += contractH;
-        // 加班时间
-        const dayOvertime = Math.max(0, h - contractH);
-        if (dayOvertime > 0 && s.overtimeType === "comp_off") {
-          compOffHours += dayOvertime;
+      const specialStatus = s.specialStatusId
+        ? specialStatuses.find((ss) => ss.id === s.specialStatusId)
+        : null;
+
+      if (specialStatus) {
+        // ── 特殊状态处理 ──
+        if (specialStatus.category === "comp_off") {
+          // 加班换休：不计工时，从累积加班时数里扣除
+          compOffCount++;
+          daysSet.add(s.date); // 加班换休那天算出勤（不扣薪）
+        } else if (specialStatus.category === "work_day") {
+          // 节日上班：计工时，额外补偿
+          const h = s.hoursValue;
+          if (typeof h === "number" && h > 0) {
+            daysSet.add(s.date);
+            totalHours += h;
+            const contractH = getContractHoursForDate(employee, s.date);
+            stdHoursTotal += contractH;
+            // 节日补偿 = 当天工时对应的日薪 × (倍率-1)
+            const dayBonus = Math.round(dailyRate * (specialStatus.salaryMultiplier - 1) * 100) / 100;
+            holidayBonus += dayBonus;
+          }
+        } else if (specialStatus.category === "absence") {
+          // 缺席类：不计工时，按倍率扣薪
+          // 排班表已自动少了1天出勤（不在 daysSet 里），额外扣薪 = (倍率-1) × 日薪
+          // 例：旷工2倍 = 额外再扣1倍日薪；病假0.5倍 = 退回0.5倍日薪（负扣薪）
+          const extraDeduction = Math.round((specialStatus.salaryMultiplier - 1) * dailyRate * 100) / 100;
+          const key = specialStatus.id;
+          if (!specialStatusDeductions[key]) {
+            specialStatusDeductions[key] = { count: 0, deduction: 0, name: specialStatus.name, multiplier: specialStatus.salaryMultiplier };
+          }
+          specialStatusDeductions[key].count++;
+          specialStatusDeductions[key].deduction += extraDeduction;
+        }
+      } else {
+        // ── 正常工作班次 ──
+        const h = s.hoursValue;
+        if (typeof h === "number" && h > 0) {
+          daysSet.add(s.date);
+          totalHours += h;
+          const contractH = getContractHoursForDate(employee, s.date);
+          stdHoursTotal += contractH;
         }
       }
     });
 
     const attendanceDays = daysSet.size;
-    const overtimeHours = Math.max(0, totalHours - stdHoursTotal);
-    const paidOvertimeHours = Math.max(0, overtimeHours - compOffHours);
+    const rawOvertimeHours = Math.max(0, totalHours - stdHoursTotal);
+    // 加班换休消耗的加班时数
+    const compOffHoursUsed = compOffCount * hoursPerCompOff;
+    // 实际计费加班时数
+    const paidOvertimeHours = Math.max(0, rawOvertimeHours - compOffHoursUsed);
 
-    // 节假日天数（取最高倍率）
-    const holidayDaysCount = holidayDaysList.filter((hd) => daysSet.has(hd.date)).length;
-    const maxHolidayMultiplier = holidayDaysList.length > 0
-      ? Math.max(...holidayDaysList.map((hd) => hd.multiplier))
-      : employee.holidayMultiplier;
+    // 少休天数（自动计算）= 应出勤 - 实际出勤
+    // 正数=缺席，负数=多出勤
+    const underRestDays = expectedAttendanceDays - attendanceDays;
 
-    const dailyRate = calcDailyRate(employee.baseSalary, daysInMonth, employee.restDaysPerMonth);
+    // 特殊状态总扣薪
+    const totalSpecialDeduction = Object.values(specialStatusDeductions)
+      .reduce((s, v) => s + v.deduction, 0);
+
+    // 加班工资
+    const overtimePay = Math.round(paidOvertimeHours * employee.overtimeHourlyRate * 100) / 100;
+
+    // 考勤工资 = 底薪 + 加班工资 - 特殊状态扣薪 + 节日补偿
+    // 注意：少休天数已通过"实际出勤天数少"自然体现，不再单独扣款
+    // （底薪是固定的，少出勤的扣款通过特殊状态的 absence 类型体现）
+    let attendanceSalary: number;
+    if (employee.type === "parttime") {
+      attendanceSalary = Math.round(totalHours * employee.overtimeHourlyRate * 100) / 100;
+    } else {
+      attendanceSalary = Math.round(
+        (employee.baseSalary + overtimePay - totalSpecialDeduction + holidayBonus) * 100
+      ) / 100;
+    }
+
     const existing = ref.current.find((r) => r.employeeId === employeeId && r.month === month);
-
-    const result = calcAttendanceSalary({
-      type: employee.type,
-      baseSalary: employee.baseSalary,
-      dailyRate,
-      totalHours,
-      stdHoursPerDay: employee.stdHoursPerDay,
-      attendanceDays,
-      overtimeHourlyRate: employee.overtimeHourlyRate,
-      underRestDays: existing?.underRestDays ?? 0,
-      holidayDays: existing?.holidayDays ?? holidayDaysCount,
-      holidayMultiplier: maxHolidayMultiplier,
-      paidOvertimeHours,
-    });
 
     return {
       id: existing?.id ?? uuid(),
@@ -440,17 +524,19 @@ function AttendanceProvider({ children }: { children: React.ReactNode }) {
       attendanceDays,
       totalHours: Math.round(totalHours * 10) / 10,
       stdHours: Math.round(stdHoursTotal * 10) / 10,
-      overtimeHours: Math.round(overtimeHours * 10) / 10,
-      compOffHours: Math.round(compOffHours * 10) / 10,
+      overtimeHours: Math.round(rawOvertimeHours * 10) / 10,
+      compOffCount,
+      hoursPerCompOff,
       paidOvertimeHours: Math.round(paidOvertimeHours * 10) / 10,
-      underRestDays: existing?.underRestDays ?? 0,
-      holidayDays: existing?.holidayDays ?? holidayDaysCount,
+      expectedAttendanceDays,
+      underRestDays,
+      specialStatusDeductions,
+      totalSpecialDeduction: Math.round(totalSpecialDeduction * 100) / 100,
+      holidayBonus: Math.round(holidayBonus * 100) / 100,
       dailyRate,
       dailyRateOverride: existing?.dailyRateOverride ?? false,
-      overtimePay: result.overtimePay,
-      underRestDeduction: result.underRestDeduction,
-      holidayBonus: result.holidayBonus,
-      attendanceSalary: result.attendanceSalary,
+      overtimePay,
+      attendanceSalary,
       notes: existing?.notes ?? "",
     };
   }, [ref]);
@@ -463,8 +549,6 @@ function AttendanceProvider({ children }: { children: React.ReactNode }) {
 }
 
 // ─── 调休余额 Store ───────────────────────────────────────────────────────────
-const COMP_OFF_KEY = "labor_comp_off_v1";
-
 interface CompOffStore {
   balances: CompOffBalance[];
   upsertBalance: (balance: CompOffBalance) => void;
@@ -477,15 +561,12 @@ const CompOffContext = createContext<CompOffStore>({
 });
 
 function CompOffProvider({ children }: { children: React.ReactNode }) {
-  const { data: balances, ref, persist, ready } = usePersisted<CompOffBalance>(COMP_OFF_KEY);
+  const { data: balances, ref, persist, ready } = usePersisted<CompOffBalance>("labor_comp_off_v1");
 
   const upsertBalance = useCallback((balance: CompOffBalance) => {
     const idx = ref.current.findIndex((b) => b.employeeId === balance.employeeId && b.month === balance.month);
-    if (idx >= 0) {
-      const next = [...ref.current]; next[idx] = balance; persist(next);
-    } else {
-      persist([...ref.current, balance]);
-    }
+    if (idx >= 0) { const next = [...ref.current]; next[idx] = balance; persist(next); }
+    else persist([...ref.current, balance]);
   }, [persist, ref]);
 
   const getBalance = useCallback((employeeId: string, month: string): CompOffBalance | null => {
@@ -500,8 +581,6 @@ function CompOffProvider({ children }: { children: React.ReactNode }) {
 }
 
 // ─── 绩效模板 Store ───────────────────────────────────────────────────────────
-const PERF_TPL_KEY = "labor_performance_templates_v1";
-
 interface PerformanceTemplateStore {
   templates: PerformanceTemplate[];
   upsertTemplate: (tpl: PerformanceTemplate) => void;
@@ -516,17 +595,12 @@ const PerformanceTemplateContext = createContext<PerformanceTemplateStore>({
 });
 
 function PerformanceTemplateProvider({ children }: { children: React.ReactNode }) {
-  const { data: templates, ref, persist, ready } = usePersisted<PerformanceTemplate>(PERF_TPL_KEY);
+  const { data: templates, ref, persist, ready } = usePersisted<PerformanceTemplate>("labor_performance_templates_v1");
 
   const upsertTemplate = useCallback((tpl: PerformanceTemplate) => {
     const idx = ref.current.findIndex((t) => t.employeeId === tpl.employeeId);
-    if (idx >= 0) {
-      const next = [...ref.current];
-      next[idx] = { ...tpl, updatedAt: new Date().toISOString() };
-      persist(next);
-    } else {
-      persist([...ref.current, { ...tpl, updatedAt: new Date().toISOString() }]);
-    }
+    if (idx >= 0) { const next = [...ref.current]; next[idx] = { ...tpl, updatedAt: new Date().toISOString() }; persist(next); }
+    else persist([...ref.current, { ...tpl, updatedAt: new Date().toISOString() }]);
   }, [persist, ref]);
 
   const deleteTemplate = useCallback((id: string) => {
@@ -545,8 +619,6 @@ function PerformanceTemplateProvider({ children }: { children: React.ReactNode }
 }
 
 // ─── 绩效月度记录 Store ───────────────────────────────────────────────────────
-const PERF_RECORD_KEY = "labor_performance_records_v1";
-
 interface PerformanceRecordStore {
   records: PerformanceRecord[];
   upsertRecord: (record: PerformanceRecord) => void;
@@ -561,17 +633,12 @@ const PerformanceRecordContext = createContext<PerformanceRecordStore>({
 });
 
 function PerformanceRecordProvider({ children }: { children: React.ReactNode }) {
-  const { data: records, ref, persist, ready } = usePersisted<PerformanceRecord>(PERF_RECORD_KEY);
+  const { data: records, ref, persist, ready } = usePersisted<PerformanceRecord>("labor_performance_records_v1");
 
   const upsertRecord = useCallback((record: PerformanceRecord) => {
     const idx = ref.current.findIndex((r) => r.employeeId === record.employeeId && r.month === record.month);
-    if (idx >= 0) {
-      const next = [...ref.current];
-      next[idx] = { ...record, updatedAt: new Date().toISOString() };
-      persist(next);
-    } else {
-      persist([...ref.current, { ...record, updatedAt: new Date().toISOString() }]);
-    }
+    if (idx >= 0) { const next = [...ref.current]; next[idx] = { ...record, updatedAt: new Date().toISOString() }; persist(next); }
+    else persist([...ref.current, { ...record, updatedAt: new Date().toISOString() }]);
   }, [persist, ref]);
 
   const deleteRecord = useCallback((id: string) => {
@@ -590,16 +657,14 @@ function PerformanceRecordProvider({ children }: { children: React.ReactNode }) 
 }
 
 // ─── 薪资单 Store ─────────────────────────────────────────────────────────────
-const PAYSLIP_KEY = "labor_payslips_v1";
-
 interface PaySlipStore {
   paySlips: PaySlip[];
   upsertPaySlip: (slip: PaySlip) => void;
   deletePaySlip: (id: string) => void;
   getPaySlip: (employeeId: string, month: string) => PaySlip | null;
   /**
-   * 从考勤+绩效+补贴自动生成薪资单草稿
-   * 不会覆盖已有的人工修改项（isOverride=true 的字段）
+   * 从考勤+绩效+补贴+社保+个税自动生成薪资单草稿
+   * 不覆盖已有的人工修改项
    */
   buildPaySlipDraft: (
     employee: Employee,
@@ -607,6 +672,11 @@ interface PaySlipStore {
     attendance: MonthlyAttendance | null,
     performanceTotal: number,
     advanceAmount: number,
+    globalSettings?: GlobalPayrollSettings,
+    /** 年度累计已税收入（用于个税累计预扣法） */
+    cumulativeIncome?: number,
+    /** 年度累计已预扣税额 */
+    cumulativeTaxPaid?: number,
   ) => PaySlip;
   ready: boolean;
 }
@@ -619,17 +689,12 @@ const PaySlipContext = createContext<PaySlipStore>({
 });
 
 function PaySlipProvider({ children }: { children: React.ReactNode }) {
-  const { data: paySlips, ref, persist, ready } = usePersisted<PaySlip>(PAYSLIP_KEY);
+  const { data: paySlips, ref, persist, ready } = usePersisted<PaySlip>("labor_payslips_v1");
 
   const upsertPaySlip = useCallback((slip: PaySlip) => {
     const idx = ref.current.findIndex((s) => s.employeeId === slip.employeeId && s.month === slip.month);
-    if (idx >= 0) {
-      const next = [...ref.current];
-      next[idx] = { ...slip, updatedAt: new Date().toISOString() };
-      persist(next);
-    } else {
-      persist([...ref.current, { ...slip, updatedAt: new Date().toISOString() }]);
-    }
+    if (idx >= 0) { const next = [...ref.current]; next[idx] = { ...slip, updatedAt: new Date().toISOString() }; persist(next); }
+    else persist([...ref.current, { ...slip, updatedAt: new Date().toISOString() }]);
   }, [persist, ref]);
 
   const deletePaySlip = useCallback((id: string) => {
@@ -646,12 +711,15 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
     attendance: MonthlyAttendance | null,
     performanceTotal: number,
     advanceAmount: number,
+    globalSettings?: GlobalPayrollSettings,
+    cumulativeIncome: number = 0,
+    cumulativeTaxPaid: number = 0,
   ): PaySlip => {
     const existing = ref.current.find((s) => s.employeeId === employee.id && s.month === month);
     const attendanceDays = attendance?.attendanceDays ?? 0;
     const attendanceSalary = attendance?.attendanceSalary ?? 0;
 
-    // 自动计算补贴
+    // ── 补贴自动计算 ──
     let mealAllowance = 0;
     let transportAllowance = 0;
     let otherAllowance = 0;
@@ -664,18 +732,63 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
         const existingDetail = existing?.allowanceDetails?.[rule.id];
         const isOverride = existingDetail?.isOverride ?? false;
         const finalAmount = isOverride ? (existingDetail?.amount ?? amount) : amount;
-
         allowanceDetails[rule.id] = { amount: finalAmount, autoNote, isOverride };
-
         if (rule.type === "transport_fixed") transportAllowance += finalAmount;
         else if (rule.type === "meal_per_day") mealAllowance += finalAmount;
         else otherAllowance += finalAmount;
       }
     }
 
+    // ── 应发薪资（税前）──
+    const grossSalary = Math.round((
+      attendanceSalary + performanceTotal +
+      (existing?.salesCommission ?? 0) +
+      transportAllowance + mealAllowance + otherAllowance +
+      (existing?.rewardPenalty ?? 0)
+    ) * 100) / 100;
+
+    // ── 社保/公积金计算 ──
+    const siConfig = employee.socialInsurance ?? globalSettings?.defaultSocialInsurance;
+    const siEnabled = (siConfig?.enabled) || (globalSettings?.socialInsuranceEnabled ?? false);
+    let socialInsuranceDeduction = existing?.socialInsuranceDeduction ?? 0;
+    let housingFundDeduction = existing?.housingFundDeduction ?? 0;
+    let socialInsuranceDetails = existing?.socialInsuranceDetails;
+
+    if (siEnabled && siConfig) {
+      const si = calcSocialInsurance(grossSalary, { ...siConfig, enabled: true });
+      socialInsuranceDeduction = si.pension + si.medical + si.unemployment + si.workInjury + si.maternity;
+      housingFundDeduction = si.housingFund;
+      socialInsuranceDetails = {
+        pension: si.pension,
+        medical: si.medical,
+        unemployment: si.unemployment,
+        workInjury: si.workInjury,
+        maternity: si.maternity,
+      };
+    }
+
+    // ── 个人所得税计算（累计预扣法）──
+    const taxConfig = employee.incomeTax ?? globalSettings?.defaultIncomeTax;
+    const taxEnabled = (taxConfig?.enabled) || (globalSettings?.incomeTaxEnabled ?? false);
+    let incomeTax = existing?.incomeTax ?? 0;
+    let incomeTaxNote = existing?.incomeTaxNote ?? "";
+
+    if (taxEnabled && taxConfig) {
+      const totalDeductions = socialInsuranceDeduction + housingFundDeduction;
+      const thisMonthIncome = grossSalary - totalDeductions - taxConfig.threshold;
+      const cumIncome = cumulativeIncome + Math.max(0, thisMonthIncome);
+      const cumDeductions = cumulativeIncome > 0 ? 0 : 0; // 已在 cumIncome 中扣除
+      const result = calcIncomeTax(
+        cumIncome, cumDeductions, cumulativeTaxPaid,
+        taxConfig.threshold, taxConfig.specialDeductions
+      );
+      incomeTax = result.tax;
+      incomeTaxNote = result.note;
+    }
+
+    // ── 实发薪资 ──
     const finalSalary = Math.round((
-      attendanceSalary + performanceTotal + transportAllowance + mealAllowance + otherAllowance +
-      (existing?.salesCommission ?? 0) + (existing?.rewardPenalty ?? 0)
+      grossSalary - socialInsuranceDeduction - housingFundDeduction - incomeTax
     ) * 100) / 100;
 
     return {
@@ -693,8 +806,14 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
       rewardPenaltyNote: existing?.rewardPenaltyNote ?? "",
       advanceAmount,
       notes: existing?.notes ?? "",
+      grossSalary,
+      socialInsuranceDeduction,
+      housingFundDeduction,
+      incomeTax,
       finalSalary,
       allowanceDetails,
+      socialInsuranceDetails,
+      incomeTaxNote,
       updatedAt: new Date().toISOString(),
     };
   }, [ref]);
@@ -706,9 +825,37 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ─── 月度设置 Provider ────────────────────────────────────────────────────────
-const MONTH_CONFIG_KEY = "labor_month_configs_v1";
+// ─── 全局薪资设置 Store ───────────────────────────────────────────────────────
+interface GlobalPayrollSettingsStore {
+  settings: GlobalPayrollSettings;
+  updateSettings: (patch: Partial<GlobalPayrollSettings>) => void;
+  ready: boolean;
+}
 
+const GlobalPayrollSettingsContext = createContext<GlobalPayrollSettingsStore>({
+  settings: DEFAULT_GLOBAL_PAYROLL_SETTINGS,
+  updateSettings: () => {},
+  ready: false,
+});
+
+function GlobalPayrollSettingsProvider({ children }: { children: React.ReactNode }) {
+  const { data: settingsArr, persist, ready } = usePersistedValue<GlobalPayrollSettings>(
+    "labor_global_payroll_settings_v1",
+    DEFAULT_GLOBAL_PAYROLL_SETTINGS
+  );
+
+  const updateSettings = useCallback((patch: Partial<GlobalPayrollSettings>) => {
+    persist({ ...settingsArr, ...patch, updatedAt: new Date().toISOString() });
+  }, [persist, settingsArr]);
+
+  return (
+    <GlobalPayrollSettingsContext.Provider value={{ settings: settingsArr, updateSettings, ready }}>
+      {children}
+    </GlobalPayrollSettingsContext.Provider>
+  );
+}
+
+// ─── 月度设置 Provider ────────────────────────────────────────────────────────
 interface MonthConfigStore {
   configs: MonthConfig[];
   upsertConfig: (config: MonthConfig) => void;
@@ -721,15 +868,12 @@ const MonthConfigContext = createContext<MonthConfigStore>({
 });
 
 function MonthConfigProvider({ children }: { children: React.ReactNode }) {
-  const { data: configs, ref, persist, ready } = usePersisted<MonthConfig>(MONTH_CONFIG_KEY);
+  const { data: configs, ref, persist, ready } = usePersisted<MonthConfig>("labor_month_configs_v1");
 
   const upsertConfig = useCallback((config: MonthConfig) => {
     const idx = ref.current.findIndex((c) => c.month === config.month);
-    if (idx >= 0) {
-      const next = [...ref.current]; next[idx] = config; persist(next);
-    } else {
-      persist([...ref.current, config]);
-    }
+    if (idx >= 0) { const next = [...ref.current]; next[idx] = config; persist(next); }
+    else persist([...ref.current, config]);
   }, [persist, ref]);
 
   const getConfig = useCallback((month: string): MonthConfig | null => {
@@ -750,21 +894,25 @@ export function LaborProvider({ children }: { children: React.ReactNode }) {
       <EmployeeProvider>
         <EmployeeGroupProvider>
           <ShiftTemplateProvider>
-            <HolidayConfigProvider>
-              <ShiftProvider>
-                <AttendanceProvider>
-                  <CompOffProvider>
-                    <PaySlipProvider>
-                      <PerformanceTemplateProvider>
-                        <PerformanceRecordProvider>
-                          {children}
-                        </PerformanceRecordProvider>
-                      </PerformanceTemplateProvider>
-                    </PaySlipProvider>
-                  </CompOffProvider>
-                </AttendanceProvider>
-              </ShiftProvider>
-            </HolidayConfigProvider>
+            <SpecialStatusProvider>
+              <HolidayConfigProvider>
+                <ShiftProvider>
+                  <AttendanceProvider>
+                    <CompOffProvider>
+                      <PaySlipProvider>
+                        <PerformanceTemplateProvider>
+                          <PerformanceRecordProvider>
+                            <GlobalPayrollSettingsProvider>
+                              {children}
+                            </GlobalPayrollSettingsProvider>
+                          </PerformanceRecordProvider>
+                        </PerformanceTemplateProvider>
+                      </PaySlipProvider>
+                    </CompOffProvider>
+                  </AttendanceProvider>
+                </ShiftProvider>
+              </HolidayConfigProvider>
+            </SpecialStatusProvider>
           </ShiftTemplateProvider>
         </EmployeeGroupProvider>
       </EmployeeProvider>
@@ -777,6 +925,7 @@ export function useEmployeeStore() { return useContext(EmployeeContext); }
 export function useEmployeeGroupStore() { return useContext(EmployeeGroupContext); }
 export function useShiftStore() { return useContext(ShiftContext); }
 export function useShiftTemplateStore() { return useContext(ShiftTemplateContext); }
+export function useSpecialStatusStore() { return useContext(SpecialStatusContext); }
 export function useHolidayConfigStore() { return useContext(HolidayConfigContext); }
 export function useAttendanceStore() { return useContext(AttendanceContext); }
 export function useCompOffStore() { return useContext(CompOffContext); }
@@ -784,3 +933,4 @@ export function usePaySlipStore() { return useContext(PaySlipContext); }
 export function usePerformanceTemplateStore() { return useContext(PerformanceTemplateContext); }
 export function usePerformanceRecordStore() { return useContext(PerformanceRecordContext); }
 export function useMonthConfigStore() { return useContext(MonthConfigContext); }
+export function useGlobalPayrollSettingsStore() { return useContext(GlobalPayrollSettingsContext); }

@@ -15,8 +15,10 @@ import { ScreenContainer } from "@/components/screen-container";
 import { useEmployeeStore, useShiftTemplateStore } from "@/lib/labor/store";
 import {
   Employee, EmployeeDept, EmployeeType, EmployeeBankAccount, WeeklyHoursRule,
+  AllowanceRule,
   DEPT_LABELS, DEPT_COLORS, EMPLOYEE_TYPE_LABELS, EMPLOYEE_TYPE_COLORS,
   calcDailyRate, getDaysInMonth, DEFAULT_SHIFT_TEMPLATES, WEEKDAY_LABELS,
+  DEFAULT_SOCIAL_INSURANCE,
 } from "@/lib/labor/types";
 
 const DEPT_OPTIONS: EmployeeDept[] = ["front", "kitchen", "parttime", "other"];
@@ -103,6 +105,30 @@ export default function LaborEmployeeFormScreen() {
   const [bankNote, setBankNote] = useState("");
   const [editingBankId, setEditingBankId] = useState<string | null>(null);
 
+  // ── 调休规则 ──
+  const [compOffEnabled, setCompOffEnabled] = useState(existing?.compOffRule?.enabled ?? false);
+  const [compOffHoursPerDay, setCompOffHoursPerDay] = useState(String(existing?.compOffRule?.hoursPerDay ?? 8));
+
+  // ── 补贴规则 ──
+  const [allowanceRules, setAllowanceRules] = useState<AllowanceRule[]>(existing?.allowanceRules ?? []);
+  const addAllowanceRule = () => {
+    setAllowanceRules((prev) => [...prev, { id: Date.now().toString(), type: "custom_fixed" as const, label: "自定义补贴", amount: 0, enabled: true }]);
+  };
+  const updateAllowanceRule = (id: string, patch: Partial<AllowanceRule>) => {
+    setAllowanceRules((prev) => prev.map((r) => r.id === id ? { ...r, ...patch } : r));
+  };
+  const deleteAllowanceRule = (id: string) => setAllowanceRules((prev) => prev.filter((r) => r.id !== id));
+
+  // ── 社保/公积金 ──
+  const [siEnabled, setSiEnabled] = useState(existing?.socialInsurance?.enabled ?? false);
+  const [siCity, setSiCity] = useState(existing?.socialInsurance?.city ?? "");
+  const [siBase, setSiBase] = useState(String(existing?.socialInsurance?.base ?? 0));
+  const [siPension, setSiPension] = useState(String(((existing?.socialInsurance?.pensionRate ?? 0.08) * 100).toFixed(1)));
+  const [siMedical, setSiMedical] = useState(String(((existing?.socialInsurance?.medicalRate ?? 0.02) * 100).toFixed(1)));
+  const [siUnemployment, setSiUnemployment] = useState(String(((existing?.socialInsurance?.unemploymentRate ?? 0.005) * 100).toFixed(1)));
+  const [siHousingFund, setSiHousingFund] = useState(String(((existing?.socialInsurance?.housingFundRate ?? 0.12) * 100).toFixed(1)));
+  const [siHousingBase, setSiHousingBase] = useState(String(existing?.socialInsurance?.housingFundBase ?? 0));
+
   const now = new Date();
   const daysInMonth = getDaysInMonth(now.getFullYear(), now.getMonth() + 1);
   const dailyRatePreview = useMemo(() => {
@@ -132,6 +158,17 @@ export default function LaborEmployeeFormScreen() {
       holidayMultiplier: holidayMult,
       monthlyFixedSalary: Number(monthlyFixedSalary) || 0,
       weeklyHoursRules: weeklyHoursRules.length > 0 ? weeklyHoursRules : undefined,
+      compOffRule: { enabled: compOffEnabled, hoursPerDay: Number(compOffHoursPerDay) || 8 },
+      allowanceRules: allowanceRules.length > 0 ? allowanceRules : undefined,
+      socialInsurance: siEnabled ? {
+        ...DEFAULT_SOCIAL_INSURANCE, enabled: true, city: siCity.trim(),
+        base: Number(siBase) || 0,
+        pensionRate: Number(siPension) / 100 || 0.08,
+        medicalRate: Number(siMedical) / 100 || 0.02,
+        unemploymentRate: Number(siUnemployment) / 100 || 0.005,
+        housingFundRate: Number(siHousingFund) / 100 || 0.12,
+        housingFundBase: Number(siHousingBase) || 0,
+      } : undefined,
       bankAccounts,
       idNumber: idNumber.trim() || undefined,
       address: address.trim() || undefined,
@@ -456,6 +493,120 @@ export default function LaborEmployeeFormScreen() {
                 <IconSymbol name="plus" size={14} color={colors.primary} />
                 <Text style={{ fontSize: 13, color: colors.primary, fontWeight: "600" }}>添加银行卡</Text>
               </TouchableOpacity>
+            )}
+          </SectionCard>
+
+          {/* ── 调休规则 ── */}
+          {isFulltime && (
+            <SectionCard title="调休规则" colors={colors}>
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 4 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>开启加班换休</Text>
+                  <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>加班时数可换成调休假期，不计加班费</Text>
+                </View>
+                <TouchableOpacity onPress={() => { tap(); setCompOffEnabled(!compOffEnabled); }}
+                  style={{ width: 44, height: 26, borderRadius: 13, backgroundColor: compOffEnabled ? colors.primary : colors.border, justifyContent: "center", paddingHorizontal: 2 }}>
+                  <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: "#fff", alignSelf: compOffEnabled ? "flex-end" : "flex-start" }} />
+                </TouchableOpacity>
+              </View>
+              {compOffEnabled && (
+                <FormRow label="多少小时加班换一天休" colors={colors}>
+                  <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+                    {[6, 7, 8, 9, 10].map((h) => (
+                      <TouchableOpacity key={h} onPress={() => { tap(); setCompOffHoursPerDay(String(h)); }}
+                        style={[S.numChip, { backgroundColor: compOffHoursPerDay === String(h) ? colors.primary : colors.surface, borderColor: compOffHoursPerDay === String(h) ? colors.primary : colors.border }]}>
+                        <Text style={{ fontSize: 13, color: compOffHoursPerDay === String(h) ? "#fff" : colors.muted }}>{h}h</Text>
+                      </TouchableOpacity>
+                    ))}
+                    <TextInput value={compOffHoursPerDay} onChangeText={setCompOffHoursPerDay} keyboardType="decimal-pad"
+                      style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border }]} />
+                  </View>
+                </FormRow>
+              )}
+            </SectionCard>
+          )}
+
+          {/* ── 补贴设置 ── */}
+          <SectionCard title="补贴设置" colors={colors}>
+            {allowanceRules.map((rule) => (
+              <View key={rule.id} style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border + "44" }}>
+                <View style={{ flex: 1, gap: 6 }}>
+                  <View style={{ flexDirection: "row", gap: 6 }}>
+                    {(["meal_per_day", "transport_fixed", "custom_fixed"] as const).map((t) => (
+                      <TouchableOpacity key={t} onPress={() => updateAllowanceRule(rule.id, { type: t })}
+                        style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, backgroundColor: rule.type === t ? colors.primary : colors.surface, borderColor: rule.type === t ? colors.primary : colors.border }}>
+                        <Text style={{ fontSize: 10, color: rule.type === t ? "#fff" : colors.muted }}>{t === "meal_per_day" ? "饭补/天" : t === "transport_fixed" ? "交通/月" : "自定义"}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+                    <TextInput value={rule.label} onChangeText={(v) => updateAllowanceRule(rule.id, { label: v })} placeholder="名称" placeholderTextColor={colors.muted}
+                      style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, flex: 1 }]} />
+                    <TextInput value={String(rule.amount)} onChangeText={(v) => updateAllowanceRule(rule.id, { amount: Number(v) || 0 })} placeholder="金额" placeholderTextColor={colors.muted} keyboardType="decimal-pad"
+                      style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, width: 70 }]} />
+                    <Text style={{ fontSize: 11, color: colors.muted }}>{rule.type === "meal_per_day" ? "元/天" : "元/月"}</Text>
+                  </View>
+                </View>
+                <TouchableOpacity onPress={() => deleteAllowanceRule(rule.id)} style={{ padding: 6 }}>
+                  <IconSymbol name="trash" size={15} color={colors.error} />
+                </TouchableOpacity>
+              </View>
+            ))}
+            <TouchableOpacity onPress={() => { tap(); addAllowanceRule(); }}
+              style={[S.addRuleBtn, { borderColor: colors.primary + "44", backgroundColor: colors.primary + "08", marginTop: 8 }]}>
+              <IconSymbol name="plus" size={13} color={colors.primary} />
+              <Text style={{ fontSize: 13, color: colors.primary, fontWeight: "600" }}>添加补贴项</Text>
+            </TouchableOpacity>
+          </SectionCard>
+
+          {/* ── 社保/公积金 ── */}
+          <SectionCard title="社保 / 公积金" colors={colors}>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 4 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>开启社保公积金计算</Text>
+                <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>开启后将自动从应发薪资里扣除</Text>
+              </View>
+              <TouchableOpacity onPress={() => { tap(); setSiEnabled(!siEnabled); }}
+                style={{ width: 44, height: 26, borderRadius: 13, backgroundColor: siEnabled ? colors.primary : colors.border, justifyContent: "center", paddingHorizontal: 2 }}>
+                <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: "#fff", alignSelf: siEnabled ? "flex-end" : "flex-start" }} />
+              </TouchableOpacity>
+            </View>
+            {siEnabled && (
+              <View style={{ gap: 10, marginTop: 8 }}>
+                <FormRow label="城市（用于政策匹配）" colors={colors}>
+                  <TextInput value={siCity} onChangeText={setSiCity} placeholder="如《上海》《北京》"
+                    placeholderTextColor={colors.muted} style={[S.input, { color: colors.foreground, borderColor: colors.border }]} />
+                </FormRow>
+                <FormRow label="社保基数（0=以工资为基数）" colors={colors}>
+                  <TextInput value={siBase} onChangeText={setSiBase} placeholder="0" keyboardType="decimal-pad"
+                    placeholderTextColor={colors.muted} style={[S.input, { color: colors.foreground, borderColor: colors.border }]} />
+                </FormRow>
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  {[
+                    { label: "养老%", value: siPension, setter: setSiPension },
+                    { label: "医疗%", value: siMedical, setter: setSiMedical },
+                    { label: "失业%", value: siUnemployment, setter: setSiUnemployment },
+                  ].map((item) => (
+                    <View key={item.label} style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 10, color: colors.muted, marginBottom: 4 }}>{item.label}</Text>
+                      <TextInput value={item.value} onChangeText={item.setter} keyboardType="decimal-pad"
+                        placeholderTextColor={colors.muted} style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, width: "100%" }]} />
+                    </View>
+                  ))}
+                </View>
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 10, color: colors.muted, marginBottom: 4 }}>公积金%</Text>
+                    <TextInput value={siHousingFund} onChangeText={setSiHousingFund} keyboardType="decimal-pad"
+                      placeholderTextColor={colors.muted} style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, width: "100%" }]} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 10, color: colors.muted, marginBottom: 4 }}>公积金基数（0=同社保）</Text>
+                    <TextInput value={siHousingBase} onChangeText={setSiHousingBase} placeholder="0" keyboardType="decimal-pad"
+                      placeholderTextColor={colors.muted} style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, width: "100%" }]} />
+                  </View>
+                </View>
+              </View>
             )}
           </SectionCard>
 

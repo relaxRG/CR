@@ -1,6 +1,6 @@
 /**
- * 人工成本管理模块 - 完整类型定义 v2
- * 新增：差异化工时、调休规则、补贴规则、绩效模板、班次模板、节假日配置、员工分组
+ * 人工成本管理模块 - 完整类型定义 v3
+ * 新增：特殊状态系统、加班换休、社保/公积金、个人所得税、薪资趋势
  */
 
 // ─── 员工部门 / 类型 ──────────────────────────────────────────────────────────
@@ -86,6 +86,122 @@ export interface AllowanceRule {
   enabled: boolean;
 }
 
+// ─── 社保 / 公积金配置 ────────────────────────────────────────────────────────
+export interface SocialInsuranceConfig {
+  /** 是否启用社保计算 */
+  enabled: boolean;
+  /** 城市（用于匹配政策，如"上海"、"北京"） */
+  city: string;
+  /** 社保基数（元/月，0=使用工资作为基数） */
+  base: number;
+  /** 养老保险个人缴费比例（默认8%） */
+  pensionRate: number;
+  /** 医疗保险个人缴费比例（默认2%） */
+  medicalRate: number;
+  /** 失业保险个人缴费比例（默认0.5%） */
+  unemploymentRate: number;
+  /** 工伤保险个人缴费比例（默认0%，通常由单位缴纳） */
+  workInjuryRate: number;
+  /** 生育保险个人缴费比例（默认0%） */
+  maternityRate: number;
+  /** 公积金个人缴费比例（默认12%） */
+  housingFundRate: number;
+  /** 公积金基数（元/月，0=使用工资作为基数） */
+  housingFundBase: number;
+  /** 最后联网更新时间 */
+  lastUpdated?: string;
+}
+
+/** 默认社保配置（全国通用基准） */
+export const DEFAULT_SOCIAL_INSURANCE: SocialInsuranceConfig = {
+  enabled: false,
+  city: "",
+  base: 0,
+  pensionRate: 0.08,
+  medicalRate: 0.02,
+  unemploymentRate: 0.005,
+  workInjuryRate: 0,
+  maternityRate: 0,
+  housingFundRate: 0.12,
+  housingFundBase: 0,
+  lastUpdated: undefined,
+};
+
+// ─── 个人所得税配置 ───────────────────────────────────────────────────────────
+export interface IncomeTaxConfig {
+  /** 是否启用个税计算 */
+  enabled: boolean;
+  /** 起征点（元/月，默认5000） */
+  threshold: number;
+  /**
+   * 专项附加扣除（元/月，如子女教育、住房贷款利息等）
+   * 需手动填写，不自动获取
+   */
+  specialDeductions: number;
+  /** 最后联网更新时间 */
+  lastUpdated?: string;
+}
+
+/** 中国个税税率表（2019年起适用） */
+export const INCOME_TAX_BRACKETS = [
+  { min: 0,      max: 36000,   rate: 0.03, quickDeduction: 0 },
+  { min: 36000,  max: 144000,  rate: 0.10, quickDeduction: 2520 },
+  { min: 144000, max: 300000,  rate: 0.20, quickDeduction: 16920 },
+  { min: 300000, max: 420000,  rate: 0.25, quickDeduction: 31920 },
+  { min: 420000, max: 660000,  rate: 0.30, quickDeduction: 52920 },
+  { min: 660000, max: 960000,  rate: 0.35, quickDeduction: 85920 },
+  { min: 960000, max: Infinity, rate: 0.45, quickDeduction: 181920 },
+];
+
+/** 默认个税配置 */
+export const DEFAULT_INCOME_TAX: IncomeTaxConfig = {
+  enabled: false,
+  threshold: 5000,
+  specialDeductions: 0,
+  lastUpdated: undefined,
+};
+
+// ─── 特殊状态模板 ─────────────────────────────────────────────────────────────
+/**
+ * 特殊状态分类：
+ * absence  = 缺席（不计工时，按倍率调整薪资）
+ * work_day = 工作日特殊（计工时，按倍率调整薪资，如节日上班）
+ * comp_off = 加班换休（不计工时，不扣薪，从累积加班时数里扣除）
+ */
+export type SpecialStatusCategory = "absence" | "work_day" | "comp_off";
+
+export interface SpecialStatus {
+  id: string;
+  /** 状态名称（如"旷工"、"病假"、"节日上班"） */
+  name: string;
+  /** 分类 */
+  category: SpecialStatusCategory;
+  /**
+   * 薪资倍率
+   * absence 类：0=不扣薪, 0.5=扣半天, 1=扣全天, 2=扣双倍（惩罚性）
+   * work_day 类：1=正常日薪, 2=双倍, 3=三倍
+   * comp_off 类：固定为 0（不扣薪，从加班时数里扣）
+   */
+  salaryMultiplier: number;
+  /** 显示颜色 */
+  color: string;
+  /** 排序权重 */
+  sortOrder: number;
+  /** 是否内置（内置状态不可删除，但可修改名称和倍率） */
+  isBuiltin?: boolean;
+}
+
+/** 预设特殊状态（可全量增删改） */
+export const DEFAULT_SPECIAL_STATUSES: SpecialStatus[] = [
+  { id: "ss_rest",     name: "休",       category: "absence",  salaryMultiplier: 0,   color: "#8E8E93", sortOrder: 0, isBuiltin: true },
+  { id: "ss_annual",   name: "年假",     category: "absence",  salaryMultiplier: 0,   color: "#34C759", sortOrder: 1, isBuiltin: true },
+  { id: "ss_sick",     name: "病假",     category: "absence",  salaryMultiplier: 0.5, color: "#FF9500", sortOrder: 2, isBuiltin: true },
+  { id: "ss_personal", name: "事假",     category: "absence",  salaryMultiplier: 1,   color: "#5856D6", sortOrder: 3, isBuiltin: true },
+  { id: "ss_absent",   name: "旷工",     category: "absence",  salaryMultiplier: 2,   color: "#FF3B30", sortOrder: 4, isBuiltin: true },
+  { id: "ss_holiday",  name: "节日上班", category: "work_day", salaryMultiplier: 3,   color: "#FF2D55", sortOrder: 5, isBuiltin: true },
+  { id: "ss_comp_off", name: "加班换休", category: "comp_off", salaryMultiplier: 0,   color: "#007AFF", sortOrder: 6, isBuiltin: true },
+];
+
 // ─── 绩效条目数据源类型 ───────────────────────────────────────────────────────
 export type PerformanceDataSource =
   | "manual"            // 纯手动
@@ -111,7 +227,6 @@ export interface PerformanceItem {
   /**
    * 阶梯规则（用于营业额提点、好评数等）
    * 例：[{ threshold: 50000, rate: 0.04 }, { threshold: 90000, rate: 0.05 }]
-   * threshold = 达到该值时，rate = 提成比例（0.04 = 4%）
    */
   tiers?: Array<{ threshold: number; rate: number; label?: string }>;
   /** 排序权重 */
@@ -121,280 +236,173 @@ export interface PerformanceItem {
 // ─── 绩效分组（模板级别） ─────────────────────────────────────────────────────
 export interface PerformanceGroup {
   id: string;
-  /** 分组标题（A / B / 工作绩效 / 利润提点...） */
   title: string;
-  /** 分组说明 */
   description: string;
-  /** 该分组下的条目 */
   items: PerformanceItem[];
-  /** 排序权重 */
   sortOrder: number;
 }
 
 // ─── 绩效模板（每位员工一个） ─────────────────────────────────────────────────
 export interface PerformanceTemplate {
   id: string;
-  /** 员工ID */
   employeeId: string;
-  /** 模板名称 */
   name: string;
-  /** 分组列表 */
   groups: PerformanceGroup[];
-  /** 更新时间 */
   updatedAt: string;
 }
 
 // ─── 绩效月度记录（每月填写实际完成情况） ────────────────────────────────────
 export interface PerformanceRecord {
   id: string;
-  /** 员工ID */
   employeeId: string;
-  /** 月份 "2026-07" */
   month: string;
-  /**
-   * 各条目实际完成金额
-   * key = PerformanceItem.id，value = 实际金额
-   */
   actuals: Record<string, number>;
-  /**
-   * 各条目是否被人工覆盖（覆盖后显示"已修改"标记）
-   * key = PerformanceItem.id
-   */
   overrides: Record<string, boolean>;
-  /**
-   * 各条目的智能填充备注（如"本月营业额：¥82,000"）
-   * key = PerformanceItem.id
-   */
   autoNotes: Record<string, string>;
-  /** 绩效合计（自动汇总） */
   totalPerformance: number;
-  /** 更新时间 */
   updatedAt: string;
 }
 
 // ─── 班次模板 ─────────────────────────────────────────────────────────────────
-/**
- * 班次名称：任意字符串，完全由用户自定义。
- * 参考餐饮行业常见班次：早班、午班、晚班、大夜班、全天班、中班等。
- * 不再限定为固定少数选项，支持增删改任意数量班次。
- */
 export type ShiftSession = string;
 
 export interface ShiftTemplate {
   id: string;
-  /**
-   * 班次名称（任意自定义，如"午班"、"晚班"、"早班"、"大夜班"等）
-   * 排班表按此字段动态分行展示
-   */
   session: string;
-  /** 开始时间（如 "11:00"） */
   startTime: string;
-  /** 结束时间（如 "17:00"，跨午夜写 "02:00"） */
   endTime: string;
-  /** 默认工时（小时）——添加排班时自动带入，可单独修改 */
   defaultHours: number;
-  /** 显示颜色（十六进制，如 "#FF9500"） */
   color: string;
-  /** 排序权重（决定排班表中班次行的显示顺序，数字越小越靠前） */
   sortOrder: number;
 }
 
-/**
- * 默认班次模板（参考餐饮行业常见设置）
- * 用户可在班次模板设置页全量增删改
- */
 export const DEFAULT_SHIFT_TEMPLATES: ShiftTemplate[] = [
   { id: "tpl_noon",    session: "午班", startTime: "10:30", endTime: "17:00", defaultHours: 6,  color: "#FF9500", sortOrder: 0 },
   { id: "tpl_evening", session: "晚班", startTime: "17:00", endTime: "24:00", defaultHours: 7,  color: "#5856D6", sortOrder: 1 },
 ];
 
-/** 班次颜色预设（新建班次时供选择） */
 export const SHIFT_COLOR_PRESETS = [
-  "#FF9500", // 橙色（午班）
-  "#5856D6", // 紫色（晚班）
-  "#34C759", // 绿色（早班）
-  "#FF3B30", // 红色（大夜班）
-  "#007AFF", // 蓝色（全天班）
-  "#AF52DE", // 紫红（中班）
-  "#5AC8FA", // 浅蓝（早午班）
-  "#FF2D55", // 玫红（大夜班）
-  "#FFCC00", // 黄色
-  "#8E8E93", // 灰色
+  "#FF9500", "#5856D6", "#34C759", "#FF3B30", "#007AFF",
+  "#AF52DE", "#5AC8FA", "#FF2D55", "#FFCC00", "#8E8E93",
 ];
-
 
 // ─── 节假日配置 ───────────────────────────────────────────────────────────────
 export interface HolidayConfig {
   id: string;
-  /** 节日名称（如"国庆节"） */
   name: string;
-  /** 节日日期列表（"2026-10-01"...） */
   dates: string[];
-  /** 工资倍率（如 2 = 2倍，1.5 = 1.5倍） */
   multiplier: number;
-  /** 适用员工ID列表（空=全部适用） */
   applicableEmployeeIds: string[];
-  /** 备注（如"法定节假日第1天"） */
   notes: string;
 }
 
-/** 法定节假日参考数据 */
 export const LEGAL_HOLIDAY_REFERENCE = [
-  { name: "元旦", desc: "1月1日，1天", multiplier: 3 },
-  { name: "春节", desc: "农历初一至初七，7天", multiplier: 3 },
-  { name: "清明节", desc: "4月4-6日，1天", multiplier: 3 },
-  { name: "劳动节", desc: "5月1-5日，1天", multiplier: 3 },
-  { name: "端午节", desc: "农历五月初五，1天", multiplier: 3 },
-  { name: "中秋节", desc: "农历八月十五，1天", multiplier: 3 },
-  { name: "国庆节", desc: "10月1-7日，3天", multiplier: 3 },
+  { name: "元旦",   desc: "1月1日，1天",       multiplier: 3 },
+  { name: "春节",   desc: "农历初一至初七，7天", multiplier: 3 },
+  { name: "清明节", desc: "4月4-6日，1天",      multiplier: 3 },
+  { name: "劳动节", desc: "5月1-5日，1天",      multiplier: 3 },
+  { name: "端午节", desc: "农历五月初五，1天",   multiplier: 3 },
+  { name: "中秋节", desc: "农历八月十五，1天",   multiplier: 3 },
+  { name: "国庆节", desc: "10月1-7日，3天",     multiplier: 3 },
 ];
 
 // ─── 员工自定义分组 ───────────────────────────────────────────────────────────
 export interface EmployeeGroup {
   id: string;
-  /** 分组名称（如"前厅"、"后厨"、"管理层"） */
   name: string;
-  /** 分组颜色 */
   color: string;
-  /** 该分组内员工ID的有序列表 */
   employeeIds: string[];
-  /** 排序权重（分组间排序） */
   sortOrder: number;
-  /** 是否折叠 */
   collapsed: boolean;
 }
 
-/** 默认员工分组（与 DEPT 对应） */
 export const DEFAULT_EMPLOYEE_GROUPS: EmployeeGroup[] = [
-  { id: "grp_front",   name: "前厅",   color: "#007AFF", employeeIds: [], sortOrder: 0, collapsed: false },
-  { id: "grp_kitchen", name: "后厨",   color: "#34C759", employeeIds: [], sortOrder: 1, collapsed: false },
-  { id: "grp_parttime",name: "兼职",   color: "#FF9500", employeeIds: [], sortOrder: 2, collapsed: false },
-  { id: "grp_other",   name: "其他",   color: "#8E8E93", employeeIds: [], sortOrder: 3, collapsed: false },
+  { id: "grp_front",    name: "前厅", color: "#007AFF", employeeIds: [], sortOrder: 0, collapsed: false },
+  { id: "grp_kitchen",  name: "后厨", color: "#34C759", employeeIds: [], sortOrder: 1, collapsed: false },
+  { id: "grp_parttime", name: "兼职", color: "#FF9500", employeeIds: [], sortOrder: 2, collapsed: false },
+  { id: "grp_other",    name: "其他", color: "#8E8E93", employeeIds: [], sortOrder: 3, collapsed: false },
 ];
 
 // ─── 员工档案（扩展版） ───────────────────────────────────────────────────────
 export interface Employee {
   id: string;
-  /** 员工代号（如 RG, Zik, 权哥） */
   code: string;
-  /** 真实姓名 */
   realName: string;
-  /** 联系方式 */
   phone: string;
-  /** 部门（保留兼容） */
   dept: EmployeeDept;
-  /** 类型：全职/兼职 */
   type: EmployeeType;
-  /** 底薪（月，全职专用） */
   baseSalary: number;
-  /** 每日标准工时（小时/天，全职专用；差异化工时优先级更高） */
+  /** 每日标准工时（无灵活规则时使用） */
   stdHoursPerDay: number;
-  /**
-   * 灵活工时规则列表（按星期范围设置合同工时）
-   * 若设置则优先于 stdHoursPerDay
-   * 例：[{ fromDay:1, toDay:4, hours:8 }, { fromDay:5, toDay:6, hours:9 }]
-   * 表示周一~周四 8h/天，周五~周六 9h/天
-   */
+  /** 灵活工时规则列表（优先于 stdHoursPerDay） */
   weeklyHoursRules?: WeeklyHoursRule[];
-  /**
-   * @deprecated 旧版差异化工时（按单天设置），已被 weeklyHoursRules 替代
-   * 保留用于数据迁移兼容
-   */
+  /** @deprecated 旧版，已被 weeklyHoursRules 替代 */
   weeklyHours?: WeeklyHoursMap;
-  /** 月休息天数（全职专用） */
   restDaysPerMonth: number;
-  /** 时薪（手动设定，兼职和全职加班都用这个） */
   hourlyRate: number;
-  /** 加班时薪（默认等于时薪，可单独设定） */
   overtimeHourlyRate: number;
-  /** 节假日倍率（如 1.5 = 1.5倍，2 = 2倍；被 HolidayConfig 覆盖时以 HolidayConfig 为准） */
   holidayMultiplier: number;
-  /** 调休规则 */
+  /** 调休规则（几小时加班换一天休） */
   compOffRule?: CompOffRule;
-  /** 补贴规则列表 */
+  /** 补贴规则列表（饭补/交通/自定义） */
   allowanceRules?: AllowanceRule[];
-  /** 默认班次（决定在排班表中归属午班行还是晚班行） */
+  /** 社保/公积金配置（每人独立，可覆盖全局配置） */
+  socialInsurance?: SocialInsuranceConfig;
+  /** 个税配置（每人独立，可覆盖全局配置） */
+  incomeTax?: IncomeTaxConfig;
   defaultSession?: ShiftSession;
-  /** 备注 */
   notes: string;
-  /** 是否在职 */
   active: boolean;
-  /**
-   * 长期兼职专用：月度固定薪资（若设置，则按月结算而非纯按小时）
-   * 0 = 不设置，仍按工时计算
-   */
   monthlyFixedSalary: number;
-  /** 銀行卡信息（用于薪资发放） */
   bankAccounts?: EmployeeBankAccount[];
-  // ─── 详细档案信息 ───────────────────────────────────────────────────────────
-  /** 身份证号 */
   idNumber?: string;
-  /** 住址 */
   address?: string;
-  /** 紧急联系人姓名 */
   emergencyContactName?: string;
-  /** 紧急联系人电话 */
   emergencyContactPhone?: string;
-  /** 紧急联系人关系 */
   emergencyContactRelation?: string;
-  /** 身份证件图片 URI（本地或 base64） */
   idCardImageUri?: string;
-  /** 健康证件图片 URI */
   healthCertImageUri?: string;
-  /** 健康证到期日期 YYYY-MM-DD */
   healthCertExpiry?: string;
-  /** 入职日期 YYYY-MM-DD */
   joinDate?: string;
-  /** 创建时间 */
   createdAt: string;
 }
 
-// ─── 员工銀行卡 ───────────────────────────────────────────────────────────────
+// ─── 员工银行卡 ───────────────────────────────────────────────────────────────
 export interface EmployeeBankAccount {
   id: string;
-  /** 账户名（通常是真实姓名） */
   accountName: string;
-  /** 銀行名称 */
   bankName: string;
-  /** 銀行卡号 */
   cardNumber: string;
-  /** 备注 */
   note: string;
-  /** 是否为默认账户 */
   isDefault: boolean;
 }
 
 // ─── 排班单元格值 ─────────────────────────────────────────────────────────────
-/** 时长版本：数字（工时）或特殊标注 */
 export type ShiftHoursValue = number | "休" | "无早" | null;
-
-/**
- * 班次标注值：任意班次名称字符串，或特殊值"休"/"无早"，或 null（未排班）
- * 不再限定为固定的午/晚选项
- */
 export type ShiftSessionValue = string | "休" | "无早" | null;
 
 // ─── 排班记录（每月每员工每天） ───────────────────────────────────────────────
 export interface ShiftEntry {
-  /** 员工ID */
   employeeId: string;
   /** 日期 "2026-02-01" */
   date: string;
   /**
-   * 班次名称（与 ShiftTemplate.session 对应，如"午班"、"晚班"、"早班"等）
-   * 同一员工同一天可有多条不同班次的记录（如同时有午班和晚班）
+   * 班次名称（工作班次时使用，如"午班"、"晚班"）
+   * 若 specialStatusId 有值，则此字段表示特殊状态名称（用于显示）
    * @deprecated 旧值 "day"/"evening"/"both" 会在读取时自动迁移
    */
   shift: string;
-  /** 时长版本：工时（小时），null=未排班 */
+  /** 工时（小时），特殊状态时为 null 或 0 */
   hoursValue: ShiftHoursValue;
-  /** 班次标注（与 shift 相同，保留用于向后兼容） */
+  /** @deprecated 保留向后兼容 */
   sessionValue: ShiftSessionValue;
   /**
-   * 加班处理方式（针对超出合同工时的部分）
-   * "pay" = 计加班费（默认）
-   * "comp_off" = 换调休
+   * 特殊状态 ID（对应 SpecialStatus.id）
+   * 若设置，该天按特殊状态规则处理薪资
+   * comp_off 类型表示加班换休（从累积加班时数里扣除 compOffRule.hoursPerDay 小时）
    */
+  specialStatusId?: string;
+  /** @deprecated 旧版加班处理方式，已被 specialStatusId 替代 */
   overtimeType?: "pay" | "comp_off";
 }
 
@@ -403,123 +411,151 @@ export interface CompOffBalance {
   id: string;
   employeeId: string;
   month: string;
-  /** 本月通过换休积累的调休天数 */
-  earnedDays: number;
-  /** 本月已使用的调休天数 */
-  usedDays: number;
-  /** 结余调休天数（可结转下月） */
-  remainingDays: number;
-  /** 换休明细（哪天加班换了多少调休） */
-  details: Array<{ date: string; overtimeHours: number; compOffDays: number }>;
+  /** 本月累积加班时数（用于加班换休计算） */
+  totalOvertimeHours: number;
+  /** 本月使用加班换休次数 */
+  compOffCount: number;
+  /** 每次换休消耗的加班时数（来自 compOffRule.hoursPerDay） */
+  hoursPerCompOff: number;
+  /** 实际计费加班时数（totalOvertimeHours - compOffCount * hoursPerCompOff） */
+  paidOvertimeHours: number;
+  /** @deprecated 旧版字段，保留兼容 */
+  earnedDays?: number;
+  usedDays?: number;
+  remainingDays?: number;
+  details?: Array<{ date: string; overtimeHours: number; compOffDays: number }>;
 }
 
 // ─── 月度考勤汇总（每员工每月） ──────────────────────────────────────────────
 export interface MonthlyAttendance {
   id: string;
-  /** 员工ID */
   employeeId: string;
-  /** 月份 "2026-02" */
   month: string;
-  /** 当月天数 */
   daysInMonth: number;
-  /** 出勤天数 */
+  /** 出勤天数（有工时的天数） */
   attendanceDays: number;
-  /** 总工时 */
+  /** 总工时（所有工作班次工时之和） */
   totalHours: number;
-  /** 标准工时（按差异化工时或统一工时计算） */
+  /** 标准工时（按灵活工时规则或统一工时计算） */
   stdHours: number;
-  /** 加班时间（总工时 - 标准工时，正数为加班） */
+  /** 累积加班时数（totalHours - stdHours，正数为加班） */
   overtimeHours: number;
-  /** 换调休的加班时间（不计入加班工资） */
-  compOffHours: number;
-  /** 实际计费加班时间（overtimeHours - compOffHours） */
+  /** 加班换休次数 */
+  compOffCount: number;
+  /** 每次换休消耗的加班时数 */
+  hoursPerCompOff: number;
+  /** 实际计费加班时数（overtimeHours - compOffCount * hoursPerCompOff） */
   paidOvertimeHours: number;
-  /** 少休天数（负数表示少休，需扣款；正数表示多休） */
+  /**
+   * 应出勤天数（daysInMonth - restDaysPerMonth）
+   * 自动从员工档案计算，不需要手动填写
+   */
+  expectedAttendanceDays: number;
+  /**
+   * 少休天数 = 应出勤天数 - 实际出勤天数
+   * 正数=少出勤（缺席），负数=多出勤（加班天数）
+   * 自动计算，不需要手动填写
+   */
   underRestDays: number;
-  /** 节假日加班天数（几倍天数） */
-  holidayDays: number;
-  /** 日薪（底薪 ÷ 实际工作天数，自动计算，可手动覆盖） */
-  dailyRate: number;
-  /** 是否手动覆盖日薪 */
-  dailyRateOverride: boolean;
-  /** 加班工资（计费加班时间 × 加班时薪） */
-  overtimePay: number;
-  /** 少休扣款（少休天数 × 日薪，负数） */
-  underRestDeduction: number;
-  /** 节假日补偿（节假日天数 × 日薪 × (节假日倍率-1)） */
+  /**
+   * 特殊状态扣薪明细
+   * key = 特殊状态 ID，value = { count: 天数, deduction: 扣薪金额, name: 状态名称 }
+   */
+  specialStatusDeductions: Record<string, { count: number; deduction: number; name: string; multiplier: number }>;
+  /** 特殊状态总扣薪（所有 absence 类状态的扣薪合计） */
+  totalSpecialDeduction: number;
+  /** 节日上班补偿（work_day 类特殊状态的额外薪资） */
   holidayBonus: number;
-  /** 考勤工资 = 底薪 + 加班工资 - 少休扣款 + 节假日补偿 */
+  dailyRate: number;
+  dailyRateOverride: boolean;
+  overtimePay: number;
+  /** 考勤工资 = 底薪 + 加班工资 - 特殊状态扣薪 + 节日上班补偿 */
   attendanceSalary: number;
-  /** 手动备注 */
   notes: string;
 }
 
 // ─── 薪资单（最终薪资） ───────────────────────────────────────────────────────
 export interface PaySlip {
   id: string;
-  /** 员工ID */
   employeeId: string;
-  /** 月份 "2026-02" */
   month: string;
-  /** 出勤天数 */
   attendanceDays: number;
-  /** 考勤工资（来自 MonthlyAttendance） */
   attendanceSalary: number;
-  /** 工作绩效（来自 PerformanceRecord.totalPerformance） */
   performanceBonus: number;
-  /** 业绩提点（利润提点等，单独字段） */
   salesCommission: number;
-  /** 吃饭补贴（自动计算：出勤天数 × 日额） */
   mealAllowance: number;
-  /** 交通补贴（固定月额） */
   transportAllowance: number;
-  /** 其他补贴 */
   otherAllowance: number;
-  /** 奖惩金额（正=奖励，负=惩罚） */
   rewardPenalty: number;
-  /** 奖惩备注 */
   rewardPenaltyNote: string;
-  /** 预支金额（从 SalaryAdvance 自动汇总） */
   advanceAmount: number;
-  /** 其他备注 */
   notes: string;
-  /** 最终薪资 = 考勤工资 + 绩效 + 提点 + 补贴 ± 奖惩 */
+  /** 最终薪资（税前，扣除社保个税前） */
+  grossSalary: number;
+  /** 社保个人缴纳金额（自动计算，可手动覆盖） */
+  socialInsuranceDeduction: number;
+  /** 公积金个人缴纳金额（自动计算，可手动覆盖） */
+  housingFundDeduction: number;
+  /** 个人所得税（累计预扣法，自动计算） */
+  incomeTax: number;
+  /** 实发薪资 = 应发 - 社保 - 公积金 - 个税 - 预支 */
   finalSalary: number;
-  /**
-   * 补贴明细（用于展示各项补贴的计算依据）
-   * key = AllowanceRule.id，value = { amount, autoNote, isOverride }
-   */
+  /** 补贴明细 */
   allowanceDetails?: Record<string, { amount: number; autoNote: string; isOverride: boolean }>;
-  /** 创建/更新时间 */
+  /** 社保明细（各险种金额） */
+  socialInsuranceDetails?: {
+    pension: number;
+    medical: number;
+    unemployment: number;
+    workInjury: number;
+    maternity: number;
+  };
+  /** 个税计算备注（如"累计应税收入¥xx，适用税率xx%"） */
+  incomeTaxNote?: string;
   updatedAt: string;
 }
 
+// ─── 全局薪资设置（社保/个税开关） ───────────────────────────────────────────
+export interface GlobalPayrollSettings {
+  /** 全局社保/公积金开关 */
+  socialInsuranceEnabled: boolean;
+  /** 全局个税开关 */
+  incomeTaxEnabled: boolean;
+  /** 全局社保配置（员工未单独配置时使用） */
+  defaultSocialInsurance: SocialInsuranceConfig;
+  /** 全局个税配置 */
+  defaultIncomeTax: IncomeTaxConfig;
+  /** 最后更新时间 */
+  updatedAt: string;
+}
+
+export const DEFAULT_GLOBAL_PAYROLL_SETTINGS: GlobalPayrollSettings = {
+  socialInsuranceEnabled: false,
+  incomeTaxEnabled: false,
+  defaultSocialInsurance: DEFAULT_SOCIAL_INSURANCE,
+  defaultIncomeTax: DEFAULT_INCOME_TAX,
+  updatedAt: new Date().toISOString(),
+};
+
 // ─── 月度设置 ─────────────────────────────────────────────────────────────────
 export interface MonthConfig {
-  /** 月份 "2026-02" */
   month: string;
-  /** 当月天数（自动计算，可手动覆盖） */
   daysInMonth: number;
-  /** 月初日期 "2026-02-01" */
   startDate: string;
-  /** 备注 */
   notes: string;
 }
 
 // ─── 工具函数 ─────────────────────────────────────────────────────────────────
 
-/** 计算当月天数 */
 export function getDaysInMonth(year: number, month: number): number {
   return new Date(year, month, 0).getDate();
 }
 
-/** 从月份字符串获取年月 */
 export function parseMonth(month: string): { year: number; month: number } {
   const [y, m] = month.split("-").map(Number);
   return { year: y, month: m };
 }
 
-/** 计算日薪（底薪 ÷ 实际工作天数） */
 export function calcDailyRate(baseSalary: number, daysInMonth: number, restDays: number): number {
   const workDays = daysInMonth - restDays;
   if (workDays <= 0) return 0;
@@ -533,20 +569,16 @@ export function calcDailyRate(baseSalary: number, daysInMonth: number, restDays:
 export function getContractHoursForDate(employee: Employee, date: string): number {
   const dow = new Date(date).getDay() as 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
-  // 新版：灵活工时规则列表
   if (employee.weeklyHoursRules && employee.weeklyHoursRules.length > 0) {
     for (const rule of employee.weeklyHoursRules) {
-      // 处理跨周情况（如 fromDay=5, toDay=0 表示周五~周日）
       const inRange = rule.fromDay <= rule.toDay
         ? dow >= rule.fromDay && dow <= rule.toDay
         : dow >= rule.fromDay || dow <= rule.toDay;
       if (inRange) return rule.hours;
     }
-    // 规则未覆盖的天，使用默认工时
     return employee.stdHoursPerDay;
   }
 
-  // 旧版兼容：WeeklyHoursMap
   if (employee.weeklyHours) {
     const h = employee.weeklyHours[dow];
     if (h === null) return 0;
@@ -556,58 +588,76 @@ export function getContractHoursForDate(employee: Employee, date: string): numbe
   return employee.stdHoursPerDay;
 }
 
-/** 计算考勤工资（支持差异化工时和调休） */
-export function calcAttendanceSalary(params: {
-  type: EmployeeType;
-  baseSalary: number;
-  dailyRate: number;
-  totalHours: number;
-  stdHoursPerDay: number;
-  attendanceDays: number;
-  overtimeHourlyRate: number;
-  underRestDays: number;
-  holidayDays: number;
-  holidayMultiplier: number;
-  /** 计费加班时间（已扣除换调休部分） */
-  paidOvertimeHours?: number;
-}): {
-  overtimeHours: number;
-  overtimePay: number;
-  underRestDeduction: number;
-  holidayBonus: number;
-  attendanceSalary: number;
+/**
+ * 计算社保/公积金个人缴纳金额
+ */
+export function calcSocialInsurance(
+  grossSalary: number,
+  config: SocialInsuranceConfig
+): {
+  pension: number;
+  medical: number;
+  unemployment: number;
+  workInjury: number;
+  maternity: number;
+  housingFund: number;
+  total: number;
 } {
-  if (params.type === "parttime") {
-    // 兼职：总工时 × 时薪
-    const attendanceSalary = params.totalHours * params.overtimeHourlyRate;
-    return { overtimeHours: params.totalHours, overtimePay: attendanceSalary, underRestDeduction: 0, holidayBonus: 0, attendanceSalary };
+  if (!config.enabled) {
+    return { pension: 0, medical: 0, unemployment: 0, workInjury: 0, maternity: 0, housingFund: 0, total: 0 };
   }
+  const base = config.base > 0 ? config.base : grossSalary;
+  const hfBase = config.housingFundBase > 0 ? config.housingFundBase : grossSalary;
 
-  // 全职
-  const stdHours = params.attendanceDays * params.stdHoursPerDay;
-  const overtimeHours = Math.max(0, params.totalHours - stdHours);
-  // 使用计费加班时间（若提供），否则使用全部加班时间
-  const billableOvertimeHours = params.paidOvertimeHours ?? overtimeHours;
-  const overtimePay = Math.round(billableOvertimeHours * params.overtimeHourlyRate * 100) / 100;
+  const pension = Math.round(base * config.pensionRate * 100) / 100;
+  const medical = Math.round(base * config.medicalRate * 100) / 100;
+  const unemployment = Math.round(base * config.unemploymentRate * 100) / 100;
+  const workInjury = Math.round(base * config.workInjuryRate * 100) / 100;
+  const maternity = Math.round(base * config.maternityRate * 100) / 100;
+  const housingFund = Math.round(hfBase * config.housingFundRate * 100) / 100;
+  const total = pension + medical + unemployment + workInjury + maternity + housingFund;
 
-  // 少休扣款（underRestDays 为负数时表示少休）
-  const underRestDeduction = params.underRestDays < 0
-    ? Math.round(Math.abs(params.underRestDays) * params.dailyRate * 100) / 100
-    : 0;
-
-  // 节假日补偿（节假日天数 × 日薪 × (倍率-1)）
-  const holidayBonus = params.holidayDays > 0
-    ? Math.round(params.holidayDays * params.dailyRate * (params.holidayMultiplier - 1) * 100) / 100
-    : 0;
-
-  const attendanceSalary = Math.round((params.baseSalary + overtimePay - underRestDeduction + holidayBonus) * 100) / 100;
-
-  return { overtimeHours, overtimePay, underRestDeduction, holidayBonus, attendanceSalary };
+  return { pension, medical, unemployment, workInjury, maternity, housingFund, total };
 }
 
-/** 计算最终薪资 */
-export function calcFinalSalary(slip: Omit<PaySlip, "finalSalary" | "id" | "updatedAt">): number {
-  return Math.round((
+/**
+ * 计算个人所得税（累计预扣法）
+ * @param cumulativeIncome 年度累计应税收入（当月及之前各月应税收入之和）
+ * @param cumulativeDeductions 年度累计专项扣除（社保+公积金+专项附加扣除）
+ * @param cumulativeTaxPaid 年度累计已预扣税额
+ * @param threshold 起征点（默认5000）
+ * @returns 本月应预扣税额
+ */
+export function calcIncomeTax(
+  cumulativeIncome: number,
+  cumulativeDeductions: number,
+  cumulativeTaxPaid: number,
+  threshold: number = 5000,
+  specialDeductions: number = 0
+): { tax: number; note: string } {
+  // 累计应纳税所得额 = 累计收入 - 累计减除费用（起征点×月数）- 累计专项扣除 - 累计专项附加扣除
+  // 简化版：直接用传入的累计数据
+  const taxableIncome = Math.max(0, cumulativeIncome - cumulativeDeductions - specialDeductions);
+
+  // 查找适用税率档
+  const bracket = INCOME_TAX_BRACKETS.find(
+    (b) => taxableIncome > b.min && taxableIncome <= b.max
+  ) ?? INCOME_TAX_BRACKETS[0];
+
+  const cumulativeTax = Math.max(0, taxableIncome * bracket.rate - bracket.quickDeduction);
+  const monthTax = Math.max(0, cumulativeTax - cumulativeTaxPaid);
+
+  const note = `累计应税收入¥${taxableIncome.toFixed(0)}，适用税率${(bracket.rate * 100).toFixed(0)}%，速算扣除数¥${bracket.quickDeduction}`;
+
+  return { tax: Math.round(monthTax * 100) / 100, note };
+}
+
+/** 计算最终薪资（税后实发） */
+export function calcFinalSalary(slip: Omit<PaySlip, "finalSalary" | "grossSalary" | "id" | "updatedAt">): {
+  grossSalary: number;
+  finalSalary: number;
+} {
+  const grossSalary = Math.round((
     slip.attendanceSalary +
     slip.performanceBonus +
     slip.salesCommission +
@@ -616,13 +666,19 @@ export function calcFinalSalary(slip: Omit<PaySlip, "finalSalary" | "id" | "upda
     slip.otherAllowance +
     slip.rewardPenalty
   ) * 100) / 100;
+
+  const finalSalary = Math.round((
+    grossSalary -
+    (slip.socialInsuranceDeduction ?? 0) -
+    (slip.housingFundDeduction ?? 0) -
+    (slip.incomeTax ?? 0)
+  ) * 100) / 100;
+
+  return { grossSalary, finalSalary };
 }
 
 /**
  * 自动计算补贴金额
- * @param rule 补贴规则
- * @param attendanceDays 出勤天数（饭补使用）
- * @returns { amount, autoNote }
  */
 export function calcAllowance(rule: AllowanceRule, attendanceDays: number): { amount: number; autoNote: string } {
   if (!rule.enabled) return { amount: 0, autoNote: "" };
@@ -641,13 +697,11 @@ export function calcAllowance(rule: AllowanceRule, attendanceDays: number): { am
   }
 }
 
-/** 生成月份标签 */
 export function monthLabel(month: string): string {
   const [y, m] = month.split("-");
   return `${y}年${Number(m)}月`;
 }
 
-/** 获取月份的所有日期 */
 export function getMonthDates(month: string): string[] {
   const { year, month: m } = parseMonth(month);
   const days = getDaysInMonth(year, m);
@@ -657,7 +711,6 @@ export function getMonthDates(month: string): string[] {
   });
 }
 
-/** 获取日期的星期几（0=周日，1=周一...6=周六） */
 export function getDayOfWeek(date: string): number {
   return new Date(date).getDay();
 }

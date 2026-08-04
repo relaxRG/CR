@@ -24,7 +24,7 @@ import {
 } from "@/lib/labor/store";
 import {
   Employee, MonthlyAttendance, PaySlip, DEPT_LABELS, DEPT_COLORS,
-  calcDailyRate, calcAttendanceSalary, calcFinalSalary,
+  calcDailyRate, calcFinalSalary,
   getDaysInMonth, parseMonth, monthLabel, getMonthDates
 } from "@/lib/labor/types";
 
@@ -51,7 +51,7 @@ function AttendanceEditModal({
   const [totalHours, setTotalHours] = useState(String(existing?.totalHours ?? ""));
   const [overtimeHours, setOvertimeHours] = useState(String(existing?.overtimeHours ?? ""));
   const [underRestDays, setUnderRestDays] = useState(String(existing?.underRestDays ?? "0"));
-  const [holidayDays, setHolidayDays] = useState(String(existing?.holidayDays ?? "0"));
+  const [holidayDays, setHolidayDays] = useState("0"); // legacy field removed
   const [dailyRateInput, setDailyRateInput] = useState(String(existing?.dailyRate ?? ""));
   const [dailyRateOverride, setDailyRateOverride] = useState(existing?.dailyRateOverride ?? false);
   const [notes, setNotes] = useState(existing?.notes ?? "");
@@ -61,20 +61,17 @@ function AttendanceEditModal({
   const autoDailyRate = calcDailyRate(employee.baseSalary, daysInMonth, employee.restDaysPerMonth);
   const effectiveDailyRate = dailyRateOverride ? Number(dailyRateInput) : autoDailyRate;
 
-  // 实时计算
+  // 实时计算（兼容新引擎）
   const calc = useMemo(() => {
-    return calcAttendanceSalary({
-      type: employee.type,
-      baseSalary: employee.baseSalary,
-      dailyRate: effectiveDailyRate,
-      totalHours: Number(totalHours) || 0,
-      stdHoursPerDay: employee.stdHoursPerDay,
-      attendanceDays: Number(attendanceDays) || 0,
-      overtimeHourlyRate: employee.overtimeHourlyRate,
-      underRestDays: Number(underRestDays) || 0,
-      holidayDays: Number(holidayDays) || 0,
-      holidayMultiplier: employee.holidayMultiplier,
-    });
+    const stdH = (Number(attendanceDays) || 0) * employee.stdHoursPerDay;
+    const rawOT = Math.max(0, (Number(totalHours) || 0) - stdH);
+    const overtimePay = Math.round(rawOT * employee.overtimeHourlyRate * 100) / 100;
+    const underRestDeduction = 0; // 新引擎通过特殊状态处理，此处保留为0
+    const holidayBonus = Math.round((Number(holidayDays) || 0) * effectiveDailyRate * (employee.holidayMultiplier - 1) * 100) / 100;
+    const attendanceSalary = employee.type === "parttime"
+      ? Math.round((Number(totalHours) || 0) * employee.overtimeHourlyRate * 100) / 100
+      : Math.round((employee.baseSalary + overtimePay - underRestDeduction + holidayBonus) * 100) / 100;
+    return { overtimeHours: rawOT, overtimePay, underRestDeduction, holidayBonus, attendanceSalary };
   }, [employee, effectiveDailyRate, totalHours, attendanceDays, underRestDays, holidayDays]);
 
   const handleSave = () => {
@@ -88,15 +85,17 @@ function AttendanceEditModal({
       totalHours: Number(totalHours) || 0,
       stdHours: (Number(attendanceDays) || 0) * employee.stdHoursPerDay,
       overtimeHours: calc.overtimeHours,
-      compOffHours: existing?.compOffHours ?? 0,
+      compOffCount: existing?.compOffCount ?? 0,
+      hoursPerCompOff: existing?.hoursPerCompOff ?? (employee.compOffRule?.hoursPerDay ?? 8),
       paidOvertimeHours: calc.overtimeHours,
+      expectedAttendanceDays: existing?.expectedAttendanceDays ?? (daysInMonth - employee.restDaysPerMonth),
       underRestDays: Number(underRestDays) || 0,
-      holidayDays: Number(holidayDays) || 0,
+      specialStatusDeductions: existing?.specialStatusDeductions ?? {},
+      totalSpecialDeduction: 0,
+      holidayBonus: calc.holidayBonus,
       dailyRate: effectiveDailyRate,
       dailyRateOverride,
       overtimePay: calc.overtimePay,
-      underRestDeduction: calc.underRestDeduction,
-      holidayBonus: calc.holidayBonus,
       attendanceSalary: calc.attendanceSalary,
       notes,
     };
@@ -292,6 +291,10 @@ function PaySlipEditModal({
       rewardPenaltyNote: rewardNote,
       advanceAmount: existing?.advanceAmount ?? 0,
       notes,
+      grossSalary: finalSalary,
+      socialInsuranceDeduction: existing?.socialInsuranceDeduction ?? 0,
+      housingFundDeduction: existing?.housingFundDeduction ?? 0,
+      incomeTax: existing?.incomeTax ?? 0,
       finalSalary,
       updatedAt: new Date().toISOString(),
     };
@@ -473,7 +476,7 @@ export default function LaborAttendanceScreen() {
         if (att) {
           lines.push(`  出勤：${att.attendanceDays}天 · 总工时：${att.totalHours}h · 考勤工资：¥${att.attendanceSalary.toFixed(2)}`);
           if (att.overtimePay > 0) lines.push(`  加班：${att.overtimeHours.toFixed(1)}h × ¥${emp.overtimeHourlyRate} = ¥${att.overtimePay.toFixed(2)}`);
-          if (att.underRestDeduction > 0) lines.push(`  少休扣款：-¥${att.underRestDeduction.toFixed(2)}`);
+          if ((att.totalSpecialDeduction ?? 0) > 0) lines.push(`  少休扣款：-¥${(att.totalSpecialDeduction ?? 0).toFixed(2)}`);
         }
         if (slip) {
           if (slip.performanceBonus > 0) lines.push(`  工作绩效：+¥${slip.performanceBonus.toFixed(2)}`);
@@ -641,8 +644,8 @@ export default function LaborAttendanceScreen() {
                       {att && att.overtimeHours > 0 && (
                         <Text style={{ fontSize: 12, color: colors.success }}>+{att.overtimeHours.toFixed(1)}h</Text>
                       )}
-                      {att && att.underRestDeduction > 0 && (
-                        <Text style={{ fontSize: 11, color: colors.error }}>-¥{att.underRestDeduction.toFixed(0)}</Text>
+                      {att && (att.totalSpecialDeduction ?? 0) > 0 && (
+                        <Text style={{ fontSize: 11, color: colors.error }}>-¥{(att.totalSpecialDeduction ?? 0).toFixed(0)}</Text>
                       )}
                       {att && att.holidayBonus > 0 && (
                         <Text style={{ fontSize: 11, color: colors.warning }}>节+¥{att.holidayBonus.toFixed(0)}</Text>
