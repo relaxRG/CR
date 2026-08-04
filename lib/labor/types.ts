@@ -610,6 +610,7 @@ export interface Employee {
   healthCertImageUri?: string;
   healthCertExpiry?: string;
   joinDate?: string;
+  leaveDate?: string;
   createdAt: string;
 }
 

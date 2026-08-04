@@ -50,6 +50,16 @@ export default function LaborEmployeeFormScreen() {
   const [dept, setDept] = useState<EmployeeDept>(existing?.dept ?? "front");
   const [type, setType] = useState<EmployeeType>(existing?.type ?? "fulltime");
   const [joinDate, setJoinDate] = useState(existing?.joinDate ?? "");
+  const [leaveDate, setLeaveDate] = useState(existing?.leaveDate ?? "");
+
+  // 自动格式化日期：输入数字自动插入 "-"
+  const formatDateInput = (text: string, setter: (v: string) => void) => {
+    const digits = text.replace(/\D/g, "").slice(0, 8);
+    let formatted = digits;
+    if (digits.length > 4) formatted = digits.slice(0, 4) + "-" + digits.slice(4);
+    if (digits.length > 6) formatted = digits.slice(0, 4) + "-" + digits.slice(4, 6) + "-" + digits.slice(6);
+    setter(formatted);
+  };
   const [active, setActive] = useState(existing?.active ?? true);
   const [notes, setNotes] = useState(existing?.notes ?? "");
   const [defaultSession, setDefaultSession] = useState<string | undefined>(existing?.defaultSession);
@@ -208,6 +218,7 @@ export default function LaborEmployeeFormScreen() {
       emergencyContactRelation: emergencyRelation.trim() || undefined,
       healthCertExpiry: healthCertExpiry.trim() || undefined,
       joinDate: joinDate.trim() || undefined,
+      leaveDate: leaveDate.trim() || undefined,
       defaultSession,
     };
 
@@ -286,11 +297,30 @@ export default function LaborEmployeeFormScreen() {
                 placeholderTextColor={colors.muted} keyboardType="phone-pad"
                 style={[S.input, { color: colors.foreground, borderColor: colors.border }]} />
             </FormRow>
+          </SectionCard>
+
+          {/* ── 在职状态 ── */}
+          <SectionCard title="状态" colors={colors}>
+            <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>
+              {[{ v: true, label: "在职" }, { v: false, label: "离职" }].map((opt) => (
+                <TouchableOpacity key={String(opt.v)} onPress={() => { tap(); setActive(opt.v); }}
+                  style={[S.optionChip, { backgroundColor: active === opt.v ? (opt.v ? colors.success : colors.error) : colors.surface, borderColor: active === opt.v ? (opt.v ? colors.success : colors.error) : colors.border }]}>
+                  <Text style={{ fontSize: 13, fontWeight: "600", color: active === opt.v ? "#fff" : colors.muted }}>{opt.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
             <FormRow label="入职日期" colors={colors}>
-              <TextInput value={joinDate} onChangeText={setJoinDate} placeholder="YYYY-MM-DD"
-                placeholderTextColor={colors.muted}
+              <TextInput value={joinDate} onChangeText={(t) => formatDateInput(t, setJoinDate)} placeholder="YYYY-MM-DD"
+                placeholderTextColor={colors.muted} keyboardType="number-pad"
                 style={[S.input, { color: colors.foreground, borderColor: colors.border }]} />
             </FormRow>
+            {!active && (
+              <FormRow label="离职日期" colors={colors}>
+                <TextInput value={leaveDate} onChangeText={(t) => formatDateInput(t, setLeaveDate)} placeholder="YYYY-MM-DD"
+                  placeholderTextColor={colors.muted} keyboardType="number-pad"
+                  style={[S.input, { color: colors.foreground, borderColor: colors.border }]} />
+              </FormRow>
+            )}
           </SectionCard>
 
           {/* ── 部门与类型 ── */}
@@ -757,17 +787,6 @@ export default function LaborEmployeeFormScreen() {
               style={[S.textarea, { color: colors.foreground, borderColor: colors.border }]} />
           </SectionCard>
 
-          {/* ── 在职状态 ── */}
-          <SectionCard title="状态" colors={colors}>
-            <View style={{ flexDirection: "row", gap: 8 }}>
-              {[{ v: true, label: "在职" }, { v: false, label: "离职" }].map((opt) => (
-                <TouchableOpacity key={String(opt.v)} onPress={() => { tap(); setActive(opt.v); }}
-                  style={[S.optionChip, { backgroundColor: active === opt.v ? (opt.v ? colors.success : colors.error) : colors.surface, borderColor: active === opt.v ? (opt.v ? colors.success : colors.error) : colors.border }]}>
-                  <Text style={{ fontSize: 13, fontWeight: "600", color: active === opt.v ? "#fff" : colors.muted }}>{opt.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </SectionCard>
         </ScrollView>
       </KeyboardAvoidingView>
     </ScreenContainer>
