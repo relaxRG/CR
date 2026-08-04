@@ -1540,14 +1540,40 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
 
   const handleCellPress = (emp: Employee, date: string, session: string) => { tap(); setEditEmployee(emp); setEditDate(date); setEditSession(session); setEditModal(true); };
 
-  const handleFillRow = (emp: Employee, session: string) => {
+  const handleFillRow = (emp: Employee) => {
     tap();
-    const tpl = sortedTemplates.find((t) => t.session === session) ?? sortedTemplates[0];
-    const dh = tpl?.defaultHours ?? 8;
-    Alert.alert(`快速填充 ${emp.code}`, `将本月所有工作日（周一~周五）填入 ${dh}h，已有数据不覆盖。`,
-      [{ text: "取消", style: "cancel" },
-       { text: "工作日", onPress: () => { const es = dates.filter((d) => { const dow = getDayOfWeek(d); return dow !== 0 && dow !== 6; }).filter((d) => !getEntry(emp.id, d, session)).map((d): ShiftEntry => ({ employeeId: emp.id, date: d, shift: session, hoursValue: dh, sessionValue: session, overtimeType: "pay" })); if (es.length > 0) batchUpsertShifts(es); } },
-       { text: "全月", onPress: () => { const es = dates.filter((d) => !getEntry(emp.id, d, session)).map((d): ShiftEntry => ({ employeeId: emp.id, date: d, shift: session, hoursValue: dh, sessionValue: session, overtimeType: "pay" })); if (es.length > 0) batchUpsertShifts(es); } }]
+    // 先弹出班次选择，再弹出工作日/全月选择
+    const sessionButtons = sortedTemplates.map((tpl) => ({
+      text: tpl.session,
+      onPress: () => {
+        const dh = tpl.defaultHours ?? 8;
+        Alert.alert(
+          `快速填充 ${emp.code} · ${tpl.session}`,
+          `将填入 ${dh}h，已有数据不覆盖。`,
+          [
+            { text: "取消", style: "cancel" },
+            { text: "工作日（周一~五）", onPress: () => {
+              const es = dates.filter((d) => { const dow = getDayOfWeek(d); return dow !== 0 && dow !== 6; })
+                .filter((d) => !getEntry(emp.id, d, tpl.session))
+                .map((d): ShiftEntry => ({ employeeId: emp.id, date: d, shift: tpl.session, hoursValue: dh, sessionValue: tpl.session, overtimeType: "pay" }));
+              if (es.length > 0) batchUpsertShifts(es);
+            }},
+            { text: "全月", onPress: () => {
+              const es = dates.filter((d) => !getEntry(emp.id, d, tpl.session))
+                .map((d): ShiftEntry => ({ employeeId: emp.id, date: d, shift: tpl.session, hoursValue: dh, sessionValue: tpl.session, overtimeType: "pay" }));
+              if (es.length > 0) batchUpsertShifts(es);
+            }},
+          ]
+        );
+      },
+    }));
+    Alert.alert(
+      `快速填充 ${emp.code}`,
+      "选择要填充的班次：",
+      [
+        { text: "取消", style: "cancel" },
+        ...sessionButtons,
+      ]
     );
   };
 
@@ -1825,7 +1851,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                   ]}>
                     {/* 班次色左竖条 */}
                     <View style={{ width: 3, height: 34, backgroundColor: tpl.color + "CC" }} />
-                    <TouchableOpacity onLongPress={() => handleFillRow(emp, tpl.session)}
+                    <TouchableOpacity onLongPress={() => handleFillRow(emp)}
                       style={[EXL.nameCol, { backgroundColor: "transparent", width: EXL_NAME_W - 3 }]}>
                       <Text style={{ fontSize: 11, fontWeight: "600", color: colors.foreground }} numberOfLines={1}>{emp.code}</Text>
                     </TouchableOpacity>

@@ -317,23 +317,7 @@ export default function LaborEmployeeFormScreen() {
                 })}
               </View>
             </FormRow>
-                      <FormRow label="默认班次（排班表分组）" colors={colors}>
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                {availableSessions.map((tpl) => (
-                  <TouchableOpacity key={tpl.id} onPress={() => { tap(); setDefaultSession(defaultSession === tpl.session ? undefined : tpl.session); }}
-                    style={[S.optionChip, { backgroundColor: defaultSession === tpl.session ? tpl.color : colors.surface, borderColor: defaultSession === tpl.session ? tpl.color : colors.border }]}>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: defaultSession === tpl.session ? "#fff" : tpl.color }} />
-                      <Text style={{ fontSize: 13, fontWeight: "600", color: defaultSession === tpl.session ? "#fff" : colors.muted }}>{tpl.session}</Text>
-                    </View>
-                  </TouchableOpacity>
-                ))}
-                <TouchableOpacity onPress={() => { tap(); setDefaultSession(undefined); }}
-                  style={[S.optionChip, { backgroundColor: !defaultSession ? colors.primary + "22" : colors.surface, borderColor: !defaultSession ? colors.primary : colors.border }]}>
-                  <Text style={{ fontSize: 13, color: !defaultSession ? colors.primary : colors.muted }}>未设置</Text>
-                </TouchableOpacity>
-              </View>
-            </FormRow>
+
           </SectionCard>
           {/* ── 工资设置 ── */}
           <SectionCard title="工资设置" colors={colors}>
@@ -351,21 +335,8 @@ export default function LaborEmployeeFormScreen() {
                     placeholderTextColor={colors.muted} keyboardType="decimal-pad"
                     style={[S.input, { color: colors.foreground, borderColor: colors.border }]} />
                 </FormRow>
-                <FormRow label="默认标准工时（无规则时使用）" colors={colors}>
-                  <View style={{ flexDirection: "row", gap: 8 }}>
-                    {[6, 7, 8, 9, 10].map((h) => (
-                      <TouchableOpacity key={h} onPress={() => { tap(); setStdHours(String(h)); }}
-                        style={[S.numChip, { backgroundColor: stdHours === String(h) ? colors.primary : colors.surface, borderColor: stdHours === String(h) ? colors.primary : colors.border }]}>
-                        <Text style={{ fontSize: 13, color: stdHours === String(h) ? "#fff" : colors.muted }}>{h}h</Text>
-                      </TouchableOpacity>
-                    ))}
-                    <TextInput value={stdHours} onChangeText={setStdHours} keyboardType="decimal-pad"
-                      style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border }]} />
-                  </View>
-                </FormRow>
-
-                {/* 灵活工时规则 */}
-                <FormRow label="灵活标准工时（可增删改）" colors={colors}>
+                {/* 灵活工时规则（直接显示，无需默认标准工时） */}
+                <FormRow label="灵活标准工时" colors={colors}>
                   <View style={{ gap: 8 }}>
                     {weeklyHoursRules.map((rule) => (
                       <WeeklyHoursRuleRow
