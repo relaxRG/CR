@@ -462,6 +462,10 @@ export default function SpiritsInventoryScreen() {
   const [showAddItem, setShowAddItem] = useState(false);
   const [editingItem, setEditingItem] = useState<SpiritItem | null>(null);
   const [showItemForm, setShowItemForm] = useState(false);
+  // 分类选择器 Modal
+  const [showCatPicker, setShowCatPicker] = useState(false);
+  const [catPickerTitle, setCatPickerTitle] = useState("");
+  const [catPickerCallback, setCatPickerCallback] = useState<((name: string) => void) | null>(null);
   const [ledgerImporting, setLedgerImporting] = useState(false);
 
   const handleSaveOpeningQty = (entry: SpiritLedgerEntry, rawVal: string) => {
@@ -677,14 +681,9 @@ export default function SpiritsInventoryScreen() {
                               Alert.alert(item.name, "选择操作", [
                                 { text: "编辑酒款", onPress: () => { setEditingItem(item); setShowItemForm(true); } },
                                 { text: "修改分类", onPress: () => {
-                                  const catOptions = getAllCategories().map((c) => ({
-                                    text: c.name,
-                                    onPress: () => updateItem(item.id, { category: c.name, categorySource: "manual" }),
-                                  }));
-                                  Alert.alert("修改分类", `「${item.name}」当前分类：${item.category || "未分类"}`, [
-                                    ...catOptions,
-                                    { text: "取消", style: "cancel" as const },
-                                  ]);
+                                  setCatPickerTitle(`修改分类：${item.name}\n当前：${item.category || "未分类"}`);
+                                  setCatPickerCallback(() => (name: string) => updateItem(item.id, { category: name, categorySource: "manual" }));
+                                  setShowCatPicker(true);
                                 }},
                                 ...(item.bottleId ? [
                                   { text: "查看酒库档案 →", onPress: () => router.push(`/bottle/${item.bottleId}` as any) },
@@ -707,14 +706,9 @@ export default function SpiritsInventoryScreen() {
                             {/* 分类列（固定） */}
                             <TouchableOpacity style={[S.tdCell, { width: 56, alignItems: "center" }]}
                               onPress={() => {
-                                const catOptions = getAllCategories().map((c) => ({
-                                  text: c.name,
-                                  onPress: () => updateItem(item.id, { category: c.name, categorySource: "manual" }),
-                                }));
-                                Alert.alert("修改分类", `「${item.name}」`, [
-                                  ...catOptions,
-                                  { text: "取消", style: "cancel" as const },
-                                ]);
+                                setCatPickerTitle(`修改分类：${item.name}`);
+                                setCatPickerCallback(() => (name: string) => updateItem(item.id, { category: name, categorySource: "manual" }));
+                                setShowCatPicker(true);
                               }}>
                               <View style={{ backgroundColor: (isUnclassified ? "#F59E0B" : catColor(item.category)) + "25",
                                 borderRadius: 4, paddingHorizontal: 3, paddingVertical: 2, maxWidth: 52 }}>
@@ -1295,7 +1289,15 @@ export default function SpiritsInventoryScreen() {
           onClose={() => { setShowAddItem(false); setShowItemForm(false); setEditingItem(null); }}
         />
       )}
-
+      {/* 分类选择器 Modal */}
+      <CategoryPickerModal
+        visible={showCatPicker}
+        title={catPickerTitle}
+        categories={getAllCategories()}
+        onSelect={(name) => { if (catPickerCallback) catPickerCallback(name); }}
+        onClose={() => { setShowCatPicker(false); setCatPickerCallback(null); }}
+        colors={colors}
+      />
       {/* 库存管理 Excel 导入预览 Modal */}
       <Modal visible={showLedgerPreview} animationType="slide" transparent={false}>
         <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -1524,6 +1526,10 @@ function SupplierDetailScreen({
   const [editingGroup, setEditingGroup] = useState<SpiritGroupDef | null>(null);
   // 分类管理 Modal
   const [showCategoryManager, setShowCategoryManager] = useState(false);
+  // 分类选择器 Modal
+  const [showCatPicker2, setShowCatPicker2] = useState(false);
+  const [catPickerTitle2, setCatPickerTitle2] = useState("");
+  const [catPickerCallback2, setCatPickerCallback2] = useState<((name: string) => void) | null>(null);
   // 批量修改供应商 Modal
   const [showBatchSupplier, setShowBatchSupplier] = useState(false);
   const [batchSupplierInput, setBatchSupplierInput] = useState("");
@@ -1722,19 +1728,15 @@ function SupplierDetailScreen({
         <TouchableOpacity onPress={() => {
           tap();
           if (selectedIds.size === 0) { Alert.alert("提示", "请先勾选要修改的记录"); return; }
-          const catOptions = store.getAllCategories().map((c: any) => ({
-            text: c.name,
-            onPress: () => {
-              [...selectedIds].forEach((id) => updatePurchase(id, { category: c.name }));
-              syncLedgerFromPurchases(month);
-              setSelectedIds(new Set()); setSelectMode(false);
-              Alert.alert("修改成功", `已更新 ${selectedIds.size} 条记录的分类`);
-            },
-          }));
-          Alert.alert("批量修改分类", `选中 ${selectedIds.size} 条记录`, [
-            ...catOptions,
-            { text: "取消", style: "cancel" as const },
-          ]);
+          const count = selectedIds.size;
+          setCatPickerTitle2(`批量修改分类（选中 ${count} 条记录）`);
+          setCatPickerCallback2(() => (name: string) => {
+            [...selectedIds].forEach((id) => updatePurchase(id, { category: name }));
+            syncLedgerFromPurchases(month);
+            setSelectedIds(new Set()); setSelectMode(false);
+            Alert.alert("修改成功", `已更新 ${count} 条记录的分类`);
+          });
+          setShowCatPicker2(true);
         }} style={[S.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Text style={{ fontSize: 12, color: colors.muted, fontWeight: "600" }}>修改分类</Text>
         </TouchableOpacity>
@@ -1873,22 +1875,17 @@ function SupplierDetailScreen({
                           onPress={() => {
                             if (selectMode) return;
                             tap();
-                            const catOptions = store.getAllCategories().map((c: any) => ({
-                              text: c.name,
-                              onPress: () => {
-                                updatePurchase(p.id, { category: c.name });
-                                if (linkedItem) {
-                                  Alert.alert("同步分类？", "是否同步修改酒款档案的分类？", [
-                                    { text: "仅此记录", style: "cancel" },
-                                    { text: "同步档案", onPress: () => store.updateItem(linkedItem.id, { category: c.name, categorySource: "manual" }) },
-                                  ]);
-                                }
-                              },
-                            }));
-                            Alert.alert("修改分类", `「${p.rawName}」`, [
-                              ...catOptions,
-                              { text: "取消", style: "cancel" as const },
-                            ]);
+                            setCatPickerTitle2(`修改分类：${p.rawName}`);
+                            setCatPickerCallback2(() => (name: string) => {
+                              updatePurchase(p.id, { category: name });
+                              if (linkedItem) {
+                                Alert.alert("同步分类？", "是否同步修改酒款档案的分类？", [
+                                  { text: "仅此记录", style: "cancel" },
+                                  { text: "同步档案", onPress: () => store.updateItem(linkedItem.id, { category: name, categorySource: "manual" }) },
+                                ]);
+                              }
+                            });
+                            setShowCatPicker2(true);
                           }}>
                           {catName ? (
                             <View style={{ backgroundColor: catColor2 + "25", borderRadius: 4, paddingHorizontal: 3, paddingVertical: 2, maxWidth: 52 }}>
@@ -2533,7 +2530,91 @@ function SupplierDetailScreen({
           onClose={() => setShowImportPreview(false)}
         />
       )}
+      {/* 分类选择器 Modal */}
+      <CategoryPickerModal
+        visible={showCatPicker2}
+        title={catPickerTitle2}
+        categories={store.getAllCategories()}
+        onSelect={(name) => { if (catPickerCallback2) catPickerCallback2(name); }}
+        onClose={() => { setShowCatPicker2(false); setCatPickerCallback2(null); }}
+        colors={colors}
+      />
     </View>
+  );
+}
+// ─── 分类选择器 Modal（替代 Alert.alert，支持分类过多时滚动显示） ─────────────────
+function CategoryPickerModal({
+  visible, title, categories, onSelect, onClose, colors,
+}: {
+  visible: boolean;
+  title: string;
+  categories: { name: string; color: string }[];
+  onSelect: (name: string) => void;
+  onClose: () => void;
+  colors: any;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="slide">
+      <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.45)" }}>
+        <View style={{
+          backgroundColor: colors.background,
+          borderTopLeftRadius: 20,
+          borderTopRightRadius: 20,
+          paddingBottom: 34,
+          maxHeight: "70%",
+        }}>
+          {/* 标题栏 */}
+          <View style={{
+            flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+            paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12,
+            borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border,
+          }}>
+            <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, flex: 1 }} numberOfLines={2}>
+              {title}
+            </Text>
+            <TouchableOpacity onPress={onClose} style={{ padding: 4 }}>
+              <IconSymbol name="xmark.circle.fill" size={22} color={colors.muted} />
+            </TouchableOpacity>
+          </View>
+          {/* 分类列表 */}
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 12, gap: 6 }}>
+            {categories.map((cat) => (
+              <TouchableOpacity
+                key={cat.name}
+                onPress={() => { onSelect(cat.name); onClose(); }}
+                style={{
+                  flexDirection: "row", alignItems: "center", gap: 12,
+                  paddingHorizontal: 16, paddingVertical: 13,
+                  backgroundColor: colors.surface,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                }}>
+                <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: cat.color }} />
+                <Text style={{ fontSize: 15, color: colors.foreground, fontWeight: "500", flex: 1 }}>
+                  {cat.name}
+                </Text>
+                <IconSymbol name="chevron.right" size={14} color={colors.muted} />
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          {/* 取消按钮 */}
+          <TouchableOpacity
+            onPress={onClose}
+            style={{
+              marginHorizontal: 16, marginTop: 4,
+              paddingVertical: 14,
+              backgroundColor: colors.surface,
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: colors.border,
+              alignItems: "center",
+            }}>
+            <Text style={{ fontSize: 15, fontWeight: "600", color: colors.muted }}>取消</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
