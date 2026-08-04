@@ -398,8 +398,8 @@ function EmployeeRosterPage({ month, colors }: { month: string; colors: any }) {
     <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 40 }}>
       {/* 工具栏：员工管理 + 对比开关 + 设置 */}
       <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-        {/* 员工管理按鈕 */}
-        <TouchableOpacity onPress={() => { tap(); router.push("/labor-employee-form" as any); }}
+        {/* 员工管理按鈕 - 跳转到员工列表页 */}
+        <TouchableOpacity onPress={() => { tap(); router.push("/labor-employees" as any); }}
           style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: colors.border + "44" }}>
           <IconSymbol name="person.2.fill" size={15} color={colors.foreground} />
           <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>员工管理</Text>
@@ -993,8 +993,6 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
     }
     // 时长模式：显示工时数字
     if (typeof h === "number" && h > 0) {
-      const isOT = contractH > 0 && h > contractH;
-      // 加班不变色不加粗，统一深灰显示
       return <Text style={EXL.cellHours}>{h % 1 === 0 ? `${h}.0` : `${h}`}</Text>;
     }
     return null;
@@ -1391,7 +1389,7 @@ const SCH = StyleSheet.create({
   // 保留旧字段（其他页面可能引用）
   headerRow: { flexDirection: "row", alignItems: "center", borderBottomWidth: 1 },
   headerCell: { height: SCH_ROW_H, alignItems: "center", justifyContent: "center", gap: 1, borderRightWidth: StyleSheet.hairlineWidth },
-  empRow: { flexDirection: "row", alignItems: "center", borderBottomWidth: StyleSheet.hairlineWidth },
+  empRow: { flexDirection: "row", alignItems: "center" },
   nameCell: { height: SCH_ROW_H + 8, justifyContent: "center", alignItems: "center", borderRightWidth: 1 },
   empCode: { fontSize: 11, fontWeight: "700" },
   empName: { fontSize: 9 },
@@ -1415,19 +1413,19 @@ const SCHEM = StyleSheet.create({
 const EXL_NAME_W = 56;  // 姓名列宽
 
 const EXL = StyleSheet.create({
-  controlBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth },
+  controlBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, paddingVertical: 8 },
   segContainer: { flexDirection: "row", borderRadius: 8, overflow: "hidden", padding: 2 },
   segItem: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6 },
   gearBtn: { width: 32, height: 32, borderRadius: 8, alignItems: "center", justifyContent: "center" },
-  weekHeaderRow: { flexDirection: "row", alignItems: "center", borderBottomWidth: StyleSheet.hairlineWidth, paddingVertical: 4 },
+  weekHeaderRow: { flexDirection: "row", alignItems: "center", paddingVertical: 4 },
   weekBlock: { borderRadius: 12, overflow: "hidden", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.07, shadowRadius: 4, elevation: 2 },
   dateRow: { flexDirection: "row", alignItems: "center" },
   dateCell: { flex: 1, height: 26, alignItems: "center", justifyContent: "center", borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: "rgba(255,255,255,0.3)" },
   dateCellText: { fontSize: 12, fontWeight: "700", color: "#fff" },
   dateLabel: { fontSize: 9, fontWeight: "600", color: "rgba(255,255,255,0.85)" },
-  nameCol: { width: EXL_NAME_W, height: 34, alignItems: "center", justifyContent: "center", borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: "#00000015" },
+  nameCol: { width: EXL_NAME_W, height: 34, alignItems: "center", justifyContent: "center" },
   empRow: { flexDirection: "row", alignItems: "center" },
-  cell: { flex: 1, height: 34, alignItems: "center", justifyContent: "center", borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: "#00000008" },
+  cell: { flex: 1, height: 34, alignItems: "center", justifyContent: "center" },
   sessionDivider: { height: 4 },
   // 单元格文字样式
   cellHours: { fontSize: 13, fontWeight: "500", color: "#1C1C1E" },
