@@ -40,9 +40,24 @@ export const DEPT_COLORS: Record<EmployeeDept, string> = {
 
 // ─── 差异化工时规则（按星期设置合同工时） ────────────────────────────────────
 /**
- * 每个星期几的合同工时
- * key: 0=周日, 1=周一, ..., 6=周六
- * value: 合同工时（小时），null=该天不上班/休息
+ * 灵活工时规则：某个星期范围内的合同工时
+ * 例：{ fromDay: 1, toDay: 4, hours: 8 } 表示周一~周四每天8小时
+ * fromDay/toDay: 0=周日, 1=周一, ..., 6=周六
+ * 多条规则按顺序匹配，第一条命中的规则生效
+ */
+export interface WeeklyHoursRule {
+  id: string;
+  /** 开始星期（0=周日, 1=周一, ..., 6=周六） */
+  fromDay: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  /** 结束星期（0=周日, 1=周一, ..., 6=周六） */
+  toDay: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  /** 该范围内每天的合同工时（小时） */
+  hours: number;
+}
+
+/**
+ * 向后兼容：旧版 WeeklyHoursMap 类型
+ * @deprecated 请使用 WeeklyHoursRule[]
  */
 export type WeeklyHoursMap = Partial<Record<0 | 1 | 2 | 3 | 4 | 5 | 6, number | null>>;
 
@@ -275,9 +290,15 @@ export interface Employee {
   /** 每日标准工时（小时/天，全职专用；差异化工时优先级更高） */
   stdHoursPerDay: number;
   /**
-   * 差异化工时规则（按星期设置合同工时）
+   * 灵活工时规则列表（按星期范围设置合同工时）
    * 若设置则优先于 stdHoursPerDay
-   * key: 0=周日, 1=周一...6=周六, value: 合同工时（null=休息）
+   * 例：[{ fromDay:1, toDay:4, hours:8 }, { fromDay:5, toDay:6, hours:9 }]
+   * 表示周一~周四 8h/天，周五~周六 9h/天
+   */
+  weeklyHoursRules?: WeeklyHoursRule[];
+  /**
+   * @deprecated 旧版差异化工时（按单天设置），已被 weeklyHoursRules 替代
+   * 保留用于数据迁移兼容
    */
   weeklyHours?: WeeklyHoursMap;
   /** 月休息天数（全职专用） */
@@ -507,15 +528,31 @@ export function calcDailyRate(baseSalary: number, daysInMonth: number, restDays:
 
 /**
  * 获取某员工某天的合同工时
- * 优先使用差异化工时规则，否则使用统一标准工时
+ * 优先级：weeklyHoursRules（新）> weeklyHours（旧，兼容）> stdHoursPerDay
  */
 export function getContractHoursForDate(employee: Employee, date: string): number {
   const dow = new Date(date).getDay() as 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
+  // 新版：灵活工时规则列表
+  if (employee.weeklyHoursRules && employee.weeklyHoursRules.length > 0) {
+    for (const rule of employee.weeklyHoursRules) {
+      // 处理跨周情况（如 fromDay=5, toDay=0 表示周五~周日）
+      const inRange = rule.fromDay <= rule.toDay
+        ? dow >= rule.fromDay && dow <= rule.toDay
+        : dow >= rule.fromDay || dow <= rule.toDay;
+      if (inRange) return rule.hours;
+    }
+    // 规则未覆盖的天，使用默认工时
+    return employee.stdHoursPerDay;
+  }
+
+  // 旧版兼容：WeeklyHoursMap
   if (employee.weeklyHours) {
     const h = employee.weeklyHours[dow];
-    if (h === null) return 0; // 该天休息
+    if (h === null) return 0;
     if (h !== undefined) return h;
   }
+
   return employee.stdHoursPerDay;
 }
 

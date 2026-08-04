@@ -273,7 +273,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors }:
             <Text style={{ fontSize: 12, color: colors.muted }}>({employee.realName})</Text>
             {isParttime && (
               <View style={{ backgroundColor: "#FF9500" + "22", paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
-                <Text style={{ fontSize: 9, fontWeight: "700", color: "#FF9500" }}>兆职</Text>
+                <Text style={{ fontSize: 9, fontWeight: "700", color: "#FF9500" }}>兼职</Text>
               </View>
             )}
           </View>

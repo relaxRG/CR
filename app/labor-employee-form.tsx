@@ -14,9 +14,9 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
 import { useEmployeeStore, useShiftTemplateStore } from "@/lib/labor/store";
 import {
-  Employee, EmployeeDept, EmployeeType, EmployeeBankAccount,
+  Employee, EmployeeDept, EmployeeType, EmployeeBankAccount, WeeklyHoursRule,
   DEPT_LABELS, DEPT_COLORS, EMPLOYEE_TYPE_LABELS, EMPLOYEE_TYPE_COLORS,
-  calcDailyRate, getDaysInMonth, DEFAULT_SHIFT_TEMPLATES,
+  calcDailyRate, getDaysInMonth, DEFAULT_SHIFT_TEMPLATES, WEEKDAY_LABELS,
 } from "@/lib/labor/types";
 
 const DEPT_OPTIONS: EmployeeDept[] = ["front", "kitchen", "parttime", "other"];
@@ -59,6 +59,32 @@ export default function LaborEmployeeFormScreen() {
   const [overtimeRate, setOvertimeRate] = useState(String(existing?.overtimeHourlyRate ?? "35"));
   const [holidayMult, setHolidayMult] = useState(existing?.holidayMultiplier ?? 1.5);
   const [monthlyFixedSalary, setMonthlyFixedSalary] = useState(String(existing?.monthlyFixedSalary ?? "0"));
+
+  // ── 灵活工时规则 ──
+  const [weeklyHoursRules, setWeeklyHoursRules] = useState<WeeklyHoursRule[]>(
+    existing?.weeklyHoursRules ?? []
+  );
+
+  // 添加规则
+  const addHoursRule = () => {
+    const newRule: WeeklyHoursRule = {
+      id: Date.now().toString(),
+      fromDay: 1,
+      toDay: 4,
+      hours: Number(stdHours) || 8,
+    };
+    setWeeklyHoursRules((prev) => [...prev, newRule]);
+  };
+
+  // 更新规则
+  const updateHoursRule = (id: string, patch: Partial<WeeklyHoursRule>) => {
+    setWeeklyHoursRules((prev) => prev.map((r) => r.id === id ? { ...r, ...patch } : r));
+  };
+
+  // 删除规则
+  const deleteHoursRule = (id: string) => {
+    setWeeklyHoursRules((prev) => prev.filter((r) => r.id !== id));
+  };
 
   // ── 详细档案 ──
   const [idNumber, setIdNumber] = useState(existing?.idNumber ?? "");
@@ -105,6 +131,7 @@ export default function LaborEmployeeFormScreen() {
       overtimeHourlyRate: Number(overtimeRate) || Number(hourlyRate) || 35,
       holidayMultiplier: holidayMult,
       monthlyFixedSalary: Number(monthlyFixedSalary) || 0,
+      weeklyHoursRules: weeklyHoursRules.length > 0 ? weeklyHoursRules : undefined,
       bankAccounts,
       idNumber: idNumber.trim() || undefined,
       address: address.trim() || undefined,
@@ -258,7 +285,7 @@ export default function LaborEmployeeFormScreen() {
                     placeholderTextColor={colors.muted} keyboardType="decimal-pad"
                     style={[S.input, { color: colors.foreground, borderColor: colors.border }]} />
                 </FormRow>
-                <FormRow label="每日标准工时" colors={colors}>
+                <FormRow label="默认标准工时（无规则时使用）" colors={colors}>
                   <View style={{ flexDirection: "row", gap: 8 }}>
                     {[6, 7, 8, 9, 10].map((h) => (
                       <TouchableOpacity key={h} onPress={() => { tap(); setStdHours(String(h)); }}
@@ -268,6 +295,32 @@ export default function LaborEmployeeFormScreen() {
                     ))}
                     <TextInput value={stdHours} onChangeText={setStdHours} keyboardType="decimal-pad"
                       style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border }]} />
+                  </View>
+                </FormRow>
+
+                {/* 灵活工时规则 */}
+                <FormRow label="灵活标准工时（可增删改）" colors={colors}>
+                  <View style={{ gap: 8 }}>
+                    {weeklyHoursRules.map((rule) => (
+                      <WeeklyHoursRuleRow
+                        key={rule.id}
+                        rule={rule}
+                        colors={colors}
+                        onUpdate={(patch) => updateHoursRule(rule.id, patch)}
+                        onDelete={() => deleteHoursRule(rule.id)}
+                      />
+                    ))}
+                    <TouchableOpacity
+                      onPress={() => { tap(); addHoursRule(); }}
+                      style={[S.addRuleBtn, { borderColor: colors.primary + "44", backgroundColor: colors.primary + "08" }]}>
+                      <IconSymbol name="plus" size={13} color={colors.primary} />
+                      <Text style={{ fontSize: 13, color: colors.primary, fontWeight: "600" }}>添加工时规则</Text>
+                    </TouchableOpacity>
+                    {weeklyHoursRules.length > 0 && (
+                      <Text style={{ fontSize: 11, color: colors.muted, lineHeight: 16 }}>
+                        提示：规则按顺序匹配，第一条命中的规则生效。未被规则覆盖的天使用默认标准工时 {stdHours}h。
+                      </Text>
+                    )}
                   </View>
                 </FormRow>
                 <FormRow label="月休息天数" colors={colors}>
@@ -495,6 +548,110 @@ function FormRow({ label, required, children, colors }: { label: string; require
   );
 }
 
+// ─── 灵活工时规则行组件 ─────────────────────────────────────────────────────────────────────────────
+const DAY_OPTIONS: Array<{ value: 0|1|2|3|4|5|6; label: string }> = [
+  { value: 1, label: "周一" },
+  { value: 2, label: "周二" },
+  { value: 3, label: "周三" },
+  { value: 4, label: "周四" },
+  { value: 5, label: "周五" },
+  { value: 6, label: "周六" },
+  { value: 0, label: "周日" },
+];
+
+function WeeklyHoursRuleRow({
+  rule, colors, onUpdate, onDelete,
+}: {
+  rule: WeeklyHoursRule;
+  colors: any;
+  onUpdate: (patch: Partial<WeeklyHoursRule>) => void;
+  onDelete: () => void;
+}) {
+  const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
+  const [showFromPicker, setShowFromPicker] = useState(false);
+  const [showToPicker, setShowToPicker] = useState(false);
+
+  const fromLabel = DAY_OPTIONS.find((d) => d.value === rule.fromDay)?.label ?? "周一";
+  const toLabel = DAY_OPTIONS.find((d) => d.value === rule.toDay)?.label ?? "周四";
+
+  return (
+    <View style={[WR.row, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      {/* 开始星期 */}
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontSize: 10, color: colors.muted, marginBottom: 3 }}>开始</Text>
+        <TouchableOpacity
+          onPress={() => { tap(); setShowFromPicker((v) => !v); setShowToPicker(false); }}
+          style={[WR.dayBtn, { borderColor: showFromPicker ? colors.primary : colors.border, backgroundColor: showFromPicker ? colors.primary + "15" : colors.surface }]}>
+          <Text style={{ fontSize: 13, fontWeight: "600", color: showFromPicker ? colors.primary : colors.foreground }}>{fromLabel}</Text>
+          <IconSymbol name="chevron.down" size={10} color={colors.muted} />
+        </TouchableOpacity>
+        {showFromPicker && (
+          <View style={[WR.picker, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            {DAY_OPTIONS.map((d) => (
+              <TouchableOpacity key={d.value} onPress={() => { tap(); onUpdate({ fromDay: d.value }); setShowFromPicker(false); }}
+                style={[WR.pickerItem, { backgroundColor: rule.fromDay === d.value ? colors.primary : "transparent" }]}>
+                <Text style={{ fontSize: 12, fontWeight: "600", color: rule.fromDay === d.value ? "#fff" : colors.foreground }}>{d.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+      </View>
+
+      <Text style={{ fontSize: 12, color: colors.muted, marginTop: 18, marginHorizontal: 4 }}>至</Text>
+
+      {/* 结束星期 */}
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontSize: 10, color: colors.muted, marginBottom: 3 }}>结束</Text>
+        <TouchableOpacity
+          onPress={() => { tap(); setShowToPicker((v) => !v); setShowFromPicker(false); }}
+          style={[WR.dayBtn, { borderColor: showToPicker ? colors.primary : colors.border, backgroundColor: showToPicker ? colors.primary + "15" : colors.surface }]}>
+          <Text style={{ fontSize: 13, fontWeight: "600", color: showToPicker ? colors.primary : colors.foreground }}>{toLabel}</Text>
+          <IconSymbol name="chevron.down" size={10} color={colors.muted} />
+        </TouchableOpacity>
+        {showToPicker && (
+          <View style={[WR.picker, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            {DAY_OPTIONS.map((d) => (
+              <TouchableOpacity key={d.value} onPress={() => { tap(); onUpdate({ toDay: d.value }); setShowToPicker(false); }}
+                style={[WR.pickerItem, { backgroundColor: rule.toDay === d.value ? colors.primary : "transparent" }]}>
+                <Text style={{ fontSize: 12, fontWeight: "600", color: rule.toDay === d.value ? "#fff" : colors.foreground }}>{d.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+      </View>
+
+      {/* 工时 */}
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontSize: 10, color: colors.muted, marginBottom: 3 }}>每天工时</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+          <TextInput
+            value={String(rule.hours)}
+            onChangeText={(v) => onUpdate({ hours: Number(v) || 8 })}
+            keyboardType="decimal-pad"
+            style={[WR.hoursInput, { color: colors.foreground, borderColor: colors.border }]}
+          />
+          <Text style={{ fontSize: 12, color: colors.muted }}>h</Text>
+        </View>
+      </View>
+
+      {/* 删除 */}
+      <TouchableOpacity onPress={() => { tap(); onDelete(); }}
+        style={[WR.deleteBtn, { backgroundColor: colors.error + "15" }]}>
+        <IconSymbol name="trash.fill" size={13} color={colors.error} />
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const WR = StyleSheet.create({
+  row: { flexDirection: "row", alignItems: "flex-start", borderRadius: 10, borderWidth: 1, padding: 10, gap: 6 },
+  dayBtn: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderRadius: 8, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 6, gap: 4 },
+  picker: { position: "absolute", top: 34, left: 0, right: 0, zIndex: 100, borderRadius: 10, borderWidth: 1, overflow: "hidden" },
+  pickerItem: { paddingHorizontal: 10, paddingVertical: 8 },
+  hoursInput: { borderRadius: 8, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 6, fontSize: 14, width: 50, textAlign: "center" },
+  deleteBtn: { width: 30, height: 30, borderRadius: 8, alignItems: "center", justifyContent: "center", marginTop: 14 },
+});
+
 const S = StyleSheet.create({
   navbar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   navTitle: { fontSize: 17, fontWeight: "600" },
@@ -513,4 +670,5 @@ const S = StyleSheet.create({
   bankBtn: { flex: 1, borderRadius: 10, borderWidth: 1, paddingVertical: 10, alignItems: "center" },
   addBankBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderRadius: 10, borderWidth: 1, borderStyle: "dashed", paddingVertical: 12 },
   iconBtn: { width: 30, height: 30, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  addRuleBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderRadius: 10, borderWidth: 1, borderStyle: "dashed", paddingVertical: 10 },
 });
