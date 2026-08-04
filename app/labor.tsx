@@ -29,7 +29,7 @@ const { width: SCREEN_W } = Dimensions.get("window");
 const NOON_COLOR = "#FF9500";
 const EVE_COLOR = "#5856D6";
 
-type CompareMode = "none" | "lastMonth" | "lastYear";
+type CompareMode = "none" | "lastMonth" | "lastYear" | "custom";
 
 // ─── 月份工具 ─────────────────────────────────────────────────────────────────
 function currentMonthStr() {
@@ -37,8 +37,9 @@ function currentMonthStr() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 }
 
-function getCompareMonth(base: string, mode: CompareMode): string | null {
+function getCompareMonth(base: string, mode: CompareMode, customMonth?: string): string | null {
   if (mode === "none") return null;
+  if (mode === "custom") return customMonth ?? null;
   const [y, m] = base.split("-").map(Number);
   if (mode === "lastMonth") {
     const d = new Date(y, m - 2, 1);
@@ -47,34 +48,51 @@ function getCompareMonth(base: string, mode: CompareMode): string | null {
   return `${y - 1}-${String(m).padStart(2, "0")}`;
 }
 
-function compareModeLabel(mode: CompareMode) {
+function recentMonths(base: string, count = 24): string[] {
+  const [y, m] = base.split("-").map(Number);
+  const result: string[] = [];
+  for (let i = 1; i <= count; i++) {
+    const d = new Date(y, m - 1 - i, 1);
+    result.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+  }
+  return result;
+}
+
+function compareModeLabel(mode: CompareMode, customMonth?: string) {
   if (mode === "lastMonth") return "上月";
   if (mode === "lastYear") return "去年同期";
+  if (mode === "custom") return customMonth ? monthLabel(customMonth) : "筛选月";
   return "不对比";
 }
 
 // ─── 对比按钮组件 ─────────────────────────────────────────────────────────────
-function CompareToggle({ mode, onChange, colors }: {
+function CompareToggle({ mode, customMonth, baseMonth, onChange, onCustomMonthChange, colors }: {
   mode: CompareMode;
+  customMonth?: string;
+  baseMonth: string;
   onChange: (m: CompareMode) => void;
+  onCustomMonthChange?: (m: string) => void;
   colors: any;
 }) {
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
   const [open, setOpen] = useState(false);
+  const [showMonthPicker, setShowMonthPicker] = useState(false);
+  const months = recentMonths(baseMonth, 24);
 
   return (
-    <View>
-      <TouchableOpacity onPress={() => { tap(); setOpen((v) => !v); }}
+    <View style={{ position: "relative" }}>
+      <TouchableOpacity onPress={() => { tap(); setOpen((v) => !v); setShowMonthPicker(false); }}
         style={[CT.btn, {
           backgroundColor: mode !== "none" ? colors.primary + "22" : colors.surface,
           borderColor: mode !== "none" ? colors.primary + "44" : colors.border,
         }]}>
         <IconSymbol name="chart.bar.xaxis" size={12} color={mode !== "none" ? colors.primary : colors.muted} />
         <Text style={{ fontSize: 11, fontWeight: "600", color: mode !== "none" ? colors.primary : colors.muted }}>
-          {mode !== "none" ? compareModeLabel(mode) : "对比"}
+          {mode !== "none" ? compareModeLabel(mode, customMonth) : "对比"}
         </Text>
       </TouchableOpacity>
-      {open && (
+
+      {open && !showMonthPicker && (
         <View style={[CT.panel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           {(["none", "lastMonth", "lastYear"] as CompareMode[]).map((m) => (
             <TouchableOpacity key={m} onPress={() => { tap(); onChange(m); setOpen(false); }}
@@ -84,6 +102,38 @@ function CompareToggle({ mode, onChange, colors }: {
               </Text>
             </TouchableOpacity>
           ))}
+          <TouchableOpacity onPress={() => { tap(); setShowMonthPicker(true); }}
+            style={[CT.option, { backgroundColor: mode === "custom" ? colors.primary : "transparent", flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
+            <Text style={{ fontSize: 12, fontWeight: "600", color: mode === "custom" ? "#fff" : colors.foreground }}>
+              {mode === "custom" && customMonth ? monthLabel(customMonth) : "筛选月"}
+            </Text>
+            <IconSymbol name="chevron.right" size={10} color={mode === "custom" ? "#fff" : colors.muted} />
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {open && showMonthPicker && (
+        <View style={[CT.panel, { backgroundColor: colors.surface, borderColor: colors.border, width: 130 }]}>
+          <TouchableOpacity onPress={() => setShowMonthPicker(false)}
+            style={{ flexDirection: "row", alignItems: "center", gap: 4, padding: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
+            <IconSymbol name="chevron.left" size={12} color={colors.primary} />
+            <Text style={{ fontSize: 12, fontWeight: "600", color: colors.primary }}>返回</Text>
+          </TouchableOpacity>
+          <ScrollView style={{ maxHeight: 220 }} showsVerticalScrollIndicator={false}>
+            {months.map((m) => (
+              <TouchableOpacity key={m} onPress={() => {
+                tap();
+                onCustomMonthChange?.(m);
+                onChange("custom");
+                setOpen(false);
+                setShowMonthPicker(false);
+              }} style={[CT.option, { backgroundColor: mode === "custom" && customMonth === m ? colors.primary : "transparent" }]}>
+                <Text style={{ fontSize: 12, fontWeight: "600", color: mode === "custom" && customMonth === m ? "#fff" : colors.foreground }}>
+                  {monthLabel(m)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </View>
       )}
     </View>
@@ -96,8 +146,9 @@ function OverviewCard({ month, colors }: { month: string; colors: any }) {
   const { paySlips } = usePaySlipStore();
   const { records: attendances } = useAttendanceStore();
   const [compareMode, setCompareMode] = useState<CompareMode>("none");
+  const [customMonth, setCustomMonth] = useState<string | undefined>();
 
-  const compareMonth = getCompareMonth(month, compareMode);
+  const compareMonth = getCompareMonth(month, compareMode, customMonth);
 
   const activeEmployees = useMemo(() => employees.filter((e) => e.active), [employees]);
   const monthSlips = useMemo(() => paySlips.filter((s) => s.month === month), [paySlips, month]);
@@ -115,7 +166,7 @@ function OverviewCard({ month, colors }: { month: string; colors: any }) {
       {/* 标题行 + 对比开关 */}
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
         <Text style={[OV.title, { color: colors.primary }]}>{monthLabel(month)} 人力总览</Text>
-        <CompareToggle mode={compareMode} onChange={setCompareMode} colors={colors} />
+        <CompareToggle mode={compareMode} customMonth={customMonth} baseMonth={month} onChange={setCompareMode} onCustomMonthChange={setCustomMonth} colors={colors} />
       </View>
 
       {/* 核心数字行 */}
@@ -153,7 +204,7 @@ function OverviewCard({ month, colors }: { month: string; colors: any }) {
       {/* 对比详情行 */}
       {compareMonth && compareTotalSalary > 0 && (
         <View style={[OV.compareRow, { borderTopColor: colors.border }]}>
-          <Text style={{ fontSize: 11, color: colors.muted }}>{compareModeLabel(compareMode)}薪资合计：</Text>
+          <Text style={{ fontSize: 11, color: colors.muted }}>{compareModeLabel(compareMode, customMonth)}薪资合计：</Text>
           <Text style={{ fontSize: 12, fontWeight: "700", color: colors.muted }}>¥{compareTotalSalary.toFixed(0)}</Text>
           {diffSalary !== null && (
             <Text style={{ fontSize: 11, color: diffSalary > 0 ? "#FF3B30" : "#34C759", marginLeft: 8 }}>
@@ -265,7 +316,8 @@ function EmployeeRosterPage({ month, colors }: { month: string; colors: any }) {
 
   // 薪资对比开关（统一控制所有卡片）
   const [compareMode, setCompareMode] = useState<CompareMode>("none");
-  const compareMonth = getCompareMonth(month, compareMode);
+  const [customMonth, setCustomMonth] = useState<string | undefined>();
+  const compareMonth = getCompareMonth(month, compareMode, customMonth);
 
   const activeEmployees = useMemo(() => employees.filter((e) => e.active), [employees]);
 
@@ -297,7 +349,7 @@ function EmployeeRosterPage({ month, colors }: { month: string; colors: any }) {
         {/* 薪资对比开关 */}
         <View style={{ alignItems: "flex-end" }}>
           <Text style={{ fontSize: 10, color: colors.muted, marginBottom: 3 }}>薪资对比</Text>
-          <CompareToggle mode={compareMode} onChange={setCompareMode} colors={colors} />
+          <CompareToggle mode={compareMode} customMonth={customMonth} baseMonth={month} onChange={setCompareMode} onCustomMonthChange={setCustomMonth} colors={colors} />
         </View>
       </View>
 
