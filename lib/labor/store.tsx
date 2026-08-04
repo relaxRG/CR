@@ -447,9 +447,12 @@ function AttendanceProvider({ children }: { children: React.ReactNode }) {
       if (specialStatus) {
         // ── 特殊状态处理 ──
         if (specialStatus.category === "comp_off") {
-          // 加班换休：不计工时，从累积加班时数里扣除
+          // 加班换休：不计实际工时，但按合同工时计入标准工时（避免加班时数虚高）
           compOffCount++;
           daysSet.add(s.date); // 加班换休那天算出勤（不扣薪）
+          // 将该天的合同工时加入标准工时，使加班时数计算准确
+          const contractH = getContractHoursForDate(employee, s.date);
+          stdHoursTotal += contractH;
         } else if (specialStatus.category === "work_day") {
           // 节日上班：计工时，额外补偿
           const h = s.hoursValue;
@@ -792,16 +795,17 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
 
     if (taxEnabled && taxConfig) {
       const totalDeductions = socialInsuranceDeduction + housingFundDeduction;
-      // 本月应税收入 = 应发 - 个人社保/公积金 - 起征点
-      const thisMonthTaxableIncome = Math.max(0, grossSalary - totalDeductions - taxConfig.threshold);
-      // 年度累计应税收入（含本月）
-      const cumIncome = cumulativeIncome + thisMonthTaxableIncome;
-      // 年度累计专项附加扣除（按月累计）
-      const monthsElapsed = parseInt(month.split("-")[1]) || 1;
-      const cumSpecialDeductions = (taxConfig.specialDeductions ?? 0) * monthsElapsed;
+      // 本月应纳税所得额 = 应发 - 个人社保/公积金 - 起征点(5000) - 专项附加扣除
+      const thisMonthTaxable = Math.max(0,
+        grossSalary - totalDeductions - taxConfig.threshold - (taxConfig.specialDeductions ?? 0)
+      );
+      // 年度累计应纳税所得额（含本月，调用方已传入前几月的累计值）
+      // cumulativeIncome 由调用方从历史 paySlips 计算，已是「应纳税所得额」
+      const cumTaxableIncome = cumulativeIncome + thisMonthTaxable;
+      // 传 0 给 cumulativeDeductions（已在 cumTaxableIncome 中扣除，不重复扣）
       const result = calcIncomeTax(
-        cumIncome, cumSpecialDeductions, cumulativeTaxPaid,
-        taxConfig.threshold, taxConfig.specialDeductions
+        cumTaxableIncome, 0, cumulativeTaxPaid,
+        taxConfig.threshold, 0
       );
       incomeTax = result.tax;
       incomeTaxNote = result.note;

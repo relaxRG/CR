@@ -174,7 +174,8 @@ function OverviewCard({ month, colors }: { month: string; colors: any }) {
   const activeEmployees = useMemo(() => employees.filter((e) => e.active), [employees]);
   const monthSlips = useMemo(() => paySlips.filter((s) => s.month === month), [paySlips, month]);
   const totalSalary = useMemo(() => monthSlips.reduce((s, p) => s + p.finalSalary, 0), [monthSlips]);
-  const totalPending = useMemo(() => monthSlips.reduce((s, p) => s + Math.max(0, p.finalSalary - p.advanceAmount), 0), [monthSlips]);
+  // finalSalary 已含预支扣除，待发合计直接累加 finalSalary
+  const totalPending = useMemo(() => monthSlips.reduce((s, p) => s + Math.max(0, p.finalSalary), 0), [monthSlips]);
   const attendCount = useMemo(() => attendances.filter((a) => a.month === month).length, [attendances, month]);
 
   // 对比月数据
@@ -311,7 +312,8 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors }:
   const isParttime = employee.type === "parttime";
 
   const diffSalary = slip && compareSlip ? slip.finalSalary - compareSlip.finalSalary : null;
-  const pending = slip ? Math.max(0, slip.finalSalary - (slip.advanceAmount ?? 0)) : null;
+  // finalSalary 已含预支扣除，待发 = 实发（不再重复减 advanceAmount）
+  const pending = slip ? slip.finalSalary : null;
   const attendanceSalary = att?.attendanceSalary ?? (slip?.attendanceSalary ?? 0);
 
   // 换休余额
@@ -1331,6 +1333,9 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   const { getHolidayForDate } = useHolidayConfigStore();
   const { advances } = useSalaryAdvanceStore();
   const { settings: globalSettings } = useGlobalPayrollSettingsStore();
+  const { getAvailableDays: getCompOffAvailDays, updateEntry: updateCompOffEntry, getEntries: getCompOffEntries, expireOldEntries: expireCompOff } = useCompOffBalanceEntryStore();
+  const { getAvailableDays: getHolidayCompOffAvailDays, updateEntry: updateHolidayCompOff, getEntries: getHolidayCompOffEntries, addEntry: addHolidayCompOff, expireOldEntries: expireHolidayCompOff } = useHolidayCompOffStore();
+  const { upsertAlert } = useUnexplainedRestAlertStore();
 
   const now = new Date();
   const todayStr = now.toISOString().slice(0, 10);
@@ -1593,13 +1598,98 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                           s.month.startsWith(curYear) &&
                           s.month < currentMonth
                         );
+                        const taxThreshold = emp.incomeTax?.threshold ?? 5000;
+                        const taxSpecialDed = emp.incomeTax?.specialDeductions ?? 0;
                         const cumulativeIncome = prevMonthSlips.reduce((sum, s) => {
-                          // 累计应税收入 = 应发 - 社保个人 - 公积金个人 - 起征点（按月）
-                          const taxableBase = Math.max(0, s.grossSalary - s.socialInsuranceDeduction - s.housingFundDeduction);
-                          return sum + taxableBase;
+                          // 累计应纳税所得额 = 应发 - 社保个人 - 公积金个人 - 起征点 - 专项附加扣除
+                          const taxable = Math.max(0,
+                            s.grossSalary - (s.socialInsuranceDeduction ?? 0) - (s.housingFundDeduction ?? 0) - taxThreshold - taxSpecialDed
+                          );
+                          return sum + taxable;
                         }, 0);
                         const cumulativeTaxPaid = prevMonthSlips.reduce((sum, s) => sum + (s.incomeTax ?? 0), 0);
-                        // 5. 生成薪资单
+                        // 5. 自动生成节假日调休余额（节日上班的班次）
+                        empShifts.forEach((s) => {
+                          if (!s.specialStatusId) return;
+                          const ss = specialStatuses.find((st) => st.id === s.specialStatusId);
+                          if (ss?.category === "work_day" && ss.salaryMultiplier > 1) {
+                            // 节日上班：产生1天调休权利，有效期至下月末
+                            const [sy, sm] = s.date.slice(0, 7).split("-").map(Number);
+                            const expD = new Date(sy, sm, 1); // 下月1日
+                            const expiresMonth = `${expD.getFullYear()}-${String(expD.getMonth() + 1).padStart(2, "0")}`;
+                            // 检查是否已存在（避免重复生成）
+                            const existing = getHolidayCompOffEntries(emp.id).find(
+                              (e) => e.workDate === s.date && e.status === "available"
+                            );
+                            if (!existing) {
+                              addHolidayCompOff({
+                                employeeId: emp.id,
+                                workDate: s.date,
+                                holidayName: ss.name,
+                                days: 1,
+                                expiresMonth,
+                                status: "available",
+                              });
+                            }
+                          }
+                        });
+
+                        // 6. 过期处理（清理过期换休余额）
+                        expireCompOff(currentMonth);
+                        expireHolidayCompOff(currentMonth);
+
+                        // 7. 自动抵扣换休余额（多休天数处理）
+                        // underRestDays < 0 表示多休了（出勤天数 < 应出勤天数）
+                        const extraRestDays = Math.max(0, -(att.underRestDays));
+                        let remainingExtraRest = extraRestDays;
+
+                        if (remainingExtraRest > 0) {
+                          // 优先抵扣节假日调休余额
+                          const holidayEntries = getHolidayCompOffEntries(emp.id)
+                            .filter((e) => e.status === "available" && e.expiresMonth >= currentMonth)
+                            .sort((a, b) => a.expiresMonth.localeCompare(b.expiresMonth));
+                          for (const entry of holidayEntries) {
+                            if (remainingExtraRest <= 0) break;
+                            const usedays = Math.min(entry.days, remainingExtraRest);
+                            updateHolidayCompOff(entry.id, {
+                              status: usedays >= entry.days ? "used" : "available",
+                              days: entry.days - usedays,
+                              usedMonth: currentMonth,
+                            });
+                            remainingExtraRest -= usedays;
+                          }
+                        }
+
+                        if (remainingExtraRest > 0) {
+                          // 再抵扣加班换休余额（按到期时间，最早到期的先用）
+                          const compOffEntries = getCompOffEntries(emp.id)
+                            .filter((e) => e.status === "available" && e.expiresMonth >= currentMonth)
+                            .sort((a, b) => a.expiresMonth.localeCompare(b.expiresMonth));
+                          for (const entry of compOffEntries) {
+                            if (remainingExtraRest <= 0) break;
+                            const usedays = Math.min(entry.days, remainingExtraRest);
+                            updateCompOffEntry(entry.id, {
+                              status: usedays >= entry.days ? "used" : "available",
+                              days: entry.days - usedays,
+                              usedMonth: currentMonth,
+                            });
+                            remainingExtraRest -= usedays;
+                          }
+                        }
+
+                        // 8. 无来源多休提醒
+                        if (remainingExtraRest > 0) {
+                          upsertAlert({
+                            id: `${emp.id}_${currentMonth}`,
+                            employeeId: emp.id,
+                            month: currentMonth,
+                            unexplainedDays: remainingExtraRest,
+                            resolution: "pending",
+                            updatedAt: new Date().toISOString(),
+                          });
+                        }
+
+                        // 9. 生成薪资单
                         const slip = buildPaySlipDraft(emp, currentMonth, att, performanceTotal, advanceTotal, globalSettings, cumulativeIncome, cumulativeTaxPaid);
                         upsertPaySlip(slip);
                         count++;

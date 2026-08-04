@@ -986,15 +986,20 @@ export function calcSocialInsurance(
  * @returns 本月应预扣税额
  */
 export function calcIncomeTax(
+  /**
+   * 年度累计应纳税所得额
+   * = 累计应发 - 累计社保个人部分 - 累计公积金个人部分 - 累计起征点（5000×月数）- 累计专项附加扣除
+   * 由调用方计算后传入，函数内部不再重复扣除
+   */
   cumulativeIncome: number,
+  /** @deprecated 保留参数兼容性，已不使用（调用方已在 cumulativeIncome 中扣除） */
   cumulativeDeductions: number,
   cumulativeTaxPaid: number,
   threshold: number = 5000,
   specialDeductions: number = 0
 ): { tax: number; note: string } {
-  // 累计应纳税所得额 = 累计收入 - 累计减除费用（起征点×月数）- 累计专项扣除 - 累计专项附加扣除
-  // 简化版：直接用传入的累计数据
-  const taxableIncome = Math.max(0, cumulativeIncome - cumulativeDeductions - specialDeductions);
+  // 累计应纳税所得额直接使用传入值（调用方已扣除社保、起征点、专项附加扣除）
+  const taxableIncome = Math.max(0, cumulativeIncome);
 
   // 查找适用税率档
   const bracket = INCOME_TAX_BRACKETS.find(
