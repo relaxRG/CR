@@ -19,6 +19,10 @@ import {
   AllowanceRule, SocialInsuranceConfig, InsuranceItem, HousingFundItem,
   CustomDept, DeptCategory, DEPT_CATEGORY_LABELS, DEPT_CATEGORY_COLORS,
   AllowanceUnit, AllowancePeriodMode, ALLOWANCE_UNIT_LABELS, ALLOWANCE_PERIOD_MODE_LABELS,
+  WorkKPIRule, WorkKPITier,
+  RevenueKPIRule, RevenueKPITier, RevenueKPISource, RevenueKPIPayMode, RevenueKPICalcType,
+  REVENUE_KPI_SOURCE_LABELS, REVENUE_KPI_PAY_MODE_LABELS, REVENUE_KPI_CALC_TYPE_LABELS,
+  calcRevenueKPIBonus,
   DEPT_LABELS, DEPT_COLORS, EMPLOYEE_TYPE_LABELS, EMPLOYEE_TYPE_COLORS,
   calcDailyRate, getDaysInMonth, DEFAULT_SHIFT_TEMPLATES, WEEKDAY_LABELS,
   DEFAULT_SOCIAL_INSURANCE, BUILTIN_CITY_POLICIES, getCityPolicy, applyCityPolicy,
@@ -141,6 +145,41 @@ export default function LaborEmployeeFormScreen() {
   };
   const deleteAllowanceRule = (id: string) => setAllowanceRules((prev) => prev.filter((r) => r.id !== id));
 
+  // ── 工作绩效（Task-based KPI） ──
+  const [workKPIRules, setWorkKPIRules] = useState<WorkKPIRule[]>(existing?.workKPIRules ?? []);
+  const [workKPIEditMode, setWorkKPIEditMode] = useState(false);
+  const addWorkKPI = () => {
+    setWorkKPIRules((prev) => [...prev, {
+      id: Date.now().toString(), name: "", cycle: "monthly" as const, notes: "", enabled: true,
+      tiers: [
+        { id: "1", label: "优秀", amount: 200, sortOrder: 1 },
+        { id: "2", label: "良好", amount: 100, sortOrder: 2 },
+        { id: "3", label: "合格", amount: 0, sortOrder: 3 },
+        { id: "4", label: "不合格", amount: -50, sortOrder: 4 },
+      ],
+    }]);
+  };
+  const updateWorkKPI = (id: string, patch: Partial<WorkKPIRule>) => {
+    setWorkKPIRules((prev) => prev.map((r) => r.id === id ? { ...r, ...patch } : r));
+  };
+  const deleteWorkKPI = (id: string) => setWorkKPIRules((prev) => prev.filter((r) => r.id !== id));
+
+  // ── 业绩绩效（Revenue-based KPI） ──
+  const [revenueKPIRules, setRevenueKPIRules] = useState<RevenueKPIRule[]>(existing?.revenueKPIRules ?? []);
+  const [revenueKPIEditMode, setRevenueKPIEditMode] = useState(false);
+  const addRevenueKPI = () => {
+    setRevenueKPIRules((prev) => [...prev, {
+      id: Date.now().toString(), name: "", source: "total_revenue" as RevenueKPISource,
+      tiers: [{ id: "1", threshold: 50000, amount: 500, sortOrder: 1 }],
+      payMode: "highest" as RevenueKPIPayMode, calcType: "fixed" as RevenueKPICalcType,
+      enabled: true,
+    }]);
+  };
+  const updateRevenueKPI = (id: string, patch: Partial<RevenueKPIRule>) => {
+    setRevenueKPIRules((prev) => prev.map((r) => r.id === id ? { ...r, ...patch } : r));
+  };
+  const deleteRevenueKPI = (id: string) => setRevenueKPIRules((prev) => prev.filter((r) => r.id !== id));
+
   // ── 社保/公积金（双轨制） ──
   const [siEnabled, setSiEnabled] = useState(existing?.socialInsurance?.enabled ?? false);
   const [taxEnabled, setTaxEnabled] = useState(existing?.incomeTax?.enabled ?? false);
@@ -223,6 +262,8 @@ export default function LaborEmployeeFormScreen() {
       weeklyHoursRules: weeklyHoursRules.length > 0 ? weeklyHoursRules : undefined,
       compOffRule: { enabled: compOffEnabled, hoursPerDay: Number(compOffHoursPerDay) || 8 },
       allowanceRules: allowanceRules.length > 0 ? allowanceRules : undefined,
+      workKPIRules: workKPIRules.length > 0 ? workKPIRules : undefined,
+      revenueKPIRules: revenueKPIRules.length > 0 ? revenueKPIRules : undefined,
       socialInsurance: siEnabled ? { ...siConfig, enabled: true, city: siCityInput.trim() } : undefined,
       incomeTax: taxEnabled ? { enabled: true, threshold: 5000, specialDeductions: 0 } : undefined,
       bankAccounts,
@@ -643,6 +684,222 @@ export default function LaborEmployeeFormScreen() {
             {allowanceRules.length === 0 && (
               <Text style={{ fontSize: 12, color: colors.muted, textAlign: "center", paddingVertical: 12 }}>点击上方标签快速添加补贴项</Text>
             )}
+                    </SectionCard>
+
+          {/* ── 工作绩效（Task-based KPI） ── */}
+          <SectionCard title="工作绩效" colors={colors} rightAction={
+            <TouchableOpacity onPress={() => { tap(); setWorkKPIEditMode(!workKPIEditMode); }}>
+              <Text style={{ fontSize: 18, color: colors.muted }}>{workKPIEditMode ? "✓" : "⚙"}</Text>
+            </TouchableOpacity>
+          }>
+            {workKPIRules.map((rule) => (
+              <View key={rule.id} style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  {workKPIEditMode ? (
+                    <TextInput value={rule.name} onChangeText={(v) => updateWorkKPI(rule.id, { name: v })}
+                      placeholder="绩效名称" placeholderTextColor={colors.muted}
+                      style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, flex: 1 }]} />
+                  ) : (
+                    <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground, flex: 1 }}>{rule.name || "未命名"}</Text>
+                  )}
+                  {workKPIEditMode && (
+                    <TouchableOpacity onPress={() => deleteWorkKPI(rule.id)} style={{ padding: 4 }}>
+                      <Text style={{ fontSize: 16, color: colors.error }}>🗑</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                {/* 档位列表 */}
+                <View style={{ marginTop: 8, gap: 4 }}>
+                  {rule.tiers.sort((a, b) => a.sortOrder - b.sortOrder).map((tier) => (
+                    <View key={tier.id} style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                      {workKPIEditMode ? (
+                        <>
+                          <TextInput value={tier.label} onChangeText={(v) => {
+                            const newTiers = rule.tiers.map((t) => t.id === tier.id ? { ...t, label: v } : t);
+                            updateWorkKPI(rule.id, { tiers: newTiers });
+                          }} placeholder="档位名" placeholderTextColor={colors.muted}
+                            style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, width: 70 }]} />
+                          <TextInput value={tier.amount !== 0 ? String(tier.amount) : ""}
+                            onChangeText={(v) => {
+                              const newTiers = rule.tiers.map((t) => t.id === tier.id ? { ...t, amount: Number(v) || 0 } : t);
+                              updateWorkKPI(rule.id, { tiers: newTiers });
+                            }} placeholder="金额" placeholderTextColor={colors.muted} keyboardType="number-pad"
+                            style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, width: 70, textAlign: "center" }]} />
+                          <Text style={{ fontSize: 11, color: colors.muted }}>元</Text>
+                          <TouchableOpacity onPress={() => {
+                            const newTiers = rule.tiers.filter((t) => t.id !== tier.id);
+                            updateWorkKPI(rule.id, { tiers: newTiers });
+                          }}><Text style={{ fontSize: 14, color: colors.error }}>×</Text></TouchableOpacity>
+                        </>
+                      ) : (
+                        <>
+                          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: tier.amount > 0 ? colors.success : tier.amount < 0 ? colors.error : colors.muted }} />
+                          <Text style={{ fontSize: 13, color: colors.foreground, width: 60 }}>{tier.label}</Text>
+                          <Text style={{ fontSize: 13, color: tier.amount > 0 ? colors.success : tier.amount < 0 ? colors.error : colors.muted, fontWeight: "500" }}>
+                            {tier.amount > 0 ? `+¥${tier.amount}` : tier.amount < 0 ? `-¥${Math.abs(tier.amount)}` : "¥0"}
+                          </Text>
+                        </>
+                      )}
+                    </View>
+                  ))}
+                  {workKPIEditMode && (
+                    <TouchableOpacity onPress={() => {
+                      const newTiers = [...rule.tiers, { id: Date.now().toString(), label: "", amount: 0, sortOrder: rule.tiers.length + 1 }];
+                      updateWorkKPI(rule.id, { tiers: newTiers });
+                    }} style={{ paddingVertical: 4 }}>
+                      <Text style={{ fontSize: 12, color: colors.primary }}>+ 添加档位</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                {/* 考核周期 + 备注 */}
+                {workKPIEditMode && (
+                  <View style={{ marginTop: 8, gap: 6 }}>
+                    <View style={{ flexDirection: "row", gap: 8 }}>
+                      {(["monthly", "quarterly"] as const).map((c) => (
+                        <TouchableOpacity key={c} onPress={() => updateWorkKPI(rule.id, { cycle: c })}
+                          style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, borderWidth: 1, backgroundColor: rule.cycle === c ? colors.primary : colors.surface, borderColor: rule.cycle === c ? colors.primary : colors.border }}>
+                          <Text style={{ fontSize: 11, color: rule.cycle === c ? "#fff" : colors.muted }}>{c === "monthly" ? "每月" : "每季度"}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                    <TextInput value={rule.notes} onChangeText={(v) => updateWorkKPI(rule.id, { notes: v })}
+                      placeholder="备注（可选）" placeholderTextColor={colors.muted} multiline
+                      style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border }]} />
+                  </View>
+                )}
+              </View>
+            ))}
+            <TouchableOpacity onPress={() => { tap(); addWorkKPI(); }} style={{ paddingVertical: 12, borderWidth: 1, borderColor: colors.primary, borderStyle: "dashed", borderRadius: 8, marginTop: 8, alignItems: "center" }}>
+              <Text style={{ fontSize: 13, color: colors.primary }}>+ 添加工作绩效项</Text>
+            </TouchableOpacity>
+          </SectionCard>
+
+          {/* ── 业绩绩效（Revenue-based KPI） ── */}
+          <SectionCard title="业绩绩效" colors={colors} rightAction={
+            <TouchableOpacity onPress={() => { tap(); setRevenueKPIEditMode(!revenueKPIEditMode); }}>
+              <Text style={{ fontSize: 18, color: colors.muted }}>{revenueKPIEditMode ? "✓" : "⚙"}</Text>
+            </TouchableOpacity>
+          }>
+            {revenueKPIRules.map((rule) => (
+              <View key={rule.id} style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  {revenueKPIEditMode ? (
+                    <TextInput value={rule.name} onChangeText={(v) => updateRevenueKPI(rule.id, { name: v })}
+                      placeholder="绩效名称" placeholderTextColor={colors.muted}
+                      style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, flex: 1 }]} />
+                  ) : (
+                    <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground, flex: 1 }}>{rule.name || "未命名"}</Text>
+                  )}
+                  {revenueKPIEditMode && (
+                    <TouchableOpacity onPress={() => deleteRevenueKPI(rule.id)} style={{ padding: 4 }}>
+                      <Text style={{ fontSize: 16, color: colors.error }}>🗑</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                {/* 数据源选择 */}
+                {revenueKPIEditMode && (
+                  <View style={{ marginTop: 8, gap: 6 }}>
+                    <Text style={{ fontSize: 11, color: colors.muted }}>数据源：</Text>
+                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                      {(["total_revenue", "net_revenue", "net_profit", "category", "manual"] as RevenueKPISource[]).map((s) => (
+                        <TouchableOpacity key={s} onPress={() => updateRevenueKPI(rule.id, { source: s })}
+                          style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, backgroundColor: rule.source === s ? colors.primary : colors.surface, borderColor: rule.source === s ? colors.primary : colors.border }}>
+                          <Text style={{ fontSize: 10, color: rule.source === s ? "#fff" : colors.muted }}>{REVENUE_KPI_SOURCE_LABELS[s]}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                    {rule.source === "category" && (
+                      <TextInput value={rule.categoryName ?? ""} onChangeText={(v) => updateRevenueKPI(rule.id, { categoryName: v })}
+                        placeholder="经营大类名称（智能匹配月报）" placeholderTextColor={colors.muted}
+                        style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border }]} />
+                    )}
+                  </View>
+                )}
+                {/* 发放模式 + 计算方式 */}
+                {revenueKPIEditMode && (
+                  <View style={{ marginTop: 8, gap: 6 }}>
+                    <View style={{ flexDirection: "row", gap: 8 }}>
+                      {(["cumulative", "highest"] as RevenueKPIPayMode[]).map((mode) => (
+                        <TouchableOpacity key={mode} onPress={() => updateRevenueKPI(rule.id, { payMode: mode })}
+                          style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, flex: 1, backgroundColor: rule.payMode === mode ? colors.success : colors.surface, borderColor: rule.payMode === mode ? colors.success : colors.border }}>
+                          <Text style={{ fontSize: 9, color: rule.payMode === mode ? "#fff" : colors.muted, textAlign: "center" }}>{REVENUE_KPI_PAY_MODE_LABELS[mode]}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                    <View style={{ flexDirection: "row", gap: 8 }}>
+                      {(["fixed", "percentage"] as RevenueKPICalcType[]).map((ct) => (
+                        <TouchableOpacity key={ct} onPress={() => updateRevenueKPI(rule.id, { calcType: ct })}
+                          style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, borderWidth: 1, backgroundColor: rule.calcType === ct ? colors.primary : colors.surface, borderColor: rule.calcType === ct ? colors.primary : colors.border }}>
+                          <Text style={{ fontSize: 11, color: rule.calcType === ct ? "#fff" : colors.muted }}>{REVENUE_KPI_CALC_TYPE_LABELS[ct]}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                    <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+                      <Text style={{ fontSize: 11, color: colors.muted }}>封顶：</Text>
+                      <TextInput value={rule.capAmount ? String(rule.capAmount) : ""}
+                        onChangeText={(v) => updateRevenueKPI(rule.id, { capAmount: Number(v) || 0 })}
+                        placeholder="0=无上限" placeholderTextColor={colors.muted} keyboardType="number-pad"
+                        style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, width: 80, textAlign: "center" }]} />
+                      <Text style={{ fontSize: 11, color: colors.muted }}>元</Text>
+                    </View>
+                  </View>
+                )}
+                {/* 档位列表 */}
+                <View style={{ marginTop: 8, gap: 4 }}>
+                  {rule.tiers.sort((a, b) => a.sortOrder - b.sortOrder).map((tier) => (
+                    <View key={tier.id} style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      {revenueKPIEditMode ? (
+                        <>
+                          <Text style={{ fontSize: 11, color: colors.muted }}>≥</Text>
+                          <TextInput value={tier.threshold > 0 ? String(tier.threshold) : ""}
+                            onChangeText={(v) => {
+                              const newTiers = rule.tiers.map((t) => t.id === tier.id ? { ...t, threshold: Number(v) || 0 } : t);
+                              updateRevenueKPI(rule.id, { tiers: newTiers });
+                            }} placeholder="金额" placeholderTextColor={colors.muted} keyboardType="number-pad"
+                            style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, width: 70, textAlign: "center" }]} />
+                          <Text style={{ fontSize: 11, color: colors.muted }}>→</Text>
+                          <TextInput value={tier.amount > 0 ? String(tier.amount) : ""}
+                            onChangeText={(v) => {
+                              const newTiers = rule.tiers.map((t) => t.id === tier.id ? { ...t, amount: Number(v) || 0 } : t);
+                              updateRevenueKPI(rule.id, { tiers: newTiers });
+                            }} placeholder={rule.calcType === "fixed" ? "奖金" : "比例"} placeholderTextColor={colors.muted} keyboardType="decimal-pad"
+                            style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, width: 60, textAlign: "center" }]} />
+                          <Text style={{ fontSize: 11, color: colors.muted }}>{rule.calcType === "fixed" ? "元" : "%"}</Text>
+                          <TouchableOpacity onPress={() => {
+                            const newTiers = rule.tiers.filter((t) => t.id !== tier.id);
+                            updateRevenueKPI(rule.id, { tiers: newTiers });
+                          }}><Text style={{ fontSize: 14, color: colors.error }}>×</Text></TouchableOpacity>
+                        </>
+                      ) : (
+                        <>
+                          <Text style={{ fontSize: 12, color: colors.muted }}>≥¥{tier.threshold.toLocaleString()}</Text>
+                          <Text style={{ fontSize: 12, color: colors.success, fontWeight: "500" }}>
+                            → {rule.calcType === "fixed" ? `+¥${tier.amount}` : `${(tier.amount * 100).toFixed(1)}%`}
+                          </Text>
+                        </>
+                      )}
+                    </View>
+                  ))}
+                  {revenueKPIEditMode && (
+                    <TouchableOpacity onPress={() => {
+                      const newTiers = [...rule.tiers, { id: Date.now().toString(), threshold: 0, amount: 0, sortOrder: rule.tiers.length + 1 }];
+                      updateRevenueKPI(rule.id, { tiers: newTiers });
+                    }} style={{ paddingVertical: 4 }}>
+                      <Text style={{ fontSize: 12, color: colors.primary }}>+ 添加档位</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                {/* 非编辑模式下显示摘要 */}
+                {!revenueKPIEditMode && (
+                  <Text style={{ fontSize: 11, color: colors.muted, marginTop: 4 }}>
+                    {REVENUE_KPI_SOURCE_LABELS[rule.source]}{rule.source === "category" ? `・${rule.categoryName}` : ""} · {REVENUE_KPI_PAY_MODE_LABELS[rule.payMode].split("（")[0]}
+                  </Text>
+                )}
+              </View>
+            ))}
+            <TouchableOpacity onPress={() => { tap(); addRevenueKPI(); }} style={{ paddingVertical: 12, borderWidth: 1, borderColor: colors.primary, borderStyle: "dashed", borderRadius: 8, marginTop: 8, alignItems: "center" }}>
+              <Text style={{ fontSize: 13, color: colors.primary }}>+ 添加业绩绩效项</Text>
+            </TouchableOpacity>
           </SectionCard>
 
           {/* ── 社保（五险） ── */}

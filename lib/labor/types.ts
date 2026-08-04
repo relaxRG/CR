@@ -188,6 +188,130 @@ export function shouldPayAllowanceThisMonth(rule: AllowanceRule, month: string):
   return true;
 }
 
+
+// ─── 工作绩效（Task-based KPI） ─────────────────────────────────────────────────
+
+/** 工作绩效档位 */
+export interface WorkKPITier {
+  id: string;
+  /** 档位标签，如"优秀""良好""合格""不合格" */
+  label: string;
+  /** 金额：正数=奖励，负数=扣款，0=无奖惩 */
+  amount: number;
+  sortOrder: number;
+}
+
+/** 工作绩效规则 */
+export interface WorkKPIRule {
+  id: string;
+  /** 绩效名称 */
+  name: string;
+  /** 档位列表（勾选实际完成档位） */
+  tiers: WorkKPITier[];
+  /** 考核周期 */
+  cycle: "monthly" | "quarterly";
+  /** 备注 */
+  notes: string;
+  /** 是否启用 */
+  enabled: boolean;
+}
+
+// ─── 业绩绩效（Revenue-based KPI） ──────────────────────────────────────────────
+
+/** 业绩绩效数据源 */
+export type RevenueKPISource =
+  | "total_revenue"      // 总营业额
+  | "net_revenue"        // 营业收入（扣手续费后）
+  | "net_profit"         // 净利润
+  | "category"           // 某个经营大类
+  | "manual";            // 手动填充
+
+export const REVENUE_KPI_SOURCE_LABELS: Record<RevenueKPISource, string> = {
+  total_revenue: "总营业额",
+  net_revenue: "营业收入（扣手续费）",
+  net_profit: "净利润",
+  category: "经营大类",
+  manual: "手动填充",
+};
+
+/** 业绩绩效发放模式 */
+export type RevenueKPIPayMode = "cumulative" | "highest";
+
+export const REVENUE_KPI_PAY_MODE_LABELS: Record<RevenueKPIPayMode, string> = {
+  cumulative: "叠加发放（所有达标档位累加）",
+  highest: "取最高档（只拿最高一档）",
+};
+
+/** 业绩绩效计算方式 */
+export type RevenueKPICalcType = "fixed" | "percentage";
+
+export const REVENUE_KPI_CALC_TYPE_LABELS: Record<RevenueKPICalcType, string> = {
+  fixed: "固定金额",
+  percentage: "按比例提成",
+};
+
+/** 业绩绩效档位 */
+export interface RevenueKPITier {
+  id: string;
+  /** 达到金额（≥ 此值触发） */
+  threshold: number;
+  /** 奖励金额（calcType=fixed时）或提成比例（calcType=percentage时，如 0.04=4%） */
+  amount: number;
+  /** 档位标签 */
+  label?: string;
+  sortOrder: number;
+}
+
+/** 业绩绩效规则 */
+export interface RevenueKPIRule {
+  id: string;
+  /** 绩效名称 */
+  name: string;
+  /** 数据源 */
+  source: RevenueKPISource;
+  /** 当 source="category" 时，指定经营大类名称（智能匹配月报） */
+  categoryName?: string;
+  /** 档位列表 */
+  tiers: RevenueKPITier[];
+  /** 发放模式 */
+  payMode: RevenueKPIPayMode;
+  /** 计算方式 */
+  calcType: RevenueKPICalcType;
+  /** 封顶金额（0=无上限） */
+  capAmount?: number;
+  /** 是否启用 */
+  enabled: boolean;
+}
+
+/**
+ * 计算业绩绩效奖金
+ */
+export function calcRevenueKPIBonus(rule: RevenueKPIRule, actualValue: number): number {
+  if (!rule.enabled || rule.tiers.length === 0) return 0;
+  const sorted = [...rule.tiers].sort((a, b) => a.threshold - b.threshold);
+  let bonus = 0;
+
+  if (rule.payMode === "highest") {
+    for (let i = sorted.length - 1; i >= 0; i--) {
+      if (actualValue >= sorted[i].threshold) {
+        bonus = rule.calcType === "fixed" ? sorted[i].amount : actualValue * sorted[i].amount;
+        break;
+      }
+    }
+  } else {
+    for (const tier of sorted) {
+      if (actualValue >= tier.threshold) {
+        bonus += rule.calcType === "fixed" ? tier.amount : actualValue * tier.amount;
+      }
+    }
+  }
+
+  if (rule.capAmount && rule.capAmount > 0 && bonus > rule.capAmount) {
+    bonus = rule.capAmount;
+  }
+  return bonus;
+}
+
 // ─── 社保 / 公积金配置 ────────────────────────────────────────────────────────
 // ─── 单个险种配置（个人+公司双轨制） ────────────────────────────────────────
 export interface InsuranceItem {
@@ -696,6 +820,10 @@ export interface Employee {
   compOffRule?: CompOffRule;
   /** 补贴规则列表（饭补/交通/自定义） */
   allowanceRules?: AllowanceRule[];
+  /** 工作绩效规则（Task-based KPI） */
+  workKPIRules?: WorkKPIRule[];
+  /** 业绩绩效规则（Revenue-based KPI） */
+  revenueKPIRules?: RevenueKPIRule[];
   /** 社保/公积金配置（每人独立，可覆盖全局配置） */
   socialInsurance?: SocialInsuranceConfig;
   /** 个税配置（每人独立，可覆盖全局配置） */
