@@ -18,7 +18,7 @@ import {
   Employee, EmployeeDept, EmployeeType, EmployeeBankAccount, WeeklyHoursRule,
   AllowanceRule, SocialInsuranceConfig, InsuranceItem, HousingFundItem,
   CustomDept, DeptCategory, DEPT_CATEGORY_LABELS, DEPT_CATEGORY_COLORS,
-  AllowanceUnit, ALLOWANCE_UNIT_LABELS,
+  AllowanceUnit, AllowancePeriodMode, ALLOWANCE_UNIT_LABELS, ALLOWANCE_PERIOD_MODE_LABELS,
   DEPT_LABELS, DEPT_COLORS, EMPLOYEE_TYPE_LABELS, EMPLOYEE_TYPE_COLORS,
   calcDailyRate, getDaysInMonth, DEFAULT_SHIFT_TEMPLATES, WEEKDAY_LABELS,
   DEFAULT_SOCIAL_INSURANCE, BUILTIN_CITY_POLICIES, getCityPolicy, applyCityPolicy,
@@ -597,13 +597,38 @@ export default function LaborEmployeeFormScreen() {
                   </View>
                   {/* 单位选择（编辑模式下显示） */}
                   {allowanceEditMode && (
-                    <View style={{ flexDirection: "row", gap: 6 }}>
-                      {(["per_day", "per_month", "per_quarter", "per_year"] as AllowanceUnit[]).map((u) => (
-                        <TouchableOpacity key={u} onPress={() => updateAllowanceRule(rule.id, { unit: u })}
-                          style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: 1, backgroundColor: (rule.unit ?? "per_month") === u ? colors.primary : colors.surface, borderColor: (rule.unit ?? "per_month") === u ? colors.primary : colors.border }}>
-                          <Text style={{ fontSize: 10, color: (rule.unit ?? "per_month") === u ? "#fff" : colors.muted }}>{ALLOWANCE_UNIT_LABELS[u]}</Text>
-                        </TouchableOpacity>
-                      ))}
+                    <View style={{ gap: 6 }}>
+                      <View style={{ flexDirection: "row", gap: 6 }}>
+                        {(["per_day", "per_month", "per_quarter", "per_year"] as AllowanceUnit[]).map((u) => (
+                          <TouchableOpacity key={u} onPress={() => updateAllowanceRule(rule.id, { unit: u, periodMode: undefined, effectiveMonth: undefined })}
+                            style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: 1, backgroundColor: (rule.unit ?? "per_month") === u ? colors.primary : colors.surface, borderColor: (rule.unit ?? "per_month") === u ? colors.primary : colors.border }}>
+                            <Text style={{ fontSize: 10, color: (rule.unit ?? "per_month") === u ? "#fff" : colors.muted }}>{ALLOWANCE_UNIT_LABELS[u]}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                      {/* 季度/年度模式选择 */}
+                      {((rule.unit ?? "per_month") === "per_quarter" || (rule.unit ?? "per_month") === "per_year") && (
+                        <View style={{ gap: 4 }}>
+                          <View style={{ flexDirection: "row", gap: 6 }}>
+                            {(["natural", "rolling"] as AllowancePeriodMode[]).map((mode) => (
+                              <TouchableOpacity key={mode} onPress={() => updateAllowanceRule(rule.id, { periodMode: mode })}
+                                style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: 1, backgroundColor: (rule.periodMode ?? "natural") === mode ? colors.success : colors.surface, borderColor: (rule.periodMode ?? "natural") === mode ? colors.success : colors.border, flex: 1 }}>
+                                <Text style={{ fontSize: 9, color: (rule.periodMode ?? "natural") === mode ? "#fff" : colors.muted, textAlign: "center" }}>
+                                  {ALLOWANCE_PERIOD_MODE_LABELS[mode][(rule.unit ?? "per_month") === "per_quarter" ? "quarter" : "year"]}
+                                </Text>
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                          {(rule.periodMode === "rolling") && (
+                            <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
+                              <Text style={{ fontSize: 10, color: colors.muted }}>生效月：</Text>
+                              <TextInput value={rule.effectiveMonth ?? ""} onChangeText={(v) => updateAllowanceRule(rule.id, { effectiveMonth: v })}
+                                placeholder="YYYY-MM" placeholderTextColor={colors.muted} keyboardType="numbers-and-punctuation"
+                                style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, width: 90, fontSize: 11 }]} />
+                            </View>
+                          )}
+                        </View>
+                      )}
                     </View>
                   )}
                 </View>

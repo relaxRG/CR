@@ -110,11 +110,24 @@ export type AllowanceType =
 /** 补贴单位 */
 export type AllowanceUnit = "per_day" | "per_month" | "per_quarter" | "per_year";
 
+/**
+ * 季度/年度补贴的发放模式
+ * - natural: 自然周期（季度=1-3/4-6/7-9/10-12，年度=当年）
+ *   错过当期则从下个周期开始
+ * - rolling: 滚动周期（从生效月起每3个月/12个月发放一次）
+ */
+export type AllowancePeriodMode = "natural" | "rolling";
+
 export const ALLOWANCE_UNIT_LABELS: Record<AllowanceUnit, string> = {
   per_day: "元/天",
   per_month: "元/月",
   per_quarter: "元/季",
   per_year: "元/年",
+};
+
+export const ALLOWANCE_PERIOD_MODE_LABELS: Record<AllowancePeriodMode, Record<"quarter" | "year", string>> = {
+  natural: { quarter: "自然季度（1-3/4-6/7-9/10-12）", year: "自然年度（当年）" },
+  rolling: { quarter: "滚动季度（生效起每3月）", year: "滚动年度（生效起每12月）" },
 };
 
 export interface AllowanceRule {
@@ -125,8 +138,54 @@ export interface AllowanceRule {
   amount: number;
   /** 单位（新版，默认 per_month） */
   unit?: AllowanceUnit;
+  /** 季度/年度发放模式（仅 per_quarter/per_year 时有效） */
+  periodMode?: AllowancePeriodMode;
+  /** 补贴生效月（YYYY-MM 格式，滚动模式下用于计算发放月） */
+  effectiveMonth?: string;
   /** 是否启用 */
   enabled: boolean;
+}
+
+/**
+ * 计算某月是否应发放季度/年度补贴
+ * @param rule 补贴规则
+ * @param month 当前月份（YYYY-MM）
+ * @returns 是否在该月发放
+ */
+export function shouldPayAllowanceThisMonth(rule: AllowanceRule, month: string): boolean {
+  const unit = rule.unit ?? "per_month";
+  if (unit === "per_day" || unit === "per_month") return true;
+
+  const mode = rule.periodMode ?? "natural";
+  const [y, m] = month.split("-").map(Number);
+
+  if (unit === "per_quarter") {
+    if (mode === "natural") {
+      // 自然季度：在季度末月发放（3、6、9、12月）
+      return m === 3 || m === 6 || m === 9 || m === 12;
+    } else {
+      // 滚动季度：从生效月起每3个月发放
+      if (!rule.effectiveMonth) return false;
+      const [ey, em] = rule.effectiveMonth.split("-").map(Number);
+      const diff = (y - ey) * 12 + (m - em);
+      return diff >= 2 && diff % 3 === 2; // 第3个月发放（索引为2）
+    }
+  }
+
+  if (unit === "per_year") {
+    if (mode === "natural") {
+      // 自然年度：在12月发放
+      return m === 12;
+    } else {
+      // 滚动年度：从生效月起每12个月发放
+      if (!rule.effectiveMonth) return false;
+      const [ey, em] = rule.effectiveMonth.split("-").map(Number);
+      const diff = (y - ey) * 12 + (m - em);
+      return diff >= 11 && diff % 12 === 11; // 第12个月发放（索引为11）
+    }
+  }
+
+  return true;
 }
 
 // ─── 社保 / 公积金配置 ────────────────────────────────────────────────────────
