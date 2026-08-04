@@ -28,7 +28,7 @@ import { useSalaryAdvanceStore } from "@/lib/labor/advance-store";
 import { usePettyCashStore } from "@/lib/store/petty-store";
 import {
   Employee, EmployeeDept, EmployeeGroup, ShiftEntry, ShiftHoursValue, ShiftTemplate,
-  SpecialStatus,
+  SpecialStatus, SpecialStatusDirection,
   DEPT_COLORS, DEPT_LABELS, EMPLOYEE_TYPE_LABELS, monthLabel,
   getMonthDates, getDayOfWeek, getContractHoursForDate,
   DEFAULT_SHIFT_TEMPLATES, DEFAULT_SPECIAL_STATUSES, SHIFT_COLOR_PRESETS, calcAllowance,
@@ -296,7 +296,9 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors }:
   const { getPaySlip } = usePaySlipStore();
   const { getAttendance } = useAttendanceStore();
   const { templates: shiftTpls } = useShiftTemplateStore();
-  const { getAvailableDays: getCompOffDays, addEntry: addCompOffEntry } = useCompOffBalanceEntryStore();
+  const { getAvailableDays: getCompOffDays, addEntry: addCompOffEntry, getEntries: getCompOffEntries, cashOutEntry: cashOutCompOff } = useCompOffBalanceEntryStore();
+  const [showCashOutModal, setShowCashOutModal] = useState(false);
+  const [cashOutDailyRate, setCashOutDailyRate] = useState("");
   const { getAvailableDays: getHolidayCompOffDays } = useHolidayCompOffStore();
   const { getAlert, resolveAlert } = useUnexplainedRestAlertStore();
   const router = useRouter();
@@ -333,6 +335,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors }:
     addCompOffEntry({
       employeeId: employee.id,
       earnedMonth: month,
+      source: "overtime",
       hoursDeducted: hours,
       days,
       expiresMonth: calcCompOffExpiresMonth(month),
@@ -486,19 +489,27 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors }:
             </View>
           )}
 
-          {/* 换休余额 + 存入按钮 */}
+          {/* 调休余额 + 存入/兑现按钮 */}
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 4 }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-              <Text style={{ fontSize: 11, color: colors.muted }}>换休余额</Text>
+              <Text style={{ fontSize: 11, color: colors.muted }}>调休余额</Text>
               <View style={{ backgroundColor: totalCompOffDays > 0 ? "#34C759" + "22" : colors.border + "44", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
                 <Text style={{ fontSize: 10, fontWeight: "700", color: totalCompOffDays > 0 ? "#34C759" : colors.muted }}>{totalCompOffDays}天</Text>
               </View>
             </View>
-            <TouchableOpacity onPress={() => { tap(); setShowCompOffModal(!showCompOffModal); }}
-              style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, backgroundColor: "#34C759" + "15", borderWidth: 1, borderColor: "#34C759" + "44" }}>
-              <IconSymbol name="plus" size={11} color="#34C759" />
-              <Text style={{ fontSize: 11, color: "#34C759", fontWeight: "600" }}>存入换休</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: "row", gap: 6 }}>
+              {totalCompOffDays > 0 && (
+                <TouchableOpacity onPress={() => { tap(); setCashOutDailyRate(String(att?.dailyRate ?? 0)); setShowCashOutModal(true); }}
+                  style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, backgroundColor: "#FF9500" + "15", borderWidth: 1, borderColor: "#FF9500" + "44" }}>
+                  <Text style={{ fontSize: 11, color: "#FF9500", fontWeight: "600" }}>兑现</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity onPress={() => { tap(); setShowCompOffModal(!showCompOffModal); }}
+                style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, backgroundColor: "#34C759" + "15", borderWidth: 1, borderColor: "#34C759" + "44" }}>
+                <IconSymbol name="plus" size={11} color="#34C759" />
+                <Text style={{ fontSize: 11, color: "#34C759", fontWeight: "600" }}>存入</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* 存入换休余额内嵌表单 */}
@@ -544,6 +555,52 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors }:
               </View>
             </View>
           )}
+
+          {/* 调休余额兑现弹窗 */}
+          <Modal visible={showCashOutModal} transparent animationType="fade" onRequestClose={() => setShowCashOutModal(false)}>
+            <View style={{ flex: 1, backgroundColor: "#00000066", justifyContent: "center", alignItems: "center", padding: 24 }}>
+              <View style={{ backgroundColor: colors.surface, borderRadius: 16, padding: 20, width: "100%", gap: 12 }}>
+                <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground }}>调休余额兑现</Text>
+                <Text style={{ fontSize: 13, color: colors.muted }}>将调休余额兑现成钱，加入本月应发薪资</Text>
+                {getCompOffEntries(employee.id)
+                  .filter((e) => e.status === "available" && e.expiresMonth >= month)
+                  .sort((a, b) => a.expiresMonth.localeCompare(b.expiresMonth))
+                  .map((entry) => {
+                    const dr = Number(cashOutDailyRate) || (att?.dailyRate ?? 0);
+                    const amount = Math.round(entry.days * dr * 100) / 100;
+                    return (
+                      <View key={entry.id} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 10, backgroundColor: colors.background, borderRadius: 10 }}>
+                        <View>
+                          <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>
+                            {entry.source === "holiday" ? `${entry.holidayName ?? "节假日"} 换休` : "加班换休"} {entry.days}天
+                          </Text>
+                          <Text style={{ fontSize: 11, color: colors.muted }}>到期：{entry.expiresMonth}</Text>
+                        </View>
+                        <TouchableOpacity onPress={() => {
+                          tap();
+                          cashOutCompOff(entry.id, Number(cashOutDailyRate) || (att?.dailyRate ?? 0), month);
+                          setShowCashOutModal(false);
+                          Alert.alert("兑现成功", `已将 ${entry.days} 天调休余额兑现 ¥${amount.toFixed(2)}，请重新生成薪资单`);
+                        }}
+                          style={{ backgroundColor: "#34C759", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 }}>
+                          <Text style={{ fontSize: 12, fontWeight: "700", color: "#fff" }}>兑现 ¥{amount.toFixed(0)}</Text>
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  })}
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <Text style={{ fontSize: 12, color: colors.muted }}>兑现日薪：¥</Text>
+                  <TextInput value={cashOutDailyRate} onChangeText={setCashOutDailyRate} keyboardType="decimal-pad"
+                    placeholder={String(att?.dailyRate ?? 0)} placeholderTextColor={colors.muted}
+                    style={{ flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 8, color: colors.foreground, fontSize: 13 }} />
+                  <Text style={{ fontSize: 11, color: colors.muted }}>(可修改)</Text>
+                </View>
+                <TouchableOpacity onPress={() => setShowCashOutModal(false)} style={{ padding: 12, alignItems: "center" }}>
+                  <Text style={{ color: colors.muted }}>取消</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
 
           {/* 操作按钮行：绩效设置 + 历史 + 编辑薪资 */}
           <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
@@ -1218,7 +1275,7 @@ function SchTemplateModal({ visible, templates, specialStatuses, colors, onSaveS
   const addNewShift = () => { tap(); setLocalShifts((prev) => [...prev, { id: `tpl_${Date.now()}`, session: "新班次", startTime: "09:00", endTime: "18:00", defaultHours: 8, color: SHIFT_COLOR_PRESETS[prev.length % SHIFT_COLOR_PRESETS.length], sortOrder: prev.length }]); };
   const removeShift = (id: string) => { tap(); Alert.alert("删除班次", "删除后该班次历史排班记录不受影响。", [{ text: "取消", style: "cancel" }, { text: "删除", style: "destructive", onPress: () => setLocalShifts((prev) => prev.filter((t) => t.id !== id)) }]); };
   const updStatus = (id: string, p: Partial<SpecialStatus>) => setLocalStatuses((prev) => prev.map((s) => s.id === id ? { ...s, ...p } : s));
-  const addNewStatus = () => { tap(); setLocalStatuses((prev) => [...prev, { id: `ss_${Date.now()}`, name: "自定义", category: "absence" as const, salaryMultiplier: 1, color: SHIFT_COLOR_PRESETS[prev.length % SHIFT_COLOR_PRESETS.length], sortOrder: prev.length }]); };
+  const addNewStatus = () => { tap(); setLocalStatuses((prev) => [...prev, { id: `ss_${Date.now()}`, name: "自定义", category: "absence" as const, direction: "negative" as const, countAsAttendance: false, salaryMultiplier: 1, color: SHIFT_COLOR_PRESETS[prev.length % SHIFT_COLOR_PRESETS.length], sortOrder: prev.length }]); };
   const removeStatus = (id: string) => { const t = localStatuses.find((s) => s.id === id); if (t?.isBuiltin) { Alert.alert("内置状态", "内置状态不可删除，但可修改名称和倍率。"); return; } tap(); Alert.alert("删除状态", "确认删除？", [{ text: "取消", style: "cancel" }, { text: "删除", style: "destructive", onPress: () => setLocalStatuses((prev) => prev.filter((s) => s.id !== id)) }]); };
   const handleSave = () => {
     const eShiftIds = templates.map((t) => t.id); const lShiftIds = localShifts.map((t) => t.id);
@@ -1230,6 +1287,8 @@ function SchTemplateModal({ visible, templates, specialStatuses, colors, onSaveS
     onClose();
   };
   const CATEGORY_LABELS: Record<string, string> = { absence: "缺席类", work_day: "工作日类", comp_off: "加班换休" };
+  const DIRECTION_LABELS: Record<string, string> = { positive: "正向（加钱）", negative: "负向（扣钱）", neutral: "中性（不加不扣）" };
+  const DIRECTION_COLORS: Record<string, string> = { positive: "#34C759", negative: "#FF3B30", neutral: "#8E8E93" };
   const MULTIPLIER_PRESETS = [0, 0.5, 1, 1.5, 2, 3];
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
@@ -1279,17 +1338,66 @@ function SchTemplateModal({ visible, templates, specialStatuses, colors, onSaveS
                     <TextInput value={ss.name} onChangeText={(v) => updStatus(ss.id, { name: v })} placeholder="状态名称" placeholderTextColor={colors.muted} style={{ flex: 1, fontSize: 15, fontWeight: "700", color: ss.color, paddingVertical: 2 }} />
                     <TouchableOpacity onPress={() => removeStatus(ss.id)} style={{ padding: 4 }}><IconSymbol name="trash" size={16} color={ss.isBuiltin ? colors.muted : colors.error} /></TouchableOpacity>
                   </View>
-                  <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
-                    {(["absence", "work_day", "comp_off"] as const).map((cat) => (
-                      <TouchableOpacity key={cat} onPress={() => updStatus(ss.id, { category: cat })}
-                        style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, backgroundColor: ss.category === cat ? ss.color : colors.surface, borderColor: ss.category === cat ? ss.color : colors.border }}>
-                        <Text style={{ fontSize: 11, fontWeight: "600", color: ss.category === cat ? "#fff" : colors.muted }}>{CATEGORY_LABELS[cat]}</Text>
-                      </TouchableOpacity>
-                    ))}
+                  {/* 方向选择（核心字段） */}
+                  <View>
+                    <Text style={{ fontSize: 10, color: colors.muted, marginBottom: 4 }}>薪资方向</Text>
+                    <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
+                      {(["positive", "negative", "neutral"] as const).map((dir) => (
+                        <TouchableOpacity key={dir} onPress={() => updStatus(ss.id, { direction: dir })}
+                          style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1,
+                            backgroundColor: (ss.direction ?? "negative") === dir ? DIRECTION_COLORS[dir] : colors.surface,
+                            borderColor: (ss.direction ?? "negative") === dir ? DIRECTION_COLORS[dir] : colors.border }}>
+                          <Text style={{ fontSize: 11, fontWeight: "600", color: (ss.direction ?? "negative") === dir ? "#fff" : colors.muted }}>{DIRECTION_LABELS[dir]}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
                   </View>
+                  {/* 是否计工时 */}
+                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                    <View>
+                      <Text style={{ fontSize: 13, color: colors.foreground }}>计入工时</Text>
+                      <Text style={{ fontSize: 10, color: colors.muted }}>该天是否有实际上班工时</Text>
+                    </View>
+                    <TouchableOpacity onPress={() => updStatus(ss.id, { countAsAttendance: !(ss.countAsAttendance ?? false) })}
+                      style={{ width: 44, height: 26, borderRadius: 13, backgroundColor: (ss.countAsAttendance ?? false) ? "#34C759" : colors.border, justifyContent: "center", paddingHorizontal: 2 }}>
+                      <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: "#fff", alignSelf: (ss.countAsAttendance ?? false) ? "flex-end" : "flex-start" }} />
+                    </TouchableOpacity>
+                  </View>
+                  {/* 是否节假日（可换休） */}
+                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                    <View>
+                      <Text style={{ fontSize: 13, color: colors.foreground }}>节假日性质</Text>
+                      <Text style={{ fontSize: 10, color: colors.muted }}>开启后可选择「拿钱」或「换休」</Text>
+                    </View>
+                    <TouchableOpacity onPress={() => updStatus(ss.id, { isHoliday: !(ss.isHoliday ?? false) })}
+                      style={{ width: 44, height: 26, borderRadius: 13, backgroundColor: (ss.isHoliday ?? false) ? "#FF2D55" : colors.border, justifyContent: "center", paddingHorizontal: 2 }}>
+                      <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: "#fff", alignSelf: (ss.isHoliday ?? false) ? "flex-end" : "flex-start" }} />
+                    </TouchableOpacity>
+                  </View>
+                  {/* 薪资倍率 */}
                   {ss.category !== "comp_off" && (
                     <View>
-                      <Text style={{ fontSize: 10, color: colors.muted, marginBottom: 6 }}>薪资倍率：{ss.salaryMultiplier}x</Text>
+                      <Text style={{ fontSize: 10, color: colors.muted, marginBottom: 6 }}>
+                        薪资倍率：{ss.salaryMultiplier}x
+                        {" · "}
+                        {(() => {
+                          const dir = ss.direction ?? "negative";
+                          const m = ss.salaryMultiplier;
+                          if (dir === "neutral") return "不加不扣";
+                          if (dir === "positive") {
+                            if (!ss.countAsAttendance) return m === 1 ? "不扣薪（退回1天）" : `退回${m}天日薪`;
+                            return m <= 1 ? "正常日薪" : `额外补偿${(m-1).toFixed(1)}倍日薪`;
+                          }
+                          // negative
+                          if (!ss.countAsAttendance) {
+                            if (m === 0) return "不扣薪";
+                            if (m < 1) return `只扣${m}天日薪（退回${(1-m).toFixed(1)}天）`;
+                            if (m === 1) return "扣1天日薪";
+                            return `扣${m}天日薪（额外惩罚${(m-1).toFixed(1)}天）`;
+                          }
+                          return `扣${m}倍日薪（上班但违规）`;
+                        })()}
+                      </Text>
                       <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
                         {MULTIPLIER_PRESETS.map((m) => (
                           <TouchableOpacity key={m} onPress={() => updStatus(ss.id, { salaryMultiplier: m })}
@@ -1299,9 +1407,20 @@ function SchTemplateModal({ visible, templates, specialStatuses, colors, onSaveS
                         ))}
                         <TextInput value={MULTIPLIER_PRESETS.includes(ss.salaryMultiplier) ? "" : String(ss.salaryMultiplier)} onChangeText={(v) => updStatus(ss.id, { salaryMultiplier: Number(v) || ss.salaryMultiplier })} placeholder="自定义" placeholderTextColor={colors.muted} keyboardType="decimal-pad" style={[SCHEM.inputSmall, { color: colors.foreground, borderColor: colors.border, width: 60 }]} />
                       </View>
-                      <Text style={{ fontSize: 10, color: colors.muted, marginTop: 4 }}>{ss.category === "absence" ? (ss.salaryMultiplier === 0 ? "不扣薪" : ss.salaryMultiplier <= 1 ? `扣除 ${ss.salaryMultiplier} 天日薪` : `额外惩罚 ${ss.salaryMultiplier - 1} 天日薪`) : `当天薪资 × ${ss.salaryMultiplier}`}</Text>
                     </View>
                   )}
+                  {/* 分类（仅用于 UI 分组） */}
+                  <View>
+                    <Text style={{ fontSize: 10, color: colors.muted, marginBottom: 4 }}>UI 分类（仅分组显示）</Text>
+                    <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
+                      {(["absence", "work_day", "comp_off"] as const).map((cat) => (
+                        <TouchableOpacity key={cat} onPress={() => updStatus(ss.id, { category: cat })}
+                          style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, backgroundColor: ss.category === cat ? ss.color : colors.surface, borderColor: ss.category === cat ? ss.color : colors.border }}>
+                          <Text style={{ fontSize: 11, fontWeight: "600", color: ss.category === cat ? "#fff" : colors.muted }}>{CATEGORY_LABELS[cat]}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
                   <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>{SHIFT_COLOR_PRESETS.map((c) => (<TouchableOpacity key={c} onPress={() => { tap(); updStatus(ss.id, { color: c }); }} style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: c, borderWidth: ss.color === c ? 3 : 1, borderColor: ss.color === c ? colors.foreground : c + "44" }} />))}</View>
                 </View>
               ))}
@@ -1333,7 +1452,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   const { getHolidayForDate } = useHolidayConfigStore();
   const { advances } = useSalaryAdvanceStore();
   const { settings: globalSettings } = useGlobalPayrollSettingsStore();
-  const { getAvailableDays: getCompOffAvailDays, updateEntry: updateCompOffEntry, getEntries: getCompOffEntries, expireOldEntries: expireCompOff } = useCompOffBalanceEntryStore();
+  const { getAvailableDays: getCompOffAvailDays, updateEntry: updateCompOffEntry, getEntries: getCompOffEntries, expireOldEntries: expireCompOff, cashOutEntry: cashOutCompOff } = useCompOffBalanceEntryStore();
   const { getAvailableDays: getHolidayCompOffAvailDays, updateEntry: updateHolidayCompOff, getEntries: getHolidayCompOffEntries, addEntry: addHolidayCompOff, expireOldEntries: expireHolidayCompOff } = useHolidayCompOffStore();
   const { upsertAlert } = useUnexplainedRestAlertStore();
 
@@ -1652,7 +1771,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                             if (remainingExtraRest <= 0) break;
                             const usedays = Math.min(entry.days, remainingExtraRest);
                             updateHolidayCompOff(entry.id, {
-                              status: usedays >= entry.days ? "used" : "available",
+                              status: usedays >= entry.days ? "used_rest" : "available",
                               days: entry.days - usedays,
                               usedMonth: currentMonth,
                             });
@@ -1669,7 +1788,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                             if (remainingExtraRest <= 0) break;
                             const usedays = Math.min(entry.days, remainingExtraRest);
                             updateCompOffEntry(entry.id, {
-                              status: usedays >= entry.days ? "used" : "available",
+                              status: usedays >= entry.days ? "used_rest" : "available",
                               days: entry.days - usedays,
                               usedMonth: currentMonth,
                             });

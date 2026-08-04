@@ -445,37 +445,80 @@ function AttendanceProvider({ children }: { children: React.ReactNode }) {
         : null;
 
       if (specialStatus) {
-        // ── 特殊状态处理 ──
-        if (specialStatus.category === "comp_off") {
-          // 加班换休：不计实际工时，但按合同工时计入标准工时（避免加班时数虚高）
+        // ── 三字段驱动引擎：direction + countAsAttendance + salaryMultiplier ──
+        // 向后兼容：如果没有新字段，根据 category 推断
+        const dir = specialStatus.direction
+          ?? (specialStatus.category === "work_day" ? "positive"
+            : specialStatus.category === "comp_off" ? "neutral"
+            : "negative");
+        const countsAsAtt = specialStatus.countAsAttendance
+          ?? (specialStatus.category !== "absence");
+        const isCompOff = specialStatus.category === "comp_off";
+
+        if (isCompOff) {
+          // 加班换休：算出勤，不计实际工时，合同工时加入标准工时（避免加班时数虚高）
           compOffCount++;
-          daysSet.add(s.date); // 加班换休那天算出勤（不扣薪）
-          // 将该天的合同工时加入标准工时，使加班时数计算准确
+          daysSet.add(s.date);
           const contractH = getContractHoursForDate(employee, s.date);
           stdHoursTotal += contractH;
-        } else if (specialStatus.category === "work_day") {
-          // 节日上班：计工时，额外补偿
+        } else if (countsAsAtt) {
+          // 算出勤的特殊状态（如节日上班、违规扣款但上了班）
           const h = s.hoursValue;
           if (typeof h === "number" && h > 0) {
             daysSet.add(s.date);
             totalHours += h;
             const contractH = getContractHoursForDate(employee, s.date);
             stdHoursTotal += contractH;
-            // 节日补偿 = 当天工时对应的日薪 × (倍率-1)
+          } else {
+            // 无工时但标记为算出勤
+            daysSet.add(s.date);
+            const contractH = getContractHoursForDate(employee, s.date);
+            stdHoursTotal += contractH;
+          }
+          // 按方向计算额外调整
+          if (dir === "positive" && specialStatus.salaryMultiplier > 1) {
+            // 正向补偿：额外给 (multiplier-1) 倍日薪
             const dayBonus = Math.round(dailyRate * (specialStatus.salaryMultiplier - 1) * 100) / 100;
             holidayBonus += dayBonus;
+          } else if (dir === "negative") {
+            // 负向惩罚（上了班但违规）：额外扣 multiplier 倍日薪
+            const extraDeduction = Math.round(specialStatus.salaryMultiplier * dailyRate * 100) / 100;
+            const key = specialStatus.id;
+            if (!specialStatusDeductions[key]) {
+              specialStatusDeductions[key] = { count: 0, deduction: 0, name: specialStatus.name, multiplier: specialStatus.salaryMultiplier };
+            }
+            specialStatusDeductions[key].count++;
+            specialStatusDeductions[key].deduction += extraDeduction;
           }
-        } else if (specialStatus.category === "absence") {
-          // 缺席类：不计工时，按倍率扣薪
-          // 排班表已自动少了1天出勤（不在 daysSet 里），额外扣薪 = (倍率-1) × 日薪
-          // 例：旷工2倍 = 额外再扣1倍日薪；病假0.5倍 = 退回0.5倍日薪（负扣薪）
-          const extraDeduction = Math.round((specialStatus.salaryMultiplier - 1) * dailyRate * 100) / 100;
-          const key = specialStatus.id;
-          if (!specialStatusDeductions[key]) {
-            specialStatusDeductions[key] = { count: 0, deduction: 0, name: specialStatus.name, multiplier: specialStatus.salaryMultiplier };
+          // neutral：不加不扣
+        } else {
+          // 不算出勤的特殊状态（如缺席、休息）
+          // 该天不加入 daysSet → 比例底薪自然少1天
+          if (dir === "negative") {
+            // 负向缺席：额外调整 = (multiplier - 1) × 日薪
+            // 旷工2x → 额外扣(2-1)=1天；病假0.5x → 退回(1-0.5)=0.5天；事假1x → 无额外调整
+            const extraDeduction = Math.round((specialStatus.salaryMultiplier - 1) * dailyRate * 100) / 100;
+            if (extraDeduction !== 0) {
+              const key = specialStatus.id;
+              if (!specialStatusDeductions[key]) {
+                specialStatusDeductions[key] = { count: 0, deduction: 0, name: specialStatus.name, multiplier: specialStatus.salaryMultiplier };
+              }
+              specialStatusDeductions[key].count++;
+              specialStatusDeductions[key].deduction += extraDeduction;
+            }
+          } else if (dir === "positive") {
+            // 正向不出勤（如年假：不出勤但不扣薪）：退回1天日薪抵消比例底薪已少的那天
+            const refund = Math.round(specialStatus.salaryMultiplier * dailyRate * 100) / 100;
+            if (refund !== 0) {
+              const key = specialStatus.id;
+              if (!specialStatusDeductions[key]) {
+                specialStatusDeductions[key] = { count: 0, deduction: 0, name: specialStatus.name, multiplier: specialStatus.salaryMultiplier };
+              }
+              specialStatusDeductions[key].count++;
+              specialStatusDeductions[key].deduction -= refund; // 负数 = 退款
+            }
           }
-          specialStatusDeductions[key].count++;
-          specialStatusDeductions[key].deduction += extraDeduction;
+          // neutral 不出勤（如普通休息）：无额外调整
         }
       } else {
         // ── 正常工作班次 ──
@@ -507,15 +550,31 @@ function AttendanceProvider({ children }: { children: React.ReactNode }) {
     // 加班工资
     const overtimePay = Math.round(paidOvertimeHours * employee.overtimeHourlyRate * 100) / 100;
 
-    // 考勤工资 = 底薪 + 加班工资 - 特殊状态扣薪 + 节日补偿
-    // 注意：少休天数已通过"实际出勤天数少"自然体现，不再单独扣款
-    // （底薪是固定的，少出勤的扣款通过特殊状态的 absence 类型体现）
+    /**
+     * 考勤工资计算逻辑（按实际出勤天数比例）
+     *
+     * 全职员工：
+     *   底薪比例 = baseSalary × (实际出勤天数 / 应出勤天数)
+     *   实际出勤天数 = 有工时天数 + 加班换休天数 + 节假日调休天数（这些天已在 daysSet 里）
+     *   特殊状态只处理额外惩罚/补偿：
+     *     - 旷工 2x：该天已不在出勤（比例已扣1天），额外再扣 (2-1)=1 天日薪
+     *     - 病假 0.5x：该天已不在出勤（比例已扣1天），退回 (1-0.5)=0.5 天日薪
+     *     - 事假 1x：该天已不在出勤（比例已扣），无额外调整
+     *
+     * 兼职员工：按实际工时 × 时薪（不受出勤天数影响）
+     */
     let attendanceSalary: number;
     if (employee.type === "parttime") {
       attendanceSalary = Math.round(totalHours * employee.overtimeHourlyRate * 100) / 100;
     } else {
+      // 按实际出勤天数比例计算底薪
+      const proportionalBase = expectedAttendanceDays > 0
+        ? Math.round((employee.baseSalary * attendanceDays / expectedAttendanceDays) * 100) / 100
+        : employee.baseSalary;
+      // 考勤工资 = 比例底薪 + 加班工资 + 特殊状态额外调整 + 节日补偿
+      // totalSpecialDeduction 是额外惩罚（无来源多休已通过比例底薪自然体现）
       attendanceSalary = Math.round(
-        (employee.baseSalary + overtimePay - totalSpecialDeduction + holidayBonus) * 100
+        (proportionalBase + overtimePay - totalSpecialDeduction + holidayBonus) * 100
       ) / 100;
     }
 
@@ -933,8 +992,10 @@ interface CompOffBalanceEntryStore {
   updateEntry: (id: string, patch: Partial<CompOffBalanceEntry>) => void;
   /** 获取某员工所有余额条目 */
   getEntries: (employeeId: string) => CompOffBalanceEntry[];
-  /** 获取某员工在某月可用的余额总天数 */
+  /** 获取某员工在某月可用的余额总天数（available 状态且未过期） */
   getAvailableDays: (employeeId: string, month: string) => number;
+  /** 将余额兑现成钱（标记为 cashed_out，记录兑现金额） */
+  cashOutEntry: (id: string, dailyRate: number, usedMonth: string) => void;
   /** 自动将过期余额标记为 expired */
   expireOldEntries: (currentMonth: string) => void;
   ready: boolean;
@@ -942,7 +1003,7 @@ interface CompOffBalanceEntryStore {
 
 const CompOffBalanceEntryContext = createContext<CompOffBalanceEntryStore>({
   entries: [], addEntry: () => {}, updateEntry: () => {},
-  getEntries: () => [], getAvailableDays: () => 0, expireOldEntries: () => {},
+  getEntries: () => [], getAvailableDays: () => 0, cashOutEntry: () => {}, expireOldEntries: () => {},
   ready: false,
 });
 
@@ -972,8 +1033,21 @@ function CompOffBalanceEntryProvider({ children }: { children: React.ReactNode }
   }, [ref]);
 
   const getAvailableDays = useCallback((employeeId: string, month: string): number => {
-    return getAvailableCompOffDays(ref.current, employeeId, month);
+    return ref.current
+      .filter((e) => e.employeeId === employeeId && e.status === "available" && e.expiresMonth >= month)
+      .reduce((sum, e) => sum + e.days, 0);
   }, [ref]);
+
+  const cashOutEntry = useCallback((id: string, dailyRate: number, usedMonth: string) => {
+    const entry = ref.current.find((e) => e.id === id);
+    if (!entry || entry.status !== "available") return;
+    const cashOutAmount = Math.round(entry.days * dailyRate * 100) / 100;
+    const next = ref.current.map((e) => e.id === id
+      ? { ...e, status: "cashed_out" as const, usedMonth, cashOutDailyRate: dailyRate, cashOutAmount }
+      : e
+    );
+    persist(next);
+  }, [persist, ref]);
 
   const expireOldEntries = useCallback((currentMonth: string) => {
     const updated = ref.current.map((e) => {
@@ -986,7 +1060,7 @@ function CompOffBalanceEntryProvider({ children }: { children: React.ReactNode }
   }, [persist, ref]);
 
   return (
-    <CompOffBalanceEntryContext.Provider value={{ entries, addEntry, updateEntry, getEntries, getAvailableDays, expireOldEntries, ready }}>
+    <CompOffBalanceEntryContext.Provider value={{ entries, addEntry, updateEntry, getEntries, getAvailableDays, cashOutEntry, expireOldEntries, ready }}>
       {children}
     </CompOffBalanceEntryContext.Provider>
   );

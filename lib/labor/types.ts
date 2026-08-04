@@ -386,19 +386,48 @@ export const DEFAULT_INCOME_TAX: IncomeTaxConfig = {
  */
 export type SpecialStatusCategory = "absence" | "work_day" | "comp_off";
 
+/**
+ * 薪资方向
+ * positive = 正向（加钱）：当天上班且有额外补偿，如节日上班
+ * negative = 负向（扣钱）：缺席或违规，如旷工、病假
+ * neutral  = 中性（不加不扣）：如普通休息、加班换休
+ */
+export type SpecialStatusDirection = "positive" | "negative" | "neutral";
+
 export interface SpecialStatus {
   id: string;
   /** 状态名称（如"旷工"、"病假"、"节日上班"） */
   name: string;
-  /** 分类 */
+  /** 分类（仅用于 UI 分组，不参与薪资计算） */
   category: SpecialStatusCategory;
   /**
-   * 薪资倍率
-   * absence 类：0=不扣薪, 0.5=扣半天, 1=扣全天, 2=扣双倍（惩罚性）
-   * work_day 类：1=正常日薪, 2=双倍, 3=三倍
-   * comp_off 类：固定为 0（不扣薪，从加班时数里扣）
+   * 薪资方向（驱动引擎计算的核心字段）
+   * positive：该天算出勤，按倍率给额外补偿
+   * negative：该天不算出勤（比例底薪已少1天），按倍率计算额外惩罚/退款
+   * neutral：该天算出勤，不加不扣（如休息、加班换休）
+   */
+  direction: SpecialStatusDirection;
+  /**
+   * 是否计入工时
+   * true：该天有实际工时（如节日上班、违规扣款但上了班）
+   * false：该天无工时（如缺席、休息、加班换休）
+   */
+  countAsAttendance: boolean;
+  /**
+   * 薪资倍率（配合 direction 使用）
+   * positive + 3x：额外补偿 (3-1)=2 倍日薪
+   * negative + 2x：额外扣 (2-1)=1 倍日薪（旷工）
+   * negative + 0.5x：退回 (1-0.5)=0.5 倍日薪（病假）
+   * negative + 1x：无额外调整（事假，比例底薪已扣）
+   * neutral + 0x：不加不扣
    */
   salaryMultiplier: number;
+  /**
+   * 是否节假日性质（可换休）
+   * true：该状态产生调休权利，生成薪资单后可选择「拿钱」或「换休」
+   * false：普通状态，不产生调休余额
+   */
+  isHoliday?: boolean;
   /** 显示颜色 */
   color: string;
   /** 排序权重 */
@@ -409,13 +438,14 @@ export interface SpecialStatus {
 
 /** 预设特殊状态（可全量增删改） */
 export const DEFAULT_SPECIAL_STATUSES: SpecialStatus[] = [
-  { id: "ss_rest",     name: "休",       category: "absence",  salaryMultiplier: 0,   color: "#8E8E93", sortOrder: 0, isBuiltin: true },
-  { id: "ss_annual",   name: "年假",     category: "absence",  salaryMultiplier: 0,   color: "#34C759", sortOrder: 1, isBuiltin: true },
-  { id: "ss_sick",     name: "病假",     category: "absence",  salaryMultiplier: 0.5, color: "#FF9500", sortOrder: 2, isBuiltin: true },
-  { id: "ss_personal", name: "事假",     category: "absence",  salaryMultiplier: 1,   color: "#5856D6", sortOrder: 3, isBuiltin: true },
-  { id: "ss_absent",   name: "旷工",     category: "absence",  salaryMultiplier: 2,   color: "#FF3B30", sortOrder: 4, isBuiltin: true },
-  { id: "ss_holiday",  name: "节日上班", category: "work_day", salaryMultiplier: 3,   color: "#FF2D55", sortOrder: 5, isBuiltin: true },
-  { id: "ss_comp_off", name: "加班换休", category: "comp_off", salaryMultiplier: 0,   color: "#007AFF", sortOrder: 6, isBuiltin: true },
+  { id: "ss_rest",     name: "休",       category: "absence",  direction: "neutral",  countAsAttendance: false, salaryMultiplier: 0,   color: "#8E8E93", sortOrder: 0, isBuiltin: true },
+  { id: "ss_annual",   name: "年假",     category: "absence",  direction: "positive", countAsAttendance: false, salaryMultiplier: 1,   color: "#34C759", sortOrder: 1, isBuiltin: true },
+  { id: "ss_sick",     name: "病假",     category: "absence",  direction: "negative", countAsAttendance: false, salaryMultiplier: 0.5, color: "#FF9500", sortOrder: 2, isBuiltin: true },
+  { id: "ss_personal", name: "事假",     category: "absence",  direction: "negative", countAsAttendance: false, salaryMultiplier: 1,   color: "#5856D6", sortOrder: 3, isBuiltin: true },
+  { id: "ss_absent",   name: "旷工",     category: "absence",  direction: "negative", countAsAttendance: false, salaryMultiplier: 2,   color: "#FF3B30", sortOrder: 4, isBuiltin: true },
+  { id: "ss_holiday",  name: "节日上班", category: "work_day", direction: "positive", countAsAttendance: true,  salaryMultiplier: 3,   color: "#FF2D55", sortOrder: 5, isBuiltin: true, isHoliday: true },
+  { id: "ss_comp_off", name: "加班换休", category: "comp_off", direction: "neutral",  countAsAttendance: true,  salaryMultiplier: 0,   color: "#007AFF", sortOrder: 6, isBuiltin: true },
+  { id: "ss_penalty",  name: "违规扣款", category: "absence",  direction: "negative", countAsAttendance: true,  salaryMultiplier: 1,   color: "#FF6B00", sortOrder: 7, isBuiltin: true },
 ];
 
 // ─── 绩效条目数据源类型 ───────────────────────────────────────────────────────
@@ -633,16 +663,38 @@ export interface CompOffBalanceEntry {
   employeeId: string;
   /** 存入月份（YYYY-MM） */
   earnedMonth: string;
-  /** 存入时扣除的加班小时数（4h=0.5天，8h=1天） */
-  hoursDeducted: number;
+  /**
+   * 来源类型
+   * overtime：加班换休（普通加班超出合同工时）
+   * holiday：节假日调休（节日上班选择换休）
+   */
+  source: "overtime" | "holiday";
+  /** 存入时扣除的加班小时数（4h=0.5天，8h=1天）（overtime 类型使用） */
+  hoursDeducted?: number;
+  /** 节假日上班日期（holiday 类型使用） */
+  workDate?: string;
+  /** 节假日名称（如「元宵节」） */
+  holidayName?: string;
+  /** 节假日上班对应的补偿金额（holiday 类型，兑现时使用） */
+  holidayBonusAmount?: number;
   /** 换算的天数（0.5 or 1） */
   days: number;
   /** 到期月份（earnedMonth + 3个月，YYYY-MM） */
   expiresMonth: string;
-  /** 使用状态：available=可用，used=已使用，expired=已过期 */
-  status: "available" | "used" | "expired";
-  /** 使用月份（status=used 时填写） */
+  /**
+   * 使用状态
+   * available：可用
+   * used_rest：已换休（抵扣多休天数）
+   * cashed_out：已兑现成钱
+   * expired：已过期
+   */
+  status: "available" | "used_rest" | "cashed_out" | "expired";
+  /** 使用月份（status=used_rest/cashed_out 时填写） */
   usedMonth?: string;
+  /** 兑现日薪（兑现时按兑现当月日薪计算，可人工修改） */
+  cashOutDailyRate?: number;
+  /** 兑现金额（days × cashOutDailyRate） */
+  cashOutAmount?: number;
   /** 备注 */
   notes?: string;
   createdAt: string;
@@ -679,7 +731,7 @@ export interface HolidayCompOffEntry {
   /** 有效期至（通常为下月末） */
   expiresMonth: string;
   /** 使用状态 */
-  status: "available" | "used" | "expired";
+  status: "available" | "used_rest" | "cashed_out" | "expired";
   usedMonth?: string;
   createdAt: string;
 }
@@ -826,6 +878,31 @@ export interface PaySlip {
   };
   /** 个税计算备注（如"累计应税收入¥xx，适用税率xx%"） */
   incomeTaxNote?: string;
+  /**
+   * 节假日补偿分配（默认全部拿钱，可手动改为换休）
+   * key = 特殊状态 ID，每条记录该节日上班日的分配方式
+   */
+  holidayBonusAllocation?: Record<string, {
+    /** 节日上班日期 */
+    date: string;
+    /** 节日名称 */
+    name: string;
+    /** 总补偿金额 */
+    totalBonus: number;
+    /** 拿钱的金额 */
+    cashAmount: number;
+    /** 换休的天数 */
+    restDays: number;
+    /** 处理方式：cash=拿钱, rest=换休, split=部分拿钱+部分换休 */
+    mode: "cash" | "rest" | "split";
+  }>;
+  /**
+   * 调休兑现金额（将调休余额兑现成钱，加入应发）
+   * 兑现时按兑现当月日薪计算，可人工修改
+   */
+  compOffCashOut?: number;
+  /** 调休兑现备注（如"兑现X天加班换休余额，日薪¥XX"） */
+  compOffCashOutNote?: string;
   updatedAt: string;
 }
 
