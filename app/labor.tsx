@@ -1987,7 +1987,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                   <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>{emp.realName}</Text>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                     <Text style={{ fontSize: 11, color: colors.muted }}>调休 {compOffBalance} 天</Text>
-                    <TouchableOpacity onPress={() => { tap(); Alert.alert("调休操作", `${emp.realName} 当前调休余额 ${compOffBalance} 天\n\n存入：手动存入1天调休\n兑换：将1天调休兑换为现金`, [{ text: "取消", style: "cancel" }, { text: "存入", onPress: () => { addCompOffEntry({ employeeId: emp.id, earnedMonth: currentMonthStr, source: "overtime", days: 1, expiresMonth: "", status: "available" }); } }, { text: "兑换", style: "destructive", onPress: () => { const avail = compOffEntries.filter((e: any) => e.status === "available"); if (avail.length === 0) { Alert.alert("无可用余额"); return; } cashOutCompOff(avail[0].id, att?.dailyRate ?? 200, currentMonthStr); } }]); }}
+                    <TouchableOpacity onPress={() => { tap(); const usedOTEntries = compOffEntries.filter((e: any) => e.source === "overtime" && e.earnedMonth === currentMonthStr).length; const availableOTHours = (att?.paidOvertimeHours ?? 0) - usedOTEntries * 8; Alert.alert("调休操作", `${emp.realName} 当前调休余额 ${compOffBalance} 天\n本月可存入加班时长：${availableOTHours.toFixed(1)}h（需≥8h）\n\n存入：加班满8h存入1天调休\n兑换：将1天调休兑换为现金`, [{ text: "取消", style: "cancel" }, { text: "存入", onPress: () => { if (availableOTHours < 8) { Alert.alert("无法存入", `本月加班时长不足8小时（剩余${availableOTHours.toFixed(1)}h），无法存入调休`); return; } addCompOffEntry({ employeeId: emp.id, earnedMonth: currentMonthStr, source: "overtime", hoursDeducted: 8, days: 1, expiresMonth: "", status: "available" }); } }, { text: "兑换", style: "destructive", onPress: () => { const avail = compOffEntries.filter((e: any) => e.status === "available"); if (avail.length === 0) { Alert.alert("无可用余额"); return; } const dailyRate = att?.dailyRate ?? 200; cashOutCompOff(avail[0].id, dailyRate, currentMonthStr); const slip = getPaySlip(emp.id, currentMonthStr); if (slip) { upsertPaySlip({ ...slip, compOffCashOut: (slip.compOffCashOut ?? 0) + dailyRate, compOffCashOutNote: `兑换调休余额，日薪¥${dailyRate}`, grossSalary: slip.grossSalary + dailyRate, finalSalary: slip.finalSalary + dailyRate, totalEmployerCost: slip.totalEmployerCost + dailyRate, updatedAt: new Date().toISOString() }); } } }]); }}
                       style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: colors.primary + "15", borderWidth: 1, borderColor: colors.primary + "33" }}>
                       <Text style={{ fontSize: 10, color: colors.primary, fontWeight: "600" }}>存入/兑换</Text>
                     </TouchableOpacity>
@@ -2003,6 +2003,55 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                       {att.totalSpecialDeduction > 0 && <Text style={{ fontSize: 11, color: colors.error }}>扣薪-¥{att.totalSpecialDeduction.toFixed(0)}</Text>}
                     </View>
                     <Text style={{ fontSize: 12, fontWeight: "600", color: colors.foreground }}>考勤工资 ¥{att.attendanceSalary.toFixed(0)}</Text>
+                    {/* 节假日拿钱/换休选择 */}
+                    {(() => {
+                      const empShifts = getShifts(currentMonthStr).filter((s: any) => s.employeeId === emp.id);
+                      const holidayShifts = empShifts.filter((s: any) => {
+                        if (!s.specialStatusId) return false;
+                        const ss = specialStatuses.find((st: any) => st.id === s.specialStatusId);
+                        return ss?.isHoliday && ss.salaryMultiplier > 1;
+                      });
+                      if (holidayShifts.length === 0) return null;
+                      const slip = getPaySlip(emp.id, currentMonthStr);
+                      return (
+                        <View style={{ marginTop: 6, paddingTop: 6, borderTopWidth: 1, borderTopColor: colors.border }}>
+                          <Text style={{ fontSize: 11, fontWeight: "600", color: colors.foreground, marginBottom: 4 }}>节假日上班处理：</Text>
+                          {holidayShifts.map((s: any) => {
+                            const ss = specialStatuses.find((st: any) => st.id === s.specialStatusId)!;
+                            const key = `${emp.id}_${s.date}_${ss.id}`;
+                            const bonusAmt = Math.round(att.dailyRate * (ss.salaryMultiplier - 1) * 100) / 100;
+                            const currentMode = slip?.holidayBonusAllocation?.[key]?.mode ?? "cash";
+                            const toggleMode = () => {
+                              const newMode = currentMode === "cash" ? "rest" : "cash";
+                              const alloc = { ...(slip?.holidayBonusAllocation ?? {}) };
+                              alloc[key] = { date: s.date, name: ss.name, totalBonus: bonusAmt, cashAmount: newMode === "cash" ? bonusAmt : 0, restDays: newMode === "rest" ? 1 : 0, mode: newMode };
+                              const totalCash = Object.values(alloc).reduce((sum: number, a: any) => sum + (a.cashAmount ?? 0), 0);
+                              if (slip) {
+                                upsertPaySlip({ ...slip, holidayBonusAllocation: alloc, updatedAt: new Date().toISOString() });
+                              }
+                              if (newMode === "rest") {
+                                const existing = getCompOffEntries(emp.id).find((e: any) => e.source === "holiday" && e.workDate === s.date && e.earnedMonth === currentMonthStr);
+                                if (!existing) { addCompOffEntry({ employeeId: emp.id, earnedMonth: currentMonthStr, source: "holiday", workDate: s.date, holidayName: ss.name, holidayBonusAmount: bonusAmt, days: 1, expiresMonth: "", status: "available" }); }
+                              } else {
+                                const existing = getCompOffEntries(emp.id).find((e: any) => e.source === "holiday" && e.workDate === s.date && e.earnedMonth === currentMonthStr);
+                                if (existing) { updateCompOffEntry(existing.id, { status: "expired" }); }
+                              }
+                            };
+                            return (
+                              <View key={key} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 3 }}>
+                                <Text style={{ fontSize: 11, color: colors.muted }}>{s.date.slice(5)} {ss.name} ¥{bonusAmt}</Text>
+                                <TouchableOpacity onPress={() => { tap(); toggleMode(); }}
+                                  style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: currentMode === "cash" ? colors.success + "20" : colors.primary + "20" }}>
+                                  <Text style={{ fontSize: 10, fontWeight: "600", color: currentMode === "cash" ? colors.success : colors.primary }}>
+                                    {currentMode === "cash" ? "拿钱" : "换休"}
+                                  </Text>
+                                </TouchableOpacity>
+                              </View>
+                            );
+                          })}
+                        </View>
+                      );
+                    })()}
                   </View>
                 ) : (
                   <Text style={{ fontSize: 11, color: colors.muted }}>暂无考勤数据</Text>
