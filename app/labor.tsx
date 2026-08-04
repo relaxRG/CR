@@ -2078,25 +2078,7 @@ export default function LaborScreen({ embedded = false }: { embedded?: boolean }
         </View>
       )}
 
-      {/* 月份导航行 + 对比开关（单一行，不重复） */}
-      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 8, paddingHorizontal: 16, gap: 12 }}>
-        <Pressable onPress={() => { tap(); const [y, m] = currentMonth.split("-").map(Number); const d = new Date(y, m - 2, 1); setCurrentMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); }}
-          style={({ pressed }) => [{ width: 32, height: 32, borderRadius: 10, backgroundColor: colors.border + "55", alignItems: "center", justifyContent: "center", opacity: pressed ? 0.5 : 1 }]}>
-          <IconSymbol name="chevron.left" size={15} color={colors.muted} />
-        </Pressable>
-        <Text style={{ flex: 1, textAlign: "center", fontSize: 16, fontWeight: "600", color: colors.foreground, letterSpacing: -0.3 }}>{monthLabel(currentMonth)}</Text>
-        <Pressable onPress={() => { tap(); const [y, m] = currentMonth.split("-").map(Number); const d = new Date(y, m, 1); setCurrentMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); }}
-          style={({ pressed }) => [{ width: 32, height: 32, borderRadius: 10, backgroundColor: colors.border + "55", alignItems: "center", justifyContent: "center", opacity: pressed ? 0.5 : 1 }]}>
-          <IconSymbol name="chevron.right" size={15} color={colors.muted} />
-        </Pressable>
-      </View>
-
-      {/* 总览卡片（含对比开关） */}
-      <View style={{ paddingHorizontal: 16, paddingBottom: 4 }}>
-        <OverviewCard month={currentMonth} colors={colors} />
-      </View>
-
-      {/* Tab 切换栏：胶囊样式，固定不动 */}
+      {/* Tab 切换栏：移到月份导航上方，固定不动 */}
       <View style={{ paddingHorizontal: 16, paddingVertical: 8, backgroundColor: colors.background }}>
         <View style={{ flexDirection: "row", backgroundColor: colors.border + "44", borderRadius: 12, padding: 3 }}>
           {PAGES.map((p) => {
@@ -2115,7 +2097,20 @@ export default function LaborScreen({ embedded = false }: { embedded?: boolean }
         </View>
       </View>
 
-      {/* 横滑内容区 */}
+      {/* 月份导航行（Tab 下方，内容区上方） */}
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 8, paddingHorizontal: 16, gap: 12 }}>
+        <Pressable onPress={() => { tap(); const [y, m] = currentMonth.split("-").map(Number); const d = new Date(y, m - 2, 1); setCurrentMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); }}
+          style={({ pressed }) => [{ width: 32, height: 32, borderRadius: 10, backgroundColor: colors.border + "55", alignItems: "center", justifyContent: "center", opacity: pressed ? 0.5 : 1 }]}>
+          <IconSymbol name="chevron.left" size={15} color={colors.muted} />
+        </Pressable>
+        <Text style={{ flex: 1, textAlign: "center", fontSize: 16, fontWeight: "600", color: colors.foreground, letterSpacing: -0.3 }}>{monthLabel(currentMonth)}</Text>
+        <Pressable onPress={() => { tap(); const [y, m] = currentMonth.split("-").map(Number); const d = new Date(y, m, 1); setCurrentMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); }}
+          style={({ pressed }) => [{ width: 32, height: 32, borderRadius: 10, backgroundColor: colors.border + "55", alignItems: "center", justifyContent: "center", opacity: pressed ? 0.5 : 1 }]}>
+          <IconSymbol name="chevron.right" size={15} color={colors.muted} />
+        </Pressable>
+      </View>
+
+      {/* 横滑内容区（总览卡片 + 各页面内容，整体可横滑切换） */}
       <ScrollView
         ref={scrollRef}
         horizontal
@@ -2124,18 +2119,27 @@ export default function LaborScreen({ embedded = false }: { embedded?: boolean }
         onMomentumScrollEnd={handleScroll}
         style={{ flex: 1 }}
         contentContainerStyle={{ flexDirection: "row" }}>
-        {/* 第一页：内嵌排班表 */}
+        {/* 第一页：总览卡片 + 内嵌排班表 */}
         <View style={{ width: SCREEN_W, flex: 1 }}>
+          <View style={{ paddingHorizontal: 16, paddingBottom: 4 }}>
+            <OverviewCard month={currentMonth} colors={colors} />
+          </View>
           <SchedulePage colors={colors} month={currentMonth} onMonthChange={setCurrentMonth} />
         </View>
 
-        {/* 第二页：员工档案（含对比开关） */}
+        {/* 第二页：总览卡片 + 员工档案 */}
         <View style={{ width: SCREEN_W, flex: 1 }}>
+          <View style={{ paddingHorizontal: 16, paddingBottom: 4 }}>
+            <OverviewCard month={currentMonth} colors={colors} />
+          </View>
           <EmployeeRosterPage month={currentMonth} colors={colors} />
         </View>
 
-        {/* 第三页：薪资预支 */}
+        {/* 第三页：总览卡片 + 薪资预支 */}
         <View style={{ width: SCREEN_W, flex: 1 }}>
+          <View style={{ paddingHorizontal: 16, paddingBottom: 4 }}>
+            <OverviewCard month={currentMonth} colors={colors} />
+          </View>
           <AdvancePage month={currentMonth} colors={colors} />
         </View>
       </ScrollView>
