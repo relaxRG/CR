@@ -471,7 +471,7 @@ export default function LaborAttendanceScreen() {
         lines.push(`${emp.code}（${emp.realName}）`);
         if (att) {
           lines.push(`  出勤：${att.attendanceDays}天 · 总工时：${att.totalHours}h · 考勤工资：¥${att.attendanceSalary.toFixed(2)}`);
-          if (att.overtimePay > 0) lines.push(`  加班：${att.overtimeHours.toFixed(1)}h × ¥${emp.overtimeHourlyRate} = ¥${att.overtimePay.toFixed(2)}`);
+          if ((att.overtimePay ?? 0) > 0) lines.push(`  加班：${(att.overtimeHours ?? 0).toFixed(1)}h × ¥${emp.overtimeHourlyRate ?? 0} = ¥${(att.overtimePay ?? 0).toFixed(2)}`);
           if ((att.totalSpecialDeduction ?? 0) > 0) lines.push(`  少休扣款：-¥${(att.totalSpecialDeduction ?? 0).toFixed(2)}`);
         }
         if (slip) {
