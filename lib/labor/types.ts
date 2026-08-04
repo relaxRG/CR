@@ -5,6 +5,37 @@
 
 // ─── 员工部门 / 类型 ──────────────────────────────────────────────────────────
 export type EmployeeDept = "front" | "kitchen" | "parttime" | "other";
+
+/** 部门归属类别：前厅需要排班，后厨需要排班，公司不需要排班 */
+export type DeptCategory = "front" | "kitchen" | "company";
+
+/** 自定义部门（可增删改） */
+export interface CustomDept {
+  id: string;
+  name: string;
+  category: DeptCategory;
+  color: string;
+  sortOrder: number;
+}
+
+/** 默认预置部门 */
+export const DEFAULT_CUSTOM_DEPTS: CustomDept[] = [
+  { id: "dept_front", name: "前厅", category: "front", color: "#1677FF", sortOrder: 0 },
+  { id: "dept_kitchen", name: "后厨", category: "kitchen", color: "#52C41A", sortOrder: 1 },
+  { id: "dept_company", name: "公司", category: "company", color: "#722ED1", sortOrder: 2 },
+];
+
+export const DEPT_CATEGORY_LABELS: Record<DeptCategory, string> = {
+  front: "前厅",
+  kitchen: "后厨",
+  company: "公司",
+};
+
+export const DEPT_CATEGORY_COLORS: Record<DeptCategory, string> = {
+  front: "#1677FF",
+  kitchen: "#52C41A",
+  company: "#722ED1",
+};
 /**
  * fulltime = 全职
  * longterm_parttime = 长期兼职（固定排班，有月度薪资，支持薪资预支）
@@ -576,6 +607,8 @@ export interface Employee {
   realName: string;
   phone: string;
   dept: EmployeeDept;
+  /** 自定义部门 ID（新版，优先于 dept 字段） */
+  customDeptId?: string;
   type: EmployeeType;
   baseSalary: number;
   /** 每日标准工时（无灵活规则时使用） */

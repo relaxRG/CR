@@ -11,11 +11,12 @@ import {
   ShiftTemplate, HolidayConfig, PerformanceTemplate, PerformanceRecord,
   EmployeeGroup, CompOffBalance, SpecialStatus, GlobalPayrollSettings,
   CompOffBalanceEntry, HolidayCompOffEntry, UnexplainedRestAlert,
+  CustomDept,
   calcDailyRate, calcAllowance, calcSocialInsurance, calcIncomeTax, calcFinalSalary,
   getDaysInMonth, parseMonth, getContractHoursForDate,
   calcCompOffExpiresMonth, getAvailableCompOffDays,
   DEFAULT_SHIFT_TEMPLATES, DEFAULT_EMPLOYEE_GROUPS, DEFAULT_SPECIAL_STATUSES,
-  DEFAULT_GLOBAL_PAYROLL_SETTINGS,
+  DEFAULT_GLOBAL_PAYROLL_SETTINGS, DEFAULT_CUSTOM_DEPTS,
 } from "./types";
 
 function uuid() { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
@@ -107,6 +108,61 @@ function EmployeeProvider({ children }: { children: React.ReactNode }) {
     </EmployeeContext.Provider>
   );
 }
+
+// ─── 自定义部门 Store ─────────────────────────────────────────────────────────
+interface CustomDeptStore {
+  depts: CustomDept[];
+  addDept: (draft: Omit<CustomDept, "id">) => string;
+  updateDept: (id: string, patch: Partial<CustomDept>) => void;
+  deleteDept: (id: string) => void;
+  getDept: (id: string) => CustomDept | undefined;
+  resolveEmployeeDept: (emp: Employee) => CustomDept;
+  ready: boolean;
+}
+
+const CustomDeptContext = createContext<CustomDeptStore>({
+  depts: DEFAULT_CUSTOM_DEPTS,
+  addDept: () => "", updateDept: () => {}, deleteDept: () => {},
+  getDept: () => undefined, resolveEmployeeDept: () => DEFAULT_CUSTOM_DEPTS[0], ready: false,
+});
+
+function CustomDeptProvider({ children }: { children: React.ReactNode }) {
+  const { data: depts, ref, persist, ready } = usePersisted<CustomDept>("labor_custom_depts_v1", DEFAULT_CUSTOM_DEPTS);
+
+  const addDept = useCallback((draft: Omit<CustomDept, "id">): string => {
+    const id = "dept_" + uuid();
+    persist([...ref.current, { ...draft, id }]);
+    return id;
+  }, [persist, ref]);
+
+  const updateDept = useCallback((id: string, patch: Partial<CustomDept>) => {
+    persist(ref.current.map((d) => d.id === id ? { ...d, ...patch } : d));
+  }, [persist, ref]);
+
+  const deleteDept = useCallback((id: string) => {
+    persist(ref.current.filter((d) => d.id !== id));
+  }, [persist, ref]);
+
+  const getDept = useCallback((id: string) => ref.current.find((d) => d.id === id), [ref]);
+
+  const resolveEmployeeDept = useCallback((emp: Employee): CustomDept => {
+    if (emp.customDeptId) {
+      const found = ref.current.find((d) => d.id === emp.customDeptId);
+      if (found) return found;
+    }
+    const legacyMap: Record<string, string> = { front: "dept_front", kitchen: "dept_kitchen", parttime: "dept_front", other: "dept_company" };
+    const mappedId = legacyMap[emp.dept] ?? "dept_front";
+    return ref.current.find((d) => d.id === mappedId) ?? ref.current[0] ?? DEFAULT_CUSTOM_DEPTS[0];
+  }, [ref]);
+
+  return (
+    <CustomDeptContext.Provider value={{ depts, addDept, updateDept, deleteDept, getDept, resolveEmployeeDept, ready }}>
+      {children}
+    </CustomDeptContext.Provider>
+  );
+}
+
+export const useCustomDeptStore = () => useContext(CustomDeptContext);
 
 // ─── 员工分组 Store ───────────────────────────────────────────────────────────
 interface EmployeeGroupStore {
@@ -1167,6 +1223,7 @@ export function LaborProvider({ children }: { children: React.ReactNode }) {
   return (
     <MonthConfigProvider>
       <EmployeeProvider>
+        <CustomDeptProvider>
         <EmployeeGroupProvider>
           <ShiftTemplateProvider>
             <SpecialStatusProvider>
@@ -1196,6 +1253,7 @@ export function LaborProvider({ children }: { children: React.ReactNode }) {
             </SpecialStatusProvider>
           </ShiftTemplateProvider>
         </EmployeeGroupProvider>
+        </CustomDeptProvider>
       </EmployeeProvider>
     </MonthConfigProvider>
   );

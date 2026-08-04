@@ -23,12 +23,13 @@ import {
   usePerformanceRecordStore, useHolidayConfigStore,
   useSpecialStatusStore, useGlobalPayrollSettingsStore,
   useCompOffBalanceEntryStore, useHolidayCompOffStore, useUnexplainedRestAlertStore,
+  useCustomDeptStore,
 } from "@/lib/labor/store";
 import { useSalaryAdvanceStore } from "@/lib/labor/advance-store";
 import { usePettyCashStore } from "@/lib/store/petty-store";
 import {
   Employee, EmployeeDept, EmployeeGroup, ShiftEntry, ShiftHoursValue, ShiftTemplate,
-  SpecialStatus, SpecialStatusDirection,
+  SpecialStatus, SpecialStatusDirection, DeptCategory, DEPT_CATEGORY_LABELS,
   DEPT_COLORS, DEPT_LABELS, EMPLOYEE_TYPE_LABELS, monthLabel,
   getMonthDates, getDayOfWeek, getContractHoursForDate,
   DEFAULT_SHIFT_TEMPLATES, DEFAULT_SPECIAL_STATUSES, SHIFT_COLOR_PRESETS, calcAllowance,
@@ -1471,7 +1472,8 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   const now = new Date();
   const todayStr = now.toISOString().slice(0, 10);
   const currentMonth = month;
-  const [dept, setDept] = useState<EmployeeDept>("front");
+  const { depts: customDepts, resolveEmployeeDept } = useCustomDeptStore();
+  const [deptCategory, setDeptCategory] = useState<DeptCategory>("front");
   // 班次/时长切换
   const [viewMode, setViewMode] = useState<"session" | "hours">("hours");
   const [showTplModal, setShowTplModal] = useState(false);
@@ -1516,9 +1518,9 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   }, [currentMonth]);
 
   const dates = useMemo(() => getMonthDates(currentMonth), [currentMonth]);
-  const deptColor = DEPT_COLORS[dept];
+  const deptColor = deptCategory === "front" ? "#1677FF" : "#52C41A";
   const monthShifts = useMemo(() => getShifts(currentMonth).map((s) => ({ ...s, shift: migrateShiftName(s.shift) })), [shifts, currentMonth]);
-  const allDeptEmployees = useMemo(() => employees.filter((e) => e.active && (e.dept === dept || (dept === "front" && e.dept === "parttime"))), [employees, dept]);
+  const allDeptEmployees = useMemo(() => employees.filter((e) => e.active && resolveEmployeeDept(e).category === deptCategory), [employees, deptCategory, resolveEmployeeDept]);
 
   const employeesBySession = useMemo(() => {
     const map: Record<string, Employee[]> = {};
@@ -1881,7 +1883,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   };
 
   // 部门主色：前厅绿色，后厨橙色
-  const deptAccent = dept === "front" ? colors.success : colors.warning;
+  const deptAccent = deptCategory === "front" ? colors.primary : colors.success;
 
   return (
     <View style={{ flex: 1 }}>
@@ -1889,10 +1891,10 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
       <View style={[EXL.controlBar, { borderBottomColor: colors.border, backgroundColor: colors.background }]}>
         {/* 前厅/后厨 — 选中色统一为黑色 */}
         <View style={[EXL.segContainer, { backgroundColor: colors.border + "44" }]}>
-          {DEPT_OPTIONS_SCH.map((d) => (
-            <TouchableOpacity key={d} onPress={() => { tap(); setDept(d); }}
-              style={[EXL.segItem, dept === d && { backgroundColor: colors.surface, shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 3, elevation: 1 }]}>
-              <Text style={{ fontSize: 12, fontWeight: dept === d ? "700" : "400", color: dept === d ? colors.foreground : colors.muted }}>{DEPT_LABELS[d]}</Text>
+          {(["front", "kitchen"] as DeptCategory[]).map((cat) => (
+            <TouchableOpacity key={cat} onPress={() => { tap(); setDeptCategory(cat); }}
+              style={[EXL.segItem, deptCategory === cat && { backgroundColor: colors.surface, shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 3, elevation: 1 }]}>
+              <Text style={{ fontSize: 12, fontWeight: deptCategory === cat ? "700" : "400", color: deptCategory === cat ? colors.foreground : colors.muted }}>{DEPT_CATEGORY_LABELS[cat]}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -2044,7 +2046,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   );
 }
 
-const DEPT_OPTIONS_SCH: EmployeeDept[] = ["front", "kitchen"];
+// DEPT_OPTIONS_SCH 已废弃，直接使用 DeptCategory 切换
 
 // ─── 主页面 ───────────────────────────────────────────────────────────────────
 const PAGES = [

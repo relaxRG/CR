@@ -13,16 +13,17 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
-import { useEmployeeStore, useShiftTemplateStore } from "@/lib/labor/store";
+import { useEmployeeStore, useShiftTemplateStore, useCustomDeptStore } from "@/lib/labor/store";
 import {
   Employee, EmployeeDept, EmployeeType, EmployeeBankAccount, WeeklyHoursRule,
   AllowanceRule, SocialInsuranceConfig, InsuranceItem, HousingFundItem,
+  CustomDept, DeptCategory, DEPT_CATEGORY_LABELS, DEPT_CATEGORY_COLORS,
   DEPT_LABELS, DEPT_COLORS, EMPLOYEE_TYPE_LABELS, EMPLOYEE_TYPE_COLORS,
   calcDailyRate, getDaysInMonth, DEFAULT_SHIFT_TEMPLATES, WEEKDAY_LABELS,
   DEFAULT_SOCIAL_INSURANCE, BUILTIN_CITY_POLICIES, getCityPolicy, applyCityPolicy,
 } from "@/lib/labor/types";
 
-const DEPT_OPTIONS: EmployeeDept[] = ["front", "kitchen", "parttime", "other"];
+
 const TYPE_OPTIONS: { key: EmployeeType; label: string; desc: string }[] = [
   { key: "fulltime", label: "全职", desc: "底薪+加班，按月结算" },
   { key: "longterm_parttime", label: "长期兼职", desc: "固定排班，支持薪资预支" },
@@ -47,7 +48,8 @@ export default function LaborEmployeeFormScreen() {
   const [code, setCode] = useState(existing?.code ?? "");
   const [realName, setRealName] = useState(existing?.realName ?? "");
   const [phone, setPhone] = useState(existing?.phone ?? "");
-  const [dept, setDept] = useState<EmployeeDept>(existing?.dept ?? "front");
+  const { depts: customDepts, resolveEmployeeDept } = useCustomDeptStore();
+  const [selectedDeptId, setSelectedDeptId] = useState<string>(existing ? resolveEmployeeDept(existing).id : customDepts[0]?.id ?? "dept_front");
   const [type, setType] = useState<EmployeeType>(existing?.type ?? "fulltime");
   const [joinDate, setJoinDate] = useState(existing?.joinDate ?? "");
   const [leaveDate, setLeaveDate] = useState(existing?.leaveDate ?? "");
@@ -188,7 +190,7 @@ export default function LaborEmployeeFormScreen() {
   }, [baseSalary, restDays, effectiveDivDays]);
 
   const isFulltime = type === "fulltime";
-  const deptColor = DEPT_COLORS[dept];
+  const deptColor = customDepts.find((d) => d.id === selectedDeptId)?.color ?? "#1677FF";
 
   const handleSave = () => {
     if (!code.trim()) { Alert.alert("请填写员工代号"); return; }
@@ -198,7 +200,9 @@ export default function LaborEmployeeFormScreen() {
 
     const draft: Omit<Employee, "id" | "createdAt"> = {
       code: code.trim(), realName: realName.trim(), phone: phone.trim(),
-      dept, type, active, notes: notes.trim(),
+      dept: (customDepts.find((d) => d.id === selectedDeptId)?.category ?? "front") as EmployeeDept,
+      customDeptId: selectedDeptId,
+      type, active, notes: notes.trim(),
       baseSalary: Number(baseSalary) || 0,
       stdHoursPerDay: Number(stdHours) || 8,
       restDaysPerMonth: Number(restDays) || 4,
@@ -303,10 +307,11 @@ export default function LaborEmployeeFormScreen() {
           <SectionCard title="部门与类型" colors={colors}>
             <FormRow label="部门" colors={colors}>
               <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
-                {DEPT_OPTIONS.map((d) => (
-                  <TouchableOpacity key={d} onPress={() => { tap(); setDept(d); }}
-                    style={[S.optionChip, { backgroundColor: dept === d ? DEPT_COLORS[d] : colors.surface, borderColor: dept === d ? DEPT_COLORS[d] : colors.border }]}>
-                    <Text style={{ fontSize: 13, fontWeight: "600", color: dept === d ? "#fff" : colors.muted }}>{DEPT_LABELS[d]}</Text>
+                {customDepts.sort((a, b) => a.sortOrder - b.sortOrder).map((d) => (
+                  <TouchableOpacity key={d.id} onPress={() => { tap(); setSelectedDeptId(d.id); }}
+                    style={[S.optionChip, { backgroundColor: selectedDeptId === d.id ? d.color : colors.surface, borderColor: selectedDeptId === d.id ? d.color : colors.border }]}>
+                    <Text style={{ fontSize: 13, fontWeight: "600", color: selectedDeptId === d.id ? "#fff" : colors.muted }}>{d.name}</Text>
+                    <Text style={{ fontSize: 10, color: selectedDeptId === d.id ? "#ffffff99" : colors.muted }}>({DEPT_CATEGORY_LABELS[d.category]})</Text>
                   </TouchableOpacity>
                 ))}
               </View>
