@@ -60,7 +60,7 @@ export default function LaborEmployeeFormScreen() {
   const [restDays, setRestDays] = useState(String(existing?.restDaysPerMonth ?? "4"));
   const [hourlyRate, setHourlyRate] = useState(String(existing?.hourlyRate ?? "35"));
   const [overtimeRate, setOvertimeRate] = useState(String(existing?.overtimeHourlyRate ?? "35"));
-  const [holidayMult, setHolidayMult] = useState(existing?.holidayMultiplier ?? 1.5);
+  const [customDivDays, setCustomDivDays] = useState<string>(""); // 空=默认当月天数
   const [monthlyFixedSalary, setMonthlyFixedSalary] = useState(String(existing?.monthlyFixedSalary ?? "0"));
 
   // ── 灵活工时规则 ──
@@ -167,12 +167,15 @@ export default function LaborEmployeeFormScreen() {
 
   const now = new Date();
   const daysInMonth = getDaysInMonth(now.getFullYear(), now.getMonth() + 1);
+  const effectiveDivDays = customDivDays && !isNaN(Number(customDivDays)) && Number(customDivDays) > 0
+    ? Number(customDivDays)
+    : daysInMonth;
   const dailyRatePreview = useMemo(() => {
     const base = Number(baseSalary);
     const rest = Number(restDays);
     if (!base || isNaN(base)) return 0;
-    return calcDailyRate(base, daysInMonth, rest);
-  }, [baseSalary, restDays, daysInMonth]);
+    return calcDailyRate(base, effectiveDivDays, rest);
+  }, [baseSalary, restDays, effectiveDivDays]);
 
   const isFulltime = type === "fulltime";
   const deptColor = DEPT_COLORS[dept];
@@ -373,10 +376,25 @@ export default function LaborEmployeeFormScreen() {
                   </View>
                 </FormRow>
                 {dailyRatePreview > 0 && (
-                  <View style={[S.dailyRatePreview, { backgroundColor: colors.primary + "0e", borderColor: colors.primary + "33" }]}>
+                  <View style={[S.dailyRatePreview, { backgroundColor: colors.primary + "0e", borderColor: colors.primary + "33", marginBottom: 16 }]}>
                     <Text style={{ fontSize: 12, color: colors.muted }}>日薪预览（当月）</Text>
                     <Text style={{ fontSize: 18, fontWeight: "700", color: colors.primary }}>¥{dailyRatePreview.toFixed(2)} / 天</Text>
-                    <Text style={{ fontSize: 11, color: colors.muted }}>¥{Number(baseSalary).toFixed(0)} ÷ ({daysInMonth}天 - {restDays}休)</Text>
+                    {/* 除数行：默认当月天数，可手动覆盖 */}
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}>
+                      <Text style={{ fontSize: 11, color: colors.muted }}>¥{Number(baseSalary).toFixed(0)} ÷ (</Text>
+                      <TextInput
+                        value={customDivDays}
+                        onChangeText={setCustomDivDays}
+                        placeholder={String(daysInMonth)}
+                        placeholderTextColor={colors.muted}
+                        keyboardType="number-pad"
+                        style={{ fontSize: 11, color: colors.primary, fontWeight: "600", minWidth: 28, borderBottomWidth: 1, borderBottomColor: colors.primary + "66", paddingVertical: 0, textAlign: "center" }}
+                      />
+                      <Text style={{ fontSize: 11, color: colors.muted }}>天 - {restDays}休)</Text>
+                    </View>
+                    {customDivDays ? (
+                      <Text style={{ fontSize: 10, color: colors.warning, marginTop: 2 }}>已自定义除数（默认当月 {daysInMonth} 天）</Text>
+                    ) : null}
                   </View>
                 )}
               </>
@@ -404,16 +422,6 @@ export default function LaborEmployeeFormScreen() {
                     <TextInput value={overtimeRate} onChangeText={setOvertimeRate} keyboardType="decimal-pad"
                       style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border }]} />
                     <Text style={{ fontSize: 12, color: colors.muted }}>元/小时</Text>
-                  </View>
-                </FormRow>
-                <FormRow label="节假日倍率" colors={colors}>
-                  <View style={{ flexDirection: "row", gap: 8 }}>
-                    {HOLIDAY_MULTIPLIERS.map((m) => (
-                      <TouchableOpacity key={m} onPress={() => { tap(); setHolidayMult(m); }}
-                        style={[S.numChip, { backgroundColor: holidayMult === m ? colors.warning : colors.surface, borderColor: holidayMult === m ? colors.warning : colors.border }]}>
-                        <Text style={{ fontSize: 13, color: holidayMult === m ? "#fff" : colors.muted }}>{m}x</Text>
-                      </TouchableOpacity>
-                    ))}
                   </View>
                 </FormRow>
               </>
