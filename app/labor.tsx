@@ -18,6 +18,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import {
   useEmployeeStore, useEmployeeGroupStore, useAttendanceStore,
   usePaySlipStore, useShiftStore, useShiftTemplateStore,
+  usePerformanceRecordStore, useHolidayConfigStore,
 } from "@/lib/labor/store";
 import { useSalaryAdvanceStore } from "@/lib/labor/advance-store";
 import { usePettyCashStore } from "@/lib/store/petty-store";
@@ -25,7 +26,7 @@ import {
   Employee, EmployeeDept, EmployeeGroup, ShiftEntry, ShiftHoursValue, ShiftTemplate,
   DEPT_COLORS, DEPT_LABELS, monthLabel,
   getMonthDates, getDayOfWeek, getContractHoursForDate,
-  DEFAULT_SHIFT_TEMPLATES, SHIFT_COLOR_PRESETS,
+  DEFAULT_SHIFT_TEMPLATES, SHIFT_COLOR_PRESETS, calcAllowance,
 } from "@/lib/labor/types";
 
 const { width: SCREEN_W } = Dimensions.get("window");
@@ -880,8 +881,11 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   const { employees } = useEmployeeStore();
   const { shifts, upsertShift, batchUpsertShifts, deleteShift, getShifts } = useShiftStore();
   const { templates, upsertTemplate, deleteTemplate } = useShiftTemplateStore();
-  const { getPaySlip } = usePaySlipStore();
-  const { getAttendance } = useAttendanceStore();
+  const { getPaySlip, upsertPaySlip, buildPaySlipDraft } = usePaySlipStore();
+  const { getAttendance, upsertAttendance, calcFromShifts } = useAttendanceStore();
+  const { getRecord: getPerfRecord } = usePerformanceRecordStore();
+  const { getHolidayForDate } = useHolidayConfigStore();
+  const { advances } = useSalaryAdvanceStore();
 
   const now = new Date();
   const todayStr = now.toISOString().slice(0, 10);
@@ -890,6 +894,8 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   // 班次/时长切换
   const [viewMode, setViewMode] = useState<"session" | "hours">("hours");
   const [showTplModal, setShowTplModal] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [genResult, setGenResult] = useState<string | null>(null);
   const [editModal, setEditModal] = useState(false);
   const [editDate, setEditDate] = useState("");
   const [editEmployee, setEditEmployee] = useState<Employee | null>(null);
@@ -1102,7 +1108,73 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
         <Pressable onPress={() => { tap(); setShowTplModal(true); }} style={[EXL.gearBtn, { backgroundColor: colors.border + "44" }]}>
           <IconSymbol name="gearshape.fill" size={16} color={colors.muted} />
         </Pressable>
+        {/* 一键生成薪资单 */}
+        <TouchableOpacity
+          onPress={() => {
+            tap();
+            Alert.alert(
+              "一键生成薪资单",
+              `将根据 ${monthLabel(currentMonth)} 排班表工时，自动计算所有在职员工的：\n• 出勤天数 / 总工时 / 加班时长\n• 考勤工资（包含加班费）\n• 补贴（饥补×出勤天数、交通补贴）\n• 绩效（已录入的绩效记录）\n\n已有薪资单的员工将被更新，手动修改的内容保留。`,
+              [
+                { text: "取消", style: "cancel" },
+                {
+                  text: "确认生成",
+                  onPress: async () => {
+                    setGenerating(true);
+                    try {
+                      const activeEmps = employees.filter((e) => e.active);
+                      let count = 0;
+                      for (const emp of activeEmps) {
+                        const empShifts = getShifts(currentMonth).filter((s) => s.employeeId === emp.id);
+                        if (empShifts.length === 0) continue;
+                        // 1. 计算出勤记录
+                        const holidayDaysList = empShifts
+                          .map((s) => {
+                            const hc = getHolidayForDate(s.date, emp.id);
+                            return hc ? { date: s.date, multiplier: hc.multiplier } : null;
+                          })
+                          .filter((x): x is { date: string; multiplier: number } => x !== null);
+                        const att = calcFromShifts(emp.id, currentMonth, emp, empShifts, holidayDaysList);
+                        upsertAttendance(att);
+                        // 2. 计算绩效总额
+                        const perfRecord = getPerfRecord(emp.id, currentMonth);
+                        const performanceTotal = perfRecord?.totalPerformance ?? 0;
+                        // 3. 计算预支总额
+                        const advanceTotal = advances
+                          .filter((a) => a.employeeId === emp.id && (a.deductMonth === currentMonth || a.date.startsWith(currentMonth)))
+                          .reduce((s, a) => s + a.amount, 0);
+                        // 4. 生成薪资单
+                        const slip = buildPaySlipDraft(emp, currentMonth, att, performanceTotal, advanceTotal);
+                        upsertPaySlip(slip);
+                        count++;
+                      }
+                      setGenResult(`✅ 已生成 ${count} 人薪资单`);
+                      setTimeout(() => setGenResult(null), 4000);
+                    } catch (e) {
+                      setGenResult("❌ 生成失败，请重试");
+                      setTimeout(() => setGenResult(null), 3000);
+                    } finally {
+                      setGenerating(false);
+                    }
+                  }
+                }
+              ]
+            );
+          }}
+          style={[EXL.gearBtn, { backgroundColor: "#34C759" + "22", width: "auto", paddingHorizontal: 10 }]}>
+          {generating
+            ? <Text style={{ fontSize: 11, fontWeight: "700", color: "#34C759" }}>计算中...</Text>
+            : <Text style={{ fontSize: 11, fontWeight: "700", color: "#34C759" }}>生成薪资单</Text>
+          }
+        </TouchableOpacity>
       </View>
+
+      {/* 生成结果提示 */}
+      {genResult && (
+        <View style={{ backgroundColor: "#34C759" + "15", paddingHorizontal: 16, paddingVertical: 6 }}>
+          <Text style={{ fontSize: 12, color: "#34C759", fontWeight: "600", textAlign: "center" }}>{genResult}</Text>
+        </View>
+      )}
 
       {/* 周标题固定行（与日期格子等宽对齐） */}
       <View style={[EXL.weekHeaderRow, { backgroundColor: colors.background, borderBottomColor: colors.border + "66" }]}>
