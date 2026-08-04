@@ -107,12 +107,24 @@ export type AllowanceType =
   | "custom_fixed"      // 自定义固定补贴
   | "custom_formula";   // 自定义公式（预留）
 
+/** 补贴单位 */
+export type AllowanceUnit = "per_day" | "per_month" | "per_quarter" | "per_year";
+
+export const ALLOWANCE_UNIT_LABELS: Record<AllowanceUnit, string> = {
+  per_day: "元/天",
+  per_month: "元/月",
+  per_quarter: "元/季",
+  per_year: "元/年",
+};
+
 export interface AllowanceRule {
   id: string;
   type: AllowanceType;
   label: string;
-  /** 金额（固定月额 or 每天金额） */
+  /** 金额 */
   amount: number;
+  /** 单位（新版，默认 per_month） */
+  unit?: AllowanceUnit;
   /** 是否启用 */
   enabled: boolean;
 }

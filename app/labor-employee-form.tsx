@@ -18,6 +18,7 @@ import {
   Employee, EmployeeDept, EmployeeType, EmployeeBankAccount, WeeklyHoursRule,
   AllowanceRule, SocialInsuranceConfig, InsuranceItem, HousingFundItem,
   CustomDept, DeptCategory, DEPT_CATEGORY_LABELS, DEPT_CATEGORY_COLORS,
+  AllowanceUnit, ALLOWANCE_UNIT_LABELS,
   DEPT_LABELS, DEPT_COLORS, EMPLOYEE_TYPE_LABELS, EMPLOYEE_TYPE_COLORS,
   calcDailyRate, getDaysInMonth, DEFAULT_SHIFT_TEMPLATES, WEEKDAY_LABELS,
   DEFAULT_SOCIAL_INSURANCE, BUILTIN_CITY_POLICIES, getCityPolicy, applyCityPolicy,
@@ -124,8 +125,16 @@ export default function LaborEmployeeFormScreen() {
 
   // ── 补贴规则 ──
   const [allowanceRules, setAllowanceRules] = useState<AllowanceRule[]>(existing?.allowanceRules ?? []);
-  const addAllowanceRule = () => {
-    setAllowanceRules((prev) => [...prev, { id: Date.now().toString(), type: "custom_fixed" as const, label: "自定义补贴", amount: 0, enabled: true }]);
+  const [allowanceEditMode, setAllowanceEditMode] = useState(false);
+  const addAllowanceRule = (preset?: { label: string; unit: AllowanceUnit }) => {
+    setAllowanceRules((prev) => [...prev, {
+      id: Date.now().toString(),
+      type: "custom_fixed" as const,
+      label: preset?.label ?? "自定义补贴",
+      amount: 0,
+      unit: preset?.unit ?? "per_month",
+      enabled: true,
+    }]);
   };
   const updateAllowanceRule = (id: string, patch: Partial<AllowanceRule>) => {
     setAllowanceRules((prev) => prev.map((r) => r.id === id ? { ...r, ...patch } : r));
@@ -134,6 +143,7 @@ export default function LaborEmployeeFormScreen() {
 
   // ── 社保/公积金（双轨制） ──
   const [siEnabled, setSiEnabled] = useState(existing?.socialInsurance?.enabled ?? false);
+  const [taxEnabled, setTaxEnabled] = useState(existing?.incomeTax?.enabled ?? false);
   const [siConfig, setSiConfig] = useState<SocialInsuranceConfig>(
     existing?.socialInsurance ?? { ...DEFAULT_SOCIAL_INSURANCE }
   );
@@ -214,6 +224,7 @@ export default function LaborEmployeeFormScreen() {
       compOffRule: { enabled: compOffEnabled, hoursPerDay: Number(compOffHoursPerDay) || 8 },
       allowanceRules: allowanceRules.length > 0 ? allowanceRules : undefined,
       socialInsurance: siEnabled ? { ...siConfig, enabled: true, city: siCityInput.trim() } : undefined,
+      incomeTax: taxEnabled ? { enabled: true, threshold: 5000, specialDeductions: 0 } : undefined,
       bankAccounts,
       idNumber: idNumber.trim() || undefined,
       address: address.trim() || undefined,
@@ -546,44 +557,74 @@ export default function LaborEmployeeFormScreen() {
           )}
 
           {/* ── 补贴设置 ── */}
-          <SectionCard title="补贴设置" colors={colors}>
-            {allowanceRules.map((rule) => (
-              <View key={rule.id} style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border + "44" }}>
-                <View style={{ flex: 1, gap: 6 }}>
-                  <View style={{ flexDirection: "row", gap: 6 }}>
-                    {(["meal_per_day", "transport_fixed", "custom_fixed"] as const).map((t) => (
-                      <TouchableOpacity key={t} onPress={() => updateAllowanceRule(rule.id, { type: t })}
-                        style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, backgroundColor: rule.type === t ? colors.primary : colors.surface, borderColor: rule.type === t ? colors.primary : colors.border }}>
-                        <Text style={{ fontSize: 10, color: rule.type === t ? "#fff" : colors.muted }}>{t === "meal_per_day" ? "饭补/天" : t === "transport_fixed" ? "交通/月" : "自定义"}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                  <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
-                    <TextInput value={rule.label} onChangeText={(v) => updateAllowanceRule(rule.id, { label: v })} placeholder="名称" placeholderTextColor={colors.muted}
-                      style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, flex: 1 }]} />
-                    <TextInput value={String(rule.amount)} onChangeText={(v) => updateAllowanceRule(rule.id, { amount: Number(v) || 0 })} placeholder="金额" placeholderTextColor={colors.muted} keyboardType="decimal-pad"
-                      style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, width: 70 }]} />
-                    <Text style={{ fontSize: 11, color: colors.muted }}>{rule.type === "meal_per_day" ? "元/天" : "元/月"}</Text>
-                  </View>
-                </View>
-                <TouchableOpacity onPress={() => deleteAllowanceRule(rule.id)} style={{ padding: 6 }}>
-                  <IconSymbol name="trash" size={15} color={colors.error} />
+          <SectionCard title="补贴设置" colors={colors} rightAction={
+            <TouchableOpacity onPress={() => { tap(); setAllowanceEditMode(!allowanceEditMode); }} style={{ padding: 4 }}>
+              <IconSymbol name={allowanceEditMode ? "checkmark" : "gearshape"} size={16} color={colors.primary} />
+            </TouchableOpacity>
+          }>
+            {/* 快捷标签：始终显示在标题下方 */}
+            <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+              {[
+                { label: "饭补", unit: "per_day" as AllowanceUnit },
+                { label: "交通补贴", unit: "per_month" as AllowanceUnit },
+                { label: "全勤奖", unit: "per_month" as AllowanceUnit },
+                { label: "房补", unit: "per_month" as AllowanceUnit },
+                { label: "高温补贴", unit: "per_month" as AllowanceUnit },
+              ].map((preset) => (
+                <TouchableOpacity key={preset.label} onPress={() => { tap(); addAllowanceRule(preset); }}
+                  style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface }}>
+                  <Text style={{ fontSize: 11, color: colors.muted }}>{preset.label}/{preset.unit === "per_day" ? "天" : "月"}</Text>
                 </TouchableOpacity>
+              ))}
+              <TouchableOpacity onPress={() => { tap(); addAllowanceRule(); }}
+                style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: colors.primary + "44", backgroundColor: colors.primary + "08" }}>
+                <Text style={{ fontSize: 11, color: colors.primary }}>+ 自定义</Text>
+              </TouchableOpacity>
+            </View>
+            {/* 补贴列表 */}
+            {allowanceRules.map((rule) => (
+              <View key={rule.id} style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border + "44" }}>
+                <View style={{ flex: 1, gap: 6 }}>
+                  <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+                    {allowanceEditMode ? (
+                      <TextInput value={rule.label} onChangeText={(v) => updateAllowanceRule(rule.id, { label: v })} placeholder="补贴名称" placeholderTextColor={colors.muted}
+                        style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, flex: 1 }]} />
+                    ) : (
+                      <Text style={{ fontSize: 13, fontWeight: "500", color: colors.foreground, flex: 1 }}>{rule.label}</Text>
+                    )}
+                    <TextInput value={rule.amount > 0 ? String(rule.amount) : ""} onChangeText={(v) => updateAllowanceRule(rule.id, { amount: Number(v) || 0 })} placeholder="金额" placeholderTextColor={colors.muted} keyboardType="decimal-pad"
+                      style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, width: 70, textAlign: "center" }]} />
+                  </View>
+                  {/* 单位选择（编辑模式下显示） */}
+                  {allowanceEditMode && (
+                    <View style={{ flexDirection: "row", gap: 6 }}>
+                      {(["per_day", "per_month", "per_quarter", "per_year"] as AllowanceUnit[]).map((u) => (
+                        <TouchableOpacity key={u} onPress={() => updateAllowanceRule(rule.id, { unit: u })}
+                          style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: 1, backgroundColor: (rule.unit ?? "per_month") === u ? colors.primary : colors.surface, borderColor: (rule.unit ?? "per_month") === u ? colors.primary : colors.border }}>
+                          <Text style={{ fontSize: 10, color: (rule.unit ?? "per_month") === u ? "#fff" : colors.muted }}>{ALLOWANCE_UNIT_LABELS[u]}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </View>
+                <Text style={{ fontSize: 11, color: colors.muted }}>{ALLOWANCE_UNIT_LABELS[rule.unit ?? "per_month"]}</Text>
+                {allowanceEditMode && (
+                  <TouchableOpacity onPress={() => deleteAllowanceRule(rule.id)} style={{ padding: 6 }}>
+                    <IconSymbol name="trash" size={15} color={colors.error} />
+                  </TouchableOpacity>
+                )}
               </View>
             ))}
-            <TouchableOpacity onPress={() => { tap(); addAllowanceRule(); }}
-              style={[S.addRuleBtn, { borderColor: colors.primary + "44", backgroundColor: colors.primary + "08", marginTop: 8 }]}>
-              <IconSymbol name="plus" size={13} color={colors.primary} />
-              <Text style={{ fontSize: 13, color: colors.primary, fontWeight: "600" }}>添加补贴项</Text>
-            </TouchableOpacity>
+            {allowanceRules.length === 0 && (
+              <Text style={{ fontSize: 12, color: colors.muted, textAlign: "center", paddingVertical: 12 }}>点击上方标签快速添加补贴项</Text>
+            )}
           </SectionCard>
 
-          {/* ── 社保/公积金（双轨制） ── */}
-          <SectionCard title="社保 / 公积金" colors={colors}>
-            {/* 开关行 */}
+          {/* ── 社保（五险） ── */}
+          <SectionCard title="社保（五险）" colors={colors}>
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 4 }}>
               <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>开启社保公积金计算</Text>
+                <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>开启社保计算</Text>
                 <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>个人部分从应发扣除，公司部分计入人力成本</Text>
               </View>
               <TouchableOpacity onPress={() => { tap(); setSiEnabled(!siEnabled); }}
@@ -593,7 +634,6 @@ export default function LaborEmployeeFormScreen() {
             </View>
             {siEnabled && (
               <View style={{ gap: 12, marginTop: 8 }}>
-                {/* 城市选择 + 联网更新 */}
                 <View style={{ gap: 6 }}>
                   <Text style={{ fontSize: 12, color: colors.muted }}>城市（自动填充政策数据）</Text>
                   <View style={{ flexDirection: "row", gap: 8 }}>
@@ -605,7 +645,6 @@ export default function LaborEmployeeFormScreen() {
                       <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "600" }}>{siUpdating ? "更新中..." : "更新数据"}</Text>
                     </TouchableOpacity>
                   </View>
-                  {/* 快捷城市选择 */}
                   <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
                     {["上海", "北京", "广州", "深圳", "杭州", "成都"].map((city) => (
                       <TouchableOpacity key={city} onPress={() => handleCityAutoFill(city)}
@@ -621,8 +660,6 @@ export default function LaborEmployeeFormScreen() {
                     </Text>
                   )}
                 </View>
-
-                {/* 社保基数 */}
                 <FormRow label="社保基数（0=以工资为基数）" colors={colors}>
                   <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
                     <TextInput value={String(siConfig.base)} onChangeText={(v) => setSiConfig((p) => ({ ...p, base: Number(v) || 0 }))}
@@ -632,8 +669,6 @@ export default function LaborEmployeeFormScreen() {
                     {siConfig.baseMax > 0 && <Text style={{ fontSize: 10, color: colors.muted }}>上限 ¥{siConfig.baseMax}</Text>}
                   </View>
                 </FormRow>
-
-                {/* 险种列表（双轨制） */}
                 <View style={{ gap: 2 }}>
                   <View style={{ flexDirection: "row", paddingHorizontal: 4, paddingBottom: 4 }}>
                     <Text style={{ flex: 2, fontSize: 10, color: colors.muted }}>险种</Text>
@@ -646,16 +681,11 @@ export default function LaborEmployeeFormScreen() {
                     return (
                       <View key={key} style={{ flexDirection: "row", alignItems: "center", paddingVertical: 6, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border + "44" }}>
                         <Text style={{ flex: 2, fontSize: 12, color: colors.foreground }}>{item.name}</Text>
-                        <TextInput
-                          value={String((item.employeeRate * 100).toFixed(2))}
-                          onChangeText={(v) => updateInsuranceItem(key, { employeeRate: Number(v) / 100 || 0 })}
+                        <TextInput value={String((item.employeeRate * 100).toFixed(2))} onChangeText={(v) => updateInsuranceItem(key, { employeeRate: Number(v) / 100 || 0 })}
                           keyboardType="decimal-pad" style={[S.inputSmall, { flex: 1, color: colors.foreground, borderColor: colors.border, textAlign: "center" }]} />
-                        <TextInput
-                          value={String((item.employerRate * 100).toFixed(2))}
-                          onChangeText={(v) => updateInsuranceItem(key, { employerRate: Number(v) / 100 || 0 })}
+                        <TextInput value={String((item.employerRate * 100).toFixed(2))} onChangeText={(v) => updateInsuranceItem(key, { employerRate: Number(v) / 100 || 0 })}
                           keyboardType="decimal-pad" style={[S.inputSmall, { flex: 1, color: colors.foreground, borderColor: colors.border, textAlign: "center" }]} />
-                        <TouchableOpacity onPress={() => updateInsuranceItem(key, { enabled: !item.enabled })}
-                          style={{ width: 36, alignItems: "center" }}>
+                        <TouchableOpacity onPress={() => updateInsuranceItem(key, { enabled: !item.enabled })} style={{ width: 36, alignItems: "center" }}>
                           <View style={{ width: 28, height: 16, borderRadius: 8, backgroundColor: item.enabled ? colors.primary : colors.border, justifyContent: "center", paddingHorizontal: 1 }}>
                             <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: "#fff", alignSelf: item.enabled ? "flex-end" : "flex-start" }} />
                           </View>
@@ -663,37 +693,9 @@ export default function LaborEmployeeFormScreen() {
                       </View>
                     );
                   })}
-                  {/* 公积金 */}
-                  <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 6, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border + "44" }}>
-                    <Text style={{ flex: 2, fontSize: 12, color: colors.foreground }}>住房公积金</Text>
-                    <TextInput
-                      value={String((siConfig.housingFund.employeeRate * 100).toFixed(2))}
-                      onChangeText={(v) => updateHousingFund({ employeeRate: Number(v) / 100 || 0 })}
-                      keyboardType="decimal-pad" style={[S.inputSmall, { flex: 1, color: colors.foreground, borderColor: colors.border, textAlign: "center" }]} />
-                    <TextInput
-                      value={String((siConfig.housingFund.employerRate * 100).toFixed(2))}
-                      onChangeText={(v) => updateHousingFund({ employerRate: Number(v) / 100 || 0 })}
-                      keyboardType="decimal-pad" style={[S.inputSmall, { flex: 1, color: colors.foreground, borderColor: colors.border, textAlign: "center" }]} />
-                    <TouchableOpacity onPress={() => updateHousingFund({ enabled: !siConfig.housingFund.enabled })}
-                      style={{ width: 36, alignItems: "center" }}>
-                      <View style={{ width: 28, height: 16, borderRadius: 8, backgroundColor: siConfig.housingFund.enabled ? colors.primary : colors.border, justifyContent: "center", paddingHorizontal: 1 }}>
-                        <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: "#fff", alignSelf: siConfig.housingFund.enabled ? "flex-end" : "flex-start" }} />
-                      </View>
-                    </TouchableOpacity>
-                  </View>
-                  {/* 公积金基数 */}
-                  <View style={{ flexDirection: "row", gap: 8, alignItems: "center", paddingTop: 4 }}>
-                    <Text style={{ fontSize: 11, color: colors.muted }}>公积金基数（0=同社保）：</Text>
-                    <TextInput value={String(siConfig.housingFund.base)} onChangeText={(v) => updateHousingFund({ base: Number(v) || 0 })}
-                      placeholder="0" keyboardType="decimal-pad" placeholderTextColor={colors.muted}
-                      style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, width: 80 }]} />
-                  </View>
                 </View>
-
-                {/* 费用预览 */}
-                {siConfig.base > 0 || true ? (() => {
-                  const base = siConfig.base > 0 ? siConfig.base : 0;
-                  if (base === 0) return null;
+                {siConfig.base > 0 && (() => {
+                  const base = siConfig.base;
                   const empTotal = (siConfig.pension.enabled ? base * siConfig.pension.employeeRate : 0) +
                     (siConfig.medical.enabled ? base * siConfig.medical.employeeRate : 0) +
                     (siConfig.unemployment.enabled ? base * siConfig.unemployment.employeeRate : 0);
@@ -704,14 +706,66 @@ export default function LaborEmployeeFormScreen() {
                     (siConfig.maternity.enabled ? base * siConfig.maternity.employerRate : 0);
                   return (
                     <View style={{ backgroundColor: colors.primary + "08", borderRadius: 8, padding: 10, gap: 4 }}>
-                      <Text style={{ fontSize: 11, color: colors.muted }}>按基数 ¥{base} 预览（不含公积金）</Text>
+                      <Text style={{ fontSize: 11, color: colors.muted }}>按基数 ¥{base} 预览</Text>
                       <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
                         <Text style={{ fontSize: 12, color: colors.foreground }}>个人代扣：¥{empTotal.toFixed(0)}</Text>
                         <Text style={{ fontSize: 12, color: colors.warning }}>公司承担：¥{erTotal.toFixed(0)}</Text>
                       </View>
                     </View>
                   );
-                })() : null}
+                })()}
+              </View>
+            )}
+          </SectionCard>
+
+          {/* ── 公积金 ── */}
+          <SectionCard title="住房公积金" colors={colors}>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 4 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>开启公积金计算</Text>
+                <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>个人+公司各承担一半</Text>
+              </View>
+              <TouchableOpacity onPress={() => { tap(); updateHousingFund({ enabled: !siConfig.housingFund.enabled }); }}
+                style={{ width: 44, height: 26, borderRadius: 13, backgroundColor: siConfig.housingFund.enabled ? colors.primary : colors.border, justifyContent: "center", paddingHorizontal: 2 }}>
+                <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: "#fff", alignSelf: siConfig.housingFund.enabled ? "flex-end" : "flex-start" }} />
+              </TouchableOpacity>
+            </View>
+            {siConfig.housingFund.enabled && (
+              <View style={{ gap: 12, marginTop: 8 }}>
+                <FormRow label="公积金基数（0=同社保）" colors={colors}>
+                  <TextInput value={String(siConfig.housingFund.base)} onChangeText={(v) => updateHousingFund({ base: Number(v) || 0 })}
+                    placeholder="0" keyboardType="decimal-pad" placeholderTextColor={colors.muted}
+                    style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, width: 120 }]} />
+                </FormRow>
+                <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+                  <Text style={{ fontSize: 12, color: colors.foreground }}>个人比例</Text>
+                  <TextInput value={String((siConfig.housingFund.employeeRate * 100).toFixed(2))} onChangeText={(v) => updateHousingFund({ employeeRate: Number(v) / 100 || 0 })}
+                    keyboardType="decimal-pad" style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, width: 60, textAlign: "center" }]} />
+                  <Text style={{ fontSize: 12, color: colors.muted }}>%</Text>
+                  <Text style={{ fontSize: 12, color: colors.foreground, marginLeft: 12 }}>公司比例</Text>
+                  <TextInput value={String((siConfig.housingFund.employerRate * 100).toFixed(2))} onChangeText={(v) => updateHousingFund({ employerRate: Number(v) / 100 || 0 })}
+                    keyboardType="decimal-pad" style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, width: 60, textAlign: "center" }]} />
+                  <Text style={{ fontSize: 12, color: colors.muted }}>%</Text>
+                </View>
+              </View>
+            )}
+          </SectionCard>
+
+          {/* ── 个税 ── */}
+          <SectionCard title="个人所得税" colors={colors}>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 4 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>开启个税计算</Text>
+                <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>累计预扣法，自动扣除起征点 ¥5000</Text>
+              </View>
+              <TouchableOpacity onPress={() => { tap(); setTaxEnabled(!taxEnabled); }}
+                style={{ width: 44, height: 26, borderRadius: 13, backgroundColor: taxEnabled ? colors.primary : colors.border, justifyContent: "center", paddingHorizontal: 2 }}>
+                <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: "#fff", alignSelf: taxEnabled ? "flex-end" : "flex-start" }} />
+              </TouchableOpacity>
+            </View>
+            {taxEnabled && (
+              <View style={{ gap: 8, marginTop: 8 }}>
+                <Text style={{ fontSize: 12, color: colors.muted }}>起征点：¥5,000/月，累计预扣法自动计算</Text>
               </View>
             )}
           </SectionCard>
@@ -798,10 +852,13 @@ export default function LaborEmployeeFormScreen() {
   );
 }
 
-function SectionCard({ title, children, colors }: { title: string; children: React.ReactNode; colors: any }) {
+function SectionCard({ title, children, colors, rightAction }: { title: string; children: React.ReactNode; colors: any; rightAction?: React.ReactNode }) {
   return (
     <View style={[S.sectionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <Text style={[S.sectionTitle, { color: colors.muted }]}>{title}</Text>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+        <Text style={[S.sectionTitle, { color: colors.muted }]}>{title}</Text>
+        {rightAction}
+      </View>
       {children}
     </View>
   );
