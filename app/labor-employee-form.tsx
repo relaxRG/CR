@@ -299,31 +299,7 @@ export default function LaborEmployeeFormScreen() {
             </FormRow>
           </SectionCard>
 
-          {/* ── 在职状态 ── */}
-          <SectionCard title="状态" colors={colors}>
-            <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>
-              {[{ v: true, label: "在职" }, { v: false, label: "离职" }].map((opt) => (
-                <TouchableOpacity key={String(opt.v)} onPress={() => { tap(); setActive(opt.v); }}
-                  style={[S.optionChip, { backgroundColor: active === opt.v ? (opt.v ? colors.success : colors.error) : colors.surface, borderColor: active === opt.v ? (opt.v ? colors.success : colors.error) : colors.border }]}>
-                  <Text style={{ fontSize: 13, fontWeight: "600", color: active === opt.v ? "#fff" : colors.muted }}>{opt.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <FormRow label="入职日期" colors={colors}>
-              <TextInput value={joinDate} onChangeText={(t) => formatDateInput(t, setJoinDate)} placeholder="YYYY-MM-DD"
-                placeholderTextColor={colors.muted} keyboardType="number-pad"
-                style={[S.input, { color: colors.foreground, borderColor: colors.border }]} />
-            </FormRow>
-            {!active && (
-              <FormRow label="离职日期" colors={colors}>
-                <TextInput value={leaveDate} onChangeText={(t) => formatDateInput(t, setLeaveDate)} placeholder="YYYY-MM-DD"
-                  placeholderTextColor={colors.muted} keyboardType="number-pad"
-                  style={[S.input, { color: colors.foreground, borderColor: colors.border }]} />
-              </FormRow>
-            )}
-          </SectionCard>
-
-          {/* ── 部门与类型 ── */}
+          {/* ── 部门与类型 ── */
           <SectionCard title="部门与类型" colors={colors}>
             <FormRow label="部门" colors={colors}>
               <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
@@ -785,6 +761,30 @@ export default function LaborEmployeeFormScreen() {
             <TextInput value={notes} onChangeText={setNotes} placeholder="备注信息（可选）"
               placeholderTextColor={colors.muted} multiline numberOfLines={3}
               style={[S.textarea, { color: colors.foreground, borderColor: colors.border }]} />
+          </SectionCard>
+
+          {/* ── 在职状态（底部） ── */}
+          <SectionCard title="状态" colors={colors}>
+            <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>
+              {[{ v: true, label: "在职" }, { v: false, label: "离职" }].map((opt) => (
+                <TouchableOpacity key={String(opt.v)} onPress={() => { tap(); setActive(opt.v); }}
+                  style={[S.optionChip, { backgroundColor: active === opt.v ? (opt.v ? colors.success : colors.error) : colors.surface, borderColor: active === opt.v ? (opt.v ? colors.success : colors.error) : colors.border }]}>
+                  <Text style={{ fontSize: 13, fontWeight: "600", color: active === opt.v ? "#fff" : colors.muted }}>{opt.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <FormRow label="入职日期" colors={colors}>
+              <TextInput value={joinDate} onChangeText={(t) => formatDateInput(t, setJoinDate)} placeholder="YYYY-MM-DD"
+                placeholderTextColor={colors.muted} keyboardType="number-pad"
+                style={[S.input, { color: colors.foreground, borderColor: colors.border }]} />
+            </FormRow>
+            {!active && (
+              <FormRow label="离职日期" colors={colors}>
+                <TextInput value={leaveDate} onChangeText={(t) => formatDateInput(t, setLeaveDate)} placeholder="YYYY-MM-DD"
+                  placeholderTextColor={colors.muted} keyboardType="number-pad"
+                  style={[S.input, { color: colors.foreground, borderColor: colors.border }]} />
+              </FormRow>
+            )}
           </SectionCard>
 
         </ScrollView>
