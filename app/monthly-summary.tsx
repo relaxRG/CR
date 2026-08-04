@@ -64,7 +64,7 @@ const CATEGORY_SECTIONS = [
 // ─── 科目行组件 ───────────────────────────────────────────────────────────────
 function LineItemRow({ item, colors, linkedModule }: { item: SummaryLineItem; colors: any; linkedModule?: string }) {
   const isPositive = item.amount > 0;
-  const amtColor = item.isDuplicate ? colors.muted : isPositive ? colors.success ?? "#34C759" : colors.error;
+  const amtColor = item.isDuplicate ? colors.muted : isPositive ? colors.success ?? colors.success : colors.error;
   const isNavigable = !item.isManual && !!linkedModule;
 
   return (
@@ -80,8 +80,8 @@ function LineItemRow({ item, colors, linkedModule }: { item: SummaryLineItem; co
             </View>
           )}
           {item.isPaid && !item.isDuplicate && (
-            <View style={[LI.paidTag, { backgroundColor: "#34C75915" }]}>
-              <Text style={{ fontSize: 9, color: "#34C759" }}>{item.paymentNote || "已付"}</Text>
+            <View style={[LI.paidTag, { backgroundColor: colors.success + "15" }]}>
+              <Text style={{ fontSize: 9, color: colors.success }}>{item.paymentNote || "已付"}</Text>
             </View>
           )}
           {!item.isPaid && !item.isDuplicate && item.amount !== 0 && (
@@ -168,8 +168,8 @@ function ManualItemModal({ visible, item, colors, onSave, onClose }: {
               <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 4, marginTop: 10 }}>金额</Text>
               <View style={{ flexDirection: "row", gap: 8 }}>
                 <TouchableOpacity onPress={() => setIsExpense(false)}
-                  style={[MI.typeBtn, { backgroundColor: !isExpense ? "#34C75915" : colors.surface, borderColor: !isExpense ? "#34C759" : colors.border }]}>
-                  <Text style={{ fontSize: 13, fontWeight: "600", color: !isExpense ? "#34C759" : colors.muted }}>收入 +</Text>
+                  style={[MI.typeBtn, { backgroundColor: !isExpense ? "#34C75915" : colors.surface, borderColor: !isExpense ? colors.success : colors.border }]}>
+                  <Text style={{ fontSize: 13, fontWeight: "600", color: !isExpense ? colors.success : colors.muted }}>收入 +</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => setIsExpense(true)}
                   style={[MI.typeBtn, { backgroundColor: isExpense ? colors.error + "15" : colors.surface, borderColor: isExpense ? colors.error : colors.border }]}>
@@ -568,13 +568,13 @@ export default function MonthlySummaryScreen() {
           borderColor: netProfit >= 0 ? "#34C75933" : colors.error + "33",
         }]}>
           <Text style={{ fontSize: 12, color: colors.muted }}>本月净利润</Text>
-          <Text style={{ fontSize: 32, fontWeight: "800", color: netProfit >= 0 ? "#34C759" : colors.error }}>
+          <Text style={{ fontSize: 32, fontWeight: "800", color: netProfit >= 0 ? colors.success : colors.error }}>
             {netProfit >= 0 ? "+" : ""}¥{netProfit.toFixed(2)}
           </Text>
           <View style={{ flexDirection: "row", gap: 16, marginTop: 8 }}>
             <View>
               <Text style={{ fontSize: 10, color: colors.muted }}>总收入</Text>
-              <Text style={{ fontSize: 14, fontWeight: "600", color: "#34C759" }}>+¥{totalRevenue.toFixed(2)}</Text>
+              <Text style={{ fontSize: 14, fontWeight: "600", color: colors.success }}>+¥{totalRevenue.toFixed(2)}</Text>
             </View>
             <View>
               <Text style={{ fontSize: 10, color: colors.muted }}>总支出</Text>
@@ -591,7 +591,7 @@ export default function MonthlySummaryScreen() {
                 <View style={{ width: 4, height: 16, borderRadius: 2, backgroundColor: sec.color }} />
                 <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>{sec.label}</Text>
               </View>
-              <Text style={{ fontSize: 14, fontWeight: "700", color: sec.sign > 0 ? "#34C759" : colors.error }}>
+              <Text style={{ fontSize: 14, fontWeight: "700", color: sec.sign > 0 ? colors.success : colors.error }}>
                 {sec.sign > 0 ? "+" : ""}¥{sec.subtotal.toFixed(2)}
               </Text>
             </View>
@@ -648,7 +648,7 @@ export default function MonthlySummaryScreen() {
                   const paidAmt = payment?.paidAmount ?? 0;
                   const actualRemaining = Math.max(0, totalAmt - advAmt - paidAmt);
                   const status = payment?.status ?? "unpaid";
-                  const statusColor = status === "paid" ? "#34C759" : status === "partial" ? colors.warning : colors.error;
+                  const statusColor = status === "paid" ? colors.success : status === "partial" ? colors.warning : colors.error;
                   if (totalAmt === 0 && !payment) return null;
                   return (
                     <View key={emp.id} style={[S.inlineCard, { borderLeftColor: statusColor }]}>
@@ -661,8 +661,8 @@ export default function MonthlySummaryScreen() {
                       <View style={{ flexDirection: "row", gap: 10, marginBottom: 6 }}>
                         <View style={S.amtBlock}><Text style={S.amtLabel}>应发</Text><Text style={[S.amtValue, { color: colors.foreground }]}>¥{totalAmt.toFixed(0)}</Text></View>
                         {advAmt > 0 && <View style={S.amtBlock}><Text style={S.amtLabel}>预支</Text><Text style={[S.amtValue, { color: colors.warning }]}>-¥{advAmt.toFixed(0)}</Text></View>}
-                        {paidAmt > 0 && <View style={S.amtBlock}><Text style={S.amtLabel}>已发</Text><Text style={[S.amtValue, { color: "#34C759" }]}>¥{paidAmt.toFixed(0)}</Text></View>}
-                        <View style={S.amtBlock}><Text style={S.amtLabel}>{advAmt > 0 ? "实发" : "待发"}</Text><Text style={[S.amtValue, { color: actualRemaining > 0 ? colors.error : "#34C759", fontWeight: "800" }]}>¥{actualRemaining.toFixed(0)}</Text></View>
+                        {paidAmt > 0 && <View style={S.amtBlock}><Text style={S.amtLabel}>已发</Text><Text style={[S.amtValue, { color: colors.success }]}>¥{paidAmt.toFixed(0)}</Text></View>}
+                        <View style={S.amtBlock}><Text style={S.amtLabel}>{advAmt > 0 ? "实发" : "待发"}</Text><Text style={[S.amtValue, { color: actualRemaining > 0 ? colors.error : colors.success, fontWeight: "800" }]}>¥{actualRemaining.toFixed(0)}</Text></View>
                       </View>
                       {defaultBank && (
                         <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
@@ -678,7 +678,7 @@ export default function MonthlySummaryScreen() {
                                 { text: "取消", style: "cancel" },
                                 { text: "确认已发放", onPress: () => { upsertPayment({ ...payment, advanceAmount: payment.advanceAmount ?? 0, paidAmount: payment.totalAmount, remainingAmount: 0, status: "paid", payments: [...payment.payments, { id: uuid(), date: now.slice(0, 10), amount: actualRem2, bankAccountId: "", paymentMethod: "转账", notes: `${selectedMonth} 薪资`, paidAt: now }], updatedAt: now }); tap(); }},
                               ]);
-                            }} style={[S.miniBtn, { backgroundColor: "#34C759" }]}>
+                            }} style={[S.miniBtn, { backgroundColor: colors.success }]}>
                               <IconSymbol name="checkmark.circle.fill" size={10} color="#fff" /><Text style={{ fontSize: 10, color: "#fff", fontWeight: "600" }}>已发</Text>
                             </TouchableOpacity>
                           )}
@@ -704,7 +704,7 @@ export default function MonthlySummaryScreen() {
                   const advAmt = payment.advanceAmount ?? 0;
                   const actualRemaining = Math.max(0, payment.totalAmount - advAmt - payment.paidAmount);
                   const status = payment.status;
-                  const statusColor = status === "paid" ? "#34C759" : status === "partial" ? colors.warning : colors.error;
+                  const statusColor = status === "paid" ? colors.success : status === "partial" ? colors.warning : colors.error;
                   return (
                     <View key={payment.id} style={[S.inlineCard, { borderLeftColor: statusColor }]}>
                       <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 4 }}>
@@ -716,8 +716,8 @@ export default function MonthlySummaryScreen() {
                       <View style={{ flexDirection: "row", gap: 10, marginBottom: 6 }}>
                         <View style={S.amtBlock}><Text style={S.amtLabel}>货款</Text><Text style={[S.amtValue, { color: colors.foreground }]}>¥{payment.totalAmount.toFixed(0)}</Text></View>
                         {advAmt > 0 && <View style={S.amtBlock}><Text style={S.amtLabel}>预付</Text><Text style={[S.amtValue, { color: colors.warning }]}>-¥{advAmt.toFixed(0)}</Text></View>}
-                        {payment.paidAmount > 0 && <View style={S.amtBlock}><Text style={S.amtLabel}>已付</Text><Text style={[S.amtValue, { color: "#34C759" }]}>¥{payment.paidAmount.toFixed(0)}</Text></View>}
-                        <View style={S.amtBlock}><Text style={S.amtLabel}>待付</Text><Text style={[S.amtValue, { color: actualRemaining > 0 ? colors.error : "#34C759", fontWeight: "800" }]}>¥{actualRemaining.toFixed(0)}</Text></View>
+                        {payment.paidAmount > 0 && <View style={S.amtBlock}><Text style={S.amtLabel}>已付</Text><Text style={[S.amtValue, { color: colors.success }]}>¥{payment.paidAmount.toFixed(0)}</Text></View>}
+                        <View style={S.amtBlock}><Text style={S.amtLabel}>待付</Text><Text style={[S.amtValue, { color: actualRemaining > 0 ? colors.error : colors.success, fontWeight: "800" }]}>¥{actualRemaining.toFixed(0)}</Text></View>
                       </View>
                       {defaultBank && (
                         <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
@@ -766,7 +766,7 @@ export default function MonthlySummaryScreen() {
         {/* 净利润参考 */}
         <View style={[S.infoBox, { backgroundColor: colors.primary + "08", borderColor: colors.primary + "22" }]}>
           <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "700" }}>本月经营净利润（参考）</Text>
-          <Text style={{ fontSize: 20, fontWeight: "800", color: netProfit >= 0 ? "#34C759" : colors.error }}>
+          <Text style={{ fontSize: 20, fontWeight: "800", color: netProfit >= 0 ? colors.success : colors.error }}>
             {netProfit >= 0 ? "+" : ""}¥{netProfit.toFixed(2)}
           </Text>
           <Text style={{ fontSize: 11, color: colors.muted, marginTop: 4 }}>
@@ -815,8 +815,8 @@ export default function MonthlySummaryScreen() {
                       )}
                       {!hasVariance && bal.closingBalance > 0 && (
                         <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 6 }}>
-                          <IconSymbol name="checkmark.circle.fill" size={12} color="#34C759" />
-                          <Text style={{ fontSize: 11, color: "#34C759" }}>余额核对无差异</Text>
+                          <IconSymbol name="checkmark.circle.fill" size={12} color={colors.success} />
+                          <Text style={{ fontSize: 11, color: colors.success }}>余额核对无差异</Text>
                         </View>
                       )}
                     </>
@@ -888,7 +888,7 @@ export default function MonthlySummaryScreen() {
             {totalAdvance > 0 && (
               <Text style={{ fontSize: 11, color: colors.warning }}>预支 ¥{totalAdvance.toFixed(2)}</Text>
             )}
-            <Text style={{ fontSize: 11, color: "#34C759" }}>已发 ¥{totalPaid.toFixed(2)}</Text>
+            <Text style={{ fontSize: 11, color: colors.success }}>已发 ¥{totalPaid.toFixed(2)}</Text>
             <Text style={{ fontSize: 12, fontWeight: "700", color: colors.error }}>待发 ¥{totalRemaining.toFixed(2)}</Text>
           </View>
         </View>
@@ -903,7 +903,7 @@ export default function MonthlySummaryScreen() {
           const remaining = payment?.remainingAmount ?? totalAmt;
           const actualRemaining = totalAmt - advAmt - paidAmt; // 实际待发
           const status = payment?.status ?? "unpaid";
-          const statusColor = status === "paid" ? "#34C759" : status === "partial" ? colors.warning : colors.error;
+          const statusColor = status === "paid" ? colors.success : status === "partial" ? colors.warning : colors.error;
           const statusLabel = status === "paid" ? "✓ 已发放" : status === "partial" ? "部分已发" : "待发放";
 
           return (
@@ -940,12 +940,12 @@ export default function MonthlySummaryScreen() {
                 {paidAmt > 0 && (
                   <View style={S.amtBlock}>
                     <Text style={S.amtLabel}>已发</Text>
-                    <Text style={[S.amtValue, { color: "#34C759" }]}>¥{paidAmt.toFixed(0)}</Text>
+                    <Text style={[S.amtValue, { color: colors.success }]}>¥{paidAmt.toFixed(0)}</Text>
                   </View>
                 )}
                 <View style={S.amtBlock}>
                   <Text style={S.amtLabel}>{advAmt > 0 ? "实发" : "待发"}</Text>
-                  <Text style={[S.amtValue, { color: actualRemaining > 0 ? colors.error : "#34C759", fontWeight: "800" }]}>
+                  <Text style={[S.amtValue, { color: actualRemaining > 0 ? colors.error : colors.success, fontWeight: "800" }]}>
                     ¥{Math.max(0, actualRemaining).toFixed(0)}
                   </Text>
                 </View>
@@ -978,7 +978,7 @@ export default function MonthlySummaryScreen() {
                     {/* 标记已发放 */}
                     {status !== "paid" && payment && (
                       <TouchableOpacity onPress={() => handleMarkPaid(payment, emp)}
-                        style={[S.copyBtn, { backgroundColor: "#34C759" }]}>
+                        style={[S.copyBtn, { backgroundColor: colors.success }]}>
                         <IconSymbol name="checkmark.circle.fill" size={12} color="#fff" />
                         <Text style={{ fontSize: 11, color: "#fff", fontWeight: "600" }}>标记已发放</Text>
                       </TouchableOpacity>
@@ -1024,7 +1024,7 @@ export default function MonthlySummaryScreen() {
     const renderSupplierCard = (payment: MonthlyPaymentRecord, sup: import("@/lib/store/monthly-summary/types").Supplier) => {
       const defaultBank = sup.bankAccounts.find((b) => b.isDefault) ?? sup.bankAccounts[0];
       const status = payment.status;
-      const statusColor = status === "paid" ? "#34C759" : status === "partial" ? colors.warning : colors.error;
+      const statusColor = status === "paid" ? colors.success : status === "partial" ? colors.warning : colors.error;
       const advAmt = payment.advanceAmount ?? 0;
       const actualRemaining = Math.max(0, payment.totalAmount - advAmt - payment.paidAmount);
       return (
@@ -1055,7 +1055,7 @@ export default function MonthlySummaryScreen() {
                   </Text>
                 </View>
                 {advAmt > 0 && <View><Text style={{ fontSize: 10, color: colors.muted }}>定金</Text><Text style={{ fontSize: 13, color: colors.warning }}>-¥{advAmt.toFixed(0)}</Text></View>}
-                {payment.paidAmount > 0 && <View><Text style={{ fontSize: 10, color: colors.muted }}>已付</Text><Text style={{ fontSize: 13, color: "#34C759" }}>¥{payment.paidAmount.toFixed(0)}</Text></View>}
+                {payment.paidAmount > 0 && <View><Text style={{ fontSize: 10, color: colors.muted }}>已付</Text><Text style={{ fontSize: 13, color: colors.success }}>¥{payment.paidAmount.toFixed(0)}</Text></View>}
                 {actualRemaining > 0 && <View><Text style={{ fontSize: 10, color: colors.muted }}>待付</Text><Text style={{ fontSize: 14, fontWeight: "700", color: colors.error }}>¥{actualRemaining.toFixed(0)}</Text></View>}
               </View>
             </View>
@@ -1088,7 +1088,7 @@ export default function MonthlySummaryScreen() {
                     setPartialPayAccountType("company");
                     setPartialPayNotes(`${sup.name} ${selectedMonth} 货款`);
                     setShowPartialPayModal(true);
-                  }} style={[S.copyBtn, { backgroundColor: "#34C759" }]}>
+                  }} style={[S.copyBtn, { backgroundColor: colors.success }]}>
                     <IconSymbol name="checkmark.circle.fill" size={12} color="#fff" />
                     <Text style={{ fontSize: 11, color: "#fff", fontWeight: "600" }}>录入付款</Text>
                   </TouchableOpacity>
@@ -1116,7 +1116,7 @@ export default function MonthlySummaryScreen() {
               {payment.payments.map((p) => (
                 <View key={p.id} style={{ flexDirection: "row", gap: 8, paddingVertical: 2 }}>
                   <Text style={{ fontSize: 11, color: colors.muted, width: 80 }}>{p.date}</Text>
-                  <Text style={{ fontSize: 12, fontWeight: "600", color: "#34C759" }}>¥{p.amount.toFixed(2)}</Text>
+                  <Text style={{ fontSize: 12, fontWeight: "600", color: colors.success }}>¥{p.amount.toFixed(2)}</Text>
                   <Text style={{ fontSize: 11, color: colors.muted }}>{p.paymentMethod}</Text>
                   {p.notes ? <Text style={{ fontSize: 11, color: colors.muted }}>{p.notes}</Text> : null}
                 </View>
@@ -1138,7 +1138,7 @@ export default function MonthlySummaryScreen() {
             <Text style={{ fontSize: 22, fontWeight: "800", color: colors.foreground }}>¥{totalAmt.toFixed(2)}</Text>
           </View>
           <View style={{ alignItems: "flex-end" }}>
-            <Text style={{ fontSize: 11, color: "#34C759" }}>已付 ¥{totalPaid.toFixed(2)}</Text>
+            <Text style={{ fontSize: 11, color: colors.success }}>已付 ¥{totalPaid.toFixed(2)}</Text>
             <Text style={{ fontSize: 11, color: colors.error }}>待付 ¥{totalRemaining.toFixed(2)}</Text>
           </View>
         </View>
@@ -1195,7 +1195,7 @@ export default function MonthlySummaryScreen() {
               const paidAmt2 = payment?.paidAmount ?? 0;
               const actualRemaining2 = Math.max(0, totalAmt2 - advAmt2 - paidAmt2);
               const status2 = payment?.status ?? "unpaid";
-              const statusColor2 = status2 === "paid" ? "#34C759" : status2 === "partial" ? colors.warning : colors.error;
+              const statusColor2 = status2 === "paid" ? colors.success : status2 === "partial" ? colors.warning : colors.error;
               return (
                 <View key={emp.id} style={[S.payrollCard, {
                   backgroundColor: colors.surface, borderColor: colors.border,
@@ -1243,12 +1243,12 @@ export default function MonthlySummaryScreen() {
               {pettyItems.map((item) => (
                 <View key={item.id} style={[S.payrollCard, {
                   backgroundColor: colors.surface, borderColor: colors.border,
-                  borderLeftColor: "#34C759", borderLeftWidth: 3,
+                  borderLeftColor: colors.success, borderLeftWidth: 3,
                 }]}>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                     <Text style={{ flex: 1, fontSize: 14, fontWeight: "600", color: colors.foreground }}>{item.label}</Text>
-                    <View style={[S.statusTag, { backgroundColor: "#34C75915" }]}>
-                      <Text style={{ fontSize: 10, fontWeight: "700", color: "#34C759" }}>
+                    <View style={[S.statusTag, { backgroundColor: colors.success + "15" }]}>
+                      <Text style={{ fontSize: 10, fontWeight: "700", color: colors.success }}>
                         {item.paymentNote || "已付(备用金)"}
                       </Text>
                     </View>
@@ -1300,7 +1300,7 @@ export default function MonthlySummaryScreen() {
               <Text style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>{r.month}</Text>
               <View style={{ flex: 1, marginLeft: 12 }}>
                 <Text style={{ fontSize: 12, color: colors.muted }}>净利润</Text>
-                <Text style={{ fontSize: 16, fontWeight: "700", color: r.netProfit >= 0 ? "#34C759" : colors.error }}>
+                <Text style={{ fontSize: 16, fontWeight: "700", color: r.netProfit >= 0 ? colors.success : colors.error }}>
                   {r.netProfit >= 0 ? "+" : ""}¥{r.netProfit.toFixed(2)}
                 </Text>
               </View>

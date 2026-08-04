@@ -206,7 +206,7 @@ export default function LaborSalaryHistoryScreen() {
 
 const S = StyleSheet.create({
   navbar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
-  navTitle: { fontSize: 17, fontWeight: "700" },
+  navTitle: { fontSize: 17, fontWeight: "600" },
   card: { borderRadius: 14, borderWidth: 1, padding: 14 },
   sectionTitle: { fontSize: 11, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.5 },
   monthRow: { flexDirection: "row", alignItems: "center", padding: 12, borderRadius: 12, borderWidth: 1 },

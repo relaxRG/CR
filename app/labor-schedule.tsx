@@ -624,8 +624,8 @@ export default function LaborScheduleScreen() {
 
 // ─── 样式 ─────────────────────────────────────────────────────────────────────
 const S = StyleSheet.create({
-  navbar: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
-  navTitle: { fontSize: 17, fontWeight: "700" },
+  navbar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
+  navTitle: { fontSize: 17, fontWeight: "600" },
   monthBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 8, paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth },
   monthLabel: { fontSize: 17, fontWeight: "700" },
   controlBar: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 8, gap: 8, borderBottomWidth: StyleSheet.hairlineWidth },

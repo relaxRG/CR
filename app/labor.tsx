@@ -2167,7 +2167,7 @@ const PC = StyleSheet.create({
   avatar: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
   detailRow: { flexDirection: "row", flexWrap: "wrap", gap: 12, paddingTop: 8, marginTop: 8, borderTopWidth: StyleSheet.hairlineWidth },
   detailItem: { alignItems: "center", minWidth: 52 },
-  detailLabel: { fontSize: 10, color: "#999", marginBottom: 2 },
+  detailLabel: { fontSize: 10, color: "#8E8E93", marginBottom: 2 },
   detailValue: { fontSize: 13, fontWeight: "600" },
 });
 
