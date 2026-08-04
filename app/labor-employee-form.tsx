@@ -299,7 +299,7 @@ export default function LaborEmployeeFormScreen() {
             </FormRow>
           </SectionCard>
 
-          {/* ── 部门与类型 ── */
+          {/* ── 部门与类型 ── */}
           <SectionCard title="部门与类型" colors={colors}>
             <FormRow label="部门" colors={colors}>
               <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
