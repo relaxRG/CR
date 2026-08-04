@@ -27,8 +27,8 @@ const STATUS_LABELS: Record<AdvanceStatus, string> = {
 };
 
 const STATUS_COLORS: Record<AdvanceStatus, string> = {
-  pending: "#FF9500",
-  deducted: "#34C759",
+  pending: "#FA8C16",
+  deducted: "#52C41A",
   cancelled: "#8E8E93",
 };
 

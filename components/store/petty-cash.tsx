@@ -23,9 +23,9 @@ import { importIcostExcel } from "@/lib/store/icost-import";
 import { useColors } from "@/hooks/use-colors";
 
 // ─── iCost 背景色 ─────────────────────────────────────────────────────────────
-const ICOST_BG = "#F5F5F5";
+const ICOST_BG = "#F7F7F7"; // Manus背景色
 const ICOST_CARD = "#FFFFFF";
-const ICOST_SELECTED_DAY = "#E8F0FE"; // 当日浅蓝背景
+const ICOST_SELECTED_DAY = "#E6F4FF"; // Manus主色浅蓝 // 当日浅蓝背景
 
 // ─── 大类颜色池（iCost 风格）──────────────────────────────────────────────────
 const GROUP_COLORS = [
@@ -416,23 +416,23 @@ export default function StorePettyCashScreen() {
   const renderRecordRow = (item: PettyRecord, showBorder = true) => {
     const isIncome = INCOME_CODES.includes(item.code);
     const catLabel = (PETTY_CODE_LABELS[item.code as PettyCode] ?? item.code).replace(/^[A-Z0-9]+ /, "");
-    const amtColor = isIncome ? "#34C759" : "#FF3B30";
-    const badgeBg = isIncome ? "#E8F5E9" : "#E8F0FE";
-    const badgeColor = isIncome ? "#34C759" : "#4A90E2";
+    const amtColor = isIncome ? "#52C41A" : "#FF4D4F";
+    const badgeBg = isIncome ? "#F6FFED" : "#E6F4FF";
+    const badgeColor = isIncome ? "#52C41A" : "#1677FF";
     return (
       <Pressable key={item.id}
         onPress={() => { tap(); openEdit(item); }}
         onLongPress={() => Alert.alert("删除", "确认删除？", [{ text: "取消", style: "cancel" }, { text: "删除", style: "destructive", onPress: () => deleteRecord(item.id) }])}
-        style={[S.recordRow, { backgroundColor: ICOST_CARD, borderBottomWidth: showBorder ? StyleSheet.hairlineWidth : 0, borderBottomColor: "#F0F0F0" }]}>
+        style={[S.recordRow, { backgroundColor: ICOST_CARD, borderBottomWidth: showBorder ? StyleSheet.hairlineWidth : 0, borderBottomColor: "#EBEBEB" }]}>
         {/* 左侧圆角方块图标 */}
         <View style={[S.codeBadge, { backgroundColor: badgeBg }]}>
           <Text style={[S.codeText, { color: badgeColor }]}>{item.code}</Text>
         </View>
         {/* 中间：分类名称 + 描述 */}
         <View style={{ flex: 1, marginLeft: 14 }}>
-          <Text style={[S.recordName, { color: "#1C1C1E" }]} numberOfLines={1}>{catLabel}</Text>
+          <Text style={[S.recordName, { color: "#1A1A1A" }]} numberOfLines={1}>{catLabel}</Text>
           {(item.description || item.paymentMethod) && (
-            <Text style={[S.recordSub, { color: "#8E8E93" }]} numberOfLines={1}>
+            <Text style={[S.recordSub, { color: "#8C8C8C" }]} numberOfLines={1}>
               {[item.description, item.paymentMethod].filter(Boolean).join("  ")}
             </Text>
           )}
@@ -456,16 +456,16 @@ export default function StorePettyCashScreen() {
           {/* iCost 风格日期头：MM/DD 星期X + 支出金额 */}
           <View style={[S.dayHeader, { backgroundColor: ICOST_BG }]}>
             <View style={{ flexDirection: "row", alignItems: "baseline", gap: 6 }}>
-              <Text style={[S.dayHeaderDate, { color: "#1C1C1E" }]}>
+              <Text style={[S.dayHeaderDate, { color: "#1A1A1A" }]}>
                 {group.date.slice(5).replace("-", "/")}
               </Text>
-              <Text style={[S.dayHeaderWeekday, { color: "#8E8E93" }]}>
+              <Text style={[S.dayHeaderWeekday, { color: "#8C8C8C" }]}>
                 {["周日","周一","周二","周三","周四","周五","周六"][new Date(group.date).getDay()]}
               </Text>
             </View>
             <View style={{ flexDirection: "row", gap: 12 }}>
               {group.dayExpense > 0 && (
-                <Text style={[S.dayHeaderAmt, { color: "#8E8E93" }]}>
+                <Text style={[S.dayHeaderAmt, { color: "#8C8C8C" }]}>
                   支出: ¥{fmtAmt(group.dayExpense, 3)}
                 </Text>
               )}
@@ -481,8 +481,8 @@ export default function StorePettyCashScreen() {
       )}
       ListEmptyComponent={
         <View style={S.empty}>
-          <Text style={[S.emptyTitle, { color: "#1C1C1E" }]}>本月暂无记录</Text>
-          <Text style={[S.emptyDesc, { color: "#8E8E93" }]}>点击右下角 + 手动添加，或点击下载图标导入 Excel</Text>
+          <Text style={[S.emptyTitle, { color: "#1A1A1A" }]}>本月暂无记录</Text>
+          <Text style={[S.emptyDesc, { color: "#8C8C8C" }]}>点击右下角 + 手动添加，或点击下载图标导入 Excel</Text>
         </View>
       }
       contentContainerStyle={{ paddingBottom: 100 + insets.bottom }}
@@ -507,7 +507,7 @@ export default function StorePettyCashScreen() {
           {/* 星期头：一 二 三 四 五 六 日 */}
           <View style={S.calWeekRow}>
             {["一","二","三","四","五","六","日"].map(d => (
-              <Text key={d} style={[S.calWeekLabel, { color: "#8E8E93" }]}>{d}</Text>
+              <Text key={d} style={[S.calWeekLabel, { color: "#8C8C8C" }]}>{d}</Text>
             ))}
           </View>
           {/* 日期格子 */}
@@ -536,7 +536,7 @@ export default function StorePettyCashScreen() {
                     </Text>
                     {/* 支出：灰色，无负号 */}
                     {expAmt > 0 && (
-                      <Text style={[S.calExpAmt, { color: "#8E8E93" }]} numberOfLines={1}>
+                      <Text style={[S.calExpAmt, { color: "#8C8C8C" }]} numberOfLines={1}>
                         {fmtCalAmt(expAmt)}
                       </Text>
                     )}
@@ -559,21 +559,21 @@ export default function StorePettyCashScreen() {
             {/* 日期头 */}
             <View style={[S.dayHeader, { backgroundColor: ICOST_BG }]}>
               <View style={{ flexDirection: "row", alignItems: "baseline", gap: 6 }}>
-                <Text style={[S.dayHeaderDate, { color: "#1C1C1E" }]}>
+                <Text style={[S.dayHeaderDate, { color: "#1A1A1A" }]}>
                   {month.slice(5)}/{String(selectedDay).padStart(2, "0")}
                 </Text>
-                <Text style={[S.dayHeaderWeekday, { color: "#8E8E93" }]}>
+                <Text style={[S.dayHeaderWeekday, { color: "#8C8C8C" }]}>
                   {["周日","周一","周二","周三","周四","周五","周六"][new Date(`${month}-${String(selectedDay).padStart(2, "0")}`).getDay()]}
                 </Text>
               </View>
               {calendarGroups.length > 0 && calendarGroups[0]?.dayExpense > 0 && (
-                <Text style={[S.dayHeaderAmt, { color: "#8E8E93" }]}>
+                <Text style={[S.dayHeaderAmt, { color: "#8C8C8C" }]}>
                   支出: ¥{fmtAmt(calendarGroups[0].dayExpense, 3)}
                 </Text>
               )}
             </View>
             {calendarGroups.length === 0
-              ? <Text style={[S.emptyDesc, { textAlign: "center", marginTop: 20, color: "#8E8E93" }]}>当日无记录</Text>
+              ? <Text style={[S.emptyDesc, { textAlign: "center", marginTop: 20, color: "#8C8C8C" }]}>当日无记录</Text>
               : calendarGroups.map(group => group.records.map((item, idx) =>
                   renderRecordRow(item, idx < group.records.length - 1)
                 ))}

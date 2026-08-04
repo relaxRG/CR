@@ -50,14 +50,14 @@ const TABS: { key: MainTab; label: string }[] = [
 ];
 
 const CATEGORY_SECTIONS = [
-  { key: "revenue", label: "本月收入", sign: 1, color: "#34C759" },
-  { key: "cogs_food", label: "进货成本·食材", sign: -1, color: "#FF9500" },
+  { key: "revenue", label: "本月收入", sign: 1, color: "#52C41A" },
+  { key: "cogs_food", label: "进货成本·食材", sign: -1, color: "#FA8C16" },
   { key: "cogs_beverage", label: "进货成本·酒水", sign: -1, color: "#5856D6" },
   { key: "cogs_wine", label: "进货成本·葡萄酒", sign: -1, color: "#C2185B" },
-  { key: "labor", label: "工资", sign: -1, color: "#FF3B30" },
-  { key: "rent", label: "房租", sign: -1, color: "#007AFF" },
+  { key: "labor", label: "工资", sign: -1, color: "#FF4D4F" },
+  { key: "rent", label: "房租", sign: -1, color: "#1677FF" },
   { key: "utilities", label: "水电", sign: -1, color: "#00BCD4" },
-  { key: "petty_other", label: "备用金其他费用", sign: -1, color: "#FF9500" },
+  { key: "petty_other", label: "备用金其他费用", sign: -1, color: "#FA8C16" },
   { key: "extra", label: "Extra INFO", sign: -1, color: "#8E8E93" },
 ];
 
@@ -168,7 +168,7 @@ function ManualItemModal({ visible, item, colors, onSave, onClose }: {
               <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 4, marginTop: 10 }}>金额</Text>
               <View style={{ flexDirection: "row", gap: 8 }}>
                 <TouchableOpacity onPress={() => setIsExpense(false)}
-                  style={[MI.typeBtn, { backgroundColor: !isExpense ? "#34C75915" : colors.surface, borderColor: !isExpense ? colors.success : colors.border }]}>
+                  style={[MI.typeBtn, { backgroundColor: !isExpense ? "#52C41A15" : colors.surface, borderColor: !isExpense ? colors.success : colors.border }]}>
                   <Text style={{ fontSize: 13, fontWeight: "600", color: !isExpense ? colors.success : colors.muted }}>收入 +</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => setIsExpense(true)}
@@ -564,8 +564,8 @@ export default function MonthlySummaryScreen() {
 
         {/* 净利润大卡 */}
         <View style={[S.profitCard, {
-          backgroundColor: netProfit >= 0 ? "#34C75908" : colors.error + "08",
-          borderColor: netProfit >= 0 ? "#34C75933" : colors.error + "33",
+          backgroundColor: netProfit >= 0 ? "#52C41A08" : colors.error + "08",
+          borderColor: netProfit >= 0 ? "#52C41A33" : colors.error + "33",
         }]}>
           <Text style={{ fontSize: 12, color: colors.muted }}>本月净利润</Text>
           <Text style={{ fontSize: 32, fontWeight: "800", color: netProfit >= 0 ? colors.success : colors.error }}>
@@ -951,7 +951,7 @@ export default function MonthlySummaryScreen() {
 
               {/* 銀行卡信息 + 操作按鈕 */}
               {defaultBank ? (
-                <View style={[S.bankInfo, { backgroundColor: "#007AFF08", borderColor: "#007AFF22" }]}>
+                <View style={[S.bankInfo, { backgroundColor: "#1677FF08", borderColor: "#1677FF22" }]}>
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>{defaultBank.accountName}</Text>
                     <Text style={{ fontSize: 11, color: colors.muted }}>{defaultBank.bankName}</Text>
@@ -1059,7 +1059,7 @@ export default function MonthlySummaryScreen() {
             </View>
           </View>
           {defaultBank ? (
-            <View style={[S.bankInfo, { backgroundColor: "#007AFF08", borderColor: "#007AFF22" }]}>
+            <View style={[S.bankInfo, { backgroundColor: "#1677FF08", borderColor: "#1677FF22" }]}>
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 12, fontWeight: "600", color: colors.foreground }}>{defaultBank.accountName}</Text>
                 <Text style={{ fontSize: 11, color: colors.muted }}>{defaultBank.bankName} {maskCardNumber(defaultBank.cardNumber)}</Text>
@@ -1235,7 +1235,7 @@ export default function MonthlySummaryScreen() {
           return (
             <View style={{ marginBottom: 4 }}>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4, marginTop: 8 }}>
-                <View style={{ width: 3, height: 14, borderRadius: 2, backgroundColor: "#FF9500" }} />
+                <View style={{ width: 3, height: 14, borderRadius: 2, backgroundColor: "#FA8C16" }} />
                 <Text style={{ fontSize: 12, fontWeight: "700", color: colors.muted }}>备用金已付项目</Text>
               </View>
               {pettyItems.map((item) => (

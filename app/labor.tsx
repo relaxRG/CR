@@ -415,9 +415,9 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors }:
             { label: "加班时长", value: att ? `${att.overtimeHours.toFixed(1)}h（计费${att.paidOvertimeHours?.toFixed(1) ?? att.overtimeHours.toFixed(1)}h）` : "—", color: colors.foreground },
             { label: "考勤工资", value: attendanceSalary > 0 ? `¥${attendanceSalary.toFixed(0)}` : "—", color: colors.foreground },
             { label: "绩效奖金", value: slip?.performanceBonus ? `+¥${slip.performanceBonus.toFixed(0)}` : "—", color: slip?.performanceBonus ? colors.success : colors.muted },
-            { label: "补贴合计", value: (slip && (slip.mealAllowance + slip.transportAllowance + slip.otherAllowance) > 0) ? `+¥${(slip.mealAllowance + slip.transportAllowance + slip.otherAllowance).toFixed(0)}` : "—", color: (slip && (slip.mealAllowance + slip.transportAllowance + slip.otherAllowance) > 0) ? "#007AFF" : colors.muted },
+            { label: "补贴合计", value: (slip && (slip.mealAllowance + slip.transportAllowance + slip.otherAllowance) > 0) ? `+¥${(slip.mealAllowance + slip.transportAllowance + slip.otherAllowance).toFixed(0)}` : "—", color: (slip && (slip.mealAllowance + slip.transportAllowance + slip.otherAllowance) > 0) ? "#1677FF" : colors.muted },
             { label: "奖惩小计", value: slip?.rewardPenalty ? (slip.rewardPenalty > 0 ? `+¥${slip.rewardPenalty.toFixed(0)}` : `-¥${Math.abs(slip.rewardPenalty).toFixed(0)}`) : "—", color: slip?.rewardPenalty ? (slip.rewardPenalty > 0 ? colors.success : colors.error) : colors.muted },
-            { label: "业绩提点", value: slip?.salesCommission ? `+¥${slip.salesCommission.toFixed(0)}` : "—", color: slip?.salesCommission ? "#007AFF" : colors.muted },
+            { label: "业绩提点", value: slip?.salesCommission ? `+¥${slip.salesCommission.toFixed(0)}` : "—", color: slip?.salesCommission ? "#1677FF" : colors.muted },
             { label: "预支小计", value: slip?.advanceAmount ? `-¥${slip.advanceAmount.toFixed(0)}` : "—", color: slip?.advanceAmount ? colors.warning : colors.muted },
           ].map(({ label, value, color }) => (
             <View key={label} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
@@ -976,7 +976,7 @@ function AdvancePage({ month, colors, headerComponent }: { month: string; colors
                   <View style={{ alignItems: "flex-end", gap: 4 }}>
                     <Text style={{ fontSize: 15, fontWeight: "700", color: "#AF52DE" }}>¥{adv.amount.toFixed(0)}</Text>
                     <TouchableOpacity onPress={() => { tap(); updateAdvance(adv.id, { status: adv.status === "deducted" ? "pending" : "deducted" }); }}
-                      style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: adv.status === "deducted" ? "#34C75922" : "#FF950022" }}>
+                      style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: adv.status === "deducted" ? "#52C41A22" : "#FA8C1622" }}>
                       <Text style={{ fontSize: 10, fontWeight: "600", color: adv.status === "deducted" ? colors.success : colors.warning }}>
                         {adv.status === "deducted" ? "已扣除" : "待扣除"}
                       </Text>
@@ -1782,7 +1782,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
     // iOS 日历配色方案
     // 日期行背景：深蓝灰 #2C3550（类似 iOS 日历表头）
     const DATE_ROW_BG = "#2C3550";
-    // 今天：蓝色圆圈（iOS 标志色 #007AFF）
+    // 今天：蓝色圆圈（iOS 标志色 #1677FF）
     // 当月日期：白色文字
     // 跨月日期：半透明白色（rgba(255,255,255,0.3)）
 
@@ -1798,7 +1798,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
             const dayNum = Number(dateStr.slice(8));
             return (
               <View key={di} style={[EXL.dateCell,
-                isToday && { backgroundColor: "#007AFF", borderRadius: 4, margin: 2 }
+                isToday && { backgroundColor: "#1677FF", borderRadius: 4, margin: 2 }
               ]}>
                 <Text style={[
                   EXL.dateCellText,
@@ -1837,7 +1837,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                         <TouchableOpacity key={di}
                           onPress={() => isCurrentMonth && handleCellPress(emp, dateStr, tpl.session)}
                           style={[EXL.cell,
-                            isToday && { backgroundColor: "#007AFF" + "15" },
+                            isToday && { backgroundColor: "#1677FF" + "15" },
                             !isCurrentMonth && { backgroundColor: colors.border + "18" }
                           ]}>
                           {isCurrentMonth ? renderCellContent(entry, tpl.session, contractH) : null}
@@ -1968,9 +1968,9 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                             paddingVertical: 10,
                             borderRadius: 10,
                             alignItems: "center",
-                            backgroundColor: selected ? (mode === "cash" ? colors.success : "#007AFF") : colors.background,
+                            backgroundColor: selected ? (mode === "cash" ? colors.success : "#1677FF") : colors.background,
                             borderWidth: 1,
-                            borderColor: selected ? (mode === "cash" ? colors.success : "#007AFF") : colors.border,
+                            borderColor: selected ? (mode === "cash" ? colors.success : "#1677FF") : colors.border,
                           }}>
                           <Text style={{ fontSize: 13, fontWeight: "700", color: selected ? "#fff" : colors.foreground }}>{mode === "cash" ? "拿钱" : "换休"}</Text>
                         </TouchableOpacity>
@@ -1988,7 +1988,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => runPayrollGeneration(pendingHolidayDecisions)}
-                style={{ flex: 1.2, alignItems: "center", justifyContent: "center", paddingVertical: 12, borderRadius: 12, backgroundColor: "#007AFF" }}>
+                style={{ flex: 1.2, alignItems: "center", justifyContent: "center", paddingVertical: 12, borderRadius: 12, backgroundColor: "#1677FF" }}>
                 <Text style={{ fontSize: 14, fontWeight: "700", color: "#fff" }}>确认并生成</Text>
               </TouchableOpacity>
             </View>
@@ -2030,9 +2030,9 @@ type PageKey = typeof PAGES[number]["key"];
 
 // 统一选中色为蓝色，与 iOS 主色一致
 const PAGE_COLORS: Record<PageKey, string> = {
-  schedule: "#007AFF",
-  roster:   "#007AFF",
-  advances: "#007AFF",
+  schedule: "#1677FF",
+  roster:   "#1677FF",
+  advances: "#1677FF",
 };
 
 export default function LaborScreen({ embedded = false }: { embedded?: boolean }) {
@@ -2232,10 +2232,10 @@ const EXL = StyleSheet.create({
   sessionDivider: { height: 4 },
   // 单元格文字样式
   cellHours: { fontSize: 13, fontWeight: "500", color: "#1C1C1E" },
-  cellOT: { color: "#FF3B30", fontWeight: "700" },
-  cellCompOff: { color: "#34C759", fontWeight: "700" },
-  cellRest: { fontSize: 11, color: "#FF3B30", fontWeight: "500" },
-  cellNoMorning: { fontSize: 10, color: "#FF3B30", fontWeight: "500" },
+  cellOT: { color: "#FF4D4F", fontWeight: "700" },
+  cellCompOff: { color: "#52C41A", fontWeight: "700" },
+  cellRest: { fontSize: 11, color: "#FF4D4F", fontWeight: "500" },
+  cellNoMorning: { fontSize: 10, color: "#FF4D4F", fontWeight: "500" },
   cellSession: { fontSize: 12, fontWeight: "500", color: "#3C3C43" },
   otDot: { width: 4, height: 4, borderRadius: 2, marginTop: 1 },
 });

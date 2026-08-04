@@ -39,9 +39,9 @@ const DATA_SOURCE_LABELS: Record<PerformanceDataSource, string> = {
 
 const DATA_SOURCE_COLORS: Record<PerformanceDataSource, string> = {
   manual: "#8E8E93",
-  revenue: "#34C759",
-  net_profit: "#007AFF",
-  attendance_days: "#FF9500",
+  revenue: "#52C41A",
+  net_profit: "#1677FF",
+  attendance_days: "#FA8C16",
 };
 
 // ─── 条目编辑 Modal ───────────────────────────────────────────────────────────
@@ -421,7 +421,7 @@ export default function LaborPerformanceScreen() {
                         {item.code ? <Text style={{ fontSize: 12, fontWeight: "700", color: deptColor }}>{item.code}</Text> : null}
                         <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>{item.title}</Text>
                         {item.isFixed && (
-                          <View style={{ backgroundColor: "#34C75922", paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
+                          <View style={{ backgroundColor: "#52C41A22", paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
                             <Text style={{ fontSize: 9, color: colors.success, fontWeight: "700" }}>固定</Text>
                           </View>
                         )}
