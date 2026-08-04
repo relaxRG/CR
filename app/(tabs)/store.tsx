@@ -125,7 +125,7 @@ function OperationsModule({ insets }: { insets: any }) {
       )}
       {opsTab === "labor" && (
         <View style={{ flex: 1 }}>
-          <LaborScreen />
+          <LaborScreen embedded />
         </View>
       )}
     </View>

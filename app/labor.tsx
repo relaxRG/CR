@@ -174,32 +174,34 @@ function OverviewCard({ month, colors }: { month: string; colors: any }) {
   const diffSalary = compareMonth && totalSalary > 0 && compareTotalSalary > 0 ? totalSalary - compareTotalSalary : null;
 
   return (
-    <View style={[OV.card, { backgroundColor: colors.primary + "0a", borderColor: colors.primary + "22" }]}>
+    <View style={[OV.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       {/* 标题行 + 对比开关 */}
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-        <Text style={[OV.title, { color: colors.primary }]}>{monthLabel(month)} 人力总览</Text>
+        <Text style={[OV.title, { color: colors.foreground }]}>人力总览</Text>
         <CompareToggle mode={compareMode} customMonth={customMonth} baseMonth={month} onChange={setCompareMode} onCustomMonthChange={setCustomMonth} colors={colors} />
       </View>
 
-      {/* 核心数字行 */}
+      {/* 核心数字行：移除已录考勤，改为已发薪资 */}
       <View style={OV.row}>
         <View style={OV.item}>
-          <Text style={[OV.label, { color: colors.muted }]}>在职人数</Text>
+          <Text style={[OV.label, { color: colors.muted }]}>在职</Text>
           <Text style={[OV.value, { color: colors.foreground }]}>{activeEmployees.length}<Text style={OV.unit}>人</Text></Text>
         </View>
         <View style={[OV.divider, { backgroundColor: colors.border }]} />
         <View style={OV.item}>
-          <Text style={[OV.label, { color: colors.muted }]}>已录考勤</Text>
-          <Text style={[OV.value, { color: colors.foreground }]}>{attendCount}<Text style={OV.unit}>人</Text></Text>
+          <Text style={[OV.label, { color: colors.muted }]}>已发</Text>
+          <Text style={[OV.value, { color: colors.foreground }]}>
+            {totalSalary - totalPending > 0 ? `¥${(totalSalary - totalPending).toFixed(0)}` : "—"}
+          </Text>
         </View>
         <View style={[OV.divider, { backgroundColor: colors.border }]} />
         <View style={OV.item}>
           <Text style={[OV.label, { color: colors.muted }]}>薪资合计</Text>
-          <Text style={[OV.value, { color: colors.primary }]}>
+          <Text style={[OV.value, { color: colors.foreground }]}>
             {totalSalary > 0 ? `¥${totalSalary.toFixed(0)}` : "—"}
           </Text>
           {diffSalary !== null && (
-            <Text style={{ fontSize: 10, fontWeight: "600", color: diffSalary > 0 ? "#FF3B30" : "#34C759" }}>
+            <Text style={{ fontSize: 10, color: diffSalary > 0 ? "#FF3B30" : "#34C759" }}>
               {diffSalary > 0 ? "▲" : "▼"} ¥{Math.abs(diffSalary).toFixed(0)}
             </Text>
           )}
@@ -207,7 +209,7 @@ function OverviewCard({ month, colors }: { month: string; colors: any }) {
         <View style={[OV.divider, { backgroundColor: colors.border }]} />
         <View style={OV.item}>
           <Text style={[OV.label, { color: colors.muted }]}>待发</Text>
-          <Text style={[OV.value, { color: totalPending > 0 ? "#FF9500" : colors.muted }]}>
+          <Text style={[OV.value, { color: totalPending > 0 ? "#FF3B30" : colors.muted }]}>
             {totalPending > 0 ? `¥${totalPending.toFixed(0)}` : "—"}
           </Text>
         </View>
@@ -786,15 +788,8 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
     // 时长模式：显示工时数字
     if (typeof h === "number" && h > 0) {
       const isOT = contractH > 0 && h > contractH;
-      const isCompOff = isOT && entry.overtimeType === "comp_off";
-      return (
-        <View style={{ alignItems: "center" }}>
-          <Text style={[EXL.cellHours, isOT && (isCompOff ? EXL.cellCompOff : EXL.cellOT)]}>
-            {h % 1 === 0 ? `${h}.0` : `${h}`}
-          </Text>
-          {isOT && <View style={[EXL.otDot, { backgroundColor: isCompOff ? "#34C759" : "#FF3B30" }]} />}
-        </View>
-      );
+      // 加班不变色不加粗，统一深灰显示
+      return <Text style={EXL.cellHours}>{h % 1 === 0 ? `${h}.0` : `${h}`}</Text>;
     }
     return null;
   };
@@ -803,8 +798,9 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   const renderWeekBlock = (week: (string | null)[], weekIdx: number) => {
     if (week.every((d) => d === null)) return null;
     // 部门日期行背景色：前厅绿，后厨橙
-    const dateBg = dept === "front" ? "#34C759" : "#FF9500";
-    const dateBgDark = dept === "front" ? "#2DB350" : "#E08800"; // 今天加深
+    // 日期行统一使用中性深色（不区分前厅/后厨）
+    const dateBg = "#3A3A3C";      // Apple 深灰，干净不展示颜色
+    const dateBgDark = "#1C1C1E";  // 今天加深
 
     return (
       <View key={weekIdx} style={[EXL.weekBlock, { backgroundColor: colors.surface, shadowColor: "#000" }]}>
@@ -948,7 +944,7 @@ const PAGE_COLORS: Record<PageKey, string> = {
   advances: "#AF52DE",
 };
 
-export default function LaborScreen() {
+export default function LaborScreen({ embedded = false }: { embedded?: boolean }) {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -975,32 +971,34 @@ export default function LaborScreen() {
 
   return (
     <ScreenContainer>
-      {/* 导航栏 */}
-      <View style={[S.navbar, { borderBottomColor: colors.border }]}>
-        <Pressable onPress={() => router.back()} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
-          <IconSymbol name="chevron.left" size={22} color={colors.primary} />
-        </Pressable>
-        <Text style={[S.navTitle, { color: colors.foreground }]}>员工管理</Text>
-        <View style={{ flexDirection: "row", gap: 12 }}>
-          <Pressable onPress={() => { tap(); router.push("/labor-employee-form" as any); }} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
-            <IconSymbol name="person.badge.plus" size={22} color={colors.primary} />
+      {/* 导航栏：嵌入模式下隐藏 */}
+      {!embedded && (
+        <View style={[S.navbar, { borderBottomColor: colors.border }]}>
+          <Pressable onPress={() => router.back()} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
+            <IconSymbol name="chevron.left" size={22} color={colors.primary} />
           </Pressable>
-          <Pressable onPress={() => { tap(); router.push("/labor-schedule" as any); }} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
-            <IconSymbol name="calendar.badge.clock" size={22} color={colors.muted} />
-          </Pressable>
+          <Text style={[S.navTitle, { color: colors.foreground }]}>员工管理</Text>
+          <View style={{ flexDirection: "row", gap: 12 }}>
+            <Pressable onPress={() => { tap(); router.push("/labor-employee-form" as any); }} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+              <IconSymbol name="person.badge.plus" size={22} color={colors.primary} />
+            </Pressable>
+            <Pressable onPress={() => { tap(); router.push("/labor-schedule" as any); }} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+              <IconSymbol name="calendar.badge.clock" size={22} color={colors.muted} />
+            </Pressable>
+          </View>
         </View>
-      </View>
+      )}
 
       {/* 月份导航行（低调风格） */}
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 8, gap: 12 }}>
         <Pressable onPress={() => { tap(); const [y, m] = currentMonth.split("-").map(Number); const d = new Date(y, m - 2, 1); setCurrentMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); }}
-          style={({ pressed }) => [{ width: 28, height: 28, borderRadius: 8, backgroundColor: colors.border + "55", alignItems: "center", justifyContent: "center", opacity: pressed ? 0.5 : 1 }]}>
-          <IconSymbol name="chevron.left" size={14} color={colors.muted} />
+          style={({ pressed }) => [{ width: 32, height: 32, borderRadius: 10, backgroundColor: colors.border + "55", alignItems: "center", justifyContent: "center", opacity: pressed ? 0.5 : 1 }]}>
+          <IconSymbol name="chevron.left" size={15} color="#007AFF" />
         </Pressable>
-        <Text style={{ fontSize: 15, fontWeight: "600", color: colors.foreground }}>{monthLabel(currentMonth)}</Text>
+        <Text style={{ fontSize: 16, fontWeight: "600", color: colors.foreground, letterSpacing: -0.3 }}>{monthLabel(currentMonth)}</Text>
         <Pressable onPress={() => { tap(); const [y, m] = currentMonth.split("-").map(Number); const d = new Date(y, m, 1); setCurrentMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); }}
-          style={({ pressed }) => [{ width: 28, height: 28, borderRadius: 8, backgroundColor: colors.border + "55", alignItems: "center", justifyContent: "center", opacity: pressed ? 0.5 : 1 }]}>
-          <IconSymbol name="chevron.right" size={14} color={colors.muted} />
+          style={({ pressed }) => [{ width: 32, height: 32, borderRadius: 10, backgroundColor: colors.border + "55", alignItems: "center", justifyContent: "center", opacity: pressed ? 0.5 : 1 }]}>
+          <IconSymbol name="chevron.right" size={15} color="#007AFF" />
         </Pressable>
       </View>
 
