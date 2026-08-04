@@ -1077,9 +1077,10 @@ function SchCellDisplay({ entry, contractHours, tplColor, colors }: {
 }
 
 // ─── 排班表单元格编辑 Modal ────────────────────────────────────────────────────
-function SchEditModal({ visible, date, employee, session, sessionColor, existing, contractHours, colors, shiftTemplates, specialStatuses, shiftGroups, onSave, onClear, onClose }: {
+function SchEditModal({ visible, date, employee, session, sessionColor, existing, contractHours, currentMonth, colors, shiftTemplates, specialStatuses, shiftGroups, onSave, onClear, onClose }: {
   visible: boolean; date: string; employee: Employee | null; session: string;
   sessionColor: string; existing: ShiftEntry | null; contractHours: number;
+  currentMonth: string;
   colors: any;
   shiftTemplates: ShiftTemplate[];
   specialStatuses: SpecialStatus[];
@@ -1123,13 +1124,27 @@ function SchEditModal({ visible, date, employee, session, sessionColor, existing
 
   const selectedSpecial = selectedSpecialId ? specialStatuses.find((s) => s.id === selectedSpecialId) : null;
 
-  // 点击班次标签：带入员工档案工时
+  // 点击班次标签：带入员工档案工时，如有冲突则提示
   const handleSelectShift = (tpl: ShiftTemplate) => {
     tap();
     setSelectedShiftSession(tpl.session);
     setSelectedSpecialId(null);
-    // 工时优先从员工档案带入，如果已有手动输入则保留
-    setHoursInput(String(autoHours));
+    const currentH = Number(hoursInput);
+    const hasManualHours = hoursInput !== "" && currentH > 0;
+    if (hasManualHours && currentH !== autoHours) {
+      // 已有手动工时且与标准工时不同，提示用户选择
+      Alert.alert(
+        "工时冲突",
+        `已填 ${currentH}h，${tpl.session}标准工时 ${autoHours}h，保留哪个？`,
+        [
+          { text: `保留 ${currentH}h`, onPress: () => { /* 不改变 hoursInput */ } },
+          { text: `使用 ${autoHours}h`, onPress: () => setHoursInput(String(autoHours)) },
+        ]
+      );
+    } else {
+      // 无工时或工时相同，直接带入标准工时
+      setHoursInput(String(autoHours));
+    }
   };
 
   const handleSave = () => {
@@ -1180,7 +1195,14 @@ function SchEditModal({ visible, date, employee, session, sessionColor, existing
           <Pressable onPress={onClose}><Text style={{ fontSize: 17, color: colors.error }}>取消</Text></Pressable>
           <View style={{ alignItems: "center" }}>
             <Text style={[SCHEM.title, { color: colors.foreground }]}>{employee.code}</Text>
-            <Text style={{ fontSize: 12, color: colors.muted }}>{date} 周{DOW[dow]}</Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <Text style={{ fontSize: 12, color: colors.muted }}>{date} 周{DOW[dow]}</Text>
+              {date && !date.startsWith(currentMonth) && (
+                <View style={{ paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4, backgroundColor: colors.warning + "22" }}>
+                  <Text style={{ fontSize: 10, color: colors.warning, fontWeight: "600" }}>跨月·不计入本月</Text>
+                </View>
+              )}
+            </View>
           </View>
           <Pressable onPress={handleSave}><Text style={{ fontSize: 17, fontWeight: "600", color: colors.primary }}>保存</Text></Pressable>
         </View>
@@ -1894,6 +1916,19 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   const dates = useMemo(() => getMonthDates(currentMonth), [currentMonth]);
   const deptColor = deptCategory === "front" ? "#1677FF" : "#52C41A";
   const monthShifts = useMemo(() => getShifts(currentMonth).map((s) => ({ ...s, shift: migrateShiftName(s.shift) })), [shifts, currentMonth]);
+
+  // 跨月格子需要查询相邻月数据：取上月和下月的排班记录
+  const adjacentShifts = useMemo(() => {
+    const [y, m] = currentMonth.split("-").map(Number);
+    const prevM = new Date(y, m - 2, 1);
+    const nextM = new Date(y, m, 1);
+    const prevMonth = `${prevM.getFullYear()}-${String(prevM.getMonth() + 1).padStart(2, "0")}`;
+    const nextMonth = `${nextM.getFullYear()}-${String(nextM.getMonth() + 1).padStart(2, "0")}`;
+    return [
+      ...getShifts(prevMonth).map((s) => ({ ...s, shift: migrateShiftName(s.shift) })),
+      ...getShifts(nextMonth).map((s) => ({ ...s, shift: migrateShiftName(s.shift) })),
+    ];
+  }, [shifts, currentMonth]);
   const allDeptEmployees = useMemo(() => employees.filter((e) => e.active && resolveEmployeeDept(e).category === deptCategory), [employees, deptCategory, resolveEmployeeDept]);
 
   const employeesBySession = useMemo(() => {
@@ -1942,10 +1977,12 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
     return rows;
   }, [sortedShiftGroups, sortedTemplates, employeesBySession]);
 
-  const getEntry = useCallback((employeeId: string, date: string, session: string): ShiftEntry | null =>
-    monthShifts.find((s) => s.employeeId === employeeId && s.date === date && s.shift === session) ?? null,
-    [monthShifts]
-  );
+  // getEntry 支持跨月查询：先查当月，再查相邻月
+  const getEntry = useCallback((employeeId: string, date: string, session: string): ShiftEntry | null => {
+    const inMonth = monthShifts.find((s) => s.employeeId === employeeId && s.date === date && s.shift === session);
+    if (inMonth) return inMonth;
+    return adjacentShifts.find((s) => s.employeeId === employeeId && s.date === date && s.shift === session) ?? null;
+  }, [monthShifts, adjacentShifts]);
 
   const handleCellPress = (emp: Employee, date: string, session: string) => { tap(); setEditEmployee(emp); setEditDate(date); setEditSession(session); setEditModal(true); };
 
@@ -1955,21 +1992,26 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
     const sessionButtons = sortedTemplates.map((tpl) => ({
       text: tpl.session,
       onPress: () => {
-        const dh = tpl.defaultHours ?? 8;
+        // 工时优先从员工档案带入，回落模板默认工时
+        const fillHours = (date: string) => {
+          const h = getContractHoursForDate(emp, date);
+          return h > 0 ? h : (tpl.defaultHours ?? 8);
+        };
+        const sampleH = fillHours(dates[0] ?? new Date().toISOString().slice(0, 10));
         Alert.alert(
           `快速填充 ${emp.code} · ${tpl.session}`,
-          `将填入 ${dh}h，已有数据不覆盖。`,
+          `工时自动带入员工档案（约 ${sampleH}h），已有数据不覆盖。`,
           [
             { text: "取消", style: "cancel" },
             { text: "工作日（周一~五）", onPress: () => {
               const es = dates.filter((d) => { const dow = getDayOfWeek(d); return dow !== 0 && dow !== 6; })
                 .filter((d) => !getEntry(emp.id, d, tpl.session))
-                .map((d): ShiftEntry => ({ employeeId: emp.id, date: d, shift: tpl.session, hoursValue: dh, sessionValue: tpl.session, overtimeType: "pay" }));
+                .map((d): ShiftEntry => ({ employeeId: emp.id, date: d, shift: tpl.session, hoursValue: fillHours(d), sessionValue: tpl.session, overtimeType: "pay" }));
               if (es.length > 0) batchUpsertShifts(es);
             }},
             { text: "全月", onPress: () => {
               const es = dates.filter((d) => !getEntry(emp.id, d, tpl.session))
-                .map((d): ShiftEntry => ({ employeeId: emp.id, date: d, shift: tpl.session, hoursValue: dh, sessionValue: tpl.session, overtimeType: "pay" }));
+                .map((d): ShiftEntry => ({ employeeId: emp.id, date: d, shift: tpl.session, hoursValue: fillHours(d), sessionValue: tpl.session, overtimeType: "pay" }));
               if (es.length > 0) batchUpsertShifts(es);
             }},
           ]
@@ -2192,22 +2234,24 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   const WEEK_HEADERS = ["周一 Monday", "周二 Tuesday", "周三 Wednesday", "周四 Thursday", "周五 Friday", "周六 Saturday", "周日 Sunday"];
   const WEEK_SHORT = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
 
-  // 单元格内容：班次模式显示班次名，时长模式显示工时数字
+  // 单元格内容：班次模式显示班次完整名称（最多3字），时长模式显示工时数字
   // 数字统一深灰色，加班红色标注，调休维色标注
-  const renderCellContent = (entry: ShiftEntry | null, session: string, contractH: number) => {
+  const renderCellContent = (entry: ShiftEntry | null, session: string, contractH: number, groupColor?: string) => {
     if (!entry) return null;
     const h = entry.hoursValue;
     // 休假/无早：红色，两种模式都显示
     if (h === "休") return <Text style={EXL.cellRest}>(休)</Text>;
     if (h === "无早") return <Text style={EXL.cellNoMorning}>(无早)</Text>;
     if (viewMode === "session") {
-      // 班次模式：显示班次名称第一个字（如「午」「晚」）
-      const label = session.slice(0, 1);
-      return <Text style={EXL.cellSession}>{label}</Text>;
+      // 班次模式：显示班次名称前3字（如「午班」「晚班」「午班A」）
+      const label = session.slice(0, 3);
+      const textColor = groupColor ?? "#3C3C43";
+      return <Text style={[EXL.cellSession, { color: textColor, fontSize: 10 }]} numberOfLines={1}>{label}</Text>;
     }
     // 时长模式：显示工时数字
     if (typeof h === "number" && h > 0) {
-      return <Text style={EXL.cellHours}>{h % 1 === 0 ? `${h}.0` : `${h}`}</Text>;
+      const isOT = contractH > 0 && h > contractH;
+      return <Text style={[EXL.cellHours, isOT && { color: "#FF4D4F", fontWeight: "700" }]}>{h % 1 === 0 ? `${h}.0` : `${h}`}</Text>;
     }
     return null;
   };
@@ -2269,12 +2313,12 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                       const isToday = dateStr === todayStr;
                       return (
                         <TouchableOpacity key={di}
-                          onPress={() => isCurrentMonth && handleCellPress(emp, dateStr, tpl.session)}
+                          onPress={() => handleCellPress(emp, dateStr, tpl.session)}
                           style={[EXL.cell,
                             isToday && { backgroundColor: "#1677FF" + "15" },
                             !isCurrentMonth && { backgroundColor: colors.border + "18" }
                           ]}>
-                          {isCurrentMonth ? renderCellContent(entry, tpl.session, contractH) : null}
+                          {renderCellContent(entry, tpl.session, contractH, groupColor)}
                         </TouchableOpacity>
                       );
                     })}
@@ -2526,6 +2570,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
         session={editSession} sessionColor={editTpl?.color ?? "#5856D6"}
         existing={editEmployee && editDate ? getEntry(editEmployee.id, editDate, editSession) : null}
         contractHours={editContractH}
+        currentMonth={currentMonth}
         colors={colors}
         shiftTemplates={sortedTemplates}
         specialStatuses={specialStatuses}
