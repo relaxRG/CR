@@ -856,10 +856,9 @@ export default function MonthlySummaryScreen() {
   const renderPayroll = () => {
     const payrollPayments = payments.filter((p) => p.payeeType === "employee");
     const totalPayroll = payrollPayments.reduce((s, p) => s + p.totalAmount, 0);
-    const totalAdvance = payrollPayments.reduce((s, p) => s + (p.advanceAmount ?? 0), 0);
     const totalPaid = payrollPayments.reduce((s, p) => s + p.paidAmount, 0);
     const totalRemaining = payrollPayments.reduce((s, p) => s + p.remainingAmount, 0);
-    const totalActual = totalPayroll - totalAdvance; // 实发总额
+    const paidRate = totalPayroll > 0 ? Math.round((totalPaid / totalPayroll) * 100) : 0;
 
     const handleMarkPaid = (payment: MonthlyPaymentRecord, emp: any) => {
       if (payment.status === "paid") return;
@@ -883,13 +882,20 @@ export default function MonthlySummaryScreen() {
           <View style={{ flex: 1 }}>
             <Text style={{ fontSize: 11, color: colors.muted }}>本月薪资总额</Text>
             <Text style={{ fontSize: 22, fontWeight: "800", color: colors.foreground }}>¥{totalPayroll.toFixed(2)}</Text>
+            {totalPayroll > 0 && (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 }}>
+                <View style={{ flex: 1, height: 4, borderRadius: 2, backgroundColor: colors.border }}>
+                  <View style={{ width: `${paidRate}%`, height: 4, borderRadius: 2, backgroundColor: paidRate >= 100 ? colors.success : colors.primary }} />
+                </View>
+                <Text style={{ fontSize: 10, color: paidRate >= 100 ? colors.success : colors.primary, fontWeight: "700" }}>{paidRate}%</Text>
+              </View>
+            )}
           </View>
           <View style={{ gap: 4, alignItems: "flex-end" }}>
-            {totalAdvance > 0 && (
-              <Text style={{ fontSize: 11, color: colors.warning }}>预支 ¥{totalAdvance.toFixed(2)}</Text>
-            )}
             <Text style={{ fontSize: 11, color: colors.success }}>已发 ¥{totalPaid.toFixed(2)}</Text>
-            <Text style={{ fontSize: 12, fontWeight: "700", color: colors.error }}>待发 ¥{totalRemaining.toFixed(2)}</Text>
+            <Text style={{ fontSize: 12, fontWeight: "700", color: totalRemaining > 0 ? colors.error : colors.success }}>
+              {totalRemaining > 0 ? `待发 ¥${totalRemaining.toFixed(2)}` : "✔ 全部已发放"}
+            </Text>
           </View>
         </View>
 
