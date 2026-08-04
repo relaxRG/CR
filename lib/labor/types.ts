@@ -997,6 +997,17 @@ export interface MonthlyAttendance {
 }
 
 // ─── 薪资单（最终薪资） ───────────────────────────────────────────────────────
+// ─── 奖惩明细条目 ─────────────────────────────────────────────────────────────
+export interface RewardPenaltyItem {
+  id: string;
+  /** 条目名称（如「全勤奖」「迟到扣款」「客诉处罚」） */
+  name: string;
+  /** 金额：正数=奖励，负数=扣款 */
+  amount: number;
+  /** 说明 */
+  note: string;
+}
+
 export interface PaySlip {
   id: string;
   employeeId: string;
@@ -1010,6 +1021,8 @@ export interface PaySlip {
   otherAllowance: number;
   rewardPenalty: number;
   rewardPenaltyNote: string;
+  /** 奖惩明细条目（多条，替代单一 rewardPenalty） */
+  rewardPenaltyItems?: RewardPenaltyItem[];
   advanceAmount: number;
   notes: string;
   /** 最终薪资（税前，扣除社保个税前） */
