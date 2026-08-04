@@ -5,6 +5,8 @@
  * 员工档案：自定义分组 + 每人发薪卡片（含对比开关）
  */
 import React, { useCallback, useMemo, useRef, useState } from "react";
+import * as FileSystem from "expo-file-system/legacy";
+import * as Sharing from "expo-sharing";
 import {
   Alert, Dimensions, Modal, Platform, Pressable, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View
@@ -20,6 +22,7 @@ import {
   usePaySlipStore, useShiftStore, useShiftTemplateStore,
   usePerformanceRecordStore, useHolidayConfigStore,
   useSpecialStatusStore, useGlobalPayrollSettingsStore,
+  useCompOffBalanceEntryStore, useHolidayCompOffStore, useUnexplainedRestAlertStore,
 } from "@/lib/labor/store";
 import { useSalaryAdvanceStore } from "@/lib/labor/advance-store";
 import { usePettyCashStore } from "@/lib/store/petty-store";
@@ -29,6 +32,7 @@ import {
   DEPT_COLORS, DEPT_LABELS, EMPLOYEE_TYPE_LABELS, monthLabel,
   getMonthDates, getDayOfWeek, getContractHoursForDate,
   DEFAULT_SHIFT_TEMPLATES, DEFAULT_SPECIAL_STATUSES, SHIFT_COLOR_PRESETS, calcAllowance,
+  calcCompOffExpiresMonth,
 } from "@/lib/labor/types";
 
 const { width: SCREEN_W } = Dimensions.get("window");
@@ -291,9 +295,14 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors }:
   const { getPaySlip } = usePaySlipStore();
   const { getAttendance } = useAttendanceStore();
   const { templates: shiftTpls } = useShiftTemplateStore();
+  const { getAvailableDays: getCompOffDays, addEntry: addCompOffEntry } = useCompOffBalanceEntryStore();
+  const { getAvailableDays: getHolidayCompOffDays } = useHolidayCompOffStore();
+  const { getAlert, resolveAlert } = useUnexplainedRestAlertStore();
   const router = useRouter();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
   const [expanded, setExpanded] = useState(false);
+  const [showCompOffModal, setShowCompOffModal] = useState(false);
+  const [compOffHoursInput, setCompOffHoursInput] = useState("8");
 
   const slip = getPaySlip(employee.id, month);
   const att = getAttendance(employee.id, month);
@@ -304,6 +313,33 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors }:
   const diffSalary = slip && compareSlip ? slip.finalSalary - compareSlip.finalSalary : null;
   const pending = slip ? Math.max(0, slip.finalSalary - (slip.advanceAmount ?? 0)) : null;
   const attendanceSalary = att?.attendanceSalary ?? (slip?.attendanceSalary ?? 0);
+
+  // 换休余额
+  const compOffDays = getCompOffDays(employee.id, month);
+  const holidayCompOffDays = getHolidayCompOffDays(employee.id, month);
+  const totalCompOffDays = compOffDays + holidayCompOffDays;
+
+  // 无来源多休提醒
+  const restAlert = getAlert(employee.id, month);
+
+  // 存入换休余额
+  const handleAddCompOff = () => {
+    const hours = Number(compOffHoursInput) || 8;
+    if (hours < 4) { Alert.alert("最少需加4小时加班"); return; }
+    const days = hours >= 8 ? 1 : 0.5;
+    // calcCompOffExpiresMonth imported at top
+    addCompOffEntry({
+      employeeId: employee.id,
+      earnedMonth: month,
+      hoursDeducted: hours,
+      days,
+      expiresMonth: calcCompOffExpiresMonth(month),
+      status: "available",
+      notes: `手动存入，扣除${hours}h加班`,
+    });
+    setShowCompOffModal(false);
+    Alert.alert("存入成功", `已存入${days}天换休余额，有效期3个月`);
+  };
 
   return (
     <TouchableOpacity activeOpacity={0.85}
@@ -435,12 +471,89 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors }:
               <Text style={{ fontSize: 11, color: colors.muted }}>备注：{slip.notes}</Text>
             </View>
           )}
-          {/* 操作按钮行：绩效设置 + 查看详情 */}
+          {/* 公司承担成本行 */}
+          {slip && (slip.totalEmployerCost ?? 0) > 0 && (
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 6, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border + "44" }}>
+              <Text style={{ fontSize: 11, color: colors.muted }}>公司总人力成本</Text>
+              <View style={{ alignItems: "flex-end" }}>
+                <Text style={{ fontSize: 12, fontWeight: "700", color: "#FF9500" }}>¥{(slip.totalEmployerCost ?? 0).toFixed(0)}</Text>
+                {(slip.employerSocialInsurance ?? 0) + (slip.employerHousingFund ?? 0) > 0 && (
+                  <Text style={{ fontSize: 10, color: colors.muted }}>含公司社保¥{((slip.employerSocialInsurance ?? 0) + (slip.employerHousingFund ?? 0)).toFixed(0)}</Text>
+                )}
+              </View>
+            </View>
+          )}
+
+          {/* 换休余额 + 存入按钮 */}
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 4 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <Text style={{ fontSize: 11, color: colors.muted }}>换休余额</Text>
+              <View style={{ backgroundColor: totalCompOffDays > 0 ? "#34C759" + "22" : colors.border + "44", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                <Text style={{ fontSize: 10, fontWeight: "700", color: totalCompOffDays > 0 ? "#34C759" : colors.muted }}>{totalCompOffDays}天</Text>
+              </View>
+            </View>
+            <TouchableOpacity onPress={() => { tap(); setShowCompOffModal(!showCompOffModal); }}
+              style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, backgroundColor: "#34C759" + "15", borderWidth: 1, borderColor: "#34C759" + "44" }}>
+              <IconSymbol name="plus" size={11} color="#34C759" />
+              <Text style={{ fontSize: 11, color: "#34C759", fontWeight: "600" }}>存入换休</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* 存入换休余额内嵌表单 */}
+          {showCompOffModal && (
+            <View style={{ backgroundColor: colors.background, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: "#34C759" + "44", gap: 10 }}>
+              <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>存入换休余额</Text>
+              <Text style={{ fontSize: 11, color: colors.muted }}>当月加班：{att?.overtimeHours?.toFixed(1) ?? 0}h · 已计费：{att?.paidOvertimeHours?.toFixed(1) ?? 0}h</Text>
+              <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+                {[4, 8].map((h) => (
+                  <TouchableOpacity key={h} onPress={() => setCompOffHoursInput(String(h))}
+                    style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 7, backgroundColor: compOffHoursInput === String(h) ? "#34C759" : colors.surface, borderWidth: 1, borderColor: compOffHoursInput === String(h) ? "#34C759" : colors.border }}>
+                    <Text style={{ fontSize: 12, color: compOffHoursInput === String(h) ? "#fff" : colors.muted }}>{h}h={h >= 8 ? 1 : 0.5}天</Text>
+                  </TouchableOpacity>
+                ))}
+                <TextInput value={compOffHoursInput} onChangeText={setCompOffHoursInput} keyboardType="decimal-pad"
+                  style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 7, paddingHorizontal: 8, paddingVertical: 5, color: colors.foreground, width: 55, fontSize: 12 }} />
+                <Text style={{ fontSize: 11, color: colors.muted }}>h</Text>
+              </View>
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                <TouchableOpacity onPress={() => setShowCompOffModal(false)}
+                  style={{ flex: 1, paddingVertical: 7, borderRadius: 7, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, alignItems: "center" }}>
+                  <Text style={{ fontSize: 12, color: colors.muted }}>取消</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleAddCompOff}
+                  style={{ flex: 1, paddingVertical: 7, borderRadius: 7, backgroundColor: "#34C759", alignItems: "center" }}>
+                  <Text style={{ fontSize: 12, fontWeight: "600", color: "#fff" }}>确认存入</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {/* 无来源多休提醒 */}
+          {restAlert && restAlert.resolution === "pending" && (
+            <View style={{ backgroundColor: "#FF9500" + "15", borderRadius: 8, padding: 8, gap: 6, borderWidth: 1, borderColor: "#FF9500" + "44" }}>
+              <Text style={{ fontSize: 11, fontWeight: "600", color: "#FF9500" }}>⚠️ 本月多休{restAlert.unexplainedDays}天，无换休余额可抵扣</Text>
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                {[{ label: "扣薪", res: "deduct" as const, color: "#FF3B30" }, { label: "不扣薪", res: "waive" as const, color: "#34C759" }].map((opt) => (
+                  <TouchableOpacity key={opt.res} onPress={() => resolveAlert(employee.id, month, opt.res)}
+                    style={{ flex: 1, paddingVertical: 5, borderRadius: 6, backgroundColor: opt.color + "15", alignItems: "center" }}>
+                    <Text style={{ fontSize: 11, color: opt.color, fontWeight: "600" }}>{opt.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* 操作按钮行：绩效设置 + 历史 + 编辑薪资 */}
           <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
             <TouchableOpacity onPress={() => { tap(); router.push({ pathname: "/labor-performance", params: { employeeId: employee.id } } as any); }}
               style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, paddingVertical: 7, borderRadius: 8, backgroundColor: "#34C759" + "15", borderWidth: 1, borderColor: "#34C759" + "44" }}>
               <IconSymbol name="chart.bar.fill" size={12} color="#34C759" />
               <Text style={{ fontSize: 12, color: "#34C759", fontWeight: "600" }}>绩效设置</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => { tap(); router.push({ pathname: "/labor-salary-history", params: { employeeId: employee.id } } as any); }}
+              style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, paddingVertical: 7, paddingHorizontal: 10, borderRadius: 8, backgroundColor: "#5856D6" + "15", borderWidth: 1, borderColor: "#5856D6" + "44" }}>
+              <IconSymbol name="clock.fill" size={12} color="#5856D6" />
+              <Text style={{ fontSize: 12, color: "#5856D6", fontWeight: "600" }}>历史</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => { tap(); router.push({ pathname: "/labor-attendance", params: { employeeId: employee.id, month } } as any); }}
               style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, paddingVertical: 7, borderRadius: 8, backgroundColor: colors.primary + "15", borderWidth: 1, borderColor: colors.primary + "44" }}>
@@ -472,7 +585,7 @@ function EmployeeRosterPage({ month, colors }: { month: string; colors: any }) {
       const monthAtts = attendances.filter((a) => a.month === month);
       const activeEmps = employees.filter((e) => e.active);
 
-      const header = ["姓名", "代号", "部门", "类型", "出勤天", "总工时", "加班时", "考勤工资", "绩效", "补贴", "奖惩", "社保", "公积金", "个税", "预支", "应发", "实发"];
+      const header = ["姓名", "代号", "部门", "类型", "出勤天", "总工时", "加班时", "考勤工资", "绩效", "补贴", "奖惩", "社保(个人)", "公积金(个人)", "个税", "预支", "应发", "实发", "公司社保", "公司公积金", "公司总成本"];
       const rows = activeEmps.map((emp) => {
         const slip = monthSlips.find((s) => s.employeeId === emp.id);
         const att = monthAtts.find((a) => a.employeeId === emp.id);
@@ -492,6 +605,9 @@ function EmployeeRosterPage({ month, colors }: { month: string; colors: any }) {
           slip?.advanceAmount?.toFixed(2) ?? "",
           (slip?.grossSalary ?? slip?.finalSalary ?? 0).toFixed(2),
           slip?.finalSalary?.toFixed(2) ?? "",
+          slip?.employerSocialInsurance?.toFixed(2) ?? "0",
+          slip?.employerHousingFund?.toFixed(2) ?? "0",
+          slip?.totalEmployerCost?.toFixed(2) ?? (slip?.grossSalary ?? 0).toFixed(2),
         ];
       });
 
@@ -502,21 +618,14 @@ function EmployeeRosterPage({ month, colors }: { month: string; colors: any }) {
 
       const fileName = `薪资表_${month}.csv`;
 
-      // 尝试使用 expo-file-system 导出
-      try {
-        const FileSystem = require("expo-file-system");
-        const Sharing = require("expo-sharing");
-        const fileUri = FileSystem.cacheDirectory + fileName;
-        await FileSystem.writeAsStringAsync(fileUri, csvWithBOM, { encoding: FileSystem.EncodingType.UTF8 });
-        const canShare = await Sharing.isAvailableAsync();
-        if (canShare) {
-          await Sharing.shareAsync(fileUri, { mimeType: "text/csv", dialogTitle: `导出${month}薪资表` });
-        } else {
-          Alert.alert("导出完成", `文件已保存到：${fileUri}`);
-        }
-      } catch {
-        // 降级：直接分享文本
-        Alert.alert(`薪资表 ${month}`, csvContent.slice(0, 500) + "...");
+      // 使用静态 import 的 expo-file-system 和 expo-sharing
+      const fileUri = (FileSystem.cacheDirectory ?? "") + fileName;
+      await FileSystem.writeAsStringAsync(fileUri, csvWithBOM, { encoding: FileSystem.EncodingType.UTF8 });
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(fileUri, { mimeType: "text/csv", dialogTitle: `导出${month}薪资表` });
+      } else {
+        Alert.alert("导出完成", `文件已保存到：${fileUri}`);
       }
     } catch (e) {
       Alert.alert("导出失败", String(e));
@@ -1216,11 +1325,12 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   const { shifts, upsertShift, batchUpsertShifts, deleteShift, getShifts } = useShiftStore();
   const { templates, upsertTemplate, deleteTemplate } = useShiftTemplateStore();
   const { statuses: specialStatuses, upsertStatus, deleteStatus } = useSpecialStatusStore();
-  const { getPaySlip, upsertPaySlip, buildPaySlipDraft } = usePaySlipStore();
+  const { paySlips, getPaySlip, upsertPaySlip, buildPaySlipDraft } = usePaySlipStore();
   const { getAttendance, upsertAttendance, calcFromShifts } = useAttendanceStore();
   const { getRecord: getPerfRecord } = usePerformanceRecordStore();
   const { getHolidayForDate } = useHolidayConfigStore();
   const { advances } = useSalaryAdvanceStore();
+  const { settings: globalSettings } = useGlobalPayrollSettingsStore();
 
   const now = new Date();
   const todayStr = now.toISOString().slice(0, 10);
@@ -1476,8 +1586,21 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                         const advanceTotal = advances
                           .filter((a) => a.employeeId === emp.id && (a.deductMonth === currentMonth || a.date.startsWith(currentMonth)))
                           .reduce((s, a) => s + a.amount, 0);
-                        // 4. 生成薪资单
-                        const slip = buildPaySlipDraft(emp, currentMonth, att, performanceTotal, advanceTotal);
+                        // 4. 计算年度累计数据（用于个税累计预扣法）
+                        const [curYear] = currentMonth.split("-");
+                        const prevMonthSlips = paySlips.filter((s) =>
+                          s.employeeId === emp.id &&
+                          s.month.startsWith(curYear) &&
+                          s.month < currentMonth
+                        );
+                        const cumulativeIncome = prevMonthSlips.reduce((sum, s) => {
+                          // 累计应税收入 = 应发 - 社保个人 - 公积金个人 - 起征点（按月）
+                          const taxableBase = Math.max(0, s.grossSalary - s.socialInsuranceDeduction - s.housingFundDeduction);
+                          return sum + taxableBase;
+                        }, 0);
+                        const cumulativeTaxPaid = prevMonthSlips.reduce((sum, s) => sum + (s.incomeTax ?? 0), 0);
+                        // 5. 生成薪资单
+                        const slip = buildPaySlipDraft(emp, currentMonth, att, performanceTotal, advanceTotal, globalSettings, cumulativeIncome, cumulativeTaxPaid);
                         upsertPaySlip(slip);
                         count++;
                       }

@@ -10,8 +10,10 @@ import {
   Employee, ShiftEntry, MonthlyAttendance, PaySlip, MonthConfig,
   ShiftTemplate, HolidayConfig, PerformanceTemplate, PerformanceRecord,
   EmployeeGroup, CompOffBalance, SpecialStatus, GlobalPayrollSettings,
+  CompOffBalanceEntry, HolidayCompOffEntry, UnexplainedRestAlert,
   calcDailyRate, calcAllowance, calcSocialInsurance, calcIncomeTax, calcFinalSalary,
   getDaysInMonth, parseMonth, getContractHoursForDate,
+  calcCompOffExpiresMonth, getAvailableCompOffDays,
   DEFAULT_SHIFT_TEMPLATES, DEFAULT_EMPLOYEE_GROUPS, DEFAULT_SPECIAL_STATUSES,
   DEFAULT_GLOBAL_PAYROLL_SETTINGS,
 } from "./types";
@@ -747,15 +749,19 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
       (existing?.rewardPenalty ?? 0)
     ) * 100) / 100;
 
-    // ── 社保/公积金计算 ──
+    // ── 社保/公积金计算（双轨制：个人+公司）──
     const siConfig = employee.socialInsurance ?? globalSettings?.defaultSocialInsurance;
     const siEnabled = (siConfig?.enabled) || (globalSettings?.socialInsuranceEnabled ?? false);
-    let socialInsuranceDeduction = existing?.socialInsuranceDeduction ?? 0;
-    let housingFundDeduction = existing?.housingFundDeduction ?? 0;
+    let socialInsuranceDeduction = existing?.socialInsuranceDeduction ?? 0;  // 个人部分
+    let housingFundDeduction = existing?.housingFundDeduction ?? 0;           // 个人部分
+    let employerSocialInsurance = existing?.employerSocialInsurance ?? 0;     // 公司部分
+    let employerHousingFund = existing?.employerHousingFund ?? 0;             // 公司部分
     let socialInsuranceDetails = existing?.socialInsuranceDetails;
+    let employerInsuranceDetails = existing?.employerInsuranceDetails;
 
     if (siEnabled && siConfig) {
       const si = calcSocialInsurance(grossSalary, { ...siConfig, enabled: true });
+      // 个人部分（从工资扣）
       socialInsuranceDeduction = si.pension + si.medical + si.unemployment + si.workInjury + si.maternity;
       housingFundDeduction = si.housingFund;
       socialInsuranceDetails = {
@@ -765,9 +771,20 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
         workInjury: si.workInjury,
         maternity: si.maternity,
       };
+      // 公司部分（公司额外支出）
+      employerSocialInsurance = si.employerPension + si.employerMedical + si.employerUnemployment + si.employerWorkInjury + si.employerMaternity;
+      employerHousingFund = si.employerHousingFund;
+      employerInsuranceDetails = {
+        pension: si.employerPension,
+        medical: si.employerMedical,
+        unemployment: si.employerUnemployment,
+        workInjury: si.employerWorkInjury,
+        maternity: si.employerMaternity,
+      };
     }
 
     // ── 个人所得税计算（累计预扣法）──
+    // cumulativeIncome 和 cumulativeTaxPaid 由调用方从当年1月到上月的 paySlips 累加传入
     const taxConfig = employee.incomeTax ?? globalSettings?.defaultIncomeTax;
     const taxEnabled = (taxConfig?.enabled) || (globalSettings?.incomeTaxEnabled ?? false);
     let incomeTax = existing?.incomeTax ?? 0;
@@ -775,20 +792,31 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
 
     if (taxEnabled && taxConfig) {
       const totalDeductions = socialInsuranceDeduction + housingFundDeduction;
-      const thisMonthIncome = grossSalary - totalDeductions - taxConfig.threshold;
-      const cumIncome = cumulativeIncome + Math.max(0, thisMonthIncome);
-      const cumDeductions = cumulativeIncome > 0 ? 0 : 0; // 已在 cumIncome 中扣除
+      // 本月应税收入 = 应发 - 个人社保/公积金 - 起征点
+      const thisMonthTaxableIncome = Math.max(0, grossSalary - totalDeductions - taxConfig.threshold);
+      // 年度累计应税收入（含本月）
+      const cumIncome = cumulativeIncome + thisMonthTaxableIncome;
+      // 年度累计专项附加扣除（按月累计）
+      const monthsElapsed = parseInt(month.split("-")[1]) || 1;
+      const cumSpecialDeductions = (taxConfig.specialDeductions ?? 0) * monthsElapsed;
       const result = calcIncomeTax(
-        cumIncome, cumDeductions, cumulativeTaxPaid,
+        cumIncome, cumSpecialDeductions, cumulativeTaxPaid,
         taxConfig.threshold, taxConfig.specialDeductions
       );
       incomeTax = result.tax;
       incomeTaxNote = result.note;
     }
 
-    // ── 实发薪资 ──
+    // ── 公司总人力成本 ──
+    const totalEmployerCost = Math.round((
+      grossSalary + employerSocialInsurance + employerHousingFund
+    ) * 100) / 100;
+
+    // ── 实发薪资（含预支扣除）──
+    // 开启社保/个税时：实发 = 应发 - 社保个人 - 公积金个人 - 个税 - 预支
+    // 关闭社保/个税时：实发 = 应发 - 预支
     const finalSalary = Math.round((
-      grossSalary - socialInsuranceDeduction - housingFundDeduction - incomeTax
+      grossSalary - socialInsuranceDeduction - housingFundDeduction - incomeTax - advanceAmount
     ) * 100) / 100;
 
     return {
@@ -811,8 +839,12 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
       housingFundDeduction,
       incomeTax,
       finalSalary,
+      employerSocialInsurance,
+      employerHousingFund,
+      totalEmployerCost,
       allowanceDetails,
       socialInsuranceDetails,
+      employerInsuranceDetails,
       incomeTaxNote,
       updatedAt: new Date().toISOString(),
     };
@@ -887,6 +919,171 @@ function MonthConfigProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+
+// ─── 换休余额明细 Store（跨月累积，有效期3个月） ──────────────────────────────
+interface CompOffBalanceEntryStore {
+  entries: CompOffBalanceEntry[];
+  /** 手动存入换休余额 */
+  addEntry: (entry: Omit<CompOffBalanceEntry, "id" | "createdAt">) => void;
+  /** 更新余额条目（如标记为已使用/已过期） */
+  updateEntry: (id: string, patch: Partial<CompOffBalanceEntry>) => void;
+  /** 获取某员工所有余额条目 */
+  getEntries: (employeeId: string) => CompOffBalanceEntry[];
+  /** 获取某员工在某月可用的余额总天数 */
+  getAvailableDays: (employeeId: string, month: string) => number;
+  /** 自动将过期余额标记为 expired */
+  expireOldEntries: (currentMonth: string) => void;
+  ready: boolean;
+}
+
+const CompOffBalanceEntryContext = createContext<CompOffBalanceEntryStore>({
+  entries: [], addEntry: () => {}, updateEntry: () => {},
+  getEntries: () => [], getAvailableDays: () => 0, expireOldEntries: () => {},
+  ready: false,
+});
+
+function CompOffBalanceEntryProvider({ children }: { children: React.ReactNode }) {
+  const { data: entries, ref, persist, ready } = usePersisted<CompOffBalanceEntry>("labor_comp_off_entries_v1");
+
+  const addEntry = useCallback((entry: Omit<CompOffBalanceEntry, "id" | "createdAt">) => {
+    const newEntry: CompOffBalanceEntry = {
+      ...entry,
+      id: uuid(),
+      createdAt: new Date().toISOString(),
+    };
+    persist([...ref.current, newEntry]);
+  }, [persist, ref]);
+
+  const updateEntry = useCallback((id: string, patch: Partial<CompOffBalanceEntry>) => {
+    const idx = ref.current.findIndex((e) => e.id === id);
+    if (idx >= 0) {
+      const next = [...ref.current];
+      next[idx] = { ...next[idx], ...patch };
+      persist(next);
+    }
+  }, [persist, ref]);
+
+  const getEntries = useCallback((employeeId: string): CompOffBalanceEntry[] => {
+    return ref.current.filter((e) => e.employeeId === employeeId);
+  }, [ref]);
+
+  const getAvailableDays = useCallback((employeeId: string, month: string): number => {
+    return getAvailableCompOffDays(ref.current, employeeId, month);
+  }, [ref]);
+
+  const expireOldEntries = useCallback((currentMonth: string) => {
+    const updated = ref.current.map((e) => {
+      if (e.status === "available" && e.expiresMonth < currentMonth) {
+        return { ...e, status: "expired" as const };
+      }
+      return e;
+    });
+    persist(updated);
+  }, [persist, ref]);
+
+  return (
+    <CompOffBalanceEntryContext.Provider value={{ entries, addEntry, updateEntry, getEntries, getAvailableDays, expireOldEntries, ready }}>
+      {children}
+    </CompOffBalanceEntryContext.Provider>
+  );
+}
+
+// ─── 节假日调休余额 Store ─────────────────────────────────────────────────────
+interface HolidayCompOffStore {
+  entries: HolidayCompOffEntry[];
+  addEntry: (entry: Omit<HolidayCompOffEntry, "id" | "createdAt">) => void;
+  updateEntry: (id: string, patch: Partial<HolidayCompOffEntry>) => void;
+  getEntries: (employeeId: string) => HolidayCompOffEntry[];
+  getAvailableDays: (employeeId: string, month: string) => number;
+  expireOldEntries: (currentMonth: string) => void;
+  ready: boolean;
+}
+
+const HolidayCompOffContext = createContext<HolidayCompOffStore>({
+  entries: [], addEntry: () => {}, updateEntry: () => {},
+  getEntries: () => [], getAvailableDays: () => 0, expireOldEntries: () => {},
+  ready: false,
+});
+
+function HolidayCompOffProvider({ children }: { children: React.ReactNode }) {
+  const { data: entries, ref, persist, ready } = usePersisted<HolidayCompOffEntry>("labor_holiday_comp_off_v1");
+
+  const addEntry = useCallback((entry: Omit<HolidayCompOffEntry, "id" | "createdAt">) => {
+    const newEntry: HolidayCompOffEntry = { ...entry, id: uuid(), createdAt: new Date().toISOString() };
+    persist([...ref.current, newEntry]);
+  }, [persist, ref]);
+
+  const updateEntry = useCallback((id: string, patch: Partial<HolidayCompOffEntry>) => {
+    const idx = ref.current.findIndex((e) => e.id === id);
+    if (idx >= 0) { const next = [...ref.current]; next[idx] = { ...next[idx], ...patch }; persist(next); }
+  }, [persist, ref]);
+
+  const getEntries = useCallback((employeeId: string): HolidayCompOffEntry[] => {
+    return ref.current.filter((e) => e.employeeId === employeeId);
+  }, [ref]);
+
+  const getAvailableDays = useCallback((employeeId: string, month: string): number => {
+    return ref.current
+      .filter((e) => e.employeeId === employeeId && e.status === "available" && e.expiresMonth >= month)
+      .reduce((sum, e) => sum + e.days, 0);
+  }, [ref]);
+
+  const expireOldEntries = useCallback((currentMonth: string) => {
+    const updated = ref.current.map((e) =>
+      e.status === "available" && e.expiresMonth < currentMonth ? { ...e, status: "expired" as const } : e
+    );
+    persist(updated);
+  }, [persist, ref]);
+
+  return (
+    <HolidayCompOffContext.Provider value={{ entries, addEntry, updateEntry, getEntries, getAvailableDays, expireOldEntries, ready }}>
+      {children}
+    </HolidayCompOffContext.Provider>
+  );
+}
+
+// ─── 无来源多休提醒 Store ─────────────────────────────────────────────────────
+interface UnexplainedRestAlertStore {
+  alerts: UnexplainedRestAlert[];
+  upsertAlert: (alert: UnexplainedRestAlert) => void;
+  getAlert: (employeeId: string, month: string) => UnexplainedRestAlert | null;
+  resolveAlert: (employeeId: string, month: string, resolution: UnexplainedRestAlert["resolution"], notes?: string) => void;
+  ready: boolean;
+}
+
+const UnexplainedRestAlertContext = createContext<UnexplainedRestAlertStore>({
+  alerts: [], upsertAlert: () => {}, getAlert: () => null, resolveAlert: () => {}, ready: false,
+});
+
+function UnexplainedRestAlertProvider({ children }: { children: React.ReactNode }) {
+  const { data: alerts, ref, persist, ready } = usePersisted<UnexplainedRestAlert>("labor_unexplained_rest_alerts_v1");
+
+  const upsertAlert = useCallback((alert: UnexplainedRestAlert) => {
+    const idx = ref.current.findIndex((a) => a.employeeId === alert.employeeId && a.month === alert.month);
+    if (idx >= 0) { const next = [...ref.current]; next[idx] = alert; persist(next); }
+    else persist([...ref.current, alert]);
+  }, [persist, ref]);
+
+  const getAlert = useCallback((employeeId: string, month: string): UnexplainedRestAlert | null => {
+    return ref.current.find((a) => a.employeeId === employeeId && a.month === month) ?? null;
+  }, [ref]);
+
+  const resolveAlert = useCallback((employeeId: string, month: string, resolution: UnexplainedRestAlert["resolution"], notes?: string) => {
+    const idx = ref.current.findIndex((a) => a.employeeId === employeeId && a.month === month);
+    if (idx >= 0) {
+      const next = [...ref.current];
+      next[idx] = { ...next[idx], resolution, notes: notes ?? next[idx].notes, updatedAt: new Date().toISOString() };
+      persist(next);
+    }
+  }, [persist, ref]);
+
+  return (
+    <UnexplainedRestAlertContext.Provider value={{ alerts, upsertAlert, getAlert, resolveAlert, ready }}>
+      {children}
+    </UnexplainedRestAlertContext.Provider>
+  );
+}
+
 // ─── 组合 Provider ────────────────────────────────────────────────────────────
 export function LaborProvider({ children }: { children: React.ReactNode }) {
   return (
@@ -899,15 +1096,21 @@ export function LaborProvider({ children }: { children: React.ReactNode }) {
                 <ShiftProvider>
                   <AttendanceProvider>
                     <CompOffProvider>
-                      <PaySlipProvider>
-                        <PerformanceTemplateProvider>
-                          <PerformanceRecordProvider>
-                            <GlobalPayrollSettingsProvider>
-                              {children}
-                            </GlobalPayrollSettingsProvider>
-                          </PerformanceRecordProvider>
-                        </PerformanceTemplateProvider>
-                      </PaySlipProvider>
+                      <CompOffBalanceEntryProvider>
+                        <HolidayCompOffProvider>
+                          <UnexplainedRestAlertProvider>
+                            <PaySlipProvider>
+                              <PerformanceTemplateProvider>
+                                <PerformanceRecordProvider>
+                                  <GlobalPayrollSettingsProvider>
+                                    {children}
+                                  </GlobalPayrollSettingsProvider>
+                                </PerformanceRecordProvider>
+                              </PerformanceTemplateProvider>
+                            </PaySlipProvider>
+                          </UnexplainedRestAlertProvider>
+                        </HolidayCompOffProvider>
+                      </CompOffBalanceEntryProvider>
                     </CompOffProvider>
                   </AttendanceProvider>
                 </ShiftProvider>
@@ -934,3 +1137,6 @@ export function usePerformanceTemplateStore() { return useContext(PerformanceTem
 export function usePerformanceRecordStore() { return useContext(PerformanceRecordContext); }
 export function useMonthConfigStore() { return useContext(MonthConfigContext); }
 export function useGlobalPayrollSettingsStore() { return useContext(GlobalPayrollSettingsContext); }
+export function useCompOffBalanceEntryStore() { return useContext(CompOffBalanceEntryContext); }
+export function useHolidayCompOffStore() { return useContext(HolidayCompOffContext); }
+export function useUnexplainedRestAlertStore() { return useContext(UnexplainedRestAlertContext); }

@@ -82,6 +82,13 @@ export const SYNC_KEYS = [
   "labor_payslips_v1",
   "labor_month_configs_v1",
   "labor.salary_advances.v1",
+  "labor_comp_off_entries_v1",
+  "labor_holiday_comp_off_v1",
+  "labor_unexplained_rest_alerts_v1",
+  "labor_global_payroll_settings_v1",
+  "labor_special_statuses_v1",
+  "labor_performance_templates_v1",
+  "labor_performance_records_v1",
   // ── 烈酒进销存（新增）──────────────────────────────────────────────────────────────────────────────
   "spirits.items.v3",
   "spirits.purchases.v3",

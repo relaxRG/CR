@@ -296,6 +296,9 @@ function PaySlipEditModal({
       housingFundDeduction: existing?.housingFundDeduction ?? 0,
       incomeTax: existing?.incomeTax ?? 0,
       finalSalary,
+      employerSocialInsurance: existing?.employerSocialInsurance ?? 0,
+      employerHousingFund: existing?.employerHousingFund ?? 0,
+      totalEmployerCost: existing?.totalEmployerCost ?? finalSalary,
       updatedAt: new Date().toISOString(),
     };
     onSave(slip);

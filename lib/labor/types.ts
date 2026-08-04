@@ -1,6 +1,6 @@
 /**
- * 人工成本管理模块 - 完整类型定义 v3
- * 新增：特殊状态系统、加班换休、社保/公积金、个人所得税、薪资趋势
+ * 人工成本管理模块 - 完整类型定义 v4
+ * 新增：社保/公积金双轨制（个人+公司）、城市政策数据库、换休余额明细、节假日调休余额、无来源多休提醒
  */
 
 // ─── 员工部门 / 类型 ──────────────────────────────────────────────────────────
@@ -87,6 +87,39 @@ export interface AllowanceRule {
 }
 
 // ─── 社保 / 公积金配置 ────────────────────────────────────────────────────────
+// ─── 单个险种配置（个人+公司双轨制） ────────────────────────────────────────
+export interface InsuranceItem {
+  /** 险种名称（如"养老保险"） */
+  name: string;
+  /** 是否启用此险种 */
+  enabled: boolean;
+  /** 个人缴费比例（如 0.08 = 8%） */
+  employeeRate: number;
+  /** 公司缴费比例（如 0.16 = 16%） */
+  employerRate: number;
+  /** 基数下限（元/月，0=不限） */
+  baseMin: number;
+  /** 基数上限（元/月，0=不限） */
+  baseMax: number;
+}
+
+export interface HousingFundItem {
+  name: string;
+  enabled: boolean;
+  /** 个人缴费比例 */
+  employeeRate: number;
+  /** 公司缴费比例 */
+  employerRate: number;
+  /** 公积金基数（0=使用工资） */
+  base: number;
+  baseMin: number;
+  baseMax: number;
+}
+
+/**
+ * 完整社保/公积金配置（双轨制：个人+公司）
+ * 支持按城市自动填充，支持手动修改每个险种
+ */
 export interface SocialInsuranceConfig {
   /** 是否启用社保计算 */
   enabled: boolean;
@@ -94,22 +127,41 @@ export interface SocialInsuranceConfig {
   city: string;
   /** 社保基数（元/月，0=使用工资作为基数） */
   base: number;
-  /** 养老保险个人缴费比例（默认8%） */
-  pensionRate: number;
-  /** 医疗保险个人缴费比例（默认2%） */
-  medicalRate: number;
-  /** 失业保险个人缴费比例（默认0.5%） */
-  unemploymentRate: number;
-  /** 工伤保险个人缴费比例（默认0%，通常由单位缴纳） */
-  workInjuryRate: number;
-  /** 生育保险个人缴费比例（默认0%） */
-  maternityRate: number;
-  /** 公积金个人缴费比例（默认12%） */
-  housingFundRate: number;
-  /** 公积金基数（元/月，0=使用工资作为基数） */
-  housingFundBase: number;
+  /** 基数下限（城市政策，0=不限） */
+  baseMin: number;
+  /** 基数上限（城市政策，0=不限） */
+  baseMax: number;
+  /** 养老保险 */
+  pension: InsuranceItem;
+  /** 医疗保险 */
+  medical: InsuranceItem;
+  /** 失业保险 */
+  unemployment: InsuranceItem;
+  /** 工伤保险（通常只有公司部分） */
+  workInjury: InsuranceItem;
+  /** 生育保险（通常只有公司部分） */
+  maternity: InsuranceItem;
+  /** 住房公积金 */
+  housingFund: HousingFundItem;
   /** 最后联网更新时间 */
   lastUpdated?: string;
+  /** 数据来源（"builtin"=内置, "network"=联网更新, "manual"=手动修改） */
+  dataSource?: "builtin" | "network" | "manual";
+}
+
+/** 向后兼容：从旧版 SocialInsuranceConfig 读取个人比例 */
+export function getSIEmployeeRate(config: SocialInsuranceConfig): {
+  pension: number; medical: number; unemployment: number;
+  workInjury: number; maternity: number; housingFund: number;
+} {
+  return {
+    pension: config.pension.employeeRate,
+    medical: config.medical.employeeRate,
+    unemployment: config.unemployment.employeeRate,
+    workInjury: config.workInjury.employeeRate,
+    maternity: config.maternity.employeeRate,
+    housingFund: config.housingFund.employeeRate,
+  };
 }
 
 /** 默认社保配置（全国通用基准） */
@@ -117,15 +169,171 @@ export const DEFAULT_SOCIAL_INSURANCE: SocialInsuranceConfig = {
   enabled: false,
   city: "",
   base: 0,
-  pensionRate: 0.08,
-  medicalRate: 0.02,
-  unemploymentRate: 0.005,
-  workInjuryRate: 0,
-  maternityRate: 0,
-  housingFundRate: 0.12,
-  housingFundBase: 0,
+  baseMin: 0,
+  baseMax: 0,
+  pension:      { name: "养老保险", enabled: true,  employeeRate: 0.08,  employerRate: 0.16,  baseMin: 0, baseMax: 0 },
+  medical:      { name: "医疗保险", enabled: true,  employeeRate: 0.02,  employerRate: 0.095, baseMin: 0, baseMax: 0 },
+  unemployment: { name: "失业保险", enabled: true,  employeeRate: 0.005, employerRate: 0.005, baseMin: 0, baseMax: 0 },
+  workInjury:   { name: "工伤保险", enabled: true,  employeeRate: 0,     employerRate: 0.004, baseMin: 0, baseMax: 0 },
+  maternity:    { name: "生育保险", enabled: false, employeeRate: 0,     employerRate: 0.008, baseMin: 0, baseMax: 0 },
+  housingFund:  { name: "住房公积金", enabled: true, employeeRate: 0.12, employerRate: 0.12,  base: 0, baseMin: 0, baseMax: 0 },
   lastUpdated: undefined,
+  dataSource: "builtin",
 };
+
+// ─── 内置城市社保数据库 ───────────────────────────────────────────────────────
+/**
+ * 主要城市社保政策内置数据（2024年标准）
+ * 支持联网更新覆盖
+ */
+export interface CityInsurancePolicy {
+  city: string;
+  /** 社保基数下限（元/月） */
+  baseMin: number;
+  /** 社保基数上限（元/月） */
+  baseMax: number;
+  pension:      { employeeRate: number; employerRate: number };
+  medical:      { employeeRate: number; employerRate: number };
+  unemployment: { employeeRate: number; employerRate: number };
+  workInjury:   { employeeRate: number; employerRate: number };
+  maternity:    { employeeRate: number; employerRate: number };
+  housingFund:  { employeeRate: number; employerRate: number; baseMin: number; baseMax: number };
+  /** 数据年份 */
+  year: number;
+  /** 数据来源说明 */
+  source: string;
+}
+
+export const BUILTIN_CITY_POLICIES: CityInsurancePolicy[] = [
+  {
+    city: "上海",
+    baseMin: 7310, baseMax: 36549,
+    pension:      { employeeRate: 0.08,  employerRate: 0.16  },
+    medical:      { employeeRate: 0.02,  employerRate: 0.095 },
+    unemployment: { employeeRate: 0.005, employerRate: 0.005 },
+    workInjury:   { employeeRate: 0,     employerRate: 0.004 },
+    maternity:    { employeeRate: 0,     employerRate: 0.008 },
+    housingFund:  { employeeRate: 0.07,  employerRate: 0.07, baseMin: 2690, baseMax: 36549 },
+    year: 2024, source: "上海市人社局2024年标准",
+  },
+  {
+    city: "北京",
+    baseMin: 6821, baseMax: 34188,
+    pension:      { employeeRate: 0.08,  employerRate: 0.16  },
+    medical:      { employeeRate: 0.02,  employerRate: 0.095 },
+    unemployment: { employeeRate: 0.005, employerRate: 0.005 },
+    workInjury:   { employeeRate: 0,     employerRate: 0.004 },
+    maternity:    { employeeRate: 0,     employerRate: 0.008 },
+    housingFund:  { employeeRate: 0.12,  employerRate: 0.12, baseMin: 2320, baseMax: 34188 },
+    year: 2024, source: "北京市人社局2024年标准",
+  },
+  {
+    city: "广州",
+    baseMin: 3096, baseMax: 30948,
+    pension:      { employeeRate: 0.08,  employerRate: 0.14  },
+    medical:      { employeeRate: 0.02,  employerRate: 0.065 },
+    unemployment: { employeeRate: 0.002, employerRate: 0.012 },
+    workInjury:   { employeeRate: 0,     employerRate: 0.003 },
+    maternity:    { employeeRate: 0,     employerRate: 0.008 },
+    housingFund:  { employeeRate: 0.12,  employerRate: 0.12, baseMin: 2300, baseMax: 30948 },
+    year: 2024, source: "广州市人社局2024年标准",
+  },
+  {
+    city: "深圳",
+    baseMin: 2360, baseMax: 31884,
+    pension:      { employeeRate: 0.08,  employerRate: 0.13  },
+    medical:      { employeeRate: 0.02,  employerRate: 0.065 },
+    unemployment: { employeeRate: 0.003, employerRate: 0.007 },
+    workInjury:   { employeeRate: 0,     employerRate: 0.003 },
+    maternity:    { employeeRate: 0,     employerRate: 0.006 },
+    housingFund:  { employeeRate: 0.05,  employerRate: 0.05, baseMin: 2360, baseMax: 31884 },
+    year: 2024, source: "深圳市人社局2024年标准",
+  },
+  {
+    city: "杭州",
+    baseMin: 3702, baseMax: 25826,
+    pension:      { employeeRate: 0.08,  employerRate: 0.14  },
+    medical:      { employeeRate: 0.02,  employerRate: 0.095 },
+    unemployment: { employeeRate: 0.005, employerRate: 0.005 },
+    workInjury:   { employeeRate: 0,     employerRate: 0.003 },
+    maternity:    { employeeRate: 0,     employerRate: 0.008 },
+    housingFund:  { employeeRate: 0.12,  employerRate: 0.12, baseMin: 2280, baseMax: 25826 },
+    year: 2024, source: "杭州市人社局2024年标准",
+  },
+  {
+    city: "成都",
+    baseMin: 3408, baseMax: 22498,
+    pension:      { employeeRate: 0.08,  employerRate: 0.16  },
+    medical:      { employeeRate: 0.02,  employerRate: 0.095 },
+    unemployment: { employeeRate: 0.005, employerRate: 0.005 },
+    workInjury:   { employeeRate: 0,     employerRate: 0.003 },
+    maternity:    { employeeRate: 0,     employerRate: 0.008 },
+    housingFund:  { employeeRate: 0.12,  employerRate: 0.12, baseMin: 2280, baseMax: 22498 },
+    year: 2024, source: "成都市人社局2024年标准",
+  },
+  {
+    city: "武汉",
+    baseMin: 3613, baseMax: 21680,
+    pension:      { employeeRate: 0.08,  employerRate: 0.16  },
+    medical:      { employeeRate: 0.02,  employerRate: 0.08  },
+    unemployment: { employeeRate: 0.005, employerRate: 0.005 },
+    workInjury:   { employeeRate: 0,     employerRate: 0.003 },
+    maternity:    { employeeRate: 0,     employerRate: 0.008 },
+    housingFund:  { employeeRate: 0.12,  employerRate: 0.12, baseMin: 2280, baseMax: 21680 },
+    year: 2024, source: "武汉市人社局2024年标准",
+  },
+  {
+    city: "南京",
+    baseMin: 3480, baseMax: 23200,
+    pension:      { employeeRate: 0.08,  employerRate: 0.16  },
+    medical:      { employeeRate: 0.02,  employerRate: 0.09  },
+    unemployment: { employeeRate: 0.005, employerRate: 0.005 },
+    workInjury:   { employeeRate: 0,     employerRate: 0.003 },
+    maternity:    { employeeRate: 0,     employerRate: 0.008 },
+    housingFund:  { employeeRate: 0.12,  employerRate: 0.12, baseMin: 2280, baseMax: 23200 },
+    year: 2024, source: "南京市人社局2024年标准",
+  },
+];
+
+/**
+ * 根据城市名称获取内置社保政策
+ * 支持模糊匹配（如"上海市"匹配"上海"）
+ */
+export function getCityPolicy(city: string): CityInsurancePolicy | null {
+  const normalized = city.replace(/市|省|区|县/g, "").trim();
+  return BUILTIN_CITY_POLICIES.find((p) =>
+    p.city === normalized || p.city.includes(normalized) || normalized.includes(p.city)
+  ) ?? null;
+}
+
+/**
+ * 根据城市政策生成 SocialInsuranceConfig
+ * 保留现有 enabled/base 设置，更新险种比例
+ */
+export function applyCityPolicy(
+  existing: SocialInsuranceConfig,
+  policy: CityInsurancePolicy
+): SocialInsuranceConfig {
+  return {
+    ...existing,
+    city: policy.city,
+    baseMin: policy.baseMin,
+    baseMax: policy.baseMax,
+    pension:      { ...existing.pension,      ...policy.pension,      name: "养老保险" },
+    medical:      { ...existing.medical,      ...policy.medical,      name: "医疗保险" },
+    unemployment: { ...existing.unemployment, ...policy.unemployment, name: "失业保险" },
+    workInjury:   { ...existing.workInjury,   ...policy.workInjury,   name: "工伤保险" },
+    maternity:    { ...existing.maternity,    ...policy.maternity,    name: "生育保险" },
+    housingFund:  {
+      ...existing.housingFund,
+      ...policy.housingFund,
+      name: "住房公积金",
+      base: existing.housingFund.base,
+    },
+    lastUpdated: new Date().toISOString(),
+    dataSource: "builtin",
+  };
+}
 
 // ─── 个人所得税配置 ───────────────────────────────────────────────────────────
 export interface IncomeTaxConfig {
@@ -138,8 +346,16 @@ export interface IncomeTaxConfig {
    * 需手动填写，不自动获取
    */
   specialDeductions: number;
+  /** 专项附加扣除明细（可选，用于展示） */
+  specialDeductionItems?: Array<{
+    name: string;   // 如"子女教育"、"住房贷款利息"
+    amount: number; // 元/月
+    enabled: boolean;
+  }>;
   /** 最后联网更新时间 */
   lastUpdated?: string;
+  /** 数据来源 */
+  dataSource?: "builtin" | "network" | "manual";
 }
 
 /** 中国个税税率表（2019年起适用） */
@@ -406,7 +622,87 @@ export interface ShiftEntry {
   overtimeType?: "pay" | "comp_off";
 }
 
-// ─── 调休余额记录（每员工每月） ──────────────────────────────────────────────
+// ─── 换休余额明细条目（跨月累积，有效期3个月） ───────────────────────────────
+/**
+ * 每次手动存入的换休余额记录
+ * 员工加班超过4h后，可手动存入换休余额
+ * 有效期从存入月起3个月，过期自动清零
+ */
+export interface CompOffBalanceEntry {
+  id: string;
+  employeeId: string;
+  /** 存入月份（YYYY-MM） */
+  earnedMonth: string;
+  /** 存入时扣除的加班小时数（4h=0.5天，8h=1天） */
+  hoursDeducted: number;
+  /** 换算的天数（0.5 or 1） */
+  days: number;
+  /** 到期月份（earnedMonth + 3个月，YYYY-MM） */
+  expiresMonth: string;
+  /** 使用状态：available=可用，used=已使用，expired=已过期 */
+  status: "available" | "used" | "expired";
+  /** 使用月份（status=used 时填写） */
+  usedMonth?: string;
+  /** 备注 */
+  notes?: string;
+  createdAt: string;
+}
+
+/** 计算换休余额到期月份（存入月 + 3个月） */
+export function calcCompOffExpiresMonth(earnedMonth: string): string {
+  const [y, m] = earnedMonth.split("-").map(Number);
+  const d = new Date(y, m - 1 + 3, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/** 获取某员工在某月可用的换休余额总天数（未过期、未使用） */
+export function getAvailableCompOffDays(entries: CompOffBalanceEntry[], employeeId: string, currentMonth: string): number {
+  return entries
+    .filter((e) => e.employeeId === employeeId && e.status === "available" && e.expiresMonth >= currentMonth)
+    .reduce((sum, e) => sum + e.days, 0);
+}
+
+// ─── 节假日调休余额（节日上班产生，当月或次月使用） ─────────────────────────
+/**
+ * 节假日上班（填写「节日上班 Nx」）后，产生的调休权利
+ * 优先于换休余额使用，当月内或次月内有效
+ */
+export interface HolidayCompOffEntry {
+  id: string;
+  employeeId: string;
+  /** 节日上班日期 */
+  workDate: string;
+  /** 节日名称（如「元宵节」） */
+  holidayName: string;
+  /** 产生的调休天数（通常为1天） */
+  days: number;
+  /** 有效期至（通常为下月末） */
+  expiresMonth: string;
+  /** 使用状态 */
+  status: "available" | "used" | "expired";
+  usedMonth?: string;
+  createdAt: string;
+}
+
+// ─── 无来源多休提醒 ───────────────────────────────────────────────────────────
+/**
+ * 当员工出勤天数 < 应出勤天数，且无换休余额/节假日调休可抵扣时，生成此提醒
+ * 老板可手动选择：扣薪 / 不扣薪 / 填写原因
+ */
+export interface UnexplainedRestAlert {
+  id: string;
+  employeeId: string;
+  month: string;
+  /** 无来源多休天数 */
+  unexplainedDays: number;
+  /** 处理方式：pending=待处理，deduct=扣薪，waive=不扣薪，noted=已备注 */
+  resolution: "pending" | "deduct" | "waive" | "noted";
+  /** 备注原因 */
+  notes?: string;
+  updatedAt: string;
+}
+
+// ─── 调休余额记录（每员工每月，保留向后兼容） ────────────────────────────────
 export interface CompOffBalance {
   id: string;
   employeeId: string;
@@ -498,8 +794,26 @@ export interface PaySlip {
   housingFundDeduction: number;
   /** 个人所得税（累计预扣法，自动计算） */
   incomeTax: number;
-  /** 实发薪资 = 应发 - 社保 - 公积金 - 个税 - 预支 */
+  /**
+   * 实发薪资 = 应发 - 社保个人部分 - 公积金个人部分 - 个税 - 预支
+   * 开启社保/个税时：实发 = grossSalary - socialInsuranceDeduction - housingFundDeduction - incomeTax - advanceAmount
+   * 关闭社保/个税时：实发 = grossSalary - advanceAmount
+   */
   finalSalary: number;
+  /** 公司承担社保总额（养老+医疗+失业+工伤+生育，公司部分） */
+  employerSocialInsurance: number;
+  /** 公司承担公积金总额（公积金公司部分） */
+  employerHousingFund: number;
+  /** 公司总人力成本 = 应发 + 公司社保 + 公司公积金 */
+  totalEmployerCost: number;
+  /** 公司社保明细（各险种公司部分金额） */
+  employerInsuranceDetails?: {
+    pension: number;
+    medical: number;
+    unemployment: number;
+    workInjury: number;
+    maternity: number;
+  };
   /** 补贴明细 */
   allowanceDetails?: Record<string, { amount: number; autoNote: string; isOverride: boolean }>;
   /** 社保明细（各险种金额） */
@@ -589,35 +903,78 @@ export function getContractHoursForDate(employee: Employee, date: string): numbe
 }
 
 /**
- * 计算社保/公积金个人缴纳金额
+ * 计算社保/公积金（双轨制：个人+公司）
+ * 返回个人缴纳金额、公司缴纳金额、合计
  */
 export function calcSocialInsurance(
   grossSalary: number,
   config: SocialInsuranceConfig
 ): {
+  // 个人部分（从员工工资扣）
   pension: number;
   medical: number;
   unemployment: number;
   workInjury: number;
   maternity: number;
   housingFund: number;
+  employeeTotal: number;
+  // 公司部分（公司额外支出）
+  employerPension: number;
+  employerMedical: number;
+  employerUnemployment: number;
+  employerWorkInjury: number;
+  employerMaternity: number;
+  employerHousingFund: number;
+  employerTotal: number;
+  // 合计
   total: number;
+  /** @deprecated 向后兼容，等同于 employeeTotal */
+  totalEmployee: number;
 } {
-  if (!config.enabled) {
-    return { pension: 0, medical: 0, unemployment: 0, workInjury: 0, maternity: 0, housingFund: 0, total: 0 };
-  }
-  const base = config.base > 0 ? config.base : grossSalary;
-  const hfBase = config.housingFundBase > 0 ? config.housingFundBase : grossSalary;
+  const zero = {
+    pension: 0, medical: 0, unemployment: 0, workInjury: 0, maternity: 0, housingFund: 0, employeeTotal: 0,
+    employerPension: 0, employerMedical: 0, employerUnemployment: 0, employerWorkInjury: 0, employerMaternity: 0, employerHousingFund: 0, employerTotal: 0,
+    total: 0, totalEmployee: 0,
+  };
+  if (!config.enabled) return zero;
 
-  const pension = Math.round(base * config.pensionRate * 100) / 100;
-  const medical = Math.round(base * config.medicalRate * 100) / 100;
-  const unemployment = Math.round(base * config.unemploymentRate * 100) / 100;
-  const workInjury = Math.round(base * config.workInjuryRate * 100) / 100;
-  const maternity = Math.round(base * config.maternityRate * 100) / 100;
-  const housingFund = Math.round(hfBase * config.housingFundRate * 100) / 100;
-  const total = pension + medical + unemployment + workInjury + maternity + housingFund;
+  // 计算基数（应用上下限）
+  const rawBase = config.base > 0 ? config.base : grossSalary;
+  const base = config.baseMax > 0
+    ? Math.min(config.baseMax, Math.max(config.baseMin, rawBase))
+    : Math.max(config.baseMin, rawBase);
 
-  return { pension, medical, unemployment, workInjury, maternity, housingFund, total };
+  const hfRawBase = config.housingFund.base > 0 ? config.housingFund.base : grossSalary;
+  const hfBase = config.housingFund.baseMax > 0
+    ? Math.min(config.housingFund.baseMax, Math.max(config.housingFund.baseMin, hfRawBase))
+    : Math.max(config.housingFund.baseMin, hfRawBase);
+
+  const r = (v: number) => Math.round(v * 100) / 100;
+
+  // 个人部分
+  const pension      = config.pension.enabled      ? r(base   * config.pension.employeeRate)      : 0;
+  const medical      = config.medical.enabled      ? r(base   * config.medical.employeeRate)      : 0;
+  const unemployment = config.unemployment.enabled ? r(base   * config.unemployment.employeeRate) : 0;
+  const workInjury   = config.workInjury.enabled   ? r(base   * config.workInjury.employeeRate)   : 0;
+  const maternity    = config.maternity.enabled    ? r(base   * config.maternity.employeeRate)    : 0;
+  const housingFund  = config.housingFund.enabled  ? r(hfBase * config.housingFund.employeeRate)  : 0;
+  const employeeTotal = pension + medical + unemployment + workInjury + maternity + housingFund;
+
+  // 公司部分
+  const employerPension      = config.pension.enabled      ? r(base   * config.pension.employerRate)      : 0;
+  const employerMedical      = config.medical.enabled      ? r(base   * config.medical.employerRate)      : 0;
+  const employerUnemployment = config.unemployment.enabled ? r(base   * config.unemployment.employerRate) : 0;
+  const employerWorkInjury   = config.workInjury.enabled   ? r(base   * config.workInjury.employerRate)   : 0;
+  const employerMaternity    = config.maternity.enabled    ? r(base   * config.maternity.employerRate)    : 0;
+  const employerHousingFund  = config.housingFund.enabled  ? r(hfBase * config.housingFund.employerRate)  : 0;
+  const employerTotal = employerPension + employerMedical + employerUnemployment + employerWorkInjury + employerMaternity + employerHousingFund;
+
+  return {
+    pension, medical, unemployment, workInjury, maternity, housingFund, employeeTotal,
+    employerPension, employerMedical, employerUnemployment, employerWorkInjury, employerMaternity, employerHousingFund, employerTotal,
+    total: employeeTotal + employerTotal,
+    totalEmployee: employeeTotal,
+  };
 }
 
 /**

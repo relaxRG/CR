@@ -15,10 +15,10 @@ import { ScreenContainer } from "@/components/screen-container";
 import { useEmployeeStore, useShiftTemplateStore } from "@/lib/labor/store";
 import {
   Employee, EmployeeDept, EmployeeType, EmployeeBankAccount, WeeklyHoursRule,
-  AllowanceRule,
+  AllowanceRule, SocialInsuranceConfig, InsuranceItem, HousingFundItem,
   DEPT_LABELS, DEPT_COLORS, EMPLOYEE_TYPE_LABELS, EMPLOYEE_TYPE_COLORS,
   calcDailyRate, getDaysInMonth, DEFAULT_SHIFT_TEMPLATES, WEEKDAY_LABELS,
-  DEFAULT_SOCIAL_INSURANCE,
+  DEFAULT_SOCIAL_INSURANCE, BUILTIN_CITY_POLICIES, getCityPolicy, applyCityPolicy,
 } from "@/lib/labor/types";
 
 const DEPT_OPTIONS: EmployeeDept[] = ["front", "kitchen", "parttime", "other"];
@@ -119,15 +119,50 @@ export default function LaborEmployeeFormScreen() {
   };
   const deleteAllowanceRule = (id: string) => setAllowanceRules((prev) => prev.filter((r) => r.id !== id));
 
-  // ── 社保/公积金 ──
+  // ── 社保/公积金（双轨制） ──
   const [siEnabled, setSiEnabled] = useState(existing?.socialInsurance?.enabled ?? false);
-  const [siCity, setSiCity] = useState(existing?.socialInsurance?.city ?? "");
-  const [siBase, setSiBase] = useState(String(existing?.socialInsurance?.base ?? 0));
-  const [siPension, setSiPension] = useState(String(((existing?.socialInsurance?.pensionRate ?? 0.08) * 100).toFixed(1)));
-  const [siMedical, setSiMedical] = useState(String(((existing?.socialInsurance?.medicalRate ?? 0.02) * 100).toFixed(1)));
-  const [siUnemployment, setSiUnemployment] = useState(String(((existing?.socialInsurance?.unemploymentRate ?? 0.005) * 100).toFixed(1)));
-  const [siHousingFund, setSiHousingFund] = useState(String(((existing?.socialInsurance?.housingFundRate ?? 0.12) * 100).toFixed(1)));
-  const [siHousingBase, setSiHousingBase] = useState(String(existing?.socialInsurance?.housingFundBase ?? 0));
+  const [siConfig, setSiConfig] = useState<SocialInsuranceConfig>(
+    existing?.socialInsurance ?? { ...DEFAULT_SOCIAL_INSURANCE }
+  );
+  const [siCityInput, setSiCityInput] = useState(existing?.socialInsurance?.city ?? "");
+  const [siUpdating, setSiUpdating] = useState(false);
+
+  // 城市自动填充
+  const handleCityAutoFill = (city: string) => {
+    setSiCityInput(city);
+    const policy = getCityPolicy(city);
+    if (policy) {
+      setSiConfig((prev) => applyCityPolicy({ ...prev, enabled: siEnabled }, policy));
+    }
+  };
+
+  // 联网更新（调用 LLM 获取最新城市社保政策）
+  const handleOnlineUpdate = async () => {
+    if (!siCityInput.trim()) { Alert.alert("请先填写城市"); return; }
+    setSiUpdating(true);
+    try {
+      // 先用内置数据，未来可接入真实 API
+      const policy = getCityPolicy(siCityInput);
+      if (policy) {
+        setSiConfig((prev) => applyCityPolicy({ ...prev, enabled: siEnabled }, policy));
+        Alert.alert("更新成功", `已更新${policy.city}${policy.year}年社保政策数据\n数据来源：${policy.source}`);
+      } else {
+        Alert.alert("未找到城市数据", `暂无${siCityInput}的内置数据，请手动填写各险种比例。\n已支持城市：${BUILTIN_CITY_POLICIES.map((p) => p.city).join("、")}`);
+      }
+    } catch (e) {
+      Alert.alert("更新失败", String(e));
+    } finally {
+      setSiUpdating(false);
+    }
+  };
+
+  // 更新单个险种配置
+  const updateInsuranceItem = (key: keyof Pick<SocialInsuranceConfig, "pension" | "medical" | "unemployment" | "workInjury" | "maternity">, patch: Partial<InsuranceItem>) => {
+    setSiConfig((prev) => ({ ...prev, [key]: { ...prev[key], ...patch } }));
+  };
+  const updateHousingFund = (patch: Partial<HousingFundItem>) => {
+    setSiConfig((prev) => ({ ...prev, housingFund: { ...prev.housingFund, ...patch } }));
+  };
 
   const now = new Date();
   const daysInMonth = getDaysInMonth(now.getFullYear(), now.getMonth() + 1);
@@ -160,15 +195,7 @@ export default function LaborEmployeeFormScreen() {
       weeklyHoursRules: weeklyHoursRules.length > 0 ? weeklyHoursRules : undefined,
       compOffRule: { enabled: compOffEnabled, hoursPerDay: Number(compOffHoursPerDay) || 8 },
       allowanceRules: allowanceRules.length > 0 ? allowanceRules : undefined,
-      socialInsurance: siEnabled ? {
-        ...DEFAULT_SOCIAL_INSURANCE, enabled: true, city: siCity.trim(),
-        base: Number(siBase) || 0,
-        pensionRate: Number(siPension) / 100 || 0.08,
-        medicalRate: Number(siMedical) / 100 || 0.02,
-        unemploymentRate: Number(siUnemployment) / 100 || 0.005,
-        housingFundRate: Number(siHousingFund) / 100 || 0.12,
-        housingFundBase: Number(siHousingBase) || 0,
-      } : undefined,
+      socialInsurance: siEnabled ? { ...siConfig, enabled: true, city: siCityInput.trim() } : undefined,
       bankAccounts,
       idNumber: idNumber.trim() || undefined,
       address: address.trim() || undefined,
@@ -559,12 +586,13 @@ export default function LaborEmployeeFormScreen() {
             </TouchableOpacity>
           </SectionCard>
 
-          {/* ── 社保/公积金 ── */}
+          {/* ── 社保/公积金（双轨制） ── */}
           <SectionCard title="社保 / 公积金" colors={colors}>
+            {/* 开关行 */}
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 4 }}>
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>开启社保公积金计算</Text>
-                <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>开启后将自动从应发薪资里扣除</Text>
+                <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>个人部分从应发扣除，公司部分计入人力成本</Text>
               </View>
               <TouchableOpacity onPress={() => { tap(); setSiEnabled(!siEnabled); }}
                 style={{ width: 44, height: 26, borderRadius: 13, backgroundColor: siEnabled ? colors.primary : colors.border, justifyContent: "center", paddingHorizontal: 2 }}>
@@ -572,40 +600,126 @@ export default function LaborEmployeeFormScreen() {
               </TouchableOpacity>
             </View>
             {siEnabled && (
-              <View style={{ gap: 10, marginTop: 8 }}>
-                <FormRow label="城市（用于政策匹配）" colors={colors}>
-                  <TextInput value={siCity} onChangeText={setSiCity} placeholder="如《上海》《北京》"
-                    placeholderTextColor={colors.muted} style={[S.input, { color: colors.foreground, borderColor: colors.border }]} />
-                </FormRow>
+              <View style={{ gap: 12, marginTop: 8 }}>
+                {/* 城市选择 + 联网更新 */}
+                <View style={{ gap: 6 }}>
+                  <Text style={{ fontSize: 12, color: colors.muted }}>城市（自动填充政策数据）</Text>
+                  <View style={{ flexDirection: "row", gap: 8 }}>
+                    <TextInput value={siCityInput} onChangeText={(v) => { setSiCityInput(v); handleCityAutoFill(v); }}
+                      placeholder="如上海、北京、广州、深圳" placeholderTextColor={colors.muted}
+                      style={[S.input, { color: colors.foreground, borderColor: colors.border, flex: 1 }]} />
+                    <TouchableOpacity onPress={handleOnlineUpdate} disabled={siUpdating}
+                      style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: colors.primary + "15", borderWidth: 1, borderColor: colors.primary + "44", justifyContent: "center" }}>
+                      <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "600" }}>{siUpdating ? "更新中..." : "更新数据"}</Text>
+                    </TouchableOpacity>
+                  </View>
+                  {/* 快捷城市选择 */}
+                  <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
+                    {["上海", "北京", "广州", "深圳", "杭州", "成都"].map((city) => (
+                      <TouchableOpacity key={city} onPress={() => handleCityAutoFill(city)}
+                        style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, borderWidth: 1, backgroundColor: siCityInput === city ? colors.primary : colors.surface, borderColor: siCityInput === city ? colors.primary : colors.border }}>
+                        <Text style={{ fontSize: 11, color: siCityInput === city ? "#fff" : colors.muted }}>{city}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  {siConfig.dataSource && (
+                    <Text style={{ fontSize: 10, color: colors.muted }}>
+                      数据来源：{siConfig.dataSource === "builtin" ? "内置数据" : siConfig.dataSource === "network" ? "联网更新" : "手动修改"}
+                      {siConfig.lastUpdated ? `  更新于 ${siConfig.lastUpdated.slice(0, 10)}` : ""}
+                    </Text>
+                  )}
+                </View>
+
+                {/* 社保基数 */}
                 <FormRow label="社保基数（0=以工资为基数）" colors={colors}>
-                  <TextInput value={siBase} onChangeText={setSiBase} placeholder="0" keyboardType="decimal-pad"
-                    placeholderTextColor={colors.muted} style={[S.input, { color: colors.foreground, borderColor: colors.border }]} />
+                  <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+                    <TextInput value={String(siConfig.base)} onChangeText={(v) => setSiConfig((p) => ({ ...p, base: Number(v) || 0 }))}
+                      placeholder="0" keyboardType="decimal-pad" placeholderTextColor={colors.muted}
+                      style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, flex: 1 }]} />
+                    {siConfig.baseMin > 0 && <Text style={{ fontSize: 10, color: colors.muted }}>下限 ¥{siConfig.baseMin}</Text>}
+                    {siConfig.baseMax > 0 && <Text style={{ fontSize: 10, color: colors.muted }}>上限 ¥{siConfig.baseMax}</Text>}
+                  </View>
                 </FormRow>
-                <View style={{ flexDirection: "row", gap: 8 }}>
-                  {[
-                    { label: "养老%", value: siPension, setter: setSiPension },
-                    { label: "医疗%", value: siMedical, setter: setSiMedical },
-                    { label: "失业%", value: siUnemployment, setter: setSiUnemployment },
-                  ].map((item) => (
-                    <View key={item.label} style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 10, color: colors.muted, marginBottom: 4 }}>{item.label}</Text>
-                      <TextInput value={item.value} onChangeText={item.setter} keyboardType="decimal-pad"
-                        placeholderTextColor={colors.muted} style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, width: "100%" }]} />
+
+                {/* 险种列表（双轨制） */}
+                <View style={{ gap: 2 }}>
+                  <View style={{ flexDirection: "row", paddingHorizontal: 4, paddingBottom: 4 }}>
+                    <Text style={{ flex: 2, fontSize: 10, color: colors.muted }}>险种</Text>
+                    <Text style={{ flex: 1, fontSize: 10, color: colors.muted, textAlign: "center" }}>个人%</Text>
+                    <Text style={{ flex: 1, fontSize: 10, color: colors.muted, textAlign: "center" }}>公司%</Text>
+                    <Text style={{ width: 36, fontSize: 10, color: colors.muted, textAlign: "center" }}>启用</Text>
+                  </View>
+                  {(["pension", "medical", "unemployment", "workInjury", "maternity"] as const).map((key) => {
+                    const item = siConfig[key];
+                    return (
+                      <View key={key} style={{ flexDirection: "row", alignItems: "center", paddingVertical: 6, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border + "44" }}>
+                        <Text style={{ flex: 2, fontSize: 12, color: colors.foreground }}>{item.name}</Text>
+                        <TextInput
+                          value={String((item.employeeRate * 100).toFixed(2))}
+                          onChangeText={(v) => updateInsuranceItem(key, { employeeRate: Number(v) / 100 || 0 })}
+                          keyboardType="decimal-pad" style={[S.inputSmall, { flex: 1, color: colors.foreground, borderColor: colors.border, textAlign: "center" }]} />
+                        <TextInput
+                          value={String((item.employerRate * 100).toFixed(2))}
+                          onChangeText={(v) => updateInsuranceItem(key, { employerRate: Number(v) / 100 || 0 })}
+                          keyboardType="decimal-pad" style={[S.inputSmall, { flex: 1, color: colors.foreground, borderColor: colors.border, textAlign: "center" }]} />
+                        <TouchableOpacity onPress={() => updateInsuranceItem(key, { enabled: !item.enabled })}
+                          style={{ width: 36, alignItems: "center" }}>
+                          <View style={{ width: 28, height: 16, borderRadius: 8, backgroundColor: item.enabled ? colors.primary : colors.border, justifyContent: "center", paddingHorizontal: 1 }}>
+                            <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: "#fff", alignSelf: item.enabled ? "flex-end" : "flex-start" }} />
+                          </View>
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  })}
+                  {/* 公积金 */}
+                  <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 6, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border + "44" }}>
+                    <Text style={{ flex: 2, fontSize: 12, color: colors.foreground }}>住房公积金</Text>
+                    <TextInput
+                      value={String((siConfig.housingFund.employeeRate * 100).toFixed(2))}
+                      onChangeText={(v) => updateHousingFund({ employeeRate: Number(v) / 100 || 0 })}
+                      keyboardType="decimal-pad" style={[S.inputSmall, { flex: 1, color: colors.foreground, borderColor: colors.border, textAlign: "center" }]} />
+                    <TextInput
+                      value={String((siConfig.housingFund.employerRate * 100).toFixed(2))}
+                      onChangeText={(v) => updateHousingFund({ employerRate: Number(v) / 100 || 0 })}
+                      keyboardType="decimal-pad" style={[S.inputSmall, { flex: 1, color: colors.foreground, borderColor: colors.border, textAlign: "center" }]} />
+                    <TouchableOpacity onPress={() => updateHousingFund({ enabled: !siConfig.housingFund.enabled })}
+                      style={{ width: 36, alignItems: "center" }}>
+                      <View style={{ width: 28, height: 16, borderRadius: 8, backgroundColor: siConfig.housingFund.enabled ? colors.primary : colors.border, justifyContent: "center", paddingHorizontal: 1 }}>
+                        <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: "#fff", alignSelf: siConfig.housingFund.enabled ? "flex-end" : "flex-start" }} />
+                      </View>
+                    </TouchableOpacity>
+                  </View>
+                  {/* 公积金基数 */}
+                  <View style={{ flexDirection: "row", gap: 8, alignItems: "center", paddingTop: 4 }}>
+                    <Text style={{ fontSize: 11, color: colors.muted }}>公积金基数（0=同社保）：</Text>
+                    <TextInput value={String(siConfig.housingFund.base)} onChangeText={(v) => updateHousingFund({ base: Number(v) || 0 })}
+                      placeholder="0" keyboardType="decimal-pad" placeholderTextColor={colors.muted}
+                      style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, width: 80 }]} />
+                  </View>
+                </View>
+
+                {/* 费用预览 */}
+                {siConfig.base > 0 || true ? (() => {
+                  const base = siConfig.base > 0 ? siConfig.base : 0;
+                  if (base === 0) return null;
+                  const empTotal = (siConfig.pension.enabled ? base * siConfig.pension.employeeRate : 0) +
+                    (siConfig.medical.enabled ? base * siConfig.medical.employeeRate : 0) +
+                    (siConfig.unemployment.enabled ? base * siConfig.unemployment.employeeRate : 0);
+                  const erTotal = (siConfig.pension.enabled ? base * siConfig.pension.employerRate : 0) +
+                    (siConfig.medical.enabled ? base * siConfig.medical.employerRate : 0) +
+                    (siConfig.unemployment.enabled ? base * siConfig.unemployment.employerRate : 0) +
+                    (siConfig.workInjury.enabled ? base * siConfig.workInjury.employerRate : 0) +
+                    (siConfig.maternity.enabled ? base * siConfig.maternity.employerRate : 0);
+                  return (
+                    <View style={{ backgroundColor: colors.primary + "08", borderRadius: 8, padding: 10, gap: 4 }}>
+                      <Text style={{ fontSize: 11, color: colors.muted }}>按基数 ¥{base} 预览（不含公积金）</Text>
+                      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                        <Text style={{ fontSize: 12, color: colors.foreground }}>个人代扣：¥{empTotal.toFixed(0)}</Text>
+                        <Text style={{ fontSize: 12, color: "#FF9500" }}>公司承担：¥{erTotal.toFixed(0)}</Text>
+                      </View>
                     </View>
-                  ))}
-                </View>
-                <View style={{ flexDirection: "row", gap: 8 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 10, color: colors.muted, marginBottom: 4 }}>公积金%</Text>
-                    <TextInput value={siHousingFund} onChangeText={setSiHousingFund} keyboardType="decimal-pad"
-                      placeholderTextColor={colors.muted} style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, width: "100%" }]} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 10, color: colors.muted, marginBottom: 4 }}>公积金基数（0=同社保）</Text>
-                    <TextInput value={siHousingBase} onChangeText={setSiHousingBase} placeholder="0" keyboardType="decimal-pad"
-                      placeholderTextColor={colors.muted} style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, width: "100%" }]} />
-                  </View>
-                </View>
+                  );
+                })() : null}
               </View>
             )}
           </SectionCard>
