@@ -276,9 +276,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors }:
               </View>
             )}
           </View>
-          <Text style={{ fontSize: 11, color: colors.muted, marginTop: 1 }}>
-            {DEPT_LABELS[employee.dept]} · {employee.defaultSession ?? ""}
-          </Text>
+
         </View>
         <View style={{ alignItems: "flex-end", gap: 2 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
@@ -407,7 +405,7 @@ function EmployeeRosterPage({ month, colors }: { month: string; colors: any }) {
         </TouchableOpacity>
         {/* 新增员工 */}
         <TouchableOpacity onPress={() => { tap(); router.push("/labor-employee-form" as any); }}
-          style={{ flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderStyle: "dashed", borderColor: colors.primary + "66", backgroundColor: colors.primary + "08" }}>
+          style={{ flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: colors.primary + "66", backgroundColor: colors.primary + "08" }}>
           <IconSymbol name="plus" size={13} color={colors.primary} />
           <Text style={{ fontSize: 13, fontWeight: "600", color: colors.primary }}>添加员工</Text>
         </TouchableOpacity>
@@ -419,14 +417,6 @@ function EmployeeRosterPage({ month, colors }: { month: string; colors: any }) {
           style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: colors.border + "44", alignItems: "center", justifyContent: "center" }}>
           <IconSymbol name="gearshape.fill" size={16} color={colors.muted} />
         </TouchableOpacity>
-      </View>
-
-      {/* 兆职说明卡片 */}
-      <View style={{ borderRadius: 10, padding: 10, backgroundColor: colors.border + "22" }}>
-        <Text style={{ fontSize: 11, color: colors.muted, lineHeight: 16 }}>
-          <Text style={{ fontWeight: "700", color: colors.foreground }}>长期兆职：</Text>有固定排班和月度薪资，支持薪资预支。预支金额在指定月份薪资结算时自动扣除。{"\n"}
-          <Text style={{ fontWeight: "700", color: colors.foreground }}>临时兆职：</Text>按次/按小时结算，无预支功能，直接在薪资单中录入实际工时。
-        </Text>
       </View>
 
       {/* 分组列表 */}
@@ -493,23 +483,54 @@ function AdvancePage({ month, colors }: { month: string; colors: any }) {
   const [addAmount, setAddAmount] = useState("");
   const [addNotes, setAddNotes] = useState("");
 
-  const monthAdvances = useMemo(() =>
-    advances.filter((a) => a.deductMonth === month || a.date.startsWith(month)),
-    [advances, month]
-  );
-
+  // 当月备用金 K1 记录（全部）
   const pettyK1Records = useMemo(() =>
     pettyRecords.filter((r) => r.code === "K1" && r.date.startsWith(month)),
     [pettyRecords, month]
   );
 
-  const unsyncedK1Count = useMemo(() =>
-    pettyK1Records.filter((r) => !monthAdvances.find((a) => a.pettyRecordId === r.id)).length,
-    [pettyK1Records, monthAdvances]
+  // 固定兼职卡片：description 含"固定"/"全职"/"长期"的 K1 记录
+  const fixedK1Records = useMemo(() =>
+    pettyK1Records.filter((r) => {
+      const d = (r.description ?? "").toLowerCase();
+      return d.includes("固定") || d.includes("全职") || d.includes("长期");
+    }),
+    [pettyK1Records]
   );
 
-  const totalAdvance = useMemo(() => monthAdvances.reduce((s, a) => s + a.amount, 0), [monthAdvances]);
-  const totalPettyK1 = useMemo(() => pettyK1Records.reduce((s, r) => s + r.amount, 0), [pettyK1Records]);
+  // 临时兼职卡片：其余 K1 记录
+  const tempK1Records = useMemo(() =>
+    pettyK1Records.filter((r) => {
+      const d = (r.description ?? "").toLowerCase();
+      return !(d.includes("固定") || d.includes("全职") || d.includes("长期"));
+    }),
+    [pettyK1Records]
+  );
+
+  // 自动同步：K1 记录全部自动纳入预支统计（智能化）
+  const autoSyncedAdvances = useMemo(() => {
+    const manual = advances.filter((a) => (a.deductMonth === month || a.date.startsWith(month)) && !a.pettyRecordId);
+    const fromK1 = pettyK1Records.map((r) => ({
+      id: "k1_" + r.id,
+      employeeId: "",
+      amount: r.amount,
+      date: r.date,
+      deductMonth: month,
+      notes: r.description || "备用金支付",
+      status: "pending" as const,
+      paidViaPetty: true,
+      pettyRecordId: r.id,
+      createdAt: r.date,
+      updatedAt: r.date,
+    }));
+    return [...fromK1, ...manual];
+  }, [advances, pettyK1Records, month]);
+
+  const totalAdvance = useMemo(() => autoSyncedAdvances.reduce((s, a) => s + a.amount, 0), [autoSyncedAdvances]);
+  const totalFixedK1 = useMemo(() => fixedK1Records.reduce((s, r) => s + r.amount, 0), [fixedK1Records]);
+  const totalTempK1 = useMemo(() => tempK1Records.reduce((s, r) => s + r.amount, 0), [tempK1Records]);
+  const manualAdvances = useMemo(() => advances.filter((a) => (a.deductMonth === month || a.date.startsWith(month)) && !a.pettyRecordId), [advances, month]);
+
   const getEmployee = (id: string) => employees.find((e) => e.id === id);
   const activeEmployees = useMemo(() => employees.filter((e) => e.active), [employees]);
 
@@ -528,152 +549,169 @@ function AdvancePage({ month, colors }: { month: string; colors: any }) {
     setAddEmpId(""); setAddAmount(""); setAddNotes("");
   };
 
-  return (
-    <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 40 }}>
-      {/* 汇总卡片 */}
-      <View style={{ borderRadius: 14, padding: 16, borderWidth: 1, borderColor: "#AF52DE" + "33", backgroundColor: "#AF52DE" + "08" }}>
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-          <View>
-            <Text style={{ fontSize: 14, fontWeight: "700", color: "#AF52DE" }}>{monthLabel(month)} 薪资预支</Text>
-            <Text style={{ fontSize: 28, fontWeight: "800", color: "#AF52DE", marginTop: 4 }}>
-              {totalAdvance > 0 ? `¥${totalAdvance.toFixed(0)}` : "—"}
-            </Text>
-            <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>{monthAdvances.length} 笔预支记录</Text>
+  // 备用金卡片组件
+  const PettyK1Card = ({ title, records, total, color }: { title: string; records: typeof pettyK1Records; total: number; color: string }) => {
+    const [collapsed, setCollapsed] = useState(false);
+    if (records.length === 0) return null;
+    return (
+      <View style={{ borderRadius: 12, borderWidth: 1, borderColor: color + "44", backgroundColor: color + "08", overflow: "hidden" }}>
+        <TouchableOpacity onPress={() => setCollapsed((v) => !v)}
+          style={{ flexDirection: "row", alignItems: "center", gap: 6, padding: 12 }}>
+          <IconSymbol name="bolt.fill" size={14} color={color} />
+          <Text style={{ fontSize: 13, fontWeight: "700", color, flex: 1 }}>{title}（{records.length}笔）</Text>
+          <Text style={{ fontSize: 13, fontWeight: "700", color }}>¥{total.toFixed(0)}</Text>
+          <IconSymbol name={collapsed ? "chevron.right" : "chevron.down"} size={13} color={color} style={{ marginLeft: 4 }} />
+        </TouchableOpacity>
+        {!collapsed && records.map((r, i) => (
+          <View key={r.id} style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, paddingVertical: 8 },
+            i > 0 && { borderTopWidth: 0.5, borderTopColor: color + "22" }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 13, color: colors.foreground }}>{r.description || "备用金支付"}</Text>
+              <Text style={{ fontSize: 10, color: colors.muted }}>{r.date.slice(5)}</Text>
+            </View>
+            <Text style={{ fontSize: 13, fontWeight: "600", color }}>¥{r.amount.toFixed(0)}</Text>
           </View>
-          <TouchableOpacity onPress={() => { tap(); setShowAddModal(true); }}
-            style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, backgroundColor: "#AF52DE" }}>
-            <IconSymbol name="plus" size={14} color="#fff" />
-            <Text style={{ fontSize: 13, fontWeight: "700", color: "#fff" }}>新增预支</Text>
-          </TouchableOpacity>
-        </View>
+        ))}
       </View>
+    );
+  };
 
-      {/* 备用金 K1 卡片（保留原有风格） */}
-      {pettyK1Records.length > 0 && (
-        <View style={{ borderRadius: 12, padding: 12, borderWidth: 1, borderColor: "#FF9500" + "44", backgroundColor: "#FF9500" + "08" }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 }}>
-            <IconSymbol name="bolt.fill" size={14} color="#FF9500" />
-            <Text style={{ fontSize: 13, fontWeight: "700", color: "#FF9500" }}>备用金 K1 记录（{pettyK1Records.length}笔）</Text>
-            <View style={{ flex: 1 }} />
-            <Text style={{ fontSize: 13, fontWeight: "700", color: "#FF9500" }}>¥{totalPettyK1.toFixed(0)}</Text>
-          </View>
-          {pettyK1Records.map((r) => (
-            <View key={r.id} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 5 }}>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 13, color: colors.foreground }}>{r.description || "固定兼职"}</Text>
-                <Text style={{ fontSize: 10, color: colors.muted }}>{r.date.slice(5)}</Text>
+  return (
+    <View style={{ flex: 1 }}>
+      <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 100 }}>
+        {/* 紫色汇总卡片 */}
+        <View style={{ borderRadius: 14, padding: 16, borderWidth: 1, borderColor: "#AF52DE" + "33", backgroundColor: "#AF52DE" + "08" }}>
+          <Text style={{ fontSize: 14, fontWeight: "700", color: "#AF52DE" }}>{monthLabel(month)} 薪资预支</Text>
+          <Text style={{ fontSize: 28, fontWeight: "800", color: "#AF52DE", marginTop: 4 }}>
+            {totalAdvance > 0 ? `¥${totalAdvance.toFixed(0)}` : "¥ —"}
+          </Text>
+          <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>{autoSyncedAdvances.length} 笔预支记录（含备用金自动同步）</Text>
+          {/* vs 对比 */}
+          <View style={{ marginTop: 10, flexDirection: "row", gap: 8 }}>
+            <View style={{ flexDirection: "row", gap: 6 }}>
+              <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: "#AF52DE" + "22" }}>
+                <Text style={{ fontSize: 11, color: "#AF52DE" }}>固定兼职 ¥{totalFixedK1.toFixed(0)}</Text>
               </View>
-              <Text style={{ fontSize: 13, fontWeight: "600", color: "#FF9500" }}>¥{r.amount.toFixed(0)}</Text>
+              <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: "#FF9500" + "22" }}>
+                <Text style={{ fontSize: 11, color: "#FF9500" }}>临时兼职 ¥{totalTempK1.toFixed(0)}</Text>
+              </View>
             </View>
-          ))}
-          {unsyncedK1Count > 0 && (
-            <View style={{ marginTop: 8, flexDirection: "row", alignItems: "center", gap: 6, padding: 8, borderRadius: 8, backgroundColor: "#FF9500" + "15" }}>
-              <IconSymbol name="exclamationmark.circle.fill" size={13} color="#FF9500" />
-              <Text style={{ fontSize: 11, color: "#FF9500", flex: 1 }}>
-                {unsyncedK1Count} 笔备用金记录尚未同步到预支统计，可手动新增预支将其纳入统计。
-              </Text>
-            </View>
-          )}
-        </View>
-      )}
-
-      {/* 预支记录列表 */}
-      {monthAdvances.length > 0 ? (
-        <View style={{ borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, overflow: "hidden" }}>
-          <View style={{ flexDirection: "row", alignItems: "center", padding: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
-            <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground, flex: 1 }}>预支明细</Text>
-            <Text style={{ fontSize: 11, color: colors.muted }}>长按可删除</Text>
           </View>
-          {monthAdvances.map((adv, i) => {
-            const emp = getEmployee(adv.employeeId);
-            const deptColor = emp ? DEPT_COLORS[emp.dept] : colors.muted;
-            return (
-              <TouchableOpacity key={adv.id}
-                onLongPress={() => { tap(); Alert.alert("删除预支", `确认删除 ${emp?.code ?? ""} 的 ¥${adv.amount} 预支记录？`, [
-                  { text: "取消", style: "cancel" },
-                  { text: "删除", style: "destructive", onPress: () => deleteAdvance(adv.id) }
-                ]); }}
-                style={[{ flexDirection: "row", alignItems: "center", gap: 10, padding: 14 },
-                  i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }
-                ]}>
-                <View style={{ width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", backgroundColor: deptColor + "22" }}>
-                  <Text style={{ fontSize: 12, fontWeight: "700", color: deptColor }}>{emp?.code.slice(0, 2) ?? "?"}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>
-                    {emp?.code ?? "未知员工"} · {adv.date.slice(5)}
-                  </Text>
-                  <Text style={{ fontSize: 11, color: colors.muted }}>
-                    {adv.notes || (adv.paidViaPetty ? "备用金支付" : "手动录入")}
-                    {adv.deductMonth && adv.deductMonth !== month ? ` · 扣除月：${adv.deductMonth}` : ""}
-                  </Text>
-                </View>
-                <View style={{ alignItems: "flex-end", gap: 4 }}>
-                  <Text style={{ fontSize: 15, fontWeight: "700", color: "#AF52DE" }}>¥{adv.amount.toFixed(0)}</Text>
-                  <TouchableOpacity onPress={() => { tap(); updateAdvance(adv.id, { status: adv.status === "deducted" ? "pending" : "deducted" }); }}
-                    style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: adv.status === "deducted" ? "#34C75922" : "#FF950022" }}>
-                    <Text style={{ fontSize: 10, fontWeight: "600", color: adv.status === "deducted" ? "#34C759" : "#FF9500" }}>
-                      {adv.status === "deducted" ? "已扣除" : "待扣除"}
+        </View>
+
+        {/* 固定兼职备用金卡片 */}
+        <PettyK1Card title="固定兼职 · 备用金 K1" records={fixedK1Records} total={totalFixedK1} color="#AF52DE" />
+
+        {/* 临时兼职备用金卡片 */}
+        <PettyK1Card title="临时兼职 · 备用金 K1" records={tempK1Records} total={totalTempK1} color="#FF9500" />
+
+        {/* 手动录入的预支记录 */}
+        {manualAdvances.length > 0 && (
+          <View style={{ borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, overflow: "hidden" }}>
+            <View style={{ flexDirection: "row", alignItems: "center", padding: 12, borderBottomWidth: 0.5, borderBottomColor: colors.border }}>
+              <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground, flex: 1 }}>手动录入预支</Text>
+              <Text style={{ fontSize: 11, color: colors.muted }}>长按可删除</Text>
+            </View>
+            {manualAdvances.map((adv, i) => {
+              const emp = getEmployee(adv.employeeId);
+              const deptColor = emp ? DEPT_COLORS[emp.dept] : colors.muted;
+              return (
+                <TouchableOpacity key={adv.id}
+                  onLongPress={() => { tap(); Alert.alert("删除预支", `确认删除 ${emp?.code ?? ""} 的 ¥${adv.amount} 预支记录？`, [
+                    { text: "取消", style: "cancel" },
+                    { text: "删除", style: "destructive", onPress: () => deleteAdvance(adv.id) }
+                  ]); }}
+                  style={[{ flexDirection: "row", alignItems: "center", gap: 10, padding: 14 },
+                    i > 0 && { borderTopWidth: 0.5, borderTopColor: colors.border }
+                  ]}>
+                  <View style={{ width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", backgroundColor: deptColor + "22" }}>
+                    <Text style={{ fontSize: 12, fontWeight: "700", color: deptColor }}>{emp?.code.slice(0, 2) ?? "?"}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>
+                      {emp?.code ?? "未知员工"} · {adv.date.slice(5)}
                     </Text>
-                  </TouchableOpacity>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      ) : (
-        <View style={{ alignItems: "center", padding: 32 }}>
-          <IconSymbol name="creditcard.fill" size={48} color={colors.border} />
-          <Text style={{ fontSize: 16, fontWeight: "600", color: colors.foreground, marginTop: 12 }}>本月暂无预支记录</Text>
-          <Text style={{ fontSize: 13, color: colors.muted, marginTop: 6 }}>大部分预支通过备用金支出，也可手动新增</Text>
-        </View>
-      )}
-
-      {/* 新增预支 Modal */}
-      <Modal visible={showAddModal} transparent animationType="slide">
-        <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.4)" }}>
-          <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 14 }}>
-            <Text style={{ fontSize: 17, fontWeight: "700", color: colors.foreground }}>新增预支记录</Text>
-            <View>
-              <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 6 }}>员工</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={{ flexDirection: "row", gap: 8 }}>
-                  {activeEmployees.map((emp) => (
-                    <TouchableOpacity key={emp.id} onPress={() => setAddEmpId(emp.id)}
-                      style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10,
-                        backgroundColor: addEmpId === emp.id ? "#AF52DE" : colors.border + "44" }}>
-                      <Text style={{ fontSize: 13, fontWeight: "600", color: addEmpId === emp.id ? "#fff" : colors.foreground }}>{emp.code}</Text>
+                    <Text style={{ fontSize: 11, color: colors.muted }}>{adv.notes || "手动录入"}</Text>
+                  </View>
+                  <View style={{ alignItems: "flex-end", gap: 4 }}>
+                    <Text style={{ fontSize: 15, fontWeight: "700", color: "#AF52DE" }}>¥{adv.amount.toFixed(0)}</Text>
+                    <TouchableOpacity onPress={() => { tap(); updateAdvance(adv.id, { status: adv.status === "deducted" ? "pending" : "deducted" }); }}
+                      style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: adv.status === "deducted" ? "#34C75922" : "#FF950022" }}>
+                      <Text style={{ fontSize: 10, fontWeight: "600", color: adv.status === "deducted" ? "#34C759" : "#FF9500" }}>
+                        {adv.status === "deducted" ? "已扣除" : "待扣除"}
+                      </Text>
                     </TouchableOpacity>
-                  ))}
-                </View>
-              </ScrollView>
-            </View>
-            <View>
-              <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 6 }}>预支金额</Text>
-              <TextInput value={addAmount} onChangeText={setAddAmount} keyboardType="numeric" placeholder="输入金额"
-                style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 12, fontSize: 16, color: colors.foreground, backgroundColor: colors.background }} />
-            </View>
-            <View>
-              <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 6 }}>备注（可选）</Text>
-              <TextInput value={addNotes} onChangeText={setAddNotes} placeholder="备注说明"
-                style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 12, fontSize: 14, color: colors.foreground, backgroundColor: colors.background }} />
-            </View>
-            <View style={{ flexDirection: "row", gap: 10 }}>
-              <TouchableOpacity onPress={() => setShowAddModal(false)}
-                style={{ flex: 1, padding: 14, borderRadius: 12, backgroundColor: colors.border + "44", alignItems: "center" }}>
-                <Text style={{ fontSize: 15, fontWeight: "600", color: colors.foreground }}>取消</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={handleAddAdvance}
-                style={{ flex: 1, padding: 14, borderRadius: 12, backgroundColor: "#AF52DE", alignItems: "center" }}>
-                <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}>确认添加</Text>
-              </TouchableOpacity>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
+
+        {autoSyncedAdvances.length === 0 && (
+          <View style={{ alignItems: "center", padding: 32 }}>
+            <IconSymbol name="creditcard.fill" size={48} color={colors.border} />
+            <Text style={{ fontSize: 16, fontWeight: "600", color: colors.foreground, marginTop: 12 }}>本月暂无预支记录</Text>
+            <Text style={{ fontSize: 13, color: colors.muted, marginTop: 6, textAlign: "center" }}>备用金 K1 记录自动同步，也可手动新增</Text>
+          </View>
+        )}
+
+        {/* 新增预支 Modal */}
+        <Modal visible={showAddModal} transparent animationType="slide">
+          <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.4)" }}>
+            <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 14 }}>
+              <Text style={{ fontSize: 17, fontWeight: "700", color: colors.foreground }}>新增预支记录</Text>
+              <View>
+                <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 6 }}>员工</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View style={{ flexDirection: "row", gap: 8 }}>
+                    {activeEmployees.map((emp) => (
+                      <TouchableOpacity key={emp.id} onPress={() => setAddEmpId(emp.id)}
+                        style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10,
+                          backgroundColor: addEmpId === emp.id ? "#AF52DE" : colors.border + "44" }}>
+                        <Text style={{ fontSize: 13, fontWeight: "600", color: addEmpId === emp.id ? "#fff" : colors.foreground }}>{emp.code}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </ScrollView>
+              </View>
+              <View>
+                <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 6 }}>预支金额</Text>
+                <TextInput value={addAmount} onChangeText={setAddAmount} keyboardType="numeric" placeholder="输入金额"
+                  style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 12, fontSize: 16, color: colors.foreground, backgroundColor: colors.background }} />
+              </View>
+              <View>
+                <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 6 }}>备注（可选）</Text>
+                <TextInput value={addNotes} onChangeText={setAddNotes} placeholder="备注说明"
+                  style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 12, fontSize: 14, color: colors.foreground, backgroundColor: colors.background }} />
+              </View>
+              <View style={{ flexDirection: "row", gap: 10 }}>
+                <TouchableOpacity onPress={() => setShowAddModal(false)}
+                  style={{ flex: 1, padding: 14, borderRadius: 12, backgroundColor: colors.border + "44", alignItems: "center" }}>
+                  <Text style={{ fontSize: 15, fontWeight: "600", color: colors.foreground }}>取消</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleAddAdvance}
+                  style={{ flex: 1, padding: 14, borderRadius: 12, backgroundColor: "#AF52DE", alignItems: "center" }}>
+                  <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}>确认添加</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
-      </Modal>
-    </ScrollView>
+        </Modal>
+      </ScrollView>
+
+      {/* 右下角悬浮 FAB 按钮 */}
+      <TouchableOpacity onPress={() => { tap(); setShowAddModal(true); }}
+        style={{ position: "absolute", right: 20, bottom: 20, flexDirection: "row", alignItems: "center", gap: 6,
+          paddingHorizontal: 18, paddingVertical: 13, borderRadius: 28, backgroundColor: "#AF52DE",
+          shadowColor: "#AF52DE", shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 8 }}>
+        <IconSymbol name="plus" size={16} color="#fff" />
+        <Text style={{ fontSize: 14, fontWeight: "700", color: "#fff" }}>新增预支</Text>
+      </TouchableOpacity>
+    </View>
   );
 }
+
 
 // ─── 排班表单元格显示 ─────────────────────────────────────────────────────────
 function SchCellDisplay({ entry, contractHours, tplColor, colors }: {
@@ -1183,21 +1221,23 @@ export default function LaborScreen({ embedded = false }: { embedded?: boolean }
         <OverviewCard month={currentMonth} colors={colors} />
       </View>
 
-      {/* Tab 切换栏 */}
-      <View style={[S.tabBar, { borderBottomColor: colors.border }]}>
-        {PAGES.map((p) => {
-          const active = activePage === p.key;
-          const col = PAGE_COLORS[p.key];
-          return (
-            <TouchableOpacity key={p.key} onPress={() => handleTabPress(p.key)}
-              style={[S.tabBtn, active && { borderBottomColor: col, borderBottomWidth: 2.5 }]}>
-              <IconSymbol name={p.icon as any} size={16} color={active ? col : colors.muted} />
-              <Text style={{ fontSize: 13, fontWeight: active ? "700" : "400", color: active ? col : colors.muted, marginTop: 2 }}>
-                {p.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
+      {/* Tab 切换栏：胶囊样式，固定不动 */}
+      <View style={{ paddingHorizontal: 16, paddingVertical: 8, backgroundColor: colors.background }}>
+        <View style={{ flexDirection: "row", backgroundColor: colors.border + "44", borderRadius: 12, padding: 3 }}>
+          {PAGES.map((p) => {
+            const active = activePage === p.key;
+            return (
+              <TouchableOpacity key={p.key} onPress={() => handleTabPress(p.key)}
+                style={[{ flex: 1, alignItems: "center", paddingVertical: 7, borderRadius: 10 },
+                  active && { backgroundColor: colors.surface, shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 4, elevation: 2 }
+                ]}>
+                <Text style={{ fontSize: 13, fontWeight: active ? "700" : "400", color: active ? "#1C1C1E" : colors.muted }}>
+                  {p.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       </View>
 
       {/* 横滑内容区 */}
