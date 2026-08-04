@@ -63,8 +63,8 @@ function fmtShort(n: number) {
 
 // ─── 环形饼图 ─────────────────────────────────────────────────────────────────
 interface PieSlice { label: string; value: number; color: string; pct: number }
-function DonutChart({ slices, total, size = 200, textColor, subColor }: {
-  slices: PieSlice[]; total: number; size?: number; textColor: string; subColor: string;
+function DonutChart({ slices, total, size = 200, textColor, subColor, centerLabel = "总支出" }: {
+  slices: PieSlice[]; total: number; size?: number; textColor: string; subColor: string; centerLabel?: string;
 }) {
   const cx = size / 2, cy = size / 2;
   const R = size * 0.40, r = size * 0.24;
@@ -85,9 +85,9 @@ function DonutChart({ slices, total, size = 200, textColor, subColor }: {
   return (
     <Svg width={size} height={size}>
       {paths.map((p, i) => <Path key={i} d={p.d} fill={p.color} />)}
-      <SvgText x={cx} y={cy - 8} textAnchor="middle" fontSize={10} fill={subColor}>总支出</SvgText>
+      <SvgText x={cx} y={cy - 8} textAnchor="middle" fontSize={10} fill={subColor}>{centerLabel}</SvgText>
       <SvgText x={cx} y={cy + 14} textAnchor="middle" fontSize={18} fontWeight="bold" fill={textColor}>
-        ¥{total >= 10000 ? `${(total / 10000).toFixed(2)}w` : total.toFixed(0)}
+        {total >= 10000 ? `¥${(total / 10000).toFixed(2)}w` : `¥${total.toFixed(0)}`}
       </SvgText>
     </Svg>
   );
@@ -563,7 +563,7 @@ export default function StorePettyCashScreen() {
         <View style={[S.pieWrap, { backgroundColor: colors.surface }]}>
           {total > 0 ? (
             <View style={{ alignItems: "center", paddingVertical: 8 }}>
-              <DonutChart slices={slices} total={total} size={200} textColor={colors.foreground} subColor={colors.muted} />
+              <DonutChart slices={slices} total={total} size={200} textColor={colors.foreground} subColor={colors.muted} centerLabel={statsTab === "income" ? "总收入" : "总支出"} />
               <View style={S.legendWrap}>
                 {slices.slice(0, 6).map((s, i) => (
                   <View key={i} style={S.legendItem}>
