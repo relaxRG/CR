@@ -683,7 +683,7 @@ function SchTemplateModal({ visible, templates, colors, onSave, onDelete, onClos
 // ─── 内嵌排班表页（第一页） ───────────────────────────────────────────────────
 // Excel 风格排班表：每周一个区块
 // 结构：日期行（橙色背景）→ 各班次员工行（工时数字）→ 班次间空行分隔
-function SchedulePage({ colors }: { colors: any }) {
+function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: string; onMonthChange: (m: string) => void }) {
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
   const { employees } = useEmployeeStore();
   const { shifts, upsertShift, batchUpsertShifts, deleteShift, getShifts } = useShiftStore();
@@ -693,8 +693,10 @@ function SchedulePage({ colors }: { colors: any }) {
 
   const now = new Date();
   const todayStr = now.toISOString().slice(0, 10);
-  const [currentMonth, setCurrentMonth] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
+  const currentMonth = month;
   const [dept, setDept] = useState<EmployeeDept>("front");
+  // 班次/时长切换
+  const [viewMode, setViewMode] = useState<"session" | "hours">("hours");
   const [showTplModal, setShowTplModal] = useState(false);
   const [editModal, setEditModal] = useState(false);
   const [editDate, setEditDate] = useState("");
@@ -758,8 +760,8 @@ function SchedulePage({ colors }: { colors: any }) {
     );
   };
 
-  const prevMonth = () => { const [y, m] = currentMonth.split("-").map(Number); const d = new Date(y, m - 2, 1); setCurrentMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); };
-  const nextMonth = () => { const [y, m] = currentMonth.split("-").map(Number); const d = new Date(y, m, 1); setCurrentMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); };
+  const prevMonth = () => { const [y, m] = currentMonth.split("-").map(Number); const d = new Date(y, m - 2, 1); onMonthChange(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); };
+  const nextMonth = () => { const [y, m] = currentMonth.split("-").map(Number); const d = new Date(y, m, 1); onMonthChange(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); };
 
   const editTpl = sortedTemplates.find((t) => t.session === editSession) ?? sortedTemplates[0] ?? DEFAULT_SHIFT_TEMPLATES[0];
   const editContractH = editEmployee && editDate ? getContractHoursForDate(editEmployee, editDate) : 0;
@@ -768,43 +770,54 @@ function SchedulePage({ colors }: { colors: any }) {
   const WEEK_HEADERS = ["周一 Monday", "周二 Tuesday", "周三 Wednesday", "周四 Thursday", "周五 Friday", "周六 Saturday", "周日 Sunday"];
   const WEEK_SHORT = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
 
-  // 单元格内容：工时数字 / 休 / 无早
-  const renderCellContent = (entry: ShiftEntry | null, tplColor: string, contractH: number) => {
+  // 单元格内容：班次模式显示班次名，时长模式显示工时数字
+  // 数字统一深灰色，加班红色标注，调休维色标注
+  const renderCellContent = (entry: ShiftEntry | null, session: string, contractH: number) => {
     if (!entry) return null;
     const h = entry.hoursValue;
-    if (h === "休") return <Text style={{ fontSize: 11, color: "#FF3B30", fontWeight: "500" }}>(休)</Text>;
-    if (h === "无早") return <Text style={{ fontSize: 10, color: "#FF3B30", fontWeight: "500" }}>(无早)</Text>;
+    // 休假/无早：红色，两种模式都显示
+    if (h === "休") return <Text style={EXL.cellRest}>(休)</Text>;
+    if (h === "无早") return <Text style={EXL.cellNoMorning}>(无早)</Text>;
+    if (viewMode === "session") {
+      // 班次模式：显示班次名称第一个字（如「午」「晚」）
+      const label = session.slice(0, 1);
+      return <Text style={EXL.cellSession}>{label}</Text>;
+    }
+    // 时长模式：显示工时数字
     if (typeof h === "number" && h > 0) {
       const isOT = contractH > 0 && h > contractH;
-      const otColor = entry.overtimeType === "comp_off" ? "#34C759" : "#FF3B30";
-      return <Text style={{ fontSize: 13, fontWeight: isOT ? "800" : "600", color: isOT ? otColor : tplColor }}>{h % 1 === 0 ? `${h}.0` : `${h}`}</Text>;
+      const isCompOff = isOT && entry.overtimeType === "comp_off";
+      return (
+        <View style={{ alignItems: "center" }}>
+          <Text style={[EXL.cellHours, isOT && (isCompOff ? EXL.cellCompOff : EXL.cellOT)]}>
+            {h % 1 === 0 ? `${h}.0` : `${h}`}
+          </Text>
+          {isOT && <View style={[EXL.otDot, { backgroundColor: isCompOff ? "#34C759" : "#FF3B30" }]} />}
+        </View>
+      );
     }
     return null;
   };
 
   // 每周区块：日期行 + 各班次员工行
   const renderWeekBlock = (week: (string | null)[], weekIdx: number) => {
-    // 过滤掉全空的周（全部是 null）
     if (week.every((d) => d === null)) return null;
-    // 找到本周第一个有效日期
-    const firstDate = week.find((d) => d !== null);
-    const lastDate = [...week].reverse().find((d) => d !== null);
-    const weekLabel = firstDate && lastDate
-      ? `${Number(firstDate.slice(8))}–${Number(lastDate.slice(8))}`
-      : "";
+    // 部门日期行背景色：前厅绿，后厨橙
+    const dateBg = dept === "front" ? "#34C759" : "#FF9500";
+    const dateBgDark = dept === "front" ? "#2DB350" : "#E08800"; // 今天加深
 
     return (
-      <View key={weekIdx} style={[EXL.weekBlock, { backgroundColor: colors.surface, shadowColor: colors.foreground }]}>
-        {/* 日期行（橙色背景，仿 Excel） */}
-        <View style={EXL.dateRow}>
-          <View style={[EXL.nameCol, { backgroundColor: EXL_DATE_BG }]}>
+      <View key={weekIdx} style={[EXL.weekBlock, { backgroundColor: colors.surface, shadowColor: "#000" }]}>
+        {/* 日期行：部门色背景 */}
+        <View style={[EXL.dateRow, { backgroundColor: dateBg }]}>
+          <View style={[EXL.nameCol, { backgroundColor: "transparent" }]}>
             <Text style={EXL.dateLabel}>日期</Text>
           </View>
           {week.map((date, di) => {
             const isToday = date === todayStr;
             return (
-              <View key={di} style={[EXL.dateCell, { backgroundColor: isToday ? "#E8A020" : EXL_DATE_BG }]}>
-                {date ? <Text style={[EXL.dateCellText, isToday && { color: "#fff", fontWeight: "800" }]}>{Number(date.slice(8))}</Text> : null}
+              <View key={di} style={[EXL.dateCell, { backgroundColor: isToday ? dateBgDark : "transparent", borderRightColor: "rgba(255,255,255,0.25)" }]}>
+                {date ? <Text style={[EXL.dateCellText, isToday && { fontWeight: "900" }]}>{Number(date.slice(8))}</Text> : null}
               </View>
             );
           })}
@@ -816,25 +829,26 @@ function SchedulePage({ colors }: { colors: any }) {
           if (empList.length === 0) return null;
           return (
             <View key={tpl.session}>
-              {/* 班次分隔行（仅在非第一个班次前显示） */}
-              {tplIdx > 0 && <View style={[EXL.sessionDivider, { backgroundColor: colors.border }]} />}
+              {tplIdx > 0 && <View style={[EXL.sessionDivider, { backgroundColor: colors.border + "88" }]} />}
               {empList.map((emp, empIdx) => {
                 const isLast = empIdx === empList.length - 1;
                 return (
-                  <View key={emp.id} style={[EXL.empRow, !isLast && { borderBottomColor: colors.border + "44", borderBottomWidth: StyleSheet.hairlineWidth }]}>
+                  <View key={emp.id} style={[EXL.empRow, !isLast && { borderBottomColor: colors.border + "55", borderBottomWidth: StyleSheet.hairlineWidth }]}>
+                    {/* 班次色左竖条 */}
+                    <View style={{ width: 3, height: 34, backgroundColor: tpl.color + "99" }} />
                     <TouchableOpacity onLongPress={() => handleFillRow(emp, tpl.session)}
-                      style={[EXL.nameCol, { backgroundColor: tpl.color + "10" }]}>
-                      <Text style={{ fontSize: 11, fontWeight: "700", color: tpl.color }} numberOfLines={1}>{emp.code}</Text>
+                      style={[EXL.nameCol, { backgroundColor: colors.background, width: EXL_NAME_W - 3 }]}>
+                      <Text style={{ fontSize: 11, fontWeight: "600", color: colors.foreground }} numberOfLines={1}>{emp.code}</Text>
                     </TouchableOpacity>
                     {week.map((date, di) => {
-                      if (!date) return <View key={di} style={EXL.cell} />;
+                      if (!date) return <View key={di} style={[EXL.cell, { backgroundColor: colors.background + "88" }]} />;
                       const entry = getEntry(emp.id, date, tpl.session);
                       const contractH = getContractHoursForDate(emp, date);
                       const isToday = date === todayStr;
                       return (
                         <TouchableOpacity key={di} onPress={() => handleCellPress(emp, date, tpl.session)}
-                          style={[EXL.cell, isToday && { backgroundColor: tpl.color + "15" }]}>
-                          {renderCellContent(entry, tpl.color, contractH)}
+                          style={[EXL.cell, isToday && { backgroundColor: deptAccent + "12" }]}>
+                          {renderCellContent(entry, tpl.session, contractH)}
                         </TouchableOpacity>
                       );
                     })}
@@ -848,28 +862,32 @@ function SchedulePage({ colors }: { colors: any }) {
     );
   };
 
+  // 部门主色：前厅绿色，后厨橙色
+  const deptAccent = dept === "front" ? "#34C759" : "#FF9500";
+
   return (
     <View style={{ flex: 1 }}>
-      {/* 控制栏 */}
+      {/* 控制栏：前厅/后厨 + 班次/时长 + 齿轮 */}
       <View style={[EXL.controlBar, { borderBottomColor: colors.border, backgroundColor: colors.background }]}>
         {/* 前厅/后厨 */}
-        <View style={[EXL.segContainer, { backgroundColor: colors.border + "44" }]}>
+        <View style={[EXL.segContainer, { backgroundColor: colors.border + "55" }]}>
           {DEPT_OPTIONS_SCH.map((d) => (
             <TouchableOpacity key={d} onPress={() => { tap(); setDept(d); }}
-              style={[EXL.segItem, dept === d && { backgroundColor: colors.surface }]}>
+              style={[EXL.segItem, dept === d && { backgroundColor: colors.surface, shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 2, elevation: 1 }]}>
               <Text style={{ fontSize: 12, fontWeight: "600", color: dept === d ? DEPT_COLORS[d] : colors.muted }}>{DEPT_LABELS[d]}</Text>
             </TouchableOpacity>
           ))}
         </View>
-        {/* 月份切换 */}
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-          <Pressable onPress={() => { tap(); prevMonth(); }} style={[EXL.navBtn, { backgroundColor: colors.primary }]}>
-            <IconSymbol name="chevron.left" size={14} color="#fff" />
-          </Pressable>
-          <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>{monthLabel(currentMonth)}</Text>
-          <Pressable onPress={() => { tap(); nextMonth(); }} style={[EXL.navBtn, { backgroundColor: colors.primary }]}>
-            <IconSymbol name="chevron.right" size={14} color="#fff" />
-          </Pressable>
+        {/* 班次/时长切换 */}
+        <View style={[EXL.segContainer, { backgroundColor: colors.border + "55" }]}>
+          {(["session", "hours"] as const).map((mode) => (
+            <TouchableOpacity key={mode} onPress={() => { tap(); setViewMode(mode); }}
+              style={[EXL.segItem, viewMode === mode && { backgroundColor: colors.surface, shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 2, elevation: 1 }]}>
+              <Text style={{ fontSize: 12, fontWeight: "600", color: viewMode === mode ? colors.foreground : colors.muted }}>
+                {mode === "session" ? "班次" : "时长"}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
         {/* 班次设置 */}
         <Pressable onPress={() => { tap(); setShowTplModal(true); }} style={[EXL.gearBtn, { backgroundColor: colors.border + "44" }]}>
@@ -877,14 +895,14 @@ function SchedulePage({ colors }: { colors: any }) {
         </Pressable>
       </View>
 
-      {/* 周标题固定行 */}
-      <View style={[EXL.weekHeaderRow, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
-        <View style={[EXL.nameCol, { backgroundColor: colors.background }]}>
-          <Text style={{ fontSize: 9, color: colors.muted }}>星期</Text>
+      {/* 周标题固定行（与日期格子等宽对齐） */}
+      <View style={[EXL.weekHeaderRow, { backgroundColor: colors.background, borderBottomColor: colors.border + "66" }]}>
+        <View style={{ width: EXL_NAME_W }}>
+          <Text style={{ fontSize: 9, color: colors.muted, textAlign: "center" }}>星期</Text>
         </View>
         {WEEK_SHORT.map((h) => (
-          <View key={h} style={EXL.weekHeaderCell}>
-            <Text style={{ fontSize: 10, fontWeight: "600", color: colors.muted }}>{h}</Text>
+          <View key={h} style={{ flex: 1, alignItems: "center" }}>
+            <Text style={{ fontSize: 10, fontWeight: "500", color: colors.muted }}>{h}</Text>
           </View>
         ))}
       </View>
@@ -936,7 +954,9 @@ export default function LaborScreen() {
   const insets = useSafeAreaInsets();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
-  const month = currentMonthStr();
+  const now = new Date();
+  const [currentMonth, setCurrentMonth] = useState(currentMonthStr());
+  const month = currentMonth;
   const [activePage, setActivePage] = useState<PageKey>("schedule");
   const scrollRef = useRef<ScrollView>(null);
 
@@ -971,9 +991,22 @@ export default function LaborScreen() {
         </View>
       </View>
 
+      {/* 月份导航行（低调风格） */}
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 8, gap: 12 }}>
+        <Pressable onPress={() => { tap(); const [y, m] = currentMonth.split("-").map(Number); const d = new Date(y, m - 2, 1); setCurrentMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); }}
+          style={({ pressed }) => [{ width: 28, height: 28, borderRadius: 8, backgroundColor: colors.border + "55", alignItems: "center", justifyContent: "center", opacity: pressed ? 0.5 : 1 }]}>
+          <IconSymbol name="chevron.left" size={14} color={colors.muted} />
+        </Pressable>
+        <Text style={{ fontSize: 15, fontWeight: "600", color: colors.foreground }}>{monthLabel(currentMonth)}</Text>
+        <Pressable onPress={() => { tap(); const [y, m] = currentMonth.split("-").map(Number); const d = new Date(y, m, 1); setCurrentMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); }}
+          style={({ pressed }) => [{ width: 28, height: 28, borderRadius: 8, backgroundColor: colors.border + "55", alignItems: "center", justifyContent: "center", opacity: pressed ? 0.5 : 1 }]}>
+          <IconSymbol name="chevron.right" size={14} color={colors.muted} />
+        </Pressable>
+      </View>
+
       {/* 总览卡片（含对比开关） */}
-      <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 }}>
-        <OverviewCard month={month} colors={colors} />
+      <View style={{ paddingHorizontal: 16, paddingBottom: 4 }}>
+        <OverviewCard month={currentMonth} colors={colors} />
       </View>
 
       {/* Tab 切换栏 */}
@@ -1004,17 +1037,17 @@ export default function LaborScreen() {
         contentContainerStyle={{ flexDirection: "row" }}>
         {/* 第一页：内嵌排班表 */}
         <View style={{ width: SCREEN_W, flex: 1 }}>
-          <SchedulePage colors={colors} />
+          <SchedulePage colors={colors} month={currentMonth} onMonthChange={setCurrentMonth} />
         </View>
 
         {/* 第二页：员工档案（含对比开关） */}
         <View style={{ width: SCREEN_W, flex: 1 }}>
-          <EmployeeRosterPage month={month} colors={colors} />
+          <EmployeeRosterPage month={currentMonth} colors={colors} />
         </View>
 
         {/* 第三页：薪资预支 */}
         <View style={{ width: SCREEN_W, flex: 1 }}>
-          <AdvancePage month={month} colors={colors} />
+          <AdvancePage month={currentMonth} colors={colors} />
         </View>
       </ScrollView>
     </ScreenContainer>
@@ -1093,24 +1126,29 @@ const SCHEM = StyleSheet.create({
 });
 
 // Excel 风格排班表样式
-const EXL_DATE_BG = "#E8A020";   // 日期行橙色背景（仿 Excel）
-const EXL_NAME_W = 56;           // 姓名列宽
+const EXL_NAME_W = 56;  // 姓名列宽
 
 const EXL = StyleSheet.create({
   controlBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth },
   segContainer: { flexDirection: "row", borderRadius: 8, overflow: "hidden", padding: 2 },
   segItem: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6 },
-  navBtn: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },
   gearBtn: { width: 32, height: 32, borderRadius: 8, alignItems: "center", justifyContent: "center" },
   weekHeaderRow: { flexDirection: "row", alignItems: "center", borderBottomWidth: StyleSheet.hairlineWidth, paddingVertical: 4 },
-  weekHeaderCell: { flex: 1, alignItems: "center" },
-  weekBlock: { borderRadius: 12, overflow: "hidden", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 },
+  weekBlock: { borderRadius: 12, overflow: "hidden", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.07, shadowRadius: 4, elevation: 2 },
   dateRow: { flexDirection: "row", alignItems: "center" },
-  dateCell: { flex: 1, height: 28, alignItems: "center", justifyContent: "center", borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: "#C8820066" },
+  dateCell: { flex: 1, height: 26, alignItems: "center", justifyContent: "center", borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: "rgba(255,255,255,0.3)" },
   dateCellText: { fontSize: 12, fontWeight: "700", color: "#fff" },
-  dateLabel: { fontSize: 10, fontWeight: "700", color: "#fff" },
-  nameCol: { width: EXL_NAME_W, height: 36, alignItems: "center", justifyContent: "center", borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: "#00000022" },
+  dateLabel: { fontSize: 9, fontWeight: "600", color: "rgba(255,255,255,0.85)" },
+  nameCol: { width: EXL_NAME_W, height: 34, alignItems: "center", justifyContent: "center", borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: "#00000015" },
   empRow: { flexDirection: "row", alignItems: "center" },
-  cell: { flex: 1, height: 36, alignItems: "center", justifyContent: "center", borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: "#00000011" },
-  sessionDivider: { height: 6 },
+  cell: { flex: 1, height: 34, alignItems: "center", justifyContent: "center", borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: "#00000008" },
+  sessionDivider: { height: 4 },
+  // 单元格文字样式
+  cellHours: { fontSize: 13, fontWeight: "500", color: "#1C1C1E" },
+  cellOT: { color: "#FF3B30", fontWeight: "700" },
+  cellCompOff: { color: "#34C759", fontWeight: "700" },
+  cellRest: { fontSize: 11, color: "#FF3B30", fontWeight: "500" },
+  cellNoMorning: { fontSize: 10, color: "#FF3B30", fontWeight: "500" },
+  cellSession: { fontSize: 12, fontWeight: "500", color: "#3C3C43" },
+  otDot: { width: 4, height: 4, borderRadius: 2, marginTop: 1 },
 });
