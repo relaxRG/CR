@@ -637,7 +637,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors }:
 }
 
 // ─── 员工档案页（第二页） ─────────────────────────────────────────────────────
-function EmployeeRosterPage({ month, colors }: { month: string; colors: any }) {
+function EmployeeRosterPage({ month, colors, headerComponent }: { month: string; colors: any; headerComponent?: React.ReactNode }) {
   const { employees } = useEmployeeStore();
   const { groups, toggleCollapse } = useEmployeeGroupStore();
   const { templates: shiftTemplates } = useShiftTemplateStore();
@@ -732,7 +732,8 @@ function EmployeeRosterPage({ month, colors }: { month: string; colors: any }) {
   };
 
   return (
-    <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 40 }}>
+    <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 120 }}>
+      {headerComponent}
       {/* 工具栏：员工管理 + 对比开关 + 设置 */}
       <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
         {/* 员工管理按鈕 - 跳转到员工列表页 */}
@@ -810,7 +811,7 @@ function EmployeeRosterPage({ month, colors }: { month: string; colors: any }) {
 }
 
 // ─── 薪资预支页（第三页） ─────────────────────────────────────────────────────
-function AdvancePage({ month, colors }: { month: string; colors: any }) {
+function AdvancePage({ month, colors, headerComponent }: { month: string; colors: any; headerComponent?: React.ReactNode }) {
   const { employees } = useEmployeeStore();
   const { advances, addAdvance, updateAdvance, deleteAdvance } = useSalaryAdvanceStore();
   const { records: pettyRecords } = usePettyCashStore();
@@ -916,7 +917,8 @@ function AdvancePage({ month, colors }: { month: string; colors: any }) {
 
   return (
     <View style={{ flex: 1 }}>
-      <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 100 }}>
+      <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 120 }}>
+        {headerComponent}
         {/* 紫色汇总卡片 */}
         <View style={{ borderRadius: 14, padding: 16, borderWidth: 1, borderColor: "#AF52DE" + "33", backgroundColor: "#AF52DE" + "08" }}>
           <Text style={{ fontSize: 14, fontWeight: "700", color: "#AF52DE" }}>{monthLabel(month)} 薪资预支</Text>
@@ -2127,20 +2129,16 @@ export default function LaborScreen({ embedded = false }: { embedded?: boolean }
           <SchedulePage colors={colors} month={currentMonth} onMonthChange={setCurrentMonth} />
         </View>
 
-        {/* 第二页：总览卡片 + 员工档案 */}
+        {/* 第二页：员工档案（总览卡片内嵌在 ScrollView 内随内容滚动） */}
         <View style={{ width: SCREEN_W, flex: 1 }}>
-          <View style={{ paddingHorizontal: 16, paddingBottom: 4 }}>
-            <OverviewCard month={currentMonth} colors={colors} />
-          </View>
-          <EmployeeRosterPage month={currentMonth} colors={colors} />
+          <EmployeeRosterPage month={currentMonth} colors={colors}
+            headerComponent={<OverviewCard month={currentMonth} colors={colors} />} />
         </View>
 
-        {/* 第三页：总览卡片 + 薪资预支 */}
+        {/* 第三页：薪资预支（总览卡片内嵌在 ScrollView 内随内容滚动） */}
         <View style={{ width: SCREEN_W, flex: 1 }}>
-          <View style={{ paddingHorizontal: 16, paddingBottom: 4 }}>
-            <OverviewCard month={currentMonth} colors={colors} />
-          </View>
-          <AdvancePage month={currentMonth} colors={colors} />
+          <AdvancePage month={currentMonth} colors={colors}
+            headerComponent={<OverviewCard month={currentMonth} colors={colors} />} />
         </View>
       </ScrollView>
     </ScreenContainer>
