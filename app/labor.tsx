@@ -49,6 +49,16 @@ function migrateShiftName(shift: string): string {
 }
 
 type CompareMode = "none" | "lastMonth" | "lastYear" | "custom";
+type HolidayDecisionItem = {
+  key: string;
+  employeeId: string;
+  employeeCode: string;
+  date: string;
+  specialStatusId: string;
+  holidayName: string;
+  bonusAmount: number;
+  mode: "cash" | "rest";
+};
 
 // ─── 月份工具 ─────────────────────────────────────────────────────────────────
 function currentMonthStr() {
@@ -1452,7 +1462,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   const { getHolidayForDate } = useHolidayConfigStore();
   const { advances } = useSalaryAdvanceStore();
   const { settings: globalSettings } = useGlobalPayrollSettingsStore();
-  const { getAvailableDays: getCompOffAvailDays, updateEntry: updateCompOffEntry, getEntries: getCompOffEntries, expireOldEntries: expireCompOff, cashOutEntry: cashOutCompOff } = useCompOffBalanceEntryStore();
+  const { getAvailableDays: getCompOffAvailDays, addEntry: addCompOffEntry, updateEntry: updateCompOffEntry, getEntries: getCompOffEntries, expireOldEntries: expireCompOff, cashOutEntry: cashOutCompOff } = useCompOffBalanceEntryStore();
   const { getAvailableDays: getHolidayCompOffAvailDays, updateEntry: updateHolidayCompOff, getEntries: getHolidayCompOffEntries, addEntry: addHolidayCompOff, expireOldEntries: expireHolidayCompOff } = useHolidayCompOffStore();
   const { upsertAlert } = useUnexplainedRestAlertStore();
 
@@ -1465,6 +1475,8 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   const [showTplModal, setShowTplModal] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [genResult, setGenResult] = useState<string | null>(null);
+  const [showHolidayDecisionModal, setShowHolidayDecisionModal] = useState(false);
+  const [pendingHolidayDecisions, setPendingHolidayDecisions] = useState<HolidayDecisionItem[]>([]);
   const [editModal, setEditModal] = useState(false);
   const [editDate, setEditDate] = useState("");
   const [editEmployee, setEditEmployee] = useState<Employee | null>(null);
@@ -1539,6 +1551,202 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
 
   const prevMonth = () => { const [y, m] = currentMonth.split("-").map(Number); const d = new Date(y, m - 2, 1); onMonthChange(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); };
   const nextMonth = () => { const [y, m] = currentMonth.split("-").map(Number); const d = new Date(y, m, 1); onMonthChange(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); };
+
+  const collectHolidayDecisionItems = useCallback((): HolidayDecisionItem[] => {
+    const activeEmps = employees.filter((e) => e.active);
+    const items: HolidayDecisionItem[] = [];
+    for (const emp of activeEmps) {
+      const empShifts = getShifts(currentMonth).filter((s) => s.employeeId === emp.id);
+      if (empShifts.length === 0) continue;
+      const holidayDaysList = empShifts
+        .map((s) => {
+          const hc = getHolidayForDate(s.date, emp.id);
+          return hc ? { date: s.date, multiplier: hc.multiplier } : null;
+        })
+        .filter((x): x is { date: string; multiplier: number } => x !== null);
+      const att = calcFromShifts(emp.id, currentMonth, emp, empShifts, specialStatuses, holidayDaysList);
+      const existingSlip = getPaySlip(emp.id, currentMonth);
+      empShifts.forEach((s) => {
+        if (!s.specialStatusId) return;
+        const ss = specialStatuses.find((st) => st.id === s.specialStatusId);
+        if (!ss?.isHoliday || ss.salaryMultiplier <= 1) return;
+        const key = `${emp.id}_${s.date}_${ss.id}`;
+        const bonusAmount = Math.round(att.dailyRate * (ss.salaryMultiplier - 1) * 100) / 100;
+        items.push({
+          key,
+          employeeId: emp.id,
+          employeeCode: emp.code,
+          date: s.date,
+          specialStatusId: ss.id,
+          holidayName: ss.name,
+          bonusAmount,
+          mode: existingSlip?.holidayBonusAllocation?.[key]?.mode === "rest" ? "rest" : "cash",
+        });
+      });
+    }
+    return items;
+  }, [employees, getShifts, currentMonth, getHolidayForDate, calcFromShifts, specialStatuses, getPaySlip]);
+
+  const runPayrollGeneration = useCallback(async (holidayDecisions: HolidayDecisionItem[]) => {
+    setGenerating(true);
+    try {
+      const activeEmps = employees.filter((e) => e.active);
+      const holidayDecisionMap = new Map(holidayDecisions.map((item) => [item.key, item.mode]));
+      let count = 0;
+      for (const emp of activeEmps) {
+        const empShifts = getShifts(currentMonth).filter((s) => s.employeeId === emp.id);
+        if (empShifts.length === 0) continue;
+        const holidayDaysList = empShifts
+          .map((s) => {
+            const hc = getHolidayForDate(s.date, emp.id);
+            return hc ? { date: s.date, multiplier: hc.multiplier } : null;
+          })
+          .filter((x): x is { date: string; multiplier: number } => x !== null);
+        const baseAtt = calcFromShifts(emp.id, currentMonth, emp, empShifts, specialStatuses, holidayDaysList);
+        const holidayBonusAllocation: Record<string, {
+          date: string;
+          name: string;
+          totalBonus: number;
+          cashAmount: number;
+          restDays: number;
+          mode: "cash" | "rest" | "split";
+        }> = {};
+        let holidayRestBonus = 0;
+        empShifts.forEach((s) => {
+          if (!s.specialStatusId) return;
+          const ss = specialStatuses.find((st) => st.id === s.specialStatusId);
+          if (!ss?.isHoliday || ss.salaryMultiplier <= 1) return;
+          const key = `${emp.id}_${s.date}_${ss.id}`;
+          const dayBonus = Math.round(baseAtt.dailyRate * (ss.salaryMultiplier - 1) * 100) / 100;
+          const mode = holidayDecisionMap.get(key) ?? (getPaySlip(emp.id, currentMonth)?.holidayBonusAllocation?.[key]?.mode === "rest" ? "rest" : "cash");
+          holidayBonusAllocation[key] = {
+            date: s.date,
+            name: ss.name,
+            totalBonus: dayBonus,
+            cashAmount: mode === "cash" ? dayBonus : 0,
+            restDays: mode === "rest" ? 1 : 0,
+            mode,
+          };
+          const existingEntry = getCompOffEntries(emp.id).find((e) => e.source === "holiday" && e.workDate === s.date && e.earnedMonth === currentMonth);
+          if (mode === "rest") {
+            holidayRestBonus += dayBonus;
+            if (!existingEntry) {
+              addCompOffEntry({
+                employeeId: emp.id,
+                earnedMonth: currentMonth,
+                source: "holiday",
+                workDate: s.date,
+                holidayName: ss.name,
+                holidayBonusAmount: dayBonus,
+                days: 1,
+                expiresMonth: calcCompOffExpiresMonth(currentMonth),
+                status: "available",
+                notes: "节假日上班选择换休自动生成",
+              });
+            } else if (existingEntry.status === "expired") {
+              updateCompOffEntry(existingEntry.id, {
+                status: "available",
+                usedMonth: undefined,
+                holidayBonusAmount: dayBonus,
+                expiresMonth: calcCompOffExpiresMonth(currentMonth),
+                notes: "重新生成薪资单后恢复为换休",
+              });
+            }
+          } else if (existingEntry && existingEntry.status === "available") {
+            updateCompOffEntry(existingEntry.id, {
+              status: "expired",
+              notes: "重新生成薪资单后改为拿钱，自动作废",
+            });
+          }
+        });
+        const att = holidayRestBonus > 0
+          ? {
+              ...baseAtt,
+              holidayBonus: Math.max(0, Math.round((baseAtt.holidayBonus - holidayRestBonus) * 100) / 100),
+              attendanceSalary: Math.round((baseAtt.attendanceSalary - holidayRestBonus) * 100) / 100,
+            }
+          : baseAtt;
+        upsertAttendance(att);
+        const perfRecord = getPerfRecord(emp.id, currentMonth);
+        const performanceTotal = perfRecord?.totalPerformance ?? 0;
+        const advanceTotal = advances
+          .filter((a) => a.employeeId === emp.id && (a.deductMonth === currentMonth || a.date.startsWith(currentMonth)))
+          .reduce((s, a) => s + a.amount, 0);
+        const [curYear] = currentMonth.split("-");
+        const prevMonthSlips = paySlips.filter((s) =>
+          s.employeeId === emp.id &&
+          s.month.startsWith(curYear) &&
+          s.month < currentMonth
+        );
+        const taxThreshold = emp.incomeTax?.threshold ?? 5000;
+        const taxSpecialDed = emp.incomeTax?.specialDeductions ?? 0;
+        const cumulativeIncome = prevMonthSlips.reduce((sum, s) => {
+          const taxable = Math.max(0,
+            s.grossSalary - (s.socialInsuranceDeduction ?? 0) - (s.housingFundDeduction ?? 0) - taxThreshold - taxSpecialDed
+          );
+          return sum + taxable;
+        }, 0);
+        const cumulativeTaxPaid = prevMonthSlips.reduce((sum, s) => sum + (s.incomeTax ?? 0), 0);
+        expireCompOff(currentMonth);
+        expireHolidayCompOff(currentMonth);
+        const extraRestDays = Math.max(0, -(att.underRestDays));
+        let remainingExtraRest = extraRestDays;
+        if (remainingExtraRest > 0) {
+          const holidayEntries = getHolidayCompOffEntries(emp.id)
+            .filter((e) => e.status === "available" && e.expiresMonth >= currentMonth)
+            .sort((a, b) => a.expiresMonth.localeCompare(b.expiresMonth));
+          for (const entry of holidayEntries) {
+            if (remainingExtraRest <= 0) break;
+            const usedays = Math.min(entry.days, remainingExtraRest);
+            updateHolidayCompOff(entry.id, {
+              status: usedays >= entry.days ? "used_rest" : "available",
+              days: entry.days - usedays,
+              usedMonth: currentMonth,
+            });
+            remainingExtraRest -= usedays;
+          }
+        }
+        if (remainingExtraRest > 0) {
+          const compOffEntries = getCompOffEntries(emp.id)
+            .filter((e) => e.status === "available" && e.expiresMonth >= currentMonth)
+            .sort((a, b) => a.expiresMonth.localeCompare(b.expiresMonth));
+          for (const entry of compOffEntries) {
+            if (remainingExtraRest <= 0) break;
+            const usedays = Math.min(entry.days, remainingExtraRest);
+            updateCompOffEntry(entry.id, {
+              status: usedays >= entry.days ? "used_rest" : "available",
+              days: entry.days - usedays,
+              usedMonth: currentMonth,
+            });
+            remainingExtraRest -= usedays;
+          }
+        }
+        if (remainingExtraRest > 0) {
+          upsertAlert({
+            id: `${emp.id}_${currentMonth}`,
+            employeeId: emp.id,
+            month: currentMonth,
+            unexplainedDays: remainingExtraRest,
+            resolution: "pending",
+            updatedAt: new Date().toISOString(),
+          });
+        }
+        const slip = buildPaySlipDraft(emp, currentMonth, att, performanceTotal, advanceTotal, globalSettings, cumulativeIncome, cumulativeTaxPaid);
+        if (Object.keys(holidayBonusAllocation).length > 0) slip.holidayBonusAllocation = holidayBonusAllocation;
+        upsertPaySlip(slip);
+        count++;
+      }
+      setShowHolidayDecisionModal(false);
+      setPendingHolidayDecisions([]);
+      setGenResult(`✅ 已生成 ${count} 人薪资单`);
+      setTimeout(() => setGenResult(null), 4000);
+    } catch (e) {
+      setGenResult("❌ 生成失败，请重试");
+      setTimeout(() => setGenResult(null), 3000);
+    } finally {
+      setGenerating(false);
+    }
+  }, [employees, getShifts, currentMonth, getHolidayForDate, calcFromShifts, specialStatuses, getPaySlip, getCompOffEntries, addCompOffEntry, updateCompOffEntry, upsertAttendance, getPerfRecord, advances, paySlips, expireCompOff, expireHolidayCompOff, getHolidayCompOffEntries, updateHolidayCompOff, upsertAlert, buildPaySlipDraft, globalSettings, upsertPaySlip]);
 
   const editTpl = sortedTemplates.find((t) => t.session === editSession) ?? sortedTemplates[0] ?? DEFAULT_SHIFT_TEMPLATES[0];
   const editContractH = editEmployee && editDate ? getContractHoursForDate(editEmployee, editDate) : 0;
@@ -1687,140 +1895,13 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                 {
                   text: "确认生成",
                   onPress: async () => {
-                    setGenerating(true);
-                    try {
-                      const activeEmps = employees.filter((e) => e.active);
-                      let count = 0;
-                      for (const emp of activeEmps) {
-                        const empShifts = getShifts(currentMonth).filter((s) => s.employeeId === emp.id);
-                        if (empShifts.length === 0) continue;
-                        // 1. 计算出勤记录
-                        const holidayDaysList = empShifts
-                          .map((s) => {
-                            const hc = getHolidayForDate(s.date, emp.id);
-                            return hc ? { date: s.date, multiplier: hc.multiplier } : null;
-                          })
-                          .filter((x): x is { date: string; multiplier: number } => x !== null);
-                        const att = calcFromShifts(emp.id, currentMonth, emp, empShifts, specialStatuses, holidayDaysList);
-                        upsertAttendance(att);
-                        // 2. 计算绩效总额
-                        const perfRecord = getPerfRecord(emp.id, currentMonth);
-                        const performanceTotal = perfRecord?.totalPerformance ?? 0;
-                        // 3. 计算预支总额
-                        const advanceTotal = advances
-                          .filter((a) => a.employeeId === emp.id && (a.deductMonth === currentMonth || a.date.startsWith(currentMonth)))
-                          .reduce((s, a) => s + a.amount, 0);
-                        // 4. 计算年度累计数据（用于个税累计预扣法）
-                        const [curYear] = currentMonth.split("-");
-                        const prevMonthSlips = paySlips.filter((s) =>
-                          s.employeeId === emp.id &&
-                          s.month.startsWith(curYear) &&
-                          s.month < currentMonth
-                        );
-                        const taxThreshold = emp.incomeTax?.threshold ?? 5000;
-                        const taxSpecialDed = emp.incomeTax?.specialDeductions ?? 0;
-                        const cumulativeIncome = prevMonthSlips.reduce((sum, s) => {
-                          // 累计应纳税所得额 = 应发 - 社保个人 - 公积金个人 - 起征点 - 专项附加扣除
-                          const taxable = Math.max(0,
-                            s.grossSalary - (s.socialInsuranceDeduction ?? 0) - (s.housingFundDeduction ?? 0) - taxThreshold - taxSpecialDed
-                          );
-                          return sum + taxable;
-                        }, 0);
-                        const cumulativeTaxPaid = prevMonthSlips.reduce((sum, s) => sum + (s.incomeTax ?? 0), 0);
-                        // 5. 自动生成节假日调休余额（节日上班的班次）
-                        empShifts.forEach((s) => {
-                          if (!s.specialStatusId) return;
-                          const ss = specialStatuses.find((st) => st.id === s.specialStatusId);
-                          if (ss?.category === "work_day" && ss.salaryMultiplier > 1) {
-                            // 节日上班：产生1天调休权利，有效期至下月末
-                            const [sy, sm] = s.date.slice(0, 7).split("-").map(Number);
-                            const expD = new Date(sy, sm, 1); // 下月1日
-                            const expiresMonth = `${expD.getFullYear()}-${String(expD.getMonth() + 1).padStart(2, "0")}`;
-                            // 检查是否已存在（避免重复生成）
-                            const existing = getHolidayCompOffEntries(emp.id).find(
-                              (e) => e.workDate === s.date && e.status === "available"
-                            );
-                            if (!existing) {
-                              addHolidayCompOff({
-                                employeeId: emp.id,
-                                workDate: s.date,
-                                holidayName: ss.name,
-                                days: 1,
-                                expiresMonth,
-                                status: "available",
-                              });
-                            }
-                          }
-                        });
-
-                        // 6. 过期处理（清理过期换休余额）
-                        expireCompOff(currentMonth);
-                        expireHolidayCompOff(currentMonth);
-
-                        // 7. 自动抵扣换休余额（多休天数处理）
-                        // underRestDays < 0 表示多休了（出勤天数 < 应出勤天数）
-                        const extraRestDays = Math.max(0, -(att.underRestDays));
-                        let remainingExtraRest = extraRestDays;
-
-                        if (remainingExtraRest > 0) {
-                          // 优先抵扣节假日调休余额
-                          const holidayEntries = getHolidayCompOffEntries(emp.id)
-                            .filter((e) => e.status === "available" && e.expiresMonth >= currentMonth)
-                            .sort((a, b) => a.expiresMonth.localeCompare(b.expiresMonth));
-                          for (const entry of holidayEntries) {
-                            if (remainingExtraRest <= 0) break;
-                            const usedays = Math.min(entry.days, remainingExtraRest);
-                            updateHolidayCompOff(entry.id, {
-                              status: usedays >= entry.days ? "used_rest" : "available",
-                              days: entry.days - usedays,
-                              usedMonth: currentMonth,
-                            });
-                            remainingExtraRest -= usedays;
-                          }
-                        }
-
-                        if (remainingExtraRest > 0) {
-                          // 再抵扣加班换休余额（按到期时间，最早到期的先用）
-                          const compOffEntries = getCompOffEntries(emp.id)
-                            .filter((e) => e.status === "available" && e.expiresMonth >= currentMonth)
-                            .sort((a, b) => a.expiresMonth.localeCompare(b.expiresMonth));
-                          for (const entry of compOffEntries) {
-                            if (remainingExtraRest <= 0) break;
-                            const usedays = Math.min(entry.days, remainingExtraRest);
-                            updateCompOffEntry(entry.id, {
-                              status: usedays >= entry.days ? "used_rest" : "available",
-                              days: entry.days - usedays,
-                              usedMonth: currentMonth,
-                            });
-                            remainingExtraRest -= usedays;
-                          }
-                        }
-
-                        // 8. 无来源多休提醒
-                        if (remainingExtraRest > 0) {
-                          upsertAlert({
-                            id: `${emp.id}_${currentMonth}`,
-                            employeeId: emp.id,
-                            month: currentMonth,
-                            unexplainedDays: remainingExtraRest,
-                            resolution: "pending",
-                            updatedAt: new Date().toISOString(),
-                          });
-                        }
-
-                        // 9. 生成薪资单
-                        const slip = buildPaySlipDraft(emp, currentMonth, att, performanceTotal, advanceTotal, globalSettings, cumulativeIncome, cumulativeTaxPaid);
-                        upsertPaySlip(slip);
-                        count++;
-                      }
-                      setGenResult(`✅ 已生成 ${count} 人薪资单`);
-                      setTimeout(() => setGenResult(null), 4000);
-                    } catch (e) {
-                      setGenResult("❌ 生成失败，请重试");
-                      setTimeout(() => setGenResult(null), 3000);
-                    } finally {
-                      setGenerating(false);
+                    const holidayDecisionItems = collectHolidayDecisionItems();
+                    if (holidayDecisionItems.length > 0) {
+                      setPendingHolidayDecisions(holidayDecisionItems);
+                      setShowHolidayDecisionModal(true);
+                      return;
                     }
+                    await runPayrollGeneration([]);
                   }
                 }
               ]
@@ -1858,6 +1939,60 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
       <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 8, gap: 10, paddingBottom: 40 }}>
         {calendarWeeks.map((week, wi) => renderWeekBlock(week, wi))}
       </ScrollView>
+
+      <Modal visible={showHolidayDecisionModal} transparent animationType="fade" onRequestClose={() => setShowHolidayDecisionModal(false)}>
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "center", padding: 20 }}>
+          <View style={{ backgroundColor: colors.background, borderRadius: 18, overflow: "hidden", maxHeight: "82%" }}>
+            <View style={{ paddingHorizontal: 18, paddingVertical: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
+              <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground }}>节假日上班处理</Text>
+              <Text style={{ fontSize: 12, color: colors.muted, marginTop: 4 }}>生成薪资单前，请为每条节假日上班记录选择「拿钱」或「换休」。</Text>
+            </View>
+            <ScrollView style={{ maxHeight: 420 }} contentContainerStyle={{ padding: 16, gap: 12 }}>
+              {pendingHolidayDecisions.map((item) => (
+                <View key={item.key} style={{ borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, borderRadius: 14, padding: 12, gap: 10, backgroundColor: colors.surface }}>
+                  <View>
+                    <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>{item.employeeCode} · {item.date}</Text>
+                    <Text style={{ fontSize: 12, color: colors.muted, marginTop: 4 }}>{item.holidayName}，节假日补偿 ¥{item.bonusAmount.toFixed(2)}</Text>
+                  </View>
+                  <View style={{ flexDirection: "row", gap: 10 }}>
+                    {(["cash", "rest"] as const).map((mode) => {
+                      const selected = item.mode === mode;
+                      return (
+                        <TouchableOpacity
+                          key={mode}
+                          onPress={() => setPendingHolidayDecisions((prev) => prev.map((it) => it.key === item.key ? { ...it, mode } : it))}
+                          style={{
+                            flex: 1,
+                            paddingVertical: 10,
+                            borderRadius: 10,
+                            alignItems: "center",
+                            backgroundColor: selected ? (mode === "cash" ? "#34C759" : "#007AFF") : colors.background,
+                            borderWidth: 1,
+                            borderColor: selected ? (mode === "cash" ? "#34C759" : "#007AFF") : colors.border,
+                          }}>
+                          <Text style={{ fontSize: 13, fontWeight: "700", color: selected ? "#fff" : colors.foreground }}>{mode === "cash" ? "拿钱" : "换休"}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+            <View style={{ flexDirection: "row", gap: 12, padding: 16, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
+              <TouchableOpacity
+                onPress={() => { setShowHolidayDecisionModal(false); setPendingHolidayDecisions([]); }}
+                style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 12, borderRadius: 12, backgroundColor: colors.border + "66" }}>
+                <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>取消</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => runPayrollGeneration(pendingHolidayDecisions)}
+                style={{ flex: 1.2, alignItems: "center", justifyContent: "center", paddingVertical: 12, borderRadius: 12, backgroundColor: "#007AFF" }}>
+                <Text style={{ fontSize: 14, fontWeight: "700", color: "#fff" }}>确认并生成</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <SchEditModal
         visible={editModal} date={editDate} employee={editEmployee}

@@ -485,7 +485,7 @@ export function splitAmount(amount: string): { qty: string; unit: string } {
   // If unitRaw looks like a partial fraction being typed (e.g. "/" or "/3" without a leading digit),
   // treat it as still part of the qty rather than a unit, so the unit picker doesn't pop open.
   // A "real" unit never starts with a bare slash.
-  const looksLikePartialFrac = /^\/\d*$/.test(unitRaw);
+  const looksLikePartialFrac = /^\/+\d*$/.test(unitRaw);
   const unit = (unitRaw && !looksLikePartialFrac) ? normalizeUnit(unitRaw) : "";
   // Re-attach partial fraction to qty so the full string is preserved in the input
   const finalQty = looksLikePartialFrac ? `${qty}${unitRaw}` : qty;
