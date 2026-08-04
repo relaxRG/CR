@@ -28,7 +28,7 @@ const TYPE_OPTIONS: { key: EmployeeType; label: string; desc: string }[] = [
   { key: "longterm_parttime", label: "长期兼职", desc: "固定排班，支持薪资预支" },
   { key: "parttime", label: "临时兼职", desc: "按次/按小时，无预支" },
 ];
-const HOLIDAY_MULTIPLIERS = [1.0, 1.5, 2.0, 3.0];
+
 
 export default function LaborEmployeeFormScreen() {
   const colors = useColors();
@@ -194,7 +194,7 @@ export default function LaborEmployeeFormScreen() {
       restDaysPerMonth: Number(restDays) || 4,
       hourlyRate: Number(hourlyRate) || 35,
       overtimeHourlyRate: Number(overtimeRate) || Number(hourlyRate) || 35,
-      holidayMultiplier: holidayMult,
+      holidayMultiplier: 2, // 统一由节假日配置/特殊状态控制，此处保留默认值兼容旧数据
       monthlyFixedSalary: Number(monthlyFixedSalary) || 0,
       weeklyHoursRules: weeklyHoursRules.length > 0 ? weeklyHoursRules : undefined,
       compOffRule: { enabled: compOffEnabled, hoursPerDay: Number(compOffHoursPerDay) || 8 },
