@@ -1,8 +1,10 @@
 /**
  * 门店 Tab — 三大模块
- * 【清单】在售清单 / 采购清单
- * 【报表】月度总报表 / 经营分析 / 备用金 / 人工成本
+ * 【当月月报】月报（月度总报表）/ 经营分析
+ * 【运营】备用金 / 员工管理
  * 【库存管理】10 个品类进销存入口
+ *
+ * 注：【清单】已迁移至研发 Tab 并优先展示
  */
 import React from "react";
 import {
@@ -15,53 +17,54 @@ import { useColors } from "@/hooks/use-colors";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useSync } from "@/lib/cf-sync/provider";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import StoreSaleScreen from "@/components/store/sale";
-import StorePurchaseScreen from "@/components/store/purchase";
 import StorePettyCashScreen from "@/components/store/petty-cash";
 import StoreAnalyticsScreen from "@/components/store/analytics";
 import StoreInventoryScreen from "@/components/store/inventory";
 import StoreReportScreen from "@/components/store/report";
 
-type MainTab = "list" | "report" | "inventory";
-type ListTab = "sale" | "purchase";
-type ReportTab = "summary" | "analytics" | "petty" | "labor";
+type MainTab = "monthly" | "operations" | "inventory";
+type MonthlyTab = "summary" | "analytics";
+type OperationsTab = "petty" | "labor";
 
 const MAIN_TABS: { key: MainTab; label: string }[] = [
-  { key: "list", label: "清单" },
-  { key: "report", label: "报表" },
-  { key: "inventory", label: "库存管理" },
-];
-const LIST_TABS: { key: ListTab; label: string }[] = [
-  { key: "sale", label: "在售清单" },
-  { key: "purchase", label: "采购清单" },
-];
-const REPORT_TABS: { key: ReportTab; label: string }[] = [
-  { key: "summary", label: `${new Date().getMonth() + 1}月报表` },
-  { key: "analytics", label: "经营分析" },
-  { key: "petty", label: "备用金" },
-  { key: "labor", label: "人工成本" },
+  { key: "monthly",    label: "当月月报" },
+  { key: "operations", label: "运营" },
+  { key: "inventory",  label: "库存管理" },
 ];
 
-function ReportModule({ insets }: { insets: any }) {
+const MONTHLY_TABS: { key: MonthlyTab; label: string }[] = [
+  { key: "summary",   label: `${new Date().getMonth() + 1}月报表` },
+  { key: "analytics", label: "经营分析" },
+];
+
+const OPERATIONS_TABS: { key: OperationsTab; label: string }[] = [
+  { key: "petty", label: "备用金" },
+  { key: "labor", label: "员工管理" },
+];
+
+// ── 当月月报模块 ──────────────────────────────────────────────────────────────
+function MonthlyModule({ insets }: { insets: any }) {
   const colors = useColors();
-  const router = useRouter();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
-  const [reportTab, setReportTab] = usePersistedState<ReportTab>("store.report.tab.v1", "summary");
+  const [monthlyTab, setMonthlyTab] = usePersistedState<MonthlyTab>("store.monthly.tab.v1", "summary");
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
         style={{ flexGrow: 0 }}
         contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 8, gap: 8, alignItems: "center" }}>
-        {REPORT_TABS.map((t) => {
-          const active = reportTab === t.key;
+        {MONTHLY_TABS.map((t) => {
+          const active = monthlyTab === t.key;
           return (
-            <Pressable key={t.key} onPress={() => { tap(); setReportTab(t.key); }}
+            <Pressable key={t.key} onPress={() => { tap(); setMonthlyTab(t.key); }}
               style={[S.subChip, {
                 backgroundColor: active ? colors.primary : colors.surface,
                 borderColor: active ? colors.primary : colors.border,
               }]}>
-              <Text style={[S.subChipText, { color: active ? "#fff" : colors.foreground, fontWeight: active ? "600" : "400" }]}>
+              <Text style={[S.subChipText, {
+                color: active ? "#fff" : colors.foreground,
+                fontWeight: active ? "600" : "400",
+              }]}>
                 {t.label}
               </Text>
             </Pressable>
@@ -69,29 +72,64 @@ function ReportModule({ insets }: { insets: any }) {
         })}
       </ScrollView>
 
-      {reportTab === "summary" && (
+      {monthlyTab === "summary" && (
         <SafeAreaInsetsContext.Provider value={insets}>
           <StoreReportScreen />
         </SafeAreaInsetsContext.Provider>
       )}
-      {reportTab === "analytics" && (
+      {monthlyTab === "analytics" && (
         <SafeAreaInsetsContext.Provider value={insets}>
           <StoreAnalyticsScreen />
         </SafeAreaInsetsContext.Provider>
       )}
-      {reportTab === "petty" && (
+    </View>
+  );
+}
+
+// ── 运营模块 ──────────────────────────────────────────────────────────────────
+function OperationsModule({ insets }: { insets: any }) {
+  const colors = useColors();
+  const router = useRouter();
+  const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
+  const [opsTab, setOpsTab] = usePersistedState<OperationsTab>("store.ops.tab.v1", "petty");
+
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}
+        style={{ flexGrow: 0 }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 8, gap: 8, alignItems: "center" }}>
+        {OPERATIONS_TABS.map((t) => {
+          const active = opsTab === t.key;
+          return (
+            <Pressable key={t.key} onPress={() => { tap(); setOpsTab(t.key); }}
+              style={[S.subChip, {
+                backgroundColor: active ? colors.primary : colors.surface,
+                borderColor: active ? colors.primary : colors.border,
+              }]}>
+              <Text style={[S.subChipText, {
+                color: active ? "#fff" : colors.foreground,
+                fontWeight: active ? "600" : "400",
+              }]}>
+                {t.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+
+      {opsTab === "petty" && (
         <SafeAreaInsetsContext.Provider value={insets}>
           <StorePettyCashScreen />
         </SafeAreaInsetsContext.Provider>
       )}
-      {reportTab === "labor" && (
+      {opsTab === "labor" && (
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom, gap: 12 }}>
           <View style={{ borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, overflow: "hidden" }}>
             {[
-              { icon: "person.2.fill", color: "#007AFF", title: "人工成本管理", sub: "员工档案 · 薪资核算", route: "/labor" },
-              { icon: "calendar.badge.clock", color: "#34C759", title: "排班管理", sub: "月度排班 · 出勤记录", route: "/labor-schedule" },
-              { icon: "clock.fill", color: "#FF9500", title: "考勤记录", sub: "打卡 · 迟到早退 · 加班", route: "/labor-attendance" },
-              { icon: "creditcard.fill", color: "#AF52DE", title: "预支管理", sub: "员工预支记录", route: "/labor-advances" },
+              { icon: "person.2.fill",        color: "#007AFF", title: "员工管理",   sub: "员工档案 · 薪资核算",    route: "/labor" },
+              { icon: "calendar.badge.clock", color: "#34C759", title: "排班管理",   sub: "月度排班 · 出勤记录",    route: "/labor-schedule" },
+              { icon: "clock.fill",           color: "#FF9500", title: "考勤记录",   sub: "打卡 · 迟到早退 · 加班", route: "/labor-attendance" },
+              { icon: "creditcard.fill",      color: "#AF52DE", title: "预支管理",   sub: "员工预支记录",           route: "/labor-advances" },
             ].map((item, i, arr) => (
               <Pressable key={item.route} onPress={() => { tap(); router.push(item.route as any); }}
                 style={({ pressed }) => [{
@@ -117,12 +155,12 @@ function ReportModule({ insets }: { insets: any }) {
   );
 }
 
+// ── 门店主屏 ──────────────────────────────────────────────────────────────────
 export default function StoreScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [mainTab, setMainTab] = usePersistedState<MainTab>("store.main.tab.v1", "list");
-  const [listTab, setListTab] = usePersistedState<ListTab>("store.list.tab.v1", "sale");
+  const [mainTab, setMainTab] = usePersistedState<MainTab>("store.main.tab.v2", "monthly");
   const { syncState } = useSync();
   const hasSyncBadge = !!syncState.error;
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
@@ -158,44 +196,13 @@ export default function StoreScreen() {
             );
           })}
         </View>
-
-        {/* 清单模块子 Tab */}
-        {mainTab === "list" && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}
-            style={{ flexGrow: 0 }}
-            contentContainerStyle={{ paddingVertical: 8, gap: 8, alignItems: "center" }}>
-            {LIST_TABS.map((t) => {
-              const active = listTab === t.key;
-              return (
-                <Pressable key={t.key} onPress={() => { tap(); setListTab(t.key); }}
-                  style={[S.subChip, {
-                    backgroundColor: active ? colors.primary : colors.surface,
-                    borderColor: active ? colors.primary : colors.border,
-                  }]}>
-                  <Text style={[S.subChipText, { color: active ? "#fff" : colors.foreground, fontWeight: active ? "600" : "400" }]}>
-                    {t.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        )}
       </View>
 
       {/* 内容区 */}
       <SafeAreaInsetsContext.Provider value={childInsets}>
-        {mainTab === "list" && (
-          <>
-            <View style={[{ flex: 1 }, listTab !== "sale" && S.hidden]}>
-              <StoreSaleScreen />
-            </View>
-            <View style={[{ flex: 1 }, listTab !== "purchase" && S.hidden]}>
-              <StorePurchaseScreen />
-            </View>
-          </>
-        )}
-        {mainTab === "report" && <ReportModule insets={childInsets} />}
-        {mainTab === "inventory" && <StoreInventoryScreen />}
+        {mainTab === "monthly"    && <MonthlyModule    insets={childInsets} />}
+        {mainTab === "operations" && <OperationsModule insets={childInsets} />}
+        {mainTab === "inventory"  && <StoreInventoryScreen />}
       </SafeAreaInsetsContext.Provider>
     </View>
   );
