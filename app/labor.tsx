@@ -2022,8 +2022,8 @@ const DEPT_OPTIONS_SCH: EmployeeDept[] = ["front", "kitchen"];
 
 // ─── 主页面 ───────────────────────────────────────────────────────────────────
 const PAGES = [
-  { key: "schedule", label: "排班表",   icon: "calendar.badge.clock" },
   { key: "roster",   label: "薪资统计", icon: "person.2.fill" },
+  { key: "schedule", label: "排班表",   icon: "calendar.badge.clock" },
   { key: "advances", label: "薪资预支", icon: "creditcard.fill" },
 ];
 type PageKey = typeof PAGES[number]["key"];
@@ -2044,7 +2044,7 @@ export default function LaborScreen({ embedded = false }: { embedded?: boolean }
   const now = new Date();
   const [currentMonth, setCurrentMonth] = useState(currentMonthStr());
   const month = currentMonth;
-  const [activePage, setActivePage] = useState<PageKey>("schedule");
+  const [activePage, setActivePage] = useState<PageKey>("roster");
   const scrollRef = useRef<ScrollView>(null);
 
   const handleTabPress = (key: PageKey) => {
@@ -2121,24 +2121,20 @@ export default function LaborScreen({ embedded = false }: { embedded?: boolean }
         onMomentumScrollEnd={handleScroll}
         style={{ flex: 1 }}
         contentContainerStyle={{ flexDirection: "row" }}>
-        {/* 第一页：总览卡片 + 内嵌排班表 */}
-        <View style={{ width: SCREEN_W, flex: 1 }}>
-          <View style={{ paddingHorizontal: 16, paddingBottom: 4 }}>
-            <OverviewCard month={currentMonth} colors={colors} />
-          </View>
-          <SchedulePage colors={colors} month={currentMonth} onMonthChange={setCurrentMonth} />
-        </View>
-
-        {/* 第二页：员工档案（总览卡片内嵌在 ScrollView 内随内容滚动） */}
+        {/* 第一页：薪资统计（含人力总览卡片） */}
         <View style={{ width: SCREEN_W, flex: 1 }}>
           <EmployeeRosterPage month={currentMonth} colors={colors}
             headerComponent={<OverviewCard month={currentMonth} colors={colors} />} />
         </View>
 
-        {/* 第三页：薪资预支（总览卡片内嵌在 ScrollView 内随内容滚动） */}
+        {/* 第二页：排班表（不显示人力总览卡片） */}
         <View style={{ width: SCREEN_W, flex: 1 }}>
-          <AdvancePage month={currentMonth} colors={colors}
-            headerComponent={<OverviewCard month={currentMonth} colors={colors} />} />
+          <SchedulePage colors={colors} month={currentMonth} onMonthChange={setCurrentMonth} />
+        </View>
+
+        {/* 第三页：薪资预支（不显示人力总览卡片） */}
+        <View style={{ width: SCREEN_W, flex: 1 }}>
+          <AdvancePage month={currentMonth} colors={colors} />
         </View>
       </ScrollView>
     </ScreenContainer>
