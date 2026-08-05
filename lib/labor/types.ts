@@ -1385,3 +1385,52 @@ export function isDayInRange(dow: number, fromDay: number, toDay: number): boole
     return dow >= fromDay || dow <= toDay;
   }
 }
+
+// ─── 班次组员工列表（手动维护，替代自动推算） ────────────────────────────────
+/**
+ * 记录某月/某部门/某班次组 → 包含哪些员工
+ * 员工可同时出现在多个班次组（如午班+晚班）
+ */
+export interface ShiftGroupMember {
+  id: string;
+  /** 月份 "2026-08" */
+  month: string;
+  /** 部门类别 */
+  deptCategory: DeptCategory;
+  /** 班次组 ID（对应 ShiftGroup.id） */
+  groupId: string;
+  /** 员工 ID */
+  employeeId: string;
+  /** 组内排序 */
+  sortOrder: number;
+  createdAt: string;
+}
+
+// ─── 排班表历史快照 ───────────────────────────────────────────────────────────
+/**
+ * 每次手动存档或自动锁定时生成一个快照版本
+ * 多版本并存，可追溯、可代入
+ */
+export interface ScheduleSnapshot {
+  id: string;
+  /** 月份 "2026-07" */
+  month: string;
+  /** 部门类别 */
+  deptCategory: DeptCategory;
+  /** 版本号（同月同部门自增） */
+  version: number;
+  /** 标签：手动存档 / 自动锁定 */
+  label: string;
+  /** 备注 */
+  note?: string;
+  /** 是否锁定（锁定后不可删除，但可预览和代入） */
+  isLocked: boolean;
+  /** 是否为最终版（下月最后一天自动生成） */
+  isFinal: boolean;
+  /** 快照生成时间 */
+  createdAt: string;
+  /** 完整排班记录快照 */
+  entries: ShiftEntry[];
+  /** 班次组员工列表快照 */
+  groupMembers: ShiftGroupMember[];
+}

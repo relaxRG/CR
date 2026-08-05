@@ -23,6 +23,7 @@ import {
   useSpecialStatusStore, useGlobalPayrollSettingsStore,
   useCompOffBalanceEntryStore, useHolidayCompOffStore, useUnexplainedRestAlertStore,
   useCustomDeptStore, useBusinessHoursStore, useShiftGroupStore, useFillPresetStore,
+  useShiftGroupMemberStore, useScheduleSnapshotStore,
 } from "@/lib/labor/store";
 import { useSalaryAdvanceStore, useAdvanceCategoryStore, BUILTIN_ADVANCE_CATEGORIES } from "@/lib/labor/advance-store";
 import { usePettyCashStore, PETTY_CODE_LABELS, PettyRecord } from "@/lib/store/petty-store";
@@ -36,7 +37,7 @@ import {
   DEFAULT_SHIFT_TEMPLATES, DEFAULT_SPECIAL_STATUSES, SHIFT_COLOR_PRESETS, calcAllowance,
   calcCompOffExpiresMonth, BusinessHoursEntry, ShiftGroup, WEEKDAY_SHORT,
   DEFAULT_BUSINESS_HOURS, DEFAULT_SHIFT_GROUPS, FillPreset, isDayInRange,
-  WEEKDAY_LABELS, PaySlip, MonthlyAttendance,
+  WEEKDAY_LABELS, PaySlip, MonthlyAttendance, ShiftGroupMember, ScheduleSnapshot,
 } from "@/lib/labor/types";
 
 const { width: SCREEN_W } = Dimensions.get("window");
@@ -3025,6 +3026,8 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   const { upsertAlert } = useUnexplainedRestAlertStore();
   const { businessHours, setBusinessHours } = useBusinessHoursStore();
   const { shiftGroups, upsertShiftGroup, deleteShiftGroup, setShiftGroups, getGroupForTemplate } = useShiftGroupStore();
+  const { getMembersForGroup, addMember, removeMember, isMember, migrateFromShifts } = useShiftGroupMemberStore();
+  const { getSnapshots, saveSnapshot, updateSnapshot, deleteSnapshot } = useScheduleSnapshotStore();
 
   const now = new Date();
   const todayStr = now.toISOString().slice(0, 10);
@@ -3055,6 +3058,13 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   // 批量删除模式
   const [editMode, setEditMode] = useState(false);
   const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set()); // key: `${empId}_${date}_${session}`
+  // 下拉选人器
+  const [addEmpDropdown, setAddEmpDropdown] = useState<{ groupId: string } | null>(null);
+  // 存档/历史 Modal
+  const [showSnapshotModal, setShowSnapshotModal] = useState(false);
+  const [snapshotNote, setSnapshotNote] = useState("");
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [previewSnapshot, setPreviewSnapshot] = useState<ScheduleSnapshot | null>(null);
 
   const toggleCellSelection = (empId: string, date: string, session: string) => {
     const key = `${empId}_${date}_${session}`;
@@ -3200,74 +3210,51 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
       ...getShifts(nextMonth),
     ];
   }, [shifts, currentMonth]);
+  // 当前部门的所有活跃员工
   const allDeptEmployees = useMemo(() => employees.filter((e) => e.active && !e.archived && resolveEmployeeDept(e).category === deptCategory), [employees, deptCategory, resolveEmployeeDept]);
 
-  // 分组引擎：以「班次」为主体
-  // - 每个班次行：显示本月在该班次有排班记录的所有员工（员工可同时出现在多个班次行）
-  // - 未分组行：本月完全无排班记录的员工
-  const employeesBySession = useMemo(() => {
-    const map: Record<string, Employee[]> = { __unassigned: [] };
-    for (const tpl of sortedTemplates) {
-      map[tpl.session] = [];
-    }
-    for (const emp of allDeptEmployees) {
-      // 找出该员工本月在各班次的排班记录
-      const sessionsWithShifts = new Set(
-        monthShifts
-          .filter((s) => s.employeeId === emp.id && sortedTemplates.some((t) => t.session === s.shift))
-          .map((s) => s.shift)
-      );
-      if (sessionsWithShifts.size === 0) {
-        // 本月完全无排班 → 未分组
-        map["__unassigned"].push(emp);
-      } else {
-        // 员工同时加入所有有排班记录的班次行
-        for (const session of sessionsWithShifts) {
-          if (map[session] !== undefined) {
-            map[session].push(emp);
-          }
-        }
-      }
-    }
-    return map;
-  }, [allDeptEmployees, sortedTemplates, monthShifts]);
-
-  // 班次分组排序：按 ShiftGroup 分组显示员工
+  // 班次分组排序
   const sortedShiftGroups = useMemo(() =>
     [...(shiftGroups.length > 0 ? shiftGroups : DEFAULT_SHIFT_GROUPS)].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)),
     [shiftGroups]
   );
 
-  // 构建分组展示数据：{ group, tpl, empList, groupColor }
-  // 构建分组展示数据
-  // - 每个班次始终显示（无人时显示「暂无排班」占位）
-  // - 员工可同时出现在多个班次行
-  // - 未分组员工（本月无任何排班）始终显示在最后
+  // 首次进入时自动从旧排班记录迁移员工列表
+  React.useEffect(() => {
+    migrateFromShifts(
+      currentMonth, deptCategory,
+      monthShifts.filter((s) => allDeptEmployees.some((e) => e.id === s.employeeId)),
+      sortedShiftGroups,
+      sortedTemplates,
+    );
+  }, [currentMonth, deptCategory]); // 仅在月份或部门切换时触发
+
+  // 新分组展示引擎：基于手动维护的员工列表构建展示数据
+  // - 每个班次组始终显示（无人时显示空列表）
+  // - 员工可同时出现在多个班次组
   const groupedScheduleRows = useMemo(() => {
     const rows: Array<{ groupId: string; groupName: string; groupColor: string; tpl: ShiftTemplate | null; empList: Employee[] }> = [];
     const coveredTplIds = new Set<string>();
-
-    // 1. 已配置分组的班次：始终显示
     for (const grp of sortedShiftGroups) {
       for (const tplId of grp.templateIds) {
         const tpl = sortedTemplates.find((t) => t.id === tplId);
         if (!tpl) continue;
         coveredTplIds.add(tpl.id);
-        const empList = employeesBySession[tpl.session] ?? [];
+        const memberIds = getMembersForGroup(currentMonth, deptCategory, grp.id).map((m) => m.employeeId);
+        const empList = memberIds.map((id) => allDeptEmployees.find((e) => e.id === id)).filter(Boolean) as Employee[];
         rows.push({ groupId: grp.id, groupName: grp.name, groupColor: grp.color, tpl, empList });
       }
     }
-    // 2. 未分组的班次：始终显示（包括无员工的）
+    // 未分组的班次模板：始终显示
     for (const tpl of sortedTemplates) {
       if (coveredTplIds.has(tpl.id)) continue;
-      const empList = employeesBySession[tpl.session] ?? [];
-      rows.push({ groupId: "__ungrouped", groupName: "未分组", groupColor: tpl.color, tpl, empList });
+      const grpId = "__ungrouped_" + tpl.id;
+      const memberIds = getMembersForGroup(currentMonth, deptCategory, grpId).map((m) => m.employeeId);
+      const empList = memberIds.map((id) => allDeptEmployees.find((e) => e.id === id)).filter(Boolean) as Employee[];
+      rows.push({ groupId: grpId, groupName: tpl.session, groupColor: tpl.color, tpl, empList });
     }
-    // 3. 未分组员工（本月无任何排班）：始终显示在最后
-    const unassigned = employeesBySession["__unassigned"] ?? [];
-    rows.push({ groupId: "__unassigned", groupName: "未分组", groupColor: "#8E8E93", tpl: null, empList: unassigned });
     return rows;
-  }, [sortedShiftGroups, sortedTemplates, employeesBySession]);
+  }, [sortedShiftGroups, sortedTemplates, getMembersForGroup, currentMonth, deptCategory, allDeptEmployees]);
 
   // getEntry 支持跨月查询：先查当月，再查相邻月
   const getEntry = useCallback((employeeId: string, date: string, session: string): ShiftEntry | null => {
@@ -3640,90 +3627,26 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
           })}
         </View>
 
-        {/* 各班次员工行（按分组排序，左侧竖条用分组颜色） */}
+        {/* 各班次员工行（手动维护列表，每组底部有「+ ▼」空行） */}
         {groupedScheduleRows.map(({ groupId, groupName, groupColor, tpl, empList }, rowIdx) => {
-          // 空分组：显示分组标题行（提示该班次暂无人排班）
-          if (empList.length === 0 && tpl !== null) {
-            return (
-              <View key={`${groupId}_${tpl.id}_empty`}>
-                {rowIdx > 0 && <View style={{ height: 4, backgroundColor: colors.border + "33" }} />}
-                <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 4, paddingHorizontal: 8, backgroundColor: groupColor + "08" }}>
-                  <View style={{ width: 3, height: 20, borderRadius: 1.5, backgroundColor: groupColor + "66", marginRight: 6 }} />
-                  <Text style={{ fontSize: 10, color: groupColor + "99", fontStyle: "italic" }}>{tpl.session} · 暂无排班</Text>
-                </View>
-              </View>
-            );
-          }
-          // 未分组员工：显示姓名，格子可点击→弹出班次选择器→直接排班
-          if (tpl === null) {
-            if (empList.length === 0) return null; // 无未分组员工时不显示该行
-            return (
-              <View key="__unassigned_row">
-                {rowIdx > 0 && <View style={{ height: 4, backgroundColor: colors.border + "33" }} />}
-                <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 4, paddingHorizontal: 8, backgroundColor: "#8E8E93" + "08" }}>
-                  <View style={{ width: 3, height: 20, borderRadius: 1.5, backgroundColor: "#8E8E93" + "66", marginRight: 6 }} />
-                  <Text style={{ fontSize: 10, color: "#8E8E93", fontWeight: "600" }}>未分组 · 未排班 ({empList.length})</Text>
-                </View>
-                {empList.map((emp, empIdx) => {
-                  const isLast = empIdx === empList.length - 1;
-                  return (
-                    <View key={emp.id} style={[EXL.empRow,
-                      !isLast && { borderBottomColor: colors.border + "33", borderBottomWidth: StyleSheet.hairlineWidth }
-                    ]}>
-                      <View style={{ width: 3, height: 34, backgroundColor: "#8E8E93" + "66" }} />
-                      <TouchableOpacity
-                        onLongPress={() => { if (!editMode) { tap(); setQuickFillEmployee(emp); if (viewMode === "session") { setShowQuickFill(true); } else { setShowQuickFillHours(true); } } }}
-                        style={[EXL.nameCol, { backgroundColor: "transparent", width: EXL_NAME_W - 3 }]}>
-                        <Text style={{ fontSize: 11, fontWeight: "600", color: colors.muted }} numberOfLines={1}>{emp.code}</Text>
-                      </TouchableOpacity>
-                      {week.map(({ dateStr, isCurrentMonth }, di) => {
-                        const isToday = dateStr === todayStr;
-                        return (
-                          <TouchableOpacity key={di}
-                            onPress={() => {
-                              if (editMode) return;
-                              // 先选择班次，再打开排班编辑
-                              tap();
-                              if (sortedTemplates.length === 1) {
-                                handleCellPress(emp, dateStr, sortedTemplates[0].session);
-                              } else {
-                                Alert.alert(
-                                  `选择班次：${emp.code} ${dateStr}`,
-                                  "请选择要排入的班次",
-                                  [
-                                    { text: "取消", style: "cancel" },
-                                    ...sortedTemplates.map((t) => ({
-                                      text: t.session,
-                                      onPress: () => handleCellPress(emp, dateStr, t.session),
-                                    })),
-                                  ]
-                                );
-                              }
-                            }}
-                            style={[EXL.cell,
-                              isToday && { backgroundColor: "#8E8E93" + "10" },
-                              !isCurrentMonth && { backgroundColor: colors.border + "0A" },
-                            ]}>
-                            <View style={{ width: 12, height: 12, borderRadius: 6, borderWidth: 1, borderColor: "#8E8E93" + "44", borderStyle: "dashed" }} />
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                  );
-                })}
-              </View>
-            );
-          }
+          if (!tpl) return null;
+          const isDropdownOpen = addEmpDropdown?.groupId === groupId;
           return (
             <View key={`${groupId}_${tpl.id}`}>
               {rowIdx > 0 && <View style={{ height: 6, backgroundColor: colors.border + "44" }} />}
+              {/* 班次组标题行 */}
+              <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 3, paddingHorizontal: 8, backgroundColor: groupColor + "10" }}>
+                <View style={{ width: 3, height: 16, borderRadius: 1.5, backgroundColor: groupColor, marginRight: 6 }} />
+                <Text style={{ fontSize: 10, fontWeight: "700", color: groupColor }}>{tpl.session}</Text>
+                <Text style={{ fontSize: 10, color: colors.muted, marginLeft: 4 }}>({empList.length}人)</Text>
+              </View>
+              {/* 员工行 */}
               {empList.map((emp, empIdx) => {
                 const isLast = empIdx === empList.length - 1;
                 return (
                   <View key={emp.id} style={[EXL.empRow,
                     !isLast && { borderBottomColor: colors.border + "33", borderBottomWidth: StyleSheet.hairlineWidth }
                   ]}>
-                    {/* 分组色左竖条（颜色由分组决定） */}
                     <View style={{ width: 3, height: 34, backgroundColor: groupColor + "CC" }} />
                     <TouchableOpacity
                       onLongPress={() => { if (!editMode) { tap(); setQuickFillEmployee(emp); if (viewMode === "session") { setShowQuickFill(true); } else { setShowQuickFillHours(true); } } }}
@@ -3739,12 +3662,8 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                       return (
                         <TouchableOpacity key={di}
                           onPress={() => {
-                            if (editMode) {
-                              tap();
-                              toggleCellSelection(emp.id, dateStr, tpl.session);
-                            } else {
-                              handleCellPress(emp, dateStr, tpl.session);
-                            }
+                            if (editMode) { tap(); toggleCellSelection(emp.id, dateStr, tpl.session); }
+                            else { handleCellPress(emp, dateStr, tpl.session); }
                           }}
                           style={[EXL.cell,
                             isToday && !isSelected && { backgroundColor: "#1677FF" + "15" },
@@ -3752,9 +3671,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                             isSelected && { backgroundColor: colors.error + "25" },
                           ]}>
                           {isSelected
-                            ? <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: colors.error, alignItems: "center", justifyContent: "center" }}>
-                                <Text style={{ fontSize: 9, color: "#fff", fontWeight: "700" }}>✓</Text>
-                              </View>
+                            ? <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: colors.error, alignItems: "center", justifyContent: "center" }}><Text style={{ fontSize: 9, color: "#fff", fontWeight: "700" }}>✓</Text></View>
                             : renderCellContent(entry, tpl.session, contractH, groupColor)
                           }
                         </TouchableOpacity>
@@ -3763,6 +3680,55 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                   </View>
                 );
               })}
+              {/* 永远存在的「+ ▼」空行 */}
+              {!editMode && (
+                <TouchableOpacity
+                  onPress={() => { tap(); setAddEmpDropdown(isDropdownOpen ? null : { groupId }); }}
+                  style={[EXL.empRow, { borderTopColor: colors.border + "33", borderTopWidth: StyleSheet.hairlineWidth }]}>
+                  <View style={{ width: 3, height: 34, backgroundColor: groupColor + "44" }} />
+                  <View style={[EXL.nameCol, { width: EXL_NAME_W - 3, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 2 }]}>
+                    <Text style={{ fontSize: 11, color: isDropdownOpen ? groupColor : colors.muted, fontWeight: "600" }}>+</Text>
+                    <Text style={{ fontSize: 9, color: isDropdownOpen ? groupColor : colors.muted }}>▼</Text>
+                  </View>
+                  {week.map((_, di) => (
+                    <View key={di} style={[EXL.cell, { backgroundColor: colors.border + "08" }]} />
+                  ))}
+                </TouchableOpacity>
+              )}
+              {/* 下拉选人器（展开时显示在「+ ▼」行下方） */}
+              {isDropdownOpen && (
+                <View style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: groupColor + "44", borderRadius: 8, margin: 4, overflow: "hidden", zIndex: 100 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 10, paddingVertical: 6, backgroundColor: groupColor + "15" }}>
+                    <Text style={{ fontSize: 11, fontWeight: "700", color: groupColor }}>添加到「{tpl.session}」</Text>
+                    <TouchableOpacity onPress={() => setAddEmpDropdown(null)}>
+                      <Text style={{ fontSize: 12, color: colors.muted }}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
+                  {allDeptEmployees.map((emp) => {
+                    const inGroup = isMember(currentMonth, deptCategory, groupId, emp.id);
+                    return (
+                      <TouchableOpacity key={emp.id}
+                        onPress={() => {
+                          tap();
+                          if (inGroup) removeMember(currentMonth, deptCategory, groupId, emp.id);
+                          else addMember(currentMonth, deptCategory, groupId, emp.id);
+                        }}
+                        style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 8,
+                          borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border + "44",
+                          backgroundColor: inGroup ? groupColor + "10" : "transparent" }}>
+                        <View style={{ width: 16, height: 16, borderRadius: 8, borderWidth: 1.5,
+                          borderColor: inGroup ? groupColor : colors.muted + "88",
+                          backgroundColor: inGroup ? groupColor : "transparent",
+                          alignItems: "center", justifyContent: "center", marginRight: 8 }}>
+                          {inGroup && <Text style={{ fontSize: 9, color: "#fff", fontWeight: "700" }}>✓</Text>}
+                        </View>
+                        <Text style={{ fontSize: 13, fontWeight: inGroup ? "700" : "400", color: inGroup ? groupColor : colors.foreground }}>{emp.code}</Text>
+                        {emp.realName !== emp.code && <Text style={{ fontSize: 11, color: colors.muted, marginLeft: 4 }}>{emp.realName}</Text>}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
             </View>
           );
         })}
@@ -3824,6 +3790,14 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
               style={[EXL.gearBtn, { backgroundColor: colors.border + "44", width: "auto", paddingHorizontal: 10 }]}>
               <Text style={{ fontSize: 11, fontWeight: "600", color: colors.foreground }}>✐ 编辑</Text>
             </TouchableOpacity>
+            {/* 存档 */}
+            <Pressable onPress={() => { tap(); setSnapshotNote(""); setShowSnapshotModal(true); }} style={[EXL.gearBtn, { backgroundColor: colors.border + "44" }]}>
+              <IconSymbol name="camera.fill" size={15} color={colors.muted} />
+            </Pressable>
+            {/* 历史版本 */}
+            <Pressable onPress={() => { tap(); setShowHistoryModal(true); }} style={[EXL.gearBtn, { backgroundColor: colors.border + "44" }]}>
+              <IconSymbol name="clock.arrow.circlepath" size={15} color={colors.muted} />
+            </Pressable>
             {/* 班次设置 */}
             <Pressable onPress={() => { tap(); setShowTplModal(true); }} style={[EXL.gearBtn, { backgroundColor: colors.border + "44" }]}>
               <IconSymbol name="gearshape.fill" size={16} color={colors.muted} />
@@ -4130,6 +4104,167 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
         }}
         onClose={() => setShowQuickFillHours(false)}
       />
+
+      {/* 存档 Modal */}
+      <Modal visible={showSnapshotModal} transparent animationType="fade" onRequestClose={() => setShowSnapshotModal(false)}>
+        <Pressable style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "center", alignItems: "center" }}
+          onPress={() => setShowSnapshotModal(false)}>
+          <Pressable style={{ width: 300, backgroundColor: colors.background, borderRadius: 16, padding: 20, gap: 14 }}
+            onPress={(e) => e.stopPropagation?.()}>
+            <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground }}>📸 存档排班表</Text>
+            <Text style={{ fontSize: 12, color: colors.muted }}>{monthLabel(currentMonth)} · {DEPT_CATEGORY_LABELS[deptCategory]}</Text>
+            <TextInput
+              value={snapshotNote}
+              onChangeText={setSnapshotNote}
+              placeholder="备注（可留空）"
+              placeholderTextColor={colors.muted}
+              style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, color: colors.foreground }}
+            />
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <TouchableOpacity onPress={() => setShowSnapshotModal(false)}
+                style={{ flex: 1, alignItems: "center", paddingVertical: 10, borderRadius: 10, backgroundColor: colors.border + "44" }}>
+                <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>取消</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  const currentMembers = sortedShiftGroups.flatMap((grp) =>
+                    grp.templateIds.flatMap((tplId) => {
+                      const tpl = sortedTemplates.find((t) => t.id === tplId);
+                      if (!tpl) return [];
+                      const grpId = grp.id;
+                      return getMembersForGroup(currentMonth, deptCategory, grpId);
+                    })
+                  );
+                  saveSnapshot({
+                    month: currentMonth,
+                    deptCategory,
+                    label: "手动存档",
+                    note: snapshotNote.trim() || undefined,
+                    isLocked: false,
+                    isFinal: false,
+                    entries: monthShifts.filter((s) => allDeptEmployees.some((e) => e.id === s.employeeId)),
+                    groupMembers: currentMembers,
+                  });
+                  setShowSnapshotModal(false);
+                  setGenResult("✅ 存档成功");
+                  setTimeout(() => setGenResult(null), 2500);
+                }}
+                style={{ flex: 1.2, alignItems: "center", paddingVertical: 10, borderRadius: 10, backgroundColor: "#1677FF" }}>
+                <Text style={{ fontSize: 14, fontWeight: "700", color: "#fff" }}>确认存档</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* 历史版本 Modal */}
+      <Modal visible={showHistoryModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => { setShowHistoryModal(false); setPreviewSnapshot(null); }}>
+        <View style={{ flex: 1, backgroundColor: colors.background }}>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
+            <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground }}>🕐 历史版本</Text>
+            <TouchableOpacity onPress={() => { setShowHistoryModal(false); setPreviewSnapshot(null); }}>
+              <Text style={{ fontSize: 14, color: colors.primary }}>关闭</Text>
+            </TouchableOpacity>
+          </View>
+          {previewSnapshot ? (
+            // 预览某个快照
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingVertical: 10, backgroundColor: colors.surface }}>
+                <TouchableOpacity onPress={() => setPreviewSnapshot(null)}>
+                  <IconSymbol name="chevron.left" size={18} color={colors.primary} />
+                </TouchableOpacity>
+                <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>v{previewSnapshot.version} · {previewSnapshot.label}</Text>
+                {previewSnapshot.isLocked && <Text style={{ fontSize: 11, color: colors.warning }}>🔒 已锁定</Text>}
+              </View>
+              <ScrollView contentContainerStyle={{ padding: 16, gap: 8 }}>
+                <Text style={{ fontSize: 12, color: colors.muted }}>存档时间：{previewSnapshot.createdAt.slice(0, 16).replace("T", " ")}</Text>
+                {previewSnapshot.note ? <Text style={{ fontSize: 12, color: colors.muted }}>备注：{previewSnapshot.note}</Text> : null}
+                <Text style={{ fontSize: 12, color: colors.muted }}>包含 {previewSnapshot.entries.length} 条排班记录、{previewSnapshot.groupMembers.length} 个员工分组</Text>
+                <View style={{ flexDirection: "row", gap: 10, marginTop: 8 }}>
+                  <TouchableOpacity
+                    onPress={() => {
+                      Alert.alert(
+                        "代入当前月",
+                        `将 v${previewSnapshot.version} 的数据代入 ${monthLabel(currentMonth)} ${DEPT_CATEGORY_LABELS[deptCategory]}？\n这将覆盖当前排班表的员工分组列表。`,
+                        [
+                          { text: "取消", style: "cancel" },
+                          { text: "仅代入员工列表", onPress: () => {
+                            // 删除当前月当前部门的成员数据，再按快照重建
+                            const toAdd = previewSnapshot.groupMembers
+                              .filter((m) => m.month === previewSnapshot.month && m.deptCategory === deptCategory)
+                              .map((m) => ({ ...m, month: currentMonth, id: Math.random().toString(36).slice(2) }));
+                            toAdd.forEach((m) => addMember(currentMonth, deptCategory, m.groupId, m.employeeId));
+                            setPreviewSnapshot(null); setShowHistoryModal(false);
+                            setGenResult("✅ 员工列表已代入"); setTimeout(() => setGenResult(null), 2500);
+                          }},
+                        ]
+                      );
+                    }}
+                    style={{ flex: 1, alignItems: "center", paddingVertical: 10, borderRadius: 10, backgroundColor: "#1677FF" }}>
+                    <Text style={{ fontSize: 13, fontWeight: "700", color: "#fff" }}>一键代入</Text>
+                  </TouchableOpacity>
+                  {!previewSnapshot.isLocked && (
+                    <TouchableOpacity
+                      onPress={() => { updateSnapshot(previewSnapshot.id, { isLocked: true }); setPreviewSnapshot({ ...previewSnapshot, isLocked: true }); }}
+                      style={{ paddingHorizontal: 14, alignItems: "center", justifyContent: "center", paddingVertical: 10, borderRadius: 10, backgroundColor: colors.warning + "22" }}>
+                      <Text style={{ fontSize: 13, fontWeight: "600", color: colors.warning }}>🔒 锁定</Text>
+                    </TouchableOpacity>
+                  )}
+                  {previewSnapshot.isLocked && (
+                    <TouchableOpacity
+                      onPress={() => Alert.alert("解锁确认", "解锁后可修改此版本，确认解锁？", [
+                        { text: "取消", style: "cancel" },
+                        { text: "解锁", style: "destructive", onPress: () => { updateSnapshot(previewSnapshot.id, { isLocked: false }); setPreviewSnapshot({ ...previewSnapshot, isLocked: false }); } },
+                      ])}
+                      style={{ paddingHorizontal: 14, alignItems: "center", justifyContent: "center", paddingVertical: 10, borderRadius: 10, backgroundColor: colors.border + "44" }}>
+                      <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted }}>🔓 解锁</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </ScrollView>
+            </View>
+          ) : (
+            // 版本列表
+            <ScrollView contentContainerStyle={{ padding: 16, gap: 10 }}>
+              {(() => {
+                const snaps = getSnapshots(currentMonth, deptCategory);
+                if (snaps.length === 0) return (
+                  <View style={{ alignItems: "center", paddingVertical: 40 }}>
+                    <Text style={{ fontSize: 14, color: colors.muted }}>暂无存档记录</Text>
+                    <Text style={{ fontSize: 12, color: colors.muted, marginTop: 6 }}>点击控制栏的 📸 按鈕存档当前排班表</Text>
+                  </View>
+                );
+                return snaps.map((snap) => (
+                  <TouchableOpacity key={snap.id} onPress={() => setPreviewSnapshot(snap)}
+                    style={{ backgroundColor: colors.surface, borderRadius: 12, padding: 14, borderWidth: 1,
+                      borderColor: snap.isFinal ? colors.warning + "66" : colors.border,
+                      borderLeftWidth: 4, borderLeftColor: snap.isFinal ? colors.warning : snap.isLocked ? colors.success : colors.primary }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>v{snap.version}</Text>
+                        {snap.isFinal && <Text style={{ fontSize: 10, color: colors.warning, fontWeight: "700" }}>[最终版]</Text>}
+                        {snap.isLocked && <Text style={{ fontSize: 10, color: colors.success }}>🔒</Text>}
+                      </View>
+                      <Text style={{ fontSize: 11, color: colors.muted }}>{snap.createdAt.slice(0, 16).replace("T", " ")}</Text>
+                    </View>
+                    <Text style={{ fontSize: 12, color: colors.muted, marginTop: 4 }}>{snap.label}{snap.note ? " · " + snap.note : ""}</Text>
+                    <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>{snap.entries.length} 条排班记录</Text>
+                    {!snap.isLocked && (
+                      <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); Alert.alert("删除确认", "删除该存档版本？", [
+                        { text: "取消", style: "cancel" },
+                        { text: "删除", style: "destructive", onPress: () => deleteSnapshot(snap.id) },
+                      ]); }}
+                        style={{ position: "absolute", right: 12, bottom: 12 }}>
+                        <Text style={{ fontSize: 11, color: colors.error }}>删除</Text>
+                      </TouchableOpacity>
+                    )}
+                  </TouchableOpacity>
+                ));
+              })()}
+            </ScrollView>
+          )}
+        </View>
+      </Modal>
     </View>
   );
 }
