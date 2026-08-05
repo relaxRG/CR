@@ -140,7 +140,12 @@ function EmployeeCard({
   const saveRewards = useCallback(() => {
     if (!slip) return;
     const totalReward = rewardItems.reduce((sum, item) => sum + item.amount, 0);
-    upsertPaySlip({ ...slip, rewardPenalty: totalReward, rewardPenaltyItems: rewardItems, notes, updatedAt: new Date().toISOString() });
+    // 同步更新 grossSalary 和 finalSalary：奖惩变化时同步更新
+    const rewardDiff = totalReward - (slip.rewardPenalty ?? 0);
+    const newGross = Math.round((slip.grossSalary + rewardDiff) * 100) / 100;
+    const newFinal = Math.round((slip.finalSalary + rewardDiff) * 100) / 100;
+    upsertPaySlip({ ...slip, rewardPenalty: totalReward, rewardPenaltyItems: rewardItems, notes,
+      grossSalary: newGross, finalSalary: newFinal, updatedAt: new Date().toISOString() });
     onToggleRewardEdit();
   }, [slip, rewardItems, notes, upsertPaySlip, onToggleRewardEdit]);
 

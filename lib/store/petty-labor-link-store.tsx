@@ -202,6 +202,7 @@ const LinkContext = createContext<LinkContextValue>({
 
 export function PettyLaborLinkProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, { links: [], aliases: [] });
+  const [ready, setReady] = React.useState(false);
 
   useEffect(() => {
     const loadLinks = (raw: string | null) => {
@@ -212,8 +213,10 @@ export function PettyLaborLinkProvider({ children }: { children: React.ReactNode
       if (!raw) return;
       try { dispatch({ type: "LOAD_ALIASES", payload: JSON.parse(raw) }); } catch {}
     };
-    AsyncStorage.getItem(LINK_STORAGE_KEY).then(loadLinks);
-    AsyncStorage.getItem(ALIAS_STORAGE_KEY).then(loadAliases);
+    Promise.all([
+      AsyncStorage.getItem(LINK_STORAGE_KEY).then(loadLinks),
+      AsyncStorage.getItem(ALIAS_STORAGE_KEY).then(loadAliases),
+    ]).then(() => setReady(true));
     registerStoreReload(() => {
       AsyncStorage.getItem(LINK_STORAGE_KEY).then(loadLinks);
       AsyncStorage.getItem(ALIAS_STORAGE_KEY).then(loadAliases);

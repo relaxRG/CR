@@ -2730,6 +2730,55 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
         const cumulativeTaxPaid = prevMonthSlips.reduce((sum, s) => sum + (s.incomeTax ?? 0), 0);
         expireCompOff(currentMonth);
         expireHolidayCompOff(currentMonth);
+
+        // 三种调休换休单独处理：按班次中的 specialStatusId 分别扣除对应余额
+        const empShiftsForCompOff = getShifts(currentMonth).filter((s) => s.employeeId === emp.id && s.specialStatusId);
+        for (const s of empShiftsForCompOff) {
+          if (s.specialStatusId === "ss_comp_off_holiday") {
+            // 节假日调休：优先消耗节假日调休余额
+            const hEntries = getHolidayCompOffEntries(emp.id)
+              .filter((e) => e.status === "available" && e.expiresMonth >= currentMonth)
+              .sort((a, b) => a.expiresMonth.localeCompare(b.expiresMonth));
+            if (hEntries.length > 0) {
+              const entry = hEntries[0];
+              const usedays = Math.min(entry.days, 1);
+              updateHolidayCompOff(entry.id, {
+                status: usedays >= entry.days ? "used_rest" : "available",
+                days: entry.days - usedays,
+                usedMonth: currentMonth,
+              });
+            }
+          } else if (s.specialStatusId === "ss_comp_off_overtime") {
+            // 加班换休：优先消耗加班调休余额
+            const otEntries = getCompOffEntries(emp.id)
+              .filter((e) => e.status === "available" && e.source === "overtime" && e.expiresMonth >= currentMonth)
+              .sort((a, b) => a.expiresMonth.localeCompare(b.expiresMonth));
+            if (otEntries.length > 0) {
+              const entry = otEntries[0];
+              const usedays = Math.min(entry.days, 1);
+              updateCompOffEntry(entry.id, {
+                status: usedays >= entry.days ? "used_rest" : "available",
+                days: entry.days - usedays,
+                usedMonth: currentMonth,
+              });
+            }
+          } else if (s.specialStatusId === "ss_comp_off_balance") {
+            // 调休余额：消耗任意可用余额
+            const balEntries = getCompOffEntries(emp.id)
+              .filter((e) => e.status === "available" && e.expiresMonth >= currentMonth)
+              .sort((a, b) => a.expiresMonth.localeCompare(b.expiresMonth));
+            if (balEntries.length > 0) {
+              const entry = balEntries[0];
+              const usedays = Math.min(entry.days, 1);
+              updateCompOffEntry(entry.id, {
+                status: usedays >= entry.days ? "used_rest" : "available",
+                days: entry.days - usedays,
+                usedMonth: currentMonth,
+              });
+            }
+          }
+        }
+
         const extraRestDays = Math.max(0, -(att.underRestDays));
         let remainingExtraRest = extraRestDays;
         if (remainingExtraRest > 0) {
@@ -3060,9 +3109,14 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                               const newMode = currentMode === "cash" ? "rest" : "cash";
                               const alloc = { ...(slip?.holidayBonusAllocation ?? {}) };
                               alloc[key] = { date: s.date, name: ss.name, totalBonus: bonusAmt, cashAmount: newMode === "cash" ? bonusAmt : 0, restDays: newMode === "rest" ? 1 : 0, mode: newMode };
-                              const totalCash = Object.values(alloc).reduce((sum: number, a: any) => sum + (a.cashAmount ?? 0), 0);
                               if (slip) {
-                                upsertPaySlip({ ...slip, holidayBonusAllocation: alloc, updatedAt: new Date().toISOString() });
+                                // 同步更新 finalSalary：拿钱时加上奖金，换休时减去奖金
+                                const oldCash = Object.values(slip.holidayBonusAllocation ?? {}).reduce((s: number, a: any) => s + (a.cashAmount ?? 0), 0);
+                                const newCash = Object.values(alloc).reduce((s: number, a: any) => s + (a.cashAmount ?? 0), 0);
+                                const cashDiff = newCash - oldCash;
+                                const newFinal = Math.round((slip.finalSalary + cashDiff) * 100) / 100;
+                                const newGross = Math.round((slip.grossSalary + cashDiff) * 100) / 100;
+                                upsertPaySlip({ ...slip, holidayBonusAllocation: alloc, finalSalary: newFinal, grossSalary: newGross, updatedAt: new Date().toISOString() });
                               }
                               if (newMode === "rest") {
                                 const existing = getCompOffEntries(emp.id).find((e: any) => e.source === "holiday" && e.workDate === s.date && e.earnedMonth === currentMonthStr);

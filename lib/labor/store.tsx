@@ -1055,6 +1055,23 @@ const CompOffBalanceEntryContext = createContext<CompOffBalanceEntryStore>({
 function CompOffBalanceEntryProvider({ children }: { children: React.ReactNode }) {
   const { data: entries, ref, persist, ready } = usePersisted<CompOffBalanceEntry>("labor_comp_off_entries_v1");
 
+  // 迁移旧数据：修复 expiresMonth 为空字符串的条目（旧版错误写入空字符串）
+  React.useEffect(() => {
+    if (!ready) return;
+    const needsFix = ref.current.some((e) => e.status === "available" && !e.expiresMonth);
+    if (needsFix) {
+      const fixed = ref.current.map((e) => {
+        if (e.status === "available" && !e.expiresMonth) {
+          // 根据 earnedMonth 计算3个月后过期
+          return { ...e, expiresMonth: calcCompOffExpiresMonth(e.earnedMonth) };
+        }
+        return e;
+      });
+      console.log("[CompOffBalanceEntryProvider] 迁移旧数据，修复 expiresMonth 为空的条目");
+      persist(fixed);
+    }
+  }, [ready]);
+
   const addEntry = useCallback((entry: Omit<CompOffBalanceEntry, "id" | "createdAt">) => {
     const newEntry: CompOffBalanceEntry = {
       ...entry,
