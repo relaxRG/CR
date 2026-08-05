@@ -9,13 +9,13 @@ import { notifySyncChange, registerStoreReload } from "../sync/engine";
 import {
   Employee, ShiftEntry, MonthlyAttendance, PaySlip, MonthConfig,
   ShiftTemplate, HolidayConfig,
-  EmployeeGroup, SpecialStatus, GlobalPayrollSettings,
+  SpecialStatus, GlobalPayrollSettings,
   CompOffBalanceEntry, HolidayCompOffEntry, UnexplainedRestAlert,
   CustomDept, BusinessHoursEntry, ShiftGroup, FillPreset,
   calcDailyRate, calcAllowance, calcSocialInsurance, calcIncomeTax, calcFinalSalary,
   getDaysInMonth, parseMonth, getContractHoursForDate,
   calcCompOffExpiresMonth, getAvailableCompOffDays,
-  DEFAULT_SHIFT_TEMPLATES, DEFAULT_EMPLOYEE_GROUPS, DEFAULT_SPECIAL_STATUSES,
+  DEFAULT_SHIFT_TEMPLATES, DEFAULT_SPECIAL_STATUSES,
   DEFAULT_GLOBAL_PAYROLL_SETTINGS, DEFAULT_CUSTOM_DEPTS,
   DEFAULT_BUSINESS_HOURS, DEFAULT_SHIFT_GROUPS,
 } from "./types";
@@ -267,73 +267,6 @@ function CustomDeptProvider({ children }: { children: React.ReactNode }) {
 }
 
 export const useCustomDeptStore = () => useContext(CustomDeptContext);
-
-// ─── 员工分组 Store ───────────────────────────────────────────────────────────
-interface EmployeeGroupStore {
-  groups: EmployeeGroup[];
-  addGroup: (draft: Omit<EmployeeGroup, "id">) => string;
-  updateGroup: (id: string, patch: Partial<EmployeeGroup>) => void;
-  deleteGroup: (id: string) => void;
-  moveEmployeeToGroup: (employeeId: string, groupId: string) => void;
-  reorderEmployeesInGroup: (groupId: string, orderedIds: string[]) => void;
-  reorderGroups: (orderedIds: string[]) => void;
-  toggleCollapse: (groupId: string) => void;
-  ready: boolean;
-}
-
-const EmployeeGroupContext = createContext<EmployeeGroupStore>({
-  groups: DEFAULT_EMPLOYEE_GROUPS,
-  addGroup: () => "", updateGroup: () => {}, deleteGroup: () => {},
-  moveEmployeeToGroup: () => {}, reorderEmployeesInGroup: () => {},
-  reorderGroups: () => {}, toggleCollapse: () => {}, ready: false,
-});
-
-function EmployeeGroupProvider({ children }: { children: React.ReactNode }) {
-  const { data: groups, ref, persist, ready } = usePersisted<EmployeeGroup>("labor_employee_groups_v1", DEFAULT_EMPLOYEE_GROUPS);
-
-  const addGroup = useCallback((draft: Omit<EmployeeGroup, "id">): string => {
-    const id = uuid();
-    persist([...ref.current, { ...draft, id }]);
-    return id;
-  }, [persist, ref]);
-
-  const updateGroup = useCallback((id: string, patch: Partial<EmployeeGroup>) => {
-    persist(ref.current.map((g) => g.id === id ? { ...g, ...patch } : g));
-  }, [persist, ref]);
-
-  const deleteGroup = useCallback((id: string) => {
-    persist(ref.current.filter((g) => g.id !== id));
-  }, [persist, ref]);
-
-  const moveEmployeeToGroup = useCallback((employeeId: string, groupId: string) => {
-    persist(ref.current.map((g) => {
-      if (g.id === groupId) return { ...g, employeeIds: g.employeeIds.includes(employeeId) ? g.employeeIds : [...g.employeeIds, employeeId] };
-      return { ...g, employeeIds: g.employeeIds.filter((id) => id !== employeeId) };
-    }));
-  }, [persist, ref]);
-
-  const reorderEmployeesInGroup = useCallback((groupId: string, orderedIds: string[]) => {
-    persist(ref.current.map((g) => g.id === groupId ? { ...g, employeeIds: orderedIds } : g));
-  }, [persist, ref]);
-
-  const reorderGroups = useCallback((orderedIds: string[]) => {
-    const sorted = [...ref.current].sort((a, b) => orderedIds.indexOf(a.id) - orderedIds.indexOf(b.id));
-    persist(sorted.map((g, i) => ({ ...g, sortOrder: i })));
-  }, [persist, ref]);
-
-  const toggleCollapse = useCallback((groupId: string) => {
-    persist(ref.current.map((g) => g.id === groupId ? { ...g, collapsed: !g.collapsed } : g));
-  }, [persist, ref]);
-
-  return (
-    <EmployeeGroupContext.Provider value={{
-      groups, addGroup, updateGroup, deleteGroup,
-      moveEmployeeToGroup, reorderEmployeesInGroup, reorderGroups, toggleCollapse, ready,
-    }}>
-      {children}
-    </EmployeeGroupContext.Provider>
-  );
-}
 
 // ─── 班次模板 Store ───────────────────────────────────────────────────────────
 interface ShiftTemplateStore {
@@ -1430,7 +1363,6 @@ export function LaborProvider({ children }: { children: React.ReactNode }) {
     <MonthConfigProvider>
       <EmployeeProvider>
         <CustomDeptProvider>
-        <EmployeeGroupProvider>
           <BusinessHoursProvider>
           <FillPresetProvider>
           <ShiftGroupProvider>
@@ -1458,7 +1390,6 @@ export function LaborProvider({ children }: { children: React.ReactNode }) {
           </ShiftGroupProvider>
           </FillPresetProvider>
           </BusinessHoursProvider>
-        </EmployeeGroupProvider>
         </CustomDeptProvider>
       </EmployeeProvider>
     </MonthConfigProvider>
@@ -1467,7 +1398,6 @@ export function LaborProvider({ children }: { children: React.ReactNode }) {
 
 // ─── Hooks ────────────────────────────────────────────────────────────────────
 export function useEmployeeStore() { return useContext(EmployeeContext); }
-export function useEmployeeGroupStore() { return useContext(EmployeeGroupContext); }
 export function useShiftStore() { return useContext(ShiftContext); }
 export function useShiftTemplateStore() { return useContext(ShiftTemplateContext); }
 export function useSpecialStatusStore() { return useContext(SpecialStatusContext); }

@@ -761,21 +761,6 @@ export const LEGAL_HOLIDAY_REFERENCE = [
 ];
 
 // ─── 员工自定义分组 ───────────────────────────────────────────────────────────
-export interface EmployeeGroup {
-  id: string;
-  name: string;
-  color: string;
-  employeeIds: string[];
-  sortOrder: number;
-  collapsed: boolean;
-}
-
-export const DEFAULT_EMPLOYEE_GROUPS: EmployeeGroup[] = [
-  { id: "grp_front",    name: "前厅", color: "#007AFF", employeeIds: [], sortOrder: 0, collapsed: false },
-  { id: "grp_kitchen",  name: "后厨", color: "#34C759", employeeIds: [], sortOrder: 1, collapsed: false },
-  { id: "grp_parttime", name: "兼职", color: "#FF9500", employeeIds: [], sortOrder: 2, collapsed: false },
-  { id: "grp_other",    name: "其他", color: "#8E8E93", employeeIds: [], sortOrder: 3, collapsed: false },
-];
 
 // ─── 员工档案（扩展版） ───────────────────────────────────────────────────────
 export interface Employee {
