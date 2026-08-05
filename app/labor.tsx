@@ -11,7 +11,7 @@ import {
   Alert, Dimensions, Modal, Platform, Pressable, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions, KeyboardAvoidingView} from "react-native";
 import * as Haptics from "expo-haptics";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -4175,11 +4175,11 @@ export default function LaborScreen({ embedded = false }: { embedded?: boolean }
   const insets = useSafeAreaInsets();
   const { width: winW } = useWindowDimensions();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
-
+  const { initialPage } = useLocalSearchParams<{ initialPage?: string }>();
   const now = new Date();
   const [currentMonth, setCurrentMonth] = useState(currentMonthStr());
   const month = currentMonth;
-  const [activePage, setActivePage] = useState<PageKey>("roster");
+  const [activePage, setActivePage] = useState<PageKey>((initialPage as PageKey) ?? "roster");
   const scrollRef = useRef<ScrollView>(null);
 
   const handleTabPress = (key: PageKey) => {

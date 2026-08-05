@@ -1,17 +1,15 @@
 /**
- * 统一薪资总览页（编辑薪资）
- * - 所有员工卡片列表（收起/展开）
- * - 当前员工默认展开
- * - 考勤区：排班表自动推算（只读，点击跳转员工管理排班表）
+ * 统一薪资总览页
+ * - 收放式员工薪资卡（2行4列网格摘要）
+ * - 考勤区：排班表自动推算（点击跳转考勤概况）
  * - 绩效补贴区：点击跳转绩效补贴页面
- * - 奖惩区：可增删改条目（唯一可编辑内容）
- * - 其他区：调休余额、预支小计
- * - 备注：总备注
- * - 薪资汇总：税前、社保、公积金、个税、实发、公司部分
+ * - 奖惩区：支持负数，可增删改
+ * - 其他区：调休余额（加班换休/节假日调休分开显示）+ 本月兑换
+ * - 备注、薪资汇总
  */
 import React, { useCallback, useMemo, useState } from "react";
 import {
-  Alert, ScrollView, StyleSheet, Text, TextInput,
+  Alert, Platform, ScrollView, StyleSheet, Text, TextInput,
   TouchableOpacity, View
 } from "react-native";
 import * as Haptics from "expo-haptics";
@@ -22,7 +20,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
 import {
   useEmployeeStore, useAttendanceStore, usePaySlipStore,
-  useCompOffBalanceEntryStore
+  useCompOffBalanceEntryStore, useHolidayCompOffStore,
 } from "@/lib/labor/store";
 import { useSalaryAdvanceStore } from "@/lib/labor/advance-store";
 import {
@@ -30,7 +28,7 @@ import {
   monthLabel,
 } from "@/lib/labor/types";
 
-const tap = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
 function calcTenure(joinDate?: string): string {
   if (!joinDate) return "";
@@ -53,6 +51,7 @@ export default function LaborAttendancePage() {
   const { getAttendance } = useAttendanceStore();
   const { getPaySlip, upsertPaySlip } = usePaySlipStore();
   const { getEntries: getCompOffEntries } = useCompOffBalanceEntryStore();
+  const { getEntries: getHolidayCompOffEntries } = useHolidayCompOffStore();
   const { advances } = useSalaryAdvanceStore();
 
   const currentMonth = month || new Date().toISOString().slice(0, 7);
@@ -84,6 +83,7 @@ export default function LaborAttendancePage() {
             getPaySlip={getPaySlip}
             upsertPaySlip={upsertPaySlip}
             getCompOffEntries={getCompOffEntries}
+            getHolidayCompOffEntries={getHolidayCompOffEntries}
             advances={advances}
             editingReward={editingRewardFor === emp.id}
             onToggleRewardEdit={() => setEditingRewardFor(editingRewardFor === emp.id ? "" : emp.id)}
@@ -98,7 +98,8 @@ export default function LaborAttendancePage() {
 // ─── 员工卡片 ─────────────────────────────────────────────────────────────────
 function EmployeeCard({
   employee, month, expanded, onToggle, colors,
-  getAttendance, getPaySlip, upsertPaySlip, getCompOffEntries,
+  getAttendance, getPaySlip, upsertPaySlip,
+  getCompOffEntries, getHolidayCompOffEntries,
   advances, editingReward, onToggleRewardEdit, router,
 }: {
   employee: Employee; month: string; expanded: boolean; onToggle: () => void; colors: any;
@@ -106,18 +107,28 @@ function EmployeeCard({
   getPaySlip: (eid: string, m: string) => PaySlip | null;
   upsertPaySlip: (slip: PaySlip) => void;
   getCompOffEntries: (eid: string) => any[];
+  getHolidayCompOffEntries: (eid: string) => any[];
   advances: any[]; editingReward: boolean; onToggleRewardEdit: () => void; router: any;
 }) {
   const att = getAttendance(employee.id, month);
   const slip = getPaySlip(employee.id, month);
   const tenure = calcTenure(employee.joinDate);
 
+  // ── 调休余额（加班换休 vs 节假日调休分开） ──
   const compOffEntries = getCompOffEntries(employee.id);
-  // CompOffEntry status: available | used_pay | used_rest | expired（没有 active）
-  const compOffBalance = compOffEntries.filter((e: any) => e.status === "available").reduce((s: number, e: any) => s + (e.days ?? 1), 0);
+  const overtimeCompOff = compOffEntries
+    .filter((e: any) => e.status === "available" && e.source === "overtime")
+    .reduce((s: number, e: any) => s + (e.days ?? 0), 0);
+  const holidayCompOffEntries = getHolidayCompOffEntries(employee.id);
+  const holidayCompOff = holidayCompOffEntries
+    .filter((e: any) => e.status === "available")
+    .reduce((s: number, e: any) => s + (e.days ?? 0), 0);
+  const totalCompOff = overtimeCompOff + holidayCompOff;
 
-  // advance status: pending | deducted | cancelled（没有 approved）
-  // 展示待扣除+已扣除的预支合计
+  // ── 本月调休兑换 ──
+  const compOffCashOut = slip?.compOffCashOut ?? 0;
+
+  // ── 预支合计 ──
   const advanceTotal = advances
     .filter((a: any) => a.employeeId === employee.id && (a.status === "pending" || a.status === "deducted"))
     .reduce((sum: number, a: any) => sum + (a.amount || 0), 0);
@@ -140,7 +151,6 @@ function EmployeeCard({
   const saveRewards = useCallback(() => {
     if (!slip) return;
     const totalReward = rewardItems.reduce((sum, item) => sum + item.amount, 0);
-    // 同步更新 grossSalary 和 finalSalary：奖惩变化时同步更新
     const rewardDiff = totalReward - (slip.rewardPenalty ?? 0);
     const newGross = Math.round((slip.grossSalary + rewardDiff) * 100) / 100;
     const newFinal = Math.round((slip.finalSalary + rewardDiff) * 100) / 100;
@@ -149,22 +159,61 @@ function EmployeeCard({
     onToggleRewardEdit();
   }, [slip, rewardItems, notes, upsertPaySlip, onToggleRewardEdit]);
 
-  // ── 收起状态 ──
+  // ── 收起状态：2行4列网格摘要 ──
   if (!expanded) {
+    const attendanceSalary = att?.attendanceSalary ?? slip?.attendanceSalary ?? 0;
+    const performance = (slip?.performanceBonus ?? 0);
+    const allowance = (slip?.mealAllowance ?? 0) + (slip?.transportAllowance ?? 0) + (slip?.otherAllowance ?? 0);
+    const reward = slip?.rewardPenalty ?? 0;
+    const cashOut = slip?.compOffCashOut ?? 0;
+    const advance = advanceTotal;
+    const gross = slip?.grossSalary ?? 0;
+    const final = slip?.finalSalary ?? 0;
+
+    const grid1 = [
+      { label: "考勤工资", value: attendanceSalary, color: colors.foreground },
+      { label: "绩效",     value: performance,      color: performance > 0 ? colors.success : colors.foreground },
+      { label: "补贴",     value: allowance,         color: allowance > 0 ? "#1677FF" : colors.foreground },
+      { label: "奖惩",     value: reward,            color: reward > 0 ? colors.success : reward < 0 ? colors.error : colors.foreground },
+    ];
+    const grid2 = [
+      { label: "调休兑换", value: cashOut,  color: cashOut > 0 ? colors.success : colors.foreground },
+      { label: "预支",     value: -advance, color: advance > 0 ? colors.warning : colors.foreground },
+      { label: "总薪资",   value: gross,    color: colors.foreground },
+      { label: "待发实发", value: final,    color: colors.primary },
+    ];
+
     return (
       <TouchableOpacity onPress={onToggle} style={[S.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        {/* 顶部：姓名 + 入职时间 */}
         <View style={S.cardHeader}>
-          <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 6 }}>
-            <Text style={{ fontSize: 15, fontWeight: "600", color: colors.foreground }}>{employee.realName}</Text>
+          <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <Text style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>{employee.realName}</Text>
             {tenure ? <Text style={{ fontSize: 11, color: colors.muted }}>{tenure}</Text> : null}
           </View>
           <IconSymbol name="chevron.down" size={14} color={colors.muted} />
         </View>
-        <View style={[S.miniRow, { borderTopColor: colors.border }]}>
-          <MiniStat label="考勤工资" value={att?.attendanceSalary} colors={colors} />
-          <MiniStat label="绩效补贴" value={slip ? (slip.performanceBonus + slip.mealAllowance) : undefined} colors={colors} />
-          <MiniStat label="奖惩" value={slip?.rewardPenalty} colors={colors} highlight />
-          <MiniStat label="实发" value={slip?.finalSalary} colors={colors} primary />
+        {/* 第一行：考勤工资 / 绩效 / 补贴 / 奖惩 */}
+        <View style={[S.gridRow, { borderTopColor: colors.border }]}>
+          {grid1.map((item) => (
+            <View key={item.label} style={S.gridCell}>
+              <Text style={{ fontSize: 10, color: colors.muted, marginBottom: 3 }}>{item.label}</Text>
+              <Text style={{ fontSize: 14, fontWeight: "700", color: item.color }}>
+                {item.value !== 0 ? `¥${Math.abs(item.value).toFixed(0)}` : "—"}
+              </Text>
+            </View>
+          ))}
+        </View>
+        {/* 第二行：调休兑换 / 预支 / 总薪资 / 待发实发 */}
+        <View style={[S.gridRow, { borderTopColor: colors.border }]}>
+          {grid2.map((item) => (
+            <View key={item.label} style={S.gridCell}>
+              <Text style={{ fontSize: 10, color: colors.muted, marginBottom: 3 }}>{item.label}</Text>
+              <Text style={{ fontSize: 14, fontWeight: "700", color: item.color }}>
+                {item.value !== 0 ? `${item.value < 0 ? "-" : ""}¥${Math.abs(item.value).toFixed(0)}` : "—"}
+              </Text>
+            </View>
+          ))}
         </View>
       </TouchableOpacity>
     );
@@ -174,19 +223,20 @@ function EmployeeCard({
   return (
     <View style={[S.card, S.cardExpanded, { backgroundColor: colors.surface, borderColor: colors.primary + "44" }]}>
       <TouchableOpacity onPress={onToggle} style={S.cardHeader}>
-        <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 6 }}>
+        <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 8 }}>
           <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground }}>{employee.realName}</Text>
           {tenure ? <Text style={{ fontSize: 11, color: colors.muted }}>{tenure}</Text> : null}
         </View>
         <IconSymbol name="chevron.up" size={14} color={colors.primary} />
       </TouchableOpacity>
 
-      {/* 考勤区（只读） */}
-      <TouchableOpacity onPress={() => router.push("/labor" as any)}
+      {/* 考勤区（只读，点击跳转考勤概况） */}
+      <TouchableOpacity
+        onPress={() => router.push({ pathname: "/labor", params: { initialPage: "schedule" } } as any)}
         style={[S.section, { borderColor: colors.border }]}>
         <View style={S.sectionHeader}>
           <Text style={[S.sectionTitle, { color: colors.muted }]}>考勤（自动推算）</Text>
-          <Text style={{ fontSize: 11, color: colors.primary }}>排班表 ›</Text>
+          <Text style={{ fontSize: 11, color: colors.primary }}>考勤概况 ›</Text>
         </View>
         {att ? (
           <View style={S.detailGrid}>
@@ -225,13 +275,13 @@ function EmployeeCard({
         </View>
       </TouchableOpacity>
 
-      {/* 奖惩区（可编辑） */}
+      {/* 奖惩区（支持负数） */}
       <View style={[S.section, { borderColor: colors.border }]}>
         <View style={S.sectionHeader}>
           <Text style={[S.sectionTitle, { color: colors.muted }]}>奖惩</Text>
           <TouchableOpacity onPress={editingReward ? saveRewards : onToggleRewardEdit}>
             <Text style={{ fontSize: 11, color: editingReward ? colors.success : colors.primary, fontWeight: "600" }}>
-              {editingReward ? "✓ 保存" : "长按编辑"}
+              {editingReward ? "✓ 保存" : "编辑"}
             </Text>
           </TouchableOpacity>
         </View>
@@ -242,12 +292,27 @@ function EmployeeCard({
           <View key={item.id} style={[S.rewardRow, { borderBottomColor: colors.border }]}>
             {editingReward ? (
               <View style={{ flex: 1, gap: 6 }}>
-                <View style={{ flexDirection: "row", gap: 8 }}>
+                <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
                   <TextInput value={item.name} onChangeText={(v) => updateRewardItem(item.id, "name", v)}
                     placeholder="名称" placeholderTextColor={colors.muted}
                     style={[S.rewardInput, { flex: 1, color: colors.foreground, borderColor: colors.border }]} />
-                  <TextInput value={item.amount ? String(item.amount) : ""} onChangeText={(v) => updateRewardItem(item.id, "amount", Number(v) || 0)}
-                    placeholder="金额" placeholderTextColor={colors.muted} keyboardType="number-pad"
+                  {/* +/- 切换按钮 */}
+                  <TouchableOpacity onPress={() => updateRewardItem(item.id, "amount", -item.amount)}
+                    style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6,
+                      backgroundColor: item.amount < 0 ? colors.error + "22" : colors.success + "22" }}>
+                    <Text style={{ fontSize: 13, fontWeight: "700",
+                      color: item.amount < 0 ? colors.error : colors.success }}>
+                      {item.amount < 0 ? "−" : "+"}
+                    </Text>
+                  </TouchableOpacity>
+                  <TextInput
+                    value={item.amount !== 0 ? String(Math.abs(item.amount)) : ""}
+                    onChangeText={(v) => {
+                      const num = parseFloat(v.replace(/[^0-9.]/g, "")) || 0;
+                      updateRewardItem(item.id, "amount", item.amount < 0 ? -num : num);
+                    }}
+                    placeholder="金额" placeholderTextColor={colors.muted}
+                    keyboardType="decimal-pad"
                     style={[S.rewardInput, { width: 80, color: colors.foreground, borderColor: colors.border, textAlign: "center" }]} />
                   <TouchableOpacity onPress={() => removeRewardItem(item.id)} style={{ padding: 4 }}>
                     <IconSymbol name="trash" size={16} color={colors.error} />
@@ -277,15 +342,30 @@ function EmployeeCard({
         )}
         {rewardItems.length > 0 && (
           <View style={{ marginTop: 6 }}>
-            <DetailRow label="奖惩小计" value={`${rewardItems.reduce((s, i) => s + i.amount, 0) >= 0 ? "+" : ""}¥${rewardItems.reduce((s, i) => s + i.amount, 0)}`} colors={colors} bold />
+            <DetailRow
+              label="奖惩小计"
+              value={`${rewardItems.reduce((s, i) => s + i.amount, 0) >= 0 ? "+" : ""}¥${rewardItems.reduce((s, i) => s + i.amount, 0)}`}
+              colors={colors} bold
+            />
           </View>
         )}
       </View>
 
-      {/* 其他区 */}
+      {/* 其他区：调休余额拆分 + 本月兑换 */}
       <View style={[S.section, { borderColor: colors.border }]}>
         <Text style={[S.sectionTitle, { color: colors.muted, marginBottom: 8 }]}>其他</Text>
-        <DetailRow label="调休余额" value={`${compOffBalance.toFixed(1)} 天`} colors={colors} />
+        {overtimeCompOff > 0 && (
+          <DetailRow label="调休余额（加班换休）" value={`${overtimeCompOff.toFixed(1)} 天`} colors={colors} />
+        )}
+        {holidayCompOff > 0 && (
+          <DetailRow label="调休余额（节假日调休）" value={`${holidayCompOff.toFixed(1)} 天`} colors={colors} />
+        )}
+        {totalCompOff === 0 && (
+          <DetailRow label="调休余额" value="0 天" colors={colors} />
+        )}
+        {compOffCashOut > 0 && (
+          <DetailRow label="本月调休兑换" value={`+¥${compOffCashOut.toFixed(0)}`} colors={colors} positive />
+        )}
         <DetailRow label="预支小计" value={advanceTotal > 0 ? `-¥${advanceTotal}` : "¥0"} colors={colors} negative={advanceTotal > 0} />
         {(slip?.pettyLaborPaid ?? 0) > 0 && (
           <DetailRow label="备用金已付" value={`-¥${(slip!.pettyLaborPaid!).toFixed(0)}`} colors={colors} negative />
@@ -322,16 +402,6 @@ function EmployeeCard({
 }
 
 // ─── 辅助组件 ─────────────────────────────────────────────────────────────────
-function MiniStat({ label, value, colors, highlight, primary }: { label: string; value?: number; colors: any; highlight?: boolean; primary?: boolean }) {
-  const color = primary ? colors.primary : highlight ? (value && value < 0 ? colors.error : colors.success) : colors.foreground;
-  return (
-    <View style={{ flex: 1, alignItems: "center" }}>
-      <Text style={{ fontSize: 10, color: colors.muted }}>{label}</Text>
-      <Text style={{ fontSize: 13, fontWeight: "600", color }}>{value != null ? `¥${value.toFixed(0)}` : "—"}</Text>
-    </View>
-  );
-}
-
 function DetailRow({ label, value, colors, bold, positive, negative, primary, muted: isMuted }: {
   label: string; value: string; colors: any; bold?: boolean; positive?: boolean; negative?: boolean; primary?: boolean; muted?: boolean;
 }) {
@@ -350,13 +420,14 @@ const S = StyleSheet.create({
   card: { borderRadius: 12, borderWidth: 1, marginBottom: 10, overflow: "hidden" },
   cardExpanded: { borderWidth: 1.5 },
   cardHeader: { flexDirection: "row", alignItems: "center", padding: 12 },
-  miniRow: { flexDirection: "row", borderTopWidth: 1, paddingVertical: 8, paddingHorizontal: 8 },
-  section: { borderTopWidth: 1, padding: 12 },
+  gridRow: { flexDirection: "row", borderTopWidth: StyleSheet.hairlineWidth },
+  gridCell: { flex: 1, alignItems: "center", paddingVertical: 10, paddingHorizontal: 4 },
+  section: { borderTopWidth: StyleSheet.hairlineWidth, padding: 12 },
   sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
   sectionTitle: { fontSize: 12, fontWeight: "600" },
   detailGrid: { gap: 2 },
   warningBanner: { marginTop: 8, padding: 6, borderRadius: 6, borderWidth: 1 },
-  rewardRow: { paddingVertical: 8, borderBottomWidth: 1 },
+  rewardRow: { paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth },
   rewardInput: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, fontSize: 13 },
   addBtn: { marginTop: 8, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderStyle: "dashed", alignItems: "center" },
   notesInput: { borderWidth: 1, borderRadius: 8, padding: 10, fontSize: 13, minHeight: 60, textAlignVertical: "top" },
