@@ -529,8 +529,6 @@ export interface UnitPresetGroup {
   labelKey: string;
   unitsZh: string[];
   unitsEn?: string[];
-  /** @deprecated Use unitsZh/unitsEn via getUnitPresetGroups(lang) */
-  units: string[];
 }
 
 export function getUnitPresetGroups(lang: "zh" | "en"): { labelKey: string; units: string[] }[] {
@@ -544,56 +542,47 @@ export const UNIT_PRESET_GROUPS: UnitPresetGroup[] = [
   {
     labelKey: "unit.group.liquid",
     unitsZh: ["ml", "oz", "cl", "dl", "L"],
-    get units() { return this.unitsZh; },
   },
   {
     labelKey: "unit.group.us_volume",
     unitsZh: ["cup", "pt", "qt", "gal"],
     unitsEn: ["cup", "pt", "qt", "gal"],
-    get units() { return this.unitsZh; },
   },
   {
     labelKey: "unit.group.weight",
     unitsZh: ["g", "kg", "斤", "两", "钱", "oz_s", "lb", "stone", "tonne"],
     unitsEn: ["g", "kg", "jin(500g)", "liang(50g)", "qian(5g)", "oz(solid)", "lb", "stone", "tonne"],
-    get units() { return this.unitsZh; },
   },
   {
     labelKey: "unit.group.spoon",
     unitsZh: ["dash", "drop", "tsp", "bsp", "tbsp", "dsp", "splash", "rinse", "pinch"],
-    get units() { return this.unitsZh; },
   },
   {
     // 计数：植物/食材类
     labelKey: "unit.group.count_botanical",
     unitsZh: ["个", "颗", "粒", "片", "根", "瓣", "枝", "叶", "茎", "荚", "束", "把"],
     unitsEn: ["pc", "pcs", "pcs", "slice", "root", "clove", "sprig", "leaf", "stalk", "pod", "bunch", "handful"],
-    get units() { return this.unitsZh; },
   },
   {
     // 计数：形状/处理类
     labelKey: "unit.group.count_shape",
     unitsZh: ["块", "条", "圈", "扭", "楔", "张", "只"],
     unitsEn: ["cube", "strip", "wheel", "twist", "wedge", "sheet", "whole"],
-    get units() { return this.unitsZh; },
   },
   {
     // 计数：容器类
     labelKey: "unit.group.count_container",
     unitsZh: ["听", "瓶", "袋", "盒"],
     unitsEn: ["can", "bottle", "bag", "box"],
-    get units() { return this.unitsZh; },
   },
   {
     labelKey: "unit.group.ratio",
     unitsZh: ["part"],
-    get units() { return this.unitsZh; },
   },
   {
     labelKey: "unit.group.fuzzy",
     unitsZh: ["适量", "少许", "to top"],
     unitsEn: ["to taste", "a pinch", "to top"],
-    get units() { return this.unitsZh; },
   },
 ];
 

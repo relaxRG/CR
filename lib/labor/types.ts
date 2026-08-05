@@ -369,20 +369,7 @@ export interface SocialInsuranceConfig {
   dataSource?: "builtin" | "network" | "manual";
 }
 
-/** 向后兼容：从旧版 SocialInsuranceConfig 读取个人比例 */
-export function getSIEmployeeRate(config: SocialInsuranceConfig): {
-  pension: number; medical: number; unemployment: number;
-  workInjury: number; maternity: number; housingFund: number;
-} {
-  return {
-    pension: config.pension.employeeRate,
-    medical: config.medical.employeeRate,
-    unemployment: config.unemployment.employeeRate,
-    workInjury: config.workInjury.employeeRate,
-    maternity: config.maternity.employeeRate,
-    housingFund: config.housingFund.employeeRate,
-  };
-}
+
 
 /** 默认社保配置（全国通用基准） */
 export const DEFAULT_SOCIAL_INSURANCE: SocialInsuranceConfig = {
@@ -986,7 +973,7 @@ export interface UnexplainedRestAlert {
   updatedAt: string;
 }
 
-// ─── 调休余额记录（每员工每月，保留向后兼容） ────────────────────────────────
+// ─── 调休余额记录（每员工每月） ────────────────────────────────────────────────
 export interface CompOffBalance {
   id: string;
   employeeId: string;
@@ -999,11 +986,7 @@ export interface CompOffBalance {
   hoursPerCompOff: number;
   /** 实际计费加班时数（totalOvertimeHours - compOffCount * hoursPerCompOff） */
   paidOvertimeHours: number;
-  /** @deprecated 旧版字段，保留兼容 */
-  earnedDays?: number;
-  usedDays?: number;
-  remainingDays?: number;
-  details?: Array<{ date: string; overtimeHours: number; compOffDays: number }>;
+
 }
 
 // ─── 月度考勤汇总（每员工每月） ──────────────────────────────────────────────
@@ -1252,13 +1235,11 @@ export function calcSocialInsurance(
   employerTotal: number;
   // 合计
   total: number;
-  /** @deprecated 向后兼容，等同于 employeeTotal */
-  totalEmployee: number;
 } {
   const zero = {
     pension: 0, medical: 0, unemployment: 0, workInjury: 0, maternity: 0, housingFund: 0, employeeTotal: 0,
     employerPension: 0, employerMedical: 0, employerUnemployment: 0, employerWorkInjury: 0, employerMaternity: 0, employerHousingFund: 0, employerTotal: 0,
-    total: 0, totalEmployee: 0,
+    total: 0,
   };
   if (!config.enabled) return zero;
 
@@ -1297,7 +1278,6 @@ export function calcSocialInsurance(
     pension, medical, unemployment, workInjury, maternity, housingFund, employeeTotal,
     employerPension, employerMedical, employerUnemployment, employerWorkInjury, employerMaternity, employerHousingFund, employerTotal,
     total: employeeTotal + employerTotal,
-    totalEmployee: employeeTotal,
   };
 }
 
@@ -1316,8 +1296,6 @@ export function calcIncomeTax(
    * 由调用方计算后传入，函数内部不再重复扣除
    */
   cumulativeIncome: number,
-  /** @deprecated 保留参数兼容性，已不使用（调用方已在 cumulativeIncome 中扣除） */
-  cumulativeDeductions: number,
   cumulativeTaxPaid: number,
   threshold: number = 5000,
   specialDeductions: number = 0

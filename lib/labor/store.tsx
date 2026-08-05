@@ -500,8 +500,7 @@ const ShiftContext = createContext<ShiftStore>({
 /**
  * 持久化迁移旧排班数据：
  * 1. shift="day"/"evening"/"both"/"午"/"晚" → "午班"/"晚班"
- * 2. 旧版 specialStatusId 记录中 shift=状态名称 → 用 sessionValue 修复
- * 3. 清除废弃字段 sessionValue 和 overtimeType
+ * 2. 清除废弃字段 sessionValue 和 overtimeType
  */
 function migrateShiftEntries(entries: ShiftEntry[]): { migrated: ShiftEntry[]; changed: boolean } {
   let changed = false;
@@ -515,14 +514,7 @@ function migrateShiftEntries(entries: ShiftEntry[]): { migrated: ShiftEntry[]; c
     else if (oldShift === "evening" || oldShift === "晚") { next.shift = "晚班"; dirty = true; }
     else if (oldShift === "both") { next.shift = "午班"; dirty = true; }
 
-    // 2. 旧版 specialStatusId 记录中 shift=状态名称 → 用 sessionValue 修复
-    const sv = (next as any).sessionValue;
-    if (next.specialStatusId && sv && typeof sv === "string" && sv !== next.shift) {
-      next.shift = sv;
-      dirty = true;
-    }
-
-    // 3. 删除废弃字段
+    // 2. 删除废弃字段
     if ("sessionValue" in next) { delete (next as any).sessionValue; dirty = true; }
     if ("overtimeType" in next) { delete (next as any).overtimeType; dirty = true; }
 
@@ -667,13 +659,8 @@ function AttendanceProvider({ children }: { children: React.ReactNode }) {
 
       if (specialStatus) {
         // ── 三字段驱动引擎：direction + countAsAttendance + salaryMultiplier ──
-        // 向后兼容：如果没有新字段，根据 category 推断
-        const dir = specialStatus.direction
-          ?? (specialStatus.category === "work_day" ? "positive"
-            : specialStatus.category === "comp_off" ? "neutral"
-            : "negative");
-        const countsAsAtt = specialStatus.countAsAttendance
-          ?? (specialStatus.category !== "absence");
+        const dir = specialStatus.direction;
+        const countsAsAtt = specialStatus.countAsAttendance;
         const isCompOff = specialStatus.category === "comp_off";
 
         if (isCompOff) {
@@ -1008,9 +995,8 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
       // 年度累计应纳税所得额（含本月，调用方已传入前几月的累计值）
       // cumulativeIncome 由调用方从历史 paySlips 计算，已是「应纳税所得额」
       const cumTaxableIncome = cumulativeIncome + thisMonthTaxable;
-      // 传 0 给 cumulativeDeductions（已在 cumTaxableIncome 中扣除，不重复扣）
       const result = calcIncomeTax(
-        cumTaxableIncome, 0, cumulativeTaxPaid,
+        cumTaxableIncome, cumulativeTaxPaid,
         taxConfig.threshold, 0
       );
       incomeTax = result.tax;
