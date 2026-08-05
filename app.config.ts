@@ -29,7 +29,7 @@ const schemeFromBundleId = `manus${timestamp}`;
 const env = {
   // App branding - update these values directly (do not use env vars)
   appName: "cocktail R",
-  appSlug: "cocktail-r",
+  appSlug: "cocktail-recipes",
   // S3 URL of the app logo - set this to the URL returned by generate_image when creating custom logo
   // Leave empty to use the default icon from assets/images/icon.png
   logoUrl: "/manus-storage/cocktail-r-icon-white_fa4c6b9d.png",
@@ -88,10 +88,10 @@ const config: ExpoConfig = {
     output: "static",
     favicon: "./assets/images/favicon.png",
   },
-  owner: "rgbab",
+  owner: "rgsd",
   extra: {
     eas: {
-      projectId: "23a4c8d7-b73e-4a58-8be5-f7eeedbfdbc6",
+      projectId: "3ab89cc0-c646-4fb8-bceb-ba24204a8811",
     },
     cfWorkerUrl: "https://cocktail-ai.kikikong2017.workers.dev",
   },
@@ -146,7 +146,7 @@ const config: ExpoConfig = {
     ],
   ],
   updates: {
-    url: "https://u.expo.dev/23a4c8d7-b73e-4a58-8be5-f7eeedbfdbc6",
+    url: "https://u.expo.dev/3ab89cc0-c646-4fb8-bceb-ba24204a8811",
   },
   runtimeVersion: {
     policy: "appVersion",
