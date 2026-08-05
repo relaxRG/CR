@@ -9,8 +9,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import {
   Alert, Dimensions, Modal, Platform, Pressable, ScrollView,
-  StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions
-} from "react-native";
+  StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions, KeyboardAvoidingView} from "react-native";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -25,7 +24,7 @@ import {
   useCompOffBalanceEntryStore, useHolidayCompOffStore, useUnexplainedRestAlertStore,
   useCustomDeptStore, useBusinessHoursStore, useShiftGroupStore, useFillPresetStore,
 } from "@/lib/labor/store";
-import { useSalaryAdvanceStore } from "@/lib/labor/advance-store";
+import { useSalaryAdvanceStore, useAdvanceCategoryStore, BUILTIN_ADVANCE_CATEGORIES } from "@/lib/labor/advance-store";
 import { usePettyCashStore, PETTY_CODE_LABELS, PettyRecord } from "@/lib/store/petty-store";
 import { fabBottom } from "@/components/floating-tab-bar";
 import { usePettyLaborLinkStore, PettyCashLaborLink, matchEmployeeFromDescription, extractKeywords } from "@/lib/store/petty-labor-link-store";
@@ -965,25 +964,43 @@ function AdvancePage({ month, colors, headerComponent }: { month: string; colors
   const insets = useSafeAreaInsets();
   const { employees } = useEmployeeStore();
   const { advances, addAdvance, updateAdvance, deleteAdvance } = useSalaryAdvanceStore();
-  const { records: pettyRecords, updateRecord: updatePettyRecord, deleteRecord: deletePettyRecord } = usePettyCashStore();
-  const { links, aliases, addLink, updateLink, deleteLink, learnAlias, getLinksForMonth, isLinked, syncFromPettyRecord, deleteLinkByPettyId } = usePettyLaborLinkStore();
+  const { allCategories, addCategory: addAdvanceCategory, updateCategory, deleteCategory } = useAdvanceCategoryStore();
+  const { records: pettyRecords, addRecord: addPettyRecord } = usePettyCashStore();
+  const { links, aliases, addLink, updateLink, deleteLink, learnAlias, getLinksForMonth, isLinked } = usePettyLaborLinkStore();
   const { getPaySlip, upsertPaySlip } = usePaySlipStore();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
+  // ── 新增预支 Modal state ──
   const [showAddModal, setShowAddModal] = useState(false);
   const [addEmpId, setAddEmpId] = useState("");
   const [addAmount, setAddAmount] = useState("");
   const [addNotes, setAddNotes] = useState("");
+  const [addCategory, setAddCategoryState] = useState("fulltime_advance");
+  const [addDate, setAddDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [addDateMode, setAddDateMode] = useState<"today" | "yesterday" | "custom">("today");
+  const [addPettyRecordId, setAddPettyRecordId] = useState<string>("");
+  const [addUsePetty, setAddUsePetty] = useState(false);
+  // 新增备用金快速录入 state
+  const [showQuickPetty, setShowQuickPetty] = useState(false);
+  const [quickPettyCode, setQuickPettyCode] = useState<"K1" | "K9">("K1");
+  const [quickPettyAmount, setQuickPettyAmount] = useState("");
+  const [quickPettyDesc, setQuickPettyDesc] = useState("");
 
-  // 员工匹配弹窗状态
+  // ── 员工匹配弹窗 state ──
   const [matchingLink, setMatchingLink] = useState<PettyCashLaborLink | null>(null);
   const [matchEmpId, setMatchEmpId] = useState("");
 
-  // 新增备用金关联弹窗
-  const [showLinkModal, setShowLinkModal] = useState(false);
-  const [linkPettyCode, setLinkPettyCode] = useState<string>("K1");
+  // ── 匹配备用金 Modal state ──
+  const [showMatchPettyModal, setShowMatchPettyModal] = useState(false);
+  const [matchPettySelections, setMatchPettySelections] = useState<Record<string, { checked: boolean; empId: string }>>({});
 
-  // 人工相关备用金代码（K1固定兼职、K9临时兼职）
+  // ── 分类管理 Modal state ──
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [editingCategoryName, setEditingCategoryName] = useState("");
+
+  // 人工相关备用金代码
   const LABOR_PETTY_CODES = ["K1", "K9"];
 
   // 当月备用金记录（人工相关，未被关联的）
@@ -991,25 +1008,18 @@ function AdvancePage({ month, colors, headerComponent }: { month: string; colors
     pettyRecords.filter((r) => r.date.startsWith(month)),
     [pettyRecords, month]
   );
-
   // 当月已关联的 links
   const monthLinks = React.useMemo(() => getLinksForMonth(month), [links, month]);
-
   // 智能识别：当月未被关联的人工相关备用金记录
   const unlinkedLaborRecords = React.useMemo(() =>
     monthPettyRecords.filter((r) => LABOR_PETTY_CODES.includes(r.code) && !isLinked(r.id)),
     [monthPettyRecords, isLinked]
   );
-
   // 自动生成草稿关联（智能识别，未保存）
   const autoDraftLinks = React.useMemo(() =>
     unlinkedLaborRecords.map((r) => {
       const match = matchEmployeeFromDescription(r.description, aliases, employees);
-      return {
-        pettyRecord: r,
-        suggestedEmployeeId: match.employeeId,
-        matchType: match.matchType,
-      };
+      return { pettyRecord: r, suggestedEmployeeId: match.employeeId, matchType: match.matchType };
     }),
     [unlinkedLaborRecords, aliases, employees]
   );
@@ -1017,175 +1027,179 @@ function AdvancePage({ month, colors, headerComponent }: { month: string; colors
   const activeEmployees = React.useMemo(() => employees.filter((e) => e.active && !e.archived), [employees]);
   const getEmployee = (id: string) => employees.find((e) => e.id === id);
 
-    // 将关联同步到薪资单
+  // ── 员工按部门分组 ──
+  const employeesByDept = React.useMemo(() => {
+    const groups: { dept: EmployeeDept; label: string; color: string; employees: Employee[] }[] = [
+      { dept: "front", label: "前厅", color: DEPT_COLORS.front, employees: [] },
+      { dept: "kitchen", label: "后厨", color: DEPT_COLORS.kitchen, employees: [] },
+      { dept: "parttime", label: "兼职", color: DEPT_COLORS.parttime, employees: [] },
+      { dept: "other", label: "其他", color: DEPT_COLORS.other, employees: [] },
+    ];
+    for (const emp of activeEmployees) {
+      const group = groups.find((g) => g.dept === emp.dept);
+      if (group) group.employees.push(emp);
+    }
+    return groups.filter((g) => g.employees.length > 0);
+  }, [activeEmployees]);
+
+  // ── 当月可选备用金条目（K1/K9，未被关联）──
+  const availablePettyForAdvance = React.useMemo(() =>
+    monthPettyRecords.filter((r) => LABOR_PETTY_CODES.includes(r.code)),
+    [monthPettyRecords]
+  );
+
+  // ── 即时同步薪资单 ──
+  const syncAdvanceToPaySlip = React.useCallback((employeeId: string, delta: number) => {
+    const existing = getPaySlip(employeeId, month);
+    if (!existing) return;
+    const newAdvance = Math.max(0, (existing.advanceAmount ?? 0) + delta);
+    const newFinal = Math.round((existing.finalSalary - delta) * 100) / 100;
+    upsertPaySlip({ ...existing, advanceAmount: newAdvance, finalSalary: newFinal, updatedAt: new Date().toISOString() });
+  }, [getPaySlip, upsertPaySlip, month]);
+
+  // ── 将关联同步到薪资单 ──
   const syncLinkToPaySlip = React.useCallback((link: PettyCashLaborLink) => {
     if (!link.employeeId || !link.syncedToPaySlip) return;
     const existing = getPaySlip(link.employeeId, month);
     if (!existing) return;
     const currentLinkIds = existing.pettyLaborLinkIds ?? [];
-    if (currentLinkIds.includes(link.id)) return; // 防止重复添加
+    if (currentLinkIds.includes(link.id)) return;
     const newLinkIds = [...currentLinkIds, link.id];
     const newPaid = (existing.pettyLaborPaid ?? 0) + link.amount;
-    // 同步更新 finalSalary：备用金已付增加，实发应减少
     const newFinal = Math.round((existing.finalSalary - link.amount) * 100) / 100;
     upsertPaySlip({ ...existing, pettyLaborPaid: newPaid, pettyLaborLinkIds: newLinkIds, finalSalary: newFinal });
   }, [getPaySlip, upsertPaySlip, month]);
-  // 从薪资单移除关联
+
+  // ── 从薪资单移除关联 ──
   const removeLinkFromPaySlip = React.useCallback((link: PettyCashLaborLink) => {
     if (!link.employeeId) return;
     const existing = getPaySlip(link.employeeId, month);
     if (!existing) return;
     const newLinkIds = (existing.pettyLaborLinkIds ?? []).filter((id) => id !== link.id);
     const newPaid = Math.max(0, (existing.pettyLaborPaid ?? 0) - link.amount);
-    // 同步更新 finalSalary：备用金已付减少，实发应增加
     const newFinal = Math.round((existing.finalSalary + link.amount) * 100) / 100;
     upsertPaySlip({ ...existing, pettyLaborPaid: newPaid, pettyLaborLinkIds: newLinkIds, finalSalary: newFinal });
   }, [getPaySlip, upsertPaySlip, month]);
 
-  // 确认纳入一条草稿关联
+  // ── 确认纳入一条草稿关联 ──
   const confirmDraftLink = (pettyRecord: PettyRecord, empId: string, matchType: "auto" | "manual" | "unmatched") => {
     const id = addLink({
-      pettyRecordId: pettyRecord.id,
-      pettyCode: pettyRecord.code,
-      amount: pettyRecord.amount,
-      date: pettyRecord.date,
-      description: pettyRecord.description,
-      paymentMethod: pettyRecord.paymentMethod,
-      employeeId: empId,
-      matchType,
-      month,
-      syncedToPaySlip: empId !== "",
+      pettyRecordId: pettyRecord.id, pettyCode: pettyRecord.code, amount: pettyRecord.amount,
+      date: pettyRecord.date, description: pettyRecord.description, paymentMethod: pettyRecord.paymentMethod,
+      employeeId: empId, matchType, month, syncedToPaySlip: empId !== "",
     });
-    // 学习别名
     if (empId && matchType === "manual") {
-      const keywords = extractKeywords(pettyRecord.description);
-      keywords.forEach((kw) => learnAlias(kw, empId));
+      extractKeywords(pettyRecord.description).forEach((kw) => learnAlias(kw, empId));
     }
-    // 同步到薪资单
     if (empId) {
-      setTimeout(() => {
-        const link = { id, pettyRecordId: pettyRecord.id, pettyCode: pettyRecord.code, amount: pettyRecord.amount, date: pettyRecord.date, description: pettyRecord.description, paymentMethod: pettyRecord.paymentMethod, employeeId: empId, matchType, month, syncedToPaySlip: true, createdAt: "", updatedAt: "" };
-        syncLinkToPaySlip(link);
-      }, 100);
+      const link = { id, pettyRecordId: pettyRecord.id, pettyCode: pettyRecord.code, amount: pettyRecord.amount,
+        date: pettyRecord.date, description: pettyRecord.description, paymentMethod: pettyRecord.paymentMethod,
+        employeeId: empId, matchType, month, syncedToPaySlip: true, createdAt: "", updatedAt: "" };
+      syncLinkToPaySlip(link);
     }
   };
 
-  // 手动匹配员工
+  // ── 手动匹配员工 ──
   const handleManualMatch = (link: PettyCashLaborLink, newEmpId: string) => {
-    // 先从旧薪资单移除
     if (link.employeeId) removeLinkFromPaySlip(link);
-    // 更新关联
     updateLink(link.id, { employeeId: newEmpId, matchType: "manual", syncedToPaySlip: newEmpId !== "" });
-    // 学习别名
     if (newEmpId) {
-      const keywords = extractKeywords(link.description);
-      keywords.forEach((kw) => learnAlias(kw, newEmpId));
-    }
-    // 同步到新薪资单
-    if (newEmpId) {
-      const updatedLink = { ...link, employeeId: newEmpId, syncedToPaySlip: true };
-      syncLinkToPaySlip(updatedLink);
+      extractKeywords(link.description).forEach((kw) => learnAlias(kw, newEmpId));
+      syncLinkToPaySlip({ ...link, employeeId: newEmpId, syncedToPaySlip: true });
     }
     setMatchingLink(null);
   };
 
-  // 备用金记录修改联动：同步更新关联快照 + 如果金额变化则重算薪资单
-  const handlePettyUpdate = React.useCallback((pettyId: string, updates: Partial<{ amount: number; description: string; paymentMethod: string; date: string }>) => {
-    // 1. 更新备用金原始记录
-    updatePettyRecord(pettyId, updates);
-    // 2. 同步关联快照
-    syncFromPettyRecord(pettyId, updates);
-    // 3. 如果金额变化，重算薪资单 pettyLaborPaid
-    if (updates.amount !== undefined) {
-      const link = links.find((l) => l.pettyRecordId === pettyId);
-      if (link?.employeeId) {
-        const existing = getPaySlip(link.employeeId, month);
-        if (existing) {
-          const oldAmount = link.amount;
-          const diff = updates.amount - oldAmount;
-          const newPaid = Math.max(0, (existing.pettyLaborPaid ?? 0) + diff);
-          const newFinal = Math.round((existing.finalSalary - diff) * 100) / 100;
-          upsertPaySlip({ ...existing, pettyLaborPaid: newPaid, finalSalary: newFinal });
-        }
-      }
-    }
-    // 4. 如果日期跨月，需从旧月薪资单移除并加到新月
-    if (updates.date !== undefined) {
-      const link = links.find((l) => l.pettyRecordId === pettyId);
-      if (link?.employeeId) {
-        const oldMonth = link.month;
-        const newMonth = updates.date.slice(0, 7);
-        if (oldMonth !== newMonth) {
-          // 从旧月薪资单移除
-          const oldSlip = getPaySlip(link.employeeId, oldMonth);
-          if (oldSlip) {
-            const newPaid = Math.max(0, (oldSlip.pettyLaborPaid ?? 0) - link.amount);
-            const newFinal = Math.round((oldSlip.finalSalary + link.amount) * 100) / 100;
-            upsertPaySlip({ ...oldSlip, pettyLaborPaid: newPaid, finalSalary: newFinal });
-          }
-          // 加入新月薪资单
-          const newSlip = getPaySlip(link.employeeId, newMonth);
-          if (newSlip) {
-            const newPaid = (newSlip.pettyLaborPaid ?? 0) + link.amount;
-            const newFinal = Math.round((newSlip.finalSalary - link.amount) * 100) / 100;
-            upsertPaySlip({ ...newSlip, pettyLaborPaid: newPaid, finalSalary: newFinal });
-          }
-          // 更新关联的 month 字段
-          updateLink(link.id, { month: newMonth, date: updates.date });
-        }
-      }
-    }
-  }, [updatePettyRecord, syncFromPettyRecord, links, getPaySlip, upsertPaySlip, updateLink, month]);
-
-  // 备用金记录删除联动：删除备用金记录 + 删除关联 + 从薪资单移除
-  const handlePettyDelete = React.useCallback((pettyId: string) => {
-    const deletedLink = deleteLinkByPettyId(pettyId);
-    if (deletedLink?.employeeId) {
-      const existing = getPaySlip(deletedLink.employeeId, deletedLink.month);
-      if (existing) {
-        const newPaid = Math.max(0, (existing.pettyLaborPaid ?? 0) - deletedLink.amount);
-        const newFinal = Math.round((existing.finalSalary + deletedLink.amount) * 100) / 100;
-        upsertPaySlip({ ...existing, pettyLaborPaid: newPaid, finalSalary: newFinal });
-      }
-    }
-    deletePettyRecord(pettyId);
-  }, [deleteLinkByPettyId, getPaySlip, upsertPaySlip, deletePettyRecord]);
-
-  // 删除关联
+  // ── 删除关联 ──
   const handleDeleteLink = (link: PettyCashLaborLink) => {
     Alert.alert("取消关联", `确认将「${link.description}」¥${link.amount} 从薪资预支中移除？`, [
       { text: "取消", style: "cancel" },
-      { text: "移除", style: "destructive", onPress: () => {
-        removeLinkFromPaySlip(link);
-        deleteLink(link.id);
-      }},
+      { text: "移除", style: "destructive", onPress: () => { removeLinkFromPaySlip(link); deleteLink(link.id); } },
     ]);
   };
 
+  // ── 新增手动预支（即时同步薪资单）──
   const handleAddAdvance = () => {
-    if (!addEmpId || !addAmount) return;
+    if (!addEmpId) { Alert.alert("请选择员工"); return; }
+    if (!addAmount || isNaN(Number(addAmount)) || Number(addAmount) <= 0) { Alert.alert("请填写正确的预支金额"); return; }
+    const amount = parseFloat(addAmount);
     addAdvance({
-      employeeId: addEmpId,
-      amount: parseFloat(addAmount),
-      date: month + "-01",
-      deductMonth: month,
+      employeeId: addEmpId, amount, date: addDate,
+      deductMonth: month, status: "pending",
+      category: addCategory,
+      pettyRecordId: addUsePetty && addPettyRecordId ? addPettyRecordId : undefined,
       notes: addNotes,
-      status: "pending",
-      paidViaPetty: false,
     });
+    // 即时同步薪资单
+    syncAdvanceToPaySlip(addEmpId, amount);
     setShowAddModal(false);
-    setAddEmpId(""); setAddAmount(""); setAddNotes("");
+    setAddEmpId(""); setAddAmount(""); setAddNotes(""); setAddPettyRecordId(""); setAddUsePetty(false);
+  };
+
+  // ── 快速新增备用金条目 ──
+  const handleQuickAddPetty = () => {
+    if (!quickPettyAmount || isNaN(Number(quickPettyAmount))) { Alert.alert("请填写金额"); return; }
+    addPettyRecord({
+      date: addDate, code: quickPettyCode, amount: parseFloat(quickPettyAmount),
+      description: quickPettyDesc || `${PETTY_CODE_LABELS[quickPettyCode]} 支出`,
+      paymentMethod: "现金", receiptUri: "",
+    });
+    setShowQuickPetty(false);
+    setQuickPettyAmount(""); setQuickPettyDesc("");
+    Alert.alert("已添加", `已新增 ${quickPettyCode} 备用金条目 ¥${quickPettyAmount}`);
+  };
+
+  // ── 匹配备用金：初始化选择状态 ──
+  const initMatchPettySelections = () => {
+    const init: Record<string, { checked: boolean; empId: string }> = {};
+    unlinkedLaborRecords.forEach((r) => {
+      const match = matchEmployeeFromDescription(r.description, aliases, employees);
+      init[r.id] = { checked: true, empId: match.employeeId };
+    });
+    setMatchPettySelections(init);
+    setShowMatchPettyModal(true);
+  };
+
+  // ── 批量确认匹配备用金 ──
+  const handleBatchConfirmMatch = () => {
+    const toConfirm = unlinkedLaborRecords.filter((r) => matchPettySelections[r.id]?.checked);
+    for (const r of toConfirm) {
+      const empId = matchPettySelections[r.id]?.empId ?? "";
+      confirmDraftLink(r, empId, empId ? "manual" : "unmatched");
+    }
+    setShowMatchPettyModal(false);
+    Alert.alert("匹配完成", `已关联 ${toConfirm.length} 条备用金记录`);
+  };
+
+  // ── 分组全选/取消全选 ──
+  const toggleGroupSelection = (code: string, checked: boolean) => {
+    const ids = unlinkedLaborRecords.filter((r) => r.code === code).map((r) => r.id);
+    setMatchPettySelections((prev) => {
+      const next = { ...prev };
+      ids.forEach((id) => { next[id] = { ...next[id], checked }; });
+      return next;
+    });
   };
 
   const totalLinked = React.useMemo(() => monthLinks.reduce((s, l) => s + l.amount, 0), [monthLinks]);
   const manualAdvances = React.useMemo(() =>
-    advances.filter((a) => (a.deductMonth === month || a.date.startsWith(month)) && !a.pettyRecordId),
+    advances.filter((a) => (a.deductMonth === month || a.date.startsWith(month))),
     [advances, month]
   );
 
+  // ── 日期快捷选 ──
+  const handleDateMode = (mode: "today" | "yesterday" | "custom") => {
+    setAddDateMode(mode);
+    if (mode === "today") setAddDate(new Date().toISOString().slice(0, 10));
+    else if (mode === "yesterday") {
+      const d = new Date(); d.setDate(d.getDate() - 1);
+      setAddDate(d.toISOString().slice(0, 10));
+    }
+  };
+
   return (
     <View style={{ flex: 1 }}>
-      <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 140 }}>
+      <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: fabBottom(insets.bottom) + 80 }}>
         {headerComponent}
 
         {/* 汇总卡片 */}
@@ -1221,24 +1235,14 @@ function AdvancePage({ month, colors, headerComponent }: { month: string; colors
             {autoDraftLinks.map((draft, i) => {
               const emp = draft.suggestedEmployeeId ? getEmployee(draft.suggestedEmployeeId) : null;
               return (
-                <View key={draft.pettyRecord.id} style={[
-                  { padding: 12, gap: 6 },
-                  i > 0 && { borderTopWidth: 0.5, borderTopColor: colors.warning + "33" }
-                ]}>
+                <View key={draft.pettyRecord.id} style={[{ padding: 12, gap: 6 }, i > 0 && { borderTopWidth: 0.5, borderTopColor: colors.warning + "33" }]}>
                   <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
                     <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>
-                        {draft.pettyRecord.description || "备用金支付"}
-                      </Text>
-                      <Text style={{ fontSize: 10, color: colors.muted }}>
-                        {draft.pettyRecord.code} · {draft.pettyRecord.date.slice(5)} · {draft.pettyRecord.paymentMethod}
-                      </Text>
+                      <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>{draft.pettyRecord.description || "备用金支付"}</Text>
+                      <Text style={{ fontSize: 10, color: colors.muted }}>{draft.pettyRecord.code} · {draft.pettyRecord.date.slice(5)} · {draft.pettyRecord.paymentMethod}</Text>
                     </View>
-                    <Text style={{ fontSize: 14, fontWeight: "700", color: colors.warning }}>
-                      ¥{draft.pettyRecord.amount.toFixed(0)}
-                    </Text>
+                    <Text style={{ fontSize: 14, fontWeight: "700", color: colors.warning }}>¥{draft.pettyRecord.amount.toFixed(0)}</Text>
                   </View>
-                  {/* 员工匹配状态 */}
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                     {emp ? (
                       <View style={{ flexDirection: "row", alignItems: "center", gap: 4, flex: 1 }}>
@@ -1250,8 +1254,7 @@ function AdvancePage({ month, colors, headerComponent }: { month: string; colors
                     ) : (
                       <Text style={{ fontSize: 11, color: colors.muted, flex: 1 }}>未识别员工，可纳入后手动匹配</Text>
                     )}
-                    <TouchableOpacity
-                      onPress={() => { tap(); confirmDraftLink(draft.pettyRecord, draft.suggestedEmployeeId, draft.matchType); }}
+                    <TouchableOpacity onPress={() => { tap(); confirmDraftLink(draft.pettyRecord, draft.suggestedEmployeeId, draft.matchType); }}
                       style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, backgroundColor: colors.warning }}>
                       <Text style={{ fontSize: 12, fontWeight: "700", color: "#fff" }}>纳入</Text>
                     </TouchableOpacity>
@@ -1266,35 +1269,22 @@ function AdvancePage({ month, colors, headerComponent }: { month: string; colors
         {monthLinks.length > 0 && (
           <View style={{ borderRadius: 14, borderWidth: 1, borderColor: "#AF52DE" + "44", backgroundColor: "#AF52DE" + "06", overflow: "hidden" }}>
             <View style={{ flexDirection: "row", alignItems: "center", padding: 12 }}>
-              <Text style={{ fontSize: 13, fontWeight: "700", color: "#AF52DE", flex: 1 }}>
-                备用金关联（{monthLinks.length}笔）
-              </Text>
+              <Text style={{ fontSize: 13, fontWeight: "700", color: "#AF52DE", flex: 1 }}>备用金关联（{monthLinks.length}笔）</Text>
               <Text style={{ fontSize: 13, fontWeight: "700", color: "#AF52DE" }}>¥{totalLinked.toFixed(0)}</Text>
             </View>
             {monthLinks.map((link, i) => {
               const emp = link.employeeId ? getEmployee(link.employeeId) : null;
               return (
-                <TouchableOpacity key={link.id}
-                  onLongPress={() => { tap(); handleDeleteLink(link); }}
-                  style={[
-                    { flexDirection: "row", alignItems: "center", padding: 12, gap: 10 },
-                    i > 0 && { borderTopWidth: 0.5, borderTopColor: "#AF52DE" + "22" }
-                  ]}>
+                <TouchableOpacity key={link.id} onLongPress={() => { tap(); handleDeleteLink(link); }}
+                  style={[{ flexDirection: "row", alignItems: "center", padding: 12, gap: 10 }, i > 0 && { borderTopWidth: 0.5, borderTopColor: "#AF52DE" + "22" }]}>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>
-                      {link.description || "备用金支付"}
-                    </Text>
-                    <Text style={{ fontSize: 10, color: colors.muted }}>
-                      {link.pettyCode} · {link.date.slice(5)} · {link.paymentMethod}
-                    </Text>
+                    <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>{link.description || "备用金支付"}</Text>
+                    <Text style={{ fontSize: 10, color: colors.muted }}>{link.pettyCode} · {link.date.slice(5)} · {link.paymentMethod}</Text>
                   </View>
                   <View style={{ alignItems: "flex-end", gap: 4 }}>
                     <Text style={{ fontSize: 14, fontWeight: "700", color: "#AF52DE" }}>¥{link.amount.toFixed(0)}</Text>
-                    {/* 员工匹配标签 */}
-                    <TouchableOpacity
-                      onPress={() => { tap(); setMatchingLink(link); setMatchEmpId(link.employeeId); }}
-                      style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6,
-                        backgroundColor: emp ? colors.success + "22" : colors.error + "22" }}>
+                    <TouchableOpacity onPress={() => { tap(); setMatchingLink(link); setMatchEmpId(link.employeeId); }}
+                      style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: emp ? colors.success + "22" : colors.error + "22" }}>
                       <Text style={{ fontSize: 10, fontWeight: "600", color: emp ? colors.success : colors.error }}>
                         {emp ? `✓ ${emp.code}` : "未匹配 点击设置"}
                       </Text>
@@ -1316,22 +1306,30 @@ function AdvancePage({ month, colors, headerComponent }: { month: string; colors
             {manualAdvances.map((adv, i) => {
               const emp = getEmployee(adv.employeeId);
               const deptColor = emp ? DEPT_COLORS[emp.dept] : colors.muted;
+              const cat = allCategories.find((c) => c.id === adv.category);
               return (
                 <TouchableOpacity key={adv.id}
                   onLongPress={() => { tap(); Alert.alert("删除预支", `确认删除 ${emp?.code ?? ""} 的 ¥${adv.amount} 预支记录？`, [
                     { text: "取消", style: "cancel" },
-                    { text: "删除", style: "destructive", onPress: () => deleteAdvance(adv.id) }
+                    { text: "删除", style: "destructive", onPress: () => {
+                      deleteAdvance(adv.id);
+                      // 即时同步薪资单
+                      syncAdvanceToPaySlip(adv.employeeId, -adv.amount);
+                    }},
                   ]); }}
-                  style={[{ flexDirection: "row", alignItems: "center", gap: 10, padding: 14 },
-                    i > 0 && { borderTopWidth: 0.5, borderTopColor: colors.border }
-                  ]}>
+                  style={[{ flexDirection: "row", alignItems: "center", gap: 10, padding: 14 }, i > 0 && { borderTopWidth: 0.5, borderTopColor: colors.border }]}>
                   <View style={{ width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", backgroundColor: deptColor + "22" }}>
                     <Text style={{ fontSize: 12, fontWeight: "700", color: deptColor }}>{emp?.code.slice(0, 2) ?? "?"}</Text>
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>
-                      {emp?.code ?? "未知员工"} · {adv.date.slice(5)}
-                    </Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>{emp?.code ?? "未知员工"} · {adv.date.slice(5)}</Text>
+                      {cat && (
+                        <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, backgroundColor: "#AF52DE" + "18" }}>
+                          <Text style={{ fontSize: 10, color: "#AF52DE", fontWeight: "600" }}>{cat.name}</Text>
+                        </View>
+                      )}
+                    </View>
                     <Text style={{ fontSize: 11, color: colors.muted }}>{adv.notes || "手动录入"}</Text>
                   </View>
                   <View style={{ alignItems: "flex-end", gap: 4 }}>
@@ -1353,76 +1351,203 @@ function AdvancePage({ month, colors, headerComponent }: { month: string; colors
           <View style={{ alignItems: "center", padding: 32 }}>
             <IconSymbol name="creditcard.fill" size={48} color={colors.border} />
             <Text style={{ fontSize: 16, fontWeight: "600", color: colors.foreground, marginTop: 12 }}>本月暂无预支记录</Text>
-            <Text style={{ fontSize: 13, color: colors.muted, marginTop: 6, textAlign: "center" }}>
-              备用金 K1/K9 记录自动识别，也可手动新增
-            </Text>
+            <Text style={{ fontSize: 13, color: colors.muted, marginTop: 6, textAlign: "center" }}>备用金 K1/K9 记录自动识别，也可手动新增</Text>
           </View>
         )}
 
-        {/* 新增手动预支 Modal */}
+        {/* ── 新增手动预支 Modal ── */}
         <Modal visible={showAddModal} transparent animationType="slide">
           <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.4)" }}>
-            <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 14 }}>
-              <Text style={{ fontSize: 17, fontWeight: "700", color: colors.foreground }}>新增预支记录</Text>
-              <View>
-                <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 6 }}>员工</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <View style={{ flexDirection: "row", gap: 8 }}>
-                    {activeEmployees.map((emp) => (
-                      <TouchableOpacity key={emp.id} onPress={() => setAddEmpId(emp.id)}
+            <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
+              <ScrollView style={{ backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20 }}
+                contentContainerStyle={{ padding: 20, gap: 14, paddingBottom: 40 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                  <Text style={{ fontSize: 17, fontWeight: "700", color: colors.foreground }}>新增预支记录</Text>
+                  <TouchableOpacity onPress={() => setShowCategoryModal(true)}>
+                    <Text style={{ fontSize: 13, color: colors.primary }}>⚙ 分类管理</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* 员工选择（按部门分组） */}
+                <View>
+                  <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 8 }}>员工</Text>
+                  {employeesByDept.map((group) => (
+                    <View key={group.dept} style={{ marginBottom: 8 }}>
+                      <Text style={{ fontSize: 11, fontWeight: "700", color: group.color, marginBottom: 6 }}>{group.label}</Text>
+                      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                        {group.employees.map((emp) => (
+                          <TouchableOpacity key={emp.id} onPress={() => { tap(); setAddEmpId(emp.id); }}
+                            style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10,
+                              backgroundColor: addEmpId === emp.id ? group.color : colors.border + "44",
+                              borderWidth: 1, borderColor: addEmpId === emp.id ? group.color : "transparent" }}>
+                            <Text style={{ fontSize: 13, fontWeight: "600", color: addEmpId === emp.id ? "#fff" : colors.foreground }}>{emp.code}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+                  ))}
+                </View>
+
+                {/* 分类选择 */}
+                <View>
+                  <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 6 }}>分类</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    <View style={{ flexDirection: "row", gap: 8 }}>
+                      {allCategories.map((cat) => (
+                        <TouchableOpacity key={cat.id} onPress={() => { tap(); setAddCategoryState(cat.id); }}
+                          style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10,
+                            backgroundColor: addCategory === cat.id ? "#AF52DE" : colors.border + "44" }}>
+                          <Text style={{ fontSize: 12, fontWeight: "600", color: addCategory === cat.id ? "#fff" : colors.muted }}>{cat.name}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </ScrollView>
+                </View>
+
+                {/* 预支金额 */}
+                <View>
+                  <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 6 }}>预支金额</Text>
+                  <TextInput value={addAmount} onChangeText={setAddAmount} keyboardType="decimal-pad" placeholder="输入金额"
+                    style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 12, fontSize: 16, color: colors.foreground, backgroundColor: colors.background }} />
+                </View>
+
+                {/* 日期快捷选 */}
+                <View>
+                  <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 6 }}>预支日期</Text>
+                  <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+                    {([["today", "今天"], ["yesterday", "昨天"], ["custom", "自定义"]] as const).map(([mode, label]) => (
+                      <TouchableOpacity key={mode} onPress={() => { tap(); handleDateMode(mode); }}
                         style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10,
-                          backgroundColor: addEmpId === emp.id ? "#AF52DE" : colors.border + "44" }}>
-                        <Text style={{ fontSize: 13, fontWeight: "600", color: addEmpId === emp.id ? "#fff" : colors.foreground }}>{emp.code}</Text>
+                          backgroundColor: addDateMode === mode ? "#AF52DE" : colors.border + "44" }}>
+                        <Text style={{ fontSize: 12, fontWeight: "600", color: addDateMode === mode ? "#fff" : colors.muted }}>{label}</Text>
                       </TouchableOpacity>
                     ))}
+                    {addDateMode === "custom" && (
+                      <TextInput value={addDate} onChangeText={setAddDate} placeholder="YYYY-MM-DD"
+                        style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 8, fontSize: 13, color: colors.foreground, backgroundColor: colors.background, flex: 1 }} />
+                    )}
+                    {addDateMode !== "custom" && (
+                      <Text style={{ fontSize: 12, color: colors.muted }}>{addDate}</Text>
+                    )}
                   </View>
-                </ScrollView>
-              </View>
-              <View>
-                <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 6 }}>预支金额</Text>
-                <TextInput value={addAmount} onChangeText={setAddAmount} keyboardType="numeric" placeholder="输入金额"
-                  style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 12, fontSize: 16, color: colors.foreground, backgroundColor: colors.background }} />
-              </View>
-              <View>
-                <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 6 }}>备注（可选）</Text>
-                <TextInput value={addNotes} onChangeText={setAddNotes} placeholder="备注说明"
-                  style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 12, fontSize: 14, color: colors.foreground, backgroundColor: colors.background }} />
-              </View>
-              <View style={{ flexDirection: "row", gap: 10 }}>
-                <TouchableOpacity onPress={() => setShowAddModal(false)}
-                  style={{ flex: 1, padding: 14, borderRadius: 12, backgroundColor: colors.border + "44", alignItems: "center" }}>
-                  <Text style={{ fontSize: 15, fontWeight: "600", color: colors.foreground }}>取消</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={handleAddAdvance}
-                  style={{ flex: 1, padding: 14, borderRadius: 12, backgroundColor: "#AF52DE", alignItems: "center" }}>
-                  <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}>确认添加</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
+                </View>
+
+                {/* 备用金支付 */}
+                <View>
+                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                    <Text style={{ fontSize: 12, color: colors.muted }}>通过备用金支付</Text>
+                    <TouchableOpacity onPress={() => { tap(); setAddUsePetty(!addUsePetty); setAddPettyRecordId(""); }}
+                      style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: 8,
+                        backgroundColor: addUsePetty ? "#AF52DE" : colors.border + "44" }}>
+                      <Text style={{ fontSize: 12, fontWeight: "600", color: addUsePetty ? "#fff" : colors.muted }}>{addUsePetty ? "已开启" : "未开启"}</Text>
+                    </TouchableOpacity>
+                  </View>
+                  {addUsePetty && (
+                    <View style={{ gap: 8 }}>
+                      {availablePettyForAdvance.length > 0 ? (
+                        <>
+                          <Text style={{ fontSize: 11, color: colors.muted }}>选择备用金条目（可选）</Text>
+                          {availablePettyForAdvance.map((r) => (
+                            <TouchableOpacity key={r.id} onPress={() => {
+                              tap();
+                              setAddPettyRecordId(addPettyRecordId === r.id ? "" : r.id);
+                              if (addPettyRecordId !== r.id && !addAmount) setAddAmount(String(r.amount));
+                            }}
+                              style={{ flexDirection: "row", alignItems: "center", padding: 10, borderRadius: 10, borderWidth: 1,
+                                backgroundColor: addPettyRecordId === r.id ? "#AF52DE" + "15" : colors.background,
+                                borderColor: addPettyRecordId === r.id ? "#AF52DE" : colors.border }}>
+                              <View style={{ flex: 1 }}>
+                                <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>{r.description || r.code}</Text>
+                                <Text style={{ fontSize: 10, color: colors.muted }}>{r.code} · {r.date.slice(5)} · {r.paymentMethod}</Text>
+                              </View>
+                              <Text style={{ fontSize: 14, fontWeight: "700", color: "#AF52DE" }}>¥{r.amount.toFixed(0)}</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </>
+                      ) : (
+                        <View style={{ padding: 10, borderRadius: 10, backgroundColor: colors.warning + "10", borderWidth: 1, borderColor: colors.warning + "33" }}>
+                          <Text style={{ fontSize: 12, color: colors.warning }}>当月暂无 K1/K9 备用金条目</Text>
+                        </View>
+                      )}
+                      <TouchableOpacity onPress={() => setShowQuickPetty(true)}
+                        style={{ flexDirection: "row", alignItems: "center", gap: 6, padding: 10, borderRadius: 10,
+                          borderWidth: 1, borderStyle: "dashed", borderColor: colors.border }}>
+                        <IconSymbol name="plus" size={14} color={colors.primary} />
+                        <Text style={{ fontSize: 12, color: colors.primary }}>没有找到？直接新增到备用金</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+
+                {/* 快速新增备用金 */}
+                {showQuickPetty && (
+                  <View style={{ padding: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background, gap: 10 }}>
+                    <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>快速新增备用金条目</Text>
+                    <View style={{ flexDirection: "row", gap: 8 }}>
+                      {(["K1", "K9"] as const).map((code) => (
+                        <TouchableOpacity key={code} onPress={() => setQuickPettyCode(code)}
+                          style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8,
+                            backgroundColor: quickPettyCode === code ? "#AF52DE" : colors.border + "44" }}>
+                          <Text style={{ fontSize: 12, fontWeight: "600", color: quickPettyCode === code ? "#fff" : colors.muted }}>
+                            {code} {PETTY_CODE_LABELS[code]}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                    <TextInput value={quickPettyAmount} onChangeText={setQuickPettyAmount} keyboardType="decimal-pad" placeholder="金额"
+                      style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 10, fontSize: 14, color: colors.foreground }} />
+                    <TextInput value={quickPettyDesc} onChangeText={setQuickPettyDesc} placeholder="描述（可选）"
+                      style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 10, fontSize: 13, color: colors.foreground }} />
+                    <View style={{ flexDirection: "row", gap: 8 }}>
+                      <TouchableOpacity onPress={() => setShowQuickPetty(false)}
+                        style={{ flex: 1, padding: 10, borderRadius: 8, backgroundColor: colors.border + "44", alignItems: "center" }}>
+                        <Text style={{ color: colors.muted }}>取消</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={handleQuickAddPetty}
+                        style={{ flex: 1, padding: 10, borderRadius: 8, backgroundColor: "#AF52DE", alignItems: "center" }}>
+                        <Text style={{ fontSize: 13, fontWeight: "700", color: "#fff" }}>添加到备用金</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
+
+                {/* 备注 */}
+                <View>
+                  <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 6 }}>备注（可选）</Text>
+                  <TextInput value={addNotes} onChangeText={setAddNotes} placeholder="备注说明"
+                    style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 12, fontSize: 14, color: colors.foreground, backgroundColor: colors.background }} />
+                </View>
+
+                <View style={{ flexDirection: "row", gap: 10 }}>
+                  <TouchableOpacity onPress={() => setShowAddModal(false)}
+                    style={{ flex: 1, padding: 14, borderRadius: 12, backgroundColor: colors.border + "44", alignItems: "center" }}>
+                    <Text style={{ fontSize: 15, fontWeight: "600", color: colors.foreground }}>取消</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={handleAddAdvance}
+                    style={{ flex: 1, padding: 14, borderRadius: 12, backgroundColor: "#AF52DE", alignItems: "center" }}>
+                    <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}>确认添加</Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            </KeyboardAvoidingView>
           </View>
         </Modal>
 
-        {/* 员工匹配弹窗 */}
+        {/* ── 员工匹配弹窗 ── */}
         <Modal visible={matchingLink !== null} transparent animationType="slide">
           <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.4)" }}>
             <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 14 }}>
-              <Text style={{ fontSize: 17, fontWeight: "700", color: colors.foreground }}>
-                匹配员工 · {matchingLink?.description}
-              </Text>
-              <Text style={{ fontSize: 12, color: colors.muted }}>
-                选择后将记忆此备注与员工的对应关系，下次自动匹配
-              </Text>
+              <Text style={{ fontSize: 17, fontWeight: "700", color: colors.foreground }}>匹配员工 · {matchingLink?.description}</Text>
+              <Text style={{ fontSize: 12, color: colors.muted }}>选择后将记忆此备注与员工的对应关系，下次自动匹配</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <View style={{ flexDirection: "row", gap: 8 }}>
                   <TouchableOpacity onPress={() => setMatchEmpId("")}
-                    style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10,
-                      backgroundColor: matchEmpId === "" ? colors.error : colors.border + "44" }}>
+                    style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, backgroundColor: matchEmpId === "" ? colors.error : colors.border + "44" }}>
                     <Text style={{ fontSize: 13, fontWeight: "600", color: matchEmpId === "" ? "#fff" : colors.muted }}>不匹配</Text>
                   </TouchableOpacity>
                   {activeEmployees.map((emp) => (
                     <TouchableOpacity key={emp.id} onPress={() => setMatchEmpId(emp.id)}
-                      style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10,
-                        backgroundColor: matchEmpId === emp.id ? "#AF52DE" : colors.border + "44" }}>
+                      style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, backgroundColor: matchEmpId === emp.id ? "#AF52DE" : colors.border + "44" }}>
                       <Text style={{ fontSize: 13, fontWeight: "600", color: matchEmpId === emp.id ? "#fff" : colors.foreground }}>{emp.code}</Text>
                     </TouchableOpacity>
                   ))}
@@ -1433,8 +1558,7 @@ function AdvancePage({ month, colors, headerComponent }: { month: string; colors
                   style={{ flex: 1, padding: 14, borderRadius: 12, backgroundColor: colors.border + "44", alignItems: "center" }}>
                   <Text style={{ fontSize: 15, fontWeight: "600", color: colors.foreground }}>取消</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => { if (matchingLink) handleManualMatch(matchingLink, matchEmpId); }}
+                <TouchableOpacity onPress={() => { if (matchingLink) handleManualMatch(matchingLink, matchEmpId); }}
                   style={{ flex: 1, padding: 14, borderRadius: 12, backgroundColor: "#AF52DE", alignItems: "center" }}>
                   <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}>确认匹配</Text>
                 </TouchableOpacity>
@@ -1443,9 +1567,172 @@ function AdvancePage({ month, colors, headerComponent }: { month: string; colors
           </View>
         </Modal>
 
+        {/* ── 匹配备用金 Modal ── */}
+        <Modal visible={showMatchPettyModal} transparent animationType="slide">
+          <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.4)" }}>
+            <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "85%", paddingBottom: 20 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", padding: 16, borderBottomWidth: 0.5, borderBottomColor: colors.border }}>
+                <Text style={{ fontSize: 17, fontWeight: "700", color: colors.foreground, flex: 1 }}>匹配备用金</Text>
+                <TouchableOpacity onPress={() => setShowMatchPettyModal(false)}>
+                  <Text style={{ fontSize: 15, color: colors.muted }}>关闭</Text>
+                </TouchableOpacity>
+              </View>
+              <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
+                {(["K1", "K9"] as const).map((code) => {
+                  const groupRecords = unlinkedLaborRecords.filter((r) => r.code === code);
+                  if (groupRecords.length === 0) return null;
+                  const allChecked = groupRecords.every((r) => matchPettySelections[r.id]?.checked);
+                  return (
+                    <View key={code} style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border, overflow: "hidden" }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", padding: 12, backgroundColor: colors.background }}>
+                        <Text style={{ fontSize: 13, fontWeight: "700", color: "#AF52DE", flex: 1 }}>{PETTY_CODE_LABELS[code]}</Text>
+                        <TouchableOpacity onPress={() => { tap(); toggleGroupSelection(code, !allChecked); }}
+                          style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 7,
+                            backgroundColor: allChecked ? "#AF52DE" : colors.border + "44" }}>
+                          <Text style={{ fontSize: 11, fontWeight: "600", color: allChecked ? "#fff" : colors.muted }}>
+                            {allChecked ? "取消全选" : "全选"}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                      {groupRecords.map((r, i) => {
+                        const sel = matchPettySelections[r.id];
+                        return (
+                          <View key={r.id} style={[{ padding: 12, gap: 8 }, i > 0 && { borderTopWidth: 0.5, borderTopColor: colors.border }]}>
+                            <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                              <TouchableOpacity onPress={() => {
+                                tap();
+                                setMatchPettySelections((prev) => ({ ...prev, [r.id]: { ...prev[r.id], checked: !prev[r.id]?.checked } }));
+                              }}
+                                style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 2,
+                                  borderColor: sel?.checked ? "#AF52DE" : colors.border,
+                                  backgroundColor: sel?.checked ? "#AF52DE" : "transparent",
+                                  alignItems: "center", justifyContent: "center" }}>
+                                {sel?.checked && <Text style={{ color: "#fff", fontSize: 13, fontWeight: "800" }}>✓</Text>}
+                              </TouchableOpacity>
+                              <View style={{ flex: 1 }}>
+                                <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>{r.description || r.code}</Text>
+                                <Text style={{ fontSize: 10, color: colors.muted }}>{r.date.slice(5)} · {r.paymentMethod}</Text>
+                              </View>
+                              <Text style={{ fontSize: 14, fontWeight: "700", color: "#AF52DE" }}>¥{r.amount.toFixed(0)}</Text>
+                            </View>
+                            {sel?.checked && (
+                              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                                <View style={{ flexDirection: "row", gap: 6 }}>
+                                  <TouchableOpacity onPress={() => setMatchPettySelections((prev) => ({ ...prev, [r.id]: { ...prev[r.id], empId: "" } }))}
+                                    style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8,
+                                      backgroundColor: !sel.empId ? colors.error : colors.border + "44" }}>
+                                    <Text style={{ fontSize: 12, color: !sel.empId ? "#fff" : colors.muted }}>不匹配</Text>
+                                  </TouchableOpacity>
+                                  {employeesByDept.map((group) => group.employees.map((emp) => (
+                                    <TouchableOpacity key={emp.id}
+                                      onPress={() => setMatchPettySelections((prev) => ({ ...prev, [r.id]: { ...prev[r.id], empId: emp.id } }))}
+                                      style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8,
+                                        backgroundColor: sel.empId === emp.id ? group.color : colors.border + "44" }}>
+                                      <Text style={{ fontSize: 12, fontWeight: "600", color: sel.empId === emp.id ? "#fff" : colors.foreground }}>{emp.code}</Text>
+                                    </TouchableOpacity>
+                                  )))}
+                                </View>
+                              </ScrollView>
+                            )}
+                          </View>
+                        );
+                      })}
+                    </View>
+                  );
+                })}
+                {unlinkedLaborRecords.length === 0 && (
+                  <View style={{ alignItems: "center", padding: 32 }}>
+                    <Text style={{ fontSize: 15, color: colors.muted }}>当月无待匹配的 K1/K9 备用金条目</Text>
+                  </View>
+                )}
+              </ScrollView>
+              {unlinkedLaborRecords.length > 0 && (
+                <View style={{ padding: 16, borderTopWidth: 0.5, borderTopColor: colors.border }}>
+                  <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 10, textAlign: "center" }}>
+                    已选 {Object.values(matchPettySelections).filter((s) => s.checked).length} 条 · 合计 ¥{
+                      unlinkedLaborRecords.filter((r) => matchPettySelections[r.id]?.checked).reduce((s, r) => s + r.amount, 0).toFixed(0)
+                    }
+                  </Text>
+                  <TouchableOpacity onPress={handleBatchConfirmMatch}
+                    style={{ padding: 14, borderRadius: 12, backgroundColor: "#AF52DE", alignItems: "center" }}>
+                    <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}>确认创建关联</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          </View>
+        </Modal>
+
+        {/* ── 分类管理 Modal ── */}
+        <Modal visible={showCategoryModal} transparent animationType="slide">
+          <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.4)" }}>
+            <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 14, maxHeight: "70%" }}>
+              <Text style={{ fontSize: 17, fontWeight: "700", color: colors.foreground }}>分类管理</Text>
+              <ScrollView>
+                {allCategories.map((cat) => (
+                  <View key={cat.id} style={{ flexDirection: "row", alignItems: "center", paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: colors.border }}>
+                    {editingCategoryId === cat.id ? (
+                      <TextInput value={editingCategoryName} onChangeText={setEditingCategoryName} autoFocus
+                        style={{ flex: 1, borderWidth: 1, borderColor: colors.primary, borderRadius: 8, padding: 8, fontSize: 14, color: colors.foreground }} />
+                    ) : (
+                      <Text style={{ flex: 1, fontSize: 14, color: colors.foreground }}>{cat.name}</Text>
+                    )}
+                    {cat.isBuiltin ? (
+                      <Text style={{ fontSize: 11, color: colors.muted, marginLeft: 8 }}>内置</Text>
+                    ) : editingCategoryId === cat.id ? (
+                      <View style={{ flexDirection: "row", gap: 8, marginLeft: 8 }}>
+                        <TouchableOpacity onPress={() => { updateCategory(cat.id, editingCategoryName); setEditingCategoryId(null); }}
+                          style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 7, backgroundColor: colors.success }}>
+                          <Text style={{ fontSize: 12, color: "#fff", fontWeight: "600" }}>保存</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => setEditingCategoryId(null)}
+                          style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 7, backgroundColor: colors.border + "44" }}>
+                          <Text style={{ fontSize: 12, color: colors.muted }}>取消</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <View style={{ flexDirection: "row", gap: 8, marginLeft: 8 }}>
+                        <TouchableOpacity onPress={() => { setEditingCategoryId(cat.id); setEditingCategoryName(cat.name); }}
+                          style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 7, backgroundColor: colors.primary + "22" }}>
+                          <Text style={{ fontSize: 12, color: colors.primary }}>编辑</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => Alert.alert("删除分类", `确认删除「${cat.name}」？`, [
+                          { text: "取消", style: "cancel" },
+                          { text: "删除", style: "destructive", onPress: () => deleteCategory(cat.id) },
+                        ])}
+                          style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 7, backgroundColor: colors.error + "22" }}>
+                          <Text style={{ fontSize: 12, color: colors.error }}>删除</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
+                ))}
+              </ScrollView>
+              <View style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>
+                <TextInput value={newCategoryName} onChangeText={setNewCategoryName} placeholder="新分类名称"
+                  style={{ flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 10, fontSize: 14, color: colors.foreground }} />
+                <TouchableOpacity onPress={() => { if (newCategoryName.trim()) { addAdvanceCategory(newCategoryName.trim()); setNewCategoryName(""); } }}
+                  style={{ paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10, backgroundColor: "#AF52DE" }}>
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: "#fff" }}>添加</Text>
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity onPress={() => setShowCategoryModal(false)}
+                style={{ padding: 12, borderRadius: 12, backgroundColor: colors.border + "44", alignItems: "center" }}>
+                <Text style={{ fontSize: 15, color: colors.muted }}>关闭</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       </ScrollView>
 
-      {/* FAB 动态跟随 Tab Bar 位置，不硬编码 */}
+      {/* FAB：匹配备用金（上）+ 新增预支（下） */}
+      <TouchableOpacity onPress={() => { tap(); initMatchPettySelections(); }}
+        style={{ position: "absolute", right: 20, bottom: fabBottom(insets.bottom) + 64, flexDirection: "row", alignItems: "center", gap: 6,
+          paddingHorizontal: 18, paddingVertical: 13, borderRadius: 28, backgroundColor: "#5856D6",
+          shadowColor: "#5856D6", shadowOpacity: 0.35, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 7 }}>
+        <IconSymbol name="link" size={16} color="#fff" />
+        <Text style={{ fontSize: 14, fontWeight: "700", color: "#fff" }}>匹配备用金</Text>
+      </TouchableOpacity>
       <TouchableOpacity onPress={() => { tap(); setShowAddModal(true); }}
         style={{ position: "absolute", right: 20, bottom: fabBottom(insets.bottom), flexDirection: "row", alignItems: "center", gap: 6,
           paddingHorizontal: 18, paddingVertical: 13, borderRadius: 28, backgroundColor: "#AF52DE",

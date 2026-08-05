@@ -85,6 +85,7 @@ export const SYNC_KEYS = [
   "labor_month_configs_v1",
   "labor_holiday_configs_v1",
   "labor.salary_advances.v1",
+  "labor.advance_categories.v1",
   "labor_comp_off_v1",
   "labor_comp_off_entries_v1",
   "labor_holiday_comp_off_v1",

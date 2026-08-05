@@ -40,7 +40,7 @@ import { SpiritsProvider } from "@/lib/spirits/store";
 import { SpiritsInventoryProvider } from "@/lib/spirits/crud-store";
 import { MonthlyReportProvider } from "@/lib/store/monthly-report/store";
 import { LaborProvider } from "@/lib/labor/store";
-import { SalaryAdvanceProvider } from "@/lib/labor/advance-store";
+import { SalaryAdvanceProvider, SalaryAdvanceCategoryProvider } from "@/lib/labor/advance-store";
 import { PettyCategoryProvider } from "@/lib/store/petty-category-store";
 import { PettyInventoryLinkProvider } from "@/lib/store/petty-inventory-link-store";
 import { PettyLaborLinkProvider } from "@/lib/store/petty-labor-link-store";
@@ -149,6 +149,7 @@ export default function RootLayout() {
           <SpiritsInventoryProvider>
           <MonthlyReportProvider>
           <LaborProvider>
+          <SalaryAdvanceCategoryProvider>
           <SalaryAdvanceProvider>
           <PettyCategoryProvider>
           <PettyInventoryLinkProvider>
@@ -266,6 +267,7 @@ export default function RootLayout() {
           </PettyInventoryLinkProvider>
           </PettyCategoryProvider>
           </SalaryAdvanceProvider>
+          </SalaryAdvanceCategoryProvider>
           </LaborProvider>
           </MonthlyReportProvider>
           </SpiritsInventoryProvider>

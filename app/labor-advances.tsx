@@ -55,7 +55,6 @@ function AddAdvanceModal({
   const [date, setDate] = useState(now.toISOString().slice(0, 10));
   const [deductMonth, setDeductMonth] = useState(nextMonth);
   const [notes, setNotes] = useState("");
-  const [paidViaPetty, setPaidViaPetty] = useState(false);
 
   // 只显示长期兼职员工
   const eligibleEmployees = useMemo(() =>
@@ -72,10 +71,10 @@ function AddAdvanceModal({
       amount: Number(amount),
       deductMonth,
       status: "pending",
+      category: "fulltime_advance",
       notes,
-      paidViaPetty,
     });
-    setSelectedEmpId(""); setAmount(""); setNotes(""); setPaidViaPetty(false);
+    setSelectedEmpId(""); setAmount(""); setNotes("");
     onClose();
   };
 
@@ -157,33 +156,7 @@ function AddAdvanceModal({
               </View>
             </View>
 
-            {/* 支付方式 */}
-            <View style={[AM.section, { borderColor: colors.border }]}>
-              <Text style={[AM.sectionTitle, { color: colors.muted }]}>支付方式</Text>
-              <View style={{ flexDirection: "row", gap: 8 }}>
-                {[
-                  { v: false, label: "直接支付" },
-                  { v: true, label: "备用金支付（K1）" },
-                ].map((opt) => (
-                  <TouchableOpacity key={String(opt.v)} onPress={() => { tap(); setPaidViaPetty(opt.v); }}
-                    style={[AM.empChip, {
-                      backgroundColor: paidViaPetty === opt.v ? "#5856D6" : colors.surface,
-                      borderColor: paidViaPetty === opt.v ? "#5856D6" : colors.border,
-                    }]}>
-                    <Text style={{ fontSize: 13, color: paidViaPetty === opt.v ? "#fff" : colors.muted }}>
-                      {opt.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              {paidViaPetty && (
-                <View style={[AM.infoBox, { backgroundColor: colors.warning + "15", borderColor: colors.warning + "33" }]}>
-                  <Text style={{ fontSize: 12, color: colors.warning }}>
-                    请在备用金中同时录入 K1（固定兼职）支出，金额与预支金额一致。
-                  </Text>
-                </View>
-              )}
-            </View>
+
 
             {/* 备注 */}
             <View style={[AM.section, { borderColor: colors.border }]}>
@@ -400,11 +373,7 @@ export default function LaborAdvancesScreen() {
                       {advance.notes}
                     </Text>
                   ) : null}
-                  {advance.paidViaPetty && (
-                    <Text style={{ fontSize: 11, color: colors.warning, marginTop: 2 }}>
-                      通过备用金 K1 支付
-                    </Text>
-                  )}
+
                 </View>
                 <Text style={{ fontSize: 18, fontWeight: "800", color: advance.status === "pending" ? "#5856D6" : colors.muted }}>
                   ¥{advance.amount.toFixed(0)}
