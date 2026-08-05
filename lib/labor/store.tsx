@@ -104,7 +104,8 @@ function EmployeeProvider({ children }: { children: React.ReactNode }) {
       "defaultSession" in e ||
       "address" in e ||
       "idCardImageUri" in e ||
-      "healthCertImageUri" in e
+      "healthCertImageUri" in e ||
+      "weeklyHours" in e
     );
     if (needsMigration) {
       console.log("[EmployeeProvider] 持久化迁移：清除废弃字段、迁移旧字段");
@@ -127,6 +128,32 @@ function EmployeeProvider({ children }: { children: React.ReactNode }) {
           next.healthCertUrl = next.healthCertImageUri;
         }
         delete next.healthCertImageUri;
+        // weeklyHours（旧版 Map 格式）迁移为 weeklyHoursRules（新版规则数组）
+        if ("weeklyHours" in next && next.weeklyHours && !next.weeklyHoursRules?.length) {
+          const map = next.weeklyHours as Record<number, number | null>;
+          const rules: Array<{ id: string; fromDay: number; toDay: number; hours: number }> = [];
+          // 将连续相同工时的天合并为一条规则
+          let i = 1; // 从周一开始
+          while (i <= 7) {
+            const dow = i % 7; // 0=周日, 1=周一, ..., 6=周六
+            const h = map[dow];
+            if (h !== null && h !== undefined && h > 0) {
+              let j = i + 1;
+              while (j <= 7) {
+                const nextDow = j % 7;
+                if (map[nextDow] === h) j++;
+                else break;
+              }
+              const toDow = (j - 1) % 7;
+              rules.push({ id: `migrated_${i}`, fromDay: dow, toDay: toDow, hours: h });
+              i = j;
+            } else {
+              i++;
+            }
+          }
+          if (rules.length > 0) next.weeklyHoursRules = rules;
+        }
+        delete next.weeklyHours;
         return next;
       }));
     }

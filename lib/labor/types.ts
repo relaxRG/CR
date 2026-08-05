@@ -86,12 +86,6 @@ export interface WeeklyHoursRule {
   hours: number;
 }
 
-/**
- * 向后兼容：旧版 WeeklyHoursMap 类型
- * @deprecated 请使用 WeeklyHoursRule[]
- */
-export type WeeklyHoursMap = Partial<Record<0 | 1 | 2 | 3 | 4 | 5 | 6, number | null>>;
-
 // ─── 调休规则 ─────────────────────────────────────────────────────────────────
 export interface CompOffRule {
   /** 多少小时加班换1天调休（默认8） */
@@ -811,8 +805,6 @@ export interface Employee {
   stdHoursPerDay: number;
   /** 灵活工时规则列表（优先于 stdHoursPerDay） */
   weeklyHoursRules?: WeeklyHoursRule[];
-  /** @deprecated 旧版，已被 weeklyHoursRules 替代，仅保留读取兼容，不再写入 */
-  weeklyHours?: WeeklyHoursMap;
   restDaysPerMonth: number;
   hourlyRate: number;
   overtimeHourlyRate: number;
@@ -1219,11 +1211,10 @@ export function calcDailyRate(baseSalary: number, daysInMonth: number, restDays:
 
 /**
  * 获取某员工某天的合同工时
- * 优先级：weeklyHoursRules（新）> weeklyHours（旧，兼容）> stdHoursPerDay
+ * 优先级：weeklyHoursRules（灵活工时规则）> stdHoursPerDay（默认工时）
  */
 export function getContractHoursForDate(employee: Employee, date: string): number {
   const dow = new Date(date).getDay() as 0 | 1 | 2 | 3 | 4 | 5 | 6;
-
   if (employee.weeklyHoursRules && employee.weeklyHoursRules.length > 0) {
     for (const rule of employee.weeklyHoursRules) {
       const inRange = rule.fromDay <= rule.toDay
@@ -1231,15 +1222,7 @@ export function getContractHoursForDate(employee: Employee, date: string): numbe
         : dow >= rule.fromDay || dow <= rule.toDay;
       if (inRange) return rule.hours;
     }
-    return employee.stdHoursPerDay;
   }
-
-  if (employee.weeklyHours) {
-    const h = employee.weeklyHours[dow];
-    if (h === null) return 0;
-    if (h !== undefined) return h;
-  }
-
   return employee.stdHoursPerDay;
 }
 
