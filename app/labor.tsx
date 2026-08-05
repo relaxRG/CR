@@ -17,7 +17,7 @@ import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
 import {
-  useEmployeeStore, useEmployeeGroupStore, useAttendanceStore,
+  useEmployeeStore, useAttendanceStore,
   usePaySlipStore, useShiftStore, useShiftTemplateStore,
   useHolidayConfigStore,
   useSpecialStatusStore, useGlobalPayrollSettingsStore,
@@ -29,7 +29,7 @@ import { usePettyCashStore, PETTY_CODE_LABELS, PettyRecord } from "@/lib/store/p
 import { fabBottom } from "@/components/floating-tab-bar";
 import { usePettyLaborLinkStore, PettyCashLaborLink, matchEmployeeFromDescription, extractKeywords } from "@/lib/store/petty-labor-link-store";
 import {
-  Employee, EmployeeDept, EmployeeGroup, ShiftEntry, ShiftHoursValue, ShiftTemplate,
+  Employee, EmployeeDept, ShiftEntry, ShiftHoursValue, ShiftTemplate,
   SpecialStatus, SpecialStatusDirection, DeptCategory, DEPT_CATEGORY_LABELS,
   DEPT_COLORS, DEPT_LABELS, EMPLOYEE_TYPE_LABELS, monthLabel,
   getMonthDates, getDayOfWeek, getContractHoursForDate,
@@ -795,7 +795,6 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
 function EmployeeRosterPage({ month, colors, headerComponent }: { month: string; colors: any; headerComponent?: React.ReactNode }) {
   const rosterInsets = useSafeAreaInsets();
   const { employees } = useEmployeeStore();
-  const { groups, toggleCollapse } = useEmployeeGroupStore();
   const { templates: shiftTemplates } = useShiftTemplateStore();
   const { paySlips } = usePaySlipStore();
   const { records: attendances } = useAttendanceStore();
@@ -870,22 +869,13 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
   const compareMonth = getCompareMonth(month, compareMode, customMonth);
 
   const activeEmployees = useMemo(() => employees.filter((e) => e.active && !e.archived), [employees]);
-
-  const sortedGroups = useMemo(() =>
-    [...groups].sort((a, b) => a.sortOrder - b.sortOrder),
-    [groups]
-  );
-
-  const ungroupedEmployees = useMemo(() => {
-    const allGroupedIds = new Set(groups.flatMap((g) => g.employeeIds));
-    return activeEmployees.filter((e) => !allGroupedIds.has(e.id));
-  }, [activeEmployees, groups]);
-
-  const getGroupEmployees = (group: EmployeeGroup): Employee[] => {
-    return group.employeeIds
-      .map((id) => activeEmployees.find((e) => e.id === id))
-      .filter((e): e is Employee => !!e);
-  };
+  // 统一分组规则：前厅/后厨/公司（全职+长期兼职）+ 临时兼职（所有部门）
+  const AUTO_DEPT_GROUPS = useMemo(() => [
+    { key: "front",    label: "前厅",   color: "#007AFF", filter: (e: Employee) => e.dept === "front" && e.type !== "parttime" },
+    { key: "kitchen",  label: "后厨",   color: "#34C759", filter: (e: Employee) => e.dept === "kitchen" && e.type !== "parttime" },
+    { key: "company",  label: "公司",   color: "#722ED1", filter: (e: Employee) => e.dept === "other" && e.type !== "parttime" },
+    { key: "parttime", label: "临时兼职", color: "#FF9500", filter: (e: Employee) => e.type === "parttime" },
+  ], []);
 
   return (
     <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: fabBottom(rosterInsets.bottom) + 20 }}>
@@ -909,22 +899,18 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
         </TouchableOpacity>
       </View>
 
-      {/* 分组列表 */}
-      {sortedGroups.map((group) => {
-        const empList = getGroupEmployees(group);
-        if (empList.length === 0) return null;
+      {/* 自动部门分组：前厅/后厨/公司（全职+长期兼职）+ 临时兼职 */}
+      {AUTO_DEPT_GROUPS.map(({ key, label, color, filter }) => {
+        const deptEmps = activeEmployees.filter(filter).sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+        if (deptEmps.length === 0) return null;
         return (
-          <View key={group.id} style={[{ borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, overflow: "hidden" }]}>
-            {/* 分组标题 */}
-            <TouchableOpacity onPress={() => { tap(); toggleCollapse(group.id); }}
-              style={{ flexDirection: "row", alignItems: "center", gap: 8, padding: 12, backgroundColor: group.color + "10" }}>
-              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: group.color }} />
-              <Text style={{ fontSize: 14, fontWeight: "700", color: group.color }}>{group.name}</Text>
-              <Text style={{ fontSize: 12, color: colors.muted, marginLeft: 2 }}>({empList.length}人)</Text>
-              <IconSymbol name={group.collapsed ? "chevron.right" : "chevron.down"} size={14} color={colors.muted} style={{ marginLeft: "auto" }} />
-            </TouchableOpacity>
-            {/* 员工卡片 */}
-            {!group.collapsed && empList.map((emp) => (
+          <View key={key} style={[{ borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, overflow: "hidden" }]}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, padding: 12, backgroundColor: color + "10" }}>
+              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: color }} />
+              <Text style={{ fontSize: 14, fontWeight: "700", color }}>{label}</Text>
+              <Text style={{ fontSize: 12, color: colors.muted, marginLeft: 2 }}>({deptEmps.length}人)</Text>
+            </View>
+            {deptEmps.map((emp) => (
               <View key={emp.id} style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
                 <PaySlipMiniCard
                   employee={emp} month={month} compareMonth={compareMonth} compareMode={compareMode} colors={colors}
@@ -937,39 +923,6 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
           </View>
         );
       })}
-
-      {/* 未分组员工：按部门+临时兼职自动分组 */}
-      {ungroupedEmployees.length > 0 && (() => {
-        const AUTO_DEPT_GROUPS = [
-          { key: "front",    label: "前厅",   color: "#007AFF", filter: (e: Employee) => e.dept === "front" && e.type !== "parttime" },
-          { key: "kitchen",  label: "后厨",   color: "#34C759", filter: (e: Employee) => e.dept === "kitchen" && e.type !== "parttime" },
-          { key: "parttime", label: "临时兼职", color: "#FF9500", filter: (e: Employee) => e.type === "parttime" },
-          { key: "other",    label: "其他",   color: "#8E8E93", filter: (e: Employee) => e.dept === "other" },
-        ];
-        return AUTO_DEPT_GROUPS.map(({ key, label, color, filter }) => {
-          const deptEmps = ungroupedEmployees.filter(filter).sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
-          if (deptEmps.length === 0) return null;
-          return (
-            <View key={key} style={[{ borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, overflow: "hidden" }]}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, padding: 12, backgroundColor: color + "10" }}>
-                <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: color }} />
-                <Text style={{ fontSize: 14, fontWeight: "700", color }}>{label}</Text>
-                <Text style={{ fontSize: 12, color: colors.muted }}>({deptEmps.length}人)</Text>
-              </View>
-              {deptEmps.map((emp) => (
-                <View key={emp.id} style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
-                  <PaySlipMiniCard
-                    employee={emp} month={month} compareMonth={compareMonth} compareMode={compareMode} colors={colors}
-                    slip={paySlips.find((s) => s.employeeId === emp.id && s.month === month) ?? null}
-                    att={attendances.find((a) => a.employeeId === emp.id && a.month === month) ?? null}
-                    compareSlip={compareMonth ? (paySlips.find((s) => s.employeeId === emp.id && s.month === compareMonth) ?? null) : null}
-                  />
-                </View>
-              ))}
-            </View>
-          );
-        });
-      })()}
 
       {activeEmployees.length === 0 && (
         <View style={{ alignItems: "center", padding: 40 }}>

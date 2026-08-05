@@ -30,7 +30,7 @@ import {
 import { useSalaryAdvanceStore } from "@/lib/labor/advance-store";
 import {
   Employee, MonthlyAttendance, PaySlip, RewardPenaltyItem,
-  monthLabel, DEPT_COLORS,
+  monthLabel,
 } from "@/lib/labor/types";
 
 const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
@@ -99,10 +99,10 @@ export default function LaborAttendancePage() {
 
       <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: 40 + insets.bottom, gap: 16 }}>
         {[
-          { key: "front",    label: "前厅",   color: DEPT_COLORS.front,    filter: (e: Employee) => e.dept === "front" && e.type !== "parttime" },
-          { key: "kitchen",  label: "后厨",   color: DEPT_COLORS.kitchen,  filter: (e: Employee) => e.dept === "kitchen" && e.type !== "parttime" },
-          { key: "parttime", label: "兼职",   color: DEPT_COLORS.parttime, filter: (e: Employee) => e.type === "parttime" },
-          { key: "other",    label: "其他",   color: DEPT_COLORS.other,    filter: (e: Employee) => e.dept !== "front" && e.dept !== "kitchen" && e.type !== "parttime" },
+          { key: "front",    label: "前厅",   color: "#007AFF", filter: (e: Employee) => e.dept === "front" && e.type !== "parttime" },
+          { key: "kitchen",  label: "后厨",   color: "#34C759", filter: (e: Employee) => e.dept === "kitchen" && e.type !== "parttime" },
+          { key: "company",  label: "公司",   color: "#722ED1", filter: (e: Employee) => e.dept === "other" && e.type !== "parttime" },
+          { key: "parttime", label: "临时兼职", color: "#FF9500", filter: (e: Employee) => e.type === "parttime" },
         ].map(({ key, label, color, filter }) => {
           const deptEmps = activeEmployees.filter(filter);
           if (deptEmps.length === 0) return null;
