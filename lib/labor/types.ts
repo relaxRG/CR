@@ -867,9 +867,10 @@ export interface ShiftEntry {
   /** 日期 "2026-02-01" */
   date: string;
   /**
-   * 班次名称（工作班次时使用，如"午班"、"晚班"）
-   * 若 specialStatusId 有值，则此字段表示特殊状态名称（用于显示）
-   * @deprecated 旧值 "day"/"evening"/"both" 会在读取时自动迁移
+   * 班次名称（始终使用行的 session 名称，如"午班"、"晚班"）
+   * 即使设置了 specialStatusId，此字段也应是 session 名称，不得是特殊状态名称
+   * 这样 getEntry/deleteShift 才能正确匹配
+   * @deprecated 旧値 "day"/"evening"/"both" 会在读取时自动迁移
    */
   shift: string;
   /** 工时（小时），特殊状态时为 null 或 0 */

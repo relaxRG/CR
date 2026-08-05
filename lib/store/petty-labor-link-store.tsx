@@ -188,6 +188,8 @@ interface LinkContextValue {
   isLinked: (pettyRecordId: string) => boolean;
   /** 备用金记录被修改时同步更新关联快照 */
   syncFromPettyRecord: (pettyRecordId: string, updates: { amount?: number; description?: string; paymentMethod?: string; date?: string }) => void;
+  /** 备用金记录被删除时，根据 pettyRecordId 删除关联，返回被删除的关联（用于调用方从薪资单移除） */
+  deleteLinkByPettyId: (pettyRecordId: string) => PettyCashLaborLink | null;
 }
 
 const LinkContext = createContext<LinkContextValue>({
@@ -195,6 +197,7 @@ const LinkContext = createContext<LinkContextValue>({
   addLink: () => "", updateLink: () => {}, deleteLink: () => {},
   learnAlias: () => {}, getLinksForMonth: () => [], isLinked: () => false,
   syncFromPettyRecord: () => {},
+  deleteLinkByPettyId: () => null,
 });
 
 export function PettyLaborLinkProvider({ children }: { children: React.ReactNode }) {
@@ -264,8 +267,19 @@ export function PettyLaborLinkProvider({ children }: { children: React.ReactNode
     dispatch({ type: "UPDATE_LINK", id: link.id, updates });
   }, [state.links]);
 
+  /**
+   * 备用金记录被删除时调用：删除关联并返回被删除的关联对象
+   * 调用方应在收到返回值后，从对应员工的薪资单中移除 pettyLaborPaid
+   */
+  const deleteLinkByPettyId = useCallback((pettyRecordId: string): PettyCashLaborLink | null => {
+    const link = state.links.find((l) => l.pettyRecordId === pettyRecordId);
+    if (!link) return null;
+    dispatch({ type: "DELETE_LINK", id: link.id });
+    return link;
+  }, [state.links]);
+
   return (
-    <LinkContext.Provider value={{ links: state.links, aliases: state.aliases, addLink, updateLink, deleteLink, learnAlias, getLinksForMonth, isLinked, syncFromPettyRecord }}>
+    <LinkContext.Provider value={{ links: state.links, aliases: state.aliases, addLink, updateLink, deleteLink, learnAlias, getLinksForMonth, isLinked, syncFromPettyRecord, deleteLinkByPettyId }}>
       {children}
     </LinkContext.Provider>
   );

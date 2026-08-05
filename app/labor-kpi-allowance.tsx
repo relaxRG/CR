@@ -123,7 +123,7 @@ export default function LaborKPIAllowancePage() {
     ) * 100) / 100;
     const newFinal = Math.round((
       newGross - (existing.socialInsuranceDeduction ?? 0) - (existing.housingFundDeduction ?? 0) -
-      (existing.incomeTax ?? 0) - existing.advanceAmount
+      (existing.incomeTax ?? 0) - existing.advanceAmount - (existing.pettyLaborPaid ?? 0)
     ) * 100) / 100;
     const updatedSlip = {
       ...existing,

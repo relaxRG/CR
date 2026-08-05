@@ -385,8 +385,40 @@ const ShiftContext = createContext<ShiftStore>({
   deleteShift: () => {}, getShifts: () => [], ready: false,
 });
 
+/** 已知的班次名称列表（用于判断旧数据中 shift 是否是特殊状态名称） */
+const KNOWN_SESSION_PATTERNS = /^(午班|晚班|day|evening|both|午|晚)/;
+
+/**
+ * 迁移旧数据：将 shift=特殊状态名称 的记录修正为 session 名称
+ * 旧版保存特殊状态时错误地用状态名称作为 shift，导致 getEntry 匹配失败
+ * 修复方案：如果有 specialStatusId 且 sessionValue 存在，用 sessionValue 作为 shift
+ */
+function migrateShiftEntries(entries: ShiftEntry[]): { migrated: ShiftEntry[]; changed: boolean } {
+  let changed = false;
+  const migrated = entries.map((e) => {
+    if (e.specialStatusId && e.sessionValue && typeof e.sessionValue === "string" && e.sessionValue !== e.shift) {
+      // sessionValue 存在且与 shift 不同，说明 shift 是旧版特殊状态名称
+      // 用 sessionValue 修复
+      changed = true;
+      return { ...e, shift: e.sessionValue as string };
+    }
+    return e;
+  });
+  return { migrated, changed };
+}
+
 function ShiftProvider({ children }: { children: React.ReactNode }) {
   const { data: shifts, ref, persist, ready } = usePersisted<ShiftEntry>("labor_shifts_v1");
+
+  // 数据加载后自动迁移旧数据
+  React.useEffect(() => {
+    if (!ready) return;
+    const { migrated, changed } = migrateShiftEntries(ref.current);
+    if (changed) {
+      console.log("[ShiftProvider] 迁移旧版 shift 数据，修复特殊状态的 shift 键");
+      persist(migrated);
+    }
+  }, [ready]);
 
   const upsertShift = useCallback((entry: ShiftEntry) => {
     const existing = ref.current.findIndex(
@@ -858,11 +890,12 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
       grossSalary + employerSocialInsurance + employerHousingFund
     ) * 100) / 100;
 
-    // ── 实发薪资（含预支扣除）──
-    // 开启社保/个税时：实发 = 应发 - 社保个人 - 公积金个人 - 个税 - 预支
-    // 关闭社保/个税时：实发 = 应发 - 预支
+    // ── 实发薪资（含预支扣除 + 备用金已付扣除）──
+    // 开启社保/个税时：实发 = 应发 - 社保个人 - 公积金个人 - 个税 - 预支 - 备用金已付
+    // 关闭社保/个税时：实发 = 应发 - 预支 - 备用金已付
+    const pettyLaborPaidAmt = existing?.pettyLaborPaid ?? 0;
     const finalSalary = Math.round((
-      grossSalary - socialInsuranceDeduction - housingFundDeduction - incomeTax - advanceAmount
+      grossSalary - socialInsuranceDeduction - housingFundDeduction - incomeTax - advanceAmount - pettyLaborPaidAmt
     ) * 100) / 100;
 
     return {

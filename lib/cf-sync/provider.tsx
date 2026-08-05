@@ -477,6 +477,13 @@ const STORAGE_KEY_LABELS: Record<string, string> = {
   "labor_payslips_v1":             "薪资单",
   "labor_month_configs_v1":        "月度薪资配置",
   "labor.salary_advances.v1":      "员工预支记录",
+  // ★ 新增：人工模块补全
+  "labor_custom_depts_v1":          "自定义部门",
+  "labor_business_hours_v1":        "店铺营业时间",
+  "labor_shift_groups_v1":          "班次分组",
+  "labor_fill_presets_v1":          "快速填充预设",
+  "store.petty_labor_links.v1":     "备用金人工关联",
+  "store.employee_name_aliases.v1": "员工名字映射",
   // ★ 新增：烈酒进销存
   "spirits.items.v3":               "烈酒酒款档案",
   "spirits.purchases.v3":           "烈酒进货流水",

@@ -18,6 +18,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
 import { useEmployeeStore } from "@/lib/labor/store";
 import { useSalaryAdvanceStore, SalaryAdvance, AdvanceStatus } from "@/lib/labor/advance-store";
+import { usePettyLaborLinkStore } from "@/lib/store/petty-labor-link-store";
 import { EMPLOYEE_TYPE_LABELS, EMPLOYEE_TYPE_COLORS, DEPT_COLORS, monthLabel } from "@/lib/labor/types";
 
 const STATUS_LABELS: Record<AdvanceStatus, string> = {
@@ -208,10 +209,12 @@ export default function LaborAdvancesScreen() {
 
   const { employees } = useEmployeeStore();
   const { advances, addAdvance, updateAdvance, deleteAdvance } = useSalaryAdvanceStore();
+  const { links } = usePettyLaborLinkStore();
 
   const [showAdd, setShowAdd] = useState(false);
   const [filterEmpId, setFilterEmpId] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<AdvanceStatus | "all">("all");
+  const [viewTab, setViewTab] = useState<"manual" | "petty" | "all">("all");
 
   const empMap = useMemo(() => new Map(employees.map((e) => [e.id, e])), [employees]);
 
@@ -226,6 +229,12 @@ export default function LaborAdvancesScreen() {
   const totalPending = useMemo(() =>
     advances.filter((a) => a.status === "pending").reduce((s, a) => s + a.amount, 0),
     [advances]
+  );
+
+  // 备用金关联预支总额
+  const totalPettyLinked = useMemo(() =>
+    links.filter((l) => l.syncedToPaySlip && l.employeeId).reduce((s, l) => s + l.amount, 0),
+    [links]
   );
 
   const handleStatusChange = (advance: SalaryAdvance, newStatus: AdvanceStatus) => {
@@ -267,16 +276,55 @@ export default function LaborAdvancesScreen() {
       {/* 汇总卡片 */}
       <View style={[S.summaryCard, { backgroundColor: "#5856D6" + "0a", borderColor: "#5856D6" + "22" }]}>
         <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 11, color: colors.muted }}>待扣除预支总额</Text>
-          <Text style={{ fontSize: 22, fontWeight: "800", color: "#5856D6" }}>
-            ¥{totalPending.toFixed(0)}
-          </Text>
+          <Text style={{ fontSize: 11, color: colors.muted }}>手动预支（待扣）</Text>
+          <Text style={{ fontSize: 20, fontWeight: "800", color: "#5856D6" }}>¥{totalPending.toFixed(0)}</Text>
+        </View>
+        <View style={{ flex: 1, alignItems: "center" }}>
+          <Text style={{ fontSize: 11, color: colors.muted }}>备用金已付</Text>
+          <Text style={{ fontSize: 20, fontWeight: "800", color: "#AF52DE" }}>¥{totalPettyLinked.toFixed(0)}</Text>
         </View>
         <View style={{ flex: 1, alignItems: "flex-end" }}>
-          <Text style={{ fontSize: 11, color: colors.muted }}>预支记录总数</Text>
-          <Text style={{ fontSize: 22, fontWeight: "800", color: colors.foreground }}>{advances.length}条</Text>
+          <Text style={{ fontSize: 11, color: colors.muted }}>合计记录</Text>
+          <Text style={{ fontSize: 20, fontWeight: "800", color: colors.foreground }}>{advances.length + links.filter((l) => l.syncedToPaySlip).length}条</Text>
         </View>
       </View>
+
+      {/* 视图切换 Tab */}
+      <View style={{ flexDirection: "row", marginHorizontal: 16, marginBottom: 8, backgroundColor: colors.border + "33", borderRadius: 10, padding: 2 }}>
+        {(["all", "manual", "petty"] as const).map((tab) => (
+          <TouchableOpacity key={tab} onPress={() => { tap(); setViewTab(tab); }}
+            style={{ flex: 1, paddingVertical: 6, borderRadius: 8, alignItems: "center",
+              backgroundColor: viewTab === tab ? colors.surface : "transparent" }}>
+            <Text style={{ fontSize: 12, fontWeight: viewTab === tab ? "700" : "400",
+              color: viewTab === tab ? colors.foreground : colors.muted }}>
+              {tab === "all" ? "全部" : tab === "manual" ? "手动预支" : "备用金关联"}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* 备用金关联预支列表 */}
+      {(viewTab === "all" || viewTab === "petty") && links.filter((l) => l.syncedToPaySlip).length > 0 && (
+        <View style={{ marginHorizontal: 16, marginBottom: 8, borderRadius: 12, borderWidth: 1, borderColor: "#AF52DE" + "44", overflow: "hidden" }}>
+          <View style={{ padding: 10, backgroundColor: "#AF52DE" + "10", flexDirection: "row", alignItems: "center" }}>
+            <Text style={{ fontSize: 13, fontWeight: "700", color: "#AF52DE", flex: 1 }}>⚡ 备用金关联（只读）</Text>
+            <Text style={{ fontSize: 11, color: colors.muted }}>在备用金页修改</Text>
+          </View>
+          {links.filter((l) => l.syncedToPaySlip && (filterEmpId === "all" || l.employeeId === filterEmpId)).map((link) => {
+            const emp = employees.find((e) => e.id === link.employeeId);
+            return (
+              <View key={link.id} style={{ padding: 12, borderTopWidth: 0.5, borderTopColor: "#AF52DE" + "22",
+                flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>{link.description}</Text>
+                  <Text style={{ fontSize: 11, color: colors.muted }}>{emp?.code ?? "未匹配"} · {link.date} · {link.pettyCode}</Text>
+                </View>
+                <Text style={{ fontSize: 14, fontWeight: "700", color: "#AF52DE" }}>¥{link.amount.toFixed(0)}</Text>
+              </View>
+            );
+          })}
+        </View>
+      )}
 
       {/* 说明 */}
       <View style={[S.infoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>

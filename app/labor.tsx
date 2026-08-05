@@ -9,7 +9,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import {
   Alert, Dimensions, Modal, Platform, Pressable, ScrollView,
-  StyleSheet, Text, TextInput, TouchableOpacity, View
+  StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions
 } from "react-native";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
@@ -822,8 +822,8 @@ function AdvancePage({ month, colors, headerComponent }: { month: string; colors
   const insets = useSafeAreaInsets();
   const { employees } = useEmployeeStore();
   const { advances, addAdvance, updateAdvance, deleteAdvance } = useSalaryAdvanceStore();
-  const { records: pettyRecords } = usePettyCashStore();
-  const { links, aliases, addLink, updateLink, deleteLink, learnAlias, getLinksForMonth, isLinked } = usePettyLaborLinkStore();
+  const { records: pettyRecords, updateRecord: updatePettyRecord, deleteRecord: deletePettyRecord } = usePettyCashStore();
+  const { links, aliases, addLink, updateLink, deleteLink, learnAlias, getLinksForMonth, isLinked, syncFromPettyRecord, deleteLinkByPettyId } = usePettyLaborLinkStore();
   const { getPaySlip, upsertPaySlip } = usePaySlipStore();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
@@ -942,6 +942,68 @@ function AdvancePage({ month, colors, headerComponent }: { month: string; colors
     }
     setMatchingLink(null);
   };
+
+  // 备用金记录修改联动：同步更新关联快照 + 如果金额变化则重算薪资单
+  const handlePettyUpdate = React.useCallback((pettyId: string, updates: Partial<{ amount: number; description: string; paymentMethod: string; date: string }>) => {
+    // 1. 更新备用金原始记录
+    updatePettyRecord(pettyId, updates);
+    // 2. 同步关联快照
+    syncFromPettyRecord(pettyId, updates);
+    // 3. 如果金额变化，重算薪资单 pettyLaborPaid
+    if (updates.amount !== undefined) {
+      const link = links.find((l) => l.pettyRecordId === pettyId);
+      if (link?.employeeId) {
+        const existing = getPaySlip(link.employeeId, month);
+        if (existing) {
+          const oldAmount = link.amount;
+          const diff = updates.amount - oldAmount;
+          const newPaid = Math.max(0, (existing.pettyLaborPaid ?? 0) + diff);
+          const newFinal = Math.round((existing.finalSalary - diff) * 100) / 100;
+          upsertPaySlip({ ...existing, pettyLaborPaid: newPaid, finalSalary: newFinal });
+        }
+      }
+    }
+    // 4. 如果日期跨月，需从旧月薪资单移除并加到新月
+    if (updates.date !== undefined) {
+      const link = links.find((l) => l.pettyRecordId === pettyId);
+      if (link?.employeeId) {
+        const oldMonth = link.month;
+        const newMonth = updates.date.slice(0, 7);
+        if (oldMonth !== newMonth) {
+          // 从旧月薪资单移除
+          const oldSlip = getPaySlip(link.employeeId, oldMonth);
+          if (oldSlip) {
+            const newPaid = Math.max(0, (oldSlip.pettyLaborPaid ?? 0) - link.amount);
+            const newFinal = Math.round((oldSlip.finalSalary + link.amount) * 100) / 100;
+            upsertPaySlip({ ...oldSlip, pettyLaborPaid: newPaid, finalSalary: newFinal });
+          }
+          // 加入新月薪资单
+          const newSlip = getPaySlip(link.employeeId, newMonth);
+          if (newSlip) {
+            const newPaid = (newSlip.pettyLaborPaid ?? 0) + link.amount;
+            const newFinal = Math.round((newSlip.finalSalary - link.amount) * 100) / 100;
+            upsertPaySlip({ ...newSlip, pettyLaborPaid: newPaid, finalSalary: newFinal });
+          }
+          // 更新关联的 month 字段
+          updateLink(link.id, { month: newMonth, date: updates.date });
+        }
+      }
+    }
+  }, [updatePettyRecord, syncFromPettyRecord, links, getPaySlip, upsertPaySlip, updateLink, month]);
+
+  // 备用金记录删除联动：删除备用金记录 + 删除关联 + 从薪资单移除
+  const handlePettyDelete = React.useCallback((pettyId: string) => {
+    const deletedLink = deleteLinkByPettyId(pettyId);
+    if (deletedLink?.employeeId) {
+      const existing = getPaySlip(deletedLink.employeeId, deletedLink.month);
+      if (existing) {
+        const newPaid = Math.max(0, (existing.pettyLaborPaid ?? 0) - deletedLink.amount);
+        const newFinal = Math.round((existing.finalSalary + deletedLink.amount) * 100) / 100;
+        upsertPaySlip({ ...existing, pettyLaborPaid: newPaid, finalSalary: newFinal });
+      }
+    }
+    deletePettyRecord(pettyId);
+  }, [deleteLinkByPettyId, getPaySlip, upsertPaySlip, deletePettyRecord]);
 
   // 删除关联
   const handleDeleteLink = (link: PettyCashLaborLink) => {
@@ -1469,6 +1531,11 @@ function SchEditModal({ visible, date, employee, session, sessionColor, existing
   onSave: (e: ShiftEntry) => void; onClear: () => void; onClose: () => void;
 }) {
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
+  // 调休余额：在调休换休区显示
+  const { getAvailableDays: getCompOffDays, getEntries: getCompOffEntries } = useCompOffBalanceEntryStore();
+  const { getAvailableDays: getHolidayCompOffDays } = useHolidayCompOffStore();
+  const compOffBalance = employee ? getCompOffEntries(employee.id).filter((e: any) => e.status === "available").reduce((s: number, e: any) => s + (e.days ?? 1), 0) : 0;
+  const holidayCompOffBalance = employee ? getHolidayCompOffDays(employee.id, currentMonth) : 0;
   const DOW = ["日", "一", "二", "三", "四", "五", "六"];
   const dow = date ? getDayOfWeek(date) : 1;
   const [hoursInput, setHoursInput] = useState("");
@@ -1531,11 +1598,13 @@ function SchEditModal({ visible, date, employee, session, sessionColor, existing
   const handleSave = () => {
     if (selectedSpecialId) {
       const ss = specialStatuses.find((s) => s.id === selectedSpecialId);
+      // 重要：shift 必须使用行的 session（而非状态名称）
+      // 这样 getEntry(empId, date, session) 和 deleteShift(empId, date, session) 才能正确匹配
       onSave({
         employeeId: employee.id, date,
-        shift: ss?.name ?? selectedSpecialId,
+        shift: session,           // 关键：始终用行 session 作为主键
         hoursValue: ss?.category === "work_day" ? (Number(hoursInput) || autoHours) : null,
-        sessionValue: ss?.name ?? selectedSpecialId,
+        sessionValue: session,    // sessionValue 也用 session
         specialStatusId: selectedSpecialId,
       });
     } else {
@@ -1570,7 +1639,9 @@ function SchEditModal({ visible, date, employee, session, sessionColor, existing
   const ungroupedShifts = shiftTemplates.filter((t) => !shiftGroups.some((g) => g.templateIds.includes(t.id)));
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide"
+      presentationStyle={Platform.OS === "ios" ? "pageSheet" : "formSheet"}
+      onRequestClose={onClose}>
       <View style={[SCHEM.sheet, { backgroundColor: colors.background }]}>
         <View style={[SCHEM.header, { borderBottomColor: colors.border }]}>
           <Pressable onPress={onClose}><Text style={{ fontSize: 17, color: colors.error }}>取消</Text></Pressable>
@@ -1704,7 +1775,23 @@ function SchEditModal({ visible, date, employee, session, sessionColor, existing
           {/* 调休换休区（拆分三种） */}
           {displayCompOffStatuses.length > 0 && (
             <View style={[SCHEM.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <Text style={[SCHEM.label, { color: colors.foreground }]}>调休换休</Text>
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                <Text style={[SCHEM.label, { color: colors.foreground }]}>调休换休</Text>
+                <View style={{ flexDirection: "row", gap: 6 }}>
+                  <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
+                    backgroundColor: compOffBalance > 0 ? "#007AFF" + "18" : colors.border + "33" }}>
+                    <Text style={{ fontSize: 10, color: compOffBalance > 0 ? "#007AFF" : colors.muted }}>
+                      加班余额 {compOffBalance.toFixed(1)}天
+                    </Text>
+                  </View>
+                  <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
+                    backgroundColor: holidayCompOffBalance > 0 ? "#34C759" + "18" : colors.border + "33" }}>
+                    <Text style={{ fontSize: 10, color: holidayCompOffBalance > 0 ? "#34C759" : colors.muted }}>
+                      节假日调休 {holidayCompOffBalance.toFixed(1)}天
+                    </Text>
+                  </View>
+                </View>
+              </View>
               <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
                 {displayCompOffStatuses.map((ss) => {
                   const sel = selectedSpecialId === ss.id;
@@ -1906,7 +1993,9 @@ function SchTemplateModal({ visible, templates, specialStatuses, businessHours, 
   ] as const;
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide"
+      presentationStyle={Platform.OS === "ios" ? "pageSheet" : "formSheet"}
+      onRequestClose={onClose}>
       <View style={[SCHEM.sheet, { backgroundColor: colors.background }]}>
         <View style={[SCHEM.header, { borderBottomColor: colors.border }]}>
           <Pressable onPress={onClose}><Text style={{ fontSize: 17, color: colors.error }}>取消</Text></Pressable>
@@ -2339,10 +2428,15 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
           return sum + taxable;
         }, 0);
         const cumulativeTaxPaid = prevMonthSlips.reduce((sum, s) => sum + (s.incomeTax ?? 0), 0);
-        const slip = buildPaySlipDraft(emp, currentMonth, att, 0, advanceTotal, globalSettings, cumulativeIncome, cumulativeTaxPaid);
-        // 保留已有的节假日分配和手动修改内容
+        // buildPaySlipDraft 内部已通过 existing 保留手动字段
+        // 但 finalSalary 需要额外扣除 pettyLaborPaid（备用金已付不在 advanceAmount 里）
         const existingSlip = getPaySlip(emp.id, currentMonth);
-        if (existingSlip?.holidayBonusAllocation) slip.holidayBonusAllocation = existingSlip.holidayBonusAllocation;
+        const slip = buildPaySlipDraft(emp, currentMonth, att, 0, advanceTotal, globalSettings, cumulativeIncome, cumulativeTaxPaid);
+        // pettyLaborPaid 需从 finalSalary 中额外扣除
+        const pettyPaid = existingSlip?.pettyLaborPaid ?? 0;
+        if (pettyPaid > 0) {
+          slip.finalSalary = Math.round((slip.finalSalary - pettyPaid) * 100) / 100;
+        }
         upsertPaySlip(slip);
       }
     }, 500);
@@ -2709,6 +2803,15 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
     // 休假/无早：红色，两种模式都显示
     if (h === "休") return <Text style={EXL.cellRest}>(休)</Text>;
     if (h === "无早") return <Text style={EXL.cellNoMorning}>(无早)</Text>;
+    // 特殊状态：显示状态简称（如「旷」「病」「节」「调」）
+    if (entry.specialStatusId) {
+      const ss = specialStatuses.find((s) => s.id === entry.specialStatusId);
+      if (ss) {
+        const shortName = ss.name.slice(0, 2);
+        const ssColor = ss.color;
+        return <Text style={{ fontSize: 9, fontWeight: "700", color: ssColor }} numberOfLines={1}>{shortName}</Text>;
+      }
+    }
     if (viewMode === "session") {
       // 班次模式：显示班次名称前3字（如「午班」「晚班」「午班A」）
       const label = session.slice(0, 3);
@@ -3126,6 +3229,7 @@ export default function LaborScreen({ embedded = false }: { embedded?: boolean }
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { width: winW } = useWindowDimensions();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
   const now = new Date();
@@ -3138,11 +3242,11 @@ export default function LaborScreen({ embedded = false }: { embedded?: boolean }
     tap();
     setActivePage(key);
     const idx = PAGES.findIndex((p) => p.key === key);
-    scrollRef.current?.scrollTo({ x: idx * SCREEN_W, animated: true });
+    scrollRef.current?.scrollTo({ x: idx * winW, animated: true });
   };
 
   const handleScroll = (e: any) => {
-    const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_W);
+    const idx = Math.round(e.nativeEvent.contentOffset.x / winW);
     const key = PAGES[idx]?.key;
     if (key && key !== activePage) setActivePage(key);
   };
@@ -3209,18 +3313,18 @@ export default function LaborScreen({ embedded = false }: { embedded?: boolean }
         style={{ flex: 1 }}
         contentContainerStyle={{ flexDirection: "row" }}>
         {/* 第一页：薪资统计（含人力总览卡片） */}
-        <View style={{ width: SCREEN_W, flex: 1 }}>
+        <View style={{ width: winW, flex: 1 }}>
           <EmployeeRosterPage month={currentMonth} colors={colors}
             headerComponent={<OverviewCard month={currentMonth} colors={colors} />} />
         </View>
 
         {/* 第二页：排班表（不显示人力总览卡片） */}
-        <View style={{ width: SCREEN_W, flex: 1 }}>
+        <View style={{ width: winW, flex: 1 }}>
           <SchedulePage colors={colors} month={currentMonth} onMonthChange={setCurrentMonth} />
         </View>
 
         {/* 第三页：薪资预支（不显示人力总览卡片） */}
-        <View style={{ width: SCREEN_W, flex: 1 }}>
+        <View style={{ width: winW, flex: 1 }}>
           <AdvancePage month={currentMonth} colors={colors} />
         </View>
       </ScrollView>

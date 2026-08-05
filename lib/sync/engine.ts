@@ -93,6 +93,13 @@ export const SYNC_KEYS = [
   "labor_special_statuses_v1",
   "labor_performance_templates_v1",
   "labor_performance_records_v1",
+  // ── 人工模块新增（补全同步）────────────────────────────────────────────────────────────────────────────────────────
+  "labor_custom_depts_v1",
+  "labor_business_hours_v1",
+  "labor_shift_groups_v1",
+  "labor_fill_presets_v1",
+  "store.petty_labor_links.v1",
+  "store.employee_name_aliases.v1",
   // ── 烈酒进销存（新增）──────────────────────────────────────────────────────────────────────────────
   "spirits.items.v3",
   "spirits.purchases.v3",
