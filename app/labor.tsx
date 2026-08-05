@@ -2598,7 +2598,7 @@ function SchTemplateModal({ visible, templates, specialStatuses, businessHours, 
 function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: string; onMonthChange: (m: string) => void }) {
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
   const { employees } = useEmployeeStore();
-  const { shifts, upsertShift, batchUpsertShifts, deleteShift, getShifts } = useShiftStore();
+  const { shifts, upsertShift, batchUpsertShifts, deleteShift, batchDeleteShifts, getShifts } = useShiftStore();
   const { templates, upsertTemplate, deleteTemplate } = useShiftTemplateStore();
   const { statuses: specialStatuses, upsertStatus, deleteStatus } = useSpecialStatusStore();
   const { paySlips, getPaySlip, upsertPaySlip, buildPaySlipDraft } = usePaySlipStore();
@@ -2674,11 +2674,23 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
       [
         { text: "取消", style: "cancel" },
         { text: "删除", style: "destructive", onPress: () => {
+          // 批量删除：一次性写入，避免逐条调用导致的竞态条件
+          const keys: Array<{ employeeId: string; date: string; shift: string }> = [];
           selectedCells.forEach((key) => {
-            const [empId, date, ...sessionParts] = key.split("_");
-            const session = sessionParts.join("_");
-            deleteShift(empId, date, session);
+            const parts = key.split("_");
+            // key 格式: empId_date_session（empId 是 UUID 含-，date 是 YYYY-MM-DD 含-，session 是班次名）
+            // 第一个 _ 前是 empId，第二个 _ 前是 date，剩下是 session
+            const empId = parts[0];
+            const date = parts[1];
+            const session = parts.slice(2).join("_");
+            // 优先用实际存储的 shift 字段（避免 editSession 与存储字段不匹配）
+            const actualEntry = monthShifts.find((s) => s.employeeId === empId && s.date === date && s.shift === session)
+              ?? adjacentShifts.find((s) => s.employeeId === empId && s.date === date && s.shift === session);
+            if (actualEntry) {
+              keys.push({ employeeId: actualEntry.employeeId, date: actualEntry.date, shift: actualEntry.shift });
+            }
           });
+          batchDeleteShifts(keys);
           setSelectedCells(new Set());
           setEditMode(false);
         }},
@@ -2862,47 +2874,6 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
     }
   };
 
-  const handleFillRow = (emp: Employee) => {
-    tap();
-    // 先弹出班次选择，再弹出工作日/全月选择
-    const sessionButtons = sortedTemplates.map((tpl) => ({
-      text: tpl.session,
-      onPress: () => {
-        // 工时优先从员工档案带入，回落模板默认工时
-        const fillHours = (date: string) => {
-          const h = getContractHoursForDate(emp, date);
-          return h > 0 ? h : (tpl.defaultHours ?? 8);
-        };
-        const sampleH = fillHours(dates[0] ?? new Date().toISOString().slice(0, 10));
-        Alert.alert(
-          `快速填充 ${emp.code} · ${tpl.session}`,
-          `工时自动带入员工档案（约 ${sampleH}h），已有数据不覆盖。`,
-          [
-            { text: "取消", style: "cancel" },
-            { text: "工作日（周一~五）", onPress: () => {
-              const es = dates.filter((d) => { const dow = getDayOfWeek(d); return dow !== 0 && dow !== 6; })
-                .filter((d) => !getEntry(emp.id, d, tpl.session))
-                .map((d): ShiftEntry => ({ employeeId: emp.id, date: d, shift: tpl.session, hoursValue: fillHours(d) }));
-              if (es.length > 0) batchUpsertShifts(es);
-            }},
-            { text: "填充全月", onPress: () => {
-              const allEntries = dates.filter((d) => !getEntry(emp.id, d, tpl.session))
-                .map((d): ShiftEntry => ({ employeeId: emp.id, date: d, shift: tpl.session, hoursValue: fillHours(d) }));
-              if (allEntries.length > 0) batchUpsertShifts(allEntries);
-            }},
-          ]
-        );
-      },
-    }));
-    Alert.alert(
-      `快速填充 ${emp.code}`,
-      "选择要填充的班次：",
-      [
-        { text: "取消", style: "cancel" },
-        ...sessionButtons,
-      ]
-    );
-  };
 
   const prevMonth = () => { const [y, m] = currentMonth.split("-").map(Number); const d = new Date(y, m - 2, 1); onMonthChange(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); };
   const nextMonth = () => { const [y, m] = currentMonth.split("-").map(Number); const d = new Date(y, m, 1); onMonthChange(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); };
@@ -3605,7 +3576,13 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
         specialStatuses={specialStatuses}
         shiftGroups={shiftGroups}
         onSave={(entry) => upsertShift(entry)}
-        onClear={() => { if (editEmployee && editDate) deleteShift(editEmployee.id, editDate, editSession); }}
+        onClear={() => {
+          if (editEmployee && editDate) {
+            // 优先用实际存储的 shift 字段，避免 editSession 与存储字段不匹配导致删除失败
+            const actualShift = getEntry(editEmployee.id, editDate, editSession)?.shift ?? editSession;
+            deleteShift(editEmployee.id, editDate, actualShift);
+          }
+        }}
         onClose={() => setShowShiftModal(false)}
       />
       {/* 时长模式格子编辑 Modal（只改工时，不影响班次） */}
@@ -3620,7 +3597,12 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
         colors={colors}
         specialStatuses={specialStatuses}
         onSave={(entry) => upsertShift(entry)}
-        onClear={() => { if (editEmployee && editDate) deleteShift(editEmployee.id, editDate, editSession); }}
+        onClear={() => {
+          if (editEmployee && editDate) {
+            const actualShift = getEntry(editEmployee.id, editDate, editSession)?.shift ?? editSession;
+            deleteShift(editEmployee.id, editDate, actualShift);
+          }
+        }}
         onClose={() => setShowHoursModal(false)}
       />
       <SchTemplateModal

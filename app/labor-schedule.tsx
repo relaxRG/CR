@@ -283,7 +283,7 @@ export default function LaborScheduleScreen() {
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
   const { employees } = useEmployeeStore();
-  const { shifts, upsertShift, batchUpsertShifts, deleteShift, getShifts } = useShiftStore();
+  const { shifts, upsertShift, batchUpsertShifts, deleteShift, batchDeleteShifts, getShifts } = useShiftStore();
   const { templates, upsertTemplate, deleteTemplate } = useShiftTemplateStore();
   const { getPaySlip } = usePaySlipStore();
   const { getAttendance } = useAttendanceStore();
@@ -661,7 +661,13 @@ export default function LaborScheduleScreen() {
         contractHours={editContractH} defaultHours={editTpl?.defaultHours ?? 8}
         colors={colors}
         onSave={(entry) => upsertShift(entry)}
-        onClear={() => { if (editEmployee && editDate) deleteShift(editEmployee.id, editDate, editSession); }}
+        onClear={() => {
+          if (editEmployee && editDate) {
+            // 优先用实际存储的 shift 字段，避免 editSession 与存储字段不匹配导致删除失败
+            const actualShift = getEntry(editEmployee.id, editDate, editSession)?.shift ?? editSession;
+            deleteShift(editEmployee.id, editDate, actualShift);
+          }
+        }}
         onClose={() => setEditModal(false)}
       />
 

@@ -441,13 +441,15 @@ interface ShiftStore {
   upsertShift: (entry: ShiftEntry) => void;
   batchUpsertShifts: (entries: ShiftEntry[]) => void;
   deleteShift: (employeeId: string, date: string, shift: string) => void;
+  /** 批量删除排班记录（一次性写入，避免竞态条件） */
+  batchDeleteShifts: (keys: Array<{ employeeId: string; date: string; shift: string }>) => void;
   getShifts: (month: string) => ShiftEntry[];
   ready: boolean;
 }
 
 const ShiftContext = createContext<ShiftStore>({
   shifts: [], upsertShift: () => {}, batchUpsertShifts: () => {},
-  deleteShift: () => {}, getShifts: () => [], ready: false,
+  deleteShift: () => {}, batchDeleteShifts: () => {}, getShifts: () => [], ready: false,
 });
 
 /**
@@ -521,12 +523,19 @@ function ShiftProvider({ children }: { children: React.ReactNode }) {
     persist(ref.current.filter((s) => !(s.employeeId === employeeId && s.date === date && s.shift === shift)));
   }, [persist, ref]);
 
+  // 批量删除：一次性过滤所有需要删除的记录，只写入一次，避免竞态条件
+  const batchDeleteShifts = useCallback((keys: Array<{ employeeId: string; date: string; shift: string }>) => {
+    if (keys.length === 0) return;
+    const keySet = new Set(keys.map((k) => `${k.employeeId}|${k.date}|${k.shift}`));
+    persist(ref.current.filter((s) => !keySet.has(`${s.employeeId}|${s.date}|${s.shift}`)));
+  }, [persist, ref]);
+
   const getShifts = useCallback((month: string): ShiftEntry[] => {
     return ref.current.filter((s) => s.date.startsWith(month));
   }, [ref]);
 
   return (
-    <ShiftContext.Provider value={{ shifts, upsertShift, batchUpsertShifts, deleteShift, getShifts, ready }}>
+    <ShiftContext.Provider value={{ shifts, upsertShift, batchUpsertShifts, deleteShift, batchDeleteShifts, getShifts, ready }}>
       {children}
     </ShiftContext.Provider>
   );
