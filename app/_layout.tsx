@@ -43,6 +43,7 @@ import { LaborProvider } from "@/lib/labor/store";
 import { SalaryAdvanceProvider } from "@/lib/labor/advance-store";
 import { PettyCategoryProvider } from "@/lib/store/petty-category-store";
 import { PettyInventoryLinkProvider } from "@/lib/store/petty-inventory-link-store";
+import { PettyLaborLinkProvider } from "@/lib/store/petty-labor-link-store";
 import { BeerProvider } from "@/lib/beer/store";
 import { IceInventoryProvider } from "@/lib/ice/inventory-store";
 import { FruitProvider } from "@/lib/fruit/store";
@@ -151,6 +152,7 @@ export default function RootLayout() {
           <SalaryAdvanceProvider>
           <PettyCategoryProvider>
           <PettyInventoryLinkProvider>
+          <PettyLaborLinkProvider>
           <BeerProvider>
           <IceInventoryProvider>
           <FruitProvider>
@@ -258,6 +260,7 @@ export default function RootLayout() {
           </FruitProvider>
           </IceInventoryProvider>
           </BeerProvider>
+          </PettyLaborLinkProvider>
           </PettyInventoryLinkProvider>
           </PettyCategoryProvider>
           </SalaryAdvanceProvider>

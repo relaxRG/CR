@@ -85,6 +85,15 @@ export interface AggregatorInput {
    * 不传则使用默认配置
    */
   inventoryConfigs?: InventoryReportConfig[];
+  /**
+   * 已被纳入薪资预支的备用金记录 ID 列表
+   * 这些记录将从备用金消耗总额中排除，单独列入「人工」类别
+   */
+  laborLinkedPettyIds?: Set<string>;
+  /**
+   * 已被纳入薪资预支的备用金人工总金额（用于单独展示）
+   */
+  laborLinkedTotal?: number;
 }
 
 // ─── 辅助：获取备用金分类配置 ────────────────────────────────────────────────
@@ -203,6 +212,10 @@ export function aggregateMonthlyReport(input: AggregatorInput): Partial<MonthlyS
       allCodes.add(rec.code);
     }
 
+    // 已被纳入薪资预支的备用金记录 ID
+    const laborLinkedIds = input.laborLinkedPettyIds ?? new Set<string>();
+    const laborLinkedTotal = input.laborLinkedTotal ?? 0;
+
     // 按分类代码生成科目行
     for (const code of allCodes) {
       const cfg = getPettyCfg(code, pettyCfgs);
@@ -210,7 +223,8 @@ export function aggregateMonthlyReport(input: AggregatorInput): Partial<MonthlyS
       // N 类（备用金账户收入）→ 跳过，不生成支出行
       if (code.startsWith("N")) continue;
 
-      const recs = input.pettyRecords.filter((r) => r.code === code);
+      // 排除已被纳入薪资预支的条目（按记录 ID 过滤）
+      const recs = input.pettyRecords.filter((r) => r.code === code && !laborLinkedIds.has(r.id));
       const total = recs.reduce((s, r) => s + r.amount, 0);
 
       // 决定归属科目
@@ -237,8 +251,8 @@ export function aggregateMonthlyReport(input: AggregatorInput): Partial<MonthlyS
       }));
     }
 
-    // 备用金其他费用汇总行（所有不单独显示的分类合计）
-    const otherRecs = input.pettyRecords.filter((r) => !excludedFromOther.has(r.code));
+    // 备用金其他费用汇总行（排除已纳入薪资预支的人工条目）
+    const otherRecs = input.pettyRecords.filter((r) => !excludedFromOther.has(r.code) && !laborLinkedIds.has(r.id));
     const otherTotal = otherRecs.reduce((s, r) => s + r.amount, 0);
     items.push(makeItem({
       code: "petty_other",
@@ -248,8 +262,22 @@ export function aggregateMonthlyReport(input: AggregatorInput): Partial<MonthlyS
       source: "petty_cash",
       isPaid: otherTotal > 0,
       paymentNote: otherTotal > 0 ? "已付(备用金)" : "",
-      notes: "未单独列示的备用金支出合计",
+      notes: "未单独列示的备用金支出合计（不含人工）",
     }));
+
+    // 备用金人工单独行（已纳入薪资预支的部分）
+    if (laborLinkedTotal > 0) {
+      items.push(makeItem({
+        code: "petty_labor",
+        label: "备用金人工支出",
+        category: "labor",
+        amount: -laborLinkedTotal,
+        source: "petty_cash",
+        isPaid: true,
+        paymentNote: "已付(备用金)",
+        notes: "已纳入薪资预支，不计入备用金消耗总额",
+      }));
+    }
 
     // 备用金收入（N4 充电宝等）
     const n4Total = input.pettyRecords.filter((r) => r.code === "N4").reduce((s, r) => s + r.amount, 0);

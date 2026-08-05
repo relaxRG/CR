@@ -28,6 +28,7 @@ import { useMonthlyReportStore } from "@/lib/store/monthly-report/store";
 import { useSupplierPurchaseStore } from "@/lib/food/ingredient-store";
 import { useWineSnapshotStore, useWineManualPurchaseStore } from "@/lib/wine/store";
 import { aggregateMonthlyReport } from "@/lib/store/monthly-summary/aggregator";
+import { usePettyLaborLinkStore } from "@/lib/store/petty-labor-link-store";
 import {
   MonthlySummaryReport, SummaryLineItem, AccountBalance, MonthlyPaymentRecord,
   AccountType, ACCOUNT_TYPE_LABELS, ACCOUNT_TYPE_COLORS,
@@ -310,6 +311,7 @@ export default function MonthlySummaryScreen() {
   const paySlipStore = usePaySlipStore();
   const spiritsStore = useSpiritsInventoryStore();
   const pettyStore = usePettyCashStore();
+  const pettyLaborLinkStore = usePettyLaborLinkStore();
   const monthlyReportStore = useMonthlyReportStore();
   const supplierPurchaseStore = useSupplierPurchaseStore();
   const wineSnapshotStore = useWineSnapshotStore();
@@ -441,6 +443,10 @@ export default function MonthlySummaryScreen() {
     const allEmployees = employees
       .filter((e: any) => e.active)
       .map((e: any) => ({ id: e.id, realName: e.realName, code: e.code }));
+    // 备用金人工关联数据（已纳入薪资预支的条目）
+    const monthLaborLinks = pettyLaborLinkStore.getLinksForMonth(selectedMonth);
+    const laborLinkedPettyIds = new Set(monthLaborLinks.map((l) => l.pettyRecordId));
+    const laborLinkedTotal = monthLaborLinks.reduce((s, l) => s + l.amount, 0);
     // 调用聚合器（传入用户配置）
     const aggregated = aggregateMonthlyReport({
       month: selectedMonth,
@@ -456,6 +462,8 @@ export default function MonthlySummaryScreen() {
       allEmployees,
       pettyCodeConfigs,
       inventoryConfigs,
+      laborLinkedPettyIds,
+      laborLinkedTotal,
     });
     // 确认后写入月报
     Alert.alert(

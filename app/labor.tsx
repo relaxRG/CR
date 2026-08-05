@@ -26,8 +26,9 @@ import {
   useCustomDeptStore, useBusinessHoursStore, useShiftGroupStore, useFillPresetStore,
 } from "@/lib/labor/store";
 import { useSalaryAdvanceStore } from "@/lib/labor/advance-store";
-import { usePettyCashStore } from "@/lib/store/petty-store";
+import { usePettyCashStore, PETTY_CODE_LABELS, PettyRecord } from "@/lib/store/petty-store";
 import { fabBottom } from "@/components/floating-tab-bar";
+import { usePettyLaborLinkStore, PettyCashLaborLink, matchEmployeeFromDescription, extractKeywords } from "@/lib/store/petty-labor-link-store";
 import {
   Employee, EmployeeDept, EmployeeGroup, ShiftEntry, ShiftHoursValue, ShiftTemplate,
   SpecialStatus, SpecialStatusDirection, DeptCategory, DEPT_CATEGORY_LABELS,
@@ -815,11 +816,14 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
 }
 
 // ─── 薪资预支页（第三页） ─────────────────────────────────────────────────────
+// 备用金人工关联卡片：显示备用金条目、员工匹配、同步薪资单
 function AdvancePage({ month, colors, headerComponent }: { month: string; colors: any; headerComponent?: React.ReactNode }) {
   const insets = useSafeAreaInsets();
   const { employees } = useEmployeeStore();
   const { advances, addAdvance, updateAdvance, deleteAdvance } = useSalaryAdvanceStore();
   const { records: pettyRecords } = usePettyCashStore();
+  const { links, aliases, addLink, updateLink, deleteLink, learnAlias, getLinksForMonth, isLinked } = usePettyLaborLinkStore();
+  const { getPaySlip, upsertPaySlip } = usePaySlipStore();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
   const [showAddModal, setShowAddModal] = useState(false);
@@ -827,56 +831,127 @@ function AdvancePage({ month, colors, headerComponent }: { month: string; colors
   const [addAmount, setAddAmount] = useState("");
   const [addNotes, setAddNotes] = useState("");
 
-  // 当月备用金 K1 记录（全部）
-  const pettyK1Records = useMemo(() =>
-    pettyRecords.filter((r) => r.code === "K1" && r.date.startsWith(month)),
+  // 员工匹配弹窗状态
+  const [matchingLink, setMatchingLink] = useState<PettyCashLaborLink | null>(null);
+  const [matchEmpId, setMatchEmpId] = useState("");
+
+  // 新增备用金关联弹窗
+  const [showLinkModal, setShowLinkModal] = useState(false);
+  const [linkPettyCode, setLinkPettyCode] = useState<string>("K1");
+
+  // 人工相关备用金代码（K1固定兼职、K9临时兼职）
+  const LABOR_PETTY_CODES = ["K1", "K9"];
+
+  // 当月备用金记录（人工相关，未被关联的）
+  const monthPettyRecords = React.useMemo(() =>
+    pettyRecords.filter((r) => r.date.startsWith(month)),
     [pettyRecords, month]
   );
 
-  // 固定兼职卡片：description 含"固定"/"全职"/"长期"的 K1 记录
-  const fixedK1Records = useMemo(() =>
-    pettyK1Records.filter((r) => {
-      const d = (r.description ?? "").toLowerCase();
-      return d.includes("固定") || d.includes("全职") || d.includes("长期");
-    }),
-    [pettyK1Records]
+  // 当月已关联的 links
+  const monthLinks = React.useMemo(() => getLinksForMonth(month), [links, month]);
+
+  // 智能识别：当月未被关联的人工相关备用金记录
+  const unlinkedLaborRecords = React.useMemo(() =>
+    monthPettyRecords.filter((r) => LABOR_PETTY_CODES.includes(r.code) && !isLinked(r.id)),
+    [monthPettyRecords, isLinked]
   );
 
-  // 临时兼职卡片：其余 K1 记录
-  const tempK1Records = useMemo(() =>
-    pettyK1Records.filter((r) => {
-      const d = (r.description ?? "").toLowerCase();
-      return !(d.includes("固定") || d.includes("全职") || d.includes("长期"));
+  // 自动生成草稿关联（智能识别，未保存）
+  const autoDraftLinks = React.useMemo(() =>
+    unlinkedLaborRecords.map((r) => {
+      const match = matchEmployeeFromDescription(r.description, aliases, employees);
+      return {
+        pettyRecord: r,
+        suggestedEmployeeId: match.employeeId,
+        matchType: match.matchType,
+      };
     }),
-    [pettyK1Records]
+    [unlinkedLaborRecords, aliases, employees]
   );
 
-  // 自动同步：K1 记录全部自动纳入预支统计（智能化）
-  const autoSyncedAdvances = useMemo(() => {
-    const manual = advances.filter((a) => (a.deductMonth === month || a.date.startsWith(month)) && !a.pettyRecordId);
-    const fromK1 = pettyK1Records.map((r) => ({
-      id: "k1_" + r.id,
-      employeeId: "",
-      amount: r.amount,
-      date: r.date,
-      deductMonth: month,
-      notes: r.description || "备用金支付",
-      status: "pending" as const,
-      paidViaPetty: true,
-      pettyRecordId: r.id,
-      createdAt: r.date,
-      updatedAt: r.date,
-    }));
-    return [...fromK1, ...manual];
-  }, [advances, pettyK1Records, month]);
-
-  const totalAdvance = useMemo(() => autoSyncedAdvances.reduce((s, a) => s + a.amount, 0), [autoSyncedAdvances]);
-  const totalFixedK1 = useMemo(() => fixedK1Records.reduce((s, r) => s + r.amount, 0), [fixedK1Records]);
-  const totalTempK1 = useMemo(() => tempK1Records.reduce((s, r) => s + r.amount, 0), [tempK1Records]);
-  const manualAdvances = useMemo(() => advances.filter((a) => (a.deductMonth === month || a.date.startsWith(month)) && !a.pettyRecordId), [advances, month]);
-
+  const activeEmployees = React.useMemo(() => employees.filter((e) => e.active), [employees]);
   const getEmployee = (id: string) => employees.find((e) => e.id === id);
-  const activeEmployees = useMemo(() => employees.filter((e) => e.active), [employees]);
+
+  // 将关联同步到薪资单
+  const syncLinkToPaySlip = React.useCallback((link: PettyCashLaborLink) => {
+    if (!link.employeeId || !link.syncedToPaySlip) return;
+    const existing = getPaySlip(link.employeeId, month);
+    if (!existing) return;
+    const currentLinkIds = existing.pettyLaborLinkIds ?? [];
+    if (currentLinkIds.includes(link.id)) return;
+    const newLinkIds = [...currentLinkIds, link.id];
+    const newPaid = (existing.pettyLaborPaid ?? 0) + link.amount;
+    upsertPaySlip({ ...existing, pettyLaborPaid: newPaid, pettyLaborLinkIds: newLinkIds });
+  }, [getPaySlip, upsertPaySlip, month]);
+
+  // 从薪资单移除关联
+  const removeLinkFromPaySlip = React.useCallback((link: PettyCashLaborLink) => {
+    if (!link.employeeId) return;
+    const existing = getPaySlip(link.employeeId, month);
+    if (!existing) return;
+    const newLinkIds = (existing.pettyLaborLinkIds ?? []).filter((id) => id !== link.id);
+    const newPaid = Math.max(0, (existing.pettyLaborPaid ?? 0) - link.amount);
+    upsertPaySlip({ ...existing, pettyLaborPaid: newPaid, pettyLaborLinkIds: newLinkIds });
+  }, [getPaySlip, upsertPaySlip, month]);
+
+  // 确认纳入一条草稿关联
+  const confirmDraftLink = (pettyRecord: PettyRecord, empId: string, matchType: "auto" | "manual" | "unmatched") => {
+    const id = addLink({
+      pettyRecordId: pettyRecord.id,
+      pettyCode: pettyRecord.code,
+      amount: pettyRecord.amount,
+      date: pettyRecord.date,
+      description: pettyRecord.description,
+      paymentMethod: pettyRecord.paymentMethod,
+      employeeId: empId,
+      matchType,
+      month,
+      syncedToPaySlip: empId !== "",
+    });
+    // 学习别名
+    if (empId && matchType === "manual") {
+      const keywords = extractKeywords(pettyRecord.description);
+      keywords.forEach((kw) => learnAlias(kw, empId));
+    }
+    // 同步到薪资单
+    if (empId) {
+      setTimeout(() => {
+        const link = { id, pettyRecordId: pettyRecord.id, pettyCode: pettyRecord.code, amount: pettyRecord.amount, date: pettyRecord.date, description: pettyRecord.description, paymentMethod: pettyRecord.paymentMethod, employeeId: empId, matchType, month, syncedToPaySlip: true, createdAt: "", updatedAt: "" };
+        syncLinkToPaySlip(link);
+      }, 100);
+    }
+  };
+
+  // 手动匹配员工
+  const handleManualMatch = (link: PettyCashLaborLink, newEmpId: string) => {
+    // 先从旧薪资单移除
+    if (link.employeeId) removeLinkFromPaySlip(link);
+    // 更新关联
+    updateLink(link.id, { employeeId: newEmpId, matchType: "manual", syncedToPaySlip: newEmpId !== "" });
+    // 学习别名
+    if (newEmpId) {
+      const keywords = extractKeywords(link.description);
+      keywords.forEach((kw) => learnAlias(kw, newEmpId));
+    }
+    // 同步到新薪资单
+    if (newEmpId) {
+      const updatedLink = { ...link, employeeId: newEmpId, syncedToPaySlip: true };
+      syncLinkToPaySlip(updatedLink);
+    }
+    setMatchingLink(null);
+  };
+
+  // 删除关联
+  const handleDeleteLink = (link: PettyCashLaborLink) => {
+    Alert.alert("取消关联", `确认将「${link.description}」¥${link.amount} 从薪资预支中移除？`, [
+      { text: "取消", style: "cancel" },
+      { text: "移除", style: "destructive", onPress: () => {
+        removeLinkFromPaySlip(link);
+        deleteLink(link.id);
+      }},
+    ]);
+  };
 
   const handleAddAdvance = () => {
     if (!addEmpId || !addAmount) return;
@@ -893,62 +968,134 @@ function AdvancePage({ month, colors, headerComponent }: { month: string; colors
     setAddEmpId(""); setAddAmount(""); setAddNotes("");
   };
 
-  // 备用金卡片组件
-  const PettyK1Card = ({ title, records, total, color }: { title: string; records: typeof pettyK1Records; total: number; color: string }) => {
-    const [collapsed, setCollapsed] = useState(false);
-    if (records.length === 0) return null;
-    return (
-      <View style={{ borderRadius: 12, borderWidth: 1, borderColor: color + "44", backgroundColor: color + "08", overflow: "hidden" }}>
-        <TouchableOpacity onPress={() => setCollapsed((v) => !v)}
-          style={{ flexDirection: "row", alignItems: "center", gap: 6, padding: 12 }}>
-          <IconSymbol name="bolt.fill" size={14} color={color} />
-          <Text style={{ fontSize: 13, fontWeight: "700", color, flex: 1 }}>{title}（{records.length}笔）</Text>
-          <Text style={{ fontSize: 13, fontWeight: "700", color }}>¥{total.toFixed(0)}</Text>
-          <IconSymbol name={collapsed ? "chevron.right" : "chevron.down"} size={13} color={color} style={{ marginLeft: 4 }} />
-        </TouchableOpacity>
-        {!collapsed && records.map((r, i) => (
-          <View key={r.id} style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, paddingVertical: 8 },
-            i > 0 && { borderTopWidth: 0.5, borderTopColor: color + "22" }]}>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 13, color: colors.foreground }}>{r.description || "备用金支付"}</Text>
-              <Text style={{ fontSize: 10, color: colors.muted }}>{r.date.slice(5)}</Text>
-            </View>
-            <Text style={{ fontSize: 13, fontWeight: "600", color }}>¥{r.amount.toFixed(0)}</Text>
-          </View>
-        ))}
-      </View>
-    );
-  };
+  const totalLinked = React.useMemo(() => monthLinks.reduce((s, l) => s + l.amount, 0), [monthLinks]);
+  const manualAdvances = React.useMemo(() =>
+    advances.filter((a) => (a.deductMonth === month || a.date.startsWith(month)) && !a.pettyRecordId),
+    [advances, month]
+  );
 
   return (
     <View style={{ flex: 1 }}>
-      <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 120 }}>
+      <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 140 }}>
         {headerComponent}
-        {/* 紫色汇总卡片 */}
+
+        {/* 汇总卡片 */}
         <View style={{ borderRadius: 14, padding: 16, borderWidth: 1, borderColor: "#AF52DE" + "33", backgroundColor: "#AF52DE" + "08" }}>
           <Text style={{ fontSize: 14, fontWeight: "700", color: "#AF52DE" }}>{monthLabel(month)} 薪资预支</Text>
           <Text style={{ fontSize: 28, fontWeight: "800", color: "#AF52DE", marginTop: 4 }}>
-            {totalAdvance > 0 ? `¥${totalAdvance.toFixed(0)}` : "¥ —"}
+            ¥{(totalLinked + manualAdvances.reduce((s, a) => s + a.amount, 0)).toFixed(0)}
           </Text>
-          <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>{autoSyncedAdvances.length} 笔预支记录（含备用金自动同步）</Text>
-          {/* vs 对比 */}
-          <View style={{ marginTop: 10, flexDirection: "row", gap: 8 }}>
-            <View style={{ flexDirection: "row", gap: 6 }}>
-              <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: "#AF52DE" + "22" }}>
-                <Text style={{ fontSize: 11, color: "#AF52DE" }}>固定兼职 ¥{totalFixedK1.toFixed(0)}</Text>
-              </View>
-              <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: colors.warning + "22" }}>
-                <Text style={{ fontSize: 11, color: colors.warning }}>临时兼职 ¥{totalTempK1.toFixed(0)}</Text>
-              </View>
+          <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>
+            备用金关联 {monthLinks.length} 笔 · 手动录入 {manualAdvances.length} 笔
+          </Text>
+          <View style={{ marginTop: 8, flexDirection: "row", gap: 8 }}>
+            <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: "#AF52DE" + "22" }}>
+              <Text style={{ fontSize: 11, color: "#AF52DE" }}>备用金已付 ¥{totalLinked.toFixed(0)}</Text>
             </View>
+            {autoDraftLinks.length > 0 && (
+              <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: colors.warning + "22" }}>
+                <Text style={{ fontSize: 11, color: colors.warning }}>待确认 {autoDraftLinks.length} 笔</Text>
+              </View>
+            )}
           </View>
         </View>
 
-        {/* 固定兼职备用金卡片 */}
-        <PettyK1Card title="固定兼职 · 备用金 K1" records={fixedK1Records} total={totalFixedK1} color="#AF52DE" />
+        {/* 智能识别草稿（待确认纳入） */}
+        {autoDraftLinks.length > 0 && (
+          <View style={{ borderRadius: 14, borderWidth: 1.5, borderColor: colors.warning + "66", backgroundColor: colors.warning + "08", overflow: "hidden" }}>
+            <View style={{ flexDirection: "row", alignItems: "center", padding: 12, gap: 6 }}>
+              <Text style={{ fontSize: 13, fontWeight: "700", color: colors.warning, flex: 1 }}>
+                ⚡ 智能识别 · 待确认（{autoDraftLinks.length}笔）
+              </Text>
+              <Text style={{ fontSize: 10, color: colors.muted }}>点击纳入薪资预支</Text>
+            </View>
+            {autoDraftLinks.map((draft, i) => {
+              const emp = draft.suggestedEmployeeId ? getEmployee(draft.suggestedEmployeeId) : null;
+              return (
+                <View key={draft.pettyRecord.id} style={[
+                  { padding: 12, gap: 6 },
+                  i > 0 && { borderTopWidth: 0.5, borderTopColor: colors.warning + "33" }
+                ]}>
+                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>
+                        {draft.pettyRecord.description || "备用金支付"}
+                      </Text>
+                      <Text style={{ fontSize: 10, color: colors.muted }}>
+                        {draft.pettyRecord.code} · {draft.pettyRecord.date.slice(5)} · {draft.pettyRecord.paymentMethod}
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 14, fontWeight: "700", color: colors.warning }}>
+                      ¥{draft.pettyRecord.amount.toFixed(0)}
+                    </Text>
+                  </View>
+                  {/* 员工匹配状态 */}
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    {emp ? (
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 4, flex: 1 }}>
+                        <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: colors.success + "22" }}>
+                          <Text style={{ fontSize: 11, color: colors.success }}>✓ 匹配 {emp.code}</Text>
+                        </View>
+                        <Text style={{ fontSize: 10, color: colors.muted }}>自动识别</Text>
+                      </View>
+                    ) : (
+                      <Text style={{ fontSize: 11, color: colors.muted, flex: 1 }}>未识别员工，可纳入后手动匹配</Text>
+                    )}
+                    <TouchableOpacity
+                      onPress={() => { tap(); confirmDraftLink(draft.pettyRecord, draft.suggestedEmployeeId, draft.matchType); }}
+                      style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, backgroundColor: colors.warning }}>
+                      <Text style={{ fontSize: 12, fontWeight: "700", color: "#fff" }}>纳入</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
 
-        {/* 临时兼职备用金卡片 */}
-        <PettyK1Card title="临时兼职 · 备用金 K1" records={tempK1Records} total={totalTempK1} color={colors.warning} />
+        {/* 已关联的备用金卡片 */}
+        {monthLinks.length > 0 && (
+          <View style={{ borderRadius: 14, borderWidth: 1, borderColor: "#AF52DE" + "44", backgroundColor: "#AF52DE" + "06", overflow: "hidden" }}>
+            <View style={{ flexDirection: "row", alignItems: "center", padding: 12 }}>
+              <Text style={{ fontSize: 13, fontWeight: "700", color: "#AF52DE", flex: 1 }}>
+                备用金关联（{monthLinks.length}笔）
+              </Text>
+              <Text style={{ fontSize: 13, fontWeight: "700", color: "#AF52DE" }}>¥{totalLinked.toFixed(0)}</Text>
+            </View>
+            {monthLinks.map((link, i) => {
+              const emp = link.employeeId ? getEmployee(link.employeeId) : null;
+              return (
+                <TouchableOpacity key={link.id}
+                  onLongPress={() => { tap(); handleDeleteLink(link); }}
+                  style={[
+                    { flexDirection: "row", alignItems: "center", padding: 12, gap: 10 },
+                    i > 0 && { borderTopWidth: 0.5, borderTopColor: "#AF52DE" + "22" }
+                  ]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>
+                      {link.description || "备用金支付"}
+                    </Text>
+                    <Text style={{ fontSize: 10, color: colors.muted }}>
+                      {link.pettyCode} · {link.date.slice(5)} · {link.paymentMethod}
+                    </Text>
+                  </View>
+                  <View style={{ alignItems: "flex-end", gap: 4 }}>
+                    <Text style={{ fontSize: 14, fontWeight: "700", color: "#AF52DE" }}>¥{link.amount.toFixed(0)}</Text>
+                    {/* 员工匹配标签 */}
+                    <TouchableOpacity
+                      onPress={() => { tap(); setMatchingLink(link); setMatchEmpId(link.employeeId); }}
+                      style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6,
+                        backgroundColor: emp ? colors.success + "22" : colors.error + "22" }}>
+                      <Text style={{ fontSize: 10, fontWeight: "600", color: emp ? colors.success : colors.error }}>
+                        {emp ? `✓ ${emp.code}` : "未匹配 点击设置"}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
 
         {/* 手动录入的预支记录 */}
         {manualAdvances.length > 0 && (
@@ -993,15 +1140,17 @@ function AdvancePage({ month, colors, headerComponent }: { month: string; colors
           </View>
         )}
 
-        {autoSyncedAdvances.length === 0 && (
+        {monthLinks.length === 0 && manualAdvances.length === 0 && autoDraftLinks.length === 0 && (
           <View style={{ alignItems: "center", padding: 32 }}>
             <IconSymbol name="creditcard.fill" size={48} color={colors.border} />
             <Text style={{ fontSize: 16, fontWeight: "600", color: colors.foreground, marginTop: 12 }}>本月暂无预支记录</Text>
-            <Text style={{ fontSize: 13, color: colors.muted, marginTop: 6, textAlign: "center" }}>备用金 K1 记录自动同步，也可手动新增</Text>
+            <Text style={{ fontSize: 13, color: colors.muted, marginTop: 6, textAlign: "center" }}>
+              备用金 K1/K9 记录自动识别，也可手动新增
+            </Text>
           </View>
         )}
 
-        {/* 新增预支 Modal */}
+        {/* 新增手动预支 Modal */}
         <Modal visible={showAddModal} transparent animationType="slide">
           <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.4)" }}>
             <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 14 }}>
@@ -1043,9 +1192,50 @@ function AdvancePage({ month, colors, headerComponent }: { month: string; colors
             </View>
           </View>
         </Modal>
+
+        {/* 员工匹配弹窗 */}
+        <Modal visible={matchingLink !== null} transparent animationType="slide">
+          <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.4)" }}>
+            <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 14 }}>
+              <Text style={{ fontSize: 17, fontWeight: "700", color: colors.foreground }}>
+                匹配员工 · {matchingLink?.description}
+              </Text>
+              <Text style={{ fontSize: 12, color: colors.muted }}>
+                选择后将记忆此备注与员工的对应关系，下次自动匹配
+              </Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  <TouchableOpacity onPress={() => setMatchEmpId("")}
+                    style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10,
+                      backgroundColor: matchEmpId === "" ? colors.error : colors.border + "44" }}>
+                    <Text style={{ fontSize: 13, fontWeight: "600", color: matchEmpId === "" ? "#fff" : colors.muted }}>不匹配</Text>
+                  </TouchableOpacity>
+                  {activeEmployees.map((emp) => (
+                    <TouchableOpacity key={emp.id} onPress={() => setMatchEmpId(emp.id)}
+                      style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10,
+                        backgroundColor: matchEmpId === emp.id ? "#AF52DE" : colors.border + "44" }}>
+                      <Text style={{ fontSize: 13, fontWeight: "600", color: matchEmpId === emp.id ? "#fff" : colors.foreground }}>{emp.code}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </ScrollView>
+              <View style={{ flexDirection: "row", gap: 10 }}>
+                <TouchableOpacity onPress={() => setMatchingLink(null)}
+                  style={{ flex: 1, padding: 14, borderRadius: 12, backgroundColor: colors.border + "44", alignItems: "center" }}>
+                  <Text style={{ fontSize: 15, fontWeight: "600", color: colors.foreground }}>取消</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => { if (matchingLink) handleManualMatch(matchingLink, matchEmpId); }}
+                  style={{ flex: 1, padding: 14, borderRadius: 12, backgroundColor: "#AF52DE", alignItems: "center" }}>
+                  <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}>确认匹配</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
       </ScrollView>
 
-      {/* 右下角悬浮 FAB 按钮 */}
       {/* FAB 动态跟随 Tab Bar 位置，不硬编码 */}
       <TouchableOpacity onPress={() => { tap(); setShowAddModal(true); }}
         style={{ position: "absolute", right: 20, bottom: fabBottom(insets.bottom), flexDirection: "row", alignItems: "center", gap: 6,
@@ -1057,7 +1247,6 @@ function AdvancePage({ month, colors, headerComponent }: { month: string; colors
     </View>
   );
 }
-
 
 // ─── 排班表单元格显示 ─────────────────────────────────────────────────────────
 function SchCellDisplay({ entry, contractHours, tplColor, colors }: {

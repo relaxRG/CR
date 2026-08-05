@@ -1144,12 +1144,19 @@ export interface PaySlip {
     mode: "cash" | "rest" | "split";
   }>;
   /**
-   * 调休兑现金额（将调休余额兑现成钱，加入应发）
+   * 调休兑现金额（将调休余额兑现成錢，加入应发）
    * 兑现时按兑现当月日薪计算，可人工修改
    */
   compOffCashOut?: number;
   /** 调休兑现备注（如"兑现X天加班换休余额，日薪¥XX"） */
   compOffCashOutNote?: string;
+  /**
+   * 备用金人工已付金额（来自备用金关联记录，自动同步）
+   * 展示在薪资单「备用金已付」一栏
+   */
+  pettyLaborPaid?: number;
+  /** 备用金人工已付明细（关联的 PettyCashLaborLink ID 列表） */
+  pettyLaborLinkIds?: string[];
   updatedAt: string;
 }
 
