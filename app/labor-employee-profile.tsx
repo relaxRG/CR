@@ -240,114 +240,84 @@ export default function LaborEmployeeProfileScreen() {
         )}
 
         {/* ── 社保（五险）── */}
-        {emp.socialInsurance && (
+        {emp.socialInsurance?.enabled && (
           <SectionCard title="社保（五险）" colors={colors}>
-            <InfoRow
-              label="状态"
-              value={emp.socialInsurance.enabled ? "已开启" : "未开启"}
-              colors={colors}
-              valueColor={emp.socialInsurance.enabled ? colors.success : colors.muted}
-            />
-            {emp.socialInsurance.enabled && (
-              <>
-                {emp.socialInsurance.city ? (
-                  <InfoRow label="城市" value={emp.socialInsurance.city} colors={colors} />
-                ) : null}
-                {emp.socialInsurance.base > 0 && (
-                  <InfoRow label="社保基数" value={`¥${emp.socialInsurance.base.toLocaleString()}`} colors={colors} />
-                )}
-                {emp.socialInsurance.dataSource && (
-                  <InfoRow
-                    label="数据来源"
-                    value={emp.socialInsurance.dataSource === "builtin" ? "内置数据 2025年" : emp.socialInsurance.dataSource === "network" ? "联网更新" : "手动修改"}
-                    colors={colors}
-                  />
-                )}
-                <View style={{ gap: 2, marginTop: 4 }}>
-                  {(["pension", "medical", "unemployment", "workInjury", "maternity"] as const).map((key) => {
-                    const item = emp.socialInsurance![key];
-                    if (!item?.enabled) return null;
-                    return (
-                      <View key={key} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 3 }}>
-                        <Text style={{ fontSize: 12, color: colors.foreground }}>{item.name}</Text>
-                        <Text style={{ fontSize: 12, color: colors.muted }}>
-                          个人 {(item.employeeRate * 100).toFixed(2)}% · 单位 {(item.employerRate * 100).toFixed(2)}%
-                        </Text>
-                      </View>
-                    );
-                  })}
-                </View>
-              </>
+            {emp.socialInsurance.city ? (
+              <InfoRow label="城市" value={emp.socialInsurance.city} colors={colors} />
+            ) : null}
+            {emp.socialInsurance.base > 0 && (
+              <InfoRow label="社保基数" value={`¥${emp.socialInsurance.base.toLocaleString()}`} colors={colors} />
             )}
+            {emp.socialInsurance.dataSource && (
+              <InfoRow
+                label="数据来源"
+                value={emp.socialInsurance.dataSource === "builtin" ? "内置数据 2025年" : emp.socialInsurance.dataSource === "network" ? "联网更新" : "手动修改"}
+                colors={colors}
+              />
+            )}
+            <View style={{ gap: 2, marginTop: 4 }}>
+              {(["pension", "medical", "unemployment", "workInjury", "maternity"] as const).map((key) => {
+                const item = emp.socialInsurance![key];
+                if (!item?.enabled) return null;
+                return (
+                  <View key={key} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 3 }}>
+                    <Text style={{ fontSize: 12, color: colors.foreground }}>{item.name}</Text>
+                    <Text style={{ fontSize: 12, color: colors.muted }}>
+                      个人 {(item.employeeRate * 100).toFixed(2)}% · 单位 {(item.employerRate * 100).toFixed(2)}%
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
           </SectionCard>
         )}
 
         {/* ── 住房公积金 ── */}
-        {emp.socialInsurance?.housingFund && (
+        {emp.socialInsurance?.housingFund?.enabled && (
           <SectionCard title="住房公积金" colors={colors}>
-            <InfoRow
-              label="状态"
-              value={emp.socialInsurance.housingFund.enabled ? "已开启" : "未开启"}
-              colors={colors}
-              valueColor={emp.socialInsurance.housingFund.enabled ? colors.success : colors.muted}
-            />
-            {emp.socialInsurance.housingFund.enabled && (
-              <>
-                {emp.socialInsurance.housingFund.base > 0 && (
-                  <InfoRow label="公积金基数" value={`¥${emp.socialInsurance.housingFund.base.toLocaleString()}`} colors={colors} />
-                )}
-                <InfoRow
-                  label="缴存比例"
-                  value={`个人 ${(emp.socialInsurance.housingFund.employeeRate * 100).toFixed(0)}% · 单位 ${(emp.socialInsurance.housingFund.employerRate * 100).toFixed(0)}%`}
-                  colors={colors}
-                />
-              </>
+            {emp.socialInsurance.housingFund.base > 0 && (
+              <InfoRow label="公积金基数" value={`¥${emp.socialInsurance.housingFund.base.toLocaleString()}`} colors={colors} />
             )}
+            <InfoRow
+              label="缴存比例"
+              value={`个人 ${(emp.socialInsurance.housingFund.employeeRate * 100).toFixed(0)}% · 单位 ${(emp.socialInsurance.housingFund.employerRate * 100).toFixed(0)}%`}
+              colors={colors}
+            />
           </SectionCard>
         )}
 
         {/* ── 个人所得税 ── */}
-        {emp.incomeTax && (
+        {emp.incomeTax?.enabled && (
           <SectionCard title="个人所得税" colors={colors}>
-            <InfoRow
-              label="状态"
-              value={emp.incomeTax.enabled ? "已开启" : "未开启"}
-              colors={colors}
-              valueColor={emp.incomeTax.enabled ? colors.success : colors.muted}
-            />
-            {emp.incomeTax.enabled && (
-              <>
-                <InfoRow label="起征点" value={`¥${emp.incomeTax.threshold.toLocaleString()} / 月`} colors={colors} />
-                {emp.incomeTax.specialDeductions > 0 && (
-                  <InfoRow label="专项附加扣除" value={`¥${emp.incomeTax.specialDeductions} / 月`} colors={colors} />
-                )}
-                {emp.incomeTax.dataSource && (
-                  <InfoRow
-                    label="数据来源"
-                    value={emp.incomeTax.dataSource === "builtin" ? "全国统一 2025年" : "手动修改"}
-                    colors={colors}
-                  />
-                )}
-                {/* 税率表（内置，只读展示） */}
-                <View style={{ marginTop: 8 }}>
-                  <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 6 }}>税率表（系统内置 · 2025年）</Text>
-                  <View style={{ flexDirection: "row", paddingHorizontal: 4, paddingBottom: 4 }}>
-                    <Text style={{ flex: 3, fontSize: 10, color: colors.muted }}>月应纳税所得额</Text>
-                    <Text style={{ flex: 1, fontSize: 10, color: colors.muted, textAlign: "center" }}>税率</Text>
-                    <Text style={{ flex: 1.5, fontSize: 10, color: colors.muted, textAlign: "right" }}>速算扣除数</Text>
-                  </View>
-                  {INCOME_TAX_BRACKETS.map((b, i) => (
-                    <View key={i} style={{ flexDirection: "row", paddingVertical: 4, paddingHorizontal: 4, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border + "44" }}>
-                      <Text style={{ flex: 3, fontSize: 11, color: colors.foreground }}>
-                        {b.max === Infinity ? `超过 ¥${(b.min / 12).toLocaleString()}` : `¥${(b.min / 12).toLocaleString()} ~ ¥${(b.max / 12).toLocaleString()}`}
-                      </Text>
-                      <Text style={{ flex: 1, fontSize: 11, color: colors.primary, textAlign: "center" }}>{(b.rate * 100).toFixed(0)}%</Text>
-                      <Text style={{ flex: 1.5, fontSize: 11, color: colors.muted, textAlign: "right" }}>¥{(b.quickDeduction / 12).toFixed(0)}</Text>
-                    </View>
-                  ))}
-                </View>
-              </>
+            <InfoRow label="起征点" value={`¥${emp.incomeTax.threshold.toLocaleString()} / 月`} colors={colors} />
+            {emp.incomeTax.specialDeductions > 0 && (
+              <InfoRow label="专项附加扣除" value={`¥${emp.incomeTax.specialDeductions} / 月`} colors={colors} />
             )}
+            {emp.incomeTax.dataSource && (
+              <InfoRow
+                label="数据来源"
+                value={emp.incomeTax.dataSource === "builtin" ? "全国统一 2025年" : "手动修改"}
+                colors={colors}
+              />
+            )}
+            {/* 税率表（内置，只读展示） */}
+            <View style={{ marginTop: 8 }}>
+              <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 6 }}>税率表（系统内置 · 2025年）</Text>
+              <View style={{ flexDirection: "row", paddingHorizontal: 4, paddingBottom: 4 }}>
+                <Text style={{ flex: 3, fontSize: 10, color: colors.muted }}>月应纳税所得额</Text>
+                <Text style={{ flex: 1, fontSize: 10, color: colors.muted, textAlign: "center" }}>税率</Text>
+                <Text style={{ flex: 1.5, fontSize: 10, color: colors.muted, textAlign: "right" }}>速算扣除数</Text>
+              </View>
+              {INCOME_TAX_BRACKETS.map((b, i) => (
+                <View key={i} style={{ flexDirection: "row", paddingVertical: 4, paddingHorizontal: 4, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border + "44" }}>
+                  <Text style={{ flex: 3, fontSize: 11, color: colors.foreground }}>
+                    {b.max === Infinity ? `超过 ¥${(b.min / 12).toLocaleString()}` : `¥${(b.min / 12).toLocaleString()} ~ ¥${(b.max / 12).toLocaleString()}`}
+                  </Text>
+                  <Text style={{ flex: 1, fontSize: 11, color: colors.primary, textAlign: "center" }}>{(b.rate * 100).toFixed(0)}%</Text>
+                  <Text style={{ flex: 1.5, fontSize: 11, color: colors.muted, textAlign: "right" }}>¥{(b.quickDeduction / 12).toFixed(0)}</Text>
+                </View>
+              ))}
+            </View>
           </SectionCard>
         )}
 
