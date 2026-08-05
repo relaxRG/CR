@@ -1052,7 +1052,6 @@ export interface PaySlip {
   transportAllowance: number;
   otherAllowance: number;
   rewardPenalty: number;
-  rewardPenaltyNote: string;
   /** 奖惩明细条目（多条，替代单一 rewardPenalty） */
   rewardPenaltyItems?: RewardPenaltyItem[];
   advanceAmount: number;

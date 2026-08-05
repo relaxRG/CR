@@ -1000,7 +1000,6 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
       transportAllowance,
       otherAllowance,
       rewardPenalty: existing?.rewardPenalty ?? 0,
-      rewardPenaltyNote: existing?.rewardPenaltyNote ?? "",
       rewardPenaltyItems: existing?.rewardPenaltyItems,
       advanceAmount,
       notes: existing?.notes ?? "",

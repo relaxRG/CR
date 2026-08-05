@@ -4182,6 +4182,18 @@ export default function LaborScreen({ embedded = false }: { embedded?: boolean }
   const [activePage, setActivePage] = useState<PageKey>((initialPage as PageKey) ?? "roster");
   const scrollRef = useRef<ScrollView>(null);
 
+  // 支持外部跳转时自动定位到指定页（如从薪资总览跳转到排班表/考勤概况）
+  React.useEffect(() => {
+    if (!initialPage) return;
+    const idx = PAGES.findIndex((p) => p.key === initialPage);
+    if (idx > 0) {
+      const timer = setTimeout(() => {
+        scrollRef.current?.scrollTo({ x: idx * winW, animated: false });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [initialPage, winW]);
+
   const handleTabPress = (key: PageKey) => {
     tap();
     setActivePage(key);
