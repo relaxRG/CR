@@ -272,7 +272,7 @@ export default function LaborEmployeesScreen() {
 
   const handlePress = (emp: Employee) => {
     tap();
-    router.push({ pathname: "/labor-employee-form", params: { id: emp.id } } as any);
+    router.push({ pathname: "/labor-employee-profile", params: { id: emp.id } } as any);
   };
 
   const totalCount = activeEmployees.length;
