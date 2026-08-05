@@ -1403,3 +1403,30 @@ export function getDayOfWeek(date: string): number {
 
 export const WEEKDAY_LABELS = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
 export const WEEKDAY_EN = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+// ─── 快速填充预设 ─────────────────────────────────────────────────────────────
+/** 快速填充预设：保存常用的填充配置（最多3个） */
+export interface FillPreset {
+  id: string;
+  /** 显示名称，如「周一~五·当月」 */
+  label: string;
+  /** 班次 session 名称 */
+  session: string;
+  /** 起始星期几（0=周日，1=周一，...，6=周六） */
+  fromDay: number;
+  /** 结束星期几（0=周日，1=周一，...，6=周六） */
+  toDay: number;
+  /** 范围：当前周 or 当前月 */
+  scope: "week" | "month";
+  createdAt: string;
+}
+
+/** 判断某个星期几是否在 fromDay~toDay 范围内（支持跨周，如周五~周二） */
+export function isDayInRange(dow: number, fromDay: number, toDay: number): boolean {
+  if (fromDay <= toDay) {
+    return dow >= fromDay && dow <= toDay;
+  } else {
+    // 跨周，如 fromDay=5(周五), toDay=2(周二) => 周五、六、日、一、二
+    return dow >= fromDay || dow <= toDay;
+  }
+}

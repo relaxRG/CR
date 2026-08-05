@@ -11,7 +11,7 @@ import {
   ShiftTemplate, HolidayConfig,
   EmployeeGroup, CompOffBalance, SpecialStatus, GlobalPayrollSettings,
   CompOffBalanceEntry, HolidayCompOffEntry, UnexplainedRestAlert,
-  CustomDept, BusinessHoursEntry, ShiftGroup,
+  CustomDept, BusinessHoursEntry, ShiftGroup, FillPreset,
   calcDailyRate, calcAllowance, calcSocialInsurance, calcIncomeTax, calcFinalSalary,
   getDaysInMonth, parseMonth, getContractHoursForDate,
   calcCompOffExpiresMonth, getAvailableCompOffDays,
@@ -1228,6 +1228,41 @@ function UnexplainedRestAlertProvider({ children }: { children: React.ReactNode 
 }
 
 // ─── 组合 Provider ────────────────────────────────────────────────────────────
+// ─── 快速填充预设 Store ───────────────────────────────────────────────────────
+interface FillPresetStore {
+  presets: FillPreset[];
+  savePreset: (preset: Omit<FillPreset, "id" | "createdAt">) => void;
+  deletePreset: (id: string) => void;
+}
+
+const FillPresetContext = createContext<FillPresetStore>({
+  presets: [], savePreset: () => {}, deletePreset: () => {},
+});
+
+function FillPresetProvider({ children }: { children: React.ReactNode }) {
+  const { data: presets, ref, persist } = usePersisted<FillPreset>("labor_fill_presets_v1");
+
+  const savePreset = useCallback((preset: Omit<FillPreset, "id" | "createdAt">) => {
+    const newPreset: FillPreset = { ...preset, id: uuid(), createdAt: new Date().toISOString() };
+    // 最多保存 3 个，满了替换最旧的
+    const current = ref.current;
+    const next = current.length >= 3
+      ? [...current.slice(1), newPreset]
+      : [...current, newPreset];
+    persist(next);
+  }, [persist, ref]);
+
+  const deletePreset = useCallback((id: string) => {
+    persist(ref.current.filter((p) => p.id !== id));
+  }, [persist, ref]);
+
+  return (
+    <FillPresetContext.Provider value={{ presets, savePreset, deletePreset }}>
+      {children}
+    </FillPresetContext.Provider>
+  );
+}
+
 export function LaborProvider({ children }: { children: React.ReactNode }) {
   return (
     <MonthConfigProvider>
@@ -1235,6 +1270,7 @@ export function LaborProvider({ children }: { children: React.ReactNode }) {
         <CustomDeptProvider>
         <EmployeeGroupProvider>
           <BusinessHoursProvider>
+          <FillPresetProvider>
           <ShiftGroupProvider>
           <ShiftTemplateProvider>
             <SpecialStatusProvider>
@@ -1260,6 +1296,7 @@ export function LaborProvider({ children }: { children: React.ReactNode }) {
             </SpecialStatusProvider>
           </ShiftTemplateProvider>
           </ShiftGroupProvider>
+          </FillPresetProvider>
           </BusinessHoursProvider>
         </EmployeeGroupProvider>
         </CustomDeptProvider>
@@ -1285,3 +1322,4 @@ export function useHolidayCompOffStore() { return useContext(HolidayCompOffConte
 export function useUnexplainedRestAlertStore() { return useContext(UnexplainedRestAlertContext); }
 export function useBusinessHoursStore() { return useContext(BusinessHoursContext); }
 export function useShiftGroupStore() { return useContext(ShiftGroupContext); }
+export function useFillPresetStore() { return useContext(FillPresetContext); }
