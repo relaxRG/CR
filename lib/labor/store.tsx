@@ -202,8 +202,12 @@ function EmployeeProvider({ children }: { children: React.ReactNode }) {
     persist(next);
   }, [persist, ref]);
 
+  const employeeContextValue = React.useMemo(
+    () => ({ employees, addEmployee, updateEmployee, deleteEmployee, archiveEmployee, restoreEmployee, reorderEmployees, ready }),
+    [employees, addEmployee, updateEmployee, deleteEmployee, archiveEmployee, restoreEmployee, reorderEmployees, ready]
+  );
   return (
-    <EmployeeContext.Provider value={{ employees, addEmployee, updateEmployee, deleteEmployee, archiveEmployee, restoreEmployee, reorderEmployees, ready }}>
+    <EmployeeContext.Provider value={employeeContextValue}>
       {children}
     </EmployeeContext.Provider>
   );
@@ -813,8 +817,12 @@ function AttendanceProvider({ children }: { children: React.ReactNode }) {
     };
   }, [ref]);
 
+  const attendanceContextValue = React.useMemo(
+    () => ({ records, upsertAttendance, deleteAttendance, getAttendance, calcFromShifts, ready }),
+    [records, upsertAttendance, deleteAttendance, getAttendance, calcFromShifts, ready]
+  );
   return (
-    <AttendanceContext.Provider value={{ records, upsertAttendance, deleteAttendance, getAttendance, calcFromShifts, ready }}>
+    <AttendanceContext.Provider value={attendanceContextValue}>
       {children}
     </AttendanceContext.Provider>
   );
@@ -1028,8 +1036,12 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
     };
   }, [ref]);
 
+  const paySlipContextValue = React.useMemo(
+    () => ({ paySlips, upsertPaySlip, deletePaySlip, getPaySlip, buildPaySlipDraft, ready }),
+    [paySlips, upsertPaySlip, deletePaySlip, getPaySlip, buildPaySlipDraft, ready]
+  );
   return (
-    <PaySlipContext.Provider value={{ paySlips, upsertPaySlip, deletePaySlip, getPaySlip, buildPaySlipDraft, ready }}>
+    <PaySlipContext.Provider value={paySlipContextValue}>
       {children}
     </PaySlipContext.Provider>
   );

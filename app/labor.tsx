@@ -3174,7 +3174,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
         const att = calcFromShifts(emp.id, currentMonth, emp, empShifts, specialStatuses, holidayDaysList);
         upsertAttendance(att);
         const advanceTotal = advances
-          .filter((a) => a.employeeId === emp.id && (a.deductMonth === currentMonth || a.date.startsWith(currentMonth)))
+          .filter((a) => a.employeeId === emp.id && (a.deductMonth === currentMonth || a.date.startsWith(currentMonth)) && (a.status === "pending" || a.status === "deducted"))
           .reduce((s, a) => s + a.amount, 0);
         const [curYear] = currentMonth.split("-");
         const prevMonthSlips = paySlips.filter((s) => s.employeeId === emp.id && s.month.startsWith(curYear) && s.month < currentMonth);
@@ -3460,7 +3460,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
         // 不传 0，防止覆盖手动录入的绩效奖金
         const performanceTotal = paySlips.find((s) => s.employeeId === emp.id && s.month === currentMonth)?.performanceBonus ?? 0;
         const advanceTotal = advances
-          .filter((a) => a.employeeId === emp.id && (a.deductMonth === currentMonth || a.date.startsWith(currentMonth)))
+          .filter((a) => a.employeeId === emp.id && (a.deductMonth === currentMonth || a.date.startsWith(currentMonth)) && (a.status === "pending" || a.status === "deducted"))
           .reduce((s, a) => s + a.amount, 0);
         const [curYear] = currentMonth.split("-");
         const prevMonthSlips = paySlips.filter((s) =>
