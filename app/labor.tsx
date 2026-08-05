@@ -643,6 +643,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors }:
 
 // ─── 员工档案页（第二页） ─────────────────────────────────────────────────────
 function EmployeeRosterPage({ month, colors, headerComponent }: { month: string; colors: any; headerComponent?: React.ReactNode }) {
+  const rosterInsets = useSafeAreaInsets();
   const { employees } = useEmployeeStore();
   const { groups, toggleCollapse } = useEmployeeGroupStore();
   const { templates: shiftTemplates } = useShiftTemplateStore();
@@ -737,7 +738,7 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
   };
 
   return (
-    <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 120 }}>
+    <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: fabBottom(rosterInsets.bottom) + 20 }}>
       {headerComponent}
       {/* 工具栏：员工管理 + 对比开关 + 设置 */}
       <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>

@@ -113,10 +113,13 @@ function EmployeeCard({
   const tenure = calcTenure(employee.joinDate);
 
   const compOffEntries = getCompOffEntries(employee.id);
-  const compOffBalance = compOffEntries.filter((e: any) => e.status === "active").length;
+  // CompOffEntry status: available | used_pay | used_rest | expired（没有 active）
+  const compOffBalance = compOffEntries.filter((e: any) => e.status === "available").reduce((s: number, e: any) => s + (e.days ?? 1), 0);
 
+  // advance status: pending | deducted | cancelled（没有 approved）
+  // 展示待扣除+已扣除的预支合计
   const advanceTotal = advances
-    .filter((a: any) => a.employeeId === employee.id && a.status === "approved")
+    .filter((a: any) => a.employeeId === employee.id && (a.status === "pending" || a.status === "deducted"))
     .reduce((sum: number, a: any) => sum + (a.amount || 0), 0);
 
   const [rewardItems, setRewardItems] = useState<RewardPenaltyItem[]>(slip?.rewardPenaltyItems ?? []);
@@ -277,8 +280,11 @@ function EmployeeCard({
       {/* 其他区 */}
       <View style={[S.section, { borderColor: colors.border }]}>
         <Text style={[S.sectionTitle, { color: colors.muted, marginBottom: 8 }]}>其他</Text>
-        <DetailRow label="调休余额" value={`${compOffBalance} 天`} colors={colors} />
+        <DetailRow label="调休余额" value={`${compOffBalance.toFixed(1)} 天`} colors={colors} />
         <DetailRow label="预支小计" value={advanceTotal > 0 ? `-¥${advanceTotal}` : "¥0"} colors={colors} negative={advanceTotal > 0} />
+        {(slip?.pettyLaborPaid ?? 0) > 0 && (
+          <DetailRow label="备用金已付" value={`-¥${(slip!.pettyLaborPaid!).toFixed(0)}`} colors={colors} negative />
+        )}
       </View>
 
       {/* 备注 */}

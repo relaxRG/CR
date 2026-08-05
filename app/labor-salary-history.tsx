@@ -52,6 +52,7 @@ export default function LaborSalaryHistoryScreen() {
       totalSI: yearSlips.reduce((s, p) => s + (p.socialInsuranceDeduction ?? 0) + (p.housingFundDeduction ?? 0), 0),
       totalEmployerCost: yearSlips.reduce((s, p) => s + (p.totalEmployerCost ?? 0), 0),
       totalAdvance: yearSlips.reduce((s, p) => s + (p.advanceAmount ?? 0), 0),
+      totalPettyPaid: yearSlips.reduce((s, p) => s + (p.pettyLaborPaid ?? 0), 0),
       count: yearSlips.length,
     };
   }, [empSlips]);
@@ -106,6 +107,7 @@ export default function LaborSalaryHistoryScreen() {
                 { label: "社保/公积金代扣", value: yearSummary.totalSI > 0 ? `-¥${yearSummary.totalSI.toFixed(0)}` : "—", color: colors.error },
                 { label: "个人所得税", value: yearSummary.totalTax > 0 ? `-¥${yearSummary.totalTax.toFixed(0)}` : "—", color: colors.error },
                 { label: "预支扣除", value: yearSummary.totalAdvance > 0 ? `-¥${yearSummary.totalAdvance.toFixed(0)}` : "—", color: colors.warning },
+                ...(yearSummary.totalPettyPaid > 0 ? [{ label: "备用金已付", value: `-¥${yearSummary.totalPettyPaid.toFixed(0)}`, color: colors.warning }] : []),
                 { label: "年度实发合计", value: `¥${yearSummary.totalFinal.toFixed(0)}`, color: deptColor, bold: true },
               ].map(({ label, value, color, bold }) => (
                 <View key={label} style={{ flexDirection: "row", justifyContent: "space-between" }}>

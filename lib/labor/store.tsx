@@ -878,6 +878,7 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
       otherAllowance,
       rewardPenalty: existing?.rewardPenalty ?? 0,
       rewardPenaltyNote: existing?.rewardPenaltyNote ?? "",
+      rewardPenaltyItems: existing?.rewardPenaltyItems,
       advanceAmount,
       notes: existing?.notes ?? "",
       grossSalary,
@@ -892,6 +893,12 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
       socialInsuranceDetails,
       employerInsuranceDetails,
       incomeTaxNote,
+      // 保留手动字段：调休兑现、节假日分配、备用金人工已付
+      compOffCashOut: existing?.compOffCashOut,
+      compOffCashOutNote: existing?.compOffCashOutNote,
+      holidayBonusAllocation: existing?.holidayBonusAllocation,
+      pettyLaborPaid: existing?.pettyLaborPaid,
+      pettyLaborLinkIds: existing?.pettyLaborLinkIds,
       updatedAt: new Date().toISOString(),
     };
   }, [ref]);

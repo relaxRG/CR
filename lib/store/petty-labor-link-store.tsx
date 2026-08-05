@@ -186,12 +186,15 @@ interface LinkContextValue {
   getLinksForMonth: (month: string) => PettyCashLaborLink[];
   /** 判断某条备用金记录是否已被关联 */
   isLinked: (pettyRecordId: string) => boolean;
+  /** 备用金记录被修改时同步更新关联快照 */
+  syncFromPettyRecord: (pettyRecordId: string, updates: { amount?: number; description?: string; paymentMethod?: string; date?: string }) => void;
 }
 
 const LinkContext = createContext<LinkContextValue>({
   links: [], aliases: [],
   addLink: () => "", updateLink: () => {}, deleteLink: () => {},
   learnAlias: () => {}, getLinksForMonth: () => [], isLinked: () => false,
+  syncFromPettyRecord: () => {},
 });
 
 export function PettyLaborLinkProvider({ children }: { children: React.ReactNode }) {
@@ -251,8 +254,18 @@ export function PettyLaborLinkProvider({ children }: { children: React.ReactNode
     return state.links.some((l) => l.pettyRecordId === pettyRecordId);
   }, [state.links]);
 
+  /**
+   * 当备用金原始记录被修改时，同步更新关联快照中的只读字段
+   * 调用方：在 PettyCashProvider 的 updateRecord 后调用
+   */
+  const syncFromPettyRecord = useCallback((pettyRecordId: string, updates: { amount?: number; description?: string; paymentMethod?: string; date?: string }) => {
+    const link = state.links.find((l) => l.pettyRecordId === pettyRecordId);
+    if (!link) return;
+    dispatch({ type: "UPDATE_LINK", id: link.id, updates });
+  }, [state.links]);
+
   return (
-    <LinkContext.Provider value={{ links: state.links, aliases: state.aliases, addLink, updateLink, deleteLink, learnAlias, getLinksForMonth, isLinked }}>
+    <LinkContext.Provider value={{ links: state.links, aliases: state.aliases, addLink, updateLink, deleteLink, learnAlias, getLinksForMonth, isLinked, syncFromPettyRecord }}>
       {children}
     </LinkContext.Provider>
   );

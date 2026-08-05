@@ -112,15 +112,26 @@ export default function LaborKPIAllowancePage() {
   };
 
   // 即时同步薪资单
+  // 注意：grossSalary = 应发（税前），不应包含 advanceAmount（预支在 finalSalary 才扣）
   const syncToPaySlip = useCallback(() => {
     if (!month || !employeeId) return;
     const existing = getPaySlip(employeeId, month);
     if (!existing) return;
+    const newGross = Math.round((
+      existing.attendanceSalary + (workKPITotal + revenueKPITotal) + allowanceTotal +
+      existing.salesCommission + existing.rewardPenalty
+    ) * 100) / 100;
+    const newFinal = Math.round((
+      newGross - (existing.socialInsuranceDeduction ?? 0) - (existing.housingFundDeduction ?? 0) -
+      (existing.incomeTax ?? 0) - existing.advanceAmount
+    ) * 100) / 100;
     const updatedSlip = {
       ...existing,
       performanceBonus: workKPITotal + revenueKPITotal,
       mealAllowance: allowanceTotal,
-      grossSalary: existing.attendanceSalary + (workKPITotal + revenueKPITotal) + allowanceTotal + existing.salesCommission + existing.rewardPenalty - existing.advanceAmount,
+      grossSalary: newGross,
+      finalSalary: newFinal,
+      totalEmployerCost: Math.round((newGross + (existing.employerSocialInsurance ?? 0) + (existing.employerHousingFund ?? 0)) * 100) / 100,
     };
     upsertPaySlip(updatedSlip);
   }, [month, employeeId, getPaySlip, upsertPaySlip, workKPITotal, revenueKPITotal, allowanceTotal]);
