@@ -724,8 +724,6 @@ export interface ShiftTemplate {
   defaultHours: number;
   color: string;
   sortOrder: number;
-  /** 所属班次分组 ID（可选） */
-  groupId?: string;
   /** 营业额预警阈值（元，0=不预警） */
   revenueWarning?: number;
 }

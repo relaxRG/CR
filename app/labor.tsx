@@ -25,25 +25,23 @@ import {
   useCustomDeptStore, useBusinessHoursStore, useShiftGroupStore, useFillPresetStore,
   useShiftGroupMemberStore, useScheduleSnapshotStore,
 } from "@/lib/labor/store";
-import { useSalaryAdvanceStore, useAdvanceCategoryStore, BUILTIN_ADVANCE_CATEGORIES } from "@/lib/labor/advance-store";
+import { useSalaryAdvanceStore, useAdvanceCategoryStore } from "@/lib/labor/advance-store";
 import { usePettyCashStore, PETTY_CODE_LABELS, PettyRecord } from "@/lib/store/petty-store";
 import { fabBottom } from "@/components/floating-tab-bar";
 import { usePettyLaborLinkStore, PettyCashLaborLink, matchEmployeeFromDescription, extractKeywords } from "@/lib/store/petty-labor-link-store";
 import {
-  Employee, EmployeeDept, ShiftEntry, ShiftHoursValue, ShiftTemplate,
-  SpecialStatus, SpecialStatusDirection, DeptCategory, DEPT_CATEGORY_LABELS,
+  Employee, EmployeeDept, ShiftEntry, ShiftTemplate,
+  SpecialStatus, DeptCategory, DEPT_CATEGORY_LABELS,
   DEPT_COLORS, DEPT_LABELS, EMPLOYEE_TYPE_LABELS, monthLabel,
   getMonthDates, getDayOfWeek, getContractHoursForDate,
-  DEFAULT_SHIFT_TEMPLATES, DEFAULT_SPECIAL_STATUSES, SHIFT_COLOR_PRESETS, calcAllowance,
+  DEFAULT_SHIFT_TEMPLATES, SHIFT_COLOR_PRESETS,
   calcCompOffExpiresMonth, BusinessHoursEntry, ShiftGroup, WEEKDAY_SHORT,
-  DEFAULT_BUSINESS_HOURS, DEFAULT_SHIFT_GROUPS, FillPreset, isDayInRange,
-  WEEKDAY_LABELS, PaySlip, MonthlyAttendance, ShiftGroupMember, ScheduleSnapshot,
+  DEFAULT_SHIFT_GROUPS, FillPreset, isDayInRange,
+  PaySlip, MonthlyAttendance, ScheduleSnapshot,
 } from "@/lib/labor/types";
 
 const { width: SCREEN_W } = Dimensions.get("window");
-const SCH_NAME_W = 64;   // 排班表左侧姓名列宽
-const SCH_CELL_W = 44;  // 排班表每天列宽
-const SCH_ROW_H = 38;   // 排班表行高
+
 
 
 
@@ -185,7 +183,6 @@ function OverviewCard({ month, colors }: { month: string; colors: any }) {
   const totalSalary = useMemo(() => monthSlips.reduce((s, p) => s + p.finalSalary, 0), [monthSlips]);
   // finalSalary 已含预支扣除，待发合计直接累加 finalSalary
   const totalPending = useMemo(() => monthSlips.reduce((s, p) => s + Math.max(0, p.finalSalary), 0), [monthSlips]);
-  const attendCount = useMemo(() => attendances.filter((a) => a.month === month).length, [attendances, month]);
 
   // 对比月数据
   const compareSlips = useMemo(() => compareMonth ? paySlips.filter((s) => s.month === compareMonth) : [], [paySlips, compareMonth]);
@@ -306,7 +303,6 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
   compareSlip: PaySlip | null;
 }) {
   const { upsertPaySlip } = usePaySlipStore();
-  const { templates: shiftTpls } = useShiftTemplateStore();
   const { getAvailableDays: getCompOffDays, addEntry: addCompOffEntry, getEntries: getCompOffEntries, cashOutEntry: cashOutCompOff } = useCompOffBalanceEntryStore();
   const { getAvailableDays: getHolidayCompOffDays } = useHolidayCompOffStore();
   const { getAlert, resolveAlert } = useUnexplainedRestAlertStore();
@@ -858,11 +854,6 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
   }, [paySlips, attendances, employees, month]);
 
   // 班次颜色查找辅助函数（动态读取模板）
-  const getSessionColor = useCallback((session: string | undefined): string => {
-    if (!session) return colors.muted;
-    const tpl = (shiftTemplates.length > 0 ? shiftTemplates : DEFAULT_SHIFT_TEMPLATES).find((t) => t.session === session);
-    return tpl?.color ?? colors.primary;
-  }, [shiftTemplates, colors]);
 
   // 薪资对比开关（统一控制所有卡片）
   const [compareMode, setCompareMode] = useState<CompareMode>("none");
@@ -2180,14 +2171,17 @@ function SchShiftModal({ visible, date, employee, session, existing, contractHou
   const compOffStatuses = specialStatuses.filter((s) => s.category === "comp_off" && s.id !== "ss_comp_off");
   const displayCompOffStatuses = compOffStatuses.length > 0 ? compOffStatuses : specialStatuses.filter((s) => s.category === "comp_off");
 
-  // 班次按分组展示
-  const groupedShifts = shiftGroups.length > 0
-    ? shiftGroups.map((grp) => ({
-        group: grp,
-        templates: shiftTemplates.filter((t) => grp.templateIds.includes(t.id)),
-      })).filter((g) => g.templates.length > 0)
-    : [{ group: null as ShiftGroup | null, templates: shiftTemplates }];
-  const ungroupedShifts = shiftTemplates.filter((t) => !shiftGroups.some((g) => g.templateIds.includes(t.id)));
+  // 班次按分组展示（已在分组的班次 + 未分组的班次统一展示）
+  const coveredTplIds = new Set(shiftGroups.flatMap((g) => g.templateIds));
+  const groupedShifts: Array<{ group: ShiftGroup | null; templates: ShiftTemplate[] }> = [
+    ...shiftGroups.map((grp) => ({
+      group: grp,
+      templates: shiftTemplates.filter((t) => grp.templateIds.includes(t.id)),
+    })).filter((g) => g.templates.length > 0),
+    ...(shiftTemplates.some((t) => !coveredTplIds.has(t.id))
+      ? [{ group: null, templates: shiftTemplates.filter((t) => !coveredTplIds.has(t.id)) }]
+      : []),
+  ];
 
   return (
     <Modal visible={visible} animationType="slide"
@@ -2246,25 +2240,7 @@ function SchShiftModal({ visible, date, employee, session, existing, contractHou
                 </View>
               </View>
             ))}
-            {ungroupedShifts.length > 0 && shiftGroups.length > 0 && (
-              <View style={{ marginTop: 10 }}>
-                <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 6 }}>未分组</Text>
-                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                  {ungroupedShifts.map((tpl) => {
-                    const sel = !existing?.specialStatusId && existing?.shift === tpl.session;
-                    return (
-                      <TouchableOpacity key={tpl.id} onPress={() => handleSelectShift(tpl)}
-                        style={[SCHEM.chip, { backgroundColor: sel ? tpl.color : colors.surface, borderColor: tpl.color }]}>
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: sel ? "#fff" : tpl.color }} />
-                          <Text style={{ fontSize: 13, fontWeight: "600", color: sel ? "#fff" : tpl.color }}>{tpl.session}</Text>
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-            )}
+
           </View>
 
           {/* 特殊状态区（点击即保存） */}
@@ -3016,7 +2992,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   const { templates, upsertTemplate, deleteTemplate } = useShiftTemplateStore();
   const { statuses: specialStatuses, upsertStatus, deleteStatus } = useSpecialStatusStore();
   const { paySlips, upsertPaySlip, buildPaySlipDraft } = usePaySlipStore();
-  const { records: attendanceRecords, getAttendance, upsertAttendance, calcFromShifts } = useAttendanceStore();
+  const { records: attendanceRecords, upsertAttendance, calcFromShifts } = useAttendanceStore();
   // 旧绩效 Store 已移除，performanceTotal 从新 KPI 系统计算
   const { getHolidayForDate } = useHolidayConfigStore();
   const { advances } = useSalaryAdvanceStore();
@@ -3025,14 +3001,14 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   const { getAvailableDays: getHolidayCompOffAvailDays, updateEntry: updateHolidayCompOff, getEntries: getHolidayCompOffEntries, addEntry: addHolidayCompOff, expireOldEntries: expireHolidayCompOff } = useHolidayCompOffStore();
   const { upsertAlert } = useUnexplainedRestAlertStore();
   const { businessHours, setBusinessHours } = useBusinessHoursStore();
-  const { shiftGroups, upsertShiftGroup, deleteShiftGroup, setShiftGroups, getGroupForTemplate } = useShiftGroupStore();
-  const { getMembersForGroup, addMember, removeMember, isMember, migrateFromShifts } = useShiftGroupMemberStore();
+  const { shiftGroups, setShiftGroups } = useShiftGroupStore();
+  const { getMembersForGroup, addMember, removeMember, isMember, migrateFromShifts, replaceMembers } = useShiftGroupMemberStore();
   const { getSnapshots, saveSnapshot, updateSnapshot, deleteSnapshot } = useScheduleSnapshotStore();
 
   const now = new Date();
   const todayStr = now.toISOString().slice(0, 10);
   const currentMonth = month;
-  const { depts: customDepts, resolveEmployeeDept } = useCustomDeptStore();
+  const { resolveEmployeeDept } = useCustomDeptStore();
   const schPageWidth = SCREEN_W;
   const [deptCategory, setDeptCategory] = useState<DeptCategory>("front");
   // 班次/时长切换
@@ -3078,7 +3054,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   const selectAllMonth = () => {
     const keys = new Set<string>();
     for (const { tpl, empList } of groupedScheduleRows) {
-      if (!tpl) continue; // 未分组员工无班次，跳过
+      if (!tpl) continue;
       for (const emp of empList) {
         for (const d of dates) {
           const entry = getEntry(emp.id, d, tpl.session);
@@ -3195,7 +3171,6 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   }, [currentMonth]);
 
   const dates = useMemo(() => getMonthDates(currentMonth), [currentMonth]);
-  const deptColor = deptCategory === "front" ? "#1677FF" : "#52C41A";
   const monthShifts = useMemo(() => getShifts(currentMonth), [shifts, currentMonth]);
 
   // 跨月格子需要查询相邻月数据：取上月和下月的排班记录
@@ -3233,8 +3208,9 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   // - 每个班次组始终显示（无人时显示空列表）
   // - 员工可同时出现在多个班次组
   const groupedScheduleRows = useMemo(() => {
-    const rows: Array<{ groupId: string; groupName: string; groupColor: string; tpl: ShiftTemplate | null; empList: Employee[] }> = [];
+    const rows: Array<{ groupId: string; groupName: string; groupColor: string; tpl: ShiftTemplate; empList: Employee[] }> = [];
     const coveredTplIds = new Set<string>();
+    // 已分组的班次模板
     for (const grp of sortedShiftGroups) {
       for (const tplId of grp.templateIds) {
         const tpl = sortedTemplates.find((t) => t.id === tplId);
@@ -3245,7 +3221,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
         rows.push({ groupId: grp.id, groupName: grp.name, groupColor: grp.color, tpl, empList });
       }
     }
-    // 未分组的班次模板：始终显示
+    // 未分组的班次模板：使用 __ungrouped_ 前缀作为虚拟组 ID，支持手动维护员工列表
     for (const tpl of sortedTemplates) {
       if (coveredTplIds.has(tpl.id)) continue;
       const grpId = "__ungrouped_" + tpl.id;
@@ -3278,43 +3254,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   };
 
 
-  const prevMonth = () => { const [y, m] = currentMonth.split("-").map(Number); const d = new Date(y, m - 2, 1); onMonthChange(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); };
-  const nextMonth = () => { const [y, m] = currentMonth.split("-").map(Number); const d = new Date(y, m, 1); onMonthChange(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); };
 
-  const collectHolidayDecisionItems = useCallback((): HolidayDecisionItem[] => {
-    const activeEmps = employees.filter((e) => e.active && !e.archived);
-    const items: HolidayDecisionItem[] = [];
-    for (const emp of activeEmps) {
-      const empShifts = getShifts(currentMonth).filter((s) => s.employeeId === emp.id);
-      if (empShifts.length === 0) continue;
-      const holidayDaysList = empShifts
-        .map((s) => {
-          const hc = getHolidayForDate(s.date, emp.id);
-          return hc ? { date: s.date, multiplier: hc.multiplier } : null;
-        })
-        .filter((x): x is { date: string; multiplier: number } => x !== null);
-      const att = calcFromShifts(emp.id, currentMonth, emp, empShifts, specialStatuses, holidayDaysList);
-      const existingSlip = paySlips.find((s) => s.employeeId === emp.id && s.month === currentMonth) ?? null;
-      empShifts.forEach((s) => {
-        if (!s.specialStatusId) return;
-        const ss = specialStatuses.find((st) => st.id === s.specialStatusId);
-        if (!ss?.isHoliday || ss.salaryMultiplier <= 1) return;
-        const key = `${emp.id}_${s.date}_${ss.id}`;
-        const bonusAmount = Math.round(att.dailyRate * (ss.salaryMultiplier - 1) * 100) / 100;
-        items.push({
-          key,
-          employeeId: emp.id,
-          employeeCode: emp.code,
-          date: s.date,
-          specialStatusId: ss.id,
-          holidayName: ss.name,
-          bonusAmount,
-          mode: existingSlip?.holidayBonusAllocation?.[key]?.mode === "rest" ? "rest" : "cash",
-        });
-      });
-    }
-    return items;
-  }, [employees, getShifts, currentMonth, getHolidayForDate, calcFromShifts, specialStatuses, paySlips]);
 
   const runPayrollGeneration = useCallback(async (holidayDecisions: HolidayDecisionItem[]) => {
     setGenerating(true);
@@ -3527,11 +3467,9 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
     }
   }, [employees, getShifts, currentMonth, getHolidayForDate, calcFromShifts, specialStatuses, getCompOffEntries, addCompOffEntry, updateCompOffEntry, upsertAttendance, advances, paySlips, expireCompOff, expireHolidayCompOff, getHolidayCompOffEntries, updateHolidayCompOff, upsertAlert, buildPaySlipDraft, globalSettings, upsertPaySlip]);
 
-  const editTpl = sortedTemplates.find((t) => t.session === editSession) ?? sortedTemplates[0] ?? DEFAULT_SHIFT_TEMPLATES[0];
   const editContractH = editEmployee && editDate ? getContractHoursForDate(editEmployee, editDate) : 0;
 
   // 周标题（周一开头）
-  const WEEK_HEADERS = ["周一 Monday", "周二 Tuesday", "周三 Wednesday", "周四 Thursday", "周五 Friday", "周六 Saturday", "周日 Sunday"];
   const WEEK_SHORT = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
 
   // 单元格内容：班次模式显示班次完整名称（最多3字），时长模式显示工时数字
@@ -3736,8 +3674,6 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
     );
   };
 
-  // 部门主色：前厅绿色，后厨橙色
-  const deptAccent = deptCategory === "front" ? colors.primary : colors.success;
 
   return (
     <View style={{ flex: 1 }}>
@@ -4189,11 +4125,11 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                         [
                           { text: "取消", style: "cancel" },
                           { text: "仅代入员工列表", onPress: () => {
-                            // 删除当前月当前部门的成员数据，再按快照重建
-                            const toAdd = previewSnapshot.groupMembers
-                              .filter((m) => m.month === previewSnapshot.month && m.deptCategory === deptCategory)
-                              .map((m) => ({ ...m, month: currentMonth, id: Math.random().toString(36).slice(2) }));
-                            toAdd.forEach((m) => addMember(currentMonth, deptCategory, m.groupId, m.employeeId));
+                            // 先清空当前月当前部门的员工列表，再按快照重建
+                            const newMembers = previewSnapshot.groupMembers
+                              .filter((m) => m.deptCategory === deptCategory)
+                              .map((m) => ({ groupId: m.groupId, employeeId: m.employeeId }));
+                            replaceMembers(currentMonth, deptCategory, newMembers);
                             setPreviewSnapshot(null); setShowHistoryModal(false);
                             setGenResult("✅ 员工列表已代入"); setTimeout(() => setGenResult(null), 2500);
                           }},
@@ -4279,23 +4215,14 @@ const PAGES = [
 ];
 type PageKey = typeof PAGES[number]["key"];
 
-// 统一选中色为蓝色，与 iOS 主色一致
-const PAGE_COLORS: Record<PageKey, string> = {
-  schedule: "#1677FF",
-  roster:   "#1677FF",
-  advances: "#1677FF",
-};
 
 export default function LaborScreen({ embedded = false }: { embedded?: boolean }) {
   const colors = useColors();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const { width: winW } = useWindowDimensions();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
   const { initialPage } = useLocalSearchParams<{ initialPage?: string }>();
-  const now = new Date();
   const [currentMonth, setCurrentMonth] = useState(currentMonthStr());
-  const month = currentMonth;
   const [activePage, setActivePage] = useState<PageKey>((initialPage as PageKey) ?? "roster");
   const scrollRef = useRef<ScrollView>(null);
 
@@ -4435,9 +4362,6 @@ const CT = StyleSheet.create({
   panel: { position: "absolute", right: 0, top: 34, borderRadius: 10, borderWidth: 1, zIndex: 100, minWidth: 110, overflow: "hidden", shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 8, elevation: 4 },
   option: { paddingHorizontal: 12, paddingVertical: 9 },
 });
-
-const CAL_NAME_W = 52;  // 月历表姓名列宽
-const CAL_CELL_FLEX = 1; // 月历表日期格平分屏宽
 
 
 const SCHEM = StyleSheet.create({

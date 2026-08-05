@@ -1372,6 +1372,8 @@ interface ShiftGroupMemberStore {
   isMember: (month: string, deptCategory: DeptCategory, groupId: string, employeeId: string) => boolean;
   /** 从旧排班记录迁移（首次使用时调用） */
   migrateFromShifts: (month: string, deptCategory: DeptCategory, shifts: ShiftEntry[], shiftGroups: { id: string; templateIds: string[] }[], templates: { id: string; session: string }[]) => void;
+  /** 替换某月某部门的全部员工列表（先清空再写入，用于快照代入） */
+  replaceMembers: (month: string, deptCategory: DeptCategory, newMembers: Array<{ groupId: string; employeeId: string }>) => void;
   ready: boolean;
 }
 const ShiftGroupMemberContext = createContext<ShiftGroupMemberStore>({
@@ -1381,6 +1383,7 @@ const ShiftGroupMemberContext = createContext<ShiftGroupMemberStore>({
   removeMember: () => {},
   isMember: () => false,
   migrateFromShifts: () => {},
+  replaceMembers: () => {},
   ready: false,
 });
 function ShiftGroupMemberProvider({ children }: { children: React.ReactNode }) {
@@ -1428,8 +1431,18 @@ function ShiftGroupMemberProvider({ children }: { children: React.ReactNode }) {
     }
     if (toAdd.length > 0) persist([...ref.current, ...toAdd]);
   }, [ref, persist]);
+  const replaceMembers = useCallback((month: string, deptCategory: DeptCategory, newMembers: Array<{ groupId: string; employeeId: string }>) => {
+    // 先删除该月该部门的所有成员数据
+    const kept = ref.current.filter((m) => !(m.month === month && m.deptCategory === deptCategory));
+    // 再按新列表写入
+    const toAdd: ShiftGroupMember[] = newMembers.map((m, i) => ({
+      id: uuid(), month, deptCategory, groupId: m.groupId, employeeId: m.employeeId,
+      sortOrder: i, createdAt: new Date().toISOString(),
+    }));
+    persist([...kept, ...toAdd]);
+  }, [ref, persist]);
   return (
-    <ShiftGroupMemberContext.Provider value={{ members, getMembersForGroup, addMember, removeMember, isMember, migrateFromShifts, ready }}>
+    <ShiftGroupMemberContext.Provider value={{ members, getMembersForGroup, addMember, removeMember, isMember, migrateFromShifts, replaceMembers, ready }}>
       {children}
     </ShiftGroupMemberContext.Provider>
   );
