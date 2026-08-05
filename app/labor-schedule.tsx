@@ -320,27 +320,26 @@ export default function LaborScheduleScreen() {
     [employees, dept]
   );
 
-  // 员工分组引擎：完全由当月实际排班决定
-  // - 无排班记录 → 未分组
-  // - 有排班记录 → 按出现次数最多的班次分组
+  // 分组引擎：以「班次」为主体
+  // - 每个班次行：本月在该班次有排班记录的员工（员工可同时出现在多个班次行）
+  // - 未分组：本月完全无排班记录的员工
   const employeesBySession = useMemo(() => {
     const map: Record<string, Employee[]> = { __unassigned: [] };
     for (const tpl of sortedTemplates) {
       map[tpl.session] = [];
     }
     for (const emp of allDeptEmployees) {
-      const empShifts = monthShifts.filter(
-        (s) => s.employeeId === emp.id && sortedTemplates.some((t) => t.session === s.shift)
+      const sessionsWithShifts = new Set(
+        monthShifts
+          .filter((s) => s.employeeId === emp.id && sortedTemplates.some((t) => t.session === s.shift))
+          .map((s) => s.shift)
       );
-      if (empShifts.length === 0) {
+      if (sessionsWithShifts.size === 0) {
         map["__unassigned"].push(emp);
       } else {
-        const sessionCount: Record<string, number> = {};
-        for (const s of empShifts) {
-          sessionCount[s.shift] = (sessionCount[s.shift] ?? 0) + 1;
+        for (const session of sessionsWithShifts) {
+          if (map[session] !== undefined) map[session].push(emp);
         }
-        const topSession = Object.entries(sessionCount).sort((a, b) => b[1] - a[1])[0][0];
-        (map[topSession] ?? map["__unassigned"]).push(emp);
       }
     }
     return map;
@@ -548,24 +547,56 @@ export default function LaborScheduleScreen() {
 
             {/* ── 各班次分组 ── */}
             {sortedTemplates.map((tpl) => renderSessionGroup(tpl))}
-            {/* ── 未分组员工 ── */}
+            {/* ── 未分组员工（本月无排班）── */}
             {(employeesBySession["__unassigned"] ?? []).length > 0 && (
               <View key="__unassigned">
                 <View style={[S.sessionHeader, { backgroundColor: "#8E8E93" + "15", borderLeftColor: "#8E8E93" }]}>
                   <View style={{ width: NAME_W, paddingLeft: 10 }}>
                     <Text style={{ fontSize: 11, fontWeight: "700", color: "#8E8E93" }}>未分组</Text>
-                    <Text style={{ fontSize: 9, color: "#8E8E93" + "99" }}>待排班</Text>
+                    <Text style={{ fontSize: 9, color: "#8E8E93" + "99" }}>未排班 · 点击格子可排班</Text>
                   </View>
                 </View>
                 {(employeesBySession["__unassigned"] ?? []).map((emp) => (
                   <View key={emp.id} style={[S.empRow, { borderBottomColor: "#8E8E93" + "22" }]}>
-                    <View style={[S.nameCell, { width: NAME_W, backgroundColor: "#8E8E93" + "08", borderRightColor: "#8E8E93" + "33" }]}>
+                    <TouchableOpacity
+                      onLongPress={() => handleFillRow(emp, sortedTemplates[0]?.session ?? "")}
+                      style={[S.nameCell, { width: NAME_W, backgroundColor: "#8E8E93" + "08", borderRightColor: "#8E8E93" + "33" }]}>
                       <Text style={[S.empCode, { color: "#8E8E93" }]} numberOfLines={1}>{emp.code}</Text>
                       <Text style={[S.empName, { color: "#8E8E93" }]} numberOfLines={1}>{emp.realName.slice(0, 4)}</Text>
-                    </View>
-                    {dates.map((d) => (
-                      <View key={d} style={[S.cell, { width: CELL_W, backgroundColor: "#8E8E93" + "05" }]} />
-                    ))}
+                    </TouchableOpacity>
+                    {dates.map((d) => {
+                      const isToday = d === todayStr;
+                      const dow = getDayOfWeek(d);
+                      const isWeekend = dow === 0 || dow === 6;
+                      return (
+                        <TouchableOpacity key={d}
+                          onPress={() => {
+                            tap();
+                            if (sortedTemplates.length === 1) {
+                              handleCellPress(emp, d, sortedTemplates[0].session);
+                            } else {
+                              Alert.alert(
+                                `选择班次：${emp.code} ${d}`,
+                                "请选择要排入的班次",
+                                [
+                                  { text: "取消", style: "cancel" },
+                                  ...sortedTemplates.map((t) => ({
+                                    text: t.session,
+                                    onPress: () => handleCellPress(emp, d, t.session),
+                                  })),
+                                ]
+                              );
+                            }
+                          }}
+                          style={[S.cell, {
+                            width: CELL_W,
+                            backgroundColor: isToday ? "#8E8E93" + "12" : isWeekend ? "#8E8E93" + "06" : "transparent",
+                            borderRightColor: colors.border + "22",
+                          }]}>
+                          <View style={{ width: 10, height: 10, borderRadius: 5, borderWidth: 1, borderColor: "#8E8E93" + "40" }} />
+                        </TouchableOpacity>
+                      );
+                    })}
                   </View>
                 ))}
               </View>

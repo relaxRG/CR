@@ -2485,32 +2485,30 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   }, [shifts, currentMonth]);
   const allDeptEmployees = useMemo(() => employees.filter((e) => e.active && resolveEmployeeDept(e).category === deptCategory), [employees, deptCategory, resolveEmployeeDept]);
 
-  // 员工分组引擎：完全由当月实际排班决定
-  // - 无排班记录 → 员工进入 "__unassigned" 未分组
-  // - 有排班记录 → 按出现次数最多的班次分组
+  // 分组引擎：以「班次」为主体
+  // - 每个班次行：显示本月在该班次有排班记录的所有员工（员工可同时出现在多个班次行）
+  // - 未分组行：本月完全无排班记录的员工
   const employeesBySession = useMemo(() => {
     const map: Record<string, Employee[]> = { __unassigned: [] };
     for (const tpl of sortedTemplates) {
       map[tpl.session] = [];
     }
     for (const emp of allDeptEmployees) {
-      const empMonthShifts = monthShifts.filter(
-        (s) => s.employeeId === emp.id && sortedTemplates.some((t) => t.session === s.shift)
+      // 找出该员工本月在各班次的排班记录
+      const sessionsWithShifts = new Set(
+        monthShifts
+          .filter((s) => s.employeeId === emp.id && sortedTemplates.some((t) => t.session === s.shift))
+          .map((s) => s.shift)
       );
-      if (empMonthShifts.length === 0) {
-        // 当月无有效排班：放入未分组
+      if (sessionsWithShifts.size === 0) {
+        // 本月完全无排班 → 未分组
         map["__unassigned"].push(emp);
       } else {
-        // 按出现最多的班次分组
-        const sessionCount: Record<string, number> = {};
-        for (const s of empMonthShifts) {
-          sessionCount[s.shift] = (sessionCount[s.shift] ?? 0) + 1;
-        }
-        const topSession = Object.entries(sessionCount).sort((a, b) => b[1] - a[1])[0][0];
-        if (map[topSession] !== undefined) {
-          map[topSession].push(emp);
-        } else {
-          map["__unassigned"].push(emp);
+        // 员工同时加入所有有排班记录的班次行
+        for (const session of sessionsWithShifts) {
+          if (map[session] !== undefined) {
+            map[session].push(emp);
+          }
         }
       }
     }
@@ -2525,13 +2523,14 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
 
   // 构建分组展示数据：{ group, tpl, empList, groupColor }
   // 构建分组展示数据
-  // - 已配置分组的班次：始终显示（无员工时显示「暂无排班」占位）
-  // - 未分组班次：有员工才显示
-  // - 未分组员工：始终显示在最后
+  // - 每个班次始终显示（无人时显示「暂无排班」占位）
+  // - 员工可同时出现在多个班次行
+  // - 未分组员工（本月无任何排班）始终显示在最后
   const groupedScheduleRows = useMemo(() => {
     const rows: Array<{ groupId: string; groupName: string; groupColor: string; tpl: ShiftTemplate | null; empList: Employee[] }> = [];
     const coveredTplIds = new Set<string>();
 
+    // 1. 已配置分组的班次：始终显示
     for (const grp of sortedShiftGroups) {
       for (const tplId of grp.templateIds) {
         const tpl = sortedTemplates.find((t) => t.id === tplId);
@@ -2541,19 +2540,15 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
         rows.push({ groupId: grp.id, groupName: grp.name, groupColor: grp.color, tpl, empList });
       }
     }
-    // 未分组班次：有员工才显示
+    // 2. 未分组的班次：始终显示（包括无员工的）
     for (const tpl of sortedTemplates) {
       if (coveredTplIds.has(tpl.id)) continue;
       const empList = employeesBySession[tpl.session] ?? [];
-      if (empList.length > 0) {
-        rows.push({ groupId: "__ungrouped", groupName: "未分组", groupColor: tpl.color, tpl, empList });
-      }
+      rows.push({ groupId: "__ungrouped", groupName: "未分组", groupColor: tpl.color, tpl, empList });
     }
-    // 未分组员工：始终显示在最后
+    // 3. 未分组员工（本月无任何排班）：始终显示在最后
     const unassigned = employeesBySession["__unassigned"] ?? [];
-    if (unassigned.length > 0) {
-      rows.push({ groupId: "__unassigned", groupName: "未分组", groupColor: "#8E8E93", tpl: null, empList: unassigned });
-    }
+    rows.push({ groupId: "__unassigned", groupName: "未分组", groupColor: "#8E8E93", tpl: null, empList: unassigned });
     return rows;
   }, [sortedShiftGroups, sortedTemplates, employeesBySession]);
 
@@ -2942,14 +2937,15 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
               </View>
             );
           }
-          // 未分组员工：显示姓名但格子不可点击（需先排班才能操作）
+          // 未分组员工：显示姓名，格子可点击→弹出班次选择器→直接排班
           if (tpl === null) {
+            if (empList.length === 0) return null; // 无未分组员工时不显示该行
             return (
               <View key="__unassigned_row">
                 {rowIdx > 0 && <View style={{ height: 4, backgroundColor: colors.border + "33" }} />}
                 <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 4, paddingHorizontal: 8, backgroundColor: "#8E8E93" + "08" }}>
                   <View style={{ width: 3, height: 20, borderRadius: 1.5, backgroundColor: "#8E8E93" + "66", marginRight: 6 }} />
-                  <Text style={{ fontSize: 10, color: "#8E8E93", fontWeight: "600" }}>未分组 ({empList.length})</Text>
+                  <Text style={{ fontSize: 10, color: "#8E8E93", fontWeight: "600" }}>未分组 · 未排班 ({empList.length})</Text>
                 </View>
                 {empList.map((emp, empIdx) => {
                   const isLast = empIdx === empList.length - 1;
@@ -2963,9 +2959,38 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                         style={[EXL.nameCol, { backgroundColor: "transparent", width: EXL_NAME_W - 3 }]}>
                         <Text style={{ fontSize: 11, fontWeight: "600", color: colors.muted }} numberOfLines={1}>{emp.code}</Text>
                       </TouchableOpacity>
-                      {week.map(({ dateStr }, di) => (
-                        <View key={di} style={[EXL.cell, { backgroundColor: colors.border + "0A" }]} />
-                      ))}
+                      {week.map(({ dateStr, isCurrentMonth }, di) => {
+                        const isToday = dateStr === todayStr;
+                        return (
+                          <TouchableOpacity key={di}
+                            onPress={() => {
+                              if (editMode) return;
+                              // 先选择班次，再打开排班编辑
+                              tap();
+                              if (sortedTemplates.length === 1) {
+                                handleCellPress(emp, dateStr, sortedTemplates[0].session);
+                              } else {
+                                Alert.alert(
+                                  `选择班次：${emp.code} ${dateStr}`,
+                                  "请选择要排入的班次",
+                                  [
+                                    { text: "取消", style: "cancel" },
+                                    ...sortedTemplates.map((t) => ({
+                                      text: t.session,
+                                      onPress: () => handleCellPress(emp, dateStr, t.session),
+                                    })),
+                                  ]
+                                );
+                              }
+                            }}
+                            style={[EXL.cell,
+                              isToday && { backgroundColor: "#8E8E93" + "10" },
+                              !isCurrentMonth && { backgroundColor: colors.border + "0A" },
+                            ]}>
+                            <View style={{ width: 12, height: 12, borderRadius: 6, borderWidth: 1, borderColor: "#8E8E93" + "44", borderStyle: "dashed" }} />
+                          </TouchableOpacity>
+                        );
+                      })}
                     </View>
                   );
                 })}
