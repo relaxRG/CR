@@ -2,7 +2,7 @@
  * 统一薪资总览页（编辑薪资）
  * - 所有员工卡片列表（收起/展开）
  * - 当前员工默认展开
- * - 考勤区：排班表自动推算（只读，点击跳转排班表）
+ * - 考勤区：排班表自动推算（只读，点击跳转员工管理排班表）
  * - 绩效补贴区：点击跳转绩效补贴页面
  * - 奖惩区：可增删改条目（唯一可编辑内容）
  * - 其他区：调休余额、预支小计
@@ -182,7 +182,7 @@ function EmployeeCard({
       </TouchableOpacity>
 
       {/* 考勤区（只读） */}
-      <TouchableOpacity onPress={() => router.push({ pathname: "/labor-schedule", params: { employeeId: employee.id } } as any)}
+      <TouchableOpacity onPress={() => router.push("/labor" as any)}
         style={[S.section, { borderColor: colors.border }]}>
         <View style={S.sectionHeader}>
           <Text style={[S.sectionTitle, { color: colors.muted }]}>考勤（自动推算）</Text>

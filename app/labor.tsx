@@ -4208,9 +4208,6 @@ export default function LaborScreen({ embedded = false }: { embedded?: boolean }
             <Pressable onPress={() => { tap(); router.push("/labor-employee-form" as any); }} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
               <IconSymbol name="person.badge.plus" size={22} color={colors.primary} />
             </Pressable>
-            <Pressable onPress={() => { tap(); router.push("/labor-schedule" as any); }} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
-              <IconSymbol name="calendar.badge.clock" size={22} color={colors.muted} />
-            </Pressable>
           </View>
         </View>
       )}

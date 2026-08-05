@@ -228,7 +228,6 @@ export default function RootLayout() {
               <Stack.Screen name="labor-archived" />
               <Stack.Screen name="labor-employee-profile" />
               <Stack.Screen name="labor-employee-form" options={{ presentation: "modal" }} />
-              <Stack.Screen name="labor-schedule" />
               <Stack.Screen name="labor-attendance" />
               <Stack.Screen name="labor-advances" />
               <Stack.Screen name="labor-salary-history" />
