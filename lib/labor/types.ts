@@ -811,7 +811,7 @@ export interface Employee {
   stdHoursPerDay: number;
   /** 灵活工时规则列表（优先于 stdHoursPerDay） */
   weeklyHoursRules?: WeeklyHoursRule[];
-  /** @deprecated 旧版，已被 weeklyHoursRules 替代 */
+  /** @deprecated 旧版，已被 weeklyHoursRules 替代，仅保留读取兼容，不再写入 */
   weeklyHours?: WeeklyHoursMap;
   restDaysPerMonth: number;
   hourlyRate: number;
@@ -829,7 +829,6 @@ export interface Employee {
   socialInsurance?: SocialInsuranceConfig;
   /** 个税配置（每人独立，可覆盖全局配置） */
   incomeTax?: IncomeTaxConfig;
-  defaultSession?: ShiftSession;
   notes: string;
   active: boolean;
   monthlyFixedSalary: number;
@@ -867,24 +866,20 @@ export interface ShiftEntry {
   /** 日期 "2026-02-01" */
   date: string;
   /**
-   * 班次名称（始终使用行的 session 名称，如"午班"、"晚班"）
+   * 班次名称（始终使用班次模板的 session 名称，如"午班"、"晚班"）
    * 即使设置了 specialStatusId，此字段也应是 session 名称，不得是特殊状态名称
    * 这样 getEntry/deleteShift 才能正确匹配
-   * @deprecated 旧値 "day"/"evening"/"both" 会在读取时自动迁移
+   * 旧値 "day"/"evening"/"both" 已在加载时持久化迁移为"午班"/"晚班"
    */
   shift: string;
   /** 工时（小时），特殊状态时为 null 或 0 */
   hoursValue: ShiftHoursValue;
-  /** @deprecated 保留向后兼容 */
-  sessionValue: ShiftSessionValue;
   /**
    * 特殊状态 ID（对应 SpecialStatus.id）
    * 若设置，该天按特殊状态规则处理薪资
    * comp_off 类型表示加班换休（从累积加班时数里扣除 compOffRule.hoursPerDay 小时）
    */
   specialStatusId?: string;
-  /** @deprecated 旧版加班处理方式，已被 specialStatusId 替代 */
-  overtimeType?: "pay" | "comp_off";
 }
 
 // ─── 换休余额明细条目（跨月累积，有效期3个月） ───────────────────────────────

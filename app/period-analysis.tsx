@@ -211,26 +211,31 @@ export default function PeriodAnalysisScreen() {
   );
 
   // 计算当月加班预警（联动排班表 + 时段数据）
+  // 匹配逐轮班：与经营分析模块的晚班模板匹配（type === "evening"）
   const overtimeAlertMap = useMemo(() => {
     if (!report) return new Map<string, "poor" | "ok">();
-    const month = report.month; // "2026-07"
+    const month = report.month;
     const monthShifts = getShifts(month);
     const alertMap = new Map<string, "poor" | "ok">();
+    // 找出经营分析模块中类型为 evening 的模板（即晚班模板）
+    const eveningTemplate = shiftTemplates.find((t) => t.type === "evening");
+    if (!eveningTemplate) return alertMap;
+    // 匹配 labor 排班模块中对应的晚班名称（默认为"晚班"）
+    const eveningSessionName = eveningTemplate.name; // 如 "晚班"
     for (const shift of monthShifts) {
-      if (shift.shift !== "evening") continue;
+      // 匹配晚班：将 labor 班次名称与经营分析晚班模板名称对比
+      if (shift.shift !== eveningSessionName) continue;
       const judgment = calcOvertimeJudgment({
         employeeId: shift.employeeId,
         date: shift.date,
-        shift: shift.shift,
+        shift: "evening", // calcOvertimeJudgment 使用 type 字段查找模板
         actualHours: shift.hoursValue,
         shiftTemplates,
         businessHours,
       });
       if (!judgment || !judgment.isOvertime) continue;
-      // 查找该日加班时段的营业额
       const dailyRecord = report.dailyRecords.find((dr) => dr.date === shift.date);
       if (!dailyRecord) continue;
-      // 加班时段 = 关门时间后的时段
       const closingMin = judgment.closingMinutes;
       const overtimeRevenue = dailyRecord.slots
         .filter((s) => {
@@ -240,7 +245,6 @@ export default function PeriodAnalysisScreen() {
         .reduce((sum, s) => sum + s.revenue, 0);
       const key = shift.date;
       const level: "poor" | "ok" = overtimeRevenue < settings.overtimeThreshold ? "poor" : "ok";
-      // 取最严重的预警级别
       if (!alertMap.has(key) || (alertMap.get(key) === "ok" && level === "poor")) {
         alertMap.set(key, level);
       }

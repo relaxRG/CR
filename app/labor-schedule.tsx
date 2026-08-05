@@ -37,13 +37,7 @@ const NAME_W = 64;   // 左侧固定姓名列宽
 const CELL_W = 44;   // 每天列宽
 const ROW_H = 38;    // 行高
 
-/** 旧数据迁移：将各种旧班次标识统一映射到新班次名称 */
-function migrateShiftName(shift: string): string {
-  if (shift === "day" || shift === "午") return "午班";
-  if (shift === "evening" || shift === "晚") return "晚班";
-  if (shift === "both") return "午班";
-  return shift;
-}
+
 
 // ─── 单元格显示 ───────────────────────────────────────────────────────────────
 function CellDisplay({ entry, contractHours, tplColor, colors }: {
@@ -66,15 +60,13 @@ function CellDisplay({ entry, contractHours, tplColor, colors }: {
   );
   if (typeof h === "number" && h > 0) {
     const isOvertime = contractHours > 0 && h > contractHours;
-    const isCompOff = entry.overtimeType === "comp_off";
-    const dotColor = isCompOff ? colors.success : colors.error;
     return (
       <View style={{ alignItems: "center" }}>
         <Text style={[CS.hours, {
-          color: isOvertime ? dotColor : tplColor,
+          color: isOvertime ? colors.error : tplColor,
           fontWeight: isOvertime ? "800" : "600",
         }]}>{h}</Text>
-        {isOvertime && <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: dotColor, marginTop: 1 }} />}
+        {isOvertime && <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: colors.error, marginTop: 1 }} />}
       </View>
     );
   }
@@ -94,13 +86,11 @@ function EditShiftModal({ visible, date, employee, session, sessionColor, existi
 
   const [hoursInput, setHoursInput] = useState("");
   const [hoursSpecial, setHoursSpecial] = useState<"休" | "无早" | null>(null);
-  const [overtimeType, setOvertimeType] = useState<"pay" | "comp_off">("pay");
 
   React.useEffect(() => {
     if (visible) {
       setHoursInput(existing && typeof existing.hoursValue === "number" ? String(existing.hoursValue) : "");
       setHoursSpecial(existing?.hoursValue === "休" ? "休" : existing?.hoursValue === "无早" ? "无早" : null);
-      setOvertimeType(existing?.overtimeType ?? "pay");
     }
   }, [visible, existing]);
 
@@ -114,7 +104,7 @@ function EditShiftModal({ visible, date, employee, session, sessionColor, existi
     let hoursValue: ShiftHoursValue = null;
     if (hoursSpecial) { hoursValue = hoursSpecial; }
     else if (hoursInput) { hoursValue = Number(hoursInput) || null; }
-    onSave({ employeeId: employee.id, date, shift: session, hoursValue, sessionValue: session, overtimeType: isOvertime ? overtimeType : "pay" });
+    onSave({ employeeId: employee.id, date, shift: session, hoursValue });
     onClose();
   };
 
@@ -156,16 +146,8 @@ function EditShiftModal({ visible, date, employee, session, sessionColor, existi
             </View>
           </View>
           {isOvertime && (
-            <View style={[EM.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <Text style={[EM.label, { color: colors.foreground }]}>加班处理（+{overtimeAmt.toFixed(1)}h）</Text>
-              <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
-                {([["pay", "计加班费"], ["comp_off", "换调休"]] as const).map(([v, label]) => (
-                  <TouchableOpacity key={v} onPress={() => { tap(); setOvertimeType(v); }}
-                    style={[EM.chip, { backgroundColor: overtimeType === v ? sessionColor : colors.surface, borderColor: sessionColor }]}>
-                    <Text style={{ fontSize: 13, color: overtimeType === v ? "#fff" : sessionColor }}>{label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+            <View style={[EM.card, { backgroundColor: colors.error + "08", borderColor: colors.error + "33" }]}>
+              <Text style={[EM.label, { color: colors.error }]}>加班 +{overtimeAmt.toFixed(1)}h（请在考勤页处理）</Text>
             </View>
           )}
           {existing && (
@@ -329,11 +311,8 @@ export default function LaborScheduleScreen() {
   const dates = useMemo(() => getMonthDates(currentMonth), [currentMonth]);
   const deptColor = DEPT_COLORS[dept];
 
-  // 当月排班数据（含旧数据迁移）
-  const monthShifts = useMemo(() =>
-    getShifts(currentMonth).map((s) => ({ ...s, shift: migrateShiftName(s.shift) })),
-    [shifts, currentMonth]
-  );
+  // 当月排班数据（已由 ShiftProvider 持久化迁移）
+  const monthShifts = useMemo(() => getShifts(currentMonth), [shifts, currentMonth]);
 
   // 当前部门的在职员工
   const allDeptEmployees = useMemo(() =>
@@ -341,27 +320,31 @@ export default function LaborScheduleScreen() {
     [employees, dept]
   );
 
-  // 按班次分组员工（动态，支持旧数据迁移）
+  // 员工分组引擎：完全由当月实际排班决定
+  // - 无排班记录 → 未分组
+  // - 有排班记录 → 按出现次数最多的班次分组
   const employeesBySession = useMemo(() => {
-    const map: Record<string, Employee[]> = {};
+    const map: Record<string, Employee[]> = { __unassigned: [] };
     for (const tpl of sortedTemplates) {
-      // 同时兼容旧值（"午"→"午班"，"晚"→"晚班"）
-      map[tpl.session] = allDeptEmployees.filter((e) => {
-        const s = migrateShiftName(e.defaultSession ?? "");
-        return s === tpl.session;
-      });
+      map[tpl.session] = [];
     }
-    // 未分配班次的员工放到最后一个班次行
-    const unassigned = allDeptEmployees.filter((e) => {
-      const s = migrateShiftName(e.defaultSession ?? "");
-      return !sortedTemplates.find((t) => t.session === s);
-    });
-    if (sortedTemplates.length > 0) {
-      const lastSession = sortedTemplates[sortedTemplates.length - 1].session;
-      map[lastSession] = [...(map[lastSession] ?? []), ...unassigned];
+    for (const emp of allDeptEmployees) {
+      const empShifts = monthShifts.filter(
+        (s) => s.employeeId === emp.id && sortedTemplates.some((t) => t.session === s.shift)
+      );
+      if (empShifts.length === 0) {
+        map["__unassigned"].push(emp);
+      } else {
+        const sessionCount: Record<string, number> = {};
+        for (const s of empShifts) {
+          sessionCount[s.shift] = (sessionCount[s.shift] ?? 0) + 1;
+        }
+        const topSession = Object.entries(sessionCount).sort((a, b) => b[1] - a[1])[0][0];
+        (map[topSession] ?? map["__unassigned"]).push(emp);
+      }
     }
     return map;
-  }, [allDeptEmployees, sortedTemplates]);
+  }, [allDeptEmployees, sortedTemplates, monthShifts]);
 
   const getEntry = useCallback((employeeId: string, date: string, session: string): ShiftEntry | null =>
     monthShifts.find((s) => s.employeeId === employeeId && s.date === date && s.shift === session) ?? null,
@@ -388,12 +371,12 @@ export default function LaborScheduleScreen() {
         { text: "填充工作日", onPress: () => {
           const entries = dates.filter((d) => { const dow = getDayOfWeek(d); return dow !== 0 && dow !== 6; })
             .filter((d) => !getEntry(employee.id, d, session))
-            .map((d): ShiftEntry => ({ employeeId: employee.id, date: d, shift: session, hoursValue: defaultHours, sessionValue: session, overtimeType: "pay" }));
+            .map((d): ShiftEntry => ({ employeeId: employee.id, date: d, shift: session, hoursValue: defaultHours }));
           if (entries.length > 0) batchUpsertShifts(entries);
         }},
         { text: "填充全月", onPress: () => {
           const entries = dates.filter((d) => !getEntry(employee.id, d, session))
-            .map((d): ShiftEntry => ({ employeeId: employee.id, date: d, shift: session, hoursValue: defaultHours, sessionValue: session, overtimeType: "pay" }));
+            .map((d): ShiftEntry => ({ employeeId: employee.id, date: d, shift: session, hoursValue: defaultHours }));
           if (entries.length > 0) batchUpsertShifts(entries);
         }},
       ]
@@ -412,7 +395,19 @@ export default function LaborScheduleScreen() {
   // ─── 渲染班次分组 ──────────────────────────────────────────────────────────
   const renderSessionGroup = (tpl: ShiftTemplate) => {
     const empList = employeesBySession[tpl.session] ?? [];
-    if (empList.length === 0) return null;
+    // 无员工时显示占位提示，不隐藏
+    if (empList.length === 0) {
+      return (
+        <View key={tpl.session}>
+          <View style={[S.sessionHeader, { backgroundColor: tpl.color + "15", borderLeftColor: tpl.color }]}>
+            <View style={{ width: NAME_W, paddingLeft: 10 }}>
+              <Text style={{ fontSize: 11, fontWeight: "700", color: tpl.color }}>{tpl.session}</Text>
+              <Text style={{ fontSize: 9, color: tpl.color + "99" }}>{tpl.startTime}–{tpl.endTime} · 暂无排班</Text>
+            </View>
+          </View>
+        </View>
+      );
+    }
 
     return (
       <View key={tpl.session}>
@@ -553,6 +548,28 @@ export default function LaborScheduleScreen() {
 
             {/* ── 各班次分组 ── */}
             {sortedTemplates.map((tpl) => renderSessionGroup(tpl))}
+            {/* ── 未分组员工 ── */}
+            {(employeesBySession["__unassigned"] ?? []).length > 0 && (
+              <View key="__unassigned">
+                <View style={[S.sessionHeader, { backgroundColor: "#8E8E93" + "15", borderLeftColor: "#8E8E93" }]}>
+                  <View style={{ width: NAME_W, paddingLeft: 10 }}>
+                    <Text style={{ fontSize: 11, fontWeight: "700", color: "#8E8E93" }}>未分组</Text>
+                    <Text style={{ fontSize: 9, color: "#8E8E93" + "99" }}>待排班</Text>
+                  </View>
+                </View>
+                {(employeesBySession["__unassigned"] ?? []).map((emp) => (
+                  <View key={emp.id} style={[S.empRow, { borderBottomColor: "#8E8E93" + "22" }]}>
+                    <View style={[S.nameCell, { width: NAME_W, backgroundColor: "#8E8E93" + "08", borderRightColor: "#8E8E93" + "33" }]}>
+                      <Text style={[S.empCode, { color: "#8E8E93" }]} numberOfLines={1}>{emp.code}</Text>
+                      <Text style={[S.empName, { color: "#8E8E93" }]} numberOfLines={1}>{emp.realName.slice(0, 4)}</Text>
+                    </View>
+                    {dates.map((d) => (
+                      <View key={d} style={[S.cell, { width: CELL_W, backgroundColor: "#8E8E93" + "05" }]} />
+                    ))}
+                  </View>
+                ))}
+              </View>
+            )}
 
             {/* ── 薪水条（可选展开） ── */}
             {showPaySlips && (
@@ -562,7 +579,12 @@ export default function LaborScheduleScreen() {
                   <Text style={{ fontSize: 14, fontWeight: "700", color: deptColor }}>{monthLabel(currentMonth)} 薪水条</Text>
                 </View>
                 {allDeptEmployees.map((emp) => {
-                  const tpl = sortedTemplates.find((t) => t.session === migrateShiftName(emp.defaultSession ?? "")) ?? sortedTemplates[sortedTemplates.length - 1] ?? DEFAULT_SHIFT_TEMPLATES[1];
+                  // 薄水条颜色：根据当月实际排班班次决定
+                  const empMonthShifts = monthShifts.filter((s) => s.employeeId === emp.id && sortedTemplates.some((t) => t.session === s.shift));
+                  const topSession = empMonthShifts.length > 0
+                    ? Object.entries(empMonthShifts.reduce((acc, s) => ({ ...acc, [s.shift]: (acc[s.shift] ?? 0) + 1 }), {} as Record<string, number>)).sort((a, b) => b[1] - a[1])[0][0]
+                    : null;
+                  const tpl = topSession ? (sortedTemplates.find((t) => t.session === topSession) ?? sortedTemplates[0]) : sortedTemplates[0];
                   const slip = getPaySlip(emp.id, currentMonth);
                   const att = getAttendance(emp.id, currentMonth);
                   const sessionColor = tpl?.color ?? "#5856D6";

@@ -89,6 +89,23 @@ const EmployeeContext = createContext<EmployeeStore>({
 function EmployeeProvider({ children }: { children: React.ReactNode }) {
   const { data: employees, ref, persist, ready } = usePersisted<Employee>("labor_employees_v1");
 
+  // 持久化迁移：清除废弃的 defaultSession 字段
+  React.useEffect(() => {
+    if (!ready) return;
+    const needsMigration = ref.current.some((e) => "defaultSession" in e);
+    if (needsMigration) {
+      console.log("[EmployeeProvider] 持久化迁移：清除员工 defaultSession 字段");
+      persist(ref.current.map((e) => {
+        if ("defaultSession" in e) {
+          const next = { ...e };
+          delete (next as any).defaultSession;
+          return next;
+        }
+        return e;
+      }));
+    }
+  }, [ready]);
+
   const addEmployee = useCallback((draft: Omit<Employee, "id" | "createdAt">): string => {
     const id = uuid();
     persist([...ref.current, { ...draft, id, createdAt: new Date().toISOString() }]);
@@ -407,24 +424,37 @@ const ShiftContext = createContext<ShiftStore>({
   deleteShift: () => {}, getShifts: () => [], ready: false,
 });
 
-/** 已知的班次名称列表（用于判断旧数据中 shift 是否是特殊状态名称） */
-const KNOWN_SESSION_PATTERNS = /^(午班|晚班|day|evening|both|午|晚)/;
-
 /**
- * 迁移旧数据：将 shift=特殊状态名称 的记录修正为 session 名称
- * 旧版保存特殊状态时错误地用状态名称作为 shift，导致 getEntry 匹配失败
- * 修复方案：如果有 specialStatusId 且 sessionValue 存在，用 sessionValue 作为 shift
+ * 持久化迁移旧排班数据：
+ * 1. shift="day"/"evening"/"both"/"午"/"晚" → "午班"/"晚班"
+ * 2. 旧版 specialStatusId 记录中 shift=状态名称 → 用 sessionValue 修复
+ * 3. 清除废弃字段 sessionValue 和 overtimeType
  */
 function migrateShiftEntries(entries: ShiftEntry[]): { migrated: ShiftEntry[]; changed: boolean } {
   let changed = false;
   const migrated = entries.map((e) => {
-    if (e.specialStatusId && e.sessionValue && typeof e.sessionValue === "string" && e.sessionValue !== e.shift) {
-      // sessionValue 存在且与 shift 不同，说明 shift 是旧版特殊状态名称
-      // 用 sessionValue 修复
-      changed = true;
-      return { ...e, shift: e.sessionValue as string };
+    let next = { ...e };
+    let dirty = false;
+
+    // 1. 迁移旧 shift 名称
+    const oldShift = next.shift;
+    if (oldShift === "day" || oldShift === "午") { next.shift = "午班"; dirty = true; }
+    else if (oldShift === "evening" || oldShift === "晚") { next.shift = "晚班"; dirty = true; }
+    else if (oldShift === "both") { next.shift = "午班"; dirty = true; }
+
+    // 2. 旧版 specialStatusId 记录中 shift=状态名称 → 用 sessionValue 修复
+    const sv = (next as any).sessionValue;
+    if (next.specialStatusId && sv && typeof sv === "string" && sv !== next.shift) {
+      next.shift = sv;
+      dirty = true;
     }
-    return e;
+
+    // 3. 删除废弃字段
+    if ("sessionValue" in next) { delete (next as any).sessionValue; dirty = true; }
+    if ("overtimeType" in next) { delete (next as any).overtimeType; dirty = true; }
+
+    if (dirty) changed = true;
+    return next;
   });
   return { migrated, changed };
 }
@@ -432,12 +462,12 @@ function migrateShiftEntries(entries: ShiftEntry[]): { migrated: ShiftEntry[]; c
 function ShiftProvider({ children }: { children: React.ReactNode }) {
   const { data: shifts, ref, persist, ready } = usePersisted<ShiftEntry>("labor_shifts_v1");
 
-  // 数据加载后自动迁移旧数据
+  // 数据加载后自动持久化迁移旧数据
   React.useEffect(() => {
     if (!ready) return;
     const { migrated, changed } = migrateShiftEntries(ref.current);
     if (changed) {
-      console.log("[ShiftProvider] 迁移旧版 shift 数据，修复特殊状态的 shift 键");
+      console.log("[ShiftProvider] 持久化迁移旧排班数据：day/evening→午班/晚班，清除废弃字段");
       persist(migrated);
     }
   }, [ready]);

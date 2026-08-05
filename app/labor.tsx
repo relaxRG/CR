@@ -45,13 +45,7 @@ const SCH_NAME_W = 64;   // 排班表左侧姓名列宽
 const SCH_CELL_W = 44;  // 排班表每天列宽
 const SCH_ROW_H = 38;   // 排班表行高
 
-/** 旧数据迁移：将各种旧班次标识统一映射到新班次名称 */
-function migrateShiftName(shift: string): string {
-  if (shift === "day" || shift === "午") return "午班";
-  if (shift === "evening" || shift === "晚") return "晚班";
-  if (shift === "both") return "午班";
-  return shift;
-}
+
 
 type CompareMode = "none" | "lastMonth" | "lastYear" | "custom";
 type HolidayDecisionItem = {
@@ -1324,7 +1318,7 @@ function SchCellDisplay({ entry, contractHours, tplColor, colors }: {
   if (h === "无早") return <View style={[SCH.badge, { backgroundColor: colors.muted + "22" }]}><Text style={[SCH.badgeText, { color: colors.muted }]}>无早</Text></View>;
   if (typeof h === "number" && h > 0) {
     const isOT = contractHours > 0 && h > contractHours;
-    const dotColor = entry.overtimeType === "comp_off" ? colors.success : colors.error;
+    const dotColor = colors.error;
     return (
       <View style={{ alignItems: "center" }}>
         <Text style={{ fontSize: 12, fontWeight: isOT ? "800" : "600", color: isOT ? dotColor : tplColor }}>{h}</Text>
@@ -1607,8 +1601,7 @@ function SchEditModal({ visible, date, employee, session, sessionColor, existing
         employeeId: employee.id, date,
         shift: session,           // 关键：始终用行 session 作为主键
         hoursValue: ss?.category === "work_day" ? (Number(hoursInput) || autoHours) : null,
-        sessionValue: session,    // sessionValue 也用 session
-        specialStatusId: selectedSpecialId,
+        specialStatusId: undefined,
       });
     } else {
       const hv: ShiftHoursValue = hoursInput ? (Number(hoursInput) || null) : null;
@@ -1616,7 +1609,6 @@ function SchEditModal({ visible, date, employee, session, sessionColor, existing
         employeeId: employee.id, date,
         shift: selectedShiftSession ?? session,
         hoursValue: hv,
-        sessionValue: selectedShiftSession ?? session,
         specialStatusId: undefined,
       });
     }
@@ -2374,6 +2366,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   const selectAllMonth = () => {
     const keys = new Set<string>();
     for (const { tpl, empList } of groupedScheduleRows) {
+      if (!tpl) continue; // 未分组员工无班次，跳过
       for (const emp of empList) {
         for (const d of dates) {
           const entry = getEntry(emp.id, d, tpl.session);
@@ -2476,7 +2469,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
 
   const dates = useMemo(() => getMonthDates(currentMonth), [currentMonth]);
   const deptColor = deptCategory === "front" ? "#1677FF" : "#52C41A";
-  const monthShifts = useMemo(() => getShifts(currentMonth).map((s) => ({ ...s, shift: migrateShiftName(s.shift) })), [shifts, currentMonth]);
+  const monthShifts = useMemo(() => getShifts(currentMonth), [shifts, currentMonth]);
 
   // 跨月格子需要查询相邻月数据：取上月和下月的排班记录
   const adjacentShifts = useMemo(() => {
@@ -2486,51 +2479,39 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
     const prevMonth = `${prevM.getFullYear()}-${String(prevM.getMonth() + 1).padStart(2, "0")}`;
     const nextMonth = `${nextM.getFullYear()}-${String(nextM.getMonth() + 1).padStart(2, "0")}`;
     return [
-      ...getShifts(prevMonth).map((s) => ({ ...s, shift: migrateShiftName(s.shift) })),
-      ...getShifts(nextMonth).map((s) => ({ ...s, shift: migrateShiftName(s.shift) })),
+      ...getShifts(prevMonth),
+      ...getShifts(nextMonth),
     ];
   }, [shifts, currentMonth]);
   const allDeptEmployees = useMemo(() => employees.filter((e) => e.active && resolveEmployeeDept(e).category === deptCategory), [employees, deptCategory, resolveEmployeeDept]);
 
-  // 员工分组逻辑：
-  // 优先按当月实际排班记录判断员工属于哪个班次分组
-  // 若当月无排班记录，则回落到 defaultSession（旧逻辑兼容）
-  // 若 defaultSession 也未设置，则放入第一个班次（而非最后一个），避免所有人堆在晚班
+  // 员工分组引擎：完全由当月实际排班决定
+  // - 无排班记录 → 员工进入 "__unassigned" 未分组
+  // - 有排班记录 → 按出现次数最多的班次分组
   const employeesBySession = useMemo(() => {
-    const map: Record<string, Employee[]> = {};
+    const map: Record<string, Employee[]> = { __unassigned: [] };
     for (const tpl of sortedTemplates) {
       map[tpl.session] = [];
     }
     for (const emp of allDeptEmployees) {
-      // 1. 先看当月实际排班：取出现次数最多的班次
-      const empMonthShifts = monthShifts.filter((s) => s.employeeId === emp.id);
-      let resolvedSession: string | undefined;
-      if (empMonthShifts.length > 0) {
+      const empMonthShifts = monthShifts.filter(
+        (s) => s.employeeId === emp.id && sortedTemplates.some((t) => t.session === s.shift)
+      );
+      if (empMonthShifts.length === 0) {
+        // 当月无有效排班：放入未分组
+        map["__unassigned"].push(emp);
+      } else {
+        // 按出现最多的班次分组
         const sessionCount: Record<string, number> = {};
         for (const s of empMonthShifts) {
-          const sess = s.shift;
-          if (sortedTemplates.find((t) => t.session === sess)) {
-            sessionCount[sess] = (sessionCount[sess] ?? 0) + 1;
-          }
+          sessionCount[s.shift] = (sessionCount[s.shift] ?? 0) + 1;
         }
-        const entries = Object.entries(sessionCount);
-        if (entries.length > 0) {
-          resolvedSession = entries.sort((a, b) => b[1] - a[1])[0][0];
+        const topSession = Object.entries(sessionCount).sort((a, b) => b[1] - a[1])[0][0];
+        if (map[topSession] !== undefined) {
+          map[topSession].push(emp);
+        } else {
+          map["__unassigned"].push(emp);
         }
-      }
-      // 2. 回落到 defaultSession
-      if (!resolvedSession) {
-        const ds = migrateShiftName(emp.defaultSession ?? "");
-        if (ds && sortedTemplates.find((t) => t.session === ds)) {
-          resolvedSession = ds;
-        }
-      }
-      // 3. 若仍未解析，放入第一个班次（不强制放最后）
-      if (!resolvedSession && sortedTemplates.length > 0) {
-        resolvedSession = sortedTemplates[0].session;
-      }
-      if (resolvedSession && map[resolvedSession] !== undefined) {
-        map[resolvedSession].push(emp);
       }
     }
     return map;
@@ -2543,10 +2524,12 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   );
 
   // 构建分组展示数据：{ group, tpl, empList, groupColor }
-  // 构建分组展示数据：始终显示所有已配置的班次分组（即使当月无人排班）
-  // 修复根因：旧代码仅当 empList.length > 0 才 push，导致当月无人排入晚班时晚班分组整行消失
+  // 构建分组展示数据
+  // - 已配置分组的班次：始终显示（无员工时显示「暂无排班」占位）
+  // - 未分组班次：有员工才显示
+  // - 未分组员工：始终显示在最后
   const groupedScheduleRows = useMemo(() => {
-    const rows: Array<{ groupId: string; groupName: string; groupColor: string; tpl: ShiftTemplate; empList: Employee[] }> = [];
+    const rows: Array<{ groupId: string; groupName: string; groupColor: string; tpl: ShiftTemplate | null; empList: Employee[] }> = [];
     const coveredTplIds = new Set<string>();
 
     for (const grp of sortedShiftGroups) {
@@ -2555,17 +2538,21 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
         if (!tpl) continue;
         coveredTplIds.add(tpl.id);
         const empList = employeesBySession[tpl.session] ?? [];
-        // 始终显示分组行，即使无员工排班（用户可看到分组并手动添加排班）
         rows.push({ groupId: grp.id, groupName: grp.name, groupColor: grp.color, tpl, empList });
       }
     }
-    // 未分组班次：仅当有员工时才显示（未分组的班次不强制展示空行）
+    // 未分组班次：有员工才显示
     for (const tpl of sortedTemplates) {
       if (coveredTplIds.has(tpl.id)) continue;
       const empList = employeesBySession[tpl.session] ?? [];
       if (empList.length > 0) {
         rows.push({ groupId: "__ungrouped", groupName: "未分组", groupColor: tpl.color, tpl, empList });
       }
+    }
+    // 未分组员工：始终显示在最后
+    const unassigned = employeesBySession["__unassigned"] ?? [];
+    if (unassigned.length > 0) {
+      rows.push({ groupId: "__unassigned", groupName: "未分组", groupColor: "#8E8E93", tpl: null, empList: unassigned });
     }
     return rows;
   }, [sortedShiftGroups, sortedTemplates, employeesBySession]);
@@ -2599,13 +2586,13 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
             { text: "工作日（周一~五）", onPress: () => {
               const es = dates.filter((d) => { const dow = getDayOfWeek(d); return dow !== 0 && dow !== 6; })
                 .filter((d) => !getEntry(emp.id, d, tpl.session))
-                .map((d): ShiftEntry => ({ employeeId: emp.id, date: d, shift: tpl.session, hoursValue: fillHours(d), sessionValue: tpl.session, overtimeType: "pay" }));
+                .map((d): ShiftEntry => ({ employeeId: emp.id, date: d, shift: tpl.session, hoursValue: fillHours(d) }));
               if (es.length > 0) batchUpsertShifts(es);
             }},
-            { text: "全月", onPress: () => {
-              const es = dates.filter((d) => !getEntry(emp.id, d, tpl.session))
-                .map((d): ShiftEntry => ({ employeeId: emp.id, date: d, shift: tpl.session, hoursValue: fillHours(d), sessionValue: tpl.session, overtimeType: "pay" }));
-              if (es.length > 0) batchUpsertShifts(es);
+            { text: "填充全月", onPress: () => {
+              const allEntries = dates.filter((d) => !getEntry(emp.id, d, tpl.session))
+                .map((d): ShiftEntry => ({ employeeId: emp.id, date: d, shift: tpl.session, hoursValue: fillHours(d) }));
+              if (allEntries.length > 0) batchUpsertShifts(allEntries);
             }},
           ]
         );
@@ -2943,8 +2930,8 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
 
         {/* 各班次员工行（按分组排序，左侧竖条用分组颜色） */}
         {groupedScheduleRows.map(({ groupId, groupName, groupColor, tpl, empList }, rowIdx) => {
-          // 空分组：显示分组标题行（提示该班次暂无人排班），不直接隐藏
-          if (empList.length === 0) {
+          // 空分组：显示分组标题行（提示该班次暂无人排班）
+          if (empList.length === 0 && tpl !== null) {
             return (
               <View key={`${groupId}_${tpl.id}_empty`}>
                 {rowIdx > 0 && <View style={{ height: 4, backgroundColor: colors.border + "33" }} />}
@@ -2952,6 +2939,36 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                   <View style={{ width: 3, height: 20, borderRadius: 1.5, backgroundColor: groupColor + "66", marginRight: 6 }} />
                   <Text style={{ fontSize: 10, color: groupColor + "99", fontStyle: "italic" }}>{tpl.session} · 暂无排班</Text>
                 </View>
+              </View>
+            );
+          }
+          // 未分组员工：显示姓名但格子不可点击（需先排班才能操作）
+          if (tpl === null) {
+            return (
+              <View key="__unassigned_row">
+                {rowIdx > 0 && <View style={{ height: 4, backgroundColor: colors.border + "33" }} />}
+                <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 4, paddingHorizontal: 8, backgroundColor: "#8E8E93" + "08" }}>
+                  <View style={{ width: 3, height: 20, borderRadius: 1.5, backgroundColor: "#8E8E93" + "66", marginRight: 6 }} />
+                  <Text style={{ fontSize: 10, color: "#8E8E93", fontWeight: "600" }}>未分组 ({empList.length})</Text>
+                </View>
+                {empList.map((emp, empIdx) => {
+                  const isLast = empIdx === empList.length - 1;
+                  return (
+                    <View key={emp.id} style={[EXL.empRow,
+                      !isLast && { borderBottomColor: colors.border + "33", borderBottomWidth: StyleSheet.hairlineWidth }
+                    ]}>
+                      <View style={{ width: 3, height: 34, backgroundColor: "#8E8E93" + "66" }} />
+                      <TouchableOpacity
+                        onLongPress={() => { if (!editMode) { tap(); setQuickFillEmployee(emp); setShowQuickFill(true); } }}
+                        style={[EXL.nameCol, { backgroundColor: "transparent", width: EXL_NAME_W - 3 }]}>
+                        <Text style={{ fontSize: 11, fontWeight: "600", color: colors.muted }} numberOfLines={1}>{emp.code}</Text>
+                      </TouchableOpacity>
+                      {week.map(({ dateStr }, di) => (
+                        <View key={di} style={[EXL.cell, { backgroundColor: colors.border + "0A" }]} />
+                      ))}
+                    </View>
+                  );
+                })}
               </View>
             );
           }
@@ -3295,8 +3312,6 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
               date: d,
               shift: session,
               hoursValue: hoursPerDate(d),
-              sessionValue: session,
-              overtimeType: "pay",
             }));
           if (entries.length > 0) batchUpsertShifts(entries);
         }}

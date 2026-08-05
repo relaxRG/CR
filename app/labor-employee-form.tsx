@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
-import { useEmployeeStore, useShiftTemplateStore, useCustomDeptStore } from "@/lib/labor/store";
+import { useEmployeeStore, useCustomDeptStore } from "@/lib/labor/store";
 import {
   Employee, EmployeeDept, EmployeeType, EmployeeBankAccount, WeeklyHoursRule,
   AllowanceRule, SocialInsuranceConfig, InsuranceItem, HousingFundItem,
@@ -24,7 +24,7 @@ import {
   REVENUE_KPI_SOURCE_LABELS, REVENUE_KPI_PAY_MODE_LABELS, REVENUE_KPI_CALC_TYPE_LABELS,
   calcRevenueKPIBonus,
   DEPT_LABELS, DEPT_COLORS, EMPLOYEE_TYPE_LABELS, EMPLOYEE_TYPE_COLORS,
-  calcDailyRate, getDaysInMonth, DEFAULT_SHIFT_TEMPLATES, WEEKDAY_LABELS,
+  calcDailyRate, getDaysInMonth, WEEKDAY_LABELS,
   DEFAULT_SOCIAL_INSURANCE, BUILTIN_CITY_POLICIES, getCityPolicy, applyCityPolicy,
 } from "@/lib/labor/types";
 
@@ -41,9 +41,6 @@ export default function LaborEmployeeFormScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const { employees, addEmployee, updateEmployee } = useEmployeeStore();
-  const { templates: shiftTemplates } = useShiftTemplateStore();
-  const availableSessions = (shiftTemplates.length > 0 ? shiftTemplates : DEFAULT_SHIFT_TEMPLATES)
-    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
   const existing = id ? employees.find((e) => e.id === id) : null;
@@ -69,8 +66,6 @@ export default function LaborEmployeeFormScreen() {
   };
   const [active, setActive] = useState(existing?.active ?? true);
   const [notes, setNotes] = useState(existing?.notes ?? "");
-  const [defaultSession, setDefaultSession] = useState<string | undefined>(existing?.defaultSession);
-
   // ── 工资设置 ──
   const [baseSalary, setBaseSalary] = useState(String(existing?.baseSalary ?? ""));
   const [stdHours, setStdHours] = useState(String(existing?.stdHoursPerDay ?? "8"));
@@ -275,7 +270,6 @@ export default function LaborEmployeeFormScreen() {
       healthCertExpiry: healthCertExpiry.trim() || undefined,
       joinDate: joinDate.trim() || undefined,
       leaveDate: leaveDate.trim() || undefined,
-      defaultSession,
     };
 
     if (isEdit && existing) updateEmployee(existing.id, draft);
