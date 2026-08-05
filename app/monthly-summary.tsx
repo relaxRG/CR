@@ -1,12 +1,11 @@
 /**
- * 月度总报表主页面（Build 119C）
+ * 月度总报表主页面（Build 120）
  *
- * 五个 Tab：
- *   总报表  — 完整科目树，防重复标注，净利润汇总
- *   账户    — 四账户余额追踪，差异分析
- *   薪资    — 薪资发放清单，一键复制
- *   货款    — 货款支付清单，已付/待付
- *   历史    — 历月净利润趋势
+ * 单页总报表：
+ *   1. 科目树（收入 / 成本 / 人工 / 房租 / 水电 / Extra）
+ *   2. 工资科目区块（按部门 + 临时兼职自动分组）
+ *   3. 供应商货款区块（嵌入进货成本科目）
+ *   4. 月报设置（备用金/库存显示规则）
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -19,7 +18,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
-import BalanceModal from "@/components/store/balance-modal";
 import { useMonthlySummaryStore } from "@/lib/store/monthly-summary/store";
 import { useEmployeeStore, usePaySlipStore } from "@/lib/labor/store";
 import { useSpiritsInventoryStore } from "@/lib/spirits/crud-store";
@@ -31,8 +29,8 @@ import { useWineSnapshotStore, useWineManualPurchaseStore } from "@/lib/wine/sto
 import { aggregateMonthlyReport } from "@/lib/store/monthly-summary/aggregator";
 import { usePettyLaborLinkStore } from "@/lib/store/petty-labor-link-store";
 import {
-  MonthlySummaryReport, SummaryLineItem, AccountBalance, MonthlyPaymentRecord,
-  AccountType, ACCOUNT_TYPE_LABELS, ACCOUNT_TYPE_COLORS,
+  MonthlySummaryReport, SummaryLineItem,
+  ACCOUNT_TYPE_LABELS, ACCOUNT_TYPE_COLORS,
   maskCardNumber, generatePaymentCopyText, SUPPLIER_CATEGORY_COLORS,
   PettyCodeConfig, InventoryReportConfig,
   DEFAULT_PETTY_CODE_CONFIGS, DEFAULT_INVENTORY_CONFIGS,
@@ -204,8 +202,8 @@ export default function MonthlySummaryScreen() {
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
   const {
-    reports, upsertReport, getReport, getPaymentsForMonth, getBalancesForMonth,
-    upsertBalance, upsertPayment, addPaymentEntry, deletePayment, suppliers,
+    reports, upsertReport, getReport, getPaymentsForMonth,
+    upsertPayment, suppliers,
     pettyCodeConfigs, inventoryConfigs,
     upsertPettyCodeConfig, deletePettyCodeConfig, resetPettyCodeConfigs,
     upsertInventoryConfig, resetInventoryConfigs,
@@ -227,9 +225,6 @@ export default function MonthlySummaryScreen() {
   });
   const [showManualModal, setShowManualModal] = useState(false);
   const [editingItem, setEditingItem] = useState<SummaryLineItem | null>(null);
-  const [showBalanceModal, setShowBalanceModal] = useState(false);
-  const [balanceAccountType, setBalanceAccountType] = useState<AccountType>("company");
-  const [editingBalance, setEditingBalance] = useState<AccountBalance | null>(null);
   const [copyToast, setCopyToast] = useState("");
   // 月报设置 Modal
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -237,7 +232,6 @@ export default function MonthlySummaryScreen() {
 
   const report = useMemo(() => getReport(selectedMonth), [reports, selectedMonth]);
   const payments = useMemo(() => getPaymentsForMonth(selectedMonth), [selectedMonth]);
-  const balances = useMemo(() => getBalancesForMonth(selectedMonth), [selectedMonth]);
 
   const handleCopy = (text: string) => {
     Clipboard.setString(text);
@@ -252,7 +246,7 @@ export default function MonthlySummaryScreen() {
       id: uuid(), month: selectedMonth, lineItems: [], manualItems: [],
       totalRevenue: 0, totalCOGS: 0, totalLabor: 0, totalRent: 0,
       totalUtilities: 0, totalPettyOther: 0, totalExtra: 0, netProfit: 0,
-      accountBalances: [], paymentRecords: [], notes: "", isFinalized: false,
+      notes: "", isFinalized: false,
       createdAt: now, updatedAt: now,
     };
     upsertReport(newReport);
@@ -367,12 +361,6 @@ export default function MonthlySummaryScreen() {
       ...wineManualPurchaseStore.purchases.map((p: any) => p.supplier),
     ]);
     const allWineSupplierNames = Array.from(allWineSupplierNamesSet);
-    // 月报供应商档案中的葡萄酒/烈酒/啤酒/冰块供应商名称
-    const allRegisteredSupplierNames = suppliers.map((s) => s.name);
-    // 所有活跃员工
-    const allEmployees = employees
-      .filter((e: any) => e.active)
-      .map((e: any) => ({ id: e.id, realName: e.realName, code: e.code }));
     // 备用金人工关联数据（已纳入薪资预支的条目）
     const monthLaborLinks = pettyLaborLinkStore.getLinksForMonth(selectedMonth);
     const laborLinkedPettyIds = new Set(monthLaborLinks.map((l) => l.pettyRecordId));
@@ -796,12 +784,6 @@ export default function MonthlySummaryScreen() {
         onSave={handleSaveManualItem}
         onClose={() => { setShowManualModal(false); setEditingItem(null); }}
       />
-      <BalanceModal
-        visible={showBalanceModal} balance={editingBalance}
-        accountType={balanceAccountType} month={selectedMonth} colors={colors}
-        onSave={(b) => upsertBalance(b)}
-        onClose={() => { setShowBalanceModal(false); setEditingBalance(null); }}
-      />
       {/* ── 月报设置 Modal ── */}
       <Modal visible={showSettingsModal} animationType="slide" presentationStyle="pageSheet"
         onRequestClose={() => setShowSettingsModal(false)}>
@@ -931,25 +913,14 @@ function MonthSelector({ selectedMonth, onSelect, colors }: { selectedMonth: str
 const S = StyleSheet.create({
   navbar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   navTitle: { fontSize: 17, fontWeight: "600" },
-  tabBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 16, borderWidth: 1 },
   monthChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1 },
   profitCard: { borderRadius: 14, borderWidth: 1, padding: 16, marginBottom: 12 },
   section: { borderRadius: 12, borderWidth: 1, marginBottom: 10, overflow: "hidden" },
   sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth },
   addItemBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 12, borderWidth: 1, borderStyle: "dashed", padding: 14, marginBottom: 10 },
   linkBtn: { flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 12, borderWidth: 1, padding: 14, marginBottom: 10 },
-  infoBox: { borderRadius: 10, borderWidth: 1, padding: 12, marginBottom: 12 },
-  accountCard: { borderRadius: 12, borderWidth: 1, padding: 14, marginBottom: 10 },
-  varianceBox: { flexDirection: "row", alignItems: "flex-start", gap: 8, borderRadius: 8, borderWidth: 1, padding: 10, marginTop: 8 },
-  editBalBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1 },
-  payrollSummary: { flexDirection: "row", alignItems: "center", borderRadius: 12, borderWidth: 1, padding: 14, marginBottom: 12 },
   payrollCard: { borderRadius: 12, borderWidth: 1, padding: 14, marginBottom: 10 },
   statusTag: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
-  bankInfo: { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 8, borderWidth: 1, padding: 10, marginTop: 10 },
-  copyBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8 },
-  addBankHint: { flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 8, borderWidth: 1, borderStyle: "dashed", padding: 10, marginTop: 10 },
-  historyRow: { flexDirection: "row", alignItems: "center", borderRadius: 12, borderWidth: 1, padding: 14, marginBottom: 8 },
-  accountMini: { borderRadius: 12, borderWidth: 1, padding: 12, flex: 1, minWidth: "45%" },
   inlineCard: { borderRadius: 10, borderWidth: 1, borderLeftWidth: 3, borderColor: "transparent", padding: 10, backgroundColor: "transparent" },
   miniBtn: { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 7 },
   amtBlock: { alignItems: "center", minWidth: 48 },

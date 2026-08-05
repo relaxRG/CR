@@ -221,15 +221,6 @@ export interface Supplier {
 }
 
 // ─── 月度付款记录 ─────────────────────────────────────────────────────────────
-export type PaymentSourceType =
-  | "supplier"    // 供应商货款
-  | "employee"    // 员工工资
-  | "petty"       // 备用金科目（已付备用金）
-  | "rent"        // 房租
-  | "utilities"   // 水电
-  | "labor_petty" // 备用金兼职/人工
-  | "manual";     // 手工录入
-
 export interface MonthlyPaymentRecord {
   id: string;
   /** 月份 "2026-07" */
@@ -238,12 +229,6 @@ export interface MonthlyPaymentRecord {
   payeeId: string;
   /** 收款人类型 */
   payeeType: "supplier" | "employee";
-  /** 来源类型（用于货款Tab分组和展示） */
-  sourceType?: PaymentSourceType;
-  /** 显示标签（覆盖默认名称） */
-  displayLabel?: string;
-  /** 付款方式标注（如「已付(备用金)」「待付转账」） */
-  paymentMethodNote?: string;
   /** 应付总金额 */
   totalAmount: number;
   /** 已付金额 */
@@ -270,17 +255,6 @@ export interface MonthlyPaymentRecord {
   notes: string;
   createdAt: string;
   updatedAt: string;
-}
-
-// ─── 货款Tab专用：备用金科目卡片（不存储在 MonthlyPaymentRecord，从报表行动态生成） ──
-export interface PettyPaymentCard {
-  code: string;
-  label: string;
-  amount: number;
-  category: AccountCategory;
-  isPaid: boolean;
-  paymentNote: string;
-  isDuplicate: boolean;
 }
 
 // ─── 四账户体系 ───────────────────────────────────────────────────────────────
@@ -334,8 +308,6 @@ export interface MonthlySummaryReport {
   totalPettyOther: number;
   totalExtra: number;
   netProfit: number;
-  accountBalances: AccountBalance[];
-  paymentRecords: MonthlyPaymentRecord[];
   manualItems: SummaryLineItem[];
   notes: string;
   isFinalized: boolean;
