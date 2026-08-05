@@ -17,7 +17,7 @@ import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
 import { useEmployeeStore } from "@/lib/labor/store";
-import { useSalaryAdvanceStore, SalaryAdvance, AdvanceStatus } from "@/lib/labor/advance-store";
+import { useSalaryAdvanceStore, useAdvanceCategoryStore, SalaryAdvance, AdvanceStatus } from "@/lib/labor/advance-store";
 import { usePettyLaborLinkStore } from "@/lib/store/petty-labor-link-store";
 import { EMPLOYEE_TYPE_LABELS, EMPLOYEE_TYPE_COLORS, DEPT_COLORS, monthLabel } from "@/lib/labor/types";
 
@@ -56,9 +56,8 @@ function AddAdvanceModal({
   const [deductMonth, setDeductMonth] = useState(nextMonth);
   const [notes, setNotes] = useState("");
 
-  // 只显示长期兼职员工
   const eligibleEmployees = useMemo(() =>
-    employees.filter((e) => e.active && (e.type === "longterm_parttime" || e.type === "fulltime")),
+    employees.filter((e) => e.active && !e.archived),
     [employees]
   );
 
@@ -111,7 +110,7 @@ function AddAdvanceModal({
                   );
                 })}
                 {eligibleEmployees.length === 0 && (
-                  <Text style={{ fontSize: 13, color: colors.muted }}>暂无长期兼职或全职员工</Text>
+                  <Text style={{ fontSize: 13, color: colors.muted }}>暂无活跃员工</Text>
                 )}
               </View>
             </View>
@@ -182,6 +181,7 @@ export default function LaborAdvancesScreen() {
 
   const { employees } = useEmployeeStore();
   const { advances, addAdvance, updateAdvance, deleteAdvance } = useSalaryAdvanceStore();
+  const { allCategories } = useAdvanceCategoryStore();
   const { links } = usePettyLaborLinkStore();
 
   const [showAdd, setShowAdd] = useState(false);
@@ -228,9 +228,8 @@ export default function LaborAdvancesScreen() {
     ]);
   };
 
-  // 有长期兼职或全职员工
   const eligibleEmployees = useMemo(() =>
-    employees.filter((e) => e.active && (e.type === "longterm_parttime" || e.type === "fulltime")),
+    employees.filter((e) => e.active && !e.archived),
     [employees]
   );
 
@@ -299,13 +298,7 @@ export default function LaborAdvancesScreen() {
         </View>
       )}
 
-      {/* 说明 */}
-      <View style={[S.infoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <Text style={{ fontSize: 12, color: colors.muted, lineHeight: 18 }}>
-          <Text style={{ fontWeight: "700", color: "#5856D6" }}>长期兼职</Text>：有固定排班和月度薪资，支持薪资预支。预支金额在指定月份薪资结算时自动扣除。{"\n"}
-          <Text style={{ fontWeight: "700", color: colors.warning }}>临时兼职</Text>：按次/按小时结算，无预支功能，直接在薪资单中录入实际工时。
-        </Text>
-      </View>
+
 
       {/* 筛选 */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
@@ -355,7 +348,7 @@ export default function LaborAdvancesScreen() {
                   </Text>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <Text style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>
                       {emp?.code ?? "未知"} · {emp?.realName ?? ""}
                     </Text>
@@ -364,6 +357,14 @@ export default function LaborAdvancesScreen() {
                         {STATUS_LABELS[advance.status]}
                       </Text>
                     </View>
+                    {advance.category && (() => {
+                      const cat = allCategories.find((c) => c.id === advance.category);
+                      return cat ? (
+                        <View style={[S.statusTag, { backgroundColor: "#AF52DE" + "18" }]}>
+                          <Text style={{ fontSize: 10, fontWeight: "600", color: "#AF52DE" }}>{cat.name}</Text>
+                        </View>
+                      ) : null;
+                    })()}
                   </View>
                   <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>
                     预支日期：{advance.date} · 扣除月份：{advance.deductMonth ? monthLabel(advance.deductMonth) : "待定"}
@@ -427,7 +428,6 @@ const S = StyleSheet.create({
   navbar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   navTitle: { fontSize: 17, fontWeight: "600" },
   summaryCard: { flexDirection: "row", alignItems: "center", margin: 16, marginBottom: 8, borderRadius: 12, borderWidth: 1, padding: 14 },
-  infoCard: { marginHorizontal: 16, marginBottom: 8, borderRadius: 10, borderWidth: 1, padding: 12 },
   filterChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1 },
   advanceCard: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 10 },
   empAvatar: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
