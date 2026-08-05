@@ -487,19 +487,18 @@ export default function MonthlySummaryScreen() {
     const monthLaborLinks = pettyLaborLinkStore.getLinksForMonth(selectedMonth);
     const laborLinkedPettyIds = new Set(monthLaborLinks.map((l) => l.pettyRecordId));
     const laborLinkedTotal = monthLaborLinks.reduce((s, l) => s + l.amount, 0);
-    // 调用聚合器（传入用户配置）
+    // 调用聚合器（labor 科目由自动同步负责，不传入 paySlips/allEmployees）
     const aggregated = aggregateMonthlyReport({
       month: selectedMonth,
       monthlyReport,
       pettyRecords,
-      paySlips,
+      // paySlips 和 allEmployees 不传入：labor lineItems 由 syncLaborLineItems 自动同步维护
       spiritPurchaseSummary,
       allSpiritSupplierNames,
       foodPurchaseRecords,
       wineSnapshotSupplierTotals,
       wineManualPurchases,
       allWineSupplierNames,
-      allEmployees,
       pettyCodeConfigs,
       inventoryConfigs,
       laborLinkedPettyIds,
@@ -522,9 +521,13 @@ export default function MonthlySummaryScreen() {
           onPress: () => {
             const r = getOrCreateReport();
             const now = new Date().toISOString();
+            // 保留现有 labor lineItems（由自动同步维护），只覆盖非 labor 科目
+            const existingLaborItems = (r.lineItems ?? []).filter((i) => i.category === "labor");
+            const nonLaborAggregated = (aggregated.lineItems ?? []).filter((i) => i.category !== "labor");
             upsertReport({
               ...r,
               ...aggregated,
+              lineItems: [...nonLaborAggregated, ...existingLaborItems],
               id: r.id,
               month: r.month,
               manualItems: r.manualItems, // 保留手动录入项
@@ -1034,7 +1037,7 @@ export default function MonthlySummaryScreen() {
                     <Text style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>{emp.realName}</Text>
                     <Text style={{ fontSize: 12, color: colors.muted }}>（{emp.code}）</Text>
                   </View>
-                  <Text style={{ fontSize: 11, color: colors.muted, marginTop: 1 }}>{emp.type === "fulltime" ? "全职" : "兴趣工"} · {emp.dept === "front" ? "前厅" : emp.dept === "kitchen" ? "后厨" : "其他"}</Text>
+                  <Text style={{ fontSize: 11, color: colors.muted, marginTop: 1 }}>{emp.type === "fulltime" ? "全职" : emp.type === "longterm_parttime" ? "长期兼职" : "临时兼职"} · {emp.dept === "front" ? "前厅" : emp.dept === "kitchen" ? "后厨" : "公司"}</Text>
                 </View>
                 <View style={[S.statusTag, { backgroundColor: statusColor + "18" }]}>
                   <Text style={{ fontSize: 11, fontWeight: "700", color: statusColor }}>{statusLabel}</Text>
