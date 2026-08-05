@@ -816,7 +816,10 @@ export interface Employee {
   restDaysPerMonth: number;
   hourlyRate: number;
   overtimeHourlyRate: number;
-  holidayMultiplier: number;
+  /** @deprecated 节假日倍率已由「特殊状态」统一控制，不再写入，仅保留读取兼容 */
+  holidayMultiplier?: number;
+  /** 员工在列表中的显示顺序（同部门内） */
+  sortOrder?: number;
   /** 调休规则（几小时加班换一天休） */
   compOffRule?: CompOffRule;
   /** 补贴规则列表（饭补/交通/自定义） */

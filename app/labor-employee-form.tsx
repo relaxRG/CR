@@ -252,7 +252,6 @@ export default function LaborEmployeeFormScreen() {
       restDaysPerMonth: Number(restDays) || 4,
       hourlyRate: Number(hourlyRate) || 35,
       overtimeHourlyRate: Number(overtimeRate) || Number(hourlyRate) || 35,
-      holidayMultiplier: 2, // 统一由节假日配置/特殊状态控制，此处保留默认值兼容旧数据
       monthlyFixedSalary: Number(monthlyFixedSalary) || 0,
       weeklyHoursRules: weeklyHoursRules.length > 0 ? weeklyHoursRules : undefined,
       compOffRule: { enabled: compOffEnabled, hoursPerDay: Number(compOffHoursPerDay) || 8 },

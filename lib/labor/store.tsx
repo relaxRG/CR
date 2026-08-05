@@ -79,11 +79,13 @@ interface EmployeeStore {
   addEmployee: (draft: Omit<Employee, "id" | "createdAt">) => string;
   updateEmployee: (id: string, patch: Partial<Employee>) => void;
   deleteEmployee: (id: string) => void;
+  /** 重新排序同部门员工（拖拽排序后调用） */
+  reorderEmployees: (orderedIds: string[]) => void;
   ready: boolean;
 }
 
 const EmployeeContext = createContext<EmployeeStore>({
-  employees: [], addEmployee: () => "", updateEmployee: () => {}, deleteEmployee: () => {}, ready: false,
+  employees: [], addEmployee: () => "", updateEmployee: () => {}, deleteEmployee: () => {}, reorderEmployees: () => {}, ready: false,
 });
 
 function EmployeeProvider({ children }: { children: React.ReactNode }) {
@@ -108,7 +110,10 @@ function EmployeeProvider({ children }: { children: React.ReactNode }) {
 
   const addEmployee = useCallback((draft: Omit<Employee, "id" | "createdAt">): string => {
     const id = uuid();
-    persist([...ref.current, { ...draft, id, createdAt: new Date().toISOString() }]);
+    // 新员工自动分配 sortOrder（同部门内最大值+1）
+    const sameDept = ref.current.filter((e) => e.dept === draft.dept);
+    const maxOrder = sameDept.reduce((max, e) => Math.max(max, e.sortOrder ?? 0), -1);
+    persist([...ref.current, { ...draft, id, sortOrder: maxOrder + 1, createdAt: new Date().toISOString() }]);
     return id;
   }, [persist, ref]);
 
@@ -120,8 +125,18 @@ function EmployeeProvider({ children }: { children: React.ReactNode }) {
     persist(ref.current.filter((e) => e.id !== id));
   }, [persist, ref]);
 
+  // 拖拽排序：根据传入的 id 顺序更新同部门员工的 sortOrder
+  const reorderEmployees = useCallback((orderedIds: string[]) => {
+    const next = [...ref.current];
+    orderedIds.forEach((id, idx) => {
+      const i = next.findIndex((e) => e.id === id);
+      if (i >= 0) next[i] = { ...next[i], sortOrder: idx };
+    });
+    persist(next);
+  }, [persist, ref]);
+
   return (
-    <EmployeeContext.Provider value={{ employees, addEmployee, updateEmployee, deleteEmployee, ready }}>
+    <EmployeeContext.Provider value={{ employees, addEmployee, updateEmployee, deleteEmployee, reorderEmployees, ready }}>
       {children}
     </EmployeeContext.Provider>
   );
