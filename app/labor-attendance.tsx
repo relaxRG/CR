@@ -179,8 +179,8 @@ function EmployeeCard({
     const grid2 = [
       { label: "调休兑换", value: cashOut,  color: cashOut > 0 ? colors.success : colors.foreground },
       { label: "预支",     value: -advance, color: advance > 0 ? colors.warning : colors.foreground },
-      { label: "总薪资",   value: gross,    color: colors.foreground },
-      { label: "待发实发", value: final,    color: colors.primary },
+      { label: "应发",     value: gross,    color: colors.foreground },
+      { label: "待发",     value: final,    color: colors.primary },
     ];
 
     return (
@@ -204,7 +204,7 @@ function EmployeeCard({
             </View>
           ))}
         </View>
-        {/* 第二行：调休兑换 / 预支 / 总薪资 / 待发实发 */}
+        {/* 第二行：调休兑换 / 预支 / 应发 / 待发 */}
         <View style={[S.gridRow, { borderTopColor: colors.border }]}>
           {grid2.map((item) => (
             <View key={item.label} style={S.gridCell}>
