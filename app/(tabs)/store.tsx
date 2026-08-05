@@ -21,10 +21,11 @@ import StorePettyCashScreen from "@/components/store/petty-cash";
 import StoreAnalyticsScreen from "@/components/store/analytics";
 import StoreInventoryScreen from "@/components/store/inventory";
 import StoreReportScreen from "@/components/store/report";
+import StoreAccountsScreen from "@/components/store/accounts";
 import LaborScreen from "@/app/labor";
 
 type MainTab = "monthly" | "operations" | "inventory";
-type MonthlyTab = "summary" | "analytics";
+type MonthlyTab = "summary" | "analytics" | "accounts";
 type OperationsTab = "petty" | "labor";
 
 const MAIN_TABS: { key: MainTab; label: string }[] = [
@@ -34,8 +35,9 @@ const MAIN_TABS: { key: MainTab; label: string }[] = [
 ];
 
 const MONTHLY_TABS: { key: MonthlyTab; label: string }[] = [
-  { key: "summary",   label: `${new Date().getMonth() + 1}月报表` },
+  { key: "summary",   label: "总月报" },
   { key: "analytics", label: "经营分析" },
+  { key: "accounts",  label: "账户" },
 ];
 
 const OPERATIONS_TABS: { key: OperationsTab; label: string }[] = [
@@ -81,6 +83,11 @@ function MonthlyModule({ insets }: { insets: any }) {
       {monthlyTab === "analytics" && (
         <SafeAreaInsetsContext.Provider value={insets}>
           <StoreAnalyticsScreen />
+        </SafeAreaInsetsContext.Provider>
+      )}
+      {monthlyTab === "accounts" && (
+        <SafeAreaInsetsContext.Provider value={insets}>
+          <StoreAccountsScreen />
         </SafeAreaInsetsContext.Provider>
       )}
     </View>
