@@ -30,7 +30,7 @@ import {
 import { useSalaryAdvanceStore } from "@/lib/labor/advance-store";
 import {
   Employee, MonthlyAttendance, PaySlip, RewardPenaltyItem,
-  monthLabel,
+  monthLabel, DEPT_COLORS,
 } from "@/lib/labor/types";
 
 const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
@@ -97,32 +97,51 @@ export default function LaborAttendancePage() {
         <View style={{ width: 36 }} />
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: 40 + insets.bottom }}>
-        {activeEmployees.map((emp) => {
-          // ── 唯一逻辑：从响应式数组派生每个员工的数据 ──
-          const att = attendances.find((a) => a.employeeId === emp.id && a.month === currentMonth) ?? null;
-          const slip = paySlips.find((s) => s.employeeId === emp.id && s.month === currentMonth) ?? null;
-          const empCompOff = compOffEntries.filter((e) => e.employeeId === emp.id);
-          const empHolidayCompOff = holidayCompOffEntries.filter((e) => e.employeeId === emp.id);
+      <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: 40 + insets.bottom, gap: 16 }}>
+        {[
+          { key: "front",    label: "前厅",   color: DEPT_COLORS.front,    filter: (e: Employee) => e.dept === "front" && e.type !== "parttime" },
+          { key: "kitchen",  label: "后厨",   color: DEPT_COLORS.kitchen,  filter: (e: Employee) => e.dept === "kitchen" && e.type !== "parttime" },
+          { key: "parttime", label: "兼职",   color: DEPT_COLORS.parttime, filter: (e: Employee) => e.type === "parttime" },
+          { key: "other",    label: "其他",   color: DEPT_COLORS.other,    filter: (e: Employee) => e.dept !== "front" && e.dept !== "kitchen" && e.type !== "parttime" },
+        ].map(({ key, label, color, filter }) => {
+          const deptEmps = activeEmployees.filter(filter);
+          if (deptEmps.length === 0) return null;
           return (
-            <EmployeeCard
-              key={emp.id}
-              employee={emp}
-              month={currentMonth}
-              att={att}
-              slip={slip}
-              compOffEntries={empCompOff}
-              holidayCompOffEntries={empHolidayCompOff}
-              advances={advances}
-              expanded={expandedId === emp.id}
-              onToggle={() => { tap(); setExpandedId(expandedId === emp.id ? "" : emp.id); }}
-              colors={colors}
-              upsertPaySlip={upsertPaySlip}
-              editingReward={editingRewardFor === emp.id}
-              onToggleRewardEdit={() => setEditingRewardFor(editingRewardFor === emp.id ? "" : emp.id)}
-              onOpenPayment={() => { tap(); setPaymentModalFor(emp.id); }}
-              router={router}
-            />
+            <View key={key} style={{ gap: 0 }}>
+              {/* 分组标题 */}
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 4, paddingBottom: 6 }}>
+                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />
+                <Text style={{ fontSize: 13, fontWeight: "700", color }}>{label}</Text>
+                <Text style={{ fontSize: 11, color: colors.muted }}>({deptEmps.length}人)</Text>
+              </View>
+              {/* 员工卡片 */}
+              {deptEmps.map((emp) => {
+                const att = attendances.find((a) => a.employeeId === emp.id && a.month === currentMonth) ?? null;
+                const slip = paySlips.find((s) => s.employeeId === emp.id && s.month === currentMonth) ?? null;
+                const empCompOff = compOffEntries.filter((e) => e.employeeId === emp.id);
+                const empHolidayCompOff = holidayCompOffEntries.filter((e) => e.employeeId === emp.id);
+                return (
+                  <EmployeeCard
+                    key={emp.id}
+                    employee={emp}
+                    month={currentMonth}
+                    att={att}
+                    slip={slip}
+                    compOffEntries={empCompOff}
+                    holidayCompOffEntries={empHolidayCompOff}
+                    advances={advances}
+                    expanded={expandedId === emp.id}
+                    onToggle={() => { tap(); setExpandedId(expandedId === emp.id ? "" : emp.id); }}
+                    colors={colors}
+                    upsertPaySlip={upsertPaySlip}
+                    editingReward={editingRewardFor === emp.id}
+                    onToggleRewardEdit={() => setEditingRewardFor(editingRewardFor === emp.id ? "" : emp.id)}
+                    onOpenPayment={() => { tap(); setPaymentModalFor(emp.id); }}
+                    router={router}
+                  />
+                );
+              })}
+            </View>
           );
         })}
       </ScrollView>
