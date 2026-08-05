@@ -1497,7 +1497,7 @@ function QuickFillModal({ visible, employee, shiftTemplates, todayStr, currentMo
             </View>
             <View style={{ flexDirection: "row", gap: 10 }}>
               <TouchableOpacity
-                onPress={() => { tap(); onSavePreset({ label: presetLabel(fromDay, toDay, scope), session: selectedSession, fromDay, toDay, scope }); }}
+                onPress={() => { tap(); onSavePreset({ label: presetLabel(fromDay, toDay, scope), session: selectedSession, fromDay, toDay, scope, mode: "shift" }); }}
                 style={{ flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: "center",
                   borderWidth: 1.5, borderColor: colors.primary, backgroundColor: colors.primary + "10" }}>
                 <Text style={{ fontSize: 13, fontWeight: "600", color: colors.primary }}>★ 保存常用</Text>

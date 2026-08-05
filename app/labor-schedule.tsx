@@ -21,11 +21,11 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
 import {
   useEmployeeStore, useShiftStore, useShiftTemplateStore,
-  useAttendanceStore, usePaySlipStore, useFillPresetStore,
+  useAttendanceStore, usePaySlipStore, useFillPresetStore, useSpecialStatusStore,
 } from "@/lib/labor/store";
 import {
   Employee, EmployeeDept, ShiftEntry, ShiftHoursValue,
-  ShiftTemplate, FillPreset,
+  ShiftTemplate, FillPreset, SpecialStatus,
   DEPT_LABELS, DEPT_COLORS,
   getMonthDates, getDayOfWeek, monthLabel, getContractHoursForDate,
   isDayInRange, DEFAULT_SHIFT_TEMPLATES, SHIFT_COLOR_PRESETS,
@@ -39,14 +39,25 @@ const ROW_H = 38;    // 行高
 
 
 // ─── 单元格显示 ───────────────────────────────────────────────────────────────
-function CellDisplay({ entry, contractHours, tplColor, colors }: {
+function CellDisplay({ entry, contractHours, tplColor, colors, specialStatuses }: {
   entry: ShiftEntry | null;
   contractHours: number;
   tplColor: string;
   colors: any;
+  specialStatuses: SpecialStatus[];
 }) {
   if (!entry) return null;
   const h = entry.hoursValue;
+  // 特殊状态（新版 specialStatusId）
+  if (entry.specialStatusId) {
+    const ss = specialStatuses.find((s) => s.id === entry.specialStatusId);
+    if (ss) return (
+      <View style={[CS.badge, { backgroundColor: ss.color + "22" }]}>
+        <Text style={[CS.badgeText, { color: ss.color }]}>{ss.name.slice(0, 2)}</Text>
+      </View>
+    );
+  }
+  // 向后兼容：旧版 "休"/"无早" hoursValue
   if (h === "休") return (
     <View style={[CS.badge, { backgroundColor: colors.error + "22" }]}>
       <Text style={[CS.badgeText, { color: colors.error }]}>休</Text>
@@ -73,10 +84,10 @@ function CellDisplay({ entry, contractHours, tplColor, colors }: {
 }
 
 // ─── 单元格编辑 Modal ─────────────────────────────────────────────────────────
-function EditShiftModal({ visible, date, employee, session, sessionColor, existing, contractHours, defaultHours, colors, onSave, onClear, onClose }: {
+function EditShiftModal({ visible, date, employee, session, sessionColor, existing, contractHours, defaultHours, colors, specialStatuses, onSave, onClear, onClose }: {
   visible: boolean; date: string; employee: Employee | null; session: string;
   sessionColor: string; existing: ShiftEntry | null; contractHours: number;
-  defaultHours: number; colors: any;
+  defaultHours: number; colors: any; specialStatuses: SpecialStatus[];
   onSave: (entry: ShiftEntry) => void; onClear: () => void; onClose: () => void;
 }) {
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
@@ -84,26 +95,24 @@ function EditShiftModal({ visible, date, employee, session, sessionColor, existi
   const dow = date ? getDayOfWeek(date) : 1;
 
   const [hoursInput, setHoursInput] = useState("");
-  const [hoursSpecial, setHoursSpecial] = useState<"休" | "无早" | null>(null);
+  const [selectedSpecialId, setSelectedSpecialId] = useState<string | null>(null);
 
   React.useEffect(() => {
     if (visible) {
       setHoursInput(existing && typeof existing.hoursValue === "number" ? String(existing.hoursValue) : "");
-      setHoursSpecial(existing?.hoursValue === "休" ? "休" : existing?.hoursValue === "无早" ? "无早" : null);
+      setSelectedSpecialId(existing?.specialStatusId ?? null);
     }
   }, [visible, existing]);
 
   if (!employee || !date) return null;
 
   const currentHours = Number(hoursInput) || 0;
-  const isOvertime = contractHours > 0 && currentHours > contractHours && !hoursSpecial;
+  const isOvertime = contractHours > 0 && currentHours > contractHours && !selectedSpecialId;
   const overtimeAmt = isOvertime ? currentHours - contractHours : 0;
 
   const handleSave = () => {
-    let hoursValue: ShiftHoursValue = null;
-    if (hoursSpecial) { hoursValue = hoursSpecial; }
-    else if (hoursInput) { hoursValue = Number(hoursInput) || null; }
-    onSave({ employeeId: employee.id, date, shift: session, hoursValue });
+    const hoursValue: ShiftHoursValue = hoursInput ? (Number(hoursInput) || null) : null;
+    onSave({ employeeId: employee.id, date, shift: session, hoursValue, specialStatusId: selectedSpecialId ?? undefined });
     onClose();
   };
 
@@ -122,7 +131,7 @@ function EditShiftModal({ visible, date, employee, session, sessionColor, existi
           <View style={[EM.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={[EM.label, { color: colors.foreground }]}>工时（小时）</Text>
             <View style={{ flexDirection: "row", gap: 8, alignItems: "center", marginTop: 8 }}>
-              <TextInput value={hoursInput} onChangeText={(t) => { setHoursInput(t); setHoursSpecial(null); }}
+              <TextInput value={hoursInput} onChangeText={(t) => { setHoursInput(t); setSelectedSpecialId(null); }}
                 placeholder={`默认 ${defaultHours}h`} placeholderTextColor={colors.muted} keyboardType="decimal-pad"
                 style={[EM.input, { color: colors.foreground, borderColor: sessionColor, flex: 1 }]} />
               <Text style={{ color: colors.muted }}>h</Text>
@@ -133,17 +142,24 @@ function EditShiftModal({ visible, date, employee, session, sessionColor, existi
               </Text>
             )}
           </View>
-          <View style={[EM.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={[EM.label, { color: colors.foreground }]}>特殊标注</Text>
-            <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
-              {(["休", "无早"] as const).map((s) => (
-                <TouchableOpacity key={s} onPress={() => { tap(); setHoursSpecial(hoursSpecial === s ? null : s); setHoursInput(""); }}
-                  style={[EM.chip, { backgroundColor: hoursSpecial === s ? (s === "休" ? colors.error : colors.muted) : colors.surface, borderColor: s === "休" ? colors.error : colors.muted }]}>
-                  <Text style={{ fontSize: 13, color: hoursSpecial === s ? "#fff" : colors.muted }}>{s}</Text>
-                </TouchableOpacity>
-              ))}
+          {specialStatuses.length > 0 && (
+            <View style={[EM.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Text style={[EM.label, { color: colors.foreground }]}>特殊状态</Text>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+                {specialStatuses.map((ss) => {
+                  const sel = selectedSpecialId === ss.id;
+                  return (
+                    <TouchableOpacity key={ss.id} onPress={() => { tap(); setSelectedSpecialId(sel ? null : ss.id); }}
+                      style={[EM.chip, { backgroundColor: sel ? ss.color : colors.surface, borderColor: ss.color }]}>
+                      <Text style={{ fontSize: 13, fontWeight: "600", color: sel ? "#fff" : ss.color }}>
+                        {ss.name}{ss.salaryMultiplier !== 1 ? ` ${ss.salaryMultiplier}x` : ""}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
             </View>
-          </View>
+          )}
           {isOvertime && (
             <View style={[EM.card, { backgroundColor: colors.error + "08", borderColor: colors.error + "33" }]}>
               <Text style={[EM.label, { color: colors.error }]}>加班 +{overtimeAmt.toFixed(1)}h（请在考勤页处理）</Text>
@@ -392,7 +408,7 @@ function QuickFillModal({ visible, employee, shiftTemplates, todayStr, currentMo
               ))}
             </View>
             <View style={{ flexDirection: "row", gap: 10 }}>
-              <TouchableOpacity onPress={() => { tap(); onSavePreset({ label: presetLabel(fromDay, toDay, scope), session: selectedSession, fromDay, toDay, scope }); }}
+              <TouchableOpacity onPress={() => { tap(); onSavePreset({ label: presetLabel(fromDay, toDay, scope), session: selectedSession, fromDay, toDay, scope, mode: "shift" }); }}
                 style={{ flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: "center", borderWidth: 1.5, borderColor: colors.primary, backgroundColor: colors.primary + "10" }}>
                 <Text style={{ fontSize: 13, fontWeight: "600", color: colors.primary }}>★ 保存常用</Text>
               </TouchableOpacity>
@@ -421,6 +437,7 @@ export default function LaborScheduleScreen() {
   const { getPaySlip } = usePaySlipStore();
   const { getAttendance } = useAttendanceStore();
   const { presets: fillPresets, savePreset: saveFillPreset, deletePreset: deleteFillPreset } = useFillPresetStore();
+  const { statuses: specialStatuses } = useSpecialStatusStore();
 
   const now = new Date();
   const todayStr = now.toISOString().slice(0, 10);
@@ -570,7 +587,7 @@ export default function LaborScheduleScreen() {
                       backgroundColor: isToday ? tpl.color + "18" : isWeekend ? tpl.color + "07" : "transparent",
                       borderRightColor: colors.border + "22",
                     }]}>
-                    <CellDisplay entry={entry} contractHours={contractH} tplColor={tpl.color} colors={colors} />
+                    <CellDisplay entry={entry} contractHours={contractH} tplColor={tpl.color} colors={colors} specialStatuses={specialStatuses} />
                   </TouchableOpacity>
                 );
               })}
@@ -779,10 +796,10 @@ export default function LaborScheduleScreen() {
         existing={editEmployee && editDate ? getEntry(editEmployee.id, editDate, editSession) : null}
         contractHours={editContractH} defaultHours={editTpl?.defaultHours ?? 8}
         colors={colors}
+        specialStatuses={specialStatuses}
         onSave={(entry) => upsertShift(entry)}
         onClear={() => {
           if (editEmployee && editDate) {
-            // 优先用实际存储的 shift 字段，避免 editSession 与存储字段不匹配导致删除失败
             const actualShift = getEntry(editEmployee.id, editDate, editSession)?.shift ?? editSession;
             deleteShift(editEmployee.id, editDate, actualShift);
           }
