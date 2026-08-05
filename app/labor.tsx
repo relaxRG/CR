@@ -448,16 +448,24 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors }:
         </View>
         {/* 右侧：应发/待发 */}
         <View style={{ alignItems: "flex-end", gap: 4 }}>
-          <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 14 }}>
+          <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 10 }}>
             <View style={{ alignItems: "flex-end" }}>
               <Text style={{ fontSize: 10, color: colors.muted }}>应发</Text>
-              <Text style={{ fontSize: 18, fontWeight: "800", color: colors.foreground, lineHeight: 22 }}>
-                {slip ? `¥${slip.finalSalary.toFixed(0)}` : "—"}
+              <Text style={{ fontSize: 16, fontWeight: "800", color: colors.foreground, lineHeight: 20 }}>
+                {slip ? `¥${(slip.grossSalary ?? slip.finalSalary).toFixed(0)}` : "—"}
               </Text>
             </View>
+            {(slip?.advanceAmount ?? 0) > 0 && (
+              <View style={{ alignItems: "flex-end" }}>
+                <Text style={{ fontSize: 10, color: colors.muted }}>预支</Text>
+                <Text style={{ fontSize: 16, fontWeight: "800", color: colors.warning, lineHeight: 20 }}>
+                  {`-¥${slip!.advanceAmount.toFixed(0)}`}
+                </Text>
+              </View>
+            )}
             <View style={{ alignItems: "flex-end" }}>
               <Text style={{ fontSize: 10, color: colors.muted }}>待发</Text>
-              <Text style={{ fontSize: 18, fontWeight: "800", color: pending && pending > 0 ? colors.success : colors.muted, lineHeight: 22 }}>
+              <Text style={{ fontSize: 16, fontWeight: "800", color: pending && pending > 0 ? colors.success : colors.muted, lineHeight: 20 }}>
                 {pending !== null ? `¥${pending.toFixed(0)}` : "—"}
               </Text>
             </View>
@@ -890,12 +898,7 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
           <IconSymbol name="person.2.fill" size={15} color={colors.foreground} />
           <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>员工管理</Text>
         </TouchableOpacity>
-        {/* 新增员工 */}
-        <TouchableOpacity onPress={() => { tap(); router.push("/labor-employee-form" as any); }}
-          style={{ flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: colors.primary + "66", backgroundColor: colors.primary + "08" }}>
-          <IconSymbol name="plus" size={13} color={colors.primary} />
-          <Text style={{ fontSize: 13, fontWeight: "600", color: colors.primary }}>添加员工</Text>
-        </TouchableOpacity>
+
         <View style={{ flex: 1 }} />
         {/* 薪资对比开关 */}
         <CompareToggle mode={compareMode} customMonth={customMonth} baseMonth={month} onChange={setCompareMode} onCustomMonthChange={setCustomMonth} colors={colors} />
@@ -930,20 +933,33 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
         );
       })}
 
-      {/* 未分组员工 */}
-      {ungroupedEmployees.length > 0 && (
-        <View style={[{ borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, overflow: "hidden" }]}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, padding: 12, backgroundColor: colors.muted + "10" }}>
-            <Text style={{ fontSize: 14, fontWeight: "700", color: colors.muted }}>未分组</Text>
-            <Text style={{ fontSize: 12, color: colors.muted }}>({ungroupedEmployees.length}人)</Text>
-          </View>
-          {ungroupedEmployees.map((emp) => (
-            <View key={emp.id} style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
-              <PaySlipMiniCard employee={emp} month={month} compareMonth={compareMonth} compareMode={compareMode} colors={colors} />
+      {/* 未分组员工：按部门+临时兼职自动分组 */}
+      {ungroupedEmployees.length > 0 && (() => {
+        const AUTO_DEPT_GROUPS = [
+          { key: "front",    label: "前厅",   color: "#007AFF", filter: (e: Employee) => e.dept === "front" && e.type !== "parttime" },
+          { key: "kitchen",  label: "后厨",   color: "#34C759", filter: (e: Employee) => e.dept === "kitchen" && e.type !== "parttime" },
+          { key: "parttime", label: "临时兼职", color: "#FF9500", filter: (e: Employee) => e.type === "parttime" },
+          { key: "other",    label: "其他",   color: "#8E8E93", filter: (e: Employee) => e.dept === "other" },
+        ];
+        return AUTO_DEPT_GROUPS.map(({ key, label, color, filter }) => {
+          const deptEmps = ungroupedEmployees.filter(filter).sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+          if (deptEmps.length === 0) return null;
+          return (
+            <View key={key} style={[{ borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, overflow: "hidden" }]}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, padding: 12, backgroundColor: color + "10" }}>
+                <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: color }} />
+                <Text style={{ fontSize: 14, fontWeight: "700", color }}>{label}</Text>
+                <Text style={{ fontSize: 12, color: colors.muted }}>({deptEmps.length}人)</Text>
+              </View>
+              {deptEmps.map((emp) => (
+                <View key={emp.id} style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
+                  <PaySlipMiniCard employee={emp} month={month} compareMonth={compareMonth} compareMode={compareMode} colors={colors} />
+                </View>
+              ))}
             </View>
-          ))}
-        </View>
-      )}
+          );
+        });
+      })()}
 
       {activeEmployees.length === 0 && (
         <View style={{ alignItems: "center", padding: 40 }}>
