@@ -27,6 +27,7 @@ import {
 } from "@/lib/labor/store";
 import { useSalaryAdvanceStore } from "@/lib/labor/advance-store";
 import { usePettyCashStore } from "@/lib/store/petty-store";
+import { fabBottom } from "@/components/floating-tab-bar";
 import {
   Employee, EmployeeDept, EmployeeGroup, ShiftEntry, ShiftHoursValue, ShiftTemplate,
   SpecialStatus, SpecialStatusDirection, DeptCategory, DEPT_CATEGORY_LABELS,
@@ -815,6 +816,7 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
 
 // ─── 薪资预支页（第三页） ─────────────────────────────────────────────────────
 function AdvancePage({ month, colors, headerComponent }: { month: string; colors: any; headerComponent?: React.ReactNode }) {
+  const insets = useSafeAreaInsets();
   const { employees } = useEmployeeStore();
   const { advances, addAdvance, updateAdvance, deleteAdvance } = useSalaryAdvanceStore();
   const { records: pettyRecords } = usePettyCashStore();
@@ -1044,8 +1046,9 @@ function AdvancePage({ month, colors, headerComponent }: { month: string; colors
       </ScrollView>
 
       {/* 右下角悬浮 FAB 按钮 */}
+      {/* FAB 动态跟随 Tab Bar 位置，不硬编码 */}
       <TouchableOpacity onPress={() => { tap(); setShowAddModal(true); }}
-        style={{ position: "absolute", right: 20, bottom: 20, flexDirection: "row", alignItems: "center", gap: 6,
+        style={{ position: "absolute", right: 20, bottom: fabBottom(insets.bottom), flexDirection: "row", alignItems: "center", gap: 6,
           paddingHorizontal: 18, paddingVertical: 13, borderRadius: 28, backgroundColor: "#AF52DE",
           shadowColor: "#AF52DE", shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 8 }}>
         <IconSymbol name="plus" size={16} color="#fff" />
