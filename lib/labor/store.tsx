@@ -267,17 +267,6 @@ const ShiftTemplateContext = createContext<ShiftTemplateStore>({
 function ShiftTemplateProvider({ children }: { children: React.ReactNode }) {
   const { data: templates, ref, persist, ready } = usePersisted<ShiftTemplate>("labor_shift_templates_v1", DEFAULT_SHIFT_TEMPLATES);
 
-  // 迁移旧数据：确保所有默认班次模板存在
-  React.useEffect(() => {
-    if (!ready) return;
-    const ids = new Set(ref.current.map((t) => t.id));
-    const missing = DEFAULT_SHIFT_TEMPLATES.filter((t) => !ids.has(t.id));
-    if (missing.length > 0) {
-      console.log("[ShiftTemplateProvider] 迁移旧数据，补充缺失的默认班次模板:", missing.map((t) => t.session));
-      persist([...ref.current, ...missing]);
-    }
-  }, [ready]);
-
   const upsertTemplate = useCallback((tpl: ShiftTemplate) => {
     const idx = ref.current.findIndex((t) => t.id === tpl.id);
     if (idx >= 0) { const next = [...ref.current]; next[idx] = tpl; persist(next); }

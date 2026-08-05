@@ -1413,7 +1413,7 @@ export interface FillPreset {
   id: string;
   /** 显示名称，如「周一~五·当月」 */
   label: string;
-  /** 班次 session 名称 */
+  /** 班次 session 名称（班次模式下使用） */
   session: string;
   /** 起始星期几（0=周日，1=周一，...，6=周六） */
   fromDay: number;
@@ -1421,6 +1421,10 @@ export interface FillPreset {
   toDay: number;
   /** 范围：当前周 or 当前月 */
   scope: "week" | "month";
+  /** 时长模式下的工时数（时长模式下使用） */
+  hours?: number;
+  /** 预设模式："shift"（班次）或 "hours"（时长） */
+  mode?: "shift" | "hours";
   createdAt: string;
 }
 
