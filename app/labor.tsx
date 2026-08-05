@@ -2492,18 +2492,49 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   }, [shifts, currentMonth]);
   const allDeptEmployees = useMemo(() => employees.filter((e) => e.active && resolveEmployeeDept(e).category === deptCategory), [employees, deptCategory, resolveEmployeeDept]);
 
+  // 员工分组逻辑：
+  // 优先按当月实际排班记录判断员工属于哪个班次分组
+  // 若当月无排班记录，则回落到 defaultSession（旧逻辑兼容）
+  // 若 defaultSession 也未设置，则放入第一个班次（而非最后一个），避免所有人堆在晚班
   const employeesBySession = useMemo(() => {
     const map: Record<string, Employee[]> = {};
     for (const tpl of sortedTemplates) {
-      map[tpl.session] = allDeptEmployees.filter((e) => migrateShiftName(e.defaultSession ?? "") === tpl.session);
+      map[tpl.session] = [];
     }
-    const unassigned = allDeptEmployees.filter((e) => !sortedTemplates.find((t) => t.session === migrateShiftName(e.defaultSession ?? "")));
-    if (sortedTemplates.length > 0) {
-      const last = sortedTemplates[sortedTemplates.length - 1].session;
-      map[last] = [...(map[last] ?? []), ...unassigned];
+    for (const emp of allDeptEmployees) {
+      // 1. 先看当月实际排班：取出现次数最多的班次
+      const empMonthShifts = monthShifts.filter((s) => s.employeeId === emp.id);
+      let resolvedSession: string | undefined;
+      if (empMonthShifts.length > 0) {
+        const sessionCount: Record<string, number> = {};
+        for (const s of empMonthShifts) {
+          const sess = s.shift;
+          if (sortedTemplates.find((t) => t.session === sess)) {
+            sessionCount[sess] = (sessionCount[sess] ?? 0) + 1;
+          }
+        }
+        const entries = Object.entries(sessionCount);
+        if (entries.length > 0) {
+          resolvedSession = entries.sort((a, b) => b[1] - a[1])[0][0];
+        }
+      }
+      // 2. 回落到 defaultSession
+      if (!resolvedSession) {
+        const ds = migrateShiftName(emp.defaultSession ?? "");
+        if (ds && sortedTemplates.find((t) => t.session === ds)) {
+          resolvedSession = ds;
+        }
+      }
+      // 3. 若仍未解析，放入第一个班次（不强制放最后）
+      if (!resolvedSession && sortedTemplates.length > 0) {
+        resolvedSession = sortedTemplates[0].session;
+      }
+      if (resolvedSession && map[resolvedSession] !== undefined) {
+        map[resolvedSession].push(emp);
+      }
     }
     return map;
-  }, [allDeptEmployees, sortedTemplates]);
+  }, [allDeptEmployees, sortedTemplates, monthShifts]);
 
   // 班次分组排序：按 ShiftGroup 分组显示员工
   const sortedShiftGroups = useMemo(() =>
@@ -2512,6 +2543,8 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   );
 
   // 构建分组展示数据：{ group, tpl, empList, groupColor }
+  // 构建分组展示数据：始终显示所有已配置的班次分组（即使当月无人排班）
+  // 修复根因：旧代码仅当 empList.length > 0 才 push，导致当月无人排入晚班时晚班分组整行消失
   const groupedScheduleRows = useMemo(() => {
     const rows: Array<{ groupId: string; groupName: string; groupColor: string; tpl: ShiftTemplate; empList: Employee[] }> = [];
     const coveredTplIds = new Set<string>();
@@ -2522,12 +2555,11 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
         if (!tpl) continue;
         coveredTplIds.add(tpl.id);
         const empList = employeesBySession[tpl.session] ?? [];
-        if (empList.length > 0) {
-          rows.push({ groupId: grp.id, groupName: grp.name, groupColor: grp.color, tpl, empList });
-        }
+        // 始终显示分组行，即使无员工排班（用户可看到分组并手动添加排班）
+        rows.push({ groupId: grp.id, groupName: grp.name, groupColor: grp.color, tpl, empList });
       }
     }
-    // 未分组班次
+    // 未分组班次：仅当有员工时才显示（未分组的班次不强制展示空行）
     for (const tpl of sortedTemplates) {
       if (coveredTplIds.has(tpl.id)) continue;
       const empList = employeesBySession[tpl.session] ?? [];
@@ -2909,9 +2941,20 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
           })}
         </View>
 
-        {/* 各班次员工行（按分组排序，左侧竖条用分组额色） */}
+        {/* 各班次员工行（按分组排序，左侧竖条用分组颜色） */}
         {groupedScheduleRows.map(({ groupId, groupName, groupColor, tpl, empList }, rowIdx) => {
-          if (empList.length === 0) return null;
+          // 空分组：显示分组标题行（提示该班次暂无人排班），不直接隐藏
+          if (empList.length === 0) {
+            return (
+              <View key={`${groupId}_${tpl.id}_empty`}>
+                {rowIdx > 0 && <View style={{ height: 4, backgroundColor: colors.border + "33" }} />}
+                <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 4, paddingHorizontal: 8, backgroundColor: groupColor + "08" }}>
+                  <View style={{ width: 3, height: 20, borderRadius: 1.5, backgroundColor: groupColor + "66", marginRight: 6 }} />
+                  <Text style={{ fontSize: 10, color: groupColor + "99", fontStyle: "italic" }}>{tpl.session} · 暂无排班</Text>
+                </View>
+              </View>
+            );
+          }
           return (
             <View key={`${groupId}_${tpl.id}`}>
               {rowIdx > 0 && <View style={{ height: 6, backgroundColor: colors.border + "44" }} />}
