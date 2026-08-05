@@ -974,7 +974,6 @@ export interface UnexplainedRestAlert {
 }
 
 // ─── 调休余额记录（每员工每月） ────────────────────────────────────────────────
-// CompOffBalance 接口已删除，由 CompOffBalanceEntry 替代
 
 // ─── 月度考勤汇总（每员工每月） ──────────────────────────────────────────────
 export interface MonthlyAttendance {

@@ -238,7 +238,3 @@ function isGenericCategoryName(rawNorm: string, category: string): boolean {
   return re ? re.test(rawNorm) : false;
 }
 
-/** @deprecated retained for API stability; use analyzeUnknownIngredient */
-export function __classifyOnly(ingredientName: string): IngredientClassification | null {
-  return classifyIngredient(ingredientName);
-}

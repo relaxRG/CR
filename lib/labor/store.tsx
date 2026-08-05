@@ -1461,7 +1461,6 @@ export function useShiftTemplateStore() { return useContext(ShiftTemplateContext
 export function useSpecialStatusStore() { return useContext(SpecialStatusContext); }
 export function useHolidayConfigStore() { return useContext(HolidayConfigContext); }
 export function useAttendanceStore() { return useContext(AttendanceContext); }
-// useCompOffStore 已删除，请使用 useCompOffBalanceEntryStore
 export function usePaySlipStore() { return useContext(PaySlipContext); }
 export function useMonthConfigStore() { return useContext(MonthConfigContext); }
 export function useGlobalPayrollSettingsStore() { return useContext(GlobalPayrollSettingsContext); }

@@ -1497,7 +1497,6 @@ export default function RecipeFormScreen() {
       setImportHint(t("form.import.readFail"));
     }
   };
-  void handlePasteImport; // legacy local parser kept for offline fallback reference
 
   const handleSave = () => {
     if (!canSave) return;
