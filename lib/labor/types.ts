@@ -910,9 +910,9 @@ export interface CompOffBalanceEntry {
   status: "available" | "used_rest" | "cashed_out" | "expired";
   /** 使用月份（status=used_rest/cashed_out 时填写） */
   usedMonth?: string;
-  /** 兑现日薪（兑现时按兑现当月日薪计算，可人工修改） */
-  cashOutDailyRate?: number;
-  /** 兑现金额（days × cashOutDailyRate） */
+  /** 兑换单位费率（加班换休=时薪，节假日换休=日薪，直接扣除=0） */
+  cashOutUnitRate?: number;
+  /** 兑换金额（days × cashOutUnitRate） */
   cashOutAmount?: number;
   /** 备注 */
   notes?: string;
@@ -974,20 +974,7 @@ export interface UnexplainedRestAlert {
 }
 
 // ─── 调休余额记录（每员工每月） ────────────────────────────────────────────────
-export interface CompOffBalance {
-  id: string;
-  employeeId: string;
-  month: string;
-  /** 本月累积加班时数（用于加班换休计算） */
-  totalOvertimeHours: number;
-  /** 本月使用加班换休次数 */
-  compOffCount: number;
-  /** 每次换休消耗的加班时数（来自 compOffRule.hoursPerDay） */
-  hoursPerCompOff: number;
-  /** 实际计费加班时数（totalOvertimeHours - compOffCount * hoursPerCompOff） */
-  paidOvertimeHours: number;
-
-}
+// CompOffBalance 接口已删除，由 CompOffBalanceEntry 替代
 
 // ─── 月度考勤汇总（每员工每月） ──────────────────────────────────────────────
 export interface MonthlyAttendance {

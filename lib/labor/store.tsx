@@ -9,7 +9,7 @@ import { notifySyncChange, registerStoreReload } from "../sync/engine";
 import {
   Employee, ShiftEntry, MonthlyAttendance, PaySlip, MonthConfig,
   ShiftTemplate, HolidayConfig,
-  EmployeeGroup, CompOffBalance, SpecialStatus, GlobalPayrollSettings,
+  EmployeeGroup, SpecialStatus, GlobalPayrollSettings,
   CompOffBalanceEntry, HolidayCompOffEntry, UnexplainedRestAlert,
   CustomDept, BusinessHoursEntry, ShiftGroup, FillPreset,
   calcDailyRate, calcAllowance, calcSocialInsurance, calcIncomeTax, calcFinalSalary,
@@ -820,38 +820,7 @@ function AttendanceProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ─── 调休余额 Store ───────────────────────────────────────────────────────────
-interface CompOffStore {
-  balances: CompOffBalance[];
-  upsertBalance: (balance: CompOffBalance) => void;
-  getBalance: (employeeId: string, month: string) => CompOffBalance | null;
-  ready: boolean;
-}
-
-const CompOffContext = createContext<CompOffStore>({
-  balances: [], upsertBalance: () => {}, getBalance: () => null, ready: false,
-});
-
-function CompOffProvider({ children }: { children: React.ReactNode }) {
-  const { data: balances, ref, persist, ready } = usePersisted<CompOffBalance>("labor_comp_off_v1");
-
-  const upsertBalance = useCallback((balance: CompOffBalance) => {
-    const idx = ref.current.findIndex((b) => b.employeeId === balance.employeeId && b.month === balance.month);
-    if (idx >= 0) { const next = [...ref.current]; next[idx] = balance; persist(next); }
-    else persist([...ref.current, balance]);
-  }, [persist, ref]);
-
-  const getBalance = useCallback((employeeId: string, month: string): CompOffBalance | null => {
-    return ref.current.find((b) => b.employeeId === employeeId && b.month === month) ?? null;
-  }, [ref]);
-
-  return (
-    <CompOffContext.Provider value={{ balances, upsertBalance, getBalance, ready }}>
-      {children}
-    </CompOffContext.Provider>
-  );
-}
-
+// ─── 旧 CompOffStore 已删除，由 CompOffBalanceEntryStore 替代 ─────────────────
 // ─── 旧绩效 Store 已移除，由 Employee.workKPIRules + Employee.revenueKPIRules 替代 ─────
 
 // ─── 薪资单 Store ─────────────────────────────────────────────────────────────
@@ -1199,12 +1168,13 @@ function CompOffBalanceEntryProvider({ children }: { children: React.ReactNode }
       .reduce((sum, e) => sum + e.days, 0);
   }, [ref]);
 
-  const cashOutEntry = useCallback((id: string, dailyRate: number, usedMonth: string) => {
+  const cashOutEntry = useCallback((id: string, unitRate: number, usedMonth: string) => {
+    // unitRate：单位兑换费率（加班换休=时薪，节假日换休=日薪），传0表示直接扣除不产生金额
     const entry = ref.current.find((e) => e.id === id);
     if (!entry || entry.status !== "available") return;
-    const cashOutAmount = Math.round(entry.days * dailyRate * 100) / 100;
+    const cashOutAmount = Math.round(entry.days * unitRate * 100) / 100;
     const next = ref.current.map((e) => e.id === id
-      ? { ...e, status: "cashed_out" as const, usedMonth, cashOutDailyRate: dailyRate, cashOutAmount }
+      ? { ...e, status: "cashed_out" as const, usedMonth, cashOutUnitRate: unitRate, cashOutAmount }
       : e
     );
     persist(next);
@@ -1455,7 +1425,6 @@ export function LaborProvider({ children }: { children: React.ReactNode }) {
               <HolidayConfigProvider>
                 <ShiftProvider>
                   <AttendanceProvider>
-                    <CompOffProvider>
                       <CompOffBalanceEntryProvider>
                         <HolidayCompOffProvider>
                           <UnexplainedRestAlertProvider>
@@ -1467,7 +1436,6 @@ export function LaborProvider({ children }: { children: React.ReactNode }) {
                           </UnexplainedRestAlertProvider>
                         </HolidayCompOffProvider>
                       </CompOffBalanceEntryProvider>
-                    </CompOffProvider>
                   </AttendanceProvider>
                 </ShiftProvider>
               </HolidayConfigProvider>
@@ -1491,7 +1459,7 @@ export function useShiftTemplateStore() { return useContext(ShiftTemplateContext
 export function useSpecialStatusStore() { return useContext(SpecialStatusContext); }
 export function useHolidayConfigStore() { return useContext(HolidayConfigContext); }
 export function useAttendanceStore() { return useContext(AttendanceContext); }
-export function useCompOffStore() { return useContext(CompOffContext); }
+// useCompOffStore 已删除，请使用 useCompOffBalanceEntryStore
 export function usePaySlipStore() { return useContext(PaySlipContext); }
 export function useMonthConfigStore() { return useContext(MonthConfigContext); }
 export function useGlobalPayrollSettingsStore() { return useContext(GlobalPayrollSettingsContext); }
