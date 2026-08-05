@@ -874,18 +874,19 @@ function AdvancePage({ month, colors, headerComponent }: { month: string; colors
   const activeEmployees = React.useMemo(() => employees.filter((e) => e.active), [employees]);
   const getEmployee = (id: string) => employees.find((e) => e.id === id);
 
-  // 将关联同步到薪资单
+    // 将关联同步到薪资单
   const syncLinkToPaySlip = React.useCallback((link: PettyCashLaborLink) => {
     if (!link.employeeId || !link.syncedToPaySlip) return;
     const existing = getPaySlip(link.employeeId, month);
     if (!existing) return;
     const currentLinkIds = existing.pettyLaborLinkIds ?? [];
-    if (currentLinkIds.includes(link.id)) return;
+    if (currentLinkIds.includes(link.id)) return; // 防止重复添加
     const newLinkIds = [...currentLinkIds, link.id];
     const newPaid = (existing.pettyLaborPaid ?? 0) + link.amount;
-    upsertPaySlip({ ...existing, pettyLaborPaid: newPaid, pettyLaborLinkIds: newLinkIds });
+    // 同步更新 finalSalary：备用金已付增加，实发应减少
+    const newFinal = Math.round((existing.finalSalary - link.amount) * 100) / 100;
+    upsertPaySlip({ ...existing, pettyLaborPaid: newPaid, pettyLaborLinkIds: newLinkIds, finalSalary: newFinal });
   }, [getPaySlip, upsertPaySlip, month]);
-
   // 从薪资单移除关联
   const removeLinkFromPaySlip = React.useCallback((link: PettyCashLaborLink) => {
     if (!link.employeeId) return;
@@ -893,7 +894,9 @@ function AdvancePage({ month, colors, headerComponent }: { month: string; colors
     if (!existing) return;
     const newLinkIds = (existing.pettyLaborLinkIds ?? []).filter((id) => id !== link.id);
     const newPaid = Math.max(0, (existing.pettyLaborPaid ?? 0) - link.amount);
-    upsertPaySlip({ ...existing, pettyLaborPaid: newPaid, pettyLaborLinkIds: newLinkIds });
+    // 同步更新 finalSalary：备用金已付减少，实发应增加
+    const newFinal = Math.round((existing.finalSalary + link.amount) * 100) / 100;
+    upsertPaySlip({ ...existing, pettyLaborPaid: newPaid, pettyLaborLinkIds: newLinkIds, finalSalary: newFinal });
   }, [getPaySlip, upsertPaySlip, month]);
 
   // 确认纳入一条草稿关联
@@ -2429,14 +2432,11 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
         }, 0);
         const cumulativeTaxPaid = prevMonthSlips.reduce((sum, s) => sum + (s.incomeTax ?? 0), 0);
         // buildPaySlipDraft 内部已通过 existing 保留手动字段
-        // 但 finalSalary 需要额外扣除 pettyLaborPaid（备用金已付不在 advanceAmount 里）
+        // 并已在 finalSalary 中正确扣除 pettyLaborPaid（不需重复扣）
+        // 重要：performanceTotal 从 existing 读取，防止覆盖手动录入的绩效奖金
         const existingSlip = getPaySlip(emp.id, currentMonth);
-        const slip = buildPaySlipDraft(emp, currentMonth, att, 0, advanceTotal, globalSettings, cumulativeIncome, cumulativeTaxPaid);
-        // pettyLaborPaid 需从 finalSalary 中额外扣除
-        const pettyPaid = existingSlip?.pettyLaborPaid ?? 0;
-        if (pettyPaid > 0) {
-          slip.finalSalary = Math.round((slip.finalSalary - pettyPaid) * 100) / 100;
-        }
+        const performanceTotal = existingSlip?.performanceBonus ?? 0;
+        const slip = buildPaySlipDraft(emp, currentMonth, att, performanceTotal, advanceTotal, globalSettings, cumulativeIncome, cumulativeTaxPaid);
         upsertPaySlip(slip);
       }
     }, 500);
@@ -2707,8 +2707,9 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
             }
           : baseAtt;
         upsertAttendance(att);
-        // 从新 KPI 系统计算绩效（暂时为 0，后续在薪资统计 Tab 中勾选后计入）
-        const performanceTotal = 0; // TODO: 从 emp.workKPIRules + emp.revenueKPIRules 计算
+        // 绩效奖金从 existing 读取（已在 labor-kpi-allowance 页手动录入）
+        // 不传 0，防止覆盖手动录入的绩效奖金
+        const performanceTotal = getPaySlip(emp.id, currentMonth)?.performanceBonus ?? 0;
         const advanceTotal = advances
           .filter((a) => a.employeeId === emp.id && (a.deductMonth === currentMonth || a.date.startsWith(currentMonth)))
           .reduce((s, a) => s + a.amount, 0);
@@ -3021,7 +3022,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                   <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>{emp.realName}</Text>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                     <Text style={{ fontSize: 11, color: colors.muted }}>调休 {compOffBalance} 天</Text>
-                    <TouchableOpacity onPress={() => { tap(); const usedOTEntries = compOffEntries.filter((e: any) => e.source === "overtime" && e.earnedMonth === currentMonthStr).length; const availableOTHours = (att?.paidOvertimeHours ?? 0) - usedOTEntries * 8; Alert.alert("调休操作", `${emp.realName} 当前调休余额 ${compOffBalance} 天\n本月可存入加班时长：${availableOTHours.toFixed(1)}h（需≥8h）\n\n存入：加班满8h存入1天调休\n兑换：将1天调休兑换为现金`, [{ text: "取消", style: "cancel" }, { text: "存入", onPress: () => { if (availableOTHours < 8) { Alert.alert("无法存入", `本月加班时长不足8小时（剩余${availableOTHours.toFixed(1)}h），无法存入调休`); return; } addCompOffEntry({ employeeId: emp.id, earnedMonth: currentMonthStr, source: "overtime", hoursDeducted: 8, days: 1, expiresMonth: "", status: "available" }); } }, { text: "兑换", style: "destructive", onPress: () => { const avail = compOffEntries.filter((e: any) => e.status === "available"); if (avail.length === 0) { Alert.alert("无可用余额"); return; } const dailyRate = att?.dailyRate ?? 200; cashOutCompOff(avail[0].id, dailyRate, currentMonthStr); const slip = getPaySlip(emp.id, currentMonthStr); if (slip) { upsertPaySlip({ ...slip, compOffCashOut: (slip.compOffCashOut ?? 0) + dailyRate, compOffCashOutNote: `兑换调休余额，日薪¥${dailyRate}`, grossSalary: slip.grossSalary + dailyRate, finalSalary: slip.finalSalary + dailyRate, totalEmployerCost: slip.totalEmployerCost + dailyRate, updatedAt: new Date().toISOString() }); } } }]); }}
+                    <TouchableOpacity onPress={() => { tap(); const usedOTEntries = compOffEntries.filter((e: any) => e.source === "overtime" && e.earnedMonth === currentMonthStr).length; const availableOTHours = (att?.paidOvertimeHours ?? 0) - usedOTEntries * 8; Alert.alert("调休操作", `${emp.realName} 当前调休余额 ${compOffBalance} 天\n本月可存入加班时长：${availableOTHours.toFixed(1)}h（需≥8h）\n\n存入：加班满8h存入1天调休\n兑换：将1天调休兑换为现金`, [{ text: "取消", style: "cancel" }, { text: "存入", onPress: () => { if (availableOTHours < 8) { Alert.alert("无法存入", `本月加班时长不足8小时（剩余${availableOTHours.toFixed(1)}h），无法存入调休`); return; } addCompOffEntry({ employeeId: emp.id, earnedMonth: currentMonthStr, source: "overtime", hoursDeducted: 8, days: 1, expiresMonth: calcCompOffExpiresMonth(currentMonthStr), status: "available" }); } }, { text: "兑换", style: "destructive", onPress: () => { const avail = compOffEntries.filter((e: any) => e.status === "available"); if (avail.length === 0) { Alert.alert("无可用余额"); return; } const dailyRate = att?.dailyRate ?? 200; cashOutCompOff(avail[0].id, dailyRate, currentMonthStr); const slip = getPaySlip(emp.id, currentMonthStr); if (slip) { upsertPaySlip({ ...slip, compOffCashOut: (slip.compOffCashOut ?? 0) + dailyRate, compOffCashOutNote: `兑换调休余额，日薪¥${dailyRate}`, grossSalary: slip.grossSalary + dailyRate, finalSalary: slip.finalSalary + dailyRate, totalEmployerCost: slip.totalEmployerCost + dailyRate, updatedAt: new Date().toISOString() }); } } }]); }}
                       style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: colors.primary + "15", borderWidth: 1, borderColor: colors.primary + "33" }}>
                       <Text style={{ fontSize: 10, color: colors.primary, fontWeight: "600" }}>存入/兑换</Text>
                     </TouchableOpacity>
@@ -3065,7 +3066,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                               }
                               if (newMode === "rest") {
                                 const existing = getCompOffEntries(emp.id).find((e: any) => e.source === "holiday" && e.workDate === s.date && e.earnedMonth === currentMonthStr);
-                                if (!existing) { addCompOffEntry({ employeeId: emp.id, earnedMonth: currentMonthStr, source: "holiday", workDate: s.date, holidayName: ss.name, holidayBonusAmount: bonusAmt, days: 1, expiresMonth: "", status: "available" }); }
+                                if (!existing) { addCompOffEntry({ employeeId: emp.id, earnedMonth: currentMonthStr, source: "holiday", workDate: s.date, holidayName: ss.name, holidayBonusAmount: bonusAmt, days: 1, expiresMonth: calcCompOffExpiresMonth(currentMonthStr), status: "available" }); }
                               } else {
                                 const existing = getCompOffEntries(emp.id).find((e: any) => e.source === "holiday" && e.workDate === s.date && e.earnedMonth === currentMonthStr);
                                 if (existing) { updateCompOffEntry(existing.id, { status: "expired" }); }
