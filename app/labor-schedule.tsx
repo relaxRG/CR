@@ -5,7 +5,6 @@
  * - 动态班次分行（从 ShiftTemplate 列表读取，不硬编码）
  * - 班次模板支持增删改任意数量班次
  * - 快速填充整行（长按姓名格）
- * - 旧数据自动迁移（"day"→"午班"，"evening"→"晚班"，"午"→"午班"，"晚"→"晚班"）
  * - 加班预警（超出合同工时标红）
  * - 调休标记
  */
@@ -22,14 +21,14 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
 import {
   useEmployeeStore, useShiftStore, useShiftTemplateStore,
-  useAttendanceStore, usePaySlipStore,
+  useAttendanceStore, usePaySlipStore, useFillPresetStore,
 } from "@/lib/labor/store";
 import {
   Employee, EmployeeDept, ShiftEntry, ShiftHoursValue,
-  ShiftTemplate,
+  ShiftTemplate, FillPreset,
   DEPT_LABELS, DEPT_COLORS,
   getMonthDates, getDayOfWeek, monthLabel, getContractHoursForDate,
-  DEFAULT_SHIFT_TEMPLATES, SHIFT_COLOR_PRESETS,
+  isDayInRange, DEFAULT_SHIFT_TEMPLATES, SHIFT_COLOR_PRESETS,
 } from "@/lib/labor/types";
 
 const DEPT_OPTIONS: EmployeeDept[] = ["front", "kitchen"];
@@ -275,6 +274,140 @@ function ShiftTemplateModal({ visible, templates, colors, onSave, onDelete, onCl
   );
 }
 
+// ─── 快速填充 Modal（长按姓名触发，与 labor.tsx 保持一致） ────────────────────
+function QuickFillModal({ visible, employee, shiftTemplates, todayStr, currentMonth, colors, presets, onSavePreset, onDeletePreset, onFill, onClose }: {
+  visible: boolean; employee: Employee | null; shiftTemplates: ShiftTemplate[];
+  todayStr: string; currentMonth: string; colors: any; presets: FillPreset[];
+  onSavePreset: (preset: Omit<FillPreset, "id" | "createdAt">) => void;
+  onDeletePreset: (id: string) => void;
+  onFill: (dates: string[], session: string, hoursPerDate: (d: string) => number) => void;
+  onClose: () => void;
+}) {
+  const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
+  const DOW_LABELS = ["日", "一", "二", "三", "四", "五", "六"];
+  const DOW_ORDER = [1, 2, 3, 4, 5, 6, 0];
+  const [selectedSession, setSelectedSession] = useState(shiftTemplates[0]?.session ?? "");
+  const [fromDay, setFromDay] = useState(1);
+  const [toDay, setToDay] = useState(5);
+  const [scope, setScope] = useState<"week" | "month">("month");
+  React.useEffect(() => { if (visible && shiftTemplates.length > 0) setSelectedSession(shiftTemplates[0].session); }, [visible, shiftTemplates]);
+  if (!employee) return null;
+  const presetLabel = (f: number, t: number, s: "week" | "month") => `周${DOW_LABELS[f]}~周${DOW_LABELS[t]}·${s === "week" ? "当周" : "当月"}`;
+  const currentWeekDates = (() => {
+    const todayDow = new Date(todayStr).getDay();
+    const mondayOffset = todayDow === 0 ? -6 : 1 - todayDow;
+    return Array.from({ length: 7 }, (_, i) => { const d = new Date(todayStr); d.setDate(d.getDate() + mondayOffset + i); return d.toISOString().slice(0, 10); });
+  })();
+  const currentMonthDates = (() => {
+    const [y, m] = currentMonth.split("-").map(Number);
+    const daysInMonth = new Date(y, m, 0).getDate();
+    return Array.from({ length: daysInMonth }, (_, i) => `${y}-${String(m).padStart(2, "0")}-${String(i + 1).padStart(2, "0")}`);
+  })();
+  const getTargetDates = (f: number, t: number, s: "week" | "month") => {
+    const pool = s === "week" ? currentWeekDates : currentMonthDates;
+    return pool.filter((d) => isDayInRange(new Date(d).getDay(), f, t));
+  };
+  const handleFill = (f: number, t: number, s: "week" | "month", sess: string) => {
+    const targetDates = getTargetDates(f, t, s);
+    if (targetDates.length === 0) { Alert.alert("提示", "没有匹配的日期，请调整星期范围"); return; }
+    const fillH = (d: string) => { const h = getContractHoursForDate(employee, d); return h > 0 ? h : 8; };
+    onFill(targetDates, sess, fillH);
+    onClose();
+  };
+  const tpl = shiftTemplates.find((t) => t.session === selectedSession);
+  const chipColor = tpl?.color ?? colors.primary;
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
+      <View style={[SCHEM.sheet, { backgroundColor: colors.background }]}>
+        <View style={[SCHEM.header, { borderBottomColor: colors.border }]}>
+          <Pressable onPress={onClose}><Text style={{ fontSize: 17, color: colors.error }}>取消</Text></Pressable>
+          <Text style={[SCHEM.title, { color: colors.foreground }]}>快速填充 {employee.code}</Text>
+          <View style={{ width: 44 }} />
+        </View>
+        <ScrollView contentContainerStyle={{ padding: 16, gap: 14 }}>
+          {presets.length > 0 && (
+            <View style={[SCHEM.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Text style={[SCHEM.label, { color: colors.foreground, marginBottom: 8 }]}>常用</Text>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                {presets.map((p) => (
+                  <View key={p.id} style={{ flexDirection: "row", alignItems: "center" }}>
+                    <TouchableOpacity onPress={() => { tap(); handleFill(p.fromDay, p.toDay, p.scope, p.session); }}
+                      style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderTopRightRadius: 0, borderBottomRightRadius: 0, borderWidth: 1.5, borderColor: colors.primary, backgroundColor: colors.primary + "12" }}>
+                      <Text style={{ fontSize: 12, fontWeight: "600", color: colors.primary }}>{p.label}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => { tap(); onDeletePreset(p.id); }}
+                      style={{ paddingHorizontal: 8, paddingVertical: 6, borderRadius: 16, borderTopLeftRadius: 0, borderBottomLeftRadius: 0, borderWidth: 1.5, borderLeftWidth: 0, borderColor: colors.primary, backgroundColor: colors.primary + "08" }}>
+                      <Text style={{ fontSize: 12, color: colors.error }}>×</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+          <View style={[SCHEM.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[SCHEM.label, { color: colors.foreground, marginBottom: 8 }]}>班次</Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+              {shiftTemplates.map((t) => { const sel = selectedSession === t.session; return (
+                <TouchableOpacity key={t.id} onPress={() => { tap(); setSelectedSession(t.session); }}
+                  style={[SCHEM.chip, { backgroundColor: sel ? t.color : colors.surface, borderColor: t.color }]}>
+                  <Text style={{ fontSize: 13, fontWeight: "600", color: sel ? "#fff" : t.color }}>{t.session}</Text>
+                </TouchableOpacity>
+              ); })}
+            </View>
+          </View>
+          <View style={[SCHEM.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+              <Text style={[SCHEM.label, { color: colors.foreground }]}>星期范围</Text>
+              <Text style={{ fontSize: 11, color: chipColor, fontWeight: "600" }}>周{DOW_LABELS[fromDay]} ~ 周{DOW_LABELS[toDay]}</Text>
+            </View>
+            <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 6 }}>起始</Text>
+            <View style={{ flexDirection: "row", gap: 5, marginBottom: 10 }}>
+              {DOW_ORDER.map((dow) => (
+                <TouchableOpacity key={"from_" + dow} onPress={() => { tap(); setFromDay(dow); }}
+                  style={{ flex: 1, height: 32, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: fromDay === dow ? chipColor : colors.border + "33", borderWidth: 1, borderColor: fromDay === dow ? chipColor : colors.border }}>
+                  <Text style={{ fontSize: 10, fontWeight: "600", color: fromDay === dow ? "#fff" : colors.muted }}>周{DOW_LABELS[dow]}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 6 }}>结束</Text>
+            <View style={{ flexDirection: "row", gap: 5, marginBottom: 8 }}>
+              {DOW_ORDER.map((dow) => (
+                <TouchableOpacity key={"to_" + dow} onPress={() => { tap(); setToDay(dow); }}
+                  style={{ flex: 1, height: 32, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: toDay === dow ? chipColor : colors.border + "33", borderWidth: 1, borderColor: toDay === dow ? chipColor : colors.border }}>
+                  <Text style={{ fontSize: 10, fontWeight: "600", color: toDay === dow ? "#fff" : colors.muted }}>周{DOW_LABELS[dow]}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={{ fontSize: 10, color: colors.muted }}>当月匹配 {getTargetDates(fromDay, toDay, "month").length} 天 · 当周匹配 {getTargetDates(fromDay, toDay, "week").length} 天</Text>
+          </View>
+          <View style={[SCHEM.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[SCHEM.label, { color: colors.foreground, marginBottom: 10 }]}>填充范围</Text>
+            <View style={{ flexDirection: "row", gap: 10, marginBottom: 14 }}>
+              {(["week", "month"] as const).map((s) => (
+                <TouchableOpacity key={s} onPress={() => { tap(); setScope(s); }}
+                  style={{ flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: "center", backgroundColor: scope === s ? chipColor : colors.border + "22", borderWidth: 1.5, borderColor: scope === s ? chipColor : colors.border }}>
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: scope === s ? "#fff" : colors.muted }}>{s === "week" ? "当前周" : "当前月"}</Text>
+                  <Text style={{ fontSize: 10, color: scope === s ? "rgba(255,255,255,0.8)" : colors.muted, marginTop: 2 }}>{getTargetDates(fromDay, toDay, s).length} 天</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <TouchableOpacity onPress={() => { tap(); onSavePreset({ label: presetLabel(fromDay, toDay, scope), session: selectedSession, fromDay, toDay, scope }); }}
+                style={{ flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: "center", borderWidth: 1.5, borderColor: colors.primary, backgroundColor: colors.primary + "10" }}>
+                <Text style={{ fontSize: 13, fontWeight: "600", color: colors.primary }}>★ 保存常用</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => { tap(); handleFill(fromDay, toDay, scope, selectedSession); }}
+                style={{ flex: 1.4, paddingVertical: 12, borderRadius: 12, alignItems: "center", backgroundColor: chipColor }}>
+                <Text style={{ fontSize: 13, fontWeight: "700", color: "#fff" }}>立即填充</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </ScrollView>
+      </View>
+    </Modal>
+  );
+}
+
 // ─── 主页面 ───────────────────────────────────────────────────────────────────
 export default function LaborScheduleScreen() {
   const colors = useColors();
@@ -287,6 +420,7 @@ export default function LaborScheduleScreen() {
   const { templates, upsertTemplate, deleteTemplate } = useShiftTemplateStore();
   const { getPaySlip } = usePaySlipStore();
   const { getAttendance } = useAttendanceStore();
+  const { presets: fillPresets, savePreset: saveFillPreset, deletePreset: deleteFillPreset } = useFillPresetStore();
 
   const now = new Date();
   const todayStr = now.toISOString().slice(0, 10);
@@ -299,6 +433,10 @@ export default function LaborScheduleScreen() {
   const [editDate, setEditDate] = useState("");
   const [editEmployee, setEditEmployee] = useState<Employee | null>(null);
   const [editSession, setEditSession] = useState<string>("晚班");
+
+  // 快速填充 Modal
+  const [showQuickFill, setShowQuickFill] = useState(false);
+  const [quickFillEmployee, setQuickFillEmployee] = useState<Employee | null>(null);
 
   // 按 sortOrder 排序的班次模板列表（动态，不硬编码）
   const sortedTemplates = useMemo(() =>
@@ -316,7 +454,7 @@ export default function LaborScheduleScreen() {
 
   // 当前部门的在职员工
   const allDeptEmployees = useMemo(() =>
-    employees.filter((e) => e.active && (e.dept === dept || (dept === "front" && e.dept === "parttime"))),
+    employees.filter((e) => e.active && !e.archived && (e.dept === dept || (dept === "front" && e.dept === "parttime"))),
     [employees, dept]
   );
 
@@ -360,28 +498,9 @@ export default function LaborScheduleScreen() {
 
   const handleFillRow = (employee: Employee, session: string) => {
     tap();
-    const tpl = sortedTemplates.find((t) => t.session === session) ?? sortedTemplates[0];
-    const defaultHours = tpl?.defaultHours ?? 8;
-    Alert.alert(
-      `快速填充 ${employee.code} ${session}`,
-      `将本月所有工作日（周一~周五）填入 ${defaultHours}h，已有数据不覆盖。`,
-      [
-        { text: "取消", style: "cancel" },
-        { text: "填充工作日", onPress: () => {
-          const entries = dates.filter((d) => { const dow = getDayOfWeek(d); return dow !== 0 && dow !== 6; })
-            .filter((d) => !getEntry(employee.id, d, session))
-            .map((d): ShiftEntry => ({ employeeId: employee.id, date: d, shift: session, hoursValue: defaultHours }));
-          if (entries.length > 0) batchUpsertShifts(entries);
-        }},
-        { text: "填充全月", onPress: () => {
-          const entries = dates.filter((d) => !getEntry(employee.id, d, session))
-            .map((d): ShiftEntry => ({ employeeId: employee.id, date: d, shift: session, hoursValue: defaultHours }));
-          if (entries.length > 0) batchUpsertShifts(entries);
-        }},
-      ]
-    );
+    setQuickFillEmployee(employee);
+    setShowQuickFill(true);
   };
-
   const prevMonth = () => { const [y, m] = currentMonth.split("-").map(Number); const d = new Date(y, m - 2, 1); setCurrentMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); };
   const nextMonth = () => { const [y, m] = currentMonth.split("-").map(Number); const d = new Date(y, m, 1); setCurrentMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); };
 
@@ -677,6 +796,27 @@ export default function LaborScheduleScreen() {
         onSave={upsertTemplate} onDelete={deleteTemplate}
         onClose={() => setShowTplModal(false)}
       />
+
+      {/* 快速填充 Modal（长按姓名触发） */}
+      <QuickFillModal
+        visible={showQuickFill}
+        employee={quickFillEmployee}
+        shiftTemplates={sortedTemplates}
+        todayStr={todayStr}
+        currentMonth={currentMonth}
+        colors={colors}
+        presets={fillPresets.filter((p) => !p.mode || p.mode === "shift")}
+        onSavePreset={(p) => saveFillPreset({ ...p, mode: "shift" })}
+        onDeletePreset={deleteFillPreset}
+        onFill={(targetDates, session, hoursPerDate) => {
+          if (!quickFillEmployee) return;
+          const entries = targetDates
+            .filter((d) => !getEntry(quickFillEmployee.id, d, session))
+            .map((d): ShiftEntry => ({ employeeId: quickFillEmployee.id, date: d, shift: session, hoursValue: hoursPerDate(d) }));
+          if (entries.length > 0) batchUpsertShifts(entries);
+        }}
+        onClose={() => setShowQuickFill(false)}
+      />
     </ScreenContainer>
   );
 }
@@ -724,4 +864,14 @@ const PSC = StyleSheet.create({
   di: { flex: 1, alignItems: "center" },
   dl: { fontSize: 10, color: "#8E8E93" },
   dv: { fontSize: 13, fontWeight: "700" },
+});
+
+// QuickFillModal 共享样式
+const SCHEM = StyleSheet.create({
+  sheet: { flex: 1 },
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth },
+  title: { fontSize: 17, fontWeight: "700" },
+  card: { borderRadius: 12, padding: 14, borderWidth: StyleSheet.hairlineWidth },
+  label: { fontSize: 13, fontWeight: "600" },
+  chip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5, flexDirection: "row", alignItems: "center", gap: 4 },
 });
