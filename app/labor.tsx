@@ -36,7 +36,7 @@ import {
   DEFAULT_SHIFT_TEMPLATES, DEFAULT_SPECIAL_STATUSES, SHIFT_COLOR_PRESETS, calcAllowance,
   calcCompOffExpiresMonth, BusinessHoursEntry, ShiftGroup, WEEKDAY_SHORT,
   DEFAULT_BUSINESS_HOURS, DEFAULT_SHIFT_GROUPS, FillPreset, isDayInRange,
-  WEEKDAY_LABELS,
+  WEEKDAY_LABELS, PaySlip, MonthlyAttendance,
 } from "@/lib/labor/types";
 
 const { width: SCREEN_W } = Dimensions.get("window");
@@ -294,15 +294,17 @@ function OverviewCard({ month, colors }: { month: string; colors: any }) {
 }
 
 // ─── 个人发薪卡片（嵌入员工档案页） ──────────────────────────────────────────
-function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors }: {
+function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, slip, att, compareSlip }: {
   employee: Employee;
   month: string;
   compareMonth: string | null;
   compareMode: CompareMode;
   colors: any;
+  slip: PaySlip | null;
+  att: MonthlyAttendance | null;
+  compareSlip: PaySlip | null;
 }) {
-  const { getPaySlip, upsertPaySlip } = usePaySlipStore();
-  const { getAttendance } = useAttendanceStore();
+  const { upsertPaySlip } = usePaySlipStore();
   const { templates: shiftTpls } = useShiftTemplateStore();
   const { getAvailableDays: getCompOffDays, addEntry: addCompOffEntry, getEntries: getCompOffEntries, cashOutEntry: cashOutCompOff } = useCompOffBalanceEntryStore();
   const { getAvailableDays: getHolidayCompOffDays } = useHolidayCompOffStore();
@@ -321,9 +323,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors }:
   const [deductMode, setDeductMode] = useState<"direct" | "cashout">("direct");
   const [deductDaysInput, setDeductDaysInput] = useState("1");
 
-  const slip = getPaySlip(employee.id, month);
-  const att = getAttendance(employee.id, month);
-  const compareSlip = compareMonth ? getPaySlip(employee.id, compareMonth) : null;
+  // slip/att/compareSlip 由父组件从响应式数组派生后传入，保证即时更新
   const deptColor = DEPT_COLORS[employee.dept];
   const isParttime = employee.type === "parttime";
 
@@ -402,7 +402,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors }:
       : Math.round(entry.days * dailyRate * 100) / 100;
     cashOutCompOff(entry.id, amount / entry.days, month);
     // 同步更新薪资单
-    const currentSlip = getPaySlip(employee.id, month);
+    const currentSlip = slip;
     if (currentSlip) {
       upsertPaySlip({
         ...currentSlip,
@@ -505,7 +505,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors }:
           {/* 特殊状态扣薪明细 */}
           {att && Object.keys(att.specialStatusDeductions ?? {}).length > 0 && (
             <View style={{ gap: 2 }}>
-              {Object.values(att.specialStatusDeductions).map((d) => (
+              {(Object.values(att.specialStatusDeductions) as { name: string; count: number; deduction: number; multiplier: number }[]).map((d) => (
                 <View key={d.name} style={{ flexDirection: "row", justifyContent: "space-between" }}>
                   <Text style={{ fontSize: 11, color: colors.muted }}>{d.name}（{d.count}天）</Text>
                   <Text style={{ fontSize: 11, color: d.deduction > 0 ? colors.error : d.deduction < 0 ? colors.success : colors.muted }}>
@@ -926,7 +926,12 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
             {/* 员工卡片 */}
             {!group.collapsed && empList.map((emp) => (
               <View key={emp.id} style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
-                <PaySlipMiniCard employee={emp} month={month} compareMonth={compareMonth} compareMode={compareMode} colors={colors} />
+                <PaySlipMiniCard
+                  employee={emp} month={month} compareMonth={compareMonth} compareMode={compareMode} colors={colors}
+                  slip={paySlips.find((s) => s.employeeId === emp.id && s.month === month) ?? null}
+                  att={attendances.find((a) => a.employeeId === emp.id && a.month === month) ?? null}
+                  compareSlip={compareMonth ? (paySlips.find((s) => s.employeeId === emp.id && s.month === compareMonth) ?? null) : null}
+                />
               </View>
             ))}
           </View>
@@ -953,7 +958,12 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
               </View>
               {deptEmps.map((emp) => (
                 <View key={emp.id} style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
-                  <PaySlipMiniCard employee={emp} month={month} compareMonth={compareMonth} compareMode={compareMode} colors={colors} />
+                  <PaySlipMiniCard
+                    employee={emp} month={month} compareMonth={compareMonth} compareMode={compareMode} colors={colors}
+                    slip={paySlips.find((s) => s.employeeId === emp.id && s.month === month) ?? null}
+                    att={attendances.find((a) => a.employeeId === emp.id && a.month === month) ?? null}
+                    compareSlip={compareMonth ? (paySlips.find((s) => s.employeeId === emp.id && s.month === compareMonth) ?? null) : null}
+                  />
                 </View>
               ))}
             </View>
@@ -3051,8 +3061,8 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   const { shifts, upsertShift, batchUpsertShifts, deleteShift, batchDeleteShifts, getShifts } = useShiftStore();
   const { templates, upsertTemplate, deleteTemplate } = useShiftTemplateStore();
   const { statuses: specialStatuses, upsertStatus, deleteStatus } = useSpecialStatusStore();
-  const { paySlips, getPaySlip, upsertPaySlip, buildPaySlipDraft } = usePaySlipStore();
-  const { getAttendance, upsertAttendance, calcFromShifts } = useAttendanceStore();
+  const { paySlips, upsertPaySlip, buildPaySlipDraft } = usePaySlipStore();
+  const { records: attendanceRecords, getAttendance, upsertAttendance, calcFromShifts } = useAttendanceStore();
   // 旧绩效 Store 已移除，performanceTotal 从新 KPI 系统计算
   const { getHolidayForDate } = useHolidayConfigStore();
   const { advances } = useSalaryAdvanceStore();
@@ -3178,7 +3188,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
         // buildPaySlipDraft 内部已通过 existing 保留手动字段
         // 并已在 finalSalary 中正确扣除 pettyLaborPaid（不需重复扣）
         // 重要：performanceTotal 从 existing 读取，防止覆盖手动录入的绩效奖金
-        const existingSlip = getPaySlip(emp.id, currentMonth);
+        const existingSlip = paySlips.find((s) => s.employeeId === emp.id && s.month === currentMonth) ?? null;
         const performanceTotal = existingSlip?.performanceBonus ?? 0;
         const slip = buildPaySlipDraft(emp, currentMonth, att, performanceTotal, advanceTotal, globalSettings, cumulativeIncome, cumulativeTaxPaid);
         upsertPaySlip(slip);
@@ -3344,7 +3354,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
         })
         .filter((x): x is { date: string; multiplier: number } => x !== null);
       const att = calcFromShifts(emp.id, currentMonth, emp, empShifts, specialStatuses, holidayDaysList);
-      const existingSlip = getPaySlip(emp.id, currentMonth);
+      const existingSlip = paySlips.find((s) => s.employeeId === emp.id && s.month === currentMonth) ?? null;
       empShifts.forEach((s) => {
         if (!s.specialStatusId) return;
         const ss = specialStatuses.find((st) => st.id === s.specialStatusId);
@@ -3364,7 +3374,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
       });
     }
     return items;
-  }, [employees, getShifts, currentMonth, getHolidayForDate, calcFromShifts, specialStatuses, getPaySlip]);
+  }, [employees, getShifts, currentMonth, getHolidayForDate, calcFromShifts, specialStatuses, paySlips]);
 
   const runPayrollGeneration = useCallback(async (holidayDecisions: HolidayDecisionItem[]) => {
     setGenerating(true);
@@ -3397,7 +3407,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
           if (!ss?.isHoliday || ss.salaryMultiplier <= 1) return;
           const key = `${emp.id}_${s.date}_${ss.id}`;
           const dayBonus = Math.round(baseAtt.dailyRate * (ss.salaryMultiplier - 1) * 100) / 100;
-          const mode = holidayDecisionMap.get(key) ?? (getPaySlip(emp.id, currentMonth)?.holidayBonusAllocation?.[key]?.mode === "rest" ? "rest" : "cash");
+          const mode = holidayDecisionMap.get(key) ?? (paySlips.find((s) => s.employeeId === emp.id && s.month === currentMonth)?.holidayBonusAllocation?.[key]?.mode === "rest" ? "rest" : "cash");
           holidayBonusAllocation[key] = {
             date: s.date,
             name: ss.name,
@@ -3448,7 +3458,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
         upsertAttendance(att);
         // 绩效奖金从 existing 读取（已在 labor-kpi-allowance 页手动录入）
         // 不传 0，防止覆盖手动录入的绩效奖金
-        const performanceTotal = getPaySlip(emp.id, currentMonth)?.performanceBonus ?? 0;
+        const performanceTotal = paySlips.find((s) => s.employeeId === emp.id && s.month === currentMonth)?.performanceBonus ?? 0;
         const advanceTotal = advances
           .filter((a) => a.employeeId === emp.id && (a.deductMonth === currentMonth || a.date.startsWith(currentMonth)))
           .reduce((s, a) => s + a.amount, 0);
@@ -3575,7 +3585,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
     } finally {
       setGenerating(false);
     }
-  }, [employees, getShifts, currentMonth, getHolidayForDate, calcFromShifts, specialStatuses, getPaySlip, getCompOffEntries, addCompOffEntry, updateCompOffEntry, upsertAttendance, advances, paySlips, expireCompOff, expireHolidayCompOff, getHolidayCompOffEntries, updateHolidayCompOff, upsertAlert, buildPaySlipDraft, globalSettings, upsertPaySlip]);
+  }, [employees, getShifts, currentMonth, getHolidayForDate, calcFromShifts, specialStatuses, getCompOffEntries, addCompOffEntry, updateCompOffEntry, upsertAttendance, advances, paySlips, expireCompOff, expireHolidayCompOff, getHolidayCompOffEntries, updateHolidayCompOff, upsertAlert, buildPaySlipDraft, globalSettings, upsertPaySlip]);
 
   const editTpl = sortedTemplates.find((t) => t.session === editSession) ?? sortedTemplates[0] ?? DEFAULT_SHIFT_TEMPLATES[0];
   const editContractH = editEmployee && editDate ? getContractHoursForDate(editEmployee, editDate) : 0;
@@ -3900,7 +3910,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
           <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground, marginBottom: 4 }}>考勤概况（{monthLabel(currentMonth)}）</Text>
           <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 8 }}>← 左滑返回排班表</Text>
           {allDeptEmployees.map((emp) => {
-            const att = getAttendance(emp.id, currentMonth);
+            const att = attendanceRecords.find((r) => r.employeeId === emp.id && r.month === currentMonth) ?? null;
             const compOffEntries = getCompOffEntries(emp.id);
             const compOffBalance = compOffEntries.filter((e: any) => e.status === "available").length;
             const currentMonthStr = currentMonth;
@@ -3946,7 +3956,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                         return ss?.isHoliday && ss.salaryMultiplier > 1;
                       });
                       if (holidayShifts.length === 0) return null;
-                      const slip = getPaySlip(emp.id, currentMonthStr);
+                      const slip = paySlips.find((s) => s.employeeId === emp.id && s.month === currentMonthStr) ?? null;
                       return (
                         <View style={{ marginTop: 6, paddingTop: 6, borderTopWidth: 1, borderTopColor: colors.border }}>
                           <Text style={{ fontSize: 11, fontWeight: "600", color: colors.foreground, marginBottom: 4 }}>节假日上班处理：</Text>
