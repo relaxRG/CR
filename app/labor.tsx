@@ -180,7 +180,7 @@ function OverviewCard({ month, colors }: { month: string; colors: any }) {
 
   const compareMonth = getCompareMonth(month, compareMode, customMonth);
 
-  const activeEmployees = useMemo(() => employees.filter((e) => e.active), [employees]);
+  const activeEmployees = useMemo(() => employees.filter((e) => e.active && !e.archived), [employees]);
   const monthSlips = useMemo(() => paySlips.filter((s) => s.month === month), [paySlips, month]);
   const totalSalary = useMemo(() => monthSlips.reduce((s, p) => s + p.finalSalary, 0), [monthSlips]);
   // finalSalary 已含预支扣除，待发合计直接累加 finalSalary
@@ -652,7 +652,7 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
     try {
       const monthSlips = paySlips.filter((s) => s.month === month);
       const monthAtts = attendances.filter((a) => a.month === month);
-      const activeEmps = employees.filter((e) => e.active);
+      const activeEmps = employees.filter((e) => e.active && !e.archived);
 
       const header = ["姓名", "代号", "部门", "类型", "出勤天", "总工时", "加班时", "考勤工资", "绩效", "补贴", "奖惩", "社保(个人)", "公积金(个人)", "个税", "预支", "应发", "实发", "公司社保", "公司公积金", "公司总成本"];
       const rows = activeEmps.map((emp) => {
@@ -713,7 +713,7 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
   const [customMonth, setCustomMonth] = useState<string | undefined>();
   const compareMonth = getCompareMonth(month, compareMode, customMonth);
 
-  const activeEmployees = useMemo(() => employees.filter((e) => e.active), [employees]);
+  const activeEmployees = useMemo(() => employees.filter((e) => e.active && !e.archived), [employees]);
 
   const sortedGroups = useMemo(() =>
     [...groups].sort((a, b) => a.sortOrder - b.sortOrder),
@@ -865,7 +865,7 @@ function AdvancePage({ month, colors, headerComponent }: { month: string; colors
     [unlinkedLaborRecords, aliases, employees]
   );
 
-  const activeEmployees = React.useMemo(() => employees.filter((e) => e.active), [employees]);
+  const activeEmployees = React.useMemo(() => employees.filter((e) => e.active && !e.archived), [employees]);
   const getEmployee = (id: string) => employees.find((e) => e.id === id);
 
     // 将关联同步到薪资单
@@ -2692,7 +2692,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
     // 防抖：500ms 内多次修改只触发一次
     if (autoSyncTimerRef.current) clearTimeout(autoSyncTimerRef.current);
     autoSyncTimerRef.current = setTimeout(() => {
-      const activeEmps = employees.filter((e) => e.active);
+      const activeEmps = employees.filter((e) => e.active && !e.archived);
       for (const emp of activeEmps) {
         const empShifts = getShifts(currentMonth).filter((s) => s.employeeId === emp.id);
         if (empShifts.length === 0) continue;
@@ -2772,7 +2772,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
       ...getShifts(nextMonth),
     ];
   }, [shifts, currentMonth]);
-  const allDeptEmployees = useMemo(() => employees.filter((e) => e.active && resolveEmployeeDept(e).category === deptCategory), [employees, deptCategory, resolveEmployeeDept]);
+  const allDeptEmployees = useMemo(() => employees.filter((e) => e.active && !e.archived && resolveEmployeeDept(e).category === deptCategory), [employees, deptCategory, resolveEmployeeDept]);
 
   // 分组引擎：以「班次」为主体
   // - 每个班次行：显示本月在该班次有排班记录的所有员工（员工可同时出现在多个班次行）
@@ -2908,7 +2908,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   const nextMonth = () => { const [y, m] = currentMonth.split("-").map(Number); const d = new Date(y, m, 1); onMonthChange(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); };
 
   const collectHolidayDecisionItems = useCallback((): HolidayDecisionItem[] => {
-    const activeEmps = employees.filter((e) => e.active);
+    const activeEmps = employees.filter((e) => e.active && !e.archived);
     const items: HolidayDecisionItem[] = [];
     for (const emp of activeEmps) {
       const empShifts = getShifts(currentMonth).filter((s) => s.employeeId === emp.id);
@@ -2945,7 +2945,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   const runPayrollGeneration = useCallback(async (holidayDecisions: HolidayDecisionItem[]) => {
     setGenerating(true);
     try {
-      const activeEmps = employees.filter((e) => e.active);
+      const activeEmps = employees.filter((e) => e.active && !e.archived);
       const holidayDecisionMap = new Map(holidayDecisions.map((item) => [item.key, item.mode]));
       let count = 0;
       for (const emp of activeEmps) {

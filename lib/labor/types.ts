@@ -846,6 +846,10 @@ export interface Employee {
   healthCertExpiry?: string;
   joinDate?: string;
   leaveDate?: string;
+  /** 是否已归档（离职归档）：归档后从主列表和排班表消失 */
+  archived?: boolean;
+  /** 归档时间 */
+  archivedAt?: string;
   createdAt: string;
 }
 
@@ -1071,6 +1075,10 @@ export interface PaySlip {
   id: string;
   employeeId: string;
   month: string;
+  /** 员工姓名快照（员工删除后仍可显示） */
+  employeeName?: string;
+  /** 员工代号快照（员工删除后仍可显示） */
+  employeeCode?: string;
   attendanceDays: number;
   attendanceSalary: number;
   performanceBonus: number;

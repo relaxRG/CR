@@ -78,14 +78,20 @@ interface EmployeeStore {
   employees: Employee[];
   addEmployee: (draft: Omit<Employee, "id" | "createdAt">) => string;
   updateEmployee: (id: string, patch: Partial<Employee>) => void;
+  /** 删除员工档案（不删除历史排班/薪资数据） */
   deleteEmployee: (id: string) => void;
+  /** 归档员工（离职归档）：从主列表和排班表消失，历史数据保留 */
+  archiveEmployee: (id: string) => void;
+  /** 恢复归档员工为在职 */
+  restoreEmployee: (id: string) => void;
   /** 重新排序同部门员工（拖拽排序后调用） */
   reorderEmployees: (orderedIds: string[]) => void;
   ready: boolean;
 }
 
 const EmployeeContext = createContext<EmployeeStore>({
-  employees: [], addEmployee: () => "", updateEmployee: () => {}, deleteEmployee: () => {}, reorderEmployees: () => {}, ready: false,
+  employees: [], addEmployee: () => "", updateEmployee: () => {}, deleteEmployee: () => {},
+  archiveEmployee: () => {}, restoreEmployee: () => {}, reorderEmployees: () => {}, ready: false,
 });
 
 function EmployeeProvider({ children }: { children: React.ReactNode }) {
@@ -125,6 +131,22 @@ function EmployeeProvider({ children }: { children: React.ReactNode }) {
     persist(ref.current.filter((e) => e.id !== id));
   }, [persist, ref]);
 
+  // 归档员工：标记 archived=true，保留所有历史数据
+  const archiveEmployee = useCallback((id: string) => {
+    persist(ref.current.map((e) => e.id === id
+      ? { ...e, archived: true, archivedAt: new Date().toISOString() }
+      : e
+    ));
+  }, [persist, ref]);
+
+  // 恢复归档员工为在职
+  const restoreEmployee = useCallback((id: string) => {
+    persist(ref.current.map((e) => e.id === id
+      ? { ...e, archived: false, archivedAt: undefined }
+      : e
+    ));
+  }, [persist, ref]);
+
   // 拖拽排序：根据传入的 id 顺序更新同部门员工的 sortOrder
   const reorderEmployees = useCallback((orderedIds: string[]) => {
     const next = [...ref.current];
@@ -136,7 +158,7 @@ function EmployeeProvider({ children }: { children: React.ReactNode }) {
   }, [persist, ref]);
 
   return (
-    <EmployeeContext.Provider value={{ employees, addEmployee, updateEmployee, deleteEmployee, reorderEmployees, ready }}>
+    <EmployeeContext.Provider value={{ employees, addEmployee, updateEmployee, deleteEmployee, archiveEmployee, restoreEmployee, reorderEmployees, ready }}>
       {children}
     </EmployeeContext.Provider>
   );
@@ -958,6 +980,9 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
       id: existing?.id ?? uuid(),
       employeeId: employee.id,
       month,
+      // 员工姓名/代号快照：员工删除后历史薪资单仍可显示姓名
+      employeeName: employee.realName,
+      employeeCode: employee.code,
       attendanceDays,
       attendanceSalary,
       performanceBonus: performanceTotal,
