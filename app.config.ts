@@ -88,10 +88,10 @@ const config: ExpoConfig = {
     output: "static",
     favicon: "./assets/images/favicon.png",
   },
-  owner: "rgsd",
+  owner: "rgbab",
   extra: {
     eas: {
-      projectId: "3ab89cc0-c646-4fb8-bceb-ba24204a8811",
+      projectId: "23a4c8d7-b73e-4a58-8be5-f7eeedbfdbc6",
     },
     cfWorkerUrl: "https://cocktail-ai.kikikong2017.workers.dev",
   },
@@ -146,7 +146,7 @@ const config: ExpoConfig = {
     ],
   ],
   updates: {
-    url: "https://u.expo.dev/3ab89cc0-c646-4fb8-bceb-ba24204a8811",
+    url: "https://u.expo.dev/23a4c8d7-b73e-4a58-8be5-f7eeedbfdbc6",
   },
   runtimeVersion: {
     policy: "appVersion",
