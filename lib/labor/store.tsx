@@ -100,16 +100,34 @@ function EmployeeProvider({ children }: { children: React.ReactNode }) {
   // 持久化迁移：清除废弃的 defaultSession 字段
   React.useEffect(() => {
     if (!ready) return;
-    const needsMigration = ref.current.some((e) => "defaultSession" in e);
+    const needsMigration = ref.current.some((e) =>
+      "defaultSession" in e ||
+      "address" in e ||
+      "idCardImageUri" in e ||
+      "healthCertImageUri" in e
+    );
     if (needsMigration) {
-      console.log("[EmployeeProvider] 持久化迁移：清除员工 defaultSession 字段");
+      console.log("[EmployeeProvider] 持久化迁移：清除废弃字段、迁移旧字段");
       persist(ref.current.map((e) => {
-        if ("defaultSession" in e) {
-          const next = { ...e };
-          delete (next as any).defaultSession;
-          return next;
+        const next: any = { ...e };
+        // 删除 defaultSession
+        delete next.defaultSession;
+        // address 迁移为 actualAddress
+        if ("address" in next && !next.actualAddress) {
+          next.actualAddress = next.address;
         }
-        return e;
+        delete next.address;
+        // idCardImageUri 迁移为 idCardFrontUrl
+        if ("idCardImageUri" in next && !next.idCardFrontUrl) {
+          next.idCardFrontUrl = next.idCardImageUri;
+        }
+        delete next.idCardImageUri;
+        // healthCertImageUri 迁移为 healthCertUrl
+        if ("healthCertImageUri" in next && !next.healthCertUrl) {
+          next.healthCertUrl = next.healthCertImageUri;
+        }
+        delete next.healthCertImageUri;
+        return next;
       }));
     }
   }, [ready]);

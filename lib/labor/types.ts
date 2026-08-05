@@ -402,7 +402,7 @@ export const DEFAULT_SOCIAL_INSURANCE: SocialInsuranceConfig = {
   unemployment: { name: "失业保险", enabled: true,  employeeRate: 0.005, employerRate: 0.005, baseMin: 0, baseMax: 0 },
   workInjury:   { name: "工伤保险", enabled: true,  employeeRate: 0,     employerRate: 0.004, baseMin: 0, baseMax: 0 },
   maternity:    { name: "生育保险", enabled: false, employeeRate: 0,     employerRate: 0.008, baseMin: 0, baseMax: 0 },
-  housingFund:  { name: "住房公积金", enabled: true, employeeRate: 0.12, employerRate: 0.12,  base: 0, baseMin: 0, baseMax: 0 },
+  housingFund:  { name: "住房公积金", enabled: false, employeeRate: 0.12, employerRate: 0.12,  base: 0, baseMin: 0, baseMax: 0 },
   lastUpdated: undefined,
   dataSource: "builtin",
 };
@@ -433,91 +433,91 @@ export interface CityInsurancePolicy {
 export const BUILTIN_CITY_POLICIES: CityInsurancePolicy[] = [
   {
     city: "上海",
-    baseMin: 7310, baseMax: 36549,
+    baseMin: 7310, baseMax: 35811,
     pension:      { employeeRate: 0.08,  employerRate: 0.16  },
     medical:      { employeeRate: 0.02,  employerRate: 0.095 },
     unemployment: { employeeRate: 0.005, employerRate: 0.005 },
     workInjury:   { employeeRate: 0,     employerRate: 0.004 },
     maternity:    { employeeRate: 0,     employerRate: 0.008 },
-    housingFund:  { employeeRate: 0.07,  employerRate: 0.07, baseMin: 2690, baseMax: 36549 },
-    year: 2024, source: "上海市人社局2024年标准",
+    housingFund:  { employeeRate: 0.07,  employerRate: 0.07, baseMin: 2540, baseMax: 35811 },
+    year: 2025, source: "上海市人社局2025年标准",
   },
   {
     city: "北京",
-    baseMin: 6821, baseMax: 34188,
+    baseMin: 7162, baseMax: 35811,
     pension:      { employeeRate: 0.08,  employerRate: 0.16  },
     medical:      { employeeRate: 0.02,  employerRate: 0.095 },
     unemployment: { employeeRate: 0.005, employerRate: 0.005 },
     workInjury:   { employeeRate: 0,     employerRate: 0.004 },
     maternity:    { employeeRate: 0,     employerRate: 0.008 },
-    housingFund:  { employeeRate: 0.12,  employerRate: 0.12, baseMin: 2320, baseMax: 34188 },
-    year: 2024, source: "北京市人社局2024年标准",
+    housingFund:  { employeeRate: 0.12,  employerRate: 0.12, baseMin: 2540, baseMax: 35811 },
+    year: 2025, source: "北京市人社局2025年标准",
   },
   {
     city: "广州",
-    baseMin: 3096, baseMax: 30948,
+    baseMin: 3096, baseMax: 35811,
     pension:      { employeeRate: 0.08,  employerRate: 0.14  },
     medical:      { employeeRate: 0.02,  employerRate: 0.065 },
     unemployment: { employeeRate: 0.002, employerRate: 0.012 },
     workInjury:   { employeeRate: 0,     employerRate: 0.003 },
     maternity:    { employeeRate: 0,     employerRate: 0.008 },
-    housingFund:  { employeeRate: 0.12,  employerRate: 0.12, baseMin: 2300, baseMax: 30948 },
-    year: 2024, source: "广州市人社局2024年标准",
+    housingFund:  { employeeRate: 0.12,  employerRate: 0.12, baseMin: 2300, baseMax: 35811 },
+    year: 2025, source: "广州市人社局2025年标准",
   },
   {
     city: "深圳",
-    baseMin: 2360, baseMax: 31884,
+    baseMin: 2360, baseMax: 35811,
     pension:      { employeeRate: 0.08,  employerRate: 0.13  },
     medical:      { employeeRate: 0.02,  employerRate: 0.065 },
     unemployment: { employeeRate: 0.003, employerRate: 0.007 },
     workInjury:   { employeeRate: 0,     employerRate: 0.003 },
     maternity:    { employeeRate: 0,     employerRate: 0.006 },
-    housingFund:  { employeeRate: 0.05,  employerRate: 0.05, baseMin: 2360, baseMax: 31884 },
-    year: 2024, source: "深圳市人社局2024年标准",
+    housingFund:  { employeeRate: 0.05,  employerRate: 0.05, baseMin: 2360, baseMax: 35811 },
+    year: 2025, source: "深圳市人社局2025年标准",
   },
   {
     city: "杭州",
-    baseMin: 3702, baseMax: 25826,
+    baseMin: 3702, baseMax: 27549,
     pension:      { employeeRate: 0.08,  employerRate: 0.14  },
     medical:      { employeeRate: 0.02,  employerRate: 0.095 },
     unemployment: { employeeRate: 0.005, employerRate: 0.005 },
     workInjury:   { employeeRate: 0,     employerRate: 0.003 },
     maternity:    { employeeRate: 0,     employerRate: 0.008 },
-    housingFund:  { employeeRate: 0.12,  employerRate: 0.12, baseMin: 2280, baseMax: 25826 },
-    year: 2024, source: "杭州市人社局2024年标准",
+    housingFund:  { employeeRate: 0.12,  employerRate: 0.12, baseMin: 2280, baseMax: 27549 },
+    year: 2025, source: "杭州市人社局2025年标准",
   },
   {
     city: "成都",
-    baseMin: 3408, baseMax: 22498,
+    baseMin: 3408, baseMax: 27549,
     pension:      { employeeRate: 0.08,  employerRate: 0.16  },
     medical:      { employeeRate: 0.02,  employerRate: 0.095 },
     unemployment: { employeeRate: 0.005, employerRate: 0.005 },
     workInjury:   { employeeRate: 0,     employerRate: 0.003 },
     maternity:    { employeeRate: 0,     employerRate: 0.008 },
-    housingFund:  { employeeRate: 0.12,  employerRate: 0.12, baseMin: 2280, baseMax: 22498 },
-    year: 2024, source: "成都市人社局2024年标准",
+    housingFund:  { employeeRate: 0.12,  employerRate: 0.12, baseMin: 2280, baseMax: 27549 },
+    year: 2025, source: "成都市人社局2025年标准",
   },
   {
     city: "武汉",
-    baseMin: 3613, baseMax: 21680,
+    baseMin: 3613, baseMax: 27549,
     pension:      { employeeRate: 0.08,  employerRate: 0.16  },
     medical:      { employeeRate: 0.02,  employerRate: 0.08  },
     unemployment: { employeeRate: 0.005, employerRate: 0.005 },
     workInjury:   { employeeRate: 0,     employerRate: 0.003 },
     maternity:    { employeeRate: 0,     employerRate: 0.008 },
-    housingFund:  { employeeRate: 0.12,  employerRate: 0.12, baseMin: 2280, baseMax: 21680 },
-    year: 2024, source: "武汉市人社局2024年标准",
+    housingFund:  { employeeRate: 0.12,  employerRate: 0.12, baseMin: 2280, baseMax: 27549 },
+    year: 2025, source: "武汉市人社局2025年标准",
   },
   {
     city: "南京",
-    baseMin: 3480, baseMax: 23200,
+    baseMin: 3480, baseMax: 27549,
     pension:      { employeeRate: 0.08,  employerRate: 0.16  },
     medical:      { employeeRate: 0.02,  employerRate: 0.09  },
     unemployment: { employeeRate: 0.005, employerRate: 0.005 },
     workInjury:   { employeeRate: 0,     employerRate: 0.003 },
     maternity:    { employeeRate: 0,     employerRate: 0.008 },
-    housingFund:  { employeeRate: 0.12,  employerRate: 0.12, baseMin: 2280, baseMax: 23200 },
-    year: 2024, source: "南京市人社局2024年标准",
+    housingFund:  { employeeRate: 0.12,  employerRate: 0.12, baseMin: 2280, baseMax: 27549 },
+    year: 2025, source: "南京市人社局2025年标准",
   },
 ];
 
@@ -835,13 +835,18 @@ export interface Employee {
   monthlyFixedSalary: number;
   bankAccounts?: EmployeeBankAccount[];
   idNumber?: string;
-  address?: string;
+  /** 身份证正面照片 URL */
+  idCardFrontUrl?: string;
+  /** 身份证反面照片 URL */
+  idCardBackUrl?: string;
+  /** 健康证照片 URL */
+  healthCertUrl?: string;
+  healthCertExpiry?: string;
+  /** 实际住址（紧急联系方式卡片中） */
+  actualAddress?: string;
   emergencyContactName?: string;
   emergencyContactPhone?: string;
   emergencyContactRelation?: string;
-  idCardImageUri?: string;
-  healthCertImageUri?: string;
-  healthCertExpiry?: string;
   joinDate?: string;
   leaveDate?: string;
   /** 是否已归档（离职归档）：归档后从主列表和排班表消失 */
