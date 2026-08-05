@@ -3185,7 +3185,10 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
       }
     }, 500);
     return () => { if (autoSyncTimerRef.current) clearTimeout(autoSyncTimerRef.current); };
-  }, [shifts, currentMonth]);
+  // 即时同步：将 employees 和 advances 加入依赖数组
+  // - employees 变化（底薪/时薪/社保配置修改）→ 立即重算所有有排班员工的薪资单
+  // - advances 变化（预支新增/删除）→ 立即重算对应员工的 finalSalary
+  }, [shifts, currentMonth, employees, advances]);
 
   const sortedTemplates = useMemo(() =>
     [...(templates.length > 0 ? templates : DEFAULT_SHIFT_TEMPLATES)].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)),
