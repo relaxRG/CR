@@ -1309,26 +1309,6 @@ function AdvancePage({ month, colors, headerComponent }: { month: string; colors
 }
 
 // ─── 排班表单元格显示 ─────────────────────────────────────────────────────────
-function SchCellDisplay({ entry, contractHours, tplColor, colors }: {
-  entry: ShiftEntry | null; contractHours: number; tplColor: string; colors: any;
-}) {
-  if (!entry) return null;
-  const h = entry.hoursValue;
-  if (h === "休") return <View style={[SCH.badge, { backgroundColor: colors.error + "22" }]}><Text style={[SCH.badgeText, { color: colors.error }]}>休</Text></View>;
-  if (h === "无早") return <View style={[SCH.badge, { backgroundColor: colors.muted + "22" }]}><Text style={[SCH.badgeText, { color: colors.muted }]}>无早</Text></View>;
-  if (typeof h === "number" && h > 0) {
-    const isOT = contractHours > 0 && h > contractHours;
-    const dotColor = colors.error;
-    return (
-      <View style={{ alignItems: "center" }}>
-        <Text style={{ fontSize: 12, fontWeight: isOT ? "800" : "600", color: isOT ? dotColor : tplColor }}>{h}</Text>
-        {isOT && <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: dotColor, marginTop: 1 }} />}
-      </View>
-    );
-  }
-  return null;
-}
-
 // ─── 快速填充 Modal ──────────────────────────────────────────────────────────
 function QuickFillModal({ visible, employee, shiftTemplates, todayStr, currentMonth, colors, presets, onSavePreset, onDeletePreset, onFill, onClose }: {
   visible: boolean;
@@ -1753,14 +1733,16 @@ function SchShiftModal({ visible, date, employee, session, existing, contractHou
   };
 
   // 点击特殊状态：立即保存
+  // 班次模式不管工时，工时由时长模式单独管理
   const handleSelectSpecial = (ss: SpecialStatus) => {
     tap();
     const isSelected = existing?.specialStatusId === ss.id;
     if (isSelected) {
-      // 再次点击已选中的特殊状态 → 取消（恢复为普通班次）
+      // 再次点击已选中的特殊状态 → 取消（恢复为普通班次，保留已有工时）
       onSave({ employeeId: employee.id, date, shift: session, hoursValue: existingHours, specialStatusId: undefined });
     } else {
-      onSave({ employeeId: employee.id, date, shift: session, hoursValue: ss.category === "work_day" ? (existingHours ?? 8) : null, specialStatusId: ss.id });
+      // 保留已有工时，只更新特殊状态
+      onSave({ employeeId: employee.id, date, shift: session, hoursValue: existingHours, specialStatusId: ss.id });
     }
     onClose();
   };
@@ -1996,6 +1978,11 @@ function SchHoursModal({ visible, date, employee, session, existing, contractHou
   const workDayStatuses = specialStatuses.filter((s) => s.category === "work_day");
   const compOffStatuses = specialStatuses.filter((s) => s.category === "comp_off" && s.id !== "ss_comp_off");
   const displayCompOffStatuses = compOffStatuses.length > 0 ? compOffStatuses : specialStatuses.filter((s) => s.category === "comp_off");
+  // 当前选中的特殊状态
+  const selectedSS = existing?.specialStatusId ? specialStatuses.find((s) => s.id === existing.specialStatusId) : null;
+  // absence 类和 comp_off 类：工时输入框锁定（不在工作，无需填写工时）
+  // work_day 类（节日上班）：工时输入框正常（需要填写实际工时）
+  const lockHoursInput = !!(selectedSS && (selectedSS.category === "absence" || selectedSS.category === "comp_off"));
 
   return (
     <Modal visible={visible} animationType="slide"
@@ -2019,9 +2006,9 @@ function SchHoursModal({ visible, date, employee, session, existing, contractHou
         </View>
         <ScrollView contentContainerStyle={{ padding: 16, gap: 14 }}>
 
-          {/* 工时输入区（只改工时，不影响班次） */}
+          {/* 工时输入区：absence/comp_off 类锁定，work_day 类正常 */}
           <View style={[SCHEM.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            {session && (
+            {!lockHoursInput && session && (
               <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 8 }}>
                 当前班次：{existing?.shift ?? session}{contractHours > 0 ? `  ·  合同工时 ${contractHours}h` : ""}
                 {isOT ? `  ·  加班 +${otAmt.toFixed(1)}h` : ""}
@@ -2029,22 +2016,33 @@ function SchHoursModal({ visible, date, employee, session, existing, contractHou
             )}
             <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
               <TextInput
-                value={hoursInput}
+                value={lockHoursInput ? "" : hoursInput}
                 onChangeText={(v) => {
-                  // 只允许数字和小数点，最多一位小数
+                  if (lockHoursInput) return;
                   const cleaned = v.replace(/[^0-9.]/g, "");
                   const parts = cleaned.split(".");
                   if (parts.length > 2) return;
                   if (parts[1] && parts[1].length > 1) return;
                   setHoursInput(cleaned);
                 }}
-                placeholder={`工时（如 9 或 8.5）`}
+                placeholder={lockHoursInput ? "---" : "工时（如 9 或 8.5）"}
                 placeholderTextColor={colors.muted}
                 keyboardType="decimal-pad"
-                style={[SCHEM.input, { color: colors.foreground, borderColor: isOT ? colors.warning : colors.border, flex: 1 }]}
+                editable={!lockHoursInput}
+                style={[SCHEM.input, {
+                  color: lockHoursInput ? colors.muted : colors.foreground,
+                  borderColor: lockHoursInput ? colors.border : (isOT ? colors.warning : colors.border),
+                  flex: 1,
+                  opacity: lockHoursInput ? 0.5 : 1,
+                }]}
               />
               <Text style={{ color: colors.muted, fontSize: 15 }}>h</Text>
             </View>
+            {lockHoursInput && (
+              <Text style={{ fontSize: 11, color: colors.muted, marginTop: 6 }}>
+                当前为「不在工作」状态，无需填写工时
+              </Text>
+            )}
           </View>
 
           {/* 特殊状态区（点击即保存） */}
@@ -3133,24 +3131,53 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
 
   // 单元格内容：班次模式显示班次完整名称（最多3字），时长模式显示工时数字
   // 数字统一深灰色，加班红色标注，调休维色标注
+  // shortLabel：前两字 + 倍率（倍率=1不显示，倍率=0.5显示.5，倍率=2显示2）
+  const ssShortLabel = (ss: SpecialStatus): string => {
+    const name = ss.name.slice(0, 2);
+    const m = ss.salaryMultiplier;
+    if (m === 1) return name;
+    if (m === 0.5) return `${name}.5`;
+    return `${name}${m}`;
+  };
+
   const renderCellContent = (entry: ShiftEntry | null, session: string, contractH: number, groupColor?: string) => {
     if (!entry) return null;
     const h = entry.hoursValue;
-    // 休假/无早：红色，两种模式都显示
+    // 向后兼容：旧版 "休"/"无早" hoursValue
     if (h === "休") return <Text style={EXL.cellRest}>(休)</Text>;
     if (h === "无早") return <Text style={EXL.cellNoMorning}>(无早)</Text>;
-    // 特殊状态：显示状态简称（如「旷」「病」「节」「调」）
+    // 特殊状态
     if (entry.specialStatusId) {
       const ss = specialStatuses.find((s) => s.id === entry.specialStatusId);
       if (ss) {
-        const shortName = ss.name.slice(0, 2);
         const ssColor = ss.color;
-        return <Text style={{ fontSize: 9, fontWeight: "700", color: ssColor }} numberOfLines={1}>{shortName}</Text>;
+        if (viewMode === "hours") {
+          // 时长模式：
+          // work_day 类 → 显示工时数字 + 右上角颜色角标
+          if (ss.category === "work_day" && typeof h === "number" && h > 0) {
+            const isOT = contractH > 0 && h > contractH;
+            return (
+              <View style={{ alignItems: "center" }}>
+                <View style={{ position: "relative" }}>
+                  <Text style={[EXL.cellHours, isOT && { color: "#FF4D4F", fontWeight: "700" }]}>
+                    {h % 1 === 0 ? `${h}.0` : `${h}`}
+                  </Text>
+                  <View style={{ position: "absolute", top: -2, right: -4, width: 5, height: 5, borderRadius: 2.5, backgroundColor: ssColor }} />
+                </View>
+              </View>
+            );
+          }
+          // absence / comp_off 类 → 文字缩写（前两字）
+          return <Text style={{ fontSize: 9, fontWeight: "700", color: ssColor }} numberOfLines={1}>{ss.name.slice(0, 2)}</Text>;
+        } else {
+          // 班次模式：前两字 + 倍率（如「节日3」「旷工2」「病假.5」）
+          return <Text style={{ fontSize: 9, fontWeight: "700", color: ssColor }} numberOfLines={1}>{ssShortLabel(ss)}</Text>;
+        }
       }
     }
     if (viewMode === "session") {
-      // 班次模式：显示班次名称前3字（如「午班」「晚班」「午班A」）
-      const label = session.slice(0, 3);
+      // 班次模式：显示班次名称前两字
+      const label = session.slice(0, 2);
       const textColor = groupColor ?? "#3C3C43";
       return <Text style={[EXL.cellSession, { color: textColor, fontSize: 10 }]} numberOfLines={1}>{label}</Text>;
     }
@@ -3839,28 +3866,6 @@ const CT = StyleSheet.create({
 const CAL_NAME_W = 52;  // 月历表姓名列宽
 const CAL_CELL_FLEX = 1; // 月历表日期格平分屏宽
 
-const SCH = StyleSheet.create({
-  monthBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth },
-  segBtn: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
-  sessionHeader: { flexDirection: "row", alignItems: "center", paddingVertical: 6, paddingHorizontal: 4, borderLeftWidth: 3, marginBottom: 2 },
-  // 月历格式
-  calHeaderRow: { flexDirection: "row", alignItems: "center", borderBottomWidth: 1, marginBottom: 1 },
-  calNameHeader: { width: CAL_NAME_W, height: 24, alignItems: "center", justifyContent: "center" },
-  calDayHeader: { flex: CAL_CELL_FLEX, height: 24, alignItems: "center", justifyContent: "center" },
-  calWeekRow: { flexDirection: "row", alignItems: "stretch", borderBottomWidth: StyleSheet.hairlineWidth, minHeight: 42 },
-  calNameCell: { width: CAL_NAME_W, justifyContent: "center", alignItems: "center", borderRightWidth: 1, paddingVertical: 4 },
-  calCell: { flex: CAL_CELL_FLEX, alignItems: "center", justifyContent: "center", paddingVertical: 3, borderWidth: StyleSheet.hairlineWidth, minHeight: 42 },
-  // 保留旧字段（其他页面可能引用）
-  headerRow: { flexDirection: "row", alignItems: "center", borderBottomWidth: 1 },
-  headerCell: { height: SCH_ROW_H, alignItems: "center", justifyContent: "center", gap: 1, borderRightWidth: StyleSheet.hairlineWidth },
-  empRow: { flexDirection: "row", alignItems: "center" },
-  nameCell: { height: SCH_ROW_H + 8, justifyContent: "center", alignItems: "center", borderRightWidth: 1 },
-  empCode: { fontSize: 11, fontWeight: "700" },
-  empName: { fontSize: 9 },
-  cell: { height: SCH_ROW_H + 8, alignItems: "center", justifyContent: "center", borderRightWidth: StyleSheet.hairlineWidth },
-  badge: { paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4 },
-  badgeText: { fontSize: 9, fontWeight: "700" },
-});
 
 const SCHEM = StyleSheet.create({
   sheet: { flex: 1 },

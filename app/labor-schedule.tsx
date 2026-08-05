@@ -39,6 +39,15 @@ const ROW_H = 38;    // 行高
 
 
 // ─── 单元格显示 ───────────────────────────────────────────────────────────────
+// shortLabel：前两字 + 倍率（倍率=1不显示，倍率=0.5显示.5）
+function ssShortLabel(ss: SpecialStatus): string {
+  const name = ss.name.slice(0, 2);
+  const m = ss.salaryMultiplier;
+  if (m === 1) return name;
+  if (m === 0.5) return `${name}.5`;
+  return `${name}${m}`;
+}
+
 function CellDisplay({ entry, contractHours, tplColor, colors, specialStatuses }: {
   entry: ShiftEntry | null;
   contractHours: number;
@@ -51,11 +60,29 @@ function CellDisplay({ entry, contractHours, tplColor, colors, specialStatuses }
   // 特殊状态（新版 specialStatusId）
   if (entry.specialStatusId) {
     const ss = specialStatuses.find((s) => s.id === entry.specialStatusId);
-    if (ss) return (
-      <View style={[CS.badge, { backgroundColor: ss.color + "22" }]}>
-        <Text style={[CS.badgeText, { color: ss.color }]}>{ss.name.slice(0, 2)}</Text>
-      </View>
-    );
+    if (ss) {
+      // work_day 类（节日上班）→ 工时数字 + 右上角颜色角标
+      if (ss.category === "work_day" && typeof h === "number" && h > 0) {
+        const isOT = contractHours > 0 && h > contractHours;
+        return (
+          <View style={{ alignItems: "center" }}>
+            <View style={{ position: "relative" }}>
+              <Text style={[CS.hours, {
+                color: isOT ? colors.error : tplColor,
+                fontWeight: isOT ? "800" : "600",
+              }]}>{h}</Text>
+              <View style={{ position: "absolute", top: -2, right: -4, width: 5, height: 5, borderRadius: 2.5, backgroundColor: ss.color }} />
+            </View>
+          </View>
+        );
+      }
+      // absence / comp_off 类 → 文字缩写（前两字）
+      return (
+        <View style={[CS.badge, { backgroundColor: ss.color + "22" }]}>
+          <Text style={[CS.badgeText, { color: ss.color }]}>{ss.name.slice(0, 2)}</Text>
+        </View>
+      );
+    }
   }
   // 向后兼容：旧版 "休"/"无早" hoursValue
   if (h === "休") return (
