@@ -269,8 +269,8 @@ function EmployeeCard({
           <Text style={{ fontSize: 11, color: colors.primary }}>详情 ›</Text>
         </View>
         <View style={S.detailGrid}>
-          <DetailRow label="绩效总额" value={`¥${(slip?.performanceBonus ?? 0).toFixed(0)}`} colors={colors} />
-          <DetailRow label="补贴总额" value={`¥${(slip?.mealAllowance ?? 0).toFixed(0)}`} colors={colors} />
+          <DetailRow label="补贴" value={`¥${(slip?.mealAllowance ?? 0).toFixed(0)}`} colors={colors} />
+          <DetailRow label="工作绩效" value={`¥${(slip?.performanceBonus ?? 0).toFixed(0)}`} colors={colors} />
           <DetailRow label="绩效补贴小计" value={`¥${((slip?.performanceBonus ?? 0) + (slip?.mealAllowance ?? 0)).toFixed(0)}`} colors={colors} bold />
         </View>
       </TouchableOpacity>

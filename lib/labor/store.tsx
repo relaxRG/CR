@@ -893,8 +893,11 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
     const allowanceDetails: Record<string, { amount: number; autoNote: string; isOverride: boolean }> = {};
 
     if (employee.allowanceRules) {
+      const overrides = existing?.allowanceOverrides;
       for (const rule of employee.allowanceRules) {
         if (!rule.enabled) continue;
+        // 如果用户在绩效补贴页手动取消了此补贴，则跳过
+        if (overrides && rule.id in overrides && !overrides[rule.id]) continue;
         const { amount, autoNote } = calcAllowance(rule, attendanceDays);
         const existingDetail = existing?.allowanceDetails?.[rule.id];
         const isOverride = existingDetail?.isOverride ?? false;
