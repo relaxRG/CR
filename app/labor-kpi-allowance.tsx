@@ -1,10 +1,11 @@
 /**
  * 绩效补贴页面
- * - 顶部总结卡：绩效总额合计 | 绩效总额 | 补贴总额
- * - 补贴展示区：勾选本月是否生效
+ * - 顶部总结卡：绩效补贴合计 | 补贴 | 工作绩效 | 业绩绩效（4格）
+ * - 补贴展示区：勾选本月是否生效（状态持久化到 PaySlip.allowanceOverrides）
  * - 工作绩效区：勾选完成档位
  * - 业绩绩效区：显示数据源金额 + 自动计算 + 手动修改实际金额
  * - 所有修改即时同步薪资单
+ * - ⚙ 跳转当前员工编辑页（传入 id 参数）
  */
 import React, { useCallback, useMemo, useState } from "react";
 import {
@@ -18,7 +19,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
 import { useEmployeeStore, usePaySlipStore } from "@/lib/labor/store";
 import {
-  Employee, AllowanceRule, WorkKPIRule, RevenueKPIRule,
+  AllowanceRule, WorkKPIRule, RevenueKPIRule,
   ALLOWANCE_UNIT_LABELS, REVENUE_KPI_SOURCE_LABELS,
   REVENUE_KPI_PAY_MODE_LABELS, calcRevenueKPIBonus,
   shouldPayAllowanceThisMonth,
@@ -37,10 +38,17 @@ export default function LaborKPIAllowancePage() {
   const employee = useMemo(() => employees.find((e) => e.id === employeeId), [employees, employeeId]);
 
   // 补贴本月生效状态（key: ruleId, value: 是否生效）
+  // 优先从 PaySlip.allowanceOverrides 读取持久化状态，否则按规则默认值
   const [allowanceEnabled, setAllowanceEnabled] = useState<Record<string, boolean>>(() => {
+    const slip = employeeId && month ? getPaySlip(employeeId, month) : null;
+    const overrides = slip?.allowanceOverrides;
     const map: Record<string, boolean> = {};
     (employee?.allowanceRules ?? []).forEach((r) => {
-      map[r.id] = r.enabled !== false && shouldPayAllowanceThisMonth(r, month || "");
+      if (overrides && r.id in overrides) {
+        map[r.id] = overrides[r.id];
+      } else {
+        map[r.id] = r.enabled !== false && shouldPayAllowanceThisMonth(r, month || "");
+      }
     });
     return map;
   });
@@ -96,10 +104,39 @@ export default function LaborKPIAllowancePage() {
   const performanceTotal = workKPITotal + revenueKPITotal;
   const grandTotal = performanceTotal + allowanceTotal;
 
-  // 切换补贴本月生效
+  // 切换补贴本月生效，并立即持久化到 PaySlip.allowanceOverrides
   const toggleAllowance = (id: string) => {
     tap();
-    setAllowanceEnabled((prev) => ({ ...prev, [id]: !prev[id] }));
+    setAllowanceEnabled((prev) => {
+      const next = { ...prev, [id]: !prev[id] };
+      // 立即持久化到 PaySlip
+      if (month && employeeId) {
+        const existing = getPaySlip(employeeId, month);
+        if (existing) {
+          const newAllowanceTotal = allowanceRules.reduce((sum, r) => {
+            if (!next[r.id]) return sum;
+            return sum + (r.amount || 0);
+          }, 0);
+          const newGross = Math.round((
+            existing.attendanceSalary + (workKPITotal + revenueKPITotal) + newAllowanceTotal +
+            existing.salesCommission + existing.rewardPenalty
+          ) * 100) / 100;
+          const newFinal = Math.round((
+            newGross - (existing.socialInsuranceDeduction ?? 0) - (existing.housingFundDeduction ?? 0) -
+            (existing.incomeTax ?? 0) - existing.advanceAmount - (existing.pettyLaborPaid ?? 0)
+          ) * 100) / 100;
+          upsertPaySlip({
+            ...existing,
+            mealAllowance: newAllowanceTotal,
+            grossSalary: newGross,
+            finalSalary: newFinal,
+            totalEmployerCost: Math.round((newGross + (existing.employerSocialInsurance ?? 0) + (existing.employerHousingFund ?? 0)) * 100) / 100,
+            allowanceOverrides: next,
+          });
+        }
+      }
+      return next;
+    });
   };
 
   // 勾选工作绩效档位
@@ -111,8 +148,7 @@ export default function LaborKPIAllowancePage() {
     }));
   };
 
-  // 即时同步薪资单
-  // 注意：grossSalary = 应发（税前），不应包含 advanceAmount（预支在 finalSalary 才扣）
+  // 返回时同步薪资单（工作绩效/业绩绩效变化）
   const syncToPaySlip = useCallback(() => {
     if (!month || !employeeId) return;
     const existing = getPaySlip(employeeId, month);
@@ -125,16 +161,16 @@ export default function LaborKPIAllowancePage() {
       newGross - (existing.socialInsuranceDeduction ?? 0) - (existing.housingFundDeduction ?? 0) -
       (existing.incomeTax ?? 0) - existing.advanceAmount - (existing.pettyLaborPaid ?? 0)
     ) * 100) / 100;
-    const updatedSlip = {
+    upsertPaySlip({
       ...existing,
       performanceBonus: workKPITotal + revenueKPITotal,
       mealAllowance: allowanceTotal,
       grossSalary: newGross,
       finalSalary: newFinal,
       totalEmployerCost: Math.round((newGross + (existing.employerSocialInsurance ?? 0) + (existing.employerHousingFund ?? 0)) * 100) / 100,
-    };
-    upsertPaySlip(updatedSlip);
-  }, [month, employeeId, getPaySlip, upsertPaySlip, workKPITotal, revenueKPITotal, allowanceTotal]);
+      allowanceOverrides: allowanceEnabled,
+    });
+  }, [month, employeeId, getPaySlip, upsertPaySlip, workKPITotal, revenueKPITotal, allowanceTotal, allowanceEnabled]);
 
   return (
     <ScreenContainer>
@@ -144,28 +180,36 @@ export default function LaborKPIAllowancePage() {
           <IconSymbol name="chevron.left" size={20} color={colors.primary} />
         </TouchableOpacity>
         <Text style={[S.navTitle, { color: colors.foreground }]}>{employee.realName} · 绩效补贴</Text>
-        <TouchableOpacity onPress={() => { tap(); router.push({ pathname: "/labor-employee-form", params: { employeeId: employee.id } } as any); }} style={{ padding: 8 }}>
+        {/* ⚙ 跳转当前员工编辑页（传入 id 参数） */}
+        <TouchableOpacity
+          onPress={() => { tap(); router.push({ pathname: "/labor-employee-form", params: { id: employee.id } } as any); }}
+          style={{ padding: 8 }}>
           <IconSymbol name="gearshape" size={20} color={colors.muted} />
         </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }}>
-        {/* 顶部总结卡 */}
+        {/* 顶部总结卡：4格（绩效补贴 / 补贴 / 工作绩效 / 业绩绩效） */}
         <View style={[S.summaryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <View style={S.summaryRow}>
             <View style={S.summaryItem}>
-              <Text style={[S.summaryLabel, { color: colors.muted }]}>绩效+补贴合计</Text>
+              <Text style={[S.summaryLabel, { color: colors.muted }]}>绩效补贴</Text>
               <Text style={[S.summaryValue, { color: colors.foreground }]}>¥{grandTotal.toFixed(0)}</Text>
             </View>
             <View style={[S.summaryDivider, { backgroundColor: colors.border }]} />
             <View style={S.summaryItem}>
-              <Text style={[S.summaryLabel, { color: colors.muted }]}>绩效总额</Text>
-              <Text style={[S.summaryValue, { color: colors.success }]}>¥{performanceTotal.toFixed(0)}</Text>
+              <Text style={[S.summaryLabel, { color: colors.muted }]}>补贴</Text>
+              <Text style={[S.summaryValue, { color: colors.primary }]}>¥{allowanceTotal.toFixed(0)}</Text>
             </View>
             <View style={[S.summaryDivider, { backgroundColor: colors.border }]} />
             <View style={S.summaryItem}>
-              <Text style={[S.summaryLabel, { color: colors.muted }]}>补贴总额</Text>
-              <Text style={[S.summaryValue, { color: colors.primary }]}>¥{allowanceTotal.toFixed(0)}</Text>
+              <Text style={[S.summaryLabel, { color: colors.muted }]}>工作绩效</Text>
+              <Text style={[S.summaryValue, { color: colors.success }]}>¥{workKPITotal.toFixed(0)}</Text>
+            </View>
+            <View style={[S.summaryDivider, { backgroundColor: colors.border }]} />
+            <View style={S.summaryItem}>
+              <Text style={[S.summaryLabel, { color: colors.muted }]}>业绩绩效</Text>
+              <Text style={[S.summaryValue, { color: colors.success }]}>¥{revenueKPITotal.toFixed(0)}</Text>
             </View>
           </View>
         </View>
@@ -243,7 +287,6 @@ export default function LaborKPIAllowancePage() {
                 <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>
                   数据源：{REVENUE_KPI_SOURCE_LABELS[rule.source]}{rule.source === "category" ? ` · ${rule.categoryName}` : ""} · {REVENUE_KPI_PAY_MODE_LABELS[rule.payMode].split("（")[0]}
                 </Text>
-                {/* 档位展示 */}
                 <View style={{ marginTop: 6, gap: 2 }}>
                   {rule.tiers.sort((a, b) => a.sortOrder - b.sortOrder).map((tier) => {
                     const reached = actual >= tier.threshold;
@@ -257,7 +300,6 @@ export default function LaborKPIAllowancePage() {
                     );
                   })}
                 </View>
-                {/* 实际达到金额输入 */}
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8 }}>
                   <Text style={{ fontSize: 12, color: colors.muted }}>实际达到：</Text>
                   <TextInput
@@ -286,7 +328,7 @@ const S = StyleSheet.create({
   summaryRow: { flexDirection: "row", alignItems: "center" },
   summaryItem: { flex: 1, alignItems: "center" },
   summaryLabel: { fontSize: 11, marginBottom: 4 },
-  summaryValue: { fontSize: 18, fontWeight: "700" },
+  summaryValue: { fontSize: 16, fontWeight: "700" },
   summaryDivider: { width: 1, height: 30 },
   sectionCard: { borderRadius: 12, borderWidth: 1, padding: 16, marginBottom: 16 },
   sectionTitle: { fontSize: 12, fontWeight: "600", marginBottom: 12 },

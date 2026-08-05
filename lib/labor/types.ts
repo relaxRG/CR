@@ -1086,6 +1086,9 @@ export interface PaySlip {
   };
   /** 补贴明细 */
   allowanceDetails?: Record<string, { amount: number; autoNote: string; isOverride: boolean }>;
+  /** 补贴本月生效状态覆盖（key: ruleId, value: 是否本月生效）
+   * 用于持久化绩效补贴页中用户手动勾选/取消的补贴项状态 */
+  allowanceOverrides?: Record<string, boolean>;
   /** 社保明细（各险种金额） */
   socialInsuranceDetails?: {
     pension: number;
