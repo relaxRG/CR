@@ -460,7 +460,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
         return (
           <View style={{ flexDirection: "row", marginTop: 8, paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border + "44" }}>
             {[
-              { label: "基础薪资", value: baseSalary !== null ? `¥${baseSalary.toFixed(0)}` : "—", color: colors.foreground },
+              { label: "比例底薪", value: baseSalary !== null ? `¥${baseSalary.toFixed(0)}` : "—", color: colors.foreground },
               { label: "加班考勤", value: overtimeAndHoliday > 0 ? `+¥${overtimeAndHoliday.toFixed(0)}` : "—", color: overtimeAndHoliday > 0 ? colors.success : colors.muted },
               { label: "综合额外", value: extraTotal !== 0 ? `${extraTotal >= 0 ? "+" : ""}¥${extraTotal.toFixed(0)}` : "—", color: extraTotal > 0 ? colors.primary : extraTotal < 0 ? colors.error : colors.muted },
               { label: "已预支", value: advanceAmount > 0 ? `-¥${advanceAmount.toFixed(0)}` : "—", color: advanceAmount > 0 ? colors.error : colors.muted },

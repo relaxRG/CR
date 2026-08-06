@@ -1,6 +1,14 @@
 /**
  * lib/labor/export.ts
  * 员工管理导出引擎 — 薪资报表（Excel/PDF）+ 排班表（时长/班次模式，Excel/PDF）
+ *
+ * 字段语义说明（与薪资卡片保持一致）：
+ *   比例底薪 = attendanceSalary - overtimePay - holidayBonus + specialDeduction
+ *            = baseSalary × (attendanceDays / expectedAttendanceDays)
+ *   特殊扣薪 = att.totalSpecialDeduction（旷工/病假等额外扣减）
+ *   考勤工资 = 比例底薪 + 加班工资 + 节假日薪资 - 特殊扣薪
+ *   业绩提点 = slip.salesCommission（从 existing 读取，非绩效考核）
+ *   工作绩效 = slip.performanceBonus（工作绩效 + 业绩绩效合计）
  */
 
 import * as FileSystem from "expo-file-system/legacy";
@@ -45,6 +53,19 @@ function weekdayLabel(dateStr: string): string {
   return WEEKDAY_LABELS[new Date(dateStr).getDay()];
 }
 
+/**
+ * 从 MonthlyAttendance 计算「比例底薪」
+ * 与薪资卡片 PaySlipMiniCard 保持完全一致：
+ *   proportionalBase = attendanceSalary - overtimePay - holidayBonus + specialDeduction
+ */
+function calcProportionalBase(att: MonthlyAttendance | undefined, slip: PaySlip | undefined): number {
+  if (!slip) return 0;
+  const specialDeduction = att?.totalSpecialDeduction ?? 0;
+  const overtimePay = att?.overtimePay ?? 0;
+  const holidayBonus = att?.holidayBonus ?? 0;
+  return Math.round((slip.attendanceSalary - overtimePay - holidayBonus + specialDeduction) * 100) / 100;
+}
+
 // ─── 导出参数类型 ──────────────────────────────────────────────────────────────
 
 export interface ExportParams {
@@ -75,17 +96,25 @@ export function buildPayrollWorkbook(params: ExportParams): XLSX.WorkBook {
   ];
 
   // ── Sheet 1：总表 ──
+  // 列顺序与薪资卡片展开区域保持一致：
+  //   考勤明细：比例底薪 | 加班工资 | 节假日薪资 | 特殊扣薪 | 考勤工资小计
+  //   综合额外：补贴合计 | 工作绩效 | 业绩提点 | 奖惩小计
+  //   扣款：预支 | 社保(个人) | 公积金(个人) | 个税
+  //   实发：实发工资 | 公司社保 | 公司公积金 | 公司总成本
   const totalHeader = [
     "部门", "姓名", "代号", "类型",
-    "底薪", "应出勤天", "实际出勤天", "日薪",
-    "加班时长(h)", "加班金额",
-    "节假日天数", "节假日薪资",
-    "考勤工资小计",
-    "工作绩效", "补贴合计", "奖惩小计", "调休兑现",
+    "合同底薪", "应出勤天", "实际出勤天", "日薪",
+    // 考勤明细（5格）
+    "比例底薪", "加班时长(h)", "加班工资", "节假日薪资", "特殊扣薪", "考勤工资小计",
+    // 综合额外
+    "补贴合计", "工作绩效", "业绩提点", "奖惩小计", "调休兑现",
+    // 应发
     "应发工资",
-    "社保代缴(个人)", "公积金代缴(个人)", "个税代缴",
-    "预支",
+    // 扣款
+    "预支", "社保代缴(个人)", "公积金代缴(个人)", "个税代缴",
+    // 实发
     "实发工资",
+    // 公司成本
     "公司社保部分", "公司公积金部分", "公司总人力成本",
     "付款状态",
   ];
@@ -105,25 +134,35 @@ export function buildPayrollWorkbook(params: ExportParams): XLSX.WorkBook {
       const slip = monthSlips.find((s) => s.employeeId === emp.id);
       const att = monthAtts.find((a) => a.employeeId === emp.id);
 
-      const baseSalary = emp.baseSalary ?? 0;
+      const contractBase = emp.baseSalary ?? 0;
       const expectedDays = att?.expectedAttendanceDays ?? 0;
       const actualDays = att?.attendanceDays ?? 0;
-      const dailySalary = expectedDays > 0 ? baseSalary / expectedDays : 0;
+      const dailySalary = expectedDays > 0 ? contractBase / expectedDays : 0;
+
+      // 考勤明细（与薪资卡片一致）
+      const proportionalBase = calcProportionalBase(att, slip);
       const overtimeHours = att?.paidOvertimeHours ?? 0;
       const overtimeAmount = att?.overtimePay ?? 0;
-      const holidayDays = 0; // 节假日天数在 PaySlip 中计算
       const holidayBonus = att?.holidayBonus ?? 0;
+      const specialDeduction = att?.totalSpecialDeduction ?? 0;
       const attendanceSalary = slip?.attendanceSalary ?? 0;
-      const performanceBonus = slip?.performanceBonus ?? 0;
+
+      // 综合额外
       const allowanceTotal = (slip?.mealAllowance ?? 0) + (slip?.transportAllowance ?? 0) + (slip?.otherAllowance ?? 0);
+      const performanceBonus = slip?.performanceBonus ?? 0;
+      const salesCommission = slip?.salesCommission ?? 0; // 业绩提点
       const rewardPenalty = slip?.rewardPenalty ?? 0;
       const compOffCashOut = slip?.compOffCashOut ?? 0;
+
+      // 应发/扣款/实发
       const grossSalary = slip?.grossSalary ?? 0;
+      const advance = slip?.advanceAmount ?? 0;
       const socialIns = slip?.socialInsuranceDeduction ?? 0;
       const housingFund = slip?.housingFundDeduction ?? 0;
       const incomeTax = slip?.incomeTax ?? 0;
-      const advance = slip?.advanceAmount ?? 0;
       const finalSalary = slip?.finalSalary ?? 0;
+
+      // 公司成本
       const empSocialIns = slip?.employerSocialInsurance ?? 0;
       const empHousingFund = slip?.employerHousingFund ?? 0;
       const totalCost = slip?.totalEmployerCost ?? grossSalary;
@@ -138,24 +177,31 @@ export function buildPayrollWorkbook(params: ExportParams): XLSX.WorkBook {
         emp.realName,
         emp.code ?? "",
         EMPLOYEE_TYPE_LABELS[emp.type],
-        baseSalary,
+        contractBase,
         expectedDays,
         actualDays,
         +dailySalary.toFixed(2),
+        // 考勤明细
+        +proportionalBase.toFixed(2),
         +overtimeHours.toFixed(1),
         +overtimeAmount.toFixed(2),
-        holidayDays,
         +holidayBonus.toFixed(2),
+        specialDeduction > 0 ? -+specialDeduction.toFixed(2) : 0, // 负数表示扣减
         +attendanceSalary.toFixed(2),
-        +performanceBonus.toFixed(2),
+        // 综合额外
         +allowanceTotal.toFixed(2),
+        +performanceBonus.toFixed(2),
+        +salesCommission.toFixed(2),
         +rewardPenalty.toFixed(2),
         +compOffCashOut.toFixed(2),
+        // 应发
         +grossSalary.toFixed(2),
-        +socialIns.toFixed(2),
-        +housingFund.toFixed(2),
-        +incomeTax.toFixed(2),
-        +advance.toFixed(2),
+        // 扣款
+        advance > 0 ? -+advance.toFixed(2) : 0,
+        socialIns > 0 ? -+socialIns.toFixed(2) : 0,
+        housingFund > 0 ? -+housingFund.toFixed(2) : 0,
+        incomeTax > 0 ? -+incomeTax.toFixed(2) : 0,
+        // 实发
         +finalSalary.toFixed(2),
         +empSocialIns.toFixed(2),
         +empHousingFund.toFixed(2),
@@ -164,28 +210,23 @@ export function buildPayrollWorkbook(params: ExportParams): XLSX.WorkBook {
       ]);
     }
 
-    // 部门小计行
-    totalRows.push([
-      `【${dept.label} 小计】`, "", "", "",
-      "", "", "", "", "", "", "", "", "", "", "", "", "",
-      "", "", "", "", "",
-      +deptFinal.toFixed(2),
-      "", "", +deptCost.toFixed(2), "",
-    ]);
+    // 部门小计行（列数与 totalHeader 对齐）
+    const subtotalRow: (string | number)[] = new Array(totalHeader.length).fill("");
+    subtotalRow[0] = `【${dept.label} 小计】`;
+    subtotalRow[totalHeader.length - 4] = +deptFinal.toFixed(2); // 实发工资列
+    subtotalRow[totalHeader.length - 1] = +deptCost.toFixed(2);  // 公司总成本列
+    totalRows.push(subtotalRow);
   }
 
   // 总计行
-  totalRows.push([
-    "【总计】", "", "", "",
-    "", "", "", "", "", "", "", "", "", "", "", "", "",
-    "", "", "", "", "",
-    +grandFinal.toFixed(2),
-    "", "", +grandCost.toFixed(2), "",
-  ]);
+  const grandRow: (string | number)[] = new Array(totalHeader.length).fill("");
+  grandRow[0] = "【总计】";
+  grandRow[totalHeader.length - 4] = +grandFinal.toFixed(2);
+  grandRow[totalHeader.length - 1] = +grandCost.toFixed(2);
+  totalRows.push(grandRow);
 
   const totalSheet = XLSX.utils.aoa_to_sheet([totalHeader, ...totalRows]);
-  // 设置列宽
-  totalSheet["!cols"] = totalHeader.map((h) => ({ wch: Math.max(h.length * 2, 8) }));
+  totalSheet["!cols"] = totalHeader.map((h) => ({ wch: Math.max(String(h).length * 2, 8) }));
   XLSX.utils.book_append_sheet(wb, totalSheet, `${month} 薪资总表`);
 
   // ── Sheet 2-N：各部门明细 ──
@@ -195,16 +236,19 @@ export function buildPayrollWorkbook(params: ExportParams): XLSX.WorkBook {
 
     const detailHeader = [
       "姓名", "代号", "类型",
-      "底薪", "应出勤天", "实际出勤天", "日薪",
-      "加班时长(h)", "加班金额",
-      "节假日天数", "节假日薪资",
-      "考勤工资小计",
-      "工作绩效", "餐补", "交通补贴", "其他补贴", "补贴合计",
+      "合同底薪", "应出勤天", "实际出勤天", "日薪",
+      // 考勤明细
+      "比例底薪", "加班时长(h)", "加班工资", "节假日薪资", "特殊扣薪", "考勤工资小计",
+      // 综合额外（细化）
+      "餐补", "交通补贴", "其他补贴", "补贴合计",
+      "工作绩效", "业绩提点",
       "奖励", "惩罚", "奖惩小计",
       "调休兑现",
+      // 应发
       "应发工资",
-      "社保代缴(个人)", "公积金代缴(个人)", "个税代缴",
-      "预支",
+      // 扣款
+      "预支", "社保代缴(个人)", "公积金代缴(个人)", "个税代缴",
+      // 实发
       "实发工资",
       "公司社保部分", "公司公积金部分", "公司总人力成本",
       "付款状态", "备注",
@@ -214,40 +258,55 @@ export function buildPayrollWorkbook(params: ExportParams): XLSX.WorkBook {
       const slip = monthSlips.find((s) => s.employeeId === emp.id);
       const att = monthAtts.find((a) => a.employeeId === emp.id);
 
-      const baseSalary = emp.baseSalary ?? 0;
+      const contractBase = emp.baseSalary ?? 0;
       const expectedDays = att?.expectedAttendanceDays ?? 0;
-      const dailySalary = expectedDays > 0 ? baseSalary / expectedDays : 0;
+      const dailySalary = expectedDays > 0 ? contractBase / expectedDays : 0;
+
+      // 考勤明细
+      const proportionalBase = calcProportionalBase(att, slip);
+      const specialDeduction = att?.totalSpecialDeduction ?? 0;
+
+      // 奖惩明细
       const rewardItems = slip?.rewardPenaltyItems ?? [];
       const rewards = rewardItems.filter((i) => i.amount > 0).reduce((s, i) => s + i.amount, 0);
-      const penalties = rewardItems.filter((i) => i.amount < 0).reduce((s, i) => s + i.amount, 0);
+      const penalties = rewardItems.filter((i) => i.amount < 0).reduce((s, i) => s + Math.abs(i.amount), 0);
 
       return [
         emp.realName,
         emp.code ?? "",
         EMPLOYEE_TYPE_LABELS[emp.type],
-        baseSalary,
+        contractBase,
         expectedDays,
         att?.attendanceDays ?? 0,
         +dailySalary.toFixed(2),
+        // 考勤明细
+        +proportionalBase.toFixed(2),
         +(att?.paidOvertimeHours ?? 0).toFixed(1),
         +(att?.overtimePay ?? 0).toFixed(2),
-        0, // holidayDays 在 PaySlip 中计算
         +(att?.holidayBonus ?? 0).toFixed(2),
+        specialDeduction > 0 ? -+specialDeduction.toFixed(2) : 0,
         +(slip?.attendanceSalary ?? 0).toFixed(2),
-        +(slip?.performanceBonus ?? 0).toFixed(2),
+        // 补贴细化
         +(slip?.mealAllowance ?? 0).toFixed(2),
         +(slip?.transportAllowance ?? 0).toFixed(2),
         +(slip?.otherAllowance ?? 0).toFixed(2),
         +((slip?.mealAllowance ?? 0) + (slip?.transportAllowance ?? 0) + (slip?.otherAllowance ?? 0)).toFixed(2),
+        // 绩效
+        +(slip?.performanceBonus ?? 0).toFixed(2),
+        +(slip?.salesCommission ?? 0).toFixed(2), // 业绩提点
+        // 奖惩
         +rewards.toFixed(2),
-        +penalties.toFixed(2),
+        penalties > 0 ? -+penalties.toFixed(2) : 0,
         +(slip?.rewardPenalty ?? 0).toFixed(2),
         +(slip?.compOffCashOut ?? 0).toFixed(2),
+        // 应发
         +(slip?.grossSalary ?? 0).toFixed(2),
-        +(slip?.socialInsuranceDeduction ?? 0).toFixed(2),
-        +(slip?.housingFundDeduction ?? 0).toFixed(2),
-        +(slip?.incomeTax ?? 0).toFixed(2),
-        +(slip?.advanceAmount ?? 0).toFixed(2),
+        // 扣款
+        (slip?.advanceAmount ?? 0) > 0 ? -+(slip?.advanceAmount ?? 0).toFixed(2) : 0,
+        (slip?.socialInsuranceDeduction ?? 0) > 0 ? -+(slip?.socialInsuranceDeduction ?? 0).toFixed(2) : 0,
+        (slip?.housingFundDeduction ?? 0) > 0 ? -+(slip?.housingFundDeduction ?? 0).toFixed(2) : 0,
+        (slip?.incomeTax ?? 0) > 0 ? -+(slip?.incomeTax ?? 0).toFixed(2) : 0,
+        // 实发
         +(slip?.finalSalary ?? 0).toFixed(2),
         +(slip?.employerSocialInsurance ?? 0).toFixed(2),
         +(slip?.employerHousingFund ?? 0).toFixed(2),
@@ -258,7 +317,7 @@ export function buildPayrollWorkbook(params: ExportParams): XLSX.WorkBook {
     });
 
     const detailSheet = XLSX.utils.aoa_to_sheet([detailHeader, ...detailRows]);
-    detailSheet["!cols"] = detailHeader.map((h) => ({ wch: Math.max(h.length * 2, 8) }));
+    detailSheet["!cols"] = detailHeader.map((h) => ({ wch: Math.max(String(h).length * 2, 8) }));
     XLSX.utils.book_append_sheet(wb, detailSheet, `${dept.label}`);
   }
 
@@ -381,23 +440,32 @@ export function buildPayrollHtml(params: ExportParams): string {
       grandFinal += finalSalary;
       grandCost += slip?.totalEmployerCost ?? slip?.grossSalary ?? 0;
 
+      // 比例底薪（与薪资卡片一致）
+      const proportionalBase = calcProportionalBase(att, slip);
+      const specialDeduction = att?.totalSpecialDeduction ?? 0;
+      const allowanceTotal = (slip?.mealAllowance ?? 0) + (slip?.transportAllowance ?? 0) + (slip?.otherAllowance ?? 0);
+
       return `
         <tr>
           <td>${emp.realName}</td>
           <td>${emp.code ?? ""}</td>
           <td>${EMPLOYEE_TYPE_LABELS[emp.type]}</td>
           <td>${att?.attendanceDays ?? "—"}/${att?.expectedAttendanceDays ?? "—"}</td>
-          <td>${fmt(att?.paidOvertimeHours ?? 0, 1)}h</td>
+          <td>¥${fmt(proportionalBase)}</td>
+          <td>${fmt(att?.paidOvertimeHours ?? 0, 1)}h / ¥${fmt(att?.overtimePay)}</td>
+          <td>¥${fmt(att?.holidayBonus)}</td>
+          <td class="${specialDeduction > 0 ? "deduct" : ""}">-¥${fmt(specialDeduction)}</td>
           <td>¥${fmt(slip?.attendanceSalary)}</td>
           <td>¥${fmt(slip?.performanceBonus)}</td>
-          <td>¥${fmt((slip?.mealAllowance ?? 0) + (slip?.transportAllowance ?? 0) + (slip?.otherAllowance ?? 0))}</td>
+          <td>¥${fmt(slip?.salesCommission)}</td>
+          <td>¥${fmt(allowanceTotal)}</td>
           <td>¥${fmt(slip?.rewardPenalty)}</td>
           <td>¥${fmt(slip?.compOffCashOut)}</td>
           <td>¥${fmt(slip?.grossSalary)}</td>
-          <td>¥${fmt(slip?.socialInsuranceDeduction)}</td>
-          <td>¥${fmt(slip?.housingFundDeduction)}</td>
-          <td>¥${fmt(slip?.incomeTax)}</td>
-          <td>¥${fmt(slip?.advanceAmount)}</td>
+          <td class="deduct">-¥${fmt(slip?.socialInsuranceDeduction)}</td>
+          <td class="deduct">-¥${fmt(slip?.housingFundDeduction)}</td>
+          <td class="deduct">-¥${fmt(slip?.incomeTax)}</td>
+          <td class="deduct">-¥${fmt(slip?.advanceAmount)}</td>
           <td class="highlight">¥${fmt(finalSalary)}</td>
           <td>¥${fmt(slip?.totalEmployerCost ?? slip?.grossSalary)}</td>
           <td class="${fmtStatus(slip) === "已发" ? "paid" : "unpaid"}">${fmtStatus(slip)}</td>
@@ -405,10 +473,10 @@ export function buildPayrollHtml(params: ExportParams): string {
     }).join("");
 
     return `
-      <tr class="dept-header"><td colspan="18">${label}（${deptEmps.length} 人）</td></tr>
+      <tr class="dept-header"><td colspan="22">${label}（${deptEmps.length} 人）</td></tr>
       ${empRows}
       <tr class="subtotal">
-        <td colspan="15">【${label} 小计】</td>
+        <td colspan="19">【${label} 小计】</td>
         <td class="highlight">¥${deptFinal.toFixed(2)}</td>
         <td colspan="2"></td>
       </tr>`;
@@ -433,6 +501,7 @@ export function buildPayrollHtml(params: ExportParams): string {
   .highlight { color: #007AFF; font-weight: bold; }
   .paid { color: #34C759; font-weight: bold; }
   .unpaid { color: #FF3B30; }
+  .deduct { color: #FF3B30; }
   .total-row td { background: #1a1a2e; color: white; font-weight: bold; }
   @page { margin: 10mm; size: A3 landscape; }
 </style>
@@ -444,19 +513,18 @@ export function buildPayrollHtml(params: ExportParams): string {
   <thead>
     <tr>
       <th>姓名</th><th>代号</th><th>类型</th>
-      <th>出勤/应出勤</th><th>加班(h)</th>
-      <th>考勤工资</th><th>绩效</th><th>补贴合计</th>
-      <th>奖惩</th><th>调休兑现</th>
+      <th>出勤/应出勤</th>
+      <th>比例底薪</th><th>加班(h/¥)</th><th>节假日薪资</th><th>特殊扣薪</th><th>考勤工资</th>
+      <th>工作绩效</th><th>业绩提点</th><th>补贴合计</th><th>奖惩</th><th>调休兑现</th>
       <th>应发工资</th>
-      <th>社保(个人)</th><th>公积金(个人)</th><th>个税</th>
-      <th>预支</th>
+      <th>社保(个人)</th><th>公积金(个人)</th><th>个税</th><th>预支</th>
       <th>实发工资</th><th>公司总成本</th><th>状态</th>
     </tr>
   </thead>
   <tbody>
     ${deptSections}
     <tr class="total-row">
-      <td colspan="15">【总计】</td>
+      <td colspan="19">【总计】</td>
       <td>¥${grandFinal.toFixed(2)}</td>
       <td>¥${grandCost.toFixed(2)}</td>
       <td></td>

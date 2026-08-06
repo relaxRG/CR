@@ -702,8 +702,14 @@ function AttendanceProvider({ children }: { children: React.ReactNode }) {
     /**
      * 考勤工资计算逻辑（按实际出勤天数比例）
      *
+     * 字段语义（与薪资卡片展示保持一致）：
+     *   比例底薪 (proportionalBase) = baseSalary × (attendanceDays / expectedAttendanceDays)
+     *   考勤工资 (attendanceSalary) = proportionalBase + overtimePay - totalSpecialDeduction + holidayBonus
+     *
+     * 展示公式验证（薪资卡片 5格加法）：
+     *   proportionalBase + overtimePay + holidayBonus - totalSpecialDeduction = attendanceSalary ✅
+     *
      * 全职员工：
-     *   底薪比例 = baseSalary × (实际出勤天数 / 应出勤天数)
      *   实际出勤天数 = 有工时天数 + 加班换休天数 + 节假日调休天数（这些天已在 daysSet 里）
      *   特殊状态只处理额外惩罚/补偿：
      *     - 旷工 2x：该天已不在出勤（比例已扣1天），额外再扣 (2-1)=1 天日薪
