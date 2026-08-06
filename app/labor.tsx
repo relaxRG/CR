@@ -450,61 +450,140 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
         )}
       </View>
 
-      {/* ─── 4格薪资摘要行（收起/展开都显示）─── */}
+      {/* ─── 5格摘要行（收起/展开都显示）─── */}
       {(() => {
         const baseSalary = slip ? Math.round((slip.attendanceSalary - (att?.overtimePay ?? 0) - (att?.holidayBonus ?? 0)) * 100) / 100 : null;
-        const overtimePay = att?.overtimePay ?? 0;
-        const holidayPay = att?.holidayBonus ?? 0;
-        const totalAttSalary = att?.attendanceSalary ?? (slip?.attendanceSalary ?? null);
+        const overtimeAndHoliday = (att?.overtimePay ?? 0) + (att?.holidayBonus ?? 0);
+        const allowanceSum = slip ? (slip.mealAllowance ?? 0) + (slip.transportAllowance ?? 0) + (slip.otherAllowance ?? 0) : 0;
+        const extraTotal = slip ? (slip.performanceBonus ?? 0) + allowanceSum + (slip.rewardPenalty ?? 0) : 0;
+        const advanceAmount = slip?.advanceAmount ?? 0;
+        const finalSalary = slip?.finalSalary ?? null;
         return (
           <View style={{ flexDirection: "row", marginTop: 8, paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border + "44" }}>
             {[
               { label: "基础薪资", value: baseSalary !== null ? `¥${baseSalary.toFixed(0)}` : "—", color: colors.foreground },
-              { label: "加班薪资", value: overtimePay > 0 ? `+¥${overtimePay.toFixed(0)}` : "—", color: overtimePay > 0 ? colors.success : colors.muted },
-              { label: "节假日薪资", value: holidayPay > 0 ? `+¥${holidayPay.toFixed(0)}` : "—", color: holidayPay > 0 ? "#FF2D55" : colors.muted },
-              { label: "总考勤工资", value: totalAttSalary !== null ? `¥${totalAttSalary.toFixed(0)}` : "—", color: deptColor },
+              { label: "加班考勤", value: overtimeAndHoliday > 0 ? `+¥${overtimeAndHoliday.toFixed(0)}` : "—", color: overtimeAndHoliday > 0 ? colors.success : colors.muted },
+              { label: "综合额外", value: extraTotal !== 0 ? `${extraTotal >= 0 ? "+" : ""}¥${extraTotal.toFixed(0)}` : "—", color: extraTotal > 0 ? colors.primary : extraTotal < 0 ? colors.error : colors.muted },
+              { label: "已预支", value: advanceAmount > 0 ? `-¥${advanceAmount.toFixed(0)}` : "—", color: advanceAmount > 0 ? colors.error : colors.muted },
+              { label: "总工资", value: finalSalary !== null ? `¥${finalSalary.toFixed(0)}` : "—", color: deptColor },
             ].map(({ label, value, color }) => (
               <View key={label} style={{ flex: 1, alignItems: "center" }}>
-                <Text style={{ fontSize: 13, fontWeight: "800", color }}>{value}</Text>
-                <Text style={{ fontSize: 9, color: colors.muted, marginTop: 2 }}>{label}</Text>
+                <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: "800", color }}>{value}</Text>
+                <Text numberOfLines={1} style={{ fontSize: 9, color: colors.muted, marginTop: 2 }}>{label}</Text>
               </View>
             ))}
           </View>
         );
       })()}
 
-      {/* 展开明细（点击卡片展开）─── 薪资构成明细 */}
+      {/* ─── 展开明细（点击卡片展开）─── */}
       {expanded && (
-        <View style={{ marginTop: 10, gap: 4, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border + "55", paddingTop: 10 }}>
+        <View style={{ marginTop: 10, gap: 0, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border + "55", paddingTop: 10 }}>
 
-          {/* ─── 薪资构成明细（绩效奖金/补贴/奖惩/预支/社保/实发）─── */}
-          {slip && (() => {
-            const allowanceSum = (slip.mealAllowance ?? 0) + (slip.transportAllowance ?? 0) + (slip.otherAllowance ?? 0);
-            const rows = [
-              { label: "绩效奖金", value: slip.performanceBonus, fmt: (v: number) => v > 0 ? `+¥${v.toFixed(0)}` : null, color: colors.success },
-              { label: "补贴合计", value: allowanceSum, fmt: (v: number) => v > 0 ? `+¥${v.toFixed(0)}` : null, color: colors.primary },
-              { label: "奖惩小计", value: slip.rewardPenalty ?? 0, fmt: (v: number) => v !== 0 ? `${v > 0 ? "+" : ""}¥${v.toFixed(0)}` : null, color: (slip.rewardPenalty ?? 0) >= 0 ? colors.success : colors.error },
-              { label: "预支小计", value: slip.advanceAmount ?? 0, fmt: (v: number) => v > 0 ? `-¥${v.toFixed(0)}` : null, color: colors.error },
-              { label: "社保代扣", value: slip.socialInsuranceDeduction ?? 0, fmt: (v: number) => v > 0 ? `-¥${v.toFixed(0)}` : null, color: colors.error },
-              { label: "公积金代扣", value: slip.housingFundDeduction ?? 0, fmt: (v: number) => v > 0 ? `-¥${v.toFixed(0)}` : null, color: colors.error },
-            ];
-            const visibleRows = rows.filter(r => r.fmt(r.value) !== null);
-            if (visibleRows.length === 0 && !slip) return null;
+          {/* ─── 考勤明细（5格）─── */}
+          {(() => {
+            const baseSalary = slip ? Math.round((slip.attendanceSalary - (att?.overtimePay ?? 0) - (att?.holidayBonus ?? 0)) * 100) / 100 : 0;
+            const overtimePay = att?.overtimePay ?? 0;
+            const holidayPay = att?.holidayBonus ?? 0;
+            const specialDeduction = att ? Object.values(att.specialStatusDeductions ?? {}).reduce((s, d) => s + d.deduction, 0) : 0;
+            const attTotal = slip?.attendanceSalary ?? 0;
             return (
-              <View style={{ paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border + "44", gap: 4 }}>
-                {visibleRows.map(({ label, value, fmt, color }) => (
-                  <View key={label} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                    <Text style={{ fontSize: 12, color: colors.muted }}>{label}</Text>
-                    <Text style={{ fontSize: 12, fontWeight: "600", color }}>{fmt(value)}</Text>
-                  </View>
-                ))}
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 6, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border + "55", marginTop: 2 }}>
-                  <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>实发薪资</Text>
-                  <Text style={{ fontSize: 15, fontWeight: "800", color: colors.primary }}>¥{slip.finalSalary.toFixed(0)}</Text>
+              <View style={{ gap: 6, paddingBottom: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border + "44" }}>
+                <Text style={{ fontSize: 10, fontWeight: "600", color: colors.muted }}>考勤明细</Text>
+                <View style={{ flexDirection: "row" }}>
+                  {[
+                    { label: "基础薪资", value: `¥${baseSalary.toFixed(0)}`, color: colors.foreground },
+                    { label: "加班工资", value: overtimePay > 0 ? `+¥${overtimePay.toFixed(0)}` : "—", color: overtimePay > 0 ? colors.success : colors.muted },
+                    { label: "节假日薪资", value: holidayPay > 0 ? `+¥${holidayPay.toFixed(0)}` : "—", color: holidayPay > 0 ? "#FF2D55" : colors.muted },
+                    { label: "特殊状态扣薪", value: specialDeduction > 0 ? `-¥${specialDeduction.toFixed(0)}` : "—", color: specialDeduction > 0 ? colors.error : colors.muted },
+                    { label: "总考勤工资", value: `¥${attTotal.toFixed(0)}`, color: deptColor },
+                  ].map(({ label, value, color }) => (
+                    <View key={label} style={{ flex: 1, alignItems: "center" }}>
+                      <Text numberOfLines={1} style={{ fontSize: 11, fontWeight: "700", color }}>{value}</Text>
+                      <Text numberOfLines={1} style={{ fontSize: 9, color: colors.muted, marginTop: 1 }}>{label}</Text>
+                    </View>
+                  ))}
                 </View>
               </View>
             );
           })()}
+
+          {/* ─── 综合额外（5格）─── */}
+          {slip && (() => {
+            const allowanceSum = (slip.mealAllowance ?? 0) + (slip.transportAllowance ?? 0) + (slip.otherAllowance ?? 0);
+            const workKPI = slip.performanceBonus ?? 0;
+            const revenueKPI = slip.salesCommission ?? 0;
+            const reward = slip.rewardPenalty ?? 0;
+            const extraTotal = allowanceSum + workKPI + revenueKPI + reward;
+            return (
+              <View style={{ gap: 6, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border + "44" }}>
+                <Text style={{ fontSize: 10, fontWeight: "600", color: colors.muted }}>综合额外</Text>
+                <View style={{ flexDirection: "row" }}>
+                  {[
+                    { label: "补贴合计", value: allowanceSum > 0 ? `+¥${allowanceSum.toFixed(0)}` : "—", color: allowanceSum > 0 ? colors.primary : colors.muted },
+                    { label: "工作绩效", value: workKPI > 0 ? `+¥${workKPI.toFixed(0)}` : "—", color: workKPI > 0 ? colors.success : colors.muted },
+                    { label: "业绩绩效", value: revenueKPI > 0 ? `+¥${revenueKPI.toFixed(0)}` : "—", color: revenueKPI > 0 ? colors.success : colors.muted },
+                    { label: "奖惩小计", value: reward !== 0 ? `${reward >= 0 ? "+" : ""}¥${reward.toFixed(0)}` : "—", color: reward > 0 ? colors.success : reward < 0 ? colors.error : colors.muted },
+                    { label: "综合小计", value: `${extraTotal >= 0 ? "+" : ""}¥${extraTotal.toFixed(0)}`, color: extraTotal >= 0 ? colors.primary : colors.error },
+                  ].map(({ label, value, color }) => (
+                    <View key={label} style={{ flex: 1, alignItems: "center" }}>
+                      <Text numberOfLines={1} style={{ fontSize: 11, fontWeight: "700", color }}>{value}</Text>
+                      <Text numberOfLines={1} style={{ fontSize: 9, color: colors.muted, marginTop: 1 }}>{label}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            );
+          })()}
+
+          {/* ─── 扣款（5格）─── */}
+          {slip && (() => {
+            const advance = slip.advanceAmount ?? 0;
+            const si = slip.socialInsuranceDeduction ?? 0;
+            const hf = slip.housingFundDeduction ?? 0;
+            const tax = slip.incomeTax ?? 0;
+            const hasDeductions = advance > 0 || si > 0 || hf > 0 || tax > 0;
+            if (!hasDeductions) return null;
+            return (
+              <View style={{ gap: 6, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border + "44" }}>
+                <Text style={{ fontSize: 10, fontWeight: "600", color: colors.muted }}>扣款</Text>
+                <View style={{ flexDirection: "row" }}>
+                  {[
+                    { label: "预支小计", value: advance > 0 ? `-¥${advance.toFixed(0)}` : "—", color: advance > 0 ? colors.error : colors.muted },
+                    { label: "社保代扣", value: si > 0 ? `-¥${si.toFixed(0)}` : "—", color: si > 0 ? colors.error : colors.muted },
+                    { label: "公积金代扣", value: hf > 0 ? `-¥${hf.toFixed(0)}` : "—", color: hf > 0 ? colors.error : colors.muted },
+                    { label: "个税代缴", value: tax > 0 ? `-¥${tax.toFixed(0)}` : "—", color: tax > 0 ? colors.error : colors.muted },
+                    { label: "—", value: "—", color: colors.muted },
+                  ].map(({ label, value, color }) => (
+                    <View key={label} style={{ flex: 1, alignItems: "center" }}>
+                      <Text numberOfLines={1} style={{ fontSize: 11, fontWeight: "700", color }}>{value}</Text>
+                      <Text numberOfLines={1} style={{ fontSize: 9, color: colors.muted, marginTop: 1 }}>{label}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            );
+          })()}
+
+          {/* ─── 实发薪资 + 公司社保公积金─── */}
+          {slip && (
+            <View style={{ paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border + "44" }}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                <Text style={{ fontSize: 14, fontWeight: "800", color: colors.foreground }}>实发薪资</Text>
+                <Text style={{ fontSize: 17, fontWeight: "900", color: colors.primary }}>¥{slip.finalSalary.toFixed(0)}</Text>
+              </View>
+              {(slip.employerSocialInsurance > 0 || slip.employerHousingFund > 0) && (
+                <View style={{ flexDirection: "row", gap: 16, marginTop: 4 }}>
+                  {slip.employerSocialInsurance > 0 && (
+                    <Text style={{ fontSize: 10, color: colors.muted }}>公司社保：¥{slip.employerSocialInsurance.toFixed(0)}</Text>
+                  )}
+                  {slip.employerHousingFund > 0 && (
+                    <Text style={{ fontSize: 10, color: colors.muted }}>公司公积金：¥{slip.employerHousingFund.toFixed(0)}</Text>
+                  )}
+                </View>
+              )}
+            </View>
+          )}
 
           {/* ─── 调休余额行 + 存入/兑换按鈕 ─── */}
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border + "44" }}>
