@@ -449,7 +449,9 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
 
       {/* ─── 5格摘要行（收起/展开都显示）─── */}
       {(() => {
-        const baseSalary = slip ? Math.round((slip.attendanceSalary - (att?.overtimePay ?? 0) - (att?.holidayBonus ?? 0)) * 100) / 100 : null;
+        // 比例底薪 = attendanceSalary - overtimePay - holidayBonus + specialDeduction
+        const _specialDed = att ? Object.values(att.specialStatusDeductions ?? {}).reduce((s, d) => s + d.deduction, 0) : 0;
+        const baseSalary = slip ? Math.round((slip.attendanceSalary - (att?.overtimePay ?? 0) - (att?.holidayBonus ?? 0) + _specialDed) * 100) / 100 : null;
         const overtimeAndHoliday = (att?.overtimePay ?? 0) + (att?.holidayBonus ?? 0);
         const allowanceSum = slip ? (slip.mealAllowance ?? 0) + (slip.transportAllowance ?? 0) + (slip.otherAllowance ?? 0) : 0;
         const extraTotal = slip ? (slip.performanceBonus ?? 0) + allowanceSum + (slip.rewardPenalty ?? 0) : 0;
@@ -479,20 +481,23 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
 
           {/* ─── 考勤明细（5格）─── */}
           {(() => {
-            const baseSalary = slip ? Math.round((slip.attendanceSalary - (att?.overtimePay ?? 0) - (att?.holidayBonus ?? 0)) * 100) / 100 : 0;
+            // 比例底薪 = slip.attendanceSalary - overtimePay - holidayBonus - specialDeduction
+            // 即：底薪 × (出勤/应出勤)，不含任何加成或扣扣
+            const specialDeduction = att ? Object.values(att.specialStatusDeductions ?? {}).reduce((s, d) => s + d.deduction, 0) : 0;
             const overtimePay = att?.overtimePay ?? 0;
             const holidayPay = att?.holidayBonus ?? 0;
-            const specialDeduction = att ? Object.values(att.specialStatusDeductions ?? {}).reduce((s, d) => s + d.deduction, 0) : 0;
+            // 比例底薪（不含加班费/节假日费/特殊扣薪）
+            const proportionalBase = slip ? Math.round((slip.attendanceSalary - overtimePay - holidayPay + specialDeduction) * 100) / 100 : 0;
             const attTotal = slip?.attendanceSalary ?? 0;
             return (
               <View style={{ gap: 6, paddingBottom: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border + "44" }}>
                 <Text style={{ fontSize: 10, fontWeight: "600", color: colors.muted }}>考勤明细</Text>
                 <View style={{ flexDirection: "row" }}>
                   {[
-                    { label: "基础薪资", value: `¥${baseSalary.toFixed(0)}`, color: colors.foreground },
+                    { label: "比例底薪", value: `¥${proportionalBase.toFixed(0)}`, color: colors.foreground },
                     { label: "加班工资", value: overtimePay > 0 ? `+¥${overtimePay.toFixed(0)}` : "—", color: overtimePay > 0 ? colors.success : colors.muted },
                     { label: "节假日薪资", value: holidayPay > 0 ? `+¥${holidayPay.toFixed(0)}` : "—", color: holidayPay > 0 ? "#FF2D55" : colors.muted },
-                    { label: "特殊状态扣薪", value: specialDeduction > 0 ? `-¥${specialDeduction.toFixed(0)}` : "—", color: specialDeduction > 0 ? colors.error : colors.muted },
+                    { label: "特殊扣薪", value: specialDeduction > 0 ? `-¥${specialDeduction.toFixed(0)}` : "—", color: specialDeduction > 0 ? colors.error : colors.muted },
                     { label: "总考勤工资", value: `¥${attTotal.toFixed(0)}`, color: deptColor },
                   ].map(({ label, value, color }) => (
                     <View key={label} style={{ flex: 1, alignItems: "center" }}>
@@ -509,6 +514,8 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
           {slip && (() => {
             const allowanceSum = (slip.mealAllowance ?? 0) + (slip.transportAllowance ?? 0) + (slip.otherAllowance ?? 0);
             const workKPI = slip.performanceBonus ?? 0;
+            // salesCommission = 业绩提点（从 existing 读取，非 revenueKPI 绩效）
+            // performanceBonus = 工作绩效 + 业绩绩效合计（由 buildPaySlipDraft 的 performanceTotal 参数传入）
             const revenueKPI = slip.salesCommission ?? 0;
             const reward = slip.rewardPenalty ?? 0;
             const extraTotal = allowanceSum + workKPI + revenueKPI + reward;
@@ -519,7 +526,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
                   {[
                     { label: "补贴合计", value: allowanceSum > 0 ? `+¥${allowanceSum.toFixed(0)}` : "—", color: allowanceSum > 0 ? colors.primary : colors.muted },
                     { label: "工作绩效", value: workKPI > 0 ? `+¥${workKPI.toFixed(0)}` : "—", color: workKPI > 0 ? colors.success : colors.muted },
-                    { label: "业绩绩效", value: revenueKPI > 0 ? `+¥${revenueKPI.toFixed(0)}` : "—", color: revenueKPI > 0 ? colors.success : colors.muted },
+                    { label: "业绩提点", value: revenueKPI > 0 ? `+¥${revenueKPI.toFixed(0)}` : "—", color: revenueKPI > 0 ? colors.success : colors.muted },
                     { label: "奖惩小计", value: reward !== 0 ? `${reward >= 0 ? "+" : ""}¥${reward.toFixed(0)}` : "—", color: reward > 0 ? colors.success : reward < 0 ? colors.error : colors.muted },
                     { label: "综合小计", value: `${extraTotal >= 0 ? "+" : ""}¥${extraTotal.toFixed(0)}`, color: extraTotal >= 0 ? colors.primary : colors.error },
                   ].map(({ label, value, color }) => (
@@ -3063,8 +3070,8 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   const { getHolidayForDate } = useHolidayConfigStore();
   const { advances } = useSalaryAdvanceStore();
   const { settings: globalSettings } = useGlobalPayrollSettingsStore();
-  const { getAvailableDays: getCompOffAvailDays, addEntry: addCompOffEntry, updateEntry: updateCompOffEntry, getEntries: getCompOffEntries, expireOldEntries: expireCompOff, cashOutEntry: cashOutCompOff } = useCompOffBalanceEntryStore();
-  const { getAvailableDays: getHolidayCompOffAvailDays, updateEntry: updateHolidayCompOff, getEntries: getHolidayCompOffEntries, addEntry: addHolidayCompOff, expireOldEntries: expireHolidayCompOff } = useHolidayCompOffStore();
+  const { entries: compOffEntriesSched, getAvailableDays: getCompOffAvailDays, addEntry: addCompOffEntry, updateEntry: updateCompOffEntry, getEntries: getCompOffEntries, expireOldEntries: expireCompOff, cashOutEntry: cashOutCompOff } = useCompOffBalanceEntryStore();
+  const { entries: holidayCompOffEntriesSched, getAvailableDays: getHolidayCompOffAvailDays, updateEntry: updateHolidayCompOff, getEntries: getHolidayCompOffEntries, addEntry: addHolidayCompOff, expireOldEntries: expireHolidayCompOff } = useHolidayCompOffStore();
   const { upsertAlert } = useUnexplainedRestAlertStore();
   const { businessHours, setBusinessHours } = useBusinessHoursStore();
   const { shiftGroups, setShiftGroups } = useShiftGroupStore();
@@ -3206,7 +3213,9 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   // 即时同步：将 employees 和 advances 加入依赖数组
   // - employees 变化（底薪/时薪/社保配置修改）→ 立即重算所有有排班员工的薪资单
   // - advances 变化（预支新增/删除）→ 立即重算对应员工的 finalSalary
-  }, [shifts, currentMonth, employees, advances]);
+  // compOffEntriesSched/holidayCompOffEntriesSched 变化（存入/兑换调休）→ 重算加班费
+  // （compOffCount 影响 paidOvertimeHours 和 overtimePay）
+  }, [shifts, currentMonth, employees, advances, compOffEntriesSched, holidayCompOffEntriesSched]);
 
   const sortedTemplates = useMemo(() =>
     [...(templates.length > 0 ? templates : DEFAULT_SHIFT_TEMPLATES)].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)),
