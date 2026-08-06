@@ -488,17 +488,85 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
       {/* 展开明细（点击卡片展开） */}
       {expanded && (
         <View style={{ marginTop: 10, gap: 4, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border + "55", paddingTop: 10 }}>
-          {/* 明细表格 */}
+
+          {/* ─── 加班超时提醒卡片（专业 App 标准）─── */}
+          {att?.overtimeAlertHours !== undefined && att.overtimeAlertHours >= 4 && (
+            <View style={{ backgroundColor: colors.warning + "18", borderRadius: 10, padding: 10, borderWidth: 1, borderColor: colors.warning + "55", flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+              <View style={{ flex: 1, gap: 2 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.warning }} />
+                  <Text style={{ fontSize: 12, fontWeight: "700", color: colors.warning }}>加班提醒</Text>
+                </View>
+                <Text style={{ fontSize: 11, color: colors.muted }}>
+                  {`本月累计加班 ${att.overtimeAlertHours.toFixed(1)}h`}
+                  {att.storedOvertimeHours ? `，已存入 ${att.storedOvertimeHours.toFixed(1)}h` : ""}
+                  {att.overtimeAlertHours - (att.storedOvertimeHours ?? 0) >= 4
+                    ? `，可存入 ${(att.overtimeAlertHours - (att.storedOvertimeHours ?? 0)).toFixed(1)}h 调休`
+                    : ""}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => { tap(); setPanelMode("add"); setAddMode("hours"); setShowCompOffModal(true); }}
+                style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 7, backgroundColor: colors.warning, marginLeft: 8 }}>
+                <Text style={{ fontSize: 11, fontWeight: "700", color: "#fff" }}>存入调休</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* ─── 考勤概况分区（一行四格）─── */}
+          {att && (
+            <View style={{ backgroundColor: colors.surface, borderRadius: 10, padding: 10, borderWidth: 1, borderColor: colors.border + "66", gap: 8, marginBottom: 2 }}>
+              <Text style={{ fontSize: 11, fontWeight: "600", color: colors.muted, marginBottom: 2 }}>考勤概况</Text>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 0 }}>
+                {[
+                  { label: "出勤", value: `${att.attendanceDays}/${att.expectedAttendanceDays}天`, color: att.attendanceDays >= att.expectedAttendanceDays ? colors.success : colors.warning },
+                  { label: "实际工时", value: `${att.totalHours.toFixed(1)}h`, color: colors.foreground },
+                  { label: "标准工时", value: `${att.stdHours.toFixed(1)}h`, color: colors.muted },
+                  { label: "加班时数", value: att.overtimeHours > 0 ? `${att.overtimeHours.toFixed(1)}h` : "—", color: att.overtimeHours > 0 ? colors.warning : colors.muted },
+                ].map(({ label, value, color }) => (
+                  <View key={label} style={{ width: "25%", alignItems: "center", paddingVertical: 4 }}>
+                    <Text style={{ fontSize: 15, fontWeight: "800", color }}>{value}</Text>
+                    <Text style={{ fontSize: 10, color: colors.muted, marginTop: 1 }}>{label}</Text>
+                  </View>
+                ))}
+              </View>
+              {/* 加班详情行 */}
+              {att.overtimeHours > 0 && (
+                <View style={{ flexDirection: "row", justifyContent: "space-between", paddingTop: 6, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border + "44" }}>
+                  <View style={{ flexDirection: "row", gap: 12 }}>
+                    <Text style={{ fontSize: 11, color: colors.muted }}>加班 <Text style={{ color: colors.warning, fontWeight: "600" }}>{att.overtimeHours.toFixed(1)}h</Text></Text>
+                    {(att.storedOvertimeHours ?? 0) > 0 && (
+                      <Text style={{ fontSize: 11, color: colors.muted }}>已存入 <Text style={{ color: colors.success, fontWeight: "600" }}>{att.storedOvertimeHours!.toFixed(1)}h</Text></Text>
+                    )}
+                    <Text style={{ fontSize: 11, color: colors.muted }}>计费 <Text style={{ color: colors.foreground, fontWeight: "600" }}>{att.paidOvertimeHours.toFixed(1)}h</Text></Text>
+                  </View>
+                  {att.overtimePay > 0 && (
+                    <Text style={{ fontSize: 11, color: colors.success, fontWeight: "600" }}>+¥{att.overtimePay.toFixed(0)}</Text>
+                  )}
+                </View>
+              )}
+              {/* 少休/多休提示 */}
+              {att.underRestDays !== 0 && (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingTop: 4, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border + "44" }}>
+                  <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: att.underRestDays > 0 ? colors.error : colors.success }} />
+                  <Text style={{ fontSize: 11, color: att.underRestDays > 0 ? colors.error : colors.success }}>
+                    {att.underRestDays > 0 ? `少出勤 ${att.underRestDays}天` : `多出勤 ${Math.abs(att.underRestDays)}天`}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* ─── 薪资构成明细─── */}
           {[
-            { label: "出勤天数", value: att ? `${att.attendanceDays}天（应${att.expectedAttendanceDays ?? "—"}天）` : "—", color: colors.foreground },
-            { label: "加班时长", value: att ? `${att.overtimeHours.toFixed(1)}h（计费${att.paidOvertimeHours?.toFixed(1) ?? att.overtimeHours.toFixed(1)}h）` : "—", color: colors.foreground },
-            { label: "考勤工资", value: attendanceSalary > 0 ? `¥${attendanceSalary.toFixed(0)}` : "—", color: colors.foreground },
-            { label: "绩效奖金", value: slip?.performanceBonus ? `+¥${slip.performanceBonus.toFixed(0)}` : "—", color: slip?.performanceBonus ? colors.success : colors.muted },
-            { label: "补贴合计", value: (slip && (slip.mealAllowance + slip.transportAllowance + slip.otherAllowance) > 0) ? `+¥${(slip.mealAllowance + slip.transportAllowance + slip.otherAllowance).toFixed(0)}` : "—", color: (slip && (slip.mealAllowance + slip.transportAllowance + slip.otherAllowance) > 0) ? "#1677FF" : colors.muted },
-            { label: "奖惩小计", value: slip?.rewardPenalty ? (slip.rewardPenalty > 0 ? `+¥${slip.rewardPenalty.toFixed(0)}` : `-¥${Math.abs(slip.rewardPenalty).toFixed(0)}`) : "—", color: slip?.rewardPenalty ? (slip.rewardPenalty > 0 ? colors.success : colors.error) : colors.muted },
-            { label: "业绩提点", value: slip?.salesCommission ? `+¥${slip.salesCommission.toFixed(0)}` : "—", color: slip?.salesCommission ? "#1677FF" : colors.muted },
-            { label: "预支小计", value: slip?.advanceAmount ? `-¥${slip.advanceAmount.toFixed(0)}` : "—", color: slip?.advanceAmount ? colors.warning : colors.muted },
-          ].map(({ label, value, color }) => (
+            { label: "考勤工资", value: attendanceSalary > 0 ? `¥${attendanceSalary.toFixed(0)}` : "—", color: colors.foreground, show: true },
+            { label: "加班工资", value: att?.overtimePay ? `+¥${att.overtimePay.toFixed(0)}` : "—", color: att?.overtimePay ? colors.success : colors.muted, show: (att?.overtimePay ?? 0) > 0 },
+            { label: "节日补偿", value: att?.holidayBonus ? `+¥${att.holidayBonus.toFixed(0)}` : "—", color: att?.holidayBonus ? colors.success : colors.muted, show: (att?.holidayBonus ?? 0) > 0 },
+            { label: "绩效奖金", value: slip?.performanceBonus ? `+¥${slip.performanceBonus.toFixed(0)}` : "—", color: slip?.performanceBonus ? colors.success : colors.muted, show: true },
+            { label: "补贴合计", value: (slip && (slip.mealAllowance + slip.transportAllowance + slip.otherAllowance) > 0) ? `+¥${(slip.mealAllowance + slip.transportAllowance + slip.otherAllowance).toFixed(0)}` : "—", color: (slip && (slip.mealAllowance + slip.transportAllowance + slip.otherAllowance) > 0) ? "#1677FF" : colors.muted, show: true },
+            { label: "奖惩小计", value: slip?.rewardPenalty ? (slip.rewardPenalty > 0 ? `+¥${slip.rewardPenalty.toFixed(0)}` : `-¥${Math.abs(slip.rewardPenalty).toFixed(0)}`) : "—", color: slip?.rewardPenalty ? (slip.rewardPenalty > 0 ? colors.success : colors.error) : colors.muted, show: true },
+            { label: "业绩提点", value: slip?.salesCommission ? `+¥${slip.salesCommission.toFixed(0)}` : "—", color: slip?.salesCommission ? "#1677FF" : colors.muted, show: true },
+            { label: "预支小计", value: slip?.advanceAmount ? `-¥${slip.advanceAmount.toFixed(0)}` : "—", color: slip?.advanceAmount ? colors.warning : colors.muted, show: true },
+          ].filter(r => r.show).map(({ label, value, color }) => (
             <View key={label} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
               <Text style={{ fontSize: 12, color: colors.muted }}>{label}</Text>
               <Text style={{ fontSize: 12, fontWeight: "600", color }}>{value}</Text>
@@ -3018,6 +3086,7 @@ function SchTemplateModal({ visible, templates, specialStatuses, businessHours, 
 // 结构：日期行（橙色背景）→ 各班次员工行（工时数字）→ 班次间空行分隔
 function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: string; onMonthChange: (m: string) => void }) {
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
+  const router = useRouter();
   const { employees } = useEmployeeStore();
   const { shifts, upsertShift, batchUpsertShifts, deleteShift, batchDeleteShifts, getShifts } = useShiftStore();
   const { templates, upsertTemplate, deleteTemplate } = useShiftTemplateStore();
@@ -3870,13 +3939,42 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                   )}
                 </View>
                 {att ? (
-                  <View style={{ gap: 4 }}>
-                    <View style={{ flexDirection: "row", gap: 12, flexWrap: "wrap" }}>
-                      <Text style={{ fontSize: 11, color: colors.muted }}>出勤 <Text style={{ color: colors.foreground, fontWeight: "500" }}>{att.attendanceDays}/{att.expectedAttendanceDays}</Text></Text>
-                      <Text style={{ fontSize: 11, color: colors.muted }}>加班 <Text style={{ color: colors.foreground, fontWeight: "500" }}>{(att.paidOvertimeHours ?? 0).toFixed(1)}h</Text></Text>
-                      {att.underRestDays < 0 && <Text style={{ fontSize: 11, color: colors.success }}>少休 {Math.abs(att.underRestDays)}天</Text>}
-                      {att.holidayBonus > 0 && <Text style={{ fontSize: 11, color: colors.success }}>节假日+¥{att.holidayBonus.toFixed(0)}</Text>}
-                      {att.totalSpecialDeduction > 0 && <Text style={{ fontSize: 11, color: colors.error }}>扣薪-¥{att.totalSpecialDeduction.toFixed(0)}</Text>}
+                  <View style={{ gap: 6 }}>
+                    {/* ─── 一行四格数据─── */}
+                    <View style={{ flexDirection: "row", gap: 0 }}>
+                      {[
+                        { label: "出勤", value: `${att.attendanceDays}/${att.expectedAttendanceDays}`, color: att.attendanceDays >= att.expectedAttendanceDays ? colors.success : colors.warning },
+                        { label: "工时", value: `${att.totalHours.toFixed(1)}h`, color: colors.foreground },
+                        { label: "加班", value: att.overtimeHours > 0 ? `${att.overtimeHours.toFixed(1)}h` : "—", color: att.overtimeHours > 0 ? colors.warning : colors.muted },
+                        { label: "计费", value: att.paidOvertimeHours > 0 ? `${att.paidOvertimeHours.toFixed(1)}h` : "—", color: att.paidOvertimeHours > 0 ? colors.foreground : colors.muted },
+                      ].map(({ label, value, color }) => (
+                        <View key={label} style={{ flex: 1, alignItems: "center" }}>
+                          <Text style={{ fontSize: 13, fontWeight: "700", color }}>{value}</Text>
+                          <Text style={{ fontSize: 9, color: colors.muted, marginTop: 1 }}>{label}</Text>
+                        </View>
+                      ))}
+                    </View>
+                    {/* ─── 加班超时提醒条─── */}
+                    {att.overtimeAlertHours !== undefined && att.overtimeAlertHours >= 4 && (
+                      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: colors.warning + "15", borderRadius: 7, padding: 7, borderWidth: 1, borderColor: colors.warning + "44" }}>
+                        <Text style={{ fontSize: 11, color: colors.warning, fontWeight: "600" }}>⏰ 加班 {att.overtimeAlertHours.toFixed(1)}h 可存入调休</Text>
+                        <TouchableOpacity
+                          onPress={() => {
+                            tap();
+                            // 导航到该员工的考勤卡片并弹出存入面板
+                            router.push({ pathname: "/labor", params: { tab: "salary", employeeId: emp.id, month: currentMonthStr, openCompOff: "1" } } as any);
+                          }}
+                          style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: colors.warning }}>
+                          <Text style={{ fontSize: 10, fontWeight: "700", color: "#fff" }}>存入</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                    {/* ─── 其他状态标签─── */}
+                    <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
+                      {att.underRestDays < 0 && <View style={{ backgroundColor: colors.success + "20", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5 }}><Text style={{ fontSize: 10, color: colors.success, fontWeight: "600" }}>多出勤 {Math.abs(att.underRestDays)}天</Text></View>}
+                      {att.underRestDays > 0 && <View style={{ backgroundColor: colors.error + "15", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5 }}><Text style={{ fontSize: 10, color: colors.error, fontWeight: "600" }}>少出勤 {att.underRestDays}天</Text></View>}
+                      {att.holidayBonus > 0 && <View style={{ backgroundColor: colors.success + "15", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5 }}><Text style={{ fontSize: 10, color: colors.success, fontWeight: "600" }}>节日+¥{att.holidayBonus.toFixed(0)}</Text></View>}
+                      {att.totalSpecialDeduction > 0 && <View style={{ backgroundColor: colors.error + "15", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5 }}><Text style={{ fontSize: 10, color: colors.error, fontWeight: "600" }}>扣薪-¥{att.totalSpecialDeduction.toFixed(0)}</Text></View>}
                     </View>
 
                     {/* 节假日拿钱/换休选择 */}

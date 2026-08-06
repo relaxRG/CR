@@ -748,6 +748,10 @@ function AttendanceProvider({ children }: { children: React.ReactNode }) {
       overtimePay,
       attendanceSalary,
       notes: existing?.notes ?? "",
+      // 加班超时提醒：加班时数超过4h时提醒员工存入调休
+      overtimeAlertHours: rawOvertimeHours >= 4 ? Math.round(rawOvertimeHours * 10) / 10 : undefined,
+      // 本月已存入调休的加班小时数（compOffCount * hoursPerCompOff）
+      storedOvertimeHours: compOffHoursUsed > 0 ? Math.round(compOffHoursUsed * 10) / 10 : undefined,
     };
   }, [ref]);
 

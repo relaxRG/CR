@@ -1002,6 +1002,15 @@ export interface MonthlyAttendance {
   /** 考勤工资 = 底薪 + 加班工资 - 特殊状态扣薪 + 节日上班补偿 */
   attendanceSalary: number;
   notes: string;
+  /**
+   * 加班超时提醒：当月加班时数超过员工档案中设定的阈値时自动生成
+   * 默认阈値：4h（超过半天就提醒存入调休）
+   */
+  overtimeAlertHours?: number;
+  /**
+   * 本月已存入调休的加班小时数（用于展示剩余可存入时数）
+   */
+  storedOvertimeHours?: number;
 }
 
 // ─── 薪资单（最终薪资） ───────────────────────────────────────────────────────
