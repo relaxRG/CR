@@ -137,6 +137,9 @@ const MAPPING = {
   "list.clipboard.fill": "assignment",
   "chart.pie.fill": "pie-chart",
   "person.crop.circle": "account-circle",
+  "arrow.clockwise.circle.fill": "refresh",
+  "gearshape.fill": "settings",
+  "gearshape": "settings",
 } as unknown as IconMapping;
 
 /**

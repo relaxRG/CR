@@ -774,3 +774,30 @@
 - [x] TypeScript 0 错误
 - [x] vitest 75/76 通过（1 skipped）
 - [x] buildNumber 更新至 133
+
+## Build 134 月报系统 v2（2026-08-06）
+
+### Phase 1-2：数据层和聚合器（已在之前版本完成）
+- [x] PettyCodeConfig 备用金分类配置（types.ts）
+- [x] InventoryReportConfig 库存模块月报配置（types.ts）
+- [x] MonthlyPaymentRecord 月度付款记录（types.ts）
+- [x] aggregateMonthlyReport 聚合引擎（aggregator.ts）
+- [x] 收入行生成（paymentMethods/dishCategories）
+- [x] 支出行按配置动态路由（PettyCodeConfig/InventoryReportConfig）
+- [x] 防重叠自动检测（manualDuplicate 优先于自动检测）
+
+### Phase 3：月报页面升级
+- [x] 科目行长按菜单（所有行均支持手工标记重复/取消重复）
+- [x] 导航栏添加一键汇总按钮（arrow.clockwise.circle.fill）
+- [x] 导航栏添加月报设置入口（gearshape.fill）
+- [x] icon-symbol.tsx 添加 arrow.clockwise.circle.fill/gearshape.fill 映射
+
+### Phase 4：货款 Tab 升级
+- [x] 供应商货款卡片添加「录入付款」按钮
+- [x] 员工薪资卡片添加「录入发放」按钮
+- [x] PaymentEntryModal 部分付款 Modal（金额/方式/账户/备注）
+- [x] 付款后自动更新 paidAmount/remainingAmount/status
+
+### 工程质量
+- [x] TypeScript 0 错误
+- [x] vitest 75/76 通过（1 skipped）

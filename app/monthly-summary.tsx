@@ -99,6 +99,91 @@ function LineItemRow({ item, colors, linkedModule }: { item: SummaryLineItem; co
 }
 
 // ─── 手动录入 Modal ───────────────────────────────────────────────────────────
+// ─── 部分付款 Modal ────────────────────────────────────────────────────────────
+function PaymentEntryModal({ visible, target, colors, onConfirm, onClose }: {
+  visible: boolean;
+  target: { id: string; name: string; remaining: number } | null;
+  colors: any;
+  onConfirm: (paymentId: string, amount: number, method: string, accountType: string, notes: string) => void;
+  onClose: () => void;
+}) {
+  const [amount, setAmount] = React.useState("");
+  const [method, setMethod] = React.useState("转账");
+  const [accountType, setAccountType] = React.useState("公司账户");
+  const [notes, setNotes] = React.useState("");
+
+  React.useEffect(() => {
+    if (visible && target) {
+      setAmount(target.remaining > 0 ? String(target.remaining.toFixed(0)) : "");
+      setMethod("转账");
+      setAccountType("公司账户");
+      setNotes("");
+    }
+  }, [visible, target]);
+
+  const METHODS = ["转账", "现金", "微信", "支付宝"];
+  const ACCOUNT_TYPES = ["公司账户", "私人账户", "备用金", "POS汇款"];
+
+  const handleConfirm = () => {
+    if (!target) return;
+    const amt = parseFloat(amount);
+    if (!amt || amt <= 0) { Alert.alert("请输入有效金额"); return; }
+    onConfirm(target.id, amt, method, accountType, notes.trim());
+    onClose();
+  };
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+        <View style={{ flex: 1, backgroundColor: colors.background }}>
+          <View style={[MI.header, { borderBottomColor: colors.border }]}>
+            <Pressable onPress={onClose}><Text style={{ fontSize: 17, color: colors.error }}>取消</Text></Pressable>
+            <Text style={{ fontSize: 17, fontWeight: "600", color: colors.foreground }}>录入付款</Text>
+            <Pressable onPress={handleConfirm}><Text style={{ fontSize: 17, fontWeight: "600", color: colors.primary }}>确认</Text></Pressable>
+          </View>
+          <ScrollView contentContainerStyle={{ padding: 16 }}>
+            {target && (
+              <View style={[MI.section, { borderColor: colors.border, marginBottom: 12 }]}>
+                <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>{target.name}</Text>
+                <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>待付金额：¥{target.remaining.toFixed(2)}</Text>
+              </View>
+            )}
+            <View style={[MI.section, { borderColor: colors.border }]}>
+              <Text style={[MI.sectionTitle, { color: colors.muted }]}>付款信息</Text>
+              <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 4 }}>本次付款金额 *</Text>
+              <TextInput value={amount} onChangeText={setAmount} placeholder="0.00"
+                keyboardType="decimal-pad" placeholderTextColor={colors.muted}
+                style={[MI.input, { color: colors.foreground, borderColor: colors.border }]} />
+              <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 4, marginTop: 10 }}>付款方式</Text>
+              <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
+                {METHODS.map((m) => (
+                  <TouchableOpacity key={m} onPress={() => setMethod(m)}
+                    style={[MI.catChip, { backgroundColor: method === m ? colors.primary : colors.surface, borderColor: method === m ? colors.primary : colors.border }]}>
+                    <Text style={{ fontSize: 12, fontWeight: "600", color: method === m ? "#fff" : colors.foreground }}>{m}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 4, marginTop: 10 }}>付款账户</Text>
+              <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
+                {ACCOUNT_TYPES.map((a) => (
+                  <TouchableOpacity key={a} onPress={() => setAccountType(a)}
+                    style={[MI.catChip, { backgroundColor: accountType === a ? colors.primary : colors.surface, borderColor: accountType === a ? colors.primary : colors.border }]}>
+                    <Text style={{ fontSize: 12, fontWeight: "600", color: accountType === a ? "#fff" : colors.foreground }}>{a}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 4, marginTop: 10 }}>备注</Text>
+              <TextInput value={notes} onChangeText={setNotes} placeholder="备注信息"
+                placeholderTextColor={colors.muted}
+                style={[MI.input, { color: colors.foreground, borderColor: colors.border }]} />
+            </View>
+          </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
 function ManualItemModal({ visible, item, colors, onSave, onClose }: {
   visible: boolean; item: SummaryLineItem | null; colors: any;
   onSave: (item: SummaryLineItem) => void; onClose: () => void;
@@ -305,6 +390,48 @@ export default function MonthlySummaryScreen() {
   const handleDeleteManualItem = (id: string) => {
     const r = getOrCreateReport();
     upsertReport({ ...r, manualItems: r.manualItems.filter((i) => i.id !== id), updatedAt: new Date().toISOString() });
+  };
+
+  // 科目行长按菜单（所有行均支持手工标记重复/取消重复）
+  const handleLineItemLongPress = (item: SummaryLineItem) => {
+    const r = getOrCreateReport();
+    const isManualDup = item.manualDuplicate === true;
+    const isAutoOrManualDup = item.isDuplicate || isManualDup;
+    const actions: { text: string; style?: "cancel" | "destructive"; onPress?: () => void }[] = [];
+    if (!isAutoOrManualDup) {
+      actions.push({
+        text: "标记为已在其他科目计入（不重复叠加）",
+        onPress: () => {
+          const update = (arr: SummaryLineItem[]) =>
+            arr.map((i) => i.id === item.id ? { ...i, manualDuplicate: true, isDuplicate: true, duplicateNote: "手工标记：已在其他科目计算" } : i);
+          upsertReport({ ...r, lineItems: update(r.lineItems), manualItems: update(r.manualItems), updatedAt: new Date().toISOString() });
+        },
+      });
+    } else {
+      actions.push({
+        text: "取消重复标记",
+        onPress: () => {
+          const update = (arr: SummaryLineItem[]) =>
+            arr.map((i) => i.id === item.id ? { ...i, manualDuplicate: false, isDuplicate: false, duplicateNote: "" } : i);
+          upsertReport({ ...r, lineItems: update(r.lineItems), manualItems: update(r.manualItems), updatedAt: new Date().toISOString() });
+        },
+      });
+    }
+    if (item.isManual) {
+      actions.push({ text: "编辑", onPress: () => { setEditingItem(item); setShowManualModal(true); } });
+      actions.push({ text: "删除", style: "destructive", onPress: () => handleDeleteManualItem(item.id) });
+    }
+    actions.push({ text: "取消", style: "cancel" });
+    Alert.alert("操作", item.label, actions);
+  };
+
+  // 部分付款 Modal 状态
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentTarget, setPaymentTarget] = useState<{ id: string; name: string; remaining: number } | null>(null);
+
+  const handleOpenPaymentModal = (paymentId: string, name: string, remaining: number) => {
+    setPaymentTarget({ id: paymentId, name, remaining });
+    setShowPaymentModal(true);
   };
 
   // 一键自动汇总：调用 aggregator 从各模块拉取数据并写入 lineItems
@@ -539,15 +666,7 @@ export default function MonthlySummaryScreen() {
                     if (route) router.push(route as any);
                   }
                 }}
-                onLongPress={() => {
-                  if (item.isManual) {
-                    Alert.alert("操作", item.label, [
-                      { text: "编辑", onPress: () => { setEditingItem(item); setShowManualModal(true); } },
-                      { text: "删除", style: "destructive", onPress: () => handleDeleteManualItem(item.id) },
-                      { text: "取消", style: "cancel" },
-                    ]);
-                  }
-                }}>
+                onLongPress={() => handleLineItemLongPress(item)}>
                 <LineItemRow item={item} colors={colors} linkedModule={item.linkedModule} />
               </TouchableOpacity>
             ))}
@@ -621,24 +740,27 @@ export default function MonthlySummaryScreen() {
                                 </View>
                                 {/* 右：已发按钮 */}
                                 {payment ? (
-                                  <TouchableOpacity
-                                    onPress={(e) => {
-                                      e.stopPropagation?.();
-                                      if (isPaid) return;
-                                      const now = new Date().toISOString();
-                                      const rem = payment.totalAmount - (payment.advanceAmount ?? 0) - payment.paidAmount;
-                                      Alert.alert("标记已发放", `确认已向 ${emp.realName} 发放薪资？\n实发：¥${rem.toFixed(2)}`, [
-                                        { text: "取消", style: "cancel" },
-                                        { text: "确认已发放", onPress: () => { upsertPayment({ ...payment, paidAmount: payment.totalAmount, remainingAmount: 0, status: "paid", payments: [...payment.payments, { id: uuid(), date: now.slice(0, 10), amount: rem, bankAccountId: "", paymentMethod: "转账", notes: `${selectedMonth} 薪资`, paidAt: now }], updatedAt: now }); tap(); }},
-                                      ]);
-                                    }}
-                                    style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8,
+                                  <View style={{ flexDirection: "row", gap: 4 }}>
+                                    {!isPaid && (
+                                      <TouchableOpacity
+                                        onPress={(e) => {
+                                          e.stopPropagation?.();
+                                          handleOpenPaymentModal(payment.id, emp.realName, finalAmt);
+                                        }}
+                                        style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8,
+                                          backgroundColor: colors.success + "18",
+                                          borderWidth: 1, borderColor: colors.success + "44" }}>
+                                        <Text style={{ fontSize: 11, fontWeight: "700", color: colors.success }}>录入发放</Text>
+                                      </TouchableOpacity>
+                                    )}
+                                    <View style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8,
                                       backgroundColor: isPaid ? colors.success + "18" : colors.error + "18",
                                       borderWidth: 1, borderColor: isPaid ? colors.success + "44" : colors.error + "44" }}>
-                                    <Text style={{ fontSize: 11, fontWeight: "700", color: isPaid ? colors.success : colors.error }}>
-                                      {isPaid ? "✓ 已发" : "待发"}
-                                    </Text>
-                                  </TouchableOpacity>
+                                      <Text style={{ fontSize: 11, fontWeight: "700", color: isPaid ? colors.success : colors.error }}>
+                                        {isPaid ? "✓ 已发" : "待发"}
+                                      </Text>
+                                    </View>
+                                  </View>
                                 ) : (
                                   <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, backgroundColor: colors.muted + "15" }}>
                                     <Text style={{ fontSize: 11, color: colors.muted }}>待发</Text>
@@ -718,14 +840,25 @@ export default function MonthlySummaryScreen() {
                         {payment.paidAmount > 0 && <View style={S.amtBlock}><Text style={S.amtLabel}>已付</Text><Text style={[S.amtValue, { color: colors.success }]}>¥{payment.paidAmount.toFixed(0)}</Text></View>}
                         <View style={S.amtBlock}><Text style={S.amtLabel}>待付</Text><Text style={[S.amtValue, { color: actualRemaining > 0 ? colors.error : colors.success, fontWeight: "800" }]}>¥{actualRemaining.toFixed(0)}</Text></View>
                       </View>
-                      {defaultBank && (
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        {defaultBank && (
                           <Text style={{ flex: 1, fontSize: 11, color: colors.muted }}>{defaultBank.bankName} {maskCardNumber(defaultBank.cardNumber)}</Text>
+                        )}
+                        {!defaultBank && <View style={{ flex: 1 }} />}
+                        {defaultBank && (
                           <TouchableOpacity onPress={() => handleCopy([`收款人：${defaultBank.accountName}`, `开户行：${defaultBank.bankName}`, `卡号：${defaultBank.cardNumber}`, `金额：¥${(actualRemaining > 0 ? actualRemaining : payment.totalAmount).toFixed(2)}`, `备注：${sup.name} ${selectedMonth} 货款`].join("\n"))} style={[S.miniBtn, { backgroundColor: colors.primary }]}>
                             <IconSymbol name="doc.on.clipboard" size={10} color="#fff" /><Text style={{ fontSize: 10, color: "#fff", fontWeight: "600" }}>复制</Text>
                           </TouchableOpacity>
-                        </View>
-                      )}
+                        )}
+                        {status !== "paid" && (
+                          <TouchableOpacity
+                            onPress={() => handleOpenPaymentModal(payment.id, sup.name, actualRemaining)}
+                            style={[S.miniBtn, { backgroundColor: colors.success }]}>
+                            <IconSymbol name="checkmark.circle.fill" size={10} color="#fff" />
+                            <Text style={{ fontSize: 10, color: "#fff", fontWeight: "600" }}>录入付款</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
                     </View>
                   );
                 })}
@@ -762,7 +895,16 @@ export default function MonthlySummaryScreen() {
         </Pressable>
         <Text style={[S.navTitle, { color: colors.foreground }]}>{`${Number(selectedMonth.slice(5, 7))}月报表`}</Text>
         <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
-
+          {/* 一键汇总按鈕 */}
+          <Pressable onPress={handleAutoAggregate}
+            style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+            <IconSymbol name="arrow.clockwise.circle.fill" size={22} color={colors.primary} />
+          </Pressable>
+          {/* 月报设置 */}
+          <Pressable onPress={() => setShowSettingsModal(true)}
+            style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+            <IconSymbol name="gearshape.fill" size={20} color={colors.muted} />
+          </Pressable>
           {/* 供应商档案入口 */}
           <Pressable onPress={() => router.push("/suppliers" as any)}
             style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
@@ -783,6 +925,38 @@ export default function MonthlySummaryScreen() {
         visible={showManualModal} item={editingItem} colors={colors}
         onSave={handleSaveManualItem}
         onClose={() => { setShowManualModal(false); setEditingItem(null); }}
+      />
+      <PaymentEntryModal
+        visible={showPaymentModal}
+        target={paymentTarget}
+        colors={colors}
+        onConfirm={(paymentId, amount, method, accountType, notes) => {
+          const existing = payments.find((p) => p.id === paymentId);
+          if (!existing) return;
+          const now = new Date().toISOString();
+          const newPaid = existing.paidAmount + amount;
+          const newRemaining = Math.max(0, existing.totalAmount - newPaid);
+          const newStatus: "unpaid" | "partial" | "paid" = newPaid >= existing.totalAmount ? "paid" : newPaid > 0 ? "partial" : "unpaid";
+          upsertPayment({
+            ...existing,
+            paidAmount: newPaid,
+            remainingAmount: newRemaining,
+            status: newStatus,
+            payments: [...existing.payments, {
+              id: uuid(),
+              date: now.slice(0, 10),
+              amount,
+              bankAccountId: "",
+              paymentMethod: method,
+              accountType: accountType as any,
+              notes,
+              paidAt: now,
+            }],
+            updatedAt: now,
+          });
+          tap();
+        }}
+        onClose={() => { setShowPaymentModal(false); setPaymentTarget(null); }}
       />
       {/* ── 月报设置 Modal ── */}
       <Modal visible={showSettingsModal} animationType="slide" presentationStyle="pageSheet"
