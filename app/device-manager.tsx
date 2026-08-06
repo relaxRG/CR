@@ -68,7 +68,6 @@ const ROLE_DESC: Record<DeviceRole, { zh: string; en: string }> = {
   guest: { zh: "只读，不同步回主设备", en: "Read-only, no push back" },
 };
 
-// ─── 邀请权限预设 Sheet ────────────────────────────────────────────────────────
 // ─── 快捷预设定义 ────────────────────────────────────────────────────────────────────────────────
 const INVITE_PRESETS: {
   labelZh: string;

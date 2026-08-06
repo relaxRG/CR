@@ -14,22 +14,44 @@ type PermRow = {
 };
 
 const PERM_ROWS: PermRow[] = [
+  // ── 酒尺配方
   { feature: "查看配方库", featureEn: "View Recipes", owner: true, collaborator: true, guest: true },
-  { feature: "新建配方", featureEn: "Add Recipe", owner: true, collaborator: true, guest: false },
-  { feature: "编辑配方", featureEn: "Edit Recipe", owner: true, collaborator: true, guest: false },
-  { feature: "删除配方", featureEn: "Delete Recipe", owner: true, collaborator: true, guest: false },
+  { feature: "新建 / 编辑 / 删除配方", featureEn: "Add / Edit / Delete Recipe", owner: true, collaborator: true, guest: false },
   { feature: "收藏 / 评分 / 做过", featureEn: "Favorite / Rating / Made", owner: true, collaborator: true, guest: true },
+  // ── 酒款库
   { feature: "查看酒款库", featureEn: "View Bottles", owner: true, collaborator: true, guest: true },
-  { feature: "新建 / 编辑酒款", featureEn: "Add / Edit Bottle", owner: true, collaborator: true, guest: false },
-  { feature: "删除酒款", featureEn: "Delete Bottle", owner: true, collaborator: true, guest: false },
+  { feature: "新建 / 编辑 / 删除酒款", featureEn: "Add / Edit / Delete Bottle", owner: true, collaborator: true, guest: false },
+  // ── 自制品
   { feature: "查看自制品", featureEn: "View Homemade", owner: true, collaborator: true, guest: true },
   { feature: "新建 / 编辑自制品", featureEn: "Add / Edit Homemade", owner: true, collaborator: true, guest: false },
+  // ── 研发室
   { feature: "研发室（查看）", featureEn: "Lab (View)", owner: true, collaborator: true, guest: true },
   { feature: "研发室（新建项目）", featureEn: "Lab (New Project)", owner: true, collaborator: true, guest: false },
+  // ── 书库
   { feature: "书库（查看）", featureEn: "Books (View)", owner: true, collaborator: true, guest: true },
   { feature: "书库（导入图书）", featureEn: "Books (Import)", owner: true, collaborator: true, guest: false },
+  // ── 门店酒单 + 采购
   { feature: "门店酒单", featureEn: "Menu", owner: true, collaborator: true, guest: true },
   { feature: "采购清单", featureEn: "Shopping", owner: true, collaborator: true, guest: true },
+  // ── 葡萄酒库
+  { feature: "葡萄酒库（查看）", featureEn: "Wine (View)", owner: true, collaborator: true, guest: true },
+  { feature: "葡萄酒库（编辑）", featureEn: "Wine (Edit)", owner: true, collaborator: true, guest: false },
+  // ── 餐食菜单
+  { feature: "餐食菜单（查看）", featureEn: "Food (View)", owner: true, collaborator: true, guest: true },
+  { feature: "餐食菜单（编辑）", featureEn: "Food (Edit)", owner: true, collaborator: true, guest: false },
+  // ── 库存管理
+  { feature: "烈酒 / 啤酒 / 水果 / 冰块库存（查看）", featureEn: "Spirits / Beer / Fruit / Ice (View)", owner: true, collaborator: true, guest: true },
+  { feature: "库存管理（编辑）", featureEn: "Inventory (Edit)", owner: true, collaborator: true, guest: false },
+  // ── 门店运营
+  { feature: "月报 / 备用金 / 供应商（查看）", featureEn: "Reports / Petty Cash / Suppliers (View)", owner: true, collaborator: true, guest: true },
+  { feature: "门店运营（编辑）", featureEn: "Store Operations (Edit)", owner: true, collaborator: true, guest: false },
+  // ── 员工管理
+  { feature: "员工档案 / 排班表（查看）", featureEn: "Staff / Shifts (View)", owner: true, collaborator: true, guest: true },
+  { feature: "员工管理（编辑）", featureEn: "Staff Management (Edit)", owner: true, collaborator: true, guest: false },
+  // ── 薪资数据
+  { feature: "薪资单 / 预支（查看）", featureEn: "Payroll / Advances (View)", owner: true, collaborator: true, guest: true },
+  { feature: "薪资数据（编辑）", featureEn: "Payroll (Edit)", owner: true, collaborator: true, guest: false },
+  // ── 设备管理
   { feature: "邀请 / 管理设备", featureEn: "Manage Devices", owner: true, collaborator: false, guest: false },
   { feature: "转移主设备权限", featureEn: "Transfer Owner", owner: true, collaborator: false, guest: false },
   { feature: "数据备份 / 恢复", featureEn: "Backup / Restore", owner: true, collaborator: false, guest: false },
