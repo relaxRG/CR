@@ -3020,7 +3020,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   const { upsertAlert } = useUnexplainedRestAlertStore();
   const { businessHours, setBusinessHours } = useBusinessHoursStore();
   const { shiftGroups, setShiftGroups } = useShiftGroupStore();
-  const { getSnapshots, saveSnapshot, updateSnapshot, deleteSnapshot } = useScheduleSnapshotStore();
+  const { snapshots: allSnapshots, saveSnapshot, updateSnapshot, deleteSnapshot } = useScheduleSnapshotStore();
 
   const now = new Date();
   const todayStr = now.toISOString().slice(0, 10);
@@ -3670,10 +3670,13 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                       <Text style={{ fontSize: 12, color: colors.muted }}>✕</Text>
                     </TouchableOpacity>
                   </View>
-                  {allDeptEmployees.map((emp) => {
+                  {(() => {
+                    // pendingKey 提到循环外，避免每次迭代重复计算
                     const pendingKey = `${currentMonth}|${deptCategory}|${groupId}|${tpl.id}`;
+                    const pendingSet = pendingEmpIds.get(pendingKey);
+                    return allDeptEmployees.map((emp) => {
                     const hasShift = monthShifts.some((s) => s.employeeId === emp.id && s.shift === tpl.session);
-                    const isPending = pendingEmpIds.get(pendingKey)?.has(emp.id) ?? false;
+                    const isPending = pendingSet?.has(emp.id) ?? false;
                     const inGroup = hasShift || isPending;
                     return (
                       <TouchableOpacity key={emp.id}
@@ -3717,7 +3720,8 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                         {emp.realName !== emp.code && <Text style={{ fontSize: 11, color: colors.muted, marginLeft: 4 }}>{emp.realName}</Text>}
                       </TouchableOpacity>
                     );
-                  })}
+                  });
+                  })()}
                 </View>
               )}
             </View>
@@ -4210,7 +4214,10 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
             // 版本列表
             <ScrollView contentContainerStyle={{ padding: 16, gap: 10 }}>
               {(() => {
-                const snaps = getSnapshots(currentMonth, deptCategory);
+                // 直接订阅 snapshots 响应式 state，避免 ref.current 读取
+                const snaps = allSnapshots
+                  .filter((s) => s.month === currentMonth && s.deptCategory === deptCategory)
+                  .sort((a, b) => b.version - a.version);
                 if (snaps.length === 0) return (
                   <View style={{ alignItems: "center", paddingVertical: 40 }}>
                     <Text style={{ fontSize: 14, color: colors.muted }}>暂无存档记录</Text>

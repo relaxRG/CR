@@ -494,3 +494,81 @@ interface PaySlip {
   workKPISelections?: Record<string, string>;
 }
 ```
+
+---
+
+## 十四、排班表响应式架构重构 Bug 根因分析（2026-08-06）
+
+### Bug 描述
+
+排班表所有操作（勾选员工、取消勾选、填写格子）需要退出 App 再重新进入才能看到效果，UI 完全不响应。
+
+### 根因
+
+`ShiftGroupMemberStore` 的 `isMember`、`getMembersForGroup` 函数内部读取 `ref.current`：
+
+```ts
+// ❌ 错误：ref.current 变化不触发 React 重渲染
+const isMember = useCallback((...) => {
+  return ref.current.some(...);  // ref 是 MutableRefObject，不是响应式 state
+}, [ref]);
+```
+
+`addMember`/`removeMember` 调用 `persist(next)` → 同时执行 `ref.current = next` 和 `setData(next)`，但 `groupedScheduleRows` 的 `useMemo` 依赖的是 `getMembersForGroup` 函数（稳定引用），而不是 `members` state，所以 React 不知道需要重新计算，UI 冻结。
+
+### 修复方案
+
+**废弃 `ShiftGroupMember` 系统**，改为「有排班数据即显示员工行」架构：
+
+- 员工行直接从 `shifts` state 推导（`monthShifts.filter(s => s.shift === tpl.session)`）
+- `shifts` 是响应式 state，任何 `upsertShift`/`deleteShift` 都触发重渲染
+- 取消勾选员工 = 删除该员工本月该班次所有 `ShiftEntry`，员工行立即消失
+- 勾选新员工 = 加入本地 `pendingEmpIds` state，员工行立即出现（格子空白）
+
+---
+
+## 十五、开发规范：响应式数据访问原则
+
+### 规范 14：UI 渲染必须订阅响应式 state，禁止在 useMemo 依赖数组中使用 getXxx 函数
+
+**原则**：凡是影响 UI 渲染的数据，必须直接订阅 Store 暴露的响应式 state（如 `shifts`、`members`、`paySlips`），不能依赖读 `ref.current` 的 `getXxx` 函数。
+
+```ts
+// ❌ 错误：useMemo 依赖 getMembersForGroup（读 ref.current，不触发重渲染）
+const rows = useMemo(() => {
+  const ids = getMembersForGroup(month, dept, groupId).map(m => m.employeeId);
+  ...
+}, [getMembersForGroup, month, dept]);  // getMembersForGroup 是稳定引用，永远不变！
+
+// ✅ 正确：直接订阅响应式 state
+const { members } = useShiftGroupMemberStore();  // 或直接从 shifts 推导
+const rows = useMemo(() => {
+  const ids = members.filter(m => m.month === month && m.groupId === groupId).map(m => m.employeeId);
+  ...
+}, [members, month, dept]);  // members 变化时触发重渲染
+```
+
+**例外**：`getXxx` 函数可以在事件处理器（`onPress`、`useCallback`）中使用，因为这些不影响渲染时机。
+
+---
+
+### 规范 15：getXxx 函数只用于事件处理器，不用于渲染计算
+
+**原则**：Store 中的 `getXxx` 函数（读 `ref.current`）只应在以下场景使用：
+- 事件处理器（`onPress`、`onChange`）
+- `useEffect` 内部
+- 其他 `useCallback` 内部（不影响渲染）
+
+**不应在以下场景使用**：
+- `useMemo` 的计算函数内（除非依赖数组包含对应的响应式 state）
+- JSX 直接渲染（除非父组件会因其他原因重渲染）
+
+---
+
+### 规范 16：新架构「有数据即显示」优于「维护成员列表」
+
+**原则**：对于列表类 UI（员工行、商品行、订单行），优先采用「有数据即显示」架构：
+- 显示条件：该实体有对应的业务数据（ShiftEntry、OrderItem 等）
+- 添加：写入业务数据，列表自动出现
+- 删除：删除业务数据，列表自动消失
+- 避免维护独立的「成员列表」中间层（增加复杂度和响应式问题）
