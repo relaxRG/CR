@@ -27,7 +27,7 @@ import {
   AllowanceRule, WorkKPIRule, RevenueKPIRule,
   ALLOWANCE_UNIT_LABELS, REVENUE_KPI_SOURCE_LABELS,
   REVENUE_KPI_PAY_MODE_LABELS, calcRevenueKPIBonus,
-  shouldPayAllowanceThisMonth,
+  shouldPayAllowanceThisMonth, calcAllowance,
 } from "@/lib/labor/types";
 
 const tap = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -91,14 +91,21 @@ export default function LaborKPIAllowancePage() {
   const workKPIRules = employee.workKPIRules ?? [];
   const revenueKPIRules = employee.revenueKPIRules ?? [];
 
-  // ── 实时计算合计（用于显示和写入） ──
+  // ── 获取当月出勤天数（用于日补贴计算） ──
+  const attendanceDays = useMemo(() => {
+    if (!employeeId || !month) return 0;
+    return getAttendance(employeeId, month)?.attendanceDays ?? 0;
+  }, [employeeId, month, getAttendance]);
 
+  // ── 实时计算合计（用于显示和写入） ──
+  // 修复 Bug：日补贴（meal_per_day）必须乘以出勤天数，使用 calcAllowance 统一计算
   const allowanceTotal = useMemo(() => {
     return allowanceRules.reduce((sum, r) => {
       if (!allowanceEnabled[r.id]) return sum;
-      return sum + (r.amount || 0);
+      const { amount } = calcAllowance(r, attendanceDays);
+      return sum + amount;
     }, 0);
-  }, [allowanceRules, allowanceEnabled]);
+  }, [allowanceRules, allowanceEnabled, attendanceDays]);
 
   const workKPITotal = useMemo(() => {
     return workKPIRules.reduce((sum, rule) => {
@@ -139,15 +146,14 @@ export default function LaborKPIAllowancePage() {
   };
 
   // ── 切换补贴本月生效（即时写入） ──
+  // 修复 Bug：删除旧的 newAllowanceTotal 局部计算（直接用 r.amount 未乘出勤天数）
+  // writeToPaySlip 内部调用 buildPaySlipDraft 重新计算所有薪资字段（含日补贴×出勤天数）
   const toggleAllowance = (id: string) => {
     tap();
     setAllowanceEnabled((prev) => {
       const next = { ...prev, [id]: !prev[id] };
-      const newAllowanceTotal = allowanceRules.reduce((sum, r) => (!next[r.id] ? sum : sum + (r.amount || 0)), 0);
       const existing = employeeId && month ? getPaySlip(employeeId, month) : null;
       if (existing) {
-        // 修复：不再用旧的 calcPaySlipUpdate 局部计算引擎
-        // writeToPaySlip 内部会调用 buildPaySlipDraft 重新计算社保/公积金/个税
         writeToPaySlip({ allowanceOverrides: next });
       }
       return next;
@@ -252,7 +258,11 @@ export default function LaborKPIAllowancePage() {
                 <Text style={{ fontSize: 11, color: colors.muted }}>{ALLOWANCE_UNIT_LABELS[rule.unit ?? "per_month"]}</Text>
               </View>
               <Text style={{ fontSize: 15, fontWeight: "600", color: allowanceEnabled[rule.id] ? colors.primary : colors.muted }}>
-                ¥{rule.amount}
+                {/* 修复 Bug：显示实际计算金额（日补贴×出勤天数），而非单价 */}
+                ¥{calcAllowance(rule, attendanceDays).amount.toFixed(0)}
+                {rule.unit === "per_day" || rule.type === "meal_per_day"
+                  ? <Text style={{ fontSize: 10, color: colors.muted }}> (¥{rule.amount}/天×{attendanceDays}天)</Text>
+                  : null}
               </Text>
             </TouchableOpacity>
           ))}
