@@ -473,93 +473,9 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
         );
       })()}
 
-      {/* 展开明细（点击卡片展开） */}
+      {/* 展开明细（点击卡片展开）─── 薪资构成明细 */}
       {expanded && (
         <View style={{ marginTop: 10, gap: 4, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border + "55", paddingTop: 10 }}>
-
-          {/* ─── 分区一：出勤统计（一行五格）─── */}
-          {att && (
-            <View style={{ gap: 6 }}>
-              <View style={{ flexDirection: "row" }}>
-                {[
-                  { label: "实际到岗", value: `${att.attendanceDays - att.compOffCount}天`, color: colors.foreground },
-                  { label: "出/应出勤", value: `${att.attendanceDays}/${att.expectedAttendanceDays}`, color: att.attendanceDays >= att.expectedAttendanceDays ? colors.success : colors.warning },
-                  { label: "实际工时", value: `${att.totalHours.toFixed(1)}h`, color: colors.foreground },
-                  { label: "标准工时", value: `${att.stdHours.toFixed(1)}h`, color: colors.muted },
-                  { label: "加班工时", value: att.paidOvertimeHours > 0 ? `${att.paidOvertimeHours.toFixed(1)}h` : "—", color: att.paidOvertimeHours > 0 ? colors.warning : colors.muted },
-                ].map(({ label, value, color }) => (
-                  <View key={label} style={{ flex: 1, alignItems: "center", paddingVertical: 2 }}>
-                    <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: "700", color }}>{value}</Text>
-                    <Text numberOfLines={1} style={{ fontSize: 9, color: colors.muted, marginTop: 1 }}>{label}</Text>
-                  </View>
-                ))}
-              </View>
-              {/* 少出勤/多出勤提示 */}
-              {att.underRestDays !== 0 && (
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                  <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: att.underRestDays > 0 ? colors.error : colors.success }} />
-                  <Text style={{ fontSize: 10, color: att.underRestDays > 0 ? colors.error : colors.success }}>
-                    {att.underRestDays > 0 ? `少出勤 ${att.underRestDays}天` : `多出勤 ${Math.abs(att.underRestDays)}天`}
-                  </Text>
-                </View>
-              )}
-            </View>
-          )}
-
-          {/* ─── 分区二：加班明细（有加班时显示）─── */}
-          {att && att.overtimeHours > 0 && (
-            <View style={{ paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border + "44", gap: 4 }}>
-              <View style={{ flexDirection: "row" }}>
-                {[
-                  { label: "总加班", value: `${att.overtimeHours.toFixed(1)}h`, color: colors.warning },
-                  { label: "换休天数", value: att.compOffCount > 0 ? `${att.compOffCount}天` : "—", color: colors.primary },
-                  { label: "计费时长", value: `${att.paidOvertimeHours.toFixed(1)}h`, color: colors.foreground },
-                  { label: "加班费", value: att.overtimePay > 0 ? `+¥${att.overtimePay.toFixed(0)}` : "—", color: att.overtimePay > 0 ? colors.success : colors.muted },
-                ].map(({ label, value, color }) => (
-                  <View key={label} style={{ flex: 1, alignItems: "center", paddingVertical: 2 }}>
-                    <Text style={{ fontSize: 12, fontWeight: "700", color }}>{value}</Text>
-                    <Text style={{ fontSize: 9, color: colors.muted, marginTop: 1 }}>{label}</Text>
-                  </View>
-                ))}
-              </View>
-              <Text style={{ fontSize: 10, color: colors.muted }}>
-                {`加班 ${att.overtimeHours.toFixed(1)}h`}
-                {att.compOffCount > 0 ? ` → 换休 ${att.compOffCount}天(${(att.compOffCount * (att.hoursPerCompOff ?? 8)).toFixed(0)}h)` : ""}
-                {` → 计费 ${att.paidOvertimeHours.toFixed(1)}h`}
-                {att.overtimePay > 0 ? ` → +¥${att.overtimePay.toFixed(0)}` : ""}
-              </Text>
-            </View>
-          )}
-
-          {/* ─── 分区三：节假日明细（有节假日上班时显示）─── */}
-          {att && (att.holidayWorkDays ?? 0) > 0 && (() => {
-            const hwDays = att.holidayWorkDays ?? 0;
-            const hrDays = slip ? Object.values(slip.holidayBonusAllocation ?? {}).filter(a => a.mode === "rest").length : 0;
-            const hcDays = hwDays - hrDays;
-            return (
-              <View style={{ paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border + "44", gap: 4 }}>
-                <View style={{ flexDirection: "row" }}>
-                  {[
-                    { label: "节假日天数", value: `${hwDays}天`, color: "#FF2D55" },
-                    { label: "换休天数", value: hrDays > 0 ? `${hrDays}天` : "—", color: colors.primary },
-                    { label: "拿錢天数", value: hcDays > 0 ? `${hcDays}天` : "—", color: colors.success },
-                    { label: "节假日薪资", value: att.holidayBonus > 0 ? `+¥${att.holidayBonus.toFixed(0)}` : "—", color: att.holidayBonus > 0 ? "#FF2D55" : colors.muted },
-                  ].map(({ label, value, color }) => (
-                    <View key={label} style={{ flex: 1, alignItems: "center", paddingVertical: 2 }}>
-                      <Text style={{ fontSize: 12, fontWeight: "700", color }}>{value}</Text>
-                      <Text style={{ fontSize: 9, color: colors.muted, marginTop: 1 }}>{label}</Text>
-                    </View>
-                  ))}
-                </View>
-                <Text style={{ fontSize: 10, color: colors.muted }}>
-                  {`节日上班 ${hwDays}天`}
-                  {hrDays > 0 ? ` → 换休 ${hrDays}天` : ""}
-                  {hcDays > 0 ? ` · 拿錢 ${hcDays}天` : ""}
-                  {att.holidayBonus > 0 ? ` → +¥${att.holidayBonus.toFixed(0)}` : ""}
-                </Text>
-              </View>
-            );
-          })()}
 
           {/* ─── 薪资构成明细（绩效奖金/补贴/奖惩/预支/社保/实发）─── */}
           {slip && (() => {
