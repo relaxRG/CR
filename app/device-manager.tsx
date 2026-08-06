@@ -69,31 +69,116 @@ const ROLE_DESC: Record<DeviceRole, { zh: string; en: string }> = {
 };
 
 // ─── 邀请权限预设 Sheet ────────────────────────────────────────────────────────
+// ─── 快捷预设定义 ────────────────────────────────────────────────────────────────────────────────
+const INVITE_PRESETS: {
+  labelZh: string;
+  labelEn: string;
+  icon: string;
+  role: DeviceRole;
+  features: FeatureKey[];
+}[] = [
+  {
+    labelZh: "🏪 吧台设备",
+    labelEn: "Bar Device",
+    icon: "🏪",
+    role: "collaborator",
+    features: ["recipes", "bottles", "homemade", "menu", "shopping"],
+  },
+  {
+    labelZh: "🍽️ 厨房设备",
+    labelEn: "Kitchen Device",
+    icon: "🍽️",
+    role: "collaborator",
+    features: ["food", "shopping"],
+  },
+  {
+    labelZh: "💰 财务只读",
+    labelEn: "Finance Read-Only",
+    icon: "💰",
+    role: "guest",
+    features: ["store_ops", "labor", "payroll"],
+  },
+  {
+    labelZh: "📊 运营只读",
+    labelEn: "Ops Read-Only",
+    icon: "📊",
+    role: "guest",
+    features: ["store_ops", "recipes", "wine", "food", "menu"],
+  },
+  {
+    labelZh: "⚗️ 研发设备",
+    labelEn: "Lab Device",
+    icon: "⚗️",
+    role: "collaborator",
+    features: ["recipes", "lab", "bottles", "homemade", "books"],
+  },
+  {
+    labelZh: "🔓 全功能协作",
+    labelEn: "Full Collaborator",
+    icon: "🔓",
+    role: "collaborator",
+    features: FEATURE_MODULES.map((m) => m.key) as FeatureKey[],
+  },
+];
+
 function InvitePermissionSheet({
   role,
   features,
   onToggle,
+  onApplyPreset,
   lang,
   colors,
 }: {
   role: DeviceRole;
   features: Set<FeatureKey>;
   onToggle: (key: FeatureKey) => void;
+  onApplyPreset: (preset: typeof INVITE_PRESETS[0]) => void;
   lang: string;
   colors: ReturnType<typeof import("@/hooks/use-colors").useColors>;
 }) {
   if (role === "owner") return null;
   return (
     <View style={{ marginTop: 12 }}>
+      {/* 快捷预设 */}
       <Text style={{ fontSize: 13, color: colors.muted, marginBottom: 8 }}>
-        {lang === "zh" ? "预设功能权限（可邀请后再调整）" : "Pre-set permissions (adjustable later)"}
+        {lang === "zh" ? "快捷预设" : "Quick Presets"}
+      </Text>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+        {INVITE_PRESETS.map((preset) => (
+          <Pressable
+            key={preset.labelZh}
+            onPress={() => onApplyPreset(preset)}
+            style={({ pressed }) => ({
+              paddingHorizontal: 12,
+              paddingVertical: 6,
+              borderRadius: 20,
+              backgroundColor: colors.surface,
+              borderWidth: 1,
+              borderColor: colors.border,
+              opacity: pressed ? 0.6 : 1,
+            })}
+          >
+            <Text style={{ fontSize: 13, color: colors.foreground }}>
+              {lang === "zh" ? preset.labelZh : preset.labelEn}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+      {/* 模块权限开关 */}
+      <Text style={{ fontSize: 13, color: colors.muted, marginBottom: 8 }}>
+        {lang === "zh" ? "自定义权限（可邀请后再调整）" : "Custom permissions (adjustable later)"}
       </Text>
       {FEATURE_MODULES.map((mod) => (
         <View key={mod.key} style={{ flexDirection: "row", alignItems: "center", paddingVertical: 6, gap: 10 }}>
           <Text style={{ fontSize: 18, width: 24, textAlign: "center" }}>{mod.icon}</Text>
-          <Text style={{ flex: 1, fontSize: 14, color: colors.foreground }}>
-            {lang === "zh" ? mod.labelZh : mod.labelEn}
-          </Text>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 14, color: colors.foreground }}>
+              {lang === "zh" ? mod.labelZh : mod.labelEn}
+            </Text>
+            <Text style={{ fontSize: 11, color: colors.muted, marginTop: 1 }}>
+              {lang === "zh" ? mod.descZh : mod.descEn}
+            </Text>
+          </View>
           <Switch
             value={features.has(mod.key)}
             onValueChange={() => { if (role !== "guest") onToggle(mod.key); }}
@@ -298,6 +383,13 @@ export default function DeviceManagerScreen() {
       }
       return next;
     });
+  };
+
+  const applyInvitePreset = (preset: typeof INVITE_PRESETS[0]) => {
+    tap();
+    setInviteFeatures(new Set(preset.features));
+    // 如果预设指定了角色，同时应用角色并生成配对码
+    void handleGenerateCode(preset.role);
   };
 
   const tap = () => {
@@ -802,6 +894,7 @@ export default function DeviceManagerScreen() {
                 role={"collaborator"}
                 features={inviteFeatures}
                 onToggle={toggleInviteFeature}
+                onApplyPreset={applyInvitePreset}
                 lang={lang}
                 colors={colors}
               />

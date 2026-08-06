@@ -112,6 +112,33 @@ export const SYNC_KEYS = [
   "spirits.selfBuyConfig.v1",
   "spirits.customCategories.v1",
   "spirits.groupMatchMemory.v1",
+  // ── 啊酒库存（新增）────────────────────────────────────────────────────────────────────────────────
+  "beer.items.v1",
+  "beer.transactions.v1",
+  "beer.snapshots.v1",
+  // ── 水果库存（新增）────────────────────────────────────────────────────────────────────────────────
+  "fruit.items.v1",
+  "fruit.transactions.v1",
+  "fruit.snapshots.v1",
+  // ── 冒泡库存（新增）────────────────────────────────────────────────────────────────────────────────
+  "ice.inv.items.v1",
+  "ice.inv.tx.v1",
+  "ice.inventory.v1",
+  // ── 器具库存（新增）────────────────────────────────────────────────────────────────────────────────
+  "equipment.inventory.v1",
+  // ── 烈酒快照和匹配记录（新增）────────────────────────────────────────────────────────────────
+  "spirits.snapshots.v1",
+  "spirits.match_records.v1",
+  // ── 供应商匹配记忆（新增）────────────────────────────────────────────────────────────────
+  "supplier.match.memory.v1",
+  // ── 菜品分析快照（新增）────────────────────────────────────────────────────────────────────
+  "dish_analysis.snapshots.v1",
+  // ── 月报附加配置（新增）────────────────────────────────────────────────────────────────────
+  "monthly_summary.petty_configs.v1",
+  "monthly_summary.inventory_configs.v1",
+  // ── 时段分析排班（新增）────────────────────────────────────────────────────────────────────
+  "schedule.business_hours.v1",
+  "schedule.shift_templates.v1",
 ] as const;
 
 const TS_PREFIX = "sync.ts.";
