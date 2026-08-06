@@ -743,3 +743,34 @@
 - [x] 查看详情页跳转修正：有 bottleId → /bottle/[id]；无 → 引导新建酒库档案
 - [x] 总结Tab删除「进货汇总（按供应商）」卡片
 - [x] ItemFormModal 升级为全屏 pageSheet（三区块：基本信息/价格规格/进销存分类）
+
+## 员工管理系统全面重构（Build 133，2026-08-06）
+
+### 排班表重构
+- [x] 手动维护班次组员工列表（ShiftGroupMemberStore，replaceMembers 方法）
+- [x] 历史快照系统（ScheduleSnapshotStore，快照代入修复 bug）
+- [x] 排班表重构全面清理旧代码/废弃字段/冲突引擎
+
+### 月报重构
+- [x] 删除5个Tab，只保留总报表单页
+- [x] 账户移至当月月报主页第三入口（balance-modal + accounts 独立组件）
+- [x] 月报工资科目自动同步+按部门分组+新卡片样式
+- [x] 旧代码全面清理（废弃 Tab 注释/旧导入/旧状态/废弃样式）
+
+### 薪资系统重构
+- [x] 薪资总览即时同步 + 底部四按钮 + 付款信息一键复制
+- [x] 薪资统计页和薪资总览页统一自动部门分组（前厅/后厨/公司/临时兼职）
+- [x] 全面修复薪资数据非响应式问题（唯一引擎/唯一逻辑/唯一点位）
+- [x] 薪资预支页面全面重构
+- [x] 绩效补贴页三项修复
+
+### 员工档案系统
+- [x] 新增员工档案卡页面（labor-employee-profile）
+- [x] 全面重构员工档案编辑页面
+- [x] 删除旧版 weeklyHours/WeeklyHoursMap，统一使用 weeklyHoursRules
+- [x] 全面清理旧版兼容代码和废弃字段
+
+### 工程质量
+- [x] TypeScript 0 错误
+- [x] vitest 75/76 通过（1 skipped）
+- [x] buildNumber 更新至 133
