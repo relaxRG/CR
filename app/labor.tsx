@@ -7,6 +7,7 @@
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
+import { exportLaborData, type ExportType } from "@/lib/labor/export";
 import {
   Alert, Clipboard, Dimensions, Modal, Platform, Pressable, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions, KeyboardAvoidingView} from "react-native";
@@ -823,60 +824,30 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
   const router = useRouter();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
-  // 导出 CSV
-  const handleExport = useCallback(async () => {
+  // ─── 导出功能（薪资报表 + 排班表，Excel/PDF）────────────────────────────────
+  const { shifts } = useShiftStore();
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = useCallback(async (type: ExportType) => {
     tap();
+    setShowExportMenu(false);
+    setExporting(true);
     try {
-      const monthSlips = paySlips.filter((s) => s.month === month);
-      const monthAtts = attendances.filter((a) => a.month === month);
-      const activeEmps = employees.filter((e) => e.active && !e.archived);
-
-      const header = ["姓名", "代号", "部门", "类型", "出勤天", "总工时", "加班时", "考勤工资", "绩效", "补贴", "奖惩", "社保(个人)", "公积金(个人)", "个税", "预支", "应发", "实发", "公司社保", "公司公积金", "公司总成本"];
-      const rows = activeEmps.map((emp) => {
-        const slip = monthSlips.find((s) => s.employeeId === emp.id);
-        const att = monthAtts.find((a) => a.employeeId === emp.id);
-        return [
-          emp.realName, emp.code,
-          DEPT_LABELS[emp.dept], EMPLOYEE_TYPE_LABELS[emp.type],
-          att?.attendanceDays ?? "",
-          att?.totalHours?.toFixed(1) ?? "",
-          att?.paidOvertimeHours?.toFixed(1) ?? "",
-          slip?.attendanceSalary?.toFixed(2) ?? "",
-          slip?.performanceBonus?.toFixed(2) ?? "",
-          ((slip?.mealAllowance ?? 0) + (slip?.transportAllowance ?? 0) + (slip?.otherAllowance ?? 0)).toFixed(2),
-          slip?.rewardPenalty?.toFixed(2) ?? "",
-          slip?.socialInsuranceDeduction?.toFixed(2) ?? "",
-          slip?.housingFundDeduction?.toFixed(2) ?? "",
-          slip?.incomeTax?.toFixed(2) ?? "",
-          slip?.advanceAmount?.toFixed(2) ?? "",
-          (slip?.grossSalary ?? slip?.finalSalary ?? 0).toFixed(2),
-          slip?.finalSalary?.toFixed(2) ?? "",
-          slip?.employerSocialInsurance?.toFixed(2) ?? "0",
-          slip?.employerHousingFund?.toFixed(2) ?? "0",
-          slip?.totalEmployerCost?.toFixed(2) ?? (slip?.grossSalary ?? 0).toFixed(2),
-        ];
+      await exportLaborData(type, {
+        month,
+        employees,
+        paySlips,
+        attendances,
+        shifts,
+        shiftTemplates,
       });
-
-      const csvContent = [header, ...rows]
-        .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
-        .join("\n");
-      const csvWithBOM = "\uFEFF" + csvContent; // UTF-8 BOM for Excel
-
-      const fileName = `薪资表_${month}.csv`;
-
-      // 使用静态 import 的 expo-file-system 和 expo-sharing
-      const fileUri = (FileSystem.cacheDirectory ?? "") + fileName;
-      await FileSystem.writeAsStringAsync(fileUri, csvWithBOM, { encoding: FileSystem.EncodingType.UTF8 });
-      const canShare = await Sharing.isAvailableAsync();
-      if (canShare) {
-        await Sharing.shareAsync(fileUri, { mimeType: "text/csv", dialogTitle: `导出${month}薪资表` });
-      } else {
-        Alert.alert("导出完成", `文件已保存到：${fileUri}`);
-      }
     } catch (e) {
       Alert.alert("导出失败", String(e));
+    } finally {
+      setExporting(false);
     }
-  }, [paySlips, attendances, employees, month]);
+  }, [month, employees, paySlips, attendances, shifts, shiftTemplates]);
 
   // 班次颜色查找辅助函数（动态读取模板）
 
@@ -909,12 +880,39 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
         <View style={{ flex: 1 }} />
         {/* 薪资对比开关 */}
         <CompareToggle mode={compareMode} customMonth={customMonth} baseMonth={month} onChange={setCompareMode} onCustomMonthChange={setCustomMonth} colors={colors} />
-        {/* 导出按鈕 */}
-        <TouchableOpacity onPress={handleExport}
-          style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: colors.border + "44", alignItems: "center", justifyContent: "center" }}>
-          <IconSymbol name="square.and.arrow.up" size={16} color={colors.muted} />
+        {/* 导出按钮 */}
+        <TouchableOpacity onPress={() => { tap(); setShowExportMenu(true); }}
+          style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: colors.border + "44", alignItems: "center", justifyContent: "center", opacity: exporting ? 0.5 : 1 }}
+          disabled={exporting}>
+          <IconSymbol name="square.and.arrow.up" size={16} color={exporting ? colors.muted : colors.foreground} />
         </TouchableOpacity>
       </View>
+
+      {/* 导出菜单 Modal */}
+      <Modal visible={showExportMenu} transparent animationType="fade" onRequestClose={() => setShowExportMenu(false)}>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)" }} activeOpacity={1} onPress={() => setShowExportMenu(false)}>
+          <View style={{ position: "absolute", right: 16, top: 120, backgroundColor: colors.surface, borderRadius: 14, padding: 8, minWidth: 220, shadowColor: "#000", shadowOpacity: 0.18, shadowRadius: 12, elevation: 8 }}>
+            <Text style={{ fontSize: 13, fontWeight: "700", color: colors.muted, paddingHorizontal: 12, paddingVertical: 6 }}>导出 {month}</Text>
+            {([
+              { type: "payroll_excel" as ExportType, icon: "tablecells", label: "薪资报表 Excel", sub: "含全部细化字段" },
+              { type: "payroll_pdf" as ExportType, icon: "doc.richtext", label: "薪资报表 PDF", sub: "A3 横向打印" },
+              { type: "schedule_hours_excel" as ExportType, icon: "clock", label: "排班表 Excel（时长）", sub: "前厅+后厨，工时模式" },
+              { type: "schedule_hours_pdf" as ExportType, icon: "clock", label: "排班表 PDF（时长）", sub: "A3 横向打印" },
+              { type: "schedule_session_excel" as ExportType, icon: "calendar", label: "排班表 Excel（班次）", sub: "前厅+后厨，班次名称" },
+              { type: "schedule_session_pdf" as ExportType, icon: "calendar", label: "排班表 PDF（班次）", sub: "A3 横向打印" },
+            ] as const).map(({ type, icon, label, sub }) => (
+              <TouchableOpacity key={type} onPress={() => handleExport(type)}
+                style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10 }}>
+                <IconSymbol name={icon as any} size={18} color={colors.foreground} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>{label}</Text>
+                  <Text style={{ fontSize: 11, color: colors.muted }}>{sub}</Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       {/* 自动部门分组：前厅/后厨/公司（全职+长期兼职）+ 临时兼职 */}
       {AUTO_DEPT_GROUPS.map(({ key, label, color, filter }) => {
