@@ -651,7 +651,8 @@ export default function MonthlySummaryScreen() {
                 {sec.sign > 0 ? "+" : ""}¥{sec.subtotal.toFixed(2)}
               </Text>
             </View>
-            {sec.items.map((item) => (
+            {/* 工资科目不渲染科目行，只保留下方的「工资发放明细」卡片（避免重复） */}
+            {sec.key !== "labor" && sec.items.map((item) => (
               <TouchableOpacity key={item.id}
                 onPress={() => {
                   if (!item.isManual && item.linkedModule) {
@@ -670,7 +671,7 @@ export default function MonthlySummaryScreen() {
                 <LineItemRow item={item} colors={colors} linkedModule={item.linkedModule} />
               </TouchableOpacity>
             ))}
-            {sec.items.length === 0 && (
+            {sec.key !== "labor" && sec.items.length === 0 && (
               <View style={{ padding: 12, alignItems: "center" }}>
                 <Text style={{ fontSize: 12, color: colors.muted }}>暂无数据 · 长按手动录入行可编辑</Text>
               </View>
@@ -728,78 +729,73 @@ export default function MonthlySummaryScreen() {
                             <TouchableOpacity key={emp.id}
                               onPress={() => router.push({ pathname: "/labor-attendance" as any, params: { employeeId: emp.id, month: selectedMonth } })}
                               style={[S.inlineCard, { borderLeftColor: deptColor, marginBottom: 6 }]}>
-                              <View style={{ flexDirection: "row", alignItems: "center" }}>
-                                {/* 左：真实姓名（昵称）*/}
-                                <View style={{ flex: 1 }}>
-                                  <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>
-                                    {emp.realName}
-                                    {emp.realName !== emp.code && emp.code
-                                      ? <Text style={{ fontSize: 11, fontWeight: "400", color: colors.muted }}>（{emp.code}）</Text>
-                                      : null}
-                                  </Text>
+                              {/* 新排版：左列（姓名）+ 中间三列（应发/预支/待发）+ 右列（未发已发+复制付款）*/}
+                              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                                {/* 左：姓名（上）+ 英文名（下）*/}
+                                <View style={{ width: 64 }}>
+                                  <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }} numberOfLines={1}>{emp.realName}</Text>
+                                  {emp.realName !== emp.code && emp.code
+                                    ? <Text style={{ fontSize: 11, color: colors.muted }} numberOfLines={1}>（{emp.code}）</Text>
+                                    : null}
                                 </View>
-                                {/* 右：已发按钮 */}
-                                {payment ? (
-                                  <View style={{ flexDirection: "row", gap: 4 }}>
-                                    {!isPaid && (
-                                      <TouchableOpacity
-                                        onPress={(e) => {
-                                          e.stopPropagation?.();
-                                          handleOpenPaymentModal(payment.id, emp.realName, finalAmt);
-                                        }}
-                                        style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8,
-                                          backgroundColor: colors.success + "18",
-                                          borderWidth: 1, borderColor: colors.success + "44" }}>
-                                        <Text style={{ fontSize: 11, fontWeight: "700", color: colors.success }}>录入发放</Text>
-                                      </TouchableOpacity>
-                                    )}
-                                    <View style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8,
-                                      backgroundColor: isPaid ? colors.success + "18" : colors.error + "18",
-                                      borderWidth: 1, borderColor: isPaid ? colors.success + "44" : colors.error + "44" }}>
-                                      <Text style={{ fontSize: 11, fontWeight: "700", color: isPaid ? colors.success : colors.error }}>
-                                        {isPaid ? "✓ 已发" : "待发"}
-                                      </Text>
-                                    </View>
+                                {/* 中间：应发 / 预支 / 待发 三列（标签 + 数字，完全对齐）*/}
+                                <View style={{ flex: 1, flexDirection: "row", justifyContent: "space-between" }}>
+                                  <View style={S.amtBlock}>
+                                    <Text style={S.amtLabel}>应发</Text>
+                                    <Text style={[S.amtValue, { color: colors.foreground }]}>¥{grossAmt.toFixed(0)}</Text>
                                   </View>
-                                ) : (
-                                  <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, backgroundColor: colors.muted + "15" }}>
-                                    <Text style={{ fontSize: 11, color: colors.muted }}>待发</Text>
-                                  </View>
-                                )}
-                              </View>
-                              {/* 金额行：应发 / 预支 / 待发 */}
-                              <View style={{ flexDirection: "row", gap: 16, marginTop: 6 }}>
-                                <View style={S.amtBlock}>
-                                  <Text style={S.amtLabel}>应发</Text>
-                                  <Text style={[S.amtValue, { color: colors.foreground }]}>¥{grossAmt.toFixed(0)}</Text>
-                                </View>
-                                {advAmt > 0 && (
                                   <View style={S.amtBlock}>
                                     <Text style={S.amtLabel}>预支</Text>
-                                    <Text style={[S.amtValue, { color: colors.warning }]}>-¥{advAmt.toFixed(0)}</Text>
+                                    <Text style={[S.amtValue, { color: advAmt > 0 ? colors.warning : colors.muted }]}>
+                                      {advAmt > 0 ? `-¥${advAmt.toFixed(0)}` : "0"}
+                                    </Text>
                                   </View>
-                                )}
-                                <View style={S.amtBlock}>
-                                  <Text style={S.amtLabel}>待发</Text>
-                                  <Text style={[S.amtValue, { color: isPaid ? colors.success : colors.error, fontWeight: "800" }]}>¥{finalAmt.toFixed(0)}</Text>
+                                  <View style={S.amtBlock}>
+                                    <Text style={S.amtLabel}>待发</Text>
+                                    <Text style={[S.amtValue, { color: isPaid ? colors.success : colors.error, fontWeight: "800" }]}>¥{finalAmt.toFixed(0)}</Text>
+                                  </View>
                                 </View>
-                                {/* 复制付款信息 */}
-                                {defaultBank && (
-                                  <TouchableOpacity
-                                    onPress={(e) => {
-                                      e.stopPropagation?.();
-                                      handleCopy([
-                                        `姓名：${emp.realName}`,
-                                        `银行：${defaultBank.bankName}`,
-                                        `卡号：${defaultBank.cardNumber}`,
-                                        `金额：${finalAmt.toFixed(0)}`,
-                                      ].join("\n"));
-                                    }}
-                                    style={[S.miniBtn, { backgroundColor: colors.primary, marginLeft: "auto" }]}>
-                                    <IconSymbol name="doc.on.clipboard" size={10} color="#fff" />
-                                    <Text style={{ fontSize: 10, color: "#fff", fontWeight: "600" }}>复制付款</Text>
-                                  </TouchableOpacity>
-                                )}
+                                {/* 右：未发/已发（上）+ 复制付款（下）*/}
+                                <View style={{ alignItems: "flex-end", gap: 4, minWidth: 64 }}>
+                                  {/* 未发/已发标签 */}
+                                  {payment ? (
+                                    <TouchableOpacity
+                                      onPress={(e) => {
+                                        e.stopPropagation?.();
+                                        if (!isPaid) handleOpenPaymentModal(payment.id, emp.realName, finalAmt);
+                                      }}
+                                      style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6,
+                                        backgroundColor: isPaid ? colors.success + "18" : colors.error + "18",
+                                        borderWidth: 1, borderColor: isPaid ? colors.success + "44" : colors.error + "44" }}>
+                                      <Text style={{ fontSize: 11, fontWeight: "700", color: isPaid ? colors.success : colors.error }}>
+                                        {isPaid ? "✓ 已发" : "未发"}
+                                      </Text>
+                                    </TouchableOpacity>
+                                  ) : (
+                                    <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: colors.muted + "15" }}>
+                                      <Text style={{ fontSize: 11, color: colors.muted }}>未发</Text>
+                                    </View>
+                                  )}
+                                  {/* 复制付款按鈕 */}
+                                  {defaultBank ? (
+                                    <TouchableOpacity
+                                      onPress={(e) => {
+                                        e.stopPropagation?.();
+                                        handleCopy([
+                                          `姓名：${emp.realName}`,
+                                          `银行：${defaultBank.bankName}`,
+                                          `卡号：${defaultBank.cardNumber}`,
+                                          `金额：${finalAmt.toFixed(0)}`,
+                                        ].join("\n"));
+                                      }}
+                                      style={[S.miniBtn, { backgroundColor: colors.primary }]}>
+                                      <IconSymbol name="doc.on.clipboard" size={10} color="#fff" />
+                                      <Text style={{ fontSize: 10, color: "#fff", fontWeight: "600" }}>复制付款</Text>
+                                    </TouchableOpacity>
+                                  ) : (
+                                    <View style={{ height: 22 }} />
+                                  )}
+                                </View>
                               </View>
                             </TouchableOpacity>
                           );

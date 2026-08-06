@@ -20,7 +20,6 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import StorePettyCashScreen from "@/components/store/petty-cash";
 import StoreAnalyticsScreen from "@/components/store/analytics";
 import StoreInventoryScreen from "@/components/store/inventory";
-import StoreReportScreen from "@/components/store/report";
 import StoreAccountsScreen from "@/components/store/accounts";
 import LaborScreen from "@/app/labor";
 
@@ -48,8 +47,10 @@ const OPERATIONS_TABS: { key: OperationsTab; label: string }[] = [
 // ── 当月月报模块 ──────────────────────────────────────────────────────────────
 function MonthlyModule({ insets }: { insets: any }) {
   const colors = useColors();
+  const router = useRouter();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
-  const [monthlyTab, setMonthlyTab] = usePersistedState<MonthlyTab>("store.monthly.tab.v1", "summary");
+  // 总月报改为直接跳转到 monthly-summary 页面，删除内嵌的 StoreReportScreen
+  const [monthlyTab, setMonthlyTab] = usePersistedState<MonthlyTab>("store.monthly.tab.v1", "analytics");
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -59,7 +60,16 @@ function MonthlyModule({ insets }: { insets: any }) {
         {MONTHLY_TABS.map((t) => {
           const active = monthlyTab === t.key;
           return (
-            <Pressable key={t.key} onPress={() => { tap(); setMonthlyTab(t.key); }}
+            <Pressable key={t.key}
+              onPress={() => {
+                tap();
+                if (t.key === "summary") {
+                  // 总月报直接跳转到完整月报页面
+                  router.push("/monthly-summary" as any);
+                } else {
+                  setMonthlyTab(t.key);
+                }
+              }}
               style={[S.subChip, {
                 backgroundColor: active ? colors.primary : colors.surface,
                 borderColor: active ? colors.primary : colors.border,
@@ -75,11 +85,6 @@ function MonthlyModule({ insets }: { insets: any }) {
         })}
       </ScrollView>
 
-      {monthlyTab === "summary" && (
-        <SafeAreaInsetsContext.Provider value={insets}>
-          <StoreReportScreen />
-        </SafeAreaInsetsContext.Provider>
-      )}
       {monthlyTab === "analytics" && (
         <SafeAreaInsetsContext.Provider value={insets}>
           <StoreAnalyticsScreen />
