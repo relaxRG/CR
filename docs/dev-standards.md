@@ -344,3 +344,153 @@ grep -n "Modal " src/file.tsx  # 注意加空格避免匹配注释
 ```
 
 **工具提示**：TypeScript 编译器不会对未使用的 import 报错（只有 ESLint 会），所以必须手动检查。
+
+---
+
+## 九、绩效补贴页退出后数据重置 Bug 根因分析（2026-08-06）
+
+### Bug 描述
+
+在绩效补贴页（`labor-kpi-allowance.tsx`）勾选工作绩效档位后，直接手势返回或点「<」返回，再次进入页面时档位选择全部重置为空白。
+
+### 根因（两个独立问题叠加）
+
+**问题 1：`workKPISelections` 和 `revenueActuals` 初始化不读持久化数据**
+
+```ts
+// ❌ 错误：初始化为空对象，每次进入页面都从空白开始
+const [workKPISelections, setWorkKPISelections] = useState<Record<string, string>>({});
+const [revenueActuals, setRevenueActuals] = useState<Record<string, string>>({});
+```
+
+`PaySlip` 类型中没有对应的持久化字段，导致即使保存成功，下次进入也无法恢复。
+
+**问题 2：`selectWorkKPITier` 只更新本地 state，不立即写入 PaySlip**
+
+```ts
+// ❌ 错误：只更新本地 state，依赖返回时的 syncToPaySlip() 写入
+const selectWorkKPITier = (ruleId, tierId) => {
+  setWorkKPISelections((prev) => ({ ...prev, [ruleId]: ... }));
+  // 没有调用 upsertPaySlip！
+};
+```
+
+`syncToPaySlip()` 只在点击「<」返回按钮时被调用，手势返回时不触发，导致数据丢失。
+
+### 修复方案
+
+1. 在 `PaySlip` 类型中新增 `workKPISelections` 和 `revenueActuals` 持久化字段
+2. 初始化时从 `PaySlip` 读取已保存的选择状态
+3. 每次点击/输入立即调用 `upsertPaySlip`（与 `toggleAllowance` 保持一致）
+4. 删除 `syncToPaySlip()` 函数，返回按钮直接 `router.back()`
+
+### 受影响的关联模块清单
+
+| 模块 | 文件 | 问题 | 处理 |
+|------|------|------|------|
+| `workKPISelections` 初始化 | `labor-kpi-allowance.tsx` | 初始化为 `{}` 不读持久化 | ✅ 从 `PaySlip.workKPISelections` 恢复 |
+| `revenueActuals` 初始化 | `labor-kpi-allowance.tsx` | 初始化为 `{}` 不读持久化 | ✅ 从 `PaySlip.revenueActuals` 恢复 |
+| `selectWorkKPITier()` | `labor-kpi-allowance.tsx` | 只更新本地 state | ✅ 改为即时 `upsertPaySlip` |
+| `updateRevenueActual()` | `labor-kpi-allowance.tsx` | 只更新本地 state | ✅ 改为即时 `upsertPaySlip` |
+| `syncToPaySlip()` | `labor-kpi-allowance.tsx` | 废弃函数 | ✅ 已删除 |
+| 返回按钮 | `labor-kpi-allowance.tsx` | `syncToPaySlip(); router.back()` | ✅ 改为直接 `router.back()` |
+| `useCallback` import | `labor-kpi-allowance.tsx` | 删除后不再需要 | ✅ 已删除 |
+| `calcPaySlipUpdate()` | `labor-kpi-allowance.tsx` | 新增统一计算入口 | ✅ 避免三处重复计算 |
+| `PaySlip.workKPISelections` | `lib/labor/types.ts` | 缺少持久化字段 | ✅ 新增 |
+| `PaySlip.revenueActuals` | `lib/labor/types.ts` | 缺少持久化字段 | ✅ 新增 |
+
+**已审查但无需修复的同类逻辑：**
+- `labor-attendance.tsx` 的 `rewardItems`/`notes`：用户主动点「✓ 保存」写入（编辑模式，合理），`notes` 用 `onBlur` 即时写入（正确）
+- `spirits-inventory.tsx` 的 `onBack`：UI 导航回调，不涉及数据同步
+- `suppliers.tsx` 的 `onBack`：UI 导航回调，不涉及数据同步
+
+---
+
+## 十、开发规范：状态持久化三原则
+
+### 规范 10：单步选择操作必须即时写入持久化存储
+
+**原则**：用户的每次点击选择（勾选、档位选择、开关切换）必须立即调用 `upsertXxx` 写入持久化存储，不能依赖「返回时同步」。
+
+```ts
+// ❌ 错误：只更新本地 state，依赖返回时同步
+const selectTier = (id: string) => {
+  setSelections((prev) => ({ ...prev, ruleId: id }));
+  // 忘记调用 upsertPaySlip！
+};
+
+// ✅ 正确：即时写入
+const selectTier = (id: string) => {
+  setSelections((prev) => {
+    const next = { ...prev, ruleId: id };
+    upsertPaySlip({ ...existing, selections: next, ...recalc(next) });
+    return next;
+  });
+};
+```
+
+**例外**：需要用户确认（删除）或批量编辑（奖惩列表）的操作，可以使用「编辑模式 → 保存」模式。
+
+---
+
+### 规范 11：本地 state 初始化必须从持久化存储读取
+
+**原则**：如果一个 state 需要在页面关闭后保留，必须：
+1. 在 `PaySlip`/`Employee` 等持久化类型中新增对应字段
+2. 在 `useState` 初始化时从持久化存储读取
+
+```ts
+// ❌ 错误：初始化为空，每次进入页面都从空白开始
+const [selections, setSelections] = useState<Record<string, string>>({});
+
+// ✅ 正确：从 PaySlip 恢复
+const [selections, setSelections] = useState<Record<string, string>>(() => {
+  const slip = getPaySlip(employeeId, month);
+  return slip?.workKPISelections ?? {};
+});
+```
+
+**检查清单**：
+- [ ] 这个 state 需要在页面关闭后保留吗？
+- [ ] 对应的持久化类型中有字段吗？
+- [ ] `useState` 初始化时读取了持久化数据吗？
+
+---
+
+### 规范 12：禁止「返回时同步」模式
+
+**原则**：禁止在返回按钮的 `onPress` 中调用同步函数，也禁止使用 `useEffect` cleanup 来同步数据。
+
+```ts
+// ❌ 错误：依赖返回时同步
+<TouchableOpacity onPress={() => { syncToPaySlip(); router.back(); }}>
+
+// ❌ 错误：useEffect cleanup 同步
+useEffect(() => {
+  return () => { syncToPaySlip(); }; // 不可靠，组件卸载时不保证执行
+}, []);
+
+// ✅ 正确：每次操作立即写入，返回按钮直接返回
+<TouchableOpacity onPress={() => router.back()}>
+```
+
+**原因**：
+- 手势返回（iOS swipe back）不触发 `onPress`
+- React Native 的 `useEffect` cleanup 在导航时不保证执行顺序
+- 用户可能切换 Tab 而不是点返回按钮
+
+---
+
+### 规范 13：新增持久化字段时同步更新类型定义
+
+**原则**：每次需要持久化新的 state，必须同步在对应的类型文件中新增字段，并添加注释说明用途。
+
+```ts
+// lib/labor/types.ts
+interface PaySlip {
+  // ...
+  /** 工作绩效档位选择（key: ruleId, value: tierId）
+   * 即时写入，进入页面时从此恢复，无需 syncToPaySlip */
+  workKPISelections?: Record<string, string>;
+}
+```
