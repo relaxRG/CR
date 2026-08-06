@@ -8,7 +8,7 @@ import React, { useCallback, useMemo, useRef, useState } from "react";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import {
-  Alert, Dimensions, Modal, Platform, Pressable, ScrollView,
+  Alert, Clipboard, Dimensions, Modal, Platform, Pressable, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions, KeyboardAvoidingView} from "react-native";
 import * as Haptics from "expo-haptics";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -764,22 +764,41 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
             </View>
           )}
 
-          {/* 操作按钮行：绩效补贴 | 编辑薪资 | 历史 */}
-          <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
+          {/* 操作按钮行：绩效补贴 | 编辑薪资 | 付款信息 | 历史 */}
+          <View style={{ flexDirection: "row", gap: 6, marginTop: 4 }}>
             <TouchableOpacity onPress={() => { tap(); router.push({ pathname: "/labor-kpi-allowance", params: { employeeId: employee.id, month } } as any); }}
-              style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, paddingVertical: 7, borderRadius: 8, backgroundColor: colors.success + "15", borderWidth: 1, borderColor: colors.success + "44" }}>
-              <IconSymbol name="chart.bar.fill" size={12} color={colors.success} />
-              <Text style={{ fontSize: 12, color: colors.success, fontWeight: "600" }}>绩效补贴</Text>
+              style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 3, paddingVertical: 7, borderRadius: 8, backgroundColor: colors.success + "15", borderWidth: 1, borderColor: colors.success + "44" }}>
+              <IconSymbol name="chart.bar.fill" size={11} color={colors.success} />
+              <Text style={{ fontSize: 11, color: colors.success, fontWeight: "600" }}>绩效补贴</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => { tap(); router.push({ pathname: "/labor-attendance", params: { employeeId: employee.id, month } } as any); }}
-              style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, paddingVertical: 7, borderRadius: 8, backgroundColor: colors.primary + "15", borderWidth: 1, borderColor: colors.primary + "44" }}>
-              <IconSymbol name="pencil" size={12} color={colors.primary} />
-              <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "600" }}>编辑薪资</Text>
+              style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 3, paddingVertical: 7, borderRadius: 8, backgroundColor: colors.primary + "15", borderWidth: 1, borderColor: colors.primary + "44" }}>
+              <IconSymbol name="pencil" size={11} color={colors.primary} />
+              <Text style={{ fontSize: 11, color: colors.primary, fontWeight: "600" }}>编辑薪资</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => {
+                tap();
+                const bank = employee.bankAccounts?.find((b: any) => b.isDefault) ?? employee.bankAccounts?.[0];
+                const lines = [
+                  `姓名：${employee.realName}`,
+                  bank ? `领款人：${bank.accountName ?? employee.realName}` : null,
+                  bank ? `开户行：${bank.bankName}` : null,
+                  bank ? `卡号：${bank.cardNumber}` : null,
+                  `金额：¥${slip?.finalSalary?.toFixed(0) ?? "0"}`,
+                  `备注：${month} 薪资`,
+                ].filter(Boolean).join("\n");
+                Clipboard.setString(lines);
+                Alert.alert("已复制", "付款信息已复制到剪贴板");
+              }}
+              style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 3, paddingVertical: 7, borderRadius: 8, backgroundColor: "#FF9500" + "15", borderWidth: 1, borderColor: "#FF9500" + "44" }}>
+              <IconSymbol name="doc.on.clipboard" size={11} color="#FF9500" />
+              <Text style={{ fontSize: 11, color: "#FF9500", fontWeight: "600" }}>付款信息</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => { tap(); router.push({ pathname: "/labor-salary-history", params: { employeeId: employee.id } } as any); }}
-              style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, paddingVertical: 7, paddingHorizontal: 10, borderRadius: 8, backgroundColor: "#5856D6" + "15", borderWidth: 1, borderColor: "#5856D6" + "44" }}>
-              <IconSymbol name="clock.fill" size={12} color="#5856D6" />
-              <Text style={{ fontSize: 12, color: "#5856D6", fontWeight: "600" }}>历史</Text>
+              style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 3, paddingVertical: 7, paddingHorizontal: 8, borderRadius: 8, backgroundColor: "#5856D6" + "15", borderWidth: 1, borderColor: "#5856D6" + "44" }}>
+              <IconSymbol name="clock.fill" size={11} color="#5856D6" />
+              <Text style={{ fontSize: 11, color: "#5856D6", fontWeight: "600" }}>历史</Text>
             </TouchableOpacity>
           </View>
         </View>

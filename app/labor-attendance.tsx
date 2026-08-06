@@ -6,15 +6,13 @@
  * - 奖惩区：支持负数，可增删改
  * - 其他区：调休余额（加班换休/节假日调休分开显示）+ 本月兑换
  * - 备注、薪资汇总
- * - 底部四按钮：绩效补贴 / 编辑薪资 / 付款信息 / 历史
- * - 付款信息：一键复制（姓名/银行/卡号/待发金额）
  *
  * 即时同步：所有数据直接订阅 paySlips/attendances 响应式数组，
  * 任何 Store 更新立即触发重渲染，无需手动刷新。
  */
 import React, { useCallback, useMemo, useState } from "react";
 import {
-  Alert, Clipboard, Modal, Platform, ScrollView, StyleSheet,
+  Alert, Clipboard, Platform, ScrollView, StyleSheet,
   Text, TextInput, TouchableOpacity, View
 } from "react-native";
 import * as Haptics from "expo-haptics";
@@ -64,28 +62,8 @@ export default function LaborAttendancePage() {
   const currentMonth = month || new Date().toISOString().slice(0, 7);
   const [expandedId, setExpandedId] = useState<string>(employeeId || "");
   const [editingRewardFor, setEditingRewardFor] = useState<string>("");
-  const [paymentModalFor, setPaymentModalFor] = useState<string>("");
 
   const activeEmployees = useMemo(() => employees.filter((e) => e.active !== false), [employees]);
-
-  // 付款信息 Modal
-  const paymentEmployee = useMemo(() => employees.find((e) => e.id === paymentModalFor), [employees, paymentModalFor]);
-  const paymentSlip = useMemo(() => paySlips.find((s) => s.employeeId === paymentModalFor && s.month === currentMonth) ?? null, [paySlips, paymentModalFor, currentMonth]);
-  const defaultBank = paymentEmployee?.bankAccounts?.find((b) => b.isDefault) ?? paymentEmployee?.bankAccounts?.[0];
-
-  const handleCopyPayment = () => {
-    if (!paymentEmployee) return;
-    const lines = [
-      `姓名：${paymentEmployee.realName}`,
-      `银行：${defaultBank?.bankName ?? "未设置"}`,
-      `卡号：${defaultBank?.cardNumber ?? "未设置"}`,
-      `金额：${paymentSlip ? paymentSlip.finalSalary.toFixed(0) : "0"}`,
-    ].join("\n");
-    Clipboard.setString(lines);
-    tap();
-    Alert.alert("已复制", "付款信息已复制到剪贴板");
-    setPaymentModalFor("");
-  };
 
   return (
     <ScreenContainer>
@@ -136,7 +114,6 @@ export default function LaborAttendancePage() {
                     upsertPaySlip={upsertPaySlip}
                     editingReward={editingRewardFor === emp.id}
                     onToggleRewardEdit={() => setEditingRewardFor(editingRewardFor === emp.id ? "" : emp.id)}
-                    onOpenPayment={() => { tap(); setPaymentModalFor(emp.id); }}
                     router={router}
                   />
                 );
@@ -145,42 +122,6 @@ export default function LaborAttendancePage() {
           );
         })}
       </ScrollView>
-
-      {/* 付款信息 Modal */}
-      <Modal visible={!!paymentModalFor} transparent animationType="fade" onRequestClose={() => setPaymentModalFor("")}>
-        <TouchableOpacity style={S.modalOverlay} activeOpacity={1} onPress={() => setPaymentModalFor("")}>
-          <TouchableOpacity activeOpacity={1} style={[S.modalBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={[S.modalTitle, { color: colors.foreground }]}>付款信息</Text>
-            {paymentEmployee ? (
-              <View style={{ gap: 10, marginVertical: 16 }}>
-                <View style={S.payRow}>
-                  <Text style={[S.payLabel, { color: colors.muted }]}>姓名</Text>
-                  <Text style={[S.payValue, { color: colors.foreground }]}>{paymentEmployee.realName}</Text>
-                </View>
-                <View style={S.payRow}>
-                  <Text style={[S.payLabel, { color: colors.muted }]}>银行</Text>
-                  <Text style={[S.payValue, { color: colors.foreground }]}>{defaultBank?.bankName ?? "未设置"}</Text>
-                </View>
-                <View style={S.payRow}>
-                  <Text style={[S.payLabel, { color: colors.muted }]}>卡号</Text>
-                  <Text style={[S.payValue, { color: colors.foreground, fontFamily: "monospace" }]}>{defaultBank?.cardNumber ?? "未设置"}</Text>
-                </View>
-                <View style={[S.payRow, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, paddingTop: 10 }]}>
-                  <Text style={[S.payLabel, { color: colors.muted }]}>待发金额</Text>
-                  <Text style={[S.payValue, { color: colors.primary, fontSize: 18, fontWeight: "800" }]}>
-                    ¥{paymentSlip ? paymentSlip.finalSalary.toFixed(0) : "0"}
-                  </Text>
-                </View>
-              </View>
-            ) : null}
-            <TouchableOpacity onPress={handleCopyPayment}
-              style={[S.copyBtn, { backgroundColor: colors.primary }]}>
-              <IconSymbol name="doc.on.doc" size={14} color="#fff" />
-              <Text style={{ color: "#fff", fontSize: 14, fontWeight: "700", marginLeft: 6 }}>复制全部</Text>
-            </TouchableOpacity>
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
     </ScreenContainer>
   );
 }
@@ -189,7 +130,7 @@ export default function LaborAttendancePage() {
 function EmployeeCard({
   employee, month, att, slip, compOffEntries, holidayCompOffEntries,
   advances, expanded, onToggle, colors, upsertPaySlip,
-  editingReward, onToggleRewardEdit, onOpenPayment, router,
+  editingReward, onToggleRewardEdit, router,
 }: {
   employee: Employee; month: string;
   att: MonthlyAttendance | null; slip: PaySlip | null;
@@ -197,7 +138,7 @@ function EmployeeCard({
   advances: any[]; expanded: boolean; onToggle: () => void; colors: any;
   upsertPaySlip: (slip: PaySlip) => void;
   editingReward: boolean; onToggleRewardEdit: () => void;
-  onOpenPayment: () => void; router: any;
+  router: any;
 }) {
   const tenure = calcTenure(employee.joinDate);
 
@@ -481,57 +422,6 @@ function EmployeeCard({
           <DetailRow label="公司总人力成本" value={`¥${slip.totalEmployerCost.toFixed(0)}`} colors={colors} bold />
         </View>
       )}
-
-      {/* 一键复制付款信息按鈕 */}
-      {slip && (() => {
-        const defaultBank = employee.bankAccounts?.find((b: any) => b.isDefault) ?? employee.bankAccounts?.[0];
-        const handleQuickCopy = () => {
-          const lines = [
-            `姓名：${employee.realName}`,
-            defaultBank ? `领款人：${defaultBank.accountName ?? employee.realName}` : null,
-            defaultBank ? `开户行：${defaultBank.bankName}` : null,
-            defaultBank ? `卡号：${defaultBank.cardNumber}` : null,
-            `金额：¥${slip.finalSalary.toFixed(0)}`,
-            `备注：${month} 薪资`,
-          ].filter(Boolean).join("\n");
-          Clipboard.setString(lines);
-          tap();
-          Alert.alert("已复制", "付款信息已复制到剪贴板");
-        };
-        return (
-          <TouchableOpacity
-            onPress={handleQuickCopy}
-            style={[S.copyPayBtn, { borderColor: colors.primary + "44", backgroundColor: colors.primary + "08" }]}>
-            <IconSymbol name="doc.on.clipboard" size={14} color={colors.primary} />
-            <Text style={{ fontSize: 13, fontWeight: "700", color: colors.primary }}>一键复制付款信息</Text>
-            <Text style={{ fontSize: 11, color: colors.muted, marginLeft: "auto" }}>实发 ¥{slip.finalSalary.toFixed(0)}</Text>
-          </TouchableOpacity>
-        );
-      })()}
-
-      {/* 底部四按鈕：绩效补贴 / 编辑薪资 / 付款信息 / 历史 */}
-      <View style={[S.actionRow, { borderTopColor: colors.border }]}>
-        <TouchableOpacity style={[S.actionBtn, { backgroundColor: colors.success + "18", borderColor: colors.success + "44" }]}
-          onPress={() => { tap(); router.push({ pathname: "/labor-kpi-allowance", params: { employeeId: employee.id, month } } as any); }}>
-          <IconSymbol name="chart.bar.fill" size={13} color={colors.success} />
-          <Text style={{ fontSize: 12, fontWeight: "600", color: colors.success }}>绩效补贴</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[S.actionBtn, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "44" }]}
-          onPress={() => { tap(); router.push({ pathname: "/labor-employee-form", params: { id: employee.id } } as any); }}>
-          <IconSymbol name="pencil" size={13} color={colors.primary} />
-          <Text style={{ fontSize: 12, fontWeight: "600", color: colors.primary }}>编辑薪资</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[S.actionBtn, { backgroundColor: "#FF9500" + "18", borderColor: "#FF9500" + "44" }]}
-          onPress={onOpenPayment}>
-          <IconSymbol name="creditcard.fill" size={13} color="#FF9500" />
-          <Text style={{ fontSize: 12, fontWeight: "600", color: "#FF9500" }}>付款信息</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[S.actionBtn, { backgroundColor: colors.muted + "18", borderColor: colors.muted + "44" }]}
-          onPress={() => { tap(); router.push({ pathname: "/labor-salary-history", params: { employeeId: employee.id } } as any); }}>
-          <IconSymbol name="clock.fill" size={13} color={colors.muted} />
-          <Text style={{ fontSize: 12, fontWeight: "600", color: colors.muted }}>历史</Text>
-        </TouchableOpacity>
-      </View>
     </View>
   );
 }
@@ -566,14 +456,4 @@ const S = StyleSheet.create({
   rewardInput: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, fontSize: 13 },
   addBtn: { marginTop: 8, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderStyle: "dashed", alignItems: "center" },
   notesInput: { borderWidth: 1, borderRadius: 8, padding: 10, fontSize: 13, minHeight: 60, textAlignVertical: "top" },
-  actionRow: { flexDirection: "row", gap: 8, padding: 12, borderTopWidth: StyleSheet.hairlineWidth },
-  actionBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, paddingVertical: 8, borderRadius: 8, borderWidth: 1 },
-  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "center", alignItems: "center", padding: 24 },
-  modalBox: { width: "100%", borderRadius: 16, borderWidth: 1, padding: 20 },
-  modalTitle: { fontSize: 16, fontWeight: "700", textAlign: "center" },
-  payRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  payLabel: { fontSize: 13 },
-  payValue: { fontSize: 14, fontWeight: "600" },
-  copyBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 12, borderRadius: 10 },
-  copyPayBtn: { flexDirection: "row", alignItems: "center", gap: 8, marginHorizontal: 12, marginBottom: 8, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 10, borderWidth: 1 },
 });
