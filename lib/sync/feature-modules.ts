@@ -275,6 +275,7 @@ export const FEATURE_MODULES: FeatureModule[] = [
       "labor_business_hours_v1",
       "labor_shift_groups_v1",
       "labor_fill_presets_v1",
+      "labor_schedule_snapshots_v1",
     ],
   },
   {

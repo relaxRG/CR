@@ -99,6 +99,7 @@ export const SYNC_KEYS = [
   "labor_business_hours_v1",
   "labor_shift_groups_v1",
   "labor_fill_presets_v1",
+  "labor_schedule_snapshots_v1",
   "store.petty_labor_links.v1",
   "store.employee_name_aliases.v1",
   // ── 烈酒进销存（新增）──────────────────────────────────────────────────────────────────────────────
