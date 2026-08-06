@@ -12,7 +12,7 @@ import {
   SpecialStatus, GlobalPayrollSettings,
   CompOffBalanceEntry, HolidayCompOffEntry, UnexplainedRestAlert,
   CustomDept, BusinessHoursEntry, ShiftGroup, FillPreset,
-  ShiftGroupMember, ScheduleSnapshot, DeptCategory,
+  ScheduleSnapshot, DeptCategory,
   calcDailyRate, calcAllowance, calcSocialInsurance, calcIncomeTax, calcFinalSalary,
   getDaysInMonth, parseMonth, getContractHoursForDate,
   calcCompOffExpiresMonth, getAvailableCompOffDays,
@@ -1356,94 +1356,6 @@ function FillPresetProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ─── 班次组员工列表 Store ─────────────────────────────────────────────────────
-interface ShiftGroupMemberStore {
-  members: ShiftGroupMember[];
-  /** 获取某月/某部门/某班次组的员工列表（按 sortOrder 排序） */
-  getMembersForGroup: (month: string, deptCategory: DeptCategory, groupId: string) => ShiftGroupMember[];
-  /** 添加员工到班次组 */
-  addMember: (month: string, deptCategory: DeptCategory, groupId: string, employeeId: string) => void;
-  /** 从班次组移除员工 */
-  removeMember: (month: string, deptCategory: DeptCategory, groupId: string, employeeId: string) => void;
-  /** 检查员工是否在某班次组 */
-  isMember: (month: string, deptCategory: DeptCategory, groupId: string, employeeId: string) => boolean;
-  /** 从旧排班记录迁移（首次使用时调用） */
-  migrateFromShifts: (month: string, deptCategory: DeptCategory, shifts: ShiftEntry[], shiftGroups: { id: string; templateIds: string[] }[], templates: { id: string; session: string }[]) => void;
-  /** 替换某月某部门的全部员工列表（先清空再写入，用于快照代入） */
-  replaceMembers: (month: string, deptCategory: DeptCategory, newMembers: Array<{ groupId: string; employeeId: string }>) => void;
-  ready: boolean;
-}
-const ShiftGroupMemberContext = createContext<ShiftGroupMemberStore>({
-  members: [],
-  getMembersForGroup: () => [],
-  addMember: () => {},
-  removeMember: () => {},
-  isMember: () => false,
-  migrateFromShifts: () => {},
-  replaceMembers: () => {},
-  ready: false,
-});
-function ShiftGroupMemberProvider({ children }: { children: React.ReactNode }) {
-  const { data: members, ref, persist, ready } = usePersisted<ShiftGroupMember>("labor_shift_group_members_v1");
-  const getMembersForGroup = useCallback((month: string, deptCategory: DeptCategory, groupId: string): ShiftGroupMember[] => {
-    return ref.current
-      .filter((m) => m.month === month && m.deptCategory === deptCategory && m.groupId === groupId)
-      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
-  }, [ref]);
-  const addMember = useCallback((month: string, deptCategory: DeptCategory, groupId: string, employeeId: string) => {
-    const exists = ref.current.some((m) => m.month === month && m.deptCategory === deptCategory && m.groupId === groupId && m.employeeId === employeeId);
-    if (exists) return;
-    const maxOrder = ref.current
-      .filter((m) => m.month === month && m.deptCategory === deptCategory && m.groupId === groupId)
-      .reduce((max, m) => Math.max(max, m.sortOrder ?? 0), -1);
-    const newMember: ShiftGroupMember = {
-      id: uuid(),
-      month, deptCategory, groupId, employeeId,
-      sortOrder: maxOrder + 1,
-      createdAt: new Date().toISOString(),
-    };
-    persist([...ref.current, newMember]);
-  }, [ref, persist]);
-  const removeMember = useCallback((month: string, deptCategory: DeptCategory, groupId: string, employeeId: string) => {
-    persist(ref.current.filter((m) => !(m.month === month && m.deptCategory === deptCategory && m.groupId === groupId && m.employeeId === employeeId)));
-  }, [ref, persist]);
-  const isMember = useCallback((month: string, deptCategory: DeptCategory, groupId: string, employeeId: string): boolean => {
-    return ref.current.some((m) => m.month === month && m.deptCategory === deptCategory && m.groupId === groupId && m.employeeId === employeeId);
-  }, [ref]);
-  const migrateFromShifts = useCallback((month: string, deptCategory: DeptCategory, shifts: ShiftEntry[], shiftGroups: { id: string; templateIds: string[] }[], templates: { id: string; session: string }[]) => {
-    // 检查是否已有该月该部门的成员数据，有则跳过迁移
-    const existing = ref.current.filter((m) => m.month === month && m.deptCategory === deptCategory);
-    if (existing.length > 0) return;
-    const toAdd: ShiftGroupMember[] = [];
-    for (const grp of shiftGroups) {
-      const tplSessions = grp.templateIds.map((tid) => templates.find((t) => t.id === tid)?.session).filter(Boolean) as string[];
-      const empIds = new Set<string>();
-      for (const shift of shifts) {
-        if (tplSessions.includes(shift.shift)) empIds.add(shift.employeeId);
-      }
-      let order = 0;
-      for (const empId of empIds) {
-        toAdd.push({ id: uuid(), month, deptCategory, groupId: grp.id, employeeId: empId, sortOrder: order++, createdAt: new Date().toISOString() });
-      }
-    }
-    if (toAdd.length > 0) persist([...ref.current, ...toAdd]);
-  }, [ref, persist]);
-  const replaceMembers = useCallback((month: string, deptCategory: DeptCategory, newMembers: Array<{ groupId: string; employeeId: string }>) => {
-    // 先删除该月该部门的所有成员数据
-    const kept = ref.current.filter((m) => !(m.month === month && m.deptCategory === deptCategory));
-    // 再按新列表写入
-    const toAdd: ShiftGroupMember[] = newMembers.map((m, i) => ({
-      id: uuid(), month, deptCategory, groupId: m.groupId, employeeId: m.employeeId,
-      sortOrder: i, createdAt: new Date().toISOString(),
-    }));
-    persist([...kept, ...toAdd]);
-  }, [ref, persist]);
-  return (
-    <ShiftGroupMemberContext.Provider value={{ members, getMembersForGroup, addMember, removeMember, isMember, migrateFromShifts, replaceMembers, ready }}>
-      {children}
-    </ShiftGroupMemberContext.Provider>
-  );
-}
 
 // ─── 排班表历史快照 Store ─────────────────────────────────────────────────────
 interface ScheduleSnapshotStore {
@@ -1511,7 +1423,6 @@ export function LaborProvider({ children }: { children: React.ReactNode }) {
           <BusinessHoursProvider>
           <FillPresetProvider>
           <ShiftGroupProvider>
-          <ShiftGroupMemberProvider>
           <ScheduleSnapshotProvider>
           <ShiftTemplateProvider>
             <SpecialStatusProvider>
@@ -1535,7 +1446,6 @@ export function LaborProvider({ children }: { children: React.ReactNode }) {
             </SpecialStatusProvider>
           </ShiftTemplateProvider>
           </ScheduleSnapshotProvider>
-          </ShiftGroupMemberProvider>
           </ShiftGroupProvider>
           </FillPresetProvider>
           </BusinessHoursProvider>
@@ -1561,5 +1471,4 @@ export function useUnexplainedRestAlertStore() { return useContext(UnexplainedRe
 export function useBusinessHoursStore() { return useContext(BusinessHoursContext); }
 export function useShiftGroupStore() { return useContext(ShiftGroupContext); }
 export function useFillPresetStore() { return useContext(FillPresetContext); }
-export function useShiftGroupMemberStore() { return useContext(ShiftGroupMemberContext); }
 export function useScheduleSnapshotStore() { return useContext(ScheduleSnapshotContext); }

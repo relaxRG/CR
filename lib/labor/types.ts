@@ -1388,25 +1388,6 @@ export function isDayInRange(dow: number, fromDay: number, toDay: number): boole
   }
 }
 
-// ─── 班次组员工列表（手动维护，替代自动推算） ────────────────────────────────
-/**
- * 记录某月/某部门/某班次组 → 包含哪些员工
- * 员工可同时出现在多个班次组（如午班+晚班）
- */
-export interface ShiftGroupMember {
-  id: string;
-  /** 月份 "2026-08" */
-  month: string;
-  /** 部门类别 */
-  deptCategory: DeptCategory;
-  /** 班次组 ID（对应 ShiftGroup.id） */
-  groupId: string;
-  /** 员工 ID */
-  employeeId: string;
-  /** 组内排序 */
-  sortOrder: number;
-  createdAt: string;
-}
 
 // ─── 排班表历史快照 ───────────────────────────────────────────────────────────
 /**
@@ -1433,6 +1414,4 @@ export interface ScheduleSnapshot {
   createdAt: string;
   /** 完整排班记录快照 */
   entries: ShiftEntry[];
-  /** 班次组员工列表快照 */
-  groupMembers: ShiftGroupMember[];
 }

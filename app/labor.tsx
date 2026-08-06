@@ -23,7 +23,7 @@ import {
   useSpecialStatusStore, useGlobalPayrollSettingsStore,
   useCompOffBalanceEntryStore, useHolidayCompOffStore, useUnexplainedRestAlertStore,
   useCustomDeptStore, useBusinessHoursStore, useShiftGroupStore, useFillPresetStore,
-  useShiftGroupMemberStore, useScheduleSnapshotStore,
+  useScheduleSnapshotStore,
 } from "@/lib/labor/store";
 import { useSalaryAdvanceStore, useAdvanceCategoryStore } from "@/lib/labor/advance-store";
 import { usePettyCashStore, PETTY_CODE_LABELS, PettyRecord } from "@/lib/store/petty-store";
@@ -3020,7 +3020,6 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   const { upsertAlert } = useUnexplainedRestAlertStore();
   const { businessHours, setBusinessHours } = useBusinessHoursStore();
   const { shiftGroups, setShiftGroups } = useShiftGroupStore();
-  const { getMembersForGroup, addMember, removeMember, isMember, migrateFromShifts, replaceMembers } = useShiftGroupMemberStore();
   const { getSnapshots, saveSnapshot, updateSnapshot, deleteSnapshot } = useScheduleSnapshotStore();
 
   const now = new Date();
@@ -3053,7 +3052,10 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   const [editMode, setEditMode] = useState(false);
   const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set()); // key: `${empId}_${date}_${session}`
   // 下拉选人器
-  const [addEmpDropdown, setAddEmpDropdown] = useState<{ groupId: string } | null>(null);
+  const [addEmpDropdown, setAddEmpDropdown] = useState<{ groupId: string; tplId: string } | null>(null);
+  // 待添加员工（已勾选但还没有排班数据，关闭面板时清空）
+  // key: `${month}|${deptCategory}|${groupId}|${tplId}`，value: Set<employeeId>
+  const [pendingEmpIds, setPendingEmpIds] = useState<Map<string, Set<string>>>(new Map());
   // 存档/历史 Modal
   const [showSnapshotModal, setShowSnapshotModal] = useState(false);
   const [snapshotNote, setSnapshotNote] = useState("");
@@ -3213,19 +3215,9 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
     [shiftGroups]
   );
 
-  // 首次进入时自动从旧排班记录迁移员工列表
-  React.useEffect(() => {
-    migrateFromShifts(
-      currentMonth, deptCategory,
-      monthShifts.filter((s) => allDeptEmployees.some((e) => e.id === s.employeeId)),
-      sortedShiftGroups,
-      sortedTemplates,
-    );
-  }, [currentMonth, deptCategory]); // 仅在月份或部门切换时触发
-
-  // 新分组展示引擎：基于手动维护的员工列表构建展示数据
-  // - 每个班次组始终显示（无人时显示空列表）
-  // - 员工可同时出现在多个班次组
+  // 新分组展示引擎：基于排班数据（ShiftEntry）自动推导员工行
+  // 规则：当月有任何 ShiftEntry 的员工自动显示；勾选新员工立即出现（格子空白）；取消勾选删除该员工本月所有排班
+  // 响应式：直接订阅 shifts state，任何变化立即触发重渲染，无需 ShiftGroupMember 中间层
   const groupedScheduleRows = useMemo(() => {
     const rows: Array<{ groupId: string; groupName: string; groupColor: string; tpl: ShiftTemplate; empList: Employee[] }> = [];
     const coveredTplIds = new Set<string>();
@@ -3235,21 +3227,37 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
         const tpl = sortedTemplates.find((t) => t.id === tplId);
         if (!tpl) continue;
         coveredTplIds.add(tpl.id);
-        const memberIds = getMembersForGroup(currentMonth, deptCategory, grp.id).map((m) => m.employeeId);
-        const empList = memberIds.map((id) => allDeptEmployees.find((e) => e.id === id)).filter(Boolean) as Employee[];
+        // 从 shifts 推导：当月有该班次 ShiftEntry 的员工自动显示
+        const empIdsWithShifts = new Set(
+          monthShifts
+            .filter((s) => s.shift === tpl.session && allDeptEmployees.some((e) => e.id === s.employeeId))
+            .map((s) => s.employeeId)
+        );
+        // 加上「待添加」员工（通过选人面板勾选但还没有排班数据）
+        const pendingKey = `${currentMonth}|${deptCategory}|${grp.id}|${tpl.id}`;
+        const pendingIds = pendingEmpIds.get(pendingKey) ?? new Set<string>();
+        const allIds = new Set([...empIdsWithShifts, ...pendingIds]);
+        const empList = allDeptEmployees.filter((e) => allIds.has(e.id));
         rows.push({ groupId: grp.id, groupName: grp.name, groupColor: grp.color, tpl, empList });
       }
     }
-    // 未分组的班次模板：使用 __ungrouped_ 前缀作为虚拟组 ID，支持手动维护员工列表
+    // 未分组的班次模板
     for (const tpl of sortedTemplates) {
       if (coveredTplIds.has(tpl.id)) continue;
       const grpId = "__ungrouped_" + tpl.id;
-      const memberIds = getMembersForGroup(currentMonth, deptCategory, grpId).map((m) => m.employeeId);
-      const empList = memberIds.map((id) => allDeptEmployees.find((e) => e.id === id)).filter(Boolean) as Employee[];
+      const empIdsWithShifts = new Set(
+        monthShifts
+          .filter((s) => s.shift === tpl.session && allDeptEmployees.some((e) => e.id === s.employeeId))
+          .map((s) => s.employeeId)
+      );
+      const pendingKey = `${currentMonth}|${deptCategory}|${grpId}|${tpl.id}`;
+      const pendingIds = pendingEmpIds.get(pendingKey) ?? new Set<string>();
+      const allIds = new Set([...empIdsWithShifts, ...pendingIds]);
+      const empList = allDeptEmployees.filter((e) => allIds.has(e.id));
       rows.push({ groupId: grpId, groupName: tpl.session, groupColor: tpl.color, tpl, empList });
     }
     return rows;
-  }, [sortedShiftGroups, sortedTemplates, getMembersForGroup, currentMonth, deptCategory, allDeptEmployees]);
+  }, [sortedShiftGroups, sortedTemplates, monthShifts, currentMonth, deptCategory, allDeptEmployees, pendingEmpIds]);
 
   // getEntry 支持跨月查询：先查当月，再查相邻月
   const getEntry = useCallback((employeeId: string, date: string, session: string): ShiftEntry | null => {
@@ -3588,7 +3596,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
         {/* 各班次员工行（手动维护列表，每组底部有「+ ▼」空行） */}
         {groupedScheduleRows.map(({ groupId, groupName, groupColor, tpl, empList }, rowIdx) => {
           if (!tpl) return null;
-          const isDropdownOpen = addEmpDropdown?.groupId === groupId;
+          const isDropdownOpen = addEmpDropdown?.groupId === groupId && addEmpDropdown?.tplId === tpl.id;
           return (
             <View key={`${groupId}_${tpl.id}`}>
               {rowIdx > 0 && <View style={{ height: 6, backgroundColor: colors.border + "44" }} />}
@@ -3641,7 +3649,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
               {/* 永远存在的「+ ▼」空行 */}
               {!editMode && (
                 <TouchableOpacity
-                  onPress={() => { tap(); setAddEmpDropdown(isDropdownOpen ? null : { groupId }); }}
+                  onPress={() => { tap(); setAddEmpDropdown(isDropdownOpen ? null : { groupId, tplId: tpl.id }); }}
                   style={[EXL.empRow, { borderTopColor: colors.border + "33", borderTopWidth: StyleSheet.hairlineWidth }]}>
                   <View style={{ width: 3, height: 34, backgroundColor: groupColor + "44" }} />
                   <View style={[EXL.nameCol, { width: EXL_NAME_W - 3, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 2 }]}>
@@ -3663,13 +3671,38 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                     </TouchableOpacity>
                   </View>
                   {allDeptEmployees.map((emp) => {
-                    const inGroup = isMember(currentMonth, deptCategory, groupId, emp.id);
+                    const pendingKey = `${currentMonth}|${deptCategory}|${groupId}|${tpl.id}`;
+                    const hasShift = monthShifts.some((s) => s.employeeId === emp.id && s.shift === tpl.session);
+                    const isPending = pendingEmpIds.get(pendingKey)?.has(emp.id) ?? false;
+                    const inGroup = hasShift || isPending;
                     return (
                       <TouchableOpacity key={emp.id}
                         onPress={() => {
                           tap();
-                          if (inGroup) removeMember(currentMonth, deptCategory, groupId, emp.id);
-                          else addMember(currentMonth, deptCategory, groupId, emp.id);
+                          if (inGroup) {
+                            // 取消勾选：删除该员工本月该班次的所有 ShiftEntry，员工行立即消失
+                            const toDelete = monthShifts
+                              .filter((s) => s.employeeId === emp.id && s.shift === tpl.session)
+                              .map((s) => ({ employeeId: s.employeeId, date: s.date, shift: s.shift }));
+                            if (toDelete.length > 0) batchDeleteShifts(toDelete);
+                            // 同时从 pending 中移除
+                            setPendingEmpIds((prev) => {
+                              const next = new Map(prev);
+                              const set = new Set(next.get(pendingKey) ?? []);
+                              set.delete(emp.id);
+                              if (set.size === 0) next.delete(pendingKey); else next.set(pendingKey, set);
+                              return next;
+                            });
+                          } else {
+                            // 勾选：加入 pending，员工行立即出现（格子空白，等待填写）
+                            setPendingEmpIds((prev) => {
+                              const next = new Map(prev);
+                              const set = new Set(next.get(pendingKey) ?? []);
+                              set.add(emp.id);
+                              next.set(pendingKey, set);
+                              return next;
+                            });
+                          }
                         }}
                         style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 8,
                           borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border + "44",
@@ -4083,14 +4116,6 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => {
-                  const currentMembers = sortedShiftGroups.flatMap((grp) =>
-                    grp.templateIds.flatMap((tplId) => {
-                      const tpl = sortedTemplates.find((t) => t.id === tplId);
-                      if (!tpl) return [];
-                      const grpId = grp.id;
-                      return getMembersForGroup(currentMonth, deptCategory, grpId);
-                    })
-                  );
                   saveSnapshot({
                     month: currentMonth,
                     deptCategory,
@@ -4099,7 +4124,6 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                     isLocked: false,
                     isFinal: false,
                     entries: monthShifts.filter((s) => allDeptEmployees.some((e) => e.id === s.employeeId)),
-                    groupMembers: currentMembers,
                   });
                   setShowSnapshotModal(false);
                   setGenResult("✅ 存档成功");
@@ -4135,23 +4159,26 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
               <ScrollView contentContainerStyle={{ padding: 16, gap: 8 }}>
                 <Text style={{ fontSize: 12, color: colors.muted }}>存档时间：{previewSnapshot.createdAt.slice(0, 16).replace("T", " ")}</Text>
                 {previewSnapshot.note ? <Text style={{ fontSize: 12, color: colors.muted }}>备注：{previewSnapshot.note}</Text> : null}
-                <Text style={{ fontSize: 12, color: colors.muted }}>包含 {previewSnapshot.entries.length} 条排班记录、{previewSnapshot.groupMembers.length} 个员工分组</Text>
+                <Text style={{ fontSize: 12, color: colors.muted }}>包含 {previewSnapshot.entries.length} 条排班记录</Text>
                 <View style={{ flexDirection: "row", gap: 10, marginTop: 8 }}>
                   <TouchableOpacity
                     onPress={() => {
                       Alert.alert(
                         "代入当前月",
-                        `将 v${previewSnapshot.version} 的数据代入 ${monthLabel(currentMonth)} ${DEPT_CATEGORY_LABELS[deptCategory]}？\n这将覆盖当前排班表的员工分组列表。`,
+                        `将 v${previewSnapshot.version} 的排班记录代入 ${monthLabel(currentMonth)} ${DEPT_CATEGORY_LABELS[deptCategory]}？\n这将覆盖当前月的排班数据。`,
                         [
                           { text: "取消", style: "cancel" },
-                          { text: "仅代入员工列表", onPress: () => {
-                            // 先清空当前月当前部门的员工列表，再按快照重建
-                            const newMembers = previewSnapshot.groupMembers
-                              .filter((m) => m.deptCategory === deptCategory)
-                              .map((m) => ({ groupId: m.groupId, employeeId: m.employeeId }));
-                            replaceMembers(currentMonth, deptCategory, newMembers);
+                          { text: "代入排班记录", onPress: () => {
+                            // 代入快照中的排班记录（覆盖当前月当前部门的排班数据）
+                            const snapshotEntries = previewSnapshot.entries
+                              .filter((s) => allDeptEmployees.some((e) => e.id === s.employeeId));
+                            // 先删除当前月当前部门的所有排班
+                            const toDelete = monthShifts.map((s) => ({ employeeId: s.employeeId, date: s.date, shift: s.shift }));
+                            if (toDelete.length > 0) batchDeleteShifts(toDelete);
+                            // 再写入快照数据
+                            if (snapshotEntries.length > 0) batchUpsertShifts(snapshotEntries);
                             setPreviewSnapshot(null); setShowHistoryModal(false);
-                            setGenResult("✅ 员工列表已代入"); setTimeout(() => setGenResult(null), 2500);
+                            setGenResult("✅ 排班记录已代入"); setTimeout(() => setGenResult(null), 2500);
                           }},
                         ]
                       );
