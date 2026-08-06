@@ -139,33 +139,39 @@ export default function StoreScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      {/* 顶部导航栏：头像 + 可见的顶级 Tab */}
-      <View style={[S.header, { paddingTop: insets.top + 10, backgroundColor: colors.background }]}>
-        {/* 头像按钮（右上角） */}
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "flex-end", paddingBottom: 4 }}>
+      {/* 顶部导航栏：Tab + 头像合并为一行（修复顶部留白过宽 Bug） */}
+      <View style={{ paddingTop: insets.top, backgroundColor: colors.background, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
+        <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 20 }}>
+          {/* Tab 列表（占满剩余空间） */}
+          <View style={{ flex: 1, flexDirection: "row" }}>
+            {visibleTabs.map((t) => {
+              const active = effectiveTab === t.key;
+              return (
+                <Pressable key={t.key} onPress={() => { tap(); setMainTab(t.key); }}
+                  style={({ pressed }) => [{
+                    paddingVertical: 12,
+                    paddingHorizontal: 4,
+                    marginRight: 16,
+                    borderBottomWidth: 2,
+                    borderBottomColor: active ? colors.primary : "transparent",
+                    opacity: pressed ? 0.6 : 1,
+                  }]}>
+                  <Text style={[S.mainTabText, {
+                    color: active ? colors.primary : colors.muted,
+                    fontWeight: active ? "700" : "400",
+                  }]}>
+                    {t.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          {/* 头像按鈕（右侧对齐） */}
           <Pressable onPress={() => { tap(); router.push("/me"); }}
             style={({ pressed }) => [S.meBtn, { opacity: pressed ? 0.7 : 1 }]}>
             {hasSyncBadge && <View style={[S.syncDot, { backgroundColor: colors.error }]} />}
             <IconSymbol name="person.crop.circle" size={28} color={colors.primary} />
           </Pressable>
-        </View>
-
-        {/* 主 Tab（仅显示有权访问的模块） */}
-        <View style={[S.mainTabRow, { borderBottomColor: colors.border }]}>
-          {visibleTabs.map((t) => {
-            const active = effectiveTab === t.key;
-            return (
-              <Pressable key={t.key} onPress={() => { tap(); setMainTab(t.key); }}
-                style={({ pressed }) => [S.mainTabBtn, active && { borderBottomColor: colors.primary, borderBottomWidth: 2 }, { opacity: pressed ? 0.6 : 1 }]}>
-                <Text style={[S.mainTabText, {
-                  color: active ? colors.primary : colors.muted,
-                  fontWeight: active ? "700" : "400",
-                }]}>
-                  {t.label}
-                </Text>
-              </Pressable>
-            );
-          })}
         </View>
       </View>
 

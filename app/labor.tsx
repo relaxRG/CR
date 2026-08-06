@@ -561,6 +561,35 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
             );
           })()}
 
+          {/* ─── 薪资构成明细（绩效奖金/补贴/奖惩/预支/社保/实发）─── */}
+          {slip && (() => {
+            const allowanceSum = (slip.mealAllowance ?? 0) + (slip.transportAllowance ?? 0) + (slip.otherAllowance ?? 0);
+            const rows = [
+              { label: "绩效奖金", value: slip.performanceBonus, fmt: (v: number) => v > 0 ? `+¥${v.toFixed(0)}` : null, color: colors.success },
+              { label: "补贴合计", value: allowanceSum, fmt: (v: number) => v > 0 ? `+¥${v.toFixed(0)}` : null, color: colors.primary },
+              { label: "奖惩小计", value: slip.rewardPenalty ?? 0, fmt: (v: number) => v !== 0 ? `${v > 0 ? "+" : ""}¥${v.toFixed(0)}` : null, color: (slip.rewardPenalty ?? 0) >= 0 ? colors.success : colors.error },
+              { label: "预支小计", value: slip.advanceAmount ?? 0, fmt: (v: number) => v > 0 ? `-¥${v.toFixed(0)}` : null, color: colors.error },
+              { label: "社保代扣", value: slip.socialInsuranceDeduction ?? 0, fmt: (v: number) => v > 0 ? `-¥${v.toFixed(0)}` : null, color: colors.error },
+              { label: "公积金代扣", value: slip.housingFundDeduction ?? 0, fmt: (v: number) => v > 0 ? `-¥${v.toFixed(0)}` : null, color: colors.error },
+            ];
+            const visibleRows = rows.filter(r => r.fmt(r.value) !== null);
+            if (visibleRows.length === 0 && !slip) return null;
+            return (
+              <View style={{ paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border + "44", gap: 4 }}>
+                {visibleRows.map(({ label, value, fmt, color }) => (
+                  <View key={label} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                    <Text style={{ fontSize: 12, color: colors.muted }}>{label}</Text>
+                    <Text style={{ fontSize: 12, fontWeight: "600", color }}>{fmt(value)}</Text>
+                  </View>
+                ))}
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 6, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border + "55", marginTop: 2 }}>
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>实发薪资</Text>
+                  <Text style={{ fontSize: 15, fontWeight: "800", color: colors.primary }}>¥{slip.finalSalary.toFixed(0)}</Text>
+                </View>
+              </View>
+            );
+          })()}
+
           {/* ─── 调休余额行 + 存入/兑换按鈕 ─── */}
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border + "44" }}>
             <Text style={{ fontSize: 12, color: colors.muted }}>调休余额：<Text style={{ color: totalCompOffDays > 0 ? colors.success : colors.muted, fontWeight: "700" }}>{totalCompOffDays}天</Text></Text>
@@ -4288,7 +4317,9 @@ const PAGES = [
 type PageKey = typeof PAGES[number]["key"];
 
 
-export default function LaborScreen({ embedded = false }: { embedded?: boolean }) {
+// 作为独立路由页面时，强制 embedded=true（隐藏多余的『员工管理』标题栏）
+// 导航已由 store.tsx 的顶级 Tab 负责，无需再内嵌一层独立导航栏
+export default function LaborScreen({ embedded = true }: { embedded?: boolean }) {
   const colors = useColors();
   const router = useRouter();
   const { width: winW } = useWindowDimensions();

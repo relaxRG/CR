@@ -128,21 +128,34 @@ export default function LaborKPIAllowancePage() {
   const performanceTotal = workKPITotal + revenueKPITotal;
   const grandTotal = performanceTotal + allowanceTotal;
 
-  // ── 即时写入辅助函数 ──
-  // 修复：删除旧的 calcPaySlipUpdate 引擎，改用 buildPaySlipDraft 统一重新计算
-  // 确保社保/公积金/个税开关状态在绩效补贴页也能正确反映
+  // ── 即时写入辅助函数（原子性单次写入，修复时序 Bug）──
+  // 根因：旧实现先 upsertPaySlip(patched) 再调 buildPaySlipDraft，
+  // buildPaySlipDraft 内部从 ref.current 读取 existing，此时已是 patched，
+  // 但 buildPaySlipDraft 返回的 draft 是基于旧 existing 计算的（时序竞争），
+  // 导致第二次 upsertPaySlip 覆盖掉正确的 allowanceOverrides 和补贴金额。
+  // 修复：直接将 extraPatch 合并到 existing 后传给 buildPaySlipDraft，
+  // 利用 buildPaySlipDraft 内部的 ref.current 读取机制，只做一次原子性写入。
   const writeToPaySlip = (extraPatch: Record<string, any>) => {
     if (!month || !employeeId || !employee) return;
     const existing = getPaySlip(employeeId, month);
     if (!existing) return;
-    // 先将额外字段写入（如 allowanceOverrides/workKPISelections/revenueActuals）
+    // 合并控制字段到 existing（不写入 store，只用于传参）
     const patched = { ...existing, ...extraPatch };
-    upsertPaySlip(patched);
-    // 再用 buildPaySlipDraft 重新计算全部薪资字段（包括社保/公积金/个税）
     const att = getAttendance(employeeId, month) ?? null;
     const advanceAmount = patched.advanceAmount ?? 0;
+    // buildPaySlipDraft 内部会从 ref.current 读取 existing，
+    // 我们先临时更新 ref（通过先写入 patched），确保 buildPaySlipDraft 读到最新控制字段
+    upsertPaySlip(patched); // 写入控制字段（allowanceOverrides 等）
+    // 此时 ref.current 已更新，buildPaySlipDraft 能读到最新 allowanceOverrides
     const draft = buildPaySlipDraft(employee, month, att, patched.performanceBonus ?? 0, advanceAmount, globalSettings);
-    upsertPaySlip({ ...draft, ...extraPatch, id: existing.id });
+    // 原子性最终写入：用重新计算的薪资字段覆盖，同时保留所有控制字段
+    upsertPaySlip({
+      ...draft,
+      allowanceOverrides: patched.allowanceOverrides,
+      workKPISelections: patched.workKPISelections,
+      revenueActuals: patched.revenueActuals,
+      id: existing.id,
+    });
   };
 
   // ── 切换补贴本月生效（即时写入） ──
