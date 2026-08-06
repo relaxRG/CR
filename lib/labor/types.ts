@@ -665,8 +665,6 @@ export const DEFAULT_SPECIAL_STATUSES: SpecialStatus[] = [
   { id: "ss_penalty",  name: "违规扣款", category: "absence",  direction: "negative", countAsAttendance: true,  salaryMultiplier: 1,   color: "#FF6B00", sortOrder: 10, isBuiltin: true },
 ];
 
-// ─── 旧绩效系统已移除，由 WorkKPIRule + RevenueKPIRule 替代 ─────────────────────
-
 // ─── 店铺经营时间 ─────────────────────────────────────────────────────────────
 /**
  * 店铺经营时间条目

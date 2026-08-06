@@ -3265,7 +3265,8 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
       let count = 0;
       for (const emp of activeEmps) {
         const empShifts = getShifts(currentMonth).filter((s) => s.employeeId === emp.id);
-        if (empShifts.length === 0) continue;
+        // 注意：不跳过空排班！排班清空时需要重新计算（归零）考勤和薪资单
+        // 与自动同步逻辑保持一致：空排班 → attendanceDays=0, attendanceSalary=0
         const holidayDaysList = empShifts
           .map((s) => {
             const hc = getHolidayForDate(s.date, emp.id);
@@ -4205,8 +4206,6 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
     </View>
   );
 }
-
-// DEPT_OPTIONS_SCH 已废弃，直接使用 DeptCategory 切换
 
 // ─── 主页面 ───────────────────────────────────────────────────────────────────
 const PAGES = [

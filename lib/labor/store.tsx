@@ -762,9 +762,6 @@ function AttendanceProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ─── 旧 CompOffStore 已删除，由 CompOffBalanceEntryStore 替代 ─────────────────
-// ─── 旧绩效 Store 已移除，由 Employee.workKPIRules + Employee.revenueKPIRules 替代 ─────
-
 // ─── 薪资单 Store ─────────────────────────────────────────────────────────────
 interface PaySlipStore {
   paySlips: PaySlip[];
