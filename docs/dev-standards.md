@@ -572,3 +572,35 @@ const rows = useMemo(() => {
 - 添加：写入业务数据，列表自动出现
 - 删除：删除业务数据，列表自动消失
 - 避免维护独立的「成员列表」中间层（增加复杂度和响应式问题）
+
+---
+
+## 十七、响应式全面审查结果（2026-08-06）
+
+### 全项目扫描结论
+
+| 模块 | 问题类型 | 修复状态 |
+|------|---------|---------|
+| `PaySlipMiniCard.getAlert` | JSX 中读 `ref.current`（安全但不一致） | ✅ 改为直接订阅 `alerts` state |
+| `PaySlipMiniCard.getCompOffDays` | JSX 中读 `ref.current` | ✅ 改为直接从 `compOffEntries` state 计算 |
+| `PaySlipMiniCard.getHolidayCompOffDays` | JSX 中读 `ref.current` | ✅ 改为直接从 `holidayCompOffEntries` state 计算 |
+| `SchShiftModal.getCompOffEntries` | JSX 中读 `ref.current` | ✅ 改为直接订阅 `entries` state |
+| `SchShiftModal.getHolidayCompOffDays` | JSX 中读 `ref.current` | ✅ 改为直接从 `entries` state 计算 |
+| `SchTimeModal.getCompOffEntries` | JSX 中读 `ref.current` | ✅ 改为直接订阅 `entries` state |
+| `SchTimeModal.getHolidayCompOffDays` | JSX 中读 `ref.current` | ✅ 改为直接从 `entries` state 计算 |
+| `SchedulePageContent.getSnapshots` | JSX IIFE 中读 `ref.current` | ✅ 改为直接订阅 `allSnapshots` state |
+| `useEffect` 内部的 `getXxx` 调用 | 事件处理器中使用（正确） | ✅ 无需修改 |
+| `useCallback` 内部的 `getXxx` 调用 | 事件处理器中使用（正确） | ✅ 无需修改 |
+| 非 labor Store（beer/books/bottles 等） | 使用 `useReducer`（天然响应式） | ✅ 无问题 |
+
+### 规范 17：所有 JSX 渲染中的数据读取必须来自响应式 state
+
+**原则**：在组件函数体（包括 JSX 直接渲染、`useMemo` 计算）中，所有数据读取必须来自响应式 state（`useState`、`useReducer` 的返回值，或 Context 中暴露的 state 字段），不能调用读 `ref.current` 的 `getXxx` 函数。
+
+**判断标准**：
+- ✅ `const restAlert = alerts.find(...)` — 从响应式 state 派生
+- ✅ `const compOffDays = entries.filter(...).reduce(...)` — 从响应式 state 计算
+- ❌ `const restAlert = getAlert(id, month)` — 读 `ref.current`，不触发重渲染
+- ❌ `const compOffDays = getAvailableDays(id, month)` — 读 `ref.current`
+
+**例外**：`useEffect`、`useCallback`、事件处理器中可以使用 `getXxx`（不影响渲染时机）。

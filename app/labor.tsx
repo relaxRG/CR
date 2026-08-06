@@ -303,9 +303,11 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
   compareSlip: PaySlip | null;
 }) {
   const { upsertPaySlip } = usePaySlipStore();
-  const { getAvailableDays: getCompOffDays, addEntry: addCompOffEntry, getEntries: getCompOffEntries, cashOutEntry: cashOutCompOff } = useCompOffBalanceEntryStore();
-  const { getAvailableDays: getHolidayCompOffDays } = useHolidayCompOffStore();
-  const { getAlert, resolveAlert } = useUnexplainedRestAlertStore();
+  // 直接订阅 entries 响应式 state，避免通过 getXxx 读 ref.current
+  const { entries: compOffEntries, addEntry: addCompOffEntry, getEntries: getCompOffEntries, cashOutEntry: cashOutCompOff } = useCompOffBalanceEntryStore();
+  const { entries: holidayCompOffEntries } = useHolidayCompOffStore();
+  // 直接订阅 alerts 响应式 state，避免通过 getAlert 读 ref.current
+  const { alerts, resolveAlert } = useUnexplainedRestAlertStore();
   const router = useRouter();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
   const [expanded, setExpanded] = useState(false);
@@ -329,13 +331,17 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
   const pending = slip ? slip.finalSalary : null;
   const attendanceSalary = att?.attendanceSalary ?? (slip?.attendanceSalary ?? 0);
 
-  // 换休余额
-  const compOffDays = getCompOffDays(employee.id, month);
-  const holidayCompOffDays = getHolidayCompOffDays(employee.id, month);
+  // 换休余额（直接从响应式 entries state 派生，天然响应式）
+  const compOffDays = compOffEntries
+    .filter((e) => e.employeeId === employee.id && e.status === "available" && e.expiresMonth >= month)
+    .reduce((sum, e) => sum + e.days, 0);
+  const holidayCompOffDays = holidayCompOffEntries
+    .filter((e) => e.employeeId === employee.id && e.status === "available" && e.expiresMonth >= month)
+    .reduce((sum, e) => sum + e.days, 0);
   const totalCompOffDays = compOffDays + holidayCompOffDays;
 
-  // 无来源多休提醒
-  const restAlert = getAlert(employee.id, month);
+  // 无来源多休提醒（直接从响应式 alerts state 派生，天然响应式）
+  const restAlert = alerts.find((a) => a.employeeId === employee.id && a.month === month) ?? null;
 
   // ── 增加：按加班小时存入 ──
   const handleAddByHours = () => {
@@ -2137,10 +2143,15 @@ function SchShiftModal({ visible, date, employee, session, existing, contractHou
   onSave: (e: ShiftEntry) => void; onClear: () => void; onClose: () => void;
 }) {
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
-  const { getEntries: getCompOffEntries } = useCompOffBalanceEntryStore();
-  const { getAvailableDays: getHolidayCompOffDays } = useHolidayCompOffStore();
-  const compOffBalance = employee ? getCompOffEntries(employee.id).filter((e: any) => e.status === "available").reduce((s: number, e: any) => s + (e.days ?? 1), 0) : 0;
-  const holidayCompOffBalance = employee ? getHolidayCompOffDays(employee.id, currentMonth) : 0;
+  // 直接订阅 entries 响应式 state，避免通过 getXxx 读 ref.current
+  const { entries: compOffEntries2 } = useCompOffBalanceEntryStore();
+  const { entries: holidayCompOffEntries2 } = useHolidayCompOffStore();
+  const compOffBalance = employee
+    ? compOffEntries2.filter((e) => e.employeeId === employee.id && e.status === "available").reduce((s, e) => s + (e.days ?? 1), 0)
+    : 0;
+  const holidayCompOffBalance = employee
+    ? holidayCompOffEntries2.filter((e) => e.employeeId === employee.id && e.status === "available" && e.expiresMonth >= currentMonth).reduce((s, e) => s + e.days, 0)
+    : 0;
   const DOW = ["日", "一", "二", "三", "四", "五", "六"];
   const dow = date ? getDayOfWeek(date) : 1;
 
@@ -2335,10 +2346,15 @@ function SchHoursModal({ visible, date, employee, session, existing, contractHou
   onSave: (e: ShiftEntry) => void; onClear: () => void; onClose: () => void;
 }) {
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
-  const { getEntries: getCompOffEntries } = useCompOffBalanceEntryStore();
-  const { getAvailableDays: getHolidayCompOffDays } = useHolidayCompOffStore();
-  const compOffBalance = employee ? getCompOffEntries(employee.id).filter((e: any) => e.status === "available").reduce((s: number, e: any) => s + (e.days ?? 1), 0) : 0;
-  const holidayCompOffBalance = employee ? getHolidayCompOffDays(employee.id, currentMonth) : 0;
+  // 直接订阅 entries 响应式 state，避免通过 getXxx 读 ref.current
+  const { entries: compOffEntries3 } = useCompOffBalanceEntryStore();
+  const { entries: holidayCompOffEntries3 } = useHolidayCompOffStore();
+  const compOffBalance = employee
+    ? compOffEntries3.filter((e) => e.employeeId === employee.id && e.status === "available").reduce((s, e) => s + (e.days ?? 1), 0)
+    : 0;
+  const holidayCompOffBalance = employee
+    ? holidayCompOffEntries3.filter((e) => e.employeeId === employee.id && e.status === "available" && e.expiresMonth >= currentMonth).reduce((s, e) => s + e.days, 0)
+    : 0;
   const DOW = ["日", "一", "二", "三", "四", "五", "六"];
   const dow = date ? getDayOfWeek(date) : 1;
   const [hoursInput, setHoursInput] = useState("");
