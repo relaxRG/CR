@@ -137,6 +137,15 @@ export function SyncProvider({
     const countHint = remaining > 1
       ? (isEn ? `\n(${remaining} conflicts remaining)` : `\n（还有 ${remaining} 个冲突需要处理）`)
       : "";
+    // 如果有多个冲突，提供「全部保留本机」和「全部采用云端」一键处理按鈕
+    const hasMultiple = remaining > 1;
+    const resolveAll = (keepLocal: boolean) => {
+      const allConflicts = pendingConflicts;
+      for (const c of allConflicts) {
+        void resolveConflict(c, keepLocal, pushFn ?? (async () => {}));
+      }
+      setPendingConflicts([]);
+    };
     Alert.alert(
       isEn ? `Sync Conflict` : `同步冲突`,
       isEn
@@ -163,6 +172,23 @@ export function SyncProvider({
             setPendingConflicts((prev) => prev.slice(1));
           },
         },
+        // 当有多个冲突时，显示一键处理全部的按鈕
+        ...(hasMultiple ? [
+          {
+            text: isEn
+              ? `Keep ALL Local (×${remaining})`
+              : `全部保留本机（一键处理 ${remaining} 个）`,
+            style: "default" as const,
+            onPress: () => resolveAll(true),
+          },
+          {
+            text: isEn
+              ? `Use ALL Cloud (×${remaining})`
+              : `全部采用云端（一键处理 ${remaining} 个）`,
+            style: "destructive" as const,
+            onPress: () => resolveAll(false),
+          },
+        ] : []),
       ],
       { cancelable: false },
     );
