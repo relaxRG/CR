@@ -6,7 +6,7 @@
 |------|-----|
 | App 名称 | cocktail R |
 | Bundle ID | com.app.cocktailrecipes |
-| Build Number | 133 |
+| Build Number | 115 (EAS remote auto-increment) |
 | App Store Connect App ID | 6788653669 |
 | EAS Project ID | 3ab89cc0-c646-4fb8-bceb-ba24204a8811 |
 | EAS Owner | rgsds-team |
