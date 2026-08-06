@@ -5,8 +5,6 @@
  * 员工档案：自定义分组 + 每人发薪卡片（含对比开关）
  */
 import React, { useCallback, useMemo, useRef, useState } from "react";
-import * as FileSystem from "expo-file-system/legacy";
-import * as Sharing from "expo-sharing";
 import { exportLaborData, type ExportType } from "@/lib/labor/export";
 import {
   Alert, Clipboard, Dimensions, Modal, Platform, Pressable, ScrollView,

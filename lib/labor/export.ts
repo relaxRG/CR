@@ -110,7 +110,7 @@ export function buildPayrollWorkbook(params: ExportParams): XLSX.WorkBook {
       const actualDays = att?.attendanceDays ?? 0;
       const dailySalary = expectedDays > 0 ? baseSalary / expectedDays : 0;
       const overtimeHours = att?.paidOvertimeHours ?? 0;
-      const overtimeAmount = 0; // overtimeBonus 在 PaySlip 中计算
+      const overtimeAmount = att?.overtimePay ?? 0;
       const holidayDays = 0; // 节假日天数在 PaySlip 中计算
       const holidayBonus = att?.holidayBonus ?? 0;
       const attendanceSalary = slip?.attendanceSalary ?? 0;
@@ -230,7 +230,7 @@ export function buildPayrollWorkbook(params: ExportParams): XLSX.WorkBook {
         att?.attendanceDays ?? 0,
         +dailySalary.toFixed(2),
         +(att?.paidOvertimeHours ?? 0).toFixed(1),
-        0, // overtimeBonus 在 PaySlip 中计算
+        +(att?.overtimePay ?? 0).toFixed(2),
         0, // holidayDays 在 PaySlip 中计算
         +(att?.holidayBonus ?? 0).toFixed(2),
         +(slip?.attendanceSalary ?? 0).toFixed(2),
