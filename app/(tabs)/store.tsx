@@ -62,9 +62,10 @@ function ReportModule({ insets }: { insets: any }) {
                   setReportTab(t.key);
                 }
               }}
-              style={[S.subChip, {
+              style={({ pressed }) => [S.subChip, {
                 backgroundColor: active ? colors.primary : colors.surface,
                 borderColor: active ? colors.primary : colors.border,
+                opacity: pressed ? 0.75 : 1,
               }]}>
               <Text style={[S.subChipText, {
                 color: active ? "#fff" : colors.foreground,
@@ -121,7 +122,7 @@ export default function StoreScreen() {
             const active = mainTab === t.key;
             return (
               <Pressable key={t.key} onPress={() => { tap(); setMainTab(t.key); }}
-                style={[S.mainTabBtn, active && { borderBottomColor: colors.primary, borderBottomWidth: 2 }]}>
+                style={({ pressed }) => [S.mainTabBtn, active && { borderBottomColor: colors.primary, borderBottomWidth: 2 }, { opacity: pressed ? 0.6 : 1 }]}>
                 <Text style={[S.mainTabText, {
                   color: active ? colors.primary : colors.muted,
                   fontWeight: active ? "700" : "400",

@@ -265,7 +265,6 @@ export default function StoreAnalyticsScreen() {
             { icon: "clock.fill", color: "#5856D6", title: "时段营业分析", sub: "午/晚/深夜/凌晨时段对比 · 加班性价比提醒", route: "/period-analysis" },
             { icon: "person.2.fill", color: "#FF9500", title: "人工成本管理", sub: employees.filter((e) => e.active).length > 0 ? `${employees.filter((e) => e.active).length} 名员工 · 本月薪资${monthLaborCost > 0 ? ` ¥${monthLaborCost.toFixed(0)}` : "未填写"}` : "排班 · 考勤 · 薪资结算", route: "/labor" },
             { icon: "doc.text.fill", color: "#30D158", title: `${new Date().getMonth() + 1}月报表`, sub: "收入/成本/工资/货款 · 账户余额追踪", route: "/monthly-summary" },
-            { icon: "creditcard.fill", color: "#AF52DE", title: "账户余额", sub: "公司/私人/备用金/开店宝 · 期初期末余额追踪", route: "/store-accounts" },
           ].map((item) => (
             <Pressable key={item.route} onPress={() => { tap(); router.push(item.route as any); }}
               style={[styles.entryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
