@@ -3843,16 +3843,17 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                 </View>
                 {att ? (
                   <View style={{ gap: 6 }}>
-                    {/* ─── 一行四格数据─── */}
+                    {/* ─── 一行五格数据（与主卡一致）─── */}
                     <View style={{ flexDirection: "row", gap: 0 }}>
                       {[
-                        { label: "出勤", value: `${att.attendanceDays}/${att.expectedAttendanceDays}`, color: att.attendanceDays >= att.expectedAttendanceDays ? colors.success : colors.warning },
-                        { label: "工时", value: `${att.totalHours.toFixed(1)}h`, color: colors.foreground },
-                        { label: "加班", value: att.overtimeHours > 0 ? `${att.overtimeHours.toFixed(1)}h` : "—", color: att.overtimeHours > 0 ? colors.warning : colors.muted },
-                        { label: "计费", value: att.paidOvertimeHours > 0 ? `${att.paidOvertimeHours.toFixed(1)}h` : "—", color: att.paidOvertimeHours > 0 ? colors.foreground : colors.muted },
+                        { label: "实际到岗", value: `${att.attendanceDays - att.compOffCount}天`, color: colors.foreground },
+                        { label: "出勤/应出勤", value: `${att.attendanceDays}/${att.expectedAttendanceDays}`, color: att.attendanceDays >= att.expectedAttendanceDays ? colors.success : colors.warning },
+                        { label: "实际工时", value: `${att.totalHours.toFixed(1)}h`, color: colors.foreground },
+                        { label: "加班工时", value: att.paidOvertimeHours > 0 ? `${att.paidOvertimeHours.toFixed(1)}h` : "—", color: att.paidOvertimeHours > 0 ? colors.warning : colors.muted },
+                        { label: "加班费", value: att.overtimePay > 0 ? `+¥${att.overtimePay.toFixed(0)}` : "—", color: att.overtimePay > 0 ? colors.success : colors.muted },
                       ].map(({ label, value, color }) => (
                         <View key={label} style={{ flex: 1, alignItems: "center" }}>
-                          <Text style={{ fontSize: 13, fontWeight: "700", color }}>{value}</Text>
+                          <Text style={{ fontSize: 11, fontWeight: "700", color }}>{value}</Text>
                           <Text style={{ fontSize: 9, color: colors.muted, marginTop: 1 }}>{label}</Text>
                         </View>
                       ))}

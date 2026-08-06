@@ -279,16 +279,18 @@ function EmployeeCard({
         </View>
         {att ? (
           <View style={S.detailGrid}>
-            <DetailRow label="底薪" value={`¥${employee.baseSalary}`} colors={colors} />
+            <DetailRow label="实际到岗" value={`${att.attendanceDays - att.compOffCount} 天`} colors={colors} bold />
             <DetailRow label="出勤/应出勤" value={`${att.attendanceDays} / ${att.expectedAttendanceDays} 天`} colors={colors} />
+            <DetailRow label="实际工时" value={`${att.totalHours.toFixed(1)} h`} colors={colors} />
+            <DetailRow label="标准工时" value={`${att.stdHours.toFixed(1)} h`} colors={colors} />
+            <DetailRow label="加班工时（计费）" value={`${(att.paidOvertimeHours ?? 0).toFixed(1)} h`} colors={colors} />
+            <DetailRow label="加班工资" value={att.overtimePay > 0 ? `+¥${att.overtimePay.toFixed(0)}` : "—"} colors={colors} positive={att.overtimePay > 0} />
+            {(att.holidayWorkDays ?? 0) > 0 && <DetailRow label="节假日上班" value={`${att.holidayWorkDays} 天`} colors={colors} />}
+            <DetailRow label="节假日薪资" value={att.holidayBonus > 0 ? `+¥${att.holidayBonus.toFixed(0)}` : "—"} colors={colors} positive={att.holidayBonus > 0} />
+            {att.underRestDays !== 0 && <DetailRow label={att.underRestDays > 0 ? "少出勤" : "多出勤"} value={`${Math.abs(att.underRestDays)} 天`} colors={colors} negative={att.underRestDays > 0} />}
+            <DetailRow label="特殊状态扣薪" value={att.totalSpecialDeduction > 0 ? `-¥${att.totalSpecialDeduction.toFixed(0)}` : "—"} colors={colors} negative={att.totalSpecialDeduction > 0} />
             <DetailRow label="日薪" value={`¥${att.dailyRate.toFixed(0)}`} colors={colors} />
-            <DetailRow label="加班时长" value={`${(att.paidOvertimeHours ?? 0).toFixed(1)} 小时`} colors={colors} />
-            <DetailRow label="加班总金额" value={`+¥${(att.overtimePay ?? 0).toFixed(0)}`} colors={colors} positive />
-            <DetailRow label="少休天数" value={att.underRestDays < 0 ? `${Math.abs(att.underRestDays)} 天` : "0 天"} colors={colors} />
-            <DetailRow label="少休补贴" value={att.underRestDays < 0 ? `+¥${(Math.abs(att.underRestDays) * att.dailyRate).toFixed(0)}` : "¥0"} colors={colors} positive={att.underRestDays < 0} />
-            <DetailRow label="特殊状态扣薪" value={att.totalSpecialDeduction > 0 ? `-¥${att.totalSpecialDeduction.toFixed(0)}` : "¥0"} colors={colors} negative={att.totalSpecialDeduction > 0} />
-            <DetailRow label="节假日天数×倍率" value={att.holidayBonus > 0 ? `+¥${att.holidayBonus.toFixed(0)}` : "—"} colors={colors} positive={att.holidayBonus > 0} />
-            <DetailRow label="考勤工资小计" value={`¥${att.attendanceSalary.toFixed(0)}`} colors={colors} bold />
+            <DetailRow label="总考勤工资" value={`¥${att.attendanceSalary.toFixed(0)}`} colors={colors} bold />
           </View>
         ) : (
           <Text style={{ fontSize: 12, color: colors.muted, paddingVertical: 8 }}>暂无考勤数据（请先在排班表填写）</Text>
