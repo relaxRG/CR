@@ -523,6 +523,53 @@ const STORAGE_KEY_LABELS: Record<string, string> = {
   "spirits.selfBuyConfig.v1":       "自采配置",
   "spirits.customCategories.v1":    "自定义分类",
   "spirits.groupMatchMemory.v1":    "集团匹配记忆",
+  "spirits.snapshots.v1":            "烈酒库存快照",
+  "spirits.match_records.v1":        "烈酒匹配记录",
+  "supplier.match.memory.v1":        "供应商匹配记忆",
+  // ★ 新增：啤酒库存
+  "beer.items.v1":                   "啤酒库存",
+  "beer.transactions.v1":            "啤酒交易记录",
+  "beer.snapshots.v1":               "啤酒库存快照",
+  // ★ 新增：水果库存
+  "fruit.items.v1":                  "水果库存",
+  "fruit.transactions.v1":           "水果交易记录",
+  "fruit.snapshots.v1":              "水果库存快照",
+  // ★ 新增：冰块库存
+  "ice.inv.items.v1":                "冰块库存",
+  "ice.inv.tx.v1":                   "冰块交易记录",
+  "ice.inventory.v1":                "冰块库存配置",
+  // ★ 新增：器具库存
+  "equipment.inventory.v1":          "器具设备清单",
+  // ★ 新增：排班快照和其他员工模块
+  "labor_schedule_snapshots_v1":     "排班表快照",
+  "labor_employee_groups_v1":        "员工分组",
+  "labor_shift_templates_v1":        "班次模板",
+  "labor_holiday_configs_v1":        "节假日配置",
+  "labor_comp_off_v1":               "调休配置",
+  "labor_comp_off_entries_v1":       "调休余额记录",
+  "labor_holiday_comp_off_v1":       "节假日调休余额",
+  "labor_unexplained_rest_alerts_v1":"未解释休息提醒",
+  "labor_special_statuses_v1":       "特殊状态配置",
+  "labor_global_payroll_settings_v1":"全局薪资设置",
+  "labor_performance_templates_v1":  "绩效模板",
+  "labor_performance_records_v1":    "绩效记录",
+  "labor.advance_categories.v1":     "预支分类",
+  // ★ 新增：月报附加配置
+  "monthly_summary.petty_configs.v1": "备用金科目配置",
+  "monthly_summary.inventory_configs.v1": "库存报表配置",
+  // ★ 新增：时段分析排班
+  "schedule.business_hours.v1":      "营业时间设置",
+  "schedule.shift_templates.v1":     "时段分析班次模板",
+  "dish_analysis.snapshots.v1":      "菜品分析快照",
+  // ★ 种子数据和迁移键（不常冲突，但需有友好名称）
+  "cocktail.seeded":                 "酒库初始化标记",
+  "cocktail_waldorf_imported_v1":    "Waldorf 导入标记",
+  "cocktail.bottles.seeded":         "酒款库初始化标记",
+  "cocktail.bottles.waldorf.v1":     "Waldorf 酒款库导入",
+  "homemade.seeded.v1":              "自制库初始化标记",
+  "homemade.waldorf.v1":             "Waldorf 自制库导入",
+  "homemade.waldorf.v2":             "Waldorf 自制库导入 v2",
+  "homemade.source.v3":              "自制库来源数据",
 };
 
 /** ★ 获取数据预览（条目数量） */

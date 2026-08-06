@@ -604,3 +604,40 @@ const rows = useMemo(() => {
 - ❌ `const compOffDays = getAvailableDays(id, month)` — 读 `ref.current`
 
 **例外**：`useEffect`、`useCallback`、事件处理器中可以使用 `getXxx`（不影响渲染时机）。
+
+---
+
+## 同步键覆盖率规范（2026-08-06）
+
+### Bug 根因分析
+
+**问题**：`labor_schedule_snapshots_v1`（排班快照）在新增功能时被遗漏，没有加入 `SYNC_KEYS`。同时 `STORAGE_KEY_LABELS` 中 39 个键缺少中文显示名称，导致同步冲突弹窗显示原始键名。
+
+**根本原因**：新增 Store 时，开发者只关注了业务逻辑，忘记了同步以下三个地方：
+1. `lib/sync/engine.ts` 的 `SYNC_KEYS`
+2. `lib/sync/feature-modules.ts` 的 `FEATURE_MODULES.storageKeys`
+3. `lib/cf-sync/provider.tsx` 的 `STORAGE_KEY_LABELS`
+
+### 受影响的关联模块
+
+| 模块 | 问题 | 修复 |
+|------|------|------|
+| `labor_schedule_snapshots_v1` | 不在 SYNC_KEYS 中，排班快照不同步 | ✅ 补全到三个地方 |
+| `STORAGE_KEY_LABELS` 39 个键 | 缺少中文显示名称 | ✅ 全部补全（啤酒/水果/冰块/器具/排班/薪资/月报配置等） |
+
+### 规范 21：新增 Store 时必须同步更新三个地方
+
+> 每次新增 `usePersisted<T>("new_key")` 时，必须同步：
+> 1. `lib/sync/engine.ts` → `SYNC_KEYS` 数组
+> 2. `lib/sync/feature-modules.ts` → 对应模块的 `storageKeys`
+> 3. `lib/cf-sync/provider.tsx` → `STORAGE_KEY_LABELS` 映射
+>
+> 测试 `tests/sync-permissions.test.ts` 会自动检测 SYNC_KEYS 与 FEATURE_MODULES 的不一致。
+
+### 规范 22：STORAGE_KEY_LABELS 必须 100% 覆盖 SYNC_KEYS
+
+> 同步冲突弹窗必须显示友好的中文名称，不能显示原始键名。
+> 每次修改 SYNC_KEYS 后，运行以下命令验证覆盖率：
+> ```bash
+> pnpm test tests/sync-permissions.test.ts
+> ```
