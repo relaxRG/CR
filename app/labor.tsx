@@ -3106,7 +3106,8 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
       const activeEmps = employees.filter((e) => e.active && !e.archived);
       for (const emp of activeEmps) {
         const empShifts = getShifts(currentMonth).filter((s) => s.employeeId === emp.id);
-        if (empShifts.length === 0) continue;
+        // 注意：不跳过空排班！排班清空时需要重新计算（归零）考勤和薪资单
+        // 否则旧的考勤记录（全勤/节假日薪资）会一直留在持久化存储中
         const holidayDaysList = empShifts
           .map((s) => { const hc = getHolidayForDate(s.date, emp.id); return hc ? { date: s.date, multiplier: hc.multiplier } : null; })
           .filter((x): x is { date: string; multiplier: number } => x !== null);
