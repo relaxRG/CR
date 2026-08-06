@@ -12,7 +12,7 @@
  */
 import React, { useCallback, useMemo, useState } from "react";
 import {
-  Alert, Clipboard, Platform, ScrollView, StyleSheet,
+  Alert, Platform, ScrollView, StyleSheet,
   Text, TextInput, TouchableOpacity, View
 } from "react-native";
 import * as Haptics from "expo-haptics";

@@ -176,3 +176,171 @@ UI 组件
 4. **验证修复**
    - 删除所有排班 → 等待 500ms → 考勤卡片应显示 0 出勤
    - 重新生成薪资单 → 薪资单应显示 0 考勤工资
+
+---
+
+## 六、按钮布局重构 Bug 根因分析（2026-08-06）
+
+### Bug 描述
+
+薪资总览页（`labor-attendance.tsx`）展开卡片底部有「绩效补贴」「编辑薪资」「付款信息」「历史」四个按钮，但用户实际需要的是在薪资统计页（`labor.tsx`）折叠卡片上操作。两个页面各有一套按钮，造成功能重复、入口分散、用户困惑。
+
+同时，「付款信息」按钮触发的是一个弹出 Modal（需要二次点击「复制全部」），而用户期望的是**一键直接复制**。
+
+### 根因
+
+**1. 功能入口分散（UI 架构问题）**
+
+开发时在两个层级（列表页卡片 + 详情页展开卡片）各自添加了操作按钮，没有统一规划入口层级。导致：
+- 同一功能（绩效补贴、编辑薪资、历史）在两个地方都有入口
+- 用户不清楚应该在哪里操作
+- 代码维护时需要同步修改两处
+
+**2. 付款信息 Modal 过度设计**
+
+付款信息只需要「复制」这一个动作，却设计成了一个完整的 Modal（展示姓名/银行/卡号/金额，再点复制按钮）。这增加了操作步骤，且 Modal 本身的 state（`paymentModalFor`、`paymentEmployee`、`paymentSlip`、`defaultBank`、`handleCopyPayment`）都需要在父组件维护，并通过 `onOpenPayment` prop 传入子组件，造成不必要的 prop drilling。
+
+**3. 废弃代码未及时清理**
+
+重构后旧的 `Clipboard` import 仍留在文件中（未使用），废弃注释（`// 旧绩效 Store 已移除`）也未删除。
+
+### 修复方案
+
+1. **删除** `labor-attendance.tsx` 中的所有按钮（四按钮块 + 一键复制按钮）及关联废弃逻辑（Modal、state、handler、prop、styles、import）
+2. **扩展** `labor.tsx` 薪资统计卡片的三按钮为四按钮，「付款信息」直接调用 `Clipboard.setString()` 复制，无需 Modal
+3. **清理** 所有废弃 import 和注释
+
+---
+
+## 七、受此次重构影响的关联模块清单
+
+| 模块 | 文件 | 影响类型 | 处理结果 |
+|------|------|---------|---------|
+| 薪资总览展开卡片底部四按钮 | `app/labor-attendance.tsx` | 删除整块 | ✅ 已删除 |
+| 一键复制付款信息按钮 | `app/labor-attendance.tsx` | 删除整块 | ✅ 已删除 |
+| 付款信息 Modal JSX | `app/labor-attendance.tsx` | 删除整块 | ✅ 已删除 |
+| `paymentModalFor` state | `app/labor-attendance.tsx` | 废弃 state | ✅ 已删除 |
+| `paymentEmployee/paymentSlip/defaultBank` useMemo | `app/labor-attendance.tsx` | 废弃派生状态 | ✅ 已删除 |
+| `handleCopyPayment` handler | `app/labor-attendance.tsx` | 废弃 handler | ✅ 已删除 |
+| `onOpenPayment` prop | `app/labor-attendance.tsx` | 废弃 prop drilling | ✅ 已删除 |
+| `Modal` import | `app/labor-attendance.tsx` | 废弃 import | ✅ 已删除 |
+| `Clipboard` import（无使用） | `app/labor-attendance.tsx` | 废弃 import | ✅ 已删除 |
+| 废弃 styles（10个） | `app/labor-attendance.tsx` | 废弃样式定义 | ✅ 已删除 |
+| 薪资统计卡片三按钮 | `app/labor.tsx` | 扩展为四按钮 | ✅ 已更新 |
+| `Clipboard` import | `app/labor.tsx` | 新增 | ✅ 已添加 |
+| 废弃注释（旧绩效 Store） | `app/labor.tsx` | 废弃注释 | ✅ 已删除 |
+| `ss_comp_off` 兼容注释 | `lib/labor/types.ts` | 向后兼容（保留） | ✅ 正常 |
+| 旧值迁移注释 | `lib/labor/types.ts` | 迁移说明（保留） | ✅ 正常 |
+
+**未受影响的同名 style**（其他文件中独立定义，与本次重构无关）：
+- `spirits-inventory.tsx` 中的 `actionBtn`
+- `wine-inventory.tsx` 中的 `actionBtn`
+- `suppliers.tsx` 中的 `copyBtn`
+- `bulk-action-bar.tsx` 中的 `actionBtn`
+- `swipeable-row.tsx` 中的 `actionBtn`
+- `BaseInventoryScreen.tsx` 中的 `actionBtn`
+
+---
+
+## 八、UI 架构规范：操作入口层级原则
+
+### 规范 6：操作入口只在一个层级定义
+
+**原则**：同一功能的操作入口只应在一个 UI 层级出现，不应在列表页和详情页各自重复。
+
+```
+❌ 错误：
+  列表页卡片（折叠）→ 有「绩效补贴」「编辑薪资」「历史」按钮
+  详情页卡片（展开）→ 也有「绩效补贴」「编辑薪资」「付款信息」「历史」按钮
+
+✅ 正确：
+  列表页卡片（折叠）→ 有「绩效补贴」「编辑薪资」「付款信息」「历史」四个按钮（唯一入口）
+  详情页卡片（展开）→ 只展示数据，不重复操作按钮
+```
+
+**适用场景**：
+- 员工薪资卡片（列表 vs 展开详情）
+- 供应商卡片（列表 vs 展开详情）
+- 库存条目（列表 vs 详情页）
+
+---
+
+### 规范 7：单步操作不应设计为 Modal
+
+**原则**：如果一个操作只有一个步骤（如「复制」），直接执行，不要包装成 Modal。
+
+```ts
+// ❌ 错误：单步操作包装成 Modal
+<TouchableOpacity onPress={() => setShowPaymentModal(true)}>
+  <Text>付款信息</Text>
+</TouchableOpacity>
+<Modal visible={showPaymentModal}>
+  {/* 展示信息... */}
+  <TouchableOpacity onPress={handleCopy}>复制全部</TouchableOpacity>
+</Modal>
+
+// ✅ 正确：直接执行
+<TouchableOpacity onPress={() => {
+  Clipboard.setString(buildPaymentText(employee, slip));
+  Alert.alert("已复制", "付款信息已复制到剪贴板");
+}}>
+  <Text>付款信息</Text>
+</TouchableOpacity>
+```
+
+**例外**：如果操作需要用户确认（删除、提交）或需要用户输入（金额、备注），才应使用 Modal/Alert。
+
+---
+
+### 规范 8：避免 Prop Drilling 传递 Modal 开关
+
+**原则**：不要通过 prop 将父组件的 Modal 开关函数传入子组件。如果子组件需要触发 Modal，应将 Modal 移入子组件内部，或使用 Context。
+
+```ts
+// ❌ 错误：通过 prop 传递 Modal 开关
+function ParentPage() {
+  const [showModal, setShowModal] = useState(false);
+  return (
+    <>
+      <ChildCard onOpenModal={() => setShowModal(true)} />
+      <Modal visible={showModal}>...</Modal>
+    </>
+  );
+}
+
+// ✅ 正确方案 A：将 Modal 移入子组件
+function ChildCard() {
+  const [showModal, setShowModal] = useState(false);
+  return (
+    <>
+      <TouchableOpacity onPress={() => setShowModal(true)}>...</TouchableOpacity>
+      <Modal visible={showModal}>...</Modal>
+    </>
+  );
+}
+
+// ✅ 正确方案 B：如果只是单步操作，直接执行（无需 Modal）
+function ChildCard({ employee, slip }) {
+  return (
+    <TouchableOpacity onPress={() => {
+      Clipboard.setString(buildPaymentText(employee, slip));
+      Alert.alert("已复制", "...");
+    }}>...</TouchableOpacity>
+  );
+}
+```
+
+---
+
+### 规范 9：废弃 import 必须与废弃代码同步删除
+
+**原则**：删除功能代码时，必须同步检查并删除不再使用的 import（包括 `Clipboard`、`Modal`、`useState`、`useMemo` 等）。
+
+**检查方法**：
+```bash
+# 检查某个 import 是否还在使用
+grep -n "Clipboard\." src/file.tsx
+grep -n "Modal " src/file.tsx  # 注意加空格避免匹配注释
+```
+
+**工具提示**：TypeScript 编译器不会对未使用的 import 报错（只有 ESLint 会），所以必须手动检查。

@@ -3012,7 +3012,6 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   const { statuses: specialStatuses, upsertStatus, deleteStatus } = useSpecialStatusStore();
   const { paySlips, upsertPaySlip, buildPaySlipDraft } = usePaySlipStore();
   const { records: attendanceRecords, upsertAttendance, calcFromShifts } = useAttendanceStore();
-  // 旧绩效 Store 已移除，performanceTotal 从新 KPI 系统计算
   const { getHolidayForDate } = useHolidayConfigStore();
   const { advances } = useSalaryAdvanceStore();
   const { settings: globalSettings } = useGlobalPayrollSettingsStore();
