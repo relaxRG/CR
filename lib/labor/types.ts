@@ -1011,6 +1011,11 @@ export interface MonthlyAttendance {
    * 本月已存入调休的加班小时数（用于展示剩余可存入时数）
    */
   storedOvertimeHours?: number;
+  /**
+   * 节假日上班天数（isHoliday=true 的特殊状态天数）
+   * 包含选择拿錢和换休的所有节假日上班天
+   */
+  holidayWorkDays?: number;
 }
 
 // ─── 薪资单（最终薪资） ───────────────────────────────────────────────────────

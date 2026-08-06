@@ -583,6 +583,7 @@ function AttendanceProvider({ children }: { children: React.ReactNode }) {
     let stdHoursTotal = 0;
     let compOffCount = 0;
     let holidayBonus = 0;
+    let holidayWorkDays = 0;
 
     // 特殊状态扣薪明细
     const specialStatusDeductions: Record<string, { count: number; deduction: number; name: string; multiplier: number }> = {};
@@ -626,6 +627,8 @@ function AttendanceProvider({ children }: { children: React.ReactNode }) {
             // 正向补偿：额外给 (multiplier-1) 倍日薪
             const dayBonus = Math.round(dailyRate * (specialStatus.salaryMultiplier - 1) * 100) / 100;
             holidayBonus += dayBonus;
+            // 统计节假日上班天数
+            if (specialStatus.isHoliday) holidayWorkDays++;
           } else if (dir === "negative") {
             // 负向惩罚（上了班但违规）：额外扣 multiplier 倍日薪
             const extraDeduction = Math.round(specialStatus.salaryMultiplier * dailyRate * 100) / 100;
@@ -752,6 +755,8 @@ function AttendanceProvider({ children }: { children: React.ReactNode }) {
       overtimeAlertHours: rawOvertimeHours >= 4 ? Math.round(rawOvertimeHours * 10) / 10 : undefined,
       // 本月已存入调休的加班小时数（compOffCount * hoursPerCompOff）
       storedOvertimeHours: compOffHoursUsed > 0 ? Math.round(compOffHoursUsed * 10) / 10 : undefined,
+      // 节假日上班天数
+      holidayWorkDays: holidayWorkDays > 0 ? holidayWorkDays : undefined,
     };
   }, [ref]);
 
