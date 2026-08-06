@@ -425,7 +425,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
       onLongPress={() => { tap(); router.push({ pathname: "/labor-attendance", params: { employeeId: employee.id, month } } as any); }}
       style={[PC.card, { backgroundColor: colors.surface, borderLeftWidth: 3, borderLeftColor: deptColor, borderColor: colors.border }]}>
 
-      {/* ─── 顶部行：姓名 + 调休/换休标签 ─── */}
+      {/* ─── 顶部行：姓名 + 实发薪资（右侧） ─── */}
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap", flex: 1 }}>
           <Text style={{ fontSize: 15, fontWeight: "800", color: colors.foreground }}>{employee.code}</Text>
@@ -437,17 +437,19 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
             </View>
           )}
         </View>
-        {/* 右侧：调休/换休天数标签 */}
-        {totalCompOffDays > 0 && (
-          <View style={{ backgroundColor: colors.primary + "18", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
-            <Text style={{ fontSize: 11, fontWeight: "700", color: colors.primary }}>调休/换休 {totalCompOffDays}天</Text>
-          </View>
-        )}
-        {!slip && (
-          <View style={{ backgroundColor: colors.warning + "22", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
-            <Text style={{ fontSize: 10, fontWeight: "600", color: colors.warning }}>待录入</Text>
-          </View>
-        )}
+        {/* 右侧：实发薪资（主）+ 调休天数（次） */}
+        <View style={{ alignItems: "flex-end", gap: 2 }}>
+          {slip ? (
+            <Text style={{ fontSize: 14, fontWeight: "800", color: colors.primary }}>实发 ¥{slip.finalSalary.toFixed(0)}</Text>
+          ) : (
+            <View style={{ backgroundColor: colors.warning + "22", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+              <Text style={{ fontSize: 10, fontWeight: "600", color: colors.warning }}>待录入</Text>
+            </View>
+          )}
+          {totalCompOffDays > 0 && (
+            <Text style={{ fontSize: 10, color: colors.primary }}>调休/换休 {totalCompOffDays}天</Text>
+          )}
+        </View>
       </View>
 
       {/* ─── 5格摘要行（收起/展开都显示）─── */}
