@@ -23,7 +23,7 @@ import StoreInventoryScreen from "@/components/store/inventory";
 import LaborScreen from "@/app/labor";
 
 type MainTab = "monthly" | "labor" | "petty" | "inventory";
-type ReportTab = "analytics" | "accounts";
+type ReportTab = "summary" | "analytics" | "accounts";
 
 const MAIN_TABS: { key: MainTab; label: string }[] = [
   { key: "monthly",   label: "报表" },
@@ -33,6 +33,7 @@ const MAIN_TABS: { key: MainTab; label: string }[] = [
 ];
 
 const REPORT_TABS: { key: ReportTab; label: string }[] = [
+  { key: "summary",   label: "总月报" },
   { key: "analytics", label: "经营分析" },
   { key: "accounts",  label: "账户" },
 ];
@@ -40,8 +41,9 @@ const REPORT_TABS: { key: ReportTab; label: string }[] = [
 // ── 报表模块（含经营分析 + 账户两个子入口）────────────────────────────────────
 function ReportModule({ insets }: { insets: any }) {
   const colors = useColors();
+  const router = useRouter();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
-  const [reportTab, setReportTab] = usePersistedState<ReportTab>("store.report.tab.v1", "analytics");
+  const [reportTab, setReportTab] = usePersistedState<ReportTab>("store.report.tab.v2", "analytics");
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -52,7 +54,14 @@ function ReportModule({ insets }: { insets: any }) {
         {REPORT_TABS.map((t) => {
           const active = reportTab === t.key;
           return (
-            <Pressable key={t.key} onPress={() => { tap(); setReportTab(t.key); }}
+            <Pressable key={t.key} onPress={() => {
+                tap();
+                if (t.key === "summary") {
+                  router.push("/monthly-summary" as any);
+                } else {
+                  setReportTab(t.key);
+                }
+              }}
               style={[S.subChip, {
                 backgroundColor: active ? colors.primary : colors.surface,
                 borderColor: active ? colors.primary : colors.border,
