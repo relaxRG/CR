@@ -16,6 +16,7 @@ import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
+import { useFeature } from "@/hooks/use-feature";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
 import { useMonthlySummaryStore } from "@/lib/store/monthly-summary/store";
@@ -284,6 +285,7 @@ export default function MonthlySummaryScreen() {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { isReadOnly } = useFeature();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
   const {
@@ -891,16 +893,20 @@ export default function MonthlySummaryScreen() {
         </Pressable>
         <Text style={[S.navTitle, { color: colors.foreground }]}>{`${Number(selectedMonth.slice(5, 7))}月报表`}</Text>
         <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
-          {/* 一键汇总按鈕 */}
-          <Pressable onPress={handleAutoAggregate}
-            style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
-            <IconSymbol name="arrow.clockwise.circle.fill" size={22} color={colors.primary} />
-          </Pressable>
-          {/* 月报设置 */}
-          <Pressable onPress={() => setShowSettingsModal(true)}
-            style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
-            <IconSymbol name="gearshape.fill" size={20} color={colors.muted} />
-          </Pressable>
+          {/* 一键汇总按鈕（只读模式隐藏） */}
+          {!isReadOnly && (
+            <Pressable onPress={handleAutoAggregate}
+              style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+              <IconSymbol name="arrow.clockwise.circle.fill" size={22} color={colors.primary} />
+            </Pressable>
+          )}
+          {/* 月报设置（只读模式隐藏） */}
+          {!isReadOnly && (
+            <Pressable onPress={() => setShowSettingsModal(true)}
+              style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+              <IconSymbol name="gearshape.fill" size={20} color={colors.muted} />
+            </Pressable>
+          )}
           {/* 供应商档案入口 */}
           <Pressable onPress={() => router.push("/suppliers" as any)}
             style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>

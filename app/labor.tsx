@@ -13,6 +13,7 @@ import * as Haptics from "expo-haptics";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
+import { useFeature } from "@/hooks/use-feature";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
 import {
@@ -308,6 +309,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
   // 直接订阅 alerts 响应式 state，避免通过 getAlert 读 ref.current
   const { alerts, resolveAlert } = useUnexplainedRestAlertStore();
   const router = useRouter();
+  const { isReadOnly } = useFeature();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
   const [expanded, setExpanded] = useState(false);
   const [showCompOffModal, setShowCompOffModal] = useState(false);
@@ -740,18 +742,22 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
           )}
 
 
-          {/* 操作按钮行：绩效补贴 | 编辑薪资 | 付款信息 | 历史 */}
+          {/* 操作按钮行：绩效补贴 | 编辑薪资（只读模式隐藏）| 付款信息 | 历史 */}
           <View style={{ flexDirection: "row", gap: 6, marginTop: 4 }}>
-            <TouchableOpacity onPress={() => { tap(); router.push({ pathname: "/labor-kpi-allowance", params: { employeeId: employee.id, month } } as any); }}
-              style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 3, paddingVertical: 7, borderRadius: 8, backgroundColor: colors.success + "15", borderWidth: 1, borderColor: colors.success + "44" }}>
-              <IconSymbol name="chart.bar.fill" size={11} color={colors.success} />
-              <Text style={{ fontSize: 11, color: colors.success, fontWeight: "600" }}>绩效补贴</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => { tap(); router.push({ pathname: "/labor-attendance", params: { employeeId: employee.id, month } } as any); }}
-              style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 3, paddingVertical: 7, borderRadius: 8, backgroundColor: colors.primary + "15", borderWidth: 1, borderColor: colors.primary + "44" }}>
-              <IconSymbol name="pencil" size={11} color={colors.primary} />
-              <Text style={{ fontSize: 11, color: colors.primary, fontWeight: "600" }}>编辑薪资</Text>
-            </TouchableOpacity>
+            {!isReadOnly && (
+              <TouchableOpacity onPress={() => { tap(); router.push({ pathname: "/labor-kpi-allowance", params: { employeeId: employee.id, month } } as any); }}
+                style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 3, paddingVertical: 7, borderRadius: 8, backgroundColor: colors.success + "15", borderWidth: 1, borderColor: colors.success + "44" }}>
+                <IconSymbol name="chart.bar.fill" size={11} color={colors.success} />
+                <Text style={{ fontSize: 11, color: colors.success, fontWeight: "600" }}>绩效补贴</Text>
+              </TouchableOpacity>
+            )}
+            {!isReadOnly && (
+              <TouchableOpacity onPress={() => { tap(); router.push({ pathname: "/labor-attendance", params: { employeeId: employee.id, month } } as any); }}
+                style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 3, paddingVertical: 7, borderRadius: 8, backgroundColor: colors.primary + "15", borderWidth: 1, borderColor: colors.primary + "44" }}>
+                <IconSymbol name="pencil" size={11} color={colors.primary} />
+                <Text style={{ fontSize: 11, color: colors.primary, fontWeight: "600" }}>编辑薪资</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
               onPress={() => {
                 tap();

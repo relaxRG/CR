@@ -30,6 +30,11 @@ export interface UseFeatureResult {
   isGuest: boolean;
   /** 是否已登录（deviceInfo 不为 null） */
   isAuthenticated: boolean;
+  /**
+   * 全局只读标志：已登录且为 guest 角色时为 true
+   * 用于全局禁用编辑按鈕、隐藏操作入口
+   */
+  isReadOnly: boolean;
 }
 
 export function useFeature(): UseFeatureResult {
@@ -54,6 +59,8 @@ export function useFeature(): UseFeatureResult {
       return hasFeature(feature);
     }
 
-    return { hasFeature, canWrite, isOwner, isGuest, isAuthenticated };
+    const isReadOnly = isAuthenticated && isGuest;
+
+    return { hasFeature, canWrite, isOwner, isGuest, isAuthenticated, isReadOnly };
   }, [deviceRole, deviceInfo]);
 }
