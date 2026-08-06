@@ -857,14 +857,18 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
     ) * 100) / 100;
 
     // ── 社保/公积金计算（双轨制：个人+公司）──
+    // 优先使用员工独立配置，否则使用全局配置
     const siConfig = employee.socialInsurance ?? globalSettings?.defaultSocialInsurance;
-    const siEnabled = (siConfig?.enabled) || (globalSettings?.socialInsuranceEnabled ?? false);
-    let socialInsuranceDeduction = existing?.socialInsuranceDeduction ?? 0;  // 个人部分
-    let housingFundDeduction = existing?.housingFundDeduction ?? 0;           // 个人部分
-    let employerSocialInsurance = existing?.employerSocialInsurance ?? 0;     // 公司部分
-    let employerHousingFund = existing?.employerHousingFund ?? 0;             // 公司部分
-    let socialInsuranceDetails = existing?.socialInsuranceDetails;
-    let employerInsuranceDetails = existing?.employerInsuranceDetails;
+    // 开关判断：必须同时满足「员工配置 enabled=true」且「全局开关未关闭」
+    // 修复 Bug：旧逻辑用 || 导致全局开关为 true 时就就算员工关闭也会计算社保
+    // 修复 Bug：初始化时不从 existing 继承旧扣除数据，开关关闭时强制清零，防止历史数据污染
+    const siEnabled = siConfig?.enabled === true && globalSettings?.socialInsuranceEnabled !== false;
+    let socialInsuranceDeduction = 0;  // 个人部分：开关关闭时强制为 0
+    let housingFundDeduction = 0;      // 个人部分：开关关闭时强制为 0
+    let employerSocialInsurance = 0;   // 公司部分：开关关闭时强制为 0
+    let employerHousingFund = 0;       // 公司部分：开关关闭时强制为 0
+    let socialInsuranceDetails: PaySlip["socialInsuranceDetails"] = undefined;
+    let employerInsuranceDetails: PaySlip["employerInsuranceDetails"] = undefined;
 
     if (siEnabled && siConfig) {
       const si = calcSocialInsurance(grossSalary, { ...siConfig, enabled: true });
@@ -893,9 +897,11 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
     // ── 个人所得税计算（累计预扣法）──
     // cumulativeIncome 和 cumulativeTaxPaid 由调用方从当年1月到上月的 paySlips 累加传入
     const taxConfig = employee.incomeTax ?? globalSettings?.defaultIncomeTax;
-    const taxEnabled = (taxConfig?.enabled) || (globalSettings?.incomeTaxEnabled ?? false);
-    let incomeTax = existing?.incomeTax ?? 0;
-    let incomeTaxNote = existing?.incomeTaxNote ?? "";
+    // 修复 Bug：与社保开关相同，个税开关必须员工配置 enabled=true 且全局开关未关闭
+    const taxEnabled = taxConfig?.enabled === true && globalSettings?.incomeTaxEnabled !== false;
+    // 修复 Bug：开关关闭时不从 existing 继承旧个税数据，强制清零
+    let incomeTax = 0;
+    let incomeTaxNote = "";
 
     if (taxEnabled && taxConfig) {
       const totalDeductions = socialInsuranceDeduction + housingFundDeduction;
