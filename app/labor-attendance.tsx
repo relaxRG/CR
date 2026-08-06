@@ -482,7 +482,34 @@ function EmployeeCard({
         </View>
       )}
 
-      {/* 底部四按钮：绩效补贴 / 编辑薪资 / 付款信息 / 历史 */}
+      {/* 一键复制付款信息按鈕 */}
+      {slip && (() => {
+        const defaultBank = employee.bankAccounts?.find((b: any) => b.isDefault) ?? employee.bankAccounts?.[0];
+        const handleQuickCopy = () => {
+          const lines = [
+            `姓名：${employee.realName}`,
+            defaultBank ? `领款人：${defaultBank.accountName ?? employee.realName}` : null,
+            defaultBank ? `开户行：${defaultBank.bankName}` : null,
+            defaultBank ? `卡号：${defaultBank.cardNumber}` : null,
+            `金额：¥${slip.finalSalary.toFixed(0)}`,
+            `备注：${month} 薪资`,
+          ].filter(Boolean).join("\n");
+          Clipboard.setString(lines);
+          tap();
+          Alert.alert("已复制", "付款信息已复制到剪贴板");
+        };
+        return (
+          <TouchableOpacity
+            onPress={handleQuickCopy}
+            style={[S.copyPayBtn, { borderColor: colors.primary + "44", backgroundColor: colors.primary + "08" }]}>
+            <IconSymbol name="doc.on.clipboard" size={14} color={colors.primary} />
+            <Text style={{ fontSize: 13, fontWeight: "700", color: colors.primary }}>一键复制付款信息</Text>
+            <Text style={{ fontSize: 11, color: colors.muted, marginLeft: "auto" }}>实发 ¥{slip.finalSalary.toFixed(0)}</Text>
+          </TouchableOpacity>
+        );
+      })()}
+
+      {/* 底部四按鈕：绩效补贴 / 编辑薪资 / 付款信息 / 历史 */}
       <View style={[S.actionRow, { borderTopColor: colors.border }]}>
         <TouchableOpacity style={[S.actionBtn, { backgroundColor: colors.success + "18", borderColor: colors.success + "44" }]}
           onPress={() => { tap(); router.push({ pathname: "/labor-kpi-allowance", params: { employeeId: employee.id, month } } as any); }}>
@@ -548,4 +575,5 @@ const S = StyleSheet.create({
   payLabel: { fontSize: 13 },
   payValue: { fontSize: 14, fontWeight: "600" },
   copyBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 12, borderRadius: 10 },
+  copyPayBtn: { flexDirection: "row", alignItems: "center", gap: 8, marginHorizontal: 12, marginBottom: 8, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 10, borderWidth: 1 },
 });
