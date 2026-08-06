@@ -1,9 +1,14 @@
 /**
  * 门店 Tab — 四大顶级模块
- * 【报表】经营分析 / 账户
- * 【员工】薪资统计 / 排班表 / 薪资预支
- * 【备用金】备用金管理
- * 【库存】10 个品类进销存入口
+ * 【报表】经营分析 / 账户        → 需要 store_ops 权限
+ * 【员工】薪资统计 / 排班表 / 薪资预支  → 需要 labor 权限
+ * 【备用金】备用金管理            → 需要 store_ops 权限
+ * 【库存】10 个品类进销存入口      → 需要 store_ops 权限
+ *
+ * 权限控制：
+ *   - owner：所有 Tab 可见
+ *   - collaborator/guest：仅显示 allowedKeys 包含对应模块的 Tab
+ *   - 未登录：显示所有 Tab（本地单机模式）
  */
 import React from "react";
 import {
@@ -15,6 +20,7 @@ import { useRouter } from "expo-router";
 import { useColors } from "@/hooks/use-colors";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useSync } from "@/lib/cf-sync/provider";
+import { useFeature } from "@/hooks/use-feature";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import StorePettyCashScreen from "@/components/store/petty-cash";
 import StoreAnalyticsScreen from "@/components/store/analytics";
@@ -25,11 +31,11 @@ import LaborScreen from "@/app/labor";
 type MainTab = "monthly" | "labor" | "petty" | "inventory";
 type ReportTab = "summary" | "analytics" | "accounts";
 
-const MAIN_TABS: { key: MainTab; label: string }[] = [
-  { key: "monthly",   label: "报表" },
-  { key: "labor",     label: "员工" },
-  { key: "petty",     label: "备用金" },
-  { key: "inventory", label: "库存" },
+const ALL_MAIN_TABS: { key: MainTab; label: string; feature: "store_ops" | "labor" }[] = [
+  { key: "monthly",   label: "报表",  feature: "store_ops" },
+  { key: "labor",     label: "员工",  feature: "labor" },
+  { key: "petty",     label: "备用金", feature: "store_ops" },
+  { key: "inventory", label: "库存",  feature: "store_ops" },
 ];
 
 const REPORT_TABS: { key: ReportTab; label: string }[] = [
@@ -38,12 +44,29 @@ const REPORT_TABS: { key: ReportTab; label: string }[] = [
   { key: "accounts",  label: "账户" },
 ];
 
-// ── 报表模块（含经营分析 + 账户两个子入口）────────────────────────────────────
-function ReportModule({ insets }: { insets: any }) {
-  const colors = useColors();
+// ── 无权限占位组件 ─────────────────────────────────────────────────────────────
+function AccessDenied({ label, colors }: { label: string; colors: any }) {
+  return (
+    <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 12 }}>
+      <IconSymbol name="lock.fill" size={40} color={colors.muted} />
+      <Text style={{ fontSize: 16, color: colors.muted, fontWeight: "600" }}>无权访问</Text>
+      <Text style={{ fontSize: 13, color: colors.muted, textAlign: "center", paddingHorizontal: 32 }}>
+        您的设备没有「{label}」模块的访问权限，请联系管理员授权。
+      </Text>
+    </View>
+  );
+}
+
+// ── 报表模块（含总月报 / 经营分析 / 账户三个子入口）──────────────────────────────
+function ReportModule({ insets, colors }: { insets: any; colors: any }) {
   const router = useRouter();
+  const { hasFeature } = useFeature();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
   const [reportTab, setReportTab] = usePersistedState<ReportTab>("store.report.tab.v2", "analytics");
+
+  if (!hasFeature("store_ops")) {
+    return <AccessDenied label="报表" colors={colors} />;
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -99,13 +122,24 @@ export default function StoreScreen() {
   const router = useRouter();
   const [mainTab, setMainTab] = usePersistedState<MainTab>("store.main.tab.v3", "monthly");
   const { syncState } = useSync();
+  const { hasFeature, isAuthenticated } = useFeature();
   const hasSyncBadge = !!syncState.error;
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
   const childInsets = { ...insets, top: 0 };
 
+  // 过滤出当前设备有权访问的 Tab（未登录时显示全部，保持本地单机模式可用）
+  const visibleTabs = ALL_MAIN_TABS.filter((t) =>
+    !isAuthenticated || hasFeature(t.feature)
+  );
+
+  // 如果当前选中的 Tab 不可见，自动切换到第一个可见 Tab
+  const effectiveTab = visibleTabs.find((t) => t.key === mainTab)
+    ? mainTab
+    : (visibleTabs[0]?.key ?? "monthly");
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      {/* 顶部导航栏：头像 + 四个顶级 Tab */}
+      {/* 顶部导航栏：头像 + 可见的顶级 Tab */}
       <View style={[S.header, { paddingTop: insets.top + 10, backgroundColor: colors.background }]}>
         {/* 头像按钮（右上角） */}
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "flex-end", paddingBottom: 4 }}>
@@ -116,10 +150,10 @@ export default function StoreScreen() {
           </Pressable>
         </View>
 
-        {/* 四大模块主 Tab（下划线风格） */}
+        {/* 主 Tab（仅显示有权访问的模块） */}
         <View style={[S.mainTabRow, { borderBottomColor: colors.border }]}>
-          {MAIN_TABS.map((t) => {
-            const active = mainTab === t.key;
+          {visibleTabs.map((t) => {
+            const active = effectiveTab === t.key;
             return (
               <Pressable key={t.key} onPress={() => { tap(); setMainTab(t.key); }}
                 style={({ pressed }) => [S.mainTabBtn, active && { borderBottomColor: colors.primary, borderBottomWidth: 2 }, { opacity: pressed ? 0.6 : 1 }]}>
@@ -137,10 +171,22 @@ export default function StoreScreen() {
 
       {/* 内容区 */}
       <SafeAreaInsetsContext.Provider value={childInsets}>
-        {mainTab === "monthly"   && <ReportModule insets={childInsets} />}
-        {mainTab === "labor"     && <View style={{ flex: 1 }}><LaborScreen embedded /></View>}
-        {mainTab === "petty"     && <SafeAreaInsetsContext.Provider value={childInsets}><StorePettyCashScreen /></SafeAreaInsetsContext.Provider>}
-        {mainTab === "inventory" && <StoreInventoryScreen />}
+        {effectiveTab === "monthly"   && <ReportModule insets={childInsets} colors={colors} />}
+        {effectiveTab === "labor"     && (
+          hasFeature("labor")
+            ? <View style={{ flex: 1 }}><LaborScreen embedded /></View>
+            : <AccessDenied label="员工" colors={colors} />
+        )}
+        {effectiveTab === "petty"     && (
+          hasFeature("store_ops")
+            ? <SafeAreaInsetsContext.Provider value={childInsets}><StorePettyCashScreen /></SafeAreaInsetsContext.Provider>
+            : <AccessDenied label="备用金" colors={colors} />
+        )}
+        {effectiveTab === "inventory" && (
+          hasFeature("store_ops")
+            ? <StoreInventoryScreen />
+            : <AccessDenied label="库存" colors={colors} />
+        )}
       </SafeAreaInsetsContext.Provider>
     </View>
   );
