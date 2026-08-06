@@ -1,13 +1,13 @@
 /**
  * 门店 Tab — 四大顶级模块
- * 【月报】经营分析 / 账户
+ * 【报表】经营分析 / 账户
  * 【员工】薪资统计 / 排班表 / 薪资预支
  * 【备用金】备用金管理
  * 【库存】10 个品类进销存入口
  */
 import React from "react";
 import {
-  Platform, Pressable, StyleSheet, Text, View
+  Platform, Pressable, ScrollView, StyleSheet, Text, View
 } from "react-native";
 import * as Haptics from "expo-haptics";
 import { SafeAreaInsetsContext, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -18,10 +18,12 @@ import { useSync } from "@/lib/cf-sync/provider";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import StorePettyCashScreen from "@/components/store/petty-cash";
 import StoreAnalyticsScreen from "@/components/store/analytics";
+import StoreAccountsScreen from "@/components/store/accounts";
 import StoreInventoryScreen from "@/components/store/inventory";
 import LaborScreen from "@/app/labor";
 
 type MainTab = "monthly" | "labor" | "petty" | "inventory";
+type ReportTab = "analytics" | "accounts";
 
 const MAIN_TABS: { key: MainTab; label: string }[] = [
   { key: "monthly",   label: "报表" },
@@ -29,6 +31,56 @@ const MAIN_TABS: { key: MainTab; label: string }[] = [
   { key: "petty",     label: "备用金" },
   { key: "inventory", label: "库存" },
 ];
+
+const REPORT_TABS: { key: ReportTab; label: string }[] = [
+  { key: "analytics", label: "经营分析" },
+  { key: "accounts",  label: "账户" },
+];
+
+// ── 报表模块（含经营分析 + 账户两个子入口）────────────────────────────────────
+function ReportModule({ insets }: { insets: any }) {
+  const colors = useColors();
+  const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
+  const [reportTab, setReportTab] = usePersistedState<ReportTab>("store.report.tab.v1", "analytics");
+
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      {/* 子 Tab Chip 切换栏 */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}
+        style={{ flexGrow: 0 }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 8, gap: 8, alignItems: "center" }}>
+        {REPORT_TABS.map((t) => {
+          const active = reportTab === t.key;
+          return (
+            <Pressable key={t.key} onPress={() => { tap(); setReportTab(t.key); }}
+              style={[S.subChip, {
+                backgroundColor: active ? colors.primary : colors.surface,
+                borderColor: active ? colors.primary : colors.border,
+              }]}>
+              <Text style={[S.subChipText, {
+                color: active ? "#fff" : colors.foreground,
+                fontWeight: active ? "600" : "400",
+              }]}>
+                {t.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+
+      {reportTab === "analytics" && (
+        <SafeAreaInsetsContext.Provider value={insets}>
+          <StoreAnalyticsScreen />
+        </SafeAreaInsetsContext.Provider>
+      )}
+      {reportTab === "accounts" && (
+        <SafeAreaInsetsContext.Provider value={insets}>
+          <StoreAccountsScreen />
+        </SafeAreaInsetsContext.Provider>
+      )}
+    </View>
+  );
+}
 
 // ── 门店主屏 ──────────────────────────────────────────────────────────────────
 export default function StoreScreen() {
@@ -75,23 +127,9 @@ export default function StoreScreen() {
 
       {/* 内容区 */}
       <SafeAreaInsetsContext.Provider value={childInsets}>
-        {mainTab === "monthly" && (
-          <View style={{ flex: 1, backgroundColor: colors.background }}>
-            <SafeAreaInsetsContext.Provider value={childInsets}>
-              <StoreAnalyticsScreen />
-            </SafeAreaInsetsContext.Provider>
-          </View>
-        )}
-        {mainTab === "labor" && (
-          <View style={{ flex: 1 }}>
-            <LaborScreen embedded />
-          </View>
-        )}
-        {mainTab === "petty" && (
-          <SafeAreaInsetsContext.Provider value={childInsets}>
-            <StorePettyCashScreen />
-          </SafeAreaInsetsContext.Provider>
-        )}
+        {mainTab === "monthly"   && <ReportModule insets={childInsets} />}
+        {mainTab === "labor"     && <View style={{ flex: 1 }}><LaborScreen embedded /></View>}
+        {mainTab === "petty"     && <SafeAreaInsetsContext.Provider value={childInsets}><StorePettyCashScreen /></SafeAreaInsetsContext.Provider>}
         {mainTab === "inventory" && <StoreInventoryScreen />}
       </SafeAreaInsetsContext.Provider>
     </View>
@@ -105,4 +143,6 @@ const S = StyleSheet.create({
   mainTabRow: { flexDirection: "row", borderBottomWidth: StyleSheet.hairlineWidth },
   mainTabBtn: { flex: 1, alignItems: "center", paddingVertical: 10, borderBottomWidth: 2, borderBottomColor: "transparent" },
   mainTabText: { fontSize: 16 },
+  subChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
+  subChipText: { fontSize: 14, lineHeight: 20 },
 });
