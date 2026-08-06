@@ -19,7 +19,6 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import StorePettyCashScreen from "@/components/store/petty-cash";
 import StoreAnalyticsScreen from "@/components/store/analytics";
 import StoreInventoryScreen from "@/components/store/inventory";
-import StoreAccountsScreen from "@/components/store/accounts";
 import LaborScreen from "@/app/labor";
 
 type MainTab = "monthly" | "labor" | "petty" | "inventory";
