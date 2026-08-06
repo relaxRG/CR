@@ -25,7 +25,7 @@ import LaborScreen from "@/app/labor";
 type MainTab = "monthly" | "labor" | "petty" | "inventory";
 
 const MAIN_TABS: { key: MainTab; label: string }[] = [
-  { key: "monthly",   label: "月报" },
+  { key: "monthly",   label: "报表" },
   { key: "labor",     label: "员工" },
   { key: "petty",     label: "备用金" },
   { key: "inventory", label: "库存" },
