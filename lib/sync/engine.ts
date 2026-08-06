@@ -762,6 +762,64 @@ export async function resolveConflict(
   }
 }
 
+/**
+ * 批量解决所有冲突（一键全部保留本机 / 全部采用云端）
+ * 优化：将所有 keepLocal 的条目合并为一次 push，将所有 useRemote 的写入合并为一次 triggerStoreReload
+ */
+export async function resolveAllConflicts(
+  conflicts: SyncConflict[],
+  keepLocal: boolean,
+  push: PushFn,
+): Promise<void> {
+  if (conflicts.length === 0) return;
+  const now = Date.now();
+  if (keepLocal) {
+    // 将所有需要保留本机的条目合并为一次批量 push，避免 N 次网络请求
+    const pushEntries = conflicts.map((c) => ({
+      storageKey: c.storageKey,
+      value: c.localValue,
+      clientUpdatedAt: now,
+    }));
+    await push(pushEntries);
+    // 批量更新本地时间戳
+    await Promise.all(
+      conflicts.map((c) => AsyncStorage.setItem(TS_PREFIX + c.storageKey, String(now)))
+    );
+    await appendLog({
+      time: now, type: "push",
+      keys: conflicts.map((c) => c.storageKey),
+      message: `冲突批量解决：保留本机（${conflicts.length} 个）`,
+    });
+  } else {
+    // 批量写入云端数据到本地
+    const prefsMergeEntries: { storageKey: string; value: string }[] = [];
+    await Promise.all(
+      conflicts.map(async (c) => {
+        const valueToWrite = PREFS_MERGE_KEYS.has(c.storageKey)
+          ? mergePrefs(c.localValue, c.remoteValue).merged
+          : c.remoteValue;
+        await AsyncStorage.setItem(c.storageKey, valueToWrite);
+        await AsyncStorage.setItem(TS_PREFIX + c.storageKey, String(c.remoteTs));
+        if (PREFS_MERGE_KEYS.has(c.storageKey)) {
+          const { merged, changed } = mergePrefs(c.localValue, c.remoteValue);
+          if (changed) prefsMergeEntries.push({ storageKey: c.storageKey, value: merged });
+        }
+      })
+    );
+    // 将需要 push 的 prefs merge 条目合并为一次请求
+    if (prefsMergeEntries.length > 0) {
+      void push(prefsMergeEntries.map((e) => ({ ...e, clientUpdatedAt: now }))).catch(() => {});
+    }
+    // 只触发一次 Store 重载（而非 N 次）
+    triggerStoreReload();
+    await appendLog({
+      time: now, type: "pull",
+      keys: conflicts.map((c) => c.storageKey),
+      message: `冲突批量解决：采用云端（${conflicts.length} 个）`,
+    });
+  }
+}
+
 /** 登出或权限被拒时停用同步 */
 export function disableSync() {
   syncEnabled = false;

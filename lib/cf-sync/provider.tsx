@@ -27,10 +27,13 @@ import {
   getSyncState,
   runInitialSync,
   subscribeSyncState,
-  type SyncState,
+  resolveConflict,
+  resolveAllConflicts,
+  clearSyncError,
   triggerStoreReload,
+  type SyncState,
+  type SyncConflict,
 } from "@/lib/sync/engine";
-import { resolveConflict, clearSyncError, type SyncConflict } from "@/lib/sync/engine";
 import { createSnapshot } from "@/lib/backup/local-backup";
 import { startAutoBackup } from "@/lib/backup/icloud-backup";
 import { syncPhotos } from "@/lib/sync/photo-sync";
@@ -141,9 +144,8 @@ export function SyncProvider({
     const hasMultiple = remaining > 1;
     const resolveAll = (keepLocal: boolean) => {
       const allConflicts = pendingConflicts;
-      for (const c of allConflicts) {
-        void resolveConflict(c, keepLocal, pushFn ?? (async () => {}));
-      }
+      // 使用批量冲突解决函数：一次 push，一次 triggerStoreReload，避免 N 次网络请求
+      void resolveAllConflicts(allConflicts, keepLocal, pushFn ?? (async () => {}));
       setPendingConflicts([]);
     };
     Alert.alert(
