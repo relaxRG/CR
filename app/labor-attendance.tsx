@@ -24,6 +24,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import {
   useEmployeeStore, useAttendanceStore, usePaySlipStore,
   useCompOffBalanceEntryStore, useHolidayCompOffStore,
+  useGlobalPayrollSettingsStore,
 } from "@/lib/labor/store";
 import { useSalaryAdvanceStore } from "@/lib/labor/advance-store";
 import {
@@ -140,6 +141,9 @@ function EmployeeCard({
   editingReward: boolean; onToggleRewardEdit: () => void;
   router: any;
 }) {
+  // 修复：在卡片内直接调用 hooks，确保 saveRewards 能访问 buildPaySlipDraft 和 globalSettings
+  const { buildPaySlipDraft } = usePaySlipStore();
+  const { settings: globalSettings } = useGlobalPayrollSettingsStore();
   const tenure = calcTenure(employee.joinDate);
 
   // ── 调休余额（加班换休 vs 节假日调休分开） ──
@@ -175,15 +179,24 @@ function EmployeeCard({
     ]);
   };
   const saveRewards = useCallback(() => {
-    if (!slip) return;
+    if (!slip || !employee) return;
     const totalReward = rewardItems.reduce((sum, item) => sum + item.amount, 0);
-    const rewardDiff = totalReward - (slip.rewardPenalty ?? 0);
-    const newGross = Math.round((slip.grossSalary + rewardDiff) * 100) / 100;
-    const newFinal = Math.round((slip.finalSalary + rewardDiff) * 100) / 100;
-    upsertPaySlip({ ...slip, rewardPenalty: totalReward, rewardPenaltyItems: rewardItems, notes,
-      grossSalary: newGross, finalSalary: newFinal, updatedAt: new Date().toISOString() });
+    // 修复：删除旧的增量计算引擎（rewardDiff 直接加减 finalSalary）
+    // 改用 buildPaySlipDraft 重新计算全部薪资字段，确保社保/公积金/个税开关状态正确反映
+    const draft = buildPaySlipDraft(
+      employee, month, att ?? null,
+      slip.performanceBonus ?? 0, advanceTotal, globalSettings
+    );
+    upsertPaySlip({
+      ...draft,
+      id: slip.id,
+      rewardPenalty: totalReward,
+      rewardPenaltyItems: rewardItems,
+      notes,
+      updatedAt: new Date().toISOString(),
+    });
     onToggleRewardEdit();
-  }, [slip, rewardItems, notes, upsertPaySlip, onToggleRewardEdit]);
+  }, [slip, employee, rewardItems, notes, upsertPaySlip, buildPaySlipDraft, att, month, advanceTotal, globalSettings, onToggleRewardEdit]);
 
   // ── 收起状态：2行4列网格摘要 ──
   if (!expanded) {

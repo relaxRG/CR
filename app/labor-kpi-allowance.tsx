@@ -22,7 +22,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
-import { useEmployeeStore, usePaySlipStore } from "@/lib/labor/store";
+import { useEmployeeStore, usePaySlipStore, useAttendanceStore, useGlobalPayrollSettingsStore } from "@/lib/labor/store";
 import {
   AllowanceRule, WorkKPIRule, RevenueKPIRule,
   ALLOWANCE_UNIT_LABELS, REVENUE_KPI_SOURCE_LABELS,
@@ -32,37 +32,15 @@ import {
 
 const tap = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-// ─── 计算薪资单更新值（统一入口，避免重复计算） ──────────────────────────────
-function calcPaySlipUpdate(
-  existing: any,
-  allowanceTotal: number,
-  workKPITotal: number,
-  revenueKPITotal: number,
-) {
-  const newGross = Math.round((
-    existing.attendanceSalary + workKPITotal + revenueKPITotal + allowanceTotal +
-    existing.salesCommission + existing.rewardPenalty
-  ) * 100) / 100;
-  const newFinal = Math.round((
-    newGross - (existing.socialInsuranceDeduction ?? 0) - (existing.housingFundDeduction ?? 0) -
-    (existing.incomeTax ?? 0) - existing.advanceAmount - (existing.pettyLaborPaid ?? 0)
-  ) * 100) / 100;
-  return {
-    performanceBonus: workKPITotal + revenueKPITotal,
-    mealAllowance: allowanceTotal,
-    grossSalary: newGross,
-    finalSalary: newFinal,
-    totalEmployerCost: Math.round((newGross + (existing.employerSocialInsurance ?? 0) + (existing.employerHousingFund ?? 0)) * 100) / 100,
-  };
-}
-
 export default function LaborKPIAllowancePage() {
   const { employeeId, month } = useLocalSearchParams<{ employeeId: string; month: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useColors();
   const { employees } = useEmployeeStore();
-  const { getPaySlip, upsertPaySlip } = usePaySlipStore();
+  const { getPaySlip, upsertPaySlip, buildPaySlipDraft } = usePaySlipStore();
+  const { getAttendance } = useAttendanceStore();
+  const { settings: globalSettings } = useGlobalPayrollSettingsStore();
 
   const employee = useMemo(() => employees.find((e) => e.id === employeeId), [employees, employeeId]);
 
@@ -144,11 +122,20 @@ export default function LaborKPIAllowancePage() {
   const grandTotal = performanceTotal + allowanceTotal;
 
   // ── 即时写入辅助函数 ──
-  const writeToPaySlip = (patch: Partial<ReturnType<typeof calcPaySlipUpdate>> & Record<string, any>) => {
-    if (!month || !employeeId) return;
+  // 修复：删除旧的 calcPaySlipUpdate 引擎，改用 buildPaySlipDraft 统一重新计算
+  // 确保社保/公积金/个税开关状态在绩效补贴页也能正确反映
+  const writeToPaySlip = (extraPatch: Record<string, any>) => {
+    if (!month || !employeeId || !employee) return;
     const existing = getPaySlip(employeeId, month);
     if (!existing) return;
-    upsertPaySlip({ ...existing, ...patch });
+    // 先将额外字段写入（如 allowanceOverrides/workKPISelections/revenueActuals）
+    const patched = { ...existing, ...extraPatch };
+    upsertPaySlip(patched);
+    // 再用 buildPaySlipDraft 重新计算全部薪资字段（包括社保/公积金/个税）
+    const att = getAttendance(employeeId, month) ?? null;
+    const advanceAmount = patched.advanceAmount ?? 0;
+    const draft = buildPaySlipDraft(employee, month, att, patched.performanceBonus ?? 0, advanceAmount, globalSettings);
+    upsertPaySlip({ ...draft, ...extraPatch, id: existing.id });
   };
 
   // ── 切换补贴本月生效（即时写入） ──
@@ -159,10 +146,9 @@ export default function LaborKPIAllowancePage() {
       const newAllowanceTotal = allowanceRules.reduce((sum, r) => (!next[r.id] ? sum : sum + (r.amount || 0)), 0);
       const existing = employeeId && month ? getPaySlip(employeeId, month) : null;
       if (existing) {
-        writeToPaySlip({
-          ...calcPaySlipUpdate(existing, newAllowanceTotal, workKPITotal, revenueKPITotal),
-          allowanceOverrides: next,
-        });
+        // 修复：不再用旧的 calcPaySlipUpdate 局部计算引擎
+        // writeToPaySlip 内部会调用 buildPaySlipDraft 重新计算社保/公积金/个税
+        writeToPaySlip({ allowanceOverrides: next });
       }
       return next;
     });
@@ -181,10 +167,8 @@ export default function LaborKPIAllowancePage() {
       }, 0);
       const existing = employeeId && month ? getPaySlip(employeeId, month) : null;
       if (existing) {
-        writeToPaySlip({
-          ...calcPaySlipUpdate(existing, allowanceTotal, newWorkKPITotal, revenueKPITotal),
-          workKPISelections: next,
-        });
+        // 修复：不再用旧的 calcPaySlipUpdate 局部计算引擎
+        writeToPaySlip({ workKPISelections: next });
       }
       return next;
     });
@@ -201,13 +185,10 @@ export default function LaborKPIAllowancePage() {
       }, 0);
       const existing = employeeId && month ? getPaySlip(employeeId, month) : null;
       if (existing) {
-        // 将字符串 map 转为数字 map 再持久化
+        // 修复：不再用旧的 calcPaySlipUpdate 局部计算引擎
         const numericActuals: Record<string, number> = {};
         Object.entries(next).forEach(([k, v]) => { numericActuals[k] = Number(v) || 0; });
-        writeToPaySlip({
-          ...calcPaySlipUpdate(existing, allowanceTotal, workKPITotal, newRevenueKPITotal),
-          revenueActuals: numericActuals,
-        });
+        writeToPaySlip({ revenueActuals: numericActuals });
       }
       return next;
     });

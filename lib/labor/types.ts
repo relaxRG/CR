@@ -1291,31 +1291,6 @@ export function calcIncomeTax(
   return { tax: Math.round(monthTax * 100) / 100, note };
 }
 
-/** 计算最终薪资（税后实发） */
-export function calcFinalSalary(slip: Omit<PaySlip, "finalSalary" | "grossSalary" | "id" | "updatedAt">): {
-  grossSalary: number;
-  finalSalary: number;
-} {
-  const grossSalary = Math.round((
-    slip.attendanceSalary +
-    slip.performanceBonus +
-    slip.salesCommission +
-    slip.mealAllowance +
-    slip.transportAllowance +
-    slip.otherAllowance +
-    slip.rewardPenalty
-  ) * 100) / 100;
-
-  const finalSalary = Math.round((
-    grossSalary -
-    (slip.socialInsuranceDeduction ?? 0) -
-    (slip.housingFundDeduction ?? 0) -
-    (slip.incomeTax ?? 0)
-  ) * 100) / 100;
-
-  return { grossSalary, finalSalary };
-}
-
 /**
  * 自动计算补贴金额
  */
