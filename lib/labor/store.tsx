@@ -864,11 +864,14 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
     }
 
     // ── 应发薪资（税前）──
+    // compOffCashOut = 兑换调休余额现金，应加入应发薪资
+    // 修复：旧版未将 compOffCashOut 纳入 grossSalary，导致兑换后应发薪资不变
     const grossSalary = Math.round((
       attendanceSalary + performanceTotal +
       (existing?.salesCommission ?? 0) +
       transportAllowance + mealAllowance + otherAllowance +
-      (existing?.rewardPenalty ?? 0)
+      (existing?.rewardPenalty ?? 0) +
+      (existing?.compOffCashOut ?? 0)
     ) * 100) / 100;
 
     // ── 社保/公积金计算（双轨制：个人+公司）──

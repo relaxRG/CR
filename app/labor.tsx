@@ -302,7 +302,9 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
   att: MonthlyAttendance | null;
   compareSlip: PaySlip | null;
 }) {
-  const { upsertPaySlip } = usePaySlipStore();
+  const { upsertPaySlip, buildPaySlipDraft } = usePaySlipStore();
+  const { settings: globalSettings } = useGlobalPayrollSettingsStore();
+  const { advances } = useSalaryAdvanceStore();
   // 直接订阅 entries 响应式 state，避免通过 getXxx 读 ref.current
   const { entries: compOffEntries, addEntry: addCompOffEntry, getEntries: getCompOffEntries, cashOutEntry: cashOutCompOff } = useCompOffBalanceEntryStore();
   const { entries: holidayCompOffEntries } = useHolidayCompOffStore();
@@ -402,17 +404,31 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
       ? Math.round((entry.hoursDeducted ?? entry.days * 8) * hourlyRate * 100) / 100
       : Math.round(entry.days * dailyRate * 100) / 100;
     cashOutCompOff(entry.id, amount / entry.days, month);
-    // 同步更新薪资单
+    // 修复：删除旧的增量计算（grossSalary + amount）
+    // 改用 buildPaySlipDraft 重算全部薪资字段，避免多次兑换导致的累积误差
     const currentSlip = slip;
     if (currentSlip) {
-      upsertPaySlip({
+      // 先写入 compOffCashOut 控制字段
+      const patched = {
         ...currentSlip,
         compOffCashOut: (currentSlip.compOffCashOut ?? 0) + amount,
         compOffCashOutNote: `兑换调休 ${entry.days}天 ¥${amount.toFixed(2)}`,
-        grossSalary: currentSlip.grossSalary + amount,
-        finalSalary: currentSlip.finalSalary + amount,
-        totalEmployerCost: currentSlip.totalEmployerCost + amount,
         updatedAt: new Date().toISOString(),
+      };
+      upsertPaySlip(patched);
+      // 再用 buildPaySlipDraft 重算（内部从 ref.current 读取最新 compOffCashOut）
+      const advanceTotal = advances
+        .filter((a) => a.employeeId === employee.id && (a.deductMonth === month || a.date.startsWith(month)) && (a.status === "pending" || a.status === "deducted"))
+        .reduce((s, a) => s + a.amount, 0);
+      const draft = buildPaySlipDraft(employee, month, att, patched.performanceBonus ?? 0, advanceTotal, globalSettings);
+      upsertPaySlip({
+        ...draft,
+        compOffCashOut: patched.compOffCashOut,
+        compOffCashOutNote: patched.compOffCashOutNote,
+        allowanceOverrides: patched.allowanceOverrides,
+        workKPISelections: patched.workKPISelections,
+        revenueActuals: patched.revenueActuals,
+        id: currentSlip.id,
       });
     }
     setShowCompOffModal(false);
@@ -3977,13 +3993,18 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                               const alloc = { ...(slip?.holidayBonusAllocation ?? {}) };
                               alloc[key] = { date: s.date, name: ss.name, totalBonus: bonusAmt, cashAmount: newMode === "cash" ? bonusAmt : 0, restDays: newMode === "rest" ? 1 : 0, mode: newMode };
                               if (slip) {
-                                // 同步更新 finalSalary：拿钱时加上奖金，换休时减去奖金
-                                const oldCash = Object.values(slip.holidayBonusAllocation ?? {}).reduce((s: number, a: any) => s + (a.cashAmount ?? 0), 0);
-                                const newCash = Object.values(alloc).reduce((s: number, a: any) => s + (a.cashAmount ?? 0), 0);
-                                const cashDiff = newCash - oldCash;
-                                const newFinal = Math.round((slip.finalSalary + cashDiff) * 100) / 100;
-                                const newGross = Math.round((slip.grossSalary + cashDiff) * 100) / 100;
-                                upsertPaySlip({ ...slip, holidayBonusAllocation: alloc, finalSalary: newFinal, grossSalary: newGross, updatedAt: new Date().toISOString() });
+                                // 修复：删除旧的增量计算（finalSalary + cashDiff）
+                                // 改用 buildPaySlipDraft 重算，避免多次切换导致的累积误差
+                                // holidayBonusAllocation 内的 cashAmount 会影响 att.holidayBonus，
+                                // autoSync 下次触发时会重算 att 和 slip，这里只需先写入控制字段
+                                const patched = { ...slip, holidayBonusAllocation: alloc, updatedAt: new Date().toISOString() };
+                                upsertPaySlip(patched);
+                                // 立即用 buildPaySlipDraft 重算，保证当前界面立即同步
+                                const advTotal = advances
+                                  .filter((a) => a.employeeId === emp.id && (a.deductMonth === currentMonthStr || a.date.startsWith(currentMonthStr)) && (a.status === "pending" || a.status === "deducted"))
+                                  .reduce((s, a) => s + a.amount, 0);
+                                const draft = buildPaySlipDraft(emp, currentMonthStr, att, patched.performanceBonus ?? 0, advTotal, globalSettings);
+                                upsertPaySlip({ ...draft, holidayBonusAllocation: alloc, allowanceOverrides: patched.allowanceOverrides, workKPISelections: patched.workKPISelections, revenueActuals: patched.revenueActuals, id: slip.id });
                               }
                               if (newMode === "rest") {
                                 const existing = getCompOffEntries(emp.id).find((e: any) => e.source === "holiday" && e.workDate === s.date && e.earnedMonth === currentMonthStr);
