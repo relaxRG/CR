@@ -437,19 +437,14 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
             </View>
           )}
         </View>
-        {/* 右侧：实发薪资（主）+ 调休天数（次） */}
-        <View style={{ alignItems: "flex-end", gap: 2 }}>
-          {slip ? (
-            <Text style={{ fontSize: 14, fontWeight: "800", color: colors.primary }}>实发 ¥{slip.finalSalary.toFixed(0)}</Text>
-          ) : (
-            <View style={{ backgroundColor: colors.warning + "22", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
-              <Text style={{ fontSize: 10, fontWeight: "600", color: colors.warning }}>待录入</Text>
-            </View>
-          )}
-          {totalCompOffDays > 0 && (
-            <Text style={{ fontSize: 10, color: colors.primary }}>调休/换休 {totalCompOffDays}天</Text>
-          )}
-        </View>
+        {/* 右侧：实发薪资 */}
+        {slip ? (
+          <Text style={{ fontSize: 14, fontWeight: "800", color: colors.primary }}>实发 ¥{slip.finalSalary.toFixed(0)}</Text>
+        ) : (
+          <View style={{ backgroundColor: colors.warning + "22", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+            <Text style={{ fontSize: 10, fontWeight: "600", color: colors.warning }}>待录入</Text>
+          </View>
+        )}
       </View>
 
       {/* ─── 5格摘要行（收起/展开都显示）─── */}
@@ -587,15 +582,52 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
             </View>
           )}
 
-          {/* ─── 调休余额行 + 存入/兑换按鈕 ─── */}
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border + "44" }}>
-            <Text style={{ fontSize: 12, color: colors.muted }}>调休余额：<Text style={{ color: totalCompOffDays > 0 ? colors.success : colors.muted, fontWeight: "700" }}>{totalCompOffDays}天</Text></Text>
-            <TouchableOpacity onPress={() => { tap(); setPanelMode("add"); setAddMode("hours"); setShowCompOffModal(!showCompOffModal); }}
-              style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 7, backgroundColor: colors.success + "15", borderWidth: 1, borderColor: colors.success + "44" }}>
-              <IconSymbol name="plusminus" size={11} color={colors.success} />
-              <Text style={{ fontSize: 11, color: colors.success, fontWeight: "600" }}>存入/兑换</Text>
-            </TouchableOpacity>
-          </View>
+          {/* ─── 调休换休分区（4格 + 存入/兑换按鈕）─── */}
+          {(() => {
+            // 加班余额：source="overtime" 且 available
+            const otDays = compOffEntries
+              .filter((e) => e.employeeId === employee.id && e.source === "overtime" && e.status === "available" && e.expiresMonth >= month)
+              .reduce((s, e) => s + e.days, 0);
+            // 节假日余额：source="holiday" 且 available
+            const holDays = compOffEntries
+              .filter((e) => e.employeeId === employee.id && e.source === "holiday" && e.status === "available" && e.expiresMonth >= month)
+              .reduce((s, e) => s + e.days, 0);
+            // 当月新增调休天数：本月 earnedMonth 且任意来源
+            const thisMonthEarned = compOffEntries
+              .filter((e) => e.employeeId === employee.id && e.earnedMonth === month)
+              .reduce((s, e) => s + e.days, 0);
+            // 当月使用：usedMonth === month 且 used_rest
+            const otUsed = compOffEntries
+              .filter((e) => e.employeeId === employee.id && e.source === "overtime" && e.status === "used_rest" && e.usedMonth === month)
+              .reduce((s, e) => s + e.days, 0);
+            const holUsed = compOffEntries
+              .filter((e) => e.employeeId === employee.id && e.source === "holiday" && e.status === "used_rest" && e.usedMonth === month)
+              .reduce((s, e) => s + e.days, 0);
+            const usedStr = (otUsed > 0 || holUsed > 0) ? `${otUsed}/${holUsed}天` : "—";
+            return (
+              <View style={{ paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border + "44", gap: 6 }}>
+                <Text style={{ fontSize: 10, fontWeight: "600", color: colors.muted }}>调休换休</Text>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  {[
+                    { label: "调休/换休", value: thisMonthEarned > 0 ? `${thisMonthEarned}天` : "—", color: thisMonthEarned > 0 ? colors.primary : colors.muted },
+                    { label: "当月使用", value: usedStr, color: (otUsed > 0 || holUsed > 0) ? colors.warning : colors.muted },
+                    { label: "加班余额", value: otDays > 0 ? `${otDays}天` : "—", color: otDays > 0 ? colors.success : colors.muted },
+                    { label: "节假日余额", value: holDays > 0 ? `${holDays}天` : "—", color: holDays > 0 ? "#FF2D55" : colors.muted },
+                  ].map(({ label, value, color }) => (
+                    <View key={label} style={{ flex: 1, alignItems: "center" }}>
+                      <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: "700", color }}>{value}</Text>
+                      <Text numberOfLines={1} style={{ fontSize: 9, color: colors.muted, marginTop: 1 }}>{label}</Text>
+                    </View>
+                  ))}
+                  <TouchableOpacity onPress={() => { tap(); setPanelMode("add"); setAddMode("hours"); setShowCompOffModal(!showCompOffModal); }}
+                    style={{ flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 7, backgroundColor: colors.success + "15", borderWidth: 1, borderColor: colors.success + "44", marginLeft: 4 }}>
+                    <IconSymbol name="plusminus" size={10} color={colors.success} />
+                    <Text style={{ fontSize: 10, color: colors.success, fontWeight: "600" }}>存入/兑换</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            );
+          })()}
 
           {/* ─── 调休余额管理面板（保留原有完整功能）─── */}
           {showCompOffModal && (
