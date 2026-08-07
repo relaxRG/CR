@@ -183,23 +183,26 @@ function calcFromShiftsPure(
     id: `att-${employeeId}-${month}`,
     employeeId,
     month,
+    daysInMonth,
     attendanceDays,
     expectedAttendanceDays,
     totalHours,
     stdHours: stdHoursTotal,
-    rawOvertimeHours: Math.round(rawOvertimeHours * 10) / 10,
-    paidOvertimeHours: Math.round(paidOvertimeHours * 10) / 10,
+    overtimeHours: Math.round(rawOvertimeHours * 10) / 10,
     compOffCount,
+    hoursPerCompOff,
+    paidOvertimeHours: Math.round(paidOvertimeHours * 10) / 10,
     overtimePay,
     holidayBonus: Math.round(holidayBonus * 100) / 100,
     holidayWorkDays,
     attendanceSalary,
     dailyRate,
+    dailyRateOverride: false,
     underRestDays,
     specialStatusDeductions,
     totalSpecialDeduction: Math.round(totalSpecialDeduction * 100) / 100,
+    notes: "",
     storedOvertimeHours: compOffHoursUsed > 0 ? Math.round(compOffHoursUsed * 10) / 10 : undefined,
-    updatedAt: new Date().toISOString(),
   };
 }
 
@@ -305,7 +308,7 @@ function makeEmployee(overrides: Partial<Employee> = {}): Employee {
     code: "E001",
     realName: "张三",
     phone: "13800000000",
-    dept: "bar",
+    dept: "front",
     type: "fulltime",
     baseSalary: 6000,
     stdHoursPerDay: 8,
@@ -316,7 +319,7 @@ function makeEmployee(overrides: Partial<Employee> = {}): Employee {
     active: true,
     monthlyFixedSalary: 0,
     createdAt: "2024-01-01T00:00:00.000Z",
-    compOffRule: { hoursPerDay: 8 },
+    compOffRule: { hoursPerDay: 8, enabled: true },
     ...overrides,
   };
 }
@@ -324,7 +327,6 @@ function makeEmployee(overrides: Partial<Employee> = {}): Employee {
 /** 创建一条排班记录 */
 function makeShift(date: string, hours: number | null, specialStatusId?: string): ShiftEntry {
   return {
-    id: `shift-${date}`,
     employeeId: "emp-001",
     date,
     shift: "晚班",
@@ -385,7 +387,7 @@ describe("Suite A：考勤工资计算引擎（calcFromShifts）", () => {
       shifts.push(makeShift(date, 10)); // 每天10小时，超出2小时
     }
     const att = calcFromShiftsPure("emp-001", MONTH, emp, shifts, ss);
-    expect(att.rawOvertimeHours).toBe(46); // 23天 × 2h
+    expect(att.overtimeHours).toBe(46); // 23天 × 2h
     expect(att.paidOvertimeHours).toBe(46);
     expect(att.overtimePay).toBe(2300); // 46h × 50
     expect(att.attendanceSalary).toBe(6000 + 2300);
@@ -463,7 +465,7 @@ describe("Suite A：考勤工资计算引擎（calcFromShifts）", () => {
     //   compOffHoursUsed = 1 × 8 = 8h
     //   paidOvertimeHours = 36 - 8 = 28h
     expect(att.compOffCount).toBe(1);
-    expect(att.rawOvertimeHours).toBe(36); // 220 - 184 = 36
+    expect(att.overtimeHours).toBe(36); // 220 - 184 = 36
     expect(att.paidOvertimeHours).toBe(28); // 36 - 8 = 28
     expect(att.overtimePay).toBe(1400); // 28h × 50
     // 5格加法闭环
@@ -662,7 +664,7 @@ describe("Suite D：autoSync 依赖完整性（存入调休联动加班费）", 
     }
     const att = calcFromShiftsPure("emp-001", MONTH, emp, shifts, DEFAULT_SPECIAL_STATUSES);
     expect(att.compOffCount).toBe(0);
-    expect(att.rawOvertimeHours).toBe(46);
+    expect(att.overtimeHours).toBe(46);
     expect(att.paidOvertimeHours).toBe(46);
     expect(att.overtimePay).toBe(2300);
   });
@@ -684,7 +686,7 @@ describe("Suite D：autoSync 依赖完整性（存入调休联动加班费）", 
     //   compOffHoursUsed = 1 × 8 = 8h
     //   paidOvertimeHours = 36 - 8 = 28h
     expect(att.compOffCount).toBe(1);
-    expect(att.rawOvertimeHours).toBe(36); // 220 - 184 = 36
+    expect(att.overtimeHours).toBe(36); // 220 - 184 = 36
     expect(att.paidOvertimeHours).toBe(28); // 36 - 8 = 28
     expect(att.overtimePay).toBe(1400); // 28 × 50
     // 薪资单中 attendanceSalary 小于无换休时的全加班工资

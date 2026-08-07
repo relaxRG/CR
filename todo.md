@@ -801,3 +801,28 @@
 ### 工程质量
 - [x] TypeScript 0 错误
 - [x] vitest 75/76 通过（1 skipped）
+
+## Build 135 月报系统 v2 续（2026-08-07）
+
+### TypeScript 修复
+- [x] 修复测试文件 attendance-payroll-e2e.test.ts 中的 8 个类型错误
+  - [x] `rawOvertimeHours` → `overtimeHours`（与 MonthlyAttendance 类型对齐）
+  - [x] `dept: "bar"` → `dept: "front"`（EmployeeDept 合法值）
+  - [x] `compOffRule: { hoursPerDay: 8 }` → `{ hoursPerDay: 8, enabled: true }`（CompOffRule 必填字段）
+  - [x] ShiftEntry fixture 移除不存在的 `id` 字段
+  - [x] MonthlyAttendance 返回值补充 `daysInMonth/hoursPerCompOff/dailyRateOverride/notes` 必填字段
+  - [x] 移除不存在的 `updatedAt` 字段
+
+### Phase 4B/4C：货款 Tab 独立分组展示 + 手工增删改
+- [x] 移除进货成本科目内嵌的供应商货款卡片（避免重复展示）
+- [x] 在月报底部新增独立「货款汇总」区域
+- [x] 按供应商类别分组展示：食材供应商 / 烈酒供应商 / 葡萄酒供应商 / 其他供应商
+- [x] 工资小计区域（显示应发/待发汇总，链接到工资科目区）
+- [x] 手工新增货款卡片 Modal（支持供应商货款/员工薪资两种类型）
+- [x] 货款卡片长按删除功能
+- [x] 修复 PaymentEntryModal 中 remainingAmount 计算未减去 advanceAmount 的 Bug
+
+### 工程质量
+- [x] TypeScript 0 错误
+- [x] vitest 192/193 通过（1 skipped）
+- [x] buildNumber 更新至 139
