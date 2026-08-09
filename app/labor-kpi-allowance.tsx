@@ -16,6 +16,7 @@ import { useEmployeeStore, usePaySlipStore, useAttendanceStore } from "@/lib/lab
 import {
   ALLOWANCE_UNIT_LABELS, REVENUE_KPI_SOURCE_LABELS,
   REVENUE_KPI_PAY_MODE_LABELS, calcRevenueKPIBonus, calcAllowance,
+  shouldPayAllowanceThisMonth,
 } from "@/lib/labor/types";
 
 const tap = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -121,9 +122,14 @@ export default function LaborKPIAllowancePage() {
             <Text style={{ fontSize: 12, color: colors.muted, textAlign: "center", paddingVertical: 16 }}>暂无补贴项，请点击右上角⚙在员工档案中配置规则</Text>
           )}
           {allowanceRules.map((rule) => {
-            const isActive = allowanceOverrides[rule.id] !== undefined
-              ? allowanceOverrides[rule.id]
-              : rule.enabled !== false;
+            // 修复：季度/年度补贴必须先判断当月是否应发放，与 buildPaySlipDraft 逻辑保持一致
+            const shouldPay = shouldPayAllowanceThisMonth(rule, month ?? "");
+            const isActive = shouldPay && (
+              allowanceOverrides[rule.id] !== undefined
+                ? allowanceOverrides[rule.id]
+                : rule.enabled !== false
+            );
+            const displayAmount = shouldPay ? calcAllowance(rule, attendanceDays).amount : 0;
             return (
               <View key={rule.id} style={[S.itemRow, { borderBottomColor: colors.border }]}>
                 <View style={[S.checkbox, {
@@ -134,11 +140,14 @@ export default function LaborKPIAllowancePage() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 14, color: isActive ? colors.foreground : colors.muted }}>{rule.label}</Text>
-                  <Text style={{ fontSize: 11, color: colors.muted }}>{ALLOWANCE_UNIT_LABELS[rule.unit ?? "per_month"]}</Text>
+                  <Text style={{ fontSize: 11, color: colors.muted }}>
+                    {ALLOWANCE_UNIT_LABELS[rule.unit ?? "per_month"]}
+                    {!shouldPay && <Text style={{ color: colors.warning }}> · 本月不发放</Text>}
+                  </Text>
                 </View>
                 <Text style={{ fontSize: 15, fontWeight: "600", color: isActive ? colors.primary : colors.muted }}>
-                  ¥{calcAllowance(rule, attendanceDays).amount.toFixed(0)}
-                  {(rule.unit === "per_day" || rule.type === "meal_per_day")
+                  ¥{displayAmount.toFixed(0)}
+                  {(rule.unit === "per_day" || rule.type === "meal_per_day") && shouldPay
                     ? <Text style={{ fontSize: 10, color: colors.muted }}> (¥{rule.amount}/天×{attendanceDays}天)</Text>
                     : null}
                 </Text>

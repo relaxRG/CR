@@ -99,10 +99,12 @@ export default function LaborKPIAllowanceEditPage() {
   const allowanceTotal = useMemo(() => {
     return allowanceRules.reduce((sum, r) => {
       if (!allowanceEnabled[r.id]) return sum;
+      // 修复：季度/年度补贴必须判断当月是否应发放，与 buildPaySlipDraft 保持一致
+      if (!shouldPayAllowanceThisMonth(r, month ?? "")) return sum;
       const { amount } = calcAllowance(r, attendanceDays);
       return sum + amount;
     }, 0);
-  }, [allowanceRules, allowanceEnabled, attendanceDays]);
+  }, [allowanceRules, allowanceEnabled, attendanceDays, month]);
 
   const workKPITotal = useMemo(() => {
     return workKPIRules.reduce((sum, rule) => {
@@ -250,28 +252,37 @@ export default function LaborKPIAllowanceEditPage() {
           {allowanceRules.length === 0 && (
             <Text style={{ fontSize: 12, color: colors.muted, textAlign: "center", paddingVertical: 16 }}>暂无补贴项，请在员工档案中配置规则</Text>
           )}
-          {allowanceRules.map((rule) => (
-            <TouchableOpacity key={rule.id}
-              onPress={() => { tap(); setAllowanceEnabled((prev) => ({ ...prev, [rule.id]: !prev[rule.id] })); }}
-              style={[S.itemRow, { borderBottomColor: colors.border }]}>
-              <View style={[S.checkbox, {
-                borderColor: allowanceEnabled[rule.id] ? colors.primary : colors.border,
-                backgroundColor: allowanceEnabled[rule.id] ? colors.primary : "transparent",
-              }]}>
-                {allowanceEnabled[rule.id] && <Text style={{ color: "#fff", fontSize: 10, fontWeight: "700" }}>✓</Text>}
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 14, color: colors.foreground }}>{rule.label}</Text>
-                <Text style={{ fontSize: 11, color: colors.muted }}>{ALLOWANCE_UNIT_LABELS[rule.unit ?? "per_month"]}</Text>
-              </View>
-              <Text style={{ fontSize: 15, fontWeight: "600", color: allowanceEnabled[rule.id] ? colors.primary : colors.muted }}>
-                ¥{calcAllowance(rule, attendanceDays).amount.toFixed(0)}
-                {(rule.unit === "per_day" || rule.type === "meal_per_day")
-                  ? <Text style={{ fontSize: 10, color: colors.muted }}> (¥{rule.amount}/天×{attendanceDays}天)</Text>
-                  : null}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          {allowanceRules.map((rule) => {
+            // 修复：季度/年度补贴必须先判断当月是否应发放，与 buildPaySlipDraft 保持一致
+            const shouldPay = shouldPayAllowanceThisMonth(rule, month ?? "");
+            const displayAmount = shouldPay ? calcAllowance(rule, attendanceDays).amount : 0;
+            // 非发放月的补贴不允许用户勾选（禁用点击）
+            return (
+              <TouchableOpacity key={rule.id}
+                onPress={() => { if (!shouldPay) return; tap(); setAllowanceEnabled((prev) => ({ ...prev, [rule.id]: !prev[rule.id] })); }}
+                style={[S.itemRow, { borderBottomColor: colors.border, opacity: shouldPay ? 1 : 0.5 }]}>
+                <View style={[S.checkbox, {
+                  borderColor: (shouldPay && allowanceEnabled[rule.id]) ? colors.primary : colors.border,
+                  backgroundColor: (shouldPay && allowanceEnabled[rule.id]) ? colors.primary : "transparent",
+                }]}>
+                  {(shouldPay && allowanceEnabled[rule.id]) && <Text style={{ color: "#fff", fontSize: 10, fontWeight: "700" }}>✓</Text>}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, color: colors.foreground }}>{rule.label}</Text>
+                  <Text style={{ fontSize: 11, color: colors.muted }}>
+                    {ALLOWANCE_UNIT_LABELS[rule.unit ?? "per_month"]}
+                    {!shouldPay && <Text style={{ color: colors.warning }}> · 本月不发放</Text>}
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 15, fontWeight: "600", color: (shouldPay && allowanceEnabled[rule.id]) ? colors.primary : colors.muted }}>
+                  ¥{displayAmount.toFixed(0)}
+                  {(rule.unit === "per_day" || rule.type === "meal_per_day") && shouldPay
+                    ? <Text style={{ fontSize: 10, color: colors.muted }}> (¥{rule.amount}/天×{attendanceDays}天)</Text>
+                    : null}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
         {/* ── 工作绩效区（可选档位） ── */}

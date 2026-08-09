@@ -62,3 +62,36 @@ React 的每次渲染都会执行函数体内的所有同步代码。如果在�
 
 ---
 *Cocktail-R 核心开发团队*
+
+## 5. 核心计算引擎的 DRY 原则与「展示-计算一致性」
+
+在近期的薪资引擎重构中，我们修复了三个由于违反「展示-计算一致性」和 DRY（Don't Repeat Yourself）原则导致的严重 Bug：
+
+1. **兼职时薪错位**：兼职员工工资计算错误地使用了 `overtimeHourlyRate`，而 UI 展示的是 `hourlyRate`。
+2. **季度补贴未拦截**：`buildPaySlipDraft` 计算引擎遗漏了 `shouldPayAllowanceThisMonth` 调用，导致季度补贴每月发放。
+3. **按天补贴分类错误**：`custom_fixed` + `per_day` 的餐补在计算时忽略了 `unit` 字段，且被错误归类到 `otherAllowance`。
+
+### 根因分析
+
+这些 Bug 产生的根本原因在于**计算逻辑的碎片化分布**：
+- `calcAllowance`（负责计算金额）和 `buildPaySlipDraft`（负责分类累加）没有共享同一个抽象分类模型，导致新增组合类型（`custom_fixed` + `per_day`）时，只改了一处，遗漏了另一处。
+- 展示层（`labor-kpi-allowance.tsx`）自己实现了一套补贴过滤逻辑，而没有调用统一的 `shouldPayAllowanceThisMonth`。
+
+### 防错指南
+
+为了避免类似问题再次发生，所有核心计算引擎的开发必须遵循以下规范：
+
+1. **唯一计算源（Single Source of Truth）**
+   任何业务数据的计算（如「补贴是否在当月发放」、「补贴最终金额」），**必须且只能在 `lib/labor/store.tsx` 或 `types.ts` 中的纯函数内实现**。UI 组件（展示页、编辑页）绝对禁止自己编写计算逻辑，必须调用核心函数。
+
+2. **UI 展示必须与引擎计算绝对一致**
+   如果 UI 界面上显示「时薪：¥35」，底层计算引擎就**必须**使用同一个变量（`employee.hourlyRate`）进行乘法运算。任何「展示 A 字段，计算用 B 字段」的妥协都会导致严重的财务事故。
+
+3. **核心函数的每一次修改，必须同步扫描所有调用点**
+   例如：在 `buildPaySlipDraft` 中加入了 `shouldPayAllowanceThisMonth` 拦截后，必须立即全局搜索 `calcAllowance` 的所有调用点（包括展示页、编辑页、测试文件），确保所有地方都同步加上了同样的拦截逻辑。
+
+4. **强制测试覆盖边界条件**
+   任何新增的配置组合（如 `custom_fixed` 加上了 `per_day` 选项），必须在 `allowance-calc.test.ts` 中补充至少 3 个测试用例：
+   - 正常计算（乘法/固定额）
+   - 零值边界（出勤 0 天）
+   - 分类归属（测试 `calcAllowanceTotal` 是否归入正确类别）
