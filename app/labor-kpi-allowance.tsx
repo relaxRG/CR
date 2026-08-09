@@ -173,38 +173,22 @@ export default function LaborKPIAllowancePage() {
     });
   };
 
-  // ── 勾选工作绩效档位（即时写入，修复：不再延迟到返回时同步） ──
+    // ── 勾选工作绩效档位（即时写入） ──
   const selectWorkKPITier = (ruleId: string, tierId: string) => {
     tap();
     setWorkKPISelections((prev) => {
       const next = { ...prev, [ruleId]: prev[ruleId] === tierId ? "" : tierId };
-      const newWorkKPITotal = workKPIRules.reduce((sum, rule) => {
-        const selId = next[rule.id];
-        if (!selId) return sum;
-        const tier = rule.tiers.find((t) => t.id === selId);
-        return sum + (tier?.amount ?? 0);
-      }, 0);
       const existing = employeeId && month ? getPaySlip(employeeId, month) : null;
-      if (existing) {
-        // 修复：不再用旧的 calcPaySlipUpdate 局部计算引擎
-        writeToPaySlip({ workKPISelections: next });
-      }
+      if (existing) writeToPaySlip({ workKPISelections: next });
       return next;
     });
   };
-
-  // ── 更新业绩绩效实际金额（即时写入，修复：不再延迟到返回时同步） ──
+  // ── 更新业绩绩效实际金额（即时写入） ──
   const updateRevenueActual = (ruleId: string, value: string) => {
     setRevenueActuals((prev) => {
       const next = { ...prev, [ruleId]: value };
-      const newRevenueKPITotal = revenueKPIRules.reduce((sum, rule) => {
-        if (!rule.enabled) return sum;
-        const actual = next[rule.id] ? Number(next[rule.id]) : 0;
-        return sum + calcRevenueKPIBonus(rule, actual);
-      }, 0);
       const existing = employeeId && month ? getPaySlip(employeeId, month) : null;
       if (existing) {
-        // 修复：不再用旧的 calcPaySlipUpdate 局部计算引擎
         const numericActuals: Record<string, number> = {};
         Object.entries(next).forEach(([k, v]) => { numericActuals[k] = Number(v) || 0; });
         writeToPaySlip({ revenueActuals: numericActuals });
