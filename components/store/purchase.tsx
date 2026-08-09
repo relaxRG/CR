@@ -11,6 +11,7 @@ import { useColors } from "@/hooks/use-colors";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useRouter } from "expo-router";
+import { useScrollPreservation } from "@/hooks/use-scroll-preservation";
 
 type PurchaseCat = "cocktail" | "wine" | "food";
 type PurchaseType = "supplier" | "self";
@@ -145,6 +146,8 @@ export default function StorePurchaseScreen() {
   const { items, addItem, toggleDone, deleteItem } = usePurchaseStore();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
   const router = useRouter();
+  // 滚动位置保持：cat 切换时重置偏移量
+  const { listRef, onScroll } = useScrollPreservation(cat);
 
   const filtered = useMemo(() => items.filter((i) => i.category === cat), [items, cat]);
   const pending = filtered.filter((i) => !i.done);
@@ -188,6 +191,9 @@ export default function StorePurchaseScreen() {
       </View>
 
       <FlatList
+        ref={listRef}
+        onScroll={onScroll}
+        scrollEventThrottle={100}
         data={[...pending, ...done]}
         keyExtractor={(i) => i.id}
         renderItem={({ item }) => (
