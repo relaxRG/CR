@@ -769,8 +769,12 @@ export interface Employee {
   customDeptId?: string;
   type: EmployeeType;
   baseSalary: number;
-  /** 每日标准工时（无灵活规则时使用） */
-  stdHoursPerDay: number;
+  /**
+   * 每日标准工时（已弃用，仅保留用于向后兼容旧数据）
+   * 新员工一律使用 weeklyHoursRules 灵活工时规则
+   * @deprecated 请使用 weeklyHoursRules
+   */
+  stdHoursPerDay?: number;
   /** 灵活工时规则列表（优先于 stdHoursPerDay） */
   weeklyHoursRules?: WeeklyHoursRule[];
   restDaysPerMonth: number;
@@ -778,6 +782,12 @@ export interface Employee {
   overtimeHourlyRate: number;
   /** 员工在列表中的显示顺序（同部门内） */
   sortOrder?: number;
+  /**
+   * 兼职员工计费模式（仅 parttime 类型有效）
+   * - "daily": 按天结算（baseSalary 为日薪，工资 = 出勤天数 × baseSalary）
+   * - "hourly": 按小时结算（工资 = 总工时 × overtimeHourlyRate）
+   */
+  parttimeMode?: "daily" | "hourly";
   /** 调休规则（几小时加班换一天休） */
   compOffRule?: CompOffRule;
   /** 补贴规则列表（饭补/交通/自定义） */
@@ -1195,7 +1205,7 @@ export function getContractHoursForDate(employee: Employee, date: string): numbe
       if (inRange) return rule.hours;
     }
   }
-  return employee.stdHoursPerDay;
+  return employee.stdHoursPerDay ?? 0;
 }
 
 /**

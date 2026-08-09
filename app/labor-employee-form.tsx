@@ -80,8 +80,9 @@ export default function LaborEmployeeFormScreen() {
     existing ? "" : "" // 始终默认空（使用当月天数）
   );
   // 兼职计费模式：按天（daily）或按小时（hourly）
+  // 优先读取已保存的 parttimeMode，新员工默认按小时
   const [parttimeMode, setParttimeMode] = useState<"daily" | "hourly">(
-    existing?.baseSalary && existing.baseSalary > 0 ? "daily" : "hourly"
+    existing?.parttimeMode ?? "hourly"
   );
 
   // ── 灵活工时规则 ──
@@ -473,6 +474,8 @@ export default function LaborEmployeeFormScreen() {
       overtimeHourlyRate: Number(overtimeRate) || Number(hourlyRate) || 0,
       monthlyFixedSalary: Number(monthlyFixedSalary) || 0,
       weeklyHoursRules: weeklyHoursRules.length > 0 ? weeklyHoursRules : undefined,
+      // 兼职计费模式：仅 parttime 类型有效，其他类型不保存
+      parttimeMode: type === "parttime" ? parttimeMode : undefined,
       compOffRule: { enabled: compOffEnabled, hoursPerDay: Number(compOffHoursPerDay) || 8 },
       allowanceRules: allowanceRules.length > 0 ? allowanceRules : undefined,
       workKPIRules: workKPIRules.length > 0 ? workKPIRules : undefined,

@@ -146,9 +146,22 @@ export default function LaborEmployeeProfileScreen() {
               <InfoRow label="月休息天数" value={`${emp.restDaysPerMonth} 天`} colors={colors} />
             </>
           )}
-          <InfoRow label={emp.type === "parttime" ? "兼职时薪" : "正常时薪（参考）"} value={`¥${emp.hourlyRate} / 小时`} colors={colors} />
-          {isFulltime && (
-            <InfoRow label="加班时薪（实际计算）" value={`¥${emp.overtimeHourlyRate} / 小时`} colors={colors} />
+          {emp.type === "parttime" ? (
+            <>
+              <InfoRow label="计费模式" value={emp.parttimeMode === "daily" ? "按天结算" : "按小时结算"} colors={colors} />
+              {emp.parttimeMode === "daily" ? (
+                <InfoRow label="兼职日薪" value={`¥${emp.baseSalary} / 天`} colors={colors} />
+              ) : (
+                <InfoRow label="兼职时薪" value={`¥${emp.overtimeHourlyRate} / 小时`} colors={colors} />
+              )}
+            </>
+          ) : (
+            <>
+              <InfoRow label="正常时薪（参考）" value={`¥${emp.hourlyRate} / 小时`} colors={colors} />
+              {isFulltime && (
+                <InfoRow label="加班时薪（实际计算）" value={`¥${emp.overtimeHourlyRate} / 小时`} colors={colors} />
+              )}
+            </>
           )}
         </SectionCard>
 

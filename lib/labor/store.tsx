@@ -721,9 +721,13 @@ function AttendanceProvider({ children }: { children: React.ReactNode }) {
      */
     let attendanceSalary: number;
     if (employee.type === "parttime") {
-      // 修复：兼职工资统一使用 overtimeHourlyRate（加班时薪）
-      // 所有时薪场景（加班工资、调休兑现、兼职工资）统一使用 overtimeHourlyRate
-      attendanceSalary = Math.round(totalHours * employee.overtimeHourlyRate * 100) / 100;
+      if (employee.parttimeMode === "daily") {
+        // 按天结算：工资 = 出勤天数 × 日薪（baseSalary）
+        attendanceSalary = Math.round(attendanceDays * employee.baseSalary * 100) / 100;
+      } else {
+        // 按小时结算（默认）：工资 = 总工时 × 加班时薪
+        attendanceSalary = Math.round(totalHours * employee.overtimeHourlyRate * 100) / 100;
+      }
     } else {
       // 按实际出勤天数比例计算底薪
       const proportionalBase = expectedAttendanceDays > 0
