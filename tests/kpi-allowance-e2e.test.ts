@@ -116,7 +116,8 @@ function calcAllowanceTotal(
     if (overrides && rule.id in overrides && !overrides[rule.id]) continue;
     const { amount } = calcAllowance(rule, attendanceDays);
     if (rule.type === "transport_fixed") transportAllowance += amount;
-    else if (rule.type === "meal_per_day") mealAllowance += amount;
+    // 修复： custom_fixed + per_day 应归入 mealAllowance，与 store.tsx 保持一致
+    else if (rule.type === "meal_per_day" || (rule.type === "custom_fixed" && rule.unit === "per_day")) mealAllowance += amount;
     else otherAllowance += amount;
   }
   return { mealAllowance, transportAllowance, otherAllowance, total: mealAllowance + transportAllowance + otherAllowance };

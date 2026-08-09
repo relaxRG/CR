@@ -1319,6 +1319,14 @@ export function calcAllowance(rule: AllowanceRule, attendanceDays: number): { am
         autoNote: `饭补 ¥${rule.amount}/天 × ${attendanceDays}天 = ¥${(rule.amount * attendanceDays).toFixed(0)}`,
       };
     case "custom_fixed":
+      // 修复 Bug：如果单位是 per_day，应乘以出勤天数（与 meal_per_day 逻辑一致）
+      if (rule.unit === "per_day") {
+        const total = Math.round(rule.amount * attendanceDays * 100) / 100;
+        return {
+          amount: total,
+          autoNote: `${rule.label} ¥${rule.amount}/天 × ${attendanceDays}天 = ¥${total.toFixed(0)}`,
+        };
+      }
       return { amount: rule.amount, autoNote: `${rule.label}（固定）¥${rule.amount}` };
     default:
       return { amount: rule.amount, autoNote: rule.label };

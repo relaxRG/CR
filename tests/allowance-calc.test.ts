@@ -84,15 +84,47 @@ describe("固定交通补贴（transport_fixed）", () => {
 
 // ─── 3. 自定义固定补贴（custom_fixed）─────────────────────────────────────────
 describe("自定义固定补贴（custom_fixed）", () => {
-  it("全勤奖 ¥500，出勤任意天数 → ¥500", () => {
-    const rule = makeRule({ type: "custom_fixed", label: "全勤奖", amount: 500 });
+  it("全勤奖 ¥500，出勤任意天数 → ¥500（固定额，不按天计）", () => {
+    // 全勤奖是固定补贴，应明确指定 unit: "per_month"
+    const rule = makeRule({ type: "custom_fixed", label: "全勤奖", amount: 500, unit: "per_month" });
     expect(calcAllowance(rule, 27).amount).toBe(500);
     expect(calcAllowance(rule, 0).amount).toBe(500);
   });
 
   it("disabled 全勤奖返回 0", () => {
-    const rule = makeRule({ type: "custom_fixed", amount: 500, enabled: false });
+    const rule = makeRule({ type: "custom_fixed", amount: 500, unit: "per_month", enabled: false });
     expect(calcAllowance(rule, 27).amount).toBe(0);
+  });
+
+  // 修复验证： custom_fixed + per_day 应乘以出勤天数
+  it("custom_fixed + per_day：餐补 ¥30/天 × 26天 = ¥780", () => {
+    const rule = makeRule({ type: "custom_fixed", label: "餐补", amount: 30, unit: "per_day" });
+    expect(calcAllowance(rule, 26).amount).toBe(780);
+  });
+
+  it("custom_fixed + per_day：出勤 0 天 → ¥0", () => {
+    const rule = makeRule({ type: "custom_fixed", label: "餐补", amount: 30, unit: "per_day" });
+    expect(calcAllowance(rule, 0).amount).toBe(0);
+  });
+
+  it("custom_fixed + per_day：不同出勤天数结果不同（不是固定额）", () => {
+    const rule = makeRule({ type: "custom_fixed", label: "餐补", amount: 30, unit: "per_day" });
+    expect(calcAllowance(rule, 20).amount).toBe(600);
+    expect(calcAllowance(rule, 26).amount).toBe(780);
+    expect(calcAllowance(rule, 30).amount).toBe(900);
+  });
+
+  it("custom_fixed + per_month：不受出勤天数影响（固定额）", () => {
+    const rule = makeRule({ type: "custom_fixed", label: "交通补贴", amount: 200, unit: "per_month" });
+    expect(calcAllowance(rule, 0).amount).toBe(200);
+    expect(calcAllowance(rule, 26).amount).toBe(200);
+  });
+
+  it("custom_fixed + per_day autoNote 包含天数计算说明", () => {
+    const rule = makeRule({ type: "custom_fixed", label: "餐补", amount: 30, unit: "per_day" });
+    const { autoNote } = calcAllowance(rule, 26);
+    expect(autoNote).toContain("26天");
+    expect(autoNote).toContain("780");
   });
 });
 

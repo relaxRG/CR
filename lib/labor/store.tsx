@@ -858,7 +858,8 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
         const finalAmount = isOverride ? (existingDetail?.amount ?? amount) : amount;
         allowanceDetails[rule.id] = { amount: finalAmount, autoNote, isOverride };
         if (rule.type === "transport_fixed") transportAllowance += finalAmount;
-        else if (rule.type === "meal_per_day") mealAllowance += finalAmount;
+        // 修复 Bug： custom_fixed + per_day（如通过「+餐补」快捷按鈕创建的餐补）应归入 mealAllowance，而非 otherAllowance
+        else if (rule.type === "meal_per_day" || (rule.type === "custom_fixed" && rule.unit === "per_day")) mealAllowance += finalAmount;
         else otherAllowance += finalAmount;
       }
     }
