@@ -5,6 +5,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useReducer } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { FruitItem, FruitTransaction, FruitMonthlySnapshot, FruitUnit } from "./types";
+import { registerStoreReload } from "../sync/engine";
 
 function uuid() { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
 
@@ -98,7 +99,7 @@ export function FruitProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = React.useState(false);
 
   useEffect(() => {
-    (async () => {
+    const load = async () => {
       try {
         const [itemsRaw, txRaw, snapRaw] = await AsyncStorage.multiGet([ITEMS_KEY, TRANSACTIONS_KEY, SNAPSHOTS_KEY]);
         if (itemsRaw[1]) dispatchItems({ type: "LOAD", payload: JSON.parse(itemsRaw[1]) });
@@ -106,7 +107,9 @@ export function FruitProvider({ children }: { children: React.ReactNode }) {
         if (snapRaw[1]) dispatchSnap({ type: "LOAD", payload: JSON.parse(snapRaw[1]) });
       } catch {}
       setReady(true);
-    })();
+    };
+    load();
+    return registerStoreReload(() => { void load(); });
   }, []);
 
   // Persist items

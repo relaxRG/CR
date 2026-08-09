@@ -8,6 +8,7 @@ import {
   EquipmentItem, MaintenanceRecord,
   calcMonthlyDepreciation, calcBookValue
 } from "@/lib/inventory-core/types";
+import { registerStoreReload } from "../sync/engine";
 
 const STORAGE_KEY = "equipment.inventory.v1";
 
@@ -59,13 +60,15 @@ export function EquipmentInventoryProvider({ children }: { children: React.React
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    (async () => {
+    const load = async () => {
       try {
         const raw = await AsyncStorage.getItem(STORAGE_KEY);
         if (raw) dispatch({ type: "LOAD", payload: JSON.parse(raw) });
       } catch {}
       setReady(true);
-    })();
+    };
+    load();
+    return registerStoreReload(() => { void load(); });
   }, []);
 
   useEffect(() => {

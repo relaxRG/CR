@@ -4,6 +4,7 @@
  */
 import React, { createContext, useCallback, useContext, useEffect, useReducer } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { registerStoreReload } from "../sync/engine";
 import {
   SpiritMonthlySnapshot,
   SpiritManualPurchase,
@@ -108,15 +109,19 @@ export function SpiritsProvider({ children }: { children: React.ReactNode }) {
 
   // Load from AsyncStorage
   useEffect(() => {
-    AsyncStorage.getItem(SNAPSHOT_KEY).then((raw) => {
-      if (raw) { try { snapshotDispatch({ type: "LOAD", payload: JSON.parse(raw) }); } catch {} }
-    });
-    AsyncStorage.getItem(MANUAL_PURCHASE_KEY).then((raw) => {
-      if (raw) { try { manualDispatch({ type: "LOAD", payload: JSON.parse(raw) }); } catch {} }
-    });
-    AsyncStorage.getItem(MATCH_RECORD_KEY).then((raw) => {
-      if (raw) { try { matchDispatch({ type: "LOAD", payload: JSON.parse(raw) }); } catch {} }
-    });
+    const load = () => {
+      AsyncStorage.getItem(SNAPSHOT_KEY).then((raw) => {
+        if (raw) { try { snapshotDispatch({ type: "LOAD", payload: JSON.parse(raw) }); } catch {} }
+      });
+      AsyncStorage.getItem(MANUAL_PURCHASE_KEY).then((raw) => {
+        if (raw) { try { manualDispatch({ type: "LOAD", payload: JSON.parse(raw) }); } catch {} }
+      });
+      AsyncStorage.getItem(MATCH_RECORD_KEY).then((raw) => {
+        if (raw) { try { matchDispatch({ type: "LOAD", payload: JSON.parse(raw) }); } catch {} }
+      });
+    };
+    load();
+    return registerStoreReload(load);
   }, []);
 
   // Persist on change

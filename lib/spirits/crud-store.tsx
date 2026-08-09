@@ -5,6 +5,7 @@
  */
 import React, { createContext, useContext, useEffect, useReducer } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { registerStoreReload } from "../sync/engine";
 import {
   SpiritItem, SpiritPurchaseRecord, SpiritLedgerEntry,
   SpiritRefPrice, SpiritSupplierInfo, SpiritCustomCategory,
@@ -394,7 +395,7 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
 
   // 加载持久化数据
   useEffect(() => {
-    Promise.all([
+    const load = () => Promise.all([
       AsyncStorage.getItem(ITEMS_KEY),
       AsyncStorage.getItem(PURCHASES_KEY),
       AsyncStorage.getItem(LEDGER_KEY),
@@ -424,6 +425,8 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
       const groupMatchMemory: GroupMatchMemory[] = groupMatchRaw ? JSON.parse(groupMatchRaw) : [];
       dispatch({ type: "LOAD", payload: { items, purchases, ledger, refPrices, suppliers, groups, matchMemory, selfBuyConfig, customCategories, groupMatchMemory } });
     });
+    load();
+    return registerStoreReload(() => { void load(); });
   }, []);
 
   // 持久化
