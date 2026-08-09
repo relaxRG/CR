@@ -129,6 +129,20 @@ export default function SpiritsInventoryScreen() {
   const categorySummary = useMemo(() => getPurchaseSummaryByCategory(selectedMonth), [ledger, selectedMonth]);
   const prevCategorySummary = useMemo(() => getPurchaseSummaryByCategory(prevMonth), [ledger, prevMonth]);
   const supplierSummary = useMemo(() => getPurchaseSummaryBySupplier(selectedMonth), [purchases, selectedMonth]);
+  // 性能优化：将 renderSummary 内的多次 reduce 提取为 useMemo
+  const summaryTotals = useMemo(() => ({
+    purchaseAmt: monthPurchases.reduce((s, p) => s + p.amount, 0),
+    prevPurchaseAmt: prevMonthPurchases.reduce((s, p) => s + p.amount, 0),
+    closingCost: monthLedger.reduce((s, e) => s + e.closingCost, 0),
+    prevClosingCost: prevMonthLedger.reduce((s, e) => s + e.closingCost, 0),
+    openingQty: monthLedger.reduce((s, e) => s + e.openingQty, 0),
+    openingCost: monthLedger.reduce((s, e) => s + e.openingQty * e.openingUnitCost, 0),
+    purchaseQty: monthLedger.reduce((s, e) => s + e.purchaseQty, 0),
+    purchaseCost: monthLedger.reduce((s, e) => s + e.purchaseCost, 0),
+    closingQty: monthLedger.reduce((s, e) => s + e.closingQty, 0),
+    consumeQty: monthLedger.reduce((s, e) => s + (e.consumeQty ?? 0), 0),
+    consumeCost: monthLedger.reduce((s, e) => s + (e.consumeQty ?? 0) * e.closingUnitCost, 0),
+  }), [monthPurchases, prevMonthPurchases, monthLedger, prevMonthLedger]);
 
   // ── 总结 Tab ────────────────────────────────────────────────────────────────
   const [showComparison, setShowComparison] = useState(false);
@@ -239,11 +253,11 @@ export default function SpiritsInventoryScreen() {
         </Text>
         <View style={{ flexDirection: "row", gap: 8 }}>
           {[
-            { label: "进货总额", value: monthPurchases.reduce((s, p) => s + p.amount, 0), fmt: (v: number) => `¥${fmtAmt(v)}`, color: "#EF4444",
-              prev: prevMonthPurchases.reduce((s, p) => s + p.amount, 0) },
+            { label: "进货总额", value: summaryTotals.purchaseAmt, fmt: (v: number) => `¥${fmtAmt(v)}`, color: "#EF4444",
+              prev: summaryTotals.prevPurchaseAmt },
             { label: "进货品种", value: new Set(monthPurchases.map((p) => p.itemId ?? p.rawName)).size, fmt: (v: number) => `${v}款`, color: colors.foreground, prev: 0 },
-            { label: "期末库存成本", value: monthLedger.reduce((s, e) => s + e.closingCost, 0), fmt: (v: number) => `¥${fmtAmt(v)}`, color: colors.primary,
-              prev: prevMonthLedger.reduce((s, e) => s + e.closingCost, 0) },
+            { label: "期末库存成本", value: summaryTotals.closingCost, fmt: (v: number) => `¥${fmtAmt(v)}`, color: colors.primary,
+              prev: summaryTotals.prevClosingCost },
           ].map((s, i) => {
             const diff = s.prev > 0 ? s.value - s.prev : 0;
             return (
@@ -405,7 +419,7 @@ export default function SpiritsInventoryScreen() {
                   );
                 })}
                 <Text style={[S.tdCell, { width: 70, textAlign: "right", fontWeight: "700", color: "#991B1B", fontSize: 12 }]}>
-                  ¥{monthPurchases.reduce((s, p) => s + p.amount, 0).toFixed(0)}
+                  ¥{summaryTotals.purchaseAmt.toFixed(0)}
                 </Text>
               </View>
             </View>
@@ -816,30 +830,30 @@ export default function SpiritsInventoryScreen() {
                   <Text style={[S.tdCell, { width: 130, fontWeight: "700", color: "#991B1B", fontSize: 12 }]}>合计</Text>
                   <Text style={[S.tdCell, { width: 70 }]} />
                   <Text style={[S.tdCell, { width: 70, textAlign: "right", fontWeight: "700", color: "#991B1B", fontSize: 11 }]}>
-                    {monthLedger.reduce((s, e) => s + e.openingQty, 0).toFixed(2)}
+                    {summaryTotals.openingQty.toFixed(2)}
                   </Text>
                   <Text style={[S.tdCell, { width: 60 }]} />
                   <Text style={[S.tdCell, { width: 70, textAlign: "right", fontWeight: "700", color: "#991B1B", fontSize: 11 }]}>
-                    ¥{monthLedger.reduce((s, e) => s + e.openingQty * e.openingUnitCost, 0).toFixed(0)}
+                    ¥{summaryTotals.openingCost.toFixed(0)}
                   </Text>
                   <Text style={[S.tdCell, { width: 70, textAlign: "right", fontWeight: "700", color: "#991B1B", fontSize: 11 }]}>
-                    {monthLedger.reduce((s, e) => s + e.purchaseQty, 0).toFixed(2)}
+                    {summaryTotals.purchaseQty.toFixed(2)}
                   </Text>
                   <Text style={[S.tdCell, { width: 70, textAlign: "right", fontWeight: "700", color: "#991B1B", fontSize: 11 }]}>
-                    ¥{monthLedger.reduce((s, e) => s + e.purchaseCost, 0).toFixed(0)}
+                    ¥{summaryTotals.purchaseCost.toFixed(0)}
                   </Text>
                   <Text style={[S.tdCell, { width: 70, textAlign: "right", fontWeight: "700", color: "#991B1B", fontSize: 12 }]}>
-                    {monthLedger.reduce((s, e) => s + e.closingQty, 0).toFixed(2)}
+                    {summaryTotals.closingQty.toFixed(2)}
                   </Text>
                   <Text style={[S.tdCell, { width: 60 }]} />
                   <Text style={[S.tdCell, { width: 70, textAlign: "right", fontWeight: "700", color: "#991B1B", fontSize: 11 }]}>
-                    ¥{monthLedger.reduce((s, e) => s + e.closingCost, 0).toFixed(0)}
+                    ¥{summaryTotals.closingCost.toFixed(0)}
                   </Text>
                   <Text style={[S.tdCell, { width: 60, textAlign: "right", fontWeight: "700", color: "#991B1B", fontSize: 11 }]}>
-                    {monthLedger.reduce((s, e) => s + e.consumeQty, 0).toFixed(1)}
+                    {summaryTotals.consumeQty.toFixed(1)}
                   </Text>
                   <Text style={[S.tdCell, { width: 70, textAlign: "right", fontWeight: "700", color: "#991B1B", fontSize: 11 }]}>
-                    ¥{monthLedger.reduce((s, e) => s + e.consumeQty * e.closingUnitCost, 0).toFixed(0)}
+                    ¥{summaryTotals.consumeCost.toFixed(0)}
                   </Text>
                 </View>
               )}

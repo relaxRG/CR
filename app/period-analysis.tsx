@@ -209,6 +209,12 @@ export default function PeriodAnalysisScreen() {
     reports.find((r) => r.month === selectedMonth) ?? latestReport,
     [reports, selectedMonth, latestReport]
   );
+  // 性能优化：将 renderOverview 内的 totalRevenue 提取为 useMemo
+  const overviewTotalRevenue = useMemo(() => {
+    if (!report) return 0;
+    const totals = report.monthlyTotals;
+    return PERIOD_ORDER.reduce((s, k) => s + totals[k].revenue, 0);
+  }, [report]);
 
   // 计算当月加班预警（联动排班表 + 时段数据）
   // 匹配逐轮班：与经营分析模块的晚班模板匹配（type === "evening"）
@@ -296,7 +302,7 @@ export default function PeriodAnalysisScreen() {
   const renderOverview = () => {
     if (!report) return <EmptyState onImport={handleImport} colors={colors} />;
     const totals = report.monthlyTotals;
-    const totalRevenue = PERIOD_ORDER.reduce((s, k) => s + totals[k].revenue, 0);
+    const totalRevenue = overviewTotalRevenue;
 
     return (
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }}>

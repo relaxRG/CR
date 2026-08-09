@@ -120,10 +120,24 @@ export default function DishAnalysisScreen() {
     snapshots.find((s) => s.month === selectedMonth) ?? snapshots[0],
     [snapshots, selectedMonth]
   );
+  // 性能优化：将 renderCategory/renderRanking 内的数据计算提取为 useMemo
+  const categoryCalc = useMemo(() => {
+    if (!snapshot || snapshot.categories.length === 0) return null;
+    const total = snapshot.categories.reduce((s, c) => s + c.salesAmount, 0);
+    const sorted = [...snapshot.categories].sort((a, b) => b.salesAmount - a.salesAmount);
+    return { total, sorted };
+  }, [snapshot]);
+  const rankingCalc = useMemo(() => {
+    if (!snapshot || snapshot.items.length === 0) return null;
+    const filtered = snapshot.items
+      .filter((d) => !searchText || d.name.toLowerCase().includes(searchText.toLowerCase()))
+      .sort((a, b) => b[sortKey] - a[sortKey]);
+    return { filtered };
+  }, [snapshot, searchText, sortKey]);
 
-  // ── 大类 Tab ──────────────────────────────────────────────────────────────
+  // ── 大类 Tab ────────────────────────────────────────────────────────────────────────────
   const renderCategory = () => {
-    if (!snapshot || snapshot.categories.length === 0) {
+    if (!categoryCalc) {
       return (
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 40 }}>
           <Text style={{ fontSize: 40 }}>📊</Text>
@@ -135,8 +149,7 @@ export default function DishAnalysisScreen() {
       );
     }
 
-    const total = snapshot.categories.reduce((s, c) => s + c.salesAmount, 0);
-    const sorted = [...snapshot.categories].sort((a, b) => b.salesAmount - a.salesAmount);
+    const { total, sorted } = categoryCalc;
 
     return (
       <ScrollView contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 40 + insets.bottom }}>
@@ -215,7 +228,7 @@ export default function DishAnalysisScreen() {
 
   // ── 排行 Tab ──────────────────────────────────────────────────────────────
   const renderRanking = () => {
-    if (!snapshot || snapshot.items.length === 0) {
+    if (!rankingCalc) {
       return (
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 40 }}>
           <Text style={{ fontSize: 40 }}>🏆</Text>
@@ -227,17 +240,7 @@ export default function DishAnalysisScreen() {
       );
     }
 
-    const filtered = snapshot.items
-      .filter((d) => {
-        if (categoryFilter !== "all") {
-          // 简单匹配：菜品名称中包含大类关键词（实际应从 subCategories 关联）
-          return true; // 暂时显示全部，后续可通过 subCategories 关联
-        }
-        if (searchText) return d.name.toLowerCase().includes(searchText.toLowerCase());
-        return true;
-      })
-      .filter((d) => !searchText || d.name.toLowerCase().includes(searchText.toLowerCase()))
-      .sort((a, b) => b[sortKey] - a[sortKey]);
+    const { filtered } = rankingCalc;
 
     return (
       <View style={{ flex: 1 }}>

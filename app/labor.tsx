@@ -927,8 +927,25 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
     { key: "front",    label: "前厅",   color: "#007AFF", filter: (e: Employee) => e.dept === "front" && e.type !== "parttime" },
     { key: "kitchen",  label: "后厨",   color: "#34C759", filter: (e: Employee) => e.dept === "kitchen" && e.type !== "parttime" },
     { key: "company",  label: "公司",   color: "#722ED1", filter: (e: Employee) => e.dept === "other" && e.type !== "parttime" },
-    { key: "parttime", label: "临时兼职", color: "#FF9500", filter: (e: Employee) => e.type === "parttime" },
+    { key: "parttime", label: "临时山山", color: "#FF9500", filter: (e: Employee) => e.type === "parttime" },
   ], []);
+  // 性能优化：预建查找 Map，将 render 循环中的 O(n) paySlips.find/attendances.find 降为 O(1)
+  const rosterSlipMap = useMemo(() => {
+    const m = new Map<string, PaySlip>();
+    paySlips.forEach((s) => { if (s.month === month) m.set(s.employeeId, s); });
+    return m;
+  }, [paySlips, month]);
+  const rosterAttMap = useMemo(() => {
+    const m = new Map<string, typeof attendances[0]>();
+    attendances.forEach((a) => { if (a.month === month) m.set(a.employeeId, a); });
+    return m;
+  }, [attendances, month]);
+  const rosterCompareSlipMap = useMemo(() => {
+    if (!compareMonth) return new Map<string, PaySlip>();
+    const m = new Map<string, PaySlip>();
+    paySlips.forEach((s) => { if (s.month === compareMonth) m.set(s.employeeId, s); });
+    return m;
+  }, [paySlips, compareMonth]);
 
   return (
     <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: fabBottom(rosterInsets.bottom) + 20 }}>
@@ -994,9 +1011,9 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
               <View key={emp.id} style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
                 <PaySlipMiniCard
                   employee={emp} month={month} compareMonth={compareMonth} compareMode={compareMode} colors={colors}
-                  slip={paySlips.find((s) => s.employeeId === emp.id && s.month === month) ?? null}
-                  att={attendances.find((a) => a.employeeId === emp.id && a.month === month) ?? null}
-                  compareSlip={compareMonth ? (paySlips.find((s) => s.employeeId === emp.id && s.month === compareMonth) ?? null) : null}
+                  slip={rosterSlipMap.get(emp.id) ?? null}
+                  att={rosterAttMap.get(emp.id) ?? null}
+                  compareSlip={compareMonth ? (rosterCompareSlipMap.get(emp.id) ?? null) : null}
                 />
               </View>
             ))}
