@@ -14,6 +14,7 @@ import {
   CustomDept, BusinessHoursEntry, ShiftGroup, FillPreset,
   ScheduleSnapshot, DeptCategory,
   calcDailyRate, calcAllowance, calcSocialInsurance, calcIncomeTax,
+  shouldPayAllowanceThisMonth,
   getDaysInMonth, parseMonth, getContractHoursForDate,
   calcCompOffExpiresMonth, getAvailableCompOffDays,
   DEFAULT_SHIFT_TEMPLATES, DEFAULT_SPECIAL_STATUSES,
@@ -720,7 +721,9 @@ function AttendanceProvider({ children }: { children: React.ReactNode }) {
      */
     let attendanceSalary: number;
     if (employee.type === "parttime") {
-      attendanceSalary = Math.round(totalHours * employee.overtimeHourlyRate * 100) / 100;
+      // 修复 Bug：山山山山工资应使用 hourlyRate（普通时薪）而非 overtimeHourlyRate（加班时薪）
+      // UI 展示（labor.tsx 第 699 行）显示的是 employee.hourlyRate，计算必须与展示一致
+      attendanceSalary = Math.round(totalHours * employee.hourlyRate * 100) / 100;
     } else {
       // 按实际出勤天数比例计算底薪
       const proportionalBase = expectedAttendanceDays > 0
@@ -850,6 +853,8 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
       const overrides = existing?.allowanceOverrides;
       for (const rule of employee.allowanceRules) {
         if (!rule.enabled) continue;
+        // 修复 Bug：季度/年度补贴必须判断当月是否应发放（之前完全没有调用 shouldPayAllowanceThisMonth）
+        if (!shouldPayAllowanceThisMonth(rule, month)) continue;
         // 如果用户在绩效补贴页手动取消了此补贴，则跳过
         if (overrides && rule.id in overrides && !overrides[rule.id]) continue;
         const { amount, autoNote } = calcAllowance(rule, attendanceDays);

@@ -113,6 +113,8 @@ function calcAllowanceTotal(
   let otherAllowance = 0;
   for (const rule of rules) {
     if (!rule.enabled) continue;
+    // 修复 Bug：季度/年度补贴必须判断当月是否应发放（默认测试环境设为 "2026-08"）
+    if (!shouldPayAllowanceThisMonth(rule, "2026-08")) continue;
     if (overrides && rule.id in overrides && !overrides[rule.id]) continue;
     const { amount } = calcAllowance(rule, attendanceDays);
     if (rule.type === "transport_fixed") transportAllowance += amount;
