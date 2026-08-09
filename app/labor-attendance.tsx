@@ -181,8 +181,11 @@ function EmployeeCard({
   const saveRewards = useCallback(() => {
     if (!slip || !employee) return;
     const totalReward = rewardItems.reduce((sum, item) => sum + item.amount, 0);
-    // 修复：删除旧的增量计算引擎（rewardDiff 直接加减 finalSalary）
-    // 改用 buildPaySlipDraft 重新计算全部薪资字段，确保社保/公积金/个税开关状态正确反映
+    // 修复 Bug：先将新 rewardPenalty 写入 store，再调用 buildPaySlipDraft
+    // 原因：buildPaySlipDraft 内部从 ref.current 读取 existing.rewardPenalty 来计算 grossSalary
+    // 若先 buildPaySlipDraft 再覆盖 rewardPenalty，grossSalary 会基于旧值计算，导致应发薪资不正确
+    upsertPaySlip({ ...slip, rewardPenalty: totalReward, rewardPenaltyItems: rewardItems, notes });
+    // 此时 ref.current 已更新，buildPaySlipDraft 能读到最新 rewardPenalty
     const draft = buildPaySlipDraft(
       employee, month, att ?? null,
       slip.performanceBonus ?? 0, advanceTotal, globalSettings
