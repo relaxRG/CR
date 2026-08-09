@@ -11,6 +11,7 @@ import {
   View,
 } from "react-native";
 import * as Haptics from "expo-haptics";
+import { useScrollPreservation } from "@/hooks/use-scroll-preservation";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -41,6 +42,9 @@ export function LabIndexScreen({ embedded = false }: { embedded?: boolean }) {
   const { projects, batchesOf } = useLabStore();
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<LabProjectStatus | null>(null);
+
+  // 滚动位置保持：从研发项目详情页返回时恢复滚动位置
+  const { listRef: labListRef, onScroll: onLabScroll } = useScrollPreservation<FlatList>();
 
   const rows = useMemo<Row[]>(() => {
     const q = query.trim().toLowerCase();
@@ -215,11 +219,14 @@ export function LabIndexScreen({ embedded = false }: { embedded?: boolean }) {
           </View>
         ) : (
         <FlatList
+          ref={labListRef}
           data={rows}
           keyExtractor={(item) =>
             item.kind === "header" ? `h-${item.status}` : item.project.id
           }
           contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32 }}
+          onScroll={onLabScroll}
+          scrollEventThrottle={100}
           renderItem={({ item }) => {
             if (item.kind === "header") {
               return (
@@ -229,7 +236,7 @@ export function LabIndexScreen({ embedded = false }: { embedded?: boolean }) {
                       width: 7,
                       height: 7,
                       borderRadius: 4,
-                      backgroundColor: STATUS_COLORS[item.status],
+                      backgroundColor: STATUS_COLORS[item.status as LabProjectStatus],
                     }}
                   />
                   <Text className="text-sm font-semibold text-muted">

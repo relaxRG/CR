@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
+import { useScrollPreservation } from "@/hooks/use-scroll-preservation";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -275,6 +276,9 @@ export default function LaborEmployeesScreen() {
     router.push({ pathname: "/labor-employee-profile", params: { id: emp.id } } as any);
   };
 
+  // 滚动位置保持：从员工详情页返回时恢复滚动位置；deptFilter 切换时重置
+  const { listRef: empScrollRef, onScroll: onEmpScroll } = useScrollPreservation<ScrollView>(deptFilter);
+
   const totalCount = activeEmployees.length;
 
   return (
@@ -343,7 +347,12 @@ export default function LaborEmployeesScreen() {
       </ScrollView>
 
       {/* 列表主体 */}
-      <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: 40 + insets.bottom }}>
+      <ScrollView
+        ref={empScrollRef}
+        contentContainerStyle={{ padding: 12, paddingBottom: 40 + insets.bottom }}
+        onScroll={onEmpScroll}
+        scrollEventThrottle={100}
+      >
 
         {/* 全部 Tab：按部门分组 */}
         {deptFilter === "all" && DEPT_ORDER.map((dept) =>

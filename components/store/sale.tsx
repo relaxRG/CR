@@ -10,6 +10,7 @@ import {
 import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
+import { useScrollPreservation } from "@/hooks/use-scroll-preservation";
 import { useColors } from "@/hooks/use-colors";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useMenuStore } from "@/lib/menu/store";
@@ -17,8 +18,8 @@ import { useWineStore } from "@/lib/wine/store";
 import { useFoodMenuStore } from "@/lib/food/menu-store";
 import { useRecipeStore } from "@/lib/recipes/store";
 import { useMenuPackageStore, MenuPackage } from "@/lib/menu/package-store";
-import { WINE_STYLE_LABELS } from "@/lib/wine/types";
-import { FOOD_CATEGORY_LABELS } from "@/lib/food/types";
+import { WINE_STYLE_LABELS, WineStyle } from "@/lib/wine/types";
+import { FOOD_CATEGORY_LABELS, FoodCategory } from "@/lib/food/types";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 
 type SaleCat = "cocktail" | "wine" | "food" | "package";
@@ -207,6 +208,9 @@ export default function StoreSaleScreen() {
   const [showPackageDetail, setShowPackageDetail] = useState(false);
   const [detailPackage, setDetailPackage] = useState<MenuPackage | null>(null);
 
+  // 滚动位置保持：cat 切换时重置偏移量
+  const { listRef: saleListRef, onScroll: onSaleScroll } = useScrollPreservation<FlatList>(cat);
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       {/* 分类 Tab */}
@@ -238,7 +242,12 @@ export default function StoreSaleScreen() {
             </TouchableOpacity>
           </View>
         ) : (
-          <FlatList data={cocktailItems} keyExtractor={(i) => i.id}
+          <FlatList
+            ref={saleListRef}
+            data={cocktailItems}
+            keyExtractor={(i) => i.id}
+            onScroll={onSaleScroll}
+            scrollEventThrottle={100}
             renderItem={({ item }) => (
               <Pressable onPress={() => { tap(); if (item.recipeId) router.push(`/recipe/${item.recipeId}` as any); }}
                 style={({ pressed }) => [S.card, { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.8 : 1 }]}>
@@ -298,7 +307,12 @@ export default function StoreSaleScreen() {
               <Text style={[S.emptyDesc, { color: colors.muted }]}>在葡萄酒库中添加库存</Text>
             </View>
           ) : (
-            <FlatList data={wineItems} keyExtractor={(b) => b.id}
+            <FlatList
+              ref={saleListRef}
+              data={wineItems}
+              keyExtractor={(b) => b.id}
+              onScroll={onSaleScroll}
+              scrollEventThrottle={100}
               renderItem={({ item }) => {
                 const isSelected = wineSelectedIds.includes(item.id);
                 return (
@@ -324,7 +338,7 @@ export default function StoreSaleScreen() {
                     )}
                     <View style={{ flex: 1 }}>
                       <Text style={[S.cardName, { color: colors.foreground }]} numberOfLines={1}>{item.name}{item.vintage ? ` ${item.vintage}` : ""}</Text>
-                      <Text style={[S.cardSub, { color: colors.muted }]} numberOfLines={1}>{[WINE_STYLE_LABELS[item.style], item.region].filter(Boolean).join(" · ")}</Text>
+                      <Text style={[S.cardSub, { color: colors.muted }]} numberOfLines={1}>{[WINE_STYLE_LABELS[item.style as WineStyle], item.region].filter(Boolean).join(" · ")}</Text>
                     </View>
                     <View style={{ alignItems: "flex-end", gap: 4 }}>
                       {item.salePrice != null && <Text style={[S.cardPrice, { color: "#9F1239" }]}>¥{item.salePrice}</Text>}
@@ -392,7 +406,12 @@ export default function StoreSaleScreen() {
               <Text style={[S.emptyDesc, { color: colors.muted }]}>在餐食 → 菜单中添加餐食</Text>
             </View>
           ) : (
-            <FlatList data={foodItems} keyExtractor={(i) => i.id}
+            <FlatList
+              ref={saleListRef}
+              data={foodItems}
+              keyExtractor={(i) => i.id}
+              onScroll={onSaleScroll}
+              scrollEventThrottle={100}
               renderItem={({ item }) => {
                 const isSelected = foodSelectedIds.includes(item.id);
                 return (
@@ -423,7 +442,7 @@ export default function StoreSaleScreen() {
                           </View>
                         )}
                       </View>
-                      <Text style={[S.cardSub, { color: colors.muted }]} numberOfLines={1}>{FOOD_CATEGORY_LABELS[item.category]}</Text>
+                      <Text style={[S.cardSub, { color: colors.muted }]} numberOfLines={1}>{FOOD_CATEGORY_LABELS[item.category as FoodCategory]}</Text>
                     </View>
                     <View style={{ alignItems: "flex-end", gap: 4 }}>
                       {item.price != null && <Text style={[S.cardPrice, { color: "#10B981" }]}>¥{item.price}</Text>}
@@ -459,7 +478,12 @@ export default function StoreSaleScreen() {
               <Text style={[S.emptyDesc, { color: colors.muted }]}>点击「新增套餐」创建组合套餐</Text>
             </View>
           ) : (
-            <FlatList data={packages} keyExtractor={(p) => p.id}
+            <FlatList
+              ref={saleListRef}
+              data={packages}
+              keyExtractor={(p) => p.id}
+              onScroll={onSaleScroll}
+              scrollEventThrottle={100}
               renderItem={({ item: pkg }) => (
                 <Pressable onPress={() => { tap(); setDetailPackage(pkg); setShowPackageDetail(true); }}
                   style={({ pressed }) => [S.card, { backgroundColor: colors.surface, borderColor: pkg.available ? colors.border : colors.muted + "44", opacity: pressed ? 0.8 : pkg.available ? 1 : 0.6 }]}>
@@ -476,7 +500,7 @@ export default function StoreSaleScreen() {
                     {pkg.description && <Text style={[S.cardSub, { color: colors.muted }]} numberOfLines={1}>{pkg.description}</Text>}
                     {pkg.tags && pkg.tags.length > 0 && (
                       <View style={{ flexDirection: "row", gap: 4, marginTop: 4, flexWrap: "wrap" }}>
-                        {pkg.tags.map((tag) => (
+                        {pkg.tags.map((tag: string) => (
                           <View key={tag} style={{ backgroundColor: colors.primary + "22", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
                             <Text style={{ fontSize: 10, color: colors.primary }}>{tag}</Text>
                           </View>
