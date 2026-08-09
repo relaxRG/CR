@@ -721,9 +721,9 @@ function AttendanceProvider({ children }: { children: React.ReactNode }) {
      */
     let attendanceSalary: number;
     if (employee.type === "parttime") {
-      // 修复 Bug：山山山山工资应使用 hourlyRate（普通时薪）而非 overtimeHourlyRate（加班时薪）
-      // UI 展示（labor.tsx 第 699 行）显示的是 employee.hourlyRate，计算必须与展示一致
-      attendanceSalary = Math.round(totalHours * employee.hourlyRate * 100) / 100;
+      // 修复：兼职工资统一使用 overtimeHourlyRate（加班时薪）
+      // 所有时薪场景（加班工资、调休兑现、兼职工资）统一使用 overtimeHourlyRate
+      attendanceSalary = Math.round(totalHours * employee.overtimeHourlyRate * 100) / 100;
     } else {
       // 按实际出勤天数比例计算底薪
       const proportionalBase = expectedAttendanceDays > 0

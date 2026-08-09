@@ -404,13 +404,14 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
     setShowCompOffModal(false);
     Alert.alert("减少成功", `已手动减少 ${days} 天调休余额`);
   };
-  // ── 减少：兑换现金（加班换休按时薪×小时，节假日换休按日薪）──
+  // ── 减少：兑换现金（加班换休按加班时薪×小时，节假日换休按日薪）──
   const handleCashOut = (entry: ReturnType<typeof getCompOffEntries>[number]) => {
-    const hourlyRate = employee.hourlyRate ?? 0;
+    // 修复：调休兑现统一使用 overtimeHourlyRate（加班时薪），与加班工资计算保持一致
+    const overtimeHourlyRate = employee.overtimeHourlyRate ?? employee.hourlyRate ?? 0;
     const dailyRate = att?.dailyRate ?? 0;
-    // 加班换休：hoursDeducted × 时薪；节假日换休：days × 日薪
+    // 加班换休：hoursDeducted × 加班时薪；节假日换休：days × 日薪
     const amount = entry.source === "overtime"
-      ? Math.round((entry.hoursDeducted ?? entry.days * 8) * hourlyRate * 100) / 100
+      ? Math.round((entry.hoursDeducted ?? entry.days * 8) * overtimeHourlyRate * 100) / 100
       : Math.round(entry.days * dailyRate * 100) / 100;
     cashOutCompOff(entry.id, amount / entry.days, month);
     // 修复：删除旧的增量计算（grossSalary + amount）
@@ -3616,6 +3617,16 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
     // 向后兼容：旧版 "休"/"无早" hoursValue
     if (h === "休") return <Text style={EXL.cellRest}>(休)</Text>;
     if (h === "无早") return <Text style={EXL.cellNoMorning}>(无早)</Text>;
+    // 工时未配置警告：有排班但无灵活工时规则覆盖该天（contractH === 0）
+    // 仅在时长模式下显示，且该天是工作日（非特殊状态）
+    if (contractH === 0 && !entry.specialStatusId && typeof h === "number" && h > 0) {
+      return (
+        <View style={{ alignItems: "center", justifyContent: "center" }}>
+          <Text style={{ fontSize: 9, color: "#FF9500", fontWeight: "700" }}>{h % 1 === 0 ? `${h}.0` : `${h}`}</Text>
+          <Text style={{ fontSize: 7, color: "#FF9500" }}>⚠️</Text>
+        </View>
+      );
+    }
     // 特殊状态
     if (entry.specialStatusId) {
       const ss = specialStatuses.find((s) => s.id === entry.specialStatusId);

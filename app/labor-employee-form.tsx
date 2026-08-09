@@ -70,7 +70,7 @@ export default function LaborEmployeeFormScreen() {
 
   // ── 工资设置 ──
   const [baseSalary, setBaseSalary] = useState(String(existing?.baseSalary ?? ""));
-  const [stdHours, setStdHours] = useState(String(existing?.stdHoursPerDay ?? "8"));
+  // stdHours 已删除 UI，不再展示默认工时输入框，全部改用灵活工时规则
   const [restDays, setRestDays] = useState(String(existing?.restDaysPerMonth ?? "4"));
   const [hourlyRate, setHourlyRate] = useState(String(existing?.hourlyRate ?? "35"));
   const [overtimeRate, setOvertimeRate] = useState(String(existing?.overtimeHourlyRate ?? "35"));
@@ -78,6 +78,10 @@ export default function LaborEmployeeFormScreen() {
   // 当月工作天数（独立输入，1~31，默认当月天数）
   const [customDivDays, setCustomDivDays] = useState(
     existing ? "" : "" // 始终默认空（使用当月天数）
+  );
+  // 兼职计费模式：按天（daily）或按小时（hourly）
+  const [parttimeMode, setParttimeMode] = useState<"daily" | "hourly">(
+    existing?.baseSalary && existing.baseSalary > 0 ? "daily" : "hourly"
   );
 
   // ── 灵活工时规则 ──
@@ -88,7 +92,7 @@ export default function LaborEmployeeFormScreen() {
     const newRule: WeeklyHoursRule = {
       id: Date.now().toString(),
       fromDay: 1, toDay: 4,
-      hours: Number(stdHours) || 8,
+      hours: 8, // 默认 8 小时，用户可自行修改
     };
     setWeeklyHoursRules((prev) => [...prev, newRule]);
   };
@@ -294,6 +298,16 @@ export default function LaborEmployeeFormScreen() {
     return calcDailyRate(base, effectiveDivDays, rest);
   }, [baseSalary, restDays, effectiveDivDays]);
 
+  // ── 正常时薪自动计算预览（日薪 ÷ 当天平均灵活工时）──
+  const autoHourlyRatePreview = useMemo(() => {
+    if (dailyRatePreview <= 0) return 0;
+    // 计算灵活工时规则的平均工时（所有规则的小时平均値）
+    if (weeklyHoursRules.length === 0) return 0; // 无规则时不自动计算
+    const avgHours = weeklyHoursRules.reduce((s, r) => s + r.hours, 0) / weeklyHoursRules.length;
+    if (avgHours <= 0) return 0;
+    return Math.round((dailyRatePreview / avgHours) * 100) / 100;
+  }, [dailyRatePreview, weeklyHoursRules]);
+
   // ── 个税计算明细 ──
   const taxPreview = useMemo(() => {
     if (!taxEnabled) return null;
@@ -450,10 +464,13 @@ export default function LaborEmployeeFormScreen() {
       customDeptId: selectedDeptId,
       type, active, notes: notes.trim(),
       baseSalary: Number(baseSalary) || 0,
-      stdHoursPerDay: Number(stdHours) || 8,
+      // stdHoursPerDay 保留字段向后兼容，但 UI 已删除输入框，全部改用灵活工时规则
+      stdHoursPerDay: 0,
       restDaysPerMonth: Number(restDays) || 4,
-      hourlyRate: Number(hourlyRate) || 35,
-      overtimeHourlyRate: Number(overtimeRate) || Number(hourlyRate) || 35,
+      // 正常时薪（仅作参考展示，不参与实际计算）
+      hourlyRate: Number(hourlyRate) || 0,
+      // 加班时薪（实际计算依据：加班工资、调休兑现、兼职工资均使用此字段）
+      overtimeHourlyRate: Number(overtimeRate) || Number(hourlyRate) || 0,
       monthlyFixedSalary: Number(monthlyFixedSalary) || 0,
       weeklyHoursRules: weeklyHoursRules.length > 0 ? weeklyHoursRules : undefined,
       compOffRule: { enabled: compOffEnabled, hoursPerDay: Number(compOffHoursPerDay) || 8 },
@@ -608,30 +625,15 @@ export default function LaborEmployeeFormScreen() {
                     placeholder="如 5600" keyboardType="decimal-pad" placeholderTextColor={colors.muted}
                     style={[S.input, { color: colors.foreground, borderColor: colors.border }]} />
                 </FormRow>
-                {/* 灵活标准工时 */}
+                {/* 灵活标准工时（已删除默认工时输入框，全部改用灵活工时规则） */}
                 <FormRow label="灵活标准工时" colors={colors}>
                   <View style={{ gap: 8 }}>
-                    {/* 默认工时（修复：添加独立输入框，范围0.5~24） */}
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                      <Text style={{ fontSize: 12, color: colors.muted }}>默认工时</Text>
-                      <TextInput
-                        value={stdHours}
-                        onChangeText={(v) => {
-                          // 允许输入小数，限制0.5~24
-                          const clean = v.replace(/[^0-9.]/g, "");
-                          setStdHours(clean);
-                        }}
-                        onBlur={() => {
-                          const n = parseFloat(stdHours);
-                          if (isNaN(n) || n < 0.5) setStdHours("0.5");
-                          else if (n > 24) setStdHours("24");
-                          else setStdHours(String(Math.round(n * 2) / 2)); // 精确到0.5
-                        }}
-                        keyboardType="decimal-pad"
-                        style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, width: 60 }]}
-                      />
-                      <Text style={{ fontSize: 12, color: colors.muted }}>h / 天（0.5~24）</Text>
-                    </View>
+                    {weeklyHoursRules.length === 0 && (
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, padding: 8, borderRadius: 8, backgroundColor: colors.warning + "18", borderWidth: 1, borderColor: colors.warning + "44" }}>
+                        <IconSymbol name="exclamationmark.triangle" size={14} color={colors.warning} />
+                        <Text style={{ fontSize: 12, color: colors.warning, flex: 1 }}>请添加工时规则，未配置规则的天将不计入标准工时</Text>
+                      </View>
+                    )}
                     {weeklyHoursRules.map((rule) => (
                       <WeeklyHoursRuleRow
                         key={rule.id} rule={rule} colors={colors}
@@ -646,7 +648,7 @@ export default function LaborEmployeeFormScreen() {
                     </TouchableOpacity>
                     {weeklyHoursRules.length > 0 && (
                       <Text style={{ fontSize: 11, color: colors.muted, lineHeight: 16 }}>
-                        提示：规则按顺序匹配，第一条命中的规则生效。未被规则覆盖的天使用默认工时 {stdHours}h。
+                        提示：规则按顺序匹配，第一条命中的规则生效。未被规则覆盖的天将不计入标准工时，请确保所有工作日均被覆盖。
                       </Text>
                     )}
                   </View>
@@ -699,28 +701,71 @@ export default function LaborEmployeeFormScreen() {
                 )}
               </>
             )}
-            <FormRow label="时薪（元/小时）" required colors={colors}>
-              <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
-                {[25, 30, 35, 40, 45].map((r) => (
-                  <TouchableOpacity key={r} onPress={() => { tap(); setHourlyRate(String(r)); }}
-                    style={[S.numChip, { backgroundColor: hourlyRate === String(r) ? deptColor : colors.surface, borderColor: hourlyRate === String(r) ? deptColor : colors.border }]}>
-                    <Text style={{ fontSize: 13, color: hourlyRate === String(r) ? "#fff" : colors.muted }}>¥{r}</Text>
+            {/* 兼职员工：计费模式选择（按天 / 按小时） */}
+            {type === "parttime" && (
+              <FormRow label="计费模式" colors={colors}>
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  <TouchableOpacity onPress={() => { tap(); setParttimeMode("daily"); }}
+                    style={[S.optionChip, { backgroundColor: parttimeMode === "daily" ? deptColor + "22" : colors.surface, borderColor: parttimeMode === "daily" ? deptColor : colors.border }]}>
+                    <Text style={{ fontSize: 13, fontWeight: "600", color: parttimeMode === "daily" ? deptColor : colors.muted }}>按天结算</Text>
                   </TouchableOpacity>
-                ))}
-                <TextInput value={hourlyRate} onChangeText={setHourlyRate} keyboardType="decimal-pad"
-                  style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border }]} />
-              </View>
-            </FormRow>
+                  <TouchableOpacity onPress={() => { tap(); setParttimeMode("hourly"); }}
+                    style={[S.optionChip, { backgroundColor: parttimeMode === "hourly" ? deptColor + "22" : colors.surface, borderColor: parttimeMode === "hourly" ? deptColor : colors.border }]}>
+                    <Text style={{ fontSize: 13, fontWeight: "600", color: parttimeMode === "hourly" ? deptColor : colors.muted }}>按小时结算</Text>
+                  </TouchableOpacity>
+                </View>
+              </FormRow>
+            )}
+            {/* 兼职按天：日薪 */}
+            {type === "parttime" && parttimeMode === "daily" && (
+              <FormRow label="兼职日薪" required colors={colors}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <TextInput value={baseSalary} onChangeText={setBaseSalary}
+                    placeholder="如 300" keyboardType="decimal-pad" placeholderTextColor={colors.muted}
+                    style={[S.input, { color: colors.foreground, borderColor: colors.border, flex: 1 }]} />
+                  <Text style={{ fontSize: 12, color: colors.muted }}>元/天</Text>
+                </View>
+              </FormRow>
+            )}
+            {/* 兼职按小时 / 全职正常时薪（仅作参考） */}
+            {(type !== "parttime" || parttimeMode === "hourly") && (
+              <FormRow label={type === "parttime" ? "兼职时薪" : "正常时薪（参考）"} required={type === "parttime"} colors={colors}>
+                <View style={{ gap: 6 }}>
+                  <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+                    {[25, 30, 35, 40, 45].map((r) => (
+                      <TouchableOpacity key={r} onPress={() => { tap(); setHourlyRate(String(r)); }}
+                        style={[S.numChip, { backgroundColor: hourlyRate === String(r) ? deptColor : colors.surface, borderColor: hourlyRate === String(r) ? deptColor : colors.border }]}>
+                        <Text style={{ fontSize: 13, color: hourlyRate === String(r) ? "#fff" : colors.muted }}>¥{r}</Text>
+                      </TouchableOpacity>
+                    ))}
+                    <TextInput value={hourlyRate} onChangeText={setHourlyRate} keyboardType="decimal-pad"
+                      style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border }]} />
+                  </View>
+                  {type !== "parttime" && autoHourlyRatePreview > 0 && (
+                    <Text style={{ fontSize: 11, color: colors.muted }}>
+                      自动计算参考値：¥{autoHourlyRatePreview.toFixed(2)}/小时（日薪 ÷ 平均工时）
+                    </Text>
+                  )}
+                  {type !== "parttime" && (
+                    <Text style={{ fontSize: 11, color: colors.muted }}>仅作参考展示，实际计算使用下方「加班时薪」</Text>
+                  )}
+                </View>
+              </FormRow>
+            )}
+            {/* 加班时薪（全职员工实际计算依据） */}
             {isFulltime && (
-              <FormRow label="加班时薪" colors={colors}>
-                <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
-                  <TouchableOpacity onPress={() => { tap(); setOvertimeRate(hourlyRate); }}
-                    style={[S.optionChip, { borderColor: colors.border, backgroundColor: overtimeRate === hourlyRate ? colors.primary + "15" : colors.surface }]}>
-                    <Text style={{ fontSize: 12, color: overtimeRate === hourlyRate ? colors.primary : colors.muted }}>同时薪</Text>
-                  </TouchableOpacity>
-                  <TextInput value={overtimeRate} onChangeText={setOvertimeRate} keyboardType="decimal-pad"
-                    style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border }]} />
-                  <Text style={{ fontSize: 12, color: colors.muted }}>元/小时</Text>
+              <FormRow label="加班时薪（实际计算）" colors={colors}>
+                <View style={{ gap: 6 }}>
+                  <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+                    <TouchableOpacity onPress={() => { tap(); setOvertimeRate(hourlyRate); }}
+                      style={[S.optionChip, { borderColor: colors.border, backgroundColor: overtimeRate === hourlyRate ? colors.primary + "15" : colors.surface }]}>
+                      <Text style={{ fontSize: 12, color: overtimeRate === hourlyRate ? colors.primary : colors.muted }}>同正常时薪</Text>
+                    </TouchableOpacity>
+                    <TextInput value={overtimeRate} onChangeText={setOvertimeRate} keyboardType="decimal-pad"
+                      style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border }]} />
+                    <Text style={{ fontSize: 12, color: colors.muted }}>元/小时</Text>
+                  </View>
+                  <Text style={{ fontSize: 11, color: colors.muted }}>加班工资、调休兑现均按此字段计算，支持填 0</Text>
                 </View>
               </FormRow>
             )}
