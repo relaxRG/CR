@@ -1084,10 +1084,10 @@ export interface PaySlip {
    * 用于持久化绩效补贴页中用户手动勾选/取消的补贴项状态 */
   allowanceOverrides?: Record<string, boolean>;
   /** 工作绩效档位选择（key: ruleId, value: tierId）
-   * 即时写入，进入页面时从此恢复，无需 syncToPaySlip */
+   * 由绩效补贴页整页保存时一次性写入，进入页面时从此初始化本地 State */
   workKPISelections?: Record<string, string>;
   /** 业绩绩效实际达到金额（key: ruleId, value: 实际金额数字）
-   * 即时写入，进入页面时从此恢复，无需 syncToPaySlip */
+   * 由绩效补贴页整页保存时一次性写入，进入页面时从此初始化本地 State */
   revenueActuals?: Record<string, number>;
   /** 社保明细（各险种金额） */
   socialInsuranceDetails?: {
