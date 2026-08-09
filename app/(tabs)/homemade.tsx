@@ -154,12 +154,12 @@ export default function HomemadeScreen() {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   // 快捷筛选解析:选中分区与其下细化的类型集合
-  const quickSections = Object.keys(quickSel);
+  const quickSections = useMemo(() => Object.keys(quickSel), [quickSel]);
   // 虚拟父分类 key(非分区):基酒/工艺,单独解析
   const VIRTUAL_PARENTS = ["__base", "__tech"];
   const quickBaseSel = quickSel["__base"] ?? [];
   const quickTechSel = quickSel["__tech"] ?? [];
-  const realQuickSections = quickSections.filter((k) => !VIRTUAL_PARENTS.includes(k));
+  const realQuickSections = useMemo(() => quickSections.filter((k) => !VIRTUAL_PARENTS.includes(k)), [quickSections]);
   const quickTypes = useMemo(
     () =>
       [

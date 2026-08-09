@@ -65,6 +65,33 @@ export default function LaborAttendancePage() {
   const [editingRewardFor, setEditingRewardFor] = useState<string>("");
 
   const activeEmployees = useMemo(() => employees.filter((e) => e.active !== false), [employees]);
+  // 性能优化：预建查找 Map，将 render 循环中的 O(n) find/filter 降为 O(1)
+  const attMap = useMemo(() => {
+    const m = new Map<string, typeof attendances[0]>();
+    attendances.forEach((a) => { if (a.month === currentMonth) m.set(a.employeeId, a); });
+    return m;
+  }, [attendances, currentMonth]);
+  const slipMap = useMemo(() => {
+    const m = new Map<string, typeof paySlips[0]>();
+    paySlips.forEach((s) => { if (s.month === currentMonth) m.set(s.employeeId, s); });
+    return m;
+  }, [paySlips, currentMonth]);
+  const compOffByEmp = useMemo(() => {
+    const m = new Map<string, typeof compOffEntries>();
+    compOffEntries.forEach((e) => {
+      if (!m.has(e.employeeId)) m.set(e.employeeId, []);
+      m.get(e.employeeId)!.push(e);
+    });
+    return m;
+  }, [compOffEntries]);
+  const holidayCompOffByEmp = useMemo(() => {
+    const m = new Map<string, typeof holidayCompOffEntries>();
+    holidayCompOffEntries.forEach((e) => {
+      if (!m.has(e.employeeId)) m.set(e.employeeId, []);
+      m.get(e.employeeId)!.push(e);
+    });
+    return m;
+  }, [holidayCompOffEntries]);
 
   return (
     <ScreenContainer>
@@ -95,10 +122,10 @@ export default function LaborAttendancePage() {
               </View>
               {/* 员工卡片 */}
               {deptEmps.map((emp) => {
-                const att = attendances.find((a) => a.employeeId === emp.id && a.month === currentMonth) ?? null;
-                const slip = paySlips.find((s) => s.employeeId === emp.id && s.month === currentMonth) ?? null;
-                const empCompOff = compOffEntries.filter((e) => e.employeeId === emp.id);
-                const empHolidayCompOff = holidayCompOffEntries.filter((e) => e.employeeId === emp.id);
+                const att = attMap.get(emp.id) ?? null;
+                const slip = slipMap.get(emp.id) ?? null;
+                const empCompOff = compOffByEmp.get(emp.id) ?? [];
+                const empHolidayCompOff = holidayCompOffByEmp.get(emp.id) ?? [];
                 return (
                   <EmployeeCard
                     key={emp.id}
@@ -146,22 +173,29 @@ function EmployeeCard({
   const { settings: globalSettings } = useGlobalPayrollSettingsStore();
   const tenure = calcTenure(employee.joinDate);
 
-  // ── 调休余额（加班换休 vs 节假日调休分开） ──
-  const overtimeCompOff = compOffEntries
-    .filter((e: any) => e.status === "available" && e.source === "overtime")
-    .reduce((s: number, e: any) => s + (e.days ?? 0), 0);
-  const holidayCompOff = holidayCompOffEntries
-    .filter((e: any) => e.status === "available")
-    .reduce((s: number, e: any) => s + (e.days ?? 0), 0);
+    // ── 调休余额（useMemo 避免每次渲染重复 filter/reduce） ──
+  const overtimeCompOff = useMemo(() =>
+    compOffEntries
+      .filter((e: any) => e.status === "available" && e.source === "overtime")
+      .reduce((s: number, e: any) => s + (e.days ?? 0), 0),
+    [compOffEntries]
+  );
+  const holidayCompOff = useMemo(() =>
+    holidayCompOffEntries
+      .filter((e: any) => e.status === "available")
+      .reduce((s: number, e: any) => s + (e.days ?? 0), 0),
+    [holidayCompOffEntries]
+  );
   const totalCompOff = overtimeCompOff + holidayCompOff;
-
   // ── 本月调休兑换 ──
   const compOffCashOut = slip?.compOffCashOut ?? 0;
-
-  // ── 预支合计 ──
-  const advanceTotal = advances
-    .filter((a: any) => a.employeeId === employee.id && (a.status === "pending" || a.status === "deducted"))
-    .reduce((sum: number, a: any) => sum + (a.amount || 0), 0);
+  // ── 预支合计（useMemo 避免每次渲染重复 filter/reduce） ──
+  const advanceTotal = useMemo(() =>
+    advances
+      .filter((a: any) => a.employeeId === employee.id && (a.status === "pending" || a.status === "deducted"))
+      .reduce((sum: number, a: any) => sum + (a.amount || 0), 0),
+    [advances, employee.id]
+  );
 
   const [rewardItems, setRewardItems] = useState<RewardPenaltyItem[]>(slip?.rewardPenaltyItems ?? []);
   const [notes, setNotes] = useState(slip?.notes ?? "");
