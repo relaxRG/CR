@@ -1,20 +1,15 @@
 /**
- * 绩效补贴页面
- * - 顶部总结卡：绩效补贴合计 | 补贴 | 工作绩效 | 业绩绩效（4格）
- * - 补贴展示区：勾选本月是否生效（即时写入 PaySlip.allowanceOverrides）
- * - 工作绩效区：勾选完成档位（即时写入 PaySlip.workKPISelections）
- * - 业绩绩效区：输入实际金额（即时写入 PaySlip.revenueActuals）
- * - 所有修改即时持久化，进入页面时从 PaySlip 恢复状态，退出无需同步
+ * 绩效补贴页面 v2（整页编辑保存模式）
+ * - 进入页面时从 PaySlip 加载当前状态到本地 State
+ * - 用户自由修改（补贴勾选、绩效档位、业绩数值），所有改动只在本地 State 暂存
+ * - 顶部总结卡实时预览（基于本地 State 计算，不影响 Store）
+ * - 右上角「保存」：一次性将所有数据写入 Store，触发全量重算，然后返回
+ * - 左上角「取消」：有改动时弹出确认弹窗，放弃改动后返回
  * - ⚙ 跳转当前员工编辑页（传入 id 参数）
- *
- * 设计原则（规范 7：单步操作即时写入，不依赖返回时同步）：
- * - 每次点击/输入立即调用 upsertPaySlip，不存在「忘记保存」
- * - 初始化时从 PaySlip 读取所有已持久化的选择状态
- * - 删除 syncToPaySlip()，返回按钮直接 router.back()
  */
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
-  ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View
+  Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View
 } from "react-native";
 import * as Haptics from "expo-haptics";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -24,7 +19,6 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
 import { useEmployeeStore, usePaySlipStore, useAttendanceStore, useGlobalPayrollSettingsStore } from "@/lib/labor/store";
 import {
-  AllowanceRule, WorkKPIRule, RevenueKPIRule,
   ALLOWANCE_UNIT_LABELS, REVENUE_KPI_SOURCE_LABELS,
   REVENUE_KPI_PAY_MODE_LABELS, calcRevenueKPIBonus,
   shouldPayAllowanceThisMonth, calcAllowance,
@@ -44,9 +38,9 @@ export default function LaborKPIAllowancePage() {
 
   const employee = useMemo(() => employees.find((e) => e.id === employeeId), [employees, employeeId]);
 
-  // ── 从 PaySlip 恢复所有持久化状态（初始化一次，之后即时写入） ──
+  // ── 从 PaySlip 初始化本地 State（仅初始化一次） ──
 
-  // 补贴本月生效状态：优先从 PaySlip.allowanceOverrides 读取，否则按规则默认值
+  // 补贴本月生效状态（本地暂存）
   const [allowanceEnabled, setAllowanceEnabled] = useState<Record<string, boolean>>(() => {
     const slip = employeeId && month ? getPaySlip(employeeId, month) : null;
     const overrides = slip?.allowanceOverrides;
@@ -61,20 +55,26 @@ export default function LaborKPIAllowancePage() {
     return map;
   });
 
-  // 工作绩效档位选择：从 PaySlip.workKPISelections 恢复（修复：不再初始化为空对象）
+  // 工作绩效档位选择（本地暂存）
   const [workKPISelections, setWorkKPISelections] = useState<Record<string, string>>(() => {
     const slip = employeeId && month ? getPaySlip(employeeId, month) : null;
     return slip?.workKPISelections ?? {};
   });
 
-  // 业绩绩效实际金额：从 PaySlip.revenueActuals 恢复（修复：不再初始化为空对象）
+  // 业绩绩效实际金额（本地暂存，字符串格式供 TextInput 使用）
   const [revenueActuals, setRevenueActuals] = useState<Record<string, string>>(() => {
     const slip = employeeId && month ? getPaySlip(employeeId, month) : null;
     const saved = slip?.revenueActuals ?? {};
-    // 转为字符串（TextInput 使用字符串）
     const map: Record<string, string> = {};
     Object.entries(saved).forEach(([k, v]) => { map[k] = String(v); });
     return map;
+  });
+
+  // 记录初始状态，用于判断是否有未保存的改动
+  const initialStateRef = useRef({
+    allowanceEnabled: { ...allowanceEnabled },
+    workKPISelections: { ...workKPISelections },
+    revenueActuals: { ...revenueActuals },
   });
 
   if (!employee) {
@@ -97,8 +97,7 @@ export default function LaborKPIAllowancePage() {
     return getAttendance(employeeId, month)?.attendanceDays ?? 0;
   }, [employeeId, month, getAttendance]);
 
-  // ── 实时计算合计（用于显示和写入） ──
-  // 修复 Bug：日补贴（meal_per_day）必须乘以出勤天数，使用 calcAllowance 统一计算
+  // ── 实时预览合计（基于本地 State，不影响 Store） ──
   const allowanceTotal = useMemo(() => {
     return allowanceRules.reduce((sum, r) => {
       if (!allowanceEnabled[r.id]) return sum;
@@ -128,92 +127,98 @@ export default function LaborKPIAllowancePage() {
   const performanceTotal = workKPITotal + revenueKPITotal;
   const grandTotal = performanceTotal + allowanceTotal;
 
-  // ── 即时写入辅助函数（原子性单次写入，修复时序 Bug）──
-  // 根因：旧实现先 upsertPaySlip(patched) 再调 buildPaySlipDraft，
-  // buildPaySlipDraft 内部从 ref.current 读取 existing，此时已是 patched，
-  // 但 buildPaySlipDraft 返回的 draft 是基于旧 existing 计算的（时序竞争），
-  // 导致第二次 upsertPaySlip 覆盖掉正确的 allowanceOverrides 和补贴金额。
-  // 修复：直接将 extraPatch 合并到 existing 后传给 buildPaySlipDraft，
-  // 利用 buildPaySlipDraft 内部的 ref.current 读取机制，只做一次原子性写入。
-  const writeToPaySlip = (extraPatch: Record<string, any>) => {
+  // ── 判断是否有未保存的改动 ──
+  const hasChanges = useCallback(() => {
+    const init = initialStateRef.current;
+    // 比较 allowanceEnabled
+    for (const id of Object.keys(allowanceEnabled)) {
+      if (allowanceEnabled[id] !== init.allowanceEnabled[id]) return true;
+    }
+    // 比较 workKPISelections
+    const allKPIIds = new Set([...Object.keys(workKPISelections), ...Object.keys(init.workKPISelections)]);
+    for (const id of allKPIIds) {
+      if ((workKPISelections[id] ?? "") !== (init.workKPISelections[id] ?? "")) return true;
+    }
+    // 比较 revenueActuals
+    const allRevIds = new Set([...Object.keys(revenueActuals), ...Object.keys(init.revenueActuals)]);
+    for (const id of allRevIds) {
+      if ((revenueActuals[id] ?? "") !== (init.revenueActuals[id] ?? "")) return true;
+    }
+    return false;
+  }, [allowanceEnabled, workKPISelections, revenueActuals]);
+
+  // ── 整页保存：一次性写入所有数据，触发全量重算 ──
+  const handleSave = useCallback(() => {
     if (!month || !employeeId || !employee) return;
     const existing = getPaySlip(employeeId, month);
-    if (!existing) return;
-    // 合并控制字段到 existing（不写入 store，只用于传参）
-    const patched = { ...existing, ...extraPatch };
+    if (!existing) {
+      router.back();
+      return;
+    }
+    tap();
+
+    // 将 revenueActuals 转为数字格式
+    const numericActuals: Record<string, number> = {};
+    Object.entries(revenueActuals).forEach(([k, v]) => { numericActuals[k] = Number(v) || 0; });
+
+    // Step 1：先将所有控制字段写入 Store
+    const patched = {
+      ...existing,
+      allowanceOverrides: allowanceEnabled,
+      workKPISelections,
+      revenueActuals: numericActuals,
+      performanceBonus: performanceTotal,
+    };
+    upsertPaySlip(patched);
+
+    // Step 2：此时 ref.current 已更新，buildPaySlipDraft 能读到最新控制字段
     const att = getAttendance(employeeId, month) ?? null;
     const advanceAmount = patched.advanceAmount ?? 0;
-    // buildPaySlipDraft 内部会从 ref.current 读取 existing，
-    // 我们先临时更新 ref（通过先写入 patched），确保 buildPaySlipDraft 读到最新控制字段
-    upsertPaySlip(patched); // 写入控制字段（allowanceOverrides 等）
-    // 此时 ref.current 已更新，buildPaySlipDraft 能读到最新 allowanceOverrides
-    const draft = buildPaySlipDraft(employee, month, att, patched.performanceBonus ?? 0, advanceAmount, globalSettings);
-    // 原子性最终写入：用重新计算的薪资字段覆盖，同时保留所有控制字段
+    const draft = buildPaySlipDraft(employee, month, att, performanceTotal, advanceAmount, globalSettings);
+
+    // Step 3：原子性最终写入，保留所有控制字段
     upsertPaySlip({
       ...draft,
-      allowanceOverrides: patched.allowanceOverrides,
-      workKPISelections: patched.workKPISelections,
-      revenueActuals: patched.revenueActuals,
+      allowanceOverrides: allowanceEnabled,
+      workKPISelections,
+      revenueActuals: numericActuals,
       id: existing.id,
     });
-  };
 
-  // ── 切换补贴本月生效（即时写入） ──
-  // 修复 Bug：删除旧的 newAllowanceTotal 局部计算（直接用 r.amount 未乘出勤天数）
-  // writeToPaySlip 内部调用 buildPaySlipDraft 重新计算所有薪资字段（含日补贴×出勤天数）
-  const toggleAllowance = (id: string) => {
-    tap();
-    setAllowanceEnabled((prev) => {
-      const next = { ...prev, [id]: !prev[id] };
-      const existing = employeeId && month ? getPaySlip(employeeId, month) : null;
-      if (existing) {
-        writeToPaySlip({ allowanceOverrides: next });
-      }
-      return next;
-    });
-  };
+    router.back();
+  }, [month, employeeId, employee, getPaySlip, allowanceEnabled, workKPISelections, revenueActuals, performanceTotal, upsertPaySlip, buildPaySlipDraft, getAttendance, globalSettings, router]);
 
-    // ── 勾选工作绩效档位（即时写入） ──
-  const selectWorkKPITier = (ruleId: string, tierId: string) => {
-    tap();
-    setWorkKPISelections((prev) => {
-      const next = { ...prev, [ruleId]: prev[ruleId] === tierId ? "" : tierId };
-      const existing = employeeId && month ? getPaySlip(employeeId, month) : null;
-      if (existing) writeToPaySlip({ workKPISelections: next });
-      return next;
-    });
-  };
-  // ── 更新业绩绩效实际金额（即时写入） ──
-  const updateRevenueActual = (ruleId: string, value: string) => {
-    setRevenueActuals((prev) => {
-      const next = { ...prev, [ruleId]: value };
-      const existing = employeeId && month ? getPaySlip(employeeId, month) : null;
-      if (existing) {
-        const numericActuals: Record<string, number> = {};
-        Object.entries(next).forEach(([k, v]) => { numericActuals[k] = Number(v) || 0; });
-        writeToPaySlip({ revenueActuals: numericActuals });
-      }
-      return next;
-    });
-  };
+  // ── 取消：有改动时弹出确认弹窗 ──
+  const handleCancel = useCallback(() => {
+    if (hasChanges()) {
+      Alert.alert(
+        "放弃更改",
+        "你有未保存的改动，确认放弃？",
+        [
+          { text: "继续编辑", style: "cancel" },
+          { text: "放弃", style: "destructive", onPress: () => router.back() },
+        ]
+      );
+    } else {
+      router.back();
+    }
+  }, [hasChanges, router]);
 
   return (
     <ScreenContainer>
-      {/* 导航栏 */}
+      {/* 导航栏：左侧「取消」，右侧「保存」 */}
       <View style={[S.navbar, { paddingTop: 8 }]}>
-        <TouchableOpacity onPress={() => router.back()} style={{ padding: 8 }}>
-          <IconSymbol name="chevron.left" size={20} color={colors.primary} />
+        <TouchableOpacity onPress={handleCancel} style={{ padding: 8 }}>
+          <Text style={{ fontSize: 16, color: colors.error }}>取消</Text>
         </TouchableOpacity>
         <Text style={[S.navTitle, { color: colors.foreground }]}>{employee.realName} · 绩效补贴</Text>
-        <TouchableOpacity
-          onPress={() => { tap(); router.push({ pathname: "/labor-employee-form", params: { id: employee.id } } as any); }}
-          style={{ padding: 8 }}>
-          <IconSymbol name="gearshape" size={20} color={colors.muted} />
+        <TouchableOpacity onPress={handleSave} style={{ padding: 8 }}>
+          <Text style={{ fontSize: 16, fontWeight: "700", color: colors.primary }}>保存</Text>
         </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }}>
-        {/* 顶部总结卡：4格（绩效补贴 / 补贴 / 工作绩效 / 业绩绩效） */}
+        {/* 顶部总结卡：4格（绩效补贴 / 补贴 / 工作绩效 / 业绩绩效）—— 实时预览 */}
         <View style={[S.summaryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <View style={S.summaryRow}>
             <View style={S.summaryItem}>
@@ -236,6 +241,13 @@ export default function LaborKPIAllowancePage() {
               <Text style={[S.summaryValue, { color: colors.success }]}>¥{revenueKPITotal.toFixed(0)}</Text>
             </View>
           </View>
+          {/* 未保存提示 */}
+          {hasChanges() && (
+            <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.border, flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.warning ?? "#FF9500" }} />
+              <Text style={{ fontSize: 11, color: colors.warning ?? "#FF9500" }}>有未保存的改动，点击右上角「保存」生效</Text>
+            </View>
+          )}
         </View>
 
         {/* ── 补贴展示区 ── */}
@@ -245,7 +257,7 @@ export default function LaborKPIAllowancePage() {
             <Text style={{ fontSize: 12, color: colors.muted, textAlign: "center", paddingVertical: 16 }}>暂无补贴项，请在员工档案中添加</Text>
           )}
           {allowanceRules.map((rule) => (
-            <TouchableOpacity key={rule.id} onPress={() => toggleAllowance(rule.id)}
+            <TouchableOpacity key={rule.id} onPress={() => { tap(); setAllowanceEnabled((prev) => ({ ...prev, [rule.id]: !prev[rule.id] })); }}
               style={[S.itemRow, { borderBottomColor: colors.border }]}>
               <View style={[S.checkbox, { borderColor: allowanceEnabled[rule.id] ? colors.primary : colors.border, backgroundColor: allowanceEnabled[rule.id] ? colors.primary : "transparent" }]}>
                 {allowanceEnabled[rule.id] && <Text style={{ color: "#fff", fontSize: 10, fontWeight: "700" }}>✓</Text>}
@@ -255,7 +267,6 @@ export default function LaborKPIAllowancePage() {
                 <Text style={{ fontSize: 11, color: colors.muted }}>{ALLOWANCE_UNIT_LABELS[rule.unit ?? "per_month"]}</Text>
               </View>
               <Text style={{ fontSize: 15, fontWeight: "600", color: allowanceEnabled[rule.id] ? colors.primary : colors.muted }}>
-                {/* 修复 Bug：显示实际计算金额（日补贴×出勤天数），而非单价 */}
                 ¥{calcAllowance(rule, attendanceDays).amount.toFixed(0)}
                 {rule.unit === "per_day" || rule.type === "meal_per_day"
                   ? <Text style={{ fontSize: 10, color: colors.muted }}> (¥{rule.amount}/天×{attendanceDays}天)</Text>
@@ -280,7 +291,8 @@ export default function LaborKPIAllowancePage() {
                   const isSelected = workKPISelections[rule.id] === tier.id;
                   const tierColor = tier.amount > 0 ? colors.success : tier.amount < 0 ? colors.error : colors.muted;
                   return (
-                    <TouchableOpacity key={tier.id} onPress={() => selectWorkKPITier(rule.id, tier.id)}
+                    <TouchableOpacity key={tier.id}
+                      onPress={() => { tap(); setWorkKPISelections((prev) => ({ ...prev, [rule.id]: prev[rule.id] === tier.id ? "" : tier.id })); }}
                       style={[S.tierChip, { borderColor: isSelected ? tierColor : colors.border, backgroundColor: isSelected ? tierColor + "15" : colors.surface }]}>
                       <Text style={{ fontSize: 12, color: isSelected ? tierColor : colors.foreground, fontWeight: isSelected ? "600" : "400" }}>
                         {tier.label}
@@ -332,7 +344,7 @@ export default function LaborKPIAllowancePage() {
                   <Text style={{ fontSize: 12, color: colors.muted }}>实际达到：</Text>
                   <TextInput
                     value={actualStr}
-                    onChangeText={(v) => updateRevenueActual(rule.id, v)}
+                    onChangeText={(v) => setRevenueActuals((prev) => ({ ...prev, [rule.id]: v }))}
                     placeholder="输入实际金额"
                     placeholderTextColor={colors.muted}
                     keyboardType="number-pad"
@@ -344,13 +356,28 @@ export default function LaborKPIAllowancePage() {
             );
           })}
         </View>
+
+        {/* 底部保存按钮（补充入口，方便长页面操作） */}
+        <TouchableOpacity onPress={handleSave}
+          style={[S.saveBtn, { backgroundColor: colors.primary }]}>
+          <Text style={{ fontSize: 16, fontWeight: "700", color: "#fff" }}>保存</Text>
+        </TouchableOpacity>
+
+        {/* 跳转员工档案设置 */}
+        <TouchableOpacity
+          onPress={() => { tap(); router.push({ pathname: "/labor-employee-form", params: { id: employee.id } } as any); }}
+          style={[S.settingsBtn, { borderColor: colors.border }]}>
+          <IconSymbol name="gearshape" size={14} color={colors.muted} />
+          <Text style={{ fontSize: 13, color: colors.muted }}>编辑员工档案（补贴/绩效规则）</Text>
+          <IconSymbol name="chevron.right" size={12} color={colors.muted} />
+        </TouchableOpacity>
       </ScrollView>
     </ScreenContainer>
   );
 }
 
 const S = StyleSheet.create({
-  navbar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 8, height: 48 },
+  navbar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, height: 48 },
   navTitle: { fontSize: 16, fontWeight: "600" },
   summaryCard: { borderRadius: 12, borderWidth: 1, padding: 16, marginBottom: 16 },
   summaryRow: { flexDirection: "row", alignItems: "center" },
@@ -364,4 +391,6 @@ const S = StyleSheet.create({
   checkbox: { width: 20, height: 20, borderRadius: 4, borderWidth: 1.5, alignItems: "center", justifyContent: "center" },
   tierChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, alignItems: "center", gap: 2 },
   amountInput: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4, fontSize: 14, width: 120, textAlign: "center" },
+  saveBtn: { borderRadius: 12, paddingVertical: 14, alignItems: "center", marginBottom: 12 },
+  settingsBtn: { flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 10, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 8 },
 });
