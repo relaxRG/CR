@@ -59,7 +59,7 @@ import {
 import { FLAVOR_TAGS, FLAVOR_TAG_EN } from "@/lib/recipes/types";
 import { FLAVOR_TAG_DEFAULT_COLORS } from "@/lib/settings/card-tags";
 import { fabBottom } from "@/components/floating-tab-bar";
-import { useFocusEffect } from "expo-router";
+import { useScrollPreservation } from "@/hooks/use-scroll-preservation";
 
 type Filter = { type: "all" } | { type: "favorites" };
 
@@ -96,27 +96,7 @@ export function RecipesScreen() {
   }, []);
 
   // ── 滚动位置保持：从配方详情页返回时恢复滚动位置 ──
-  const flatListRef = useRef<FlatList>(null);
-  const scrollOffsetRef = useRef(0);
-  const isRestoringRef = useRef(false);
-
-  useFocusEffect(
-    useCallback(() => {
-      // 屏幕获得焦点时（从配方详情页返回），恢复之前保存的滚动位置
-      if (scrollOffsetRef.current > 0) {
-        isRestoringRef.current = true;
-        // 延迟一帧确保列表已完全渲染
-        const timer = setTimeout(() => {
-          flatListRef.current?.scrollToOffset({
-            offset: scrollOffsetRef.current,
-            animated: false,
-          });
-          isRestoringRef.current = false;
-        }, 50);
-        return () => clearTimeout(timer);
-      }
-    }, []),
-  );
+  const { listRef: flatListRef, onScroll: onListScroll } = useScrollPreservation<FlatList>();
 
 
   const [enrichingRecipes, setEnrichingRecipes] = useState(false);
@@ -794,12 +774,7 @@ export function RecipesScreen() {
             paddingTop: 4,
             paddingBottom: 100 + insets.bottom,
           }}
-          onScroll={(e) => {
-            // 不在恢复滚动时才保存位置，避免覆盖已保存的实际位置
-            if (!isRestoringRef.current) {
-              scrollOffsetRef.current = e.nativeEvent.contentOffset.y;
-            }
-          }}
+          onScroll={onListScroll}
           scrollEventThrottle={100}
           ListEmptyComponent={
             ready ? (

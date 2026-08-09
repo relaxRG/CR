@@ -1,6 +1,7 @@
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useScrollPreservation } from "@/hooks/use-scroll-preservation";
 import {
   Alert,
   FlatList,
@@ -186,6 +187,9 @@ export default function HomemadeScreen() {
     isMountedRef.current = true;
     return () => { isMountedRef.current = false; };
   }, []);
+
+  // 滚动位置保持：从自制品详情页返回时恢复滚动位置
+  const { listRef: homemadeListRef, onScroll: onHomemadeScroll } = useScrollPreservation<FlatList>();
 
   const [enriching, setEnriching] = useState(false);
   const [enrichMsg, setEnrichMsg] = useState<string | null>(null);
@@ -886,6 +890,7 @@ export default function HomemadeScreen() {
         )
       ) : selectMode ? null : (
         <FlatList
+          ref={homemadeListRef}
           data={rows}
           keyExtractor={(item) => item.key}
           contentContainerStyle={{
@@ -893,6 +898,8 @@ export default function HomemadeScreen() {
             paddingTop: 4,
             paddingBottom: 90 + insets.bottom,
           }}
+          onScroll={onHomemadeScroll}
+          scrollEventThrottle={100}
           renderItem={({ item }) =>
             item.kind === "header" ? (
               <View style={styles.sectionHeader}>

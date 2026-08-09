@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { SearchBar } from "@/components/search-bar";
 import { useRouter } from "expo-router";
+import { useScrollPreservation } from "@/hooks/use-scroll-preservation";
 import * as Haptics from "expo-haptics";
 
 import { ScreenContainer } from "@/components/screen-container";
@@ -136,6 +137,9 @@ export default function BooksScreen() {
     tap();
     router.push({ pathname: "/book-reader", params: { id: book.id } });
   };
+
+  // 滚动位置保持：从书籍阅读页返回时恢复滚动位置
+  const { listRef: booksListRef, onScroll: onBooksScroll } = useScrollPreservation<FlatList>();
 
   const handleLongPress = useCallback(
     (book: StoredBook) => {
@@ -364,6 +368,7 @@ export default function BooksScreen() {
         </View>
       ) : (
         <FlatList
+          ref={booksListRef}
           data={filteredAndSorted}
           keyExtractor={(b) => b.id}
           numColumns={isTablet ? 2 : 1}
@@ -374,6 +379,8 @@ export default function BooksScreen() {
             paddingBottom: 90 + insets.bottom,
           }}
           columnWrapperStyle={isTablet ? { gap: 12 } : undefined}
+          onScroll={onBooksScroll}
+          scrollEventThrottle={100}
           renderItem={({ item: book, index }) => (
             <Pressable
               onPress={() => handleOpen(book)}

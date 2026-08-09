@@ -632,7 +632,6 @@ export default function MonthlySummaryScreen() {
   const renderReport = () => {
     const allItems = [...(report?.lineItems ?? []), ...(report?.manualItems ?? [])];
     const payrollPaymentsR = payments.filter((p) => p.payeeType === "employee");
-    const supplierPaymentsR = payments.filter((p) => p.payeeType === "supplier");
     const sections = CATEGORY_SECTIONS.map((cs) => ({
       ...cs,
       items: allItems.filter((i) => i.category === cs.key),

@@ -7,6 +7,7 @@ import { Alert, FlatList, Platform, Pressable, StyleSheet, Text, TextInput, View
 import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
+import { useScrollPreservation } from "@/hooks/use-scroll-preservation";
 import { useColors } from "@/hooks/use-colors";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useWineStore } from "@/lib/wine/store";
@@ -110,6 +111,9 @@ export default function WineScreen() {
     router.push(`/wine/${b.id}` as any);
   };
 
+  // 滚动位置保持：tab 切换时重置偏移量
+  const { listRef: wineListRef, onScroll: onWineScroll } = useScrollPreservation<FlatList>(tab);
+
   const subtitle = bottles.length > 0 ? `共 ${bottles.length} 款 · 独立数据库` : "记录每一款葡萄酒";
 
   return (
@@ -185,24 +189,33 @@ export default function WineScreen() {
         </View>
       ) : tab === "list" ? (
         <FlatList
+          ref={wineListRef}
           data={filtered}
           keyExtractor={(b) => b.id}
           renderItem={({ item }) => <WineCard bottle={item} onPress={() => handlePress(item)} />}
           contentContainerStyle={{ padding: 16, paddingBottom: 100 + insets.bottom }}
+          onScroll={onWineScroll}
+          scrollEventThrottle={100}
         />
       ) : tab === "region" ? (
         <FlatList
+          ref={wineListRef}
           data={byRegion}
           keyExtractor={([key]) => key}
           renderItem={({ item: [key, items] }) => <GroupSection title={key} items={items} onPress={handlePress} />}
           contentContainerStyle={{ padding: 16, paddingBottom: 100 + insets.bottom }}
+          onScroll={onWineScroll}
+          scrollEventThrottle={100}
         />
       ) : (
         <FlatList
+          ref={wineListRef}
           data={byGrape}
           keyExtractor={([key]) => key}
           renderItem={({ item: [key, items] }) => <GroupSection title={key} items={items} onPress={handlePress} />}
           contentContainerStyle={{ padding: 16, paddingBottom: 100 + insets.bottom }}
+          onScroll={onWineScroll}
+          scrollEventThrottle={100}
         />
       )}
     </View>

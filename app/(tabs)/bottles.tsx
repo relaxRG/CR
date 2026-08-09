@@ -52,6 +52,7 @@ import { useRecipeStore } from "@/lib/recipes/store";
 import { smartLinkIngredient } from "@/lib/recipes/smart-link";
 import type { Recipe } from "@/lib/recipes/types";
 import { fabBottom } from "@/components/floating-tab-bar";
+import { useScrollPreservation } from "@/hooks/use-scroll-preservation";
 
 export default function BottlesScreen() {
   const colors = useColors();
@@ -149,6 +150,8 @@ export default function BottlesScreen() {
     return () => { isMountedRef.current = false; };
   }, []);
 
+  // 滚动位置保持：从酒款详情页返回时恢复滚动位置；group 切换时重置偏移量
+  const { listRef: bottlesListRef, onScroll: onBottlesScroll } = useScrollPreservation<FlatList>(group);
 
   const [aiQueue, setAiQueue] = useState<Bottle[]>([]);
   const [aiQueueIdx, setAiQueueIdx] = useState(0);
@@ -1183,6 +1186,7 @@ export default function BottlesScreen() {
         />
       ) : (
         <FlatList
+          ref={bottlesListRef}
           data={sorted}
           keyExtractor={(item) => item.id}
           contentContainerStyle={{
@@ -1190,6 +1194,8 @@ export default function BottlesScreen() {
             paddingTop: 8,
             paddingBottom: 90 + insets.bottom,
           }}
+          onScroll={onBottlesScroll}
+          scrollEventThrottle={100}
           renderItem={({ item, index }) => (
             <BottleCard
               bottle={item}

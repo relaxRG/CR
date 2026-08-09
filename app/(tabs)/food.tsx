@@ -6,6 +6,7 @@ import { Alert, FlatList, Platform, Pressable, StyleSheet, Text, TextInput, View
 import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets, SafeAreaInsetsContext } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
+import { useScrollPreservation } from "@/hooks/use-scroll-preservation";
 import { useColors } from "@/hooks/use-colors";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useFoodMenuStore } from "@/lib/food/menu-store";
@@ -105,6 +106,9 @@ export default function FoodScreen() {
 
   const addRoute = tab === "menu" ? "/food-form" : "/food-ingredient-form";
 
+  // 滚动位置保持：tab 切换时重置偏移量
+  const { listRef: foodListRef, onScroll: onFoodScroll } = useScrollPreservation<FlatList>(tab);
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={[styles.header, { paddingTop: insets.top + 10, backgroundColor: colors.background }]}>
@@ -163,10 +167,13 @@ export default function FoodScreen() {
           </View>
         ) : (
           <FlatList
+            ref={foodListRef}
             data={filteredMenu}
             keyExtractor={(i) => i.id}
             renderItem={({ item }) => <MenuItemCard item={item} onPress={() => { tap(); router.push(`/food/${item.id}` as any); }} />}
             contentContainerStyle={{ padding: 16, paddingBottom: 100 + insets.bottom }}
+            onScroll={onFoodScroll}
+            scrollEventThrottle={100}
           />
         )
       ) : (
@@ -178,10 +185,13 @@ export default function FoodScreen() {
           </View>
         ) : (
           <FlatList
+            ref={foodListRef}
             data={filteredIngredients}
             keyExtractor={(i) => i.id}
             renderItem={({ item }) => <IngredientCard item={item} onPress={() => { tap(); router.push(`/food-ingredient/${item.id}` as any); }} />}
             contentContainerStyle={{ padding: 16, paddingBottom: 100 + insets.bottom }}
+            onScroll={onFoodScroll}
+            scrollEventThrottle={100}
           />
         )
       )}
