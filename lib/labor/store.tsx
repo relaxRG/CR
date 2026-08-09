@@ -163,15 +163,17 @@ function EmployeeProvider({ children }: { children: React.ReactNode }) {
 
   const addEmployee = useCallback((draft: Omit<Employee, "id" | "createdAt">): string => {
     const id = uuid();
-    // 新员工自动分配 sortOrder（同部门内最大值+1）
+    const now = Date.now();
+    // 新员工自动分配 sortOrder（同部门内最大値+1）
     const sameDept = ref.current.filter((e) => e.dept === draft.dept);
     const maxOrder = sameDept.reduce((max, e) => Math.max(max, e.sortOrder ?? 0), -1);
-    persist([...ref.current, { ...draft, id, sortOrder: maxOrder + 1, createdAt: new Date().toISOString() }]);
+    persist([...ref.current, { ...draft, id, sortOrder: maxOrder + 1, createdAt: new Date().toISOString(), updatedAt: now }]);
     return id;
   }, [persist, ref]);
 
   const updateEmployee = useCallback((id: string, patch: Partial<Employee>) => {
-    persist(ref.current.map((e) => e.id === id ? { ...e, ...patch } : e));
+    // 写入 updatedAt 时间戳，支持多端并发修改时的字段级 LWW 合并
+    persist(ref.current.map((e) => e.id === id ? { ...e, ...patch, updatedAt: Date.now() } : e));
   }, [persist, ref]);
 
   const deleteEmployee = useCallback((id: string) => {

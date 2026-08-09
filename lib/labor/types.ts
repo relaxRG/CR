@@ -824,6 +824,12 @@ export interface Employee {
   /** 归档时间 */
   archivedAt?: string;
   createdAt: string;
+  /**
+   * 最后修改时间戳（毫秒，Unix epoch）
+   * 用于多端并发修改时的字段级 LWW（Last Write Wins）合并
+   * 由 updateEmployee() 自动写入，无需手动维护
+   */
+  updatedAt?: number;
 }
 
 // ─── 员工银行卡 ───────────────────────────────────────────────────────────────

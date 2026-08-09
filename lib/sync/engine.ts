@@ -338,6 +338,10 @@ const ID_LIST_KEYS = new Set<string>([
   "spirits.matchMemory.v1",
   "spirits.customCategories.v1",
   "spirits.groupMatchMemory.v1",
+  // ★ 员工模块有 id 字段的键（防止并发修改时数据丢失）
+  "labor_comp_off_entries_v1",      // 调休余额明细（CompOffBalanceEntry）
+  "labor_holiday_comp_off_v1",      // 节假日调休余额（HolidayCompOffEntry）
+  "labor_unexplained_rest_alerts_v1", // 无来源多休提醒（UnexplainedRestAlert）
 ]);
 
 const STORE_OBJECT_KEYS = new Map<string, string[]>([
