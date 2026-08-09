@@ -232,6 +232,7 @@ export default function RootLayout() {
               <Stack.Screen name="labor-advances" />
               <Stack.Screen name="labor-salary-history" />
               <Stack.Screen name="labor-kpi-allowance" />
+              <Stack.Screen name="labor-kpi-allowance-edit" />
               <Stack.Screen name="petty-category-settings" options={{ presentation: "modal" }} />
               <Stack.Screen name="beer-ice-inventory" />
               <Stack.Screen name="beer-inventory" />
