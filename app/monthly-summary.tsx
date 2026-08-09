@@ -626,10 +626,8 @@ export default function MonthlySummaryScreen() {
     setAddPaymentNotes("");
     tap();
   };
-
-  // ── 单页滚动视图（主入口） ────────────────────────────────────────────────────
-  // ── 总报表 Tab ────────────────────────────────────────────────────────────
-  const renderReport = () => {
+  // ── 总报表 Tab 数据计算（useMemo 避免每次渲染重复计算）
+  const reportCalc = useMemo(() => {
     const allItems = [...(report?.lineItems ?? []), ...(report?.manualItems ?? [])];
     const payrollPaymentsR = payments.filter((p) => p.payeeType === "employee");
     const sections = CATEGORY_SECTIONS.map((cs) => ({
@@ -637,10 +635,15 @@ export default function MonthlySummaryScreen() {
       items: allItems.filter((i) => i.category === cs.key),
       subtotal: allItems.filter((i) => i.category === cs.key && !i.isDuplicate).reduce((s, i) => s + i.amount, 0),
     }));
-
     const totalRevenue = sections.find((s) => s.key === "revenue")?.subtotal ?? 0;
     const totalExpenses = sections.filter((s) => s.key !== "revenue").reduce((s, sec) => s + sec.subtotal, 0);
     const netProfit = totalRevenue + totalExpenses;
+    return { allItems, payrollPaymentsR, sections, totalRevenue, totalExpenses, netProfit };
+  }, [report, payments]);
+
+  // ── 总报表 Tab ────────────────────────────────────────────────────────────
+  const renderReport = () => {
+    const { allItems, payrollPaymentsR, sections, totalRevenue, totalExpenses, netProfit } = reportCalc;
 
     return (
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }}>

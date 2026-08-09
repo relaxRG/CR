@@ -331,17 +331,26 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
 
 
 
-  // 换休余额（直接从响应式 entries state 派生，天然响应式）
-  const compOffDays = compOffEntries
-    .filter((e) => e.employeeId === employee.id && e.status === "available" && e.expiresMonth >= month)
-    .reduce((sum, e) => sum + e.days, 0);
-  const holidayCompOffDays = holidayCompOffEntries
-    .filter((e) => e.employeeId === employee.id && e.status === "available" && e.expiresMonth >= month)
-    .reduce((sum, e) => sum + e.days, 0);
+  // 换休余额（useMemo 避免每次渲染对全量 entries 重复 filter/reduce）
+  const compOffDays = useMemo(() =>
+    compOffEntries
+      .filter((e) => e.employeeId === employee.id && e.status === "available" && e.expiresMonth >= month)
+      .reduce((sum, e) => sum + e.days, 0),
+    [compOffEntries, employee.id, month]
+  );
+  const holidayCompOffDays = useMemo(() =>
+    holidayCompOffEntries
+      .filter((e) => e.employeeId === employee.id && e.status === "available" && e.expiresMonth >= month)
+      .reduce((sum, e) => sum + e.days, 0),
+    [holidayCompOffEntries, employee.id, month]
+  );
   const totalCompOffDays = compOffDays + holidayCompOffDays;
 
-  // 无来源多休提醒（直接从响应式 alerts state 派生，天然响应式）
-  const restAlert = alerts.find((a) => a.employeeId === employee.id && a.month === month) ?? null;
+  // 无来源多休提醒（useMemo 避免每次渲染对全量 alerts 重复 find）
+  const restAlert = useMemo(() =>
+    alerts.find((a) => a.employeeId === employee.id && a.month === month) ?? null,
+    [alerts, employee.id, month]
+  );
 
   // ── 增加：按加班小时存入 ──
   const handleAddByHours = () => {
