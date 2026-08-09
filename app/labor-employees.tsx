@@ -129,8 +129,8 @@ function SwipeableEmpCard({
             </View>
             <Text style={{ fontSize: 12, color: colors.muted, marginTop: 3 }}>
               {emp.type === "fulltime"
-                ? `底薪¥${emp.baseSalary} · ${emp.stdHoursPerDay}h/天 · 休${emp.restDaysPerMonth}天/月 · 时薪¥${emp.hourlyRate}`
-                : `兼职 · 时薪¥${emp.hourlyRate}/h`}
+                ? `底薪¥${emp.baseSalary} · ${emp.weeklyHoursRules?.length ? `${emp.weeklyHoursRules.length}条工时规则` : "未配置工时"} · 休${emp.restDaysPerMonth}天/月 · 加班时薪¥${emp.overtimeHourlyRate}`
+                : `兼职 · 时薪¥${emp.overtimeHourlyRate}/h`}
             </Text>
             {emp.phone ? (
               <Text style={{ fontSize: 11, color: colors.muted, marginTop: 1 }}>{emp.phone}</Text>

@@ -123,8 +123,10 @@ export default function LaborEmployeeProfileScreen() {
           {isFulltime && (
             <>
               <InfoRow label="底薪（月）" value={`¥${emp.baseSalary}`} colors={colors} />
-              {/* 灵活工时 */}
-              <InfoRow label="默认工时" value={`${emp.stdHoursPerDay}h / 天`} colors={colors} />
+              {/* 灵活工时（已删除默认工时展示，全部改用灵活工时规则） */}
+              {(!emp.weeklyHoursRules || emp.weeklyHoursRules.length === 0) && (
+                <InfoRow label="灵活工时" value="未配置工时规则" colors={colors} />
+              )}
               {emp.weeklyHoursRules && emp.weeklyHoursRules.length > 0 && (
                 <View style={{ marginBottom: 14 }}>
                   <Text style={[S.infoLabel, { color: colors.foreground }]}>灵活工时规则</Text>
@@ -144,9 +146,9 @@ export default function LaborEmployeeProfileScreen() {
               <InfoRow label="月休息天数" value={`${emp.restDaysPerMonth} 天`} colors={colors} />
             </>
           )}
-          <InfoRow label="时薪" value={`¥${emp.hourlyRate} / 小时`} colors={colors} />
+          <InfoRow label={emp.type === "parttime" ? "兼职时薪" : "正常时薪（参考）"} value={`¥${emp.hourlyRate} / 小时`} colors={colors} />
           {isFulltime && (
-            <InfoRow label="加班时薪" value={`¥${emp.overtimeHourlyRate} / 小时`} colors={colors} />
+            <InfoRow label="加班时薪（实际计算）" value={`¥${emp.overtimeHourlyRate} / 小时`} colors={colors} />
           )}
         </SectionCard>
 

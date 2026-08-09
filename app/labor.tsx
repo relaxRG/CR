@@ -697,7 +697,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
                   </View>
                   {addMode === "hours" && (
                     <View style={{ gap: 8 }}>
-                      <Text style={{ fontSize: 11, color: colors.muted }}>当月加班：{att?.overtimeHours?.toFixed(1) ?? 0}h · 已计费：{att?.paidOvertimeHours?.toFixed(1) ?? 0}h · 时薪 ¥{employee.hourlyRate}</Text>
+                      <Text style={{ fontSize: 11, color: colors.muted }}>当月加班：{att?.overtimeHours?.toFixed(1) ?? 0}h · 已计费：{att?.paidOvertimeHours?.toFixed(1) ?? 0}h · 加班时薪 ¥{employee.overtimeHourlyRate}</Text>
                       <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
                         {[4, 8].map((h) => (
                           <TouchableOpacity key={h} onPress={() => setCompOffHoursInput(String(h))}
@@ -780,7 +780,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
                   )}
                   {deductMode === "cashout" && (
                     <View style={{ gap: 8 }}>
-                      <Text style={{ fontSize: 11, color: colors.muted }}>{`加班换休 → 时薪 ¥${employee.hourlyRate} × 加班小时数\n节假日换休 → 日薪 ¥${att?.dailyRate?.toFixed(0) ?? "—"} × 天数`}</Text>
+                      <Text style={{ fontSize: 11, color: colors.muted }}>{`加班换休 → 加班时薪 ¥${employee.overtimeHourlyRate} × 加班小时数\n节假日换休 → 日薪 ¥${att?.dailyRate?.toFixed(0) ?? "—"} × 天数`}</Text>
                       {getCompOffEntries(employee.id)
                         .filter((e) => e.status === "available" && e.expiresMonth >= month)
                         .sort((a, b) => a.expiresMonth.localeCompare(b.expiresMonth))
@@ -788,7 +788,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
                           const isOT = entry.source === "overtime";
                           const hours = entry.hoursDeducted ?? entry.days * 8;
                           const amount = isOT
-                            ? Math.round(hours * (employee.hourlyRate ?? 0) * 100) / 100
+                            ? Math.round(hours * (employee.overtimeHourlyRate ?? employee.hourlyRate ?? 0) * 100) / 100
                             : Math.round(entry.days * (att?.dailyRate ?? 0) * 100) / 100;
                           return (
                             <View key={entry.id} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 10, backgroundColor: colors.surface, borderRadius: 10, borderWidth: 1, borderColor: colors.border }}>
@@ -797,7 +797,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
                                   {isOT ? `加班换休 ${entry.days}天（${hours}h）` : `${entry.holidayName ?? "节假日"} 换休 ${entry.days}天`}
                                 </Text>
                                 <Text style={{ fontSize: 11, color: colors.muted }}>
-                                  {isOT ? `¥${employee.hourlyRate} × ${hours}h` : `¥${att?.dailyRate?.toFixed(0) ?? "—"} × ${entry.days}天`} · 到期 {entry.expiresMonth}
+                                  {isOT ? `¥${employee.overtimeHourlyRate} × ${hours}h` : `¥${att?.dailyRate?.toFixed(0) ?? "—"} × ${entry.days}天`} · 到期 {entry.expiresMonth}
                                 </Text>
                               </View>
                               <TouchableOpacity onPress={() => { tap(); handleCashOut(entry); }}
@@ -2844,7 +2844,7 @@ function SchTemplateModal({ visible, templates, specialStatuses, businessHours, 
                           style={[SCHEM.inputSmall, { color: colors.foreground, borderColor: colors.border, width: "100%" }]} />
                       </View>
                     </View>
-                    <Text style={{ fontSize: 10, color: colors.muted }}>工时由员工档案 stdHoursPerDay 自动带入，无需在此设置</Text>
+                    <Text style={{ fontSize: 10, color: colors.muted }}>工时由员工档案的灵活工时规则自动带入，无需在此设置</Text>
                   </View>
                 );
               })}

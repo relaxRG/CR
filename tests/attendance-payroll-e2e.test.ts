@@ -550,14 +550,15 @@ describe("Suite B：兑换调休余额（handleCashOut 重构验证）", () => {
     expect(slip.finalSalary).toBe(Math.round((6000 + cashOutAmount - advanceAmount) * 100) / 100);
   });
 
-  it("B4. 加班换休兑换金额：overtime 按时薪×小时，holiday 按日薪×天数", () => {
-    const hourlyRate = emp.hourlyRate ?? 0;
+  it("B4. 加班换休兑换金额：overtime 按加班时薪×小时，holiday 按日薪×天数", () => {
+    // 修复：调休兑现统一使用 overtimeHourlyRate（加班时薪），与引擎保持一致
+    const overtimeHourlyRate = emp.overtimeHourlyRate ?? emp.hourlyRate ?? 0;
     const dailyRate = DAILY_RATE;
 
-    // overtime 类型：8小时加班换休，时薪 37.5
+    // overtime 类型：8小时加班换休，加班时薪 50
     const overtimeEntry = { source: "overtime" as const, hoursDeducted: 8, days: 1 };
-    const overtimeAmount = Math.round((overtimeEntry.hoursDeducted ?? overtimeEntry.days * 8) * hourlyRate * 100) / 100;
-    expect(overtimeAmount).toBe(300); // 8h × 37.5
+    const overtimeAmount = Math.round((overtimeEntry.hoursDeducted ?? overtimeEntry.days * 8) * overtimeHourlyRate * 100) / 100;
+    expect(overtimeAmount).toBe(400); // 8h × 50（加班时薪）
 
     // holiday 类型：1天节假日换休，日薪 260.87
     const holidayEntry = { source: "holiday" as const, days: 1 };

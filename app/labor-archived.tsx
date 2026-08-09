@@ -123,8 +123,8 @@ export default function LaborArchivedScreen() {
                   </View>
                   <Text style={{ fontSize: 12, color: colors.muted + "88", marginTop: 3 }}>
                     {emp.type === "fulltime"
-                      ? `底薪¥${emp.baseSalary} · 时薪¥${emp.hourlyRate}`
-                      : `兼职 · 时薪¥${emp.hourlyRate}/h`}
+                      ? `底薪¥${emp.baseSalary} · 加班时薪¥${emp.overtimeHourlyRate}`
+                      : `兼职 · 时薪¥${emp.overtimeHourlyRate}/h`}
                   </Text>
                   <Text style={{ fontSize: 11, color: "#FF9500" + "99", marginTop: 2 }}>
                     归档于 {archivedDate}
