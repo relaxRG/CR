@@ -314,15 +314,25 @@ export default function LaborEmployeeFormScreen() {
     if (!taxEnabled) return null;
     const salary = Number(baseSalary) || 0;
     if (salary <= 0) return null;
+    // 修复 Bug：社保基数应应用城市政策的上下限约束，与 calcSocialInsurance 保持一致
     const siDeduct = siEnabled ? (() => {
-      const base = siConfig.base > 0 ? siConfig.base : salary;
+      const rawBase = siConfig.base > 0 ? siConfig.base : salary;
+      const base = siConfig.baseMax > 0
+        ? Math.min(siConfig.baseMax, Math.max(siConfig.baseMin, rawBase))
+        : Math.max(siConfig.baseMin, rawBase);
       return (siConfig.pension.enabled ? base * siConfig.pension.employeeRate : 0) +
         (siConfig.medical.enabled ? base * siConfig.medical.employeeRate : 0) +
-        (siConfig.unemployment.enabled ? base * siConfig.unemployment.employeeRate : 0);
+        (siConfig.unemployment.enabled ? base * siConfig.unemployment.employeeRate : 0) +
+        (siConfig.workInjury.enabled ? base * siConfig.workInjury.employeeRate : 0) +
+        (siConfig.maternity.enabled ? base * siConfig.maternity.employeeRate : 0);
     })() : 0;
+    // 修复 Bug：公积金基数同样应应用上下限约束
     const hfDeduct = hfEnabled ? (() => {
-      const base = siConfig.housingFund.base > 0 ? siConfig.housingFund.base : salary;
-      return base * siConfig.housingFund.employeeRate;
+      const hfRawBase = siConfig.housingFund.base > 0 ? siConfig.housingFund.base : salary;
+      const hfBase = siConfig.housingFund.baseMax > 0
+        ? Math.min(siConfig.housingFund.baseMax, Math.max(siConfig.housingFund.baseMin, hfRawBase))
+        : Math.max(siConfig.housingFund.baseMin, hfRawBase);
+      return hfBase * siConfig.housingFund.employeeRate;
     })() : 0;
     const threshold = taxConfig.threshold || 5000;
     const specialDeductions = taxConfig.specialDeductions || 0;
@@ -338,28 +348,40 @@ export default function LaborEmployeeFormScreen() {
 
   // ── 社保计算明细 ──
   const siPreview = useMemo(() => {
-    if (!siEnabled || siConfig.base <= 0) return null;
-    const base = siConfig.base;
+    if (!siEnabled) return null;
+    const salary = Number(baseSalary) || 0;
+    // 修复 Bug：社保基数应应用城市政策的上下限约束
+    const rawBase = siConfig.base > 0 ? siConfig.base : salary;
+    if (rawBase <= 0) return null;
+    const base = siConfig.baseMax > 0
+      ? Math.min(siConfig.baseMax, Math.max(siConfig.baseMin, rawBase))
+      : Math.max(siConfig.baseMin, rawBase);
     const empTotal = (siConfig.pension.enabled ? base * siConfig.pension.employeeRate : 0) +
       (siConfig.medical.enabled ? base * siConfig.medical.employeeRate : 0) +
-      (siConfig.unemployment.enabled ? base * siConfig.unemployment.employeeRate : 0);
+      (siConfig.unemployment.enabled ? base * siConfig.unemployment.employeeRate : 0) +
+      (siConfig.workInjury.enabled ? base * siConfig.workInjury.employeeRate : 0) +
+      (siConfig.maternity.enabled ? base * siConfig.maternity.employeeRate : 0);
     const erTotal = (siConfig.pension.enabled ? base * siConfig.pension.employerRate : 0) +
       (siConfig.medical.enabled ? base * siConfig.medical.employerRate : 0) +
       (siConfig.unemployment.enabled ? base * siConfig.unemployment.employerRate : 0) +
       (siConfig.workInjury.enabled ? base * siConfig.workInjury.employerRate : 0) +
       (siConfig.maternity.enabled ? base * siConfig.maternity.employerRate : 0);
     return { base, empTotal, erTotal };
-  }, [siEnabled, siConfig]);
+  }, [siEnabled, siConfig, baseSalary]);
 
   // ── 公积金计算明细 ──
   const hfPreview = useMemo(() => {
     if (!hfEnabled) return null;
     const salary = Number(baseSalary) || 0;
-    const base = siConfig.housingFund.base > 0 ? siConfig.housingFund.base : salary;
-    if (base <= 0) return null;
-    const empAmount = base * siConfig.housingFund.employeeRate;
-    const erAmount = base * siConfig.housingFund.employerRate;
-    return { base, empAmount, erAmount, total: empAmount + erAmount };
+    // 修复 Bug：公积金基数应应用上下限约束
+    const hfRawBase = siConfig.housingFund.base > 0 ? siConfig.housingFund.base : salary;
+    if (hfRawBase <= 0) return null;
+    const hfBase = siConfig.housingFund.baseMax > 0
+      ? Math.min(siConfig.housingFund.baseMax, Math.max(siConfig.housingFund.baseMin, hfRawBase))
+      : Math.max(siConfig.housingFund.baseMin, hfRawBase);
+    const empAmount = hfBase * siConfig.housingFund.employeeRate;
+    const erAmount = hfBase * siConfig.housingFund.employerRate;
+    return { base: hfBase, empAmount, erAmount, total: empAmount + erAmount };
   }, [hfEnabled, siConfig.housingFund, baseSalary]);
 
   const isFulltime = type === "fulltime";
