@@ -10,6 +10,7 @@ import {
   Employee, EmployeeDept, ShiftEntry, MonthlyAttendance, PaySlip, MonthConfig,
   ShiftTemplate, HolidayConfig,
   SpecialStatus, GlobalPayrollSettings,
+  MonthlyConfirmation, PayrollConfirmationStatus, PayrollAdjustment, AdjustmentSettleMethod,
   CompOffBalanceEntry, HolidayCompOffEntry, UnexplainedRestAlert,
   CustomDept, BusinessHoursEntry, ShiftGroup, FillPreset,
   ScheduleSnapshot, DeptCategory,
@@ -1123,6 +1124,133 @@ function GlobalPayrollSettingsProvider({ children }: { children: React.ReactNode
   );
 }
 
+// ─── 确认发薪状态机 Provider ──────────────────────────────────────────────────
+interface PayrollConfirmationStore {
+  confirmations: MonthlyConfirmation[];
+  getStatus: (month: string) => PayrollConfirmationStatus;
+  getConfirmation: (month: string) => MonthlyConfirmation | null;
+  isMonthLocked: (month: string) => boolean;
+  isMonthWritable: (month: string) => boolean;
+  confirmPayroll: (month: string, summary: MonthlyConfirmation["summary"]) => void;
+  enterAdjustMode: (month: string) => void;
+  confirmAdjustment: (month: string, adjustments: PayrollAdjustment[]) => void;
+  cancelAdjustment: (month: string) => void;
+  revokeConfirmation: (month: string) => void;
+  settleAdjustment: (month: string, adjustmentId: string, method: AdjustmentSettleMethod, settledInMonth: string) => void;
+  getPendingAdjustments: (month: string) => PayrollAdjustment[];
+  ready: boolean;
+}
+
+const PayrollConfirmationContext = createContext<PayrollConfirmationStore>({
+  confirmations: [],
+  getStatus: () => "draft",
+  getConfirmation: () => null,
+  isMonthLocked: () => false,
+  isMonthWritable: () => true,
+  confirmPayroll: () => {},
+  enterAdjustMode: () => {},
+  confirmAdjustment: () => {},
+  cancelAdjustment: () => {},
+  revokeConfirmation: () => {},
+  settleAdjustment: () => {},
+  getPendingAdjustments: () => [],
+  ready: false,
+});
+
+function PayrollConfirmationProvider({ children }: { children: React.ReactNode }) {
+  const { data: confirmations, ref, persist, ready } = usePersisted<MonthlyConfirmation>("labor_payroll_confirmations_v1");
+
+  const getConfirmation = useCallback((month: string): MonthlyConfirmation | null => {
+    return ref.current.find((c) => c.month === month) ?? null;
+  }, [ref]);
+
+  const getStatus = useCallback((month: string): PayrollConfirmationStatus => {
+    return getConfirmation(month)?.status ?? "draft";
+  }, [getConfirmation]);
+
+  const isMonthLocked = useCallback((month: string): boolean => {
+    return getStatus(month) === "frozen";
+  }, [getStatus]);
+
+  const isMonthWritable = useCallback((month: string): boolean => {
+    const status = getStatus(month);
+    return status === "draft" || status === "adjusting";
+  }, [getStatus]);
+
+  const upsertConfirmation = useCallback((conf: MonthlyConfirmation) => {
+    const idx = ref.current.findIndex((c) => c.month === conf.month);
+    if (idx >= 0) { const next = [...ref.current]; next[idx] = conf; persist(next); }
+    else persist([...ref.current, conf]);
+  }, [persist, ref]);
+
+  const confirmPayroll = useCallback((month: string, summary: MonthlyConfirmation["summary"]) => {
+    const existing = getConfirmation(month);
+    upsertConfirmation({
+      month,
+      status: "frozen",
+      frozenAt: Date.now(),
+      frozenBy: "manager",
+      adjustingAt: undefined,
+      adjustments: existing?.adjustments ?? [],
+      summary,
+    });
+  }, [getConfirmation, upsertConfirmation]);
+
+  const enterAdjustMode = useCallback((month: string) => {
+    const existing = getConfirmation(month);
+    if (!existing || existing.status !== "frozen") return;
+    upsertConfirmation({ ...existing, status: "adjusting", adjustingAt: Date.now() });
+  }, [getConfirmation, upsertConfirmation]);
+
+  const confirmAdjustment = useCallback((month: string, adjustments: PayrollAdjustment[]) => {
+    const existing = getConfirmation(month);
+    if (!existing || existing.status !== "adjusting") return;
+    upsertConfirmation({
+      ...existing,
+      status: "frozen",
+      frozenAt: Date.now(),
+      adjustments: [...existing.adjustments, ...adjustments],
+    });
+  }, [getConfirmation, upsertConfirmation]);
+
+  const cancelAdjustment = useCallback((month: string) => {
+    const existing = getConfirmation(month);
+    if (!existing || existing.status !== "adjusting") return;
+    upsertConfirmation({ ...existing, status: "frozen", adjustingAt: undefined });
+  }, [getConfirmation, upsertConfirmation]);
+
+  const revokeConfirmation = useCallback((month: string) => {
+    const existing = getConfirmation(month);
+    if (!existing) return;
+    upsertConfirmation({ ...existing, status: "draft", frozenAt: undefined, frozenBy: undefined });
+  }, [getConfirmation, upsertConfirmation]);
+
+  const settleAdjustment = useCallback((month: string, adjustmentId: string, method: AdjustmentSettleMethod, settledInMonth: string) => {
+    const existing = getConfirmation(month);
+    if (!existing) return;
+    const updated = existing.adjustments.map((a) =>
+      a.id === adjustmentId ? { ...a, settled: true, settleMethod: method, settledInMonth } : a
+    );
+    upsertConfirmation({ ...existing, adjustments: updated });
+  }, [getConfirmation, upsertConfirmation]);
+
+  const getPendingAdjustments = useCallback((month: string): PayrollAdjustment[] => {
+    const existing = getConfirmation(month);
+    if (!existing) return [];
+    return existing.adjustments.filter((a) => !a.settled);
+  }, [getConfirmation]);
+
+  return (
+    <PayrollConfirmationContext.Provider value={{
+      confirmations, getStatus, getConfirmation, isMonthLocked, isMonthWritable,
+      confirmPayroll, enterAdjustMode, confirmAdjustment, cancelAdjustment,
+      revokeConfirmation, settleAdjustment, getPendingAdjustments, ready,
+    }}>
+      {children}
+    </PayrollConfirmationContext.Provider>
+  );
+}
+
 // ─── 月度设置 Provider ────────────────────────────────────────────────────────
 interface MonthConfigStore {
   configs: MonthConfig[];
@@ -1550,7 +1678,9 @@ export function LaborProvider({ children }: { children: React.ReactNode }) {
                           <UnexplainedRestAlertProvider>
                             <PaySlipProvider>
                                   <GlobalPayrollSettingsProvider>
-                                    {children}
+                                    <PayrollConfirmationProvider>
+                                      {children}
+                                    </PayrollConfirmationProvider>
                                   </GlobalPayrollSettingsProvider>
                             </PaySlipProvider>
                           </UnexplainedRestAlertProvider>
@@ -1589,3 +1719,4 @@ export function useBusinessHoursStore() { return useContext(BusinessHoursContext
 export function useShiftGroupStore() { return useContext(ShiftGroupContext); }
 export function useFillPresetStore() { return useContext(FillPresetContext); }
 export function useScheduleSnapshotStore() { return useContext(ScheduleSnapshotContext); }
+export function usePayrollConfirmationStore() { return useContext(PayrollConfirmationContext); }

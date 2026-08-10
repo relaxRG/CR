@@ -27,6 +27,7 @@ import {
   useCompOffBalanceEntryStore, useHolidayCompOffStore, useUnexplainedRestAlertStore,
   useCustomDeptStore, useBusinessHoursStore, useShiftGroupStore, useFillPresetStore,
   useScheduleSnapshotStore, useDeptOrderStore, DEFAULT_DEPT_ORDER,
+  usePayrollConfirmationStore,
 } from "@/lib/labor/store";
 import { useSalaryAdvanceStore, useAdvanceCategoryStore } from "@/lib/labor/advance-store";
 import { usePettyCashStore, PETTY_CODE_LABELS, PettyRecord } from "@/lib/store/petty-store";
@@ -315,6 +316,8 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
   const { alerts, resolveAlert } = useUnexplainedRestAlertStore();
   const router = useRouter();
   const { isReadOnly } = useFeature();
+  const { isMonthWritable: isMonthWritableForCard } = usePayrollConfirmationStore();
+  const canWrite = !isReadOnly && isMonthWritableForCard(month);
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
   const [expanded, setExpanded] = useState(false);
   const [showCompOffModal, setShowCompOffModal] = useState(false);
@@ -912,14 +915,14 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
 
           {/* 操作按钮行：绩效补贴 | 编辑薪资（只读模式隐藏）| 付款信息 | 历史 */}
           <View style={{ flexDirection: "row", gap: 6, marginTop: 4 }}>
-            {!isReadOnly && (
+            {canWrite && (
               <TouchableOpacity onPress={() => { tap(); router.push({ pathname: "/labor-kpi-allowance", params: { employeeId: employee.id, month } } as any); }}
                 style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 3, paddingVertical: 7, borderRadius: 8, backgroundColor: colors.success + "15", borderWidth: 1, borderColor: colors.success + "44" }}>
                 <IconSymbol name="chart.bar.fill" size={11} color={colors.success} />
                 <Text style={{ fontSize: 11, color: colors.success, fontWeight: "600" }}>绩效补贴</Text>
               </TouchableOpacity>
             )}
-            {!isReadOnly && (
+            {canWrite && (
               <TouchableOpacity onPress={() => { tap(); router.push({ pathname: "/labor-attendance", params: { employeeId: employee.id, month } } as any); }}
                 style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 3, paddingVertical: 7, borderRadius: 8, backgroundColor: colors.primary + "15", borderWidth: 1, borderColor: colors.primary + "44" }}>
                 <IconSymbol name="pencil" size={11} color={colors.primary} />
@@ -3415,8 +3418,8 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   const { upsertAlert } = useUnexplainedRestAlertStore();
   const { businessHours, setBusinessHours } = useBusinessHoursStore();
   const { shiftGroups, setShiftGroups } = useShiftGroupStore();
-  const { snapshots: allSnapshots, saveSnapshot, updateSnapshot, deleteSnapshot } = useScheduleSnapshotStore();
-
+    const { snapshots: allSnapshots, saveSnapshot, updateSnapshot, deleteSnapshot } = useScheduleSnapshotStore();
+  const { getStatus: getConfirmStatus, isMonthWritable } = usePayrollConfirmationStore();
   const now = new Date();
   const todayStr = now.toISOString().slice(0, 10);
   const currentMonth = month;
@@ -3525,6 +3528,8 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   // 排班数据自动同步薪资单：每次 shifts 变化时自动重算当月已有排班的员工薪资单
   const autoSyncTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   React.useEffect(() => {
+    // 确认发薪锁定检查：已确认月份跳过所有自动写入
+    if (getConfirmStatus(currentMonth) === "frozen") return;
     // 防抖：500ms 内多次修改只触发一次
     if (autoSyncTimerRef.current) clearTimeout(autoSyncTimerRef.current);
     autoSyncTimerRef.current = setTimeout(() => {
@@ -3680,6 +3685,10 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   // 班次模式格子点击 → SchShiftModal
   // 时长模式格子点击 → SchHoursModal
   const handleCellPress = (emp: Employee, date: string, session: string) => {
+    if (!isMonthWritable(currentMonth)) {
+      Alert.alert("已锁定", "本月已确认发薪，如需修改请先进入差额调整模式。");
+      return;
+    }
     tap();
     setEditEmployee(emp);
     setEditDate(date);
@@ -4038,7 +4047,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                   ]}>
                     <View style={{ width: 3, height: 34, backgroundColor: groupColor + "CC" }} />
                     <TouchableOpacity
-                      onLongPress={() => { if (!editMode) { tap(); setQuickFillEmployee(emp); if (viewMode === "session") { setShowQuickFill(true); } else { setShowQuickFillHours(true); } } }}
+                      onLongPress={() => { if (!editMode) { if (!isMonthWritable(currentMonth)) { Alert.alert("已锁定", "本月已确认发薪，如需修改请先进入差额调整模式。"); return; } tap(); setQuickFillEmployee(emp); if (viewMode === "session") { setShowQuickFill(true); } else { setShowQuickFillHours(true); } } }}
                       style={[EXL.nameCol, { backgroundColor: "transparent", width: EXL_NAME_W - 3 }]}>
                       <Text style={{ fontSize: 11, fontWeight: "600", color: colors.foreground }} numberOfLines={1}>{emp.code}</Text>
                     </TouchableOpacity>
