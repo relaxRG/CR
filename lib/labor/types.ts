@@ -1158,6 +1158,28 @@ export interface PaySlip {
   pettyLaborPaid?: number;
   /** 备用金人工已付明细（关联的 PettyCashLaborLink ID 列表） */
   pettyLaborLinkIds?: string[];
+
+  // ─── 确认发薪快照字段 ───
+  /** 确认发薪时间戳（有值 = 已确认/已锁定） */
+  frozenAt?: number;
+  /** 确认人 */
+  frozenBy?: string;
+  /** 确认时的快照数据（不可变副本，用于差额计算） */
+  frozenSnapshot?: {
+    grossSalary: number;
+    finalSalary: number;
+    attendanceSalary: number;
+    mealAllowance: number;
+    transportAllowance: number;
+    otherAllowance: number;
+    performanceBonus: number;
+    socialInsuranceDeduction: number;
+    housingFundDeduction: number;
+    advanceAmount: number;
+  };
+  /** 上月差额调整（计入本月薪资） */
+  adjustmentFromPrevMonth?: number;
+
   updatedAt: string;
 }
 
@@ -1452,4 +1474,54 @@ export interface ScheduleSnapshot {
   createdAt: string;
   /** 完整排班记录快照 */
   entries: ShiftEntry[];
+}
+
+// ─── 确认发薪状态管理 ─────────────────────────────────────────────────────────
+
+export type PayrollConfirmationStatus = "draft" | "frozen" | "adjusting";
+
+/** 差额调整处理方式 */
+export type AdjustmentSettleMethod = "next_month" | "separate" | "ignored";
+
+/** 单条差额调整记录 */
+export interface PayrollAdjustment {
+  id: string;
+  /** 调整产生时间 */
+  createdAt: number;
+  /** 涉及员工 */
+  employeeId: string;
+  employeeName: string;
+  /** 差额金额（正=应补发，负=应扣回） */
+  amount: number;
+  /** 差额明细说明 */
+  details: string;
+  /** 是否已处理 */
+  settled: boolean;
+  /** 处理方式 */
+  settleMethod?: AdjustmentSettleMethod;
+  /** 处理月份 */
+  settledInMonth?: string;
+}
+
+/** 月度确认状态 */
+export interface MonthlyConfirmation {
+  /** 月份（YYYY-MM） */
+  month: string;
+  /** 状态：draft=草稿 | frozen=已锁定 | adjusting=调整模式 */
+  status: PayrollConfirmationStatus;
+  /** 确认发薪时间 */
+  frozenAt?: number;
+  /** 确认人 */
+  frozenBy?: string;
+  /** 进入调整模式的时间 */
+  adjustingAt?: number;
+  /** 调整历史记录 */
+  adjustments: PayrollAdjustment[];
+  /** 确认时的汇总数据 */
+  summary?: {
+    totalEmployees: number;
+    totalGrossSalary: number;
+    totalFinalSalary: number;
+    totalDeductions: number;
+  };
 }
