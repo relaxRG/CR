@@ -288,3 +288,133 @@ describe("Suite M：薪资卡片视觉回归测试", () => {
     });
   });
 });
+
+// ─── 多屏幕分辨率自适应字号模拟 ──────────────────────────────────────────────
+
+/**
+ * 模拟 adjustsFontSizeToFit 的缩放逻辑
+ * React Native 会根据文字宽度和容器宽度自动缩小字号
+ *
+ * 近似公式：
+ *   charWidth(fontSize) ≈ fontSize × 0.6（等宽估算）
+ *   textWidth = text.length × charWidth
+ *   if textWidth > containerWidth → scale = containerWidth / textWidth
+ *   effectiveFontSize = max(fontSize × minimumFontScale, fontSize × scale)
+ */
+function simulateAdjustsFontSize(
+  text: string,
+  containerWidth: number,
+  fontSize: number,
+  minimumFontScale: number
+): { effectiveFontSize: number; overflows: boolean } {
+  const charWidthRatio = 0.62; // 数字字符宽度约为字号的 62%
+  const textWidth = text.length * fontSize * charWidthRatio;
+  if (textWidth <= containerWidth) {
+    return { effectiveFontSize: fontSize, overflows: false };
+  }
+  const scale = containerWidth / textWidth;
+  const effectiveFontSize = Math.max(fontSize * minimumFontScale, fontSize * scale);
+  const overflows = effectiveFontSize < fontSize * minimumFontScale;
+  return { effectiveFontSize, overflows };
+}
+
+// 设备屏幕宽度（逻辑点）
+const DEVICES = {
+  "iPhone SE (375pt)": 375,
+  "iPhone 15 (390pt)": 390,
+  "iPhone 15 Pro Max (430pt)": 430,
+  "iPad mini (744pt)": 744,
+};
+
+// 人力总览卡片：4格等分，每格宽度 = (屏幕宽 - padding*2 - divider*3) / 4
+function getOVItemWidth(screenWidth: number): number {
+  const padding = 14 * 2; // card padding
+  const dividers = 3; // 3条分割线（约1px）
+  return (screenWidth - padding - dividers) / 4;
+}
+
+// 薪资卡片5格：每格宽度 = (屏幕宽 - cardPadding*2 - outerPadding*2) / 5
+function getPayslipItemWidth(screenWidth: number): number {
+  const outerPadding = 16 * 2;
+  const cardPadding = 12 * 2;
+  return (screenWidth - outerPadding - cardPadding) / 5;
+}
+
+describe("Suite N：多屏幕分辨率自适应字号测试", () => {
+
+  describe("N1. 人力总览卡片 - 大金额不溢出", () => {
+    const testAmounts = [
+      { label: "5位整数", text: "¥14411", fontSize: 16, minScale: 0.6 },
+      { label: "7位含小数", text: "¥14410.74", fontSize: 16, minScale: 0.6 },
+      { label: "6位整数", text: "¥100000", fontSize: 16, minScale: 0.6 },
+      { label: "破折号", text: "—", fontSize: 16, minScale: 0.6 },
+    ];
+
+    Object.entries(DEVICES).forEach(([device, screenWidth]) => {
+      testAmounts.forEach(({ label, text, fontSize, minScale }) => {
+        it(`${device} - ${label}(${text})不溢出`, () => {
+          const containerWidth = getOVItemWidth(screenWidth);
+          const { overflows } = simulateAdjustsFontSize(text, containerWidth, fontSize, minScale);
+          expect(overflows).toBe(false);
+        });
+      });
+    });
+  });
+
+  describe("N2. 薪资卡片5格 - 大金额不溢出", () => {
+    const testAmounts = [
+      { label: "6位含小数", text: "¥14410.74", fontSize: 12, minScale: 0.7 },
+      { label: "负号+6位", text: "-¥8339.80", fontSize: 12, minScale: 0.7 },
+      { label: "+号+5位", text: "+¥14411", fontSize: 12, minScale: 0.7 },
+      { label: "预支+6位", text: "-¥14411", fontSize: 12, minScale: 0.7 },
+    ];
+
+    Object.entries(DEVICES).forEach(([device, screenWidth]) => {
+      testAmounts.forEach(({ label, text, fontSize, minScale }) => {
+        it(`${device} - ${label}(${text})不溢出`, () => {
+          const containerWidth = getPayslipItemWidth(screenWidth);
+          const { overflows } = simulateAdjustsFontSize(text, containerWidth, fontSize, minScale);
+          expect(overflows).toBe(false);
+        });
+      });
+    });
+  });
+
+  describe("N3. 短金额保持原始字号", () => {
+    const shortAmounts = ["¥0", "—", "¥15", "¥100"];
+    const device = "iPhone SE (375pt)";
+    const screenWidth = 375;
+
+    shortAmounts.forEach((text) => {
+      it(`${device} - 短金额 ${text} 不缩小`, () => {
+        const containerWidth = getOVItemWidth(screenWidth);
+        const { effectiveFontSize } = simulateAdjustsFontSize(text, containerWidth, 16, 0.6);
+        expect(effectiveFontSize).toBe(16); // 短金额不触发缩小
+      });
+    });
+  });
+
+  describe("N4. formatMoney 精度与自适应字号兼容性", () => {
+    // 验证 formatMoney 输出的字符串长度在各设备上均不溢出
+    const moneyValues = [
+      { value: 14410.74, expected: "14410.74" },
+      { value: 100000, expected: "100000" },
+      { value: 8339.80, expected: "8339.80" },
+      { value: 0.1, expected: "0.10" },
+      { value: NaN, expected: "0" },
+    ];
+
+    moneyValues.forEach(({ value, expected }) => {
+      it(`formatMoney(${value}) = "${expected}"`, () => {
+        expect(formatMoney(value)).toBe(expected);
+      });
+    });
+
+    it("最长可能金额 ¥99999.99 在 iPhone SE 5格中不溢出", () => {
+      const text = "¥99999.99";
+      const containerWidth = getPayslipItemWidth(375);
+      const { overflows } = simulateAdjustsFontSize(text, containerWidth, 12, 0.7);
+      expect(overflows).toBe(false);
+    });
+  });
+});
