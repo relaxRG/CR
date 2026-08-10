@@ -35,6 +35,7 @@ import {
 } from "@/lib/cf-sync/client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
+import { useSync } from "@/lib/cf-sync/provider";
 
 // ─── 功能模块定义（从纯 TS 文件导入，不依赖 React Native）─────────────────────────────
 export type { FeatureKey } from "@/lib/sync/feature-modules";
@@ -118,6 +119,7 @@ export default function RoleSettingsScreen() {
     }
   })();
 
+  const { refreshDeviceInfo } = useSync();
   const [role, setRole] = useState<DeviceRole>(initialRole);
   const [enabledFeatures, setEnabledFeatures] = useState<Set<FeatureKey>>(
     allowedKeysToFeatures(initialAllowedKeys),
@@ -220,14 +222,16 @@ export default function RoleSettingsScreen() {
           await SecureStore.setItemAsync(key, "collaborator");
         }
       }
+      // 转移后立即刷新本机的 deviceInfo State，无需重新进入页面
+      await refreshDeviceInfo();
       if (Platform.OS !== "web") {
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
       Alert.alert(
         lang === "zh" ? "转移成功" : "Transfer Complete",
         lang === "zh"
-          ? `已将主设备权限转移给「${deviceName}」。本机已降级为协作者，请重新进入设备管理页面查看最新状态。`
-          : `Owner role transferred to "${deviceName}". This device is now a collaborator. Please reopen Device Manager to see the updated status.`,
+          ? `已将主设备权限转移给「${deviceName}」。本机已降级为协作者。`
+          : `Owner role transferred to "${deviceName}". This device is now a collaborator.`,
         [{ text: "OK", onPress: () => router.back() }],
       );
     } catch (e) {
