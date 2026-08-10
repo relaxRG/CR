@@ -7,6 +7,7 @@
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import { formatMoney } from "@/lib/utils";
 import { exportLaborData, type ExportType } from "@/lib/labor/export";
+import { buildImportTemplate, parseImportFile, type ImportResult } from "@/lib/labor/import";
 import {
   Alert, Clipboard, Dimensions, Modal, Platform, Pressable, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions, KeyboardAvoidingView} from "react-native";
@@ -963,8 +964,13 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
 
   // ─── 导出功能（薪资报表 + 排班表，Excel/PDF）────────────────────────────────
   const { shifts } = useShiftStore();
+  const { deptOrder: exportDeptOrder } = useDeptOrderStore();
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [showImportMenu, setShowImportMenu] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [showImportPreview, setShowImportPreview] = useState(false);
 
   const _handleExportRaw = useCallback(async (type: ExportType) => {
     tap();
@@ -978,15 +984,58 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
         attendances,
         shifts,
         shiftTemplates,
+        deptOrder: exportDeptOrder,
       });
     } catch (e) {
       Alert.alert("导出失败", String(e));
     } finally {
       setExporting(false);
     }
-  }, [month, employees, paySlips, attendances, shifts, shiftTemplates]);
+  }, [month, employees, paySlips, attendances, shifts, shiftTemplates, exportDeptOrder]);
   // 防抖包装：1500ms 内重复点击被忽略，防止移动端连续快速点击触发多次导出任务
   const handleExport = useThrottleFn(_handleExportRaw, 1500);
+
+  // ─── 导入功能（排班数据批量导入）──────────────────────────────────────────────
+  const { batchUpsertShifts } = useShiftStore();
+
+  const handleDownloadTemplate = useCallback(async () => {
+    tap();
+    setShowImportMenu(false);
+    try {
+      await buildImportTemplate({ month, employees, shiftTemplates });
+    } catch (e) {
+      Alert.alert("模版生成失败", String(e));
+    }
+  }, [month, employees, shiftTemplates]);
+
+  const handlePickImportFile = useCallback(async () => {
+    tap();
+    setShowImportMenu(false);
+    setImporting(true);
+    try {
+      const result = await parseImportFile({
+        month,
+        employees,
+        shiftTemplates,
+        existingShifts: shifts,
+      });
+      if (!result) return;
+      setImportResult(result);
+      setShowImportPreview(true);
+    } catch (e) {
+      Alert.alert("文件解析失败", String(e));
+    } finally {
+      setImporting(false);
+    }
+  }, [month, employees, shiftTemplates, shifts]);
+
+  const handleConfirmImport = useCallback(() => {
+    if (!importResult) return;
+    batchUpsertShifts(importResult.entries);
+    setShowImportPreview(false);
+    setImportResult(null);
+    Alert.alert("导入成功", `已写入 ${importResult.parsedCount} 条排班记录${importResult.overwriteCount > 0 ? `，覆盖 ${importResult.overwriteCount} 条原有数据` : ""}`);
+  }, [importResult, batchUpsertShifts]);
 
   // 班次颜色查找辅助函数（动态读取模板）
 
@@ -1040,6 +1089,12 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
         <View style={{ flex: 1 }} />
         {/* 薪资对比开关 */}
         <CompareToggle mode={compareMode} customMonth={customMonth} baseMonth={month} onChange={setCompareMode} onCustomMonthChange={setCustomMonth} colors={colors} />
+        {/* 导入按钮 */}
+        <TouchableOpacity onPress={() => { tap(); setShowImportMenu(true); }}
+          style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: colors.border + "44", alignItems: "center", justifyContent: "center", opacity: importing ? 0.5 : 1 }}
+          disabled={importing}>
+          <IconSymbol name="square.and.arrow.down" size={16} color={importing ? colors.muted : colors.foreground} />
+        </TouchableOpacity>
         {/* 导出按钮 */}
         <TouchableOpacity onPress={() => { tap(); setShowExportMenu(true); }}
           style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: colors.border + "44", alignItems: "center", justifyContent: "center", opacity: exporting ? 0.5 : 1 }}
@@ -1048,27 +1103,120 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
         </TouchableOpacity>
       </View>
 
+      {/* 导入菜单 Modal */}
+      <Modal visible={showImportMenu} transparent animationType="fade" onRequestClose={() => setShowImportMenu(false)}>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)" }} activeOpacity={1} onPress={() => setShowImportMenu(false)}>
+          <View style={{ position: "absolute", right: 16, top: 120, backgroundColor: colors.surface, borderRadius: 14, padding: 8, minWidth: 220, shadowColor: "#000", shadowOpacity: 0.18, shadowRadius: 12, elevation: 8 }}>
+            <Text style={{ fontSize: 13, fontWeight: "700", color: colors.muted, paddingHorizontal: 12, paddingVertical: 6 }}>导入排班 {month}</Text>
+            <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); void handleDownloadTemplate(); }}
+              style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10 }}>
+              <IconSymbol name="arrow.down.doc" size={18} color="#007AFF" />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>下载排班模版</Text>
+                <Text style={{ fontSize: 11, color: colors.muted }}>含班次模版 + 工时模版</Text>
+              </View>
+            </TouchableOpacity>
+            <View style={{ height: 1, backgroundColor: colors.border, marginHorizontal: 12 }} />
+            <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); void handlePickImportFile(); }}
+              style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10 }}>
+              <IconSymbol name="square.and.arrow.up.on.square" size={18} color="#34C759" />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>导入排班数据</Text>
+                <Text style={{ fontSize: 11, color: colors.muted }}>选择填好的 Excel 文件</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* 导入预览 Modal */}
+      <Modal visible={showImportPreview} transparent animationType="slide" onRequestClose={() => setShowImportPreview(false)}>
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" }}>
+          <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "80%" }}>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+              <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground }}>导入预览</Text>
+              <TouchableOpacity onPress={() => setShowImportPreview(false)}>
+                <IconSymbol name="xmark.circle.fill" size={22} color={colors.muted} />
+              </TouchableOpacity>
+            </View>
+            {importResult && (
+              <View style={{ padding: 16 }}>
+                <View style={{ flexDirection: "row", gap: 12, marginBottom: 12 }}>
+                  <View style={{ flex: 1, backgroundColor: "#34C75920", borderRadius: 10, padding: 10, alignItems: "center" }}>
+                    <Text style={{ fontSize: 20, fontWeight: "700", color: "#34C759" }}>{importResult.parsedCount}</Text>
+                    <Text style={{ fontSize: 11, color: colors.muted }}>待写入</Text>
+                  </View>
+                  <View style={{ flex: 1, backgroundColor: "#FF950020", borderRadius: 10, padding: 10, alignItems: "center" }}>
+                    <Text style={{ fontSize: 20, fontWeight: "700", color: "#FF9500" }}>{importResult.overwriteCount}</Text>
+                    <Text style={{ fontSize: 11, color: colors.muted }}>将覆盖</Text>
+                  </View>
+                  <View style={{ flex: 1, backgroundColor: "#FF3B3020", borderRadius: 10, padding: 10, alignItems: "center" }}>
+                    <Text style={{ fontSize: 20, fontWeight: "700", color: "#FF3B30" }}>{importResult.skippedCount}</Text>
+                    <Text style={{ fontSize: 11, color: colors.muted }}>已跳过</Text>
+                  </View>
+                </View>
+                {importResult.warnings.length > 0 && (
+                  <View style={{ backgroundColor: "#FF950020", borderRadius: 10, padding: 10, marginBottom: 12 }}>
+                    <Text style={{ fontSize: 12, fontWeight: "600", color: "#FF9500", marginBottom: 4 }}>⚠️ 警告（{importResult.warnings.length} 条）</Text>
+                    {importResult.warnings.slice(0, 5).map((w, i) => (
+                      <Text key={i} style={{ fontSize: 11, color: colors.muted }}>{w}</Text>
+                    ))}
+                    {importResult.warnings.length > 5 && <Text style={{ fontSize: 11, color: colors.muted }}>...还有 {importResult.warnings.length - 5} 条</Text>}
+                  </View>
+                )}
+                <ScrollView style={{ maxHeight: 200, marginBottom: 12 }}>
+                  {importResult.preview.slice(0, 50).map((row, i) => (
+                    <View key={i} style={{ flexDirection: "row", alignItems: "center", paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                      <Text style={{ width: 60, fontSize: 12, color: colors.muted }}>{row.employeeCode}</Text>
+                      <Text style={{ width: 60, fontSize: 12, color: colors.foreground }}>{row.employeeName}</Text>
+                      <Text style={{ width: 70, fontSize: 12, color: colors.muted }}>{row.date.slice(5)}</Text>
+                      <Text style={{ flex: 1, fontSize: 12, color: row.session ? "#007AFF" : colors.muted }}>{row.session ?? "—"}</Text>
+                      <Text style={{ width: 50, fontSize: 12, color: row.hoursValue ? "#34C759" : colors.muted, textAlign: "right" }}>{row.hoursValue ? `${row.hoursValue}h` : "—"}</Text>
+                      {row.willOverwrite && <Text style={{ fontSize: 10, color: "#FF9500", marginLeft: 4 }}>覆盖</Text>}
+                    </View>
+                  ))}
+                  {importResult.preview.length > 50 && <Text style={{ fontSize: 11, color: colors.muted, textAlign: "center", paddingVertical: 8 }}>...还有 {importResult.parsedCount - 50} 条</Text>}
+                </ScrollView>
+                <View style={{ flexDirection: "row", gap: 10 }}>
+                  <TouchableOpacity onPress={() => setShowImportPreview(false)}
+                    style={{ flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: colors.border + "44", alignItems: "center" }}>
+                    <Text style={{ fontSize: 15, fontWeight: "600", color: colors.foreground }}>取消</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={handleConfirmImport}
+                    style={{ flex: 2, paddingVertical: 12, borderRadius: 12, backgroundColor: "#34C759", alignItems: "center" }}>
+                    <Text style={{ fontSize: 15, fontWeight: "700", color: "white" }}>确认导入 {importResult.parsedCount} 条</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
+
       {/* 导出菜单 Modal */}
       <Modal visible={showExportMenu} transparent animationType="fade" onRequestClose={() => setShowExportMenu(false)}>
         <TouchableOpacity style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)" }} activeOpacity={1} onPress={() => setShowExportMenu(false)}>
-          <View style={{ position: "absolute", right: 16, top: 120, backgroundColor: colors.surface, borderRadius: 14, padding: 8, minWidth: 220, shadowColor: "#000", shadowOpacity: 0.18, shadowRadius: 12, elevation: 8 }}>
+          <View style={{ position: "absolute", right: 16, top: 120, backgroundColor: colors.surface, borderRadius: 14, padding: 8, minWidth: 240, shadowColor: "#000", shadowOpacity: 0.18, shadowRadius: 12, elevation: 8 }}>
             <Text style={{ fontSize: 13, fontWeight: "700", color: colors.muted, paddingHorizontal: 12, paddingVertical: 6 }}>导出 {month}</Text>
             {([
-              { type: "payroll_excel" as ExportType, icon: "tablecells", label: "薪资报表 Excel", sub: "含全部细化字段" },
+              { type: "combined_excel" as ExportType, icon: "tablecells.badge.ellipsis", label: "综合报表 Excel", sub: "薪资+考勤+排班，6个Sheet" },
+              { type: "combined_pdf" as ExportType, icon: "doc.richtext.fill", label: "综合报表 PDF", sub: "薪资总表+日历排班，A3横向" },
+              { type: "payroll_excel" as ExportType, icon: "tablecells", label: "薪资报表 Excel", sub: "仅薪资，含全部细化字段" },
               { type: "payroll_pdf" as ExportType, icon: "doc.richtext", label: "薪资报表 PDF", sub: "A3 横向打印" },
-              { type: "schedule_hours_excel" as ExportType, icon: "clock", label: "排班表 Excel（时长）", sub: "前厅+后厨，工时模式" },
-              { type: "schedule_hours_pdf" as ExportType, icon: "clock", label: "排班表 PDF（时长）", sub: "A3 横向打印" },
               { type: "schedule_session_excel" as ExportType, icon: "calendar", label: "排班表 Excel（班次）", sub: "前厅+后厨，班次名称" },
-              { type: "schedule_session_pdf" as ExportType, icon: "calendar", label: "排班表 PDF（班次）", sub: "A3 横向打印" },
-            ] as const).map(({ type, icon, label, sub }) => (
-              <TouchableOpacity key={type} onPress={(e) => { e.stopPropagation?.(); handleExport(type); }}
-                style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10 }}>
-                <IconSymbol name={icon as any} size={18} color={colors.foreground} />
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>{label}</Text>
-                  <Text style={{ fontSize: 11, color: colors.muted }}>{sub}</Text>
-                </View>
-              </TouchableOpacity>
+              { type: "schedule_hours_excel" as ExportType, icon: "clock", label: "排班表 Excel（时长）", sub: "前厅+后厨，工时模式" },
+            ] as const).map(({ type, icon, label, sub }, idx) => (
+              <React.Fragment key={type}>
+                {idx === 2 && <View style={{ height: 1, backgroundColor: colors.border, marginHorizontal: 12, marginVertical: 4 }} />}
+                <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); handleExport(type); }}
+                  style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10 }}>
+                  <IconSymbol name={icon as any} size={18} color={idx < 2 ? "#007AFF" : colors.foreground} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontWeight: "600", color: idx < 2 ? "#007AFF" : colors.foreground }}>{label}</Text>
+                    <Text style={{ fontSize: 11, color: colors.muted }}>{sub}</Text>
+                  </View>
+                </TouchableOpacity>
+              </React.Fragment>
             ))}
           </View>
         </TouchableOpacity>
