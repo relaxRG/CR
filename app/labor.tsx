@@ -2587,7 +2587,7 @@ function SchShiftModal({ visible, date, employee, session, existing, contractHou
               <Text style={{ fontSize: 12, color: colors.muted }}>{date} 周{DOW[dow]}</Text>
               {date && !date.startsWith(currentMonth) && (
                 <View style={{ paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4, backgroundColor: colors.warning + "22" }}>
-                  <Text style={{ fontSize: 10, color: colors.warning, fontWeight: "600" }}>跨月·不计入本月</Text>
+                  <Text style={{ fontSize: 10, color: colors.warning, fontWeight: "600" }}>跨月·计入{date.slice(5,7)}月考勤</Text>
                 </View>
               )}
             </View>
@@ -2792,7 +2792,7 @@ function SchHoursModal({ visible, date, employee, session, existing, contractHou
               <Text style={{ fontSize: 12, color: colors.muted }}>{date} 周{DOW[dow]}</Text>
               {date && !date.startsWith(currentMonth) && (
                 <View style={{ paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4, backgroundColor: colors.warning + "22" }}>
-                  <Text style={{ fontSize: 10, color: colors.warning, fontWeight: "600" }}>跨月·不计入本月</Text>
+                  <Text style={{ fontSize: 10, color: colors.warning, fontWeight: "600" }}>跨月·计入{date.slice(5,7)}月考勤</Text>
                 </View>
               )}
             </View>
