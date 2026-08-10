@@ -502,6 +502,14 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
         );
       })()}
 
+      {/* ─── 备注预览（收起状态，有备注才显示）─── */}
+      {!expanded && slip?.notes ? (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 6, paddingTop: 6, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border + "33" }}>
+          <IconSymbol name="note.text" size={10} color={colors.muted} />
+          <Text numberOfLines={1} style={{ fontSize: 11, color: colors.muted, flex: 1 }}>{slip.notes}</Text>
+        </View>
+      ) : null}
+
       {/* ─── 展开明细（点击卡片展开）─── */}
       {expanded && (
         <View style={{ marginTop: 10, gap: 0, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border + "55", paddingTop: 10 }}>
@@ -928,6 +936,14 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
               <Text style={{ fontSize: 11, color: "#5856D6", fontWeight: "600" }}>历史</Text>
             </TouchableOpacity>
           </View>
+
+          {/* ─── 备注预览（展开状态，卡片最底部）─── */}
+          {slip?.notes ? (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 6, paddingTop: 6, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border + "33" }}>
+              <IconSymbol name="note.text" size={10} color={colors.muted} />
+              <Text numberOfLines={2} style={{ fontSize: 11, color: colors.muted, flex: 1 }}>{slip.notes}</Text>
+            </View>
+          ) : null}
         </View>
       )}
     </TouchableOpacity>

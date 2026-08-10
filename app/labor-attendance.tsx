@@ -199,6 +199,8 @@ function EmployeeCard({
 
   const [rewardItems, setRewardItems] = useState<RewardPenaltyItem[]>(slip?.rewardPenaltyItems ?? []);
   const [notes, setNotes] = useState(slip?.notes ?? "");
+  const [noteEditing, setNoteEditing] = useState(false);
+  const [noteInput, setNoteInput] = useState(slip?.notes ?? "");
 
   const addRewardItem = () => {
     setRewardItems([...rewardItems, { id: Date.now().toString(), name: "", amount: 0, note: "" }]);
@@ -456,11 +458,49 @@ function EmployeeCard({
 
       {/* 备注 */}
       <View style={[S.section, { borderColor: colors.border }]}>
-        <Text style={[S.sectionTitle, { color: colors.muted, marginBottom: 8 }]}>备注</Text>
-        <TextInput value={notes} onChangeText={setNotes}
-          onBlur={() => { if (slip && notes !== slip.notes) upsertPaySlip({ ...slip, notes, updatedAt: new Date().toISOString() }); }}
-          placeholder="薪资备注..." placeholderTextColor={colors.muted} multiline
-          style={[S.notesInput, { color: colors.foreground, borderColor: colors.border }]} />
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+          <Text style={[S.sectionTitle, { color: colors.muted }]}>备注</Text>
+          {!noteEditing ? (
+            <TouchableOpacity
+              onPress={() => { setNoteInput(notes); setNoteEditing(true); }}
+              style={{ flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: colors.primary + "15", borderWidth: 1, borderColor: colors.primary + "33" }}>
+              <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "600" }}>编辑</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={{ flexDirection: "row", gap: 8 }}>
+              <TouchableOpacity
+                onPress={() => setNoteEditing(false)}
+                style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: 1, borderColor: colors.border }}>
+                <Text style={{ fontSize: 12, color: colors.muted }}>取消</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  const trimmed = noteInput.trim();
+                  setNotes(trimmed);
+                  if (slip) upsertPaySlip({ ...slip, notes: trimmed, updatedAt: new Date().toISOString() });
+                  setNoteEditing(false);
+                }}
+                style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: colors.primary }}>
+                <Text style={{ fontSize: 12, color: "#fff", fontWeight: "700" }}>保存</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+        {noteEditing ? (
+          <TextInput
+            value={noteInput}
+            onChangeText={setNoteInput}
+            placeholder="添加备注（如：含年终奖、代发差旅等）"
+            placeholderTextColor={colors.muted}
+            multiline
+            autoFocus
+            style={[S.notesInput, { color: colors.foreground, borderColor: colors.primary }]}
+          />
+        ) : (
+          <Text style={{ fontSize: 13, color: notes ? colors.foreground : colors.muted, fontStyle: notes ? "normal" : "italic", lineHeight: 20 }}>
+            {notes || "暂无备注"}
+          </Text>
+        )}
       </View>
 
       {/* 薪资汇总 */}
