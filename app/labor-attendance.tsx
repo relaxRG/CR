@@ -195,11 +195,17 @@ function EmployeeCard({
   // ── 本月调休兑换 ──
   const compOffCashOut = slip?.compOffCashOut ?? 0;
   // ── 预支合计（useMemo 避免每次渲染重复 filter/reduce） ──
+  // 修复：加入 month 过滤（deductMonth 或 date 匹配当月），与自动同步引擎保持一致
+  // 原来缺少 month 过滤，会把历史所有月份的预支全部累加，导致预支小计偏大
   const advanceTotal = useMemo(() =>
     advances
-      .filter((a: any) => a.employeeId === employee.id && (a.status === "pending" || a.status === "deducted"))
+      .filter((a: any) =>
+        a.employeeId === employee.id &&
+        (a.deductMonth === month || a.date?.startsWith(month)) &&
+        (a.status === "pending" || a.status === "deducted")
+      )
       .reduce((sum: number, a: any) => sum + (a.amount || 0), 0),
-    [advances, employee.id]
+    [advances, employee.id, month]
   );
 
   const [rewardItems, setRewardItems] = useState<RewardPenaltyItem[]>(slip?.rewardPenaltyItems ?? []);
@@ -460,7 +466,7 @@ function EmployeeCard({
         {compOffCashOut > 0 && (
           <DetailRow label="本月调休兑换" value={`+¥${formatMoney(compOffCashOut)}`} colors={colors} positive />
         )}
-        <DetailRow label="预支小计" value={advanceTotal > 0 ? `-¥${advanceTotal}` : "¥0"} colors={colors} negative={advanceTotal > 0} />
+        <DetailRow label="预支小计" value={advanceTotal > 0 ? `-¥${formatMoney(advanceTotal)}` : "¥0"} colors={colors} negative={advanceTotal > 0} />
         {(slip?.pettyLaborPaid ?? 0) > 0 && (
           <DetailRow label="备用金已付" value={`-¥${formatMoney((slip!.pettyLaborPaid!))}`} colors={colors} negative />
         )}
