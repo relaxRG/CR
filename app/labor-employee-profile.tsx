@@ -53,7 +53,8 @@ export default function LaborEmployeeProfileScreen() {
 
   const dept = resolveEmployeeDept(emp);
   const deptColor = dept.color ?? DEPT_COLORS[emp.dept] ?? colors.primary;
-  const isFulltime = emp.type === "fulltime" || emp.type === "longterm_parttime";
+  const isFulltime = emp.type === "fulltime";
+  const isParttime = emp.type === "parttime" || emp.type === "longterm_parttime";
   const typeColor = EMPLOYEE_TYPE_COLORS[emp.type] ?? colors.primary;
 
   return (

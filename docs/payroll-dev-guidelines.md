@@ -92,6 +92,25 @@ const result = denominator > 0
 
 > **`tests/` 中的纯函数版计算逻辑（如 `calcFromShiftsPure`）必须与 `store.tsx` 保持完全一致。任何修改 store.tsx 的 PR 必须同步更新测试文件。**
 
+### 规范 7：员工类型分支必须覆盖所有兼职变体
+
+> **任何基于 `employee.type` 的条件分支，如果语义是“兼职逻辑”，必须同时包含 `"parttime"` 和 `"longterm_parttime"`。仅在部门分组过滤器中允许单独检查 `"parttime"`。**
+
+```typescript
+// ✅ 正确：薪资计算/UI/校验中的兼职判断
+const isParttime = employee.type === "parttime" || employee.type === "longterm_parttime";
+
+// ✅ 正确：部门分组过滤器（临时兼职单独分组，长期兼职归属部门）
+parttime: { filter: (e) => e.type === "parttime" }  // 此处故意不含 longterm
+
+// ❌ 错误：薪资计算中只检查 parttime
+if (employee.type === "parttime") { ... }  // 漏掉 longterm_parttime
+```
+
+### 规范 8：兼职员工不依赖全职专属字段
+
+> **兼职员工保存时必须清理不适用的字段：`restDaysPerMonth=0`、`weeklyHoursRules=undefined`。校验规则（V003/V004）必须排除兼职员工。**
+
 ---
 
 ## 三、代码审查清单
