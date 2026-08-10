@@ -652,7 +652,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
                       <Text numberOfLines={1} style={{ fontSize: 9, color: colors.muted, marginTop: 1 }}>{label}</Text>
                     </View>
                   ))}
-                  <TouchableOpacity onPress={() => { tap(); setPanelMode("add"); setAddMode("hours"); setShowCompOffModal(!showCompOffModal); }}
+                  <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); tap(); setPanelMode("add"); setAddMode("hours"); setShowCompOffModal(!showCompOffModal); }}
                     style={{ flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 7, backgroundColor: colors.success + "15", borderWidth: 1, borderColor: colors.success + "44", marginLeft: 4 }}>
                     <IconSymbol name="plusminus" size={10} color={colors.success} />
                     <Text style={{ fontSize: 10, color: colors.success, fontWeight: "600" }}>存入/兑换</Text>
@@ -668,7 +668,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
               {/* 面板标题行 */}
               <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
                 <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>调休余额管理</Text>
-                <TouchableOpacity onPress={() => setShowCompOffModal(false)} style={{ paddingHorizontal: 8, paddingVertical: 4 }}>
+                <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); setShowCompOffModal(false); }} style={{ paddingHorizontal: 8, paddingVertical: 4 }}>
                   <Text style={{ fontSize: 13, color: colors.muted }}>关闭</Text>
                 </TouchableOpacity>
               </View>
@@ -704,7 +704,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
                     <Text style={{ fontSize: 11, fontWeight: "600", color: colors.foreground }}>存入调休</Text>
                     <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
                       {[4, 8].map((h) => (
-                        <TouchableOpacity key={h} onPress={() => setCompOffHoursInput(String(h))}
+                        <TouchableOpacity key={h} onPress={(e) => { e.stopPropagation?.(); setCompOffHoursInput(String(h)); }}
                           style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7,
                             backgroundColor: compOffHoursInput === String(h) ? colors.warning : colors.background,
                             borderWidth: 1, borderColor: compOffHoursInput === String(h) ? colors.warning : colors.border }}>
@@ -715,7 +715,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
                         style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 7, paddingHorizontal: 8, paddingVertical: 6, color: colors.foreground, width: 55, fontSize: 12, backgroundColor: colors.background }} />
                       <Text style={{ fontSize: 11, color: colors.muted }}>h</Text>
                     </View>
-                    <TouchableOpacity onPress={handleAddByHours}
+                    <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); handleAddByHours(); }}
                       style={{ paddingVertical: 9, borderRadius: 8, backgroundColor: colors.warning, alignItems: "center" }}>
                       <Text style={{ fontSize: 13, fontWeight: "700", color: "#fff" }}>存入 {Number(compOffHoursInput) >= 8 ? 1 : 0.5}天调休</Text>
                     </TouchableOpacity>
@@ -737,7 +737,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
                               <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>加班调休 {entry.days}天（{hours}h）</Text>
                               <Text style={{ fontSize: 11, color: colors.muted }}>￥{employee.overtimeHourlyRate} × {hours}h · 到期 {entry.expiresMonth}</Text>
                             </View>
-                            <TouchableOpacity onPress={() => { tap(); handleCashOut(entry); }}
+                            <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); tap(); handleCashOut(entry); }}
                               style={{ backgroundColor: colors.warning, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7, marginLeft: 8 }}>
                               <Text style={{ fontSize: 12, fontWeight: "700", color: "#fff" }}>兑换 ￥{amount.toFixed(0)}</Text>
                             </TouchableOpacity>
@@ -749,13 +749,13 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
                 })()}
                 {/* 加班调休存入/兑换切换按鈕 */}
                 <View style={{ flexDirection: "row", gap: 8 }}>
-                  <TouchableOpacity onPress={() => { setPanelMode("add"); setAddMode("hours"); }}
+                  <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); setPanelMode("add"); setAddMode("hours"); }}
                     style={{ flex: 1, paddingVertical: 7, borderRadius: 8, borderWidth: 1, alignItems: "center",
                       backgroundColor: panelMode === "add" ? colors.warning : colors.background,
                       borderColor: panelMode === "add" ? colors.warning : colors.border }}>
                     <Text style={{ fontSize: 12, fontWeight: "600", color: panelMode === "add" ? "#fff" : colors.muted }}>+ 存入调休</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => { setPanelMode("deduct"); setDeductMode("cashout"); }}
+                  <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); setPanelMode("deduct"); setDeductMode("cashout"); }}
                     style={{ flex: 1, paddingVertical: 7, borderRadius: 8, borderWidth: 1, alignItems: "center",
                       backgroundColor: panelMode === "deduct" ? colors.warning + "22" : colors.background,
                       borderColor: panelMode === "deduct" ? colors.warning : colors.border }}>
@@ -790,7 +790,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
                               <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>{entry.holidayName ?? "节假日"} 换休 {entry.days}天</Text>
                               <Text style={{ fontSize: 11, color: colors.muted }}>日薪 ￥{att?.dailyRate?.toFixed(0) ?? "—"} × {entry.days}天 · 到期 {entry.expiresMonth}</Text>
                             </View>
-                            <TouchableOpacity onPress={() => { tap(); handleCashOut(entry); }}
+                            <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); tap(); handleCashOut(entry); }}
                               style={{ backgroundColor: "#FF2D55", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7, marginLeft: 8 }}>
                               <Text style={{ fontSize: 12, fontWeight: "700", color: "#fff" }}>兑换 ￥{amount.toFixed(0)}</Text>
                             </TouchableOpacity>
@@ -810,13 +810,13 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
                 </View>
                 <Text style={{ fontSize: 11, color: colors.muted }}>直接增加或减少天数，不产生金额</Text>
                 <View style={{ flexDirection: "row", gap: 8 }}>
-                  <TouchableOpacity onPress={() => { setPanelMode("add"); setAddMode("days"); }}
+                  <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); setPanelMode("add"); setAddMode("days"); }}
                     style={{ flex: 1, paddingVertical: 7, borderRadius: 8, borderWidth: 1, alignItems: "center",
                       backgroundColor: panelMode === "add" && addMode === "days" ? colors.success : colors.background,
                       borderColor: panelMode === "add" && addMode === "days" ? colors.success : colors.border }}>
                     <Text style={{ fontSize: 12, fontWeight: "600", color: panelMode === "add" && addMode === "days" ? "#fff" : colors.muted }}>+ 增加天数</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => { setPanelMode("deduct"); setDeductMode("direct"); }}
+                  <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); setPanelMode("deduct"); setDeductMode("direct"); }}
                     style={{ flex: 1, paddingVertical: 7, borderRadius: 8, borderWidth: 1, alignItems: "center",
                       backgroundColor: panelMode === "deduct" && deductMode === "direct" ? colors.error : colors.background,
                       borderColor: panelMode === "deduct" && deductMode === "direct" ? colors.error : colors.border }}>
@@ -827,7 +827,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
                   <View style={{ gap: 8 }}>
                     <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
                       {[0.5, 1, 2].map((d) => (
-                        <TouchableOpacity key={d} onPress={() => setAddDaysInput(String(d))}
+                        <TouchableOpacity key={d} onPress={(e) => { e.stopPropagation?.(); setAddDaysInput(String(d)); }}
                           style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7,
                             backgroundColor: addDaysInput === String(d) ? colors.success : colors.background,
                             borderWidth: 1, borderColor: addDaysInput === String(d) ? colors.success : colors.border }}>
@@ -838,7 +838,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
                         style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 7, paddingHorizontal: 8, paddingVertical: 6, color: colors.foreground, width: 55, fontSize: 12, backgroundColor: colors.background }} />
                       <Text style={{ fontSize: 11, color: colors.muted }}>天</Text>
                     </View>
-                    <TouchableOpacity onPress={handleAddByDays}
+                    <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); handleAddByDays(); }}
                       style={{ paddingVertical: 9, borderRadius: 8, backgroundColor: colors.success, alignItems: "center" }}>
                       <Text style={{ fontSize: 13, fontWeight: "700", color: "#fff" }}>确认增加 {addDaysInput || "0"} 天</Text>
                     </TouchableOpacity>
@@ -849,7 +849,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
                     <Text style={{ fontSize: 11, color: colors.muted }}>当前余额 {totalCompOffDays} 天</Text>
                     <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
                       {[0.5, 1, 2].map((d) => (
-                        <TouchableOpacity key={d} onPress={() => setDeductDaysInput(String(d))}
+                        <TouchableOpacity key={d} onPress={(e) => { e.stopPropagation?.(); setDeductDaysInput(String(d)); }}
                           style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7,
                             backgroundColor: deductDaysInput === String(d) ? colors.error : colors.background,
                             borderWidth: 1, borderColor: deductDaysInput === String(d) ? colors.error : colors.border }}>
@@ -860,7 +860,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
                         style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 7, paddingHorizontal: 8, paddingVertical: 6, color: colors.foreground, width: 55, fontSize: 12, backgroundColor: colors.background }} />
                       <Text style={{ fontSize: 11, color: colors.muted }}>天</Text>
                     </View>
-                    <TouchableOpacity onPress={handleDeductDirect}
+                    <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); handleDeductDirect(); }}
                       style={{ paddingVertical: 9, borderRadius: 8, backgroundColor: colors.error, alignItems: "center" }}>
                       <Text style={{ fontSize: 13, fontWeight: "700", color: "#fff" }}>确认减少 {deductDaysInput || "0"} 天</Text>
                     </TouchableOpacity>
@@ -4241,11 +4241,11 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                                       </View>
                                       {/* 存入/兑换切换按鈕 */}
                                       <View style={{ flexDirection: "row", gap: 6 }}>
-                                        <TouchableOpacity onPress={() => { setPMode("add"); setAMode("hours"); }}
+                                        <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); setPMode("add"); setAMode("hours"); }}
                                           style={{ flex: 1, paddingVertical: 6, borderRadius: 7, borderWidth: 1, alignItems: "center", backgroundColor: pMode === "add" ? colors.warning : colors.surface, borderColor: pMode === "add" ? colors.warning : colors.border }}>
                                           <Text style={{ fontSize: 11, fontWeight: "600", color: pMode === "add" ? "#fff" : colors.muted }}>+ 存入调休</Text>
                                         </TouchableOpacity>
-                                        <TouchableOpacity onPress={() => { setPMode("deduct"); setDMode("cashout"); }}
+                                        <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); setPMode("deduct"); setDMode("cashout"); }}
                                           style={{ flex: 1, paddingVertical: 6, borderRadius: 7, borderWidth: 1, alignItems: "center", backgroundColor: pMode === "deduct" && dMode === "cashout" ? colors.warning + "22" : colors.surface, borderColor: pMode === "deduct" && dMode === "cashout" ? colors.warning : colors.border }}>
                                           <Text style={{ fontSize: 11, fontWeight: "600", color: pMode === "deduct" && dMode === "cashout" ? colors.warning : colors.muted }}>兑换现金</Text>
                                         </TouchableOpacity>
@@ -4255,7 +4255,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                                         <View style={{ gap: 6 }}>
                                           <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
                                             {[4, 8].map((h) => (
-                                              <TouchableOpacity key={h} onPress={() => setHours(String(h))}
+                                              <TouchableOpacity key={h} onPress={(e) => { e.stopPropagation?.(); setHours(String(h)); }}
                                                 style={{ paddingHorizontal: 8, paddingVertical: 5, borderRadius: 6, backgroundColor: hoursVal === String(h) ? colors.warning : colors.surface, borderWidth: 1, borderColor: hoursVal === String(h) ? colors.warning : colors.border }}>
                                                 <Text style={{ fontSize: 11, color: hoursVal === String(h) ? "#fff" : colors.muted }}>{h}h={h>=8?1:0.5}天</Text>
                                               </TouchableOpacity>
@@ -4264,7 +4264,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                                               style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 5, color: colors.foreground, width: 48, fontSize: 11, backgroundColor: colors.surface }} />
                                             <Text style={{ fontSize: 10, color: colors.muted }}>h</Text>
                                           </View>
-                                          <TouchableOpacity onPress={doAddByHours}
+                                          <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); doAddByHours(); }}
                                             style={{ paddingVertical: 8, borderRadius: 7, backgroundColor: colors.warning, alignItems: "center" }}>
                                             <Text style={{ fontSize: 12, fontWeight: "700", color: "#fff" }}>存入 {Number(hoursVal) >= 8 ? 1 : 0.5}天调休</Text>
                                           </TouchableOpacity>
@@ -4284,7 +4284,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                                                       <Text style={{ fontSize: 12, fontWeight: "600", color: colors.foreground }}>加班调休 {entry.days}天（{hours}h）</Text>
                                                       <Text style={{ fontSize: 10, color: colors.muted }}>￥{emp.overtimeHourlyRate ?? 0} × {hours}h · 到期 {entry.expiresMonth}</Text>
                                                     </View>
-                                                    <TouchableOpacity onPress={() => doCashOut(entry)}
+                                                    <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); doCashOut(entry); }}
                                                       style={{ backgroundColor: colors.warning, borderRadius: 7, paddingHorizontal: 10, paddingVertical: 6, marginLeft: 6 }}>
                                                       <Text style={{ fontSize: 11, fontWeight: "700", color: "#fff" }}>兑换 ￥{amount.toFixed(0)}</Text>
                                                     </TouchableOpacity>
@@ -4315,7 +4315,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                                                   <Text style={{ fontSize: 12, fontWeight: "600", color: colors.foreground }}>{entry.holidayName ?? "节假日"} 换休 {entry.days}天</Text>
                                                   <Text style={{ fontSize: 10, color: colors.muted }}>日薪 ￥{att?.dailyRate?.toFixed(0) ?? "—"} × {entry.days}天 · 到期 {entry.expiresMonth}</Text>
                                                 </View>
-                                                <TouchableOpacity onPress={() => doCashOut(entry)}
+                                                <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); doCashOut(entry); }}
                                                   style={{ backgroundColor: "#FF2D55", borderRadius: 7, paddingHorizontal: 10, paddingVertical: 6, marginLeft: 6 }}>
                                                   <Text style={{ fontSize: 11, fontWeight: "700", color: "#fff" }}>兑换 ￥{amount.toFixed(0)}</Text>
                                                 </TouchableOpacity>
@@ -4331,11 +4331,11 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                                         <Text style={{ fontSize: 12, fontWeight: "700", color: colors.foreground }}>手动调整</Text>
                                       </View>
                                       <View style={{ flexDirection: "row", gap: 6 }}>
-                                        <TouchableOpacity onPress={() => { setPMode("add"); setAMode("days"); }}
+                                        <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); setPMode("add"); setAMode("days"); }}
                                           style={{ flex: 1, paddingVertical: 6, borderRadius: 7, borderWidth: 1, alignItems: "center", backgroundColor: pMode === "add" && aMode === "days" ? colors.success : colors.surface, borderColor: pMode === "add" && aMode === "days" ? colors.success : colors.border }}>
                                           <Text style={{ fontSize: 11, fontWeight: "600", color: pMode === "add" && aMode === "days" ? "#fff" : colors.muted }}>+ 增加天数</Text>
                                         </TouchableOpacity>
-                                        <TouchableOpacity onPress={() => { setPMode("deduct"); setDMode("direct"); }}
+                                        <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); setPMode("deduct"); setDMode("direct"); }}
                                           style={{ flex: 1, paddingVertical: 6, borderRadius: 7, borderWidth: 1, alignItems: "center", backgroundColor: pMode === "deduct" && dMode === "direct" ? colors.error : colors.surface, borderColor: pMode === "deduct" && dMode === "direct" ? colors.error : colors.border }}>
                                           <Text style={{ fontSize: 11, fontWeight: "600", color: pMode === "deduct" && dMode === "direct" ? "#fff" : colors.muted }}>− 减少天数</Text>
                                         </TouchableOpacity>
@@ -4344,7 +4344,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                                         <View style={{ gap: 6 }}>
                                           <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
                                             {[0.5, 1, 2].map((d) => (
-                                              <TouchableOpacity key={d} onPress={() => setDays(String(d))}
+                                              <TouchableOpacity key={d} onPress={(e) => { e.stopPropagation?.(); setDays(String(d)); }}
                                                 style={{ paddingHorizontal: 8, paddingVertical: 5, borderRadius: 6, backgroundColor: daysVal === String(d) ? colors.success : colors.surface, borderWidth: 1, borderColor: daysVal === String(d) ? colors.success : colors.border }}>
                                                 <Text style={{ fontSize: 11, color: daysVal === String(d) ? "#fff" : colors.muted }}>{d}天</Text>
                                               </TouchableOpacity>
@@ -4353,7 +4353,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                                               style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 5, color: colors.foreground, width: 48, fontSize: 11, backgroundColor: colors.surface }} />
                                             <Text style={{ fontSize: 10, color: colors.muted }}>天</Text>
                                           </View>
-                                          <TouchableOpacity onPress={doAddByDays}
+                                          <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); doAddByDays(); }}
                                             style={{ paddingVertical: 8, borderRadius: 7, backgroundColor: colors.success, alignItems: "center" }}>
                                             <Text style={{ fontSize: 12, fontWeight: "700", color: "#fff" }}>确认增加 {daysVal || "0"} 天</Text>
                                           </TouchableOpacity>
@@ -4364,7 +4364,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                                           <Text style={{ fontSize: 10, color: colors.muted }}>当前余额 {totalCompOffDays} 天</Text>
                                           <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
                                             {[0.5, 1, 2].map((d) => (
-                                              <TouchableOpacity key={d} onPress={() => setDays(String(d))}
+                                              <TouchableOpacity key={d} onPress={(e) => { e.stopPropagation?.(); setDays(String(d)); }}
                                                 style={{ paddingHorizontal: 8, paddingVertical: 5, borderRadius: 6, backgroundColor: daysVal === String(d) ? colors.error : colors.surface, borderWidth: 1, borderColor: daysVal === String(d) ? colors.error : colors.border }}>
                                                 <Text style={{ fontSize: 11, color: daysVal === String(d) ? "#fff" : colors.muted }}>{d}天</Text>
                                               </TouchableOpacity>
@@ -4373,7 +4373,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                                               style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 5, color: colors.foreground, width: 48, fontSize: 11, backgroundColor: colors.surface }} />
                                             <Text style={{ fontSize: 10, color: colors.muted }}>天</Text>
                                           </View>
-                                          <TouchableOpacity onPress={doDeductDirect}
+                                          <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); doDeductDirect(); }}
                                             style={{ paddingVertical: 8, borderRadius: 7, backgroundColor: colors.error, alignItems: "center" }}>
                                             <Text style={{ fontSize: 12, fontWeight: "700", color: "#fff" }}>确认减少 {daysVal || "0"} 天</Text>
                                           </TouchableOpacity>
