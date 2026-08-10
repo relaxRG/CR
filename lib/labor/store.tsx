@@ -6,6 +6,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { notifySyncChange, registerStoreReload } from "../sync/engine";
+import { SeparatePaymentProvider } from "./separate-payment-store";
 import {
   Employee, EmployeeDept, ShiftEntry, MonthlyAttendance, PaySlip, MonthConfig,
   ShiftTemplate, HolidayConfig,
@@ -1679,7 +1680,9 @@ export function LaborProvider({ children }: { children: React.ReactNode }) {
                             <PaySlipProvider>
                                   <GlobalPayrollSettingsProvider>
                                     <PayrollConfirmationProvider>
-                                      {children}
+                                      <SeparatePaymentProvider>
+                                        {children}
+                                      </SeparatePaymentProvider>
                                     </PayrollConfirmationProvider>
                                   </GlobalPayrollSettingsProvider>
                             </PaySlipProvider>
