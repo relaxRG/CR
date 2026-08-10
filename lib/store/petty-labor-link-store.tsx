@@ -158,19 +158,23 @@ export function matchEmployeeFromDescription(
   }
 
   // 2. 再直接匹配员工 code 或 realName
-  // 策略 A：keywords 分词匹配（英文/多字中文）
-  // 策略 B：descLower 直接子串匹配（兜底单字符中文，如 description="宇" 匹配 code="小宇"）
+  // 策略 A：keywords 分词匹配
+  //   - 多字符关键词（>=2）：匹配 code + realName（完整词段，精度高）
+  //   - 单字符关键词（=1）：只匹配 code（realName 单字符子串匹配太宽泛，如"洋"⊆"张忠洋"）
+  // 策略 B：cleanedDesc 整体是 code 的子串（底单字符 code，仅针对 code 不针对 realName）
+  const cleanedDesc = description
+    .replace(/\(pd\)/gi, "").replace(/\(pt\)/gi, "").replace(/w\s*/gi, "")
+    .replace(/[()（）]/g, "").trim().toLowerCase();
   for (const emp of employees) {
     const codeL = emp.code.toLowerCase();
     const nameL = (emp.realName ?? "").toLowerCase();
-    const matchByKeyword = keywords.length > 0 && keywords.some((k) => codeL.includes(k) || (nameL && nameL.includes(k)));
-    // 策略 B：当 description 本身就是员工 code/realName 的子串时直接命中
-    // 注意：需要 description 清理后的文本（去掉标记前缀）才做子串匹配，避免误匹配
-    const cleanedDesc = description
-      .replace(/\(pd\)/gi, "").replace(/\(pt\)/gi, "").replace(/w\s*/gi, "")
-      .replace(/[()（）]/g, "").trim().toLowerCase();
-    const matchBySubstring = cleanedDesc.length >= 1 && (codeL.includes(cleanedDesc) || (nameL && nameL.includes(cleanedDesc)));
-    if (matchByKeyword || matchBySubstring) {
+    const matchByKeyword = keywords.length > 0 && keywords.some((k) => {
+      if (k.length >= 2) return codeL.includes(k) || (nameL && nameL.includes(k));
+      return codeL.includes(k); // 单字符只匹配 code，避免误匹配 realName
+    });
+    // 策略 B：cleanedDesc 整体是 code 的子串（仅针对 code）
+    const matchByCodeSubstring = cleanedDesc.length >= 1 && codeL.includes(cleanedDesc);
+    if (matchByKeyword || matchByCodeSubstring) {
       return { employeeId: emp.id, matchType: "auto" };
     }
   }
