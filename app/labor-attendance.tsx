@@ -198,9 +198,12 @@ function EmployeeCard({
   );
 
   const [rewardItems, setRewardItems] = useState<RewardPenaltyItem[]>(slip?.rewardPenaltyItems ?? []);
+  // 备注状态：notes 为已保存的备注，noteInput 为编辑中的临时内容
   const [notes, setNotes] = useState(slip?.notes ?? "");
   const [noteEditing, setNoteEditing] = useState(false);
   const [noteInput, setNoteInput] = useState(slip?.notes ?? "");
+  // 当前实际备注内容：编辑中用 noteInput，未编辑用 notes
+  const currentNotes = noteEditing ? noteInput : notes;
 
   const addRewardItem = () => {
     setRewardItems([...rewardItems, { id: Date.now().toString(), name: "", amount: 0, note: "" }]);
@@ -220,7 +223,7 @@ function EmployeeCard({
     // 修复 Bug：先将新 rewardPenalty 写入 store，再调用 buildPaySlipDraft
     // 原因：buildPaySlipDraft 内部从 ref.current 读取 existing.rewardPenalty 来计算 grossSalary
     // 若先 buildPaySlipDraft 再覆盖 rewardPenalty，grossSalary 会基于旧值计算，导致应发薪资不正确
-    upsertPaySlip({ ...slip, rewardPenalty: totalReward, rewardPenaltyItems: rewardItems, notes });
+    upsertPaySlip({ ...slip, rewardPenalty: totalReward, rewardPenaltyItems: rewardItems, notes: currentNotes });
     // 此时 ref.current 已更新，buildPaySlipDraft 能读到最新 rewardPenalty
     const draft = buildPaySlipDraft(
       employee, month, att ?? null,
@@ -231,11 +234,13 @@ function EmployeeCard({
       id: slip.id,
       rewardPenalty: totalReward,
       rewardPenaltyItems: rewardItems,
-      notes,
+      notes: currentNotes,
       updatedAt: new Date().toISOString(),
     });
+    // 如果备注正在编辑中，同步到 notes state 并退出编辑态
+    if (noteEditing) { setNotes(noteInput); setNoteEditing(false); }
     onToggleRewardEdit();
-  }, [slip, employee, rewardItems, notes, upsertPaySlip, buildPaySlipDraft, att, month, advanceTotal, globalSettings, onToggleRewardEdit]);
+  }, [slip, employee, rewardItems, notes, noteEditing, noteInput, upsertPaySlip, buildPaySlipDraft, att, month, advanceTotal, globalSettings, onToggleRewardEdit]);
 
   // ── 收起状态：2行4列网格摘要 ──
   if (!expanded) {
@@ -496,10 +501,18 @@ function EmployeeCard({
             autoFocus
             style={[S.notesInput, { color: colors.foreground, borderColor: colors.primary }]}
           />
+        ) : notes ? (
+          <TouchableOpacity onPress={() => { setNoteInput(notes); setNoteEditing(true); }} activeOpacity={0.7}>
+            <Text style={{ fontSize: 13, color: colors.foreground, lineHeight: 20 }}>{notes}</Text>
+          </TouchableOpacity>
         ) : (
-          <Text style={{ fontSize: 13, color: notes ? colors.foreground : colors.muted, fontStyle: notes ? "normal" : "italic", lineHeight: 20 }}>
-            {notes || "暂无备注"}
-          </Text>
+          <TouchableOpacity
+            onPress={() => { setNoteInput(""); setNoteEditing(true); }}
+            activeOpacity={0.7}
+            style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 8, paddingHorizontal: 4 }}>
+            <IconSymbol name="plus.circle" size={14} color={colors.muted} />
+            <Text style={{ fontSize: 13, color: colors.muted, fontStyle: "italic" }}>点击添加备注</Text>
+          </TouchableOpacity>
         )}
       </View>
 
