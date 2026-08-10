@@ -744,7 +744,7 @@ export default function SpiritsInventoryScreen() {
                                   tap();
                                   Alert.prompt(
                                     "修改参考价",
-                                    `「${item.name}」当前参考价：¥${rp > 0 ? rp.toFixed(0) : "未设置"}`,
+                                    `「${item.name}」当前参考价：¥${rp > 0 ? formatMoney(rp) : "未设置"}`,
                                     (val) => {
                                       const n = parseFloat(val ?? "");
                                       if (!isNaN(n) && n >= 0) {

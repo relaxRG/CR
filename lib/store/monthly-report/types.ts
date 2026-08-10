@@ -1,3 +1,4 @@
+import { formatMoney } from "@/lib/utils";
 /**
  * 店铺月度经营分析数据类型
  * 基于 predawn 美团收银系统导出的四类报表：
@@ -179,8 +180,8 @@ export function generateInsights(report: MonthlyReport): BusinessInsight[] {
     insights.push({
       type: kpi.revenueVs >= 0 ? "growth" : "decline",
       title: kpi.revenueVs >= 0 ? "营业收入增长" : "营业收入下滑",
-      desc: `较对比周期${kpi.revenueVs >= 0 ? "增长" : "下降"} ¥${Math.abs(kpi.revenueVs).toFixed(0)}（${Math.abs(pct).toFixed(1)}%）`,
-      value: `¥${Math.abs(kpi.revenueVs).toFixed(0)}`,
+      desc: `较对比周期${kpi.revenueVs >= 0 ? "增长" : "下降"} ¥${formatMoney(Math.abs(kpi.revenueVs))}（${Math.abs(pct).toFixed(1)}%）`,
+      value: `¥${formatMoney(Math.abs(kpi.revenueVs))}`,
     });
   }
 
@@ -192,8 +193,8 @@ export function generateInsights(report: MonthlyReport): BusinessInsight[] {
       insights.push({
         type: "growth",
         title: `${top.name} 增长最快`,
-        desc: `较对比周期增长 ¥${(top.vsAmount ?? 0).toFixed(0)}，占比 ${(top.salesAmountPct * 100).toFixed(1)}%`,
-        value: `+¥${(top.vsAmount ?? 0).toFixed(0)}`,
+        desc: `较对比周期增长 ¥${formatMoney(top.vsAmount ?? 0)}，占比 ${(top.salesAmountPct * 100).toFixed(1)}%`,
+        value: `+¥${formatMoney(top.vsAmount ?? 0)}`,
       });
     }
     const bottom = sortedCats[sortedCats.length - 1];
@@ -201,8 +202,8 @@ export function generateInsights(report: MonthlyReport): BusinessInsight[] {
       insights.push({
         type: "decline",
         title: `${bottom.name} 下滑明显`,
-        desc: `较对比周期下降 ¥${Math.abs(bottom.vsAmount ?? 0).toFixed(0)}`,
-        value: `-¥${Math.abs(bottom.vsAmount ?? 0).toFixed(0)}`,
+        desc: `较对比周期下降 ¥${formatMoney(Math.abs(bottom.vsAmount ?? 0))}`,
+        value: `-¥${formatMoney(Math.abs(bottom.vsAmount ?? 0))}`,
       });
     }
   }

@@ -1,3 +1,4 @@
+import { formatMoney } from "@/lib/utils";
 /**
  * 人工成本管理模块 - 完整类型定义 v4
  * 新增：社保/公积金双轨制（个人+公司）、城市政策数据库、换休余额明细、节假日调休余额、无来源多休提醒
@@ -1316,7 +1317,7 @@ export function calcIncomeTax(
   const cumulativeTax = Math.max(0, taxableIncome * bracket.rate - bracket.quickDeduction);
   const monthTax = Math.max(0, cumulativeTax - cumulativeTaxPaid);
 
-  const note = `累计应税收入¥${taxableIncome.toFixed(0)}，适用税率${(bracket.rate * 100).toFixed(0)}%，速算扣除数¥${bracket.quickDeduction}`;
+  const note = `累计应税收入¥${formatMoney(taxableIncome)}，适用税率${(bracket.rate * 100).toFixed(0)}%，速算扣除数¥${formatMoney(bracket.quickDeduction)}`;
 
   return { tax: Math.round(monthTax * 100) / 100, note };
 }
@@ -1332,7 +1333,7 @@ export function calcAllowance(rule: AllowanceRule, attendanceDays: number): { am
     case "meal_per_day":
       return {
         amount: Math.round(rule.amount * attendanceDays * 100) / 100,
-        autoNote: `饭补 ¥${rule.amount}/天 × ${attendanceDays}天 = ¥${(rule.amount * attendanceDays).toFixed(0)}`,
+        autoNote: `饭补 ¥${formatMoney(rule.amount)}/天 × ${attendanceDays}天 = ¥${formatMoney(rule.amount * attendanceDays)}`,
       };
     case "custom_fixed":
       // 修复 Bug：如果单位是 per_day，应乘以出勤天数（与 meal_per_day 逻辑一致）
@@ -1340,7 +1341,7 @@ export function calcAllowance(rule: AllowanceRule, attendanceDays: number): { am
         const total = Math.round(rule.amount * attendanceDays * 100) / 100;
         return {
           amount: total,
-          autoNote: `${rule.label} ¥${rule.amount}/天 × ${attendanceDays}天 = ¥${total.toFixed(0)}`,
+          autoNote: `${rule.label} ¥${formatMoney(rule.amount)}/天 × ${attendanceDays}天 = ¥${formatMoney(total)}`,
         };
       }
       return { amount: rule.amount, autoNote: `${rule.label}（固定）¥${rule.amount}` };

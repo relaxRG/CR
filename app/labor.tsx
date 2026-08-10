@@ -749,7 +749,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
                             </View>
                             <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); tap(); handleCashOut(entry); }}
                               style={{ backgroundColor: colors.warning, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7, marginLeft: 8 }}>
-                              <Text style={{ fontSize: 12, fontWeight: "700", color: "#fff" }}>兑换 ￥{amount.toFixed(0)}</Text>
+                              <Text style={{ fontSize: 12, fontWeight: "700", color: "#fff" }}>兑换 ￥{formatMoney(amount)}</Text>
                             </TouchableOpacity>
                           </View>
                         );
@@ -798,11 +798,11 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
                           <View key={entry.id} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 10, backgroundColor: colors.background, borderRadius: 8, borderWidth: 1, borderColor: colors.border }}>
                             <View style={{ flex: 1 }}>
                               <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>{entry.holidayName ?? "节假日"} 换休 {entry.days}天</Text>
-                              <Text style={{ fontSize: 11, color: colors.muted }}>日薪 ￥{att?.dailyRate?.toFixed(0) ?? "—"} × {entry.days}天 · 到期 {entry.expiresMonth}</Text>
+                              <Text style={{ fontSize: 11, color: colors.muted }}>日薪 ￥{att?.dailyRate != null ? formatMoney(att.dailyRate) : "—"} × {entry.days}天 · 到期 {entry.expiresMonth}</Text>
                             </View>
                             <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); tap(); handleCashOut(entry); }}
                               style={{ backgroundColor: "#FF2D55", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7, marginLeft: 8 }}>
-                              <Text style={{ fontSize: 12, fontWeight: "700", color: "#fff" }}>兑换 ￥{amount.toFixed(0)}</Text>
+                              <Text style={{ fontSize: 12, fontWeight: "700", color: "#fff" }}>兑换 ￥{formatMoney(amount)}</Text>
                             </TouchableOpacity>
                           </View>
                         );
@@ -921,7 +921,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
                   bank ? `领款人：${bank.accountName ?? employee.realName}` : null,
                   bank ? `开户行：${bank.bankName}` : null,
                   bank ? `卡号：${bank.cardNumber}` : null,
-                  `金额：¥${slip?.finalSalary?.toFixed(0) ?? "0"}`,
+                  `金额：¥${formatMoney(slip?.finalSalary ?? 0)}`,
                   `备注：${month} 薪资`,
                 ].filter(Boolean).join("\n");
                 Clipboard.setString(lines);
@@ -4317,7 +4317,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                                                     </View>
                                                     <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); doCashOut(entry); }}
                                                       style={{ backgroundColor: colors.warning, borderRadius: 7, paddingHorizontal: 10, paddingVertical: 6, marginLeft: 6 }}>
-                                                      <Text style={{ fontSize: 11, fontWeight: "700", color: "#fff" }}>兑换 ￥{amount.toFixed(0)}</Text>
+                                                      <Text style={{ fontSize: 11, fontWeight: "700", color: "#fff" }}>兑换 ￥{formatMoney(amount)}</Text>
                                                     </TouchableOpacity>
                                                   </View>
                                                 );
@@ -4344,11 +4344,11 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                                               <View key={entry.id} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 8, backgroundColor: colors.background, borderRadius: 7, borderWidth: 1, borderColor: colors.border }}>
                                                 <View style={{ flex: 1 }}>
                                                   <Text style={{ fontSize: 12, fontWeight: "600", color: colors.foreground }}>{entry.holidayName ?? "节假日"} 换休 {entry.days}天</Text>
-                                                  <Text style={{ fontSize: 10, color: colors.muted }}>日薪 ￥{att?.dailyRate?.toFixed(0) ?? "—"} × {entry.days}天 · 到期 {entry.expiresMonth}</Text>
+                                                  <Text style={{ fontSize: 10, color: colors.muted }}>日薪 ￥{att?.dailyRate != null ? formatMoney(att.dailyRate) : "—"} × {entry.days}天 · 到期 {entry.expiresMonth}</Text>
                                                 </View>
                                                 <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); doCashOut(entry); }}
                                                   style={{ backgroundColor: "#FF2D55", borderRadius: 7, paddingHorizontal: 10, paddingVertical: 6, marginLeft: 6 }}>
-                                                  <Text style={{ fontSize: 11, fontWeight: "700", color: "#fff" }}>兑换 ￥{amount.toFixed(0)}</Text>
+                                                  <Text style={{ fontSize: 11, fontWeight: "700", color: "#fff" }}>兑换 ￥{formatMoney(amount)}</Text>
                                                 </TouchableOpacity>
                                               </View>
                                             );

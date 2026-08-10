@@ -1,3 +1,4 @@
+import { formatMoney } from "@/lib/utils";
 /**
  * 时段营业分析模块类型定义
  * 基于 predawn 餐时段营业统计 Excel（半小时粒度）
@@ -186,7 +187,7 @@ export function isAfterTime(slotStr: string, afterTime: string): boolean {
 /** 格式化营业额 */
 export function fmtRevenue(n: number): string {
   if (n >= 10000) return `¥${(n / 10000).toFixed(1)}w`;
-  return `¥${n.toFixed(0)}`;
+  return `¥${formatMoney(n)}`;
 }
 
 /** 获取时段的起始分钟数（用于排序） */

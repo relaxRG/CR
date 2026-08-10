@@ -1,3 +1,4 @@
+import { formatMoney } from "@/lib/utils";
 /**
  * lib/labor/export.ts
  * 员工管理导出引擎 — 薪资报表（Excel/PDF）+ 排班表（时长/班次模式，Excel/PDF）
@@ -31,7 +32,7 @@ function fmtStatus(slip: PaySlip | undefined): string {
   const paid = slip.pettyLaborPaid ?? 0;
   const final = slip.finalSalary ?? 0;
   if (paid >= final && final > 0) return "已发";
-  if (paid > 0) return `部分已发 (¥${paid.toFixed(0)})`;
+  if (paid > 0) return `部分已发 (¥${formatMoney(paid)})`;
   return "待发";
 }
 
