@@ -163,18 +163,20 @@ export default function LaborEmployeeSortPage() {
                 <Text style={[S.rowLabel, { color: colors.foreground }]}>{DEPT_LABELS[dept]}</Text>
                 <View style={S.arrowGroup}>
                   <TouchableOpacity
-                    onPress={() => moveDept(index, "up")}
+                    onPress={(e) => { e.stopPropagation?.(); moveDept(index, "up"); }}
                     disabled={index === 0}
+                    hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
                     style={[S.arrowBtn, { opacity: index === 0 ? 0.25 : 1 }]}
                   >
-                    <IconSymbol name="chevron.up" size={16} color={colors.primary} />
+                    <IconSymbol name="chevron.up" size={18} color={colors.primary} />
                   </TouchableOpacity>
                   <TouchableOpacity
-                    onPress={() => moveDept(index, "down")}
+                    onPress={(e) => { e.stopPropagation?.(); moveDept(index, "down"); }}
                     disabled={index === localDeptOrder.length - 1}
+                    hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
                     style={[S.arrowBtn, { opacity: index === localDeptOrder.length - 1 ? 0.25 : 1 }]}
                   >
-                    <IconSymbol name="chevron.down" size={16} color={colors.primary} />
+                    <IconSymbol name="chevron.down" size={18} color={colors.primary} />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -211,18 +213,20 @@ export default function LaborEmployeeSortPage() {
                   </View>
                   <View style={S.arrowGroup}>
                     <TouchableOpacity
-                      onPress={() => moveEmployee(dept, index, "up")}
+                      onPress={(e) => { e.stopPropagation?.(); moveEmployee(dept, index, "up"); }}
                       disabled={index === 0}
+                      hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
                       style={[S.arrowBtn, { opacity: index === 0 ? 0.25 : 1 }]}
                     >
-                      <IconSymbol name="chevron.up" size={16} color={colors.primary} />
+                      <IconSymbol name="chevron.up" size={18} color={colors.primary} />
                     </TouchableOpacity>
                     <TouchableOpacity
-                      onPress={() => moveEmployee(dept, index, "down")}
+                      onPress={(e) => { e.stopPropagation?.(); moveEmployee(dept, index, "down"); }}
                       disabled={index === empList.length - 1}
+                      hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
                       style={[S.arrowBtn, { opacity: index === empList.length - 1 ? 0.25 : 1 }]}
                     >
-                      <IconSymbol name="chevron.down" size={16} color={colors.primary} />
+                      <IconSymbol name="chevron.down" size={18} color={colors.primary} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -294,12 +298,12 @@ const S = StyleSheet.create({
   },
   arrowGroup: {
     flexDirection: "row",
-    gap: 4,
+    gap: 2,
   },
   arrowBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
+    width: 44,
+    height: 44,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
   },

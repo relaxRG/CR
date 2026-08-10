@@ -21,7 +21,7 @@ import { useFeature } from "@/hooks/use-feature";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
 import { useMonthlySummaryStore } from "@/lib/store/monthly-summary/store";
-import { useEmployeeStore, usePaySlipStore } from "@/lib/labor/store";
+import { useEmployeeStore, usePaySlipStore, useDeptOrderStore, DEFAULT_DEPT_ORDER } from "@/lib/labor/store";
 import { useSpiritsInventoryStore } from "@/lib/spirits/crud-store";
 import { calcMonthlyPourCost, pourCostColor } from "@/lib/spirits/pour-cost";
 import { usePettyCashStore } from "@/lib/store/petty-store";
@@ -298,6 +298,7 @@ export default function MonthlySummaryScreen() {
     getPettyCodeConfig, getInventoryConfig,
   } = useMonthlySummaryStore();
   const { employees } = useEmployeeStore();
+  const { deptOrder } = useDeptOrderStore();
   const paySlipStore = usePaySlipStore();
   const spiritsStore = useSpiritsInventoryStore();
   const pettyStore = usePettyCashStore();
@@ -712,12 +713,13 @@ export default function MonthlySummaryScreen() {
 
             {/* 工资科目：按部门分组的员工薪资卡片（自动同步，无需手动刷新）*/}
             {sec.key === "labor" && (() => {
-              const LABOR_DEPT_GROUPS = [
-                { key: "front",    label: "前厅",   color: "#007AFF", filter: (e: any) => e.dept === "front" && e.type !== "parttime" },
-                { key: "kitchen",  label: "后厨",   color: "#34C759", filter: (e: any) => e.dept === "kitchen" && e.type !== "parttime" },
-                { key: "company",  label: "公司",   color: "#722ED1", filter: (e: any) => e.dept === "other" && e.type !== "parttime" },
-                { key: "parttime", label: "临时兼职", color: "#FF9500", filter: (e: any) => e.type === "parttime" },
-              ];
+              const DEPT_GROUP_DEFS_MS: Record<string, { label: string; color: string; filter: (e: any) => boolean }> = {
+                front:    { label: "前厅",   color: "#007AFF", filter: (e: any) => e.dept === "front" && e.type !== "parttime" },
+                kitchen:  { label: "后厨",   color: "#34C759", filter: (e: any) => e.dept === "kitchen" && e.type !== "parttime" },
+                other:    { label: "公司",   color: "#722ED1", filter: (e: any) => e.dept === "other" && e.type !== "parttime" },
+                parttime: { label: "临时兼职", color: "#FF9500", filter: (e: any) => e.type === "parttime" },
+              };
+              const LABOR_DEPT_GROUPS = deptOrder.map((k) => ({ key: k, ...(DEPT_GROUP_DEFS_MS[k] ?? DEPT_GROUP_DEFS_MS.front) }));
               const activeEmps = employees.filter((e) => e.active !== false && !e.archived);
               const totalPending = payrollPaymentsR.reduce((s, p) => s + p.remainingAmount, 0);
               return (

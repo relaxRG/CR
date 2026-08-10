@@ -25,7 +25,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import {
   useEmployeeStore, useAttendanceStore, usePaySlipStore,
   useCompOffBalanceEntryStore, useHolidayCompOffStore,
-  useGlobalPayrollSettingsStore,
+  useGlobalPayrollSettingsStore, useDeptOrderStore, DEFAULT_DEPT_ORDER,
 } from "@/lib/labor/store";
 import { useSalaryAdvanceStore } from "@/lib/labor/advance-store";
 import {
@@ -55,6 +55,7 @@ export default function LaborAttendancePage() {
 
   // ── 唯一点位：直接订阅响应式数组，任何 Store 更新立即重渲染 ──
   const { employees } = useEmployeeStore();
+  const { deptOrder } = useDeptOrderStore();
   const { records: attendances } = useAttendanceStore();
   const { paySlips, upsertPaySlip } = usePaySlipStore();
   const { entries: compOffEntries } = useCompOffBalanceEntryStore();
@@ -105,12 +106,15 @@ export default function LaborAttendancePage() {
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: 40 + insets.bottom, gap: 16 }}>
-        {[
-          { key: "front",    label: "前厅",   color: "#007AFF", filter: (e: Employee) => e.dept === "front" && e.type !== "parttime" },
-          { key: "kitchen",  label: "后厨",   color: "#34C759", filter: (e: Employee) => e.dept === "kitchen" && e.type !== "parttime" },
-          { key: "company",  label: "公司",   color: "#722ED1", filter: (e: Employee) => e.dept === "other" && e.type !== "parttime" },
-          { key: "parttime", label: "临时兼职", color: "#FF9500", filter: (e: Employee) => e.type === "parttime" },
-        ].map(({ key, label, color, filter }) => {
+        {(() => {
+          const DEPT_GROUP_DEFS_ATT: Record<string, { label: string; color: string; filter: (e: Employee) => boolean }> = {
+            front:    { label: "前厅",   color: "#007AFF", filter: (e) => e.dept === "front" && e.type !== "parttime" },
+            kitchen:  { label: "后厨",   color: "#34C759", filter: (e) => e.dept === "kitchen" && e.type !== "parttime" },
+            other:    { label: "公司",   color: "#722ED1", filter: (e) => e.dept === "other" && e.type !== "parttime" },
+            parttime: { label: "临时兼职", color: "#FF9500", filter: (e) => e.type === "parttime" },
+          };
+          return deptOrder.map((k) => ({ key: k, ...(DEPT_GROUP_DEFS_ATT[k] ?? DEPT_GROUP_DEFS_ATT.front) }));
+        })().map(({ key, label, color, filter }) => {
           const deptEmps = activeEmployees.filter(filter);
           if (deptEmps.length === 0) return null;
           return (
