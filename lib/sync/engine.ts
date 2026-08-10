@@ -96,6 +96,7 @@ export const SYNC_KEYS = [
   "labor_performance_records_v1",
   // ── 人工模块新增（补全同步）────────────────────────────────────────────────────────────────────────────────────────
   "labor_custom_depts_v1",
+  "labor_dept_order_v1",
   "labor_business_hours_v1",
   "labor_shift_groups_v1",
   "labor_fill_presets_v1",

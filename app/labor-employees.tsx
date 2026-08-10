@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
-import { useEmployeeStore } from "@/lib/labor/store";
+import { useEmployeeStore, useDeptOrderStore } from "@/lib/labor/store";
 import { DEPT_LABELS, DEPT_COLORS, EmployeeDept, Employee } from "@/lib/labor/types";
 
 const DEPT_FILTERS: { key: EmployeeDept | "all"; label: string }[] = [
@@ -27,7 +27,6 @@ const DEPT_FILTERS: { key: EmployeeDept | "all"; label: string }[] = [
   { key: "parttime", label: "兼职" },
   { key: "other",    label: "其他" },
 ];
-const DEPT_ORDER: EmployeeDept[] = ["front", "kitchen", "parttime", "other"];
 const SWIPE_THRESHOLD = 60; // 触发操作的滑动距离
 
 // ── 可左右滑动的员工卡片 ──────────────────────────────────────────────────────
@@ -154,7 +153,7 @@ function SwipeableEmpCard({
 
 // ── 部门分组区块 ──────────────────────────────────────────────────────────────
 function DeptSection({
-  dept, employees, colors, onPress, onArchive, onDelete, onReorder,
+  dept, employees, colors, onPress, onArchive, onDelete,
 }: {
   dept: EmployeeDept;
   employees: Employee[];
@@ -162,24 +161,8 @@ function DeptSection({
   onPress: (emp: Employee) => void;
   onArchive: (emp: Employee) => void;
   onDelete: (emp: Employee) => void;
-  onReorder: (orderedIds: string[]) => void;
 }) {
   const deptColor = DEPT_COLORS[dept];
-  const [localOrder, setLocalOrder] = useState<Employee[]>(employees);
-
-  React.useEffect(() => { setLocalOrder(employees); }, [employees]);
-
-  const handleDragEnd = (fromId: string, toId: string) => {
-    if (fromId === toId) return;
-    const from = localOrder.findIndex((e) => e.id === fromId);
-    const to   = localOrder.findIndex((e) => e.id === toId);
-    if (from < 0 || to < 0) return;
-    const next = [...localOrder];
-    const [moved] = next.splice(from, 1);
-    next.splice(to, 0, moved);
-    setLocalOrder(next);
-    onReorder(next.map((e) => e.id));
-  };
 
   if (employees.length === 0) return null;
 
@@ -194,7 +177,7 @@ function DeptSection({
         </View>
         <Text style={{ fontSize: 10, color: colors.muted }}>← 左滑归档  右滑删除 →</Text>
       </View>
-      {localOrder.map((emp) => (
+      {employees.map((emp) => (
         <SwipeableEmpCard
           key={emp.id}
           emp={emp}
@@ -202,9 +185,6 @@ function DeptSection({
           onPress={() => onPress(emp)}
           onArchive={() => onArchive(emp)}
           onDelete={() => onDelete(emp)}
-          onDragStart={() => {
-            if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          }}
         />
       ))}
     </View>
@@ -217,7 +197,8 @@ export default function LaborEmployeesScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
-  const { employees, deleteEmployee, archiveEmployee, reorderEmployees } = useEmployeeStore();
+  const { employees, deleteEmployee, archiveEmployee } = useEmployeeStore();
+  const { deptOrder } = useDeptOrderStore();
   const [deptFilter, setDeptFilter] = useState<EmployeeDept | "all">("all");
 
   // 只显示未归档的员工
@@ -232,11 +213,11 @@ export default function LaborEmployeesScreen() {
       if (orderA !== orderB) return orderA - orderB;
       return a.code.localeCompare(b.code);
     });
-    return DEPT_ORDER.reduce<Record<EmployeeDept, Employee[]>>((acc, dept) => {
+    return deptOrder.reduce<Record<EmployeeDept, Employee[]>>((acc, dept) => {
       acc[dept] = sorted.filter((e) => e.dept === dept);
       return acc;
     }, { front: [], kitchen: [], parttime: [], other: [] });
-  }, [activeEmployees]);
+  }, [activeEmployees, deptOrder]);
 
   const filtered = useMemo(() => {
     if (deptFilter === "all") return null;
@@ -293,6 +274,12 @@ export default function LaborEmployeesScreen() {
           <Text style={{ fontSize: 11, color: colors.muted }}>{totalCount} 人在职</Text>
         </View>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          {/* 排序入口 */}
+          <TouchableOpacity
+            onPress={() => { tap(); router.push("/labor-employee-sort" as any); }}
+            style={{ padding: 4 }}>
+            <IconSymbol name="arrow.up.arrow.down" size={20} color={colors.muted} />
+          </TouchableOpacity>
           {/* 归档入口 */}
           <TouchableOpacity
             onPress={() => { tap(); router.push("/labor-archived" as any); }}
@@ -355,7 +342,7 @@ export default function LaborEmployeesScreen() {
       >
 
         {/* 全部 Tab：按部门分组 */}
-        {deptFilter === "all" && DEPT_ORDER.map((dept) =>
+        {deptFilter === "all" && deptOrder.map((dept) =>
           grouped[dept].length > 0 ? (
             <DeptSection
               key={dept}
@@ -365,9 +352,8 @@ export default function LaborEmployeesScreen() {
               onPress={handlePress}
               onArchive={handleArchive}
               onDelete={handleDelete}
-              onReorder={reorderEmployees}
-            />
-          ) : null
+          />
+        ) : null
         )}
 
         {/* 单部门 Tab */}
@@ -379,7 +365,6 @@ export default function LaborEmployeesScreen() {
             onPress={handlePress}
             onArchive={handleArchive}
             onDelete={handleDelete}
-            onReorder={reorderEmployees}
           />
         )}
 

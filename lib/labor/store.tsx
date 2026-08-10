@@ -7,7 +7,7 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { notifySyncChange, registerStoreReload } from "../sync/engine";
 import {
-  Employee, ShiftEntry, MonthlyAttendance, PaySlip, MonthConfig,
+  Employee, EmployeeDept, ShiftEntry, MonthlyAttendance, PaySlip, MonthConfig,
   ShiftTemplate, HolidayConfig,
   SpecialStatus, GlobalPayrollSettings,
   CompOffBalanceEntry, HolidayCompOffEntry, UnexplainedRestAlert,
@@ -271,6 +271,50 @@ function CustomDeptProvider({ children }: { children: React.ReactNode }) {
 }
 
 export const useCustomDeptStore = () => useContext(CustomDeptContext);
+
+// ─── 分组顺序 Store ───────────────────────────────────────────────────────────
+/** 默认分组顺序（前厅/后厨/公司/临时兼职） */
+export const DEFAULT_DEPT_ORDER: EmployeeDept[] = ["front", "kitchen", "other", "parttime"];
+const DEPT_ORDER_KEY = "labor_dept_order_v1";
+
+interface DeptOrderStore {
+  deptOrder: EmployeeDept[];
+  saveDeptOrder: (order: EmployeeDept[]) => void;
+  ready: boolean;
+}
+const DeptOrderContext = createContext<DeptOrderStore>({
+  deptOrder: DEFAULT_DEPT_ORDER,
+  saveDeptOrder: () => {},
+  ready: false,
+});
+function DeptOrderProvider({ children }: { children: React.ReactNode }) {
+  const [deptOrder, setDeptOrder] = useState<EmployeeDept[]>(DEFAULT_DEPT_ORDER);
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    const load = () => AsyncStorage.getItem(DEPT_ORDER_KEY).then((raw) => {
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw) as EmployeeDept[];
+          if (Array.isArray(parsed) && parsed.length > 0) setDeptOrder(parsed);
+        } catch {}
+      }
+      setReady(true);
+    });
+    load();
+    return registerStoreReload(load);
+  }, []);
+  const saveDeptOrder = useCallback((order: EmployeeDept[]) => {
+    setDeptOrder(order);
+    AsyncStorage.setItem(DEPT_ORDER_KEY, JSON.stringify(order)).catch(console.error);
+    notifySyncChange(DEPT_ORDER_KEY);
+  }, []);
+  return (
+    <DeptOrderContext.Provider value={{ deptOrder, saveDeptOrder, ready }}>
+      {children}
+    </DeptOrderContext.Provider>
+  );
+}
+export const useDeptOrderStore = () => useContext(DeptOrderContext);
 
 // ─── 班次模板 Store ───────────────────────────────────────────────────────────
 interface ShiftTemplateStore {
@@ -1465,6 +1509,7 @@ export function LaborProvider({ children }: { children: React.ReactNode }) {
     <MonthConfigProvider>
       <EmployeeProvider>
         <CustomDeptProvider>
+          <DeptOrderProvider>
           <BusinessHoursProvider>
           <FillPresetProvider>
           <ShiftGroupProvider>
@@ -1494,6 +1539,7 @@ export function LaborProvider({ children }: { children: React.ReactNode }) {
           </ShiftGroupProvider>
           </FillPresetProvider>
           </BusinessHoursProvider>
+          </DeptOrderProvider>
         </CustomDeptProvider>
       </EmployeeProvider>
     </MonthConfigProvider>

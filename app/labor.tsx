@@ -25,7 +25,7 @@ import {
   useSpecialStatusStore, useGlobalPayrollSettingsStore,
   useCompOffBalanceEntryStore, useHolidayCompOffStore, useUnexplainedRestAlertStore,
   useCustomDeptStore, useBusinessHoursStore, useShiftGroupStore, useFillPresetStore,
-  useScheduleSnapshotStore,
+  useScheduleSnapshotStore, useDeptOrderStore, DEFAULT_DEPT_ORDER,
 } from "@/lib/labor/store";
 import { useSalaryAdvanceStore, useAdvanceCategoryStore } from "@/lib/labor/advance-store";
 import { usePettyCashStore, PETTY_CODE_LABELS, PettyRecord } from "@/lib/store/petty-store";
@@ -996,13 +996,17 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
   const compareMonth = getCompareMonth(month, compareMode, customMonth);
 
   const activeEmployees = useMemo(() => employees.filter((e) => e.active && !e.archived), [employees]);
-  // 统一分组规则：前厅/后厨/公司（全职+长期兼职）+ 临时兼职（所有部门）
-  const AUTO_DEPT_GROUPS = useMemo(() => [
-    { key: "front",    label: "前厅",   color: "#007AFF", filter: (e: Employee) => e.dept === "front" && e.type !== "parttime" },
-    { key: "kitchen",  label: "后厨",   color: "#34C759", filter: (e: Employee) => e.dept === "kitchen" && e.type !== "parttime" },
-    { key: "company",  label: "公司",   color: "#722ED1", filter: (e: Employee) => e.dept === "other" && e.type !== "parttime" },
-    { key: "parttime", label: "临时兼职", color: "#FF9500", filter: (e: Employee) => e.type === "parttime" },
-  ], []);
+  const { deptOrder } = useDeptOrderStore();
+  // 统一分组规则：按用户设置的分组顺序动态排列
+  const DEPT_GROUP_DEFS: Record<string, { label: string; color: string; filter: (e: Employee) => boolean }> = {
+    front:    { label: "前厅",   color: "#007AFF", filter: (e) => e.dept === "front" && e.type !== "parttime" },
+    kitchen:  { label: "后厨",   color: "#34C759", filter: (e) => e.dept === "kitchen" && e.type !== "parttime" },
+    other:    { label: "公司",   color: "#722ED1", filter: (e) => e.dept === "other" && e.type !== "parttime" },
+    parttime: { label: "临时兼职", color: "#FF9500", filter: (e) => e.type === "parttime" },
+  };
+  const AUTO_DEPT_GROUPS = useMemo(() =>
+    deptOrder.map((key) => ({ key, ...DEPT_GROUP_DEFS[key] ?? DEPT_GROUP_DEFS.front }))
+  , [deptOrder]);
   // 性能优化：预建查找 Map，将 render 循环中的 O(n) paySlips.find/attendances.find 降为 O(1)
   const rosterSlipMap = useMemo(() => {
     const m = new Map<string, PaySlip>();
