@@ -3422,7 +3422,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   const { shifts, upsertShift, batchUpsertShifts, deleteShift, batchDeleteShifts, getShifts } = useShiftStore();
   const { templates, upsertTemplate, deleteTemplate } = useShiftTemplateStore();
   const { statuses: specialStatuses, upsertStatus, deleteStatus } = useSpecialStatusStore();
-  const { paySlips, upsertPaySlip, buildPaySlipDraft } = usePaySlipStore();
+  const { paySlips, upsertPaySlip, buildPaySlipDraft, getPaySlip } = usePaySlipStore();
   const { records: attendanceRecords, upsertAttendance, calcFromShifts } = useAttendanceStore();
   const { getHolidayForDate } = useHolidayConfigStore();
   const { advances } = useSalaryAdvanceStore();
@@ -3573,7 +3573,9 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
         // buildPaySlipDraft 内部已通过 existing 保留手动字段
         // 并已在 finalSalary 中正确扣除 pettyLaborPaid（不需重复扣）
         // 重要：performanceTotal 从 existing 读取，防止覆盖手动录入的绩效奖金
-        const existingSlip = paySlips.find((s) => s.employeeId === emp.id && s.month === currentMonth) ?? null;
+        // 修复：改用 getPaySlip（基于 ref.current）替代 paySlips.find（可能是 stale closure）
+        // 这确保 autoSync 始终读取最新的 performanceBonus，即使 paySlips state 尚未更新
+        const existingSlip = getPaySlip(emp.id, currentMonth);
         const performanceTotal = existingSlip?.performanceBonus ?? 0;
         const slip = buildPaySlipDraft(emp, currentMonth, att, performanceTotal, advanceTotal, globalSettings, cumulativeIncome, cumulativeTaxPaid);
         upsertPaySlip(slip);
@@ -3801,7 +3803,8 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
         upsertAttendance(att);
         // 绩效奖金从 existing 读取（已在 labor-kpi-allowance 页手动录入）
         // 不传 0，防止覆盖手动录入的绩效奖金
-        const performanceTotal = paySlips.find((s) => s.employeeId === emp.id && s.month === currentMonth)?.performanceBonus ?? 0;
+        // 修复：改用 getPaySlip（基于 ref.current）替代 paySlips.find，消除 stale closure 风险
+        const performanceTotal = getPaySlip(emp.id, currentMonth)?.performanceBonus ?? 0;
         const advanceTotal = advances
           .filter((a) => a.employeeId === emp.id && (a.deductMonth === currentMonth || a.date.startsWith(currentMonth)) && (a.status === "pending" || a.status === "deducted"))
           .reduce((s, a) => s + a.amount, 0);
