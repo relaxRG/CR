@@ -1036,9 +1036,9 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
       grossSalary + employerSocialInsurance + employerHousingFund
     ) * 100) / 100;
 
-    // ── 实发薪资（含预支扣除 + 备用金已付扣除）──
-    // 开启社保/个税时：实发 = 应发 - 社保个人 - 公积金个人 - 个税 - 预支 - 备用金已付
-    // 关闭社保/个税时：实发 = 应发 - 预支 - 备用金已付
+    // ── 实发薪资（含已预支扣除）──
+    // 开启社保/个税时：实发 = 应发 - 社保个人 - 公积金个人 - 个税 - 已预支（advanceAmount + pettyLaborPaid）
+    // 关闭社保/个税时：实发 = 应发 - 已预支（advanceAmount + pettyLaborPaid）
     const pettyLaborPaidAmt = existing?.pettyLaborPaid ?? 0;
     const finalSalary = Math.round((
       grossSalary - socialInsuranceDeduction - housingFundDeduction - incomeTax - advanceAmount - pettyLaborPaidAmt

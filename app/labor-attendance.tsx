@@ -194,9 +194,9 @@ function EmployeeCard({
   const totalCompOff = overtimeCompOff + holidayCompOff;
   // ── 本月调休兑换 ──
   const compOffCashOut = slip?.compOffCashOut ?? 0;
-  // ── 预支合计（useMemo 避免每次渲染重复 filter/reduce） ──
-  // 修复：加入 month 过滤（deductMonth 或 date 匹配当月），与自动同步引擎保持一致
-  // 原来缺少 month 过滤，会把历史所有月份的预支全部累加，导致预支小计偏大
+  // ── 当月手动预支合计（useMemo 缓存）──
+  // 过滤条件：employeeId + month（deductMonth 或 date 前缀）+ 未扣除/已扣除状态
+  // 注意：这里只统计手动预支（advances），备用金已付由 slip.pettyLaborPaid 单独记录
   const advanceTotal = useMemo(() =>
     advances
       .filter((a: any) =>
@@ -299,7 +299,7 @@ function EmployeeCard({
             </View>
           ))}
         </View>
-        {/* 第二行：调休兑换 / 预支 / 应发 / 待发 */}
+        {/* 第二行：调休兑换 / 已预支 / 应发 / 待发 */}
         <View style={[S.gridRow, { borderTopColor: colors.border }]}>
           {grid2.map((item) => (
             <View key={item.label} style={S.gridCell}>

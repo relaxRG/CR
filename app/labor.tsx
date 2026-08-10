@@ -185,10 +185,9 @@ function OverviewCard({ month, colors }: { month: string; colors: any }) {
   const activeEmployees = useMemo(() => employees.filter((e) => e.active && !e.archived), [employees]);
   const monthSlips = useMemo(() => paySlips.filter((s) => s.month === month), [paySlips, month]);
   const totalSalary = useMemo(() => monthSlips.reduce((s, p) => s + p.finalSalary, 0), [monthSlips]);
-  // finalSalary 已含预支扣除，待发合计直接累加 finalSalary
+  // finalSalary 已含已预支扣除，待发合计直接累加 finalSalary
   const totalPending = useMemo(() => monthSlips.reduce((s, p) => s + Math.max(0, p.finalSalary), 0), [monthSlips]);
-  // 已发 = 本月所有员工的预支合计（备用金已付 pettyLaborPaid + 手动预支 advanceAmount）
-  // 预支金额已实际付出，是真实意义上的"已发"；finalSalary 差值法在全员预支场景下为 0 不准确
+  // 已预支 = 本月所有员工的预支合计（手动预支 advanceAmount + 备用金已付 pettyLaborPaid）
   const totalAdvancePaid = useMemo(() => monthSlips.reduce((s, p) => s + (p.pettyLaborPaid ?? 0) + (p.advanceAmount ?? 0), 0), [monthSlips]);
 
   // 对比月数据
