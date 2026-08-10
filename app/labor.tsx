@@ -3515,6 +3515,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
 
   const deleteSelected = () => {
     if (selectedCells.size === 0) return;
+    if (!isMonthWritable(currentMonth)) { Alert.alert("已锁定", "本月已确认发薪，如需修改请先进入差额调整模式。"); return; }
     Alert.alert(
       "确认删除",
       `确认删除 ${selectedCells.size} 条排班记录？此操作不可撤销。`,

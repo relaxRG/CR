@@ -160,3 +160,100 @@ export function getAdjustmentForMonth(
     .filter((a) => a.employeeId === employeeId && !a.settled && a.settleMethod === "next_month")
     .reduce((sum, a) => sum + a.amount, 0);
 }
+
+// ─── 单独补发单生成器 ─────────────────────────────────────────────────────────
+
+/**
+ * 单独补发单（与正常薪资流程完全隔离）
+ *
+ * 当管理者选择“单独补发”时，差额不计入任何月份的薪资单，
+ * 而是生成一张独立的补发单，单独记录、单独付款、单独导出。
+ */
+export interface SeparatePaymentSlip {
+  /** 唯一 ID */
+  id: string;
+  /** 关联的调整记录 ID */
+  adjustmentId: string;
+  /** 员工 ID */
+  employeeId: string;
+  /** 员工名称 */
+  employeeName: string;
+  /** 原始月份（差额产生的月份） */
+  sourceMonth: string;
+  /** 补发金额（正=补发，负=扣回） */
+  amount: number;
+  /** 差额明细 */
+  details: string;
+  /** 创建时间 */
+  createdAt: number;
+  /** 付款状态 */
+  paymentStatus: "pending" | "paid";
+  /** 付款时间 */
+  paidAt?: number;
+  /** 备注 */
+  notes?: string;
+}
+
+/**
+ * 从差额记录生成单独补发单
+ *
+ * 核心隔离原则：
+ * 1. 补发单不修改任何月份的 PaySlip
+ * 2. 补发单不计入 buildPaySlipDraft 的计算
+ * 3. 补发单有独立的付款状态跟踪
+ * 4. 补发单可单独导出（不混入月度报表）
+ */
+export function generateSeparatePaymentSlip(
+  adjustment: PayrollAdjustment,
+  sourceMonth: string,
+): SeparatePaymentSlip {
+  return {
+    id: `sep-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    adjustmentId: adjustment.id,
+    employeeId: adjustment.employeeId,
+    employeeName: adjustment.employeeName,
+    sourceMonth,
+    amount: adjustment.amount,
+    details: adjustment.details,
+    createdAt: Date.now(),
+    paymentStatus: "pending",
+  };
+}
+
+/**
+ * 批量生成补发单（当管理者选择“单独补发”时调用）
+ *
+ * 流程：
+ * 1. calculateAdjustments() → 获取差额列表
+ * 2. 用户选择 "separate" 方式
+ * 3. 调用此函数生成补发单
+ * 4. 补发单存入独立的 separatePayments 存储
+ * 5. 差额记录标记为 settled + settleMethod = "separate"
+ * 6. 补发单不影响任何月份的 PaySlip 数据
+ */
+export function generateSeparatePayments(
+  adjustments: PayrollAdjustment[],
+  sourceMonth: string,
+): SeparatePaymentSlip[] {
+  return adjustments
+    .filter((a) => a.settleMethod === "separate" && !a.settled)
+    .map((a) => generateSeparatePaymentSlip(a, sourceMonth));
+}
+
+/**
+ * 验证“单独补发”的隔离性：
+ *
+ * getAdjustmentForMonth() 中的过滤条件：
+ *   .filter(a => a.settleMethod === "next_month")  // 只包含 "next_month"
+ *
+ * 这意味着 settleMethod === "separate" 的差额永远不会被
+ * getAdjustmentForMonth 读取，因此不会计入下月薪资。
+ *
+ * 隔离链路：
+ *   separate 差额 → 不进入 getAdjustmentForMonth
+ *                   → 不影响 buildPaySlipDraft
+ *                   → 不影响任何月份的 finalSalary
+ *                   → 独立存储在 separatePayments 中
+ *                   → 独立付款、独立导出
+ */
+

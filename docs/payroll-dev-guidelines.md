@@ -136,3 +136,35 @@ PR 涉及薪资计算时，审查者必须检查：
 | `lib/labor/validation.ts` | 数据校验规则 | 禁止修改数据 |
 | `lib/labor/export.ts` | 导出格式化 | 禁止重新实现计算逻辑 |
 | `app/labor.tsx` | UI 展示 + 用户交互 | 禁止内联计算公式 |
+
+
+---
+
+## 五、确认发薪机制开发规范
+
+### 5.1 状态机规范
+
+| 规范 | 说明 |
+|------|------|
+| **规范 8** | 所有写操作入口必须检查 `isMonthWritable(month)` |
+| **规范 9** | FROZEN 状态下 autoSync 必须跳过（不写入考勤/薪资单） |
+| **规范 10** | 差额计算必须基于 frozenSnapshot 对比（不可使用其他来源） |
+| **规范 11** | "单独补发"必须与正常薪资流程完全隔离（不修改 PaySlip） |
+| **规范 12** | 状态转换必须有前置条件检查（如 enterAdjustMode 仅在 frozen 时有效） |
+
+### 5.2 "单独补发"隔离原则
+
+```
+separate 差额 → 不进入 getAdjustmentForMonth()
+             → 不影响 buildPaySlipDraft()
+             → 不影响任何月份的 finalSalary
+             → 独立存储在 separatePayments 中
+             → 独立付款、独立导出
+```
+
+### 5.3 新增操作入口时的检查清单
+
+- [ ] 是否在函数开头添加了 `if (!isMonthWritable(month))` 检查
+- [ ] Alert 提示文案是否统一为"本月已确认发薪，如需修改请先进入差额调整模式。"
+- [ ] 是否在 ADJUSTING 状态下允许操作（adjusting 应可写）
+- [ ] 是否更新了 `docs/payroll-confirmation-snapshot.md` 中的操作入口清单
