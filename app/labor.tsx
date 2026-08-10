@@ -496,7 +496,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
         const overtimeAndHoliday = isParttimeEmp ? 0 : ((att?.overtimePay ?? 0) + (att?.holidayBonus ?? 0));
         const allowanceSum = slip ? (slip.mealAllowance ?? 0) + (slip.transportAllowance ?? 0) + (slip.otherAllowance ?? 0) : 0;
         const extraTotal = slip ? (slip.performanceBonus ?? 0) + allowanceSum + (slip.rewardPenalty ?? 0) : 0;
-        const advanceAmount = slip?.advanceAmount ?? 0;
+        const advanceAmount = (slip?.advanceAmount ?? 0) + (slip?.pettyLaborPaid ?? 0);
         const finalSalary = slip?.finalSalary ?? null;
         return (
           <View style={{ flexDirection: "row", marginTop: 8, paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border + "44" }}>
@@ -599,7 +599,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
 
           {/* ─── 扣款（5格）─── */}
           {slip && (() => {
-            const advance = slip.advanceAmount ?? 0;
+            const advance = (slip.advanceAmount ?? 0) + (slip.pettyLaborPaid ?? 0);
             const si = slip.socialInsuranceDeduction ?? 0;
             const hf = slip.housingFundDeduction ?? 0;
             const tax = slip.incomeTax ?? 0;

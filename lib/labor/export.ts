@@ -167,7 +167,7 @@ export function buildPayrollWorkbook(params: ExportParams): XLSX.WorkBook {
 
       // 应发/扣款/实发
       const grossSalary = slip?.grossSalary ?? 0;
-      const advance = slip?.advanceAmount ?? 0;
+      const advance = (slip?.advanceAmount ?? 0) + (slip?.pettyLaborPaid ?? 0);
       const socialIns = slip?.socialInsuranceDeduction ?? 0;
       const housingFund = slip?.housingFundDeduction ?? 0;
       const incomeTax = slip?.incomeTax ?? 0;
@@ -313,7 +313,7 @@ export function buildPayrollWorkbook(params: ExportParams): XLSX.WorkBook {
         // 应发
         +(slip?.grossSalary ?? 0).toFixed(2),
         // 扣款
-        (slip?.advanceAmount ?? 0) > 0 ? -+(slip?.advanceAmount ?? 0).toFixed(2) : 0,
+        ((slip?.advanceAmount ?? 0) + (slip?.pettyLaborPaid ?? 0)) > 0 ? -+((slip?.advanceAmount ?? 0) + (slip?.pettyLaborPaid ?? 0)).toFixed(2) : 0,
         (slip?.socialInsuranceDeduction ?? 0) > 0 ? -+(slip?.socialInsuranceDeduction ?? 0).toFixed(2) : 0,
         (slip?.housingFundDeduction ?? 0) > 0 ? -+(slip?.housingFundDeduction ?? 0).toFixed(2) : 0,
         (slip?.incomeTax ?? 0) > 0 ? -+(slip?.incomeTax ?? 0).toFixed(2) : 0,
@@ -479,7 +479,7 @@ export function buildPayrollHtml(params: ExportParams): string {
           <td class="deduct">-¥${fmt(slip?.socialInsuranceDeduction)}</td>
           <td class="deduct">-¥${fmt(slip?.housingFundDeduction)}</td>
           <td class="deduct">-¥${fmt(slip?.incomeTax)}</td>
-          <td class="deduct">-¥${fmt(slip?.advanceAmount)}</td>
+          <td class="deduct">-¥${fmt((slip?.advanceAmount ?? 0) + (slip?.pettyLaborPaid ?? 0))}</td>
           <td class="highlight">¥${fmt(finalSalary)}</td>
           <td>¥${fmt(slip?.totalEmployerCost ?? slip?.grossSalary)}</td>
           <td class="${fmtStatus(slip) === "已发" ? "paid" : "unpaid"}">${fmtStatus(slip)}</td>
@@ -827,7 +827,7 @@ export function buildCombinedWorkbook(params: ExportParams): XLSX.WorkBook {
       const rewardPenalty = slip?.rewardPenalty ?? 0;
       const compOffCashOut = slip?.compOffCashOut ?? 0;
       const grossSalary = slip?.grossSalary ?? 0;
-      const advance = slip?.advanceAmount ?? 0;
+      const advance = (slip?.advanceAmount ?? 0) + (slip?.pettyLaborPaid ?? 0);
       const socialIns = slip?.socialInsuranceDeduction ?? 0;
       const housingFund = slip?.housingFundDeduction ?? 0;
       const incomeTax = slip?.incomeTax ?? 0;
@@ -1053,7 +1053,7 @@ export function buildCombinedHtml(params: ExportParams): string {
         <td>¥${fmt(slip?.performanceBonus)}</td><td>¥${fmt(allowanceTotal)}</td><td>¥${fmt(slip?.rewardPenalty)}</td>
         <td>¥${fmt(slip?.grossSalary)}</td>
         <td class="deduct">-¥${fmt(slip?.socialInsuranceDeduction)}</td>
-        <td class="deduct">-¥${fmt(slip?.advanceAmount)}</td>
+        <td class="deduct">-¥${fmt((slip?.advanceAmount ?? 0) + (slip?.pettyLaborPaid ?? 0))}</td>
         <td class="highlight">¥${fmt(finalSalary)}</td>
         <td>¥${fmt(slip?.totalEmployerCost ?? slip?.grossSalary)}</td>
         <td class="${fmtStatus(slip) === "已发" ? "paid" : "unpaid"}">${fmtStatus(slip)}</td>
