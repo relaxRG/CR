@@ -240,3 +240,42 @@ describe("边界值", () => {
     expect(calcAllowance(rule, 31).amount).toBe(465);
   });
 });
+
+// ─── 7. 升级验证：unit 统一计算（不依赖 type 的 switch-case）────────────────────
+describe("升级验证：unit 统一决定计算方式", () => {
+  it("任意 type + unit=per_day → 乘以出勤天数", () => {
+    // 模拟旧版创建的规则：type 可能是任意值，但 unit 明确为 per_day
+    const rule = makeRule({ type: "custom_fixed" as any, label: "餐补", amount: 15, unit: "per_day" });
+    expect(calcAllowance(rule, 27).amount).toBe(405);
+  });
+
+  it("未知 type + unit=per_day → 仍然乘以天数（不走 default 分支返回固定值）", () => {
+    const rule = makeRule({ type: "unknown_type" as any, label: "餐补", amount: 15, unit: "per_day" });
+    expect(calcAllowance(rule, 27).amount).toBe(405);
+  });
+
+  it("meal_per_day 无 unit 字段 → 自动推断为 per_day", () => {
+    // 旧版 meal_per_day 规则可能没有 unit 字段
+    const rule: any = { id: "r1", type: "meal_per_day", label: "饭补", amount: 15, enabled: true };
+    expect(calcAllowance(rule, 27).amount).toBe(405);
+  });
+
+  it("custom_fixed 无 unit 字段 → 默认 per_month（固定值）", () => {
+    const rule: any = { id: "r1", type: "custom_fixed", label: "全勤奖", amount: 500, enabled: true };
+    expect(calcAllowance(rule, 27).amount).toBe(500);
+    expect(calcAllowance(rule, 0).amount).toBe(500);
+  });
+
+  it("transport_fixed 无 unit 字段 → 默认 per_month（固定值）", () => {
+    const rule: any = { id: "r1", type: "transport_fixed", label: "交通", amount: 200, enabled: true };
+    expect(calcAllowance(rule, 27).amount).toBe(200);
+  });
+
+  it("per_day 补贴随出勤天数动态变化（子豪场景：¥15/天）", () => {
+    const rule = makeRule({ type: "custom_fixed", label: "餐补", amount: 15, unit: "per_day" });
+    expect(calcAllowance(rule, 1).amount).toBe(15);
+    expect(calcAllowance(rule, 10).amount).toBe(150);
+    expect(calcAllowance(rule, 27).amount).toBe(405);
+    expect(calcAllowance(rule, 31).amount).toBe(465);
+  });
+});

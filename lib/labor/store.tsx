@@ -913,18 +913,25 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
       const overrides = existing?.allowanceOverrides;
       for (const rule of employee.allowanceRules) {
         if (!rule.enabled) continue;
-        // 修复 Bug：季度/年度补贴必须判断当月是否应发放（之前完全没有调用 shouldPayAllowanceThisMonth）
         if (!shouldPayAllowanceThisMonth(rule, month)) continue;
         // 如果用户在绩效补贴页手动取消了此补贴，则跳过
         if (overrides && rule.id in overrides && !overrides[rule.id]) continue;
-        const { amount, autoNote } = calcAllowance(rule, attendanceDays);
+        const { amount: autoAmount, autoNote } = calcAllowance(rule, attendanceDays);
+
+        // 升级：区分动态补贴和固定补贴
+        // 动态补贴（per_day）：始终使用最新计算值，禁止 isOverride 锁定
+        // 固定补贴（per_month/quarter/year）：支持手动覆盖
+        const unit = rule.unit ?? (rule.type === "meal_per_day" ? "per_day" : "per_month");
+        const isDynamic = unit === "per_day";
         const existingDetail = existing?.allowanceDetails?.[rule.id];
-        const isOverride = existingDetail?.isOverride ?? false;
-        const finalAmount = isOverride ? (existingDetail?.amount ?? amount) : amount;
+        const isOverride = isDynamic ? false : (existingDetail?.isOverride ?? false);
+        const finalAmount = isOverride ? (existingDetail?.amount ?? autoAmount) : autoAmount;
+
         allowanceDetails[rule.id] = { amount: finalAmount, autoNote, isOverride };
+
+        // 分类统一按 unit 判断：per_day 归入 mealAllowance，transport_fixed 归入 transportAllowance
         if (rule.type === "transport_fixed") transportAllowance += finalAmount;
-        // 修复 Bug： custom_fixed + per_day（如通过「+餐补」快捷按鈕创建的餐补）应归入 mealAllowance，而非 otherAllowance
-        else if (rule.type === "meal_per_day" || (rule.type === "custom_fixed" && rule.unit === "per_day")) mealAllowance += finalAmount;
+        else if (isDynamic || rule.type === "meal_per_day") mealAllowance += finalAmount;
         else otherAllowance += finalAmount;
       }
     }

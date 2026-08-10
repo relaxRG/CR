@@ -1343,27 +1343,29 @@ export function calcIncomeTax(
  */
 export function calcAllowance(rule: AllowanceRule, attendanceDays: number): { amount: number; autoNote: string } {
   if (!rule.enabled) return { amount: 0, autoNote: "" };
-  switch (rule.type) {
-    case "transport_fixed":
-      return { amount: rule.amount, autoNote: `交通补贴（固定）¥${rule.amount}` };
-    case "meal_per_day":
-      return {
-        amount: Math.round(rule.amount * attendanceDays * 100) / 100,
-        autoNote: `饭补 ¥${formatMoney(rule.amount)}/天 × ${attendanceDays}天 = ¥${formatMoney(rule.amount * attendanceDays)}`,
-      };
-    case "custom_fixed":
-      // 修复 Bug：如果单位是 per_day，应乘以出勤天数（与 meal_per_day 逻辑一致）
-      if (rule.unit === "per_day") {
-        const total = Math.round(rule.amount * attendanceDays * 100) / 100;
-        return {
-          amount: total,
-          autoNote: `${rule.label} ¥${formatMoney(rule.amount)}/天 × ${attendanceDays}天 = ¥${formatMoney(total)}`,
-        };
-      }
-      return { amount: rule.amount, autoNote: `${rule.label}（固定）¥${rule.amount}` };
-    default:
-      return { amount: rule.amount, autoNote: rule.label };
+
+  // 升级：统一按 unit 字段决定计算方式
+  // 规则：
+  //   1. transport_fixed 始终为固定补贴（不受 unit 字段影响）
+  //   2. 其他类型按 unit 字段决定：per_day 乘天数，其余固定
+  //   3. meal_per_day 无 unit 字段时自动推断为 per_day
+  if (rule.type === "transport_fixed") {
+    return { amount: rule.amount, autoNote: `${rule.label}（固定）¥${rule.amount}` };
   }
+
+  const unit = rule.unit ?? (rule.type === "meal_per_day" ? "per_day" : "per_month");
+
+  if (unit === "per_day") {
+    // 动态补贴：金额 = 单价 × 出勤天数
+    const total = Math.round(rule.amount * attendanceDays * 100) / 100;
+    return {
+      amount: total,
+      autoNote: `${rule.label} ¥${formatMoney(rule.amount)}/天 × ${attendanceDays}天 = ¥${formatMoney(total)}`,
+    };
+  }
+
+  // 固定补贴：per_month / per_quarter / per_year
+  return { amount: rule.amount, autoNote: `${rule.label}（固定）¥${rule.amount}` };
 }
 
 export function monthLabel(month: string): string {
