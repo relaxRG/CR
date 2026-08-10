@@ -1,0 +1,211 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ─── 1. TypeScript 类型检查 ────────────────────────────────────────────────
+  typecheck:
+    name: TypeScript (strict)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: TypeScript strict check
+        run: pnpm exec tsc --noEmit --strict
+        # 门禁：0 个 TypeScript 错误，否则 CI 失败
+
+  # ─── 2. 单元测试 & 回归测试 ────────────────────────────────────────────────
+  test:
+    name: Unit & Regression Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run all tests
+        run: pnpm test
+        # 门禁：所有测试通过（当前 369 passed | 1 skipped），否则 CI 失败
+
+      - name: Run sync lifecycle regression tests (critical path)
+        run: pnpm exec vitest run tests/sync-rejoin-lifecycle.test.ts --reporter=verbose
+        # 专项门禁：退出同步组后重新加入的完整生命周期（14 个用例）
+
+      - name: Run social insurance calc tests (critical path)
+        run: pnpm exec vitest run tests/social-insurance-calc.test.ts --reporter=verbose
+        # 专项门禁：社保/公积金/个税计算（44 个用例）
+
+      - name: Run KPI allowance e2e tests (critical path)
+        run: pnpm exec vitest run tests/kpi-allowance-e2e.test.ts --reporter=verbose
+        # 专项门禁：绩效补贴端到端（32 个用例）
+
+      - name: Run allowance calc regression tests (critical path)
+        run: pnpm exec vitest run tests/allowance-calc.test.ts --reporter=verbose
+        # 专项门禁：按天补贴计算回归（含 custom_fixed+per_day 修复）
+
+      - name: Run empty shift cleanup tests (critical path)
+        run: pnpm exec vitest run tests/empty-shift-cleanup.test.ts --reporter=verbose
+        # 专项门禁：空排班记录清理迁移脚本（27 个用例）
+
+      - name: Run att card expand bubble tests (critical path)
+        run: pnpm exec vitest run tests/att-card-expand-bubble.test.ts --reporter=verbose
+        # 专项门禁：考勤卡片展开/收起和事件冒泡防护（30 个用例）
+
+  # ─── 3. 存储与 State 脱节检查 ─────────────────────────────────────────────
+  storage-state-audit:
+    name: Storage-State Consistency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run storage-state audit
+        run: |
+          python3 - << 'PYEOF'
+          import re, os, glob, sys
+
+          APP_DIR = "app"
+          LIB_DIR = "lib"
+
+          WRITE_PATTERNS = [
+              r'AsyncStorage\.setItem\(',
+              r'SecureStore\.setItemAsync\(',
+              r'saveDeviceInfo\(',
+          ]
+
+          SAFE_CONTEXTS = [
+              'usePersisted', 'lib/cf-sync/client', 'lib/sync/engine',
+              'lib/labor/store', 'lib/store/', 'lib/spirits/', 'lib/fruit/',
+              'lib/equipment/', 'lib/homemade/', 'lib/backup/', 'lib/beer/',
+              'lib/books/', 'lib/bottles/',
+          ]
+
+          def is_safe_file(filepath):
+              return any(safe in filepath for safe in SAFE_CONTEXTS)
+
+          def scan_file(filepath):
+              if is_safe_file(filepath):
+                  return []
+              with open(filepath, 'r', encoding='utf-8') as f:
+                  lines = f.read().split('\n')
+              issues = []
+              for i, line in enumerate(lines, 1):
+                  stripped = line.strip()
+                  if stripped.startswith('//') or stripped.startswith('*'):
+                      continue
+                  for pattern in WRITE_PATTERNS:
+                      if re.search(pattern, line):
+                          ctx_start = max(0, i - 6)
+                          ctx_end = min(len(lines), i + 5)
+                          context = '\n'.join(lines[ctx_start:ctx_end])
+                          has_set_state = bool(re.search(
+                              r'set[A-Z]\w+\(|dispatch\(|setState\(|setDeviceInfo\(|refreshDeviceInfo\(|restartSync\(',
+                              context
+                          ))
+                          is_in_component = any(
+                              re.search(r'export default function|const \w+ = \(\) =>', lines[j])
+                              for j in range(max(0, i-30), i)
+                          )
+                          if not has_set_state and is_in_component:
+                              issues.append(f"{filepath}:{i}: {line.strip()[:80]}")
+              return issues
+
+          files = (
+              glob.glob(os.path.join(APP_DIR, "**/*.tsx"), recursive=True) +
+              glob.glob(os.path.join(APP_DIR, "**/*.ts"), recursive=True) +
+              glob.glob(os.path.join(LIB_DIR, "**/*.tsx"), recursive=True) +
+              glob.glob(os.path.join(LIB_DIR, "**/*.ts"), recursive=True)
+          )
+
+          all_issues = []
+          for f in sorted(files):
+              all_issues.extend(scan_file(f))
+
+          if all_issues:
+              print(f"❌ 发现 {len(all_issues)} 个存储与 State 脱节隐患（违反规范10）：")
+              for issue in all_issues:
+                  print(f"  {issue}")
+              sys.exit(1)
+          else:
+              print(f"✅ 存储与 State 一致性检查通过（扫描 {len(files)} 个文件）")
+          PYEOF
+        # 门禁：违反规范10时 CI 失败
+
+  # ─── 4. 事件冒泡检查 ───────────────────────────────────────────────────────
+  bubble-audit:
+    name: Event Bubble Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run event bubble audit
+        run: |
+          python3 - << 'PYEOF'
+          import re, os, glob, sys
+
+          # 检查已知的展开卡片组件内是否有子按钮缺少 stopPropagation
+          # 这是一个轻量级检查，主要确保 labor.tsx 中的关键区域不退化
+          files = glob.glob("app/**/*.tsx", recursive=True)
+          issues = []
+
+          for filepath in files:
+              with open(filepath, 'r', encoding='utf-8') as f:
+                  content = f.read()
+              # 检查是否有嵌套 TouchableOpacity 但没有 stopPropagation 的模式
+              # 只检查已知高风险区域：labor.tsx 的调休面板
+              if 'labor.tsx' in filepath:
+                  # 确保 restartSync 相关的按钮有 stopPropagation
+                  panel_sections = re.findall(
+                      r'(handleAddByHours|handleCashOut|setPanelMode|doCashOut)[^;]{0,200}',
+                      content
+                  )
+                  for section in panel_sections:
+                      if 'stopPropagation' not in section and 'onPress' in section:
+                          issues.append(f"{filepath}: 可能缺少 stopPropagation: {section[:60]}")
+
+          if issues:
+              print(f"⚠️  发现 {len(issues)} 个潜在事件冒泡问题（违反规范7）：")
+              for issue in issues:
+                  print(f"  {issue}")
+              # 警告级别，不阻断 CI（已有专项测试覆盖）
+              print("（已有 att-card-expand-bubble.test.ts 覆盖，请确认是否需要修复）")
+          else:
+              print("✅ 事件冒泡检查通过")
+          PYEOF
