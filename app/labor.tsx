@@ -1037,7 +1037,7 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
               { type: "schedule_session_excel" as ExportType, icon: "calendar", label: "排班表 Excel（班次）", sub: "前厅+后厨，班次名称" },
               { type: "schedule_session_pdf" as ExportType, icon: "calendar", label: "排班表 PDF（班次）", sub: "A3 横向打印" },
             ] as const).map(({ type, icon, label, sub }) => (
-              <TouchableOpacity key={type} onPress={() => handleExport(type)}
+              <TouchableOpacity key={type} onPress={(e) => { e.stopPropagation?.(); handleExport(type); }}
                 style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10 }}>
                 <IconSymbol name={icon as any} size={18} color={colors.foreground} />
                 <View style={{ flex: 1 }}>
