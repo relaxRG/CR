@@ -13,6 +13,7 @@ import * as Haptics from "expo-haptics";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
+import { useThrottleFn } from "@/hooks/use-debounce-fn";
 import { useFeature } from "@/hooks/use-feature";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
@@ -948,7 +949,7 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [exporting, setExporting] = useState(false);
 
-  const handleExport = useCallback(async (type: ExportType) => {
+  const _handleExportRaw = useCallback(async (type: ExportType) => {
     tap();
     setShowExportMenu(false);
     setExporting(true);
@@ -967,6 +968,8 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
       setExporting(false);
     }
   }, [month, employees, paySlips, attendances, shifts, shiftTemplates]);
+  // 防抖包装：1500ms 内重复点击被忽略，防止移动端连续快速点击触发多次导出任务
+  const handleExport = useThrottleFn(_handleExportRaw, 1500);
 
   // 班次颜色查找辅助函数（动态读取模板）
 
