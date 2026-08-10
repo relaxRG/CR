@@ -522,6 +522,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
             // 比例底薪：统一使用 calcProportionalBase helper
             const overtimePay = att?.overtimePay ?? 0;
             const holidayPay = att?.holidayBonus ?? 0;
+            const specialDeduction = att?.totalSpecialDeduction ?? 0;
             const proportionalBase = (!att || att.attendanceDays <= 0 || att.expectedAttendanceDays <= 0)
               ? 0
               : calcProportionalBase(employee.baseSalary, att.attendanceDays, att.expectedAttendanceDays);
