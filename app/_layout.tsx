@@ -76,6 +76,13 @@ export default function RootLayout() {
   // Initialize Manus runtime for cookie injection from parent container
   useEffect(() => {
     initManusRuntime();
+    // 迁移脚本：清理历史遗留的空排班记录（hoursValue=null 且无特殊状态）
+    // 根因：SchHoursModal 旧版本清空工时保留了空记录，导致考勤统计异常（已修复于 commit e70c4c5）
+    import("@/lib/migrations/clean-empty-shift-entries").then(({ cleanEmptyShiftEntries }) => {
+      cleanEmptyShiftEntries().then((removed) => {
+        if (removed > 0) console.log(`[Startup] 已清理 ${removed} 条空排班记录`);
+      });
+    });
   }, []);
 
   const handleSafeAreaUpdate = useCallback((metrics: Metrics) => {

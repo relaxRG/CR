@@ -104,3 +104,55 @@ React 的每次渲染都会执行函数体内的所有同步代码。如果在�
 2. **写入层兼容**：在保存逻辑中，保留该字段但强制写入空值或零值（如 `stdHoursPerDay: 0`），逐步洗掉旧数据。
 3. **读取层兼容（Fallback）**：引擎在读取时，优先使用新字段（如 `weeklyHoursRules`），如果新字段为空或无效，则 fallback 读取旧字段（`stdHoursPerDay`），确保老用户不受影响。
 4. **UI 层隔离**：在前端 UI 彻底删除废弃字段的输入框和展示位，强制新用户和老用户在编辑时使用新字段。对于依赖旧字段的展示，应提示「请更新配置」。
+
+## 7. 嵌套可点击组件的事件冒泡防护
+
+在 React Native 中，`TouchableOpacity` / `Pressable` 的点击事件默认会向上冒泡。这在嵌套交互组件时会导致严重的误触问题。
+
+**规范要求：**
+凡是将 `TouchableOpacity` / `Pressable` 嵌套在另一个可点击容器（如可展开卡片、Modal 触发按钮）内时，子组件的 `onPress` 必须调用 `e.stopPropagation?.()` 阻止事件冒泡。
+
+**标准写法：**
+```tsx
+<TouchableOpacity onPress={(e) => { 
+  e.stopPropagation?.(); 
+  doSomething(); 
+}}>
+```
+
+**容器级防护：**
+如果子组件区域较大（如内联展开的整个面板），可使用拦截容器包裹整个区域，防止内部所有点击穿透到外层卡片：
+```tsx
+<TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation?.()}>
+  {/* 内部的所有子按钮即使不写 stopPropagation，也不会冒泡到最外层 */}
+</TouchableOpacity>
+```
+
+## 8. 清空操作必须删除记录，而不是保留空值
+
+在表单或表格中，当用户清空一个输入字段（如工时）并保存时，如果该字段是这条记录存在的唯一意义，**必须删除整条记录，而不是将字段设为 `null` 并保留记录**。
+
+**反面模式（错误）：**
+```tsx
+// 用户清空工时输入框
+const hv = hoursInput ? Number(hoursInput) : null;
+// 错误：保留了 hoursValue=null 的空记录
+upsertShift({ employeeId, date, hoursValue: hv });
+```
+保留空值记录会导致：
+1. 列表过滤逻辑需要额外增加 `hoursValue !== null` 的判断，极易遗漏。
+2. 历史遗留的空记录会污染统计结果（例如在排班表中，员工明明没有排班，但因为存在一条空记录而依然显示在列表中）。
+3. UI 显示异常，甚至导致崩溃。
+
+**标准模式（正确）：**
+```tsx
+const hv = hoursInput ? Number(hoursInput) : null;
+// 正确：当工时为空且无其他附属意义（如特殊状态）时，直接删除记录
+if (hv === null && !specialStatusId) {
+  deleteShift(employeeId, date);
+  return;
+}
+upsertShift({ employeeId, date, hoursValue: hv, specialStatusId });
+```
+**规范要求：**
+在任何包含「清空」或「重置」语义的保存操作中，必须评估该记录是否还有存在的必要。如果无必要，必须调用对应的 `delete` / `remove` 方法彻底清除。
