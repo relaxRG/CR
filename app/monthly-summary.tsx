@@ -754,7 +754,7 @@ export default function MonthlySummaryScreen() {
                           const slip = paySlipStore?.paySlips?.find((s: any) => s.employeeId === emp.id && s.month === selectedMonth);
                           const defaultBank = emp.bankAccounts?.find((b: any) => b.isDefault) ?? emp.bankAccounts?.[0];
                           const grossAmt = slip?.grossSalary ?? payment?.totalAmount ?? 0;
-                          const advAmt = slip?.advanceAmount ?? payment?.advanceAmount ?? 0;
+                          const advAmt = slip ? ((slip.advanceAmount ?? 0) + (slip.pettyLaborPaid ?? 0)) : (payment?.advanceAmount ?? 0);
                           const finalAmt = slip?.finalSalary ?? Math.max(0, grossAmt - advAmt);
                           const status = payment?.status ?? "unpaid";
                           const isPaid = status === "paid";
