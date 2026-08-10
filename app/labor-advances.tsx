@@ -6,6 +6,7 @@
  * - 在薪资单中自动扣除
  */
 import React, { useMemo, useState } from "react";
+import { formatMoney } from "@/lib/utils";
 import {
   Alert, KeyboardAvoidingView, Modal, Platform, Pressable,
   ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View
@@ -249,11 +250,11 @@ export default function LaborAdvancesScreen() {
       <View style={[S.summaryCard, { backgroundColor: "#5856D6" + "0a", borderColor: "#5856D6" + "22" }]}>
         <View style={{ flex: 1 }}>
           <Text style={{ fontSize: 11, color: colors.muted }}>手动预支（待扣）</Text>
-          <Text style={{ fontSize: 20, fontWeight: "800", color: "#5856D6" }}>¥{totalPending.toFixed(0)}</Text>
+          <Text style={{ fontSize: 20, fontWeight: "800", color: "#5856D6" }}>¥{formatMoney(totalPending)}</Text>
         </View>
         <View style={{ flex: 1, alignItems: "center" }}>
           <Text style={{ fontSize: 11, color: colors.muted }}>备用金已付</Text>
-          <Text style={{ fontSize: 20, fontWeight: "800", color: "#AF52DE" }}>¥{totalPettyLinked.toFixed(0)}</Text>
+          <Text style={{ fontSize: 20, fontWeight: "800", color: "#AF52DE" }}>¥{formatMoney(totalPettyLinked)}</Text>
         </View>
         <View style={{ flex: 1, alignItems: "flex-end" }}>
           <Text style={{ fontSize: 11, color: colors.muted }}>合计记录</Text>
@@ -291,7 +292,7 @@ export default function LaborAdvancesScreen() {
                   <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>{link.description}</Text>
                   <Text style={{ fontSize: 11, color: colors.muted }}>{emp?.code ?? "未匹配"} · {link.date} · {link.pettyCode}</Text>
                 </View>
-                <Text style={{ fontSize: 14, fontWeight: "700", color: "#AF52DE" }}>¥{link.amount.toFixed(0)}</Text>
+                <Text style={{ fontSize: 14, fontWeight: "700", color: "#AF52DE" }}>¥{formatMoney(link.amount)}</Text>
               </View>
             );
           })}
@@ -377,7 +378,7 @@ export default function LaborAdvancesScreen() {
 
                 </View>
                 <Text style={{ fontSize: 18, fontWeight: "800", color: advance.status === "pending" ? "#5856D6" : colors.muted }}>
-                  ¥{advance.amount.toFixed(0)}
+                  ¥{formatMoney(advance.amount)}
                 </Text>
               </View>
 

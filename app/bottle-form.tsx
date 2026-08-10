@@ -1,4 +1,5 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { formatMoney } from "@/lib/utils";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -1259,7 +1260,7 @@ export default function BottleFormScreen() {
                       {qty > 1 && (
                         <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
                           <Text style={{ fontSize: 12, color: colors.muted }}>{lang === "zh" ? "单瓶：" : "Per bottle: "}</Text>
-                          <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>¥{perBottle.toFixed(2)}</Text>
+                          <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>¥{formatMoney(perBottle)}</Text>
                         </View>
                       )}
                       <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
@@ -1303,7 +1304,7 @@ export default function BottleFormScreen() {
                   return (
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 12, paddingHorizontal: 4 }}>
                       <Text style={{ fontSize: 12, color: colors.muted }}>{lang === "zh" ? "单瓶/罐成本：" : "Per unit cost: "}</Text>
-                      <Text style={{ fontSize: 13, fontWeight: "600", color: colors.primary }}>¥{perUnit.toFixed(2)}</Text>
+                      <Text style={{ fontSize: 13, fontWeight: "600", color: colors.primary }}>¥{formatMoney(perUnit)}</Text>
                     </View>
                   );
                 })()}
@@ -1339,7 +1340,7 @@ export default function BottleFormScreen() {
                   return (
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 12, paddingHorizontal: 4 }}>
                       <Text style={{ fontSize: 12, color: colors.muted }}>{lang === "zh" ? "单罐/瓶成本：" : "Per unit cost: "}</Text>
-                      <Text style={{ fontSize: 13, fontWeight: "600", color: colors.primary }}>¥{perUnit.toFixed(2)}</Text>
+                      <Text style={{ fontSize: 13, fontWeight: "600", color: colors.primary }}>¥{formatMoney(perUnit)}</Text>
                     </View>
                   );
                 })()}

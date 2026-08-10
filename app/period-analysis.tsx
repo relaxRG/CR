@@ -8,6 +8,7 @@
  *   提醒   — 加班性价比提醒（1:30am后营业额 < 阈值）
  */
 import React, { useMemo, useState } from "react";
+import { formatMoney } from "@/lib/utils";
 import {
   Alert, KeyboardAvoidingView, Modal, Platform, Pressable,
   ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View
@@ -95,7 +96,7 @@ function SlotHeatBar({ slot, avgRevenue, maxRevenue, color, colors }: {
         <View style={{ width: `${Math.round(pct * 100)}%`, height: "100%", backgroundColor: color, borderRadius: 7 }} />
       </View>
       <Text style={{ fontSize: 11, fontWeight: "600", color, width: 50, textAlign: "right" }}>
-        ¥{avgRevenue.toFixed(0)}
+        ¥{formatMoney(avgRevenue)}
       </Text>
     </View>
   );
@@ -409,7 +410,7 @@ export default function PeriodAnalysisScreen() {
                     <Text style={{ fontSize: 11, color: colors.muted }}>{spiritPurchases.length}条记录</Text>
                   </View>
                   <View style={{ alignItems: "flex-end" }}>
-                    <Text style={{ fontSize: 16, fontWeight: "700", color: "#EF4444" }}>¥{spiritCost.toFixed(0)}</Text>
+                    <Text style={{ fontSize: 16, fontWeight: "700", color: "#EF4444" }}>¥{formatMoney(spiritCost)}</Text>
                     {beverageCostPct !== null && (
                       <Text style={{ fontSize: 11, fontWeight: "600", color: pourCostColor(beverageCostPct) }}>
                         酒水成本率 {beverageCostPct.toFixed(1)}%
@@ -425,7 +426,7 @@ export default function PeriodAnalysisScreen() {
                     <Text style={{ fontSize: 11, color: colors.muted }}>{foodRecords.length}条记录</Text>
                   </View>
                   <View style={{ alignItems: "flex-end" }}>
-                    <Text style={{ fontSize: 16, fontWeight: "700", color: "#F59E0B" }}>¥{foodCost.toFixed(0)}</Text>
+                    <Text style={{ fontSize: 16, fontWeight: "700", color: "#F59E0B" }}>¥{formatMoney(foodCost)}</Text>
                     {foodCostPct !== null && (
                       <Text style={{ fontSize: 11, fontWeight: "600", color: foodCostPct < 30 ? "#10B981" : "#EF4444" }}>
                         食材成本率 {foodCostPct.toFixed(1)}%
@@ -536,7 +537,7 @@ export default function PeriodAnalysisScreen() {
                         borderColor: s.revenue > 0 ? color + "44" : colors.border,
                       }]}>
                         <Text style={{ fontSize: 9, color: s.revenue > 0 ? color : colors.muted }}>
-                          {s.slot.split("-")[0]} ¥{s.revenue.toFixed(0)}
+                          {s.slot.split("-")[0]} ¥{formatMoney(s.revenue)}
                         </Text>
                       </View>
                     ))}
@@ -646,7 +647,7 @@ export default function PeriodAnalysisScreen() {
                     <Text style={{ fontSize: 12, color: colors.muted, width: 80 }}>{s.slot}</Text>
                     <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 8 }}>
                       <Text style={{ fontSize: 13, fontWeight: "600", color: isLow ? colors.error : colors.foreground }}>
-                        ¥{s.revenue.toFixed(0)}
+                        ¥{formatMoney(s.revenue)}
                       </Text>
                       <Text style={{ fontSize: 11, color: colors.muted }}>{s.orders}单 · {s.guests}人</Text>
                       {isLow && s.revenue > 0 && (
@@ -671,7 +672,7 @@ export default function PeriodAnalysisScreen() {
                     {settings.alertStartTime} 后：
                   </Text>
                   <Text style={{ fontSize: 12, fontWeight: "700", color: dr.after130amRevenue < settings.overtimeThreshold ? colors.error : color }}>
-                    ¥{dr.after130amRevenue.toFixed(0)}（{dr.after130amOrders}单）
+                    ¥{formatMoney(dr.after130amRevenue)}（{dr.after130amOrders}单）
                   </Text>
                   {dr.after130amRevenue < settings.overtimeThreshold && (
                     <Text style={{ fontSize: 11, color: colors.error }}>
@@ -745,7 +746,7 @@ export default function PeriodAnalysisScreen() {
                 </Text>
                 <View style={{ flex: 1 }} />
                 <Text style={{ fontSize: 14, fontWeight: "700", color: colors.error }}>
-                  ¥{alert.after130amRevenue.toFixed(0)}
+                  ¥{formatMoney(alert.after130amRevenue)}
                 </Text>
               </View>
 
@@ -753,13 +754,13 @@ export default function PeriodAnalysisScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 11, color: colors.muted }}>凌晨总营业额</Text>
                   <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>
-                    ¥{alert.lateNightRevenue.toFixed(0)}
+                    ¥{formatMoney(alert.lateNightRevenue)}
                   </Text>
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 11, color: colors.muted }}>{settings.alertStartTime} 后营业额</Text>
                   <Text style={{ fontSize: 14, fontWeight: "600", color: colors.error }}>
-                    ¥{alert.after130amRevenue.toFixed(0)}（{alert.orders}单）
+                    ¥{formatMoney(alert.after130amRevenue)}（{alert.orders}单）
                   </Text>
                 </View>
                 <View style={{ flex: 1 }}>
@@ -776,7 +777,7 @@ export default function PeriodAnalysisScreen() {
                     <View key={ls.slot} style={{ flexDirection: "row", gap: 8, paddingVertical: 2 }}>
                       <Text style={{ fontSize: 12, color: colors.muted, width: 80 }}>{ls.slot}</Text>
                       <Text style={{ fontSize: 12, fontWeight: "600", color: ls.revenue === 0 ? colors.warning : colors.error }}>
-                        ¥{ls.revenue.toFixed(0)}
+                        ¥{formatMoney(ls.revenue)}
                       </Text>
                       <Text style={{ fontSize: 12, color: colors.muted }}>{ls.orders}单</Text>
                       {ls.revenue === 0 && ls.orders > 0 && (

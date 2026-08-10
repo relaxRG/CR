@@ -1,4 +1,5 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { formatMoney } from "@/lib/utils";
 import React from "react";
 import { Alert, Platform, Pressable, ScrollView, ScrollView as HScrollView, StyleSheet, Text, View } from "react-native";
 import * as Haptics from "expo-haptics";
@@ -496,7 +497,7 @@ export default function BottleDetailScreen() {
                         <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 2 }}>商品名：{ch.supplierProductName}</Text>
                       )}
                       <Text style={{ fontSize: 16, fontWeight: "700", color: colors.primary }}>
-                        ¥{ch.latestPrice.toFixed(2)}
+                        ¥{formatMoney(ch.latestPrice)}
                         <Text style={{ fontSize: 12, fontWeight: "400", color: colors.muted }}>/{ch.unit}</Text>
                       </Text>
                       {(ch.priceHistory ?? []).length > 1 && (

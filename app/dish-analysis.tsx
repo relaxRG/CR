@@ -9,6 +9,7 @@
  *   对比   — 多月趋势对比
  */
 import React, { useMemo, useState } from "react";
+import { formatMoney } from "@/lib/utils";
 import {
   Alert, Platform, Pressable, ScrollView, StyleSheet,
   Text, TextInput, TouchableOpacity, View
@@ -67,7 +68,7 @@ function getCategoryColor(name: string): string {
 
 function fmtAmt(n: number): string {
   if (n >= 10000) return `¥${(n / 10000).toFixed(1)}w`;
-  return `¥${n.toFixed(0)}`;
+  return `¥${formatMoney(n)}`;
 }
 
 function fmtPct(n: number): string {

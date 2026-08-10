@@ -6,6 +6,7 @@
  * - 库存预警
  */
 import React, { useMemo, useState } from "react";
+import { formatMoney } from "@/lib/utils";
 import {
   Alert, KeyboardAvoidingView, Modal, Platform, Pressable,
   ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View
@@ -45,7 +46,7 @@ function BeerItemCard({ item, onIn, onOut, onEdit, colors }: {
           </View>
         </View>
         <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>
-          {item.spec} · 进价¥{item.latestCostPrice.toFixed(2)} · 售价¥{item.sellingPrice.toFixed(2)} · 毛利{margin}%
+          {item.spec} · 进价¥{formatMoney(item.latestCostPrice)} · 售价¥{formatMoney(item.sellingPrice)} · 毛利{margin}%
         </Text>
         {item.supplier ? <Text style={{ fontSize: 11, color: colors.muted }}>{item.supplier}</Text> : null}
         {lowStock && <Text style={{ fontSize: 11, color: colors.error, marginTop: 2 }}>⚠ 库存不足（预警线：{item.alertThreshold}）</Text>}
@@ -78,7 +79,7 @@ function IceItemCard({ item, onIn, onOut, onEdit, colors }: {
       <View style={{ flex: 1 }}>
         <Text style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>{item.name}</Text>
         <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>
-          {item.spec} · 进价¥{item.latestCostPrice.toFixed(2)}/{item.unit}
+          {item.spec} · 进价¥{formatMoney(item.latestCostPrice)}/{item.unit}
         </Text>
         {item.supplier ? <Text style={{ fontSize: 11, color: colors.muted }}>{item.supplier}</Text> : null}
         {lowStock && <Text style={{ fontSize: 11, color: colors.error, marginTop: 2 }}>⚠ 库存不足</Text>}
@@ -119,7 +120,7 @@ function FruitItemCard({ item, onIn, onOut, onEdit, colors }: {
           </View>
         </View>
         <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>
-          {item.spec ? `${item.spec} · ` : ""}进价¥{item.latestCostPrice.toFixed(2)}/{unitLabel}
+          {item.spec ? `${item.spec} · ` : ""}进价¥{formatMoney(item.latestCostPrice)}/{unitLabel}
         </Text>
         {item.usage ? <Text style={{ fontSize: 11, color: colors.muted }}>用途：{item.usage}</Text> : null}
         {item.supplier ? <Text style={{ fontSize: 11, color: colors.muted }}>来源：{item.supplier}</Text> : null}
@@ -209,7 +210,7 @@ function PurchaseModal({
               {total > 0 && (
                 <View style={[PM.totalRow, { backgroundColor: color + "0a" }]}>
                   <Text style={{ fontSize: 13, color: colors.muted }}>本次进货金额</Text>
-                  <Text style={{ fontSize: 18, fontWeight: "700", color }}>¥{total.toFixed(2)}</Text>
+                  <Text style={{ fontSize: 18, fontWeight: "700", color }}>¥{formatMoney(total)}</Text>
                 </View>
               )}
             </View>
@@ -464,7 +465,7 @@ export default function BeerIceInventoryScreen() {
             <View style={{ flex: 1, alignItems: "center" }}>
               <Text style={{ fontSize: 11, color: colors.muted }}>库存价值</Text>
               <Text style={{ fontSize: 18, fontWeight: "700", color: BEER_COLOR }}>
-                ¥{beerItems.reduce((s, i) => s + i.currentStock * i.latestCostPrice, 0).toFixed(0)}
+                ¥{formatMoney(beerItems.reduce((s, i) => s + i.currentStock * i.latestCostPrice, 0))}
               </Text>
             </View>
           </>
@@ -477,7 +478,7 @@ export default function BeerIceInventoryScreen() {
             <View style={{ flex: 1, alignItems: "center" }}>
               <Text style={{ fontSize: 11, color: colors.muted }}>库存价值</Text>
               <Text style={{ fontSize: 18, fontWeight: "700", color: ICE_COLOR }}>
-                ¥{iceItems.reduce((s, i) => s + i.currentStock * i.latestCostPrice, 0).toFixed(0)}
+                ¥{formatMoney(iceItems.reduce((s, i) => s + i.currentStock * i.latestCostPrice, 0))}
               </Text>
             </View>
           </>
@@ -496,7 +497,7 @@ export default function BeerIceInventoryScreen() {
             <View style={{ flex: 1, alignItems: "center" }}>
               <Text style={{ fontSize: 11, color: colors.muted }}>库存价值</Text>
               <Text style={{ fontSize: 18, fontWeight: "700", color: FRUIT_COLOR }}>
-                ¥{fruitItems.reduce((s, i) => s + i.currentStock * i.latestCostPrice, 0).toFixed(0)}
+                ¥{formatMoney(fruitItems.reduce((s, i) => s + i.currentStock * i.latestCostPrice, 0))}
               </Text>
             </View>
           </>

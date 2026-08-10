@@ -9,6 +9,7 @@
  * - 查看历史进货价记录
  */
 import React, { useState } from "react";
+import { formatMoney } from "@/lib/utils";
 import {
   Alert, KeyboardAvoidingView, Linking, Modal, Platform, Pressable,
   ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
@@ -301,7 +302,7 @@ export default function BottleChannelsScreen() {
           {bottle.nameEn ? <Text style={{ fontSize: 13, color: colors.muted }}>{bottle.nameEn}</Text> : null}
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8 }}>
             <Text style={{ fontSize: 12, color: colors.muted }}>当前成本计算价：</Text>
-            <Text style={{ fontSize: 16, fontWeight: "700", color: colors.primary }}>¥{effectivePrice.toFixed(2)}</Text>
+            <Text style={{ fontSize: 16, fontWeight: "700", color: colors.primary }}>¥{formatMoney(effectivePrice)}</Text>
             {channels.find((c) => c.isCostBasis) && (
               <Text style={{ fontSize: 11, color: colors.muted }}>
                 （来自「{channels.find((c) => c.isCostBasis)!.name}」）
@@ -368,7 +369,7 @@ export default function BottleChannelsScreen() {
                 <View>
                   <Text style={{ fontSize: 11, color: colors.muted }}>最新进货价</Text>
                   <Text style={{ fontSize: 20, fontWeight: "700", color: ch.isCostBasis ? colors.primary : colors.foreground }}>
-                    ¥{ch.latestPrice.toFixed(2)}
+                    ¥{formatMoney(ch.latestPrice)}
                     <Text style={{ fontSize: 13, fontWeight: "400", color: colors.muted }}>/{ch.unit}</Text>
                   </Text>
                 </View>

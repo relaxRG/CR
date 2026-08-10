@@ -3,6 +3,7 @@
  * 特点：按餐具类型分组，损耗录入（破损/丢失），低频进货，关联备用金 C 类
  */
 import React, { useState } from "react";
+import { formatMoney } from "@/lib/utils";
 import {
   Alert, KeyboardAvoidingView, Modal, Platform, Pressable,
   ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View
@@ -115,7 +116,7 @@ function LossEntryModal({ visible, store, onClose }: {
               <View style={[S.totalRow, { backgroundColor: colors.error + "0a" }]}>
                 <Text style={{ fontSize: 13, color: colors.muted }}>损耗金额</Text>
                 <Text style={{ fontSize: 18, fontWeight: "700", color: colors.error }}>
-                  ¥{(Number(qty) * (selectedItem.latestCostPrice || 0)).toFixed(2)}
+                  ¥{formatMoney((Number(qty) * (selectedItem.latestCostPrice || 0)))}
                 </Text>
               </View>
             )}
@@ -167,7 +168,7 @@ export default function TablewareInventoryScreen() {
                     </View>
                     <View style={{ alignItems: "flex-end" }}>
                       <Text style={{ fontSize: 15, fontWeight: "700", color: "#EF4444" }}>-{r.quantity} 个</Text>
-                      <Text style={{ fontSize: 12, color: "#888" }}>¥{r.totalCost.toFixed(2)}</Text>
+                      <Text style={{ fontSize: 12, color: "#888" }}>¥{formatMoney(r.totalCost)}</Text>
                     </View>
                   </View>
                 ))

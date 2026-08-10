@@ -4,6 +4,7 @@
  * Tab：设备台账 / 购入登记 / 维修记录 / 折旧汇总
  */
 import React, { useState, useMemo } from "react";
+import { formatMoney } from "@/lib/utils";
 import {
   Alert, KeyboardAvoidingView, Modal, Platform, Pressable,
   ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View
@@ -49,10 +50,10 @@ function EquipmentCard({ item, onEdit, onMaintenance, colors }: {
         </View>
         {item.spec ? <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>{item.spec}</Text> : null}
         <Text style={{ fontSize: 12, color: colors.muted }}>
-          购入 {item.purchaseDate} · ¥{item.purchasePrice.toFixed(0)} · 已用 {months} 个月
+          购入 {item.purchaseDate} · ¥{formatMoney(item.purchasePrice)} · 已用 {months} 个月
         </Text>
         <Text style={{ fontSize: 12, color: EQUIP_COLOR }}>
-          月折旧 ¥{monthly.toFixed(2)} · 账面净值 ¥{bookValue.toFixed(0)}
+          月折旧 ¥{formatMoney(monthly)} · 账面净值 ¥{formatMoney(bookValue)}
         </Text>
       </View>
       <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
@@ -139,7 +140,7 @@ function PurchaseModal({ visible, item, colors, onSave, onClose }: {
             {monthly > 0 && (
               <View style={[S.totalRow, { backgroundColor: EQUIP_COLOR + "0a" }]}>
                 <Text style={{ fontSize: 13, color: colors.muted }}>月折旧金额</Text>
-                <Text style={{ fontSize: 18, fontWeight: "700", color: EQUIP_COLOR }}>¥{monthly.toFixed(2)}/月</Text>
+                <Text style={{ fontSize: 18, fontWeight: "700", color: EQUIP_COLOR }}>¥{formatMoney(monthly)}/月</Text>
               </View>
             )}
 
@@ -332,9 +333,9 @@ export default function EquipmentInventoryScreen() {
       <View style={[S.summaryRow, { borderBottomColor: colors.border }]}>
         {[
           { label: "设备数量", value: `${store.items.filter((i) => i.active).length}`, unit: "台", color: EQUIP_COLOR },
-          { label: "原值合计", value: `¥${totalPurchaseValue.toFixed(0)}`, unit: "", color: colors.foreground },
-          { label: "账面净值", value: `¥${totalBookValue.toFixed(0)}`, unit: "", color: EQUIP_COLOR },
-          { label: "月折旧", value: `¥${totalMonthlyDepreciation.toFixed(0)}`, unit: "", color: colors.warning },
+          { label: "原值合计", value: `¥${formatMoney(totalPurchaseValue)}`, unit: "", color: colors.foreground },
+          { label: "账面净值", value: `¥${formatMoney(totalBookValue)}`, unit: "", color: EQUIP_COLOR },
+          { label: "月折旧", value: `¥${formatMoney(totalMonthlyDepreciation)}`, unit: "", color: colors.warning },
         ].map((c, i) => (
           <View key={i} style={{ flex: 1, alignItems: "center" }}>
             <Text style={{ fontSize: 10, color: colors.muted }}>{c.label}</Text>
@@ -397,7 +398,7 @@ export default function EquipmentInventoryScreen() {
                     <Text style={{ fontSize: 12, color: colors.muted }}>{r.date} · {r.vendor || "维修"}</Text>
                     <Text style={{ fontSize: 12, color: colors.foreground }}>{r.description}</Text>
                   </View>
-                  <Text style={{ fontSize: 16, fontWeight: "700", color: colors.warning }}>¥{r.cost.toFixed(0)}</Text>
+                  <Text style={{ fontSize: 16, fontWeight: "700", color: colors.warning }}>¥{formatMoney(r.cost)}</Text>
                 </View>
               ))
             )}
@@ -410,10 +411,10 @@ export default function EquipmentInventoryScreen() {
             <View style={[S.summaryCard, { backgroundColor: EQUIP_COLOR + "0a", borderColor: EQUIP_COLOR + "22" }]}>
               <Text style={{ fontSize: 14, fontWeight: "700", color: EQUIP_COLOR, marginBottom: 8 }}>折旧汇总</Text>
               {[
-                { label: "本月折旧总额", value: `¥${totalMonthlyDepreciation.toFixed(2)}`, color: EQUIP_COLOR },
-                { label: "本月维修费用", value: `¥${monthMaintenanceCost.toFixed(2)}`, color: colors.warning },
-                { label: "本月设备成本", value: `¥${(totalMonthlyDepreciation + monthMaintenanceCost).toFixed(2)}`, color: colors.foreground },
-                { label: "设备账面净值", value: `¥${totalBookValue.toFixed(0)}`, color: EQUIP_COLOR },
+                { label: "本月折旧总额", value: `¥${formatMoney(totalMonthlyDepreciation)}`, color: EQUIP_COLOR },
+                { label: "本月维修费用", value: `¥${formatMoney(monthMaintenanceCost)}`, color: colors.warning },
+                { label: "本月设备成本", value: `¥${formatMoney((totalMonthlyDepreciation + monthMaintenanceCost))}`, color: colors.foreground },
+                { label: "设备账面净值", value: `¥${formatMoney(totalBookValue)}`, color: EQUIP_COLOR },
               ].map((row, i) => (
                 <View key={i} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 4 }}>
                   <Text style={{ fontSize: 13, color: colors.muted }}>{row.label}</Text>
@@ -430,12 +431,12 @@ export default function EquipmentInventoryScreen() {
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>{item.name}</Text>
                     <Text style={{ fontSize: 12, color: colors.muted }}>
-                      原值 ¥{item.purchasePrice.toFixed(0)} · 使用年限 {item.usefulLifeYears} 年
+                      原值 ¥{formatMoney(item.purchasePrice)} · 使用年限 {item.usefulLifeYears} 年
                     </Text>
                   </View>
                   <View style={{ alignItems: "flex-end" }}>
-                    <Text style={{ fontSize: 14, fontWeight: "700", color: EQUIP_COLOR }}>¥{monthly.toFixed(2)}/月</Text>
-                    <Text style={{ fontSize: 11, color: colors.muted }}>净值 ¥{bookVal.toFixed(0)}</Text>
+                    <Text style={{ fontSize: 14, fontWeight: "700", color: EQUIP_COLOR }}>¥{formatMoney(monthly)}/月</Text>
+                    <Text style={{ fontSize: 11, color: colors.muted }}>净值 ¥{formatMoney(bookVal)}</Text>
                   </View>
                 </View>
               );

@@ -5,6 +5,7 @@
  * 注意：不关联鸡尾酒原料库
  */
 import React, { useMemo, useState } from "react";
+import { formatMoney } from "@/lib/utils";
 import {
   Alert, KeyboardAvoidingView, Modal, Platform, Pressable,
   ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View
@@ -124,7 +125,7 @@ function PurchaseModal({ visible, ingredients, colors, onSave, onClose }: {
             {total > 0 && (
               <View style={[S.totalRow, { backgroundColor: FOOD_COLOR + "0a" }]}>
                 <Text style={{ fontSize: 13, color: colors.muted }}>本次进货金额</Text>
-                <Text style={{ fontSize: 18, fontWeight: "700", color: FOOD_COLOR }}>¥{total.toFixed(2)}</Text>
+                <Text style={{ fontSize: 18, fontWeight: "700", color: FOOD_COLOR }}>¥{formatMoney(total)}</Text>
               </View>
             )}
             <View style={[S.pettyHint, { backgroundColor: colors.warning + "0a", borderColor: colors.warning + "22" }]}>
@@ -231,7 +232,7 @@ export default function FoodInventoryScreen() {
       <View style={[S.summaryRow, { borderBottomColor: colors.border }]}>
         {[
           { label: "食材种数", value: `${ingredients.length}`, color: FOOD_COLOR },
-          { label: "库存总值", value: `¥${totalStockValue.toFixed(0)}`, color: FOOD_COLOR },
+          { label: "库存总值", value: `¥${formatMoney(totalStockValue)}`, color: FOOD_COLOR },
           ...(lowStockItems.length > 0 ? [{ label: "库存预警", value: `${lowStockItems.length}种`, color: colors.error }] : []),
         ].map((c, i) => (
           <View key={i} style={{ flex: 1, alignItems: "center" }}>
@@ -288,7 +289,7 @@ export default function FoodInventoryScreen() {
                             {priceDelta !== 0 && (
                               <View style={[S.tag, { backgroundColor: priceDelta > 0 ? colors.error + "22" : colors.success + "22" }]}>
                                 <Text style={{ fontSize: 10, color: priceDelta > 0 ? colors.error : colors.success }}>
-                                  {priceDelta > 0 ? `↑¥${priceDelta.toFixed(2)}` : `↓¥${Math.abs(priceDelta).toFixed(2)}`}
+                                  {priceDelta > 0 ? `↑¥${formatMoney(priceDelta)}` : `↓¥${formatMoney(Math.abs(priceDelta))}`}
                                 </Text>
                               </View>
                             )}
@@ -304,7 +305,7 @@ export default function FoodInventoryScreen() {
                             {ing.stock} {ing.unit}
                           </Text>
                           <Text style={{ fontSize: 11, color: colors.muted }}>
-                            ¥{((ing.costPrice ?? 0) * ing.stock).toFixed(0)}
+                            ¥{formatMoney(((ing.costPrice ?? 0) * ing.stock))}
                           </Text>
                         </View>
                       </View>
@@ -338,7 +339,7 @@ export default function FoodInventoryScreen() {
               <Text style={{ fontSize: 14, fontWeight: "700", color: FOOD_COLOR, marginBottom: 8 }}>{currentMonth} 食材概况</Text>
               {[
                 { label: "食材种数", value: `${ingredients.length} 种`, color: FOOD_COLOR },
-                { label: "库存总成本", value: `¥${totalStockValue.toFixed(2)}`, color: FOOD_COLOR },
+                { label: "库存总成本", value: `¥${formatMoney(totalStockValue)}`, color: FOOD_COLOR },
                 { label: "库存预警", value: `${lowStockItems.length} 种`, color: lowStockItems.length > 0 ? colors.error : colors.muted },
               ].map((row, i) => (
                 <View key={i} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 4 }}>
@@ -369,7 +370,7 @@ export default function FoodInventoryScreen() {
                         </Text>
                       </View>
                       <Text style={{ fontSize: 15, fontWeight: "700", color: delta > 0 ? colors.error : colors.success }}>
-                        {delta > 0 ? `↑¥${delta.toFixed(2)}` : `↓¥${Math.abs(delta).toFixed(2)}`}
+                        {delta > 0 ? `↑¥${formatMoney(delta)}` : `↓¥${formatMoney(Math.abs(delta))}`}
                       </Text>
                     </View>
                   );

@@ -5,6 +5,7 @@
  * 员工档案：自定义分组 + 每人发薪卡片（含对比开关）
  */
 import React, { useCallback, useMemo, useRef, useState } from "react";
+import { formatMoney } from "@/lib/utils";
 import { exportLaborData, type ExportType } from "@/lib/labor/export";
 import {
   Alert, Clipboard, Dimensions, Modal, Platform, Pressable, ScrollView,
@@ -222,11 +223,11 @@ function OverviewCard({ month, colors }: { month: string; colors: any }) {
         <View style={OV.item}>
           <Text style={[OV.label, { color: colors.muted }]}>薪资合计</Text>
           <Text style={[OV.value, { color: colors.foreground }]}>
-            {totalSalary > 0 ? `¥${totalSalary.toFixed(0)}` : "—"}
+            {totalSalary > 0 ? `¥${formatMoney(totalSalary)}` : "—"}
           </Text>
           {diffSalary !== null && (
             <Text style={{ fontSize: 10, color: diffSalary > 0 ? colors.error : colors.success }}>
-              {diffSalary > 0 ? "▲" : "▼"} ¥{Math.abs(diffSalary).toFixed(0)}
+              {diffSalary > 0 ? "▲" : "▼"} ¥{formatMoney(Math.abs(diffSalary))}
             </Text>
           )}
         </View>
@@ -234,14 +235,14 @@ function OverviewCard({ month, colors }: { month: string; colors: any }) {
         <View style={OV.item}>
           <Text style={[OV.label, { color: colors.muted }]}>已发</Text>
           <Text style={[OV.value, { color: colors.foreground }]}>
-            {totalSalary - totalPending > 0 ? `¥${(totalSalary - totalPending).toFixed(0)}` : "—"}
+            {totalSalary - totalPending > 0 ? `¥${formatMoney((totalSalary - totalPending))}` : "—"}
           </Text>
         </View>
         <View style={[OV.divider, { backgroundColor: colors.border }]} />
         <View style={OV.item}>
           <Text style={[OV.label, { color: colors.muted }]}>待发</Text>
           <Text style={[OV.value, { color: totalPending > 0 ? colors.error : colors.muted }]}>
-            {totalPending > 0 ? `¥${totalPending.toFixed(0)}` : "—"}
+            {totalPending > 0 ? `¥${formatMoney(totalPending)}` : "—"}
           </Text>
         </View>
       </View>
@@ -250,10 +251,10 @@ function OverviewCard({ month, colors }: { month: string; colors: any }) {
       {compareMonth && compareTotalSalary > 0 && (
         <View style={[OV.compareRow, { borderTopColor: colors.border }]}>
           <Text style={{ fontSize: 11, color: colors.muted }}>{compareModeLabel(compareMode, customMonth)}薪资合计：</Text>
-          <Text style={{ fontSize: 12, fontWeight: "700", color: colors.muted }}>¥{compareTotalSalary.toFixed(0)}</Text>
+          <Text style={{ fontSize: 12, fontWeight: "700", color: colors.muted }}>¥{formatMoney(compareTotalSalary)}</Text>
           {diffSalary !== null && (
             <Text style={{ fontSize: 11, color: diffSalary > 0 ? colors.error : colors.success, marginLeft: 8 }}>
-              {diffSalary > 0 ? "增加" : "减少"} ¥{Math.abs(diffSalary).toFixed(0)}（{((Math.abs(diffSalary) / compareTotalSalary) * 100).toFixed(1)}%）
+              {diffSalary > 0 ? "增加" : "减少"} ¥{formatMoney(Math.abs(diffSalary))}（{((Math.abs(diffSalary) / compareTotalSalary) * 100).toFixed(1)}%）
             </Text>
           )}
         </View>
@@ -283,8 +284,8 @@ function OverviewCard({ month, colors }: { month: string; colors: any }) {
             })}
           </View>
           <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-            <Text style={{ fontSize: 10, color: colors.muted }}>最高：¥{maxTrend.toFixed(0)}</Text>
-            <Text style={{ fontSize: 10, color: colors.primary, fontWeight: "600" }}>本月：¥{totalSalary.toFixed(0)}</Text>
+            <Text style={{ fontSize: 10, color: colors.muted }}>最高：¥{formatMoney(maxTrend)}</Text>
+            <Text style={{ fontSize: 10, color: colors.primary, fontWeight: "600" }}>本月：¥{formatMoney(totalSalary)}</Text>
           </View>
         </View>
       )}
@@ -423,7 +424,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
       const patched = {
         ...currentSlip,
         compOffCashOut: (currentSlip.compOffCashOut ?? 0) + amount,
-        compOffCashOutNote: `兑换调休 ${entry.days}天 ¥${amount.toFixed(2)}`,
+        compOffCashOutNote: `兑换调休 ${entry.days}天 ¥${formatMoney(amount)}`,
         updatedAt: new Date().toISOString(),
       };
       upsertPaySlip(patched);
@@ -443,7 +444,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
       });
     }
     setShowCompOffModal(false);
-    Alert.alert("兑换成功", `已将 ${entry.days} 天调休余额兑换 ¥${amount.toFixed(2)}，已加入本月薪资单`);
+    Alert.alert("兑换成功", `已将 ${entry.days} 天调休余额兑换 ¥${formatMoney(amount)}，已加入本月薪资单`);
   };
 
   return (
@@ -466,7 +467,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
         </View>
         {/* 右侧：实发薪资 */}
         {slip ? (
-          <Text style={{ fontSize: 14, fontWeight: "800", color: colors.primary }}>实发 ¥{slip.finalSalary.toFixed(0)}</Text>
+          <Text style={{ fontSize: 14, fontWeight: "800", color: colors.primary }}>实发 ¥{formatMoney(slip.finalSalary)}</Text>
         ) : (
           <View style={{ backgroundColor: colors.warning + "22", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
             <Text style={{ fontSize: 10, fontWeight: "600", color: colors.warning }}>待录入</Text>
@@ -487,11 +488,11 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
         return (
           <View style={{ flexDirection: "row", marginTop: 8, paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border + "44" }}>
             {[
-              { label: "比例底薪", value: baseSalary !== null ? `¥${baseSalary.toFixed(0)}` : "—", color: colors.foreground },
-              { label: "加班考勤", value: overtimeAndHoliday > 0 ? `+¥${overtimeAndHoliday.toFixed(0)}` : "—", color: overtimeAndHoliday > 0 ? colors.success : colors.muted },
-              { label: "综合额外", value: extraTotal !== 0 ? `${extraTotal >= 0 ? "+" : ""}¥${extraTotal.toFixed(0)}` : "—", color: extraTotal > 0 ? colors.primary : extraTotal < 0 ? colors.error : colors.muted },
-              { label: "已预支", value: advanceAmount > 0 ? `-¥${advanceAmount.toFixed(0)}` : "—", color: advanceAmount > 0 ? colors.error : colors.muted },
-              { label: "总工资", value: finalSalary !== null ? `¥${finalSalary.toFixed(0)}` : "—", color: deptColor },
+              { label: "比例底薪", value: baseSalary !== null ? `¥${formatMoney(baseSalary)}` : "—", color: colors.foreground },
+              { label: "加班考勤", value: overtimeAndHoliday > 0 ? `+¥${formatMoney(overtimeAndHoliday)}` : "—", color: overtimeAndHoliday > 0 ? colors.success : colors.muted },
+              { label: "综合额外", value: extraTotal !== 0 ? `${extraTotal >= 0 ? "+" : ""}¥${formatMoney(extraTotal)}` : "—", color: extraTotal > 0 ? colors.primary : extraTotal < 0 ? colors.error : colors.muted },
+              { label: "已预支", value: advanceAmount > 0 ? `-¥${formatMoney(advanceAmount)}` : "—", color: advanceAmount > 0 ? colors.error : colors.muted },
+              { label: "总工资", value: finalSalary !== null ? `¥${formatMoney(finalSalary)}` : "—", color: deptColor },
             ].map(({ label, value, color }) => (
               <View key={label} style={{ flex: 1, alignItems: "center" }}>
                 <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: "800", color }}>{value}</Text>
@@ -529,11 +530,11 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
                 <Text style={{ fontSize: 10, fontWeight: "600", color: colors.muted }}>考勤明细</Text>
                 <View style={{ flexDirection: "row" }}>
                   {[
-                    { label: "比例底薪", value: `¥${proportionalBase.toFixed(0)}`, color: colors.foreground },
-                    { label: "加班工资", value: overtimePay > 0 ? `+¥${overtimePay.toFixed(0)}` : "—", color: overtimePay > 0 ? colors.success : colors.muted },
-                    { label: "节假日薪资", value: holidayPay > 0 ? `+¥${holidayPay.toFixed(0)}` : "—", color: holidayPay > 0 ? "#FF2D55" : colors.muted },
-                    { label: "特殊扣薪", value: specialDeduction > 0 ? `-¥${specialDeduction.toFixed(0)}` : "—", color: specialDeduction > 0 ? colors.error : colors.muted },
-                    { label: "总考勤工资", value: `¥${attTotal.toFixed(0)}`, color: deptColor },
+                    { label: "比例底薪", value: `¥${formatMoney(proportionalBase)}`, color: colors.foreground },
+                    { label: "加班工资", value: overtimePay > 0 ? `+¥${formatMoney(overtimePay)}` : "—", color: overtimePay > 0 ? colors.success : colors.muted },
+                    { label: "节假日薪资", value: holidayPay > 0 ? `+¥${formatMoney(holidayPay)}` : "—", color: holidayPay > 0 ? "#FF2D55" : colors.muted },
+                    { label: "特殊扣薪", value: specialDeduction > 0 ? `-¥${formatMoney(specialDeduction)}` : "—", color: specialDeduction > 0 ? colors.error : colors.muted },
+                    { label: "总考勤工资", value: `¥${formatMoney(attTotal)}`, color: deptColor },
                   ].map(({ label, value, color }) => (
                     <View key={label} style={{ flex: 1, alignItems: "center" }}>
                       <Text numberOfLines={1} style={{ fontSize: 11, fontWeight: "700", color }}>{value}</Text>
@@ -559,11 +560,11 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
                 <Text style={{ fontSize: 10, fontWeight: "600", color: colors.muted }}>综合额外</Text>
                 <View style={{ flexDirection: "row" }}>
                   {[
-                    { label: "补贴合计", value: allowanceSum > 0 ? `+¥${allowanceSum.toFixed(0)}` : "—", color: allowanceSum > 0 ? colors.primary : colors.muted },
-                    { label: "工作绩效", value: workKPI > 0 ? `+¥${workKPI.toFixed(0)}` : "—", color: workKPI > 0 ? colors.success : colors.muted },
-                    { label: "业绩提点", value: revenueKPI > 0 ? `+¥${revenueKPI.toFixed(0)}` : "—", color: revenueKPI > 0 ? colors.success : colors.muted },
-                    { label: "奖惩小计", value: reward !== 0 ? `${reward >= 0 ? "+" : ""}¥${reward.toFixed(0)}` : "—", color: reward > 0 ? colors.success : reward < 0 ? colors.error : colors.muted },
-                    { label: "综合小计", value: `${extraTotal >= 0 ? "+" : ""}¥${extraTotal.toFixed(0)}`, color: extraTotal >= 0 ? colors.primary : colors.error },
+                    { label: "补贴合计", value: allowanceSum > 0 ? `+¥${formatMoney(allowanceSum)}` : "—", color: allowanceSum > 0 ? colors.primary : colors.muted },
+                    { label: "工作绩效", value: workKPI > 0 ? `+¥${formatMoney(workKPI)}` : "—", color: workKPI > 0 ? colors.success : colors.muted },
+                    { label: "业绩提点", value: revenueKPI > 0 ? `+¥${formatMoney(revenueKPI)}` : "—", color: revenueKPI > 0 ? colors.success : colors.muted },
+                    { label: "奖惩小计", value: reward !== 0 ? `${reward >= 0 ? "+" : ""}¥${formatMoney(reward)}` : "—", color: reward > 0 ? colors.success : reward < 0 ? colors.error : colors.muted },
+                    { label: "综合小计", value: `${extraTotal >= 0 ? "+" : ""}¥${formatMoney(extraTotal)}`, color: extraTotal >= 0 ? colors.primary : colors.error },
                   ].map(({ label, value, color }) => (
                     <View key={label} style={{ flex: 1, alignItems: "center" }}>
                       <Text numberOfLines={1} style={{ fontSize: 11, fontWeight: "700", color }}>{value}</Text>
@@ -588,10 +589,10 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
                 <Text style={{ fontSize: 10, fontWeight: "600", color: colors.muted }}>扣款</Text>
                 <View style={{ flexDirection: "row" }}>
                   {[
-                    { label: "预支小计", value: advance > 0 ? `-¥${advance.toFixed(0)}` : "—", color: advance > 0 ? colors.error : colors.muted },
-                    { label: "社保代扣", value: si > 0 ? `-¥${si.toFixed(0)}` : "—", color: si > 0 ? colors.error : colors.muted },
-                    { label: "公积金代扣", value: hf > 0 ? `-¥${hf.toFixed(0)}` : "—", color: hf > 0 ? colors.error : colors.muted },
-                    { label: "个税代缴", value: tax > 0 ? `-¥${tax.toFixed(0)}` : "—", color: tax > 0 ? colors.error : colors.muted },
+                    { label: "预支小计", value: advance > 0 ? `-¥${formatMoney(advance)}` : "—", color: advance > 0 ? colors.error : colors.muted },
+                    { label: "社保代扣", value: si > 0 ? `-¥${formatMoney(si)}` : "—", color: si > 0 ? colors.error : colors.muted },
+                    { label: "公积金代扣", value: hf > 0 ? `-¥${formatMoney(hf)}` : "—", color: hf > 0 ? colors.error : colors.muted },
+                    { label: "个税代缴", value: tax > 0 ? `-¥${formatMoney(tax)}` : "—", color: tax > 0 ? colors.error : colors.muted },
                     { label: "—", value: "—", color: colors.muted },
                   ].map(({ label, value, color }) => (
                     <View key={label} style={{ flex: 1, alignItems: "center" }}>
@@ -609,15 +610,15 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
             <View style={{ paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border + "44" }}>
               <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
                 <Text style={{ fontSize: 14, fontWeight: "800", color: colors.foreground }}>实发薪资</Text>
-                <Text style={{ fontSize: 17, fontWeight: "900", color: colors.primary }}>¥{slip.finalSalary.toFixed(0)}</Text>
+                <Text style={{ fontSize: 17, fontWeight: "900", color: colors.primary }}>¥{formatMoney(slip.finalSalary)}</Text>
               </View>
               {(slip.employerSocialInsurance > 0 || slip.employerHousingFund > 0) && (
                 <View style={{ flexDirection: "row", gap: 16, marginTop: 4 }}>
                   {slip.employerSocialInsurance > 0 && (
-                    <Text style={{ fontSize: 10, color: colors.muted }}>公司社保：¥{slip.employerSocialInsurance.toFixed(0)}</Text>
+                    <Text style={{ fontSize: 10, color: colors.muted }}>公司社保：¥{formatMoney(slip.employerSocialInsurance)}</Text>
                   )}
                   {slip.employerHousingFund > 0 && (
-                    <Text style={{ fontSize: 10, color: colors.muted }}>公司公积金：¥{slip.employerHousingFund.toFixed(0)}</Text>
+                    <Text style={{ fontSize: 10, color: colors.muted }}>公司公积金：¥{formatMoney(slip.employerHousingFund)}</Text>
                   )}
                 </View>
               )}
@@ -1355,14 +1356,14 @@ function AdvancePage({ month, colors, headerComponent }: { month: string; colors
         <View style={{ borderRadius: 14, padding: 16, borderWidth: 1, borderColor: "#AF52DE" + "33", backgroundColor: "#AF52DE" + "08" }}>
           <Text style={{ fontSize: 14, fontWeight: "700", color: "#AF52DE" }}>{monthLabel(month)} 薪资预支</Text>
           <Text style={{ fontSize: 28, fontWeight: "800", color: "#AF52DE", marginTop: 4 }}>
-            ¥{(totalLinked + manualAdvances.reduce((s, a) => s + a.amount, 0)).toFixed(0)}
+            ¥{formatMoney((totalLinked + manualAdvances.reduce((s, a) => s + a.amount, 0)))}
           </Text>
           <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>
             备用金关联 {monthLinks.length} 笔 · 手动录入 {manualAdvances.length} 笔
           </Text>
           <View style={{ marginTop: 8, flexDirection: "row", gap: 8 }}>
             <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: "#AF52DE" + "22" }}>
-              <Text style={{ fontSize: 11, color: "#AF52DE" }}>备用金已付 ¥{totalLinked.toFixed(0)}</Text>
+              <Text style={{ fontSize: 11, color: "#AF52DE" }}>备用金已付 ¥{formatMoney(totalLinked)}</Text>
             </View>
             {autoDraftLinks.length > 0 && (
               <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: colors.warning + "22" }}>
@@ -1390,7 +1391,7 @@ function AdvancePage({ month, colors, headerComponent }: { month: string; colors
                       <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>{draft.pettyRecord.description || "备用金支付"}</Text>
                       <Text style={{ fontSize: 10, color: colors.muted }}>{draft.pettyRecord.code} · {draft.pettyRecord.date.slice(5)} · {draft.pettyRecord.paymentMethod}</Text>
                     </View>
-                    <Text style={{ fontSize: 14, fontWeight: "700", color: colors.warning }}>¥{draft.pettyRecord.amount.toFixed(0)}</Text>
+                    <Text style={{ fontSize: 14, fontWeight: "700", color: colors.warning }}>¥{formatMoney(draft.pettyRecord.amount)}</Text>
                   </View>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                     {emp ? (
@@ -1419,7 +1420,7 @@ function AdvancePage({ month, colors, headerComponent }: { month: string; colors
           <View style={{ borderRadius: 14, borderWidth: 1, borderColor: "#AF52DE" + "44", backgroundColor: "#AF52DE" + "06", overflow: "hidden" }}>
             <View style={{ flexDirection: "row", alignItems: "center", padding: 12 }}>
               <Text style={{ fontSize: 13, fontWeight: "700", color: "#AF52DE", flex: 1 }}>备用金关联（{monthLinks.length}笔）</Text>
-              <Text style={{ fontSize: 13, fontWeight: "700", color: "#AF52DE" }}>¥{totalLinked.toFixed(0)}</Text>
+              <Text style={{ fontSize: 13, fontWeight: "700", color: "#AF52DE" }}>¥{formatMoney(totalLinked)}</Text>
             </View>
             {monthLinks.map((link, i) => {
               const emp = link.employeeId ? getEmployee(link.employeeId) : null;
@@ -1431,7 +1432,7 @@ function AdvancePage({ month, colors, headerComponent }: { month: string; colors
                     <Text style={{ fontSize: 10, color: colors.muted }}>{link.pettyCode} · {link.date.slice(5)} · {link.paymentMethod}</Text>
                   </View>
                   <View style={{ alignItems: "flex-end", gap: 4 }}>
-                    <Text style={{ fontSize: 14, fontWeight: "700", color: "#AF52DE" }}>¥{link.amount.toFixed(0)}</Text>
+                    <Text style={{ fontSize: 14, fontWeight: "700", color: "#AF52DE" }}>¥{formatMoney(link.amount)}</Text>
                     <TouchableOpacity onPress={() => { tap(); setMatchingLink(link); setMatchEmpId(link.employeeId); }}
                       style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: emp ? colors.success + "22" : colors.error + "22" }}>
                       <Text style={{ fontSize: 10, fontWeight: "600", color: emp ? colors.success : colors.error }}>
@@ -1482,7 +1483,7 @@ function AdvancePage({ month, colors, headerComponent }: { month: string; colors
                     <Text style={{ fontSize: 11, color: colors.muted }}>{adv.notes || "手动录入"}</Text>
                   </View>
                   <View style={{ alignItems: "flex-end", gap: 4 }}>
-                    <Text style={{ fontSize: 15, fontWeight: "700", color: "#AF52DE" }}>¥{adv.amount.toFixed(0)}</Text>
+                    <Text style={{ fontSize: 15, fontWeight: "700", color: "#AF52DE" }}>¥{formatMoney(adv.amount)}</Text>
                     <TouchableOpacity onPress={() => { tap(); updateAdvance(adv.id, { status: adv.status === "deducted" ? "pending" : "deducted" }); }}
                       style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: adv.status === "deducted" ? "#52C41A22" : "#FA8C1622" }}>
                       <Text style={{ fontSize: 10, fontWeight: "600", color: adv.status === "deducted" ? colors.success : colors.warning }}>
@@ -1609,7 +1610,7 @@ function AdvancePage({ month, colors, headerComponent }: { month: string; colors
                                 <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>{r.description || r.code}</Text>
                                 <Text style={{ fontSize: 10, color: colors.muted }}>{r.code} · {r.date.slice(5)} · {r.paymentMethod}</Text>
                               </View>
-                              <Text style={{ fontSize: 14, fontWeight: "700", color: "#AF52DE" }}>¥{r.amount.toFixed(0)}</Text>
+                              <Text style={{ fontSize: 14, fontWeight: "700", color: "#AF52DE" }}>¥{formatMoney(r.amount)}</Text>
                             </TouchableOpacity>
                           ))}
                         </>
@@ -1762,7 +1763,7 @@ function AdvancePage({ month, colors, headerComponent }: { month: string; colors
                                 <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>{r.description || r.code}</Text>
                                 <Text style={{ fontSize: 10, color: colors.muted }}>{r.date.slice(5)} · {r.paymentMethod}</Text>
                               </View>
-                              <Text style={{ fontSize: 14, fontWeight: "700", color: "#AF52DE" }}>¥{r.amount.toFixed(0)}</Text>
+                              <Text style={{ fontSize: 14, fontWeight: "700", color: "#AF52DE" }}>¥{formatMoney(r.amount)}</Text>
                             </View>
                             {sel?.checked && (
                               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -4087,10 +4088,10 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                       return (
                         <View style={{ flexDirection: "row", paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.border + "44" }}>
                           {[
-                            { label: "基础薪资", value: baseSal !== null ? `￥${baseSal.toFixed(0)}` : "—", color: colors.foreground },
-                            { label: "加班薪资", value: otPay > 0 ? `+￥${otPay.toFixed(0)}` : "—", color: otPay > 0 ? colors.success : colors.muted },
-                            { label: "节假日薪资", value: holPay > 0 ? `+￥${holPay.toFixed(0)}` : "—", color: holPay > 0 ? "#FF2D55" : colors.muted },
-                            { label: "总考勤工资", value: `￥${total.toFixed(0)}`, color: DEPT_COLORS[emp.dept] },
+                            { label: "基础薪资", value: baseSal !== null ? `￥${formatMoney(baseSal)}` : "—", color: colors.foreground },
+                            { label: "加班薪资", value: otPay > 0 ? `+￥${formatMoney(otPay)}` : "—", color: otPay > 0 ? colors.success : colors.muted },
+                            { label: "节假日薪资", value: holPay > 0 ? `+￥${formatMoney(holPay)}` : "—", color: holPay > 0 ? "#FF2D55" : colors.muted },
+                            { label: "总考勤工资", value: `￥${formatMoney(total)}`, color: DEPT_COLORS[emp.dept] },
                           ].map(({ label, value, color }) => (
                             <View key={label} style={{ flex: 1, alignItems: "center" }}>
                               <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: "800", color }}>{value}</Text>
@@ -4129,7 +4130,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                               { label: "总加班", value: att.overtimeHours > 0 ? `${att.overtimeHours.toFixed(1)}h` : "—", color: att.overtimeHours > 0 ? colors.warning : colors.muted },
                               { label: "换休天数", value: att.compOffCount > 0 ? `${att.compOffCount}天` : "—", color: att.compOffCount > 0 ? colors.primary : colors.muted },
                               { label: "计费时长", value: att.paidOvertimeHours > 0 ? `${att.paidOvertimeHours.toFixed(1)}h` : "—", color: att.paidOvertimeHours > 0 ? colors.foreground : colors.muted },
-                              { label: "加班费", value: att.overtimePay > 0 ? `+￥${att.overtimePay.toFixed(0)}` : "—", color: att.overtimePay > 0 ? colors.success : colors.muted },
+                              { label: "加班费", value: att.overtimePay > 0 ? `+￥${formatMoney(att.overtimePay)}` : "—", color: att.overtimePay > 0 ? colors.success : colors.muted },
                             ].map(({ label, value, color }) => (
                               <View key={label} style={{ flex: 1, alignItems: "center" }}>
                                 <Text numberOfLines={1} style={{ fontSize: 11, fontWeight: "700", color }}>{value}</Text>
@@ -4142,7 +4143,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                               {`加班 ${att.overtimeHours.toFixed(1)}h`}
                               {att.compOffCount > 0 ? ` → 换休 ${att.compOffCount}天(${(att.compOffCount * (att.hoursPerCompOff ?? 8)).toFixed(0)}h)` : ""}
                               {` → 计费 ${att.paidOvertimeHours.toFixed(1)}h`}
-                              {att.overtimePay > 0 ? ` → +￥${att.overtimePay.toFixed(0)}` : ""}
+                              {att.overtimePay > 0 ? ` → +￥${formatMoney(att.overtimePay)}` : ""}
                             </Text>
                           )}
                         </View>
@@ -4160,7 +4161,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                                   { label: "节假日", value: hwDays > 0 ? `${hwDays}天` : "—", color: hwDays > 0 ? "#FF2D55" : colors.muted },
                                   { label: "换休天数", value: hrDays > 0 ? `${hrDays}天` : "—", color: hrDays > 0 ? colors.primary : colors.muted },
                                   { label: "拿钱天数", value: hcDays > 0 ? `${hcDays}天` : "—", color: hcDays > 0 ? colors.success : colors.muted },
-                                  { label: "节假日薪资", value: att.holidayBonus > 0 ? `+￥${att.holidayBonus.toFixed(0)}` : "—", color: att.holidayBonus > 0 ? "#FF2D55" : colors.muted },
+                                  { label: "节假日薪资", value: att.holidayBonus > 0 ? `+￥${formatMoney(att.holidayBonus)}` : "—", color: att.holidayBonus > 0 ? "#FF2D55" : colors.muted },
                                 ].map(({ label, value, color }) => (
                                   <View key={label} style={{ flex: 1, alignItems: "center" }}>
                                     <Text numberOfLines={1} style={{ fontSize: 11, fontWeight: "700", color }}>{value}</Text>
@@ -4173,7 +4174,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                                   {`节日上班 ${hwDays}天`}
                                   {hrDays > 0 ? ` → 换休 ${hrDays}天` : ""}
                                   {hcDays > 0 ? ` · 拿钱 ${hcDays}天` : ""}
-                                  {att.holidayBonus > 0 ? ` → +￥${att.holidayBonus.toFixed(0)}` : ""}
+                                  {att.holidayBonus > 0 ? ` → +￥${formatMoney(att.holidayBonus)}` : ""}
                                 </Text>
                               )}
                             </View>
@@ -4223,7 +4224,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                               : Math.round(entry.days * dailyRateVal * 100) / 100;
                             cashOutCompOff(entry.id, amount / entry.days, currentMonthStr);
                             if (slip) {
-                              const patched = { ...slip, compOffCashOut: (slip.compOffCashOut ?? 0) + amount, compOffCashOutNote: `兑换调休 ${entry.days}天 ￥${amount.toFixed(2)}`, updatedAt: new Date().toISOString() };
+                              const patched = { ...slip, compOffCashOut: (slip.compOffCashOut ?? 0) + amount, compOffCashOutNote: `兑换调休 ${entry.days}天 ￥${formatMoney(amount)}`, updatedAt: new Date().toISOString() };
                               upsertPaySlip(patched);
                               const advTotal = advances.filter((a) => a.employeeId === empId && (a.deductMonth === currentMonthStr || a.date.startsWith(currentMonthStr)) && (a.status === "pending" || a.status === "deducted")).reduce((s, a) => s + a.amount, 0);
                               const draft = buildPaySlipDraft(emp, currentMonthStr, att!, patched.performanceBonus ?? 0, advTotal, globalSettings);
@@ -4440,7 +4441,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                 <View key={item.key} style={{ borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, borderRadius: 14, padding: 12, gap: 10, backgroundColor: colors.surface }}>
                   <View>
                     <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>{item.employeeCode} · {item.date}</Text>
-                    <Text style={{ fontSize: 12, color: colors.muted, marginTop: 4 }}>{item.holidayName}，节假日补偿 ¥{item.bonusAmount.toFixed(2)}</Text>
+                    <Text style={{ fontSize: 12, color: colors.muted, marginTop: 4 }}>{item.holidayName}，节假日补偿 ¥{formatMoney(item.bonusAmount)}</Text>
                   </View>
                   <View style={{ flexDirection: "row", gap: 10 }}>
                     {(["cash", "rest"] as const).map((mode) => {

@@ -3,6 +3,7 @@
  * 特点：SKU 多，高频消耗，按场所分组，批量快速录入，关联备用金 D 类
  */
 import React, { useState } from "react";
+import { formatMoney } from "@/lib/utils";
 import {
   Alert, KeyboardAvoidingView, Modal, Platform, Pressable,
   ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View
@@ -93,7 +94,7 @@ function BatchEntryModal({ visible, store, onClose }: {
           {total > 0 && (
             <View style={[S.totalRow, { backgroundColor: DAILY_COLOR + "0a", marginHorizontal: 12, marginBottom: 8 }]}>
               <Text style={{ fontSize: 13, color: colors.muted }}>本次合计</Text>
-              <Text style={{ fontSize: 18, fontWeight: "700", color: DAILY_COLOR }}>¥{total.toFixed(2)}</Text>
+              <Text style={{ fontSize: 18, fontWeight: "700", color: DAILY_COLOR }}>¥{formatMoney(total)}</Text>
             </View>
           )}
 

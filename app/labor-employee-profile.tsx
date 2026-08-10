@@ -7,6 +7,7 @@
  * 右上角「编辑」按钮跳转编辑表单（Modal），保存后自动返回本页
  */
 import React from "react";
+import { formatMoney } from "@/lib/utils";
 import {
   Image, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View,
 } from "react-native";
@@ -329,7 +330,7 @@ export default function LaborEmployeeProfileScreen() {
                     {b.max === Infinity ? `超过 ¥${(b.min / 12).toLocaleString()}` : `¥${(b.min / 12).toLocaleString()} ~ ¥${(b.max / 12).toLocaleString()}`}
                   </Text>
                   <Text style={{ flex: 1, fontSize: 11, color: colors.primary, textAlign: "center" }}>{(b.rate * 100).toFixed(0)}%</Text>
-                  <Text style={{ flex: 1.5, fontSize: 11, color: colors.muted, textAlign: "right" }}>¥{(b.quickDeduction / 12).toFixed(0)}</Text>
+                  <Text style={{ flex: 1.5, fontSize: 11, color: colors.muted, textAlign: "right" }}>¥{formatMoney((b.quickDeduction / 12))}</Text>
                 </View>
               ))}
             </View>

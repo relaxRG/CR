@@ -9,7 +9,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
 import { useGuestGuard } from "@/hooks/use-guest-guard";
-import { displayNames } from "@/lib/utils";
+import { displayNames, formatMoney} from "@/lib/utils";
 import { useHomemadeStore } from "@/lib/homemade/store";
 import { useBottleStore } from "@/lib/bottles/store";
 import { estimatePrepCostFull } from "@/lib/homemade/cost";
@@ -691,13 +691,13 @@ export default function HomemadeDetailScreen() {
                 {/* 每单位成本（通用） */}
                 <Text className="text-xs font-semibold" style={{ color: colors.primary }}>
                   {lang === "zh"
-                    ? `每${cost.baseUnit ?? "份"} ¥${cost.costPerBaseUnit.toFixed(2)}`
-                    : `¥${cost.costPerBaseUnit.toFixed(2)} / ${cost.baseUnit ?? "unit"}`}
+                    ? `每${cost.baseUnit ?? "份"} ¥${formatMoney(cost.costPerBaseUnit)}`
+                    : `¥${formatMoney(cost.costPerBaseUnit)} / ${cost.baseUnit ?? "unit"}`}
                 </Text>
                 {/* 兼容：如果是 ml 单位，额外显示 per30ml */}
                 {cost.costPer30Ml !== null && cost.baseUnit === "ml" ? (
                   <Text className="text-xs text-muted">
-                    {t("hm.cost.per30")} ¥{cost.costPer30Ml.toFixed(2)}
+                    {t("hm.cost.per30")} ¥{formatMoney(cost.costPer30Ml)}
                   </Text>
                 ) : null}
               </View>
@@ -708,12 +708,12 @@ export default function HomemadeDetailScreen() {
               >
                 {cost.costPer100Ml !== null ? (
                   <Text className="text-xs text-muted">
-                    {t("hm.cost.per100")} ¥{cost.costPer100Ml.toFixed(2)}
+                    {t("hm.cost.per100")} ¥{formatMoney(cost.costPer100Ml)}
                   </Text>
                 ) : <View />}
                 {cost.costPer30Ml !== null ? (
                   <Text className="text-xs font-semibold" style={{ color: colors.primary }}>
-                    {t("hm.cost.per30")} ¥{cost.costPer30Ml.toFixed(2)}
+                    {t("hm.cost.per30")} ¥{formatMoney(cost.costPer30Ml)}
                   </Text>
                 ) : null}
               </View>
@@ -742,8 +742,8 @@ export default function HomemadeDetailScreen() {
               >
                 <Text className="text-xs font-semibold" style={{ color: colors.primary }}>
                   {lang === "zh"
-                    ? `每${cost.baseUnit ?? "个"} ¥${cost.costPerPiece.toFixed(2)}`
-                    : `¥${cost.costPerPiece.toFixed(2)} / ${cost.baseUnit ?? "pc"}`}
+                    ? `每${cost.baseUnit ?? "个"} ¥${formatMoney(cost.costPerPiece)}`
+                    : `¥${formatMoney(cost.costPerPiece)} / ${cost.baseUnit ?? "pc"}`}
                 </Text>
               </View>
             ) : null}

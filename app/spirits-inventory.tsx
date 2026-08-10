@@ -6,6 +6,7 @@
  * Tab 4: 🔍 采购分析 — 供应商分析 + 品牌集团分析
  */
 import React, { useMemo, useState } from "react";
+import { formatMoney } from "@/lib/utils";
 import {
   Alert, Dimensions, KeyboardAvoidingView, Modal, Platform, Pressable,
   ScrollView, StyleSheet, Text, TextInput, TouchableOpacity,
@@ -43,7 +44,7 @@ const { width: SCREEN_W } = Dimensions.get("window");
 function uuid() { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
 function catColor(cat: string) { return SPIRIT_CATEGORY_COLORS[cat] ?? "#6B7280"; }
 function tap() { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }
-function fmtAmt(n: number) { return n >= 10000 ? `${(n / 10000).toFixed(1)}万` : n.toFixed(0); }
+function fmtAmt(n: number) { return n >= 10000 ? `${(n / 10000).toFixed(1)}万` : formatMoney(n); }
 
 type Tab = "summary" | "ledger" | "purchase" | "analysis";
 const TABS: { key: Tab; label: string }[] = [
@@ -381,7 +382,7 @@ export default function SpiritsInventoryScreen() {
                       <Text style={{ fontSize: 11, color: colors.foreground }}>¥{refPrice}</Text>
                       {showComparison && prevRefPrice > 0 && prevRefPrice !== refPrice && (
                         <Text style={{ fontSize: 9, color: refPrice > prevRefPrice ? "#EF4444" : "#10B981" }}>
-                          {refPrice > prevRefPrice ? "↑" : "↓"}¥{Math.abs(refPrice - prevRefPrice).toFixed(0)}
+                          {refPrice > prevRefPrice ? "↑" : "↓"}¥{formatMoney(Math.abs(refPrice - prevRefPrice))}
                         </Text>
                       )}
                     </View>
@@ -393,13 +394,13 @@ export default function SpiritsInventoryScreen() {
                             {d ? d.qty : "—"}
                           </Text>
                           <Text style={[S.tdCell, { width: 65, textAlign: "right", fontSize: 11, color: d ? "#EF4444" : colors.muted }]}>
-                            {d ? `¥${d.amount.toFixed(0)}` : "—"}
+                            {d ? `¥${formatMoney(d.amount)}` : "—"}
                           </Text>
                         </React.Fragment>
                       );
                     })}
                     <Text style={[S.tdCell, { width: 70, textAlign: "right", fontSize: 12, fontWeight: "700", color: "#EF4444" }]}>
-                      ¥{totalAmt.toFixed(0)}
+                      ¥{formatMoney(totalAmt)}
                     </Text>
                   </View>
                 );
@@ -414,12 +415,12 @@ export default function SpiritsInventoryScreen() {
                   return (
                     <React.Fragment key={sup}>
                       <Text style={[S.tdCell, { width: 55, textAlign: "right", fontWeight: "700", color: "#991B1B", fontSize: 11 }]}>{supQty}</Text>
-                      <Text style={[S.tdCell, { width: 65, textAlign: "right", fontWeight: "700", color: "#991B1B", fontSize: 11 }]}>¥{supTotal.toFixed(0)}</Text>
+                      <Text style={[S.tdCell, { width: 65, textAlign: "right", fontWeight: "700", color: "#991B1B", fontSize: 11 }]}>¥{formatMoney(supTotal)}</Text>
                     </React.Fragment>
                   );
                 })}
                 <Text style={[S.tdCell, { width: 70, textAlign: "right", fontWeight: "700", color: "#991B1B", fontSize: 12 }]}>
-                  ¥{summaryTotals.purchaseAmt.toFixed(0)}
+                  ¥{formatMoney(summaryTotals.purchaseAmt)}
                 </Text>
               </View>
             </View>
@@ -758,7 +759,7 @@ export default function SpiritsInventoryScreen() {
                                   );
                                 }}>
                                 <Text style={{ fontSize: 11, color: rp > 0 ? "#EF4444" : colors.muted, fontWeight: rp > 0 ? "600" : "400" }}>
-                                  {rp > 0 ? `¥${rp.toFixed(0)}` : "—"}
+                                  {rp > 0 ? `¥${formatMoney(rp)}` : "—"}
                                 </Text>
                               </TouchableOpacity>
                             );
@@ -787,32 +788,32 @@ export default function SpiritsInventoryScreen() {
                             )}
                           </View>
                           <Text style={[S.tdCell, { width: 60, textAlign: "right", fontSize: 11, color: colors.foreground }]}>
-                            {entry ? `¥${entry.openingUnitCost.toFixed(0)}` : "—"}
+                            {entry ? `¥${formatMoney(entry.openingUnitCost)}` : "—"}
                           </Text>
                           <Text style={[S.tdCell, { width: 70, textAlign: "right", fontSize: 11, color: colors.foreground }]}>
-                            {entry ? `¥${(entry.openingQty * entry.openingUnitCost).toFixed(0)}` : "—"}
+                            {entry ? `¥${formatMoney((entry.openingQty * entry.openingUnitCost))}` : "—"}
                           </Text>
                           <Text style={[S.tdCell, { width: 70, textAlign: "right", fontSize: 11, color: colors.primary }]}>
                             {entry ? (entry.purchaseQty > 0 ? `+${entry.purchaseQty}` : "—") : "—"}
                           </Text>
                           <Text style={[S.tdCell, { width: 70, textAlign: "right", fontSize: 11, color: colors.primary }]}>
-                            {entry ? (entry.purchaseCost > 0 ? `¥${entry.purchaseCost.toFixed(0)}` : "—") : "—"}
+                            {entry ? (entry.purchaseCost > 0 ? `¥${formatMoney(entry.purchaseCost)}` : "—") : "—"}
                           </Text>
                           <Text style={[S.tdCell, { width: 70, textAlign: "right", fontSize: 12, fontWeight: "700",
                             color: isNeg ? "#EF4444" : colors.foreground }]}>
                             {entry ? `${isNeg ? "⚠️" : ""}${entry.closingQty.toFixed(2)}` : "—"}
                           </Text>
                           <Text style={[S.tdCell, { width: 60, textAlign: "right", fontSize: 11, color: colors.foreground }]}>
-                            {entry ? `¥${entry.closingUnitCost.toFixed(0)}` : "—"}
+                            {entry ? `¥${formatMoney(entry.closingUnitCost)}` : "—"}
                           </Text>
                           <Text style={[S.tdCell, { width: 70, textAlign: "right", fontSize: 11, color: "#EF4444" }]}>
-                            {entry ? `¥${entry.closingCost.toFixed(0)}` : "—"}
+                            {entry ? `¥${formatMoney(entry.closingCost)}` : "—"}
                           </Text>
                           <Text style={[S.tdCell, { width: 60, textAlign: "right", fontSize: 11, color: colors.muted }]}>
                             {entry ? (entry.consumeQty > 0 ? entry.consumeQty.toFixed(1) : "—") : "—"}
                           </Text>
                           <Text style={[S.tdCell, { width: 70, textAlign: "right", fontSize: 11, color: colors.muted }]}>
-                            {entry ? (entry.consumeQty > 0 ? `¥${(entry.consumeQty * entry.closingUnitCost).toFixed(0)}` : "—") : "—"}
+                            {entry ? (entry.consumeQty > 0 ? `¥${formatMoney((entry.consumeQty * entry.closingUnitCost))}` : "—") : "—"}
                           </Text>
                         </TouchableOpacity>
                       );
@@ -834,26 +835,26 @@ export default function SpiritsInventoryScreen() {
                   </Text>
                   <Text style={[S.tdCell, { width: 60 }]} />
                   <Text style={[S.tdCell, { width: 70, textAlign: "right", fontWeight: "700", color: "#991B1B", fontSize: 11 }]}>
-                    ¥{summaryTotals.openingCost.toFixed(0)}
+                    ¥{formatMoney(summaryTotals.openingCost)}
                   </Text>
                   <Text style={[S.tdCell, { width: 70, textAlign: "right", fontWeight: "700", color: "#991B1B", fontSize: 11 }]}>
                     {summaryTotals.purchaseQty.toFixed(2)}
                   </Text>
                   <Text style={[S.tdCell, { width: 70, textAlign: "right", fontWeight: "700", color: "#991B1B", fontSize: 11 }]}>
-                    ¥{summaryTotals.purchaseCost.toFixed(0)}
+                    ¥{formatMoney(summaryTotals.purchaseCost)}
                   </Text>
                   <Text style={[S.tdCell, { width: 70, textAlign: "right", fontWeight: "700", color: "#991B1B", fontSize: 12 }]}>
                     {summaryTotals.closingQty.toFixed(2)}
                   </Text>
                   <Text style={[S.tdCell, { width: 60 }]} />
                   <Text style={[S.tdCell, { width: 70, textAlign: "right", fontWeight: "700", color: "#991B1B", fontSize: 11 }]}>
-                    ¥{summaryTotals.closingCost.toFixed(0)}
+                    ¥{formatMoney(summaryTotals.closingCost)}
                   </Text>
                   <Text style={[S.tdCell, { width: 60, textAlign: "right", fontWeight: "700", color: "#991B1B", fontSize: 11 }]}>
                     {summaryTotals.consumeQty.toFixed(1)}
                   </Text>
                   <Text style={[S.tdCell, { width: 70, textAlign: "right", fontWeight: "700", color: "#991B1B", fontSize: 11 }]}>
-                    ¥{summaryTotals.consumeCost.toFixed(0)}
+                    ¥{formatMoney(summaryTotals.consumeCost)}
                   </Text>
                 </View>
               )}
@@ -972,7 +973,7 @@ export default function SpiritsInventoryScreen() {
                     <Text style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>{sup}</Text>
                     {data ? (
                       <Text style={{ fontSize: 12, color: colors.muted }}>
-                        本月 ¥{data.amount.toFixed(0)} · {data.qty}笔 · {data.items}款
+                        本月 ¥{formatMoney(data.amount)} · {data.qty}笔 · {data.items}款
                       </Text>
                     ) : (
                       <Text style={{ fontSize: 12, color: colors.muted }}>本月暂无进货</Text>
@@ -1023,7 +1024,7 @@ export default function SpiritsInventoryScreen() {
               <View key={sup} style={{ marginBottom: 12 }}>
                 <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
                   <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>{sup}</Text>
-                  <Text style={{ fontSize: 13, fontWeight: "700", color: "#EF4444" }}>¥{data.amount.toFixed(0)} · {pct}%</Text>
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: "#EF4444" }}>¥{formatMoney(data.amount)} · {pct}%</Text>
                 </View>
                 <View style={{ height: 8, backgroundColor: colors.border, borderRadius: 4, overflow: "hidden", marginBottom: 4 }}>
                   <View style={{ width: `${pct}%`, height: "100%", backgroundColor: color, borderRadius: 4 }} />
@@ -1070,7 +1071,7 @@ export default function SpiritsInventoryScreen() {
                 </View>
                 <Text style={{ fontSize: 11, color: colors.foreground, width: 120 }} numberOfLines={1}>{g}</Text>
                 <Text style={{ fontSize: 11, fontWeight: "600", color: "#EF4444", width: 70, textAlign: "right" }}>
-                  ¥{amt.toFixed(0)} {pct}%
+                  ¥{formatMoney(amt)} {pct}%
                 </Text>
               </View>
             );
@@ -1333,9 +1334,9 @@ export default function SpiritsInventoryScreen() {
           {ledgerImportPreview && (
             <View style={{ flexDirection: "row", padding: 12, backgroundColor: colors.surface, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
               {[
-                { label: "本月进货", value: `¥${ledgerImportPreview.totalPurchase.toFixed(0)}`, color: "#EF4444" },
+                { label: "本月进货", value: `¥${formatMoney(ledgerImportPreview.totalPurchase)}`, color: "#EF4444" },
                 { label: "本月消耗", value: ledgerImportPreview.totalConsume.toFixed(1), color: colors.foreground },
-                { label: "期末成本", value: `¥${ledgerImportPreview.totalEndCost.toFixed(0)}`, color: colors.primary },
+                { label: "期末成本", value: `¥${formatMoney(ledgerImportPreview.totalEndCost)}`, color: colors.primary },
                 { label: "进货记录", value: `${ledgerImportPreview.purchaseOrders.length}笔`, color: colors.foreground },
               ].map((s, i) => (
                 <View key={i} style={{ flex: 1, alignItems: "center" }}>
@@ -1383,8 +1384,8 @@ export default function SpiritsInventoryScreen() {
                     <Text style={[S.tdCell, { width: 60, textAlign: "right", fontSize: 12, fontWeight: "700", color: inv.endQty < 0 ? "#EF4444" : colors.foreground }]}>
                       {inv.endQty < 0 ? `⚠️${inv.endQty}` : inv.endQty}
                     </Text>
-                    <Text style={[S.tdCell, { width: 70, textAlign: "right", fontSize: 11, color: colors.foreground }]}>¥{inv.unitCost.toFixed(0)}</Text>
-                    <Text style={[S.tdCell, { width: 80, textAlign: "right", fontSize: 11, color: "#EF4444" }]}>¥{inv.endCost.toFixed(0)}</Text>
+                    <Text style={[S.tdCell, { width: 70, textAlign: "right", fontSize: 11, color: colors.foreground }]}>¥{formatMoney(inv.unitCost)}</Text>
+                    <Text style={[S.tdCell, { width: 80, textAlign: "right", fontSize: 11, color: "#EF4444" }]}>¥{formatMoney(inv.endCost)}</Text>
                   </View>
                 ))}
               </View>
@@ -1397,9 +1398,9 @@ export default function SpiritsInventoryScreen() {
                 {ledgerImportPriceChanges.map((c, i) => (
                   <View key={i} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
                     <Text style={{ fontSize: 12, color: colors.foreground, flex: 1 }} numberOfLines={1}>{c.name}</Text>
-                    <Text style={{ fontSize: 12, color: colors.muted, marginHorizontal: 8 }}>¥{c.prevPrice.toFixed(0)} → ¥{c.currPrice.toFixed(0)}</Text>
+                    <Text style={{ fontSize: 12, color: colors.muted, marginHorizontal: 8 }}>¥{formatMoney(c.prevPrice)} → ¥{formatMoney(c.currPrice)}</Text>
                     <Text style={{ fontSize: 12, fontWeight: "700", color: c.changeAmt > 0 ? "#EF4444" : "#10B981" }}>
-                      {c.changeAmt > 0 ? "↑" : "↓"}¥{Math.abs(c.changeAmt).toFixed(0)}
+                      {c.changeAmt > 0 ? "↑" : "↓"}¥{formatMoney(Math.abs(c.changeAmt))}
                     </Text>
                   </View>
                 ))}
@@ -1810,7 +1811,7 @@ function SupplierDetailScreen({
       {/* 供应商信息头 */}
       <View style={{ paddingHorizontal: 16, paddingVertical: 8, backgroundColor: colors.surface, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
         <Text style={{ fontSize: 12, color: colors.muted }}>
-          往来单位：{supplier} · 本月合计 ¥{totalAmt.toFixed(0)} · {supPurchases.length} 笔
+          往来单位：{supplier} · 本月合计 ¥{formatMoney(totalAmt)} · {supPurchases.length} 笔
         </Text>
       </View>
 
@@ -2024,12 +2025,12 @@ function SupplierDetailScreen({
                       <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
                         {isPriceAlert && <Text style={{ fontSize: 9 }}>⚠️</Text>}
                         <Text style={{ fontSize: 11, color: isPriceAlert ? "#F59E0B" : colors.foreground, fontWeight: isPriceAlert ? "700" : "400" }}>
-                          ¥{p.unitPrice.toFixed(0)}
+                          ¥{formatMoney(p.unitPrice)}
                         </Text>
                       </View>
                       {priceDiff !== 0 && refPrice > 0 && (
                         <Text style={{ fontSize: 9, fontWeight: "700", color: priceDiff > 0 ? "#EF4444" : "#10B981" }}>
-                          {priceDiff > 0 ? "↑" : "↓"}¥{Math.abs(priceDiff).toFixed(0)}({priceDiffPct.toFixed(0)}%)
+                          {priceDiff > 0 ? "↑" : "↓"}¥{formatMoney(Math.abs(priceDiff))}({priceDiffPct.toFixed(0)}%)
                         </Text>
                       )}
                     </TouchableOpacity>
@@ -2049,10 +2050,10 @@ function SupplierDetailScreen({
                           }
                         }, "plain-text", String(p.amount.toFixed(0)), "decimal-pad");
                       }}>
-                      <Text style={{ fontSize: 12, fontWeight: "700", color: "#EF4444" }}>¥{p.amount.toFixed(0)}</Text>
+                      <Text style={{ fontSize: 12, fontWeight: "700", color: "#EF4444" }}>¥{formatMoney(p.amount)}</Text>
                       {priceDiff !== 0 && refPrice > 0 && (
                         <Text style={{ fontSize: 9, fontWeight: "700", color: priceDiff > 0 ? "#EF4444" : "#10B981" }}>
-                          {priceDiff > 0 ? "↑" : "↓"}¥{Math.abs(priceDiff * p.quantity).toFixed(0)}
+                          {priceDiff > 0 ? "↑" : "↓"}¥{formatMoney(Math.abs(priceDiff * p.quantity))}
                         </Text>
                       )}
                     </TouchableOpacity>
@@ -2073,7 +2074,7 @@ function SupplierDetailScreen({
                 </Text>
                 <Text style={[S.tdCell, { width: 90 }]} />
                 <Text style={[S.tdCell, { width: 90, textAlign: "right", fontWeight: "700", color: "#991B1B", fontSize: 12 }]}>
-                  ¥{totalAmt.toFixed(0)}
+                  ¥{formatMoney(totalAmt)}
                 </Text>
               </View>
             </View>
@@ -2138,7 +2139,7 @@ function SupplierDetailScreen({
                   [{ label: "分类", value: previewItem.category, color: colors.foreground }, { label: "单位", value: previewItem.unit, color: colors.foreground }],
                   [{ label: "参考单价", value: refPrice > 0 ? `¥${refPrice}` : "未设置", color: refPrice > 0 ? "#EF4444" : colors.muted }, { label: "供应商", value: previewItem.supplier || "-", color: colors.foreground }],
                   [{ label: "本月进货", value: ledgerEntry ? `${ledgerEntry.purchaseQty}瓶` : "0瓶", color: colors.foreground }, { label: "本月消耗", value: ledgerEntry ? `${ledgerEntry.consumeQty}瓶` : "0瓶", color: colors.foreground }],
-                  [{ label: "期末库存", value: ledgerEntry ? `${ledgerEntry.closingQty}瓶` : "0瓶", color: (ledgerEntry?.closingQty ?? 0) < 0 ? "#EF4444" : "#10B981" }, { label: "期末成本", value: ledgerEntry ? `¥${ledgerEntry.closingCost.toFixed(0)}` : "-", color: colors.foreground }],
+                  [{ label: "期末库存", value: ledgerEntry ? `${ledgerEntry.closingQty}瓶` : "0瓶", color: (ledgerEntry?.closingQty ?? 0) < 0 ? "#EF4444" : "#10B981" }, { label: "期末成本", value: ledgerEntry ? `¥${formatMoney(ledgerEntry.closingCost)}` : "-", color: colors.foreground }],
                 ];
                 return rows.map((row, ri) => (
                   <View key={ri} style={{ flexDirection: "row", borderBottomWidth: ri < rows.length - 1 ? StyleSheet.hairlineWidth : 0, borderBottomColor: colors.border }}>
@@ -2834,7 +2835,7 @@ function PurchaseFormModal({ visible, items, month, supplier, colors, getRefPric
                   value={unitPrice} onChangeText={setUnitPrice} keyboardType="decimal-pad" placeholder="¥" placeholderTextColor={colors.muted} />
                 {priceDiff !== 0 && (
                   <Text style={{ fontSize: 11, color: priceDiff > 0 ? "#EF4444" : "#10B981", marginTop: 4, fontWeight: "700" }}>
-                    {priceDiff > 0 ? "↑ 涨了" : "↓ 降了"} ¥{Math.abs(priceDiff).toFixed(0)}（较参考价）
+                    {priceDiff > 0 ? "↑ 涨了" : "↓ 降了"} ¥{formatMoney(Math.abs(priceDiff))}（较参考价）
                   </Text>
                 )}
               </View>
@@ -2940,7 +2941,7 @@ function PettyImportModal({ visible, pettyRecords, items, month, colors, matchPe
                 <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>{s.desc}</Text>
-                    <Text style={{ fontSize: 11, color: colors.muted }}>{s.date} · ¥{s.amount.toFixed(0)}</Text>
+                    <Text style={{ fontSize: 11, color: colors.muted }}>{s.date} · ¥{formatMoney(s.amount)}</Text>
                   </View>
                   <TouchableOpacity onPress={() => update(idx, { selected: !s.selected })}
                     style={{ width: 24, height: 24, borderRadius: 12, borderWidth: 2,
@@ -2976,7 +2977,7 @@ function PettyImportModal({ visible, pettyRecords, items, month, colors, matchPe
                   <Text style={{ fontSize: 11, color: colors.muted, marginTop: 4 }}>
                     应收增加：¥{(parseFloat(s.qty) * parseFloat(s.unitPrice)).toFixed(1)}
                     {Math.abs(parseFloat(s.qty) * parseFloat(s.unitPrice) - s.amount) > 1 && (
-                      <Text style={{ color: "#F59E0B" }}> ⚠️ 与备用金金额 ¥{s.amount.toFixed(0)} 不符</Text>
+                      <Text style={{ color: "#F59E0B" }}> ⚠️ 与备用金金额 ¥{formatMoney(s.amount)} 不符</Text>
                     )}
                   </Text>
                 )}
@@ -3161,7 +3162,7 @@ function ImportPreviewModal({
               {source === "pdf" ? "PDF 解析预览" : "Excel 导入预览"}
             </Text>
             <Text style={{ fontSize: 11, color: colors.muted }}>
-              {rows.length} 条记录 · 合计 ¥{totalAmt.toFixed(0)} · {supplier}
+              {rows.length} 条记录 · 合计 ¥{formatMoney(totalAmt)} · {supplier}
             </Text>
           </View>
           <TouchableOpacity onPress={() => { if (rows.length === 0) { Alert.alert("提示", "没有可导入的记录"); return; } onConfirm(rows); }}>
@@ -3381,12 +3382,12 @@ function ImportPreviewModal({
                     <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground, flex: 1, marginRight: 8 }} numberOfLines={2}>
                       {row.rawName}
                     </Text>
-                    <Text style={{ fontSize: 13, fontWeight: "700", color: "#EF4444" }}>¥{row.amount.toFixed(0)}</Text>
+                    <Text style={{ fontSize: 13, fontWeight: "700", color: "#EF4444" }}>¥{formatMoney(row.amount)}</Text>
                   </View>
                   <View style={{ flexDirection: "row", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
                     <Text style={{ fontSize: 11, color: colors.muted }}>{row.date}</Text>
                     <Text style={{ fontSize: 11, color: colors.muted }}>{row.quantity} {row.unit}</Text>
-                    <Text style={{ fontSize: 11, color: colors.muted }}>¥{row.unitPrice.toFixed(0)}/瓶</Text>
+                    <Text style={{ fontSize: 11, color: colors.muted }}>¥{formatMoney(row.unitPrice)}/瓶</Text>
                     {row.supplier && row.supplier !== supplier && (
                       <Text style={{ fontSize: 11, color: "#F59E0B", fontWeight: "600" }}>{row.supplier}</Text>
                     )}
@@ -3415,7 +3416,7 @@ function ImportPreviewModal({
             <TouchableOpacity onPress={() => onConfirm(rows)}
               style={{ padding: 16, backgroundColor: "#EF4444", borderRadius: 14, alignItems: "center" }}>
               <Text style={{ fontSize: 16, color: "#fff", fontWeight: "700" }}>
-                确认导入 {rows.length} 条 · 合计 ¥{totalAmt.toFixed(0)}
+                确认导入 {rows.length} 条 · 合计 ¥{formatMoney(totalAmt)}
               </Text>
             </TouchableOpacity>
           </View>

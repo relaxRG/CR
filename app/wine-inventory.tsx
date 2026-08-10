@@ -6,6 +6,7 @@
  * - 总结：月度趋势折线图 + 快照历史 + Pour Cost 卡片
  */
 import React, { useMemo, useState } from "react";
+import { formatMoney } from "@/lib/utils";
 import {
   Alert, FlatList, Modal, Platform, Pressable, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View
@@ -84,7 +85,7 @@ function LedgerRow({ item, colors }: { item: WineInventoryItem; colors: any }) {
           <DetailRow label="期末单位成本" value={`¥${item.unitCost}`} colors={colors} />
           <DetailRow label="期末库存成本" value={`¥${item.endCost}`} colors={colors} />
           <DetailRow label="消耗瓶数" value={`${item.consumeBottles} 瓶`} colors={colors} />
-          <DetailRow label="本期消耗量" value={`¥${item.consumeQty.toFixed(0)}`} colors={colors} />
+          <DetailRow label="本期消耗量" value={`¥${formatMoney(item.consumeQty)}`} colors={colors} />
         </View>
       )}
     </TouchableOpacity>
@@ -167,7 +168,7 @@ function PurchaseRow({
           {showAlert && delta !== null && (
             <View style={{ backgroundColor: (delta > 0 ? "#EF4444" : "#10B981") + "20", paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4 }}>
               <Text style={{ fontSize: 10, fontWeight: "700", color: delta > 0 ? "#EF4444" : "#10B981" }}>
-                {delta > 0 ? "↑" : "↓"}¥{Math.abs(delta).toFixed(2)}
+                {delta > 0 ? "↑" : "↓"}¥{formatMoney(Math.abs(delta))}
               </Text>
             </View>
           )}
@@ -179,7 +180,7 @@ function PurchaseRow({
 
       {/* 右侧金额 */}
       <View style={{ alignItems: "flex-end" }}>
-        <Text style={{ fontSize: 15, fontWeight: "700", color: colors.primary }}>¥{purchase.amount.toFixed(0)}</Text>
+        <Text style={{ fontSize: 15, fontWeight: "700", color: colors.primary }}>¥{formatMoney(purchase.amount)}</Text>
         <Text style={{ fontSize: 11, color: colors.muted }}>¥{purchase.unitPrice}/瓶</Text>
       </View>
     </TouchableOpacity>
@@ -213,10 +214,10 @@ function SupplierCard({
           </View>
           <View style={{ alignItems: "flex-end", gap: 2 }}>
             {monthPurchase > 0 && (
-              <Text style={[S.supplierAmount, { color: colors.primary }]}>本月 ¥{monthPurchase.toFixed(0)}</Text>
+              <Text style={[S.supplierAmount, { color: colors.primary }]}>本月 ¥{formatMoney(monthPurchase)}</Text>
             )}
             {cumulativePurchase > 0 && (
-              <Text style={[S.supplierCumul, { color: colors.muted }]}>累计 ¥{cumulativePurchase.toFixed(0)}</Text>
+              <Text style={[S.supplierCumul, { color: colors.muted }]}>累计 ¥{formatMoney(cumulativePurchase)}</Text>
             )}
           </View>
         </View>
@@ -268,11 +269,11 @@ function buildPurchaseText(
   lines.push(`─────────────────────`);
   entries.forEach(({ item, qty, unitPrice }, i) => {
     lines.push(`${i + 1}. ${item.name}`);
-    lines.push(`   ${item.wineType} · ${qty} 瓶 × ¥${unitPrice.toFixed(2)} = ¥${(qty * unitPrice).toFixed(2)}`);
+    lines.push(`   ${item.wineType} · ${qty} 瓶 × ¥${formatMoney(unitPrice)} = ¥${formatMoney((qty * unitPrice))}`);
   });
   lines.push(`─────────────────────`);
   const total = entries.reduce((s, e) => s + e.qty * e.unitPrice, 0);
-  lines.push(`合计：¥${total.toFixed(2)}`);
+  lines.push(`合计：¥${formatMoney(total)}`);
   lines.push(`共 ${entries.length} 款，${entries.reduce((s, e) => s + e.qty, 0)} 瓶`);
   lines.push(`=====================`);
   return lines.join("\n");
@@ -356,7 +357,7 @@ function PurchaseEntrySheet({
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
           {total > 0 && (
             <View style={[S.totalBanner, { backgroundColor: colors.primary + "12", borderColor: colors.primary + "33" }]}>
-              <Text style={[S.totalText, { color: colors.primary }]}>本次进货合计：¥{total.toFixed(2)}</Text>
+              <Text style={[S.totalText, { color: colors.primary }]}>本次进货合计：¥{formatMoney(total)}</Text>
             </View>
           )}
 
@@ -394,7 +395,7 @@ function PurchaseEntrySheet({
               </View>
               {Number(qtys[item.seq] || 0) > 0 && (
                 <Text style={[S.entrySubtotal, { color: colors.primary }]}>
-                  小计 ¥{(Number(qtys[item.seq]) * Number(prices[item.seq] || item.unitCost || 0)).toFixed(2)}
+                  小计 ¥{formatMoney((Number(qtys[item.seq]) * Number(prices[item.seq] || item.unitCost || 0)))}
                 </Text>
               )}
             </View>
@@ -562,7 +563,7 @@ export default function WineInventoryScreen() {
       });
     });
     const total = entries.reduce((s, e) => s + e.qty * e.unitPrice, 0);
-    Alert.alert("进货已记录", `${activeSupplierForEntry} 共 ${entries.length} 款，合计 ¥${total.toFixed(2)}`);
+    Alert.alert("进货已记录", `${activeSupplierForEntry} 共 ${entries.length} 款，合计 ¥${formatMoney(total)}`);
   };
 
   const activeSupplierItems = useMemo(
@@ -658,8 +659,8 @@ export default function WineInventoryScreen() {
           {/* 统计卡片 */}
           <View style={[S.statsRow, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
             <StatCell label="期末库存" value={`${ledgerStats.totalEndQty}瓶`} color={colors.foreground} />
-            <StatCell label="期末成本" value={`¥${ledgerStats.totalEndCost.toFixed(0)}`} color={colors.foreground} />
-            <StatCell label="本月进货" value={`¥${ledgerStats.totalPurchaseCost.toFixed(0)}`} color={colors.primary} />
+            <StatCell label="期末成本" value={`¥${formatMoney(ledgerStats.totalEndCost)}`} color={colors.foreground} />
+            <StatCell label="本月进货" value={`¥${formatMoney(ledgerStats.totalPurchaseCost)}`} color={colors.primary} />
             <StatCell label="本月消耗" value={`${ledgerStats.totalConsumeBottles}瓶`} color={colors.warning} />
           </View>
           {/* 工具栏 */}
@@ -725,7 +726,7 @@ export default function WineInventoryScreen() {
               {Object.entries(supplierCumulTotals).sort((a, b) => b[1] - a[1]).map(([sup, amt]) => (
                 <View key={sup} style={S.supplierSummaryRow}>
                   <Text style={[S.supplierSummaryName, { color: colors.foreground }]}>{sup}</Text>
-                  <Text style={[S.supplierSummaryAmt, { color: colors.primary }]}>¥{amt.toFixed(0)}</Text>
+                  <Text style={[S.supplierSummaryAmt, { color: colors.primary }]}>¥{formatMoney(amt)}</Text>
                 </View>
               ))}
             </View>
@@ -850,7 +851,7 @@ export default function WineInventoryScreen() {
                     selected={selectedIds.has(p.id)}
                     onSelect={() => toggleSelect(p.id)}
                     onEdit={() => {
-                      Alert.alert(p.productName, `供应商：${p.supplier}\n日期：${p.date}\n数量：${p.quantity}瓶\n单价：¥${p.unitPrice}\n金额：¥${p.amount.toFixed(2)}`, [
+                      Alert.alert(p.productName, `供应商：${p.supplier}\n日期：${p.date}\n数量：${p.quantity}瓶\n单价：¥${p.unitPrice}\n金额：¥${formatMoney(p.amount)}`, [
                         { text: "关闭" },
                         { text: "删除", style: "destructive", onPress: () => {
                           Alert.alert("确认删除", `删除「${p.productName}」这条进货记录？`, [
@@ -868,7 +869,7 @@ export default function WineInventoryScreen() {
               ListHeaderComponent={
                 <View style={{ marginBottom: 12 }}>
                   <Text style={{ fontSize: 13, color: colors.muted }}>
-                    共 {monthPurchaseRecords.length} 条 · 合计 ¥{monthPurchaseRecords.reduce((s, p) => s + p.amount, 0).toFixed(0)}
+                    共 {monthPurchaseRecords.length} 条 · 合计 ¥{formatMoney(monthPurchaseRecords.reduce((s, p) => s + p.amount, 0))}
                   </Text>
                 </View>
               }
@@ -900,14 +901,14 @@ export default function WineInventoryScreen() {
                 <Text style={[S.summaryCardDate, { color: colors.muted }]}>{snap.importedAt.slice(0, 10)}</Text>
               </View>
               <View style={S.summaryCardStats}>
-                <SummaryStatCell label="月进货" value={`¥${snap.totalPurchase.toFixed(0)}`} color={colors.primary} />
-                <SummaryStatCell label="月消耗" value={`¥${snap.totalConsume.toFixed(0)}`} color={colors.warning} />
-                <SummaryStatCell label="期末成本" value={`¥${snap.totalEndCost.toFixed(0)}`} color={colors.foreground} />
+                <SummaryStatCell label="月进货" value={`¥${formatMoney(snap.totalPurchase)}`} color={colors.primary} />
+                <SummaryStatCell label="月消耗" value={`¥${formatMoney(snap.totalConsume)}`} color={colors.warning} />
+                <SummaryStatCell label="期末成本" value={`¥${formatMoney(snap.totalEndCost)}`} color={colors.foreground} />
               </View>
               {Object.entries(snap.supplierTotals).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).map(([sup, amt]) => (
                 <View key={sup} style={[S.summarySupRow, { borderTopColor: colors.border }]}>
                   <Text style={[S.summarySupName, { color: colors.muted }]}>{sup}</Text>
-                  <Text style={[S.summarySupAmt, { color: colors.primary }]}>¥{amt.toFixed(0)}</Text>
+                  <Text style={[S.summarySupAmt, { color: colors.primary }]}>¥{formatMoney(amt)}</Text>
                 </View>
               ))}
               <Pressable onPress={() => handleDeleteSnapshot(snap.id, snap.monthLabel)} style={S.deleteSnap}>
@@ -929,7 +930,7 @@ export default function WineInventoryScreen() {
                     <Text style={[S.manualName, { color: colors.foreground }]} numberOfLines={1}>{p.productName}</Text>
                     <Text style={[S.manualMeta, { color: colors.muted }]}>{p.supplier} · {p.date} · {p.quantity}瓶 × ¥{p.unitPrice}</Text>
                   </View>
-                  <Text style={[S.manualAmt, { color: colors.primary }]}>¥{p.amount.toFixed(0)}</Text>
+                  <Text style={[S.manualAmt, { color: colors.primary }]}>¥{formatMoney(p.amount)}</Text>
                 </View>
               ))}
             </>

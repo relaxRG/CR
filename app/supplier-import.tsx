@@ -7,6 +7,7 @@
  * - 确认后批量写入进销存 + 原料库
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { formatMoney } from "@/lib/utils";
 import {
   ActivityIndicator, Alert, FlatList, Modal, Platform, Pressable,
   ScrollView, StyleSheet, Text, TextInput, View,
@@ -525,7 +526,7 @@ export default function SupplierImportScreen() {
               <Text style={[S.periodLabel, { color: colors.muted }]}>{preview.periodLabel}  ·  共{stats.total}种商品</Text>
             </View>
             <View style={S.summaryRight}>
-              <Text style={[S.totalAmt, { color: colors.primary }]}>¥{preview.totalAmount.toFixed(0)}</Text>
+              <Text style={[S.totalAmt, { color: colors.primary }]}>¥{formatMoney(preview.totalAmount)}</Text>
               <Text style={[S.totalLabel, { color: colors.muted }]}>总金额</Text>
             </View>
           </View>

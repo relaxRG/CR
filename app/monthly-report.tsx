@@ -14,6 +14,7 @@
  * 9. 历史月份快照选择
  */
 import React, { useMemo, useState } from "react";
+import { formatMoney } from "@/lib/utils";
 import {
   Alert, FlatList, Platform, Pressable, ScrollView,
   StyleSheet, Text, TouchableOpacity, View
@@ -205,7 +206,7 @@ function CategoryBar({ cat, maxAmount, colors }: {
         </View>
       </View>
       <View style={{ alignItems: "flex-end", marginLeft: 10, minWidth: 80 }}>
-        <Text style={[S.catBarAmt, { color: colors.foreground }]}>¥{cat.salesAmount.toFixed(0)}</Text>
+        <Text style={[S.catBarAmt, { color: colors.foreground }]}>¥{formatMoney(cat.salesAmount)}</Text>
         <Text style={[S.catBarPct, { color: colors.muted }]}>{(cat.salesAmountPct * 100).toFixed(1)}%</Text>
       </View>
     </View>
@@ -362,7 +363,7 @@ export default function MonthlyReportScreen() {
                 vsValue={report.kpi.turnoverVs} colors={colors} />
               <KpiCard label="订单量" value={String(report.kpi.orderCount)}
                 vsValue={report.kpi.orderCountVs} colors={colors} />
-              <KpiCard label="优惠金额" value={`¥${report.kpi.discountAmount.toFixed(0)}`}
+              <KpiCard label="优惠金额" value={`¥${formatMoney(report.kpi.discountAmount)}`}
                 vsValue={report.kpi.discountAmountVs} colors={colors} />
               <KpiCard label="优惠占比" value={`${(report.kpi.discountRate * 100).toFixed(2)}%`} colors={colors} />
               <KpiCard label="消费桌数" value={String(report.kpi.tableCount)}
@@ -372,7 +373,7 @@ export default function MonthlyReportScreen() {
               <KpiCard label="退菜数量" value={String(report.kpi.returnDishCount)} colors={colors} />
               <KpiCard label="反结单量" value={String(report.kpi.refundOrderCount)}
                 vsValue={report.kpi.refundOrderCountVs} colors={colors} />
-              <KpiCard label="非会员人均" value={`¥${report.kpi.avgSpendPerPerson.toFixed(2)}`} colors={colors} />
+              <KpiCard label="非会员人均" value={`¥${formatMoney(report.kpi.avgSpendPerPerson)}`} colors={colors} />
               <KpiCard label="菜品销量" value={`${report.kpi.dishSalesCount}份`} colors={colors} />
             </View>
           </View>
@@ -406,7 +407,7 @@ export default function MonthlyReportScreen() {
                       <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: PAYMENT_COLORS[i % PAYMENT_COLORS.length] }} />
                       <Text style={[S.payName, { color: colors.foreground }]} numberOfLines={1}>{p.name}</Text>
                     </View>
-                    <Text style={[S.payAmt, { color: colors.foreground }]}>¥{p.amount.toFixed(2)}</Text>
+                    <Text style={[S.payAmt, { color: colors.foreground }]}>¥{formatMoney(p.amount)}</Text>
                     <Text style={[S.payPct, { color: colors.muted }]}>{(p.pct * 100).toFixed(1)}%</Text>
                     {p.vsAmount !== undefined && p.vsAmount !== 0 && (
                       <Text style={{ fontSize: 11, color: p.vsAmount >= 0 ? colors.error : colors.success, width: 70, textAlign: "right" }}>
@@ -449,11 +450,11 @@ export default function MonthlyReportScreen() {
                   <View style={{ flex: 1 }}>
                     <Text style={[S.dishName, { color: colors.foreground }]} numberOfLines={1}>{dish.name}</Text>
                     <Text style={[S.dishMeta, { color: colors.muted }]}>
-                      {dish.salesQty}份 · {dish.status} · 优惠¥{dish.discountAmount.toFixed(0)}
+                      {dish.salesQty}份 · {dish.status} · 优惠¥{formatMoney(dish.discountAmount)}
                     </Text>
                   </View>
                   <View style={{ alignItems: "flex-end" }}>
-                    <Text style={[S.dishAmt, { color: colors.foreground }]}>¥{dish.salesAmount.toFixed(0)}</Text>
+                    <Text style={[S.dishAmt, { color: colors.foreground }]}>¥{formatMoney(dish.salesAmount)}</Text>
                     <Text style={[S.dishPct, { color: colors.muted }]}>{(dish.salesAmountPct * 100).toFixed(1)}%</Text>
                   </View>
                 </View>
@@ -476,11 +477,11 @@ export default function MonthlyReportScreen() {
                 {report.dailyRevenues.slice().reverse().slice(0, 7).map((d, i) => (
                   <View key={i} style={[S.dailyRow, { borderBottomColor: colors.border }]}>
                     <Text style={[S.dailyDate, { color: colors.muted }]}>{d.date.slice(5)}</Text>
-                    <Text style={[S.dailyTotal, { color: colors.foreground }]}>¥{d.total.toFixed(0)}</Text>
+                    <Text style={[S.dailyTotal, { color: colors.foreground }]}>¥{formatMoney(d.total)}</Text>
                     <View style={{ flexDirection: "row", gap: 8 }}>
-                      <Text style={{ fontSize: 10, color: "#FF9500" }}>微信¥{d.wechat.toFixed(0)}</Text>
-                      <Text style={{ fontSize: 10, color: "#007AFF" }}>支付宝¥{d.alipay.toFixed(0)}</Text>
-                      {d.meituan > 0 && <Text style={{ fontSize: 10, color: "#FF6B35" }}>美团¥{d.meituan.toFixed(0)}</Text>}
+                      <Text style={{ fontSize: 10, color: "#FF9500" }}>微信¥{formatMoney(d.wechat)}</Text>
+                      <Text style={{ fontSize: 10, color: "#007AFF" }}>支付宝¥{formatMoney(d.alipay)}</Text>
+                      {d.meituan > 0 && <Text style={{ fontSize: 10, color: "#FF6B35" }}>美团¥{formatMoney(d.meituan)}</Text>}
                     </View>
                   </View>
                 ))}
@@ -514,10 +515,10 @@ export default function MonthlyReportScreen() {
             </View>
             <View style={S.kpiGrid}>
               <KpiCard label="会员营业额占比" value={`${(report.customerStats.memberRevenuePct * 100).toFixed(2)}%`} colors={colors} />
-              <KpiCard label="非会员人均" value={`¥${report.customerStats.nonMemberAvgSpend.toFixed(2)}`} colors={colors} />
+              <KpiCard label="非会员人均" value={`¥${formatMoney(report.customerStats.nonMemberAvgSpend)}`} colors={colors} />
               <KpiCard label="新增会员" value={`${report.customerStats.newMembers}人`} colors={colors} />
               <KpiCard label="会员消费笔数" value={`${report.customerStats.memberOrderCount}笔`} colors={colors} />
-              <KpiCard label="储值余额消费" value={`¥${report.customerStats.storedBalanceConsume.toFixed(2)}`} colors={colors} />
+              <KpiCard label="储值余额消费" value={`¥${formatMoney(report.customerStats.storedBalanceConsume)}`} colors={colors} />
               <KpiCard label="积分赠送" value={`${report.customerStats.pointsEarned}分`} colors={colors} />
             </View>
           </View>
@@ -555,7 +556,7 @@ export default function MonthlyReportScreen() {
                         backgroundColor: r.id === report.id ? colors.primary + "0a" : colors.background }]}>
                       <Text style={{ fontSize: 11, color: r.id === report.id ? colors.primary : colors.muted, marginBottom: 4 }}>{r.monthLabel}</Text>
                       <Text style={{ fontSize: 15, fontWeight: "700", color: r.id === report.id ? colors.primary : colors.foreground }}>¥{(r.kpi.revenue / 10000).toFixed(1)}w</Text>
-                      <Text style={{ fontSize: 10, color: colors.muted, marginTop: 2 }}>{r.kpi.orderCount}单 · 均¥{r.kpi.avgSpendPerPerson.toFixed(0)}</Text>
+                      <Text style={{ fontSize: 10, color: colors.muted, marginTop: 2 }}>{r.kpi.orderCount}单 · 均¥{formatMoney(r.kpi.avgSpendPerPerson)}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -574,7 +575,7 @@ export default function MonthlyReportScreen() {
                   <TouchableOpacity onPress={() => { tap(); setSelectedId(r.id); }} style={{ flex: 1 }}>
                     <Text style={[S.historyMonth, { color: r.id === report.id ? colors.primary : colors.foreground }]}>{r.monthLabel}</Text>
                     <Text style={[S.historyMeta, { color: colors.muted }]}>
-                      营业收入 ¥{r.kpi.revenue.toFixed(0)} · 订单 {r.kpi.orderCount}单 · {r.importedAt.slice(0, 10)}
+                      营业收入 ¥{formatMoney(r.kpi.revenue)} · 订单 {r.kpi.orderCount}单 · {r.importedAt.slice(0, 10)}
                     </Text>
                   </TouchableOpacity>
                   <Pressable onPress={() => handleDelete(r.id, r.monthLabel)} style={{ padding: 8 }}>

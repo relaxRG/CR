@@ -48,3 +48,17 @@ export function displayNames(
   const secondaryRaw = lang === "en" ? (e ? z : "") : (z ? e : "");
   return { primary, secondary: secondaryRaw === primary ? "" : secondaryRaw };
 }
+
+/**
+ * 智能金额格式化：整数不显示小数点，有小数则保留两位
+ *
+ * - ¥9305   → "9305"
+ * - ¥345.5  → "345.50"
+ * - ¥12.34  → "12.34"
+ * - ¥0.1    → "0.10"
+ *
+ * 使用方式：`¥${formatMoney(amount)}`
+ */
+export function formatMoney(n: number): string {
+  return n % 1 === 0 ? n.toFixed(0) : n.toFixed(2);
+}

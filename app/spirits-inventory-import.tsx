@@ -8,6 +8,7 @@
  * 4. 自动同步 Bottle 库（更新库存/进价，新款入库）
  */
 import React, { useState } from "react";
+import { formatMoney } from "@/lib/utils";
 import {
   Alert, Modal, Platform, Pressable, ScrollView,
   StyleSheet, Text, TouchableOpacity, View, ActivityIndicator
@@ -60,10 +61,10 @@ function PriceChangeRow({ change, colors }: { change: SpiritPriceChange; colors:
       <Text style={[PS.priceName, { color: colors.foreground }]} numberOfLines={1}>{change.name}</Text>
       <View style={{ alignItems: "flex-end" }}>
         <Text style={{ fontSize: 13, fontWeight: "700", color }}>
-          {isUp ? "▲" : "▼"} ¥{Math.abs(change.currPrice - change.prevPrice).toFixed(0)}
+          {isUp ? "▲" : "▼"} ¥{formatMoney(Math.abs(change.currPrice - change.prevPrice))}
         </Text>
         <Text style={{ fontSize: 11, color: colors.muted }}>
-          ¥{change.prevPrice.toFixed(0)} → ¥{change.currPrice.toFixed(0)}
+          ¥{formatMoney(change.prevPrice)} → ¥{formatMoney(change.currPrice)}
         </Text>
       </View>
     </View>
@@ -269,15 +270,15 @@ export default function SpiritsInventoryImportScreen() {
           {preview && (
             <View style={[PS.previewStats, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
               <View style={{ flex: 1, alignItems: "center" }}>
-                <Text style={{ fontSize: 14, fontWeight: "700", color: colors.primary }}>¥{preview.totalPurchase.toFixed(0)}</Text>
+                <Text style={{ fontSize: 14, fontWeight: "700", color: colors.primary }}>¥{formatMoney(preview.totalPurchase)}</Text>
                 <Text style={{ fontSize: 10, color: colors.muted }}>本月进货</Text>
               </View>
               <View style={{ flex: 1, alignItems: "center" }}>
-                <Text style={{ fontSize: 14, fontWeight: "700", color: colors.warning }}>¥{preview.totalConsume.toFixed(0)}</Text>
+                <Text style={{ fontSize: 14, fontWeight: "700", color: colors.warning }}>¥{formatMoney(preview.totalConsume)}</Text>
                 <Text style={{ fontSize: 10, color: colors.muted }}>本月消耗</Text>
               </View>
               <View style={{ flex: 1, alignItems: "center" }}>
-                <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>¥{preview.totalEndCost.toFixed(0)}</Text>
+                <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>¥{formatMoney(preview.totalEndCost)}</Text>
                 <Text style={{ fontSize: 10, color: colors.muted }}>期末成本</Text>
               </View>
               <View style={{ flex: 1, alignItems: "center" }}>

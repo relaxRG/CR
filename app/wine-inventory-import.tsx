@@ -5,6 +5,7 @@
  * 导入后自动同步 WineBottle 资料库（新增款 addBottle，已有款 updateBottle 更新库存和进价）
  */
 import React, { useState } from "react";
+import { formatMoney } from "@/lib/utils";
 import {
   Alert, Modal, Platform, Pressable, ScrollView,
   StyleSheet, Text, TouchableOpacity, View
@@ -308,15 +309,15 @@ export default function WineInventoryImportScreen() {
           {preview && (
             <View style={[PS.previewStats, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
               <View style={{ flex: 1, alignItems: "center" }}>
-                <Text style={{ fontSize: 15, fontWeight: "700", color: colors.primary }}>¥{preview.totalPurchase.toFixed(0)}</Text>
+                <Text style={{ fontSize: 15, fontWeight: "700", color: colors.primary }}>¥{formatMoney(preview.totalPurchase)}</Text>
                 <Text style={{ fontSize: 11, color: colors.muted }}>本月进货</Text>
               </View>
               <View style={{ flex: 1, alignItems: "center" }}>
-                <Text style={{ fontSize: 15, fontWeight: "700", color: colors.warning }}>¥{preview.totalConsume.toFixed(0)}</Text>
+                <Text style={{ fontSize: 15, fontWeight: "700", color: colors.warning }}>¥{formatMoney(preview.totalConsume)}</Text>
                 <Text style={{ fontSize: 11, color: colors.muted }}>本月消耗</Text>
               </View>
               <View style={{ flex: 1, alignItems: "center" }}>
-                <Text style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>¥{preview.totalEndCost.toFixed(0)}</Text>
+                <Text style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>¥{formatMoney(preview.totalEndCost)}</Text>
                 <Text style={{ fontSize: 11, color: colors.muted }}>期末成本</Text>
               </View>
               <View style={{ flex: 1, alignItems: "center" }}>
@@ -334,7 +335,7 @@ export default function WineInventoryImportScreen() {
                 {Object.entries(preview.supplierTotals).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).map(([sup, amt]) => (
                   <View key={sup} style={[PS.supChip, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                     <Text style={{ fontSize: 12, fontWeight: "600", color: colors.foreground }}>{sup}</Text>
-                    <Text style={{ fontSize: 12, color: colors.primary }}>¥{amt.toFixed(0)}</Text>
+                    <Text style={{ fontSize: 12, color: colors.primary }}>¥{formatMoney(amt)}</Text>
                   </View>
                 ))}
               </ScrollView>

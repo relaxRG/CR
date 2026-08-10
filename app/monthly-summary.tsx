@@ -8,6 +8,7 @@
  *   4. 月报设置（备用金/库存显示规则）
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { formatMoney } from "@/lib/utils";
 import {
   Alert, Clipboard, KeyboardAvoidingView, Modal, Platform, Pressable,
   ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View
@@ -89,7 +90,7 @@ function LineItemRow({ item, colors, linkedModule }: { item: SummaryLineItem; co
       </View>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
         <Text style={{ fontSize: 14, fontWeight: "700", color: amtColor, minWidth: 80, textAlign: "right" }}>
-          {item.amount === 0 ? "—" : `${isPositive ? "+" : ""}¥${Math.abs(item.amount).toFixed(2)}`}
+          {item.amount === 0 ? "—" : `${isPositive ? "+" : ""}¥${formatMoney(Math.abs(item.amount))}`}
         </Text>
         {isNavigable && (
           <IconSymbol name="chevron.right" size={12} color={colors.muted} />
@@ -146,7 +147,7 @@ function PaymentEntryModal({ visible, target, colors, onConfirm, onClose }: {
             {target && (
               <View style={[MI.section, { borderColor: colors.border, marginBottom: 12 }]}>
                 <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>{target.name}</Text>
-                <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>待付金额：¥{target.remaining.toFixed(2)}</Text>
+                <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>待付金额：¥{formatMoney(target.remaining)}</Text>
               </View>
             )}
             <View style={[MI.section, { borderColor: colors.border }]}>
@@ -657,16 +658,16 @@ export default function MonthlySummaryScreen() {
         }]}>
           <Text style={{ fontSize: 12, color: colors.muted }}>本月净利润</Text>
           <Text style={{ fontSize: 32, fontWeight: "800", color: netProfit >= 0 ? colors.success : colors.error }}>
-            {netProfit >= 0 ? "+" : ""}¥{netProfit.toFixed(2)}
+            {netProfit >= 0 ? "+" : ""}¥{formatMoney(netProfit)}
           </Text>
           <View style={{ flexDirection: "row", gap: 16, marginTop: 8 }}>
             <View>
               <Text style={{ fontSize: 10, color: colors.muted }}>总收入</Text>
-              <Text style={{ fontSize: 14, fontWeight: "600", color: colors.success }}>+¥{totalRevenue.toFixed(2)}</Text>
+              <Text style={{ fontSize: 14, fontWeight: "600", color: colors.success }}>+¥{formatMoney(totalRevenue)}</Text>
             </View>
             <View>
               <Text style={{ fontSize: 10, color: colors.muted }}>总支出</Text>
-              <Text style={{ fontSize: 14, fontWeight: "600", color: colors.error }}>-¥{Math.abs(totalExpenses).toFixed(2)}</Text>
+              <Text style={{ fontSize: 14, fontWeight: "600", color: colors.error }}>-¥{formatMoney(Math.abs(totalExpenses))}</Text>
             </View>
           </View>
         </View>
@@ -680,7 +681,7 @@ export default function MonthlySummaryScreen() {
                 <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>{sec.label}</Text>
               </View>
               <Text style={{ fontSize: 14, fontWeight: "700", color: sec.sign > 0 ? colors.success : colors.error }}>
-                {sec.sign > 0 ? "+" : ""}¥{sec.subtotal.toFixed(2)}
+                {sec.sign > 0 ? "+" : ""}¥{formatMoney(sec.subtotal)}
               </Text>
             </View>
             {/* 工资科目不渲染科目行，只保留下方的「工资发放明细」卡片（避免重复） */}
@@ -725,7 +726,7 @@ export default function MonthlySummaryScreen() {
                   <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 10, paddingBottom: 6 }}>
                     <Text style={{ fontSize: 11, fontWeight: "700", color: colors.muted }}>工资发放明细</Text>
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                      {totalPending > 0 && <Text style={{ fontSize: 11, color: colors.error, fontWeight: "700" }}>待发 ¥{totalPending.toFixed(0)}</Text>}
+                      {totalPending > 0 && <Text style={{ fontSize: 11, color: colors.error, fontWeight: "700" }}>待发 ¥{formatMoney(totalPending)}</Text>}
                       <TouchableOpacity onPress={() => router.push("/labor" as any)}
                         style={{ flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6, backgroundColor: colors.primary + "15", borderWidth: 1, borderColor: colors.primary + "33" }}>
                         <Text style={{ fontSize: 10, color: colors.primary, fontWeight: "600" }}>薪资管理</Text>
@@ -774,17 +775,17 @@ export default function MonthlySummaryScreen() {
                                 <View style={{ flex: 1, flexDirection: "row", justifyContent: "space-between" }}>
                                   <View style={S.amtBlock}>
                                     <Text style={S.amtLabel}>应发</Text>
-                                    <Text style={[S.amtValue, { color: colors.foreground }]}>¥{grossAmt.toFixed(0)}</Text>
+                                    <Text style={[S.amtValue, { color: colors.foreground }]}>¥{formatMoney(grossAmt)}</Text>
                                   </View>
                                   <View style={S.amtBlock}>
                                     <Text style={S.amtLabel}>预支</Text>
                                     <Text style={[S.amtValue, { color: advAmt > 0 ? colors.warning : colors.muted }]}>
-                                      {advAmt > 0 ? `-¥${advAmt.toFixed(0)}` : "0"}
+                                      {advAmt > 0 ? `-¥${formatMoney(advAmt)}` : "0"}
                                     </Text>
                                   </View>
                                   <View style={S.amtBlock}>
                                     <Text style={S.amtLabel}>待发</Text>
-                                    <Text style={[S.amtValue, { color: isPaid ? colors.success : colors.error, fontWeight: "800" }]}>¥{finalAmt.toFixed(0)}</Text>
+                                    <Text style={[S.amtValue, { color: isPaid ? colors.success : colors.error, fontWeight: "800" }]}>¥{formatMoney(finalAmt)}</Text>
                                   </View>
                                 </View>
                                 {/* 右：未发/已发（上）+ 复制付款（下）*/}
@@ -905,10 +906,10 @@ export default function MonthlySummaryScreen() {
                   </View>
                 </View>
                 <View style={{ flexDirection: "row", gap: 10, marginBottom: 6 }}>
-                  <View style={S.amtBlock}><Text style={S.amtLabel}>货款</Text><Text style={[S.amtValue, { color: colors.foreground }]}>¥{payment.totalAmount.toFixed(0)}</Text></View>
-                  {advAmt > 0 && <View style={S.amtBlock}><Text style={S.amtLabel}>预付</Text><Text style={[S.amtValue, { color: colors.warning }]}>-¥{advAmt.toFixed(0)}</Text></View>}
-                  {payment.paidAmount > 0 && <View style={S.amtBlock}><Text style={S.amtLabel}>已付</Text><Text style={[S.amtValue, { color: colors.success }]}>¥{payment.paidAmount.toFixed(0)}</Text></View>}
-                  <View style={S.amtBlock}><Text style={S.amtLabel}>待付</Text><Text style={[S.amtValue, { color: actualRemaining > 0 ? colors.error : colors.success, fontWeight: "800" }]}>¥{actualRemaining.toFixed(0)}</Text></View>
+                  <View style={S.amtBlock}><Text style={S.amtLabel}>货款</Text><Text style={[S.amtValue, { color: colors.foreground }]}>¥{formatMoney(payment.totalAmount)}</Text></View>
+                  {advAmt > 0 && <View style={S.amtBlock}><Text style={S.amtLabel}>预付</Text><Text style={[S.amtValue, { color: colors.warning }]}>-¥{formatMoney(advAmt)}</Text></View>}
+                  {payment.paidAmount > 0 && <View style={S.amtBlock}><Text style={S.amtLabel}>已付</Text><Text style={[S.amtValue, { color: colors.success }]}>¥{formatMoney(payment.paidAmount)}</Text></View>}
+                  <View style={S.amtBlock}><Text style={S.amtLabel}>待付</Text><Text style={[S.amtValue, { color: actualRemaining > 0 ? colors.error : colors.success, fontWeight: "800" }]}>¥{formatMoney(actualRemaining)}</Text></View>
                 </View>
                 {payment.notes ? <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 4 }}>{payment.notes}</Text> : null}
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
@@ -920,7 +921,7 @@ export default function MonthlySummaryScreen() {
                       `收款人：${bankInfo.accountName}`,
                       `开户行：${bankInfo.bankName}`,
                       `卡号：${bankInfo.cardNumber}`,
-                      `金额：¥${(actualRemaining > 0 ? actualRemaining : payment.totalAmount).toFixed(2)}`,
+                      `金额：¥${formatMoney((actualRemaining > 0 ? actualRemaining : payment.totalAmount))}`,
                       `备注：${name} ${selectedMonth} 货款`,
                     ].join("\n"))} style={[S.miniBtn, { backgroundColor: colors.primary }]}>
                       <IconSymbol name="doc.on.clipboard" size={10} color="#fff" />
@@ -949,7 +950,7 @@ export default function MonthlySummaryScreen() {
                 </View>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
                   {totalRemaining > 0 && (
-                    <Text style={{ fontSize: 12, fontWeight: "700", color: colors.error }}>待付 ¥{totalRemaining.toFixed(0)}</Text>
+                    <Text style={{ fontSize: 12, fontWeight: "700", color: colors.error }}>待付 ¥{formatMoney(totalRemaining)}</Text>
                   )}
                   {!isReadOnly && (
                     <TouchableOpacity onPress={() => { tap(); setShowAddPaymentModal(true); }}
@@ -973,7 +974,7 @@ export default function MonthlySummaryScreen() {
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 6 }}>
                       <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: gColor }} />
                       <Text style={{ fontSize: 11, fontWeight: "700", color: gColor }}>{gLabel}</Text>
-                      {groupRemaining > 0 && <Text style={{ fontSize: 10, color: colors.error, marginLeft: 4 }}>待付 ¥{groupRemaining.toFixed(0)}</Text>}
+                      {groupRemaining > 0 && <Text style={{ fontSize: 10, color: colors.error, marginLeft: 4 }}>待付 ¥{formatMoney(groupRemaining)}</Text>}
                     </View>
                     {groupPmts.map((payment) => {
                       const sup = suppliers.find((s) => s.id === payment.payeeId);
@@ -993,8 +994,8 @@ export default function MonthlySummaryScreen() {
                       <Text style={{ fontSize: 11, fontWeight: "700", color: "#FF4D4F" }}>工资小计</Text>
                     </View>
                     <View style={{ flexDirection: "row", gap: 12 }}>
-                      <Text style={{ fontSize: 11, color: colors.muted }}>应发 ¥{employeePmts.reduce((s, p) => s + p.totalAmount, 0).toFixed(0)}</Text>
-                      {totalEmployeeRemaining > 0 && <Text style={{ fontSize: 11, fontWeight: "700", color: colors.error }}>待发 ¥{totalEmployeeRemaining.toFixed(0)}</Text>}
+                      <Text style={{ fontSize: 11, color: colors.muted }}>应发 ¥{formatMoney(employeePmts.reduce((s, p) => s + p.totalAmount, 0))}</Text>
+                      {totalEmployeeRemaining > 0 && <Text style={{ fontSize: 11, fontWeight: "700", color: colors.error }}>待发 ¥{formatMoney(totalEmployeeRemaining)}</Text>}
                     </View>
                   </View>
                   <TouchableOpacity onPress={() => router.push("/labor" as any)}

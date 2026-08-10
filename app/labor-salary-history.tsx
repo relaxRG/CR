@@ -3,6 +3,7 @@
  * 按员工查看近12月薪资记录，包含公司承担成本分析
  */
 import React, { useMemo, useState } from "react";
+import { formatMoney } from "@/lib/utils";
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -103,12 +104,12 @@ export default function LaborSalaryHistoryScreen() {
           {viewMode === "employee" ? (
             <View style={{ gap: 6, marginTop: 10 }}>
               {[
-                { label: "年度应发合计", value: `¥${yearSummary.totalGross.toFixed(0)}`, color: colors.foreground },
-                { label: "社保/公积金代扣", value: yearSummary.totalSI > 0 ? `-¥${yearSummary.totalSI.toFixed(0)}` : "—", color: colors.error },
-                { label: "个人所得税", value: yearSummary.totalTax > 0 ? `-¥${yearSummary.totalTax.toFixed(0)}` : "—", color: colors.error },
-                { label: "预支扣除", value: yearSummary.totalAdvance > 0 ? `-¥${yearSummary.totalAdvance.toFixed(0)}` : "—", color: colors.warning },
-                ...(yearSummary.totalPettyPaid > 0 ? [{ label: "备用金已付", value: `-¥${yearSummary.totalPettyPaid.toFixed(0)}`, color: colors.warning }] : []),
-                { label: "年度实发合计", value: `¥${yearSummary.totalFinal.toFixed(0)}`, color: deptColor, bold: true },
+                { label: "年度应发合计", value: `¥${formatMoney(yearSummary.totalGross)}`, color: colors.foreground },
+                { label: "社保/公积金代扣", value: yearSummary.totalSI > 0 ? `-¥${formatMoney(yearSummary.totalSI)}` : "—", color: colors.error },
+                { label: "个人所得税", value: yearSummary.totalTax > 0 ? `-¥${formatMoney(yearSummary.totalTax)}` : "—", color: colors.error },
+                { label: "预支扣除", value: yearSummary.totalAdvance > 0 ? `-¥${formatMoney(yearSummary.totalAdvance)}` : "—", color: colors.warning },
+                ...(yearSummary.totalPettyPaid > 0 ? [{ label: "备用金已付", value: `-¥${formatMoney(yearSummary.totalPettyPaid)}`, color: colors.warning }] : []),
+                { label: "年度实发合计", value: `¥${formatMoney(yearSummary.totalFinal)}`, color: deptColor, bold: true },
               ].map(({ label, value, color, bold }) => (
                 <View key={label} style={{ flexDirection: "row", justifyContent: "space-between" }}>
                   <Text style={{ fontSize: 12, color: colors.muted }}>{label}</Text>
@@ -119,10 +120,10 @@ export default function LaborSalaryHistoryScreen() {
           ) : (
             <View style={{ gap: 6, marginTop: 10 }}>
               {[
-                { label: "年度应发合计", value: `¥${yearSummary.totalGross.toFixed(0)}`, color: colors.foreground },
-                { label: "公司社保/公积金", value: yearSummary.totalEmployerCost > 0 ? `+¥${(yearSummary.totalEmployerCost - yearSummary.totalGross).toFixed(0)}` : "—", color: colors.warning },
-                { label: "公司总人力成本", value: yearSummary.totalEmployerCost > 0 ? `¥${yearSummary.totalEmployerCost.toFixed(0)}` : `¥${yearSummary.totalGross.toFixed(0)}`, color: colors.warning, bold: true },
-                { label: "月均人力成本", value: yearSummary.count > 0 ? `¥${(yearSummary.totalEmployerCost / yearSummary.count || yearSummary.totalGross / yearSummary.count).toFixed(0)}/月` : "—", color: colors.muted },
+                { label: "年度应发合计", value: `¥${formatMoney(yearSummary.totalGross)}`, color: colors.foreground },
+                { label: "公司社保/公积金", value: yearSummary.totalEmployerCost > 0 ? `+¥${formatMoney((yearSummary.totalEmployerCost - yearSummary.totalGross))}` : "—", color: colors.warning },
+                { label: "公司总人力成本", value: yearSummary.totalEmployerCost > 0 ? `¥${formatMoney(yearSummary.totalEmployerCost)}` : `¥${formatMoney(yearSummary.totalGross)}`, color: colors.warning, bold: true },
+                { label: "月均人力成本", value: yearSummary.count > 0 ? `¥${formatMoney((yearSummary.totalEmployerCost / yearSummary.count || yearSummary.totalGross / yearSummary.count))}/月` : "—", color: colors.muted },
               ].map(({ label, value, color, bold }) => (
                 <View key={label} style={{ flexDirection: "row", justifyContent: "space-between" }}>
                   <Text style={{ fontSize: 12, color: colors.muted }}>{label}</Text>
@@ -185,12 +186,12 @@ export default function LaborSalaryHistoryScreen() {
               <View style={{ alignItems: "flex-end", gap: 2 }}>
                 {slip ? (
                   <>
-                    <Text style={{ fontSize: 14, fontWeight: "700", color: deptColor }}>¥{slip.finalSalary.toFixed(0)}</Text>
+                    <Text style={{ fontSize: 14, fontWeight: "700", color: deptColor }}>¥{formatMoney(slip.finalSalary)}</Text>
                     {(slip.totalEmployerCost ?? 0) > 0 && (
-                      <Text style={{ fontSize: 10, color: colors.warning }}>公司¥{(slip.totalEmployerCost ?? 0).toFixed(0)}</Text>
+                      <Text style={{ fontSize: 10, color: colors.warning }}>公司¥{formatMoney((slip.totalEmployerCost ?? 0))}</Text>
                     )}
                     {(slip.incomeTax ?? 0) > 0 && (
-                      <Text style={{ fontSize: 10, color: colors.muted }}>税¥{(slip.incomeTax ?? 0).toFixed(0)}</Text>
+                      <Text style={{ fontSize: 10, color: colors.muted }}>税¥{formatMoney((slip.incomeTax ?? 0))}</Text>
                     )}
                   </>
                 ) : (

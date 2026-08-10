@@ -3,6 +3,7 @@
  * 支持9种报表类型自动识别 + 缺失检测 + 多文件同时导入
  */
 import React, { useState } from "react";
+import { formatMoney } from "@/lib/utils";
 import {
   Alert, ActivityIndicator, Modal, Platform, Pressable,
   ScrollView, StyleSheet, Text, TouchableOpacity, View
@@ -208,7 +209,7 @@ export default function MonthlyReportImportScreen() {
     } else {
       Alert.alert(
         "导入成功",
-        `${preview.monthLabel} 经营报告已完整导入\n营业收入 ¥${preview.kpi.revenue.toFixed(0)}\n订单量 ${preview.kpi.orderCount} 单`,
+        `${preview.monthLabel} 经营报告已完整导入\n营业收入 ¥${formatMoney(preview.kpi.revenue)}\n订单量 ${preview.kpi.orderCount} 单`,
         [
           { text: "查看分析", onPress: () => router.replace("/monthly-report" as any) },
           { text: "继续导入" },
@@ -400,12 +401,12 @@ export default function MonthlyReportImportScreen() {
               </View>
               <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
                 {[
-                  { label: "营业额", value: `¥${preview.kpi.turnover.toFixed(0)}` },
+                  { label: "营业额", value: `¥${formatMoney(preview.kpi.turnover)}` },
                   { label: "订单量", value: `${preview.kpi.orderCount}单` },
-                  { label: "优惠金额", value: `¥${preview.kpi.discountAmount.toFixed(0)}` },
+                  { label: "优惠金额", value: `¥${formatMoney(preview.kpi.discountAmount)}` },
                   { label: "菜品销量", value: `${preview.kpi.dishSalesCount}份` },
                   { label: "退菜数量", value: `${preview.kpi.returnDishCount}份` },
-                  { label: "非会员人均", value: `¥${preview.kpi.avgSpendPerPerson.toFixed(2)}` },
+                  { label: "非会员人均", value: `¥${formatMoney(preview.kpi.avgSpendPerPerson)}` },
                 ].map((item, i) => (
                   <View key={i} style={[S.previewStatCell, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                     <Text style={{ fontSize: 11, color: colors.muted }}>{item.label}</Text>
@@ -424,7 +425,7 @@ export default function MonthlyReportImportScreen() {
                     <View key={i} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 4 }}>
                       <Text style={{ fontSize: 12, color: colors.muted }}>{cat.name}</Text>
                       <Text style={{ fontSize: 12, fontWeight: "600", color: colors.foreground }}>
-                        ¥{cat.salesAmount.toFixed(0)} ({(cat.salesAmountPct * 100).toFixed(1)}%)
+                        ¥{formatMoney(cat.salesAmount)} ({(cat.salesAmountPct * 100).toFixed(1)}%)
                       </Text>
                     </View>
                   ))}
@@ -441,7 +442,7 @@ export default function MonthlyReportImportScreen() {
                     <View key={i} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 4 }}>
                       <Text style={{ fontSize: 12, color: colors.muted }}>{p.name}</Text>
                       <Text style={{ fontSize: 12, fontWeight: "600", color: colors.foreground }}>
-                        ¥{p.amount.toFixed(0)} ({(p.pct * 100).toFixed(1)}%)
+                        ¥{formatMoney(p.amount)} ({(p.pct * 100).toFixed(1)}%)
                       </Text>
                     </View>
                   ))}
@@ -455,9 +456,9 @@ export default function MonthlyReportImportScreen() {
                     日度收款（{preview.dailyRevenues.length}天）
                   </Text>
                   <Text style={{ fontSize: 12, color: colors.muted }}>
-                    最高：¥{Math.max(...preview.dailyRevenues.map((d) => d.total)).toFixed(0)} ·
-                    最低：¥{Math.min(...preview.dailyRevenues.map((d) => d.total)).toFixed(0)} ·
-                    日均：¥{(preview.dailyRevenues.reduce((s, d) => s + d.total, 0) / preview.dailyRevenues.length).toFixed(0)}
+                    最高：¥{formatMoney(Math.max(...preview.dailyRevenues.map((d) => d.total)))} ·
+                    最低：¥{formatMoney(Math.min(...preview.dailyRevenues.map((d) => d.total)))} ·
+                    日均：¥{formatMoney((preview.dailyRevenues.reduce((s, d) => s + d.total, 0) / preview.dailyRevenues.length))}
                   </Text>
                 </View>
               )}
@@ -472,7 +473,7 @@ export default function MonthlyReportImportScreen() {
                     <View key={i} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 4 }}>
                       <Text style={{ fontSize: 12, color: colors.muted, flex: 1 }} numberOfLines={1}>{d.name}</Text>
                       <Text style={{ fontSize: 12, fontWeight: "600", color: colors.foreground }}>
-                        ¥{d.salesAmount.toFixed(0)}
+                        ¥{formatMoney(d.salesAmount)}
                       </Text>
                     </View>
                   ))}

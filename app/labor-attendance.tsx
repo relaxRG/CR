@@ -11,6 +11,7 @@
  * 任何 Store 更新立即触发重渲染，无需手动刷新。
  */
 import React, { useCallback, useMemo, useState } from "react";
+import { formatMoney } from "@/lib/utils";
 import {
   Alert, Platform, ScrollView, StyleSheet,
   Text, TextInput, TouchableOpacity, View
@@ -282,7 +283,7 @@ function EmployeeCard({
             <View key={item.label} style={S.gridCell}>
               <Text style={{ fontSize: 10, color: colors.muted, marginBottom: 3 }}>{item.label}</Text>
               <Text style={{ fontSize: 14, fontWeight: "700", color: item.color }}>
-                {item.value !== 0 ? `¥${Math.abs(item.value).toFixed(0)}` : "—"}
+                {item.value !== 0 ? `¥${formatMoney(Math.abs(item.value))}` : "—"}
               </Text>
             </View>
           ))}
@@ -293,7 +294,7 @@ function EmployeeCard({
             <View key={item.label} style={S.gridCell}>
               <Text style={{ fontSize: 10, color: colors.muted, marginBottom: 3 }}>{item.label}</Text>
               <Text style={{ fontSize: 14, fontWeight: "700", color: item.color }}>
-                {item.value !== 0 ? `${item.value < 0 ? "-" : ""}¥${Math.abs(item.value).toFixed(0)}` : "—"}
+                {item.value !== 0 ? `${item.value < 0 ? "-" : ""}¥${formatMoney(Math.abs(item.value))}` : "—"}
               </Text>
             </View>
           ))}
@@ -328,13 +329,13 @@ function EmployeeCard({
             <DetailRow label="实际工时" value={`${att.totalHours.toFixed(1)} h`} colors={colors} />
             <DetailRow label="标准工时" value={`${att.stdHours.toFixed(1)} h`} colors={colors} />
             <DetailRow label="加班工时（计费）" value={`${(att.paidOvertimeHours ?? 0).toFixed(1)} h`} colors={colors} />
-            <DetailRow label="加班工资" value={att.overtimePay > 0 ? `+¥${att.overtimePay.toFixed(0)}` : "—"} colors={colors} positive={att.overtimePay > 0} />
+            <DetailRow label="加班工资" value={att.overtimePay > 0 ? `+¥${formatMoney(att.overtimePay)}` : "—"} colors={colors} positive={att.overtimePay > 0} />
             {(att.holidayWorkDays ?? 0) > 0 && <DetailRow label="节假日上班" value={`${att.holidayWorkDays} 天`} colors={colors} />}
-            <DetailRow label="节假日薪资" value={att.holidayBonus > 0 ? `+¥${att.holidayBonus.toFixed(0)}` : "—"} colors={colors} positive={att.holidayBonus > 0} />
+            <DetailRow label="节假日薪资" value={att.holidayBonus > 0 ? `+¥${formatMoney(att.holidayBonus)}` : "—"} colors={colors} positive={att.holidayBonus > 0} />
             {att.underRestDays !== 0 && <DetailRow label={att.underRestDays > 0 ? "少出勤" : "多出勤"} value={`${Math.abs(att.underRestDays)} 天`} colors={colors} negative={att.underRestDays > 0} />}
-            <DetailRow label="特殊状态扣薪" value={att.totalSpecialDeduction > 0 ? `-¥${att.totalSpecialDeduction.toFixed(0)}` : "—"} colors={colors} negative={att.totalSpecialDeduction > 0} />
-            <DetailRow label="日薪" value={`¥${att.dailyRate.toFixed(0)}`} colors={colors} />
-            <DetailRow label="总考勤工资" value={`¥${att.attendanceSalary.toFixed(0)}`} colors={colors} bold />
+            <DetailRow label="特殊状态扣薪" value={att.totalSpecialDeduction > 0 ? `-¥${formatMoney(att.totalSpecialDeduction)}` : "—"} colors={colors} negative={att.totalSpecialDeduction > 0} />
+            <DetailRow label="日薪" value={`¥${formatMoney(att.dailyRate)}`} colors={colors} />
+            <DetailRow label="总考勤工资" value={`¥${formatMoney(att.attendanceSalary)}`} colors={colors} bold />
           </View>
         ) : (
           <Text style={{ fontSize: 12, color: colors.muted, paddingVertical: 8 }}>暂无考勤数据（请先在排班表填写）</Text>
@@ -355,13 +356,13 @@ function EmployeeCard({
         </View>
         <View style={S.detailGrid}>
           {/* 补贴展示全部三项，与薪资卡片综合额外展示保持一致 */}
-          <DetailRow label="餐补" value={`¥${(slip?.mealAllowance ?? 0).toFixed(0)}`} colors={colors} />
-          <DetailRow label="交通补贴" value={`¥${(slip?.transportAllowance ?? 0).toFixed(0)}`} colors={colors} />
-          {(slip?.otherAllowance ?? 0) > 0 && <DetailRow label="其他补贴" value={`¥${(slip?.otherAllowance ?? 0).toFixed(0)}`} colors={colors} />}
-          <DetailRow label="工作绩效" value={`¥${(slip?.performanceBonus ?? 0).toFixed(0)}`} colors={colors} />
-          {(slip?.salesCommission ?? 0) > 0 && <DetailRow label="业绩提点" value={`¥${(slip?.salesCommission ?? 0).toFixed(0)}`} colors={colors} />}
+          <DetailRow label="餐补" value={`¥${formatMoney((slip?.mealAllowance ?? 0))}`} colors={colors} />
+          <DetailRow label="交通补贴" value={`¥${formatMoney((slip?.transportAllowance ?? 0))}`} colors={colors} />
+          {(slip?.otherAllowance ?? 0) > 0 && <DetailRow label="其他补贴" value={`¥${formatMoney((slip?.otherAllowance ?? 0))}`} colors={colors} />}
+          <DetailRow label="工作绩效" value={`¥${formatMoney((slip?.performanceBonus ?? 0))}`} colors={colors} />
+          {(slip?.salesCommission ?? 0) > 0 && <DetailRow label="业绩提点" value={`¥${formatMoney((slip?.salesCommission ?? 0))}`} colors={colors} />}
           {/* 综合小计 = 补贴合计 + 工作绩效 + 业绩提点，与 buildPaySlipDraft 中 grossSalary 的构成保持一致 */}
-          <DetailRow label="综合小计" value={`¥${((slip?.performanceBonus ?? 0) + (slip?.mealAllowance ?? 0) + (slip?.transportAllowance ?? 0) + (slip?.otherAllowance ?? 0) + (slip?.salesCommission ?? 0)).toFixed(0)}`} colors={colors} bold />
+          <DetailRow label="综合小计" value={`¥${formatMoney(((slip?.performanceBonus ?? 0) + (slip?.mealAllowance ?? 0) + (slip?.transportAllowance ?? 0) + (slip?.otherAllowance ?? 0) + (slip?.salesCommission ?? 0)))}`} colors={colors} bold />
         </View>
       </TouchableOpacity>
 
@@ -453,11 +454,11 @@ function EmployeeCard({
           <DetailRow label="调休余额" value="0 天" colors={colors} />
         )}
         {compOffCashOut > 0 && (
-          <DetailRow label="本月调休兑换" value={`+¥${compOffCashOut.toFixed(0)}`} colors={colors} positive />
+          <DetailRow label="本月调休兑换" value={`+¥${formatMoney(compOffCashOut)}`} colors={colors} positive />
         )}
         <DetailRow label="预支小计" value={advanceTotal > 0 ? `-¥${advanceTotal}` : "¥0"} colors={colors} negative={advanceTotal > 0} />
         {(slip?.pettyLaborPaid ?? 0) > 0 && (
-          <DetailRow label="备用金已付" value={`-¥${(slip!.pettyLaborPaid!).toFixed(0)}`} colors={colors} negative />
+          <DetailRow label="备用金已付" value={`-¥${formatMoney((slip!.pettyLaborPaid!))}`} colors={colors} negative />
         )}
       </View>
 
@@ -520,16 +521,16 @@ function EmployeeCard({
       {slip && (
         <View style={[S.section, { borderColor: colors.primary + "44", backgroundColor: colors.primary + "08" }]}>
           <Text style={[S.sectionTitle, { color: colors.primary, marginBottom: 8 }]}>薪资汇总</Text>
-          <DetailRow label="税前工资" value={`¥${slip.grossSalary.toFixed(0)}`} colors={colors} />
-          <DetailRow label="社保代缴（个人）" value={slip.socialInsuranceDeduction > 0 ? `-¥${slip.socialInsuranceDeduction.toFixed(0)}` : "—"} colors={colors} negative={slip.socialInsuranceDeduction > 0} />
-          <DetailRow label="公积金代缴（个人）" value={slip.housingFundDeduction > 0 ? `-¥${slip.housingFundDeduction.toFixed(0)}` : "—"} colors={colors} negative={slip.housingFundDeduction > 0} />
-          <DetailRow label="个税代缴" value={slip.incomeTax > 0 ? `-¥${slip.incomeTax.toFixed(0)}` : "—"} colors={colors} negative={slip.incomeTax > 0} />
+          <DetailRow label="税前工资" value={`¥${formatMoney(slip.grossSalary)}`} colors={colors} />
+          <DetailRow label="社保代缴（个人）" value={slip.socialInsuranceDeduction > 0 ? `-¥${formatMoney(slip.socialInsuranceDeduction)}` : "—"} colors={colors} negative={slip.socialInsuranceDeduction > 0} />
+          <DetailRow label="公积金代缴（个人）" value={slip.housingFundDeduction > 0 ? `-¥${formatMoney(slip.housingFundDeduction)}` : "—"} colors={colors} negative={slip.housingFundDeduction > 0} />
+          <DetailRow label="个税代缴" value={slip.incomeTax > 0 ? `-¥${formatMoney(slip.incomeTax)}` : "—"} colors={colors} negative={slip.incomeTax > 0} />
           <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 6 }} />
-          <DetailRow label="实发薪资" value={`¥${slip.finalSalary.toFixed(0)}`} colors={colors} bold primary />
+          <DetailRow label="实发薪资" value={`¥${formatMoney(slip.finalSalary)}`} colors={colors} bold primary />
           <View style={{ height: 8 }} />
-          <DetailRow label="公司社保部分" value={slip.employerSocialInsurance > 0 ? `¥${slip.employerSocialInsurance.toFixed(0)}` : "—"} colors={colors} muted />
-          <DetailRow label="公司公积金部分" value={slip.employerHousingFund > 0 ? `¥${slip.employerHousingFund.toFixed(0)}` : "—"} colors={colors} muted />
-          <DetailRow label="公司总人力成本" value={`¥${slip.totalEmployerCost.toFixed(0)}`} colors={colors} bold />
+          <DetailRow label="公司社保部分" value={slip.employerSocialInsurance > 0 ? `¥${formatMoney(slip.employerSocialInsurance)}` : "—"} colors={colors} muted />
+          <DetailRow label="公司公积金部分" value={slip.employerHousingFund > 0 ? `¥${formatMoney(slip.employerHousingFund)}` : "—"} colors={colors} muted />
+          <DetailRow label="公司总人力成本" value={`¥${formatMoney(slip.totalEmployerCost)}`} colors={colors} bold />
         </View>
       )}
     </View>

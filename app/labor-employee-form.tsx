@@ -5,6 +5,7 @@
  *     重构详细档案（身份证照片/健康证照片）+ 紧急联系方式（实际住址）
  */
 import React, { useCallback, useMemo, useState } from "react";
+import { formatMoney } from "@/lib/utils";
 import {
   ActionSheetIOS, Alert, Clipboard, Image, KeyboardAvoidingView, Linking,
   Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View
@@ -717,9 +718,9 @@ export default function LaborEmployeeFormScreen() {
                 {dailyRatePreview > 0 && (
                   <View style={[S.dailyRatePreview, { backgroundColor: colors.primary + "0e", borderColor: colors.primary + "33" }]}>
                     <Text style={{ fontSize: 12, color: colors.muted }}>日薪预览（当月）</Text>
-                    <Text style={{ fontSize: 18, fontWeight: "700", color: colors.primary }}>¥{dailyRatePreview.toFixed(2)} / 天</Text>
+                    <Text style={{ fontSize: 18, fontWeight: "700", color: colors.primary }}>¥{formatMoney(dailyRatePreview)} / 天</Text>
                     <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>
-                      ¥{Number(baseSalary).toFixed(0)} ÷ ({effectiveDivDays}天 - {restDays}休)
+                      ¥{formatMoney(Number(baseSalary))} ÷ ({effectiveDivDays}天 - {restDays}休)
                       {customDivDays ? `（自定义 ${customDivDays} 天）` : `（当月 ${daysInMonth} 天）`}
                     </Text>
                   </View>
@@ -768,7 +769,7 @@ export default function LaborEmployeeFormScreen() {
                   </View>
                   {type !== "parttime" && autoHourlyRatePreview > 0 && (
                     <Text style={{ fontSize: 11, color: colors.muted }}>
-                      自动计算参考値：¥{autoHourlyRatePreview.toFixed(2)}/小时（日薪 ÷ 平均工时）
+                      自动计算参考値：¥{formatMoney(autoHourlyRatePreview)}/小时（日薪 ÷ 平均工时）
                     </Text>
                   )}
                   {type !== "parttime" && (
@@ -1212,10 +1213,10 @@ export default function LaborEmployeeFormScreen() {
                   <View style={{ backgroundColor: colors.primary + "08", borderRadius: 10, padding: 12, gap: 4, borderWidth: 1, borderColor: colors.primary + "22" }}>
                     <Text style={{ fontSize: 11, fontWeight: "600", color: colors.primary }}>ℹ 社保计算明细（基数 ¥{siPreview.base.toLocaleString()} · {siCityInput || "—"} 2025年）</Text>
                     <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 4 }}>
-                      <Text style={{ fontSize: 12, color: colors.foreground }}>个人合计：¥{siPreview.empTotal.toFixed(0)}/月</Text>
-                      <Text style={{ fontSize: 12, color: colors.warning }}>单位合计：¥{siPreview.erTotal.toFixed(0)}/月</Text>
+                      <Text style={{ fontSize: 12, color: colors.foreground }}>个人合计：¥{formatMoney(siPreview.empTotal)}/月</Text>
+                      <Text style={{ fontSize: 12, color: colors.warning }}>单位合计：¥{formatMoney(siPreview.erTotal)}/月</Text>
                     </View>
-                    <Text style={{ fontSize: 11, color: colors.muted }}>员工实发：底薪 - ¥{siPreview.empTotal.toFixed(0)} = 到手工资减少 ¥{siPreview.empTotal.toFixed(0)}</Text>
+                    <Text style={{ fontSize: 11, color: colors.muted }}>员工实发：底薪 - ¥{formatMoney(siPreview.empTotal)} = 到手工资减少 ¥{formatMoney(siPreview.empTotal)}</Text>
                   </View>
                 )}
               </View>
@@ -1285,13 +1286,13 @@ export default function LaborEmployeeFormScreen() {
                   <View style={{ backgroundColor: colors.primary + "08", borderRadius: 10, padding: 12, gap: 4, borderWidth: 1, borderColor: colors.primary + "22" }}>
                     <Text style={{ fontSize: 11, fontWeight: "600", color: colors.primary }}>ℹ 公积金计算明细（基数 ¥{hfPreview.base.toLocaleString()} · {hfCityInput || "—"} 2025年）</Text>
                     <Text style={{ fontSize: 12, color: colors.foreground, marginTop: 4 }}>
-                      个人 ¥{hfPreview.base.toLocaleString()}×{(siConfig.housingFund.employeeRate * 100).toFixed(0)}%=¥{hfPreview.empAmount.toFixed(0)}/月
+                      个人 ¥{hfPreview.base.toLocaleString()}×{(siConfig.housingFund.employeeRate * 100).toFixed(0)}%=¥{formatMoney(hfPreview.empAmount)}/月
                     </Text>
                     <Text style={{ fontSize: 12, color: colors.warning }}>
-                      单位 ¥{hfPreview.base.toLocaleString()}×{(siConfig.housingFund.employerRate * 100).toFixed(0)}%=¥{hfPreview.erAmount.toFixed(0)}/月
+                      单位 ¥{hfPreview.base.toLocaleString()}×{(siConfig.housingFund.employerRate * 100).toFixed(0)}%=¥{formatMoney(hfPreview.erAmount)}/月
                     </Text>
-                    <Text style={{ fontSize: 12, color: colors.foreground }}>合计缴存 ¥{hfPreview.total.toFixed(0)}/月（计入员工公积金账户）</Text>
-                    <Text style={{ fontSize: 11, color: colors.muted }}>员工实发：底薪 - ¥{hfPreview.empAmount.toFixed(0)} = 到手工资减少 ¥{hfPreview.empAmount.toFixed(0)}</Text>
+                    <Text style={{ fontSize: 12, color: colors.foreground }}>合计缴存 ¥{formatMoney(hfPreview.total)}/月（计入员工公积金账户）</Text>
+                    <Text style={{ fontSize: 11, color: colors.muted }}>员工实发：底薪 - ¥{formatMoney(hfPreview.empAmount)} = 到手工资减少 ¥{formatMoney(hfPreview.empAmount)}</Text>
                   </View>
                 )}
               </View>
@@ -1356,7 +1357,7 @@ export default function LaborEmployeeFormScreen() {
                         {b.max === Infinity ? `超过 ¥${(b.min / 12).toLocaleString()}` : `¥${(b.min / 12).toLocaleString()} ~ ¥${(b.max / 12).toLocaleString()}`}
                       </Text>
                       <Text style={{ flex: 1, fontSize: 11, color: colors.primary, textAlign: "center" }}>{(b.rate * 100).toFixed(0)}%</Text>
-                      <Text style={{ flex: 1.5, fontSize: 11, color: colors.muted, textAlign: "right" }}>¥{(b.quickDeduction / 12).toFixed(0)}</Text>
+                      <Text style={{ flex: 1.5, fontSize: 11, color: colors.muted, textAlign: "right" }}>¥{formatMoney((b.quickDeduction / 12))}</Text>
                     </View>
                   ))}
                 </View>
@@ -1364,16 +1365,16 @@ export default function LaborEmployeeFormScreen() {
                 {taxPreview && (
                   <View style={{ backgroundColor: colors.primary + "08", borderRadius: 10, padding: 12, gap: 4, borderWidth: 1, borderColor: colors.primary + "22" }}>
                     <Text style={{ fontSize: 11, fontWeight: "600", color: colors.primary }}>
-                      ℹ 个税计算明细（底薪¥{taxPreview.salary.toLocaleString()} · 社保¥{taxPreview.siDeduct.toFixed(0)} · 公积金¥{taxPreview.hfDeduct.toFixed(0)}）
+                      ℹ 个税计算明细（底薪¥{taxPreview.salary.toLocaleString()} · 社保¥{formatMoney(taxPreview.siDeduct)} · 公积金¥{formatMoney(taxPreview.hfDeduct)}）
                     </Text>
                     <Text style={{ fontSize: 11, color: colors.muted, marginTop: 4 }}>
-                      ¥{taxPreview.salary.toLocaleString()} - ¥{taxPreview.threshold.toLocaleString()} - ¥{taxPreview.siDeduct.toFixed(0)} - ¥{taxPreview.hfDeduct.toFixed(0)} - ¥{taxPreview.specialDeductions} = 应纳税所得额 ¥{taxPreview.taxableIncome.toFixed(0)}
+                      ¥{taxPreview.salary.toLocaleString()} - ¥{taxPreview.threshold.toLocaleString()} - ¥{formatMoney(taxPreview.siDeduct)} - ¥{formatMoney(taxPreview.hfDeduct)} - ¥{taxPreview.specialDeductions} = 应纳税所得额 ¥{formatMoney(taxPreview.taxableIncome)}
                     </Text>
                     <Text style={{ fontSize: 11, color: colors.foreground }}>
-                      适用 {(taxPreview.bracket.rate * 100).toFixed(0)}% 档 · 应纳税额 ¥{taxPreview.monthlyTax.toFixed(0)}/月
+                      适用 {(taxPreview.bracket.rate * 100).toFixed(0)}% 档 · 应纳税额 ¥{formatMoney(taxPreview.monthlyTax)}/月
                     </Text>
                     <Text style={{ fontSize: 12, fontWeight: "600", color: colors.success }}>
-                      员工实发：¥{taxPreview.netSalary.toFixed(0)}/月
+                      员工实发：¥{formatMoney(taxPreview.netSalary)}/月
                     </Text>
                   </View>
                 )}

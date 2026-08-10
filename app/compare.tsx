@@ -6,7 +6,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
-import { displayNames } from "@/lib/utils";
+import { displayNames, formatMoney} from "@/lib/utils";
 import { useRecipeStore } from "@/lib/recipes/store";
 import { useBottleStore } from "@/lib/bottles/store";
 import { useHomemadeStore } from "@/lib/homemade/store";
@@ -210,8 +210,8 @@ export default function CompareScreen() {
               label: lang === "zh" ? "每单位成本" : "Cost/Unit",
               values: costs.map((c) =>
                 c.costPerBaseUnit !== null
-                  ? `¥${c.costPerBaseUnit.toFixed(2)}/${c.baseUnit ?? "份"}`
-                  : (c.costPer30Ml !== null ? `¥${c.costPer30Ml.toFixed(2)}/30ml` : null),
+                  ? `¥${formatMoney(c.costPerBaseUnit)}/${c.baseUnit ?? "份"}`
+                  : (c.costPer30Ml !== null ? `¥${formatMoney(c.costPer30Ml)}/30ml` : null),
               ),
               numeric: costs.map((c) => c.costPerBaseUnit ?? c.costPer30Ml),
               highlightMin: true,

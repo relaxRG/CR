@@ -2,6 +2,7 @@
  * 食材详情页
  */
 import React, { useMemo, useState } from "react";
+import { formatMoney } from "@/lib/utils";
 import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from "react-native";
 import * as Haptics from "expo-haptics";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -183,7 +184,7 @@ export default function FoodIngredientDetailScreen() {
                       <Text style={{ fontSize: 12, color: delta > 0 ? "#EF4444" : delta < 0 ? "#22C55E" : colors.muted }}>
                         {delta > 0 ? "▲" : delta < 0 ? "▼" : "—"} 最近一次
                         {delta > 0 ? "涨价" : delta < 0 ? "降价" : "持平"}
-                        {delta !== 0 ? ` ¥${Math.abs(delta).toFixed(2)} (${Math.abs(Number(pct))}%)` : ""}
+                        {delta !== 0 ? ` ¥${formatMoney(Math.abs(delta))} (${Math.abs(Number(pct))}%)` : ""}
                         {" · "}{last.date} · {last.supplier}
                       </Text>
                     </View>
