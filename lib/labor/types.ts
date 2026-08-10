@@ -1055,29 +1055,41 @@ export interface PaySlip {
   /** 员工代号快照（员工删除后仍可显示） */
   employeeCode?: string;
   attendanceDays: number;
+  /** 考勤工资（比例底薪 + 加班工资 + 节假日补偿 - 特殊扣薪）。精度：2位小数，Math.round(·×100)/100 */
   attendanceSalary: number;
+  /** 绩效奖金（工作绩效 + 业绩绩效）。精度：2位小数 */
   performanceBonus: number;
+  /** 业绩提点（营业额按比例提成）。精度：2位小数 */
   salesCommission: number;
+  /** 餐补合计（per_day 规则：餐补日单价 × 出勤天数）。精度：2位小数 */
   mealAllowance: number;
+  /** 交通补贴（固定金额，按周期发放）。精度：2位小数 */
   transportAllowance: number;
+  /** 其他补贴合计。精度：2位小数 */
   otherAllowance: number;
+  /** 奖惩小计（正数为奖励，负数为罚款）。精度：2位小数 */
   rewardPenalty: number;
   /** 奖惩明细条目（多条，替代单一 rewardPenalty） */
   rewardPenaltyItems?: RewardPenaltyItem[];
+  /** 手动预支金额（仅包含手动新增预支，不含备用金关联）。精度：2位小数 */
   advanceAmount: number;
   notes: string;
-  /** 最终薪资（税前，扣除社保个税前） */
+  /**
+   * 应发薪资（税前，扣除社保个税前）。精度：2位小数
+   * grossSalary = attendanceSalary + performanceBonus + salesCommission +
+   *              mealAllowance + transportAllowance + otherAllowance + rewardPenalty + compOffCashOut
+   */
   grossSalary: number;
-  /** 社保个人缴纳金额（自动计算，可手动覆盖） */
+  /** 社保个人缴纳金额（自动计算，可手动覆盖）。精度：2位小数 */
   socialInsuranceDeduction: number;
-  /** 公积金个人缴纳金额（自动计算，可手动覆盖） */
+  /** 公积金个人缴纳金额（自动计算，可手动覆盖）。精度：2位小数 */
   housingFundDeduction: number;
-  /** 个人所得税（累计预扣法，自动计算） */
+  /** 个人所得税（累计预扣法，自动计算）。精度：2位小数 */
   incomeTax: number;
   /**
-   * 实发薪资 = 应发 - 社保个人部分 - 公积金个人部分 - 个税 - 预支
-   * 开启社保/个税时：实发 = grossSalary - socialInsuranceDeduction - housingFundDeduction - incomeTax - advanceAmount
-   * 关闭社保/个税时：实发 = grossSalary - advanceAmount
+   * 实发薪资。精度：2位小数
+   * 公式：finalSalary = grossSalary - socialInsuranceDeduction - housingFundDeduction - incomeTax - advanceAmount - pettyLaborPaid
+   * 展示时预支合计：advanceAmount + pettyLaborPaid（手动预支 + 备用金关联）
    */
   finalSalary: number;
   /** 公司承担社保总额（养老+医疗+失业+工伤+生育，公司部分） */
@@ -1152,8 +1164,9 @@ export interface PaySlip {
   /** 调休兑现备注（如"兑现X天加班换休余额，日薪¥XX"） */
   compOffCashOutNote?: string;
   /**
-   * 备用金人工已付金额（来自备用金关联记录，自动同步）
-   * 展示在薪资单「备用金已付」一栏
+   * 备用金人工已付金额（来自备用金关联记录，自动同步）。精度：2位小数
+   * 展示时与 advanceAmount 合并计算：已预支 = advanceAmount + pettyLaborPaid
+   * 计入 finalSalary 公式：finalSalary = grossSalary - ... - advanceAmount - pettyLaborPaid
    */
   pettyLaborPaid?: number;
   /** 备用金人工已付明细（关联的 PettyCashLaborLink ID 列表） */
