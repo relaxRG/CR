@@ -3587,7 +3587,10 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   // - advances 变化（预支新增/删除）→ 立即重算对应员工的 finalSalary
   // compOffEntriesSched/holidayCompOffEntriesSched 变化（存入/兑换调休）→ 重算加班费
   // （compOffCount 影响 paidOvertimeHours 和 overtimePay）
-  }, [shifts, currentMonth, employees, advances, compOffEntriesSched, holidayCompOffEntriesSched]);
+  // 修复：将 globalSettings 和 specialStatuses 加入依赖数组
+  // 用户修改全局社保/个税配置或特殊状态配置后，autoSync 会立即重算所有员工薪资
+  // 不会导致无限循环，因为 autoSync 写入 paySlips，而 paySlips 不在依赖数组中
+  }, [shifts, currentMonth, employees, advances, compOffEntriesSched, holidayCompOffEntriesSched, globalSettings, specialStatuses]);
 
   const sortedTemplates = useMemo(() =>
     [...(templates.length > 0 ? templates : DEFAULT_SHIFT_TEMPLATES)].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)),
