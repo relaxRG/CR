@@ -37,7 +37,7 @@ fi
 
 echo "✅ 已登录 EAS: $(eas whoami)"
 
-# 检查凭证文件
+# 检查凭证文件（与 credentials.json 保持一致）
 CREDS_DIR="$HOME/.apple-creds"
 if [ ! -f "$CREDS_DIR/AuthKey_SS7N6Q2U48.p8" ]; then
   echo ""
@@ -45,16 +45,16 @@ if [ ! -f "$CREDS_DIR/AuthKey_SS7N6Q2U48.p8" ]; then
   echo "   请将 AuthKey_SS7N6Q2U48.p8 放置到 $CREDS_DIR/"
 fi
 
-if [ ! -f "$CREDS_DIR/new_profile.mobileprovision" ]; then
+if [ ! -f "$CREDS_DIR/profile_eas.mobileprovision" ]; then
   echo ""
   echo "⚠️  缺少 Provisioning Profile 文件"
-  echo "   请将 new_profile.mobileprovision 放置到 $CREDS_DIR/"
+  echo "   请将 profile_eas.mobileprovision 放置到 $CREDS_DIR/"
 fi
 
-if [ ! -f "$CREDS_DIR/distribution_macos.p12" ]; then
+if [ ! -f "$CREDS_DIR/distribution_eas.p12" ]; then
   echo ""
   echo "⚠️  缺少 Distribution Certificate 文件"
-  echo "   请将 distribution_macos.p12 放置到 $CREDS_DIR/"
+  echo "   请将 distribution_eas.p12 放置到 $CREDS_DIR/"
 fi
 
 echo ""

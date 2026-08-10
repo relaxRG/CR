@@ -6,7 +6,7 @@
 |------|-----|
 | App 名称 | cocktail R |
 | Bundle ID | com.app.cocktailrecipes |
-| Build Number | 115 (EAS remote auto-increment) |
+| Build Number | 139（app.config.ts，EAS autoIncrement 自动递增） |
 | App Store Connect App ID | 6788653669 |
 | EAS Project ID | 3ab89cc0-c646-4fb8-bceb-ba24204a8811 |
 | EAS Owner | rgsds-team |
@@ -21,8 +21,8 @@
 | 文件 | 说明 |
 |------|------|
 | `AuthKey_SS7N6Q2U48.p8` | App Store Connect API Key（用于自动提交 TestFlight） |
-| `new_profile.mobileprovision` | iOS Distribution Provisioning Profile |
-| `distribution_macos.p12` | Distribution Certificate（密码：expo123） |
+| `profile_eas.mobileprovision` | iOS Distribution Provisioning Profile |
+| `distribution_eas.p12` | Distribution Certificate（密码见 credentials.json） |
 
 > **注意**：以上凭证文件需要从 Apple Developer Portal 下载，或从上一次构建的备份中恢复。
 
@@ -93,7 +93,29 @@ xcrun altool --upload-app -f <path-to.ipa> \
 }
 ```
 
-## Build 133/134 更新内容（TestFlight 说明）
+## Build 135/139 更新内容（TestFlight 说明）
+
+### Build 135/139 — 月报系统 v2 续 + 员工管理重构
+
+**月报系统**
+- 货款 Tab 独立分组展示（食材/烈酒/葡萄酒/其他供应商）
+- 手工新增/删除货款卡片
+- 工资小计区域（应发/待发汇总）
+- 科目行长按菜单（标记/取消重复）
+
+**员工管理**
+- 排班表手动维护班次组员工列表
+- 历史快照系统
+- 薪资总览即时同步 + 底部四按钮
+- 员工档案卡页面
+
+**工程质量**
+- TypeScript 0 错误
+- vitest 624/625 通过（1 skipped）
+
+---
+
+## Build 133/134 更新内容（历史参考）
 
 ### Build 133 — 员工管理系统全面重构
 
