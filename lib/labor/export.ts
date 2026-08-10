@@ -59,9 +59,13 @@ function weekdayLabel(dateStr: string): string {
  * 从 MonthlyAttendance 计算「比例底薪」
  * 与薪资卡片 PaySlipMiniCard 保持完全一致：
  *   proportionalBase = attendanceSalary - overtimePay - holidayBonus + specialDeduction
+ *
+ * 专业规则：无出勤或应出勤为0时，直接返回0，避免反推公式在边界情况下产生异常值
  */
 function calcProportionalBase(att: MonthlyAttendance | undefined, slip: PaySlip | undefined): number {
-  if (!slip) return 0;
+  if (!slip || !att) return 0;
+  // 无出勤直接返回 0
+  if (att.attendanceDays <= 0 || att.expectedAttendanceDays <= 0) return 0;
   const specialDeduction = att?.totalSpecialDeduction ?? 0;
   const overtimePay = att?.overtimePay ?? 0;
   const holidayBonus = att?.holidayBonus ?? 0;

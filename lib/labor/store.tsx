@@ -13,7 +13,7 @@ import {
   CompOffBalanceEntry, HolidayCompOffEntry, UnexplainedRestAlert,
   CustomDept, BusinessHoursEntry, ShiftGroup, FillPreset,
   ScheduleSnapshot, DeptCategory,
-  calcDailyRate, calcAllowance, calcSocialInsurance, calcIncomeTax,
+  calcDailyRate, calcProportionalBase, calcAllowance, calcSocialInsurance, calcIncomeTax,
   shouldPayAllowanceThisMonth,
   getDaysInMonth, parseMonth, getContractHoursForDate,
   calcCompOffExpiresMonth, getAvailableCompOffDays,
@@ -785,9 +785,10 @@ function AttendanceProvider({ children }: { children: React.ReactNode }) {
       }
     } else {
       // 按实际出勤天数比例计算底薪
-      const proportionalBase = expectedAttendanceDays > 0
+      // 专业规则：无出勤(attendanceDays=0)或应出勤为0时，比例底薪=0
+      const proportionalBase = (expectedAttendanceDays > 0 && attendanceDays > 0)
         ? Math.round((employee.baseSalary * attendanceDays / expectedAttendanceDays) * 100) / 100
-        : employee.baseSalary;
+        : 0;
       // 考勤工资 = 比例底薪 + 加班工资 + 特殊状态额外调整 + 节日补偿
       // totalSpecialDeduction 是额外惩罚（无来源多休已通过比例底薪自然体现）
       attendanceSalary = Math.round(

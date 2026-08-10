@@ -478,9 +478,11 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
 
       {/* ─── 5格摘要行（收起/展开都显示）─── */}
       {(() => {
-        // 比例底薪 = attendanceSalary - overtimePay - holidayBonus + specialDeduction
+        // 比例底薪：无出勤时直接显示0，有出勤时通过反推公式计算
         const _specialDed = att ? Object.values(att.specialStatusDeductions ?? {}).reduce((s, d) => s + d.deduction, 0) : 0;
-        const baseSalary = slip ? Math.round((slip.attendanceSalary - (att?.overtimePay ?? 0) - (att?.holidayBonus ?? 0) + _specialDed) * 100) / 100 : null;
+        const baseSalary = (!att || att.attendanceDays <= 0 || att.expectedAttendanceDays <= 0)
+          ? 0
+          : slip ? Math.round((slip.attendanceSalary - (att?.overtimePay ?? 0) - (att?.holidayBonus ?? 0) + _specialDed) * 100) / 100 : null;
         const overtimeAndHoliday = (att?.overtimePay ?? 0) + (att?.holidayBonus ?? 0);
         const allowanceSum = slip ? (slip.mealAllowance ?? 0) + (slip.transportAllowance ?? 0) + (slip.otherAllowance ?? 0) : 0;
         const extraTotal = slip ? (slip.performanceBonus ?? 0) + allowanceSum + (slip.rewardPenalty ?? 0) : 0;
@@ -518,13 +520,14 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
 
           {/* ─── 考勤明细（5格）─── */}
           {(() => {
-            // 比例底薪 = slip.attendanceSalary - overtimePay - holidayBonus - specialDeduction
-            // 即：底薪 × (出勤/应出勤)，不含任何加成或扣扣
+            // 比例底薪：无出勤时直接为0，有出勤时通过反推公式计算
             const specialDeduction = att ? Object.values(att.specialStatusDeductions ?? {}).reduce((s, d) => s + d.deduction, 0) : 0;
             const overtimePay = att?.overtimePay ?? 0;
             const holidayPay = att?.holidayBonus ?? 0;
             // 比例底薪（不含加班费/节假日费/特殊扣薪）
-            const proportionalBase = slip ? Math.round((slip.attendanceSalary - overtimePay - holidayPay + specialDeduction) * 100) / 100 : 0;
+            const proportionalBase = (!att || att.attendanceDays <= 0 || att.expectedAttendanceDays <= 0)
+              ? 0
+              : slip ? Math.round((slip.attendanceSalary - overtimePay - holidayPay + specialDeduction) * 100) / 100 : 0;
             const attTotal = slip?.attendanceSalary ?? 0;
             return (
               <View style={{ gap: 6, paddingBottom: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border + "44" }}>
@@ -4285,7 +4288,11 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                     {/* ─── 4格薄资摘要行（收起/展开都显示）─── */}
                     {(() => {
                       const slip = paySlips.find((s) => s.employeeId === emp.id && s.month === currentMonthStr) ?? null;
-                      const baseSal = slip ? Math.round((slip.attendanceSalary - (att.overtimePay ?? 0) - (att.holidayBonus ?? 0)) * 100) / 100 : null;
+                      // 修复口径不一致：加回 specialDeduction，并增加零出勤防护
+                      const _specDed = Object.values(att.specialStatusDeductions ?? {}).reduce((s, d) => s + d.deduction, 0);
+                      const baseSal = (att.attendanceDays <= 0 || att.expectedAttendanceDays <= 0)
+                        ? 0
+                        : slip ? Math.round((slip.attendanceSalary - (att.overtimePay ?? 0) - (att.holidayBonus ?? 0) + _specDed) * 100) / 100 : null;
                       const otPay = att.overtimePay ?? 0;
                       const holPay = att.holidayBonus ?? 0;
                       const total = att.attendanceSalary;

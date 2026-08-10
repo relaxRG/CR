@@ -1198,6 +1198,23 @@ export function calcDailyRate(baseSalary: number, daysInMonth: number, restDays:
 }
 
 /**
+ * 计算比例底薪（统一入口，消除多处反推公式不一致）
+ *
+ * 专业规则：
+ * 1. 无出勤（attendanceDays=0）→ 返回 0
+ * 2. 应出勤天数为 0（配置异常）→ 返回 0
+ * 3. 正常情况 → baseSalary × (attendanceDays / expectedAttendanceDays)
+ */
+export function calcProportionalBase(
+  baseSalary: number,
+  attendanceDays: number,
+  expectedAttendanceDays: number
+): number {
+  if (attendanceDays <= 0 || expectedAttendanceDays <= 0) return 0;
+  return Math.round((baseSalary * attendanceDays / expectedAttendanceDays) * 100) / 100;
+}
+
+/**
  * 获取某员工某天的合同工时
  * 优先级：weeklyHoursRules（灵活工时规则）> stdHoursPerDay（默认工时）
  */
