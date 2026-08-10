@@ -486,16 +486,19 @@ export default function LaborEmployeeFormScreen() {
       dept: (customDepts.find((d) => d.id === selectedDeptId)?.category ?? "front") as EmployeeDept,
       customDeptId: selectedDeptId,
       type, active, notes: notes.trim(),
+      // 兼职员工：baseSalary 仅在按天结算时为日薪，按小时结算时为 0
       baseSalary: Number(baseSalary) || 0,
-      // stdHoursPerDay 保留字段向后兼容，但 UI 已删除输入框，全部改用灵活工时规则
+      // stdHoursPerDay 保留字段向后兼容
       stdHoursPerDay: 0,
-      restDaysPerMonth: Number(restDays) || 4,
+      // 兼职员工不依赖月休息天数，设为 0 避免影响 expectedAttendanceDays 计算
+      restDaysPerMonth: (type === "parttime" || type === "longterm_parttime") ? 0 : (Number(restDays) || 4),
       // 正常时薪（仅作参考展示，不参与实际计算）
       hourlyRate: Number(hourlyRate) || 0,
-      // 加班时薪（实际计算依据：加班工资、调休兑现、兼职工资均使用此字段）
+      // 加班时薪 / 兼职时薪（实际计算依据）
       overtimeHourlyRate: Number(overtimeRate) || Number(hourlyRate) || 0,
-      weeklyHoursRules: weeklyHoursRules.length > 0 ? weeklyHoursRules : undefined,
-      // 兼职计费模式：仅 parttime 类型有效，其他类型不保存
+      // 兼职员工不需要灵活工时规则（无合同工时概念）
+      weeklyHoursRules: (type === "parttime" || type === "longterm_parttime") ? undefined : (weeklyHoursRules.length > 0 ? weeklyHoursRules : undefined),
+      // 兼职计费模式
       parttimeMode: (type === "parttime" || type === "longterm_parttime") ? parttimeMode : undefined,
       compOffRule: { enabled: compOffEnabled, hoursPerDay: Number(compOffHoursPerDay) || 8 },
       allowanceRules: allowanceRules.length > 0 ? allowanceRules : undefined,

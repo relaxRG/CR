@@ -110,30 +110,34 @@ export function validatePayrollData(
     }
   }
 
-  // V003: 出勤超应出勤（超过150%）
-  if (attendance.expectedAttendanceDays > 0 && attendance.attendanceDays > attendance.expectedAttendanceDays * 1.5) {
-    results.push({
-      ruleId: "V003",
-      severity: "warning",
-      employeeId: employee.id,
-      employeeName: name,
-      month,
-      message: `${name} 出勤 ${attendance.attendanceDays} 天，超过应出勤 ${attendance.expectedAttendanceDays} 天的 150%`,
-      suggestion: "请确认排班数据是否正确，是否有重复录入",
-    });
+  // V003: 出勤超应出勤（超过150%）—— 仅对全职员工有意义，兼职无“应出勤”概念
+  if (employee.type !== "parttime" && employee.type !== "longterm_parttime") {
+    if (attendance.expectedAttendanceDays > 0 && attendance.attendanceDays > attendance.expectedAttendanceDays * 1.5) {
+      results.push({
+        ruleId: "V003",
+        severity: "warning",
+        employeeId: employee.id,
+        employeeName: name,
+        month,
+        message: `${name} 出勤 ${attendance.attendanceDays} 天，超过应出勤 ${attendance.expectedAttendanceDays} 天的 150%`,
+        suggestion: "请确认排班数据是否正确，是否有重复录入",
+      });
+    }
   }
 
-  // V004: 底薪配置异常
-  if (employee.restDaysPerMonth >= daysInMonth) {
-    results.push({
-      ruleId: "V004",
-      severity: "error",
-      employeeId: employee.id,
-      employeeName: name,
-      month,
-      message: `${name} 每月休息天数(${employee.restDaysPerMonth}) ≥ 当月天数(${daysInMonth})，配置异常`,
-      suggestion: "请修改员工档案中的每月休息天数",
-    });
+  // V004: 底薪配置异常—— 仅对全职员工有意义，兼职不依赖 restDaysPerMonth
+  if (employee.type !== "parttime" && employee.type !== "longterm_parttime") {
+    if (employee.restDaysPerMonth >= daysInMonth) {
+      results.push({
+        ruleId: "V004",
+        severity: "error",
+        employeeId: employee.id,
+        employeeName: name,
+        month,
+        message: `${name} 每月休息天数(${employee.restDaysPerMonth}) ≥ 当月天数(${daysInMonth})，配置异常`,
+        suggestion: "请修改员工档案中的每月休息天数",
+      });
+    }
   }
 
   // V005: 排班无工时（非特殊状态的排班应有工时）
