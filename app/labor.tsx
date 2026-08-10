@@ -4032,45 +4032,45 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                             ))}
                           </View>
                         </View>
-                        {/* ─── 分区二：加班明细（有加班时显示）─── */}
-                        {att.overtimeHours > 0 && (
-                          <View style={{ gap: 6, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border + "44" }}>
-                            <Text style={{ fontSize: 10, fontWeight: "600", color: colors.muted }}>▼ 加班明细（有加班时显示）</Text>
-                            <View style={{ flexDirection: "row" }}>
-                              {[
-                                { label: "总加班", value: `${att.overtimeHours.toFixed(1)}h`, color: colors.warning },
-                                { label: "换休天数", value: att.compOffCount > 0 ? `${att.compOffCount}天` : "—", color: colors.primary },
-                                { label: "计费时长", value: `${att.paidOvertimeHours.toFixed(1)}h`, color: colors.foreground },
-                                { label: "加班费", value: att.overtimePay > 0 ? `+￥${att.overtimePay.toFixed(0)}` : "—", color: att.overtimePay > 0 ? colors.success : colors.muted },
-                              ].map(({ label, value, color }) => (
-                                <View key={label} style={{ flex: 1, alignItems: "center" }}>
-                                  <Text numberOfLines={1} style={{ fontSize: 11, fontWeight: "700", color }}>{value}</Text>
-                                  <Text numberOfLines={1} style={{ fontSize: 9, color: colors.muted, marginTop: 1 }}>{label}</Text>
-                                </View>
-                              ))}
-                            </View>
+                        {/* ─── 分区二：加班明细（始终显示）─── */}
+                        <View style={{ gap: 6, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border + "44" }}>
+                          <Text style={{ fontSize: 10, fontWeight: "600", color: colors.muted }}>▼ 加班明细</Text>
+                          <View style={{ flexDirection: "row" }}>
+                            {[
+                              { label: "总加班", value: att.overtimeHours > 0 ? `${att.overtimeHours.toFixed(1)}h` : "—", color: att.overtimeHours > 0 ? colors.warning : colors.muted },
+                              { label: "换休天数", value: att.compOffCount > 0 ? `${att.compOffCount}天` : "—", color: att.compOffCount > 0 ? colors.primary : colors.muted },
+                              { label: "计费时长", value: att.paidOvertimeHours > 0 ? `${att.paidOvertimeHours.toFixed(1)}h` : "—", color: att.paidOvertimeHours > 0 ? colors.foreground : colors.muted },
+                              { label: "加班费", value: att.overtimePay > 0 ? `+￥${att.overtimePay.toFixed(0)}` : "—", color: att.overtimePay > 0 ? colors.success : colors.muted },
+                            ].map(({ label, value, color }) => (
+                              <View key={label} style={{ flex: 1, alignItems: "center" }}>
+                                <Text numberOfLines={1} style={{ fontSize: 11, fontWeight: "700", color }}>{value}</Text>
+                                <Text numberOfLines={1} style={{ fontSize: 9, color: colors.muted, marginTop: 1 }}>{label}</Text>
+                              </View>
+                            ))}
+                          </View>
+                          {att.overtimeHours > 0 && (
                             <Text style={{ fontSize: 10, color: colors.muted }}>
                               {`加班 ${att.overtimeHours.toFixed(1)}h`}
                               {att.compOffCount > 0 ? ` → 换休 ${att.compOffCount}天(${(att.compOffCount * (att.hoursPerCompOff ?? 8)).toFixed(0)}h)` : ""}
                               {` → 计费 ${att.paidOvertimeHours.toFixed(1)}h`}
                               {att.overtimePay > 0 ? ` → +￥${att.overtimePay.toFixed(0)}` : ""}
                             </Text>
-                          </View>
-                        )}
-                        {/* ─── 分区三：节假日明细（有节假日上班时显示）─── */}
-                        {(att.holidayWorkDays ?? 0) > 0 && (() => {
+                          )}
+                        </View>
+                        {/* ─── 分区三：节假日明细（始终显示）─── */}
+                        {(() => {
                           const slip = paySlips.find((s) => s.employeeId === emp.id && s.month === currentMonthStr) ?? null;
                           const hwDays = att.holidayWorkDays ?? 0;
                           const hrDays = slip ? Object.values(slip.holidayBonusAllocation ?? {}).filter((a: any) => a.mode === "rest").length : 0;
                           const hcDays = hwDays - hrDays;
                           return (
                             <View style={{ gap: 6, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border + "44" }}>
-                              <Text style={{ fontSize: 10, fontWeight: "600", color: colors.muted }}>▼ 节假日明细（有节假日上班时显示）</Text>
+                              <Text style={{ fontSize: 10, fontWeight: "600", color: colors.muted }}>▼ 节假日明细</Text>
                               <View style={{ flexDirection: "row" }}>
                                 {[
-                                  { label: "节假日", value: `${hwDays}天`, color: "#FF2D55" },
-                                  { label: "换休天数", value: hrDays > 0 ? `${hrDays}天` : "—", color: colors.primary },
-                                  { label: "拿錢天数", value: hcDays > 0 ? `${hcDays}天` : "—", color: colors.success },
+                                  { label: "节假日", value: hwDays > 0 ? `${hwDays}天` : "—", color: hwDays > 0 ? "#FF2D55" : colors.muted },
+                                  { label: "换休天数", value: hrDays > 0 ? `${hrDays}天` : "—", color: hrDays > 0 ? colors.primary : colors.muted },
+                                  { label: "拿钱天数", value: hcDays > 0 ? `${hcDays}天` : "—", color: hcDays > 0 ? colors.success : colors.muted },
                                   { label: "节假日薪资", value: att.holidayBonus > 0 ? `+￥${att.holidayBonus.toFixed(0)}` : "—", color: att.holidayBonus > 0 ? "#FF2D55" : colors.muted },
                                 ].map(({ label, value, color }) => (
                                   <View key={label} style={{ flex: 1, alignItems: "center" }}>
@@ -4079,12 +4079,14 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                                   </View>
                                 ))}
                               </View>
-                              <Text style={{ fontSize: 10, color: colors.muted }}>
-                                {`节日上班 ${hwDays}天`}
-                                {hrDays > 0 ? ` → 换休 ${hrDays}天` : ""}
-                                {hcDays > 0 ? ` · 拿錢 ${hcDays}天` : ""}
-                                {att.holidayBonus > 0 ? ` → +￥${att.holidayBonus.toFixed(0)}` : ""}
-                              </Text>
+                              {hwDays > 0 && (
+                                <Text style={{ fontSize: 10, color: colors.muted }}>
+                                  {`节日上班 ${hwDays}天`}
+                                  {hrDays > 0 ? ` → 换休 ${hrDays}天` : ""}
+                                  {hcDays > 0 ? ` · 拿钱 ${hcDays}天` : ""}
+                                  {att.holidayBonus > 0 ? ` → +￥${att.holidayBonus.toFixed(0)}` : ""}
+                                </Text>
+                              )}
                             </View>
                           );
                         })()}
