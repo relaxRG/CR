@@ -224,7 +224,7 @@ function OverviewCard({ month, colors }: { month: string; colors: any }) {
         <View style={[OV.divider, { backgroundColor: colors.border }]} />
         <View style={OV.item}>
           <Text style={[OV.label, { color: colors.muted }]}>薪资合计</Text>
-          <Text style={[OV.value, { color: colors.foreground }]}>
+          <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={[OV.value, { color: colors.foreground }]}>
             {totalSalary > 0 ? `¥${formatMoney(totalSalary)}` : "—"}
           </Text>
           {diffSalary !== null && (
@@ -236,14 +236,14 @@ function OverviewCard({ month, colors }: { month: string; colors: any }) {
         <View style={[OV.divider, { backgroundColor: colors.border }]} />
         <View style={OV.item}>
           <Text style={[OV.label, { color: colors.muted }]}>已发</Text>
-          <Text style={[OV.value, { color: colors.foreground }]}>
+          <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={[OV.value, { color: colors.foreground }]}>
             {totalSalary - totalPending > 0 ? `¥${formatMoney((totalSalary - totalPending))}` : "—"}
           </Text>
         </View>
         <View style={[OV.divider, { backgroundColor: colors.border }]} />
         <View style={OV.item}>
           <Text style={[OV.label, { color: colors.muted }]}>待发</Text>
-          <Text style={[OV.value, { color: totalPending > 0 ? colors.error : colors.muted }]}>
+          <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={[OV.value, { color: totalPending > 0 ? colors.error : colors.muted }]}>
             {totalPending > 0 ? `¥${formatMoney(totalPending)}` : "—"}
           </Text>
         </View>
@@ -508,7 +508,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
               { label: "总工资", value: finalSalary !== null ? `¥${formatMoney(finalSalary)}` : "—", color: deptColor },
             ].map(({ label, value, color }) => (
               <View key={label} style={{ flex: 1, alignItems: "center" }}>
-                <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: "800", color }}>{value}</Text>
+                <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ fontSize: 12, fontWeight: "800", color }}>{value}</Text>
                 <Text numberOfLines={1} style={{ fontSize: 9, color: colors.muted, marginTop: 2 }}>{label}</Text>
               </View>
             ))}
@@ -558,7 +558,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
                 <View style={{ flexDirection: "row" }}>
                   {items.map(({ label, value, color }) => (
                     <View key={label} style={{ flex: 1, alignItems: "center" }}>
-                      <Text numberOfLines={1} style={{ fontSize: 11, fontWeight: "700", color }}>{value}</Text>
+                      <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ fontSize: 11, fontWeight: "700", color }}>{value}</Text>
                       <Text numberOfLines={1} style={{ fontSize: 9, color: colors.muted, marginTop: 1 }}>{label}</Text>
                     </View>
                   ))}
@@ -586,9 +586,9 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
                     { label: "业绩提点", value: revenueKPI > 0 ? `+¥${formatMoney(revenueKPI)}` : "—", color: revenueKPI > 0 ? colors.success : colors.muted },
                     { label: "奖惩小计", value: reward !== 0 ? `${reward >= 0 ? "+" : ""}¥${formatMoney(reward)}` : "—", color: reward > 0 ? colors.success : reward < 0 ? colors.error : colors.muted },
                     { label: "综合小计", value: `${extraTotal >= 0 ? "+" : ""}¥${formatMoney(extraTotal)}`, color: extraTotal >= 0 ? colors.primary : colors.error },
-                  ].map(({ label, value, color }) => (
+                                    ].map(({ label, value, color }) => (
                     <View key={label} style={{ flex: 1, alignItems: "center" }}>
-                      <Text numberOfLines={1} style={{ fontSize: 11, fontWeight: "700", color }}>{value}</Text>
+                      <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ fontSize: 11, fontWeight: "700", color }}>{value}</Text>
                       <Text numberOfLines={1} style={{ fontSize: 9, color: colors.muted, marginTop: 1 }}>{label}</Text>
                     </View>
                   ))}
@@ -596,7 +596,6 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
               </View>
             );
           })()}
-
           {/* ─── 扣款（5格）─── */}
           {slip && (() => {
             const advance = (slip.advanceAmount ?? 0) + (slip.pettyLaborPaid ?? 0);
@@ -615,9 +614,9 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
                     { label: "公积金代扣", value: hf > 0 ? `-¥${formatMoney(hf)}` : "—", color: hf > 0 ? colors.error : colors.muted },
                     { label: "个税代缴", value: tax > 0 ? `-¥${formatMoney(tax)}` : "—", color: tax > 0 ? colors.error : colors.muted },
                     { label: "—", value: "—", color: colors.muted },
-                  ].map(({ label, value, color }) => (
+                                    ].map(({ label, value, color }) => (
                     <View key={label} style={{ flex: 1, alignItems: "center" }}>
-                      <Text numberOfLines={1} style={{ fontSize: 11, fontWeight: "700", color }}>{value}</Text>
+                      <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ fontSize: 11, fontWeight: "700", color }}>{value}</Text>
                       <Text numberOfLines={1} style={{ fontSize: 9, color: colors.muted, marginTop: 1 }}>{label}</Text>
                     </View>
                   ))}
@@ -625,7 +624,6 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
               </View>
             );
           })()}
-
           {/* ─── 实发薪资 + 公司社保公积金─── */}
           {slip && (
             <View style={{ paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border + "44" }}>
@@ -4349,7 +4347,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                             { label: "总考勤工资", value: `￥${formatMoney(total)}`, color: DEPT_COLORS[emp.dept] },
                           ].map(({ label, value, color }) => (
                             <View key={label} style={{ flex: 1, alignItems: "center" }}>
-                              <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: "800", color }}>{value}</Text>
+                              <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ fontSize: 12, fontWeight: "800", color }}>{value}</Text>
                               <Text numberOfLines={1} style={{ fontSize: 9, color: colors.muted, marginTop: 2 }}>{label}</Text>
                             </View>
                           ))}
@@ -5150,7 +5148,7 @@ const OV = StyleSheet.create({
   item: { flex: 1, alignItems: "center" },
   divider: { width: StyleSheet.hairlineWidth, height: 32 },
   label: { fontSize: 10, marginBottom: 3 },
-  value: { fontSize: 18, fontWeight: "800" },
+  value: { fontSize: 16, fontWeight: "800" },
   unit: { fontSize: 12, fontWeight: "400" },
   compareRow: { flexDirection: "row", alignItems: "center", paddingTop: 8, marginTop: 8, borderTopWidth: StyleSheet.hairlineWidth },
 });
