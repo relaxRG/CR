@@ -2527,6 +2527,13 @@ function SchHoursModal({ visible, date, employee, session, existing, contractHou
   const handleSave = () => {
     // 只改工时，保留原有班次；若格子无排班则用当前行 session 创建
     const hv = hoursInput ? (Number(hoursInput) || null) : null;
+    // 修复 Bug：工时为空且无特殊状态时，应删除记录（而不是保留 hoursValue=null 的空记录）
+    // 原因：空记录会导致 groupedScheduleRows 中员工仍然出现在排班表，且考勤统计可能引用旧数据
+    if (hv === null && !existing?.specialStatusId) {
+      onClear();
+      onClose();
+      return;
+    }
     onSave({ employeeId: employee.id, date, shift: existing?.shift ?? session, hoursValue: hv, specialStatusId: undefined });
     onClose();
   };
@@ -3410,9 +3417,11 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
         if (!tpl) continue;
         coveredTplIds.add(tpl.id);
         // 从 shifts 推导：当月有该班次 ShiftEntry 的员工自动显示
+        // 修复 Bug：过滤掉 hoursValue=null 且无特殊状态的空记录（历史遗留的无效记录）
         const empIdsWithShifts = new Set(
           monthShifts
-            .filter((s) => s.shift === tpl.session && allDeptEmployees.some((e) => e.id === s.employeeId))
+            .filter((s) => s.shift === tpl.session && allDeptEmployees.some((e) => e.id === s.employeeId)
+              && (s.hoursValue !== null || s.specialStatusId != null))
             .map((s) => s.employeeId)
         );
         // 加上「待添加」员工（通过选人面板勾选但还没有排班数据）
@@ -3427,9 +3436,11 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
     for (const tpl of sortedTemplates) {
       if (coveredTplIds.has(tpl.id)) continue;
       const grpId = "__ungrouped_" + tpl.id;
+      // 修复 Bug：过滤掉 hoursValue=null 且无特殊状态的空记录
       const empIdsWithShifts = new Set(
         monthShifts
-          .filter((s) => s.shift === tpl.session && allDeptEmployees.some((e) => e.id === s.employeeId))
+          .filter((s) => s.shift === tpl.session && allDeptEmployees.some((e) => e.id === s.employeeId)
+            && (s.hoursValue !== null || s.specialStatusId != null))
           .map((s) => s.employeeId)
       );
       const pendingKey = `${currentMonth}|${deptCategory}|${grpId}|${tpl.id}`;
