@@ -360,6 +360,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
 
   // ── 增加：按加班小时存入 ──
   const handleAddByHours = () => {
+    if (!canWrite) { Alert.alert("已锁定", "本月已确认发薪，如需修改请先进入差额调整模式。"); return; }
     const hours = Number(compOffHoursInput) || 8;
     if (hours < 4) { Alert.alert("最少需4小时加班"); return; }
     const days = hours >= 8 ? 1 : 0.5;
@@ -378,6 +379,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
   };
   // ── 增加：直接增加天数（不消耗加班时间）──
   const handleAddByDays = () => {
+    if (!canWrite) { Alert.alert("已锁定", "本月已确认发薪，如需修改请先进入差额调整模式。"); return; }
     const days = parseFloat(addDaysInput);
     if (isNaN(days) || days <= 0) { Alert.alert("请输入有效天数"); return; }
     addCompOffEntry({
@@ -394,6 +396,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
   };
   // ── 减少：直接扣除天数（不产生金额）──
   const handleDeductDirect = () => {
+    if (!canWrite) { Alert.alert("已锁定", "本月已确认发薪，如需修改请先进入差额调整模式。"); return; }
     const days = parseFloat(deductDaysInput);
     if (isNaN(days) || days <= 0) { Alert.alert("请输入有效天数"); return; }
     const avail = getCompOffEntries(employee.id)
@@ -412,6 +415,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
   };
   // ── 减少：兑换现金（加班换休按加班时薪×小时，节假日换休按日薪）──
   const handleCashOut = (entry: ReturnType<typeof getCompOffEntries>[number]) => {
+    if (!canWrite) { Alert.alert("已锁定", "本月已确认发薪，如需修改请先进入差额调整模式。"); return; }
     // 修复：调休兑现统一使用 overtimeHourlyRate（加班时薪），与加班工资计算保持一致
     const overtimeHourlyRate = employee.overtimeHourlyRate ?? employee.hourlyRate ?? 0;
     const dailyRate = att?.dailyRate ?? 0;
@@ -679,7 +683,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
                       <Text numberOfLines={1} style={{ fontSize: 9, color: colors.muted, marginTop: 1 }}>{label}</Text>
                     </View>
                   ))}
-                  <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); tap(); setPanelMode("add"); setAddMode("hours"); setShowCompOffModal(!showCompOffModal); }}
+                  <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); if (!canWrite) { Alert.alert("已锁定", "本月已确认发薪，如需修改请先进入差额调整模式。"); return; } tap(); setPanelMode("add"); setAddMode("hours"); setShowCompOffModal(!showCompOffModal); }}
                     style={{ flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 7, backgroundColor: colors.success + "15", borderWidth: 1, borderColor: colors.success + "44", marginLeft: 4 }}>
                     <IconSymbol name="plusminus" size={10} color={colors.success} />
                     <Text style={{ fontSize: 10, color: colors.success, fontWeight: "600" }}>存入/兑换</Text>
@@ -975,6 +979,7 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
   const { templates: shiftTemplates } = useShiftTemplateStore();
   const { paySlips } = usePaySlipStore();
   const { records: attendances } = useAttendanceStore();
+  const { isMonthWritable: isMonthWritableRoster } = usePayrollConfirmationStore();
   const router = useRouter();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
@@ -1047,6 +1052,7 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
 
   const handleConfirmImport = useCallback(() => {
     if (!importResult) return;
+    if (!isMonthWritableRoster(month)) { Alert.alert("已锁定", "本月已确认发薪，如需修改请先进入差额调整模式。"); return; }
     batchUpsertShifts(importResult.entries);
     setShowImportPreview(false);
     setImportResult(null);
@@ -1118,6 +1124,18 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
           <IconSymbol name="square.and.arrow.up" size={16} color={exporting ? colors.muted : colors.foreground} />
         </TouchableOpacity>
       </View>
+
+      {/* 确认发薪状态栏 */}
+      {(() => {
+        const confStatus = isMonthWritableRoster ? (isMonthWritableRoster(month) ? "writable" : "locked") : "writable";
+        if (confStatus === "locked") return (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: colors.muted + "15", borderWidth: 1, borderColor: colors.muted + "33" }}>
+            <IconSymbol name="lock.fill" size={12} color={colors.muted} />
+            <Text style={{ fontSize: 11, color: colors.muted, flex: 1 }}>本月已确认发薪，数据已锁定</Text>
+          </View>
+        );
+        return null;
+      })()}
 
       {/* 导入菜单 Modal */}
       <Modal visible={showImportMenu} transparent animationType="fade" onRequestClose={() => setShowImportMenu(false)}>
@@ -1338,6 +1356,7 @@ function AdvancePage({ month, colors, headerComponent }: { month: string; colors
   const { records: pettyRecords, addRecord: addPettyRecord } = usePettyCashStore();
   const { links, aliases, addLink, updateLink, deleteLink, learnAlias, getLinksForMonth, isLinked } = usePettyLaborLinkStore();
   const { getPaySlip, upsertPaySlip } = usePaySlipStore();
+  const { isMonthWritable } = usePayrollConfirmationStore();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
   // ── 新增预支 Modal state ──
@@ -1490,6 +1509,7 @@ function AdvancePage({ month, colors, headerComponent }: { month: string; colors
 
   // ── 新增手动预支（即时同步薪资单）──
   const handleAddAdvance = () => {
+    if (!isMonthWritable(month)) { Alert.alert("已锁定", "本月已确认发薪，如需修改请先进入差额调整模式。"); return; }
     if (!addEmpId) { Alert.alert("请选择员工"); return; }
     if (!addAmount || isNaN(Number(addAmount)) || Number(addAmount) <= 0) { Alert.alert("请填写正确的预支金额"); return; }
     const amount = parseFloat(addAmount);
@@ -1679,7 +1699,7 @@ function AdvancePage({ month, colors, headerComponent }: { month: string; colors
               const cat = allCategories.find((c) => c.id === adv.category);
               return (
                 <TouchableOpacity key={adv.id}
-                  onLongPress={() => { tap(); Alert.alert("删除预支", `确认删除 ${emp?.code ?? ""} 的 ¥${adv.amount} 预支记录？`, [
+                  onLongPress={() => { if (!isMonthWritable(month)) { Alert.alert("已锁定", "本月已确认发薪，如需修改请先进入差额调整模式。"); return; } tap(); Alert.alert("删除预支", `确认删除 ${emp?.code ?? ""} 的 ¥${adv.amount} 预支记录？`, [
                     { text: "取消", style: "cancel" },
                     { text: "删除", style: "destructive", onPress: () => {
                       deleteAdvance(adv.id);
