@@ -74,6 +74,7 @@ describe("Suite H：确认发薪全流程", () => {
         socialInsuranceDeduction: 300,
         housingFundDeduction: 200,
         advanceAmount: 1000,
+        pettyLaborPaid: 0, // 备用金已付（未设置时默认 0）
       });
     });
 
@@ -83,6 +84,8 @@ describe("Suite H：确认发薪全流程", () => {
       expect(snapshot!.grossSalary).toBe(0);
       expect(snapshot!.finalSalary).toBe(0);
       expect(snapshot!.mealAllowance).toBe(0);
+      expect(snapshot!.advanceAmount).toBe(0);
+      expect(snapshot!.pettyLaborPaid).toBe(0); // 备用金已付缺失时默认 0
     });
   });
 

@@ -110,7 +110,7 @@ export function buildPayrollWorkbook(params: ExportParams): XLSX.WorkBook {
   // 列顺序与薪资卡片展开区域保持一致：
   //   考勤明细：基础/工时薪资 | 加班工资 | 节假日薪资 | 特殊扣薪 | 考勤工资小计
   //   综合额外：补贴合计 | 工作绩效 | 业绩提点 | 奖惩小计
-  //   扣款：预支 | 社保(个人) | 公积金(个人) | 个税
+  //   扣款：已预支 | 社保(个人) | 公积金(个人) | 个税
   //   实发：实发工资 | 公司社保 | 公司公积金 | 公司总成本
   const totalHeader = [
     "部门", "姓名", "代号", "类型",
@@ -122,7 +122,7 @@ export function buildPayrollWorkbook(params: ExportParams): XLSX.WorkBook {
     // 应发
     "应发工资",
     // 扣款
-    "预支", "社保代缴(个人)", "公积金代缴(个人)", "个税代缴",
+    "已预支", "社保代缴(个人)", "公积金代缴(个人)", "个税代缴",
     // 实发
     "实发工资",
     // 公司成本
@@ -258,7 +258,7 @@ export function buildPayrollWorkbook(params: ExportParams): XLSX.WorkBook {
       // 应发
       "应发工资",
       // 扣款
-      "预支", "社保代缴(个人)", "公积金代缴(个人)", "个税代缴",
+      "已预支", "社保代缴(个人)", "公积金代缴(个人)", "个税代缴",
       // 实发
       "实发工资",
       "公司社保部分", "公司公积金部分", "公司总人力成本",
@@ -531,7 +531,7 @@ export function buildPayrollHtml(params: ExportParams): string {
       <th>基础/工时薪资</th><th>加班(h/¥)</th><th>节假日薪资</th><th>特殊扣薪</th><th>考勤工资</th>
       <th>工作绩效</th><th>业绩提点</th><th>补贴合计</th><th>奖惩</th><th>调休兑现</th>
       <th>应发工资</th>
-      <th>社保(个人)</th><th>公积金(个人)</th><th>个税</th><th>预支</th>
+      <th>社保(个人)</th><th>公积金(个人)</th><th>个税</th><th>已预支</th>
       <th>实发工资</th><th>公司总成本</th><th>状态</th>
     </tr>
   </thead>
@@ -794,7 +794,7 @@ export function buildCombinedWorkbook(params: ExportParams): XLSX.WorkBook {
     "基础/工时薪资", "加班时长(h)", "加班工资", "节假日薪资", "特殊扣薪", "考勤工资小计",
     "补贴合计", "工作绩效", "业绩提点", "奖惩小计", "调休兑现",
     "应发工资",
-    "预支", "社保代缴(个人)", "公积金代缴(个人)", "个税代缴",
+    "已预支", "社保代缴(个人)", "公积金代缴(个人)", "个税代缴",
     "实发工资",
     "公司社保部分", "公司公积金部分", "公司总人力成本",
     "付款状态",
@@ -1170,7 +1170,7 @@ export function buildCombinedHtml(params: ExportParams): string {
       <th>姓名</th><th>代号</th><th>类型</th><th>出勤/应出勤</th>
       <th>基础/工时薪资</th><th>加班(h/¥)</th><th>节假日</th><th>特殊扣薪</th><th>考勤工资</th>
       <th>绩效</th><th>补贴</th><th>奖惩</th><th>应发</th>
-      <th>社保</th><th>预支</th><th>实发</th><th>公司成本</th><th>状态</th>
+      <th>社保</th><th>已预支</th><th>实发</th><th>公司成本</th><th>状态</th>
     </tr>
   </thead>
   <tbody>

@@ -63,7 +63,7 @@ export function calculateAdjustments(
       { field: "performanceBonus", label: "绩效奖金" },
       { field: "socialInsuranceDeduction", label: "社保扣除" },
       { field: "housingFundDeduction", label: "公积金扣除" },
-      { field: "advanceAmount", label: "预支" },
+      { field: "advanceAmount", label: "已预支" },
     ];
 
     for (const { field, label } of fields) {
@@ -107,6 +107,8 @@ export function buildFrozenSnapshot(slip: PaySlip): PaySlip["frozenSnapshot"] {
     socialInsuranceDeduction: slip.socialInsuranceDeduction ?? 0,
     housingFundDeduction: slip.housingFundDeduction ?? 0,
     advanceAmount: slip.advanceAmount ?? 0,
+    // 已预支 = advanceAmount + pettyLaborPaid，快照两者均记录以支持差额对比
+    pettyLaborPaid: slip.pettyLaborPaid ?? 0,
   };
 }
 

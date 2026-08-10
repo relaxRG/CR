@@ -1188,7 +1188,10 @@ export interface PaySlip {
     performanceBonus: number;
     socialInsuranceDeduction: number;
     housingFundDeduction: number;
+    /** 手动预支金额 */
     advanceAmount: number;
+    /** 备用金已付金额（与 advanceAmount 合并展示为「已预支」） */
+    pettyLaborPaid?: number;
   };
   /** 上月差额调整（计入本月薪资） */
   adjustmentFromPrevMonth?: number;
