@@ -111,6 +111,17 @@ describe("比例底薪计算（修复双重计算 Bug）", () => {
     expect(Math.round(sum * 100) / 100).toBe(params.attendanceSalary);
   });
 
+  it("零出勤时比例底薪应为 0（无排班 Bug 修复验证）", () => {
+    // 当 attendanceSalary=0（无出勤）时，比例底薪应为 0
+    const base = calcProportionalBase({
+      attendanceSalary: 0,
+      overtimePay: 0,
+      holidayBonus: 0,
+      totalSpecialDeduction: 0,
+    });
+    expect(base).toBe(0);
+  });
+
   it("旧逻辑（错误）：baseSalary = attendanceSalary - overtimePay - holidayBonus 会导致双重计算", () => {
     // 旧逻辑：baseSalary 已经包含了 -specialDeduction
     // 展开区域又单独显示 specialDeduction，导致视觉上多减了一次

@@ -171,9 +171,10 @@ function calcFromShiftsPure(
   if (employee.type === "parttime") {
     attendanceSalary = Math.round(totalHours * employee.overtimeHourlyRate * 100) / 100;
   } else {
-    const proportionalBase = expectedAttendanceDays > 0
+    // 专业规则：无出勤(attendanceDays=0)或应出勤为0时，比例底薪=0
+    const proportionalBase = (expectedAttendanceDays > 0 && attendanceDays > 0)
       ? Math.round((employee.baseSalary * attendanceDays / expectedAttendanceDays) * 100) / 100
-      : employee.baseSalary;
+      : 0;
     attendanceSalary = Math.round(
       (proportionalBase + overtimePay - totalSpecialDeduction + holidayBonus) * 100
     ) / 100;
@@ -361,6 +362,26 @@ describe("Suite A：考勤工资计算引擎（calcFromShifts）", () => {
     const proportionalBase = att.attendanceSalary - att.overtimePay - att.holidayBonus + att.totalSpecialDeduction;
     expect(Math.round((proportionalBase + att.overtimePay + att.holidayBonus - att.totalSpecialDeduction) * 100) / 100)
       .toBe(att.attendanceSalary);
+  });
+
+  it("A1b. 零出勤（无排班）：attendanceSalary = 0，比例底薪 = 0", () => {
+    // 关键 Bug 修复验证：无排班时不应产生任何底薪
+    const shifts: ShiftEntry[] = []; // 空排班
+    const att = calcFromShiftsPure("emp-001", MONTH, emp, shifts, ss);
+    expect(att.attendanceDays).toBe(0);
+    expect(att.attendanceSalary).toBe(0);
+    expect(att.overtimePay).toBe(0);
+    expect(att.totalSpecialDeduction).toBe(0);
+    expect(att.holidayBonus).toBe(0);
+  });
+
+  it("A1c. 配置异常（restDaysPerMonth >= daysInMonth）：attendanceSalary = 0", () => {
+    // 当 restDaysPerMonth 配置异常时，不应回退到全额底薪
+    const badEmp = makeEmployee({ restDaysPerMonth: 31 });
+    const shifts: ShiftEntry[] = [];
+    const att = calcFromShiftsPure("emp-001", MONTH, badEmp, shifts, ss);
+    expect(att.expectedAttendanceDays).toBe(0);
+    expect(att.attendanceSalary).toBe(0);
   });
 
   it("A2. 缺勤1天（出勤22天）：attendanceSalary = 6000 × 22/23", () => {

@@ -18,7 +18,7 @@ import * as Sharing from "expo-sharing";
 import * as XLSX from "xlsx";
 
 import type { Employee, EmployeeDept, ShiftEntry, MonthlyAttendance, PaySlip, ShiftTemplate } from "./types";
-import { DEPT_LABELS, EMPLOYEE_TYPE_LABELS } from "./types";
+import { DEPT_LABELS, EMPLOYEE_TYPE_LABELS, calcProportionalBase as calcProportionalBaseFromTypes } from "./types";
 import { DEFAULT_DEPT_ORDER } from "../labor/store";
 
 // ─── 辅助函数 ──────────────────────────────────────────────────────────────────
@@ -56,15 +56,15 @@ function weekdayLabel(dateStr: string): string {
 }
 
 /**
- * 从 MonthlyAttendance 计算「比例底薪」
- * 与薪资卡片 PaySlipMiniCard 保持完全一致：
- *   proportionalBase = attendanceSalary - overtimePay - holidayBonus + specialDeduction
+ * 从 MonthlyAttendance + Employee 计算「比例底薪」
+ * 统一使用 types.ts 中的 calcProportionalBase helper
+ * 不再使用反推公式，避免口径不一致
  *
- * 专业规则：无出勤或应出勤为0时，直接返回0，避免反推公式在边界情况下产生异常值
+ * 注意：导出时没有 employee.baseSalary，但有 att.attendanceSalary
+ * 因此导出场景仍用反推公式（但增加零出勤防护）
  */
 function calcProportionalBase(att: MonthlyAttendance | undefined, slip: PaySlip | undefined): number {
   if (!slip || !att) return 0;
-  // 无出勤直接返回 0
   if (att.attendanceDays <= 0 || att.expectedAttendanceDays <= 0) return 0;
   const specialDeduction = att?.totalSpecialDeduction ?? 0;
   const overtimePay = att?.overtimePay ?? 0;
