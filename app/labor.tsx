@@ -662,158 +662,211 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
             );
           })()}
 
-          {/* ─── 调休余额管理面板（保留原有完整功能）─── */}
+          {/* ─── 调休余额管理面板（重构：加班调休 / 节假日换休 两栏分区）─── */}
           {showCompOffModal && (
-            <View style={{ backgroundColor: colors.background, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: colors.border, gap: 12 }}>
+            <View style={{ backgroundColor: colors.background, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: colors.border, gap: 14 }}>
+              {/* 面板标题行 */}
               <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
                 <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>调休余额管理</Text>
-                <TouchableOpacity onPress={() => setShowCompOffModal(false)}>
+                <TouchableOpacity onPress={() => setShowCompOffModal(false)} style={{ paddingHorizontal: 8, paddingVertical: 4 }}>
                   <Text style={{ fontSize: 13, color: colors.muted }}>关闭</Text>
                 </TouchableOpacity>
               </View>
-              {/* 主模式切换：增加 / 减少 */}
-              <View style={{ flexDirection: "row", gap: 8 }}>
-                {([["加", "+ 增加"] as const, ["减", "- 减少"] as const]).map(([mode, label]) => (
-                  <TouchableOpacity key={mode} onPress={() => setPanelMode(mode === "加" ? "add" : "deduct")}
-                    style={{ flex: 1, paddingVertical: 8, borderRadius: 8, borderWidth: 1, alignItems: "center",
-                      backgroundColor: (mode === "加" ? panelMode === "add" : panelMode === "deduct") ? (mode === "加" ? colors.success : colors.error) : colors.surface,
-                      borderColor: (mode === "加" ? panelMode === "add" : panelMode === "deduct") ? (mode === "加" ? colors.success : colors.error) : colors.border }}>
-                    <Text style={{ fontSize: 13, fontWeight: "700", color: (mode === "加" ? panelMode === "add" : panelMode === "deduct") ? "#fff" : colors.muted }}>{label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              {/* 增加面板 */}
-              {panelMode === "add" && (
-                <View style={{ gap: 10 }}>
-                  <View style={{ flexDirection: "row", gap: 6 }}>
-                    {([["按加班小时", "按加班小时（消耗加班）"] as const, ["直接天数", "直接增加天数"] as const]).map(([m, label]) => (
-                      <TouchableOpacity key={m} onPress={() => setAddMode(m === "按加班小时" ? "hours" : "days")}
-                        style={{ flex: 1, paddingVertical: 6, borderRadius: 7, borderWidth: 1, alignItems: "center",
-                          backgroundColor: (m === "按加班小时" ? addMode === "hours" : addMode === "days") ? colors.success + "22" : colors.surface,
-                          borderColor: (m === "按加班小时" ? addMode === "hours" : addMode === "days") ? colors.success : colors.border }}>
-                        <Text style={{ fontSize: 11, fontWeight: "600", color: (m === "按加班小时" ? addMode === "hours" : addMode === "days") ? colors.success : colors.muted }}>{label}</Text>
-                      </TouchableOpacity>
-                    ))}
+
+              {/* ─── 分区一：加班调休（来源：overtimeHours）─── */}
+              <View style={{ gap: 10, padding: 12, backgroundColor: colors.surface, borderRadius: 10, borderWidth: 1, borderColor: colors.warning + "44" }}>
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.warning }} />
+                    <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>加班调休</Text>
                   </View>
-                  {addMode === "hours" && (
-                    <View style={{ gap: 8 }}>
-                      <Text style={{ fontSize: 11, color: colors.muted }}>当月加班：{att?.overtimeHours?.toFixed(1) ?? 0}h · 已计费：{att?.paidOvertimeHours?.toFixed(1) ?? 0}h · 加班时薪 ¥{employee.overtimeHourlyRate}</Text>
-                      <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
-                        {[4, 8].map((h) => (
-                          <TouchableOpacity key={h} onPress={() => setCompOffHoursInput(String(h))}
-                            style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7,
-                              backgroundColor: compOffHoursInput === String(h) ? colors.success : colors.surface,
-                              borderWidth: 1, borderColor: compOffHoursInput === String(h) ? colors.success : colors.border }}>
-                            <Text style={{ fontSize: 12, color: compOffHoursInput === String(h) ? "#fff" : colors.muted }}>{h}h = {h >= 8 ? 1 : 0.5}天</Text>
-                          </TouchableOpacity>
-                        ))}
-                        <TextInput value={compOffHoursInput} onChangeText={setCompOffHoursInput} keyboardType="decimal-pad"
-                          style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 7, paddingHorizontal: 8, paddingVertical: 6, color: colors.foreground, width: 55, fontSize: 12 }} />
-                        <Text style={{ fontSize: 11, color: colors.muted }}>h</Text>
-                      </View>
-                      <TouchableOpacity onPress={handleAddByHours}
-                        style={{ paddingVertical: 9, borderRadius: 8, backgroundColor: colors.success, alignItems: "center" }}>
-                        <Text style={{ fontSize: 13, fontWeight: "700", color: "#fff" }}>
-                          确认存入（{Number(compOffHoursInput) >= 8 ? 1 : 0.5}天）
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-                  {addMode === "days" && (
-                    <View style={{ gap: 8 }}>
-                      <Text style={{ fontSize: 11, color: colors.muted }}>直接增加天数，不消耗加班时间</Text>
-                      <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
-                        {[0.5, 1, 2].map((d) => (
-                          <TouchableOpacity key={d} onPress={() => setAddDaysInput(String(d))}
-                            style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7,
-                              backgroundColor: addDaysInput === String(d) ? colors.success : colors.surface,
-                              borderWidth: 1, borderColor: addDaysInput === String(d) ? colors.success : colors.border }}>
-                            <Text style={{ fontSize: 12, color: addDaysInput === String(d) ? "#fff" : colors.muted }}>{d}天</Text>
-                          </TouchableOpacity>
-                        ))}
-                        <TextInput value={addDaysInput} onChangeText={setAddDaysInput} keyboardType="decimal-pad"
-                          style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 7, paddingHorizontal: 8, paddingVertical: 6, color: colors.foreground, width: 55, fontSize: 12 }} />
-                        <Text style={{ fontSize: 11, color: colors.muted }}>天</Text>
-                      </View>
-                      <TouchableOpacity onPress={handleAddByDays}
-                        style={{ paddingVertical: 9, borderRadius: 8, backgroundColor: colors.success, alignItems: "center" }}>
-                        <Text style={{ fontSize: 13, fontWeight: "700", color: "#fff" }}>确认增加 {addDaysInput || "0"} 天</Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
+                  <Text style={{ fontSize: 11, color: colors.muted }}>
+                    余额 {compOffEntries.filter((e) => e.employeeId === employee.id && e.source === "overtime" && e.status === "available" && e.expiresMonth >= month).reduce((s, e) => s + e.days, 0)}天
+                  </Text>
                 </View>
-              )}
-              {/* 减少面板 */}
-              {panelMode === "deduct" && (
-                <View style={{ gap: 10 }}>
-                  <View style={{ flexDirection: "row", gap: 6 }}>
-                    {([["直接减", "直接减少天数"] as const, ["兑换现金", "兑换现金"] as const]).map(([m, label]) => (
-                      <TouchableOpacity key={m} onPress={() => setDeductMode(m === "直接减" ? "direct" : "cashout")}
-                        style={{ flex: 1, paddingVertical: 6, borderRadius: 7, borderWidth: 1, alignItems: "center",
-                          backgroundColor: (m === "直接减" ? deductMode === "direct" : deductMode === "cashout") ? colors.error + "22" : colors.surface,
-                          borderColor: (m === "直接减" ? deductMode === "direct" : deductMode === "cashout") ? colors.error : colors.border }}>
-                        <Text style={{ fontSize: 11, fontWeight: "600", color: (m === "直接减" ? deductMode === "direct" : deductMode === "cashout") ? colors.error : colors.muted }}>{label}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                  {deductMode === "direct" && (
-                    <View style={{ gap: 8 }}>
-                      <Text style={{ fontSize: 11, color: colors.muted }}>当前余额 {totalCompOffDays} 天，直接扣除（不产生金额）</Text>
-                      <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
-                        {[0.5, 1, 2].map((d) => (
-                          <TouchableOpacity key={d} onPress={() => setDeductDaysInput(String(d))}
-                            style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7,
-                              backgroundColor: deductDaysInput === String(d) ? colors.error : colors.surface,
-                              borderWidth: 1, borderColor: deductDaysInput === String(d) ? colors.error : colors.border }}>
-                            <Text style={{ fontSize: 12, color: deductDaysInput === String(d) ? "#fff" : colors.muted }}>{d}天</Text>
-                          </TouchableOpacity>
-                        ))}
-                        <TextInput value={deductDaysInput} onChangeText={setDeductDaysInput} keyboardType="decimal-pad"
-                          style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 7, paddingHorizontal: 8, paddingVertical: 6, color: colors.foreground, width: 55, fontSize: 12 }} />
-                        <Text style={{ fontSize: 11, color: colors.muted }}>天</Text>
-                      </View>
-                      <TouchableOpacity onPress={handleDeductDirect}
-                        style={{ paddingVertical: 9, borderRadius: 8, backgroundColor: colors.error, alignItems: "center" }}>
-                        <Text style={{ fontSize: 13, fontWeight: "700", color: "#fff" }}>确认减少 {deductDaysInput || "0"} 天</Text>
-                      </TouchableOpacity>
+                <Text style={{ fontSize: 11, color: colors.muted }}>加班时数转化为调休天数，兑换时按「加班时薪」结算</Text>
+                {/* 加班情况提示 */}
+                <View style={{ flexDirection: "row", gap: 12, paddingVertical: 6, paddingHorizontal: 10, backgroundColor: colors.warning + "10", borderRadius: 8 }}>
+                  {[
+                    { label: "当月加班", value: `${att?.overtimeHours?.toFixed(1) ?? 0}h` },
+                    { label: "已计费", value: `${att?.paidOvertimeHours?.toFixed(1) ?? 0}h` },
+                    { label: "加班时薪", value: `￥${employee.overtimeHourlyRate}` },
+                  ].map(({ label, value }) => (
+                    <View key={label} style={{ alignItems: "center" }}>
+                      <Text style={{ fontSize: 12, fontWeight: "700", color: colors.warning }}>{value}</Text>
+                      <Text style={{ fontSize: 9, color: colors.muted, marginTop: 1 }}>{label}</Text>
                     </View>
-                  )}
-                  {deductMode === "cashout" && (
+                  ))}
+                </View>
+                {/* 加班调休存入操作 */}
+                {panelMode === "add" && addMode === "hours" && (
+                  <View style={{ gap: 8 }}>
+                    <Text style={{ fontSize: 11, fontWeight: "600", color: colors.foreground }}>存入调休</Text>
+                    <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+                      {[4, 8].map((h) => (
+                        <TouchableOpacity key={h} onPress={() => setCompOffHoursInput(String(h))}
+                          style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7,
+                            backgroundColor: compOffHoursInput === String(h) ? colors.warning : colors.background,
+                            borderWidth: 1, borderColor: compOffHoursInput === String(h) ? colors.warning : colors.border }}>
+                          <Text style={{ fontSize: 12, color: compOffHoursInput === String(h) ? "#fff" : colors.muted }}>{h}h = {h >= 8 ? 1 : 0.5}天</Text>
+                        </TouchableOpacity>
+                      ))}
+                      <TextInput value={compOffHoursInput} onChangeText={setCompOffHoursInput} keyboardType="decimal-pad"
+                        style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 7, paddingHorizontal: 8, paddingVertical: 6, color: colors.foreground, width: 55, fontSize: 12, backgroundColor: colors.background }} />
+                      <Text style={{ fontSize: 11, color: colors.muted }}>h</Text>
+                    </View>
+                    <TouchableOpacity onPress={handleAddByHours}
+                      style={{ paddingVertical: 9, borderRadius: 8, backgroundColor: colors.warning, alignItems: "center" }}>
+                      <Text style={{ fontSize: 13, fontWeight: "700", color: "#fff" }}>存入 {Number(compOffHoursInput) >= 8 ? 1 : 0.5}天调休</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+                {/* 加班调休兑换列表 */}
+                {panelMode === "deduct" && deductMode === "cashout" && (() => {
+                  const otEntries = getCompOffEntries(employee.id).filter((e) => e.source === "overtime" && e.status === "available" && e.expiresMonth >= month).sort((a, b) => a.expiresMonth.localeCompare(b.expiresMonth));
+                  if (otEntries.length === 0) return <Text style={{ fontSize: 12, color: colors.muted, textAlign: "center", paddingVertical: 6 }}>暂无加班调休余额</Text>;
+                  return (
                     <View style={{ gap: 8 }}>
-                      <Text style={{ fontSize: 11, color: colors.muted }}>{`加班换休 → 加班时薪 ¥${employee.overtimeHourlyRate} × 加班小时数\n节假日换休 → 日薪 ¥${att?.dailyRate?.toFixed(0) ?? "—"} × 天数`}</Text>
-                      {getCompOffEntries(employee.id)
-                        .filter((e) => e.status === "available" && e.expiresMonth >= month)
-                        .sort((a, b) => a.expiresMonth.localeCompare(b.expiresMonth))
-                        .map((entry) => {
-                          const isOT = entry.source === "overtime";
-                          const hours = entry.hoursDeducted ?? entry.days * 8;
-                          const amount = isOT
-                            ? Math.round(hours * (employee.overtimeHourlyRate ?? employee.hourlyRate ?? 0) * 100) / 100
-                            : Math.round(entry.days * (att?.dailyRate ?? 0) * 100) / 100;
-                          return (
-                            <View key={entry.id} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 10, backgroundColor: colors.surface, borderRadius: 10, borderWidth: 1, borderColor: colors.border }}>
-                              <View style={{ flex: 1 }}>
-                                <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>
-                                  {isOT ? `加班换休 ${entry.days}天（${hours}h）` : `${entry.holidayName ?? "节假日"} 换休 ${entry.days}天`}
-                                </Text>
-                                <Text style={{ fontSize: 11, color: colors.muted }}>
-                                  {isOT ? `¥${employee.overtimeHourlyRate} × ${hours}h` : `¥${att?.dailyRate?.toFixed(0) ?? "—"} × ${entry.days}天`} · 到期 {entry.expiresMonth}
-                                </Text>
-                              </View>
-                              <TouchableOpacity onPress={() => { tap(); handleCashOut(entry); }}
-                                style={{ backgroundColor: colors.warning, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7, marginLeft: 8 }}>
-                                <Text style={{ fontSize: 12, fontWeight: "700", color: "#fff" }}>兑换 ¥{amount.toFixed(0)}</Text>
-                              </TouchableOpacity>
+                      <Text style={{ fontSize: 11, fontWeight: "600", color: colors.foreground }}>兑换为现金</Text>
+                      {otEntries.map((entry) => {
+                        const hours = entry.hoursDeducted ?? entry.days * 8;
+                        const amount = Math.round(hours * (employee.overtimeHourlyRate ?? employee.hourlyRate ?? 0) * 100) / 100;
+                        return (
+                          <View key={entry.id} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 10, backgroundColor: colors.background, borderRadius: 8, borderWidth: 1, borderColor: colors.border }}>
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>加班调休 {entry.days}天（{hours}h）</Text>
+                              <Text style={{ fontSize: 11, color: colors.muted }}>￥{employee.overtimeHourlyRate} × {hours}h · 到期 {entry.expiresMonth}</Text>
                             </View>
-                          );
-                        })}
-                      {getCompOffEntries(employee.id).filter((e) => e.status === "available" && e.expiresMonth >= month).length === 0 && (
-                        <Text style={{ fontSize: 12, color: colors.muted, textAlign: "center", paddingVertical: 8 }}>暂无可兑换余额</Text>
-                      )}
+                            <TouchableOpacity onPress={() => { tap(); handleCashOut(entry); }}
+                              style={{ backgroundColor: colors.warning, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7, marginLeft: 8 }}>
+                              <Text style={{ fontSize: 12, fontWeight: "700", color: "#fff" }}>兑换 ￥{amount.toFixed(0)}</Text>
+                            </TouchableOpacity>
+                          </View>
+                        );
+                      })}
                     </View>
-                  )}
+                  );
+                })()}
+                {/* 加班调休存入/兑换切换按鈕 */}
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  <TouchableOpacity onPress={() => { setPanelMode("add"); setAddMode("hours"); }}
+                    style={{ flex: 1, paddingVertical: 7, borderRadius: 8, borderWidth: 1, alignItems: "center",
+                      backgroundColor: panelMode === "add" ? colors.warning : colors.background,
+                      borderColor: panelMode === "add" ? colors.warning : colors.border }}>
+                    <Text style={{ fontSize: 12, fontWeight: "600", color: panelMode === "add" ? "#fff" : colors.muted }}>+ 存入调休</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => { setPanelMode("deduct"); setDeductMode("cashout"); }}
+                    style={{ flex: 1, paddingVertical: 7, borderRadius: 8, borderWidth: 1, alignItems: "center",
+                      backgroundColor: panelMode === "deduct" ? colors.warning + "22" : colors.background,
+                      borderColor: panelMode === "deduct" ? colors.warning : colors.border }}>
+                    <Text style={{ fontSize: 12, fontWeight: "600", color: panelMode === "deduct" ? colors.warning : colors.muted }}>兑换现金</Text>
+                  </TouchableOpacity>
                 </View>
-              )}
+              </View>
+
+              {/* ─── 分区二：节假日换休（来源：holidayBonus）─── */}
+              <View style={{ gap: 10, padding: 12, backgroundColor: colors.surface, borderRadius: 10, borderWidth: 1, borderColor: "#FF2D5544" }}>
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#FF2D55" }} />
+                    <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>节假日换休</Text>
+                  </View>
+                  <Text style={{ fontSize: 11, color: colors.muted }}>
+                    余额 {compOffEntries.filter((e) => e.employeeId === employee.id && e.source === "holiday" && e.status === "available" && e.expiresMonth >= month).reduce((s, e) => s + e.days, 0)}天
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 11, color: colors.muted }}>节假日上班选择「换休」后存入，兑换时按「日薪」结算</Text>
+                {/* 节假日兑换列表 */}
+                {(() => {
+                  const holEntries = getCompOffEntries(employee.id).filter((e) => e.source === "holiday" && e.status === "available" && e.expiresMonth >= month).sort((a, b) => a.expiresMonth.localeCompare(b.expiresMonth));
+                  if (holEntries.length === 0) return <Text style={{ fontSize: 12, color: colors.muted, textAlign: "center", paddingVertical: 6 }}>暂无节假日换休余额</Text>;
+                  return (
+                    <View style={{ gap: 8 }}>
+                      {holEntries.map((entry) => {
+                        const amount = Math.round(entry.days * (att?.dailyRate ?? 0) * 100) / 100;
+                        return (
+                          <View key={entry.id} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 10, backgroundColor: colors.background, borderRadius: 8, borderWidth: 1, borderColor: colors.border }}>
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>{entry.holidayName ?? "节假日"} 换休 {entry.days}天</Text>
+                              <Text style={{ fontSize: 11, color: colors.muted }}>日薪 ￥{att?.dailyRate?.toFixed(0) ?? "—"} × {entry.days}天 · 到期 {entry.expiresMonth}</Text>
+                            </View>
+                            <TouchableOpacity onPress={() => { tap(); handleCashOut(entry); }}
+                              style={{ backgroundColor: "#FF2D55", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7, marginLeft: 8 }}>
+                              <Text style={{ fontSize: 12, fontWeight: "700", color: "#fff" }}>兑换 ￥{amount.toFixed(0)}</Text>
+                            </TouchableOpacity>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  );
+                })()}
+              </View>
+
+              {/* ─── 手动调整分区（直接增加/减少天数）─── */}
+              <View style={{ gap: 10, padding: 12, backgroundColor: colors.surface, borderRadius: 10, borderWidth: 1, borderColor: colors.border }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.muted }} />
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>手动调整</Text>
+                </View>
+                <Text style={{ fontSize: 11, color: colors.muted }}>直接增加或减少天数，不产生金额</Text>
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  <TouchableOpacity onPress={() => { setPanelMode("add"); setAddMode("days"); }}
+                    style={{ flex: 1, paddingVertical: 7, borderRadius: 8, borderWidth: 1, alignItems: "center",
+                      backgroundColor: panelMode === "add" && addMode === "days" ? colors.success : colors.background,
+                      borderColor: panelMode === "add" && addMode === "days" ? colors.success : colors.border }}>
+                    <Text style={{ fontSize: 12, fontWeight: "600", color: panelMode === "add" && addMode === "days" ? "#fff" : colors.muted }}>+ 增加天数</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => { setPanelMode("deduct"); setDeductMode("direct"); }}
+                    style={{ flex: 1, paddingVertical: 7, borderRadius: 8, borderWidth: 1, alignItems: "center",
+                      backgroundColor: panelMode === "deduct" && deductMode === "direct" ? colors.error : colors.background,
+                      borderColor: panelMode === "deduct" && deductMode === "direct" ? colors.error : colors.border }}>
+                    <Text style={{ fontSize: 12, fontWeight: "600", color: panelMode === "deduct" && deductMode === "direct" ? "#fff" : colors.muted }}>− 减少天数</Text>
+                  </TouchableOpacity>
+                </View>
+                {panelMode === "add" && addMode === "days" && (
+                  <View style={{ gap: 8 }}>
+                    <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+                      {[0.5, 1, 2].map((d) => (
+                        <TouchableOpacity key={d} onPress={() => setAddDaysInput(String(d))}
+                          style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7,
+                            backgroundColor: addDaysInput === String(d) ? colors.success : colors.background,
+                            borderWidth: 1, borderColor: addDaysInput === String(d) ? colors.success : colors.border }}>
+                          <Text style={{ fontSize: 12, color: addDaysInput === String(d) ? "#fff" : colors.muted }}>{d}天</Text>
+                        </TouchableOpacity>
+                      ))}
+                      <TextInput value={addDaysInput} onChangeText={setAddDaysInput} keyboardType="decimal-pad"
+                        style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 7, paddingHorizontal: 8, paddingVertical: 6, color: colors.foreground, width: 55, fontSize: 12, backgroundColor: colors.background }} />
+                      <Text style={{ fontSize: 11, color: colors.muted }}>天</Text>
+                    </View>
+                    <TouchableOpacity onPress={handleAddByDays}
+                      style={{ paddingVertical: 9, borderRadius: 8, backgroundColor: colors.success, alignItems: "center" }}>
+                      <Text style={{ fontSize: 13, fontWeight: "700", color: "#fff" }}>确认增加 {addDaysInput || "0"} 天</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+                {panelMode === "deduct" && deductMode === "direct" && (
+                  <View style={{ gap: 8 }}>
+                    <Text style={{ fontSize: 11, color: colors.muted }}>当前余额 {totalCompOffDays} 天</Text>
+                    <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+                      {[0.5, 1, 2].map((d) => (
+                        <TouchableOpacity key={d} onPress={() => setDeductDaysInput(String(d))}
+                          style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7,
+                            backgroundColor: deductDaysInput === String(d) ? colors.error : colors.background,
+                            borderWidth: 1, borderColor: deductDaysInput === String(d) ? colors.error : colors.border }}>
+                          <Text style={{ fontSize: 12, color: deductDaysInput === String(d) ? "#fff" : colors.muted }}>{d}天</Text>
+                        </TouchableOpacity>
+                      ))}
+                      <TextInput value={deductDaysInput} onChangeText={setDeductDaysInput} keyboardType="decimal-pad"
+                        style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 7, paddingHorizontal: 8, paddingVertical: 6, color: colors.foreground, width: 55, fontSize: 12, backgroundColor: colors.background }} />
+                      <Text style={{ fontSize: 11, color: colors.muted }}>天</Text>
+                    </View>
+                    <TouchableOpacity onPress={handleDeductDirect}
+                      style={{ paddingVertical: 9, borderRadius: 8, backgroundColor: colors.error, alignItems: "center" }}>
+                      <Text style={{ fontSize: 13, fontWeight: "700", color: "#fff" }}>确认减少 {deductDaysInput || "0"} 天</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
             </View>
           )}
 
