@@ -240,14 +240,9 @@ function EmployeeCard({
       employee, month, att ?? null,
       slip.performanceBonus ?? 0, advanceTotal, globalSettings
     );
-    upsertPaySlip({
-      ...draft,
-      id: slip.id,
-      rewardPenalty: totalReward,
-      rewardPenaltyItems: rewardItems,
-      notes: currentNotes,
-      updatedAt: new Date().toISOString(),
-    });
+    // draft 已包含所有控制字段（allowanceOverrides/workKPISelections/revenueActuals 等）
+    // rewardPenalty/rewardPenaltyItems/notes 由 buildPaySlipDraft 内部从 existing 读取（Step 1 已写入）
+    upsertPaySlip({ ...draft, id: slip.id });
     // 如果备注正在编辑中，同步到 notes state 并退出编辑态
     if (noteEditing) { setNotes(noteInput); setNoteEditing(false); }
     onToggleRewardEdit();

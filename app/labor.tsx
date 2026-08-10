@@ -443,15 +443,9 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
         .filter((a) => a.employeeId === employee.id && (a.deductMonth === month || a.date.startsWith(month)) && (a.status === "pending" || a.status === "deducted"))
         .reduce((s, a) => s + a.amount, 0);
       const draft = buildPaySlipDraft(employee, month, att, patched.performanceBonus ?? 0, advanceTotal, globalSettings);
-      upsertPaySlip({
-        ...draft,
-        compOffCashOut: patched.compOffCashOut,
-        compOffCashOutNote: patched.compOffCashOutNote,
-        allowanceOverrides: patched.allowanceOverrides,
-        workKPISelections: patched.workKPISelections,
-        revenueActuals: patched.revenueActuals,
-        id: currentSlip.id,
-      });
+      // draft 已包含所有控制字段（allowanceOverrides/workKPISelections/revenueActuals/compOffCashOut 等）
+      // 不需再次显式传入
+      upsertPaySlip({ ...draft, id: currentSlip.id });
     }
     setShowCompOffModal(false);
     Alert.alert("兑换成功", `已将 ${entry.days} 天调休余额兑换 ¥${formatMoney(amount)}，已加入本月薪资单`);
@@ -4483,7 +4477,8 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                               upsertPaySlip(patched);
                               const advTotal = advances.filter((a) => a.employeeId === empId && (a.deductMonth === currentMonthStr || a.date.startsWith(currentMonthStr)) && (a.status === "pending" || a.status === "deducted")).reduce((s, a) => s + a.amount, 0);
                               const draft = buildPaySlipDraft(emp, currentMonthStr, att!, patched.performanceBonus ?? 0, advTotal, globalSettings);
-                              upsertPaySlip({ ...draft, compOffCashOut: patched.compOffCashOut, compOffCashOutNote: patched.compOffCashOutNote, allowanceOverrides: patched.allowanceOverrides, workKPISelections: patched.workKPISelections, revenueActuals: patched.revenueActuals, holidayBonusAllocation: patched.holidayBonusAllocation, id: slip.id });
+                              // draft 已包含所有控制字段（allowanceOverrides/workKPISelections/revenueActuals/compOffCashOut/holidayBonusAllocation 等）
+                              upsertPaySlip({ ...draft, id: slip.id });
                             }
                           };
                           const otEntries = getCompOffEntries(empId).filter((e: any) => e.source === "overtime" && e.status === "available" && e.expiresMonth >= currentMonthStr).sort((a: any, b: any) => a.expiresMonth.localeCompare(b.expiresMonth));

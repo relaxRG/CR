@@ -1074,12 +1074,17 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
       socialInsuranceDetails,
       employerInsuranceDetails,
       incomeTaxNote,
-      // 保留手动字段：调休兑现、节假日分配、备用金人工已付
+      // 保留手动控制字段：调休兑现、节假日分配、备用金人工已付
       compOffCashOut: existing?.compOffCashOut,
       compOffCashOutNote: existing?.compOffCashOutNote,
       holidayBonusAllocation: existing?.holidayBonusAllocation,
       pettyLaborPaid: existing?.pettyLaborPaid,
       pettyLaborLinkIds: existing?.pettyLaborLinkIds,
+      // 保留绩效补贴控制字段：这三个字段是由用户在绩效补贴页手动设置的，必须保留
+      // 不保留会导致 autoSync 每次触发时清除用户的绩效设置（已反复修复 5 次的根本原因）
+      allowanceOverrides: existing?.allowanceOverrides,
+      workKPISelections: existing?.workKPISelections,
+      revenueActuals: existing?.revenueActuals,
       updatedAt: new Date().toISOString(),
     };
   }, [ref]);

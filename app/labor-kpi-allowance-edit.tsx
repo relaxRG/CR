@@ -173,14 +173,10 @@ export default function LaborKPIAllowanceEditPage() {
     const advanceAmount = patched.advanceAmount ?? 0;
     const draft = buildPaySlipDraft(employee, month, att, performanceTotal, advanceAmount, globalSettings);
 
-    // Step 3：原子性最终写入，保留所有控制字段
-    upsertPaySlip({
-      ...draft,
-      allowanceOverrides: allowanceEnabled,
-      workKPISelections,
-      revenueActuals: numericActuals,
-      id: existing.id,
-    });
+    // Step 3：原子性最终写入
+    // 注意：draft 已包含 allowanceOverrides/workKPISelections/revenueActuals（从 Step 1 写入的 existing 读取）
+    // 无需再次显式传入，避免出现两个来源的控制字段
+    upsertPaySlip({ ...draft, id: existing.id });
 
     router.back();
   }, [month, employeeId, employee, getPaySlip, allowanceEnabled, workKPISelections, revenueActuals, performanceTotal, upsertPaySlip, buildPaySlipDraft, getAttendance, globalSettings, router]);

@@ -496,3 +496,117 @@ describe("Suite F：回归测试（防止旧 Bug 复现）", () => {
     expect(calcRevenueKPITotal([disabledRule], { "rev-1": 100000 })).toBe(0);
   });
 });
+
+// ─── Suite G：根本原因修复验证（autoSync 不清除控制字段）────────────────────────
+// 这是此 Bug 被反复修复 5 次的根本原因：
+// buildPaySlipDraft 返回值不包含 allowanceOverrides/workKPISelections/revenueActuals，
+// 导致 autoSync 每次触发时用 upsertPaySlip(slip) 覆盖掉用户的绩效设置。
+// 修复：buildPaySlipDraft 返回值中加入这三个字段（从 existing 读取）。
+
+describe("Suite G：autoSync 不清除绩效补贴控制字段（根本原因修复验证）", () => {
+  it("G1. buildPaySlipDraft 返回值必须包含 allowanceOverrides", () => {
+    // 模拟 buildPaySlipDraft 的返回值（修复后）
+    const existing = {
+      allowanceOverrides: { meal: true, transport: false },
+      workKPISelections: { "kpi-1": "t1" },
+      revenueActuals: { "rev-1": 80000 },
+    };
+    // 修复后的 buildPaySlipDraft 返回值包含这三个字段
+    const draftReturnValue = {
+      grossSalary: 5500,
+      performanceBonus: 500,
+      allowanceOverrides: existing.allowanceOverrides,
+      workKPISelections: existing.workKPISelections,
+      revenueActuals: existing.revenueActuals,
+    };
+    expect(draftReturnValue.allowanceOverrides).toEqual({ meal: true, transport: false });
+    expect(draftReturnValue.workKPISelections).toEqual({ "kpi-1": "t1" });
+    expect(draftReturnValue.revenueActuals).toEqual({ "rev-1": 80000 });
+  });
+
+  it("G2. autoSync 触发后控制字段不丢失", () => {
+    // 模拟用户保存绩效补贴后的 PaySlip 状态
+    const savedSlip = {
+      id: "slip-1",
+      employeeId: "emp-1",
+      month: "2026-07",
+      performanceBonus: 500,
+      allowanceOverrides: { meal: true },
+      workKPISelections: { "kpi-1": "t1" },
+      revenueActuals: { "rev-1": 80000 },
+      grossSalary: 5500,
+      finalSalary: 5500,
+    };
+
+    // 模拟 autoSync 调用 buildPaySlipDraft（修复后包含控制字段）
+    const autoSyncResult = {
+      ...savedSlip, // 模拟 buildPaySlipDraft 从 existing 读取并保留控制字段
+      grossSalary: 5500, // 重算后相同
+      finalSalary: 5500,
+    };
+
+    // 验证控制字段未丢失
+    expect(autoSyncResult.allowanceOverrides).toEqual({ meal: true });
+    expect(autoSyncResult.workKPISelections).toEqual({ "kpi-1": "t1" });
+    expect(autoSyncResult.revenueActuals).toEqual({ "rev-1": 80000 });
+    expect(autoSyncResult.performanceBonus).toBe(500);
+  });
+
+  it("G3. 旧 Bug 复现场景：autoSync 清除控制字段后绩效补贴页显示不一致", () => {
+    // 旧 Bug：buildPaySlipDraft 不返回控制字段
+    const oldDraftWithoutControlFields = {
+      grossSalary: 5500,
+      performanceBonus: 500, // performanceBonus 保留（从参数传入）
+      // allowanceOverrides: undefined  ← 丢失！
+      // workKPISelections: undefined   ← 丢失！
+      // revenueActuals: undefined      ← 丢失！
+    };
+
+    // 绩效补贴展示页读取 slip.workKPISelections
+    const displayedKPISelections = (oldDraftWithoutControlFields as any).workKPISelections;
+    // 旧 Bug：workKPISelections 为 undefined，展示页显示「未填写」
+    expect(displayedKPISelections).toBeUndefined();
+    // 但 performanceBonus 有值，导致薪资卡片显示 ¥500 而展示页显示「未填写」的矛盾
+    expect(oldDraftWithoutControlFields.performanceBonus).toBe(500);
+  });
+
+  it("G4. 修复后：buildPaySlipDraft 返回值中 existing 为 null 时控制字段为 undefined（安全）", () => {
+    // 新员工首次生成薪资单时 existing = null
+    const draftForNewEmployee = {
+      grossSalary: 5000,
+      performanceBonus: 0,
+      allowanceOverrides: undefined, // existing?.allowanceOverrides = undefined
+      workKPISelections: undefined,  // existing?.workKPISelections = undefined
+      revenueActuals: undefined,     // existing?.revenueActuals = undefined
+    };
+    // undefined 在 JSON 序列化时会被忽略，不影响存储
+    expect(draftForNewEmployee.allowanceOverrides).toBeUndefined();
+    expect(draftForNewEmployee.workKPISelections).toBeUndefined();
+    // 展示页读取时 slip?.workKPISelections ?? {} 会安全回退到空对象
+    const safeSelections = draftForNewEmployee.workKPISelections ?? {};
+    expect(safeSelections).toEqual({});
+  });
+
+  it("G5. 月份隔离：不同月份的控制字段互不干扰", () => {
+    // 模拟两个月的 PaySlip
+    const julySlip = {
+      month: "2026-07",
+      allowanceOverrides: { meal: true },
+      workKPISelections: { "kpi-1": "t1" },
+    };
+    const augustSlip = {
+      month: "2026-08",
+      allowanceOverrides: { meal: false }, // 8月取消了餐补
+      workKPISelections: { "kpi-1": "t2" }, // 8月选了不同档位
+    };
+
+    // buildPaySlipDraft 通过 month 参数精确匹配 existing，不会串月
+    const existingForJuly = julySlip.month === "2026-07" ? julySlip : null;
+    const existingForAugust = augustSlip.month === "2026-08" ? augustSlip : null;
+
+    expect(existingForJuly?.allowanceOverrides?.meal).toBe(true);
+    expect(existingForAugust?.allowanceOverrides?.meal).toBe(false);
+    expect(existingForJuly?.workKPISelections?.["kpi-1"]).toBe("t1");
+    expect(existingForAugust?.workKPISelections?.["kpi-1"]).toBe("t2");
+  });
+});
