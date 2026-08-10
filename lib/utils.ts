@@ -60,5 +60,6 @@ export function displayNames(
  * 使用方式：`¥${formatMoney(amount)}`
  */
 export function formatMoney(n: number): string {
+  if (!Number.isFinite(n)) return "0";
   return n % 1 === 0 ? n.toFixed(0) : n.toFixed(2);
 }

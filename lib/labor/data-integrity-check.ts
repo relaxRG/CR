@@ -81,6 +81,20 @@ export function checkPettyLaborIntegrity(
       continue;
     }
 
+    // 检查有 pettyLaborPaid > 0 但无 linkIds（旧版数据）— 优先于 amount_mismatch
+    if (recordedPaid > 0 && linkIds.length === 0) {
+      issues.push({
+        slipId: slip.id,
+        employeeId: slip.employeeId,
+        month: slip.month,
+        type: "missing_link_ids",
+        description: `pettyLaborPaid = ¥${recordedPaid} 但无对应 linkIds（可能是旧版数据）`,
+        currentValue: recordedPaid,
+        expectedValue: recordedPaid, // 保留原值（无法确定正确值）
+      });
+      continue;
+    }
+
     // 检查金额不一致（linkIds 对应的金额合计 ≠ pettyLaborPaid）
     const calculatedPaid = linkIds.reduce((sum, id) => sum + (linkMap.get(id)?.amount ?? 0), 0);
     if (Math.abs(calculatedPaid - recordedPaid) > 0.01) {
@@ -92,19 +106,6 @@ export function checkPettyLaborIntegrity(
         description: `pettyLaborPaid (¥${recordedPaid}) ≠ linkIds 合计 (¥${calculatedPaid})`,
         currentValue: recordedPaid,
         expectedValue: calculatedPaid,
-      });
-    }
-
-    // 检查有 pettyLaborPaid > 0 但无 linkIds（旧版数据）
-    if (recordedPaid > 0 && linkIds.length === 0) {
-      issues.push({
-        slipId: slip.id,
-        employeeId: slip.employeeId,
-        month: slip.month,
-        type: "missing_link_ids",
-        description: `pettyLaborPaid = ¥${recordedPaid} 但无对应 linkIds（可能是旧版数据）`,
-        currentValue: recordedPaid,
-        expectedValue: recordedPaid, // 保留原值（无法确定正确值）
       });
     }
   }
