@@ -777,17 +777,17 @@ export default function MonthlySummaryScreen() {
                                 <View style={{ flex: 1, flexDirection: "row", justifyContent: "space-between" }}>
                                   <View style={S.amtBlock}>
                                     <Text style={S.amtLabel}>应发</Text>
-                                    <Text style={[S.amtValue, { color: colors.foreground }]}>¥{formatMoney(grossAmt)}</Text>
+                                    <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={[S.amtValue, { color: colors.foreground }]}>¥{formatMoney(grossAmt)}</Text>
                                   </View>
                                   <View style={S.amtBlock}>
                                     <Text style={S.amtLabel}>已预支</Text>
-                                    <Text style={[S.amtValue, { color: advAmt > 0 ? colors.warning : colors.muted }]}>
+                                    <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={[S.amtValue, { color: advAmt > 0 ? colors.warning : colors.muted }]}>
                                       {advAmt > 0 ? `-¥${formatMoney(advAmt)}` : "0"}
                                     </Text>
                                   </View>
                                   <View style={S.amtBlock}>
                                     <Text style={S.amtLabel}>待发</Text>
-                                    <Text style={[S.amtValue, { color: isPaid ? colors.success : colors.error, fontWeight: "800" }]}>¥{formatMoney(finalAmt)}</Text>
+                                    <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={[S.amtValue, { color: isPaid ? colors.success : colors.error, fontWeight: "800" }]}>¥{formatMoney(finalAmt)}</Text>
                                   </View>
                                 </View>
                                 {/* 右：未发/已发（上）+ 复制付款（下）*/}
