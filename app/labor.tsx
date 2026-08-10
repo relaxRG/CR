@@ -478,11 +478,15 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
 
       {/* ─── 5格摘要行（收起/展开都显示）─── */}
       {(() => {
-        // 比例底薪：统一使用 calcProportionalBase helper
-        const baseSalary = (!att || att.attendanceDays <= 0 || att.expectedAttendanceDays <= 0)
-          ? 0
-          : calcProportionalBase(employee.baseSalary, att.attendanceDays, att.expectedAttendanceDays);
-        const overtimeAndHoliday = (att?.overtimePay ?? 0) + (att?.holidayBonus ?? 0);
+        // 兼职员工显示"工时薪资"，全职员工显示"比例底薪"
+        const isParttimeEmp = employee.type === "parttime" || employee.type === "longterm_parttime";
+        const firstLabel = isParttimeEmp ? "工时薪资" : "比例底薪";
+        const firstValue = isParttimeEmp
+          ? (att?.attendanceSalary ?? 0)
+          : ((!att || att.attendanceDays <= 0 || att.expectedAttendanceDays <= 0)
+            ? 0
+            : calcProportionalBase(employee.baseSalary, att.attendanceDays, att.expectedAttendanceDays));
+        const overtimeAndHoliday = isParttimeEmp ? 0 : ((att?.overtimePay ?? 0) + (att?.holidayBonus ?? 0));
         const allowanceSum = slip ? (slip.mealAllowance ?? 0) + (slip.transportAllowance ?? 0) + (slip.otherAllowance ?? 0) : 0;
         const extraTotal = slip ? (slip.performanceBonus ?? 0) + allowanceSum + (slip.rewardPenalty ?? 0) : 0;
         const advanceAmount = slip?.advanceAmount ?? 0;
@@ -490,7 +494,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
         return (
           <View style={{ flexDirection: "row", marginTop: 8, paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border + "44" }}>
             {[
-              { label: "比例底薪", value: baseSalary !== null ? `¥${formatMoney(baseSalary)}` : "—", color: colors.foreground },
+              { label: firstLabel, value: `¥${formatMoney(firstValue)}`, color: colors.foreground },
               { label: "加班考勤", value: overtimeAndHoliday > 0 ? `+¥${formatMoney(overtimeAndHoliday)}` : "—", color: overtimeAndHoliday > 0 ? colors.success : colors.muted },
               { label: "综合额外", value: extraTotal !== 0 ? `${extraTotal >= 0 ? "+" : ""}¥${formatMoney(extraTotal)}` : "—", color: extraTotal > 0 ? colors.primary : extraTotal < 0 ? colors.error : colors.muted },
               { label: "已预支", value: advanceAmount > 0 ? `-¥${formatMoney(advanceAmount)}` : "—", color: advanceAmount > 0 ? colors.error : colors.muted },
@@ -519,7 +523,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
 
           {/* ─── 考勤明细（5格）─── */}
           {(() => {
-            // 比例底薪：统一使用 calcProportionalBase helper
+            const isParttimeEmp2 = employee.type === "parttime" || employee.type === "longterm_parttime";
             const overtimePay = att?.overtimePay ?? 0;
             const holidayPay = att?.holidayBonus ?? 0;
             const specialDeduction = att?.totalSpecialDeduction ?? 0;
@@ -527,17 +531,25 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
               ? 0
               : calcProportionalBase(employee.baseSalary, att.attendanceDays, att.expectedAttendanceDays);
             const attTotal = slip?.attendanceSalary ?? 0;
+            // 兼职员工显示不同的考勤明细布局
+            const items = isParttimeEmp2 ? [
+              { label: "工时薪资", value: `¥${formatMoney(attTotal)}`, color: colors.foreground },
+              { label: "出勤天数", value: att ? `${att.attendanceDays}天` : "—", color: colors.muted },
+              { label: "总工时", value: att ? `${att.totalHours}h` : "—", color: colors.muted },
+              { label: "时薪", value: `¥${employee.overtimeHourlyRate}/h`, color: colors.muted },
+              { label: "总考勤工资", value: `¥${formatMoney(attTotal)}`, color: deptColor },
+            ] : [
+              { label: "比例底薪", value: `¥${formatMoney(proportionalBase)}`, color: colors.foreground },
+              { label: "加班工资", value: overtimePay > 0 ? `+¥${formatMoney(overtimePay)}` : "—", color: overtimePay > 0 ? colors.success : colors.muted },
+              { label: "节假日薪资", value: holidayPay > 0 ? `+¥${formatMoney(holidayPay)}` : "—", color: holidayPay > 0 ? "#FF2D55" : colors.muted },
+              { label: "特殊扣薪", value: specialDeduction > 0 ? `-¥${formatMoney(specialDeduction)}` : "—", color: specialDeduction > 0 ? colors.error : colors.muted },
+              { label: "总考勤工资", value: `¥${formatMoney(attTotal)}`, color: deptColor },
+            ];
             return (
               <View style={{ gap: 6, paddingBottom: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border + "44" }}>
                 <Text style={{ fontSize: 10, fontWeight: "600", color: colors.muted }}>考勤明细</Text>
                 <View style={{ flexDirection: "row" }}>
-                  {[
-                    { label: "比例底薪", value: `¥${formatMoney(proportionalBase)}`, color: colors.foreground },
-                    { label: "加班工资", value: overtimePay > 0 ? `+¥${formatMoney(overtimePay)}` : "—", color: overtimePay > 0 ? colors.success : colors.muted },
-                    { label: "节假日薪资", value: holidayPay > 0 ? `+¥${formatMoney(holidayPay)}` : "—", color: holidayPay > 0 ? "#FF2D55" : colors.muted },
-                    { label: "特殊扣薪", value: specialDeduction > 0 ? `-¥${formatMoney(specialDeduction)}` : "—", color: specialDeduction > 0 ? colors.error : colors.muted },
-                    { label: "总考勤工资", value: `¥${formatMoney(attTotal)}`, color: deptColor },
-                  ].map(({ label, value, color }) => (
+                  {items.map(({ label, value, color }) => (
                     <View key={label} style={{ flex: 1, alignItems: "center" }}>
                       <Text numberOfLines={1} style={{ fontSize: 11, fontWeight: "700", color }}>{value}</Text>
                       <Text numberOfLines={1} style={{ fontSize: 9, color: colors.muted, marginTop: 1 }}>{label}</Text>
@@ -3917,8 +3929,10 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
     if (h === "休") return <Text style={EXL.cellRest}>(休)</Text>;
     if (h === "无早") return <Text style={EXL.cellNoMorning}>(无早)</Text>;
     // 工时未配置警告：有排班但无灵活工时规则覆盖该天（contractH === 0）
-    // 仅在时长模式下显示，且该天是工作日（非特殊状态）
-    if (contractH === 0 && !entry.specialStatusId && typeof h === "number" && h > 0) {
+    // 仅对全职员工显示（兼职员工无合同工时是正常的，不需要警告）
+    const cellEmp = employees.find((e) => e.id === entry.employeeId);
+    const isCellParttime = cellEmp?.type === "parttime" || cellEmp?.type === "longterm_parttime";
+    if (contractH === 0 && !entry.specialStatusId && typeof h === "number" && h > 0 && !isCellParttime) {
       return (
         <View style={{ alignItems: "center", justifyContent: "center" }}>
           <Text style={{ fontSize: 9, color: "#FF9500", fontWeight: "700" }}>{h % 1 === 0 ? `${h}.0` : `${h}`}</Text>
@@ -4286,12 +4300,15 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                     {/* ─── 4格薄资摘要行（收起/展开都显示）─── */}
                     {(() => {
                       const slip = paySlips.find((s) => s.employeeId === emp.id && s.month === currentMonthStr) ?? null;
-                      // 统一使用 calcProportionalBase helper
-                      const baseSal = (att.attendanceDays <= 0 || att.expectedAttendanceDays <= 0)
-                        ? 0
-                        : calcProportionalBase(emp.baseSalary, att.attendanceDays, att.expectedAttendanceDays);
-                      const otPay = att.overtimePay ?? 0;
-                      const holPay = att.holidayBonus ?? 0;
+                      // 兼职员工显示工时薪资，全职显示比例底薪
+                      const isEmpParttime = emp.type === "parttime" || emp.type === "longterm_parttime";
+                      const baseSal = isEmpParttime
+                        ? att.attendanceSalary
+                        : ((att.attendanceDays <= 0 || att.expectedAttendanceDays <= 0)
+                          ? 0
+                          : calcProportionalBase(emp.baseSalary, att.attendanceDays, att.expectedAttendanceDays));
+                      const otPay = isEmpParttime ? 0 : (att.overtimePay ?? 0);
+                      const holPay = isEmpParttime ? 0 : (att.holidayBonus ?? 0);
                       const total = att.attendanceSalary;
                       return (
                         <View style={{ flexDirection: "row", paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.border + "44" }}>

@@ -80,7 +80,7 @@ export function validatePayrollData(
   // V001: 零排班非零底薪
   if (attendance.attendanceDays === 0 && employee.baseSalary > 0 && employee.active && !employee.archived) {
     // 仅对全职和长期兼职提示（临时兼职无排班是正常的）
-    if (employee.type !== "parttime") {
+    if (employee.type !== "parttime" && employee.type !== "longterm_parttime") {
       results.push({
         ruleId: "V001",
         severity: "warning",

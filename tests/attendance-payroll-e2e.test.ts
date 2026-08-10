@@ -168,8 +168,12 @@ function calcFromShiftsPure(
   const overtimePay = Math.round(paidOvertimeHours * employee.overtimeHourlyRate * 100) / 100;
 
   let attendanceSalary: number;
-  if (employee.type === "parttime") {
-    attendanceSalary = Math.round(totalHours * employee.overtimeHourlyRate * 100) / 100;
+  if (employee.type === "parttime" || employee.type === "longterm_parttime") {
+    if (employee.parttimeMode === "daily") {
+      attendanceSalary = Math.round(attendanceDays * employee.baseSalary * 100) / 100;
+    } else {
+      attendanceSalary = Math.round(totalHours * employee.overtimeHourlyRate * 100) / 100;
+    }
   } else {
     // 专业规则：无出勤(attendanceDays=0)或应出勤为0时，比例底薪=0
     const proportionalBase = (expectedAttendanceDays > 0 && attendanceDays > 0)
@@ -891,5 +895,79 @@ describe("Suite F：绩效补贴展示完整性（综合小计修复验证）", 
     const nonAttendancePart = Math.round((slip.grossSalary - slip.attendanceSalary) * 100) / 100;
     const expectedNonAtt = Math.round((displayTotal + (slip.rewardPenalty ?? 0) + (slip.compOffCashOut ?? 0)) * 100) / 100;
     expect(nonAttendancePart).toBe(expectedNonAtt);
+  });
+});
+
+// ─── Suite G：长期兼职（longterm_parttime）薪资计算验证 ─────────────────────────
+
+describe("Suite G：长期兼职（longterm_parttime）薪资计算", () => {
+  /** 长期兼职员工：按小时结算，时薪35，无底薪 */
+  const ltParttime = makeEmployee({
+    type: "longterm_parttime" as any,
+    baseSalary: 0,
+    overtimeHourlyRate: 35,
+    restDaysPerMonth: 4,
+    parttimeMode: "hourly",
+  });
+
+  const ss = DEFAULT_SPECIAL_STATUSES;
+
+  it("G1. 按小时结算：attendanceSalary = totalHours × overtimeHourlyRate", () => {
+    const shifts: ShiftEntry[] = [];
+    // 24天 × 8h = 192h
+    for (let d = 1; d <= 24; d++) {
+      shifts.push({ employeeId: "emp-001", date: `2026-07-${String(d).padStart(2, "0")}`, shift: "午班", hoursValue: 8 });
+    }
+    const att = calcFromShiftsPure("emp-001", MONTH, ltParttime, shifts, ss);
+    expect(att.attendanceDays).toBe(24);
+    expect(att.totalHours).toBe(192);
+    expect(att.attendanceSalary).toBe(Math.round(192 * 35 * 100) / 100); // 6720
+  });
+
+  it("G2. 按小时结算（31天 × 8h = 248h）：attendanceSalary = 8680", () => {
+    const shifts: ShiftEntry[] = [];
+    for (let d = 1; d <= 31; d++) {
+      shifts.push({ employeeId: "emp-001", date: `2026-07-${String(d).padStart(2, "0")}`, shift: "午班", hoursValue: 8 });
+    }
+    const att = calcFromShiftsPure("emp-001", MONTH, ltParttime, shifts, ss);
+    expect(att.attendanceDays).toBe(31);
+    expect(att.totalHours).toBe(248);
+    expect(att.attendanceSalary).toBe(8680); // 248 × 35
+  });
+
+  it("G3. 按天结算：attendanceSalary = attendanceDays × baseSalary（日薪）", () => {
+    const dailyParttime = makeEmployee({
+      type: "longterm_parttime" as any,
+      baseSalary: 300, // 日薪
+      overtimeHourlyRate: 35,
+      restDaysPerMonth: 4,
+      parttimeMode: "daily",
+    });
+    const shifts: ShiftEntry[] = [];
+    for (let d = 1; d <= 20; d++) {
+      shifts.push({ employeeId: "emp-001", date: `2026-07-${String(d).padStart(2, "0")}`, shift: "午班", hoursValue: 8 });
+    }
+    const att = calcFromShiftsPure("emp-001", MONTH, dailyParttime, shifts, ss);
+    expect(att.attendanceDays).toBe(20);
+    expect(att.attendanceSalary).toBe(6000); // 20 × 300
+  });
+
+  it("G4. 零排班：attendanceSalary = 0（不产生任何底薪）", () => {
+    const shifts: ShiftEntry[] = [];
+    const att = calcFromShiftsPure("emp-001", MONTH, ltParttime, shifts, ss);
+    expect(att.attendanceDays).toBe(0);
+    expect(att.attendanceSalary).toBe(0);
+  });
+
+  it("G5. 不受节假日倍数和特殊状态扣薪影响", () => {
+    const shifts: ShiftEntry[] = [];
+    for (let d = 1; d <= 23; d++) {
+      shifts.push({ employeeId: "emp-001", date: `2026-07-${String(d).padStart(2, "0")}`, shift: "午班", hoursValue: 8 });
+    }
+    const att = calcFromShiftsPure("emp-001", MONTH, ltParttime, shifts, ss);
+    // 兼职不受特殊状态影响
+    expect(att.totalSpecialDeduction).toBe(0);
+    expect(att.holidayBonus).toBe(0);
+    expect(att.attendanceSalary).toBe(Math.round(184 * 35 * 100) / 100); // 6440
   });
 });

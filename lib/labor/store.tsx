@@ -775,7 +775,7 @@ function AttendanceProvider({ children }: { children: React.ReactNode }) {
      * 兼职员工：按实际工时 × 时薪（不受出勤天数影响）
      */
     let attendanceSalary: number;
-    if (employee.type === "parttime") {
+    if (employee.type === "parttime" || employee.type === "longterm_parttime") {
       if (employee.parttimeMode === "daily") {
         // 按天结算：工资 = 出勤天数 × 日薪（baseSalary）
         attendanceSalary = Math.round(attendanceDays * employee.baseSalary * 100) / 100;
