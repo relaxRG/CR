@@ -13,6 +13,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // ─── 模拟导出菜单状态 ─────────────────────────────────────────────────────────
 
 type ExportType =
+  | "combined_excel"
+  | "combined_pdf"
   | "payroll_excel"
   | "payroll_pdf"
   | "schedule_hours_excel"
@@ -30,6 +32,8 @@ function createExportMenuState(): ExportMenuState {
   return {
     showExportMenu: true,
     exportCallCount: {
+      combined_excel: 0,
+      combined_pdf: 0,
       payroll_excel: 0,
       payroll_pdf: 0,
       schedule_hours_excel: 0,
@@ -148,8 +152,10 @@ describe("导出菜单 Modal 事件冒泡修复验证", () => {
     expect(state.lastExportType).toBeNull();
   });
 
-  it("修复后：6 种导出类型各自独立触发，互不干扰", () => {
+  it("修复后：8 种导出类型各自独立触发，互不干扰", () => {
     const types: ExportType[] = [
+      "combined_excel",
+      "combined_pdf",
       "payroll_excel",
       "payroll_pdf",
       "schedule_hours_excel",

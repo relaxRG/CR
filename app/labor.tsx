@@ -1141,41 +1141,91 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
             </View>
             {importResult && (
               <View style={{ padding: 16 }}>
-                <View style={{ flexDirection: "row", gap: 12, marginBottom: 12 }}>
+                {/* 统计卡片 */}
+                <View style={{ flexDirection: "row", gap: 10, marginBottom: 12 }}>
                   <View style={{ flex: 1, backgroundColor: "#34C75920", borderRadius: 10, padding: 10, alignItems: "center" }}>
-                    <Text style={{ fontSize: 20, fontWeight: "700", color: "#34C759" }}>{importResult.parsedCount}</Text>
-                    <Text style={{ fontSize: 11, color: colors.muted }}>待写入</Text>
+                    <Text style={{ fontSize: 22, fontWeight: "800", color: "#34C759" }}>{importResult.parsedCount}</Text>
+                    <Text style={{ fontSize: 11, fontWeight: "600", color: "#34C759" }}>待写入</Text>
+                    <Text style={{ fontSize: 9, color: colors.muted, marginTop: 2 }}>全部将写入</Text>
                   </View>
                   <View style={{ flex: 1, backgroundColor: "#FF950020", borderRadius: 10, padding: 10, alignItems: "center" }}>
-                    <Text style={{ fontSize: 20, fontWeight: "700", color: "#FF9500" }}>{importResult.overwriteCount}</Text>
-                    <Text style={{ fontSize: 11, color: colors.muted }}>将覆盖</Text>
+                    <Text style={{ fontSize: 22, fontWeight: "800", color: "#FF9500" }}>{importResult.overwriteCount}</Text>
+                    <Text style={{ fontSize: 11, fontWeight: "600", color: "#FF9500" }}>将覆盖</Text>
+                    <Text style={{ fontSize: 9, color: colors.muted, marginTop: 2 }}>原有数据替换</Text>
                   </View>
-                  <View style={{ flex: 1, backgroundColor: "#FF3B3020", borderRadius: 10, padding: 10, alignItems: "center" }}>
-                    <Text style={{ fontSize: 20, fontWeight: "700", color: "#FF3B30" }}>{importResult.skippedCount}</Text>
-                    <Text style={{ fontSize: 11, color: colors.muted }}>已跳过</Text>
+                  <View style={{ flex: 1, backgroundColor: importResult.skippedCount > 0 ? "#FF3B3020" : colors.border + "22", borderRadius: 10, padding: 10, alignItems: "center" }}>
+                    <Text style={{ fontSize: 22, fontWeight: "800", color: importResult.skippedCount > 0 ? "#FF3B30" : colors.muted }}>{importResult.skippedCount}</Text>
+                    <Text style={{ fontSize: 11, fontWeight: "600", color: importResult.skippedCount > 0 ? "#FF3B30" : colors.muted }}>已跳过</Text>
+                    <Text style={{ fontSize: 9, color: colors.muted, marginTop: 2 }}>员工不存在等</Text>
                   </View>
                 </View>
+                {/* 警告区域 */}
                 {importResult.warnings.length > 0 && (
-                  <View style={{ backgroundColor: "#FF950020", borderRadius: 10, padding: 10, marginBottom: 12 }}>
-                    <Text style={{ fontSize: 12, fontWeight: "600", color: "#FF9500", marginBottom: 4 }}>⚠️ 警告（{importResult.warnings.length} 条）</Text>
+                  <View style={{ backgroundColor: "#FF3B3015", borderRadius: 10, padding: 10, marginBottom: 10, borderLeftWidth: 3, borderLeftColor: "#FF3B30" }}>
+                    <Text style={{ fontSize: 12, fontWeight: "700", color: "#FF3B30", marginBottom: 6 }}>⚠️ 发现 {importResult.warnings.length} 个问题，建议检查模版后重新导入</Text>
                     {importResult.warnings.slice(0, 5).map((w, i) => (
-                      <Text key={i} style={{ fontSize: 11, color: colors.muted }}>{w}</Text>
+                      <View key={i} style={{ flexDirection: "row", alignItems: "flex-start", marginBottom: 3 }}>
+                        <Text style={{ fontSize: 10, color: "#FF3B30", marginRight: 4, marginTop: 1 }}>•</Text>
+                        <Text style={{ flex: 1, fontSize: 11, color: colors.foreground, lineHeight: 16 }}>{w}</Text>
+                      </View>
                     ))}
-                    {importResult.warnings.length > 5 && <Text style={{ fontSize: 11, color: colors.muted }}>...还有 {importResult.warnings.length - 5} 条</Text>}
+                    {importResult.warnings.length > 5 && (
+                      <Text style={{ fontSize: 11, color: "#FF3B30", marginTop: 2 }}>… 还有 {importResult.warnings.length - 5} 个问题未展示</Text>
+                    )}
                   </View>
                 )}
+                {importResult.warnings.length === 0 && (
+                  <View style={{ backgroundColor: "#34C75915", borderRadius: 10, padding: 8, marginBottom: 10, flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <Text style={{ fontSize: 13 }}>✅</Text>
+                    <Text style={{ fontSize: 12, color: "#34C759", fontWeight: "600" }}>文件解析正常，所有员工匹配成功</Text>
+                  </View>
+                )}
+                {/* 预览列表 */}
+                <View style={{ flexDirection: "row", paddingVertical: 4, paddingHorizontal: 4, backgroundColor: colors.border + "44", borderRadius: 6, marginBottom: 4 }}>
+                  <Text style={{ width: 52, fontSize: 10, fontWeight: "700", color: colors.muted }}>代号</Text>
+                  <Text style={{ width: 56, fontSize: 10, fontWeight: "700", color: colors.muted }}>姓名</Text>
+                  <Text style={{ width: 52, fontSize: 10, fontWeight: "700", color: colors.muted }}>日期</Text>
+                  <Text style={{ flex: 1, fontSize: 10, fontWeight: "700", color: "#007AFF" }}>班次</Text>
+                  <Text style={{ width: 44, fontSize: 10, fontWeight: "700", color: "#34C759", textAlign: "right" }}>工时</Text>
+                  <Text style={{ width: 32, fontSize: 10, fontWeight: "700", color: colors.muted, textAlign: "center" }}>状态</Text>
+                </View>
                 <ScrollView style={{ maxHeight: 200, marginBottom: 12 }}>
                   {importResult.preview.slice(0, 50).map((row, i) => (
-                    <View key={i} style={{ flexDirection: "row", alignItems: "center", paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                      <Text style={{ width: 60, fontSize: 12, color: colors.muted }}>{row.employeeCode}</Text>
-                      <Text style={{ width: 60, fontSize: 12, color: colors.foreground }}>{row.employeeName}</Text>
-                      <Text style={{ width: 70, fontSize: 12, color: colors.muted }}>{row.date.slice(5)}</Text>
-                      <Text style={{ flex: 1, fontSize: 12, color: row.session ? "#007AFF" : colors.muted }}>{row.session ?? "—"}</Text>
-                      <Text style={{ width: 50, fontSize: 12, color: row.hoursValue ? "#34C759" : colors.muted, textAlign: "right" }}>{row.hoursValue ? `${row.hoursValue}h` : "—"}</Text>
-                      {row.willOverwrite && <Text style={{ fontSize: 10, color: "#FF9500", marginLeft: 4 }}>覆盖</Text>}
+                    <View key={i} style={[
+                      { flexDirection: "row", alignItems: "center", paddingVertical: 5, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: colors.border },
+                      row.willOverwrite && { backgroundColor: "#FF950012" },
+                    ]}>
+                      <Text style={{ width: 52, fontSize: 11, color: colors.muted }}>{row.employeeCode}</Text>
+                      <Text style={{ width: 56, fontSize: 11, fontWeight: "600", color: colors.foreground }}>{row.employeeName}</Text>
+                      <Text style={{ width: 52, fontSize: 11, color: colors.muted }}>{row.date.slice(5)}</Text>
+                      <View style={{ flex: 1 }}>
+                        {row.session ? (
+                          <View style={{ backgroundColor: "#007AFF18", borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1, alignSelf: "flex-start" }}>
+                            <Text style={{ fontSize: 11, color: "#007AFF", fontWeight: "600" }}>{row.session}</Text>
+                          </View>
+                        ) : (
+                          <Text style={{ fontSize: 11, color: colors.muted }}>—</Text>
+                        )}
+                      </View>
+                      <Text style={{ width: 44, fontSize: 11, color: row.hoursValue ? "#34C759" : colors.muted, textAlign: "right", fontWeight: row.hoursValue ? "600" : "400" }}>
+                        {row.hoursValue ? `${row.hoursValue}h` : "—"}
+                      </Text>
+                      <View style={{ width: 32, alignItems: "center" }}>
+                        {row.willOverwrite ? (
+                          <View style={{ backgroundColor: "#FF950030", borderRadius: 4, paddingHorizontal: 3, paddingVertical: 1 }}>
+                            <Text style={{ fontSize: 9, color: "#FF9500", fontWeight: "700" }}>覆盖</Text>
+                          </View>
+                        ) : (
+                          <View style={{ backgroundColor: "#34C75920", borderRadius: 4, paddingHorizontal: 3, paddingVertical: 1 }}>
+                            <Text style={{ fontSize: 9, color: "#34C759", fontWeight: "700" }}>新增</Text>
+                          </View>
+                        )}
+                      </View>
                     </View>
                   ))}
-                  {importResult.preview.length > 50 && <Text style={{ fontSize: 11, color: colors.muted, textAlign: "center", paddingVertical: 8 }}>...还有 {importResult.parsedCount - 50} 条</Text>}
+                  {importResult.preview.length > 50 && (
+                    <Text style={{ fontSize: 11, color: colors.muted, textAlign: "center", paddingVertical: 8 }}>… 还有 {importResult.parsedCount - 50} 条未展示</Text>
+                  )}
                 </ScrollView>
                 <View style={{ flexDirection: "row", gap: 10 }}>
                   <TouchableOpacity onPress={() => setShowImportPreview(false)}
@@ -1183,8 +1233,10 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
                     <Text style={{ fontSize: 15, fontWeight: "600", color: colors.foreground }}>取消</Text>
                   </TouchableOpacity>
                   <TouchableOpacity onPress={handleConfirmImport}
-                    style={{ flex: 2, paddingVertical: 12, borderRadius: 12, backgroundColor: "#34C759", alignItems: "center" }}>
-                    <Text style={{ fontSize: 15, fontWeight: "700", color: "white" }}>确认导入 {importResult.parsedCount} 条</Text>
+                    style={{ flex: 2, paddingVertical: 12, borderRadius: 12, backgroundColor: importResult.warnings.length > 0 ? "#FF9500" : "#34C759", alignItems: "center" }}>
+                    <Text style={{ fontSize: 15, fontWeight: "700", color: "white" }}>
+                      {importResult.warnings.length > 0 ? `仍然导入 ${importResult.parsedCount} 条` : `确认导入 ${importResult.parsedCount} 条`}
+                    </Text>
                   </TouchableOpacity>
                 </View>
               </View>
