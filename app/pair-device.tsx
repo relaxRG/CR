@@ -22,11 +22,13 @@ import { useI18n } from "@/lib/i18n";
 import { pairWithCode } from "@/lib/cf-sync/client";
 import { QRScanner } from "@/components/qr-scanner";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useSync } from "@/lib/cf-sync/provider";
 
 export default function PairDeviceScreen() {
   const colors = useColors();
   const router = useRouter();
   const { lang } = useI18n();
+  const { restartSync } = useSync();
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const inputRef = useRef<TextInput>(null);
@@ -50,6 +52,8 @@ export default function PairDeviceScreen() {
       setLoading(true);
       tap();
       await pairWithCode(trimmed);
+      // 配对成功后重启同步引擎（退出同步组后重新加入时必须调用，否则同步引擎不会重新启动）
+      void restartSync();
       if (Platform.OS !== "web") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
@@ -93,6 +97,8 @@ export default function PairDeviceScreen() {
     try {
       setLoading(true);
       await pairWithCode(scannedCode);
+      // 配对成功后重启同步引擎
+      void restartSync();
       if (Platform.OS !== "web") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }

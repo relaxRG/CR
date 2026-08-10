@@ -68,6 +68,11 @@ type SyncContextValue = {
   hasPendingConflicts: boolean;
   /** 刷新本地设备信息（重命名后调用） */
   refreshDeviceInfo: () => Promise<void>;
+  /**
+   * 重启同步引擎（退出同步组后重新配对时调用）
+   * 会重置 startedRef 并重新执行完整同步流程（读取新 DeviceInfo → pull → merge → push）
+   */
+  restartSync: () => Promise<boolean>;
 };
 
 const SyncContext = createContext<SyncContextValue | null>(null);
@@ -401,6 +406,50 @@ export function SyncProvider({
     clearSyncError();
   }, []);
 
+  // 重启同步引擎：退出同步组后重新配对时调用
+  // 重置 startedRef 并重新执行完整同步流程（读取新 DeviceInfo → pull → merge → push）
+  const restartSync = useCallback(async (): Promise<boolean> => {
+    // 停止当前实时监听
+    stopRealtimeRef.current?.();
+    stopRealtimeRef.current = null;
+    // 清除重试计时器
+    if (retryTimerRef.current) {
+      clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+    retryCountRef.current = 0;
+    syncingRef.current = false;
+    // 重置 startedRef，允许同步引擎重新启动
+    startedRef.current = false;
+    // 执行完整同步（会读取新的 DeviceInfo 并重新连接）
+    const ok = await performSync();
+    if (ok) {
+      // 同步成功后重新启动实时监听
+      stopRealtimeRef.current = startRealtimeSync((since) => {
+        void (async () => {
+          if (syncingRef.current) return;
+          syncingRef.current = true;
+          try {
+            const { entries } = await cfPull(since > 0 ? since : undefined);
+            if (entries.length > 0) {
+              const { overwritten, conflicts } = await runInitialSync(entries, pushFn);
+              if (overwritten && Platform.OS !== "web") triggerStoreReload();
+              if (conflicts.length > 0) setPendingConflicts(conflicts);
+              lastSyncAtRef.current = Date.now();
+            }
+          } catch (err) {
+            console.warn("[Realtime] incremental pull failed:", err);
+          } finally {
+            syncingRef.current = false;
+          }
+        })();
+      });
+    } else {
+      scheduleRetry();
+    }
+    return ok;
+  }, [performSync, scheduleRetry, pushFn]);
+
   // Build a user-like object for compatibility with existing UI
   const user = deviceInfo
     ? {
@@ -432,6 +481,7 @@ export function SyncProvider({
           const info = await getDeviceInfo();
           setDeviceInfo(info);
         },
+        restartSync,
       }}
     >
       {children}
