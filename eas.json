@@ -7,7 +7,7 @@
   "build": {
     "production": {
       "autoIncrement": true,
-      "credentialsSource": "remote",
+      "credentialsSource": "local",
       "ios": {
         "resourceClass": "m-medium"
       },

@@ -237,3 +237,37 @@ if (isParttime) { /* 兼职逻辑 */ }
 - [ ] 新增员工类型判断时，搜索 `=== "parttime"` 确认是否需要同时处理 `longterm_parttime`
 - [ ] 使用 `isParttime` 辅助变量统一判断，避免遗漏
 - [ ] 新增员工类型时，同步更新所有相关的类型判断逻辑
+
+## 12. 全局排序规则必须通过 Store 传递，禁止硬编码
+
+**背景**：员工分组顺序（前厅/后厨/公司/临时兼职）现在由用户在「员工排序」页面配置，持久化到 `labor_dept_order_v1`，通过 `useDeptOrderStore` 读取。
+
+**规范**：凡是需要展示员工分组列表的页面（报表、统计、导出引擎等），必须从 `useDeptOrderStore` 读取 `deptOrder`，不得硬编码 `["front", "kitchen", "other", "parttime"]` 数组。
+
+**正确写法：**
+```ts
+// ✅ 正确：从 Store 读取
+const { deptOrder } = useDeptOrderStore();
+const groups = deptOrder.map((k) => ({ key: k, ...DEPT_GROUP_DEFS[k] }));
+
+// ✅ 正确：导出引擎通过参数传入
+await exportLaborData(type, { ..., deptOrder });
+```
+
+**错误写法：**
+```ts
+// ❌ 错误：硬编码分组顺序
+const groups = [
+  { key: "front", ... },
+  { key: "kitchen", ... },
+  { key: "other", ... },
+  { key: "parttime", ... },
+];
+```
+
+**覆盖范围（已全部联动）**：
+- `labor-employees.tsx`（员工管理列表）
+- `labor.tsx`（排班表 + 薪资统计 + 考勤概况）
+- `labor-attendance.tsx`（编辑薪资员工选择）
+- `monthly-summary.tsx`（月报工资发放明细）
+- `lib/labor/export.ts`（Excel/PDF 导出引擎）
