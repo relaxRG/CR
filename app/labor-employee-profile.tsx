@@ -145,7 +145,7 @@ export default function LaborEmployeeProfileScreen() {
               <InfoRow label="月休息天数" value={`${emp.restDaysPerMonth} 天`} colors={colors} />
             </>
           )}
-          {emp.type === "parttime" ? (
+          {(emp.type === "parttime" || emp.type === "longterm_parttime") ? (
             <>
               <InfoRow label="计费模式" value={emp.parttimeMode === "daily" ? "按天结算" : "按小时结算"} colors={colors} />
               {emp.parttimeMode === "daily" ? (

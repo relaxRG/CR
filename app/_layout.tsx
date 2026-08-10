@@ -83,6 +83,13 @@ export default function RootLayout() {
         if (removed > 0) console.log(`[Startup] 已清理 ${removed} 条空排班记录`);
       });
     });
+    // 迁移脚本：清理历史遗留的 monthlyFixedSalary 字段（幽灵字段，已删除于 commit be4f76e）
+    // 根因：该字段存在于 Employee 接口但从未被计算引擎使用，属于幽灵字段
+    import("@/lib/migrations/clean-monthly-fixed-salary").then(({ cleanMonthlyFixedSalary }) => {
+      cleanMonthlyFixedSalary().then((cleaned) => {
+        if (cleaned > 0) console.log(`[Startup] 已清理 ${cleaned} 条员工记录中的 monthlyFixedSalary 字段`);
+      });
+    });
   }, []);
 
   const handleSafeAreaUpdate = useCallback((metrics: Metrics) => {

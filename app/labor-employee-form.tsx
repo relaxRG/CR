@@ -759,12 +759,12 @@ export default function LaborEmployeeFormScreen() {
                     <TextInput value={hourlyRate} onChangeText={setHourlyRate} keyboardType="decimal-pad"
                       style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border }]} />
                   </View>
-                  {type !== "parttime" && autoHourlyRatePreview > 0 && (
+                  {(type === "fulltime") && autoHourlyRatePreview > 0 && (
                     <Text style={{ fontSize: 11, color: colors.muted }}>
                       自动计算参考値：¥{formatMoney(autoHourlyRatePreview)}/小时（日薪 ÷ 平均工时）
                     </Text>
                   )}
-                  {type !== "parttime" && (
+                  {(type === "fulltime") && (
                     <Text style={{ fontSize: 11, color: colors.muted }}>仅作参考展示，实际计算使用下方「加班时薪」</Text>
                   )}
                 </View>

@@ -210,3 +210,30 @@ void restartSync(); // 重置 startedRef + 重新执行 performSync + 重启实�
 - [ ] 调用了 `AsyncStorage.setItem` 或封装的持久化函数后，是否有对应的 `setState`？
 - [ ] 如果没有 `setState`，是否有 `useEffect` 会在适当时机重新读取？
 - [ ] 如果是引擎级别的状态（如同步引擎的 `deviceInfo`），是否需要调用重启函数？
+
+## 11. 员工类型判断必须覆盖所有兼职子类型
+
+**背景**：项目中存在两种兼职类型：`parttime`（临时兼职）和 `longterm_parttime`（长期兼职）。它们在薪资计算上完全相同（不适用节假日倍数、特殊状态扣薪），但历史代码中大量使用 `type === "parttime"` 判断，遗漏了 `longterm_parttime`，导致长期兼职员工被错误地套用全职薪资逻辑（节假日倍数工资、旷工扣薪等）。
+
+**错误写法：**
+```ts
+if (employee.type === "parttime") { /* 兼职逻辑 */ }
+```
+
+**正确写法：**
+```ts
+const isParttime = employee.type === "parttime" || employee.type === "longterm_parttime";
+if (isParttime) { /* 兼职逻辑 */ }
+```
+
+**适用场景：**
+- 薪资计算引擎（`calcFromShifts`、`buildPaySlipDraft`）
+- UI 展示逻辑（档案编辑页、档案展示页、薪资统计卡片）
+- 导出引擎（`export.ts`）
+
+**例外**：分组过滤逻辑（前厅/后厨/公司/临时兼职）按部门分组，长期兼职按部门归属，不受此规范影响。
+
+**检查清单：**
+- [ ] 新增员工类型判断时，搜索 `=== "parttime"` 确认是否需要同时处理 `longterm_parttime`
+- [ ] 使用 `isParttime` 辅助变量统一判断，避免遗漏
+- [ ] 新增员工类型时，同步更新所有相关的类型判断逻辑

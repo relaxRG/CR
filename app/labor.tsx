@@ -329,7 +329,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
 
   // slip/att/compareSlip 由父组件从响应式数组派生后传入，保证即时更新
   const deptColor = DEPT_COLORS[employee.dept];
-  const isParttime = employee.type === "parttime";
+  const isParttime = employee.type === "parttime" || employee.type === "longterm_parttime";
 
 
 
@@ -1001,7 +1001,7 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
     { key: "front",    label: "前厅",   color: "#007AFF", filter: (e: Employee) => e.dept === "front" && e.type !== "parttime" },
     { key: "kitchen",  label: "后厨",   color: "#34C759", filter: (e: Employee) => e.dept === "kitchen" && e.type !== "parttime" },
     { key: "company",  label: "公司",   color: "#722ED1", filter: (e: Employee) => e.dept === "other" && e.type !== "parttime" },
-    { key: "parttime", label: "临时山山", color: "#FF9500", filter: (e: Employee) => e.type === "parttime" },
+    { key: "parttime", label: "临时兼职", color: "#FF9500", filter: (e: Employee) => e.type === "parttime" },
   ], []);
   // 性能优化：预建查找 Map，将 render 循环中的 O(n) paySlips.find/attendances.find 降为 O(1)
   const rosterSlipMap = useMemo(() => {
