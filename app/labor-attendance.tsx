@@ -299,7 +299,8 @@ function EmployeeCard({
           {grid2.map((item) => (
             <View key={item.label} style={S.gridCell}>
               <Text style={{ fontSize: 10, color: colors.muted, marginBottom: 3 }}>{item.label}</Text>
-              <Text style={{ fontSize: 14, fontWeight: "700", color: item.color }}>
+              {/* 修复：加 adjustsFontSizeToFit 防止 iPhone SE 等小屏数字截断 */}
+              <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} style={{ fontSize: 14, fontWeight: "700", color: item.color }}>
                 {item.value !== 0 ? `${item.value < 0 ? "-" : ""}¥${formatMoney(Math.abs(item.value))}` : "—"}
               </Text>
             </View>
