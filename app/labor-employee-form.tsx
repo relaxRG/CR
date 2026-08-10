@@ -75,7 +75,6 @@ export default function LaborEmployeeFormScreen() {
   const [restDays, setRestDays] = useState(String(existing?.restDaysPerMonth ?? "4"));
   const [hourlyRate, setHourlyRate] = useState(String(existing?.hourlyRate ?? "35"));
   const [overtimeRate, setOvertimeRate] = useState(String(existing?.overtimeHourlyRate ?? "35"));
-  const [monthlyFixedSalary, setMonthlyFixedSalary] = useState(String(existing?.monthlyFixedSalary ?? "0"));
   // 当月工作天数（独立输入，1~31，默认当月天数）
   const [customDivDays, setCustomDivDays] = useState(
     existing ? "" : "" // 始终默认空（使用当月天数）
@@ -495,10 +494,9 @@ export default function LaborEmployeeFormScreen() {
       hourlyRate: Number(hourlyRate) || 0,
       // 加班时薪（实际计算依据：加班工资、调休兑现、兼职工资均使用此字段）
       overtimeHourlyRate: Number(overtimeRate) || Number(hourlyRate) || 0,
-      monthlyFixedSalary: Number(monthlyFixedSalary) || 0,
       weeklyHoursRules: weeklyHoursRules.length > 0 ? weeklyHoursRules : undefined,
       // 兼职计费模式：仅 parttime 类型有效，其他类型不保存
-      parttimeMode: type === "parttime" ? parttimeMode : undefined,
+      parttimeMode: (type === "parttime" || type === "longterm_parttime") ? parttimeMode : undefined,
       compOffRule: { enabled: compOffEnabled, hoursPerDay: Number(compOffHoursPerDay) || 8 },
       allowanceRules: allowanceRules.length > 0 ? allowanceRules : undefined,
       workKPIRules: workKPIRules.length > 0 ? workKPIRules : undefined,
@@ -637,13 +635,7 @@ export default function LaborEmployeeFormScreen() {
 
           {/* ── 工资设置 ── */}
           <SectionCard title="工资设置" colors={colors}>
-            {type === "longterm_parttime" && (
-              <FormRow label="月度固定薪资（长期兼职）" colors={colors}>
-                <TextInput value={monthlyFixedSalary} onChangeText={setMonthlyFixedSalary}
-                  placeholder="0" keyboardType="decimal-pad" placeholderTextColor={colors.muted}
-                  style={[S.input, { color: colors.foreground, borderColor: colors.border }]} />
-              </FormRow>
-            )}
+
             {isFulltime && (
               <>
                 <FormRow label="底薪（月）" required colors={colors}>
@@ -728,7 +720,7 @@ export default function LaborEmployeeFormScreen() {
               </>
             )}
             {/* 兼职员工：计费模式选择（按天 / 按小时） */}
-            {type === "parttime" && (
+            {(type === "parttime" || type === "longterm_parttime") && (
               <FormRow label="计费模式" colors={colors}>
                 <View style={{ flexDirection: "row", gap: 8 }}>
                   <TouchableOpacity onPress={() => { tap(); setParttimeMode("daily"); }}
@@ -743,7 +735,7 @@ export default function LaborEmployeeFormScreen() {
               </FormRow>
             )}
             {/* 兼职按天：日薪 */}
-            {type === "parttime" && parttimeMode === "daily" && (
+            {(type === "parttime" || type === "longterm_parttime") && parttimeMode === "daily" && (
               <FormRow label="兼职日薪" required colors={colors}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                   <TextInput value={baseSalary} onChangeText={setBaseSalary}
@@ -754,8 +746,8 @@ export default function LaborEmployeeFormScreen() {
               </FormRow>
             )}
             {/* 兼职按小时 / 全职正常时薪（仅作参考） */}
-            {(type !== "parttime" || parttimeMode === "hourly") && (
-              <FormRow label={type === "parttime" ? "兼职时薪" : "正常时薪（参考）"} required={type === "parttime"} colors={colors}>
+            {(type === "fulltime" || parttimeMode === "hourly") && (
+              <FormRow label={(type === "parttime" || type === "longterm_parttime") ? "兼职时薪" : "正常时薪（参考）"} required={type === "parttime" || type === "longterm_parttime"} colors={colors}>
                 <View style={{ gap: 6 }}>
                   <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
                     {[25, 30, 35, 40, 45].map((r) => (

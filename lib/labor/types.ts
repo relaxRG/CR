@@ -803,7 +803,6 @@ export interface Employee {
   incomeTax?: IncomeTaxConfig;
   notes: string;
   active: boolean;
-  monthlyFixedSalary: number;
   bankAccounts?: EmployeeBankAccount[];
   idNumber?: string;
   /** 身份证正面照片 URL */

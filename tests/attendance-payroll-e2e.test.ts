@@ -317,7 +317,6 @@ function makeEmployee(overrides: Partial<Employee> = {}): Employee {
     overtimeHourlyRate: 50,
     notes: "",
     active: true,
-    monthlyFixedSalary: 0,
     createdAt: "2024-01-01T00:00:00.000Z",
     compOffRule: { hoursPerDay: 8, enabled: true },
     ...overrides,

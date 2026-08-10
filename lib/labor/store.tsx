@@ -591,7 +591,11 @@ function AttendanceProvider({ children }: { children: React.ReactNode }) {
     // 特殊状态扣薪明细
     const specialStatusDeductions: Record<string, { count: number; deduction: number; name: string; multiplier: number }> = {};
 
-    // 先计算日薪（用于特殊状态扣薪）
+    // 兼职员工标识（longterm_parttime 和 parttime 都是兼职逻辑）
+    // 兼职不适用：节假日倍数工资、特殊状态扣薪（这些基于 dailyRate，对兼职无意义）
+    const isParttime = employee.type === "parttime" || employee.type === "longterm_parttime";
+
+    // 先计算日薪（用于特殊状态扣薪，兼职员工此值仅用于显示，不参与计算）
     const dailyRate = calcDailyRate(employee.baseSalary, daysInMonth, employee.restDaysPerMonth);
 
     empShifts.forEach((s) => {
@@ -625,32 +629,17 @@ function AttendanceProvider({ children }: { children: React.ReactNode }) {
             const contractH = getContractHoursForDate(employee, s.date);
             stdHoursTotal += contractH;
           }
-          // 按方向计算额外调整
-          if (dir === "positive" && specialStatus.salaryMultiplier > 1) {
-            // 正向补偿：额外给 (multiplier-1) 倍日薪
-            const dayBonus = Math.round(dailyRate * (specialStatus.salaryMultiplier - 1) * 100) / 100;
-            holidayBonus += dayBonus;
-            // 统计节假日上班天数
-            if (specialStatus.isHoliday) holidayWorkDays++;
-          } else if (dir === "negative") {
-            // 负向惩罚（上了班但违规）：额外扣 multiplier 倍日薪
-            const extraDeduction = Math.round(specialStatus.salaryMultiplier * dailyRate * 100) / 100;
-            const key = specialStatus.id;
-            if (!specialStatusDeductions[key]) {
-              specialStatusDeductions[key] = { count: 0, deduction: 0, name: specialStatus.name, multiplier: specialStatus.salaryMultiplier };
-            }
-            specialStatusDeductions[key].count++;
-            specialStatusDeductions[key].deduction += extraDeduction;
-          }
-          // neutral：不加不扣
-        } else {
-          // 不算出勤的特殊状态（如缺席、休息）
-          // 该天不加入 daysSet → 比例底薪自然少1天
-          if (dir === "negative") {
-            // 负向缺席：额外调整 = (multiplier - 1) × 日薪
-            // 旷工2x → 额外扣(2-1)=1天；病假0.5x → 退回(1-0.5)=0.5天；事假1x → 无额外调整
-            const extraDeduction = Math.round((specialStatus.salaryMultiplier - 1) * dailyRate * 100) / 100;
-            if (extraDeduction !== 0) {
+          // 按方向计算额外调整（兼职员工不适用节假日倍数和特殊状态扣薪）
+          if (!isParttime) {
+            if (dir === "positive" && specialStatus.salaryMultiplier > 1) {
+              // 正向补偿：额外给 (multiplier-1) 倍日薪
+              const dayBonus = Math.round(dailyRate * (specialStatus.salaryMultiplier - 1) * 100) / 100;
+              holidayBonus += dayBonus;
+              // 统计节假日上班天数
+              if (specialStatus.isHoliday) holidayWorkDays++;
+            } else if (dir === "negative") {
+              // 负向惩罚（上了班但违规）：额外扣 multiplier 倍日薪
+              const extraDeduction = Math.round(specialStatus.salaryMultiplier * dailyRate * 100) / 100;
               const key = specialStatus.id;
               if (!specialStatusDeductions[key]) {
                 specialStatusDeductions[key] = { count: 0, deduction: 0, name: specialStatus.name, multiplier: specialStatus.salaryMultiplier };
@@ -658,19 +647,39 @@ function AttendanceProvider({ children }: { children: React.ReactNode }) {
               specialStatusDeductions[key].count++;
               specialStatusDeductions[key].deduction += extraDeduction;
             }
-          } else if (dir === "positive") {
-            // 正向不出勤（如年假：不出勤但不扣薪）：退回1天日薪抵消比例底薪已少的那天
-            const refund = Math.round(specialStatus.salaryMultiplier * dailyRate * 100) / 100;
-            if (refund !== 0) {
-              const key = specialStatus.id;
-              if (!specialStatusDeductions[key]) {
-                specialStatusDeductions[key] = { count: 0, deduction: 0, name: specialStatus.name, multiplier: specialStatus.salaryMultiplier };
-              }
-              specialStatusDeductions[key].count++;
-              specialStatusDeductions[key].deduction -= refund; // 负数 = 退款
-            }
+            // neutral：不加不扣
           }
-          // neutral 不出勤（如普通休息）：无额外调整
+        } else {
+          // 不算出勤的特殊状态（如缺席、休息）
+          // 该天不加入 daysSet → 比例底薪自然少1天
+          // 兼职员工不适用特殊状态扣薪（按天结算则不计入出勤天数，按小时结算则不计入工时）
+          if (!isParttime) {
+            if (dir === "negative") {
+              // 负向缺席：额外调整 = (multiplier - 1) × 日薪
+              // 旷工2x → 额外扣(2-1)=1天；病分0.5x → 退回(1-0.5)=0.5天；事剘1x → 无额外调整
+              const extraDeduction = Math.round((specialStatus.salaryMultiplier - 1) * dailyRate * 100) / 100;
+              if (extraDeduction !== 0) {
+                const key = specialStatus.id;
+                if (!specialStatusDeductions[key]) {
+                  specialStatusDeductions[key] = { count: 0, deduction: 0, name: specialStatus.name, multiplier: specialStatus.salaryMultiplier };
+                }
+                specialStatusDeductions[key].count++;
+                specialStatusDeductions[key].deduction += extraDeduction;
+              }
+            } else if (dir === "positive") {
+              // 正向不出勤（如年假：不出勤但不扣薪）：退回1天日薪抒消比例底薪已少的那天
+              const refund = Math.round(specialStatus.salaryMultiplier * dailyRate * 100) / 100;
+              if (refund !== 0) {
+                const key = specialStatus.id;
+                if (!specialStatusDeductions[key]) {
+                  specialStatusDeductions[key] = { count: 0, deduction: 0, name: specialStatus.name, multiplier: specialStatus.salaryMultiplier };
+                }
+                specialStatusDeductions[key].count++;
+                specialStatusDeductions[key].deduction -= refund; // 负数 = 退款
+              }
+            }
+            // neutral 不出勤（如普通休息）：无额外调整
+          }
         }
       } else {
         // ── 正常工作班次 ──

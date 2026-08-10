@@ -118,9 +118,7 @@ export default function LaborEmployeeProfileScreen() {
 
         {/* ── 工资设置 ── */}
         <SectionCard title="工资设置" colors={colors}>
-          {emp.type === "longterm_parttime" && (
-            <InfoRow label="月度固定薪资" value={`¥${emp.monthlyFixedSalary ?? 0}`} colors={colors} />
-          )}
+
           {isFulltime && (
             <>
               <InfoRow label="底薪（月）" value={`¥${emp.baseSalary}`} colors={colors} />
