@@ -180,3 +180,33 @@ import { formatMoney } from "@/lib/utils";
 **例外情况：**
 - 超过 10,000 的大额数据，可使用自定义的 `fmtAmt` 函数缩写为 `X.X万`。
 - 非金额数据（如工时 `8.0h`、百分比 `12.5%`、纯数字变化量 `+345`）不受此规范限制，可继续使用 `toFixed`。
+
+## 10. 写入持久化存储后必须同步更新 React State
+
+凡是直接调用 `AsyncStorage.setItem`、`SecureStore.setItemAsync` 或封装函数（如 `saveDeviceInfo`、`pairWithCode`）写入持久化数据后，如果该数据被 React Context/State 管理，**必须同时调用对应的 `setState` 或触发引擎重启函数**。否则 UI 和引擎会读取到过期的 React State，导致功能失效。
+
+**典型 Bug 场景（退出同步组后无法重新加入）：**
+
+```ts
+// ❌ 错误：只写入 AsyncStorage，没有通知 SyncProvider
+await pairWithCode(code);
+// SyncProvider 的 deviceInfo state 仍为 null，同步引擎不会重启
+
+// ✅ 正确：写入后调用 restartSync 重启同步引擎
+await pairWithCode(code);
+void restartSync(); // 重置 startedRef + 重新执行 performSync + 重启实时监听
+```
+
+**规范要求：**
+
+在任何「写入持久化存储」的操作后，必须评估该数据是否被 React State 管理。如果是，必须选择以下方式之一同步更新：
+
+1. **直接 setState**：`setDeviceInfo(newInfo)`（适合简单数据更新）
+2. **调用引擎重启函数**：`restartSync()`（适合需要重新初始化整个引擎的场景）
+3. **触发 useEffect 重新读取**：通过修改依赖项（如 `setReloadKey(k+1)`）让 `useEffect` 重新从存储读取
+
+**检查清单（代码审查时）：**
+
+- [ ] 调用了 `AsyncStorage.setItem` 或封装的持久化函数后，是否有对应的 `setState`？
+- [ ] 如果没有 `setState`，是否有 `useEffect` 会在适当时机重新读取？
+- [ ] 如果是引擎级别的状态（如同步引擎的 `deviceInfo`），是否需要调用重启函数？
