@@ -254,9 +254,9 @@ describe("升级验证：unit 统一决定计算方式", () => {
     expect(calcAllowance(rule, 27).amount).toBe(405);
   });
 
-  it("meal_per_day 无 unit 字段 → 自动推断为 per_day", () => {
-    // 旧版 meal_per_day 规则可能没有 unit 字段
-    const rule: any = { id: "r1", type: "meal_per_day", label: "饭补", amount: 15, enabled: true };
+  it("meal_per_day 迁移后 unit=per_day → 正确乘以天数", () => {
+    // 旧版 meal_per_day 规则经过迁移后 unit 被补充为 "per_day"
+    const rule: any = { id: "r1", type: "meal_per_day", label: "饭补", amount: 15, unit: "per_day", enabled: true };
     expect(calcAllowance(rule, 27).amount).toBe(405);
   });
 

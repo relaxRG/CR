@@ -107,7 +107,9 @@ function EmployeeProvider({ children }: { children: React.ReactNode }) {
       "address" in e ||
       "idCardImageUri" in e ||
       "healthCertImageUri" in e ||
-      "weeklyHours" in e
+      "weeklyHours" in e ||
+      // P3 迁移：旧版 allowanceRules 可能无 unit 字段
+      (e.allowanceRules?.some((r: any) => !r.unit))
     );
     if (needsMigration) {
       console.log("[EmployeeProvider] 持久化迁移：清除废弃字段、迁移旧字段");
@@ -156,6 +158,14 @@ function EmployeeProvider({ children }: { children: React.ReactNode }) {
           if (rules.length > 0) next.weeklyHoursRules = rules;
         }
         delete next.weeklyHours;
+        // P3 迁移：为旧版 allowanceRules 补充 unit 字段
+        if (next.allowanceRules?.length) {
+          next.allowanceRules = next.allowanceRules.map((r: any) => {
+            if (r.unit) return r;
+            // 推断规则：meal_per_day → per_day，其他 → per_month
+            return { ...r, unit: r.type === "meal_per_day" ? "per_day" : "per_month" };
+          });
+        }
         return next;
       }));
     }
@@ -907,7 +917,7 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
     let mealAllowance = 0;
     let transportAllowance = 0;
     let otherAllowance = 0;
-    const allowanceDetails: Record<string, { amount: number; autoNote: string; isOverride: boolean }> = {};
+    const allowanceDetails: Record<string, { amount: number; autoNote: string; isOverride: boolean; calcBasis?: { formula: "rate_x_days" | "fixed" | "override"; rate?: number; days?: number; calculatedAt: number } }> = {};
 
     if (employee.allowanceRules) {
       const overrides = existing?.allowanceOverrides;
@@ -918,18 +928,26 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
         if (overrides && rule.id in overrides && !overrides[rule.id]) continue;
         const { amount: autoAmount, autoNote } = calcAllowance(rule, attendanceDays);
 
-        // 升级：区分动态补贴和固定补贴
-        // 动态补贴（per_day）：始终使用最新计算值，禁止 isOverride 锁定
-        // 固定补贴（per_month/quarter/year）：支持手动覆盖
-        const unit = rule.unit ?? (rule.type === "meal_per_day" ? "per_day" : "per_month");
-        const isDynamic = unit === "per_day";
+        // unit 已为必填字段，直接使用
+        const isDynamic = rule.unit === "per_day";
         const existingDetail = existing?.allowanceDetails?.[rule.id];
+        // 动态补贴禁止 isOverride，固定补贴支持手动覆盖
         const isOverride = isDynamic ? false : (existingDetail?.isOverride ?? false);
         const finalAmount = isOverride ? (existingDetail?.amount ?? autoAmount) : autoAmount;
 
-        allowanceDetails[rule.id] = { amount: finalAmount, autoNote, isOverride };
+        // 写入 calcBasis 审计字段
+        allowanceDetails[rule.id] = {
+          amount: finalAmount,
+          autoNote,
+          isOverride,
+          calcBasis: isDynamic
+            ? { formula: "rate_x_days", rate: rule.amount, days: attendanceDays, calculatedAt: Date.now() }
+            : isOverride
+              ? { formula: "override", calculatedAt: Date.now() }
+              : { formula: "fixed", calculatedAt: Date.now() },
+        };
 
-        // 分类统一按 unit 判断：per_day 归入 mealAllowance，transport_fixed 归入 transportAllowance
+        // 分类：per_day 归入 mealAllowance，transport_fixed 归入 transportAllowance
         if (rule.type === "transport_fixed") transportAllowance += finalAmount;
         else if (isDynamic || rule.type === "meal_per_day") mealAllowance += finalAmount;
         else otherAllowance += finalAmount;

@@ -131,8 +131,8 @@ export interface AllowanceRule {
   label: string;
   /** 金额 */
   amount: number;
-  /** 单位（新版，默认 per_month） */
-  unit?: AllowanceUnit;
+  /** 计算单位（必填：决定补贴是按天/月/季/年计算） */
+  unit: AllowanceUnit;
   /** 季度/年度发放模式（仅 per_quarter/per_year 时有效） */
   periodMode?: AllowancePeriodMode;
   /** 补贴生效月（YYYY-MM 格式，滚动模式下用于计算发放月） */
@@ -148,13 +148,13 @@ export interface AllowanceRule {
  * @returns 是否在该月发放
  */
 export function shouldPayAllowanceThisMonth(rule: AllowanceRule, month: string): boolean {
-  const unit = rule.unit ?? "per_month";
-  if (unit === "per_day" || unit === "per_month") return true;
+  // unit 已为必填字段，无需推断
+  if (rule.unit === "per_day" || rule.unit === "per_month") return true;
 
   const mode = rule.periodMode ?? "natural";
   const [y, m] = month.split("-").map(Number);
 
-  if (unit === "per_quarter") {
+  if (rule.unit === "per_quarter") {
     if (mode === "natural") {
       // 自然季度：在季度末月发放（3、6、9、12月）
       return m === 3 || m === 6 || m === 9 || m === 12;
@@ -167,7 +167,7 @@ export function shouldPayAllowanceThisMonth(rule: AllowanceRule, month: string):
     }
   }
 
-  if (unit === "per_year") {
+  if (rule.unit === "per_year") {
     if (mode === "natural") {
       // 自然年度：在12月发放
       return m === 12;
@@ -1095,7 +1095,18 @@ export interface PaySlip {
     maternity: number;
   };
   /** 补贴明细 */
-  allowanceDetails?: Record<string, { amount: number; autoNote: string; isOverride: boolean }>;
+  allowanceDetails?: Record<string, {
+    amount: number;
+    autoNote: string;
+    isOverride: boolean;
+    /** 审计字段：记录计算依据，便于追溯和调试 */
+    calcBasis?: {
+      formula: "rate_x_days" | "fixed" | "override";
+      rate?: number;
+      days?: number;
+      calculatedAt: number;
+    };
+  }>;
   /** 补贴本月生效状态覆盖（key: ruleId, value: 是否本月生效）
    * 用于持久化绩效补贴页中用户手动勾选/取消的补贴项状态 */
   allowanceOverrides?: Record<string, boolean>;
@@ -1344,18 +1355,13 @@ export function calcIncomeTax(
 export function calcAllowance(rule: AllowanceRule, attendanceDays: number): { amount: number; autoNote: string } {
   if (!rule.enabled) return { amount: 0, autoNote: "" };
 
-  // 升级：统一按 unit 字段决定计算方式
-  // 规则：
-  //   1. transport_fixed 始终为固定补贴（不受 unit 字段影响）
-  //   2. 其他类型按 unit 字段决定：per_day 乘天数，其余固定
-  //   3. meal_per_day 无 unit 字段时自动推断为 per_day
+  // unit 已为必填字段，直接使用，无需推断
+  // transport_fixed 始终为固定补贴（不受 unit 影响）
   if (rule.type === "transport_fixed") {
     return { amount: rule.amount, autoNote: `${rule.label}（固定）¥${rule.amount}` };
   }
 
-  const unit = rule.unit ?? (rule.type === "meal_per_day" ? "per_day" : "per_month");
-
-  if (unit === "per_day") {
+  if (rule.unit === "per_day") {
     // 动态补贴：金额 = 单价 × 出勤天数
     const total = Math.round(rule.amount * attendanceDays * 100) / 100;
     return {
