@@ -780,7 +780,7 @@ export default function MonthlySummaryScreen() {
                                     <Text style={[S.amtValue, { color: colors.foreground }]}>¥{formatMoney(grossAmt)}</Text>
                                   </View>
                                   <View style={S.amtBlock}>
-                                    <Text style={S.amtLabel}>预支</Text>
+                                    <Text style={S.amtLabel}>已预支</Text>
                                     <Text style={[S.amtValue, { color: advAmt > 0 ? colors.warning : colors.muted }]}>
                                       {advAmt > 0 ? `-¥${formatMoney(advAmt)}` : "0"}
                                     </Text>

@@ -260,7 +260,8 @@ function EmployeeCard({
     const allowance = (slip?.mealAllowance ?? 0) + (slip?.transportAllowance ?? 0) + (slip?.otherAllowance ?? 0);
     const reward = slip?.rewardPenalty ?? 0;
     const cashOut = slip?.compOffCashOut ?? 0;
-    const advance = advanceTotal;
+    // 已预支 = 手动预支 + 备用金已付（与展开状态保持一致）
+    const advance = advanceTotal + (slip?.pettyLaborPaid ?? 0);
     const gross = slip?.grossSalary ?? 0;
     const final = slip?.finalSalary ?? 0;
 
@@ -272,7 +273,7 @@ function EmployeeCard({
     ];
     const grid2 = [
       { label: "调休兑换", value: cashOut,  color: cashOut > 0 ? colors.success : colors.foreground },
-      { label: "预支",     value: -advance, color: advance > 0 ? colors.warning : colors.foreground },
+      { label: "已预支",   value: -advance, color: advance > 0 ? colors.warning : colors.foreground },
       { label: "应发",     value: gross,    color: colors.foreground },
       { label: "待发",     value: final,    color: colors.primary },
     ];
@@ -466,10 +467,11 @@ function EmployeeCard({
         {compOffCashOut > 0 && (
           <DetailRow label="本月调休兑换" value={`+¥${formatMoney(compOffCashOut)}`} colors={colors} positive />
         )}
-        <DetailRow label="预支小计" value={advanceTotal > 0 ? `-¥${formatMoney(advanceTotal)}` : "¥0"} colors={colors} negative={advanceTotal > 0} />
-        {(slip?.pettyLaborPaid ?? 0) > 0 && (
-          <DetailRow label="备用金已付" value={`-¥${formatMoney((slip!.pettyLaborPaid!))}`} colors={colors} negative />
-        )}
+        {/* 已预支 = 手动预支（advanceTotal）+ 备用金已付（pettyLaborPaid）合并展示 */}
+        {(() => {
+          const totalAdvance = advanceTotal + (slip?.pettyLaborPaid ?? 0);
+          return <DetailRow label="已预支" value={totalAdvance > 0 ? `-¥${formatMoney(totalAdvance)}` : "¥0"} colors={colors} negative={totalAdvance > 0} />;
+        })()}
       </View>
 
       {/* 备注 */}

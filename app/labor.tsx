@@ -238,7 +238,7 @@ function OverviewCard({ month, colors }: { month: string; colors: any }) {
         </View>
         <View style={[OV.divider, { backgroundColor: colors.border }]} />
         <View style={OV.item}>
-          <Text style={[OV.label, { color: colors.muted }]}>已发</Text>
+          <Text style={[OV.label, { color: colors.muted }]}>已预支</Text>
           <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={[OV.value, { color: colors.foreground }]}>
             {totalAdvancePaid > 0 ? `¥${formatMoney(totalAdvancePaid)}` : "—"}
           </Text>
@@ -612,7 +612,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
                 <Text style={{ fontSize: 10, fontWeight: "600", color: colors.muted }}>扣款</Text>
                 <View style={{ flexDirection: "row" }}>
                   {[
-                    { label: "预支小计", value: advance > 0 ? `-¥${formatMoney(advance)}` : "—", color: advance > 0 ? colors.error : colors.muted },
+                    { label: "已预支", value: advance > 0 ? `-¥${formatMoney(advance)}` : "—", color: advance > 0 ? colors.error : colors.muted },
                     { label: "社保代扣", value: si > 0 ? `-¥${formatMoney(si)}` : "—", color: si > 0 ? colors.error : colors.muted },
                     { label: "公积金代扣", value: hf > 0 ? `-¥${formatMoney(hf)}` : "—", color: hf > 0 ? colors.error : colors.muted },
                     { label: "个税代缴", value: tax > 0 ? `-¥${formatMoney(tax)}` : "—", color: tax > 0 ? colors.error : colors.muted },

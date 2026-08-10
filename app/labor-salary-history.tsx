@@ -107,8 +107,7 @@ export default function LaborSalaryHistoryScreen() {
                 { label: "年度应发合计", value: `¥${formatMoney(yearSummary.totalGross)}`, color: colors.foreground },
                 { label: "社保/公积金代扣", value: yearSummary.totalSI > 0 ? `-¥${formatMoney(yearSummary.totalSI)}` : "—", color: colors.error },
                 { label: "个人所得税", value: yearSummary.totalTax > 0 ? `-¥${formatMoney(yearSummary.totalTax)}` : "—", color: colors.error },
-                { label: "预支扣除", value: yearSummary.totalAdvance > 0 ? `-¥${formatMoney(yearSummary.totalAdvance)}` : "—", color: colors.warning },
-                ...(yearSummary.totalPettyPaid > 0 ? [{ label: "备用金已付", value: `-¥${formatMoney(yearSummary.totalPettyPaid)}`, color: colors.warning }] : []),
+                { label: "已预支", value: (yearSummary.totalAdvance + (yearSummary.totalPettyPaid ?? 0)) > 0 ? `-¥${formatMoney(yearSummary.totalAdvance + (yearSummary.totalPettyPaid ?? 0))}` : "—", color: colors.warning },
                 { label: "年度实发合计", value: `¥${formatMoney(yearSummary.totalFinal)}`, color: deptColor, bold: true },
               ].map(({ label, value, color, bold }) => (
                 <View key={label} style={{ flexDirection: "row", justifyContent: "space-between" }}>
