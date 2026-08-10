@@ -156,3 +156,27 @@ upsertShift({ employeeId, date, hoursValue: hv, specialStatusId });
 ```
 **规范要求：**
 在任何包含「清空」或「重置」语义的保存操作中，必须评估该记录是否还有存在的必要。如果无必要，必须调用对应的 `delete` / `remove` 方法彻底清除。
+
+## 9. 金额显示规范（智能小数位）
+
+为了保证全项目金额显示的统一性，并提供更简洁的视觉体验，所有金额展示必须使用 `formatMoney` 工具函数，**禁止在组件内直接调用 `.toFixed(0)` 或 `.toFixed(2)`**。
+
+**规范要求：**
+- 整数金额不显示小数点（如 `¥9305`）
+- 有小数的金额统一保留两位（如 `¥345.50`）
+- 无特殊要求时，零值应根据上下文处理（有时显示 `—` 比显示 `¥0` 更清晰）
+
+**标准写法：**
+```tsx
+import { formatMoney } from "@/lib/utils";
+
+// 正确
+<Text>¥{formatMoney(item.price)}</Text>
+
+// 错误
+<Text>¥{item.price.toFixed(0)}</Text>
+<Text>¥{item.price.toFixed(2)}</Text>
+```
+**例外情况：**
+- 超过 10,000 的大额数据，可使用自定义的 `fmtAmt` 函数缩写为 `X.X万`。
+- 非金额数据（如工时 `8.0h`、百分比 `12.5%`、纯数字变化量 `+345`）不受此规范限制，可继续使用 `toFixed`。
