@@ -1059,6 +1059,10 @@ export interface PaySlip {
   attendanceSalary: number;
   /** 绩效奖金（工作绩效 + 业绩绩效）。精度：2位小数 */
   performanceBonus: number;
+  /** 工作绩效小计（workKPIRules 档位合计）。精度：2位小数 */
+  workKPIBonus?: number;
+  /** 业绩绩效小计（revenueKPIRules 阶梯合计）。精度：2位小数 */
+  revenueKPIBonus?: number;
   /** 业绩提点（营业额按比例提成）。精度：2位小数 */
   salesCommission: number;
   /** 餐补合计（per_day 规则：餐补日单价 × 出勤天数）。精度：2位小数 */

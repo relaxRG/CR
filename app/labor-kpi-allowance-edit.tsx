@@ -173,6 +173,9 @@ export default function LaborKPIAllowanceEditPage() {
       workKPISelections,
       revenueActuals: numericActuals,
       performanceBonus: performanceTotal,
+      // 分项绩效字段：保存工作绩效和业绩绩效小计，供展示页正确展示
+      workKPIBonus: workKPITotal,
+      revenueKPIBonus: revenueKPITotal,
     };
     upsertPaySlip(patched);
 

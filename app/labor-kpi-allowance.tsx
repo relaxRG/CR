@@ -72,6 +72,9 @@ export default function LaborKPIAllowancePage() {
   const transportAllowance = slip?.transportAllowance ?? 0;
   const otherAllowance = slip?.otherAllowance ?? 0;
   const performanceBonus = slip?.performanceBonus ?? 0;
+  // 分项绩效字段：优先使用新字段，旧数据回落到 performanceBonus（向后兼容）
+  const workKPIBonus = slip?.workKPIBonus ?? performanceBonus;
+  const revenueKPIBonus = slip?.revenueKPIBonus ?? 0;
   const salesCommission = slip?.salesCommission ?? 0;
   const allowanceTotal = mealAllowance + transportAllowance + otherAllowance;
   const grandTotal = allowanceTotal + performanceBonus + salesCommission;
@@ -114,12 +117,12 @@ export default function LaborKPIAllowancePage() {
             <View style={[S.summaryDivider, { backgroundColor: colors.border }]} />
             <View style={S.summaryItem}>
               <Text style={[S.summaryLabel, { color: colors.muted }]}>工作绩效</Text>
-              <Text style={[S.summaryValue, { color: colors.success }]}>¥{formatMoney(performanceBonus)}</Text>
+              <Text style={[S.summaryValue, { color: colors.success }]}>¥{formatMoney(workKPIBonus)}</Text>
             </View>
             <View style={[S.summaryDivider, { backgroundColor: colors.border }]} />
             <View style={S.summaryItem}>
               <Text style={[S.summaryLabel, { color: colors.muted }]}>业绩绩效</Text>
-              <Text style={[S.summaryValue, { color: colors.success }]}>¥{formatMoney(salesCommission)}</Text>
+              <Text style={[S.summaryValue, { color: colors.success }]}>¥{formatMoney(revenueKPIBonus)}</Text>
             </View>
           </View>
         </View>

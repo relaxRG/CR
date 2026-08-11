@@ -1055,6 +1055,9 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
       attendanceDays,
       attendanceSalary,
       performanceBonus: performanceTotal,
+      // 分项绩效字段：由 handleSave 写入，buildPaySlipDraft 从 existing 保留
+      workKPIBonus: existing?.workKPIBonus,
+      revenueKPIBonus: existing?.revenueKPIBonus,
       salesCommission: existing?.salesCommission ?? 0,
       mealAllowance,
       transportAllowance,
