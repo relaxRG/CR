@@ -28,11 +28,17 @@ export default function LaborKPIAllowancePage() {
   const insets = useSafeAreaInsets();
   const colors = useColors();
   const { employees } = useEmployeeStore();
-  const { getPaySlip } = usePaySlipStore();
+  // 关键修复：从 paySlips state 读取（而非 getPaySlip + ref.current）
+  // 原因：getPaySlip 依赖 ref（稳定引用），Stack Navigator 返回时 useMemo 不重新计算
+  // paySlips state 在 persist 时通过 setData 更新，会触发重新渲染
+  const { paySlips } = usePaySlipStore();
   const { getAttendance } = useAttendanceStore();
 
   const employee = useMemo(() => employees.find((e) => e.id === employeeId), [employees, employeeId]);
-  const slip = useMemo(() => (employeeId && month ? getPaySlip(employeeId, month) : null), [employeeId, month, getPaySlip]);
+  const slip = useMemo(
+    () => (employeeId && month ? paySlips.find((s) => s.employeeId === employeeId && s.month === month) ?? null : null),
+    [paySlips, employeeId, month]
+  );
 
   if (!employee) {
     return (

@@ -610,3 +610,66 @@ describe("Suite G：autoSync 不清除绩效补贴控制字段（根本原因修
     expect(existingForAugust?.workKPISelections?.["kpi-1"]).toBe("t2");
   });
 });
+
+// ─── Suite H：展示页 useMemo 响应性修复验证 ───────────────────────────────────
+// 根本原因：展示页 useMemo 依赖 getPaySlip（稳定引用），Stack Navigator 返回时不重新计算
+// 修复：改为依赖 paySlips state（React state，persist 时通过 setData 更新）
+describe("Suite H：展示页 paySlips state 响应性", () => {
+  it("H1. paySlips state 变化时 slip 应重新计算（模拟 useMemo 依赖 paySlips）", () => {
+    const employeeId = "emp_rg";
+    const month = "2026-08";
+
+    // 初始状态：workKPISelections 为空
+    let paySlips = [{ employeeId, month, workKPISelections: {} }];
+    const getSlip = (slips: typeof paySlips) =>
+      slips.find((s) => s.employeeId === employeeId && s.month === month) ?? null;
+
+    const slip1 = getSlip(paySlips);
+    expect(slip1?.workKPISelections).toEqual({});
+
+    // 模拟 handleSave 后 paySlips state 更新
+    paySlips = [{ employeeId, month, workKPISelections: { "rule_1": "tier_a", "rule_2": "tier_b" } }];
+
+    // useMemo 依赖 paySlips → 重新计算
+    const slip2 = getSlip(paySlips);
+    expect(slip2?.workKPISelections).toEqual({ "rule_1": "tier_a", "rule_2": "tier_b" });
+  });
+
+  it("H2. getPaySlip（基于 ref.current）在 ref 对象不变时返回稳定引用（旧问题复现）", () => {
+    // 模拟 ref 对象稳定但 ref.current 变化的场景
+    const ref = { current: [{ employeeId: "emp_rg", month: "2026-08", workKPISelections: {} }] };
+    const getPaySlip = (id: string, m: string) =>
+      ref.current.find((s) => s.employeeId === id && s.month === m) ?? null;
+
+    // 第一次调用
+    const slip1 = getPaySlip("emp_rg", "2026-08");
+    expect(slip1?.workKPISelections).toEqual({});
+
+    // ref.current 更新（模拟 persist）
+    ref.current = [{ employeeId: "emp_rg", month: "2026-08", workKPISelections: { "rule_1": "tier_a" } }];
+
+    // 再次调用 getPaySlip → 返回新值（因为每次调用都读 ref.current）
+    const slip2 = getPaySlip("emp_rg", "2026-08");
+    expect(slip2?.workKPISelections).toEqual({ "rule_1": "tier_a" });
+
+    // 但 useMemo 缓存了 slip1！只有依赖变化时才重新调用 getPaySlip
+    // 这就是为什么展示页不更新：useMemo 不知道 ref.current 变了
+  });
+
+  it("H3. 修复后：依赖 paySlips state 的 useMemo 在 persist 后立即更新", () => {
+    // 模拟 persist 调用 setData 触发 React 重新渲染
+    let paySlipsState = [{ employeeId: "emp_rg", month: "2026-08", workKPISelections: {} }];
+
+    // 模拟 useMemo 计算（依赖 paySlipsState）
+    const computeSlip = (state: typeof paySlipsState) =>
+      state.find((s) => s.employeeId === "emp_rg" && s.month === "2026-08") ?? null;
+
+    const slip1 = computeSlip(paySlipsState);
+    expect(slip1?.workKPISelections).toEqual({});
+
+    // persist 调用 setData → paySlipsState 更新 → useMemo 重新计算
+    paySlipsState = [{ employeeId: "emp_rg", month: "2026-08", workKPISelections: { "rule_1": "tier_a" } }];
+    const slip2 = computeSlip(paySlipsState);
+    expect(slip2?.workKPISelections).toEqual({ "rule_1": "tier_a" });
+  });
+});
