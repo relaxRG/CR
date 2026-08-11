@@ -567,3 +567,67 @@ describe("Suite L：比例底薪异常边界与精度守卫", () => {
     expect(calcAttendanceBaseSalary(dailyRate, 27, 26)).toBe(10384.62);
   });
 });
+
+
+// ─── Suite M: 31天月请假与调休结算 ───────────────────────────────────────────
+
+describe("Suite M：31天、月休4天的请假与调休底薪结算", () => {
+  const month31 = "2026-07";
+  const employee31 = makeEmployee({ baseSalary: 10000, restDaysPerMonth: 4, overtimeHourlyRate: 50, stdHoursPerDay: 8 });
+  const dailyRate31 = 10000 / 27;
+
+  const normalShifts = Array.from({ length: 26 }, (_, index) =>
+    makeShift(`${month31}-${String(index + 1).padStart(2, "0")}`, 8)
+  );
+
+  it("M1. 事假不计出勤：27 个应出勤日只排 26 天，底薪只发 26 天且无重复扣减", () => {
+    const shifts = [...normalShifts, makeShift("2026-07-27", 0, "ss_personal")];
+    const result = calculateAttendanceFromShifts({
+      employeeId: "emp-001", month: month31, employee: employee31, shifts, specialStatuses: DEFAULT_SPECIAL_STATUSES,
+    });
+    expect(result.expectedAttendanceDays).toBe(27);
+    expect(result.attendanceDays).toBe(26);
+    expect(result.proportionalBaseSalary).toBe(Math.round(dailyRate31 * 26 * 100) / 100);
+    expect(result.totalSpecialDeduction).toBe(0);
+    expect(result.attendanceSalary).toBe(9629.63);
+  });
+
+  it("M2. 病假不计出勤但按 0.5 倍日薪结算：在缺勤基数上返还半天工资", () => {
+    const shifts = [...normalShifts, makeShift("2026-07-27", 0, "ss_sick")];
+    const result = calculateAttendanceFromShifts({
+      employeeId: "emp-001", month: month31, employee: employee31, shifts, specialStatuses: DEFAULT_SPECIAL_STATUSES,
+    });
+    const halfDay = Math.round(dailyRate31 * 0.5 * 100) / 100;
+    expect(result.attendanceDays).toBe(26);
+    expect(result.specialStatusDeductions.ss_sick?.deduction).toBe(-halfDay);
+    expect(result.totalSpecialDeduction).toBe(-halfDay);
+    expect(result.attendanceSalary).toBe(Math.round((dailyRate31 * 26 + halfDay) * 100) / 100);
+  });
+
+  it("M3. 有足额调休余额时，调休计为带薪出勤：满 27 天底薪不扣，加班费不凭空增加", () => {
+    const shifts = [...normalShifts, makeShift("2026-07-27", 0, "ss_comp_off_overtime")];
+    const result = calculateAttendanceFromShifts({
+      employeeId: "emp-001", month: month31, employee: employee31, shifts, specialStatuses: DEFAULT_SPECIAL_STATUSES,
+    });
+    expect(result.attendanceDays).toBe(27);
+    expect(result.compOffCount).toBe(1);
+    expect(result.proportionalBaseSalary).toBe(10000);
+    expect(result.overtimePay).toBe(0);
+    expect(result.attendanceSalary).toBe(10000);
+  });
+
+  it("M4. 调休只影响对应加班小时：26天每天10小时加一天调休，计薪加班小时扣除8h", () => {
+    const shifts = [
+      ...Array.from({ length: 26 }, (_, index) => makeShift(`${month31}-${String(index + 1).padStart(2, "0")}`, 10)),
+      makeShift("2026-07-27", 0, "ss_comp_off_overtime"),
+    ];
+    const result = calculateAttendanceFromShifts({
+      employeeId: "emp-001", month: month31, employee: employee31, shifts, specialStatuses: DEFAULT_SPECIAL_STATUSES,
+    });
+    // total=260h；标准=26×8+8=216h；原始加班44h；调休占用8h，计薪36h。
+    expect(result.overtimeHours).toBe(44);
+    expect(result.paidOvertimeHours).toBe(36);
+    expect(result.overtimePay).toBe(1800);
+    expect(result.attendanceSalary).toBe(11800);
+  });
+});

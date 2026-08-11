@@ -2795,9 +2795,23 @@ function SchHoursModal({ visible, date, employee, session, existing, contractHou
     const isSelected = existing?.specialStatusId === ss.id;
     if (isSelected) {
       onSave({ employeeId: employee.id, date, shift: existing?.shift ?? session, hoursValue: null, specialStatusId: undefined });
-    } else {
-      onSave({ employeeId: employee.id, date, shift: existing?.shift ?? session, hoursValue: null, specialStatusId: ss.id });
+      onClose();
+      return;
     }
+
+    // 调休状态会计入带薪出勤，必须在写入前校验对应来源至少有 1 天可用余额。
+    // ss_comp_off 为历史 ID，按加班余额语义兼容；balance 状态可优先使用任一来源的余额。
+    const availableDays = ss.id === "ss_comp_off_holiday"
+      ? holidayCompOffBalance
+      : ss.id === "ss_comp_off_balance"
+        ? compOffBalance + holidayCompOffBalance
+        : compOffBalance;
+    if (availableDays < 1) {
+      Alert.alert("调休余额不足", `「${ss.name}」至少需要 1 天可用调休余额，当前可用 ${availableDays.toFixed(1)} 天。`);
+      return;
+    }
+
+    onSave({ employeeId: employee.id, date, shift: existing?.shift ?? session, hoursValue: null, specialStatusId: ss.id });
     onClose();
   };
 
@@ -3550,6 +3564,132 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
     );
   };
 
+  /**
+   * 异常纠错：强制清空当前月的全部排班，并立即将排班派生的考勤/薪资重算为零。
+   *
+   * 它与“生成薪资单”职责分离：本操作保留绩效、固定补贴、奖惩、预支和调休兑现等
+   * 独立人工字段，只撤销排班、考勤工资、节假日换休分配及本月尚未使用的节假日调休权益。
+   */
+  const handleForceClearCurrentMonthSchedule = useCallback(() => {
+    if (!isMonthWritable(currentMonth)) {
+      Alert.alert("已锁定", "本月已确认发薪。如需纠错，请先在月报中进入差额调整模式。");
+      return;
+    }
+
+    const entriesToClear = getShifts(currentMonth);
+
+    const consumedHolidayEntry = compOffEntriesSched.find((entry) =>
+      entry.source === "holiday" && entry.earnedMonth === currentMonth &&
+      (entry.status === "used_rest" || entry.status === "cashed_out")
+    );
+    if (consumedHolidayEntry) {
+      Alert.alert(
+        "无法安全清空",
+        "本月节假日调休权益已被使用或兑现。请先在调休明细中完成差额处理，避免清空排班后留下无法追溯的余额。",
+      );
+      return;
+    }
+
+    Alert.alert(
+      "强制清空本月排班",
+      entriesToClear.length > 0
+        ? `将删除 ${entriesToClear.length} 条排班，并把所有在职员工的排班派生考勤工资重新计算。绩效、固定补贴、奖惩、预支和调休兑现不会被删除。`
+        : "本月当前没有排班记录；将强制重算所有在职员工，以清零可能残留的排班派生考勤工资。绩效、固定补贴、奖惩、预支和调休兑现不会被删除。",
+      [
+        { text: "取消", style: "cancel" },
+        {
+          text: "继续",
+          style: "destructive",
+          onPress: () => Alert.alert(
+            "最后确认",
+            `确认清空 ${currentMonth} 的全部排班？该操作将同步清零排班派生的出勤、比例底薪、加班费和节假日补偿。`,
+            [
+              { text: "取消", style: "cancel" },
+              {
+                text: "确认清空",
+                style: "destructive",
+                onPress: () => {
+                  batchDeleteShifts(entriesToClear.map((entry) => ({
+                    employeeId: entry.employeeId,
+                    date: entry.date,
+                    shift: entry.shift,
+                  })));
+
+                  const activeEmps = employees.filter((employee) => employee.active && !employee.archived);
+                  const [currentYear] = currentMonth.split("-");
+                  for (const employee of activeEmps) {
+                    const existingSlip = getPaySlip(employee.id, currentMonth);
+
+                    // 回退本月调休排班曾消费的余额。多个班次可能消费同一条余额，必须先按 entryId 聚合，
+                    // 再一次性恢复，否则第一笔恢复为 available 后会使后续使用记录被跳过。
+                    const usedDaysByEntry = new Map<string, number>();
+                    for (const usage of Object.values(existingSlip?.compOffUsage ?? {})) {
+                      usedDaysByEntry.set(usage.entryId, (usedDaysByEntry.get(usage.entryId) ?? 0) + usage.days);
+                    }
+                    for (const [entryId, usedDays] of usedDaysByEntry) {
+                      const entry = getCompOffEntries(employee.id).find((item) => item.id === entryId);
+                      if (entry?.status === "used_rest" && entry.usedMonth === currentMonth) {
+                        updateCompOffEntry(entry.id, {
+                          status: "available",
+                          days: entry.days + usedDays,
+                          usedMonth: undefined,
+                          notes: "本月排班已强制清空，恢复此前消费的调休余额",
+                        });
+                      }
+                    }
+
+                    // 节假日上班选择换休而产生、且尚未使用的权益随其源排班一并作废，保留 expired 记录供审计。
+                    for (const entry of getCompOffEntries(employee.id)) {
+                      if (entry.source === "holiday" && entry.earnedMonth === currentMonth && entry.status === "available") {
+                        updateCompOffEntry(entry.id, {
+                          status: "expired",
+                          notes: "本月源排班已强制清空，节假日调休权益作废",
+                        });
+                      }
+                    }
+
+                    const emptyAttendance = calcFromShifts(employee.id, currentMonth, employee, [], specialStatuses, []);
+                    upsertAttendance(emptyAttendance);
+                    const advanceTotal = advances
+                      .filter((advance) => advance.employeeId === employee.id && (advance.deductMonth === currentMonth || advance.date.startsWith(currentMonth)) && (advance.status === "pending" || advance.status === "deducted"))
+                      .reduce((sum, advance) => sum + advance.amount, 0);
+                    const previousSlips = paySlips.filter((slip) =>
+                      slip.employeeId === employee.id && slip.month.startsWith(currentYear) && slip.month < currentMonth
+                    );
+                    const taxThreshold = employee.incomeTax?.threshold ?? 5000;
+                    const taxSpecialDeductions = employee.incomeTax?.specialDeductions ?? 0;
+                    const cumulativeIncome = previousSlips.reduce((sum, slip) => sum + Math.max(0,
+                      slip.grossSalary - (slip.socialInsuranceDeduction ?? 0) - (slip.housingFundDeduction ?? 0) - taxThreshold - taxSpecialDeductions
+                    ), 0);
+                    const cumulativeTaxPaid = previousSlips.reduce((sum, slip) => sum + (slip.incomeTax ?? 0), 0);
+                    const correctedSlip = buildPaySlipDraft(
+                      employee,
+                      currentMonth,
+                      emptyAttendance,
+                      existingSlip?.performanceBonus ?? 0,
+                      advanceTotal,
+                      globalSettings,
+                      cumulativeIncome,
+                      cumulativeTaxPaid,
+                    );
+                    // 这两项仅由已删除的排班产生；不能在空排班薪资单中继续残留。
+                    correctedSlip.holidayBonusAllocation = undefined;
+                    correctedSlip.compOffUsage = undefined;
+                    upsertPaySlip(correctedSlip);
+                  }
+                  setSelectedCells(new Set());
+                  setEditMode(false);
+                  setGenResult(`✅ 已清空 ${currentMonth} 排班，并重算 ${activeEmps.length} 人的考勤工资`);
+                  setTimeout(() => setGenResult(null), 5000);
+                },
+              },
+            ],
+          ),
+        },
+      ],
+    );
+  }, [isMonthWritable, currentMonth, getShifts, compOffEntriesSched, batchDeleteShifts, employees, getPaySlip, getCompOffEntries, updateCompOffEntry, calcFromShifts, specialStatuses, upsertAttendance, advances, paySlips, buildPaySlipDraft, globalSettings, upsertPaySlip]);
+
   // 排班数据自动同步薪资单：每次 shifts 变化时自动重算当月已有排班的员工薪资单
   const autoSyncTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   React.useEffect(() => {
@@ -3917,11 +4057,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
    * 生成薪资单入口：扫描当月全部活跃员工的节假日上班记录，若有尚未决策的项目则弹出选择 Modal；
    * 若全部已有历史决策则直接生成。
    */
-  const handleGeneratePayroll = useCallback(() => {
-    if (!isMonthWritable(currentMonth)) {
-      Alert.alert("已锁定", "本月已确认发薪，如需修改请先进入差额调整模式。");
-      return;
-    }
+  const continueGeneratePayroll = useCallback(() => {
     const activeEmps = employees.filter((e) => e.active && !e.archived);
     const decisions: HolidayDecisionItem[] = [];
     for (const emp of activeEmps) {
@@ -3957,7 +4093,26 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
     } else {
       runPayrollGeneration([]);
     }
-  }, [isMonthWritable, currentMonth, employees, getShifts, calcFromShifts, specialStatuses, getHolidayForDate, getPaySlip, runPayrollGeneration]);
+  }, [currentMonth, employees, getShifts, calcFromShifts, specialStatuses, getHolidayForDate, getPaySlip, runPayrollGeneration]);
+
+  /**
+   * 结算入口只负责生成薪资单；异常排班必须使用独立的“强制清空本月排班”流程纠正。
+   */
+  const handleGeneratePayroll = useCallback(() => {
+    if (!isMonthWritable(currentMonth)) {
+      Alert.alert("已锁定", "本月已确认发薪，如需修改请先进入差额调整模式。");
+      return;
+    }
+    const activeCount = employees.filter((employee) => employee.active && !employee.archived).length;
+    Alert.alert(
+      "确认生成薪资单",
+      `将按 ${currentMonth} 当前排班为 ${activeCount} 名在职员工生成或更新薪资单。已有绩效、补贴、预支和调休结算会按既有规则保留。此操作不会清空错误排班。`,
+      [
+        { text: "取消", style: "cancel" },
+        { text: "确认生成", onPress: continueGeneratePayroll },
+      ],
+    );
+  }, [isMonthWritable, currentMonth, employees, continueGeneratePayroll]);
 
   const editContractH = editEmployee && editDate ? getContractHoursForDate(editEmployee, editDate) : 0;
 
@@ -4225,6 +4380,11 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
             <TouchableOpacity onPress={() => { tap(); deleteSelected(); }}
               style={[EXL.gearBtn, { backgroundColor: selectedCells.size > 0 ? colors.error + "22" : colors.border + "22", width: "auto", paddingHorizontal: 10 }]}>
               <Text style={{ fontSize: 11, fontWeight: "600", color: selectedCells.size > 0 ? colors.error : colors.muted }}>🗑 删除选中</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => { tap(); handleForceClearCurrentMonthSchedule(); }}
+              accessibilityLabel="强制清空本月排班并重算考勤工资"
+              style={[EXL.gearBtn, { backgroundColor: colors.error + "12", width: "auto", paddingHorizontal: 9 }]}>
+              <Text style={{ fontSize: 11, fontWeight: "700", color: colors.error }}>清空本月</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => { tap(); setEditMode(false); setSelectedCells(new Set()); }}
               style={[EXL.gearBtn, { backgroundColor: colors.border + "44", width: "auto", paddingHorizontal: 10 }]}>
