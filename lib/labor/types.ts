@@ -1259,7 +1259,9 @@ export function calcProportionalBase(
   attendanceDays: number,
   expectedAttendanceDays: number
 ): number {
+  // 防护：<= 0 无法拦截 NaN（NaN <= 0 为 false），需单独判断
   if (attendanceDays <= 0 || expectedAttendanceDays <= 0) return 0;
+  if (isNaN(attendanceDays) || isNaN(expectedAttendanceDays)) return 0;
   return Math.round((baseSalary * attendanceDays / expectedAttendanceDays) * 100) / 100;
 }
 

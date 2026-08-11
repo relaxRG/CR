@@ -2564,7 +2564,10 @@ function SchShiftModal({ visible, date, employee, session, existing, contractHou
     tap();
     const isSelected = existing?.specialStatusId === ss.id;
     if (isSelected) {
-      // 再次点击已选中的特殊状态 → 取消（恢复为普通班次，保留已有工时）
+      // 再次点击已选中的特殊状态 → 取消
+      // 修复：如果 existingHours=null（特殊状态清除了工时），直接删除记录而非保存空记录
+      if (existingHours === null) { onClear(); onClose(); return; }
+      // 恢复为普通班次，保留已有工时
       onSave({ employeeId: employee.id, date, shift: session, hoursValue: existingHours, specialStatusId: undefined });
     } else {
       // 保留已有工时，只更新特殊状态
@@ -2578,6 +2581,8 @@ function SchShiftModal({ visible, date, employee, session, existing, contractHou
     tap();
     const isSelected = existing?.specialStatusId === ss.id;
     if (isSelected) {
+      // 修复：调休换休会清除工时（hoursValue=null），取消时应删除记录而非保存空记录
+      if (existingHours === null) { onClear(); onClose(); return; }
       onSave({ employeeId: employee.id, date, shift: session, hoursValue: existingHours, specialStatusId: undefined });
     } else {
       onSave({ employeeId: employee.id, date, shift: session, hoursValue: null, specialStatusId: ss.id });

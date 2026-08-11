@@ -631,7 +631,8 @@ function AttendanceProvider({ children }: { children: React.ReactNode }) {
     const empShifts = shifts.filter((s) => s.employeeId === employeeId && s.date.startsWith(month));
 
     // 应出勤天数（自动计算）
-    const expectedAttendanceDays = Math.max(0, daysInMonth - employee.restDaysPerMonth);
+    // 防护：restDaysPerMonth 可能在旧版数据中缺失（undefined），?? 0 防止 NaN 传播
+    const expectedAttendanceDays = Math.max(0, daysInMonth - (employee.restDaysPerMonth ?? 0));
 
     // 加班换休配置
     const hoursPerCompOff = employee.compOffRule?.hoursPerDay ?? 8;
@@ -652,7 +653,7 @@ function AttendanceProvider({ children }: { children: React.ReactNode }) {
     const isParttime = employee.type === "parttime" || employee.type === "longterm_parttime";
 
     // 先计算日薪（用于特殊状态扣薪，兼职员工此值仅用于显示，不参与计算）
-    const dailyRate = calcDailyRate(employee.baseSalary, daysInMonth, employee.restDaysPerMonth);
+    const dailyRate = calcDailyRate(employee.baseSalary, daysInMonth, employee.restDaysPerMonth ?? 0);
 
     empShifts.forEach((s) => {
       const specialStatus = s.specialStatusId
