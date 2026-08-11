@@ -297,7 +297,7 @@ export default function MonthlySummaryScreen() {
     upsertInventoryConfig, resetInventoryConfigs,
     getPettyCodeConfig, getInventoryConfig,
   } = useMonthlySummaryStore();
-  const { employees } = useEmployeeStore();
+  const { employees, ready: employeesReady } = useEmployeeStore();
   const { deptOrder } = useDeptOrderStore();
   const paySlipStore = usePaySlipStore();
   const {
@@ -352,6 +352,8 @@ export default function MonthlySummaryScreen() {
   // ── 自动同步：paySlips 变化时自动更新月报 labor lineItems（防抖 800ms）──
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const syncLaborLineItems = useCallback((month: string) => {
+    // 关键修复：employees 未加载完成时不执行，防止 label 写入 employeeId
+    if (!employeesReady || employees.length === 0) return;
     const slips = paySlipStore?.paySlips?.filter((s: any) => s.month === month) ?? [];
     if (slips.length === 0) return;
     const r = getReport(month);
@@ -379,7 +381,7 @@ export default function MonthlySummaryScreen() {
     const newLineItems = [...existingNonLabor, ...laborItems];
     const totalLabor = laborItems.reduce((s: number, i: any) => s + Math.abs(i.amount), 0);
     upsertReport({ ...r, lineItems: newLineItems, totalLabor, updatedAt: new Date().toISOString() });
-  }, [paySlipStore, employees, getReport, upsertReport]);
+  }, [paySlipStore, employees, employeesReady, getReport, upsertReport]);
 
   useEffect(() => {
     if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
@@ -387,7 +389,7 @@ export default function MonthlySummaryScreen() {
       syncLaborLineItems(selectedMonth);
     }, 800);
     return () => { if (syncTimerRef.current) clearTimeout(syncTimerRef.current); };
-  }, [paySlipStore?.paySlips, selectedMonth, syncLaborLineItems]);
+  }, [paySlipStore?.paySlips, selectedMonth, syncLaborLineItems, employees]);
 
   const handleSaveManualItem = (item: SummaryLineItem) => {
     const r = getOrCreateReport();
