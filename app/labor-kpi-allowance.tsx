@@ -32,7 +32,8 @@ export default function LaborKPIAllowancePage() {
   // 原因：getPaySlip 依赖 ref（稳定引用），Stack Navigator 返回时 useMemo 不重新计算
   // paySlips state 在 persist 时通过 setData 更新，会触发重新渲染
   const { paySlips } = usePaySlipStore();
-  const { getAttendance } = useAttendanceStore();
+  // 防御性修复：订阅 records state，确保考勤数据变化时 attendanceDays useMemo 能重新计算
+  const { getAttendance, records: attendanceRecords } = useAttendanceStore();
 
   const employee = useMemo(() => employees.find((e) => e.id === employeeId), [employees, employeeId]);
   const slip = useMemo(
@@ -60,10 +61,11 @@ export default function LaborKPIAllowancePage() {
   const revenueActuals = slip?.revenueActuals ?? {};
 
   // 出勤天数（用于日补贴展示）
+  // 防御性修复：加入 attendanceRecords 依赖，确保考勤数据更新时重新计算
   const attendanceDays = useMemo(() => {
     if (!employeeId || !month) return 0;
     return getAttendance(employeeId, month)?.attendanceDays ?? 0;
-  }, [employeeId, month, getAttendance]);
+  }, [employeeId, month, getAttendance, attendanceRecords]);
 
   // 从 PaySlip 读取已保存的合计数据
   const mealAllowance = slip?.mealAllowance ?? 0;

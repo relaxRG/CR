@@ -32,7 +32,8 @@ export default function LaborKPIAllowanceEditPage() {
   const colors = useColors();
   const { employees } = useEmployeeStore();
   const { getPaySlip, upsertPaySlip, buildPaySlipDraft } = usePaySlipStore();
-  const { getAttendance } = useAttendanceStore();
+  // 防御性修复：订阅 records state，确保考勤数据变化时 attendanceDays useMemo 能重新计算
+  const { getAttendance, records: attendanceRecords } = useAttendanceStore();
   const { settings: globalSettings } = useGlobalPayrollSettingsStore();
   const { isMonthWritable } = usePayrollConfirmationStore();
 
@@ -92,10 +93,11 @@ export default function LaborKPIAllowanceEditPage() {
   const revenueKPIRules = employee.revenueKPIRules ?? [];
 
   // ── 获取当月出勤天数（用于日补贴计算） ──
+  // 防御性修复：加入 attendanceRecords 依赖，确保考勤数据更新时重新计算
   const attendanceDays = useMemo(() => {
     if (!employeeId || !month) return 0;
     return getAttendance(employeeId, month)?.attendanceDays ?? 0;
-  }, [employeeId, month, getAttendance]);
+  }, [employeeId, month, getAttendance, attendanceRecords]);
 
   // ── 实时预览合计（基于本地 State，不影响 Store） ──
   const allowanceTotal = useMemo(() => {
