@@ -77,7 +77,8 @@ export default function LaborKPIAllowancePage() {
   const revenueKPIBonus = slip?.revenueKPIBonus ?? 0;
   const salesCommission = slip?.salesCommission ?? 0;
   const allowanceTotal = mealAllowance + transportAllowance + otherAllowance;
-  const grandTotal = allowanceTotal + performanceBonus + salesCommission;
+  // grandTotal = 补贴 + 工作绩效 + 业绩绩效（不含 salesCommission 业绩提点，业绩提点是营业额提成，不属于绩效补贴页范畴）
+  const grandTotal = allowanceTotal + performanceBonus;
 
   return (
     <ScreenContainer>

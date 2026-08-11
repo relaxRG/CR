@@ -163,6 +163,7 @@ export function buildPayrollWorkbook(params: ExportParams): XLSX.WorkBook {
       // 综合额外
       const allowanceTotal = (slip?.mealAllowance ?? 0) + (slip?.transportAllowance ?? 0) + (slip?.otherAllowance ?? 0);
       const performanceBonus = slip?.performanceBonus ?? 0;
+      const workKPIBonus = slip?.workKPIBonus ?? performanceBonus; // 工作绩效分项，向后兼容
       const salesCommission = slip?.salesCommission ?? 0; // 业绩提点
       const rewardPenalty = slip?.rewardPenalty ?? 0;
       const compOffCashOut = slip?.compOffCashOut ?? 0;
@@ -203,7 +204,7 @@ export function buildPayrollWorkbook(params: ExportParams): XLSX.WorkBook {
         +attendanceSalary.toFixed(2),
         // 综合额外
         +allowanceTotal.toFixed(2),
-        +performanceBonus.toFixed(2),
+        +workKPIBonus.toFixed(2),
         +salesCommission.toFixed(2),
         +rewardPenalty.toFixed(2),
         +compOffCashOut.toFixed(2),
@@ -305,7 +306,7 @@ export function buildPayrollWorkbook(params: ExportParams): XLSX.WorkBook {
         +(slip?.otherAllowance ?? 0).toFixed(2),
         +((slip?.mealAllowance ?? 0) + (slip?.transportAllowance ?? 0) + (slip?.otherAllowance ?? 0)).toFixed(2),
         // 绩效
-        +(slip?.performanceBonus ?? 0).toFixed(2),
+        +(slip?.workKPIBonus ?? slip?.performanceBonus ?? 0).toFixed(2),
         +(slip?.salesCommission ?? 0).toFixed(2), // 业绩提点
         // 奖惩
         +rewards.toFixed(2),
@@ -472,7 +473,7 @@ export function buildPayrollHtml(params: ExportParams): string {
           <td>¥${fmt(att?.holidayBonus)}</td>
           <td class="${specialDeduction > 0 ? "deduct" : ""}">-¥${fmt(specialDeduction)}</td>
           <td>¥${fmt(slip?.attendanceSalary)}</td>
-          <td>¥${fmt(slip?.performanceBonus)}</td>
+          <td>¥${fmt(slip?.workKPIBonus ?? slip?.performanceBonus)}</td>
           <td>¥${fmt(slip?.salesCommission)}</td>
           <td>¥${fmt(allowanceTotal)}</td>
           <td>¥${fmt(slip?.rewardPenalty)}</td>
@@ -825,6 +826,7 @@ export function buildCombinedWorkbook(params: ExportParams): XLSX.WorkBook {
       const attendanceSalary = slip?.attendanceSalary ?? 0;
       const allowanceTotal = (slip?.mealAllowance ?? 0) + (slip?.transportAllowance ?? 0) + (slip?.otherAllowance ?? 0);
       const performanceBonus = slip?.performanceBonus ?? 0;
+      const workKPIBonus = slip?.workKPIBonus ?? performanceBonus; // 工作绩效分项，向后兼容
       const salesCommission = slip?.salesCommission ?? 0;
       const rewardPenalty = slip?.rewardPenalty ?? 0;
       const compOffCashOut = slip?.compOffCashOut ?? 0;
@@ -849,7 +851,7 @@ export function buildCombinedWorkbook(params: ExportParams): XLSX.WorkBook {
         +proportionalBase.toFixed(2), +overtimeHours.toFixed(1), +overtimeAmount.toFixed(2),
         +holidayBonus.toFixed(2), specialDeduction > 0 ? -+specialDeduction.toFixed(2) : 0,
         +attendanceSalary.toFixed(2),
-        +allowanceTotal.toFixed(2), +performanceBonus.toFixed(2), +salesCommission.toFixed(2),
+        +allowanceTotal.toFixed(2), +workKPIBonus.toFixed(2), +salesCommission.toFixed(2),
         +rewardPenalty.toFixed(2), +compOffCashOut.toFixed(2),
         +grossSalary.toFixed(2),
         advance > 0 ? -+advance.toFixed(2) : 0,
@@ -1052,7 +1054,7 @@ export function buildCombinedHtml(params: ExportParams): string {
         <td>¥${fmt(proportionalBase)}</td><td>${fmt(att?.paidOvertimeHours ?? 0, 1)}h/¥${fmt(att?.overtimePay)}</td>
         <td>¥${fmt(att?.holidayBonus)}</td><td class="deduct">-¥${fmt(specialDeduction)}</td>
         <td>¥${fmt(slip?.attendanceSalary)}</td>
-        <td>¥${fmt(slip?.performanceBonus)}</td><td>¥${fmt(allowanceTotal)}</td><td>¥${fmt(slip?.rewardPenalty)}</td>
+        <td>¥${fmt(slip?.workKPIBonus ?? slip?.performanceBonus)}</td><td>¥${fmt(allowanceTotal)}</td><td>¥${fmt(slip?.rewardPenalty)}</td>
         <td>¥${fmt(slip?.grossSalary)}</td>
         <td class="deduct">-¥${fmt(slip?.socialInsuranceDeduction)}</td>
         <td class="deduct">-¥${fmt((slip?.advanceAmount ?? 0) + (slip?.pettyLaborPaid ?? 0))}</td>
