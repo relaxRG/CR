@@ -569,8 +569,10 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
             const allowanceSum = (slip.mealAllowance ?? 0) + (slip.transportAllowance ?? 0) + (slip.otherAllowance ?? 0);
             // 分项绩效：workKPIBonus = 工作绩效小计，向后兼容回落到 performanceBonus
             const workKPI = slip.workKPIBonus ?? slip.performanceBonus ?? 0;
-            // salesCommission = 业绩提点（营业额按比例提成），标签「业绩提点」与语义一致
-            const revenueKPI = slip.salesCommission ?? 0;
+            // 业绩 = 业绩绩效（revenueKPIBonus）+ 业绩提点（salesCommission）合并展示
+            // revenueKPIBonus = 绩效补贴页配置的业绩绩效规则合计
+            // salesCommission = 营业额按比例提成（业绩提点）
+            const revenueKPI = (slip.revenueKPIBonus ?? 0) + (slip.salesCommission ?? 0);
             const reward = slip.rewardPenalty ?? 0;
             const extraTotal = allowanceSum + workKPI + revenueKPI + reward;
             return (
@@ -580,7 +582,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
                   {[
                     { label: "补贴合计", value: allowanceSum > 0 ? `+¥${formatMoney(allowanceSum)}` : "—", color: allowanceSum > 0 ? colors.primary : colors.muted },
                     { label: "工作绩效", value: workKPI > 0 ? `+¥${formatMoney(workKPI)}` : "—", color: workKPI > 0 ? colors.success : colors.muted },
-                    { label: "业绩提点", value: revenueKPI > 0 ? `+¥${formatMoney(revenueKPI)}` : "—", color: revenueKPI > 0 ? colors.success : colors.muted },
+                    { label: "业绩", value: revenueKPI > 0 ? `+¥${formatMoney(revenueKPI)}` : "—", color: revenueKPI > 0 ? colors.success : colors.muted },
                     { label: "奖惩小计", value: reward !== 0 ? `${reward >= 0 ? "+" : ""}¥${formatMoney(reward)}` : "—", color: reward > 0 ? colors.success : reward < 0 ? colors.error : colors.muted },
                     { label: "综合小计", value: `${extraTotal >= 0 ? "+" : ""}¥${formatMoney(extraTotal)}`, color: extraTotal >= 0 ? colors.primary : colors.error },
                                     ].map(({ label, value, color }) => (

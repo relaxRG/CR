@@ -390,10 +390,13 @@ function EmployeeCard({
           <DetailRow label="餐补" value={`¥${formatMoney((slip?.mealAllowance ?? 0))}`} colors={colors} />
           <DetailRow label="交通补贴" value={`¥${formatMoney((slip?.transportAllowance ?? 0))}`} colors={colors} />
           {(slip?.otherAllowance ?? 0) > 0 && <DetailRow label="其他补贴" value={`¥${formatMoney((slip?.otherAllowance ?? 0))}`} colors={colors} />}
-          {/* 分项绩效：workKPIBonus = 工作绩效小计，向后兼容回落到 performanceBonus */}
+          {/* 工作绩效：workKPIBonus 分项，向后兼容回落到 performanceBonus */}
           <DetailRow label="工作绩效" value={`¥${formatMoney((slip?.workKPIBonus ?? slip?.performanceBonus ?? 0))}`} colors={colors} />
+          {/* 业绩绩效：revenueKPIBonus（绩效补贴页业绩绩效规则合计），有值才显示 */}
+          {(slip?.revenueKPIBonus ?? 0) > 0 && <DetailRow label="业绩绩效" value={`¥${formatMoney((slip?.revenueKPIBonus ?? 0))}`} colors={colors} />}
+          {/* 业绩提点：salesCommission（营业额按比例提成），有值才显示 */}
           {(slip?.salesCommission ?? 0) > 0 && <DetailRow label="业绩提点" value={`¥${formatMoney((slip?.salesCommission ?? 0))}`} colors={colors} />}
-          {/* 综合小计 = 补贴合计 + 工作绩效 + 业绩提点，与 buildPaySlipDraft 中 grossSalary 的构成保持一致 */}
+          {/* 综合小计 = 补贴合计 + 工作绩效 + 业绩绩效 + 业绩提点 */}
           <DetailRow label="综合小计" value={`¥${formatMoney(((slip?.performanceBonus ?? 0) + (slip?.mealAllowance ?? 0) + (slip?.transportAllowance ?? 0) + (slip?.otherAllowance ?? 0) + (slip?.salesCommission ?? 0)))}`} colors={colors} bold />
         </View>
       </TouchableOpacity>
