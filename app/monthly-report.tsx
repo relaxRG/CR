@@ -15,6 +15,7 @@
  */
 import React, { useMemo, useState } from "react";
 import { formatMoney } from "@/lib/utils";
+import { numericColor, NUMERIC_TONE } from "@/lib/theme/numeric-color-tokens";
 import {
   Alert, FlatList, Platform, Pressable, ScrollView,
   StyleSheet, Text, TouchableOpacity, View
@@ -479,9 +480,9 @@ export default function MonthlyReportScreen() {
                     <Text style={[S.dailyDate, { color: colors.muted }]}>{d.date.slice(5)}</Text>
                     <Text style={[S.dailyTotal, { color: colors.foreground }]}>¥{formatMoney(d.total)}</Text>
                     <View style={{ flexDirection: "row", gap: 8 }}>
-                      <Text style={{ fontSize: 10, color: "#FF9500" }}>微信¥{formatMoney(d.wechat)}</Text>
-                      <Text style={{ fontSize: 10, color: "#007AFF" }}>支付宝¥{formatMoney(d.alipay)}</Text>
-                      {d.meituan > 0 && <Text style={{ fontSize: 10, color: "#FF6B35" }}>美团¥{formatMoney(d.meituan)}</Text>}
+                      <Text style={{ fontSize: 10, color: numericColor(colors, NUMERIC_TONE.muted) }}>微信 ¥{formatMoney(d.wechat)}</Text>
+                      <Text style={{ fontSize: 10, color: numericColor(colors, NUMERIC_TONE.muted) }}>支付宝 ¥{formatMoney(d.alipay)}</Text>
+                      {d.meituan > 0 && <Text style={{ fontSize: 10, color: numericColor(colors, NUMERIC_TONE.muted) }}>美团 ¥{formatMoney(d.meituan)}</Text>}
                     </View>
                   </View>
                 ))}

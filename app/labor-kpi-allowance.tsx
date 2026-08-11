@@ -6,6 +6,7 @@
  */
 import React, { useMemo } from "react";
 import { formatMoney } from "@/lib/utils";
+import { numericColor, NUMERIC_TONE } from "@/lib/theme/numeric-color-tokens";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import * as Haptics from "expo-haptics";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -108,22 +109,22 @@ export default function LaborKPIAllowancePage() {
           <View style={S.summaryRow}>
             <View style={S.summaryItem}>
               <Text style={[S.summaryLabel, { color: colors.muted }]}>绩效补贴</Text>
-              <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65} style={[S.summaryValue, { color: colors.foreground }]}>¥{formatMoney(grandTotal)}</Text>
+              <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65} style={[S.summaryValue, { color: numericColor(colors, NUMERIC_TONE.primary) }]}>¥{formatMoney(grandTotal)}</Text>
             </View>
             <View style={[S.summaryDivider, { backgroundColor: colors.border }]} />
             <View style={S.summaryItem}>
               <Text style={[S.summaryLabel, { color: colors.muted }]}>补贴</Text>
-              <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65} style={[S.summaryValue, { color: colors.primary }]}>¥{formatMoney(allowanceTotal)}</Text>
+              <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65} style={[S.summaryValue, { color: numericColor(colors) }]}>¥{formatMoney(allowanceTotal)}</Text>
             </View>
             <View style={[S.summaryDivider, { backgroundColor: colors.border }]} />
             <View style={S.summaryItem}>
               <Text style={[S.summaryLabel, { color: colors.muted }]}>工作绩效</Text>
-              <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65} style={[S.summaryValue, { color: colors.success }]}>¥{formatMoney(workKPIBonus)}</Text>
+              <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65} style={[S.summaryValue, { color: numericColor(colors) }]}>¥{formatMoney(workKPIBonus)}</Text>
             </View>
             <View style={[S.summaryDivider, { backgroundColor: colors.border }]} />
             <View style={S.summaryItem}>
               <Text style={[S.summaryLabel, { color: colors.muted }]}>业绩绩效</Text>
-              <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65} style={[S.summaryValue, { color: colors.success }]}>¥{formatMoney(revenueKPIBonus)}</Text>
+              <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65} style={[S.summaryValue, { color: numericColor(colors) }]}>¥{formatMoney(revenueKPIBonus)}</Text>
             </View>
           </View>
         </View>
@@ -187,7 +188,7 @@ export default function LaborKPIAllowancePage() {
                       <View style={[S.readonlyChip, { borderColor: colors.success + "66", backgroundColor: colors.success + "15" }]}>
                         <Text style={{ fontSize: 12, color: colors.success, fontWeight: "600" }}>{selectedTier.label}</Text>
                       </View>
-                      <Text style={{ fontSize: 13, fontWeight: "600", color: selectedTier.amount >= 0 ? colors.success : colors.error }}>
+                      <Text style={{ fontSize: 13, fontWeight: "600", color: numericColor(colors, selectedTier.amount < 0 ? NUMERIC_TONE.negative : NUMERIC_TONE.value) }}>
                         {selectedTier.amount >= 0 ? `+¥${selectedTier.amount}` : `-¥${Math.abs(selectedTier.amount)}`}
                       </Text>
                     </View>
@@ -214,7 +215,7 @@ export default function LaborKPIAllowancePage() {
               <View key={rule.id} style={[S.itemRow, { borderBottomColor: colors.border, flexDirection: "column", alignItems: "stretch" }]}>
                 <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
                   <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>{rule.name}</Text>
-                  <Text style={{ fontSize: 14, fontWeight: "600", color: bonus > 0 ? colors.success : colors.muted }}>+¥{formatMoney(bonus)}</Text>
+                  <Text style={{ fontSize: 14, fontWeight: "600", color: bonus > 0 ? numericColor(colors) : numericColor(colors, NUMERIC_TONE.muted) }}>+¥{formatMoney(bonus)}</Text>
                 </View>
                 <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>
                   数据源：{REVENUE_KPI_SOURCE_LABELS[rule.source]}{rule.source === "category" ? ` · ${rule.categoryName}` : ""} · {REVENUE_KPI_PAY_MODE_LABELS[rule.payMode].split("（")[0]}
@@ -233,7 +234,7 @@ export default function LaborKPIAllowancePage() {
                     return (
                       <View key={tier.id} style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                         <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: reached ? colors.success : colors.border }} />
-                        <Text style={{ fontSize: 11, color: reached ? colors.success : colors.muted }}>
+                        <Text style={{ fontSize: 11, color: reached ? numericColor(colors) : numericColor(colors, NUMERIC_TONE.muted) }}>
                           ≥¥{tier.threshold.toLocaleString()} → {rule.calcType === "fixed" ? `+¥${tier.amount}` : `${(tier.amount * 100).toFixed(1)}%`}
                         </Text>
                       </View>

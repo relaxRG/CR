@@ -12,6 +12,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { formatMoney } from "@/lib/utils";
+import { numericColor, NUMERIC_TONE } from "@/lib/theme/numeric-color-tokens";
 import {
   Alert, Platform, ScrollView, StyleSheet,
   Text, TextInput, TouchableOpacity, View
@@ -274,16 +275,16 @@ function EmployeeCard({
     const final = slip?.finalSalary ?? 0;
 
     const grid1 = [
-      { label: "考勤工资", value: attendanceSalary, color: colors.foreground },
-      { label: "绩效",     value: performance,      color: colors.foreground },
-      { label: "补贴",     value: allowance,         color: colors.foreground },
-      { label: "奖惩",     value: reward,            color: reward < 0 ? colors.error : colors.foreground },
+      { label: "考勤工资", value: attendanceSalary, color: numericColor(colors) },
+      { label: "绩效",     value: performance,      color: numericColor(colors) },
+      { label: "补贴",     value: allowance,         color: numericColor(colors) },
+      { label: "奖惩",     value: reward,            color: numericColor(colors, reward < 0 ? NUMERIC_TONE.negative : NUMERIC_TONE.value) },
     ];
     const grid2 = [
-      { label: "调休兑换", value: cashOut,  color: colors.foreground },
-      { label: "已预支",   value: -advance, color: colors.foreground },
-      { label: "应发",     value: gross,    color: colors.foreground },
-      { label: "待发",     value: final,    color: colors.primary },
+      { label: "调休兑换", value: cashOut,  color: numericColor(colors) },
+      { label: "已预支",   value: -advance, color: numericColor(colors) },
+      { label: "应发",     value: gross,    color: numericColor(colors) },
+      { label: "待发",     value: final,    color: numericColor(colors, NUMERIC_TONE.primary) },
     ];
 
     return (
@@ -563,7 +564,10 @@ function DetailRow({ label, value, colors, bold, positive, negative, primary, mu
   label: string; value: string; colors: any; bold?: boolean; positive?: boolean; negative?: boolean; primary?: boolean; muted?: boolean;
 }) {
   // 普通收入、补贴和扣款只靠正负号表达；颜色只强调主结果、真实异常和次要信息。
-  const valueColor = primary ? colors.primary : negative ? colors.error : isMuted ? colors.muted : colors.foreground;
+  const valueColor = numericColor(
+    colors,
+    primary ? NUMERIC_TONE.primary : negative ? NUMERIC_TONE.negative : isMuted ? NUMERIC_TONE.muted : NUMERIC_TONE.value,
+  );
   return (
     <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 3 }}>
       {/* flex:1 + numberOfLines=1 防止 label 换行挤压 value 区域 */}

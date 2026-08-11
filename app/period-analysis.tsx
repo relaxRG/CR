@@ -9,6 +9,7 @@
  */
 import React, { useMemo, useState } from "react";
 import { formatMoney } from "@/lib/utils";
+import { numericColor } from "@/lib/theme/numeric-color-tokens";
 import {
   Alert, KeyboardAvoidingView, Modal, Platform, Pressable,
   ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View
@@ -77,7 +78,7 @@ function PeriodSummaryCard({ periodKey, totals, colors }: {
       </View>
       <View style={{ alignItems: "flex-end" }}>
         <Text style={{ fontSize: 10, color: colors.muted }}>日均</Text>
-        <Text style={{ fontSize: 18, fontWeight: "800", color }}>{fmtRevenue(totals.avgDailyRevenue)}</Text>
+        <Text style={{ fontSize: 18, fontWeight: "800", color: numericColor(colors) }}>{fmtRevenue(totals.avgDailyRevenue)}</Text>
         <Text style={{ fontSize: 11, color: colors.muted }}>{totals.avgDailyOrders}单/天</Text>
       </View>
     </View>
@@ -95,7 +96,7 @@ function SlotHeatBar({ slot, avgRevenue, maxRevenue, color, colors }: {
       <View style={{ flex: 1, height: 14, backgroundColor: colors.border, borderRadius: 7, overflow: "hidden" }}>
         <View style={{ width: `${Math.round(pct * 100)}%`, height: "100%", backgroundColor: color, borderRadius: 7 }} />
       </View>
-      <Text style={{ fontSize: 11, fontWeight: "600", color, width: 50, textAlign: "right" }}>
+      <Text style={{ fontSize: 11, fontWeight: "600", color: numericColor(colors), width: 50, textAlign: "right" }}>
         ¥{formatMoney(avgRevenue)}
       </Text>
     </View>

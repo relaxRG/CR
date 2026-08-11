@@ -6,6 +6,7 @@
  */
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import { formatMoney } from "@/lib/utils";
+import { numericColor, NUMERIC_TONE } from "@/lib/theme/numeric-color-tokens";
 import { exportLaborData, type ExportType } from "@/lib/labor/export";
 import { buildImportTemplate, parseImportFile, type ImportResult } from "@/lib/labor/import";
 import { getNonWritableScheduleMonths } from "@/lib/labor/schedule-guards";
@@ -498,11 +499,11 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
         return (
           <View style={{ flexDirection: "row", marginTop: 8, paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border + "44" }}>
             {[
-              { label: firstLabel, value: `¥${formatMoney(firstValue)}`, color: colors.foreground },
-              { label: "加班考勤", value: overtimeAndHoliday > 0 ? `+¥${formatMoney(overtimeAndHoliday)}` : "—", color: overtimeAndHoliday > 0 ? colors.success : colors.muted },
-              { label: "综合额外", value: extraTotal !== 0 ? `${extraTotal >= 0 ? "+" : ""}¥${formatMoney(extraTotal)}` : "—", color: extraTotal > 0 ? colors.primary : extraTotal < 0 ? colors.error : colors.muted },
-              { label: "已预支", value: advanceAmount > 0 ? `-¥${formatMoney(advanceAmount)}` : "—", color: advanceAmount > 0 ? colors.error : colors.muted },
-              { label: "总工资", value: finalSalary !== null ? `¥${formatMoney(finalSalary)}` : "—", color: deptColor },
+              { label: firstLabel, value: `¥${formatMoney(firstValue)}`, color: numericColor(colors) },
+              { label: "加班考勤", value: overtimeAndHoliday > 0 ? `+¥${formatMoney(overtimeAndHoliday)}` : "—", color: overtimeAndHoliday > 0 ? numericColor(colors) : numericColor(colors, NUMERIC_TONE.muted) },
+              { label: "综合额外", value: extraTotal !== 0 ? `${extraTotal >= 0 ? "+" : ""}¥${formatMoney(extraTotal)}` : "—", color: extraTotal > 0 ? numericColor(colors, NUMERIC_TONE.primary) : extraTotal < 0 ? numericColor(colors, NUMERIC_TONE.negative) : numericColor(colors, NUMERIC_TONE.muted) },
+              { label: "已预支", value: advanceAmount > 0 ? `-¥${formatMoney(advanceAmount)}` : "—", color: advanceAmount > 0 ? numericColor(colors) : numericColor(colors, NUMERIC_TONE.muted) },
+              { label: "总工资", value: finalSalary !== null ? `¥${formatMoney(finalSalary)}` : "—", color: numericColor(colors, NUMERIC_TONE.primary) },
             ].map(({ label, value, color }) => (
               <View key={label} style={{ flex: 1, alignItems: "center" }}>
                 <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ fontSize: 12, fontWeight: "800", color }}>{value}</Text>
@@ -535,17 +536,17 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
             const attTotal = slip?.attendanceSalary ?? 0;
             // 兼职员工显示不同的考勤明细布局
             const items = isParttimeEmp2 ? [
-              { label: "工时薪资", value: `¥${formatMoney(attTotal)}`, color: colors.foreground },
-              { label: "出勤天数", value: att ? `${att.attendanceDays}天` : "—", color: colors.muted },
-              { label: "总工时", value: att ? `${att.totalHours}h` : "—", color: colors.muted },
-              { label: "时薪", value: `¥${employee.overtimeHourlyRate}/h`, color: colors.muted },
-              { label: "总考勤工资", value: `¥${formatMoney(attTotal)}`, color: deptColor },
+              { label: "工时薪资", value: `¥${formatMoney(attTotal)}`, color: numericColor(colors) },
+              { label: "出勤天数", value: att ? `${att.attendanceDays}天` : "—", color: numericColor(colors, NUMERIC_TONE.muted) },
+              { label: "总工时", value: att ? `${att.totalHours}h` : "—", color: numericColor(colors, NUMERIC_TONE.muted) },
+              { label: "时薪", value: `¥${employee.overtimeHourlyRate}/h`, color: numericColor(colors, NUMERIC_TONE.muted) },
+              { label: "总考勤工资", value: `¥${formatMoney(attTotal)}`, color: numericColor(colors, NUMERIC_TONE.primary) },
             ] : [
-              { label: "比例底薪", value: `¥${formatMoney(proportionalBase)}`, color: colors.foreground },
-              { label: "加班工资", value: overtimePay > 0 ? `+¥${formatMoney(overtimePay)}` : "—", color: overtimePay > 0 ? colors.success : colors.muted },
-              { label: "节假日薪资", value: holidayPay > 0 ? `+¥${formatMoney(holidayPay)}` : "—", color: holidayPay > 0 ? "#FF2D55" : colors.muted },
-              { label: "特殊扣薪", value: specialDeduction > 0 ? `-¥${formatMoney(specialDeduction)}` : "—", color: specialDeduction > 0 ? colors.error : colors.muted },
-              { label: "总考勤工资", value: `¥${formatMoney(attTotal)}`, color: deptColor },
+              { label: "比例底薪", value: `¥${formatMoney(proportionalBase)}`, color: numericColor(colors) },
+              { label: "加班工资", value: overtimePay > 0 ? `+¥${formatMoney(overtimePay)}` : "—", color: overtimePay > 0 ? numericColor(colors) : numericColor(colors, NUMERIC_TONE.muted) },
+              { label: "节假日薪资", value: holidayPay > 0 ? `+¥${formatMoney(holidayPay)}` : "—", color: holidayPay > 0 ? numericColor(colors) : numericColor(colors, NUMERIC_TONE.muted) },
+              { label: "特殊扣薪", value: specialDeduction > 0 ? `-¥${formatMoney(specialDeduction)}` : "—", color: specialDeduction > 0 ? numericColor(colors, NUMERIC_TONE.negative) : numericColor(colors, NUMERIC_TONE.muted) },
+              { label: "总考勤工资", value: `¥${formatMoney(attTotal)}`, color: numericColor(colors, NUMERIC_TONE.primary) },
             ];
             return (
               <View style={{ gap: 6, paddingBottom: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border + "44" }}>

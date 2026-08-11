@@ -12,7 +12,9 @@
  *   - 编辑模式中存在独立“清空本月”入口；
  *   - 正常模式仍包含独立的“生成薪资单”入口；
  *   - 月报页显示唯一“月度归档并确认发薪”主按钮；
- *   - 冻结归档与差额调整中的月报操作区均可在移动视口正常展示。
+ *   - 冻结归档与差额调整中的月报操作区均可在移动视口正常展示；
+ *   - 薪资统计、考勤概况、绩效汇总、时段成本分析与月度经营报告在
+ *     375/390/430pt 下均不存在根级横向溢出。
  */
 import { createReadStream, existsSync } from "node:fs";
 import { createServer } from "node:http";
@@ -187,6 +189,37 @@ try {
   if (!adjustingClose.result.value.hasDiscard || !adjustingClose.result.value.hasReclose) throw new Error('月报 ADJUSTING 未显示放弃调整与重新归档入口');
   if (adjustingClose.result.value.rootScrollWidth > adjustingClose.result.value.rootClientWidth) throw new Error('月报 ADJUSTING 出现根级横向溢出');
   report.push({ width: 375, monthClose: { draft: draftClose.result.value, frozen: frozenClose.result.value, adjusting: adjustingClose.result.value } });
+
+  // 核心薪资与报表页：路由级视觉烟雾测试。
+  // 此处只验证根级布局，因为页面业务内容和数字状态已由 Vitest 的金额/颜色回归夹具覆盖。
+  const reportRoutes = [
+    ["/labor", "薪资统计"],
+    ["/labor-attendance", "考勤概况"],
+    [`/labor-kpi-allowance?employeeId=h5-e2e-employee&month=${closeMonth}`, "绩效汇总"],
+    ["/period-analysis", "时段成本分析"],
+    ["/monthly-report", "月度经营报告"],
+  ];
+  for (const [path, label] of reportRoutes) {
+    const viewports = [];
+    for (const width of [375, 390, 430]) {
+      await call("Emulation.setDeviceMetricsOverride", { width, height: 844, deviceScaleFactor: 3, mobile: true });
+      await call("Page.navigate", { url: `http://localhost:${port}${path}` });
+      await sleep(700);
+      const layout = await call("Runtime.evaluate", { expression: `(() => ({
+        rootClientWidth: document.documentElement.clientWidth,
+        rootScrollWidth: document.documentElement.scrollWidth,
+        bodyScrollWidth: document.body.scrollWidth,
+        hasVisibleText: document.body.innerText.trim().length > 0,
+      }))()`, returnByValue: true });
+      const state = layout.result.value;
+      if (!state.hasVisibleText) throw new Error(`${label} ${width}pt 页面未加载内容`);
+      if (state.rootScrollWidth > state.rootClientWidth || state.bodyScrollWidth > state.rootClientWidth) {
+        throw new Error(`${label} ${width}pt 出现根级横向溢出：${JSON.stringify(state)}`);
+      }
+      viewports.push({ width, ...state });
+    }
+    report.push({ reportPage: label, viewports });
+  }
 
   await call("Emulation.clearDeviceMetricsOverride");
   socket.close();

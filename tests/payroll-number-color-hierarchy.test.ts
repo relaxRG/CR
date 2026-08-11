@@ -24,6 +24,7 @@ describe("薪资与考勤数字颜色层级", () => {
     expect(extra).not.toContain("#FF2D55");
     expect(extra).toContain("color: extraTotal >= 0 ? colors.primary : colors.error");
     expect(extra).toContain("color: reward < 0 ? colors.error : reward > 0 ? colors.foreground");
+    expect(labor).toContain('import { numericColor, NUMERIC_TONE } from "@/lib/theme/numeric-color-tokens";');
   });
 
   it("薪资统计的常规扣款仅依靠负号表达，不把预支、社保、公积金和个税全部标成红色", () => {
@@ -36,14 +37,15 @@ describe("薪资与考勤数字颜色层级", () => {
 
   it("考勤概况收起卡只突出待发和负向奖惩，普通金额保持正文色", () => {
     const compact = block(attendance, "const grid1 = [", "return (\n      <TouchableOpacity");
-    expect(compact).toContain("{ label: \"待发\",     value: final,    color: colors.primary }");
-    expect(compact).toContain("reward < 0 ? colors.error : colors.foreground");
+    expect(compact).toContain('color: numericColor(colors, NUMERIC_TONE.primary)');
+    expect(compact).toContain('reward < 0 ? NUMERIC_TONE.negative : NUMERIC_TONE.value');
     expect(compact).not.toContain("colors.success");
     expect(compact).not.toContain("colors.warning");
   });
 
   it("展开详情不再把每项正向金额染绿，保留主结果、真实异常和次要信息三层", () => {
-    expect(attendance).toContain("const valueColor = primary ? colors.primary : negative ? colors.error : isMuted ? colors.muted : colors.foreground;");
+    expect(attendance).toContain("const valueColor = numericColor(");
+    expect(attendance).toContain("primary ? NUMERIC_TONE.primary : negative ? NUMERIC_TONE.negative");
     expect(attendance).not.toContain("positive ? colors.success");
   });
 });
