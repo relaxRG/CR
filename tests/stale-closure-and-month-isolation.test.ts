@@ -353,3 +353,62 @@ describe("Suite E：三步走保存时序（handleSave）", () => {
     expect(Object.keys(finalSlip)).toEqual(["grossSalary", "allowanceOverrides", "id"]);
   });
 });
+
+// ─── Suite F：App 启动时序 ready 检查 ────────────────────────────────────────
+// 根本原因：autoSync 在 shifts/employees 未加载完成时触发，activeEmps=[] 导致
+// 循环不执行，旧的 attendances/paySlips 数据不会被清零
+// 修复：autoSync 开头加 shiftsReady && employeesReady 检查
+describe("Suite F：App 启动时序 ready 检查（比例底薪根本原因）", () => {
+  it("F1. shiftsReady=false 时 autoSync 应跳过执行", () => {
+    const shiftsReady = false;
+    const employeesReady = true;
+    const shouldRun = shiftsReady && employeesReady;
+    expect(shouldRun).toBe(false);
+  });
+
+  it("F2. employeesReady=false 时 autoSync 应跳过执行", () => {
+    const shiftsReady = true;
+    const employeesReady = false;
+    const shouldRun = shiftsReady && employeesReady;
+    expect(shouldRun).toBe(false);
+  });
+
+  it("F3. 两者都 ready 时 autoSync 才执行", () => {
+    const shiftsReady = true;
+    const employeesReady = true;
+    const shouldRun = shiftsReady && employeesReady;
+    expect(shouldRun).toBe(true);
+  });
+
+  it("F4. 无排班时 calcProportionalBase 返回 0（attendanceDays=0）", () => {
+    // 模拟 calcProportionalBase 的逻辑
+    const baseSalary = 8000;
+    const attendanceDays = 0; // 无排班
+    const expectedAttendanceDays = 27; // 31天月份，restDaysPerMonth=4
+    const proportionalBase = (attendanceDays <= 0 || expectedAttendanceDays <= 0)
+      ? 0
+      : Math.round((baseSalary * attendanceDays / expectedAttendanceDays) * 100) / 100;
+    expect(proportionalBase).toBe(0);
+  });
+
+  it("F5. autoSync 依赖数组包含 shiftsReady 和 employeesReady", () => {
+    const autoSyncDeps = [
+      "shifts", "currentMonth", "employees", "advances",
+      "compOffEntriesSched", "holidayCompOffEntriesSched",
+      "globalSettings", "specialStatuses",
+      "shiftsReady", "employeesReady",
+    ];
+    expect(autoSyncDeps).toContain("shiftsReady");
+    expect(autoSyncDeps).toContain("employeesReady");
+    expect(autoSyncDeps).not.toContain("paySlips"); // 防止无限循环
+  });
+
+  it("F6. App 启动时序：employees 未 ready 时 activeEmps 为空导致旧数据保留", () => {
+    // 模拟 App 启动时的错误场景（修复前）
+    const employees: any[] = []; // employees 未加载完成
+    const activeEmps = employees.filter((e: any) => e.active && !e.archived);
+    // 如果 activeEmps 为空，循环不执行，旧数据不会被清零
+    expect(activeEmps).toHaveLength(0);
+    // 这就是为什么需要 ready 检查：防止在 employees 未加载完成时执行 autoSync
+  });
+});

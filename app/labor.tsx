@@ -3419,8 +3419,8 @@ function SchTemplateModal({ visible, templates, specialStatuses, businessHours, 
 function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: string; onMonthChange: (m: string) => void }) {
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
   const router = useRouter();
-  const { employees } = useEmployeeStore();
-  const { shifts, upsertShift, batchUpsertShifts, deleteShift, batchDeleteShifts, getShifts } = useShiftStore();
+  const { employees, ready: employeesReady } = useEmployeeStore();
+  const { shifts, upsertShift, batchUpsertShifts, deleteShift, batchDeleteShifts, getShifts, ready: shiftsReady } = useShiftStore();
   const { templates, upsertTemplate, deleteTemplate } = useShiftTemplateStore();
   const { statuses: specialStatuses, upsertStatus, deleteStatus } = useSpecialStatusStore();
   const { paySlips, upsertPaySlip, buildPaySlipDraft, getPaySlip } = usePaySlipStore();
@@ -3544,6 +3544,11 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   // 排班数据自动同步薪资单：每次 shifts 变化时自动重算当月已有排班的员工薪资单
   const autoSyncTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   React.useEffect(() => {
+    // 关键修复：必须等待 shifts 和 employees 两个 store 都加载完成后才执行
+    // 原因：App 启动时 AsyncStorage 异步加载，如果在 employees 未加载完成时触发，
+    // activeEmps=[] 导致循环不执行，旧的 attendances/paySlips 数据不会被清零
+    // 这就是「无排班但有比例底薪」反复出现的根本原因
+    if (!shiftsReady || !employeesReady) return;
     // 确认发薪锁定检查：已确认月份跳过所有自动写入
     if (getConfirmStatus(currentMonth) === "frozen") return;
     // 防抖：500ms 内多次修改只触发一次
@@ -3605,7 +3610,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   // 修复：将 globalSettings 和 specialStatuses 加入依赖数组
   // 用户修改全局社保/个税配置或特殊状态配置后，autoSync 会立即重算所有员工薪资
   // 不会导致无限循环，因为 autoSync 写入 paySlips，而 paySlips 不在依赖数组中
-  }, [shifts, currentMonth, employees, advances, compOffEntriesSched, holidayCompOffEntriesSched, globalSettings, specialStatuses]);
+  }, [shifts, currentMonth, employees, advances, compOffEntriesSched, holidayCompOffEntriesSched, globalSettings, specialStatuses, shiftsReady, employeesReady]);
 
   const sortedTemplates = useMemo(() =>
     [...(templates.length > 0 ? templates : DEFAULT_SHIFT_TEMPLATES)].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)),
