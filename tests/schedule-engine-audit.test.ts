@@ -631,3 +631,60 @@ describe("Suite M：31天、月休4天的请假与调休底薪结算", () => {
     expect(result.attendanceSalary).toBe(11800);
   });
 });
+
+
+// ─── Suite N: 跨月请假 + 法定节假日 + 调休的组合考勤 ─────────────────────────
+
+describe("Suite N：跨月请假、法定节假日与调休组合的月度隔离结算", () => {
+  it("N1. 7月仅结算7月记录：跨月病假不得扣薪；本月病假、事假、调休和法定节日按统一日薪精确结算", () => {
+    const month = "2026-07";
+    const employee = makeEmployee({ baseSalary: 10000, restDaysPerMonth: 4, overtimeHourlyRate: 50, stdHoursPerDay: 8 });
+    const normalShifts = Array.from({ length: 25 }, (_, index) =>
+      makeShift(`${month}-${String(index + 1).padStart(2, "0")}`, 8)
+    );
+    const shifts: ShiftEntry[] = [
+      // 跨月病假只作为混合数据输入，不能污染 7 月考勤与扣薪。
+      makeShift("2026-06-30", 0, "ss_sick"),
+      ...normalShifts,
+      makeShift("2026-07-26", 0, "ss_personal"),
+      makeShift("2026-07-27", 0, "ss_comp_off_overtime"),
+      makeShift("2026-07-28", 0, "ss_sick"),
+      makeShift("2026-08-01", 0, "ss_sick"),
+    ];
+
+    const result = calculateAttendanceFromShifts({
+      employeeId: "emp-001",
+      month,
+      employee,
+      shifts,
+      specialStatuses: DEFAULT_SPECIAL_STATUSES,
+      // 7月4日设为法定节假日，普通上班班次获得 3 倍工资中的额外 2 倍日薪。
+      holidayDays: [{ date: "2026-07-04", multiplier: 3 }],
+    });
+
+    const dailyRate = 10000 / 27;
+    const expectedBase = Math.round(dailyRate * 26 * 100) / 100;
+    const sickHalfDayCredit = Math.round(dailyRate * 0.5 * 100) / 100;
+    const holidayBonus = Math.round(dailyRate * 2 * 100) / 100;
+
+    // 25 天正常上班 + 1 天有效调休；事假和病假不计出勤；6/30 与 8/1 记录必须被月份隔离。
+    expect(result.daysInMonth).toBe(31);
+    expect(result.expectedAttendanceDays).toBe(27);
+    expect(result.attendanceDays).toBe(26);
+    expect(result.underRestDays).toBe(1);
+    expect(result.compOffCount).toBe(1);
+    expect(result.proportionalBaseSalary).toBe(expectedBase);
+
+    // 只有本月病假产生 -0.5 日薪的 deduction；事假不重复扣薪，跨月病假不能进入统计。
+    expect(result.specialStatusDeductions.ss_sick?.count).toBe(1);
+    expect(result.specialStatusDeductions.ss_sick?.deduction).toBe(-sickHalfDayCredit);
+    expect(result.specialStatusDeductions.ss_personal).toBeUndefined();
+    expect(result.totalSpecialDeduction).toBe(-sickHalfDayCredit);
+
+    expect(result.holidayWorkDays).toBe(1);
+    expect(result.holidayBonus).toBe(holidayBonus);
+    expect(result.overtimePay).toBe(0);
+    expect(result.attendanceSalary).toBe(Math.round((expectedBase + sickHalfDayCredit + holidayBonus) * 100) / 100);
+    expect(result.attendanceSalary).toBe(10555.56);
+  });
+});
