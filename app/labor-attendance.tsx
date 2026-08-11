@@ -26,6 +26,7 @@ import {
   useEmployeeStore, useAttendanceStore, usePaySlipStore,
   useCompOffBalanceEntryStore, useHolidayCompOffStore,
   useGlobalPayrollSettingsStore, useDeptOrderStore, DEFAULT_DEPT_ORDER,
+  usePayrollConfirmationStore,
 } from "@/lib/labor/store";
 import { useSalaryAdvanceStore } from "@/lib/labor/advance-store";
 import {
@@ -176,6 +177,7 @@ function EmployeeCard({
   // 修复：在卡片内直接调用 hooks，确保 saveRewards 能访问 buildPaySlipDraft 和 globalSettings
   const { buildPaySlipDraft } = usePaySlipStore();
   const { settings: globalSettings } = useGlobalPayrollSettingsStore();
+  const { isMonthWritable } = usePayrollConfirmationStore();
   const tenure = calcTenure(employee.joinDate);
 
     // ── 调休余额（useMemo 避免每次渲染重复 filter/reduce） ──
@@ -230,6 +232,11 @@ function EmployeeCard({
   };
   const saveRewards = useCallback(() => {
     if (!slip || !employee) return;
+    // 锁定拦截：已确认发薪的月份不允许修改
+    if (!isMonthWritable(month)) {
+      Alert.alert("已锁定", "本月已确认发薪，如需修改请先进入差额调整模式。");
+      return;
+    }
     const totalReward = rewardItems.reduce((sum, item) => sum + item.amount, 0);
     // 修复 Bug：先将新 rewardPenalty 写入 store，再调用 buildPaySlipDraft
     // 原因：buildPaySlipDraft 内部从 ref.current 读取 existing.rewardPenalty 来计算 grossSalary

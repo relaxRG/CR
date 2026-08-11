@@ -5,61 +5,25 @@
  *
  * 覆盖场景：
  *   Suite A：基础状态转换（DRAFT → FROZEN → ADJUSTING → FROZEN）
- *     A1. 初始状态为 DRAFT（未确认）
- *     A2. confirmPayroll：DRAFT → FROZEN
- *     A3. enterAdjustMode：FROZEN → ADJUSTING
- *     A4. confirmAdjustment：ADJUSTING → FROZEN
- *     A5. cancelAdjustment：ADJUSTING → FROZEN（丢弃修改）
- *     A6. revokeConfirmation：FROZEN → DRAFT（撤销确认）
- *
  *   Suite B：非法状态转换防护
- *     B1. 不能从 DRAFT 直接进入 ADJUSTING
- *     B2. 不能从 ADJUSTING 直接 revokeConfirmation
- *     B3. 重复 confirmPayroll 应覆盖（幂等）
- *     B4. 已 FROZEN 时再次 enterAdjustMode 有效
- *     B5. DRAFT 状态下 cancelAdjustment 无效
- *
  *   Suite C：锁定状态下的写入拦截
- *     C1. isMonthWritable：DRAFT → true
- *     C2. isMonthWritable：FROZEN → false
- *     C3. isMonthWritable：ADJUSTING → true（允许差额调整）
- *     C4. isMonthLocked：DRAFT → false
- *     C5. isMonthLocked：FROZEN → true
- *     C6. isMonthLocked：ADJUSTING → true
- *
- *   Suite D：frozenSnapshot 完整性
- *     D1. confirmPayroll 时生成 frozenSnapshot
- *     D2. frozenSnapshot 包含所有关键字段
- *     D3. revokeConfirmation 后 frozenSnapshot 保留（用于审计）
- *     D4. 差额检测：frozenSnapshot vs 当前 PaySlip
- *
- *   Suite E：多月份隔离
- *     E1. 不同月份的锁定状态互不干扰
- *     E2. 锁定 7 月不影响 8 月的写入
- *     E3. 跨年月份隔离
- *
+ *   Suite D：summary 完整性
+ *   Suite E：多月份隔离（跨月/跨年）
  *   Suite F：差额调整流程
- *     F1. enterAdjustMode 后可写入差额
- *     F2. confirmAdjustment 记录差额条目
- *     F3. getPendingAdjustments 返回未结算差额
- *     F4. settleAdjustment 标记差额已结算
- *     F5. 已结算差额不再出现在 getPendingAdjustments
+ *   Suite G：边界情况（空数据/连续操作/大量月份）
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   PayrollConfirmationStatus,
   MonthlyConfirmation,
   PayrollAdjustment,
+  AdjustmentSettleMethod,
 } from "@/lib/labor/types";
 
 // ─── 辅助函数：模拟 usePayrollConfirmationStore 的核心逻辑 ──────────────────
 
 function createMockStore() {
   let confirmations: MonthlyConfirmation[] = [];
-
-  function uuid() {
-    return Math.random().toString(36).slice(2) + Date.now().toString(36);
-  }
 
   function getConfirmation(month: string): MonthlyConfirmation | undefined {
     return confirmations.find((c) => c.month === month);
@@ -78,17 +42,18 @@ function createMockStore() {
     return getConfirmation(month)?.status ?? "draft";
   }
 
+  // 与 store.tsx:1177 一致：只有 frozen 才算 locked
   function isMonthLocked(month: string): boolean {
-    const status = getStatus(month);
-    return status === "frozen" || status === "adjusting";
+    return getStatus(month) === "frozen";
   }
 
+  // 与 store.tsx:1181 一致：draft 和 adjusting 都可写
   function isMonthWritable(month: string): boolean {
     const status = getStatus(month);
     return status === "draft" || status === "adjusting";
   }
 
-  function confirmPayroll(month: string, summary: MonthlyConfirmation["summary"]) {
+  function confirmPayroll(month: string, summary: NonNullable<MonthlyConfirmation["summary"]>) {
     const existing = getConfirmation(month);
     upsertConfirmation({
       month,
@@ -130,7 +95,7 @@ function createMockStore() {
     upsertConfirmation({ ...existing, status: "draft", frozenAt: undefined, frozenBy: undefined });
   }
 
-  function settleAdjustment(month: string, adjustmentId: string, method: "next_month" | "cash" | "offset", settledInMonth: string) {
+  function settleAdjustment(month: string, adjustmentId: string, method: AdjustmentSettleMethod, settledInMonth: string) {
     const existing = getConfirmation(month);
     if (!existing) return;
     const updated = existing.adjustments.map((a) =>
@@ -153,16 +118,30 @@ function createMockStore() {
     getStatus, isMonthLocked, isMonthWritable,
     confirmPayroll, enterAdjustMode, confirmAdjustment, cancelAdjustment,
     revokeConfirmation, settleAdjustment, getPendingAdjustments,
-    getConfirmation, reset, uuid,
+    getConfirmation, reset,
   };
 }
 
-const mockSummary: MonthlyConfirmation["summary"] = {
-  totalGross: 50000,
-  totalFinal: 45000,
-  employeeCount: 8,
-  confirmedAt: new Date().toISOString(),
+// 使用实际类型字段名
+const mockSummary: NonNullable<MonthlyConfirmation["summary"]> = {
+  totalEmployees: 8,
+  totalGrossSalary: 50000,
+  totalFinalSalary: 45000,
+  totalDeductions: 5000,
 };
+
+// 辅助：创建合法的 PayrollAdjustment（字段与 types.ts 对齐）
+function makeAdj(id: string, employeeId: string, employeeName: string, amount: number, details: string): PayrollAdjustment {
+  return {
+    id,
+    createdAt: Date.now(),
+    employeeId,
+    employeeName,
+    amount,
+    details,
+    settled: false,
+  };
+}
 
 // ─── Suite A：基础状态转换 ─────────────────────────────────────────────────────
 
@@ -184,7 +163,7 @@ describe("Suite A：基础状态转换", () => {
     const conf = store.getConfirmation("2026-07");
     expect(conf?.frozenAt).toBeDefined();
     expect(conf?.frozenBy).toBe("manager");
-    expect(conf?.summary?.totalGross).toBe(50000);
+    expect(conf?.summary?.totalGrossSalary).toBe(50000);
   });
 
   it("A3. enterAdjustMode：FROZEN → ADJUSTING", () => {
@@ -198,15 +177,11 @@ describe("Suite A：基础状态转换", () => {
   it("A4. confirmAdjustment：ADJUSTING → FROZEN", () => {
     store.confirmPayroll("2026-07", mockSummary);
     store.enterAdjustMode("2026-07");
-    store.confirmAdjustment("2026-07", [{
-      id: "adj-1", employeeId: "emp-1", employeeName: "王琪",
-      delta: 200, reason: "绩效补贴补发", createdAt: new Date().toISOString(),
-      settled: false,
-    }]);
+    store.confirmAdjustment("2026-07", [makeAdj("adj-1", "emp-1", "王琪", 200, "绩效补贴补发")]);
     expect(store.getStatus("2026-07")).toBe("frozen");
     const conf = store.getConfirmation("2026-07");
     expect(conf?.adjustments).toHaveLength(1);
-    expect(conf?.adjustments[0].delta).toBe(200);
+    expect(conf?.adjustments[0].amount).toBe(200);
   });
 
   it("A5. cancelAdjustment：ADJUSTING → FROZEN（丢弃修改）", () => {
@@ -239,43 +214,35 @@ describe("Suite B：非法状态转换防护", () => {
   });
 
   it("B1. 不能从 DRAFT 直接进入 ADJUSTING", () => {
-    store.enterAdjustMode("2026-07"); // 无效操作
-    expect(store.getStatus("2026-07")).toBe("draft"); // 仍为 DRAFT
+    store.enterAdjustMode("2026-07");
+    expect(store.getStatus("2026-07")).toBe("draft");
   });
 
-  it("B2. 不能从 ADJUSTING 直接 revokeConfirmation（应先 cancel）", () => {
+  it("B2. ADJUSTING 状态下 revokeConfirmation 直接变为 DRAFT", () => {
     store.confirmPayroll("2026-07", mockSummary);
     store.enterAdjustMode("2026-07");
-    store.revokeConfirmation("2026-07"); // 允许撤销（从 adjusting 也可以）
-    // 实际业务：revokeConfirmation 不检查状态，直接设为 draft
+    store.revokeConfirmation("2026-07");
     expect(store.getStatus("2026-07")).toBe("draft");
   });
 
   it("B3. 重复 confirmPayroll 应覆盖（幂等）", () => {
     store.confirmPayroll("2026-07", mockSummary);
-    const firstFrozenAt = store.getConfirmation("2026-07")?.frozenAt;
-
-    // 等待 1ms 确保时间戳不同
-    const newSummary = { ...mockSummary, totalGross: 55000 };
+    const newSummary = { ...mockSummary, totalGrossSalary: 55000 };
     store.confirmPayroll("2026-07", newSummary);
-
     expect(store.getStatus("2026-07")).toBe("frozen");
-    expect(store.getConfirmation("2026-07")?.summary?.totalGross).toBe(55000);
-    // 只有一条记录（不重复）
+    expect(store.getConfirmation("2026-07")?.summary?.totalGrossSalary).toBe(55000);
   });
 
-  it("B4. 已 FROZEN 时再次 enterAdjustMode 有效", () => {
+  it("B4. FROZEN 时 confirmAdjustment 无效（需先 enterAdjustMode）", () => {
     store.confirmPayroll("2026-07", mockSummary);
-    store.confirmAdjustment("2026-07", []); // 无效（不在 adjusting 状态）
-    expect(store.getStatus("2026-07")).toBe("frozen"); // 仍为 frozen
-
-    store.enterAdjustMode("2026-07");
-    expect(store.getStatus("2026-07")).toBe("adjusting");
+    store.confirmAdjustment("2026-07", [makeAdj("adj-1", "emp-1", "王琪", 200, "补发")]);
+    expect(store.getStatus("2026-07")).toBe("frozen");
+    expect(store.getConfirmation("2026-07")?.adjustments).toHaveLength(0);
   });
 
   it("B5. DRAFT 状态下 cancelAdjustment 无效", () => {
-    store.cancelAdjustment("2026-07"); // 无效操作
-    expect(store.getStatus("2026-07")).toBe("draft"); // 仍为 DRAFT
+    store.cancelAdjustment("2026-07");
+    expect(store.getStatus("2026-07")).toBe("draft");
   });
 });
 
@@ -312,16 +279,17 @@ describe("Suite C：锁定状态下的写入拦截", () => {
     expect(store.isMonthLocked("2026-07")).toBe(true);
   });
 
-  it("C6. isMonthLocked：ADJUSTING → true（调整期间仍算锁定）", () => {
+  it("C6. isMonthLocked：ADJUSTING → false（调整期间不算锁定，允许写入）", () => {
     store.confirmPayroll("2026-07", mockSummary);
     store.enterAdjustMode("2026-07");
-    expect(store.isMonthLocked("2026-07")).toBe(true);
+    // 与 store.tsx:1177 一致：isMonthLocked 只检查 frozen
+    expect(store.isMonthLocked("2026-07")).toBe(false);
   });
 });
 
-// ─── Suite D：frozenSnapshot 完整性 ──────────────────────────────────────────
+// ─── Suite D：summary 完整性 ──────────────────────────────────────────────────
 
-describe("Suite D：frozenSnapshot 完整性", () => {
+describe("Suite D：summary 完整性", () => {
   let store: ReturnType<typeof createMockStore>;
 
   beforeEach(() => {
@@ -332,41 +300,38 @@ describe("Suite D：frozenSnapshot 完整性", () => {
     store.confirmPayroll("2026-07", mockSummary);
     const conf = store.getConfirmation("2026-07");
     expect(conf?.summary).toBeDefined();
-    expect(conf?.summary?.totalGross).toBe(50000);
-    expect(conf?.summary?.totalFinal).toBe(45000);
-    expect(conf?.summary?.employeeCount).toBe(8);
+    expect(conf?.summary?.totalGrossSalary).toBe(50000);
+    expect(conf?.summary?.totalFinalSalary).toBe(45000);
+    expect(conf?.summary?.totalEmployees).toBe(8);
+    expect(conf?.summary?.totalDeductions).toBe(5000);
   });
 
   it("D2. summary 包含所有关键字段", () => {
     store.confirmPayroll("2026-07", mockSummary);
     const summary = store.getConfirmation("2026-07")?.summary;
     expect(summary).toMatchObject({
-      totalGross: expect.any(Number),
-      totalFinal: expect.any(Number),
-      employeeCount: expect.any(Number),
-      confirmedAt: expect.any(String),
+      totalEmployees: expect.any(Number),
+      totalGrossSalary: expect.any(Number),
+      totalFinalSalary: expect.any(Number),
+      totalDeductions: expect.any(Number),
     });
   });
 
   it("D3. revokeConfirmation 后 summary 保留（用于审计）", () => {
     store.confirmPayroll("2026-07", mockSummary);
     store.revokeConfirmation("2026-07");
-    // status 变为 draft，但 summary 仍保留（审计需要）
     const conf = store.getConfirmation("2026-07");
     expect(conf?.status).toBe("draft");
-    expect(conf?.summary?.totalGross).toBe(50000); // 保留
+    expect(conf?.summary?.totalGrossSalary).toBe(50000);
   });
 
-  it("D4. 差额检测：summary.totalFinal 与当前 PaySlip 对比", () => {
+  it("D4. 差额检测：summary.totalFinalSalary 与当前 PaySlip 对比", () => {
     const frozenFinal = 45000;
-    store.confirmPayroll("2026-07", { ...mockSummary, totalFinal: frozenFinal });
-
-    // 模拟当前 PaySlip 发生变化
-    const currentFinal = 46000; // 差额 +1000
+    store.confirmPayroll("2026-07", { ...mockSummary, totalFinalSalary: frozenFinal });
+    const currentFinal = 46000;
     const delta = currentFinal - frozenFinal;
-
     expect(delta).toBe(1000);
-    expect(delta > 0).toBe(true); // 有正差额，需要补发
+    expect(delta > 0).toBe(true);
   });
 });
 
@@ -382,14 +347,14 @@ describe("Suite E：多月份隔离", () => {
   it("E1. 不同月份的锁定状态互不干扰", () => {
     store.confirmPayroll("2026-07", mockSummary);
     expect(store.getStatus("2026-07")).toBe("frozen");
-    expect(store.getStatus("2026-08")).toBe("draft"); // 8月不受影响
-    expect(store.getStatus("2026-06")).toBe("draft"); // 6月不受影响
+    expect(store.getStatus("2026-08")).toBe("draft");
+    expect(store.getStatus("2026-06")).toBe("draft");
   });
 
   it("E2. 锁定 7 月不影响 8 月的写入", () => {
     store.confirmPayroll("2026-07", mockSummary);
-    expect(store.isMonthWritable("2026-07")).toBe(false); // 7月锁定
-    expect(store.isMonthWritable("2026-08")).toBe(true);  // 8月可写
+    expect(store.isMonthWritable("2026-07")).toBe(false);
+    expect(store.isMonthWritable("2026-08")).toBe(true);
   });
 
   it("E3. 跨年月份隔离", () => {
@@ -397,11 +362,10 @@ describe("Suite E：多月份隔离", () => {
     store.confirmPayroll("2026-01", mockSummary);
     expect(store.getStatus("2025-12")).toBe("frozen");
     expect(store.getStatus("2026-01")).toBe("frozen");
-    expect(store.getStatus("2026-02")).toBe("draft"); // 2026-02 未锁定
-
+    expect(store.getStatus("2026-02")).toBe("draft");
     store.revokeConfirmation("2025-12");
     expect(store.getStatus("2025-12")).toBe("draft");
-    expect(store.getStatus("2026-01")).toBe("frozen"); // 不受影响
+    expect(store.getStatus("2026-01")).toBe("frozen");
   });
 });
 
@@ -421,31 +385,24 @@ describe("Suite F：差额调整流程", () => {
   });
 
   it("F2. confirmAdjustment 记录差额条目", () => {
-    const adj: PayrollAdjustment = {
-      id: "adj-1", employeeId: "emp-1", employeeName: "王琪",
-      delta: 500, reason: "绩效补贴补发（7月）",
-      createdAt: new Date().toISOString(), settled: false,
-    };
-    store.confirmAdjustment("2026-07", [adj]);
+    store.confirmAdjustment("2026-07", [makeAdj("adj-1", "emp-1", "王琪", 500, "绩效补贴补发（7月）")]);
     const conf = store.getConfirmation("2026-07");
     expect(conf?.adjustments).toHaveLength(1);
-    expect(conf?.adjustments[0].delta).toBe(500);
+    expect(conf?.adjustments[0].amount).toBe(500);
     expect(conf?.adjustments[0].settled).toBe(false);
   });
 
   it("F3. getPendingAdjustments 返回未结算差额", () => {
     store.confirmAdjustment("2026-07", [
-      { id: "adj-1", employeeId: "emp-1", employeeName: "王琪", delta: 500, reason: "补发", createdAt: new Date().toISOString(), settled: false },
-      { id: "adj-2", employeeId: "emp-2", employeeName: "Stephen", delta: -200, reason: "多发扣回", createdAt: new Date().toISOString(), settled: false },
+      makeAdj("adj-1", "emp-1", "王琪", 500, "补发"),
+      makeAdj("adj-2", "emp-2", "Stephen", -200, "多发扣回"),
     ]);
     const pending = store.getPendingAdjustments("2026-07");
     expect(pending).toHaveLength(2);
   });
 
   it("F4. settleAdjustment 标记差额已结算", () => {
-    store.confirmAdjustment("2026-07", [
-      { id: "adj-1", employeeId: "emp-1", employeeName: "王琪", delta: 500, reason: "补发", createdAt: new Date().toISOString(), settled: false },
-    ]);
+    store.confirmAdjustment("2026-07", [makeAdj("adj-1", "emp-1", "王琪", 500, "补发")]);
     store.settleAdjustment("2026-07", "adj-1", "next_month", "2026-08");
     const conf = store.getConfirmation("2026-07");
     expect(conf?.adjustments[0].settled).toBe(true);
@@ -455,12 +412,68 @@ describe("Suite F：差额调整流程", () => {
 
   it("F5. 已结算差额不再出现在 getPendingAdjustments", () => {
     store.confirmAdjustment("2026-07", [
-      { id: "adj-1", employeeId: "emp-1", employeeName: "王琪", delta: 500, reason: "补发", createdAt: new Date().toISOString(), settled: false },
-      { id: "adj-2", employeeId: "emp-2", employeeName: "Stephen", delta: -200, reason: "多发扣回", createdAt: new Date().toISOString(), settled: false },
+      makeAdj("adj-1", "emp-1", "王琪", 500, "补发"),
+      makeAdj("adj-2", "emp-2", "Stephen", -200, "多发扣回"),
     ]);
     store.settleAdjustment("2026-07", "adj-1", "next_month", "2026-08");
     const pending = store.getPendingAdjustments("2026-07");
     expect(pending).toHaveLength(1);
-    expect(pending[0].id).toBe("adj-2"); // 只剩 adj-2
+    expect(pending[0].id).toBe("adj-2");
+  });
+});
+
+// ─── Suite G：边界情况 ────────────────────────────────────────────────────────
+
+describe("Suite G：边界情况", () => {
+  let store: ReturnType<typeof createMockStore>;
+
+  beforeEach(() => {
+    store = createMockStore();
+  });
+
+  it("G1. 对未知月份查询返回 DRAFT", () => {
+    expect(store.getStatus("9999-99")).toBe("draft");
+    expect(store.isMonthWritable("9999-99")).toBe(true);
+    expect(store.isMonthLocked("9999-99")).toBe(false);
+  });
+
+  it("G2. 连续 confirmPayroll → revokeConfirmation 循环（幂等性）", () => {
+    for (let i = 0; i < 5; i++) {
+      store.confirmPayroll("2026-07", mockSummary);
+      expect(store.getStatus("2026-07")).toBe("frozen");
+      store.revokeConfirmation("2026-07");
+      expect(store.getStatus("2026-07")).toBe("draft");
+    }
+  });
+
+  it("G3. 多次 enterAdjustMode → cancelAdjustment 循环", () => {
+    store.confirmPayroll("2026-07", mockSummary);
+    for (let i = 0; i < 3; i++) {
+      store.enterAdjustMode("2026-07");
+      expect(store.getStatus("2026-07")).toBe("adjusting");
+      store.cancelAdjustment("2026-07");
+      expect(store.getStatus("2026-07")).toBe("frozen");
+    }
+  });
+
+  it("G4. 12 个月份同时锁定互不干扰", () => {
+    const months = Array.from({ length: 12 }, (_, i) => `2026-${String(i + 1).padStart(2, "0")}`);
+    months.forEach((m) => store.confirmPayroll(m, mockSummary));
+    months.forEach((m) => expect(store.getStatus(m)).toBe("frozen"));
+    store.revokeConfirmation("2026-06");
+    expect(store.getStatus("2026-06")).toBe("draft");
+    months.filter((m) => m !== "2026-06").forEach((m) =>
+      expect(store.getStatus(m)).toBe("frozen")
+    );
+  });
+
+  it("G5. 差额调整后 summary 保持不变（不被覆盖）", () => {
+    store.confirmPayroll("2026-07", mockSummary);
+    store.enterAdjustMode("2026-07");
+    store.confirmAdjustment("2026-07", [makeAdj("adj-1", "emp-1", "王琪", 200, "补发")]);
+    // summary 应保留原始确认时的数据
+    const conf = store.getConfirmation("2026-07");
+    expect(conf?.summary?.totalGrossSalary).toBe(50000);
+    expect(conf?.summary?.totalFinalSalary).toBe(45000);
   });
 });

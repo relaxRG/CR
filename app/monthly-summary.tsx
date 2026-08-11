@@ -21,7 +21,7 @@ import { useFeature } from "@/hooks/use-feature";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
 import { useMonthlySummaryStore } from "@/lib/store/monthly-summary/store";
-import { useEmployeeStore, usePaySlipStore, useDeptOrderStore, DEFAULT_DEPT_ORDER } from "@/lib/labor/store";
+import { useEmployeeStore, usePaySlipStore, useDeptOrderStore, DEFAULT_DEPT_ORDER, usePayrollConfirmationStore } from "@/lib/labor/store";
 import { useSpiritsInventoryStore } from "@/lib/spirits/crud-store";
 import { calcMonthlyPourCost, pourCostColor } from "@/lib/spirits/pour-cost";
 import { usePettyCashStore } from "@/lib/store/petty-store";
@@ -300,6 +300,13 @@ export default function MonthlySummaryScreen() {
   const { employees } = useEmployeeStore();
   const { deptOrder } = useDeptOrderStore();
   const paySlipStore = usePaySlipStore();
+  const {
+    getStatus: getPayrollStatus,
+    confirmPayroll,
+    enterAdjustMode,
+    revokeConfirmation,
+    getConfirmation,
+  } = usePayrollConfirmationStore();
   const spiritsStore = useSpiritsInventoryStore();
   const pettyStore = usePettyCashStore();
   const pettyLaborLinkStore = usePettyLaborLinkStore();
@@ -838,6 +845,105 @@ export default function MonthlySummaryScreen() {
                       </View>
                     );
                   })}
+
+                  {/* ── 确认发薪操作条 ── */}
+                  {!isReadOnly && (() => {
+                    const lockStatus = getPayrollStatus(selectedMonth);
+                    const totalGross = activeEmps.reduce((s, emp) => {
+                      const slip = paySlipStore?.paySlips?.find((sl: any) => sl.employeeId === emp.id && sl.month === selectedMonth);
+                      return s + (slip?.grossSalary ?? 0);
+                    }, 0);
+                    const totalFinal = activeEmps.reduce((s, emp) => {
+                      const slip = paySlipStore?.paySlips?.find((sl: any) => sl.employeeId === emp.id && sl.month === selectedMonth);
+                      return s + (slip?.finalSalary ?? 0);
+                    }, 0);
+                    const empCount = activeEmps.filter(emp =>
+                      paySlipStore?.paySlips?.some((sl: any) => sl.employeeId === emp.id && sl.month === selectedMonth && (sl.grossSalary ?? 0) > 0)
+                    ).length;
+
+                    if (lockStatus === "frozen") {
+                      const conf = getConfirmation(selectedMonth);
+                      return (
+                        <View style={{ margin: 10, marginTop: 6, padding: 12, borderRadius: 12, backgroundColor: "#52C41A10", borderWidth: 1, borderColor: "#52C41A44" }}>
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                            <IconSymbol name="checkmark.seal.fill" size={16} color="#52C41A" />
+                            <Text style={{ fontSize: 13, fontWeight: "700", color: "#52C41A", flex: 1 }}>本月已确认发薪</Text>
+                            <Text style={{ fontSize: 11, color: colors.muted }}>{conf?.frozenAt ? new Date(conf.frozenAt).toLocaleDateString("zh-CN") : ""}</Text>
+                          </View>
+                          <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 10 }}>
+                            应发 ¥{formatMoney(conf?.summary?.totalGrossSalary ?? totalGross)} · 实发 ¥{formatMoney(conf?.summary?.totalFinalSalary ?? totalFinal)} · {conf?.summary?.totalEmployees ?? empCount} 人
+                          </Text>
+                          <View style={{ flexDirection: "row", gap: 8 }}>
+                            <TouchableOpacity
+                              onPress={() => { tap(); Alert.alert("进入差额调整", "进入差额调整模式后，可修改本月薪资数据。确认？", [
+                                { text: "取消", style: "cancel" },
+                                { text: "确认进入", onPress: () => enterAdjustMode(selectedMonth) },
+                              ]); }}
+                              style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 8, borderRadius: 8, backgroundColor: colors.warning + "15", borderWidth: 1, borderColor: colors.warning + "44" }}>
+                              <IconSymbol name="pencil.circle" size={14} color={colors.warning} />
+                              <Text style={{ fontSize: 12, fontWeight: "600", color: colors.warning }}>差额调整</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              onPress={() => { tap(); Alert.alert("撤销确认", "撤销后本月数据将恢复可编辑状态，确认？", [
+                                { text: "取消", style: "cancel" },
+                                { text: "撤销确认", style: "destructive", onPress: () => revokeConfirmation(selectedMonth) },
+                              ]); }}
+                              style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 8, borderRadius: 8, backgroundColor: colors.error + "10", borderWidth: 1, borderColor: colors.error + "33" }}>
+                              <IconSymbol name="lock.open" size={14} color={colors.error} />
+                              <Text style={{ fontSize: 12, fontWeight: "600", color: colors.error }}>撤销确认</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      );
+                    }
+
+                    if (lockStatus === "adjusting") {
+                      return (
+                        <View style={{ margin: 10, marginTop: 6, padding: 12, borderRadius: 12, backgroundColor: colors.warning + "10", borderWidth: 1, borderColor: colors.warning + "44" }}>
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                            <IconSymbol name="pencil.circle.fill" size={16} color={colors.warning} />
+                            <Text style={{ fontSize: 13, fontWeight: "700", color: colors.warning, flex: 1 }}>差额调整模式</Text>
+                          </View>
+                          <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 10 }}>当前处于差额调整模式，数据可编辑。完成后请重新确认发薪。</Text>
+                          <TouchableOpacity
+                            onPress={() => { tap(); Alert.alert("重新确认发薪", "确认后本月数据将再次锁定，确认？", [
+                              { text: "取消", style: "cancel" },
+                              { text: "确认发薪", onPress: () => confirmPayroll(selectedMonth, {
+                                totalEmployees: empCount, totalGrossSalary: totalGross, totalFinalSalary: totalFinal, totalDeductions: totalGross - totalFinal,
+                              }) },
+                            ]); }}
+                            style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 10, borderRadius: 10, backgroundColor: colors.warning, borderWidth: 0 }}>
+                            <IconSymbol name="lock.fill" size={14} color="#fff" />
+                            <Text style={{ fontSize: 13, fontWeight: "700", color: "#fff" }}>重新确认发薪（锁定）</Text>
+                          </TouchableOpacity>
+                        </View>
+                      );
+                    }
+
+                    // DRAFT 状态：显示确认发薪按钮
+                    if (totalFinal <= 0) return null; // 无薪资数据时不显示
+                    return (
+                      <TouchableOpacity
+                        onPress={() => { tap(); Alert.alert(
+                          "确认发薪",
+                          `确认后本月数据将锁定，不可直接修改。\n\n应发 ¥${formatMoney(totalGross)} · 实发 ¥${formatMoney(totalFinal)} · ${empCount} 人`,
+                          [
+                            { text: "取消", style: "cancel" },
+                            { text: "确认发薪", onPress: () => confirmPayroll(selectedMonth, {
+                              totalEmployees: empCount, totalGrossSalary: totalGross, totalFinalSalary: totalFinal, totalDeductions: totalGross - totalFinal,
+                            }) },
+                          ]
+                        ); }}
+                        style={{ margin: 10, marginTop: 6, flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12, backgroundColor: colors.warning + "12", borderWidth: 1, borderColor: colors.warning + "55" }}>
+                        <IconSymbol name="lock.fill" size={16} color={colors.warning} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 13, fontWeight: "700", color: colors.warning }}>确认发薪（锁定本月数据）</Text>
+                          <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>实发 ¥{formatMoney(totalFinal)} · {empCount} 人</Text>
+                        </View>
+                        <IconSymbol name="chevron.right" size={14} color={colors.warning} />
+                      </TouchableOpacity>
+                    );
+                  })()}
                 </View>
               );
             })()}

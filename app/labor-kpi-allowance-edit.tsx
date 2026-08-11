@@ -16,7 +16,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
 import { ScreenContainer } from "@/components/screen-container";
-import { useEmployeeStore, usePaySlipStore, useAttendanceStore, useGlobalPayrollSettingsStore } from "@/lib/labor/store";
+import { useEmployeeStore, usePaySlipStore, useAttendanceStore, useGlobalPayrollSettingsStore, usePayrollConfirmationStore } from "@/lib/labor/store";
 import {
   ALLOWANCE_UNIT_LABELS, REVENUE_KPI_SOURCE_LABELS,
   REVENUE_KPI_PAY_MODE_LABELS, calcRevenueKPIBonus,
@@ -34,6 +34,7 @@ export default function LaborKPIAllowanceEditPage() {
   const { getPaySlip, upsertPaySlip, buildPaySlipDraft } = usePaySlipStore();
   const { getAttendance } = useAttendanceStore();
   const { settings: globalSettings } = useGlobalPayrollSettingsStore();
+  const { isMonthWritable } = usePayrollConfirmationStore();
 
   const employee = useMemo(() => employees.find((e) => e.id === employeeId), [employees, employeeId]);
 
@@ -148,6 +149,11 @@ export default function LaborKPIAllowanceEditPage() {
   // ── 整页保存：一次性写入所有数据，触发全量重算 ──
   const handleSave = useCallback(() => {
     if (!month || !employeeId || !employee) return;
+    // 锁定拦截：已确认发薪的月份不允许修改
+    if (!isMonthWritable(month)) {
+      Alert.alert("已锁定", "本月已确认发薪，如需修改请先进入差额调整模式。");
+      return;
+    }
     const existing = getPaySlip(employeeId, month);
     if (!existing) {
       router.back();

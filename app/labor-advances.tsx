@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
-import { useEmployeeStore } from "@/lib/labor/store";
+import { useEmployeeStore, usePayrollConfirmationStore } from "@/lib/labor/store";
 import { useSalaryAdvanceStore, useAdvanceCategoryStore, SalaryAdvance, AdvanceStatus } from "@/lib/labor/advance-store";
 import { usePettyLaborLinkStore } from "@/lib/store/petty-labor-link-store";
 import { EMPLOYEE_TYPE_LABELS, EMPLOYEE_TYPE_COLORS, DEPT_COLORS, monthLabel } from "@/lib/labor/types";
@@ -182,6 +182,7 @@ export default function LaborAdvancesScreen() {
 
   const { employees } = useEmployeeStore();
   const { advances, addAdvance, updateAdvance, deleteAdvance } = useSalaryAdvanceStore();
+  const { isMonthWritable } = usePayrollConfirmationStore();
   const { allCategories } = useAdvanceCategoryStore();
   const { links } = usePettyLaborLinkStore();
 
@@ -212,6 +213,12 @@ export default function LaborAdvancesScreen() {
   );
 
   const handleStatusChange = (advance: SalaryAdvance, newStatus: AdvanceStatus) => {
+    // 锁定拦截：按记录的目标月份判断
+    const targetMonth = advance.deductMonth ?? advance.date.slice(0, 7);
+    if (!isMonthWritable(targetMonth)) {
+      Alert.alert("已锁定", `${targetMonth} 已确认发薪，如需修改请先进入差额调整模式。`);
+      return;
+    }
     Alert.alert(
       `标记为「${STATUS_LABELS[newStatus]}」`,
       `确认将 ${empMap.get(advance.employeeId)?.code ?? "员工"} ¥${advance.amount} 的预支标记为${STATUS_LABELS[newStatus]}？`,
@@ -223,6 +230,12 @@ export default function LaborAdvancesScreen() {
   };
 
   const handleDelete = (advance: SalaryAdvance) => {
+    // 锁定拦截：按记录的目标月份判断
+    const targetMonth = advance.deductMonth ?? advance.date.slice(0, 7);
+    if (!isMonthWritable(targetMonth)) {
+      Alert.alert("已锁定", `${targetMonth} 已确认发薪，如需修改请先进入差额调整模式。`);
+      return;
+    }
     Alert.alert("删除预支记录", "确认删除此预支记录？", [
       { text: "取消", style: "cancel" },
       { text: "删除", style: "destructive", onPress: () => deleteAdvance(advance.id) },
