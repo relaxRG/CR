@@ -42,8 +42,7 @@ import { calcDailyRate, calcAttendanceBaseSalary } from "@/lib/labor/types";
 const dailyRate = calcDailyRate(baseSalary, daysInMonth, restDays);
 const base = calcAttendanceBaseSalary(dailyRate, attendanceDays, expectedDays);
 
-// ❌ 错误：从聚合考勤工资反推新数据的比例底薪
-const base = slip.attendanceSalary - overtimePay - holidayBonus + specialDeduction;
+// ❌ 错误：从聚合考勤工资反推新数据的比例底薪（禁止保留任何该类公式）
 ```
 
 ### 规范 2：除法运算必须同时检查分子和分母

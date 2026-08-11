@@ -11,6 +11,7 @@ import { buildImportTemplate, parseImportFile, type ImportResult } from "@/lib/l
 import { getNonWritableScheduleMonths } from "@/lib/labor/schedule-guards";
 import { applyHolidayRestAllocation } from "@/lib/labor/holiday-pay";
 import { getHolidayAllocationKey, getHolidayWorkInfo } from "@/lib/labor/holiday-work";
+import { shouldAutoSyncPayrollMonth } from "@/lib/labor/payroll-sync-guards";
 import { checkControlFieldsIntegrity, checkAdvanceCrossMonthPollution } from "@/lib/labor/payroll-monitor";
 import {
   Alert, Clipboard, Dimensions, Modal, Platform, Pressable, ScrollView,
@@ -3557,8 +3558,8 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
     // activeEmps=[] 导致循环不执行，旧的 attendances/paySlips 数据不会被清零
     // 这就是「无排班但有比例底薪」反复出现的根本原因
     if (!shiftsReady || !employeesReady) return;
-    // 确认发薪锁定检查：已确认月份跳过所有自动写入
-    if (getConfirmStatus(currentMonth) === "frozen") return;
+    // 只有草稿或调整中月份允许自动写入；冻结月绝不重算。
+    if (!shouldAutoSyncPayrollMonth(getConfirmStatus(currentMonth))) return;
     // 防抖：500ms 内多次修改只触发一次
     if (autoSyncTimerRef.current) clearTimeout(autoSyncTimerRef.current);
     autoSyncTimerRef.current = setTimeout(() => {

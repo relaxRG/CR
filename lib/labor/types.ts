@@ -1266,7 +1266,7 @@ export function parseMonth(month: string): { year: number; month: number } {
  */
 export function calcDailyRate(baseSalary: number, daysInMonth: number, restDays: number): number {
   const expectedAttendanceDays = daysInMonth - restDays;
-  if (!Number.isFinite(baseSalary) || !Number.isFinite(expectedAttendanceDays) || expectedAttendanceDays <= 0) return 0;
+  if (!Number.isFinite(baseSalary) || !Number.isFinite(expectedAttendanceDays) || baseSalary <= 0 || expectedAttendanceDays <= 0) return 0;
   return baseSalary / expectedAttendanceDays;
 }
 

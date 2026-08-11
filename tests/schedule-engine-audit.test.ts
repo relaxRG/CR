@@ -539,3 +539,31 @@ describe("Suite K：比例底薪统一为日薪 × 实际出勤天数", () => {
     expect(getAttendanceBaseSalary(legacyAttendance)).toBe(7708.31);
   });
 });
+
+
+describe("Suite L：比例底薪异常边界与精度守卫", () => {
+  it("L1. 只有 1 个应出勤日时，出勤 1 天比例底薪严格等于月底薪", () => {
+    const dailyRate = calcDailyRate(8888.88, 31, 30);
+    expect(dailyRate).toBe(8888.88);
+    expect(calcAttendanceBaseSalary(dailyRate, 1, 1)).toBe(8888.88);
+  });
+
+  it("L2. 月休天数等于或超过自然月天数时，日薪与比例底薪均归零", () => {
+    expect(calcDailyRate(8888.88, 30, 30)).toBe(0);
+    expect(calcDailyRate(8888.88, 30, 31)).toBe(0);
+    expect(calcAttendanceBaseSalary(0, 1, 0)).toBe(0);
+  });
+
+  it("L3. 非法底薪、非有限日薪或负出勤天数不会产生负工资或 NaN", () => {
+    expect(calcDailyRate(-1, 30, 4)).toBe(0);
+    expect(calcDailyRate(Number.NaN, 30, 4)).toBe(0);
+    expect(calcDailyRate(Number.POSITIVE_INFINITY, 30, 4)).toBe(0);
+    expect(calcAttendanceBaseSalary(Number.NaN, 20, 26)).toBe(0);
+    expect(calcAttendanceBaseSalary(384.615, -1, 26)).toBe(0);
+  });
+
+  it("L4. 实际出勤超过常规应出勤天数时，仍按同一日薪累计且仅在最终金额取整", () => {
+    const dailyRate = calcDailyRate(10000, 30, 4);
+    expect(calcAttendanceBaseSalary(dailyRate, 27, 26)).toBe(10384.62);
+  });
+});

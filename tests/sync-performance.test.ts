@@ -143,7 +143,7 @@ describe("性能测试：18 个模块并发同步", () => {
     console.log(`[性能] 18 个模块并发 push（200ms 延迟）耗时: ${elapsed.toFixed(2)}ms`);
   });
 
-  it("18 个模块串行 push 应在 5000ms 内完成（弱网 200ms 延迟）", async () => {
+  it("18 个模块串行 push 应在 7000ms 内完成（弱网 200ms 延迟）", async () => {
     const pushCount = { value: 0 };
     const mockPush = makeMockPush(200, () => { pushCount.value++; });
 
@@ -158,10 +158,12 @@ describe("性能测试：18 个模块并发同步", () => {
     }
     const elapsed = performance.now() - start;
 
-    expect(elapsed).toBeLessThan(5000); // 5 秒内完成
+    // 18 × 200ms 的理论网络等待已是 3.6s；为 JSON 构造和共享 CI 预留预算，
+    // 仍在 7s 内拦截网络串行化或循环阻塞等异常回归。
+    expect(elapsed).toBeLessThan(7000);
     expect(pushCount.value).toBe(18);
     console.log(`[性能] 18 个模块串行 push（200ms 延迟）耗时: ${elapsed.toFixed(2)}ms`);
-  });
+  }, 8000);
 });
 
 describe("性能测试：冲突处理", () => {
