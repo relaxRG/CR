@@ -396,8 +396,9 @@ function EmployeeCard({
           {(slip?.revenueKPIBonus ?? 0) > 0 && <DetailRow label="业绩绩效" value={`¥${formatMoney((slip?.revenueKPIBonus ?? 0))}`} colors={colors} />}
           {/* 业绩提点：salesCommission（营业额按比例提成），有值才显示 */}
           {(slip?.salesCommission ?? 0) > 0 && <DetailRow label="业绩提点" value={`¥${formatMoney((slip?.salesCommission ?? 0))}`} colors={colors} />}
-          {/* 综合小计 = 补贴合计 + 工作绩效 + 业绩绩效 + 业绩提点 */}
-          <DetailRow label="综合小计" value={`¥${formatMoney(((slip?.performanceBonus ?? 0) + (slip?.mealAllowance ?? 0) + (slip?.transportAllowance ?? 0) + (slip?.otherAllowance ?? 0) + (slip?.salesCommission ?? 0)))}`} colors={colors} bold />
+          {/* 综合小计 = 补贴合计 + 工作绩效 + 业绩绩效 + 业绩提点 + 奖惩小计 */}
+          {/* 与 grossSalary 中的综合部分保持一致：performanceBonus + allowanceTotal + salesCommission + rewardPenalty */}
+          <DetailRow label="综合小计" value={`¥${formatMoney(((slip?.performanceBonus ?? 0) + (slip?.mealAllowance ?? 0) + (slip?.transportAllowance ?? 0) + (slip?.otherAllowance ?? 0) + (slip?.salesCommission ?? 0) + (slip?.rewardPenalty ?? 0)))}`} colors={colors} bold />
         </View>
       </TouchableOpacity>
 
