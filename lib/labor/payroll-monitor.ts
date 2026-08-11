@@ -263,3 +263,92 @@ export function checkFrozenViolation(
     month,
   });
 }
+
+/**
+ * 规则 A6：绩效补贴控制字段丢失检测
+ *
+ * 当 autoSync 执行后，检测到某员工的 performanceBonus > 0 但
+ * allowanceOverrides/workKPISelections 同时为空时触发。
+ * 这是跨月闭包污染的典型症状：控制字段被 autoSync 覆盖清除。
+ *
+ * 调用时机：autoSync 每次执行完毕后，对所有有绩效设置的员工调用此检查。
+ */
+export function checkControlFieldsIntegrity(
+  employeeId: string,
+  employeeName: string,
+  month: string,
+  performanceBonus: number,
+  allowanceOverrides: Record<string, boolean> | undefined,
+  workKPISelections: Record<string, string> | undefined
+) {
+  // 如果 performanceBonus > 0 但控制字段全部为空，说明可能发生了控制字段丢失
+  const hasPerformance = performanceBonus > 0;
+  const hasOverrides = allowanceOverrides && Object.keys(allowanceOverrides).length > 0;
+  const hasKPISelections = workKPISelections && Object.keys(workKPISelections).length > 0;
+
+  if (hasPerformance && !hasOverrides && !hasKPISelections) {
+    reportAnomaly({
+      severity: "warning",
+      rule: "A6-CONTROL_FIELDS_LOST",
+      message: `${employeeName} ${month} performanceBonus=¥${performanceBonus} 但 allowanceOverrides 和 workKPISelections 均为空，疑似控制字段丢失（跨月闭包污染）`,
+      employeeId,
+      month,
+    });
+  }
+}
+
+/**
+ * 规则 A7：跨月数据污染检测
+ *
+ * 当检测到某月的 advances 合计与 paySlip.advanceAmount 差异过大时触发。
+ * 差异过大通常意味着 advances 过滤缺少 month 约束，统计了其他月份的数据。
+ *
+ * 调用时机：autoSync 计算 advanceTotal 后，与 paySlip.advanceAmount 对比。
+ */
+export function checkAdvanceCrossMonthPollution(
+  employeeId: string,
+  employeeName: string,
+  month: string,
+  calculatedAdvance: number,
+  storedAdvanceAmount: number
+) {
+  // 允许 ¥1 以内的浮点误差
+  const diff = Math.abs(calculatedAdvance - storedAdvanceAmount);
+  if (diff > 1 && storedAdvanceAmount > 0) {
+    // 差异超过 ¥100 或超过存储值的 50% 时告警
+    const isSignificant = diff > 100 || diff > storedAdvanceAmount * 0.5;
+    if (isSignificant) {
+      reportAnomaly({
+        severity: "warning",
+        rule: "A7-ADVANCE_CROSS_MONTH",
+        message: `${employeeName} ${month} 预支合计不一致：计算值=¥${calculatedAdvance.toFixed(2)}，存储值=¥${storedAdvanceAmount.toFixed(2)}，差异=¥${diff.toFixed(2)}，疑似跨月数据污染`,
+        employeeId,
+        month,
+      });
+    }
+  }
+}
+
+/**
+ * 导出调试信息（用于用户反馈时附加）
+ * 包含最近日志 + 活跃告警，格式化为可读字符串
+ */
+export function exportDebugReport(): string {
+  const logs = getRecentLogs();
+  const alerts = getActiveAlerts();
+  const lines: string[] = [
+    `=== Payroll Debug Report ===`,
+    `Generated: ${new Date().toISOString()}`,
+    ``,
+    `--- Active Alerts (${alerts.length}) ---`,
+    ...alerts.map((a) =>
+      `[${a.severity.toUpperCase()}] ${a.rule}: ${a.message} (${a.detectedAt})`
+    ),
+    ``,
+    `--- Recent Logs (last ${logs.length}) ---`,
+    ...logs.slice(-20).map((l) =>
+      `[${l.level.toUpperCase()}][${l.tag}] ${l.message}`
+    ),
+  ];
+  return lines.join("\n");
+}

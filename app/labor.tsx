@@ -8,6 +8,7 @@ import React, { useCallback, useMemo, useRef, useState } from "react";
 import { formatMoney } from "@/lib/utils";
 import { exportLaborData, type ExportType } from "@/lib/labor/export";
 import { buildImportTemplate, parseImportFile, type ImportResult } from "@/lib/labor/import";
+import { checkControlFieldsIntegrity, checkAdvanceCrossMonthPollution } from "@/lib/labor/payroll-monitor";
 import {
   Alert, Clipboard, Dimensions, Modal, Platform, Pressable, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions, KeyboardAvoidingView} from "react-native";
@@ -3579,6 +3580,20 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
         const performanceTotal = existingSlip?.performanceBonus ?? 0;
         const slip = buildPaySlipDraft(emp, currentMonth, att, performanceTotal, advanceTotal, globalSettings, cumulativeIncome, cumulativeTaxPaid);
         upsertPaySlip(slip);
+        // 监控规则 A6：检测控制字段丢失（跨月闭包污染典型症状）
+        checkControlFieldsIntegrity(
+          emp.id, emp.realName, currentMonth,
+          slip.performanceBonus ?? 0,
+          slip.allowanceOverrides,
+          slip.workKPISelections
+        );
+        // 监控规则 A7：检测跨月数据污染（预支合计与存储差异过大）
+        if (existingSlip?.advanceAmount != null) {
+          checkAdvanceCrossMonthPollution(
+            emp.id, emp.realName, currentMonth,
+            advanceTotal, existingSlip.advanceAmount
+          );
+        }
       }
     }, 500);
     return () => { if (autoSyncTimerRef.current) clearTimeout(autoSyncTimerRef.current); };

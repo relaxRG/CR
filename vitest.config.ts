@@ -9,5 +9,22 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "json-summary"],
+      include: [
+        "lib/labor/**/*.{ts,tsx}",
+        "lib/store/petty-labor-link-store.tsx",
+      ],
+      exclude: [
+        "**/*.test.{ts,tsx}",
+        "**/node_modules/**",
+      ],
+      thresholds: {
+        lines: 60,
+        functions: 60,
+        branches: 50,
+      },
+    },
   },
 });
