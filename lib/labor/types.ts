@@ -949,6 +949,8 @@ export interface HolidayCompOffEntry {
   /** 使用状态 */
   status: "available" | "used_rest" | "cashed_out" | "expired";
   usedMonth?: string;
+  /** 已迁移至 CompOffBalanceEntry（source=holiday）；仅保留作历史兼容，不再参与业务计算。 */
+  migratedToUnified?: boolean;
   createdAt: string;
 }
 
@@ -1167,6 +1169,16 @@ export interface PaySlip {
   compOffCashOut?: number;
   /** 调休兑现备注（如"兑现X天加班换休余额，日薪¥XX"） */
   compOffCashOutNote?: string;
+  /**
+   * 由本月排班中的调休状态消耗的余额明细；key = date|shift|specialStatusId。
+   * 生成薪资单重试或自动同步时据此保持幂等，避免同一排班重复扣减调休余额。
+   */
+  compOffUsage?: Record<string, {
+    entryId: string;
+    days: number;
+    source: "holiday" | "overtime" | "balance";
+    consumedAt: number;
+  }>;
   /**
    * 备用金人工已付金额（来自备用金关联记录，自动同步）。精度：2位小数
    * 展示时与 advanceAmount 合并计算：已预支 = advanceAmount + pettyLaborPaid

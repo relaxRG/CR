@@ -24,7 +24,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
 import {
   useEmployeeStore, useAttendanceStore, usePaySlipStore,
-  useCompOffBalanceEntryStore, useHolidayCompOffStore,
+  useCompOffBalanceEntryStore,
   useGlobalPayrollSettingsStore, useDeptOrderStore, DEFAULT_DEPT_ORDER,
   usePayrollConfirmationStore,
 } from "@/lib/labor/store";
@@ -60,7 +60,6 @@ export default function LaborAttendancePage() {
   const { records: attendances } = useAttendanceStore();
   const { paySlips, upsertPaySlip } = usePaySlipStore();
   const { entries: compOffEntries } = useCompOffBalanceEntryStore();
-  const { entries: holidayCompOffEntries } = useHolidayCompOffStore();
   const { advances } = useSalaryAdvanceStore();
 
   const currentMonth = month || new Date().toISOString().slice(0, 7);
@@ -87,14 +86,6 @@ export default function LaborAttendancePage() {
     });
     return m;
   }, [compOffEntries]);
-  const holidayCompOffByEmp = useMemo(() => {
-    const m = new Map<string, typeof holidayCompOffEntries>();
-    holidayCompOffEntries.forEach((e) => {
-      if (!m.has(e.employeeId)) m.set(e.employeeId, []);
-      m.get(e.employeeId)!.push(e);
-    });
-    return m;
-  }, [holidayCompOffEntries]);
 
   return (
     <ScreenContainer>
@@ -131,7 +122,6 @@ export default function LaborAttendancePage() {
                 const att = attMap.get(emp.id) ?? null;
                 const slip = slipMap.get(emp.id) ?? null;
                 const empCompOff = compOffByEmp.get(emp.id) ?? [];
-                const empHolidayCompOff = holidayCompOffByEmp.get(emp.id) ?? [];
                 return (
                   <EmployeeCard
                     key={emp.id}
@@ -140,7 +130,6 @@ export default function LaborAttendancePage() {
                     att={att}
                     slip={slip}
                     compOffEntries={empCompOff}
-                    holidayCompOffEntries={empHolidayCompOff}
                     advances={advances}
                     expanded={expandedId === emp.id}
                     onToggle={() => { tap(); setExpandedId(expandedId === emp.id ? "" : emp.id); }}
@@ -162,13 +151,13 @@ export default function LaborAttendancePage() {
 
 // ─── 员工卡片 ─────────────────────────────────────────────────────────────────
 function EmployeeCard({
-  employee, month, att, slip, compOffEntries, holidayCompOffEntries,
+  employee, month, att, slip, compOffEntries,
   advances, expanded, onToggle, colors, upsertPaySlip,
   editingReward, onToggleRewardEdit, router,
 }: {
   employee: Employee; month: string;
   att: MonthlyAttendance | null; slip: PaySlip | null;
-  compOffEntries: any[]; holidayCompOffEntries: any[];
+  compOffEntries: any[];
   advances: any[]; expanded: boolean; onToggle: () => void; colors: any;
   upsertPaySlip: (slip: PaySlip) => void;
   editingReward: boolean; onToggleRewardEdit: () => void;
@@ -188,10 +177,10 @@ function EmployeeCard({
     [compOffEntries]
   );
   const holidayCompOff = useMemo(() =>
-    holidayCompOffEntries
-      .filter((e: any) => e.status === "available")
+    compOffEntries
+      .filter((e: any) => e.status === "available" && e.source === "holiday")
       .reduce((s: number, e: any) => s + (e.days ?? 0), 0),
-    [holidayCompOffEntries]
+    [compOffEntries]
   );
   const totalCompOff = overtimeCompOff + holidayCompOff;
   // ── 本月调休兑换 ──

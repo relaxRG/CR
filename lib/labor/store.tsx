@@ -7,6 +7,7 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { notifySyncChange, registerStoreReload } from "../sync/engine";
 import { SeparatePaymentProvider } from "./separate-payment-store";
+import { calculateAttendanceFromShifts } from "./attendance-calculator";
 import {
   Employee, EmployeeDept, ShiftEntry, MonthlyAttendance, PaySlip, MonthConfig,
   ShiftTemplate, HolidayConfig,
@@ -626,220 +627,16 @@ function AttendanceProvider({ children }: { children: React.ReactNode }) {
     specialStatuses: SpecialStatus[],
     holidayDaysList: Array<{ date: string; multiplier: number }> = []
   ): MonthlyAttendance => {
-    const { year, month: m } = parseMonth(month);
-    const daysInMonth = getDaysInMonth(year, m);
-    const empShifts = shifts.filter((s) => s.employeeId === employeeId && s.date.startsWith(month));
-
-    // 应出勤天数（自动计算）
-    // 防护：restDaysPerMonth 可能在旧版数据中缺失（undefined），?? 0 防止 NaN 传播
-    const expectedAttendanceDays = Math.max(0, daysInMonth - (employee.restDaysPerMonth ?? 0));
-
-    // 加班换休配置
-    const hoursPerCompOff = employee.compOffRule?.hoursPerDay ?? 8;
-
-    // 遍历排班记录，分类处理
-    const daysSet = new Set<string>();
-    let totalHours = 0;
-    let stdHoursTotal = 0;
-    let compOffCount = 0;
-    let holidayBonus = 0;
-    let holidayWorkDays = 0;
-
-    // 特殊状态扣薪明细
-    const specialStatusDeductions: Record<string, { count: number; deduction: number; name: string; multiplier: number }> = {};
-
-    // 兼职员工标识（longterm_parttime 和 parttime 都是兼职逻辑）
-    // 兼职不适用：节假日倍数工资、特殊状态扣薪（这些基于 dailyRate，对兼职无意义）
-    const isParttime = employee.type === "parttime" || employee.type === "longterm_parttime";
-
-    // 先计算日薪（用于特殊状态扣薪，兼职员工此值仅用于显示，不参与计算）
-    const dailyRate = calcDailyRate(employee.baseSalary, daysInMonth, employee.restDaysPerMonth ?? 0);
-
-    empShifts.forEach((s) => {
-      const specialStatus = s.specialStatusId
-        ? specialStatuses.find((ss) => ss.id === s.specialStatusId)
-        : null;
-
-      if (specialStatus) {
-        // ── 三字段驱动引擎：direction + countAsAttendance + salaryMultiplier ──
-        const dir = specialStatus.direction;
-        const countsAsAtt = specialStatus.countAsAttendance;
-        const isCompOff = specialStatus.category === "comp_off";
-
-        if (isCompOff) {
-          // 加班换休：算出勤，不计实际工时，合同工时加入标准工时（避免加班时数虚高）
-          compOffCount++;
-          daysSet.add(s.date);
-          const contractH = getContractHoursForDate(employee, s.date);
-          stdHoursTotal += contractH;
-        } else if (countsAsAtt) {
-          // 算出勤的特殊状态（如节日上班、违规扣款但上了班）
-          const h = s.hoursValue;
-          if (typeof h === "number" && h > 0) {
-            daysSet.add(s.date);
-            totalHours += h;
-            const contractH = getContractHoursForDate(employee, s.date);
-            stdHoursTotal += contractH;
-          } else {
-            // 无工时但标记为算出勤
-            daysSet.add(s.date);
-            const contractH = getContractHoursForDate(employee, s.date);
-            stdHoursTotal += contractH;
-          }
-          // 按方向计算额外调整（兼职员工不适用节假日倍数和特殊状态扣薪）
-          if (!isParttime) {
-            if (dir === "positive" && specialStatus.salaryMultiplier > 1) {
-              // 正向补偿：额外给 (multiplier-1) 倍日薪
-              const dayBonus = Math.round(dailyRate * (specialStatus.salaryMultiplier - 1) * 100) / 100;
-              holidayBonus += dayBonus;
-              // 统计节假日上班天数
-              if (specialStatus.isHoliday) holidayWorkDays++;
-            } else if (dir === "negative") {
-              // 负向惩罚（上了班但违规）：额外扣 multiplier 倍日薪
-              const extraDeduction = Math.round(specialStatus.salaryMultiplier * dailyRate * 100) / 100;
-              const key = specialStatus.id;
-              if (!specialStatusDeductions[key]) {
-                specialStatusDeductions[key] = { count: 0, deduction: 0, name: specialStatus.name, multiplier: specialStatus.salaryMultiplier };
-              }
-              specialStatusDeductions[key].count++;
-              specialStatusDeductions[key].deduction += extraDeduction;
-            }
-            // neutral：不加不扣
-          }
-        } else {
-          // 不算出勤的特殊状态（如缺席、休息）
-          // 该天不加入 daysSet → 比例底薪自然少1天
-          // 兼职员工不适用特殊状态扣薪（按天结算则不计入出勤天数，按小时结算则不计入工时）
-          if (!isParttime) {
-            if (dir === "negative") {
-              // 负向缺席：额外调整 = (multiplier - 1) × 日薪
-              // 旷工2x → 额外扣(2-1)=1天；病分0.5x → 退回(1-0.5)=0.5天；事剘1x → 无额外调整
-              const extraDeduction = Math.round((specialStatus.salaryMultiplier - 1) * dailyRate * 100) / 100;
-              if (extraDeduction !== 0) {
-                const key = specialStatus.id;
-                if (!specialStatusDeductions[key]) {
-                  specialStatusDeductions[key] = { count: 0, deduction: 0, name: specialStatus.name, multiplier: specialStatus.salaryMultiplier };
-                }
-                specialStatusDeductions[key].count++;
-                specialStatusDeductions[key].deduction += extraDeduction;
-              }
-            } else if (dir === "positive") {
-              // 正向不出勤（如年假：不出勤但不扣薪）：退回1天日薪抒消比例底薪已少的那天
-              const refund = Math.round(specialStatus.salaryMultiplier * dailyRate * 100) / 100;
-              if (refund !== 0) {
-                const key = specialStatus.id;
-                if (!specialStatusDeductions[key]) {
-                  specialStatusDeductions[key] = { count: 0, deduction: 0, name: specialStatus.name, multiplier: specialStatus.salaryMultiplier };
-                }
-                specialStatusDeductions[key].count++;
-                specialStatusDeductions[key].deduction -= refund; // 负数 = 退款
-              }
-            }
-            // neutral 不出勤（如普通休息）：无额外调整
-          }
-        }
-      } else {
-        // ── 正常工作班次 ──
-        const h = s.hoursValue;
-        if (typeof h === "number" && h > 0) {
-          daysSet.add(s.date);
-          totalHours += h;
-          const contractH = getContractHoursForDate(employee, s.date);
-          stdHoursTotal += contractH;
-        }
-      }
-    });
-
-    const attendanceDays = daysSet.size;
-    const rawOvertimeHours = Math.max(0, totalHours - stdHoursTotal);
-    // 加班换休消耗的加班时数
-    const compOffHoursUsed = compOffCount * hoursPerCompOff;
-    // 实际计费加班时数
-    const paidOvertimeHours = Math.max(0, rawOvertimeHours - compOffHoursUsed);
-
-    // 少休天数（自动计算）= 应出勤 - 实际出勤
-    // 正数=缺席，负数=多出勤
-    const underRestDays = expectedAttendanceDays - attendanceDays;
-
-    // 特殊状态总扣薪
-    const totalSpecialDeduction = Object.values(specialStatusDeductions)
-      .reduce((s, v) => s + v.deduction, 0);
-
-    // 加班工资
-    const overtimePay = Math.round(paidOvertimeHours * employee.overtimeHourlyRate * 100) / 100;
-
-    /**
-     * 考勤工资计算逻辑（按实际出勤天数比例）
-     *
-     * 字段语义（与薪资卡片展示保持一致）：
-     *   比例底薪 (proportionalBase) = baseSalary × (attendanceDays / expectedAttendanceDays)
-     *   考勤工资 (attendanceSalary) = proportionalBase + overtimePay - totalSpecialDeduction + holidayBonus
-     *
-     * 展示公式验证（薪资卡片 5格加法）：
-     *   proportionalBase + overtimePay + holidayBonus - totalSpecialDeduction = attendanceSalary ✅
-     *
-     * 全职员工：
-     *   实际出勤天数 = 有工时天数 + 加班换休天数 + 节假日调休天数（这些天已在 daysSet 里）
-     *   特殊状态只处理额外惩罚/补偿：
-     *     - 旷工 2x：该天已不在出勤（比例已扣1天），额外再扣 (2-1)=1 天日薪
-     *     - 病假 0.5x：该天已不在出勤（比例已扣1天），退回 (1-0.5)=0.5 天日薪
-     *     - 事假 1x：该天已不在出勤（比例已扣），无额外调整
-     *
-     * 兼职员工：按实际工时 × 时薪（不受出勤天数影响）
-     */
-    let attendanceSalary: number;
-    if (employee.type === "parttime" || employee.type === "longterm_parttime") {
-      if (employee.parttimeMode === "daily") {
-        // 按天结算：工资 = 出勤天数 × 日薪（baseSalary）
-        attendanceSalary = Math.round(attendanceDays * employee.baseSalary * 100) / 100;
-      } else {
-        // 按小时结算（默认）：工资 = 总工时 × 加班时薪
-        attendanceSalary = Math.round(totalHours * employee.overtimeHourlyRate * 100) / 100;
-      }
-    } else {
-      // 按实际出勤天数比例计算底薪
-      // 专业规则：无出勤(attendanceDays=0)或应出勤为0时，比例底薪=0
-      const proportionalBase = (expectedAttendanceDays > 0 && attendanceDays > 0)
-        ? Math.round((employee.baseSalary * attendanceDays / expectedAttendanceDays) * 100) / 100
-        : 0;
-      // 考勤工资 = 比例底薪 + 加班工资 + 特殊状态额外调整 + 节日补偿
-      // totalSpecialDeduction 是额外惩罚（无来源多休已通过比例底薪自然体现）
-      attendanceSalary = Math.round(
-        (proportionalBase + overtimePay - totalSpecialDeduction + holidayBonus) * 100
-      ) / 100;
-    }
-
-    const existing = ref.current.find((r) => r.employeeId === employeeId && r.month === month);
-
-    return {
-      id: existing?.id ?? uuid(),
+    const existing = ref.current.find((record) => record.employeeId === employeeId && record.month === month) ?? null;
+    return calculateAttendanceFromShifts({
       employeeId,
       month,
-      daysInMonth,
-      attendanceDays,
-      totalHours: Math.round(totalHours * 10) / 10,
-      stdHours: Math.round(stdHoursTotal * 10) / 10,
-      overtimeHours: Math.round(rawOvertimeHours * 10) / 10,
-      compOffCount,
-      hoursPerCompOff,
-      paidOvertimeHours: Math.round(paidOvertimeHours * 10) / 10,
-      expectedAttendanceDays,
-      underRestDays,
-      specialStatusDeductions,
-      totalSpecialDeduction: Math.round(totalSpecialDeduction * 100) / 100,
-      holidayBonus: Math.round(holidayBonus * 100) / 100,
-      dailyRate,
-      dailyRateOverride: existing?.dailyRateOverride ?? false,
-      overtimePay,
-      attendanceSalary,
-      notes: existing?.notes ?? "",
-      // 加班超时提醒：加班时数超过4h时提醒员工存入调休
-      overtimeAlertHours: rawOvertimeHours >= 4 ? Math.round(rawOvertimeHours * 10) / 10 : undefined,
-      // 本月已存入调休的加班小时数（compOffCount * hoursPerCompOff）
-      storedOvertimeHours: compOffHoursUsed > 0 ? Math.round(compOffHoursUsed * 10) / 10 : undefined,
-      // 节假日上班天数
-      holidayWorkDays: holidayWorkDays > 0 ? holidayWorkDays : undefined,
-    };
+      employee,
+      shifts,
+      specialStatuses,
+      holidayDays: holidayDaysList,
+      existing,
+    });
   }, [ref]);
 
   const attendanceContextValue = React.useMemo(
@@ -1081,6 +878,7 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
       // 保留手动控制字段：调休兑现、节假日分配、备用金人工已付
       compOffCashOut: existing?.compOffCashOut,
       compOffCashOutNote: existing?.compOffCashOutNote,
+      compOffUsage: existing?.compOffUsage,
       holidayBonusAllocation: existing?.holidayBonusAllocation,
       pettyLaborPaid: existing?.pettyLaborPaid,
       pettyLaborLinkIds: existing?.pettyLaborLinkIds,
@@ -1414,6 +1212,7 @@ const HolidayCompOffContext = createContext<HolidayCompOffStore>({
 
 function HolidayCompOffProvider({ children }: { children: React.ReactNode }) {
   const { data: entries, ref, persist, ready } = usePersisted<HolidayCompOffEntry>("labor_holiday_comp_off_v1");
+  const unifiedCompOff = useContext(CompOffBalanceEntryContext);
 
   const addEntry = useCallback((entry: Omit<HolidayCompOffEntry, "id" | "createdAt">) => {
     const newEntry: HolidayCompOffEntry = { ...entry, id: uuid(), createdAt: new Date().toISOString() };
@@ -1424,6 +1223,38 @@ function HolidayCompOffProvider({ children }: { children: React.ReactNode }) {
     const idx = ref.current.findIndex((e) => e.id === id);
     if (idx >= 0) { const next = [...ref.current]; next[idx] = { ...next[idx], ...patch }; persist(next); }
   }, [persist, ref]);
+
+  // 旧 HolidayCompOffEntry 与新 CompOffBalanceEntry（source=holiday）并存会造成余额重复展示和
+  // 消费不一致。保留本 Provider 只用于一次性迁移历史数据，业务读取统一走 CompOffBalanceEntry。
+  React.useEffect(() => {
+    if (!ready || !unifiedCompOff.ready) return;
+    const pending = ref.current.filter((entry) => !entry.migratedToUnified);
+    if (pending.length === 0) return;
+
+    for (const legacy of pending) {
+      const alreadyMigrated = unifiedCompOff.entries.some((entry) =>
+        entry.employeeId === legacy.employeeId &&
+        entry.source === "holiday" &&
+        entry.workDate === legacy.workDate &&
+        entry.earnedMonth === legacy.workDate.slice(0, 7)
+      );
+      if (!alreadyMigrated) {
+        unifiedCompOff.addEntry({
+          employeeId: legacy.employeeId,
+          earnedMonth: legacy.workDate.slice(0, 7),
+          source: "holiday",
+          workDate: legacy.workDate,
+          holidayName: legacy.holidayName,
+          days: legacy.days,
+          expiresMonth: legacy.expiresMonth,
+          status: legacy.status,
+          usedMonth: legacy.usedMonth,
+          notes: `从旧节假日调休余额迁移：${legacy.id}`,
+        });
+      }
+      updateEntry(legacy.id, { migratedToUnified: true });
+    }
+  }, [ready, unifiedCompOff.ready, unifiedCompOff.entries, unifiedCompOff.addEntry, ref, updateEntry]);
 
   const getEntries = useCallback((employeeId: string): HolidayCompOffEntry[] => {
     return ref.current.filter((e) => e.employeeId === employeeId);

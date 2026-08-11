@@ -8,6 +8,9 @@ import React, { useCallback, useMemo, useRef, useState } from "react";
 import { formatMoney } from "@/lib/utils";
 import { exportLaborData, type ExportType } from "@/lib/labor/export";
 import { buildImportTemplate, parseImportFile, type ImportResult } from "@/lib/labor/import";
+import { getNonWritableScheduleMonths } from "@/lib/labor/schedule-guards";
+import { applyHolidayRestAllocation } from "@/lib/labor/holiday-pay";
+import { getHolidayAllocationKey, getHolidayWorkInfo } from "@/lib/labor/holiday-work";
 import { checkControlFieldsIntegrity, checkAdvanceCrossMonthPollution } from "@/lib/labor/payroll-monitor";
 import {
   Alert, Clipboard, Dimensions, Modal, Platform, Pressable, ScrollView,
@@ -25,7 +28,7 @@ import {
   usePaySlipStore, useShiftStore, useShiftTemplateStore,
   useHolidayConfigStore,
   useSpecialStatusStore, useGlobalPayrollSettingsStore,
-  useCompOffBalanceEntryStore, useHolidayCompOffStore, useUnexplainedRestAlertStore,
+  useCompOffBalanceEntryStore, useUnexplainedRestAlertStore,
   useCustomDeptStore, useBusinessHoursStore, useShiftGroupStore, useFillPresetStore,
   useScheduleSnapshotStore, useDeptOrderStore, DEFAULT_DEPT_ORDER,
   usePayrollConfirmationStore,
@@ -314,7 +317,6 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
   const { advances } = useSalaryAdvanceStore();
   // 直接订阅 entries 响应式 state，避免通过 getXxx 读 ref.current
   const { entries: compOffEntries, addEntry: addCompOffEntry, getEntries: getCompOffEntries, cashOutEntry: cashOutCompOff } = useCompOffBalanceEntryStore();
-  const { entries: holidayCompOffEntries } = useHolidayCompOffStore();
   // 直接订阅 alerts 响应式 state，避免通过 getAlert 读 ref.current
   const { alerts, resolveAlert } = useUnexplainedRestAlertStore();
   const router = useRouter();
@@ -343,15 +345,15 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
   // 换休余额（useMemo 避免每次渲染对全量 entries 重复 filter/reduce）
   const compOffDays = useMemo(() =>
     compOffEntries
-      .filter((e) => e.employeeId === employee.id && e.status === "available" && e.expiresMonth >= month)
+      .filter((e) => e.employeeId === employee.id && e.source === "overtime" && e.status === "available" && e.expiresMonth >= month)
       .reduce((sum, e) => sum + e.days, 0),
     [compOffEntries, employee.id, month]
   );
   const holidayCompOffDays = useMemo(() =>
-    holidayCompOffEntries
-      .filter((e) => e.employeeId === employee.id && e.status === "available" && e.expiresMonth >= month)
+    compOffEntries
+      .filter((e) => e.employeeId === employee.id && e.source === "holiday" && e.status === "available" && e.expiresMonth >= month)
       .reduce((sum, e) => sum + e.days, 0),
-    [holidayCompOffEntries, employee.id, month]
+    [compOffEntries, employee.id, month]
   );
   const totalCompOffDays = compOffDays + holidayCompOffDays;
 
@@ -2536,12 +2538,11 @@ function SchShiftModal({ visible, date, employee, session, existing, contractHou
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
   // 直接订阅 entries 响应式 state，避免通过 getXxx 读 ref.current
   const { entries: compOffEntries2 } = useCompOffBalanceEntryStore();
-  const { entries: holidayCompOffEntries2 } = useHolidayCompOffStore();
   const compOffBalance = employee
-    ? compOffEntries2.filter((e) => e.employeeId === employee.id && e.status === "available").reduce((s, e) => s + (e.days ?? 1), 0)
+    ? compOffEntries2.filter((e) => e.employeeId === employee.id && e.source === "overtime" && e.status === "available" && e.expiresMonth >= currentMonth).reduce((s, e) => s + (e.days ?? 1), 0)
     : 0;
   const holidayCompOffBalance = employee
-    ? holidayCompOffEntries2.filter((e) => e.employeeId === employee.id && e.status === "available" && e.expiresMonth >= currentMonth).reduce((s, e) => s + e.days, 0)
+    ? compOffEntries2.filter((e) => e.employeeId === employee.id && e.source === "holiday" && e.status === "available" && e.expiresMonth >= currentMonth).reduce((s, e) => s + e.days, 0)
     : 0;
   const DOW = ["日", "一", "二", "三", "四", "五", "六"];
   const dow = date ? getDayOfWeek(date) : 1;
@@ -2744,12 +2745,11 @@ function SchHoursModal({ visible, date, employee, session, existing, contractHou
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
   // 直接订阅 entries 响应式 state，避免通过 getXxx 读 ref.current
   const { entries: compOffEntries3 } = useCompOffBalanceEntryStore();
-  const { entries: holidayCompOffEntries3 } = useHolidayCompOffStore();
   const compOffBalance = employee
-    ? compOffEntries3.filter((e) => e.employeeId === employee.id && e.status === "available").reduce((s, e) => s + (e.days ?? 1), 0)
+    ? compOffEntries3.filter((e) => e.employeeId === employee.id && e.source === "overtime" && e.status === "available" && e.expiresMonth >= currentMonth).reduce((s, e) => s + (e.days ?? 1), 0)
     : 0;
   const holidayCompOffBalance = employee
-    ? holidayCompOffEntries3.filter((e) => e.employeeId === employee.id && e.status === "available" && e.expiresMonth >= currentMonth).reduce((s, e) => s + e.days, 0)
+    ? compOffEntries3.filter((e) => e.employeeId === employee.id && e.source === "holiday" && e.status === "available" && e.expiresMonth >= currentMonth).reduce((s, e) => s + e.days, 0)
     : 0;
   const DOW = ["日", "一", "二", "三", "四", "五", "六"];
   const dow = date ? getDayOfWeek(date) : 1;
@@ -3432,11 +3432,10 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   const { statuses: specialStatuses, upsertStatus, deleteStatus } = useSpecialStatusStore();
   const { paySlips, upsertPaySlip, buildPaySlipDraft, getPaySlip } = usePaySlipStore();
   const { records: attendanceRecords, upsertAttendance, calcFromShifts } = useAttendanceStore();
-  const { getHolidayForDate } = useHolidayConfigStore();
+  const { holidays, getHolidayForDate } = useHolidayConfigStore();
   const { advances } = useSalaryAdvanceStore();
   const { settings: globalSettings } = useGlobalPayrollSettingsStore();
   const { entries: compOffEntriesSched, getAvailableDays: getCompOffAvailDays, addEntry: addCompOffEntry, updateEntry: updateCompOffEntry, getEntries: getCompOffEntries, expireOldEntries: expireCompOff, cashOutEntry: cashOutCompOff } = useCompOffBalanceEntryStore();
-  const { entries: holidayCompOffEntriesSched, getAvailableDays: getHolidayCompOffAvailDays, updateEntry: updateHolidayCompOff, getEntries: getHolidayCompOffEntries, addEntry: addHolidayCompOff, expireOldEntries: expireHolidayCompOff } = useHolidayCompOffStore();
   const { upsertAlert } = useUnexplainedRestAlertStore();
   const { businessHours, setBusinessHours } = useBusinessHoursStore();
   const { shiftGroups, setShiftGroups } = useShiftGroupStore();
@@ -3492,6 +3491,16 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   const [attDaysInput, setAttDaysInput] = useState<Record<string, string>>({});
   const [previewSnapshot, setPreviewSnapshot] = useState<ScheduleSnapshot | null>(null);
 
+  const ensureScheduleDatesWritable = useCallback((datesToWrite: readonly string[]): boolean => {
+    const lockedMonths = getNonWritableScheduleMonths(datesToWrite, isMonthWritable);
+    if (lockedMonths.length === 0) return true;
+    Alert.alert(
+      "存在已锁定月份",
+      `${lockedMonths.join("、")} 已确认发薪。如需修改，请先在对应月报中进入差额调整模式。`,
+    );
+    return false;
+  }, [isMonthWritable]);
+
   const toggleCellSelection = (empId: string, date: string, session: string) => {
     const key = `${empId}_${date}_${session}`;
     setSelectedCells((prev) => {
@@ -3517,30 +3526,26 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
 
   const deleteSelected = () => {
     if (selectedCells.size === 0) return;
-    if (!isMonthWritable(currentMonth)) { Alert.alert("已锁定", "本月已确认发薪，如需修改请先进入差额调整模式。"); return; }
+    const visibleEntries = [...monthShifts, ...adjacentShifts];
+    // 从真实记录回查选中项，而不是拆分 `${employeeId}_${date}_${shift}` 字符串。
+    // 这样员工 ID 或班次名中出现下划线时也不会删错记录。
+    const selectedEntries = visibleEntries.filter((entry) =>
+      selectedCells.has(`${entry.employeeId}_${entry.date}_${entry.shift}`)
+    );
+    if (!ensureScheduleDatesWritable(selectedEntries.map((entry) => entry.date))) return;
+
     Alert.alert(
       "确认删除",
-      `确认删除 ${selectedCells.size} 条排班记录？此操作不可撤销。`,
+      `确认删除 ${selectedEntries.length} 条排班记录？此操作不可撤销。`,
       [
         { text: "取消", style: "cancel" },
         { text: "删除", style: "destructive", onPress: () => {
-          // 批量删除：一次性写入，避免逐条调用导致的竞态条件
-          const keys: Array<{ employeeId: string; date: string; shift: string }> = [];
-          selectedCells.forEach((key) => {
-            const parts = key.split("_");
-            // key 格式: empId_date_session（empId 是 UUID 含-，date 是 YYYY-MM-DD 含-，session 是班次名）
-            // 第一个 _ 前是 empId，第二个 _ 前是 date，剩下是 session
-            const empId = parts[0];
-            const date = parts[1];
-            const session = parts.slice(2).join("_");
-            // 优先用实际存储的 shift 字段（避免 editSession 与存储字段不匹配）
-            const actualEntry = monthShifts.find((s) => s.employeeId === empId && s.date === date && s.shift === session)
-              ?? adjacentShifts.find((s) => s.employeeId === empId && s.date === date && s.shift === session);
-            if (actualEntry) {
-              keys.push({ employeeId: actualEntry.employeeId, date: actualEntry.date, shift: actualEntry.shift });
-            }
-          });
-          batchDeleteShifts(keys);
+          // 批量删除：一次性写入，避免逐条调用导致的竞态条件。
+          batchDeleteShifts(selectedEntries.map((entry) => ({
+            employeeId: entry.employeeId,
+            date: entry.date,
+            shift: entry.shift,
+          })));
           setSelectedCells(new Set());
           setEditMode(false);
         }},
@@ -3569,7 +3574,10 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
         const holidayDaysList = empShifts
           .map((s) => { const hc = getHolidayForDate(s.date, emp.id); return hc ? { date: s.date, multiplier: hc.multiplier } : null; })
           .filter((x): x is { date: string; multiplier: number } => x !== null);
-        const att = calcFromShifts(emp.id, currentMonth, emp, empShifts, specialStatuses, holidayDaysList);
+        const baseAtt = calcFromShifts(emp.id, currentMonth, emp, empShifts, specialStatuses, holidayDaysList);
+        // autoSync 必须尊重薪资单中已经确认的“节假日换休”选择，不能把该部分补偿重新加回。
+        const existingSlip = getPaySlip(emp.id, currentMonth);
+        const att = applyHolidayRestAllocation(baseAtt, existingSlip?.holidayBonusAllocation);
         upsertAttendance(att);
         const advanceTotal = advances
           .filter((a) => a.employeeId === emp.id && (a.deductMonth === currentMonth || a.date.startsWith(currentMonth)) && (a.status === "pending" || a.status === "deducted"))
@@ -3588,7 +3596,6 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
         // 重要：performanceTotal 从 existing 读取，防止覆盖手动录入的绩效奖金
         // 修复：改用 getPaySlip（基于 ref.current）替代 paySlips.find（可能是 stale closure）
         // 这确保 autoSync 始终读取最新的 performanceBonus，即使 paySlips state 尚未更新
-        const existingSlip = getPaySlip(emp.id, currentMonth);
         const performanceTotal = existingSlip?.performanceBonus ?? 0;
         const slip = buildPaySlipDraft(emp, currentMonth, att, performanceTotal, advanceTotal, globalSettings, cumulativeIncome, cumulativeTaxPaid);
         upsertPaySlip(slip);
@@ -3612,12 +3619,12 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   // 即时同步：将 employees 和 advances 加入依赖数组
   // - employees 变化（底薪/时薪/社保配置修改）→ 立即重算所有有排班员工的薪资单
   // - advances 变化（预支新增/删除）→ 立即重算对应员工的 finalSalary
-  // compOffEntriesSched/holidayCompOffEntriesSched 变化（存入/兑换调休）→ 重算加班费
+  // compOffEntriesSched 变化（存入/兑换调休）→ 触发必要的考勤/薪资重算
   // （compOffCount 影响 paidOvertimeHours 和 overtimePay）
   // 修复：将 globalSettings 和 specialStatuses 加入依赖数组
   // 用户修改全局社保/个税配置或特殊状态配置后，autoSync 会立即重算所有员工薪资
   // 不会导致无限循环，因为 autoSync 写入 paySlips，而 paySlips 不在依赖数组中
-  }, [shifts, currentMonth, employees, advances, compOffEntriesSched, holidayCompOffEntriesSched, globalSettings, specialStatuses, shiftsReady, employeesReady]);
+  }, [shifts, currentMonth, employees, advances, compOffEntriesSched, holidays, globalSettings, specialStatuses, shiftsReady, employeesReady]);
 
   const sortedTemplates = useMemo(() =>
     [...(templates.length > 0 ? templates : DEFAULT_SHIFT_TEMPLATES)].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)),
@@ -3732,10 +3739,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   // 班次模式格子点击 → SchShiftModal
   // 时长模式格子点击 → SchHoursModal
   const handleCellPress = (emp: Employee, date: string, session: string) => {
-    if (!isMonthWritable(currentMonth)) {
-      Alert.alert("已锁定", "本月已确认发薪，如需修改请先进入差额调整模式。");
-      return;
-    }
+    if (!ensureScheduleDatesWritable([date])) return;
     tap();
     setEditEmployee(emp);
     setEditDate(date);
@@ -3776,16 +3780,20 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
           mode: "cash" | "rest" | "split";
         }> = {};
         let holidayRestBonus = 0;
+        const existingSlip = getPaySlip(emp.id, currentMonth);
+        // 每条调休排班只允许消费一次余额；记录保存在薪资单中，重试生成时可安全跳过。
+        const compOffUsage = { ...(existingSlip?.compOffUsage ?? {}) };
         empShifts.forEach((s) => {
-          if (!s.specialStatusId) return;
-          const ss = specialStatuses.find((st) => st.id === s.specialStatusId);
-          if (!ss?.isHoliday || ss.salaryMultiplier <= 1) return;
-          const key = `${emp.id}_${s.date}_${ss.id}`;
-          const dayBonus = Math.round(baseAtt.dailyRate * (ss.salaryMultiplier - 1) * 100) / 100;
-          const mode = holidayDecisionMap.get(key) ?? (paySlips.find((s) => s.employeeId === emp.id && s.month === currentMonth)?.holidayBonusAllocation?.[key]?.mode === "rest" ? "rest" : "cash");
+          const ss = s.specialStatusId ? specialStatuses.find((st) => st.id === s.specialStatusId) : undefined;
+          const holidayInfo = getHolidayWorkInfo(s, ss, getHolidayForDate(s.date, emp.id));
+          if (!holidayInfo) return;
+          const key = getHolidayAllocationKey(emp.id, s.date, holidayInfo.allocationKeyPart);
+          const dayBonus = Math.round(baseAtt.dailyRate * (holidayInfo.multiplier - 1) * 100) / 100;
+          const existingMode = existingSlip?.holidayBonusAllocation?.[key]?.mode;
+          const mode = holidayDecisionMap.get(key) ?? (existingMode === "rest" ? "rest" : "cash");
           holidayBonusAllocation[key] = {
             date: s.date,
-            name: ss.name,
+            name: holidayInfo.name,
             totalBonus: dayBonus,
             cashAmount: mode === "cash" ? dayBonus : 0,
             restDays: mode === "rest" ? 1 : 0,
@@ -3800,7 +3808,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                 earnedMonth: currentMonth,
                 source: "holiday",
                 workDate: s.date,
-                holidayName: ss.name,
+                holidayName: holidayInfo.name,
                 holidayBonusAmount: dayBonus,
                 days: 1,
                 expiresMonth: calcCompOffExpiresMonth(currentMonth),
@@ -3834,7 +3842,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
         // 绩效奖金从 existing 读取（已在 labor-kpi-allowance 页手动录入）
         // 不传 0，防止覆盖手动录入的绩效奖金
         // 修复：改用 getPaySlip（基于 ref.current）替代 paySlips.find，消除 stale closure 风险
-        const performanceTotal = getPaySlip(emp.id, currentMonth)?.performanceBonus ?? 0;
+        const performanceTotal = existingSlip?.performanceBonus ?? 0;
         const advanceTotal = advances
           .filter((a) => a.employeeId === emp.id && (a.deductMonth === currentMonth || a.date.startsWith(currentMonth)) && (a.status === "pending" || a.status === "deducted"))
           .reduce((s, a) => s + a.amount, 0);
@@ -3854,100 +3862,45 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
         }, 0);
         const cumulativeTaxPaid = prevMonthSlips.reduce((sum, s) => sum + (s.incomeTax ?? 0), 0);
         expireCompOff(currentMonth);
-        expireHolidayCompOff(currentMonth);
 
-        // 三种调休换休单独处理：按班次中的 specialStatusId 分别扣除对应余额
-        const empShiftsForCompOff = getShifts(currentMonth).filter((s) => s.employeeId === emp.id && s.specialStatusId);
-        for (const s of empShiftsForCompOff) {
-          if (s.specialStatusId === "ss_comp_off_holiday") {
-            // 节假日调休：优先消耗节假日调休余额
-            const hEntries = getHolidayCompOffEntries(emp.id)
-              .filter((e) => e.status === "available" && e.expiresMonth >= currentMonth)
-              .sort((a, b) => a.expiresMonth.localeCompare(b.expiresMonth));
-            if (hEntries.length > 0) {
-              const entry = hEntries[0];
-              const usedays = Math.min(entry.days, 1);
-              updateHolidayCompOff(entry.id, {
-                status: usedays >= entry.days ? "used_rest" : "available",
-                days: entry.days - usedays,
-                usedMonth: currentMonth,
-              });
-            }
-          } else if (s.specialStatusId === "ss_comp_off_overtime") {
-            // 加班换休：优先消耗加班调休余额
-            const otEntries = getCompOffEntries(emp.id)
-              .filter((e) => e.status === "available" && e.source === "overtime" && e.expiresMonth >= currentMonth)
-              .sort((a, b) => a.expiresMonth.localeCompare(b.expiresMonth));
-            if (otEntries.length > 0) {
-              const entry = otEntries[0];
-              const usedays = Math.min(entry.days, 1);
-              updateCompOffEntry(entry.id, {
-                status: usedays >= entry.days ? "used_rest" : "available",
-                days: entry.days - usedays,
-                usedMonth: currentMonth,
-              });
-            }
-          } else if (s.specialStatusId === "ss_comp_off_balance") {
-            // 调休余额：消耗任意可用余额
-            const balEntries = getCompOffEntries(emp.id)
-              .filter((e) => e.status === "available" && e.expiresMonth >= currentMonth)
-              .sort((a, b) => a.expiresMonth.localeCompare(b.expiresMonth));
-            if (balEntries.length > 0) {
-              const entry = balEntries[0];
-              const usedays = Math.min(entry.days, 1);
-              updateCompOffEntry(entry.id, {
-                status: usedays >= entry.days ? "used_rest" : "available",
-                days: entry.days - usedays,
-                usedMonth: currentMonth,
-              });
-            }
-          }
-        }
+        // 调休状态按“日期 + 班次 + 状态”精确消费一次余额。仅显式标记的调休排班可消费，
+        // 不再依据出勤天数自动扣减，以免重试生成或考勤波动误扣历史余额。
+        const consumeCompOffForShift = (shift: ShiftEntry, source: "holiday" | "overtime" | "balance") => {
+          const usageKey = `${shift.date}|${shift.shift}|${shift.specialStatusId}`;
+          if (compOffUsage[usageKey]) return;
+          const availableEntry = getCompOffEntries(emp.id)
+            .filter((entry) => entry.status === "available" && entry.expiresMonth >= currentMonth)
+            .filter((entry) => source === "balance" || entry.source === source)
+            .sort((a, b) => a.expiresMonth.localeCompare(b.expiresMonth))[0];
+          if (!availableEntry) return;
 
-        const extraRestDays = Math.max(0, -(att.underRestDays));
-        let remainingExtraRest = extraRestDays;
-        if (remainingExtraRest > 0) {
-          const holidayEntries = getHolidayCompOffEntries(emp.id)
-            .filter((e) => e.status === "available" && e.expiresMonth >= currentMonth)
-            .sort((a, b) => a.expiresMonth.localeCompare(b.expiresMonth));
-          for (const entry of holidayEntries) {
-            if (remainingExtraRest <= 0) break;
-            const usedays = Math.min(entry.days, remainingExtraRest);
-            updateHolidayCompOff(entry.id, {
-              status: usedays >= entry.days ? "used_rest" : "available",
-              days: entry.days - usedays,
-              usedMonth: currentMonth,
-            });
-            remainingExtraRest -= usedays;
-          }
-        }
-        if (remainingExtraRest > 0) {
-          const compOffEntries = getCompOffEntries(emp.id)
-            .filter((e) => e.status === "available" && e.expiresMonth >= currentMonth)
-            .sort((a, b) => a.expiresMonth.localeCompare(b.expiresMonth));
-          for (const entry of compOffEntries) {
-            if (remainingExtraRest <= 0) break;
-            const usedays = Math.min(entry.days, remainingExtraRest);
-            updateCompOffEntry(entry.id, {
-              status: usedays >= entry.days ? "used_rest" : "available",
-              days: entry.days - usedays,
-              usedMonth: currentMonth,
-            });
-            remainingExtraRest -= usedays;
-          }
-        }
-        if (remainingExtraRest > 0) {
-          upsertAlert({
-            id: `${emp.id}_${currentMonth}`,
-            employeeId: emp.id,
-            month: currentMonth,
-            unexplainedDays: remainingExtraRest,
-            resolution: "pending",
-            updatedAt: new Date().toISOString(),
+          const usedDays = Math.min(availableEntry.days, 1);
+          updateCompOffEntry(availableEntry.id, {
+            status: usedDays >= availableEntry.days ? "used_rest" : "available",
+            days: availableEntry.days - usedDays,
+            usedMonth: currentMonth,
           });
+          compOffUsage[usageKey] = {
+            entryId: availableEntry.id,
+            days: usedDays,
+            source,
+            consumedAt: Date.now(),
+          };
+        };
+
+        for (const shift of empShifts) {
+          if (shift.specialStatusId === "ss_comp_off_holiday") {
+            consumeCompOffForShift(shift, "holiday");
+          } else if (shift.specialStatusId === "ss_comp_off_overtime" || shift.specialStatusId === "ss_comp_off") {
+            // ss_comp_off 是历史 ID，按“加班换休”语义兼容处理。
+            consumeCompOffForShift(shift, "overtime");
+          } else if (shift.specialStatusId === "ss_comp_off_balance") {
+            consumeCompOffForShift(shift, "balance");
+          }
         }
         const slip = buildPaySlipDraft(emp, currentMonth, att, performanceTotal, advanceTotal, globalSettings, cumulativeIncome, cumulativeTaxPaid);
         if (Object.keys(holidayBonusAllocation).length > 0) slip.holidayBonusAllocation = holidayBonusAllocation;
+        if (Object.keys(compOffUsage).length > 0) slip.compOffUsage = compOffUsage;
         upsertPaySlip(slip);
         count++;
       }
@@ -3961,7 +3914,53 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
     } finally {
       setGenerating(false);
     }
-  }, [employees, getShifts, currentMonth, getHolidayForDate, calcFromShifts, specialStatuses, getCompOffEntries, addCompOffEntry, updateCompOffEntry, upsertAttendance, advances, paySlips, expireCompOff, expireHolidayCompOff, getHolidayCompOffEntries, updateHolidayCompOff, upsertAlert, buildPaySlipDraft, globalSettings, upsertPaySlip]);
+  }, [employees, getShifts, currentMonth, getHolidayForDate, calcFromShifts, specialStatuses, getCompOffEntries, getPaySlip, addCompOffEntry, updateCompOffEntry, upsertAttendance, advances, paySlips, expireCompOff, upsertAlert, buildPaySlipDraft, globalSettings, upsertPaySlip]);
+
+  /**
+   * 生成薪资单入口：扫描当月全部活跃员工的节假日上班记录，若有尚未决策的项目则弹出选择 Modal；
+   * 若全部已有历史决策则直接生成。
+   */
+  const handleGeneratePayroll = useCallback(() => {
+    if (!isMonthWritable(currentMonth)) {
+      Alert.alert("已锁定", "本月已确认发薪，如需修改请先进入差额调整模式。");
+      return;
+    }
+    const activeEmps = employees.filter((e) => e.active && !e.archived);
+    const decisions: HolidayDecisionItem[] = [];
+    for (const emp of activeEmps) {
+      // 兼职员工不适用节假日倍率/换休决策，和真实考勤计算器保持一致。
+      if (emp.type === "parttime" || emp.type === "longterm_parttime") continue;
+      const empShifts = getShifts(currentMonth).filter((s) => s.employeeId === emp.id);
+      const holidayDaysList = empShifts
+        .map((shift) => { const holiday = getHolidayForDate(shift.date, emp.id); return holiday ? { date: shift.date, multiplier: holiday.multiplier } : null; })
+        .filter((item): item is { date: string; multiplier: number } => item !== null);
+      const baseAttendance = calcFromShifts(emp.id, currentMonth, emp, empShifts, specialStatuses, holidayDaysList);
+      const existingSlip = getPaySlip(emp.id, currentMonth);
+      for (const shift of empShifts) {
+        const ss = shift.specialStatusId ? specialStatuses.find((st) => st.id === shift.specialStatusId) : undefined;
+        const holidayInfo = getHolidayWorkInfo(shift, ss, getHolidayForDate(shift.date, emp.id));
+        if (!holidayInfo) continue;
+        const key = getHolidayAllocationKey(emp.id, shift.date, holidayInfo.allocationKeyPart);
+        const existingMode = existingSlip?.holidayBonusAllocation?.[key]?.mode;
+        decisions.push({
+          key,
+          employeeId: emp.id,
+          employeeCode: emp.code,
+          date: shift.date,
+          specialStatusId: shift.specialStatusId ?? "",
+          holidayName: holidayInfo.name,
+          bonusAmount: Math.round(baseAttendance.dailyRate * (holidayInfo.multiplier - 1) * 100) / 100,
+          mode: existingMode === "rest" ? "rest" : "cash",
+        });
+      }
+    }
+    if (decisions.length > 0) {
+      setPendingHolidayDecisions(decisions);
+      setShowHolidayDecisionModal(true);
+    } else {
+      runPayrollGeneration([]);
+    }
+  }, [isMonthWritable, currentMonth, employees, getShifts, calcFromShifts, specialStatuses, getHolidayForDate, getPaySlip, runPayrollGeneration]);
 
   const editContractH = editEmployee && editDate ? getContractHoursForDate(editEmployee, editDate) : 0;
 
@@ -4263,6 +4262,14 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
               style={[EXL.gearBtn, { backgroundColor: colors.border + "44", width: "auto", paddingHorizontal: 10 }]}>
               <Text style={{ fontSize: 11, fontWeight: "600", color: colors.foreground }}>✐ 编辑</Text>
             </TouchableOpacity>
+            {/* 生成薪资单 */}
+            <Pressable
+              onPress={() => { tap(); handleGeneratePayroll(); }}
+              disabled={generating}
+              accessibilityLabel="生成薪资单"
+              style={[EXL.gearBtn, { backgroundColor: generating ? colors.border + "22" : colors.primary + "18" }]}>
+              <IconSymbol name="banknote.fill" size={15} color={generating ? colors.muted : colors.primary} />
+            </Pressable>
             {/* 存档 */}
             <Pressable onPress={() => { tap(); setSnapshotNote(""); setShowSnapshotModal(true); }} style={[EXL.gearBtn, { backgroundColor: colors.border + "44" }]}>
               <IconSymbol name="camera.fill" size={15} color={colors.muted} />
@@ -4493,9 +4500,25 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                           const doDeductDirect = () => {
                             const days = parseFloat(daysVal);
                             if (isNaN(days) || days <= 0) { Alert.alert("请输入有效天数"); return; }
-                            const avail = getCompOffEntries(empId).filter((e: any) => e.status === "available" && e.expiresMonth >= currentMonthStr).sort((a: any, b: any) => a.expiresMonth.localeCompare(b.expiresMonth));
+                            const avail = getCompOffEntries(empId)
+                              .filter((e: any) => e.status === "available" && e.expiresMonth >= currentMonthStr)
+                              .sort((a: any, b: any) => a.expiresMonth.localeCompare(b.expiresMonth));
+                            const availableDays = avail.reduce((sum: number, entry: any) => sum + entry.days, 0);
+                            if (availableDays < days) {
+                              Alert.alert("余额不足", `可用调休余额仅 ${availableDays.toFixed(1)} 天，无法减少 ${days} 天。`);
+                              return;
+                            }
                             let remaining = days;
-                            for (const entry of avail) { if (remaining <= 0) break; if (entry.days <= remaining) { cashOutCompOff(entry.id, 0, currentMonthStr); remaining -= entry.days; } }
+                            for (const entry of avail) {
+                              if (remaining <= 0) break;
+                              const usedDays = Math.min(entry.days, remaining);
+                              updateCompOffEntry(entry.id, {
+                                status: usedDays >= entry.days ? "used_rest" : "available",
+                                days: entry.days - usedDays,
+                                usedMonth: currentMonthStr,
+                              });
+                              remaining -= usedDays;
+                            }
                             Alert.alert("减少成功", `已手动减少 ${days} 天调休余额`);
                           };
                           const doCashOut = (entry: any) => {
@@ -4779,9 +4802,9 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
         shiftTemplates={sortedTemplates}
         specialStatuses={specialStatuses}
         shiftGroups={shiftGroups}
-        onSave={(entry) => upsertShift(entry)}
+        onSave={(entry) => { if (ensureScheduleDatesWritable([entry.date])) upsertShift(entry); }}
         onClear={() => {
-          if (editEmployee && editDate) {
+          if (editEmployee && editDate && ensureScheduleDatesWritable([editDate])) {
             // 优先用实际存储的 shift 字段，避免 editSession 与存储字段不匹配导致删除失败
             const actualShift = getEntry(editEmployee.id, editDate, editSession)?.shift ?? editSession;
             deleteShift(editEmployee.id, editDate, actualShift);
@@ -4800,9 +4823,9 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
         currentMonth={currentMonth}
         colors={colors}
         specialStatuses={specialStatuses}
-        onSave={(entry) => upsertShift(entry)}
+        onSave={(entry) => { if (ensureScheduleDatesWritable([entry.date])) upsertShift(entry); }}
         onClear={() => {
-          if (editEmployee && editDate) {
+          if (editEmployee && editDate && ensureScheduleDatesWritable([editDate])) {
             const actualShift = getEntry(editEmployee.id, editDate, editSession)?.shift ?? editSession;
             deleteShift(editEmployee.id, editDate, actualShift);
           }
@@ -4836,6 +4859,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
         onSavePreset={saveFillPreset}
         onDeletePreset={deleteFillPreset}
         onFill={(targetDates, session, hoursPerDate) => {
+          if (!ensureScheduleDatesWritable(targetDates)) return;
           const entries: ShiftEntry[] = targetDates
             .filter((d) => !getEntry(quickFillEmployee!.id, d, session))
             .map((d): ShiftEntry => ({
@@ -4859,6 +4883,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
         onSavePreset={saveFillPreset}
         onDeletePreset={deleteFillPreset}
         onFill={(targetDates, hours) => {
+          if (!ensureScheduleDatesWritable(targetDates)) return;
           // 只改工时，不影响班次；跳过已有工时的格子
           const entries: ShiftEntry[] = targetDates
             .filter((d) => {
@@ -4954,11 +4979,18 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                         [
                           { text: "取消", style: "cancel" },
                           { text: "代入排班记录", onPress: () => {
+                            // 代入前检查月度锁定状态
+                            if (!isMonthWritable(currentMonth)) {
+                              Alert.alert("已锁定", "本月已确认发薪，如需修改请先进入差额调整模式。");
+                              return;
+                            }
                             // 代入快照中的排班记录（覆盖当前月当前部门的排班数据）
                             const snapshotEntries = previewSnapshot.entries
                               .filter((s) => allDeptEmployees.some((e) => e.id === s.employeeId));
-                            // 先删除当前月当前部门的所有排班
-                            const toDelete = monthShifts.map((s) => ({ employeeId: s.employeeId, date: s.date, shift: s.shift }));
+                            // 先删除当前月当前部门的所有排班；不得影响另一个部门的记录。
+                            const toDelete = monthShifts
+                              .filter((s) => allDeptEmployees.some((e) => e.id === s.employeeId))
+                              .map((s) => ({ employeeId: s.employeeId, date: s.date, shift: s.shift }));
                             if (toDelete.length > 0) batchDeleteShifts(toDelete);
                             // 再写入快照数据
                             if (snapshotEntries.length > 0) batchUpsertShifts(snapshotEntries);

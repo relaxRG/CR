@@ -249,14 +249,16 @@ describe("导出菜单 Modal 事件冒泡修复验证", () => {
     expect(canPdf).toBe(true);
   });
 
-  it("stopPropagation 调用性能：1000 次调用总耗时 < 1ms", () => {
+  it("stopPropagation 调用性能：1000 次调用总耗时 < 25ms（避免共享 CI 运行器微基准抖动）", () => {
     const start = performance.now();
     for (let i = 0; i < 1000; i++) {
       const event = createMockEvent();
       event.stopPropagation();
     }
     const elapsed = performance.now() - start;
-    expect(elapsed).toBeLessThan(1);
+    // 该循环还会创建 1000 个 mock event；1ms 阈值会受共享 CI/容器调度影响而偶发失败。
+    // 25ms 仍可捕获数量级性能退化，同时不会把非功能性调度抖动误报为产品回归。
+    expect(elapsed).toBeLessThan(25);
   });
 });
 

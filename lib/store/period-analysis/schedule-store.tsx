@@ -2,7 +2,7 @@
  * 营业时间设置 + 班次档案 Store (Build 135)
  */
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import React, { createContext, useCallback, useContext, useEffect, useReducer } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useReducer, useState } from "react";
 import { notifySyncChange, registerStoreReload } from "../../sync/engine";
 import {
   BusinessHoursConfig, ShiftTemplate,
@@ -64,6 +64,8 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
     businessHours: { ...DEFAULT_BUSINESS_HOURS },
     shiftTemplates: [...DEFAULT_SHIFT_TEMPLATES],
   });
+  // 在 AsyncStorage 首次加载完成前禁止持久化默认值，避免慢设备上覆盖已有配置。
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -79,18 +81,19 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
             shiftTemplates: stRaw ? JSON.parse(stRaw) : [...DEFAULT_SHIFT_TEMPLATES],
           },
         });
-      } catch {}
+      } catch {} finally { setHydrated(true); }
     };
     load();
-    registerStoreReload(load);
+    return registerStoreReload(load);
   }, []);
 
   useEffect(() => {
+    if (!hydrated) return;
     AsyncStorage.setItem(BIZ_HOURS_KEY, JSON.stringify(state.businessHours)).catch(() => {});
     AsyncStorage.setItem(SHIFT_TEMPLATES_KEY, JSON.stringify(state.shiftTemplates)).catch(() => {});
     notifySyncChange(BIZ_HOURS_KEY);
     notifySyncChange(SHIFT_TEMPLATES_KEY);
-  }, [state]);
+  }, [state, hydrated]);
 
   const updateBusinessHours = useCallback((config: BusinessHoursConfig) =>
     dispatch({ type: "UPDATE_BIZ_HOURS", config }), []);
