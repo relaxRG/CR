@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
 import { getUnitPresetGroups, unitDisplayLabel, normalizeUnit } from "@/lib/units";
+import { RESPONSIVE_LAYOUT } from "@/lib/theme/responsive-layout-tokens";
 
 interface UnitPickerSheetProps {
   visible: boolean;
@@ -89,6 +90,7 @@ export function UnitPickerSheet({
                       style={({ pressed }) => [
                         styles.unitChip,
                         styles.recentChip,
+                        RESPONSIVE_LAYOUT.wrapOption,
                         {
                           backgroundColor: isSelected ? colors.primary : `${colors.primary}15`,
                           borderColor: isSelected ? colors.primary : `${colors.primary}40`,
@@ -97,7 +99,9 @@ export function UnitPickerSheet({
                       ]}
                     >
                       <Text
+                        numberOfLines={2}
                         style={[
+                          RESPONSIVE_LAYOUT.rowText,
                           styles.unitChipText,
                           {
                             color: isSelected ? colors.background : colors.primary,
@@ -120,6 +124,7 @@ export function UnitPickerSheet({
               onPress={() => { onSelect(""); onClose(); }}
               style={({ pressed }) => [
                 styles.unitChip,
+                RESPONSIVE_LAYOUT.wrapOption,
                 {
                   backgroundColor:
                     selectedUnit === ""
@@ -132,7 +137,9 @@ export function UnitPickerSheet({
               ]}
             >
               <Text
+                numberOfLines={2}
                 style={[
+                  RESPONSIVE_LAYOUT.rowText,
                   styles.unitChipText,
                   {
                     color:
@@ -162,6 +169,7 @@ export function UnitPickerSheet({
                       onPress={() => { onSelect(normalizedUnit); onClose(); }}
                       style={({ pressed }) => [
                         styles.unitChip,
+                        RESPONSIVE_LAYOUT.wrapOption,
                         {
                           backgroundColor: isSelected
                             ? colors.primary
@@ -172,7 +180,9 @@ export function UnitPickerSheet({
                       ]}
                     >
                       <Text
+                        numberOfLines={2}
                         style={[
+                          RESPONSIVE_LAYOUT.rowText,
                           styles.unitChipText,
                           {
                             color: isSelected

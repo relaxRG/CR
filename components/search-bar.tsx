@@ -2,6 +2,7 @@ import React from "react";
 import { Platform, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
+import { RESPONSIVE_LAYOUT } from "@/lib/theme/responsive-layout-tokens";
 
 interface SearchBarProps {
   value: string;
@@ -34,9 +35,11 @@ export function SearchBar({
         style,
       ]}
     >
-      <IconSymbol name="magnifyingglass" size={17} color={colors.muted} />
+      <View style={RESPONSIVE_LAYOUT.fixedRowItem}>
+        <IconSymbol name="magnifyingglass" size={17} color={colors.muted} />
+      </View>
       <TextInput
-        style={[styles.input, { color: colors.foreground }]}
+        style={[RESPONSIVE_LAYOUT.fluidRowContent, styles.input, { color: colors.foreground }]}
         placeholder={placeholder}
         placeholderTextColor={colors.muted}
         value={value}
@@ -47,7 +50,8 @@ export function SearchBar({
         autoCapitalize="none"
       />
       {value.length > 0 ? (
-        <Pressable onPress={() => onChangeText("")} hitSlop={8} style={({ pressed }) => [pressed && { opacity: 0.6 }]}>
+        <Pressable onPress={() => onChangeText("")} hitSlop={8} style={({ pressed }) => [RESPONSIVE_LAYOUT.fixedRowItem, pressed && { opacity: 0.6 }]}>
+
           <IconSymbol name="xmark.circle.fill" size={17} color={colors.muted} />
         </Pressable>
       ) : null}
@@ -59,6 +63,7 @@ const styles = StyleSheet.create({
   wrap: {
     flexDirection: "row",
     alignItems: "center",
+    minWidth: 0,
     borderRadius: 12,
     paddingHorizontal: 12,
     height: 42,

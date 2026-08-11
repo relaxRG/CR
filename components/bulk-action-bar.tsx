@@ -7,6 +7,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { bulkBarBottom } from "@/components/floating-tab-bar";
 import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
+import { RESPONSIVE_LAYOUT } from "@/lib/theme/responsive-layout-tokens";
 
 export interface BulkAction {
   key: string;
@@ -52,7 +53,7 @@ export function BulkActionBar({
       ]}
     >
       <View style={styles.topRow}>
-        <Text style={[styles.count, { color: colors.foreground }]}>
+        <Text numberOfLines={1} style={[RESPONSIVE_LAYOUT.rowText, styles.count, { color: colors.foreground }]}>
           {t("sel.count").replace("{n}", String(count))}
         </Text>
         <Pressable
@@ -61,7 +62,7 @@ export function BulkActionBar({
             if (allSelected) onClearAll();
             else onSelectAll();
           }}
-          style={({ pressed }) => [styles.selAllBtn, pressed && { opacity: 0.6 }]}
+          style={({ pressed }) => [RESPONSIVE_LAYOUT.fixedRowItem, styles.selAllBtn, pressed && { opacity: 0.6 }]}
         >
           <Text style={[styles.selAllText, { color: colors.primary }]}>
             {allSelected ? t("sel.none") : t("sel.all")}
@@ -157,11 +158,12 @@ export function BulkEditSheet({
                 onPress={() => toggle(o.key)}
                 style={[
                   styles.optChip,
+                  RESPONSIVE_LAYOUT.wrapOption,
                   { borderColor: active ? colors.primary : colors.border, backgroundColor: active ? colors.primary : colors.background },
                 ]}
               >
-                {o.color ? <View style={[styles.optDot, { backgroundColor: o.color }]} /> : null}
-                <Text style={[styles.optText, { color: active ? "#fff" : colors.foreground }]}>{o.label}</Text>
+                {o.color ? <View style={[RESPONSIVE_LAYOUT.fixedRowItem, styles.optDot, { backgroundColor: o.color }]} /> : null}
+                <Text numberOfLines={2} style={[RESPONSIVE_LAYOUT.rowText, styles.optText, { color: active ? "#fff" : colors.foreground }]}>{o.label}</Text>
               </Pressable>
             );
           })}
@@ -189,7 +191,7 @@ export function BulkEditSheet({
             pressed && { opacity: 0.85 },
           ]}
         >
-          <Text style={styles.applyText}>{t("sel.sheet.apply").replace("{n}", String(count))}</Text>
+          <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={[RESPONSIVE_LAYOUT.actionText, styles.applyText]}>{t("sel.sheet.apply").replace("{n}", String(count))}</Text>
         </Pressable>
       </View>
     </Modal>

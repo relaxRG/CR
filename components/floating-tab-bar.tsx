@@ -3,6 +3,7 @@ import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
+import { RESPONSIVE_LAYOUT } from "@/lib/theme/responsive-layout-tokens";
 
 export interface FloatingTabItem {
   key: string;
@@ -69,10 +70,13 @@ export function FloatingTabBar({
             </View>
             <Text
               style={[
+                RESPONSIVE_LAYOUT.actionText,
                 styles.label,
                 { color: active ? colors.primary : colors.muted },
               ]}
               numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.75}
             >
               {item.label}
             </Text>
@@ -127,6 +131,7 @@ const styles = StyleSheet.create({
   },
   tab: {
     flex: 1,
+    minWidth: 0,
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 8,

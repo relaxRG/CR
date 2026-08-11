@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
+import { RESPONSIVE_LAYOUT } from "@/lib/theme/responsive-layout-tokens";
 
 /** 一个筛选维度(如分类/风味/工艺),options 为可勾选标签 */
 export interface FilterDimension {
@@ -108,12 +109,16 @@ export function FilterSortSheet({
                       ]}
                     >
                       <Text
-                        style={{
-                          fontSize: 15,
-                          lineHeight: 21,
-                          color: active ? colors.primary : colors.foreground,
-                          fontWeight: active ? "600" : "400",
-                        }}
+                        numberOfLines={2}
+                        style={[
+                          RESPONSIVE_LAYOUT.rowText,
+                          {
+                            fontSize: 15,
+                            lineHeight: 21,
+                            color: active ? colors.primary : colors.foreground,
+                            fontWeight: active ? "600" : "400",
+                          },
+                        ]}
                       >
                         {opt.label}
                       </Text>
@@ -152,6 +157,7 @@ export function FilterSortSheet({
                         }}
                         style={({ pressed }) => [
                           styles.tag,
+                          RESPONSIVE_LAYOUT.wrapOption,
                           {
                             backgroundColor: active ? tint : colors.surface,
                             borderColor: active ? tint : colors.border,
@@ -161,12 +167,16 @@ export function FilterSortSheet({
                       >
                         {active ? <IconSymbol name="checkmark" size={12} color="#FFFFFF" /> : null}
                         <Text
-                          style={{
-                            fontSize: 13,
-                            lineHeight: 18,
-                            fontWeight: active ? "600" : "400",
-                            color: active ? "#FFFFFF" : colors.foreground,
-                          }}
+                          numberOfLines={2}
+                          style={[
+                            RESPONSIVE_LAYOUT.rowText,
+                            {
+                              fontSize: 13,
+                              lineHeight: 18,
+                              fontWeight: active ? "600" : "400",
+                              color: active ? "#FFFFFF" : colors.foreground,
+                            },
+                          ]}
                         >
                           {opt.label}
                         </Text>
@@ -192,7 +202,7 @@ export function FilterSortSheet({
               { borderColor: colors.border, opacity: selectedTotal === 0 ? 0.4 : pressed ? 0.7 : 1 },
             ]}
           >
-            <Text style={{ fontSize: 15, lineHeight: 21, color: colors.foreground, fontWeight: "500" }}>
+              <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={[RESPONSIVE_LAYOUT.actionText, { fontSize: 15, lineHeight: 21, color: colors.foreground, fontWeight: "500" }]}>
               {t("fs.clear")}
             </Text>
           </Pressable>
@@ -204,7 +214,7 @@ export function FilterSortSheet({
               pressed && { opacity: 0.85 },
             ]}
           >
-            <Text style={{ fontSize: 15, lineHeight: 21, color: "#FFFFFF", fontWeight: "600" }}>
+              <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={[RESPONSIVE_LAYOUT.actionText, { fontSize: 15, lineHeight: 21, color: "#FFFFFF", fontWeight: "600" }]}>
               {t("fs.done", { n: resultCount })}
             </Text>
           </Pressable>

@@ -10,6 +10,7 @@ import { suggestIngredients, type IngredientSuggestion } from "@/lib/suggest";
 import type { Bottle } from "@/lib/bottles/types";
 import type { HomemadePrep } from "@/lib/homemade/types";
 import type { GroupResolver } from "@/lib/suggest";
+import { RESPONSIVE_LAYOUT } from "@/lib/theme/responsive-layout-tokens";
 
 export type LinkPickResult =
   | { kind: "bottle"; bottleId: string; name: string }
@@ -72,7 +73,7 @@ export function LinkPickerSheet({ visible, initialQuery, bottles, preps, groupOf
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} />
-      <View style={[styles.sheet, { backgroundColor: colors.background, paddingBottom: Math.max(insets.bottom, 16) }]}>
+      <View style={[styles.sheet, RESPONSIVE_LAYOUT.sheetContent, { backgroundColor: colors.background, paddingBottom: Math.max(insets.bottom, 16) }]}>
         <View style={styles.handle} />
         <Text className="text-base font-semibold text-foreground" style={{ textAlign: "center", marginBottom: 10, lineHeight: 22 }}>
           {t("form.link.pickTitle")}
@@ -80,7 +81,7 @@ export function LinkPickerSheet({ visible, initialQuery, bottles, preps, groupOf
         <View style={[styles.searchBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <IconSymbol name="magnifyingglass" size={15} color={colors.muted} />
           <TextInput
-            style={{ flex: 1, fontSize: 15, color: colors.foreground, paddingVertical: 8, lineHeight: 20 }}
+            style={[RESPONSIVE_LAYOUT.fluidRowContent, { fontSize: 15, color: colors.foreground, paddingVertical: 8, lineHeight: 20 }]}
             value={query}
             onChangeText={setQuery}
             placeholder={t("form.link.searchPlaceholder")}
@@ -89,7 +90,7 @@ export function LinkPickerSheet({ visible, initialQuery, bottles, preps, groupOf
             returnKeyType="search"
           />
           {query ? (
-            <Pressable onPress={() => setQuery("")} hitSlop={8}>
+            <Pressable onPress={() => setQuery("")} hitSlop={8} style={RESPONSIVE_LAYOUT.fixedRowItem}>
               <IconSymbol name="xmark.circle.fill" size={16} color={colors.muted} />
             </Pressable>
           ) : null}
@@ -118,13 +119,13 @@ export function LinkPickerSheet({ visible, initialQuery, bottles, preps, groupOf
                 size={14}
                 color={SOURCE_COLOR[s.source] ?? colors.muted}
               />
-              <View style={{ flex: 1 }}>
-                <Text className="text-[15px] text-foreground" numberOfLines={1} style={{ lineHeight: 20 }}>{s.value}</Text>
+              <View style={RESPONSIVE_LAYOUT.fluidRowContent}>
+                <Text className="text-[15px] text-foreground" numberOfLines={1} style={[RESPONSIVE_LAYOUT.rowText, { lineHeight: 20 }]}>{s.value}</Text>
                 {s.secondary ? (
-                  <Text className="text-xs text-muted" numberOfLines={1} style={{ lineHeight: 16 }}>{s.secondary}</Text>
+                  <Text className="text-xs text-muted" numberOfLines={1} style={[RESPONSIVE_LAYOUT.rowText, { lineHeight: 16 }]}>{s.secondary}</Text>
                 ) : null}
               </View>
-              <Text style={{ fontSize: 11, lineHeight: 14, color: SOURCE_COLOR[s.source] ?? colors.muted }}>{sourceLabel(s.source)}</Text>
+              <Text numberOfLines={1} style={[RESPONSIVE_LAYOUT.fixedRowItem, { fontSize: 11, lineHeight: 14, color: SOURCE_COLOR[s.source] ?? colors.muted }]}>{sourceLabel(s.source)}</Text>
             </Pressable>
           )}
         />
@@ -133,7 +134,7 @@ export function LinkPickerSheet({ visible, initialQuery, bottles, preps, groupOf
             onPress={() => onPick({ kind: "none" })}
             style={({ pressed }) => [styles.footerBtn, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }, pressed && { opacity: 0.7 }]}
           >
-            <Text className="text-sm font-medium text-muted" style={{ lineHeight: 20 }}>
+            <Text className="text-sm font-medium text-muted" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={[RESPONSIVE_LAYOUT.actionText, { lineHeight: 20 }]}>
               {t("form.link.keepText")}
             </Text>
           </Pressable>
@@ -141,7 +142,7 @@ export function LinkPickerSheet({ visible, initialQuery, bottles, preps, groupOf
             onPress={onClose}
             style={({ pressed }) => [styles.footerBtn, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }, pressed && { opacity: 0.7 }]}
           >
-            <Text className="text-sm font-medium text-foreground" style={{ lineHeight: 20 }}>{t("common.cancel")}</Text>
+            <Text className="text-sm font-medium text-foreground" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={[RESPONSIVE_LAYOUT.actionText, { lineHeight: 20 }]}>{t("common.cancel")}</Text>
           </Pressable>
         </View>
       </View>
