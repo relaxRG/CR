@@ -41,21 +41,55 @@ export function buildFinalScheduleByDept(
   shifts: ShiftEntry[],
   month: string,
 ): Partial<Record<DeptCategory, FinalScheduleSnapshot>> {
-  const result: Partial<Record<DeptCategory, FinalScheduleSnapshot>> = {};
-  const activeEmployees = employees.filter((employee) => employee.active && !employee.archived);
-  const monthShifts = shifts.filter((shift) => shift.date.startsWith(month));
   const categories: DeptCategory[] = ["front", "kitchen", "company"];
+  const employeeIdsByDept = new Map<DeptCategory, string[]>();
+  const deptByEmployeeId = new Map<string, DeptCategory>();
+  const entriesByDept = new Map<DeptCategory, ShiftEntry[]>();
 
   for (const category of categories) {
-    const employeeIds = activeEmployees.filter((employee) => employee.dept === category).map((employee) => employee.id);
+    employeeIdsByDept.set(category, []);
+    entriesByDept.set(category, []);
+  }
+  for (const employee of employees) {
+    if (!employee.active || employee.archived) continue;
+    const category = employee.dept as DeptCategory;
+    if (!employeeIdsByDept.has(category)) continue;
+    employeeIdsByDept.get(category)!.push(employee.id);
+    deptByEmployeeId.set(employee.id, category);
+  }
+  for (const shift of shifts) {
+    if (!shift.date.startsWith(month)) continue;
+    const category = deptByEmployeeId.get(shift.employeeId);
+    if (category) entriesByDept.get(category)!.push({ ...shift });
+  }
+
+  const result: Partial<Record<DeptCategory, FinalScheduleSnapshot>> = {};
+  for (const category of categories) {
+    const employeeIds = employeeIdsByDept.get(category)!;
     if (employeeIds.length === 0) continue;
-    const entries = monthShifts.filter((shift) => employeeIds.includes(shift.employeeId));
-    result[category] = {
-      deptCategory: category,
-      entries: entries.map((entry) => ({ ...entry })),
-      employeeIds,
-      entryCount: entries.length,
-    };
+    const entries = entriesByDept.get(category)!;
+    result[category] = { deptCategory: category, entries, employeeIds, entryCount: entries.length };
+  }
+  return result;
+}
+
+/**
+ * 按员工和当月薪资单一次索引后构造冻结薪资快照，避免每位员工重复线性查找薪资单。
+ */
+export function buildFrozenPayrollByEmployee(
+  employees: Employee[],
+  paySlips: PaySlip[],
+  month: string,
+): Record<string, FrozenPayrollSnapshot> {
+  const slipByEmployeeId = new Map<string, PaySlip>();
+  for (const slip of paySlips) {
+    if (slip.month === month) slipByEmployeeId.set(slip.employeeId, slip);
+  }
+  const result: Record<string, FrozenPayrollSnapshot> = {};
+  for (const employee of employees) {
+    if (!employee.active || employee.archived) continue;
+    const slip = slipByEmployeeId.get(employee.id);
+    if (slip) result[employee.id] = buildFrozenPayrollSnapshot(employee, slip);
   }
   return result;
 }
@@ -108,9 +142,12 @@ export function calculateArchiveAdjustments(
 }
 
 export function getCurrentMonthCloseArchive(archives: MonthCloseArchive[], month: string): MonthCloseArchive | null {
-  return archives
-    .filter((archive) => archive.month === month && archive.status === "frozen")
-    .sort((a, b) => b.version - a.version)[0] ?? null;
+  let current: MonthCloseArchive | null = null;
+  for (const archive of archives) {
+    if (archive.month !== month || archive.status !== "frozen") continue;
+    if (!current || archive.version > current.version) current = archive;
+  }
+  return current;
 }
 
 export function getMonthCloseStatus(archives: MonthCloseArchive[], adjustingMonths: Set<string>, month: string): "draft" | "frozen" | "adjusting" {

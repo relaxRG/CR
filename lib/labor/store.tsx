@@ -8,6 +8,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { notifySyncChange, registerStoreReload } from "../sync/engine";
 import { SeparatePaymentProvider } from "./separate-payment-store";
 import { calculateAttendanceFromShifts } from "./attendance-calculator";
+import { createMonthCloseOperationGate } from "./month-close-operation-gate";
 import {
   Employee, EmployeeDept, ShiftEntry, MonthlyAttendance, PaySlip, MonthConfig,
   ShiftTemplate, HolidayConfig,
@@ -26,7 +27,7 @@ import {
 } from "./types";
 import {
   buildFinalScheduleByDept,
-  buildFrozenPayrollSnapshot,
+  buildFrozenPayrollByEmployee,
   calculateArchiveAdjustments,
   getCurrentMonthCloseArchive,
   getMonthCloseStatus,
@@ -1010,6 +1011,7 @@ function MonthCloseProvider({ children }: { children: React.ReactNode }) {
   const { shifts, replaceMonthShifts, ready: shiftsReady } = useShiftStore();
   const { records, replaceMonthAttendances, ready: attendancesReady } = useAttendanceStore();
   const { paySlips, replaceMonthPaySlips, ready: paySlipsReady } = usePaySlipStore();
+  const monthOperationGateRef = useRef(createMonthCloseOperationGate());
 
   useEffect(() => {
     if (!archivesReady || !sessionsReady) return;
@@ -1027,18 +1029,16 @@ function MonthCloseProvider({ children }: { children: React.ReactNode }) {
     return status === "draft" || status === "adjusting";
   }, [getStatus]);
 
-  const snapshotPayroll = useCallback((month: string) => {
-    const result: Record<string, ReturnType<typeof buildFrozenPayrollSnapshot>> = {};
-    for (const employee of employees.filter((item) => item.active && !item.archived)) {
-      const slip = paySlips.find((item) => item.employeeId === employee.id && item.month === month);
-      if (slip) result[employee.id] = buildFrozenPayrollSnapshot(employee, slip);
-    }
-    return result;
-  }, [employees, paySlips]);
+  const snapshotPayroll = useCallback(
+    (month: string) => buildFrozenPayrollByEmployee(employees, paySlips, month),
+    [employees, paySlips],
+  );
 
   const finalizeMonthClose = useCallback((month: string, summary: MonthCloseArchive["summary"]): MonthCloseArchive | null => {
-    if (!employeesReady || !shiftsReady || !attendancesReady || !paySlipsReady) return null;
-    const status = getStatus(month);
+    if (!monthOperationGateRef.current.tryAcquire(month)) return null;
+    try {
+      if (!employeesReady || !shiftsReady || !attendancesReady || !paySlipsReady) return null;
+      const status = getStatus(month);
     if (status === "frozen") return null;
     const activeEmployees = employees.filter((employee) => employee.active && !employee.archived);
     const scheduleByDept = buildFinalScheduleByDept(activeEmployees, shifts, month);
@@ -1070,13 +1070,18 @@ function MonthCloseProvider({ children }: { children: React.ReactNode }) {
         : archive);
     }
     persistArchives([...nextArchives, nextArchive]);
-    if (session) persistSessions(sessionsRef.current.filter((item) => item.id !== session.id));
-    return nextArchive;
+      if (session) persistSessions(sessionsRef.current.filter((item) => item.id !== session.id));
+      return nextArchive;
+    } finally {
+      monthOperationGateRef.current.release(month);
+    }
   }, [archivesRef, attendancesReady, employees, employeesReady, getAdjustmentSession, getStatus, paySlipsReady, persistArchives, persistSessions, sessionsRef, shifts, shiftsReady, snapshotPayroll]);
 
   const openAdjustmentSession = useCallback((month: string, reason: string, settleMethod: AdjustmentSettleMethod): MonthAdjustmentSession | null => {
-    if (!employeesReady || !shiftsReady || !attendancesReady || !paySlipsReady || !reason.trim()) return null;
-    const archive = getCurrentArchive(month);
+    if (!monthOperationGateRef.current.tryAcquire(month)) return null;
+    try {
+      if (!employeesReady || !shiftsReady || !attendancesReady || !paySlipsReady || !reason.trim()) return null;
+      const archive = getCurrentArchive(month);
     if (!archive || getAdjustmentSession(month)) return null;
     const session: MonthAdjustmentSession = {
       id: `adjust-${month}-${Date.now()}`,
@@ -1094,39 +1099,57 @@ function MonthCloseProvider({ children }: { children: React.ReactNode }) {
         paySlips: paySlips.filter((slip) => slip.month === month).map((slip) => ({ ...slip })),
       },
     };
-    persistSessions([...sessionsRef.current, session]);
-    return session;
+      persistSessions([...sessionsRef.current, session]);
+      return session;
+    } finally {
+      monthOperationGateRef.current.release(month);
+    }
   }, [attendancesReady, employeesReady, getAdjustmentSession, getCurrentArchive, paySlips, paySlipsReady, persistSessions, records, sessionsRef, shifts, shiftsReady]);
 
   const discardAdjustmentSession = useCallback((month: string): boolean => {
-    const session = getAdjustmentSession(month);
-    if (!session) return false;
-    replaceMonthShifts(month, session.baseline.shifts);
-    replaceMonthAttendances(month, session.baseline.attendances);
-    replaceMonthPaySlips(month, session.baseline.paySlips);
-    persistSessions(sessionsRef.current.filter((item) => item.id !== session.id));
-    return true;
+    if (!monthOperationGateRef.current.tryAcquire(month)) return false;
+    try {
+      const session = getAdjustmentSession(month);
+      if (!session) return false;
+      replaceMonthShifts(month, session.baseline.shifts);
+      replaceMonthAttendances(month, session.baseline.attendances);
+      replaceMonthPaySlips(month, session.baseline.paySlips);
+      persistSessions(sessionsRef.current.filter((item) => item.id !== session.id));
+      return true;
+    } finally {
+      monthOperationGateRef.current.release(month);
+    }
   }, [getAdjustmentSession, persistSessions, replaceMonthAttendances, replaceMonthPaySlips, replaceMonthShifts, sessionsRef]);
 
   const applyArchivedSchedule = useCallback((month: string, archiveId: string): boolean => {
-    if (!getAdjustmentSession(month)) return false;
-    const archive = archivesRef.current.find((item) => item.id === archiveId && item.month === month && item.status === "frozen");
-    if (!archive) return false;
-    const entries = Object.values(archive.scheduleByDept).flatMap((snapshot) => snapshot?.entries ?? []);
-    replaceMonthShifts(month, entries);
-    return true;
+    if (!monthOperationGateRef.current.tryAcquire(month)) return false;
+    try {
+      if (!getAdjustmentSession(month)) return false;
+      const archive = archivesRef.current.find((item) => item.id === archiveId && item.month === month && item.status === "frozen");
+      if (!archive) return false;
+      const entries = Object.values(archive.scheduleByDept).flatMap((snapshot) => snapshot?.entries ?? []);
+      replaceMonthShifts(month, entries);
+      return true;
+    } finally {
+      monthOperationGateRef.current.release(month);
+    }
   }, [archivesRef, getAdjustmentSession, replaceMonthShifts]);
 
   const settleAdjustment = useCallback((month: string, adjustmentId: string, method: AdjustmentSettleMethod, settledInMonth: string) => {
-    const current = getCurrentArchive(month);
-    if (!current) return;
-    const nextArchives = archivesRef.current.map((archive) => archive.id !== current.id ? archive : {
-      ...archive,
-      adjustments: archive.adjustments.map((adjustment) => adjustment.id === adjustmentId
-        ? { ...adjustment, settled: true, settleMethod: method, settledInMonth }
-        : adjustment),
-    });
-    persistArchives(nextArchives);
+    if (!monthOperationGateRef.current.tryAcquire(month)) return;
+    try {
+      const current = getCurrentArchive(month);
+      if (!current) return;
+      const nextArchives = archivesRef.current.map((archive) => archive.id !== current.id ? archive : {
+        ...archive,
+        adjustments: archive.adjustments.map((adjustment) => adjustment.id === adjustmentId
+          ? { ...adjustment, settled: true, settleMethod: method, settledInMonth }
+          : adjustment),
+      });
+      persistArchives(nextArchives);
+    } finally {
+      monthOperationGateRef.current.release(month);
+    }
   }, [archivesRef, getCurrentArchive, persistArchives]);
 
   const getPendingAdjustments = useCallback((month: string) => getCurrentArchive(month)?.adjustments.filter((adjustment) => !adjustment.settled) ?? [], [getCurrentArchive]);
