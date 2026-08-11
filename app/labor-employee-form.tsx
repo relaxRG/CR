@@ -75,10 +75,7 @@ export default function LaborEmployeeFormScreen() {
   const [restDays, setRestDays] = useState(String(existing?.restDaysPerMonth ?? "4"));
   const [hourlyRate, setHourlyRate] = useState(String(existing?.hourlyRate ?? "35"));
   const [overtimeRate, setOvertimeRate] = useState(String(existing?.overtimeHourlyRate ?? "35"));
-  // 当月工作天数（独立输入，1~31，默认当月天数）
-  const [customDivDays, setCustomDivDays] = useState(
-    existing ? "" : "" // 始终默认空（使用当月天数）
-  );
+  // 日薪分母始终使用当前自然月天数；不得允许仅修改预览而不影响实际薪资的伪配置。
   // 兼职计费模式：按天（daily）或按小时（hourly）
   // 优先读取已保存的 parttimeMode，新员工默认按小时
   const [parttimeMode, setParttimeMode] = useState<"daily" | "hourly">(
@@ -289,17 +286,14 @@ export default function LaborEmployeeFormScreen() {
   // ── 日薪预览 ──
   const now = new Date();
   const daysInMonth = getDaysInMonth(now.getFullYear(), now.getMonth() + 1);
-  const effectiveDivDays = customDivDays && !isNaN(Number(customDivDays)) && Number(customDivDays) >= 1 && Number(customDivDays) <= 31
-    ? Number(customDivDays)
-    : daysInMonth;
   const dailyRatePreview = useMemo(() => {
     const base = Number(baseSalary);
     const rest = Number(restDays);
     if (!base || isNaN(base)) return 0;
-    return calcDailyRate(base, effectiveDivDays, rest);
-  }, [baseSalary, restDays, effectiveDivDays]);
+    return calcDailyRate(base, daysInMonth, rest);
+  }, [baseSalary, restDays, daysInMonth]);
 
-  // ── 正常时薪自动计算预览（日薪 ÷ 当天平均灵活工时）──
+  // ── 日薪参考时薪（日薪 ÷ 平均灵活工时；只读且不参与实际薪资计算）──
   const autoHourlyRatePreview = useMemo(() => {
     if (dailyRatePreview <= 0) return 0;
     // 计算灵活工时规则的平均工时（所有规则的小时平均値）
@@ -470,16 +464,14 @@ export default function LaborEmployeeFormScreen() {
     if (!code.trim()) { Alert.alert("请填写员工代号"); return; }
     if (!realName.trim()) { Alert.alert("请填写真实姓名"); return; }
     if (isFulltime && !baseSalary) { Alert.alert("请填写底薪"); return; }
-    if (!hourlyRate) { Alert.alert("请填写时薪"); return; }
-
-    // 验证当月工作天数
-    if (customDivDays) {
-      const days = Number(customDivDays);
-      if (isNaN(days) || days < 1 || days > 31) {
-        Alert.alert("当月工作天数无效", "请填写 1~31 之间的整数");
-        return;
-      }
+    if ((type === "parttime" || type === "longterm_parttime") && parttimeMode === "hourly" && !hourlyRate) {
+      Alert.alert("请填写兼职时薪");
+      return;
     }
+
+    const overtimeRateValue = overtimeRate.trim() === "" || Number.isNaN(Number(overtimeRate))
+      ? (isFulltime ? autoHourlyRatePreview : Number(hourlyRate) || 0)
+      : Number(overtimeRate);
 
     const draft: Omit<Employee, "id" | "createdAt"> = {
       code: code.trim(), realName: realName.trim(), phone: phone.trim(),
@@ -492,10 +484,11 @@ export default function LaborEmployeeFormScreen() {
       stdHoursPerDay: 0,
       // 兼职员工不依赖月休息天数，设为 0 避免影响 expectedAttendanceDays 计算
       restDaysPerMonth: (type === "parttime" || type === "longterm_parttime") ? 0 : (Number(restDays) || 4),
-      // 正常时薪（仅作参考展示，不参与实际计算）
-      hourlyRate: Number(hourlyRate) || 0,
-      // 加班时薪 / 兼职时薪（实际计算依据）
-      overtimeHourlyRate: Number(overtimeRate) || Number(hourlyRate) || 0,
+      // 全职日薪参考时薪由日薪 ÷ 平均灵活工时自动推导；兼职时薪保留人工输入。
+      // 该字段仅兼容历史数据与加班时薪兜底，不作为全职的人工填写项。
+      hourlyRate: isFulltime ? autoHourlyRatePreview : (Number(hourlyRate) || 0),
+      // 加班时薪 / 兼职时薪（实际计算依据）；支持显式填写 0。
+      overtimeHourlyRate: overtimeRateValue,
       // 兼职员工不需要灵活工时规则（无合同工时概念）
       weeklyHoursRules: (type === "parttime" || type === "longterm_parttime") ? undefined : (weeklyHoursRules.length > 0 ? weeklyHoursRules : undefined),
       // 兼职计费模式
@@ -686,28 +679,12 @@ export default function LaborEmployeeFormScreen() {
                       style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border }]} />
                   </View>
                 </FormRow>
-                {/* 当月工作天数（独立行，修复格子消失Bug） */}
-                <FormRow label="当月工作天数" colors={colors}>
+                <FormRow label="日薪计薪天数" colors={colors}>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                    <TextInput
-                      value={customDivDays}
-                      onChangeText={(v) => {
-                        const clean = v.replace(/[^0-9]/g, "");
-                        setCustomDivDays(clean);
-                      }}
-                      onBlur={() => {
-                        if (customDivDays) {
-                          const n = parseInt(customDivDays);
-                          if (isNaN(n) || n < 1) setCustomDivDays("1");
-                          else if (n > 31) setCustomDivDays("31");
-                        }
-                      }}
-                      placeholder={String(daysInMonth)}
-                      placeholderTextColor={colors.muted}
-                      keyboardType="number-pad"
-                      style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, width: 60 }]}
-                    />
-                    <Text style={{ fontSize: 12, color: colors.muted }}>天（1~31，默认当月 {daysInMonth} 天）</Text>
+                    <View style={[S.inputSmall, { width: 76, borderColor: colors.border, justifyContent: "center" }]}>
+                      <Text style={{ fontSize: 16, color: colors.foreground, textAlign: "center" }}>{daysInMonth}</Text>
+                    </View>
+                    <Text style={{ fontSize: 12, color: colors.muted }}>天（自然月天数，自动计算）</Text>
                   </View>
                 </FormRow>
                 {dailyRatePreview > 0 && (
@@ -715,8 +692,7 @@ export default function LaborEmployeeFormScreen() {
                     <Text style={{ fontSize: 12, color: colors.muted }}>日薪预览（当月）</Text>
                     <Text style={{ fontSize: 18, fontWeight: "700", color: colors.primary }}>¥{formatMoney(dailyRatePreview)} / 天</Text>
                     <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>
-                      ¥{formatMoney(Number(baseSalary))} ÷ ({effectiveDivDays}天 - {restDays}休)
-                      {customDivDays ? `（自定义 ${customDivDays} 天）` : `（当月 ${daysInMonth} 天）`}
+                      ¥{formatMoney(Number(baseSalary))} ÷ ({daysInMonth}天 - {restDays}休)（自然月计薪）
                     </Text>
                   </View>
                 )}
@@ -748,28 +724,18 @@ export default function LaborEmployeeFormScreen() {
                 </View>
               </FormRow>
             )}
-            {/* 兼职按小时 / 全职正常时薪（仅作参考） */}
-            {(type === "fulltime" || parttimeMode === "hourly") && (
-              <FormRow label={(type === "parttime" || type === "longterm_parttime") ? "兼职时薪" : "正常时薪（参考）"} required={type === "parttime" || type === "longterm_parttime"} colors={colors}>
-                <View style={{ gap: 6 }}>
-                  <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
-                    {[25, 30, 35, 40, 45].map((r) => (
-                      <TouchableOpacity key={r} onPress={() => { tap(); setHourlyRate(String(r)); }}
-                        style={[S.numChip, { backgroundColor: hourlyRate === String(r) ? deptColor : colors.surface, borderColor: hourlyRate === String(r) ? deptColor : colors.border }]}>
-                        <Text style={{ fontSize: 13, color: hourlyRate === String(r) ? "#fff" : colors.muted }}>¥{r}</Text>
-                      </TouchableOpacity>
-                    ))}
-                    <TextInput value={hourlyRate} onChangeText={setHourlyRate} keyboardType="decimal-pad"
-                      style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border }]} />
-                  </View>
-                  {(type === "fulltime") && autoHourlyRatePreview > 0 && (
-                    <Text style={{ fontSize: 11, color: colors.muted }}>
-                      自动计算参考値：¥{formatMoney(autoHourlyRatePreview)}/小时（日薪 ÷ 平均工时）
-                    </Text>
-                  )}
-                  {(type === "fulltime") && (
-                    <Text style={{ fontSize: 11, color: colors.muted }}>仅作参考展示，实际计算使用下方「加班时薪」</Text>
-                  )}
+            {/* 兼职按小时：实际计薪时薪；全职不再提供“正常时薪”人工填写项。 */}
+            {(type === "parttime" || type === "longterm_parttime") && parttimeMode === "hourly" && (
+              <FormRow label="兼职时薪" required colors={colors}>
+                <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+                  {[25, 30, 35, 40, 45].map((r) => (
+                    <TouchableOpacity key={r} onPress={() => { tap(); setHourlyRate(String(r)); }}
+                      style={[S.numChip, { backgroundColor: hourlyRate === String(r) ? deptColor : colors.surface, borderColor: hourlyRate === String(r) ? deptColor : colors.border }]}>
+                      <Text style={{ fontSize: 13, color: hourlyRate === String(r) ? "#fff" : colors.muted }}>¥{r}</Text>
+                    </TouchableOpacity>
+                  ))}
+                  <TextInput value={hourlyRate} onChangeText={setHourlyRate} keyboardType="decimal-pad"
+                    style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border }]} />
                 </View>
               </FormRow>
             )}
@@ -778,14 +744,17 @@ export default function LaborEmployeeFormScreen() {
               <FormRow label="加班时薪（实际计算）" colors={colors}>
                 <View style={{ gap: 6 }}>
                   <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
-                    <TouchableOpacity onPress={() => { tap(); setOvertimeRate(hourlyRate); }}
-                      style={[S.optionChip, { borderColor: colors.border, backgroundColor: overtimeRate === hourlyRate ? colors.primary + "15" : colors.surface }]}>
-                      <Text style={{ fontSize: 12, color: overtimeRate === hourlyRate ? colors.primary : colors.muted }}>同正常时薪</Text>
+                    <TouchableOpacity disabled={autoHourlyRatePreview <= 0} onPress={() => { tap(); setOvertimeRate(String(autoHourlyRatePreview)); }}
+                      style={[S.optionChip, { borderColor: colors.border, backgroundColor: overtimeRate === String(autoHourlyRatePreview) ? colors.primary + "15" : colors.surface, opacity: autoHourlyRatePreview > 0 ? 1 : 0.45 }]}>
+                      <Text style={{ fontSize: 12, color: overtimeRate === String(autoHourlyRatePreview) ? colors.primary : colors.muted }}>采用日薪参考</Text>
                     </TouchableOpacity>
                     <TextInput value={overtimeRate} onChangeText={setOvertimeRate} keyboardType="decimal-pad"
                       style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border }]} />
                     <Text style={{ fontSize: 12, color: colors.muted }}>元/小时</Text>
                   </View>
+                  {autoHourlyRatePreview > 0 && (
+                    <Text style={{ fontSize: 11, color: colors.muted }}>日薪参考：¥{formatMoney(autoHourlyRatePreview)}/小时（日薪 ÷ 平均工时，不参与实际计算）</Text>
+                  )}
                   <Text style={{ fontSize: 11, color: colors.muted }}>加班工资、调休兑现均按此字段计算，支持填 0</Text>
                 </View>
               </FormRow>

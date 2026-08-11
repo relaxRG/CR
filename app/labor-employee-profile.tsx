@@ -156,12 +156,7 @@ export default function LaborEmployeeProfileScreen() {
               )}
             </>
           ) : (
-            <>
-              <InfoRow label="正常时薪（参考）" value={`¥${emp.hourlyRate} / 小时`} colors={colors} />
-              {isFulltime && (
-                <InfoRow label="加班时薪（实际计算）" value={`¥${emp.overtimeHourlyRate} / 小时`} colors={colors} />
-              )}
-            </>
+            <InfoRow label="加班时薪（实际计算）" value={`¥${emp.overtimeHourlyRate} / 小时`} colors={colors} />
           )}
         </SectionCard>
 
