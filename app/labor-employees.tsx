@@ -317,15 +317,14 @@ export default function LaborEmployeesScreen() {
                 backgroundColor: isActive ? chipColor : colors.surface,
                 borderColor: isActive ? chipColor : colors.border,
               }]}>
-              <Text style={{ fontSize: 13, fontWeight: "600", color: isActive ? "#fff" : colors.muted }}>
+              <Text numberOfLines={1} style={[S.filterLabel, { color: isActive ? "#fff" : colors.muted }]}>
                 {f.label}
               </Text>
               {count > 0 && (
-                <View style={{
+                <View style={[S.filterCountBadge, {
                   backgroundColor: isActive ? "rgba(255,255,255,0.3)" : colors.border + "66",
-                  borderRadius: 8, paddingHorizontal: 5, paddingVertical: 1, marginLeft: 4,
-                }}>
-                  <Text style={{ fontSize: 10, fontWeight: "700", color: isActive ? "#fff" : colors.muted }}>{count}</Text>
+                }]}>
+                  <Text numberOfLines={1} style={{ fontSize: 10, lineHeight: 12, fontWeight: "700", color: isActive ? "#fff" : colors.muted }}>{count}</Text>
                 </View>
               )}
             </TouchableOpacity>
@@ -398,8 +397,15 @@ const S = StyleSheet.create({
   },
   navTitle: { fontSize: 17, fontWeight: "600" },
   filterChip: {
-    flexDirection: "row", alignItems: "center",
-    paddingHorizontal: 12, paddingVertical: 7, borderRadius: 16, borderWidth: 1,
+    flexDirection: "row", alignItems: "center", flexShrink: 0,
+    minHeight: 36, paddingLeft: 12, paddingRight: 8, paddingVertical: 6,
+    borderRadius: 18, borderWidth: 1,
+  },
+  // 标签文字和人数徽标均不可压缩：横向筛选栏空间不足时由 ScrollView 滚动，而非互相覆盖。
+  filterLabel: { fontSize: 13, lineHeight: 18, fontWeight: "600", flexShrink: 0 },
+  filterCountBadge: {
+    minWidth: 20, height: 20, paddingHorizontal: 5, marginLeft: 6,
+    borderRadius: 10, alignItems: "center", justifyContent: "center", flexShrink: 0,
   },
   deptHeader: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",

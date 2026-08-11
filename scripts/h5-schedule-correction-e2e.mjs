@@ -140,8 +140,13 @@ try {
   const seed = await call("Runtime.evaluate", { expression: `(() => {
     const month = new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0');
     const employee = { id: 'h5-e2e-employee', code: 'E2E', realName: 'H5测试', phone: '', dept: 'front', type: 'fulltime', baseSalary: 10000, restDaysPerMonth: 4, hourlyRate: 0, overtimeHourlyRate: 50, notes: '', active: true, createdAt: new Date().toISOString() };
+    const employees = [
+      employee,
+      ...Array.from({ length: 4 }, (_, i) => ({ ...employee, id: 'h5-front-' + i, code: 'F' + i, realName: '前厅测试' + i, dept: 'front' })),
+      ...Array.from({ length: 3 }, (_, i) => ({ ...employee, id: 'h5-kitchen-' + i, code: 'K' + i, realName: '后厨测试' + i, dept: 'kitchen' })),
+    ];
     const slip = { id: 'h5-e2e-slip', employeeId: employee.id, month, attendanceDays: 27, attendanceSalary: 10000, performanceBonus: 0, salesCommission: 0, mealAllowance: 0, transportAllowance: 0, otherAllowance: 0, rewardPenalty: 0, advanceAmount: 0, grossSalary: 10000, socialInsuranceDeduction: 0, housingFundDeduction: 0, incomeTax: 0, finalSalary: 10000, employerSocialInsurance: 0, employerHousingFund: 0, totalEmployerCost: 10000, notes: '', updatedAt: new Date().toISOString() };
-    localStorage.setItem('labor_employees_v1', JSON.stringify([employee]));
+    localStorage.setItem('labor_employees_v1', JSON.stringify(employees));
     localStorage.setItem('labor_payslips_v1', JSON.stringify([slip]));
     localStorage.removeItem('labor_month_close_archives_v1');
     localStorage.removeItem('labor_month_adjustment_sessions_v1');
@@ -220,6 +225,37 @@ try {
     }
     report.push({ reportPage: label, viewports });
   }
+
+  // 员工档案顶部筛选栏：验证“后厨 3”文字与人数徽标分别完整可见、边界不相交。
+  const employeeFilterViewports = [];
+  for (const width of [375, 390, 430]) {
+    await call("Emulation.setDeviceMetricsOverride", { width, height: 844, deviceScaleFactor: 3, mobile: true });
+    await call("Page.navigate", { url: `http://localhost:${port}/labor-employees` });
+    await sleep(700);
+    const layout = await call("Runtime.evaluate", { expression: `(() => {
+      const elements = [...document.querySelectorAll('*')];
+      const chip = elements.find((node) => node.textContent?.replace(/\\s/g, '') === '后厨3');
+      const label = chip && [...chip.querySelectorAll('*')].find((node) => node.children.length === 0 && node.textContent?.trim() === '后厨');
+      const badge = chip && [...chip.querySelectorAll('*')].find((node) => node.children.length === 0 && node.textContent?.trim() === '3');
+      const chipRect = chip?.getBoundingClientRect();
+      const labelRect = label?.getBoundingClientRect();
+      const badgeBox = badge && [badge, ...function* () { let node = badge.parentElement; while (node) { yield node; node = node.parentElement; } }()].find((node) => node.textContent?.trim() === '3' && node.getBoundingClientRect().width >= 20);
+      const badgeRect = badgeBox?.getBoundingClientRect();
+      return {
+        rootClientWidth: document.documentElement.clientWidth,
+        rootScrollWidth: document.documentElement.scrollWidth,
+        bodyScrollWidth: document.body.scrollWidth,
+        foundChip: Boolean(chip && label && badge),
+        hasOverlap: Boolean(labelRect && badgeRect && labelRect.right > badgeRect.left),
+        fitsChip: Boolean(chipRect && labelRect && badgeRect && labelRect.left >= chipRect.left && badgeRect.right <= chipRect.right),
+      };
+    })()`, returnByValue: true });
+    const state = layout.result.value;
+    if (!state.foundChip || state.hasOverlap || !state.fitsChip) throw new Error(`员工筛选“后厨 3”在 ${width}pt 未完整独立显示：${JSON.stringify(state)}`);
+    if (state.rootScrollWidth > state.rootClientWidth || state.bodyScrollWidth > state.rootClientWidth) throw new Error(`员工筛选栏在 ${width}pt 造成根级横向溢出：${JSON.stringify(state)}`);
+    employeeFilterViewports.push({ width, ...state });
+  }
+  report.push({ reportPage: "员工档案筛选标签", viewports: employeeFilterViewports });
 
   await call("Emulation.clearDeviceMetricsOverride");
   socket.close();
