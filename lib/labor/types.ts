@@ -1014,10 +1014,12 @@ export interface MonthlyAttendance {
   totalSpecialDeduction: number;
   /** 节日上班补偿（work_day 类特殊状态的额外薪资） */
   holidayBonus: number;
+  /** 日薪原始基数 = 月底薪 ÷ 当月应出勤天数；保留原始精度，显示时再格式化为两位小数。 */
   dailyRate: number;
-  dailyRateOverride: boolean;
+  /** 比例底薪 = 日薪原始基数 × 实际出勤天数，最终金额保留两位小数。 */
+  proportionalBaseSalary?: number;
   overtimePay: number;
-  /** 考勤工资 = 底薪 + 加班工资 - 特殊状态扣薪 + 节日上班补偿 */
+  /** 考勤工资 = 比例底薪 + 加班工资 - 特殊状态扣薪 + 节日上班补偿 */
   attendanceSalary: number;
   notes: string;
   /**
@@ -1256,29 +1258,50 @@ export function parseMonth(month: string): { year: number; month: number } {
   return { year: y, month: m };
 }
 
+/**
+ * 日薪原始基数：月底薪 ÷ 当月应出勤天数。
+ *
+ * 不在这里提前四舍五入；同一原始日薪必须同时供比例底薪、节假日倍率、特殊状态扣薪和
+ * 调休兑现使用，所有最终金额仅在各自结算边界统一保留两位小数。
+ */
 export function calcDailyRate(baseSalary: number, daysInMonth: number, restDays: number): number {
-  const workDays = daysInMonth - restDays;
-  if (workDays <= 0) return 0;
-  return Math.round((baseSalary / workDays) * 100) / 100;
+  const expectedAttendanceDays = daysInMonth - restDays;
+  if (!Number.isFinite(baseSalary) || !Number.isFinite(expectedAttendanceDays) || expectedAttendanceDays <= 0) return 0;
+  return baseSalary / expectedAttendanceDays;
 }
 
 /**
- * 计算比例底薪（统一入口，消除多处反推公式不一致）
+ * 比例底薪唯一入口：日薪原始基数 × 实际出勤天数。
  *
- * 专业规则：
- * 1. 无出勤（attendanceDays=0）→ 返回 0
- * 2. 应出勤天数为 0（配置异常）→ 返回 0
- * 3. 正常情况 → baseSalary × (attendanceDays / expectedAttendanceDays)
+ * 1. 无出勤或应出勤配置异常时归零；
+ * 2. 仅在最终金额处保留两位小数，避免先将日薪显示值四舍五入后再乘天数产生累计误差；
+ * 3. expectedAttendanceDays 只作为与日薪来源一致性的防御校验，不参与第二次除法。
  */
-export function calcProportionalBase(
-  baseSalary: number,
+export function calcAttendanceBaseSalary(
+  dailyRate: number,
   attendanceDays: number,
-  expectedAttendanceDays: number
+  expectedAttendanceDays: number,
 ): number {
-  // 防护：<= 0 无法拦截 NaN（NaN <= 0 为 false），需单独判断
+  if (!Number.isFinite(dailyRate) || !Number.isFinite(attendanceDays) || !Number.isFinite(expectedAttendanceDays)) return 0;
   if (attendanceDays <= 0 || expectedAttendanceDays <= 0) return 0;
-  if (isNaN(attendanceDays) || isNaN(expectedAttendanceDays)) return 0;
-  return Math.round((baseSalary * attendanceDays / expectedAttendanceDays) * 100) / 100;
+  return Math.round(dailyRate * attendanceDays * 100) / 100;
+}
+
+/**
+ * 获取持久化的比例底薪。新考勤记录直接读取比例底薪字段；仅旧数据缺少该字段时，
+ * 才从已结算考勤工资反推一次，确保历史薪资不被迁移时静默改写。
+ */
+export function getAttendanceBaseSalary(attendance: MonthlyAttendance | null | undefined): number {
+  if (!attendance || attendance.attendanceDays <= 0 || attendance.expectedAttendanceDays <= 0) return 0;
+  if (typeof attendance.proportionalBaseSalary === "number" && Number.isFinite(attendance.proportionalBaseSalary)) {
+    return attendance.proportionalBaseSalary;
+  }
+  return Math.round((
+    attendance.attendanceSalary
+    - attendance.overtimePay
+    - attendance.holidayBonus
+    + attendance.totalSpecialDeduction
+  ) * 100) / 100;
 }
 
 /**

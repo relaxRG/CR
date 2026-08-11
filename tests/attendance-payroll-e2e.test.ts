@@ -47,6 +47,7 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import {
+  calcAttendanceBaseSalary,
   calcDailyRate,
   getDaysInMonth,
   parseMonth,
@@ -168,6 +169,7 @@ function calcFromShiftsPure(
   const overtimePay = Math.round(paidOvertimeHours * employee.overtimeHourlyRate * 100) / 100;
 
   let attendanceSalary: number;
+  let proportionalBaseSalary: number | undefined;
   if (employee.type === "parttime" || employee.type === "longterm_parttime") {
     if (employee.parttimeMode === "daily") {
       attendanceSalary = Math.round(attendanceDays * employee.baseSalary * 100) / 100;
@@ -175,12 +177,10 @@ function calcFromShiftsPure(
       attendanceSalary = Math.round(totalHours * employee.overtimeHourlyRate * 100) / 100;
     }
   } else {
-    // 专业规则：无出勤(attendanceDays=0)或应出勤为0时，比例底薪=0
-    const proportionalBase = (expectedAttendanceDays > 0 && attendanceDays > 0)
-      ? Math.round((employee.baseSalary * attendanceDays / expectedAttendanceDays) * 100) / 100
-      : 0;
+    // 比例底薪唯一口径：日薪原始基数 × 实际出勤天数，最终金额保留两位小数。
+    proportionalBaseSalary = calcAttendanceBaseSalary(dailyRate, attendanceDays, expectedAttendanceDays);
     attendanceSalary = Math.round(
-      (proportionalBase + overtimePay - totalSpecialDeduction + holidayBonus) * 100
+      (proportionalBaseSalary + overtimePay - totalSpecialDeduction + holidayBonus) * 100
     ) / 100;
   }
 
@@ -202,7 +202,7 @@ function calcFromShiftsPure(
     holidayWorkDays,
     attendanceSalary,
     dailyRate,
-    dailyRateOverride: false,
+    proportionalBaseSalary,
     underRestDays,
     specialStatusDeductions,
     totalSpecialDeduction: Math.round(totalSpecialDeduction * 100) / 100,
@@ -340,7 +340,8 @@ function makeShift(date: string, hours: number | null, specialStatusId?: string)
 }
 
 /** 日薪 = 6000 / (31 - 8) = 260.87 */
-const DAILY_RATE = calcDailyRate(6000, DAYS_IN_MONTH, REST_DAYS);
+// 日薪原始基数保留完整精度；用于最终金额断言时按结算边界保留两位小数。
+const DAILY_RATE = Math.round(calcDailyRate(6000, DAYS_IN_MONTH, REST_DAYS) * 100) / 100;
 
 // ─── Suite A：考勤工资计算引擎 ────────────────────────────────────────────────
 

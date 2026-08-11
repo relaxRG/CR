@@ -7,10 +7,9 @@
 `lib/labor/store.tsx` 第 786 行的 `calcFromShifts` 函数中：
 
 ```typescript
-// 旧代码（有 Bug）
-const proportionalBase = expectedAttendanceDays > 0
-  ? Math.round((employee.baseSalary * attendanceDays / expectedAttendanceDays) * 100) / 100
-  : employee.baseSalary;  // ← 当 expectedAttendanceDays=0 时回退到全额底薪
+// 历史错误：应出勤天数异常时回退为全额底薪。
+// 当前规则：无出勤或应出勤天数不大于 0 时归零；
+// 正常情况按“日薪原始基数 × 实际出勤天数”在结算边界保留两位小数。
 ```
 
 当 `expectedAttendanceDays = 0`（即 `restDaysPerMonth >= daysInMonth`）时，代码回退返回全额底薪而非 0。
@@ -38,28 +37,26 @@ const proportionalBase = expectedAttendanceDays > 0
 > **所有派生值（如比例底薪、日薪、加班费）必须通过 `lib/labor/types.ts` 中的导出函数计算，禁止在 UI 层或导出层内联重新实现。**
 
 ```typescript
-// ✅ 正确：使用统一 helper
-import { calcProportionalBase } from "@/lib/labor/types";
-const base = calcProportionalBase(baseSalary, attendanceDays, expectedDays);
+// ✅ 正确：以日薪原始基数累计比例底薪，并由考勤引擎持久化结果
+import { calcDailyRate, calcAttendanceBaseSalary } from "@/lib/labor/types";
+const dailyRate = calcDailyRate(baseSalary, daysInMonth, restDays);
+const base = calcAttendanceBaseSalary(dailyRate, attendanceDays, expectedDays);
 
-// ❌ 错误：内联反推公式
+// ❌ 错误：从聚合考勤工资反推新数据的比例底薪
 const base = slip.attendanceSalary - overtimePay - holidayBonus + specialDeduction;
 ```
 
 ### 规范 2：除法运算必须同时检查分子和分母
 
-> **任何涉及除法的薪资计算，必须同时验证分子 > 0 和分母 > 0，且回退值为 0（而非全额）。**
+> **日薪分母固定为“当月自然日天数 − 月休天数”。日薪保留原始精度，比例底薪按“日薪 × 实际出勤天数”累计，并且仅在最终金额处保留两位小数；无出勤或应出勤天数不大于 0 时必须归零。**
 
 ```typescript
-// ✅ 正确
-const result = (numerator > 0 && denominator > 0)
-  ? Math.round((value * numerator / denominator) * 100) / 100
-  : 0;
+// ✅ 正确：同一日薪原始基数贯穿比例底薪、节假日、特殊状态和调休兑现
+const dailyRate = calcDailyRate(baseSalary, daysInMonth, restDays);
+const result = calcAttendanceBaseSalary(dailyRate, attendanceDays, expectedDays);
 
-// ❌ 错误
-const result = denominator > 0
-  ? Math.round((value * numerator / denominator) * 100) / 100
-  : value; // 回退到全额是危险的
+// ❌ 错误：先将展示日薪四舍五入，再乘出勤天数；会产生累计误差
+const result = Math.round(displayDailyRate * attendanceDays * 100) / 100;
 ```
 
 ### 规范 3：边界条件必须有对应测试用例
@@ -90,7 +87,7 @@ const result = denominator > 0
 
 ### 规范 6：测试文件中的计算逻辑必须与生产代码同步
 
-> **`tests/` 中的纯函数版计算逻辑（如 `calcFromShiftsPure`）必须与 `store.tsx` 保持完全一致。任何修改 store.tsx 的 PR 必须同步更新测试文件。**
+> **测试必须优先直接调用生产纯计算器（`attendance-calculator.ts`、`types.ts`）。如确有测试夹具需要独立实现，任何公式变动必须同步更新，并增加生产函数交叉断言，禁止长期维护计算镜像。**
 
 ### 规范 7：员工类型分支必须覆盖所有兼职变体
 
@@ -117,7 +114,7 @@ if (employee.type === "parttime") { ... }  // 漏掉 longterm_parttime
 
 PR 涉及薪资计算时，审查者必须检查：
 
-- [ ] 是否使用了统一 helper（`calcProportionalBase`, `calcDailyRate`）
+- [ ] 是否使用了统一 helper（`calcDailyRate`, `calcAttendanceBaseSalary`, `getAttendanceBaseSalary`）
 - [ ] 除法运算是否同时检查分子和分母
 - [ ] 回退值是否为 0（而非全额或 undefined）
 - [ ] 是否有对应的边界条件测试

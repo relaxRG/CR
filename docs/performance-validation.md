@@ -15,8 +15,8 @@
 | 修改 | 性能影响 | 说明 |
 |------|---------|------|
 | `attendanceDays > 0` 条件判断 | 无影响 | 仅增加一个布尔比较 |
-| `calcProportionalBase` helper | 无影响 | 函数调用开销可忽略（纯算术） |
-| UI 层使用 helper 替代反推公式 | 微优化 | 减少了 `Object.values().reduce()` 调用 |
+| `calcAttendanceBaseSalary` / `getAttendanceBaseSalary` helper | 无影响 | 纯算术与字段读取，函数调用开销可忽略 |
+| UI 层读取持久化比例底薪替代反推公式 | 微优化 | 不再从聚合考勤工资拆分计算 |
 | 跨月标签文本变更 | 无影响 | 纯字符串替换 |
 
 **结论：本次修改不引入任何性能回归。** 实际上，UI 层移除了 `Object.values(att.specialStatusDeductions).reduce()` 的内联计算，略微减少了渲染时的计算量。
@@ -91,7 +91,7 @@
 
 本次修改对渲染性能的影响：
 
-- **薪资卡片（PaySlipMiniCard）**：移除了 `Object.values().reduce()` 内联计算，改为调用 `calcProportionalBase(baseSalary, days, expectedDays)`（3个数字参数的纯算术），渲染更快。
+- **薪资卡片（PaySlipMiniCard）**：直接调用 `getAttendanceBaseSalary(att)` 读取持久化比例底薪；仅历史记录缺少字段时才执行一次兼容读取，渲染路径更稳定。
 - **考勤概况卡片**：同上优化。
 - **排班表跨月标签**：从静态字符串改为 `date.slice(5,7)` 动态插值，开销可忽略。
 
@@ -104,4 +104,4 @@ autoSync 的 500ms 防抖确保：
 
 ### 3.3 内存使用
 
-本次修改不增加任何新的 state 或 ref，不影响内存占用。`calcProportionalBase` 是纯函数，无闭包捕获。
+本次修改不增加任何新的 state 或 ref，不影响内存占用。`calcAttendanceBaseSalary` 和 `getAttendanceBaseSalary` 均为无闭包的纯函数。

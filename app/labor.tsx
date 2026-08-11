@@ -43,7 +43,7 @@ import {
   DEPT_COLORS, DEPT_LABELS, EMPLOYEE_TYPE_LABELS, monthLabel,
   getMonthDates, getDayOfWeek, getContractHoursForDate,
   DEFAULT_SHIFT_TEMPLATES, SHIFT_COLOR_PRESETS,
-  calcCompOffExpiresMonth, calcProportionalBase, BusinessHoursEntry, ShiftGroup, WEEKDAY_SHORT,
+  calcCompOffExpiresMonth, getAttendanceBaseSalary, BusinessHoursEntry, ShiftGroup, WEEKDAY_SHORT,
   DEFAULT_SHIFT_GROUPS, FillPreset, isDayInRange,
   PaySlip, MonthlyAttendance, ScheduleSnapshot,
 } from "@/lib/labor/types";
@@ -489,9 +489,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
         const firstLabel = isParttimeEmp ? "工时薪资" : "比例底薪";
         const firstValue = isParttimeEmp
           ? (att?.attendanceSalary ?? 0)
-          : ((!att || att.attendanceDays <= 0 || att.expectedAttendanceDays <= 0)
-            ? 0
-            : calcProportionalBase(employee.baseSalary, att.attendanceDays, att.expectedAttendanceDays));
+          : getAttendanceBaseSalary(att);
         const overtimeAndHoliday = isParttimeEmp ? 0 : ((att?.overtimePay ?? 0) + (att?.holidayBonus ?? 0));
         const allowanceSum = slip ? (slip.mealAllowance ?? 0) + (slip.transportAllowance ?? 0) + (slip.otherAllowance ?? 0) : 0;
         const extraTotal = slip ? (slip.performanceBonus ?? 0) + allowanceSum + (slip.rewardPenalty ?? 0) : 0;
@@ -533,9 +531,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
             const overtimePay = att?.overtimePay ?? 0;
             const holidayPay = att?.holidayBonus ?? 0;
             const specialDeduction = att?.totalSpecialDeduction ?? 0;
-            const proportionalBase = (!att || att.attendanceDays <= 0 || att.expectedAttendanceDays <= 0)
-              ? 0
-              : calcProportionalBase(employee.baseSalary, att.attendanceDays, att.expectedAttendanceDays);
+            const proportionalBase = getAttendanceBaseSalary(att);
             const attTotal = slip?.attendanceSalary ?? 0;
             // 兼职员工显示不同的考勤明细布局
             const items = isParttimeEmp2 ? [
@@ -4368,9 +4364,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                       const isEmpParttime = emp.type === "parttime" || emp.type === "longterm_parttime";
                       const baseSal = isEmpParttime
                         ? att.attendanceSalary
-                        : ((att.attendanceDays <= 0 || att.expectedAttendanceDays <= 0)
-                          ? 0
-                          : calcProportionalBase(emp.baseSalary, att.attendanceDays, att.expectedAttendanceDays));
+                        : getAttendanceBaseSalary(att);
                       const otPay = isEmpParttime ? 0 : (att.overtimePay ?? 0);
                       const holPay = isEmpParttime ? 0 : (att.holidayBonus ?? 0);
                       const total = att.attendanceSalary;

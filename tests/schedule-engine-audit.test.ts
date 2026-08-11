@@ -20,7 +20,7 @@ import { canWriteScheduleDates, getNonWritableScheduleMonths, monthFromScheduleD
 import { applyHolidayRestAllocation, getHolidayRestBonus } from "../lib/labor/holiday-pay";
 import { getHolidayAllocationKey, getHolidayWorkInfo } from "../lib/labor/holiday-work";
 import type { Employee, ShiftEntry, SpecialStatus } from "../lib/labor/types";
-import { DEFAULT_SPECIAL_STATUSES } from "../lib/labor/types";
+import { calcAttendanceBaseSalary, calcDailyRate, DEFAULT_SPECIAL_STATUSES, getAttendanceBaseSalary } from "../lib/labor/types";
 
 // ─── 测试夹具 ─────────────────────────────────────────────────────────────────
 
@@ -237,7 +237,6 @@ describe("Suite D：holiday-pay 节假日换休不计薪", () => {
     totalSpecialDeduction: 0,
     holidayBonus: 500,
     dailyRate: 260.87,
-    dailyRateOverride: false,
     overtimePay: 0,
     attendanceSalary: 5000,
     notes: "",
@@ -487,5 +486,56 @@ describe("Suite J：2025 人社部工资折算标准（人社部发〔2025〕2�
     });
     // 7月31天，休8天，工作日23天：6000/23 ≈ 260.87
     expect(result.dailyRate).toBeCloseTo(6000 / 23, 1);
+  });
+});
+
+// ─── Suite K: 比例底薪与日薪单一基数 ─────────────────────────────────────────
+
+describe("Suite K：比例底薪统一为日薪 × 实际出勤天数", () => {
+  it("K1. 日薪使用月底薪 ÷ 应出勤天数的原始精度，不提前截断为展示金额", () => {
+    const dailyRate = calcDailyRate(10000, 30, 4);
+    expect(dailyRate).toBeCloseTo(10000 / 26, 12);
+    expect(dailyRate).not.toBe(384.62);
+  });
+
+  it("K2. 比例底薪 = 原始日薪 × 实际出勤天数，最终金额才保留两位小数", () => {
+    const dailyRate = calcDailyRate(10000, 30, 4);
+    const proportionalBase = calcAttendanceBaseSalary(dailyRate, 20, 26);
+    expect(proportionalBase).toBe(7692.31);
+    // 若误用展示后的 ¥384.62 再乘 20，会得到错误的 ¥7,692.40。
+    expect(proportionalBase).not.toBe(Math.round(384.62 * 20 * 100) / 100);
+  });
+
+  it("K3. 全勤时比例底薪与月底薪严格闭环", () => {
+    const dailyRate = calcDailyRate(10000, 30, 4);
+    expect(calcAttendanceBaseSalary(dailyRate, 26, 26)).toBe(10000);
+  });
+
+  it("K4. 真实考勤引擎持久化比例底薪，供 UI 和导出直接读取", () => {
+    const shifts = Array.from({ length: 20 }, (_, index) =>
+      makeShift(`2026-04-${String(index + 1).padStart(2, "0")}`, 8)
+    );
+    const result = calculateAttendanceFromShifts({
+      employeeId: "emp-001",
+      month: "2026-04",
+      employee: makeEmployee({ baseSalary: 10000, restDaysPerMonth: 4 }),
+      shifts,
+      specialStatuses: DEFAULT_SPECIAL_STATUSES,
+    });
+    expect(result.expectedAttendanceDays).toBe(26);
+    expect(result.proportionalBaseSalary).toBe(7692.31);
+    expect(getAttendanceBaseSalary(result)).toBe(7692.31);
+  });
+
+  it("K5. 历史考勤缺少比例底薪字段时，仅按已结算数据兼容读取，不改写历史金额", () => {
+    const legacyAttendance = {
+      attendanceDays: 20,
+      expectedAttendanceDays: 26,
+      attendanceSalary: 7800.31,
+      overtimePay: 100,
+      holidayBonus: 200,
+      totalSpecialDeduction: 208,
+    } as any;
+    expect(getAttendanceBaseSalary(legacyAttendance)).toBe(7708.31);
   });
 });

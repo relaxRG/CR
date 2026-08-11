@@ -38,15 +38,13 @@ if (contractH === 0 && !entry.specialStatusId && typeof h === "number" && h > 0)
 **位置：** `app/labor.tsx` 第 481-484 行
 
 ```typescript
-const baseSalary = (!att || att.attendanceDays <= 0 || att.expectedAttendanceDays <= 0)
-  ? 0
-  : calcProportionalBase(employee.baseSalary, att.attendanceDays, att.expectedAttendanceDays);
+const baseSalary = getAttendanceBaseSalary(att); // 新考勤读取持久化日薪累计结果
 ```
 
 **原因：** 朱大哥的配置是 `baseSalary=0, restDaysPerMonth=4`，所以：
 - `expectedAttendanceDays = 31 - 4 = 27`（> 0）
 - `attendanceDays = 约 24`（> 0）
-- `calcProportionalBase(0, 24, 27) = 0`
+- `calcAttendanceBaseSalary(0, 24, 27) = 0`
 
 但 UI 显示的是 ¥-8680，这说明 **UI 仍在使用旧的反推公式**（从 `slip.attendanceSalary` 反推），而 `slip.attendanceSalary = 0`（因为引擎走的是 else 分支而非 parttime 分支）。
 
@@ -65,7 +63,7 @@ if (employee.type === "parttime") {
 **原因：** 条件判断只检查 `"parttime"`，**没有包含 `"longterm_parttime"`**！
 
 所以朱大哥虽然是长期兼职，但薪资计算走的是**全职分支**：
-- `proportionalBase = 0 × 24/27 = 0`
+- `proportionalBaseSalary = 日薪(0) × 24 = 0`
 - `overtimePay = paidOvertimeHours × overtimeHourlyRate`
 
 但 `overtimePay` 的计算依赖 `rawOvertimeHours = totalHours - stdHoursTotal`，而 `stdHoursTotal` 来自 `getContractHoursForDate()` 返回 0，所以：
@@ -133,7 +131,7 @@ if (isParttimeEmp) {
   value = att?.attendanceSalary ?? 0;
 } else {
   label = "比例底薪";
-  value = calcProportionalBase(...);
+  value = getAttendanceBaseSalary(att);
 }
 ```
 

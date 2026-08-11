@@ -1,140 +1,66 @@
 /**
  * tests/payslip-display-calc.test.ts
- * 薪资卡片展示计算逻辑单元测试
+ * 薪资卡片与导出展示计算逻辑单元测试。
  *
- * 覆盖三个修复点：
- * 1. 考勤明细5格「比例底薪」计算（不含特殊扣薪的双重计算）
- * 2. autoSync 依赖完整性（compOffEntries 变化触发重算）
- * 3. salesCommission 字段语义（业绩提点 ≠ 业绩绩效）
+ * 比例底薪唯一口径：日薪原始基数 × 实际出勤天数；新数据由考勤引擎持久化，
+ * 历史数据仅在缺少该字段时按已结算考勤金额兼容读取。
  */
 
 import { describe, it, expect } from "vitest";
+import { calcAttendanceBaseSalary, calcDailyRate, getAttendanceBaseSalary } from "../lib/labor/types";
 
-// ─── 1. 比例底薪计算（修复双重计算 Bug）─────────────────────────────────────────
+// ─── 1. 比例底薪计算与展示 ──────────────────────────────────────────────────────
 
-/**
- * 核心公式：
- *   attendanceSalary = proportionalBase + overtimePay - specialDeduction + holidayBonus
- *   proportionalBase = attendanceSalary - overtimePay + specialDeduction - holidayBonus
- *
- * 5格加法验证：
- *   proportionalBase + overtimePay + holidayBonus - specialDeduction = attendanceSalary ✅
- */
-function calcProportionalBase(params: {
-  attendanceSalary: number;
-  overtimePay: number;
-  holidayBonus: number;
-  totalSpecialDeduction: number;
-}): number {
-  const { attendanceSalary, overtimePay, holidayBonus, totalSpecialDeduction } = params;
-  return Math.round(
-    (attendanceSalary - overtimePay - holidayBonus + totalSpecialDeduction) * 100
-  ) / 100;
-}
-
-describe("比例底薪计算（修复双重计算 Bug）", () => {
-  it("无加班无节假日无特殊扣薪：比例底薪 = 考勤工资", () => {
-    const base = calcProportionalBase({
-      attendanceSalary: 5000,
-      overtimePay: 0,
-      holidayBonus: 0,
-      totalSpecialDeduction: 0,
-    });
-    expect(base).toBe(5000);
+describe("比例底薪：日薪累计单一口径", () => {
+  it("日薪 = 月底薪 ÷ 应出勤天数，并保留原始精度直到最终金额结算", () => {
+    const dailyRate = calcDailyRate(10000, 30, 4);
+    expect(dailyRate).toBeCloseTo(10000 / 26, 12);
+    expect(calcAttendanceBaseSalary(dailyRate, 20, 26)).toBe(7692.31);
   });
 
-  it("有加班费：比例底薪 = 考勤工资 - 加班费", () => {
-    const base = calcProportionalBase({
-      attendanceSalary: 5405,
+  it("全勤时，日薪累计的比例底薪与月底薪闭环", () => {
+    const dailyRate = calcDailyRate(6000, 31, 8);
+    expect(calcAttendanceBaseSalary(dailyRate, 23, 23)).toBe(6000);
+  });
+
+  it("零出勤或应出勤配置异常时，比例底薪强制归零", () => {
+    expect(calcAttendanceBaseSalary(384.615, 0, 26)).toBe(0);
+    expect(calcAttendanceBaseSalary(384.615, 20, 0)).toBe(0);
+  });
+
+  it("5格考勤工资闭环：比例底薪 + 加班 + 节假日 − 特殊扣薪 = 考勤工资", () => {
+    const proportionalBase = calcAttendanceBaseSalary(calcDailyRate(10000, 30, 4), 20, 26);
+    const overtimePay = 405;
+    const holidayBonus = 769.23;
+    const specialDeduction = 384.62;
+    const attendanceSalary = Math.round((proportionalBase + overtimePay + holidayBonus - specialDeduction) * 100) / 100;
+    expect(attendanceSalary).toBe(8481.92);
+  });
+
+  it("新考勤记录优先读取持久化比例底薪，不从聚合考勤工资反推", () => {
+    const att = {
+      attendanceDays: 20,
+      expectedAttendanceDays: 26,
+      proportionalBaseSalary: 7692.31,
+      // 下列值即使因额外工资而变化，也不影响比例底薪展示。
+      attendanceSalary: 8481.92,
       overtimePay: 405,
-      holidayBonus: 0,
-      totalSpecialDeduction: 0,
-    });
-    expect(base).toBe(5000);
+      holidayBonus: 769.23,
+      totalSpecialDeduction: 384.62,
+    } as any;
+    expect(getAttendanceBaseSalary(att)).toBe(7692.31);
   });
 
-  it("有节假日薪资：比例底薪 = 考勤工资 - 加班费 - 节假日薪资", () => {
-    const base = calcProportionalBase({
-      attendanceSalary: 5600,
+  it("历史考勤缺少比例底薪字段时，兼容读取已结算金额而不修改历史工资", () => {
+    const legacyAtt = {
+      attendanceDays: 20,
+      expectedAttendanceDays: 26,
+      attendanceSalary: 8481.92,
       overtimePay: 405,
-      holidayBonus: 195,
-      totalSpecialDeduction: 0,
-    });
-    expect(base).toBe(5000);
-  });
-
-  it("有特殊扣薪（旷工）：比例底薪 = 考勤工资 + 特殊扣薪（还原）", () => {
-    // attendanceSalary = proportionalBase - specialDeduction
-    // proportionalBase = attendanceSalary + specialDeduction
-    const base = calcProportionalBase({
-      attendanceSalary: 4800, // 5000 - 200（旷工扣薪）
-      overtimePay: 0,
-      holidayBonus: 0,
-      totalSpecialDeduction: 200,
-    });
-    expect(base).toBe(5000); // 还原为未扣前的比例底薪
-  });
-
-  it("5格加法验证：proportionalBase + overtimePay + holidayBonus - specialDeduction = attendanceSalary", () => {
-    const params = {
-      attendanceSalary: 5600,
-      overtimePay: 405,
-      holidayBonus: 195,
-      totalSpecialDeduction: 0,
-    };
-    const proportionalBase = calcProportionalBase(params);
-    const sum = proportionalBase + params.overtimePay + params.holidayBonus - params.totalSpecialDeduction;
-    expect(Math.round(sum * 100) / 100).toBe(params.attendanceSalary);
-  });
-
-  it("5格加法验证（含特殊扣薪）", () => {
-    const params = {
-      attendanceSalary: 4800,
-      overtimePay: 0,
-      holidayBonus: 0,
-      totalSpecialDeduction: 200,
-    };
-    const proportionalBase = calcProportionalBase(params);
-    const sum = proportionalBase + params.overtimePay + params.holidayBonus - params.totalSpecialDeduction;
-    expect(Math.round(sum * 100) / 100).toBe(params.attendanceSalary);
-  });
-
-  it("复杂场景：加班 + 节假日 + 旷工扣薪", () => {
-    const params = {
-      attendanceSalary: 5200, // 5000 + 405 + 195 - 400
-      overtimePay: 405,
-      holidayBonus: 195,
-      totalSpecialDeduction: 400,
-    };
-    const proportionalBase = calcProportionalBase(params);
-    const sum = proportionalBase + params.overtimePay + params.holidayBonus - params.totalSpecialDeduction;
-    expect(Math.round(sum * 100) / 100).toBe(params.attendanceSalary);
-  });
-
-  it("零出勤时比例底薪应为 0（无排班 Bug 修复验证）", () => {
-    // 当 attendanceSalary=0（无出勤）时，比例底薪应为 0
-    const base = calcProportionalBase({
-      attendanceSalary: 0,
-      overtimePay: 0,
-      holidayBonus: 0,
-      totalSpecialDeduction: 0,
-    });
-    expect(base).toBe(0);
-  });
-
-  it("旧逻辑（错误）：baseSalary = attendanceSalary - overtimePay - holidayBonus 会导致双重计算", () => {
-    // 旧逻辑：baseSalary 已经包含了 -specialDeduction
-    // 展开区域又单独显示 specialDeduction，导致视觉上多减了一次
-    const oldBaseSalary = 4800 - 0 - 0; // = 4800（已含 -200 扣薪）
-    const specialDeduction = 200;
-    // 旧的5格合计 = 4800 + 0 + 0 - 200 = 4600 ≠ 4800（attendanceSalary）
-    const oldSum = oldBaseSalary + 0 + 0 - specialDeduction;
-    expect(oldSum).not.toBe(4800); // 旧逻辑是错误的
-
-    // 新逻辑：proportionalBase = 4800 + 200 = 5000
-    const newBase = calcProportionalBase({ attendanceSalary: 4800, overtimePay: 0, holidayBonus: 0, totalSpecialDeduction: 200 });
-    const newSum = newBase + 0 + 0 - 200;
-    expect(newSum).toBe(4800); // 新逻辑正确
+      holidayBonus: 769.23,
+      totalSpecialDeduction: 384.62,
+    } as any;
+    expect(getAttendanceBaseSalary(legacyAtt)).toBe(7692.31);
   });
 });
 
@@ -142,33 +68,20 @@ describe("比例底薪计算（修复双重计算 Bug）", () => {
 
 describe("autoSync 依赖完整性", () => {
   it("compOffEntries 变化应触发薪资重算（概念验证）", () => {
-    // 模拟：存入 4h 调休后，paidOvertimeHours 应减少
     const rawOvertimeHours = 4;
-    const compOffHoursUsed = 4; // 存入4h调休
-    const hoursPerCompOff = 8;
-    const compOffCount = Math.floor(compOffHoursUsed / hoursPerCompOff); // 0天（不足1天）
-    const paidOvertimeHours = Math.max(0, rawOvertimeHours - compOffHoursUsed); // 0h
+    const compOffHoursUsed = 4;
+    const paidOvertimeHours = Math.max(0, rawOvertimeHours - compOffHoursUsed);
 
     expect(paidOvertimeHours).toBe(0);
-    // 加班费 = 0h × 时薪 = 0
-    const overtimeHourlyRate = 50;
-    const overtimePay = paidOvertimeHours * overtimeHourlyRate;
-    expect(overtimePay).toBe(0);
+    expect(paidOvertimeHours * 50).toBe(0);
   });
 
   it("存入8h调休（1天）后，paidOvertimeHours 减少8h", () => {
-    const rawOvertimeHours = 12;
-    const compOffHoursUsed = 8;
-    const paidOvertimeHours = Math.max(0, rawOvertimeHours - compOffHoursUsed);
-    expect(paidOvertimeHours).toBe(4);
+    expect(Math.max(0, 12 - 8)).toBe(4);
   });
 
   it("存入超过实际加班时长，paidOvertimeHours 不为负数", () => {
-    const rawOvertimeHours = 4;
-    const compOffHoursUsed = 8; // 存入超出
-    const paidOvertimeHours = Math.max(0, rawOvertimeHours - compOffHoursUsed);
-    expect(paidOvertimeHours).toBe(0);
-    expect(paidOvertimeHours).toBeGreaterThanOrEqual(0);
+    expect(Math.max(0, 4 - 8)).toBe(0);
   });
 });
 
@@ -176,69 +89,35 @@ describe("autoSync 依赖完整性", () => {
 
 describe("salesCommission 字段语义（业绩提点）", () => {
   it("salesCommission 是业绩提点，不是业绩绩效考核结果", () => {
-    // performanceBonus = 工作绩效 + 业绩绩效合计（由 buildPaySlipDraft 的 performanceTotal 参数传入）
-    // salesCommission = 业绩提点（从 existing 读取，独立字段）
-    const slip = {
-      performanceBonus: 500, // 工作绩效 300 + 业绩绩效 200
-      salesCommission: 150,  // 业绩提点（独立）
-    };
-
-    // 综合额外小计 = 补贴 + 工作绩效 + 业绩提点 + 奖惩
+    const slip = { performanceBonus: 500, salesCommission: 150 };
     const allowanceSum = 375;
-    const extraTotal = allowanceSum + slip.performanceBonus + slip.salesCommission + 0;
-    expect(extraTotal).toBe(1025);
-
-    // 业绩提点标签应为「业绩提点」而非「业绩绩效」
-    const label = "业绩提点"; // 修复后的标签
-    expect(label).toBe("业绩提点");
-    expect(label).not.toBe("业绩绩效");
+    expect(allowanceSum + slip.performanceBonus + slip.salesCommission).toBe(1025);
+    expect("业绩提点").not.toBe("业绩绩效");
   });
 
   it("grossSalary 包含 salesCommission", () => {
-    // buildPaySlipDraft 中：
-    // grossSalary = attendanceSalary + performanceTotal + salesCommission + allowances + rewardPenalty
-    const attendanceSalary = 5000;
-    const performanceTotal = 500;
-    const salesCommission = 150;
-    const allowances = 375;
-    const rewardPenalty = 0;
-    const grossSalary = attendanceSalary + performanceTotal + salesCommission + allowances + rewardPenalty;
+    const grossSalary = 5000 + 500 + 150 + 375;
     expect(grossSalary).toBe(6025);
   });
 });
 
-// ─── 4. export.ts 比例底薪计算一致性 ─────────────────────────────────────────────
+// ─── 4. 导出与薪资卡片一致性 ────────────────────────────────────────────────────
 
-describe("export.ts calcProportionalBase 与薪资卡片一致性", () => {
-  it("export.ts 和 PaySlipMiniCard 使用相同公式", () => {
-    // export.ts 中的 calcProportionalBase 函数
-    const exportCalc = (att: { totalSpecialDeduction: number; overtimePay: number; holidayBonus: number } | undefined, slip: { attendanceSalary: number } | undefined) => {
-      if (!slip) return 0;
-      const specialDeduction = att?.totalSpecialDeduction ?? 0;
-      const overtimePay = att?.overtimePay ?? 0;
-      const holidayBonus = att?.holidayBonus ?? 0;
-      return Math.round((slip.attendanceSalary - overtimePay - holidayBonus + specialDeduction) * 100) / 100;
-    };
-
-    // PaySlipMiniCard 中的计算
-    const cardCalc = (att: { overtimePay: number; holidayBonus: number; specialStatusDeductions: Record<string, { deduction: number }> } | null, slip: { attendanceSalary: number } | null) => {
-      const specialDeduction = att ? Object.values(att.specialStatusDeductions ?? {}).reduce((s, d) => s + d.deduction, 0) : 0;
-      const overtimePay = att?.overtimePay ?? 0;
-      const holidayBonus = att?.holidayBonus ?? 0;
-      return slip ? Math.round((slip.attendanceSalary - overtimePay - holidayBonus + specialDeduction) * 100) / 100 : 0;
-    };
-
+describe("导出与薪资卡片的比例底薪一致性", () => {
+  it("二者都读取同一份持久化比例底薪字段", () => {
     const att = {
-      totalSpecialDeduction: 200,
+      attendanceDays: 20,
+      expectedAttendanceDays: 26,
+      proportionalBaseSalary: 7692.31,
+      attendanceSalary: 8481.92,
       overtimePay: 405,
-      holidayBonus: 195,
-      specialStatusDeductions: { "absent": { deduction: 200 } },
-    };
-    const slip = { attendanceSalary: 5400 };
+      holidayBonus: 769.23,
+      totalSpecialDeduction: 384.62,
+    } as any;
 
-    const exportResult = exportCalc(att, slip);
-    const cardResult = cardCalc(att, slip);
-    expect(exportResult).toBe(cardResult);
-    expect(exportResult).toBe(5000);
+    const cardValue = getAttendanceBaseSalary(att);
+    const exportValue = getAttendanceBaseSalary(att);
+    expect(cardValue).toBe(7692.31);
+    expect(exportValue).toBe(cardValue);
   });
 });

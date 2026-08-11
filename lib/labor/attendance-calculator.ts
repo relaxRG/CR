@@ -1,5 +1,5 @@
 import type { Employee, MonthlyAttendance, ShiftEntry, SpecialStatus } from "./types";
-import { calcDailyRate, getContractHoursForDate, getDaysInMonth, parseMonth } from "./types";
+import { calcAttendanceBaseSalary, calcDailyRate, getContractHoursForDate, getDaysInMonth, parseMonth } from "./types";
 
 function createAttendanceId(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -148,16 +148,19 @@ export function calculateAttendanceFromShifts({
     .reduce((sum, detail) => sum + detail.deduction, 0);
   const overtimePay = Math.round(paidOvertimeHours * employee.overtimeHourlyRate * 100) / 100;
 
+  // 全职比例底薪必须从同一日薪原始基数累计：日薪 × 实际出勤天数。
+  // 日薪、节假日倍率、特殊状态扣减、节假日调休兑现由此共享同一分母和精度来源。
+  const proportionalBaseSalary = isParttime
+    ? undefined
+    : calcAttendanceBaseSalary(dailyRate, attendanceDays, expectedAttendanceDays);
+
   let attendanceSalary: number;
   if (isParttime) {
     attendanceSalary = employee.parttimeMode === "daily"
       ? Math.round(attendanceDays * employee.baseSalary * 100) / 100
       : Math.round(totalHours * employee.overtimeHourlyRate * 100) / 100;
   } else {
-    const proportionalBase = expectedAttendanceDays > 0 && attendanceDays > 0
-      ? Math.round(employee.baseSalary * attendanceDays / expectedAttendanceDays * 100) / 100
-      : 0;
-    attendanceSalary = Math.round((proportionalBase + overtimePay - totalSpecialDeduction + holidayBonus) * 100) / 100;
+    attendanceSalary = Math.round(((proportionalBaseSalary ?? 0) + overtimePay - totalSpecialDeduction + holidayBonus) * 100) / 100;
   }
 
   return {
@@ -178,7 +181,7 @@ export function calculateAttendanceFromShifts({
     totalSpecialDeduction: Math.round(totalSpecialDeduction * 100) / 100,
     holidayBonus: Math.round(holidayBonus * 100) / 100,
     dailyRate,
-    dailyRateOverride: existing?.dailyRateOverride ?? false,
+    proportionalBaseSalary,
     overtimePay,
     attendanceSalary,
     notes: existing?.notes ?? "",

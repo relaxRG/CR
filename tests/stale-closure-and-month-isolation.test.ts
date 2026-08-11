@@ -36,6 +36,7 @@
  *     E3. 不需要在 Step 3 中再次显式传入控制字段
  */
 import { describe, it, expect } from "vitest";
+import { calcAttendanceBaseSalary, calcDailyRate } from "../lib/labor/types";
 
 // ─── 辅助函数 ─────────────────────────────────────────────────────────────────
 
@@ -380,21 +381,15 @@ describe("Suite F：App 启动时序 ready 检查（比例底薪根本原因）"
     expect(shouldRun).toBe(true);
   });
 
-  it("F4. 无排班时 calcProportionalBase 返回 0（attendanceDays=0）", () => {
-    // 模拟 calcProportionalBase 的逻辑
-    const baseSalary = 8000;
-    const attendanceDays = 0; // 无排班
-    const expectedAttendanceDays = 27; // 31天月份，restDaysPerMonth=4
-    const proportionalBase = (attendanceDays <= 0 || expectedAttendanceDays <= 0)
-      ? 0
-      : Math.round((baseSalary * attendanceDays / expectedAttendanceDays) * 100) / 100;
-    expect(proportionalBase).toBe(0);
+  it("F4. 无排班时日薪累计比例底薪返回 0（attendanceDays=0）", () => {
+    const dailyRate = calcDailyRate(8000, 31, 4);
+    expect(calcAttendanceBaseSalary(dailyRate, 0, 27)).toBe(0);
   });
 
   it("F5. autoSync 依赖数组包含 shiftsReady 和 employeesReady", () => {
     const autoSyncDeps = [
       "shifts", "currentMonth", "employees", "advances",
-      "compOffEntriesSched", "holidayCompOffEntriesSched",
+      "compOffEntriesSched",
       "globalSettings", "specialStatuses",
       "shiftsReady", "employeesReady",
     ];

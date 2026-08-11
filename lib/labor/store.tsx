@@ -16,7 +16,7 @@ import {
   CompOffBalanceEntry, HolidayCompOffEntry, UnexplainedRestAlert,
   CustomDept, BusinessHoursEntry, ShiftGroup, FillPreset,
   ScheduleSnapshot, DeptCategory,
-  calcDailyRate, calcProportionalBase, calcAllowance, calcSocialInsurance, calcIncomeTax,
+  calcAllowance, calcSocialInsurance, calcIncomeTax,
   shouldPayAllowanceThisMonth,
   getDaysInMonth, parseMonth, getContractHoursForDate,
   calcCompOffExpiresMonth, getAvailableCompOffDays,

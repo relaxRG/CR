@@ -14,7 +14,7 @@
 | 2 | longterm_parttime 走了全职分支 | 类型分支条件遗漏新类型 | 使用 `isParttime()` helper 统一判断 |
 | 3 | 补贴合计显示单日金额而非月总额 | `calcAllowance` 依赖 type 而非 unit | 统一按 unit 字段路由计算 |
 | 4 | 排班表对兼职显示无意义的警告 | 全职逻辑未排除兼职 | 按类型条件渲染 |
-| 5 | 3处 UI 使用不同的反推公式 | 违反 Single Source of Truth | 统一使用 `calcProportionalBase` helper |
+| 5 | UI 与导出使用不同的比例底薪来源 | 违反 Single Source of Truth | 考勤引擎持久化 `proportionalBaseSalary`，统一通过 `getAttendanceBaseSalary` 读取 |
 
 ### 共性根因
 
@@ -27,8 +27,8 @@
 ### 原则 1：Single Source of Truth（单一真相源）
 
 ```
-❌ 错误：UI 中用反推公式计算比例底薪
-✅ 正确：统一调用 calcProportionalBase(baseSalary, attendanceDays, expectedDays)
+❌ 错误：UI 中从聚合考勤工资反推比例底薪
+✅ 正确：考勤引擎按“日薪 × 实际出勤天数”持久化，UI/导出调用 getAttendanceBaseSalary(att) 读取
 ```
 
 **规则：** 任何派生值必须有且仅有一个计算入口。UI 只负责展示，不负责计算。
@@ -120,7 +120,7 @@
 
 ### 薪资相关 PR 必检项
 
-- [ ] 是否使用了统一 helper（`calcProportionalBase`, `calcDailyRate`, `calcAllowance`）
+- [ ] 是否使用了统一 helper（`calcDailyRate`, `calcAttendanceBaseSalary`, `getAttendanceBaseSalary`, `calcAllowance`）
 - [ ] 除法运算是否同时检查分子和分母
 - [ ] 回退值是否为 0（而非全额或 undefined）
 - [ ] 员工类型判断是否覆盖了所有变体（fulltime/longterm_parttime/parttime）

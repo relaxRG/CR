@@ -4,8 +4,8 @@ import { formatMoney } from "@/lib/utils";
  * 员工管理导出引擎 — 薪资报表（Excel/PDF）+ 排班表（时长/班次模式，Excel/PDF）
  *
  * 字段语义说明（与薪资卡片保持一致）：
- *   比例底薪 = attendanceSalary - overtimePay - holidayBonus + specialDeduction
- *            = baseSalary × (attendanceDays / expectedAttendanceDays)
+ *   比例底薪 = 日薪原始基数 × 实际出勤天数（最终金额保留两位小数）
+ *   日薪原始基数 = 月底薪 ÷ 当月应出勤天数
  *   特殊扣薪 = att.totalSpecialDeduction（旷工/病假等额外扣减）
  *   考勤工资 = 比例底薪 + 加班工资 + 节假日薪资 - 特殊扣薪
  *   业绩提点 = slip.salesCommission（从 existing 读取，非绩效考核）
@@ -20,7 +20,7 @@ import * as Sharing from "expo-sharing";
 import * as XLSX from "xlsx";
 
 import type { Employee, EmployeeDept, ShiftEntry, MonthlyAttendance, PaySlip, ShiftTemplate } from "./types";
-import { DEPT_LABELS, EMPLOYEE_TYPE_LABELS, calcProportionalBase as calcProportionalBaseFromTypes } from "./types";
+import { DEPT_LABELS, EMPLOYEE_TYPE_LABELS, getAttendanceBaseSalary } from "./types";
 import { DEFAULT_DEPT_ORDER } from "../labor/store";
 
 // ─── 辅助函数 ──────────────────────────────────────────────────────────────────
@@ -57,22 +57,6 @@ function weekdayLabel(dateStr: string): string {
   return WEEKDAY_LABELS[new Date(dateStr).getDay()];
 }
 
-/**
- * 从 MonthlyAttendance + Employee 计算「比例底薪」
- * 统一使用 types.ts 中的 calcProportionalBase helper
- * 不再使用反推公式，避免口径不一致
- *
- * 注意：导出时没有 employee.baseSalary，但有 att.attendanceSalary
- * 因此导出场景仍用反推公式（但增加零出勤防护）
- */
-function calcProportionalBase(att: MonthlyAttendance | undefined, slip: PaySlip | undefined): number {
-  if (!slip || !att) return 0;
-  if (att.attendanceDays <= 0 || att.expectedAttendanceDays <= 0) return 0;
-  const specialDeduction = att?.totalSpecialDeduction ?? 0;
-  const overtimePay = att?.overtimePay ?? 0;
-  const holidayBonus = att?.holidayBonus ?? 0;
-  return Math.round((slip.attendanceSalary - overtimePay - holidayBonus + specialDeduction) * 100) / 100;
-}
 
 // ─── 导出参数类型 ──────────────────────────────────────────────────────────────
 
@@ -150,10 +134,11 @@ export function buildPayrollWorkbook(params: ExportParams): XLSX.WorkBook {
       const contractBase = emp.baseSalary ?? 0;
       const expectedDays = att?.expectedAttendanceDays ?? 0;
       const actualDays = att?.attendanceDays ?? 0;
-      const dailySalary = expectedDays > 0 ? contractBase / expectedDays : 0;
+      // 优先读取考勤引擎计算时保存的原始日薪；历史数据才以合同底薪/应出勤天数回退。
+      const dailySalary = att?.dailyRate ?? (expectedDays > 0 ? contractBase / expectedDays : 0);
 
-      // 考勤明细（与薪资卡片一致）
-      const proportionalBase = calcProportionalBase(att, slip);
+      // 考勤明细（与薪资卡片一致）：日薪原始基数 × 实际出勤天数。
+      const proportionalBase = getAttendanceBaseSalary(att);
       const overtimeHours = att?.paidOvertimeHours ?? 0;
       const overtimeAmount = att?.overtimePay ?? 0;
       const holidayBonus = att?.holidayBonus ?? 0;
@@ -275,10 +260,10 @@ export function buildPayrollWorkbook(params: ExportParams): XLSX.WorkBook {
 
       const contractBase = emp.baseSalary ?? 0;
       const expectedDays = att?.expectedAttendanceDays ?? 0;
-      const dailySalary = expectedDays > 0 ? contractBase / expectedDays : 0;
+      const dailySalary = att?.dailyRate ?? (expectedDays > 0 ? contractBase / expectedDays : 0);
 
       // 考勤明细
-      const proportionalBase = calcProportionalBase(att, slip);
+      const proportionalBase = getAttendanceBaseSalary(att);
       const specialDeduction = att?.totalSpecialDeduction ?? 0;
 
       // 奖惩明细
@@ -460,7 +445,7 @@ export function buildPayrollHtml(params: ExportParams): string {
       grandCost += slip?.totalEmployerCost ?? slip?.grossSalary ?? 0;
 
       // 基础/工时薪资（全职=比例底薪，兼职=工时薪资）
-      const proportionalBase = calcProportionalBase(att, slip);
+      const proportionalBase = getAttendanceBaseSalary(att);
       const specialDeduction = att?.totalSpecialDeduction ?? 0;
       const allowanceTotal = (slip?.mealAllowance ?? 0) + (slip?.transportAllowance ?? 0) + (slip?.otherAllowance ?? 0);
 
@@ -820,8 +805,8 @@ export function buildCombinedWorkbook(params: ExportParams): XLSX.WorkBook {
       const att = monthAtts.find((a) => a.employeeId === emp.id);
       const contractBase = emp.baseSalary ?? 0;
       const expectedDays = att?.expectedAttendanceDays ?? 0;
-      const dailySalary = expectedDays > 0 ? contractBase / expectedDays : 0;
-      const proportionalBase = calcProportionalBase(att, slip);
+      const dailySalary = att?.dailyRate ?? (expectedDays > 0 ? contractBase / expectedDays : 0);
+      const proportionalBase = getAttendanceBaseSalary(att);
       const overtimeHours = att?.paidOvertimeHours ?? 0;
       const overtimeAmount = att?.overtimePay ?? 0;
       const holidayBonus = att?.holidayBonus ?? 0;
@@ -1048,7 +1033,7 @@ export function buildCombinedHtml(params: ExportParams): string {
       deptFinal += finalSalary;
       grandFinal += finalSalary;
       grandCost += slip?.totalEmployerCost ?? slip?.grossSalary ?? 0;
-      const proportionalBase = calcProportionalBase(att, slip);
+      const proportionalBase = getAttendanceBaseSalary(att);
       const specialDeduction = att?.totalSpecialDeduction ?? 0;
       const allowanceTotal = (slip?.mealAllowance ?? 0) + (slip?.transportAllowance ?? 0) + (slip?.otherAllowance ?? 0);
       return `<tr>

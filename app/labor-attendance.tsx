@@ -360,11 +360,6 @@ function EmployeeCard({
         ) : (
           <Text style={{ fontSize: 12, color: colors.muted, paddingVertical: 8 }}>暂无考勤数据（请先在排班表填写）</Text>
         )}
-        {att?.dailyRateOverride && (
-          <View style={[S.warningBanner, { backgroundColor: colors.warning + "15", borderColor: colors.warning + "44" }]}>
-            <Text style={{ fontSize: 11, color: colors.warning }}>⚠ 日薪已手动覆盖，与自动计算值不同</Text>
-          </View>
-        )}
       </TouchableOpacity>
 
       {/* 绩效补贴区 */}
