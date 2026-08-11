@@ -27,7 +27,7 @@ function ColorSwatch({ name, value }: { name: PaletteName; value: string }) {
 export default function ThemeLabScreen() {
   const [pressCount, setPressCount] = useState(0);
   const [lastAction, setLastAction] = useState<string>("None yet");
-  const { colorScheme, setColorScheme } = useThemeContext();
+  const { colorScheme, themePreference, setColorScheme, followSystemTheme } = useThemeContext();
   const colors = useColors();
 
   const swatches = useMemo(
@@ -109,6 +109,25 @@ export default function ThemeLabScreen() {
               </Pressable>
             ))}
           </View>
+
+          <Pressable
+            onPress={() => {
+              followSystemTheme();
+              setLastAction("Following the current system appearance");
+            }}
+            style={({ pressed }) => [
+              styles.followSystemButton,
+              {
+                backgroundColor: themePreference === "system" ? colors.primary : colors.surface,
+                borderColor: themePreference === "system" ? colors.primary : colors.border,
+              },
+              pressed && { opacity: 0.7 },
+            ]}
+          >
+            <Text style={[styles.followSystemText, { color: themePreference === "system" ? colors.background : colors.foreground }]}>
+              Follow system · current {colorScheme}
+            </Text>
+          </Pressable>
 
           <ThemedView className="rounded-2xl border border-border p-4">
             <Text className="text-lg font-bold text-foreground">
@@ -237,5 +256,16 @@ const styles = StyleSheet.create({
   },
   schemeToggleSubtitle: {
     fontSize: 12,
+  },
+  followSystemButton: {
+    alignItems: "center",
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 11,
+  },
+  followSystemText: {
+    fontSize: 14,
+    fontWeight: "600",
+    lineHeight: 18,
   },
 });
