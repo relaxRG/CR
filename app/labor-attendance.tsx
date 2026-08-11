@@ -10,7 +10,7 @@
  * 即时同步：所有数据直接订阅 paySlips/attendances 响应式数组，
  * 任何 Store 更新立即触发重渲染，无需手动刷新。
  */
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { formatMoney } from "@/lib/utils";
 import {
   Alert, Platform, ScrollView, StyleSheet,
@@ -217,6 +217,23 @@ function EmployeeCard({
   const [noteInput, setNoteInput] = useState(slip?.notes ?? "");
   // 当前实际备注内容：编辑中用 noteInput，未编辑用 notes
   const currentNotes = noteEditing ? noteInput : notes;
+
+  // 防御性修复：slip prop 变化时（多设备同步/autoSync）同步本地 state
+  // 只在用户未处于编辑状态时同步，避免覆盖用户正在输入的内容
+  const slipId = slip?.id;
+  const slipUpdatedAt = slip?.updatedAt;
+  useEffect(() => {
+    if (!editingReward) {
+      setRewardItems(slip?.rewardPenaltyItems ?? []);
+    }
+  }, [slipId, slipUpdatedAt, editingReward]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!noteEditing) {
+      const newNotes = slip?.notes ?? "";
+      setNotes(newNotes);
+      setNoteInput(newNotes);
+    }
+  }, [slipId, slipUpdatedAt, noteEditing]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const addRewardItem = () => {
     setRewardItems([...rewardItems, { id: Date.now().toString(), name: "", amount: 0, note: "" }]);
