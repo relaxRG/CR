@@ -578,10 +578,10 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
                 <Text style={{ fontSize: 10, fontWeight: "600", color: colors.muted }}>综合额外</Text>
                 <View style={{ flexDirection: "row" }}>
                   {[
-                    { label: "补贴合计", value: allowanceSum > 0 ? `+¥${formatMoney(allowanceSum)}` : "—", color: allowanceSum > 0 ? colors.primary : colors.muted },
-                    { label: "工作绩效", value: workKPI > 0 ? `+¥${formatMoney(workKPI)}` : "—", color: workKPI > 0 ? colors.success : colors.muted },
-                    { label: "业绩", value: revenueKPI > 0 ? `+¥${formatMoney(revenueKPI)}` : "—", color: revenueKPI > 0 ? colors.success : colors.muted },
-                    { label: "奖惩小计", value: reward !== 0 ? `${reward >= 0 ? "+" : ""}¥${formatMoney(reward)}` : "—", color: reward > 0 ? colors.success : reward < 0 ? colors.error : colors.muted },
+                    { label: "补贴合计", value: allowanceSum > 0 ? `+¥${formatMoney(allowanceSum)}` : "—", color: allowanceSum > 0 ? colors.foreground : colors.muted },
+                    { label: "工作绩效", value: workKPI > 0 ? `+¥${formatMoney(workKPI)}` : "—", color: workKPI > 0 ? colors.foreground : colors.muted },
+                    { label: "业绩", value: revenueKPI > 0 ? `+¥${formatMoney(revenueKPI)}` : "—", color: revenueKPI > 0 ? colors.foreground : colors.muted },
+                    { label: "奖惩小计", value: reward !== 0 ? `${reward >= 0 ? "+" : ""}¥${formatMoney(reward)}` : "—", color: reward < 0 ? colors.error : reward > 0 ? colors.foreground : colors.muted },
                     { label: "综合小计", value: `${extraTotal >= 0 ? "+" : ""}¥${formatMoney(extraTotal)}`, color: extraTotal >= 0 ? colors.primary : colors.error },
                                     ].map(({ label, value, color }) => (
                     <View key={label} style={{ flex: 1, alignItems: "center" }}>
@@ -606,10 +606,10 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
                 <Text style={{ fontSize: 10, fontWeight: "600", color: colors.muted }}>扣款</Text>
                 <View style={{ flexDirection: "row" }}>
                   {[
-                    { label: "已预支", value: advance > 0 ? `-¥${formatMoney(advance)}` : "—", color: advance > 0 ? colors.error : colors.muted },
-                    { label: "社保代扣", value: si > 0 ? `-¥${formatMoney(si)}` : "—", color: si > 0 ? colors.error : colors.muted },
-                    { label: "公积金代扣", value: hf > 0 ? `-¥${formatMoney(hf)}` : "—", color: hf > 0 ? colors.error : colors.muted },
-                    { label: "个税代缴", value: tax > 0 ? `-¥${formatMoney(tax)}` : "—", color: tax > 0 ? colors.error : colors.muted },
+                    { label: "已预支", value: advance > 0 ? `-¥${formatMoney(advance)}` : "—", color: advance > 0 ? colors.foreground : colors.muted },
+                    { label: "社保代扣", value: si > 0 ? `-¥${formatMoney(si)}` : "—", color: si > 0 ? colors.foreground : colors.muted },
+                    { label: "公积金代扣", value: hf > 0 ? `-¥${formatMoney(hf)}` : "—", color: hf > 0 ? colors.foreground : colors.muted },
+                    { label: "个税代缴", value: tax > 0 ? `-¥${formatMoney(tax)}` : "—", color: tax > 0 ? colors.foreground : colors.muted },
                     { label: "—", value: "—", color: colors.muted },
                                     ].map(({ label, value, color }) => (
                     <View key={label} style={{ flex: 1, alignItems: "center" }}>
@@ -668,10 +668,10 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
                 <Text style={{ fontSize: 10, fontWeight: "600", color: colors.muted }}>调休换休</Text>
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
                   {[
-                    { label: "调休/换休", value: thisMonthEarned > 0 ? `${thisMonthEarned}天` : "—", color: thisMonthEarned > 0 ? colors.primary : colors.muted },
-                    { label: "当月使用", value: usedStr, color: (otUsed > 0 || holUsed > 0) ? colors.warning : colors.muted },
-                    { label: "加班余额", value: otDays > 0 ? `${otDays}天` : "—", color: otDays > 0 ? colors.success : colors.muted },
-                    { label: "节假日余额", value: holDays > 0 ? `${holDays}天` : "—", color: holDays > 0 ? "#FF2D55" : colors.muted },
+                    { label: "调休/换休", value: thisMonthEarned > 0 ? `${thisMonthEarned}天` : "—", color: thisMonthEarned > 0 ? colors.foreground : colors.muted },
+                    { label: "当月使用", value: usedStr, color: (otUsed > 0 || holUsed > 0) ? colors.foreground : colors.muted },
+                    { label: "加班余额", value: otDays > 0 ? `${otDays}天` : "—", color: otDays > 0 ? colors.foreground : colors.muted },
+                    { label: "节假日余额", value: holDays > 0 ? `${holDays}天` : "—", color: holDays > 0 ? colors.foreground : colors.muted },
                   ].map(({ label, value, color }) => (
                     <View key={label} style={{ flex: 1, alignItems: "center" }}>
                       <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: "700", color }}>{value}</Text>

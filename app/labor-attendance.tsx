@@ -275,13 +275,13 @@ function EmployeeCard({
 
     const grid1 = [
       { label: "考勤工资", value: attendanceSalary, color: colors.foreground },
-      { label: "绩效",     value: performance,      color: performance > 0 ? colors.success : colors.foreground },
-      { label: "补贴",     value: allowance,         color: allowance > 0 ? "#1677FF" : colors.foreground },
-      { label: "奖惩",     value: reward,            color: reward > 0 ? colors.success : reward < 0 ? colors.error : colors.foreground },
+      { label: "绩效",     value: performance,      color: colors.foreground },
+      { label: "补贴",     value: allowance,         color: colors.foreground },
+      { label: "奖惩",     value: reward,            color: reward < 0 ? colors.error : colors.foreground },
     ];
     const grid2 = [
-      { label: "调休兑换", value: cashOut,  color: cashOut > 0 ? colors.success : colors.foreground },
-      { label: "已预支",   value: -advance, color: advance > 0 ? colors.warning : colors.foreground },
+      { label: "调休兑换", value: cashOut,  color: colors.foreground },
+      { label: "已预支",   value: -advance, color: colors.foreground },
       { label: "应发",     value: gross,    color: colors.foreground },
       { label: "待发",     value: final,    color: colors.primary },
     ];
@@ -562,7 +562,8 @@ function EmployeeCard({
 function DetailRow({ label, value, colors, bold, positive, negative, primary, muted: isMuted }: {
   label: string; value: string; colors: any; bold?: boolean; positive?: boolean; negative?: boolean; primary?: boolean; muted?: boolean;
 }) {
-  const valueColor = primary ? colors.primary : positive ? colors.success : negative ? colors.error : isMuted ? colors.muted : colors.foreground;
+  // 普通收入、补贴和扣款只靠正负号表达；颜色只强调主结果、真实异常和次要信息。
+  const valueColor = primary ? colors.primary : negative ? colors.error : isMuted ? colors.muted : colors.foreground;
   return (
     <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 3 }}>
       {/* flex:1 + numberOfLines=1 防止 label 换行挤压 value 区域 */}
