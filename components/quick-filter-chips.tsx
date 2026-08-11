@@ -189,6 +189,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   chip: {
+    flexShrink: 0,
+    minHeight: 32,
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: 999,
@@ -198,6 +200,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 3,
+    flexShrink: 0,
   },
   chipText: {
     fontSize: 13,
@@ -219,6 +222,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 3,
+    flexShrink: 0,
     paddingHorizontal: 11,
     paddingVertical: 5,
     borderRadius: 999,

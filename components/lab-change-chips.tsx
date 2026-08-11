@@ -3,6 +3,7 @@ import { Text, View } from "react-native";
 
 import { useI18n } from "@/lib/i18n";
 import { LAB_CHANGE_COLORS, LabChange } from "@/lib/lab/types";
+import { CHIP_BADGE_LAYOUT } from "@/lib/theme/chip-badge-tokens";
 
 /**
  * 变量维度 chip 行:展示批次相对上一版的差异标记。
@@ -58,17 +59,20 @@ function Chip({ color, label, subtle }: { color: string; label: string; subtle?:
   return (
     <View
       className="flex-row items-center rounded-md px-1.5"
-      style={{
-        backgroundColor: color + (subtle ? "14" : "1F"),
-        paddingVertical: 2,
-        gap: 4,
-      }}
+      style={[
+        CHIP_BADGE_LAYOUT.wrapChip,
+        {
+          backgroundColor: color + (subtle ? "14" : "1F"),
+          paddingVertical: 2,
+          gap: 4,
+        },
+      ]}
     >
       <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: color }} />
       <Text
         className="text-[11px] font-medium"
-        style={{ color, lineHeight: 15 }}
-        numberOfLines={1}
+        style={[CHIP_BADGE_LAYOUT.wrapLabel, { color }]}
+        numberOfLines={2}
       >
         {label}
       </Text>

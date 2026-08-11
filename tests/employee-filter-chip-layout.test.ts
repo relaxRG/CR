@@ -5,14 +5,12 @@ import path from "node:path";
 const source = fs.readFileSync(path.resolve(__dirname, "../app/labor-employees.tsx"), "utf8");
 
 describe("员工档案顶部筛选标签布局", () => {
-  it("部门文字和人数徽标均使用不可压缩的独立布局", () => {
-    expect(source).toContain('numberOfLines={1} style={[S.filterLabel');
-    expect(source).toContain('style={[S.filterCountBadge');
-    expect(source).toContain('filterChip: {\n    flexDirection: "row", alignItems: "center", flexShrink: 0,');
-    expect(source).toContain('filterLabel: { fontSize: 13, lineHeight: 18, fontWeight: "600", flexShrink: 0 }');
-    expect(source).toContain('minWidth: 20, height: 20');
-    expect(source).toContain('marginLeft: 6');
-    expect(source).toContain('flexShrink: 0,\n  },');
+  it("部门文字和人数徽标均使用共享的不可压缩独立布局 Token", () => {
+    expect(source).toContain('import { CHIP_BADGE_LAYOUT, formatCompactCount } from "@/lib/theme/chip-badge-tokens";');
+    expect(source).toContain('style={[CHIP_BADGE_LAYOUT.scrollChip');
+    expect(source).toContain('numberOfLines={1} style={[CHIP_BADGE_LAYOUT.scrollLabel');
+    expect(source).toContain('style={[CHIP_BADGE_LAYOUT.countBadge');
+    expect(source).toContain('formatCompactCount(count)');
   });
 
   it("筛选栏保留横向滚动容器，空间不足时不压缩标签内容或制造页面级溢出", () => {

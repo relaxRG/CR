@@ -115,13 +115,13 @@ export default function StoreInventoryScreen() {
             activeOpacity={0.75}
             style={[S.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <View style={[S.colorBar, { backgroundColor: cat.color }]} />
-            <View style={{ flex: 1, paddingLeft: 12 }}>
+              <View style={{ flex: 1, minWidth: 0, paddingLeft: 12 }}>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                <Text style={{ fontSize: 22 }}>{cat.emoji}</Text>
-                <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground }}>{cat.label}</Text>
+                <Text style={{ fontSize: 22, flexShrink: 0 }}>{cat.emoji}</Text>
+                <Text numberOfLines={1} style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, flexShrink: 1 }}>{cat.label}</Text>
                 {cat.badge && (
                   <View style={[S.badge, { backgroundColor: cat.color + "22" }]}>
-                    <Text style={{ fontSize: 11, fontWeight: "600", color: cat.color }}>{cat.badge}</Text>
+                    <Text numberOfLines={1} style={{ fontSize: 11, lineHeight: 14, fontWeight: "600", color: cat.color }}>{cat.badge}</Text>
                   </View>
                 )}
               </View>
@@ -138,5 +138,5 @@ export default function StoreInventoryScreen() {
 const S = StyleSheet.create({
   card: { flexDirection: "row", alignItems: "center", borderRadius: 14, borderWidth: 1, overflow: "hidden", minHeight: 68 },
   colorBar: { width: 5, alignSelf: "stretch" },
-  badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  badge: { flexShrink: 0, minHeight: 20, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, alignItems: "center", justifyContent: "center" },
 });

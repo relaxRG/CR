@@ -19,6 +19,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
 import { useEmployeeStore, useDeptOrderStore } from "@/lib/labor/store";
 import { DEPT_LABELS, DEPT_COLORS, EmployeeDept, Employee } from "@/lib/labor/types";
+import { CHIP_BADGE_LAYOUT, formatCompactCount } from "@/lib/theme/chip-badge-tokens";
 
 const DEPT_FILTERS: { key: EmployeeDept | "all"; label: string }[] = [
   { key: "all",      label: "全部" },
@@ -313,18 +314,18 @@ export default function LaborEmployeesScreen() {
           const chipColor = f.key === "all" ? colors.primary : DEPT_COLORS[f.key as EmployeeDept];
           return (
             <TouchableOpacity key={f.key} onPress={() => { tap(); setDeptFilter(f.key); }}
-              style={[S.filterChip, {
+              style={[CHIP_BADGE_LAYOUT.scrollChip, {
                 backgroundColor: isActive ? chipColor : colors.surface,
                 borderColor: isActive ? chipColor : colors.border,
               }]}>
-              <Text numberOfLines={1} style={[S.filterLabel, { color: isActive ? "#fff" : colors.muted }]}>
+              <Text numberOfLines={1} style={[CHIP_BADGE_LAYOUT.scrollLabel, { color: isActive ? "#fff" : colors.muted }]}>
                 {f.label}
               </Text>
               {count > 0 && (
-                <View style={[S.filterCountBadge, {
+                <View style={[CHIP_BADGE_LAYOUT.countBadge, {
                   backgroundColor: isActive ? "rgba(255,255,255,0.3)" : colors.border + "66",
                 }]}>
-                  <Text numberOfLines={1} style={{ fontSize: 10, lineHeight: 12, fontWeight: "700", color: isActive ? "#fff" : colors.muted }}>{count}</Text>
+                  <Text numberOfLines={1} style={{ fontSize: 10, lineHeight: 12, fontWeight: "700", color: isActive ? "#fff" : colors.muted }}>{formatCompactCount(count)}</Text>
                 </View>
               )}
             </TouchableOpacity>
@@ -396,17 +397,6 @@ const S = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth,
   },
   navTitle: { fontSize: 17, fontWeight: "600" },
-  filterChip: {
-    flexDirection: "row", alignItems: "center", flexShrink: 0,
-    minHeight: 36, paddingLeft: 12, paddingRight: 8, paddingVertical: 6,
-    borderRadius: 18, borderWidth: 1,
-  },
-  // 标签文字和人数徽标均不可压缩：横向筛选栏空间不足时由 ScrollView 滚动，而非互相覆盖。
-  filterLabel: { fontSize: 13, lineHeight: 18, fontWeight: "600", flexShrink: 0 },
-  filterCountBadge: {
-    minWidth: 20, height: 20, paddingHorizontal: 5, marginLeft: 6,
-    borderRadius: 10, alignItems: "center", justifyContent: "center", flexShrink: 0,
-  },
   deptHeader: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     paddingHorizontal: 12, paddingVertical: 8, marginBottom: 4,
