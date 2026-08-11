@@ -380,6 +380,31 @@ describe("Suite A：考勤工资计算引擎（calcFromShifts）", () => {
     expect(att.holidayBonus).toBe(0);
   });
 
+  it("A1d. 31天、月休4天、全月无排班：不得自动多发第27天或任何工资", () => {
+    const month31 = "2026-07";
+    const employee31 = makeEmployee({ baseSalary: 10000, restDaysPerMonth: 4 });
+    const att = calcFromShiftsPure("emp-001", month31, employee31, [], ss);
+    const staleSlip = { id: "stale-31-day-slip", attendanceSalary: 10000, grossSalary: 10000, finalSalary: 10000 };
+    const slip = buildPaySlipDraftPure(employee31, month31, att, 0, 0, undefined, staleSlip);
+
+    // 31 - 4 = 27 只是应出勤分母；没有任何排班时实际出勤必须为 0。
+    expect(att.daysInMonth).toBe(31);
+    expect(att.expectedAttendanceDays).toBe(27);
+    expect(att.attendanceDays).toBe(0);
+    expect(att.dailyRate).toBeCloseTo(10000 / 27, 12);
+    expect(att.proportionalBaseSalary).toBe(0);
+    expect(att.overtimePay).toBe(0);
+    expect(att.holidayBonus).toBe(0);
+    expect(att.attendanceSalary).toBe(0);
+
+    // 即使存储里残留一张旧的全额考勤工资单，手动“生成薪资单”使用新的空排班考勤
+    // 构建草稿时也必须覆盖该字段，而非把 10,000 元错误地延续到本月。
+    // 无手工绩效、补贴、提点、奖惩、调休兑现或预支时，整张薪资单也必须归零。
+    expect(slip.attendanceSalary).toBe(0);
+    expect(slip.grossSalary).toBe(0);
+    expect(slip.finalSalary).toBe(0);
+  });
+
   it("A1c. 配置异常（restDaysPerMonth >= daysInMonth）：attendanceSalary = 0", () => {
     // 当 restDaysPerMonth 配置异常时，不应回退到全额底薪
     const badEmp = makeEmployee({ restDaysPerMonth: 31 });
