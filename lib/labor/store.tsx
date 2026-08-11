@@ -12,10 +12,10 @@ import {
   Employee, EmployeeDept, ShiftEntry, MonthlyAttendance, PaySlip, MonthConfig,
   ShiftTemplate, HolidayConfig,
   SpecialStatus, GlobalPayrollSettings,
-  MonthlyConfirmation, PayrollConfirmationStatus, PayrollAdjustment, AdjustmentSettleMethod,
+  MonthCloseArchive, MonthCloseStatus, MonthAdjustmentSession, PayrollAdjustment, AdjustmentSettleMethod,
   CompOffBalanceEntry, HolidayCompOffEntry, UnexplainedRestAlert,
   CustomDept, BusinessHoursEntry, ShiftGroup, FillPreset,
-  ScheduleSnapshot, DeptCategory,
+  DeptCategory,
   calcAllowance, calcSocialInsurance, calcIncomeTax,
   shouldPayAllowanceThisMonth,
   getDaysInMonth, parseMonth, getContractHoursForDate,
@@ -24,6 +24,13 @@ import {
   DEFAULT_GLOBAL_PAYROLL_SETTINGS, DEFAULT_CUSTOM_DEPTS,
   DEFAULT_BUSINESS_HOURS, DEFAULT_SHIFT_GROUPS,
 } from "./types";
+import {
+  buildFinalScheduleByDept,
+  buildFrozenPayrollSnapshot,
+  calculateArchiveAdjustments,
+  getCurrentMonthCloseArchive,
+  getMonthCloseStatus,
+} from "./month-close";
 
 function uuid() { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
 
@@ -487,12 +494,14 @@ interface ShiftStore {
   /** 批量删除排班记录（一次性写入，避免竞态条件） */
   batchDeleteShifts: (keys: Array<{ employeeId: string; date: string; shift: string }>) => void;
   getShifts: (month: string) => ShiftEntry[];
+  /** 用指定月份记录完整替换当前月，用于受控差额调整的回滚。 */
+  replaceMonthShifts: (month: string, entries: ShiftEntry[]) => void;
   ready: boolean;
 }
 
 const ShiftContext = createContext<ShiftStore>({
   shifts: [], upsertShift: () => {}, batchUpsertShifts: () => {},
-  deleteShift: () => {}, batchDeleteShifts: () => {}, getShifts: () => [], ready: false,
+  deleteShift: () => {}, batchDeleteShifts: () => {}, getShifts: () => [], replaceMonthShifts: () => {}, ready: false,
 });
 
 /**
@@ -569,8 +578,12 @@ function ShiftProvider({ children }: { children: React.ReactNode }) {
     return ref.current.filter((s) => s.date.startsWith(month));
   }, [ref]);
 
+  const replaceMonthShifts = useCallback((month: string, entries: ShiftEntry[]) => {
+    persist([...ref.current.filter((shift) => !shift.date.startsWith(month)), ...entries.map((entry) => ({ ...entry }))]);
+  }, [persist, ref]);
+
   return (
-    <ShiftContext.Provider value={{ shifts, upsertShift, batchUpsertShifts, deleteShift, batchDeleteShifts, getShifts, ready }}>
+    <ShiftContext.Provider value={{ shifts, upsertShift, batchUpsertShifts, deleteShift, batchDeleteShifts, getShifts, replaceMonthShifts, ready }}>
       {children}
     </ShiftContext.Provider>
   );
@@ -594,12 +607,14 @@ interface AttendanceStore {
     specialStatuses: SpecialStatus[],
     holidayDays?: Array<{ date: string; multiplier: number }>
   ) => MonthlyAttendance;
+  /** 用指定月份考勤完整替换当前月，用于受控差额调整的回滚。 */
+  replaceMonthAttendances: (month: string, nextRecords: MonthlyAttendance[]) => void;
   ready: boolean;
 }
 
 const AttendanceContext = createContext<AttendanceStore>({
   records: [], upsertAttendance: () => {}, deleteAttendance: () => {},
-  getAttendance: () => null, calcFromShifts: () => ({} as MonthlyAttendance), ready: false,
+  getAttendance: () => null, calcFromShifts: () => ({} as MonthlyAttendance), replaceMonthAttendances: () => {}, ready: false,
 });
 
 function AttendanceProvider({ children }: { children: React.ReactNode }) {
@@ -639,9 +654,13 @@ function AttendanceProvider({ children }: { children: React.ReactNode }) {
     });
   }, [ref]);
 
+  const replaceMonthAttendances = useCallback((month: string, nextRecords: MonthlyAttendance[]) => {
+    persist([...ref.current.filter((record) => record.month !== month), ...nextRecords.map((record) => ({ ...record }))]);
+  }, [persist, ref]);
+
   const attendanceContextValue = React.useMemo(
-    () => ({ records, upsertAttendance, deleteAttendance, getAttendance, calcFromShifts, ready }),
-    [records, upsertAttendance, deleteAttendance, getAttendance, calcFromShifts, ready]
+    () => ({ records, upsertAttendance, deleteAttendance, getAttendance, calcFromShifts, replaceMonthAttendances, ready }),
+    [records, upsertAttendance, deleteAttendance, getAttendance, calcFromShifts, replaceMonthAttendances, ready]
   );
   return (
     <AttendanceContext.Provider value={attendanceContextValue}>
@@ -672,18 +691,32 @@ interface PaySlipStore {
     /** 年度累计已预扣税额 */
     cumulativeTaxPaid?: number,
   ) => PaySlip;
+  /** 用指定月份薪资单完整替换当前月，用于受控差额调整的回滚。 */
+  replaceMonthPaySlips: (month: string, nextSlips: PaySlip[]) => void;
   ready: boolean;
 }
 
 const PaySlipContext = createContext<PaySlipStore>({
   paySlips: [], upsertPaySlip: () => {}, deletePaySlip: () => {},
   getPaySlip: () => null,
-  buildPaySlipDraft: () => ({} as PaySlip),
+  buildPaySlipDraft: () => ({} as PaySlip), replaceMonthPaySlips: () => {},
   ready: false,
 });
 
 function PaySlipProvider({ children }: { children: React.ReactNode }) {
   const { data: paySlips, ref, persist, ready } = usePersisted<PaySlip>("labor_payslips_v1");
+
+  // 新月度归档不迁移旧薪资单冻结字段；加载后一次性物理删除，避免旧结算语义混入新体系。
+  useEffect(() => {
+    if (!ready) return;
+    const legacyKeys = ["frozenAt", "frozenBy", "frozenSnapshot"];
+    if (!ref.current.some((slip: any) => legacyKeys.some((key) => key in slip))) return;
+    persist(ref.current.map((slip: any) => {
+      const next = { ...slip };
+      for (const key of legacyKeys) delete next[key];
+      return next;
+    }));
+  }, [ready, persist, ref]);
 
   const upsertPaySlip = useCallback((slip: PaySlip) => {
     const idx = ref.current.findIndex((s) => s.employeeId === slip.employeeId && s.month === slip.month);
@@ -698,6 +731,13 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
   const getPaySlip = useCallback((employeeId: string, month: string): PaySlip | null => {
     return ref.current.find((s) => s.employeeId === employeeId && s.month === month) ?? null;
   }, [ref]);
+
+  const replaceMonthPaySlips = useCallback((month: string, nextSlips: PaySlip[]) => {
+    persist([
+      ...ref.current.filter((slip) => slip.month !== month),
+      ...nextSlips.map((slip) => ({ ...slip, updatedAt: new Date().toISOString() })),
+    ]);
+  }, [persist, ref]);
 
   const buildPaySlipDraft = useCallback((
     employee: Employee,
@@ -892,8 +932,8 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
   }, [ref]);
 
   const paySlipContextValue = React.useMemo(
-    () => ({ paySlips, upsertPaySlip, deletePaySlip, getPaySlip, buildPaySlipDraft, ready }),
-    [paySlips, upsertPaySlip, deletePaySlip, getPaySlip, buildPaySlipDraft, ready]
+    () => ({ paySlips, upsertPaySlip, deletePaySlip, getPaySlip, buildPaySlipDraft, replaceMonthPaySlips, ready }),
+    [paySlips, upsertPaySlip, deletePaySlip, getPaySlip, buildPaySlipDraft, replaceMonthPaySlips, ready]
   );
   return (
     <PaySlipContext.Provider value={paySlipContextValue}>
@@ -932,130 +972,174 @@ function GlobalPayrollSettingsProvider({ children }: { children: React.ReactNode
   );
 }
 
-// ─── 确认发薪状态机 Provider ──────────────────────────────────────────────────
-interface PayrollConfirmationStore {
-  confirmations: MonthlyConfirmation[];
-  getStatus: (month: string) => PayrollConfirmationStatus;
-  getConfirmation: (month: string) => MonthlyConfirmation | null;
+// ─── 月度归档 Provider ────────────────────────────────────────────────────────
+interface MonthCloseStore {
+  archives: MonthCloseArchive[];
+  sessions: MonthAdjustmentSession[];
+  getStatus: (month: string) => MonthCloseStatus;
+  getCurrentArchive: (month: string) => MonthCloseArchive | null;
+  getArchives: (month: string) => MonthCloseArchive[];
+  getAdjustmentSession: (month: string) => MonthAdjustmentSession | null;
   isMonthLocked: (month: string) => boolean;
   isMonthWritable: (month: string) => boolean;
-  confirmPayroll: (month: string, summary: MonthlyConfirmation["summary"]) => void;
-  enterAdjustMode: (month: string) => void;
-  confirmAdjustment: (month: string, adjustments: PayrollAdjustment[]) => void;
-  cancelAdjustment: (month: string) => void;
-  revokeConfirmation: (month: string) => void;
+  finalizeMonthClose: (month: string, summary: MonthCloseArchive["summary"]) => MonthCloseArchive | null;
+  openAdjustmentSession: (month: string, reason: string, settleMethod: AdjustmentSettleMethod) => MonthAdjustmentSession | null;
+  discardAdjustmentSession: (month: string) => boolean;
+  /** 仅在调整会话中，将指定正式归档的完整排班依据应用到当前月。 */
+  applyArchivedSchedule: (month: string, archiveId: string) => boolean;
   settleAdjustment: (month: string, adjustmentId: string, method: AdjustmentSettleMethod, settledInMonth: string) => void;
   getPendingAdjustments: (month: string) => PayrollAdjustment[];
   ready: boolean;
 }
 
-const PayrollConfirmationContext = createContext<PayrollConfirmationStore>({
-  confirmations: [],
-  getStatus: () => "draft",
-  getConfirmation: () => null,
-  isMonthLocked: () => false,
-  isMonthWritable: () => true,
-  confirmPayroll: () => {},
-  enterAdjustMode: () => {},
-  confirmAdjustment: () => {},
-  cancelAdjustment: () => {},
-  revokeConfirmation: () => {},
-  settleAdjustment: () => {},
-  getPendingAdjustments: () => [],
-  ready: false,
+const MonthCloseContext = createContext<MonthCloseStore>({
+  archives: [], sessions: [], getStatus: () => "draft", getCurrentArchive: () => null, getArchives: () => [],
+  getAdjustmentSession: () => null, isMonthLocked: () => false, isMonthWritable: () => true,
+  finalizeMonthClose: () => null, openAdjustmentSession: () => null, discardAdjustmentSession: () => false, applyArchivedSchedule: () => false,
+  settleAdjustment: () => {}, getPendingAdjustments: () => [], ready: false,
 });
 
-function PayrollConfirmationProvider({ children }: { children: React.ReactNode }) {
-  const { data: confirmations, ref, persist, ready } = usePersisted<MonthlyConfirmation>("labor_payroll_confirmations_v1");
+/**
+ * 新的唯一月度归档中心。
+ * 旧的 labor_schedule_snapshots_v1 与 labor_payroll_confirmations_v1 不迁移，首次加载即永久删除。
+ */
+function MonthCloseProvider({ children }: { children: React.ReactNode }) {
+  const { data: archives, ref: archivesRef, persist: persistArchives, ready: archivesReady } = usePersisted<MonthCloseArchive>("labor_month_close_archives_v1");
+  const { data: sessions, ref: sessionsRef, persist: persistSessions, ready: sessionsReady } = usePersisted<MonthAdjustmentSession>("labor_month_adjustment_sessions_v1");
+  const { employees, ready: employeesReady } = useEmployeeStore();
+  const { shifts, replaceMonthShifts, ready: shiftsReady } = useShiftStore();
+  const { records, replaceMonthAttendances, ready: attendancesReady } = useAttendanceStore();
+  const { paySlips, replaceMonthPaySlips, ready: paySlipsReady } = usePaySlipStore();
 
-  const getConfirmation = useCallback((month: string): MonthlyConfirmation | null => {
-    return ref.current.find((c) => c.month === month) ?? null;
-  }, [ref]);
+  useEffect(() => {
+    if (!archivesReady || !sessionsReady) return;
+    // 用户要求不迁移旧归档/确认数据：永久清除旧键以及旧薪资单冻结字段。
+    AsyncStorage.multiRemove(["labor_schedule_snapshots_v1", "labor_payroll_confirmations_v1"]).catch(console.error);
+  }, [archivesReady, sessionsReady]);
 
-  const getStatus = useCallback((month: string): PayrollConfirmationStatus => {
-    return getConfirmation(month)?.status ?? "draft";
-  }, [getConfirmation]);
-
-  const isMonthLocked = useCallback((month: string): boolean => {
-    return getStatus(month) === "frozen";
-  }, [getStatus]);
-
-  const isMonthWritable = useCallback((month: string): boolean => {
+  const getAdjustmentSession = useCallback((month: string) => sessionsRef.current.find((session) => session.month === month && session.status === "open") ?? null, [sessionsRef]);
+  const getCurrentArchive = useCallback((month: string) => getCurrentMonthCloseArchive(archivesRef.current, month), [archivesRef]);
+  const getArchives = useCallback((month: string) => archivesRef.current.filter((archive) => archive.month === month).sort((a, b) => b.version - a.version), [archivesRef]);
+  const getStatus = useCallback((month: string): MonthCloseStatus => getMonthCloseStatus(archivesRef.current, new Set(sessionsRef.current.filter((session) => session.status === "open").map((session) => session.month)), month), [archivesRef, sessionsRef]);
+  const isMonthLocked = useCallback((month: string) => getStatus(month) === "frozen", [getStatus]);
+  const isMonthWritable = useCallback((month: string) => {
     const status = getStatus(month);
     return status === "draft" || status === "adjusting";
   }, [getStatus]);
 
-  const upsertConfirmation = useCallback((conf: MonthlyConfirmation) => {
-    const idx = ref.current.findIndex((c) => c.month === conf.month);
-    if (idx >= 0) { const next = [...ref.current]; next[idx] = conf; persist(next); }
-    else persist([...ref.current, conf]);
-  }, [persist, ref]);
+  const snapshotPayroll = useCallback((month: string) => {
+    const result: Record<string, ReturnType<typeof buildFrozenPayrollSnapshot>> = {};
+    for (const employee of employees.filter((item) => item.active && !item.archived)) {
+      const slip = paySlips.find((item) => item.employeeId === employee.id && item.month === month);
+      if (slip) result[employee.id] = buildFrozenPayrollSnapshot(employee, slip);
+    }
+    return result;
+  }, [employees, paySlips]);
 
-  const confirmPayroll = useCallback((month: string, summary: MonthlyConfirmation["summary"]) => {
-    const existing = getConfirmation(month);
-    upsertConfirmation({
+  const finalizeMonthClose = useCallback((month: string, summary: MonthCloseArchive["summary"]): MonthCloseArchive | null => {
+    if (!employeesReady || !shiftsReady || !attendancesReady || !paySlipsReady) return null;
+    const status = getStatus(month);
+    if (status === "frozen") return null;
+    const activeEmployees = employees.filter((employee) => employee.active && !employee.archived);
+    const scheduleByDept = buildFinalScheduleByDept(activeEmployees, shifts, month);
+    const payrollByEmployee = snapshotPayroll(month);
+    const session = getAdjustmentSession(month);
+    const baseArchive = session ? archivesRef.current.find((archive) => archive.id === session.baseArchiveId) : null;
+    if (status === "adjusting" && (!session || !baseArchive || baseArchive.status !== "frozen")) return null;
+
+    const createdAt = Date.now();
+    const version = Math.max(0, ...archivesRef.current.filter((archive) => archive.month === month).map((archive) => archive.version)) + 1;
+    const nextArchive: MonthCloseArchive = {
+      id: `close-${month}-${version}-${createdAt}`,
       month,
+      version,
       status: "frozen",
-      frozenAt: Date.now(),
-      frozenBy: "manager",
-      adjustingAt: undefined,
-      adjustments: existing?.adjustments ?? [],
+      createdAt,
+      closedBy: "manager",
+      previousArchiveId: baseArchive?.id,
       summary,
-    });
-  }, [getConfirmation, upsertConfirmation]);
+      scheduleByDept,
+      payrollByEmployee,
+      adjustments: baseArchive ? calculateArchiveAdjustments(baseArchive, payrollByEmployee, createdAt) : [],
+    };
 
-  const enterAdjustMode = useCallback((month: string) => {
-    const existing = getConfirmation(month);
-    if (!existing || existing.status !== "frozen") return;
-    upsertConfirmation({ ...existing, status: "adjusting", adjustingAt: Date.now() });
-  }, [getConfirmation, upsertConfirmation]);
+    let nextArchives = [...archivesRef.current];
+    if (baseArchive) {
+      nextArchives = nextArchives.map((archive) => archive.id === baseArchive.id
+        ? { ...archive, status: "superseded", supersededByArchiveId: nextArchive.id }
+        : archive);
+    }
+    persistArchives([...nextArchives, nextArchive]);
+    if (session) persistSessions(sessionsRef.current.filter((item) => item.id !== session.id));
+    return nextArchive;
+  }, [archivesRef, attendancesReady, employees, employeesReady, getAdjustmentSession, getStatus, paySlipsReady, persistArchives, persistSessions, sessionsRef, shifts, shiftsReady, snapshotPayroll]);
 
-  const confirmAdjustment = useCallback((month: string, adjustments: PayrollAdjustment[]) => {
-    const existing = getConfirmation(month);
-    if (!existing || existing.status !== "adjusting") return;
-    upsertConfirmation({
-      ...existing,
-      status: "frozen",
-      frozenAt: Date.now(),
-      adjustments: [...existing.adjustments, ...adjustments],
-    });
-  }, [getConfirmation, upsertConfirmation]);
+  const openAdjustmentSession = useCallback((month: string, reason: string, settleMethod: AdjustmentSettleMethod): MonthAdjustmentSession | null => {
+    if (!employeesReady || !shiftsReady || !attendancesReady || !paySlipsReady || !reason.trim()) return null;
+    const archive = getCurrentArchive(month);
+    if (!archive || getAdjustmentSession(month)) return null;
+    const session: MonthAdjustmentSession = {
+      id: `adjust-${month}-${Date.now()}`,
+      month,
+      baseArchiveId: archive.id,
+      baseVersion: archive.version,
+      status: "open",
+      reason: reason.trim(),
+      settleMethod,
+      createdAt: Date.now(),
+      createdBy: "manager",
+      baseline: {
+        shifts: shifts.filter((shift) => shift.date.startsWith(month)).map((shift) => ({ ...shift })),
+        attendances: records.filter((record) => record.month === month).map((record) => ({ ...record })),
+        paySlips: paySlips.filter((slip) => slip.month === month).map((slip) => ({ ...slip })),
+      },
+    };
+    persistSessions([...sessionsRef.current, session]);
+    return session;
+  }, [attendancesReady, employeesReady, getAdjustmentSession, getCurrentArchive, paySlips, paySlipsReady, persistSessions, records, sessionsRef, shifts, shiftsReady]);
 
-  const cancelAdjustment = useCallback((month: string) => {
-    const existing = getConfirmation(month);
-    if (!existing || existing.status !== "adjusting") return;
-    upsertConfirmation({ ...existing, status: "frozen", adjustingAt: undefined });
-  }, [getConfirmation, upsertConfirmation]);
+  const discardAdjustmentSession = useCallback((month: string): boolean => {
+    const session = getAdjustmentSession(month);
+    if (!session) return false;
+    replaceMonthShifts(month, session.baseline.shifts);
+    replaceMonthAttendances(month, session.baseline.attendances);
+    replaceMonthPaySlips(month, session.baseline.paySlips);
+    persistSessions(sessionsRef.current.filter((item) => item.id !== session.id));
+    return true;
+  }, [getAdjustmentSession, persistSessions, replaceMonthAttendances, replaceMonthPaySlips, replaceMonthShifts, sessionsRef]);
 
-  const revokeConfirmation = useCallback((month: string) => {
-    const existing = getConfirmation(month);
-    if (!existing) return;
-    upsertConfirmation({ ...existing, status: "draft", frozenAt: undefined, frozenBy: undefined });
-  }, [getConfirmation, upsertConfirmation]);
+  const applyArchivedSchedule = useCallback((month: string, archiveId: string): boolean => {
+    if (!getAdjustmentSession(month)) return false;
+    const archive = archivesRef.current.find((item) => item.id === archiveId && item.month === month && item.status === "frozen");
+    if (!archive) return false;
+    const entries = Object.values(archive.scheduleByDept).flatMap((snapshot) => snapshot?.entries ?? []);
+    replaceMonthShifts(month, entries);
+    return true;
+  }, [archivesRef, getAdjustmentSession, replaceMonthShifts]);
 
   const settleAdjustment = useCallback((month: string, adjustmentId: string, method: AdjustmentSettleMethod, settledInMonth: string) => {
-    const existing = getConfirmation(month);
-    if (!existing) return;
-    const updated = existing.adjustments.map((a) =>
-      a.id === adjustmentId ? { ...a, settled: true, settleMethod: method, settledInMonth } : a
-    );
-    upsertConfirmation({ ...existing, adjustments: updated });
-  }, [getConfirmation, upsertConfirmation]);
+    const current = getCurrentArchive(month);
+    if (!current) return;
+    const nextArchives = archivesRef.current.map((archive) => archive.id !== current.id ? archive : {
+      ...archive,
+      adjustments: archive.adjustments.map((adjustment) => adjustment.id === adjustmentId
+        ? { ...adjustment, settled: true, settleMethod: method, settledInMonth }
+        : adjustment),
+    });
+    persistArchives(nextArchives);
+  }, [archivesRef, getCurrentArchive, persistArchives]);
 
-  const getPendingAdjustments = useCallback((month: string): PayrollAdjustment[] => {
-    const existing = getConfirmation(month);
-    if (!existing) return [];
-    return existing.adjustments.filter((a) => !a.settled);
-  }, [getConfirmation]);
+  const getPendingAdjustments = useCallback((month: string) => getCurrentArchive(month)?.adjustments.filter((adjustment) => !adjustment.settled) ?? [], [getCurrentArchive]);
+  const ready = archivesReady && sessionsReady && employeesReady && shiftsReady && attendancesReady && paySlipsReady;
 
   return (
-    <PayrollConfirmationContext.Provider value={{
-      confirmations, getStatus, getConfirmation, isMonthLocked, isMonthWritable,
-      confirmPayroll, enterAdjustMode, confirmAdjustment, cancelAdjustment,
-      revokeConfirmation, settleAdjustment, getPendingAdjustments, ready,
+    <MonthCloseContext.Provider value={{
+      archives, sessions, getStatus, getCurrentArchive, getArchives, getAdjustmentSession,
+      isMonthLocked, isMonthWritable, finalizeMonthClose, openAdjustmentSession,
+      discardAdjustmentSession, applyArchivedSchedule, settleAdjustment, getPendingAdjustments, ready,
     }}>
       {children}
-    </PayrollConfirmationContext.Provider>
+    </MonthCloseContext.Provider>
   );
 }
 
@@ -1441,64 +1525,6 @@ function FillPresetProvider({ children }: { children: React.ReactNode }) {
 }
 
 
-// ─── 排班表历史快照 Store ─────────────────────────────────────────────────────
-interface ScheduleSnapshotStore {
-  snapshots: ScheduleSnapshot[];
-  /** 获取某月某部门的所有快照版本（按版本号降序） */
-  getSnapshots: (month: string, deptCategory: DeptCategory) => ScheduleSnapshot[];
-  /** 保存新快照（自动分配版本号） */
-  saveSnapshot: (snapshot: Omit<ScheduleSnapshot, "id" | "version" | "createdAt">) => void;
-  /** 更新快照（锁定/解锁/修改备注） */
-  updateSnapshot: (id: string, updates: Partial<Pick<ScheduleSnapshot, "isLocked" | "isFinal" | "note" | "label">>) => void;
-  /** 删除快照（仅未锁定的可删除） */
-  deleteSnapshot: (id: string) => void;
-  ready: boolean;
-}
-const ScheduleSnapshotContext = createContext<ScheduleSnapshotStore>({
-  snapshots: [],
-  getSnapshots: () => [],
-  saveSnapshot: () => {},
-  updateSnapshot: () => {},
-  deleteSnapshot: () => {},
-  ready: false,
-});
-function ScheduleSnapshotProvider({ children }: { children: React.ReactNode }) {
-  const { data: snapshots, ref, persist, ready } = usePersisted<ScheduleSnapshot>("labor_schedule_snapshots_v1");
-  const getSnapshots = useCallback((month: string, deptCategory: DeptCategory): ScheduleSnapshot[] => {
-    return ref.current
-      .filter((s) => s.month === month && s.deptCategory === deptCategory)
-      .sort((a, b) => b.version - a.version);
-  }, [ref]);
-  const saveSnapshot = useCallback((snapshot: Omit<ScheduleSnapshot, "id" | "version" | "createdAt">) => {
-    const existing = ref.current.filter((s) => s.month === snapshot.month && s.deptCategory === snapshot.deptCategory);
-    const nextVersion = existing.length > 0 ? Math.max(...existing.map((s) => s.version)) + 1 : 1;
-    const newSnapshot: ScheduleSnapshot = {
-      ...snapshot,
-      id: uuid(),
-      version: nextVersion,
-      createdAt: new Date().toISOString(),
-    };
-    persist([...ref.current, newSnapshot]);
-  }, [ref, persist]);
-  const updateSnapshot = useCallback((id: string, updates: Partial<Pick<ScheduleSnapshot, "isLocked" | "isFinal" | "note" | "label">>) => {
-    const idx = ref.current.findIndex((s) => s.id === id);
-    if (idx < 0) return;
-    const next = [...ref.current];
-    next[idx] = { ...next[idx], ...updates };
-    persist(next);
-  }, [ref, persist]);
-  const deleteSnapshot = useCallback((id: string) => {
-    const snap = ref.current.find((s) => s.id === id);
-    if (!snap || snap.isLocked) return; // 锁定的不可删除
-    persist(ref.current.filter((s) => s.id !== id));
-  }, [ref, persist]);
-  return (
-    <ScheduleSnapshotContext.Provider value={{ snapshots, getSnapshots, saveSnapshot, updateSnapshot, deleteSnapshot, ready }}>
-      {children}
-    </ScheduleSnapshotContext.Provider>
-  );
-}
-
 export function LaborProvider({ children }: { children: React.ReactNode }) {
   return (
     <MonthConfigProvider>
@@ -1508,7 +1534,6 @@ export function LaborProvider({ children }: { children: React.ReactNode }) {
           <BusinessHoursProvider>
           <FillPresetProvider>
           <ShiftGroupProvider>
-          <ScheduleSnapshotProvider>
           <ShiftTemplateProvider>
             <SpecialStatusProvider>
               <HolidayConfigProvider>
@@ -1519,11 +1544,11 @@ export function LaborProvider({ children }: { children: React.ReactNode }) {
                           <UnexplainedRestAlertProvider>
                             <PaySlipProvider>
                                   <GlobalPayrollSettingsProvider>
-                                    <PayrollConfirmationProvider>
+                                    <MonthCloseProvider>
                                       <SeparatePaymentProvider>
                                         {children}
                                       </SeparatePaymentProvider>
-                                    </PayrollConfirmationProvider>
+                                    </MonthCloseProvider>
                                   </GlobalPayrollSettingsProvider>
                             </PaySlipProvider>
                           </UnexplainedRestAlertProvider>
@@ -1534,7 +1559,6 @@ export function LaborProvider({ children }: { children: React.ReactNode }) {
               </HolidayConfigProvider>
             </SpecialStatusProvider>
           </ShiftTemplateProvider>
-          </ScheduleSnapshotProvider>
           </ShiftGroupProvider>
           </FillPresetProvider>
           </BusinessHoursProvider>
@@ -1561,5 +1585,4 @@ export function useUnexplainedRestAlertStore() { return useContext(UnexplainedRe
 export function useBusinessHoursStore() { return useContext(BusinessHoursContext); }
 export function useShiftGroupStore() { return useContext(ShiftGroupContext); }
 export function useFillPresetStore() { return useContext(FillPresetContext); }
-export function useScheduleSnapshotStore() { return useContext(ScheduleSnapshotContext); }
-export function usePayrollConfirmationStore() { return useContext(PayrollConfirmationContext); }
+export function useMonthCloseStore() { return useContext(MonthCloseContext); }

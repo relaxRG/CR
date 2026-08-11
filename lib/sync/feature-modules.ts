@@ -275,7 +275,6 @@ export const FEATURE_MODULES: FeatureModule[] = [
       "labor_business_hours_v1",
       "labor_shift_groups_v1",
       "labor_fill_presets_v1",
-      "labor_schedule_snapshots_v1",
     ],
   },
   {
@@ -284,10 +283,12 @@ export const FEATURE_MODULES: FeatureModule[] = [
     labelEn: "Payroll",
     icon: "💰",
     color: "#E74C3C",
-    descZh: "薪资单、预支记录、绩效模板、全局薪资设置",
+    descZh: "薪资单、月度归档、调整会话、预支记录、绩效模板、全局薪资设置",
     descEn: "Pay slips, advances, performance templates, global settings",
     storageKeys: [
       "labor_payslips_v1",
+      "labor_month_close_archives_v1",
+      "labor_month_adjustment_sessions_v1",
       "labor.salary_advances.v1",
       "labor.advance_categories.v1",
       "labor_performance_templates_v1",

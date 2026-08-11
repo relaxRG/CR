@@ -21,7 +21,7 @@ import { useFeature } from "@/hooks/use-feature";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
 import { useMonthlySummaryStore } from "@/lib/store/monthly-summary/store";
-import { useEmployeeStore, usePaySlipStore, useDeptOrderStore, DEFAULT_DEPT_ORDER, usePayrollConfirmationStore } from "@/lib/labor/store";
+import { useEmployeeStore, usePaySlipStore, useDeptOrderStore, DEFAULT_DEPT_ORDER, useMonthCloseStore } from "@/lib/labor/store";
 import { useSpiritsInventoryStore } from "@/lib/spirits/crud-store";
 import { calcMonthlyPourCost, pourCostColor } from "@/lib/spirits/pour-cost";
 import { usePettyCashStore } from "@/lib/store/petty-store";
@@ -301,12 +301,14 @@ export default function MonthlySummaryScreen() {
   const { deptOrder } = useDeptOrderStore();
   const paySlipStore = usePaySlipStore();
   const {
-    getStatus: getPayrollStatus,
-    confirmPayroll,
-    enterAdjustMode,
-    revokeConfirmation,
-    getConfirmation,
-  } = usePayrollConfirmationStore();
+    getStatus: getMonthCloseStatus,
+    getCurrentArchive,
+    getArchives,
+    finalizeMonthClose,
+    openAdjustmentSession,
+    discardAdjustmentSession,
+    applyArchivedSchedule,
+  } = useMonthCloseStore();
   const spiritsStore = useSpiritsInventoryStore();
   const pettyStore = usePettyCashStore();
   const pettyLaborLinkStore = usePettyLaborLinkStore();
@@ -320,6 +322,9 @@ export default function MonthlySummaryScreen() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   });
   const [showManualModal, setShowManualModal] = useState(false);
+  const [showArchiveModal, setShowArchiveModal] = useState(false);
+  const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
+  const [adjustmentReason, setAdjustmentReason] = useState("");
   const [editingItem, setEditingItem] = useState<SummaryLineItem | null>(null);
   const [copyToast, setCopyToast] = useState("");
   // 月报设置 Modal
@@ -848,99 +853,88 @@ export default function MonthlySummaryScreen() {
                     );
                   })}
 
-                  {/* ── 确认发薪操作条 ── */}
+                  {/* ── 月度归档中心：唯一正式结算与排班归档入口 ── */}
                   {!isReadOnly && (() => {
-                    const lockStatus = getPayrollStatus(selectedMonth);
-                    const totalGross = activeEmps.reduce((s, emp) => {
-                      const slip = paySlipStore?.paySlips?.find((sl: any) => sl.employeeId === emp.id && sl.month === selectedMonth);
-                      return s + (slip?.grossSalary ?? 0);
+                    const closeStatus = getMonthCloseStatus(selectedMonth);
+                    const currentArchive = getCurrentArchive(selectedMonth);
+                    const totalGross = activeEmps.reduce((sum, employee) => {
+                      const slip = paySlipStore?.paySlips?.find((item: any) => item.employeeId === employee.id && item.month === selectedMonth);
+                      return sum + (slip?.grossSalary ?? 0);
                     }, 0);
-                    const totalFinal = activeEmps.reduce((s, emp) => {
-                      const slip = paySlipStore?.paySlips?.find((sl: any) => sl.employeeId === emp.id && sl.month === selectedMonth);
-                      return s + (slip?.finalSalary ?? 0);
+                    const totalFinal = activeEmps.reduce((sum, employee) => {
+                      const slip = paySlipStore?.paySlips?.find((item: any) => item.employeeId === employee.id && item.month === selectedMonth);
+                      return sum + (slip?.finalSalary ?? 0);
                     }, 0);
-                    const empCount = activeEmps.filter(emp =>
-                      paySlipStore?.paySlips?.some((sl: any) => sl.employeeId === emp.id && sl.month === selectedMonth && (sl.grossSalary ?? 0) > 0)
-                    ).length;
+                    const summary = {
+                      totalEmployees: activeEmps.filter((employee) => paySlipStore?.paySlips?.some((slip: any) => slip.employeeId === employee.id && slip.month === selectedMonth)).length,
+                      totalGrossSalary: totalGross,
+                      totalFinalSalary: totalFinal,
+                      totalDeductions: totalGross - totalFinal,
+                    };
 
-                    if (lockStatus === "frozen") {
-                      const conf = getConfirmation(selectedMonth);
+                    const finalize = (reconfirm: boolean) => Alert.alert(
+                      reconfirm ? '重新归档并确认发薪' : (totalFinal > 0 ? '月度归档并确认发薪' : '归档本月（无发薪）'),
+                      (reconfirm ? '将创建新的归档版本，并保留旧版本与差额记录。' : '系统将保存最终排班依据和冻结薪资快照。') + '\\n\\n应发 ¥' + formatMoney(totalGross) + ' · 实发 ¥' + formatMoney(totalFinal) + ' · ' + summary.totalEmployees + ' 人',
+                      [
+                        { text: '取消', style: 'cancel' },
+                        { text: reconfirm ? '重新归档' : '确认归档', onPress: () => {
+                          const archive = finalizeMonthClose(selectedMonth, summary);
+                          if (archive) Alert.alert('归档完成', '已创建月度归档 v' + archive.version + '。');
+                          else Alert.alert('暂不可归档', '请等待排班、员工、考勤和薪资数据加载完成；已冻结月份需先进入差额调整。');
+                        } },
+                      ],
+                    );
+
+                    if (closeStatus === 'frozen' && currentArchive) {
                       return (
-                        <View style={{ margin: 10, marginTop: 6, padding: 12, borderRadius: 12, backgroundColor: "#52C41A10", borderWidth: 1, borderColor: "#52C41A44" }}>
-                          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                        <View style={{ margin: 10, marginTop: 6, padding: 12, borderRadius: 12, backgroundColor: '#52C41A10', borderWidth: 1, borderColor: '#52C41A44' }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                             <IconSymbol name="checkmark.seal.fill" size={16} color="#52C41A" />
-                            <Text style={{ fontSize: 13, fontWeight: "700", color: "#52C41A", flex: 1 }}>本月已确认发薪</Text>
-                            <Text style={{ fontSize: 11, color: colors.muted }}>{conf?.frozenAt ? new Date(conf.frozenAt).toLocaleDateString("zh-CN") : ""}</Text>
+                            <Text style={{ fontSize: 13, fontWeight: '700', color: '#52C41A', flex: 1 }}>本月已结算归档 · v{currentArchive.version}</Text>
+                            <Text style={{ fontSize: 11, color: colors.muted }}>{new Date(currentArchive.createdAt).toLocaleDateString('zh-CN')}</Text>
                           </View>
-                          <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 10 }}>
-                            应发 ¥{formatMoney(conf?.summary?.totalGrossSalary ?? totalGross)} · 实发 ¥{formatMoney(conf?.summary?.totalFinalSalary ?? totalFinal)} · {conf?.summary?.totalEmployees ?? empCount} 人
-                          </Text>
-                          <View style={{ flexDirection: "row", gap: 8 }}>
-                            <TouchableOpacity
-                              onPress={() => { tap(); Alert.alert("进入差额调整", "进入差额调整模式后，可修改本月薪资数据。确认？", [
-                                { text: "取消", style: "cancel" },
-                                { text: "确认进入", onPress: () => enterAdjustMode(selectedMonth) },
-                              ]); }}
-                              style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 8, borderRadius: 8, backgroundColor: colors.warning + "15", borderWidth: 1, borderColor: colors.warning + "44" }}>
+                          <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 10 }}>最终排班和冻结薪资已关联保存。应发 ¥{formatMoney(currentArchive.summary.totalGrossSalary)} · 实发 ¥{formatMoney(currentArchive.summary.totalFinalSalary)} · {currentArchive.summary.totalEmployees} 人</Text>
+                          <View style={{ flexDirection: 'row', gap: 8 }}>
+                            <TouchableOpacity onPress={() => { tap(); setShowArchiveModal(true); }} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8, borderRadius: 8, backgroundColor: colors.primary + '12', borderWidth: 1, borderColor: colors.primary + '33' }}>
+                              <IconSymbol name="archivebox" size={14} color={colors.primary} />
+                              <Text style={{ fontSize: 12, fontWeight: '600', color: colors.primary }}>查看月度归档</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => { tap(); setAdjustmentReason(''); setShowAdjustmentModal(true); }} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8, borderRadius: 8, backgroundColor: colors.warning + '15', borderWidth: 1, borderColor: colors.warning + '44' }}>
                               <IconSymbol name="pencil.circle" size={14} color={colors.warning} />
-                              <Text style={{ fontSize: 12, fontWeight: "600", color: colors.warning }}>差额调整</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              onPress={() => { tap(); Alert.alert("撤销确认", "撤销后本月数据将恢复可编辑状态，确认？", [
-                                { text: "取消", style: "cancel" },
-                                { text: "撤销确认", style: "destructive", onPress: () => revokeConfirmation(selectedMonth) },
-                              ]); }}
-                              style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 8, borderRadius: 8, backgroundColor: colors.error + "10", borderWidth: 1, borderColor: colors.error + "33" }}>
-                              <IconSymbol name="lock.open" size={14} color={colors.error} />
-                              <Text style={{ fontSize: 12, fontWeight: "600", color: colors.error }}>撤销确认</Text>
+                              <Text style={{ fontSize: 12, fontWeight: '600', color: colors.warning }}>进入差额调整</Text>
                             </TouchableOpacity>
                           </View>
                         </View>
                       );
                     }
 
-                    if (lockStatus === "adjusting") {
+                    if (closeStatus === 'adjusting') {
                       return (
-                        <View style={{ margin: 10, marginTop: 6, padding: 12, borderRadius: 12, backgroundColor: colors.warning + "10", borderWidth: 1, borderColor: colors.warning + "44" }}>
-                          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                        <View style={{ margin: 10, marginTop: 6, padding: 12, borderRadius: 12, backgroundColor: colors.warning + '10', borderWidth: 1, borderColor: colors.warning + '44' }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                             <IconSymbol name="pencil.circle.fill" size={16} color={colors.warning} />
-                            <Text style={{ fontSize: 13, fontWeight: "700", color: colors.warning, flex: 1 }}>差额调整模式</Text>
+                            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.warning, flex: 1 }}>差额调整中</Text>
                           </View>
-                          <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 10 }}>当前处于差额调整模式，数据可编辑。完成后请重新确认发薪。</Text>
-                          <TouchableOpacity
-                            onPress={() => { tap(); Alert.alert("重新确认发薪", "确认后本月数据将再次锁定，确认？", [
-                              { text: "取消", style: "cancel" },
-                              { text: "确认发薪", onPress: () => confirmPayroll(selectedMonth, {
-                                totalEmployees: empCount, totalGrossSalary: totalGross, totalFinalSalary: totalFinal, totalDeductions: totalGross - totalFinal,
-                              }) },
-                            ]); }}
-                            style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 10, borderRadius: 10, backgroundColor: colors.warning, borderWidth: 0 }}>
-                            <IconSymbol name="lock.fill" size={14} color="#fff" />
-                            <Text style={{ fontSize: 13, fontWeight: "700", color: "#fff" }}>重新确认发薪（锁定）</Text>
-                          </TouchableOpacity>
+                          <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 10 }}>修改会与归档 v{currentArchive?.version ?? 1} 对比。放弃调整将恢复打开调整时的排班、考勤和薪资基线。</Text>
+                          <View style={{ flexDirection: 'row', gap: 8 }}>
+                            <TouchableOpacity onPress={() => Alert.alert('放弃调整', '将恢复进入调整前的完整月度基线，本次修改不会保留。确认放弃？', [{ text: '取消', style: 'cancel' }, { text: '放弃调整', style: 'destructive', onPress: () => discardAdjustmentSession(selectedMonth) }])} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 9, borderRadius: 8, backgroundColor: colors.border + '44' }}>
+                              <Text style={{ fontSize: 12, fontWeight: '600', color: colors.muted }}>放弃调整</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => finalize(true)} style={{ flex: 1.3, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 9, borderRadius: 8, backgroundColor: colors.warning }}>
+                              <IconSymbol name="lock.fill" size={14} color="#fff" />
+                              <Text style={{ fontSize: 12, fontWeight: '700', color: '#fff' }}>重新归档并确认</Text>
+                            </TouchableOpacity>
+                          </View>
                         </View>
                       );
                     }
 
-                    // DRAFT 状态：显示确认发薪按钮
-                    if (totalFinal <= 0) return null; // 无薪资数据时不显示
                     return (
-                      <TouchableOpacity
-                        onPress={() => { tap(); Alert.alert(
-                          "确认发薪",
-                          `确认后本月数据将锁定，不可直接修改。\n\n应发 ¥${formatMoney(totalGross)} · 实发 ¥${formatMoney(totalFinal)} · ${empCount} 人`,
-                          [
-                            { text: "取消", style: "cancel" },
-                            { text: "确认发薪", onPress: () => confirmPayroll(selectedMonth, {
-                              totalEmployees: empCount, totalGrossSalary: totalGross, totalFinalSalary: totalFinal, totalDeductions: totalGross - totalFinal,
-                            }) },
-                          ]
-                        ); }}
-                        style={{ margin: 10, marginTop: 6, flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12, backgroundColor: colors.warning + "12", borderWidth: 1, borderColor: colors.warning + "55" }}>
-                        <IconSymbol name="lock.fill" size={16} color={colors.warning} />
+                      <TouchableOpacity onPress={() => { tap(); finalize(false); }} style={{ margin: 10, marginTop: 6, flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12, backgroundColor: colors.warning + '12', borderWidth: 1, borderColor: colors.warning + '55' }}>
+                        <IconSymbol name="archivebox.fill" size={16} color={colors.warning} />
                         <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 13, fontWeight: "700", color: colors.warning }}>确认发薪（锁定本月数据）</Text>
-                          <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>实发 ¥{formatMoney(totalFinal)} · {empCount} 人</Text>
+                          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.warning }}>{totalFinal > 0 ? '月度归档并确认发薪' : '归档本月（无发薪）'}</Text>
+                          <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>同时保存最终排班依据与冻结薪资快照 · {summary.totalEmployees} 人</Text>
                         </View>
                         <IconSymbol name="chevron.right" size={14} color={colors.warning} />
                       </TouchableOpacity>
@@ -1247,6 +1241,67 @@ export default function MonthlySummaryScreen() {
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ── 月度归档详情：唯一正式排班与薪资历史入口 ── */}
+      <Modal visible={showArchiveModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowArchiveModal(false)}>
+        <View style={{ flex: 1, backgroundColor: colors.background }}>
+          <View style={[S.navbar, { borderBottomColor: colors.border }]}>
+            <View style={{ width: 44 }} />
+            <Text style={[S.navTitle, { color: colors.foreground }]}>月度结算归档</Text>
+            <Pressable onPress={() => setShowArchiveModal(false)} style={{ padding: 8 }}><Text style={{ fontSize: 16, color: colors.primary }}>关闭</Text></Pressable>
+          </View>
+          <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
+            {(() => {
+              const archives = getArchives(selectedMonth);
+              if (archives.length === 0) return <Text style={{ color: colors.muted, textAlign: "center", marginTop: 40 }}>本月尚未创建正式归档。</Text>;
+              return archives.map((archive) => (
+                <View key={archive.id} style={[S.payrollCard, { backgroundColor: colors.surface, borderColor: archive.status === "frozen" ? colors.success + "55" : colors.border }]}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <IconSymbol name={archive.status === "frozen" ? "checkmark.seal.fill" : "clock.arrow.circlepath"} size={16} color={archive.status === "frozen" ? colors.success : colors.muted} />
+                    <Text style={{ flex: 1, color: colors.foreground, fontSize: 14, fontWeight: "700" }}>归档 v{archive.version}{archive.status === "superseded" ? " · 已被新版本替代" : " · 当前正式版本"}</Text>
+                    <Text style={{ color: colors.muted, fontSize: 11 }}>{new Date(archive.createdAt).toLocaleString("zh-CN")}</Text>
+                  </View>
+                  <Text style={{ color: colors.muted, fontSize: 12, marginTop: 8 }}>最终排班：{Object.values(archive.scheduleByDept).reduce((sum, snapshot) => sum + (snapshot?.entryCount ?? 0), 0)} 条 · 薪资快照：{Object.keys(archive.payrollByEmployee).length} 人</Text>
+                  <Text style={{ color: colors.muted, fontSize: 12, marginTop: 3 }}>应发 ¥{formatMoney(archive.summary.totalGrossSalary)} · 实发 ¥{formatMoney(archive.summary.totalFinalSalary)} · 差额 {archive.adjustments.length} 条</Text>
+                  {getMonthCloseStatus(selectedMonth) === "adjusting" && archive.status === "frozen" ? (
+                    <TouchableOpacity onPress={() => Alert.alert("应用归档排班", `将归档 v${archive.version} 的完整排班覆盖当前调整草稿；此操作会触发重新计算。确认继续？`, [
+                      { text: "取消", style: "cancel" },
+                      { text: "应用归档排班", onPress: () => {
+                        if (applyArchivedSchedule(selectedMonth, archive.id)) Alert.alert("已应用", "归档排班已应用到调整草稿，请核对差额后重新归档。");
+                      } },
+                    ])} style={{ marginTop: 10, alignItems: "center", paddingVertical: 8, borderRadius: 8, backgroundColor: colors.primary + "12", borderWidth: 1, borderColor: colors.primary + "33" }}>
+                      <Text style={{ fontSize: 12, fontWeight: "600", color: colors.primary }}>应用此归档排班到调整草稿</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+              ));
+            })()}
+          </ScrollView>
+        </View>
+      </Modal>
+
+      {/* ── FROZEN → ADJUSTING：必须说明原因并保存可回滚基线 ── */}
+      <Modal visible={showAdjustmentModal} transparent animationType="fade" onRequestClose={() => setShowAdjustmentModal(false)}>
+        <Pressable onPress={() => setShowAdjustmentModal(false)} style={{ flex: 1, justifyContent: "center", padding: 24, backgroundColor: "rgba(0,0,0,0.42)" }}>
+          <Pressable onPress={(event) => event.stopPropagation?.()} style={{ backgroundColor: colors.background, borderRadius: 16, padding: 18, gap: 12 }}>
+            <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground }}>进入差额调整</Text>
+            <Text style={{ fontSize: 12, color: colors.muted }}>系统将保存当前冻结版本的完整月度基线。放弃调整时，排班、考勤和薪资会恢复到该基线。</Text>
+            <Text style={{ fontSize: 12, fontWeight: "600", color: colors.foreground }}>调整原因 *</Text>
+            <TextInput value={adjustmentReason} onChangeText={setAdjustmentReason} placeholder="例如：漏录 7 月 14 日班次" placeholderTextColor={colors.muted} multiline style={{ minHeight: 72, borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 10, color: colors.foreground, textAlignVertical: "top" }} />
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <TouchableOpacity onPress={() => setShowAdjustmentModal(false)} style={{ flex: 1, alignItems: "center", paddingVertical: 11, borderRadius: 10, backgroundColor: colors.border + "44" }}><Text style={{ color: colors.foreground, fontWeight: "600" }}>取消</Text></TouchableOpacity>
+              <TouchableOpacity onPress={() => {
+                const reason = adjustmentReason.trim();
+                if (!reason) { Alert.alert("请填写调整原因", "冻结月调整必须留下审计原因。"); return; }
+                const session = openAdjustmentSession(selectedMonth, reason, "next_month");
+                if (!session) { Alert.alert("无法进入调整", "本月没有当前正式归档，或已有未完成的调整会话。"); return; }
+                setShowAdjustmentModal(false);
+                Alert.alert("已进入差额调整", `基于归档 v${session.baseVersion} 创建调整草稿。`);
+              }} style={{ flex: 1.2, alignItems: "center", paddingVertical: 11, borderRadius: 10, backgroundColor: colors.warning }}><Text style={{ color: "#fff", fontWeight: "700" }}>确认进入</Text></TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
       </Modal>
 
       {/* ── 月报设置 Modal ── */}

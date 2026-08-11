@@ -1,4 +1,4 @@
-import type { PayrollConfirmationStatus } from "./types";
+import type { MonthCloseStatus } from "./types";
 
 /**
  * 自动同步与月度锁定的唯一权限口径。
@@ -7,12 +7,12 @@ import type { PayrollConfirmationStatus } from "./types";
  * ADJUSTING：已确认后进入差额调整，允许受控重算以生成调整前的当前草稿。
  * FROZEN：已确认发薪，禁止任何自动写入，历史结算只允许通过调整流程处理。
  */
-export function shouldAutoSyncPayrollMonth(status: PayrollConfirmationStatus): boolean {
+export function shouldAutoSyncPayrollMonth(status: MonthCloseStatus): boolean {
   return status === "draft" || status === "adjusting";
 }
 
 /** 仅用于可读的诊断和测试输出。 */
-export function describePayrollAutoSync(status: PayrollConfirmationStatus): string {
+export function describePayrollAutoSync(status: MonthCloseStatus): string {
   switch (status) {
     case "draft":
       return "自动重算：草稿月份";

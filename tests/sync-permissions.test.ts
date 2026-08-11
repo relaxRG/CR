@@ -66,9 +66,9 @@ const SYNC_KEYS_SNAPSHOT = [
   "labor_holiday_comp_off_v1", "labor_unexplained_rest_alerts_v1",
   "labor_special_statuses_v1", "labor_custom_depts_v1", "labor_business_hours_v1",
   "labor_shift_groups_v1",   "labor_fill_presets_v1",
-  "labor_schedule_snapshots_v1",
   // ── 薪资数据
-  "labor_payslips_v1", "labor.salary_advances.v1", "labor.advance_categories.v1",
+  "labor_payslips_v1", "labor_month_close_archives_v1", "labor_month_adjustment_sessions_v1",
+  "labor.salary_advances.v1", "labor.advance_categories.v1",
   "labor_performance_templates_v1", "labor_performance_records_v1",
   "labor_global_payroll_settings_v1",
 ] as const;

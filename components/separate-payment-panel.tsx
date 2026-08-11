@@ -6,7 +6,7 @@ import React, { useMemo, useState } from "react";
 import { Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useSeparatePaymentStore } from "@/lib/labor/separate-payment-store";
-import type { SeparatePaymentSlip } from "@/lib/labor/payroll-confirmation";
+import type { SeparatePaymentSlip } from "@/lib/labor/adjustment-settlement";
 
 interface Props {
   colors: any;

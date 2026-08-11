@@ -16,7 +16,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
 import { ScreenContainer } from "@/components/screen-container";
-import { useEmployeeStore, usePaySlipStore, useAttendanceStore, useGlobalPayrollSettingsStore, usePayrollConfirmationStore } from "@/lib/labor/store";
+import { useEmployeeStore, usePaySlipStore, useAttendanceStore, useGlobalPayrollSettingsStore, useMonthCloseStore } from "@/lib/labor/store";
 import {
   ALLOWANCE_UNIT_LABELS, REVENUE_KPI_SOURCE_LABELS,
   REVENUE_KPI_PAY_MODE_LABELS, calcRevenueKPIBonus,
@@ -35,7 +35,7 @@ export default function LaborKPIAllowanceEditPage() {
   // 防御性修复：订阅 records state，确保考勤数据变化时 attendanceDays useMemo 能重新计算
   const { getAttendance, records: attendanceRecords } = useAttendanceStore();
   const { settings: globalSettings } = useGlobalPayrollSettingsStore();
-  const { isMonthWritable } = usePayrollConfirmationStore();
+  const { isMonthWritable } = useMonthCloseStore();
 
   const employee = useMemo(() => employees.find((e) => e.id === employeeId), [employees, employeeId]);
 

@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
-import { useEmployeeStore, usePayrollConfirmationStore } from "@/lib/labor/store";
+import { useEmployeeStore, useMonthCloseStore } from "@/lib/labor/store";
 import { useSalaryAdvanceStore, useAdvanceCategoryStore, SalaryAdvance, AdvanceStatus } from "@/lib/labor/advance-store";
 import { usePettyLaborLinkStore } from "@/lib/store/petty-labor-link-store";
 import { EMPLOYEE_TYPE_LABELS, EMPLOYEE_TYPE_COLORS, DEPT_COLORS, monthLabel } from "@/lib/labor/types";
@@ -182,7 +182,7 @@ export default function LaborAdvancesScreen() {
 
   const { employees } = useEmployeeStore();
   const { advances, addAdvance, updateAdvance, deleteAdvance } = useSalaryAdvanceStore();
-  const { isMonthWritable } = usePayrollConfirmationStore();
+  const { isMonthWritable } = useMonthCloseStore();
   const { allCategories } = useAdvanceCategoryStore();
   const { links } = usePettyLaborLinkStore();
 

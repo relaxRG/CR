@@ -26,7 +26,7 @@ import {
   useEmployeeStore, useAttendanceStore, usePaySlipStore,
   useCompOffBalanceEntryStore,
   useGlobalPayrollSettingsStore, useDeptOrderStore, DEFAULT_DEPT_ORDER,
-  usePayrollConfirmationStore,
+  useMonthCloseStore,
 } from "@/lib/labor/store";
 import { useSalaryAdvanceStore } from "@/lib/labor/advance-store";
 import {
@@ -166,7 +166,7 @@ function EmployeeCard({
   // 修复：在卡片内直接调用 hooks，确保 saveRewards 能访问 buildPaySlipDraft 和 globalSettings
   const { buildPaySlipDraft } = usePaySlipStore();
   const { settings: globalSettings } = useGlobalPayrollSettingsStore();
-  const { isMonthWritable } = usePayrollConfirmationStore();
+  const { isMonthWritable } = useMonthCloseStore();
   const tenure = calcTenure(employee.joinDate);
 
     // ── 调休余额（useMemo 避免每次渲染重复 filter/reduce） ──

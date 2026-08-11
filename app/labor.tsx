@@ -31,8 +31,7 @@ import {
   useSpecialStatusStore, useGlobalPayrollSettingsStore,
   useCompOffBalanceEntryStore, useUnexplainedRestAlertStore,
   useCustomDeptStore, useBusinessHoursStore, useShiftGroupStore, useFillPresetStore,
-  useScheduleSnapshotStore, useDeptOrderStore, DEFAULT_DEPT_ORDER,
-  usePayrollConfirmationStore,
+  useMonthCloseStore, useDeptOrderStore, DEFAULT_DEPT_ORDER,
 } from "@/lib/labor/store";
 import { useSalaryAdvanceStore, useAdvanceCategoryStore } from "@/lib/labor/advance-store";
 import { usePettyCashStore, PETTY_CODE_LABELS, PettyRecord } from "@/lib/store/petty-store";
@@ -46,7 +45,7 @@ import {
   DEFAULT_SHIFT_TEMPLATES, SHIFT_COLOR_PRESETS,
   calcCompOffExpiresMonth, getAttendanceBaseSalary, BusinessHoursEntry, ShiftGroup, WEEKDAY_SHORT,
   DEFAULT_SHIFT_GROUPS, FillPreset, isDayInRange,
-  PaySlip, MonthlyAttendance, ScheduleSnapshot,
+  PaySlip, MonthlyAttendance,
 } from "@/lib/labor/types";
 
 const { width: SCREEN_W } = Dimensions.get("window");
@@ -322,7 +321,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
   const { alerts, resolveAlert } = useUnexplainedRestAlertStore();
   const router = useRouter();
   const { isReadOnly } = useFeature();
-  const { isMonthWritable: isMonthWritableForCard } = usePayrollConfirmationStore();
+  const { isMonthWritable: isMonthWritableForCard } = useMonthCloseStore();
   const canWrite = !isReadOnly && isMonthWritableForCard(month);
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
   const [expanded, setExpanded] = useState(false);
@@ -975,7 +974,7 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
   const { templates: shiftTemplates } = useShiftTemplateStore();
   const { paySlips } = usePaySlipStore();
   const { records: attendances } = useAttendanceStore();
-  const { isMonthWritable: isMonthWritableRoster } = usePayrollConfirmationStore();
+  const { isMonthWritable: isMonthWritableRoster } = useMonthCloseStore();
   const router = useRouter();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
@@ -1352,7 +1351,7 @@ function AdvancePage({ month, colors, headerComponent }: { month: string; colors
   const { records: pettyRecords, addRecord: addPettyRecord } = usePettyCashStore();
   const { links, aliases, addLink, updateLink, deleteLink, learnAlias, getLinksForMonth, isLinked } = usePettyLaborLinkStore();
   const { getPaySlip, upsertPaySlip } = usePaySlipStore();
-  const { isMonthWritable } = usePayrollConfirmationStore();
+  const { isMonthWritable } = useMonthCloseStore();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
   // ── 新增预支 Modal state ──
@@ -3450,8 +3449,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   const { upsertAlert } = useUnexplainedRestAlertStore();
   const { businessHours, setBusinessHours } = useBusinessHoursStore();
   const { shiftGroups, setShiftGroups } = useShiftGroupStore();
-    const { snapshots: allSnapshots, saveSnapshot, updateSnapshot, deleteSnapshot } = useScheduleSnapshotStore();
-  const { getStatus: getConfirmStatus, isMonthWritable } = usePayrollConfirmationStore();
+    const { getStatus: getCloseStatus, isMonthWritable } = useMonthCloseStore();
   const now = new Date();
   const todayStr = now.toISOString().slice(0, 10);
   const currentMonth = month;
@@ -3487,9 +3485,6 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   // key: `${month}|${deptCategory}|${groupId}|${tplId}`，value: Set<employeeId>
   const [pendingEmpIds, setPendingEmpIds] = useState<Map<string, Set<string>>>(new Map());
   // 存档/历史 Modal
-  const [showSnapshotModal, setShowSnapshotModal] = useState(false);
-  const [snapshotNote, setSnapshotNote] = useState("");
-  const [showHistoryModal, setShowHistoryModal] = useState(false);
   // 考勤概况卡片展开状态（key: employeeId，value: 是否展开）
   const [expandedAttCards, setExpandedAttCards] = useState<Set<string>>(new Set());
   // 考勤概况卡片调休面板展开状态（key: employeeId，value: 是否展开调休面板）
@@ -3500,7 +3495,6 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   const [attDeductMode, setAttDeductMode] = useState<Record<string, "direct" | "cashout">>({});
   const [attHoursInput, setAttHoursInput] = useState<Record<string, string>>({});
   const [attDaysInput, setAttDaysInput] = useState<Record<string, string>>({});
-  const [previewSnapshot, setPreviewSnapshot] = useState<ScheduleSnapshot | null>(null);
 
   const ensureScheduleDatesWritable = useCallback((datesToWrite: readonly string[]): boolean => {
     const lockedMonths = getNonWritableScheduleMonths(datesToWrite, isMonthWritable);
@@ -3699,7 +3693,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
     // 这就是「无排班但有比例底薪」反复出现的根本原因
     if (!shiftsReady || !employeesReady) return;
     // 只有草稿或调整中月份允许自动写入；冻结月绝不重算。
-    if (!shouldAutoSyncPayrollMonth(getConfirmStatus(currentMonth))) return;
+    if (!shouldAutoSyncPayrollMonth(getCloseStatus(currentMonth))) return;
     // 防抖：500ms 内多次修改只触发一次
     if (autoSyncTimerRef.current) clearTimeout(autoSyncTimerRef.current);
     autoSyncTimerRef.current = setTimeout(() => {
@@ -4427,14 +4421,6 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
               style={[EXL.gearBtn, { backgroundColor: generating ? colors.border + "22" : colors.primary + "18" }]}>
               <IconSymbol name="banknote.fill" size={15} color={generating ? colors.muted : colors.primary} />
             </Pressable>
-            {/* 存档 */}
-            <Pressable onPress={() => { tap(); setSnapshotNote(""); setShowSnapshotModal(true); }} style={[EXL.gearBtn, { backgroundColor: colors.border + "44" }]}>
-              <IconSymbol name="camera.fill" size={15} color={colors.muted} />
-            </Pressable>
-            {/* 历史版本 */}
-            <Pressable onPress={() => { tap(); setShowHistoryModal(true); }} style={[EXL.gearBtn, { backgroundColor: colors.border + "44" }]}>
-              <IconSymbol name="clock.arrow.circlepath" size={15} color={colors.muted} />
-            </Pressable>
             {/* 班次设置 */}
             <Pressable onPress={() => { tap(); setShowTplModal(true); }} style={[EXL.gearBtn, { backgroundColor: colors.border + "44" }]}>
               <IconSymbol name="gearshape.fill" size={16} color={colors.muted} />
@@ -5059,170 +5045,6 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
         onClose={() => setShowQuickFillHours(false)}
       />
 
-      {/* 存档 Modal */}
-      <Modal visible={showSnapshotModal} transparent animationType="fade" onRequestClose={() => setShowSnapshotModal(false)}>
-        <Pressable style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "center", alignItems: "center" }}
-          onPress={() => setShowSnapshotModal(false)}>
-          <Pressable style={{ width: 300, backgroundColor: colors.background, borderRadius: 16, padding: 20, gap: 14 }}
-            onPress={(e) => e.stopPropagation?.()}>
-            <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground }}>📸 存档排班表</Text>
-            <Text style={{ fontSize: 12, color: colors.muted }}>{monthLabel(currentMonth)} · {DEPT_CATEGORY_LABELS[deptCategory]}</Text>
-            <TextInput
-              value={snapshotNote}
-              onChangeText={setSnapshotNote}
-              placeholder="备注（可留空）"
-              placeholderTextColor={colors.muted}
-              style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, color: colors.foreground }}
-            />
-            <View style={{ flexDirection: "row", gap: 10 }}>
-              <TouchableOpacity onPress={() => setShowSnapshotModal(false)}
-                style={{ flex: 1, alignItems: "center", paddingVertical: 10, borderRadius: 10, backgroundColor: colors.border + "44" }}>
-                <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>取消</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => {
-                  saveSnapshot({
-                    month: currentMonth,
-                    deptCategory,
-                    label: "手动存档",
-                    note: snapshotNote.trim() || undefined,
-                    isLocked: false,
-                    isFinal: false,
-                    entries: monthShifts.filter((s) => allDeptEmployees.some((e) => e.id === s.employeeId)),
-                  });
-                  setShowSnapshotModal(false);
-                  setGenResult("✅ 存档成功");
-                  setTimeout(() => setGenResult(null), 2500);
-                }}
-                style={{ flex: 1.2, alignItems: "center", paddingVertical: 10, borderRadius: 10, backgroundColor: "#1677FF" }}>
-                <Text style={{ fontSize: 14, fontWeight: "700", color: "#fff" }}>确认存档</Text>
-              </TouchableOpacity>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      {/* 历史版本 Modal */}
-      <Modal visible={showHistoryModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => { setShowHistoryModal(false); setPreviewSnapshot(null); }}>
-        <View style={{ flex: 1, backgroundColor: colors.background }}>
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
-            <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground }}>🕐 历史版本</Text>
-            <TouchableOpacity onPress={() => { setShowHistoryModal(false); setPreviewSnapshot(null); }}>
-              <Text style={{ fontSize: 14, color: colors.primary }}>关闭</Text>
-            </TouchableOpacity>
-          </View>
-          {previewSnapshot ? (
-            // 预览某个快照
-            <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingVertical: 10, backgroundColor: colors.surface }}>
-                <TouchableOpacity onPress={() => setPreviewSnapshot(null)}>
-                  <IconSymbol name="chevron.left" size={18} color={colors.primary} />
-                </TouchableOpacity>
-                <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>v{previewSnapshot.version} · {previewSnapshot.label}</Text>
-                {previewSnapshot.isLocked && <Text style={{ fontSize: 11, color: colors.warning }}>🔒 已锁定</Text>}
-              </View>
-              <ScrollView contentContainerStyle={{ padding: 16, gap: 8 }}>
-                <Text style={{ fontSize: 12, color: colors.muted }}>存档时间：{previewSnapshot.createdAt.slice(0, 16).replace("T", " ")}</Text>
-                {previewSnapshot.note ? <Text style={{ fontSize: 12, color: colors.muted }}>备注：{previewSnapshot.note}</Text> : null}
-                <Text style={{ fontSize: 12, color: colors.muted }}>包含 {previewSnapshot.entries.length} 条排班记录</Text>
-                <View style={{ flexDirection: "row", gap: 10, marginTop: 8 }}>
-                  <TouchableOpacity
-                    onPress={() => {
-                      Alert.alert(
-                        "代入当前月",
-                        `将 v${previewSnapshot.version} 的排班记录代入 ${monthLabel(currentMonth)} ${DEPT_CATEGORY_LABELS[deptCategory]}？\n这将覆盖当前月的排班数据。`,
-                        [
-                          { text: "取消", style: "cancel" },
-                          { text: "代入排班记录", onPress: () => {
-                            // 代入前检查月度锁定状态
-                            if (!isMonthWritable(currentMonth)) {
-                              Alert.alert("已锁定", "本月已确认发薪，如需修改请先进入差额调整模式。");
-                              return;
-                            }
-                            // 代入快照中的排班记录（覆盖当前月当前部门的排班数据）
-                            const snapshotEntries = previewSnapshot.entries
-                              .filter((s) => allDeptEmployees.some((e) => e.id === s.employeeId));
-                            // 先删除当前月当前部门的所有排班；不得影响另一个部门的记录。
-                            const toDelete = monthShifts
-                              .filter((s) => allDeptEmployees.some((e) => e.id === s.employeeId))
-                              .map((s) => ({ employeeId: s.employeeId, date: s.date, shift: s.shift }));
-                            if (toDelete.length > 0) batchDeleteShifts(toDelete);
-                            // 再写入快照数据
-                            if (snapshotEntries.length > 0) batchUpsertShifts(snapshotEntries);
-                            setPreviewSnapshot(null); setShowHistoryModal(false);
-                            setGenResult("✅ 排班记录已代入"); setTimeout(() => setGenResult(null), 2500);
-                          }},
-                        ]
-                      );
-                    }}
-                    style={{ flex: 1, alignItems: "center", paddingVertical: 10, borderRadius: 10, backgroundColor: "#1677FF" }}>
-                    <Text style={{ fontSize: 13, fontWeight: "700", color: "#fff" }}>一键代入</Text>
-                  </TouchableOpacity>
-                  {!previewSnapshot.isLocked && (
-                    <TouchableOpacity
-                      onPress={() => { updateSnapshot(previewSnapshot.id, { isLocked: true }); setPreviewSnapshot({ ...previewSnapshot, isLocked: true }); }}
-                      style={{ paddingHorizontal: 14, alignItems: "center", justifyContent: "center", paddingVertical: 10, borderRadius: 10, backgroundColor: colors.warning + "22" }}>
-                      <Text style={{ fontSize: 13, fontWeight: "600", color: colors.warning }}>🔒 锁定</Text>
-                    </TouchableOpacity>
-                  )}
-                  {previewSnapshot.isLocked && (
-                    <TouchableOpacity
-                      onPress={() => Alert.alert("解锁确认", "解锁后可修改此版本，确认解锁？", [
-                        { text: "取消", style: "cancel" },
-                        { text: "解锁", style: "destructive", onPress: () => { updateSnapshot(previewSnapshot.id, { isLocked: false }); setPreviewSnapshot({ ...previewSnapshot, isLocked: false }); } },
-                      ])}
-                      style={{ paddingHorizontal: 14, alignItems: "center", justifyContent: "center", paddingVertical: 10, borderRadius: 10, backgroundColor: colors.border + "44" }}>
-                      <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted }}>🔓 解锁</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </ScrollView>
-            </View>
-          ) : (
-            // 版本列表
-            <ScrollView contentContainerStyle={{ padding: 16, gap: 10 }}>
-              {(() => {
-                // 直接订阅 snapshots 响应式 state，避免 ref.current 读取
-                const snaps = allSnapshots
-                  .filter((s) => s.month === currentMonth && s.deptCategory === deptCategory)
-                  .sort((a, b) => b.version - a.version);
-                if (snaps.length === 0) return (
-                  <View style={{ alignItems: "center", paddingVertical: 40 }}>
-                    <Text style={{ fontSize: 14, color: colors.muted }}>暂无存档记录</Text>
-                    <Text style={{ fontSize: 12, color: colors.muted, marginTop: 6 }}>点击控制栏的 📸 按鈕存档当前排班表</Text>
-                  </View>
-                );
-                return snaps.map((snap) => (
-                  <TouchableOpacity key={snap.id} onPress={() => setPreviewSnapshot(snap)}
-                    style={{ backgroundColor: colors.surface, borderRadius: 12, padding: 14, borderWidth: 1,
-                      borderColor: snap.isFinal ? colors.warning + "66" : colors.border,
-                      borderLeftWidth: 4, borderLeftColor: snap.isFinal ? colors.warning : snap.isLocked ? colors.success : colors.primary }}>
-                    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                        <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>v{snap.version}</Text>
-                        {snap.isFinal && <Text style={{ fontSize: 10, color: colors.warning, fontWeight: "700" }}>[最终版]</Text>}
-                        {snap.isLocked && <Text style={{ fontSize: 10, color: colors.success }}>🔒</Text>}
-                      </View>
-                      <Text style={{ fontSize: 11, color: colors.muted }}>{snap.createdAt.slice(0, 16).replace("T", " ")}</Text>
-                    </View>
-                    <Text style={{ fontSize: 12, color: colors.muted, marginTop: 4 }}>{snap.label}{snap.note ? " · " + snap.note : ""}</Text>
-                    <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>{snap.entries.length} 条排班记录</Text>
-                    {!snap.isLocked && (
-                      <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); Alert.alert("删除确认", "删除该存档版本？", [
-                        { text: "取消", style: "cancel" },
-                        { text: "删除", style: "destructive", onPress: () => deleteSnapshot(snap.id) },
-                      ]); }}
-                        style={{ position: "absolute", right: 12, bottom: 12 }}>
-                        <Text style={{ fontSize: 11, color: colors.error }}>删除</Text>
-                      </TouchableOpacity>
-                    )}
-                  </TouchableOpacity>
-                ));
-              })()}
-            </ScrollView>
-          )}
-        </View>
-      </Modal>
     </View>
   );
 }

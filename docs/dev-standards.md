@@ -607,23 +607,20 @@ const rows = useMemo(() => {
 
 ---
 
-## 同步键覆盖率规范（2026-08-06）
+## 同步键覆盖率规范（2026-08-12）
 
-### Bug 根因分析
+### 月度归档存储规则
 
-**问题**：`labor_schedule_snapshots_v1`（排班快照）在新增功能时被遗漏，没有加入 `SYNC_KEYS`。同时 `STORAGE_KEY_LABELS` 中 39 个键缺少中文显示名称，导致同步冲突弹窗显示原始键名。
+旧的手动排班快照键和旧确认发薪键已废弃，禁止重新加入同步列表。新的正式归档由 `labor_month_close_archives_v1` 与 `labor_month_adjustment_sessions_v1` 承担；新增或调整这两个键时必须同步以下三处：
 
-**根本原因**：新增 Store 时，开发者只关注了业务逻辑，忘记了同步以下三个地方：
 1. `lib/sync/engine.ts` 的 `SYNC_KEYS`
 2. `lib/sync/feature-modules.ts` 的 `FEATURE_MODULES.storageKeys`
 3. `lib/cf-sync/provider.tsx` 的 `STORAGE_KEY_LABELS`
 
-### 受影响的关联模块
-
-| 模块 | 问题 | 修复 |
+| 模块 | 当前职责 | 约束 |
 |------|------|------|
-| `labor_schedule_snapshots_v1` | 不在 SYNC_KEYS 中，排班快照不同步 | ✅ 补全到三个地方 |
-| `STORAGE_KEY_LABELS` 39 个键 | 缺少中文显示名称 | ✅ 全部补全（啤酒/水果/冰块/器具/排班/薪资/月报配置等） |
+| `labor_month_close_archives_v1` | 冻结的月度归档版本及最终排班/薪资依据 | 必须同步，不可被普通编辑覆盖 |
+| `labor_month_adjustment_sessions_v1` | 可放弃的差额调整会话和月度基线 | 必须同步，但只允许调整流程写入 |
 
 ### 规范 21：新增 Store 时必须同步更新三个地方
 

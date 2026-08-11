@@ -82,6 +82,8 @@ export const SYNC_KEYS = [
   "labor_shift_templates_v1",
   "labor_attendance_v1",
   "labor_payslips_v1",
+  "labor_month_close_archives_v1",
+  "labor_month_adjustment_sessions_v1",
   "labor_month_configs_v1",
   "labor_holiday_configs_v1",
   "labor.salary_advances.v1",
@@ -100,7 +102,6 @@ export const SYNC_KEYS = [
   "labor_business_hours_v1",
   "labor_shift_groups_v1",
   "labor_fill_presets_v1",
-  "labor_schedule_snapshots_v1",
   "store.petty_labor_links.v1",
   "store.employee_name_aliases.v1",
   // ── 烈酒进销存（新增）──────────────────────────────────────────────────────────────────────────────
@@ -327,6 +328,8 @@ const ID_LIST_KEYS = new Set<string>([
   "lab.plan.v1",
   "labor_employees_v1",
   "labor_payslips_v1",
+  "labor_month_close_archives_v1",
+  "labor_month_adjustment_sessions_v1",
   "monthly_summary.suppliers.v1",
   "monthly_summary.payments.v1",
   // 烈酒进销存

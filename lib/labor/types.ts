@@ -1190,28 +1190,7 @@ export interface PaySlip {
   /** 备用金人工已付明细（关联的 PettyCashLaborLink ID 列表） */
   pettyLaborLinkIds?: string[];
 
-  // ─── 确认发薪快照字段 ───
-  /** 确认发薪时间戳（有值 = 已确认/已锁定） */
-  frozenAt?: number;
-  /** 确认人 */
-  frozenBy?: string;
-  /** 确认时的快照数据（不可变副本，用于差额计算） */
-  frozenSnapshot?: {
-    grossSalary: number;
-    finalSalary: number;
-    attendanceSalary: number;
-    mealAllowance: number;
-    transportAllowance: number;
-    otherAllowance: number;
-    performanceBonus: number;
-    socialInsuranceDeduction: number;
-    housingFundDeduction: number;
-    /** 手动预支金额 */
-    advanceAmount: number;
-    /** 备用金已付金额（与 advanceAmount 合并展示为「已预支」） */
-    pettyLaborPaid?: number;
-  };
-  /** 上月差额调整（计入本月薪资） */
+  /** 上月已结算差额（由月度归档差额调整引擎生成并计入本月薪资） */
   adjustmentFromPrevMonth?: number;
 
   updatedAt: string;
@@ -1506,79 +1485,94 @@ export function isDayInRange(dow: number, fromDay: number, toDay: number): boole
 }
 
 
-// ─── 排班表历史快照 ───────────────────────────────────────────────────────────
-/**
- * 每次手动存档或自动锁定时生成一个快照版本
- * 多版本并存，可追溯、可代入
- */
-export interface ScheduleSnapshot {
-  id: string;
-  /** 月份 "2026-07" */
-  month: string;
-  /** 部门类别 */
+// ─── 月度归档与差额调整 ─────────────────────────────────────────────────────
+
+/** 月度归档状态。DRAFT 不持久化；有正式归档时为 FROZEN；调整草稿期间为 ADJUSTING。 */
+export type MonthCloseStatus = "draft" | "frozen" | "adjusting";
+
+/** 差额结算方式 */
+export type AdjustmentSettleMethod = "next_month" | "separate" | "manual";
+
+/** 已归档的单个部门最终排班依据。只能由月度归档事务创建，不提供手工存档入口。 */
+export interface FinalScheduleSnapshot {
   deptCategory: DeptCategory;
-  /** 版本号（同月同部门自增） */
-  version: number;
-  /** 标签：手动存档 / 自动锁定 */
-  label: string;
-  /** 备注 */
-  note?: string;
-  /** 是否锁定（锁定后不可删除，但可预览和代入） */
-  isLocked: boolean;
-  /** 是否为最终版（下月最后一天自动生成） */
-  isFinal: boolean;
-  /** 快照生成时间 */
-  createdAt: string;
-  /** 完整排班记录快照 */
   entries: ShiftEntry[];
+  employeeIds: string[];
+  entryCount: number;
 }
 
-// ─── 确认发薪状态管理 ─────────────────────────────────────────────────────────
-
-export type PayrollConfirmationStatus = "draft" | "frozen" | "adjusting";
-
-/** 差额调整处理方式 */
-export type AdjustmentSettleMethod = "next_month" | "separate" | "ignored";
-
-/** 单条差额调整记录 */
-export interface PayrollAdjustment {
-  id: string;
-  /** 调整产生时间 */
-  createdAt: number;
-  /** 涉及员工 */
+/** 已归档的单个员工薪资依据。独立于实时 PaySlip，禁止被自动同步覆盖。 */
+export interface FrozenPayrollSnapshot {
   employeeId: string;
   employeeName: string;
-  /** 差额金额（正=应补发，负=应扣回） */
+  grossSalary: number;
+  finalSalary: number;
+  attendanceSalary: number;
+  mealAllowance: number;
+  transportAllowance: number;
+  otherAllowance: number;
+  performanceBonus: number;
+  workKPIBonus?: number;
+  revenueKPIBonus?: number;
+  salesCommission?: number;
+  rewardPenalty?: number;
+  socialInsuranceDeduction: number;
+  housingFundDeduction: number;
+  incomeTax?: number;
+  advanceAmount: number;
+  pettyLaborPaid?: number;
+}
+
+/** 归档完成后产生的单员工差额记录。 */
+export interface PayrollAdjustment {
+  id: string;
+  archiveId: string;
+  createdAt: number;
+  employeeId: string;
+  employeeName: string;
   amount: number;
-  /** 差额明细说明 */
   details: string;
-  /** 是否已处理 */
   settled: boolean;
-  /** 处理方式 */
   settleMethod?: AdjustmentSettleMethod;
-  /** 处理月份 */
   settledInMonth?: string;
 }
 
-/** 月度确认状态 */
-export interface MonthlyConfirmation {
-  /** 月份（YYYY-MM） */
+/** 正式月度归档版本：同时保存最终排班依据与冻结薪资依据。 */
+export interface MonthCloseArchive {
+  id: string;
   month: string;
-  /** 状态：draft=草稿 | frozen=已锁定 | adjusting=调整模式 */
-  status: PayrollConfirmationStatus;
-  /** 确认发薪时间 */
-  frozenAt?: number;
-  /** 确认人 */
-  frozenBy?: string;
-  /** 进入调整模式的时间 */
-  adjustingAt?: number;
-  /** 调整历史记录 */
-  adjustments: PayrollAdjustment[];
-  /** 确认时的汇总数据 */
-  summary?: {
+  version: number;
+  status: "frozen" | "superseded";
+  createdAt: number;
+  closedBy: string;
+  previousArchiveId?: string;
+  supersededByArchiveId?: string;
+  summary: {
     totalEmployees: number;
     totalGrossSalary: number;
     totalFinalSalary: number;
     totalDeductions: number;
+  };
+  scheduleByDept: Partial<Record<DeptCategory, FinalScheduleSnapshot>>;
+  payrollByEmployee: Record<string, FrozenPayrollSnapshot>;
+  adjustments: PayrollAdjustment[];
+}
+
+/** FROZEN 月进入调整时创建的隔离会话。实时正式数据不在会话中直接修改。 */
+export interface MonthAdjustmentSession {
+  id: string;
+  month: string;
+  baseArchiveId: string;
+  baseVersion: number;
+  status: "open";
+  reason: string;
+  settleMethod: AdjustmentSettleMethod;
+  createdAt: number;
+  createdBy: string;
+  /** 打开调整时的完整月度基线；放弃调整必须精确恢复，避免污染冻结版本。 */
+  baseline: {
+    shifts: ShiftEntry[];
+    attendances: MonthlyAttendance[];
+    paySlips: PaySlip[];
   };
 }

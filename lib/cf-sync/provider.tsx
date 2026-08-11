@@ -553,6 +553,8 @@ const STORAGE_KEY_LABELS: Record<string, string> = {
   "labor_shifts_v1":               "排班记录",
   "labor_attendance_v1":           "考勤记录",
   "labor_payslips_v1":             "薪资单",
+  "labor_month_close_archives_v1":  "月度结算归档",
+  "labor_month_adjustment_sessions_v1": "薪资差额调整会话",
   "labor_month_configs_v1":        "月度薪资配置",
   "labor.salary_advances.v1":      "员工预支记录",
   // ★ 新增：人工模块补全
@@ -591,7 +593,6 @@ const STORAGE_KEY_LABELS: Record<string, string> = {
   // ★ 新增：器具库存
   "equipment.inventory.v1":          "器具设备清单",
   // ★ 新增：排班快照和其他员工模块
-  "labor_schedule_snapshots_v1":     "排班表快照",
   "labor_employee_groups_v1":        "员工分组",
   "labor_shift_templates_v1":        "班次模板",
   "labor_holiday_configs_v1":        "节假日配置",

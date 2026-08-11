@@ -5,7 +5,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useReducer } from "react";
 import { notifySyncChange, registerStoreReload } from "../sync/engine";
-import type { SeparatePaymentSlip } from "./payroll-confirmation";
+import type { SeparatePaymentSlip } from "./adjustment-settlement";
 
 const STORAGE_KEY = "labor.separate_payments.v1";
 

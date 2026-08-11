@@ -10,7 +10,9 @@
  *   - /labor 可加载且无根级横向溢出；
  *   - “编辑”入口可进入编辑模式；
  *   - 编辑模式中存在独立“清空本月”入口；
- *   - 正常模式仍包含独立的“生成薪资单”入口。
+ *   - 正常模式仍包含独立的“生成薪资单”入口；
+ *   - 月报页显示唯一“月度归档并确认发薪”主按钮；
+ *   - 冻结归档与差额调整中的月报操作区均可在移动视口正常展示。
  */
 import { createReadStream, existsSync } from "node:fs";
 import { createServer } from "node:http";
@@ -130,6 +132,61 @@ try {
     }
     report.push({ width, normalMode: initialState, editMode: editState });
   }
+
+  // 月报唯一归档入口：写入最小可用夹具后重新导航，验证 DRAFT / FROZEN / ADJUSTING 三态。
+  await call("Emulation.setDeviceMetricsOverride", { width: 375, height: 844, deviceScaleFactor: 3, mobile: true });
+  const seed = await call("Runtime.evaluate", { expression: `(() => {
+    const month = new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0');
+    const employee = { id: 'h5-e2e-employee', code: 'E2E', realName: 'H5测试', phone: '', dept: 'front', type: 'fulltime', baseSalary: 10000, restDaysPerMonth: 4, hourlyRate: 0, overtimeHourlyRate: 50, notes: '', active: true, createdAt: new Date().toISOString() };
+    const slip = { id: 'h5-e2e-slip', employeeId: employee.id, month, attendanceDays: 27, attendanceSalary: 10000, performanceBonus: 0, salesCommission: 0, mealAllowance: 0, transportAllowance: 0, otherAllowance: 0, rewardPenalty: 0, advanceAmount: 0, grossSalary: 10000, socialInsuranceDeduction: 0, housingFundDeduction: 0, incomeTax: 0, finalSalary: 10000, employerSocialInsurance: 0, employerHousingFund: 0, totalEmployerCost: 10000, notes: '', updatedAt: new Date().toISOString() };
+    localStorage.setItem('labor_employees_v1', JSON.stringify([employee]));
+    localStorage.setItem('labor_payslips_v1', JSON.stringify([slip]));
+    localStorage.removeItem('labor_month_close_archives_v1');
+    localStorage.removeItem('labor_month_adjustment_sessions_v1');
+    return month;
+  })()`, returnByValue: true });
+  const closeMonth = seed.result.value;
+  await call("Page.navigate", { url: `http://localhost:${port}/monthly-summary` });
+  await sleep(900);
+  const draftClose = await call("Runtime.evaluate", { expression: `(() => ({
+    hasClose: ${hasTextExpression("月度归档并确认发薪")},
+    rootClientWidth: document.documentElement.clientWidth,
+    rootScrollWidth: document.documentElement.scrollWidth,
+  }))()`, returnByValue: true });
+  if (!draftClose.result.value.hasClose) throw new Error('月报 DRAFT 未显示唯一月度归档主按钮');
+  if (draftClose.result.value.rootScrollWidth > draftClose.result.value.rootClientWidth) throw new Error('月报 DRAFT 出现根级横向溢出');
+
+  await call("Runtime.evaluate", { expression: `(() => {
+    const month = ${JSON.stringify(closeMonth)};
+    const archive = { id: 'h5-close-v1', month, version: 1, status: 'frozen', createdAt: Date.now(), closedBy: 'manager', summary: { totalEmployees: 1, totalGrossSalary: 10000, totalFinalSalary: 10000, totalDeductions: 0 }, scheduleByDept: {}, payrollByEmployee: {}, adjustments: [] };
+    localStorage.setItem('labor_month_close_archives_v1', JSON.stringify([archive]));
+  })()`, returnByValue: true });
+  await call("Page.navigate", { url: `http://localhost:${port}/monthly-summary` });
+  await sleep(900);
+  const frozenClose = await call("Runtime.evaluate", { expression: `(() => ({
+    hasArchive: ${hasTextExpression("查看月度归档")},
+    hasAdjust: ${hasTextExpression("进入差额调整")},
+    rootClientWidth: document.documentElement.clientWidth,
+    rootScrollWidth: document.documentElement.scrollWidth,
+  }))()`, returnByValue: true });
+  if (!frozenClose.result.value.hasArchive || !frozenClose.result.value.hasAdjust) throw new Error('月报 FROZEN 未显示归档查看与差额调整入口');
+  if (frozenClose.result.value.rootScrollWidth > frozenClose.result.value.rootClientWidth) throw new Error('月报 FROZEN 出现根级横向溢出');
+
+  await call("Runtime.evaluate", { expression: `(() => {
+    const month = ${JSON.stringify(closeMonth)};
+    localStorage.setItem('labor_month_adjustment_sessions_v1', JSON.stringify([{ id: 'h5-adjust', month, baseArchiveId: 'h5-close-v1', baseVersion: 1, status: 'open', reason: 'H5验证', settleMethod: 'next_month', createdAt: Date.now(), createdBy: 'manager', baseline: { shifts: [], attendances: [], paySlips: [] } }]));
+  })()`, returnByValue: true });
+  await call("Page.navigate", { url: `http://localhost:${port}/monthly-summary` });
+  await sleep(900);
+  const adjustingClose = await call("Runtime.evaluate", { expression: `(() => ({
+    hasDiscard: ${hasTextExpression("放弃调整")},
+    hasReclose: ${hasTextExpression("重新归档并确认")},
+    rootClientWidth: document.documentElement.clientWidth,
+    rootScrollWidth: document.documentElement.scrollWidth,
+  }))()`, returnByValue: true });
+  if (!adjustingClose.result.value.hasDiscard || !adjustingClose.result.value.hasReclose) throw new Error('月报 ADJUSTING 未显示放弃调整与重新归档入口');
+  if (adjustingClose.result.value.rootScrollWidth > adjustingClose.result.value.rootClientWidth) throw new Error('月报 ADJUSTING 出现根级横向溢出');
+  report.push({ width: 375, monthClose: { draft: draftClose.result.value, frozen: frozenClose.result.value, adjusting: adjustingClose.result.value } });
 
   await call("Emulation.clearDeviceMetricsOverride");
   socket.close();
