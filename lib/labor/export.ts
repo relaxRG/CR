@@ -9,7 +9,9 @@ import { formatMoney } from "@/lib/utils";
  *   特殊扣薪 = att.totalSpecialDeduction（旷工/病假等额外扣减）
  *   考勤工资 = 比例底薪 + 加班工资 + 节假日薪资 - 特殊扣薪
  *   业绩提点 = slip.salesCommission（从 existing 读取，非绩效考核）
- *   工作绩效 = slip.performanceBonus（工作绩效 + 业绩绩效合计）
+ *   工作绩效 = slip.performanceBonus（workKPI + revenueKPI 合计）
+ *   工作绩效小计 = slip.workKPIBonus（仅 workKPIRules 档位合计）
+ *   业绩绩效小计 = slip.revenueKPIBonus（仅 revenueKPIRules 阶梯合计）
  */
 
 import * as FileSystem from "expo-file-system/legacy";

@@ -567,9 +567,9 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
           {/* ─── 综合额外（5格）─── */}
           {slip && (() => {
             const allowanceSum = (slip.mealAllowance ?? 0) + (slip.transportAllowance ?? 0) + (slip.otherAllowance ?? 0);
-            const workKPI = slip.performanceBonus ?? 0;
-            // salesCommission = 业绩提点（从 existing 读取，非 revenueKPI 绩效）
-            // performanceBonus = 工作绩效 + 业绩绩效合计（由 buildPaySlipDraft 的 performanceTotal 参数传入）
+            // 分项绩效：workKPIBonus = 工作绩效小计，向后兼容回落到 performanceBonus
+            const workKPI = slip.workKPIBonus ?? slip.performanceBonus ?? 0;
+            // salesCommission = 业绩提点（营业额按比例提成），标签「业绩提点」与语义一致
             const revenueKPI = slip.salesCommission ?? 0;
             const reward = slip.rewardPenalty ?? 0;
             const extraTotal = allowanceSum + workKPI + revenueKPI + reward;
