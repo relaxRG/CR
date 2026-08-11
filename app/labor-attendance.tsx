@@ -581,8 +581,9 @@ function DetailRow({ label, value, colors, bold, positive, negative, primary, mu
   const valueColor = primary ? colors.primary : positive ? colors.success : negative ? colors.error : isMuted ? colors.muted : colors.foreground;
   return (
     <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 3 }}>
-      <Text style={{ fontSize: 13, color: colors.foreground, fontWeight: bold ? "600" : "400" }}>{label}</Text>
-      <Text style={{ fontSize: 13, color: valueColor, fontWeight: bold ? "700" : "500" }}>{value}</Text>
+      {/* flex:1 + numberOfLines=1 防止 label 换行挤压 value 区域 */}
+      <Text numberOfLines={1} style={{ fontSize: 13, color: colors.foreground, fontWeight: bold ? "600" : "400", flex: 1, marginRight: 8 }}>{label}</Text>
+      <Text numberOfLines={1} style={{ fontSize: 13, color: valueColor, fontWeight: bold ? "700" : "500", flexShrink: 0 }}>{value}</Text>
     </View>
   );
 }

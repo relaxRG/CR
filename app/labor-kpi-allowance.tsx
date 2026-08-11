@@ -108,22 +108,22 @@ export default function LaborKPIAllowancePage() {
           <View style={S.summaryRow}>
             <View style={S.summaryItem}>
               <Text style={[S.summaryLabel, { color: colors.muted }]}>绩效补贴</Text>
-              <Text style={[S.summaryValue, { color: colors.foreground }]}>¥{formatMoney(grandTotal)}</Text>
+              <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65} style={[S.summaryValue, { color: colors.foreground }]}>¥{formatMoney(grandTotal)}</Text>
             </View>
             <View style={[S.summaryDivider, { backgroundColor: colors.border }]} />
             <View style={S.summaryItem}>
               <Text style={[S.summaryLabel, { color: colors.muted }]}>补贴</Text>
-              <Text style={[S.summaryValue, { color: colors.primary }]}>¥{formatMoney(allowanceTotal)}</Text>
+              <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65} style={[S.summaryValue, { color: colors.primary }]}>¥{formatMoney(allowanceTotal)}</Text>
             </View>
             <View style={[S.summaryDivider, { backgroundColor: colors.border }]} />
             <View style={S.summaryItem}>
               <Text style={[S.summaryLabel, { color: colors.muted }]}>工作绩效</Text>
-              <Text style={[S.summaryValue, { color: colors.success }]}>¥{formatMoney(workKPIBonus)}</Text>
+              <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65} style={[S.summaryValue, { color: colors.success }]}>¥{formatMoney(workKPIBonus)}</Text>
             </View>
             <View style={[S.summaryDivider, { backgroundColor: colors.border }]} />
             <View style={S.summaryItem}>
               <Text style={[S.summaryLabel, { color: colors.muted }]}>业绩绩效</Text>
-              <Text style={[S.summaryValue, { color: colors.success }]}>¥{formatMoney(revenueKPIBonus)}</Text>
+              <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65} style={[S.summaryValue, { color: colors.success }]}>¥{formatMoney(revenueKPIBonus)}</Text>
             </View>
           </View>
         </View>
@@ -256,6 +256,7 @@ const S = StyleSheet.create({
   summaryRow: { flexDirection: "row", alignItems: "center" },
   summaryItem: { flex: 1, alignItems: "center" },
   summaryLabel: { fontSize: 11, marginBottom: 4 },
+  // fontSize: 16 在 4格布局（每格 ~77pt）下，¥100,000+ 会触碰边界，加 adjustsFontSizeToFit 防止溢出
   summaryValue: { fontSize: 16, fontWeight: "700" },
   summaryDivider: { width: 1, height: 30 },
   sectionCard: { borderRadius: 12, borderWidth: 1, padding: 16, marginBottom: 16 },

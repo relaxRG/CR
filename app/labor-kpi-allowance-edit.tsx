@@ -227,22 +227,22 @@ export default function LaborKPIAllowanceEditPage() {
           <View style={S.summaryRow}>
             <View style={S.summaryItem}>
               <Text style={[S.summaryLabel, { color: colors.muted }]}>绩效补贴</Text>
-              <Text style={[S.summaryValue, { color: colors.foreground }]}>¥{formatMoney(grandTotal)}</Text>
+              <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65} style={[S.summaryValue, { color: colors.foreground }]}>¥{formatMoney(grandTotal)}</Text>
             </View>
             <View style={[S.summaryDivider, { backgroundColor: colors.border }]} />
             <View style={S.summaryItem}>
               <Text style={[S.summaryLabel, { color: colors.muted }]}>补贴</Text>
-              <Text style={[S.summaryValue, { color: colors.primary }]}>¥{formatMoney(allowanceTotal)}</Text>
+              <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65} style={[S.summaryValue, { color: colors.primary }]}>¥{formatMoney(allowanceTotal)}</Text>
             </View>
             <View style={[S.summaryDivider, { backgroundColor: colors.border }]} />
             <View style={S.summaryItem}>
               <Text style={[S.summaryLabel, { color: colors.muted }]}>工作绩效</Text>
-              <Text style={[S.summaryValue, { color: colors.success }]}>¥{formatMoney(workKPITotal)}</Text>
+              <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65} style={[S.summaryValue, { color: colors.success }]}>¥{formatMoney(workKPITotal)}</Text>
             </View>
             <View style={[S.summaryDivider, { backgroundColor: colors.border }]} />
             <View style={S.summaryItem}>
               <Text style={[S.summaryLabel, { color: colors.muted }]}>业绩绩效</Text>
-              <Text style={[S.summaryValue, { color: colors.success }]}>¥{formatMoney(revenueKPITotal)}</Text>
+              <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65} style={[S.summaryValue, { color: colors.success }]}>¥{formatMoney(revenueKPITotal)}</Text>
             </View>
           </View>
           {/* 未保存提示 */}

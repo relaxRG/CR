@@ -29,6 +29,9 @@ function createAuthContext(): { ctx: TrpcContext; clearedCookies: CookieCall[] }
     user,
     req: {
       protocol: "https",
+      // getSessionCookieOptions 会读取 req.hostname 来计算 cookie domain
+      // 测试环境使用 localhost，getParentDomain 会返回 undefined（本地不设 domain）
+      hostname: "localhost",
       headers: {},
     } as TrpcContext["req"],
     res: {
@@ -41,8 +44,8 @@ function createAuthContext(): { ctx: TrpcContext; clearedCookies: CookieCall[] }
   return { ctx, clearedCookies };
 }
 
-// TODO: Remove `.skip` below once you implement user authentication
-describe.skip("auth.logout", () => {
+// auth.logout 路由已在 server/routers.ts 第 575 行实现，移除 .skip
+describe("auth.logout", () => {
   it("clears the session cookie and reports success", async () => {
     const { ctx, clearedCookies } = createAuthContext();
     const caller = appRouter.createCaller(ctx);
