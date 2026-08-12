@@ -17,14 +17,14 @@ import {
   CompOffBalanceEntry, HolidayCompOffEntry, UnexplainedRestAlert,
   CustomDept, BusinessHoursEntry, ShiftGroup, FillPreset,
   DeptCategory,
-  calcAllowance, calcSocialInsurance, calcIncomeTax,
-  shouldPayAllowanceThisMonth,
+  calcSocialInsurance, calcIncomeTax,
   getDaysInMonth, parseMonth, getContractHoursForDate,
   calcCompOffExpiresMonth, getAvailableCompOffDays,
   DEFAULT_SHIFT_TEMPLATES, DEFAULT_SPECIAL_STATUSES,
   DEFAULT_GLOBAL_PAYROLL_SETTINGS, DEFAULT_CUSTOM_DEPTS,
   DEFAULT_BUSINESS_HOURS, DEFAULT_SHIFT_GROUPS,
 } from "./types";
+import { settlePayrollExtras } from "./payroll-extras";
 import {
   buildFinalScheduleByDept,
   buildFrozenPayrollByEmployee,
@@ -684,7 +684,6 @@ interface PaySlipStore {
     employee: Employee,
     month: string,
     attendance: MonthlyAttendance | null,
-    performanceTotal: number,
     advanceAmount: number,
     globalSettings?: GlobalPayrollSettings,
     /** 年度累计已税收入（用于个税累计预扣法） */
@@ -744,7 +743,6 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
     employee: Employee,
     month: string,
     attendance: MonthlyAttendance | null,
-    performanceTotal: number,
     advanceAmount: number,
     globalSettings?: GlobalPayrollSettings,
     cumulativeIncome: number = 0,
@@ -754,54 +752,21 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
     const attendanceDays = attendance?.attendanceDays ?? 0;
     const attendanceSalary = attendance?.attendanceSalary ?? 0;
 
-    // ── 补贴自动计算 ──
-    let mealAllowance = 0;
-    let transportAllowance = 0;
-    let otherAllowance = 0;
-    const allowanceDetails: Record<string, { amount: number; autoNote: string; isOverride: boolean; calcBasis?: { formula: "rate_x_days" | "fixed" | "override"; rate?: number; days?: number; calculatedAt: number } }> = {};
-
-    if (employee.allowanceRules) {
-      const overrides = existing?.allowanceOverrides;
-      for (const rule of employee.allowanceRules) {
-        if (!rule.enabled) continue;
-        if (!shouldPayAllowanceThisMonth(rule, month)) continue;
-        // 如果用户在绩效补贴页手动取消了此补贴，则跳过
-        if (overrides && rule.id in overrides && !overrides[rule.id]) continue;
-        const { amount: autoAmount, autoNote } = calcAllowance(rule, attendanceDays);
-
-        // unit 已为必填字段，直接使用
-        const isDynamic = rule.unit === "per_day";
-        const existingDetail = existing?.allowanceDetails?.[rule.id];
-        // 动态补贴禁止 isOverride，固定补贴支持手动覆盖
-        const isOverride = isDynamic ? false : (existingDetail?.isOverride ?? false);
-        const finalAmount = isOverride ? (existingDetail?.amount ?? autoAmount) : autoAmount;
-
-        // 写入 calcBasis 审计字段
-        allowanceDetails[rule.id] = {
-          amount: finalAmount,
-          autoNote,
-          isOverride,
-          calcBasis: isDynamic
-            ? { formula: "rate_x_days", rate: rule.amount, days: attendanceDays, calculatedAt: Date.now() }
-            : isOverride
-              ? { formula: "override", calculatedAt: Date.now() }
-              : { formula: "fixed", calculatedAt: Date.now() },
-        };
-
-        // 分类：per_day 归入 mealAllowance，transport_fixed 归入 transportAllowance
-        if (rule.type === "transport_fixed") transportAllowance += finalAmount;
-        else if (isDynamic || rule.type === "meal_per_day") mealAllowance += finalAmount;
-        else otherAllowance += finalAmount;
-      }
-    }
+    // ── 绩效与补贴唯一实时结算 ──
+    // 控制字段只在薪资单中持久化；金额只由此结算结果生成。
+    const extras = settlePayrollExtras(employee, month, attendanceDays, {
+      allowanceOverrides: existing?.allowanceOverrides,
+      allowanceDetails: existing?.allowanceDetails,
+      workKPISelections: existing?.workKPISelections,
+      revenueActuals: existing?.revenueActuals,
+    });
 
     // ── 应发薪资（税前）──
     // compOffCashOut = 兑换调休余额现金，应加入应发薪资
     // 修复：旧版未将 compOffCashOut 纳入 grossSalary，导致兑换后应发薪资不变
     const grossSalary = Math.round((
-      attendanceSalary + performanceTotal +
-      (existing?.salesCommission ?? 0) +
-      transportAllowance + mealAllowance + otherAllowance +
+      attendanceSalary + extras.performanceTotal +
+      extras.transportAllowance + extras.mealAllowance + extras.otherAllowance +
       (existing?.rewardPenalty ?? 0) +
       (existing?.compOffCashOut ?? 0)
     ) * 100) / 100;
@@ -892,14 +857,11 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
       employeeCode: employee.code,
       attendanceDays,
       attendanceSalary,
-      performanceBonus: performanceTotal,
-      // 分项绩效字段：由 handleSave 写入，buildPaySlipDraft 从 existing 保留
-      workKPIBonus: existing?.workKPIBonus,
-      revenueKPIBonus: existing?.revenueKPIBonus,
-      salesCommission: existing?.salesCommission ?? 0,
-      mealAllowance,
-      transportAllowance,
-      otherAllowance,
+      workKPIBonus: extras.workKPIBonus,
+      revenueKPIBonus: extras.revenueKPIBonus,
+      mealAllowance: extras.mealAllowance,
+      transportAllowance: extras.transportAllowance,
+      otherAllowance: extras.otherAllowance,
       rewardPenalty: existing?.rewardPenalty ?? 0,
       rewardPenaltyItems: existing?.rewardPenaltyItems,
       advanceAmount,
@@ -912,7 +874,7 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
       employerSocialInsurance,
       employerHousingFund,
       totalEmployerCost,
-      allowanceDetails,
+      allowanceDetails: extras.allowanceDetails,
       socialInsuranceDetails,
       employerInsuranceDetails,
       incomeTaxNote,

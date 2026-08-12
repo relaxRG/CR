@@ -55,9 +55,9 @@ function renderFiveGridSummary(
   const overtimeAndHoliday = (att?.overtimePay ?? 0) + (att?.holidayBonus ?? 0);
 
   // 第3格：综合额外
-  const extraTotal = (slip?.performanceBonus ?? 0) + (slip?.mealAllowance ?? 0) +
-    (slip?.transportAllowance ?? 0) + (slip?.otherAllowance ?? 0) +
-    (slip?.rewardPenalty ?? 0) + (slip?.salesCommission ?? 0) +
+  const extraTotal = (slip?.workKPIBonus ?? 0) + (slip?.revenueKPIBonus ?? 0) +
+    (slip?.mealAllowance ?? 0) + (slip?.transportAllowance ?? 0) +
+    (slip?.otherAllowance ?? 0) + (slip?.rewardPenalty ?? 0) +
     (slip?.compOffCashOut ?? 0);
 
   // 第4格：已预支（合计手动 + 备用金）
@@ -589,20 +589,18 @@ describe("Suite O：summaryCard 4格字体缩放单元测试", () => {
     it("4格标签顺序：绩效补贴 / 补贴 / 工作绩效 / 业绩绩效", () => {
       const labels = ["绩效补贴", "补贴", "工作绩效", "业绩绩效"];
       expect(labels).toHaveLength(4);
-      expect(labels[0]).toBe("绩效补贴"); // grandTotal = allowanceTotal + performanceBonus
-      expect(labels[1]).toBe("补贴");     // allowanceTotal
-      expect(labels[2]).toBe("工作绩效"); // workKPIBonus
-      expect(labels[3]).toBe("业绩绩效"); // revenueKPIBonus
+      expect(labels[0]).toBe("绩效补贴"); // 补贴合计 + 工作绩效 + 业绩绩效
+      expect(labels[1]).toBe("补贴");     // 补贴合计
+      expect(labels[2]).toBe("工作绩效");
+      expect(labels[3]).toBe("业绩绩效");
     });
 
-    it("4格语义：grandTotal = 补贴合计 + performanceBonus（不含 salesCommission）", () => {
-      // 绩效补贴页的 grandTotal 不含 salesCommission（业绩提点是独立来源）
+    it("4格语义：绩效补贴 = 补贴合计 + 工作绩效 + 业绩绩效", () => {
       const allowanceTotal = 345;
-      const performanceBonus = 2200; // workKPIBonus + revenueKPIBonus
-      const salesCommission = 500;   // 不计入 grandTotal
-      const grandTotal = allowanceTotal + performanceBonus;
-      expect(grandTotal).toBe(2545);
-      expect(grandTotal).not.toBe(allowanceTotal + performanceBonus + salesCommission);
+      const workKPIBonus = 1700;
+      const revenueKPIBonus = 500;
+      const performanceAllowance = allowanceTotal + workKPIBonus + revenueKPIBonus;
+      expect(performanceAllowance).toBe(2545);
     });
   });
 

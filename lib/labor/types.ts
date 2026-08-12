@@ -1061,14 +1061,10 @@ export interface PaySlip {
   attendanceDays: number;
   /** 考勤工资（比例底薪 + 加班工资 + 节假日补偿 - 特殊扣薪）。精度：2位小数，Math.round(·×100)/100 */
   attendanceSalary: number;
-  /** 绩效奖金（工作绩效 + 业绩绩效）。精度：2位小数 */
-  performanceBonus: number;
   /** 工作绩效小计（workKPIRules 档位合计）。精度：2位小数 */
   workKPIBonus?: number;
   /** 业绩绩效小计（revenueKPIRules 阶梯合计）。精度：2位小数 */
   revenueKPIBonus?: number;
-  /** 业绩提点（营业额按比例提成）。精度：2位小数 */
-  salesCommission: number;
   /** 餐补合计（per_day 规则：餐补日单价 × 出勤天数）。精度：2位小数 */
   mealAllowance: number;
   /** 交通补贴（固定金额，按周期发放）。精度：2位小数 */
@@ -1084,7 +1080,7 @@ export interface PaySlip {
   notes: string;
   /**
    * 应发薪资（税前，扣除社保个税前）。精度：2位小数
-   * grossSalary = attendanceSalary + performanceBonus + salesCommission +
+   * grossSalary = attendanceSalary + workKPIBonus + revenueKPIBonus +
    *              mealAllowance + transportAllowance + otherAllowance + rewardPenalty + compOffCashOut
    */
   grossSalary: number;
@@ -1511,10 +1507,8 @@ export interface FrozenPayrollSnapshot {
   mealAllowance: number;
   transportAllowance: number;
   otherAllowance: number;
-  performanceBonus: number;
   workKPIBonus?: number;
   revenueKPIBonus?: number;
-  salesCommission?: number;
   rewardPenalty?: number;
   socialInsuranceDeduction: number;
   housingFundDeduction: number;

@@ -446,7 +446,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
       const advanceTotal = advances
         .filter((a) => a.employeeId === employee.id && (a.deductMonth === month || a.date.startsWith(month)) && (a.status === "pending" || a.status === "deducted"))
         .reduce((s, a) => s + a.amount, 0);
-      const draft = buildPaySlipDraft(employee, month, att, patched.performanceBonus ?? 0, advanceTotal, globalSettings);
+      const draft = buildPaySlipDraft(employee, month, att, advanceTotal, globalSettings);
       // draft 已包含所有控制字段（allowanceOverrides/workKPISelections/revenueActuals/compOffCashOut 等）
       // 不需再次显式传入
       upsertPaySlip({ ...draft, id: currentSlip.id });
@@ -493,7 +493,9 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
           : getAttendanceBaseSalary(att);
         const overtimeAndHoliday = isParttimeEmp ? 0 : ((att?.overtimePay ?? 0) + (att?.holidayBonus ?? 0));
         const allowanceSum = slip ? (slip.mealAllowance ?? 0) + (slip.transportAllowance ?? 0) + (slip.otherAllowance ?? 0) : 0;
-        const extraTotal = slip ? (slip.performanceBonus ?? 0) + allowanceSum + (slip.rewardPenalty ?? 0) : 0;
+        const performanceTotal = slip ? (slip.workKPIBonus ?? 0) + (slip.revenueKPIBonus ?? 0) : 0;
+        // 综合额外 = 补贴合计 + 工作绩效 + 业绩绩效 + 奖惩小计。
+        const extraTotal = slip ? performanceTotal + allowanceSum + (slip.rewardPenalty ?? 0) : 0;
         const advanceAmount = (slip?.advanceAmount ?? 0) + (slip?.pettyLaborPaid ?? 0);
         const finalSalary = slip?.finalSalary ?? null;
         return (
@@ -566,26 +568,23 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
           {/* ─── 综合额外（5格）─── */}
           {slip && (() => {
             const allowanceSum = (slip.mealAllowance ?? 0) + (slip.transportAllowance ?? 0) + (slip.otherAllowance ?? 0);
-            // 分项绩效：workKPIBonus = 工作绩效小计，向后兼容回落到 performanceBonus
-            const workKPI = slip.workKPIBonus ?? slip.performanceBonus ?? 0;
-            // 业绩 = 业绩绩效（revenueKPIBonus）+ 业绩提点（salesCommission）合并展示
-            // revenueKPIBonus = 绩效补贴页配置的业绩绩效规则合计
-            // salesCommission = 营业额按比例提成（业绩提点）
-            const revenueKPI = (slip.revenueKPIBonus ?? 0) + (slip.salesCommission ?? 0);
+            const workKPI = slip.workKPIBonus ?? 0;
+            const revenueKPI = slip.revenueKPIBonus ?? 0;
             const reward = slip.rewardPenalty ?? 0;
+            // 综合额外 = 补贴合计 + 工作绩效 + 业绩绩效 + 奖惩小计。
             const extraTotal = allowanceSum + workKPI + revenueKPI + reward;
             return (
               <View style={{ gap: 6, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border + "44" }}>
                 <Text style={{ fontSize: 10, fontWeight: "600", color: colors.muted }}>综合额外</Text>
-                <View style={{ flexDirection: "row" }}>
+                <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
                   {[
                     { label: "补贴合计", value: allowanceSum > 0 ? `+¥${formatMoney(allowanceSum)}` : "—", color: allowanceSum > 0 ? colors.foreground : colors.muted },
-                    { label: "工作绩效", value: workKPI > 0 ? `+¥${formatMoney(workKPI)}` : "—", color: workKPI > 0 ? colors.foreground : colors.muted },
-                    { label: "业绩", value: revenueKPI > 0 ? `+¥${formatMoney(revenueKPI)}` : "—", color: revenueKPI > 0 ? colors.foreground : colors.muted },
+                    { label: "工作绩效", value: workKPI !== 0 ? `${workKPI >= 0 ? "+" : ""}¥${formatMoney(workKPI)}` : "—", color: workKPI < 0 ? colors.error : workKPI > 0 ? colors.foreground : colors.muted },
+                    { label: "业绩绩效", value: revenueKPI !== 0 ? `${revenueKPI >= 0 ? "+" : ""}¥${formatMoney(revenueKPI)}` : "—", color: revenueKPI < 0 ? colors.error : revenueKPI > 0 ? colors.foreground : colors.muted },
                     { label: "奖惩小计", value: reward !== 0 ? `${reward >= 0 ? "+" : ""}¥${formatMoney(reward)}` : "—", color: reward < 0 ? colors.error : reward > 0 ? colors.foreground : colors.muted },
-                    { label: "综合小计", value: `${extraTotal >= 0 ? "+" : ""}¥${formatMoney(extraTotal)}`, color: extraTotal >= 0 ? colors.primary : colors.error },
-                                    ].map(({ label, value, color }) => (
-                    <View key={label} style={{ flex: 1, alignItems: "center" }}>
+                    { label: "综合额外", value: `${extraTotal >= 0 ? "+" : ""}¥${formatMoney(extraTotal)}`, color: extraTotal >= 0 ? colors.primary : colors.error },
+                  ].map(({ label, value, color }) => (
+                    <View key={label} style={{ width: "33.333%", alignItems: "center", paddingVertical: 3 }}>
                       <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ fontSize: 11, fontWeight: "700", color }}>{value}</Text>
                       <Text numberOfLines={1} style={{ fontSize: 9, color: colors.muted, marginTop: 1 }}>{label}</Text>
                     </View>
@@ -3661,7 +3660,6 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                       employee,
                       currentMonth,
                       emptyAttendance,
-                      existingSlip?.performanceBonus ?? 0,
                       advanceTotal,
                       globalSettings,
                       cumulativeIncome,
@@ -3723,20 +3721,18 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
           return sum + taxable;
         }, 0);
         const cumulativeTaxPaid = prevMonthSlips.reduce((sum, s) => sum + (s.incomeTax ?? 0), 0);
-        // buildPaySlipDraft 内部已通过 existing 保留手动字段
-        // 并已在 finalSalary 中正确扣除 pettyLaborPaid（不需重复扣）
-        // 重要：performanceTotal 从 existing 读取，防止覆盖手动录入的绩效奖金
-        // 修复：改用 getPaySlip（基于 ref.current）替代 paySlips.find（可能是 stale closure）
-        // 这确保 autoSync 始终读取最新的 performanceBonus，即使 paySlips state 尚未更新
-        const performanceTotal = existingSlip?.performanceBonus ?? 0;
-        const slip = buildPaySlipDraft(emp, currentMonth, att, performanceTotal, advanceTotal, globalSettings, cumulativeIncome, cumulativeTaxPaid);
+        // buildPaySlipDraft 从当前薪资单读取绩效/补贴控制字段，并统一实时结算所有分项。
+        // 不再传递旧聚合金额，避免自动同步覆盖工作绩效或业绩绩效。
+        const slip = buildPaySlipDraft(emp, currentMonth, att, advanceTotal, globalSettings, cumulativeIncome, cumulativeTaxPaid);
         upsertPaySlip(slip);
         // 监控规则 A6：检测控制字段丢失（跨月闭包污染典型症状）
         checkControlFieldsIntegrity(
           emp.id, emp.realName, currentMonth,
-          slip.performanceBonus ?? 0,
+          slip.workKPIBonus ?? 0,
+          slip.revenueKPIBonus ?? 0,
           slip.allowanceOverrides,
-          slip.workKPISelections
+          slip.workKPISelections,
+          slip.revenueActuals,
         );
         // 监控规则 A7：检测跨月数据污染（预支合计与存储差异过大）
         if (existingSlip?.advanceAmount != null) {
@@ -3971,10 +3967,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
             }
           : baseAtt;
         upsertAttendance(att);
-        // 绩效奖金从 existing 读取（已在 labor-kpi-allowance 页手动录入）
-        // 不传 0，防止覆盖手动录入的绩效奖金
-        // 修复：改用 getPaySlip（基于 ref.current）替代 paySlips.find，消除 stale closure 风险
-        const performanceTotal = existingSlip?.performanceBonus ?? 0;
+        // 绩效补贴控制字段由唯一结算引擎从当前薪资单读取并重算。
         const advanceTotal = advances
           .filter((a) => a.employeeId === emp.id && (a.deductMonth === currentMonth || a.date.startsWith(currentMonth)) && (a.status === "pending" || a.status === "deducted"))
           .reduce((s, a) => s + a.amount, 0);
@@ -4030,7 +4023,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
             consumeCompOffForShift(shift, "balance");
           }
         }
-        const slip = buildPaySlipDraft(emp, currentMonth, att, performanceTotal, advanceTotal, globalSettings, cumulativeIncome, cumulativeTaxPaid);
+        const slip = buildPaySlipDraft(emp, currentMonth, att, advanceTotal, globalSettings, cumulativeIncome, cumulativeTaxPaid);
         if (Object.keys(holidayBonusAllocation).length > 0) slip.holidayBonusAllocation = holidayBonusAllocation;
         if (Object.keys(compOffUsage).length > 0) slip.compOffUsage = compOffUsage;
         upsertPaySlip(slip);
@@ -4674,7 +4667,7 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
                               const patched = { ...slip, compOffCashOut: (slip.compOffCashOut ?? 0) + amount, compOffCashOutNote: `兑换调休 ${entry.days}天 ￥${formatMoney(amount)}`, updatedAt: new Date().toISOString() };
                               upsertPaySlip(patched);
                               const advTotal = advances.filter((a) => a.employeeId === empId && (a.deductMonth === currentMonthStr || a.date.startsWith(currentMonthStr)) && (a.status === "pending" || a.status === "deducted")).reduce((s, a) => s + a.amount, 0);
-                              const draft = buildPaySlipDraft(emp, currentMonthStr, att!, patched.performanceBonus ?? 0, advTotal, globalSettings);
+                              const draft = buildPaySlipDraft(emp, currentMonthStr, att!, advTotal, globalSettings);
                               // draft 已包含所有控制字段（allowanceOverrides/workKPISelections/revenueActuals/compOffCashOut/holidayBonusAllocation 等）
                               upsertPaySlip({ ...draft, id: slip.id });
                             }

@@ -252,7 +252,7 @@ function EmployeeCard({
     // 此时 ref.current 已更新，buildPaySlipDraft 能读到最新 rewardPenalty
     const draft = buildPaySlipDraft(
       employee, month, att ?? null,
-      slip.performanceBonus ?? 0, advanceTotal, globalSettings
+      advanceTotal, globalSettings
     );
     // draft 已包含所有控制字段（allowanceOverrides/workKPISelections/revenueActuals 等）
     // rewardPenalty/rewardPenaltyItems/notes 由 buildPaySlipDraft 内部从 existing 读取（Step 1 已写入）
@@ -265,7 +265,8 @@ function EmployeeCard({
   // ── 收起状态：2行4列网格摘要 ──
   if (!expanded) {
     const attendanceSalary = att?.attendanceSalary ?? slip?.attendanceSalary ?? 0;
-    const performance = (slip?.performanceBonus ?? 0);
+    const workKPI = slip?.workKPIBonus ?? 0;
+    const revenueKPI = slip?.revenueKPIBonus ?? 0;
     const allowance = (slip?.mealAllowance ?? 0) + (slip?.transportAllowance ?? 0) + (slip?.otherAllowance ?? 0);
     const reward = slip?.rewardPenalty ?? 0;
     const cashOut = slip?.compOffCashOut ?? 0;
@@ -276,9 +277,9 @@ function EmployeeCard({
 
     const grid1 = [
       { label: "考勤工资", value: attendanceSalary, color: numericColor(colors) },
-      { label: "绩效",     value: performance,      color: numericColor(colors) },
-      { label: "补贴",     value: allowance,         color: numericColor(colors) },
-      { label: "奖惩",     value: reward,            color: numericColor(colors, reward < 0 ? NUMERIC_TONE.negative : NUMERIC_TONE.value) },
+      { label: "工作绩效", value: workKPI,           color: numericColor(colors, workKPI < 0 ? NUMERIC_TONE.negative : NUMERIC_TONE.value) },
+      { label: "业绩绩效", value: revenueKPI,        color: numericColor(colors, revenueKPI < 0 ? NUMERIC_TONE.negative : NUMERIC_TONE.value) },
+      { label: "补贴合计", value: allowance,         color: numericColor(colors) },
     ];
     const grid2 = [
       { label: "调休兑换", value: cashOut,  color: numericColor(colors) },
@@ -297,7 +298,7 @@ function EmployeeCard({
           </View>
           <IconSymbol name="chevron.down" size={14} color={colors.muted} />
         </View>
-        {/* 第一行：考勤工资 / 绩效 / 补贴 / 奖惩 */}
+        {/* 第一行：考勤工资 / 工作绩效 / 业绩绩效 / 补贴合计 */}
         <View style={[S.gridRow, { borderTopColor: colors.border }]}>
           {grid1.map((item) => (
             <View key={item.label} style={S.gridCell}>
@@ -375,15 +376,10 @@ function EmployeeCard({
           <DetailRow label="餐补" value={`¥${formatMoney((slip?.mealAllowance ?? 0))}`} colors={colors} />
           <DetailRow label="交通补贴" value={`¥${formatMoney((slip?.transportAllowance ?? 0))}`} colors={colors} />
           {(slip?.otherAllowance ?? 0) > 0 && <DetailRow label="其他补贴" value={`¥${formatMoney((slip?.otherAllowance ?? 0))}`} colors={colors} />}
-          {/* 工作绩效：workKPIBonus 分项，向后兼容回落到 performanceBonus */}
-          <DetailRow label="工作绩效" value={`¥${formatMoney((slip?.workKPIBonus ?? slip?.performanceBonus ?? 0))}`} colors={colors} />
-          {/* 业绩绩效：revenueKPIBonus（绩效补贴页业绩绩效规则合计），有值才显示 */}
-          {(slip?.revenueKPIBonus ?? 0) > 0 && <DetailRow label="业绩绩效" value={`¥${formatMoney((slip?.revenueKPIBonus ?? 0))}`} colors={colors} />}
-          {/* 业绩提点：salesCommission（营业额按比例提成），有值才显示 */}
-          {(slip?.salesCommission ?? 0) > 0 && <DetailRow label="业绩提点" value={`¥${formatMoney((slip?.salesCommission ?? 0))}`} colors={colors} />}
-          {/* 综合小计 = 补贴合计 + 工作绩效 + 业绩绩效 + 业绩提点 + 奖惩小计 */}
-          {/* 与 grossSalary 中的综合部分保持一致：performanceBonus + allowanceTotal + salesCommission + rewardPenalty */}
-          <DetailRow label="综合小计" value={`¥${formatMoney(((slip?.performanceBonus ?? 0) + (slip?.mealAllowance ?? 0) + (slip?.transportAllowance ?? 0) + (slip?.otherAllowance ?? 0) + (slip?.salesCommission ?? 0) + (slip?.rewardPenalty ?? 0)))}`} colors={colors} bold />
+          <DetailRow label="工作绩效" value={`¥${formatMoney((slip?.workKPIBonus ?? 0))}`} colors={colors} />
+          <DetailRow label="业绩绩效" value={`¥${formatMoney((slip?.revenueKPIBonus ?? 0))}`} colors={colors} />
+          {/* 综合额外 = 补贴合计 + 工作绩效 + 业绩绩效 + 奖惩小计，与 grossSalary 保持一致。 */}
+          <DetailRow label="综合额外" value={`¥${formatMoney(((slip?.workKPIBonus ?? 0) + (slip?.revenueKPIBonus ?? 0) + (slip?.mealAllowance ?? 0) + (slip?.transportAllowance ?? 0) + (slip?.otherAllowance ?? 0) + (slip?.rewardPenalty ?? 0)))}`} colors={colors} bold />
         </View>
       </TouchableOpacity>
 

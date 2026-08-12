@@ -37,12 +37,12 @@
  *
  *   Suite E：grossSalary 构成完整性验证
  *     E1. compOffCashOut 纳入 grossSalary（修复旧版遗漏）
- *     E2. salesCommission 纳入 grossSalary
+ *     E2. 工作绩效与业绩绩效各自只计一次
  *     E3. rewardPenalty 纳入 grossSalary
  *     E4. 所有分项之和 = grossSalary（闭环验证）
  *
  *   Suite F：绩效补贴展示完整性（labor-attendance.tsx 修复验证）
- *     F1. 综合小计 = performanceBonus + mealAllowance + transportAllowance + otherAllowance + salesCommission
+ *     F1. 绩效补贴与综合额外采用统一分项口径
  *     F2. 旧版「绩效补贴小计」漏掉 transportAllowance 的回归测试
  */
 import { describe, it, expect, beforeEach } from "vitest";
@@ -61,8 +61,8 @@ import {
   type SpecialStatus,
   type GlobalPayrollSettings,
   type AllowanceRule,
-  calcAllowance,
 } from "../lib/labor/types";
+import { settlePayrollExtras } from "../lib/labor/payroll-extras";
 
 // ─── 测试工具函数（与 store.tsx 保持完全一致）────────────────────────────────
 
@@ -219,7 +219,6 @@ function buildPaySlipDraftPure(
   employee: Employee,
   month: string,
   attendance: MonthlyAttendance | null,
-  performanceTotal: number,
   advanceAmount: number,
   globalSettings?: GlobalPayrollSettings,
   existing?: Partial<PaySlip>
@@ -227,27 +226,17 @@ function buildPaySlipDraftPure(
   const attendanceDays = attendance?.attendanceDays ?? 0;
   const attendanceSalary = attendance?.attendanceSalary ?? 0;
 
-  // 补贴计算
-  let mealAllowance = 0;
-  let transportAllowance = 0;
-  let otherAllowance = 0;
-  if (employee.allowanceRules) {
-    for (const rule of employee.allowanceRules) {
-      if (!rule.enabled) continue;
-      const overrideEnabled = existing?.allowanceOverrides?.[rule.id];
-      if (overrideEnabled === false) continue;
-      const { amount: finalAmount } = calcAllowance(rule, attendanceDays);
-      if (rule.type === "transport_fixed") transportAllowance += finalAmount;
-      else if (rule.type === "meal_per_day") mealAllowance += finalAmount;
-      else otherAllowance += finalAmount;
-    }
-  }
+  const extras = settlePayrollExtras(employee, month, attendanceDays, {
+    allowanceOverrides: existing?.allowanceOverrides,
+    allowanceDetails: existing?.allowanceDetails,
+    workKPISelections: existing?.workKPISelections,
+    revenueActuals: existing?.revenueActuals,
+  });
 
-  // 应发薪资（含 compOffCashOut 修复）
+  // 应发薪资（补贴合计 + 工作绩效 + 业绩绩效 + 奖惩 + 调休兑现）
   const grossSalary = Math.round((
-    attendanceSalary + performanceTotal +
-    (existing?.salesCommission ?? 0) +
-    transportAllowance + mealAllowance + otherAllowance +
+    attendanceSalary + extras.performanceTotal +
+    extras.transportAllowance + extras.mealAllowance + extras.otherAllowance +
     (existing?.rewardPenalty ?? 0) +
     (existing?.compOffCashOut ?? 0)
   ) * 100) / 100;
@@ -272,11 +261,11 @@ function buildPaySlipDraftPure(
     employeeCode: employee.code,
     attendanceDays,
     attendanceSalary,
-    performanceBonus: performanceTotal,
-    salesCommission: existing?.salesCommission ?? 0,
-    mealAllowance,
-    transportAllowance,
-    otherAllowance,
+    workKPIBonus: extras.workKPIBonus,
+    revenueKPIBonus: extras.revenueKPIBonus,
+    mealAllowance: extras.mealAllowance,
+    transportAllowance: extras.transportAllowance,
+    otherAllowance: extras.otherAllowance,
     rewardPenalty: existing?.rewardPenalty ?? 0,
     compOffCashOut: existing?.compOffCashOut ?? 0,
     compOffCashOutNote: existing?.compOffCashOutNote,
@@ -284,6 +273,8 @@ function buildPaySlipDraftPure(
     socialInsuranceDeduction,
     housingFundDeduction,
     incomeTax,
+    employerSocialInsurance: 0,
+    employerHousingFund: 0,
     advanceAmount,
     pettyLaborPaid: pettyLaborPaidAmt,
     pettyLaborLinkIds: existing?.pettyLaborLinkIds,
@@ -292,6 +283,7 @@ function buildPaySlipDraftPure(
     allowanceOverrides: existing?.allowanceOverrides,
     workKPISelections: existing?.workKPISelections,
     revenueActuals: existing?.revenueActuals,
+    allowanceDetails: extras.allowanceDetails,
     holidayBonusAllocation: existing?.holidayBonusAllocation,
     notes: existing?.notes,
     updatedAt: new Date().toISOString(),
@@ -385,7 +377,7 @@ describe("Suite A：考勤工资计算引擎（calcFromShifts）", () => {
     const employee31 = makeEmployee({ baseSalary: 10000, restDaysPerMonth: 4 });
     const att = calcFromShiftsPure("emp-001", month31, employee31, [], ss);
     const staleSlip = { id: "stale-31-day-slip", attendanceSalary: 10000, grossSalary: 10000, finalSalary: 10000 };
-    const slip = buildPaySlipDraftPure(employee31, month31, att, 0, 0, undefined, staleSlip);
+    const slip = buildPaySlipDraftPure(employee31, month31, att, 0, undefined, staleSlip);
 
     // 31 - 4 = 27 只是应出勤分母；没有任何排班时实际出勤必须为 0。
     expect(att.daysInMonth).toBe(31);
@@ -542,13 +534,13 @@ describe("Suite B：兑换调休余额（handleCashOut 重构验证）", () => {
   it("B1. 首次兑换调休：grossSalary 增加 compOffCashOut 金额", () => {
     const att = makeBaseAtt();
     // 初始薪资单（无兑换）
-    const slip0 = buildPaySlipDraftPure(emp, MONTH, att, 0, 0);
+    const slip0 = buildPaySlipDraftPure(emp, MONTH, att, 0);
     expect(slip0.grossSalary).toBe(6000);
     expect(slip0.compOffCashOut).toBe(0);
 
     // 兑换1天调休（按日薪计算）
     const cashOutAmount = Math.round(DAILY_RATE * 1 * 100) / 100;
-    const slip1 = buildPaySlipDraftPure(emp, MONTH, att, 0, 0, undefined, {
+    const slip1 = buildPaySlipDraftPure(emp, MONTH, att, 0, undefined, {
       ...slip0,
       compOffCashOut: cashOutAmount,
       compOffCashOutNote: `兑换调休 1天 ¥${cashOutAmount.toFixed(2)}`,
@@ -560,11 +552,11 @@ describe("Suite B：兑换调休余额（handleCashOut 重构验证）", () => {
 
   it("B2. 多次兑换：grossSalary 不累积误差（每次基于 buildPaySlipDraft 重算）", () => {
     const att = makeBaseAtt();
-    const slip0 = buildPaySlipDraftPure(emp, MONTH, att, 0, 0);
+    const slip0 = buildPaySlipDraftPure(emp, MONTH, att, 0);
 
     // 第1次兑换：1天
     const amount1 = Math.round(DAILY_RATE * 100) / 100;
-    const slip1 = buildPaySlipDraftPure(emp, MONTH, att, 0, 0, undefined, {
+    const slip1 = buildPaySlipDraftPure(emp, MONTH, att, 0, undefined, {
       ...slip0,
       compOffCashOut: amount1,
     });
@@ -572,7 +564,7 @@ describe("Suite B：兑换调休余额（handleCashOut 重构验证）", () => {
     // 第2次兑换：再兑换0.5天
     const amount2 = Math.round(DAILY_RATE * 0.5 * 100) / 100;
     const totalCashOut = Math.round((amount1 + amount2) * 100) / 100;
-    const slip2 = buildPaySlipDraftPure(emp, MONTH, att, 0, 0, undefined, {
+    const slip2 = buildPaySlipDraftPure(emp, MONTH, att, 0, undefined, {
       ...slip1,
       compOffCashOut: totalCashOut,
     });
@@ -593,7 +585,7 @@ describe("Suite B：兑换调休余额（handleCashOut 重构验证）", () => {
     const att = makeBaseAtt();
     const cashOutAmount = Math.round(DAILY_RATE * 100) / 100;
     const advanceAmount = 1000;
-    const slip = buildPaySlipDraftPure(emp, MONTH, att, 0, advanceAmount, undefined, {
+    const slip = buildPaySlipDraftPure(emp, MONTH, att, advanceAmount, undefined, {
       compOffCashOut: cashOutAmount,
     });
     expect(slip.grossSalary).toBe(Math.round((6000 + cashOutAmount) * 100) / 100);
@@ -635,7 +627,7 @@ describe("Suite C：节假日换休切换（toggleMode 重构验证）", () => {
 
   it("C1. 初始状态（拿钱）：grossSalary 包含 holidayBonus", () => {
     const att = makeHolidayAtt();
-    const slip = buildPaySlipDraftPure(emp, MONTH, att, 0, 0);
+    const slip = buildPaySlipDraftPure(emp, MONTH, att, 0);
     // 全勤 + 节假日奖金
     expect(slip.attendanceSalary).toBeCloseTo(6000 + bonusAmt, 1);
     expect(slip.grossSalary).toBeCloseTo(6000 + bonusAmt, 1);
@@ -650,7 +642,7 @@ describe("Suite C：节假日换休切换（toggleMode 重构验证）", () => {
     };
     // 换休后 att.holidayBonus 应为 0（由 autoSync 重算），这里模拟重算后的 att
     const attAfterRest: MonthlyAttendance = { ...att, holidayBonus: 0, attendanceSalary: 6000 };
-    const slip = buildPaySlipDraftPure(emp, MONTH, attAfterRest, 0, 0, undefined, {
+    const slip = buildPaySlipDraftPure(emp, MONTH, attAfterRest, 0, undefined, {
       holidayBonusAllocation: alloc,
     });
     expect(slip.grossSalary).toBe(6000);
@@ -662,17 +654,17 @@ describe("Suite C：节假日换休切换（toggleMode 重构验证）", () => {
     const key = "emp-001_2026-07-01_ss_holiday";
 
     // 初始（拿钱）
-    const slip0 = buildPaySlipDraftPure(emp, MONTH, att, 0, 0);
+    const slip0 = buildPaySlipDraftPure(emp, MONTH, att, 0);
     const initialGross = slip0.grossSalary;
 
     // 切换为换休（att.holidayBonus 变为 0）
     const attRest: MonthlyAttendance = { ...att, holidayBonus: 0, attendanceSalary: 6000 };
     const allocRest = { [key]: { date: "2026-07-01", name: "节日上班", totalBonus: bonusAmt, cashAmount: 0, restDays: 1, mode: "rest" as const } };
-    const slip1 = buildPaySlipDraftPure(emp, MONTH, attRest, 0, 0, undefined, { holidayBonusAllocation: allocRest });
+    const slip1 = buildPaySlipDraftPure(emp, MONTH, attRest, 0, undefined, { holidayBonusAllocation: allocRest });
 
     // 切换回拿钱（att.holidayBonus 恢复）
     const allocCash = { [key]: { date: "2026-07-01", name: "节日上班", totalBonus: bonusAmt, cashAmount: bonusAmt, restDays: 0, mode: "cash" as const } };
-    const slip2 = buildPaySlipDraftPure(emp, MONTH, att, 0, 0, undefined, { holidayBonusAllocation: allocCash });
+    const slip2 = buildPaySlipDraftPure(emp, MONTH, att, 0, undefined, { holidayBonusAllocation: allocCash });
 
     expect(slip2.grossSalary).toBe(initialGross);
     expect(slip1.grossSalary).toBeLessThan(initialGross);
@@ -680,7 +672,7 @@ describe("Suite C：节假日换休切换（toggleMode 重构验证）", () => {
 
   it("C4. 旧版增量计算的累积误差验证（确认修复有效）", () => {
     const att = makeHolidayAtt();
-    const initialGross = buildPaySlipDraftPure(emp, MONTH, att, 0, 0).grossSalary;
+    const initialGross = buildPaySlipDraftPure(emp, MONTH, att, 0).grossSalary;
 
     // 模拟旧版增量计算：多次切换后 grossSalary 漂移
     let oldGross = initialGross;
@@ -697,7 +689,7 @@ describe("Suite C：节假日换休切换（toggleMode 重构验证）", () => {
     // 新版每次都基于 buildPaySlipDraft 重算，不会累积
     // 本测试验证：新版的幂等性（最终值 = 初始值）
     const attCash: MonthlyAttendance = { ...att };
-    const slip = buildPaySlipDraftPure(emp, MONTH, attCash, 0, 0);
+    const slip = buildPaySlipDraftPure(emp, MONTH, attCash, 0);
     expect(slip.grossSalary).toBe(initialGross); // 新版幂等
   });
 });
@@ -775,12 +767,12 @@ describe("Suite D：autoSync 依赖完整性（存入调休联动加班费）", 
       shifts1.push(makeShift(`2026-07-${String(d).padStart(2, "0")}`, 10));
     }
     const att1 = calcFromShiftsPure("emp-001", MONTH, emp, shifts1, DEFAULT_SPECIAL_STATUSES);
-    const slip1 = buildPaySlipDraftPure(emp, MONTH, att1, 0, 0);
+    const slip1 = buildPaySlipDraftPure(emp, MONTH, att1, 0);
 
     // 2. 用户存入调休（在排班表标记第23天为换休）
     const shifts2 = [...shifts1.slice(0, 22), makeShift("2026-07-23", null, "ss_comp_off_overtime")];
     const att2 = calcFromShiftsPure("emp-001", MONTH, emp, shifts2, DEFAULT_SPECIAL_STATUSES);
-    const slip2 = buildPaySlipDraftPure(emp, MONTH, att2, 0, 0);
+    const slip2 = buildPaySlipDraftPure(emp, MONTH, att2, 0);
 
     // 验证：存入调休后，加班费减少，薪资单同步更新
     // att2 第23天为 comp_off：rawOvertimeHours=22×2=44，stdHours=22×8+8=184，rawOT=220-184=36，paidOT=36-8=28
@@ -792,135 +784,82 @@ describe("Suite D：autoSync 依赖完整性（存入调休联动加班费）", 
   });
 });
 
-// ─── Suite E：grossSalary 构成完整性验证 ─────────────────────────────────────
+// ─── Suite E：唯一薪资结算引擎 ───────────────────────────────────────────────
 
-describe("Suite E：grossSalary 构成完整性验证", () => {
-  const emp = makeEmployee();
+describe("Suite E：唯一薪资结算引擎", () => {
+  const emp = makeEmployee({
+    workKPIRules: [{ id: "work-quality", name: "工作质量", cycle: "monthly", notes: "", enabled: true, tiers: [{ id: "good", label: "达标", amount: 1700, sortOrder: 1 }] }],
+    revenueKPIRules: [{ id: "revenue-store", name: "店铺营业额", source: "manual", payMode: "highest", calcType: "fixed", enabled: true, tiers: [{ id: "reached", threshold: 280000, amount: 500, sortOrder: 1 }] }],
+  });
 
   function makeFullAtt(): MonthlyAttendance {
     const shifts: ShiftEntry[] = [];
-    for (let d = 1; d <= 23; d++) {
-      shifts.push(makeShift(`2026-07-${String(d).padStart(2, "0")}`, 8));
-    }
+    for (let d = 1; d <= 23; d++) shifts.push(makeShift(`2026-07-${String(d).padStart(2, "0")}`, 8));
     return calcFromShiftsPure("emp-001", MONTH, emp, shifts, DEFAULT_SPECIAL_STATUSES);
   }
 
-  it("E1. compOffCashOut 纳入 grossSalary（修复旧版遗漏）", () => {
-    const att = makeFullAtt();
-    const cashOut = 500;
-    const slip = buildPaySlipDraftPure(emp, MONTH, att, 0, 0, undefined, { compOffCashOut: cashOut });
-    expect(slip.grossSalary).toBe(6000 + cashOut);
-    expect(slip.compOffCashOut).toBe(cashOut);
+  it("E1. 调休兑现纳入应发", () => {
+    const slip = buildPaySlipDraftPure(emp, MONTH, makeFullAtt(), 0, undefined, { compOffCashOut: 500 });
+    expect(slip.grossSalary).toBe(6500);
   });
 
-  it("E2. salesCommission 纳入 grossSalary", () => {
-    const att = makeFullAtt();
-    const commission = 800;
-    const slip = buildPaySlipDraftPure(emp, MONTH, att, 0, 0, undefined, { salesCommission: commission });
-    expect(slip.grossSalary).toBe(6000 + commission);
-    expect(slip.salesCommission).toBe(commission);
+  it("E2. 工作绩效和业绩绩效各自只计一次", () => {
+    const slip = buildPaySlipDraftPure(emp, MONTH, makeFullAtt(), 0, undefined, {
+      workKPISelections: { "work-quality": "good" },
+      revenueActuals: { "revenue-store": 280000 },
+    });
+    expect(slip.workKPIBonus).toBe(1700);
+    expect(slip.revenueKPIBonus).toBe(500);
+    expect(slip.grossSalary).toBe(8200);
+    expect("salesCommission" in slip).toBe(false);
   });
 
-  it("E3. rewardPenalty 纳入 grossSalary（正数为奖励，负数为惩罚）", () => {
+  it("E3. 奖惩小计纳入应发（正数奖励、负数惩罚）", () => {
     const att = makeFullAtt();
-    // 奖励 200
-    const slipReward = buildPaySlipDraftPure(emp, MONTH, att, 0, 0, undefined, { rewardPenalty: 200 });
-    expect(slipReward.grossSalary).toBe(6200);
-    // 惩罚 -300
-    const slipPenalty = buildPaySlipDraftPure(emp, MONTH, att, 0, 0, undefined, { rewardPenalty: -300 });
-    expect(slipPenalty.grossSalary).toBe(5700);
+    expect(buildPaySlipDraftPure(emp, MONTH, att, 0, undefined, { rewardPenalty: 200 }).grossSalary).toBe(6200);
+    expect(buildPaySlipDraftPure(emp, MONTH, att, 0, undefined, { rewardPenalty: -300 }).grossSalary).toBe(5700);
   });
 
-  it("E4. 所有分项之和 = grossSalary（闭环验证）", () => {
-    const att = makeFullAtt();
-    const existing = {
-      salesCommission: 800,
+  it("E4. 应发工资与分项结算闭环一致", () => {
+    const slip = buildPaySlipDraftPure(emp, MONTH, makeFullAtt(), 0, undefined, {
+      workKPISelections: { "work-quality": "good" },
+      revenueActuals: { "revenue-store": 280000 },
       rewardPenalty: 200,
       compOffCashOut: 500,
-    };
-    const slip = buildPaySlipDraftPure(emp, MONTH, att, 500, 0, undefined, existing);
-    // grossSalary = attendanceSalary + performanceBonus + salesCommission + mealAllowance + transportAllowance + otherAllowance + rewardPenalty + compOffCashOut
-    const expected = Math.round((
-      slip.attendanceSalary +
-      slip.performanceBonus +
-      (slip.salesCommission ?? 0) +
-      slip.mealAllowance +
-      slip.transportAllowance +
-      slip.otherAllowance +
-      (slip.rewardPenalty ?? 0) +
-      (slip.compOffCashOut ?? 0)
-    ) * 100) / 100;
+    });
+    const expected = slip.attendanceSalary + (slip.workKPIBonus ?? 0) + (slip.revenueKPIBonus ?? 0) + slip.mealAllowance + slip.transportAllowance + slip.otherAllowance + (slip.rewardPenalty ?? 0) + (slip.compOffCashOut ?? 0);
     expect(slip.grossSalary).toBe(expected);
   });
 });
 
-// ─── Suite F：绩效补贴展示完整性（labor-attendance.tsx 修复验证）──────────────
+// ─── Suite F：术语与零出勤边界 ───────────────────────────────────────────────
 
-describe("Suite F：绩效补贴展示完整性（综合小计修复验证）", () => {
-  it("F1. 综合小计 = performanceBonus + mealAllowance + transportAllowance + otherAllowance + salesCommission", () => {
-    const slip = {
-      performanceBonus: 500,
-      mealAllowance: 300,
-      transportAllowance: 200,
-      otherAllowance: 100,
-      salesCommission: 800,
-    };
-    // 新版「综合小计」计算（修复后）
-    const newTotal = (slip.performanceBonus ?? 0) +
-      (slip.mealAllowance ?? 0) +
-      (slip.transportAllowance ?? 0) +
-      (slip.otherAllowance ?? 0) +
-      (slip.salesCommission ?? 0);
-    expect(newTotal).toBe(1900);
+describe("Suite F：术语与零出勤边界", () => {
+  it("F1. 绩效补贴 = 补贴合计 + 工作绩效 + 业绩绩效", () => {
+    const settlement = settlePayrollExtras(makeEmployee({
+      allowanceRules: [{ id: "meal", label: "餐补", amount: 15, unit: "per_day", type: "meal_per_day", enabled: true, frequency: "monthly" } as AllowanceRule],
+      workKPIRules: [{ id: "work", name: "工作", cycle: "monthly", notes: "", enabled: true, tiers: [{ id: "ok", label: "达标", amount: 1700, sortOrder: 1 }] }],
+      revenueKPIRules: [{ id: "revenue", name: "业绩", source: "manual", payMode: "highest", calcType: "fixed", enabled: true, tiers: [{ id: "hit", threshold: 1, amount: 500, sortOrder: 1 }] }],
+    }), MONTH, 2, { workKPISelections: { work: "ok" }, revenueActuals: { revenue: 1 } });
+    expect(settlement.allowanceTotal).toBe(30);
+    expect(settlement.workKPIBonus).toBe(1700);
+    expect(settlement.revenueKPIBonus).toBe(500);
+    expect(settlement.allowanceTotal + settlement.performanceTotal).toBe(2230);
   });
 
-  it("F2. 旧版「绩效补贴小计」漏掉 transportAllowance 的回归测试", () => {
-    const slip = {
-      performanceBonus: 500,
-      mealAllowance: 300,
-      transportAllowance: 200, // 旧版漏掉
-      otherAllowance: 100,     // 旧版漏掉
-      salesCommission: 800,    // 旧版漏掉
-    };
-    // 旧版计算（仅含 performanceBonus + mealAllowance）
-    const oldTotal = (slip.performanceBonus ?? 0) + (slip.mealAllowance ?? 0);
-    // 新版计算（含全部5项）
-    const newTotal = (slip.performanceBonus ?? 0) +
-      (slip.mealAllowance ?? 0) +
-      (slip.transportAllowance ?? 0) +
-      (slip.otherAllowance ?? 0) +
-      (slip.salesCommission ?? 0);
-    // 旧版漏掉了 1100（200 + 100 + 800）
-    expect(oldTotal).toBe(800);
-    expect(newTotal).toBe(1900);
-    expect(newTotal - oldTotal).toBe(1100); // 修复后多出 1100
+  it("F2. 零出勤时按天餐补必须清零，不继承旧金额", () => {
+    const empWithMeal = makeEmployee({ allowanceRules: [{ id: "meal", label: "餐补", amount: 15, unit: "per_day", type: "meal_per_day", enabled: true, frequency: "monthly" } as AllowanceRule] });
+    const settlement = settlePayrollExtras(empWithMeal, MONTH, 0, { allowanceDetails: { meal: { amount: 15, autoNote: "旧值", isOverride: false } } });
+    expect(settlement.mealAllowance).toBe(0);
+    expect(settlement.allowanceDetails.meal.amount).toBe(0);
   });
 
-  it("F3. 综合小计与 grossSalary 构成一致（排除考勤工资部分）", () => {
-    const emp = makeEmployee();
-    const shifts: ShiftEntry[] = [];
-    for (let d = 1; d <= 23; d++) {
-      shifts.push(makeShift(`2026-07-${String(d).padStart(2, "0")}`, 8));
-    }
-    const att = calcFromShiftsPure("emp-001", MONTH, emp, shifts, DEFAULT_SPECIAL_STATUSES);
-    const existing = {
-      salesCommission: 800,
-      rewardPenalty: 0,
-      compOffCashOut: 0,
-    };
-    const slip = buildPaySlipDraftPure(emp, MONTH, att, 500, 0, undefined, existing);
-
-    // 综合小计（绩效补贴区展示的值）
-    const displayTotal = (slip.performanceBonus ?? 0) +
-      (slip.mealAllowance ?? 0) +
-      (slip.transportAllowance ?? 0) +
-      (slip.otherAllowance ?? 0) +
-      (slip.salesCommission ?? 0);
-
-    // grossSalary - attendanceSalary = 综合小计 + rewardPenalty + compOffCashOut
-    const nonAttendancePart = Math.round((slip.grossSalary - slip.attendanceSalary) * 100) / 100;
-    const expectedNonAtt = Math.round((displayTotal + (slip.rewardPenalty ?? 0) + (slip.compOffCashOut ?? 0)) * 100) / 100;
-    expect(nonAttendancePart).toBe(expectedNonAtt);
+  it("F3. 综合额外 = 绩效补贴 + 奖惩小计", () => {
+    const slip = { mealAllowance: 300, transportAllowance: 200, otherAllowance: 100, workKPIBonus: 1700, revenueKPIBonus: 500, rewardPenalty: -100 };
+    const performanceAllowance = slip.mealAllowance + slip.transportAllowance + slip.otherAllowance + slip.workKPIBonus + slip.revenueKPIBonus;
+    const extraTotal = performanceAllowance + slip.rewardPenalty;
+    expect(performanceAllowance).toBe(2800);
+    expect(extraTotal).toBe(2700);
   });
 });
 

@@ -8,10 +8,10 @@ import { formatMoney } from "@/lib/utils";
  *   日薪原始基数 = 月底薪 ÷ 当月应出勤天数
  *   特殊扣薪 = att.totalSpecialDeduction（旷工/病假等额外扣减）
  *   考勤工资 = 比例底薪 + 加班工资 + 节假日薪资 - 特殊扣薪
- *   业绩提点 = slip.salesCommission（从 existing 读取，非绩效考核）
- *   工作绩效 = slip.performanceBonus（workKPI + revenueKPI 合计）
- *   工作绩效小计 = slip.workKPIBonus（仅 workKPIRules 档位合计）
- *   业绩绩效小计 = slip.revenueKPIBonus（仅 revenueKPIRules 阶梯合计）
+ *   补贴合计 = 餐补 + 交通补贴 + 其他补贴
+ *   工作绩效 = slip.workKPIBonus（工作 KPI 档位合计）
+ *   业绩绩效 = slip.revenueKPIBonus（经营业绩规则合计）
+ *   综合额外 = 补贴合计 + 工作绩效 + 业绩绩效 + 奖惩小计
  */
 
 import * as FileSystem from "expo-file-system/legacy";
@@ -95,7 +95,7 @@ export function buildPayrollWorkbook(params: ExportParams): XLSX.WorkBook {
   // ── Sheet 1：总表 ──
   // 列顺序与薪资卡片展开区域保持一致：
   //   考勤明细：基础/工时薪资 | 加班工资 | 节假日薪资 | 特殊扣薪 | 考勤工资小计
-  //   综合额外：补贴合计 | 工作绩效 | 业绩提点 | 奖惩小计
+  //   综合额外：补贴合计 | 工作绩效 | 业绩绩效 | 奖惩小计
   //   扣款：已预支 | 社保(个人) | 公积金(个人) | 个税
   //   实发：实发工资 | 公司社保 | 公司公积金 | 公司总成本
   const totalHeader = [
@@ -104,7 +104,7 @@ export function buildPayrollWorkbook(params: ExportParams): XLSX.WorkBook {
     // 考勤明细（5格）
     "基础/工时薪资", "加班时长(h)", "加班工资", "节假日薪资", "特殊扣薪", "考勤工资小计",
     // 综合额外
-    "补贴合计", "工作绩效", "业绩绩效", "业绩提点", "奖惩小计", "调休兑现",
+    "补贴合计", "工作绩效", "业绩绩效", "奖惩小计", "调休兑现",
     // 应发
     "应发工资",
     // 扣款
@@ -147,9 +147,8 @@ export function buildPayrollWorkbook(params: ExportParams): XLSX.WorkBook {
 
       // 综合额外
       const allowanceTotal = (slip?.mealAllowance ?? 0) + (slip?.transportAllowance ?? 0) + (slip?.otherAllowance ?? 0);
-      const performanceBonus = slip?.performanceBonus ?? 0;
-      const workKPIBonus = slip?.workKPIBonus ?? performanceBonus; // 工作绩效分项，向后兼容
-      const salesCommission = slip?.salesCommission ?? 0; // 业绩提点
+      const workKPIBonus = slip?.workKPIBonus ?? 0;
+      const revenueKPIBonus = slip?.revenueKPIBonus ?? 0;
       const rewardPenalty = slip?.rewardPenalty ?? 0;
       const compOffCashOut = slip?.compOffCashOut ?? 0;
 
@@ -190,8 +189,7 @@ export function buildPayrollWorkbook(params: ExportParams): XLSX.WorkBook {
         // 综合额外
         +allowanceTotal.toFixed(2),
         +workKPIBonus.toFixed(2),
-        +(slip?.revenueKPIBonus ?? 0).toFixed(2),
-        +salesCommission.toFixed(2),
+        +revenueKPIBonus.toFixed(2),
         +rewardPenalty.toFixed(2),
         +compOffCashOut.toFixed(2),
         // 应发
@@ -241,7 +239,7 @@ export function buildPayrollWorkbook(params: ExportParams): XLSX.WorkBook {
       "基础/工时薪资", "加班时长(h)", "加班工资", "节假日薪资", "特殊扣薪", "考勤工资小计",
       // 综合额外（细化）
       "餐补", "交通补贴", "其他补贴", "补贴合计",
-      "工作绩效", "业绩绩效", "业绩提点",
+      "工作绩效", "业绩绩效",
       "奖励", "惩罚", "奖惩小计",
       "调休兑现",
       // 应发
@@ -292,9 +290,8 @@ export function buildPayrollWorkbook(params: ExportParams): XLSX.WorkBook {
         +(slip?.otherAllowance ?? 0).toFixed(2),
         +((slip?.mealAllowance ?? 0) + (slip?.transportAllowance ?? 0) + (slip?.otherAllowance ?? 0)).toFixed(2),
         // 绩效
-        +(slip?.workKPIBonus ?? slip?.performanceBonus ?? 0).toFixed(2),
+        +(slip?.workKPIBonus ?? 0).toFixed(2),
         +(slip?.revenueKPIBonus ?? 0).toFixed(2),
-        +(slip?.salesCommission ?? 0).toFixed(2), // 业绩提点
         // 奖惩
         +rewards.toFixed(2),
         penalties > 0 ? -+penalties.toFixed(2) : 0,
@@ -460,9 +457,8 @@ export function buildPayrollHtml(params: ExportParams): string {
           <td>¥${fmt(att?.holidayBonus)}</td>
           <td class="${specialDeduction > 0 ? "deduct" : ""}">-¥${fmt(specialDeduction)}</td>
           <td>¥${fmt(slip?.attendanceSalary)}</td>
-          <td>¥${fmt(slip?.workKPIBonus ?? slip?.performanceBonus)}</td>
+          <td>¥${fmt(slip?.workKPIBonus)}</td>
           <td>¥${fmt(slip?.revenueKPIBonus)}</td>
-          <td>¥${fmt(slip?.salesCommission)}</td>
           <td>¥${fmt(allowanceTotal)}</td>
           <td>¥${fmt(slip?.rewardPenalty)}</td>
           <td>¥${fmt(slip?.compOffCashOut)}</td>
@@ -520,7 +516,7 @@ export function buildPayrollHtml(params: ExportParams): string {
       <th>姓名</th><th>代号</th><th>类型</th>
       <th>出勤/应出勤</th>
       <th>基础/工时薪资</th><th>加班(h/¥)</th><th>节假日薪资</th><th>特殊扣薪</th><th>考勤工资</th>
-      <th>工作绩效</th><th>业绩绩效</th><th>业绩提点</th><th>补贴合计</th><th>奖惩</th><th>调休兑现</th>
+      <th>工作绩效</th><th>业绩绩效</th><th>补贴合计</th><th>奖惩</th><th>调休兑现</th>
       <th>应发工资</th>
       <th>社保(个人)</th><th>公积金(个人)</th><th>个税</th><th>已预支</th>
       <th>实发工资</th><th>公司总成本</th><th>状态</th>
@@ -783,7 +779,7 @@ export function buildCombinedWorkbook(params: ExportParams): XLSX.WorkBook {
     "部门", "姓名", "代号", "类型",
     "合同底薪", "应出勤天", "实际出勤天", "日薪",
     "基础/工时薪资", "加班时长(h)", "加班工资", "节假日薪资", "特殊扣薪", "考勤工资小计",
-    "补贴合计", "工作绩效", "业绩绩效", "业绩提点", "奖惩小计", "调休兑现",
+    "补贴合计", "工作绩效", "业绩绩效", "奖惩小计", "调休兑现",
     "应发工资",
     "已预支", "社保代缴(个人)", "公积金代缴(个人)", "个税代缴",
     "实发工资",
@@ -813,9 +809,8 @@ export function buildCombinedWorkbook(params: ExportParams): XLSX.WorkBook {
       const specialDeduction = att?.totalSpecialDeduction ?? 0;
       const attendanceSalary = slip?.attendanceSalary ?? 0;
       const allowanceTotal = (slip?.mealAllowance ?? 0) + (slip?.transportAllowance ?? 0) + (slip?.otherAllowance ?? 0);
-      const performanceBonus = slip?.performanceBonus ?? 0;
-      const workKPIBonus = slip?.workKPIBonus ?? performanceBonus; // 工作绩效分项，向后兼容
-      const salesCommission = slip?.salesCommission ?? 0;
+      const workKPIBonus = slip?.workKPIBonus ?? 0;
+      const revenueKPIBonus = slip?.revenueKPIBonus ?? 0;
       const rewardPenalty = slip?.rewardPenalty ?? 0;
       const compOffCashOut = slip?.compOffCashOut ?? 0;
       const grossSalary = slip?.grossSalary ?? 0;
@@ -839,7 +834,7 @@ export function buildCombinedWorkbook(params: ExportParams): XLSX.WorkBook {
         +proportionalBase.toFixed(2), +overtimeHours.toFixed(1), +overtimeAmount.toFixed(2),
         +holidayBonus.toFixed(2), specialDeduction > 0 ? -+specialDeduction.toFixed(2) : 0,
         +attendanceSalary.toFixed(2),
-        +allowanceTotal.toFixed(2), +workKPIBonus.toFixed(2), +(slip?.revenueKPIBonus ?? 0).toFixed(2), +salesCommission.toFixed(2),
+        +allowanceTotal.toFixed(2), +workKPIBonus.toFixed(2), +revenueKPIBonus.toFixed(2),
         +rewardPenalty.toFixed(2), +compOffCashOut.toFixed(2),
         +grossSalary.toFixed(2),
         advance > 0 ? -+advance.toFixed(2) : 0,
@@ -1042,7 +1037,7 @@ export function buildCombinedHtml(params: ExportParams): string {
         <td>¥${fmt(proportionalBase)}</td><td>${fmt(att?.paidOvertimeHours ?? 0, 1)}h/¥${fmt(att?.overtimePay)}</td>
         <td>¥${fmt(att?.holidayBonus)}</td><td class="deduct">-¥${fmt(specialDeduction)}</td>
         <td>¥${fmt(slip?.attendanceSalary)}</td>
-        <td>¥${fmt(slip?.workKPIBonus ?? slip?.performanceBonus)}</td><td>¥${fmt(slip?.revenueKPIBonus)}</td><td>¥${fmt(allowanceTotal)}</td><td>¥${fmt(slip?.rewardPenalty)}</td>
+        <td>¥${fmt(slip?.workKPIBonus)}</td><td>¥${fmt(slip?.revenueKPIBonus)}</td><td>¥${fmt(allowanceTotal)}</td><td>¥${fmt(slip?.rewardPenalty)}</td>
         <td>¥${fmt(slip?.grossSalary)}</td>
         <td class="deduct">-¥${fmt(slip?.socialInsuranceDeduction)}</td>
         <td class="deduct">-¥${fmt((slip?.advanceAmount ?? 0) + (slip?.pettyLaborPaid ?? 0))}</td>

@@ -19,9 +19,9 @@ import { ScreenContainer } from "@/components/screen-container";
 import { useEmployeeStore, usePaySlipStore, useAttendanceStore, useGlobalPayrollSettingsStore, useMonthCloseStore } from "@/lib/labor/store";
 import {
   ALLOWANCE_UNIT_LABELS, REVENUE_KPI_SOURCE_LABELS,
-  REVENUE_KPI_PAY_MODE_LABELS, calcRevenueKPIBonus,
-  shouldPayAllowanceThisMonth, calcAllowance,
+  REVENUE_KPI_PAY_MODE_LABELS, shouldPayAllowanceThisMonth,
 } from "@/lib/labor/types";
+import { settlePayrollExtras } from "@/lib/labor/payroll-extras";
 
 const tap = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
@@ -99,37 +99,16 @@ export default function LaborKPIAllowanceEditPage() {
     return getAttendance(employeeId, month)?.attendanceDays ?? 0;
   }, [employeeId, month, getAttendance, attendanceRecords]);
 
-  // ── 实时预览合计（基于本地 State，不影响 Store） ──
-  const allowanceTotal = useMemo(() => {
-    return allowanceRules.reduce((sum, r) => {
-      if (!allowanceEnabled[r.id]) return sum;
-      // 修复：季度/年度补贴必须判断当月是否应发放，与 buildPaySlipDraft 保持一致
-      if (!shouldPayAllowanceThisMonth(r, month ?? "")) return sum;
-      const { amount } = calcAllowance(r, attendanceDays);
-      return sum + amount;
-    }, 0);
-  }, [allowanceRules, allowanceEnabled, attendanceDays, month]);
-
-  const workKPITotal = useMemo(() => {
-    return workKPIRules.reduce((sum, rule) => {
-      const selectedTierId = workKPISelections[rule.id];
-      if (!selectedTierId) return sum;
-      const tier = rule.tiers.find((t) => t.id === selectedTierId);
-      return sum + (tier?.amount ?? 0);
-    }, 0);
-  }, [workKPIRules, workKPISelections]);
-
-  const revenueKPITotal = useMemo(() => {
-    return revenueKPIRules.reduce((sum, rule) => {
-      if (!rule.enabled) return sum;
-      const actualStr = revenueActuals[rule.id];
-      const actual = actualStr ? Number(actualStr) : 0;
-      return sum + calcRevenueKPIBonus(rule, actual);
-    }, 0);
-  }, [revenueKPIRules, revenueActuals]);
-
-  const performanceTotal = workKPITotal + revenueKPITotal;
-  const grandTotal = performanceTotal + allowanceTotal;
+  // ── 实时预览合计（与薪资草稿、只读页完全使用同一结算引擎） ──
+  const extras = useMemo(() => settlePayrollExtras(employee, month ?? "", attendanceDays, {
+    allowanceOverrides: allowanceEnabled,
+    workKPISelections,
+    revenueActuals: Object.fromEntries(Object.entries(revenueActuals).map(([id, value]) => [id, Number(value) || 0])),
+  }), [employee, month, attendanceDays, allowanceEnabled, workKPISelections, revenueActuals]);
+  const allowanceTotal = extras.allowanceTotal;
+  const workKPITotal = extras.workKPIBonus;
+  const revenueKPITotal = extras.revenueKPIBonus;
+  const grandTotal = extras.allowanceTotal + extras.performanceTotal;
 
   // ── 判断是否有未保存的改动 ──
   const hasChanges = useCallback(() => {
@@ -172,17 +151,13 @@ export default function LaborKPIAllowanceEditPage() {
       allowanceOverrides: allowanceEnabled,
       workKPISelections,
       revenueActuals: numericActuals,
-      performanceBonus: performanceTotal,
-      // 分项绩效字段：保存工作绩效和业绩绩效小计，供展示页正确展示
-      workKPIBonus: workKPITotal,
-      revenueKPIBonus: revenueKPITotal,
     };
     upsertPaySlip(patched);
 
     // Step 2：此时 ref.current 已更新，buildPaySlipDraft 能读到最新控制字段
     const att = getAttendance(employeeId, month) ?? null;
     const advanceAmount = patched.advanceAmount ?? 0;
-    const draft = buildPaySlipDraft(employee, month, att, performanceTotal, advanceAmount, globalSettings);
+    const draft = buildPaySlipDraft(employee, month, att, advanceAmount, globalSettings);
 
     // Step 3：原子性最终写入
     // 注意：draft 已包含 allowanceOverrides/workKPISelections/revenueActuals（从 Step 1 写入的 existing 读取）
@@ -190,7 +165,7 @@ export default function LaborKPIAllowanceEditPage() {
     upsertPaySlip({ ...draft, id: existing.id });
 
     router.back();
-  }, [month, employeeId, employee, getPaySlip, allowanceEnabled, workKPISelections, revenueActuals, performanceTotal, upsertPaySlip, buildPaySlipDraft, getAttendance, globalSettings, router]);
+  }, [month, employeeId, employee, getPaySlip, allowanceEnabled, workKPISelections, revenueActuals, upsertPaySlip, buildPaySlipDraft, getAttendance, globalSettings, router]);
 
   // ── 取消：有改动时弹出确认弹窗 ──
   const handleCancel = useCallback(() => {
@@ -263,7 +238,7 @@ export default function LaborKPIAllowanceEditPage() {
           {allowanceRules.map((rule) => {
             // 修复：季度/年度补贴必须先判断当月是否应发放，与 buildPaySlipDraft 保持一致
             const shouldPay = shouldPayAllowanceThisMonth(rule, month ?? "");
-            const displayAmount = shouldPay ? calcAllowance(rule, attendanceDays).amount : 0;
+            const displayAmount = extras.allowanceDetails[rule.id]?.amount ?? 0;
             // 非发放月的补贴不允许用户勾选（禁用点击）
             return (
               <TouchableOpacity key={rule.id}
@@ -337,7 +312,7 @@ export default function LaborKPIAllowanceEditPage() {
           {revenueKPIRules.filter((r) => r.enabled).map((rule) => {
             const actualStr = revenueActuals[rule.id] ?? "";
             const actual = actualStr ? Number(actualStr) : 0;
-            const bonus = calcRevenueKPIBonus(rule, actual);
+            const bonus = extras.revenueKPIDetails[rule.id]?.amount ?? 0;
             return (
               <View key={rule.id} style={[S.itemRow, { borderBottomColor: colors.border, flexDirection: "column", alignItems: "stretch" }]}>
                 <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>

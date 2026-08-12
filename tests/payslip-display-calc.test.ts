@@ -85,17 +85,16 @@ describe("autoSync 依赖完整性", () => {
   });
 });
 
-// ─── 3. salesCommission 字段语义验证 ─────────────────────────────────────────────
+// ─── 3. 业绩绩效与综合额外语义验证 ─────────────────────────────────────────────
 
-describe("salesCommission 字段语义（业绩提点）", () => {
-  it("salesCommission 是业绩提点，不是业绩绩效考核结果", () => {
-    const slip = { performanceBonus: 500, salesCommission: 150 };
+describe("业绩绩效唯一语义", () => {
+  it("业绩绩效是唯一业绩奖励金额，不拆分第二个业绩字段", () => {
+    const slip = { workKPIBonus: 500, revenueKPIBonus: 150 };
     const allowanceSum = 375;
-    expect(allowanceSum + slip.performanceBonus + slip.salesCommission).toBe(1025);
-    expect("业绩提点").not.toBe("业绩绩效");
+    expect(allowanceSum + slip.workKPIBonus + slip.revenueKPIBonus).toBe(1025);
   });
 
-  it("grossSalary 包含 salesCommission", () => {
+  it("应发工资仅计一次业绩绩效", () => {
     const grossSalary = 5000 + 500 + 150 + 375;
     expect(grossSalary).toBe(6025);
   });

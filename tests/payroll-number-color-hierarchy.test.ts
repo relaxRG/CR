@@ -35,10 +35,11 @@ describe("薪资与考勤数字颜色层级", () => {
     expect(deductions).toContain("color: tax > 0 ? colors.foreground : colors.muted");
   });
 
-  it("考勤概况收起卡只突出待发和负向奖惩，普通金额保持正文色", () => {
+  it("考勤概况收起卡只突出待发和负向绩效，普通金额保持正文色", () => {
     const compact = block(attendance, "const grid1 = [", "return (\n      <TouchableOpacity");
     expect(compact).toContain('color: numericColor(colors, NUMERIC_TONE.primary)');
-    expect(compact).toContain('reward < 0 ? NUMERIC_TONE.negative : NUMERIC_TONE.value');
+    expect(compact).toContain('workKPI < 0 ? NUMERIC_TONE.negative : NUMERIC_TONE.value');
+    expect(compact).toContain('revenueKPI < 0 ? NUMERIC_TONE.negative : NUMERIC_TONE.value');
     expect(compact).not.toContain("colors.success");
     expect(compact).not.toContain("colors.warning");
   });

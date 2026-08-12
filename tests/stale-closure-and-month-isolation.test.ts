@@ -67,7 +67,8 @@ function makePaySlip(overrides: {
   month?: string;
   grossSalary?: number;
   finalSalary?: number;
-  performanceBonus?: number;
+  workKPIBonus?: number;
+  revenueKPIBonus?: number;
   allowanceOverrides?: Record<string, boolean>;
   workKPISelections?: Record<string, string>;
   revenueActuals?: Record<string, number>;
@@ -83,7 +84,8 @@ function makePaySlip(overrides: {
     month: overrides.month ?? "2026-07",
     grossSalary: overrides.grossSalary ?? 5000,
     finalSalary: overrides.finalSalary ?? 5000,
-    performanceBonus: overrides.performanceBonus ?? 0,
+    workKPIBonus: overrides.workKPIBonus ?? 0,
+    revenueKPIBonus: overrides.revenueKPIBonus ?? 0,
     allowanceOverrides: overrides.allowanceOverrides,
     workKPISelections: overrides.workKPISelections,
     revenueActuals: overrides.revenueActuals,
@@ -181,15 +183,15 @@ describe("Suite B：月份隔离（paySlips 过滤）", () => {
   });
 
   it("B3. 不同员工的 PaySlip 互不干扰", () => {
-    const emp1Slip = makePaySlip({ employeeId: "emp-1", performanceBonus: 500 });
-    const emp2Slip = makePaySlip({ id: "slip-2", employeeId: "emp-2", performanceBonus: 300 });
+    const emp1Slip = makePaySlip({ employeeId: "emp-1", workKPIBonus: 500 });
+    const emp2Slip = makePaySlip({ id: "slip-2", employeeId: "emp-2", revenueKPIBonus: 300 });
 
     const paySlips = [emp1Slip, emp2Slip];
     const emp1 = paySlips.find(s => s.employeeId === "emp-1");
     const emp2 = paySlips.find(s => s.employeeId === "emp-2");
 
-    expect(emp1?.performanceBonus).toBe(500);
-    expect(emp2?.performanceBonus).toBe(300);
+    expect(emp1?.workKPIBonus).toBe(500);
+    expect(emp2?.revenueKPIBonus).toBe(300);
   });
 
   it("B4. 年度个税累计：只统计当年且早于当月的记录", () => {
@@ -240,7 +242,8 @@ describe("Suite C：buildPaySlipDraft 控制字段保留（autoSync 不清除）
     return {
       grossSalary: 5500,
       finalSalary: 5500,
-      performanceBonus: existing?.performanceBonus ?? 0,
+      workKPIBonus: existing?.workKPIBonus ?? 0,
+      revenueKPIBonus: existing?.revenueKPIBonus ?? 0,
       mealAllowance: 345,
       transportAllowance: 0,
       otherAllowance: 15,

@@ -25,7 +25,9 @@ describe("薪资生成确认与排班纠错清空 UI 守卫", () => {
     expect(laborSource).toContain("calcFromShifts(employee.id, currentMonth, employee, [], specialStatuses, [])");
     expect(laborSource).toContain("upsertAttendance(emptyAttendance)");
     expect(laborSource).toContain("buildPaySlipDraft(");
-    expect(laborSource).toContain("existingSlip?.performanceBonus ?? 0");
+    expect(laborSource).toContain("buildPaySlipDraft(");
+    expect(laborSource).not.toContain("performanceBonus");
+    expect(laborSource).not.toContain("salesCommission");
     expect(laborSource).toContain("correctedSlip.holidayBonusAllocation = undefined");
     expect(laborSource).toContain("correctedSlip.compOffUsage = undefined");
   });

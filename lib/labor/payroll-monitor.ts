@@ -267,8 +267,8 @@ export function checkFrozenViolation(
 /**
  * 规则 A6：绩效补贴控制字段丢失检测
  *
- * 当 autoSync 执行后，检测到某员工的 performanceBonus > 0 但
- * allowanceOverrides/workKPISelections 同时为空时触发。
+ * 当 autoSync 执行后，检测到某员工的工作绩效或业绩绩效大于0，但
+ * allowanceOverrides/workKPISelections/revenueActuals 同时为空时触发。
  * 这是跨月闭包污染的典型症状：控制字段被 autoSync 覆盖清除。
  *
  * 调用时机：autoSync 每次执行完毕后，对所有有绩效设置的员工调用此检查。
@@ -277,20 +277,22 @@ export function checkControlFieldsIntegrity(
   employeeId: string,
   employeeName: string,
   month: string,
-  performanceBonus: number,
+  workKPIBonus: number,
+  revenueKPIBonus: number,
   allowanceOverrides: Record<string, boolean> | undefined,
-  workKPISelections: Record<string, string> | undefined
+  workKPISelections: Record<string, string> | undefined,
+  revenueActuals: Record<string, number> | undefined,
 ) {
-  // 如果 performanceBonus > 0 但控制字段全部为空，说明可能发生了控制字段丢失
-  const hasPerformance = performanceBonus > 0;
+  const hasPerformance = workKPIBonus !== 0 || revenueKPIBonus !== 0;
   const hasOverrides = allowanceOverrides && Object.keys(allowanceOverrides).length > 0;
   const hasKPISelections = workKPISelections && Object.keys(workKPISelections).length > 0;
+  const hasRevenueActuals = revenueActuals && Object.keys(revenueActuals).length > 0;
 
-  if (hasPerformance && !hasOverrides && !hasKPISelections) {
+  if (hasPerformance && !hasOverrides && !hasKPISelections && !hasRevenueActuals) {
     reportAnomaly({
       severity: "warning",
       rule: "A6-CONTROL_FIELDS_LOST",
-      message: `${employeeName} ${month} performanceBonus=¥${performanceBonus} 但 allowanceOverrides 和 workKPISelections 均为空，疑似控制字段丢失（跨月闭包污染）`,
+      message: `${employeeName} ${month} 工作绩效=¥${workKPIBonus}、业绩绩效=¥${revenueKPIBonus}，但绩效补贴控制字段均为空，疑似控制字段丢失（跨月闭包污染）`,
       employeeId,
       month,
     });

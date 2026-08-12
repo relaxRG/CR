@@ -14,12 +14,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
-import { useEmployeeStore, usePaySlipStore, useAttendanceStore } from "@/lib/labor/store";
+import { useEmployeeStore, usePaySlipStore } from "@/lib/labor/store";
 import {
   ALLOWANCE_UNIT_LABELS, REVENUE_KPI_SOURCE_LABELS,
-  REVENUE_KPI_PAY_MODE_LABELS, calcRevenueKPIBonus, calcAllowance,
-  shouldPayAllowanceThisMonth,
+  REVENUE_KPI_PAY_MODE_LABELS, shouldPayAllowanceThisMonth,
 } from "@/lib/labor/types";
+import { settlePayrollExtras } from "@/lib/labor/payroll-extras";
 
 const tap = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
@@ -33,8 +33,6 @@ export default function LaborKPIAllowancePage() {
   // 原因：getPaySlip 依赖 ref（稳定引用），Stack Navigator 返回时 useMemo 不重新计算
   // paySlips state 在 persist 时通过 setData 更新，会触发重新渲染
   const { paySlips } = usePaySlipStore();
-  // 防御性修复：订阅 records state，确保考勤数据变化时 attendanceDays useMemo 能重新计算
-  const { getAttendance, records: attendanceRecords } = useAttendanceStore();
 
   const employee = useMemo(() => employees.find((e) => e.id === employeeId), [employees, employeeId]);
   const slip = useMemo(
@@ -61,25 +59,17 @@ export default function LaborKPIAllowancePage() {
   const workKPISelections = slip?.workKPISelections ?? {};
   const revenueActuals = slip?.revenueActuals ?? {};
 
-  // 出勤天数（用于日补贴展示）
-  // 防御性修复：加入 attendanceRecords 依赖，确保考勤数据更新时重新计算
-  const attendanceDays = useMemo(() => {
-    if (!employeeId || !month) return 0;
-    return getAttendance(employeeId, month)?.attendanceDays ?? 0;
-  }, [employeeId, month, getAttendance, attendanceRecords]);
-
-  // 从 PaySlip 读取已保存的合计数据
-  const mealAllowance = slip?.mealAllowance ?? 0;
-  const transportAllowance = slip?.transportAllowance ?? 0;
-  const otherAllowance = slip?.otherAllowance ?? 0;
-  const performanceBonus = slip?.performanceBonus ?? 0;
-  // 分项绩效字段：优先使用新字段，旧数据回落到 performanceBonus（向后兼容）
-  const workKPIBonus = slip?.workKPIBonus ?? performanceBonus;
-  const revenueKPIBonus = slip?.revenueKPIBonus ?? 0;
-  const salesCommission = slip?.salesCommission ?? 0;
-  const allowanceTotal = mealAllowance + transportAllowance + otherAllowance;
-  // grandTotal = 补贴 + 工作绩效 + 业绩绩效（不含 salesCommission 业绩提点，业绩提点是营业额提成，不属于绩效补贴页范畴）
-  const grandTotal = allowanceTotal + performanceBonus;
+  // 只读页不再重复计算：所有分项均从同一结算引擎读取。
+  const extras = useMemo(() => settlePayrollExtras(employee, month ?? "", slip?.attendanceDays ?? 0, {
+    allowanceOverrides,
+    allowanceDetails: slip?.allowanceDetails,
+    workKPISelections,
+    revenueActuals,
+  }), [employee, month, slip, allowanceOverrides, workKPISelections, revenueActuals]);
+  const allowanceTotal = extras.allowanceTotal;
+  const workKPIBonus = extras.workKPIBonus;
+  const revenueKPIBonus = extras.revenueKPIBonus;
+  const grandTotal = extras.allowanceTotal + extras.performanceTotal;
 
   return (
     <ScreenContainer>
@@ -143,7 +133,7 @@ export default function LaborKPIAllowancePage() {
                 ? allowanceOverrides[rule.id]
                 : rule.enabled !== false
             );
-            const displayAmount = shouldPay ? calcAllowance(rule, attendanceDays).amount : 0;
+            const displayAmount = extras.allowanceDetails[rule.id]?.amount ?? 0;
             return (
               <View key={rule.id} style={[S.itemRow, { borderBottomColor: colors.border }]}>
                 <View style={[S.checkbox, {
@@ -162,7 +152,7 @@ export default function LaborKPIAllowancePage() {
                 <Text style={{ fontSize: 15, fontWeight: "600", color: isActive ? colors.primary : colors.muted }}>
                   ¥{formatMoney(displayAmount)}
                   {(rule.unit === "per_day" || rule.type === "meal_per_day") && shouldPay
-                    ? <Text style={{ fontSize: 10, color: colors.muted }}> (¥{rule.amount}/天×{attendanceDays}天)</Text>
+                    ? <Text style={{ fontSize: 10, color: colors.muted }}> (¥{rule.amount}/天×{slip?.attendanceDays ?? 0}天)</Text>
                     : null}
                 </Text>
               </View>
@@ -210,7 +200,7 @@ export default function LaborKPIAllowancePage() {
           )}
           {revenueKPIRules.filter((r) => r.enabled).map((rule) => {
             const actual = revenueActuals[rule.id] ?? 0;
-            const bonus = calcRevenueKPIBonus(rule, actual);
+            const bonus = extras.revenueKPIDetails[rule.id]?.amount ?? 0;
             return (
               <View key={rule.id} style={[S.itemRow, { borderBottomColor: colors.border, flexDirection: "column", alignItems: "stretch" }]}>
                 <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>

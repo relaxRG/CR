@@ -15,7 +15,7 @@ function makeEmployee(index: number): Employee {
 function makeSlip(employeeId: string): PaySlip {
   return {
     id: `p-${employeeId}`, employeeId, month: "2026-07", attendanceDays: 27,
-    attendanceSalary: 10000, performanceBonus: 0, salesCommission: 0, mealAllowance: 0,
+    attendanceSalary: 10000, workKPIBonus: 0, revenueKPIBonus: 0, mealAllowance: 0,
     transportAllowance: 0, otherAllowance: 0, rewardPenalty: 0, advanceAmount: 0,
     grossSalary: 10000, socialInsuranceDeduction: 0, housingFundDeduction: 0,
     incomeTax: 0, finalSalary: 10000, notes: "", employerSocialInsurance: 0,
