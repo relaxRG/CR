@@ -64,7 +64,7 @@
 | 旧考勤数据残留 | 排班清空后考勤未重算 | autoSync 不跳过空排班（注释明确说明） |
 | 旧薪资单残留 | 考勤归零后薪资单未更新 | autoSync 每次都重新 buildPaySlipDraft |
 | 跨月数据不同步 | 7月视图修改8月排班 | shifts 依赖触发 autoSync |
-| 手动字段丢失 | 重算覆盖手动录入的绩效 | `performanceTotal = existingSlip?.performanceBonus ?? 0` |
+| 绩效控制字段丢失 | 重算覆盖补贴启用状态、工作KPI档位或业绩实绩 | `allowanceOverrides`、`workKPISelections`、`revenueActuals`完整传入唯一结算引擎 |
 
 ### 2.3 依赖数组完整性
 

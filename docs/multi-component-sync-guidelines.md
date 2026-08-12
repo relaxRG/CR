@@ -14,7 +14,7 @@ upsertPaySlip(patched);
 // 🚨 问题发生：buildPaySlipDraft 内部从 ref.current 读取 existing。
 // 此时 upsertPaySlip 虽已执行，但它是一个异步触发的动作，或者在同一事件循环中
 // ref.current 已经更新，但 buildPaySlipDraft 返回的 draft 没有继承 patched 里的 allowanceOverrides。
-const draft = buildPaySlipDraft(employee, month, att, patched.performanceBonus ?? 0, advanceAmount, globalSettings);
+const draft = buildPaySlipDraft(employee, month, att, advanceAmount, globalSettings);
 
 // 3. 再次写入，此时 draft 覆盖了 patched，导致 allowanceOverrides 丢失
 upsertPaySlip({ ...draft, ...extraPatch, id: existing.id });

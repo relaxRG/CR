@@ -78,7 +78,7 @@ UI 组件
 **允许**：以下增量操作可以直接 patch 薪资单（因为它们是独立的增量项，不依赖排班）：
 - `compOffCashOut`（调休兑现，增量加入）
 - `rewardPenalty`（奖惩，增量加入）
-- `performanceBonus`（绩效，手动录入）
+- `allowanceOverrides`、`workKPISelections`、`revenueActuals`（绩效补贴控制字段；金额必须由唯一结算引擎生成）
 - `advanceAmount`（预支，手动录入）
 - `pettyLaborPaid`（备用金已付，同步）
 
