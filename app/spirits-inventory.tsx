@@ -32,6 +32,7 @@ import {
 } from "@/lib/spirits/excel-import";
 import { parseSpiritInventoryExcel } from "@/lib/spirits/excel-parser";
 import { buildImportedPurchaseRecords, dominantPurchaseMonth } from "@/lib/spirits/import-bridge";
+import { normalizeImportDate } from "@/lib/import/date-utils";
 import {   SpiritMonthlySnapshot, SpiritInventoryItem, SpiritPriceChange, SpiritPurchaseOrderItem } from "@/lib/spirits/types";
 import { normalizeLLMRows } from "@/lib/spirits/pdf-import";
 import { exportToExcel, exportToPdf, ExportData } from "@/lib/spirits/export";
@@ -3157,9 +3158,11 @@ function ImportPreviewModal({
     if (editingIdx === null) return;
     const qty = parseFloat(editQty) || rows[editingIdx].quantity;
     const price = parseFloat(editPrice) || rows[editingIdx].unitPrice;
-    // 验证日期格式
-    const dateOk = /^\d{4}-\d{2}-\d{2}$/.test(editDate);
-    const newDate = dateOk ? editDate : rows[editingIdx].date;
+    const newDate = normalizeImportDate(editDate);
+    if (!newDate) {
+      Alert.alert("日期无效", "请输入有效日期，例如：2026-07-15、2026/7/15 或 2026年7月15日");
+      return;
+    }
     const newMonth = newDate.slice(0, 7);
     setRows((prev) => prev.map((r, i) => i === editingIdx ? {
       ...r,
@@ -3179,13 +3182,16 @@ function ImportPreviewModal({
   };
 
   const applyBatchDate = () => {
-    const dateOk = /^\d{4}-\d{2}-\d{2}$/.test(batchDate);
-    if (!dateOk) { Alert.alert("格式错误", "请输入 YYYY-MM-DD 格式，如：2026-07-15"); return; }
-    const newMonth = batchDate.slice(0, 7);
+    const normalizedDate = normalizeImportDate(batchDate);
+    if (!normalizedDate) {
+      Alert.alert("日期无效", "请输入有效日期，例如：2026-07-15、2026/7/15 或 2026年7月15日");
+      return;
+    }
+    const newMonth = normalizedDate.slice(0, 7);
     // 多选模式下只修改选中的，普通模式下修改全部
     setRows((prev) => prev.map((r, i) => {
       if (selectMode && !selectedIdxs.has(i)) return r;
-      return { ...r, date: batchDate, month: newMonth };
+      return { ...r, date: normalizedDate, month: newMonth };
     }));
     setShowBatchDate(false);
     setBatchDate("");

@@ -154,7 +154,7 @@ export const FEATURE_MODULES: FeatureModule[] = [
     color: "#E67E22",
     descZh: "菜单、食材、采购记录",
     descEn: "Food menu, ingredients, purchases",
-    storageKeys: ["food.menu.v1", "food.ingredients.v2", "food.purchases.v1"],
+    storageKeys: ["food.menu.v1", "food.ingredients.v2", "food.purchases.v1", "supplier.match.memory.v1"],
   },
   {
     key: "spirits",
@@ -175,7 +175,6 @@ export const FEATURE_MODULES: FeatureModule[] = [
       "spirits.selfBuyConfig.v1",
       "spirits.customCategories.v1",
       "spirits.groupMatchMemory.v1",
-      "supplier.match.memory.v1",
     ],
   },
   {

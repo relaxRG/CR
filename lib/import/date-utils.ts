@@ -9,8 +9,8 @@ function formatDate(year: number, month: number, day: number): string | null {
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
-/** 将Excel或人工填写的日期归一化为 YYYY-MM-DD；不能可靠解析时返回 null。 */
-export function normalizeSpiritImportDate(value: unknown): string | null {
+/** 将库存导入来源的日期归一化为 YYYY-MM-DD；不能可靠解析时返回 null。 */
+export function normalizeImportDate(value: unknown): string | null {
   if (value === null || value === undefined || value === "") return null;
 
   if (value instanceof Date) {
@@ -49,6 +49,6 @@ export function normalizeSpiritImportDate(value: unknown): string | null {
   return null;
 }
 
-export function getSpiritImportMonth(value: string | null | undefined): string | null {
+export function getImportMonth(value: string | null | undefined): string | null {
   return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value.slice(0, 7) : null;
 }

@@ -20,6 +20,8 @@ import { ScreenContainer } from "@/components/screen-container";
 import { useWineSnapshotStore, useWineStore } from "@/lib/wine/store";
 import { WineInventoryItem, WinePurchaseOrderItem, WineMonthlySnapshot } from "@/lib/wine/types";
 import { utils, read as xlsxRead } from "xlsx";
+import { normalizeImportDate } from "@/lib/import/date-utils";
+import { dominantPurchaseMonth } from "@/lib/spirits/import-bridge";
 
 function uuid() { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
 
@@ -61,20 +63,17 @@ function parseWineInventoryExcel(base64: string): WineMonthlySnapshot | null {
     const purchaseOrders: WinePurchaseOrderItem[] = [];
     if (wsPO) {
       const rows = utils.sheet_to_json<any[]>(wsPO, { header: 1, defval: null });
+      let lastValidDate = "";
       for (let i = 2; i < rows.length; i++) {
         const r = rows[i];
         const dateVal = r[1]; const supplier = r[2]; const productName = r[3];
         if (!supplier || !productName) continue;
-        let dateStr = "";
-        if (dateVal instanceof Date) {
-          dateStr = dateVal.toISOString().slice(0, 10);
-        } else if (typeof dateVal === "string") {
-          dateStr = dateVal.slice(0, 10);
-        } else if (typeof dateVal === "number") {
-          // Excel 序列日期
-          const d = new Date((dateVal - 25569) * 86400 * 1000);
-          dateStr = d.toISOString().slice(0, 10);
-        }
+        const parsedDate = normalizeImportDate(dateVal);
+        const hasDateValue = dateVal !== null && dateVal !== undefined && String(dateVal).trim() !== "";
+        if (hasDateValue && !parsedDate) continue;
+        const dateStr = parsedDate ?? lastValidDate;
+        if (!dateStr) continue;
+        if (parsedDate) lastValidDate = parsedDate;
         purchaseOrders.push({
           date: dateStr,
           supplier: String(supplier).trim(),
@@ -94,17 +93,12 @@ function parseWineInventoryExcel(base64: string): WineMonthlySnapshot | null {
       }
     });
 
-    // ── 月份标签（从进货总单第一条日期推断） ──
-    let monthLabel = "未知月份";
-    if (purchaseOrders.length > 0 && purchaseOrders[0].date) {
-      const d = purchaseOrders[0].date;
-      const [y, m] = d.split("-");
-      monthLabel = `${y}年${Number(m)}月`;
-    } else if (items.length > 0) {
-      // 尝试从文件名或当前时间推断
-      const now = new Date();
-      monthLabel = `${now.getFullYear()}年${now.getMonth() + 1}月`;
-    }
+    // ── 月份标签（按有效进货日期的主月份推断） ──
+    const now = new Date();
+    const fallbackMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const snapshotMonth = dominantPurchaseMonth(purchaseOrders, fallbackMonth);
+    const [year, month] = snapshotMonth.split("-");
+    const monthLabel = `${year}年${Number(month)}月`;
 
     const totalPurchase = Object.values(supplierTotals).reduce((s, v) => s + v, 0);
     const totalConsume = items.reduce((s, i) => s + i.consumeQty, 0);

@@ -10,6 +10,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as XLSX from "xlsx";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { FoodIngredient, SupplierPurchaseItem } from "@/lib/food/types";
+import { normalizeImportDate } from "@/lib/import/date-utils";
 
 // ─── 常量 ─────────────────────────────────────────────────────────────────────
 
@@ -265,14 +266,6 @@ export interface SupplierImportPreview {
   totalAmount: number;
 }
 
-function parseDate(raw: unknown): string {
-  if (!raw) return new Date().toISOString().slice(0, 10);
-  const s = String(raw).trim();
-  const m1 = s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
-  if (m1) return `${m1[1]}-${m1[2].padStart(2, "0")}-${m1[3].padStart(2, "0")}`;
-  return new Date().toISOString().slice(0, 10);
-}
-
 /** 选择并解析创略商贸 Excel 文件 */
 export async function parseSupplierExcel(): Promise<SupplierImportPreview | null> {
   const result = await DocumentPicker.getDocumentAsync({
@@ -336,6 +329,7 @@ export async function parseSupplierExcel(): Promise<SupplierImportPreview | null
   const rows: ParsedRow[] = [];
   const latestPrices: Record<string, number> = {};
   let totalAmount = 0;
+  let lastValidDate = "";
 
   for (let i = headerRowIdx + 1; i < allRows.length; i++) {
     const row = allRows[i] as unknown[];
@@ -347,7 +341,13 @@ export async function parseSupplierExcel(): Promise<SupplierImportPreview | null
     if (!rawName || (qty === 0 && price === 0)) continue;
 
     const split = splitProductName(rawName);
-    const date = parseDate(colIdx.date >= 0 ? row[colIdx.date] : "");
+    const rawDate = colIdx.date >= 0 ? row[colIdx.date] : null;
+    const parsedDate = normalizeImportDate(rawDate);
+    const hasDateValue = rawDate !== null && rawDate !== undefined && String(rawDate).trim() !== "";
+    if (hasDateValue && !parsedDate) continue;
+    const date = parsedDate ?? lastValidDate;
+    if (!date) continue;
+    if (parsedDate) lastValidDate = parsedDate;
     const orderNo = colIdx.orderNo >= 0 ? String(row[colIdx.orderNo] ?? "").trim() : "";
     const unit = colIdx.unit >= 0 ? String(row[colIdx.unit] ?? "").trim() : "";
 

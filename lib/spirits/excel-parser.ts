@@ -15,7 +15,7 @@
  * - 酒类信息：列0=产品序号 列1=盘点分类 列2=中文名 列3=英文名 列4=参考单价 列5=规格
  */
 import { utils, read as xlsxRead } from "xlsx";
-import { normalizeSpiritImportDate } from "./date-utils";
+import { normalizeImportDate } from "../import/date-utils";
 import { dominantPurchaseMonth } from "./import-bridge";
 import {
   SpiritInventoryItem,
@@ -107,7 +107,7 @@ function parseSupplierSheet(ws: any, supplierName: string): SpiritPurchaseOrderI
     if (qty === 0 && price === 0 && amount === 0) continue;
 
     const rawDate = r[1];
-    const parsedDate = normalizeSpiritImportDate(rawDate);
+    const parsedDate = normalizeImportDate(rawDate);
     const hasDateValue = rawDate !== null && rawDate !== undefined && String(rawDate).trim() !== "";
     if (hasDateValue && !parsedDate) continue;
     const date = parsedDate ?? lastValidDate;

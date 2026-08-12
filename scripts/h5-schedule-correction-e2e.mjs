@@ -227,6 +227,57 @@ try {
     report.push({ reportPage: label, viewports });
   }
 
+  // 烈酒库存：模拟已确认的当月导入记录，验证同一采购会同步显示在库存台账与当月进货两个移动端页面。
+  await call("Runtime.evaluate", { expression: `(() => {
+    const month = ${JSON.stringify(closeMonth)};
+    const now = new Date().toISOString();
+    const item = { id: 'h5-spirit-item', name: 'H5进口金宾', nameEn: 'H5 Jim Beam', category: 'Whisky', unit: '瓶', refPrice: 118, active: true, createdAt: now, updatedAt: now };
+    const purchase = { id: 'h5-spirit-purchase', month, date: month + '-15', itemId: item.id, rawName: 'H5进口金宾', unit: '瓶', quantity: 3, unitPrice: 118, amount: 354, supplier: 'H5供应商', category: 'Whisky', source: 'excel', createdAt: now };
+    const ledger = { id: 'h5-spirit-ledger', month, itemId: item.id, openingQty: 1, openingUnitCost: 100, purchaseQty: 3, purchaseCost: 354, consumeQty: 0, closingQty: 4, closingUnitCost: 113.5, closingCost: 454, isClosed: false, updatedAt: now };
+    localStorage.setItem('spirits.items.v3', JSON.stringify([item]));
+    localStorage.setItem('spirits.purchases.v3', JSON.stringify([purchase]));
+    localStorage.setItem('spirits.ledger.v3', JSON.stringify([ledger]));
+    return month;
+  })()`, returnByValue: true });
+  const spiritsViewports = [];
+  for (const width of [375, 390, 430]) {
+    await call("Emulation.setDeviceMetricsOverride", { width, height: 844, deviceScaleFactor: 3, mobile: true });
+    await call("Page.navigate", { url: `http://localhost:${port}/spirits-inventory` });
+    await sleep(900);
+    const ledgerClicked = await call("Runtime.evaluate", { expression: clickTextExpression("📋 库存管理"), returnByValue: true });
+    if (!ledgerClicked.result.value) throw new Error(`烈酒库存 ${width}pt 缺少库存管理Tab`);
+    await sleep(200);
+    const ledgerState = await call("Runtime.evaluate", { expression: `(() => ({
+      rootClientWidth: document.documentElement.clientWidth,
+      rootScrollWidth: document.documentElement.scrollWidth,
+      bodyScrollWidth: document.body.scrollWidth,
+      hasImportedItem: document.body.innerText.includes('H5进口金宾'),
+    }))()`, returnByValue: true });
+    if (!ledgerState.result.value.hasImportedItem) throw new Error(`烈酒库存 ${width}pt 未显示导入酒款`);
+    if (ledgerState.result.value.rootScrollWidth > ledgerState.result.value.rootClientWidth || ledgerState.result.value.bodyScrollWidth > ledgerState.result.value.rootClientWidth) {
+      throw new Error(`烈酒库存台账 ${width}pt 出现根级横向溢出：${JSON.stringify(ledgerState.result.value)}`);
+    }
+
+    const purchaseClicked = await call("Runtime.evaluate", { expression: clickTextExpression("📦 当月进货"), returnByValue: true });
+    if (!purchaseClicked.result.value) throw new Error(`烈酒库存 ${width}pt 缺少当月进货Tab`);
+    await sleep(200);
+    const supplierClicked = await call("Runtime.evaluate", { expression: clickTextExpression("H5供应商"), returnByValue: true });
+    if (!supplierClicked.result.value) throw new Error(`烈酒当月进货 ${width}pt 未显示导入供应商`);
+    await sleep(200);
+    const purchaseState = await call("Runtime.evaluate", { expression: `(() => ({
+      rootClientWidth: document.documentElement.clientWidth,
+      rootScrollWidth: document.documentElement.scrollWidth,
+      bodyScrollWidth: document.body.scrollWidth,
+      hasImportedPurchase: document.body.innerText.includes('H5进口金宾') && document.body.innerText.includes('H5供应商'),
+    }))()`, returnByValue: true });
+    if (!purchaseState.result.value.hasImportedPurchase) throw new Error(`烈酒当月进货 ${width}pt 未同步显示导入采购`);
+    if (purchaseState.result.value.rootScrollWidth > purchaseState.result.value.rootClientWidth || purchaseState.result.value.bodyScrollWidth > purchaseState.result.value.rootClientWidth) {
+      throw new Error(`烈酒当月进货 ${width}pt 出现根级横向溢出：${JSON.stringify(purchaseState.result.value)}`);
+    }
+    spiritsViewports.push({ width, ledger: ledgerState.result.value, purchase: purchaseState.result.value });
+  }
+  report.push({ reportPage: "烈酒库存导入同步", viewports: spiritsViewports });
+
   // 员工档案顶部筛选栏：验证“后厨 3”文字与人数徽标分别完整可见、边界不相交。
   const employeeFilterViewports = [];
   for (const width of [375, 390, 430]) {

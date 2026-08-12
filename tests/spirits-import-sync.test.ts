@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { utils, write } from "xlsx";
-import { normalizeSpiritImportDate } from "../lib/spirits/date-utils";
+import { normalizeImportDate } from "../lib/import/date-utils";
 import { parseSpiritsExcel } from "../lib/spirits/excel-import";
 import { parseSpiritInventoryExcel } from "../lib/spirits/excel-parser";
 import {
@@ -37,11 +37,11 @@ const order = (overrides: Partial<SpiritPurchaseOrderItem> = {}): SpiritPurchase
 
 describe("烈酒当月进货导入与库存同步", () => {
   it("统一归一化Excel序列号、日期对象、斜杠日期和中文日期，并拒绝不存在的自然日", () => {
-    expect(normalizeSpiritImportDate(46238)).toBe("2026-08-04");
-    expect(normalizeSpiritImportDate(new Date("2026-08-03T00:00:00.000Z"))).toBe("2026-08-03");
-    expect(normalizeSpiritImportDate("2026/8/3 10:30:00")).toBe("2026-08-03");
-    expect(normalizeSpiritImportDate("2026年8月3日")).toBe("2026-08-03");
-    expect(normalizeSpiritImportDate("2026-02-30")).toBeNull();
+    expect(normalizeImportDate(46238)).toBe("2026-08-04");
+    expect(normalizeImportDate(new Date("2026-08-03T00:00:00.000Z"))).toBe("2026-08-03");
+    expect(normalizeImportDate("2026/8/3 10:30:00")).toBe("2026-08-03");
+    expect(normalizeImportDate("2026年8月3日")).toBe("2026-08-03");
+    expect(normalizeImportDate("2026-02-30")).toBeNull();
   });
 
   it("通用进货导入只继承已验证日期，不会把首行空日期或无效日期错误归入今天", () => {
@@ -100,5 +100,42 @@ describe("烈酒当月进货导入与库存同步", () => {
 
     expect(purchasesForMonth(persisted, pending, "2026-08")).toHaveLength(2);
     expect(purchasesForMonth(persisted, pending, "2026-09")).toHaveLength(0);
+  });
+});
+
+
+describe("烈酒导入日期边界：非法日期与跨月采购", () => {
+  it("跳过非法自然日，保留空日期继承行，并将跨月有效采购分别归入自身月份", () => {
+    const parsed = parseSpiritsExcel([
+      ["日期", "商品名称", "单位", "数量", "单价", "金额"],
+      ["2026-07-31", "金宾波本", "瓶", 1, 118, 118],
+      [null, "金宾波本", "瓶", 2, 118, 236],
+      ["2026-02-30", "不应导入的酒款", "瓶", 1, 100, 100],
+      ["2026年8月1日", "金宾波本", "瓶", 3, 118, 354],
+      [null, "金宾波本", "瓶", 1, 118, 118],
+    ]);
+
+    expect(parsed.rows.map((row) => ({ date: row.date, month: row.month, name: row.rawName }))).toEqual([
+      { date: "2026-07-31", month: "2026-07", name: "金宾波本" },
+      { date: "2026-07-31", month: "2026-07", name: "金宾波本" },
+      { date: "2026-08-01", month: "2026-08", name: "金宾波本" },
+      { date: "2026-08-01", month: "2026-08", name: "金宾波本" },
+    ]);
+    expect(parsed.warnings.some((warning) => warning.includes("不应导入的酒款") && warning.includes("日期无法识别"))).toBe(true);
+
+    const orders = parsed.rows.map((row) => order({
+      rawName: row.rawName,
+      nameZh: row.nameZh,
+      nameEn: row.nameEn,
+      date: row.date,
+      quantity: row.quantity,
+      unitPrice: row.unitPrice,
+      amount: row.amount,
+    }));
+    const { records, unmatched } = buildImportedPurchaseRecords(orders, [item], "2026-07");
+
+    expect(unmatched).toEqual([]);
+    expect(records.map((record) => record.month)).toEqual(["2026-07", "2026-07", "2026-08", "2026-08"]);
+    expect(records.reduce((total, record) => total + record.amount, 0)).toBe(826);
   });
 });

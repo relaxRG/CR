@@ -70,7 +70,7 @@ export function buildImportedPurchaseRecords(
   return { records, unmatched };
 }
 
-export function dominantPurchaseMonth(orders: readonly SpiritPurchaseOrderItem[], fallbackMonth: string): string {
+export function dominantPurchaseMonth(orders: readonly { date: string }[], fallbackMonth: string): string {
   const counts = new Map<string, number>();
   const firstIndex = new Map<string, number>();
   orders.forEach((order, index) => {

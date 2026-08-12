@@ -10,6 +10,7 @@
  * 注意：可能有两个文件（同一数据集），需去重
  */
 import * as XLSX from "xlsx";
+import { normalizeImportDate } from "@/lib/import/date-utils";
 import {
   HalfHourSlot, DailyPeriodRecord, PeriodAnalysisReport,
   PeriodAnalysisSettings, DEFAULT_PERIOD_SETTINGS,
@@ -34,18 +35,6 @@ interface RawRow {
   perPersonAfter: number;
 }
 
-function parseDate(raw: unknown): string {
-  if (!raw) return "";
-  const s = String(raw).trim().replace(/\//g, "-");
-  // 处理 "2026-07-31" 格式
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-  // 处理 Excel 日期数字
-  if (typeof raw === "number") {
-    const d = XLSX.SSF.parse_date_code(raw);
-    if (d) return `${d.y}-${String(d.m).padStart(2, "0")}-${String(d.d).padStart(2, "0")}`;
-  }
-  return s;
-}
 
 function safeNum(v: unknown): number {
   if (v === null || v === undefined || v === "") return 0;
@@ -80,7 +69,7 @@ export function parsePeriodAnalysisExcel(
       for (let i = headerRow + 1; i < rows.length; i++) {
         const row = rows[i] as unknown[];
         if (!row || !row[0] || !row[1]) continue;
-        const date = parseDate(row[0]);
+        const date = normalizeImportDate(row[0]) ?? "";
         const slot = String(row[1]).trim();
         if (!date || !slot || slot === "半小时") continue;
 

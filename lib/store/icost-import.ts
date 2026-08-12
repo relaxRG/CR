@@ -9,7 +9,8 @@ import * as FileSystem from "expo-file-system/legacy";
 // xlsx 是 CommonJS 模块，需要用 require 方式导入
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const XLSX = require("xlsx") as typeof import("xlsx");
-import type { PettyCode, PettyRecord } from "./petty-store";
+import { PettyRecord, PettyCode } from "./petty-store";
+import { normalizeImportDate } from "@/lib/import/date-utils";
 
 /** iCost 二级分类 → PettyCode 映射表 */
 const ICOST_SUBCAT_MAP: Record<string, PettyCode> = {
@@ -85,19 +86,6 @@ function resolveCode(subcat: string): PettyCode | null {
     if (validCodes.includes(code)) return code;
   }
   return null;
-}
-
-/** 解析日期字符串为 YYYY-MM-DD */
-function parseDate(raw: unknown): string {
-  if (!raw) return new Date().toISOString().slice(0, 10);
-  const s = String(raw).trim();
-  // YYYY/MM/DD → YYYY-MM-DD
-  const m1 = s.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})/);
-  if (m1) return `${m1[1]}-${m1[2].padStart(2, "0")}-${m1[3].padStart(2, "0")}`;
-  // YYYY-MM-DD
-  const m2 = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
-  if (m2) return `${m2[1]}-${m2[2].padStart(2, "0")}-${m2[3].padStart(2, "0")}`;
-  return new Date().toISOString().slice(0, 10);
 }
 
 export interface ImportResult {
@@ -194,8 +182,12 @@ export async function importIcostExcel(): Promise<ImportResult | null> {
       continue;
     }
 
-    // 解析日期
-    const date = parseDate(rawDate);
+    // 解析日期：无法可靠识别时不允许归入当天。
+    const date = normalizeImportDate(rawDate);
+    if (!date) {
+      skippedRows.push({ row: i + 1, reason: "日期无效", subcat: rawCat2 });
+      continue;
+    }
 
     // 支付方式：从类型推断
     const paymentMethod = rawType === "收入" ? "收入" : "银行卡";

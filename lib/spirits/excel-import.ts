@@ -23,7 +23,7 @@
  * - 纯英文名
  */
 
-import { normalizeSpiritImportDate } from "./date-utils";
+import { normalizeImportDate } from "../import/date-utils";
 
 export interface ParsedPurchaseRow {
   date: string;        // YYYY-MM-DD
@@ -316,7 +316,7 @@ export function parseSpiritsExcel(
 
     // 解析日期（缺失时继承上一行）
     const rawDate = colMap.dateIdx >= 0 ? row[colMap.dateIdx] : null;
-    const parsedDate = normalizeSpiritImportDate(rawDate);
+    const parsedDate = normalizeImportDate(rawDate);
     const hasDateValue = rawDate !== null && rawDate !== undefined && String(rawDate).trim() !== "";
     if (hasDateValue && !parsedDate) {
       warnings.push(`行${i + 1} 「${rawName}」日期无法识别，已跳过该行`);
