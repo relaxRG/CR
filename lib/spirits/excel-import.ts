@@ -23,6 +23,8 @@
  * - 纯英文名
  */
 
+import { normalizeSpiritImportDate } from "./date-utils";
+
 export interface ParsedPurchaseRow {
   date: string;        // YYYY-MM-DD
   month: string;       // YYYY-MM
@@ -66,83 +68,6 @@ const COL_PATTERNS = {
 
 // ─── 工具函数 ─────────────────────────────────────────────────────────────────
 
-/** 解析各种日期格式 → YYYY-MM-DD（增强版，修复时区偏移 + 支持更多格式）*/
-function parseDate(val: any): string | null {
-  if (val === null || val === undefined || val === "") return null;
-
-  // ① JavaScript Date 对象（xlsx cellDates:true 时返回）
-  //   必须用 UTC 方法，避免时区偏移导致日期少一天
-  if (val instanceof Date) {
-    if (isNaN(val.getTime())) return null;
-    // xlsx 把 Excel 日期序列号转成 Date 时，时间部分是 00:00:00 UTC
-    // 在 UTC+8 环境下，getFullYear() 会返回前一天 → 必须用 getUTC*
-    const y = val.getUTCFullYear();
-    const mo = String(val.getUTCMonth() + 1).padStart(2, "0");
-    const d = String(val.getUTCDate()).padStart(2, "0");
-    return `${y}-${mo}-${d}`;
-  }
-
-  const s = String(val).trim();
-  if (!s) return null;
-
-  // ② 纯数字：Excel 日期序列号（4-5 位，25569 = 1970-01-01）
-  if (/^\d{4,5}$/.test(s)) {
-    const n = Number(s);
-    if (n > 25569 && n < 60000) {
-      const ms = (n - 25569) * 86400 * 1000;
-      const d = new Date(ms);
-      return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
-    }
-  }
-
-  // ③ 8位纯数字：YYYYMMDD
-  if (/^\d{8}$/.test(s)) {
-    const y = s.slice(0, 4), mo = s.slice(4, 6), d = s.slice(6, 8);
-    if (Number(mo) >= 1 && Number(mo) <= 12 && Number(d) >= 1 && Number(d) <= 31)
-      return `${y}-${mo}-${d}`;
-  }
-
-  // ④ ISO 格式（含时间）：2026-02-01T00:00:00 或 2026-02-01 08:00:00
-  if (s.includes("T") || /\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(s)) {
-    return s.slice(0, 10);
-  }
-
-  // ⑤ YYYY-MM-DD 或 YYYY/MM/DD 或 YYYY.MM.DD
-  const m1 = s.match(/^(\d{4})[-\/\.](\d{1,2})[-\/\.](\d{1,2})/);
-  if (m1) return `${m1[1]}-${m1[2].padStart(2, "0")}-${m1[3].padStart(2, "0")}`;
-
-  // ⑥ DD/MM/YYYY 或 MM/DD/YYYY（末尾是4位年份）
-  // 注意：xlsx raw:false 可能输出 "2/1/2026" (M/D/YYYY) 格式
-  const m2 = s.match(/^(\d{1,2})[-\/\.](\d{1,2})[-\/\.](\d{4})/);
-  if (m2) {
-    // 如果第一个数字 > 12，则必然是 DD/MM/YYYY；否则假设是 MM/DD/YYYY（与 xlsx 输出匹配）
-    const first = Number(m2[1]), second = Number(m2[2]);
-    if (first > 12) {
-      // DD/MM/YYYY
-      return `${m2[3]}-${m2[2].padStart(2, "0")}-${m2[1].padStart(2, "0")}`;
-    } else {
-      // MM/DD/YYYY
-      return `${m2[3]}-${m2[1].padStart(2, "0")}-${m2[2].padStart(2, "0")}`;
-    }
-  }
-
-  // ⑦ 中文完整日期：2026年2月1日 / 2026年02月01日
-  const m3 = s.match(/(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日?/);
-  if (m3) return `${m3[1]}-${m3[2].padStart(2, "0")}-${m3[3].padStart(2, "0")}`;
-
-  // ⑧ 中文无年份：2月1日 / 02月01日（自动补当前年）
-  const m4 = s.match(/^(\d{1,2})\s*月\s*(\d{1,2})\s*日?$/);
-  if (m4) {
-    const year = new Date().getFullYear();
-    return `${year}-${m4[1].padStart(2, "0")}-${m4[2].padStart(2, "0")}`;
-  }
-
-  // ⑨ 中文年月无日：2026年2月（补1日）
-  const m5 = s.match(/(\d{4})\s*年\s*(\d{1,2})\s*月$/);
-  if (m5) return `${m5[1]}-${m5[2].padStart(2, "0")}-01`;
-
-  return null;
-}
 
 /** 解析数字（处理千分位、货币符号、中文数字等）*/
 function parseNumber(val: any): number {
@@ -368,7 +293,7 @@ export function parseSpiritsExcel(
 
   // 4. 解析数据行
   const dataStartRow = headerRowIdx >= 0 ? headerRowIdx + 1 : 0;
-  let lastValidDate = new Date().toISOString().slice(0, 10);
+  let lastValidDate: string | null = null;
   const monthCounts: Record<string, number> = {};
 
   for (let i = dataStartRow; i < rows.length; i++) {
@@ -391,8 +316,17 @@ export function parseSpiritsExcel(
 
     // 解析日期（缺失时继承上一行）
     const rawDate = colMap.dateIdx >= 0 ? row[colMap.dateIdx] : null;
-    const parsedDate = parseDate(rawDate);
+    const parsedDate = normalizeSpiritImportDate(rawDate);
+    const hasDateValue = rawDate !== null && rawDate !== undefined && String(rawDate).trim() !== "";
+    if (hasDateValue && !parsedDate) {
+      warnings.push(`行${i + 1} 「${rawName}」日期无法识别，已跳过该行`);
+      continue;
+    }
     const date = parsedDate ?? lastValidDate;
+    if (!date) {
+      warnings.push(`行${i + 1} 「${rawName}」缺少可继承的日期，已跳过该行`);
+      continue;
+    }
     if (parsedDate) lastValidDate = parsedDate;
     const month = date.slice(0, 7);
     monthCounts[month] = (monthCounts[month] ?? 0) + 1;

@@ -31,7 +31,8 @@ import {
   parseSpiritsExcel, ParsedPurchaseRow, previewSheets, parseSheetFromWorkbook,
 } from "@/lib/spirits/excel-import";
 import { parseSpiritInventoryExcel } from "@/lib/spirits/excel-parser";
-import { SpiritMonthlySnapshot, SpiritInventoryItem, SpiritPriceChange } from "@/lib/spirits/types";
+import { buildImportedPurchaseRecords, dominantPurchaseMonth } from "@/lib/spirits/import-bridge";
+import {   SpiritMonthlySnapshot, SpiritInventoryItem, SpiritPriceChange, SpiritPurchaseOrderItem } from "@/lib/spirits/types";
 import { normalizeLLMRows } from "@/lib/spirits/pdf-import";
 import { exportToExcel, exportToPdf, ExportData } from "@/lib/spirits/export";
 import { usePettyCashStore } from "@/lib/store/petty-store";
@@ -530,12 +531,12 @@ export default function SpiritsInventoryScreen() {
   const handleLedgerImportConfirm = () => {
     if (!ledgerImportPreview) return;
     const snapshot = ledgerImportPreview;
-    // 推断月份（从进货记录日期，或默认当前月）
-    const importMonth = snapshot.purchaseOrders.find((po) => po.date)?.date.slice(0, 7) ?? selectedMonth;
+    const importMonth = dominantPurchaseMonth(snapshot.purchaseOrders, selectedMonth);
+    const resolvedItems = [...items];
     let addedItems = 0, updatedItems = 0, addedLedger = 0;
+
     snapshot.items.forEach((inv: SpiritInventoryItem) => {
-      // 1. 查找或创建 SpiritItem
-      let existing = items.find((i) => i.name.trim() === inv.name.trim());
+      let existing = resolvedItems.find((item) => item.name.trim() === inv.name.trim());
       if (!existing) {
         existing = addItem({
           name: inv.name,
@@ -544,15 +545,14 @@ export default function SpiritsInventoryScreen() {
           refPrice: inv.unitCost > 0 ? inv.unitCost : 0,
           active: true,
         });
+        resolvedItems.push(existing);
         addedItems++;
       } else {
-        // 更新参考单价（如果有新单价）
         if (inv.unitCost > 0 && Math.abs(inv.unitCost - existing.refPrice) > 0.01) {
           setRefPrice(existing.id, importMonth, inv.unitCost, "import");
         }
         updatedItems++;
       }
-      // 2. 写入台账（upsertLedger）
       const prevEntry = getItemLedger(existing.id, importMonth);
       upsertLedger({
         id: prevEntry?.id,
@@ -570,12 +570,39 @@ export default function SpiritsInventoryScreen() {
       });
       addedLedger++;
     });
+
+    const firstPass = buildImportedPurchaseRecords(snapshot.purchaseOrders, resolvedItems, importMonth);
+    firstPass.unmatched.forEach((order: SpiritPurchaseOrderItem) => {
+      const existing = resolvedItems.find((item) => item.name.trim() === (order.nameZh || order.rawName).trim());
+      if (existing) return;
+      const item = addItem({
+        name: order.nameZh || order.rawName,
+        category: "Other",
+        unit: order.spec || "瓶",
+        refPrice: order.unitPrice,
+        supplier: order.supplier,
+        spec: order.spec,
+        active: true,
+      });
+      resolvedItems.push(item);
+      addedItems++;
+    });
+    const purchaseImport = buildImportedPurchaseRecords(snapshot.purchaseOrders, resolvedItems, importMonth);
+    batchAddPurchases(purchaseImport.records);
+
+    // 盘点主月份以Excel台账为准；跨月订单仅重建其实际归属月份，避免覆盖盘点期末数。
+    const crossMonthRecords = purchaseImport.records.filter((record) => record.month !== importMonth);
+    for (const month of new Set(crossMonthRecords.map((record) => record.month))) {
+      syncLedgerFromPurchases(month, crossMonthRecords.filter((record) => record.month === month));
+    }
+
     setShowLedgerPreview(false);
     setLedgerImportPreview(null);
     Alert.alert(
       "导入成功 ✅",
       `${snapshot.monthLabel}\n` +
       `台账：${addedLedger} 款已写入\n` +
+      `当月进货：${purchaseImport.records.length} 笔已同步\n` +
       `酒款档案：新增 ${addedItems} 款，更新 ${updatedItems} 款` +
       (ledgerImportPriceChanges.length > 0 ? `\n⚠️ ${ledgerImportPriceChanges.length} 款价格有变动` : "")
     );
@@ -2111,8 +2138,11 @@ function SupplierDetailScreen({
           matchPettyToItem={matchPettyToItem}
           setMatchMemory={setMatchMemory}
           onConfirm={(records) => {
-            batchAddPurchases(records.map((r) => ({ ...r, supplier: "自采", source: "manual" as const })));
-            syncLedgerFromPurchases(month);
+            const pending = records.map((record) => ({ ...record, supplier: "自采", source: "manual" as const }));
+            batchAddPurchases(pending);
+            for (const targetMonth of new Set(pending.map((record) => record.month))) {
+              syncLedgerFromPurchases(targetMonth, pending.filter((record) => record.month === targetMonth));
+            }
             setShowPettyImport(false);
           }}
           onClose={() => setShowPettyImport(false)}
@@ -2524,23 +2554,48 @@ function SupplierDetailScreen({
           month={month}
           colors={colors}
           onConfirm={(rows) => {
-            batchAddPurchases(rows.map((r) => ({
-              month: r.month ?? month,
-              date: r.date,
-              rawName: r.rawName,
-              itemId: undefined as string | undefined,
-              // 导入时自动检测集团
-              group: detectPurchaseGroup(r.rawName) || undefined,
+            const orders: SpiritPurchaseOrderItem[] = rows.map((row) => ({
               supplier,
-              quantity: r.quantity,
-              unit: r.unit,
-              unitPrice: r.unitPrice,
-              amount: r.amount,
-              source: importPreviewSource,
-            })));
-            syncLedgerFromPurchases(month);
+              rawName: row.rawName,
+              nameZh: row.nameZh,
+              nameEn: row.nameEn,
+              unitPrice: row.unitPrice,
+              quantity: row.quantity,
+              amount: row.amount,
+              spec: row.unit,
+              date: row.date,
+            }));
+            const resolvedItems = [...items];
+            let addedItems = 0;
+            const initial = buildImportedPurchaseRecords(orders, resolvedItems, month, importPreviewSource);
+            initial.unmatched.forEach((order) => {
+              const name = order.nameZh || order.rawName;
+              if (resolvedItems.some((item) => item.name.trim() === name.trim())) return;
+              const item = addItem({
+                name,
+                category: "Other",
+                unit: order.spec || "瓶",
+                refPrice: order.unitPrice,
+                supplier: order.supplier,
+                spec: order.spec,
+                active: true,
+              });
+              resolvedItems.push(item);
+              addedItems++;
+            });
+            const purchaseImport = buildImportedPurchaseRecords(orders, resolvedItems, month, importPreviewSource);
+            batchAddPurchases(purchaseImport.records);
+            for (const targetMonth of new Set(purchaseImport.records.map((record) => record.month))) {
+              syncLedgerFromPurchases(
+                targetMonth,
+                purchaseImport.records.filter((record) => record.month === targetMonth),
+              );
+            }
             setShowImportPreview(false);
-            Alert.alert("导入成功 ✅", `已导入 ${rows.length} 条进货记录`);
+            Alert.alert(
+              "导入成功 ✅",
+              `进货记录：${purchaseImport.records.length} 条已同步\n酒款档案：新增 ${addedItems} 款\n台账：已按每条记录的实际日期归属重算`,
+            );
           }}
           onClose={() => setShowImportPreview(false)}
         />

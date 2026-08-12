@@ -248,10 +248,6 @@ export default function FoodInventoryScreen() {
           style={[S.actionBtn, { backgroundColor: FOOD_COLOR + "15", borderColor: FOOD_COLOR + "33" }]}>
           <Text style={{ fontSize: 12, color: FOOD_COLOR, fontWeight: "600" }}>📦 录入进货</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => router.push("/spirits-inventory-import" as any)}
-          style={[S.actionBtn, { backgroundColor: colors.primary + "15", borderColor: colors.primary + "33" }]}>
-          <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "600" }}>📊 导入 Excel</Text>
-        </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }}>

@@ -36,7 +36,6 @@ import { RevenueProvider } from "@/lib/store/revenue-store";
 import { PettyCashProvider } from "@/lib/store/petty-store";
 import { InventoryProvider } from "@/lib/store/inventory-store";
 import { LabPlanProvider } from "@/lib/lab/plan-store";
-import { SpiritsProvider } from "@/lib/spirits/store";
 import { SpiritsInventoryProvider } from "@/lib/spirits/crud-store";
 import { MonthlyReportProvider } from "@/lib/store/monthly-report/store";
 import { LaborProvider } from "@/lib/labor/store";
@@ -159,7 +158,6 @@ export default function RootLayout() {
           <InventoryProvider>
           <LabPlanProvider>
           <SupplierPurchaseProvider>
-          <SpiritsProvider>
           <SpiritsInventoryProvider>
           <MonthlyReportProvider>
           <LaborProvider>
@@ -234,7 +232,6 @@ export default function RootLayout() {
               <Stack.Screen name="wine-inventory" />
               <Stack.Screen name="wine-inventory-import" options={{ presentation: "modal" }} />
               <Stack.Screen name="spirits-inventory" />
-              <Stack.Screen name="spirits-inventory-import" options={{ presentation: "modal" }} />
               <Stack.Screen name="monthly-report" />
               <Stack.Screen name="monthly-report-import" options={{ presentation: "modal" }} />
               <Stack.Screen name="labor" />
@@ -286,7 +283,6 @@ export default function RootLayout() {
           </LaborProvider>
           </MonthlyReportProvider>
           </SpiritsInventoryProvider>
-          </SpiritsProvider>
           </SupplierPurchaseProvider>
           </LabPlanProvider>
           </InventoryProvider>

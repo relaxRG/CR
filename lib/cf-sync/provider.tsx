@@ -575,8 +575,6 @@ const STORAGE_KEY_LABELS: Record<string, string> = {
   "spirits.selfBuyConfig.v1":       "自采配置",
   "spirits.customCategories.v1":    "自定义分类",
   "spirits.groupMatchMemory.v1":    "集团匹配记忆",
-  "spirits.snapshots.v1":            "烈酒库存快照",
-  "spirits.match_records.v1":        "烈酒匹配记录",
   "supplier.match.memory.v1":        "供应商匹配记忆",
   // ★ 新增：啤酒库存
   "beer.items.v1":                   "啤酒库存",

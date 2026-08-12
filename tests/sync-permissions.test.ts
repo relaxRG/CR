@@ -40,8 +40,7 @@ const SYNC_KEYS_SNAPSHOT = [
   "spirits.items.v3", "spirits.purchases.v3", "spirits.ledger.v3",
   "spirits.refPrices.v1", "spirits.suppliers.v1", "spirits.groups.v1",
   "spirits.matchMemory.v1", "spirits.selfBuyConfig.v1", "spirits.customCategories.v1",
-  "spirits.groupMatchMemory.v1", "spirits.snapshots.v1", "spirits.match_records.v1",
-  "supplier.match.memory.v1",
+  "spirits.groupMatchMemory.v1", "supplier.match.memory.v1",
   // ── 啤酒库存
   "beer.items.v1", "beer.transactions.v1", "beer.snapshots.v1",
   // ── 水果库存

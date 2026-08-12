@@ -175,8 +175,6 @@ export const FEATURE_MODULES: FeatureModule[] = [
       "spirits.selfBuyConfig.v1",
       "spirits.customCategories.v1",
       "spirits.groupMatchMemory.v1",
-      "spirits.snapshots.v1",
-      "spirits.match_records.v1",
       "supplier.match.memory.v1",
     ],
   },

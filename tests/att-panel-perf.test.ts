@@ -221,6 +221,13 @@ describe("性能测试：连续快速点击调休余额面板按钮", () => {
       }
     }
 
+    // 预热：将首次JIT编译和模块恢复成本排除在实际滚动查询基准之外。
+    for (let k = 0; k < 10; k++) {
+      const empId = `emp${(k % 10) + 1}`;
+      store.getAvailableEntries(empId, "2026-08");
+      store.getTotalDays(empId, "2026-08");
+    }
+
     const start = performance.now();
     // 查询 50 次（模拟列表滚动时的重复查询）
     for (let k = 0; k < 50; k++) {

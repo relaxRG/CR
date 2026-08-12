@@ -15,6 +15,8 @@
  * - 酒类信息：列0=产品序号 列1=盘点分类 列2=中文名 列3=英文名 列4=参考单价 列5=规格
  */
 import { utils, read as xlsxRead } from "xlsx";
+import { normalizeSpiritImportDate } from "./date-utils";
+import { dominantPurchaseMonth } from "./import-bridge";
 import {
   SpiritInventoryItem,
   SpiritPurchaseOrderItem,
@@ -47,30 +49,6 @@ export function parseSupplierName(raw: string): { nameZh: string; nameEn: string
   return { nameZh: s, nameEn: "" };
 }
 
-/**
- * 解析 Excel 日期值
- */
-function parseExcelDate(val: any): string {
-  if (!val) return "";
-  if (val instanceof Date) {
-    if (isNaN(val.getTime())) return "";
-    // 必须用 UTC 方法，避免 UTC+8 时区导致日期少一天
-    const y = val.getUTCFullYear();
-    const mo = String(val.getUTCMonth() + 1).padStart(2, "0");
-    const d = String(val.getUTCDate()).padStart(2, "0");
-    return `${y}-${mo}-${d}`;
-  }
-  if (typeof val === "string") {
-    // 处理 "2026-02-01 00:00:00" 格式
-    return val.slice(0, 10);
-  }
-  if (typeof val === "number") {
-    // Excel 日期序列号，用 UTC 避免时区偏移
-    const d = new Date((val - 25569) * 86400 * 1000);
-    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
-  }
-  return "";
-}
 
 /**
  * 解析「烈酒盘点」工作表（164 款有效数据）
@@ -114,6 +92,7 @@ function parseSupplierSheet(ws: any, supplierName: string): SpiritPurchaseOrderI
   if (!ws) return [];
   const rows = utils.sheet_to_json<any[]>(ws, { header: 1, defval: null });
   const items: SpiritPurchaseOrderItem[] = [];
+  let lastValidDate = "";
 
   // 数据从第3行开始（index=2），跳过往来单位行和表头行
   for (let i = 2; i < rows.length; i++) {
@@ -127,6 +106,14 @@ function parseSupplierSheet(ws: any, supplierName: string): SpiritPurchaseOrderI
     const amount = Number(r[6]) || (qty * price);
     if (qty === 0 && price === 0 && amount === 0) continue;
 
+    const rawDate = r[1];
+    const parsedDate = normalizeSpiritImportDate(rawDate);
+    const hasDateValue = rawDate !== null && rawDate !== undefined && String(rawDate).trim() !== "";
+    if (hasDateValue && !parsedDate) continue;
+    const date = parsedDate ?? lastValidDate;
+    if (!date) continue;
+    if (parsedDate) lastValidDate = parsedDate;
+
     const { nameZh, nameEn } = parseSupplierName(rawName);
     items.push({
       supplier: supplierName,
@@ -137,7 +124,7 @@ function parseSupplierSheet(ws: any, supplierName: string): SpiritPurchaseOrderI
       quantity: qty,
       amount,
       spec: String(r[3] || "").trim(),
-      date: parseExcelDate(r[1]),
+      date,
     });
   }
   return items;
@@ -263,15 +250,11 @@ export function parseSpiritInventoryExcel(base64: string): {
     });
 
     // ── 月份标签 ──
-    let monthLabel = "未知月份";
-    const firstDate = purchaseOrders.find((po) => po.date)?.date;
-    if (firstDate) {
-      const [y, m] = firstDate.split("-");
-      monthLabel = `${y}年${Number(m)}月`;
-    } else {
-      const now = new Date();
-      monthLabel = `${now.getFullYear()}年${now.getMonth() + 1}月`;
-    }
+    const now = new Date();
+    const fallbackMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const snapshotMonth = dominantPurchaseMonth(purchaseOrders, fallbackMonth);
+    const [year, month] = snapshotMonth.split("-");
+    const monthLabel = `${year}年${Number(month)}月`;
 
     const totalPurchase =
       Object.values(supplierTotals).reduce((s, v) => s + v, 0) ||

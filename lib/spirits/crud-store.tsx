@@ -6,6 +6,7 @@
 import React, { createContext, useContext, useEffect, useReducer } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { registerStoreReload } from "../sync/engine";
+import { purchasesForMonth, type PendingSpiritPurchase } from "./import-bridge";
 import {
   SpiritItem, SpiritPurchaseRecord, SpiritLedgerEntry,
   SpiritRefPrice, SpiritSupplierInfo, SpiritCustomCategory,
@@ -379,7 +380,7 @@ interface SpiritsContextValue extends SpiritsState {
   getPurchaseSummaryBySupplier: (month: string) => Record<string, { qty: number; amount: number; items: number }>;
   // 月结
   closeMonth: (month: string) => void;
-  syncLedgerFromPurchases: (month: string) => void;
+  syncLedgerFromPurchases: (month: string, pending?: readonly PendingSpiritPurchase[]) => void;
   /** ★ 月末盘点：录入实际期末库存量，自动反推消耗量 */
   setActualClosing: (itemId: string, month: string, actualQty: number) => void;
   /** ★ 批量月末盘点：一次性录入所有酒款的实际期末库存量 */
@@ -771,9 +772,9 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
     }
   };
 
-  const syncLedgerFromPurchases = (month: string) => {
-    const monthPurchases = state.purchases.filter((p) => p.month === month);
-    const byItem: Record<string, SpiritPurchaseRecord[]> = {};
+  const syncLedgerFromPurchases = (month: string, pending: readonly PendingSpiritPurchase[] = []) => {
+    const monthPurchases = purchasesForMonth(state.purchases, pending, month);
+    const byItem: Record<string, Array<SpiritPurchaseRecord | PendingSpiritPurchase>> = {};
     monthPurchases.forEach((p) => {
       const key = p.itemId ?? `raw:${p.rawName}`;
       if (!byItem[key]) byItem[key] = [];
