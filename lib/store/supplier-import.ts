@@ -308,7 +308,10 @@ export async function parseSupplierExcel(): Promise<SupplierImportPreview | null
       headerRowIdx = i;
     }
     if (joined.includes("往来单位") || joined.includes("供应商")) {
-      const nameCell = row.find((c) => c && !String(c).includes("往来单位") && !String(c).includes("供应商"));
+      const labelIndex = row.findIndex((cell) => String(cell ?? "").includes("往来单位") || String(cell ?? "").includes("供应商"));
+      const nameCell = labelIndex >= 0
+        ? row.slice(labelIndex + 1).find((cell) => String(cell ?? "").trim())
+        : undefined;
       if (nameCell) supplierName = String(nameCell).trim();
     }
   }
