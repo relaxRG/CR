@@ -88,9 +88,9 @@ export default function MeScreen() {
               <View style={[styles.iconWrap, { backgroundColor: colors.primary }]}>
                 <IconSymbol name="tag.fill" size={18} color="#FFFFFF" />
               </View>
-              <View style={{ flex: 1 }}>
+              <View style={styles.rowContent}>
                 <Text style={styles.rowTitle} className="text-foreground">{t("me.tags")}</Text>
-                <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>{t("me.tags.desc")}</Text>
+                <Text style={styles.rowDesc} className="text-muted" numberOfLines={2}>{t("me.tags.desc")}</Text>
               </View>
               <IconSymbol name="chevron.right" size={18} color={colors.muted} />
             </Pressable>
@@ -102,9 +102,9 @@ export default function MeScreen() {
               <View style={[styles.iconWrap, { backgroundColor: "#34C759" }]}>
                 <IconSymbol name="square.and.arrow.down.fill" size={18} color="#FFFFFF" />
               </View>
-              <View style={{ flex: 1 }}>
+              <View style={styles.rowContent}>
                 <Text style={styles.rowTitle} className="text-foreground">{t("me.import")}</Text>
-                <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>{t("me.import.desc")}</Text>
+                <Text style={styles.rowDesc} className="text-muted" numberOfLines={2}>{t("me.import.desc")}</Text>
               </View>
               <IconSymbol name="chevron.right" size={18} color={colors.muted} />
             </Pressable>
@@ -116,9 +116,9 @@ export default function MeScreen() {
               <View style={[styles.iconWrap, { backgroundColor: "#AF52DE" }]}>
                 <IconSymbol name="tray.2.fill" size={18} color="#FFFFFF" />
               </View>
-              <View style={{ flex: 1 }}>
+              <View style={styles.rowContent}>
                 <Text style={styles.rowTitle} className="text-foreground">{t("me.taxonomy")}</Text>
-                <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>{t("me.taxonomy.desc")}</Text>
+                <Text style={styles.rowDesc} className="text-muted" numberOfLines={2}>{t("me.taxonomy.desc")}</Text>
               </View>
               <IconSymbol name="chevron.right" size={18} color={colors.muted} />
             </Pressable>
@@ -130,9 +130,9 @@ export default function MeScreen() {
               <View style={[styles.iconWrap, { backgroundColor: "#00C7BE" }]}>
                 <IconSymbol name="tag.fill" size={18} color="#FFFFFF" />
               </View>
-              <View style={{ flex: 1 }}>
+              <View style={styles.rowContent}>
                 <Text style={styles.rowTitle} className="text-foreground">{t("me.systemTags")}</Text>
-                <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>{t("me.systemTags.desc")}</Text>
+                <Text style={styles.rowDesc} className="text-muted" numberOfLines={2}>{t("me.systemTags.desc")}</Text>
               </View>
               <IconSymbol name="chevron.right" size={18} color={colors.muted} />
             </Pressable>
@@ -144,9 +144,9 @@ export default function MeScreen() {
               <View style={[styles.iconWrap, { backgroundColor: "#FF9500" }]}>
                 <IconSymbol name="rectangle.3.group.fill" size={18} color="#FFFFFF" />
               </View>
-              <View style={{ flex: 1 }}>
+              <View style={styles.rowContent}>
                 <Text style={styles.rowTitle} className="text-foreground">{t("me.cardTags")}</Text>
-                <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>{t("me.cardTags.desc")}</Text>
+                <Text style={styles.rowDesc} className="text-muted" numberOfLines={2}>{t("me.cardTags.desc")}</Text>
               </View>
               <IconSymbol name="chevron.right" size={18} color={colors.muted} />
             </Pressable>
@@ -158,9 +158,9 @@ export default function MeScreen() {
               <View style={[styles.iconWrap, { backgroundColor: "#FF9500" }]}>
                 <IconSymbol name="book.fill" size={18} color="#FFFFFF" />
               </View>
-              <View style={{ flex: 1 }}>
+              <View style={styles.rowContent}>
                 <Text style={styles.rowTitle} className="text-foreground">{t("me.bookImport")}</Text>
-                <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>{t("me.bookImport.desc")}</Text>
+                <Text style={styles.rowDesc} className="text-muted" numberOfLines={2}>{t("me.bookImport.desc")}</Text>
               </View>
               <IconSymbol name="chevron.right" size={18} color={colors.muted} />
             </Pressable>
@@ -172,9 +172,9 @@ export default function MeScreen() {
               <View style={[styles.iconWrap, { backgroundColor: "#5AC8FA" }]}>
                 <IconSymbol name="snowflake" size={18} color="#FFFFFF" />
               </View>
-              <View style={{ flex: 1 }}>
+              <View style={styles.rowContent}>
                 <Text style={styles.rowTitle} className="text-foreground">{t("me.ice")}</Text>
-                <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>{t("me.ice.desc")}</Text>
+                <Text style={styles.rowDesc} className="text-muted" numberOfLines={2}>{t("me.ice.desc")}</Text>
               </View>
               <IconSymbol name="chevron.right" size={18} color={colors.muted} />
             </Pressable>
@@ -192,9 +192,9 @@ export default function MeScreen() {
               <View style={[styles.iconWrap, { backgroundColor: "#FF6B35" }]}>
                 <IconSymbol name="externaldrive.fill" size={18} color="#FFFFFF" />
               </View>
-              <View style={{ flex: 1 }}>
+              <View style={styles.rowContent}>
                 <Text style={styles.rowTitle} className="text-foreground">{t("me.dataManager")}</Text>
-                <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>{t("me.dataManager.desc")}</Text>
+                <Text style={styles.rowDesc} className="text-muted" numberOfLines={2}>{t("me.dataManager.desc")}</Text>
               </View>
               <IconSymbol name="chevron.right" size={18} color={colors.muted} />
             </Pressable>
@@ -204,11 +204,11 @@ export default function MeScreen() {
               <View style={[styles.iconWrap, { backgroundColor: "#0A84FF" }]}>
                 <IconSymbol name="icloud.fill" size={18} color="#FFFFFF" />
               </View>
-              <View style={{ flex: 1 }}>
+              <View style={styles.rowContent}>
                 <Text style={styles.rowTitle} className="text-foreground">
                   {isAuthenticated && user?.name ? user.name : t("sync.title")}
                 </Text>
-                <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>
+                <Text style={styles.rowDesc} className="text-muted" numberOfLines={2}>
                   {syncStatusText}
                 </Text>
               </View>
@@ -224,11 +224,11 @@ export default function MeScreen() {
                   <View style={[styles.iconWrap, { backgroundColor: "#5856D6" }]}>
                     <IconSymbol name="laptopcomputer.and.iphone" size={18} color="#FFFFFF" />
                   </View>
-                  <View style={{ flex: 1 }}>
+                  <View style={styles.rowContent}>
                     <Text style={styles.rowTitle} className="text-foreground">
                       {lang === "zh" ? "设备管理" : "Device Manager"}
                     </Text>
-                    <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>
+                    <Text style={styles.rowDesc} className="text-muted" numberOfLines={2}>
                       {lang === "zh" ? "管理同步设备、邀请新设备加入" : "Manage sync devices, invite new ones"}
                     </Text>
                   </View>
@@ -245,11 +245,11 @@ export default function MeScreen() {
                   <View style={[styles.iconWrap, { backgroundColor: "#5856D6" }]}>
                     <IconSymbol name="plus.circle.fill" size={18} color="#FFFFFF" />
                   </View>
-                  <View style={{ flex: 1 }}>
+                  <View style={styles.rowContent}>
                     <Text style={styles.rowTitle} className="text-foreground">
                       {lang === "zh" ? "创建同步组" : "Create Sync Group"}
                     </Text>
-                    <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>
+                    <Text style={styles.rowDesc} className="text-muted" numberOfLines={2}>
                       {lang === "zh" ? "成为主设备，生成配对码邀请其他设备" : "Become owner, generate pair code"}
                     </Text>
                   </View>
@@ -264,11 +264,11 @@ export default function MeScreen() {
                   <View style={[styles.iconWrap, { backgroundColor: "#34C759" }]}>
                     <IconSymbol name="paperplane.fill" size={18} color="#FFFFFF" />
                   </View>
-                  <View style={{ flex: 1 }}>
+                  <View style={styles.rowContent}>
                     <Text style={styles.rowTitle} className="text-foreground">
                       {lang === "zh" ? "加入设备组" : "Join Device Group"}
                     </Text>
-                    <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>
+                    <Text style={styles.rowDesc} className="text-muted" numberOfLines={2}>
                       {lang === "zh" ? "输入配对码，与其他设备同步数据" : "Enter pair code to sync with other devices"}
                     </Text>
                   </View>
@@ -290,11 +290,11 @@ export default function MeScreen() {
               <View style={[styles.iconWrap, { backgroundColor: "#FF9500" }]}>
                 <IconSymbol name="externaldrive.fill" size={18} color="#FFFFFF" />
               </View>
-              <View style={{ flex: 1 }}>
+              <View style={styles.rowContent}>
                 <Text style={styles.rowTitle} className="text-foreground">
                   {lang === "zh" ? "数据备份" : "Data Backup"}
                 </Text>
-                <Text style={styles.rowDesc} className="text-muted" numberOfLines={1}>
+                <Text style={styles.rowDesc} className="text-muted" numberOfLines={2}>
                   {icloudLastAt
                     ? (lang === "zh" ? `上次 iCloud 备份：${new Date(icloudLastAt).toLocaleString()}` : `Last iCloud backup: ${new Date(icloudLastAt).toLocaleString()}`)
                     : (lang === "zh" ? "备份、恢复与导入导出" : "Backup, restore, import & export")}
@@ -331,6 +331,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
+  },
+  rowContent: {
+    flex: 1,
+    minWidth: 0,
   },
   rowTitle: {
     fontSize: 16,

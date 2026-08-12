@@ -1,0 +1,77 @@
+name: UI Quality Gate
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  unit-and-contracts:
+    name: TypeScript and UI contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - run: pnpm test
+
+  mobile-h5-regression:
+    name: H5 theme and responsive regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: unit-and-contracts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Start headless Chromium CDP endpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          BROWSER_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
+          "$BROWSER_BIN" \
+            --headless=new \
+            --no-sandbox \
+            --disable-dev-shm-usage \
+            --remote-debugging-address=127.0.0.1 \
+            --remote-debugging-port=9222 \
+            --user-data-dir=/tmp/cocktail-r-chrome \
+            about:blank >/tmp/cocktail-r-chrome.log 2>&1 &
+          for _ in {1..30}; do
+            curl --fail --silent http://127.0.0.1:9222/json/version >/dev/null && exit 0
+            sleep 1
+          done
+          cat /tmp/cocktail-r-chrome.log
+          exit 1
+      - name: Verify instant system theme hot switching
+        run: pnpm test:h5:theme-hot-switch
+      - name: Verify mobile responsive pages and shared components
+        run: pnpm test:h5:schedule-correction
+      - name: Remove generated web build
+        if: always()
+        run: rm -rf dist-web
+      - name: Upload browser log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chromium-log
+          path: /tmp/cocktail-r-chrome.log
+          if-no-files-found: ignore

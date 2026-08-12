@@ -97,9 +97,9 @@ export default function MePage() {
                   <View style={[styles.iconWrap, { backgroundColor: item.color }]}>
                     <IconSymbol name={item.icon as any} size={18} color="#FFFFFF" />
                   </View>
-                  <View style={{ flex: 1 }}>
+                  <View style={styles.rowContent}>
                     <Text style={[styles.rowTitle, { color: colors.foreground }]}>{item.label}</Text>
-                    <Text style={[styles.rowDesc, { color: colors.muted }]} numberOfLines={1}>{item.desc}</Text>
+                    <Text style={[styles.rowDesc, { color: colors.muted }]} numberOfLines={2}>{item.desc}</Text>
                   </View>
                   <IconSymbol name="chevron.right" size={18} color={colors.muted} />
                 </Pressable>
@@ -120,9 +120,9 @@ export default function MePage() {
               <View style={[styles.iconWrap, { backgroundColor: "#FF6B35" }]}>
                 <IconSymbol name="externaldrive.fill" size={18} color="#FFFFFF" />
               </View>
-              <View style={{ flex: 1 }}>
+              <View style={styles.rowContent}>
                 <Text style={[styles.rowTitle, { color: colors.foreground }]}>数据管理</Text>
-                <Text style={[styles.rowDesc, { color: colors.muted }]} numberOfLines={1}>导入导出、重置数据</Text>
+                <Text style={[styles.rowDesc, { color: colors.muted }]} numberOfLines={2}>导入导出、重置数据</Text>
               </View>
               <IconSymbol name="chevron.right" size={18} color={colors.muted} />
             </Pressable>
@@ -131,11 +131,11 @@ export default function MePage() {
               <View style={[styles.iconWrap, { backgroundColor: "#0A84FF" }]}>
                 <IconSymbol name="icloud.fill" size={18} color="#FFFFFF" />
               </View>
-              <View style={{ flex: 1 }}>
+              <View style={styles.rowContent}>
                 <Text style={[styles.rowTitle, { color: colors.foreground }]}>
                   {isAuthenticated && user?.name ? user.name : "云端同步"}
                 </Text>
-                <Text style={[styles.rowDesc, { color: colors.muted }]} numberOfLines={1}>{syncStatusText}</Text>
+                <Text style={[styles.rowDesc, { color: colors.muted }]} numberOfLines={2}>{syncStatusText}</Text>
               </View>
             </View>
             <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 64 }} />
@@ -147,9 +147,9 @@ export default function MePage() {
                 <View style={[styles.iconWrap, { backgroundColor: "#5856D6" }]}>
                   <IconSymbol name="laptopcomputer.and.iphone" size={18} color="#FFFFFF" />
                 </View>
-                <View style={{ flex: 1 }}>
+                <View style={styles.rowContent}>
                   <Text style={[styles.rowTitle, { color: colors.foreground }]}>设备管理</Text>
-                  <Text style={[styles.rowDesc, { color: colors.muted }]} numberOfLines={1}>管理同步设备、邀请新设备加入</Text>
+                  <Text style={[styles.rowDesc, { color: colors.muted }]} numberOfLines={2}>管理同步设备、邀请新设备加入</Text>
                 </View>
                 <IconSymbol name="chevron.right" size={18} color={colors.muted} />
               </Pressable>
@@ -162,9 +162,9 @@ export default function MePage() {
                   <View style={[styles.iconWrap, { backgroundColor: "#5856D6" }]}>
                     <IconSymbol name="plus.circle.fill" size={18} color="#FFFFFF" />
                   </View>
-                  <View style={{ flex: 1 }}>
+                  <View style={styles.rowContent}>
                     <Text style={[styles.rowTitle, { color: colors.foreground }]}>创建同步组</Text>
-                    <Text style={[styles.rowDesc, { color: colors.muted }]} numberOfLines={1}>成为主设备，生成配对码邀请其他设备</Text>
+                    <Text style={[styles.rowDesc, { color: colors.muted }]} numberOfLines={2}>成为主设备，生成配对码邀请其他设备</Text>
                   </View>
                   <IconSymbol name="chevron.right" size={18} color={colors.muted} />
                 </Pressable>
@@ -176,9 +176,9 @@ export default function MePage() {
                   <View style={[styles.iconWrap, { backgroundColor: "#34C759" }]}>
                     <IconSymbol name="paperplane.fill" size={18} color="#FFFFFF" />
                   </View>
-                  <View style={{ flex: 1 }}>
+                  <View style={styles.rowContent}>
                     <Text style={[styles.rowTitle, { color: colors.foreground }]}>加入设备组</Text>
-                    <Text style={[styles.rowDesc, { color: colors.muted }]} numberOfLines={1}>输入配对码，与其他设备同步数据</Text>
+                    <Text style={[styles.rowDesc, { color: colors.muted }]} numberOfLines={2}>输入配对码，与其他设备同步数据</Text>
                   </View>
                   <IconSymbol name="chevron.right" size={18} color={colors.muted} />
                 </Pressable>
@@ -197,9 +197,9 @@ export default function MePage() {
               <View style={[styles.iconWrap, { backgroundColor: "#FF9500" }]}>
                 <IconSymbol name="externaldrive.fill" size={18} color="#FFFFFF" />
               </View>
-              <View style={{ flex: 1 }}>
+              <View style={styles.rowContent}>
                 <Text style={[styles.rowTitle, { color: colors.foreground }]}>数据备份</Text>
-                <Text style={[styles.rowDesc, { color: colors.muted }]} numberOfLines={1}>
+                <Text style={[styles.rowDesc, { color: colors.muted }]} numberOfLines={2}>
                   {icloudLastAt
                     ? `上次 iCloud 备份：${new Date(icloudLastAt).toLocaleString()}`
                     : "备份、恢复与导入导出"}
@@ -222,6 +222,7 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 13, fontWeight: "500", marginBottom: 8, marginLeft: 4 },
   row: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14, gap: 12 },
   iconWrap: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  rowContent: { flex: 1, minWidth: 0 },
   rowTitle: { fontSize: 16, fontWeight: "600", lineHeight: 22 },
   rowDesc: { fontSize: 12, lineHeight: 17, marginTop: 2 },
 });

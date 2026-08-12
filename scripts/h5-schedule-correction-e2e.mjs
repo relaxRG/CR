@@ -13,7 +13,7 @@
  *   - 正常模式仍包含独立的“生成薪资单”入口；
  *   - 月报页显示唯一“月度归档并确认发薪”主按钮；
  *   - 冻结归档与差额调整中的月报操作区均可在移动视口正常展示；
- *   - 薪资统计、考勤概况、绩效汇总、时段成本分析与月度经营报告在
+ *   - 薪资统计、考勤概况、绩效汇总、时段成本分析、月度经营报告与个人中心在
  *     375/390/430pt 下均不存在根级横向溢出。
  */
 import { createReadStream, existsSync } from "node:fs";
@@ -203,6 +203,7 @@ try {
     [`/labor-kpi-allowance?employeeId=h5-e2e-employee&month=${closeMonth}`, "绩效汇总"],
     ["/period-analysis", "时段成本分析"],
     ["/monthly-report", "月度经营报告"],
+    ["/me", "个人中心"],
   ];
   for (const [path, label] of reportRoutes) {
     const viewports = [];
