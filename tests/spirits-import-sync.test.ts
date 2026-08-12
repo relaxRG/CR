@@ -5,6 +5,7 @@ import { utils, write } from "xlsx";
 import { normalizeImportDate } from "../lib/import/date-utils";
 import { parseSpiritsExcel } from "../lib/spirits/excel-import";
 import { parseSpiritInventoryExcel } from "../lib/spirits/excel-parser";
+import { normalizeLLMRows } from "../lib/spirits/pdf-import";
 import {
   buildImportedPurchaseRecords,
   dominantPurchaseMonth,
@@ -169,5 +170,33 @@ describe("烈酒普通手动录入即时库存更新", () => {
     expect(storeSource).toContain("return record;");
     expect(inventoryPage).toContain("const pending = addPurchase({ ...data, supplier });");
     expect(inventoryPage).toContain("syncLedgerFromPurchases(pending.month, [pending]);");
+  });
+});
+
+
+describe("烈酒PDF进货导入日期边界", () => {
+  it("只继承已验证日期，跳过非法或首行缺日期，并按实际月份保留有效采购", () => {
+    const result = normalizeLLMRows({
+      supplier: "至缘",
+      rows: [
+        { date: null, rawName: "首行缺日期", quantity: 1, unitPrice: 100, amount: 100 },
+        { date: "2026-07-31", rawName: "七月金宾", quantity: 1, unitPrice: 118, amount: 118 },
+        { date: "", rawName: "继承七月日期", quantity: 2, unitPrice: 118, amount: 236 },
+        { date: "2026-02-30", rawName: "非法日期酒款", quantity: 1, unitPrice: 100, amount: 100 },
+        { date: "2026年8月1日", rawName: "八月金宾", quantity: 1, unitPrice: 118, amount: 118 },
+      ],
+    });
+
+    expect(result.rows.map((row) => ({ name: row.rawName, date: row.date, month: row.month }))).toEqual([
+      { name: "七月金宾", date: "2026-07-31", month: "2026-07" },
+      { name: "继承七月日期", date: "2026-07-31", month: "2026-07" },
+      { name: "八月金宾", date: "2026-08-01", month: "2026-08" },
+    ]);
+    expect(result.month).toBe("2026-07");
+    expect(result.totalAmount).toBe(472);
+    expect(result.warnings).toEqual(expect.arrayContaining([
+      expect.stringContaining("首行缺日期"),
+      expect.stringContaining("非法日期酒款"),
+    ]));
   });
 });

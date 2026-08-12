@@ -13,6 +13,7 @@
  */
 
 import { ParsedPurchaseRow, ExcelImportResult, guessCategory } from "./excel-import";
+import { getImportMonth, normalizeImportDate } from "@/lib/import/date-utils";
 
 export interface PdfParseRequest {
   pdfBase64: string;
@@ -132,13 +133,30 @@ export function normalizeLLMRows(
   const supplier = llmData.supplier ?? supplierHint;
   const rows: ParsedPurchaseRow[] = [];
   const monthCounts: Record<string, number> = {};
+  let lastValidDate = "";
 
   for (const item of llmData.rows) {
     const rawName = String(item.rawName ?? item.name ?? "").trim();
     if (!rawName) continue;
 
-    const date = String(item.date ?? "").slice(0, 10) || new Date().toISOString().slice(0, 10);
-    const month = date.slice(0, 7);
+    const rawDate = item.date;
+    const parsedDate = normalizeImportDate(rawDate);
+    const hasDateValue = rawDate !== null && rawDate !== undefined && String(rawDate).trim() !== "";
+    if (hasDateValue && !parsedDate) {
+      warnings.push(`「${rawName}」日期无法识别，已跳过`);
+      continue;
+    }
+    const date = parsedDate ?? lastValidDate;
+    if (!date) {
+      warnings.push(`「${rawName}」缺少可继承的有效日期，已跳过`);
+      continue;
+    }
+    if (parsedDate) lastValidDate = parsedDate;
+    const month = getImportMonth(date);
+    if (!month) {
+      warnings.push(`「${rawName}」月份无法识别，已跳过`);
+      continue;
+    }
     monthCounts[month] = (monthCounts[month] ?? 0) + 1;
 
     const quantity = Number(item.quantity) || 1;
@@ -156,8 +174,7 @@ export function normalizeLLMRows(
     });
   }
 
-  const mainMonth = Object.entries(monthCounts).sort((a, b) => b[1] - a[1])[0]?.[0]
-    ?? new Date().toISOString().slice(0, 7);
+  const mainMonth = Object.entries(monthCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "";
   const totalAmount = rows.reduce((s, r) => s + r.amount, 0);
 
   return { rows, month: mainMonth, supplier, totalAmount, errors, warnings };
