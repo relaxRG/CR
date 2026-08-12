@@ -863,9 +863,82 @@ describe("Suite F：术语与零出勤边界", () => {
   });
 });
 
-// ─── Suite G：长期兼职（longterm_parttime）薪资计算验证 ─────────────────────────
+// ─── Suite G：王琪与瑞雪截图场景的薪资闭环 ────────────────────────────────────
 
-describe("Suite G：长期兼职（longterm_parttime）薪资计算", () => {
+describe("Suite G：王琪与瑞雪的绩效补贴实时回写", () => {
+  it("G1. 王琪：零出勤时旧餐补清零，业绩绩效¥500即时进入应发", () => {
+    const wangqi = makeEmployee({
+      id: "wangqi", realName: "王琪",
+      allowanceRules: [{ id: "meal", label: "餐补", amount: 15, unit: "per_day", type: "meal_per_day", enabled: true, frequency: "monthly" } as AllowanceRule],
+      workKPIRules: [],
+      revenueKPIRules: [{ id: "store-revenue", name: "店铺营业额", source: "manual", payMode: "highest", calcType: "fixed", enabled: true, tiers: [{ id: "280k", threshold: 280000, amount: 500, sortOrder: 1 }] }],
+    });
+    const zeroAttendance = calcFromShiftsPure("wangqi", MONTH, wangqi, [], DEFAULT_SPECIAL_STATUSES);
+    const slip = buildPaySlipDraftPure(wangqi, MONTH, zeroAttendance, 0, undefined, {
+      allowanceDetails: { meal: { amount: 15, autoNote: "旧薪资单残留", isOverride: false } },
+      revenueActuals: { "store-revenue": 280000 },
+    });
+
+    expect(zeroAttendance.attendanceDays).toBe(0);
+    expect(slip.mealAllowance).toBe(0);
+    expect(slip.workKPIBonus).toBe(0);
+    expect(slip.revenueKPIBonus).toBe(500);
+    expect(slip.grossSalary).toBe(500);
+    expect(slip.finalSalary).toBe(500);
+  });
+
+  it("G2. 王琪：业绩门槛临界值与出勤从1天归零时均保持唯一结算口径", () => {
+    const wangqi = makeEmployee({
+      id: "wangqi", realName: "王琪",
+      allowanceRules: [{ id: "meal", label: "餐补", amount: 15, unit: "per_day", type: "meal_per_day", enabled: true, frequency: "monthly" } as AllowanceRule],
+      workKPIRules: [],
+      revenueKPIRules: [{ id: "store-revenue", name: "店铺营业额", source: "manual", payMode: "highest", calcType: "fixed", enabled: true, tiers: [{ id: "280k", threshold: 280000, amount: 500, sortOrder: 1 }] }],
+    });
+    const oneDay = calcFromShiftsPure("wangqi", MONTH, wangqi, [{ ...makeShift("2026-07-01", 8), employeeId: "wangqi" }], DEFAULT_SPECIAL_STATUSES);
+    const zeroDay = calcFromShiftsPure("wangqi", MONTH, wangqi, [], DEFAULT_SPECIAL_STATUSES);
+    const beforeClear = buildPaySlipDraftPure(wangqi, MONTH, oneDay, 0, undefined, { revenueActuals: { "store-revenue": 280000 } });
+    const afterClear = buildPaySlipDraftPure(wangqi, MONTH, zeroDay, 0, undefined, { revenueActuals: { "store-revenue": 280000 } });
+    const belowThreshold = buildPaySlipDraftPure(wangqi, MONTH, zeroDay, 0, undefined, { revenueActuals: { "store-revenue": 279999 } });
+
+    expect(beforeClear.mealAllowance).toBe(15);
+    expect(beforeClear.revenueKPIBonus).toBe(500);
+    expect(afterClear.mealAllowance).toBe(0);
+    expect(afterClear.revenueKPIBonus).toBe(500);
+    expect(afterClear.grossSalary).toBe(500);
+    expect(belowThreshold.revenueKPIBonus).toBe(0);
+    expect(belowThreshold.grossSalary).toBe(0);
+  });
+
+  it("G3. 瑞雪：固定公司补贴¥2,500与五项工作绩效¥1,700完整进入应发且不生成第二个业绩金额", () => {
+    const workAmounts = [200, 300, 500, 300, 400];
+    const ruixue = makeEmployee({
+      id: "ruixue", realName: "瑞雪",
+      allowanceRules: [{ id: "company", label: "公司补贴", amount: 2500, unit: "per_month", type: "custom_fixed", enabled: true }],
+      workKPIRules: workAmounts.map((amount, index) => ({
+        id: `work-${index}`, name: `工作KPI${index + 1}`, cycle: "monthly" as const, notes: "", enabled: true,
+        tiers: [{ id: `hit-${index}`, label: "达标", amount, sortOrder: 1 }],
+      })),
+      revenueKPIRules: [],
+    });
+    const zeroAttendance = calcFromShiftsPure("ruixue", MONTH, ruixue, [], DEFAULT_SPECIAL_STATUSES);
+    const selections = Object.fromEntries(workAmounts.map((_, index) => [`work-${index}`, `hit-${index}`]));
+    const slip = buildPaySlipDraftPure(ruixue, MONTH, zeroAttendance, 0, undefined, { workKPISelections: selections });
+
+    expect(slip.attendanceSalary).toBe(0);
+    expect(slip.transportAllowance).toBe(0);
+    expect(slip.otherAllowance).toBe(2500);
+    expect(slip.mealAllowance).toBe(0);
+    expect(slip.workKPIBonus).toBe(1700);
+    expect(slip.revenueKPIBonus).toBe(0);
+    expect(slip.grossSalary).toBe(4200);
+    expect(slip.finalSalary).toBe(4200);
+    expect("salesCommission" in slip).toBe(false);
+  });
+});
+
+// ─── Suite H：长期兼职（longterm_parttime）薪资计算验证 ─────────────────────────
+
+describe("Suite H：长期兼职（longterm_parttime）薪资计算", () => {
   /** 长期兼职员工：按小时结算，时薪35，无底薪 */
   const ltParttime = makeEmployee({
     type: "longterm_parttime" as any,
