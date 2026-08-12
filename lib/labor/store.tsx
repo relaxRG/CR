@@ -706,10 +706,10 @@ const PaySlipContext = createContext<PaySlipStore>({
 function PaySlipProvider({ children }: { children: React.ReactNode }) {
   const { data: paySlips, ref, persist, ready } = usePersisted<PaySlip>("labor_payslips_v1");
 
-  // 新月度归档不迁移旧薪资单冻结字段；加载后一次性物理删除，避免旧结算语义混入新体系。
+  // 加载后一次性物理删除废弃字段，避免旧本地草稿在实时结算时继续回流。
   useEffect(() => {
     if (!ready) return;
-    const legacyKeys = ["frozenAt", "frozenBy", "frozenSnapshot"];
+    const legacyKeys = ["frozenAt", "frozenBy", "frozenSnapshot", "performanceBonus", "salesCommission"];
     if (!ref.current.some((slip: any) => legacyKeys.some((key) => key in slip))) return;
     persist(ref.current.map((slip: any) => {
       const next = { ...slip };
