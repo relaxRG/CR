@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { utils, write } from "xlsx";
 import { normalizeImportDate } from "../lib/import/date-utils";
 import { parseSpiritsExcel } from "../lib/spirits/excel-import";
@@ -137,5 +139,35 @@ describe("烈酒导入日期边界：非法日期与跨月采购", () => {
     expect(unmatched).toEqual([]);
     expect(records.map((record) => record.month)).toEqual(["2026-07", "2026-07", "2026-08", "2026-08"]);
     expect(records.reduce((total, record) => total + record.amount, 0)).toBe(826);
+  });
+});
+
+
+describe("烈酒普通手动录入即时库存更新", () => {
+  it("将刚创建的单笔采购作为待写入记录合并进当月台账输入，且页面不得依赖下一次状态刷新", () => {
+    const manualPending: SpiritPurchaseRecord = {
+      id: "manual-pending",
+      month: "2026-08",
+      date: "2026-08-15",
+      itemId: item.id,
+      rawName: item.name,
+      unit: "瓶",
+      quantity: 1,
+      unitPrice: 128,
+      amount: 128,
+      supplier: "至缘",
+      category: "Whisky",
+      source: "manual",
+      createdAt: "2026-08-15T00:00:00.000Z",
+    };
+
+    expect(purchasesForMonth([], [manualPending], "2026-08")).toEqual([manualPending]);
+
+    const inventoryPage = readFileSync(resolve(process.cwd(), "app/spirits-inventory.tsx"), "utf8");
+    const storeSource = readFileSync(resolve(process.cwd(), "lib/spirits/crud-store.tsx"), "utf8");
+    expect(storeSource).toContain("addPurchase: (data: Omit<SpiritPurchaseRecord, \"id\" | \"createdAt\">) => SpiritPurchaseRecord;");
+    expect(storeSource).toContain("return record;");
+    expect(inventoryPage).toContain("const pending = addPurchase({ ...data, supplier });");
+    expect(inventoryPage).toContain("syncLedgerFromPurchases(pending.month, [pending]);");
   });
 });

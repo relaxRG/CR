@@ -337,7 +337,7 @@ interface SpiritsContextValue extends SpiritsState {
   updateItem: (id: string, patch: Partial<SpiritItem>) => void;
   deleteItem: (id: string) => void;
   // 进货流水
-  addPurchase: (data: Omit<SpiritPurchaseRecord, "id" | "createdAt">) => void;
+  addPurchase: (data: Omit<SpiritPurchaseRecord, "id" | "createdAt">) => SpiritPurchaseRecord;
   updatePurchase: (id: string, patch: Partial<SpiritPurchaseRecord>) => void;
   deletePurchase: (id: string) => void;
   batchAddPurchases: (records: Omit<SpiritPurchaseRecord, "id" | "createdAt">[]) => void;
@@ -465,9 +465,10 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
   };
 
   // ── 进货流水 ──────────────────────────────────────────────────────────────
-  const addPurchase = (data: Omit<SpiritPurchaseRecord, "id" | "createdAt">) => {
+  const addPurchase = (data: Omit<SpiritPurchaseRecord, "id" | "createdAt">): SpiritPurchaseRecord => {
     const record: SpiritPurchaseRecord = { ...data, id: uuid(), createdAt: new Date().toISOString() };
     dispatch({ type: "ADD_PURCHASE", record });
+    return record;
   };
 
   const updatePurchase = (id: string, patch: Partial<SpiritPurchaseRecord>) => {

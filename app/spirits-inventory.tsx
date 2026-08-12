@@ -2120,8 +2120,8 @@ function SupplierDetailScreen({
           colors={colors}
           getRefPrice={getRefPrice}
           onSave={(data) => {
-            addPurchase({ ...data, supplier });
-            syncLedgerFromPurchases(month);
+            const pending = addPurchase({ ...data, supplier });
+            syncLedgerFromPurchases(pending.month, [pending]);
             setShowAddPurchase(false);
           }}
           onClose={() => setShowAddPurchase(false)}
