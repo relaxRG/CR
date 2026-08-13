@@ -22,10 +22,17 @@ import { ScreenContainer } from "@/components/screen-container";
 import { useEmployeeStore, useCustomDeptStore } from "@/lib/labor/store";
 import { ALLOWANCE_PRESETS, createAllowanceRule, type AllowanceRulePreset } from "@/lib/labor/allowance-rule-factory";
 import {
+  CUSTOM_ALLOWANCE_UNIT_OPTIONS,
+  isPeriodicAllowanceUnit,
+  normalizeAllowanceRuleForSave,
+  validateAllowanceRulesForSave,
+} from "@/lib/labor/allowance-rule-config";
+import {
   Employee, EmployeeDept, EmployeeType, EmployeeBankAccount, WeeklyHoursRule,
   AllowanceRule, SocialInsuranceConfig, InsuranceItem, HousingFundItem,
   IncomeTaxConfig, INCOME_TAX_BRACKETS,
-  AllowanceUnit, WorkKPIRule, WorkKPITier,
+  ALLOWANCE_UNIT_LABELS, ALLOWANCE_PERIOD_MODE_LABELS,
+  WorkKPIRule, WorkKPITier,
   RevenueKPIRule, RevenueKPITier, RevenueKPISource, RevenueKPIPayMode, RevenueKPICalcType,
   REVENUE_KPI_SOURCE_LABELS, REVENUE_KPI_PAY_MODE_LABELS, REVENUE_KPI_CALC_TYPE_LABELS,
   calcRevenueKPIBonus,
@@ -470,6 +477,10 @@ export default function LaborEmployeeFormScreen() {
       ? (isFulltime ? autoHourlyRatePreview : Number(hourlyRate) || 0)
       : Number(overtimeRate);
 
+    const allowanceValidationError = validateAllowanceRulesForSave(allowanceRules);
+    if (allowanceValidationError) { Alert.alert("补贴设置", allowanceValidationError); return; }
+    const normalizedAllowanceRules = allowanceRules.map(normalizeAllowanceRuleForSave);
+
     const draft: Omit<Employee, "id" | "createdAt"> = {
       code: code.trim(), realName: realName.trim(), phone: phone.trim(),
       dept: (customDepts.find((d) => d.id === selectedDeptId)?.category ?? "front") as EmployeeDept,
@@ -491,7 +502,7 @@ export default function LaborEmployeeFormScreen() {
       // 兼职计费模式
       parttimeMode: (type === "parttime" || type === "longterm_parttime") ? parttimeMode : undefined,
       compOffRule: { enabled: compOffEnabled, hoursPerDay: Number(compOffHoursPerDay) || 8 },
-      allowanceRules: allowanceRules.length > 0 ? allowanceRules : undefined,
+      allowanceRules: normalizedAllowanceRules.length > 0 ? normalizedAllowanceRules : undefined,
       workKPIRules: workKPIRules.length > 0 ? workKPIRules : undefined,
       revenueKPIRules: revenueKPIRules.length > 0 ? revenueKPIRules : undefined,
       // Bug修复：始终保存完整配置，enabled 字段控制开关，不保存 undefined
@@ -874,27 +885,93 @@ export default function LaborEmployeeFormScreen() {
                 ))}
               </View>
             )}
-            {allowanceRules.map((rule) => (
-              <View key={rule.id} style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
-                {allowanceEditMode ? (
-                  <>
-                    <TextInput value={rule.label} onChangeText={(v) => updateAllowanceRule(rule.id, { label: v })} placeholder="补贴名称" placeholderTextColor={colors.muted}
-                      style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, flex: 1 }]} />
-                    <TextInput value={String(rule.amount)} onChangeText={(v) => updateAllowanceRule(rule.id, { amount: Number(v) || 0 })}
-                      keyboardType="decimal-pad" style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, width: 70, textAlign: "center" }]} />
-                    <Text style={{ fontSize: 11, color: colors.muted }}>元/{rule.unit === "per_day" ? "天" : "月"}</Text>
-                    <TouchableOpacity onPress={() => deleteAllowanceRule(rule.id)}>
-                      <Text style={{ fontSize: 16, color: colors.error }}>×</Text>
-                    </TouchableOpacity>
-                  </>
-                ) : (
-                  <>
-                    <Text style={{ fontSize: 13, fontWeight: "500", color: colors.foreground, flex: 1 }}>{rule.label}</Text>
-                    <Text style={{ fontSize: 12, color: colors.muted }}>¥{rule.amount}/{rule.unit === "per_day" ? "天" : "月"}</Text>
-                  </>
-                )}
-              </View>
-            ))}
+            {allowanceRules.map((rule) => {
+              const isBusinessPreset = rule.type === "meal_per_day" || rule.type === "transport_fixed";
+              const isPeriodic = isPeriodicAllowanceUnit(rule.unit);
+              const isRolling = rule.periodMode === "rolling";
+              const periodKind = rule.unit === "per_quarter" ? "quarter" : "year";
+              return (
+                <View key={rule.id} style={{ paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
+                  {allowanceEditMode ? (
+                    <>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                        <TextInput value={rule.label} onChangeText={(v) => updateAllowanceRule(rule.id, { label: v })} placeholder="补贴名称" placeholderTextColor={colors.muted}
+                          style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, flex: 1 }]} />
+                        <TextInput value={String(rule.amount)} onChangeText={(v) => updateAllowanceRule(rule.id, { amount: Number(v) || 0 })}
+                          keyboardType="decimal-pad" style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, width: 70, textAlign: "center" }]} />
+                        <Text style={{ fontSize: 11, color: colors.muted }}>{ALLOWANCE_UNIT_LABELS[rule.unit]}</Text>
+                        <TouchableOpacity onPress={() => deleteAllowanceRule(rule.id)}>
+                          <Text style={{ fontSize: 16, color: colors.error }}>×</Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      {isBusinessPreset ? (
+                        <Text style={{ marginTop: 6, fontSize: 11, color: colors.muted }}>
+                          {rule.type === "meal_per_day" ? "餐补固定按实际出勤天数结算" : "交通补贴固定按月结算"}
+                        </Text>
+                      ) : (
+                        <View style={{ marginTop: 8, gap: 7 }}>
+                          <Text style={{ fontSize: 11, color: colors.muted }}>发放单位</Text>
+                          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                            {CUSTOM_ALLOWANCE_UNIT_OPTIONS.map((unit) => {
+                              const selected = rule.unit === unit;
+                              return (
+                                <TouchableOpacity key={unit} onPress={() => updateAllowanceRule(rule.id, {
+                                  unit,
+                                  periodMode: isPeriodicAllowanceUnit(unit) ? (rule.periodMode ?? "natural") : undefined,
+                                  effectiveMonth: isPeriodicAllowanceUnit(unit) && (rule.periodMode ?? "natural") === "rolling"
+                                    ? (rule.effectiveMonth ?? new Date().toISOString().slice(0, 7))
+                                    : undefined,
+                                })}
+                                  style={{ paddingHorizontal: 9, paddingVertical: 5, borderRadius: 7, borderWidth: 1, borderColor: selected ? colors.primary : colors.border, backgroundColor: selected ? colors.primary + "12" : colors.surface }}>
+                                  <Text style={{ fontSize: 11, color: selected ? colors.primary : colors.foreground }}>{ALLOWANCE_UNIT_LABELS[unit]}</Text>
+                                </TouchableOpacity>
+                              );
+                            })}
+                          </View>
+
+                          {isPeriodic && (
+                            <>
+                              <Text style={{ fontSize: 11, color: colors.muted }}>发放周期</Text>
+                              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                                {(["natural", "rolling"] as const).map((periodMode) => {
+                                  const selected = (rule.periodMode ?? "natural") === periodMode;
+                                  return (
+                                    <TouchableOpacity key={periodMode} onPress={() => updateAllowanceRule(rule.id, {
+                                      periodMode,
+                                      effectiveMonth: periodMode === "rolling" ? (rule.effectiveMonth ?? new Date().toISOString().slice(0, 7)) : undefined,
+                                    })}
+                                      style={{ paddingHorizontal: 9, paddingVertical: 5, borderRadius: 7, borderWidth: 1, borderColor: selected ? colors.primary : colors.border, backgroundColor: selected ? colors.primary + "12" : colors.surface }}>
+                                      <Text style={{ fontSize: 11, color: selected ? colors.primary : colors.foreground }}>{ALLOWANCE_PERIOD_MODE_LABELS[periodMode][periodKind]}</Text>
+                                    </TouchableOpacity>
+                                  );
+                                })}
+                              </View>
+                              {isRolling && (
+                                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                                  <Text style={{ fontSize: 11, color: colors.muted }}>生效月</Text>
+                                  <TextInput value={rule.effectiveMonth ?? ""} onChangeText={(v) => updateAllowanceRule(rule.id, { effectiveMonth: v })}
+                                    placeholder="YYYY-MM" placeholderTextColor={colors.muted}
+                                    style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, width: 100, textAlign: "center" }]} />
+                                </View>
+                              )}
+                            </>
+                          )}
+                        </View>
+                      )}
+                    </>
+                  ) : (
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                      <Text style={{ fontSize: 13, fontWeight: "500", color: colors.foreground, flex: 1 }}>{rule.label}</Text>
+                      <Text style={{ fontSize: 12, color: colors.muted }}>
+                        ¥{rule.amount}/{rule.unit === "per_day" ? "天" : rule.unit === "per_month" ? "月" : rule.unit === "per_quarter" ? "季" : "年"}
+                        {isPeriodic ? ` · ${(rule.periodMode ?? "natural") === "rolling" ? "滚动" : "自然"}` : ""}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              );
+            })}
             {allowanceEditMode && (
               <TouchableOpacity onPress={() => { tap(); addAllowanceRule(); }}
                 style={{ paddingVertical: 10, borderWidth: 1, borderColor: colors.primary, borderStyle: "dashed", borderRadius: 8, marginTop: 8, alignItems: "center" }}>
