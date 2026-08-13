@@ -6,7 +6,7 @@
  * - 导航栏左侧「取消」：有改动时弹出确认弹窗，放弃改动后返回
  * - 导航栏右侧「保存」：一次性将所有数据写入 Store，触发全量重算，然后返回
  */
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatMoney } from "@/lib/utils";
 import {
   Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View
@@ -22,6 +22,7 @@ import {
   REVENUE_KPI_PAY_MODE_LABELS, shouldPayAllowanceThisMonth,
 } from "@/lib/labor/types";
 import { settlePayrollExtras } from "@/lib/labor/payroll-extras";
+import { buildPayrollExtrasEditorState } from "@/lib/labor/payroll-extras-editor-state";
 
 const tap = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
@@ -41,35 +42,17 @@ export default function LaborKPIAllowanceEditPage() {
 
   // ── 从 PaySlip 初始化本地 State（仅初始化一次） ──
 
-  // 补贴本月生效状态（本地暂存）
-  const [allowanceEnabled, setAllowanceEnabled] = useState<Record<string, boolean>>(() => {
-    const slip = employeeId && month ? getPaySlip(employeeId, month) : null;
-    const overrides = slip?.allowanceOverrides;
-    const map: Record<string, boolean> = {};
-    (employee?.allowanceRules ?? []).forEach((r) => {
-      if (overrides && r.id in overrides) {
-        map[r.id] = overrides[r.id];
-      } else {
-        map[r.id] = r.enabled !== false && shouldPayAllowanceThisMonth(r, month || "");
-      }
-    });
-    return map;
-  });
+  const initialEditorState = employee && employeeId && month
+    ? buildPayrollExtrasEditorState(employee, month, getPaySlip(employeeId, month))
+    : { allowanceEnabled: {}, workKPISelections: {}, revenueActuals: {} };
 
-  // 工作绩效档位选择（本地暂存）
-  const [workKPISelections, setWorkKPISelections] = useState<Record<string, string>>(() => {
-    const slip = employeeId && month ? getPaySlip(employeeId, month) : null;
-    return slip?.workKPISelections ?? {};
-  });
+  // 补贴、工作绩效和业绩绩效均只在编辑页本地暂存；保存后统一重算。
+  const [allowanceEnabled, setAllowanceEnabled] = useState<Record<string, boolean>>(() => initialEditorState.allowanceEnabled);
+  const [workKPISelections, setWorkKPISelections] = useState<Record<string, string>>(() => initialEditorState.workKPISelections);
+  const [revenueActuals, setRevenueActuals] = useState<Record<string, string>>(() => initialEditorState.revenueActuals);
 
-  // 业绩绩效实际金额（本地暂存，字符串格式供 TextInput 使用）
-  const [revenueActuals, setRevenueActuals] = useState<Record<string, string>>(() => {
-    const slip = employeeId && month ? getPaySlip(employeeId, month) : null;
-    const saved = slip?.revenueActuals ?? {};
-    const map: Record<string, string> = {};
-    Object.entries(saved).forEach(([k, v]) => { map[k] = String(v); });
-    return map;
-  });
+  // 仅在员工和月份首次就绪时初始化，避免异步加载员工档案后遗留空状态。
+  const initializedKeyRef = useRef<string | null>(null);
 
   // 记录初始状态，用于判断是否有未保存的改动
   const initialStateRef = useRef({
@@ -91,6 +74,27 @@ export default function LaborKPIAllowanceEditPage() {
   const allowanceRules = employee.allowanceRules ?? [];
   const workKPIRules = employee.workKPIRules ?? [];
   const revenueKPIRules = employee.revenueKPIRules ?? [];
+
+  // 员工档案由持久化Store异步加载时，useState 初始化器不会再次执行。
+  // 因此必须在当前 employeeId + month 第一次就绪时，从薪资单重建本地编辑状态；
+  // 后续用户未保存修改绝不能被此 effect 覆盖。
+  useEffect(() => {
+    if (!employee || !employeeId || !month) return;
+    const key = `${employeeId}:${month}`;
+    if (initializedKeyRef.current === key) return;
+
+    const next = buildPayrollExtrasEditorState(employee, month, getPaySlip(employeeId, month));
+
+    setAllowanceEnabled(next.allowanceEnabled);
+    setWorkKPISelections(next.workKPISelections);
+    setRevenueActuals(next.revenueActuals);
+    initialStateRef.current = {
+      allowanceEnabled: { ...next.allowanceEnabled },
+      workKPISelections: { ...next.workKPISelections },
+      revenueActuals: { ...next.revenueActuals },
+    };
+    initializedKeyRef.current = key;
+  }, [employee, employeeId, month, getPaySlip]);
 
   // ── 获取当月出勤天数（用于日补贴计算） ──
   // 防御性修复：加入 attendanceRecords 依赖，确保考勤数据更新时重新计算
