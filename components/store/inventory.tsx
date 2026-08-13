@@ -19,7 +19,9 @@ import { useTablewareInventoryStore } from "@/lib/tableware/inventory-store";
 import { useDailyInventoryStore } from "@/lib/daily/inventory-store";
 import { useEquipmentInventoryStore } from "@/lib/equipment/inventory-store";
 
-export default function StoreInventoryScreen() {
+export type InventoryPortalMode = "inventory" | "shop";
+
+export default function StoreInventoryScreen({ mode = "inventory" }: { mode?: InventoryPortalMode }) {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -64,7 +66,7 @@ export default function StoreInventoryScreen() {
         : `${spiritsItems.length} 款已建档 · 点击录入台账`
       : "点击录入烈酒库存";
 
-    return [
+    const allCategories = [
       { emoji: "🥃", label: "烈酒", color: "#6B7280", route: "/spirits-inventory",
         sub: spiritsSub,
         badge: spiritsItems.length > 0 ? `${spiritsItems.length}款` : undefined },
@@ -96,7 +98,16 @@ export default function StoreInventoryScreen() {
         sub: equipItems.length > 0 ? `${equipItems.length} 台 · 月折旧¥${equipmentStore.getTotalMonthlyDepreciation().toFixed(0)}` : "点击登记设备",
         badge: equipItems.length > 0 ? `${equipItems.length}台` : undefined },
     ];
-  }, [spiritsStore, wineStore, foodStore, beerStore, iceStore, fruitStore, glasswareStore, tablewareStore, dailyStore, equipmentStore, currentMonth]);
+
+    return mode === "shop"
+      ? allCategories.filter((category) => ["杯具", "餐具", "日用品", "设备"].includes(category.label))
+      : allCategories.filter((category) => !["杯具", "餐具", "日用品", "设备"].includes(category.label));
+  }, [spiritsStore, wineStore, foodStore, beerStore, iceStore, fruitStore, glasswareStore, tablewareStore, dailyStore, equipmentStore, currentMonth, mode]);
+
+  const title = mode === "shop" ? "店铺" : "库存管理";
+  const description = mode === "shop"
+    ? "杯具、餐具、日用品与设备资产"
+    : "酒水、食材、冰块与水果库存";
 
   return (
     <ScrollView
@@ -104,9 +115,9 @@ export default function StoreInventoryScreen() {
       contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }}
     >
       <View style={{ marginBottom: 16 }}>
-        <Text style={{ fontSize: 22, fontWeight: "700", color: colors.foreground }}>库存管理</Text>
+        <Text style={{ fontSize: 22, fontWeight: "700", color: colors.foreground }}>{title}</Text>
         <Text style={{ fontSize: 13, color: colors.muted, marginTop: 2 }}>
-          共 {categories.filter((c) => c.badge).length} 个品类已有数据
+          {description} · {categories.filter((c) => c.badge).length} 个品类已有数据
         </Text>
       </View>
       <View style={{ gap: 10 }}>

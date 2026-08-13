@@ -3,7 +3,8 @@
  * 【报表】经营分析 / 账户        → 需要 store_ops 权限
  * 【员工】薪资统计 / 排班表 / 薪资预支  → 需要 labor 权限
  * 【备用金】备用金管理            → 需要 store_ops 权限
- * 【库存】10 个品类进销存入口      → 需要 store_ops 权限
+ * 【店铺】杯具 / 餐具 / 日用品 / 设备 → 需要 store_ops 权限
+ * 【库存】酒水 / 食材 / 冰块 / 水果    → 需要 store_ops 权限
  *
  * 权限控制：
  *   - owner：所有 Tab 可见
@@ -26,15 +27,17 @@ import StorePettyCashScreen from "@/components/store/petty-cash";
 import StoreAnalyticsScreen from "@/components/store/analytics";
 import StoreAccountsScreen from "@/components/store/accounts";
 import StoreInventoryScreen from "@/components/store/inventory";
+import StoreShopScreen from "@/components/store/shop";
 import LaborScreen from "@/app/labor";
 
-type MainTab = "monthly" | "labor" | "petty" | "inventory";
+type MainTab = "monthly" | "labor" | "petty" | "shop" | "inventory";
 type ReportTab = "summary" | "analytics" | "accounts";
 
 const ALL_MAIN_TABS: { key: MainTab; label: string; feature: "store_ops" | "labor" }[] = [
   { key: "monthly",   label: "报表",  feature: "store_ops" },
   { key: "labor",     label: "员工",  feature: "labor" },
   { key: "petty",     label: "备用金", feature: "store_ops" },
+  { key: "shop",      label: "店铺",  feature: "store_ops" },
   { key: "inventory", label: "库存",  feature: "store_ops" },
 ];
 
@@ -143,8 +146,8 @@ export default function StoreScreen() {
       {/* 顶部导航栏：Tab + 头像合并为一行（修复顶部留白过宽 Bug） */}
       <View style={{ paddingTop: insets.top, backgroundColor: colors.background, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
         <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 20 }}>
-          {/* Tab 列表（占满剩余空间） */}
-          <View style={{ flex: 1, flexDirection: "row" }}>
+          {/* Tab 列表：第五个主模块在窄屏水平滚动，头像始终固定可见 */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ flexDirection: "row" }}>
             {visibleTabs.map((t) => {
               const active = effectiveTab === t.key;
               return (
@@ -166,7 +169,7 @@ export default function StoreScreen() {
                 </Pressable>
               );
             })}
-          </View>
+          </ScrollView>
           {/* 头像按鈕（右侧对齐） */}
           <Pressable onPress={() => { tap(); router.push("/me"); }}
             style={({ pressed }) => [S.meBtn, { opacity: pressed ? 0.7 : 1 }]}>
@@ -189,9 +192,14 @@ export default function StoreScreen() {
             ? <SafeAreaInsetsContext.Provider value={childInsets}><StorePettyCashScreen /></SafeAreaInsetsContext.Provider>
             : <AccessDenied label="备用金" colors={colors} />
         )}
+        {effectiveTab === "shop"      && (
+          canAccess("store_ops")
+            ? <StoreShopScreen />
+            : <AccessDenied label="店铺" colors={colors} />
+        )}
         {effectiveTab === "inventory" && (
           canAccess("store_ops")
-            ? <StoreInventoryScreen />
+            ? <StoreInventoryScreen mode="inventory" />
             : <AccessDenied label="库存" colors={colors} />
         )}
       </SafeAreaInsetsContext.Provider>
