@@ -790,7 +790,9 @@ export interface Employee {
   parttimeMode?: "daily" | "hourly";
   /** 调休规则（几小时加班换一天休） */
   compOffRule?: CompOffRule;
-  /** 补贴规则列表（饭补/交通/自定义） */
+  /** 补贴规则结构版本；缺失即视为历史数据并在加载时整体清空，不做迁移。 */
+  allowanceRulesSchemaVersion?: number;
+  /** 补贴规则列表（餐补/交通/自定义） */
   allowanceRules?: AllowanceRule[];
   /** 工作绩效规则（Task-based KPI） */
   workKPIRules?: WorkKPIRule[];

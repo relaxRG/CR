@@ -25,7 +25,7 @@ import {
   DEFAULT_BUSINESS_HOURS, DEFAULT_SHIFT_GROUPS,
 } from "./types";
 import { settlePayrollExtras } from "./payroll-extras";
-import { migrateAllowanceRules, needsAllowanceRulesMigration } from "./allowance-rule-migration";
+import { CURRENT_ALLOWANCE_RULES_SCHEMA_VERSION, getActiveAllowanceControls, needsHistoricalAllowanceRulesReset, resetHistoricalAllowanceRules } from "./allowance-rules-reset";
 import {
   buildFinalScheduleByDept,
   buildFrozenPayrollByEmployee,
@@ -120,8 +120,8 @@ function EmployeeProvider({ children }: { children: React.ReactNode }) {
       "idCardImageUri" in e ||
       "healthCertImageUri" in e ||
       "weeklyHours" in e ||
-      // 补贴规则迁移：补齐旧单位、修正旧预设类型、净化无效周期字段。
-      needsAllowanceRulesMigration(e.allowanceRules)
+      // 用户明确要求删除所有历史补贴规则，不做格式迁移或类型推断。
+      needsHistoricalAllowanceRulesReset(e)
     );
     if (needsMigration) {
       console.log("[EmployeeProvider] 持久化迁移：清除废弃字段、迁移旧字段");
@@ -170,10 +170,11 @@ function EmployeeProvider({ children }: { children: React.ReactNode }) {
           if (rules.length > 0) next.weeklyHoursRules = rules;
         }
         delete next.weeklyHours;
-        // 补贴规则迁移：历史快捷预设曾以 custom_fixed 写入；统一规范为
-        // meal_per_day / transport_fixed / custom_fixed，并补齐周期与生效月字段。
-        const migratedAllowanceRules = migrateAllowanceRules(next.allowanceRules);
-        if (migratedAllowanceRules) next.allowanceRules = migratedAllowanceRules;
+        // 用户明确要求删除所有历史补贴规则，不做迁移：保留空规则状态，
+        // 后续只能在新员工档案表单中重新创建当前结构的规则。
+        if (needsHistoricalAllowanceRulesReset(next)) {
+          Object.assign(next, resetHistoricalAllowanceRules(next));
+        }
         return next;
       }));
     }
@@ -185,13 +186,20 @@ function EmployeeProvider({ children }: { children: React.ReactNode }) {
     // 新员工自动分配 sortOrder（同部门内最大値+1）
     const sameDept = ref.current.filter((e) => e.dept === draft.dept);
     const maxOrder = sameDept.reduce((max, e) => Math.max(max, e.sortOrder ?? 0), -1);
-    persist([...ref.current, { ...draft, id, sortOrder: maxOrder + 1, createdAt: new Date().toISOString(), updatedAt: now }]);
+    persist([...ref.current, { ...draft, allowanceRulesSchemaVersion: CURRENT_ALLOWANCE_RULES_SCHEMA_VERSION, id, sortOrder: maxOrder + 1, createdAt: new Date().toISOString(), updatedAt: now }]);
     return id;
   }, [persist, ref]);
 
   const updateEmployee = useCallback((id: string, patch: Partial<Employee>) => {
     // 写入 updatedAt 时间戳，支持多端并发修改时的字段级 LWW 合并
-    persist(ref.current.map((e) => e.id === id ? { ...e, ...patch, updatedAt: Date.now() } : e));
+    persist(ref.current.map((e) => e.id === id ? {
+      ...e,
+      ...patch,
+      allowanceRulesSchemaVersion: patch.allowanceRules !== undefined
+        ? CURRENT_ALLOWANCE_RULES_SCHEMA_VERSION
+        : e.allowanceRulesSchemaVersion,
+      updatedAt: Date.now(),
+    } : e));
   }, [persist, ref]);
 
   const deleteEmployee = useCallback((id: string) => {
@@ -750,10 +758,12 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
     const attendanceSalary = attendance?.attendanceSalary ?? 0;
 
     // ── 绩效与补贴唯一实时结算 ──
-    // 控制字段只在薪资单中持久化；金额只由此结算结果生成。
+    // 补贴规则已被清空时，旧薪资单的开关和金额明细必须同时丢弃，
+    // 防止历史规则通过控制字段在DRAFT重算中继续回流。
+    const activeAllowanceControls = getActiveAllowanceControls(employee, existing);
     const extras = settlePayrollExtras(employee, month, attendanceDays, {
-      allowanceOverrides: existing?.allowanceOverrides,
-      allowanceDetails: existing?.allowanceDetails,
+      allowanceOverrides: activeAllowanceControls.allowanceOverrides,
+      allowanceDetails: activeAllowanceControls.allowanceDetails,
       workKPISelections: existing?.workKPISelections,
       revenueActuals: existing?.revenueActuals,
     });
@@ -882,9 +892,8 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
       holidayBonusAllocation: existing?.holidayBonusAllocation,
       pettyLaborPaid: existing?.pettyLaborPaid,
       pettyLaborLinkIds: existing?.pettyLaborLinkIds,
-      // 保留绩效补贴控制字段：这三个字段是由用户在绩效补贴页手动设置的，必须保留
-      // 不保留会导致 autoSync 每次触发时清除用户的绩效设置（已反复修复 5 次的根本原因）
-      allowanceOverrides: existing?.allowanceOverrides,
+      // 仅在员工仍有当前版本补贴规则时保留月度补贴开关；历史规则已清空时显式删除。
+      allowanceOverrides: activeAllowanceControls.allowanceOverrides,
       workKPISelections: existing?.workKPISelections,
       revenueActuals: existing?.revenueActuals,
       updatedAt: new Date().toISOString(),
