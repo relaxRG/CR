@@ -12,6 +12,10 @@ describe("店铺顶级模块与库存分类", () => {
     expect(store).toContain('{ key: "shop",      label: "店铺",  feature: "store_ops" }');
     expect(store).toContain('<ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}');
     expect(store).toContain('<StoreShopScreen />');
+    expect(store.indexOf('label: "报表"')).toBeLessThan(store.indexOf('label: "员工"'));
+    expect(store.indexOf('label: "员工"')).toBeLessThan(store.indexOf('label: "备用金"'));
+    expect(store.indexOf('label: "备用金"')).toBeLessThan(store.indexOf('label: "库存"'));
+    expect(store.indexOf('label: "库存"')).toBeLessThan(store.indexOf('label: "店铺"'));
   });
 
   it("店铺只承载杯具、餐具、日用品和设备，普通库存不再展示这些门店物资", () => {
@@ -20,6 +24,11 @@ describe("店铺顶级模块与库存分类", () => {
     expect(inventory).toContain('["杯具", "餐具", "日用品", "设备"]');
     expect(inventory).toContain('mode === "shop"');
     expect(inventory).toContain('"酒水、食材、冰块与水果库存"');
+    expect(inventory.indexOf('label: "烈酒"')).toBeLessThan(inventory.indexOf('label: "葡萄酒"'));
+    expect(inventory.indexOf('label: "葡萄酒"')).toBeLessThan(inventory.indexOf('label: "水果"'));
+    expect(inventory.indexOf('label: "水果"')).toBeLessThan(inventory.indexOf('label: "食材"'));
+    expect(inventory.indexOf('label: "食材"')).toBeLessThan(inventory.indexOf('label: "啤酒"'));
+    expect(inventory.indexOf('label: "啤酒"')).toBeLessThan(inventory.indexOf('label: "冰块"'));
     expect(inventory).toContain('"杯具、餐具、日用品与设备资产"');
   });
 

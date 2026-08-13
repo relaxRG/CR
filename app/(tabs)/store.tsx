@@ -37,8 +37,8 @@ const ALL_MAIN_TABS: { key: MainTab; label: string; feature: "store_ops" | "labo
   { key: "monthly",   label: "报表",  feature: "store_ops" },
   { key: "labor",     label: "员工",  feature: "labor" },
   { key: "petty",     label: "备用金", feature: "store_ops" },
-  { key: "shop",      label: "店铺",  feature: "store_ops" },
   { key: "inventory", label: "库存",  feature: "store_ops" },
+  { key: "shop",      label: "店铺",  feature: "store_ops" },
 ];
 
 const REPORT_TABS: { key: ReportTab; label: string }[] = [
