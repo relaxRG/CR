@@ -11,6 +11,8 @@ import { getResponsivePagerIndex, getResponsivePagerOffset } from "@/lib/theme/r
 import { exportLaborData, type ExportType } from "@/lib/labor/export";
 import { buildImportTemplate, parseImportFile, type ImportResult } from "@/lib/labor/import";
 import { getNonWritableScheduleMonths } from "@/lib/labor/schedule-guards";
+import { createMonthCloseOperationGate } from "@/lib/labor/month-close-operation-gate";
+import { createSnapshot } from "@/lib/backup/local-backup";
 import { applyHolidayRestAllocation } from "@/lib/labor/holiday-pay";
 import { getHolidayAllocationKey, getHolidayWorkInfo } from "@/lib/labor/holiday-work";
 import { shouldAutoSyncPayrollMonth } from "@/lib/labor/payroll-sync-guards";
@@ -988,12 +990,14 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
   const rosterInsets = useSafeAreaInsets();
   const { employees } = useEmployeeStore();
   const { templates: shiftTemplates } = useShiftTemplateStore();
-  const { paySlips, buildPaySlipDraft, upsertPaySlip } = usePaySlipStore();
+  const { paySlips, buildPaySlipDraft, upsertPaySlip, replaceMonthPaySlips } = usePaySlipStore();
   const { records: attendances } = useAttendanceStore();
   const { advances } = useSalaryAdvanceStore();
   const { settings: globalSettings } = useGlobalPayrollSettingsStore();
   const { getStatus: getRosterMonthStatus, isMonthWritable: isMonthWritableRoster } = useMonthCloseStore();
   const router = useRouter();
+  const [recalculatingMonth, setRecalculatingMonth] = useState(false);
+  const payrollRecalculationGateRef = useRef(createMonthCloseOperationGate());
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
   // ─── 导出功能（薪资报表 + 排班表，Excel/PDF）────────────────────────────────
@@ -1109,6 +1113,72 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
     return m;
   }, [paySlips, compareMonth]);
 
+  const handleRecalculateSelectedDraftMonth = useCallback(() => {
+    if (getRosterMonthStatus(month) !== "draft") {
+      Alert.alert("无法重新计算", `所选月 ${month} 已确认发薪或正在差额调整，请使用对应的归档流程。`);
+      return;
+    }
+    Alert.alert(
+      "重新计算所选月草稿薪资",
+      `将为 ${month} 创建本地恢复快照，并按当前考勤、补贴、工作绩效、业绩绩效、预支与扣除重建全部草稿薪资。不会修改其他月份或已确认发薪数据。`,
+      [
+        { text: "取消", style: "cancel" },
+        {
+          text: "确认重新计算",
+          style: "destructive",
+          onPress: () => {
+            void (async () => {
+              if (!payrollRecalculationGateRef.current.tryAcquire(month)) {
+                Alert.alert("正在计算", `${month} 已有重算任务进行中，请稍候。`);
+                return;
+              }
+              setRecalculatingMonth(true);
+              try {
+                const snapshot = await createSnapshot();
+                const existingByEmployee = new Map(rosterSlipMap);
+                const rebuiltByEmployee = new Map<string, PaySlip>();
+                for (const employee of activeEmployees) {
+                  const advanceAmount = advances
+                    .filter((advance) => advance.employeeId === employee.id
+                      && (advance.deductMonth === month || advance.date.startsWith(month))
+                      && (advance.status === "pending" || advance.status === "deducted"))
+                    .reduce((sum, advance) => sum + advance.amount, 0);
+                  const { cumulativeIncome, cumulativeTaxPaid } = getDraftPayrollCumulativeTaxInputs(
+                    employee, month, paySlips, globalSettings,
+                  );
+                  const rebuilt = buildPaySlipDraft(
+                    employee,
+                    month,
+                    rosterAttMap.get(employee.id) ?? null,
+                    advanceAmount,
+                    globalSettings,
+                    cumulativeIncome,
+                    cumulativeTaxPaid,
+                  );
+                  rebuiltByEmployee.set(employee.id, {
+                    ...rebuilt,
+                    id: existingByEmployee.get(employee.id)?.id ?? rebuilt.id,
+                  });
+                }
+                // 一次持久化替换本月：活动员工使用唯一公式重建；非活动历史记录原样保留。
+                const nextMonthSlips = paySlips
+                  .filter((slip) => slip.month === month && !rebuiltByEmployee.has(slip.employeeId))
+                  .concat([...rebuiltByEmployee.values()]);
+                replaceMonthPaySlips(month, nextMonthSlips);
+                Alert.alert("重新计算完成", `${month} 已重建 ${rebuiltByEmployee.size} 位员工的草稿薪资。恢复快照：${snapshot.slots[snapshot.currentSlot === 0 ? 6 : snapshot.currentSlot - 1]?.label ?? "已创建"}`);
+              } catch {
+                Alert.alert("重新计算失败", "未写入新的月薪资单。请从本地加密快照恢复后重试。");
+              } finally {
+                payrollRecalculationGateRef.current.release(month);
+                setRecalculatingMonth(false);
+              }
+            })();
+          },
+        },
+      ],
+    );
+  }, [activeEmployees, advances, buildPaySlipDraft, getRosterMonthStatus, globalSettings, month, paySlips, replaceMonthPaySlips, rosterAttMap, rosterSlipMap]);
+
   // DRAFT 唯一对账：控制字段、出勤或规则变化后，立即将旧聚合金额重建为唯一结算结果。
   // FROZEN / ADJUSTING 绝不在此处写入，历史快照及差额会话由月度状态机单独保护。
   React.useEffect(() => {
@@ -1150,6 +1220,15 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
         <View style={{ flex: 1 }} />
         {/* 薪资对比开关 */}
         <CompareToggle mode={compareMode} customMonth={customMonth} baseMonth={month} onChange={setCompareMode} onCustomMonthChange={setCustomMonth} colors={colors} />
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel={`重新计算所选月 ${month} 草稿薪资`}
+          accessibilityHint="仅重建所选月草稿薪资，不修改其他月份或已确认发薪数据"
+          onPress={() => { tap(); handleRecalculateSelectedDraftMonth(); }}
+          disabled={recalculatingMonth || getRosterMonthStatus(month) !== "draft"}
+          style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: colors.primary + "15", borderWidth: 1, borderColor: colors.primary + "44", alignItems: "center", justifyContent: "center", opacity: recalculatingMonth || getRosterMonthStatus(month) !== "draft" ? 0.42 : 1 }}>
+          <IconSymbol name="arrow.clockwise" size={15} color={colors.primary} />
+        </TouchableOpacity>
         {/* 导入按钮 */}
         <TouchableOpacity onPress={() => { tap(); setShowImportMenu(true); }}
           style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: colors.border + "44", alignItems: "center", justifyContent: "center", opacity: importing ? 0.5 : 1 }}
