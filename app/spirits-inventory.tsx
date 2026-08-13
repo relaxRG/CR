@@ -8,7 +8,7 @@
 import React, { useMemo, useState } from "react";
 import { formatMoney } from "@/lib/utils";
 import {
-  Alert, Dimensions, KeyboardAvoidingView, Modal, Platform, Pressable,
+  Alert, KeyboardAvoidingView, Modal, Platform, Pressable,
   ScrollView, StyleSheet, Text, TextInput, TouchableOpacity,
   View, ActivityIndicator,
 } from "react-native";
@@ -39,8 +39,6 @@ import { exportToExcel, exportToPdf, ExportData } from "@/lib/spirits/export";
 import { usePettyCashStore } from "@/lib/store/petty-store";
 import { getApiBaseUrl } from "@/constants/oauth";
 import * as Auth from "@/lib/_core/auth";
-
-const { width: SCREEN_W } = Dimensions.get("window");
 
 // ─── 工具 ─────────────────────────────────────────────────────────────────────
 function uuid() { return Math.random().toString(36).slice(2) + Date.now().toString(36); }

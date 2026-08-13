@@ -7,6 +7,7 @@
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import { formatMoney } from "@/lib/utils";
 import { numericColor, NUMERIC_TONE } from "@/lib/theme/numeric-color-tokens";
+import { getResponsivePagerIndex, getResponsivePagerOffset } from "@/lib/theme/responsive-pager";
 import { exportLaborData, type ExportType } from "@/lib/labor/export";
 import { buildImportTemplate, parseImportFile, type ImportResult } from "@/lib/labor/import";
 import { getNonWritableScheduleMonths } from "@/lib/labor/schedule-guards";
@@ -3458,7 +3459,7 @@ function SchedulePage({ colors, month, onMonthChange, pageWidth }: { colors: any
     if (previousSchedulePageWidth.current === schPageWidth) return;
     previousSchedulePageWidth.current = schPageWidth;
     requestAnimationFrame(() => {
-      schedulePagerRef.current?.scrollTo({ x: schedulePagerIndex * schPageWidth, animated: false });
+      schedulePagerRef.current?.scrollTo({ x: getResponsivePagerOffset(schedulePagerIndex, schPageWidth, 2), animated: false });
     });
   }, [schPageWidth, schedulePagerIndex]);
   const [deptCategory, setDeptCategory] = useState<DeptCategory>("front");
@@ -4457,7 +4458,7 @@ function SchedulePage({ colors, month, onMonthChange, pageWidth }: { colors: any
         showsHorizontalScrollIndicator={false}
         onMomentumScrollEnd={(event) => {
           const offset = event.nativeEvent.contentOffset.x;
-          setSchedulePagerIndex(Math.max(0, Math.min(1, Math.round(offset / schPageWidth))));
+          setSchedulePagerIndex(getResponsivePagerIndex(offset, schPageWidth, 2));
         }}
         style={{ flex: 1 }}>
         {/* 左页：排班表 */}
@@ -5086,7 +5087,7 @@ export default function LaborScreen({ embedded = true }: { embedded?: boolean })
     const idx = PAGES.findIndex((p) => p.key === initialPage);
     if (idx > 0) {
       const timer = setTimeout(() => {
-        scrollRef.current?.scrollTo({ x: idx * winW, animated: false });
+        scrollRef.current?.scrollTo({ x: getResponsivePagerOffset(idx, winW, PAGES.length), animated: false });
       }, 100);
       return () => clearTimeout(timer);
     }
@@ -5098,7 +5099,7 @@ export default function LaborScreen({ embedded = true }: { embedded?: boolean })
     previousPagerWidth.current = winW;
     const pageIndex = PAGES.findIndex((p) => p.key === activePage);
     requestAnimationFrame(() => {
-      scrollRef.current?.scrollTo({ x: Math.max(0, pageIndex) * winW, animated: false });
+      scrollRef.current?.scrollTo({ x: getResponsivePagerOffset(pageIndex, winW, PAGES.length), animated: false });
     });
   }, [winW, activePage]);
 
@@ -5106,11 +5107,11 @@ export default function LaborScreen({ embedded = true }: { embedded?: boolean })
     tap();
     setActivePage(key);
     const idx = PAGES.findIndex((p) => p.key === key);
-    scrollRef.current?.scrollTo({ x: idx * winW, animated: true });
+    scrollRef.current?.scrollTo({ x: getResponsivePagerOffset(idx, winW, PAGES.length), animated: true });
   };
 
   const handleScroll = (e: any) => {
-    const idx = Math.round(e.nativeEvent.contentOffset.x / winW);
+    const idx = getResponsivePagerIndex(e.nativeEvent.contentOffset.x, winW, PAGES.length);
     const key = PAGES[idx]?.key;
     if (key && key !== activePage) setActivePage(key);
   };

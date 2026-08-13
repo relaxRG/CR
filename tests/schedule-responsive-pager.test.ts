@@ -20,10 +20,11 @@ describe("排班表响应式分页与网页缩放护栏", () => {
 
   it("外层与内层分页均在宽度变化后对齐当前页，并保存当前分页索引", () => {
     expect(source).toContain("const previousPagerWidth = useRef(winW);");
-    expect(source).toContain("scrollRef.current?.scrollTo({ x: Math.max(0, pageIndex) * winW, animated: false })");
+    expect(source).toContain('import { getResponsivePagerIndex, getResponsivePagerOffset } from "@/lib/theme/responsive-pager"');
+    expect(source).toContain("scrollRef.current?.scrollTo({ x: getResponsivePagerOffset(pageIndex, winW, PAGES.length), animated: false })");
     expect(source).toContain("const previousSchedulePageWidth = useRef(schPageWidth);");
-    expect(source).toContain("schedulePagerRef.current?.scrollTo({ x: schedulePagerIndex * schPageWidth, animated: false })");
-    expect(source).toContain("setSchedulePagerIndex(Math.max(0, Math.min(1, Math.round(offset / schPageWidth))))");
+    expect(source).toContain("schedulePagerRef.current?.scrollTo({ x: getResponsivePagerOffset(schedulePagerIndex, schPageWidth, 2), animated: false })");
+    expect(source).toContain("setSchedulePagerIndex(getResponsivePagerIndex(offset, schPageWidth, 2))");
   });
 
   it("排班控制栏可换行，缩放时不会为了保持单行而挤压日历网格", () => {
