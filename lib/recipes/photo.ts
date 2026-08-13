@@ -1,16 +1,24 @@
 import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
 import { Alert, Platform } from "react-native";
+import { getDeviceInfo } from "@/lib/cf-sync/client";
 
-/** 照片保存目录（App documentDirectory 下，iCloud 备份范围内） */
-const PHOTO_DIR = `${FileSystem.documentDirectory}recipe-photos/`;
+/** 未配对本地模式与旧版本照片的兼容根目录。 */
+const LEGACY_PHOTO_DIR = `${FileSystem.documentDirectory}recipe-photos/`;
 
-/** 确保照片目录存在 */
-async function ensurePhotoDir() {
-  const info = await FileSystem.getInfoAsync(PHOTO_DIR);
+/**
+ * 以同步组为照片物理分区；未配对设备保留本地目录，不能隐式创建同步成员资格。
+ * 与 lib/sync/photo-sync.ts 使用相同的目录规则，避免旧组文件进入目标组。
+ */
+export async function ensureRecipePhotoDirectory(): Promise<string> {
+  const device = await getDeviceInfo();
+  const safeGroupId = device?.groupId.replace(/[^A-Za-z0-9_-]/g, "_");
+  const directory = safeGroupId ? `${LEGACY_PHOTO_DIR}${safeGroupId}/` : LEGACY_PHOTO_DIR;
+  const info = await FileSystem.getInfoAsync(directory);
   if (!info.exists) {
-    await FileSystem.makeDirectoryAsync(PHOTO_DIR, { intermediates: true });
+    await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
   }
+  return directory;
 }
 
 /**
@@ -18,12 +26,12 @@ async function ensurePhotoDir() {
  * iOS 的 ph:// URI 不可直接读取，必须先复制到 cache/document 目录。
  */
 async function persistPhoto(sourceUri: string, recipeId: string): Promise<string> {
-  await ensurePhotoDir();
+  const photoDir = await ensureRecipePhotoDirectory();
   // 从 URI 最后一段提取合法扩展名；无法识别时回退 jpg（避免 ext 变成整个 URI 导致复制失败）
   const lastSegment = sourceUri.split("/").pop() ?? "";
   const extMatch = /\.([a-zA-Z0-9]{2,5})(?:\?.*)?$/.exec(lastSegment);
   const ext = extMatch ? extMatch[1].toLowerCase() : "jpg";
-  const destPath = `${PHOTO_DIR}${recipeId}_${Date.now()}.${ext}`;
+  const destPath = `${photoDir}${recipeId}_${Date.now()}.${ext}`;
   await FileSystem.copyAsync({ from: sourceUri, to: destPath });
   return destPath;
 }

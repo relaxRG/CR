@@ -1930,7 +1930,7 @@ var worker_v3_default = {
       return new Response(null, { status: 204, headers: corsHeaders(origin) });
     }
     if (path === "/health") {
-      return json({ status: "ok", version: "v3", timestamp: Date.now() }, 200, origin);
+      return json({ status: "ok", version: "v4", release: "group-switch-safe", timestamp: Date.now() }, 200, origin);
     }
     if (path.startsWith("/api/ai/")) {
       const ip = request.headers.get("CF-Connecting-IP") || "unknown";

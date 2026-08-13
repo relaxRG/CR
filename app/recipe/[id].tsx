@@ -64,6 +64,7 @@ import {
   type SourceRef,
 } from "@/lib/recipes/types";
 import { FLAVOR_TAG_DEFAULT_COLORS } from "@/lib/settings/card-tags";
+import { ensureRecipePhotoDirectory } from "@/lib/recipes/photo";
 
 export default function RecipeDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -142,9 +143,7 @@ export default function RecipeDetailScreen() {
       } catch {
         // 压缩失败时回退使用原图
       }
-      const dir = `${FileSystem.documentDirectory}recipe-photos/`;
-      const dirInfo = await FileSystem.getInfoAsync(dir);
-      if (!dirInfo.exists) await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
+      const dir = await ensureRecipePhotoDirectory();
       const destPath = `${dir}${recipe.id}_${Date.now()}.jpg`;
       await FileSystem.copyAsync({ from: sourceUri, to: destPath });
       updateRecipePhoto(recipe.id, "add", destPath);

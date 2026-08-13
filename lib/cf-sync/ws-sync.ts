@@ -29,6 +29,8 @@ let lastKnownServerTs = 0;
 let onPushDetectedCb: PushDetectedCallback | null = null;
 let appStateSubscription: ReturnType<typeof AppState.addEventListener> | null = null;
 let isActive = true;
+/** 每次停止、登出或切换同步组递增；遗留异步轮询不得跨代次回调。 */
+let realtimeEpoch = 0;
 /** 上次通知 Worker 的时间戳（用于节流，30s 内不重复通知） */
 let lastNotifiedAt = 0;
 const NOTIFY_THROTTLE_MS = 30_000;
@@ -95,9 +97,12 @@ async function checkForUpdates(): Promise<number | null> {
 function startPolling(onPushDetected: PushDetectedCallback) {
   if (pollTimer) return; // 已在运行
   onPushDetectedCb = onPushDetected;
+  const pollEpoch = realtimeEpoch;
 
   const poll = async () => {
     const latestAt = await checkForUpdates();
+    // 切组、登出或停止监听后，旧请求即使稍后返回也不得触发新组回调。
+    if (pollEpoch !== realtimeEpoch) return;
     if (latestAt && latestAt > lastKnownServerTs) {
       const prevTs = lastKnownServerTs;
       lastKnownServerTs = latestAt;
@@ -153,6 +158,7 @@ export function startRealtimeSync(onPushDetected: PushDetectedCallback): () => v
   }
 
   return () => {
+    realtimeEpoch += 1;
     stopPolling();
     appStateSubscription?.remove();
     appStateSubscription = null;
@@ -164,6 +170,7 @@ export function startRealtimeSync(onPushDetected: PushDetectedCallback): () => v
  * 重置时间戳（登出或切换设备组时调用）
  */
 export function resetRealtimeSync(): void {
+  realtimeEpoch += 1;
   stopPolling();
   lastKnownServerTs = 0;
   onPushDetectedCb = null;
