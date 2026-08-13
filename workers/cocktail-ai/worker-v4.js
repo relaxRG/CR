@@ -1571,7 +1571,11 @@ async function ownerHandoffError(env, source, handoffDeviceId) {
 async function handleDevicePrepareSwitch(env, body, headers, origin) {
   await ensureSwitchSchema(env);
   const source = await verifyDevice(env, headers.get("X-Device-Id"), headers.get("X-Device-Token"));
-  if (!source) return err("Unauthorized", 401, origin);
+  // 失效的来源成员资格可通过显式恢复加入处理；绝不能用笼统Unauthorized诱导客户端走不安全降级。
+  if (!source) {
+    console.warn("[cf-sync] source_membership_unavailable", { hasDeviceId: Boolean(headers.get("X-Device-Id")) });
+    return err("SOURCE_MEMBERSHIP_UNAVAILABLE", 401, origin);
+  }
   const { code, switchId, deviceName, platform, handoffDeviceId } = body || {};
   if (!isValidSwitchId(switchId) || typeof code !== "string" || !/^\d{6}$/.test(code)) return err("Invalid switch request", 400, origin);
   const existing = await env.DB.prepare("SELECT switch_id FROM group_switches WHERE switch_id = ?").bind(switchId).first();
@@ -1602,6 +1606,43 @@ async function handleDevicePrepareSwitch(env, body, headers, origin) {
   ).run();
   await logSwitchEvent(env, switchId, "switch_prepared");
   return json({ switchId, recoveryTicket, target: { groupId: pair.group_id, role: pair.role, expiresAt: pair.expires_at } }, 200, origin);
+}
+
+async function handleDeviceRecoverJoin(env, body, origin) {
+  await ensureSwitchSchema(env);
+  const { code, deviceId, deviceName, platform } = body || {};
+  if (!/^\d{6}$/.test(code || "") || typeof deviceId !== "string" || deviceId.length < 8 || deviceId.length > 64) {
+    return err("RECOVERY_JOIN_INVALID", 400, origin);
+  }
+  const normalizedName = typeof deviceName === "string" ? deviceName.trim().slice(0, 40) : "";
+  if (!normalizedName || /[\u0000-\u001F\u007F]/.test(normalizedName)) return err("DEVICE_NAME_INVALID", 400, origin);
+
+  const pair = await env.DB.prepare("SELECT * FROM pair_codes WHERE code = ? AND used = 0 AND expires_at > ? AND reserved_switch_id IS NULL").bind(code, Date.now()).first();
+  if (!pair) return err("PAIR_CODE_UNAVAILABLE", 400, origin);
+  const existing = await env.DB.prepare("SELECT device_id FROM devices WHERE device_id = ? AND is_active = 1").bind(deviceId).first();
+  if (existing) return err("RECOVERY_DEVICE_ID_COLLISION", 409, origin);
+
+  // 先保留一次性码，避免并发恢复或普通配对重复消费；插入失败时立即释放保留。
+  const reservationId = `recovery-${deviceId}`;
+  const reservation = await env.DB.prepare("UPDATE pair_codes SET reserved_switch_id = ?, reserved_at = ? WHERE code = ? AND used = 0 AND expires_at > ? AND reserved_switch_id IS NULL").bind(reservationId, Date.now(), code, Date.now()).run();
+  if (Number(reservation.meta?.changes || 0) !== 1) return err("PAIR_CODE_UNAVAILABLE", 409, origin);
+
+  const token = generateToken();
+  try {
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO devices (device_id, group_id, token, name, platform, role, allowed_keys, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)").bind(deviceId, pair.group_id, token, normalizedName, typeof platform === "string" ? platform.slice(0, 24) : "ios", pair.role, pair.allowed_keys || null, Date.now()),
+      env.DB.prepare("UPDATE pair_codes SET used = 1 WHERE code = ? AND reserved_switch_id = ?").bind(code, reservationId),
+      env.DB.prepare("INSERT INTO group_ts (group_id, last_push_at) VALUES (?, ?) ON CONFLICT(group_id) DO UPDATE SET last_push_at = excluded.last_push_at").bind(pair.group_id, Date.now())
+    ]);
+  } catch (error) {
+    await env.DB.prepare("UPDATE pair_codes SET reserved_switch_id = NULL, reserved_at = NULL WHERE code = ? AND reserved_switch_id = ? AND used = 0").bind(code, reservationId).run();
+    console.error("[cf-sync] recovery_join_failed", { code: "RECOVERY_JOIN_WRITE_FAILED" });
+    return err("RECOVERY_JOIN_WRITE_FAILED", 500, origin);
+  }
+  let allowedKeys = null;
+  try { allowedKeys = pair.allowed_keys ? JSON.parse(pair.allowed_keys) : null; } catch {}
+  console.info("[cf-sync] recovery_join_completed", { targetGroup: String(pair.group_id).slice(0, 8), role: pair.role });
+  return json({ membership: { deviceId, deviceToken: token, groupId: pair.group_id, role: pair.role, allowedKeys, deviceName: normalizedName } }, 200, origin);
 }
 
 async function handleDeviceCommitSwitch(env, body, headers, origin) {
@@ -1752,6 +1793,26 @@ async function handleDeviceList(env, headers, origin) {
 __name(handleDeviceList, "handleDeviceList");
 __name2(handleDeviceList, "handleDeviceList");
 __name22(handleDeviceList, "handleDeviceList");
+async function handleDeviceRename(env, body, headers, origin) {
+  const device = await verifyDevice(env, headers.get("X-Device-Id"), headers.get("X-Device-Token"));
+  if (!device) return err("DEVICE_AUTH_UNAUTHORIZED", 401, origin);
+  const requestedName = typeof body?.deviceName === "string" ? body.deviceName.trim() : "";
+  if (!requestedName || requestedName.length > 40 || /[\u0000-\u001F\u007F]/.test(requestedName)) return err("DEVICE_NAME_INVALID", 400, origin);
+  const rows = await env.DB.prepare("SELECT name FROM devices WHERE group_id = ? AND is_active = 1 AND device_id <> ?").bind(device.group_id, device.device_id).all();
+  const names = new Set((rows.results || []).map((row) => String(row.name || "").toLocaleLowerCase()));
+  let deviceName = requestedName;
+  for (let index = 2; names.has(deviceName.toLocaleLowerCase()); index += 1) {
+    const suffix = ` (${index})`;
+    deviceName = `${requestedName.slice(0, Math.max(1, 40 - suffix.length))}${suffix}`;
+  }
+  await env.DB.batch([
+    env.DB.prepare("UPDATE devices SET name = ? WHERE device_id = ? AND group_id = ? AND is_active = 1").bind(deviceName, device.device_id, device.group_id),
+    env.DB.prepare("INSERT INTO group_ts (group_id, last_push_at) VALUES (?, ?) ON CONFLICT(group_id) DO UPDATE SET last_push_at = excluded.last_push_at").bind(device.group_id, Date.now())
+  ]);
+  console.info("[cf-sync] device_renamed", { group: String(device.group_id).slice(0, 8), self: true });
+  return json({ deviceName }, 200, origin);
+}
+
 async function handleDeviceKick(env, body, headers, origin) {
   const deviceId = headers.get("X-Device-Id");
   const token = headers.get("X-Device-Token");
@@ -2037,6 +2098,11 @@ var worker_v3_default = {
       try { body = await request.json(); } catch {}
       return handleDevicePrepareSwitch(env, body, request.headers, origin);
     }
+    if (path === "/api/device/recover-join" && method === "POST") {
+      let body = {};
+      try { body = await request.json(); } catch {}
+      return handleDeviceRecoverJoin(env, body, origin);
+    }
     if (path === "/api/device/commit-switch" && method === "POST") {
       let body = {};
       try { body = await request.json(); } catch {}
@@ -2078,6 +2144,11 @@ var worker_v3_default = {
     }
     if (path === "/api/device/list" && method === "GET") {
       return handleDeviceList(env, request.headers, origin);
+    }
+    if (path === "/api/device/rename" && method === "POST") {
+      let body = {};
+      try { body = await request.json(); } catch {}
+      return handleDeviceRename(env, body, request.headers, origin);
     }
     if (path === "/api/device/kick" && method === "POST") {
       let body = {};

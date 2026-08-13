@@ -8,7 +8,9 @@ if (![currentPath, sourcePath, bindingsPath, outputPath, boundaryPath].every(Boo
 const current = fs.readFileSync(currentPath, 'utf8');
 const source = fs.readFileSync(sourcePath, 'utf8');
 const bindingsResponse = JSON.parse(fs.readFileSync(bindingsPath, 'utf8'));
-const existingBindings = bindingsResponse.result;
+const existingBindings = Array.isArray(bindingsResponse.result)
+  ? bindingsResponse.result
+  : bindingsResponse.result?.bindings;
 if (!Array.isArray(existingBindings)) throw new Error('Worker binding metadata is unavailable.');
 const bindings = existingBindings.map((binding) => (
   binding.type === 'secret_text'

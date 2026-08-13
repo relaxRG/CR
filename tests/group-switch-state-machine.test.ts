@@ -77,6 +77,10 @@ vi.mock("@/lib/cf-sync/client", () => ({
     return preparedStatus === "prepared" ? { state: "prepared" as const } : { state: "committed" as const, membership: target };
   }),
   cancelPreparedGroupSwitch: vi.fn(async () => calls.push("cancel-server")),
+  recoverJoinWithCode: vi.fn(async () => {
+    calls.push("recover-join");
+    return target;
+  }),
   pullCompleteTargetSnapshot: vi.fn(async () => {
     calls.push("pull-target-snapshot");
     return { groupId: "group-b", revision: "1:1", complete: true as const, presentKeys: ["cocktail.recipes"], entries: [{ storageKey: "cocktail.recipes", value: "B", clientUpdatedAt: 2 }] };
@@ -85,6 +89,7 @@ vi.mock("@/lib/cf-sync/client", () => ({
 }));
 
 import {
+  recoverJoinAfterUnavailableSource,
   recoverPendingGroupSwitch,
   switchToAnotherGroup,
   type GroupSwitchRuntime,
@@ -133,6 +138,33 @@ describe("同步组切换状态机", () => {
     expect(calls).toContain("retain-barrier");
     expect(calls).not.toContain("release-source");
     expect(storage.get("cf.sync.groupSwitchSession.v1")).toContain('"mode":"error"');
+  });
+
+  it("来源成员资格失效后，恢复加入只创建B组成员并只水合B组快照", async () => {
+    await recoverJoinAfterUnavailableSource("123456", runtime());
+
+    expect(calls).toEqual(expect.arrayContaining([
+      "snapshot", "barrier", "stop-source-realtime", "recover-join",
+      "save-target-membership", "set-target-membership", "pull-target-snapshot",
+      "hydrate-target", "download-target-photos", "complete-barrier",
+    ]));
+    expect(calls).not.toContain("prepare");
+    expect(calls).not.toContain("commit");
+    expect(calls).not.toContain("release-source");
+    expect(currentMember.groupId).toBe("group-b");
+    expect(storage.get("cf.sync.groupSwitchSession.v1")).toBeUndefined();
+  });
+
+  it("恢复加入遇到网络错误时保持写入屏障，绝不自动回退为普通配对或A组推送", async () => {
+    const client = await import("@/lib/cf-sync/client");
+    vi.mocked(client.recoverJoinWithCode).mockRejectedValueOnce(new Error("NETWORK_OFFLINE"));
+
+    await expect(recoverJoinAfterUnavailableSource("123456", runtime())).rejects.toThrow("NETWORK_OFFLINE");
+
+    expect(calls).toContain("retain-barrier");
+    expect(calls).not.toContain("prepare");
+    expect(calls).not.toContain("release-source");
+    expect(storage.get("cf.sync.groupSwitchSession.v1")).toContain('"flow":"recovery-join"');
   });
 
   it("冷启动发现提交前中断时撤销服务端准备、释放屏障并恢复A组，不会水合B组", async () => {

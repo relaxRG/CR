@@ -18,7 +18,10 @@ export type GroupSwitchDiagnosticEvent =
   | "switch_recovery_completed"
   | "switch_recovery_failed"
   | "source_resumed"
-  | "local_recovery_completed";
+  | "local_recovery_completed"
+  | "recovery_join_started"
+  | "recovery_join_committed"
+  | "recovery_join_failed";
 
 export type GroupSwitchDiagnostic = {
   at: number;

@@ -338,7 +338,7 @@ export default function DeviceManagerScreen() {
   const router = useRouter();
   const { lang } = useI18n();
   const insets = useSafeAreaInsets();
-  const { deviceInfo, deviceRole, syncState, syncError, retrySync, logout, refreshDeviceInfo, isGroupSwitching } = useSync();
+  const { deviceInfo, deviceRole, syncState, syncError, retrySync, logout, refreshDeviceInfo, createSyncGroup, isGroupSwitching } = useSync();
   const [manualSyncing, setManualSyncing] = useState(false);
   const [renamingDevice, setRenamingDevice] = useState(false);
   const [renameInput, setRenameInput] = useState("");
@@ -539,6 +539,36 @@ export default function DeviceManagerScreen() {
       pathname: "/pair-device",
       params: { switch: "1", handoffDeviceId: handoffDeviceId ?? "" },
     });
+  };
+
+  const handleCreateSyncGroup = () => {
+    if (deviceInfo || isGroupSwitching) return;
+    tap();
+    const title = lang === "zh" ? "创建新的同步组" : "Create New Sync Group";
+    const message = lang === "zh"
+      ? "将以本机设备型号作为初始名称创建独立同步组。现有本地数据会在首次同步后备份到该新组；之后仍可在设备管理中重命名。"
+      : "A new independent group will be created using this device model as its initial name. Existing local data will back up to this group after the first sync, and you can rename the device later.";
+    const create = async () => {
+      try {
+        await createSyncGroup();
+        await loadDevices();
+        await loadBackupStatus();
+        Alert.alert(
+          lang === "zh" ? "同步组已创建" : "Sync Group Created",
+          lang === "zh" ? "本机已成为主设备。现在可以生成配对码邀请其他设备。" : "This device is now the owner. You can generate a pair code to invite other devices.",
+        );
+      } catch (error) {
+        Alert.alert(lang === "zh" ? "创建失败" : "Creation Failed", String(error));
+      }
+    };
+    if (Platform.OS === "web") {
+      if (window.confirm(message)) void create();
+      return;
+    }
+    Alert.alert(title, message, [
+      { text: lang === "zh" ? "取消" : "Cancel", style: "cancel" },
+      { text: lang === "zh" ? "创建" : "Create", onPress: () => void create() },
+    ]);
   };
 
   const handleOpenGroupSwitch = () => {
@@ -796,7 +826,39 @@ export default function DeviceManagerScreen() {
           )}
         </View>
 
-        {/* ── 3. Current Device Card ── */}
+        {/* ── 3. Unpaired local mode: choose explicit create or join; never auto-register. ── */}
+        {!deviceInfo && (
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
+              {lang === "zh" ? "尚未加入同步组" : "Not in a Sync Group"}
+            </Text>
+            <Text style={[styles.hint, { color: colors.muted, marginBottom: 14 }]}>
+              {lang === "zh"
+                ? "请明确选择创建新的独立同步组，或输入其他设备生成的配对码加入已有同步组。本机不会自动成为主设备。"
+                : "Explicitly create an independent group or enter a code from another device. This device will never become an owner automatically."}
+            </Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+              <Pressable
+                testID="create-sync-group"
+                onPress={handleCreateSyncGroup}
+                disabled={isGroupSwitching}
+                style={({ pressed }) => [styles.roleBtn, { backgroundColor: colors.primary, opacity: pressed || isGroupSwitching ? 0.65 : 1 }]}
+              >
+                {isGroupSwitching ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.roleBtnText}>{lang === "zh" ? "创建新的同步组" : "Create New Group"}</Text>}
+              </Pressable>
+              <Pressable
+                testID="join-existing-sync-group"
+                onPress={() => { tap(); router.push("/pair-device"); }}
+                disabled={isGroupSwitching}
+                style={({ pressed }) => [styles.roleBtn, { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.primary, opacity: pressed || isGroupSwitching ? 0.65 : 1 }]}
+              >
+                <Text style={[styles.roleBtnText, { color: colors.primary }]}>{lang === "zh" ? "加入已有同步组" : "Join Existing Group"}</Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
+
+        {/* ── 4. Current Device Card ── */}
         {deviceInfo && (
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <View style={[styles.roleTag, { backgroundColor: ROLE_LABELS[deviceInfo.role].color + "20" }]}>
@@ -881,7 +943,7 @@ export default function DeviceManagerScreen() {
           </View>
         )}
 
-        {/* ── 4. Join another group (all active roles) ── */}
+        {/* ── 5. Join another group (all active roles) ── */}
         {deviceInfo && (
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
@@ -904,7 +966,7 @@ export default function DeviceManagerScreen() {
           </View>
         )}
 
-        {/* ── 5. Pair Code Section (owner only) ── */}
+        {/* ── 6. Pair Code Section (owner only) ── */}
         {isOwner && (
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
@@ -977,7 +1039,7 @@ export default function DeviceManagerScreen() {
           </View>
         )}
 
-        {/* ── 6. Device List ── */}
+        {/* ── 7. Device List ── */}
         <Text style={[styles.listTitle, { color: colors.muted }]}>
           {lang === "zh" ? `设备组（${devices.length} 台）` : `Devices (${devices.length})`}
         </Text>

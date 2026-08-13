@@ -17,6 +17,7 @@ import {
   cfPull,
   cfPush,
   clearDeviceInfo,
+  createNewSyncGroup,
   getDeviceInfo,
   saveDeviceInfo,
   type DeviceInfo,
@@ -39,7 +40,7 @@ import { startAutoBackup } from "@/lib/backup/icloud-backup";
 import { syncPhotos } from "@/lib/sync/photo-sync";
 import { useI18n } from "@/lib/i18n";
 import { startRealtimeSync, notifyPushDone, resetRealtimeSync } from "./ws-sync";
-import { recoverPendingGroupSwitch, switchToAnotherGroup, type GroupSwitchRuntime } from "./group-switch";
+import { recoverJoinAfterUnavailableSource, recoverPendingGroupSwitch, switchToAnotherGroup, type GroupSwitchRuntime } from "./group-switch";
 
 // ─── Context type (compatible with original useSync) ─────────────────────────
 type SyncContextValue = {
@@ -74,6 +75,10 @@ type SyncContextValue = {
    * 会重置 startedRef 并重新执行完整同步流程（读取新 DeviceInfo → pull → merge → push）
    */
   restartSync: () => Promise<boolean>;
+  /** 用户明确创建新的独立同步组；未配对本地模式绝不会自动调用。 */
+  createSyncGroup: (deviceName?: string) => Promise<void>;
+  /** 来源成员资格已失效时，经用户二次确认后仅拉取目标组数据恢复加入。 */
+  recoverJoinToAnotherGroup: (code: string) => Promise<void>;
   /** 加入另一个同步组；主设备可选择先把原组主角色交接给其他活跃设备。 */
   switchToAnotherGroup: (code: string, handoffDeviceId?: string) => Promise<void>;
   /** 正在执行原子切组或冷启动补偿时禁用高风险设备管理操作。 */
@@ -468,6 +473,28 @@ export function SyncProvider({
     return ok;
   }, [performSync, scheduleRetry]);
 
+  const createCurrentDeviceSyncGroup = useCallback(async (deviceName?: string) => {
+    if (await getDeviceInfo()) throw new Error("SYNC_GROUP_ALREADY_ACTIVE");
+    setIsGroupSwitching(true);
+    try {
+      const membership = await createNewSyncGroup(deviceName);
+      setDeviceInfo(membership);
+      await restartSync();
+    } finally {
+      setIsGroupSwitching(false);
+    }
+  }, [restartSync]);
+
+  const recoverCurrentDeviceToAnotherGroup = useCallback(async (code: string) => {
+    setIsGroupSwitching(true);
+    try {
+      await recoverJoinAfterUnavailableSource(code, groupSwitchRuntime);
+      await restartSync();
+    } finally {
+      setIsGroupSwitching(false);
+    }
+  }, [groupSwitchRuntime, restartSync]);
+
   const switchCurrentDeviceToAnotherGroup = useCallback(async (code: string, handoffDeviceId?: string) => {
     const switchId = typeof crypto !== "undefined" && crypto.randomUUID
       ? crypto.randomUUID()
@@ -513,6 +540,8 @@ export function SyncProvider({
           setDeviceInfo(info);
         },
         restartSync,
+        createSyncGroup: createCurrentDeviceSyncGroup,
+        recoverJoinToAnotherGroup: recoverCurrentDeviceToAnotherGroup,
         switchToAnotherGroup: switchCurrentDeviceToAnotherGroup,
         isGroupSwitching,
       }}

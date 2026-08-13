@@ -17,6 +17,7 @@ import {
   getGroupSwitchStatus,
   prepareGroupSwitch,
   pullCompleteTargetSnapshot,
+  recoverJoinWithCode,
   saveDeviceInfo,
   type DeviceInfo,
   type GroupSwitchPreparation,
@@ -39,6 +40,8 @@ export type PersistedGroupSwitchSession = {
   writeEpoch: number;
   createdAt: number;
   lastErrorCode?: string;
+  /** 来源成员资格已失效时的显式恢复加入；无恢复票据，冷启动只允许目标水合或安全释放。 */
+  flow?: "atomic" | "recovery-join";
 };
 
 export type GroupSwitchRuntime = {
@@ -229,7 +232,78 @@ export async function switchToAnotherGroup(
         errorCode: code,
         retryable: true,
       });
+    } else {
+      // 来源认证失败发生在服务端准备前，也必须留下脱敏的稳定错误码，便于判断是否显示恢复加入。
+      await appendGroupSwitchDiagnostic({
+        event: "switch_prepare_failed",
+        switchId: input.switchId,
+        sourceGroupId: source.groupId,
+        errorCode: code,
+        retryable: code !== "SOURCE_MEMBERSHIP_UNAVAILABLE",
+      });
     }
+    throw error;
+  }
+}
+
+/**
+ * 来源成员资格已失效后的显式恢复加入。调用者必须在UI二次确认后执行；
+ * 这不是普通切组的自动降级，任何网络或5xx错误均不会进入本流程。
+ */
+export async function recoverJoinAfterUnavailableSource(
+  code: string,
+  runtime: GroupSwitchRuntime,
+): Promise<void> {
+  const source = await getDeviceInfo();
+  if (!source) throw new Error("SYNC_GROUP_NOT_ACTIVE");
+  const switchId = `recovery-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  const snapshotMeta = await createSnapshot();
+  const localSnapshotSlot = (snapshotMeta.currentSlot + SNAPSHOT_SLOT_COUNT - 1) % SNAPSHOT_SLOT_COUNT;
+  const writeEpoch = await beginGroupSwitchWriteBarrier(switchId);
+  runtime.stopSourceRealtime();
+  let session: PersistedGroupSwitchSession = {
+    version: 1,
+    switchId,
+    mode: "prepared",
+    flow: "recovery-join",
+    source: { deviceId: source.deviceId, groupId: source.groupId, deviceName: source.deviceName },
+    // 占位值仅在recover-join API返回前使用；冷启动会回到安全本地模式而不是推送旧键。
+    targetGroupId: "pending",
+    localSnapshotSlot,
+    writeEpoch,
+    createdAt: Date.now(),
+  };
+  await saveSession(session);
+  await appendGroupSwitchDiagnostic({
+    event: "recovery_join_started",
+    switchId,
+    sourceGroupId: source.groupId,
+  });
+  try {
+    const membership = await recoverJoinWithCode({ code });
+    // 先持久化目标身份，再更新事务状态：强退后只能以目标令牌继续完整水合。
+    await saveDeviceInfo(membership);
+    runtime.setActiveMembership(membership);
+    session = { ...session, mode: "committed", targetGroupId: membership.groupId };
+    await saveSession(session);
+    await appendGroupSwitchDiagnostic({
+      event: "recovery_join_committed",
+      switchId,
+      sourceGroupId: source.groupId,
+      targetGroupId: membership.groupId,
+    });
+    await hydrateCommittedSwitch(session, membership, runtime);
+  } catch (error) {
+    const codeValue = errorCode(error);
+    await saveSession({ ...session, mode: "error", lastErrorCode: codeValue });
+    await retainGroupSwitchRecoveryBarrier(writeEpoch, codeValue);
+    await appendGroupSwitchDiagnostic({
+      event: "recovery_join_failed",
+      switchId,
+      sourceGroupId: source.groupId,
+      errorCode: codeValue,
+      retryable: true,
+    });
     throw error;
   }
 }
@@ -242,9 +316,33 @@ export async function recoverPendingGroupSwitch(
 ): Promise<"none" | "source-resumed" | "target-recovered" | "blocked"> {
   const session = await getPendingGroupSwitchSession();
   if (!session) return "none";
+  const epoch = await beginGroupSwitchWriteBarrier(session.switchId);
+  if (session.flow === "recovery-join") {
+    runtime.stopSourceRealtime();
+    const current = await getDeviceInfo();
+    // API成功后身份已落盘：只能继续目标组完整水合，绝不回到旧组推送。
+    if (current && current.groupId !== session.source.groupId && session.targetGroupId !== "pending") {
+      try {
+        await hydrateCommittedSwitch({ ...session, writeEpoch: epoch }, current, runtime);
+        return "target-recovered";
+      } catch (error) {
+        const code = errorCode(error);
+        await saveSession({ ...session, mode: "error", writeEpoch: epoch, lastErrorCode: code });
+        await retainGroupSwitchRecoveryBarrier(epoch, code);
+        return "blocked";
+      }
+    }
+    // API尚未成功时没有目标身份；释放屏障回到本地模式，允许用户重新显式确认恢复加入。
+    if (current?.groupId === session.source.groupId) {
+      releasePreparedGroupSwitchBarrier(epoch, runtime.createTargetPush(current));
+      await clearSession(session);
+      return "source-resumed";
+    }
+    await retainGroupSwitchRecoveryBarrier(epoch, "RECOVERY_JOIN_STATE_UNKNOWN");
+    return "blocked";
+  }
   const ticket = await readTicket(session.switchId);
   if (!ticket) return "blocked";
-  const epoch = await beginGroupSwitchWriteBarrier(session.switchId);
   const recoverySession = { ...session, writeEpoch: epoch };
   await saveSession(recoverySession);
   runtime.stopSourceRealtime();

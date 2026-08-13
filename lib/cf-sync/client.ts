@@ -7,6 +7,7 @@
  */
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
+import * as Device from "expo-device";
 import { Platform } from "react-native";
 
 export const CF_WORKER_URL = "https://cocktail-ai.kikikong2017.workers.dev";
@@ -150,7 +151,7 @@ export async function createNewSyncGroup(deviceName?: string): Promise<DeviceInf
 
   // Generate new device ID
   const deviceId = generateUUID();
-  const name = deviceName ?? getDefaultDeviceName();
+  const name = deviceName ?? getSuggestedDeviceName();
 
   const res = await cfFetch("/api/device/register", {
     method: "POST",
@@ -175,11 +176,17 @@ export async function createNewSyncGroup(deviceName?: string): Promise<DeviceInf
   return info;
 }
 
-function getDefaultDeviceName(): string {
+/**
+ * 初始展示名：优先使用系统公开的型号名，不读取序列号、广告ID或用户Apple设备名。
+ * 用户后续改名会永久覆盖该建议值，身份与令牌始终保持独立。
+ */
+export function getSuggestedDeviceName(): string {
+  const modelName = typeof Device.modelName === "string" ? Device.modelName.trim() : "";
+  if (modelName) return modelName.slice(0, 40);
   if (Platform.OS === "ios") return "iPhone";
   if (Platform.OS === "android") return "Android";
-  if (Platform.OS === "web") return "Web";
-  return "Device";
+  if (Platform.OS === "web") return "Web 浏览器";
+  return "设备";
 }
 
 // ─── Pair code ────────────────────────────────────────────────────────────────
@@ -221,7 +228,7 @@ export async function pairWithCode(
   if (await getDeviceInfo()) throw new Error("SYNC_GROUP_SWITCH_REQUIRES_ATOMIC_WORKER_PROTOCOL");
   // Generate new device ID
   const deviceId = generateUUID();
-  const name = deviceName ?? getDefaultDeviceName();
+  const name = deviceName ?? getSuggestedDeviceName();
 
   const res = await cfFetch("/api/device/pair", {
     method: "POST",
@@ -284,6 +291,25 @@ async function readError(res: Response, fallback: string): Promise<never> {
     code = body.error ?? fallback;
   } catch {}
   throw new Error(code);
+}
+
+export async function recoverJoinWithCode(input: {
+  code: string;
+  deviceName?: string;
+}): Promise<DeviceInfo> {
+  if (!/^\d{6}$/.test(input.code)) throw new Error("PAIR_CODE_INVALID");
+  const deviceId = generateUUID();
+  const deviceName = input.deviceName?.trim() || getSuggestedDeviceName();
+  const res = await cfFetch("/api/device/recover-join", {
+    method: "POST",
+    body: JSON.stringify({ deviceId, deviceName, platform: Platform.OS, code: input.code }),
+  });
+  if (!res.ok) return readError(res, `RECOVERY_JOIN_FAILED_${res.status}`);
+  const data = await res.json() as { membership: DeviceInfo };
+  if (!data.membership?.deviceId || !data.membership?.deviceToken || !data.membership?.groupId) {
+    throw new Error("RECOVERY_MEMBERSHIP_INVALID");
+  }
+  return data.membership;
 }
 
 export async function prepareGroupSwitch(input: {
@@ -409,12 +435,25 @@ export async function updateDeviceRole(
   }
 }
 
-/** 重命名本机设备（仅更新本地存储，下次同步时服务端会收到新 deviceName） */
+/**
+ * 重命名当前设备。名称是展示字段，必须由Worker在当前组内持久化后再写回本机，
+ * 不会改变设备ID、令牌、角色、授权键或同步组。
+ */
 export async function renameCurrentDevice(newName: string): Promise<void> {
   const deviceInfo = await getDeviceInfo();
   if (!deviceInfo) throw new Error("Device not registered");
-  const updated: DeviceInfo = { ...deviceInfo, deviceName: newName.trim() || deviceInfo.deviceName };
-  await saveDeviceInfo(updated);
+  const normalized = newName.trim();
+  if (!normalized) throw new Error("DEVICE_NAME_REQUIRED");
+  if (normalized.length > 40 || /[\u0000-\u001F\u007F]/.test(normalized)) throw new Error("DEVICE_NAME_INVALID");
+
+  const res = await cfFetch("/api/device/rename", {
+    method: "POST",
+    deviceInfo,
+    body: JSON.stringify({ deviceName: normalized }),
+  });
+  if (!res.ok) return readError(res, `DEVICE_RENAME_FAILED_${res.status}`);
+  const data = await res.json() as { deviceName?: string };
+  await saveDeviceInfo({ ...deviceInfo, deviceName: data.deviceName ?? normalized });
 }
 
 // ─── Sync ─────────────────────────────────────────────────────────────────────

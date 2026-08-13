@@ -28,7 +28,7 @@ export default function PairDeviceScreen() {
   const colors = useColors();
   const router = useRouter();
   const { lang } = useI18n();
-  const { restartSync, deviceInfo, switchToAnotherGroup, isGroupSwitching } = useSync();
+  const { restartSync, deviceInfo, recoverJoinToAnotherGroup, switchToAnotherGroup, isGroupSwitching } = useSync();
   const params = useLocalSearchParams<{ switch?: string; handoffDeviceId?: string }>();
   const isSwitchMode = params.switch === "1" && !!deviceInfo;
   const [code, setCode] = useState("");
@@ -38,6 +38,48 @@ export default function PairDeviceScreen() {
 
   const tap = () => {
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
+  const describeJoinError = (raw: string) => {
+    const codeValue = raw.replace(/^Error:\s*/, "");
+    const messages: Record<string, { zh: string; en: string }> = {
+      PAIR_CODE_UNAVAILABLE: { zh: "目标配对码已过期、已使用或不存在。请在目标主设备上重新生成配对码。", en: "The target code is expired, used, or unavailable. Generate a new code on the target owner device." },
+      TARGET_GROUP_SAME_AS_SOURCE: { zh: "目标同步组与当前同步组相同，无需切换。", en: "The target is already your current sync group." },
+      OWNER_HANDOFF_REQUIRED: { zh: "当前设备是原同步组主设备，请先选择其他活跃设备完成主设备交接。", en: "This device owns the current group. Select another active device to receive owner role first." },
+      OWNER_HANDOFF_INVALID: { zh: "所选的新主设备已失效，请刷新设备列表后重试。", en: "The selected handoff device is unavailable. Refresh the device list and retry." },
+      DEVICE_AUTH_UNAUTHORIZED: { zh: "设备身份已失效，请返回设备管理并使用安全恢复加入。", en: "This device membership is unavailable. Return to Device Manager and use recovery join." },
+    };
+    return messages[codeValue]?.[lang === "zh" ? "zh" : "en"] ?? codeValue;
+  };
+
+  const completeSwitchSuccess = () => {
+    if (Platform.OS !== "web") {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+    Alert.alert(
+      lang === "zh" ? "已安全切换同步组" : "Sync Group Switched",
+      lang === "zh"
+        ? "目标组数据已完整下载并替换本机同步数据。当前组数据不会上传到目标组。"
+        : "Target data was download-replaced. Current-group data was not uploaded.",
+      [{ text: "OK", onPress: () => router.back() }],
+    );
+  };
+
+  const confirmRecoveryJoin = async (code: string) => {
+    try {
+      setLoading(true);
+      await recoverJoinToAnotherGroup(code);
+      completeSwitchSuccess();
+    } catch (error) {
+      Alert.alert(
+        lang === "zh" ? "恢复加入失败" : "Recovery Join Failed",
+        lang === "zh"
+          ? `未能安全加入目标组：${String(error)}。本机保持写入保护，请检查网络或使用新的目标配对码后重试。`
+          : `Could not safely join the target group: ${String(error)}. Local writes remain protected; check the network or use a new target code and retry.`,
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   const joinWithCode = async (rawCode: string) => {
@@ -60,23 +102,38 @@ export default function PairDeviceScreen() {
         // 新设备配对后重启当前成员资格同步；启动路径不会自动创建主设备。
         void restartSync();
       }
-      if (Platform.OS !== "web") {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      if (isSwitchMode) {
+        completeSwitchSuccess();
+      } else {
+        if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        Alert.alert(
+          lang === "zh" ? "配对成功" : "Paired Successfully",
+          lang === "zh" ? "设备已加入同步组，数据将自动同步" : "Device joined the sync group. Data will sync automatically.",
+          [{ text: "OK", onPress: () => router.back() }],
+        );
       }
-      Alert.alert(
-        lang === "zh" ? (isSwitchMode ? "已安全切换同步组" : "配对成功") : (isSwitchMode ? "Sync Group Switched" : "Paired Successfully"),
-        lang === "zh"
-          ? (isSwitchMode ? "目标组数据已完整下载并替换本机同步数据。当前组数据不会上传到目标组。" : "设备已加入同步组，数据将自动同步")
-          : (isSwitchMode ? "Target data was download-replaced. Current-group data was not uploaded." : "Device joined the sync group. Data will sync automatically."),
-        [{ text: "OK", onPress: () => router.back() }],
-      );
     } catch (e: unknown) {
       if (Platform.OS !== "web") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
+      const codeValue = String(e).replace(/^Error:\s*/, "");
+      // 只有Worker明确说明来源成员资格失效，才允许用户选择恢复加入；网络、超时和其他401绝不自动降级。
+      if (isSwitchMode && codeValue.includes("SOURCE_MEMBERSHIP_UNAVAILABLE")) {
+        Alert.alert(
+          lang === "zh" ? "原同步组凭据已失效" : "Original Group Membership Is Unavailable",
+          lang === "zh"
+            ? "系统无法验证原同步组身份。仍可安全加入目标组：本机将先保留加密备份，再只下载目标组数据；旧组数据不会上传。"
+            : "The original group membership cannot be verified. You can still safely join the target group: an encrypted backup is retained and only target-group data is downloaded; old data is never uploaded.",
+          [
+            { text: lang === "zh" ? "取消" : "Cancel", style: "cancel" },
+            { text: lang === "zh" ? "确认恢复加入" : "Confirm Recovery Join", onPress: () => void confirmRecoveryJoin(trimmed) },
+          ],
+        );
+        return;
+      }
       Alert.alert(
         lang === "zh" ? (isSwitchMode ? "切换失败" : "配对失败") : (isSwitchMode ? "Switch Failed" : "Pairing Failed"),
-        String(e),
+        describeJoinError(codeValue),
       );
     } finally {
       setLoading(false);

@@ -166,6 +166,27 @@ class SwitchProtocol:
             self.db.execute("UPDATE group_switches SET state = 'committed' WHERE switch_id = ?", (switch_id,))
         return Membership(record["target_device_id"], record["target_group_id"], record["target_token"], record["target_role"])
 
+    def recover_join(self, code: str, device_id: str) -> Membership:
+        """模拟来源成员已失效后的显式恢复加入：完全不读取来源令牌或来源组数据。"""
+        pair = self.db.execute(
+            "SELECT group_id, role FROM pair_codes WHERE code = ? AND used = 0 AND reserved_switch_id IS NULL",
+            (code,),
+        ).fetchone()
+        assert pair, "PAIR_CODE_UNAVAILABLE"
+        token = f"recovery-token-{device_id}"
+        with self.db:
+            reserved = self.db.execute(
+                "UPDATE pair_codes SET reserved_switch_id = ? WHERE code = ? AND used = 0 AND reserved_switch_id IS NULL",
+                (f"recovery-{device_id}", code),
+            ).rowcount
+            assert reserved == 1, "PAIR_CODE_UNAVAILABLE"
+            self.db.execute(
+                "INSERT INTO devices (id, device_id, group_id, token, name, role, is_active, created_at) VALUES (?, ?, ?, ?, 'recovery', ?, 1, 1)",
+                (device_id, device_id, pair[0], token, pair[1]),
+            )
+            self.db.execute("UPDATE pair_codes SET used = 1 WHERE code = ?", (code,))
+        return Membership(device_id, pair[0], token, pair[1])
+
     def complete_snapshot(self, member: Membership) -> list[tuple[str, str]]:
         active = self.db.execute(
             "SELECT 1 FROM devices WHERE device_id = ? AND token = ? AND group_id = ? AND is_active = 1",
@@ -216,6 +237,17 @@ class GroupSwitchChaosTests(unittest.TestCase):
         self.p.commit(self.source, "switch-handoff", "ticket-" + "z" * 32)
         role = self.p.db.execute("SELECT role FROM devices WHERE device_id = ?", (colleague.device_id,)).fetchone()[0]
         self.assertEqual(role, "owner")
+
+    def test_recovery_join_with_inactive_source_never_reads_or_pushes_a_group_data(self) -> None:
+        self.p.db.execute("UPDATE devices SET is_active = 0 WHERE device_id = ?", (self.source.device_id,))
+        target = self.p.recover_join("123456", "recovery-device")
+        snapshot = dict(self.p.complete_snapshot(target))
+        self.assertEqual(target.group_id, "B")
+        self.assertTrue(all(A_MARKER not in value for value in snapshot.values()))
+        self.assertEqual(snapshot, {"cocktail.recipes": B_MARKER, "labor_payslips_v1": B_MARKER})
+        self.assertEqual(self.p.db.execute("SELECT used FROM pair_codes WHERE code = '123456'").fetchone()[0], 1)
+        with self.assertRaises(AssertionError):
+            self.p.complete_snapshot(self.source)
 
     def test_invalid_ticket_cannot_discover_or_complete_switch(self) -> None:
         ticket = "ticket-" + "k" * 32
