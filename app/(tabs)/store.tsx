@@ -60,11 +60,11 @@ function AccessDenied({ label, colors }: { label: string; colors: any }) {
 // ── 报表模块（含总月报 / 经营分析 / 账户三个子入口）──────────────────────────────
 function ReportModule({ insets, colors }: { insets: any; colors: any }) {
   const router = useRouter();
-  const { hasFeature } = useFeature();
+  const { hasFeature, isAuthenticated } = useFeature();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
   const [reportTab, setReportTab] = usePersistedState<ReportTab>("store.report.tab.v2", "analytics");
 
-  if (!hasFeature("store_ops")) {
+  if (isAuthenticated && !hasFeature("store_ops")) {
     return <AccessDenied label="报表" colors={colors} />;
   }
 
@@ -123,6 +123,7 @@ export default function StoreScreen() {
   const [mainTab, setMainTab] = usePersistedState<MainTab>("store.main.tab.v3", "monthly");
   const { syncState } = useSync();
   const { hasFeature, isAuthenticated } = useFeature();
+  const canAccess = (feature: "store_ops" | "labor") => !isAuthenticated || hasFeature(feature);
   const hasSyncBadge = !!syncState.error;
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
   const childInsets = { ...insets, top: 0 };
@@ -179,17 +180,17 @@ export default function StoreScreen() {
       <SafeAreaInsetsContext.Provider value={childInsets}>
         {effectiveTab === "monthly"   && <ReportModule insets={childInsets} colors={colors} />}
         {effectiveTab === "labor"     && (
-          hasFeature("labor")
+          canAccess("labor")
             ? <View style={{ flex: 1 }}><LaborScreen embedded /></View>
             : <AccessDenied label="员工" colors={colors} />
         )}
         {effectiveTab === "petty"     && (
-          hasFeature("store_ops")
+          canAccess("store_ops")
             ? <SafeAreaInsetsContext.Provider value={childInsets}><StorePettyCashScreen /></SafeAreaInsetsContext.Provider>
             : <AccessDenied label="备用金" colors={colors} />
         )}
         {effectiveTab === "inventory" && (
-          hasFeature("store_ops")
+          canAccess("store_ops")
             ? <StoreInventoryScreen />
             : <AccessDenied label="库存" colors={colors} />
         )}
