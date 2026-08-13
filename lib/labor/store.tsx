@@ -25,6 +25,7 @@ import {
   DEFAULT_BUSINESS_HOURS, DEFAULT_SHIFT_GROUPS,
 } from "./types";
 import { settlePayrollExtras } from "./payroll-extras";
+import { migrateAllowanceRules, needsAllowanceRulesMigration } from "./allowance-rule-migration";
 import {
   buildFinalScheduleByDept,
   buildFrozenPayrollByEmployee,
@@ -119,8 +120,8 @@ function EmployeeProvider({ children }: { children: React.ReactNode }) {
       "idCardImageUri" in e ||
       "healthCertImageUri" in e ||
       "weeklyHours" in e ||
-      // P3 迁移：旧版 allowanceRules 可能无 unit 字段
-      (e.allowanceRules?.some((r: any) => !r.unit))
+      // 补贴规则迁移：补齐旧单位、修正旧预设类型、净化无效周期字段。
+      needsAllowanceRulesMigration(e.allowanceRules)
     );
     if (needsMigration) {
       console.log("[EmployeeProvider] 持久化迁移：清除废弃字段、迁移旧字段");
@@ -169,14 +170,10 @@ function EmployeeProvider({ children }: { children: React.ReactNode }) {
           if (rules.length > 0) next.weeklyHoursRules = rules;
         }
         delete next.weeklyHours;
-        // P3 迁移：为旧版 allowanceRules 补充 unit 字段
-        if (next.allowanceRules?.length) {
-          next.allowanceRules = next.allowanceRules.map((r: any) => {
-            if (r.unit) return r;
-            // 推断规则：meal_per_day → per_day，其他 → per_month
-            return { ...r, unit: r.type === "meal_per_day" ? "per_day" : "per_month" };
-          });
-        }
+        // 补贴规则迁移：历史快捷预设曾以 custom_fixed 写入；统一规范为
+        // meal_per_day / transport_fixed / custom_fixed，并补齐周期与生效月字段。
+        const migratedAllowanceRules = migrateAllowanceRules(next.allowanceRules);
+        if (migratedAllowanceRules) next.allowanceRules = migratedAllowanceRules;
         return next;
       }));
     }
