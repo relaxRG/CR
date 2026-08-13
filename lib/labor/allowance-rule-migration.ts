@@ -4,7 +4,6 @@ const KNOWN_TYPES = new Set<AllowanceType>([
   "meal_per_day",
   "transport_fixed",
   "custom_fixed",
-  "custom_formula",
 ]);
 const KNOWN_UNITS = new Set<AllowanceUnit>(["per_day", "per_month", "per_quarter", "per_year"]);
 const KNOWN_PERIOD_MODES = new Set<AllowancePeriodMode>(["natural", "rolling"]);

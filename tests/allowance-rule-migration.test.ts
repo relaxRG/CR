@@ -44,12 +44,16 @@ describe("历史补贴规则迁移", () => {
     expect(monthly).toMatchObject({ unit: "per_month", periodMode: undefined, effectiveMonth: undefined });
   });
 
-  it("无效类型、单位、金额和周期字段会安全净化为可结算规则", () => {
+  it("无效类型、已删除公式类型、单位、金额和周期字段会安全净化为可结算规则", () => {
     const migrated = migrateAllowanceRule({
       id: "legacy", type: "unknown", label: "其他补贴", amount: "not-a-number",
       unit: "weekly", periodMode: "invalid", effectiveMonth: "2026-13",
     });
+    const removedFormula = migrateAllowanceRule({
+      id: "formula", type: "custom_formula", label: "历史补贴", amount: 300, unit: "per_month", enabled: true,
+    });
     expect(migrated).toMatchObject({ type: "custom_fixed", unit: "per_month", amount: 0, periodMode: undefined, effectiveMonth: undefined, enabled: true });
+    expect(removedFormula).toMatchObject({ type: "custom_fixed", unit: "per_month", amount: 300, enabled: true });
   });
 
   it("迁移检测只在历史字段与规范化结果不同时触发持久化写回", () => {

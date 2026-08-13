@@ -99,8 +99,7 @@ export interface CompOffRule {
 export type AllowanceType =
   | "transport_fixed"   // 交通补贴（固定月额）
   | "meal_per_day"      // 饭补（每出勤天 × 日额）
-  | "custom_fixed"      // 自定义固定补贴
-  | "custom_formula";   // 自定义公式（预留）
+  | "custom_fixed";     // 自定义固定补贴
 
 /** 补贴单位 */
 export type AllowanceUnit = "per_day" | "per_month" | "per_quarter" | "per_year";

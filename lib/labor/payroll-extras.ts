@@ -1,11 +1,11 @@
 import {
   calcAllowance,
   calcRevenueKPIBonus,
-  type AllowanceRule,
   type Employee,
   type PaySlip,
   shouldPayAllowanceThisMonth,
 } from "./types";
+import { getAllowanceSettlementBucket, isDailyAllowanceRule } from "./allowance-rule-semantics";
 
 export type PayrollExtrasControls = Pick<
   PaySlip,
@@ -53,7 +53,7 @@ export function settlePayrollExtras(
     if (!rule.enabled || !shouldPayAllowanceThisMonth(rule, month)) continue;
     if (rule.id in allowanceOverrides && !allowanceOverrides[rule.id]) continue;
 
-    const isDaily = rule.unit === "per_day" || rule.type === "meal_per_day";
+    const isDaily = isDailyAllowanceRule(rule);
     const previous = priorDetails[rule.id];
     // 按天补贴绝不允许手动金额残留；固定补贴才允许明确的人工覆盖。
     const isOverride = !isDaily && previous?.isOverride === true;
@@ -71,8 +71,9 @@ export function settlePayrollExtras(
           : { formula: "fixed", calculatedAt: Date.now() },
     };
 
-    if (rule.type === "transport_fixed") transportAllowance += amount;
-    else if (isDaily) mealAllowance += amount;
+    const bucket = getAllowanceSettlementBucket(rule);
+    if (bucket === "transport") transportAllowance += amount;
+    else if (bucket === "meal") mealAllowance += amount;
     else otherAllowance += amount;
   }
 
@@ -123,9 +124,4 @@ export function getPayrollExtrasGrandTotal(
   rewardPenalty: number = 0,
 ): number {
   return roundMoney(settlement.allowanceTotal + settlement.performanceTotal + rewardPenalty);
-}
-
-/** 仅供测试与迁移审计使用，明确每日补贴不可在零出勤时遗留金额。 */
-export function isDailyAllowanceRule(rule: AllowanceRule): boolean {
-  return rule.unit === "per_day" || rule.type === "meal_per_day";
 }

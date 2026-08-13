@@ -27,6 +27,7 @@ import {
   normalizeAllowanceRuleForSave,
   validateAllowanceRulesForSave,
 } from "@/lib/labor/allowance-rule-config";
+import { isProtectedAllowancePreset } from "@/lib/labor/allowance-rule-semantics";
 import {
   Employee, EmployeeDept, EmployeeType, EmployeeBankAccount, WeeklyHoursRule,
   AllowanceRule, SocialInsuranceConfig, InsuranceItem, HousingFundItem,
@@ -886,7 +887,7 @@ export default function LaborEmployeeFormScreen() {
               </View>
             )}
             {allowanceRules.map((rule) => {
-              const isBusinessPreset = rule.type === "meal_per_day" || rule.type === "transport_fixed";
+              const isBusinessPreset = isProtectedAllowancePreset(rule);
               const isPeriodic = isPeriodicAllowanceUnit(rule.unit);
               const isRolling = rule.periodMode === "rolling";
               const periodKind = rule.unit === "per_quarter" ? "quarter" : "year";

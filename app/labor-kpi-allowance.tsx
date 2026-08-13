@@ -20,6 +20,7 @@ import {
   REVENUE_KPI_PAY_MODE_LABELS, shouldPayAllowanceThisMonth,
 } from "@/lib/labor/types";
 import { settlePayrollExtras } from "@/lib/labor/payroll-extras";
+import { isDailyAllowanceRule } from "@/lib/labor/allowance-rule-semantics";
 
 const tap = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
@@ -151,7 +152,7 @@ export default function LaborKPIAllowancePage() {
                 </View>
                 <Text style={{ fontSize: 15, fontWeight: "600", color: isActive ? colors.primary : colors.muted }}>
                   ¥{formatMoney(displayAmount)}
-                  {(rule.unit === "per_day" || rule.type === "meal_per_day") && shouldPay
+                  {isDailyAllowanceRule(rule) && shouldPay
                     ? <Text style={{ fontSize: 10, color: colors.muted }}> (¥{rule.amount}/天×{slip?.attendanceDays ?? 0}天)</Text>
                     : null}
                 </Text>

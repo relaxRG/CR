@@ -21,8 +21,7 @@
 export type AllowanceType =
   | "transport_fixed"  // 交通补贴（固定月额）
   | "meal_per_day"     // 餐补（按实际出勤天数）
-  | "custom_fixed"     // 公司补贴/岗位补贴/其他自定义固定补贴
-  | "custom_formula";  // 自定义公式保留类型
+  | "custom_fixed";    // 公司补贴/岗位补贴/其他自定义固定补贴
 
 export type AllowanceUnit = "per_day" | "per_month" | "per_quarter" | "per_year";
 
@@ -137,14 +136,15 @@ for (const rule of employee.allowanceRules ?? []) {
   if (!rule.enabled || !shouldPayAllowanceThisMonth(rule, month)) continue;
   if (rule.id in allowanceOverrides && !allowanceOverrides[rule.id]) continue;
 
-  const isDaily = rule.unit === "per_day" || rule.type === "meal_per_day";
+  const isDaily = isDailyAllowanceRule(rule);
   const previous = priorDetails[rule.id];
   const isOverride = !isDaily && previous?.isOverride === true;
   const calculated = calcAllowance(rule, safeAttendanceDays);
   const amount = isOverride ? (previous.amount ?? calculated.amount) : calculated.amount;
 
-  if (rule.type === "transport_fixed") transportAllowance += amount;
-  else if (isDaily) mealAllowance += amount;
+  const bucket = getAllowanceSettlementBucket(rule);
+  if (bucket === "transport") transportAllowance += amount;
+  else if (bucket === "meal") mealAllowance += amount;
   else otherAllowance += amount;
 }
 ```
@@ -158,7 +158,6 @@ for (const rule of employee.allowanceRules ?? []) {
 | `custom_fixed` + `per_month` | 固定 `amount` | `otherAllowance` | 不因零出勤自动清零。 |
 | `custom_fixed` + `per_quarter` | 季度发放月的固定 `amount` | `otherAllowance` | 非发放月为0。 |
 | `custom_fixed` + `per_year` | 年度发放月的固定 `amount` | `otherAllowance` | 非发放月为0。 |
-| `custom_formula` | 当前实现按其 `unit` 调用同一基础计算；没有独立公式解释器 | 按天进入 `mealAllowance`，否则进入 `otherAllowance` | 由单位决定。 |
 
 底层金额函数：
 

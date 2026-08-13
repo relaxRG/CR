@@ -23,6 +23,7 @@ import {
 } from "@/lib/labor/types";
 import { settlePayrollExtras } from "@/lib/labor/payroll-extras";
 import { buildPayrollExtrasEditorState } from "@/lib/labor/payroll-extras-editor-state";
+import { isDailyAllowanceRule } from "@/lib/labor/allowance-rule-semantics";
 
 const tap = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
@@ -263,7 +264,7 @@ export default function LaborKPIAllowanceEditPage() {
                 </View>
                 <Text style={{ fontSize: 15, fontWeight: "600", color: (shouldPay && allowanceEnabled[rule.id]) ? colors.primary : colors.muted }}>
                   ¥{formatMoney(displayAmount)}
-                  {(rule.unit === "per_day" || rule.type === "meal_per_day") && shouldPay
+                  {isDailyAllowanceRule(rule) && shouldPay
                     ? <Text style={{ fontSize: 10, color: colors.muted }}> (¥{rule.amount}/天×{attendanceDays}天)</Text>
                     : null}
                 </Text>
