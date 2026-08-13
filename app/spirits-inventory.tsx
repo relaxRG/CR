@@ -9,8 +9,8 @@ import React, { useMemo, useState } from "react";
 import { formatMoney } from "@/lib/utils";
 import {
   Alert, KeyboardAvoidingView, Modal, Platform, Pressable,
-  ScrollView, StyleSheet, Text, TextInput, TouchableOpacity,
-  View, ActivityIndicator,
+  ScrollView, SectionList, StyleSheet, Text, TextInput, TouchableOpacity,
+  View, ActivityIndicator, useWindowDimensions,
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
@@ -46,6 +46,31 @@ function catColor(cat: string) { return SPIRIT_CATEGORY_COLORS[cat] ?? "#6B7280"
 function tap() { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }
 function fmtAmt(n: number) { return n >= 10000 ? `${(n / 10000).toFixed(1)}万` : formatMoney(n); }
 
+function LedgerDetailSection({
+  title,
+  metrics,
+  colors,
+  tone = "default",
+}: {
+  title: string;
+  metrics: Array<[string, string | number]>;
+  colors: ReturnType<typeof useColors>;
+  tone?: "default" | "negative";
+}) {
+  const valueColor = tone === "negative" ? "#EF4444" : colors.foreground;
+  return (
+    <View style={{ marginBottom: 10, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, backgroundColor: colors.surface, padding: 12 }}>
+      <Text style={{ fontSize: 12, fontWeight: "800", color: colors.muted, marginBottom: 8 }}>{title}</Text>
+      {metrics.map(([label, value], index) => (
+        <View key={label} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: index === 0 ? 0 : 8 }}>
+          <Text style={{ fontSize: 13, color: colors.muted }}>{label}</Text>
+          <Text style={{ fontSize: 14, fontWeight: "700", color: valueColor }}>{String(value)}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 type Tab = "summary" | "ledger" | "purchase" | "analysis";
 const TABS: { key: Tab; label: string }[] = [
   { key: "summary", label: "📊 总结" },
@@ -58,6 +83,8 @@ const TABS: { key: Tab; label: string }[] = [
 export default function SpiritsInventoryScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { width: viewportWidth } = useWindowDimensions();
+  const useCompactLedger = viewportWidth < 600;
   const router = useRouter();
   const store = useSpiritsInventoryStore();
   const {
@@ -474,9 +501,37 @@ export default function SpiritsInventoryScreen() {
   // ── 库存管理 Tab ─────────────────────────────────────────────────────────────
   const [ledgerEditMode, setLedgerEditMode] = useState(false);
   const [editingOpeningQty, setEditingOpeningQty] = useState<Record<string, string>>({});
+  const [selectedLedgerItemId, setSelectedLedgerItemId] = useState<string | null>(null);
   const [showAddItem, setShowAddItem] = useState(false);
   const [editingItem, setEditingItem] = useState<SpiritItem | null>(null);
   const [showItemForm, setShowItemForm] = useState(false);
+
+  const compactLedgerSections = useMemo(() => {
+    const allCats = getAllCategories();
+    const activeItems = items.filter((item) => item.active);
+    const sections: Array<{ title: string; color: string; data: SpiritItem[]; unclassified?: boolean }> = [];
+    const unclassified = activeItems.filter((item) => !item.category || item.category === "" ||
+      (!SPIRIT_CATEGORIES.includes(item.category as any) && !allCats.some((category) => category.name === item.category)));
+    if (unclassified.length > 0) sections.push({ title: "⚠️ 未分类", color: "#F59E0B", data: unclassified, unclassified: true });
+    SPIRIT_CATEGORIES.forEach((category) => {
+      const data = activeItems.filter((item) => item.category === category);
+      if (data.length > 0) sections.push({ title: category, color: catColor(category), data });
+    });
+    allCats.filter((category) => !SPIRIT_CATEGORIES.includes(category.name as any)).forEach((category) => {
+      const data = activeItems.filter((item) => item.category === category.name);
+      if (data.length > 0) sections.push({ title: category.name, color: catColor(category.name), data });
+    });
+    return sections;
+  }, [items, ledger, selectedMonth]);
+
+  const selectedLedgerItem = useMemo(
+    () => items.find((item) => item.id === selectedLedgerItemId) ?? null,
+    [items, selectedLedgerItemId],
+  );
+  const selectedLedgerEntry = useMemo(
+    () => selectedLedgerItem ? getItemLedger(selectedLedgerItem.id, selectedMonth) : undefined,
+    [ledger, selectedLedgerItem, selectedMonth],
+  );
   // 分类选择器 Modal
   const [showCatPicker, setShowCatPicker] = useState(false);
   const [catPickerTitle, setCatPickerTitle] = useState("");
@@ -654,13 +709,66 @@ export default function SpiritsInventoryScreen() {
         </TouchableOpacity>
       </ScrollView>
 
-      {/* 横向滚动表格 */}
+      {/* 台账：移动端以主列列表展示，宽屏保留完整横向对账表 */}
       <ScrollView contentContainerStyle={{ paddingBottom: 40 + insets.bottom }}>
         {items.length === 0 ? (
           <View style={{ alignItems: "center", padding: 40 }}>
             <Text style={{ fontSize: 48 }}>🥃</Text>
             <Text style={{ fontSize: 16, fontWeight: "600", color: colors.foreground, marginTop: 12 }}>还没有酒款档案</Text>
             <Text style={{ fontSize: 13, color: colors.muted, marginTop: 6 }}>点击「新增酒款」或导入 Excel</Text>
+          </View>
+        ) : useCompactLedger ? (
+          <View testID="spirits-ledger-compact-list">
+            <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 9, backgroundColor: "#991B1B" }}>
+              <Text style={{ flex: 1, fontSize: 12, fontWeight: "700", color: "#fff" }}>酒款</Text>
+              <Text style={{ width: 72, fontSize: 11, fontWeight: "700", color: "#fff", textAlign: "right" }}>期末库存</Text>
+              <Text style={{ width: 82, fontSize: 11, fontWeight: "700", color: "#fff", textAlign: "right" }}>期末成本</Text>
+            </View>
+            {compactLedgerSections.map((section) => (
+              <React.Fragment key={section.title}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 7, backgroundColor: section.color + "20" }}>
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: section.color }} />
+                  <Text style={{ fontSize: 12, fontWeight: "700", color: section.color }}>{section.title}</Text>
+                  {section.unclassified && <Text style={{ fontSize: 10, color: "#F59E0B" }}>请补充分类</Text>}
+                </View>
+                {section.data.map((item) => {
+                  const entry = getItemLedger(item.id, selectedMonth);
+                  const isNegative = Boolean(entry && entry.closingQty < 0);
+                  return (
+                    <TouchableOpacity
+                      key={item.id}
+                      testID={`spirits-ledger-compact-row-${item.id}`}
+                      onPress={() => { tap(); setSelectedLedgerItemId(item.id); }}
+                      style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, backgroundColor: isNegative ? "#FEF2F2" : colors.surface }}
+                    >
+                      <View style={{ width: 4, alignSelf: "stretch", borderRadius: 2, backgroundColor: isNegative ? "#EF4444" : catColor(item.category) }} />
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text numberOfLines={2} style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>{item.name}</Text>
+                        <Text numberOfLines={1} style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>{item.category || "未分类"}</Text>
+                      </View>
+                      <View style={{ width: 72, alignItems: "flex-end" }}>
+                        <Text style={{ fontSize: 14, fontWeight: "700", color: isNegative ? "#EF4444" : colors.foreground }}>{entry ? entry.closingQty.toFixed(2) : "—"}</Text>
+                        <Text style={{ fontSize: 10, color: isNegative ? "#EF4444" : colors.muted }}>{isNegative ? "库存不足" : "期末库存"}</Text>
+                      </View>
+                      <View style={{ width: 82, alignItems: "flex-end" }}>
+                        <Text style={{ fontSize: 13, fontWeight: "700", color: "#991B1B" }}>{entry ? `¥${formatMoney(entry.closingCost)}` : "—"}</Text>
+                        <Text style={{ fontSize: 10, color: colors.muted }}>期末成本</Text>
+                      </View>
+                      <IconSymbol name="chevron.right" size={15} color={colors.muted} />
+                    </TouchableOpacity>
+                  );
+                })}
+              </React.Fragment>
+            ))}
+            {monthLedger.length > 0 && (
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 14, backgroundColor: "#FEF2F2" }}>
+                <Text style={{ fontSize: 13, fontWeight: "700", color: "#991B1B" }}>合计</Text>
+                <View style={{ alignItems: "flex-end" }}>
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: "#991B1B" }}>库存 {summaryTotals.closingQty.toFixed(2)}</Text>
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: "#991B1B" }}>¥{formatMoney(summaryTotals.closingCost)}</Text>
+                </View>
+              </View>
+            )}
           </View>
         ) : (
           <ScrollView horizontal showsHorizontalScrollIndicator style={{ flexGrow: 0 }}>
@@ -888,6 +996,110 @@ export default function SpiritsInventoryScreen() {
           </ScrollView>
         )}
       </ScrollView>
+
+      <Modal
+        visible={Boolean(selectedLedgerItem)}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectedLedgerItemId(null)}
+      >
+        <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(15,23,42,0.42)" }}>
+          <Pressable style={{ flex: 1 }} onPress={() => setSelectedLedgerItemId(null)} />
+          <View testID="spirits-ledger-detail-sheet" style={{ maxHeight: "86%", backgroundColor: colors.background, borderTopLeftRadius: 22, borderTopRightRadius: 22, paddingBottom: Math.max(insets.bottom, 16) }}>
+            <View style={{ alignItems: "center", paddingTop: 10, paddingBottom: 4 }}>
+              <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border }} />
+            </View>
+            {selectedLedgerItem && (
+              <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 16 }}>
+                <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 10, paddingVertical: 12 }}>
+                  <View style={{ width: 5, alignSelf: "stretch", borderRadius: 3, backgroundColor: selectedLedgerEntry && selectedLedgerEntry.closingQty < 0 ? "#EF4444" : catColor(selectedLedgerItem.category) }} />
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text numberOfLines={2} style={{ fontSize: 19, fontWeight: "800", color: colors.foreground }}>{selectedLedgerItem.name}</Text>
+                    <Text style={{ fontSize: 12, color: colors.muted, marginTop: 3 }}>{selectedLedgerItem.category || "未分类"} · {selectedMonth}</Text>
+                  </View>
+                  <TouchableOpacity onPress={() => setSelectedLedgerItemId(null)} hitSlop={10}>
+                    <IconSymbol name="xmark" size={18} color={colors.muted} />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={{ flexDirection: "row", gap: 8, marginBottom: 14 }}>
+                  <TouchableOpacity
+                    onPress={() => { setEditingItem(selectedLedgerItem); setShowItemForm(true); setSelectedLedgerItemId(null); }}
+                    style={[S.actionBtn, { flex: 1, justifyContent: "center", backgroundColor: colors.surface, borderColor: colors.border }]}
+                  >
+                    <IconSymbol name="pencil" size={13} color={colors.primary} />
+                    <Text style={{ fontSize: 12, fontWeight: "700", color: colors.primary }}>编辑酒款</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setCatPickerTitle(`修改分类：${selectedLedgerItem.name}`);
+                      setCatPickerCallback(() => (name: string) => updateItem(selectedLedgerItem.id, { category: name, categorySource: "manual" }));
+                      setShowCatPicker(true);
+                      setSelectedLedgerItemId(null);
+                    }}
+                    style={[S.actionBtn, { flex: 1, justifyContent: "center", backgroundColor: colors.surface, borderColor: colors.border }]}
+                  >
+                    <IconSymbol name="folder" size={13} color={colors.primary} />
+                    <Text style={{ fontSize: 12, fontWeight: "700", color: colors.primary }}>修改分类</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {selectedLedgerEntry && ledgerEditMode && (
+                  <View style={{ padding: 12, borderRadius: 12, backgroundColor: "#F59E0B14", borderWidth: 1, borderColor: "#F59E0B55", marginBottom: 12 }}>
+                    <Text style={{ fontSize: 12, fontWeight: "700", color: "#B45309", marginBottom: 7 }}>编辑期初库存量</Text>
+                    <TextInput
+                      style={[S.inlineInput, { width: "100%", color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background, textAlign: "left" }]}
+                      value={editingOpeningQty[`${selectedLedgerItem.id}:${selectedMonth}`] ?? String(selectedLedgerEntry.openingQty)}
+                      onChangeText={(value) => setEditingOpeningQty((previous) => ({ ...previous, [`${selectedLedgerItem.id}:${selectedMonth}`]: value }))}
+                      onBlur={() => {
+                        const raw = editingOpeningQty[`${selectedLedgerItem.id}:${selectedMonth}`];
+                        if (raw !== undefined) handleSaveOpeningQty(selectedLedgerEntry, raw);
+                      }}
+                      keyboardType="decimal-pad"
+                    />
+                  </View>
+                )}
+
+                <LedgerDetailSection
+                  title="期初"
+                  metrics={[
+                    ["期初库存量", selectedLedgerEntry?.openingQty ?? "—"],
+                    ["期初单价", selectedLedgerEntry ? `¥${formatMoney(selectedLedgerEntry.openingUnitCost)}` : "—"],
+                    ["期初成本", selectedLedgerEntry ? `¥${formatMoney(selectedLedgerEntry.openingQty * selectedLedgerEntry.openingUnitCost)}` : "—"],
+                  ]}
+                  colors={colors}
+                />
+                <LedgerDetailSection
+                  title="本月进货"
+                  metrics={[
+                    ["进货数量", selectedLedgerEntry && selectedLedgerEntry.purchaseQty > 0 ? `+${selectedLedgerEntry.purchaseQty}` : "—"],
+                    ["进货成本", selectedLedgerEntry && selectedLedgerEntry.purchaseCost > 0 ? `¥${formatMoney(selectedLedgerEntry.purchaseCost)}` : "—"],
+                  ]}
+                  colors={colors}
+                />
+                <LedgerDetailSection
+                  title="期末库存"
+                  tone={selectedLedgerEntry && selectedLedgerEntry.closingQty < 0 ? "negative" : "default"}
+                  metrics={[
+                    ["期末库存量", selectedLedgerEntry ? selectedLedgerEntry.closingQty.toFixed(2) : "—"],
+                    ["单位成本", selectedLedgerEntry ? `¥${formatMoney(selectedLedgerEntry.closingUnitCost)}` : "—"],
+                    ["期末成本", selectedLedgerEntry ? `¥${formatMoney(selectedLedgerEntry.closingCost)}` : "—"],
+                  ]}
+                  colors={colors}
+                />
+                <LedgerDetailSection
+                  title="本期消耗"
+                  metrics={[
+                    ["消耗瓶数", selectedLedgerEntry && selectedLedgerEntry.consumeQty > 0 ? selectedLedgerEntry.consumeQty.toFixed(1) : "—"],
+                    ["本期消耗成本", selectedLedgerEntry && selectedLedgerEntry.consumeQty > 0 ? `¥${formatMoney(selectedLedgerEntry.consumeQty * selectedLedgerEntry.closingUnitCost)}` : "—"],
+                  ]}
+                  colors={colors}
+                />
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 

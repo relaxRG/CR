@@ -299,7 +299,34 @@ try {
     if (ledgerState.result.value.rootScrollWidth > ledgerState.result.value.rootClientWidth || ledgerState.result.value.bodyScrollWidth > ledgerState.result.value.rootClientWidth) {
       throw new Error(`烈酒库存台账 ${width}pt 出现根级横向溢出：${JSON.stringify(ledgerState.result.value)}`);
     }
+    const compactClicked = await call("Runtime.evaluate", { expression: `(() => {
+      const row = document.querySelector('[data-testid="spirits-ledger-compact-row-h5-spirit-item"]');
+      if (!row) return false;
+      row.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+      return true;
+    })()`, returnByValue: true });
+    if (!compactClicked.result.value) throw new Error(`烈酒库存 ${width}pt 未渲染移动端紧凑主列表行`);
+    await sleep(180);
+    const detailState = await call("Runtime.evaluate", { expression: `(() => {
+      const sheet = document.querySelector('[data-testid="spirits-ledger-detail-sheet"]');
+      return {
+        visible: Boolean(sheet),
+        hasPrimaryColumns: document.body.innerText.includes('期末库存') && document.body.innerText.includes('期末成本'),
+        hasFullDetail: ['期初', '本月进货', '期末库存', '本期消耗'].every((text) => sheet?.innerText.includes(text)),
+        rootClientWidth: document.documentElement.clientWidth,
+        rootScrollWidth: document.documentElement.scrollWidth,
+        bodyScrollWidth: document.body.scrollWidth,
+      };
+    })()`, returnByValue: true });
+    if (!detailState.result.value.visible || !detailState.result.value.hasPrimaryColumns || !detailState.result.value.hasFullDetail) {
+      throw new Error(`烈酒库存 ${width}pt 紧凑列表或详情抽屉不完整：${JSON.stringify(detailState.result.value)}`);
+    }
+    if (detailState.result.value.rootScrollWidth > detailState.result.value.rootClientWidth || detailState.result.value.bodyScrollWidth > detailState.result.value.rootClientWidth) {
+      throw new Error(`烈酒库存详情抽屉 ${width}pt 出现根级横向溢出：${JSON.stringify(detailState.result.value)}`);
+    }
 
+    await call("Page.navigate", { url: `http://localhost:${port}/spirits-inventory` });
+    await sleep(350);
     const purchaseClicked = await call("Runtime.evaluate", { expression: clickTextExpression("📦 当月进货"), returnByValue: true });
     if (!purchaseClicked.result.value) throw new Error(`烈酒库存 ${width}pt 缺少当月进货Tab`);
     await sleep(200);
@@ -316,7 +343,7 @@ try {
     if (purchaseState.result.value.rootScrollWidth > purchaseState.result.value.rootClientWidth || purchaseState.result.value.bodyScrollWidth > purchaseState.result.value.rootClientWidth) {
       throw new Error(`烈酒当月进货 ${width}pt 出现根级横向溢出：${JSON.stringify(purchaseState.result.value)}`);
     }
-    spiritsViewports.push({ width, ledger: ledgerState.result.value, purchase: purchaseState.result.value });
+    spiritsViewports.push({ width, ledger: ledgerState.result.value, compactDetail: detailState.result.value, purchase: purchaseState.result.value });
   }
   report.push({ reportPage: "烈酒库存导入同步", viewports: spiritsViewports });
 
