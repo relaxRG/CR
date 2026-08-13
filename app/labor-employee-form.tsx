@@ -20,6 +20,7 @@ import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
 import { useEmployeeStore, useCustomDeptStore } from "@/lib/labor/store";
+import { ALLOWANCE_PRESETS, createAllowanceRule, type AllowanceRulePreset } from "@/lib/labor/allowance-rule-factory";
 import {
   Employee, EmployeeDept, EmployeeType, EmployeeBankAccount, WeeklyHoursRule,
   AllowanceRule, SocialInsuranceConfig, InsuranceItem, HousingFundItem,
@@ -130,12 +131,8 @@ export default function LaborEmployeeFormScreen() {
   // ── 补贴规则 ──
   const [allowanceRules, setAllowanceRules] = useState<AllowanceRule[]>(existing?.allowanceRules ?? []);
   const [allowanceEditMode, setAllowanceEditMode] = useState(false);
-  const addAllowanceRule = (preset?: { label: string; unit: AllowanceUnit }) => {
-    setAllowanceRules((prev) => [...prev, {
-      id: Date.now().toString(), type: "custom_fixed" as const,
-      label: preset?.label ?? "自定义补贴", amount: 0,
-      unit: preset?.unit ?? "per_month", enabled: true,
-    }]);
+  const addAllowanceRule = (preset?: AllowanceRulePreset) => {
+    setAllowanceRules((prev) => [...prev, createAllowanceRule(Date.now().toString(), preset)]);
   };
   const updateAllowanceRule = (id: string, patch: Partial<AllowanceRule>) => {
     setAllowanceRules((prev) => prev.map((r) => r.id === id ? { ...r, ...patch } : r));
@@ -869,7 +866,7 @@ export default function LaborEmployeeFormScreen() {
             )}
             {allowanceEditMode && (
               <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
-                {[{ label: "餐补", unit: "per_day" as AllowanceUnit }, { label: "交通补贴", unit: "per_month" as AllowanceUnit }].map((preset) => (
+                {[ALLOWANCE_PRESETS.meal, ALLOWANCE_PRESETS.transport].map((preset) => (
                   <TouchableOpacity key={preset.label} onPress={() => { tap(); addAllowanceRule(preset); }}
                     style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: colors.primary + "44", backgroundColor: colors.primary + "08" }}>
                     <Text style={{ fontSize: 12, color: colors.primary }}>+ {preset.label}</Text>
