@@ -18,6 +18,7 @@ import {
   cfPush,
   clearDeviceInfo,
   getDeviceInfo,
+  saveDeviceInfo,
   type DeviceInfo,
   type DeviceRole,
 } from "./client";
@@ -244,38 +245,47 @@ export function SyncProvider({
       }
       setDeviceInfo(info);
       setAuthLoading(false);
-      if (info.role !== "owner") { void checkAndNotifyPermissionChange(info.allowedKeys); }
+
+      // 首次请求先由Worker权威成员记录覆盖本机角色/授权缓存。
+      // 不能依据旧缓存决定本轮模块守卫、拉取范围或推送范围。
+      const pull = await cfPull();
+      const effectiveInfo: DeviceInfo = {
+        ...info,
+        role: pull.role,
+        allowedKeys: pull.allowedKeys,
+      };
+      const permissionsChanged = info.role !== effectiveInfo.role
+        || JSON.stringify(info.allowedKeys?.slice().sort() ?? null) !== JSON.stringify(effectiveInfo.allowedKeys?.slice().sort() ?? null);
+      if (permissionsChanged) {
+        await saveDeviceInfo(effectiveInfo);
+        setDeviceInfo(effectiveInfo);
+      }
+      if (effectiveInfo.role !== "owner") {
+        void checkAndNotifyPermissionChange(effectiveInfo.allowedKeys);
+      }
 
       // ── Backup channels ────────────────────────────────────────────────
-      // 1. Create local snapshot (channel 3)
       void createSnapshot().catch((e) =>
         console.warn("[CFSync] local snapshot failed:", e),
       );
-      // 2. Start local-documents auto-backup every 5 min (channel 2).
-      //    Note: writes to app documentDirectory (included in iCloud device
-      //    backup, NOT cross-device iCloud Drive sync).
-      startAutoBackup(info.deviceName);
+      startAutoBackup(effectiveInfo.deviceName);
       // ───────────────────────────────────────────────────────────────────
 
-     if (info.role === "guest") {
-      // Guest devices: pull only, no push
-      const { entries } = await cfPull();
-       const { overwritten: guestOverwritten, conflicts: guestConflicts } = await runInitialSync(entries, async () => {
-        // no-op push for guests — read-only devices don't push
-      });
-      if (guestOverwritten && Platform.OS === "web" && typeof window !== "undefined") {
-        window.location.reload();
-      } else if (guestOverwritten && Platform.OS !== "web") {
-        triggerStoreReload();
-      }
-      if (guestConflicts.length > 0) {
-        setPendingConflicts(guestConflicts);
-      }
-    } else {
-      // Owner / collaborator: full sync
-      const { entries } = await cfPull();
-       const { overwritten, conflicts } = await runInitialSync(entries, pushFn);
-       if (overwritten && Platform.OS === "web" && typeof window !== "undefined") {
+      const pushWithEffectivePermission = async (entries: { storageKey: string; value: string; clientUpdatedAt: number }[]) => {
+        if (effectiveInfo.role === "guest") return;
+        const allowedKeys = effectiveInfo.allowedKeys;
+        const filtered = effectiveInfo.role === "collaborator" && Array.isArray(allowedKeys)
+          ? entries.filter((entry) => allowedKeys.includes(entry.storageKey))
+          : entries;
+        if (filtered.length === 0) return;
+        await cfPush(filtered);
+        void notifyPushDone();
+      };
+      const { overwritten, conflicts } = await runInitialSync(
+        pull.entries,
+        effectiveInfo.role === "guest" ? async () => {} : pushWithEffectivePermission,
+      );
+      if (overwritten && Platform.OS === "web" && typeof window !== "undefined") {
         window.location.reload();
       } else if (overwritten && Platform.OS !== "web") {
         triggerStoreReload();
@@ -283,7 +293,6 @@ export function SyncProvider({
       if (conflicts.length > 0) {
         setPendingConflicts(conflicts);
       }
-    }
       // 成品照片同步（非阻塞）：上传本地新照片、下载云端缺失照片并修复路径。
       // 下载/路径修复发生后触发 store 重载，让详情页立即显示照片。
       void syncPhotos()
@@ -310,7 +319,7 @@ export function SyncProvider({
     } finally {
       syncingRef.current = false;
     }
-  }, [pushFn]);
+  }, []);
 
   // Auto-retry with exponential backoff: 30s * 2^n, capped at 10 min, max 8 attempts
   const scheduleRetry = useCallback(() => {
@@ -354,25 +363,9 @@ export function SyncProvider({
       else if (await getDeviceInfo()) {
         // 仅已有活跃成员资格时才启动实时监听。
         stopRealtimeRef.current?.();
-        stopRealtimeRef.current = startRealtimeSync((since) => {
-          // 检测到其他设备有新数据 → 触发增量 pull
-          void (async () => {
-            if (syncingRef.current) return;
-            syncingRef.current = true;
-            try {
-              const { entries } = await cfPull(since > 0 ? since : undefined);
-              if (entries.length > 0) {
-                const { overwritten, conflicts } = await runInitialSync(entries, pushFn);
-                if (overwritten && Platform.OS !== "web") triggerStoreReload();
-                if (conflicts.length > 0) setPendingConflicts(conflicts);
-                lastSyncAtRef.current = Date.now();
-              }
-            } catch (err) {
-              console.warn("[Realtime] incremental pull failed:", err);
-            } finally {
-              syncingRef.current = false;
-            }
-          })();
+        stopRealtimeRef.current = startRealtimeSync(() => {
+          // 角色或授权键可能刚在服务端变更；必须复用完整流程以刷新本机成员资格缓存。
+          void performSync();
         });
       }
     })();
@@ -465,30 +458,15 @@ export function SyncProvider({
     const ok = await performSync();
     if (ok && await getDeviceInfo()) {
       // 仅已有活跃成员资格时重新启动实时监听
-      stopRealtimeRef.current = startRealtimeSync((since) => {
-        void (async () => {
-          if (syncingRef.current) return;
-          syncingRef.current = true;
-          try {
-            const { entries } = await cfPull(since > 0 ? since : undefined);
-            if (entries.length > 0) {
-              const { overwritten, conflicts } = await runInitialSync(entries, pushFn);
-              if (overwritten && Platform.OS !== "web") triggerStoreReload();
-              if (conflicts.length > 0) setPendingConflicts(conflicts);
-              lastSyncAtRef.current = Date.now();
-            }
-          } catch (err) {
-            console.warn("[Realtime] incremental pull failed:", err);
-          } finally {
-            syncingRef.current = false;
-          }
-        })();
+      stopRealtimeRef.current = startRealtimeSync(() => {
+        // 重启后的实时通知同样必须走完整成员资格刷新，不能绕过权限缓存写回。
+        void performSync();
       });
     } else {
       scheduleRetry();
     }
     return ok;
-  }, [performSync, scheduleRetry, pushFn]);
+  }, [performSync, scheduleRetry]);
 
   const switchCurrentDeviceToAnotherGroup = useCallback(async (code: string, handoffDeviceId?: string) => {
     const switchId = typeof crypto !== "undefined" && crypto.randomUUID

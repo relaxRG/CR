@@ -1316,18 +1316,24 @@ async function handleSyncPull(env, body, headers, origin) {
   const tombstones = await env.DB.prepare(
     "SELECT storage_key, deleted_at FROM sync_tombstones WHERE group_id = ?"
   ).bind(device.group_id).all();
-  const canWrite = device.role !== "guest";
-  const camelEntries = (rows.results || []).map((r) => ({
-    storageKey: r.storage_key,
-    value: r.value,
-    clientUpdatedAt: r.client_updated_at
-  }));
-  const camelTombstones = (tombstones.results || []).map((t) => ({
-    storageKey: t.storage_key,
-    deletedAt: t.deleted_at
-  }));
   let pullAllowedKeys = null;
   try { pullAllowedKeys = device.allowed_keys ? JSON.parse(device.allowed_keys) : null; } catch {}
+  // 权限必须在服务端生效：协作/访客设备只可读取明确授权的存储键。
+  const allowedSet = device.role === "owner" ? null : new Set(Array.isArray(pullAllowedKeys) ? pullAllowedKeys : []);
+  const canWrite = device.role === "owner" || (device.role === "collaborator" && allowedSet.size > 0);
+  const camelEntries = (rows.results || [])
+    .filter((r) => !allowedSet || allowedSet.has(r.storage_key))
+    .map((r) => ({
+      storageKey: r.storage_key,
+      value: r.value,
+      clientUpdatedAt: r.client_updated_at
+    }));
+  const camelTombstones = (tombstones.results || [])
+    .filter((t) => !allowedSet || allowedSet.has(t.storage_key))
+    .map((t) => ({
+      storageKey: t.storage_key,
+      deletedAt: t.deleted_at
+    }));
   return json({
     entries: camelEntries,
     tombstones: camelTombstones,
@@ -1348,8 +1354,13 @@ async function handleSyncPush(env, body, headers, origin) {
   if (device.role === "guest") return err("Guest devices cannot push", 403, origin);
   const { entries } = body || {};
   if (!Array.isArray(entries)) return err("entries required", 400, origin);
+  let serverAllowedKeys = null;
+  try { serverAllowedKeys = device.allowed_keys ? JSON.parse(device.allowed_keys) : null; } catch {}
+  const writableEntries = device.role === "collaborator"
+    ? entries.filter((entry) => Array.isArray(serverAllowedKeys) && serverAllowedKeys.includes(entry?.storageKey))
+    : entries;
   let pushed = 0;
-  for (const entry of entries.slice(0, 40)) {
+  for (const entry of writableEntries.slice(0, 40)) {
     if (!entry.storageKey || entry.value === void 0) continue;
     await env.DB.prepare(
       "INSERT INTO sync_data (group_id, storage_key, value, client_updated_at, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(group_id, storage_key) DO UPDATE SET value = excluded.value, client_updated_at = excluded.client_updated_at, updated_at = excluded.updated_at WHERE excluded.client_updated_at > sync_data.client_updated_at"
@@ -1763,8 +1774,9 @@ async function handleDeviceUpdateRole(env, body, headers, origin) {
   const device = await verifyDevice(env, deviceId, token);
   if (!device) return err("Unauthorized", 401, origin);
   if (device.role !== "owner") return err("Only owner can update roles", 403, origin);
-  const { targetDeviceId, role } = body || {};
+  const { targetDeviceId, role, allowedKeys = null } = body || {};
   if (!targetDeviceId || !["owner", "collaborator", "guest"].includes(role)) return err("Invalid params", 400, origin);
+  const serializedAllowedKeys = Array.isArray(allowedKeys) ? JSON.stringify(allowedKeys) : null;
   const target = await env.DB.prepare(
     "SELECT device_id FROM devices WHERE device_id = ? AND group_id = ? AND is_active = 1"
   ).bind(targetDeviceId, device.group_id).first();
@@ -1777,10 +1789,19 @@ async function handleDeviceUpdateRole(env, body, headers, origin) {
     ]);
   } else {
     await env.DB.prepare(
-      "UPDATE devices SET role = ? WHERE device_id = ? AND group_id = ?"
-    ).bind(role, targetDeviceId, device.group_id).run();
+      "UPDATE devices SET role = ?, allowed_keys = ? WHERE device_id = ? AND group_id = ?"
+    ).bind(role, role === "owner" ? null : serializedAllowedKeys, targetDeviceId, device.group_id).run();
   }
-  return json({ success: true }, 200, origin);
+  // 权限不是sync_data条目；单独更新时间戳以唤醒目标设备的实时刷新。
+  await env.DB.prepare(
+    "INSERT INTO group_ts (group_id, last_push_at) VALUES (?, ?) ON CONFLICT(group_id) DO UPDATE SET last_push_at = excluded.last_push_at"
+  ).bind(device.group_id, Date.now()).run();
+  return json({
+    success: true,
+    targetDeviceId,
+    role,
+    allowedKeys: role === "owner" ? null : (Array.isArray(allowedKeys) ? allowedKeys : null),
+  }, 200, origin);
 }
 __name(handleDeviceUpdateRole, "handleDeviceUpdateRole");
 __name2(handleDeviceUpdateRole, "handleDeviceUpdateRole");
