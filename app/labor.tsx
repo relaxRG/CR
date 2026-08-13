@@ -14,6 +14,14 @@ import { getNonWritableScheduleMonths } from "@/lib/labor/schedule-guards";
 import { applyHolidayRestAllocation } from "@/lib/labor/holiday-pay";
 import { getHolidayAllocationKey, getHolidayWorkInfo } from "@/lib/labor/holiday-work";
 import { shouldAutoSyncPayrollMonth } from "@/lib/labor/payroll-sync-guards";
+import {
+  resolveDraftPayrollExtrasForDisplay,
+  resolvePersistedPayrollExtrasForDisplay,
+} from "@/lib/labor/payroll-extras";
+import {
+  getDraftPayrollCumulativeTaxInputs,
+  hasDraftPayrollReconciliationDelta,
+} from "@/lib/labor/payroll-draft-reconciliation";
 import { checkControlFieldsIntegrity, checkAdvanceCrossMonthPollution } from "@/lib/labor/payroll-monitor";
 import {
   Alert, Clipboard, Modal, Platform, Pressable, ScrollView,
@@ -51,6 +59,7 @@ import {
 } from "@/lib/labor/types";
 
 type CompareMode = "none" | "lastMonth" | "lastYear" | "custom";
+
 type HolidayDecisionItem = {
   key: string;
   employeeId: string;
@@ -318,7 +327,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
   const { alerts, resolveAlert } = useUnexplainedRestAlertStore();
   const router = useRouter();
   const { isReadOnly } = useFeature();
-  const { isMonthWritable: isMonthWritableForCard } = useMonthCloseStore();
+  const { getStatus: getMonthCloseStatus, isMonthWritable: isMonthWritableForCard } = useMonthCloseStore();
   const canWrite = !isReadOnly && isMonthWritableForCard(month);
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
   const [expanded, setExpanded] = useState(false);
@@ -336,8 +345,23 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
   // slip/att/compareSlip 由父组件从响应式数组派生后传入，保证即时更新
   const deptColor = DEPT_COLORS[employee.dept];
   const isParttime = employee.type === "parttime" || employee.type === "longterm_parttime";
-
-
+  // DRAFT 卡片不能直接读取可能滞后的薪资单聚合金额；只读月保留历史快照。
+  const extrasDisplay = useMemo(() => {
+    if (!slip) return null;
+    if (getMonthCloseStatus(month) !== "draft") return resolvePersistedPayrollExtrasForDisplay(slip);
+    return resolveDraftPayrollExtrasForDisplay(
+      employee,
+      month,
+      att?.attendanceDays ?? slip.attendanceDays ?? 0,
+      {
+        allowanceOverrides: slip.allowanceOverrides,
+        allowanceDetails: slip.allowanceDetails,
+        workKPISelections: slip.workKPISelections,
+        revenueActuals: slip.revenueActuals,
+      },
+      slip.rewardPenalty ?? 0,
+    );
+  }, [att?.attendanceDays, employee, getMonthCloseStatus, month, slip]);
 
   // 换休余额（useMemo 避免每次渲染对全量 entries 重复 filter/reduce）
   const compOffDays = useMemo(() =>
@@ -488,10 +512,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
           ? (att?.attendanceSalary ?? 0)
           : getAttendanceBaseSalary(att);
         const overtimeAndHoliday = isParttimeEmp ? 0 : ((att?.overtimePay ?? 0) + (att?.holidayBonus ?? 0));
-        const allowanceSum = slip ? (slip.mealAllowance ?? 0) + (slip.transportAllowance ?? 0) + (slip.otherAllowance ?? 0) : 0;
-        const performanceTotal = slip ? (slip.workKPIBonus ?? 0) + (slip.revenueKPIBonus ?? 0) : 0;
-        // 综合额外 = 补贴合计 + 工作绩效 + 业绩绩效 + 奖惩小计。
-        const extraTotal = slip ? performanceTotal + allowanceSum + (slip.rewardPenalty ?? 0) : 0;
+        const extraTotal = extrasDisplay?.grandTotal ?? 0;
         const advanceAmount = (slip?.advanceAmount ?? 0) + (slip?.pettyLaborPaid ?? 0);
         const finalSalary = slip?.finalSalary ?? null;
         return (
@@ -563,16 +584,15 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
 
           {/* ─── 综合额外（5格）─── */}
           {slip && (() => {
-            const allowanceSum = (slip.mealAllowance ?? 0) + (slip.transportAllowance ?? 0) + (slip.otherAllowance ?? 0);
-            const workKPI = slip.workKPIBonus ?? 0;
-            const revenueKPI = slip.revenueKPIBonus ?? 0;
-            const reward = slip.rewardPenalty ?? 0;
-            // 综合额外 = 补贴合计 + 工作绩效 + 业绩绩效 + 奖惩小计。
-            const extraTotal = allowanceSum + workKPI + revenueKPI + reward;
+            const allowanceSum = extrasDisplay?.allowanceTotal ?? 0;
+            const workKPI = extrasDisplay?.workKPIBonus ?? 0;
+            const revenueKPI = extrasDisplay?.revenueKPIBonus ?? 0;
+            const reward = extrasDisplay?.rewardPenalty ?? 0;
+            const extraTotal = extrasDisplay?.grandTotal ?? 0;
             return (
               <View style={{ gap: 6, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border + "44" }}>
                 <Text style={{ fontSize: 10, fontWeight: "600", color: colors.muted }}>综合额外</Text>
-                <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
+                <View style={{ flexDirection: "row", flexWrap: "nowrap" }}>
                   {[
                     { label: "补贴合计", value: allowanceSum > 0 ? `+¥${formatMoney(allowanceSum)}` : "—", color: allowanceSum > 0 ? colors.foreground : colors.muted },
                     { label: "工作绩效", value: workKPI !== 0 ? `${workKPI >= 0 ? "+" : ""}¥${formatMoney(workKPI)}` : "—", color: workKPI < 0 ? colors.error : workKPI > 0 ? colors.foreground : colors.muted },
@@ -580,7 +600,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
                     { label: "奖惩小计", value: reward !== 0 ? `${reward >= 0 ? "+" : ""}¥${formatMoney(reward)}` : "—", color: reward < 0 ? colors.error : reward > 0 ? colors.foreground : colors.muted },
                     { label: "综合额外", value: `${extraTotal >= 0 ? "+" : ""}¥${formatMoney(extraTotal)}`, color: extraTotal >= 0 ? colors.primary : colors.error },
                   ].map(({ label, value, color }) => (
-                    <View key={label} style={{ width: "33.333%", alignItems: "center", paddingVertical: 3 }}>
+                    <View key={label} style={{ flex: 1, minWidth: 0, alignItems: "center", paddingVertical: 3 }}>
                       <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ fontSize: 11, fontWeight: "700", color }}>{value}</Text>
                       <Text numberOfLines={1} style={{ fontSize: 9, color: colors.muted, marginTop: 1 }}>{label}</Text>
                     </View>
@@ -968,9 +988,11 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
   const rosterInsets = useSafeAreaInsets();
   const { employees } = useEmployeeStore();
   const { templates: shiftTemplates } = useShiftTemplateStore();
-  const { paySlips } = usePaySlipStore();
+  const { paySlips, buildPaySlipDraft, upsertPaySlip } = usePaySlipStore();
   const { records: attendances } = useAttendanceStore();
-  const { isMonthWritable: isMonthWritableRoster } = useMonthCloseStore();
+  const { advances } = useSalaryAdvanceStore();
+  const { settings: globalSettings } = useGlobalPayrollSettingsStore();
+  const { getStatus: getRosterMonthStatus, isMonthWritable: isMonthWritableRoster } = useMonthCloseStore();
   const router = useRouter();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
@@ -1086,6 +1108,32 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
     paySlips.forEach((s) => { if (s.month === compareMonth) m.set(s.employeeId, s); });
     return m;
   }, [paySlips, compareMonth]);
+
+  // DRAFT 唯一对账：控制字段、出勤或规则变化后，立即将旧聚合金额重建为唯一结算结果。
+  // FROZEN / ADJUSTING 绝不在此处写入，历史快照及差额会话由月度状态机单独保护。
+  React.useEffect(() => {
+    if (getRosterMonthStatus(month) !== "draft") return;
+    for (const employee of activeEmployees) {
+      const current = rosterSlipMap.get(employee.id);
+      if (!current) continue;
+      const attendance = rosterAttMap.get(employee.id) ?? null;
+      const advanceAmount = advances
+        .filter((advance) => advance.employeeId === employee.id
+          && (advance.deductMonth === month || advance.date.startsWith(month))
+          && (advance.status === "pending" || advance.status === "deducted"))
+        .reduce((sum, advance) => sum + advance.amount, 0);
+      const { cumulativeIncome, cumulativeTaxPaid } = getDraftPayrollCumulativeTaxInputs(
+        employee,
+        month,
+        paySlips,
+        globalSettings,
+      );
+      const rebuilt = buildPaySlipDraft(employee, month, attendance, advanceAmount, globalSettings, cumulativeIncome, cumulativeTaxPaid);
+      if (hasDraftPayrollReconciliationDelta(current, rebuilt)) {
+        upsertPaySlip({ ...rebuilt, id: current.id });
+      }
+    }
+  }, [activeEmployees, advances, buildPaySlipDraft, getRosterMonthStatus, globalSettings, month, paySlips, rosterAttMap, rosterSlipMap, upsertPaySlip]);
 
   return (
     <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: fabBottom(rosterInsets.bottom) + 20 }}>
@@ -3719,15 +3767,12 @@ function SchedulePage({ colors, month, onMonthChange, pageWidth }: { colors: any
         const advanceTotal = advances
           .filter((a) => a.employeeId === emp.id && (a.deductMonth === currentMonth || a.date.startsWith(currentMonth)) && (a.status === "pending" || a.status === "deducted"))
           .reduce((s, a) => s + a.amount, 0);
-        const [curYear] = currentMonth.split("-");
-        const prevMonthSlips = paySlips.filter((s) => s.employeeId === emp.id && s.month.startsWith(curYear) && s.month < currentMonth);
-        const taxThreshold = emp.incomeTax?.threshold ?? 5000;
-        const taxSpecialDed = emp.incomeTax?.specialDeductions ?? 0;
-        const cumulativeIncome = prevMonthSlips.reduce((sum, s) => {
-          const taxable = Math.max(0, s.grossSalary - (s.socialInsuranceDeduction ?? 0) - (s.housingFundDeduction ?? 0) - taxThreshold - taxSpecialDed);
-          return sum + taxable;
-        }, 0);
-        const cumulativeTaxPaid = prevMonthSlips.reduce((sum, s) => sum + (s.incomeTax ?? 0), 0);
+        const { cumulativeIncome, cumulativeTaxPaid } = getDraftPayrollCumulativeTaxInputs(
+          emp,
+          currentMonth,
+          paySlips,
+          globalSettings,
+        );
         // buildPaySlipDraft 从当前薪资单读取绩效/补贴控制字段，并统一实时结算所有分项。
         // 不再传递旧聚合金额，避免自动同步覆盖工作绩效或业绩绩效。
         const slip = buildPaySlipDraft(emp, currentMonth, att, advanceTotal, globalSettings, cumulativeIncome, cumulativeTaxPaid);
