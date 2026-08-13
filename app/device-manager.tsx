@@ -338,7 +338,7 @@ export default function DeviceManagerScreen() {
   const router = useRouter();
   const { lang } = useI18n();
   const insets = useSafeAreaInsets();
-  const { deviceInfo, deviceRole, syncState, syncError, retrySync, logout, refreshDeviceInfo } = useSync();
+  const { deviceInfo, deviceRole, syncState, syncError, retrySync, logout, refreshDeviceInfo, isGroupSwitching } = useSync();
   const [manualSyncing, setManualSyncing] = useState(false);
   const [renamingDevice, setRenamingDevice] = useState(false);
   const [renameInput, setRenameInput] = useState("");
@@ -531,6 +531,50 @@ export default function DeviceManagerScreen() {
     } catch (e: unknown) {
       Alert.alert(lang === "zh" ? "修改失败" : "Failed", String(e));
     }
+  };
+
+  const openGroupSwitch = (handoffDeviceId?: string) => {
+    if (!deviceInfo || isGroupSwitching) return;
+    router.push({
+      pathname: "/pair-device",
+      params: { switch: "1", handoffDeviceId: handoffDeviceId ?? "" },
+    });
+  };
+
+  const handleOpenGroupSwitch = () => {
+    if (!deviceInfo || isGroupSwitching) return;
+    tap();
+    const candidates = devices.filter((item) => !item.isCurrentDevice);
+    if (deviceInfo.role === "owner" && candidates.length > 0) {
+      Alert.alert(
+        lang === "zh" ? "交接主设备后加入新组" : "Hand off owner role before switching",
+        lang === "zh"
+          ? "当前设备是主设备。请选择原同步组的新主设备；完成交接后，本设备才会安全加入其他同步组。"
+          : "This is the owner device. Choose the new owner of the current group before this device joins another group.",
+        [
+          ...candidates.map((item) => ({
+            text: item.name,
+            onPress: () => openGroupSwitch(item.id),
+          })),
+          { text: lang === "zh" ? "取消" : "Cancel", style: "cancel" as const },
+        ],
+      );
+      return;
+    }
+    if (deviceInfo.role === "owner") {
+      Alert.alert(
+        lang === "zh" ? "加入其他同步组" : "Join another sync group",
+        lang === "zh"
+          ? "原同步组目前只有本设备。继续后，本设备会加入新组；原组数据保留在云端，但将不再有活跃主设备。"
+          : "This is the only device in the current group. Continuing joins the new group; the old cloud data remains, but it will have no active owner.",
+        [
+          { text: lang === "zh" ? "取消" : "Cancel", style: "cancel" },
+          { text: lang === "zh" ? "继续" : "Continue", onPress: () => openGroupSwitch() },
+        ],
+      );
+      return;
+    }
+    openGroupSwitch();
   };
 
   // Manual "Sync Now"
@@ -837,7 +881,30 @@ export default function DeviceManagerScreen() {
           </View>
         )}
 
-        {/* ── 4. Pair Code Section (owner only) ── */}
+        {/* ── 4. Join another group (all active roles) ── */}
+        {deviceInfo && (
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
+              {lang === "zh" ? "同步组切换" : "Switch Sync Group"}
+            </Text>
+            <Text style={[styles.hint, { color: colors.muted, marginBottom: 14 }]}>
+              {lang === "zh"
+                ? "加入其他同步组会先创建本地快照，再仅下载并替换为目标组数据；不会把当前组的数据上传到目标组。"
+                : "Joining another group creates a local snapshot, then download-replaces with target data. Current-group data is never uploaded to the target group."}
+            </Text>
+            <Pressable
+              onPress={handleOpenGroupSwitch}
+              disabled={isGroupSwitching}
+              style={({ pressed }) => [styles.roleBtn, { backgroundColor: colors.primary, opacity: pressed || isGroupSwitching ? 0.65 : 1, alignSelf: "flex-start" }]}
+            >
+              {isGroupSwitching ? <ActivityIndicator color="#fff" size="small" /> : (
+                <Text style={styles.roleBtnText}>{lang === "zh" ? "加入其他同步组" : "Join Another Group"}</Text>
+              )}
+            </Pressable>
+          </View>
+        )}
+
+        {/* ── 5. Pair Code Section (owner only) ── */}
         {isOwner && (
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
@@ -910,7 +977,7 @@ export default function DeviceManagerScreen() {
           </View>
         )}
 
-        {/* ── 5. Device List ── */}
+        {/* ── 6. Device List ── */}
         <Text style={[styles.listTitle, { color: colors.muted }]}>
           {lang === "zh" ? `设备组（${devices.length} 台）` : `Devices (${devices.length})`}
         </Text>

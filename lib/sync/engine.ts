@@ -388,6 +388,177 @@ let initialSyncDone = false;
 
 const DIRTY_KEYS_PERSIST_KEY = "sync.dirtyKeys.pending";
 
+/**
+ * 跨同步组切换期间的全局写入屏障。
+ * 该屏障与同组LWW同步互斥：激活后，任何脏键、定时推送与普通首轮同步都必须停机。
+ */
+type GroupSwitchBarrier = {
+  epoch: number;
+  switchId: string;
+};
+
+let groupSwitchBarrier: GroupSwitchBarrier | null = null;
+let groupSwitchEpoch = 0;
+
+export type TargetGroupSnapshot = {
+  /** Worker 绑定到新成员令牌后回传的目标组ID，用于防止响应错组。 */
+  groupId: string;
+  /** 完整快照版本；不使用增量 since 游标。 */
+  revision: string;
+  /** 只有完整快照才可覆盖或删除本地同步键。 */
+  complete: true;
+  entries: Array<{ storageKey: string; value: string; clientUpdatedAt: number }>;
+  /** 目标组权威存在键清单；不在其中的本机旧键会被删除。 */
+  presentKeys: string[];
+};
+
+function requireActiveGroupSwitchBarrier(epoch: number): GroupSwitchBarrier {
+  const barrier = groupSwitchBarrier;
+  if (!barrier || barrier.epoch !== epoch) {
+    throw new Error("SYNC_GROUP_SWITCH_WRITE_BLOCKED");
+  }
+  return barrier;
+}
+
+/**
+ * 停止同组LWW同步、清除旧脏键并建立切组写入屏障。
+ * 在调用此函数后，只有 hydrateTargetGroupSnapshot() 可写入同步业务键。
+ */
+export async function beginGroupSwitchWriteBarrier(switchId: string): Promise<number> {
+  groupSwitchEpoch += 1;
+  const epoch = groupSwitchEpoch;
+  groupSwitchBarrier = { epoch, switchId };
+  syncEnabled = false;
+  pushFn = null;
+  initialSyncDone = false;
+  dirtyKeys.clear();
+  if (pushTimer) clearTimeout(pushTimer);
+  pushTimer = null;
+  await AsyncStorage.multiRemove([DIRTY_KEYS_PERSIST_KEY, LAST_SYNC_KEY]);
+  setState({ enabled: false, syncing: false, error: null });
+  await appendLog({
+    time: Date.now(),
+    type: "switch",
+    message: `同步组切换 ${switchId.slice(0, 8)}：已启用写入屏障`,
+  });
+  return epoch;
+}
+
+export function isGroupSwitchWriteBarrierActive(): boolean {
+  return groupSwitchBarrier !== null;
+}
+
+/** 目标组水合期间拒绝被卸载组件的陈旧闭包重新开启普通同步。 */
+export function assertNoGroupSwitchWriteBarrier(): void {
+  if (groupSwitchBarrier) throw new Error("SYNC_GROUP_SWITCH_IN_PROGRESS");
+}
+
+/**
+ * 使用目标组的完整快照精确替换所有同步业务键。
+ * 严禁调用 mergeByKey、runInitialSync、notifySyncChange 或 pushFn。
+ */
+export async function hydrateTargetGroupSnapshot(
+  snapshot: TargetGroupSnapshot,
+  expectedGroupId: string,
+  epoch: number,
+): Promise<{ written: number; removed: number }> {
+  const barrier = requireActiveGroupSwitchBarrier(epoch);
+  if (!snapshot.complete) throw new Error("TARGET_SNAPSHOT_INCOMPLETE");
+  if (snapshot.groupId !== expectedGroupId) throw new Error("TARGET_SNAPSHOT_GROUP_MISMATCH");
+  if (!snapshot.revision) throw new Error("TARGET_SNAPSHOT_REVISION_MISSING");
+
+  const knownKeys = new Set<string>(SYNC_KEYS);
+  const presentKeys = new Set(snapshot.presentKeys);
+  const entries = new Map<string, { storageKey: string; value: string; clientUpdatedAt: number }>();
+
+  for (const key of snapshot.presentKeys) {
+    if (!knownKeys.has(key)) throw new Error("TARGET_SNAPSHOT_UNKNOWN_KEY");
+  }
+  for (const entry of snapshot.entries) {
+    if (!knownKeys.has(entry.storageKey) || !presentKeys.has(entry.storageKey)) {
+      throw new Error("TARGET_SNAPSHOT_UNKNOWN_KEY");
+    }
+    if (entries.has(entry.storageKey) || !Number.isFinite(entry.clientUpdatedAt)) {
+      throw new Error("TARGET_SNAPSHOT_INVALID_ENTRY");
+    }
+    entries.set(entry.storageKey, entry);
+  }
+  if (entries.size !== presentKeys.size) throw new Error("TARGET_SNAPSHOT_ENTRY_MANIFEST_MISMATCH");
+
+  let written = 0;
+  let removed = 0;
+  const keys = [...SYNC_KEYS];
+  for (let offset = 0; offset < keys.length; offset += 20) {
+    requireActiveGroupSwitchBarrier(epoch);
+    const writes: [string, string][] = [];
+    const removals: string[] = [];
+    for (const key of keys.slice(offset, offset + 20)) {
+      const entry = entries.get(key);
+      if (entry) {
+        writes.push([key, entry.value], [TS_PREFIX + key, String(entry.clientUpdatedAt)]);
+        written += 1;
+      } else {
+        removals.push(key, TS_PREFIX + key);
+        removed += 1;
+      }
+    }
+    if (writes.length > 0) await AsyncStorage.multiSet(writes);
+    if (removals.length > 0) await AsyncStorage.multiRemove(removals);
+  }
+
+  requireActiveGroupSwitchBarrier(epoch);
+  await AsyncStorage.multiRemove([DIRTY_KEYS_PERSIST_KEY, LAST_SYNC_KEY]);
+  dirtyKeys.clear();
+  await appendLog({
+    time: Date.now(),
+    type: "switch",
+    message: `同步组切换 ${barrier.switchId.slice(0, 8)}：目标组完整替换完成（写入 ${written}，清除 ${removed}）`,
+  });
+  return { written, removed };
+}
+
+/**
+ * 目标数据、Store重载和照片只读下载全部完成后才允许普通增量同步。
+ */
+export function completeGroupSwitchWriteBarrier(
+  epoch: number,
+  nextPushFn: PushFn,
+): void {
+  requireActiveGroupSwitchBarrier(epoch);
+  groupSwitchBarrier = null;
+  pushFn = nextPushFn;
+  syncEnabled = true;
+  initialSyncDone = true;
+  setState({ enabled: true, syncing: false, error: null, lastSyncedAt: Date.now() });
+}
+
+/** 提交前取消切换时恢复原组普通同步；提交后不得调用此函数。 */
+export function cancelPreparedGroupSwitch(epoch: number, sourcePushFn: PushFn): void {
+  requireActiveGroupSwitchBarrier(epoch);
+  groupSwitchBarrier = null;
+  pushFn = sourcePushFn;
+  syncEnabled = true;
+  initialSyncDone = true;
+  setState({ enabled: true, syncing: false, error: null });
+}
+
+/** 已提交后无网络或快照错误时继续隔离，不允许任何补偿推送。 */
+export async function retainGroupSwitchRecoveryBarrier(epoch: number, reason: string): Promise<void> {
+  const barrier = requireActiveGroupSwitchBarrier(epoch);
+  await appendLog({
+    time: Date.now(),
+    type: "switch",
+    message: `同步组切换 ${barrier.switchId.slice(0, 8)}：等待安全恢复（${reason}）`,
+  });
+}
+
+/** 仅供测试隔离全局引擎状态。 */
+export function __resetGroupSwitchBarrierForTests(): void {
+  groupSwitchBarrier = null;
+  groupSwitchEpoch = 0;
+}
+
+
 async function persistDirtyKeys(): Promise<void> {
   const arr = Array.from(dirtyKeys);
   if (arr.length === 0) {
@@ -413,7 +584,7 @@ async function loadPersistedDirtyKeys(): Promise<void> {
 
 export type SyncLogEntry = {
   time: number;
-  type: "push" | "pull" | "backup" | "restore" | "error" | "conflict";
+  type: "push" | "pull" | "backup" | "restore" | "error" | "conflict" | "switch";
   keys?: string[];
   message?: string;
 };
@@ -544,6 +715,8 @@ export function clearSyncError(): void {
 /** store 持久化后调用：标记键为脏并调度推送 */
 export function notifySyncChange(key: string) {
   if (!(SYNC_KEYS as readonly string[]).includes(key)) return;
+  // 跨组水合期间，任何陈旧Store闭包都不得更新时间戳或进入B组脏键队列。
+  if (groupSwitchBarrier) return;
   const now = Date.now();
   AsyncStorage.setItem(TS_PREFIX + key, String(now)).catch(() => {});
   if (!syncEnabled || !pushFn) return;
@@ -556,6 +729,8 @@ export function notifySyncChange(key: string) {
 }
 
 async function flushDirtyKeys() {
+  // 目标组水合期间绝不允许脏键推送；旧A组队列已在屏障建立时销毁。
+  if (groupSwitchBarrier) return;
   // ★ P0-A：初始同步完成前，禁止任何推送，防止旧设备/空设备覆盖云端新数据
   if (!initialSyncDone) {
     console.log("[Sync] flushDirtyKeys deferred: waiting for initialSync to complete");
@@ -618,6 +793,7 @@ export async function runInitialSync(
   remoteEntries: { storageKey: string; value: string; clientUpdatedAt: number }[],
   push: PushFn,
 ): Promise<{ overwritten: boolean; conflicts: SyncConflict[] }> {
+  assertNoGroupSwitchWriteBarrier();
   pushFn = push;
   syncEnabled = true;
   // ★ P0-A：重置锁，防止并发调用

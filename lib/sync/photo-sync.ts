@@ -16,8 +16,8 @@ import { Platform } from "react-native";
 
 import { CF_WORKER_URL, getDeviceInfo, type DeviceInfo } from "@/lib/cf-sync/client";
 
-const PHOTO_DIR = `${FileSystem.documentDirectory ?? ""}recipe-photos/`;
-const UPLOADED_SET_KEY = "cf.photoSync.uploaded";
+const LEGACY_PHOTO_DIR = `${FileSystem.documentDirectory ?? ""}recipe-photos/`;
+const UPLOADED_SET_KEY_PREFIX = "cf.photoSync.uploaded";
 const RECIPES_KEY = "cocktail.recipes";
 /** 单张照片 base64 上限（Worker 端 1.5M 字符限制，留余量） */
 const MAX_BASE64_LEN = 1_400_000;
@@ -30,6 +30,35 @@ const MIN_QUALITY = 0.3;
 let running = false;
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
+
+function photoDirectory(groupId: string): string {
+  const safeGroupId = groupId.replace(/[^A-Za-z0-9_-]/g, "_");
+  return `${LEGACY_PHOTO_DIR}${safeGroupId}/`;
+}
+
+async function ensurePhotoDirectory(groupId: string): Promise<string> {
+  const directory = photoDirectory(groupId);
+  const info = await FileSystem.getInfoAsync(directory);
+  if (!info.exists) await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
+  return directory;
+}
+
+/**
+ * 旧版本照片位于无分组目录。仅在当前成员资格的普通上传路径中迁入，
+ * 目标组的 download-only 水合绝不读取该目录，避免A组文件穿透到B组。
+ */
+async function resolveScopedPhotoPath(groupId: string, name: string, allowLegacyMigration: boolean): Promise<string> {
+  const directory = await ensurePhotoDirectory(groupId);
+  const scopedPath = `${directory}${name}`;
+  const scopedInfo = await FileSystem.getInfoAsync(scopedPath);
+  if (scopedInfo.exists || !allowLegacyMigration) return scopedPath;
+  const legacyPath = `${LEGACY_PHOTO_DIR}${name}`;
+  const legacyInfo = await FileSystem.getInfoAsync(legacyPath);
+  if (legacyInfo.exists) {
+    await FileSystem.copyAsync({ from: legacyPath, to: scopedPath });
+  }
+  return scopedPath;
+}
 
 function fileNameOf(uri: string): string {
   return uri.split("/").pop() ?? "";
@@ -67,17 +96,21 @@ async function compressToLimit(uri: string): Promise<string | null> {
   return null;
 }
 
-async function loadUploadedSet(): Promise<Set<string>> {
+function uploadedSetKey(groupId: string): string {
+  return `${UPLOADED_SET_KEY_PREFIX}:${groupId}`;
+}
+
+async function loadUploadedSet(groupId: string): Promise<Set<string>> {
   try {
-    const raw = await AsyncStorage.getItem(UPLOADED_SET_KEY);
+    const raw = await AsyncStorage.getItem(uploadedSetKey(groupId));
     if (raw) return new Set(JSON.parse(raw) as string[]);
   } catch {}
   return new Set();
 }
 
-async function saveUploadedSet(set: Set<string>): Promise<void> {
+async function saveUploadedSet(groupId: string, set: Set<string>): Promise<void> {
   try {
-    await AsyncStorage.setItem(UPLOADED_SET_KEY, JSON.stringify([...set]));
+    await AsyncStorage.setItem(uploadedSetKey(groupId), JSON.stringify([...set]));
   } catch {}
 }
 
@@ -129,7 +162,7 @@ async function uploadPendingPhotos(
   const data = await readRecipesRaw();
   if (!data) return 0;
 
-  const uploaded = await loadUploadedSet();
+  const uploaded = await loadUploadedSet(deviceInfo.groupId);
   let count = 0;
   let oversizedCount = 0;
   const pendingNames: string[] = [];
@@ -148,7 +181,7 @@ async function uploadPendingPhotos(
       const name = fileNameOf(uri);
       if (!name || uploaded.has(name)) continue;
       try {
-        const localPath = `${PHOTO_DIR}${name}`;
+        const localPath = await resolveScopedPhotoPath(deviceInfo.groupId, name, true);
         const info = await FileSystem.getInfoAsync(localPath);
         if (!info.exists) continue; // 本机没有该文件（等对端上传）
         const base64 = await FileSystem.readAsStringAsync(localPath, {
@@ -200,7 +233,7 @@ async function uploadPendingPhotos(
     }
   }
 
-  if (count > 0) await saveUploadedSet(uploaded);
+  if (count > 0) await saveUploadedSet(deviceInfo.groupId, uploaded);
   return oversizedCount;
 }
 
@@ -218,20 +251,16 @@ async function downloadMissingPhotos(deviceInfo: DeviceInfo): Promise<number> {
   };
   if (!Array.isArray(photos) || photos.length === 0) return 0;
 
-  // 确保本地目录存在
-  try {
-    const dirInfo = await FileSystem.getInfoAsync(PHOTO_DIR);
-    if (!dirInfo.exists) {
-      await FileSystem.makeDirectoryAsync(PHOTO_DIR, { intermediates: true });
-    }
-  } catch {}
+  // 目标组下载仅使用其专属目录，不读取旧无分组目录。
+  let directory = "";
+  try { directory = await ensurePhotoDirectory(deviceInfo.groupId); } catch { return 0; }
 
-  const uploaded = await loadUploadedSet();
+  const uploaded = await loadUploadedSet(deviceInfo.groupId);
   let downloadedCount = 0;
 
   for (const p of photos) {
     if (p.deleted || !p.photoId) continue;
-    const localPath = `${PHOTO_DIR}${p.photoId}`;
+    const localPath = `${directory}${p.photoId}`;
     try {
       const info = await FileSystem.getInfoAsync(localPath);
       if (info.exists) {
@@ -254,7 +283,7 @@ async function downloadMissingPhotos(deviceInfo: DeviceInfo): Promise<number> {
     }
   }
 
-  await saveUploadedSet(uploaded);
+  await saveUploadedSet(deviceInfo.groupId, uploaded);
   return downloadedCount;
 }
 
@@ -262,7 +291,7 @@ async function downloadMissingPhotos(deviceInfo: DeviceInfo): Promise<number> {
  * 修复 photoUris 路径：把非本机前缀的 URI 重写为本机 PHOTO_DIR 路径
  * （仅当本机文件确实存在时才重写；返回是否有修改）。
  */
-async function repairPhotoUriPaths(): Promise<boolean> {
+async function repairPhotoUriPaths(deviceInfo: DeviceInfo): Promise<boolean> {
   const data = await readRecipesRaw();
   if (!data) return false;
 
@@ -273,7 +302,7 @@ async function repairPhotoUriPaths(): Promise<boolean> {
     const next: string[] = [];
     for (const uri of uris) {
       const name = fileNameOf(uri);
-      const localPath = `${PHOTO_DIR}${name}`;
+      const localPath = await resolveScopedPhotoPath(deviceInfo.groupId, name, false);
       if (uri === localPath) {
         next.push(uri);
         continue;
@@ -315,8 +344,8 @@ export async function deleteCloudPhoto(photoUri: string): Promise<void> {
     const name = fileNameOf(photoUri);
     if (!name) return;
     await photoFetch("/api/photos/delete", deviceInfo, { photoId: name });
-    const uploaded = await loadUploadedSet();
-    if (uploaded.delete(name)) await saveUploadedSet(uploaded);
+    const uploaded = await loadUploadedSet(deviceInfo.groupId);
+    if (uploaded.delete(name)) await saveUploadedSet(deviceInfo.groupId, uploaded);
   } catch {
     // 静默失败（云端照片残留无害）
   }
@@ -330,6 +359,7 @@ export async function deleteCloudPhoto(photoUri: string): Promise<void> {
  */
 export async function syncPhotos(
   onProgress?: (phase: "upload" | "download" | "repair", done: number, total: number) => void,
+  mode: "full" | "download-only" = "full",
 ): Promise<{ downloaded: number; repaired: boolean; oversized: number }> {
   if (Platform.OS === "web") return { downloaded: 0, repaired: false, oversized: 0 };
   if (running) return { downloaded: 0, repaired: false, oversized: 0 };
@@ -337,9 +367,10 @@ export async function syncPhotos(
   try {
     const deviceInfo = await getDeviceInfo();
     if (!deviceInfo) return { downloaded: 0, repaired: false, oversized: 0 };
-    const oversized = await uploadPendingPhotos(deviceInfo, onProgress);
+    // 目标组首次水合只能下载，绝不允许把旧组文件上传到新成员资格。
+    const oversized = mode === "full" ? await uploadPendingPhotos(deviceInfo, onProgress) : 0;
     const downloaded = await downloadMissingPhotos(deviceInfo);
-    const repaired = await repairPhotoUriPaths();
+    const repaired = await repairPhotoUriPaths(deviceInfo);
     onProgress?.("repair", 1, 1);
     return { downloaded, repaired, oversized };
   } catch {

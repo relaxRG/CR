@@ -13,7 +13,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { useRef, useState } from "react";
 import { ScreenContainer } from "@/components/screen-container";
@@ -28,7 +28,9 @@ export default function PairDeviceScreen() {
   const colors = useColors();
   const router = useRouter();
   const { lang } = useI18n();
-  const { restartSync } = useSync();
+  const { restartSync, deviceInfo, switchToAnotherGroup, isGroupSwitching } = useSync();
+  const params = useLocalSearchParams<{ switch?: string; handoffDeviceId?: string }>();
+  const isSwitchMode = params.switch === "1" && !!deviceInfo;
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const inputRef = useRef<TextInput>(null);
@@ -38,8 +40,8 @@ export default function PairDeviceScreen() {
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
-  const handlePair = async () => {
-    const trimmed = code.trim();
+  const joinWithCode = async (rawCode: string) => {
+    const trimmed = rawCode.trim();
     if (trimmed.length !== 6 || !/^\d{6}$/.test(trimmed)) {
       Alert.alert(
         lang === "zh" ? "格式错误" : "Invalid Code",
@@ -51,17 +53,21 @@ export default function PairDeviceScreen() {
     try {
       setLoading(true);
       tap();
-      await pairWithCode(trimmed);
-      // 配对成功后重启同步引擎（退出同步组后重新加入时必须调用，否则同步引擎不会重新启动）
-      void restartSync();
+      if (isSwitchMode) {
+        await switchToAnotherGroup(trimmed, params.handoffDeviceId || undefined);
+      } else {
+        await pairWithCode(trimmed);
+        // 新设备配对后重启当前成员资格同步；启动路径不会自动创建主设备。
+        void restartSync();
+      }
       if (Platform.OS !== "web") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
       Alert.alert(
-        lang === "zh" ? "配对成功 🎉" : "Paired Successfully 🎉",
+        lang === "zh" ? (isSwitchMode ? "已安全切换同步组" : "配对成功") : (isSwitchMode ? "Sync Group Switched" : "Paired Successfully"),
         lang === "zh"
-          ? "设备已加入同步组，数据将自动同步"
-          : "Device joined the sync group. Data will sync automatically.",
+          ? (isSwitchMode ? "目标组数据已完整下载并替换本机同步数据。当前组数据不会上传到目标组。" : "设备已加入同步组，数据将自动同步")
+          : (isSwitchMode ? "Target data was download-replaced. Current-group data was not uploaded." : "Device joined the sync group. Data will sync automatically."),
         [{ text: "OK", onPress: () => router.back() }],
       );
     } catch (e: unknown) {
@@ -69,7 +75,7 @@ export default function PairDeviceScreen() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
       Alert.alert(
-        lang === "zh" ? "配对失败" : "Pairing Failed",
+        lang === "zh" ? (isSwitchMode ? "切换失败" : "配对失败") : (isSwitchMode ? "Switch Failed" : "Pairing Failed"),
         String(e),
       );
     } finally {
@@ -77,10 +83,11 @@ export default function PairDeviceScreen() {
     }
   };
 
-  /** 扫码成功回调：提取 6 位数字并自动配对 */
+  const handlePair = async () => joinWithCode(code);
+
+  /** 扫码成功回调：提取 6 位数字并自动加入或安全切组 */
   const handleScanned = async (data: string) => {
     setShowScanner(false);
-    // 支持纯数字码或 URL 格式（如 cocktailr://pair?code=123456）
     const match = data.match(/\d{6}/);
     if (!match) {
       Alert.alert(
@@ -91,35 +98,8 @@ export default function PairDeviceScreen() {
     }
     const scannedCode = match[0];
     setCode(scannedCode);
-    // 自动触发配对
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    Keyboard.dismiss();
-    try {
-      setLoading(true);
-      await pairWithCode(scannedCode);
-      // 配对成功后重启同步引擎
-      void restartSync();
-      if (Platform.OS !== "web") {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      }
-      Alert.alert(
-        lang === "zh" ? "配对成功 🎉" : "Paired Successfully 🎉",
-        lang === "zh"
-          ? "设备已加入同步组，数据将自动同步"
-          : "Device joined the sync group. Data will sync automatically.",
-        [{ text: "OK", onPress: () => router.back() }],
-      );
-    } catch (e: unknown) {
-      if (Platform.OS !== "web") {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      }
-      Alert.alert(
-        lang === "zh" ? "配对失败" : "Pairing Failed",
-        String(e),
-      );
-    } finally {
-      setLoading(false);
-    }
+    await joinWithCode(scannedCode);
   };
 
   return (
@@ -146,7 +126,7 @@ export default function PairDeviceScreen() {
           <IconSymbol name="chevron.left" size={22} color={colors.primary} />
         </Pressable>
         <Text style={[styles.title, { color: colors.foreground }]}>
-          {lang === "zh" ? "加入设备组" : "Join Device Group"}
+          {lang === "zh" ? (isSwitchMode ? "加入其他同步组" : "加入设备组") : (isSwitchMode ? "Join Another Group" : "Join Device Group")}
         </Text>
         <View style={{ width: 60 }} />
       </View>
@@ -154,12 +134,12 @@ export default function PairDeviceScreen() {
       {/* Description */}
       <View style={styles.descBox}>
         <Text style={[styles.descTitle, { color: colors.foreground }]}>
-          {lang === "zh" ? "输入配对码" : "Enter Pair Code"}
+          {lang === "zh" ? (isSwitchMode ? "输入目标组配对码" : "输入配对码") : (isSwitchMode ? "Enter Target Group Code" : "Enter Pair Code")}
         </Text>
         <Text style={[styles.descText, { color: colors.muted }]}>
           {lang === "zh"
-            ? "在主设备的「设备管理」页面生成配对码，然后在此输入 6 位数字"
-            : "Generate a pair code on the owner device in Device Manager, then enter the 6-digit code here"}
+            ? (isSwitchMode ? "本机将先创建加密快照，再仅下载并替换为目标组数据。当前组数据不会上传到目标组。" : "在主设备的「设备管理」页面生成配对码，然后在此输入 6 位数字")
+            : (isSwitchMode ? "This device creates an encrypted snapshot, then download-replaces with target data. Current data is never uploaded to the target group." : "Generate a pair code on the owner device in Device Manager, then enter the 6-digit code here")}
         </Text>
       </View>
 
@@ -204,20 +184,22 @@ export default function PairDeviceScreen() {
       {/* Submit button */}
       <Pressable
         onPress={handlePair}
-        disabled={loading || code.length !== 6}
+        disabled={loading || isGroupSwitching || code.length !== 6}
         style={({ pressed }) => [
           styles.submitBtn,
           {
-            backgroundColor: code.length === 6 ? colors.primary : colors.border,
+                            backgroundColor: code.length === 6 && !isGroupSwitching ? colors.primary : colors.border,
+
             opacity: pressed ? 0.8 : 1,
           },
         ]}
       >
-        {loading ? (
+                  {loading || isGroupSwitching ? (
+
           <ActivityIndicator color="#fff" />
         ) : (
           <Text style={styles.submitBtnText}>
-            {lang === "zh" ? "加入设备组" : "Join Group"}
+            {lang === "zh" ? (isSwitchMode ? "安全加入目标组" : "加入设备组") : (isSwitchMode ? "Safely Join Target Group" : "Join Group")}
           </Text>
         )}
       </Pressable>

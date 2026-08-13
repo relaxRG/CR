@@ -18,19 +18,22 @@ function typeLabel(type: SyncLogEntry["type"], lang: string) {
     restore:  ["恢复", "Restore"],
     error:    ["错误", "Error"],
     conflict: ["冲突", "Conflict"],
+    switch:   ["切换", "Switch"],
   };
   return lang === "zh" ? map[type][0] : map[type][1];
 }
 
 function typeColor(type: SyncLogEntry["type"]) {
-  return {
+  const colors: Record<SyncLogEntry["type"], string> = {
     push:     "#007AFF",
     pull:     "#34C759",
     backup:   "#FF9500",
     restore:  "#FF3B30",
     error:    "#FF3B30",
     conflict: "#FF6B00",
-  }[type];
+    switch:   "#5856D6",
+  };
+  return colors[type];
 }
 
 export default function SyncLogScreen() {

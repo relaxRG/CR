@@ -3,15 +3,13 @@
  * 方案 C+: 设备配对 + 角色权限 + 云端同步
  *
  * Worker URL: https://cocktail-ai.kikikong2017.workers.dev
- * Worker Secret: 用于 HMAC-SHA256 设备令牌签名
+ * 设备令牌只由 Worker 签发和校验；客户端绝不持有可派生访问令牌的服务端密钥。
  */
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 
 export const CF_WORKER_URL = "https://cocktail-ai.kikikong2017.workers.dev";
-export const CF_WORKER_SECRET = "7b398c49c07157e84387682987ef29a678dd31e8fc548eed30272330fe0dbd70";
-
 // AsyncStorage keys for device identity
 const DEVICE_ID_KEY = "cf.sync.deviceId";
 const GROUP_ID_KEY = "cf.sync.groupId";
@@ -19,20 +17,6 @@ const DEVICE_TOKEN_KEY = "cf.sync.deviceToken";
 const DEVICE_ROLE_KEY = "cf.sync.deviceRole";
 const DEVICE_ALLOWED_KEYS_KEY = "cf.sync.allowedKeys";
 const DEVICE_NAME_KEY = "cf.sync.deviceName";
-
-// ─── HMAC-SHA256 device token ─────────────────────────────────────────────────
-async function makeDeviceToken(deviceId: string, groupId: string): Promise<string> {
-  const enc = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    "raw",
-    enc.encode(CF_WORKER_SECRET),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(`${deviceId}:${groupId}`));
-  return btoa(String.fromCharCode(...new Uint8Array(sig)));
-}
 
 // ─── UUID generation ──────────────────────────────────────────────────────────
 function generateUUID(): string {
@@ -106,7 +90,7 @@ export async function getDeviceInfo(): Promise<DeviceInfo | null> {
   };
 }
 
-async function saveDeviceInfo(info: DeviceInfo): Promise<void> {
+export async function saveDeviceInfo(info: DeviceInfo): Promise<void> {
   await Promise.all([
     storeSecure(DEVICE_ID_KEY, info.deviceId),
     storeSecure(GROUP_ID_KEY, info.groupId),
@@ -157,13 +141,12 @@ async function cfFetch(
 
 // ─── Registration ─────────────────────────────────────────────────────────────
 /**
- * Get or create device identity.
- * - First call: creates a new device group (becomes owner)
- * - Subsequent calls: returns cached identity
+ * 显式创建一个新的独立同步组。
+ * 只能由用户点击“创建新的同步组”后调用；启动、重试、前后台回归和退出操作绝不能调用它。
  */
-export async function getOrCreateDevice(deviceName?: string): Promise<DeviceInfo> {
+export async function createNewSyncGroup(deviceName?: string): Promise<DeviceInfo> {
   const existing = await getDeviceInfo();
-  if (existing) return existing;
+  if (existing) throw new Error("SYNC_GROUP_ALREADY_ACTIVE");
 
   // Generate new device ID
   const deviceId = generateUUID();
@@ -233,6 +216,9 @@ export async function pairWithCode(
   code: string,
   deviceName?: string,
 ): Promise<DeviceInfo> {
+  // 旧 /pair 协议只能安全用于未加入任何同步组的设备。
+  // 已激活设备切换群组必须使用Worker原子switch协议，不能覆盖旧成员资格。
+  if (await getDeviceInfo()) throw new Error("SYNC_GROUP_SWITCH_REQUIRES_ATOMIC_WORKER_PROTOCOL");
   // Generate new device ID
   const deviceId = generateUUID();
   const name = deviceName ?? getDefaultDeviceName();
@@ -264,6 +250,105 @@ export async function pairWithCode(
   };
   await saveDeviceInfo(info);
   return info;
+}
+
+// ─── Safe group switching ─────────────────────────────────────────────────────
+export type GroupSwitchTargetPreview = {
+  groupId: string;
+  role: DeviceRole;
+  expiresAt: number;
+};
+
+export type GroupSwitchPreparation = {
+  switchId: string;
+  recoveryTicket: string;
+  target: GroupSwitchTargetPreview;
+};
+
+export type GroupSwitchStatus =
+  | { state: "prepared" | "cancelled" }
+  | { state: "committed"; membership: DeviceInfo };
+
+export type CompleteSyncSnapshot = {
+  groupId: string;
+  revision: string;
+  complete: true;
+  presentKeys: string[];
+  entries: SyncEntry[];
+};
+
+async function readError(res: Response, fallback: string): Promise<never> {
+  let code = fallback;
+  try {
+    const body = await res.json() as { error?: string };
+    code = body.error ?? fallback;
+  } catch {}
+  throw new Error(code);
+}
+
+export async function prepareGroupSwitch(input: {
+  code: string;
+  switchId: string;
+  handoffDeviceId?: string;
+  deviceName?: string;
+  platform?: string;
+}): Promise<GroupSwitchPreparation> {
+  const source = await getDeviceInfo();
+  if (!source) throw new Error("SYNC_GROUP_NOT_ACTIVE");
+  const res = await cfFetch("/api/device/prepare-switch", {
+    method: "POST",
+    deviceInfo: source,
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) return readError(res, `SWITCH_PREPARE_FAILED_${res.status}`);
+  return res.json() as Promise<GroupSwitchPreparation>;
+}
+
+export async function commitGroupSwitch(input: {
+  switchId: string;
+  recoveryTicket: string;
+}): Promise<GroupSwitchStatus> {
+  const source = await getDeviceInfo();
+  if (!source) throw new Error("SYNC_GROUP_NOT_ACTIVE");
+  const res = await cfFetch("/api/device/commit-switch", {
+    method: "POST",
+    deviceInfo: source,
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) return readError(res, `SWITCH_COMMIT_FAILED_${res.status}`);
+  return res.json() as Promise<GroupSwitchStatus>;
+}
+
+export async function getGroupSwitchStatus(input: {
+  switchId: string;
+  recoveryTicket: string;
+}): Promise<GroupSwitchStatus> {
+  const res = await cfFetch("/api/device/switch-status", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) return readError(res, `SWITCH_STATUS_FAILED_${res.status}`);
+  return res.json() as Promise<GroupSwitchStatus>;
+}
+
+export async function cancelPreparedGroupSwitch(input: {
+  switchId: string;
+  recoveryTicket: string;
+}): Promise<void> {
+  const res = await cfFetch("/api/device/cancel-switch", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) return readError(res, `SWITCH_CANCEL_FAILED_${res.status}`);
+}
+
+export async function pullCompleteTargetSnapshot(membership: DeviceInfo): Promise<CompleteSyncSnapshot> {
+  const res = await cfFetch("/api/sync/snapshot", {
+    method: "GET",
+    deviceInfo: membership,
+  });
+  if (!res.ok) return readError(res, `TARGET_SNAPSHOT_FAILED_${res.status}`);
+  return res.json() as Promise<CompleteSyncSnapshot>;
 }
 
 // ─── Device list ──────────────────────────────────────────────────────────────

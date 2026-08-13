@@ -18,7 +18,6 @@ import {
   cfPush,
   clearDeviceInfo,
   getDeviceInfo,
-  getOrCreateDevice,
   type DeviceInfo,
   type DeviceRole,
 } from "./client";
@@ -39,6 +38,7 @@ import { startAutoBackup } from "@/lib/backup/icloud-backup";
 import { syncPhotos } from "@/lib/sync/photo-sync";
 import { useI18n } from "@/lib/i18n";
 import { startRealtimeSync, notifyPushDone, resetRealtimeSync } from "./ws-sync";
+import { recoverPendingGroupSwitch, switchToAnotherGroup, type GroupSwitchRuntime } from "./group-switch";
 
 // ─── Context type (compatible with original useSync) ─────────────────────────
 type SyncContextValue = {
@@ -56,7 +56,7 @@ type SyncContextValue = {
   deviceRole: DeviceRole | null;
   /** Last sync error message (registration or pull/push failure), null when healthy */
   syncError: string | null;
-  /** Manually retry full sync (register if needed → pull → merge → push) */
+  /** Manually retry the currently active group. Unpaired local mode never auto-creates a group. */
   retrySync: () => Promise<boolean>;
   /** Trigger pair code flow (owner generates code for new device) */
   openPairModal: () => void;
@@ -73,6 +73,10 @@ type SyncContextValue = {
    * 会重置 startedRef 并重新执行完整同步流程（读取新 DeviceInfo → pull → merge → push）
    */
   restartSync: () => Promise<boolean>;
+  /** 加入另一个同步组；主设备可选择先把原组主角色交接给其他活跃设备。 */
+  switchToAnotherGroup: (code: string, handoffDeviceId?: string) => Promise<void>;
+  /** 正在执行原子切组或冷启动补偿时禁用高风险设备管理操作。 */
+  isGroupSwitching: boolean;
 };
 
 const SyncContext = createContext<SyncContextValue | null>(null);
@@ -95,6 +99,7 @@ export function SyncProvider({
   const [authLoading, setAuthLoading] = useState(true);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [pendingConflicts, setPendingConflicts] = useState<SyncConflict[]>([]);
+  const [isGroupSwitching, setIsGroupSwitching] = useState(false);
   const { lang } = useI18n();
   const startedRef = useRef(false);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -121,6 +126,27 @@ export function SyncProvider({
     },
     [deviceInfo],
   );
+
+  const groupSwitchRuntime: GroupSwitchRuntime = {
+    stopSourceRealtime: () => {
+      stopRealtimeRef.current?.();
+      stopRealtimeRef.current = null;
+      resetRealtimeSync();
+    },
+    setActiveMembership: (membership) => setDeviceInfo(membership),
+    // 首次水合必须仅下载目标组照片，禁止旧组文件被上传到新成员资格。
+    syncTargetPhotosReadOnly: async () => {
+      await syncPhotos(undefined, "download-only");
+    },
+    createTargetPush: (membership) => async (entries) => {
+      const filtered = membership.role === "collaborator" && Array.isArray(membership.allowedKeys)
+        ? entries.filter((entry) => (membership.allowedKeys as string[]).includes(entry.storageKey))
+        : entries;
+      if (filtered.length === 0 || membership.role === "guest") return;
+      await cfPush(filtered);
+      void notifyPushDone();
+    },
+  };
 
   // ★ 冲突解决：升级版—显示数据预览和自动推荐
   useEffect(() => {
@@ -201,14 +227,21 @@ export function SyncProvider({
     );
   }, [pendingConflicts, pushFn, lang]);
 
-  // Full sync pipeline: register (if needed) → pull → merge → push.
+  // Full sync pipeline: existing membership only → pull → merge → push.
   // Returns true on success. Safe to call repeatedly (guarded by syncingRef).
   const performSync = useCallback(async (): Promise<boolean> => {
     if (syncingRef.current) return false;
     syncingRef.current = true;
     try {
-      // Get or create device identity (auto-registers as owner on first run)
-      const info = await getOrCreateDevice();
+      // 仅使用已有成员资格。未配对状态是本地模式，绝不能因启动、重试或前后台回归而自动创建主设备组。
+      const info = await getDeviceInfo();
+      if (!info) {
+        setDeviceInfo(null);
+        setAuthLoading(false);
+        setSyncError(null);
+        disableSync();
+        return true;
+      }
       setDeviceInfo(info);
       setAuthLoading(false);
       if (info.role !== "owner") { void checkAndNotifyPermissionChange(info.allowedKeys); }
@@ -308,10 +341,18 @@ export function SyncProvider({
     if (startedRef.current) return;
     startedRef.current = true;
     void (async () => {
+      setIsGroupSwitching(true);
+      const recovery = await recoverPendingGroupSwitch(groupSwitchRuntime);
+      setIsGroupSwitching(false);
+      if (recovery === "blocked") {
+        setAuthLoading(false);
+        setSyncError(lang === "zh" ? "同步组切换等待网络恢复，请勿清除应用数据" : "Group switch is awaiting network recovery. Do not clear app data.");
+        return;
+      }
       const ok = await performSync();
       if (!ok) scheduleRetry();
-      else {
-        // 首次同步成功后启动实时推送监听
+      else if (await getDeviceInfo()) {
+        // 仅已有活跃成员资格时才启动实时监听。
         stopRealtimeRef.current?.();
         stopRealtimeRef.current = startRealtimeSync((since) => {
           // 检测到其他设备有新数据 → 触发增量 pull
@@ -340,7 +381,7 @@ export function SyncProvider({
       stopRealtimeRef.current?.();
       stopRealtimeRef.current = null;
     };
-  }, [performSync, scheduleRetry]);
+  }, [performSync, scheduleRetry, lang, pushFn]);
 
   // Bug 5 修复：前台激活自动同步。
   // 此前 pull 只在冷启动执行一次，iOS App 常驻后台多天时永远拉不到其它设备
@@ -375,7 +416,7 @@ export function SyncProvider({
     onRequestPair?.();
   }, [onRequestPair]);
 
-  // "logout" = remove device identity (leaves the sync group)
+  // "logout" = stop the current local sync session. Provider never recreates a group after this call.
   const logout = useCallback(async () => {
     disableSync();
     await clearDeviceInfo();
@@ -406,8 +447,7 @@ export function SyncProvider({
     clearSyncError();
   }, []);
 
-  // 重启同步引擎：退出同步组后重新配对时调用
-  // 重置 startedRef 并重新执行完整同步流程（读取新 DeviceInfo → pull → merge → push）
+  // 配对成功或恢复完成后重新同步当前已激活的成员资格；不隐式注册新组。
   const restartSync = useCallback(async (): Promise<boolean> => {
     // 停止当前实时监听
     stopRealtimeRef.current?.();
@@ -421,10 +461,10 @@ export function SyncProvider({
     syncingRef.current = false;
     // 重置 startedRef，允许同步引擎重新启动
     startedRef.current = false;
-    // 执行完整同步（会读取新的 DeviceInfo 并重新连接）
+    // 执行当前成员资格的完整同步；未配对时安全停留在本地模式。
     const ok = await performSync();
-    if (ok) {
-      // 同步成功后重新启动实时监听
+    if (ok && await getDeviceInfo()) {
+      // 仅已有活跃成员资格时重新启动实时监听
       stopRealtimeRef.current = startRealtimeSync((since) => {
         void (async () => {
           if (syncingRef.current) return;
@@ -449,6 +489,19 @@ export function SyncProvider({
     }
     return ok;
   }, [performSync, scheduleRetry, pushFn]);
+
+  const switchCurrentDeviceToAnotherGroup = useCallback(async (code: string, handoffDeviceId?: string) => {
+    const switchId = typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `switch-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    setIsGroupSwitching(true);
+    try {
+      await switchToAnotherGroup({ code, switchId, handoffDeviceId }, groupSwitchRuntime);
+      await restartSync();
+    } finally {
+      setIsGroupSwitching(false);
+    }
+  }, [groupSwitchRuntime, restartSync]);
 
   // Build a user-like object for compatibility with existing UI
   const user = deviceInfo
@@ -482,6 +535,8 @@ export function SyncProvider({
           setDeviceInfo(info);
         },
         restartSync,
+        switchToAnotherGroup: switchCurrentDeviceToAnotherGroup,
+        isGroupSwitching,
       }}
     >
       {children}
