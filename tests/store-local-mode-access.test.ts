@@ -23,6 +23,8 @@ describe("门店本地单机模式访问守卫", () => {
     );
     expect(storeSource).toContain('canAccess("labor")');
     expect(storeSource).toContain('canAccess("store_ops")');
+    expect(storeSource).toContain('effectiveTab === "inventory" && (\n          canAccess("store_ops")');
+    expect(storeSource).toContain('effectiveTab === "shop"      && (\n          canAccess("store_ops")');
 
     const visibleRule = '!isAuthenticated || hasFeature(t.feature)';
     expect(storeSource).toContain(visibleRule);

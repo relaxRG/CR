@@ -147,11 +147,11 @@ export default function StoreScreen() {
       <View style={{ paddingTop: insets.top, backgroundColor: colors.background, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
         <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 20 }}>
           {/* Tab 列表：第五个主模块在窄屏水平滚动，头像始终固定可见 */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ flexDirection: "row" }}>
+          <ScrollView testID="store-main-tabs" horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ flexDirection: "row" }}>
             {visibleTabs.map((t) => {
               const active = effectiveTab === t.key;
               return (
-                <Pressable key={t.key} onPress={() => { tap(); setMainTab(t.key); }}
+                <Pressable key={t.key} testID={`store-main-tab-${t.key}`} onPress={() => { tap(); setMainTab(t.key); }}
                   style={({ pressed }) => [{
                     paddingVertical: 12,
                     paddingHorizontal: 4,

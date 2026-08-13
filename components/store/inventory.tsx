@@ -8,6 +8,7 @@ import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useSpiritsInventoryStore } from "@/lib/spirits/crud-store";  // ✅ 新 crud-store
 import { useWineSnapshotStore } from "@/lib/wine/store";
 import { useFoodIngredientStore } from "@/lib/food/ingredient-store";
@@ -40,6 +41,10 @@ export default function StoreInventoryScreen({ mode = "inventory" }: { mode?: In
   const equipmentStore = useEquipmentInventoryStore();
 
   const currentMonth = new Date().toISOString().slice(0, 7);
+  const [activeCategory, setActiveCategory] = usePersistedState<string>(
+    mode === "shop" ? "store.shop.category.v1" : "store.inventory.category.v1",
+    mode === "shop" ? "glassware" : "spirits",
+  );
 
   const categories = useMemo(() => {
     // ✅ 烈酒：从新 crud-store 读取当前月台账数据
@@ -67,34 +72,34 @@ export default function StoreInventoryScreen({ mode = "inventory" }: { mode?: In
       : "点击录入烈酒库存";
 
     const allCategories = [
-      { emoji: "🥃", label: "烈酒", color: "#6B7280", route: "/spirits-inventory",
+      { key: "spirits", emoji: "🥃", label: "烈酒", color: "#6B7280", route: "/spirits-inventory",
         sub: spiritsSub,
         badge: spiritsItems.length > 0 ? `${spiritsItems.length}款` : undefined },
-      { emoji: "🍷", label: "葡萄酒", color: "#9F1239", route: "/wine-inventory",
+      { key: "wine", emoji: "🍷", label: "葡萄酒", color: "#9F1239", route: "/wine-inventory",
         sub: wineSnap ? `${wineSnap.monthLabel} · ${wineSnap.items.length} 款 · 期末¥${wineSnap.totalEndCost.toFixed(0)}` : "导入 Excel 开始使用",
         badge: wineSnap ? `${wineSnap.items.length}款` : undefined },
-      { emoji: "🍋", label: "水果", color: "#22C55E", route: "/fruit-inventory",
+      { key: "fruit", emoji: "🍋", label: "水果", color: "#22C55E", route: "/fruit-inventory",
         sub: fruitItems.length > 0 ? `${fruitItems.length} 种${fruitStore.getLowStockItems().length > 0 ? ` · ⚠ ${fruitStore.getLowStockItems().length}种预警` : ""}` : "点击添加水果档案",
         badge: fruitItems.length > 0 ? `${fruitItems.length}种` : undefined },
-      { emoji: "🥩", label: "食材", color: "#10B981", route: "/food-inventory",
+      { key: "food", emoji: "🥩", label: "食材", color: "#10B981", route: "/food-inventory",
         sub: foodStore.ingredients.length > 0 ? `${foodStore.ingredients.length} 种${foodLow > 0 ? ` · ⚠ ${foodLow}种预警` : ""}` : "点击管理食材档案",
         badge: foodStore.ingredients.length > 0 ? `${foodStore.ingredients.length}种` : undefined },
-      { emoji: "🍺", label: "啤酒", color: "#F4A300", route: "/beer-inventory",
+      { key: "beer", emoji: "🍺", label: "啤酒", color: "#F4A300", route: "/beer-inventory",
         sub: beerItems.length > 0 ? `${beerItems.length} 款${beerStore.getLowStockItems().length > 0 ? ` · ⚠ ${beerStore.getLowStockItems().length}种预警` : ""}` : "点击添加啤酒档案",
         badge: beerItems.length > 0 ? `${beerItems.length}款` : undefined },
-      { emoji: "🧊", label: "冰块", color: "#00BCD4", route: "/ice-inventory",
+      { key: "ice", emoji: "🧊", label: "冰块", color: "#00BCD4", route: "/ice-inventory",
         sub: iceItems.length > 0 ? `${iceItems.length} 种${iceStore.getLowStockItems().length > 0 ? ` · ⚠ ${iceStore.getLowStockItems().length}种预警` : ""}` : "点击添加冰块档案",
         badge: iceItems.length > 0 ? `${iceItems.length}种` : undefined },
-      { emoji: "🥂", label: "杯具", color: "#6366F1", route: "/glassware-inventory",
+      { key: "glassware", emoji: "🥂", label: "杯具", color: "#6366F1", route: "/glassware-inventory",
         sub: glassItems.length > 0 ? `${glassItems.length} 款 · 本月损耗${glasswareStore.consumes.filter((c) => c.reason === "loss" && c.date.startsWith(currentMonth)).length}次` : "点击添加杯具档案",
         badge: glassItems.length > 0 ? `${glassItems.length}款` : undefined },
-      { emoji: "🍽️", label: "餐具", color: "#0EA5E9", route: "/tableware-inventory",
+      { key: "tableware", emoji: "🍽️", label: "餐具", color: "#0EA5E9", route: "/tableware-inventory",
         sub: tableItems.length > 0 ? `${tableItems.length} 款 · 本月损耗${tablewareStore.consumes.filter((c) => c.reason === "loss" && c.date.startsWith(currentMonth)).length}次` : "点击添加餐具档案",
         badge: tableItems.length > 0 ? `${tableItems.length}款` : undefined },
-      { emoji: "🧴", label: "日用品", color: "#F59E0B", route: "/daily-inventory",
+      { key: "daily", emoji: "🧴", label: "日用品", color: "#F59E0B", route: "/daily-inventory",
         sub: dailyItems.length > 0 ? `${dailyItems.length} 种${dailyStore.getLowStockItems().length > 0 ? ` · ⚠ ${dailyStore.getLowStockItems().length}种预警` : ""}` : "点击添加日用品档案",
         badge: dailyItems.length > 0 ? `${dailyItems.length}种` : undefined },
-      { emoji: "🔧", label: "设备", color: "#6366F1", route: "/equipment-inventory",
+      { key: "equipment", emoji: "🔧", label: "设备", color: "#6366F1", route: "/equipment-inventory",
         sub: equipItems.length > 0 ? `${equipItems.length} 台 · 月折旧¥${equipmentStore.getTotalMonthlyDepreciation().toFixed(0)}` : "点击登记设备",
         badge: equipItems.length > 0 ? `${equipItems.length}台` : undefined },
     ];
@@ -108,6 +113,7 @@ export default function StoreInventoryScreen({ mode = "inventory" }: { mode?: In
   const description = mode === "shop"
     ? "杯具、餐具、日用品与设备资产"
     : "酒水、食材、冰块与水果库存";
+  const currentCategory = categories.find((category) => category.key === activeCategory) ?? categories[0];
 
   return (
     <ScrollView
@@ -120,28 +126,55 @@ export default function StoreInventoryScreen({ mode = "inventory" }: { mode?: In
           {description} · {categories.filter((c) => c.badge).length} 个品类已有数据
         </Text>
       </View>
-      <View style={{ gap: 10 }}>
-        {categories.map((cat) => (
-          <TouchableOpacity key={cat.label} onPress={() => { tap(); router.push(cat.route as any); }}
-            activeOpacity={0.75}
-            style={[S.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <View style={[S.colorBar, { backgroundColor: cat.color }]} />
-              <View style={{ flex: 1, minWidth: 0, paddingLeft: 12 }}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                <Text style={{ fontSize: 22, flexShrink: 0 }}>{cat.emoji}</Text>
-                <Text numberOfLines={1} style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, flexShrink: 1 }}>{cat.label}</Text>
-                {cat.badge && (
-                  <View style={[S.badge, { backgroundColor: cat.color + "22" }]}>
-                    <Text numberOfLines={1} style={{ fontSize: 11, lineHeight: 14, fontWeight: "600", color: cat.color }}>{cat.badge}</Text>
-                  </View>
-                )}
-              </View>
-              <Text style={{ fontSize: 12, color: colors.muted, marginTop: 3 }} numberOfLines={1}>{cat.sub}</Text>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        testID={mode === "shop" ? "shop-segmented-tabs" : "inventory-segmented-tabs"}
+        style={{ flexGrow: 0, marginHorizontal: -16, marginBottom: 14 }}
+        contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
+      >
+        {categories.map((category) => {
+          const active = currentCategory?.key === category.key;
+          return (
+            <TouchableOpacity
+              key={category.key}
+              testID={`${mode}-segment-${category.key}`}
+              onPress={() => { tap(); setActiveCategory(category.key); }}
+              activeOpacity={0.75}
+              style={[S.segment, {
+                backgroundColor: active ? category.color : colors.surface,
+                borderColor: active ? category.color : colors.border,
+              }]}
+            >
+              <Text style={[S.segmentText, { color: active ? "#fff" : colors.foreground }]}>{category.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+
+      {currentCategory && (
+        <TouchableOpacity
+          testID={`${mode}-active-category-card`}
+          onPress={() => { tap(); router.push(currentCategory.route as any); }}
+          activeOpacity={0.75}
+          style={[S.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        >
+          <View style={[S.colorBar, { backgroundColor: currentCategory.color }]} />
+          <View style={{ flex: 1, minWidth: 0, paddingLeft: 12 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <Text style={{ fontSize: 26, flexShrink: 0 }}>{currentCategory.emoji}</Text>
+              <Text numberOfLines={1} style={{ fontSize: 18, fontWeight: "700", color: colors.foreground, flexShrink: 1 }}>{currentCategory.label}</Text>
+              {currentCategory.badge && (
+                <View style={[S.badge, { backgroundColor: currentCategory.color + "22" }]}>
+                  <Text numberOfLines={1} style={{ fontSize: 11, lineHeight: 14, fontWeight: "600", color: currentCategory.color }}>{currentCategory.badge}</Text>
+                </View>
+              )}
             </View>
-            <Text style={{ fontSize: 20, color: colors.muted, paddingRight: 4 }}>›</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+            <Text style={{ fontSize: 13, color: colors.muted, marginTop: 5 }} numberOfLines={2}>{currentCategory.sub}</Text>
+            <Text style={{ fontSize: 13, color: currentCategory.color, fontWeight: "700", marginTop: 12 }}>进入{currentCategory.label}管理 ›</Text>
+          </View>
+        </TouchableOpacity>
+      )}
     </ScrollView>
   );
 }
@@ -150,4 +183,6 @@ const S = StyleSheet.create({
   card: { flexDirection: "row", alignItems: "center", borderRadius: 14, borderWidth: 1, overflow: "hidden", minHeight: 68 },
   colorBar: { width: 5, alignSelf: "stretch" },
   badge: { flexShrink: 0, minHeight: 20, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  segment: { minHeight: 36, justifyContent: "center", paddingHorizontal: 16, borderRadius: 10, borderWidth: 1 },
+  segmentText: { fontSize: 14, fontWeight: "600" },
 });
