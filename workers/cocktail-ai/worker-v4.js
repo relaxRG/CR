@@ -1,7 +1,7 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
-// worker-v3.js
+// cocktail-ai production worker
 var __defProp2 = Object.defineProperty;
 var __name2 = /* @__PURE__ */ __name((target, value) => __defProp2(target, "name", { value, configurable: true }), "__name");
 var __defProp22 = Object.defineProperty;
@@ -150,7 +150,7 @@ async function callAI(env, messages, options = {}) {
   } catch (e) {
     // Fallback to Workers AI if DeepSeek fails and AI binding is available
     if (env.AI) {
-      console.log("DeepSeek failed, falling back to Workers AI:", e.message);
+      console.warn("[AI] DEEPSEEK_FALLBACK");
       return callWorkersAI(env, messages, options);
     }
     throw e;
@@ -925,7 +925,7 @@ async function handleOcr(env, body, origin) {
     const text = await primaryFn();
     return json({ text, _model: useQwenFirst ? "qwen-vl-max" : "gemini-2.0-flash" }, 200, origin);
   } catch (primaryErr) {
-    console.warn("[OCR] \u4E3B\u6A21\u578B\u5931\u8D25\uFF0C\u5207\u6362\u5907\u7528:", primaryErr.message);
+    console.warn("[OCR] PRIMARY_MODEL_FALLBACK");
     try {
       const text = await fallbackFn();
       return json({ text, _model: useQwenFirst ? "gemini-2.0-flash" : "qwen-vl-max", _fallback: true }, 200, origin);
@@ -1063,7 +1063,7 @@ Rules:
       const items = parseItems(raw);
       return json({ items, _model: "qwen-vl-max" }, 200, origin);
     } catch (qwenErr) {
-      console.warn("[BulkImport] Qwen-VL-Max \u5931\u8D25\uFF0C\u5207\u6362 Gemini Flash:", qwenErr.message);
+      console.warn("[OCR] BULK_MODEL_FALLBACK");
     }
     try {
       if (!env.GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not configured");
@@ -2006,7 +2006,7 @@ var worker_v3_default = {
     try {
       await initDB(env);
     } catch (e) {
-      console.error("[initDB] failed:", e && e.message);
+      console.error("[initDB] INIT_DB_FAILED");
     }
     if (method === "OPTIONS") {
       return new Response(null, { status: 204, headers: corsHeaders(origin) });
@@ -2180,13 +2180,13 @@ var worker_v3_default = {
   async scheduled(event, env, ctx) {
     try {
       const balance = await checkDeepSeekBalance(env);
-      console.log(`[Cron] DeepSeek balance: \xA5${balance}`);
+      console.log("[Cron] BALANCE_CHECK_SUCCEEDED");
       if (balance !== null && balance < 5) {
         const sent = await sendAlertEmail(env, balance);
-        console.log(`[Cron] Alert email sent: ${sent}`);
+        console.log("[Cron] BALANCE_ALERT_DISPATCHED");
       }
     } catch (e) {
-      console.error("[Cron] Error:", e.message);
+      console.error("[Cron] BALANCE_CHECK_FAILED");
     }
   }
 };

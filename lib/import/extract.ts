@@ -75,6 +75,18 @@ function dirOf(path: string): string {
   return i >= 0 ? path.slice(0, i + 1) : "";
 }
 
+// pdfjs 2.16.105 的Worker与主库必须保持相同版本。不要import本地pdf.worker.entry：Metro会在导出时
+// 把约2MB的legacy Worker交给独立Jest转换进程，受限环境会被监督器SIGTERM。浏览器按需下载Worker。
+const PDFJS_WORKER_URL = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js";
+
+async function loadWebPdfJs() {
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf");
+  if (typeof window !== "undefined") {
+    pdfjs.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_URL;
+  }
+  return pdfjs;
+}
+
 function resolvePath(base: string, rel: string): string {
   if (rel.startsWith("/")) return rel.slice(1);
   const parts = (base + rel).split("/");
@@ -428,9 +440,7 @@ export async function extractEpubToFileSystem(
 }
 
 export async function extractPdf(data: ArrayBuffer): Promise<ExtractedBook> {
-  const pdfjs = await import("pdfjs-dist/legacy/build/pdf");
-  // Metro/Web 无独立 worker:加载 entry 使 pdfjs 走主线程 fake worker
-  await import("pdfjs-dist/legacy/build/pdf.worker.entry" as string);
+  const pdfjs = await loadWebPdfJs();
 
   const doc = await pdfjs.getDocument({ data: new Uint8Array(data) }).promise;
   const meta = await doc.getMetadata().catch(() => null);
@@ -483,8 +493,7 @@ export async function renderPdfPagesToImages(
   data: ArrayBuffer,
   opts: { maxPages?: number; scale?: number; onProgress?: (done: number, total: number) => void } = {},
 ): Promise<OcrImage[]> {
-  const pdfjs = await import("pdfjs-dist/legacy/build/pdf");
-  await import("pdfjs-dist/legacy/build/pdf.worker.entry" as string);
+  const pdfjs = await loadWebPdfJs();
 
   const doc = await pdfjs.getDocument({ data: new Uint8Array(data) }).promise;
   const total = Math.min(doc.numPages, opts.maxPages ?? 40);

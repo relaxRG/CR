@@ -29,10 +29,12 @@ const server = createServer((request, response) => {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function getPageTarget() {
-  const targets = await (await fetch("http://localhost:9222/json")).json();
-  const target = targets.find((item) => item.type === "page" && item.webSocketDebuggerUrl);
-  if (!target) throw new Error("未找到可用 Chromium 页面。请启动带 remote debugging port 9222 的浏览器。");
+async function getDedicatedTestTarget() {
+  // 不复用用户当前浏览器页面，避免主题回归导航或模拟系统外观影响登录中的敏感页面。
+  const response = await fetch("http://localhost:9222/json/new?about:blank", { method: "PUT" });
+  if (!response.ok) throw new Error(`无法创建专用H5测试标签页：HTTP ${response.status}`);
+  const target = await response.json();
+  if (!target?.webSocketDebuggerUrl) throw new Error("专用H5测试标签页缺少CDP连接地址。");
   return target;
 }
 
@@ -51,7 +53,14 @@ async function openCdp(target) {
   });
   const call = (method, params = {}) => new Promise((resolve, reject) => {
     const requestId = ++id;
-    pending.set(requestId, (message) => message.error ? reject(new Error(message.error.message)) : resolve(message.result));
+    const timeout = setTimeout(() => {
+      pending.delete(requestId);
+      reject(new Error(`CDP_TIMEOUT:${method}`));
+    }, 15_000);
+    pending.set(requestId, (message) => {
+      clearTimeout(timeout);
+      return message.error ? reject(new Error(message.error.message)) : resolve(message.result);
+    });
     socket.send(JSON.stringify({ id: requestId, method, params }));
   });
   return { socket, call };
@@ -90,7 +99,7 @@ server.listen(port, "127.0.0.1");
 await new Promise((resolve) => server.once("listening", resolve));
 
 try {
-  const { socket, call } = await openCdp(await getPageTarget());
+  const { socket, call } = await openCdp(await getDedicatedTestTarget());
   await call("Page.enable");
   await call("Emulation.setDeviceMetricsOverride", { width: 375, height: 844, deviceScaleFactor: 3, mobile: true });
 
