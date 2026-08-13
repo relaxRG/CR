@@ -15,7 +15,7 @@ import { getHolidayAllocationKey, getHolidayWorkInfo } from "@/lib/labor/holiday
 import { shouldAutoSyncPayrollMonth } from "@/lib/labor/payroll-sync-guards";
 import { checkControlFieldsIntegrity, checkAdvanceCrossMonthPollution } from "@/lib/labor/payroll-monitor";
 import {
-  Alert, Clipboard, Dimensions, Modal, Platform, Pressable, ScrollView,
+  Alert, Clipboard, Modal, Platform, Pressable, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions, KeyboardAvoidingView} from "react-native";
 import * as Haptics from "expo-haptics";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -48,11 +48,6 @@ import {
   DEFAULT_SHIFT_GROUPS, FillPreset, isDayInRange,
   PaySlip, MonthlyAttendance,
 } from "@/lib/labor/types";
-
-const { width: SCREEN_W } = Dimensions.get("window");
-
-
-
 
 type CompareMode = "none" | "lastMonth" | "lastYear" | "custom";
 type HolidayDecisionItem = {
@@ -3433,7 +3428,7 @@ function SchTemplateModal({ visible, templates, specialStatuses, businessHours, 
 // ─── 内嵌排班表页（第一页） ───────────────────────────────────────────────────
 // Excel 风格排班表：每周一个区块
 // 结构：日期行（橙色背景）→ 各班次员工行（工时数字）→ 班次间空行分隔
-function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: string; onMonthChange: (m: string) => void }) {
+function SchedulePage({ colors, month, onMonthChange, pageWidth }: { colors: any; month: string; onMonthChange: (m: string) => void; pageWidth: number }) {
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
   const router = useRouter();
   const { employees, ready: employeesReady } = useEmployeeStore();
@@ -3454,7 +3449,18 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
   const todayStr = now.toISOString().slice(0, 10);
   const currentMonth = month;
   const { resolveEmployeeDept } = useCustomDeptStore();
-  const schPageWidth = SCREEN_W;
+  // 与外层三页使用同一实时页宽；禁止读取模块加载时的静态 Dimensions 宽度。
+  const schPageWidth = pageWidth;
+  const schedulePagerRef = useRef<ScrollView>(null);
+  const [schedulePagerIndex, setSchedulePagerIndex] = useState(0);
+  const previousSchedulePageWidth = useRef(schPageWidth);
+  React.useEffect(() => {
+    if (previousSchedulePageWidth.current === schPageWidth) return;
+    previousSchedulePageWidth.current = schPageWidth;
+    requestAnimationFrame(() => {
+      schedulePagerRef.current?.scrollTo({ x: schedulePagerIndex * schPageWidth, animated: false });
+    });
+  }, [schPageWidth, schedulePagerIndex]);
   const [deptCategory, setDeptCategory] = useState<DeptCategory>("front");
   // 班次/时长切换
   const [viewMode, setViewMode] = useState<"session" | "hours">("hours");
@@ -4444,13 +4450,22 @@ function SchedulePage({ colors, month, onMonthChange }: { colors: any; month: st
       <Text style={{ fontSize: 9, color: colors.muted, paddingHorizontal: 12, paddingBottom: 2 }}>长按姓名快速填充 · 右滑查看考勤{editMode ? " · 编辑模式：点击格子选中" : ""}</Text>
 
       {/* 排班表主体 + 考勤卡片（左右滑动） */}
-      <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
+      <ScrollView
+        ref={schedulePagerRef}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={(event) => {
+          const offset = event.nativeEvent.contentOffset.x;
+          setSchedulePagerIndex(Math.max(0, Math.min(1, Math.round(offset / schPageWidth))));
+        }}
+        style={{ flex: 1 }}>
         {/* 左页：排班表 */}
-        <ScrollView style={{ width: schPageWidth, flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 8, gap: 10, paddingBottom: 120 }}>
+        <ScrollView testID="schedule-grid-page" style={{ width: schPageWidth, flexGrow: 0, flexShrink: 0 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 8, gap: 10, paddingBottom: 120 }}>
           {calendarWeeks.map((week, wi) => renderWeekBlock(week, wi))}
         </ScrollView>
         {/* 右页：考勤卡片 */}
-        <ScrollView style={{ width: schPageWidth, flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 12, gap: 10, paddingBottom: 120 }}>
+        <ScrollView testID="schedule-attendance-page" style={{ width: schPageWidth, flexGrow: 0, flexShrink: 0 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 12, gap: 10, paddingBottom: 120 }}>
           <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground, marginBottom: 4 }}>考勤概况（{monthLabel(currentMonth)}）</Text>
           <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 8 }}>← 左滑返回排班表</Text>
           {allDeptEmployees.map((emp) => {
@@ -5063,6 +5078,7 @@ export default function LaborScreen({ embedded = true }: { embedded?: boolean })
   const [currentMonth, setCurrentMonth] = useState(currentMonthStr());
   const [activePage, setActivePage] = useState<PageKey>((initialPage as PageKey) ?? "roster");
   const scrollRef = useRef<ScrollView>(null);
+  const previousPagerWidth = useRef(winW);
 
   // 支持外部跳转时自动定位到指定页（如从薪资总览跳转到排班表/考勤概况）
   React.useEffect(() => {
@@ -5075,6 +5091,16 @@ export default function LaborScreen({ embedded = true }: { embedded?: boolean })
       return () => clearTimeout(timer);
     }
   }, [initialPage, winW]);
+
+  // 浏览器缩放、网页分屏或旋转导致宽度变化时，保持当前页而不是遗留在旧页宽坐标。
+  React.useEffect(() => {
+    if (previousPagerWidth.current === winW) return;
+    previousPagerWidth.current = winW;
+    const pageIndex = PAGES.findIndex((p) => p.key === activePage);
+    requestAnimationFrame(() => {
+      scrollRef.current?.scrollTo({ x: Math.max(0, pageIndex) * winW, animated: false });
+    });
+  }, [winW, activePage]);
 
   const handleTabPress = (key: PageKey) => {
     tap();
@@ -5148,18 +5174,18 @@ export default function LaborScreen({ embedded = true }: { embedded?: boolean })
         style={{ flex: 1 }}
         contentContainerStyle={{ flexDirection: "row" }}>
         {/* 第一页：薪资统计（含人力总览卡片） */}
-        <View style={{ width: winW, flex: 1 }}>
+        <View testID="labor-roster-page" style={{ width: winW, flexGrow: 0, flexShrink: 0 }}>
           <EmployeeRosterPage month={currentMonth} colors={colors}
             headerComponent={<OverviewCard month={currentMonth} colors={colors} />} />
         </View>
 
         {/* 第二页：排班表（不显示人力总览卡片） */}
-        <View style={{ width: winW, flex: 1 }}>
-          <SchedulePage colors={colors} month={currentMonth} onMonthChange={setCurrentMonth} />
+        <View testID="labor-schedule-page" style={{ width: winW, flexGrow: 0, flexShrink: 0 }}>
+          <SchedulePage colors={colors} month={currentMonth} onMonthChange={setCurrentMonth} pageWidth={winW} />
         </View>
 
         {/* 第三页：薪资预支（不显示人力总览卡片） */}
-        <View style={{ width: winW, flex: 1 }}>
+        <View testID="labor-advance-page" style={{ width: winW, flexGrow: 0, flexShrink: 0 }}>
           <AdvancePage month={currentMonth} colors={colors} />
         </View>
       </ScrollView>
@@ -5217,7 +5243,7 @@ const SCHEM = StyleSheet.create({
 const EXL_NAME_W = 56;  // 姓名列宽
 
 const EXL = StyleSheet.create({
-  controlBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, paddingVertical: 8 },
+  controlBar: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 8, paddingHorizontal: 12, paddingVertical: 8 },
   segContainer: { flexDirection: "row", borderRadius: 8, overflow: "hidden", padding: 2 },
   segItem: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6 },
   gearBtn: { width: 32, height: 32, borderRadius: 8, alignItems: "center", justifyContent: "center" },

@@ -135,6 +135,48 @@ try {
     report.push({ width, normalMode: initialState, editMode: editState });
   }
 
+  // 桌面网页缩放/分屏等价回归：连续改变当前页面宽度后，外层三页与排班内两页必须同步为同一页宽，
+  // 且保持“排班表”当前页，不能露出薪资预支页面或遗留旧页宽坐标。
+  await call("Emulation.setDeviceMetricsOverride", { width: 1024, height: 900, deviceScaleFactor: 1, mobile: false });
+  await call("Page.navigate", { url: route });
+  await sleep(900);
+  const desktopScheduleClicked = await call("Runtime.evaluate", { expression: clickTextExpression("排班表"), returnByValue: true });
+  if (!desktopScheduleClicked.result.value) throw new Error("桌面缩放回归未找到排班表页签");
+  await sleep(250);
+  const desktopScaleSteps = [];
+  for (const width of [1024, 1280, 1440]) {
+    await call("Emulation.setDeviceMetricsOverride", { width, height: 900, deviceScaleFactor: 1, mobile: false });
+    await sleep(350);
+    const desktopLayout = await call("Runtime.evaluate", { expression: `(() => {
+      const byId = (id) => document.querySelector('[data-testid="' + id + '"]');
+      const rect = (id) => byId(id)?.getBoundingClientRect();
+      const page = rect('labor-schedule-page');
+      const grid = rect('schedule-grid-page');
+      const attendance = rect('schedule-attendance-page');
+      return {
+        rootClientWidth: document.documentElement.clientWidth,
+        rootScrollWidth: document.documentElement.scrollWidth,
+        bodyScrollWidth: document.body.scrollWidth,
+        hasPages: Boolean(page && grid && attendance),
+        schedulePageLeft: page?.left ?? null,
+        schedulePageWidth: page?.width ?? null,
+        gridPageWidth: grid?.width ?? null,
+        attendancePageWidth: attendance?.width ?? null,
+      };
+    })()`, returnByValue: true });
+    const state = desktopLayout.result.value;
+    if (!state.hasPages) throw new Error(`桌面 ${width}px 未渲染排班分页测试节点：${JSON.stringify(state)}`);
+    if (state.rootScrollWidth > state.rootClientWidth || state.bodyScrollWidth > state.rootClientWidth) {
+      throw new Error(`桌面 ${width}px 排班页出现根级横向溢出：${JSON.stringify(state)}`);
+    }
+    for (const [name, value] of [["外层排班页", state.schedulePageWidth], ["内层排班页", state.gridPageWidth], ["内层考勤页", state.attendancePageWidth]]) {
+      if (Math.abs(value - state.rootClientWidth) > 1) throw new Error(`桌面 ${width}px ${name}宽度未随当前页面同步：${JSON.stringify(state)}`);
+    }
+    if (Math.abs(state.schedulePageLeft) > 1) throw new Error(`桌面 ${width}px 缩放后未保持排班表当前页：${JSON.stringify(state)}`);
+    desktopScaleSteps.push({ width, ...state });
+  }
+  report.push({ reportPage: "排班表桌面缩放", viewports: desktopScaleSteps });
+
   // 月报唯一归档入口：写入最小可用夹具后重新导航，验证 DRAFT / FROZEN / ADJUSTING 三态。
   await call("Emulation.setDeviceMetricsOverride", { width: 375, height: 844, deviceScaleFactor: 3, mobile: true });
   const seed = await call("Runtime.evaluate", { expression: `(() => {
