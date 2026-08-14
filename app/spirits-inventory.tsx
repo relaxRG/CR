@@ -1824,10 +1824,13 @@ function SupplierDetailScreen({
         )}
       </ScrollView>
 
-      {/* 第二行操作栏：多选操作 */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}
-        style={{ flexGrow: 0, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}
-        contentContainerStyle={{ gap: 8, paddingHorizontal: 12, paddingVertical: 6, alignItems: "center" }}>
+      {/* 批量操作仅在用户主动进入多选模式后显示。 */}
+      {selectMode && (
+        <View style={{ backgroundColor: "#FEF2F2", borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "#FECACA" }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}
+            style={{ flexGrow: 0 }}
+            contentContainerStyle={{ gap: 8, paddingHorizontal: 12, paddingVertical: 6, alignItems: "center" }}>
+            <Text style={{ fontSize: 12, color: "#EF4444", fontWeight: "700" }}>已选 {selectedIds.size}/{supPurchases.length}</Text>
         <TouchableOpacity onPress={() => {
           tap();
           const allIds = new Set(supPurchases.map((p) => p.id));
@@ -1836,9 +1839,15 @@ function SupplierDetailScreen({
         }} style={[S.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Text style={{ fontSize: 12, color: colors.muted, fontWeight: "600" }}>全选</Text>
         </TouchableOpacity>
+        {selectedIds.size > 0 && (
+          <TouchableOpacity onPress={() => { tap(); setSelectedIds(new Set()); }}
+            style={[S.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={{ fontSize: 12, color: colors.muted, fontWeight: "600" }}>清空选择</Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity onPress={() => { tap(); setSelectedIds(new Set()); setSelectMode(false); }}
-          style={[S.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={{ fontSize: 12, color: colors.muted, fontWeight: "600" }}>取消全选</Text>
+          style={[S.actionBtn, { backgroundColor: colors.surface, borderColor: "#EF4444" }]}>
+          <Text style={{ fontSize: 12, color: "#EF4444", fontWeight: "700" }}>取消多选</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => {
           tap();
@@ -1922,7 +1931,9 @@ function SupplierDetailScreen({
           <IconSymbol name="trash" size={13} color="#EF4444" />
           <Text style={{ fontSize: 12, color: "#EF4444", fontWeight: "600" }}>删除{selectedIds.size > 0 ? `(${selectedIds.size})` : ""}</Text>
         </TouchableOpacity>
-      </ScrollView>
+          </ScrollView>
+        </View>
+      )}
 
       {/* 供应商信息头 */}
       <View style={{ paddingHorizontal: 16, paddingVertical: 8, backgroundColor: colors.surface, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
@@ -3210,6 +3221,7 @@ function ImportPreviewModal({
   // 多选模式
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIdxs, setSelectedIdxs] = useState<Set<number>>(new Set());
+  const insets = useSafeAreaInsets();
 
   // 每次打开重置
   React.useEffect(() => {
@@ -3302,7 +3314,7 @@ function ImportPreviewModal({
     <Modal visible={visible} animationType="slide" transparent={false}>
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         {/* 头部 */}
-        <View style={[S.navbar, { borderBottomColor: colors.border, paddingTop: 52 }]}>
+        <View style={[S.navbar, { borderBottomColor: colors.border, paddingTop: Math.max(insets.top, 16) + 12 }]}>
           <TouchableOpacity onPress={onClose}>
             <Text style={{ fontSize: 15, color: "#EF4444", fontWeight: "600" }}>取消</Text>
           </TouchableOpacity>
@@ -3311,7 +3323,7 @@ function ImportPreviewModal({
               {source === "pdf" ? "PDF 解析预览" : "Excel 导入预览"}
             </Text>
             <Text style={{ fontSize: 11, color: colors.muted }}>
-              {rows.length} 条记录 · 合计 ¥{formatMoney(totalAmt)} · {supplier}
+              {rows.length} 条记录 · 合计 ¥{formatMoney(totalAmt)}
             </Text>
           </View>
           <TouchableOpacity onPress={() => { if (rows.length === 0) { Alert.alert("提示", "没有可导入的记录"); return; } onConfirm(rows); }}>
@@ -3341,7 +3353,7 @@ function ImportPreviewModal({
             <TouchableOpacity onPress={() => { setShowBatchDate(!showBatchDate); setShowBatchSupplier(false); }}
               style={[S.actionBtn, { backgroundColor: showBatchDate ? "#EF444420" : colors.background, borderColor: showBatchDate ? "#EF4444" : colors.border }]}>
               <IconSymbol name="calendar" size={13} color={showBatchDate ? "#EF4444" : colors.muted} />
-              <Text style={{ fontSize: 12, color: showBatchDate ? "#EF4444" : colors.muted, fontWeight: "600" }}>批量改日期</Text>
+              <Text style={{ fontSize: 12, color: showBatchDate ? "#EF4444" : colors.muted, fontWeight: "600" }}>改日期</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => { setSelectMode(true); setShowBatchDate(false); setShowBatchSupplier(false); }}
               style={[S.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -3496,7 +3508,7 @@ function ImportPreviewModal({
         )}
 
         {/* 记录列表 */}
-        <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+        <ScrollView contentContainerStyle={{ paddingBottom: 112 + Math.max(insets.bottom, 16) }}>
           {rows.length === 0 && (
             <View style={{ alignItems: "center", padding: 40 }}>
               <Text style={{ color: colors.muted }}>所有记录已删除</Text>
@@ -3528,10 +3540,10 @@ function ImportPreviewModal({
                 {/* 主内容 */}
                 <View style={{ flex: 1, padding: 12 }}>
                   <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
-                    <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground, flex: 1, marginRight: 8 }} numberOfLines={2}>
+                    <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground, flex: 1, minWidth: 0, marginRight: 8 }} numberOfLines={2}>
                       {row.rawName}
                     </Text>
-                    <Text style={{ fontSize: 13, fontWeight: "700", color: "#EF4444" }}>¥{formatMoney(row.amount)}</Text>
+                    <Text style={{ fontSize: 13, fontWeight: "700", color: "#EF4444", flexShrink: 0 }}>¥{formatMoney(row.amount)}</Text>
                   </View>
                   <View style={{ flexDirection: "row", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
                     <Text style={{ fontSize: 11, color: colors.muted }}>{row.date}</Text>
@@ -3550,7 +3562,7 @@ function ImportPreviewModal({
                       { text: "取消", style: "cancel" },
                       { text: "删除", style: "destructive", onPress: () => deleteRow(idx) },
                     ]);
-                  }} style={{ padding: 12 }}>
+                  }} style={{ minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" }}>
                     <IconSymbol name="trash" size={16} color="#EF4444" />
                   </TouchableOpacity>
                 )}
@@ -3561,7 +3573,7 @@ function ImportPreviewModal({
 
         {/* 底部确认栏 */}
         {rows.length > 0 && (
-          <View style={{ padding: 16, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, backgroundColor: colors.background }}>
+          <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 16 + Math.max(insets.bottom, 0), borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, backgroundColor: colors.background }}>
             <TouchableOpacity onPress={() => onConfirm(rows)}
               style={{ padding: 16, backgroundColor: "#EF4444", borderRadius: 14, alignItems: "center" }}>
               <Text style={{ fontSize: 16, color: "#fff", fontWeight: "700" }}>
