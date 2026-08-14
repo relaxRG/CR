@@ -147,10 +147,7 @@ export function FoodIngredientProvider({ children }: { children: React.ReactNode
             const parsed = JSON.parse(raw);
             dispatch({
               type: "LOAD",
-              payload: {
-                ingredients: parsed.ingredients ?? [],
-                priceHistory: parsed.priceHistory ?? {},
-              },
+              payload: sanitizeFoodIngredientState(parsed),
             });
           } catch {}
         }
