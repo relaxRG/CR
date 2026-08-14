@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { SupplierPurchaseColumnMenu } from "@/components/spirits/supplier-purchase-column-menu";
 import { ScreenContainer } from "@/components/screen-container";
 import {
   useSpiritsInventoryStore, getCurrentMonth, SpiritGroupDef, fuzzyMatchScore,
@@ -37,6 +38,12 @@ import { normalizeImportDate } from "@/lib/import/date-utils";
 import {   SpiritMonthlySnapshot, SpiritInventoryItem, SpiritPriceChange, SpiritPurchaseOrderItem } from "@/lib/spirits/types";
 import { normalizeLLMRows } from "@/lib/spirits/pdf-import";
 import { exportToExcel, exportToPdf, ExportData } from "@/lib/spirits/export";
+import {
+  applySupplierPurchaseTableView,
+  DEFAULT_SUPPLIER_PURCHASE_TABLE_VIEW,
+  hasSupplierPurchaseTableFilters,
+  type SupplierPurchaseSortKey,
+} from "@/lib/spirits/purchase-table-view";
 import { usePettyCashStore } from "@/lib/store/petty-store";
 import { getApiBaseUrl } from "@/constants/oauth";
 import * as Auth from "@/lib/_core/auth";
@@ -1670,6 +1677,29 @@ function SupplierDetailScreen({
   const [batchDateInput, setBatchDateInput] = useState("");
   // 仅控制供应商进货表的显示语言，不参与Excel导入、账务计算或同步。
   const [purchaseNameLanguage, setPurchaseNameLanguage] = usePersistedState<"zh" | "en">("spirits.purchase.name-language.v1", "zh");
+  const [purchaseTableView, setPurchaseTableView] = useState(DEFAULT_SUPPLIER_PURCHASE_TABLE_VIEW);
+  const [activePurchaseColumn, setActivePurchaseColumn] = useState<SupplierPurchaseSortKey | null>(null);
+  const visibleSupplierPurchases = useMemo(() => applySupplierPurchaseTableView(
+    supPurchases.map((purchase) => {
+      const item = items.find((candidate) => candidate.id === purchase.itemId);
+      const preferred = purchaseNameLanguage === "zh" ? item?.name : item?.nameEn;
+      const fallback = purchaseNameLanguage === "zh" ? item?.nameEn : item?.name;
+      return {
+        ...purchase,
+        displayName: preferred?.trim() || fallback?.trim() || purchase.rawName,
+        displayGroup: purchase.group || detectPurchaseGroup(purchase.rawName) || (item ? getItemGroup(item) : ""),
+      };
+    }),
+    purchaseTableView,
+  ), [supPurchases, items, purchaseNameLanguage, purchaseTableView, groups]);
+  const visibleSupplierPurchaseTotal = visibleSupplierPurchases.reduce((sum, purchase) => sum + purchase.amount, 0);
+  const purchaseTableHasAdjustments = Boolean(purchaseTableView.sort) || hasSupplierPurchaseTableFilters(purchaseTableView.filters);
+  const purchaseTableSummary = [
+    purchaseTableView.sort ? `${({ name: "商品名称", quantity: "数量", unitPrice: "单价", amount: "总价", group: "集团" } as const)[purchaseTableView.sort.key]}${purchaseTableView.sort.direction === "asc" ? "升序" : "降序"}` : "",
+    purchaseTableView.filters.nameQuery ? `名称含「${purchaseTableView.filters.nameQuery}」` : "",
+    purchaseTableView.filters.groups.length ? `集团 ${purchaseTableView.filters.groups.length} 个` : "",
+    purchaseTableView.filters.onlyUnassignedGroup ? "仅待填集团" : "",
+  ].filter(Boolean).join(" · ");
 
   // 备用金导入
   const pettyRecords = useMemo(() => {
@@ -1943,15 +1973,23 @@ function SupplierDetailScreen({
         <Text style={{ fontSize: 12, color: colors.muted }}>
           往来单位：{supplier} · 本月合计 ¥{formatMoney(totalAmt)} · {supPurchases.length} 笔
         </Text>
+        {purchaseTableHasAdjustments && (
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 6, gap: 8 }}>
+            <Text style={{ fontSize: 11, color: colors.primary, flex: 1 }} numberOfLines={1}>已调整：{purchaseTableSummary || "范围筛选"} · 显示 {visibleSupplierPurchases.length} 笔</Text>
+            <TouchableOpacity onPress={() => setPurchaseTableView(DEFAULT_SUPPLIER_PURCHASE_TABLE_VIEW)} style={{ minHeight: 30, justifyContent: "center" }}>
+              <Text style={{ fontSize: 11, color: "#EF4444", fontWeight: "700" }}>清除全部</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       {/* 进货流水表格 */}
       <ScrollView contentContainerStyle={{ paddingBottom: 40 + insets.bottom }}>
-        {supPurchases.length === 0 ? (
+        {visibleSupplierPurchases.length === 0 ? (
           <View style={{ alignItems: "center", padding: 40 }}>
             <Text style={{ fontSize: 48 }}>📦</Text>
-            <Text style={{ fontSize: 16, fontWeight: "600", color: colors.foreground, marginTop: 12 }}>本月暂无进货记录</Text>
-            <Text style={{ fontSize: 13, color: colors.muted, marginTop: 6 }}>手动录入或导入 Excel 进货单</Text>
+            <Text style={{ fontSize: 16, fontWeight: "600", color: colors.foreground, marginTop: 12 }}>{supPurchases.length === 0 ? "本月暂无进货记录" : "没有符合当前筛选的进货记录"}</Text>
+            <Text style={{ fontSize: 13, color: colors.muted, marginTop: 6 }}>{supPurchases.length === 0 ? "手动录入或导入 Excel 进货单" : "可使用上方“清除全部”恢复完整列表"}</Text>
           </View>
         ) : (
           <ScrollView horizontal showsHorizontalScrollIndicator style={{ flexGrow: 0 }}>
@@ -1964,25 +2002,29 @@ function SupplierDetailScreen({
                 <Text style={[S.thCell, { width: 90 }]}>日期</Text>
                 <View style={{ width: 160, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 }}>
                   <Text style={S.thCell}>商品名称</Text>
-                  <TouchableOpacity
-                    testID="spirits-purchase-name-language-toggle"
-                    accessibilityRole="button"
-                    accessibilityLabel="切换商品名称中英文显示"
-                    onPress={() => setPurchaseNameLanguage((language) => language === "zh" ? "en" : "zh")}
-                    style={{ minWidth: 34, minHeight: 28, paddingHorizontal: 5, borderRadius: 7, borderWidth: 1, borderColor: "#FCA5A5", alignItems: "center", justifyContent: "center" }}
-                  >
-                    <Text style={{ fontSize: 10, fontWeight: "800", color: "#fff" }}>{purchaseNameLanguage === "zh" ? "中" : "EN"}</Text>
+                  <TouchableOpacity testID="spirits-purchase-column-name" accessibilityRole="button" accessibilityLabel="调整商品名称显示、排序和筛选"
+                    onPress={() => setActivePurchaseColumn("name")}
+                    style={{ minWidth: 30, minHeight: 28, alignItems: "center", justifyContent: "center" }}>
+                    <Text style={{ fontSize: 14, fontWeight: "800", color: purchaseTableView.sort?.key === "name" || purchaseTableView.filters.nameQuery ? "#FDE68A" : "#fff" }}>⌄</Text>
                   </TouchableOpacity>
                 </View>
-                <Text style={[S.thCell, { width: 50 }]}>数量</Text>
+                <View style={{ width: 50, flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
+                  <Text style={S.thCell}>数量</Text><TouchableOpacity testID="spirits-purchase-column-quantity" onPress={() => setActivePurchaseColumn("quantity")} style={{ minWidth: 24, minHeight: 28, alignItems: "center", justifyContent: "center" }}><Text style={{ color: purchaseTableView.sort?.key === "quantity" || purchaseTableView.filters.quantityMin || purchaseTableView.filters.quantityMax ? "#FDE68A" : "#fff" }}>⌄</Text></TouchableOpacity>
+                </View>
                 <Text style={[S.thCell, { width: 56 }]}>规格</Text>
-                <Text style={[S.thCell, { width: 90 }]}>单价</Text>
-                <Text style={[S.thCell, { width: 90 }]}>应收增加</Text>
-                <Text style={[S.thCell, { width: 80 }]}>集团</Text>
+                <View style={{ width: 90, flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
+                  <Text style={S.thCell}>单价</Text><TouchableOpacity testID="spirits-purchase-column-unit-price" onPress={() => setActivePurchaseColumn("unitPrice")} style={{ minWidth: 24, minHeight: 28, alignItems: "center", justifyContent: "center" }}><Text style={{ color: purchaseTableView.sort?.key === "unitPrice" || purchaseTableView.filters.unitPriceMin || purchaseTableView.filters.unitPriceMax ? "#FDE68A" : "#fff" }}>⌄</Text></TouchableOpacity>
+                </View>
+                <View style={{ width: 90, flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
+                  <Text style={S.thCell}>总价</Text><TouchableOpacity testID="spirits-purchase-column-amount" onPress={() => setActivePurchaseColumn("amount")} style={{ minWidth: 24, minHeight: 28, alignItems: "center", justifyContent: "center" }}><Text style={{ color: purchaseTableView.sort?.key === "amount" || purchaseTableView.filters.amountMin || purchaseTableView.filters.amountMax ? "#FDE68A" : "#fff" }}>⌄</Text></TouchableOpacity>
+                </View>
+                <View style={{ width: 80, flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
+                  <Text style={S.thCell}>集团</Text><TouchableOpacity testID="spirits-purchase-column-group" onPress={() => setActivePurchaseColumn("group")} style={{ minWidth: 24, minHeight: 28, alignItems: "center", justifyContent: "center" }}><Text style={{ color: purchaseTableView.sort?.key === "group" || purchaseTableView.filters.groups.length || purchaseTableView.filters.onlyUnassignedGroup ? "#FDE68A" : "#fff" }}>⌄</Text></TouchableOpacity>
+                </View>
               </View>
 
               {/* 数据行 */}
-              {supPurchases.map((p, idx) => {
+              {visibleSupplierPurchases.map((p, idx) => {
                 const item = items.find((i) => i.id === p.itemId);
                 const refPrice = item ? getRefPrice(item.id, month) : 0;
                 const priceDiff = refPrice > 0 ? p.unitPrice - refPrice : 0;
@@ -2094,12 +2136,7 @@ function SupplierDetailScreen({
                       }}>
                       <View style={{ flexDirection: "row", alignItems: "center", gap: 4, height: 34 }}>
                         <Text style={{ fontSize: 11, lineHeight: 16, color: colors.foreground, flex: 1 }} numberOfLines={2}>
-                          {(() => {
-                            if (!item) return p.rawName;
-                            const preferred = purchaseNameLanguage === "zh" ? item.name : item.nameEn;
-                            const fallback = purchaseNameLanguage === "zh" ? item.nameEn : item.name;
-                            return preferred?.trim() || fallback?.trim() || p.rawName;
-                          })()}
+                          {p.displayName}
                         </Text>
                         {!p.itemId && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: "#F59E0B" }} />}
                       </View>
@@ -2214,7 +2251,7 @@ function SupplierDetailScreen({
                 <Text style={[S.tdCell, { width: 56 }]} />
                 <Text style={[S.tdCell, { width: 90 }]} />
                 <Text style={[S.tdCell, { width: 90, textAlign: "right", fontWeight: "700", color: "#991B1B", fontSize: 12 }]}>
-                  ¥{formatMoney(totalAmt)}
+                  ¥{formatMoney(visibleSupplierPurchaseTotal)}
                 </Text>
                 <Text style={[S.tdCell, { width: 80 }]} />
 
@@ -2723,6 +2760,17 @@ function SupplierDetailScreen({
         onSelect={(name) => { if (catPickerCallback2) catPickerCallback2(name); }}
         onClose={() => { setShowCatPicker2(false); setCatPickerCallback2(null); }}
         colors={colors}
+      />
+      <SupplierPurchaseColumnMenu
+        visible={activePurchaseColumn !== null}
+        column={activePurchaseColumn}
+        colors={colors}
+        groups={groups.map((group) => group.name)}
+        nameLanguage={purchaseNameLanguage}
+        onNameLanguageChange={setPurchaseNameLanguage}
+        view={purchaseTableView}
+        onViewChange={setPurchaseTableView}
+        onClose={() => setActivePurchaseColumn(null)}
       />
     </View>
   );
