@@ -25,7 +25,7 @@ describe("标签与数量徽标 Design Token", () => {
     expect(formatCompactCount(Number.NaN)).toBe("0");
   });
 
-  it("员工部门筛选、快捷筛选、变更标签和库存分类卡均保留对应窄屏护栏", () => {
+  it("员工部门筛选、快捷筛选、变更标签和库存分类分段导航均保留对应窄屏护栏", () => {
     const employees = read("app/labor-employees.tsx");
     const quickFilters = read("components/quick-filter-chips.tsx");
     const labChanges = read("components/lab-change-chips.tsx");
@@ -38,7 +38,7 @@ describe("标签与数量徽标 Design Token", () => {
     expect(quickFilters).toContain('subChip: {\n    flexDirection: "row",\n    alignItems: "center",\n    gap: 3,\n    flexShrink: 0,');
     expect(labChanges).toContain('CHIP_BADGE_LAYOUT.wrapChip');
     expect(labChanges).toContain('numberOfLines={2}');
-    expect(inventory).toContain('flex: 1, minWidth: 0, paddingLeft: 12');
-    expect(inventory).toContain('flexShrink: 0, minHeight: 20');
+    expect(inventory).toContain('horizontal\n        showsHorizontalScrollIndicator={false}\n        testID={mode === "shop" ? "shop-segmented-tabs" : "inventory-segmented-tabs"}');
+    expect(inventory).toContain('segment: { minHeight: 36');
   });
 });

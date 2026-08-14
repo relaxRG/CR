@@ -134,7 +134,12 @@ function LossEntryModal({ visible, store, onClose }: {
 }
 
 // ─── 主页面 ───────────────────────────────────────────────────────────────────
-export default function GlasswareInventoryScreen() {
+export interface GlasswareInventoryScreenProps {
+  month?: string;
+  embedded?: boolean;
+}
+
+export default function GlasswareInventoryScreen({ month, embedded = false }: GlasswareInventoryScreenProps) {
   const store = useGlasswareInventoryStore();
   const [showLoss, setShowLoss] = useState(false);
 
@@ -154,6 +159,8 @@ export default function GlasswareInventoryScreen() {
         getGroupLabel={getGroupLabel}
         parseExcel={parseGlasswareExcel}
         excelFormatHint={GLASSWARE_EXCEL_HINT}
+        month={month}
+        embedded={embedded}
         extraTabs={[{ key: "loss", label: "损耗记录" }]}
         renderExtraTabContent={(tab) => {
           if (tab !== "loss") return null;

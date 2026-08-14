@@ -69,8 +69,6 @@ export default function FoodIngredientDetailScreen() {
     ]);
   };
 
-  const isLow = item.stock <= item.alertThreshold && item.alertThreshold > 0;
-
   return (
     <ScreenContainer>
       <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8 }}>
@@ -102,20 +100,14 @@ export default function FoodIngredientDetailScreen() {
         </View>
 
         {/* 库存 */}
-        <View style={[styles.card, { backgroundColor: isLow ? colors.warning + "11" : colors.surface, borderColor: isLow ? colors.warning : colors.border }]}>
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <View style={{ flexDirection: "row", justifyContent: "space-around", marginBottom: 12 }}>
             <View style={{ alignItems: "center" }}>
               <Text style={[styles.priceLabel, { color: colors.muted }]}>当前库存</Text>
-              <Text style={[styles.priceValue, { color: isLow ? colors.warning : colors.foreground }]}>
+              <Text style={[styles.priceValue, { color: colors.foreground }]}>
                 {item.stock} {item.unit || ""}
               </Text>
             </View>
-            {item.alertThreshold > 0 && (
-              <View style={{ alignItems: "center" }}>
-                <Text style={[styles.priceLabel, { color: colors.muted }]}>预警线</Text>
-                <Text style={[styles.priceValue, { color: colors.muted }]}>{item.alertThreshold}</Text>
-              </View>
-            )}
             {item.costPrice != null && (
               <View style={{ alignItems: "center" }}>
                 <Text style={[styles.priceLabel, { color: colors.muted }]}>采购价</Text>
@@ -123,7 +115,6 @@ export default function FoodIngredientDetailScreen() {
               </View>
             )}
           </View>
-          {isLow && <Text style={{ color: colors.warning, fontSize: 13, textAlign: "center", marginBottom: 8 }}>⚠️ 库存低于预警线，请及时补货</Text>}
           <View style={{ flexDirection: "row", gap: 12 }}>
             <Pressable onPress={() => adjustStock(1)}
               style={[styles.stockBtn, { backgroundColor: colors.success + "22", flex: 1 }]}>

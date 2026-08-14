@@ -51,7 +51,6 @@ function MenuItemCard({ item, onPress }: { item: FoodItem; onPress: () => void }
 
 function IngredientCard({ item, onPress }: { item: FoodIngredient; onPress: () => void }) {
   const colors = useColors();
-  const lowStock = item.stock <= item.alertThreshold;
   return (
     <Pressable
       onPress={onPress}
@@ -64,14 +63,9 @@ function IngredientCard({ item, onPress }: { item: FoodIngredient; onPress: () =
         </Text>
       </View>
       <View style={{ alignItems: "flex-end", gap: 4 }}>
-        <Text style={[styles.cardPrice, { color: lowStock ? colors.error : colors.foreground }]}>
+        <Text style={[styles.cardPrice, { color: colors.foreground }]}>
           {item.stock} {item.unit}
         </Text>
-        {lowStock && (
-          <View style={[styles.badge, { backgroundColor: colors.error + "22" }]}>
-            <Text style={[styles.badgeText, { color: colors.error }]}>库存不足</Text>
-          </View>
-        )}
       </View>
     </Pressable>
   );

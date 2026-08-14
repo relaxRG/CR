@@ -48,7 +48,6 @@ export async function parseBeerInventoryExcel(base64: string): Promise<{
         spec: String(r[2] ?? "").trim(),
         unit: "瓶",
         currentStock: Number(r[4]) || 0,
-        alertThreshold: 12,
         latestCostPrice: Number(r[7]) || 0,
         supplier: String(r[9] ?? "").trim(),
         notes: "",

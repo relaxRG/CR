@@ -52,7 +52,6 @@ export function ItemEditModal({
   const [spec, setSpec] = useState("");
   const [unit, setUnit] = useState(defaultUnit);
   const [currentStock, setCurrentStock] = useState("0");
-  const [alertThreshold, setAlertThreshold] = useState("5");
   const [latestCostPrice, setLatestCostPrice] = useState("");
   const [supplier, setSupplier] = useState("");
   const [notes, setNotes] = useState("");
@@ -67,7 +66,6 @@ export function ItemEditModal({
       setSpec(item.spec);
       setUnit(item.unit);
       setCurrentStock(String(item.currentStock));
-      setAlertThreshold(String(item.alertThreshold));
       setLatestCostPrice(String(item.latestCostPrice || ""));
       setSupplier(item.supplier);
       setNotes(item.notes);
@@ -80,7 +78,7 @@ export function ItemEditModal({
     } else {
       setName(""); setNameEn(""); setCategory(categoryOptions?.[0]?.value ?? "other");
       setSpec(""); setUnit(defaultUnit); setCurrentStock("0");
-      setAlertThreshold("5"); setLatestCostPrice(""); setSupplier(""); setNotes("");
+      setLatestCostPrice(""); setSupplier(""); setNotes("");
       const extraInit: Record<string, string> = {};
       extraFields.forEach((f) => { extraInit[f.key] = ""; });
       setExtra(extraInit);
@@ -98,7 +96,6 @@ export function ItemEditModal({
       spec: spec.trim(),
       unit: unit.trim() || defaultUnit,
       currentStock: Number(currentStock) || 0,
-      alertThreshold: Number(alertThreshold) || 0,
       latestCostPrice: Number(latestCostPrice) || 0,
       supplier: supplier.trim(),
       notes: notes.trim(),
@@ -126,7 +123,6 @@ export function ItemEditModal({
               { label: "规格", value: spec, onChange: setSpec, placeholder: "如 330ml、500g/袋" },
               { label: "单位", value: unit, onChange: setUnit, placeholder: defaultUnit },
               { label: "当前库存", value: currentStock, onChange: setCurrentStock, placeholder: "0", kb: "decimal-pad" as const },
-              { label: "预警线", value: alertThreshold, onChange: setAlertThreshold, placeholder: "5", kb: "decimal-pad" as const },
               { label: "进货价（元/单位）", value: latestCostPrice, onChange: setLatestCostPrice, placeholder: "0.00", kb: "decimal-pad" as const },
               { label: "供应商", value: supplier, onChange: setSupplier, placeholder: "可选" },
             ].map((f, i) => (

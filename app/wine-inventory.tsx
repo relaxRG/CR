@@ -422,7 +422,12 @@ function PurchaseEntrySheet({
 }
 
 // ─── 主页面 ───────────────────────────────────────────────────────────────────
-export default function WineInventoryScreen() {
+export interface WineInventoryScreenProps {
+  month?: string;
+  embedded?: boolean;
+}
+
+export default function WineInventoryScreen({ month, embedded = false }: WineInventoryScreenProps) {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -436,7 +441,7 @@ export default function WineInventoryScreen() {
   const [showPurchaseSheet, setShowPurchaseSheet] = useState(false);
   const [activeSupplierForEntry, setActiveSupplierForEntry] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth());
+  const selectedMonth = month ?? getCurrentMonth();
 
   // ★ 当月进货多选状态
   const [selectMode, setSelectMode] = useState(false);
@@ -611,8 +616,8 @@ export default function WineInventoryScreen() {
 
   return (
     <ScreenContainer>
-      {/* 导航栏 */}
-      <View style={[S.navbar, { borderBottomColor: colors.border }]}>
+      {/* 独立路由才保留返回导航；工作台已提供分类与月份层级。 */}
+      {!embedded && <View style={[S.navbar, { borderBottomColor: colors.border }]}>
         <Pressable onPress={() => router.back()} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
           <IconSymbol name="chevron.left" size={22} color={colors.primary} />
         </Pressable>
@@ -625,7 +630,7 @@ export default function WineInventoryScreen() {
             <IconSymbol name="square.and.arrow.down.fill" size={20} color={colors.primary} />
           </Pressable>
         </View>
-      </View>
+      </View>}
 
       {/* Tab 切换 */}
       <View style={[S.tabBar, { backgroundColor: colors.border + "33" }]}>
@@ -737,27 +742,6 @@ export default function WineInventoryScreen() {
       {/* ── 当月进货视图（全面升级）── */}
       {viewTab === "purchase" && (
         <>
-          {/* 月份选择 */}
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, gap: 16 }}>
-            <TouchableOpacity onPress={() => {
-              const [y, m] = selectedMonth.split("-").map(Number);
-              const prev = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
-              setSelectedMonth(prev);
-            }}>
-              <IconSymbol name="chevron.left" size={18} color={colors.foreground} />
-            </TouchableOpacity>
-            <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground }}>
-              {selectedMonth.slice(0, 4)}年{Number(selectedMonth.slice(5, 7))}月
-            </Text>
-            <TouchableOpacity onPress={() => {
-              const [y, m] = selectedMonth.split("-").map(Number);
-              const next = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`;
-              if (next <= getCurrentMonth()) setSelectedMonth(next);
-            }}>
-              <IconSymbol name="chevron.right" size={18} color={selectedMonth >= getCurrentMonth() ? colors.border : colors.foreground} />
-            </TouchableOpacity>
-          </View>
-
           {/* ★ 酒商筛选栏 */}
           {purchaseSuppliers.length > 0 && (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }} contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 8, gap: 8, alignItems: "center" }}>

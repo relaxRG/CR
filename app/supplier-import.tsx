@@ -313,7 +313,6 @@ export default function SupplierImportScreen() {
           unit: rs.row.unit,
           costPrice: rs.row.unitPrice,
           stock: 0,
-          alertThreshold: 0,
           supplier: preview.supplierName,
           notes: enName ? `英文名：${enName}` : "",
         };

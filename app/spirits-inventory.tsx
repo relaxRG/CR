@@ -80,7 +80,11 @@ const TABS: { key: Tab; label: string }[] = [
 ];
 
 // ─── 主页面 ───────────────────────────────────────────────────────────────────
-export default function SpiritsInventoryScreen() {
+export interface SpiritsInventoryScreenProps {
+  month?: string;
+}
+
+export default function SpiritsInventoryScreen({ month }: SpiritsInventoryScreenProps) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { width: viewportWidth } = useWindowDimensions();
@@ -99,53 +103,19 @@ export default function SpiritsInventoryScreen() {
     setMatchMemory, matchPettyToItem,
     selfBuyConfig, updateSelfBuyConfig,
     getMonthPurchases, getMonthLedger, getItemLedger,
-    getAvailableMonths, getPurchaseSummaryByCategory, getPurchaseSummaryBySupplier,
+    getPurchaseSummaryByCategory, getPurchaseSummaryBySupplier,
     closeMonth, syncLedgerFromPurchases,
-    setActualClosing, batchSetActualClosing, checkPrevMonthClosed,
+    setActualClosing, batchSetActualClosing,
   } = store;
   const pettyStore = usePettyCashStore();
 
   const [tab, setTab] = useState<Tab>("summary");
-  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth());
-  const [showMonthPicker, setShowMonthPicker] = useState(false);
+  const selectedMonth = month ?? getCurrentMonth();
   const [activeSupplier, setActiveSupplier] = useState<string | null>(null);
   // ★ 月末盘点状态
   const [showStocktakeModal, setShowStocktakeModal] = useState(false);
   const [stocktakeValues, setStocktakeValues] = useState<Record<string, string>>({});
 
-  // ★ 月份切换时自动检查上月月结
-  const handleMonthChange = (newMonth: string) => {
-    const { needsClose, prevMonth } = checkPrevMonthClosed(newMonth);
-    if (needsClose) {
-      Alert.alert(
-        "月结提示",
-        `${prevMonth.slice(0, 4)}年${Number(prevMonth.slice(5, 7))}月尚未月结，建议先完成月结再切换。是否立即月结？`,
-        [
-          { text: "稍后再说", style: "cancel", onPress: () => setSelectedMonth(newMonth) },
-          { text: "立即月结", onPress: () => { closeMonth(prevMonth); setSelectedMonth(newMonth); Alert.alert("月结完成", `${prevMonth} 期末库存已带入下月期初`); } },
-        ]
-      );
-    } else {
-      setSelectedMonth(newMonth);
-    }
-  };
-
-  // 月份列表：有数据的历史月份 + 当前月往前12个月，去重后最多显示24个
-  const availableMonths = useMemo(() => {
-    const dataMonths = getAvailableMonths(); // 有数据的月份
-    // 生成当前月往前12个月的列表
-    const cur = getCurrentMonth();
-    const [cy, cm] = cur.split("-").map(Number);
-    const recentMonths: string[] = [];
-    for (let i = 0; i < 12; i++) {
-      let my = cy, mm = cm - i;
-      if (mm <= 0) { my -= 1; mm += 12; }
-      recentMonths.push(`${my}-${String(mm).padStart(2, "0")}`);
-    }
-    // 合并：有数据的月份优先，再加上近12个月，去重、降序、最多24个
-    const merged = [...new Set([...dataMonths, ...recentMonths])].sort().reverse().slice(0, 24);
-    return merged;
-  }, [purchases, ledger]);
   const monthPurchases = useMemo(() => getMonthPurchases(selectedMonth), [purchases, selectedMonth]);
   const monthLedger = useMemo(() => getMonthLedger(selectedMonth), [ledger, selectedMonth]);
 
@@ -1360,59 +1330,14 @@ export default function SpiritsInventoryScreen() {
   // ── 主渲染 ────────────────────────────────────────────────────────────────────
   return (
     <ScreenContainer>
-      {/* 导航栏 */}
-      <View style={{ borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, paddingBottom: 8 }}>
-        {/* 上行：标题小字 */}
-        <View style={{ alignItems: "center", paddingTop: 6, paddingBottom: 2 }}>
-          <Text style={{ fontSize: 11, color: colors.muted, fontWeight: "500" }}>
-            {activeSupplier ? activeSupplier : "烈酒库存管理"}
-          </Text>
-        </View>
-        {/* 下行：返回 + 月份居中 + 左右切换 */}
-        <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 12 }}>
-          {/* 返回按鈕 */}
-          <TouchableOpacity onPress={() => {
-            tap();
-            if (activeSupplier !== null) { setActiveSupplier(null); return; }
-            router.back();
-          }} style={{ width: 36, alignItems: "flex-start" }}>
+      {activeSupplier !== null && (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
+          <TouchableOpacity onPress={() => { tap(); setActiveSupplier(null); }} accessibilityRole="button" accessibilityLabel="返回供应商列表">
             <IconSymbol name="chevron.left" size={20} color="#EF4444" />
           </TouchableOpacity>
-          {/* 月份居中区域 */}
-          <View style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12 }}>
-            {/* 上一个月 */}
-            <TouchableOpacity onPress={() => {
-              tap();
-              const [y, m] = selectedMonth.split("-").map(Number);
-              const prev = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
-              handleMonthChange(prev);
-            }}>
-              <IconSymbol name="chevron.left" size={18} color={colors.foreground} />
-            </TouchableOpacity>
-            {/* 月份文字（点击弹出选择器） */}
-            <TouchableOpacity onPress={() => { tap(); setShowMonthPicker(true); }}
-              style={{ paddingHorizontal: 8, paddingVertical: 4 }}>
-              <Text style={{ fontSize: 17, fontWeight: "700", color: colors.foreground }}>
-                {selectedMonth.slice(0, 4)}年{Number(selectedMonth.slice(5, 7))}月
-              </Text>
-            </TouchableOpacity>
-            {/* 下一个月 */}
-            <TouchableOpacity onPress={() => {
-              tap();
-              const [y, m] = selectedMonth.split("-").map(Number);
-              const next = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`;
-              // 不允许跳过当前月
-              if (next <= getCurrentMonth()) handleMonthChange(next);
-              else tap();
-            }}>
-              <IconSymbol name="chevron.right" size={18}
-                color={selectedMonth >= getCurrentMonth() ? colors.border : colors.foreground} />
-            </TouchableOpacity>
-          </View>
-          {/* 右侧占位（对称布局） */}
-          <View style={{ width: 36 }} />
+          <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>{activeSupplier}</Text>
         </View>
-      </View>
+      )}
 
       {/* Tab 选择器（供应商子界面时隐藏） */}
       {activeSupplier === null && (
@@ -1444,53 +1369,6 @@ export default function SpiritsInventoryScreen() {
       ) : (
         renderPurchase()
       )}
-
-      {/* 月份选择 Modal */}
-      <Modal visible={showMonthPicker} transparent animationType="slide">
-        <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.4)" }}>
-          <View style={{ backgroundColor: colors.background, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: "70%" }}>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-              <Text style={{ fontSize: 17, fontWeight: "700", color: colors.foreground }}>选择月份</Text>
-              <Text style={{ fontSize: 12, color: colors.muted }}>共 {availableMonths.length} 个月</Text>
-            </View>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {availableMonths.map((mo) => {
-                const hasPurchase = purchases.some((p) => p.month === mo);
-                const hasLedger = ledger.some((e) => e.month === mo);
-                const hasData = hasPurchase || hasLedger;
-                const isCurrent = mo === getCurrentMonth();
-                const isSelected = mo === selectedMonth;
-                return (
-                  <TouchableOpacity key={mo} onPress={() => { tap(); handleMonthChange(mo); setShowMonthPicker(false); }}
-                    style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-                      paddingVertical: 13, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border,
-                      backgroundColor: isSelected ? "#EF444410" : "transparent",
-                      paddingHorizontal: 4, borderRadius: 6 }}>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                      {isSelected && <View style={{ width: 4, height: 16, borderRadius: 2, backgroundColor: "#EF4444" }} />}
-                      <Text style={{ fontSize: 15, color: isSelected ? "#EF4444" : colors.foreground, fontWeight: isSelected ? "700" : "400" }}>
-                        {mo.slice(0, 4)}年{Number(mo.slice(5, 7))}月
-                      </Text>
-                      {isCurrent && <View style={{ paddingHorizontal: 6, paddingVertical: 2, backgroundColor: "#EF444420", borderRadius: 6 }}>
-                        <Text style={{ fontSize: 10, color: "#EF4444", fontWeight: "600" }}>当前</Text>
-                      </View>}
-                    </View>
-                    {hasData && (
-                      <Text style={{ fontSize: 11, color: colors.primary }}>
-                        {hasPurchase ? `${purchases.filter((p) => p.month === mo).length}笔进货` : "有台账"}
-                      </Text>
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-            <TouchableOpacity onPress={() => setShowMonthPicker(false)}
-              style={{ marginTop: 12, padding: 14, backgroundColor: colors.surface, borderRadius: 12, alignItems: "center" }}>
-              <Text style={{ fontSize: 15, color: colors.muted }}>取消</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
 
       {/* 新增供应商 Modal */}
       <Modal visible={showAddSupplier} transparent animationType="slide">

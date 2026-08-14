@@ -251,7 +251,12 @@ function MaintenanceModal({ visible, items, colors, onSave, onClose }: {
 }
 
 // ─── 主页面 ───────────────────────────────────────────────────────────────────
-export default function EquipmentInventoryScreen() {
+export interface EquipmentInventoryScreenProps {
+  month?: string;
+  embedded?: boolean;
+}
+
+export default function EquipmentInventoryScreen({ month, embedded = false }: EquipmentInventoryScreenProps) {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -265,7 +270,7 @@ export default function EquipmentInventoryScreen() {
   const [maintenanceItem, setMaintenanceItem] = useState<EquipmentItem | null>(null);
   const [importLoading, setImportLoading] = useState(false);
 
-  const currentMonth = new Date().toISOString().slice(0, 7);
+  const currentMonth = month ?? new Date().toISOString().slice(0, 7);
   const totalMonthlyDepreciation = store.getTotalMonthlyDepreciation();
   const monthMaintenanceCost = store.getMonthMaintenanceCost(currentMonth);
   const totalBookValue = useMemo(() => store.items.filter((i) => i.active).reduce((s, i) => s + calcBookValue(i), 0), [store.items]);
@@ -298,8 +303,8 @@ export default function EquipmentInventoryScreen() {
 
   return (
     <ScreenContainer>
-      {/* 导航栏 */}
-      <View style={[S.navbar, { borderBottomColor: colors.border }]}>
+      {/* 独立路由才保留返回导航；工作台已提供分类与月份层级。 */}
+      {!embedded && <View style={[S.navbar, { borderBottomColor: colors.border }]}>
         <Pressable onPress={() => router.back()} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
           <IconSymbol name="chevron.left" size={22} color={colors.primary} />
         </Pressable>
@@ -312,7 +317,7 @@ export default function EquipmentInventoryScreen() {
             <IconSymbol name="plus" size={22} color={EQUIP_COLOR} />
           </Pressable>
         </View>
-      </View>
+      </View>}
 
       {/* Tab */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false}

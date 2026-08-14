@@ -22,7 +22,7 @@ export const DAILY_CATEGORIES = [
 export const DAILY_EXCEL_HINT =
   "A列：名称 | B列：分类(吧台耗材/洗手间/厨房/清洁/包装/办公/其他)\n" +
   "C列：规格 | D列：单位 | E列：期初库存 | F列：本月进货量 | G列：本月消耗量\n" +
-  "H列：进价(元/单位) | I列：预警线 | J列：供应商";
+  "H列：进价(元/单位) | I列：供应商";
 
 export async function parseDailyExcel(base64: string): Promise<{
   items?: import("@/lib/inventory-core/store").GenericInventoryItem extends infer T ? Omit<T, "id" | "createdAt" | "updatedAt">[] : never;
@@ -49,9 +49,8 @@ export async function parseDailyExcel(base64: string): Promise<{
         spec: String(r[2] ?? "").trim(),
         unit: String(r[3] ?? "个").trim(),
         currentStock: Number(r[4]) || 0,
-        alertThreshold: Number(r[8]) || 3,
         latestCostPrice: Number(r[7]) || 0,
-        supplier: String(r[9] ?? "").trim(),
+        supplier: String(r[8] ?? "").trim(),
         notes: "",
         active: true,
       });

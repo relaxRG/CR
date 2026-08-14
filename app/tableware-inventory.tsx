@@ -127,7 +127,12 @@ function LossEntryModal({ visible, store, onClose }: {
   );
 }
 
-export default function TablewareInventoryScreen() {
+export interface TablewareInventoryScreenProps {
+  month?: string;
+  embedded?: boolean;
+}
+
+export default function TablewareInventoryScreen({ month, embedded = false }: TablewareInventoryScreenProps) {
   const store = useTablewareInventoryStore();
   const [showLoss, setShowLoss] = useState(false);
 
@@ -147,6 +152,8 @@ export default function TablewareInventoryScreen() {
         getGroupLabel={getGroupLabel}
         parseExcel={parseTablewareExcel}
         excelFormatHint={TABLEWARE_EXCEL_HINT}
+        month={month}
+        embedded={embedded}
         extraTabs={[{ key: "loss", label: "损耗记录" }]}
         renderExtraTabContent={(tab) => {
           if (tab !== "loss") return null;

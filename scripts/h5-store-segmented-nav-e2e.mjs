@@ -94,16 +94,17 @@ function clickTestIdExpression(testId) {
   })()`;
 }
 
-function layoutExpression(tabTestId, activeCardTestId) {
+function layoutExpression(tabTestId, workspaceTestId) {
   return `(() => {
     const tabs = document.querySelector('[data-testid=${JSON.stringify(tabTestId)}]');
-    const activeCard = document.querySelector('[data-testid=${JSON.stringify(activeCardTestId)}]');
+    const workspace = document.querySelector('[data-testid=${JSON.stringify(workspaceTestId)}]');
     return {
       rootClientWidth: document.documentElement.clientWidth,
       rootScrollWidth: document.documentElement.scrollWidth,
       bodyScrollWidth: document.body.scrollWidth,
       tabLabels: tabs?.innerText.replace(/\\s+/g, ' ').trim() ?? '',
-      activeCardText: activeCard?.innerText.replace(/\\s+/g, ' ').trim() ?? '',
+      workspaceFound: Boolean(workspace),
+      workspaceText: workspace?.innerText.replace(/\\s+/g, ' ').trim() ?? '',
     };
   })()`;
 }
@@ -145,7 +146,7 @@ try {
     await click(call, clickTestIdExpression("store-main-tab-inventory"), `${width}pt 未找到库存主导航`);
     await sleep(250);
     const inventoryInitial = await call("Runtime.evaluate", {
-      expression: layoutExpression("inventory-segmented-tabs", "inventory-active-category-card"),
+      expression: layoutExpression("inventory-segmented-tabs", "inventory-workspace-spirits"),
       returnByValue: true,
     });
     const inventoryState = inventoryInitial.result.value;
@@ -157,19 +158,26 @@ try {
     await click(call, clickTestIdExpression("inventory-segment-fruit"), `${width}pt 未找到水果分段`);
     await sleep(150);
     const fruitActive = await call("Runtime.evaluate", {
-      expression: layoutExpression("inventory-segmented-tabs", "inventory-active-category-card"),
+      expression: layoutExpression("inventory-segmented-tabs", "inventory-workspace-fruit"),
       returnByValue: true,
     });
     const fruitState = fruitActive.result.value;
     assertNoRootOverflow(`${width}pt 水果分段`, fruitState);
-    if (!fruitState.activeCardText.includes("水果") || !fruitState.activeCardText.includes("进入水果管理")) {
-      throw new Error(`${width}pt 切换水果分段后内容区未同步：${JSON.stringify(fruitState)}`);
+    if (!fruitState.workspaceFound || !fruitState.workspaceText.includes("库存管理")) {
+      throw new Error(`${width}pt 切换水果分段后原有业务工作区未同步：${JSON.stringify(fruitState)}`);
     }
+    await click(call, clickTestIdExpression("inventory-month-navigator-picker"), `${width}pt 未找到库存快速选月`);
+    await sleep(120);
+    const inventoryPicker = await call("Runtime.evaluate", {
+      expression: `document.body.innerText.includes('选择库存月份')`,
+      returnByValue: true,
+    });
+    if (!inventoryPicker.result.value) throw new Error(`${width}pt 库存快速选月面板未打开`);
 
     await click(call, clickTestIdExpression("store-main-tab-shop"), `${width}pt 未找到店铺主导航`);
     await sleep(250);
     const shopInitial = await call("Runtime.evaluate", {
-      expression: layoutExpression("shop-segmented-tabs", "shop-active-category-card"),
+      expression: layoutExpression("shop-segmented-tabs", "shop-workspace-glassware"),
       returnByValue: true,
     });
     const shopState = shopInitial.result.value;
@@ -181,14 +189,19 @@ try {
     await click(call, clickTestIdExpression("shop-segment-equipment"), `${width}pt 未找到设备分段`);
     await sleep(150);
     const equipmentActive = await call("Runtime.evaluate", {
-      expression: layoutExpression("shop-segmented-tabs", "shop-active-category-card"),
+      expression: layoutExpression("shop-segmented-tabs", "shop-workspace-equipment"),
       returnByValue: true,
     });
     const equipmentState = equipmentActive.result.value;
     assertNoRootOverflow(`${width}pt 设备分段`, equipmentState);
-    if (!equipmentState.activeCardText.includes("设备") || !equipmentState.activeCardText.includes("进入设备管理")) {
-      throw new Error(`${width}pt 切换设备分段后内容区未同步：${JSON.stringify(equipmentState)}`);
+    if (!equipmentState.workspaceFound || !equipmentState.workspaceText.includes("设备台账")) {
+      throw new Error(`${width}pt 切换设备分段后原有业务工作区未同步：${JSON.stringify(equipmentState)}`);
     }
+    const legacyEntry = await call("Runtime.evaluate", {
+      expression: `document.body.innerText.includes('进入烈酒管理') || document.body.innerText.includes('进入设备管理')`,
+      returnByValue: true,
+    });
+    if (legacyEntry.result.value) throw new Error(`${width}pt 仍保留已删除的中间管理页跳转入口`);
 
     report.push({ width, inventory: { initial: inventoryState, fruit: fruitState }, shop: { initial: shopState, equipment: equipmentState } });
   }

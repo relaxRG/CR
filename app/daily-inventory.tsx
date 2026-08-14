@@ -141,7 +141,12 @@ function BatchEntryModal({ visible, store, onClose }: {
   );
 }
 
-export default function DailyInventoryScreen() {
+export interface DailyInventoryScreenProps {
+  month?: string;
+  embedded?: boolean;
+}
+
+export default function DailyInventoryScreen({ month, embedded = false }: DailyInventoryScreenProps) {
   const store = useDailyInventoryStore();
   const [showBatch, setShowBatch] = useState(false);
 
@@ -160,6 +165,8 @@ export default function DailyInventoryScreen() {
         getGroupLabel={getGroupLabel}
         parseExcel={parseDailyExcel}
         excelFormatHint={DAILY_EXCEL_HINT}
+        month={month}
+        embedded={embedded}
         extraTabs={[{ key: "batch", label: "批量录入" }]}
         renderExtraTabContent={(tab) => {
           if (tab !== "batch") return null;

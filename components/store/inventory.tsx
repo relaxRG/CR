@@ -1,17 +1,20 @@
-/**
- * 进销存模块导航入口（重构版）
- * 展示全部 10 个品类的入口卡片，每个品类独立页面
- */
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo } from "react";
 import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import * as Haptics from "expo-haptics";
-import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
 import { usePersistedState } from "@/hooks/use-persisted-state";
-import { useSpiritsInventoryStore } from "@/lib/spirits/crud-store";  // ✅ 新 crud-store
-import { useWineSnapshotStore } from "@/lib/wine/store";
-import { useFoodIngredientStore } from "@/lib/food/ingredient-store";
+import { BoundedMonthNavigator } from "@/components/inventory/BoundedMonthNavigator";
+import {
+  clampInventoryMonth,
+  deriveInventoryMonthBounds,
+  getCurrentInventoryMonth,
+  normalizeInventoryMonth,
+  type InventoryMonth,
+} from "@/lib/inventory-core/month-browser";
+import { useSpiritsInventoryStore } from "@/lib/spirits/crud-store";
+import { useWineManualPurchaseStore, useWineSnapshotStore } from "@/lib/wine/store";
+import { useFoodIngredientStore, useSupplierPurchaseStore } from "@/lib/food/ingredient-store";
 import { useBeerInventoryStore } from "@/lib/beer/inventory-store";
 import { useIceNewInventoryStore } from "@/lib/ice/new-inventory-store";
 import { useFruitNewInventoryStore } from "@/lib/fruit/new-inventory-store";
@@ -19,19 +22,52 @@ import { useGlasswareInventoryStore } from "@/lib/glassware/inventory-store";
 import { useTablewareInventoryStore } from "@/lib/tableware/inventory-store";
 import { useDailyInventoryStore } from "@/lib/daily/inventory-store";
 import { useEquipmentInventoryStore } from "@/lib/equipment/inventory-store";
+import SpiritsInventoryScreen from "@/app/spirits-inventory";
+import WineInventoryScreen from "@/app/wine-inventory";
+import FruitInventoryScreen from "@/app/fruit-inventory";
+import FoodInventoryScreen from "@/app/food-inventory";
+import BeerInventoryScreen from "@/app/beer-inventory";
+import IceInventoryScreen from "@/app/ice-inventory";
+import GlasswareInventoryScreen from "@/app/glassware-inventory";
+import TablewareInventoryScreen from "@/app/tableware-inventory";
+import DailyInventoryScreen from "@/app/daily-inventory";
+import EquipmentInventoryScreen from "@/app/equipment-inventory";
 
 export type InventoryPortalMode = "inventory" | "shop";
+type InventoryCategoryKey = "spirits" | "wine" | "fruit" | "food" | "beer" | "ice" | "glassware" | "tableware" | "daily" | "equipment";
+
+const CATEGORIES: Array<{ key: InventoryCategoryKey; label: string; emoji: string; color: string; mode: InventoryPortalMode }> = [
+  { key: "spirits", label: "烈酒", emoji: "🥃", color: "#6B7280", mode: "inventory" },
+  { key: "wine", label: "葡萄酒", emoji: "🍷", color: "#9F1239", mode: "inventory" },
+  { key: "fruit", label: "水果", emoji: "🍋", color: "#22C55E", mode: "inventory" },
+  { key: "food", label: "食材", emoji: "🥩", color: "#10B981", mode: "inventory" },
+  { key: "beer", label: "啤酒", emoji: "🍺", color: "#F4A300", mode: "inventory" },
+  { key: "ice", label: "冰块", emoji: "🧊", color: "#00BCD4", mode: "inventory" },
+  { key: "glassware", label: "杯具", emoji: "🥂", color: "#6366F1", mode: "shop" },
+  { key: "tableware", label: "餐具", emoji: "🍽️", color: "#0EA5E9", mode: "shop" },
+  { key: "daily", label: "日用品", emoji: "🧴", color: "#F59E0B", mode: "shop" },
+  { key: "equipment", label: "设备", emoji: "🔧", color: "#6366F1", mode: "shop" },
+];
+
+function normalizeMany(values: Array<string | null | undefined>): string[] {
+  return values.filter((value): value is string => normalizeInventoryMonth(value) !== null);
+}
 
 export default function StoreInventoryScreen({ mode = "inventory" }: { mode?: InventoryPortalMode }) {
   const colors = useColors();
-  const router = useRouter();
   const insets = useSafeAreaInsets();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
+  const categoryStorageKey = mode === "shop" ? "store.shop.category.v2" : "store.inventory.category.v2";
+  const monthStorageKey = mode === "shop" ? "store.shop.month.v1" : "store.inventory.month.v1";
+  const defaultCategory = mode === "shop" ? "glassware" : "spirits";
+  const [activeCategory, setActiveCategory] = usePersistedState<InventoryCategoryKey>(categoryStorageKey, defaultCategory);
+  const [persistedMonth, setPersistedMonth] = usePersistedState<string>(monthStorageKey, getCurrentInventoryMonth());
 
-  // ✅ 烈酒改用新的 crud-store
   const spiritsStore = useSpiritsInventoryStore();
-  const wineStore = useWineSnapshotStore();
+  const wineSnapshots = useWineSnapshotStore();
+  const wineManualPurchases = useWineManualPurchaseStore();
   const foodStore = useFoodIngredientStore();
+  const foodPurchases = useSupplierPurchaseStore();
   const beerStore = useBeerInventoryStore();
   const iceStore = useIceNewInventoryStore();
   const fruitStore = useFruitNewInventoryStore();
@@ -40,97 +76,72 @@ export default function StoreInventoryScreen({ mode = "inventory" }: { mode?: In
   const dailyStore = useDailyInventoryStore();
   const equipmentStore = useEquipmentInventoryStore();
 
-  const currentMonth = new Date().toISOString().slice(0, 7);
-  const [activeCategory, setActiveCategory] = usePersistedState<string>(
-    mode === "shop" ? "store.shop.category.v1" : "store.inventory.category.v1",
-    mode === "shop" ? "glassware" : "spirits",
-  );
-
-  const categories = useMemo(() => {
-    // ✅ 烈酒：从新 crud-store 读取当前月台账数据
-    const spiritsItems = spiritsStore.items.filter((i) => i.active);
-    const spiritsMonthLedger = spiritsStore.getMonthLedger(currentMonth);
-    const spiritsEndCost = spiritsMonthLedger.reduce((s, e) => s + e.closingCost, 0);
-    const spiritsMonthPurchases = spiritsStore.getMonthPurchases(currentMonth);
-    const spiritsMonthAmt = spiritsMonthPurchases.reduce((s, p) => s + p.amount, 0);
-
-    const wineSnap = wineStore.snapshots[0];
-    const beerItems = beerStore.items.filter((i) => i.active);
-    const iceItems = iceStore.items.filter((i) => i.active);
-    const fruitItems = fruitStore.items.filter((i) => i.active);
-    const glassItems = glasswareStore.items.filter((i) => i.active);
-    const tableItems = tablewareStore.items.filter((i) => i.active);
-    const dailyItems = dailyStore.items.filter((i) => i.active);
-    const equipItems = equipmentStore.items.filter((i) => i.active);
-    const foodLow = foodStore.ingredients.filter((i) => i.alertThreshold > 0 && i.stock <= i.alertThreshold).length;
-
-    // 烈酒副标题：有台账数据显示期末成本，有进货显示本月进货额，否则提示录入
-    const spiritsSub = spiritsItems.length > 0
-      ? spiritsEndCost > 0
-        ? `${spiritsItems.length} 款 · 期末¥${spiritsEndCost.toFixed(0)}${spiritsMonthAmt > 0 ? ` · 本月进货¥${spiritsMonthAmt.toFixed(0)}` : ""}`
-        : `${spiritsItems.length} 款已建档 · 点击录入台账`
-      : "点击录入烈酒库存";
-
-    const allCategories = [
-      { key: "spirits", emoji: "🥃", label: "烈酒", color: "#6B7280", route: "/spirits-inventory",
-        sub: spiritsSub,
-        badge: spiritsItems.length > 0 ? `${spiritsItems.length}款` : undefined },
-      { key: "wine", emoji: "🍷", label: "葡萄酒", color: "#9F1239", route: "/wine-inventory",
-        sub: wineSnap ? `${wineSnap.monthLabel} · ${wineSnap.items.length} 款 · 期末¥${wineSnap.totalEndCost.toFixed(0)}` : "导入 Excel 开始使用",
-        badge: wineSnap ? `${wineSnap.items.length}款` : undefined },
-      { key: "fruit", emoji: "🍋", label: "水果", color: "#22C55E", route: "/fruit-inventory",
-        sub: fruitItems.length > 0 ? `${fruitItems.length} 种${fruitStore.getLowStockItems().length > 0 ? ` · ⚠ ${fruitStore.getLowStockItems().length}种预警` : ""}` : "点击添加水果档案",
-        badge: fruitItems.length > 0 ? `${fruitItems.length}种` : undefined },
-      { key: "food", emoji: "🥩", label: "食材", color: "#10B981", route: "/food-inventory",
-        sub: foodStore.ingredients.length > 0 ? `${foodStore.ingredients.length} 种${foodLow > 0 ? ` · ⚠ ${foodLow}种预警` : ""}` : "点击管理食材档案",
-        badge: foodStore.ingredients.length > 0 ? `${foodStore.ingredients.length}种` : undefined },
-      { key: "beer", emoji: "🍺", label: "啤酒", color: "#F4A300", route: "/beer-inventory",
-        sub: beerItems.length > 0 ? `${beerItems.length} 款${beerStore.getLowStockItems().length > 0 ? ` · ⚠ ${beerStore.getLowStockItems().length}种预警` : ""}` : "点击添加啤酒档案",
-        badge: beerItems.length > 0 ? `${beerItems.length}款` : undefined },
-      { key: "ice", emoji: "🧊", label: "冰块", color: "#00BCD4", route: "/ice-inventory",
-        sub: iceItems.length > 0 ? `${iceItems.length} 种${iceStore.getLowStockItems().length > 0 ? ` · ⚠ ${iceStore.getLowStockItems().length}种预警` : ""}` : "点击添加冰块档案",
-        badge: iceItems.length > 0 ? `${iceItems.length}种` : undefined },
-      { key: "glassware", emoji: "🥂", label: "杯具", color: "#6366F1", route: "/glassware-inventory",
-        sub: glassItems.length > 0 ? `${glassItems.length} 款 · 本月损耗${glasswareStore.consumes.filter((c) => c.reason === "loss" && c.date.startsWith(currentMonth)).length}次` : "点击添加杯具档案",
-        badge: glassItems.length > 0 ? `${glassItems.length}款` : undefined },
-      { key: "tableware", emoji: "🍽️", label: "餐具", color: "#0EA5E9", route: "/tableware-inventory",
-        sub: tableItems.length > 0 ? `${tableItems.length} 款 · 本月损耗${tablewareStore.consumes.filter((c) => c.reason === "loss" && c.date.startsWith(currentMonth)).length}次` : "点击添加餐具档案",
-        badge: tableItems.length > 0 ? `${tableItems.length}款` : undefined },
-      { key: "daily", emoji: "🧴", label: "日用品", color: "#F59E0B", route: "/daily-inventory",
-        sub: dailyItems.length > 0 ? `${dailyItems.length} 种${dailyStore.getLowStockItems().length > 0 ? ` · ⚠ ${dailyStore.getLowStockItems().length}种预警` : ""}` : "点击添加日用品档案",
-        badge: dailyItems.length > 0 ? `${dailyItems.length}种` : undefined },
-      { key: "equipment", emoji: "🔧", label: "设备", color: "#6366F1", route: "/equipment-inventory",
-        sub: equipItems.length > 0 ? `${equipItems.length} 台 · 月折旧¥${equipmentStore.getTotalMonthlyDepreciation().toFixed(0)}` : "点击登记设备",
-        badge: equipItems.length > 0 ? `${equipItems.length}台` : undefined },
-    ];
-
-    return mode === "shop"
-      ? allCategories.filter((category) => ["杯具", "餐具", "日用品", "设备"].includes(category.label))
-      : allCategories.filter((category) => !["杯具", "餐具", "日用品", "设备"].includes(category.label));
-  }, [spiritsStore, wineStore, foodStore, beerStore, iceStore, fruitStore, glasswareStore, tablewareStore, dailyStore, equipmentStore, currentMonth, mode]);
-
-  const title = mode === "shop" ? "店铺" : "库存管理";
-  const description = mode === "shop"
-    ? "杯具、餐具、日用品与设备资产"
-    : "酒水、食材、冰块与水果库存";
+  const categories = CATEGORIES.filter((category) => category.mode === mode);
   const currentCategory = categories.find((category) => category.key === activeCategory) ?? categories[0];
 
+  const categoryMonths = useMemo(() => {
+    const genericMonths = (store: { snapshots: Array<{ month: string }>; purchases: Array<{ date: string }>; consumes: Array<{ date: string }> }) => [
+      ...store.snapshots.map((snapshot) => snapshot.month),
+      ...store.purchases.map((purchase) => purchase.date),
+      ...store.consumes.map((consume) => consume.date),
+    ];
+    const allMonths: Record<InventoryCategoryKey, string[]> = {
+      spirits: [
+        ...spiritsStore.ledger.map((entry) => entry.month),
+        ...spiritsStore.purchases.map((purchase) => purchase.date ?? purchase.month),
+      ],
+      wine: [
+        ...wineSnapshots.snapshots.map((snapshot) => snapshot.monthLabel),
+        ...wineSnapshots.snapshots.flatMap((snapshot) => snapshot.purchaseOrders.map((purchase) => purchase.date)),
+        ...wineManualPurchases.purchases.map((purchase) => purchase.date),
+      ],
+      fruit: genericMonths(fruitStore),
+      beer: genericMonths(beerStore),
+      ice: genericMonths(iceStore),
+      food: [
+        ...foodStore.ingredients.flatMap((ingredient) => (ingredient.priceHistory ?? []).map((entry) => entry.date)),
+        ...foodPurchases.records.flatMap((record: any) => [record.importDate, ...(record.items ?? []).map((item: any) => item.date)]),
+      ],
+      glassware: genericMonths(glasswareStore),
+      tableware: genericMonths(tablewareStore),
+      daily: genericMonths(dailyStore),
+      equipment: [
+        ...equipmentStore.items.map((item) => item.purchaseDate),
+        ...equipmentStore.maintenanceRecords.map((record) => record.date),
+      ],
+    };
+    return allMonths;
+  }, [spiritsStore, wineSnapshots, wineManualPurchases, foodStore, foodPurchases, fruitStore, beerStore, iceStore, glasswareStore, tablewareStore, dailyStore, equipmentStore]);
+
+  const bounds = useMemo(
+    () => deriveInventoryMonthBounds(categories.flatMap((category) => normalizeMany(categoryMonths[category.key]))),
+    [categories, categoryMonths],
+  );
+  const selectedMonth = clampInventoryMonth(persistedMonth, bounds);
+
+  useEffect(() => {
+    if (persistedMonth !== selectedMonth) setPersistedMonth(selectedMonth);
+  }, [persistedMonth, selectedMonth, setPersistedMonth]);
+
+  useEffect(() => {
+    if (!categories.some((category) => category.key === activeCategory)) setActiveCategory(defaultCategory);
+  }, [activeCategory, categories, defaultCategory, setActiveCategory]);
+
+  const title = mode === "shop" ? "店铺" : "库存管理";
+  const description = mode === "shop" ? "杯具、餐具、日用品与设备" : "烈酒、葡萄酒、水果、食材、啤酒与冰块";
+
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: colors.background }}
-      contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }}
-    >
-      <View style={{ marginBottom: 16 }}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <View style={{ paddingTop: 16, paddingHorizontal: 16 }}>
         <Text style={{ fontSize: 22, fontWeight: "700", color: colors.foreground }}>{title}</Text>
-        <Text style={{ fontSize: 13, color: colors.muted, marginTop: 2 }}>
-          {description} · {categories.filter((c) => c.badge).length} 个品类已有数据
-        </Text>
+        <Text style={{ fontSize: 13, color: colors.muted, marginTop: 2 }}>{description}</Text>
       </View>
+
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         testID={mode === "shop" ? "shop-segmented-tabs" : "inventory-segmented-tabs"}
-        style={{ flexGrow: 0, marginHorizontal: -16, marginBottom: 14 }}
+        style={{ flexGrow: 0, marginTop: 14 }}
         contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
       >
         {categories.map((category) => {
@@ -141,10 +152,7 @@ export default function StoreInventoryScreen({ mode = "inventory" }: { mode?: In
               testID={`${mode}-segment-${category.key}`}
               onPress={() => { tap(); setActiveCategory(category.key); }}
               activeOpacity={0.75}
-              style={[S.segment, {
-                backgroundColor: active ? category.color : colors.surface,
-                borderColor: active ? category.color : colors.border,
-              }]}
+              style={[S.segment, { backgroundColor: active ? category.color : colors.surface, borderColor: active ? category.color : colors.border }]}
             >
               <Text style={[S.segmentText, { color: active ? "#fff" : colors.foreground }]}>{category.label}</Text>
             </TouchableOpacity>
@@ -152,37 +160,31 @@ export default function StoreInventoryScreen({ mode = "inventory" }: { mode?: In
         })}
       </ScrollView>
 
-      {currentCategory && (
-        <TouchableOpacity
-          testID={`${mode}-active-category-card`}
-          onPress={() => { tap(); router.push(currentCategory.route as any); }}
-          activeOpacity={0.75}
-          style={[S.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
-        >
-          <View style={[S.colorBar, { backgroundColor: currentCategory.color }]} />
-          <View style={{ flex: 1, minWidth: 0, paddingLeft: 12 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <Text style={{ fontSize: 26, flexShrink: 0 }}>{currentCategory.emoji}</Text>
-              <Text numberOfLines={1} style={{ fontSize: 18, fontWeight: "700", color: colors.foreground, flexShrink: 1 }}>{currentCategory.label}</Text>
-              {currentCategory.badge && (
-                <View style={[S.badge, { backgroundColor: currentCategory.color + "22" }]}>
-                  <Text numberOfLines={1} style={{ fontSize: 11, lineHeight: 14, fontWeight: "600", color: currentCategory.color }}>{currentCategory.badge}</Text>
-                </View>
-              )}
-            </View>
-            <Text style={{ fontSize: 13, color: colors.muted, marginTop: 5 }} numberOfLines={2}>{currentCategory.sub}</Text>
-            <Text style={{ fontSize: 13, color: currentCategory.color, fontWeight: "700", marginTop: 12 }}>进入{currentCategory.label}管理 ›</Text>
-          </View>
-        </TouchableOpacity>
-      )}
-    </ScrollView>
+      <BoundedMonthNavigator month={selectedMonth} bounds={bounds} onChange={setPersistedMonth} testID={`${mode}-month-navigator`} />
+
+      <View testID={`${mode}-workspace-${currentCategory.key}`} style={{ flex: 1, paddingBottom: insets.bottom }}>
+        <InventoryBusinessPanel category={currentCategory.key} month={selectedMonth} />
+      </View>
+    </View>
   );
 }
 
+function InventoryBusinessPanel({ category, month }: { category: InventoryCategoryKey; month: InventoryMonth }) {
+  switch (category) {
+    case "spirits": return <SpiritsInventoryScreen month={month} />;
+    case "wine": return <WineInventoryScreen month={month} embedded />;
+    case "fruit": return <FruitInventoryScreen month={month} embedded />;
+    case "food": return <FoodInventoryScreen month={month} embedded />;
+    case "beer": return <BeerInventoryScreen month={month} embedded />;
+    case "ice": return <IceInventoryScreen month={month} embedded />;
+    case "glassware": return <GlasswareInventoryScreen month={month} embedded />;
+    case "tableware": return <TablewareInventoryScreen month={month} embedded />;
+    case "daily": return <DailyInventoryScreen month={month} embedded />;
+    case "equipment": return <EquipmentInventoryScreen month={month} embedded />;
+  }
+}
+
 const S = StyleSheet.create({
-  card: { flexDirection: "row", alignItems: "center", borderRadius: 14, borderWidth: 1, overflow: "hidden", minHeight: 68 },
-  colorBar: { width: 5, alignSelf: "stretch" },
-  badge: { flexShrink: 0, minHeight: 20, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, alignItems: "center", justifyContent: "center" },
   segment: { minHeight: 36, justifyContent: "center", paddingHorizontal: 16, borderRadius: 10, borderWidth: 1 },
   segmentText: { fontSize: 14, fontWeight: "600" },
 });

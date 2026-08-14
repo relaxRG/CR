@@ -50,7 +50,6 @@ export async function parseGlasswareExcel(base64: string): Promise<{
         spec: String(r[2] ?? "").trim(),
         unit: "个",
         currentStock: Number(r[3]) || 0,
-        alertThreshold: 10,
         latestCostPrice: Number(r[6]) || 0,
         supplier: String(r[7] ?? "").trim(),
         notes: "",

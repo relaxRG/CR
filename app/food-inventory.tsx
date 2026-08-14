@@ -147,7 +147,12 @@ function PurchaseModal({ visible, ingredients, colors, onSave, onClose }: {
 }
 
 // ─── 主页面 ───────────────────────────────────────────────────────────────────
-export default function FoodInventoryScreen() {
+export interface FoodInventoryScreenProps {
+  month?: string;
+  embedded?: boolean;
+}
+
+export default function FoodInventoryScreen({ month, embedded = false }: FoodInventoryScreenProps) {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -160,7 +165,7 @@ export default function FoodInventoryScreen() {
   const [filterCat, setFilterCat] = useState<IngredientCategory | "all">("all");
   const [importLoading, setImportLoading] = useState(false);
 
-  const currentMonth = getCurrentMonth();
+  const currentMonth = month ?? getCurrentMonth();
 
   // 按类别分组
   const byCategory = useMemo(() => {
@@ -171,11 +176,6 @@ export default function FoodInventoryScreen() {
     });
     return map;
   }, [ingredients]);
-
-  const lowStockItems = useMemo(() =>
-    ingredients.filter((i) => i.alertThreshold > 0 && i.stock <= i.alertThreshold),
-    [ingredients]
-  );
 
   const totalStockValue = useMemo(() =>
     ingredients.reduce((s, i) => s + i.stock * (i.costPrice ?? 0), 0),
@@ -202,8 +202,8 @@ export default function FoodInventoryScreen() {
 
   return (
     <ScreenContainer>
-      {/* 导航栏 */}
-      <View style={[S.navbar, { borderBottomColor: colors.border }]}>
+      {/* 独立路由才保留返回导航；工作台已提供分类与月份层级。 */}
+      {!embedded && <View style={[S.navbar, { borderBottomColor: colors.border }]}>
         <Pressable onPress={() => router.back()} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
           <IconSymbol name="chevron.left" size={22} color={colors.primary} />
         </Pressable>
@@ -211,7 +211,7 @@ export default function FoodInventoryScreen() {
         <Pressable onPress={() => router.push("/food-ingredient-form/new" as any)} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
           <IconSymbol name="plus" size={22} color={FOOD_COLOR} />
         </Pressable>
-      </View>
+      </View>}
 
       {/* Tab */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
@@ -233,7 +233,6 @@ export default function FoodInventoryScreen() {
         {[
           { label: "食材种数", value: `${ingredients.length}`, color: FOOD_COLOR },
           { label: "库存总值", value: `¥${formatMoney(totalStockValue)}`, color: FOOD_COLOR },
-          ...(lowStockItems.length > 0 ? [{ label: "库存预警", value: `${lowStockItems.length}种`, color: colors.error }] : []),
         ].map((c, i) => (
           <View key={i} style={{ flex: 1, alignItems: "center" }}>
             <Text style={{ fontSize: 10, color: colors.muted }}>{c.label}</Text>
@@ -273,12 +272,11 @@ export default function FoodInventoryScreen() {
                     <Text style={{ fontSize: 12, color: colors.muted }}>({items.length} 种)</Text>
                   </View>
                   {items.map((ing) => {
-                    const lowStock = ing.alertThreshold > 0 && ing.stock <= ing.alertThreshold;
                     const priceHistory = ing.priceHistory ?? [];
                     const lastTwo = priceHistory.slice(0, 2);
                     const priceDelta = lastTwo.length >= 2 ? lastTwo[0].price - lastTwo[1].price : 0;
                     return (
-                      <View key={ing.id} style={[S.foodCard, { backgroundColor: colors.surface, borderColor: lowStock ? colors.error : colors.border }]}>
+                      <View key={ing.id} style={[S.foodCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                         <View style={{ flex: 1 }}>
                           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                             <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>{ing.name}</Text>
@@ -294,10 +292,9 @@ export default function FoodInventoryScreen() {
                             {ing.spec ? `${ing.spec} · ` : ""}¥{ing.costPrice?.toFixed(2) ?? "-"}/{ing.unit}
                             {ing.supplier ? ` · ${ing.supplier}` : ""}
                           </Text>
-                          {lowStock && <Text style={{ fontSize: 11, color: colors.error }}>⚠ 库存不足</Text>}
                         </View>
                         <View style={{ alignItems: "flex-end" }}>
-                          <Text style={{ fontSize: 16, fontWeight: "700", color: lowStock ? colors.error : FOOD_COLOR }}>
+                          <Text style={{ fontSize: 16, fontWeight: "700", color: FOOD_COLOR }}>
                             {ing.stock} {ing.unit}
                           </Text>
                           <Text style={{ fontSize: 11, color: colors.muted }}>
@@ -336,7 +333,6 @@ export default function FoodInventoryScreen() {
               {[
                 { label: "食材种数", value: `${ingredients.length} 种`, color: FOOD_COLOR },
                 { label: "库存总成本", value: `¥${formatMoney(totalStockValue)}`, color: FOOD_COLOR },
-                { label: "库存预警", value: `${lowStockItems.length} 种`, color: lowStockItems.length > 0 ? colors.error : colors.muted },
               ].map((row, i) => (
                 <View key={i} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 4 }}>
                   <Text style={{ fontSize: 13, color: colors.muted }}>{row.label}</Text>

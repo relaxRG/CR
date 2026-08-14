@@ -19,8 +19,6 @@ export interface GenericInventoryItem {
   unit: string;
   /** 当前实际库存（由进出库操作维护） */
   currentStock: number;
-  /** 库存预警线 */
-  alertThreshold: number;
   /** 最新进货价 */
   latestCostPrice: number;
   /** 供应商 */
@@ -145,8 +143,6 @@ export interface GenericInventoryContextValue extends GenericInventoryState {
   getItemMonthConsumes: (itemId: string, month: string) => ConsumeRecord[];
   /** 获取某商品本月期初数据（从上月快照自动带入） */
   getOpeningData: (itemId: string, month?: string) => { qty: number; unitCost: number };
-  /** 低库存商品列表 */
-  getLowStockItems: () => GenericInventoryItem[];
 }
 
 // ─── Store 工厂函数 ──────────────────────────────────────────────────────────
@@ -245,10 +241,6 @@ export function createGenericInventoryStore(storageKey: string, categoryId: stri
       return getOpeningFromLastMonth(lastSnap, itemId);
     }, [state.snapshots]);
 
-    const getLowStockItems = useCallback((): GenericInventoryItem[] => {
-      return state.items.filter((i) => i.active && i.currentStock <= i.alertThreshold);
-    }, [state.items]);
-
     return (
       <Context.Provider value={{
         ...state, ready,
@@ -259,7 +251,7 @@ export function createGenericInventoryStore(storageKey: string, categoryId: stri
         getLastSnapshot, getSnapshotByMonth,
         getMonthPurchases, getMonthConsumes,
         getItemMonthPurchases, getItemMonthConsumes,
-        getOpeningData, getLowStockItems,
+        getOpeningData,
       }}>
         {children}
       </Context.Provider>

@@ -34,7 +34,6 @@ import { MenuPackageProvider } from "@/lib/menu/package-store";
 import { FoodIngredientProvider, SupplierPurchaseProvider } from "@/lib/food/ingredient-store";
 import { RevenueProvider } from "@/lib/store/revenue-store";
 import { PettyCashProvider } from "@/lib/store/petty-store";
-import { InventoryProvider } from "@/lib/store/inventory-store";
 import { LabPlanProvider } from "@/lib/lab/plan-store";
 import { SpiritsInventoryProvider } from "@/lib/spirits/crud-store";
 import { MonthlyReportProvider } from "@/lib/store/monthly-report/store";
@@ -43,9 +42,6 @@ import { SalaryAdvanceProvider, SalaryAdvanceCategoryProvider } from "@/lib/labo
 import { PettyCategoryProvider } from "@/lib/store/petty-category-store";
 import { PettyInventoryLinkProvider } from "@/lib/store/petty-inventory-link-store";
 import { PettyLaborLinkProvider } from "@/lib/store/petty-labor-link-store";
-import { BeerProvider } from "@/lib/beer/store";
-import { IceInventoryProvider } from "@/lib/ice/inventory-store";
-import { FruitProvider } from "@/lib/fruit/store";
 import { PeriodAnalysisProvider } from "@/lib/store/period-analysis/store";
 import { MonthlySummaryProvider } from "@/lib/store/monthly-summary/store";
 import { DishAnalysisProvider } from "@/lib/store/monthly-report/dish-analysis-store";
@@ -155,7 +151,6 @@ export default function RootLayout() {
           <FoodIngredientProvider>
           <RevenueProvider>
           <PettyCashProvider>
-          <InventoryProvider>
           <LabPlanProvider>
           <SupplierPurchaseProvider>
           <SpiritsInventoryProvider>
@@ -166,9 +161,6 @@ export default function RootLayout() {
           <PettyCategoryProvider>
           <PettyInventoryLinkProvider>
           <PettyLaborLinkProvider>
-          <BeerProvider>
-          <IceInventoryProvider>
-          <FruitProvider>
           <BeerInventoryProvider>
           <IceNewInventoryProvider>
           <FruitNewInventoryProvider>
@@ -246,7 +238,6 @@ export default function RootLayout() {
               <Stack.Screen name="labor-kpi-allowance-edit" />
               <Stack.Screen name="labor-employee-sort" />
               <Stack.Screen name="petty-category-settings" options={{ presentation: "modal" }} />
-              <Stack.Screen name="beer-ice-inventory" />
               <Stack.Screen name="beer-inventory" />
               <Stack.Screen name="ice-inventory" />
               <Stack.Screen name="fruit-inventory" />
@@ -272,9 +263,6 @@ export default function RootLayout() {
           </FruitNewInventoryProvider>
           </IceNewInventoryProvider>
           </BeerInventoryProvider>
-          </FruitProvider>
-          </IceInventoryProvider>
-          </BeerProvider>
           </PettyLaborLinkProvider>
           </PettyInventoryLinkProvider>
           </PettyCategoryProvider>
@@ -285,7 +273,6 @@ export default function RootLayout() {
           </SpiritsInventoryProvider>
           </SupplierPurchaseProvider>
           </LabPlanProvider>
-          </InventoryProvider>
           </PettyCashProvider>
           </RevenueProvider>
           </FoodIngredientProvider>

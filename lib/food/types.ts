@@ -63,8 +63,6 @@ export interface FoodIngredient {
   costPrice: number | null;
   /** 当前库存数量 */
   stock: number;
-  /** 库存预警线 */
-  alertThreshold: number;
   /** 供应商 */
   supplier: string;
   /** 备注 */

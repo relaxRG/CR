@@ -25,19 +25,22 @@ describe("店铺顶级模块与库存分类", () => {
   it("店铺只承载杯具、餐具、日用品和设备，普通库存不再展示这些门店物资", () => {
     const inventory = read("components/store/inventory.tsx");
     expect(inventory).toContain('export type InventoryPortalMode = "inventory" | "shop"');
-    expect(inventory).toContain('["杯具", "餐具", "日用品", "设备"]');
+    expect(inventory).toContain('const CATEGORIES: Array');
     expect(inventory).toContain('mode === "shop"');
-    expect(inventory).toContain('"酒水、食材、冰块与水果库存"');
+    expect(inventory).toContain('烈酒、葡萄酒、水果、食材、啤酒与冰块');
     expect(inventory.indexOf('label: "烈酒"')).toBeLessThan(inventory.indexOf('label: "葡萄酒"'));
     expect(inventory.indexOf('label: "葡萄酒"')).toBeLessThan(inventory.indexOf('label: "水果"'));
     expect(inventory.indexOf('label: "水果"')).toBeLessThan(inventory.indexOf('label: "食材"'));
     expect(inventory.indexOf('label: "食材"')).toBeLessThan(inventory.indexOf('label: "啤酒"'));
     expect(inventory.indexOf('label: "啤酒"')).toBeLessThan(inventory.indexOf('label: "冰块"'));
-    expect(inventory).toContain('"杯具、餐具、日用品与设备资产"');
+    expect(inventory).toContain('杯具、餐具、日用品与设备');
     expect(inventory).toContain('testID={mode === "shop" ? "shop-segmented-tabs" : "inventory-segmented-tabs"}');
-    expect(inventory).toContain('"store.inventory.category.v1"');
-    expect(inventory).toContain('"store.shop.category.v1"');
-    expect(inventory).toContain('testID={`${mode}-active-category-card`}');
+    expect(inventory).toContain('"store.inventory.category.v2"');
+    expect(inventory).toContain('"store.shop.category.v2"');
+    expect(inventory).toContain('"store.inventory.month.v1"');
+    expect(inventory).toContain('"store.shop.month.v1"');
+    expect(inventory).toContain('BoundedMonthNavigator');
+    expect(inventory).toContain('testID={`${mode}-workspace-${currentCategory.key}`}');
   });
 
   it("店铺聚合页复用库存数据源，不引入第二套库存持久化逻辑", () => {

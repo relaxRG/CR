@@ -43,7 +43,6 @@ export async function parseIceInventoryExcel(base64: string): Promise<{
         spec: String(r[1] ?? "").trim(),
         unit: String(r[2] ?? "袋").trim(),
         currentStock: Number(r[3]) || 0,
-        alertThreshold: 2,
         latestCostPrice: Number(r[6]) || 0,
         supplier: String(r[7] ?? "").trim(),
         notes: "",

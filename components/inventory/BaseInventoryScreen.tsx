@@ -56,13 +56,17 @@ export interface BaseInventoryScreenProps {
   renderExtraTabContent?: (tab: string) => React.ReactNode;
   /** 额外 Tab 定义 */
   extraTabs?: { key: string; label: string }[];
+  /** 工作台传入的统一库存月份；未传入时保持独立页面的当前月行为。 */
+  month?: string;
+  /** 嵌入工作台时隐藏独立页面标题和返回入口。 */
+  embedded?: boolean;
 }
 
 export function BaseInventoryScreen({
   store, title, emoji, accentColor, categoryId, categoryLabel,
   pettyHint, showLoss = false, categoryOptions, defaultUnit = "个",
   extraFields = [], getGroupLabel, parseExcel, excelFormatHint,
-  renderExtraTabContent, extraTabs = [],
+  renderExtraTabContent, extraTabs = [], month, embedded = false,
 }: BaseInventoryScreenProps) {
   const colors = useColors();
   const router = useRouter();
@@ -81,9 +85,8 @@ export function BaseInventoryScreen({
   const [importPreview, setImportPreview] = useState<Omit<GenericInventoryItem, "id" | "createdAt" | "updatedAt">[]>([]);
   const [showImportPreview, setShowImportPreview] = useState(false);
 
-  const currentMonth = getCurrentMonth();
+  const currentMonth = month ?? getCurrentMonth();
   const activeItems = useMemo(() => store.items.filter((i) => i.active), [store.items]);
-  const lowStockItems = useMemo(() => store.getLowStockItems(), [store]);
   const monthPurchases = useMemo(() => store.getMonthPurchases(currentMonth), [store, currentMonth]);
   const monthConsumes = useMemo(() => store.getMonthConsumes(currentMonth), [store, currentMonth]);
   const totalMonthPurchase = useMemo(() => monthPurchases.reduce((s, r) => s + r.totalAmount, 0), [monthPurchases]);
@@ -183,8 +186,8 @@ export function BaseInventoryScreen({
 
   return (
     <ScreenContainer>
-      {/* 导航栏 */}
-      <View style={[S.navbar, { borderBottomColor: colors.border }]}>
+      {/* 独立路由保留标题与返回；嵌入工作台时由外层统一提供分类与月份导航。 */}
+      {!embedded && <View style={[S.navbar, { borderBottomColor: colors.border }]}>
         <Pressable onPress={() => router.back()} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
           <IconSymbol name="chevron.left" size={22} color={colors.primary} />
         </Pressable>
@@ -199,7 +202,7 @@ export function BaseInventoryScreen({
             <IconSymbol name="plus" size={22} color={accentColor} />
           </Pressable>
         </View>
-      </View>
+      </View>}
 
       {/* Tab 切换 */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
@@ -240,22 +243,6 @@ export function BaseInventoryScreen({
                 </View>
               ))}
             </View>
-
-            {/* 库存预警 */}
-            {lowStockItems.length > 0 && (
-              <View style={[S.summaryCard, { backgroundColor: colors.error + "0a", borderColor: colors.error + "22" }]}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 }}>
-                  <IconSymbol name="exclamationmark.triangle.fill" size={15} color={colors.error} />
-                  <Text style={{ fontSize: 14, fontWeight: "700", color: colors.error }}>库存预警（{lowStockItems.length} 款）</Text>
-                </View>
-                {lowStockItems.map((item) => (
-                  <View key={item.id} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 4 }}>
-                    <Text style={{ fontSize: 13, color: colors.foreground }}>{item.name}</Text>
-                    <Text style={{ fontSize: 13, color: colors.error }}>库存 {item.currentStock} {item.unit}（预警线 {item.alertThreshold}）</Text>
-                  </View>
-                ))}
-              </View>
-            )}
 
             {/* 与上月对比 */}
             {lastSnapshot && (

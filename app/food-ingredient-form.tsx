@@ -28,7 +28,6 @@ export default function FoodIngredientFormScreen() {
   const [unit, setUnit] = useState(existing?.unit ?? "");
   const [costPrice, setCostPrice] = useState(existing?.costPrice != null ? String(existing.costPrice) : "");
   const [stock, setStock] = useState(String(existing?.stock ?? "0"));
-  const [alertThreshold, setAlertThreshold] = useState(String(existing?.alertThreshold ?? "0"));
   const [supplier, setSupplier] = useState(existing?.supplier ?? "");
   const [notes, setNotes] = useState(existing?.notes ?? "");
 
@@ -46,7 +45,6 @@ export default function FoodIngredientFormScreen() {
       unit: unit.trim(),
       costPrice: costPrice ? parseFloat(costPrice) : null,
       stock: parseInt(stock) || 0,
-      alertThreshold: parseInt(alertThreshold) || 0,
       supplier: supplier.trim(),
       notes: notes.trim(),
     };
@@ -107,7 +105,6 @@ export default function FoodIngredientFormScreen() {
           { label: "单位", value: unit, onChange: setUnit, placeholder: "如：袋、kg、个" },
           { label: "采购价（元）", value: costPrice, onChange: setCostPrice, placeholder: "可选", keyboardType: "decimal-pad" as const },
           { label: "当前库存", value: stock, onChange: setStock, placeholder: "0", keyboardType: "number-pad" as const },
-          { label: "库存预警线", value: alertThreshold, onChange: setAlertThreshold, placeholder: "0", keyboardType: "number-pad" as const },
           { label: "供应商", value: supplier, onChange: setSupplier, placeholder: "可选" },
         ].map((f) => (
           <View key={f.label} style={{ marginBottom: 16 }}>

@@ -8,15 +8,14 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useReducer } from "react";
 import { notifySyncChange, registerStoreReload } from "../sync/engine";
-import { InventoryCategory } from "./inventory-store";
-
 const STORAGE_KEY = "store.petty_categories.v1";
 
 // ─── 类型定义 ─────────────────────────────────────────────────────────────────
 
-/** 进销存品类（扩展，含啤酒和冰块） */
+/** 备用金可关联的库存类别；不再依赖已删除的旧库存Provider模型。 */
+type BaseInventoryCategory = "spirit" | "wine" | "food" | "equipment" | "tableware" | "daily";
 export type ExtendedInventoryCategory =
-  | InventoryCategory
+  | BaseInventoryCategory
   | "beer"
   | "ice"
   | "fruit"

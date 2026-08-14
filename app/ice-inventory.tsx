@@ -9,7 +9,12 @@ import IceCostLinkTab from "@/components/inventory/IceCostLinkTab";
 
 const ICE_COLOR = "#00BCD4";
 
-export default function IceInventoryScreen() {
+export interface IceInventoryScreenProps {
+  month?: string;
+  embedded?: boolean;
+}
+
+export default function IceInventoryScreen({ month, embedded = false }: IceInventoryScreenProps) {
   const store = useIceNewInventoryStore();
   return (
     <BaseInventoryScreen
@@ -24,6 +29,8 @@ export default function IceInventoryScreen() {
       defaultUnit="袋"
       parseExcel={parseIceInventoryExcel}
       excelFormatHint={ICE_EXCEL_HINT}
+      month={month}
+      embedded={embedded}
       extraTabs={[{ key: "costLink", label: "💡 成本联动" }]}
       renderExtraTabContent={(tab) => {
         if (tab === "costLink") return <IceCostLinkTab />;

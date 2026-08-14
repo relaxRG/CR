@@ -18,7 +18,12 @@ function getGroupLabel(item: GenericInventoryItem): string {
   return cat?.label ?? "其他";
 }
 
-export default function FruitInventoryScreen() {
+export interface FruitInventoryScreenProps {
+  month?: string;
+  embedded?: boolean;
+}
+
+export default function FruitInventoryScreen({ month, embedded = false }: FruitInventoryScreenProps) {
   const store = useFruitNewInventoryStore();
   return (
     <BaseInventoryScreen
@@ -35,6 +40,8 @@ export default function FruitInventoryScreen() {
       getGroupLabel={getGroupLabel}
       parseExcel={parseFruitInventoryExcel}
       excelFormatHint={FRUIT_EXCEL_HINT}
+      month={month}
+      embedded={embedded}
     />
   );
 }

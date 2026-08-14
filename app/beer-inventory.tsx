@@ -18,7 +18,12 @@ function getGroupLabel(item: GenericInventoryItem): string {
   return pkg?.label ?? "其他";
 }
 
-export default function BeerInventoryScreen() {
+export interface BeerInventoryScreenProps {
+  month?: string;
+  embedded?: boolean;
+}
+
+export default function BeerInventoryScreen({ month, embedded = false }: BeerInventoryScreenProps) {
   const store = useBeerInventoryStore();
   return (
     <BaseInventoryScreen
@@ -35,6 +40,8 @@ export default function BeerInventoryScreen() {
       getGroupLabel={getGroupLabel}
       parseExcel={parseBeerInventoryExcel}
       excelFormatHint={BEER_EXCEL_HINT}
+      month={month}
+      embedded={embedded}
     />
   );
 }
