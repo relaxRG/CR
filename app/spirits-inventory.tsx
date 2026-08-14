@@ -18,6 +18,7 @@ import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
 import {
@@ -1667,6 +1668,8 @@ function SupplierDetailScreen({
   // 批量修改日期 Modal
   const [showBatchDate, setShowBatchDate] = useState(false);
   const [batchDateInput, setBatchDateInput] = useState("");
+  // 仅控制供应商进货表的显示语言，不参与Excel导入、账务计算或同步。
+  const [purchaseNameLanguage, setPurchaseNameLanguage] = usePersistedState<"zh" | "en">("spirits.purchase.name-language.v1", "zh");
 
   // 备用金导入
   const pettyRecords = useMemo(() => {
@@ -1959,13 +1962,25 @@ function SupplierDetailScreen({
                 <Text style={[S.thCell, { width: 36 }]}>行号</Text>
                 <Text style={[S.thCell, { width: 56 }]}>分类</Text>
                 <Text style={[S.thCell, { width: 90 }]}>日期</Text>
-                <Text style={[S.thCell, { width: 160 }]}>商品名称</Text>
-                <Text style={[S.thCell, { width: 80 }]}>集团</Text>
-                <Text style={[S.thCell, { width: 40 }]}>规格</Text>
+                <View style={{ width: 160, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 }}>
+                  <Text style={S.thCell}>商品名称</Text>
+                  <TouchableOpacity
+                    testID="spirits-purchase-name-language-toggle"
+                    accessibilityRole="button"
+                    accessibilityLabel="切换商品名称中英文显示"
+                    onPress={() => setPurchaseNameLanguage((language) => language === "zh" ? "en" : "zh")}
+                    style={{ minWidth: 34, minHeight: 28, paddingHorizontal: 5, borderRadius: 7, borderWidth: 1, borderColor: "#FCA5A5", alignItems: "center", justifyContent: "center" }}
+                  >
+                    <Text style={{ fontSize: 10, fontWeight: "800", color: "#fff" }}>{purchaseNameLanguage === "zh" ? "中" : "EN"}</Text>
+                  </TouchableOpacity>
+                </View>
                 <Text style={[S.thCell, { width: 50 }]}>数量</Text>
+                <Text style={[S.thCell, { width: 56 }]}>规格</Text>
                 <Text style={[S.thCell, { width: 90 }]}>单价</Text>
                 <Text style={[S.thCell, { width: 90 }]}>应收增加</Text>
+                <Text style={[S.thCell, { width: 80 }]}>集团</Text>
               </View>
+
               {/* 数据行 */}
               {supPurchases.map((p, idx) => {
                 const item = items.find((i) => i.id === p.itemId);
@@ -1994,6 +2009,8 @@ function SupplierDetailScreen({
                       }
                     }}
                     style={[S.tableRow, {
+                      height: 58,
+                      minHeight: 58,
                       backgroundColor: isSelected ? "#FEF2F2" : idx % 2 === 0 ? colors.surface : colors.background,
                     }]}>
                     {selectMode && (
@@ -2057,7 +2074,7 @@ function SupplierDetailScreen({
                       }}>
                       <Text style={{ fontSize: 11, color: colors.foreground }}>{p.date}</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={[S.tdCell, { width: 160 }]}
+                    <TouchableOpacity style={[S.tdCell, { width: 160, height: 58, justifyContent: "center" }]}
                       onPress={() => {
                         if (!selectMode) {
                           tap();
@@ -2075,48 +2092,18 @@ function SupplierDetailScreen({
                           toggleSelect(p.id);
                         }
                       }}>
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                        <Text style={{ fontSize: 11, color: colors.foreground, flex: 1 }} numberOfLines={2}>{p.rawName}</Text>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 4, height: 34 }}>
+                        <Text style={{ fontSize: 11, lineHeight: 16, color: colors.foreground, flex: 1 }} numberOfLines={2}>
+                          {(() => {
+                            if (!item) return p.rawName;
+                            const preferred = purchaseNameLanguage === "zh" ? item.name : item.nameEn;
+                            const fallback = purchaseNameLanguage === "zh" ? item.nameEn : item.name;
+                            return preferred?.trim() || fallback?.trim() || p.rawName;
+                          })()}
+                        </Text>
                         {!p.itemId && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: "#F59E0B" }} />}
                       </View>
                     </TouchableOpacity>
-                    {/* 集团列 */}
-                    <TouchableOpacity style={[S.tdCell, { width: 80 }]}
-                      onPress={() => {
-                        if (selectMode) return;
-                        tap();
-                        // 弹出集团选择器
-                        const groupNames = groups.map((g) => g.name);
-                        Alert.alert(
-                          "设置集团归属",
-                          `「${p.rawName}」`,
-                          [
-                            ...groupNames.map((gn) => ({
-                              text: gn,
-                              onPress: () => {
-                                updatePurchase(p.id, { group: gn });
-                                rememberGroupMatch(p.rawName, gn);
-                              },
-                            })),
-                            { text: "清除", style: "destructive" as const, onPress: () => updatePurchase(p.id, { group: undefined }) },
-                            { text: "取消", style: "cancel" as const },
-                          ]
-                        );
-                      }}>
-                      {purchaseGroup ? (
-                        <View style={{ backgroundColor: (groups.find((g) => g.name === purchaseGroup)?.color ?? "#6B7280") + "20",
-                          borderRadius: 6, paddingHorizontal: 4, paddingVertical: 2 }}>
-                          <Text style={{ fontSize: 9, fontWeight: "700",
-                            color: groups.find((g) => g.name === purchaseGroup)?.color ?? "#6B7280" }}
-                            numberOfLines={2}>
-                            {purchaseGroup.replace(/ \(.*\)/, "")}
-                          </Text>
-                        </View>
-                      ) : (
-                        <Text style={{ fontSize: 9, color: "#F59E0B", fontWeight: "600" }}>待填</Text>
-                      )}
-                    </TouchableOpacity>
-                    <Text style={[S.tdCell, { width: 40, textAlign: "center", fontSize: 11, color: colors.muted }]}>{p.unit}</Text>
                     {/* 数量列（可点击编辑） */}
                     <TouchableOpacity style={[S.tdCell, { width: 50, alignItems: "flex-end" }]}
                       onPress={() => {
@@ -2134,6 +2121,7 @@ function SupplierDetailScreen({
                       }}>
                       <Text style={{ fontSize: 11, color: colors.foreground }}>{p.quantity}</Text>
                     </TouchableOpacity>
+                    <Text style={[S.tdCell, { width: 56, textAlign: "center", fontSize: 11, color: colors.muted }]}>{p.unit || "—"}</Text>
                     {/* 单价列（可点击编辑，90pt，价格涨跌独占第二行） */}
                     <TouchableOpacity style={[S.tdCell, { width: 90, alignItems: "flex-end" }]}
                       onPress={() => {
@@ -2184,6 +2172,32 @@ function SupplierDetailScreen({
                         </Text>
                       )}
                     </TouchableOpacity>
+                    {/* 集团列：位于应收增加之后。 */}
+                    <TouchableOpacity style={[S.tdCell, { width: 80 }]}
+                      onPress={() => {
+                        if (selectMode) return;
+                        tap();
+                        const groupNames = groups.map((g) => g.name);
+                        Alert.alert("设置集团归属", `「${p.rawName}」`, [
+                          ...groupNames.map((gn) => ({
+                            text: gn,
+                            onPress: () => {
+                              updatePurchase(p.id, { group: gn });
+                              rememberGroupMatch(p.rawName, gn);
+                            },
+                          })),
+                          { text: "清除", style: "destructive" as const, onPress: () => updatePurchase(p.id, { group: undefined }) },
+                          { text: "取消", style: "cancel" as const },
+                        ]);
+                      }}>
+                      {purchaseGroup ? (
+                        <View style={{ backgroundColor: (groups.find((g) => g.name === purchaseGroup)?.color ?? "#6B7280") + "20", borderRadius: 6, paddingHorizontal: 4, paddingVertical: 2 }}>
+                          <Text style={{ fontSize: 9, fontWeight: "700", color: groups.find((g) => g.name === purchaseGroup)?.color ?? "#6B7280" }} numberOfLines={2}>
+                            {purchaseGroup.replace(/ \(.*\)/, "")}
+                          </Text>
+                        </View>
+                      ) : <Text style={{ fontSize: 9, color: "#F59E0B", fontWeight: "600" }}>待填</Text>}
+                    </TouchableOpacity>
                   </TouchableOpacity>
                 );
               })}
@@ -2193,16 +2207,17 @@ function SupplierDetailScreen({
                 <Text style={[S.tdCell, { width: 36 }]} />
                 <Text style={[S.tdCell, { width: 56 }]} />
                 <Text style={[S.tdCell, { width: 90 }]} />
-                <Text style={[S.tdCell, { width: 160, fontWeight: "700", color: "#991B1B", fontSize: 12 }]}>合计</Text>
-                <Text style={[S.tdCell, { width: 80 }]} />
-                <Text style={[S.tdCell, { width: 40 }]} />
+                                <Text style={[S.tdCell, { width: 160, fontWeight: "700", color: "#991B1B", fontSize: 12 }]}>合计</Text>
                 <Text style={[S.tdCell, { width: 50, textAlign: "right", fontWeight: "700", color: "#991B1B", fontSize: 11 }]}>
                   {supPurchases.reduce((s, p) => s + p.quantity, 0)}
                 </Text>
+                <Text style={[S.tdCell, { width: 56 }]} />
                 <Text style={[S.tdCell, { width: 90 }]} />
                 <Text style={[S.tdCell, { width: 90, textAlign: "right", fontWeight: "700", color: "#991B1B", fontSize: 12 }]}>
                   ¥{formatMoney(totalAmt)}
                 </Text>
+                <Text style={[S.tdCell, { width: 80 }]} />
+
               </View>
             </View>
           </ScrollView>
