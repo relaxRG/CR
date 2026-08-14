@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import type { SupplierPurchaseSortKey, SupplierPurchaseTableView } from "@/lib/spirits/purchase-table-view";
+import type { SupplierPurchaseNameOption, SupplierPurchaseSortKey, SupplierPurchaseTableView } from "@/lib/spirits/purchase-table-view";
 
 type NameLanguage = "zh" | "en";
 
@@ -10,6 +10,7 @@ type Props = {
   column: SupplierPurchaseSortKey | null;
   colors: { background: string; surface: string; foreground: string; muted: string; border: string; primary: string };
   groups: string[];
+  nameOptions: SupplierPurchaseNameOption[];
   nameLanguage: NameLanguage;
   onNameLanguageChange: (language: NameLanguage) => void;
   view: SupplierPurchaseTableView;
@@ -30,7 +31,7 @@ function updateFilters(view: SupplierPurchaseTableView, key: keyof SupplierPurch
 }
 
 export function SupplierPurchaseColumnMenu({
-  visible, column, colors, groups, nameLanguage, onNameLanguageChange, view, onViewChange, onClose,
+  visible, column, colors, groups, nameOptions, nameLanguage, onNameLanguageChange, view, onViewChange, onClose,
 }: Props) {
   const insets = useSafeAreaInsets();
   const range = useMemo(() => {
@@ -45,7 +46,7 @@ export function SupplierPurchaseColumnMenu({
   const selectSort = (direction: "asc" | "desc") => onViewChange({ ...view, sort: { key: column, direction } });
   const clearColumn = () => {
     const next = { ...view, filters: { ...view.filters } };
-    if (column === "name") next.filters.nameQuery = "";
+    if (column === "name") { next.filters.nameQuery = ""; next.filters.nameKeys = []; next.filters.onlyUnmatchedNames = false; }
     if (column === "quantity") { next.filters.quantityMin = ""; next.filters.quantityMax = ""; }
     if (column === "unitPrice") { next.filters.unitPriceMin = ""; next.filters.unitPriceMax = ""; }
     if (column === "amount") { next.filters.amountMin = ""; next.filters.amountMax = ""; }
@@ -53,6 +54,20 @@ export function SupplierPurchaseColumnMenu({
     if (next.sort?.key === column) next.sort = null;
     onViewChange(next);
   };
+
+  const normalizedNameQuery = view.filters.nameQuery.trim().toLocaleLowerCase();
+  const visibleNameOptions = column === "name"
+    ? nameOptions.filter((option) => !normalizedNameQuery || option.searchableName.toLocaleLowerCase().includes(normalizedNameQuery))
+    : [];
+  const visibleNameKeys = visibleNameOptions.map((option) => option.key);
+  const allVisibleNamesSelected = visibleNameKeys.length > 0 && visibleNameKeys.every((key) => view.filters.nameKeys.includes(key));
+  const toggleNameKey = (key: string) => onViewChange(updateFilters(view, "nameKeys", view.filters.nameKeys.includes(key)
+    ? view.filters.nameKeys.filter((value) => value !== key)
+    : [...view.filters.nameKeys, key]));
+  const toggleAllVisibleNames = () => onViewChange(updateFilters(view, "nameKeys", allVisibleNamesSelected
+    ? view.filters.nameKeys.filter((key) => !visibleNameKeys.includes(key))
+    : [...new Set([...view.filters.nameKeys, ...visibleNameKeys])],
+  ));
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -77,8 +92,29 @@ export function SupplierPurchaseColumnMenu({
               </View>
               <Text style={[S.label, { color: colors.muted }]}>名称筛选</Text>
               <TextInput value={view.filters.nameQuery} onChangeText={(value) => onViewChange(updateFilters(view, "nameQuery", value))}
-                placeholder="输入名称关键词" placeholderTextColor={colors.muted}
+                placeholder="搜索商品名称" placeholderTextColor={colors.muted}
                 style={[S.input, { borderColor: colors.border, color: colors.foreground }]} />
+              <View style={S.nameFilterHeader}>
+                <TouchableOpacity testID="supplier-name-select-all-visible" onPress={toggleAllVisibleNames} style={{ minHeight: 36, justifyContent: "center" }}>
+                  <Text style={{ color: colors.primary, fontWeight: "700", fontSize: 13 }}>{allVisibleNamesSelected ? "取消全选当前结果" : "全选当前结果"}</Text>
+                </TouchableOpacity>
+                <Text style={{ color: colors.muted, fontSize: 12 }}>已选 {view.filters.nameKeys.length} / {nameOptions.length}</Text>
+              </View>
+              <TouchableOpacity testID="supplier-name-only-unmatched" onPress={() => onViewChange(updateFilters(view, "onlyUnmatchedNames", !view.filters.onlyUnmatchedNames))}
+                style={[S.unmatched, { borderColor: view.filters.onlyUnmatchedNames ? colors.primary : colors.border, backgroundColor: view.filters.onlyUnmatchedNames ? colors.primary + "18" : colors.surface }]}>
+                <Text style={{ color: view.filters.onlyUnmatchedNames ? colors.primary : colors.foreground, fontWeight: "700" }}>{view.filters.onlyUnmatchedNames ? "✓ 仅显示未匹配商品" : "□ 仅显示未匹配商品"}</Text>
+              </TouchableOpacity>
+              <View style={[S.nameOptions, { borderColor: colors.border }]}>
+                {visibleNameOptions.map((option) => {
+                  const selected = view.filters.nameKeys.includes(option.key);
+                  return <TouchableOpacity key={option.key} testID={`supplier-name-option-${option.key}`} onPress={() => toggleNameKey(option.key)} style={S.nameOption}>
+                    <Text style={{ color: selected ? colors.primary : colors.muted, fontSize: 16 }}>{selected ? "☑" : "□"}</Text>
+                    <Text style={{ color: colors.foreground, fontSize: 13, flex: 1 }} numberOfLines={1}>{option.label}</Text>
+                    <Text style={{ color: option.isMatched ? colors.muted : "#D97706", fontSize: 11 }}>{option.isMatched ? `${option.count}笔` : `未匹配 · ${option.count}笔`}</Text>
+                  </TouchableOpacity>;
+                })}
+                {visibleNameOptions.length === 0 && <Text style={{ color: colors.muted, fontSize: 13, textAlign: "center", paddingVertical: 12 }}>没有符合当前搜索的商品名称</Text>}
+              </View>
             </>
           )}
           {range && (
@@ -147,5 +183,9 @@ const S = StyleSheet.create({
   halfInput: { flex: 1 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: { minHeight: 38, justifyContent: "center", borderRadius: 19, borderWidth: 1, paddingHorizontal: 12 },
+  nameFilterHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  unmatched: { minHeight: 40, borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, justifyContent: "center" },
+  nameOptions: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 10, overflow: "hidden" },
+  nameOption: { minHeight: 42, flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "rgba(0,0,0,0.08)" },
   clear: { minHeight: 44, alignItems: "center", justifyContent: "center", borderRadius: 10, borderWidth: 1, marginTop: 4 },
 });

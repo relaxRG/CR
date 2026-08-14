@@ -40,6 +40,7 @@ import { normalizeLLMRows } from "@/lib/spirits/pdf-import";
 import { exportToExcel, exportToPdf, ExportData } from "@/lib/spirits/export";
 import {
   applySupplierPurchaseTableView,
+  collectSupplierPurchaseNameOptions,
   DEFAULT_SUPPLIER_PURCHASE_TABLE_VIEW,
   hasSupplierPurchaseTableFilters,
   type SupplierPurchaseSortKey,
@@ -1679,19 +1680,28 @@ function SupplierDetailScreen({
   const [purchaseNameLanguage, setPurchaseNameLanguage] = usePersistedState<"zh" | "en">("spirits.purchase.name-language.v1", "zh");
   const [purchaseTableView, setPurchaseTableView] = useState(DEFAULT_SUPPLIER_PURCHASE_TABLE_VIEW);
   const [activePurchaseColumn, setActivePurchaseColumn] = useState<SupplierPurchaseSortKey | null>(null);
-  const visibleSupplierPurchases = useMemo(() => applySupplierPurchaseTableView(
-    supPurchases.map((purchase) => {
-      const item = items.find((candidate) => candidate.id === purchase.itemId);
-      const preferred = purchaseNameLanguage === "zh" ? item?.name : item?.nameEn;
-      const fallback = purchaseNameLanguage === "zh" ? item?.nameEn : item?.name;
-      return {
-        ...purchase,
-        displayName: preferred?.trim() || fallback?.trim() || purchase.rawName,
-        displayGroup: purchase.group || detectPurchaseGroup(purchase.rawName) || (item ? getItemGroup(item) : ""),
-      };
-    }),
-    purchaseTableView,
-  ), [supPurchases, items, purchaseNameLanguage, purchaseTableView, groups]);
+  const supplierPurchaseRows = useMemo(() => supPurchases.map((purchase) => {
+    const item = items.find((candidate) => candidate.id === purchase.itemId);
+    const preferred = purchaseNameLanguage === "zh" ? item?.name : item?.nameEn;
+    const fallback = purchaseNameLanguage === "zh" ? item?.nameEn : item?.name;
+    const isMatched = Boolean(item?.id);
+    return {
+      ...purchase,
+      nameKey: isMatched ? `item:${item!.id}` : `raw:${purchase.rawName.trim().toLocaleLowerCase()}`,
+      isMatched,
+      searchableName: [item?.name, item?.nameEn, purchase.rawName].filter(Boolean).join(" "),
+      displayName: preferred?.trim() || fallback?.trim() || purchase.rawName,
+      displayGroup: purchase.group || detectPurchaseGroup(purchase.rawName) || (item ? getItemGroup(item) : ""),
+    };
+  }), [supPurchases, items, purchaseNameLanguage, groups]);
+  const supplierPurchaseNameOptions = useMemo(
+    () => collectSupplierPurchaseNameOptions(supplierPurchaseRows),
+    [supplierPurchaseRows],
+  );
+  const visibleSupplierPurchases = useMemo(
+    () => applySupplierPurchaseTableView(supplierPurchaseRows, purchaseTableView),
+    [supplierPurchaseRows, purchaseTableView],
+  );
   const visibleSupplierPurchaseTotal = visibleSupplierPurchases.reduce((sum, purchase) => sum + purchase.amount, 0);
   const purchaseTableHasAdjustments = Boolean(purchaseTableView.sort) || hasSupplierPurchaseTableFilters(purchaseTableView.filters);
   const purchaseTableSummary = [
@@ -2766,6 +2776,7 @@ function SupplierDetailScreen({
         column={activePurchaseColumn}
         colors={colors}
         groups={groups.map((group) => group.name)}
+        nameOptions={supplierPurchaseNameOptions}
         nameLanguage={purchaseNameLanguage}
         onNameLanguageChange={setPurchaseNameLanguage}
         view={purchaseTableView}
