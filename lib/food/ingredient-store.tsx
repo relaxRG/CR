@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useReducer } from "react";
 import { notifySyncChange, registerStoreReload } from "../sync/engine";
 import { FoodIngredient, PriceHistoryEntry, SupplierPurchaseRecord } from "./types";
+import { stripLegacyInventoryAlertThreshold } from "../inventory-core/legacy-cleanup";
 
 const STORAGE_KEY = "food.ingredients.v2";
 const PURCHASE_KEY = "food.purchases.v1";
@@ -14,6 +15,24 @@ export interface FoodIngredientState {
 
 export interface PurchaseState {
   records: SupplierPurchaseRecord[];
+}
+
+/** 历史食材档案的预警字段已废弃；任何加载入口都必须先清除。 */
+export function sanitizeFoodIngredientState(raw: unknown): FoodIngredientState {
+  const source = Array.isArray(raw)
+    ? { ingredients: raw }
+    : raw && typeof raw === "object"
+      ? raw as Record<string, unknown>
+      : {};
+  const ingredients = Array.isArray(source.ingredients) ? source.ingredients : [];
+  return {
+    ingredients: ingredients
+      .filter((ingredient): ingredient is Record<string, unknown> => Boolean(ingredient) && typeof ingredient === "object")
+      .map((ingredient) => stripLegacyInventoryAlertThreshold(ingredient) as unknown as FoodIngredient),
+    priceHistory: source.priceHistory && typeof source.priceHistory === "object"
+      ? source.priceHistory as Record<string, PriceHistoryEntry[]>
+      : {},
+  };
 }
 
 type Action =
@@ -103,10 +122,7 @@ export function FoodIngredientProvider({ children }: { children: React.ReactNode
           const parsed = JSON.parse(raw);
           dispatch({
             type: "LOAD",
-            payload: {
-              ingredients: parsed.ingredients ?? [],
-              priceHistory: parsed.priceHistory ?? {},
-            },
+            payload: sanitizeFoodIngredientState(parsed),
           });
           return;
         } catch {}
@@ -118,10 +134,7 @@ export function FoodIngredientProvider({ children }: { children: React.ReactNode
             const parsed1 = JSON.parse(raw1);
             dispatch({
               type: "LOAD",
-              payload: {
-                ingredients: Array.isArray(parsed1) ? parsed1 : (parsed1.ingredients ?? []),
-                priceHistory: {},
-              },
+              payload: sanitizeFoodIngredientState(parsed1),
             });
           } catch {}
         }

@@ -5,6 +5,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useReducer, useState } from "react";
 import { MonthlySnapshot, PurchaseRecord, ConsumeRecord, getCurrentMonth, getPrevMonth, getOpeningFromLastMonth } from "./types";
+import { stripLegacyInventoryAlertThreshold } from "./legacy-cleanup";
 
 function uuid() { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
 
@@ -37,6 +38,23 @@ export interface GenericInventoryState {
   purchases: PurchaseRecord[];
   consumes: ConsumeRecord[];
   snapshots: MonthlySnapshot[];
+}
+
+/**
+ * 历史库存数据曾包含 alertThreshold。预警功能已移除，加载时即丢弃该字段，
+ * 随后的持久化和同步写回会自然清除它，避免旧数据重新污染新模型。
+ */
+export function sanitizeGenericInventoryState(raw: unknown): GenericInventoryState {
+  const source = raw && typeof raw === "object" ? raw as Record<string, unknown> : {};
+  const items = Array.isArray(source.items) ? source.items : [];
+  return {
+    items: items
+      .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
+      .map((item) => stripLegacyInventoryAlertThreshold(item) as unknown as GenericInventoryItem),
+    purchases: Array.isArray(source.purchases) ? source.purchases as PurchaseRecord[] : [],
+    consumes: Array.isArray(source.consumes) ? source.consumes as ConsumeRecord[] : [],
+    snapshots: Array.isArray(source.snapshots) ? source.snapshots as MonthlySnapshot[] : [],
+  };
 }
 
 type Action =
@@ -159,7 +177,7 @@ export function createGenericInventoryStore(storageKey: string, categoryId: stri
       (async () => {
         try {
           const raw = await AsyncStorage.getItem(storageKey);
-          if (raw) dispatch({ type: "LOAD", payload: JSON.parse(raw) });
+          if (raw) dispatch({ type: "LOAD", payload: sanitizeGenericInventoryState(JSON.parse(raw)) });
         } catch {}
         setReady(true);
       })();
