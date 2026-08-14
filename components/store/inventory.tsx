@@ -49,6 +49,9 @@ const CATEGORIES: Array<{ key: InventoryCategoryKey; label: string; emoji: strin
   { key: "equipment", label: "设备", emoji: "🔧", color: "#6366F1", mode: "shop" },
 ];
 
+const INVENTORY_CATEGORIES = CATEGORIES.filter((category) => category.mode === "inventory");
+const SHOP_CATEGORIES = CATEGORIES.filter((category) => category.mode === "shop");
+
 function normalizeMany(values: Array<string | null | undefined>): string[] {
   return values.filter((value): value is string => normalizeInventoryMonth(value) !== null);
 }
@@ -76,7 +79,7 @@ export default function StoreInventoryScreen({ mode = "inventory" }: { mode?: In
   const dailyStore = useDailyInventoryStore();
   const equipmentStore = useEquipmentInventoryStore();
 
-  const categories = CATEGORIES.filter((category) => category.mode === mode);
+  const categories = mode === "shop" ? SHOP_CATEGORIES : INVENTORY_CATEGORIES;
   const currentCategory = categories.find((category) => category.key === activeCategory) ?? categories[0];
 
   const categoryMonths = useMemo(() => {

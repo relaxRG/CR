@@ -145,16 +145,22 @@ try {
 
     await click(call, clickTestIdExpression("store-main-tab-inventory"), `${width}pt 未找到库存主导航`);
     await sleep(250);
+    await click(call, clickTestIdExpression("inventory-segment-spirits"), `${width}pt 未找到烈酒分段`);
+    await sleep(120);
     const inventoryInitial = await call("Runtime.evaluate", {
       expression: layoutExpression("inventory-segmented-tabs", "inventory-workspace-spirits"),
       returnByValue: true,
     });
     const inventoryState = inventoryInitial.result.value;
     assertNoRootOverflow(`${width}pt 库存初始页`, inventoryState);
-    if (inventoryState.tabLabels !== "烈酒 葡萄酒 水果 食材 啤酒 冰块") {
-      throw new Error(`${width}pt 库存分段顺序错误：${JSON.stringify(inventoryState)}`);
+    if (inventoryState.tabLabels !== "烈酒 葡萄酒 水果 食材 啤酒 冰块" || !inventoryState.workspaceFound) {
+      throw new Error(`${width}pt 库存分段顺序或初始工作区错误：${JSON.stringify(inventoryState)}`);
     }
 
+    const inventoryMonthBeforeCategoryChange = await call("Runtime.evaluate", {
+      expression: `document.querySelector('[data-testid="inventory-month-navigator"]')?.innerText.replace(/\\s+/g, ' ').trim() ?? ''`,
+      returnByValue: true,
+    });
     await click(call, clickTestIdExpression("inventory-segment-fruit"), `${width}pt 未找到水果分段`);
     await sleep(150);
     const fruitActive = await call("Runtime.evaluate", {
@@ -166,6 +172,13 @@ try {
     if (!fruitState.workspaceFound || !fruitState.workspaceText.includes("库存管理")) {
       throw new Error(`${width}pt 切换水果分段后原有业务工作区未同步：${JSON.stringify(fruitState)}`);
     }
+    const inventoryMonthAfterCategoryChange = await call("Runtime.evaluate", {
+      expression: `document.querySelector('[data-testid="inventory-month-navigator"]')?.innerText.replace(/\\s+/g, ' ').trim() ?? ''`,
+      returnByValue: true,
+    });
+    if (inventoryMonthBeforeCategoryChange.result.value !== inventoryMonthAfterCategoryChange.result.value) {
+      throw new Error(`${width}pt 切换库存分类后月份状态发生错位`);
+    }
     await click(call, clickTestIdExpression("inventory-month-navigator-picker"), `${width}pt 未找到库存快速选月`);
     await sleep(120);
     const inventoryPicker = await call("Runtime.evaluate", {
@@ -173,17 +186,21 @@ try {
       returnByValue: true,
     });
     if (!inventoryPicker.result.value) throw new Error(`${width}pt 库存快速选月面板未打开`);
+    await call("Runtime.evaluate", { expression: `document.querySelector('[aria-label="关闭月份选择"]')?.click()` });
+    await sleep(80);
 
     await click(call, clickTestIdExpression("store-main-tab-shop"), `${width}pt 未找到店铺主导航`);
     await sleep(250);
+    await click(call, clickTestIdExpression("shop-segment-glassware"), `${width}pt 未找到杯具分段`);
+    await sleep(120);
     const shopInitial = await call("Runtime.evaluate", {
       expression: layoutExpression("shop-segmented-tabs", "shop-workspace-glassware"),
       returnByValue: true,
     });
     const shopState = shopInitial.result.value;
     assertNoRootOverflow(`${width}pt 店铺初始页`, shopState);
-    if (shopState.tabLabels !== "杯具 餐具 日用品 设备") {
-      throw new Error(`${width}pt 店铺分段顺序错误：${JSON.stringify(shopState)}`);
+    if (shopState.tabLabels !== "杯具 餐具 日用品 设备" || !shopState.workspaceFound) {
+      throw new Error(`${width}pt 店铺分段顺序或初始工作区错误：${JSON.stringify(shopState)}`);
     }
 
     await click(call, clickTestIdExpression("shop-segment-equipment"), `${width}pt 未找到设备分段`);
