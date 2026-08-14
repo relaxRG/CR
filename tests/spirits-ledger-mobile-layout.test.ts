@@ -3,16 +3,17 @@ import { describe, expect, it } from "vitest";
 
 const source = readFileSync("app/spirits-inventory.tsx", "utf8");
 
-describe("烈酒库存移动端紧凑台账", () => {
-  it("在窄屏使用实时断点和主列紧凑列表，而不压缩14列宽表", () => {
-    expect(source).toContain('const useCompactLedger = viewportWidth < 600;');
+describe("烈酒库存移动端双视图", () => {
+  it("保留三列移动概览，同时允许用户切换到完整Excel台账", () => {
+    expect(source).toContain('usePersistedState<"compact" | "table">("spirits.ledger.view-mode.v1", "compact")');
     expect(source).toContain('testID="spirits-ledger-compact-list"');
-    expect(source).toContain('useCompactLedger ? (');
+    expect(source).toContain('testID="spirits-ledger-view-switcher"');
     expect(source).toContain('期末库存');
     expect(source).toContain('期末成本');
+    expect(source).not.toContain("useCompactLedger");
   });
 
-  it("通过抽屉提供期初、进货、期末和消耗完整数据，且复用现有写入入口", () => {
+  it("点击移动概览名称仍提供期初、进货、期末和消耗完整详情卡片，并复用现有写入入口", () => {
     expect(source).toContain('testID="spirits-ledger-detail-sheet"');
     expect(source).toContain('title="期初"');
     expect(source).toContain('title="本月进货"');
@@ -23,10 +24,11 @@ describe("烈酒库存移动端紧凑台账", () => {
     expect(source).toContain('setShowCatPicker(true)');
   });
 
-  it("保留宽屏横向对账表，不把局部数据表误改为整页分页", () => {
-    expect(source).toContain(') : (\n          <ScrollView horizontal showsHorizontalScrollIndicator style={{ flexGrow: 0 }}>');
+  it("Excel台账保持局部横向滚动并包含完整期初、进货、期末、消耗和集团字段", () => {
+    expect(source).toContain('ScrollView horizontal showsHorizontalScrollIndicator style={{ flexGrow: 0 }}');
     expect(source).toContain('期初库存量');
-    expect(source).toContain('本月进货量');
-    expect(source).toContain('本期消耗量');
+    expect(source).toContain('进货数量');
+    expect(source).toContain('消耗瓶数');
+    expect(source).toContain('["集团", "group", 100]');
   });
 });

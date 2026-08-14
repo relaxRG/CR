@@ -17,6 +17,8 @@ export interface SpiritCustomCategory {
   color: string;
   /** 是否为内置分类（内置不可删除） */
   builtin: boolean;
+  /** 用户自定义显示顺序；历史数据缺失时按原始内置顺序与创建时间回退。 */
+  order?: number;
   createdAt: string;
 }
 
@@ -223,8 +225,10 @@ export interface SpiritInventoryItem {
   endQty: number;
   unitCost: number;
   endCost: number;
+  /** Excel第11列：消耗瓶数。 */
   consumeBottles: number;
-  consumeQty: number;
+  /** Excel第12列：本期消耗成本。 */
+  consumeCost: number;
 }
 
 // ─── 供应商进货明细 ──────────────────────────────────────────────────────────
@@ -353,7 +357,9 @@ export interface SpiritLedgerEntry {
   prevClosingQty?: number;
   purchaseQty: number;     // 本月进货量（自动汇总）
   purchaseCost: number;    // 本月进货成本（自动汇总）
-  consumeQty: number;      // 本月消耗量（手动录入）
+  consumeQty: number;      // 本月消耗瓶数（手动录入或盘点反推）
+  /** Excel盘点导入有明确成本时保留；旧数据缺失时按消耗瓶数×期末单位成本回退计算。 */
+  consumeCost?: number;
   closingQty: number;      // 期末库存量 = 期初+进货-消耗
   closingUnitCost: number; // 期末单价
   closingCost: number;     // 期末库存成本

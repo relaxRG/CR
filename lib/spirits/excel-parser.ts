@@ -77,7 +77,7 @@ function parseLedgerSheet(ws: any): SpiritInventoryItem[] {
       unitCost: Number(r[9]) || 0,
       endCost: Number(r[10]) || 0,
       consumeBottles: Number(r[11]) || 0,
-      consumeQty: Number(r[12]) || 0,
+      consumeCost: Number(r[12]) || 0,
     });
   }
   return items;
@@ -259,7 +259,7 @@ export function parseSpiritInventoryExcel(base64: string): {
     const totalPurchase =
       Object.values(supplierTotals).reduce((s, v) => s + v, 0) ||
       items.reduce((s, i) => s + i.purchaseCost, 0);
-    const totalConsume = items.reduce((s, i) => s + i.consumeQty, 0);
+    const totalConsume = items.reduce((s, i) => s + i.consumeCost, 0);
     const totalEndCost = items.reduce((s, i) => s + i.endCost, 0);
 
     const snapshot: SpiritMonthlySnapshot = {

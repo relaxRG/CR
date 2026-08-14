@@ -7,6 +7,8 @@ import React, { createContext, useContext, useEffect, useReducer } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { registerStoreReload } from "../sync/engine";
 import { purchasesForMonth, type PendingSpiritPurchase } from "./import-bridge";
+import { moveInventoryCategory } from "./category-lifecycle";
+import { normalizeLegacySpiritLedger } from "./ledger-legacy-cleanup";
 import {
   SpiritItem, SpiritPurchaseRecord, SpiritLedgerEntry,
   SpiritRefPrice, SpiritSupplierInfo, SpiritCustomCategory,
@@ -229,6 +231,8 @@ type Action =
   | { type: "UPDATE_SELF_BUY_CONFIG"; config: SelfBuyConfig }
   | { type: "UPSERT_CUSTOM_CATEGORY"; category: SpiritCustomCategory }
   | { type: "DELETE_CUSTOM_CATEGORY"; id: string }
+  | { type: "MIGRATE_CATEGORY_CONTENT"; fromCategory: string; toCategory: string }
+  | { type: "MIGRATE_AND_DELETE_CATEGORY"; id: string; fromCategory: string; toCategory: string }
   | { type: "SET_GROUP_MATCH_MEMORY"; memory: GroupMatchMemory }
   | { type: "BATCH_UPDATE_PURCHASES_CATEGORY"; itemId: string; category: string };
 
@@ -307,10 +311,26 @@ function reducer(state: SpiritsState, action: Action): SpiritsState {
       }
       return { ...state, customCategories: [...state.customCategories, action.category] };
     }
-    case "DELETE_CUSTOM_CATEGORY": return {
+    case "DELETE_CUSTOM_CATEGORY": {
+      const category = state.customCategories.find((entry) => entry.id === action.id);
+      if (!category || category.builtin || state.items.some((item) => item.category === category.name)) return state;
+      return { ...state, customCategories: state.customCategories.filter((entry) => entry.id !== action.id) };
+    }
+    case "MIGRATE_CATEGORY_CONTENT": return {
       ...state,
-      customCategories: state.customCategories.filter((c) => !(c.id === action.id && !c.builtin)),
+      items: state.items.map((item) => item.category === action.fromCategory ? { ...item, category: action.toCategory, categorySource: "manual", updatedAt: new Date().toISOString() } : item),
+      purchases: state.purchases.map((purchase) => purchase.category === action.fromCategory ? { ...purchase, category: action.toCategory } : purchase),
     };
+    case "MIGRATE_AND_DELETE_CATEGORY": {
+      const category = state.customCategories.find((entry) => entry.id === action.id);
+      if (!category || category.builtin) return state;
+      return {
+        ...state,
+        items: state.items.map((item) => item.category === action.fromCategory ? { ...item, category: action.toCategory, categorySource: "manual", updatedAt: new Date().toISOString() } : item),
+        purchases: state.purchases.map((purchase) => purchase.category === action.fromCategory ? { ...purchase, category: action.toCategory } : purchase),
+        customCategories: state.customCategories.filter((entry) => entry.id !== action.id),
+      };
+    }
     case "SET_GROUP_MATCH_MEMORY": {
       const filtered = state.groupMatchMemory.filter((m) => m.rawName !== action.memory.rawName);
       return { ...state, groupMatchMemory: [...filtered, action.memory] };
@@ -360,9 +380,10 @@ interface SpiritsContextValue extends SpiritsState {
   detectPurchaseGroup: (rawName: string) => string;
   rememberGroupMatch: (rawName: string, groupName: string) => void;
   // 自定义分类
-  getAllCategories: () => { name: string; color: string; builtin: boolean; id: string }[];
+  getAllCategories: () => { name: string; color: string; builtin: boolean; id: string; order: number }[];
   upsertCustomCategory: (data: Omit<SpiritCustomCategory, "id" | "createdAt"> & { id?: string }) => void;
-  deleteCustomCategory: (id: string) => void;
+  moveCategory: (id: string, direction: "up" | "down") => void;
+  removeCategorySafely: (id: string, toCategory: string) => boolean;
   getCategoryColor: (catName: string) => string;
   // 备用金匹配记忆
   setMatchMemory: (description: string, itemId: string, itemName: string, confidence: PettyMatchMemory["confidence"]) => void;
@@ -410,7 +431,7 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
     ]).then(([itemsRaw, purchasesRaw, ledgerRaw, refPricesRaw, suppliersRaw, groupsRaw, matchMemoryRaw, selfBuyRaw, customCatsRaw, groupMatchRaw]) => {
       const items = itemsRaw ? JSON.parse(itemsRaw) : [];
       const purchases = purchasesRaw ? JSON.parse(purchasesRaw) : [];
-      const ledger = ledgerRaw ? JSON.parse(ledgerRaw) : [];
+      const ledger: SpiritLedgerEntry[] = (ledgerRaw ? JSON.parse(ledgerRaw) : []).map(normalizeLegacySpiritLedger);
       const refPrices = refPricesRaw ? JSON.parse(refPricesRaw) : [];
       const suppliers = suppliersRaw ? JSON.parse(suppliersRaw) : [];
       const storedGroups: SpiritGroupDef[] = groupsRaw ? JSON.parse(groupsRaw) : [];
@@ -614,34 +635,61 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
   };
 
   // ── 自定义分类管理 ───────────────────────────────────────────────────────────────
-  const getAllCategories = (): { name: string; color: string; builtin: boolean; id: string }[] => {
-    const builtinList = (SPIRIT_CATEGORIES as readonly string[]).map((cat) => {
+  const getAllCategories = (): { name: string; color: string; builtin: boolean; id: string; order: number }[] => {
+    const builtinList = (SPIRIT_CATEGORIES as readonly string[]).map((cat, index) => {
       const override = state.customCategories.find((c) => c.originalName === cat || c.id === cat);
       return {
         id: cat,
         name: override ? override.name : cat,
         color: override ? override.color : (SPIRIT_CATEGORY_COLORS[cat] ?? "#6B7280"),
         builtin: true,
+        order: override?.order ?? index,
       };
     });
     const customList = state.customCategories
       .filter((c) => !c.builtin)
-      .map((c) => ({ id: c.id, name: c.name, color: c.color, builtin: false }));
-    return [...builtinList, ...customList];
+      .map((c, index) => ({ id: c.id, name: c.name, color: c.color, builtin: false, order: c.order ?? SPIRIT_CATEGORIES.length + index }));
+    return [...builtinList, ...customList].sort((left, right) => left.order - right.order || left.name.localeCompare(right.name, "zh-Hans-CN"));
   };
 
   const upsertCustomCategory = (data: Omit<SpiritCustomCategory, "id" | "createdAt"> & { id?: string }) => {
     const now = new Date().toISOString();
+    const previous = data.id ? state.customCategories.find((category) => category.id === data.id) : undefined;
+    const previousName = previous?.name ?? (data.builtin ? data.originalName ?? data.id : undefined);
     const category: SpiritCustomCategory = {
       ...data,
       id: data.id ?? uuid(),
-      createdAt: data.id ? (state.customCategories.find((c) => c.id === data.id)?.createdAt ?? now) : now,
+      createdAt: data.id ? (previous?.createdAt ?? now) : now,
     };
     dispatch({ type: "UPSERT_CUSTOM_CATEGORY", category });
+    if (previousName && previousName !== category.name) dispatch({ type: "MIGRATE_CATEGORY_CONTENT", fromCategory: previousName, toCategory: category.name });
   };
 
-  const deleteCustomCategory = (id: string) => {
-    dispatch({ type: "DELETE_CUSTOM_CATEGORY", id });
+  const moveCategory = (id: string, direction: "up" | "down") => {
+    const ordered = getAllCategories();
+    const changes = moveInventoryCategory(ordered, id, direction);
+    if (!changes.length) return;
+    const current = ordered.find((category) => category.id === changes[0].id)!;
+    const target = ordered.find((category) => category.id === changes[1].id)!;
+    const now = new Date().toISOString();
+    const persistOrder = (category: typeof current, order: number) => dispatch({ type: "UPSERT_CUSTOM_CATEGORY", category: {
+      id: category.id,
+      originalName: category.builtin ? category.id : undefined,
+      name: category.name,
+      color: category.color,
+      builtin: category.builtin,
+      order,
+      createdAt: state.customCategories.find((entry) => entry.id === category.id)?.createdAt ?? now,
+    } });
+    persistOrder(current, changes[0].order);
+    persistOrder(target, changes[1].order);
+  };
+
+  const removeCategorySafely = (id: string, toCategory: string) => {
+    const category = state.customCategories.find((entry) => entry.id === id);
+    if (!category || category.builtin) return false;
+    dispatch({ type: "MIGRATE_AND_DELETE_CATEGORY", id, fromCategory: category.name, toCategory });
+    return true;
   };
 
   const getCategoryColor = (catName: string): string => {
@@ -859,7 +907,7 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
     setRefPrice, getRefPrice,
     upsertSupplier, deleteSupplier, getSupplierByName,
     upsertGroup, deleteGroup, mergeGroup, getItemGroup, detectPurchaseGroup, rememberGroupMatch,
-    getAllCategories, upsertCustomCategory, deleteCustomCategory, getCategoryColor,
+    getAllCategories, upsertCustomCategory, moveCategory, removeCategorySafely, getCategoryColor,
     setMatchMemory, findMatchMemory, matchPettyToItem,
     updateSelfBuyConfig,
     getMonthPurchases, getSupplierMonthPurchases, getMonthLedger, getItemLedger,
