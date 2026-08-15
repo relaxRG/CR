@@ -296,7 +296,12 @@ try {
     await call("Emulation.setDeviceMetricsOverride", { width, height: 844, deviceScaleFactor: 3, mobile: true });
     await call("Page.navigate", { url: `http://localhost:${port}/spirits-inventory` });
     await sleep(900);
-    const ledgerClicked = await call("Runtime.evaluate", { expression: clickTextExpression("📋 库存管理"), returnByValue: true });
+    const ledgerClicked = await call("Runtime.evaluate", { expression: `(() => {
+      const tab = document.querySelector('[data-testid="spirits-tab-ledger"]');
+      if (!tab) return false;
+      tab.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+      return true;
+    })()`, returnByValue: true });
     if (!ledgerClicked.result.value) throw new Error(`烈酒库存 ${width}pt 缺少库存管理Tab`);
     await sleep(200);
     const ledgerState = await call("Runtime.evaluate", { expression: `(() => ({
@@ -304,18 +309,22 @@ try {
       rootScrollWidth: document.documentElement.scrollWidth,
       bodyScrollWidth: document.body.scrollWidth,
       hasImportedItem: document.body.innerText.includes('H5进口金宾'),
+      hasExcelTableName: Boolean(document.querySelector('[data-testid="spirits-ledger-table-name-h5-spirit-item"]')),
+      hasLegacyViewSwitcher: Boolean(document.querySelector('[data-testid="spirits-ledger-view-switcher"]')),
     }))()`, returnByValue: true });
-    if (!ledgerState.result.value.hasImportedItem) throw new Error(`烈酒库存 ${width}pt 未显示导入酒款`);
+    if (!ledgerState.result.value.hasImportedItem || !ledgerState.result.value.hasExcelTableName || ledgerState.result.value.hasLegacyViewSwitcher) {
+      throw new Error(`烈酒库存 ${width}pt 未直接渲染完整Excel台账：${JSON.stringify(ledgerState.result.value)}`);
+    }
     if (ledgerState.result.value.rootScrollWidth > ledgerState.result.value.rootClientWidth || ledgerState.result.value.bodyScrollWidth > ledgerState.result.value.rootClientWidth) {
       throw new Error(`烈酒库存台账 ${width}pt 出现根级横向溢出：${JSON.stringify(ledgerState.result.value)}`);
     }
-    const compactClicked = await call("Runtime.evaluate", { expression: `(() => {
-      const row = document.querySelector('[data-testid="spirits-ledger-compact-row-h5-spirit-item"]');
-      if (!row) return false;
-      row.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+    const nameClicked = await call("Runtime.evaluate", { expression: `(() => {
+      const name = document.querySelector('[data-testid="spirits-ledger-table-name-h5-spirit-item"]');
+      if (!name) return false;
+      name.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
       return true;
     })()`, returnByValue: true });
-    if (!compactClicked.result.value) throw new Error(`烈酒库存 ${width}pt 未渲染移动端紧凑主列表行`);
+    if (!nameClicked.result.value) throw new Error(`烈酒库存 ${width}pt 未渲染Excel台账商品名称`);
     await sleep(180);
     const detailState = await call("Runtime.evaluate", { expression: `(() => {
       const sheet = document.querySelector('[data-testid="spirits-ledger-detail-sheet"]');
@@ -329,7 +338,7 @@ try {
       };
     })()`, returnByValue: true });
     if (!detailState.result.value.visible || !detailState.result.value.hasPrimaryColumns || !detailState.result.value.hasFullDetail) {
-      throw new Error(`烈酒库存 ${width}pt 紧凑列表或详情抽屉不完整：${JSON.stringify(detailState.result.value)}`);
+      throw new Error(`烈酒库存 ${width}pt Excel台账商品名称或详情抽屉不完整：${JSON.stringify(detailState.result.value)}`);
     }
     if (detailState.result.value.rootScrollWidth > detailState.result.value.rootClientWidth || detailState.result.value.bodyScrollWidth > detailState.result.value.rootClientWidth) {
       throw new Error(`烈酒库存详情抽屉 ${width}pt 出现根级横向溢出：${JSON.stringify(detailState.result.value)}`);
@@ -353,7 +362,7 @@ try {
     if (purchaseState.result.value.rootScrollWidth > purchaseState.result.value.rootClientWidth || purchaseState.result.value.bodyScrollWidth > purchaseState.result.value.rootClientWidth) {
       throw new Error(`烈酒当月进货 ${width}pt 出现根级横向溢出：${JSON.stringify(purchaseState.result.value)}`);
     }
-    spiritsViewports.push({ width, ledger: ledgerState.result.value, compactDetail: detailState.result.value, purchase: purchaseState.result.value });
+    spiritsViewports.push({ width, ledger: ledgerState.result.value, ledgerDetail: detailState.result.value, purchase: purchaseState.result.value });
   }
   report.push({ reportPage: "烈酒库存导入同步", viewports: spiritsViewports });
 

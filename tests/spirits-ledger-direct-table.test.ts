@@ -4,12 +4,15 @@ import { resolve } from "node:path";
 
 const source = readFileSync(resolve(process.cwd(), "app/spirits-inventory.tsx"), "utf8");
 
-describe("烈酒库存双视图与完整Excel台账", () => {
-  it("保留移动三列概览，并改为用户可选择的双视图而不是屏幕宽度自动替换", () => {
-    expect(source).toContain('usePersistedState<"compact" | "table">("spirits.ledger.view-mode.v1", "compact")');
-    expect(source).toContain('testID="spirits-ledger-compact-list"');
-    expect(source).toContain('testID="spirits-ledger-view-switcher"');
-    expect(source).not.toContain("useCompactLedger");
+describe("烈酒库存完整Excel台账", () => {
+  it("库存管理不再提供移动概览或持久化视图切换，直接展示唯一Excel台账", () => {
+    expect(source).not.toContain('spirits.ledger.view-mode.v1');
+    expect(source).not.toContain('ledgerViewMode');
+    expect(source).not.toContain('compactLedgerSections');
+    expect(source).not.toContain('spirits-ledger-compact-list');
+    expect(source).not.toContain('spirits-ledger-view-switcher');
+    expect(source).toContain('库存管理直接展示完整Excel台账；商品名称点击仍打开详情卡片。');
+    expect(source).toContain('ScrollView horizontal showsHorizontalScrollIndicator style={{ flexGrow: 0 }}');
   });
 
   it("完整表固定包含期初、进货、期末、消耗字段并将集团置于最右", () => {
@@ -24,13 +27,14 @@ describe("烈酒库存双视图与完整Excel台账", () => {
   });
 
   it("名称点击继续打开详情卡片，完整表的筛选合计只计算可见行", () => {
+    expect(source).toContain('testID={`spirits-ledger-table-name-${item.id}`}');
     expect(source).toContain('onPress={() => { tap(); setSelectedLedgerItemId(item.id); }}');
     expect(source).toContain('calculateLedgerTableTotals(visibleLedgerRows)');
     expect(source).toContain('visibleLedgerTotals.consumeCost');
   });
 
   it("新增、导入、编辑期初、分类管理、月结和月末盘点在同一横向工具栏中可达", () => {
-    const toolbar = source.slice(source.indexOf('/* 操作栏：同一行横向滚动，不裁切文字或图标。 */'), source.indexOf('spirits-ledger-view-switcher'));
+    const toolbar = source.slice(source.indexOf('/* 操作栏：同一行横向滚动，不裁切文字或图标。 */'), source.indexOf('/* 库存管理直接展示完整Excel台账；商品名称点击仍打开详情卡片。 */'));
     for (const label of ["新增酒款", "导入Excel", "编辑期初", "管理进销存分类", "月结", "月末盘点"]) expect(toolbar).toContain(label);
     expect(toolbar).toContain('horizontal showsHorizontalScrollIndicator={false}');
     expect(toolbar).toContain('minHeight: 60');

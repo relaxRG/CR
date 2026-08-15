@@ -107,7 +107,6 @@ export interface SpiritsInventoryScreenProps {
 export default function SpiritsInventoryScreen({ month, embedded = false }: SpiritsInventoryScreenProps) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const [ledgerViewMode, setLedgerViewMode] = usePersistedState<"compact" | "table">("spirits.ledger.view-mode.v1", "compact");
   const router = useRouter();
   const store = useSpiritsInventoryStore();
   const {
@@ -496,23 +495,6 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
   const [editingItem, setEditingItem] = useState<SpiritItem | null>(null);
   const [showItemForm, setShowItemForm] = useState(false);
 
-  const compactLedgerSections = useMemo(() => {
-    const allCats = getAllCategories();
-    const activeItems = items.filter((item) => item.active);
-    const sections: Array<{ title: string; color: string; data: SpiritItem[]; unclassified?: boolean }> = [];
-    const unclassified = activeItems.filter((item) => !item.category || item.category === "" ||
-      (!SPIRIT_CATEGORIES.includes(item.category as any) && !allCats.some((category) => category.name === item.category)));
-    if (unclassified.length > 0) sections.push({ title: "⚠️ 未分类", color: "#F59E0B", data: unclassified, unclassified: true });
-    SPIRIT_CATEGORIES.forEach((category) => {
-      const data = activeItems.filter((item) => item.category === category);
-      if (data.length > 0) sections.push({ title: category, color: catColor(category), data });
-    });
-    allCats.filter((category) => !SPIRIT_CATEGORIES.includes(category.name as any)).forEach((category) => {
-      const data = activeItems.filter((item) => item.category === category.name);
-      if (data.length > 0) sections.push({ title: category.name, color: catColor(category.name), data });
-    });
-    return sections;
-  }, [items, ledger, selectedMonth]);
 
   const [ledgerNameLanguage, setLedgerNameLanguage] = usePersistedState<"zh" | "en">("spirits.ledger.name-language.v1", "zh");
   const [ledgerTableView, setLedgerTableView] = useState(DEFAULT_LEDGER_TABLE_VIEW);
@@ -738,69 +720,13 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
         </TouchableOpacity>
       </ScrollView>
 
-      <View testID="spirits-ledger-view-switcher" style={{ flexDirection: "row", gap: 8, paddingHorizontal: 12, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
-        {(["compact", "table"] as const).map((mode) => <TouchableOpacity key={mode} onPress={() => setLedgerViewMode(mode)} style={{ minHeight: 36, borderRadius: 18, paddingHorizontal: 14, justifyContent: "center", backgroundColor: ledgerViewMode === mode ? "#991B1B" : colors.surface, borderWidth: 1, borderColor: ledgerViewMode === mode ? "#991B1B" : colors.border }}><Text style={{ fontSize: 12, fontWeight: "700", color: ledgerViewMode === mode ? "#fff" : colors.foreground }}>{mode === "compact" ? "移动概览" : "Excel台账"}</Text></TouchableOpacity>)}
-      </View>
-
-      {/* 两套视图独立存在：移动概览保留三列，Excel台账保持全部字段。 */}
+      {/* 库存管理直接展示完整Excel台账；商品名称点击仍打开详情卡片。 */}
       <ScrollView contentContainerStyle={{ paddingBottom: 40 + insets.bottom }}>
         {items.length === 0 ? (
           <View style={{ alignItems: "center", padding: 40 }}>
             <Text style={{ fontSize: 48 }}>🥃</Text>
             <Text style={{ fontSize: 16, fontWeight: "600", color: colors.foreground, marginTop: 12 }}>还没有酒款档案</Text>
             <Text style={{ fontSize: 13, color: colors.muted, marginTop: 6 }}>点击「新增酒款」或导入 Excel</Text>
-          </View>
-        ) : ledgerViewMode === "compact" ? (
-          <View testID="spirits-ledger-compact-list">
-            <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 9, backgroundColor: "#991B1B" }}>
-              <Text style={{ flex: 1, fontSize: 12, fontWeight: "700", color: "#fff" }}>酒款</Text>
-              <Text style={{ width: 72, fontSize: 11, fontWeight: "700", color: "#fff", textAlign: "right" }}>期末库存</Text>
-              <Text style={{ width: 82, fontSize: 11, fontWeight: "700", color: "#fff", textAlign: "right" }}>期末成本</Text>
-            </View>
-            {compactLedgerSections.map((section) => (
-              <React.Fragment key={section.title}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 7, backgroundColor: section.color + "20" }}>
-                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: section.color }} />
-                  <Text style={{ fontSize: 12, fontWeight: "700", color: section.color }}>{section.title}</Text>
-                  {section.unclassified && <Text style={{ fontSize: 10, color: "#F59E0B" }}>请补充分类</Text>}
-                </View>
-                {section.data.map((item) => {
-                  const entry = getItemLedger(item.id, selectedMonth);
-                  const isNegative = Boolean(entry && entry.closingQty < 0);
-                  return (
-                    <TouchableOpacity
-                      key={item.id}
-                      testID={`spirits-ledger-compact-row-${item.id}`}
-                      onPress={() => { tap(); setSelectedLedgerItemId(item.id); }}
-                      style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, backgroundColor: isNegative ? "#FEF2F2" : colors.surface }}
-                    >
-                      <View style={{ width: 4, alignSelf: "stretch", borderRadius: 2, backgroundColor: isNegative ? "#EF4444" : catColor(item.category) }} />
-                      <View style={{ flex: 1, minWidth: 0 }}>
-                        <Text numberOfLines={2} style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>{ledgerTableRows.find((row) => row.id === item.id)?.displayName ?? item.name}</Text>
-                      </View>
-                      <View style={{ width: 72, alignItems: "flex-end" }}>
-                        <Text style={{ fontSize: 14, fontWeight: "700", color: isNegative ? "#EF4444" : colors.foreground }}>{entry ? entry.closingQty.toFixed(2) : "—"}</Text>
-                        <Text style={{ fontSize: 10, color: isNegative ? "#EF4444" : colors.muted }}>{isNegative ? "库存不足" : "期末库存"}</Text>
-                      </View>
-                      <View style={{ width: 82, alignItems: "flex-end" }}>
-                        <Text style={{ fontSize: 13, fontWeight: "700", color: "#991B1B" }}>{entry ? `¥${formatMoney(entry.closingCost)}` : "—"}</Text>
-                        <Text style={{ fontSize: 10, color: colors.muted }}>期末成本</Text>
-                      </View>
-                      <IconSymbol name="chevron.right" size={15} color={colors.muted} />
-                    </TouchableOpacity>
-                  );
-                })}
-              </React.Fragment>
-            ))}
-            {monthLedger.length > 0 && (
-              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 14, backgroundColor: "#FEF2F2" }}>
-                <Text style={{ fontSize: 13, fontWeight: "700", color: "#991B1B" }}>合计</Text>
-                <View style={{ alignItems: "flex-end" }}>
-                  <Text style={{ fontSize: 13, fontWeight: "700", color: "#991B1B" }}>库存 {summaryTotals.closingQty.toFixed(2)}</Text>
-                  <Text style={{ fontSize: 13, fontWeight: "700", color: "#991B1B" }}>¥{formatMoney(summaryTotals.closingCost)}</Text>
-                </View>
-              </View>
-            )}
           </View>
         ) : (
           <ScrollView horizontal showsHorizontalScrollIndicator style={{ flexGrow: 0 }}>
@@ -881,7 +807,7 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
                             }}
                             style={[S.tableRow, { backgroundColor: isNeg ? "#FEF2F2" : idx % 2 === 0 ? colors.surface : colors.background }]}>
                             <Text style={[S.tdCell, { width: 36, textAlign: "center", fontSize: 11, color: colors.muted }]}>{idx + 1}</Text>
-                            <Text style={[S.tdCell, { width: 136, fontSize: 11, color: colors.foreground }]} numberOfLines={2}>{ledgerTableRows.find((row) => row.id === item.id)?.displayName ?? item.name}</Text>
+                            <Text testID={`spirits-ledger-table-name-${item.id}`} style={[S.tdCell, { width: 136, fontSize: 11, color: colors.foreground }]} numberOfLines={2}>{ledgerTableRows.find((row) => row.id === item.id)?.displayName ?? item.name}</Text>
                           {/* 参考价列（可点击编辑） */}
                           {(() => {
                             const rp = getRefPrice(item.id, selectedMonth);
