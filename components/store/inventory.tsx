@@ -130,21 +130,22 @@ export default function StoreInventoryScreen({ mode = "inventory" }: { mode?: In
     if (!categories.some((category) => category.key === activeCategory)) setActiveCategory(defaultCategory);
   }, [activeCategory, categories, defaultCategory, setActiveCategory]);
 
-  const title = mode === "shop" ? "店铺" : "库存管理";
-  const description = mode === "shop" ? "杯具、餐具、日用品与设备" : "烈酒、葡萄酒、水果、食材、啤酒与冰块";
+  const showPortalHeader = mode === "shop";
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <View style={{ paddingTop: 16, paddingHorizontal: 16 }}>
-        <Text style={{ fontSize: 22, fontWeight: "700", color: colors.foreground }}>{title}</Text>
-        <Text style={{ fontSize: 13, color: colors.muted, marginTop: 2 }}>{description}</Text>
-      </View>
+      {showPortalHeader && (
+        <View style={{ paddingTop: 16, paddingHorizontal: 16 }}>
+          <Text style={{ fontSize: 22, fontWeight: "700", color: colors.foreground }}>店铺</Text>
+          <Text style={{ fontSize: 13, color: colors.muted, marginTop: 2 }}>杯具、餐具、日用品与设备</Text>
+        </View>
+      )}
 
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         testID={mode === "shop" ? "shop-segmented-tabs" : "inventory-segmented-tabs"}
-        style={{ flexGrow: 0, marginTop: 14 }}
+        style={{ flexGrow: 0, marginTop: showPortalHeader ? 14 : 8 }}
         contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
       >
         {categories.map((category) => {
@@ -174,7 +175,7 @@ export default function StoreInventoryScreen({ mode = "inventory" }: { mode?: In
 
 function InventoryBusinessPanel({ category, month }: { category: InventoryCategoryKey; month: InventoryMonth }) {
   switch (category) {
-    case "spirits": return <SpiritsInventoryScreen month={month} />;
+    case "spirits": return <SpiritsInventoryScreen month={month} embedded />;
     case "wine": return <WineInventoryScreen month={month} embedded />;
     case "fruit": return <FruitInventoryScreen month={month} embedded />;
     case "food": return <FoodInventoryScreen month={month} embedded />;

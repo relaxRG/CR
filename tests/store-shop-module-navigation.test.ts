@@ -27,7 +27,9 @@ describe("店铺顶级模块与库存分类", () => {
     expect(inventory).toContain('export type InventoryPortalMode = "inventory" | "shop"');
     expect(inventory).toContain('const CATEGORIES: Array');
     expect(inventory).toContain('mode === "shop"');
-    expect(inventory).toContain('烈酒、葡萄酒、水果、食材、啤酒与冰块');
+    expect(inventory).not.toContain('烈酒、葡萄酒、水果、食材、啤酒与冰块');
+    expect(inventory).toContain('const showPortalHeader = mode === "shop"');
+    expect(inventory).toContain('case "spirits": return <SpiritsInventoryScreen month={month} embedded />;');
     expect(inventory.indexOf('label: "烈酒"')).toBeLessThan(inventory.indexOf('label: "葡萄酒"'));
     expect(inventory.indexOf('label: "葡萄酒"')).toBeLessThan(inventory.indexOf('label: "水果"'));
     expect(inventory.indexOf('label: "水果"')).toBeLessThan(inventory.indexOf('label: "食材"'));
@@ -41,6 +43,16 @@ describe("店铺顶级模块与库存分类", () => {
     expect(inventory).toContain('"store.shop.month.v1"');
     expect(inventory).toContain('BoundedMonthNavigator');
     expect(inventory).toContain('testID={`${mode}-workspace-${currentCategory.key}`}');
+    expect(inventory).toContain('marginTop: showPortalHeader ? 14 : 8');
+  });
+
+  it("烈酒嵌入工作台时删除重复安全区，并让同排操作栏可横向滚动而不裁切", () => {
+    const spirits = read("app/spirits-inventory.tsx");
+    expect(spirits).toContain('embedded?: boolean;');
+    expect(spirits).toContain('<ScreenContainer edges={embedded ? [] : undefined}>');
+    expect(spirits).toContain('同一行横向滚动，不裁切文字或图标');
+    expect(spirits).toContain('minHeight: 60');
+    expect(spirits).toContain('flexShrink: 0, minHeight: 44');
   });
 
   it("店铺聚合页复用库存数据源，不引入第二套库存持久化逻辑", () => {

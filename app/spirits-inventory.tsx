@@ -101,9 +101,10 @@ const TABS: { key: Tab; label: string }[] = [
 // ─── 主页面 ───────────────────────────────────────────────────────────────────
 export interface SpiritsInventoryScreenProps {
   month?: string;
+  embedded?: boolean;
 }
 
-export default function SpiritsInventoryScreen({ month }: SpiritsInventoryScreenProps) {
+export default function SpiritsInventoryScreen({ month, embedded = false }: SpiritsInventoryScreenProps) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const [ledgerViewMode, setLedgerViewMode] = usePersistedState<"compact" | "table">("spirits.ledger.view-mode.v1", "compact");
@@ -686,10 +687,10 @@ export default function SpiritsInventoryScreen({ month }: SpiritsInventoryScreen
 
   const renderLedger = () => (
     <View style={{ flex: 1 }}>
-      {/* 操作栏 */}
+      {/* 操作栏：同一行横向滚动，不裁切文字或图标。 */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
-        style={{ flexGrow: 0, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}
-        contentContainerStyle={{ gap: 8, paddingHorizontal: 12, paddingVertical: 8, alignItems: "center" }}>
+        style={{ flexGrow: 0, minHeight: 60, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}
+        contentContainerStyle={{ gap: 8, minHeight: 60, paddingHorizontal: 12, paddingVertical: 8, alignItems: "center" }}>
         <TouchableOpacity onPress={() => { tap(); setShowAddItem(true); }}
           style={[S.actionBtn, { backgroundColor: "#EF4444" + "15", borderColor: "#EF4444" + "33" }]}>
           <IconSymbol name="plus" size={13} color="#EF4444" />
@@ -1356,7 +1357,7 @@ export default function SpiritsInventoryScreen({ month }: SpiritsInventoryScreen
 
   // ── 主渲染 ────────────────────────────────────────────────────────────────────
   return (
-    <ScreenContainer>
+    <ScreenContainer edges={embedded ? [] : undefined}>
       {activeSupplier !== null && (
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
           <TouchableOpacity onPress={() => { tap(); setActiveSupplier(null); }} accessibilityRole="button" accessibilityLabel="返回供应商列表">
@@ -3294,7 +3295,7 @@ const S = StyleSheet.create({
   tabChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
   card: { borderRadius: 12, borderWidth: 1, padding: 14, marginBottom: 12 },
   cardTitle: { fontSize: 14, fontWeight: "700", marginBottom: 10 },
-  actionBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1 },
+  actionBtn: { flexDirection: "row", flexShrink: 0, minHeight: 44, alignItems: "center", justifyContent: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1 },
   toggleBtn: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 14, borderWidth: 1 },
   tableHeader: { flexDirection: "row", alignItems: "center", paddingVertical: 8 },
   tableRow: { flexDirection: "row", alignItems: "center", paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "rgba(0,0,0,0.06)" },

@@ -164,7 +164,7 @@ export function BoundedMonthNavigator({ month, bounds, onChange, testID = "inven
 }
 
 const S = StyleSheet.create({
-  row: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12, paddingVertical: 10, paddingHorizontal: 16 },
+  row: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12, minHeight: 52, paddingVertical: 8, paddingHorizontal: 16 },
   arrow: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   monthButton: { minWidth: 164, minHeight: 36, borderWidth: StyleSheet.hairlineWidth, borderRadius: 10, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingHorizontal: 12 },
   monthText: { fontSize: 16, fontWeight: "600", letterSpacing: -0.3 },
