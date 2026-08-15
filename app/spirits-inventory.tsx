@@ -1044,118 +1044,77 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
   }, [purchases, suppliers]);
 
   const renderPurchase = () => {
-    if (activeSupplier !== null) {
-      return (
-        <SupplierDetailScreen
-          supplier={activeSupplier}
-          month={selectedMonth}
-          colors={colors}
-          insets={insets}
-          items={items}
-          purchases={purchases}
-          store={store}
-          pettyStore={pettyStore}
-          onBack={() => setActiveSupplier(null)}
-        />
-      );
-    }
-    const supSummary = getPurchaseSummaryBySupplier(selectedMonth);
-    const totalAmt = Object.values(supSummary).reduce((s, v) => s + v.amount, 0);
-    const totalQty = Object.values(supSummary).reduce((s, v) => s + v.qty, 0);
-    const totalItems = Object.values(supSummary).reduce((s, v) => s + v.items, 0);
+    // 供应商和新增入口属于同一行；选择后直接在当前页渲染明细，不再进入卡片二级页面。
+    const selectedSupplier = activeSupplier ?? allSupplierNames[0] ?? null;
+    const unmatchedList = monthPurchases.filter((purchase) => !purchase.itemId);
 
     return (
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }}>
-        <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
-          <TouchableOpacity onPress={() => { tap(); setShowAddSupplier(true); }}
-            style={[S.actionBtn, { backgroundColor: "#EF4444" + "15", borderColor: "#EF4444" + "33" }]}>
+      <View testID="spirits-purchase-inline-workspace" style={{ flex: 1 }}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          testID="spirits-purchase-supplier-tabs"
+          style={{ flexGrow: 0, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}
+          contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 8, gap: 8, alignItems: "center" }}
+        >
+          {allSupplierNames.map((sup) => {
+            const active = selectedSupplier === sup;
+            return (
+              <TouchableOpacity
+                key={sup}
+                testID={`spirits-purchase-supplier-tab-${sup}`}
+                onPress={() => { tap(); setActiveSupplier(sup); }}
+                style={[S.tabChip, {
+                  backgroundColor: active ? "#EF4444" : colors.surface,
+                  borderColor: active ? "#EF4444" : colors.border,
+                }]}
+              >
+                <Text style={{ fontSize: 13, fontWeight: "600", color: active ? "#fff" : colors.muted }}>{sup}</Text>
+              </TouchableOpacity>
+            );
+          })}
+          <TouchableOpacity
+            testID="spirits-purchase-add-supplier"
+            onPress={() => { tap(); setShowAddSupplier(true); }}
+            style={[S.actionBtn, { backgroundColor: "#EF4444" + "15", borderColor: "#EF4444" + "33" }]}
+          >
             <IconSymbol name="plus" size={13} color="#EF4444" />
             <Text style={{ fontSize: 12, color: "#EF4444", fontWeight: "600" }}>新增供应商</Text>
           </TouchableOpacity>
-        </View>
+        </ScrollView>
 
-        {/* 当月合计卡 */}
-        <View style={[S.card, { backgroundColor: "#FEF2F2", borderColor: "#FECACA" }]}>
-          <Text style={{ fontSize: 13, fontWeight: "700", color: "#991B1B", marginBottom: 8 }}>
-            {selectedMonth.slice(0, 4)}年{Number(selectedMonth.slice(5, 7))}月 · 进货合计
-          </Text>
-          <View style={{ flexDirection: "row", gap: 8 }}>
-            {[
-              { label: "总金额", value: `¥${fmtAmt(totalAmt)}`, color: "#EF4444" },
-              { label: "总笔数", value: `${totalQty}笔`, color: "#991B1B" },
-              { label: "总品种", value: `${totalItems}款`, color: "#991B1B" },
-            ].map((s, i) => (
-              <View key={i} style={{ flex: 1, alignItems: "center" }}>
-                <Text style={{ fontSize: 10, color: "#991B1B" }}>{s.label}</Text>
-                <Text style={{ fontSize: 15, fontWeight: "700", color: s.color }}>{s.value}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
+        {unmatchedList.length > 0 && (
+          <TouchableOpacity
+            onPress={() => { tap(); setActiveSupplier(unmatchedList[0]?.supplier ?? "未知供应商"); }}
+            style={{ flexDirection: "row", alignItems: "center", gap: 8, marginHorizontal: 12, marginTop: 8, padding: 10,
+              backgroundColor: "#FEF3C7", borderRadius: 10, borderWidth: 1, borderColor: "#FCD34D" }}
+          >
+            <Text style={{ fontSize: 15 }}>⚠️</Text>
+            <Text style={{ flex: 1, fontSize: 12, color: "#92400E", fontWeight: "600" }}>
+              {unmatchedList.length} 条进货记录未匹配到酒款，点击切换到待处理供应商
+            </Text>
+          </TouchableOpacity>
+        )}
 
-        {/* 未匹配汇总提示条 */}
-        {(() => {
-          const unmatchedList = monthPurchases.filter((p) => !p.itemId);
-          if (unmatchedList.length === 0) return null;
-          return (
-            <TouchableOpacity
-              onPress={() => {
-                tap();
-                // 跳转到第一个有未匹配记录的供应商，在供应商详情页处理
-                const firstSupplier = unmatchedList[0]?.supplier ?? "未知供应商";
-                setActiveSupplier(firstSupplier);
-              }}
-              style={{ flexDirection: "row", alignItems: "center", gap: 8, padding: 12,
-                backgroundColor: "#FEF3C7", borderRadius: 10, borderWidth: 1,
-                borderColor: "#FCD34D", marginBottom: 12 }}>
-              <Text style={{ fontSize: 16 }}>⚠️</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 13, fontWeight: "700", color: "#92400E" }}>
-                  {unmatchedList.length} 条进货记录未匹配到酒款档案
-                </Text>
-                <Text style={{ fontSize: 11, color: "#B45309" }}>
-                  点击处理 · 匹配后可参与库存计算和采购分析
-                </Text>
-              </View>
-              <Text style={{ fontSize: 11, color: "#92400E", fontWeight: "600" }}>逐一处理 ›</Text>
-            </TouchableOpacity>
-          );
-        })()}
-
-        {/* 供应商列表 */}
-        {allSupplierNames.map((sup) => {
-          const data = supSummary[sup];
-          return (
-            <TouchableOpacity key={sup} onPress={() => { tap(); setActiveSupplier(sup); }}
-              style={[S.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                  <Text style={{ fontSize: 20 }}>{sup === "自采" ? "🛒" : "🏢"}</Text>
-                  <View>
-                    <Text style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>{sup}</Text>
-                    {data ? (
-                      <Text style={{ fontSize: 12, color: colors.muted }}>
-                        本月 ¥{formatMoney(data.amount)} · {data.qty}笔 · {data.items}款
-                      </Text>
-                    ) : (
-                      <Text style={{ fontSize: 12, color: colors.muted }}>本月暂无进货</Text>
-                    )}
-                  </View>
-                </View>
-                <IconSymbol name="chevron.right" size={16} color={colors.muted} />
-              </View>
-            </TouchableOpacity>
-          );
-        })}
-
-        {allSupplierNames.length === 0 && (
-          <View style={{ alignItems: "center", padding: 40 }}>
-            <Text style={{ fontSize: 48 }}>🏢</Text>
-            <Text style={{ fontSize: 16, fontWeight: "600", color: colors.foreground, marginTop: 12 }}>还没有供应商</Text>
-            <Text style={{ fontSize: 13, color: colors.muted, marginTop: 6 }}>点击「新增供应商」添加</Text>
+        {selectedSupplier ? (
+          <SupplierDetailScreen
+            supplier={selectedSupplier}
+            month={selectedMonth}
+            colors={colors}
+            insets={insets}
+            items={items}
+            purchases={purchases}
+            store={store}
+            pettyStore={pettyStore}
+          />
+        ) : (
+          <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 40 }}>
+            <Text style={{ fontSize: 44 }}>🏢</Text>
+            <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginTop: 12 }}>还没有供应商</Text>
+            <Text style={{ fontSize: 13, color: colors.muted, marginTop: 6 }}>点击上方「新增供应商」后即可直接录入当月进货</Text>
           </View>
         )}
-      </ScrollView>
+      </View>
     );
   };
 
@@ -1284,18 +1243,8 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
   // ── 主渲染 ────────────────────────────────────────────────────────────────────
   return (
     <ScreenContainer edges={embedded ? [] : undefined}>
-      {activeSupplier !== null && (
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
-          <TouchableOpacity onPress={() => { tap(); setActiveSupplier(null); }} accessibilityRole="button" accessibilityLabel="返回供应商列表">
-            <IconSymbol name="chevron.left" size={20} color="#EF4444" />
-          </TouchableOpacity>
-          <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>{activeSupplier}</Text>
-        </View>
-      )}
-
-      {/* Tab 选择器（供应商子界面时隐藏） */}
-      {activeSupplier === null && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}
+      {/* Tab 选择器：供应商选择仅在“当月进货”内容区切换，不再隐藏业务页签。 */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}
           style={{ flexGrow: 0, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}
           contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 8, gap: 8, alignItems: "center" }}>
           {TABS.map((t) => (
@@ -1309,20 +1258,15 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
               </Text>
             </TouchableOpacity>
           ))}
-        </ScrollView>
-      )}
+      </ScrollView>
 
       {/* Tab 内容 */}
-      {activeSupplier === null ? (
-        <>
-          {tab === "summary" && renderSummary()}
-          {tab === "ledger" && renderLedger()}
-          {tab === "purchase" && renderPurchase()}
-          {tab === "analysis" && renderAnalysis()}
-        </>
-      ) : (
-        renderPurchase()
-      )}
+      <>
+        {tab === "summary" && renderSummary()}
+        {tab === "ledger" && renderLedger()}
+        {tab === "purchase" && renderPurchase()}
+        {tab === "analysis" && renderAnalysis()}
+      </>
 
       {/* 新增供应商 Modal */}
       <Modal visible={showAddSupplier} transparent animationType="slide">
@@ -1345,7 +1289,9 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => {
                   if (!newSupplierName.trim()) return;
-                  upsertSupplier({ name: newSupplierName.trim(), isSelfBuy: newSupplierName.includes("自采") });
+                  const createdSupplierName = newSupplierName.trim();
+                  upsertSupplier({ name: createdSupplierName, isSelfBuy: createdSupplierName.includes("自采") });
+                  setActiveSupplier(createdSupplierName);
                   setShowAddSupplier(false);
                   setNewSupplierName("");
                 }} style={{ flex: 1, padding: 14, backgroundColor: "#EF4444", borderRadius: 12, alignItems: "center" }}>
@@ -1581,13 +1527,12 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
 
 // ─── 供应商详情子界面 ──────────────────────────────────────────────────────────
 function SupplierDetailScreen({
-  supplier, month, colors, insets, items, purchases, store, pettyStore, onBack,
+  supplier, month, colors, insets, items, purchases, store, pettyStore,
 }: {
   supplier: string; month: string; colors: any; insets: any;
   items: SpiritItem[]; purchases: SpiritPurchaseRecord[];
   store: ReturnType<typeof useSpiritsInventoryStore>;
   pettyStore: any;
-  onBack: () => void;
 }) {
   const {
     addPurchase, deletePurchase, batchAddPurchases, batchDeletePurchases,
@@ -1783,7 +1728,7 @@ function SupplierDetailScreen({
   };
 
   return (
-    <View style={{ flex: 1 }}>
+    <View testID="spirits-supplier-purchase-detail" style={{ flex: 1 }}>
       {/* 操作栏 */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
         style={{ flexGrow: 0, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}

@@ -355,16 +355,28 @@ try {
     const purchaseClicked = await call("Runtime.evaluate", { expression: clickTextExpression("📦 当月进货"), returnByValue: true });
     if (!purchaseClicked.result.value) throw new Error(`烈酒库存 ${width}pt 缺少当月进货Tab`);
     await sleep(200);
-    const supplierClicked = await call("Runtime.evaluate", { expression: clickTextExpression("H5供应商"), returnByValue: true });
-    if (!supplierClicked.result.value) throw new Error(`烈酒当月进货 ${width}pt 未显示导入供应商`);
+    const supplierTabClicked = await call("Runtime.evaluate", { expression: `(() => {
+      const tab = document.querySelector('[data-testid="spirits-purchase-supplier-tab-H5供应商"]');
+      if (!tab) return false;
+      tab.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+      return true;
+    })()`, returnByValue: true });
+    if (!supplierTabClicked.result.value) throw new Error(`烈酒当月进货 ${width}pt 未显示供应商同页标签`);
     await sleep(200);
     const purchaseState = await call("Runtime.evaluate", { expression: `(() => ({
       rootClientWidth: document.documentElement.clientWidth,
       rootScrollWidth: document.documentElement.scrollWidth,
       bodyScrollWidth: document.body.scrollWidth,
+      hasSupplierTabs: Boolean(document.querySelector('[data-testid="spirits-purchase-supplier-tabs"]')),
+      hasSupplierTab: Boolean(document.querySelector('[data-testid="spirits-purchase-supplier-tab-H5供应商"]')),
+      hasAddSupplier: Boolean(document.querySelector('[data-testid="spirits-purchase-add-supplier"]')),
+      hasInlineDetail: Boolean(document.querySelector('[data-testid="spirits-supplier-purchase-detail"]')),
       hasImportedPurchase: document.body.innerText.includes('H5进口金宾') && document.body.innerText.includes('H5供应商'),
+      hasLegacySummary: document.body.innerText.includes('进货合计'),
     }))()`, returnByValue: true });
-    if (!purchaseState.result.value.hasImportedPurchase) throw new Error(`烈酒当月进货 ${width}pt 未同步显示导入采购`);
+    if (!purchaseState.result.value.hasSupplierTabs || !purchaseState.result.value.hasSupplierTab || !purchaseState.result.value.hasAddSupplier || !purchaseState.result.value.hasInlineDetail || !purchaseState.result.value.hasImportedPurchase || purchaseState.result.value.hasLegacySummary) {
+      throw new Error(`烈酒当月进货 ${width}pt 未完成供应商同页标签明细改造：${JSON.stringify(purchaseState.result.value)}`);
+    }
     if (purchaseState.result.value.rootScrollWidth > purchaseState.result.value.rootClientWidth || purchaseState.result.value.bodyScrollWidth > purchaseState.result.value.rootClientWidth) {
       throw new Error(`烈酒当月进货 ${width}pt 出现根级横向溢出：${JSON.stringify(purchaseState.result.value)}`);
     }
