@@ -234,7 +234,7 @@ export function BaseInventoryScreen({
         style={{ flexGrow: 0 }}
         contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 8, gap: 8, alignItems: "center" }}>
         {allTabs.map((t) => (
-          <TouchableOpacity key={t.key} hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }} onPress={() => { tap(); setTab(t.key); }}
+          <TouchableOpacity key={t.key} testID={`${categoryId}-inventory-tab-${t.key}`} hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }} onPress={() => { tap(); setTab(t.key); }}
             style={[S.tabChip, {
               backgroundColor: tab === t.key ? accentColor : colors.surface,
               borderColor: tab === t.key ? accentColor : colors.border,

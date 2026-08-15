@@ -35,6 +35,7 @@ describe("库存工作台紧凑布局与移动端交互护栏", () => {
     expect(base).toContain("horizontal nestedScrollEnabled directionalLockEnabled");
     expect(base).toContain('keyboardShouldPersistTaps="handled"');
     expect(base).toContain("tabChip: { minHeight: 44");
+    expect(base).toContain('testID={`${categoryId}-inventory-tab-${t.key}`}');
     expect(table).toContain("horizontal nestedScrollEnabled directionalLockEnabled");
     expect(table).toContain("hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}");
 
@@ -56,5 +57,7 @@ describe("库存工作台紧凑布局与移动端交互护栏", () => {
     expect(h5).toContain("wine-tab-supplier");
     expect(h5).toContain("wine-supplier-horizontal-ledger-table");
     expect(h5).toContain("wine-supplier-record-purchase");
+    expect(h5).toContain("fruit-inventory-tab-summary");
+    expect(h5).toContain("水果总结页签");
   });
 });

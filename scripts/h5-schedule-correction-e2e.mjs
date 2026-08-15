@@ -420,7 +420,23 @@ try {
       await sleep(140);
       const detail = await call("Runtime.evaluate", { expression: `Boolean(document.querySelector('[data-testid="${spec.sheet}"]'))`, returnByValue: true });
       if (!detail.result.value) throw new Error(`${spec.label} ${width}pt 商品名称未打开详情卡片`);
-      directLedgerViewports.push({ width, label: spec.label, ...state });
+      let summaryTab = undefined;
+      if (spec.label === "水果") {
+        const summaryClicked = await call("Runtime.evaluate", { expression: `(() => { const tab = document.querySelector('[data-testid="fruit-inventory-tab-summary"]'); if (!tab) return false; tab.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window })); return true; })()`, returnByValue: true });
+        if (!summaryClicked.result.value) throw new Error(`水果 ${width}pt 未找到总结页签`);
+        await sleep(120);
+        const summaryState = await call("Runtime.evaluate", { expression: `(() => {
+          const summary = document.querySelector('[data-testid="fruit-inventory-tab-summary"]');
+          const ledger = document.querySelector('[data-testid="fruit-inventory-tab-ledger"]');
+          const summaryRect = summary?.getBoundingClientRect();
+          const ledgerRect = ledger?.getBoundingClientRect();
+          return { found: Boolean(summary && ledger), summaryHeight: summaryRect?.height ?? 0, ledgerHeight: ledgerRect?.height ?? 0, summaryTop: summaryRect?.top ?? 0, ledgerTop: ledgerRect?.top ?? 0, rootClientWidth: document.documentElement.clientWidth, rootScrollWidth: document.documentElement.scrollWidth, bodyScrollWidth: document.body.scrollWidth };
+        })()`, returnByValue: true });
+        summaryTab = summaryState.result.value;
+        if (!summaryTab.found || summaryTab.summaryHeight < 44 || Math.abs(summaryTab.summaryHeight - summaryTab.ledgerHeight) > 1 || Math.abs(summaryTab.summaryTop - summaryTab.ledgerTop) > 1) throw new Error(`水果总结页签 ${width}pt 尺寸或对齐异常：${JSON.stringify(summaryTab)}`);
+        if (summaryTab.rootScrollWidth > summaryTab.rootClientWidth || summaryTab.bodyScrollWidth > summaryTab.rootClientWidth) throw new Error(`水果总结页签 ${width}pt 出现根级横向溢出：${JSON.stringify(summaryTab)}`);
+      }
+      directLedgerViewports.push({ width, label: spec.label, ...state, summaryTab });
     }
   }
   report.push({ reportPage: '四类库存直接完整台账', viewports: directLedgerViewports });
