@@ -81,6 +81,42 @@ export interface PriceHistoryEntry {
   source: "manual" | "import";
 }
 
+/** 食材月度台账基础行。所有金额均由明细记录汇总，避免依赖当前库存倒推历史月份。 */
+export interface FoodMonthlyLedgerEntry {
+  id: string;
+  month: string; // YYYY-MM
+  ingredientId: string;
+  openingQty: number;
+  openingUnitCost: number;
+  purchaseQty: number;
+  purchaseCost: number;
+  consumeQty: number;
+  consumeCost: number;
+  /** 月末实盘数量；未盘点时按期初+进货-消耗计算。 */
+  actualClosingQty?: number;
+  /** 实盘采用的单位成本；缺省时使用加权单位成本。 */
+  actualClosingUnitCost?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type FoodLedgerMovementKind = "purchase" | "consume" | "stocktake";
+
+/** 食材月度台账的原子流水。采购、领用/损耗与盘点均以月份归属保存。 */
+export interface FoodLedgerMovement {
+  id: string;
+  month: string; // YYYY-MM
+  ingredientId: string;
+  kind: FoodLedgerMovementKind;
+  date: string; // YYYY-MM-DD
+  quantity: number;
+  unitCost: number;
+  totalCost: number;
+  supplier?: string;
+  notes: string;
+  createdAt: string;
+}
+
 /** 供应商进货记录（每次导入生成一批） */
 export interface SupplierPurchaseRecord {
   id: string;

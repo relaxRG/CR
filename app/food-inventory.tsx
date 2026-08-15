@@ -18,9 +18,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
-import { useFoodIngredientStore } from "@/lib/food/ingredient-store";
+import { FoodMonthlyLedgerRow, useFoodIngredientStore } from "@/lib/food/ingredient-store";
 import { FoodIngredient, INGREDIENT_CATEGORY_LABELS, IngredientCategory } from "@/lib/food/types";
-import { getCurrentMonth, getPrevMonth } from "@/lib/inventory-core/types";
+import { HorizontalLedgerTable, HorizontalLedgerColumn, HorizontalLedgerGroup } from "@/components/inventory/HorizontalLedgerTable";
+import { FoodLedgerMovementModal } from "@/components/food/FoodLedgerMovementModal";
+import { getCurrentMonth } from "@/lib/inventory-core/types";
 
 const FOOD_COLOR = "#10B981";
 type Tab = "ledger" | "purchase" | "summary";
@@ -45,7 +47,7 @@ const CATEGORY_COLORS: Record<IngredientCategory, string> = {
 // ─── 进货录入 Modal ───────────────────────────────────────────────────────────
 function PurchaseModal({ visible, ingredients, colors, onSave, onClose }: {
   visible: boolean; ingredients: FoodIngredient[]; colors: any;
-  onSave: (ingredientId: string, qty: number, price: number, supplier: string, notes: string) => void;
+  onSave: (ingredientId: string, qty: number, price: number, supplier: string, notes: string, date: string) => void;
   onClose: () => void;
 }) {
   const [selectedId, setSelectedId] = useState("");
@@ -68,7 +70,7 @@ function PurchaseModal({ visible, ingredients, colors, onSave, onClose }: {
   const handleSave = () => {
     if (!selectedId) { Alert.alert("请选择食材"); return; }
     if (!qty || Number(qty) <= 0) { Alert.alert("请填写数量"); return; }
-    onSave(selectedId, Number(qty), Number(price) || 0, supplier, notes);
+    onSave(selectedId, Number(qty), Number(price) || 0, supplier, notes, date);
     setSelectedId(""); setQty(""); setPrice(""); setSupplier(""); setNotes("");
     onClose();
   };
@@ -158,12 +160,15 @@ export default function FoodInventoryScreen({ month, embedded = false }: FoodInv
   const insets = useSafeAreaInsets();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
-  const { ingredients, updateIngredient } = useFoodIngredientStore();
+  const {
+    ingredients, getMonthLedger, recordPurchase, recordConsume, recordStocktake, closeMonth,
+  } = useFoodIngredientStore();
 
   const [tab, setTab] = useState<Tab>("ledger");
   const [showPurchase, setShowPurchase] = useState(false);
-  const [filterCat, setFilterCat] = useState<IngredientCategory | "all">("all");
-  const [importLoading, setImportLoading] = useState(false);
+  const [showConsume, setShowConsume] = useState(false);
+  const [showStocktake, setShowStocktake] = useState(false);
+  const [selectedLedgerRow, setSelectedLedgerRow] = useState<FoodMonthlyLedgerRow | null>(null);
 
   const currentMonth = month ?? getCurrentMonth();
 
@@ -182,17 +187,32 @@ export default function FoodInventoryScreen({ month, embedded = false }: FoodInv
     [ingredients]
   );
 
-  const handlePurchase = (ingredientId: string, qty: number, price: number, supplier: string, notes: string) => {
-    // 更新库存和价格
-    const ing = ingredients.find((i) => i.id === ingredientId);
-    if (!ing) return;
-    updateIngredient(ingredientId, {
-      stock: ing.stock + qty,
-      costPrice: price > 0 ? price : ing.costPrice,
-      supplier: supplier || ing.supplier,
-    });
-    // 进货记录（通过 updateIngredient 更新价格历史即可）
+  const handlePurchase = (ingredientId: string, qty: number, price: number, supplier: string, notes: string, date: string) => {
+    recordPurchase({ ingredientId, quantity: qty, unitPrice: price, supplier, notes, date });
   };
+
+  const monthLedger = useMemo(() => getMonthLedger(currentMonth), [getMonthLedger, currentMonth]);
+  const ledgerGroups = useMemo<HorizontalLedgerGroup<FoodMonthlyLedgerRow>[]>(() =>
+    INGREDIENT_CATEGORIES.map((category) => ({
+      id: category,
+      label: INGREDIENT_CATEGORY_LABELS[category],
+      color: CATEGORY_COLORS[category],
+      rows: monthLedger.filter((row) => row.category === category),
+    })).filter((group) => group.rows.length > 0),
+  [monthLedger]);
+  const ledgerColumns = useMemo<HorizontalLedgerColumn<FoodMonthlyLedgerRow>[]>(() => [
+    { key: "name", label: "商品名称", width: 146, onPress: setSelectedLedgerRow, testID: (row) => `food-ledger-name-${row.ingredientId}`, render: (row) => <><Text numberOfLines={1} style={{ color: colors.foreground, fontSize: 12, fontWeight: "800" }}>{row.name}</Text><Text numberOfLines={1} style={{ color: colors.muted, fontSize: 10 }}>{row.spec || row.unit}</Text></> },
+    { key: "openingQty", label: "期初数量", width: 76, align: "right", render: (row) => <Text style={{ color: colors.foreground, fontSize: 12 }}>{row.openingQty.toFixed(2)}</Text> },
+    { key: "openingUnitCost", label: "期初单价", width: 76, align: "right", render: (row) => <Text style={{ color: colors.foreground, fontSize: 12 }}>¥{formatMoney(row.openingUnitCost)}</Text> },
+    { key: "openingCost", label: "期初成本", width: 82, align: "right", render: (row) => <Text style={{ color: colors.foreground, fontSize: 12 }}>¥{formatMoney(row.openingQty * row.openingUnitCost)}</Text> },
+    { key: "purchaseQty", label: "进货数量", width: 76, align: "right", render: (row) => <Text style={{ color: row.purchaseQty > 0 ? FOOD_COLOR : colors.muted, fontSize: 12 }}>{row.purchaseQty > 0 ? `+${row.purchaseQty.toFixed(2)}` : "—"}</Text> },
+    { key: "purchaseCost", label: "进货成本", width: 82, align: "right", render: (row) => <Text style={{ color: row.purchaseCost > 0 ? FOOD_COLOR : colors.muted, fontSize: 12 }}>{row.purchaseCost > 0 ? `¥${formatMoney(row.purchaseCost)}` : "—"}</Text> },
+    { key: "consumeQty", label: "消耗数量", width: 76, align: "right", render: (row) => <Text style={{ color: row.consumeQty > 0 ? colors.warning : colors.muted, fontSize: 12 }}>{row.consumeQty > 0 ? row.consumeQty.toFixed(2) : "—"}</Text> },
+    { key: "consumeCost", label: "消耗成本", width: 82, align: "right", render: (row) => <Text style={{ color: row.consumeCost > 0 ? colors.warning : colors.muted, fontSize: 12 }}>{row.consumeCost > 0 ? `¥${formatMoney(row.consumeCost)}` : "—"}</Text> },
+    { key: "closingQty", label: "期末库存", width: 76, align: "right", render: (row) => <Text style={{ color: row.closingQty <= 0 ? colors.error : colors.foreground, fontSize: 12, fontWeight: "800" }}>{row.closingQty.toFixed(2)}</Text> },
+    { key: "closingUnitCost", label: "期末单价", width: 82, align: "right", render: (row) => <Text style={{ color: colors.foreground, fontSize: 12 }}>¥{formatMoney(row.closingUnitCost)}</Text> },
+    { key: "closingCost", label: "期末成本", width: 82, align: "right", render: (row) => <Text style={{ color: FOOD_COLOR, fontSize: 12, fontWeight: "800" }}>¥{formatMoney(row.closingCost)}</Text> },
+  ], [colors]);
 
   const TABS: { key: Tab; label: string }[] = [
     { key: "summary", label: "📊 总结" },
@@ -241,73 +261,39 @@ export default function FoodInventoryScreen({ month, embedded = false }: FoodInv
         ))}
       </View>
 
-      {/* 快捷操作 */}
-      <View style={[S.actionRow, { borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => { tap(); setShowPurchase(true); }}
-          style={[S.actionBtn, { backgroundColor: FOOD_COLOR + "15", borderColor: FOOD_COLOR + "33" }]}>
-          <Text style={{ fontSize: 12, color: FOOD_COLOR, fontWeight: "600" }}>📦 录入进货</Text>
+      {/* 食材月度台账操作栏：同一行局部横向滚动。 */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} testID="food-ledger-action-toolbar"
+        style={{ flexGrow: 0, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}
+        contentContainerStyle={{ gap: 8, paddingHorizontal: 12, paddingVertical: 8, alignItems: "center" }}>
+        <TouchableOpacity onPress={() => { tap(); setShowPurchase(true); }} style={[S.actionBtn, { backgroundColor: FOOD_COLOR + "15", borderColor: FOOD_COLOR + "33" }]}>
+          <Text style={{ fontSize: 12, color: FOOD_COLOR, fontWeight: "700" }}>📦 录入进货</Text>
         </TouchableOpacity>
-      </View>
+        <TouchableOpacity onPress={() => { tap(); setShowConsume(true); }} style={[S.actionBtn, { backgroundColor: colors.warning + "15", borderColor: colors.warning + "33" }]}>
+          <Text style={{ fontSize: 12, color: colors.warning, fontWeight: "700" }}>🍽️ 录入消耗</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => { tap(); setShowStocktake(true); }} style={[S.actionBtn, { backgroundColor: "#F59E0B22", borderColor: "#F59E0B" }]}>
+          <Text style={{ fontSize: 12, color: "#F59E0B", fontWeight: "700" }}>📋 月末盘点</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => Alert.alert("月结确认", `确认结转 ${currentMonth} 的食材期末库存至下月期初？`, [
+          { text: "取消", style: "cancel" },
+          { text: "确认月结", onPress: () => { closeMonth(currentMonth); Alert.alert("月结完成", "食材期末库存已结转为下月期初。 "); } },
+        ])} style={[S.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "700" }}>🔒 月结</Text>
+        </TouchableOpacity>
+      </ScrollView>
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }}>
-        {/* 台账 Tab */}
+        {/* 台账 Tab：直接展示完整Excel式月度台账。 */}
         {tab === "ledger" && (
-          ingredients.length === 0 ? (
-            <View style={{ alignItems: "center", padding: 40 }}>
-              <Text style={{ fontSize: 48 }}>🥩</Text>
-              <Text style={{ fontSize: 16, fontWeight: "600", color: colors.foreground, marginTop: 12 }}>还没有食材档案</Text>
-              <Text style={{ fontSize: 13, color: colors.muted, textAlign: "center", marginTop: 6 }}>
-                点击右上角 + 添加食材，或在「门店 → 食材」导入 Excel
-              </Text>
-            </View>
-          ) : (
-            INGREDIENT_CATEGORIES.filter((cat) => byCategory[cat]?.length).map((cat) => {
-              const catColor = CATEGORY_COLORS[cat];
-              const items = byCategory[cat] ?? [];
-              return (
-                <View key={cat} style={{ marginBottom: 16 }}>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                    <View style={{ width: 4, height: 16, borderRadius: 2, backgroundColor: catColor }} />
-                    <Text style={{ fontSize: 14, fontWeight: "700", color: catColor }}>{INGREDIENT_CATEGORY_LABELS[cat]}</Text>
-                    <Text style={{ fontSize: 12, color: colors.muted }}>({items.length} 种)</Text>
-                  </View>
-                  {items.map((ing) => {
-                    const priceHistory = ing.priceHistory ?? [];
-                    const lastTwo = priceHistory.slice(0, 2);
-                    const priceDelta = lastTwo.length >= 2 ? lastTwo[0].price - lastTwo[1].price : 0;
-                    return (
-                      <View key={ing.id} style={[S.foodCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                        <View style={{ flex: 1 }}>
-                          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                            <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>{ing.name}</Text>
-                            {priceDelta !== 0 && (
-                              <View style={[S.tag, { backgroundColor: priceDelta > 0 ? colors.error + "22" : colors.success + "22" }]}>
-                                <Text style={{ fontSize: 10, color: priceDelta > 0 ? colors.error : colors.success }}>
-                                  {priceDelta > 0 ? `↑¥${formatMoney(priceDelta)}` : `↓¥${formatMoney(Math.abs(priceDelta))}`}
-                                </Text>
-                              </View>
-                            )}
-                          </View>
-                          <Text style={{ fontSize: 12, color: colors.muted }}>
-                            {ing.spec ? `${ing.spec} · ` : ""}¥{ing.costPrice?.toFixed(2) ?? "-"}/{ing.unit}
-                            {ing.supplier ? ` · ${ing.supplier}` : ""}
-                          </Text>
-                        </View>
-                        <View style={{ alignItems: "flex-end" }}>
-                          <Text style={{ fontSize: 16, fontWeight: "700", color: FOOD_COLOR }}>
-                            {ing.stock} {ing.unit}
-                          </Text>
-                          <Text style={{ fontSize: 11, color: colors.muted }}>
-                            ¥{formatMoney(((ing.costPrice ?? 0) * ing.stock))}
-                          </Text>
-                        </View>
-                      </View>
-                    );
-                  })}
-                </View>
-              );
-            })
-          )
+          <HorizontalLedgerTable
+            testID="food-horizontal-ledger-table"
+            columns={ledgerColumns}
+            groups={ledgerGroups}
+            rowKey={(row) => row.ingredientId}
+            emptyLabel="还没有食材档案；请先新增食材或导入供应商进货单。"
+            rowTone={(row) => row.closingQty <= 0 ? "negative" : "default"}
+            footer={monthLedger.length > 0 ? <View style={{ flexDirection: "row", minHeight: 42, backgroundColor: FOOD_COLOR + "14", alignItems: "center", paddingHorizontal: 10 }}><Text style={{ width: 146, color: FOOD_COLOR, fontWeight: "800", fontSize: 12 }}>合计</Text><Text style={{ width: 76, color: FOOD_COLOR, textAlign: "right", fontWeight: "800", fontSize: 12 }}>{monthLedger.reduce((sum, row) => sum + row.openingQty, 0).toFixed(2)}</Text><Text style={{ width: 76 + 82 + 76 + 82 + 76 + 82, color: FOOD_COLOR }} /><Text style={{ width: 76, color: FOOD_COLOR, textAlign: "right", fontWeight: "800", fontSize: 12 }}>{monthLedger.reduce((sum, row) => sum + row.closingQty, 0).toFixed(2)}</Text><Text style={{ width: 82 }} /><Text style={{ width: 82, color: FOOD_COLOR, textAlign: "right", fontWeight: "800", fontSize: 12 }}>¥{formatMoney(monthLedger.reduce((sum, row) => sum + row.closingCost, 0))}</Text></View> : undefined}
+          />
         )}
 
         {/* 进货录入 Tab */}
@@ -375,6 +361,34 @@ export default function FoodInventoryScreen({ month, embedded = false }: FoodInv
 
       <PurchaseModal visible={showPurchase} ingredients={ingredients} colors={colors}
         onSave={handlePurchase} onClose={() => setShowPurchase(false)} />
+      <FoodLedgerMovementModal
+        visible={showConsume}
+        mode="consume"
+        ingredients={ingredients}
+        colors={colors}
+        onSave={({ ingredientId, quantity, date, unitCost, notes }) => recordConsume({ ingredientId, quantity, date, unitCost, notes })}
+        onClose={() => setShowConsume(false)}
+      />
+      <FoodLedgerMovementModal
+        visible={showStocktake}
+        mode="stocktake"
+        ingredients={ingredients}
+        colors={colors}
+        onSave={({ ingredientId, quantity, date, unitCost, notes }) => recordStocktake({ ingredientId, actualClosingQty: quantity, date, unitCost, notes })}
+        onClose={() => setShowStocktake(false)}
+      />
+      <Modal visible={Boolean(selectedLedgerRow)} animationType="slide" transparent onRequestClose={() => setSelectedLedgerRow(null)}>
+        <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(15,23,42,0.42)" }}>
+          <Pressable style={{ flex: 1 }} onPress={() => setSelectedLedgerRow(null)} />
+          {selectedLedgerRow && <View testID="food-ledger-detail-sheet" style={{ maxHeight: "82%", padding: 16, paddingBottom: Math.max(insets.bottom, 16), backgroundColor: colors.background, borderTopLeftRadius: 22, borderTopRightRadius: 22 }}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+              <View style={{ flex: 1 }}><Text style={{ color: colors.foreground, fontSize: 19, fontWeight: "800" }}>{selectedLedgerRow.name}</Text><Text style={{ color: colors.muted, fontSize: 12, marginTop: 3 }}>{INGREDIENT_CATEGORY_LABELS[selectedLedgerRow.category]} · {currentMonth}</Text></View>
+              <TouchableOpacity onPress={() => setSelectedLedgerRow(null)}><IconSymbol name="xmark" size={18} color={colors.muted} /></TouchableOpacity>
+            </View>
+            {[["期初", `${selectedLedgerRow.openingQty.toFixed(2)} ${selectedLedgerRow.unit} · ¥${formatMoney(selectedLedgerRow.openingQty * selectedLedgerRow.openingUnitCost)}`], ["本月进货", `${selectedLedgerRow.purchaseQty.toFixed(2)} ${selectedLedgerRow.unit} · ¥${formatMoney(selectedLedgerRow.purchaseCost)}`], ["本月消耗", `${selectedLedgerRow.consumeQty.toFixed(2)} ${selectedLedgerRow.unit} · ¥${formatMoney(selectedLedgerRow.consumeCost)}`], ["期末库存", `${selectedLedgerRow.closingQty.toFixed(2)} ${selectedLedgerRow.unit} · ¥${formatMoney(selectedLedgerRow.closingCost)}`]].map(([label, value]) => <View key={label} style={[S.detailMetric, { backgroundColor: colors.surface, borderColor: colors.border }]}><Text style={{ color: colors.muted, fontSize: 13 }}>{label}</Text><Text style={{ color: colors.foreground, fontSize: 14, fontWeight: "800" }}>{value}</Text></View>)}
+          </View>}
+        </View>
+      </Modal>
     </ScreenContainer>
   );
 }
@@ -400,4 +414,5 @@ const S = StyleSheet.create({
   pettyHint: { borderRadius: 8, borderWidth: 1, padding: 10 },
   summaryCard: { borderRadius: 12, borderWidth: 1, padding: 14 },
   hintCard: { borderRadius: 10, borderWidth: 1, padding: 12 },
+  detailMetric: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, padding: 12, marginTop: 8 },
 });

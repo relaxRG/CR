@@ -40,6 +40,8 @@ export default function BeerInventoryScreen({ month, embedded = false }: BeerInv
       getGroupLabel={getGroupLabel}
       parseExcel={parseBeerInventoryExcel}
       excelFormatHint={BEER_EXCEL_HINT}
+      defaultTab="ledger"
+      ledgerPresentation="table"
       month={month}
       embedded={embedded}
     />

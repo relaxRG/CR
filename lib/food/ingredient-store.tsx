@@ -1,7 +1,13 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import React, { createContext, useCallback, useContext, useEffect, useReducer } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useReducer, useState } from "react";
 import { notifySyncChange, registerStoreReload } from "../sync/engine";
-import { FoodIngredient, PriceHistoryEntry, SupplierPurchaseRecord } from "./types";
+import {
+  FoodIngredient,
+  FoodLedgerMovement,
+  FoodMonthlyLedgerEntry,
+  PriceHistoryEntry,
+  SupplierPurchaseRecord,
+} from "./types";
 import { stripLegacyInventoryAlertThreshold } from "../inventory-core/legacy-cleanup";
 
 const STORAGE_KEY = "food.ingredients.v2";
@@ -9,12 +15,75 @@ const PURCHASE_KEY = "food.purchases.v1";
 
 export interface FoodIngredientState {
   ingredients: FoodIngredient[];
-  /** 每个 ingredient 的价格历史，key=ingredientId */
+  /** 每个 ingredient 的价格历史，key=ingredientId。 */
   priceHistory: Record<string, PriceHistoryEntry[]>;
+  /** 月度期初、采购汇总、消耗汇总和实盘结果。 */
+  ledgerEntries: FoodMonthlyLedgerEntry[];
+  /** 月度台账的原子流水，用于审计采购、消耗和盘点来源。 */
+  ledgerMovements: FoodLedgerMovement[];
+}
+
+export interface FoodMonthlyLedgerRow extends FoodMonthlyLedgerEntry {
+  name: string;
+  nameEn?: string;
+  category: FoodIngredient["category"];
+  spec: string;
+  unit: string;
+  closingQty: number;
+  closingUnitCost: number;
+  closingCost: number;
+}
+
+export interface FoodPurchaseInput {
+  ingredientId: string;
+  quantity: number;
+  unitPrice: number;
+  date: string;
+  supplier: string;
+  notes?: string;
+  source?: PriceHistoryEntry["source"];
+}
+
+export interface FoodConsumeInput {
+  ingredientId: string;
+  quantity: number;
+  date: string;
+  unitCost?: number;
+  notes?: string;
+}
+
+export interface FoodStocktakeInput {
+  ingredientId: string;
+  actualClosingQty: number;
+  date: string;
+  unitCost?: number;
+  notes?: string;
 }
 
 export interface PurchaseState {
   records: SupplierPurchaseRecord[];
+}
+
+function monthFromDate(date: string) {
+  return /^\d{4}-\d{2}/.test(date) ? date.slice(0, 7) : new Date().toISOString().slice(0, 7);
+}
+
+function uuid(): string { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
+
+function weightedUnitCost(entry: Pick<FoodMonthlyLedgerEntry, "openingQty" | "openingUnitCost" | "purchaseQty" | "purchaseCost">) {
+  const totalQty = entry.openingQty + entry.purchaseQty;
+  if (totalQty <= 0) return entry.openingUnitCost;
+  return Math.round(((entry.openingQty * entry.openingUnitCost + entry.purchaseCost) / totalQty) * 100) / 100;
+}
+
+function theoreticalClosingQty(entry: Pick<FoodMonthlyLedgerEntry, "openingQty" | "purchaseQty" | "consumeQty">) {
+  return Math.max(0, entry.openingQty + entry.purchaseQty - entry.consumeQty);
+}
+
+function entryClosing(entry: FoodMonthlyLedgerEntry) {
+  const closingUnitCost = entry.actualClosingUnitCost ?? weightedUnitCost(entry);
+  const closingQty = entry.actualClosingQty ?? theoreticalClosingQty(entry);
+  return { closingQty, closingUnitCost, closingCost: Math.round(closingQty * closingUnitCost * 100) / 100 };
 }
 
 /** 历史食材档案的预警字段已废弃；任何加载入口都必须先清除。 */
@@ -32,7 +101,202 @@ export function sanitizeFoodIngredientState(raw: unknown): FoodIngredientState {
     priceHistory: source.priceHistory && typeof source.priceHistory === "object"
       ? source.priceHistory as Record<string, PriceHistoryEntry[]>
       : {},
+    ledgerEntries: Array.isArray(source.ledgerEntries)
+      ? source.ledgerEntries.filter((entry): entry is FoodMonthlyLedgerEntry => Boolean(entry) && typeof entry === "object")
+      : [],
+    ledgerMovements: Array.isArray(source.ledgerMovements)
+      ? source.ledgerMovements.filter((movement): movement is FoodLedgerMovement => Boolean(movement) && typeof movement === "object")
+      : [],
   };
+}
+
+function lastClosedEntry(entries: FoodMonthlyLedgerEntry[], ingredientId: string, month: string) {
+  return entries
+    .filter((entry) => entry.ingredientId === ingredientId && entry.month < month)
+    .sort((a, b) => b.month.localeCompare(a.month))[0];
+}
+
+function createLedgerEntry(state: FoodIngredientState, ingredientId: string, month: string, now: string): FoodMonthlyLedgerEntry {
+  const ingredient = state.ingredients.find((item) => item.id === ingredientId);
+  const previous = lastClosedEntry(state.ledgerEntries, ingredientId, month);
+  const previousClosing = previous ? entryClosing(previous) : undefined;
+  return {
+    id: `food-ledger-${uuid()}`,
+    month,
+    ingredientId,
+    openingQty: previousClosing?.closingQty ?? ingredient?.stock ?? 0,
+    openingUnitCost: previousClosing?.closingUnitCost ?? ingredient?.costPrice ?? 0,
+    purchaseQty: 0,
+    purchaseCost: 0,
+    consumeQty: 0,
+    consumeCost: 0,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+function withLedgerEntry(
+  state: FoodIngredientState,
+  ingredientId: string,
+  month: string,
+  now: string,
+  update: (entry: FoodMonthlyLedgerEntry) => FoodMonthlyLedgerEntry,
+) {
+  const existing = state.ledgerEntries.find((entry) => entry.ingredientId === ingredientId && entry.month === month);
+  const base = existing ?? createLedgerEntry(state, ingredientId, month, now);
+  const next = update(base);
+  return {
+    ...state,
+    ledgerEntries: existing
+      ? state.ledgerEntries.map((entry) => entry.id === existing.id ? next : entry)
+      : [...state.ledgerEntries, next],
+  };
+}
+
+function appendPriceHistory(
+  state: FoodIngredientState,
+  ingredientId: string,
+  entry: PriceHistoryEntry,
+) {
+  const existing = state.priceHistory[ingredientId] ?? [];
+  if (existing.some((history) => history.date === entry.date && history.price === entry.price && history.supplier === entry.supplier)) {
+    return state.priceHistory;
+  }
+  return { ...state.priceHistory, [ingredientId]: [entry, ...existing].slice(0, 50) };
+}
+
+function applyPurchase(state: FoodIngredientState, input: FoodPurchaseInput): FoodIngredientState {
+  const ingredient = state.ingredients.find((item) => item.id === input.ingredientId);
+  if (!ingredient || input.quantity <= 0) return state;
+  const now = new Date().toISOString();
+  const date = input.date || now.slice(0, 10);
+  const month = monthFromDate(date);
+  const unitPrice = Math.max(0, input.unitPrice || ingredient.costPrice || 0);
+  const totalCost = Math.round(input.quantity * unitPrice * 100) / 100;
+  const priceEntry: PriceHistoryEntry = { price: unitPrice, date, supplier: input.supplier || ingredient.supplier, source: input.source ?? "manual" };
+  const priceHistory = appendPriceHistory(state, ingredient.id, priceEntry);
+  const nextIngredient = {
+    ...ingredient,
+    stock: Math.max(0, ingredient.stock + input.quantity),
+    costPrice: unitPrice || ingredient.costPrice,
+    supplier: input.supplier || ingredient.supplier,
+    priceHistory: priceHistory[ingredient.id] ?? ingredient.priceHistory,
+    updatedAt: now,
+  };
+  const withEntry = withLedgerEntry({ ...state, priceHistory }, ingredient.id, month, now, (entry) => ({
+    ...entry,
+    purchaseQty: entry.purchaseQty + input.quantity,
+    purchaseCost: Math.round((entry.purchaseCost + totalCost) * 100) / 100,
+    actualClosingQty: undefined,
+    actualClosingUnitCost: undefined,
+    updatedAt: now,
+  }));
+  return {
+    ...withEntry,
+    ingredients: state.ingredients.map((item) => item.id === ingredient.id ? nextIngredient : item),
+    priceHistory,
+    ledgerMovements: [{
+      id: `food-movement-${uuid()}`,
+      month,
+      ingredientId: ingredient.id,
+      kind: "purchase",
+      date,
+      quantity: input.quantity,
+      unitCost: unitPrice,
+      totalCost,
+      supplier: input.supplier || ingredient.supplier,
+      notes: input.notes ?? "",
+      createdAt: now,
+    }, ...withEntry.ledgerMovements],
+  };
+}
+
+function applyConsume(state: FoodIngredientState, input: FoodConsumeInput): FoodIngredientState {
+  const ingredient = state.ingredients.find((item) => item.id === input.ingredientId);
+  if (!ingredient || input.quantity <= 0) return state;
+  const now = new Date().toISOString();
+  const date = input.date || now.slice(0, 10);
+  const month = monthFromDate(date);
+  const currentEntry = state.ledgerEntries.find((entry) => entry.ingredientId === ingredient.id && entry.month === month);
+  const unitCost = Math.max(0, input.unitCost ?? (currentEntry ? weightedUnitCost(currentEntry) : ingredient.costPrice ?? 0));
+  const totalCost = Math.round(input.quantity * unitCost * 100) / 100;
+  const withEntry = withLedgerEntry(state, ingredient.id, month, now, (entry) => ({
+    ...entry,
+    consumeQty: entry.consumeQty + input.quantity,
+    consumeCost: Math.round((entry.consumeCost + totalCost) * 100) / 100,
+    actualClosingQty: undefined,
+    actualClosingUnitCost: undefined,
+    updatedAt: now,
+  }));
+  return {
+    ...withEntry,
+    ingredients: state.ingredients.map((item) => item.id === ingredient.id
+      ? { ...item, stock: Math.max(0, item.stock - input.quantity), updatedAt: now }
+      : item),
+    ledgerMovements: [{
+      id: `food-movement-${uuid()}`,
+      month,
+      ingredientId: ingredient.id,
+      kind: "consume",
+      date,
+      quantity: input.quantity,
+      unitCost,
+      totalCost,
+      notes: input.notes ?? "",
+      createdAt: now,
+    }, ...withEntry.ledgerMovements],
+  };
+}
+
+function applyStocktake(state: FoodIngredientState, input: FoodStocktakeInput): FoodIngredientState {
+  const ingredient = state.ingredients.find((item) => item.id === input.ingredientId);
+  if (!ingredient || input.actualClosingQty < 0) return state;
+  const now = new Date().toISOString();
+  const date = input.date || now.slice(0, 10);
+  const month = monthFromDate(date);
+  const currentEntry = state.ledgerEntries.find((entry) => entry.ingredientId === ingredient.id && entry.month === month);
+  const unitCost = Math.max(0, input.unitCost ?? (currentEntry ? weightedUnitCost(currentEntry) : ingredient.costPrice ?? 0));
+  const withEntry = withLedgerEntry(state, ingredient.id, month, now, (entry) => ({
+    ...entry,
+    actualClosingQty: input.actualClosingQty,
+    actualClosingUnitCost: unitCost,
+    updatedAt: now,
+  }));
+  return {
+    ...withEntry,
+    ingredients: state.ingredients.map((item) => item.id === ingredient.id
+      ? { ...item, stock: input.actualClosingQty, costPrice: unitCost || item.costPrice, updatedAt: now }
+      : item),
+    ledgerMovements: [{
+      id: `food-movement-${uuid()}`,
+      month,
+      ingredientId: ingredient.id,
+      kind: "stocktake",
+      date,
+      quantity: input.actualClosingQty,
+      unitCost,
+      totalCost: Math.round(input.actualClosingQty * unitCost * 100) / 100,
+      notes: input.notes ?? "",
+      createdAt: now,
+    }, ...withEntry.ledgerMovements],
+  };
+}
+
+export function buildFoodMonthlyLedger(state: FoodIngredientState, month: string): FoodMonthlyLedgerRow[] {
+  return state.ingredients.map((ingredient) => {
+    const entry = state.ledgerEntries.find((candidate) => candidate.ingredientId === ingredient.id && candidate.month === month)
+      ?? createLedgerEntry(state, ingredient.id, month, new Date().toISOString());
+    const closing = entryClosing(entry);
+    return {
+      ...entry,
+      name: ingredient.name,
+      nameEn: ingredient.nameEn,
+      category: ingredient.category,
+      spec: ingredient.spec,
+      unit: ingredient.unit,
+      ...closing,
+    };
+  });
 }
 
 type Action =
@@ -41,59 +305,51 @@ type Action =
   | { type: "UPDATE"; id: string; updates: Partial<FoodIngredient> }
   | { type: "DELETE"; id: string }
   | { type: "UPDATE_STOCK"; id: string; delta: number }
-  | {
-      type: "BATCH_IMPORT";
-      updates: {
-        id: string;
-        costPrice: number;
-        stockDelta: number;
-        supplier: string;
-        priceEntry: PriceHistoryEntry;
-      }[];
-    };
+  | { type: "RECORD_PURCHASE"; input: FoodPurchaseInput }
+  | { type: "RECORD_CONSUME"; input: FoodConsumeInput }
+  | { type: "RECORD_STOCKTAKE"; input: FoodStocktakeInput }
+  | { type: "CLOSE_MONTH"; month: string }
+  | { type: "BATCH_IMPORT"; updates: { id: string; costPrice: number; stockDelta: number; supplier: string; priceEntry: PriceHistoryEntry }[] };
 
-function uuid(): string { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
-
-function reducer(state: FoodIngredientState, action: Action): FoodIngredientState {
+export function foodIngredientReducer(state: FoodIngredientState, action: Action): FoodIngredientState {
   switch (action.type) {
     case "LOAD": return action.payload;
     case "ADD": return { ...state, ingredients: [action.ingredient, ...state.ingredients] };
     case "UPDATE": return {
       ...state,
-      ingredients: state.ingredients.map((i) =>
-        i.id === action.id ? { ...i, ...action.updates, updatedAt: new Date().toISOString() } : i
-      ),
+      ingredients: state.ingredients.map((item) => item.id === action.id ? { ...item, ...action.updates, updatedAt: new Date().toISOString() } : item),
     };
-    case "DELETE": return { ...state, ingredients: state.ingredients.filter((i) => i.id !== action.id) };
+    case "DELETE": return { ...state, ingredients: state.ingredients.filter((item) => item.id !== action.id) };
     case "UPDATE_STOCK": return {
       ...state,
-      ingredients: state.ingredients.map((i) =>
-        i.id === action.id ? { ...i, stock: Math.max(0, i.stock + action.delta), updatedAt: new Date().toISOString() } : i
-      ),
+      ingredients: state.ingredients.map((item) => item.id === action.id ? { ...item, stock: Math.max(0, item.stock + action.delta), updatedAt: new Date().toISOString() } : item),
     };
-    case "BATCH_IMPORT": {
-      const newIngredients = state.ingredients.map((ing) => {
-        const upd = action.updates.find((u) => u.id === ing.id);
-        if (!upd) return ing;
-        return {
-          ...ing,
-          costPrice: upd.costPrice,
-          supplier: upd.supplier || ing.supplier,
-          stock: Math.max(0, ing.stock + upd.stockDelta),
-          updatedAt: new Date().toISOString(),
-        };
-      });
-      const newHistory = { ...state.priceHistory };
-      for (const upd of action.updates) {
-        const existing = newHistory[upd.id] ?? [];
-        const alreadyExists = existing.some(
-          (e) => e.date === upd.priceEntry.date && e.price === upd.priceEntry.price
-        );
-        if (!alreadyExists) {
-          newHistory[upd.id] = [upd.priceEntry, ...existing].slice(0, 50);
-        }
-      }
-      return { ingredients: newIngredients, priceHistory: newHistory };
+    case "RECORD_PURCHASE": return applyPurchase(state, action.input);
+    case "RECORD_CONSUME": return applyConsume(state, action.input);
+    case "RECORD_STOCKTAKE": return applyStocktake(state, action.input);
+    case "BATCH_IMPORT": return action.updates.reduce(
+      (next, update) => applyPurchase(next, {
+        ingredientId: update.id,
+        quantity: update.stockDelta,
+        unitPrice: update.costPrice,
+        date: update.priceEntry.date,
+        supplier: update.supplier,
+        source: update.priceEntry.source,
+      }),
+      state,
+    );
+    case "CLOSE_MONTH": {
+      const now = new Date().toISOString();
+      return state.ingredients.reduce((next, ingredient) => {
+        const existing = next.ledgerEntries.find((entry) => entry.ingredientId === ingredient.id && entry.month === action.month);
+        const closing = entryClosing(existing ?? createLedgerEntry(next, ingredient.id, action.month, now));
+        return withLedgerEntry(next, ingredient.id, action.month, now, (entry) => ({
+          ...entry,
+          actualClosingQty: entry.actualClosingQty ?? closing.closingQty,
+          actualClosingUnitCost: entry.actualClosingUnitCost ?? closing.closingUnitCost,
+          updatedAt: now,
+        }));
+      }, state);
     }
     default: return state;
   }
@@ -104,88 +360,63 @@ interface FoodIngredientContextValue extends FoodIngredientState {
   updateIngredient: (id: string, updates: Partial<FoodIngredient>) => void;
   deleteIngredient: (id: string) => void;
   updateStock: (id: string, delta: number) => void;
-  batchImport: (
-    updates: { id: string; costPrice: number; stockDelta: number; supplier: string; priceEntry: PriceHistoryEntry }[]
-  ) => void;
+  recordPurchase: (input: FoodPurchaseInput) => void;
+  recordConsume: (input: FoodConsumeInput) => void;
+  recordStocktake: (input: FoodStocktakeInput) => void;
+  closeMonth: (month: string) => void;
+  getMonthLedger: (month: string) => FoodMonthlyLedgerRow[];
+  batchImport: (updates: { id: string; costPrice: number; stockDelta: number; supplier: string; priceEntry: PriceHistoryEntry }[]) => void;
 }
 
 const FoodIngredientContext = createContext<FoodIngredientContextValue | null>(null);
 
 export function FoodIngredientProvider({ children }: { children: React.ReactNode }) {
-  const [state, dispatch] = useReducer(reducer, { ingredients: [], priceHistory: {} });
+  const [state, dispatch] = useReducer(foodIngredientReducer, { ingredients: [], priceHistory: {}, ledgerEntries: [], ledgerMovements: [] });
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    // 先尝试读 v2，再回退 v1（兼容旧数据）
-    AsyncStorage.getItem(STORAGE_KEY).then((raw) => {
-      if (raw) {
-        try {
-          const parsed = JSON.parse(raw);
-          dispatch({
-            type: "LOAD",
-            payload: sanitizeFoodIngredientState(parsed),
-          });
-          return;
-        } catch {}
+    let active = true;
+    const load = async () => {
+      let raw = await AsyncStorage.getItem(STORAGE_KEY);
+      if (!raw) raw = await AsyncStorage.getItem("food.ingredients.v1");
+      if (raw && active) {
+        try { dispatch({ type: "LOAD", payload: sanitizeFoodIngredientState(JSON.parse(raw)) }); } catch {}
       }
-      // 回退读 v1
-      AsyncStorage.getItem("food.ingredients.v1").then((raw1) => {
-        if (raw1) {
-          try {
-            const parsed1 = JSON.parse(raw1);
-            dispatch({
-              type: "LOAD",
-              payload: sanitizeFoodIngredientState(parsed1),
-            });
-          } catch {}
-        }
-      });
-    });
-    registerStoreReload(() => {
-      AsyncStorage.getItem(STORAGE_KEY).then((raw) => {
-        if (raw) {
-          try {
-            const parsed = JSON.parse(raw);
-            dispatch({
-              type: "LOAD",
-              payload: sanitizeFoodIngredientState(parsed),
-            });
-          } catch {}
-        }
-      });
-    });
+      if (active) setHydrated(true);
+    };
+    void load();
+    const unregister = registerStoreReload(load);
+    return () => {
+      active = false;
+      unregister();
+    };
   }, []);
 
   useEffect(() => {
+    if (!hydrated) return;
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state)).catch(() => {});
     notifySyncChange(STORAGE_KEY);
-  }, [state]);
+  }, [hydrated, state]);
 
   const addIngredient = useCallback((data: Omit<FoodIngredient, "id" | "createdAt" | "updatedAt">) => {
     const now = new Date().toISOString();
     dispatch({ type: "ADD", ingredient: { ...data, id: uuid(), createdAt: now, updatedAt: now } });
   }, []);
-
-  const updateIngredient = useCallback((id: string, updates: Partial<FoodIngredient>) => {
-    dispatch({ type: "UPDATE", id, updates });
-  }, []);
-
+  const updateIngredient = useCallback((id: string, updates: Partial<FoodIngredient>) => dispatch({ type: "UPDATE", id, updates }), []);
   const deleteIngredient = useCallback((id: string) => dispatch({ type: "DELETE", id }), []);
-
-  const updateStock = useCallback((id: string, delta: number) => {
-    dispatch({ type: "UPDATE_STOCK", id, delta });
-  }, []);
-
-  const batchImport = useCallback(
-    (updates: { id: string; costPrice: number; stockDelta: number; supplier: string; priceEntry: PriceHistoryEntry }[]) => {
-      dispatch({ type: "BATCH_IMPORT", updates });
-    },
-    []
-  );
+  const updateStock = useCallback((id: string, delta: number) => dispatch({ type: "UPDATE_STOCK", id, delta }), []);
+  const recordPurchase = useCallback((input: FoodPurchaseInput) => dispatch({ type: "RECORD_PURCHASE", input }), []);
+  const recordConsume = useCallback((input: FoodConsumeInput) => dispatch({ type: "RECORD_CONSUME", input }), []);
+  const recordStocktake = useCallback((input: FoodStocktakeInput) => dispatch({ type: "RECORD_STOCKTAKE", input }), []);
+  const closeMonth = useCallback((month: string) => dispatch({ type: "CLOSE_MONTH", month }), []);
+  const getMonthLedger = useCallback((month: string) => buildFoodMonthlyLedger(state, month), [state]);
+  const batchImport = useCallback((updates: { id: string; costPrice: number; stockDelta: number; supplier: string; priceEntry: PriceHistoryEntry }[]) => dispatch({ type: "BATCH_IMPORT", updates }), []);
 
   return (
-    <FoodIngredientContext.Provider
-      value={{ ...state, addIngredient, updateIngredient, deleteIngredient, updateStock, batchImport }}
-    >
+    <FoodIngredientContext.Provider value={{
+      ...state, addIngredient, updateIngredient, deleteIngredient, updateStock,
+      recordPurchase, recordConsume, recordStocktake, closeMonth, getMonthLedger, batchImport,
+    }}>
       {children}
     </FoodIngredientContext.Provider>
   );
@@ -207,7 +438,7 @@ function purchaseReducer(state: PurchaseState, action: PurchaseAction): Purchase
   switch (action.type) {
     case "LOAD": return action.payload;
     case "ADD_RECORD": return { records: [action.record, ...state.records] };
-    case "DELETE_RECORD": return { records: state.records.filter((r) => r.id !== action.id) };
+    case "DELETE_RECORD": return { records: state.records.filter((record) => record.id !== action.id) };
     default: return state;
   }
 }
@@ -221,35 +452,20 @@ const PurchaseContext = createContext<PurchaseContextValue | null>(null);
 
 export function SupplierPurchaseProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(purchaseReducer, { records: [] });
-
   useEffect(() => {
     const load = () => AsyncStorage.getItem(PURCHASE_KEY).then((raw) => {
       if (raw) { try { dispatch({ type: "LOAD", payload: JSON.parse(raw) }); } catch {} }
     });
     load();
-    // ★ 注册同步重载回调
     return registerStoreReload(load);
   }, []);
-
   useEffect(() => {
     AsyncStorage.setItem(PURCHASE_KEY, JSON.stringify(state)).catch(() => {});
-    // ★ 通知同步引擎
     notifySyncChange(PURCHASE_KEY);
   }, [state]);
-
-  const addRecord = useCallback((record: SupplierPurchaseRecord) => {
-    dispatch({ type: "ADD_RECORD", record });
-  }, []);
-
-  const deleteRecord = useCallback((id: string) => {
-    dispatch({ type: "DELETE_RECORD", id });
-  }, []);
-
-  return (
-    <PurchaseContext.Provider value={{ ...state, addRecord, deleteRecord }}>
-      {children}
-    </PurchaseContext.Provider>
-  );
+  const addRecord = useCallback((record: SupplierPurchaseRecord) => dispatch({ type: "ADD_RECORD", record }), []);
+  const deleteRecord = useCallback((id: string) => dispatch({ type: "DELETE_RECORD", id }), []);
+  return <PurchaseContext.Provider value={{ ...state, addRecord, deleteRecord }}>{children}</PurchaseContext.Provider>;
 }
 
 export function useSupplierPurchaseStore(): PurchaseContextValue {

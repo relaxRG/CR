@@ -40,6 +40,8 @@ export default function FruitInventoryScreen({ month, embedded = false }: FruitI
       getGroupLabel={getGroupLabel}
       parseExcel={parseFruitInventoryExcel}
       excelFormatHint={FRUIT_EXCEL_HINT}
+      defaultTab="ledger"
+      ledgerPresentation="table"
       month={month}
       embedded={embedded}
     />

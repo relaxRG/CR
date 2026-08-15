@@ -17,8 +17,10 @@ import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
 import { GenericInventoryContextValue, GenericInventoryItem } from "@/lib/inventory-core/store";
-import { getCurrentMonth, MonthlySnapshot } from "@/lib/inventory-core/types";
+import { getCurrentMonth, MonthlyLedgerItem, MonthlySnapshot } from "@/lib/inventory-core/types";
 import { MonthlyLedgerRow } from "./MonthlyLedgerSheet";
+import { HorizontalLedgerColumn, HorizontalLedgerGroup, HorizontalLedgerTable } from "./HorizontalLedgerTable";
+import { MonthlyLedgerDetailSheet } from "./MonthlyLedgerDetailSheet";
 import { MonthCloseModal } from "./MonthCloseModal";
 import { OpeningStockModal } from "./OpeningStockModal";
 import { PurchaseEntryModal } from "./PurchaseEntryModal";
@@ -58,6 +60,10 @@ export interface BaseInventoryScreenProps {
   extraTabs?: { key: string; label: string }[];
   /** 工作台传入的统一库存月份；未传入时保持独立页面的当前月行为。 */
   month?: string;
+  /** 台账页面的默认页签；仅需要直接进入台账的分类显式开启。 */
+  defaultTab?: Tab;
+  /** cards 保留既有折叠列表；table 直接展示完整横向台账。 */
+  ledgerPresentation?: "cards" | "table";
   /** 嵌入工作台时隐藏独立页面标题和返回入口。 */
   embedded?: boolean;
 }
@@ -66,14 +72,14 @@ export function BaseInventoryScreen({
   store, title, emoji, accentColor, categoryId, categoryLabel,
   pettyHint, showLoss = false, categoryOptions, defaultUnit = "个",
   extraFields = [], getGroupLabel, parseExcel, excelFormatHint,
-  renderExtraTabContent, extraTabs = [], month, embedded = false,
+  renderExtraTabContent, extraTabs = [], month, defaultTab = "summary", ledgerPresentation = "cards", embedded = false,
 }: BaseInventoryScreenProps) {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
-  const [tab, setTab] = useState<string>("summary");
+  const [tab, setTab] = useState<string>(defaultTab);
   const [showPurchase, setShowPurchase] = useState(false);
   const [purchaseMode, setPurchaseMode] = useState<"in" | "out">("in");
   const [preselectedId, setPreselectedId] = useState<string | undefined>();
@@ -81,6 +87,7 @@ export function BaseInventoryScreen({
   const [showOpening, setShowOpening] = useState(false);
   const [showEditItem, setShowEditItem] = useState(false);
   const [editingItem, setEditingItem] = useState<GenericInventoryItem | null>(null);
+  const [selectedLedgerItem, setSelectedLedgerItem] = useState<MonthlyLedgerItem | null>(null);
   const [importLoading, setImportLoading] = useState(false);
   const [importPreview, setImportPreview] = useState<Omit<GenericInventoryItem, "id" | "createdAt" | "updatedAt">[]>([]);
   const [showImportPreview, setShowImportPreview] = useState(false);
@@ -139,7 +146,6 @@ export function BaseInventoryScreen({
 
   const totalClosingCost = useMemo(() => ledgerItems.reduce((s, i) => s + i.closingCost, 0), [ledgerItems]);
   const totalOpeningCost = useMemo(() => ledgerItems.reduce((s, i) => s + i.openingCost, 0), [ledgerItems]);
-
   // 按分组展示
   const groupedLedger = useMemo(() => {
     if (!getGroupLabel) return { "": ledgerItems };
@@ -151,6 +157,25 @@ export function BaseInventoryScreen({
     });
     return map;
   }, [ledgerItems, getGroupLabel]);
+
+  const ledgerGroups = useMemo<HorizontalLedgerGroup<MonthlyLedgerItem>[]>(() => Object.entries(groupedLedger).map(([label, rows]) => ({
+    id: label || "uncategorized", label: label || "未分类", color: accentColor, rows,
+  })), [groupedLedger, accentColor]);
+  const ledgerColumns = useMemo<HorizontalLedgerColumn<MonthlyLedgerItem>[]>(() => [
+    { key: "name", label: "商品名称", width: 146, onPress: setSelectedLedgerItem, testID: (item) => `${categoryId}-ledger-name-${item.itemId}`, render: (item) => <><Text numberOfLines={1} style={{ color: colors.foreground, fontSize: 12, fontWeight: "800" }}>{item.name}</Text><Text numberOfLines={1} style={{ color: colors.muted, fontSize: 10 }}>{item.spec || item.unit}</Text></> },
+    { key: "openingQty", label: "期初数量", width: 76, align: "right", render: (item) => <Text style={{ color: colors.foreground, fontSize: 12 }}>{item.openingQty.toFixed(2)}</Text> },
+    { key: "openingUnitCost", label: "期初单价", width: 76, align: "right", render: (item) => <Text style={{ color: colors.foreground, fontSize: 12 }}>¥{item.openingUnitCost.toFixed(2)}</Text> },
+    { key: "openingCost", label: "期初成本", width: 82, align: "right", render: (item) => <Text style={{ color: colors.foreground, fontSize: 12 }}>¥{item.openingCost.toFixed(2)}</Text> },
+    { key: "purchaseQty", label: "进货数量", width: 76, align: "right", render: (item) => <Text style={{ color: item.purchaseQty > 0 ? accentColor : colors.muted, fontSize: 12 }}>{item.purchaseQty > 0 ? `+${item.purchaseQty.toFixed(2)}` : "—"}</Text> },
+    { key: "purchaseCost", label: "进货成本", width: 82, align: "right", render: (item) => <Text style={{ color: item.purchaseCost > 0 ? accentColor : colors.muted, fontSize: 12 }}>{item.purchaseCost > 0 ? `¥${item.purchaseCost.toFixed(2)}` : "—"}</Text> },
+    { key: "consumeQty", label: "消耗数量", width: 76, align: "right", render: (item) => <Text style={{ color: item.consumeQty > 0 ? colors.warning : colors.muted, fontSize: 12 }}>{item.consumeQty > 0 ? item.consumeQty.toFixed(2) : "—"}</Text> },
+    { key: "consumeCost", label: "消耗成本", width: 82, align: "right", render: (item) => <Text style={{ color: item.consumeCost > 0 ? colors.warning : colors.muted, fontSize: 12 }}>{item.consumeCost > 0 ? `¥${item.consumeCost.toFixed(2)}` : "—"}</Text> },
+    ...(showLoss ? [{ key: "lossQty", label: "损耗数量", width: 76, align: "right" as const, render: (item: MonthlyLedgerItem) => <Text style={{ color: item.lossQty > 0 ? colors.error : colors.muted, fontSize: 12 }}>{item.lossQty > 0 ? item.lossQty.toFixed(2) : "—"}</Text> }] : []),
+    { key: "closingQty", label: "期末库存", width: 76, align: "right", render: (item) => <Text style={{ color: item.closingQty <= 0 ? colors.error : colors.foreground, fontSize: 12, fontWeight: "800" }}>{item.closingQty.toFixed(2)}</Text> },
+    { key: "closingUnitCost", label: "期末单价", width: 82, align: "right", render: (item) => <Text style={{ color: colors.foreground, fontSize: 12 }}>¥{item.closingUnitCost.toFixed(2)}</Text> },
+    { key: "closingCost", label: "期末成本", width: 82, align: "right", render: (item) => <Text style={{ color: accentColor, fontSize: 12, fontWeight: "800" }}>¥{item.closingCost.toFixed(2)}</Text> },
+  ], [accentColor, categoryId, colors, showLoss]);
+
 
   const handlePickExcel = async () => {
     if (!parseExcel) { Alert.alert("该品类暂不支持 Excel 导入"); return; }
@@ -337,6 +362,14 @@ export function BaseInventoryScreen({
             {/* 台账列表 */}
             {activeItems.length === 0 ? (
               <EmptyState emoji={emoji} accentColor={accentColor} excelFormatHint={excelFormatHint} colors={colors} />
+            ) : ledgerPresentation === "table" ? (
+              <HorizontalLedgerTable
+                testID={`${categoryId}-horizontal-ledger-table`}
+                columns={ledgerColumns}
+                groups={ledgerGroups}
+                rowKey={(item) => item.itemId}
+                rowTone={(item) => item.closingQty <= 0 ? "negative" : "default"}
+              />
             ) : getGroupLabel ? (
               Object.entries(groupedLedger).map(([group, items]) => (
                 <View key={group} style={{ marginBottom: 16 }}>
@@ -464,6 +497,8 @@ export function BaseInventoryScreen({
 
       <OpeningStockModal visible={showOpening} onClose={() => setShowOpening(false)}
         store={store} categoryLabel={categoryLabel} accentColor={accentColor} />
+
+      <MonthlyLedgerDetailSheet item={selectedLedgerItem} accentColor={accentColor} onClose={() => setSelectedLedgerItem(null)} />
 
       <ItemEditModal visible={showEditItem} onClose={() => setShowEditItem(false)}
         item={editingItem} accentColor={accentColor} categoryLabel={categoryLabel}

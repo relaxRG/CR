@@ -366,6 +366,47 @@ try {
   }
   report.push({ reportPage: "烈酒库存导入同步", viewports: spiritsViewports });
 
+  // 直接完整台账：葡萄酒、水果、啤酒与食材均应在库存管理中直接显示横向表格，且名称可打开详情。
+  await call("Runtime.evaluate", { expression: `(() => {
+    const now = new Date().toISOString();
+    const month = ${JSON.stringify(closeMonth)};
+    const genericItem = (id, name, category, unit) => ({ id, name, category, spec: 'H5规格', unit, currentStock: 4, latestCostPrice: 12, supplier: 'H5供应商', notes: '', active: true, createdAt: now, updatedAt: now });
+    localStorage.setItem('fruit.inventory.v2', JSON.stringify({ items: [genericItem('h5-fruit', 'H5青柠', 'citrus', 'kg')], purchases: [], consumes: [], snapshots: [] }));
+    localStorage.setItem('beer.inventory.v2', JSON.stringify({ items: [genericItem('h5-beer', 'H5精酿啤酒', 'bottle', '瓶')], purchases: [], consumes: [], snapshots: [] }));
+    localStorage.setItem('wine.snapshots.v2', JSON.stringify({ snapshots: [{ id: 'h5-wine-snapshot', monthLabel: month, importedAt: now, supplierTotals: { 'H5酒商': 36 }, totalPurchase: 36, totalConsume: 24, totalEndCost: 96, items: [{ seq: 1, wineType: 'Red', supplier: 'H5酒商', name: 'H5赤霞珠', initUnitCost: 20, initQty: 4, initCost: 80, purchaseQty: 2, purchaseCost: 36, endQty: 4, unitCost: 24, endCost: 96, consumeBottles: 2, consumeQty: 24 }], purchaseOrders: [] }] }));
+    localStorage.setItem('food.ingredients.v2', JSON.stringify({ ingredients: [{ id: 'h5-food', name: 'H5牛肉', category: 'meat', spec: '1kg/包', unit: '包', costPrice: 30, stock: 3, supplier: 'H5食材商', notes: '', createdAt: now, updatedAt: now }], priceHistory: {}, ledgerEntries: [{ id: 'h5-food-ledger', month, ingredientId: 'h5-food', openingQty: 2, openingUnitCost: 28, purchaseQty: 2, purchaseCost: 64, consumeQty: 1, consumeCost: 32, createdAt: now, updatedAt: now }], ledgerMovements: [] }));
+    return month;
+  })()`, returnByValue: true });
+  const directLedgerViewports = [];
+  for (const width of [375, 390, 430]) {
+    await call("Emulation.setDeviceMetricsOverride", { width, height: 844, deviceScaleFactor: 3, mobile: true });
+    for (const spec of [
+      { label: '葡萄酒', path: '/wine-inventory', table: 'wine-horizontal-ledger-table', name: 'wine-ledger-name-1', sheet: 'generic-ledger-detail-sheet' },
+      { label: '水果', path: '/fruit-inventory', table: 'fruit-horizontal-ledger-table', name: 'fruit-ledger-name-h5-fruit', sheet: 'generic-ledger-detail-sheet' },
+      { label: '啤酒', path: '/beer-inventory', table: 'beer-horizontal-ledger-table', name: 'beer-ledger-name-h5-beer', sheet: 'generic-ledger-detail-sheet' },
+      { label: '食材', path: '/food-inventory', table: 'food-horizontal-ledger-table', name: 'food-ledger-name-h5-food', sheet: 'food-ledger-detail-sheet' },
+    ]) {
+      await call("Page.navigate", { url: `http://localhost:${port}${spec.path}` });
+      await sleep(760);
+      const tableState = await call("Runtime.evaluate", { expression: `(() => {
+        const table = document.querySelector('[data-testid="${spec.table}"]');
+        const name = document.querySelector('[data-testid="${spec.name}"]');
+        if (table) table.scrollLeft = Math.max(0, table.scrollWidth - table.clientWidth);
+        return { foundTable: Boolean(table), foundName: Boolean(name), clientWidth: table?.clientWidth ?? 0, scrollWidth: table?.scrollWidth ?? 0, reachedEnd: table?.scrollLeft ?? 0, rootClientWidth: document.documentElement.clientWidth, rootScrollWidth: document.documentElement.scrollWidth, bodyScrollWidth: document.body.scrollWidth };
+      })()`, returnByValue: true });
+      const state = tableState.result.value;
+      if (!state.foundTable || !state.foundName || (state.scrollWidth > state.clientWidth + 1 && state.reachedEnd < 1)) throw new Error(`${spec.label} ${width}pt 未直接显示可横向滚动的完整台账：${JSON.stringify(state)}`);
+      if (state.rootScrollWidth > state.rootClientWidth || state.bodyScrollWidth > state.rootClientWidth) throw new Error(`${spec.label} 完整台账 ${width}pt 出现根级横向溢出：${JSON.stringify(state)}`);
+      const clicked = await call("Runtime.evaluate", { expression: `(() => { const name = document.querySelector('[data-testid="${spec.name}"]'); if (!name) return false; name.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window })); return true; })()`, returnByValue: true });
+      if (!clicked.result.value) throw new Error(`${spec.label} ${width}pt 未能点击台账商品名称`);
+      await sleep(140);
+      const detail = await call("Runtime.evaluate", { expression: `Boolean(document.querySelector('[data-testid="${spec.sheet}"]'))`, returnByValue: true });
+      if (!detail.result.value) throw new Error(`${spec.label} ${width}pt 商品名称未打开详情卡片`);
+      directLedgerViewports.push({ width, label: spec.label, ...state });
+    }
+  }
+  report.push({ reportPage: '四类库存直接完整台账', viewports: directLedgerViewports });
+
   // 员工档案顶部筛选栏：验证“后厨 3”文字与人数徽标分别完整可见、边界不相交。
   const employeeFilterViewports = [];
   for (const width of [375, 390, 430]) {

@@ -22,6 +22,9 @@ import { ScreenContainer } from "@/components/screen-container";
 import { useWineStore, useWineSnapshotStore, useWineManualPurchaseStore } from "@/lib/wine/store";
 import { WineInventoryItem, WineManualPurchase } from "@/lib/wine/types";
 import { WineSupplierTrendChart } from "@/components/wine-supplier-trend-chart";
+import { HorizontalLedgerColumn, HorizontalLedgerGroup, HorizontalLedgerTable } from "@/components/inventory/HorizontalLedgerTable";
+import { MonthlyLedgerDetailSheet } from "@/components/inventory/MonthlyLedgerDetailSheet";
+import { MonthlyLedgerItem } from "@/lib/inventory-core/types";
 
 type ViewTab = "ledger" | "supplier" | "purchase" | "summary";
 
@@ -35,79 +38,6 @@ const VIEW_TABS: { key: ViewTab; label: string }[] = [
 function getCurrentMonth(): string {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-}
-
-// ─── 台账行 ──────────────────────────────────────────────────────────────────
-function LedgerRow({ item, colors }: { item: WineInventoryItem; colors: any }) {
-  const [expanded, setExpanded] = useState(false);
-  const hasActualEndQty = item.actualEndQty !== undefined;
-  return (
-    <TouchableOpacity
-      onPress={() => setExpanded(!expanded)}
-      style={[S.ledgerRow, { borderColor: colors.border, backgroundColor: colors.surface }]}
-      activeOpacity={0.75}
-    >
-      {/* 主行 */}
-      <View style={S.ledgerMain}>
-        <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-            <Text style={[S.ledgerSeq, { color: colors.muted }]}>#{item.seq}</Text>
-            <View style={[S.typeTag, { backgroundColor: typeColor(item.wineType) + "22" }]}>
-              <Text style={[S.typeTagText, { color: typeColor(item.wineType) }]}>{item.wineType}</Text>
-            </View>
-            {hasActualEndQty && (
-              <View style={{ backgroundColor: "#10B98122", paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
-                <Text style={{ fontSize: 9, color: "#10B981", fontWeight: "700" }}>已盘点</Text>
-              </View>
-            )}
-          </View>
-          <Text style={[S.ledgerName, { color: colors.foreground }]} numberOfLines={expanded ? undefined : 1}>
-            {item.name}
-          </Text>
-          <Text style={[S.ledgerSupplier, { color: colors.muted }]}>{item.supplier}</Text>
-        </View>
-        {/* 关键数字 */}
-        <View style={S.ledgerNums}>
-          <NumCell label="期末" value={item.endQty} unit="瓶" color={item.endQty > 0 ? colors.success : colors.muted} />
-          <NumCell label="进货" value={item.purchaseQty} unit="瓶" color={item.purchaseQty > 0 ? colors.primary : colors.muted} />
-          <NumCell label="消耗" value={item.consumeBottles} unit="瓶" color={item.consumeBottles > 0 ? colors.warning : colors.muted} />
-        </View>
-      </View>
-      {/* 展开详情 */}
-      {expanded && (
-        <View style={[S.ledgerDetail, { borderTopColor: colors.border }]}>
-          <DetailRow label="期初单位成本" value={`¥${item.initUnitCost}`} colors={colors} />
-          <DetailRow label="期初库存量" value={`${item.initQty} 瓶`} colors={colors} />
-          <DetailRow label="期初库存成本" value={`¥${item.initCost}`} colors={colors} />
-          <DetailRow label="本月进货量" value={`${item.purchaseQty} 瓶`} colors={colors} />
-          <DetailRow label="本月进货成本" value={`¥${item.purchaseCost}`} colors={colors} />
-          <DetailRow label="期末库存量" value={`${item.endQty} 瓶${hasActualEndQty ? " (实盘)" : ""}`} colors={colors} />
-          <DetailRow label="期末单位成本" value={`¥${item.unitCost}`} colors={colors} />
-          <DetailRow label="期末库存成本" value={`¥${item.endCost}`} colors={colors} />
-          <DetailRow label="消耗瓶数" value={`${item.consumeBottles} 瓶`} colors={colors} />
-          <DetailRow label="本期消耗量" value={`¥${formatMoney(item.consumeQty)}`} colors={colors} />
-        </View>
-      )}
-    </TouchableOpacity>
-  );
-}
-
-function NumCell({ label, value, unit, color }: { label: string; value: number; unit: string; color: string }) {
-  return (
-    <View style={{ alignItems: "center", minWidth: 44 }}>
-      <Text style={{ fontSize: 16, fontWeight: "700", color }}>{value}</Text>
-      <Text style={{ fontSize: 10, color, opacity: 0.7 }}>{label}</Text>
-    </View>
-  );
-}
-
-function DetailRow({ label, value, colors }: { label: string; value: string; colors: any }) {
-  return (
-    <View style={S.detailRow}>
-      <Text style={[S.detailLabel, { color: colors.muted }]}>{label}</Text>
-      <Text style={[S.detailValue, { color: colors.foreground }]}>{value}</Text>
-    </View>
-  );
 }
 
 function typeColor(type: string): string {
@@ -441,6 +371,7 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
   const [showPurchaseSheet, setShowPurchaseSheet] = useState(false);
   const [activeSupplierForEntry, setActiveSupplierForEntry] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedLedgerItem, setSelectedLedgerItem] = useState<MonthlyLedgerItem | null>(null);
   const selectedMonth = month ?? getCurrentMonth();
 
   // ★ 当月进货多选状态
@@ -502,6 +433,46 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
     }
     return list;
   }, [items, filterSupplier, searchQuery]);
+
+  const wineLedgerRows = useMemo<MonthlyLedgerItem[]>(() => filteredItems.map((item) => ({
+    itemId: String(item.seq),
+    name: item.name,
+    category: item.wineType || "其他",
+    spec: item.supplier,
+    unit: "瓶",
+    openingQty: item.initQty,
+    openingUnitCost: item.initUnitCost,
+    openingCost: item.initCost,
+    purchaseQty: item.purchaseQty,
+    purchaseCost: item.purchaseCost,
+    consumeQty: item.consumeBottles,
+    consumeCost: item.consumeQty,
+    lossQty: 0,
+    lossCost: 0,
+    closingQty: item.actualEndQty ?? item.endQty,
+    closingUnitCost: item.unitCost,
+    closingCost: (item.actualEndQty ?? item.endQty) * item.unitCost,
+    notes: `供应商：${item.supplier}`,
+  })), [filteredItems]);
+  const wineLedgerGroups = useMemo<HorizontalLedgerGroup<MonthlyLedgerItem>[]>(() => {
+    const groups = new Map<string, MonthlyLedgerItem[]>();
+    wineLedgerRows.forEach((row) => groups.set(row.category, [...(groups.get(row.category) ?? []), row]));
+    return [...groups.entries()].map(([label, rows]) => ({ id: label, label, color: typeColor(label), rows }));
+  }, [wineLedgerRows]);
+  const wineLedgerColumns = useMemo<HorizontalLedgerColumn<MonthlyLedgerItem>[]>(() => [
+    { key: "sequence", label: "序", width: 38, align: "center", render: (row) => <Text style={{ color: colors.muted, fontSize: 11 }}>{row.itemId}</Text> },
+    { key: "name", label: "商品名称", width: 146, onPress: setSelectedLedgerItem, testID: (row) => `wine-ledger-name-${row.itemId}`, render: (row) => <><Text numberOfLines={1} style={{ color: colors.foreground, fontSize: 12, fontWeight: "800" }}>{row.name}</Text><Text numberOfLines={1} style={{ color: colors.muted, fontSize: 10 }}>{row.spec}</Text></> },
+    { key: "openingQty", label: "期初数量", width: 76, align: "right", render: (row) => <Text style={{ color: colors.foreground, fontSize: 12 }}>{row.openingQty.toFixed(2)}</Text> },
+    { key: "openingUnitCost", label: "期初单价", width: 76, align: "right", render: (row) => <Text style={{ color: colors.foreground, fontSize: 12 }}>¥{formatMoney(row.openingUnitCost)}</Text> },
+    { key: "openingCost", label: "期初成本", width: 82, align: "right", render: (row) => <Text style={{ color: colors.foreground, fontSize: 12 }}>¥{formatMoney(row.openingCost)}</Text> },
+    { key: "purchaseQty", label: "进货数量", width: 76, align: "right", render: (row) => <Text style={{ color: row.purchaseQty > 0 ? colors.primary : colors.muted, fontSize: 12 }}>{row.purchaseQty > 0 ? `+${row.purchaseQty.toFixed(2)}` : "—"}</Text> },
+    { key: "purchaseCost", label: "进货成本", width: 82, align: "right", render: (row) => <Text style={{ color: row.purchaseCost > 0 ? colors.primary : colors.muted, fontSize: 12 }}>{row.purchaseCost > 0 ? `¥${formatMoney(row.purchaseCost)}` : "—"}</Text> },
+    { key: "consumeQty", label: "消耗瓶数", width: 76, align: "right", render: (row) => <Text style={{ color: row.consumeQty > 0 ? colors.warning : colors.muted, fontSize: 12 }}>{row.consumeQty > 0 ? row.consumeQty.toFixed(2) : "—"}</Text> },
+    { key: "consumeCost", label: "消耗成本", width: 82, align: "right", render: (row) => <Text style={{ color: row.consumeCost > 0 ? colors.warning : colors.muted, fontSize: 12 }}>{row.consumeCost > 0 ? `¥${formatMoney(row.consumeCost)}` : "—"}</Text> },
+    { key: "closingQty", label: "期末库存", width: 76, align: "right", render: (row) => <Text style={{ color: row.closingQty <= 0 ? colors.error : colors.foreground, fontSize: 12, fontWeight: "800" }}>{row.closingQty.toFixed(2)}</Text> },
+    { key: "closingUnitCost", label: "期末单价", width: 82, align: "right", render: (row) => <Text style={{ color: colors.foreground, fontSize: 12 }}>¥{formatMoney(row.closingUnitCost)}</Text> },
+    { key: "closingCost", label: "期末成本", width: 82, align: "right", render: (row) => <Text style={{ color: colors.primary, fontSize: 12, fontWeight: "800" }}>¥{formatMoney(row.closingCost)}</Text> },
+  ], [colors]);
 
   // ★ 当月进货记录（含筛选）
   const monthPurchaseRecords = useMemo(() => {
@@ -700,14 +671,20 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
             <TextInput value={searchQuery} onChangeText={setSearchQuery} placeholder="搜索酒名…" placeholderTextColor={colors.muted}
               style={[S.searchInput, { color: colors.foreground }]} returnKeyType="search" />
           </View>
-          <FlatList
-            data={filteredItems}
-            keyExtractor={(i) => String(i.seq)}
-            renderItem={({ item }) => <LedgerRow item={item} colors={colors} />}
-            contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }}
-          />
+          <View style={{ paddingHorizontal: 16, paddingBottom: 40 + insets.bottom }}>
+            <HorizontalLedgerTable
+              testID="wine-horizontal-ledger-table"
+              columns={wineLedgerColumns}
+              groups={wineLedgerGroups}
+              rowKey={(row) => row.itemId}
+              emptyLabel="当前筛选条件下没有葡萄酒台账记录。"
+              rowTone={(row) => row.closingQty <= 0 ? "negative" : "default"}
+            />
+          </View>
         </>
       )}
+
+      <MonthlyLedgerDetailSheet item={selectedLedgerItem} accentColor={colors.primary} onClose={() => setSelectedLedgerItem(null)} />
 
       {/* ── 供应商视图 ── */}
       {viewTab === "supplier" && items.length > 0 && (
