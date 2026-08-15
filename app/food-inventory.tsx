@@ -201,7 +201,7 @@ export default function FoodInventoryScreen({ month, embedded = false }: FoodInv
   ];
 
   return (
-    <ScreenContainer>
+    <ScreenContainer edges={embedded ? [] : undefined}>
       {/* 独立路由才保留返回导航；工作台已提供分类与月份层级。 */}
       {!embedded && <View style={[S.navbar, { borderBottomColor: colors.border }]}>
         <Pressable onPress={() => router.back()} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
@@ -385,7 +385,7 @@ const S = StyleSheet.create({
   tabChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
   summaryRow: { flexDirection: "row", paddingVertical: 10, paddingHorizontal: 8, borderBottomWidth: StyleSheet.hairlineWidth },
   actionRow: { flexDirection: "row", paddingHorizontal: 12, paddingVertical: 8, gap: 8, borderBottomWidth: StyleSheet.hairlineWidth },
-  actionBtn: { flex: 1, paddingVertical: 8, borderRadius: 10, borderWidth: 1, alignItems: "center" },
+  actionBtn: { flexShrink: 0, minHeight: 44, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   foodCard: { flexDirection: "row", alignItems: "flex-start", borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 8, gap: 10 },
   tag: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
   sheet: { flex: 1 },

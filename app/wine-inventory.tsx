@@ -615,7 +615,7 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
   };
 
   return (
-    <ScreenContainer>
+    <ScreenContainer edges={embedded ? [] : undefined}>
       {/* 独立路由才保留返回导航；工作台已提供分类与月份层级。 */}
       {!embedded && <View style={[S.navbar, { borderBottomColor: colors.border }]}>
         <Pressable onPress={() => router.back()} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
@@ -669,7 +669,7 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
             <StatCell label="本月消耗" value={`${ledgerStats.totalConsumeBottles}瓶`} color={colors.warning} />
           </View>
           {/* 工具栏 */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }} contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 8, gap: 8, alignItems: "center" }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, minHeight: 60, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }} contentContainerStyle={{ minHeight: 60, paddingHorizontal: 16, paddingVertical: 8, gap: 8, alignItems: "center" }}>
             <TouchableOpacity onPress={() => {
               tap();
               const initVals: Record<number, string> = {};
@@ -1051,7 +1051,7 @@ const S = StyleSheet.create({
   filterChipText: { fontSize: 13, fontWeight: "500" },
   searchBox: { flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 7 },
   searchInput: { flex: 1, fontSize: 14, lineHeight: 19 },
-  actionBtn: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, borderWidth: 1 },
+  actionBtn: { flexDirection: "row", flexShrink: 0, minHeight: 44, alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, borderWidth: 1 },
   ledgerRow: { borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 8 },
   ledgerMain: { flexDirection: "row", alignItems: "center", gap: 8 },
   ledgerSeq: { fontSize: 11, fontWeight: "600" },

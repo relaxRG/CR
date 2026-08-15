@@ -55,6 +55,26 @@ describe("店铺顶级模块与库存分类", () => {
     expect(spirits).toContain('flexShrink: 0, minHeight: 44');
   });
 
+  it("其余五类库存和店铺四类通过统一嵌入安全区与横向操作栏避免重复留白和文字裁切", () => {
+    const base = read("components/inventory/BaseInventoryScreen.tsx");
+    const wine = read("app/wine-inventory.tsx");
+    const food = read("app/food-inventory.tsx");
+    const equipment = read("app/equipment-inventory.tsx");
+
+    for (const source of [base, wine, food, equipment]) {
+      expect(source).toContain('<ScreenContainer edges={embedded ? [] : undefined}>');
+    }
+    expect(base).toContain('<ScrollView horizontal showsHorizontalScrollIndicator={false}');
+    expect(base).toContain('flexShrink: 0, minHeight: 44');
+    expect(wine).toContain('minHeight: 60');
+    expect(wine).toContain('flexShrink: 0, minHeight: 44');
+    expect(food).toContain('flexShrink: 0, minHeight: 44');
+
+    for (const wrapper of ["fruit", "beer", "ice", "glassware", "tableware", "daily"]) {
+      expect(read(`app/${wrapper}-inventory.tsx`)).toContain("embedded={embedded}");
+    }
+  });
+
   it("店铺聚合页复用库存数据源，不引入第二套库存持久化逻辑", () => {
     const shop = read("components/store/shop.tsx");
     const inventory = read("components/store/inventory.tsx");

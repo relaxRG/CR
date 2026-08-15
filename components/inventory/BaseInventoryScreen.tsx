@@ -185,7 +185,7 @@ export function BaseInventoryScreen({
   ];
 
   return (
-    <ScreenContainer>
+    <ScreenContainer edges={embedded ? [] : undefined}>
       {/* 独立路由保留标题与返回；嵌入工作台时由外层统一提供分类与月份导航。 */}
       {!embedded && <View style={[S.navbar, { borderBottomColor: colors.border }]}>
         <Pressable onPress={() => router.back()} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
@@ -317,7 +317,9 @@ export function BaseInventoryScreen({
         {tab === "ledger" && (
           <View style={{ gap: 10 }}>
             {/* 快捷操作 */}
-            <View style={{ flexDirection: "row", gap: 8, marginBottom: 4 }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}
+              style={{ flexGrow: 0, marginBottom: 4 }}
+              contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
               <TouchableOpacity onPress={() => { tap(); setShowOpening(true); }}
                 style={[S.actionBtn, { backgroundColor: accentColor + "15", borderColor: accentColor + "33" }]}>
                 <Text style={{ fontSize: 12, color: accentColor, fontWeight: "600" }}>📋 期初录入</Text>
@@ -330,7 +332,7 @@ export function BaseInventoryScreen({
                 style={[S.actionBtn, { backgroundColor: colors.primary + "15", borderColor: colors.primary + "33" }]}>
                 <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "600" }}>+ 新增品类</Text>
               </TouchableOpacity>
-            </View>
+            </ScrollView>
 
             {/* 台账列表 */}
             {activeItems.length === 0 ? (
@@ -531,7 +533,7 @@ const S = StyleSheet.create({
   navbar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   navTitle: { fontSize: 17, fontWeight: "600" },
   tabChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
-  actionBtn: { flex: 1, paddingVertical: 8, borderRadius: 10, borderWidth: 1, alignItems: "center" },
+  actionBtn: { flexShrink: 0, minHeight: 44, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   bigBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: "center" },
   recordCard: { flexDirection: "row", alignItems: "center", borderRadius: 12, borderWidth: 1, padding: 12, gap: 10 },
   summaryCard: { borderRadius: 12, borderWidth: 1, padding: 14 },

@@ -161,23 +161,27 @@ try {
       expression: `document.querySelector('[data-testid="inventory-month-navigator"]')?.innerText.replace(/\\s+/g, ' ').trim() ?? ''`,
       returnByValue: true,
     });
-    await click(call, clickTestIdExpression("inventory-segment-fruit"), `${width}pt 未找到水果分段`);
-    await sleep(150);
-    const fruitActive = await call("Runtime.evaluate", {
-      expression: layoutExpression("inventory-segmented-tabs", "inventory-workspace-fruit"),
-      returnByValue: true,
-    });
-    const fruitState = fruitActive.result.value;
-    assertNoRootOverflow(`${width}pt 水果分段`, fruitState);
-    if (!fruitState.workspaceFound || !fruitState.workspaceText.includes("库存管理")) {
-      throw new Error(`${width}pt 切换水果分段后原有业务工作区未同步：${JSON.stringify(fruitState)}`);
-    }
-    const inventoryMonthAfterCategoryChange = await call("Runtime.evaluate", {
-      expression: `document.querySelector('[data-testid="inventory-month-navigator"]')?.innerText.replace(/\\s+/g, ' ').trim() ?? ''`,
-      returnByValue: true,
-    });
-    if (inventoryMonthBeforeCategoryChange.result.value !== inventoryMonthAfterCategoryChange.result.value) {
-      throw new Error(`${width}pt 切换库存分类后月份状态发生错位`);
+    const inventoryCategoryStates = {};
+    for (const [key, label] of [["wine", "葡萄酒"], ["fruit", "水果"], ["food", "食材"], ["beer", "啤酒"], ["ice", "冰块"]]) {
+      await click(call, clickTestIdExpression(`inventory-segment-${key}`), `${width}pt 未找到${label}分段`);
+      await sleep(150);
+      const active = await call("Runtime.evaluate", {
+        expression: layoutExpression("inventory-segmented-tabs", `inventory-workspace-${key}`),
+        returnByValue: true,
+      });
+      const state = active.result.value;
+      assertNoRootOverflow(`${width}pt ${label}分段`, state);
+      if (!state.workspaceFound) {
+        throw new Error(`${width}pt 切换${label}分段后原有业务工作区未同步：${JSON.stringify(state)}`);
+      }
+      const inventoryMonthAfterCategoryChange = await call("Runtime.evaluate", {
+        expression: `document.querySelector('[data-testid="inventory-month-navigator"]')?.innerText.replace(/\\s+/g, ' ').trim() ?? ''`,
+        returnByValue: true,
+      });
+      if (inventoryMonthBeforeCategoryChange.result.value !== inventoryMonthAfterCategoryChange.result.value) {
+        throw new Error(`${width}pt 切换${label}分类后月份状态发生错位`);
+      }
+      inventoryCategoryStates[key] = state;
     }
     await click(call, clickTestIdExpression("inventory-month-navigator-picker"), `${width}pt 未找到库存快速选月`);
     await sleep(120);
@@ -203,16 +207,20 @@ try {
       throw new Error(`${width}pt 店铺分段顺序或初始工作区错误：${JSON.stringify(shopState)}`);
     }
 
-    await click(call, clickTestIdExpression("shop-segment-equipment"), `${width}pt 未找到设备分段`);
-    await sleep(150);
-    const equipmentActive = await call("Runtime.evaluate", {
-      expression: layoutExpression("shop-segmented-tabs", "shop-workspace-equipment"),
-      returnByValue: true,
-    });
-    const equipmentState = equipmentActive.result.value;
-    assertNoRootOverflow(`${width}pt 设备分段`, equipmentState);
-    if (!equipmentState.workspaceFound || !equipmentState.workspaceText.includes("设备台账")) {
-      throw new Error(`${width}pt 切换设备分段后原有业务工作区未同步：${JSON.stringify(equipmentState)}`);
+    const shopCategoryStates = {};
+    for (const [key, label] of [["tableware", "餐具"], ["daily", "日用品"], ["equipment", "设备"]]) {
+      await click(call, clickTestIdExpression(`shop-segment-${key}`), `${width}pt 未找到${label}分段`);
+      await sleep(150);
+      const active = await call("Runtime.evaluate", {
+        expression: layoutExpression("shop-segmented-tabs", `shop-workspace-${key}`),
+        returnByValue: true,
+      });
+      const state = active.result.value;
+      assertNoRootOverflow(`${width}pt ${label}分段`, state);
+      if (!state.workspaceFound) {
+        throw new Error(`${width}pt 切换${label}分段后原有业务工作区未同步：${JSON.stringify(state)}`);
+      }
+      shopCategoryStates[key] = state;
     }
     const legacyEntry = await call("Runtime.evaluate", {
       expression: `document.body.innerText.includes('进入烈酒管理') || document.body.innerText.includes('进入设备管理')`,
@@ -220,7 +228,7 @@ try {
     });
     if (legacyEntry.result.value) throw new Error(`${width}pt 仍保留已删除的中间管理页跳转入口`);
 
-    report.push({ width, inventory: { initial: inventoryState, fruit: fruitState }, shop: { initial: shopState, equipment: equipmentState } });
+    report.push({ width, inventory: { initial: inventoryState, ...inventoryCategoryStates }, shop: { initial: shopState, ...shopCategoryStates } });
   }
 
   await call("Emulation.clearDeviceMetricsOverride");

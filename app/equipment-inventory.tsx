@@ -302,7 +302,7 @@ export default function EquipmentInventoryScreen({ month, embedded = false }: Eq
   ];
 
   return (
-    <ScreenContainer>
+    <ScreenContainer edges={embedded ? [] : undefined}>
       {/* 独立路由才保留返回导航；工作台已提供分类与月份层级。 */}
       {!embedded && <View style={[S.navbar, { borderBottomColor: colors.border }]}>
         <Pressable onPress={() => router.back()} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
