@@ -1248,7 +1248,7 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
           style={{ flexGrow: 0, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}
           contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 8, gap: 8, alignItems: "center" }}>
           {TABS.map((t) => (
-            <TouchableOpacity key={t.key} testID={`spirits-tab-${t.key}`} onPress={() => { tap(); setTab(t.key); }}
+            <TouchableOpacity key={t.key} testID={`spirits-tab-${t.key}`} hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }} onPress={() => { tap(); setTab(t.key); }}
               style={[S.tabChip, {
                 backgroundColor: tab === t.key ? "#EF4444" : colors.surface,
                 borderColor: tab === t.key ? "#EF4444" : colors.border,
@@ -3163,7 +3163,7 @@ function PettyImportModal({ visible, pettyRecords, items, month, colors, matchPe
 const S = StyleSheet.create({
   navbar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   navTitle: { fontSize: 17, fontWeight: "700" },
-  tabChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
+  tabChip: { minHeight: 44, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   card: { borderRadius: 12, borderWidth: 1, padding: 14, marginBottom: 12 },
   cardTitle: { fontSize: 14, fontWeight: "700", marginBottom: 10 },
   actionBtn: { flexDirection: "row", flexShrink: 0, minHeight: 44, alignItems: "center", justifyContent: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1 },

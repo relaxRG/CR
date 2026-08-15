@@ -226,7 +226,7 @@ export default function FoodInventoryScreen({ month, embedded = false }: FoodInv
         style={{ flexGrow: 0 }}
         contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 8, gap: 8, alignItems: "center" }}>
         {TABS.map((t) => (
-          <TouchableOpacity key={t.key} onPress={() => { tap(); setTab(t.key); }}
+          <TouchableOpacity key={t.key} testID={`food-tab-${t.key}`} hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }} onPress={() => { tap(); setTab(t.key); }}
             style={[S.tabChip, {
               backgroundColor: tab === t.key ? FOOD_COLOR : colors.surface,
               borderColor: tab === t.key ? FOOD_COLOR : colors.border,
@@ -371,7 +371,7 @@ export default function FoodInventoryScreen({ month, embedded = false }: FoodInv
 const S = StyleSheet.create({
   navbar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   navTitle: { fontSize: 17, fontWeight: "600" },
-  tabChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
+  tabChip: { minHeight: 44, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   actionRow: { flexDirection: "row", paddingHorizontal: 12, paddingVertical: 8, gap: 8, borderBottomWidth: StyleSheet.hairlineWidth },
   actionBtn: { flexShrink: 0, minHeight: 44, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   foodCard: { flexDirection: "row", alignItems: "flex-start", borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 8, gap: 10 },

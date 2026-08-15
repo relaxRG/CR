@@ -1001,7 +1001,7 @@ const S = StyleSheet.create({
   navbar: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   navTitle: { flex: 1, fontSize: 17, fontWeight: "600", textAlign: "center" },
   tabBar: { flexDirection: "row", margin: 12, borderRadius: 10, padding: 2, gap: 2 },
-  tabBtn: { flex: 1, height: 32, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  tabBtn: { flex: 1, minHeight: 44, borderRadius: 8, alignItems: "center", justifyContent: "center" },
   tabText: { fontSize: 13, lineHeight: 18 },
   statsRow: { flexDirection: "row", paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   filterScroll: { borderBottomWidth: StyleSheet.hairlineWidth, paddingVertical: 8 },

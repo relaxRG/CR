@@ -51,7 +51,19 @@ describe("库存工作台紧凑布局与移动端交互护栏", () => {
     expect(equipment).toContain("chip: { minHeight: 44");
   });
 
-  it("H5回归覆盖葡萄酒供应商同页明细的标签、滚动、录入入口与详情卡片", () => {
+  it("十个库存与店铺分类的业务页签均使用44pt最小触控尺寸", () => {
+    const spirits = read("app/spirits-inventory.tsx");
+    const wine = read("app/wine-inventory.tsx");
+    const food = read("app/food-inventory.tsx");
+    const equipment = read("app/equipment-inventory.tsx");
+    for (const source of [spirits, wine, food, equipment]) {
+      expect(source).toContain("minHeight: 44");
+    }
+    expect(food).toContain('testID={`food-tab-${t.key}`}');
+    expect(equipment).toContain('testID={`equipment-tab-${t.key}`}');
+  });
+
+  it("H5回归覆盖十类分类页签的尺寸一致性以及葡萄酒供应商同页明细", () => {
     const h5 = read("scripts/h5-schedule-correction-e2e.mjs");
     expect(h5).toContain("葡萄酒供应商同页明细");
     expect(h5).toContain("wine-tab-supplier");
@@ -59,5 +71,10 @@ describe("库存工作台紧凑布局与移动端交互护栏", () => {
     expect(h5).toContain("wine-supplier-record-purchase");
     expect(h5).toContain("fruit-inventory-tab-summary");
     expect(h5).toContain("水果总结页签");
+    expect(h5).toContain("十类分类页签尺寸一致性");
+    expect(h5).toContain("categoryTabSpecs");
+    for (const label of ["烈酒", "葡萄酒", "水果", "食材", "啤酒", "冰块", "杯具", "餐具", "日用品", "设备"]) {
+      expect(h5).toContain(`label: \"${label}\"`);
+    }
   });
 });

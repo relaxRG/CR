@@ -441,6 +441,43 @@ try {
   }
   report.push({ reportPage: '四类库存直接完整台账', viewports: directLedgerViewports });
 
+  // 十类库存与店铺分类：选中页签和相邻页签必须等高、顶边对齐，且不会把绿色/红色选中态拉伸为异常块。
+  const categoryTabLayoutViewports = [];
+  const categoryTabSpecs = [
+    { label: "烈酒", path: "/spirits-inventory", active: "spirits-tab-summary", peer: "spirits-tab-ledger" },
+    { label: "葡萄酒", path: "/wine-inventory", active: "wine-tab-summary", peer: "wine-tab-ledger" },
+    { label: "水果", path: "/fruit-inventory", active: "fruit-inventory-tab-summary", peer: "fruit-inventory-tab-ledger" },
+    { label: "食材", path: "/food-inventory", active: "food-tab-summary", peer: "food-tab-ledger" },
+    { label: "啤酒", path: "/beer-inventory", active: "beer-inventory-tab-summary", peer: "beer-inventory-tab-ledger" },
+    { label: "冰块", path: "/ice-inventory", active: "ice-inventory-tab-summary", peer: "ice-inventory-tab-ledger" },
+    { label: "杯具", path: "/glassware-inventory", active: "glassware-inventory-tab-summary", peer: "glassware-inventory-tab-ledger" },
+    { label: "餐具", path: "/tableware-inventory", active: "tableware-inventory-tab-summary", peer: "tableware-inventory-tab-ledger" },
+    { label: "日用品", path: "/daily-inventory", active: "daily-inventory-tab-summary", peer: "daily-inventory-tab-ledger" },
+    { label: "设备", path: "/equipment-inventory", active: "equipment-tab-ledger", peer: "equipment-tab-purchase" },
+  ];
+  for (const width of MOBILE_VIEWPORTS) {
+    await call("Emulation.setDeviceMetricsOverride", { width, height: 844, deviceScaleFactor: 3, mobile: true });
+    for (const spec of categoryTabSpecs) {
+      await call("Page.navigate", { url: `http://localhost:${port}${spec.path}` });
+      await sleep(620);
+      const clicked = await call("Runtime.evaluate", { expression: `(() => { const tab = document.querySelector('[data-testid="${spec.active}"]'); if (!tab) return false; tab.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window })); return true; })()`, returnByValue: true });
+      if (!clicked.result.value) throw new Error(`${spec.label} ${width}pt 未找到待验证的页签`);
+      await sleep(90);
+      const tabState = await call("Runtime.evaluate", { expression: `(() => {
+        const active = document.querySelector('[data-testid="${spec.active}"]');
+        const peer = document.querySelector('[data-testid="${spec.peer}"]');
+        const activeRect = active?.getBoundingClientRect();
+        const peerRect = peer?.getBoundingClientRect();
+        return { found: Boolean(active && peer), activeHeight: activeRect?.height ?? 0, peerHeight: peerRect?.height ?? 0, activeTop: activeRect?.top ?? 0, peerTop: peerRect?.top ?? 0, rootClientWidth: document.documentElement.clientWidth, rootScrollWidth: document.documentElement.scrollWidth, bodyScrollWidth: document.body.scrollWidth };
+      })()`, returnByValue: true });
+      const state = tabState.result.value;
+      if (!state.found || state.activeHeight < 44 || Math.abs(state.activeHeight - state.peerHeight) > 1 || Math.abs(state.activeTop - state.peerTop) > 1) throw new Error(`${spec.label} ${width}pt 页签选中态尺寸或对齐异常：${JSON.stringify(state)}`);
+      if (state.rootScrollWidth > state.rootClientWidth || state.bodyScrollWidth > state.rootClientWidth) throw new Error(`${spec.label} ${width}pt 页签选中态出现根级横向溢出：${JSON.stringify(state)}`);
+      categoryTabLayoutViewports.push({ width, label: spec.label, ...state });
+    }
+  }
+  report.push({ reportPage: "十类分类页签尺寸一致性", viewports: categoryTabLayoutViewports });
+
   // 葡萄酒供应商：标签同页切换、直接明细表与录入入口均不再依赖供应商卡片页面。
   const wineSupplierViewports = [];
   for (const width of MOBILE_VIEWPORTS) {

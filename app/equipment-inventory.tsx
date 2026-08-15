@@ -324,7 +324,7 @@ export default function EquipmentInventoryScreen({ month, embedded = false }: Eq
         style={{ flexGrow: 0 }}
         contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 8, gap: 8, alignItems: "center" }}>
         {TABS.map((t) => (
-          <TouchableOpacity key={t.key} onPress={() => { tap(); setTab(t.key); }}
+          <TouchableOpacity key={t.key} testID={`equipment-tab-${t.key}`} hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }} onPress={() => { tap(); setTab(t.key); }}
             style={[S.tabChip, {
               backgroundColor: tab === t.key ? EQUIP_COLOR : colors.surface,
               borderColor: tab === t.key ? EQUIP_COLOR : colors.border,
