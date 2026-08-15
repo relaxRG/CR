@@ -23,6 +23,8 @@ import { extname, join, normalize } from "node:path";
 const root = join(process.cwd(), "dist-web");
 const port = Number(process.env.H5_E2E_PORT ?? 8093);
 const route = `http://localhost:${port}/labor`;
+// 极窄屏、主流窄屏与大屏手机均纳入回归，台账只能在自身容器内横向滚动。
+const MOBILE_VIEWPORTS = [320, 360, 375, 390, 412, 430];
 const contentTypes = {
   ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8",
   ".png": "image/png", ".svg": "image/svg+xml", ".ico": "image/x-icon", ".woff2": "font/woff2",
@@ -96,12 +98,16 @@ function clickTextExpression(text) {
 server.listen(port, "127.0.0.1");
 await new Promise((resolve) => server.once("listening", resolve));
 
+let testTarget;
+let testSocket;
 try {
-  const { socket, call } = await openCdp(await getDedicatedTestTarget());
+  testTarget = await getDedicatedTestTarget();
+  const { socket, call } = await openCdp(testTarget);
+  testSocket = socket;
   const report = [];
   await call("Page.enable");
 
-  for (const width of [375, 390, 430]) {
+  for (const width of MOBILE_VIEWPORTS) {
     await call("Emulation.setDeviceMetricsOverride", {
       width, height: 844, deviceScaleFactor: 3, mobile: true,
     });
@@ -259,7 +265,7 @@ try {
   ];
   for (const [path, label] of reportRoutes) {
     const viewports = [];
-    for (const width of [375, 390, 430]) {
+    for (const width of MOBILE_VIEWPORTS) {
       await call("Emulation.setDeviceMetricsOverride", { width, height: 844, deviceScaleFactor: 3, mobile: true });
       await call("Page.navigate", { url: `http://localhost:${port}${path}` });
       await sleep(700);
@@ -292,7 +298,7 @@ try {
     return month;
   })()`, returnByValue: true });
   const spiritsViewports = [];
-  for (const width of [375, 390, 430]) {
+  for (const width of MOBILE_VIEWPORTS) {
     await call("Emulation.setDeviceMetricsOverride", { width, height: 844, deviceScaleFactor: 3, mobile: true });
     await call("Page.navigate", { url: `http://localhost:${port}/spirits-inventory` });
     await sleep(900);
@@ -378,7 +384,7 @@ try {
     return month;
   })()`, returnByValue: true });
   const directLedgerViewports = [];
-  for (const width of [375, 390, 430]) {
+  for (const width of MOBILE_VIEWPORTS) {
     await call("Emulation.setDeviceMetricsOverride", { width, height: 844, deviceScaleFactor: 3, mobile: true });
     for (const spec of [
       { label: '葡萄酒', path: '/wine-inventory', table: 'wine-horizontal-ledger-table', name: 'wine-ledger-name-1', sheet: 'generic-ledger-detail-sheet' },
@@ -409,7 +415,7 @@ try {
 
   // 员工档案顶部筛选栏：验证“后厨 3”文字与人数徽标分别完整可见、边界不相交。
   const employeeFilterViewports = [];
-  for (const width of [375, 390, 430]) {
+  for (const width of MOBILE_VIEWPORTS) {
     await call("Emulation.setDeviceMetricsOverride", { width, height: 844, deviceScaleFactor: 3, mobile: true });
     await call("Page.navigate", { url: `http://localhost:${port}/labor-employees` });
     await sleep(700);
@@ -442,5 +448,9 @@ try {
   socket.close();
   console.log(JSON.stringify({ passed: true, route, report }, null, 2));
 } finally {
+  if (testTarget?.id) {
+    await fetch(`http://localhost:9222/json/close/${testTarget.id}`).catch(() => {});
+  }
+  testSocket?.close();
   server.close();
 }

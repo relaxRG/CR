@@ -102,6 +102,8 @@ export default function StoreInventoryScreen({ mode = "inventory" }: { mode?: In
       beer: genericMonths(beerStore),
       ice: genericMonths(iceStore),
       food: [
+        ...foodStore.ledgerEntries.map((entry) => entry.month),
+        ...foodStore.ledgerMovements.flatMap((movement) => [movement.month, movement.date]),
         ...foodStore.ingredients.flatMap((ingredient) => (ingredient.priceHistory ?? []).map((entry) => entry.date)),
         ...foodPurchases.records.flatMap((record: any) => [record.importDate, ...(record.items ?? []).map((item: any) => item.date)]),
       ],
