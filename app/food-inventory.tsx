@@ -10,8 +10,6 @@ import {
   Alert, KeyboardAvoidingView, Modal, Platform, Pressable,
   ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View
 } from "react-native";
-import * as DocumentPicker from "expo-document-picker";
-import * as FileSystem from "expo-file-system/legacy";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -171,16 +169,6 @@ export default function FoodInventoryScreen({ month, embedded = false }: FoodInv
   const [selectedLedgerRow, setSelectedLedgerRow] = useState<FoodMonthlyLedgerRow | null>(null);
 
   const currentMonth = month ?? getCurrentMonth();
-
-  // 按类别分组
-  const byCategory = useMemo(() => {
-    const map: Record<string, FoodIngredient[]> = {};
-    ingredients.forEach((ing) => {
-      if (!map[ing.category]) map[ing.category] = [];
-      map[ing.category].push(ing);
-    });
-    return map;
-  }, [ingredients]);
 
   const totalStockValue = useMemo(() =>
     ingredients.reduce((s, i) => s + i.stock * (i.costPrice ?? 0), 0),

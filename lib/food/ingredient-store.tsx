@@ -319,7 +319,16 @@ export function foodIngredientReducer(state: FoodIngredientState, action: Action
       ...state,
       ingredients: state.ingredients.map((item) => item.id === action.id ? { ...item, ...action.updates, updatedAt: new Date().toISOString() } : item),
     };
-    case "DELETE": return { ...state, ingredients: state.ingredients.filter((item) => item.id !== action.id) };
+    case "DELETE": {
+      const { [action.id]: _deletedPriceHistory, ...priceHistory } = state.priceHistory;
+      return {
+        ...state,
+        ingredients: state.ingredients.filter((item) => item.id !== action.id),
+        priceHistory,
+        ledgerEntries: state.ledgerEntries.filter((entry) => entry.ingredientId !== action.id),
+        ledgerMovements: state.ledgerMovements.filter((movement) => movement.ingredientId !== action.id),
+      };
+    }
     case "UPDATE_STOCK": return {
       ...state,
       ingredients: state.ingredients.map((item) => item.id === action.id ? { ...item, stock: Math.max(0, item.stock + action.delta), updatedAt: new Date().toISOString() } : item),
@@ -356,7 +365,8 @@ export function foodIngredientReducer(state: FoodIngredientState, action: Action
 }
 
 interface FoodIngredientContextValue extends FoodIngredientState {
-  addIngredient: (data: Omit<FoodIngredient, "id" | "createdAt" | "updatedAt">) => void;
+  /** 返回稳定ID，供同一批供应商导入将新增食材立即写入月度采购流水。 */
+  addIngredient: (data: Omit<FoodIngredient, "id" | "createdAt" | "updatedAt">) => string;
   updateIngredient: (id: string, updates: Partial<FoodIngredient>) => void;
   deleteIngredient: (id: string) => void;
   updateStock: (id: string, delta: number) => void;
@@ -400,7 +410,9 @@ export function FoodIngredientProvider({ children }: { children: React.ReactNode
 
   const addIngredient = useCallback((data: Omit<FoodIngredient, "id" | "createdAt" | "updatedAt">) => {
     const now = new Date().toISOString();
-    dispatch({ type: "ADD", ingredient: { ...data, id: uuid(), createdAt: now, updatedAt: now } });
+    const id = uuid();
+    dispatch({ type: "ADD", ingredient: { ...data, id, createdAt: now, updatedAt: now } });
+    return id;
   }, []);
   const updateIngredient = useCallback((id: string, updates: Partial<FoodIngredient>) => dispatch({ type: "UPDATE", id, updates }), []);
   const deleteIngredient = useCallback((id: string) => dispatch({ type: "DELETE", id }), []);

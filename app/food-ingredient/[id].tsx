@@ -19,7 +19,7 @@ export default function FoodIngredientDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { ingredients, updateIngredient, deleteIngredient } = useFoodIngredientStore();
+  const { ingredients, deleteIngredient, recordPurchase, recordConsume } = useFoodIngredientStore();
   const item = ingredients.find((i) => i.id === id);
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
   const { width: screenWidth } = useWindowDimensions();
@@ -58,8 +58,26 @@ export default function FoodIngredientDetailScreen() {
 
   const adjustStock = (delta: number) => {
     tap();
-    const next = Math.max(0, item.stock + delta);
-    updateIngredient(item.id, { stock: next });
+    const date = new Date().toISOString().slice(0, 10);
+    if (delta > 0) {
+      recordPurchase({
+        ingredientId: item.id,
+        quantity: delta,
+        unitPrice: item.costPrice ?? 0,
+        supplier: item.supplier,
+        date,
+        notes: "食材详情快捷入库",
+      });
+      return;
+    }
+    if (item.stock <= 0) return;
+    recordConsume({
+      ingredientId: item.id,
+      quantity: Math.min(Math.abs(delta), item.stock),
+      unitCost: item.costPrice ?? 0,
+      date,
+      notes: "食材详情快捷出库",
+    });
   };
 
   const handleDelete = () => {

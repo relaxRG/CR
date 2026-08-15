@@ -19,7 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
-import { useWineStore, useWineSnapshotStore, useWineManualPurchaseStore } from "@/lib/wine/store";
+import { useWineSnapshotStore, useWineManualPurchaseStore } from "@/lib/wine/store";
 import { WineInventoryItem, WineManualPurchase } from "@/lib/wine/types";
 import { WineSupplierTrendChart } from "@/components/wine-supplier-trend-chart";
 import { HorizontalLedgerColumn, HorizontalLedgerGroup, HorizontalLedgerTable } from "@/components/inventory/HorizontalLedgerTable";

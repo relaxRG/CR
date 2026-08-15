@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   FoodIngredientState,
@@ -52,6 +53,26 @@ describe("食材月度台账", () => {
     expect(state.ledgerMovements.map((movement) => movement.kind).sort()).toEqual(["consume", "purchase", "stocktake"]);
   });
 
+  it("供应商批量导入通过采购入口同步写入库存、月度采购汇总与原子流水", () => {
+    const state = foodIngredientReducer(initialState(), {
+      type: "BATCH_IMPORT",
+      updates: [{
+        id: ingredient.id,
+        costPrice: 13,
+        stockDelta: 4,
+        supplier: "导入供应商",
+        priceEntry: { price: 13, date: "2026-05-18", supplier: "导入供应商", source: "import" },
+      }],
+    });
+    const [row] = buildFoodMonthlyLedger(state, "2026-05");
+    expect(state.ingredients[0].stock).toBe(14);
+    expect(row.openingQty).toBe(10);
+    expect(row.purchaseQty).toBe(4);
+    expect(row.purchaseCost).toBe(52);
+    expect(row.closingQty).toBe(14);
+    expect(state.ledgerMovements).toEqual(expect.arrayContaining([expect.objectContaining({ kind: "purchase", month: "2026-05", quantity: 4, totalCost: 52 })]));
+  });
+
   it("月结将实盘期末冻结为下月期初，而后续月份不依赖当前库存倒推", () => {
     let state = foodIngredientReducer(initialState(), {
       type: "RECORD_PURCHASE",
@@ -67,6 +88,25 @@ describe("食材月度台账", () => {
     expect(june.openingQty).toBe(8);
     expect(june.openingUnitCost).toBe(14);
     expect(june.closingQty).toBe(8);
+  });
+
+  it("删除食材会同时清理该食材的价格历史、月度台账和原子流水", () => {
+    let state = foodIngredientReducer(initialState(), {
+      type: "RECORD_PURCHASE",
+      input: { ingredientId: ingredient.id, quantity: 1, unitPrice: 12, date: "2026-05-04", supplier: "测试供应商" },
+    });
+    state = foodIngredientReducer(state, { type: "DELETE", id: ingredient.id });
+    expect(state.ingredients).toEqual([]);
+    expect(state.priceHistory[ingredient.id]).toBeUndefined();
+    expect(state.ledgerEntries).toEqual([]);
+    expect(state.ledgerMovements).toEqual([]);
+  });
+
+  it("食材详情快捷加减库存必须通过采购和消耗流水，不能直接覆盖 stock", () => {
+    const detailSource = readFileSync("app/food-ingredient/[id].tsx", "utf8");
+    expect(detailSource).toContain("recordPurchase({");
+    expect(detailSource).toContain("recordConsume({");
+    expect(detailSource).not.toContain("updateIngredient(item.id, { stock:");
   });
 
   it("历史食材数据缺少新增台账字段时保持原有档案与价格历史，并初始化为空账务集合", () => {

@@ -316,9 +316,9 @@ export default function SupplierImportScreen() {
           supplier: preview.supplierName,
           notes: enName ? `英文名：${enName}` : "",
         };
-        addIngredient(newIng);
-        // 记忆（新建后 id 未知，下次导入时会通过名称匹配）
-        newIdMap[rs.row.rawName] = zhName; // 暂存名称，下次靠名称匹配
+        const newIngredientId = addIngredient(newIng);
+        // 新增档案立即拿到稳定ID：同一批导入必须同时写入库存与月度采购台账。
+        newIdMap[rs.row.rawName] = newIngredientId;
       }
     }
 
@@ -326,13 +326,14 @@ export default function SupplierImportScreen() {
     const updates: Parameters<typeof batchImport>[0] = [];
     const processedNames = new Set<string>();
     for (const rs of toProcess) {
-      if (!rs.matchedId) continue;
+      const ingredientId = rs.matchedId ?? newIdMap[rs.row.rawName];
+      if (!ingredientId) continue;
       const key = rs.row.rawName;
       if (processedNames.has(key)) continue;
       processedNames.add(key);
       const agg = aggregated[key];
       updates.push({
-        id: rs.matchedId,
+        id: ingredientId,
         costPrice: agg?.latestPrice ?? rs.row.unitPrice,
         stockDelta: agg?.totalQty ?? rs.row.quantity,
         supplier: preview.supplierName,
@@ -344,7 +345,7 @@ export default function SupplierImportScreen() {
         },
       });
       // 更新记忆
-      await rememberMatch(key, rs.matchedId);
+      await rememberMatch(key, ingredientId);
     }
     if (updates.length > 0) batchImport(updates);
 
@@ -357,7 +358,7 @@ export default function SupplierImportScreen() {
       amount: rs.row.amount,
       date: rs.row.date,
       orderNo: rs.row.orderNo,
-      matchedIngredientId: rs.matchedId,
+      matchedIngredientId: rs.matchedId ?? newIdMap[rs.row.rawName] ?? null,
       matchScore: rs.matchScore,
       priceDelta: rs.priceDelta,
       prevPrice: rs.prevPrice,
