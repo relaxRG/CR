@@ -62,6 +62,7 @@ const closingCost = Math.round(closingQty * closingUnitCost * 100) / 100;
 | `components/inventory/HorizontalLedgerTable.tsx` | 台账呈现 | 通用列配置、分组、局部横向滚动和名称点击回调 |
 | `components/inventory/MonthlyLedgerDetailSheet.tsx` | 移动端详情 | 通用名称详情卡片，复用同一月度行数据 |
 | `components/inventory/BaseInventoryScreen.tsx` | 水果、啤酒、冰块和店铺通用库存壳 | 增加显式 `ledgerPresentation`；水果、啤酒启用直接完整台账，冰块和店铺继续使用有效的卡片模式 |
+| `components/inventory/ItemEditModal.tsx` | 通用商品档案编辑 | 既有商品不再显示或提交“当前库存”；仅新建商品可录入期初库存，后续数量必须走采购、出库、盘点或月结 |
 | `app/wine-inventory.tsx` | 葡萄酒自定义台账 | 删除旧 `LedgerRow` 折叠卡片，接入完整横向台账、筛选结果和名称详情 |
 
 ## 3. 已删除的旧代码与废弃字段
@@ -72,6 +73,7 @@ const closingCost = Math.round(closingQty * closingUnitCost * 100) / 100;
 | 食材库存旧卡片分组 `byCategory` | 已删除，改由月度台账分组直接渲染 |
 | 食材无用的文件选择/文件系统导入 | 已删除 |
 | 食材详情直接 `updateIngredient(... stock ...)` | 已删除，改用采购/消耗流水 |
+| 通用库存既有商品编辑“当前库存”输入 | 已删除；防止水果、啤酒等通过档案编辑绕过月度流水 |
 | `alertThreshold` | 不存在活跃业务模型、表单和计算路径；仅保留历史加载时剥离函数与对应测试 |
 | 通用 `MonthlyLedgerSheet` | **保留且非废弃**；目前仍被冰块、杯具、餐具、日用品、设备的卡片模式使用 |
 
@@ -93,9 +95,10 @@ const closingCost = Math.round(closingQty * closingUnitCost * 100) / 100;
 |---|---|---|
 | 食材 reducer | 采购、消耗、实盘、月结、批量导入、删除清理、详情快捷入口、历史字段清理 | `6` 项通过 |
 | 供应商导入连接 | 新建食材稳定 ID、同批入库归属、供应商记录归属 | `2` 项通过 |
+| 通用库存写入保护 | 既有商品编辑隐藏库存输入并保持原库存 | `2` 项通过 |
 | 直接台账结构 | 通用横向表格、葡萄酒移除旧卡片、水果/啤酒配置、食材入口 | `4` 项通过 |
 | 日期与月份 | 葡萄酒非法/跨月日期、食品供应商非法日期、统一月份边界与钳制 | `7` 项通过 |
-| 全量单元回归 | 全仓库功能 | `88` 文件、`925` 用例通过 |
+| 全量单元回归 | 全仓库功能 | `89` 文件、`927` 用例通过 |
 | H5 移动端 | 375、390、430pt；葡萄酒、水果、啤酒、食材台账横向滚动、名称详情、无根级横向溢出 | 全部通过 |
 
 H5 数据表自身宽度为 936–974px，而 375–430pt 视口内的表格容器宽度为 343–398px；脚本确认 `scrollLeft` 可到达右端，且 `documentElement/body` 宽度始终等于视口宽度，因此横向内容被限制在台账容器内，没有造成页面级卡顿或横向溢出。

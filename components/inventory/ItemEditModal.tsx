@@ -95,7 +95,8 @@ export function ItemEditModal({
       category,
       spec: spec.trim(),
       unit: unit.trim() || defaultUnit,
-      currentStock: Number(currentStock) || 0,
+      // 既有商品的数量只能由采购、出库、盘点或月结动作变更；编辑档案不得绕过月度流水。
+      currentStock: item ? item.currentStock : (Number(currentStock) || 0),
       latestCostPrice: Number(latestCostPrice) || 0,
       supplier: supplier.trim(),
       notes: notes.trim(),
@@ -122,7 +123,7 @@ export function ItemEditModal({
               { label: "英文名", value: nameEn, onChange: setNameEn, placeholder: "可选" },
               { label: "规格", value: spec, onChange: setSpec, placeholder: "如 330ml、500g/袋" },
               { label: "单位", value: unit, onChange: setUnit, placeholder: defaultUnit },
-              { label: "当前库存", value: currentStock, onChange: setCurrentStock, placeholder: "0", kb: "decimal-pad" as const },
+              ...(item ? [] : [{ label: "期初库存", value: currentStock, onChange: setCurrentStock, placeholder: "0", kb: "decimal-pad" as const }]),
               { label: "进货价（元/单位）", value: latestCostPrice, onChange: setLatestCostPrice, placeholder: "0.00", kb: "decimal-pad" as const },
               { label: "供应商", value: supplier, onChange: setSupplier, placeholder: "可选" },
             ].map((f, i) => (
