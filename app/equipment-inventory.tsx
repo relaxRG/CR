@@ -118,7 +118,7 @@ function PurchaseModal({ visible, item, colors, onSave, onClose }: {
             <Text style={[S.title, { color: colors.foreground }]}>{item ? "编辑设备" : "购入登记"}</Text>
             <Pressable onPress={handleSave}><Text style={{ fontSize: 17, fontWeight: "600", color: EQUIP_COLOR }}>保存</Text></Pressable>
           </View>
-          <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
+          <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, paddingBottom: 32, gap: 12 }}>
             {[
               { label: "设备名称 *", value: name, onChange: setName, placeholder: "如 制冰机" },
               { label: "规格/型号", value: spec, onChange: setSpec, placeholder: "可选" },
@@ -149,7 +149,7 @@ function PurchaseModal({ visible, item, colors, onSave, onClose }: {
               <Text style={[S.label, { color: colors.muted }]}>设备类型</Text>
               <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
                 {EQUIPMENT_TYPES.map((t) => (
-                  <TouchableOpacity key={t.value} onPress={() => setEquipmentType(t.value)}
+                  <TouchableOpacity key={t.value} hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }} onPress={() => setEquipmentType(t.value)}
                     style={[S.chip, {
                       backgroundColor: equipmentType === t.value ? EQUIP_COLOR : colors.surface,
                       borderColor: equipmentType === t.value ? EQUIP_COLOR : colors.border,
@@ -165,7 +165,7 @@ function PurchaseModal({ visible, item, colors, onSave, onClose }: {
               <Text style={[S.label, { color: colors.muted }]}>当前状态</Text>
               <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
                 {([["normal", "正常", colors.success], ["repair", "维修中", colors.warning], ["scrapped", "已报废", colors.error]] as const).map(([v, l, c]) => (
-                  <TouchableOpacity key={v} onPress={() => setStatus(v)}
+                  <TouchableOpacity key={v} hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }} onPress={() => setStatus(v)}
                     style={[S.chip, { backgroundColor: status === v ? c : colors.surface, borderColor: status === v ? c : colors.border }]}>
                     <Text style={{ fontSize: 12, color: status === v ? "#fff" : colors.muted }}>{l}</Text>
                   </TouchableOpacity>
@@ -208,13 +208,13 @@ function MaintenanceModal({ visible, items, colors, onSave, onClose }: {
             <Text style={[S.title, { color: colors.foreground }]}>维修记录</Text>
             <Pressable onPress={handleSave}><Text style={{ fontSize: 17, fontWeight: "600", color: colors.warning }}>保存</Text></Pressable>
           </View>
-          <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
+          <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, paddingBottom: 32, gap: 12 }}>
             <View>
               <Text style={[S.label, { color: colors.muted }]}>选择设备 *</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 6 }}>
+              <ScrollView horizontal nestedScrollEnabled directionalLockEnabled showsHorizontalScrollIndicator={false} style={{ marginTop: 6 }} contentContainerStyle={{ paddingHorizontal: 4, gap: 8 }}>
                 <View style={{ flexDirection: "row", gap: 8 }}>
                   {items.filter((i) => i.active).map((item) => (
-                    <TouchableOpacity key={item.id} onPress={() => setSelectedId(item.id)}
+                    <TouchableOpacity key={item.id} hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }} onPress={() => setSelectedId(item.id)}
                       style={[S.chip, {
                         backgroundColor: selectedId === item.id ? colors.warning : colors.surface,
                         borderColor: selectedId === item.id ? colors.warning : colors.border,
@@ -464,7 +464,7 @@ export default function EquipmentInventoryScreen({ month, embedded = false }: Eq
 const S = StyleSheet.create({
   navbar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   navTitle: { fontSize: 17, fontWeight: "600" },
-  tabChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
+  tabChip: { minHeight: 44, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   summaryRow: { flexDirection: "row", paddingVertical: 10, paddingHorizontal: 8, borderBottomWidth: StyleSheet.hairlineWidth },
   card: { flexDirection: "row", alignItems: "flex-start", borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 8, gap: 10 },
   tag: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
@@ -475,7 +475,7 @@ const S = StyleSheet.create({
   label: { fontSize: 13, fontWeight: "500", marginBottom: 4 },
   input: { borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15 },
   textarea: { borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, minHeight: 80 },
-  chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1 },
+  chip: { minHeight: 44, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   totalRow: { borderRadius: 10, padding: 12, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   summaryCard: { borderRadius: 12, borderWidth: 1, padding: 14 },
   hintCard: { borderRadius: 10, borderWidth: 1, padding: 12 },

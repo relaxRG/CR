@@ -54,7 +54,7 @@ export function HorizontalLedgerTable<Row>({
   }
 
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator testID={testID} style={{ flexGrow: 0 }}>
+    <ScrollView horizontal nestedScrollEnabled directionalLockEnabled showsHorizontalScrollIndicator testID={testID} style={{ flexGrow: 0 }}>
       <View>
         <View style={[S.header, { backgroundColor: colors.primary }]}>
           {columns.map((column) => (
@@ -88,6 +88,7 @@ export function HorizontalLedgerTable<Row>({
                       <Pressable
                         key={column.key}
                         testID={column.testID?.(row)}
+                        hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
                         onPress={() => column.onPress?.(row)}
                         accessibilityRole="button"
                         style={({ pressed }) => ({ opacity: pressed ? 0.62 : 1 })}

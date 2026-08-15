@@ -64,7 +64,7 @@ describe("店铺顶级模块与库存分类", () => {
     for (const source of [base, wine, food, equipment]) {
       expect(source).toContain('<ScreenContainer edges={embedded ? [] : undefined}>');
     }
-    expect(base).toContain('<ScrollView horizontal showsHorizontalScrollIndicator={false}');
+    expect(base).toContain('<ScrollView horizontal nestedScrollEnabled directionalLockEnabled showsHorizontalScrollIndicator={false}');
     expect(base).toContain('flexShrink: 0, minHeight: 44');
     expect(wine).toContain('minHeight: 60');
     expect(wine).toContain('flexShrink: 0, minHeight: 44');

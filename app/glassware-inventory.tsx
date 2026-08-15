@@ -63,17 +63,17 @@ function LossEntryModal({ visible, store, onClose }: {
             <Text style={[S.title, { color: colors.foreground }]}>损耗录入</Text>
             <Pressable onPress={handleSave}><Text style={{ fontSize: 17, fontWeight: "600", color: colors.error }}>记录</Text></Pressable>
           </View>
-          <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
+          <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, paddingBottom: 32, gap: 12 }}>
             <View style={[S.hint, { backgroundColor: colors.error + "0a", borderColor: colors.error + "22" }]}>
               <Text style={{ fontSize: 12, color: colors.error }}>⚠️ 记录杯具破损、丢失等损耗情况，用于月度损耗率统计</Text>
             </View>
             {/* 选择杯具 */}
             <View>
               <Text style={[S.label, { color: colors.muted }]}>选择杯具 *</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 6 }}>
+              <ScrollView horizontal nestedScrollEnabled directionalLockEnabled showsHorizontalScrollIndicator={false} style={{ marginTop: 6 }} contentContainerStyle={{ paddingHorizontal: 4, gap: 8 }}>
                 <View style={{ flexDirection: "row", gap: 8 }}>
                   {activeItems.map((item) => (
-                    <TouchableOpacity key={item.id} onPress={() => setSelectedItemId(item.id)}
+                    <TouchableOpacity key={item.id} hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }} onPress={() => setSelectedItemId(item.id)}
                       style={[S.chip, {
                         backgroundColor: selectedItemId === item.id ? colors.error : colors.surface,
                         borderColor: selectedItemId === item.id ? colors.error : colors.border,
@@ -97,7 +97,7 @@ function LossEntryModal({ visible, store, onClose }: {
               <Text style={[S.label, { color: colors.muted }]}>损耗原因</Text>
               <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
                 {LOSS_REASONS.map((r) => (
-                  <TouchableOpacity key={r} onPress={() => setReason(r)}
+                  <TouchableOpacity key={r} hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }} onPress={() => setReason(r)}
                     style={[S.chip, {
                       backgroundColor: reason === r ? colors.error : colors.surface,
                       borderColor: reason === r ? colors.error : colors.border,
@@ -203,7 +203,7 @@ const S = StyleSheet.create({
   title: { fontSize: 17, fontWeight: "600" },
   label: { fontSize: 13, fontWeight: "500", marginBottom: 4 },
   input: { borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15 },
-  chip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, alignItems: "center", minWidth: 80 },
+  chip: { minHeight: 44, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center", minWidth: 80 },
   hint: { borderRadius: 8, borderWidth: 1, padding: 10 },
   totalRow: { borderRadius: 10, padding: 12, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
 });

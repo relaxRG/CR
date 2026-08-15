@@ -425,6 +425,36 @@ try {
   }
   report.push({ reportPage: '四类库存直接完整台账', viewports: directLedgerViewports });
 
+  // 葡萄酒供应商：标签同页切换、直接明细表与录入入口均不再依赖供应商卡片页面。
+  const wineSupplierViewports = [];
+  for (const width of MOBILE_VIEWPORTS) {
+    await call("Emulation.setDeviceMetricsOverride", { width, height: 844, deviceScaleFactor: 3, mobile: true });
+    await call("Page.navigate", { url: `http://localhost:${port}/wine-inventory` });
+    await sleep(760);
+    const switched = await call("Runtime.evaluate", { expression: `(() => { const tab = document.querySelector('[data-testid="wine-tab-supplier"]'); if (!tab) return false; tab.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window })); return true; })()`, returnByValue: true });
+    if (!switched.result.value) throw new Error(`葡萄酒供应商 ${width}pt 未找到同页标签入口`);
+    await sleep(160);
+    const supplierState = await call("Runtime.evaluate", { expression: `(() => {
+      const workspace = document.querySelector('[data-testid="wine-supplier-inline-workspace"]');
+      const tabs = document.querySelector('[data-testid="wine-supplier-tabs"]');
+      const table = document.querySelector('[data-testid="wine-supplier-horizontal-ledger-table"]');
+      const record = document.querySelector('[data-testid="wine-supplier-record-purchase"]');
+      const name = document.querySelector('[data-testid="wine-ledger-name-1"]');
+      if (table) table.scrollLeft = Math.max(0, table.scrollWidth - table.clientWidth);
+      return { workspace: Boolean(workspace), tabs: Boolean(tabs), table: Boolean(table), record: Boolean(record), name: Boolean(name), clientWidth: table?.clientWidth ?? 0, scrollWidth: table?.scrollWidth ?? 0, reachedEnd: table?.scrollLeft ?? 0, rootClientWidth: document.documentElement.clientWidth, rootScrollWidth: document.documentElement.scrollWidth, bodyScrollWidth: document.body.scrollWidth };
+    })()`, returnByValue: true });
+    const state = supplierState.result.value;
+    if (!state.workspace || !state.tabs || !state.table || !state.record || !state.name || (state.scrollWidth > state.clientWidth + 1 && state.reachedEnd < 1)) throw new Error(`葡萄酒供应商 ${width}pt 未直接展示可滚动明细：${JSON.stringify(state)}`);
+    if (state.rootScrollWidth > state.rootClientWidth || state.bodyScrollWidth > state.rootClientWidth) throw new Error(`葡萄酒供应商 ${width}pt 出现根级横向溢出：${JSON.stringify(state)}`);
+    const clicked = await call("Runtime.evaluate", { expression: `(() => { const name = document.querySelector('[data-testid="wine-ledger-name-1"]'); if (!name) return false; name.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window })); return true; })()`, returnByValue: true });
+    if (!clicked.result.value) throw new Error(`葡萄酒供应商 ${width}pt 未能点击明细商品名称`);
+    await sleep(140);
+    const detail = await call("Runtime.evaluate", { expression: `Boolean(document.querySelector('[data-testid="generic-ledger-detail-sheet"]'))`, returnByValue: true });
+    if (!detail.result.value) throw new Error(`葡萄酒供应商 ${width}pt 商品名称未打开详情卡片`);
+    wineSupplierViewports.push({ width, ...state });
+  }
+  report.push({ reportPage: '葡萄酒供应商同页明细', viewports: wineSupplierViewports });
+
   // 员工档案顶部筛选栏：验证“后厨 3”文字与人数徽标分别完整可见、边界不相交。
   const employeeFilterViewports = [];
   for (const width of MOBILE_VIEWPORTS) {

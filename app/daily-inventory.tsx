@@ -72,7 +72,7 @@ function BatchEntryModal({ visible, store, onClose }: {
           {/* 模式切换 */}
           <View style={{ flexDirection: "row", margin: 12, gap: 8 }}>
             {(["in", "out"] as const).map((m) => (
-              <TouchableOpacity key={m} onPress={() => setMode(m)} style={[S.modeBtn, {
+              <TouchableOpacity key={m} hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }} onPress={() => setMode(m)} style={[S.modeBtn, {
                 backgroundColor: mode === m ? (m === "in" ? DAILY_COLOR : colors.error) : colors.surface,
                 borderColor: mode === m ? (m === "in" ? DAILY_COLOR : colors.error) : colors.border,
               }]}>
@@ -98,7 +98,7 @@ function BatchEntryModal({ visible, store, onClose }: {
             </View>
           )}
 
-          <ScrollView contentContainerStyle={{ padding: 12, gap: 6 }}>
+          <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 12, paddingBottom: 32, gap: 6 }}>
             {activeItems.map((item) => {
               const e = entries[item.id] ?? { qty: "", price: String(item.latestCostPrice || "") };
               const hasQty = e.qty && Number(e.qty) > 0;
@@ -195,7 +195,7 @@ const S = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 16, borderBottomWidth: StyleSheet.hairlineWidth },
   title: { fontSize: 17, fontWeight: "600" },
   input: { borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8, fontSize: 14 },
-  modeBtn: { flex: 1, paddingVertical: 10, borderRadius: 10, borderWidth: 1, alignItems: "center" },
+  modeBtn: { flex: 1, minHeight: 44, paddingVertical: 10, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   totalRow: { borderRadius: 10, padding: 12, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   batchRow: { flexDirection: "row", alignItems: "center", borderRadius: 10, borderWidth: 1, padding: 10, gap: 8 },
   batchInput: { borderRadius: 8, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 6, fontSize: 14, textAlign: "center", width: 60 },

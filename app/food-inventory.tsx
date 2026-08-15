@@ -236,19 +236,6 @@ export default function FoodInventoryScreen({ month, embedded = false }: FoodInv
         ))}
       </ScrollView>
 
-      {/* 汇总行 */}
-      <View style={[S.summaryRow, { borderBottomColor: colors.border }]}>
-        {[
-          { label: "食材种数", value: `${ingredients.length}`, color: FOOD_COLOR },
-          { label: "库存总值", value: `¥${formatMoney(totalStockValue)}`, color: FOOD_COLOR },
-        ].map((c, i) => (
-          <View key={i} style={{ flex: 1, alignItems: "center" }}>
-            <Text style={{ fontSize: 10, color: colors.muted }}>{c.label}</Text>
-            <Text style={{ fontSize: 15, fontWeight: "700", color: c.color }}>{c.value}</Text>
-          </View>
-        ))}
-      </View>
-
       {/* 食材月度台账操作栏：同一行局部横向滚动。 */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} testID="food-ledger-action-toolbar"
         style={{ flexGrow: 0, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}
@@ -385,7 +372,6 @@ const S = StyleSheet.create({
   navbar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   navTitle: { fontSize: 17, fontWeight: "600" },
   tabChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
-  summaryRow: { flexDirection: "row", paddingVertical: 10, paddingHorizontal: 8, borderBottomWidth: StyleSheet.hairlineWidth },
   actionRow: { flexDirection: "row", paddingHorizontal: 12, paddingVertical: 8, gap: 8, borderBottomWidth: StyleSheet.hairlineWidth },
   actionBtn: { flexShrink: 0, minHeight: 44, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   foodCard: { flexDirection: "row", alignItems: "flex-start", borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 8, gap: 10 },

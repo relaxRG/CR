@@ -117,75 +117,6 @@ function PurchaseRow({
   );
 }
 
-// ─── 供应商卡片 ───────────────────────────────────────────────────────────────
-function SupplierCard({
-  supplier, items, monthPurchase, cumulativePurchase, colors, onFilter
-}: {
-  supplier: string;
-  items: WineInventoryItem[];
-  monthPurchase: number;
-  cumulativePurchase: number;
-  colors: any;
-  onFilter: () => void;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const endQty = items.reduce((s, i) => s + i.endQty, 0);
-  const consumeBottles = items.reduce((s, i) => s + i.consumeBottles, 0);
-
-  return (
-    <View style={[S.supplierCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <TouchableOpacity onPress={() => setExpanded(!expanded)} activeOpacity={0.8}>
-        <View style={S.supplierHeader}>
-          <View style={{ flex: 1 }}>
-            <Text style={[S.supplierName, { color: colors.foreground }]}>{supplier}</Text>
-            <Text style={[S.supplierMeta, { color: colors.muted }]}>
-              {items.length} 款 · 期末库存 {endQty} 瓶 · 本月消耗 {consumeBottles} 瓶
-            </Text>
-          </View>
-          <View style={{ alignItems: "flex-end", gap: 2 }}>
-            {monthPurchase > 0 && (
-              <Text style={[S.supplierAmount, { color: colors.primary }]}>本月 ¥{formatMoney(monthPurchase)}</Text>
-            )}
-            {cumulativePurchase > 0 && (
-              <Text style={[S.supplierCumul, { color: colors.muted }]}>累计 ¥{formatMoney(cumulativePurchase)}</Text>
-            )}
-          </View>
-        </View>
-      </TouchableOpacity>
-
-      {/* 进货录入入口 */}
-      <TouchableOpacity onPress={onFilter} style={[S.supplierEntryBtn, { borderColor: colors.primary + "44", backgroundColor: colors.primary + "0e" }]}>
-        <IconSymbol name="square.and.pencil" size={13} color={colors.primary} />
-        <Text style={[S.supplierEntryText, { color: colors.primary }]}>录入 {supplier} 进货数量</Text>
-      </TouchableOpacity>
-
-      {/* 展开酒款列表 */}
-      {expanded && (
-        <View style={[S.supplierItems, { borderTopColor: colors.border }]}>
-          {items.map((item) => (
-            <View key={item.seq} style={[S.supplierItemRow, { borderBottomColor: colors.border }]}>
-              <View style={{ flex: 1 }}>
-                <Text style={[S.supplierItemName, { color: colors.foreground }]} numberOfLines={1}>{item.name}</Text>
-                <Text style={[S.supplierItemMeta, { color: colors.muted }]}>
-                  {item.wineType} · ¥{item.unitCost}/瓶
-                </Text>
-              </View>
-              <View style={{ alignItems: "flex-end", gap: 2 }}>
-                <Text style={{ fontSize: 13, fontWeight: "600", color: item.endQty > 0 ? colors.success : colors.muted }}>
-                  期末 {item.endQty} 瓶
-                </Text>
-                {item.purchaseQty > 0 && (
-                  <Text style={{ fontSize: 11, color: colors.primary }}>本月进 {item.purchaseQty} 瓶</Text>
-                )}
-              </View>
-            </View>
-          ))}
-        </View>
-      )}
-    </View>
-  );
-}
-
 // ─── 生成进货单文本 ────────────────────────────────────────────────────────────
 function buildPurchaseText(
   supplier: string,
@@ -368,6 +299,8 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
 
   const [viewTab, setViewTab] = useState<ViewTab>("ledger");
   const [filterSupplier, setFilterSupplier] = useState<string | null>(null);
+  // 供应商页仅切换当前同页明细，不影响库存管理页的供应商筛选。
+  const [supplierViewSupplier, setSupplierViewSupplier] = useState<string | null>(null);
   const [showPurchaseSheet, setShowPurchaseSheet] = useState(false);
   const [activeSupplierForEntry, setActiveSupplierForEntry] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -434,7 +367,7 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
     return list;
   }, [items, filterSupplier, searchQuery]);
 
-  const wineLedgerRows = useMemo<MonthlyLedgerItem[]>(() => filteredItems.map((item) => ({
+  const toWineLedgerRow = (item: WineInventoryItem): MonthlyLedgerItem => ({
     itemId: String(item.seq),
     name: item.name,
     category: item.wineType || "其他",
@@ -453,7 +386,9 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
     closingUnitCost: item.unitCost,
     closingCost: (item.actualEndQty ?? item.endQty) * item.unitCost,
     notes: `供应商：${item.supplier}`,
-  })), [filteredItems]);
+  });
+
+  const wineLedgerRows = useMemo<MonthlyLedgerItem[]>(() => filteredItems.map(toWineLedgerRow), [filteredItems]);
   const wineLedgerGroups = useMemo<HorizontalLedgerGroup<MonthlyLedgerItem>[]>(() => {
     const groups = new Map<string, MonthlyLedgerItem[]>();
     wineLedgerRows.forEach((row) => groups.set(row.category, [...(groups.get(row.category) ?? []), row]));
@@ -473,6 +408,19 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
     { key: "closingUnitCost", label: "期末单价", width: 82, align: "right", render: (row) => <Text style={{ color: colors.foreground, fontSize: 12 }}>¥{formatMoney(row.closingUnitCost)}</Text> },
     { key: "closingCost", label: "期末成本", width: 82, align: "right", render: (row) => <Text style={{ color: colors.primary, fontSize: 12, fontWeight: "800" }}>¥{formatMoney(row.closingCost)}</Text> },
   ], [colors]);
+
+  const selectedSupplierView = supplierViewSupplier && allSuppliers.includes(supplierViewSupplier)
+    ? supplierViewSupplier
+    : allSuppliers[0] ?? null;
+  const supplierViewRows = useMemo<MonthlyLedgerItem[]>(
+    () => (selectedSupplierView ? (bySupplier.get(selectedSupplierView) ?? []).map(toWineLedgerRow) : []),
+    [bySupplier, selectedSupplierView],
+  );
+  const supplierViewGroups = useMemo<HorizontalLedgerGroup<MonthlyLedgerItem>[]>(() => {
+    const groups = new Map<string, MonthlyLedgerItem[]>();
+    supplierViewRows.forEach((row) => groups.set(row.category, [...(groups.get(row.category) ?? []), row]));
+    return [...groups.entries()].map(([label, rows]) => ({ id: label, label, color: typeColor(label), rows }));
+  }, [supplierViewRows]);
 
   // ★ 当月进货记录（含筛选）
   const monthPurchaseRecords = useMemo(() => {
@@ -606,7 +554,7 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
       {/* Tab 切换 */}
       <View style={[S.tabBar, { backgroundColor: colors.border + "33" }]}>
         {VIEW_TABS.map((t) => (
-          <TouchableOpacity key={t.key} onPress={() => { tap(); setViewTab(t.key); }}
+          <TouchableOpacity key={t.key} testID={`wine-tab-${t.key}`} hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }} onPress={() => { tap(); setViewTab(t.key); }}
             style={[S.tabBtn, viewTab === t.key && { backgroundColor: colors.background }]}>
             <Text style={[S.tabText, { color: viewTab === t.key ? colors.foreground : colors.muted, fontWeight: viewTab === t.key ? "600" : "400" }]}>
               {t.label}
@@ -686,34 +634,67 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
 
       <MonthlyLedgerDetailSheet item={selectedLedgerItem} accentColor={colors.primary} onClose={() => setSelectedLedgerItem(null)} />
 
-      {/* ── 供应商视图 ── */}
+      {/* ── 供应商视图：标签切换后在同页直接显示台账，不再使用供应商入口卡片。 ── */}
       {viewTab === "supplier" && items.length > 0 && (
-        <FlatList
-          data={Array.from(bySupplier.entries()).sort((a, b) => (supplierMonthTotals[b[0]] ?? 0) - (supplierMonthTotals[a[0]] ?? 0))}
-          keyExtractor={([sup]) => sup}
-          renderItem={({ item: [sup, supItems] }) => (
-            <SupplierCard
-              supplier={sup}
-              items={supItems}
-              monthPurchase={supplierMonthTotals[sup] ?? 0}
-              cumulativePurchase={supplierCumulTotals[sup] ?? 0}
-              colors={colors}
-              onFilter={() => handlePurchaseEntry(sup)}
-            />
-          )}
-          contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }}
-          ListHeaderComponent={
-            <View style={[S.supplierSummaryCard, { backgroundColor: colors.primary + "0e", borderColor: colors.primary + "33" }]}>
-              <Text style={[S.supplierSummaryTitle, { color: colors.primary }]}>供应商累计进货</Text>
-              {Object.entries(supplierCumulTotals).sort((a, b) => b[1] - a[1]).map(([sup, amt]) => (
-                <View key={sup} style={S.supplierSummaryRow}>
-                  <Text style={[S.supplierSummaryName, { color: colors.foreground }]}>{sup}</Text>
-                  <Text style={[S.supplierSummaryAmt, { color: colors.primary }]}>¥{formatMoney(amt)}</Text>
+        <View testID="wine-supplier-inline-workspace" style={{ flex: 1 }}>
+          <ScrollView
+            horizontal
+            nestedScrollEnabled
+            directionalLockEnabled
+            showsHorizontalScrollIndicator={false}
+            testID="wine-supplier-tabs"
+            style={{ flexGrow: 0, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}
+            contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 8, gap: 8, alignItems: "center" }}
+          >
+            {allSuppliers.map((supplier) => {
+              const active = selectedSupplierView === supplier;
+              return (
+                <TouchableOpacity
+                  key={supplier}
+                  testID={`wine-supplier-tab-${supplier}`}
+                  hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                  onPress={() => { tap(); setSupplierViewSupplier(supplier); }}
+                  style={[S.filterChip, { backgroundColor: active ? colors.primary : colors.surface, borderColor: active ? colors.primary : colors.border }]}
+                >
+                  <Text style={[S.filterChipText, { color: active ? "#fff" : colors.muted }]}>{supplier}</Text>
+                </TouchableOpacity>
+              );
+            })}
+            {selectedSupplierView && (
+              <TouchableOpacity
+                testID="wine-supplier-record-purchase"
+                hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                onPress={() => handlePurchaseEntry(selectedSupplierView)}
+                style={[S.actionBtn, { backgroundColor: colors.primary + "14", borderColor: colors.primary + "44" }]}
+              >
+                <IconSymbol name="plus" size={13} color={colors.primary} />
+                <Text style={{ color: colors.primary, fontSize: 12, fontWeight: "700" }}>录入进货</Text>
+              </TouchableOpacity>
+            )}
+          </ScrollView>
+
+          {selectedSupplierView && (
+            <View style={{ flex: 1, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 40 + insets.bottom }}>
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10, paddingBottom: 10 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: colors.foreground, fontSize: 15, fontWeight: "800" }}>{selectedSupplierView}</Text>
+                  <Text style={{ color: colors.muted, fontSize: 12, marginTop: 2 }}>
+                    本月 ¥{formatMoney(supplierMonthTotals[selectedSupplierView] ?? 0)} · 累计 ¥{formatMoney(supplierCumulTotals[selectedSupplierView] ?? 0)}
+                  </Text>
                 </View>
-              ))}
+                <Text style={{ color: colors.muted, fontSize: 12 }}>{supplierViewRows.length} 款</Text>
+              </View>
+              <HorizontalLedgerTable
+                testID="wine-supplier-horizontal-ledger-table"
+                columns={wineLedgerColumns}
+                groups={supplierViewGroups}
+                rowKey={(row) => row.itemId}
+                emptyLabel="该供应商暂无葡萄酒台账记录。"
+                rowTone={(row) => row.closingQty <= 0 ? "negative" : "default"}
+              />
             </View>
-          }
-        />
+          )}
+        </View>
       )}
 
       {/* ── 当月进货视图（全面升级）── */}
@@ -1042,23 +1023,6 @@ const S = StyleSheet.create({
   detailLabel: { fontSize: 12 },
   detailValue: { fontSize: 12, fontWeight: "500" },
   purchaseRow: { flexDirection: "row", alignItems: "center", borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 8 },
-  supplierCard: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 12 },
-  supplierHeader: { flexDirection: "row", alignItems: "flex-start", marginBottom: 10 },
-  supplierName: { fontSize: 16, fontWeight: "700" },
-  supplierMeta: { fontSize: 12, marginTop: 2 },
-  supplierAmount: { fontSize: 15, fontWeight: "700" },
-  supplierCumul: { fontSize: 12 },
-  supplierEntryBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1 },
-  supplierEntryText: { fontSize: 13, fontWeight: "500" },
-  supplierItems: { marginTop: 10, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth },
-  supplierItemRow: { flexDirection: "row", alignItems: "center", paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth },
-  supplierItemName: { fontSize: 13, fontWeight: "500" },
-  supplierItemMeta: { fontSize: 11, marginTop: 1 },
-  supplierSummaryCard: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 16 },
-  supplierSummaryTitle: { fontSize: 14, fontWeight: "700", marginBottom: 10 },
-  supplierSummaryRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 4 },
-  supplierSummaryName: { fontSize: 13 },
-  supplierSummaryAmt: { fontSize: 13, fontWeight: "600" },
   sectionTitle: { fontSize: 12, fontWeight: "600", letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 10 },
   trendCard: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 4 },
   trendTitle: { fontSize: 15, fontWeight: "700" },

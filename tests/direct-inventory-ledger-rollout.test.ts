@@ -13,7 +13,7 @@ const food = read("app/food-inventory.tsx");
 describe("库存直接完整台账改造", () => {
   it("通用横向台账封装局部滚动、分类分组与商品名称详情触发能力", () => {
     expect(table).toContain("export function HorizontalLedgerTable");
-    expect(table).toContain("horizontal showsHorizontalScrollIndicator");
+    expect(table).toContain("horizontal nestedScrollEnabled directionalLockEnabled showsHorizontalScrollIndicator");
     expect(table).toContain("HorizontalLedgerColumn<Row>");
     expect(table).toContain("onPress?: (row: Row) => void");
     expect(table).toContain("testID={column.testID?.(row)}");

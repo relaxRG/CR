@@ -230,10 +230,11 @@ export function BaseInventoryScreen({
       </View>}
 
       {/* Tab 切换 */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 8, gap: 8 }}>
+      <ScrollView horizontal nestedScrollEnabled directionalLockEnabled showsHorizontalScrollIndicator={false}
+        style={{ flexGrow: 0 }}
+        contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 8, gap: 8, alignItems: "center" }}>
         {allTabs.map((t) => (
-          <TouchableOpacity key={t.key} onPress={() => { tap(); setTab(t.key); }}
+          <TouchableOpacity key={t.key} hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }} onPress={() => { tap(); setTab(t.key); }}
             style={[S.tabChip, {
               backgroundColor: tab === t.key ? accentColor : colors.surface,
               borderColor: tab === t.key ? accentColor : colors.border,
@@ -245,7 +246,7 @@ export function BaseInventoryScreen({
         ))}
       </ScrollView>
 
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }}>
+      <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }}>
 
         {/* ── 总结 Tab ─────────────────────────────────────────────────────── */}
         {tab === "summary" && (
@@ -342,9 +343,9 @@ export function BaseInventoryScreen({
         {tab === "ledger" && (
           <View style={{ gap: 10 }}>
             {/* 快捷操作 */}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}
+            <ScrollView horizontal nestedScrollEnabled directionalLockEnabled showsHorizontalScrollIndicator={false}
               style={{ flexGrow: 0, marginBottom: 4 }}
-              contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
+              contentContainerStyle={{ gap: 8, paddingHorizontal: 4, paddingVertical: 4, alignItems: "center" }}>
               <TouchableOpacity onPress={() => { tap(); setShowOpening(true); }}
                 style={[S.actionBtn, { backgroundColor: accentColor + "15", borderColor: accentColor + "33" }]}>
                 <Text style={{ fontSize: 12, color: accentColor, fontWeight: "600" }}>📋 期初录入</Text>
@@ -567,9 +568,9 @@ function EmptyState({ emoji, accentColor, excelFormatHint, colors }: any) {
 const S = StyleSheet.create({
   navbar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   navTitle: { fontSize: 17, fontWeight: "600" },
-  tabChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
+  tabChip: { minHeight: 44, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   actionBtn: { flexShrink: 0, minHeight: 44, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center" },
-  bigBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: "center" },
+  bigBtn: { flex: 1, minHeight: 48, paddingVertical: 14, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   recordCard: { flexDirection: "row", alignItems: "center", borderRadius: 12, borderWidth: 1, padding: 12, gap: 10 },
   summaryCard: { borderRadius: 12, borderWidth: 1, padding: 14 },
   importOverlay: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
