@@ -688,7 +688,7 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
   const renderLedger = () => (
     <View style={{ flex: 1 }}>
       {/* 操作栏：同一行横向滚动，不裁切文字或图标。 */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} testID="spirits-inventory-action-toolbar"
         style={{ flexGrow: 0, minHeight: 60, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}
         contentContainerStyle={{ gap: 8, minHeight: 60, paddingHorizontal: 12, paddingVertical: 8, alignItems: "center" }}>
         <TouchableOpacity onPress={() => { tap(); setShowAddItem(true); }}
@@ -1373,7 +1373,7 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
           style={{ flexGrow: 0, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}
           contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 8, gap: 8, alignItems: "center" }}>
           {TABS.map((t) => (
-            <TouchableOpacity key={t.key} onPress={() => { tap(); setTab(t.key); }}
+            <TouchableOpacity key={t.key} testID={`spirits-tab-${t.key}`} onPress={() => { tap(); setTab(t.key); }}
               style={[S.tabChip, {
                 backgroundColor: tab === t.key ? "#EF4444" : colors.surface,
                 borderColor: tab === t.key ? "#EF4444" : colors.border,

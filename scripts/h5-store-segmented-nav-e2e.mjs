@@ -115,6 +115,33 @@ function assertNoRootOverflow(label, state) {
   }
 }
 
+function horizontalScrollExpression(testId) {
+  return `(() => {
+    const element = document.querySelector('[data-testid=${JSON.stringify(testId)}]');
+    if (!element) return { found: false };
+    const clientWidth = element.clientWidth;
+    const scrollWidth = element.scrollWidth;
+    const clientHeight = element.clientHeight;
+    const scrollHeight = element.scrollHeight;
+    const expectedEnd = Math.max(0, scrollWidth - clientWidth);
+    element.scrollLeft = expectedEnd;
+    element.dispatchEvent(new Event('scroll', { bubbles: true }));
+    const reachedEnd = element.scrollLeft;
+    element.scrollLeft = 0;
+    return { found: true, clientWidth, scrollWidth, clientHeight, scrollHeight, expectedEnd, reachedEnd };
+  })()`;
+}
+
+function assertHorizontalScroller(label, state) {
+  if (!state.found) throw new Error(`${label}缺少横向滚动容器`);
+  if (state.scrollHeight > state.clientHeight + 1) {
+    throw new Error(`${label}出现垂直内容裁切：${JSON.stringify(state)}`);
+  }
+  if (state.expectedEnd > 1 && state.reachedEnd < 1) {
+    throw new Error(`${label}内容超出宽度但无法横向滚动：${JSON.stringify(state)}`);
+  }
+}
+
 async function click(call, expression, error) {
   const result = await call("Runtime.evaluate", { expression, returnByValue: true });
   if (!result.result.value) throw new Error(error);
@@ -142,6 +169,10 @@ try {
     if (mainTabs.result.value !== "报表 员工 备用金 库存 店铺") {
       throw new Error(`${width}pt 主导航顺序错误：${JSON.stringify(mainTabs.result.value)}`);
     }
+    const mainTabsScroller = await call("Runtime.evaluate", {
+      expression: horizontalScrollExpression("store-main-tabs"), returnByValue: true,
+    });
+    assertHorizontalScroller(`${width}pt 主导航`, mainTabsScroller.result.value);
 
     await click(call, clickTestIdExpression("store-main-tab-inventory"), `${width}pt 未找到库存主导航`);
     await sleep(250);
@@ -156,6 +187,16 @@ try {
     if (inventoryState.tabLabels !== "烈酒 葡萄酒 水果 食材 啤酒 冰块" || !inventoryState.workspaceFound) {
       throw new Error(`${width}pt 库存分段顺序或初始工作区错误：${JSON.stringify(inventoryState)}`);
     }
+    const inventoryTabsScroller = await call("Runtime.evaluate", {
+      expression: horizontalScrollExpression("inventory-segmented-tabs"), returnByValue: true,
+    });
+    assertHorizontalScroller(`${width}pt 库存分类标签`, inventoryTabsScroller.result.value);
+    await click(call, clickTestIdExpression("spirits-tab-ledger"), `${width}pt 未找到烈酒库存管理页签`);
+    await sleep(120);
+    const spiritsToolbarScroller = await call("Runtime.evaluate", {
+      expression: horizontalScrollExpression("spirits-inventory-action-toolbar"), returnByValue: true,
+    });
+    assertHorizontalScroller(`${width}pt 烈酒库存操作栏`, spiritsToolbarScroller.result.value);
 
     const inventoryMonthBeforeCategoryChange = await call("Runtime.evaluate", {
       expression: `document.querySelector('[data-testid="inventory-month-navigator"]')?.innerText.replace(/\\s+/g, ' ').trim() ?? ''`,
@@ -206,6 +247,10 @@ try {
     if (shopState.tabLabels !== "杯具 餐具 日用品 设备" || !shopState.workspaceFound) {
       throw new Error(`${width}pt 店铺分段顺序或初始工作区错误：${JSON.stringify(shopState)}`);
     }
+    const shopTabsScroller = await call("Runtime.evaluate", {
+      expression: horizontalScrollExpression("shop-segmented-tabs"), returnByValue: true,
+    });
+    assertHorizontalScroller(`${width}pt 店铺分类标签`, shopTabsScroller.result.value);
 
     const shopCategoryStates = {};
     for (const [key, label] of [["tableware", "餐具"], ["daily", "日用品"], ["equipment", "设备"]]) {
