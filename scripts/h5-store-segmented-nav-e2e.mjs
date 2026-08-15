@@ -16,6 +16,8 @@ import { extname, join, normalize } from "node:path";
 const root = join(process.cwd(), "dist-web");
 const port = Number(process.env.H5_E2E_PORT ?? 8094);
 const route = `http://localhost:${port}/store`;
+// 极窄屏、主流窄屏与大屏手机均需覆盖分类切换和滚动边界。
+const MOBILE_VIEWPORTS = [320, 360, 375, 390, 412, 430];
 const contentTypes = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -150,12 +152,16 @@ async function click(call, expression, error) {
 server.listen(port, "127.0.0.1");
 await new Promise((resolve) => server.once("listening", resolve));
 
+let testTarget;
+let testSocket;
 try {
-  const { socket, call } = await openCdp(await getDedicatedTestTarget());
+  testTarget = await getDedicatedTestTarget();
+  const { socket, call } = await openCdp(testTarget);
+  testSocket = socket;
   const report = [];
   await call("Page.enable");
 
-  for (const width of [375, 390, 430]) {
+  for (const width of MOBILE_VIEWPORTS) {
     await call("Emulation.setDeviceMetricsOverride", {
       width, height: 844, deviceScaleFactor: 3, mobile: true,
     });
@@ -277,8 +283,11 @@ try {
   }
 
   await call("Emulation.clearDeviceMetricsOverride");
-  socket.close();
   console.log(JSON.stringify({ passed: true, route, report }, null, 2));
 } finally {
+  if (testTarget?.id) {
+    await fetch(`http://localhost:9222/json/close/${testTarget.id}`).catch(() => {});
+  }
+  testSocket?.close();
   server.close();
 }

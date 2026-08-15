@@ -75,6 +75,14 @@ describe("店铺顶级模块与库存分类", () => {
     }
   });
 
+  it("工作台H5回归覆盖极窄到大屏手机，并在结束后关闭专用测试页", () => {
+    const h5 = read("scripts/h5-store-segmented-nav-e2e.mjs");
+    expect(h5).toContain("const MOBILE_VIEWPORTS = [320, 360, 375, 390, 412, 430]");
+    expect(h5).toContain("for (const width of MOBILE_VIEWPORTS)");
+    expect(h5).toContain("json/close/${testTarget.id}");
+    expect(h5).toContain("testSocket?.close()");
+  });
+
   it("店铺聚合页复用库存数据源，不引入第二套库存持久化逻辑", () => {
     const shop = read("components/store/shop.tsx");
     const inventory = read("components/store/inventory.tsx");
