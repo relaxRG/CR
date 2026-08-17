@@ -221,3 +221,33 @@ describe("美团一年导入窗口", () => {
     expect(isMeituanMonthWithinAppHistory("2025-08", "2026-08-17")).toBe(false);
   });
 });
+
+import {
+  createMeituanBillResumeState,
+  getResumableMeituanApiBatches,
+  markMeituanApiBatchResult,
+  markMeituanApiBatchRunning,
+} from "@/lib/integrations/meituan/daily-bill-resume";
+
+describe("美团一年日账单断点续传", () => {
+  it("中断后跳过已完成批次，仅从失败或未完成的七天 API 批次恢复，且不把文件导入批次伪造为同步完成", () => {
+    const plan = buildMeituanAnnualImportPlan({ today: "2026-08-17" });
+    const apiBatches = plan.filter((batch) => batch.source === "meituan-openapi");
+    const fileBatches = plan.filter((batch) => batch.source === "file-import");
+    const first = apiBatches[0];
+    const second = apiBatches[1];
+
+    let state = createMeituanBillResumeState("mt-current-store", 12);
+    state = markMeituanApiBatchRunning(state, first, "2026-08-17T01:00:00.000Z");
+    state = markMeituanApiBatchResult({ state, batch: first, now: "2026-08-17T01:00:03.000Z", success: true });
+    state = markMeituanApiBatchRunning(state, second, "2026-08-17T01:00:04.000Z");
+    state = markMeituanApiBatchResult({ state, batch: second, now: "2026-08-17T01:00:05.000Z", success: false, errorMessage: "网络中断" });
+
+    const resumed = getResumableMeituanApiBatches({ storeId: "mt-current-store", batches: plan, state });
+    expect(resumed).not.toContainEqual(first);
+    expect(resumed).toContainEqual(second);
+    expect(resumed.every((batch) => batch.source === "meituan-openapi")).toBe(true);
+    expect(resumed).not.toContainEqual(fileBatches[0]);
+    expect(state.checkpoints[Object.keys(state.checkpoints)[1]].status).toBe("failed");
+  });
+});
