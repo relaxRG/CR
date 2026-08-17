@@ -160,6 +160,7 @@ import {
   buildCurrentStoreDailyBillPreview,
   buildCurrentStoreMonthlyImportPreview,
   createMeituanSingleStoreBinding,
+  createMonthlyReportFromMeituanPreview,
 } from "@/lib/integrations/meituan/single-store-binding";
 
 describe("当前单店美团绑定", () => {
@@ -178,6 +179,22 @@ describe("当前单店美团绑定", () => {
     expect(binding.bindingId).toBe("meituan-guanJia.single-store.v1");
     expect(preview.kpi.revenue).toBe(100);
     expect(preview.issues.some((item) => item.code === "STORE_MISMATCH")).toBe(true);
+  });
+
+  it("确认写入快照时保留未分类营业收入，绝不为平账而丢弃差额", () => {
+    const binding = createMeituanSingleStoreBinding("mt-current-store", "当前门店");
+    const preview = buildCurrentStoreMonthlyImportPreview({
+      binding,
+      month: "2026-07",
+      revenueRows: [{ storeId: "mt-current-store", month: "2026-07", revenue: 120 }],
+      dishCategoryRows: [{ storeId: "mt-current-store", month: "2026-07", categoryName: "Food", revenue: 100 }],
+    });
+    const report = createMonthlyReportFromMeituanPreview(preview, "2026-08-17T00:00:00.000Z");
+
+    expect(report.rawMonth).toBe("2026-07");
+    expect(report.dishCategories).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: "未分类营业收入（待核对）", revenue: 20 }),
+    ]));
   });
 
   it("单店日账单仍严格使用绑定门店 ID 建立订单幂等键", () => {

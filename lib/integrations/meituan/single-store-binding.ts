@@ -5,6 +5,7 @@ import {
   type MeituanMonthlyRevenueRow,
   type MeituanStoreScope,
 } from "./monthly-import";
+import type { MonthlyReport } from "@/lib/store/monthly-report/types";
 import {
   buildMeituanDailyBillPreview,
   type MeituanDailyBillPreview,
@@ -42,6 +43,60 @@ export function buildCurrentStoreMonthlyImportPreview(input: {
     revenueRows: input.revenueRows,
     dishCategoryRows: input.dishCategoryRows,
   });
+}
+
+/** 将已通过门店和月份隔离的美团预览转换为当前月报可确认写入的最小快照。 */
+export function createMonthlyReportFromMeituanPreview(preview: MeituanMonthlyImportPreview, now = new Date().toISOString()): MonthlyReport {
+  const [year, month] = preview.month.split("-");
+  return {
+    id: preview.importKey,
+    rawMonth: preview.month,
+    monthLabel: `${year}年${Number(month)}月`,
+    importedAt: now,
+    compareMode: "mom",
+    kpi: {
+      ...preview.kpi,
+      tableCount: 0,
+      refundOrderCount: 0,
+      giftDishCount: 0,
+      returnDishCount: 0,
+      dishSalesCount: preview.dishCategories.reduce((sum, item) => sum + item.salesQty, 0),
+      avgSpendPerPerson: 0,
+    },
+    paymentMethods: [],
+    dishCategories: preview.unclassifiedRevenue === 0
+      ? preview.dishCategories
+      : [...preview.dishCategories, {
+          name: "未分类营业收入（待核对）",
+          salesQty: 0,
+          salesQtyPct: 0,
+          salesAmount: preview.unclassifiedRevenue,
+          salesAmountPct: 0,
+          revenue: preview.unclassifiedRevenue,
+          revenuePct: 0,
+          discountAmount: 0,
+          discountPct: 0,
+        }],
+    topDishes: [],
+    mealPeriods: [],
+    discounts: [],
+    customerStats: {
+      memberRevenuePct: 0,
+      nonMemberRevenuePct: 0,
+      memberRevenue: 0,
+      memberAvgSpend: 0,
+      nonMemberRevenue: 0,
+      nonMemberAvgSpend: 0,
+      newMembers: 0,
+      newMemberCards: 0,
+      memberOrderCount: 0,
+      storedBalanceConsume: 0,
+      giftBalanceConsume: 0,
+      pointsEarned: 0,
+    },
+    dailyRevenues: [],
+    returnDishes: [],
+  };
 }
 
 export function buildCurrentStoreDailyBillPreview(input: {
