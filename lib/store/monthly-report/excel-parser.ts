@@ -1,6 +1,6 @@
 /**
  * 月度经营报表 Excel 解析器
- * 支持 predawn 美团收银系统导出的四类报表：
+ * 支持从收银系统手动导出的四类报表：
  *
  * 1. 营业概览.xlsx（4个工作表）
  *    - 营业：KPI + 优惠构成
@@ -22,8 +22,6 @@ import {
   MonthlyReport, MonthlyKPI, PaymentMethod, DishCategory, DishItem,
   MealPeriod, DiscountItem, CustomerStats, DailyRevenue, ReturnDishItem,
 } from "./types";
-import { canonicalizeMeituanCategoryName } from "@/lib/integrations/meituan/monthly-import";
-
 function uuid() { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
 
 function safeNum(v: any): number {
@@ -33,6 +31,19 @@ function safeNum(v: any): number {
 
 function safeStr(v: any): string {
   return v == null ? "" : String(v).trim();
+}
+
+function canonicalizeDishCategoryName(value: string): { key: string; label: string } | null {
+  const label = String(value ?? "")
+    .normalize("NFKC")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .replace(/[–—]/g, "-")
+    .replace(/[・]/g, "·")
+    .replace(/\s+/g, " ")
+    .replace(/\s*([·/+()&-])\s*/g, "$1")
+    .trim();
+  if (!label || label === "合计") return null;
+  return { key: label.toLocaleLowerCase("en-US"), label };
 }
 
 /**
@@ -265,7 +276,7 @@ function parseDishCategoriesExcel(base64: string): DishCategory[] {
   for (let i = 4; i < rows.length; i++) {
     const row = rows[i];
     if (!row) continue;
-    const category = canonicalizeMeituanCategoryName(safeStr(row[1]));
+    const category = canonicalizeDishCategoryName(safeStr(row[1]));
     if (!category) continue;
 
     const existing = map.get(category.key);

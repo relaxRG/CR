@@ -2,7 +2,7 @@
  * 月度经营报表导入页 (Build 135)
  * 支持9种报表类型自动识别 + 缺失检测 + 多文件同时导入
  */
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { formatMoney } from "@/lib/utils";
 import {
   Alert, ActivityIndicator, Modal, Platform, Pressable,
@@ -15,7 +15,6 @@ import { useRouter } from "expo-router";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useMonthlyReportStore } from "@/lib/store/monthly-report/store";
 import { parseMonthlyReport } from "@/lib/store/monthly-report/excel-parser";
 import { MonthlyReport } from "@/lib/store/monthly-report/types";
@@ -32,13 +31,6 @@ import {
   REQUIRED_REPORT_TYPES,
   OPTIONAL_REPORT_TYPES,
 } from "@/lib/store/monthly-report/dish-analysis-types";
-import { parseMeituanDishCategoriesWorkbook, parseMeituanMonthlyRevenueWorkbook } from "@/lib/integrations/meituan/excel-adapter";
-import {
-  buildCurrentStoreMonthlyImportPreview,
-  createMeituanSingleStoreBinding,
-  createMonthlyReportFromMeituanPreview,
-  type MeituanSingleStoreBinding,
-} from "@/lib/integrations/meituan/single-store-binding";
 
 // ─── 文件类型图标映射 ──────────────────────────────────────────────────────────
 const FILE_TYPE_ICONS: Record<ReportFileType, string> = {
@@ -76,13 +68,6 @@ interface UploadedFile {
   detecting?: boolean;
 }
 
-interface MeituanSelectedFile {
-  name: string;
-  base64: string;
-}
-
-const MEITUAN_SINGLE_STORE_BINDING_KEY = "meituan-guanJia.single-store.binding.v1";
-
 // ─── 所有支持的报表（用于说明卡片） ───────────────────────────────────────────
 const ALL_REPORT_TYPES: ReportFileType[] = [
   "overview",
@@ -109,22 +94,6 @@ export default function MonthlyReportImportScreen() {
   const [preview, setPreview] = useState<MonthlyReport | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [missingTypes, setMissingTypes] = useState<ReportFileType[]>([]);
-  const [importSource, setImportSource] = useState<"generic" | "meituan">("generic");
-  const [meituanBinding, setMeituanBinding] = useState<MeituanSingleStoreBinding | null>(null);
-  const [meituanRevenueFile, setMeituanRevenueFile] = useState<MeituanSelectedFile | null>(null);
-  const [meituanCategoryFile, setMeituanCategoryFile] = useState<MeituanSelectedFile | null>(null);
-  const [meituanPreviewMeta, setMeituanPreviewMeta] = useState<{ month: string; storeName: string; issueCount: number } | null>(null);
-
-  useEffect(() => {
-    AsyncStorage.getItem(MEITUAN_SINGLE_STORE_BINDING_KEY).then((raw) => {
-      if (!raw) return;
-      try {
-        const parsed = JSON.parse(raw) as MeituanSingleStoreBinding;
-        if (parsed?.bindingId === "meituan-guanJia.single-store.v1" && parsed.storeId) setMeituanBinding(parsed);
-      } catch { /* 损坏的绑定不阻断文件导入，后续按原始门店 ID 重新绑定。 */ }
-    }).catch(() => {});
-  }, []);
-
   // ─── 文件选择 ──────────────────────────────────────────────────────────────
   const handlePickFiles = async () => {
     tap();
@@ -157,67 +126,6 @@ export default function MonthlyReportImportScreen() {
     } catch (e) {
       setLoading(false);
       Alert.alert("选择文件失败", String(e));
-    }
-  };
-
-  const handlePickMeituanFile = async (kind: "revenue" | "category") => {
-    tap();
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-excel", "*/*"],
-        copyToCacheDirectory: true,
-        multiple: false,
-      });
-      if (result.canceled || !result.assets?.[0]) return;
-      const asset = result.assets[0];
-      const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 });
-      const selected = { name: asset.name, base64 };
-      if (kind === "revenue") setMeituanRevenueFile(selected);
-      else setMeituanCategoryFile(selected);
-    } catch (error) {
-      Alert.alert("选择美团文件失败", String(error));
-    }
-  };
-
-  const handleParseMeituan = async () => {
-    if (!meituanRevenueFile || !meituanCategoryFile) {
-      Alert.alert("请先选择两份文件", "需要“月度营业收入”和“菜品销售统计—大类”两份美团管家智能版导出文件。");
-      return;
-    }
-    tap();
-    setLoading(true);
-    try {
-      const revenue = parseMeituanMonthlyRevenueWorkbook(meituanRevenueFile.base64);
-      const categories = parseMeituanDishCategoriesWorkbook(meituanCategoryFile.base64);
-      const storeIds = Array.from(new Set([...revenue.rows, ...categories.rows].map((row) => row.storeId.trim()).filter(Boolean)));
-      const months = Array.from(new Set([...revenue.rows, ...categories.rows].map((row) => row.month.trim()).filter(Boolean)));
-      if (storeIds.length !== 1) throw new Error("当前仅支持一家门店：请上传只包含当前门店 ID 的两份原始导出文件");
-      if (months.length !== 1) throw new Error("两份文件必须只包含同一个营业月份；请先在美团管家按月筛选后重新导出");
-      const incomingStoreId = storeIds[0];
-      if (meituanBinding && meituanBinding.storeId !== incomingStoreId) {
-        throw new Error(`文件门店 ID ${incomingStoreId} 与已绑定门店 ${meituanBinding.storeId} 不一致，已拒绝导入`);
-      }
-      const binding = meituanBinding ?? createMeituanSingleStoreBinding(incomingStoreId, "当前门店");
-      if (!meituanBinding) {
-        setMeituanBinding(binding);
-        AsyncStorage.setItem(MEITUAN_SINGLE_STORE_BINDING_KEY, JSON.stringify(binding)).catch(() => {});
-      }
-      const preview = buildCurrentStoreMonthlyImportPreview({
-        binding,
-        month: months[0],
-        revenueRows: revenue.rows,
-        dishCategoryRows: categories.rows,
-      });
-      const report = createMonthlyReportFromMeituanPreview(preview);
-      setPreview(report);
-      setMissingTypes([]);
-      setImportSource("meituan");
-      setMeituanPreviewMeta({ month: preview.month, storeName: binding.storeName, issueCount: preview.issues.length });
-      setShowPreview(true);
-    } catch (error) {
-      Alert.alert("美团文件解析失败", String(error));
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -273,7 +181,6 @@ export default function MonthlyReportImportScreen() {
       // 3. 检测缺失报表
       const missing = REQUIRED_REPORT_TYPES.filter((t) => !detectedTypes.has(t));
       setMissingTypes(missing);
-      setImportSource("generic");
       setPreview(report);
       setShowPreview(true);
     } catch (e) {
@@ -288,17 +195,6 @@ export default function MonthlyReportImportScreen() {
     setShowPreview(false);
     setPreview(null);
     setFiles([]);
-    setMeituanRevenueFile(null);
-    setMeituanCategoryFile(null);
-    setMeituanPreviewMeta(null);
-
-    if (importSource === "meituan") {
-      Alert.alert("美团数据已导入", `${preview.monthLabel} 已按当前绑定门店导入。菜品大类中的同名分类已自动归并。`, [
-        { text: "查看分析", onPress: () => router.replace("/monthly-report" as any) },
-        { text: "继续导入" },
-      ]);
-      return;
-    }
 
     if (missingTypes.length > 0) {
       Alert.alert(
@@ -333,35 +229,9 @@ export default function MonthlyReportImportScreen() {
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 20 }}>
-        <View testID="meituan-single-store-import" style={[S.meituanCard, { backgroundColor: "#F0FDF4", borderColor: "#86EFAC" }]}>
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-            <View style={{ flex: 1 }}>
-              <Text style={[S.infoTitle, { color: "#15803D" }]}>美团管家智能版 · 当前门店</Text>
-              <Text style={{ fontSize: 11, color: "#166534", marginTop: 4 }}>
-                {meituanBinding ? `已绑定门店 ID：${meituanBinding.storeId}` : "首次成功解析后自动绑定文件中的当前门店 ID"}
-              </Text>
-            </View>
-            <IconSymbol name="building.2.fill" size={22} color="#16A34A" />
-          </View>
-          <Text style={{ fontSize: 11, lineHeight: 16, color: "#166534", marginTop: 10 }}>
-            选择同一月份的“月度营业收入”和“菜品销售统计—大类”文件。系统会自动合并 Food / food 等同名分类，并在确认前显示收入差额。
-          </Text>
-          <View style={S.meituanFileActions}>
-            <TouchableOpacity testID="meituan-pick-revenue" onPress={() => handlePickMeituanFile("revenue")} style={S.meituanFileButton}>
-              <Text style={S.meituanFileButtonText}>{meituanRevenueFile ? "✓ 月度营业收入已选择" : "选择月度营业收入"}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity testID="meituan-pick-category" onPress={() => handlePickMeituanFile("category")} style={S.meituanFileButton}>
-              <Text style={S.meituanFileButtonText}>{meituanCategoryFile ? "✓ 菜品大类已选择" : "选择菜品销售大类"}</Text>
-            </TouchableOpacity>
-          </View>
-          <TouchableOpacity testID="meituan-parse-preview" onPress={handleParseMeituan} disabled={loading} style={[S.meituanParseButton, { opacity: loading ? 0.55 : 1 }]}>
-            <Text style={S.meituanParseButtonText}>{loading ? "正在解析…" : "解析并预览美团数据"}</Text>
-          </TouchableOpacity>
-        </View>
-
         {/* 说明卡片 */}
         <View style={[S.infoCard, { backgroundColor: colors.primary + "0e", borderColor: colors.primary + "33" }]}>
-          <Text style={[S.infoTitle, { color: colors.primary }]}>支持的报表文件（美团收银系统导出）</Text>
+          <Text style={[S.infoTitle, { color: colors.primary }]}>支持的报表文件（从收银系统自行导出）</Text>
           <View style={{ gap: 8, marginTop: 10 }}>
             {/* 必要报表 */}
             <Text style={{ fontSize: 11, color: colors.muted, fontWeight: "600" }}>必要报表</Text>
@@ -486,9 +356,7 @@ export default function MonthlyReportImportScreen() {
             <View style={{ alignItems: "center" }}>
               <Text style={[S.previewTitle, { color: colors.foreground }]}>{preview?.monthLabel}</Text>
               <Text style={{ fontSize: 12, color: colors.muted }}>
-                {importSource === "meituan"
-                  ? `美团当前门店预览${meituanPreviewMeta?.issueCount ? ` · ${meituanPreviewMeta.issueCount} 项待核对` : " · 收入已平衡"}`
-                  : missingTypes.length === 0 ? "✓ 数据完整" : `⚠️ 缺失 ${missingTypes.length} 种报表`}
+                {missingTypes.length === 0 ? "✓ 数据完整" : `⚠️ 缺失 ${missingTypes.length} 种报表`}
               </Text>
             </View>
             <Pressable onPress={handleConfirm}>
@@ -500,11 +368,6 @@ export default function MonthlyReportImportScreen() {
             <ScrollView contentContainerStyle={{ padding: 20 }}>
               {/* 导入状态总览 */}
               <View style={[S.importStatusCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                {importSource === "meituan" && (
-                  <Text style={{ fontSize: 12, color: "#15803D", marginBottom: 8 }}>
-                    当前门店：{meituanPreviewMeta?.storeName ?? "当前门店"} · 业务月：{meituanPreviewMeta?.month}
-                  </Text>
-                )}
                 <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground, marginBottom: 8 }}>
                   已识别报表
                 </Text>
@@ -629,12 +492,6 @@ const S = StyleSheet.create({
   infoCard: { borderRadius: 14, borderWidth: 1, padding: 16, marginBottom: 20 },
   infoTitle: { fontSize: 14, fontWeight: "700" },
   infoHint: { fontSize: 11, marginTop: 10, lineHeight: 16 },
-  meituanCard: { borderRadius: 14, borderWidth: 1, padding: 16, marginBottom: 16 },
-  meituanFileActions: { flexDirection: "row", gap: 8, marginTop: 12 },
-  meituanFileButton: { flex: 1, minHeight: 44, borderRadius: 10, backgroundColor: "#DCFCE7", borderWidth: 1, borderColor: "#86EFAC", alignItems: "center", justifyContent: "center", paddingHorizontal: 8 },
-  meituanFileButtonText: { color: "#166534", fontSize: 11, fontWeight: "700", textAlign: "center" },
-  meituanParseButton: { minHeight: 46, borderRadius: 12, backgroundColor: "#16A34A", alignItems: "center", justifyContent: "center", marginTop: 10 },
-  meituanParseButtonText: { color: "#fff", fontSize: 14, fontWeight: "700" },
   typeIconBadge: { width: 24, height: 24, borderRadius: 6, alignItems: "center", justifyContent: "center" },
   pickBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, borderRadius: 14, paddingVertical: 16, marginBottom: 16 },
   pickBtnText: { color: "#fff", fontSize: 17, fontWeight: "600" },
