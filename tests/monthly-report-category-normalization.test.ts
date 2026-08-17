@@ -26,6 +26,6 @@ describe("月度经营报表菜品大类归并", () => {
       revenue: 155,
       discountAmount: 15,
     });
-    expect(result.report?.dishCategories.find((item) => item.name === "Food · 套餐")?.revenue).toBe(30);
+    expect(result.report?.dishCategories.find((item) => item.name === "Food·套餐")?.revenue).toBe(30);
   });
 });

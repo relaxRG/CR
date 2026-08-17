@@ -12,7 +12,7 @@ describe("美团管家智能版多店月度导入", () => {
   it("将 food、Food、全角空格 food 自动合并，但不误合并 Food · 套餐", () => {
     expect(canonicalizeMeituanCategoryName(" FOOD ")).toEqual({ key: "food", label: "FOOD" });
     expect(canonicalizeMeituanCategoryName("Ｆｏｏｄ")).toEqual({ key: "food", label: "Food" });
-    expect(canonicalizeMeituanCategoryName("Food · 套餐")?.key).toBe("food · 套餐");
+    expect(canonicalizeMeituanCategoryName("Food · 套餐")?.key).toBe("food·套餐");
 
     const preview = buildMeituanMonthlyImportPreview({
       store,
@@ -27,7 +27,7 @@ describe("美团管家智能版多店月度导入", () => {
 
     expect(preview.dishCategories).toHaveLength(2);
     expect(preview.dishCategories.find((item) => item.name.toLowerCase() === "food")?.revenue).toBe(120);
-    expect(preview.dishCategories.find((item) => item.name === "Food · 套餐")?.revenue).toBe(40);
+    expect(preview.dishCategories.find((item) => item.name === "Food·套餐")?.revenue).toBe(40);
     expect(preview.isBalanced).toBe(true);
     expect(preview.importKey).toBe("meituan-guanJia:mt-store-a:2026-07");
   });
@@ -266,5 +266,22 @@ describe("美团一年日账单断点续传", () => {
     expect(resumed.every((batch) => batch.source === "meituan-openapi")).toBe(true);
     expect(resumed).not.toContainEqual(fileBatches[0]);
     expect(state.checkpoints[Object.keys(state.checkpoints)[1]].status).toBe("failed");
+  });
+});
+
+describe("美团菜品大类归并边界", () => {
+  it("合并大小写、全半角、零宽字符与标点空格变体", () => {
+    expect(canonicalizeMeituanCategoryName("ＦＯＯＤ")).toEqual({ key: "food", label: "FOOD" });
+    expect(canonicalizeMeituanCategoryName(" Food\u200B ")).toEqual({ key: "food", label: "Food" });
+    expect(canonicalizeMeituanCategoryName("Food ・ 套餐")).toEqual({ key: "food·套餐", label: "Food·套餐" });
+    expect(canonicalizeMeituanCategoryName("food·套餐")).toEqual({ key: "food·套餐", label: "food·套餐" });
+    expect(canonicalizeMeituanCategoryName("  特调 — 季节 ")).toEqual({ key: "特调-季节", label: "特调-季节" });
+  });
+
+  it("拒绝空白或合计行，且不会把带业务后缀的分类误合并为基础分类", () => {
+    expect(canonicalizeMeituanCategoryName("\u200B　 ")).toBeNull();
+    expect(canonicalizeMeituanCategoryName(" 合计 ")).toBeNull();
+    expect(canonicalizeMeituanCategoryName("Food")?.key).not.toBe(canonicalizeMeituanCategoryName("Food · 套餐")?.key);
+    expect(canonicalizeMeituanCategoryName("Wine(杯装)")?.key).not.toBe(canonicalizeMeituanCategoryName("Wine")?.key);
   });
 });

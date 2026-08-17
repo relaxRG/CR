@@ -62,7 +62,10 @@ export function canonicalizeMeituanCategoryName(raw: string): { key: string; lab
   const label = String(raw ?? "")
     .normalize("NFKC")
     .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .replace(/[–—]/g, "-")
+    .replace(/[・]/g, "·")
     .replace(/\s+/g, " ")
+    .replace(/\s*([·/+()&-])\s*/g, "$1")
     .trim();
   if (!label || label === "合计") return null;
   return { key: label.toLocaleLowerCase("en-US"), label };
