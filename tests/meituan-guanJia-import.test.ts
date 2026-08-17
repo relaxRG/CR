@@ -198,3 +198,26 @@ describe("当前单店美团绑定", () => {
     expect(preview.bills[0].sourceKey).toBe("meituan-openapi:mt-current-store:current-order-1");
   });
 });
+
+import {
+  buildMeituanAnnualImportPlan,
+  isMeituanMonthWithinAppHistory,
+  MEITUAN_APP_HISTORY_MONTHS,
+} from "@/lib/integrations/meituan/bill-import-window";
+
+describe("美团一年导入窗口", () => {
+  it("保留最近十二个自然月，官方可查询日期按七天批次拆分，较早日期明确改走文件导入", () => {
+    const plan = buildMeituanAnnualImportPlan({ today: "2026-08-17" });
+    expect(MEITUAN_APP_HISTORY_MONTHS).toBe(12);
+    expect(plan[0]).toMatchObject({ source: "file-import", month: "2025-09", startDate: "2025-09-01", reason: "OUTSIDE_OFFICIAL_LOOKBACK" });
+    const apiBatches = plan.filter((batch) => batch.source === "meituan-openapi");
+    expect(apiBatches.length).toBeGreaterThan(0);
+    expect(apiBatches.every((batch) => {
+      const start = new Date(`${batch.startDate}T00:00:00Z`).getTime();
+      const end = new Date(`${batch.endDate}T00:00:00Z`).getTime();
+      return (end - start) / 86_400_000 + 1 <= 7 && batch.startDate >= "2026-05-20";
+    })).toBe(true);
+    expect(isMeituanMonthWithinAppHistory("2025-09", "2026-08-17")).toBe(true);
+    expect(isMeituanMonthWithinAppHistory("2025-08", "2026-08-17")).toBe(false);
+  });
+});
