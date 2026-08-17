@@ -22,6 +22,7 @@ import {
   MonthlyReport, MonthlyKPI, PaymentMethod, DishCategory, DishItem,
   MealPeriod, DiscountItem, CustomerStats, DailyRevenue, ReturnDishItem,
 } from "./types";
+import { canonicalizeMeituanCategoryName } from "@/lib/integrations/meituan/monthly-import";
 
 function uuid() { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
 
@@ -264,10 +265,10 @@ function parseDishCategoriesExcel(base64: string): DishCategory[] {
   for (let i = 4; i < rows.length; i++) {
     const row = rows[i];
     if (!row) continue;
-    const catName = safeStr(row[1]);
-    if (!catName || catName === "合计") continue;
+    const category = canonicalizeMeituanCategoryName(safeStr(row[1]));
+    if (!category) continue;
 
-    const existing = map.get(catName);
+    const existing = map.get(category.key);
     const salesQty = safeNum(row[2]);
     const salesAmount = safeNum(row[4]);
     const revenue = safeNum(row[6]);
@@ -279,8 +280,8 @@ function parseDishCategoriesExcel(base64: string): DishCategory[] {
       existing.revenue += revenue;
       existing.discountAmount += discountAmount;
     } else {
-      map.set(catName, {
-        name: catName,
+      map.set(category.key, {
+        name: category.label,
         salesQty,
         salesQtyPct: safeNum(row[3]),
         salesAmount,
