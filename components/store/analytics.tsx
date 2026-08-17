@@ -11,6 +11,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { BoundedBusinessMonthNavigator } from "@/components/months/BoundedBusinessMonthNavigator";
+import { useReportMonthNavigation } from "@/hooks/use-report-month-navigation";
 import { useRevenueStore, REVENUE_CATEGORY_LABELS, RevenueCategory } from "@/lib/store/revenue-store";
 import { usePettyCashStore } from "@/lib/store/petty-store";
 import { useMonthlyReportStore } from "@/lib/store/monthly-report/store";
@@ -94,19 +96,6 @@ function CustomRangePicker({ visible, start, end, onConfirm, onClose, colors }: 
   );
 }
 
-function MonthPicker({ value, onChange, colors }: { value: string; onChange: (v: string) => void; colors: any }) {
-  const months = useMemo(() => { const r: string[] = []; const now = new Date(); for (let i = 0; i < 24; i++) { const d = new Date(now.getFullYear(), now.getMonth() - i, 1); r.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); } return r; }, []);
-  return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingHorizontal: 2 }}>
-      {months.map((m) => (
-        <TouchableOpacity key={m} onPress={() => onChange(m)} style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: value === m ? colors.primary : colors.border, backgroundColor: value === m ? colors.primary : colors.surface }}>
-          <Text style={{ fontSize: 13, fontWeight: value === m ? "600" : "400", color: value === m ? "#fff" : colors.muted }}>{Number(m.slice(5, 7))}月{m.slice(0, 4) !== String(new Date().getFullYear()) ? ` ${m.slice(0, 4)}` : ""}</Text>
-        </TouchableOpacity>
-      ))}
-    </ScrollView>
-  );
-}
-
 function YearPicker({ value, onChange, colors }: { value: string; onChange: (v: string) => void; colors: any }) {
   const years = useMemo(() => { const cur = new Date().getFullYear(); return Array.from({ length: 5 }, (_, i) => String(cur - i)); }, []);
   return (
@@ -143,24 +132,23 @@ export default function StoreAnalyticsScreen() {
   const { paySlips } = usePaySlipStore();
   const { records } = useRevenueStore();
   const { records: pettyRecords } = usePettyCashStore();
+  const { month: reportMonth, bounds: reportMonthBounds, selectMonth: selectReportMonth } = useReportMonthNavigation();
   const [mode, setMode] = useState<PeriodMode>("month");
   const [compare, setCompare] = useState<CompareMode>("prev");
   const [selectedDay, setSelectedDay] = useState(fmtDate(new Date()));
-  const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [selectedYear, setSelectedYear] = useState(() => String(new Date().getFullYear()));
   const [customStart, setCustomStart] = useState(() => { const d = new Date(); d.setDate(d.getDate() - 29); return fmtDate(d); });
   const [customEnd, setCustomEnd] = useState(fmtDate(new Date()));
   const [showCustomPicker, setShowCustomPicker] = useState(false);
-  const currentMonthStr = new Date().toISOString().slice(0, 7);
-  const monthLaborCost = paySlips.filter((s) => s.month === currentMonthStr).reduce((sum, s) => sum + s.finalSalary, 0);
+  const monthLaborCost = paySlips.filter((s) => s.month === reportMonth).reduce((sum, s) => sum + s.finalSalary, 0);
   const costCategories: RevenueCategory[] = ["food_cost", "spirit_cost", "wine_cost", "petty_cash", "labor_cost", "rent", "utilities", "operations"];
   const currentRange = useMemo((): { start: Date; end: Date } => {
     if (mode === "day") return dayRange(selectedDay);
-    if (mode === "month") return monthRange(selectedMonth);
+    if (mode === "month") return monthRange(reportMonth);
     if (mode === "year") return yearRange(selectedYear);
     return { start: parseDate(customStart), end: parseDate(customEnd) };
-  }, [mode, selectedDay, selectedMonth, selectedYear, customStart, customEnd]);
-  const previousRange = useMemo(() => prevRange(mode, selectedDay, selectedMonth, selectedYear, customStart, customEnd), [mode, selectedDay, selectedMonth, selectedYear, customStart, customEnd]);
+  }, [mode, selectedDay, reportMonth, selectedYear, customStart, customEnd]);
+  const previousRange = useMemo(() => prevRange(mode, selectedDay, reportMonth, selectedYear, customStart, customEnd), [mode, selectedDay, reportMonth, selectedYear, customStart, customEnd]);
   const calcSummary = (start: Date, end: Date) => {
     const map: Partial<Record<RevenueCategory, number>> = {};
     records.filter((r) => { const d = new Date(r.date); return d >= start && d <= end; }).forEach((r) => { map[r.category] = (map[r.category] ?? 0) + r.amount; });
@@ -177,7 +165,7 @@ export default function StoreAnalyticsScreen() {
   const totalCostPrev = Object.entries(prev).filter(([k]) => k !== "revenue").reduce((s, [, v]) => s + (v ?? 0), 0);
   const profitPrev = totalRevPrev - totalCostPrev;
   const pctChange = (cur: number, prev: number) => { if (prev === 0) return null; return ((cur - prev) / prev * 100).toFixed(1); };
-  const label = periodLabel(mode, selectedDay, selectedMonth, selectedYear, customStart, customEnd);
+  const label = periodLabel(mode, selectedDay, reportMonth, selectedYear, customStart, customEnd);
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.background }} contentContainerStyle={{ paddingBottom: 40 + insets.bottom }}>
       <View style={[styles.subHeader, { backgroundColor: colors.background }]}>
@@ -194,7 +182,15 @@ export default function StoreAnalyticsScreen() {
         </View>
         <View style={{ marginTop: 8 }}>
           {mode === "day" && <DayPicker value={selectedDay} onChange={setSelectedDay} colors={colors} />}
-          {mode === "month" && <MonthPicker value={selectedMonth} onChange={setSelectedMonth} colors={colors} />}
+          {mode === "month" && (
+            <BoundedBusinessMonthNavigator
+              testID="analytics-month-navigator"
+              subject="经营分析"
+              month={reportMonth}
+              bounds={reportMonthBounds}
+              onChange={selectReportMonth}
+            />
+          )}
           {mode === "year" && <YearPicker value={selectedYear} onChange={setSelectedYear} colors={colors} />}
           {mode === "custom" && (
             <TouchableOpacity onPress={() => setShowCustomPicker(true)} style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.surface, borderRadius: 10, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, paddingVertical: 8 }}>
@@ -264,9 +260,16 @@ export default function StoreAnalyticsScreen() {
             { icon: "chart.bar.fill", color: "#007AFF", title: "店铺月度经营分析", sub: reports.length > 0 ? `已有 ${reports.length} 份报告 · 最新 ${reports[0].monthLabel}` : "导入报表数据开始分析", route: "/monthly-report" },
             { icon: "clock.fill", color: "#5856D6", title: "时段营业分析", sub: "午/晚/深夜/凌晨时段对比 · 加班性价比提醒", route: "/period-analysis" },
             { icon: "person.2.fill", color: "#FF9500", title: "人工成本管理", sub: employees.filter((e) => e.active).length > 0 ? `${employees.filter((e) => e.active).length} 名员工 · 本月薪资${monthLaborCost > 0 ? ` ¥${monthLaborCost.toFixed(0)}` : "未填写"}` : "排班 · 考勤 · 薪资结算", route: "/labor" },
-            { icon: "doc.text.fill", color: "#30D158", title: `${new Date().getMonth() + 1}月报表`, sub: "收入/成本/工资/货款 · 账户余额追踪", route: "/monthly-summary" },
+            { icon: "doc.text.fill", color: "#30D158", title: `${Number(reportMonth.slice(5, 7))}月报表`, sub: "收入/成本/工资/货款 · 账户余额追踪", route: "/monthly-summary" },
           ].map((item) => (
-            <Pressable key={item.route} onPress={() => { tap(); router.push(item.route as any); }}
+            <Pressable key={item.route} onPress={() => {
+              tap();
+              if (item.route === "/monthly-summary") {
+                router.push({ pathname: "/monthly-summary" as any, params: { month: reportMonth } });
+              } else {
+                router.push(item.route as any);
+              }
+            }}
               style={[styles.entryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <View style={[styles.entryIcon, { backgroundColor: item.color + "22" }]}>
                 <IconSymbol name={item.icon as any} size={20} color={item.color} />

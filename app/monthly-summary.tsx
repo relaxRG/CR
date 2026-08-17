@@ -20,6 +20,8 @@ import { useColors } from "@/hooks/use-colors";
 import { useFeature } from "@/hooks/use-feature";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
+import { BoundedBusinessMonthNavigator } from "@/components/months/BoundedBusinessMonthNavigator";
+import { useReportMonthNavigation } from "@/hooks/use-report-month-navigation";
 import { useMonthlySummaryStore } from "@/lib/store/monthly-summary/store";
 import { useEmployeeStore, usePaySlipStore, useDeptOrderStore, DEFAULT_DEPT_ORDER, useMonthCloseStore } from "@/lib/labor/store";
 import { useSpiritsInventoryStore } from "@/lib/spirits/crud-store";
@@ -317,10 +319,7 @@ export default function MonthlySummaryScreen() {
   const wineSnapshotStore = useWineSnapshotStore();
   const wineManualPurchaseStore = useWineManualPurchaseStore();
 
-  const [selectedMonth, setSelectedMonth] = useState<string>(() => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  });
+  const { month: selectedMonth, bounds: reportMonthBounds, selectMonth: setSelectedMonth } = useReportMonthNavigation();
   const [showManualModal, setShowManualModal] = useState(false);
   const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
@@ -664,7 +663,13 @@ export default function MonthlySummaryScreen() {
     return (
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }}>
         {/* 月份选择 */}
-        <MonthSelector selectedMonth={selectedMonth} onSelect={setSelectedMonth} colors={colors} />
+        <BoundedBusinessMonthNavigator
+          testID="monthly-summary-month-navigator"
+          subject="总月报"
+          month={selectedMonth}
+          bounds={reportMonthBounds}
+          onChange={setSelectedMonth}
+        />
 
         {/* 净利润大卡 */}
         <View style={[S.profitCard, {
@@ -1404,36 +1409,10 @@ export default function MonthlySummaryScreen() {
   );
 }
 
-// ─── 月份选择器 ───────────────────────────────────────────────────────────────
-function MonthSelector({ selectedMonth, onSelect, colors }: { selectedMonth: string; onSelect: (m: string) => void; colors: any }) {
-  const months = useMemo(() => {
-    const result: string[] = [];
-    const now = new Date();
-    for (let i = 0; i < 12; i++) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      result.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
-    }
-    return result;
-  }, []);
-
-  return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{ gap: 8, marginBottom: 12 }}>
-      {months.map((m) => (
-        <TouchableOpacity key={m} onPress={() => onSelect(m)}
-          style={[S.monthChip, { backgroundColor: selectedMonth === m ? colors.primary : colors.surface, borderColor: selectedMonth === m ? colors.primary : colors.border }]}>
-          <Text style={{ fontSize: 12, fontWeight: "600", color: selectedMonth === m ? "#fff" : colors.muted }}>{m}</Text>
-        </TouchableOpacity>
-      ))}
-    </ScrollView>
-  );
-}
-
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const S = StyleSheet.create({
   navbar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   navTitle: { fontSize: 17, fontWeight: "600" },
-  monthChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1 },
   profitCard: { borderRadius: 14, borderWidth: 1, padding: 16, marginBottom: 12 },
   section: { borderRadius: 12, borderWidth: 1, marginBottom: 10, overflow: "hidden" },
   sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth },

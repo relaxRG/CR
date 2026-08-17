@@ -20,6 +20,7 @@ import { SafeAreaInsetsContext, useSafeAreaInsets } from "react-native-safe-area
 import { useRouter } from "expo-router";
 import { useColors } from "@/hooks/use-colors";
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import { useReportMonthNavigation } from "@/hooks/use-report-month-navigation";
 import { useSync } from "@/lib/cf-sync/provider";
 import { useFeature } from "@/hooks/use-feature";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -66,6 +67,7 @@ function ReportModule({ insets, colors }: { insets: any; colors: any }) {
   const { hasFeature, isAuthenticated } = useFeature();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
   const [reportTab, setReportTab] = usePersistedState<ReportTab>("store.report.tab.v2", "analytics");
+  const { month: reportMonth } = useReportMonthNavigation();
 
   if (isAuthenticated && !hasFeature("store_ops")) {
     return <AccessDenied label="报表" colors={colors} />;
@@ -74,16 +76,16 @@ function ReportModule({ insets, colors }: { insets: any; colors: any }) {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       {/* 子 Tab Chip 切换栏 */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} testID="store-report-tabs"
         style={{ flexGrow: 0 }}
         contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 8, gap: 8, alignItems: "center" }}>
         {REPORT_TABS.map((t) => {
           const active = reportTab === t.key;
           return (
-            <Pressable key={t.key} onPress={() => {
+            <Pressable key={t.key} testID={`store-report-tab-${t.key}`} onPress={() => {
                 tap();
                 if (t.key === "summary") {
-                  router.push("/monthly-summary" as any);
+                  router.push({ pathname: "/monthly-summary" as any, params: { month: reportMonth } });
                 } else {
                   setReportTab(t.key);
                 }

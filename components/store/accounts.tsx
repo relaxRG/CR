@@ -9,35 +9,11 @@ import * as Haptics from "expo-haptics";
 import { Platform } from "react-native";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { BoundedBusinessMonthNavigator } from "@/components/months/BoundedBusinessMonthNavigator";
+import { useReportMonthNavigation } from "@/hooks/use-report-month-navigation";
 import { useMonthlySummaryStore } from "@/lib/store/monthly-summary/store";
 import { AccountBalance, AccountType, ACCOUNT_TYPE_COLORS, ACCOUNT_TYPE_LABELS } from "@/lib/store/monthly-summary/types";
 import BalanceModal from "@/components/store/balance-modal";
-
-// ── MonthSelector（月份选择横向滚动）────────────────────────────────────────
-function MonthSelector({ selectedMonth, onSelect, colors }: { selectedMonth: string; onSelect: (m: string) => void; colors: any }) {
-  const months = React.useMemo(() => {
-    const result: string[] = [];
-    const now = new Date();
-    for (let i = 0; i < 12; i++) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      result.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
-    }
-    return result;
-  }, []);
-  return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{ gap: 8, marginBottom: 12 }}>
-      {months.map((m) => (
-        <TouchableOpacity key={m} onPress={() => onSelect(m)}
-          style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1,
-            backgroundColor: selectedMonth === m ? colors.primary : colors.surface,
-            borderColor: selectedMonth === m ? colors.primary : colors.border }}>
-          <Text style={{ fontSize: 12, fontWeight: "600", color: selectedMonth === m ? "#fff" : colors.muted }}>{m}</Text>
-        </TouchableOpacity>
-      ))}
-    </ScrollView>
-  );
-}
 
 export default function StoreAccountsScreen() {
   const colors = useColors();
@@ -46,9 +22,7 @@ export default function StoreAccountsScreen() {
 
   const { reports, getBalancesForMonth, upsertBalance } = useMonthlySummaryStore();
 
-  const now = new Date();
-  const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  const [selectedMonth, setSelectedMonth] = useState(defaultMonth);
+  const { month: selectedMonth, bounds: reportMonthBounds, selectMonth: setSelectedMonth } = useReportMonthNavigation();
 
   const balances = getBalancesForMonth(selectedMonth);
   const report = reports?.find((r) => r.month === selectedMonth);
@@ -64,7 +38,13 @@ export default function StoreAccountsScreen() {
   return (
     <>
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }}>
-        <MonthSelector selectedMonth={selectedMonth} onSelect={setSelectedMonth} colors={colors} />
+        <BoundedBusinessMonthNavigator
+          testID="accounts-month-navigator"
+          subject="账户"
+          month={selectedMonth}
+          bounds={reportMonthBounds}
+          onChange={setSelectedMonth}
+        />
 
         {/* 净利润参考 */}
         <View style={{ borderRadius: 10, borderWidth: 1, padding: 12, marginBottom: 12,

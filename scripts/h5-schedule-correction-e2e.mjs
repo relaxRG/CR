@@ -95,6 +95,20 @@ function clickTextExpression(text) {
   })()`;
 }
 
+function clickTestIdExpression(testId) {
+  return `(() => {
+    const element = document.querySelector('[data-testid=${JSON.stringify(testId)}]');
+    if (!element) return false;
+    element.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+    return true;
+  })()`;
+}
+
+async function click(call, expression, error) {
+  const result = await call("Runtime.evaluate", { expression, returnByValue: true });
+  if (!result.result.value) throw new Error(error);
+}
+
 server.listen(port, "127.0.0.1");
 await new Promise((resolve) => server.once("listening", resolve));
 
@@ -507,6 +521,46 @@ try {
     wineSupplierViewports.push({ width, ...state });
   }
   report.push({ reportPage: '葡萄酒供应商同页明细', viewports: wineSupplierViewports });
+
+  // 总月报、经营分析与账户：统一受限月份导航必须在工作台和独立路由中保持相同月份文案与无溢出布局。
+  const reportMonthNavigatorViewports = [];
+  for (const width of MOBILE_VIEWPORTS) {
+    await call("Emulation.setDeviceMetricsOverride", { width, height: 844, deviceScaleFactor: 3, mobile: true });
+    await call("Page.navigate", { url: `http://localhost:${port}/store` });
+    await sleep(760);
+    await click(call, clickTestIdExpression("store-main-tab-monthly"), `${width}pt 未找到报表主导航`);
+    await sleep(120);
+    const states = [];
+    for (const spec of [
+      { tab: "store-report-tab-analytics", navigator: "analytics-month-navigator", label: "经营分析" },
+      { tab: "store-report-tab-accounts", navigator: "accounts-month-navigator", label: "账户" },
+    ]) {
+      await click(call, clickTestIdExpression(spec.tab), `${width}pt 未找到${spec.label}页签`);
+      await sleep(150);
+      const measured = await call("Runtime.evaluate", { expression: `(() => {
+        const navigator = document.querySelector('[data-testid="${spec.navigator}"]');
+        const picker = document.querySelector('[data-testid="${spec.navigator}-picker"]');
+        return { found: Boolean(navigator && picker), label: picker?.innerText.replace(/\\s+/g, ' ').trim() ?? '', rootClientWidth: document.documentElement.clientWidth, rootScrollWidth: document.documentElement.scrollWidth, bodyScrollWidth: document.body.scrollWidth };
+      })()`, returnByValue: true });
+      const state = measured.result.value;
+      if (!state.found) throw new Error(`${spec.label} ${width}pt 缺少统一月份导航`);
+      if (state.rootScrollWidth > state.rootClientWidth || state.bodyScrollWidth > state.rootClientWidth) throw new Error(`${spec.label} ${width}pt 月份导航出现根级横向溢出：${JSON.stringify(state)}`);
+      states.push({ label: spec.label, ...state });
+    }
+    await call("Page.navigate", { url: `http://localhost:${port}/monthly-summary` });
+    await sleep(620);
+    const summaryMeasured = await call("Runtime.evaluate", { expression: `(() => {
+      const navigator = document.querySelector('[data-testid="monthly-summary-month-navigator"]');
+      const picker = document.querySelector('[data-testid="monthly-summary-month-navigator-picker"]');
+      return { found: Boolean(navigator && picker), label: picker?.innerText.replace(/\\s+/g, ' ').trim() ?? '', rootClientWidth: document.documentElement.clientWidth, rootScrollWidth: document.documentElement.scrollWidth, bodyScrollWidth: document.body.scrollWidth };
+    })()`, returnByValue: true });
+    const summaryState = summaryMeasured.result.value;
+    if (!summaryState.found) throw new Error(`总月报 ${width}pt 缺少统一月份导航`);
+    if (summaryState.rootScrollWidth > summaryState.rootClientWidth || summaryState.bodyScrollWidth > summaryState.rootClientWidth) throw new Error(`总月报 ${width}pt 月份导航出现根级横向溢出：${JSON.stringify(summaryState)}`);
+    if (!states.every((state) => state.label === summaryState.label)) throw new Error(`报表三页 ${width}pt 月份不同步：${JSON.stringify({ states, summaryState })}`);
+    reportMonthNavigatorViewports.push({ width, states, summary: summaryState });
+  }
+  report.push({ reportPage: "报表统一月份导航", viewports: reportMonthNavigatorViewports });
 
   // 员工档案顶部筛选栏：验证“后厨 3”文字与人数徽标分别完整可见、边界不相交。
   const employeeFilterViewports = [];
