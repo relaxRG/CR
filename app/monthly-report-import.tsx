@@ -266,7 +266,7 @@ export default function MonthlyReportImportScreen() {
         </View>
 
         {/* 选择文件按钮 */}
-        <TouchableOpacity onPress={handlePickFiles} disabled={loading}
+        <TouchableOpacity testID="monthly-report-pick-files" onPress={handlePickFiles} disabled={loading}
           style={[S.pickBtn, { backgroundColor: loading ? colors.border : colors.primary }]}>
           {loading ? <ActivityIndicator color="#fff" /> : <IconSymbol name="square.and.arrow.down.fill" size={20} color="#fff" />}
           <Text style={S.pickBtnText}>{loading ? "处理中…" : "选择 Excel 文件（可多选）"}</Text>
@@ -338,7 +338,7 @@ export default function MonthlyReportImportScreen() {
 
         {/* 解析按钮 */}
         {files.length > 0 && (
-          <TouchableOpacity onPress={handleParse} disabled={loading}
+          <TouchableOpacity testID="monthly-report-parse-files" onPress={handleParse} disabled={loading}
             style={[S.parseBtn, { backgroundColor: loading ? colors.border : "#10B981" }]}>
             {loading ? <ActivityIndicator color="#fff" /> : <IconSymbol name="checkmark.circle.fill" size={20} color="#fff" />}
             <Text style={S.parseBtnText}>{loading ? "解析中…" : `解析 ${files.length} 个文件`}</Text>
