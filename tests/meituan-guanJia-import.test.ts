@@ -155,3 +155,46 @@ describe("美团管家智能版 Excel 模板适配器", () => {
     expect(preview.isBalanced).toBe(true);
   });
 });
+
+import {
+  buildCurrentStoreDailyBillPreview,
+  buildCurrentStoreMonthlyImportPreview,
+  createMeituanSingleStoreBinding,
+} from "@/lib/integrations/meituan/single-store-binding";
+
+describe("当前单店美团绑定", () => {
+  it("仅使用已绑定门店 ID 生成预览，并将其他门店文件行作为错误隔离", () => {
+    const binding = createMeituanSingleStoreBinding("mt-current-store", "当前门店");
+    const preview = buildCurrentStoreMonthlyImportPreview({
+      binding,
+      month: "2026-07",
+      revenueRows: [
+        { storeId: "mt-current-store", month: "2026-07", revenue: 100 },
+        { storeId: "mt-other-store", month: "2026-07", revenue: 999 },
+      ],
+      dishCategoryRows: [{ storeId: "mt-current-store", month: "2026-07", categoryName: "Food", revenue: 100 }],
+    });
+
+    expect(binding.bindingId).toBe("meituan-guanJia.single-store.v1");
+    expect(preview.kpi.revenue).toBe(100);
+    expect(preview.issues.some((item) => item.code === "STORE_MISMATCH")).toBe(true);
+  });
+
+  it("单店日账单仍严格使用绑定门店 ID 建立订单幂等键", () => {
+    const binding = createMeituanSingleStoreBinding("mt-current-store", "当前门店");
+    const preview = buildCurrentStoreDailyBillPreview({
+      binding,
+      month: "2026-07",
+      bills: [{
+        wmOrderViewId: "current-order-1",
+        daliyBillDate: "2026-07-02",
+        appPoiCode: "mt-current-store",
+        settleAmount: 90,
+        totalFoodAmount: 100,
+      }],
+    });
+
+    expect(preview.isValid).toBe(true);
+    expect(preview.bills[0].sourceKey).toBe("meituan-openapi:mt-current-store:current-order-1");
+  });
+});
