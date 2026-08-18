@@ -712,7 +712,7 @@ export default function MonthlySummaryScreen({ embedded = false }: { embedded?: 
                   if (!item.isManual && item.linkedModule) {
                     const moduleRoutes: Record<string, string> = {
                       "labor-attendance": "/labor",
-                      "monthly-report": "/monthly-report",
+                      "monthly-report": "/store",
                       "spirits-inventory": "/spirits-inventory",
                       "wine-inventory": "/wine-inventory",
                       "supplier-import": "/suppliers",

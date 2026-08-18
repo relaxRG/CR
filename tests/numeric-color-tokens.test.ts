@@ -32,12 +32,4 @@ describe("数字颜色 Design Token", () => {
     expect(source).not.toContain("color: colors.success }]}>¥{formatMoney(revenueKPIBonus)}");
   });
 
-  it("月度经营报告的支付渠道金额不再使用渠道专属硬编码颜色", () => {
-    const source = read("app/monthly-report.tsx");
-    expect(source).toContain('import { numericColor, NUMERIC_TONE } from "@/lib/theme/numeric-color-tokens";');
-    expect(source).toContain("微信 ¥{formatMoney(d.wechat)}");
-    expect(source).not.toContain('color: "#FF9500" }>微信');
-    expect(source).not.toContain('color: "#007AFF" }>支付宝');
-    expect(source).not.toContain('color: "#FF6B35" }>美团');
-  });
 });

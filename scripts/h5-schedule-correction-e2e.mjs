@@ -274,7 +274,7 @@ try {
     ["/labor-attendance", "考勤概况"],
     [`/labor-kpi-allowance?employeeId=h5-e2e-employee&month=${closeMonth}`, "绩效汇总"],
     ["/period-analysis", "时段成本分析"],
-    ["/monthly-report", "月度经营报告"],
+    ["/store", "报表工作台"],
     ["/me", "个人中心"],
   ];
   for (const [path, label] of reportRoutes) {

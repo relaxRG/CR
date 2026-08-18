@@ -38,6 +38,13 @@ describe("全局业务月份与紧凑选择器规范", () => {
     expect(petty).toContain("min: month < pettyLocalBounds.min ? month : pettyLocalBounds.min");
   });
 
+  it("快速连续切月立即更新界面，并将持久化写入合并为最后一次选择", () => {
+    expect(provider).toContain("BUSINESS_MONTH_PERSIST_DEBOUNCE_MS = 120");
+    expect(provider).toContain("setMonth(normalized)");
+    expect(provider).toContain("clearTimeout(persistTimer.current)");
+    expect(provider).toContain("setStoredMonth(normalized)");
+  });
+
   it("月份选择器使用紧凑上浮卡片而非大底部抽屉", () => {
     expect(navigator).toContain('animationType="fade"');
     expect(navigator).toContain('justifyContent: "flex-start"');

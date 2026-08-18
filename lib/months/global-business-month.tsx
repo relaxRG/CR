@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useMemo } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import {
   getCurrentInventoryMonth,
@@ -7,6 +7,8 @@ import {
 } from "@/lib/inventory-core/month-browser";
 
 const STORAGE_KEY = "business.global-active-month.v1";
+/** 快速点按月份时，界面立即响应；持久化只写入最后一次选择。 */
+export const BUSINESS_MONTH_PERSIST_DEBOUNCE_MS = 120;
 
 interface GlobalBusinessMonthContextValue {
   month: InventoryMonth;
@@ -23,12 +25,29 @@ const GlobalBusinessMonthContext = createContext<GlobalBusinessMonthContextValue
  */
 export function GlobalBusinessMonthProvider({ children }: { children: React.ReactNode }) {
   const [storedMonth, setStoredMonth] = usePersistedState<InventoryMonth>(STORAGE_KEY, getCurrentInventoryMonth());
-  const month = normalizeInventoryMonth(storedMonth) ?? getCurrentInventoryMonth();
+  const normalizedStoredMonth = normalizeInventoryMonth(storedMonth) ?? getCurrentInventoryMonth();
+  const [month, setMonth] = useState<InventoryMonth>(normalizedStoredMonth);
+  const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 只同步外部加载或跨设备恢复后的存储值；本地连续点按由 selectMonth 立即驱动。
+  useEffect(() => {
+    setMonth(normalizedStoredMonth);
+  }, [normalizedStoredMonth]);
+
+  useEffect(() => () => {
+    if (persistTimer.current) clearTimeout(persistTimer.current);
+  }, []);
 
   const selectMonth = useCallback((next: string) => {
     const normalized = normalizeInventoryMonth(next);
-    if (normalized) setStoredMonth(normalized);
-  }, [setStoredMonth]);
+    if (!normalized || normalized === month) return;
+    setMonth(normalized);
+    if (persistTimer.current) clearTimeout(persistTimer.current);
+    persistTimer.current = setTimeout(() => {
+      setStoredMonth(normalized);
+      persistTimer.current = null;
+    }, BUSINESS_MONTH_PERSIST_DEBOUNCE_MS);
+  }, [month, setStoredMonth]);
 
   const value = useMemo(() => ({ month, selectMonth }), [month, selectMonth]);
   return <GlobalBusinessMonthContext.Provider value={value}>{children}</GlobalBusinessMonthContext.Provider>;
