@@ -17,10 +17,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
-import { useEmployeeStore, useMonthCloseStore } from "@/lib/labor/store";
+import { useEmployeeStore, useMonthCloseStore, useDeptOrderStore } from "@/lib/labor/store";
 import { useSalaryAdvanceStore, useAdvanceCategoryStore, SalaryAdvance, AdvanceStatus } from "@/lib/labor/advance-store";
 import { usePettyLaborLinkStore } from "@/lib/store/petty-labor-link-store";
 import { EMPLOYEE_TYPE_LABELS, EMPLOYEE_TYPE_COLORS, DEPT_COLORS, monthLabel } from "@/lib/labor/types";
+import { sortEmployeesByProfileOrder } from "@/lib/labor/employee-profile-order";
 
 const STATUS_LABELS: Record<AdvanceStatus, string> = {
   pending: "待扣除",
@@ -45,6 +46,7 @@ function AddAdvanceModal({
 }) {
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
   const { employees } = useEmployeeStore();
+  const { deptOrder } = useDeptOrderStore();
   const now = new Date();
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const nextMonth = now.getMonth() === 11
@@ -57,9 +59,9 @@ function AddAdvanceModal({
   const [deductMonth, setDeductMonth] = useState(nextMonth);
   const [notes, setNotes] = useState("");
 
-  const eligibleEmployees = useMemo(() =>
-    employees.filter((e) => e.active && !e.archived),
-    [employees]
+  const eligibleEmployees = useMemo(
+    () => sortEmployeesByProfileOrder(employees.filter((e) => e.active && !e.archived), deptOrder),
+    [employees, deptOrder],
   );
 
   const handleSave = () => {
@@ -181,6 +183,7 @@ export default function LaborAdvancesScreen() {
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
   const { employees } = useEmployeeStore();
+  const { deptOrder } = useDeptOrderStore();
   const { advances, addAdvance, updateAdvance, deleteAdvance } = useSalaryAdvanceStore();
   const { isMonthWritable } = useMonthCloseStore();
   const { allCategories } = useAdvanceCategoryStore();
@@ -242,9 +245,9 @@ export default function LaborAdvancesScreen() {
     ]);
   };
 
-  const eligibleEmployees = useMemo(() =>
-    employees.filter((e) => e.active && !e.archived),
-    [employees]
+  const eligibleEmployees = useMemo(
+    () => sortEmployeesByProfileOrder(employees.filter((e) => e.active && !e.archived), deptOrder),
+    [employees, deptOrder],
   );
 
   return (

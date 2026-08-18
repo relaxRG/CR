@@ -12,6 +12,7 @@ import { getResponsivePagerIndex, getResponsivePagerOffset } from "@/lib/theme/r
 import { exportLaborData, type ExportType } from "@/lib/labor/export";
 import { buildImportTemplate, parseImportFile, type ImportResult } from "@/lib/labor/import";
 import { getNonWritableScheduleMonths } from "@/lib/labor/schedule-guards";
+import { sortEmployeesWithinProfileGroup } from "@/lib/labor/employee-profile-order";
 import { createMonthCloseOperationGate } from "@/lib/labor/month-close-operation-gate";
 import { createSnapshot } from "@/lib/backup/local-backup";
 import { applyHolidayRestAllocation } from "@/lib/labor/holiday-pay";
@@ -3577,6 +3578,7 @@ function SchedulePage({ colors, month, onMonthChange, pageWidth }: { colors: any
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
   const router = useRouter();
   const { employees, ready: employeesReady } = useEmployeeStore();
+  const { deptOrder } = useDeptOrderStore();
   const { shifts, upsertShift, batchUpsertShifts, deleteShift, batchDeleteShifts, getShifts, ready: shiftsReady } = useShiftStore();
   const { templates, upsertTemplate, deleteTemplate } = useShiftTemplateStore();
   const { statuses: specialStatuses, upsertStatus, deleteStatus } = useSpecialStatusStore();
@@ -3989,7 +3991,10 @@ function SchedulePage({ colors, month, onMonthChange, pageWidth }: { colors: any
     ];
   }, [shifts, currentMonth]);
   // 当前部门的所有活跃员工
-  const allDeptEmployees = useMemo(() => employees.filter((e) => e.active && !e.archived && resolveEmployeeDept(e).category === deptCategory), [employees, deptCategory, resolveEmployeeDept]);
+  const allDeptEmployees = useMemo(
+    () => sortEmployeesWithinProfileGroup(employees.filter((e) => e.active && !e.archived && resolveEmployeeDept(e).category === deptCategory)),
+    [employees, deptCategory, resolveEmployeeDept, deptOrder],
+  );
 
   // 班次分组排序
   const sortedShiftGroups = useMemo(() =>

@@ -9,6 +9,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatMoney } from "@/lib/utils";
+import { sortEmployeesByProfileOrder } from "@/lib/labor/employee-profile-order";
 import {
   Alert, Clipboard, KeyboardAvoidingView, Modal, Platform, Pressable,
   ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View
@@ -739,7 +740,7 @@ export default function MonthlySummaryScreen() {
                 parttime: { label: "临时兼职", color: "#FF9500", filter: (e: any) => e.type === "parttime" },
               };
               const LABOR_DEPT_GROUPS = deptOrder.map((k) => ({ key: k, ...(DEPT_GROUP_DEFS_MS[k] ?? DEPT_GROUP_DEFS_MS.front) }));
-              const activeEmps = employees.filter((e) => e.active !== false && !e.archived);
+              const activeEmps = sortEmployeesByProfileOrder(employees.filter((e) => e.active !== false && !e.archived), deptOrder);
               const totalPending = payrollPaymentsR.reduce((s, p) => s + p.remainingAmount, 0);
               return (
                 <View style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>

@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
+import { sortEmployeesByProfileOrder } from "@/lib/labor/employee-profile-order";
 import { useEmployeeStore, useDeptOrderStore } from "@/lib/labor/store";
 import { DEPT_LABELS, DEPT_COLORS, EmployeeDept, Employee } from "@/lib/labor/types";
 import { CHIP_BADGE_LAYOUT, formatCompactCount } from "@/lib/theme/chip-badge-tokens";
@@ -202,29 +203,24 @@ export default function LaborEmployeesScreen() {
   const { deptOrder } = useDeptOrderStore();
   const [deptFilter, setDeptFilter] = useState<EmployeeDept | "all">("all");
 
-  // 只显示未归档的员工
-  const activeEmployees = useMemo(() => employees.filter((e) => !e.archived), [employees]);
+  // 员工档案排序是所有员工列表的唯一顺序来源。
+  const activeEmployees = useMemo(
+    () => sortEmployeesByProfileOrder(employees.filter((e) => !e.archived), deptOrder),
+    [employees, deptOrder],
+  );
   const archivedCount = useMemo(() => employees.filter((e) => e.archived).length, [employees]);
 
-  // 按部门分组 + sortOrder 排序
-  const grouped = useMemo(() => {
-    const sorted = [...activeEmployees].sort((a, b) => {
-      const orderA = a.sortOrder ?? 999;
-      const orderB = b.sortOrder ?? 999;
-      if (orderA !== orderB) return orderA - orderB;
-      return a.code.localeCompare(b.code);
-    });
-    return deptOrder.reduce<Record<EmployeeDept, Employee[]>>((acc, dept) => {
-      acc[dept] = sorted.filter((e) => e.dept === dept);
+  // 分组仅负责分区；组内顺序继承 activeEmployees 的员工档案排序。
+  const grouped = useMemo(() =>
+    deptOrder.reduce<Record<EmployeeDept, Employee[]>>((acc, dept) => {
+      acc[dept] = activeEmployees.filter((e) => e.dept === dept);
       return acc;
-    }, { front: [], kitchen: [], parttime: [], other: [] });
-  }, [activeEmployees, deptOrder]);
+    }, { front: [], kitchen: [], parttime: [], other: [] }),
+  [activeEmployees, deptOrder]);
 
   const filtered = useMemo(() => {
     if (deptFilter === "all") return null;
-    return [...activeEmployees]
-      .filter((e) => e.dept === deptFilter)
-      .sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999) || a.code.localeCompare(b.code));
+    return activeEmployees.filter((e) => e.dept === deptFilter);
   }, [activeEmployees, deptFilter]);
 
   const handleArchive = (emp: Employee) => {

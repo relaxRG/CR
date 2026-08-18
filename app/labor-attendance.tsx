@@ -14,6 +14,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { formatMoney } from "@/lib/utils";
 import { formatEditableMoney, moneyDraftToAmount, normalizeMoneyDraft, roundMoneyToCents } from "@/lib/labor/money-input";
 import { numericColor, NUMERIC_TONE } from "@/lib/theme/numeric-color-tokens";
+import { sortEmployeesByProfileOrder } from "@/lib/labor/employee-profile-order";
 import {
   Alert, Platform, ScrollView, StyleSheet,
   Text, TextInput, TouchableOpacity, View
@@ -68,7 +69,10 @@ export default function LaborAttendancePage() {
   const [expandedId, setExpandedId] = useState<string>(employeeId || "");
   const [editingRewardFor, setEditingRewardFor] = useState<string>("");
 
-  const activeEmployees = useMemo(() => employees.filter((e) => e.active !== false), [employees]);
+  const activeEmployees = useMemo(
+    () => sortEmployeesByProfileOrder(employees.filter((e) => e.active !== false && !e.archived), deptOrder),
+    [employees, deptOrder],
+  );
   // 性能优化：预建查找 Map，将 render 循环中的 O(n) find/filter 降为 O(1)
   const attMap = useMemo(() => {
     const m = new Map<string, typeof attendances[0]>();

@@ -8,6 +8,7 @@ import type {
   PaySlip,
   ShiftEntry,
 } from "./types";
+import { sortEmployeesWithinProfileGroup } from "./employee-profile-order";
 
 function roundMoney(value: number): number {
   return Math.round((Number.isFinite(value) ? value : 0) * 100) / 100;
@@ -48,7 +49,7 @@ export function buildFinalScheduleByDept(
     employeeIdsByDept.set(category, []);
     entriesByDept.set(category, []);
   }
-  for (const employee of employees) {
+  for (const employee of sortEmployeesWithinProfileGroup(employees)) {
     if (!employee.active || employee.archived) continue;
     const category = employee.dept as DeptCategory;
     if (!employeeIdsByDept.has(category)) continue;

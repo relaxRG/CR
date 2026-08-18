@@ -14,7 +14,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
-import { useEmployeeStore } from "@/lib/labor/store";
+import { useEmployeeStore, useDeptOrderStore } from "@/lib/labor/store";
+import { sortEmployeesByProfileOrder } from "@/lib/labor/employee-profile-order";
 import { DEPT_LABELS, DEPT_COLORS, Employee } from "@/lib/labor/types";
 
 export default function LaborArchivedScreen() {
@@ -23,17 +24,11 @@ export default function LaborArchivedScreen() {
   const insets = useSafeAreaInsets();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
   const { employees, restoreEmployee, deleteEmployee } = useEmployeeStore();
+  const { deptOrder } = useDeptOrderStore();
 
-  const archived = useMemo(() =>
-    [...employees]
-      .filter((e) => e.archived)
-      .sort((a, b) => {
-        // 按归档时间倒序
-        const ta = a.archivedAt ?? a.createdAt;
-        const tb = b.archivedAt ?? b.createdAt;
-        return tb.localeCompare(ta);
-      }),
-    [employees]
+  const archived = useMemo(
+    () => sortEmployeesByProfileOrder(employees.filter((e) => e.archived), deptOrder),
+    [employees, deptOrder],
   );
 
   const handleRestore = (emp: Employee) => {

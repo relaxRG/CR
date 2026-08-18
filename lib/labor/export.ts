@@ -23,6 +23,7 @@ import type { Employee, EmployeeDept, ShiftEntry, MonthlyAttendance, PaySlip, Sh
 import { DEPT_LABELS, EMPLOYEE_TYPE_LABELS, getAttendanceBaseSalary } from "./types";
 import { DEFAULT_DEPT_ORDER } from "../labor/store";
 import { sumMoney } from "@/lib/finance/money";
+import { sortEmployeesWithinProfileGroup } from "./employee-profile-order";
 
 // ─── 辅助函数 ──────────────────────────────────────────────────────────────────
 
@@ -122,7 +123,7 @@ export function buildPayrollWorkbook(params: ExportParams): XLSX.WorkBook {
   let grandCost = 0;
 
   for (const dept of DEPT_ORDER) {
-    const deptEmps = activeEmps.filter(dept.filter);
+    const deptEmps = sortEmployeesWithinProfileGroup(activeEmps.filter(dept.filter));
     if (deptEmps.length === 0) continue;
 
     let deptFinal = 0;
@@ -230,7 +231,7 @@ export function buildPayrollWorkbook(params: ExportParams): XLSX.WorkBook {
 
   // ── Sheet 2-N：各部门明细 ──
   for (const dept of DEPT_ORDER) {
-    const deptEmps = activeEmps.filter(dept.filter);
+    const deptEmps = sortEmployeesWithinProfileGroup(activeEmps.filter(dept.filter));
     if (deptEmps.length === 0) continue;
 
     const detailHeader = [
@@ -338,7 +339,7 @@ export function buildScheduleWorkbook(params: ExportParams, mode: ScheduleMode):
   ];
 
   for (const dept of DEPT_GROUPS) {
-    const deptEmps = employees.filter((e) => e.active && !e.archived && dept.filter(e));
+    const deptEmps = sortEmployeesWithinProfileGroup(employees.filter((e) => e.active && !e.archived && dept.filter(e)));
     if (deptEmps.length === 0) continue;
 
     // 表头：姓名 + 日期列
@@ -430,7 +431,7 @@ export function buildPayrollHtml(params: ExportParams): string {
   let grandCost = 0;
 
   const deptSections = DEPT_ORDER.map(({ label, filter }) => {
-    const deptEmps = activeEmps.filter(filter);
+    const deptEmps = sortEmployeesWithinProfileGroup(activeEmps.filter(filter));
     if (deptEmps.length === 0) return "";
 
     let deptFinal = 0;
@@ -549,7 +550,7 @@ export function buildScheduleHtml(params: ExportParams, mode: ScheduleMode): str
   ];
 
   const deptSections = DEPT_GROUPS.map(({ label, filter }) => {
-    const deptEmps = employees.filter((e) => e.active && !e.archived && filter(e));
+    const deptEmps = sortEmployeesWithinProfileGroup(employees.filter((e) => e.active && !e.archived && filter(e)));
     if (deptEmps.length === 0) return "";
 
     const dateHeaders = days.map((d) => {
@@ -792,7 +793,7 @@ export function buildCombinedWorkbook(params: ExportParams): XLSX.WorkBook {
   let grandCost = 0;
 
   for (const dept of DEPT_ORDER_CMB) {
-    const deptEmps = activeEmps.filter(dept.filter).sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+    const deptEmps = sortEmployeesWithinProfileGroup(activeEmps.filter(dept.filter));
     if (deptEmps.length === 0) continue;
     let deptFinal = 0;
     let deptCost = 0;
@@ -875,7 +876,7 @@ export function buildCombinedWorkbook(params: ExportParams): XLSX.WorkBook {
   const attRows: (string | number)[][] = [];
 
   for (const dept of DEPT_ORDER_CMB) {
-    const deptEmps = activeEmps.filter(dept.filter).sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+    const deptEmps = sortEmployeesWithinProfileGroup(activeEmps.filter(dept.filter));
     if (deptEmps.length === 0) continue;
 
     for (const emp of deptEmps) {
@@ -923,7 +924,7 @@ export function buildCombinedWorkbook(params: ExportParams): XLSX.WorkBook {
   ];
 
   for (const dept of SCHEDULE_DEPTS) {
-    const deptEmps = activeEmps.filter(dept.filter).sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+    const deptEmps = sortEmployeesWithinProfileGroup(activeEmps.filter(dept.filter));
     if (deptEmps.length === 0) continue;
 
     // 班次表（格子=班次名称）
@@ -1018,7 +1019,7 @@ export function buildCombinedHtml(params: ExportParams): string {
   let grandFinal = 0;
   let grandCost = 0;
   const payrollSections = DEPT_ORDER_CPDF.map(({ label, filter }) => {
-    const deptEmps = activeEmps.filter(filter).sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+    const deptEmps = sortEmployeesWithinProfileGroup(activeEmps.filter(filter));
     if (deptEmps.length === 0) return "";
     let deptFinal = 0;
     const empRows = deptEmps.map((emp) => {
@@ -1053,7 +1054,7 @@ export function buildCombinedHtml(params: ExportParams): string {
 
   // ── 排班表 HTML（日历形式，前厅+后厨，班次+工时）──
   const scheduleSections = SCHEDULE_DEPTS_CPDF.map(({ label, filter }) => {
-    const deptEmps = activeEmps.filter(filter).sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+    const deptEmps = sortEmployeesWithinProfileGroup(activeEmps.filter(filter));
     if (deptEmps.length === 0) return "";
 
     const dateHeaders = days.map((d) => {
