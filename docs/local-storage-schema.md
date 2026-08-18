@@ -1,6 +1,6 @@
 # 本地存储键与数据结构清单
 
-> 由 `pnpm audit:storage` 从生产源代码生成；生成时间：2026-08-18T07:05:32.386Z。
+> 由 `pnpm audit:storage` 从生产源代码生成；生成时间：2026-08-18T07:35:09.475Z。
 > 本清单覆盖 `AsyncStorage`、`SecureStore`、Web `localStorage` 与通用库存工厂传入的键。`{variable}` 表示按运行时参数生成的键模式。
 
 ## 已解析键
@@ -19,7 +19,7 @@
 | AsyncStorage | `bottles.material.migrated.v9` | getItem, setItem | `"1"` | BottleStore | `lib/bottles/store.tsx:191`<br>`lib/bottles/store.tsx:281` |
 | AsyncStorage | `bottles.taxonomy.categories.v1` | getItem, setItem | `JSON.stringify(v10.next；JSON.stringify(next` | BottleCategoryDef, BottleTaxonomyStore | `lib/bottles/taxonomy.tsx:572`<br>`lib/bottles/taxonomy.tsx:583`<br>`lib/bottles/taxonomy.tsx:606`<br>`lib/bottles/taxonomy.tsx:622` |
 | AsyncStorage | `bottles.taxonomy.styles.v1` | getItem, setItem | `JSON.stringify(v9s.next；JSON.stringify(next` | BottleCategoryDef, BottleTaxonomyStore | `lib/bottles/taxonomy.tsx:573`<br>`lib/bottles/taxonomy.tsx:592`<br>`lib/bottles/taxonomy.tsx:607`<br>`lib/bottles/taxonomy.tsx:627` |
-| AsyncStorage | `cf.sync.groupSwitchSession.v1` | setItem, removeItem, getItem | `JSON.stringify(session` | DeviceInfo, PersistedGroupSwitchSession | `lib/cf-sync/group-switch.ts:84`<br>`lib/cf-sync/group-switch.ts:89`<br>`lib/cf-sync/group-switch.ts:96` |
+| AsyncStorage | `cf.sync.groupSwitchSession.v1` | setItem, removeItem, getItem | `JSON.stringify(session` | DeviceInfo, PersistedGroupSwitchSession | `lib/cf-sync/group-switch.ts:90`<br>`lib/cf-sync/group-switch.ts:95`<br>`lib/cf-sync/group-switch.ts:102` |
 | AsyncStorage | `cf.sync.prevAllowedKeys.v1` | getItem, setItem | `JSON.stringify(newAllowedKeys` | DeviceInfo, SyncState | `lib/cf-sync/provider.tsx:737`<br>`lib/cf-sync/provider.tsx:739`<br>`lib/cf-sync/provider.tsx:746` |
 | AsyncStorage | `cf.sync.switchDiagnostics.v1` | getItem, setItem | `JSON.stringify(entries` | 见源文件的写入表达式 | `lib/cf-sync/switch-diagnostics.ts:76`<br>`lib/cf-sync/switch-diagnostics.ts:80`<br>`lib/cf-sync/switch-diagnostics.ts:88` |
 | AsyncStorage | `cocktail_recent_units` | getItem, setItem | `JSON.stringify(next` | 见源文件的写入表达式 | `hooks/use-recent-units.ts:15`<br>`hooks/use-recent-units.ts:30` |
@@ -129,8 +129,7 @@
 | AsyncStorage | `removals` | multiRemove | `lib/sync/engine.ts:506` |
 | AsyncStorage | `storageKey` | getItem, setItem | `lib/inventory-core/store.tsx:173`<br>`lib/inventory-core/store.tsx:182` |
 | AsyncStorage | `SUMMARY_KEYS` | multiGet | `lib/backup/local-backup.ts:281` |
-| AsyncStorage | `ticketKey(switchId` | setItem, getItem, removeItem | `lib/cf-sync/group-switch.ts:64`<br>`lib/cf-sync/group-switch.ts:71`<br>`lib/cf-sync/group-switch.ts:77` |
-| SecureStore | `ticketKey(switchId` | setItemAsync, getItemAsync, deleteItemAsync | `lib/cf-sync/group-switch.ts:67`<br>`lib/cf-sync/group-switch.ts:72`<br>`lib/cf-sync/group-switch.ts:80` |
+| SecureStore | `ticketKey(switchId` | setItemAsync, getItemAsync, deleteItemAsync | `lib/cf-sync/group-switch.ts:73`<br>`lib/cf-sync/group-switch.ts:78`<br>`lib/cf-sync/group-switch.ts:86` |
 | AsyncStorage | `TS_PREFIX + c.storageKey` | setItem | `lib/sync/engine.ts:995`<br>`lib/sync/engine.ts:1011` |
 | AsyncStorage | `TS_PREFIX + conflict.storageKey` | setItem | `lib/sync/engine.ts:953`<br>`lib/sync/engine.ts:960` |
 | AsyncStorage | `TS_PREFIX + key` | setItem, getItem | `lib/sync/engine.ts:721`<br>`lib/sync/engine.ts:749`<br>`lib/sync/engine.ts:818`<br>`lib/sync/engine.ts:838`<br>`lib/sync/engine.ts:885` |

@@ -44,8 +44,7 @@ export type SnapshotV2Crypto = {
 const CREDENTIAL_KEY_PATTERNS = [
   /^app_session_token$/,
   /^manus-runtime-user-info$/,
-  /^cf\.sync\.device(?:Id|Token|Role|Name|AllowedKeys|GroupId)$/,
-  /^cf\.sync\.groupSwitchTicket\./,
+  /^cf\.sync\./,
 ] as const;
 
 function associatedData(createdAt: number): string {

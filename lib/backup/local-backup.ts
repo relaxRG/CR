@@ -1,11 +1,11 @@
 /**
- * 本地加密备份通道（5D 方案 - 通道 3）
+ * 本地快照通道（V1：明文；不提供保密性）
  *
  * 功能：
- * - 每次 app 启动时自动创建快照（最多保留 3 个，循环覆盖）
- * - 每个快照包含 SHA-256 哈希用于完整性校验
+ * - 每次 app 启动时自动创建快照（最多保留 7 个，循环覆盖）
+ * - 每个快照包含非密码学校验值，只用于发现意外变更
  * - 支持从任意快照恢复
- * - 快照存储在 AsyncStorage（key: backup.snapshot.{0|1|2}）
+ * - 快照存储在 AsyncStorage（key: backup.snapshot.{0..6}）
  */
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SYNC_KEYS } from "@/lib/sync/engine";
@@ -20,7 +20,7 @@ const CHUNK_SIZE_LIMIT = 1.5 * 1024 * 1024; // ★ 1.5MB 分片阈値（防 Asyn
 const CHUNK_SUFFIX = ".chunks";
 
 export type SnapshotMeta = {
-  /** 当前写入槽位（0-2 循环） */
+  /** 当前写入槽位（0-6 循环） */
   currentSlot: number;
   /** 各槽位的快照信息 */
   slots: Array<{
@@ -38,7 +38,7 @@ export type Snapshot = {
   data: Record<string, string | null>;
 };
 
-/** 计算简单哈希（不依赖 crypto，使用 djb2 变体） */
+/** 计算非密码学校验值（不提供防篡改或保密性保证） */
 function simpleHash(str: string): string {
   let h1 = 0xdeadbeef;
   let h2 = 0x41c6ce57;

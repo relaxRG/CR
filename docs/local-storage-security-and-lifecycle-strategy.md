@@ -8,14 +8,14 @@
 
 ## 1. 执行结论
 
-当前审计识别 **124 个本地存储键或键模式**，其中 **24 项为动态表达式**。原生端认证会话与设备身份主要使用 `expo-secure-store`；但 Web 平台会将同步设备令牌和组切换恢复票据回退到未加密的 AsyncStorage。与此同时，员工、薪资、预支、银行账户、供应商联系方式、经营报表和库存成本等业务数据存放在 AsyncStorage，并会进入本地快照与受控同步范围。
+当前审计识别 **124 个本地存储键或键模式**，其中 **21 项为动态表达式**。原生端认证会话与设备身份主要使用 `expo-secure-store`；Web 端组切换恢复票据已改为仅存于当前页面内存，但同步设备令牌仍可能回退到未加密的 AsyncStorage。与此同时，员工、薪资、预支、银行账户、供应商联系方式、经营报表和库存成本等业务数据存放在 AsyncStorage，并会进入本地快照与受控同步范围。
 
 React Native 官方将 AsyncStorage 定义为未加密键值存储，明确不应用于令牌或秘密；Expo SecureStore 则使用 Android Keystore 加密的 SharedPreferences 与 iOS Keychain，适合存放小型敏感凭据。[1] [2] 因而本项目的主要风险并不是“所有键都必须加密”，而是**必须将凭据、临时授权物和高敏感业务数据与低敏感 UI 偏好分层处理**。
 
 | 风险级别 | 当前结论 | 处理优先级 |
 |---|---|---|
 | P0 | 认证模块曾将令牌前缀和完整用户对象写入 console；本次已移除敏感日志内容。 | 已修复，持续测试 |
-| P0 | Web 端将 `cf.sync.deviceToken` 与组切换 `recoveryTicket` 写入 AsyncStorage。两者均属于可授权或恢复授权的秘密。 | 下一安全迭代必须处理 |
+| P0 | Web 端 `cf.sync.deviceToken` 仍可能写入 AsyncStorage，属于可授权秘密；`recoveryTicket` 已改为仅内存保存。 | 下一安全迭代必须处理 deviceToken |
 | P1 | 员工、薪资、银行账户、供应商联系方式和经营数据在 AsyncStorage 中以明文 JSON 保存，并会被本地快照复制。 | 设计完成后分阶段迁移 |
 | P1 | 本地快照注释称“加密”，实际只使用 `simpleHash()` 完整性指纹，不提供保密性。 | 文档已纠正；迁移时改为加密容器 |
 | P2 | 业务快照、同步日志、诊断与动态键缺少统一 TTL、分类元数据、版本登记和删除责任。 | 纳入统一注册表和生命周期治理 |
@@ -30,7 +30,7 @@ React Native 官方将 AsyncStorage 定义为未加密键值存储，明确不�
 | `manus-runtime-user-info` | 原生 SecureStore；Web localStorage | 用户 ID、OpenID、姓名、邮箱、登录方式 | Web localStorage 对脚本注入和共用浏览器暴露面更大。 | Web 仅保存最小化的非敏感展示信息，认证身份由服务端 Cookie 获取 |
 | `cf.sync.deviceToken` | 原生 SecureStore；Web AsyncStorage | 同步设备授权令牌 | Web 明文持久化为 P0 风险。 | 原生 SecureStore；Web 改为 HttpOnly 会话或短期内存令牌 |
 | `cf.sync.deviceId`、`groupId`、`deviceRole`、`allowedKeys`、`deviceName` | 原生 SecureStore；Web AsyncStorage | 设备身份与权限范围 | 虽不都是秘密，但组合后可增加权限篡改、隐私关联和诊断泄露风险。 | 身份由服务端验证；客户端仅保留最小非秘密显示元数据 |
-| `cf.sync.groupSwitchTicket.{switchId}` | 原生 SecureStore；Web AsyncStorage | 组切换恢复票据 | 可用于恢复切换，属于临时高敏感授权物。 | Web 不落盘票据；服务端以 Cookie 会话绑定恢复状态；原生 SecureStore + 10 分钟 TTL |
+| `cf.sync.groupSwitchTicket.{switchId}` | 原生 SecureStore；Web 当前页面内存 | 组切换恢复票据 | 可用于恢复切换，属于临时高敏感授权物。 | Web 不落盘票据；刷新后安全阻断并重新发起切换；原生 SecureStore + 10 分钟 TTL |
 | `cf.sync.groupSwitchSession.v1` | AsyncStorage | 切换状态、设备/组标识、错误码 | 不含票据，但含跨组关联信息。 | 保留状态最小集；使用短 TTL，完成或失败终态立即清除 |
 
 ### 2.2 高敏感业务数据
@@ -135,7 +135,7 @@ type StoredEnvelope<T> = {
 | 项目 | 目标方案 | 截止条件 |
 |---|---|---|
 | Web `deviceToken` | 改为服务端 HttpOnly、Secure、SameSite Cookie，或仅存在于页面内存的短期令牌；不得落入 AsyncStorage/localStorage。 | `audit:storage` 不再识别 Web 凭据写入 AsyncStorage |
-| Web `recoveryTicket` | 票据只在服务端会话保存；浏览器仅保存无秘密的 `switchId`。若必须临时存储，使用会话级状态并设置不超过 10 分钟 TTL。 | 页面刷新和恢复流程由服务端绑定会话验证 |
+| Web `recoveryTicket` | 已改为仅当前页面内存；刷新或关闭后安全阻断并要求重新发起切换。后续可升级为服务端 Cookie 会话恢复。 | 浏览器持久化中不存在票据 |
 | 原生凭据 | 保持 SecureStore，配置适当可访问级别；注销、离组、设备撤销与令牌过期时显式删除。 | 单元测试覆盖四类清除事件 |
 | 用户展示信息 | Web 端最小化存储，避免邮箱/OpenID；Native 保留在 SecureStore，退出时删除。 | 仅保留渲染必要字段 |
 
@@ -176,7 +176,7 @@ type EncryptedSnapshotV2 = {
 | 阶段 | 工作内容 | 验收标准 |
 |---|---|---|
 | A：立即 | 保持本次日志脱敏；为认证与同步编写日志泄露测试。 | 测试中无 token/user object 输出；`grep` 无 token 前缀日志 |
-| B：下一安全迭代 | 消除 Web AsyncStorage 中的 `deviceToken` 与 `recoveryTicket`；引入服务端 Cookie 会话恢复。 | 浏览器持久化中不存在授权秘密 |
+| B：下一安全迭代 | 消除 Web AsyncStorage 中的 `deviceToken`；`recoveryTicket` 已完成内存化，后续可引入服务端 Cookie 会话恢复。 | 浏览器持久化中不存在授权秘密 |
 | C：存储注册表 | 落地 `storage-registry.ts`、CI 比对与敏感性分类。 | 新增键未登记时 CI 失败；同步/备份白名单来自注册表 |
 | D：业务加密试点 | 先迁移人事薪资与供应商银行账户；再扩展到月报和快照。 | 密钥不在 AsyncStorage；业务 payload 不可被明文读取 |
 | E：快照 V2 | 使用加密容器和显式版本信封；停止将旧 `simpleHash` 作为“加密”表述。 | 快照不含凭据；认证加密验证失败时拒绝恢复 |

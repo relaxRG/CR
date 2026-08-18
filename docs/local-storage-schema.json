@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-18T07:05:32.387Z",
+  "generatedAt": "2026-08-18T07:35:09.476Z",
   "records": [
     {
       "backend": "AsyncStorage",
@@ -401,21 +401,21 @@
         {
           "operation": "setItem",
           "file": "lib/cf-sync/group-switch.ts",
-          "line": 84,
+          "line": 90,
           "value": "JSON.stringify(session",
           "structure": "DeviceInfo, PersistedGroupSwitchSession"
         },
         {
           "operation": "removeItem",
           "file": "lib/cf-sync/group-switch.ts",
-          "line": 89,
+          "line": 95,
           "value": "",
           "structure": "DeviceInfo, PersistedGroupSwitchSession"
         },
         {
           "operation": "getItem",
           "file": "lib/cf-sync/group-switch.ts",
-          "line": 96,
+          "line": 102,
           "value": "",
           "structure": "DeviceInfo, PersistedGroupSwitchSession"
         }
@@ -2998,34 +2998,6 @@
       ]
     },
     {
-      "backend": "AsyncStorage",
-      "key": "ticketKey(switchId",
-      "status": "unresolved",
-      "calls": [
-        {
-          "operation": "setItem",
-          "file": "lib/cf-sync/group-switch.ts",
-          "line": 64,
-          "value": "ticket",
-          "structure": "DeviceInfo, PersistedGroupSwitchSession"
-        },
-        {
-          "operation": "getItem",
-          "file": "lib/cf-sync/group-switch.ts",
-          "line": 71,
-          "value": "",
-          "structure": "DeviceInfo, PersistedGroupSwitchSession"
-        },
-        {
-          "operation": "removeItem",
-          "file": "lib/cf-sync/group-switch.ts",
-          "line": 77,
-          "value": "",
-          "structure": "DeviceInfo, PersistedGroupSwitchSession"
-        }
-      ]
-    },
-    {
       "backend": "SecureStore",
       "key": "ticketKey(switchId",
       "status": "unresolved",
@@ -3033,21 +3005,21 @@
         {
           "operation": "setItemAsync",
           "file": "lib/cf-sync/group-switch.ts",
-          "line": 67,
+          "line": 73,
           "value": "ticket",
           "structure": "DeviceInfo, PersistedGroupSwitchSession"
         },
         {
           "operation": "getItemAsync",
           "file": "lib/cf-sync/group-switch.ts",
-          "line": 72,
+          "line": 78,
           "value": "",
           "structure": "DeviceInfo, PersistedGroupSwitchSession"
         },
         {
           "operation": "deleteItemAsync",
           "file": "lib/cf-sync/group-switch.ts",
-          "line": 80,
+          "line": 86,
           "value": "",
           "structure": "DeviceInfo, PersistedGroupSwitchSession"
         }
@@ -3644,34 +3616,6 @@
       ]
     },
     {
-      "backend": "AsyncStorage",
-      "key": "ticketKey(switchId",
-      "status": "unresolved",
-      "calls": [
-        {
-          "operation": "setItem",
-          "file": "lib/cf-sync/group-switch.ts",
-          "line": 64,
-          "value": "ticket",
-          "structure": "DeviceInfo, PersistedGroupSwitchSession"
-        },
-        {
-          "operation": "getItem",
-          "file": "lib/cf-sync/group-switch.ts",
-          "line": 71,
-          "value": "",
-          "structure": "DeviceInfo, PersistedGroupSwitchSession"
-        },
-        {
-          "operation": "removeItem",
-          "file": "lib/cf-sync/group-switch.ts",
-          "line": 77,
-          "value": "",
-          "structure": "DeviceInfo, PersistedGroupSwitchSession"
-        }
-      ]
-    },
-    {
       "backend": "SecureStore",
       "key": "ticketKey(switchId",
       "status": "unresolved",
@@ -3679,21 +3623,21 @@
         {
           "operation": "setItemAsync",
           "file": "lib/cf-sync/group-switch.ts",
-          "line": 67,
+          "line": 73,
           "value": "ticket",
           "structure": "DeviceInfo, PersistedGroupSwitchSession"
         },
         {
           "operation": "getItemAsync",
           "file": "lib/cf-sync/group-switch.ts",
-          "line": 72,
+          "line": 78,
           "value": "",
           "structure": "DeviceInfo, PersistedGroupSwitchSession"
         },
         {
           "operation": "deleteItemAsync",
           "file": "lib/cf-sync/group-switch.ts",
-          "line": 80,
+          "line": 86,
           "value": "",
           "structure": "DeviceInfo, PersistedGroupSwitchSession"
         }
