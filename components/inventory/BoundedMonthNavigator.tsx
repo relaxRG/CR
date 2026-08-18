@@ -19,143 +19,53 @@ interface BoundedMonthNavigatorProps {
   testID?: string;
 }
 
+/** 库存、店铺与其他模块共用的库存风格紧凑上浮月份卡片。 */
 export function BoundedMonthNavigator({ month, bounds, onChange, testID = "inventory-month-navigator" }: BoundedMonthNavigatorProps) {
   const colors = useColors();
-  const [pickerVisible, setPickerVisible] = useState(false);
-  const [pickerYear, setPickerYear] = useState(Number(month.slice(0, 4)));
-  const canGoPrevious = canNavigateInventoryMonth(month, -1, bounds);
-  const canGoNext = canNavigateInventoryMonth(month, 1, bounds);
+  const [visible, setVisible] = useState(false);
+  const [year, setYear] = useState(Number(month.slice(0, 4)));
+  const canPrevious = canNavigateInventoryMonth(month, -1, bounds);
+  const canNext = canNavigateInventoryMonth(month, 1, bounds);
+  const available = useMemo(() => inventoryMonthsForYear(year, bounds), [year, bounds]);
   const firstYear = Number(bounds.min.slice(0, 4));
   const lastYear = Number(bounds.max.slice(0, 4));
-  const selectableMonths = useMemo(() => inventoryMonthsForYear(pickerYear, bounds), [pickerYear, bounds]);
-  const canGoPreviousYear = pickerYear > firstYear;
-  const canGoNextYear = pickerYear < lastYear;
-  const currentNaturalMonth = getCurrentInventoryMonth();
-  const canReturnToCurrent = currentNaturalMonth >= bounds.min && currentNaturalMonth <= bounds.max && currentNaturalMonth !== month;
+  const current = getCurrentInventoryMonth();
 
-  useEffect(() => {
-    if (pickerVisible) setPickerYear(Number(month.slice(0, 4)));
-  }, [pickerVisible, month]);
-
-  const changeBy = (offset: -1 | 1) => {
-    if (!canNavigateInventoryMonth(month, offset, bounds)) return;
-    onChange(addInventoryMonths(month, offset));
-  };
-
-  const select = (nextMonth: InventoryMonth) => {
-    onChange(nextMonth);
-    setPickerVisible(false);
-  };
+  useEffect(() => { if (visible) setYear(Number(month.slice(0, 4))); }, [visible, month]);
+  const select = (next: InventoryMonth) => { onChange(next); setVisible(false); };
 
   return (
     <>
       <View testID={testID} style={S.row}>
-        <Pressable
-          testID={`${testID}-previous`}
-          accessibilityRole="button"
-          accessibilityLabel="上一个库存月份"
-          accessibilityState={{ disabled: !canGoPrevious }}
-          disabled={!canGoPrevious}
-          onPress={() => changeBy(-1)}
-          style={({ pressed }) => [S.arrow, {
-            backgroundColor: colors.border + "55",
-            opacity: !canGoPrevious ? 0.32 : pressed ? 0.55 : 1,
-          }]}
-        >
+        <Pressable testID={`${testID}-previous`} accessibilityRole="button" accessibilityLabel="上一个库存月份" accessibilityState={{ disabled: !canPrevious }} disabled={!canPrevious} onPress={() => onChange(addInventoryMonths(month, -1))} style={({ pressed }) => [S.arrow, { backgroundColor: colors.border + "55", opacity: !canPrevious ? 0.32 : pressed ? 0.55 : 1 }]}>
           <IconSymbol name="chevron.left" size={15} color={colors.muted} />
         </Pressable>
-
-        <Pressable
-          testID={`${testID}-picker`}
-          accessibilityRole="button"
-          accessibilityLabel={`选择库存月份，当前${inventoryMonthLabel(month)}`}
-          onPress={() => setPickerVisible(true)}
-          style={({ pressed }) => [S.monthButton, { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.7 : 1 }]}
-        >
+        <Pressable testID={`${testID}-picker`} accessibilityRole="button" accessibilityLabel={`选择库存月份，当前${inventoryMonthLabel(month)}`} onPress={() => setVisible(true)} style={({ pressed }) => [S.monthButton, { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.7 : 1 }]}>
           <Text style={[S.monthText, { color: colors.foreground }]}>{inventoryMonthLabel(month)}</Text>
           <IconSymbol name="chevron.down" size={14} color={colors.muted} />
         </Pressable>
-
-        <Pressable
-          testID={`${testID}-next`}
-          accessibilityRole="button"
-          accessibilityLabel="下一个库存月份"
-          accessibilityState={{ disabled: !canGoNext }}
-          disabled={!canGoNext}
-          onPress={() => changeBy(1)}
-          style={({ pressed }) => [S.arrow, {
-            backgroundColor: colors.border + "55",
-            opacity: !canGoNext ? 0.32 : pressed ? 0.55 : 1,
-          }]}
-        >
+        <Pressable testID={`${testID}-next`} accessibilityRole="button" accessibilityLabel="下一个库存月份" accessibilityState={{ disabled: !canNext }} disabled={!canNext} onPress={() => onChange(addInventoryMonths(month, 1))} style={({ pressed }) => [S.arrow, { backgroundColor: colors.border + "55", opacity: !canNext ? 0.32 : pressed ? 0.55 : 1 }]}>
           <IconSymbol name="chevron.right" size={15} color={colors.muted} />
         </Pressable>
       </View>
 
-      <Modal visible={pickerVisible} transparent animationType="slide" onRequestClose={() => setPickerVisible(false)}>
-        <Pressable style={S.backdrop} onPress={() => setPickerVisible(false)}>
-          <Pressable style={[S.sheet, { backgroundColor: colors.background }]} onPress={() => undefined}>
-            <View style={[S.handle, { backgroundColor: colors.border }]} />
-            <View style={S.sheetHeader}>
-              <Text style={[S.sheetTitle, { color: colors.foreground }]}>选择库存月份</Text>
-              <Pressable accessibilityRole="button" accessibilityLabel="关闭月份选择" onPress={() => setPickerVisible(false)} hitSlop={10}>
-                <Text style={[S.closeText, { color: colors.muted }]}>关闭</Text>
-              </Pressable>
+      <Modal visible={visible} transparent animationType="fade" onRequestClose={() => setVisible(false)}>
+        <Pressable testID={`${testID}-backdrop`} style={S.backdrop} onPress={() => setVisible(false)}>
+          <Pressable testID={`${testID}-floating-card`} style={[S.card, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={() => undefined}>
+            <View style={S.cardHeader}>
+              <Pressable disabled={year <= firstYear} onPress={() => setYear((value) => value - 1)} hitSlop={8} style={({ pressed }) => [S.yearArrow, { opacity: year <= firstYear ? 0.28 : pressed ? 0.55 : 1 }]}><IconSymbol name="chevron.left" size={15} color={colors.muted} /></Pressable>
+              <Text style={[S.yearText, { color: colors.foreground }]}>{year}年</Text>
+              <Pressable disabled={year >= lastYear} onPress={() => setYear((value) => value + 1)} hitSlop={8} style={({ pressed }) => [S.yearArrow, { opacity: year >= lastYear ? 0.28 : pressed ? 0.55 : 1 }]}><IconSymbol name="chevron.right" size={15} color={colors.muted} /></Pressable>
             </View>
-
-            <View style={S.yearRow}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="上一年"
-                accessibilityState={{ disabled: !canGoPreviousYear }}
-                disabled={!canGoPreviousYear}
-                onPress={() => setPickerYear((year) => year - 1)}
-                style={({ pressed }) => [S.yearArrow, { backgroundColor: colors.border + "55", opacity: !canGoPreviousYear ? 0.3 : pressed ? 0.55 : 1 }]}
-              >
-                <IconSymbol name="chevron.left" size={15} color={colors.muted} />
-              </Pressable>
-              <Text style={[S.yearText, { color: colors.foreground }]}>{pickerYear}年</Text>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="下一年"
-                accessibilityState={{ disabled: !canGoNextYear }}
-                disabled={!canGoNextYear}
-                onPress={() => setPickerYear((year) => year + 1)}
-                style={({ pressed }) => [S.yearArrow, { backgroundColor: colors.border + "55", opacity: !canGoNextYear ? 0.3 : pressed ? 0.55 : 1 }]}
-              >
-                <IconSymbol name="chevron.right" size={15} color={colors.muted} />
-              </Pressable>
-            </View>
-
-            <View style={S.monthGrid}>
+            <View style={S.grid}>
               {Array.from({ length: 12 }, (_, index) => {
-                const candidate = `${pickerYear}-${String(index + 1).padStart(2, "0")}` as InventoryMonth;
-                const enabled = selectableMonths.includes(candidate);
+                const candidate = `${year}-${String(index + 1).padStart(2, "0")}` as InventoryMonth;
+                const enabled = available.includes(candidate);
                 const active = candidate === month;
-                return (
-                  <TouchableOpacity
-                    key={candidate}
-                    testID={`${testID}-month-${candidate}`}
-                    disabled={!enabled}
-                    activeOpacity={0.72}
-                    onPress={() => select(candidate)}
-                    style={[S.monthCell, {
-                      backgroundColor: active ? colors.primary : colors.surface,
-                      borderColor: active ? colors.primary : colors.border,
-                      opacity: enabled ? 1 : 0.28,
-                    }]}
-                  >
-                    <Text style={[S.monthCellText, { color: active ? "#fff" : colors.foreground }]}>{index + 1}月</Text>
-                  </TouchableOpacity>
-                );
+                return <TouchableOpacity key={candidate} testID={`${testID}-month-${candidate}`} disabled={!enabled} activeOpacity={0.72} onPress={() => select(candidate)} style={[S.monthCell, { backgroundColor: active ? colors.primary : colors.background, borderColor: active ? colors.primary : colors.border, opacity: enabled ? 1 : 0.28 }]}><Text style={{ color: active ? "#fff" : colors.foreground, fontSize: 13, fontWeight: "700" }}>{index + 1}月</Text></TouchableOpacity>;
               })}
             </View>
-
-            {canReturnToCurrent && (
-              <TouchableOpacity onPress={() => select(currentNaturalMonth)} activeOpacity={0.75} style={[S.currentButton, { borderColor: colors.primary, backgroundColor: colors.primary + "12" }]}>
-                <Text style={{ fontSize: 14, fontWeight: "700", color: colors.primary }}>回到本月：{inventoryMonthLabel(currentNaturalMonth)}</Text>
-              </TouchableOpacity>
-            )}
+            {current >= bounds.min && current <= bounds.max && current !== month ? <TouchableOpacity onPress={() => select(current)} activeOpacity={0.75} style={[S.current, { borderColor: colors.primary + "44", backgroundColor: colors.primary + "0d" }]}><Text style={{ color: colors.primary, fontSize: 12, fontWeight: "700" }}>回到本月 · {inventoryMonthLabel(current)}</Text></TouchableOpacity> : null}
           </Pressable>
         </Pressable>
       </Modal>
@@ -168,17 +78,12 @@ const S = StyleSheet.create({
   arrow: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   monthButton: { minWidth: 164, minHeight: 36, borderWidth: StyleSheet.hairlineWidth, borderRadius: 10, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingHorizontal: 12 },
   monthText: { fontSize: 16, fontWeight: "600", letterSpacing: -0.3 },
-  backdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "#00000066" },
-  sheet: { borderTopLeftRadius: 22, borderTopRightRadius: 22, paddingHorizontal: 20, paddingBottom: 34 },
-  handle: { width: 36, height: 4, borderRadius: 2, alignSelf: "center", marginTop: 10, marginBottom: 14 },
-  sheetHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 18 },
-  sheetTitle: { fontSize: 18, fontWeight: "700" },
-  closeText: { fontSize: 15, fontWeight: "600" },
-  yearRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 16, marginBottom: 18 },
-  yearArrow: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center" },
-  yearText: { minWidth: 90, textAlign: "center", fontSize: 16, fontWeight: "700" },
-  monthGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  monthCell: { width: "22.8%", minHeight: 44, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, alignItems: "center", justifyContent: "center" },
-  monthCellText: { fontSize: 14, fontWeight: "600" },
-  currentButton: { minHeight: 42, borderWidth: 1, borderRadius: 10, alignItems: "center", justifyContent: "center", marginTop: 20 },
+  backdrop: { flex: 1, alignItems: "center", justifyContent: "flex-start", paddingTop: 112, paddingHorizontal: 16, backgroundColor: "#00000033" },
+  card: { width: "100%", maxWidth: 336, borderWidth: StyleSheet.hairlineWidth, borderRadius: 16, padding: 14, shadowColor: "#0f172a", shadowOpacity: 0.2, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 12 },
+  cardHeader: { minHeight: 30, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 20, marginBottom: 10 },
+  yearArrow: { width: 30, height: 30, alignItems: "center", justifyContent: "center", borderRadius: 8 },
+  yearText: { minWidth: 84, textAlign: "center", fontSize: 16, fontWeight: "800" },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  monthCell: { width: "31.4%", minHeight: 38, borderRadius: 9, borderWidth: StyleSheet.hairlineWidth, alignItems: "center", justifyContent: "center" },
+  current: { minHeight: 34, borderWidth: StyleSheet.hairlineWidth, borderRadius: 9, alignItems: "center", justifyContent: "center", marginTop: 10 },
 });

@@ -13,6 +13,7 @@ describe("全局业务月份与紧凑选择器规范", () => {
   const labor = read("app/labor.tsx");
   const petty = read("components/store/petty-cash.tsx");
   const navigator = read("components/months/BoundedBusinessMonthNavigator.tsx");
+  const inventoryNavigator = read("components/inventory/BoundedMonthNavigator.tsx");
   const migration = read("lib/migrations/clean-legacy-business-month-keys.ts");
 
   it("提供唯一全局月份状态并挂载在业务数据树内", () => {
@@ -44,6 +45,10 @@ describe("全局业务月份与紧凑选择器规范", () => {
     expect(navigator).toContain('testID={`${testID}-floating-card`}');
     expect(navigator).not.toContain("borderTopLeftRadius");
     expect(navigator).not.toContain('justifyContent: "flex-end"');
+    expect(inventoryNavigator).toContain('animationType="fade"');
+    expect(inventoryNavigator).toContain('justifyContent: "flex-start"');
+    expect(inventoryNavigator).toContain('maxWidth: 336');
+    expect(inventoryNavigator).not.toContain("sheetTitle");
   });
 
   it("旧模块私有月份键会在启动时清理，不保留兼容分支", () => {
