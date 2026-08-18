@@ -26,6 +26,7 @@ import { HorizontalLedgerColumn, HorizontalLedgerGroup, HorizontalLedgerTable } 
 import { MonthlyLedgerDetailSheet } from "@/components/inventory/MonthlyLedgerDetailSheet";
 import { MonthlyLedgerItem } from "@/lib/inventory-core/types";
 import { MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS, MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
+import { useModuleMonthCloseStore } from "@/lib/month-close/module-month-close-store";
 
 type ViewTab = "ledger" | "supplier" | "purchase" | "summary";
 
@@ -307,6 +308,13 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedLedgerItem, setSelectedLedgerItem] = useState<MonthlyLedgerItem | null>(null);
   const selectedMonth = month ?? getCurrentMonth();
+  const moduleClose = useModuleMonthCloseStore();
+  const wineCloseStatus = moduleClose.getStatus("wine", selectedMonth);
+  const assertWineWritable = () => {
+    if (moduleClose.isWritable("wine", selectedMonth)) return true;
+    Alert.alert("葡萄酒月份已归档", `${selectedMonth} 葡萄酒已归档。请先在葡萄酒模块开启调整，不能直接修改历史台账。`);
+    return false;
+  };
 
   // ★ 当月进货多选状态
   const [selectMode, setSelectMode] = useState(false);
@@ -591,6 +599,7 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
           {/* 工具栏 */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, minHeight: 60, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }} contentContainerStyle={{ minHeight: 60, paddingHorizontal: 16, paddingVertical: 8, gap: 8, alignItems: "center" }}>
             <TouchableOpacity onPress={() => {
+              if (!assertWineWritable()) return;
               tap();
               const initVals: Record<number, string> = {};
               items.forEach((i) => { initVals[i.seq] = String(i.endQty); });
@@ -599,6 +608,26 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
             }} style={[S.actionBtn, { backgroundColor: "#F59E0B22", borderColor: "#F59E0B" }]}>
               <IconSymbol name="checklist" size={13} color="#F59E0B" />
               <Text style={{ fontSize: 12, color: "#F59E0B", fontWeight: "600" }}>月末盘点</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => {
+              if (!assertWineWritable()) return;
+              const monthPurchases = getMonthPurchases(selectedMonth);
+              const payable = monthPurchases.reduce((sum, purchase) => sum + purchase.amount, 0);
+              Alert.alert("葡萄酒月度归档", `确认归档 ${selectedMonth} 葡萄酒台账？归档后需先开启调整才能修改。`, [
+                { text: "取消", style: "cancel" },
+                { text: "确认归档", onPress: () => {
+                  moduleClose.finalize({
+                    module: "wine",
+                    month: selectedMonth,
+                    snapshot: { month: selectedMonth, snapshot: latestSnapshot, purchases: monthPurchases },
+                    paymentSummary: { payable, paid: 0, remaining: payable },
+                  });
+                  Alert.alert("归档完成", `${selectedMonth} 葡萄酒已独立归档。`);
+                } },
+              ]);
+            }} style={[S.actionBtn, { backgroundColor: wineCloseStatus === "draft" ? colors.primary + "12" : colors.success + "14", borderColor: wineCloseStatus === "draft" ? colors.primary : colors.success }]}> 
+              <IconSymbol name="archivebox" size={13} color={wineCloseStatus === "draft" ? colors.primary : colors.success} />
+              <Text style={{ fontSize: 12, color: wineCloseStatus === "draft" ? colors.primary : colors.success, fontWeight: "600" }}>{wineCloseStatus === "draft" ? "月度归档" : "已归档"}</Text>
             </TouchableOpacity>
           </ScrollView>
           {/* 供应商筛选 */}
@@ -928,7 +957,7 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
               <Text style={{ fontSize: 12, color: colors.muted }}>填入实际期末库存量，自动测算消耗</Text>
             </View>
             <Pressable onPress={() => {
-              if (!latestSnapshot) return;
+              if (!assertWineWritable() || !latestSnapshot) return;
               const entries = items
                 .filter((item) => stocktakeValues[item.seq] !== undefined && stocktakeValues[item.seq] !== "")
                 .map((item) => ({ seq: item.seq, actualQty: parseFloat(stocktakeValues[item.seq] ?? "0") || 0 }));

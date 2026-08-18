@@ -35,6 +35,15 @@ describe("模块独立月结界面接入", () => {
     expect(food).toContain("recordStocktake");
   });
 
+  it("葡萄酒归档复用葡萄酒快照和当月采购，只锁葡萄酒盘点写入", () => {
+    const wine = read("app/wine-inventory.tsx");
+    expect(wine).toContain('moduleClose.getStatus("wine", selectedMonth)');
+    expect(wine).toContain('moduleClose.isWritable("wine", selectedMonth)');
+    expect(wine).toContain('module: "wine"');
+    expect(wine).toContain("snapshot: { month: selectedMonth, snapshot: latestSnapshot, purchases: monthPurchases }");
+    expect(wine).toContain("if (!assertWineWritable() || !latestSnapshot) return;");
+  });
+
   it("账户归档只保护账户余额录入，不锁工资、库存或备用金", () => {
     const accounts = read("components/store/accounts.tsx");
     expect(accounts).toContain('moduleClose.getStatus("accounts", selectedMonth)');
