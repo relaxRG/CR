@@ -28,7 +28,6 @@ interface HorizontalLedgerTableProps<Row> {
   emptyLabel?: string;
   footer?: ReactNode;
   testID?: string;
-  rowTone?: (row: Row, index: number) => "default" | "negative";
   sort?: { key: string; direction: "asc" | "desc" };
   onSort?: (key: string) => void;
 }
@@ -44,7 +43,6 @@ export function HorizontalLedgerTable<Row>({
   emptyLabel = "暂无台账数据",
   footer,
   testID,
-  rowTone,
   sort,
   onSort,
 }: HorizontalLedgerTableProps<Row>) {
@@ -97,10 +95,7 @@ export function HorizontalLedgerTable<Row>({
               <Text style={{ color: colors.muted, fontSize: 10 }}>({group.rows.length})</Text>
             </View>
             {group.rows.map((row, index) => {
-              const tone = rowTone?.(row, index) ?? "default";
-              const backgroundColor = tone === "negative"
-                ? "#FEF2F2"
-                : index % 2 === 0 ? colors.surface : colors.background;
+              const backgroundColor = index % 2 === 0 ? colors.surface : colors.background;
               return (
                 <View key={rowKey(row)} style={[S.row, { backgroundColor, borderBottomColor: colors.border }]}>
                   {columns.map((column) => {

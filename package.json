@@ -21,6 +21,7 @@
     "test:h5:money-input": "npx expo export --platform web --output-dir dist-web && node scripts/h5-money-input-e2e.mjs",
     "test:h5:employee-order": "npx expo export --platform web --output-dir dist-web && node scripts/h5-employee-order-mobile-e2e.mjs",
     "test:h5:global-month-stress": "npx expo export --platform web --output-dir dist-web && node scripts/h5-global-month-stress-e2e.mjs",
+    "test:h5:wine-performance": "npx expo export --platform web --output-dir dist-web && node scripts/h5-wine-workbench-performance-e2e.mjs",
     "audit:storage": "node scripts/audit-local-storage.mjs",
     "generate:storage-registry": "node scripts/generate-storage-registry.mjs",
     "check:storage-policy": "node scripts/check-storage-policy.mjs",

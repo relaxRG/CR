@@ -23,7 +23,8 @@ import { useWineSnapshotStore, useWineManualPurchaseStore, useWineStore } from "
 import { WineInventoryItem, WineManualPurchase } from "@/lib/wine/types";
 import { applyWineLedgerView, applyWinePurchaseView, collectWineTypes, getWineSupplierNames, SortState, toggleSort, WineLedgerSortKey, WinePurchaseSortKey } from "@/lib/wine/table-view";
 import { WineSupplierTrendChart } from "@/components/wine-supplier-trend-chart";
-import { HorizontalLedgerColumn, HorizontalLedgerGroup, HorizontalLedgerTable } from "@/components/inventory/HorizontalLedgerTable";
+import { HorizontalLedgerColumn, HorizontalLedgerGroup } from "@/components/inventory/HorizontalLedgerTable";
+import { VirtualizedHorizontalLedgerTable } from "@/components/inventory/VirtualizedHorizontalLedgerTable";
 import { MonthlyLedgerDetailSheet } from "@/components/inventory/MonthlyLedgerDetailSheet";
 import { MonthlyLedgerItem } from "@/lib/inventory-core/types";
 import { MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS, MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
@@ -49,7 +50,7 @@ function normalizeWineIdentity(value: string): string {
 
 // ─── 进货记录行 ───────────────────────────────────────────────────────────────
 function PurchaseRow({
-  purchase, prevUnitPrice, colors, selected, onSelect, onEdit, onDelete
+  purchase, prevUnitPrice, colors, selected, onSelect, onEdit
 }: {
   purchase: WineManualPurchase;
   prevUnitPrice: number | null;
@@ -57,7 +58,6 @@ function PurchaseRow({
   selected: boolean;
   onSelect: () => void;
   onEdit: () => void;
-  onDelete: () => void;
 }) {
   const delta = prevUnitPrice !== null ? purchase.unitPrice - prevUnitPrice : (purchase.unitPriceDelta ?? null);
   const alertPct = 0; // 默认全部显示涨跌
@@ -630,11 +630,7 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
       {/* ── 台账视图：工作台只保留一个纵向滚动容器，表格自身仅横向滚动。 */}
       {viewTab === "ledger" && items.length > 0 && (
         <View testID="wine-ledger-scroll-workspace" style={{ flex: 1 }}>
-          <ScrollView
-            nestedScrollEnabled
-            showsVerticalScrollIndicator
-            contentContainerStyle={{ paddingBottom: 40 + insets.bottom }}
-          >
+          <View style={{ flex: 1 }}>
             <View style={[S.statsRow, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
               <StatCell label="期末库存" value={`${ledgerStats.totalEndQty}瓶`} color={colors.foreground} />
               <StatCell label="期末成本" value={`¥${formatMoney(ledgerStats.totalEndCost)}`} color={colors.foreground} />
@@ -698,8 +694,8 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
               <IconSymbol name="magnifyingglass" size={14} color={colors.muted} />
               <TextInput value={searchQuery} onChangeText={setSearchQuery} placeholder="搜索商品名称、供应商或酒类…" placeholderTextColor={colors.muted} style={[S.searchInput, { color: colors.foreground }]} returnKeyType="search" />
             </View>
-            <View style={{ paddingHorizontal: 16 }}>
-              <HorizontalLedgerTable
+            <View style={{ flex: 1, paddingHorizontal: 16, paddingBottom: 8 + insets.bottom }}>
+              <VirtualizedHorizontalLedgerTable
                 testID="wine-horizontal-ledger-table"
                 columns={wineLedgerColumns}
                 groups={wineLedgerGroups}
@@ -709,7 +705,7 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
                 onSort={(key) => setLedgerSort((current) => toggleSort(current, key as WineLedgerSortKey))}
               />
             </View>
-          </ScrollView>
+          </View>
         </View>
       )}
 
@@ -922,7 +918,6 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
                         }},
                       ]);
                     }}
-                    onDelete={() => deleteManualPurchase(p.id)}
                   />
                 );
               }}

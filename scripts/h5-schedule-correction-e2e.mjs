@@ -536,7 +536,7 @@ try {
     const state = (await call("Runtime.evaluate", { expression: `(() => {
       const workspace = document.querySelector('[data-testid="wine-ledger-scroll-workspace"]');
       const table = document.querySelector('[data-testid="wine-horizontal-ledger-table"]');
-      const vertical = workspace?.querySelector('[style*="overflow-y"]') || workspace?.firstElementChild;
+      const vertical = document.querySelector('[data-testid="wine-horizontal-ledger-table-virtual-list"]');
       if (vertical) vertical.scrollTop = Math.max(0, vertical.scrollHeight - vertical.clientHeight);
       if (table) table.scrollLeft = Math.max(0, table.scrollWidth - table.clientWidth);
       return { workspace: Boolean(workspace), table: Boolean(table), verticalClientHeight: vertical?.clientHeight ?? 0, verticalScrollHeight: vertical?.scrollHeight ?? 0, verticalReachedEnd: vertical?.scrollTop ?? 0, horizontalClientWidth: table?.clientWidth ?? 0, horizontalScrollWidth: table?.scrollWidth ?? 0, horizontalReachedEnd: table?.scrollLeft ?? 0, rootClientWidth: document.documentElement.clientWidth, rootScrollWidth: document.documentElement.scrollWidth };

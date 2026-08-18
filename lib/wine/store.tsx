@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useReducer } from "react";
 import { notifySyncChange, registerStoreReload } from "../sync/engine";
 import { WineBottle, WineMonthlySnapshot, WineManualPurchase, WineInventoryItem } from "./types";
+import { wineManualPurchaseReducer, WineManualPurchaseState } from "./manual-purchase-reducer";
 
 const STORAGE_KEY = "wine.bottles.v1";
 const SNAPSHOT_KEY = "wine.snapshots.v2";
@@ -13,10 +14,6 @@ export interface WineState {
 
 export interface WineSnapshotState {
   snapshots: WineMonthlySnapshot[];
-}
-
-export interface WineManualPurchaseState {
-  purchases: WineManualPurchase[];
 }
 
 type Action =
@@ -33,15 +30,6 @@ type SnapshotAction =
   | { type: "ADD_SNAPSHOT"; snapshot: WineMonthlySnapshot }
   | { type: "UPDATE_SNAPSHOT"; id: string; updates: Partial<WineMonthlySnapshot> }
   | { type: "DELETE_SNAPSHOT"; id: string };
-
-type ManualPurchaseAction =
-  | { type: "LOAD"; payload: WineManualPurchaseState }
-  | { type: "ADD"; purchase: WineManualPurchase }
-  | { type: "UPDATE"; id: string; updates: Partial<WineManualPurchase> }
-  | { type: "BATCH_UPDATE"; ids: string[]; updates: Partial<WineManualPurchase> }
-  | { type: "BATCH_UPDATE_DATE"; ids: string[]; date: string }
-  | { type: "DELETE"; id: string }
-  | { type: "BATCH_DELETE"; ids: string[] };
 
 function uuid(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -85,37 +73,6 @@ function snapshotReducer(state: WineSnapshotState, action: SnapshotAction): Wine
       ),
     };
     case "DELETE_SNAPSHOT": return { snapshots: state.snapshots.filter((s) => s.id !== action.id) };
-    default: return state;
-  }
-}
-
-export function wineManualPurchaseReducer(state: WineManualPurchaseState, action: ManualPurchaseAction): WineManualPurchaseState {
-  switch (action.type) {
-    case "LOAD": return action.payload;
-    case "ADD": return { purchases: [action.purchase, ...state.purchases] };
-    case "UPDATE": return {
-      purchases: state.purchases.map((p) =>
-        p.id === action.id ? { ...p, ...action.updates } : p
-      ),
-    };
-    case "BATCH_UPDATE": return {
-      purchases: state.purchases.map((purchase) => {
-        if (!action.ids.includes(purchase.id)) return purchase;
-        const next = { ...purchase, ...action.updates };
-        // 数量或单价调整后必须同步重算总价，禁止留下旧金额。
-        if (action.updates.quantity !== undefined || action.updates.unitPrice !== undefined) {
-          next.amount = next.quantity * next.unitPrice;
-        }
-        return next;
-      }),
-    };
-    case "BATCH_UPDATE_DATE": return {
-      purchases: state.purchases.map((p) =>
-        action.ids.includes(p.id) ? { ...p, date: action.date } : p
-      ),
-    };
-    case "DELETE": return { purchases: state.purchases.filter((p) => p.id !== action.id) };
-    case "BATCH_DELETE": return { purchases: state.purchases.filter((p) => !action.ids.includes(p.id)) };
     default: return state;
   }
 }

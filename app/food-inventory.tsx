@@ -286,7 +286,6 @@ export default function FoodInventoryScreen({ month, embedded = false }: FoodInv
             groups={ledgerGroups}
             rowKey={(row) => row.ingredientId}
             emptyLabel="还没有食材档案；请先新增食材或导入供应商进货单。"
-            rowTone={(row) => row.closingQty <= 0 ? "negative" : "default"}
             footer={monthLedger.length > 0 ? <View style={{ flexDirection: "row", minHeight: 42, backgroundColor: FOOD_COLOR + "14", alignItems: "center", paddingHorizontal: 10 }}><Text style={{ width: 146, color: FOOD_COLOR, fontWeight: "800", fontSize: 12 }}>合计</Text><Text style={{ width: 76, color: FOOD_COLOR, textAlign: "right", fontWeight: "800", fontSize: 12 }}>{monthLedger.reduce((sum, row) => sum + row.openingQty, 0).toFixed(2)}</Text><Text style={{ width: 76 + 82 + 76 + 82 + 76 + 82, color: FOOD_COLOR }} /><Text style={{ width: 76, color: FOOD_COLOR, textAlign: "right", fontWeight: "800", fontSize: 12 }}>{monthLedger.reduce((sum, row) => sum + row.closingQty, 0).toFixed(2)}</Text><Text style={{ width: 82 }} /><Text style={{ width: 82, color: FOOD_COLOR, textAlign: "right", fontWeight: "800", fontSize: 12 }}>¥{formatMoney(sumMoney(monthLedger.map((row) => row.closingCost)))}</Text></View> : undefined}
           />
         )}

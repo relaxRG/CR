@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyWineLedgerView, applyWinePurchaseView, collectWineTypes, getWineSupplierNames, toggleSort } from "@/lib/wine/table-view";
+import { applyWineLedgerView, applyWinePurchaseView, collectWineTypes, compareWineTypes, getWineSupplierNames, toggleSort, wineTypeRank } from "@/lib/wine/table-view";
 import type { WineInventoryItem, WineManualPurchase } from "@/lib/wine/types";
 
 const item = (overrides: Partial<WineInventoryItem>): WineInventoryItem => ({
@@ -68,5 +68,28 @@ describe("葡萄酒工作台筛选与排序", () => {
     ];
     expect(applyWinePurchaseView(rows, "", null, { key: "amount", direction: "desc" }).map((row) => row.id)).toEqual(["a", "b"]);
     expect(toggleSort({ key: "amount", direction: "desc" }, "amount")).toEqual({ key: "amount", direction: "asc" });
+  });
+
+  it("未知分类、空筛选、数值列和文本列排序均保持稳定", () => {
+    const rows = [
+      item({ seq: 1, wineType: "自然酒", name: "霞多丽", supplier: "A", actualEndQty: 9, endQty: 1 }),
+      item({ seq: 2, wineType: "其他", name: "赤霞珠", supplier: "B", actualEndQty: undefined, endQty: 2 }),
+      item({ seq: 3, wineType: "", name: "黑皮诺", supplier: "C", endQty: 3 }),
+    ];
+    expect(wineTypeRank("未知")).toBeGreaterThan(wineTypeRank("Natural"));
+    expect(compareWineTypes("White", "Red")).toBeGreaterThan(0);
+    expect(applyWineLedgerView(rows, "", null, null, { key: "closingQty", direction: "desc" }).map((row) => row.seq)).toEqual([1, 3, 2]);
+    expect(applyWineLedgerView(rows, "", null, null, { key: "name", direction: "asc" }).map((row) => row.name)).toEqual(["赤霞珠", "黑皮诺", "霞多丽"]);
+    expect(toggleSort({ key: "amount", direction: "asc" }, "name")).toEqual({ key: "name", direction: "asc" });
+  });
+
+  it("采购可按文本字段、备注搜索和供应商交集筛选", () => {
+    const rows = [
+      purchase({ id: "a", supplier: "EMW", productName: "霞多丽", notes: "紧急" }),
+      purchase({ id: "b", supplier: "君荟", productName: "赤霞珠", date: "2026-02-09" }),
+    ];
+    expect(applyWinePurchaseView(rows, "紧急", "EMW", { key: "supplier", direction: "asc" }).map((row) => row.id)).toEqual(["a"]);
+    expect(applyWinePurchaseView(rows, "", null, { key: "date", direction: "asc" }).map((row) => row.id)).toEqual(["a", "b"]);
+    expect(getWineSupplierNames([item({ supplier: "" })], rows, [" ", "EMW"])).toEqual(["君荟", "EMW"]);
   });
 });

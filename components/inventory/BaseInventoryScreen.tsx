@@ -369,7 +369,6 @@ export function BaseInventoryScreen({
                 columns={ledgerColumns}
                 groups={ledgerGroups}
                 rowKey={(item) => item.itemId}
-                rowTone={(item) => item.closingQty <= 0 ? "negative" : "default"}
               />
             ) : getGroupLabel ? (
               Object.entries(groupedLedger).map(([group, items]) => (
