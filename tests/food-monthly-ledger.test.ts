@@ -109,12 +109,12 @@ describe("食材月度台账", () => {
     expect(detailSource).not.toContain("updateIngredient(item.id, { stock:");
   });
 
-  it("历史食材数据缺少新增台账字段时保持原有档案与价格历史，并初始化为空账务集合", () => {
+  it("当前食材档案未创建月度台账时保留档案与价格历史，并初始化为空账务集合", () => {
     const sanitized = sanitizeFoodIngredientState({
-      ingredients: [{ ...ingredient, alertThreshold: 2 }],
+      ingredients: [ingredient],
       priceHistory: { [ingredient.id]: [{ price: 10, date: "2026-05-01", supplier: "测试供应商", source: "manual" }] },
     });
-    expect(sanitized.ingredients[0]).not.toHaveProperty("alertThreshold");
+    expect(sanitized.ingredients).toEqual([ingredient]);
     expect(sanitized.priceHistory[ingredient.id]).toHaveLength(1);
     expect(sanitized.ledgerEntries).toEqual([]);
     expect(sanitized.ledgerMovements).toEqual([]);

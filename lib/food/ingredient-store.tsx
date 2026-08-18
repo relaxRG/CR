@@ -8,7 +8,6 @@ import {
   PriceHistoryEntry,
   SupplierPurchaseRecord,
 } from "./types";
-import { stripLegacyInventoryAlertThreshold } from "../inventory-core/legacy-cleanup";
 
 const STORAGE_KEY = "food.ingredients.v2";
 const PURCHASE_KEY = "food.purchases.v1";
@@ -86,7 +85,6 @@ function entryClosing(entry: FoodMonthlyLedgerEntry) {
   return { closingQty, closingUnitCost, closingCost: Math.round(closingQty * closingUnitCost * 100) / 100 };
 }
 
-/** 历史食材档案的预警字段已废弃；任何加载入口都必须先清除。 */
 export function sanitizeFoodIngredientState(raw: unknown): FoodIngredientState {
   const source = Array.isArray(raw)
     ? { ingredients: raw }
@@ -96,8 +94,7 @@ export function sanitizeFoodIngredientState(raw: unknown): FoodIngredientState {
   const ingredients = Array.isArray(source.ingredients) ? source.ingredients : [];
   return {
     ingredients: ingredients
-      .filter((ingredient): ingredient is Record<string, unknown> => Boolean(ingredient) && typeof ingredient === "object")
-      .map((ingredient) => stripLegacyInventoryAlertThreshold(ingredient) as unknown as FoodIngredient),
+      .filter((ingredient): ingredient is FoodIngredient => Boolean(ingredient) && typeof ingredient === "object"),
     priceHistory: source.priceHistory && typeof source.priceHistory === "object"
       ? source.priceHistory as Record<string, PriceHistoryEntry[]>
       : {},

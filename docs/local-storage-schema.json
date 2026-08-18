@@ -1,0 +1,3906 @@
+{
+  "generatedAt": "2026-08-18T06:44:07.349Z",
+  "records": [
+    {
+      "backend": "AsyncStorage",
+      "key": "[...SYNC_KEYS]",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "multiGet",
+          "file": "lib/backup/icloud-backup.ts",
+          "line": 137,
+          "value": "",
+          "structure": ""
+        },
+        {
+          "operation": "multiGet",
+          "file": "lib/backup/local-backup.ts",
+          "line": 83,
+          "value": "",
+          "structure": "SnapshotMeta, Snapshot, DataCounts"
+        },
+        {
+          "operation": "multiGet",
+          "file": "lib/backup/local-backup.ts",
+          "line": 380,
+          "value": "",
+          "structure": "SnapshotMeta, Snapshot, DataCounts"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "[\"cocktail.recipes\"",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "multiGet",
+          "file": "app/backup.tsx",
+          "line": 72,
+          "value": "",
+          "structure": ""
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "[\"labor_schedule_snapshots_v1\"",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "multiRemove",
+          "file": "lib/labor/store.tsx",
+          "line": 987,
+          "value": "",
+          "structure": "EmployeeStore, CustomDeptStore, DeptOrderStore, ShiftTemplateStore, SpecialStatusStore, HolidayConfigStore, ShiftStore, AttendanceStore, PaySlipStore, GlobalPayrollSettingsStore, MonthCloseStore, MonthConfigStore, CompOffBalanceEntryStore, HolidayCompOffStore, BusinessHoursStore, ShiftGroupStore, UnexplainedRestAlertStore, FillPresetStore"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "[DIRTY_KEYS_PERSIST_KEY",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "multiRemove",
+          "file": "lib/sync/engine.ts",
+          "line": 437,
+          "value": "",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        },
+        {
+          "operation": "multiRemove",
+          "file": "lib/sync/engine.ts",
+          "line": 510,
+          "value": "",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "{variable}{variable}",
+      "status": "pattern",
+      "calls": [
+        {
+          "operation": "setItem",
+          "file": "lib/backup/local-backup.ts",
+          "line": 102,
+          "value": "snapshotJson",
+          "structure": "SnapshotMeta, Snapshot, DataCounts"
+        },
+        {
+          "operation": "removeItem",
+          "file": "lib/backup/local-backup.ts",
+          "line": 127,
+          "value": "",
+          "structure": "SnapshotMeta, Snapshot, DataCounts"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/backup/local-backup.ts",
+          "line": 172,
+          "value": "",
+          "structure": "SnapshotMeta, Snapshot, DataCounts"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "{variable}{variable}.chunk.{variable}",
+      "status": "pattern",
+      "calls": [
+        {
+          "operation": "setItem",
+          "file": "lib/backup/local-backup.ts",
+          "line": 130,
+          "value": "chunk",
+          "structure": "SnapshotMeta, Snapshot, DataCounts"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/backup/local-backup.ts",
+          "line": 155,
+          "value": "",
+          "structure": "SnapshotMeta, Snapshot, DataCounts"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "{variable}{variable}{variable}",
+      "status": "pattern",
+      "calls": [
+        {
+          "operation": "setItem",
+          "file": "lib/backup/local-backup.ts",
+          "line": 132,
+          "value": "String(chunks",
+          "structure": "SnapshotMeta, Snapshot, DataCounts"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/backup/local-backup.ts",
+          "line": 138,
+          "value": "",
+          "structure": "SnapshotMeta, Snapshot, DataCounts"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/backup/local-backup.ts",
+          "line": 150,
+          "value": "",
+          "structure": "SnapshotMeta, Snapshot, DataCounts"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "app.lang.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/cf-sync/provider.tsx",
+          "line": 747,
+          "value": "",
+          "structure": "DeviceInfo, SyncState"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/i18n/index.tsx",
+          "line": 21,
+          "value": "",
+          "structure": ""
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/i18n/index.tsx",
+          "line": 28,
+          "value": "next",
+          "structure": ""
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "backup.icloud.meta",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/backup/icloud-backup.ts",
+          "line": 108,
+          "value": "",
+          "structure": ""
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/backup/icloud-backup.ts",
+          "line": 176,
+          "value": "JSON.stringify(newMeta",
+          "structure": ""
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "backup.meta",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/backup/local-backup.ts",
+          "line": 66,
+          "value": "",
+          "structure": "SnapshotMeta, Snapshot, DataCounts"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/backup/local-backup.ts",
+          "line": 118,
+          "value": "JSON.stringify(newMeta",
+          "structure": "SnapshotMeta, Snapshot, DataCounts"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "beer.inventory.v2",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "factory-key",
+          "file": "lib/beer/inventory-store.tsx",
+          "line": 8,
+          "value": "GenericInventoryState",
+          "structure": "GenericInventoryState, GenericInventoryItem, PurchaseRecord, ConsumeRecord, MonthlySnapshot"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "bottles.material.migrated.v8",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/bottles/store.tsx",
+          "line": 165,
+          "value": "",
+          "structure": "BottleStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/bottles/store.tsx",
+          "line": 184,
+          "value": "\"1\"",
+          "structure": "BottleStore"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "bottles.material.migrated.v9",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/bottles/store.tsx",
+          "line": 191,
+          "value": "",
+          "structure": "BottleStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/bottles/store.tsx",
+          "line": 281,
+          "value": "\"1\"",
+          "structure": "BottleStore"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "bottles.taxonomy.categories.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/bottles/taxonomy.tsx",
+          "line": 572,
+          "value": "",
+          "structure": "BottleCategoryDef, BottleTaxonomyStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/bottles/taxonomy.tsx",
+          "line": 583,
+          "value": "JSON.stringify(v10.next",
+          "structure": "BottleCategoryDef, BottleTaxonomyStore"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/bottles/taxonomy.tsx",
+          "line": 606,
+          "value": "",
+          "structure": "BottleCategoryDef, BottleTaxonomyStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/bottles/taxonomy.tsx",
+          "line": 622,
+          "value": "JSON.stringify(next",
+          "structure": "BottleCategoryDef, BottleTaxonomyStore"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "bottles.taxonomy.styles.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/bottles/taxonomy.tsx",
+          "line": 573,
+          "value": "",
+          "structure": "BottleCategoryDef, BottleTaxonomyStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/bottles/taxonomy.tsx",
+          "line": 592,
+          "value": "JSON.stringify(v9s.next",
+          "structure": "BottleCategoryDef, BottleTaxonomyStore"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/bottles/taxonomy.tsx",
+          "line": 607,
+          "value": "",
+          "structure": "BottleCategoryDef, BottleTaxonomyStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/bottles/taxonomy.tsx",
+          "line": 627,
+          "value": "JSON.stringify(next",
+          "structure": "BottleCategoryDef, BottleTaxonomyStore"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "c.storageKey",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "setItem",
+          "file": "lib/sync/engine.ts",
+          "line": 1010,
+          "value": "valueToWrite",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "cf.sync.groupSwitchSession.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "setItem",
+          "file": "lib/cf-sync/group-switch.ts",
+          "line": 84,
+          "value": "JSON.stringify(session",
+          "structure": "DeviceInfo, PersistedGroupSwitchSession"
+        },
+        {
+          "operation": "removeItem",
+          "file": "lib/cf-sync/group-switch.ts",
+          "line": 89,
+          "value": "",
+          "structure": "DeviceInfo, PersistedGroupSwitchSession"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/cf-sync/group-switch.ts",
+          "line": 96,
+          "value": "",
+          "structure": "DeviceInfo, PersistedGroupSwitchSession"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "cf.sync.prevAllowedKeys.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/cf-sync/provider.tsx",
+          "line": 737,
+          "value": "",
+          "structure": "DeviceInfo, SyncState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/cf-sync/provider.tsx",
+          "line": 739,
+          "value": "JSON.stringify(newAllowedKeys",
+          "structure": "DeviceInfo, SyncState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/cf-sync/provider.tsx",
+          "line": 746,
+          "value": "JSON.stringify(newAllowedKeys",
+          "structure": "DeviceInfo, SyncState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "cf.sync.switchDiagnostics.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/cf-sync/switch-diagnostics.ts",
+          "line": 76,
+          "value": "",
+          "structure": ""
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/cf-sync/switch-diagnostics.ts",
+          "line": 80,
+          "value": "JSON.stringify(entries",
+          "structure": ""
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/cf-sync/switch-diagnostics.ts",
+          "line": 88,
+          "value": "",
+          "structure": ""
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "chapterKey(bookId",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/books/store.tsx",
+          "line": 178,
+          "value": "",
+          "structure": "StoredBook, BookStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/books/store.tsx",
+          "line": 187,
+          "value": "idx",
+          "structure": "StoredBook, BookStore"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "chapterKey(id",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "setItem",
+          "file": "lib/books/store.tsx",
+          "line": 151,
+          "value": "i",
+          "structure": "StoredBook, BookStore"
+        },
+        {
+          "operation": "removeItem",
+          "file": "lib/books/store.tsx",
+          "line": 206,
+          "value": "",
+          "structure": "StoredBook, BookStore"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "cocktail_recent_units",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "hooks/use-recent-units.ts",
+          "line": 15,
+          "value": "",
+          "structure": ""
+        },
+        {
+          "operation": "setItem",
+          "file": "hooks/use-recent-units.ts",
+          "line": 30,
+          "value": "JSON.stringify(next",
+          "structure": ""
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "cocktail.books.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/books/store.tsx",
+          "line": 99,
+          "value": "",
+          "structure": "StoredBook, BookStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/books/store.tsx",
+          "line": 117,
+          "value": "JSON.stringify(next",
+          "structure": "StoredBook, BookStore"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/books/store.tsx",
+          "line": 181,
+          "value": "",
+          "structure": "StoredBook, BookStore"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "cocktail.bottles",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/bottles/store.tsx",
+          "line": 94,
+          "value": "",
+          "structure": "BottleStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/bottles/store.tsx",
+          "line": 114,
+          "value": "JSON.stringify(list",
+          "structure": "BottleStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/bottles/store.tsx",
+          "line": 128,
+          "value": "JSON.stringify(list",
+          "structure": "BottleStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/bottles/store.tsx",
+          "line": 141,
+          "value": "JSON.stringify(list",
+          "structure": "BottleStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/bottles/store.tsx",
+          "line": 158,
+          "value": "JSON.stringify(list",
+          "structure": "BottleStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/bottles/store.tsx",
+          "line": 181,
+          "value": "JSON.stringify(list",
+          "structure": "BottleStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/bottles/store.tsx",
+          "line": 278,
+          "value": "JSON.stringify(list",
+          "structure": "BottleStore"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/bottles/store.tsx",
+          "line": 297,
+          "value": "",
+          "structure": "BottleStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/bottles/store.tsx",
+          "line": 310,
+          "value": "JSON.stringify(next",
+          "structure": "BottleStore"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "cocktail.bottles.seeded",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/bottles/store.tsx",
+          "line": 95,
+          "value": "",
+          "structure": "BottleStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/bottles/store.tsx",
+          "line": 160,
+          "value": "SEED_VERSION",
+          "structure": "BottleStore"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "cocktail.categories",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/recipes/store.tsx",
+          "line": 49,
+          "value": "",
+          "structure": "RecipeStore"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/recipes/store.tsx",
+          "line": 232,
+          "value": "",
+          "structure": "RecipeStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/recipes/store.tsx",
+          "line": 278,
+          "value": "JSON.stringify(cats",
+          "structure": "RecipeStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/recipes/store.tsx",
+          "line": 464,
+          "value": "JSON.stringify(next",
+          "structure": "RecipeStore"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "cocktail.categoryGroups",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/recipes/store.tsx",
+          "line": 52,
+          "value": "",
+          "structure": "RecipeStore"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/recipes/store.tsx",
+          "line": 426,
+          "value": "",
+          "structure": "RecipeStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/recipes/store.tsx",
+          "line": 485,
+          "value": "JSON.stringify(next",
+          "structure": "RecipeStore"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "cocktail.iceSettings.v2",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/ice/cost.ts",
+          "line": 121,
+          "value": "",
+          "structure": "IceSettings, IceCostItem"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/ice/cost.ts",
+          "line": 135,
+          "value": "JSON.stringify(s",
+          "structure": "IceSettings, IceCostItem"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "cocktail.lab.batches",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/lab/store.tsx",
+          "line": 71,
+          "value": "",
+          "structure": "LabStore"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/lab/store.tsx",
+          "line": 90,
+          "value": "",
+          "structure": "LabStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/lab/store.tsx",
+          "line": 105,
+          "value": "JSON.stringify(next",
+          "structure": "LabStore"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "cocktail.lab.projects",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/lab/store.tsx",
+          "line": 70,
+          "value": "",
+          "structure": "LabStore"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/lab/store.tsx",
+          "line": 89,
+          "value": "",
+          "structure": "LabStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/lab/store.tsx",
+          "line": 100,
+          "value": "JSON.stringify(next",
+          "structure": "LabStore"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "cocktail.prefs.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/recipes/store.tsx",
+          "line": 53,
+          "value": "",
+          "structure": "RecipeStore"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/recipes/store.tsx",
+          "line": 398,
+          "value": "",
+          "structure": "RecipeStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/recipes/store.tsx",
+          "line": 421,
+          "value": "JSON.stringify(loadedPrefs",
+          "structure": "RecipeStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/recipes/store.tsx",
+          "line": 718,
+          "value": "JSON.stringify(next",
+          "structure": "RecipeStore"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "cocktail.reader.highlights.v1.${id}",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "app/book-reader.tsx",
+          "line": 868,
+          "value": "",
+          "structure": "ReviewItem"
+        },
+        {
+          "operation": "setItem",
+          "file": "app/book-reader.tsx",
+          "line": 897,
+          "value": "JSON.stringify(highlights",
+          "structure": "ReviewItem"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "cocktail.reader.settings.v1.${id}",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "app/book-reader.tsx",
+          "line": 855,
+          "value": "",
+          "structure": "ReviewItem"
+        },
+        {
+          "operation": "setItem",
+          "file": "app/book-reader.tsx",
+          "line": 877,
+          "value": "JSON.stringify({ fontSize",
+          "structure": "ReviewItem"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "cocktail.recipes",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/recipes/store.tsx",
+          "line": 48,
+          "value": "",
+          "structure": "RecipeStore"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/recipes/store.tsx",
+          "line": 231,
+          "value": "",
+          "structure": "RecipeStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/recipes/store.tsx",
+          "line": 284,
+          "value": "JSON.stringify(recs",
+          "structure": "RecipeStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/recipes/store.tsx",
+          "line": 458,
+          "value": "JSON.stringify(next",
+          "structure": "RecipeStore"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/sync/photo-sync.ts",
+          "line": 144,
+          "value": "",
+          "structure": "DeviceInfo"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/sync/photo-sync.ts",
+          "line": 328,
+          "value": "JSON.stringify(data.list",
+          "structure": "DeviceInfo"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "cocktail.seeded",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/recipes/store.tsx",
+          "line": 233,
+          "value": "",
+          "structure": "RecipeStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/recipes/store.tsx",
+          "line": 280,
+          "value": "\"1\"",
+          "structure": "RecipeStore"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "cocktail.tagGroups",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/recipes/store.tsx",
+          "line": 51,
+          "value": "",
+          "structure": "RecipeStore"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/recipes/store.tsx",
+          "line": 235,
+          "value": "",
+          "structure": "RecipeStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/recipes/store.tsx",
+          "line": 356,
+          "value": "JSON.stringify(mutableGroupList",
+          "structure": "RecipeStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/recipes/store.tsx",
+          "line": 365,
+          "value": "JSON.stringify(mutableGroupList",
+          "structure": "RecipeStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/recipes/store.tsx",
+          "line": 378,
+          "value": "JSON.stringify(mutableGroupList",
+          "structure": "RecipeStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/recipes/store.tsx",
+          "line": 478,
+          "value": "JSON.stringify(next",
+          "structure": "RecipeStore"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "cocktail.tags",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/recipes/store.tsx",
+          "line": 50,
+          "value": "",
+          "structure": "RecipeStore"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/recipes/store.tsx",
+          "line": 234,
+          "value": "",
+          "structure": "RecipeStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/recipes/store.tsx",
+          "line": 292,
+          "value": "JSON.stringify(tagList",
+          "structure": "RecipeStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/recipes/store.tsx",
+          "line": 303,
+          "value": "JSON.stringify(tagList",
+          "structure": "RecipeStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/recipes/store.tsx",
+          "line": 312,
+          "value": "JSON.stringify(tagList",
+          "structure": "RecipeStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/recipes/store.tsx",
+          "line": 323,
+          "value": "JSON.stringify(tagList",
+          "structure": "RecipeStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/recipes/store.tsx",
+          "line": 335,
+          "value": "JSON.stringify(tagList",
+          "structure": "RecipeStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/recipes/store.tsx",
+          "line": 391,
+          "value": "JSON.stringify(tagList",
+          "structure": "RecipeStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/recipes/store.tsx",
+          "line": 470,
+          "value": "JSON.stringify(next",
+          "structure": "RecipeStore"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "conflict.storageKey",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "setItem",
+          "file": "lib/sync/engine.ts",
+          "line": 959,
+          "value": "valueToWrite",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "daily.inventory.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "factory-key",
+          "file": "lib/daily/inventory-store.tsx",
+          "line": 8,
+          "value": "GenericInventoryState",
+          "structure": "GenericInventoryState, GenericInventoryItem, PurchaseRecord, ConsumeRecord, MonthlySnapshot"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "device.customRoleNames.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "app/role-settings.tsx",
+          "line": 50,
+          "value": "",
+          "structure": ""
+        },
+        {
+          "operation": "getItem",
+          "file": "app/role-settings.tsx",
+          "line": 61,
+          "value": "",
+          "structure": ""
+        },
+        {
+          "operation": "setItem",
+          "file": "app/role-settings.tsx",
+          "line": 68,
+          "value": "JSON.stringify(map",
+          "structure": ""
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "dish_analysis.snapshots.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/store/monthly-report/dish-analysis-store.tsx",
+          "line": 55,
+          "value": "",
+          "structure": "DishAnalysisState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/store/monthly-report/dish-analysis-store.tsx",
+          "line": 64,
+          "value": "JSON.stringify(state.snapshots",
+          "structure": "DishAnalysisState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "equipment.inventory.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/equipment/inventory-store.tsx",
+          "line": 65,
+          "value": "",
+          "structure": "EquipmentState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/equipment/inventory-store.tsx",
+          "line": 76,
+          "value": "JSON.stringify(state",
+          "structure": "EquipmentState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "food.ingredients.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/food/ingredient-store.tsx",
+          "line": 388,
+          "value": "",
+          "structure": "FoodIngredientState, PurchaseState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "food.ingredients.v2",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/food/ingredient-store.tsx",
+          "line": 387,
+          "value": "",
+          "structure": "FoodIngredientState, PurchaseState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/food/ingredient-store.tsx",
+          "line": 404,
+          "value": "JSON.stringify(state",
+          "structure": "FoodIngredientState, PurchaseState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "food.menu.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/food/menu-store.tsx",
+          "line": 52,
+          "value": "",
+          "structure": "FoodMenuState"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/food/menu-store.tsx",
+          "line": 56,
+          "value": "",
+          "structure": "FoodMenuState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/food/menu-store.tsx",
+          "line": 63,
+          "value": "JSON.stringify(state",
+          "structure": "FoodMenuState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "food.purchases.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/food/ingredient-store.tsx",
+          "line": 465,
+          "value": "",
+          "structure": "FoodIngredientState, PurchaseState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/food/ingredient-store.tsx",
+          "line": 472,
+          "value": "JSON.stringify(state",
+          "structure": "FoodIngredientState, PurchaseState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "fruit.inventory.v2",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "factory-key",
+          "file": "lib/fruit/new-inventory-store.tsx",
+          "line": 8,
+          "value": "GenericInventoryState",
+          "structure": "GenericInventoryState, GenericInventoryItem, PurchaseRecord, ConsumeRecord, MonthlySnapshot"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "glassware.inventory.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "factory-key",
+          "file": "lib/glassware/inventory-store.tsx",
+          "line": 8,
+          "value": "GenericInventoryState",
+          "structure": "GenericInventoryState, GenericInventoryItem, PurchaseRecord, ConsumeRecord, MonthlySnapshot"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "homemade.preps.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/homemade/store.tsx",
+          "line": 170,
+          "value": "",
+          "structure": "HomemadeStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/homemade/store.tsx",
+          "line": 225,
+          "value": "JSON.stringify(migrated",
+          "structure": "HomemadeStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/homemade/store.tsx",
+          "line": 245,
+          "value": "JSON.stringify(finalList",
+          "structure": "HomemadeStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/homemade/store.tsx",
+          "line": 309,
+          "value": "JSON.stringify(finalList",
+          "structure": "HomemadeStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/homemade/store.tsx",
+          "line": 347,
+          "value": "JSON.stringify(finalList",
+          "structure": "HomemadeStore"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/homemade/store.tsx",
+          "line": 375,
+          "value": "",
+          "structure": "HomemadeStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/homemade/store.tsx",
+          "line": 388,
+          "value": "JSON.stringify(list",
+          "structure": "HomemadeStore"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "homemade.sections.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/homemade/store.tsx",
+          "line": 171,
+          "value": "",
+          "structure": "HomemadeStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/homemade/store.tsx",
+          "line": 356,
+          "value": "JSON.stringify(nextSections",
+          "structure": "HomemadeStore"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/homemade/store.tsx",
+          "line": 376,
+          "value": "",
+          "structure": "HomemadeStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/homemade/store.tsx",
+          "line": 394,
+          "value": "JSON.stringify(list",
+          "structure": "HomemadeStore"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "homemade.seeded.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "setItem",
+          "file": "lib/homemade/store.tsx",
+          "line": 534,
+          "value": "\"1\"",
+          "structure": "HomemadeStore"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "homemade.source.v3",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/homemade/store.tsx",
+          "line": 318,
+          "value": "",
+          "structure": "HomemadeStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/homemade/store.tsx",
+          "line": 350,
+          "value": "\"1\"",
+          "structure": "HomemadeStore"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "homemade.taxonomy.v2",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/homemade/store.tsx",
+          "line": 173,
+          "value": "",
+          "structure": "HomemadeStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/homemade/store.tsx",
+          "line": 360,
+          "value": "\"1\"",
+          "structure": "HomemadeStore"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "homemade.types.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/homemade/store.tsx",
+          "line": 172,
+          "value": "",
+          "structure": "HomemadeStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/homemade/store.tsx",
+          "line": 358,
+          "value": "JSON.stringify(nextTypes",
+          "structure": "HomemadeStore"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/homemade/store.tsx",
+          "line": 377,
+          "value": "",
+          "structure": "HomemadeStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/homemade/store.tsx",
+          "line": 400,
+          "value": "JSON.stringify(list",
+          "structure": "HomemadeStore"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "homemade.waldorf.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/homemade/store.tsx",
+          "line": 231,
+          "value": "",
+          "structure": "HomemadeStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/homemade/store.tsx",
+          "line": 248,
+          "value": "\"1\"",
+          "structure": "HomemadeStore"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "homemade.waldorf.v2",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/homemade/store.tsx",
+          "line": 254,
+          "value": "",
+          "structure": "HomemadeStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/homemade/store.tsx",
+          "line": 312,
+          "value": "\"1\"",
+          "structure": "HomemadeStore"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "ice.inventory.v2",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "factory-key",
+          "file": "lib/ice/new-inventory-store.tsx",
+          "line": 8,
+          "value": "GenericInventoryState",
+          "structure": "GenericInventoryState, GenericInventoryItem, PurchaseRecord, ConsumeRecord, MonthlySnapshot"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "iosColorPicker.recent.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "components/ios-color-picker.tsx",
+          "line": 93,
+          "value": "",
+          "structure": ""
+        },
+        {
+          "operation": "setItem",
+          "file": "components/ios-color-picker.tsx",
+          "line": 101,
+          "value": "JSON.stringify(colors",
+          "structure": ""
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "key",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "setItem",
+          "file": "app/role-settings.tsx",
+          "line": 220,
+          "value": "\"collaborator\"",
+          "structure": ""
+        },
+        {
+          "operation": "getItem",
+          "file": "hooks/use-persisted-state.ts",
+          "line": 14,
+          "value": "",
+          "structure": ""
+        },
+        {
+          "operation": "setItem",
+          "file": "hooks/use-persisted-state.ts",
+          "line": 37,
+          "value": "JSON.stringify(next",
+          "structure": ""
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/backup/icloud-backup.ts",
+          "line": 248,
+          "value": "value",
+          "structure": ""
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/backup/local-backup.ts",
+          "line": 205,
+          "value": "value",
+          "structure": "SnapshotMeta, Snapshot, DataCounts"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/backup/local-backup.ts",
+          "line": 464,
+          "value": "value",
+          "structure": "SnapshotMeta, Snapshot, DataCounts"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/cf-sync/client.ts",
+          "line": 37,
+          "value": "value",
+          "structure": "DeviceInfo, CompleteSyncSnapshot, SyncEntry"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/cf-sync/client.ts",
+          "line": 45,
+          "value": "",
+          "structure": "DeviceInfo, CompleteSyncSnapshot, SyncEntry"
+        },
+        {
+          "operation": "removeItem",
+          "file": "lib/cf-sync/client.ts",
+          "line": 52,
+          "value": "",
+          "structure": "DeviceInfo, CompleteSyncSnapshot, SyncEntry"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/labor/store.tsx",
+          "line": 46,
+          "value": "",
+          "structure": "EmployeeStore, CustomDeptStore, DeptOrderStore, ShiftTemplateStore, SpecialStatusStore, HolidayConfigStore, ShiftStore, AttendanceStore, PaySlipStore, GlobalPayrollSettingsStore, MonthCloseStore, MonthConfigStore, CompOffBalanceEntryStore, HolidayCompOffStore, BusinessHoursStore, ShiftGroupStore, UnexplainedRestAlertStore, FillPresetStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/labor/store.tsx",
+          "line": 59,
+          "value": "JSON.stringify(next",
+          "structure": "EmployeeStore, CustomDeptStore, DeptOrderStore, ShiftTemplateStore, SpecialStatusStore, HolidayConfigStore, ShiftStore, AttendanceStore, PaySlipStore, GlobalPayrollSettingsStore, MonthCloseStore, MonthConfigStore, CompOffBalanceEntryStore, HolidayCompOffStore, BusinessHoursStore, ShiftGroupStore, UnexplainedRestAlertStore, FillPresetStore"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/labor/store.tsx",
+          "line": 73,
+          "value": "",
+          "structure": "EmployeeStore, CustomDeptStore, DeptOrderStore, ShiftTemplateStore, SpecialStatusStore, HolidayConfigStore, ShiftStore, AttendanceStore, PaySlipStore, GlobalPayrollSettingsStore, MonthCloseStore, MonthConfigStore, CompOffBalanceEntryStore, HolidayCompOffStore, BusinessHoursStore, ShiftGroupStore, UnexplainedRestAlertStore, FillPresetStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/labor/store.tsx",
+          "line": 84,
+          "value": "JSON.stringify(next",
+          "structure": "EmployeeStore, CustomDeptStore, DeptOrderStore, ShiftTemplateStore, SpecialStatusStore, HolidayConfigStore, ShiftStore, AttendanceStore, PaySlipStore, GlobalPayrollSettingsStore, MonthCloseStore, MonthConfigStore, CompOffBalanceEntryStore, HolidayCompOffStore, BusinessHoursStore, ShiftGroupStore, UnexplainedRestAlertStore, FillPresetStore"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/sync/engine.ts",
+          "line": 655,
+          "value": "",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/sync/engine.ts",
+          "line": 673,
+          "value": "value",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        },
+        {
+          "operation": "removeItem",
+          "file": "lib/sync/engine.ts",
+          "line": 675,
+          "value": "",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/sync/engine.ts",
+          "line": 748,
+          "value": "",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/sync/engine.ts",
+          "line": 817,
+          "value": "",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/sync/engine.ts",
+          "line": 837,
+          "value": "",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/sync/engine.ts",
+          "line": 884,
+          "value": "mergedValue",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        }
+      ]
+    },
+    {
+      "backend": "SecureStore",
+      "key": "key",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "setItemAsync",
+          "file": "app/role-settings.tsx",
+          "line": 222,
+          "value": "\"collaborator\"",
+          "structure": ""
+        },
+        {
+          "operation": "setItemAsync",
+          "file": "lib/cf-sync/client.ts",
+          "line": 39,
+          "value": "value",
+          "structure": "DeviceInfo, CompleteSyncSnapshot, SyncEntry"
+        },
+        {
+          "operation": "getItemAsync",
+          "file": "lib/cf-sync/client.ts",
+          "line": 47,
+          "value": "",
+          "structure": "DeviceInfo, CompleteSyncSnapshot, SyncEntry"
+        },
+        {
+          "operation": "deleteItemAsync",
+          "file": "lib/cf-sync/client.ts",
+          "line": 54,
+          "value": "",
+          "structure": "DeviceInfo, CompleteSyncSnapshot, SyncEntry"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "keys",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "multiGet",
+          "file": "app/data-manager.tsx",
+          "line": 51,
+          "value": "",
+          "structure": ""
+        },
+        {
+          "operation": "multiRemove",
+          "file": "app/data-manager.tsx",
+          "line": 114,
+          "value": "",
+          "structure": ""
+        },
+        {
+          "operation": "multiRemove",
+          "file": "lib/backup/local-backup.ts",
+          "line": 143,
+          "value": "",
+          "structure": "SnapshotMeta, Snapshot, DataCounts"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "lab.plan.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/lab/plan-store.tsx",
+          "line": 65,
+          "value": "",
+          "structure": "PlanCategory, PlanItemType, PlanItemStatus, PlanItem, PlanState"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/lab/plan-store.tsx",
+          "line": 69,
+          "value": "",
+          "structure": "PlanCategory, PlanItemType, PlanItemStatus, PlanItem, PlanState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/lab/plan-store.tsx",
+          "line": 76,
+          "value": "JSON.stringify(state",
+          "structure": "PlanCategory, PlanItemType, PlanItemStatus, PlanItem, PlanState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "labor_dept_order_v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/labor/store.tsx",
+          "line": 320,
+          "value": "",
+          "structure": "EmployeeStore, CustomDeptStore, DeptOrderStore, ShiftTemplateStore, SpecialStatusStore, HolidayConfigStore, ShiftStore, AttendanceStore, PaySlipStore, GlobalPayrollSettingsStore, MonthCloseStore, MonthConfigStore, CompOffBalanceEntryStore, HolidayCompOffStore, BusinessHoursStore, ShiftGroupStore, UnexplainedRestAlertStore, FillPresetStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/labor/store.tsx",
+          "line": 334,
+          "value": "JSON.stringify(order",
+          "structure": "EmployeeStore, CustomDeptStore, DeptOrderStore, ShiftTemplateStore, SpecialStatusStore, HolidayConfigStore, ShiftStore, AttendanceStore, PaySlipStore, GlobalPayrollSettingsStore, MonthCloseStore, MonthConfigStore, CompOffBalanceEntryStore, HolidayCompOffStore, BusinessHoursStore, ShiftGroupStore, UnexplainedRestAlertStore, FillPresetStore"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "labor_employees_v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/migrations/clean-monthly-fixed-salary.ts",
+          "line": 44,
+          "value": "",
+          "structure": ""
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/migrations/clean-monthly-fixed-salary.ts",
+          "line": 74,
+          "value": "JSON.stringify(updated",
+          "structure": ""
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "labor_shifts_v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/migrations/clean-empty-shift-entries.ts",
+          "line": 58,
+          "value": "",
+          "structure": "ShiftEntryRaw"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/migrations/clean-empty-shift-entries.ts",
+          "line": 82,
+          "value": "JSON.stringify(cleaned",
+          "structure": "ShiftEntryRaw"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "labor.advance_categories.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/labor/advance-store.tsx",
+          "line": 144,
+          "value": "",
+          "structure": "AdvanceCategory, AdvanceState, CategoryState, CategoryAction, CategoryContextValue"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/labor/advance-store.tsx",
+          "line": 152,
+          "value": "JSON.stringify(state.customCategories",
+          "structure": "AdvanceCategory, AdvanceState, CategoryState, CategoryAction, CategoryContextValue"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "labor.salary_advances.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/labor/advance-store.tsx",
+          "line": 185,
+          "value": "",
+          "structure": "AdvanceCategory, AdvanceState, CategoryState, CategoryAction, CategoryContextValue"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/labor/advance-store.tsx",
+          "line": 203,
+          "value": "JSON.stringify(state",
+          "structure": "AdvanceCategory, AdvanceState, CategoryState, CategoryAction, CategoryContextValue"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "labor.separate_payments.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/labor/separate-payment-store.tsx",
+          "line": 94,
+          "value": "",
+          "structure": "SeparatePaymentState, SeparatePaymentStore"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/labor/separate-payment-store.tsx",
+          "line": 98,
+          "value": "",
+          "structure": "SeparatePaymentState, SeparatePaymentStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/labor/separate-payment-store.tsx",
+          "line": 106,
+          "value": "JSON.stringify(payments",
+          "structure": "SeparatePaymentState, SeparatePaymentStore"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "menu_store_v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/menu/store.tsx",
+          "line": 334,
+          "value": "",
+          "structure": "MenuEntry, MenuState"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/menu/store.tsx",
+          "line": 351,
+          "value": "",
+          "structure": "MenuEntry, MenuState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/menu/store.tsx",
+          "line": 362,
+          "value": "JSON.stringify(state",
+          "structure": "MenuEntry, MenuState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "menu.packages.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/menu/package-store.tsx",
+          "line": 71,
+          "value": "",
+          "structure": "PackageItem"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/menu/package-store.tsx",
+          "line": 82,
+          "value": "JSON.stringify(packages",
+          "structure": "PackageItem"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "migration_clean_empty_shifts_v1_done",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/migrations/clean-empty-shift-entries.ts",
+          "line": 55,
+          "value": "",
+          "structure": "ShiftEntryRaw"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/migrations/clean-empty-shift-entries.ts",
+          "line": 60,
+          "value": "\"1\"",
+          "structure": "ShiftEntryRaw"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/migrations/clean-empty-shift-entries.ts",
+          "line": 68,
+          "value": "\"1\"",
+          "structure": "ShiftEntryRaw"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/migrations/clean-empty-shift-entries.ts",
+          "line": 73,
+          "value": "\"1\"",
+          "structure": "ShiftEntryRaw"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/migrations/clean-empty-shift-entries.ts",
+          "line": 87,
+          "value": "\"1\"",
+          "structure": "ShiftEntryRaw"
+        },
+        {
+          "operation": "removeItem",
+          "file": "lib/migrations/clean-empty-shift-entries.ts",
+          "line": 99,
+          "value": "",
+          "structure": "ShiftEntryRaw"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "migration_clean_monthly_fixed_salary_v1_done",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/migrations/clean-monthly-fixed-salary.ts",
+          "line": 41,
+          "value": "",
+          "structure": ""
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/migrations/clean-monthly-fixed-salary.ts",
+          "line": 46,
+          "value": "\"1\"",
+          "structure": ""
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/migrations/clean-monthly-fixed-salary.ts",
+          "line": 54,
+          "value": "\"1\"",
+          "structure": ""
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/migrations/clean-monthly-fixed-salary.ts",
+          "line": 59,
+          "value": "\"1\"",
+          "structure": ""
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/migrations/clean-monthly-fixed-salary.ts",
+          "line": 79,
+          "value": "\"1\"",
+          "structure": ""
+        },
+        {
+          "operation": "removeItem",
+          "file": "lib/migrations/clean-monthly-fixed-salary.ts",
+          "line": 91,
+          "value": "",
+          "structure": ""
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "monthly_reports_v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/store/monthly-report/store.tsx",
+          "line": 34,
+          "value": "",
+          "structure": "MonthlyReportStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/store/monthly-report/store.tsx",
+          "line": 52,
+          "value": "JSON.stringify(next",
+          "structure": "MonthlyReportStore"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "monthly_summary.balances.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/store/monthly-summary/store.tsx",
+          "line": 181,
+          "value": "",
+          "structure": "SummaryState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/store/monthly-summary/store.tsx",
+          "line": 220,
+          "value": "JSON.stringify(state.balances",
+          "structure": "SummaryState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "monthly_summary.inventory_configs.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/store/monthly-summary/store.tsx",
+          "line": 183,
+          "value": "",
+          "structure": "SummaryState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/store/monthly-summary/store.tsx",
+          "line": 222,
+          "value": "JSON.stringify(state.inventoryConfigs",
+          "structure": "SummaryState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "monthly_summary.payments.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/store/monthly-summary/store.tsx",
+          "line": 180,
+          "value": "",
+          "structure": "SummaryState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/store/monthly-summary/store.tsx",
+          "line": 219,
+          "value": "JSON.stringify(state.payments",
+          "structure": "SummaryState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "monthly_summary.petty_configs.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/store/monthly-summary/store.tsx",
+          "line": 182,
+          "value": "",
+          "structure": "SummaryState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/store/monthly-summary/store.tsx",
+          "line": 221,
+          "value": "JSON.stringify(state.pettyCodeConfigs",
+          "structure": "SummaryState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "monthly_summary.reports.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/store/monthly-summary/store.tsx",
+          "line": 178,
+          "value": "",
+          "structure": "SummaryState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/store/monthly-summary/store.tsx",
+          "line": 217,
+          "value": "JSON.stringify(state.reports",
+          "structure": "SummaryState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "monthly_summary.suppliers.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/store/monthly-summary/store.tsx",
+          "line": 179,
+          "value": "",
+          "structure": "SummaryState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/store/monthly-summary/store.tsx",
+          "line": 218,
+          "value": "JSON.stringify(state.suppliers",
+          "structure": "SummaryState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "period_analysis.reports.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/store/period-analysis/store.tsx",
+          "line": 63,
+          "value": "",
+          "structure": "PeriodAnalysisState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/store/period-analysis/store.tsx",
+          "line": 81,
+          "value": "JSON.stringify(state.reports",
+          "structure": "PeriodAnalysisState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "period_analysis.settings.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/store/period-analysis/store.tsx",
+          "line": 64,
+          "value": "",
+          "structure": "PeriodAnalysisState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/store/period-analysis/store.tsx",
+          "line": 82,
+          "value": "JSON.stringify(state.settings",
+          "structure": "PeriodAnalysisState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "removals",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "multiRemove",
+          "file": "lib/sync/engine.ts",
+          "line": 506,
+          "value": "",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "schedule.business_hours.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/store/period-analysis/schedule-store.tsx",
+          "line": 74,
+          "value": "",
+          "structure": "ScheduleState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/store/period-analysis/schedule-store.tsx",
+          "line": 92,
+          "value": "JSON.stringify(state.businessHours",
+          "structure": "ScheduleState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "schedule.shift_templates.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/store/period-analysis/schedule-store.tsx",
+          "line": 75,
+          "value": "",
+          "structure": "ScheduleState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/store/period-analysis/schedule-store.tsx",
+          "line": 93,
+          "value": "JSON.stringify(state.shiftTemplates",
+          "structure": "ScheduleState"
+        }
+      ]
+    },
+    {
+      "backend": "SecureStore",
+      "key": "SESSION_TOKEN_KEY",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "getItemAsync",
+          "file": "lib/_core/auth.ts",
+          "line": 24,
+          "value": "",
+          "structure": ""
+        },
+        {
+          "operation": "setItemAsync",
+          "file": "lib/_core/auth.ts",
+          "line": 46,
+          "value": "token",
+          "structure": ""
+        },
+        {
+          "operation": "deleteItemAsync",
+          "file": "lib/_core/auth.ts",
+          "line": 64,
+          "value": "",
+          "structure": ""
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "shopping_store_v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/shopping/store.tsx",
+          "line": 186,
+          "value": "",
+          "structure": "ShoppingItem, ShoppingState"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/shopping/store.tsx",
+          "line": 203,
+          "value": "",
+          "structure": "ShoppingItem, ShoppingState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/shopping/store.tsx",
+          "line": 213,
+          "value": "JSON.stringify(state",
+          "structure": "ShoppingItem, ShoppingState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "spirits.customCategories.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/spirits/crud-store.tsx",
+          "line": 438,
+          "value": "",
+          "structure": "SelfBuyConfig, SpiritsState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/spirits/crud-store.tsx",
+          "line": 476,
+          "value": "JSON.stringify(state.customCategories",
+          "structure": "SelfBuyConfig, SpiritsState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "spirits.groupMatchMemory.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/spirits/crud-store.tsx",
+          "line": 439,
+          "value": "",
+          "structure": "SelfBuyConfig, SpiritsState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/spirits/crud-store.tsx",
+          "line": 477,
+          "value": "JSON.stringify(state.groupMatchMemory",
+          "structure": "SelfBuyConfig, SpiritsState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "spirits.groups.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/spirits/crud-store.tsx",
+          "line": 435,
+          "value": "",
+          "structure": "SelfBuyConfig, SpiritsState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/spirits/crud-store.tsx",
+          "line": 473,
+          "value": "JSON.stringify(state.groups",
+          "structure": "SelfBuyConfig, SpiritsState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "spirits.items.v3",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/spirits/crud-store.tsx",
+          "line": 430,
+          "value": "",
+          "structure": "SelfBuyConfig, SpiritsState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/spirits/crud-store.tsx",
+          "line": 468,
+          "value": "JSON.stringify(state.items",
+          "structure": "SelfBuyConfig, SpiritsState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "spirits.ledger.v3",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/spirits/crud-store.tsx",
+          "line": 432,
+          "value": "",
+          "structure": "SelfBuyConfig, SpiritsState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/spirits/crud-store.tsx",
+          "line": 470,
+          "value": "JSON.stringify(state.ledger",
+          "structure": "SelfBuyConfig, SpiritsState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "spirits.matchMemory.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/spirits/crud-store.tsx",
+          "line": 436,
+          "value": "",
+          "structure": "SelfBuyConfig, SpiritsState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/spirits/crud-store.tsx",
+          "line": 474,
+          "value": "JSON.stringify(state.matchMemory",
+          "structure": "SelfBuyConfig, SpiritsState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "spirits.purchases.v3",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/spirits/crud-store.tsx",
+          "line": 431,
+          "value": "",
+          "structure": "SelfBuyConfig, SpiritsState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/spirits/crud-store.tsx",
+          "line": 469,
+          "value": "JSON.stringify(state.purchases",
+          "structure": "SelfBuyConfig, SpiritsState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "spirits.refPrices.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/spirits/crud-store.tsx",
+          "line": 433,
+          "value": "",
+          "structure": "SelfBuyConfig, SpiritsState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/spirits/crud-store.tsx",
+          "line": 471,
+          "value": "JSON.stringify(state.refPrices",
+          "structure": "SelfBuyConfig, SpiritsState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "spirits.selfBuyConfig.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/spirits/crud-store.tsx",
+          "line": 437,
+          "value": "",
+          "structure": "SelfBuyConfig, SpiritsState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/spirits/crud-store.tsx",
+          "line": 475,
+          "value": "JSON.stringify(state.selfBuyConfig",
+          "structure": "SelfBuyConfig, SpiritsState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "spirits.suppliers.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/spirits/crud-store.tsx",
+          "line": 434,
+          "value": "",
+          "structure": "SelfBuyConfig, SpiritsState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/spirits/crud-store.tsx",
+          "line": 472,
+          "value": "JSON.stringify(state.suppliers",
+          "structure": "SelfBuyConfig, SpiritsState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "storageKey",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/inventory-core/store.tsx",
+          "line": 173,
+          "value": "",
+          "structure": "GenericInventoryItem, GenericInventoryState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/inventory-core/store.tsx",
+          "line": 182,
+          "value": "JSON.stringify(state",
+          "structure": "GenericInventoryItem, GenericInventoryState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "store_business_hours_v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "app/store-hours.tsx",
+          "line": 56,
+          "value": "",
+          "structure": "BusinessHoursConfig"
+        },
+        {
+          "operation": "getItem",
+          "file": "app/store-hours.tsx",
+          "line": 72,
+          "value": "",
+          "structure": "BusinessHoursConfig"
+        },
+        {
+          "operation": "setItem",
+          "file": "app/store-hours.tsx",
+          "line": 83,
+          "value": "JSON.stringify(updated",
+          "structure": "BusinessHoursConfig"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "store.employee_name_aliases.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/store/petty-labor-link-store.tsx",
+          "line": 231,
+          "value": "",
+          "structure": "LinkState"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/store/petty-labor-link-store.tsx",
+          "line": 235,
+          "value": "",
+          "structure": "LinkState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/store/petty-labor-link-store.tsx",
+          "line": 245,
+          "value": "JSON.stringify(state.aliases",
+          "structure": "LinkState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "store.petty_categories.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/store/petty-category-store.tsx",
+          "line": 248,
+          "value": "",
+          "structure": "BaseInventoryCategory, ExtendedInventoryCategory, PettyCategory, PettyCategoryState, PettyCategoryContextValue"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/store/petty-category-store.tsx",
+          "line": 257,
+          "value": "",
+          "structure": "BaseInventoryCategory, ExtendedInventoryCategory, PettyCategory, PettyCategoryState, PettyCategoryContextValue"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/store/petty-category-store.tsx",
+          "line": 264,
+          "value": "JSON.stringify(state",
+          "structure": "BaseInventoryCategory, ExtendedInventoryCategory, PettyCategory, PettyCategoryState, PettyCategoryContextValue"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "store.petty_inv_links.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/store/petty-inventory-link-store.tsx",
+          "line": 101,
+          "value": "",
+          "structure": "LinkState"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/store/petty-inventory-link-store.tsx",
+          "line": 105,
+          "value": "",
+          "structure": "LinkState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/store/petty-inventory-link-store.tsx",
+          "line": 112,
+          "value": "JSON.stringify(state",
+          "structure": "LinkState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "store.petty_labor_links.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/store/petty-labor-link-store.tsx",
+          "line": 230,
+          "value": "",
+          "structure": "LinkState"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/store/petty-labor-link-store.tsx",
+          "line": 234,
+          "value": "",
+          "structure": "LinkState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/store/petty-labor-link-store.tsx",
+          "line": 240,
+          "value": "JSON.stringify(state.links",
+          "structure": "LinkState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "store.petty.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/store/petty-store.tsx",
+          "line": 179,
+          "value": "",
+          "structure": "PettyRecord, PettyState"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/store/petty-store.tsx",
+          "line": 180,
+          "value": "",
+          "structure": "PettyRecord, PettyState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/store/petty-store.tsx",
+          "line": 184,
+          "value": "JSON.stringify(state",
+          "structure": "PettyRecord, PettyState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "store.purchase.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "components/store/purchase.tsx",
+          "line": 41,
+          "value": "",
+          "structure": "PurchaseItem"
+        },
+        {
+          "operation": "setItem",
+          "file": "components/store/purchase.tsx",
+          "line": 47,
+          "value": "JSON.stringify(next",
+          "structure": "PurchaseItem"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "store.revenue.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/store/revenue-store.tsx",
+          "line": 94,
+          "value": "",
+          "structure": "RevenueCategory, RevenueRecord, StaffRecord, RevenueState"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/store/revenue-store.tsx",
+          "line": 98,
+          "value": "",
+          "structure": "RevenueCategory, RevenueRecord, StaffRecord, RevenueState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/store/revenue-store.tsx",
+          "line": 105,
+          "value": "JSON.stringify(state",
+          "structure": "RevenueCategory, RevenueRecord, StaffRecord, RevenueState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "SUMMARY_KEYS",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "multiGet",
+          "file": "lib/backup/local-backup.ts",
+          "line": 281,
+          "value": "",
+          "structure": "SnapshotMeta, Snapshot, DataCounts"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "supplier.match.memory.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/store/supplier-import.ts",
+          "line": 113,
+          "value": "",
+          "structure": ""
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/store/supplier-import.ts",
+          "line": 122,
+          "value": "JSON.stringify(memory",
+          "structure": ""
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "sync.backup.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/sync/engine.ts",
+          "line": 644,
+          "value": "",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/sync/engine.ts",
+          "line": 658,
+          "value": "JSON.stringify(backup",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/sync/engine.ts",
+          "line": 668,
+          "value": "",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/sync/engine.ts",
+          "line": 693,
+          "value": "",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "sync.dirtyKeys.pending",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "removeItem",
+          "file": "lib/sync/engine.ts",
+          "line": 565,
+          "value": "",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/sync/engine.ts",
+          "line": 567,
+          "value": "JSON.stringify(arr",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/sync/engine.ts",
+          "line": 573,
+          "value": "",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "sync.lastPulledAt",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "setItem",
+          "file": "lib/sync/engine.ts",
+          "line": 770,
+          "value": "String(now",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/sync/engine.ts",
+          "line": 912,
+          "value": "String(now",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "sync.log.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/sync/engine.ts",
+          "line": 631,
+          "value": "",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/sync/engine.ts",
+          "line": 635,
+          "value": "JSON.stringify(log",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/sync/engine.ts",
+          "line": 643,
+          "value": "",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/sync/engine.ts",
+          "line": 704,
+          "value": "",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "tableware.inventory.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "factory-key",
+          "file": "lib/tableware/inventory-store.tsx",
+          "line": 8,
+          "value": "GenericInventoryState",
+          "structure": "GenericInventoryState, GenericInventoryItem, PurchaseRecord, ConsumeRecord, MonthlySnapshot"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "ticketKey(switchId",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "setItem",
+          "file": "lib/cf-sync/group-switch.ts",
+          "line": 64,
+          "value": "ticket",
+          "structure": "DeviceInfo, PersistedGroupSwitchSession"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/cf-sync/group-switch.ts",
+          "line": 71,
+          "value": "",
+          "structure": "DeviceInfo, PersistedGroupSwitchSession"
+        },
+        {
+          "operation": "removeItem",
+          "file": "lib/cf-sync/group-switch.ts",
+          "line": 77,
+          "value": "",
+          "structure": "DeviceInfo, PersistedGroupSwitchSession"
+        }
+      ]
+    },
+    {
+      "backend": "SecureStore",
+      "key": "ticketKey(switchId",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "setItemAsync",
+          "file": "lib/cf-sync/group-switch.ts",
+          "line": 67,
+          "value": "ticket",
+          "structure": "DeviceInfo, PersistedGroupSwitchSession"
+        },
+        {
+          "operation": "getItemAsync",
+          "file": "lib/cf-sync/group-switch.ts",
+          "line": 72,
+          "value": "",
+          "structure": "DeviceInfo, PersistedGroupSwitchSession"
+        },
+        {
+          "operation": "deleteItemAsync",
+          "file": "lib/cf-sync/group-switch.ts",
+          "line": 80,
+          "value": "",
+          "structure": "DeviceInfo, PersistedGroupSwitchSession"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "TS_PREFIX + c.storageKey",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "setItem",
+          "file": "lib/sync/engine.ts",
+          "line": 995,
+          "value": "String(now",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/sync/engine.ts",
+          "line": 1011,
+          "value": "String(c.remoteTs",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "TS_PREFIX + conflict.storageKey",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "setItem",
+          "file": "lib/sync/engine.ts",
+          "line": 953,
+          "value": "String(now",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/sync/engine.ts",
+          "line": 960,
+          "value": "String(conflict.remoteTs",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "TS_PREFIX + key",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "setItem",
+          "file": "lib/sync/engine.ts",
+          "line": 721,
+          "value": "String(now",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/sync/engine.ts",
+          "line": 749,
+          "value": "",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/sync/engine.ts",
+          "line": 818,
+          "value": "",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/sync/engine.ts",
+          "line": 838,
+          "value": "",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/sync/engine.ts",
+          "line": 885,
+          "value": "String(remote!.clientUpdatedAt",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "uploadedSetKey(groupId",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/sync/photo-sync.ts",
+          "line": 105,
+          "value": "",
+          "structure": "DeviceInfo"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/sync/photo-sync.ts",
+          "line": 113,
+          "value": "JSON.stringify([...set]",
+          "structure": "DeviceInfo"
+        }
+      ]
+    },
+    {
+      "backend": "localStorage",
+      "key": "USER_INFO_KEY",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/_core/auth.ts",
+          "line": 78,
+          "value": "",
+          "structure": ""
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/_core/auth.ts",
+          "line": 103,
+          "value": "JSON.stringify(user",
+          "structure": ""
+        },
+        {
+          "operation": "removeItem",
+          "file": "lib/_core/auth.ts",
+          "line": 120,
+          "value": "",
+          "structure": ""
+        }
+      ]
+    },
+    {
+      "backend": "SecureStore",
+      "key": "USER_INFO_KEY",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "getItemAsync",
+          "file": "lib/_core/auth.ts",
+          "line": 81,
+          "value": "",
+          "structure": ""
+        },
+        {
+          "operation": "setItemAsync",
+          "file": "lib/_core/auth.ts",
+          "line": 109,
+          "value": "JSON.stringify(user",
+          "structure": ""
+        },
+        {
+          "operation": "deleteItemAsync",
+          "file": "lib/_core/auth.ts",
+          "line": 125,
+          "value": "",
+          "structure": ""
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "wine.bottles.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/wine/store.tsx",
+          "line": 158,
+          "value": "",
+          "structure": "WineState, WineSnapshotState, WineManualPurchaseState, SnapshotAction, WineSnapshotContextValue"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/wine/store.tsx",
+          "line": 182,
+          "value": "JSON.stringify(state",
+          "structure": "WineState, WineSnapshotState, WineManualPurchaseState, SnapshotAction, WineSnapshotContextValue"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "wine.manual_purchases.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/wine/store.tsx",
+          "line": 174,
+          "value": "",
+          "structure": "WineState, WineSnapshotState, WineManualPurchaseState, SnapshotAction, WineSnapshotContextValue"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/wine/store.tsx",
+          "line": 192,
+          "value": "JSON.stringify(manualState",
+          "structure": "WineState, WineSnapshotState, WineManualPurchaseState, SnapshotAction, WineSnapshotContextValue"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "wine.snapshots.v2",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/wine/store.tsx",
+          "line": 166,
+          "value": "",
+          "structure": "WineState, WineSnapshotState, WineManualPurchaseState, SnapshotAction, WineSnapshotContextValue"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/wine/store.tsx",
+          "line": 187,
+          "value": "JSON.stringify(snapshotState",
+          "structure": "WineState, WineSnapshotState, WineManualPurchaseState, SnapshotAction, WineSnapshotContextValue"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "writes",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "multiSet",
+          "file": "lib/sync/engine.ts",
+          "line": 505,
+          "value": "",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        }
+      ]
+    }
+  ],
+  "unresolved": [
+    {
+      "backend": "AsyncStorage",
+      "key": "[...SYNC_KEYS]",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "multiGet",
+          "file": "lib/backup/icloud-backup.ts",
+          "line": 137,
+          "value": "",
+          "structure": ""
+        },
+        {
+          "operation": "multiGet",
+          "file": "lib/backup/local-backup.ts",
+          "line": 83,
+          "value": "",
+          "structure": "SnapshotMeta, Snapshot, DataCounts"
+        },
+        {
+          "operation": "multiGet",
+          "file": "lib/backup/local-backup.ts",
+          "line": 380,
+          "value": "",
+          "structure": "SnapshotMeta, Snapshot, DataCounts"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "[\"cocktail.recipes\"",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "multiGet",
+          "file": "app/backup.tsx",
+          "line": 72,
+          "value": "",
+          "structure": ""
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "[\"labor_schedule_snapshots_v1\"",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "multiRemove",
+          "file": "lib/labor/store.tsx",
+          "line": 987,
+          "value": "",
+          "structure": "EmployeeStore, CustomDeptStore, DeptOrderStore, ShiftTemplateStore, SpecialStatusStore, HolidayConfigStore, ShiftStore, AttendanceStore, PaySlipStore, GlobalPayrollSettingsStore, MonthCloseStore, MonthConfigStore, CompOffBalanceEntryStore, HolidayCompOffStore, BusinessHoursStore, ShiftGroupStore, UnexplainedRestAlertStore, FillPresetStore"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "[DIRTY_KEYS_PERSIST_KEY",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "multiRemove",
+          "file": "lib/sync/engine.ts",
+          "line": 437,
+          "value": "",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        },
+        {
+          "operation": "multiRemove",
+          "file": "lib/sync/engine.ts",
+          "line": 510,
+          "value": "",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "c.storageKey",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "setItem",
+          "file": "lib/sync/engine.ts",
+          "line": 1010,
+          "value": "valueToWrite",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "chapterKey(bookId",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/books/store.tsx",
+          "line": 178,
+          "value": "",
+          "structure": "StoredBook, BookStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/books/store.tsx",
+          "line": 187,
+          "value": "idx",
+          "structure": "StoredBook, BookStore"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "chapterKey(id",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "setItem",
+          "file": "lib/books/store.tsx",
+          "line": 151,
+          "value": "i",
+          "structure": "StoredBook, BookStore"
+        },
+        {
+          "operation": "removeItem",
+          "file": "lib/books/store.tsx",
+          "line": 206,
+          "value": "",
+          "structure": "StoredBook, BookStore"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "conflict.storageKey",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "setItem",
+          "file": "lib/sync/engine.ts",
+          "line": 959,
+          "value": "valueToWrite",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "key",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "setItem",
+          "file": "app/role-settings.tsx",
+          "line": 220,
+          "value": "\"collaborator\"",
+          "structure": ""
+        },
+        {
+          "operation": "getItem",
+          "file": "hooks/use-persisted-state.ts",
+          "line": 14,
+          "value": "",
+          "structure": ""
+        },
+        {
+          "operation": "setItem",
+          "file": "hooks/use-persisted-state.ts",
+          "line": 37,
+          "value": "JSON.stringify(next",
+          "structure": ""
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/backup/icloud-backup.ts",
+          "line": 248,
+          "value": "value",
+          "structure": ""
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/backup/local-backup.ts",
+          "line": 205,
+          "value": "value",
+          "structure": "SnapshotMeta, Snapshot, DataCounts"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/backup/local-backup.ts",
+          "line": 464,
+          "value": "value",
+          "structure": "SnapshotMeta, Snapshot, DataCounts"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/cf-sync/client.ts",
+          "line": 37,
+          "value": "value",
+          "structure": "DeviceInfo, CompleteSyncSnapshot, SyncEntry"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/cf-sync/client.ts",
+          "line": 45,
+          "value": "",
+          "structure": "DeviceInfo, CompleteSyncSnapshot, SyncEntry"
+        },
+        {
+          "operation": "removeItem",
+          "file": "lib/cf-sync/client.ts",
+          "line": 52,
+          "value": "",
+          "structure": "DeviceInfo, CompleteSyncSnapshot, SyncEntry"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/labor/store.tsx",
+          "line": 46,
+          "value": "",
+          "structure": "EmployeeStore, CustomDeptStore, DeptOrderStore, ShiftTemplateStore, SpecialStatusStore, HolidayConfigStore, ShiftStore, AttendanceStore, PaySlipStore, GlobalPayrollSettingsStore, MonthCloseStore, MonthConfigStore, CompOffBalanceEntryStore, HolidayCompOffStore, BusinessHoursStore, ShiftGroupStore, UnexplainedRestAlertStore, FillPresetStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/labor/store.tsx",
+          "line": 59,
+          "value": "JSON.stringify(next",
+          "structure": "EmployeeStore, CustomDeptStore, DeptOrderStore, ShiftTemplateStore, SpecialStatusStore, HolidayConfigStore, ShiftStore, AttendanceStore, PaySlipStore, GlobalPayrollSettingsStore, MonthCloseStore, MonthConfigStore, CompOffBalanceEntryStore, HolidayCompOffStore, BusinessHoursStore, ShiftGroupStore, UnexplainedRestAlertStore, FillPresetStore"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/labor/store.tsx",
+          "line": 73,
+          "value": "",
+          "structure": "EmployeeStore, CustomDeptStore, DeptOrderStore, ShiftTemplateStore, SpecialStatusStore, HolidayConfigStore, ShiftStore, AttendanceStore, PaySlipStore, GlobalPayrollSettingsStore, MonthCloseStore, MonthConfigStore, CompOffBalanceEntryStore, HolidayCompOffStore, BusinessHoursStore, ShiftGroupStore, UnexplainedRestAlertStore, FillPresetStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/labor/store.tsx",
+          "line": 84,
+          "value": "JSON.stringify(next",
+          "structure": "EmployeeStore, CustomDeptStore, DeptOrderStore, ShiftTemplateStore, SpecialStatusStore, HolidayConfigStore, ShiftStore, AttendanceStore, PaySlipStore, GlobalPayrollSettingsStore, MonthCloseStore, MonthConfigStore, CompOffBalanceEntryStore, HolidayCompOffStore, BusinessHoursStore, ShiftGroupStore, UnexplainedRestAlertStore, FillPresetStore"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/sync/engine.ts",
+          "line": 655,
+          "value": "",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/sync/engine.ts",
+          "line": 673,
+          "value": "value",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        },
+        {
+          "operation": "removeItem",
+          "file": "lib/sync/engine.ts",
+          "line": 675,
+          "value": "",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/sync/engine.ts",
+          "line": 748,
+          "value": "",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/sync/engine.ts",
+          "line": 817,
+          "value": "",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/sync/engine.ts",
+          "line": 837,
+          "value": "",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/sync/engine.ts",
+          "line": 884,
+          "value": "mergedValue",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        }
+      ]
+    },
+    {
+      "backend": "SecureStore",
+      "key": "key",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "setItemAsync",
+          "file": "app/role-settings.tsx",
+          "line": 222,
+          "value": "\"collaborator\"",
+          "structure": ""
+        },
+        {
+          "operation": "setItemAsync",
+          "file": "lib/cf-sync/client.ts",
+          "line": 39,
+          "value": "value",
+          "structure": "DeviceInfo, CompleteSyncSnapshot, SyncEntry"
+        },
+        {
+          "operation": "getItemAsync",
+          "file": "lib/cf-sync/client.ts",
+          "line": 47,
+          "value": "",
+          "structure": "DeviceInfo, CompleteSyncSnapshot, SyncEntry"
+        },
+        {
+          "operation": "deleteItemAsync",
+          "file": "lib/cf-sync/client.ts",
+          "line": 54,
+          "value": "",
+          "structure": "DeviceInfo, CompleteSyncSnapshot, SyncEntry"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "keys",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "multiGet",
+          "file": "app/data-manager.tsx",
+          "line": 51,
+          "value": "",
+          "structure": ""
+        },
+        {
+          "operation": "multiRemove",
+          "file": "app/data-manager.tsx",
+          "line": 114,
+          "value": "",
+          "structure": ""
+        },
+        {
+          "operation": "multiRemove",
+          "file": "lib/backup/local-backup.ts",
+          "line": 143,
+          "value": "",
+          "structure": "SnapshotMeta, Snapshot, DataCounts"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "removals",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "multiRemove",
+          "file": "lib/sync/engine.ts",
+          "line": 506,
+          "value": "",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        }
+      ]
+    },
+    {
+      "backend": "SecureStore",
+      "key": "SESSION_TOKEN_KEY",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "getItemAsync",
+          "file": "lib/_core/auth.ts",
+          "line": 24,
+          "value": "",
+          "structure": ""
+        },
+        {
+          "operation": "setItemAsync",
+          "file": "lib/_core/auth.ts",
+          "line": 46,
+          "value": "token",
+          "structure": ""
+        },
+        {
+          "operation": "deleteItemAsync",
+          "file": "lib/_core/auth.ts",
+          "line": 64,
+          "value": "",
+          "structure": ""
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "storageKey",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/inventory-core/store.tsx",
+          "line": 173,
+          "value": "",
+          "structure": "GenericInventoryItem, GenericInventoryState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/inventory-core/store.tsx",
+          "line": 182,
+          "value": "JSON.stringify(state",
+          "structure": "GenericInventoryItem, GenericInventoryState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "SUMMARY_KEYS",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "multiGet",
+          "file": "lib/backup/local-backup.ts",
+          "line": 281,
+          "value": "",
+          "structure": "SnapshotMeta, Snapshot, DataCounts"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "ticketKey(switchId",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "setItem",
+          "file": "lib/cf-sync/group-switch.ts",
+          "line": 64,
+          "value": "ticket",
+          "structure": "DeviceInfo, PersistedGroupSwitchSession"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/cf-sync/group-switch.ts",
+          "line": 71,
+          "value": "",
+          "structure": "DeviceInfo, PersistedGroupSwitchSession"
+        },
+        {
+          "operation": "removeItem",
+          "file": "lib/cf-sync/group-switch.ts",
+          "line": 77,
+          "value": "",
+          "structure": "DeviceInfo, PersistedGroupSwitchSession"
+        }
+      ]
+    },
+    {
+      "backend": "SecureStore",
+      "key": "ticketKey(switchId",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "setItemAsync",
+          "file": "lib/cf-sync/group-switch.ts",
+          "line": 67,
+          "value": "ticket",
+          "structure": "DeviceInfo, PersistedGroupSwitchSession"
+        },
+        {
+          "operation": "getItemAsync",
+          "file": "lib/cf-sync/group-switch.ts",
+          "line": 72,
+          "value": "",
+          "structure": "DeviceInfo, PersistedGroupSwitchSession"
+        },
+        {
+          "operation": "deleteItemAsync",
+          "file": "lib/cf-sync/group-switch.ts",
+          "line": 80,
+          "value": "",
+          "structure": "DeviceInfo, PersistedGroupSwitchSession"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "TS_PREFIX + c.storageKey",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "setItem",
+          "file": "lib/sync/engine.ts",
+          "line": 995,
+          "value": "String(now",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/sync/engine.ts",
+          "line": 1011,
+          "value": "String(c.remoteTs",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "TS_PREFIX + conflict.storageKey",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "setItem",
+          "file": "lib/sync/engine.ts",
+          "line": 953,
+          "value": "String(now",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/sync/engine.ts",
+          "line": 960,
+          "value": "String(conflict.remoteTs",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "TS_PREFIX + key",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "setItem",
+          "file": "lib/sync/engine.ts",
+          "line": 721,
+          "value": "String(now",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/sync/engine.ts",
+          "line": 749,
+          "value": "",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/sync/engine.ts",
+          "line": 818,
+          "value": "",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/sync/engine.ts",
+          "line": 838,
+          "value": "",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/sync/engine.ts",
+          "line": 885,
+          "value": "String(remote!.clientUpdatedAt",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "uploadedSetKey(groupId",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/sync/photo-sync.ts",
+          "line": 105,
+          "value": "",
+          "structure": "DeviceInfo"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/sync/photo-sync.ts",
+          "line": 113,
+          "value": "JSON.stringify([...set]",
+          "structure": "DeviceInfo"
+        }
+      ]
+    },
+    {
+      "backend": "localStorage",
+      "key": "USER_INFO_KEY",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/_core/auth.ts",
+          "line": 78,
+          "value": "",
+          "structure": ""
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/_core/auth.ts",
+          "line": 103,
+          "value": "JSON.stringify(user",
+          "structure": ""
+        },
+        {
+          "operation": "removeItem",
+          "file": "lib/_core/auth.ts",
+          "line": 120,
+          "value": "",
+          "structure": ""
+        }
+      ]
+    },
+    {
+      "backend": "SecureStore",
+      "key": "USER_INFO_KEY",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "getItemAsync",
+          "file": "lib/_core/auth.ts",
+          "line": 81,
+          "value": "",
+          "structure": ""
+        },
+        {
+          "operation": "setItemAsync",
+          "file": "lib/_core/auth.ts",
+          "line": 109,
+          "value": "JSON.stringify(user",
+          "structure": ""
+        },
+        {
+          "operation": "deleteItemAsync",
+          "file": "lib/_core/auth.ts",
+          "line": 125,
+          "value": "",
+          "structure": ""
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "writes",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "multiSet",
+          "file": "lib/sync/engine.ts",
+          "line": 505,
+          "value": "",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        }
+      ]
+    }
+  ]
+}

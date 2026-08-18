@@ -17,6 +17,7 @@
     "test:h5:theme-hot-switch": "npx expo export --platform web --output-dir dist-web && node scripts/h5-theme-hot-switch-e2e.mjs",
     "test:h5:store-segmented-nav": "npx expo export --platform web --output-dir dist-web && node scripts/h5-store-segmented-nav-e2e.mjs",
     "test:h5:monthly-report-import": "npx expo export --platform web --output-dir dist-web && node scripts/h5-monthly-report-import-e2e.mjs",
+    "audit:storage": "node scripts/audit-local-storage.mjs",
     "db:push": "drizzle-kit generate && drizzle-kit migrate",
     "android": "expo start --android",
     "ios": "expo start --ios",

@@ -358,8 +358,8 @@ export interface SpiritLedgerEntry {
   purchaseQty: number;     // 本月进货量（自动汇总）
   purchaseCost: number;    // 本月进货成本（自动汇总）
   consumeQty: number;      // 本月消耗瓶数（手动录入或盘点反推）
-  /** Excel盘点导入有明确成本时保留；旧数据缺失时按消耗瓶数×期末单位成本回退计算。 */
-  consumeCost?: number;
+  /** 本月消耗成本。 */
+  consumeCost: number;
   closingQty: number;      // 期末库存量 = 期初+进货-消耗
   closingUnitCost: number; // 期末单价
   closingCost: number;     // 期末库存成本

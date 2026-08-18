@@ -8,7 +8,6 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { registerStoreReload } from "../sync/engine";
 import { purchasesForMonth, type PendingSpiritPurchase } from "./import-bridge";
 import { moveInventoryCategory } from "./category-lifecycle";
-import { normalizeLegacySpiritLedger } from "./ledger-legacy-cleanup";
 import {
   SpiritItem, SpiritPurchaseRecord, SpiritLedgerEntry,
   SpiritRefPrice, SpiritSupplierInfo, SpiritCustomCategory,
@@ -208,6 +207,16 @@ const initial: SpiritsState = {
   customCategories: [],
   groupMatchMemory: [],
 };
+
+export function isCurrentSpiritLedgerEntry(value: unknown): value is SpiritLedgerEntry {
+  if (!value || typeof value !== "object") return false;
+  const entry = value as Record<string, unknown>;
+  const textFields = ["id", "month", "itemId", "updatedAt"];
+  const numberFields = ["openingQty", "openingUnitCost", "purchaseQty", "purchaseCost", "consumeQty", "consumeCost", "closingQty", "closingUnitCost", "closingCost"];
+  return textFields.every((field) => typeof entry[field] === "string")
+    && numberFields.every((field) => typeof entry[field] === "number" && Number.isFinite(entry[field]))
+    && typeof entry.isClosed === "boolean";
+}
 
 type Action =
   | { type: "LOAD"; payload: SpiritsState }
@@ -431,7 +440,10 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
     ]).then(([itemsRaw, purchasesRaw, ledgerRaw, refPricesRaw, suppliersRaw, groupsRaw, matchMemoryRaw, selfBuyRaw, customCatsRaw, groupMatchRaw]) => {
       const items = itemsRaw ? JSON.parse(itemsRaw) : [];
       const purchases = purchasesRaw ? JSON.parse(purchasesRaw) : [];
-      const ledger: SpiritLedgerEntry[] = (ledgerRaw ? JSON.parse(ledgerRaw) : []).map(normalizeLegacySpiritLedger);
+      const parsedLedger: unknown = ledgerRaw ? JSON.parse(ledgerRaw) : [];
+      const ledger: SpiritLedgerEntry[] = Array.isArray(parsedLedger)
+        ? parsedLedger.filter(isCurrentSpiritLedgerEntry)
+        : [];
       const refPrices = refPricesRaw ? JSON.parse(refPricesRaw) : [];
       const suppliers = suppliersRaw ? JSON.parse(suppliersRaw) : [];
       const storedGroups: SpiritGroupDef[] = groupsRaw ? JSON.parse(groupsRaw) : [];
@@ -812,6 +824,7 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
           purchaseQty: 0,
           purchaseCost: 0,
           consumeQty: 0,
+          consumeCost: 0,
           closingQty: entry.closingQty,
           closingUnitCost: entry.closingUnitCost,
           closingCost: entry.closingCost,
@@ -856,6 +869,7 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
           purchaseQty,
           purchaseCost,
           consumeQty: 0,
+          consumeCost: 0,
           closingQty: purchaseQty,
           closingUnitCost: purchaseQty > 0 ? purchaseCost / purchaseQty : refPrice,
           closingCost: purchaseCost,
