@@ -10,19 +10,20 @@ describe("设备权限授予后的刷新与服务端边界", () => {
     const worker = source("workers/cocktail-ai/worker-v4.js");
 
     expect(worker).toContain("const { targetDeviceId, role, allowedKeys = null } = body || {}");
-    expect(worker).toContain("const serializedAllowedKeys = Array.isArray(allowedKeys) ? JSON.stringify(allowedKeys) : null");
+    expect(worker).toContain("const normalizedRole = normalizeDeviceRole(role)");
+    expect(worker).toContain("const normalizedAllowedKeys = normalizeRequestedAllowedKeys(allowedKeys)");
     expect(worker).toContain("UPDATE devices SET role = ?, allowed_keys = ?");
-    expect(worker).toContain("allowedKeys: role === \"owner\" ? null");
+    expect(worker).toContain("allowedKeys: normalizedRole === \"owner\" ? null : normalizedAllowedKeys");
   });
 
   it("Worker必须按当前设备授权过滤拉取、墓碑和推送，客户端不能单独承担安全边界", () => {
     const worker = source("workers/cocktail-ai/worker-v4.js");
 
-    expect(worker).toContain("!Array.isArray(pullAllowedKeys) ? null");
-    expect(worker).toContain("allowedSet.has(r.storage_key)");
-    expect(worker).toContain("allowedSet.has(t.storage_key)");
-    expect(worker).toContain("device.role === \"collaborator\" && Array.isArray(serverAllowedKeys)");
-    expect(worker).toContain("serverAllowedKeys.includes(entry?.storageKey)");
+    expect(worker).toContain("filterSyncEntriesForDevice(device");
+    expect(worker).toContain("parseStoredAllowedKeys(device.allowed_keys)");
+    expect(worker).toContain("allowedKeys === null");
+    expect(worker).toContain("new Set(allowedKeys)");
+    expect(worker).toContain("const writableEntries = filterSyncEntriesForDevice(device, entries)");
   });
 
   it("权限变更会唤醒组内实时同步，目标设备本轮先写回授权缓存再决定读写行为", () => {

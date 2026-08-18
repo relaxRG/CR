@@ -1359,12 +1359,11 @@ async function verifyDevice(env, deviceId, token) {
   const row = await env.DB.prepare(
     "SELECT d.device_id, d.group_id, d.role, d.name, d.allowed_keys, d.token FROM devices d WHERE d.device_id = ? AND d.token = ? AND d.is_active = 1"
   ).bind(deviceId, token).first();
-  if (row) {
-    try {
-      await env.DB.prepare("UPDATE devices SET last_seen = ? WHERE device_id = ?").bind(Date.now(), deviceId).run();
-    } catch {}
-  }
-  return row || null;
+  if (!row || !normalizeDeviceRole(row.role)) return null;
+  try {
+    await env.DB.prepare("UPDATE devices SET last_seen = ? WHERE device_id = ?").bind(Date.now(), deviceId).run();
+  } catch {}
+  return row;
 }
 
 async function verifyRequestDevice(env, headers) {
@@ -1379,7 +1378,7 @@ async function verifyRequestDevice(env, headers) {
   const row = sessionId
     ? await env.DB.prepare("SELECT d.device_id, d.group_id, d.role, d.name, d.allowed_keys, d.token FROM web_device_sessions s JOIN devices d ON d.device_id = s.device_id WHERE s.session_id = ? AND s.expires_at > ? AND d.is_active = 1").bind(sessionId, now).first()
     : await env.DB.prepare("SELECT d.device_id, d.group_id, d.role, d.name, d.allowed_keys, d.token FROM web_device_memory_tickets t JOIN devices d ON d.device_id = t.device_id WHERE t.ticket = ? AND t.expires_at > ? AND d.is_active = 1").bind(memoryTicket, now).first();
-  if (!row || (requestedDeviceId && row.device_id !== requestedDeviceId)) return null;
+  if (!row || !normalizeDeviceRole(row.role) || (requestedDeviceId && row.device_id !== requestedDeviceId)) return null;
   try { await env.DB.prepare("UPDATE devices SET last_seen = ? WHERE device_id = ?").bind(now, row.device_id).run(); } catch {}
   return row;
 }
@@ -1400,24 +1399,17 @@ async function handleSyncPull(env, body, headers, origin) {
   const tombstones = await env.DB.prepare(
     "SELECT storage_key, deleted_at FROM sync_tombstones WHERE group_id = ?"
   ).bind(device.group_id).all();
-  let pullAllowedKeys = null;
-  try { pullAllowedKeys = device.allowed_keys ? JSON.parse(device.allowed_keys) : null; } catch {}
-  // null = 全功能，不是空权限；只有明确数组才启用逐键过滤。
-  const allowedSet = device.role === "owner" || !Array.isArray(pullAllowedKeys) ? null : new Set(pullAllowedKeys);
+  const pullAllowedKeys = parseStoredAllowedKeys(device.allowed_keys);
   const canWrite = device.role === "owner" || device.role === "collaborator";
-  const camelEntries = (rows.results || [])
-    .filter((r) => !allowedSet || allowedSet.has(r.storage_key))
-    .map((r) => ({
-      storageKey: r.storage_key,
-      value: r.value,
-      clientUpdatedAt: r.client_updated_at
-    }));
-  const camelTombstones = (tombstones.results || [])
-    .filter((t) => !allowedSet || allowedSet.has(t.storage_key))
-    .map((t) => ({
-      storageKey: t.storage_key,
-      deletedAt: t.deleted_at
-    }));
+  const camelEntries = filterSyncEntriesForDevice(device, (rows.results || []).map((r) => ({
+    storageKey: r.storage_key,
+    value: r.value,
+    clientUpdatedAt: r.client_updated_at
+  })));
+  const camelTombstones = filterSyncEntriesForDevice(device, (tombstones.results || []).map((t) => ({
+    storageKey: t.storage_key,
+    deletedAt: t.deleted_at
+  })));
   return json({
     entries: camelEntries,
     tombstones: camelTombstones,
@@ -1436,11 +1428,7 @@ async function handleSyncPush(env, body, headers, origin) {
   if (device.role === "guest") return err("Guest devices cannot push", 403, origin);
   const { entries } = body || {};
   if (!Array.isArray(entries)) return err("entries required", 400, origin);
-  let serverAllowedKeys = null;
-  try { serverAllowedKeys = device.allowed_keys ? JSON.parse(device.allowed_keys) : null; } catch {}
-  const writableEntries = device.role === "collaborator" && Array.isArray(serverAllowedKeys)
-    ? entries.filter((entry) => serverAllowedKeys.includes(entry?.storageKey))
-    : entries;
+  const writableEntries = filterSyncEntriesForDevice(device, entries);
   let pushed = 0;
   for (const entry of writableEntries.slice(0, 40)) {
     if (!entry.storageKey || entry.value === void 0) continue;
@@ -1618,8 +1606,7 @@ async function logSwitchEvent(env, switchId, event, errorCode = null) {
 }
 
 function switchMemberPayload(row, includeToken = true) {
-  let allowedKeys = null;
-  try { allowedKeys = row.allowed_keys ? JSON.parse(row.allowed_keys) : null; } catch {}
+  const allowedKeys = parseStoredAllowedKeys(row.allowed_keys);
   return {
     deviceId: row.device_id,
     ...(includeToken ? { deviceToken: row.token } : {}),
@@ -1690,6 +1677,7 @@ async function handleDevicePrepareSwitch(env, body, headers, origin) {
   const recoveryTicket = generateToken();
   const targetDeviceId = generateToken().slice(0, 16);
   const targetToken = generateToken();
+  const targetAllowedKeys = parseStoredAllowedKeys(pair.allowed_keys);
   await env.DB.prepare("INSERT INTO group_switches (switch_id, state, source_device_id, source_group_id, target_group_id, target_device_id, target_token, target_name, target_platform, target_role, target_allowed_keys, handoff_device_id, pair_code, recovery_ticket_hash, created_at) VALUES (?, 'prepared', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(
     switchId,
     source.device_id,
@@ -1698,9 +1686,9 @@ async function handleDevicePrepareSwitch(env, body, headers, origin) {
     targetDeviceId,
     targetToken,
     typeof deviceName === "string" && deviceName.trim() ? deviceName.trim().slice(0, 80) : source.name || "Device",
-    typeof platform === "string" ? platform.slice(0, 24) : "ios",
-    pair.role,
-    pair.allowed_keys || null,
+    normalizeDevicePlatform(platform),
+    normalizeDeviceRole(pair.role) ?? "guest",
+    targetAllowedKeys === null ? null : JSON.stringify(targetAllowedKeys),
     handoffDeviceId || null,
     code,
     await hashSwitchTicket(recoveryTicket),
@@ -1730,9 +1718,10 @@ async function handleDeviceRecoverJoin(env, body, origin) {
   if (Number(reservation.meta?.changes || 0) !== 1) return err("PAIR_CODE_UNAVAILABLE", 409, origin);
 
   const token = generateToken();
+  const recoveryAllowedKeys = parseStoredAllowedKeys(pair.allowed_keys);
   try {
     await env.DB.batch([
-      env.DB.prepare("INSERT INTO devices (device_id, group_id, token, name, platform, role, allowed_keys, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)").bind(deviceId, pair.group_id, token, normalizedName, typeof platform === "string" ? platform.slice(0, 24) : "ios", pair.role, pair.allowed_keys || null, Date.now()),
+      env.DB.prepare("INSERT INTO devices (device_id, group_id, token, name, platform, role, allowed_keys, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)").bind(deviceId, pair.group_id, token, normalizedName, normalizeDevicePlatform(platform), normalizeDeviceRole(pair.role) ?? "guest", recoveryAllowedKeys === null ? null : JSON.stringify(recoveryAllowedKeys), Date.now()),
       env.DB.prepare("UPDATE pair_codes SET used = 1 WHERE code = ? AND reserved_switch_id = ?").bind(code, reservationId),
       env.DB.prepare("INSERT INTO group_ts (group_id, last_push_at) VALUES (?, ?) ON CONFLICT(group_id) DO UPDATE SET last_push_at = excluded.last_push_at").bind(pair.group_id, Date.now())
     ]);
@@ -1741,10 +1730,9 @@ async function handleDeviceRecoverJoin(env, body, origin) {
     console.error("[cf-sync] recovery_join_failed", { code: "RECOVERY_JOIN_WRITE_FAILED" });
     return err("RECOVERY_JOIN_WRITE_FAILED", 500, origin);
   }
-  let allowedKeys = null;
-  try { allowedKeys = pair.allowed_keys ? JSON.parse(pair.allowed_keys) : null; } catch {}
+  const allowedKeys = recoveryAllowedKeys;
   console.info("[cf-sync] recovery_join_completed", { targetGroup: String(pair.group_id).slice(0, 8), role: pair.role });
-  return deviceMembershipResponse(env, { deviceId, deviceToken: token, groupId: pair.group_id, role: pair.role, allowedKeys, deviceName: normalizedName }, origin, platform === "web");
+  return deviceMembershipResponse(env, { deviceId, deviceToken: token, groupId: pair.group_id, role: normalizeDeviceRole(pair.role) ?? "guest", allowedKeys, deviceName: normalizedName }, origin, normalizeDevicePlatform(platform) === "web");
 }
 
 async function handleDeviceCommitSwitch(env, body, headers, origin) {
@@ -1813,7 +1801,7 @@ async function handleSyncCompleteSnapshot(env, headers, origin) {
   const device = await verifyRequestDevice(env, headers);
   if (!device) return err("Unauthorized", 401, origin);
   const rows = await env.DB.prepare("SELECT storage_key, value, client_updated_at FROM sync_data WHERE group_id = ? ORDER BY storage_key ASC").bind(device.group_id).all();
-  const entries = (rows.results || []).map((row) => ({ storageKey: row.storage_key, value: row.value, clientUpdatedAt: row.client_updated_at }));
+  const entries = filterSyncEntriesForDevice(device, (rows.results || []).map((row) => ({ storageKey: row.storage_key, value: row.value, clientUpdatedAt: row.client_updated_at })));
   const revision = `${entries.length}:${entries.reduce((max, entry) => Math.max(max, Number(entry.clientUpdatedAt) || 0), 0)}`;
   return json({ groupId: device.group_id, revision, complete: true, presentKeys: entries.map((entry) => entry.storageKey), entries }, 200, origin);
 }
@@ -1822,10 +1810,42 @@ function normalizeDevicePlatform(value) {
   return ["ios", "android", "web", "macos", "unknown"].includes(value) ? value : "unknown";
 }
 
+function normalizeDeviceRole(value, allowedRoles = ["owner", "collaborator", "guest"]) {
+  return allowedRoles.includes(value) ? value : null;
+}
+
+/**
+ * null 是明确的全功能授权；格式损坏、非数组或包含非法键的历史值必须失败关闭为[]，
+ * 不得因解析失败升级为全权限。
+ */
+function filterSyncEntriesForDevice(device, entries) {
+  const allowedKeys = parseStoredAllowedKeys(device.allowed_keys);
+  if (device.role === "owner" || allowedKeys === null) return entries;
+  const allowedSet = new Set(allowedKeys);
+  return entries.filter((entry) => allowedSet.has(entry?.storageKey));
+}
+
+function parseStoredAllowedKeys(raw) {
+  if (raw == null) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.every((key) => typeof key === "string" && key.length > 0 && key.length <= 160) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function normalizeRequestedAllowedKeys(value) {
+  if (value == null) return null;
+  if (!Array.isArray(value) || !value.every((key) => typeof key === "string" && key.length > 0 && key.length <= 160)) return [];
+  return [...new Set(value)];
+}
+
 async function handleDeviceUpdateMetadata(env, body, headers, origin) {
   const device = await verifyRequestDevice(env, headers);
   if (!device) return err("DEVICE_AUTH_UNAUTHORIZED", 401, origin);
-  const platform = normalizeDevicePlatform(body?.platform);
+  if (!body || !["ios", "android", "web", "macos", "unknown"].includes(body.platform)) return err("DEVICE_PLATFORM_INVALID", 400, origin);
+  const platform = normalizeDevicePlatform(body.platform);
   await env.DB.prepare("UPDATE devices SET platform = ? WHERE device_id = ? AND group_id = ? AND is_active = 1").bind(platform, device.device_id, device.group_id).run();
   return json({ platform }, 200, origin);
 }
@@ -1842,7 +1862,7 @@ async function handleDeviceRegister(env, body, origin) {
     "INSERT INTO devices (device_id, group_id, token, name, platform, role, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?)"
   ).bind(deviceId, groupId, token, deviceName || "Unknown", normalizeDevicePlatform(platform), "owner", Date.now()).run();
   const membership = { deviceId, deviceToken: token, groupId, role: "owner", allowedKeys: null, deviceName: deviceName || "Unknown" };
-  return deviceMembershipResponse(env, membership, origin, platform === "web");
+  return deviceMembershipResponse(env, membership, origin, normalizeDevicePlatform(platform) === "web");
 }
 __name(handleDeviceRegister, "handleDeviceRegister");
 __name2(handleDeviceRegister, "handleDeviceRegister");
@@ -1852,13 +1872,15 @@ async function handleDeviceGenerateCode(env, body, headers, origin) {
   if (!device) return err("Unauthorized", 401, origin);
   if (device.role !== "owner") return err("Only owner can generate pair codes", 403, origin);
   const { role = "collaborator", expiresInMinutes = 10, allowedKeys = null } = body || {};
-  if (!["collaborator", "guest"].includes(role)) return err("Invalid role", 400, origin);
+  const normalizedRole = normalizeDeviceRole(role, ["collaborator", "guest"]);
+  if (!normalizedRole) return err("Invalid role", 400, origin);
+  const normalizedAllowedKeys = normalizeRequestedAllowedKeys(allowedKeys);
   const code = String(Math.floor(100000 + Math.random() * 900000));
-  const expiresAt = Date.now() + expiresInMinutes * 60 * 1e3;
+  const expiresAt = Date.now() + Math.min(60, Math.max(1, Number(expiresInMinutes) || 10)) * 60 * 1e3;
   await env.DB.prepare(
     "INSERT INTO pair_codes (code, group_id, role, allowed_keys, expires_at, used) VALUES (?, ?, ?, ?, ?, 0)"
-  ).bind(code, device.group_id, role, Array.isArray(allowedKeys) ? JSON.stringify(allowedKeys) : null, expiresAt).run();
-  return json({ code, expiresAt, role, allowedKeys: Array.isArray(allowedKeys) ? allowedKeys : null }, 200, origin);
+  ).bind(code, device.group_id, normalizedRole, normalizedAllowedKeys === null ? null : JSON.stringify(normalizedAllowedKeys), expiresAt).run();
+  return json({ code, expiresAt, role: normalizedRole, allowedKeys: normalizedAllowedKeys }, 200, origin);
 }
 __name(handleDeviceGenerateCode, "handleDeviceGenerateCode");
 __name2(handleDeviceGenerateCode, "handleDeviceGenerateCode");
@@ -1867,22 +1889,24 @@ async function handleDevicePair(env, body, origin) {
   const { code, deviceName, platform } = body || {};
   if (!code) return err("code required", 400, origin);
   const pairRow = await env.DB.prepare(
-    "SELECT * FROM pair_codes WHERE code = ? AND used = 0 AND expires_at > ?"
+    "SELECT * FROM pair_codes WHERE code = ? AND used = 0 AND expires_at > ? AND reserved_switch_id IS NULL"
   ).bind(code, Date.now()).first();
   if (!pairRow) return err("Invalid or expired code", 400, origin);
   const deviceId = (body && typeof body.deviceId === "string" && body.deviceId.length >= 8 && body.deviceId.length <= 64) ? body.deviceId : generateToken().slice(0, 16);
   const token = generateToken();
   await env.DB.prepare(
     "INSERT INTO devices (device_id, group_id, token, name, platform, role, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?)"
-  ).bind(deviceId, pairRow.group_id, token, deviceName || "Unknown", normalizeDevicePlatform(platform), pairRow.role, Date.now()).run();
+  ).bind(deviceId, pairRow.group_id, token, deviceName || "Unknown", normalizeDevicePlatform(platform), normalizeDeviceRole(pairRow.role) ?? "guest", Date.now()).run();
   await env.DB.prepare("UPDATE pair_codes SET used = 1 WHERE code = ?").bind(code).run();
-  let pairAllowedKeys = null;
-  try { pairAllowedKeys = pairRow.allowed_keys ? JSON.parse(pairRow.allowed_keys) : null; } catch {}
-  const membership = { deviceId, deviceToken: token, groupId: pairRow.group_id, role: pairRow.role, allowedKeys: pairAllowedKeys, deviceName: deviceName || "Unknown" };
-  const isWeb = platform === "web";
+  const pairAllowedKeys = parseStoredAllowedKeys(pairRow.allowed_keys);
+  const membership = { deviceId, deviceToken: token, groupId: pairRow.group_id, role: normalizeDeviceRole(pairRow.role) ?? "guest", allowedKeys: pairAllowedKeys, deviceName: deviceName || "Unknown" };
+  const isWeb = normalizeDevicePlatform(platform) === "web";
   if (!isWeb) return json({ ...membership, token }, 200, origin);
-  const sessionId = await issueWebDeviceSession(env, deviceId, origin);
-  return jsonWithWebSession({ ...membership, deviceToken: undefined }, origin, sessionId);
+  const [sessionId, webMemoryTicket] = await Promise.all([
+    issueWebDeviceSession(env, deviceId, origin),
+    issueWebMemoryTicket(env, deviceId, origin),
+  ]);
+  return jsonWithWebSession({ ...membership, deviceToken: undefined, webMemoryTicket }, origin, sessionId);
 }
 __name(handleDevicePair, "handleDevicePair");
 __name2(handleDevicePair, "handleDevicePair");
@@ -1894,20 +1918,19 @@ async function handleDeviceList(env, headers, origin) {
     "SELECT device_id, name, platform, role, allowed_keys, is_active, last_seen, created_at FROM devices WHERE group_id = ? AND is_active = 1"
   ).bind(device.group_id).all();
   const mapped = (rows.results || []).map((r) => {
-    let ak = null;
-    try { ak = r.allowed_keys ? JSON.parse(r.allowed_keys) : null; } catch {}
+    const ak = parseStoredAllowedKeys(r.allowed_keys);
     return {
       id: r.device_id,
       name: r.name,
-      platform: r.platform,
-      role: r.role,
+      platform: normalizeDevicePlatform(r.platform),
+      role: normalizeDeviceRole(r.role) ?? "guest",
       allowedKeys: ak,
       last_seen: r.last_seen ?? null,
       created_at: r.created_at,
-      isCurrentDevice: r.device_id === deviceId
+      isCurrentDevice: r.device_id === device.device_id
     };
   });
-  return json({ devices: mapped, currentDeviceId: deviceId }, 200, origin);
+  return json({ devices: mapped, currentDeviceId: device.device_id }, 200, origin);
 }
 __name(handleDeviceList, "handleDeviceList");
 __name2(handleDeviceList, "handleDeviceList");
@@ -1951,22 +1974,24 @@ async function handleDeviceUpdateRole(env, body, headers, origin) {
   if (!device) return err("Unauthorized", 401, origin);
   if (device.role !== "owner") return err("Only owner can update roles", 403, origin);
   const { targetDeviceId, role, allowedKeys = null } = body || {};
-  if (!targetDeviceId || !["owner", "collaborator", "guest"].includes(role)) return err("Invalid params", 400, origin);
-  const serializedAllowedKeys = Array.isArray(allowedKeys) ? JSON.stringify(allowedKeys) : null;
+  const normalizedRole = normalizeDeviceRole(role);
+  if (!targetDeviceId || !normalizedRole) return err("Invalid params", 400, origin);
+  const normalizedAllowedKeys = normalizeRequestedAllowedKeys(allowedKeys);
+  const serializedAllowedKeys = normalizedAllowedKeys === null ? null : JSON.stringify(normalizedAllowedKeys);
   const target = await env.DB.prepare(
     "SELECT device_id FROM devices WHERE device_id = ? AND group_id = ? AND is_active = 1"
   ).bind(targetDeviceId, device.group_id).first();
   if (!target) return err("Target device not found", 404, origin);
-  if (role === "owner") {
+  if (normalizedRole === "owner") {
     await env.DB.batch([
       env.DB.prepare("UPDATE devices SET role = 'collaborator' WHERE group_id = ? AND role = 'owner'").bind(device.group_id),
-      env.DB.prepare("UPDATE devices SET role = 'owner' WHERE device_id = ? AND group_id = ? AND is_active = 1").bind(targetDeviceId, device.group_id),
+      env.DB.prepare("UPDATE devices SET role = 'owner', allowed_keys = NULL WHERE device_id = ? AND group_id = ? AND is_active = 1").bind(targetDeviceId, device.group_id),
       env.DB.prepare("UPDATE device_groups SET owner_device_id = ? WHERE id = ?").bind(targetDeviceId, device.group_id)
     ]);
   } else {
     await env.DB.prepare(
       "UPDATE devices SET role = ?, allowed_keys = ? WHERE device_id = ? AND group_id = ?"
-    ).bind(role, role === "owner" ? null : serializedAllowedKeys, targetDeviceId, device.group_id).run();
+    ).bind(normalizedRole, serializedAllowedKeys, targetDeviceId, device.group_id).run();
   }
   // 权限不是sync_data条目；单独更新时间戳以唤醒目标设备的实时刷新。
   await env.DB.prepare(
@@ -1975,8 +2000,8 @@ async function handleDeviceUpdateRole(env, body, headers, origin) {
   return json({
     success: true,
     targetDeviceId,
-    role,
-    allowedKeys: role === "owner" ? null : (Array.isArray(allowedKeys) ? allowedKeys : null),
+    role: normalizedRole,
+    allowedKeys: normalizedRole === "owner" ? null : normalizedAllowedKeys,
   }, 200, origin);
 }
 __name(handleDeviceUpdateRole, "handleDeviceUpdateRole");

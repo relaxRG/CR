@@ -40,10 +40,12 @@ const read = (relativePath: string) => fs.readFileSync(path.join(root, relativeP
 describe("同步服务端全权限与平台元数据边界", () => {
   it("Worker将null allowed_keys保留为全功能，并提供受鉴权的平台刷新接口", () => {
     const worker = read("workers/cocktail-ai/worker-v4.js");
-    expect(worker).toContain('!Array.isArray(pullAllowedKeys) ? null');
-    expect(worker).toContain('device.role === "collaborator" && Array.isArray(serverAllowedKeys)');
+    expect(worker).toContain('filterSyncEntriesForDevice(device');
+    expect(worker).toContain('handleSyncCompleteSnapshot');
+    expect(worker).toContain('!normalizeDeviceRole(row.role)');
     expect(worker).toContain('path === "/api/device/update-metadata"');
-    expect(worker).toContain('normalizeDevicePlatform');
+    expect(worker).toContain('DEVICE_PLATFORM_INVALID');
+    expect(worker).toContain('isCurrentDevice: r.device_id === device.device_id');
   });
 
   it("客户端同步成功后刷新历史平台元数据，并且切组也使用统一平台分类", () => {

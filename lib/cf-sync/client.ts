@@ -230,12 +230,15 @@ export async function createNewSyncGroup(deviceName?: string): Promise<DeviceInf
     throw new Error(`Device registration failed: ${res.status} ${body}`);
   }
 
-  const data = await res.json() as { groupId: string; deviceToken: string; role: DeviceRole };
+  const data = await res.json() as { membership?: DeviceInfo; groupId?: string; deviceToken?: string; role?: DeviceRole };
+  // Worker的安全会话包装会返回membership；兼容已部署的扁平响应，但不依赖任一固定形状。
+  const membership = data.membership ?? data;
+  if (!membership.groupId || !membership.deviceToken || !membership.role) throw new Error("DEVICE_REGISTRATION_RESPONSE_INVALID");
   const info: DeviceInfo = {
     deviceId,
-    groupId: data.groupId,
-    deviceToken: data.deviceToken,
-    role: data.role,
+    groupId: membership.groupId,
+    deviceToken: membership.deviceToken,
+    role: membership.role,
     allowedKeys: null,
     deviceName: name,
   };
