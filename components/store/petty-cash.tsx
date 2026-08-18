@@ -21,6 +21,7 @@ import {
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { importIcostExcel } from "@/lib/store/icost-import";
 import { useColors } from "@/hooks/use-colors";
+import { useModuleMonthCloseStore } from "@/lib/month-close/module-month-close-store";
 import { MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS, MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
 
 // ─── iCost 背景色 ─────────────────────────────────────────────────────────────
@@ -171,6 +172,13 @@ export default function StorePettyCashScreen() {
   const { records, addRecord, updateRecord, deleteRecord, setPeriod, calcPeriod, periods } = usePettyCashStore();
 
   const [month, setMonth] = useState(todayMonth());
+  const moduleClose = useModuleMonthCloseStore();
+  const pettyCloseStatus = moduleClose.getStatus("petty_cash", month);
+  const assertPettyWritable = () => {
+    if (moduleClose.isWritable("petty_cash", month)) return true;
+    Alert.alert("备用金月份已归档", `${month} 备用金已归档。请先在备用金模块开启调整，不能直接修改历史账本。`);
+    return false;
+  };
   const [viewMode, setViewMode] = useState<ViewMode>("ledger");
   const [statsTab, setStatsTab] = useState<StatsTab>("expense");
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
@@ -263,6 +271,7 @@ export default function StorePettyCashScreen() {
   }, [monthRecords, statsTab, month, records]);
 
   const handleImportExcel = useCallback(async () => {
+    if (!assertPettyWritable()) return;
     tap();
     setImporting(true);
     try {
@@ -286,6 +295,7 @@ export default function StorePettyCashScreen() {
     setShowAdd(true);
   };
   const handleAdd = () => {
+    if (!assertPettyWritable()) return;
     if (!addAmount || isNaN(parseFloat(addAmount))) { Alert.alert("请输入金额"); return; }
     const payload = { date: addDate, code: addCode, amount: parseFloat(addAmount), description: addDesc, paymentMethod: addPayment, receiptUri: "" };
     if (editingId) { updateRecord(editingId, payload); } else { addRecord(payload); }
@@ -294,6 +304,7 @@ export default function StorePettyCashScreen() {
   };
 
   const handleSaveOpening = () => {
+    if (!assertPettyWritable()) return;
     const val = parseFloat(openingInput);
     if (isNaN(val)) { Alert.alert("请输入有效金额"); return; }
     const autoVal = summary.openingAutoValue;
@@ -303,6 +314,25 @@ export default function StorePettyCashScreen() {
         { text: "确认", onPress: () => { setPeriod({ month, openingBalance: val, note: "" }); setShowOpeningEdit(false); } },
       ]);
     } else { setPeriod({ month, openingBalance: val, note: "" }); setShowOpeningEdit(false); }
+  };
+
+  const handleCloseMonth = () => {
+    if (!assertPettyWritable()) return;
+    Alert.alert("备用金月度归档", `确认归档 ${getMonthLabel(month)} 备用金账本？归档后需先开启调整才能修改。`, [
+      { text: "取消", style: "cancel" },
+      {
+        text: "确认归档",
+        onPress: () => {
+          moduleClose.finalize({
+            module: "petty_cash",
+            month,
+            snapshot: { month, summary, records: monthRecords, period: periods.find((item) => item.month === month) ?? null },
+            paymentSummary: { payable: 0, paid: 0, remaining: 0 },
+          });
+          Alert.alert("归档完成", `${getMonthLabel(month)} 备用金已独立归档。`);
+        },
+      },
+    ]);
   };
 
   const toggleGroup = (key: string) => {
@@ -338,6 +368,12 @@ export default function StorePettyCashScreen() {
         </Pressable>
       ))}
       <View style={{ flex: 1 }} />
+      <Pressable onPress={handleCloseMonth}
+        style={[S.downloadBtn, { backgroundColor: pettyCloseStatus === "draft" ? ICOST_CARD : colors.success + "14", marginRight: 4 }]}>
+        <Text style={{ color: pettyCloseStatus === "draft" ? colors.primary : colors.success, fontSize: 11, fontWeight: "700" }}>
+          {pettyCloseStatus === "draft" ? "归档" : "已归档"}
+        </Text>
+      </Pressable>
       <Pressable onPress={handleImportExcel} disabled={importing}
         style={[S.downloadBtn, { backgroundColor: ICOST_CARD }]}>
         {importing
@@ -423,7 +459,7 @@ export default function StorePettyCashScreen() {
     return (
       <Pressable key={item.id}
         onPress={() => { tap(); openEdit(item); }}
-        onLongPress={() => Alert.alert("删除", "确认删除？", [{ text: "取消", style: "cancel" }, { text: "删除", style: "destructive", onPress: () => deleteRecord(item.id) }])}
+        onLongPress={() => { if (!assertPettyWritable()) return; Alert.alert("删除", "确认删除？", [{ text: "取消", style: "cancel" }, { text: "删除", style: "destructive", onPress: () => deleteRecord(item.id) }]); }}
         style={[S.recordRow, { backgroundColor: ICOST_CARD, borderBottomWidth: showBorder ? StyleSheet.hairlineWidth : 0, borderBottomColor: "#EBEBEB" }]}>
         {/* 左侧圆角方块图标 */}
         <View style={[S.codeBadge, { backgroundColor: badgeBg }]}>

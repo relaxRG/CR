@@ -59,6 +59,7 @@ import {
 import { usePettyCashStore } from "@/lib/store/petty-store";
 import { getApiBaseUrl } from "@/constants/oauth";
 import * as Auth from "@/lib/_core/auth";
+import { useModuleMonthCloseStore } from "@/lib/month-close/module-month-close-store";
 
 // ─── 工具 ─────────────────────────────────────────────────────────────────────
 function uuid() { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
@@ -130,6 +131,13 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
 
   const [tab, setTab] = useState<Tab>("summary");
   const selectedMonth = month ?? getCurrentMonth();
+  const moduleClose = useModuleMonthCloseStore();
+  const spiritsCloseStatus = moduleClose.getStatus("spirits", selectedMonth);
+  const assertSpiritsWritable = () => {
+    if (moduleClose.isWritable("spirits", selectedMonth)) return true;
+    Alert.alert("烈酒月份已归档", `${selectedMonth} 烈酒已归档。请先在烈酒模块开启调整，不能直接修改历史台账。`);
+    return false;
+  };
   const [activeSupplier, setActiveSupplier] = useState<string | null>(null);
   // ★ 月末盘点状态
   const [showStocktakeModal, setShowStocktakeModal] = useState(false);
@@ -694,11 +702,22 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
           tap();
           Alert.alert("月结确认", `将 ${selectedMonth} 的期末库存带入下月期初？`, [
             { text: "取消", style: "cancel" },
-            { text: "确认月结", onPress: () => { closeMonth(selectedMonth); Alert.alert("月结完成", "期末库存已带入下月期初"); } },
+            { text: "确认月结", onPress: () => {
+              if (!assertSpiritsWritable()) return;
+              closeMonth(selectedMonth);
+              const payable = sumMoney(monthPurchases.map((purchase) => purchase.amount));
+              moduleClose.finalize({
+                module: "spirits",
+                month: selectedMonth,
+                snapshot: { month: selectedMonth, ledger: monthLedger, purchases: monthPurchases },
+                paymentSummary: { payable, paid: 0, remaining: payable },
+              });
+              Alert.alert("月结完成", "期末库存已带入下月期初");
+            } },
           ]);
         }} style={[S.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <IconSymbol name="checkmark.seal.fill" size={13} color={colors.primary} />
-          <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "600" }}>月结</Text>
+          <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "600" }}>月结 · {spiritsCloseStatus === "draft" ? "草稿" : "已归档"}</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => { tap(); setLedgerEditMode(!ledgerEditMode); }}
           style={[S.actionBtn, { backgroundColor: ledgerEditMode ? "#EF4444" : colors.surface, borderColor: ledgerEditMode ? "#EF4444" : colors.border }]}>
