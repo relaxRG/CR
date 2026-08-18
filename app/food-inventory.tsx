@@ -6,6 +6,7 @@
  */
 import React, { useMemo, useState } from "react";
 import { formatMoney } from "@/lib/utils";
+import { multiplyMoney, sumMoney } from "@/lib/finance/money";
 import {
   Alert, KeyboardAvoidingView, Modal, Platform, Pressable,
   ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View
@@ -56,7 +57,7 @@ function PurchaseModal({ visible, ingredients, colors, onSave, onClose }: {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
 
   const selected = ingredients.find((i) => i.id === selectedId);
-  const total = (Number(qty) || 0) * (Number(price) || 0);
+  const total = multiplyMoney(Number(qty) || 0, Number(price) || 0);
 
   React.useEffect(() => {
     if (selected) {
@@ -171,7 +172,7 @@ export default function FoodInventoryScreen({ month, embedded = false }: FoodInv
   const currentMonth = month ?? getCurrentMonth();
 
   const totalStockValue = useMemo(() =>
-    ingredients.reduce((s, i) => s + i.stock * (i.costPrice ?? 0), 0),
+    sumMoney(ingredients.map((ingredient) => multiplyMoney(ingredient.stock, ingredient.costPrice))),
     [ingredients]
   );
 
@@ -192,7 +193,7 @@ export default function FoodInventoryScreen({ month, embedded = false }: FoodInv
     { key: "name", label: "商品名称", width: 146, onPress: setSelectedLedgerRow, testID: (row) => `food-ledger-name-${row.ingredientId}`, render: (row) => <><Text numberOfLines={1} style={{ color: colors.foreground, fontSize: 12, fontWeight: "800" }}>{row.name}</Text><Text numberOfLines={1} style={{ color: colors.muted, fontSize: 10 }}>{row.spec || row.unit}</Text></> },
     { key: "openingQty", label: "期初数量", width: 76, align: "right", render: (row) => <Text style={{ color: colors.foreground, fontSize: 12 }}>{row.openingQty.toFixed(2)}</Text> },
     { key: "openingUnitCost", label: "期初单价", width: 76, align: "right", render: (row) => <Text style={{ color: colors.foreground, fontSize: 12 }}>¥{formatMoney(row.openingUnitCost)}</Text> },
-    { key: "openingCost", label: "期初成本", width: 82, align: "right", render: (row) => <Text style={{ color: colors.foreground, fontSize: 12 }}>¥{formatMoney(row.openingQty * row.openingUnitCost)}</Text> },
+    { key: "openingCost", label: "期初成本", width: 82, align: "right", render: (row) => <Text style={{ color: colors.foreground, fontSize: 12 }}>¥{formatMoney(multiplyMoney(row.openingQty, row.openingUnitCost))}</Text> },
     { key: "purchaseQty", label: "进货数量", width: 76, align: "right", render: (row) => <Text style={{ color: row.purchaseQty > 0 ? FOOD_COLOR : colors.muted, fontSize: 12 }}>{row.purchaseQty > 0 ? `+${row.purchaseQty.toFixed(2)}` : "—"}</Text> },
     { key: "purchaseCost", label: "进货成本", width: 82, align: "right", render: (row) => <Text style={{ color: row.purchaseCost > 0 ? FOOD_COLOR : colors.muted, fontSize: 12 }}>{row.purchaseCost > 0 ? `¥${formatMoney(row.purchaseCost)}` : "—"}</Text> },
     { key: "consumeQty", label: "消耗数量", width: 76, align: "right", render: (row) => <Text style={{ color: row.consumeQty > 0 ? colors.warning : colors.muted, fontSize: 12 }}>{row.consumeQty > 0 ? row.consumeQty.toFixed(2) : "—"}</Text> },
@@ -267,7 +268,7 @@ export default function FoodInventoryScreen({ month, embedded = false }: FoodInv
             rowKey={(row) => row.ingredientId}
             emptyLabel="还没有食材档案；请先新增食材或导入供应商进货单。"
             rowTone={(row) => row.closingQty <= 0 ? "negative" : "default"}
-            footer={monthLedger.length > 0 ? <View style={{ flexDirection: "row", minHeight: 42, backgroundColor: FOOD_COLOR + "14", alignItems: "center", paddingHorizontal: 10 }}><Text style={{ width: 146, color: FOOD_COLOR, fontWeight: "800", fontSize: 12 }}>合计</Text><Text style={{ width: 76, color: FOOD_COLOR, textAlign: "right", fontWeight: "800", fontSize: 12 }}>{monthLedger.reduce((sum, row) => sum + row.openingQty, 0).toFixed(2)}</Text><Text style={{ width: 76 + 82 + 76 + 82 + 76 + 82, color: FOOD_COLOR }} /><Text style={{ width: 76, color: FOOD_COLOR, textAlign: "right", fontWeight: "800", fontSize: 12 }}>{monthLedger.reduce((sum, row) => sum + row.closingQty, 0).toFixed(2)}</Text><Text style={{ width: 82 }} /><Text style={{ width: 82, color: FOOD_COLOR, textAlign: "right", fontWeight: "800", fontSize: 12 }}>¥{formatMoney(monthLedger.reduce((sum, row) => sum + row.closingCost, 0))}</Text></View> : undefined}
+            footer={monthLedger.length > 0 ? <View style={{ flexDirection: "row", minHeight: 42, backgroundColor: FOOD_COLOR + "14", alignItems: "center", paddingHorizontal: 10 }}><Text style={{ width: 146, color: FOOD_COLOR, fontWeight: "800", fontSize: 12 }}>合计</Text><Text style={{ width: 76, color: FOOD_COLOR, textAlign: "right", fontWeight: "800", fontSize: 12 }}>{monthLedger.reduce((sum, row) => sum + row.openingQty, 0).toFixed(2)}</Text><Text style={{ width: 76 + 82 + 76 + 82 + 76 + 82, color: FOOD_COLOR }} /><Text style={{ width: 76, color: FOOD_COLOR, textAlign: "right", fontWeight: "800", fontSize: 12 }}>{monthLedger.reduce((sum, row) => sum + row.closingQty, 0).toFixed(2)}</Text><Text style={{ width: 82 }} /><Text style={{ width: 82, color: FOOD_COLOR, textAlign: "right", fontWeight: "800", fontSize: 12 }}>¥{formatMoney(sumMoney(monthLedger.map((row) => row.closingCost)))}</Text></View> : undefined}
           />
         )}
 

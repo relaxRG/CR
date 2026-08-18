@@ -11,6 +11,7 @@
  */
 import * as XLSX from "xlsx";
 import { normalizeImportDate } from "@/lib/import/date-utils";
+import { roundMoney, sumMoney } from "@/lib/finance/money";
 import {
   HalfHourSlot, DailyPeriodRecord, PeriodAnalysisReport,
   PeriodAnalysisSettings, DEFAULT_PERIOD_SETTINGS,
@@ -144,7 +145,7 @@ export function parsePeriodAnalysisExcel(
     };
     for (const s of slots) {
       const pt = periodTotals[s.period];
-      pt.revenue += s.revenue;
+      pt.revenue = sumMoney([pt.revenue, s.revenue]);
       pt.orders += s.orders;
       pt.guests += s.guests;
       pt.slotCount++;
@@ -152,14 +153,14 @@ export function parsePeriodAnalysisExcel(
 
     // 凌晨加班分析
     const lateSlots = slots.filter((s) => s.period === "late_night");
-    const lateNightRevenue = lateSlots.reduce((sum, s) => sum + s.revenue, 0);
+    const lateNightRevenue = sumMoney(lateSlots.map((slot) => slot.revenue));
     const lateNightOrders = lateSlots.reduce((sum, s) => sum + s.orders, 0);
 
     // 1:30am 后的时段
     const after130Slots = lateSlots.filter((s) =>
       isAfterTime(s.slot, settings.alertStartTime)
     );
-    const after130amRevenue = after130Slots.reduce((sum, s) => sum + s.revenue, 0);
+    const after130amRevenue = sumMoney(after130Slots.map((slot) => slot.revenue));
     const after130amOrders = after130Slots.reduce((sum, s) => sum + s.orders, 0);
 
     // 加班性价比提醒：有凌晨加班 + 1:30后营业额 < 阈值
@@ -194,7 +195,7 @@ export function parsePeriodAnalysisExcel(
     for (const pk of periodKeys) {
       const pt = dr.periodTotals[pk];
       if (pt.revenue > 0 || pt.orders > 0) {
-        monthlyTotals[pk].revenue += pt.revenue;
+        monthlyTotals[pk].revenue = sumMoney([monthlyTotals[pk].revenue, pt.revenue]);
         monthlyTotals[pk].orders += pt.orders;
         monthlyTotals[pk].guests += pt.guests;
         monthlyTotals[pk].activeDays++;
@@ -204,7 +205,7 @@ export function parsePeriodAnalysisExcel(
   for (const pk of periodKeys) {
     const mt = monthlyTotals[pk];
     if (mt.activeDays > 0) {
-      mt.avgDailyRevenue = Math.round(mt.revenue / mt.activeDays);
+      mt.avgDailyRevenue = roundMoney(mt.revenue / mt.activeDays);
       mt.avgDailyOrders = Math.round((mt.orders / mt.activeDays) * 10) / 10;
     }
   }
@@ -218,14 +219,14 @@ export function parsePeriodAnalysisExcel(
           totalRevenue: 0, totalOrders: 0, activeDays: 0, avgRevenue: 0, period: s.period,
         };
       }
-      slotDistribution[s.slot].totalRevenue += s.revenue;
+      slotDistribution[s.slot].totalRevenue = sumMoney([slotDistribution[s.slot].totalRevenue, s.revenue]);
       slotDistribution[s.slot].totalOrders += s.orders;
       slotDistribution[s.slot].activeDays++;
     }
   }
   for (const key of Object.keys(slotDistribution)) {
     const sd = slotDistribution[key];
-    sd.avgRevenue = sd.activeDays > 0 ? Math.round(sd.totalRevenue / sd.activeDays) : 0;
+    sd.avgRevenue = sd.activeDays > 0 ? roundMoney(sd.totalRevenue / sd.activeDays) : 0;
   }
 
   // 加班性价比提醒列表

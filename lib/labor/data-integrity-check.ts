@@ -11,6 +11,7 @@
  */
 
 import type { PaySlip } from "./types";
+import { roundMoney, sumMoney } from "@/lib/finance/money";
 
 /** 备用金关联记录的最小接口 */
 interface LinkRecord {
@@ -68,7 +69,7 @@ export function checkPettyLaborIntegrity(
     const orphanIds = linkIds.filter((id) => !linkMap.has(id));
     if (orphanIds.length > 0) {
       const validLinks = linkIds.filter((id) => linkMap.has(id));
-      const expectedPaid = validLinks.reduce((sum, id) => sum + (linkMap.get(id)?.amount ?? 0), 0);
+      const expectedPaid = sumMoney(validLinks.map((id) => linkMap.get(id)?.amount));
       issues.push({
         slipId: slip.id,
         employeeId: slip.employeeId,
@@ -96,8 +97,8 @@ export function checkPettyLaborIntegrity(
     }
 
     // 检查金额不一致（linkIds 对应的金额合计 ≠ pettyLaborPaid）
-    const calculatedPaid = linkIds.reduce((sum, id) => sum + (linkMap.get(id)?.amount ?? 0), 0);
-    if (Math.abs(calculatedPaid - recordedPaid) > 0.01) {
+    const calculatedPaid = sumMoney(linkIds.map((id) => linkMap.get(id)?.amount));
+    if (roundMoney(calculatedPaid) !== roundMoney(recordedPaid)) {
       issues.push({
         slipId: slip.id,
         employeeId: slip.employeeId,
@@ -140,19 +141,19 @@ export function repairPettyLaborData(
 
     // 移除孤立的 linkId
     const validLinkIds = linkIds.filter((id) => linkMap.has(id));
-    const correctPaid = validLinkIds.reduce((sum, id) => sum + (linkMap.get(id)?.amount ?? 0), 0);
+    const correctPaid = sumMoney(validLinkIds.map((id) => linkMap.get(id)?.amount));
 
     // 检查是否需要修复
     const needsRepair =
       validLinkIds.length !== linkIds.length || // 有孤立 linkId
-      Math.abs(correctPaid - recordedPaid) > 0.01; // 金额不一致
+      roundMoney(correctPaid) !== roundMoney(recordedPaid); // 金额不一致
 
     if (needsRepair) {
       // 重新计算 finalSalary
       const oldDeduction = recordedPaid;
       const newDeduction = correctPaid;
       const finalSalaryDelta = oldDeduction - newDeduction; // 正值 = 之前多扣了
-      const newFinalSalary = Math.round(((slip.finalSalary ?? 0) + finalSalaryDelta) * 100) / 100;
+      const newFinalSalary = sumMoney([slip.finalSalary ?? 0, finalSalaryDelta]);
 
       repaired.push({
         ...slip,

@@ -16,6 +16,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import * as Print from "expo-print";
 import { SpiritItem, SpiritPurchaseRecord, SpiritLedgerEntry } from "./types";
+import { multiplyMoney, sumMoney } from "@/lib/finance/money";
 
 // ─── 类型定义 ─────────────────────────────────────────────────────────────────
 export interface ExportData {
@@ -54,8 +55,8 @@ export async function exportToExcel(data: ExportData): Promise<void> {
   const wb = XLSX.utils.book_new();
 
   // ── Sheet 1: 月度总结 ────────────────────────────────────────────────────────
-  const totalPurchaseAmt = monthPurchases.reduce((s, p) => s + p.amount, 0);
-  const totalClosingCost = monthLedger.reduce((s, e) => s + e.closingCost, 0);
+  const totalPurchaseAmt = sumMoney(monthPurchases.map((purchase) => purchase.amount));
+  const totalClosingCost = sumMoney(monthLedger.map((entry) => entry.closingCost));
   const totalConsumeQty = monthLedger.reduce((s, e) => s + e.consumeQty, 0);
   const supplierCount = new Set(monthPurchases.map((p) => p.supplier ?? "未知")).size;
 
@@ -107,7 +108,7 @@ export async function exportToExcel(data: ExportData): Promise<void> {
       item?.unit ?? "瓶",
       e.openingQty,
       fmt(e.openingUnitCost, 2),
-      fmt(e.openingQty * e.openingUnitCost),
+      fmt(multiplyMoney(e.openingQty, e.openingUnitCost)),
       e.purchaseQty,
       fmt(e.purchaseCost),
       e.consumeQty,
@@ -122,12 +123,12 @@ export async function exportToExcel(data: ExportData): Promise<void> {
   const ledgerTotal = [
     "合计", "", "", "", "",
     monthLedger.reduce((s, e) => s + e.openingQty, 0),
-    "", fmt(monthLedger.reduce((s, e) => s + e.openingQty * e.openingUnitCost, 0)),
+    "", fmt(sumMoney(monthLedger.map((entry) => multiplyMoney(entry.openingQty, entry.openingUnitCost)))),
     monthLedger.reduce((s, e) => s + e.purchaseQty, 0),
-    fmt(monthLedger.reduce((s, e) => s + e.purchaseCost, 0)),
+    fmt(sumMoney(monthLedger.map((entry) => entry.purchaseCost))),
     monthLedger.reduce((s, e) => s + e.consumeQty, 0),
     monthLedger.reduce((s, e) => s + e.closingQty, 0),
-    "", fmt(monthLedger.reduce((s, e) => s + e.closingCost, 0)),
+    "", fmt(sumMoney(monthLedger.map((entry) => entry.closingCost))),
     "", "",
   ];
   const ws2 = XLSX.utils.aoa_to_sheet([ledgerHeader, ...ledgerRows, ledgerTotal]);
@@ -167,7 +168,7 @@ export async function exportToExcel(data: ExportData): Promise<void> {
     "合计", "", "", "", "", "",
     monthPurchases.reduce((s, p) => s + p.quantity, 0),
     "",
-    fmt(monthPurchases.reduce((s, p) => s + p.amount, 0)),
+    fmt(sumMoney(monthPurchases.map((purchase) => purchase.amount))),
     "", "",
   ];
   const ws3 = XLSX.utils.aoa_to_sheet([purchaseHeader, ...purchaseRows, purchaseTotal]);
@@ -187,7 +188,7 @@ export async function exportToExcel(data: ExportData): Promise<void> {
     const sup = p.supplier ?? "未知";
     if (!byItem[item.id].bySupplier[sup]) byItem[item.id].bySupplier[sup] = { qty: 0, amount: 0 };
     byItem[item.id].bySupplier[sup].qty += p.quantity;
-    byItem[item.id].bySupplier[sup].amount += p.amount;
+    byItem[item.id].bySupplier[sup].amount = sumMoney([byItem[item.id].bySupplier[sup].amount, p.amount]);
   });
 
   const summaryHeader = ["商品名称", "分类", "参考单价(¥)",
@@ -201,7 +202,7 @@ export async function exportToExcel(data: ExportData): Promise<void> {
       bySupplier[s] ? fmt(bySupplier[s].amount) : "0",
     ]);
     const totalQty = Object.values(bySupplier).reduce((s, v) => s + v.qty, 0);
-    const totalAmt = Object.values(bySupplier).reduce((s, v) => s + v.amount, 0);
+    const totalAmt = sumMoney(Object.values(bySupplier).map((supplier) => supplier.amount));
     return [item.name, item.category, refPrice > 0 ? fmt(refPrice, 2) : "", ...supCols, totalQty, fmt(totalAmt)];
   });
   const ws4 = XLSX.utils.aoa_to_sheet([summaryHeader, ...summaryRows2]);

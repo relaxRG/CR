@@ -120,3 +120,24 @@ describe("食材月度台账", () => {
     expect(sanitized.ledgerMovements).toEqual([]);
   });
 });
+
+
+describe("食材月度台账金额精度", () => {
+  it("多笔小数采购与消耗的成本汇总保持到分", () => {
+    let state = initialState();
+    for (const [date, unitPrice] of [["2026-05-02", 0.1], ["2026-05-03", 0.2], ["2026-05-04", 0.3]] as const) {
+      state = foodIngredientReducer(state, {
+        type: "RECORD_PURCHASE",
+        input: { ingredientId: ingredient.id, quantity: 1, unitPrice, date, supplier: "测试供应商" },
+      });
+    }
+    state = foodIngredientReducer(state, {
+      type: "RECORD_CONSUME",
+      input: { ingredientId: ingredient.id, quantity: 1, unitCost: 0.1, date: "2026-05-05", notes: "小数成本回归" },
+    });
+
+    const [row] = buildFoodMonthlyLedger(state, "2026-05");
+    expect(row.purchaseCost).toBe(0.6);
+    expect(row.consumeCost).toBe(0.1);
+  });
+});

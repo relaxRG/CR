@@ -7,6 +7,7 @@
  */
 import React, { useMemo, useState } from "react";
 import { formatMoney } from "@/lib/utils";
+import { sumMoney } from "@/lib/finance/money";
 import {
   Alert, KeyboardAvoidingView, Modal, Platform, Pressable,
   ScrollView, SectionList, StyleSheet, Text, TextInput, TouchableOpacity,
@@ -1614,7 +1615,7 @@ function SupplierDetailScreen({
     () => applySupplierPurchaseTableView(supplierPurchaseRows, purchaseTableView),
     [supplierPurchaseRows, purchaseTableView],
   );
-  const visibleSupplierPurchaseTotal = visibleSupplierPurchases.reduce((sum, purchase) => sum + purchase.amount, 0);
+  const visibleSupplierPurchaseTotal = sumMoney(visibleSupplierPurchases.map((purchase) => purchase.amount));
   const purchaseTableHasAdjustments = Boolean(purchaseTableView.sort) || hasSupplierPurchaseTableFilters(purchaseTableView.filters);
   const purchaseTableSummary = [
     purchaseTableView.sort ? `${({ name: "商品名称", quantity: "数量", unitPrice: "单价", amount: "总价", group: "集团" } as const)[purchaseTableView.sort.key]}${purchaseTableView.sort.direction === "asc" ? "升序" : "降序"}` : "",

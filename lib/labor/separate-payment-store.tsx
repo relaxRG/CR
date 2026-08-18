@@ -5,6 +5,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useReducer } from "react";
 import { notifySyncChange, registerStoreReload } from "../sync/engine";
+import { sumMoney } from "@/lib/finance/money";
 import type { SeparatePaymentSlip } from "./adjustment-settlement";
 
 const STORAGE_KEY = "labor.separate_payments.v1";
@@ -144,8 +145,8 @@ export function SeparatePaymentProvider({ children }: { children: React.ReactNod
     const total = state.payments.length;
     const pending = state.payments.filter((p) => p.paymentStatus === "pending").length;
     const paid = total - pending;
-    const totalAmount = state.payments.reduce((sum, p) => sum + p.amount, 0);
-    const pendingAmount = state.payments.filter((p) => p.paymentStatus === "pending").reduce((sum, p) => sum + p.amount, 0);
+    const totalAmount = sumMoney(state.payments.map((payment) => payment.amount));
+    const pendingAmount = sumMoney(state.payments.filter((payment) => payment.paymentStatus === "pending").map((payment) => payment.amount));
     return { total, pending, paid, totalAmount, pendingAmount };
   }, [state.payments]);
 

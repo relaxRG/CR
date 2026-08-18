@@ -71,9 +71,9 @@ export function settlePayrollExtras(
     };
 
     const bucket = getAllowanceSettlementBucket(rule);
-    if (bucket === "transport") transportAllowance += amount;
-    else if (bucket === "meal") mealAllowance += amount;
-    else otherAllowance += amount;
+    if (bucket === "transport") transportAllowance = sumMoney([transportAllowance, amount]);
+    else if (bucket === "meal") mealAllowance = sumMoney([mealAllowance, amount]);
+    else otherAllowance = sumMoney([otherAllowance, amount]);
   }
 
   let workKPIBonus = 0;
@@ -84,7 +84,7 @@ export function settlePayrollExtras(
     const tier = rule.tiers.find((item) => item.id === tierId);
     const amount = tier?.amount ?? 0;
     workKPIDetails[rule.id] = { tierId, amount };
-    workKPIBonus += amount;
+    workKPIBonus = sumMoney([workKPIBonus, amount]);
   }
 
   let revenueKPIBonus = 0;
@@ -94,7 +94,7 @@ export function settlePayrollExtras(
     const actual = controls.revenueActuals?.[rule.id] ?? 0;
     const amount = calcRevenueKPIBonus(rule, actual);
     revenueKPIDetails[rule.id] = { actual, amount };
-    revenueKPIBonus += amount;
+    revenueKPIBonus = sumMoney([revenueKPIBonus, amount]);
   }
 
   mealAllowance = roundMoney(mealAllowance);

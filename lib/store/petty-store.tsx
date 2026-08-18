@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useReducer } from "react";
 import { notifySyncChange, registerStoreReload } from "../sync/engine";
+import { sumMoney } from "@/lib/finance/money";
 
 const STORAGE_KEY = "store.petty.v1";
 
@@ -137,7 +138,7 @@ interface PettyContextValue extends PettyState {
 const PettyContext = createContext<PettyContextValue | null>(null);
 
 /** 纯函数：计算某月期末备用金（可递归） */
-function calcClosingPure(
+export function calcClosingPure(
   month: string,
   allRecords: PettyRecord[],
   allPeriods: PettyPeriod[],
@@ -145,12 +146,9 @@ function calcClosingPure(
 ): number {
   if (depth > 24) return 0; // 防止无限递归
   const monthRecords = allRecords.filter((r) => r.date.startsWith(month));
-  let expense = 0, inflow = 0, otherIncome = 0;
-  for (const r of monthRecords) {
-    if (["N0","N1","N2"].includes(r.code)) inflow += r.amount;
-    else if (["N3","N4","N5"].includes(r.code)) otherIncome += r.amount;
-    else expense += r.amount;
-  }
+  const inflow = sumMoney(monthRecords.filter((record) => ["N0", "N1", "N2"].includes(record.code)).map((record) => record.amount));
+  const otherIncome = sumMoney(monthRecords.filter((record) => ["N3", "N4", "N5"].includes(record.code)).map((record) => record.amount));
+  const expense = sumMoney(monthRecords.filter((record) => !["N0", "N1", "N2", "N3", "N4", "N5"].includes(record.code)).map((record) => record.amount));
   const periodData = allPeriods.find((p) => p.month === month);
   let opening: number;
   if (periodData && periodData.openingBalance >= 0) {
@@ -161,7 +159,7 @@ function calcClosingPure(
     const prevMonth = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
     opening = calcClosingPure(prevMonth, allRecords, allPeriods, depth + 1);
   }
-  return opening + inflow + otherIncome - expense;
+  return sumMoney([opening, inflow, otherIncome, -expense]);
 }
 
 export function PettyCashProvider({ children }: { children: React.ReactNode }) {
@@ -199,17 +197,13 @@ export function PettyCashProvider({ children }: { children: React.ReactNode }) {
   const calcPeriod = useCallback((month: string): PeriodSummary => {
     const monthRecords = state.records.filter((r) => r.date.startsWith(month));
     const groupExpenses: Record<string, number> = {};
-    let expense = 0, inflow = 0, otherIncome = 0;
-    for (const r of monthRecords) {
-      if (["N0","N1","N2"].includes(r.code)) {
-        inflow += r.amount;
-      } else if (["N3","N4","N5"].includes(r.code)) {
-        otherIncome += r.amount;
-      } else {
-        expense += r.amount;
-        const g = r.code[0];
-        groupExpenses[g] = (groupExpenses[g] ?? 0) + r.amount;
-      }
+    const inflow = sumMoney(monthRecords.filter((record) => ["N0", "N1", "N2"].includes(record.code)).map((record) => record.amount));
+    const otherIncome = sumMoney(monthRecords.filter((record) => ["N3", "N4", "N5"].includes(record.code)).map((record) => record.amount));
+    const expenseRecords = monthRecords.filter((record) => !["N0", "N1", "N2", "N3", "N4", "N5"].includes(record.code));
+    const expense = sumMoney(expenseRecords.map((record) => record.amount));
+    for (const record of expenseRecords) {
+      const group = record.code[0];
+      groupExpenses[group] = sumMoney([groupExpenses[group], record.amount]);
     }
     // 自动期初 = 上月期末
     const [y, m] = month.split("-").map(Number);
@@ -224,7 +218,7 @@ export function PettyCashProvider({ children }: { children: React.ReactNode }) {
       inflow,
       otherIncome,
       expense,
-      closingBalance: openingBalance + inflow + otherIncome - expense,
+      closingBalance: sumMoney([openingBalance, inflow, otherIncome, -expense]),
       groupExpenses,
       openingOverridden,
       openingAutoValue,

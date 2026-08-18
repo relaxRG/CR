@@ -9,6 +9,7 @@
  */
 import React, { useMemo, useState } from "react";
 import { formatMoney } from "@/lib/utils";
+import { sumMoney } from "@/lib/finance/money";
 import { numericColor } from "@/lib/theme/numeric-color-tokens";
 import {
   Alert, KeyboardAvoidingView, Modal, Platform, Pressable,
@@ -245,12 +246,12 @@ export default function PeriodAnalysisScreen() {
       const dailyRecord = report.dailyRecords.find((dr) => dr.date === shift.date);
       if (!dailyRecord) continue;
       const closingMin = judgment.closingMinutes;
-      const overtimeRevenue = dailyRecord.slots
-        .filter((s) => {
-          const startMin = s.startHour * 60 + s.startMin;
+      const overtimeRevenue = sumMoney(dailyRecord.slots
+        .filter((slot) => {
+          const startMin = slot.startHour * 60 + slot.startMin;
           return startMin >= (closingMin % 1440);
         })
-        .reduce((sum, s) => sum + s.revenue, 0);
+        .map((slot) => slot.revenue));
       const key = shift.date;
       const level: "poor" | "ok" = overtimeRevenue < settings.overtimeThreshold ? "poor" : "ok";
       if (!alertMap.has(key) || (alertMap.get(key) === "ok" && level === "poor")) {

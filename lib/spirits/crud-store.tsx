@@ -8,6 +8,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { registerStoreReload } from "../sync/engine";
 import { purchasesForMonth, type PendingSpiritPurchase } from "./import-bridge";
 import { moveInventoryCategory } from "./category-lifecycle";
+import { sumMoney } from "@/lib/finance/money";
 import {
   SpiritItem, SpiritPurchaseRecord, SpiritLedgerEntry,
   SpiritRefPrice, SpiritSupplierInfo, SpiritCustomCategory,
@@ -798,7 +799,7 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
       const sup = p.supplier ?? "未知供应商";
       if (!result[sup]) result[sup] = { qty: 0, amount: 0, items: 0 };
       result[sup].qty += p.quantity;
-      result[sup].amount += p.amount;
+      result[sup].amount = sumMoney([result[sup].amount, p.amount]);
       const key = `${sup}:${p.itemId ?? p.rawName}`;
       if (!itemIds.has(key)) { result[sup].items++; itemIds.add(key); }
     }

@@ -22,6 +22,7 @@ import * as XLSX from "xlsx";
 import type { Employee, EmployeeDept, ShiftEntry, MonthlyAttendance, PaySlip, ShiftTemplate } from "./types";
 import { DEPT_LABELS, EMPLOYEE_TYPE_LABELS, getAttendanceBaseSalary } from "./types";
 import { DEFAULT_DEPT_ORDER } from "../labor/store";
+import { sumMoney } from "@/lib/finance/money";
 
 // ─── 辅助函数 ──────────────────────────────────────────────────────────────────
 
@@ -146,7 +147,7 @@ export function buildPayrollWorkbook(params: ExportParams): XLSX.WorkBook {
       const attendanceSalary = slip?.attendanceSalary ?? 0;
 
       // 综合额外
-      const allowanceTotal = (slip?.mealAllowance ?? 0) + (slip?.transportAllowance ?? 0) + (slip?.otherAllowance ?? 0);
+      const allowanceTotal = sumMoney([slip?.mealAllowance, slip?.transportAllowance, slip?.otherAllowance]);
       const workKPIBonus = slip?.workKPIBonus ?? 0;
       const revenueKPIBonus = slip?.revenueKPIBonus ?? 0;
       const rewardPenalty = slip?.rewardPenalty ?? 0;
@@ -154,7 +155,7 @@ export function buildPayrollWorkbook(params: ExportParams): XLSX.WorkBook {
 
       // 应发/扣款/实发
       const grossSalary = slip?.grossSalary ?? 0;
-      const advance = (slip?.advanceAmount ?? 0) + (slip?.pettyLaborPaid ?? 0);
+      const advance = sumMoney([slip?.advanceAmount, slip?.pettyLaborPaid]);
       const socialIns = slip?.socialInsuranceDeduction ?? 0;
       const housingFund = slip?.housingFundDeduction ?? 0;
       const incomeTax = slip?.incomeTax ?? 0;
@@ -165,10 +166,10 @@ export function buildPayrollWorkbook(params: ExportParams): XLSX.WorkBook {
       const empHousingFund = slip?.employerHousingFund ?? 0;
       const totalCost = slip?.totalEmployerCost ?? grossSalary;
 
-      deptFinal += finalSalary;
-      deptCost += totalCost;
-      grandFinal += finalSalary;
-      grandCost += totalCost;
+      deptFinal = sumMoney([deptFinal, finalSalary]);
+      deptCost = sumMoney([deptCost, totalCost]);
+      grandFinal = sumMoney([grandFinal, finalSalary]);
+      grandCost = sumMoney([grandCost, totalCost]);
 
       totalRows.push([
         dept.label,
@@ -437,14 +438,14 @@ export function buildPayrollHtml(params: ExportParams): string {
       const slip = monthSlips.find((s) => s.employeeId === emp.id);
       const att = monthAtts.find((a) => a.employeeId === emp.id);
       const finalSalary = slip?.finalSalary ?? 0;
-      deptFinal += finalSalary;
-      grandFinal += finalSalary;
-      grandCost += slip?.totalEmployerCost ?? slip?.grossSalary ?? 0;
+      deptFinal = sumMoney([deptFinal, finalSalary]);
+      grandFinal = sumMoney([grandFinal, finalSalary]);
+      grandCost = sumMoney([grandCost, slip?.totalEmployerCost ?? slip?.grossSalary]);
 
       // 基础/工时薪资（全职=比例底薪，兼职=工时薪资）
       const proportionalBase = getAttendanceBaseSalary(att);
       const specialDeduction = att?.totalSpecialDeduction ?? 0;
-      const allowanceTotal = (slip?.mealAllowance ?? 0) + (slip?.transportAllowance ?? 0) + (slip?.otherAllowance ?? 0);
+      const allowanceTotal = sumMoney([slip?.mealAllowance, slip?.transportAllowance, slip?.otherAllowance]);
 
       return `
         <tr>
@@ -808,13 +809,13 @@ export function buildCombinedWorkbook(params: ExportParams): XLSX.WorkBook {
       const holidayBonus = att?.holidayBonus ?? 0;
       const specialDeduction = att?.totalSpecialDeduction ?? 0;
       const attendanceSalary = slip?.attendanceSalary ?? 0;
-      const allowanceTotal = (slip?.mealAllowance ?? 0) + (slip?.transportAllowance ?? 0) + (slip?.otherAllowance ?? 0);
+      const allowanceTotal = sumMoney([slip?.mealAllowance, slip?.transportAllowance, slip?.otherAllowance]);
       const workKPIBonus = slip?.workKPIBonus ?? 0;
       const revenueKPIBonus = slip?.revenueKPIBonus ?? 0;
       const rewardPenalty = slip?.rewardPenalty ?? 0;
       const compOffCashOut = slip?.compOffCashOut ?? 0;
       const grossSalary = slip?.grossSalary ?? 0;
-      const advance = (slip?.advanceAmount ?? 0) + (slip?.pettyLaborPaid ?? 0);
+      const advance = sumMoney([slip?.advanceAmount, slip?.pettyLaborPaid]);
       const socialIns = slip?.socialInsuranceDeduction ?? 0;
       const housingFund = slip?.housingFundDeduction ?? 0;
       const incomeTax = slip?.incomeTax ?? 0;
@@ -823,10 +824,10 @@ export function buildCombinedWorkbook(params: ExportParams): XLSX.WorkBook {
       const empHousingFund = slip?.employerHousingFund ?? 0;
       const totalCost = slip?.totalEmployerCost ?? grossSalary;
 
-      deptFinal += finalSalary;
-      deptCost += totalCost;
-      grandFinal += finalSalary;
-      grandCost += totalCost;
+      deptFinal = sumMoney([deptFinal, finalSalary]);
+      deptCost = sumMoney([deptCost, totalCost]);
+      grandFinal = sumMoney([grandFinal, finalSalary]);
+      grandCost = sumMoney([grandCost, totalCost]);
 
       payrollRows.push([
         dept.label, emp.realName, emp.code ?? "", EMPLOYEE_TYPE_LABELS[emp.type],
@@ -1025,12 +1026,12 @@ export function buildCombinedHtml(params: ExportParams): string {
       const slip = monthSlips.find((s) => s.employeeId === emp.id);
       const att = monthAtts.find((a) => a.employeeId === emp.id);
       const finalSalary = slip?.finalSalary ?? 0;
-      deptFinal += finalSalary;
-      grandFinal += finalSalary;
-      grandCost += slip?.totalEmployerCost ?? slip?.grossSalary ?? 0;
+      deptFinal = sumMoney([deptFinal, finalSalary]);
+      grandFinal = sumMoney([grandFinal, finalSalary]);
+      grandCost = sumMoney([grandCost, slip?.totalEmployerCost ?? slip?.grossSalary]);
       const proportionalBase = getAttendanceBaseSalary(att);
       const specialDeduction = att?.totalSpecialDeduction ?? 0;
-      const allowanceTotal = (slip?.mealAllowance ?? 0) + (slip?.transportAllowance ?? 0) + (slip?.otherAllowance ?? 0);
+      const allowanceTotal = sumMoney([slip?.mealAllowance, slip?.transportAllowance, slip?.otherAllowance]);
       return `<tr>
         <td>${emp.realName}</td><td>${emp.code ?? ""}</td><td>${EMPLOYEE_TYPE_LABELS[emp.type]}</td>
         <td>${att?.attendanceDays ?? "—"}/${att?.expectedAttendanceDays ?? "—"}</td>

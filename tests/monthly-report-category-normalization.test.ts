@@ -29,3 +29,30 @@ describe("月度经营报表菜品大类归并", () => {
     expect(result.report?.dishCategories.find((item) => item.name === "Food·套餐")?.revenue).toBe(30);
   });
 });
+
+
+describe("月度经营报表金额精度", () => {
+  it("归并多条小数金额时按分汇总，不保留浮点尾差", () => {
+    const sheet = utils.aoa_to_sheet([
+      ["菜品销售统计（大类）"],
+      [],
+      [],
+      ["营业月份", "菜品大类", "销售数量", "数量占比", "销售额", "销售额占比", "菜品收入", "收入占比", "优惠", "优惠占比"],
+      ["2026/07", "Food", 1, 0, 0.1, 0, 0.1, 0, 0.01, 0],
+      ["2026/07", "food", 1, 0, 0.2, 0, 0.2, 0, 0.02, 0],
+      ["2026/07", "FOOD", 1, 0, 0.3, 0, 0.3, 0, 0.03, 0],
+    ]);
+    const workbook = utils.book_new();
+    utils.book_append_sheet(workbook, sheet, "菜品大类");
+
+    const result = parseMonthlyReport({ dishCatsBase64: write(workbook, { type: "base64", bookType: "xlsx" }) });
+    const food = result.report?.dishCategories.find((item) => item.name === "Food");
+
+    expect(result.error).toBeUndefined();
+    expect(food).toMatchObject({
+      salesAmount: 0.6,
+      revenue: 0.6,
+      discountAmount: 0.06,
+    });
+  });
+});

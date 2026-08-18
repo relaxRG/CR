@@ -1,4 +1,5 @@
 import type { MonthCloseArchive, PayrollAdjustment } from "./types";
+import { sumMoney } from "@/lib/finance/money";
 
 /** 与月度薪资单隔离的单独补发/扣回单。 */
 export interface SeparatePaymentSlip {
@@ -53,7 +54,7 @@ export function getAdjustmentForMonth(
     .filter((item) => item.month === previousMonth(currentMonth) && item.status === "frozen")
     .sort((a, b) => b.version - a.version)[0];
   if (!archive) return 0;
-  return archive.adjustments
+  return sumMoney(archive.adjustments
     .filter((adjustment) => adjustment.employeeId === employeeId && !adjustment.settled && adjustment.settleMethod === "next_month")
-    .reduce((sum, adjustment) => sum + adjustment.amount, 0);
+    .map((adjustment) => adjustment.amount));
 }

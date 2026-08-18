@@ -1,4 +1,5 @@
 import { Ingredient } from "../recipes/types";
+import { sumMoney } from "@/lib/finance/money";
 import { Bottle } from "./types";
 import { bottleGroupOf } from "./types";
 import {
@@ -262,7 +263,7 @@ export function estimateRecipeCost(
   const estimated = items.filter((i) => i.cost !== null);
   return {
     items,
-    total: estimated.reduce((sum, i) => sum + (i.cost ?? 0), 0),
+    total: sumMoney(estimated.map((item) => item.cost)),
     estimatedCount: estimated.length,
     totalCount: ingredients.length,
   };

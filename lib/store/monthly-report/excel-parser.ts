@@ -18,6 +18,7 @@
  *    - 列：营业月份/菜品大类/销售数量/占比/销售额/占比/菜品收入/占比/优惠/占比
  */
 import { utils, read as xlsxRead } from "xlsx";
+import { sumMoney } from "@/lib/finance/money";
 import {
   MonthlyReport, MonthlyKPI, PaymentMethod, DishCategory, DishItem,
   MealPeriod, DiscountItem, CustomerStats, DailyRevenue, ReturnDishItem,
@@ -287,9 +288,9 @@ function parseDishCategoriesExcel(base64: string): DishCategory[] {
 
     if (existing) {
       existing.salesQty += salesQty;
-      existing.salesAmount += salesAmount;
-      existing.revenue += revenue;
-      existing.discountAmount += discountAmount;
+      existing.salesAmount = sumMoney([existing.salesAmount, salesAmount]);
+      existing.revenue = sumMoney([existing.revenue, revenue]);
+      existing.discountAmount = sumMoney([existing.discountAmount, discountAmount]);
     } else {
       map.set(category.key, {
         name: category.label,
@@ -307,7 +308,7 @@ function parseDishCategoriesExcel(base64: string): DishCategory[] {
 
   // 重新计算占比
   const cats = Array.from(map.values());
-  const totalSalesAmount = cats.reduce((s, c) => s + c.salesAmount, 0);
+  const totalSalesAmount = sumMoney(cats.map((category) => category.salesAmount));
   if (totalSalesAmount > 0) {
     cats.forEach((c) => { c.salesAmountPct = c.salesAmount / totalSalesAmount; });
   }

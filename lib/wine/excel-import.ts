@@ -1,6 +1,7 @@
 import { utils, read as xlsxRead } from "xlsx";
 import { normalizeImportDate } from "@/lib/import/date-utils";
 import { dominantPurchaseMonth } from "@/lib/spirits/import-bridge";
+import { sumMoney } from "@/lib/finance/money";
 import type { WineInventoryItem, WinePurchaseOrderItem, WineMonthlySnapshot } from "@/lib/wine/types";
 
 function uuid() { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
@@ -71,7 +72,7 @@ export function parseWineInventoryExcel(base64: string): WineMonthlySnapshot | n
     const supplierTotals: Record<string, number> = {};
     items.forEach((item) => {
       if (item.purchaseCost > 0) {
-        supplierTotals[item.supplier] = (supplierTotals[item.supplier] ?? 0) + item.purchaseCost;
+        supplierTotals[item.supplier] = sumMoney([supplierTotals[item.supplier], item.purchaseCost]);
       }
     });
 
@@ -87,9 +88,9 @@ export function parseWineInventoryExcel(base64: string): WineMonthlySnapshot | n
       items,
       purchaseOrders,
       supplierTotals,
-      totalPurchase: Object.values(supplierTotals).reduce((sum, value) => sum + value, 0),
+      totalPurchase: sumMoney(Object.values(supplierTotals)),
       totalConsume: items.reduce((sum, item) => sum + item.consumeQty, 0),
-      totalEndCost: items.reduce((sum, item) => sum + item.endCost, 0),
+      totalEndCost: sumMoney(items.map((item) => item.endCost)),
     };
   } catch (error) {
     console.error("葡萄酒 Excel 解析失败", error);

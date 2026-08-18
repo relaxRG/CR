@@ -6,6 +6,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useReducer } from "react";
 import { notifySyncChange, registerStoreReload } from "../sync/engine";
+import { sumMoney } from "@/lib/finance/money";
 
 const STORAGE_KEY = "labor.salary_advances.v1";
 const CATEGORY_STORAGE_KEY = "labor.advance_categories.v1";
@@ -217,13 +218,13 @@ export function SalaryAdvanceProvider({ children }: { children: React.ReactNode 
   const deleteAdvance = useCallback((id: string) => dispatch({ type: "DELETE", id }), []);
 
   const getPendingDeduction = useCallback((employeeId: string, month: string): number => {
-    return state.advances
-      .filter((a) =>
-        a.employeeId === employeeId &&
-        a.status === "pending" &&
-        (a.deductMonth === month || a.deductMonth === "")
+    return sumMoney(state.advances
+      .filter((advance) =>
+        advance.employeeId === employeeId &&
+        advance.status === "pending" &&
+        (advance.deductMonth === month || advance.deductMonth === "")
       )
-      .reduce((sum, a) => sum + a.amount, 0);
+      .map((advance) => advance.amount));
   }, [state.advances]);
 
   const getAdvancesForMonth = useCallback((employeeId: string, month: string): SalaryAdvance[] => {

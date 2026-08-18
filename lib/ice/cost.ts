@@ -11,6 +11,7 @@
  */
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { notifySyncChange } from "../sync/engine";
+import { sumMoney } from "@/lib/finance/money";
 
 export type IcePricing = "perDrink" | "perGram" | "perPiece";
 
@@ -217,6 +218,5 @@ export function estimateIceCost(method: string, ice: string, s: IceSettings): Ic
     if (crushed) items.push({ use: "serve", kind: crushed, cost: iceKindCostPerDrink(crushed) });
   }
 
-  const total = items.reduce((sum, x) => sum + x.cost, 0);
-  return { items, total: Math.round(total * 100) / 100 };
+  return { items, total: sumMoney(items.map((item) => item.cost)) };
 }

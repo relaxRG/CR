@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useReducer, useState } from "react";
 import { notifySyncChange, registerStoreReload } from "../sync/engine";
+import { multiplyMoney, roundMoney, sumMoney } from "@/lib/finance/money";
 import {
   FoodIngredient,
   FoodLedgerMovement,
@@ -72,7 +73,7 @@ function uuid(): string { return Math.random().toString(36).slice(2) + Date.now(
 function weightedUnitCost(entry: Pick<FoodMonthlyLedgerEntry, "openingQty" | "openingUnitCost" | "purchaseQty" | "purchaseCost">) {
   const totalQty = entry.openingQty + entry.purchaseQty;
   if (totalQty <= 0) return entry.openingUnitCost;
-  return Math.round(((entry.openingQty * entry.openingUnitCost + entry.purchaseCost) / totalQty) * 100) / 100;
+  return roundMoney(sumMoney([multiplyMoney(entry.openingQty, entry.openingUnitCost), entry.purchaseCost]) / totalQty);
 }
 
 function theoreticalClosingQty(entry: Pick<FoodMonthlyLedgerEntry, "openingQty" | "purchaseQty" | "consumeQty">) {
@@ -82,7 +83,7 @@ function theoreticalClosingQty(entry: Pick<FoodMonthlyLedgerEntry, "openingQty" 
 function entryClosing(entry: FoodMonthlyLedgerEntry) {
   const closingUnitCost = entry.actualClosingUnitCost ?? weightedUnitCost(entry);
   const closingQty = entry.actualClosingQty ?? theoreticalClosingQty(entry);
-  return { closingQty, closingUnitCost, closingCost: Math.round(closingQty * closingUnitCost * 100) / 100 };
+  return { closingQty, closingUnitCost, closingCost: multiplyMoney(closingQty, closingUnitCost) };
 }
 
 export function sanitizeFoodIngredientState(raw: unknown): FoodIngredientState {
@@ -169,7 +170,7 @@ function applyPurchase(state: FoodIngredientState, input: FoodPurchaseInput): Fo
   const date = input.date || now.slice(0, 10);
   const month = monthFromDate(date);
   const unitPrice = Math.max(0, input.unitPrice || ingredient.costPrice || 0);
-  const totalCost = Math.round(input.quantity * unitPrice * 100) / 100;
+  const totalCost = multiplyMoney(input.quantity, unitPrice);
   const priceEntry: PriceHistoryEntry = { price: unitPrice, date, supplier: input.supplier || ingredient.supplier, source: input.source ?? "manual" };
   const priceHistory = appendPriceHistory(state, ingredient.id, priceEntry);
   const nextIngredient = {
@@ -183,7 +184,7 @@ function applyPurchase(state: FoodIngredientState, input: FoodPurchaseInput): Fo
   const withEntry = withLedgerEntry({ ...state, priceHistory }, ingredient.id, month, now, (entry) => ({
     ...entry,
     purchaseQty: entry.purchaseQty + input.quantity,
-    purchaseCost: Math.round((entry.purchaseCost + totalCost) * 100) / 100,
+    purchaseCost: sumMoney([entry.purchaseCost, totalCost]),
     actualClosingQty: undefined,
     actualClosingUnitCost: undefined,
     updatedAt: now,
@@ -216,11 +217,11 @@ function applyConsume(state: FoodIngredientState, input: FoodConsumeInput): Food
   const month = monthFromDate(date);
   const currentEntry = state.ledgerEntries.find((entry) => entry.ingredientId === ingredient.id && entry.month === month);
   const unitCost = Math.max(0, input.unitCost ?? (currentEntry ? weightedUnitCost(currentEntry) : ingredient.costPrice ?? 0));
-  const totalCost = Math.round(input.quantity * unitCost * 100) / 100;
+  const totalCost = multiplyMoney(input.quantity, unitCost);
   const withEntry = withLedgerEntry(state, ingredient.id, month, now, (entry) => ({
     ...entry,
     consumeQty: entry.consumeQty + input.quantity,
-    consumeCost: Math.round((entry.consumeCost + totalCost) * 100) / 100,
+    consumeCost: sumMoney([entry.consumeCost, totalCost]),
     actualClosingQty: undefined,
     actualClosingUnitCost: undefined,
     updatedAt: now,
@@ -272,7 +273,7 @@ function applyStocktake(state: FoodIngredientState, input: FoodStocktakeInput): 
       date,
       quantity: input.actualClosingQty,
       unitCost,
-      totalCost: Math.round(input.actualClosingQty * unitCost * 100) / 100,
+      totalCost: multiplyMoney(input.actualClosingQty, unitCost),
       notes: input.notes ?? "",
       createdAt: now,
     }, ...withEntry.ledgerMovements],
