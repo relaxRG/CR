@@ -28,6 +28,12 @@ const SESSION_KEY = "cf.sync.groupSwitchSession.v1";
 const TICKET_KEY_PREFIX = "cf.sync.groupSwitchTicket.";
 const SNAPSHOT_SLOT_COUNT = 7;
 
+/**
+ * Web端恢复票据只允许在当前页面生命周期内存中存在。
+ * 浏览器刷新或关闭后必须安全失败并要求用户重新发起切换，绝不写入 AsyncStorage/localStorage。
+ */
+const webRecoveryTickets = new Map<string, string>();
+
 export type GroupSwitchMode = "prepared" | "committed" | "hydrating" | "error";
 
 export type PersistedGroupSwitchSession = {
@@ -61,20 +67,20 @@ function ticketKey(switchId: string): string {
 
 async function saveTicket(switchId: string, ticket: string): Promise<void> {
   if (Platform.OS === "web") {
-    await AsyncStorage.setItem(ticketKey(switchId), ticket);
+    webRecoveryTickets.set(switchId, ticket);
     return;
   }
   await SecureStore.setItemAsync(ticketKey(switchId), ticket);
 }
 
 async function readTicket(switchId: string): Promise<string | null> {
-  if (Platform.OS === "web") return AsyncStorage.getItem(ticketKey(switchId));
+  if (Platform.OS === "web") return webRecoveryTickets.get(switchId) ?? null;
   return SecureStore.getItemAsync(ticketKey(switchId));
 }
 
 async function clearTicket(switchId: string): Promise<void> {
   if (Platform.OS === "web") {
-    await AsyncStorage.removeItem(ticketKey(switchId));
+    webRecoveryTickets.delete(switchId);
     return;
   }
   await SecureStore.deleteItemAsync(ticketKey(switchId));
