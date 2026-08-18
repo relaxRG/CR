@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo } from "react";
 import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import * as Haptics from "expo-haptics";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { BoundedMonthNavigator } from "@/components/inventory/BoundedMonthNavigator";
@@ -57,7 +56,6 @@ function normalizeMany(values: Array<string | null | undefined>): string[] {
 
 export default function StoreInventoryScreen({ mode = "inventory" }: { mode?: InventoryPortalMode }) {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
   const categoryStorageKey = mode === "shop" ? "store.shop.category.v2" : "store.inventory.category.v2";
   const defaultCategory = mode === "shop" ? "glassware" : "spirits";
@@ -167,7 +165,7 @@ export default function StoreInventoryScreen({ mode = "inventory" }: { mode?: In
 
       <BoundedMonthNavigator month={selectedMonth} bounds={bounds} onChange={selectGlobalMonth} testID={`${mode}-month-navigator`} />
 
-      <View testID={`${mode}-workspace-${currentCategory.key}`} style={{ flex: 1, paddingBottom: insets.bottom }}>
+      <View testID={`${mode}-workspace-${currentCategory.key}`} style={{ flex: 1 }}>
         <InventoryBusinessPanel category={currentCategory.key} month={selectedMonth} />
       </View>
     </View>

@@ -416,6 +416,7 @@ try {
       return { seq, wineType: wineTypes[index % wineTypes.length], supplier: 'H5酒商', name: 'H5酒款' + seq + ' 赤霞珠', initUnitCost: unitCost, initQty, initCost: initQty * unitCost, purchaseQty, purchaseCost: purchaseQty * unitCost, endQty, unitCost, endCost: endQty * unitCost, consumeBottles: 1, consumeQty: unitCost };
     });
     localStorage.setItem('wine.snapshots.v2', JSON.stringify({ snapshots: [{ id: 'h5-wine-snapshot', monthLabel: wineMonthLabel, importedAt: now, supplierTotals: { 'H5酒商': 396 }, totalPurchase: 396, totalConsume: 792, totalEndCost: wineItems.reduce((sum, item) => sum + item.endCost, 0), items: wineItems, purchaseOrders: [] }] }));
+    localStorage.setItem('wine.manual_purchases.v1', JSON.stringify({ purchases: Array.from({ length: 36 }, (_, index) => ({ id: 'h5-wine-purchase-' + index, date: month + '-' + String((index % 27) + 1).padStart(2, '0'), supplier: 'H5酒商', bottleId: null, productName: 'H5采购酒款' + (index + 1), unitPrice: 20 + (index % 5), quantity: 1 + (index % 4), amount: (20 + (index % 5)) * (1 + (index % 4)), notes: 'H5采购备注', createdAt: now, source: 'manual' })) }));
     localStorage.setItem('food.ingredients.v2', JSON.stringify({ ingredients: [{ id: 'h5-food', name: 'H5牛肉', category: 'meat', spec: '1kg/包', unit: '包', costPrice: 30, stock: 3, supplier: 'H5食材商', notes: '', createdAt: now, updatedAt: now }], priceHistory: {}, ledgerEntries: [{ id: 'h5-food-ledger', month, ingredientId: 'h5-food', openingQty: 2, openingUnitCost: 28, purchaseQty: 2, purchaseCost: 64, consumeQty: 1, consumeCost: 32, createdAt: now, updatedAt: now }], ledgerMovements: [] }));
     return month;
   })()`, returnByValue: true });
@@ -547,6 +548,29 @@ try {
     wineLedgerScrollViewports.push({ width, ...state });
   }
   report.push({ reportPage: '葡萄酒库存横纵向滚动', viewports: wineLedgerScrollViewports });
+
+  // 葡萄酒当月进货：分类、日期、商品名称固定显示；末行需在浮动导航上方可达。
+  const winePurchaseLedgerViewports = [];
+  for (const width of MOBILE_VIEWPORTS) {
+    await call("Emulation.setDeviceMetricsOverride", { width, height: 844, deviceScaleFactor: 3, mobile: true });
+    await call("Page.navigate", { url: `http://localhost:${port}/wine-inventory` });
+    await sleep(760);
+    await click(call, clickTestIdExpression("wine-tab-purchase"), `${width}pt 未找到葡萄酒当月进货页签`);
+    await sleep(180);
+    const state = (await call("Runtime.evaluate", { expression: `(() => {
+      const table = document.querySelector('[data-testid="wine-purchase-ledger-table"]');
+      const list = document.querySelector('[data-testid="wine-purchase-ledger-table-virtual-list"]');
+      const name = document.querySelector('[data-testid="wine-purchase-name-h5-wine-purchase-1"]');
+      if (list) list.scrollTop = Math.max(0, list.scrollHeight - list.clientHeight);
+      if (table) table.scrollLeft = Math.max(0, table.scrollWidth - table.clientWidth);
+      const fixedText = table?.parentElement?.textContent ?? '';
+      return { table: Boolean(table), list: Boolean(list), name: Boolean(name), hasCategory: fixedText.includes('分类'), hasDate: fixedText.includes('日期'), hasName: fixedText.includes('商品名称'), verticalClientHeight: list?.clientHeight ?? 0, verticalScrollHeight: list?.scrollHeight ?? 0, verticalReachedEnd: list?.scrollTop ?? 0, horizontalClientWidth: table?.clientWidth ?? 0, horizontalScrollWidth: table?.scrollWidth ?? 0, horizontalReachedEnd: table?.scrollLeft ?? 0, rootClientWidth: document.documentElement.clientWidth, rootScrollWidth: document.documentElement.scrollWidth, bodyScrollWidth: document.body.scrollWidth };
+    })()`, returnByValue: true })).result.value;
+    if (!state.table || !state.list || !state.name || !state.hasCategory || !state.hasDate || !state.hasName || (state.verticalScrollHeight > state.verticalClientHeight + 1 && state.verticalReachedEnd < 1) || (state.horizontalScrollWidth > state.horizontalClientWidth + 1 && state.horizontalReachedEnd < 1)) throw new Error(`葡萄酒当月进货 ${width}pt 固定列或滚动异常：${JSON.stringify(state)}`);
+    if (state.rootScrollWidth > state.rootClientWidth || state.bodyScrollWidth > state.rootClientWidth) throw new Error(`葡萄酒当月进货 ${width}pt 出现根级横向溢出：${JSON.stringify(state)}`);
+    winePurchaseLedgerViewports.push({ width, ...state });
+  }
+  report.push({ reportPage: '葡萄酒当月进货固定列与末行可达性', viewports: winePurchaseLedgerViewports });
 
   // 报表四页签：总月报、经营分析、账户、时段经营分析均在同一工作台切换，且只保留一套月份导航。
   const reportMonthNavigatorViewports = [];

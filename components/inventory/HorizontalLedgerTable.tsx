@@ -1,11 +1,18 @@
-import React, { ReactNode } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { ReactNode, useMemo } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useColors } from "@/hooks/use-colors";
+import { expandStoreTableColumns, getStoreTableViewport, STORE_TABLE_METRICS } from "@/lib/store/table-display";
 
 export interface HorizontalLedgerColumn<Row> {
   key: string;
   label: string;
   width: number;
+  /** 手机端使用的最小可读宽度；桌面与平板仍使用 width 和弹性权重。 */
+  compactWidth?: number;
+  /** 手机端固定在左侧的身份列；其余列可横向浏览。 */
+  pinned?: boolean;
+  /** 桌面宽屏下分配剩余宽度的权重。 */
+  flexWeight?: number;
   align?: "left" | "center" | "right";
   render: (row: Row) => ReactNode;
   onPress?: (row: Row) => void;
@@ -47,6 +54,14 @@ export function HorizontalLedgerTable<Row>({
   onSort,
 }: HorizontalLedgerTableProps<Row>) {
   const colors = useColors();
+  const { width: windowWidth } = useWindowDimensions();
+  const responsiveColumns = useMemo(() => {
+    const baseColumns = getStoreTableViewport(windowWidth) === "phone"
+      ? columns.map((column) => ({ ...column, width: column.compactWidth ?? column.width }))
+      : columns;
+    return expandStoreTableColumns(baseColumns, Math.max(0, windowWidth - 32));
+  }, [columns, windowWidth]);
+  const totalWidth = responsiveColumns.reduce((total, column) => total + column.width, 0);
   const hasRows = groups.some((group) => group.rows.length > 0);
 
   if (!hasRows) {
@@ -59,9 +74,9 @@ export function HorizontalLedgerTable<Row>({
 
   return (
     <ScrollView horizontal nestedScrollEnabled directionalLockEnabled showsHorizontalScrollIndicator testID={testID} style={{ flexGrow: 0 }}>
-      <View>
+      <View style={{ width: totalWidth, minWidth: "100%" }}>
         <View style={[S.header, { backgroundColor: colors.primary }]}>
-          {columns.map((column) => {
+          {responsiveColumns.map((column) => {
             const isSortable = Boolean(onSort && column.sortKey);
             const active = sort?.key === column.sortKey;
             const header = (
@@ -91,14 +106,14 @@ export function HorizontalLedgerTable<Row>({
           <React.Fragment key={group.id}>
             <View style={[S.groupHeader, { backgroundColor: group.color + "20" }]}>
               <View style={[S.groupDot, { backgroundColor: group.color }]} />
-              <Text style={{ color: group.color, fontSize: 11, fontWeight: "800" }}>{group.label}</Text>
-              <Text style={{ color: colors.muted, fontSize: 10 }}>({group.rows.length})</Text>
+              <Text style={{ color: group.color, fontSize: STORE_TABLE_METRICS.bodyFontSize, fontWeight: "800" }}>{group.label}</Text>
+              <Text style={{ color: colors.muted, fontSize: 11 }}>({group.rows.length})</Text>
             </View>
             {group.rows.map((row, index) => {
               const backgroundColor = index % 2 === 0 ? colors.surface : colors.background;
               return (
                 <View key={rowKey(row)} style={[S.row, { backgroundColor, borderBottomColor: colors.border }]}>
-                  {columns.map((column) => {
+                  {responsiveColumns.map((column) => {
                     const content = (
                       <View style={[S.cell, { width: column.width, alignItems: alignment(column.align) }]}>
                         {column.render(row)}
@@ -135,14 +150,14 @@ function alignment(align: HorizontalLedgerColumn<unknown>["align"]) {
 }
 
 const S = StyleSheet.create({
-  header: { flexDirection: "row", minHeight: 40 },
-  headerCell: { justifyContent: "center", paddingHorizontal: 7, paddingVertical: 8 },
-  headerText: { color: "#fff", fontSize: 11, fontWeight: "800" },
-  headerLabel: { flexDirection: "row", alignItems: "center", gap: 2 },
-  sortMark: { fontSize: 10, fontWeight: "800" },
-  groupHeader: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 30, paddingHorizontal: 10 },
+  header: { flexDirection: "row", minHeight: STORE_TABLE_METRICS.headerHeight },
+  headerCell: { justifyContent: "center", paddingHorizontal: 9, paddingVertical: 8 },
+  headerText: { color: "#fff", fontSize: STORE_TABLE_METRICS.bodyFontSize, fontWeight: "800" },
+  headerLabel: { flexDirection: "row", alignItems: "center", gap: 3 },
+  sortMark: { fontSize: 11, fontWeight: "800" },
+  groupHeader: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: STORE_TABLE_METRICS.groupHeight, paddingHorizontal: 10 },
   groupDot: { width: 8, height: 8, borderRadius: 4 },
-  row: { flexDirection: "row", minHeight: 48, borderBottomWidth: StyleSheet.hairlineWidth },
-  cell: { justifyContent: "center", paddingHorizontal: 7, paddingVertical: 7 },
+  row: { flexDirection: "row", minHeight: STORE_TABLE_METRICS.rowHeight, borderBottomWidth: StyleSheet.hairlineWidth },
+  cell: { justifyContent: "center", paddingHorizontal: 9, paddingVertical: 6 },
   empty: { minHeight: 120, alignItems: "center", justifyContent: "center", borderWidth: StyleSheet.hairlineWidth, borderRadius: 12 },
 });

@@ -20,7 +20,6 @@ const flatListFiles = [
   "app/lab/projects.tsx",
   "app/supplier-import.tsx",
   "app/sync-log.tsx",
-  "app/wine-inventory.tsx",
   "components/link-picker-sheet.tsx",
   "components/store/petty-cash.tsx",
   "components/store/purchase.tsx",
@@ -48,6 +47,16 @@ describe("移动端虚拟列表性能规范", () => {
     expect(listCount).toBeGreaterThan(0);
     expect(flatListConfigured(source)).toBe(listCount);
     expect(source).toContain("@/components/performance/mobile-virtual-list");
+  });
+
+  it("葡萄酒长台账使用专用的固定列窗口化组件，替代 FlatList 同样受性能策略保护", () => {
+    const source = readSource("app/wine-inventory.tsx");
+    const table = readSource("components/inventory/VirtualizedHorizontalLedgerTable.tsx");
+    expect(source).toContain("VirtualizedHorizontalLedgerTable");
+    expect(table).toContain("const OVERSCAN_PX = ROW_HEIGHT * 24");
+    expect(table).toContain("scrollEventThrottle={48}");
+    expect(table).toContain("pinnedScrollRef");
+    expect(table).toContain("dataScrollRef");
   });
 
   it("嵌套拖拽列表使用专用的自动滚动与虚拟化配置", () => {

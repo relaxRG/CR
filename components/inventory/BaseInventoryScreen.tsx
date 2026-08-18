@@ -20,6 +20,7 @@ import { GenericInventoryContextValue, GenericInventoryItem } from "@/lib/invent
 import { getCurrentMonth, MonthlyLedgerItem, MonthlySnapshot } from "@/lib/inventory-core/types";
 import { MonthlyLedgerRow } from "./MonthlyLedgerSheet";
 import { HorizontalLedgerColumn, HorizontalLedgerGroup, HorizontalLedgerTable } from "./HorizontalLedgerTable";
+import { formatStoreMoney, formatStoreQuantity, STORE_TABLE_METRICS } from "@/lib/store/table-display";
 import { MonthlyLedgerDetailSheet } from "./MonthlyLedgerDetailSheet";
 import { MonthCloseModal } from "./MonthCloseModal";
 import { OpeningStockModal } from "./OpeningStockModal";
@@ -162,18 +163,18 @@ export function BaseInventoryScreen({
     id: label || "uncategorized", label: label || "未分类", color: accentColor, rows,
   })), [groupedLedger, accentColor]);
   const ledgerColumns = useMemo<HorizontalLedgerColumn<MonthlyLedgerItem>[]>(() => [
-    { key: "name", label: "商品名称", width: 146, onPress: setSelectedLedgerItem, testID: (item) => `${categoryId}-ledger-name-${item.itemId}`, render: (item) => <><Text numberOfLines={1} style={{ color: colors.foreground, fontSize: 12, fontWeight: "800" }}>{item.name}</Text><Text numberOfLines={1} style={{ color: colors.muted, fontSize: 10 }}>{item.spec || item.unit}</Text></> },
-    { key: "openingQty", label: "期初数量", width: 76, align: "right", render: (item) => <Text style={{ color: colors.foreground, fontSize: 12 }}>{item.openingQty.toFixed(2)}</Text> },
-    { key: "openingUnitCost", label: "期初单价", width: 76, align: "right", render: (item) => <Text style={{ color: colors.foreground, fontSize: 12 }}>¥{item.openingUnitCost.toFixed(2)}</Text> },
-    { key: "openingCost", label: "期初成本", width: 82, align: "right", render: (item) => <Text style={{ color: colors.foreground, fontSize: 12 }}>¥{item.openingCost.toFixed(2)}</Text> },
-    { key: "purchaseQty", label: "进货数量", width: 76, align: "right", render: (item) => <Text style={{ color: item.purchaseQty > 0 ? accentColor : colors.muted, fontSize: 12 }}>{item.purchaseQty > 0 ? `+${item.purchaseQty.toFixed(2)}` : "—"}</Text> },
-    { key: "purchaseCost", label: "进货成本", width: 82, align: "right", render: (item) => <Text style={{ color: item.purchaseCost > 0 ? accentColor : colors.muted, fontSize: 12 }}>{item.purchaseCost > 0 ? `¥${item.purchaseCost.toFixed(2)}` : "—"}</Text> },
-    { key: "consumeQty", label: "消耗数量", width: 76, align: "right", render: (item) => <Text style={{ color: item.consumeQty > 0 ? colors.warning : colors.muted, fontSize: 12 }}>{item.consumeQty > 0 ? item.consumeQty.toFixed(2) : "—"}</Text> },
-    { key: "consumeCost", label: "消耗成本", width: 82, align: "right", render: (item) => <Text style={{ color: item.consumeCost > 0 ? colors.warning : colors.muted, fontSize: 12 }}>{item.consumeCost > 0 ? `¥${item.consumeCost.toFixed(2)}` : "—"}</Text> },
-    ...(showLoss ? [{ key: "lossQty", label: "损耗数量", width: 76, align: "right" as const, render: (item: MonthlyLedgerItem) => <Text style={{ color: item.lossQty > 0 ? colors.error : colors.muted, fontSize: 12 }}>{item.lossQty > 0 ? item.lossQty.toFixed(2) : "—"}</Text> }] : []),
-    { key: "closingQty", label: "期末库存", width: 76, align: "right", render: (item) => <Text style={{ color: item.closingQty <= 0 ? colors.error : colors.foreground, fontSize: 12, fontWeight: "800" }}>{item.closingQty.toFixed(2)}</Text> },
-    { key: "closingUnitCost", label: "期末单价", width: 82, align: "right", render: (item) => <Text style={{ color: colors.foreground, fontSize: 12 }}>¥{item.closingUnitCost.toFixed(2)}</Text> },
-    { key: "closingCost", label: "期末成本", width: 82, align: "right", render: (item) => <Text style={{ color: accentColor, fontSize: 12, fontWeight: "800" }}>¥{item.closingCost.toFixed(2)}</Text> },
+    { key: "name", label: "商品名称", width: 184, pinned: true, flexWeight: 3, onPress: setSelectedLedgerItem, testID: (item) => `${categoryId}-ledger-name-${item.itemId}`, render: (item) => <><Text numberOfLines={1} style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.nameFontSize, fontWeight: "800" }}>{item.name}</Text><Text numberOfLines={1} style={{ color: colors.muted, fontSize: 11 }}>{item.spec || item.unit}</Text></> },
+    { key: "openingQty", label: "期初量", width: 88, flexWeight: 1, align: "right", render: (item) => <Text style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{formatStoreQuantity(item.openingQty)}</Text> },
+    { key: "openingUnitCost", label: "期初单价", width: 104, flexWeight: 1.2, align: "right", render: (item) => <Text style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{formatStoreMoney(item.openingUnitCost)}</Text> },
+    { key: "openingCost", label: "期初成本", width: 112, flexWeight: 1.3, align: "right", render: (item) => <Text style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{formatStoreMoney(item.openingCost)}</Text> },
+    { key: "purchaseQty", label: "进货量", width: 88, flexWeight: 1, align: "right", render: (item) => <Text style={{ color: item.purchaseQty > 0 ? accentColor : colors.muted, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{item.purchaseQty > 0 ? `+${formatStoreQuantity(item.purchaseQty)}` : "—"}</Text> },
+    { key: "purchaseCost", label: "进货成本", width: 112, flexWeight: 1.3, align: "right", render: (item) => <Text style={{ color: item.purchaseCost > 0 ? accentColor : colors.muted, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{item.purchaseCost > 0 ? formatStoreMoney(item.purchaseCost) : "—"}</Text> },
+    { key: "consumeQty", label: "消耗量", width: 88, flexWeight: 1, align: "right", render: (item) => <Text style={{ color: item.consumeQty > 0 ? colors.warning : colors.muted, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{item.consumeQty > 0 ? formatStoreQuantity(item.consumeQty) : "—"}</Text> },
+    { key: "consumeCost", label: "消耗成本", width: 112, flexWeight: 1.3, align: "right", render: (item) => <Text style={{ color: item.consumeCost > 0 ? colors.warning : colors.muted, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{item.consumeCost > 0 ? formatStoreMoney(item.consumeCost) : "—"}</Text> },
+    ...(showLoss ? [{ key: "lossQty", label: "损耗量", width: 88, flexWeight: 1, align: "right" as const, render: (item: MonthlyLedgerItem) => <Text style={{ color: item.lossQty > 0 ? colors.error : colors.muted, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{item.lossQty > 0 ? formatStoreQuantity(item.lossQty) : "—"}</Text> }] : []),
+    { key: "closingQty", label: "期末量", width: 88, flexWeight: 1, align: "right", render: (item) => <Text style={{ color: item.closingQty <= 0 ? colors.muted : colors.foreground, fontSize: STORE_TABLE_METRICS.numericFontSize, fontWeight: "800" }}>{formatStoreQuantity(item.closingQty)}</Text> },
+    { key: "closingUnitCost", label: "期末单价", width: 112, flexWeight: 1.3, align: "right", render: (item) => <Text style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{formatStoreMoney(item.closingUnitCost)}</Text> },
+    { key: "closingCost", label: "期末成本", width: 120, flexWeight: 1.5, align: "right", render: (item) => <Text style={{ color: accentColor, fontSize: STORE_TABLE_METRICS.numericFontSize, fontWeight: "800" }}>{formatStoreMoney(item.closingCost)}</Text> },
   ], [accentColor, categoryId, colors, showLoss]);
 
 

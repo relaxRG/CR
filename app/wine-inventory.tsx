@@ -30,6 +30,7 @@ import { MonthlyLedgerDetailSheet } from "@/components/inventory/MonthlyLedgerDe
 import { MonthlyLedgerItem } from "@/lib/inventory-core/types";
 import { MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS, MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
 import { useModuleMonthCloseStore } from "@/lib/month-close/module-month-close-store";
+import { formatStoreMoney, formatStoreQuantity, STORE_TABLE_METRICS } from "@/lib/store/table-display";
 
 type ViewTab = "ledger" | "supplier" | "purchase" | "summary";
 
@@ -47,71 +48,6 @@ function getCurrentMonth(): string {
 
 function normalizeWineIdentity(value: string): string {
   return value.trim().toLocaleLowerCase().replace(/[\s\-–—_()（）·.，,]/g, "");
-}
-
-// ─── 进货记录行 ───────────────────────────────────────────────────────────────
-function PurchaseRow({
-  purchase, prevUnitPrice, colors, selected, onSelect, onEdit
-}: {
-  purchase: WineManualPurchase;
-  prevUnitPrice: number | null;
-  colors: any;
-  selected: boolean;
-  onSelect: () => void;
-  onEdit: () => void;
-}) {
-  const delta = prevUnitPrice !== null ? purchase.unitPrice - prevUnitPrice : (purchase.unitPriceDelta ?? null);
-  const alertPct = 0; // 默认全部显示涨跌
-  const showAlert = delta !== null && Math.abs(delta) > 0 && Math.abs(delta / (prevUnitPrice || purchase.unitPrice)) * 100 > alertPct;
-
-  return (
-    <TouchableOpacity
-      onLongPress={onSelect}
-      onPress={selected ? onSelect : onEdit}
-      activeOpacity={0.8}
-      style={[S.purchaseRow, {
-        backgroundColor: selected ? colors.primary + "15" : colors.surface,
-        borderColor: selected ? colors.primary : colors.border,
-      }]}
-    >
-      {/* 左侧选择圆圈 */}
-      <TouchableOpacity onPress={onSelect} style={{ marginRight: 10 }}>
-        <View style={{
-          width: 22, height: 22, borderRadius: 11,
-          borderWidth: 2, borderColor: selected ? colors.primary : colors.border,
-          backgroundColor: selected ? colors.primary : "transparent",
-          alignItems: "center", justifyContent: "center",
-        }}>
-          {selected && <IconSymbol name="checkmark" size={12} color="#fff" />}
-        </View>
-      </TouchableOpacity>
-
-      {/* 内容 */}
-      <View style={{ flex: 1 }}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 2 }}>
-          <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }} numberOfLines={1}>
-            {purchase.productName}
-          </Text>
-          {showAlert && delta !== null && (
-            <View style={{ backgroundColor: colors.primary + "12", paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4 }}>
-              <Text style={{ fontSize: 10, fontWeight: "700", color: colors.primary }}>
-                {delta > 0 ? "↑" : "↓"}¥{formatMoney(Math.abs(delta))}
-              </Text>
-            </View>
-          )}
-        </View>
-        <Text style={{ fontSize: 11, color: colors.muted }}>
-          {purchase.supplier} · {purchase.date} · {purchase.quantity}瓶
-        </Text>
-      </View>
-
-      {/* 右侧金额 */}
-      <View style={{ alignItems: "flex-end" }}>
-        <Text style={{ fontSize: 15, fontWeight: "700", color: colors.primary }}>¥{formatMoney(purchase.amount)}</Text>
-        <Text style={{ fontSize: 11, color: colors.muted }}>¥{purchase.unitPrice}/瓶</Text>
-      </View>
-    </TouchableOpacity>
-  );
 }
 
 // ─── 生成进货单文本 ────────────────────────────────────────────────────────────
@@ -403,18 +339,19 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
     return [...groups.entries()].map(([label, rows]) => ({ id: label, label, color: colors.muted, rows }));
   }, [wineLedgerRows, colors.muted]);
   const wineLedgerColumns = useMemo<HorizontalLedgerColumn<MonthlyLedgerItem>[]>(() => [
-    { key: "sequence", label: "序", width: 38, align: "center", render: (row) => <Text style={{ color: colors.muted, fontSize: 11 }}>{row.itemId}</Text> },
-    { key: "name", sortKey: "name", label: "商品名称", width: 146, onPress: setSelectedLedgerItem, testID: (row) => `wine-ledger-name-${row.itemId}`, render: (row) => <><Text numberOfLines={1} style={{ color: colors.foreground, fontSize: 12, fontWeight: "800" }}>{row.name}</Text><Text numberOfLines={1} style={{ color: colors.muted, fontSize: 10 }}>{row.spec}</Text></> },
-    { key: "openingQty", sortKey: "openingQty", label: "期初数量", width: 76, align: "right", render: (row) => <Text style={{ color: colors.foreground, fontSize: 12 }}>{row.openingQty.toFixed(2)}</Text> },
-    { key: "openingUnitCost", sortKey: "openingUnitCost", label: "期初单价", width: 76, align: "right", render: (row) => <Text style={{ color: colors.foreground, fontSize: 12 }}>¥{formatMoney(row.openingUnitCost)}</Text> },
-    { key: "openingCost", sortKey: "openingCost", label: "期初成本", width: 82, align: "right", render: (row) => <Text style={{ color: colors.foreground, fontSize: 12 }}>¥{formatMoney(row.openingCost)}</Text> },
-    { key: "purchaseQty", sortKey: "purchaseQty", label: "进货数量", width: 76, align: "right", render: (row) => <Text style={{ color: row.purchaseQty > 0 ? colors.primary : colors.muted, fontSize: 12 }}>{row.purchaseQty > 0 ? `+${row.purchaseQty.toFixed(2)}` : "—"}</Text> },
-    { key: "purchaseCost", sortKey: "purchaseCost", label: "进货成本", width: 82, align: "right", render: (row) => <Text style={{ color: row.purchaseCost > 0 ? colors.primary : colors.muted, fontSize: 12 }}>{row.purchaseCost > 0 ? `¥${formatMoney(row.purchaseCost)}` : "—"}</Text> },
-    { key: "consumeQty", sortKey: "consumeQty", label: "消耗瓶数", width: 76, align: "right", render: (row) => <Text style={{ color: row.consumeQty > 0 ? colors.warning : colors.muted, fontSize: 12 }}>{row.consumeQty > 0 ? row.consumeQty.toFixed(2) : "—"}</Text> },
-    { key: "consumeCost", sortKey: "consumeCost", label: "消耗成本", width: 82, align: "right", render: (row) => <Text style={{ color: row.consumeCost > 0 ? colors.warning : colors.muted, fontSize: 12 }}>{row.consumeCost > 0 ? `¥${formatMoney(row.consumeCost)}` : "—"}</Text> },
-    { key: "closingQty", sortKey: "closingQty", label: "期末库存", width: 76, align: "right", render: (row) => <Text style={{ color: row.closingQty <= 0 ? colors.muted : colors.foreground, fontSize: 12, fontWeight: "800" }}>{row.closingQty.toFixed(2)}</Text> },
-    { key: "closingUnitCost", sortKey: "closingUnitCost", label: "期末单价", width: 82, align: "right", render: (row) => <Text style={{ color: colors.foreground, fontSize: 12 }}>¥{formatMoney(row.closingUnitCost)}</Text> },
-    { key: "closingCost", sortKey: "closingCost", label: "期末成本", width: 82, align: "right", render: (row) => <Text style={{ color: colors.primary, fontSize: 12, fontWeight: "800" }}>¥{formatMoney(row.closingCost)}</Text> },
+    { key: "sequence", label: "序号", width: 46, compactWidth: 40, pinned: true, flexWeight: 0.4, align: "center", render: (row) => <Text style={{ color: colors.muted, fontSize: STORE_TABLE_METRICS.bodyFontSize }}>{row.itemId}</Text> },
+    { key: "name", sortKey: "name", label: "商品名称", width: 184, compactWidth: 150, pinned: true, flexWeight: 3, onPress: setSelectedLedgerItem, testID: (row) => `wine-ledger-name-${row.itemId}`, render: (row) => <><Text numberOfLines={1} style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.nameFontSize, fontWeight: "800" }}>{row.name}</Text><Text numberOfLines={1} style={{ color: colors.muted, fontSize: 11 }}>{row.spec}</Text></> },
+    { key: "referencePrice", label: "参考价", width: 96, compactWidth: 68, pinned: true, flexWeight: 1.1, align: "right", render: (row) => <Text style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{formatStoreMoney(row.openingUnitCost)}</Text> },
+    { key: "openingQty", sortKey: "openingQty", label: "期初量", width: 88, flexWeight: 1, align: "right", render: (row) => <Text style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{formatStoreQuantity(row.openingQty)}</Text> },
+    { key: "openingUnitCost", sortKey: "openingUnitCost", label: "期初单价", width: 104, flexWeight: 1.2, align: "right", render: (row) => <Text style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{formatStoreMoney(row.openingUnitCost)}</Text> },
+    { key: "openingCost", sortKey: "openingCost", label: "期初成本", width: 112, flexWeight: 1.3, align: "right", render: (row) => <Text style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{formatStoreMoney(row.openingCost)}</Text> },
+    { key: "purchaseQty", sortKey: "purchaseQty", label: "进货量", width: 88, flexWeight: 1, align: "right", render: (row) => <Text style={{ color: row.purchaseQty > 0 ? colors.primary : colors.muted, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{row.purchaseQty > 0 ? `+${formatStoreQuantity(row.purchaseQty)}` : "—"}</Text> },
+    { key: "purchaseCost", sortKey: "purchaseCost", label: "进货成本", width: 112, flexWeight: 1.3, align: "right", render: (row) => <Text style={{ color: row.purchaseCost > 0 ? colors.primary : colors.muted, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{row.purchaseCost > 0 ? formatStoreMoney(row.purchaseCost) : "—"}</Text> },
+    { key: "consumeQty", sortKey: "consumeQty", label: "消耗量", width: 88, flexWeight: 1, align: "right", render: (row) => <Text style={{ color: row.consumeQty > 0 ? colors.warning : colors.muted, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{row.consumeQty > 0 ? formatStoreQuantity(row.consumeQty) : "—"}</Text> },
+    { key: "consumeCost", sortKey: "consumeCost", label: "消耗成本", width: 112, flexWeight: 1.3, align: "right", render: (row) => <Text style={{ color: row.consumeCost > 0 ? colors.warning : colors.muted, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{row.consumeCost > 0 ? formatStoreMoney(row.consumeCost) : "—"}</Text> },
+    { key: "closingQty", sortKey: "closingQty", label: "期末量", width: 88, flexWeight: 1, align: "right", render: (row) => <Text style={{ color: row.closingQty <= 0 ? colors.muted : colors.foreground, fontSize: STORE_TABLE_METRICS.numericFontSize, fontWeight: "800" }}>{formatStoreQuantity(row.closingQty)}</Text> },
+    { key: "closingUnitCost", sortKey: "closingUnitCost", label: "期末单价", width: 112, flexWeight: 1.3, align: "right", render: (row) => <Text style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{formatStoreMoney(row.closingUnitCost)}</Text> },
+    { key: "closingCost", sortKey: "closingCost", label: "期末成本", width: 120, flexWeight: 1.5, align: "right", render: (row) => <Text style={{ color: colors.primary, fontSize: STORE_TABLE_METRICS.numericFontSize, fontWeight: "800" }}>{formatStoreMoney(row.closingCost)}</Text> },
   ], [colors]);
 
   const selectedSupplierView = supplierViewSupplier && allSuppliers.includes(supplierViewSupplier)
@@ -452,22 +389,44 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
     [purchases, selectedMonth, purchaseSearchQuery, purchaseFilterSupplier, purchaseSort],
   );
   const purchaseSuppliers = allSuppliers;
-
-  // ★ 构建价格历史 Map（用于显示涨跌）
-  const prevUnitPriceMap = useMemo(() => {
-    const map: Record<string, number | null> = {};
-    const sorted = [...purchases].sort((a, b) => a.date.localeCompare(b.date));
-    for (const p of sorted) {
-      const key = `${p.supplier}:${p.productName}`;
-      if (p.date.startsWith(selectedMonth)) {
-        // 当月的记录：找上一条同款记录的单价
-        if (!(key in map)) map[key] = null; // 还没有历史价格
-      } else {
-        map[key] = p.unitPrice; // 记录历史价格
+  const purchaseLedgerRows = useMemo(() => monthPurchaseRecords.map((purchase) => ({
+    ...purchase,
+    category: bottles.find((bottle) => bottle.id === purchase.bottleId)?.style ?? "Other",
+  })), [monthPurchaseRecords, bottles]);
+  const purchaseLedgerGroups = useMemo<HorizontalLedgerGroup<(typeof purchaseLedgerRows)[number]>[]>(() => [{
+    id: "month-purchases",
+    label: "当月进货",
+    color: colors.muted,
+    rows: purchaseLedgerRows,
+  }], [purchaseLedgerRows, colors.muted]);
+  const purchaseLedgerColumns = useMemo<HorizontalLedgerColumn<(typeof purchaseLedgerRows)[number]>[]>(() => [
+    { key: "category", label: "分类", width: 88, compactWidth: 56, pinned: true, flexWeight: 0.9, render: (row) => <Text numberOfLines={1} style={{ color: colors.muted, fontSize: STORE_TABLE_METRICS.bodyFontSize, fontWeight: "700" }}>{row.category}</Text> },
+    { key: "date", sortKey: "date", label: "日期", width: 112, compactWidth: 64, pinned: true, flexWeight: 1.1, render: (row) => <Text numberOfLines={1} style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.bodyFontSize }}>{row.date}</Text> },
+    { key: "name", sortKey: "name", label: "商品名称", width: 220, compactWidth: 158, pinned: true, flexWeight: 3, onPress: (row) => {
+      if (selectMode) {
+        setSelectedIds((current) => {
+          const next = new Set(current);
+          if (next.has(row.id)) next.delete(row.id);
+          else next.add(row.id);
+          return next;
+        });
+        return;
       }
-    }
-    return map;
-  }, [purchases, selectedMonth]);
+      Alert.alert(row.productName, `供应商：${row.supplier}\n日期：${row.date}\n数量：${formatStoreQuantity(row.quantity)}瓶\n单价：${formatStoreMoney(row.unitPrice)}\n金额：${formatStoreMoney(row.amount)}`, [
+        { text: "关闭" },
+        { text: "删除", style: "destructive", onPress: () => Alert.alert("确认删除", `删除「${row.productName}」这条进货记录？`, [
+          { text: "取消", style: "cancel" },
+          { text: "删除", style: "destructive", onPress: () => deleteManualPurchase(row.id) },
+        ]) },
+      ]);
+    }, testID: (row) => `wine-purchase-name-${row.id}`, render: (row) => <Text numberOfLines={1} style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.nameFontSize, fontWeight: "800" }}>{row.productName}</Text> },
+    { key: "quantity", sortKey: "quantity", label: "数量", width: 88, flexWeight: 1, align: "right", render: (row) => <Text style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{formatStoreQuantity(row.quantity)}</Text> },
+    { key: "unit", label: "单位", width: 68, flexWeight: 0.6, align: "center", render: () => <Text style={{ color: colors.muted, fontSize: STORE_TABLE_METRICS.bodyFontSize }}>瓶</Text> },
+    { key: "unitPrice", sortKey: "unitPrice", label: "单价", width: 112, flexWeight: 1.2, align: "right", render: (row) => <Text style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{formatStoreMoney(row.unitPrice)}</Text> },
+    { key: "amount", sortKey: "amount", label: "总价", width: 120, flexWeight: 1.4, align: "right", render: (row) => <Text style={{ color: colors.primary, fontSize: STORE_TABLE_METRICS.numericFontSize, fontWeight: "800" }}>{formatStoreMoney(row.amount)}</Text> },
+    { key: "supplier", label: "供应商", width: 156, flexWeight: 1.6, render: (row) => <Text numberOfLines={1} style={{ color: colors.muted, fontSize: STORE_TABLE_METRICS.bodyFontSize }}>{row.supplier}</Text> },
+    { key: "notes", label: "备注", width: 180, flexWeight: 1.8, render: (row) => <Text numberOfLines={1} style={{ color: colors.muted, fontSize: STORE_TABLE_METRICS.bodyFontSize }}>{row.notes || "—"}</Text> },
+  ], [colors, deleteManualPurchase, selectMode]);
 
   // 台账统计
   const ledgerStats = useMemo(() => ({
@@ -487,10 +446,11 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
   const handleSavePurchase = (entries: { item: WineInventoryItem; qty: number; unitPrice: number }[]) => {
     const today = new Date().toISOString().slice(0, 10);
     entries.forEach(({ item, qty, unitPrice }) => {
-      // ★ 计算与上次进货单价的差值
-      const key = `${item.supplier}:${item.name}`;
-      const prevPrice = prevUnitPriceMap[key] ?? null;
-      const unitPriceDelta = prevPrice !== null ? unitPrice - prevPrice : undefined;
+      // 从唯一采购流水中定位同供应商同酒款的最近历史单价。
+      const prevPurchase = purchases
+        .filter((purchase) => purchase.supplier === item.supplier && purchase.productName === item.name && purchase.date < today)
+        .sort((left, right) => right.date.localeCompare(left.date))[0];
+      const unitPriceDelta = prevPurchase ? unitPrice - prevPurchase.unitPrice : undefined;
       addManualPurchase({
         date: today,
         supplier: item.supplier,
@@ -681,10 +641,10 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
         <View testID="wine-ledger-scroll-workspace" style={{ flex: 1 }}>
           <View style={{ flex: 1 }}>
             <View style={[S.statsRow, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-              <StatCell label="期末库存" value={`${ledgerStats.totalEndQty}瓶`} color={colors.foreground} />
-              <StatCell label="期末成本" value={`¥${formatMoney(ledgerStats.totalEndCost)}`} color={colors.foreground} />
-              <StatCell label="本月进货" value={`¥${formatMoney(ledgerStats.totalPurchaseCost)}`} color={colors.primary} />
-              <StatCell label="本月消耗" value={`${ledgerStats.totalConsumeBottles}瓶`} color={colors.warning} />
+              <StatCell label="期末库存" value={`${formatStoreQuantity(ledgerStats.totalEndQty)}瓶`} color={colors.foreground} />
+              <StatCell label="期末成本" value={formatStoreMoney(ledgerStats.totalEndCost)} color={colors.foreground} />
+              <StatCell label="本月进货" value={formatStoreMoney(ledgerStats.totalPurchaseCost)} color={colors.primary} />
+              <StatCell label="本月消耗" value={`${formatStoreQuantity(ledgerStats.totalConsumeBottles)}瓶`} color={colors.warning} />
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, minHeight: 60, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }} contentContainerStyle={{ minHeight: 60, paddingHorizontal: 16, paddingVertical: 8, gap: 8, alignItems: "center" }}>
               <TouchableOpacity onPress={() => {
@@ -955,42 +915,20 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
               </TouchableOpacity>
             </View>
           ) : (
-            <FlatList {...MOBILE_VIRTUAL_LIST_PROPS}
-              data={monthPurchaseRecords}
-              keyExtractor={(p) => p.id}
-              renderItem={({ item: p }) => {
-                const key = `${p.supplier}:${p.productName}`;
-                const prevPrice = prevUnitPriceMap[key] ?? null;
-                return (
-                  <PurchaseRow
-                    purchase={p}
-                    prevUnitPrice={prevPrice}
-                    colors={colors}
-                    selected={selectedIds.has(p.id)}
-                    onSelect={() => toggleSelect(p.id)}
-                    onEdit={() => {
-                      Alert.alert(p.productName, `供应商：${p.supplier}\n日期：${p.date}\n数量：${p.quantity}瓶\n单价：¥${p.unitPrice}\n金额：¥${formatMoney(p.amount)}`, [
-                        { text: "关闭" },
-                        { text: "删除", style: "destructive", onPress: () => {
-                          Alert.alert("确认删除", `删除「${p.productName}」这条进货记录？`, [
-                            { text: "取消", style: "cancel" },
-                            { text: "删除", style: "destructive", onPress: () => deleteManualPurchase(p.id) },
-                          ]);
-                        }},
-                      ]);
-                    }}
-                  />
-                );
-              }}
-              contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }}
-              ListHeaderComponent={
-                <View style={{ marginBottom: 12 }}>
-                  <Text style={{ fontSize: 13, color: colors.muted }}>
-                    共 {monthPurchaseRecords.length} 条 · 合计 ¥{formatMoney(monthPurchaseRecords.reduce((s, p) => s + p.amount, 0))}
-                  </Text>
-                </View>
-              }
-            />
+            <View style={S.purchaseLedgerWrap}>
+              <Text style={{ fontSize: STORE_TABLE_METRICS.bodyFontSize, color: colors.muted, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 8 }}>
+                共 {monthPurchaseRecords.length} 条 · 合计 {formatStoreMoney(monthPurchaseRecords.reduce((sum, purchase) => sum + purchase.amount, 0))}
+              </Text>
+              <VirtualizedHorizontalLedgerTable
+                testID="wine-purchase-ledger-table"
+                columns={purchaseLedgerColumns}
+                groups={purchaseLedgerGroups}
+                rowKey={(row) => row.id}
+                sort={purchaseSort}
+                onSort={(key) => setPurchaseSort((current) => toggleSort(current, key as WinePurchaseSortKey))}
+                showGroupHeaders={false}
+              />
+            </View>
           )}
         </>
       )}
@@ -1280,7 +1218,7 @@ const S = StyleSheet.create({
   detailRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 },
   detailLabel: { fontSize: 12 },
   detailValue: { fontSize: 12, fontWeight: "500" },
-  purchaseRow: { flexDirection: "row", alignItems: "center", borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 8 },
+  purchaseLedgerWrap: { flex: 1, minHeight: 0, paddingBottom: 8 },
   sectionTitle: { fontSize: 12, fontWeight: "600", letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 10 },
   trendCard: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 4 },
   trendTitle: { fontSize: 15, fontWeight: "700" },

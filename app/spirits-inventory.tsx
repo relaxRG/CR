@@ -41,6 +41,7 @@ import { normalizeImportDate } from "@/lib/import/date-utils";
 import {   SpiritMonthlySnapshot, SpiritInventoryItem, SpiritPriceChange, SpiritPurchaseOrderItem } from "@/lib/spirits/types";
 import { normalizeLLMRows } from "@/lib/spirits/pdf-import";
 import { exportToExcel, exportToPdf, ExportData } from "@/lib/spirits/export";
+import { formatStoreMoney, formatStoreQuantity, STORE_TABLE_METRICS } from "@/lib/store/table-display";
 import {
   applySupplierPurchaseTableView,
   collectSupplierPurchaseNameOptions,
@@ -279,10 +280,10 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
         </Text>
         <View style={{ flexDirection: "row", gap: 8 }}>
           {[
-            { label: "进货总额", value: summaryTotals.purchaseAmt, fmt: (v: number) => `¥${fmtAmt(v)}`, color: "#EF4444",
+            { label: "进货总额", value: summaryTotals.purchaseAmt, fmt: (v: number) => formatStoreMoney(v), color: colors.primary,
               prev: summaryTotals.prevPurchaseAmt },
             { label: "进货品种", value: new Set(monthPurchases.map((p) => p.itemId ?? p.rawName)).size, fmt: (v: number) => `${v}款`, color: colors.foreground, prev: 0 },
-            { label: "期末库存成本", value: summaryTotals.closingCost, fmt: (v: number) => `¥${fmtAmt(v)}`, color: colors.primary,
+            { label: "期末库存成本", value: summaryTotals.closingCost, fmt: (v: number) => formatStoreMoney(v), color: colors.primary,
               prev: summaryTotals.prevClosingCost },
           ].map((s, i) => {
             const diff = s.prev > 0 ? s.value - s.prev : 0;
@@ -306,16 +307,16 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
           <Text style={[S.cardTitle, { color: colors.foreground, marginBottom: 0 }]}>分类汇总</Text>
           <TouchableOpacity onPress={() => setShowComparison(!showComparison)}
-            style={[S.toggleBtn, { backgroundColor: showComparison ? "#EF4444" : colors.surface, borderColor: showComparison ? "#EF4444" : colors.border }]}>
+            style={[S.toggleBtn, { backgroundColor: showComparison ? colors.primary : colors.surface, borderColor: showComparison ? colors.primary : colors.border }]}>
             <Text style={{ fontSize: 11, fontWeight: "600", color: showComparison ? "#fff" : colors.muted }}>
               {showComparison ? "对比 开" : "对比 关"}
             </Text>
           </TouchableOpacity>
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }}>
-          <View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, width: "100%" }}>
+          <View style={S.summaryTableContent}>
             {/* 表头 */}
-            <View style={[S.tableHeader, { backgroundColor: "#991B1B" }]}>
+            <View style={[S.tableHeader, { backgroundColor: colors.primary }]}>
               <Text style={[S.thCell, S.colCat]}>烈酒分类</Text>
               <Text style={[S.thCell, S.colNum]}>期初库存</Text>
               <Text style={[S.thCell, S.colNum]}>本月进货</Text>
@@ -340,7 +341,7 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
                     return (
                       <View key={field} style={[S.tdCell, S.colNum, { alignItems: "flex-end" }]}>
                         <Text style={{ fontSize: 12, color: val < 0 ? "#EF4444" : colors.foreground, fontWeight: val < 0 ? "700" : "400" }}>
-                          {val === 0 ? "—" : val.toFixed(2)}
+                          {val === 0 ? "—" : formatStoreQuantity(val)}
                         </Text>
                         {showComparison && prevVal !== 0 && (
                           <Text style={{ fontSize: 9, color: val > prevVal ? "#EF4444" : "#10B981" }}>
@@ -753,13 +754,13 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
             <View>
               {ledgerTableHasAdjustments && <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 10, paddingVertical: 6, backgroundColor: "#FEF2F2" }}><Text style={{ fontSize: 11, color: "#991B1B", fontWeight: "700" }}>已筛选/排序 · 显示 {visibleLedgerRows.length} 款</Text><TouchableOpacity onPress={() => setLedgerTableView(DEFAULT_LEDGER_TABLE_VIEW)}><Text style={{ color: "#991B1B", fontSize: 11, fontWeight: "700" }}>清除全部</Text></TouchableOpacity></View>}
               {/* 14列：序号 + 12项库存成本字段 + 最右集团。 */}
-              <View style={[S.tableHeader, { backgroundColor: "#991B1B" }]}>
-                <Text style={[S.thCell, { width: 36 }]}>序</Text>
+              <View style={[S.tableHeader, { backgroundColor: colors.primary, minHeight: STORE_TABLE_METRICS.headerHeight }]}>
+                <Text style={[S.thCell, { width: 44 }]}>序</Text>
                 {([
-                  ["商品名称", "name", 136], ["参考价", "referencePrice", 70], ["期初库存量", "openingQty", 76], ["期初单价", "openingUnitCost", 70], ["期初成本", "openingCost", 76],
-                  ["进货数量", "purchaseQty", 76], ["进货成本", "purchaseCost", 76], ["期末库存量", "closingQty", 76], ["期末单位成本", "closingUnitCost", 82], ["期末成本", "closingCost", 76],
-                  ["消耗瓶数", "consumeQty", 70], ["消耗成本", "consumeCost", 76], ["集团", "group", 100],
-                ] as Array<[string, LedgerSortKey, number]>).map(([label, key, width]) => <TouchableOpacity key={key} testID={`spirits-ledger-column-${key}`} onPress={() => setActiveLedgerColumn(key)} style={{ width, minHeight: 38, justifyContent: "center", paddingHorizontal: 4 }}><Text style={[S.thCell, { width: "auto", paddingHorizontal: 0 }]}>{label}⌄</Text></TouchableOpacity>)}
+                  ["商品名称", "name", 184], ["参考价", "referencePrice", 96], ["期初量", "openingQty", 88], ["期初单价", "openingUnitCost", 104], ["期初成本", "openingCost", 112],
+                  ["进货量", "purchaseQty", 88], ["进货成本", "purchaseCost", 112], ["期末量", "closingQty", 88], ["期末单价", "closingUnitCost", 112], ["期末成本", "closingCost", 112],
+                  ["消耗量", "consumeQty", 88], ["消耗成本", "consumeCost", 112], ["集团", "group", 140],
+                ] as Array<[string, LedgerSortKey, number]>).map(([label, key, width]) => <TouchableOpacity key={key} testID={`spirits-ledger-column-${key}`} onPress={() => setActiveLedgerColumn(key)} style={{ width, minHeight: STORE_TABLE_METRICS.headerHeight, justifyContent: "center", paddingHorizontal: 8 }}><Text style={[S.thCell, { width: "auto", paddingHorizontal: 0 }]}>{label}⌄</Text></TouchableOpacity>)}
               </View>
               {/* 按分类分组（动态，未分类置顶） */}
               {(() => {
@@ -784,7 +785,7 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
                   const isFiltered = cat === "__filtered__";
                   const isUnclassified = cat === "__unclassified__";
                   const displayCat = isFiltered ? "筛选结果" : isUnclassified ? "⚠️ 未分类" : cat;
-                  const color = isFiltered ? "#991B1B" : isUnclassified ? "#F59E0B" : catColor(cat);
+                  const color = isFiltered ? colors.primary : isUnclassified ? "#F59E0B" : catColor(cat);
                   return (
                     <React.Fragment key={cat}>
                       <View style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: color + "20" }}>
@@ -825,9 +826,9 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
                                 { text: "取消", style: "cancel" as const },
                               ]);
                             }}
-                            style={[S.tableRow, { backgroundColor: isNeg ? "#FEF2F2" : idx % 2 === 0 ? colors.surface : colors.background }]}>
-                            <Text style={[S.tdCell, { width: 36, textAlign: "center", fontSize: 11, color: colors.muted }]}>{idx + 1}</Text>
-                            <Text testID={`spirits-ledger-table-name-${item.id}`} style={[S.tdCell, { width: 136, fontSize: 11, color: colors.foreground }]} numberOfLines={2}>{ledgerTableRows.find((row) => row.id === item.id)?.displayName ?? item.name}</Text>
+                            style={[S.tableRow, { minHeight: STORE_TABLE_METRICS.rowHeight, backgroundColor: idx % 2 === 0 ? colors.surface : colors.background }]}>
+                            <Text style={[S.tdCell, { width: 44, textAlign: "center", fontSize: STORE_TABLE_METRICS.bodyFontSize, color: colors.muted }]}>{idx + 1}</Text>
+                            <Text testID={`spirits-ledger-table-name-${item.id}`} style={[S.tdCell, { width: 184, fontSize: STORE_TABLE_METRICS.nameFontSize, fontWeight: "800", color: colors.foreground }]} numberOfLines={1}>{ledgerTableRows.find((row) => row.id === item.id)?.displayName ?? item.name}</Text>
                           {/* 参考价列（可点击编辑） */}
                           {(() => {
                             const rp = getRefPrice(item.id, selectedMonth);
@@ -3188,12 +3189,13 @@ const S = StyleSheet.create({
   cardTitle: { fontSize: 14, fontWeight: "700", marginBottom: 10 },
   actionBtn: { flexDirection: "row", flexShrink: 0, minHeight: 44, alignItems: "center", justifyContent: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1 },
   toggleBtn: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 14, borderWidth: 1 },
-  tableHeader: { flexDirection: "row", alignItems: "center", paddingVertical: 8 },
-  tableRow: { flexDirection: "row", alignItems: "center", paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "rgba(0,0,0,0.06)" },
-  thCell: { fontSize: 11, fontWeight: "700", color: "#fff", paddingHorizontal: 6, textAlign: "center" },
-  tdCell: { paddingHorizontal: 6, paddingVertical: 2 },
-  colCat: { width: 130 },
-  colNum: { width: 72 },
+  summaryTableContent: { width: "100%", minWidth: 440 },
+  tableHeader: { flexDirection: "row", alignItems: "center", minHeight: STORE_TABLE_METRICS.summaryHeaderHeight },
+  tableRow: { flexDirection: "row", alignItems: "center", minHeight: STORE_TABLE_METRICS.summaryRowHeight, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "rgba(0,0,0,0.06)" },
+  thCell: { fontSize: STORE_TABLE_METRICS.bodyFontSize, fontWeight: "700", color: "#fff", paddingHorizontal: 10, textAlign: "center" },
+  tdCell: { paddingHorizontal: 10, paddingVertical: 2 },
+  colCat: { flex: 1.8, minWidth: 160 },
+  colNum: { flex: 1, minWidth: 78 },
   inlineInput: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 4, fontSize: 11, width: 64, textAlign: "right" },
   supplierRow: { flexDirection: "row", alignItems: "center", paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth },
   input: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15 },

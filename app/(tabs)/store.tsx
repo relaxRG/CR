@@ -25,6 +25,7 @@ import { BoundedBusinessMonthNavigator } from "@/components/months/BoundedBusine
 import { useSync } from "@/lib/cf-sync/provider";
 import { useFeature } from "@/hooks/use-feature";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { floatingTabContentBottomInset } from "@/components/floating-tab-bar";
 import StorePettyCashScreen from "@/components/store/petty-cash";
 import StoreAnalyticsScreen from "@/components/store/analytics";
 import StoreAccountsScreen from "@/components/store/accounts";
@@ -150,7 +151,9 @@ export default function StoreScreen() {
   const canAccess = (feature: "store_ops" | "labor") => !isAuthenticated || hasFeature(feature);
   const hasSyncBadge = !!syncState.error;
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
-  const childInsets = { ...insets, top: 0 };
+  const contentBottomInset = floatingTabContentBottomInset(insets.bottom);
+  // 子页面沿用原有安全区 API，但 bottom 已包含浮动导航高度，所有现有 ScrollView 自动获得末行预留。
+  const childInsets = { ...insets, top: 0, bottom: contentBottomInset };
 
   // 过滤出当前设备有权访问的 Tab（未登录时显示全部，保持本地单机模式可用）
   const visibleTabs = ALL_MAIN_TABS.filter((t) =>
@@ -163,7 +166,7 @@ export default function StoreScreen() {
     : (visibleTabs[0]?.key ?? "monthly");
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <View style={{ flex: 1, backgroundColor: colors.background, paddingBottom: contentBottomInset }}>
       {/* 顶部导航栏：Tab + 头像合并为一行（修复顶部留白过宽 Bug） */}
       <View style={{ paddingTop: insets.top, backgroundColor: colors.background, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
         <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 20 }}>

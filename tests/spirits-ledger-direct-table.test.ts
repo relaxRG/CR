@@ -17,12 +17,13 @@ describe("烈酒库存完整Excel台账", () => {
 
   it("完整表固定包含期初、进货、期末、消耗字段并将集团置于最右", () => {
     const header = source.slice(source.indexOf('/* 14列：'), source.indexOf('/* 按分类分组'));
-    expect(header).toContain('["商品名称", "name", 136]');
-    expect(header).toContain('["期初库存量", "openingQty", 76]');
-    expect(header).toContain('["进货数量", "purchaseQty", 76]');
-    expect(header).toContain('["期末单位成本", "closingUnitCost", 82]');
-    expect(header).toContain('["消耗成本", "consumeCost", 76]');
-    expect(header).toContain('["集团", "group", 100]');
+    expect(header).toContain('["商品名称", "name", 184]');
+    expect(header).toContain('["参考价", "referencePrice", 96]');
+    expect(header).toContain('["期初量", "openingQty", 88]');
+    expect(header).toContain('["进货量", "purchaseQty", 88]');
+    expect(header).toContain('["期末单价", "closingUnitCost", 112]');
+    expect(header).toContain('["消耗成本", "consumeCost", 112]');
+    expect(header).toContain('["集团", "group", 140]');
     expect(header.indexOf('"consumeCost"')).toBeLessThan(header.indexOf('"group"'));
   });
 

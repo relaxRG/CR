@@ -17,7 +17,9 @@ describe("葡萄酒工作台长列表性能护栏", () => {
     expect(table).toContain("visibleEntries");
     expect(table).toContain("scrollEventThrottle={48}");
     expect(table).toContain("horizontal");
-    expect(table).toContain('testID={testID ? `${testID}-virtual-list` : undefined}');
+    expect(table).toContain('testID={source === "data" && testID ? `${testID}-virtual-list` : undefined}');
+    expect(table).toContain("pinnedScrollRef");
+    expect(table).toContain("dataScrollRef");
   });
 
   it("移动端性能脚本以360条库存和180条采购做60 FPS与内存稳定性压力验证", () => {
