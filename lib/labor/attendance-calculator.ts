@@ -1,5 +1,6 @@
 import type { Employee, MonthlyAttendance, ShiftEntry, SpecialStatus } from "./types";
 import { calcAttendanceBaseSalary, calcDailyRate, getContractHoursForDate, getDaysInMonth, parseMonth } from "./types";
+import { getCompOffSource, getOvertimeCompOffValidation } from "./comp-off-settlement";
 
 function createAttendanceId(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -25,8 +26,10 @@ export interface CalculateAttendanceParams {
 /**
  * 从排班记录派生单个员工单月考勤。
  *
- * 此函数是排班→考勤→薪资链路的唯一计算入口。它不写入存储，因而可直接以真实生产
- * 逻辑覆盖节假日倍率、特殊状态、加班和跨月隔离测试，避免测试镜像与产品引擎漂移。
+ * 加班换休、余额休与节假日调休必须保持三个独立来源：
+ * - 加班换休只占用本月真实加班；
+ * - 调休余额/节假日调休只消费对应余额条目，不影响本月加班费；
+ * - 原始加班只比较真实工作班次，不让“休息日”虚增标准工时并吞掉加班费。
  */
 export function calculateAttendanceFromShifts({
   employeeId,
@@ -41,13 +44,17 @@ export function calculateAttendanceFromShifts({
   const daysInMonth = getDaysInMonth(year, monthNumber);
   const empShifts = shifts.filter((shift) => shift.employeeId === employeeId && shift.date.startsWith(month));
   const expectedAttendanceDays = Math.max(0, daysInMonth - (employee.restDaysPerMonth ?? 0));
-  const hoursPerCompOff = employee.compOffRule?.hoursPerDay ?? 8;
+  const overtimeHoursPerCompOff = employee.compOffRule?.hoursPerDay ?? 8;
   const holidayByDate = new Map(holidayDays.map((holiday) => [holiday.date, holiday]));
 
   const attendanceDates = new Set<string>();
   let totalHours = 0;
   let standardHours = 0;
-  let compOffCount = 0;
+  // 原始加班的分母仅包括真实工作班次；三种“休”都不能通过增加标准工时吞掉加班。
+  let workedStandardHours = 0;
+  let overtimeCompOffDays = 0;
+  let balanceCompOffDays = 0;
+  let holidayCompOffDays = 0;
   let holidayBonus = 0;
   let holidayWorkDays = 0;
   const specialStatusDeductions: MonthlyAttendance["specialStatusDeductions"] = {};
@@ -89,27 +96,36 @@ export function calculateAttendanceFromShifts({
     if (!specialStatus) {
       const hours = shift.hoursValue;
       if (typeof hours !== "number" || hours <= 0) continue;
+      const contractHours = getContractHoursForDate(employee, shift.date);
       attendanceDates.add(shift.date);
       totalHours += hours;
-      standardHours += getContractHoursForDate(employee, shift.date);
-      // 节假日配置不仅用于 UI 标记；普通班次在配置日期上工作时也必须进入倍率工资。
+      standardHours += contractHours;
+      workedStandardHours += contractHours;
       addHolidayBonus(shift.date, 1, false);
       continue;
     }
 
     if (specialStatus.category === "comp_off") {
-      // 调休日算出勤但没有实际工时；其余额消费由明确的调休余额工作流处理。
-      compOffCount++;
+      const source = getCompOffSource(specialStatus.id);
+      const contractHours = getContractHoursForDate(employee, shift.date);
       attendanceDates.add(shift.date);
-      standardHours += getContractHoursForDate(employee, shift.date);
+      // 保持“实际出勤/标准工时”展示口径；但不纳入原始加班的标准工时分母。
+      standardHours += contractHours;
+      if (source === "overtime") overtimeCompOffDays++;
+      else if (source === "balance") balanceCompOffDays++;
+      else if (source === "holiday") holidayCompOffDays++;
       continue;
     }
 
     if (specialStatus.countAsAttendance) {
       const hours = shift.hoursValue;
+      const contractHours = getContractHoursForDate(employee, shift.date);
       attendanceDates.add(shift.date);
-      if (typeof hours === "number" && hours > 0) totalHours += hours;
-      standardHours += getContractHoursForDate(employee, shift.date);
+      if (typeof hours === "number" && hours > 0) {
+        totalHours += hours;
+        workedStandardHours += contractHours;
+      }
+      standardHours += contractHours;
 
       if (!isParttime) {
         if (specialStatus.direction === "positive") {
@@ -140,16 +156,16 @@ export function calculateAttendanceFromShifts({
   }
 
   const attendanceDays = attendanceDates.size;
-  const rawOvertimeHours = Math.max(0, totalHours - standardHours);
-  const compOffHoursUsed = compOffCount * hoursPerCompOff;
-  const paidOvertimeHours = Math.max(0, rawOvertimeHours - compOffHoursUsed);
+  const rawOvertimeHours = Math.max(0, totalHours - workedStandardHours);
+  const overtimeCompOffHours = overtimeCompOffDays * overtimeHoursPerCompOff;
+  const overtimeCompOff = getOvertimeCompOffValidation(rawOvertimeHours, overtimeCompOffHours);
+  const paidOvertimeHours = Math.max(0, rawOvertimeHours - overtimeCompOff.appliedHours);
   const underRestDays = expectedAttendanceDays - attendanceDays;
   const totalSpecialDeduction = Object.values(specialStatusDeductions)
     .reduce((sum, detail) => sum + detail.deduction, 0);
   const overtimePay = Math.round(paidOvertimeHours * employee.overtimeHourlyRate * 100) / 100;
 
   // 全职比例底薪必须从同一日薪原始基数累计：日薪 × 实际出勤天数。
-  // 日薪、节假日倍率、特殊状态扣减、节假日调休兑现由此共享同一分母和精度来源。
   const proportionalBaseSalary = isParttime
     ? undefined
     : calcAttendanceBaseSalary(dailyRate, attendanceDays, expectedAttendanceDays);
@@ -172,8 +188,11 @@ export function calculateAttendanceFromShifts({
     totalHours: Math.round(totalHours * 10) / 10,
     stdHours: Math.round(standardHours * 10) / 10,
     overtimeHours: Math.round(rawOvertimeHours * 10) / 10,
-    compOffCount,
-    hoursPerCompOff,
+    overtimeCompOffDays,
+    overtimeCompOffHours: Math.round(overtimeCompOff.appliedHours * 10) / 10,
+    balanceCompOffDays,
+    holidayCompOffDays,
+    overtimeCompOffShortfallHours: overtimeCompOff.missingHours > 0 ? Math.round(overtimeCompOff.missingHours * 10) / 10 : undefined,
     paidOvertimeHours: Math.round(paidOvertimeHours * 10) / 10,
     expectedAttendanceDays,
     underRestDays,
@@ -186,7 +205,6 @@ export function calculateAttendanceFromShifts({
     attendanceSalary,
     notes: existing?.notes ?? "",
     overtimeAlertHours: rawOvertimeHours >= 4 ? Math.round(rawOvertimeHours * 10) / 10 : undefined,
-    storedOvertimeHours: compOffHoursUsed > 0 ? Math.round(compOffHoursUsed * 10) / 10 : undefined,
     holidayWorkDays: holidayWorkDays > 0 ? holidayWorkDays : undefined,
   };
 }

@@ -32,9 +32,10 @@ describe("薪资生成确认与排班纠错清空 UI 守卫", () => {
     expect(laborSource).toContain("correctedSlip.compOffUsage = undefined");
   });
 
-  it("调休在写入排班前必须校验来源余额，避免无余额时被错误计作带薪出勤", () => {
-    expect(laborSource).toContain("const availableDays = ss.id === \"ss_comp_off_holiday\"");
-    expect(laborSource).toContain("if (availableDays < 1)");
+  it("调休在写入排班前必须使用统一来源校验，避免无余额时被错误计作带薪出勤", () => {
+    expect(laborSource).toContain("const validateAndUpsertShift = useCallback");
+    expect(laborSource).toContain("planCompOffBalanceConsumption");
+    expect(laborSource).toContain("getOvertimeCompOffValidation");
     expect(laborSource).toContain('Alert.alert("调休余额不足"');
   });
 

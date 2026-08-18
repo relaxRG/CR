@@ -367,11 +367,13 @@ function EmployeeCard({
         </View>
         {att ? (
           <View style={S.detailGrid}>
-            <DetailRow label="实际到岗" value={`${att.attendanceDays - att.compOffCount} 天`} colors={colors} bold />
+            <DetailRow label="实际到岗" value={`${att.attendanceDays - att.overtimeCompOffDays - att.balanceCompOffDays - att.holidayCompOffDays} 天`} colors={colors} bold />
             <DetailRow label="出勤/应出勤" value={`${att.attendanceDays} / ${att.expectedAttendanceDays} 天`} colors={colors} />
             <DetailRow label="实际工时" value={`${att.totalHours.toFixed(1)} h`} colors={colors} />
             <DetailRow label="标准工时" value={`${att.stdHours.toFixed(1)} h`} colors={colors} />
-            <DetailRow label="加班工时（计费）" value={`${(att.paidOvertimeHours ?? 0).toFixed(1)} h`} colors={colors} />
+            <DetailRow label="原始加班" value={`${(att.overtimeHours ?? 0).toFixed(1)} h`} colors={colors} />
+            <DetailRow label="加班换休" value={att.overtimeCompOffDays > 0 ? `${att.overtimeCompOffDays} 天（${att.overtimeCompOffHours.toFixed(1)} h）` : "—"} colors={colors} />
+            <DetailRow label="计费加班" value={`${(att.paidOvertimeHours ?? 0).toFixed(1)} h`} colors={colors} />
             <DetailRow label="加班工资" value={att.overtimePay > 0 ? `+¥${formatMoney(att.overtimePay)}` : "—"} colors={colors} positive={att.overtimePay > 0} />
             {(att.holidayWorkDays ?? 0) > 0 && <DetailRow label="节假日上班" value={`${att.holidayWorkDays} 天`} colors={colors} />}
             <DetailRow label="节假日薪资" value={att.holidayBonus > 0 ? `+¥${formatMoney(att.holidayBonus)}` : "—"} colors={colors} positive={att.holidayBonus > 0} />

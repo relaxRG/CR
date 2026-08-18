@@ -401,9 +401,9 @@ describe("调休余额计算：加班调休 vs 节假日换休（两套独立逻
 
 describe("考勤卡片兜底显示逻辑", () => {
   it("无加班时，加班明细所有字段显示「—」", () => {
-    const att = { overtimeHours: 0, compOffCount: 0, paidOvertimeHours: 0, overtimePay: 0 };
+    const att = { overtimeHours: 0, overtimeCompOffDays: 0, paidOvertimeHours: 0, overtimePay: 0 };
     const totalOT = att.overtimeHours > 0 ? `${att.overtimeHours.toFixed(1)}h` : "—";
-    const compOff = att.compOffCount > 0 ? `${att.compOffCount}天` : "—";
+    const compOff = att.overtimeCompOffDays > 0 ? `${att.overtimeCompOffDays}天` : "—";
     const paidOT = att.paidOvertimeHours > 0 ? `${att.paidOvertimeHours.toFixed(1)}h` : "—";
     const otPay = att.overtimePay > 0 ? `+¥${att.overtimePay.toFixed(0)}` : "—";
     expect(totalOT).toBe("—");
@@ -413,11 +413,11 @@ describe("考勤卡片兜底显示逻辑", () => {
   });
 
   it("有加班时，加班明细显示实际数值", () => {
-    const att = { overtimeHours: 11.5, compOffCount: 1, paidOvertimeHours: 3.5, overtimePay: 157.5 };
+    const att = { overtimeHours: 43.5, overtimeCompOffDays: 4, paidOvertimeHours: 11.5, overtimePay: 575 };
     const totalOT = att.overtimeHours > 0 ? `${att.overtimeHours.toFixed(1)}h` : "—";
-    const compOff = att.compOffCount > 0 ? `${att.compOffCount}天` : "—";
-    expect(totalOT).toBe("11.5h");
-    expect(compOff).toBe("1天");
+    const compOff = att.overtimeCompOffDays > 0 ? `${att.overtimeCompOffDays}天` : "—";
+    expect(totalOT).toBe("43.5h");
+    expect(compOff).toBe("4天");
   });
 
   it("无节假日上班时，节假日明细所有字段显示「—」", () => {

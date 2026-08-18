@@ -398,14 +398,16 @@ const SpecialStatusContext = createContext<SpecialStatusStore>({
 function SpecialStatusProvider({ children }: { children: React.ReactNode }) {
   const { data: statuses, ref, persist, ready } = usePersisted<SpecialStatus>("labor_special_statuses_v1", DEFAULT_SPECIAL_STATUSES);
 
-  // 迁移旧数据：确保三种新调休换休状态存在
+  // 删除无来源旧调休状态，并确保三种来源明确的新状态完整存在。
   React.useEffect(() => {
     if (!ready) return;
-    const ids = new Set(ref.current.map((s) => s.id));
-    const missing = DEFAULT_SPECIAL_STATUSES.filter((s) => !ids.has(s.id));
-    if (missing.length > 0) {
-      console.log("[SpecialStatusProvider] 迁移旧数据，补充缺失的内置状态:", missing.map((s) => s.id));
-      persist([...ref.current, ...missing]);
+    const withoutLegacy = ref.current.filter((status) => status.id !== "ss_comp_off");
+    const ids = new Set(withoutLegacy.map((status) => status.id));
+    const missing = DEFAULT_SPECIAL_STATUSES.filter((status) => !ids.has(status.id));
+    const next = [...withoutLegacy, ...missing];
+    if (next.length !== ref.current.length || missing.length > 0) {
+      console.log("[SpecialStatusProvider] 清理旧通用调休状态并补齐来源明确的内置状态");
+      persist(next);
     }
   }, [ready]);
 
@@ -518,7 +520,7 @@ const ShiftContext = createContext<ShiftStore>({
  */
 function migrateShiftEntries(entries: ShiftEntry[]): { migrated: ShiftEntry[]; changed: boolean } {
   let changed = false;
-  const migrated = entries.map((e) => {
+  const migrated = entries.flatMap((e) => {
     let next = { ...e };
     let dirty = false;
 
@@ -532,8 +534,14 @@ function migrateShiftEntries(entries: ShiftEntry[]): { migrated: ShiftEntry[]; c
     if ("sessionValue" in next) { delete (next as any).sessionValue; dirty = true; }
     if ("overtimeType" in next) { delete (next as any).overtimeType; dirty = true; }
 
+    // 旧“通用调休”没有来源，无法安全映射为加班换休、余额休或节假日调休；直接删除。
+    if (next.specialStatusId === "ss_comp_off") {
+      changed = true;
+      return [];
+    }
+
     if (dirty) changed = true;
-    return next;
+    return [next];
   });
   return { migrated, changed };
 }
@@ -626,6 +634,28 @@ const AttendanceContext = createContext<AttendanceStore>({
 
 function AttendanceProvider({ children }: { children: React.ReactNode }) {
   const { data: records, ref, persist, ready } = usePersisted<MonthlyAttendance>("labor_attendance_v1");
+
+  // 删除旧的混合换休字段。历史月份需由“重新计算本月”按当前排班生成新口径，
+  // 不对无来源的旧 compOffCount / storedOvertimeHours 做猜测性迁移。
+  React.useEffect(() => {
+    if (!ready) return;
+    let changed = false;
+    const next = ref.current.map((record) => {
+      const normalized = {
+        ...record,
+        overtimeCompOffDays: record.overtimeCompOffDays ?? 0,
+        overtimeCompOffHours: record.overtimeCompOffHours ?? 0,
+        balanceCompOffDays: record.balanceCompOffDays ?? 0,
+        holidayCompOffDays: record.holidayCompOffDays ?? 0,
+      } as MonthlyAttendance & Record<string, unknown>;
+      if ("compOffCount" in normalized) { delete normalized.compOffCount; changed = true; }
+      if ("hoursPerCompOff" in normalized) { delete normalized.hoursPerCompOff; changed = true; }
+      if ("storedOvertimeHours" in normalized) { delete normalized.storedOvertimeHours; changed = true; }
+      if (normalized.overtimeCompOffDays !== record.overtimeCompOffDays || normalized.overtimeCompOffHours !== record.overtimeCompOffHours || normalized.balanceCompOffDays !== record.balanceCompOffDays || normalized.holidayCompOffDays !== record.holidayCompOffDays) changed = true;
+      return normalized as MonthlyAttendance;
+    });
+    if (changed) persist(next);
+  }, [ready]);
 
   const upsertAttendance = useCallback((record: MonthlyAttendance) => {
     const idx = ref.current.findIndex((r) => r.employeeId === record.employeeId && r.month === record.month);

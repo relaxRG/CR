@@ -6,6 +6,7 @@
  */
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import { formatMoney } from "@/lib/utils";
+import { sumMoney } from "@/lib/finance/money";
 import { numericColor, NUMERIC_TONE } from "@/lib/theme/numeric-color-tokens";
 import { getResponsivePagerIndex, getResponsivePagerOffset } from "@/lib/theme/responsive-pager";
 import { exportLaborData, type ExportType } from "@/lib/labor/export";
@@ -25,7 +26,17 @@ import {
   hasDraftPayrollReconciliationDelta,
 } from "@/lib/labor/payroll-draft-reconciliation";
 import { checkControlFieldsIntegrity, checkAdvanceCrossMonthPollution } from "@/lib/labor/payroll-monitor";
-import { reconcilePaySlip } from "@/lib/labor/payroll-reconciliation";
+import { calculateFinalSalary, calculateGrossSalary, reconcilePaySlip } from "@/lib/labor/payroll-reconciliation";
+import {
+  BALANCE_COMP_OFF_STATUS,
+  HOLIDAY_COMP_OFF_STATUS,
+  OVERTIME_COMP_OFF_STATUS,
+  getCompOffDemandDays,
+  getCompOffSource,
+  getExpiringCompOffEntries,
+  getOvertimeCompOffValidation,
+  planCompOffBalanceConsumption,
+} from "@/lib/labor/comp-off-settlement";
 import {
   Alert, Clipboard, Modal, Platform, Pressable, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions, KeyboardAvoidingView} from "react-native";
@@ -73,6 +84,16 @@ type HolidayDecisionItem = {
   holidayName: string;
   bonusAmount: number;
   mode: "cash" | "rest";
+};
+
+type ExpiringCompOffDecisionItem = {
+  entryId: string;
+  employeeId: string;
+  employeeCode: string;
+  source: "overtime" | "holiday";
+  days: number;
+  expiresMonth: string;
+  cashOut: boolean;
 };
 
 // ─── 月份工具 ─────────────────────────────────────────────────────────────────
@@ -2667,7 +2688,7 @@ function SchShiftModal({ visible, date, employee, session, existing, contractHou
   shiftTemplates: ShiftTemplate[];
   specialStatuses: SpecialStatus[];
   shiftGroups: ShiftGroup[];
-  onSave: (e: ShiftEntry) => void; onClear: () => void; onClose: () => void;
+  onSave: (e: ShiftEntry) => boolean; onClear: () => void; onClose: () => void;
 }) {
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
   // 直接订阅 entries 响应式 state，避免通过 getXxx 读 ref.current
@@ -2691,8 +2712,7 @@ function SchShiftModal({ visible, date, employee, session, existing, contractHou
   const handleSelectShift = (tpl: ShiftTemplate) => {
     tap();
     const finalHours = existingHours ?? tpl.defaultHours ?? 8;
-    onSave({ employeeId: employee.id, date, shift: tpl.session, hoursValue: finalHours, specialStatusId: undefined });
-    onClose();
+    if (onSave({ employeeId: employee.id, date, shift: tpl.session, hoursValue: finalHours, specialStatusId: undefined })) onClose();
   };
 
   // 点击特殊状态：立即保存
@@ -2705,12 +2725,11 @@ function SchShiftModal({ visible, date, employee, session, existing, contractHou
       // 修复：如果 existingHours=null（特殊状态清除了工时），直接删除记录而非保存空记录
       if (existingHours === null) { onClear(); onClose(); return; }
       // 恢复为普通班次，保留已有工时
-      onSave({ employeeId: employee.id, date, shift: session, hoursValue: existingHours, specialStatusId: undefined });
-    } else {
-      // 保留已有工时，只更新特殊状态
-      onSave({ employeeId: employee.id, date, shift: session, hoursValue: existingHours, specialStatusId: ss.id });
+      if (onSave({ employeeId: employee.id, date, shift: session, hoursValue: existingHours, specialStatusId: undefined })) onClose();
+      return;
     }
-    onClose();
+    // 保留已有工时，只更新特殊状态
+    if (onSave({ employeeId: employee.id, date, shift: session, hoursValue: existingHours, specialStatusId: ss.id })) onClose();
   };
 
   // 点击调休换休：立即保存
@@ -2720,16 +2739,15 @@ function SchShiftModal({ visible, date, employee, session, existing, contractHou
     if (isSelected) {
       // 修复：调休换休会清除工时（hoursValue=null），取消时应删除记录而非保存空记录
       if (existingHours === null) { onClear(); onClose(); return; }
-      onSave({ employeeId: employee.id, date, shift: session, hoursValue: existingHours, specialStatusId: undefined });
-    } else {
-      onSave({ employeeId: employee.id, date, shift: session, hoursValue: null, specialStatusId: ss.id });
+      if (onSave({ employeeId: employee.id, date, shift: session, hoursValue: existingHours, specialStatusId: undefined })) onClose();
+      return;
     }
-    onClose();
+    if (onSave({ employeeId: employee.id, date, shift: session, hoursValue: null, specialStatusId: ss.id })) onClose();
   };
 
   const absenceStatuses = specialStatuses.filter((s) => s.category === "absence");
   const workDayStatuses = specialStatuses.filter((s) => s.category === "work_day");
-  const compOffStatuses = specialStatuses.filter((s) => s.category === "comp_off" && s.id !== "ss_comp_off");
+  const compOffStatuses = specialStatuses.filter((s) => s.category === "comp_off");
   const displayCompOffStatuses = compOffStatuses.length > 0 ? compOffStatuses : specialStatuses.filter((s) => s.category === "comp_off");
 
   // 班次按分组展示（已在分组的班次 + 未分组的班次统一展示）
@@ -2874,7 +2892,7 @@ function SchHoursModal({ visible, date, employee, session, existing, contractHou
   existing: ShiftEntry | null; contractHours: number;
   currentMonth: string; colors: any;
   specialStatuses: SpecialStatus[];
-  onSave: (e: ShiftEntry) => void; onClear: () => void; onClose: () => void;
+  onSave: (e: ShiftEntry) => boolean; onClear: () => void; onClose: () => void;
 }) {
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
   // 直接订阅 entries 响应式 state，避免通过 getXxx 读 ref.current
@@ -2911,8 +2929,7 @@ function SchHoursModal({ visible, date, employee, session, existing, contractHou
       onClose();
       return;
     }
-    onSave({ employeeId: employee.id, date, shift: existing?.shift ?? session, hoursValue: hv, specialStatusId: undefined });
-    onClose();
+    if (onSave({ employeeId: employee.id, date, shift: existing?.shift ?? session, hoursValue: hv, specialStatusId: undefined })) onClose();
   };
 
   // 特殊状态/调休：点击即立即保存
@@ -2920,41 +2937,26 @@ function SchHoursModal({ visible, date, employee, session, existing, contractHou
     tap();
     const isSelected = existing?.specialStatusId === ss.id;
     if (isSelected) {
-      onSave({ employeeId: employee.id, date, shift: existing?.shift ?? session, hoursValue: null, specialStatusId: undefined });
-    } else {
-      onSave({ employeeId: employee.id, date, shift: existing?.shift ?? session, hoursValue: ss.category === "work_day" ? (Number(hoursInput) || 8) : null, specialStatusId: ss.id });
+      if (onSave({ employeeId: employee.id, date, shift: existing?.shift ?? session, hoursValue: null, specialStatusId: undefined })) onClose();
+      return;
     }
-    onClose();
+    if (onSave({ employeeId: employee.id, date, shift: existing?.shift ?? session, hoursValue: ss.category === "work_day" ? (Number(hoursInput) || 8) : null, specialStatusId: ss.id })) onClose();
   };
 
   const handleSelectCompOff = (ss: SpecialStatus) => {
     tap();
     const isSelected = existing?.specialStatusId === ss.id;
     if (isSelected) {
-      onSave({ employeeId: employee.id, date, shift: existing?.shift ?? session, hoursValue: null, specialStatusId: undefined });
-      onClose();
+      if (onSave({ employeeId: employee.id, date, shift: existing?.shift ?? session, hoursValue: null, specialStatusId: undefined })) onClose();
       return;
     }
-
-    // 调休状态会计入带薪出勤，必须在写入前校验对应来源至少有 1 天可用余额。
-    // ss_comp_off 为历史 ID，按加班余额语义兼容；balance 状态可优先使用任一来源的余额。
-    const availableDays = ss.id === "ss_comp_off_holiday"
-      ? holidayCompOffBalance
-      : ss.id === "ss_comp_off_balance"
-        ? compOffBalance + holidayCompOffBalance
-        : compOffBalance;
-    if (availableDays < 1) {
-      Alert.alert("调休余额不足", `「${ss.name}」至少需要 1 天可用调休余额，当前可用 ${availableDays.toFixed(1)} 天。`);
-      return;
-    }
-
-    onSave({ employeeId: employee.id, date, shift: existing?.shift ?? session, hoursValue: null, specialStatusId: ss.id });
-    onClose();
+    // 余额与本月加班的完整月度校验由唯一排班写入入口执行；失败时不关闭弹窗。
+    if (onSave({ employeeId: employee.id, date, shift: existing?.shift ?? session, hoursValue: null, specialStatusId: ss.id })) onClose();
   };
 
   const absenceStatuses = specialStatuses.filter((s) => s.category === "absence");
   const workDayStatuses = specialStatuses.filter((s) => s.category === "work_day");
-  const compOffStatuses = specialStatuses.filter((s) => s.category === "comp_off" && s.id !== "ss_comp_off");
+  const compOffStatuses = specialStatuses.filter((s) => s.category === "comp_off");
   const displayCompOffStatuses = compOffStatuses.length > 0 ? compOffStatuses : specialStatuses.filter((s) => s.category === "comp_off");
   // 当前选中的特殊状态
   const selectedSS = existing?.specialStatusId ? specialStatuses.find((s) => s.id === existing.specialStatusId) : null;
@@ -3612,6 +3614,8 @@ function SchedulePage({ colors, month, onMonthChange, pageWidth }: { colors: any
   const [genResult, setGenResult] = useState<string | null>(null);
   const [showHolidayDecisionModal, setShowHolidayDecisionModal] = useState(false);
   const [pendingHolidayDecisions, setPendingHolidayDecisions] = useState<HolidayDecisionItem[]>([]);
+  const [showExpiringCompOffModal, setShowExpiringCompOffModal] = useState(false);
+  const [pendingExpiringCompOff, setPendingExpiringCompOff] = useState<ExpiringCompOffDecisionItem[]>([]);
   // 班次模式格子编辑 Modal
   const [showShiftModal, setShowShiftModal] = useState(false);
   // 时长模式格子编辑 Modal
@@ -3654,6 +3658,42 @@ function SchedulePage({ colors, month, onMonthChange, pageWidth }: { colors: any
     );
     return false;
   }, [isMonthWritable]);
+
+  /**
+   * 排班唯一写入入口：先在候选排班上完整结算，再持久化。
+   * 这样“加班换休”只能占用本月真实加班，“余额休/节休”只能消费真实余额，
+   * 不会出现余额为零仍能保存、或余额休吞掉本月加班费的情况。
+   */
+  const validateAndUpsertShift = useCallback((entry: ShiftEntry): boolean => {
+    if (!ensureScheduleDatesWritable([entry.date])) return false;
+    const employee = employees.find((item) => item.id === entry.employeeId);
+    if (!employee) return false;
+    const entryMonth = entry.date.slice(0, 7);
+    const sameMonth = getShifts(entryMonth);
+    const candidateShifts = [
+      ...sameMonth.filter((item) => !(item.employeeId === entry.employeeId && item.date === entry.date && item.shift === entry.shift)),
+      entry,
+    ];
+    const source = getCompOffSource(entry.specialStatusId);
+    if (source === "overtime") {
+      const att = calcFromShifts(entry.employeeId, entryMonth, employee, candidateShifts, specialStatuses);
+      const check = getOvertimeCompOffValidation(att.overtimeHours, att.overtimeCompOffDays * (employee.compOffRule?.hoursPerDay ?? 8));
+      if (!check.isValid) {
+        Alert.alert("加班换休不足", `本月原始加班 ${check.availableHours.toFixed(1)}h，已申请换休 ${check.requestedCompOffHours.toFixed(1)}h，尚缺 ${check.missingHours.toFixed(1)}h。请调整排班或改用真实调休余额。`);
+        return false;
+      }
+    }
+    if (source === "balance" || source === "holiday") {
+      const demandDays = getCompOffDemandDays(candidateShifts, source);
+      const plan = planCompOffBalanceConsumption(compOffEntriesSched.filter((item) => item.employeeId === entry.employeeId), demandDays, source, entryMonth);
+      if (plan.missingDays > 0) {
+        Alert.alert("调休余额不足", `${source === "holiday" ? "节假日调休" : "调休余额"}可用 ${plan.availableDays.toFixed(1)} 天，排班需要 ${plan.requestedDays.toFixed(1)} 天，尚缺 ${plan.missingDays.toFixed(1)} 天。`);
+        return false;
+      }
+    }
+    upsertShift(entry);
+    return true;
+  }, [calcFromShifts, compOffEntriesSched, employees, ensureScheduleDatesWritable, getShifts, specialStatuses, upsertShift]);
 
   const toggleCellSelection = (empId: string, date: string, session: string) => {
     const key = `${empId}_${date}_${session}`;
@@ -3766,8 +3806,10 @@ function SchedulePage({ colors, month, onMonthChange, pageWidth }: { colors: any
                     // 回退本月调休排班曾消费的余额。多个班次可能消费同一条余额，必须先按 entryId 聚合，
                     // 再一次性恢复，否则第一笔恢复为 available 后会使后续使用记录被跳过。
                     const usedDaysByEntry = new Map<string, number>();
-                    for (const usage of Object.values(existingSlip?.compOffUsage ?? {})) {
-                      usedDaysByEntry.set(usage.entryId, (usedDaysByEntry.get(usage.entryId) ?? 0) + usage.days);
+                    for (const allocations of Object.values(existingSlip?.compOffUsage ?? {})) {
+                      for (const usage of allocations) {
+                        usedDaysByEntry.set(usage.entryId, (usedDaysByEntry.get(usage.entryId) ?? 0) + usage.days);
+                      }
                     }
                     for (const [entryId, usedDays] of usedDaysByEntry) {
                       const entry = getCompOffEntries(employee.id).find((item) => item.id === entryId);
@@ -3894,7 +3936,7 @@ function SchedulePage({ colors, month, onMonthChange, pageWidth }: { colors: any
   // - employees 变化（底薪/时薪/社保配置修改）→ 立即重算所有有排班员工的薪资单
   // - advances 变化（预支新增/删除）→ 立即重算对应员工的 finalSalary
   // compOffEntriesSched 变化（存入/兑换调休）→ 触发必要的考勤/薪资重算
-  // （compOffCount 影响 paidOvertimeHours 和 overtimePay）
+  // （加班换休占用影响 paidOvertimeHours 和 overtimePay；余额休与节休不影响加班费）
   // 修复：将 globalSettings 和 specialStatuses 加入依赖数组
   // 用户修改全局社保/个税配置或特殊状态配置后，autoSync 会立即重算所有员工薪资
   // 不会导致无限循环，因为 autoSync 写入 paySlips，而 paySlips 不在依赖数组中
@@ -4028,7 +4070,7 @@ function SchedulePage({ colors, month, onMonthChange, pageWidth }: { colors: any
 
 
 
-  const runPayrollGeneration = useCallback(async (holidayDecisions: HolidayDecisionItem[]) => {
+  const runPayrollGeneration = useCallback(async (holidayDecisions: HolidayDecisionItem[], expiringCashOutEntryIds: readonly string[] = []) => {
     setGenerating(true);
     try {
       const activeEmps = employees.filter((e) => e.active && !e.archived);
@@ -4055,8 +4097,19 @@ function SchedulePage({ colors, month, onMonthChange, pageWidth }: { colors: any
         }> = {};
         let holidayRestBonus = 0;
         const existingSlip = getPaySlip(emp.id, currentMonth);
-        // 每条调休排班只允许消费一次余额；记录保存在薪资单中，重试生成时可安全跳过。
-        const compOffUsage = { ...(existingSlip?.compOffUsage ?? {}) };
+        const expiringCashOutEntries = getCompOffEntries(emp.id).filter((entry) => expiringCashOutEntryIds.includes(entry.id) && entry.status === "available" && entry.expiresMonth === currentMonth);
+        const expiringCashOutAmount = sumMoney(expiringCashOutEntries.map((entry) => {
+          const unitAmount = entry.source === "overtime"
+            ? (entry.hoursDeducted ?? entry.days * (emp.compOffRule?.hoursPerDay ?? 8)) * (emp.overtimeHourlyRate ?? emp.hourlyRate ?? 0)
+            : entry.days * baseAtt.dailyRate;
+          return unitAmount;
+        }));
+        for (const entry of expiringCashOutEntries) {
+          const unitRate = entry.days > 0 ? (entry.source === "overtime"
+            ? ((entry.hoursDeducted ?? entry.days * (emp.compOffRule?.hoursPerDay ?? 8)) * (emp.overtimeHourlyRate ?? emp.hourlyRate ?? 0)) / entry.days
+            : baseAtt.dailyRate) : 0;
+          cashOutCompOff(entry.id, unitRate, currentMonth);
+        }
         empShifts.forEach((s) => {
           const ss = s.specialStatusId ? specialStatuses.find((st) => st.id === s.specialStatusId) : undefined;
           const holidayInfo = getHolidayWorkInfo(s, ss, getHolidayForDate(s.date, emp.id));
@@ -4134,49 +4187,78 @@ function SchedulePage({ colors, month, onMonthChange, pageWidth }: { colors: any
         const cumulativeTaxPaid = prevMonthSlips.reduce((sum, s) => sum + (s.incomeTax ?? 0), 0);
         expireCompOff(currentMonth);
 
-        // 调休状态按“日期 + 班次 + 状态”精确消费一次余额。仅显式标记的调休排班可消费，
-        // 不再依据出勤天数自动扣减，以免重试生成或考勤波动误扣历史余额。
-        const consumeCompOffForShift = (shift: ShiftEntry, source: "holiday" | "overtime" | "balance") => {
-          const usageKey = `${shift.date}|${shift.shift}|${shift.specialStatusId}`;
-          if (compOffUsage[usageKey]) return;
-          const availableEntry = getCompOffEntries(emp.id)
-            .filter((entry) => entry.status === "available" && entry.expiresMonth >= currentMonth)
-            .filter((entry) => source === "balance" || entry.source === source)
-            .sort((a, b) => a.expiresMonth.localeCompare(b.expiresMonth))[0];
-          if (!availableEntry) return;
-
-          const usedDays = Math.min(availableEntry.days, 1);
-          updateCompOffEntry(availableEntry.id, {
-            status: usedDays >= availableEntry.days ? "used_rest" : "available",
-            days: availableEntry.days - usedDays,
-            usedMonth: currentMonth,
-          });
-          compOffUsage[usageKey] = {
-            entryId: availableEntry.id,
-            days: usedDays,
-            source,
-            consumedAt: Date.now(),
+        /**
+         * 余额休/节休只消费余额；加班换休已在 attendance-calculator 内从本月原始加班扣除，
+         * 因此绝不能再来这里消费跨月余额或影响当月加班费。
+         * 重新生成前先在内存中释放本月旧分配，然后按最早到期优先重建，保证幂等。
+         */
+        const oldUsage = Object.values(existingSlip?.compOffUsage ?? {}).flat();
+        const releasedEntries = getCompOffEntries(emp.id).map((entry) => {
+          const releasedDays = oldUsage.filter((allocation) => allocation.entryId === entry.id)
+            .reduce((total, allocation) => total + allocation.days, 0);
+          if (releasedDays <= 0) return { ...entry };
+          return {
+            ...entry,
+            days: entry.days + releasedDays,
+            status: "available" as const,
+            usedMonth: undefined,
           };
-        };
+        });
+        const nextEntries = releasedEntries.map((entry) => ({ ...entry }));
+        const nextUsage: NonNullable<PaySlip["compOffUsage"]> = {};
 
-        for (const shift of empShifts) {
-          if (shift.specialStatusId === "ss_comp_off_holiday") {
-            consumeCompOffForShift(shift, "holiday");
-          } else if (shift.specialStatusId === "ss_comp_off_overtime" || shift.specialStatusId === "ss_comp_off") {
-            // ss_comp_off 是历史 ID，按“加班换休”语义兼容处理。
-            consumeCompOffForShift(shift, "overtime");
-          } else if (shift.specialStatusId === "ss_comp_off_balance") {
-            consumeCompOffForShift(shift, "balance");
+        for (const source of ["balance", "holiday"] as const) {
+          const sourceShifts = empShifts.filter((shift) => getCompOffSource(shift.specialStatusId) === source);
+          if (sourceShifts.length === 0) continue;
+          const plan = planCompOffBalanceConsumption(nextEntries, sourceShifts.length, source, currentMonth);
+          if (plan.missingDays > 0) {
+            throw new Error(`${emp.realName}${source === "holiday" ? "节假日调休" : "调休余额"}不足`);
+          }
+          const allocationQueue = plan.allocations.map((allocation) => ({ ...allocation }));
+          for (const shift of sourceShifts) {
+            const usageKey = `${shift.date}|${shift.shift}|${shift.specialStatusId}`;
+            let remaining = 1;
+            const allocations = [] as NonNullable<PaySlip["compOffUsage"]>[string];
+            while (remaining > 0 && allocationQueue.length > 0) {
+              const allocation = allocationQueue[0];
+              const consumed = Math.min(remaining, allocation.days);
+              allocations.push({ entryId: allocation.entryId, days: consumed, source: allocation.source, consumedAt: Date.now() });
+              const target = nextEntries.find((entry) => entry.id === allocation.entryId);
+              if (target) {
+                target.days = Math.max(0, target.days - consumed);
+                target.status = target.days === 0 ? "used_rest" : "available";
+                target.usedMonth = target.days === 0 ? currentMonth : undefined;
+              }
+              allocation.days -= consumed;
+              remaining -= consumed;
+              if (allocation.days === 0) allocationQueue.shift();
+            }
+            nextUsage[usageKey] = allocations;
+          }
+        }
+        for (const nextEntry of nextEntries) {
+          const original = getCompOffEntries(emp.id).find((entry) => entry.id === nextEntry.id);
+          if (!original || original.days !== nextEntry.days || original.status !== nextEntry.status || original.usedMonth !== nextEntry.usedMonth) {
+            updateCompOffEntry(nextEntry.id, { days: nextEntry.days, status: nextEntry.status, usedMonth: nextEntry.usedMonth });
           }
         }
         const slip = buildPaySlipDraft(emp, currentMonth, att, advanceTotal, globalSettings, cumulativeIncome, cumulativeTaxPaid);
+        if (expiringCashOutAmount > 0) {
+          slip.compOffCashOut = sumMoney([existingSlip?.compOffCashOut, expiringCashOutAmount]);
+          slip.compOffCashOutNote = `到期调休兑换 ¥${formatMoney(expiringCashOutAmount)}`;
+          slip.grossSalary = calculateGrossSalary(slip);
+          slip.finalSalary = calculateFinalSalary(slip);
+        }
         if (Object.keys(holidayBonusAllocation).length > 0) slip.holidayBonusAllocation = holidayBonusAllocation;
-        if (Object.keys(compOffUsage).length > 0) slip.compOffUsage = compOffUsage;
+        if (Object.keys(nextUsage).length > 0) slip.compOffUsage = nextUsage;
+        else delete slip.compOffUsage;
         upsertPaySlip(slip);
         count++;
       }
       setShowHolidayDecisionModal(false);
+      setShowExpiringCompOffModal(false);
       setPendingHolidayDecisions([]);
+      setPendingExpiringCompOff([]);
       setGenResult(`✅ 已生成 ${count} 人薪资单`);
       setTimeout(() => setGenResult(null), 4000);
     } catch (e) {
@@ -4221,13 +4303,36 @@ function SchedulePage({ colors, month, onMonthChange, pageWidth }: { colors: any
         });
       }
     }
-    if (decisions.length > 0) {
-      setPendingHolidayDecisions(decisions);
+    const expiringDecisions: ExpiringCompOffDecisionItem[] = [];
+    for (const emp of activeEmps) {
+      const empShifts = getShifts(currentMonth).filter((shift) => shift.employeeId === emp.id);
+      const entries = getCompOffEntries(emp.id);
+      const balancePlan = planCompOffBalanceConsumption(entries, getCompOffDemandDays(empShifts, "balance"), "balance", currentMonth);
+      const holidayPlan = planCompOffBalanceConsumption(entries, getCompOffDemandDays(empShifts, "holiday"), "holiday", currentMonth);
+      const scheduledEntryIds = new Set([...balancePlan.allocations, ...holidayPlan.allocations].map((allocation) => allocation.entryId));
+      for (const entry of getExpiringCompOffEntries(entries, emp.id, currentMonth)) {
+        if (scheduledEntryIds.has(entry.id)) continue;
+        expiringDecisions.push({
+          entryId: entry.id,
+          employeeId: emp.id,
+          employeeCode: emp.code,
+          source: entry.source,
+          days: entry.days,
+          expiresMonth: entry.expiresMonth,
+          cashOut: true,
+        });
+      }
+    }
+    setPendingHolidayDecisions(decisions);
+    setPendingExpiringCompOff(expiringDecisions);
+    if (expiringDecisions.length > 0) {
+      setShowExpiringCompOffModal(true);
+    } else if (decisions.length > 0) {
       setShowHolidayDecisionModal(true);
     } else {
       runPayrollGeneration([]);
     }
-  }, [currentMonth, employees, getShifts, calcFromShifts, specialStatuses, getHolidayForDate, getPaySlip, runPayrollGeneration]);
+  }, [currentMonth, employees, getShifts, calcFromShifts, specialStatuses, getHolidayForDate, getPaySlip, getCompOffEntries, runPayrollGeneration]);
 
   /**
    * 结算入口只负责生成薪资单；异常排班必须使用独立的“强制清空本月排班”流程纠正。
@@ -4267,9 +4372,8 @@ function SchedulePage({ colors, month, onMonthChange, pageWidth }: { colors: any
   const renderCellContent = (entry: ShiftEntry | null, session: string, contractH: number, groupColor?: string) => {
     if (!entry) return null;
     const h = entry.hoursValue;
-    // 向后兼容：旧版 "休"/"无早" hoursValue
-    if (h === "休") return <Text style={EXL.cellRest}>(休)</Text>;
-    if (h === "无早") return <Text style={EXL.cellNoMorning}>(无早)</Text>;
+    if (h === "休") return <View style={EXL.cellRest}><Text style={EXL.cellRestText}>休</Text></View>;
+    if (h === "无早") return <Text style={EXL.cellNoMorning}>无早</Text>;
     // 工时未配置警告：有排班但无灵活工时规则覆盖该天（contractH === 0）
     // 仅对全职员工显示（兼职员工无合同工时是正常的，不需要警告）
     const cellEmp = employees.find((e) => e.id === entry.employeeId);
@@ -4289,22 +4393,22 @@ function SchedulePage({ colors, month, onMonthChange, pageWidth }: { colors: any
         const ssColor = ss.color;
         if (viewMode === "hours") {
           // 时长模式：
-          // work_day 类 → 显示工时数字 + 右上角颜色角标
+          // 节假日上班：工时数字保持中性，用“节”标记表达状态，不与普通加班共用红色。
           if (ss.category === "work_day" && typeof h === "number" && h > 0) {
-            const isOT = contractH > 0 && h > contractH;
             return (
-              <View style={{ alignItems: "center" }}>
-                <View style={{ position: "relative" }}>
-                  <Text style={[EXL.cellHours, isOT && { color: "#FF4D4F", fontWeight: "700" }]}>
-                    {h % 1 === 0 ? `${h}.0` : `${h}`}
-                  </Text>
-                  <View style={{ position: "absolute", top: -2, right: -4, width: 5, height: 5, borderRadius: 2.5, backgroundColor: ssColor }} />
-                </View>
+              <View style={EXL.cellWithBadge}>
+                <Text style={EXL.cellHours}>{h % 1 === 0 ? `${h}.0` : `${h}`}</Text>
+                <Text style={[EXL.cellStateBadge, { backgroundColor: ssColor + "20", color: ssColor }]}>节</Text>
               </View>
             );
           }
-          // absence / comp_off 类 → 文字缩写（前两字）
-          return <Text style={{ fontSize: 9, fontWeight: "700", color: ssColor }} numberOfLines={1}>{ss.name.slice(0, 2)}</Text>;
+          if (ss.category === "comp_off") {
+            const source = getCompOffSource(ss.id);
+            const label = source === "overtime" ? "换" : source === "balance" ? "余额" : "节休";
+            return <View style={[EXL.cellCompOff, { backgroundColor: ssColor + "18" }]}><Text style={[EXL.cellCompOffText, { color: ssColor }]}>{label}</Text></View>;
+          }
+          // 缺勤等特殊状态仅以状态标签表达，不与正常工时数字混淆。
+          return <Text style={{ fontSize: 10, fontWeight: "700", color: ssColor }} numberOfLines={1}>{ss.name.slice(0, 2)}</Text>;
         } else {
           // 班次模式：前两字 + 倍率（如「节日3」「旷工2」「病假.5」）
           return <Text style={{ fontSize: 9, fontWeight: "700", color: ssColor }} numberOfLines={1}>{ssShortLabel(ss)}</Text>;
@@ -4317,10 +4421,13 @@ function SchedulePage({ colors, month, onMonthChange, pageWidth }: { colors: any
       const textColor = groupColor ?? "#3C3C43";
       return <Text style={[EXL.cellSession, { color: textColor, fontSize: 10 }]} numberOfLines={1}>{label}</Text>;
     }
-    // 时长模式：显示工时数字
+    // 时长模式：数字永远保持中性；加班通过橙色“加”标记表达，避免与“休”混用红色。
     if (typeof h === "number" && h > 0) {
       const isOT = contractH > 0 && h > contractH;
-      return <Text style={[EXL.cellHours, isOT && { color: "#FF4D4F", fontWeight: "700" }]}>{h % 1 === 0 ? `${h}.0` : `${h}`}</Text>;
+      if (isOT) {
+        return <View style={EXL.cellWithBadge}><Text style={EXL.cellHours}>{h % 1 === 0 ? `${h}.0` : `${h}`}</Text><Text style={[EXL.cellStateBadge, EXL.cellOvertimeBadge]}>加</Text></View>;
+      }
+      return <Text style={EXL.cellHours}>{h % 1 === 0 ? `${h}.0` : `${h}`}</Text>;
     }
     return null;
   };
@@ -4688,11 +4795,11 @@ function SchedulePage({ colors, month, onMonthChange, pageWidth }: { colors: any
                           <Text style={{ fontSize: 10, fontWeight: "600", color: colors.muted }}>▼ 出勤统计</Text>
                           <View style={{ flexDirection: "row" }}>
                             {[
-                              { label: "实际到岗", value: `${att.attendanceDays - att.compOffCount}天`, color: colors.foreground },
+                              { label: "实际到岗", value: `${att.attendanceDays - att.overtimeCompOffDays - att.balanceCompOffDays - att.holidayCompOffDays}天`, color: colors.foreground },
                               { label: "出勤/应出勤", value: `${att.attendanceDays}/${att.expectedAttendanceDays}天`, color: att.attendanceDays >= att.expectedAttendanceDays ? colors.success : colors.warning },
                               { label: "实际工时", value: `${att.totalHours.toFixed(1)}h`, color: colors.foreground },
                               { label: "标准工时", value: att.stdHours > 0 ? `${att.stdHours.toFixed(1)}h` : "—", color: colors.muted },
-                              { label: "加班工时", value: att.paidOvertimeHours > 0 ? `${att.paidOvertimeHours.toFixed(1)}h` : "—", color: att.paidOvertimeHours > 0 ? colors.warning : colors.muted },
+                              { label: "计费加班", value: att.paidOvertimeHours > 0 ? `${att.paidOvertimeHours.toFixed(1)}h` : "—", color: att.paidOvertimeHours > 0 ? colors.warning : colors.muted },
                             ].map(({ label, value, color }) => (
                               <View key={label} style={{ flex: 1, alignItems: "center" }}>
                                 <Text numberOfLines={1} style={{ fontSize: 11, fontWeight: "700", color }}>{value}</Text>
@@ -4706,9 +4813,9 @@ function SchedulePage({ colors, month, onMonthChange, pageWidth }: { colors: any
                           <Text style={{ fontSize: 10, fontWeight: "600", color: colors.muted }}>▼ 加班明细</Text>
                           <View style={{ flexDirection: "row" }}>
                             {[
-                              { label: "总加班", value: att.overtimeHours > 0 ? `${att.overtimeHours.toFixed(1)}h` : "—", color: att.overtimeHours > 0 ? colors.warning : colors.muted },
-                              { label: "换休天数", value: att.compOffCount > 0 ? `${att.compOffCount}天` : "—", color: att.compOffCount > 0 ? colors.primary : colors.muted },
-                              { label: "计费时长", value: att.paidOvertimeHours > 0 ? `${att.paidOvertimeHours.toFixed(1)}h` : "—", color: att.paidOvertimeHours > 0 ? colors.foreground : colors.muted },
+                              { label: "原始加班", value: att.overtimeHours > 0 ? `${att.overtimeHours.toFixed(1)}h` : "—", color: att.overtimeHours > 0 ? colors.warning : colors.muted },
+                              { label: "加班换休", value: att.overtimeCompOffDays > 0 ? `${att.overtimeCompOffDays}天` : "—", color: att.overtimeCompOffDays > 0 ? colors.primary : colors.muted },
+                              { label: "计费加班", value: att.paidOvertimeHours > 0 ? `${att.paidOvertimeHours.toFixed(1)}h` : "—", color: att.paidOvertimeHours > 0 ? colors.foreground : colors.muted },
                               { label: "加班费", value: att.overtimePay > 0 ? `+￥${formatMoney(att.overtimePay)}` : "—", color: att.overtimePay > 0 ? colors.success : colors.muted },
                             ].map(({ label, value, color }) => (
                               <View key={label} style={{ flex: 1, alignItems: "center" }}>
@@ -4719,9 +4826,10 @@ function SchedulePage({ colors, month, onMonthChange, pageWidth }: { colors: any
                           </View>
                           {att.overtimeHours > 0 && (
                             <Text style={{ fontSize: 10, color: colors.muted }}>
-                              {`加班 ${att.overtimeHours.toFixed(1)}h`}
-                              {att.compOffCount > 0 ? ` → 换休 ${att.compOffCount}天(${(att.compOffCount * (att.hoursPerCompOff ?? 8)).toFixed(0)}h)` : ""}
-                              {` → 计费 ${att.paidOvertimeHours.toFixed(1)}h`}
+                              {`原始加班 ${att.overtimeHours.toFixed(1)}h`}
+                              {att.overtimeCompOffDays > 0 ? ` → 加班换休 ${att.overtimeCompOffDays}天（占用 ${att.overtimeCompOffHours.toFixed(1)}h）` : ""}
+                              {` → 计费加班 ${att.paidOvertimeHours.toFixed(1)}h`}
+                              {att.overtimeCompOffShortfallHours ? `（换休超额 ${att.overtimeCompOffShortfallHours.toFixed(1)}h，需修正）` : ""}
                               {att.overtimePay > 0 ? ` → +￥${formatMoney(att.overtimePay)}` : ""}
                             </Text>
                           )}
@@ -5025,6 +5133,48 @@ function SchedulePage({ colors, month, onMonthChange, pageWidth }: { colors: any
         </ScrollView>
       </ScrollView>
 
+      <Modal visible={showExpiringCompOffModal} transparent animationType="fade" onRequestClose={() => setShowExpiringCompOffModal(false)}>
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "center", padding: 20 }}>
+          <View style={{ backgroundColor: colors.background, borderRadius: 18, overflow: "hidden", maxHeight: "82%" }}>
+            <View style={{ paddingHorizontal: 18, paddingVertical: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
+              <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground }}>本月到期调休余额</Text>
+              <Text style={{ fontSize: 12, color: colors.muted, marginTop: 4 }}>以下余额在 {currentMonth} 月末到期。可选择兑换现金；不兑换将于月结后到期作废。</Text>
+            </View>
+            <ScrollView style={{ maxHeight: 420 }} contentContainerStyle={{ padding: 16, gap: 12 }}>
+              {pendingExpiringCompOff.map((item) => (
+                <View key={item.entryId} style={{ borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, borderRadius: 14, padding: 12, gap: 10, backgroundColor: colors.surface }}>
+                  <View>
+                    <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>{item.employeeCode} · {item.source === "overtime" ? "加班调休" : "节假日调休"} {item.days} 天</Text>
+                    <Text style={{ fontSize: 12, color: colors.muted, marginTop: 4 }}>到期月份：{item.expiresMonth}；{item.source === "overtime" ? "按加班时薪兑换" : "按日薪兑换"}</Text>
+                  </View>
+                  <View style={{ flexDirection: "row", gap: 10 }}>
+                    {[true, false].map((cashOut) => {
+                      const selected = item.cashOut === cashOut;
+                      return <TouchableOpacity key={String(cashOut)} onPress={() => setPendingExpiringCompOff((prev) => prev.map((entry) => entry.entryId === item.entryId ? { ...entry, cashOut } : entry))}
+                        style={{ flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: "center", backgroundColor: selected ? (cashOut ? colors.success : colors.error) : colors.background, borderWidth: 1, borderColor: selected ? (cashOut ? colors.success : colors.error) : colors.border }}>
+                        <Text style={{ fontSize: 13, fontWeight: "700", color: selected ? "#fff" : colors.foreground }}>{cashOut ? "兑换现金" : "到期作废"}</Text>
+                      </TouchableOpacity>;
+                    })}
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+            <View style={{ flexDirection: "row", gap: 12, padding: 16, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
+              <TouchableOpacity onPress={() => { setShowExpiringCompOffModal(false); setPendingExpiringCompOff([]); setPendingHolidayDecisions([]); }} style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 12, borderRadius: 12, backgroundColor: colors.border + "66" }}>
+                <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>取消</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => {
+                setShowExpiringCompOffModal(false);
+                if (pendingHolidayDecisions.length > 0) setShowHolidayDecisionModal(true);
+                else runPayrollGeneration([], pendingExpiringCompOff.filter((item) => item.cashOut).map((item) => item.entryId));
+              }} style={{ flex: 1.2, alignItems: "center", justifyContent: "center", paddingVertical: 12, borderRadius: 12, backgroundColor: colors.primary }}>
+                <Text style={{ fontSize: 14, fontWeight: "700", color: "#fff" }}>确认处理</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <Modal visible={showHolidayDecisionModal} transparent animationType="fade" onRequestClose={() => setShowHolidayDecisionModal(false)}>
         <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "center", padding: 20 }}>
           <View style={{ backgroundColor: colors.background, borderRadius: 18, overflow: "hidden", maxHeight: "82%" }}>
@@ -5070,7 +5220,7 @@ function SchedulePage({ colors, month, onMonthChange, pageWidth }: { colors: any
                 <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>取消</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={() => runPayrollGeneration(pendingHolidayDecisions)}
+                onPress={() => runPayrollGeneration(pendingHolidayDecisions, pendingExpiringCompOff.filter((item) => item.cashOut).map((item) => item.entryId))}
                 style={{ flex: 1.2, alignItems: "center", justifyContent: "center", paddingVertical: 12, borderRadius: 12, backgroundColor: "#1677FF" }}>
                 <Text style={{ fontSize: 14, fontWeight: "700", color: "#fff" }}>确认并生成</Text>
               </TouchableOpacity>
@@ -5092,7 +5242,7 @@ function SchedulePage({ colors, month, onMonthChange, pageWidth }: { colors: any
         shiftTemplates={sortedTemplates}
         specialStatuses={specialStatuses}
         shiftGroups={shiftGroups}
-        onSave={(entry) => { if (ensureScheduleDatesWritable([entry.date])) upsertShift(entry); }}
+        onSave={validateAndUpsertShift}
         onClear={() => {
           if (editEmployee && editDate && ensureScheduleDatesWritable([editDate])) {
             // 优先用实际存储的 shift 字段，避免 editSession 与存储字段不匹配导致删除失败
@@ -5113,7 +5263,7 @@ function SchedulePage({ colors, month, onMonthChange, pageWidth }: { colors: any
         currentMonth={currentMonth}
         colors={colors}
         specialStatuses={specialStatuses}
-        onSave={(entry) => { if (ensureScheduleDatesWritable([entry.date])) upsertShift(entry); }}
+        onSave={validateAndUpsertShift}
         onClear={() => {
           if (editEmployee && editDate && ensureScheduleDatesWritable([editDate])) {
             const actualShift = getEntry(editEmployee.id, editDate, editSession)?.shift ?? editSession;
@@ -5397,12 +5547,15 @@ const EXL = StyleSheet.create({
   empRow: { flexDirection: "row", alignItems: "center" },
   cell: { flex: 1, height: 34, alignItems: "center", justifyContent: "center" },
   sessionDivider: { height: 4 },
-  // 单元格文字样式
-  cellHours: { fontSize: 13, fontWeight: "500", color: "#1C1C1E" },
-  cellOT: { color: "#FF4D4F", fontWeight: "700" },
-  cellCompOff: { color: "#52C41A", fontWeight: "700" },
-  cellRest: { fontSize: 11, color: "#FF4D4F", fontWeight: "500" },
-  cellNoMorning: { fontSize: 10, color: "#FF4D4F", fontWeight: "500" },
+  // 单元格：数字维持中性；状态由文本标签、浅色底和颜色共同表达。
+  cellHours: { fontSize: 13, fontWeight: "600", color: "#1C1C1E" },
+  cellWithBadge: { flexDirection: "row", alignItems: "center", gap: 2 },
+  cellStateBadge: { fontSize: 8, fontWeight: "800", lineHeight: 13, paddingHorizontal: 3, borderRadius: 4 },
+  cellOvertimeBadge: { backgroundColor: "#D9770620", color: "#B45309" },
+  cellCompOff: { minWidth: 24, height: 20, paddingHorizontal: 4, borderRadius: 5, alignItems: "center", justifyContent: "center" },
+  cellCompOffText: { fontSize: 10, fontWeight: "800", lineHeight: 14 },
+  cellRest: { minWidth: 22, height: 20, borderRadius: 5, alignItems: "center", justifyContent: "center", backgroundColor: "#64748B14" },
+  cellRestText: { fontSize: 12, color: "#475569", fontWeight: "700", lineHeight: 16 },
+  cellNoMorning: { fontSize: 10, color: "#64748B", fontWeight: "600" },
   cellSession: { fontSize: 12, fontWeight: "500", color: "#3C3C43" },
-  otDot: { width: 4, height: 4, borderRadius: 2, marginTop: 1 },
 });

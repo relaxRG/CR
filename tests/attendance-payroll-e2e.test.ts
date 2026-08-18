@@ -15,7 +15,7 @@
  *     A4. 旷工：额外扣1天日薪，attendanceSalary 减少
  *     A5. 病假：退回0.5天日薪，attendanceSalary 增加
  *     A6. 节假日上班：holidayBonus 加入 attendanceSalary
- *     A7. 加班换休（comp_off）：compOffCount++，paidOvertimeHours 减少
+ *     A7. 加班换休：明确占用本月加班小时，计费加班相应减少
  *
  *   Suite B：兑换调休余额（handleCashOut 重构验证）
  *     B1. 首次兑换：grossSalary 增加 compOffCashOut 金额
@@ -82,11 +82,12 @@ function calcFromShiftsPure(
   const daysInMonth = getDaysInMonth(year, m);
   const empShifts = shifts.filter((s) => s.employeeId === employeeId && s.date.startsWith(month));
   const expectedAttendanceDays = Math.max(0, daysInMonth - employee.restDaysPerMonth);
-  const hoursPerCompOff = employee.compOffRule?.hoursPerDay ?? 8;
+  const overtimeHoursPerCompOff = employee.compOffRule?.hoursPerDay ?? 8;
   const daysSet = new Set<string>();
   let totalHours = 0;
   let stdHoursTotal = 0;
-  let compOffCount = 0;
+  let workedStdHours = 0;
+  let overtimeCompOffDays = 0;
   let holidayBonus = 0;
   let holidayWorkDays = 0;
   const specialStatusDeductions: Record<string, { count: number; deduction: number; name: string; multiplier: number }> = {};
@@ -101,7 +102,7 @@ function calcFromShiftsPure(
       const countsAsAtt = specialStatus.countAsAttendance;
       const isCompOff = specialStatus.category === "comp_off";
       if (isCompOff) {
-        compOffCount++;
+        overtimeCompOffDays++;
         daysSet.add(s.date);
         const contractH = getContractHoursForDate(employee, s.date);
         stdHoursTotal += contractH;
@@ -112,6 +113,7 @@ function calcFromShiftsPure(
           totalHours += h;
           const contractH = getContractHoursForDate(employee, s.date);
           stdHoursTotal += contractH;
+          workedStdHours += contractH;
         } else {
           daysSet.add(s.date);
           const contractH = getContractHoursForDate(employee, s.date);
@@ -150,6 +152,7 @@ function calcFromShiftsPure(
         totalHours += h;
         const contractH = getContractHoursForDate(employee, s.date);
         stdHoursTotal += contractH;
+        workedStdHours += contractH;
         const hd = holidayDaysList.find((hd) => hd.date === s.date);
         if (hd && hd.multiplier > 1) {
           const dayBonus = Math.round(dailyRate * (hd.multiplier - 1) * 100) / 100;
@@ -161,8 +164,8 @@ function calcFromShiftsPure(
   });
 
   const attendanceDays = daysSet.size;
-  const rawOvertimeHours = Math.max(0, totalHours - stdHoursTotal);
-  const compOffHoursUsed = compOffCount * hoursPerCompOff;
+  const rawOvertimeHours = Math.max(0, totalHours - workedStdHours);
+  const compOffHoursUsed = overtimeCompOffDays * overtimeHoursPerCompOff;
   const paidOvertimeHours = Math.max(0, rawOvertimeHours - compOffHoursUsed);
   const underRestDays = expectedAttendanceDays - attendanceDays;
   const totalSpecialDeduction = Object.values(specialStatusDeductions).reduce((s, v) => s + v.deduction, 0);
@@ -194,8 +197,10 @@ function calcFromShiftsPure(
     totalHours,
     stdHours: stdHoursTotal,
     overtimeHours: Math.round(rawOvertimeHours * 10) / 10,
-    compOffCount,
-    hoursPerCompOff,
+    overtimeCompOffDays,
+    overtimeCompOffHours: Math.round(compOffHoursUsed * 10) / 10,
+    balanceCompOffDays: 0,
+    holidayCompOffDays: 0,
     paidOvertimeHours: Math.round(paidOvertimeHours * 10) / 10,
     overtimePay,
     holidayBonus: Math.round(holidayBonus * 100) / 100,
@@ -207,7 +212,6 @@ function calcFromShiftsPure(
     specialStatusDeductions,
     totalSpecialDeduction: Math.round(totalSpecialDeduction * 100) / 100,
     notes: "",
-    storedOvertimeHours: compOffHoursUsed > 0 ? Math.round(compOffHoursUsed * 10) / 10 : undefined,
   };
 }
 
@@ -491,7 +495,7 @@ describe("Suite A：考勤工资计算引擎（calcFromShifts）", () => {
       .toBe(att.attendanceSalary);
   });
 
-  it("A7. 加班换休（comp_off）：compOffCount++，paidOvertimeHours 减少，5格加法闭环", () => {
+  it("A7. 加班换休：明确占用本月加班小时，计费加班减少且薪资闭环", () => {
     const shifts: ShiftEntry[] = [];
     // 22天正常上班（每天10h）
     for (let d = 1; d <= 22; d++) {
@@ -501,15 +505,12 @@ describe("Suite A：考勤工资计算引擎（calcFromShifts）", () => {
     // 第23天加班换休
     shifts.push(makeShift("2026-07-23", null, "ss_comp_off_overtime"));
     const att = calcFromShiftsPure("emp-001", MONTH, emp, shifts, ss);
-    // 计算逻辑：
-    //   22天 × 10h = 220h，stdHours = 22×8 + 8(换休天) = 184h
-    //   rawOvertimeHours = 220 - 184 = 36h
-    //   compOffHoursUsed = 1 × 8 = 8h
-    //   paidOvertimeHours = 36 - 8 = 28h
-    expect(att.compOffCount).toBe(1);
-    expect(att.overtimeHours).toBe(36); // 220 - 184 = 36
-    expect(att.paidOvertimeHours).toBe(28); // 36 - 8 = 28
-    expect(att.overtimePay).toBe(1400); // 28h × 50
+    // 真实工作工时为 22 × 10h，原始加班 = 220 - 22×8 = 44h；
+    // 加班换休仅占用 8h，剩余 36h 必须继续计费。
+    expect(att.overtimeCompOffDays).toBe(1);
+    expect(att.overtimeHours).toBe(44);
+    expect(att.paidOvertimeHours).toBe(36);
+    expect(att.overtimePay).toBe(1800);
     // 5格加法闭环
     const proportionalBase = att.attendanceSalary - att.overtimePay - att.holidayBonus + att.totalSpecialDeduction;
     expect(Math.round((proportionalBase + att.overtimePay + att.holidayBonus - att.totalSpecialDeduction) * 100) / 100)
@@ -706,13 +707,13 @@ describe("Suite D：autoSync 依赖完整性（存入调休联动加班费）", 
       shifts.push(makeShift(`2026-07-${String(d).padStart(2, "0")}`, 10));
     }
     const att = calcFromShiftsPure("emp-001", MONTH, emp, shifts, DEFAULT_SPECIAL_STATUSES);
-    expect(att.compOffCount).toBe(0);
+    expect(att.overtimeCompOffDays).toBe(0);
     expect(att.overtimeHours).toBe(46);
     expect(att.paidOvertimeHours).toBe(46);
     expect(att.overtimePay).toBe(2300);
   });
 
-  it("D2. 存入调休后（排班记录增加 comp_off）：paidOvertimeHours 减少，overtimePay 同步减少", () => {
+  it("D2. 加班换休后：计费加班只扣除已占用的8小时", () => {
     const shifts: ShiftEntry[] = [];
     for (let d = 1; d <= 22; d++) {
       shifts.push(makeShift(`2026-07-${String(d).padStart(2, "0")}`, 10));
@@ -720,18 +721,11 @@ describe("Suite D：autoSync 依赖完整性（存入调休联动加班费）", 
     // 第23天标记为加班换休
     shifts.push(makeShift("2026-07-23", null, "ss_comp_off_overtime"));
     const att = calcFromShiftsPure("emp-001", MONTH, emp, shifts, DEFAULT_SPECIAL_STATUSES);
-    // 计算逻辑说明：
-    //   22天 × 10h = 220h 总工时
-    //   22天合同工时 = 22 × 8 = 176h
-    //   comp_off 第23天加合同工时 = 8h（避免加班时数虚高）
-    //   stdHoursTotal = 176 + 8 = 184h
-    //   rawOvertimeHours = 220 - 184 = 36h
-    //   compOffHoursUsed = 1 × 8 = 8h
-    //   paidOvertimeHours = 36 - 8 = 28h
-    expect(att.compOffCount).toBe(1);
-    expect(att.overtimeHours).toBe(36); // 220 - 184 = 36
-    expect(att.paidOvertimeHours).toBe(28); // 36 - 8 = 28
-    expect(att.overtimePay).toBe(1400); // 28 × 50
+    // 22天真实工作：原始加班 = 220 - 22×8 = 44h；加班换休占用8h，计费36h。
+    expect(att.overtimeCompOffDays).toBe(1);
+    expect(att.overtimeHours).toBe(44);
+    expect(att.paidOvertimeHours).toBe(36);
+    expect(att.overtimePay).toBe(1800);
     // 薪资单中 attendanceSalary 小于无换休时的全加班工资
     expect(att.attendanceSalary).toBeLessThan(6000 + 2300);
   });
@@ -752,8 +746,8 @@ describe("Suite D：autoSync 依赖完整性（存入调休联动加班费）", 
     }
     const attAfterCashOut = calcFromShiftsPure("emp-001", MONTH, emp, shiftsAfterCashOut, DEFAULT_SPECIAL_STATUSES);
 
-    // comp_off 存入时：rawOvertimeHours=36，paidOvertimeHours=28
-    expect(attWithCompOff.paidOvertimeHours).toBe(28);
+    // 加班换休时：原始加班44h，扣除8h后仍有36h计费加班。
+    expect(attWithCompOff.paidOvertimeHours).toBe(36);
     // 兑换后（排班恢复为23天全加班）：paidOvertimeHours恢复为46
     expect(attAfterCashOut.paidOvertimeHours).toBe(46); // 恢复
     expect(attAfterCashOut.overtimePay).toBe(2300); // 恢复
@@ -774,12 +768,11 @@ describe("Suite D：autoSync 依赖完整性（存入调休联动加班费）", 
     const att2 = calcFromShiftsPure("emp-001", MONTH, emp, shifts2, DEFAULT_SPECIAL_STATUSES);
     const slip2 = buildPaySlipDraftPure(emp, MONTH, att2, 0);
 
-    // 验证：存入调休后，加班费减少，薪资单同步更新
-    // att2 第23天为 comp_off：rawOvertimeHours=22×2=44，stdHours=22×8+8=184，rawOT=220-184=36，paidOT=36-8=28
+    // 验证：加班换休后仅扣除8h，加班费与薪资单同步保留剩余36h。
     expect(att1.overtimePay).toBe(2300);
-    expect(att2.overtimePay).toBe(1400); // 28h × 50 = 1400
+    expect(att2.overtimePay).toBe(1800); // 36h × 50 = 1800
     expect(slip1.grossSalary).toBe(6000 + 2300);
-    expect(slip2.grossSalary).toBe(Math.round((6000 + 1400) * 100) / 100); // 同步减少
+    expect(slip2.grossSalary).toBe(Math.round((6000 + 1800) * 100) / 100); // 同步减少
     expect(slip2.grossSalary).toBeLessThan(slip1.grossSalary);
   });
 });

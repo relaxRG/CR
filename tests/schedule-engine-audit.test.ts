@@ -228,8 +228,10 @@ describe("Suite D：holiday-pay 节假日换休不计薪", () => {
     totalHours: 140,
     stdHours: 140,
     overtimeHours: 0,
-    compOffCount: 0,
-    hoursPerCompOff: 8,
+    overtimeCompOffDays: 0,
+    overtimeCompOffHours: 0,
+    balanceCompOffDays: 0,
+    holidayCompOffDays: 0,
     paidOvertimeHours: 0,
     expectedAttendanceDays: 23,
     underRestDays: 3,
@@ -610,7 +612,7 @@ describe("Suite M：31天、月休4天的请假与调休底薪结算", () => {
       employeeId: "emp-001", month: month31, employee: employee31, shifts, specialStatuses: DEFAULT_SPECIAL_STATUSES,
     });
     expect(result.attendanceDays).toBe(27);
-    expect(result.compOffCount).toBe(1);
+    expect(result.overtimeCompOffDays).toBe(1);
     expect(result.proportionalBaseSalary).toBe(10000);
     expect(result.overtimePay).toBe(0);
     expect(result.attendanceSalary).toBe(10000);
@@ -624,11 +626,13 @@ describe("Suite M：31天、月休4天的请假与调休底薪结算", () => {
     const result = calculateAttendanceFromShifts({
       employeeId: "emp-001", month: month31, employee: employee31, shifts, specialStatuses: DEFAULT_SPECIAL_STATUSES,
     });
-    // total=260h；标准=26×8+8=216h；原始加班44h；调休占用8h，计薪36h。
-    expect(result.overtimeHours).toBe(44);
-    expect(result.paidOvertimeHours).toBe(36);
-    expect(result.overtimePay).toBe(1800);
-    expect(result.attendanceSalary).toBe(11800);
+    // 真实工作日为 26×10h，原始加班 = 260 - 26×8 = 52h；
+    // 加班换休不再虚增原始加班的标准工时，仅占用 8h，因此计费 44h。
+    expect(result.overtimeHours).toBe(52);
+    expect(result.overtimeCompOffHours).toBe(8);
+    expect(result.paidOvertimeHours).toBe(44);
+    expect(result.overtimePay).toBe(2200);
+    expect(result.attendanceSalary).toBe(12200);
   });
 });
 
@@ -672,7 +676,7 @@ describe("Suite N：跨月请假、法定节假日与调休组合的月度隔离
     expect(result.expectedAttendanceDays).toBe(27);
     expect(result.attendanceDays).toBe(26);
     expect(result.underRestDays).toBe(1);
-    expect(result.compOffCount).toBe(1);
+    expect(result.overtimeCompOffDays).toBe(1);
     expect(result.proportionalBaseSalary).toBe(expectedBase);
 
     // 只有本月病假产生 -0.5 日薪的 deduction；事假不重复扣薪，跨月病假不能进入统计。

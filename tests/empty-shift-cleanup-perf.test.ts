@@ -40,7 +40,7 @@ function generateEntries(count: number, dirtyRatio: number): ShiftEntryRaw[] {
   const entries: ShiftEntryRaw[] = [];
   const employees = ["emp_001", "emp_002", "emp_003", "emp_004", "emp_005"];
   const sessions = ["午班", "晚班", "早班"];
-  const specialStatuses = [undefined, "ss_comp_off", "ss_absent", "ss_holiday"];
+  const specialStatuses = [undefined, "ss_comp_off_overtime", "ss_absent", "ss_holiday"];
 
   for (let i = 0; i < count; i++) {
     const empId = employees[i % employees.length];

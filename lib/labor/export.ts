@@ -869,9 +869,8 @@ export function buildCombinedWorkbook(params: ExportParams): XLSX.WorkBook {
   const attHeader = [
     "部门", "姓名", "代号", "类型",
     "应出勤天", "实际出勤天", "实际到岗天",
-    "标准工时(h)", "实际工时(h)", "加班工时(h)", "计费加班(h)",
-    "节假日上班天", "节假日薪资", "换休天数", "拿钱天数",
-    "调休余额(天)", "备注",
+    "标准工时(h)", "实际工时(h)", "原始加班(h)", "加班换休(h)", "计费加班(h)",
+    "余额休(天)", "节假日调休(天)", "节假日上班天", "节假日薪资", "备注",
   ];
   const attRows: (string | number)[][] = [];
 
@@ -887,16 +886,16 @@ export function buildCombinedWorkbook(params: ExportParams): XLSX.WorkBook {
         dept.label, emp.realName, emp.code ?? "", EMPLOYEE_TYPE_LABELS[emp.type],
         att?.expectedAttendanceDays ?? 0,
         att?.attendanceDays ?? 0,
-        att?.attendanceDays ?? 0,
+        (att?.attendanceDays ?? 0) - (att?.overtimeCompOffDays ?? 0) - (att?.balanceCompOffDays ?? 0) - (att?.holidayCompOffDays ?? 0),
         +(att?.stdHours ?? 0).toFixed(1),
         +(att?.totalHours ?? 0).toFixed(1),
         +(att?.overtimeHours ?? 0).toFixed(1),
+        +(att?.overtimeCompOffHours ?? 0).toFixed(1),
         +(att?.paidOvertimeHours ?? 0).toFixed(1),
+        att?.balanceCompOffDays ?? 0,
+        att?.holidayCompOffDays ?? 0,
         att?.holidayWorkDays ?? 0,
         +(att?.holidayBonus ?? 0).toFixed(2),
-        att?.compOffCount ?? 0,
-        0,
-        +(att?.storedOvertimeHours ?? 0).toFixed(1),
         slip?.notes ?? "",
       ]);
     }

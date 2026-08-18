@@ -652,17 +652,13 @@ export const DEFAULT_SPECIAL_STATUSES: SpecialStatus[] = [
   { id: "ss_absent",   name: "旷工",     category: "absence",  direction: "negative", countAsAttendance: false, salaryMultiplier: 2,   color: "#FF3B30", sortOrder: 4, isBuiltin: true },
   { id: "ss_holiday",  name: "节日上班", category: "work_day", direction: "positive", countAsAttendance: true,  salaryMultiplier: 3,   color: "#FF2D55", sortOrder: 5, isBuiltin: true, isHoliday: true },
   /**
-   * 调休换休三种（拆分自旧版 ss_comp_off）
-   * ss_comp_off_overtime  = 加班换休（优先扣加班时间）
-   * ss_comp_off_balance   = 调休余额（优先扣调休余额）
-   * ss_comp_off_holiday   = 节假日调休（优先匹配当月节假日多倍）
-   * 保留旧 id ss_comp_off 向后兼容
+   * 三种调休来源必须明确，禁止再使用无来源的通用调休状态：
+   * 加班换休只占用本月真实加班；调休余额和节假日调休只消费对应余额。
    */
-  { id: "ss_comp_off",         name: "加班换休",   category: "comp_off", direction: "neutral", countAsAttendance: true, salaryMultiplier: 0, color: "#007AFF", sortOrder: 6, isBuiltin: true },
-  { id: "ss_comp_off_overtime", name: "加班换休",   category: "comp_off", direction: "neutral", countAsAttendance: true, salaryMultiplier: 0, color: "#007AFF", sortOrder: 7, isBuiltin: true },
-  { id: "ss_comp_off_balance",  name: "调休余额",   category: "comp_off", direction: "neutral", countAsAttendance: true, salaryMultiplier: 0, color: "#5AC8FA", sortOrder: 8, isBuiltin: true },
-  { id: "ss_comp_off_holiday",  name: "节假日调休", category: "comp_off", direction: "neutral", countAsAttendance: true, salaryMultiplier: 0, color: "#34C759", sortOrder: 9, isBuiltin: true },
-  { id: "ss_penalty",  name: "违规扣款", category: "absence",  direction: "negative", countAsAttendance: true,  salaryMultiplier: 1,   color: "#FF6B00", sortOrder: 10, isBuiltin: true },
+  { id: "ss_comp_off_overtime", name: "加班换休",   category: "comp_off", direction: "neutral", countAsAttendance: true, salaryMultiplier: 0, color: "#D97706", sortOrder: 6, isBuiltin: true },
+  { id: "ss_comp_off_balance",  name: "调休余额",   category: "comp_off", direction: "neutral", countAsAttendance: true, salaryMultiplier: 0, color: "#2563EB", sortOrder: 7, isBuiltin: true },
+  { id: "ss_comp_off_holiday",  name: "节假日调休", category: "comp_off", direction: "neutral", countAsAttendance: true, salaryMultiplier: 0, color: "#16A34A", sortOrder: 8, isBuiltin: true },
+  { id: "ss_penalty",  name: "违规扣款", category: "absence",  direction: "negative", countAsAttendance: true,  salaryMultiplier: 1,   color: "#FF6B00", sortOrder: 9, isBuiltin: true },
 ];
 
 // ─── 店铺经营时间 ─────────────────────────────────────────────────────────────
@@ -987,13 +983,19 @@ export interface MonthlyAttendance {
   totalHours: number;
   /** 标准工时（按灵活工时规则或统一工时计算） */
   stdHours: number;
-  /** 累积加班时数（totalHours - stdHours，正数为加班） */
+  /** 原始加班时数：仅以实际工作班次的工时与标准工时比较；余额休与节假日休不影响此值。 */
   overtimeHours: number;
-  /** 加班换休次数 */
-  compOffCount: number;
-  /** 每次换休消耗的加班时数 */
-  hoursPerCompOff: number;
-  /** 实际计费加班时数（overtimeHours - compOffCount * hoursPerCompOff） */
+  /** 加班换休天数：自动从本月原始加班中占用。 */
+  overtimeCompOffDays: number;
+  /** 加班换休实际占用的本月加班小时数。 */
+  overtimeCompOffHours: number;
+  /** 调休余额使用天数：按最早到期余额条目消费，不影响本月加班费。 */
+  balanceCompOffDays: number;
+  /** 节假日调休使用天数：仅消费节假日换休余额，不影响本月加班费。 */
+  holidayCompOffDays: number;
+  /** 加班换休申请超出本月原始加班的小时数；非零时禁止确认薪资单。 */
+  overtimeCompOffShortfallHours?: number;
+  /** 实际计费加班时数（原始加班 - 已确认的加班换休占用）。 */
   paidOvertimeHours: number;
   /**
    * 应出勤天数（daysInMonth - restDaysPerMonth）
@@ -1028,10 +1030,6 @@ export interface MonthlyAttendance {
    * 默认阈値：4h（超过半天就提醒存入调休）
    */
   overtimeAlertHours?: number;
-  /**
-   * 本月已存入调休的加班小时数（用于展示剩余可存入时数）
-   */
-  storedOvertimeHours?: number;
   /**
    * 节假日上班天数（isHoliday=true 的特殊状态天数）
    * 包含选择拿錢和换休的所有节假日上班天
@@ -1169,15 +1167,15 @@ export interface PaySlip {
   /** 调休兑现备注（如"兑现X天加班换休余额，日薪¥XX"） */
   compOffCashOutNote?: string;
   /**
-   * 由本月排班中的调休状态消耗的余额明细；key = date|shift|specialStatusId。
-   * 生成薪资单重试或自动同步时据此保持幂等，避免同一排班重复扣减调休余额。
+   * 由本月排班中的余额休状态消耗的条目明细；key = date|shift|specialStatusId。
+   * 每个排班日可按最早到期优先分配多条余额，重算时由唯一结算器原子释放和重建。
    */
-  compOffUsage?: Record<string, {
+  compOffUsage?: Record<string, Array<{
     entryId: string;
     days: number;
-    source: "holiday" | "overtime" | "balance";
+    source: "holiday" | "overtime";
     consumedAt: number;
-  }>;
+  }>>;
   /**
    * 备用金人工已付金额（来自备用金关联记录，自动同步）。精度：2位小数
    * 展示时与 advanceAmount 合并计算：已预支 = advanceAmount + pettyLaborPaid

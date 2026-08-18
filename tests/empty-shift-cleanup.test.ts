@@ -64,7 +64,7 @@ describe("isEmptyShiftEntry", () => {
   });
 
   it("有特殊状态（调休）→ 不是空记录，即使工时为 null", () => {
-    expect(isEmptyShiftEntry(makeShift({ hoursValue: null, specialStatusId: "ss_comp_off" }))).toBe(false);
+    expect(isEmptyShiftEntry(makeShift({ hoursValue: null, specialStatusId: "ss_comp_off_overtime" }))).toBe(false);
   });
 
   it("有特殊状态（旷工）→ 不是空记录", () => {
@@ -125,7 +125,7 @@ describe("cleanEmptyShiftEntries", () => {
     await setShifts([
       makeShift({ employeeId: "emp_001", date: "2026-08-01", hoursValue: 8 }),           // 保留
       makeShift({ employeeId: "emp_001", date: "2026-08-02", hoursValue: null }),          // 清理
-      makeShift({ employeeId: "emp_001", date: "2026-08-03", hoursValue: null, specialStatusId: "ss_comp_off" }), // 保留（有特殊状态）
+      makeShift({ employeeId: "emp_001", date: "2026-08-03", hoursValue: null, specialStatusId: "ss_comp_off_overtime" }), // 保留（有特殊状态）
       makeShift({ employeeId: "emp_002", date: "2026-08-01", hoursValue: undefined }),     // 清理
       makeShift({ employeeId: "emp_002", date: "2026-08-04", hoursValue: 0 }),             // 清理
     ]);
@@ -135,7 +135,7 @@ describe("cleanEmptyShiftEntries", () => {
     expect(remaining).toHaveLength(2);
     // 验证保留的是正确的记录
     expect(remaining.some((r) => r.date === "2026-08-01" && r.employeeId === "emp_001")).toBe(true);
-    expect(remaining.some((r) => r.date === "2026-08-03" && r.specialStatusId === "ss_comp_off")).toBe(true);
+    expect(remaining.some((r) => r.date === "2026-08-03" && r.specialStatusId === "ss_comp_off_overtime")).toBe(true);
   });
 
   it("全部是空记录 → 全部清理，返回正确数量", async () => {
@@ -203,7 +203,7 @@ describe("SchHoursModal 清空工时行为回归", () => {
     // 但作为防御性测试保留
     const onSave = vi.fn();
     const onClear = vi.fn();
-    simulateHandleSave("", "ss_comp_off", onSave, onClear);
+    simulateHandleSave("", "ss_comp_off_overtime", onSave, onClear);
     expect(onSave).toHaveBeenCalledOnce();
     expect(onClear).not.toHaveBeenCalled();
   });
@@ -282,7 +282,7 @@ describe("groupedScheduleRows 空记录过滤回归", () => {
 
   it("有特殊状态（无工时）→ 员工出现在排班表", () => {
     const shifts: ShiftEntryRaw[] = [
-      makeShift({ employeeId: "emp_001", shift: "午班", hoursValue: null, specialStatusId: "ss_comp_off" }),
+      makeShift({ employeeId: "emp_001", shift: "午班", hoursValue: null, specialStatusId: "ss_comp_off_overtime" }),
     ];
     const ids = getEmpIdsWithValidShifts(shifts, "午班");
     expect(ids.has("emp_001")).toBe(true);
