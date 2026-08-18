@@ -25,6 +25,7 @@ import {
   hasDraftPayrollReconciliationDelta,
 } from "@/lib/labor/payroll-draft-reconciliation";
 import { checkControlFieldsIntegrity, checkAdvanceCrossMonthPollution } from "@/lib/labor/payroll-monitor";
+import { reconcilePaySlip } from "@/lib/labor/payroll-reconciliation";
 import {
   Alert, Clipboard, Modal, Platform, Pressable, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions, KeyboardAvoidingView} from "react-native";
@@ -365,6 +366,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
       slip.rewardPenalty ?? 0,
     );
   }, [att?.attendanceDays, employee, getMonthCloseStatus, month, slip]);
+  const payrollReconciliation = useMemo(() => slip ? reconcilePaySlip(slip) : null, [slip]);
 
   // 换休余额（useMemo 避免每次渲染对全量 entries 重复 filter/reduce）
   const compOffDays = useMemo(() =>
@@ -640,15 +642,27 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
               </View>
             );
           })()}
-          {/* ─── 实发薪资 + 公司社保公积金─── */}
-          {slip && (
-            <View style={{ paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border + "44" }}>
+          {/* ─── 薪资对账：调休兑现单列，实发公式与已保存薪资单按分核对 ─── */}
+          {slip && payrollReconciliation && (
+            <View style={{ paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border + "44", gap: 5 }}>
+              {(slip.compOffCashOut ?? 0) !== 0 && (
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <Text style={{ fontSize: 11, color: colors.muted }}>调休兑现（已计入应发）</Text>
+                  <Text style={{ fontSize: 12, fontWeight: "700", color: colors.foreground }}>{slip.compOffCashOut! >= 0 ? "+" : ""}¥{formatMoney(slip.compOffCashOut ?? 0)}</Text>
+                </View>
+              )}
               <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
                 <Text style={{ fontSize: 14, fontWeight: "800", color: colors.foreground }}>实发薪资</Text>
                 <Text style={{ fontSize: 17, fontWeight: "900", color: colors.primary }}>¥{formatMoney(slip.finalSalary)}</Text>
               </View>
+              <Text style={{ fontSize: 10, color: colors.muted }}>
+                应发 ¥{formatMoney(payrollReconciliation.grossSalary)} − 扣款 ¥{formatMoney(payrollReconciliation.deductionsTotal)} = 实发 ¥{formatMoney(payrollReconciliation.finalSalary)}
+              </Text>
+              {(Math.abs(payrollReconciliation.storedGrossVariance) >= 0.01 || Math.abs(payrollReconciliation.storedFinalVariance) >= 0.01) && (
+                <Text style={{ fontSize: 10, fontWeight: "700", color: colors.error }}>薪资单与明细存在差额，需使用“重新计算本月”刷新。</Text>
+              )}
               {(slip.employerSocialInsurance > 0 || slip.employerHousingFund > 0) && (
-                <View style={{ flexDirection: "row", gap: 16, marginTop: 4 }}>
+                <View style={{ flexDirection: "row", gap: 16, marginTop: 1 }}>
                   {slip.employerSocialInsurance > 0 && (
                     <Text style={{ fontSize: 10, color: colors.muted }}>公司社保：¥{formatMoney(slip.employerSocialInsurance)}</Text>
                   )}

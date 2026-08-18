@@ -6,6 +6,7 @@ import {
   shouldPayAllowanceThisMonth,
 } from "./types";
 import { getAllowanceSettlementBucket, isDailyAllowanceRule } from "./allowance-rule-semantics";
+import { roundMoney, sumMoney } from "@/lib/finance/money";
 
 export type PayrollExtrasControls = Pick<
   PaySlip,
@@ -24,8 +25,6 @@ export interface PayrollExtrasSettlement {
   revenueKPIDetails: Record<string, { actual: number; amount: number }>;
   performanceTotal: number;
 }
-
-const roundMoney = (value: number) => Math.round(value * 100) / 100;
 
 /**
  * 月度绩效与补贴唯一结算入口。
@@ -108,13 +107,13 @@ export function settlePayrollExtras(
     mealAllowance,
     transportAllowance,
     otherAllowance,
-    allowanceTotal: roundMoney(mealAllowance + transportAllowance + otherAllowance),
+    allowanceTotal: sumMoney([mealAllowance, transportAllowance, otherAllowance]),
     allowanceDetails,
     workKPIBonus,
     workKPIDetails,
     revenueKPIBonus,
     revenueKPIDetails,
-    performanceTotal: roundMoney(workKPIBonus + revenueKPIBonus),
+    performanceTotal: sumMoney([workKPIBonus, revenueKPIBonus]),
   };
 }
 
@@ -123,7 +122,7 @@ export function getPayrollExtrasGrandTotal(
   settlement: Pick<PayrollExtrasSettlement, "allowanceTotal" | "performanceTotal">,
   rewardPenalty: number = 0,
 ): number {
-  return roundMoney(settlement.allowanceTotal + settlement.performanceTotal + rewardPenalty);
+  return sumMoney([settlement.allowanceTotal, settlement.performanceTotal, rewardPenalty]);
 }
 
 /**
@@ -189,9 +188,9 @@ export function resolvePersistedPayrollExtrasForDisplay(
     mealAllowance,
     transportAllowance,
     otherAllowance,
-    allowanceTotal: roundMoney(mealAllowance + transportAllowance + otherAllowance),
+    allowanceTotal: sumMoney([mealAllowance, transportAllowance, otherAllowance]),
     workKPIBonus,
     revenueKPIBonus,
-    performanceTotal: roundMoney(workKPIBonus + revenueKPIBonus),
+    performanceTotal: sumMoney([workKPIBonus, revenueKPIBonus]),
   }, slip.rewardPenalty ?? 0);
 }

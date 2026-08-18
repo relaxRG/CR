@@ -25,6 +25,7 @@ import {
   DEFAULT_BUSINESS_HOURS, DEFAULT_SHIFT_GROUPS,
 } from "./types";
 import { settlePayrollExtras } from "./payroll-extras";
+import { calculateFinalSalary, calculateGrossSalary } from "./payroll-reconciliation";
 import { CURRENT_ALLOWANCE_RULES_SCHEMA_VERSION, getActiveAllowanceControls, needsHistoricalAllowanceRulesReset, resetHistoricalAllowanceRules } from "./allowance-rules-reset";
 import {
   buildFinalScheduleByDept,
@@ -771,12 +772,16 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
     // ── 应发薪资（税前）──
     // compOffCashOut = 兑换调休余额现金，应加入应发薪资
     // 修复：旧版未将 compOffCashOut 纳入 grossSalary，导致兑换后应发薪资不变
-    const grossSalary = Math.round((
-      attendanceSalary + extras.performanceTotal +
-      extras.transportAllowance + extras.mealAllowance + extras.otherAllowance +
-      (existing?.rewardPenalty ?? 0) +
-      (existing?.compOffCashOut ?? 0)
-    ) * 100) / 100;
+    const grossSalary = calculateGrossSalary({
+      attendanceSalary,
+      workKPIBonus: extras.workKPIBonus,
+      revenueKPIBonus: extras.revenueKPIBonus,
+      transportAllowance: extras.transportAllowance,
+      mealAllowance: extras.mealAllowance,
+      otherAllowance: extras.otherAllowance,
+      rewardPenalty: existing?.rewardPenalty ?? 0,
+      compOffCashOut: existing?.compOffCashOut ?? 0,
+    });
 
     // ── 社保/公积金计算（双轨制：个人+公司）──
     // 优先使用员工独立配置，否则使用全局配置
@@ -851,9 +856,21 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
     // 开启社保/个税时：实发 = 应发 - 社保个人 - 公积金个人 - 个税 - 已预支（advanceAmount + pettyLaborPaid）
     // 关闭社保/个税时：实发 = 应发 - 已预支（advanceAmount + pettyLaborPaid）
     const pettyLaborPaidAmt = existing?.pettyLaborPaid ?? 0;
-    const finalSalary = Math.round((
-      grossSalary - socialInsuranceDeduction - housingFundDeduction - incomeTax - advanceAmount - pettyLaborPaidAmt
-    ) * 100) / 100;
+    const finalSalary = calculateFinalSalary({
+      attendanceSalary,
+      workKPIBonus: extras.workKPIBonus,
+      revenueKPIBonus: extras.revenueKPIBonus,
+      transportAllowance: extras.transportAllowance,
+      mealAllowance: extras.mealAllowance,
+      otherAllowance: extras.otherAllowance,
+      rewardPenalty: existing?.rewardPenalty ?? 0,
+      compOffCashOut: existing?.compOffCashOut ?? 0,
+      socialInsuranceDeduction,
+      housingFundDeduction,
+      incomeTax,
+      advanceAmount,
+      pettyLaborPaid: pettyLaborPaidAmt,
+    });
 
     return {
       id: existing?.id ?? uuid(),

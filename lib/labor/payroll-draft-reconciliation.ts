@@ -1,10 +1,12 @@
 import type { Employee, GlobalPayrollSettings, PaySlip } from "./types";
+import { subtractMoney, sumMoney } from "@/lib/finance/money";
 
 const MONEY_FIELDS: Array<keyof PaySlip> = [
   "attendanceDays", "attendanceSalary",
   "mealAllowance", "transportAllowance", "otherAllowance",
   "workKPIBonus", "revenueKPIBonus", "rewardPenalty",
   "grossSalary", "socialInsuranceDeduction", "housingFundDeduction", "incomeTax",
+  "compOffCashOut", "pettyLaborPaid",
   "finalSalary", "employerSocialInsurance", "employerHousingFund", "totalEmployerCost",
 ];
 
@@ -23,11 +25,13 @@ export function getDraftPayrollCumulativeTaxInputs(
   const previousSlips = paySlips.filter((slip) =>
     slip.employeeId === employee.id && slip.month.startsWith(yearPrefix) && slip.month < month,
   );
-  const cumulativeIncome = previousSlips.reduce((sum, slip) => sum + Math.max(0,
-    slip.grossSalary - (slip.socialInsuranceDeduction ?? 0) - (slip.housingFundDeduction ?? 0)
-      - (taxConfig?.threshold ?? 5000) - (taxConfig?.specialDeductions ?? 0),
-  ), 0);
-  const cumulativeTaxPaid = previousSlips.reduce((sum, slip) => sum + (slip.incomeTax ?? 0), 0);
+  const cumulativeIncome = sumMoney(previousSlips.map((slip) => Math.max(0, subtractMoney(slip.grossSalary, [
+    slip.socialInsuranceDeduction,
+    slip.housingFundDeduction,
+    taxConfig?.threshold ?? 5000,
+    taxConfig?.specialDeductions ?? 0,
+  ]))));
+  const cumulativeTaxPaid = sumMoney(previousSlips.map((slip) => slip.incomeTax));
   return { cumulativeIncome, cumulativeTaxPaid };
 }
 
@@ -37,6 +41,6 @@ export function getDraftPayrollCumulativeTaxInputs(
  */
 export function hasDraftPayrollReconciliationDelta(current: PaySlip, next: PaySlip): boolean {
   return MONEY_FIELDS.some((field) =>
-    Math.abs(Number(current[field] ?? 0) - Number(next[field] ?? 0)) >= 0.005,
+    Math.abs(subtractMoney(current[field] as number | undefined, [next[field] as number | undefined])) >= 0.01,
   );
 }

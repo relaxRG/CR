@@ -28,7 +28,7 @@ describe("薪资与考勤数字颜色层级", () => {
   });
 
   it("薪资统计的常规扣款仅依靠负号表达，不把预支、社保、公积金和个税全部标成红色", () => {
-    const deductions = block(labor, "{/* ─── 扣款（5格）─── */}", "{/* ─── 实发薪资 + 公司社保公积金─── */}");
+    const deductions = block(labor, "{/* ─── 扣款（5格）─── */}", "{/* ─── 薪资对账：调休兑现单列，实发公式与已保存薪资单按分核对 ─── */}");
     expect(deductions).not.toContain("colors.error");
     expect(deductions).not.toContain("colors.warning");
     expect(deductions).toContain("color: advance > 0 ? colors.foreground : colors.muted");

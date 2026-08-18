@@ -25,6 +25,7 @@ import { PETTY_CODE_LABELS } from "../../store/petty-store";
 import type { MonthlyReport } from "../../store/monthly-report/types";
 import type { PaySlip } from "../../labor/types";
 import type { SupplierPurchaseRecord } from "../../food/types";
+import { sumMoney } from "@/lib/finance/money";
 
 function uuid(): string { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
 
@@ -444,29 +445,30 @@ export function aggregateMonthlyReport(input: AggregatorInput): Partial<MonthlyS
     item.manualDuplicate !== undefined ? item.manualDuplicate : item.isDuplicate;
 
   const nonDuplicate = items.filter((i) => !effectiveDuplicate(i));
-  const totalRevenue = nonDuplicate.filter((i) => i.category === "revenue" && i.amount > 0).reduce((s, i) => s + i.amount, 0);
-  const revenueDeductions = nonDuplicate.filter((i) => i.category === "revenue" && i.amount < 0).reduce((s, i) => s + i.amount, 0);
-  const totalCOGS = nonDuplicate.filter((i) => ["cogs_food","cogs_beverage","cogs_wine"].includes(i.category)).reduce((s, i) => s + i.amount, 0);
-  const totalLabor = nonDuplicate.filter((i) => i.category === "labor").reduce((s, i) => s + i.amount, 0);
-  const totalRent = [...nonDuplicate, ...manualItems.filter((i) => !effectiveDuplicate(i))].filter((i) => i.category === "rent").reduce((s, i) => s + i.amount, 0);
-  const totalUtilities = nonDuplicate.filter((i) => i.category === "utilities").reduce((s, i) => s + i.amount, 0);
-  const totalPettyOther = nonDuplicate.filter((i) => i.category === "petty_other").reduce((s, i) => s + i.amount, 0);
-  const totalExtra = manualItems.filter((i) => i.category === "extra" && !effectiveDuplicate(i)).reduce((s, i) => s + i.amount, 0);
-  const manualRevenue = manualItems.filter((i) => i.category === "revenue" && !effectiveDuplicate(i)).reduce((s, i) => s + i.amount, 0);
-  const manualCOGS = manualItems.filter((i) => ["cogs_food","cogs_beverage","cogs_wine"].includes(i.category) && !effectiveDuplicate(i)).reduce((s, i) => s + i.amount, 0);
-  const manualLabor = manualItems.filter((i) => i.category === "labor" && !effectiveDuplicate(i)).reduce((s, i) => s + i.amount, 0);
+  const sumAmounts = (records: ReadonlyArray<SummaryLineItem>) => sumMoney(records.map((item) => item.amount));
+  const totalRevenue = sumAmounts(nonDuplicate.filter((i) => i.category === "revenue" && i.amount > 0));
+  const revenueDeductions = sumAmounts(nonDuplicate.filter((i) => i.category === "revenue" && i.amount < 0));
+  const totalCOGS = sumAmounts(nonDuplicate.filter((i) => ["cogs_food","cogs_beverage","cogs_wine"].includes(i.category)));
+  const totalLabor = sumAmounts(nonDuplicate.filter((i) => i.category === "labor"));
+  const totalRent = sumAmounts([...nonDuplicate, ...manualItems.filter((i) => !effectiveDuplicate(i))].filter((i) => i.category === "rent"));
+  const totalUtilities = sumAmounts(nonDuplicate.filter((i) => i.category === "utilities"));
+  const totalPettyOther = sumAmounts(nonDuplicate.filter((i) => i.category === "petty_other"));
+  const totalExtra = sumAmounts(manualItems.filter((i) => i.category === "extra" && !effectiveDuplicate(i)));
+  const manualRevenue = sumAmounts(manualItems.filter((i) => i.category === "revenue" && !effectiveDuplicate(i)));
+  const manualCOGS = sumAmounts(manualItems.filter((i) => ["cogs_food","cogs_beverage","cogs_wine"].includes(i.category) && !effectiveDuplicate(i)));
+  const manualLabor = sumAmounts(manualItems.filter((i) => i.category === "labor" && !effectiveDuplicate(i)));
 
-  const netProfit = (totalRevenue + revenueDeductions + manualRevenue)
-    + totalCOGS + manualCOGS
-    + totalLabor + manualLabor
-    + totalRent + totalUtilities + totalPettyOther + totalExtra;
+  const resolvedRevenue = sumMoney([totalRevenue, revenueDeductions, manualRevenue]);
+  const resolvedCOGS = sumMoney([totalCOGS, manualCOGS]);
+  const resolvedLabor = sumMoney([totalLabor, manualLabor]);
+  const netProfit = sumMoney([resolvedRevenue, resolvedCOGS, resolvedLabor, totalRent, totalUtilities, totalPettyOther, totalExtra]);
 
   return {
     lineItems: items,
     manualItems,
-    totalRevenue: totalRevenue + revenueDeductions + manualRevenue,
-    totalCOGS: Math.abs(totalCOGS + manualCOGS),
-    totalLabor: Math.abs(totalLabor + manualLabor),
+    totalRevenue: resolvedRevenue,
+    totalCOGS: Math.abs(resolvedCOGS),
+    totalLabor: Math.abs(resolvedLabor),
     totalRent: Math.abs(totalRent),
     totalUtilities: Math.abs(totalUtilities),
     totalPettyOther: Math.abs(totalPettyOther),
