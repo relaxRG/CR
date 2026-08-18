@@ -1,6 +1,27 @@
 {
-  "generatedAt": "2026-08-18T08:48:32.186Z",
+  "generatedAt": "2026-08-18T18:55:11.285Z",
   "records": [
+    {
+      "backend": "AsyncStorage",
+      "key": "[...LEGACY_MONTH_KEYS]",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "multiGet",
+          "file": "lib/migrations/clean-legacy-business-month-keys.ts",
+          "line": 17,
+          "value": "",
+          "structure": ""
+        },
+        {
+          "operation": "multiRemove",
+          "file": "lib/migrations/clean-legacy-business-month-keys.ts",
+          "line": 19,
+          "value": "",
+          "structure": ""
+        }
+      ]
+    },
     {
       "backend": "AsyncStorage",
       "key": "[...SYNC_KEYS]",
@@ -51,7 +72,7 @@
         {
           "operation": "multiRemove",
           "file": "lib/labor/store.tsx",
-          "line": 987,
+          "line": 1034,
           "value": "",
           "structure": "EmployeeStore, CustomDeptStore, DeptOrderStore, ShiftTemplateStore, SpecialStatusStore, HolidayConfigStore, ShiftStore, AttendanceStore, PaySlipStore, GlobalPayrollSettingsStore, MonthCloseStore, MonthConfigStore, CompOffBalanceEntryStore, HolidayCompOffStore, BusinessHoursStore, ShiftGroupStore, UnexplainedRestAlertStore, FillPresetStore"
         }
@@ -240,7 +261,7 @@
         {
           "operation": "getItem",
           "file": "lib/cf-sync/provider.tsx",
-          "line": 747,
+          "line": 751,
           "value": "",
           "structure": "DeviceInfo, SyncState"
         },
@@ -513,14 +534,14 @@
         {
           "operation": "removeItem",
           "file": "lib/cf-sync/client.ts",
-          "line": 64,
+          "line": 65,
           "value": "",
           "structure": "WebMemoryTicket, DeviceInfo, CompleteSyncSnapshot, SyncEntry"
         },
         {
           "operation": "removeItem",
           "file": "lib/cf-sync/client.ts",
-          "line": 114,
+          "line": 129,
           "value": "",
           "structure": "WebMemoryTicket, DeviceInfo, CompleteSyncSnapshot, SyncEntry"
         }
@@ -534,21 +555,21 @@
         {
           "operation": "setItemAsync",
           "file": "lib/cf-sync/client.ts",
-          "line": 67,
+          "line": 68,
           "value": "token",
           "structure": "WebMemoryTicket, DeviceInfo, CompleteSyncSnapshot, SyncEntry"
         },
         {
           "operation": "getItemAsync",
           "file": "lib/cf-sync/client.ts",
-          "line": 72,
+          "line": 73,
           "value": "",
           "structure": "WebMemoryTicket, DeviceInfo, CompleteSyncSnapshot, SyncEntry"
         },
         {
           "operation": "deleteItemAsync",
           "file": "lib/cf-sync/client.ts",
-          "line": 77,
+          "line": 78,
           "value": "",
           "structure": "WebMemoryTicket, DeviceInfo, CompleteSyncSnapshot, SyncEntry"
         }
@@ -562,21 +583,21 @@
         {
           "operation": "setItem",
           "file": "lib/cf-sync/group-switch.ts",
-          "line": 90,
+          "line": 91,
           "value": "JSON.stringify(session",
           "structure": "DeviceInfo, PersistedGroupSwitchSession"
         },
         {
           "operation": "removeItem",
           "file": "lib/cf-sync/group-switch.ts",
-          "line": 95,
+          "line": 96,
           "value": "",
           "structure": "DeviceInfo, PersistedGroupSwitchSession"
         },
         {
           "operation": "getItem",
           "file": "lib/cf-sync/group-switch.ts",
-          "line": 102,
+          "line": 103,
           "value": "",
           "structure": "DeviceInfo, PersistedGroupSwitchSession"
         }
@@ -590,21 +611,21 @@
         {
           "operation": "getItem",
           "file": "lib/cf-sync/provider.tsx",
-          "line": 737,
+          "line": 741,
           "value": "",
           "structure": "DeviceInfo, SyncState"
         },
         {
           "operation": "setItem",
           "file": "lib/cf-sync/provider.tsx",
-          "line": 739,
+          "line": 743,
           "value": "JSON.stringify(newAllowedKeys",
           "structure": "DeviceInfo, SyncState"
         },
         {
           "operation": "setItem",
           "file": "lib/cf-sync/provider.tsx",
-          "line": 746,
+          "line": 750,
           "value": "JSON.stringify(newAllowedKeys",
           "structure": "DeviceInfo, SyncState"
         }
@@ -891,14 +912,14 @@
         {
           "operation": "getItem",
           "file": "lib/ice/cost.ts",
-          "line": 121,
+          "line": 122,
           "value": "",
           "structure": "IceSettings, IceCostItem"
         },
         {
           "operation": "setItem",
           "file": "lib/ice/cost.ts",
-          "line": 135,
+          "line": 136,
           "value": "JSON.stringify(s",
           "structure": "IceSettings, IceCostItem"
         }
@@ -1332,7 +1353,7 @@
         {
           "operation": "getItem",
           "file": "lib/food/ingredient-store.tsx",
-          "line": 388,
+          "line": 389,
           "value": "",
           "structure": "FoodIngredientState, PurchaseState"
         }
@@ -1346,14 +1367,14 @@
         {
           "operation": "getItem",
           "file": "lib/food/ingredient-store.tsx",
-          "line": 387,
+          "line": 388,
           "value": "",
           "structure": "FoodIngredientState, PurchaseState"
         },
         {
           "operation": "setItem",
           "file": "lib/food/ingredient-store.tsx",
-          "line": 404,
+          "line": 405,
           "value": "JSON.stringify(state",
           "structure": "FoodIngredientState, PurchaseState"
         }
@@ -1395,14 +1416,14 @@
         {
           "operation": "getItem",
           "file": "lib/food/ingredient-store.tsx",
-          "line": 465,
+          "line": 466,
           "value": "",
           "structure": "FoodIngredientState, PurchaseState"
         },
         {
           "operation": "setItem",
           "file": "lib/food/ingredient-store.tsx",
-          "line": 472,
+          "line": 473,
           "value": "JSON.stringify(state",
           "structure": "FoodIngredientState, PurchaseState"
         }
@@ -1738,49 +1759,49 @@
         {
           "operation": "setItem",
           "file": "lib/cf-sync/client.ts",
-          "line": 41,
+          "line": 42,
           "value": "value",
           "structure": "WebMemoryTicket, DeviceInfo, CompleteSyncSnapshot, SyncEntry"
         },
         {
           "operation": "getItem",
           "file": "lib/cf-sync/client.ts",
-          "line": 49,
+          "line": 50,
           "value": "",
           "structure": "WebMemoryTicket, DeviceInfo, CompleteSyncSnapshot, SyncEntry"
         },
         {
           "operation": "removeItem",
           "file": "lib/cf-sync/client.ts",
-          "line": 56,
+          "line": 57,
           "value": "",
           "structure": "WebMemoryTicket, DeviceInfo, CompleteSyncSnapshot, SyncEntry"
         },
         {
           "operation": "getItem",
           "file": "lib/labor/store.tsx",
-          "line": 46,
+          "line": 47,
           "value": "",
           "structure": "EmployeeStore, CustomDeptStore, DeptOrderStore, ShiftTemplateStore, SpecialStatusStore, HolidayConfigStore, ShiftStore, AttendanceStore, PaySlipStore, GlobalPayrollSettingsStore, MonthCloseStore, MonthConfigStore, CompOffBalanceEntryStore, HolidayCompOffStore, BusinessHoursStore, ShiftGroupStore, UnexplainedRestAlertStore, FillPresetStore"
         },
         {
           "operation": "setItem",
           "file": "lib/labor/store.tsx",
-          "line": 59,
+          "line": 60,
           "value": "JSON.stringify(next",
           "structure": "EmployeeStore, CustomDeptStore, DeptOrderStore, ShiftTemplateStore, SpecialStatusStore, HolidayConfigStore, ShiftStore, AttendanceStore, PaySlipStore, GlobalPayrollSettingsStore, MonthCloseStore, MonthConfigStore, CompOffBalanceEntryStore, HolidayCompOffStore, BusinessHoursStore, ShiftGroupStore, UnexplainedRestAlertStore, FillPresetStore"
         },
         {
           "operation": "getItem",
           "file": "lib/labor/store.tsx",
-          "line": 73,
+          "line": 74,
           "value": "",
           "structure": "EmployeeStore, CustomDeptStore, DeptOrderStore, ShiftTemplateStore, SpecialStatusStore, HolidayConfigStore, ShiftStore, AttendanceStore, PaySlipStore, GlobalPayrollSettingsStore, MonthCloseStore, MonthConfigStore, CompOffBalanceEntryStore, HolidayCompOffStore, BusinessHoursStore, ShiftGroupStore, UnexplainedRestAlertStore, FillPresetStore"
         },
         {
           "operation": "setItem",
           "file": "lib/labor/store.tsx",
-          "line": 84,
+          "line": 85,
           "value": "JSON.stringify(next",
           "structure": "EmployeeStore, CustomDeptStore, DeptOrderStore, ShiftTemplateStore, SpecialStatusStore, HolidayConfigStore, ShiftStore, AttendanceStore, PaySlipStore, GlobalPayrollSettingsStore, MonthCloseStore, MonthConfigStore, CompOffBalanceEntryStore, HolidayCompOffStore, BusinessHoursStore, ShiftGroupStore, UnexplainedRestAlertStore, FillPresetStore"
         },
@@ -1850,21 +1871,21 @@
         {
           "operation": "setItemAsync",
           "file": "lib/cf-sync/client.ts",
-          "line": 43,
+          "line": 44,
           "value": "value",
           "structure": "WebMemoryTicket, DeviceInfo, CompleteSyncSnapshot, SyncEntry"
         },
         {
           "operation": "getItemAsync",
           "file": "lib/cf-sync/client.ts",
-          "line": 51,
+          "line": 52,
           "value": "",
           "structure": "WebMemoryTicket, DeviceInfo, CompleteSyncSnapshot, SyncEntry"
         },
         {
           "operation": "deleteItemAsync",
           "file": "lib/cf-sync/client.ts",
-          "line": 58,
+          "line": 59,
           "value": "",
           "structure": "WebMemoryTicket, DeviceInfo, CompleteSyncSnapshot, SyncEntry"
         }
@@ -1948,14 +1969,14 @@
         {
           "operation": "getItem",
           "file": "lib/labor/store.tsx",
-          "line": 320,
+          "line": 321,
           "value": "",
           "structure": "EmployeeStore, CustomDeptStore, DeptOrderStore, ShiftTemplateStore, SpecialStatusStore, HolidayConfigStore, ShiftStore, AttendanceStore, PaySlipStore, GlobalPayrollSettingsStore, MonthCloseStore, MonthConfigStore, CompOffBalanceEntryStore, HolidayCompOffStore, BusinessHoursStore, ShiftGroupStore, UnexplainedRestAlertStore, FillPresetStore"
         },
         {
           "operation": "setItem",
           "file": "lib/labor/store.tsx",
-          "line": 334,
+          "line": 335,
           "value": "JSON.stringify(order",
           "structure": "EmployeeStore, CustomDeptStore, DeptOrderStore, ShiftTemplateStore, SpecialStatusStore, HolidayConfigStore, ShiftStore, AttendanceStore, PaySlipStore, GlobalPayrollSettingsStore, MonthCloseStore, MonthConfigStore, CompOffBalanceEntryStore, HolidayCompOffStore, BusinessHoursStore, ShiftGroupStore, UnexplainedRestAlertStore, FillPresetStore"
         }
@@ -2011,14 +2032,14 @@
         {
           "operation": "getItem",
           "file": "lib/labor/advance-store.tsx",
-          "line": 144,
+          "line": 145,
           "value": "",
           "structure": "AdvanceCategory, AdvanceState, CategoryState, CategoryAction, CategoryContextValue"
         },
         {
           "operation": "setItem",
           "file": "lib/labor/advance-store.tsx",
-          "line": 152,
+          "line": 153,
           "value": "JSON.stringify(state.customCategories",
           "structure": "AdvanceCategory, AdvanceState, CategoryState, CategoryAction, CategoryContextValue"
         }
@@ -2032,14 +2053,14 @@
         {
           "operation": "getItem",
           "file": "lib/labor/advance-store.tsx",
-          "line": 185,
+          "line": 186,
           "value": "",
           "structure": "AdvanceCategory, AdvanceState, CategoryState, CategoryAction, CategoryContextValue"
         },
         {
           "operation": "setItem",
           "file": "lib/labor/advance-store.tsx",
-          "line": 203,
+          "line": 204,
           "value": "JSON.stringify(state",
           "structure": "AdvanceCategory, AdvanceState, CategoryState, CategoryAction, CategoryContextValue"
         }
@@ -2053,21 +2074,21 @@
         {
           "operation": "getItem",
           "file": "lib/labor/separate-payment-store.tsx",
-          "line": 94,
+          "line": 95,
           "value": "",
           "structure": "SeparatePaymentState, SeparatePaymentStore"
         },
         {
           "operation": "getItem",
           "file": "lib/labor/separate-payment-store.tsx",
-          "line": 98,
+          "line": 99,
           "value": "",
           "structure": "SeparatePaymentState, SeparatePaymentStore"
         },
         {
           "operation": "setItem",
           "file": "lib/labor/separate-payment-store.tsx",
-          "line": 106,
+          "line": 107,
           "value": "JSON.stringify(payments",
           "structure": "SeparatePaymentState, SeparatePaymentStore"
         }
@@ -2229,6 +2250,34 @@
     },
     {
       "backend": "AsyncStorage",
+      "key": "migration_clean_legacy_business_month_keys_v1_done",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/migrations/clean-legacy-business-month-keys.ts",
+          "line": 16,
+          "value": "",
+          "structure": ""
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/migrations/clean-legacy-business-month-keys.ts",
+          "line": 20,
+          "value": "\"1\"",
+          "structure": ""
+        },
+        {
+          "operation": "removeItem",
+          "file": "lib/migrations/clean-legacy-business-month-keys.ts",
+          "line": 29,
+          "value": "",
+          "structure": ""
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
       "key": "migration_clean_monthly_fixed_salary_v1_done",
       "status": "resolved",
       "calls": [
@@ -2273,6 +2322,69 @@
           "line": 91,
           "value": "",
           "structure": ""
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "module_month_adjustment_sessions_v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "setItem",
+          "file": "lib/month-close/module-month-close-store.tsx",
+          "line": 88,
+          "value": "JSON.stringify(next",
+          "structure": "ModuleMonthCloseStore"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/month-close/module-month-close-store.tsx",
+          "line": 95,
+          "value": "",
+          "structure": "ModuleMonthCloseStore"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "module_month_close_archives_v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "setItem",
+          "file": "lib/month-close/module-month-close-store.tsx",
+          "line": 81,
+          "value": "JSON.stringify(next",
+          "structure": "ModuleMonthCloseStore"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/month-close/module-month-close-store.tsx",
+          "line": 94,
+          "value": "",
+          "structure": "ModuleMonthCloseStore"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "monthly_report.raw_excel_archive.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/store/monthly-report/raw-excel-archive-store.tsx",
+          "line": 79,
+          "value": "",
+          "structure": "RawExcelArchiveStore"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/store/monthly-report/raw-excel-archive-store.tsx",
+          "line": 95,
+          "value": "JSON.stringify(next",
+          "structure": "RawExcelArchiveStore"
         }
       ]
     },
@@ -2571,14 +2683,14 @@
         {
           "operation": "getItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 438,
+          "line": 439,
           "value": "",
           "structure": "SelfBuyConfig, SpiritsState"
         },
         {
           "operation": "setItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 476,
+          "line": 477,
           "value": "JSON.stringify(state.customCategories",
           "structure": "SelfBuyConfig, SpiritsState"
         }
@@ -2592,14 +2704,14 @@
         {
           "operation": "getItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 439,
+          "line": 440,
           "value": "",
           "structure": "SelfBuyConfig, SpiritsState"
         },
         {
           "operation": "setItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 477,
+          "line": 478,
           "value": "JSON.stringify(state.groupMatchMemory",
           "structure": "SelfBuyConfig, SpiritsState"
         }
@@ -2613,14 +2725,14 @@
         {
           "operation": "getItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 435,
+          "line": 436,
           "value": "",
           "structure": "SelfBuyConfig, SpiritsState"
         },
         {
           "operation": "setItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 473,
+          "line": 474,
           "value": "JSON.stringify(state.groups",
           "structure": "SelfBuyConfig, SpiritsState"
         }
@@ -2634,14 +2746,14 @@
         {
           "operation": "getItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 430,
+          "line": 431,
           "value": "",
           "structure": "SelfBuyConfig, SpiritsState"
         },
         {
           "operation": "setItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 468,
+          "line": 469,
           "value": "JSON.stringify(state.items",
           "structure": "SelfBuyConfig, SpiritsState"
         }
@@ -2655,14 +2767,14 @@
         {
           "operation": "getItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 432,
+          "line": 433,
           "value": "",
           "structure": "SelfBuyConfig, SpiritsState"
         },
         {
           "operation": "setItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 470,
+          "line": 471,
           "value": "JSON.stringify(state.ledger",
           "structure": "SelfBuyConfig, SpiritsState"
         }
@@ -2676,14 +2788,14 @@
         {
           "operation": "getItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 436,
+          "line": 437,
           "value": "",
           "structure": "SelfBuyConfig, SpiritsState"
         },
         {
           "operation": "setItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 474,
+          "line": 475,
           "value": "JSON.stringify(state.matchMemory",
           "structure": "SelfBuyConfig, SpiritsState"
         }
@@ -2697,14 +2809,14 @@
         {
           "operation": "getItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 431,
+          "line": 432,
           "value": "",
           "structure": "SelfBuyConfig, SpiritsState"
         },
         {
           "operation": "setItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 469,
+          "line": 470,
           "value": "JSON.stringify(state.purchases",
           "structure": "SelfBuyConfig, SpiritsState"
         }
@@ -2718,14 +2830,14 @@
         {
           "operation": "getItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 433,
+          "line": 434,
           "value": "",
           "structure": "SelfBuyConfig, SpiritsState"
         },
         {
           "operation": "setItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 471,
+          "line": 472,
           "value": "JSON.stringify(state.refPrices",
           "structure": "SelfBuyConfig, SpiritsState"
         }
@@ -2739,14 +2851,14 @@
         {
           "operation": "getItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 437,
+          "line": 438,
           "value": "",
           "structure": "SelfBuyConfig, SpiritsState"
         },
         {
           "operation": "setItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 475,
+          "line": 476,
           "value": "JSON.stringify(state.selfBuyConfig",
           "structure": "SelfBuyConfig, SpiritsState"
         }
@@ -2760,14 +2872,14 @@
         {
           "operation": "getItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 434,
+          "line": 435,
           "value": "",
           "structure": "SelfBuyConfig, SpiritsState"
         },
         {
           "operation": "setItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 472,
+          "line": 473,
           "value": "JSON.stringify(state.suppliers",
           "structure": "SelfBuyConfig, SpiritsState"
         }
@@ -2942,21 +3054,21 @@
         {
           "operation": "getItem",
           "file": "lib/store/petty-store.tsx",
-          "line": 179,
+          "line": 177,
           "value": "",
           "structure": "PettyRecord, PettyState"
         },
         {
           "operation": "getItem",
           "file": "lib/store/petty-store.tsx",
-          "line": 180,
+          "line": 178,
           "value": "",
           "structure": "PettyRecord, PettyState"
         },
         {
           "operation": "setItem",
           "file": "lib/store/petty-store.tsx",
-          "line": 184,
+          "line": 182,
           "value": "JSON.stringify(state",
           "structure": "PettyRecord, PettyState"
         }
@@ -2970,14 +3082,14 @@
         {
           "operation": "getItem",
           "file": "components/store/purchase.tsx",
-          "line": 41,
+          "line": 42,
           "value": "",
           "structure": "PurchaseItem"
         },
         {
           "operation": "setItem",
           "file": "components/store/purchase.tsx",
-          "line": 47,
+          "line": 48,
           "value": "JSON.stringify(next",
           "structure": "PurchaseItem"
         }
@@ -3187,21 +3299,21 @@
         {
           "operation": "setItemAsync",
           "file": "lib/cf-sync/group-switch.ts",
-          "line": 73,
+          "line": 74,
           "value": "ticket",
           "structure": "DeviceInfo, PersistedGroupSwitchSession"
         },
         {
           "operation": "getItemAsync",
           "file": "lib/cf-sync/group-switch.ts",
-          "line": 78,
+          "line": 79,
           "value": "",
           "structure": "DeviceInfo, PersistedGroupSwitchSession"
         },
         {
           "operation": "deleteItemAsync",
           "file": "lib/cf-sync/group-switch.ts",
-          "line": 86,
+          "line": 87,
           "value": "",
           "structure": "DeviceInfo, PersistedGroupSwitchSession"
         }
@@ -3407,6 +3519,27 @@
   "unresolved": [
     {
       "backend": "AsyncStorage",
+      "key": "[...LEGACY_MONTH_KEYS]",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "multiGet",
+          "file": "lib/migrations/clean-legacy-business-month-keys.ts",
+          "line": 17,
+          "value": "",
+          "structure": ""
+        },
+        {
+          "operation": "multiRemove",
+          "file": "lib/migrations/clean-legacy-business-month-keys.ts",
+          "line": 19,
+          "value": "",
+          "structure": ""
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
       "key": "[...SYNC_KEYS]",
       "status": "unresolved",
       "calls": [
@@ -3455,7 +3588,7 @@
         {
           "operation": "multiRemove",
           "file": "lib/labor/store.tsx",
-          "line": 987,
+          "line": 1034,
           "value": "",
           "structure": "EmployeeStore, CustomDeptStore, DeptOrderStore, ShiftTemplateStore, SpecialStatusStore, HolidayConfigStore, ShiftStore, AttendanceStore, PaySlipStore, GlobalPayrollSettingsStore, MonthCloseStore, MonthConfigStore, CompOffBalanceEntryStore, HolidayCompOffStore, BusinessHoursStore, ShiftGroupStore, UnexplainedRestAlertStore, FillPresetStore"
         }
@@ -3616,49 +3749,49 @@
         {
           "operation": "setItem",
           "file": "lib/cf-sync/client.ts",
-          "line": 41,
+          "line": 42,
           "value": "value",
           "structure": "WebMemoryTicket, DeviceInfo, CompleteSyncSnapshot, SyncEntry"
         },
         {
           "operation": "getItem",
           "file": "lib/cf-sync/client.ts",
-          "line": 49,
+          "line": 50,
           "value": "",
           "structure": "WebMemoryTicket, DeviceInfo, CompleteSyncSnapshot, SyncEntry"
         },
         {
           "operation": "removeItem",
           "file": "lib/cf-sync/client.ts",
-          "line": 56,
+          "line": 57,
           "value": "",
           "structure": "WebMemoryTicket, DeviceInfo, CompleteSyncSnapshot, SyncEntry"
         },
         {
           "operation": "getItem",
           "file": "lib/labor/store.tsx",
-          "line": 46,
+          "line": 47,
           "value": "",
           "structure": "EmployeeStore, CustomDeptStore, DeptOrderStore, ShiftTemplateStore, SpecialStatusStore, HolidayConfigStore, ShiftStore, AttendanceStore, PaySlipStore, GlobalPayrollSettingsStore, MonthCloseStore, MonthConfigStore, CompOffBalanceEntryStore, HolidayCompOffStore, BusinessHoursStore, ShiftGroupStore, UnexplainedRestAlertStore, FillPresetStore"
         },
         {
           "operation": "setItem",
           "file": "lib/labor/store.tsx",
-          "line": 59,
+          "line": 60,
           "value": "JSON.stringify(next",
           "structure": "EmployeeStore, CustomDeptStore, DeptOrderStore, ShiftTemplateStore, SpecialStatusStore, HolidayConfigStore, ShiftStore, AttendanceStore, PaySlipStore, GlobalPayrollSettingsStore, MonthCloseStore, MonthConfigStore, CompOffBalanceEntryStore, HolidayCompOffStore, BusinessHoursStore, ShiftGroupStore, UnexplainedRestAlertStore, FillPresetStore"
         },
         {
           "operation": "getItem",
           "file": "lib/labor/store.tsx",
-          "line": 73,
+          "line": 74,
           "value": "",
           "structure": "EmployeeStore, CustomDeptStore, DeptOrderStore, ShiftTemplateStore, SpecialStatusStore, HolidayConfigStore, ShiftStore, AttendanceStore, PaySlipStore, GlobalPayrollSettingsStore, MonthCloseStore, MonthConfigStore, CompOffBalanceEntryStore, HolidayCompOffStore, BusinessHoursStore, ShiftGroupStore, UnexplainedRestAlertStore, FillPresetStore"
         },
         {
           "operation": "setItem",
           "file": "lib/labor/store.tsx",
-          "line": 84,
+          "line": 85,
           "value": "JSON.stringify(next",
           "structure": "EmployeeStore, CustomDeptStore, DeptOrderStore, ShiftTemplateStore, SpecialStatusStore, HolidayConfigStore, ShiftStore, AttendanceStore, PaySlipStore, GlobalPayrollSettingsStore, MonthCloseStore, MonthConfigStore, CompOffBalanceEntryStore, HolidayCompOffStore, BusinessHoursStore, ShiftGroupStore, UnexplainedRestAlertStore, FillPresetStore"
         },
@@ -3728,21 +3861,21 @@
         {
           "operation": "setItemAsync",
           "file": "lib/cf-sync/client.ts",
-          "line": 43,
+          "line": 44,
           "value": "value",
           "structure": "WebMemoryTicket, DeviceInfo, CompleteSyncSnapshot, SyncEntry"
         },
         {
           "operation": "getItemAsync",
           "file": "lib/cf-sync/client.ts",
-          "line": 51,
+          "line": 52,
           "value": "",
           "structure": "WebMemoryTicket, DeviceInfo, CompleteSyncSnapshot, SyncEntry"
         },
         {
           "operation": "deleteItemAsync",
           "file": "lib/cf-sync/client.ts",
-          "line": 58,
+          "line": 59,
           "value": "",
           "structure": "WebMemoryTicket, DeviceInfo, CompleteSyncSnapshot, SyncEntry"
         }
@@ -3861,21 +3994,21 @@
         {
           "operation": "setItemAsync",
           "file": "lib/cf-sync/group-switch.ts",
-          "line": 73,
+          "line": 74,
           "value": "ticket",
           "structure": "DeviceInfo, PersistedGroupSwitchSession"
         },
         {
           "operation": "getItemAsync",
           "file": "lib/cf-sync/group-switch.ts",
-          "line": 78,
+          "line": 79,
           "value": "",
           "structure": "DeviceInfo, PersistedGroupSwitchSession"
         },
         {
           "operation": "deleteItemAsync",
           "file": "lib/cf-sync/group-switch.ts",
-          "line": 86,
+          "line": 87,
           "value": "",
           "structure": "DeviceInfo, PersistedGroupSwitchSession"
         }

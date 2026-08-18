@@ -21,12 +21,17 @@ import { MonthlyReport } from "@/lib/store/monthly-report/types";
 import { useDishAnalysisStore } from "@/lib/store/monthly-report/dish-analysis-store";
 import { usePeriodAnalysisStore } from "@/lib/store/period-analysis/store";
 import { parsePeriodAnalysisExcel } from "@/lib/store/period-analysis/excel-parser";
+import { PeriodAnalysisReport } from "@/lib/store/period-analysis/types";
+import { useRawExcelArchiveStore } from "@/lib/store/monthly-report/raw-excel-archive-store";
+import { normalizeMonthlyReportMonth } from "@/lib/store/monthly-report/rebuild-dish-categories";
+import { formatRawExcelSize, getRawExcelExportFilename } from "@/lib/store/monthly-report/raw-excel-archive";
 import {
   detectReportTypeByFilename,
   detectReportTypeByContent,
   parseDishAnalysis,
 } from "@/lib/store/monthly-report/dish-analysis-parser";
 import {
+  DishAnalysisSnapshot,
   ReportFileType,
   REPORT_FILE_TYPE_LABELS,
   REPORT_FILE_TYPE_DESC,
@@ -108,12 +113,21 @@ export default function MonthlyReportImportScreen() {
   const { addReport } = useMonthlyReportStore();
   const { upsertSnapshot } = useDishAnalysisStore();
   const { addReport: addPeriodReport, settings: periodSettings } = usePeriodAnalysisStore();
+  const {
+    groups: archivedGroups,
+    ready: archiveReady,
+    archiveFiles,
+    deleteFile: deleteArchivedFile,
+    exportFile: exportArchivedFile,
+  } = useRawExcelArchiveStore();
 
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<MonthlyReport | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [missingTypes, setMissingTypes] = useState<ReportFileType[]>([]);
+  const [dishSnapshotPreview, setDishSnapshotPreview] = useState<DishAnalysisSnapshot | null>(null);
+  const [periodReportPreview, setPeriodReportPreview] = useState<PeriodAnalysisReport | null>(null);
   // ─── 文件选择 ──────────────────────────────────────────────────────────────
   const handlePickFiles = async () => {
     tap();
@@ -166,8 +180,10 @@ export default function MonthlyReportImportScreen() {
     if (files.length === 0) { Alert.alert("请先选择文件"); return; }
     tap();
     setLoading(true);
+    setDishSnapshotPreview(null);
+    setPeriodReportPreview(null);
     try {
-      // 1. 解析营业概览（传统路径，写入 MonthlyReport）
+      // 1. 解析营业概览（只生成预览，确认后再统一写入）
       const overviewFile = files.find((f) => f.type === "overview");
       const dailyFile = files.find((f) => f.type === "daily_payment");
       const dishNameFile = files.find((f) => f.type === "dish_by_name");
@@ -186,19 +202,19 @@ export default function MonthlyReportImportScreen() {
         return;
       }
 
-      // 2. 解析菜品分析（新路径，写入 DishAnalysisSnapshot）
+      // 2. 解析菜品与时段分析，但仅在用户确认导入后写入 Store，取消预览不会污染已归档数据。
       const dishFiles = files
         .filter((f) => f.base64 && f.type !== "overview")
         .map((f) => ({ base64: f.base64!, filename: f.name }));
 
       if (dishFiles.length > 0) {
         const { snapshot } = parseDishAnalysis({ files: dishFiles });
-        if (snapshot.month) {
-          upsertSnapshot(snapshot);
+        if (snapshot.month && normalizeMonthlyReportMonth(snapshot.month) !== normalizeMonthlyReportMonth(report.rawMonth)) {
+          throw new Error(`菜品分析月份 ${snapshot.monthLabel} 与营业概览 ${report.monthLabel} 不一致，请只导入同一自然月文件。`);
         }
+        if (snapshot.month) setDishSnapshotPreview(snapshot);
       }
 
-      // 3. 同一批次的时段文件直接生成时段分析报告；不再要求用户去时段页重复上传。
       const periodFiles = files.filter((file) =>
         file.base64 && (file.type === "time_slot_order" || file.type === "time_slot_checkout"),
       );
@@ -207,7 +223,10 @@ export default function MonthlyReportImportScreen() {
           periodFiles.map((file) => base64ToArrayBuffer(file.base64!)),
           periodSettings,
         );
-        if (periodReport) addPeriodReport(periodReport);
+        if (periodReport && normalizeMonthlyReportMonth(periodReport.month) !== normalizeMonthlyReportMonth(report.rawMonth)) {
+          throw new Error(`时段分析月份 ${periodReport.month} 与营业概览 ${report.monthLabel} 不一致，请只导入同一自然月文件。`);
+        }
+        if (periodReport) setPeriodReportPreview(periodReport);
       }
 
       // 4. 检测缺失报表
@@ -221,12 +240,33 @@ export default function MonthlyReportImportScreen() {
     }
   };
 
-  const handleConfirm = () => {
-    if (!preview) return;
-    addReport(preview);
-    setShowPreview(false);
-    setPreview(null);
-    setFiles([]);
+  const handleConfirm = async () => {
+    if (!preview || loading) return;
+    setLoading(true);
+    try {
+      const archiveMonth = normalizeMonthlyReportMonth(preview.rawMonth);
+      if (!archiveMonth) throw new Error("无法识别营业概览的业务月份，不能将原始文件归档到错误月份。");
+      await archiveFiles({
+        month: archiveMonth,
+        monthLabel: preview.monthLabel,
+        files: files
+          .filter((file): file is UploadedFile & { base64: string } => Boolean(file.base64))
+          .map((file) => ({ filename: file.name, base64: file.base64, fileType: file.type })),
+      });
+      addReport(preview);
+      if (dishSnapshotPreview) upsertSnapshot(dishSnapshotPreview);
+      if (periodReportPreview) addPeriodReport(periodReportPreview);
+      setShowPreview(false);
+      setPreview(null);
+      setFiles([]);
+      setDishSnapshotPreview(null);
+      setPeriodReportPreview(null);
+      setLoading(false);
+    } catch (error) {
+      setLoading(false);
+      Alert.alert("归档失败", `本次数据未确认导入。请检查设备可用存储后重试。\n\n${String(error)}`);
+      return;
+    }
 
     if (missingTypes.length > 0) {
       Alert.alert(
@@ -293,9 +333,70 @@ export default function MonthlyReportImportScreen() {
             ))}
           </View>
           <Text style={[S.infoHint, { color: colors.muted }]}>
-            可同时选择多个文件，系统自动识别类型。每月只保留最新一份报告。
+            可同时选择多个文件，系统自动识别类型。业务数据按月以最新确认导入显示；每一次上传的原始 Excel 都会独立归档，可随时重新导出。
           </Text>
         </View>
+
+        {/* 已归档原始文件：按业务月份和报表分类整理，可重新获取。 */}
+        {archiveReady && archivedGroups.length > 0 && (
+          <View testID="monthly-report-raw-excel-archive" style={[S.archiveCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={S.archiveHeader}>
+              <View>
+                <Text style={[S.archiveTitle, { color: colors.foreground }]}>已归档原始报表</Text>
+                <Text style={[S.archiveHint, { color: colors.muted }]}>每次确认导入均保留；按月份与报表类型整理，导出时自动重新命名。</Text>
+              </View>
+              <View style={[S.archiveCountBadge, { backgroundColor: colors.primary + "18" }]}>
+                <Text style={{ fontSize: 11, color: colors.primary, fontWeight: "700" }}>
+                  {archivedGroups.reduce((total, group) => total + group.files.length, 0)} 份
+                </Text>
+              </View>
+            </View>
+            {archivedGroups.map((group) => (
+              <View key={group.month} style={[S.archiveMonthGroup, { borderTopColor: colors.border }]}>
+                <Text style={[S.archiveMonthTitle, { color: colors.foreground }]}>{group.monthLabel}</Text>
+                {group.files.map((file) => (
+                  <View key={file.id} style={S.archiveFileRow}>
+                    <View style={[S.typeIconBadge, { backgroundColor: FILE_TYPE_COLORS[file.fileType] + "18" }]}>
+                      <IconSymbol name={FILE_TYPE_ICONS[file.fileType] as any} size={13} color={FILE_TYPE_COLORS[file.fileType]} />
+                    </View>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={[S.archiveFileTitle, { color: colors.foreground }]} numberOfLines={1}>
+                        {REPORT_FILE_TYPE_LABELS[file.fileType]}
+                      </Text>
+                      <Text style={[S.archiveFileMeta, { color: colors.muted }]} numberOfLines={1}>
+                        第 {file.revision} 次导入 · {formatRawExcelSize(file.sizeBytes)} · 导出为 {getRawExcelExportFilename(file)}
+                      </Text>
+                    </View>
+                    <Pressable
+                      testID={`monthly-report-export-${file.id}`}
+                      accessibilityLabel={`导出 ${REPORT_FILE_TYPE_LABELS[file.fileType]}`}
+                      onPress={() => exportArchivedFile(file).catch((error) => Alert.alert("导出失败", String(error)))}
+                      style={({ pressed }) => [S.archiveAction, { backgroundColor: colors.primary + "14", opacity: pressed ? 0.55 : 1 }]}
+                    >
+                      <IconSymbol name="square.and.arrow.up" size={15} color={colors.primary} />
+                      <Text style={{ fontSize: 11, color: colors.primary, fontWeight: "700" }}>导出</Text>
+                    </Pressable>
+                    <Pressable
+                      testID={`monthly-report-delete-archive-${file.id}`}
+                      accessibilityLabel={`删除 ${REPORT_FILE_TYPE_LABELS[file.fileType]}`}
+                      onPress={() => Alert.alert(
+                        "删除已归档原文件？",
+                        `将删除 ${group.monthLabel} 的${REPORT_FILE_TYPE_LABELS[file.fileType]}原始 Excel，已解析并导入的报表数据不会受到影响。`,
+                        [
+                          { text: "取消", style: "cancel" },
+                          { text: "删除", style: "destructive", onPress: () => deleteArchivedFile(file.id).catch((error) => Alert.alert("删除失败", String(error))) },
+                        ],
+                      )}
+                      style={({ pressed }) => ({ padding: 7, opacity: pressed ? 0.55 : 1 })}
+                    >
+                      <IconSymbol name="trash" size={15} color={colors.error} />
+                    </Pressable>
+                  </View>
+                ))}
+              </View>
+            ))}
+          </View>
+        )}
 
         {/* 选择文件按钮 */}
         <TouchableOpacity testID="monthly-report-pick-files" onPress={handlePickFiles} disabled={loading}
@@ -527,6 +628,17 @@ const S = StyleSheet.create({
   typeIconBadge: { width: 24, height: 24, borderRadius: 6, alignItems: "center", justifyContent: "center" },
   pickBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, borderRadius: 14, paddingVertical: 16, marginBottom: 16 },
   pickBtnText: { color: "#fff", fontSize: 17, fontWeight: "600" },
+  archiveCard: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 16 },
+  archiveHeader: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 12 },
+  archiveTitle: { fontSize: 14, fontWeight: "700" },
+  archiveHint: { fontSize: 11, marginTop: 3, lineHeight: 16 },
+  archiveCountBadge: { borderRadius: 9, paddingHorizontal: 8, paddingVertical: 4 },
+  archiveMonthGroup: { borderTopWidth: StyleSheet.hairlineWidth, marginTop: 12, paddingTop: 10 },
+  archiveMonthTitle: { fontSize: 13, fontWeight: "700", marginBottom: 4 },
+  archiveFileRow: { flexDirection: "row", alignItems: "center", gap: 7, paddingVertical: 7 },
+  archiveFileTitle: { fontSize: 12, fontWeight: "600" },
+  archiveFileMeta: { fontSize: 10, marginTop: 2 },
+  archiveAction: { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 8, paddingVertical: 7, borderRadius: 8 },
   fileList: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 16 },
   fileListTitle: { fontSize: 14, fontWeight: "700" },
   missingBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },

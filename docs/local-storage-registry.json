@@ -1,9 +1,26 @@
 {
   "version": 1,
   "generatedFrom": "docs/local-storage-schema.json",
-  "entryCount": 128,
-  "dynamicEntryCount": 25,
+  "entryCount": 133,
+  "dynamicEntryCount": 26,
   "entries": [
+    {
+      "backend": "AsyncStorage",
+      "key": "[...LEGACY_MONTH_KEYS]",
+      "status": "unresolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/migrations/clean-legacy-business-month-keys.ts"
+      ],
+      "operations": [
+        "multiGet",
+        "multiRemove"
+      ],
+      "dynamic": true,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
     {
       "backend": "AsyncStorage",
       "key": "[...SYNC_KEYS]",
@@ -1292,6 +1309,25 @@
     },
     {
       "backend": "AsyncStorage",
+      "key": "migration_clean_legacy_business_month_keys_v1_done",
+      "status": "resolved",
+      "classification": "S3-diagnostic",
+      "ownerFiles": [
+        "lib/migrations/clean-legacy-business-month-keys.ts"
+      ],
+      "operations": [
+        "getItem",
+        "removeItem",
+        "setItem"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "startup-ttl",
+        "leave-group"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
       "key": "migration_clean_monthly_fixed_salary_v1_done",
       "status": "resolved",
       "classification": "S1-business",
@@ -1301,6 +1337,58 @@
       "operations": [
         "getItem",
         "removeItem",
+        "setItem"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "module_month_adjustment_sessions_v1",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/month-close/module-month-close-store.tsx"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "module_month_close_archives_v1",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/month-close/module-month-close-store.tsx"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "monthly_report.raw_excel_archive.v1",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/store/monthly-report/raw-excel-archive-store.tsx"
+      ],
+      "operations": [
+        "getItem",
         "setItem"
       ],
       "dynamic": false,

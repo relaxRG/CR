@@ -55,6 +55,7 @@ import { DailyInventoryProvider } from "@/lib/daily/inventory-store";
 import { EquipmentInventoryProvider } from "@/lib/equipment/inventory-store";
 import { ModuleMonthCloseProvider } from "@/lib/month-close/module-month-close-store";
 import { GlobalBusinessMonthProvider } from "@/lib/months/global-business-month";
+import { RawExcelArchiveProvider } from "@/lib/store/monthly-report/raw-excel-archive-store";
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
@@ -162,6 +163,7 @@ export default function RootLayout() {
           <SupplierPurchaseProvider>
           <SpiritsInventoryProvider>
           <MonthlyReportProvider>
+          <RawExcelArchiveProvider>
           <LaborProvider>
           <SalaryAdvanceCategoryProvider>
           <SalaryAdvanceProvider>
@@ -279,6 +281,7 @@ export default function RootLayout() {
           </SalaryAdvanceProvider>
           </SalaryAdvanceCategoryProvider>
           </LaborProvider>
+          </RawExcelArchiveProvider>
           </MonthlyReportProvider>
           </SpiritsInventoryProvider>
           </SupplierPurchaseProvider>

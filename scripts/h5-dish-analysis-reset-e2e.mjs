@@ -3,8 +3,8 @@ import { createServer } from "node:http";
 import { extname, join, normalize } from "node:path";
 
 const root = join(process.cwd(), "dist-web");
-const port = Number(process.env.H5_E2E_PORT ?? 8097);
-const route = `http://localhost:${port}/monthly-report-import`;
+const port = Number(process.env.H5_E2E_PORT ?? 8098);
+const route = `http://localhost:${port}/dish-analysis`;
 const viewports = [320, 360, 375, 390, 412, 430];
 const contentTypes = {
   ".html": "text/html; charset=utf-8",
@@ -58,6 +58,38 @@ async function openCdp(target) {
   return { socket, call };
 }
 
+const monthlyReports = [{
+  id: "report-2026-07",
+  rawMonth: "2026/07",
+  monthLabel: "2026年7月",
+  dishCategories: [{
+    name: "Food", salesQty: 3485, salesQtyPct: 0.7,
+    salesAmount: 10000, salesAmountPct: 0.7,
+    revenue: 9500, revenuePct: 0.7,
+    discountAmount: 500, discountPct: 0.05,
+  }],
+}];
+const dishSnapshots = [{
+  id: "dish-2026-07",
+  month: "2026-07",
+  monthLabel: "2026年7月",
+  importedAt: "2026-08-18T00:00:00.000Z",
+  categories: [{
+    name: "3485", salesQty: 0, salesQtyPct: 0,
+    salesAmount: 10000, salesAmountPct: 1,
+    revenue: 9500, revenuePct: 1, discount: 500,
+  }],
+  subCategories: [{
+    category: "Food", subCategory: "小食", salesQty: 1, salesQtyPct: 1,
+    salesAmount: 100, salesAmountPct: 1, revenue: 100, revenuePct: 1, discount: 0,
+  }],
+  items: [], specs: [], dailyPayments: [],
+  importedReports: {
+    categories: true, subCategories: true, items: false, specs: false,
+    revenueStatement: false, dailyPayments: false, timeSlotsByOrder: false, timeSlotsByCheckout: false,
+  },
+}];
+
 server.listen(port, "127.0.0.1");
 await new Promise((resolve) => server.once("listening", resolve));
 
@@ -69,67 +101,60 @@ try {
   socket = connection.socket;
   const { call } = connection;
   await call("Page.enable");
-  const report = [];
-  const archiveSeed = [{
-    id: "2026-07:overview",
-    month: "2026-07",
-    monthLabel: "2026年7月",
-    fileType: "overview",
-    filename: "营业概览-原始.xlsx",
-    uri: "file:///missing-test-file.xlsx",
-    sizeBytes: 1048576,
-    archivedAt: "2026-08-18T00:00:00.000Z",
-  }];
+  await call("Page.addScriptToEvaluateOnNewDocument", {
+    source: `
+      localStorage.setItem("monthly_reports_v1", ${JSON.stringify(JSON.stringify(monthlyReports))});
+      localStorage.setItem("dish_analysis.snapshots.v1", ${JSON.stringify(JSON.stringify(dishSnapshots))});
+    `,
+  });
 
+  const report = [];
   for (const width of viewports) {
     await call("Emulation.setDeviceMetricsOverride", { width, height: 844, deviceScaleFactor: 3, mobile: true });
     await call("Page.navigate", { url: route });
-    await sleep(900);
-    await call("Runtime.evaluate", {
-      expression: `localStorage.setItem("monthly_report.raw_excel_archive.v1", ${JSON.stringify(JSON.stringify(archiveSeed))}); location.reload();`,
-    });
-    await sleep(900);
-    const state = (await call("Runtime.evaluate", {
+    await sleep(1100);
+    const before = (await call("Runtime.evaluate", {
       expression: `(() => {
         const root = document.documentElement;
-        const picker = document.querySelector('[data-testid="monthly-report-pick-files"]');
-        const retired = document.querySelector('[data-testid*="meituan"]');
-        const archive = document.querySelector('[data-testid="monthly-report-raw-excel-archive"]');
-        const archiveExport = document.querySelector('[data-testid="monthly-report-export-2026-07:overview"]');
-        const rect = picker?.getBoundingClientRect();
-        const text = document.body.innerText;
+        const reset = document.querySelector('[data-testid="dish-analysis-reset-current-month"]');
         return {
           rootClientWidth: root.clientWidth,
           rootScrollWidth: root.scrollWidth,
           bodyScrollWidth: document.body.scrollWidth,
-          picker: rect ? { height: rect.height, width: rect.width } : null,
-          hasManualHint: text.includes("从收银系统自行导出"),
-          retiredEntryFound: Boolean(retired),
-          archiveFound: Boolean(archive),
-          archiveExportFound: Boolean(archiveExport),
-          hasRenamedExport: text.includes("导出为 2026年7月_营业概览.xlsx"),
+          resetFound: Boolean(reset),
+          resetWidth: reset?.getBoundingClientRect().width ?? 0,
+          rendersIncorrectCategory: document.body.innerText.includes("3485"),
         };
       })()`,
       returnByValue: true,
     })).result.value;
 
-    if (!state.picker) throw new Error(`${width}pt 未显示通用手动文件选择入口：${JSON.stringify(state)}`);
-    if (state.rootScrollWidth > state.rootClientWidth || state.bodyScrollWidth > state.rootClientWidth) {
-      throw new Error(`${width}pt 月度报表导入页出现根级横向溢出：${JSON.stringify(state)}`);
+    if (!before.resetFound || before.resetWidth < 36 || !before.rendersIncorrectCategory) {
+      throw new Error(`${width}pt 未正确加载同月经营分析或重置热区不足：${JSON.stringify(before)}`);
     }
-    if (state.picker.height < 44 || state.picker.width <= 0) {
-      throw new Error(`${width}pt 手动文件选择热区不足：${JSON.stringify(state)}`);
+    if (before.rootScrollWidth > before.rootClientWidth || before.bodyScrollWidth > before.rootClientWidth) {
+      throw new Error(`${width}pt 菜品分析页出现根级横向溢出：${JSON.stringify(before)}`);
     }
-    if (!state.hasManualHint || state.retiredEntryFound) {
-      throw new Error(`${width}pt 手动导入回退状态不正确：${JSON.stringify(state)}`);
+
+    // react-native-web 的 Alert 为无 UI 实现；点击后可验证真实 Pressable 已进入单飞锁定，避免重复触发确认/写入。
+    await call("Runtime.evaluate", {
+      expression: `document.querySelector('[data-testid="dish-analysis-reset-current-month"]')?.click();`,
+    });
+    await sleep(120);
+    const afterFirstTap = (await call("Runtime.evaluate", {
+      expression: `(() => {
+        const reset = document.querySelector('[data-testid="dish-analysis-reset-current-month"]');
+        return { ariaDisabled: reset?.getAttribute("aria-disabled"), disabled: Boolean(reset?.disabled) };
+      })()`,
+      returnByValue: true,
+    })).result.value;
+    if (afterFirstTap.ariaDisabled !== "true" && !afterFirstTap.disabled) {
+      throw new Error(`${width}pt 首次点击后未进入重置单飞锁：${JSON.stringify(afterFirstTap)}`);
     }
-    if (!state.archiveFound || !state.archiveExportFound || !state.hasRenamedExport) {
-      throw new Error(`${width}pt 原始 Excel 归档与导出入口展示不正确：${JSON.stringify(state)}`);
-    }
-    report.push({ width, ...state });
+    report.push({ width, ...before, afterFirstTap });
   }
 
-  console.log(JSON.stringify({ name: "月度报表手动导入移动端回归", viewports: report }, null, 2));
+  console.log(JSON.stringify({ name: "菜品分析按月重置移动端回归", viewports: report }, null, 2));
 } finally {
   if (socket) socket.close();
   if (target?.id) await fetch(`http://localhost:9222/json/close/${target.id}`).catch(() => {});

@@ -17,6 +17,7 @@
     "test:h5:theme-hot-switch": "npx expo export --platform web --output-dir dist-web && node scripts/h5-theme-hot-switch-e2e.mjs",
     "test:h5:store-segmented-nav": "npx expo export --platform web --output-dir dist-web && node scripts/h5-store-segmented-nav-e2e.mjs",
     "test:h5:monthly-report-import": "npx expo export --platform web --output-dir dist-web && node scripts/h5-monthly-report-import-e2e.mjs",
+    "test:h5:dish-analysis-reset": "npx expo export --platform web --output-dir dist-web && node scripts/h5-dish-analysis-reset-e2e.mjs",
     "test:h5:money-input": "npx expo export --platform web --output-dir dist-web && node scripts/h5-money-input-e2e.mjs",
     "test:h5:employee-order": "npx expo export --platform web --output-dir dist-web && node scripts/h5-employee-order-mobile-e2e.mjs",
     "test:h5:global-month-stress": "npx expo export --platform web --output-dir dist-web && node scripts/h5-global-month-stress-e2e.mjs",

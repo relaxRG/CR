@@ -8,7 +8,7 @@
  *   规格   — 菜品规格明细
  *   对比   — 多月趋势对比
  */
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { formatMoney } from "@/lib/utils";
 import {
   Alert, Platform, Pressable, ScrollView, StyleSheet,
@@ -23,6 +23,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { useDishAnalysisStore } from "@/lib/store/monthly-report/dish-analysis-store";
 import { useMonthlyReportStore } from "@/lib/store/monthly-report/store";
 import { findMonthlyReportForDishAnalysis, rebuildDishCategoriesFromMonthlyReport } from "@/lib/store/monthly-report/rebuild-dish-categories";
+import { createResetActionGate } from "@/lib/store/monthly-report/reset-action-gate";
 import {
   DishCategoryData, DishSubCategoryData, DishItemData, DishSpecData,
 } from "@/lib/store/monthly-report/dish-analysis-types";
@@ -119,6 +120,8 @@ export default function DishAnalysisScreen() {
   const [searchText, setSearchText] = useState("");
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [compareMonths, setCompareMonths] = useState<string[]>([]);
+  const [isResetPromptOpen, setIsResetPromptOpen] = useState(false);
+  const resetGateRef = useRef(createResetActionGate());
 
   const snapshot = useMemo(() =>
     snapshots.find((s) => s.month === selectedMonth) ?? snapshots[0],
@@ -140,9 +143,15 @@ export default function DishAnalysisScreen() {
   }, [snapshot, searchText, sortKey]);
 
   const resetCurrentMonthAnalysis = () => {
-    if (!snapshot) return;
+    if (!snapshot || !resetGateRef.current.tryAcquire()) return;
+    setIsResetPromptOpen(true);
+    const releaseResetLock = () => {
+      resetGateRef.current.release();
+      setIsResetPromptOpen(false);
+    };
     const report = findMonthlyReportForDishAnalysis(reports, snapshot.month);
     const action = () => {
+      releaseResetLock();
       if (report) {
         upsertSnapshot(rebuildDishCategoriesFromMonthlyReport(snapshot, report));
         Alert.alert("已重建", `${snapshot.monthLabel} 的菜品大类已从同月原始月报重新生成。`);
@@ -160,7 +169,11 @@ export default function DishAnalysisScreen() {
       report
         ? "将清除本月旧的菜品大类派生数据，并从同月原始月报重新生成。小类、菜品与规格明细不会被删除。"
         : "将清除本月错误菜品分析快照；由于没有保存的同月原始月报，随后需要重新导入一次。",
-      [{ text: "取消", style: "cancel" }, { text: report ? "重置并重建" : "清除错误数据", style: "destructive", onPress: action }],
+      [
+        { text: "取消", style: "cancel", onPress: releaseResetLock },
+        { text: report ? "重置并重建" : "清除错误数据", style: "destructive", onPress: action },
+      ],
+      { cancelable: true, onDismiss: releaseResetLock },
     );
   };
 
@@ -479,8 +492,14 @@ export default function DishAnalysisScreen() {
           accessibilityRole="button"
           accessibilityLabel="重置本月经营分析"
           onPress={resetCurrentMonthAnalysis}
-          disabled={!snapshot}
-          style={({ pressed }) => ({ opacity: !snapshot ? 0.35 : pressed ? 0.6 : 1, padding: 2 })}
+          disabled={!snapshot || isResetPromptOpen}
+          style={({ pressed }) => ({
+            width: 40,
+            height: 40,
+            alignItems: "center",
+            justifyContent: "center",
+            opacity: !snapshot || isResetPromptOpen ? 0.35 : pressed ? 0.6 : 1,
+          })}
         >
           <IconSymbol name="arrow.clockwise" size={19} color={colors.primary} />
         </Pressable>

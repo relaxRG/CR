@@ -1,9 +1,13 @@
 import type { DishAnalysisSnapshot } from "./dish-analysis-types";
 import type { MonthlyReport } from "./types";
 
-function normalizeMonth(value: string): string {
+export function normalizeMonthlyReportMonth(value: string): string {
   const match = String(value ?? "").match(/(\d{4})[^\d]?(\d{1,2})/);
-  return match ? `${match[1]}-${match[2].padStart(2, "0")}` : "";
+  if (!match) return "";
+  const month = Number(match[2]);
+  return Number.isInteger(month) && month >= 1 && month <= 12
+    ? `${match[1]}-${String(month).padStart(2, "0")}`
+    : "";
 }
 
 /**
@@ -14,8 +18,8 @@ export function rebuildDishCategoriesFromMonthlyReport(
   snapshot: DishAnalysisSnapshot,
   report: MonthlyReport,
 ): DishAnalysisSnapshot {
-  const snapshotMonth = normalizeMonth(snapshot.month);
-  const reportMonth = normalizeMonth(report.rawMonth || report.monthLabel);
+  const snapshotMonth = normalizeMonthlyReportMonth(snapshot.month);
+  const reportMonth = normalizeMonthlyReportMonth(report.rawMonth || report.monthLabel);
   if (!snapshotMonth || snapshotMonth !== reportMonth) {
     throw new Error("只能使用同月份的原始月报重建菜品大类。");
   }
@@ -41,6 +45,6 @@ export function findMonthlyReportForDishAnalysis(
   reports: MonthlyReport[],
   month: string,
 ): MonthlyReport | undefined {
-  const normalized = normalizeMonth(month);
-  return reports.find((report) => normalizeMonth(report.rawMonth || report.monthLabel) === normalized);
+  const normalized = normalizeMonthlyReportMonth(month);
+  return reports.find((report) => normalizeMonthlyReportMonth(report.rawMonth || report.monthLabel) === normalized);
 }
