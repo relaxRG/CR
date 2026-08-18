@@ -87,7 +87,7 @@ const config: ExpoConfig = {
     output: "static",
     favicon: "./assets/images/favicon.png",
   },
-  owner: "rgsds-team",
+  owner: "cocktailrg",
   extra: {
     eas: {
       projectId: "3ab89cc0-c646-4fb8-bceb-ba24204a8811",

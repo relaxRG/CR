@@ -133,7 +133,7 @@ const markdown = [
   "",
 ];
 
-const output = { generatedAt: new Date().toISOString(), records, unresolved };
+const output = { generatedAt: "deterministic-source-scan", records, unresolved };
 writeFileSync(join(root, "docs/local-storage-schema.md"), markdown.join("\n"));
 writeFileSync(join(root, "docs/local-storage-schema.json"), JSON.stringify(output, null, 2));
 console.log(JSON.stringify({ sourceFiles: files.length, keys: records.length, unresolved: unresolved.length }, null, 2));

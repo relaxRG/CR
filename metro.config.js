@@ -18,7 +18,7 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
 
 module.exports = withNativeWind(config, {
   input: "./global.css",
-  // Force write CSS to file system instead of virtual modules
-  // This fixes iOS styling issues in development mode
-  forceWriteFileSystem: true,
+  // 开发期保留文件系统 CSS 以兼容原生样式；CI 静态导出改用虚拟模块，避免
+  // Web 与静态渲染并发打包时重写 node_modules/react-native-css-interop/.cache/web.css。
+  forceWriteFileSystem: process.env.CI !== "true",
 });
