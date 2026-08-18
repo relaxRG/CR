@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
+import { MoneyInput } from "@/components/forms/MoneyInput";
 import { useEmployeeStore, useCustomDeptStore } from "@/lib/labor/store";
 import { ALLOWANCE_PRESETS, createAllowanceRule, type AllowanceRulePreset } from "@/lib/labor/allowance-rule-factory";
 import {
@@ -898,8 +899,8 @@ export default function LaborEmployeeFormScreen() {
                       <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                         <TextInput value={rule.label} onChangeText={(v) => updateAllowanceRule(rule.id, { label: v })} placeholder="补贴名称" placeholderTextColor={colors.muted}
                           style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, flex: 1 }]} />
-                        <TextInput value={String(rule.amount)} onChangeText={(v) => updateAllowanceRule(rule.id, { amount: Number(v) || 0 })}
-                          keyboardType="decimal-pad" style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, width: 70, textAlign: "center" }]} />
+                        <MoneyInput value={rule.amount} onValueChange={(amount) => updateAllowanceRule(rule.id, { amount })}
+                          style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, width: 70, textAlign: "center" }]} />
                         <Text style={{ fontSize: 11, color: colors.muted }}>{ALLOWANCE_UNIT_LABELS[rule.unit]}</Text>
                         <TouchableOpacity onPress={() => deleteAllowanceRule(rule.id)}>
                           <Text style={{ fontSize: 16, color: colors.error }}>×</Text>
@@ -1014,17 +1015,15 @@ export default function LaborEmployeeFormScreen() {
                           }} placeholder="档位名" placeholderTextColor={colors.muted}
                             style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, width: 70 }]} />
                           {/* 修复：绩效支持负数，使用 default keyboard 允许负号 */}
-                          <TextInput
-                            value={tier.amount !== 0 ? String(tier.amount) : ""}
-                            onChangeText={(v) => {
-                              // 允许负号开头
-                              const clean = v.replace(/[^0-9\-]/g, "").replace(/(?!^)-/g, "");
-                              const newTiers = rule.tiers.map((t) => t.id === tier.id ? { ...t, amount: clean === "" || clean === "-" ? 0 : parseInt(clean) || 0 } : t);
+                          <MoneyInput
+                            value={tier.amount}
+                            allowNegative
+                            onValueChange={(amount) => {
+                              const newTiers = rule.tiers.map((t) => t.id === tier.id ? { ...t, amount } : t);
                               updateWorkKPI(rule.id, { tiers: newTiers });
                             }}
                             placeholder="金额（可负数）"
                             placeholderTextColor={colors.muted}
-                            keyboardType={Platform.OS === "ios" ? "numbers-and-punctuation" : "default"}
                             style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, width: 90, textAlign: "center" }]}
                           />
                           <Text style={{ fontSize: 11, color: colors.muted }}>元</Text>
@@ -1119,15 +1118,15 @@ export default function LaborEmployeeFormScreen() {
                     {rule.tiers.map((tier) => (
                       <View key={tier.id} style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                         <Text style={{ fontSize: 11, color: colors.muted }}>≥¥</Text>
-                        <TextInput value={String(tier.threshold)} onChangeText={(v) => {
-                          const newTiers = rule.tiers.map((t) => t.id === tier.id ? { ...t, threshold: Number(v) || 0 } : t);
+                        <MoneyInput value={tier.threshold} onValueChange={(threshold) => {
+                          const newTiers = rule.tiers.map((t) => t.id === tier.id ? { ...t, threshold } : t);
                           updateRevenueKPI(rule.id, { tiers: newTiers });
-                        }} keyboardType="decimal-pad" style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, width: 80 }]} />
+                        }} style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, width: 80 }]} />
                         <Text style={{ fontSize: 11, color: colors.muted }}>{rule.calcType === "percentage" ? "提成%" : "奖励¥"}</Text>
-                        <TextInput value={String(tier.amount)} onChangeText={(v) => {
-                          const newTiers = rule.tiers.map((t) => t.id === tier.id ? { ...t, amount: Number(v) || 0 } : t);
+                        <MoneyInput value={tier.amount} onValueChange={(amount) => {
+                          const newTiers = rule.tiers.map((t) => t.id === tier.id ? { ...t, amount } : t);
                           updateRevenueKPI(rule.id, { tiers: newTiers });
-                        }} keyboardType="decimal-pad" style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, width: 70 }]} />
+                        }} style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, width: 70 }]} />
                         <TouchableOpacity onPress={() => {
                           const newTiers = rule.tiers.filter((t) => t.id !== tier.id);
                           updateRevenueKPI(rule.id, { tiers: newTiers });
@@ -1207,8 +1206,8 @@ export default function LaborEmployeeFormScreen() {
                 {/* 社保基数 */}
                 <FormRow label="社保基数（0=以工资为基数）" colors={colors}>
                   <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
-                    <TextInput value={String(siConfig.base)} onChangeText={(v) => setSiConfig((p) => ({ ...p, base: Number(v) || 0 }))}
-                      placeholder="0" keyboardType="decimal-pad" placeholderTextColor={colors.muted}
+                    <MoneyInput value={siConfig.base} onValueChange={(base) => setSiConfig((p) => ({ ...p, base }))}
+                      placeholder="0" placeholderTextColor={colors.muted}
                       style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, flex: 1 }]} />
                     {siConfig.baseMin > 0 && <Text style={{ fontSize: 10, color: colors.muted }}>下限 ¥{siConfig.baseMin.toLocaleString()}</Text>}
                     {siConfig.baseMax > 0 && <Text style={{ fontSize: 10, color: colors.muted }}>上限 ¥{siConfig.baseMax.toLocaleString()}</Text>}
@@ -1232,11 +1231,11 @@ export default function LaborEmployeeFormScreen() {
                     return (
                       <View key={key} style={{ flexDirection: "row", alignItems: "center", paddingVertical: 7, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border + "44" }}>
                         <Text style={{ flex: 2, fontSize: 12, color: item.enabled ? colors.foreground : colors.muted }}>{item.name}</Text>
-                        <TextInput value={String((item.employeeRate * 100).toFixed(2))} onChangeText={(v) => { updateInsuranceItem(key, { employeeRate: Number(v) / 100 || 0 }); }}
-                          keyboardType="decimal-pad" style={[S.inputSmall, { flex: 1.5, color: colors.foreground, borderColor: colors.border, textAlign: "center", fontSize: 11 }]} />
+                        <MoneyInput value={item.employeeRate * 100} onValueChange={(percentage) => updateInsuranceItem(key, { employeeRate: percentage / 100 })}
+                          style={[S.inputSmall, { flex: 1.5, color: colors.foreground, borderColor: colors.border, textAlign: "center", fontSize: 11 }]} />
                         <Text style={{ flex: 1.5, fontSize: 11, color: item.enabled ? colors.primary : colors.muted, textAlign: "center" }}>¥{empAmt}</Text>
-                        <TextInput value={String((item.employerRate * 100).toFixed(2))} onChangeText={(v) => { updateInsuranceItem(key, { employerRate: Number(v) / 100 || 0 }); }}
-                          keyboardType="decimal-pad" style={[S.inputSmall, { flex: 1.5, color: colors.foreground, borderColor: colors.border, textAlign: "center", fontSize: 11 }]} />
+                        <MoneyInput value={item.employerRate * 100} onValueChange={(percentage) => updateInsuranceItem(key, { employerRate: percentage / 100 })}
+                          style={[S.inputSmall, { flex: 1.5, color: colors.foreground, borderColor: colors.border, textAlign: "center", fontSize: 11 }]} />
                         <Text style={{ flex: 1.5, fontSize: 11, color: item.enabled ? colors.warning : colors.muted, textAlign: "center" }}>¥{erAmt}</Text>
                         <TouchableOpacity onPress={() => updateInsuranceItem(key, { enabled: !item.enabled })} style={{ width: 32, alignItems: "center" }}>
                           <View style={{ width: 26, height: 15, borderRadius: 8, backgroundColor: item.enabled ? colors.primary : colors.border, justifyContent: "center", paddingHorizontal: 1 }}>
@@ -1298,8 +1297,8 @@ export default function LaborEmployeeFormScreen() {
                 {/* 基数 */}
                 <FormRow label="公积金基数（0=同社保）" colors={colors}>
                   <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
-                    <TextInput value={String(siConfig.housingFund.base)} onChangeText={(v) => updateHousingFund({ base: Number(v) || 0 })}
-                      placeholder="0" keyboardType="decimal-pad" placeholderTextColor={colors.muted}
+                    <MoneyInput value={siConfig.housingFund.base} onValueChange={(base) => updateHousingFund({ base })}
+                      placeholder="0" placeholderTextColor={colors.muted}
                       style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, width: 100 }]} />
                     {siConfig.housingFund.baseMin > 0 && <Text style={{ fontSize: 10, color: colors.muted }}>下限 ¥{siConfig.housingFund.baseMin.toLocaleString()}</Text>}
                     {siConfig.housingFund.baseMax > 0 && <Text style={{ fontSize: 10, color: colors.muted }}>上限 ¥{siConfig.housingFund.baseMax.toLocaleString()}</Text>}
@@ -1309,14 +1308,14 @@ export default function LaborEmployeeFormScreen() {
                 <View style={{ flexDirection: "row", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                     <Text style={{ fontSize: 12, color: colors.foreground }}>个人比例</Text>
-                    <TextInput value={String((siConfig.housingFund.employeeRate * 100).toFixed(2))} onChangeText={(v) => updateHousingFund({ employeeRate: Number(v) / 100 || 0 })}
-                      keyboardType="decimal-pad" style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, width: 60, textAlign: "center" }]} />
+                    <MoneyInput value={siConfig.housingFund.employeeRate * 100} onValueChange={(percentage) => updateHousingFund({ employeeRate: percentage / 100 })}
+                      style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, width: 60, textAlign: "center" }]} />
                     <Text style={{ fontSize: 12, color: colors.muted }}>%</Text>
                   </View>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                     <Text style={{ fontSize: 12, color: colors.foreground }}>单位比例</Text>
-                    <TextInput value={String((siConfig.housingFund.employerRate * 100).toFixed(2))} onChangeText={(v) => updateHousingFund({ employerRate: Number(v) / 100 || 0 })}
-                      keyboardType="decimal-pad" style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, width: 60, textAlign: "center" }]} />
+                    <MoneyInput value={siConfig.housingFund.employerRate * 100} onValueChange={(percentage) => updateHousingFund({ employerRate: percentage / 100 })}
+                      style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, width: 60, textAlign: "center" }]} />
                     <Text style={{ fontSize: 12, color: colors.muted }}>%（范围 5%~12%）</Text>
                   </View>
                 </View>
@@ -1369,14 +1368,14 @@ export default function LaborEmployeeFormScreen() {
                 <View style={{ flexDirection: "row", gap: 12, flexWrap: "wrap" }}>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                     <Text style={{ fontSize: 12, color: colors.foreground }}>起征点</Text>
-                    <TextInput value={String(taxConfig.threshold)} onChangeText={(v) => setTaxConfig((p) => ({ ...p, threshold: Number(v) || 5000 }))}
-                      keyboardType="decimal-pad" style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, width: 70 }]} />
+                    <MoneyInput value={taxConfig.threshold} onValueChange={(threshold) => setTaxConfig((p) => ({ ...p, threshold }))}
+                      style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, width: 70 }]} />
                     <Text style={{ fontSize: 12, color: colors.muted }}>元/月</Text>
                   </View>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                     <Text style={{ fontSize: 12, color: colors.foreground }}>专项附加扣除</Text>
-                    <TextInput value={String(taxConfig.specialDeductions)} onChangeText={(v) => setTaxConfig((p) => ({ ...p, specialDeductions: Number(v) || 0 }))}
-                      keyboardType="decimal-pad" style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, width: 70 }]} />
+                    <MoneyInput value={taxConfig.specialDeductions} onValueChange={(specialDeductions) => setTaxConfig((p) => ({ ...p, specialDeductions }))}
+                      style={[S.inputSmall, { color: colors.foreground, borderColor: colors.border, width: 70 }]} />
                     <Text style={{ fontSize: 12, color: colors.muted }}>元/月</Text>
                   </View>
                 </View>

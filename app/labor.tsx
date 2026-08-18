@@ -36,6 +36,7 @@ import { useThrottleFn } from "@/hooks/use-debounce-fn";
 import { useFeature } from "@/hooks/use-feature";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
+import { MoneyInput } from "@/components/forms/MoneyInput";
 import {
   useEmployeeStore, useAttendanceStore,
   usePaySlipStore, useShiftStore, useShiftTemplateStore,
@@ -3293,9 +3294,9 @@ function SchTemplateModal({ visible, templates, specialStatuses, businessHours, 
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={{ fontSize: 10, color: colors.muted, marginBottom: 3 }}>营业额预警</Text>
-                        <TextInput value={tpl.revenueWarning ? String(tpl.revenueWarning) : ""}
-                          onChangeText={(v) => updShift(tpl.id, { revenueWarning: Number(v) || 0 })}
-                          placeholder="0=关闭" placeholderTextColor={colors.muted} keyboardType="decimal-pad"
+                        <MoneyInput value={tpl.revenueWarning ?? 0}
+                          onValueChange={(revenueWarning) => updShift(tpl.id, { revenueWarning })}
+                          placeholder="0=关闭" placeholderTextColor={colors.muted}
                           style={[SCHEM.inputSmall, { color: colors.foreground, borderColor: colors.border, width: "100%" }]} />
                       </View>
                     </View>
@@ -3510,9 +3511,9 @@ function SchTemplateModal({ visible, templates, specialStatuses, businessHours, 
                             <Text style={{ fontSize: 12, color: ss.salaryMultiplier === m ? "#fff" : colors.muted }}>{m}x</Text>
                           </TouchableOpacity>
                         ))}
-                        <TextInput value={MULTIPLIER_PRESETS.includes(ss.salaryMultiplier) ? "" : String(ss.salaryMultiplier)}
-                          onChangeText={(v) => updStatus(ss.id, { salaryMultiplier: Number(v) || ss.salaryMultiplier })}
-                          placeholder="自定义" placeholderTextColor={colors.muted} keyboardType="decimal-pad"
+                        <MoneyInput value={MULTIPLIER_PRESETS.includes(ss.salaryMultiplier) ? 0 : ss.salaryMultiplier}
+                          onValueChange={(salaryMultiplier) => updStatus(ss.id, { salaryMultiplier })}
+                          placeholder="自定义" placeholderTextColor={colors.muted}
                           style={[SCHEM.inputSmall, { color: colors.foreground, borderColor: colors.border, width: 60 }]} />
                       </View>
                     </View>
