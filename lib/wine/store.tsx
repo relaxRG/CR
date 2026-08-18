@@ -1,12 +1,21 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useReducer } from "react";
 import { notifySyncChange, registerStoreReload } from "../sync/engine";
-import { WineBottle, WineMonthlySnapshot, WineManualPurchase, WineInventoryItem } from "./types";
+import {
+  WineAuditEntry,
+  WineBottle,
+  WineImportBatch,
+  WineManualPurchase,
+  WineMonthRestorePoint,
+  WineMonthlySnapshot,
+} from "./types";
+import { rebuildWineSnapshotFromPurchases } from "./workbook-engine";
 import { wineManualPurchaseReducer, WineManualPurchaseState } from "./manual-purchase-reducer";
 
 const STORAGE_KEY = "wine.bottles.v1";
 const SNAPSHOT_KEY = "wine.snapshots.v2";
 const MANUAL_PURCHASE_KEY = "wine.manual_purchases.v1";
+const IMPORT_CONTROL_KEY = "wine.import_control.v1";
 
 export interface WineState {
   bottles: WineBottle[];
@@ -14,6 +23,12 @@ export interface WineState {
 
 export interface WineSnapshotState {
   snapshots: WineMonthlySnapshot[];
+}
+
+export interface WineImportControlState {
+  batches: WineImportBatch[];
+  restorePoints: WineMonthRestorePoint[];
+  auditEntries: WineAuditEntry[];
 }
 
 type Action =
@@ -28,8 +43,15 @@ type Action =
 type SnapshotAction =
   | { type: "LOAD"; payload: WineSnapshotState }
   | { type: "ADD_SNAPSHOT"; snapshot: WineMonthlySnapshot }
+  | { type: "REPLACE_MONTH_SNAPSHOT"; month: string; snapshot: WineMonthlySnapshot }
   | { type: "UPDATE_SNAPSHOT"; id: string; updates: Partial<WineMonthlySnapshot> }
   | { type: "DELETE_SNAPSHOT"; id: string };
+
+type ImportControlAction =
+  | { type: "LOAD"; payload: WineImportControlState }
+  | { type: "ADD_BATCH"; batch: WineImportBatch }
+  | { type: "ADD_RESTORE_POINT"; restorePoint: WineMonthRestorePoint }
+  | { type: "ADD_AUDIT"; entry: WineAuditEntry };
 
 function uuid(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -39,6 +61,17 @@ export { uuid as wineUuid };
 const initialState: WineState = { bottles: [] };
 const initialSnapshotState: WineSnapshotState = { snapshots: [] };
 const initialManualState: WineManualPurchaseState = { purchases: [] };
+const initialImportControlState: WineImportControlState = { batches: [], restorePoints: [], auditEntries: [] };
+
+function importControlReducer(state: WineImportControlState, action: ImportControlAction): WineImportControlState {
+  switch (action.type) {
+    case "LOAD": return action.payload;
+    case "ADD_BATCH": return { ...state, batches: [action.batch, ...state.batches] };
+    case "ADD_RESTORE_POINT": return { ...state, restorePoints: [action.restorePoint, ...state.restorePoints].slice(0, 24) };
+    case "ADD_AUDIT": return { ...state, auditEntries: [action.entry, ...state.auditEntries].slice(0, 240) };
+    default: return state;
+  }
+}
 
 function reducer(state: WineState, action: Action): WineState {
   switch (action.type) {
@@ -67,6 +100,13 @@ function snapshotReducer(state: WineSnapshotState, action: SnapshotAction): Wine
   switch (action.type) {
     case "LOAD": return action.payload;
     case "ADD_SNAPSHOT": return { snapshots: [action.snapshot, ...state.snapshots] };
+    case "REPLACE_MONTH_SNAPSHOT":
+      return {
+        snapshots: [
+          action.snapshot,
+          ...state.snapshots.filter((snapshot) => snapshot.monthLabel !== action.month && !snapshot.monthLabel.startsWith(`${action.month.slice(0, 4)}年${Number(action.month.slice(5))}月`)),
+        ],
+      };
     case "UPDATE_SNAPSHOT": return {
       snapshots: state.snapshots.map((s) =>
         s.id === action.id ? { ...s, ...action.updates } : s
@@ -116,14 +156,23 @@ interface WineManualPurchaseContextValue extends WineManualPurchaseState {
   getMonthPurchases: (month: string) => WineManualPurchase[];
 }
 
+interface WineImportControlContextValue extends WineImportControlState {
+  applyWorkbookImport: (input: { month: string; snapshot: WineMonthlySnapshot | null; purchases: WineManualPurchase[]; batch: WineImportBatch }) => void;
+  clearMonthPurchases: (month: string) => WineMonthRestorePoint;
+  recalculateMonthInventory: (month: string) => WineMonthRestorePoint | null;
+  restoreMonth: (restorePointId: string) => boolean;
+}
+
 const WineContext = createContext<WineContextValue | null>(null);
 const WineSnapshotContext = createContext<WineSnapshotContextValue | null>(null);
 const WineManualPurchaseContext = createContext<WineManualPurchaseContextValue | null>(null);
+const WineImportControlContext = createContext<WineImportControlContextValue | null>(null);
 
 export function WineProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const [snapshotState, snapshotDispatch] = useReducer(snapshotReducer, initialSnapshotState);
   const [manualState, manualDispatch] = useReducer(wineManualPurchaseReducer, initialManualState);
+  const [importControlState, importControlDispatch] = useReducer(importControlReducer, initialImportControlState);
 
   useEffect(() => {
     const loadBottles = () => AsyncStorage.getItem(STORAGE_KEY).then((raw) => {
@@ -150,6 +199,14 @@ export function WineProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    const loadImportControl = () => AsyncStorage.getItem(IMPORT_CONTROL_KEY).then((raw) => {
+      if (raw) { try { importControlDispatch({ type: "LOAD", payload: JSON.parse(raw) }); } catch {} }
+    });
+    loadImportControl();
+    return registerStoreReload(loadImportControl);
+  }, []);
+
+  useEffect(() => {
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state)).catch(() => {});
     notifySyncChange(STORAGE_KEY);
   }, [state]);
@@ -163,6 +220,11 @@ export function WineProvider({ children }: { children: React.ReactNode }) {
     AsyncStorage.setItem(MANUAL_PURCHASE_KEY, JSON.stringify(manualState)).catch(() => {});
     notifySyncChange(MANUAL_PURCHASE_KEY);
   }, [manualState]);
+
+  useEffect(() => {
+    AsyncStorage.setItem(IMPORT_CONTROL_KEY, JSON.stringify(importControlState)).catch(() => {});
+    notifySyncChange(IMPORT_CONTROL_KEY);
+  }, [importControlState]);
 
   // ── WineBottle 方法 ────────────────────────────────────────────────────────
   const addBottle = useCallback((data: Omit<WineBottle, "id" | "createdAt" | "updatedAt">) => {
@@ -296,6 +358,85 @@ export function WineProvider({ children }: { children: React.ReactNode }) {
     return manualState.purchases.filter((p) => p.date.startsWith(month));
   }, [manualState.purchases]);
 
+  const createRestorePoint = useCallback((month: string, reason: WineMonthRestorePoint["reason"]): WineMonthRestorePoint => {
+    const restorePoint: WineMonthRestorePoint = {
+      id: uuid(),
+      month,
+      reason,
+      createdAt: new Date().toISOString(),
+      snapshot: snapshotState.snapshots.find((snapshot) => snapshot.monthLabel === `${month.slice(0, 4)}年${Number(month.slice(5))}月`) ?? null,
+      purchases: manualState.purchases.filter((purchase) => purchase.date.startsWith(month)),
+      batchIds: importControlState.batches.filter((batch) => batch.month === month).map((batch) => batch.id),
+    };
+    importControlDispatch({ type: "ADD_RESTORE_POINT", restorePoint });
+    return restorePoint;
+  }, [snapshotState.snapshots, manualState.purchases, importControlState.batches]);
+
+  const applyWorkbookImport = useCallback((input: { month: string; snapshot: WineMonthlySnapshot | null; purchases: WineManualPurchase[]; batch: WineImportBatch }) => {
+    const existingSnapshot = snapshotState.snapshots.some((snapshot) => snapshot.monthLabel === `${input.month.slice(0, 4)}年${Number(input.month.slice(5))}月`);
+    const existingPurchases = manualState.purchases.some((purchase) => purchase.date.startsWith(input.month));
+    const restorePoint = existingSnapshot || existingPurchases ? createRestorePoint(input.month, "before_replace_import") : null;
+    if (input.snapshot) snapshotDispatch({ type: "REPLACE_MONTH_SNAPSHOT", month: input.month, snapshot: input.snapshot });
+    if (input.purchases.length > 0) manualDispatch({ type: "BATCH_ADD", purchases: input.purchases });
+    importControlDispatch({ type: "ADD_BATCH", batch: input.batch });
+    importControlDispatch({
+      type: "ADD_AUDIT",
+      entry: {
+        id: uuid(), month: input.month, action: "workbook_import", occurredAt: new Date().toISOString(),
+        detail: `导入复杂葡萄酒工作簿：库存 ${input.batch.appliedRows.inventory} 行，进货 ${input.batch.appliedRows.purchases} 行，跳过重复 ${input.batch.appliedRows.skippedDuplicates} 行。`,
+        affected: { snapshots: input.snapshot ? 1 : 0, purchases: input.purchases.length, batches: 1 }, restorePointId: restorePoint?.id,
+      },
+    });
+  }, [createRestorePoint, snapshotState.snapshots, manualState.purchases]);
+
+  const clearMonthPurchases = useCallback((month: string): WineMonthRestorePoint => {
+    const restorePoint = createRestorePoint(month, "before_clear_purchases");
+    const affected = manualState.purchases.filter((purchase) => purchase.date.startsWith(month)).length;
+    manualDispatch({ type: "CLEAR_MONTH", month });
+    importControlDispatch({
+      type: "ADD_AUDIT",
+      entry: {
+        id: uuid(), month, action: "clear_month_purchases", occurredAt: new Date().toISOString(),
+        detail: `强制清空 ${month} 采购流水 ${affected} 笔。`,
+        affected: { snapshots: 0, purchases: affected, batches: 0 }, restorePointId: restorePoint.id,
+      },
+    });
+    return restorePoint;
+  }, [createRestorePoint, manualState.purchases]);
+
+  const recalculateMonthInventory = useCallback((month: string): WineMonthRestorePoint | null => {
+    const snapshot = snapshotState.snapshots.find((item) => item.monthLabel === `${month.slice(0, 4)}年${Number(month.slice(5))}月`);
+    if (!snapshot) return null;
+    const restorePoint = createRestorePoint(month, "before_recalculate");
+    const rebuilt = rebuildWineSnapshotFromPurchases(snapshot, manualState.purchases);
+    snapshotDispatch({ type: "UPDATE_SNAPSHOT", id: snapshot.id, updates: rebuilt });
+    importControlDispatch({
+      type: "ADD_AUDIT",
+      entry: {
+        id: uuid(), month, action: "recalculate_month_inventory", occurredAt: new Date().toISOString(),
+        detail: `从 ${manualState.purchases.filter((purchase) => purchase.date.startsWith(month)).length} 笔唯一采购流水重新计算库存派生字段。`,
+        affected: { snapshots: 1, purchases: 0, batches: 0 }, restorePointId: restorePoint.id,
+      },
+    });
+    return restorePoint;
+  }, [createRestorePoint, snapshotState.snapshots, manualState.purchases]);
+
+  const restoreMonth = useCallback((restorePointId: string): boolean => {
+    const restorePoint = importControlState.restorePoints.find((point) => point.id === restorePointId);
+    if (!restorePoint) return false;
+    manualDispatch({ type: "RESTORE_MONTH", month: restorePoint.month, purchases: restorePoint.purchases });
+    if (restorePoint.snapshot) snapshotDispatch({ type: "REPLACE_MONTH_SNAPSHOT", month: restorePoint.month, snapshot: restorePoint.snapshot });
+    importControlDispatch({
+      type: "ADD_AUDIT",
+      entry: {
+        id: uuid(), month: restorePoint.month, action: "restore_month", occurredAt: new Date().toISOString(),
+        detail: `从恢复点还原 ${restorePoint.month} 的库存快照与采购流水。`,
+        affected: { snapshots: restorePoint.snapshot ? 1 : 0, purchases: restorePoint.purchases.length, batches: 0 }, restorePointId,
+      },
+    });
+    return true;
+  }, [importControlState.restorePoints]);
+
   return (
     <WineContext.Provider value={{
       ...state,
@@ -313,7 +454,12 @@ export function WineProvider({ children }: { children: React.ReactNode }) {
           batchDeleteManualPurchases, batchUpdateManualPurchases, batchUpdateManualPurchaseDate,
           getSupplierMonthPurchases, getMonthPurchases,
         }}>
-          {children}
+          <WineImportControlContext.Provider value={{
+            ...importControlState,
+            applyWorkbookImport, clearMonthPurchases, recalculateMonthInventory, restoreMonth,
+          }}>
+            {children}
+          </WineImportControlContext.Provider>
         </WineManualPurchaseContext.Provider>
       </WineSnapshotContext.Provider>
     </WineContext.Provider>
@@ -335,5 +481,11 @@ export function useWineSnapshotStore(): WineSnapshotContextValue {
 export function useWineManualPurchaseStore(): WineManualPurchaseContextValue {
   const ctx = useContext(WineManualPurchaseContext);
   if (!ctx) throw new Error("useWineManualPurchaseStore must be used within WineProvider");
+  return ctx;
+}
+
+export function useWineImportControlStore(): WineImportControlContextValue {
+  const ctx = useContext(WineImportControlContext);
+  if (!ctx) throw new Error("useWineImportControlStore must be used within WineProvider");
   return ctx;
 }

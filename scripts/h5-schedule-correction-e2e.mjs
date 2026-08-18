@@ -405,6 +405,7 @@ try {
     const genericItem = (id, name, category, unit) => ({ id, name, category, spec: 'H5规格', unit, currentStock: 4, latestCostPrice: 12, supplier: 'H5供应商', notes: '', active: true, createdAt: now, updatedAt: now });
     localStorage.setItem('fruit.inventory.v2', JSON.stringify({ items: [genericItem('h5-fruit', 'H5青柠', 'citrus', 'kg')], purchases: [], consumes: [], snapshots: [] }));
     localStorage.setItem('beer.inventory.v2', JSON.stringify({ items: [genericItem('h5-beer', 'H5精酿啤酒', 'bottle', '瓶')], purchases: [], consumes: [], snapshots: [] }));
+    const wineMonthLabel = month.slice(0, 4) + '年' + Number(month.slice(5)) + '月';
     const wineTypes = ['Red', 'White', 'Sparkling'];
     const wineItems = Array.from({ length: 36 }, (_, index) => {
       const seq = index + 1;
@@ -414,7 +415,7 @@ try {
       const endQty = initQty + purchaseQty - 1;
       return { seq, wineType: wineTypes[index % wineTypes.length], supplier: 'H5酒商', name: 'H5酒款' + seq + ' 赤霞珠', initUnitCost: unitCost, initQty, initCost: initQty * unitCost, purchaseQty, purchaseCost: purchaseQty * unitCost, endQty, unitCost, endCost: endQty * unitCost, consumeBottles: 1, consumeQty: unitCost };
     });
-    localStorage.setItem('wine.snapshots.v2', JSON.stringify({ snapshots: [{ id: 'h5-wine-snapshot', monthLabel: month, importedAt: now, supplierTotals: { 'H5酒商': 396 }, totalPurchase: 396, totalConsume: 792, totalEndCost: wineItems.reduce((sum, item) => sum + item.endCost, 0), items: wineItems, purchaseOrders: [] }] }));
+    localStorage.setItem('wine.snapshots.v2', JSON.stringify({ snapshots: [{ id: 'h5-wine-snapshot', monthLabel: wineMonthLabel, importedAt: now, supplierTotals: { 'H5酒商': 396 }, totalPurchase: 396, totalConsume: 792, totalEndCost: wineItems.reduce((sum, item) => sum + item.endCost, 0), items: wineItems, purchaseOrders: [] }] }));
     localStorage.setItem('food.ingredients.v2', JSON.stringify({ ingredients: [{ id: 'h5-food', name: 'H5牛肉', category: 'meat', spec: '1kg/包', unit: '包', costPrice: 30, stock: 3, supplier: 'H5食材商', notes: '', createdAt: now, updatedAt: now }], priceHistory: {}, ledgerEntries: [{ id: 'h5-food-ledger', month, ingredientId: 'h5-food', openingQty: 2, openingUnitCost: 28, purchaseQty: 2, purchaseCost: 64, consumeQty: 1, consumeCost: 32, createdAt: now, updatedAt: now }], ledgerMovements: [] }));
     return month;
   })()`, returnByValue: true });

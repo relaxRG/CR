@@ -11,7 +11,7 @@ vi.mock("expo-file-system/legacy", () => ({
 
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
-import { parseWineInventoryExcel } from "../lib/wine/excel-import";
+import { parseWineWorkbook } from "../lib/wine/workbook-engine";
 import { parseSupplierExcel } from "../lib/store/supplier-import";
 
 function toBase64(sheets: Array<{ name: string; rows: unknown[][] }>): string {
@@ -44,13 +44,13 @@ describe("葡萄酒库存导入日期边界", () => {
       },
     ]);
 
-    const snapshot = parseWineInventoryExcel(base64);
+    const preview = parseWineWorkbook(base64, "2026-07");
 
-    expect(snapshot?.purchaseOrders.map((order) => order.date)).toEqual([
+    expect(preview?.purchaseLines.map((order) => order.date)).toEqual([
       "2026-07-31", "2026-07-31", "2026-08-01", "2026-08-01",
     ]);
-    expect(snapshot?.purchaseOrders.map((order) => order.productName)).not.toContain("不应导入");
-    expect(snapshot?.monthLabel).toBe("2026年7月");
+    expect(preview?.purchaseLines.map((order) => order.productName)).not.toContain("不应导入");
+    expect(preview?.monthLabel).toBe("2026年7月");
   });
 });
 

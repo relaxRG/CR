@@ -4,7 +4,7 @@
  * 生成 WineMonthlySnapshot 并存入 store
  * 导入后自动同步 WineBottle 资料库（新增款 addBottle，已有款 updateBottle 更新库存和进价）
  */
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { formatMoney } from "@/lib/utils";
 import {
   Alert, Modal, Platform, Pressable, ScrollView,
@@ -17,9 +17,11 @@ import { useRouter } from "expo-router";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
-import { useWineSnapshotStore, useWineStore } from "@/lib/wine/store";
-import { WineInventoryItem, WineMonthlySnapshot } from "@/lib/wine/types";
-import { parseWineInventoryExcel } from "@/lib/wine/excel-import";
+import { wineUuid, useWineImportControlStore, useWineManualPurchaseStore, useWineStore } from "@/lib/wine/store";
+import { WineInventoryItem } from "@/lib/wine/types";
+import { assessWineWorkbookImport, createWineImportBatch, createWineWorkbookSnapshot, parseWineWorkbook, WineWorkbookImportPreview } from "@/lib/wine/workbook-engine";
+import { useGlobalBusinessMonth } from "@/lib/months/global-business-month";
+import { downloadWineWorkbookTemplate } from "@/lib/wine/workbook-export";
 
 // ─── 预览行 ───────────────────────────────────────────────────────────────────
 function PreviewRow({ item, colors }: { item: WineInventoryItem; colors: any }) {
@@ -43,13 +45,19 @@ function PreviewRow({ item, colors }: { item: WineInventoryItem; colors: any }) 
 export default function WineInventoryImportScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { addSnapshot } = useWineSnapshotStore();
+  const { month: activeMonth } = useGlobalBusinessMonth();
   const { bottles, addBottle, updateBottle } = useWineStore();
+  const { batches, applyWorkbookImport } = useWineImportControlStore();
+  const { purchases } = useWineManualPurchaseStore();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
   const [loading, setLoading] = useState(false);
-  const [preview, setPreview] = useState<WineMonthlySnapshot | null>(null);
+  const [preview, setPreview] = useState<WineWorkbookImportPreview | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const assessment = useMemo(
+    () => preview ? assessWineWorkbookImport(preview, purchases, batches) : null,
+    [preview, purchases, batches],
+  );
 
   const handlePick = async () => {
     tap();
@@ -63,13 +71,17 @@ export default function WineInventoryImportScreen() {
       const asset = result.assets[0];
       setLoading(true);
       const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 });
-      const snapshot = parseWineInventoryExcel(base64);
+      const parsed = parseWineWorkbook(base64, activeMonth);
       setLoading(false);
-      if (!snapshot || snapshot.items.length === 0) {
-        Alert.alert("解析失败", "未能识别葡萄酒盘点数据，请确认 Excel 包含「葡萄酒盘点」工作表");
+      if (!parsed || (parsed.items.length === 0 && parsed.purchaseLines.length === 0)) {
+        Alert.alert("解析失败", "未能识别葡萄酒盘点或进货总单数据，请确认工作簿包含「葡萄酒盘点」或「进货总单」工作表。");
         return;
       }
-      setPreview(snapshot);
+      if (parsed.month !== activeMonth) {
+        Alert.alert("业务月份不一致", `该工作簿识别为 ${parsed.monthLabel}，当前葡萄酒工作台为 ${activeMonth}。请先切换到对应月份后再导入，避免跨月串账。`);
+        return;
+      }
+      setPreview(parsed);
       setShowPreview(true);
     } catch (e) {
       setLoading(false);
@@ -122,16 +134,37 @@ export default function WineInventoryImportScreen() {
   };
 
   const handleConfirm = () => {
-    if (!preview) return;
-    // 1. 存入快照
-    addSnapshot(preview);
-    // 2. 同步 WineBottle 资料库
-    const { added, updated } = syncBottleLibrary(preview.items);
+    if (!preview || !assessment) return;
+    if (assessment.exactFileDuplicate) {
+      Alert.alert("已阻止重复导入", `该工作簿已于 ${assessment.exactFileDuplicate.importedAt.slice(0, 16)} 导入为 ${preview.monthLabel}。如需更正，请先在当月进货执行“强制清空本月进货”，再导入。`);
+      return;
+    }
+    if (assessment.conflicts.length > 0) {
+      Alert.alert("发现冲突记录", `发现 ${assessment.conflicts.length} 条同日期、供应商与商品但数量或单价不同的记录。请先修正 Excel，避免覆盖真实采购流水。`);
+      return;
+    }
+    const batchId = wineUuid();
+    const purchaseRecords = assessment.applicablePurchaseLines.map((line) => ({
+      id: wineUuid(), date: line.date, supplier: line.supplier, bottleId: null,
+      productName: line.productName, unitPrice: line.unitPrice, quantity: line.quantity, amount: line.amount,
+      notes: "", createdAt: new Date().toISOString(), source: "workbook" as const,
+      importBatchId: batchId, importFingerprint: line.fingerprint, sourceSheet: line.sourceSheet, sourceRow: line.sourceRow,
+    }));
+    const snapshot = preview.items.length > 0
+      ? createWineWorkbookSnapshot(wineUuid(), preview, purchaseRecords)
+      : null;
+    const batch = createWineImportBatch({
+      id: batchId, month: preview.month, filename: "复杂葡萄酒工作簿.xlsx", fileFingerprint: preview.fileFingerprint, status: "imported",
+      sourceSheets: preview.sourceSheets, parsedRows: preview.sourceRows,
+      appliedRows: { inventory: preview.items.length, purchases: purchaseRecords.length, skippedDuplicates: assessment.duplicateRowIndexes.length + assessment.existingDuplicateRowIndexes.length, conflicts: assessment.conflicts.length },
+    });
+    applyWorkbookImport({ month: preview.month, snapshot, purchases: purchaseRecords, batch });
+    const { added, updated } = syncBottleLibrary(snapshot?.items ?? []);
     setShowPreview(false);
     setPreview(null);
     Alert.alert(
       "导入成功",
-      `已导入 ${preview.monthLabel}，共 ${preview.items.length} 款葡萄酒\n酒款库：新增 ${added} 款，更新 ${updated} 款`,
+      `已分配 ${preview.monthLabel} 工作簿\n库存 ${preview.items.length} 款 · 进货 ${purchaseRecords.length} 笔 · 跳过重复 ${batch.appliedRows.skippedDuplicates} 笔\n葡萄酒库：新增 ${added} 款，更新 ${updated} 款`,
       [
         { text: "查看进销存", onPress: () => router.replace("/wine-inventory" as any) },
         { text: "继续导入" },
@@ -167,6 +200,17 @@ export default function WineInventoryImportScreen() {
             </Text>
           </View>
         </View>
+
+        <TouchableOpacity
+          onPress={() => { void downloadWineWorkbookTemplate(activeMonth).catch((error) => Alert.alert("模板下载失败", String(error))); }}
+          style={[PS.templateBtn, { borderColor: colors.primary, backgroundColor: colors.primary + "0d" }]}
+        >
+          <IconSymbol name="square.and.arrow.down" size={20} color={colors.primary} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: colors.primary, fontSize: 16, fontWeight: "700" }}>下载完整工作簿模板</Text>
+            <Text style={{ color: colors.muted, fontSize: 12, marginTop: 2 }}>含葡萄酒盘点、进货总单及自动汇总页</Text>
+          </View>
+        </TouchableOpacity>
 
         {/* 导入按钮 */}
         <TouchableOpacity
@@ -256,6 +300,7 @@ const PS = StyleSheet.create({
   infoText: { fontSize: 12, lineHeight: 18 },
   syncNote: { flexDirection: "row", alignItems: "flex-start", gap: 6, borderRadius: 8, borderWidth: 1, padding: 8, marginTop: 10 },
   syncNoteText: { flex: 1, fontSize: 11, lineHeight: 16 },
+  templateBtn: { flexDirection: "row", alignItems: "center", gap: 12, borderRadius: 14, borderWidth: 1, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 12 },
   pickBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, borderRadius: 14, paddingVertical: 16, marginBottom: 12 },
   pickBtnText: { color: "#fff", fontSize: 17, fontWeight: "600" },
   hint: { fontSize: 12, textAlign: "center", lineHeight: 18 },

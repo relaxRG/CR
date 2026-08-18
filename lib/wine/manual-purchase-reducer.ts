@@ -11,7 +11,10 @@ export type WineManualPurchaseAction =
   | { type: "BATCH_UPDATE"; ids: string[]; updates: Partial<WineManualPurchase> }
   | { type: "BATCH_UPDATE_DATE"; ids: string[]; date: string }
   | { type: "DELETE"; id: string }
-  | { type: "BATCH_DELETE"; ids: string[] };
+  | { type: "BATCH_DELETE"; ids: string[] }
+  | { type: "BATCH_ADD"; purchases: WineManualPurchase[] }
+  | { type: "CLEAR_MONTH"; month: string }
+  | { type: "RESTORE_MONTH"; month: string; purchases: WineManualPurchase[] };
 
 /**
  * 手动采购的唯一状态机。所有批量编辑在同一个 reducer 中完成，
@@ -53,6 +56,17 @@ export function wineManualPurchaseReducer(
       return { purchases: state.purchases.filter((purchase) => purchase.id !== action.id) };
     case "BATCH_DELETE":
       return { purchases: state.purchases.filter((purchase) => !action.ids.includes(purchase.id)) };
+    case "BATCH_ADD":
+      return { purchases: [...action.purchases, ...state.purchases] };
+    case "CLEAR_MONTH":
+      return { purchases: state.purchases.filter((purchase) => !purchase.date.startsWith(action.month)) };
+    case "RESTORE_MONTH":
+      return {
+        purchases: [
+          ...action.purchases,
+          ...state.purchases.filter((purchase) => !purchase.date.startsWith(action.month)),
+        ],
+      };
     default:
       return state;
   }

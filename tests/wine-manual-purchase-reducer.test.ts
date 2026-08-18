@@ -44,6 +44,16 @@ describe("葡萄酒手动采购批量编辑", () => {
     expect(dated.purchases.map((purchase) => purchase.date)).toEqual(["2026-02-10", "2026-02-20"]);
   });
 
+  it("按月清空和恢复只影响目标业务月，且批量写入保持单一流水顺序", () => {
+    const crossMonth = { purchases: [...state.purchases, { ...state.purchases[0], id: "p-3", date: "2026-03-01" }] };
+    const cleared = wineManualPurchaseReducer(crossMonth, { type: "CLEAR_MONTH", month: "2026-02" });
+    expect(cleared.purchases.map((purchase) => purchase.id)).toEqual(["p-3"]);
+    const restored = wineManualPurchaseReducer(cleared, { type: "RESTORE_MONTH", month: "2026-02", purchases: state.purchases });
+    expect(restored.purchases.map((purchase) => purchase.id)).toEqual(["p-1", "p-2", "p-3"]);
+    const appended = wineManualPurchaseReducer(restored, { type: "BATCH_ADD", purchases: [{ ...state.purchases[0], id: "workbook-1", source: "workbook" }] });
+    expect(appended.purchases.map((purchase) => purchase.id)).toEqual(["workbook-1", "p-1", "p-2", "p-3"]);
+  });
+
   it("加载、新增、单条修改和删除均不会影响未命中的记录", () => {
     const loaded = wineManualPurchaseReducer({ purchases: [] }, { type: "LOAD", payload: state });
     expect(loaded).toEqual(state);

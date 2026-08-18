@@ -19,7 +19,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
-import { useWineSnapshotStore, useWineManualPurchaseStore, useWineStore } from "@/lib/wine/store";
+import { useWineImportControlStore, useWineSnapshotStore, useWineManualPurchaseStore, useWineStore } from "@/lib/wine/store";
+import { exportWinePdf, exportWineWorkbook, summarizeWineProducts, summarizeWineSuppliers } from "@/lib/wine/workbook-export";
 import { WineInventoryItem, WineManualPurchase } from "@/lib/wine/types";
 import { applyWineLedgerView, applyWinePurchaseView, collectWineTypes, getWineSupplierNames, SortState, toggleSort, WineLedgerSortKey, WinePurchaseSortKey } from "@/lib/wine/table-view";
 import { WineSupplierTrendChart } from "@/components/wine-supplier-trend-chart";
@@ -290,9 +291,10 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
   const insets = useSafeAreaInsets();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
-  const { snapshots, addSnapshot, deleteSnapshot, setActualEndQty, batchSetActualEndQty } = useWineSnapshotStore();
+  const { snapshots, deleteSnapshot, setActualEndQty, batchSetActualEndQty } = useWineSnapshotStore();
   const { bottles } = useWineStore();
   const { purchases, addManualPurchase, deleteManualPurchase, batchDeleteManualPurchases, batchUpdateManualPurchases, batchUpdateManualPurchaseDate, getMonthPurchases } = useWineManualPurchaseStore();
+  const { clearMonthPurchases, recalculateMonthInventory, batches, auditEntries } = useWineImportControlStore();
 
   const [viewTab, setViewTab] = useState<ViewTab>("ledger");
   const [filterSupplier, setFilterSupplier] = useState<string | null>(null);
@@ -328,9 +330,11 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
   // ★ 月末盘点状态
   const [showStocktakeModal, setShowStocktakeModal] = useState(false);
   const [stocktakeValues, setStocktakeValues] = useState<Record<number, string>>({});
+  const [dangerousAction, setDangerousAction] = useState<"clear" | "recalculate" | null>(null);
+  const [dangerousConfirmation, setDangerousConfirmation] = useState("");
 
-  // 最新快照
-  const latestSnapshot = snapshots[0] ?? null;
+  // 当前工作台只读取全局业务月份对应的快照；绝不能按导入时间把其他月份的数据带入当前页。
+  const latestSnapshot = snapshots.find((snapshot) => snapshot.monthLabel === `${selectedMonth.slice(0, 4)}年${Number(selectedMonth.slice(5))}月`) ?? null;
   const items: WineInventoryItem[] = latestSnapshot?.items ?? [];
 
   // 所有供应商统一来自台账、手动采购与葡萄酒库；没有采购记录时也能先选供应商录入。
@@ -350,22 +354,19 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
     return map;
   }, [items]);
 
-  // 供应商进货额（本月）
-  const supplierMonthTotals = latestSnapshot?.supplierTotals ?? {};
-
-  // 供应商累计进货（跨所有快照）
-  const supplierCumulTotals = useMemo(() => {
-    const map: Record<string, number> = {};
-    snapshots.forEach((snap) => {
-      Object.entries(snap.supplierTotals).forEach(([sup, amt]) => {
-        map[sup] = (map[sup] ?? 0) + amt;
-      });
-    });
-    purchases.forEach((p) => {
-      map[p.supplier] = (map[p.supplier] ?? 0) + p.amount;
-    });
-    return map;
-  }, [snapshots, purchases]);
+  // 供应商与酒款的月度／累计统计只从唯一采购流水计算，不再与快照汇总重复相加。
+  const supplierPurchaseSummaries = useMemo(
+    () => summarizeWineSuppliers({ month: selectedMonth, snapshot: latestSnapshot, purchases, batches, auditEntries }),
+    [selectedMonth, latestSnapshot, purchases, batches, auditEntries],
+  );
+  const productPurchaseSummaries = useMemo(
+    () => summarizeWineProducts({ month: selectedMonth, snapshot: latestSnapshot, purchases, batches, auditEntries }),
+    [selectedMonth, latestSnapshot, purchases, batches, auditEntries],
+  );
+  const supplierCumulTotals = useMemo(
+    () => Object.fromEntries(supplierPurchaseSummaries.map((summary) => [summary.supplier, summary.cumulativeAmount])),
+    [supplierPurchaseSummaries],
+  );
 
   // 台账筛选与排序必须共用同一纯规则，确保搜索、供应商、酒类和表头排序可叠加。
   const filteredItems = useMemo(
@@ -583,6 +584,45 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
     Alert.alert("修改完成", `已更新 ${count} 条进货记录。`);
   };
 
+  const exportCurrentWineWorkbook = async (format: "xlsx" | "pdf") => {
+    try {
+      const data = { month: selectedMonth, snapshot: latestSnapshot, purchases, batches, auditEntries };
+      if (format === "xlsx") await exportWineWorkbook(data);
+      else await exportWinePdf(data);
+    } catch (error) {
+      Alert.alert("导出失败", String(error));
+    }
+  };
+
+  const openDangerousAction = (action: "clear" | "recalculate") => {
+    if (!assertWineWritable()) return;
+    if (action === "recalculate" && !latestSnapshot) {
+      Alert.alert("暂无库存快照", `当前 ${selectedMonth} 没有库存管理数据，无法重新计算。`);
+      return;
+    }
+    setDangerousConfirmation("");
+    setDangerousAction(action);
+  };
+
+  const confirmDangerousAction = () => {
+    if (!dangerousAction) return;
+    const required = dangerousAction === "clear" ? `清空 ${selectedMonth}` : `重算 ${selectedMonth}`;
+    if (dangerousConfirmation.trim() !== required) {
+      Alert.alert("确认文字不匹配", `请准确输入“${required}”后再执行。`);
+      return;
+    }
+    if (dangerousAction === "clear") {
+      const restorePoint = clearMonthPurchases(selectedMonth);
+      setDangerousAction(null);
+      Alert.alert("已清空本月进货", `${selectedMonth} 的采购流水已清空，库存派生数据可在“库存管理”执行强制重新计算。\n恢复点：${restorePoint.createdAt.slice(0, 16)}`);
+      return;
+    }
+    const restorePoint = recalculateMonthInventory(selectedMonth);
+    setDangerousAction(null);
+    if (!restorePoint) return;
+    Alert.alert("重新计算完成", `${selectedMonth} 的期初成本、进货、期末成本与消耗已从唯一采购流水重建。\n恢复点：${restorePoint.createdAt.slice(0, 16)}`);
+  };
+
   return (
     <ScreenContainer edges={embedded ? [] : undefined}>
       {/* 独立路由才保留返回导航；工作台已提供分类与月份层级。 */}
@@ -593,7 +633,16 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
         <Text style={[S.navTitle, { color: colors.foreground }]}>
           葡萄酒进销存{latestSnapshot ? ` · ${latestSnapshot.monthLabel}` : ""}
         </Text>
-        <View style={{ flexDirection: "row", gap: 12 }}>
+        <View style={{ flexDirection: "row", gap: 16 }}>
+          <Pressable onPress={() => {
+            Alert.alert("导出葡萄酒工作台", "导出当前业务月份的总结、库存管理、当月进货、供应商与累计进货内容。", [
+              { text: "取消", style: "cancel" },
+              { text: "综合 Excel", onPress: () => { void exportCurrentWineWorkbook("xlsx"); } },
+              { text: "综合 PDF", onPress: () => { void exportCurrentWineWorkbook("pdf"); } },
+            ]);
+          }} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+            <IconSymbol name="square.and.arrow.up.fill" size={20} color={colors.primary} />
+          </Pressable>
           <Pressable onPress={() => { tap(); router.push("/wine-inventory-import" as any); }}
             style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
             <IconSymbol name="square.and.arrow.down.fill" size={20} color={colors.primary} />
@@ -648,6 +697,10 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
               }} style={[S.actionBtn, { backgroundColor: "#F59E0B22", borderColor: "#F59E0B" }]}>
                 <IconSymbol name="checklist" size={13} color="#F59E0B" />
                 <Text style={{ fontSize: 12, color: "#92400E", fontWeight: "600" }}>月末盘点</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => openDangerousAction("recalculate")} style={[S.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <IconSymbol name="arrow.clockwise" size={13} color={colors.primary} />
+                <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "600" }}>强制重新计算</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => {
                 if (!assertWineWritable()) return;
@@ -842,7 +895,15 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
               return <TouchableOpacity key={key} testID={`wine-purchase-sort-${key}`} onPress={() => setPurchaseSort((current) => toggleSort(current, key))} style={[S.filterChip, { backgroundColor: active ? colors.primary : colors.surface, borderColor: active ? colors.primary : colors.border }]}><Text style={[S.filterChipText, { color: active ? "#fff" : colors.muted }]}>{label}{active ? (purchaseSort.direction === "asc" ? " ↑" : " ↓") : " ↕"}</Text></TouchableOpacity>;
             })}
           </ScrollView>
-          <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 8, gap: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 8, gap: 8, alignItems: "center", borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
+            <TouchableOpacity onPress={() => { tap(); router.push("/wine-inventory-import" as any); }} style={[S.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <IconSymbol name="square.and.arrow.down.fill" size={13} color={colors.primary} />
+              <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "600" }}>导入完整 Excel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => openDangerousAction("clear")} style={[S.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <IconSymbol name="trash" size={13} color={colors.foreground} />
+              <Text style={{ fontSize: 12, color: colors.foreground, fontWeight: "600" }}>强制清空本月</Text>
+            </TouchableOpacity>
             <TouchableOpacity onPress={() => {
               tap();
               const supplier = purchaseFilterSupplier ?? allSuppliers[0];
@@ -857,7 +918,7 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
               <IconSymbol name="checkmark.circle" size={13} color={selectMode ? "#fff" : colors.muted} />
               <Text style={{ fontSize: 12, color: selectMode ? "#fff" : colors.muted, fontWeight: "600" }}>{selectMode ? `已选 ${selectedIds.size}` : "多选"}</Text>
             </TouchableOpacity>
-          </View>
+          </ScrollView>
 
           {/* 批量操作只有主动进入多选模式后出现。 */}
           {selectMode && (
@@ -948,8 +1009,24 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
             </View>
           )}
 
+          <Text style={[S.sectionTitle, { color: colors.muted, marginTop: snapshots.length >= 1 ? 16 : 0 }]}>供应商月度与累计进货</Text>
+          {supplierPurchaseSummaries.length === 0 ? <Text style={{ color: colors.muted, fontSize: 13 }}>当前及历史月份暂无采购流水。</Text> : supplierPurchaseSummaries.map((summary) => (
+            <View key={summary.supplier} style={[S.summarySupRow, { backgroundColor: colors.surface, borderTopColor: colors.border, paddingHorizontal: 12, paddingVertical: 10 }]}>
+              <View style={{ flex: 1, minWidth: 0 }}><Text numberOfLines={1} style={{ color: colors.foreground, fontSize: 13, fontWeight: "700" }}>{summary.supplier}</Text><Text style={{ color: colors.muted, fontSize: 11, marginTop: 2 }}>本月 {summary.monthQty} 瓶 · 累计 {summary.cumulativeQty} 瓶 · {summary.productCount} 款酒</Text></View>
+              <View style={{ alignItems: "flex-end" }}><Text style={{ color: colors.primary, fontSize: 13, fontWeight: "800" }}>¥{formatMoney(summary.monthAmount)}</Text><Text style={{ color: colors.muted, fontSize: 11, marginTop: 2 }}>累计 ¥{formatMoney(summary.cumulativeAmount)}</Text></View>
+            </View>
+          ))}
+
+          <Text style={[S.sectionTitle, { color: colors.muted, marginTop: 20 }]}>酒款月度与累计进货</Text>
+          {productPurchaseSummaries.slice(0, 12).map((summary) => (
+            <View key={`${summary.supplier}-${summary.productName}`} style={[S.summarySupRow, { backgroundColor: colors.surface, borderTopColor: colors.border, paddingHorizontal: 12, paddingVertical: 10 }]}>
+              <View style={{ flex: 1, minWidth: 0 }}><Text numberOfLines={1} style={{ color: colors.foreground, fontSize: 13, fontWeight: "700" }}>{summary.productName}</Text><Text numberOfLines={1} style={{ color: colors.muted, fontSize: 11, marginTop: 2 }}>{summary.supplier} · 本月 {summary.monthQty} 瓶 · 累计 {summary.cumulativeQty} 瓶</Text></View>
+              <View style={{ alignItems: "flex-end" }}><Text style={{ color: colors.primary, fontSize: 13, fontWeight: "800" }}>¥{formatMoney(summary.monthAmount)}</Text><Text style={{ color: colors.muted, fontSize: 11, marginTop: 2 }}>累计 ¥{formatMoney(summary.cumulativeAmount)}</Text></View>
+            </View>
+          ))}
+
           {/* 快照历史 */}
-          <Text style={[S.sectionTitle, { color: colors.muted, marginTop: snapshots.length >= 1 ? 16 : 0 }]}>月度快照（{snapshots.length} 份）</Text>
+          <Text style={[S.sectionTitle, { color: colors.muted, marginTop: 20 }]}>月度快照（{snapshots.length} 份）</Text>
           {snapshots.map((snap) => (
             <View key={snap.id} style={[S.summaryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <View style={S.summaryCardHeader}>
@@ -1048,6 +1125,39 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
               </Pressable>
               <Pressable onPress={handleBatchUpdateDate} style={{ flex: 1, padding: 12, borderRadius: 10, backgroundColor: colors.primary, alignItems: "center" }}>
                 <Text style={{ color: "#fff", fontWeight: "600" }}>确认</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 强制操作必须输入月份口令，避免误触清空或重算。 */}
+      <Modal transparent visible={dangerousAction !== null} animationType="fade" onRequestClose={() => setDangerousAction(null)}>
+        <View style={{ flex: 1, backgroundColor: "#00000066", justifyContent: "center", padding: 24 }}>
+          <View style={{ backgroundColor: colors.surface, borderRadius: 16, padding: 20, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border }}>
+            <Text style={{ color: colors.foreground, fontSize: 18, fontWeight: "800" }}>
+              {dangerousAction === "clear" ? "强制清空本月进货" : "强制重新计算本月库存"}
+            </Text>
+            <Text style={{ color: colors.muted, fontSize: 13, lineHeight: 19, marginTop: 8 }}>
+              {dangerousAction === "clear"
+                ? `将清空 ${selectedMonth} 的所有采购流水；不会删除葡萄酒资料库或其他月份。系统会先创建恢复点。`
+                : `将保留 ${selectedMonth} 的期初和期末盘点输入，并从唯一采购流水重建所有派生字段。系统会先创建恢复点。`}
+            </Text>
+            <Text style={{ color: colors.foreground, fontSize: 13, marginTop: 16 }}>请输入“{dangerousAction === "clear" ? `清空 ${selectedMonth}` : `重算 ${selectedMonth}`}”确认</Text>
+            <TextInput
+              value={dangerousConfirmation}
+              onChangeText={setDangerousConfirmation}
+              autoCapitalize="none"
+              placeholder={dangerousAction === "clear" ? `清空 ${selectedMonth}` : `重算 ${selectedMonth}`}
+              placeholderTextColor={colors.muted}
+              style={{ marginTop: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 12, color: colors.foreground, backgroundColor: colors.background }}
+            />
+            <View style={{ flexDirection: "row", gap: 10, marginTop: 18 }}>
+              <Pressable onPress={() => setDangerousAction(null)} style={{ flex: 1, minHeight: 44, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.border, borderRadius: 10 }}>
+                <Text style={{ color: colors.muted, fontWeight: "700" }}>取消</Text>
+              </Pressable>
+              <Pressable onPress={confirmDangerousAction} style={{ flex: 1, minHeight: 44, alignItems: "center", justifyContent: "center", backgroundColor: colors.primary, borderRadius: 10 }}>
+                <Text style={{ color: "#fff", fontWeight: "800" }}>确认执行</Text>
               </Pressable>
             </View>
           </View>

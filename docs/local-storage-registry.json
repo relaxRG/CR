@@ -1,7 +1,7 @@
 {
   "version": 1,
   "generatedFrom": "docs/local-storage-schema.json",
-  "entryCount": 133,
+  "entryCount": 134,
   "dynamicEntryCount": 26,
   "entries": [
     {
@@ -2157,6 +2157,24 @@
     {
       "backend": "AsyncStorage",
       "key": "wine.bottles.v1",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/wine/store.tsx"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "wine.import_control.v1",
       "status": "resolved",
       "classification": "S1-business",
       "ownerFiles": [

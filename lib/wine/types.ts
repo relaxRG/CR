@@ -117,6 +117,9 @@ export interface WineMonthlySnapshot {
 }
 
 /** 手动进货录入记录 */
+export type WinePurchaseSource = "manual" | "workbook";
+
+/** 唯一采购流水；手动录入和复杂工作簿的进货总单共用同一账本。 */
 export interface WineManualPurchase {
   id: string;
   date: string;          // YYYY-MM-DD
@@ -129,11 +132,59 @@ export interface WineManualPurchase {
   amount: number;
   notes: string;
   createdAt: string;
+  /** 数据来源；缺省历史记录按 manual 迁移。 */
+  source?: WinePurchaseSource;
+  /** 复杂工作簿导入批次；手动记录为空。 */
+  importBatchId?: string;
+  /** 确定性行指纹，用于阻止重复导入。 */
+  importFingerprint?: string;
+  /** 原始工作表与行号，便于审计和回退。 */
+  sourceSheet?: string;
+  sourceRow?: number;
   // ★ 新增字段
   /** 与上次进货单价的差值（正=涨价，负=降价） */
   unitPriceDelta?: number;
   /** 是否触发价格预警 */
   priceAlertTriggered?: boolean;
+}
+
+export type WineImportBatchStatus = "imported" | "replaced" | "cleared" | "recalculated" | "restored";
+
+/** 一次复杂工作簿导入或强制业务操作的可审计批次。 */
+export interface WineImportBatch {
+  id: string;
+  month: string;
+  filename: string;
+  fileFingerprint: string;
+  sourceSchema: "wine_workbook_v1";
+  status: WineImportBatchStatus;
+  importedAt: string;
+  sourceSheets: string[];
+  parsedRows: { inventory: number; purchases: number; summary: number; purchaseSummary: number };
+  appliedRows: { inventory: number; purchases: number; skippedDuplicates: number; conflicts: number };
+  note?: string;
+}
+
+/** 清空、重算或替换前保存的一次本月可恢复状态。 */
+export interface WineMonthRestorePoint {
+  id: string;
+  month: string;
+  reason: "before_clear_purchases" | "before_recalculate" | "before_replace_import";
+  createdAt: string;
+  snapshot: WineMonthlySnapshot | null;
+  purchases: WineManualPurchase[];
+  batchIds: string[];
+}
+
+/** 仅记录会改变持久化业务数据的葡萄酒工作台操作。 */
+export interface WineAuditEntry {
+  id: string;
+  month: string;
+  action: "workbook_import" | "clear_month_purchases" | "recalculate_month_inventory" | "restore_month";
+  occurredAt: string;
+  detail: string;
+  affected: { snapshots: number; purchases: number; batches: number };
+  restorePointId?: string;
 }
 
 export const WINE_STYLE_LABELS: Record<WineStyle, string> = {
