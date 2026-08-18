@@ -12,6 +12,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { formatMoney } from "@/lib/utils";
+import { formatEditableMoney, moneyDraftToAmount, normalizeMoneyDraft, roundMoneyToCents } from "@/lib/labor/money-input";
 import { numericColor, NUMERIC_TONE } from "@/lib/theme/numeric-color-tokens";
 import {
   Alert, Platform, ScrollView, StyleSheet,
@@ -201,6 +202,9 @@ function EmployeeCard({
   );
 
   const [rewardItems, setRewardItems] = useState<RewardPenaltyItem[]>(slip?.rewardPenaltyItems ?? []);
+  const [rewardAmountDrafts, setRewardAmountDrafts] = useState<Record<string, string>>(() =>
+    Object.fromEntries((slip?.rewardPenaltyItems ?? []).map((item) => [item.id, formatEditableMoney(item.amount)]))
+  );
   // 备注状态：notes 为已保存的备注，noteInput 为编辑中的临时内容
   const [notes, setNotes] = useState(slip?.notes ?? "");
   const [noteEditing, setNoteEditing] = useState(false);
@@ -214,7 +218,9 @@ function EmployeeCard({
   const slipUpdatedAt = slip?.updatedAt;
   useEffect(() => {
     if (!editingReward) {
-      setRewardItems(slip?.rewardPenaltyItems ?? []);
+      const items = slip?.rewardPenaltyItems ?? [];
+      setRewardItems(items);
+      setRewardAmountDrafts(Object.fromEntries(items.map((item) => [item.id, formatEditableMoney(item.amount)])));
     }
   }, [slipId, slipUpdatedAt, editingReward]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -226,15 +232,29 @@ function EmployeeCard({
   }, [slipId, slipUpdatedAt, noteEditing]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const addRewardItem = () => {
-    setRewardItems([...rewardItems, { id: Date.now().toString(), name: "", amount: 0, note: "" }]);
+    const item = { id: Date.now().toString(), name: "", amount: 0, note: "" };
+    setRewardItems([...rewardItems, item]);
+    setRewardAmountDrafts((drafts) => ({ ...drafts, [item.id]: "" }));
   };
   const updateRewardItem = (id: string, field: keyof RewardPenaltyItem, value: any) => {
     setRewardItems(rewardItems.map((item) => item.id === id ? { ...item, [field]: value } : item));
   };
+  const updateRewardAmountDraft = (id: string, value: string) => {
+    const draft = normalizeMoneyDraft(value);
+    setRewardAmountDrafts((drafts) => ({ ...drafts, [id]: draft }));
+    setRewardItems((items) => items.map((item) => {
+      if (item.id !== id) return item;
+      const amount = moneyDraftToAmount(draft);
+      return { ...item, amount: item.amount < 0 ? -amount : amount };
+    }));
+  };
   const removeRewardItem = (id: string) => {
     Alert.alert("删除奖惩", "确定删除此条目？", [
       { text: "取消", style: "cancel" },
-      { text: "删除", style: "destructive", onPress: () => setRewardItems(rewardItems.filter((i) => i.id !== id)) },
+      { text: "删除", style: "destructive", onPress: () => {
+        setRewardItems((items) => items.filter((i) => i.id !== id));
+        setRewardAmountDrafts((drafts) => { const { [id]: _removed, ...next } = drafts; return next; });
+      } },
     ]);
   };
   const saveRewards = useCallback(() => {
@@ -244,11 +264,12 @@ function EmployeeCard({
       Alert.alert("已锁定", "本月已确认发薪，如需修改请先进入差额调整模式。");
       return;
     }
-    const totalReward = rewardItems.reduce((sum, item) => sum + item.amount, 0);
+    const normalizedItems = rewardItems.map((item) => ({ ...item, amount: roundMoneyToCents(item.amount) }));
+    const totalReward = roundMoneyToCents(normalizedItems.reduce((sum, item) => sum + item.amount, 0));
     // 修复 Bug：先将新 rewardPenalty 写入 store，再调用 buildPaySlipDraft
     // 原因：buildPaySlipDraft 内部从 ref.current 读取 existing.rewardPenalty 来计算 grossSalary
     // 若先 buildPaySlipDraft 再覆盖 rewardPenalty，grossSalary 会基于旧值计算，导致应发薪资不正确
-    upsertPaySlip({ ...slip, rewardPenalty: totalReward, rewardPenaltyItems: rewardItems, notes: currentNotes });
+    upsertPaySlip({ ...slip, rewardPenalty: totalReward, rewardPenaltyItems: normalizedItems, notes: currentNotes });
     // 此时 ref.current 已更新，buildPaySlipDraft 能读到最新 rewardPenalty
     const draft = buildPaySlipDraft(
       employee, month, att ?? null,
@@ -413,13 +434,12 @@ function EmployeeCard({
                     </Text>
                   </TouchableOpacity>
                   <TextInput
-                    value={item.amount !== 0 ? String(Math.abs(item.amount)) : ""}
-                    onChangeText={(v) => {
-                      const num = parseFloat(v.replace(/[^0-9.]/g, "")) || 0;
-                      updateRewardItem(item.id, "amount", item.amount < 0 ? -num : num);
-                    }}
-                    placeholder="金额" placeholderTextColor={colors.muted}
+                    value={rewardAmountDrafts[item.id] ?? formatEditableMoney(item.amount)}
+                    onChangeText={(v) => updateRewardAmountDraft(item.id, v)}
+                    onBlur={() => setRewardAmountDrafts((drafts) => ({ ...drafts, [item.id]: formatEditableMoney(item.amount) }))}
+                    placeholder="金额（最多2位小数）" placeholderTextColor={colors.muted}
                     keyboardType="decimal-pad"
+                    inputMode="decimal"
                     style={[S.rewardInput, { width: 80, color: colors.foreground, borderColor: colors.border, textAlign: "center" }]} />
                   <TouchableOpacity onPress={() => removeRewardItem(item.id)} style={{ padding: 4 }}>
                     <IconSymbol name="trash" size={16} color={colors.error} />
