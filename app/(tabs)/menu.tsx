@@ -33,6 +33,7 @@ import { displayNames } from "@/lib/utils";
 import { Recipe } from "@/lib/recipes/types";
 import { useSpiritsInventoryStore } from "@/lib/spirits/crud-store";
 import { calcDirectPourCost, calcRecipePourCost, pourCostColor, confidenceLabel } from "@/lib/spirits/pour-cost";
+import { MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS, MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
 
 // ─── 售价行（内联编辑） ───────────────────────────────────────────────────────
 
@@ -389,7 +390,7 @@ function AddRecipeSheet({ targetGroupId, onClose }: AddRecipeSheetProps) {
           returnKeyType="done"
         />
       </View>
-      <FlatList
+      <FlatList {...MOBILE_VIRTUAL_LIST_PROPS}
         data={filtered}
         keyExtractor={(r) => r.id}
         renderItem={({ item: r }) => {
@@ -798,7 +799,7 @@ export default function MenuScreen() {
         )
       )}
 
-      <FlatList
+      <FlatList {...MOBILE_VIRTUAL_LIST_PROPS}
         data={listData}
         keyExtractor={(item, index) => {
           if (item.kind === "ungrouped-header") return "ungrouped-header";

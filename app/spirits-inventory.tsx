@@ -10,7 +10,7 @@ import { formatMoney } from "@/lib/utils";
 import { sumMoney } from "@/lib/finance/money";
 import {
   Alert, KeyboardAvoidingView, Modal, Platform, Pressable,
-  ScrollView, SectionList, StyleSheet, Text, TextInput, TouchableOpacity,
+  ScrollView, StyleSheet, Text, TextInput, TouchableOpacity,
   View, ActivityIndicator,
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";

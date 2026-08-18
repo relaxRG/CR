@@ -23,6 +23,7 @@ import { useGuestGuard } from "@/hooks/use-guest-guard";
 import { useBookStore, StoredBook } from "@/lib/books/store";
 import { useIsTablet } from "@/hooks/use-is-tablet";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS, MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
 
 /** Decode HTML entities in display strings */
 function decodeHtml(str: string): string {
@@ -367,7 +368,7 @@ export default function BooksScreen() {
           </Text>
         </View>
       ) : (
-        <FlatList
+        <FlatList {...MOBILE_VIRTUAL_LIST_PROPS}
           ref={booksListRef}
           data={filteredAndSorted}
           keyExtractor={(b) => b.id}

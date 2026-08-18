@@ -1152,7 +1152,7 @@ export default function BottlesScreen() {
         )
       ) : selectMode ? null : (
       familyView ? (
-        <FlatList
+        <FlatList {...MOBILE_VIRTUAL_LIST_PROPS}
           data={familyView}
           keyExtractor={(row) => (row.kind === "bottle" ? row.bottle.id : `fam-${row.family.key}`)}
           contentContainerStyle={{
@@ -1185,7 +1185,7 @@ export default function BottlesScreen() {
           }
         />
       ) : (
-        <FlatList
+        <FlatList {...MOBILE_VIRTUAL_LIST_PROPS}
           ref={bottlesListRef}
           data={sorted}
           keyExtractor={(item) => item.id}
@@ -1209,7 +1209,7 @@ export default function BottlesScreen() {
 
       {/* 多选模式:平铺列表 + 勾选行 */}
       {ready && sorted.length > 0 && selectMode ? (
-        <FlatList
+        <FlatList {...MOBILE_VIRTUAL_LIST_PROPS}
           data={sorted}
           keyExtractor={(item) => item.id}
           contentContainerStyle={{
@@ -1701,3 +1701,4 @@ const styles = StyleSheet.create({
 });
       {/* 二级分组切换器：基酒库 / 酒款库 / 软饮库 / 原材料库 + 多选按钮 */}
 import { useGuestGuard } from "@/hooks/use-guest-guard";
+import { MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS, MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";

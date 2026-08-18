@@ -13,6 +13,7 @@ import { useFoodMenuStore } from "@/lib/food/menu-store";
 import { useFoodIngredientStore } from "@/lib/food/ingredient-store";
 import { FoodItem, FOOD_CATEGORY_LABELS, FoodIngredient, INGREDIENT_CATEGORY_LABELS } from "@/lib/food/types";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS, MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
 
 type FoodTab = "menu" | "ingredients";
 
@@ -160,7 +161,7 @@ export default function FoodScreen() {
             <Text style={[styles.emptyDesc, { color: colors.muted }]}>{items.length === 0 ? "点击右上角 + 添加第一道菜" : "试试其他关键词"}</Text>
           </View>
         ) : (
-          <FlatList
+          <FlatList {...MOBILE_VIRTUAL_LIST_PROPS}
             ref={foodListRef}
             data={filteredMenu}
             keyExtractor={(i) => i.id}
@@ -178,7 +179,7 @@ export default function FoodScreen() {
             <Text style={[styles.emptyDesc, { color: colors.muted }]}>{ingredients.length === 0 ? "点击右上角 + 添加原料" : "试试其他关键词"}</Text>
           </View>
         ) : (
-          <FlatList
+          <FlatList {...MOBILE_VIRTUAL_LIST_PROPS}
             ref={foodListRef}
             data={filteredIngredients}
             keyExtractor={(i) => i.id}

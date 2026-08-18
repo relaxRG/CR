@@ -748,7 +748,7 @@ export function RecipesScreen() {
         </View>
         )
       ) : selectMode ? null : (
-        <FlatList
+        <FlatList {...MOBILE_VIRTUAL_LIST_PROPS}
           ref={flatListRef}
           data={grouped}
           keyExtractor={(g) => g.items[0].id}
@@ -790,7 +790,7 @@ export function RecipesScreen() {
 
       {/* 多选模式:平铺列表 + 勾选行 */}
       {ready && recipes.length > 0 && selectMode ? (
-        <FlatList
+        <FlatList {...MOBILE_VIRTUAL_LIST_PROPS}
           data={sorted}
           keyExtractor={(r) => r.id}
           numColumns={isTablet ? 2 : 1}
@@ -1120,3 +1120,4 @@ const styles = StyleSheet.create({
 
 export default RecipesScreen;
 import { useGuestGuard } from "@/hooks/use-guest-guard";
+import { MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS, MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";

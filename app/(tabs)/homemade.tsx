@@ -889,7 +889,7 @@ export default function HomemadeScreen() {
         </View>
         )
       ) : selectMode ? null : (
-        <FlatList
+        <FlatList {...MOBILE_VIRTUAL_LIST_PROPS}
           ref={homemadeListRef}
           data={rows}
           keyExtractor={(item) => item.key}
@@ -937,7 +937,7 @@ export default function HomemadeScreen() {
 
       {/* 多选模式:平铺列表 + 勾选行 */}
       {ready && sorted.length > 0 && selectMode ? (
-        <FlatList
+        <FlatList {...MOBILE_VIRTUAL_LIST_PROPS}
           data={sorted}
           keyExtractor={(item) => item.id}
           contentContainerStyle={{
@@ -1657,3 +1657,4 @@ const styles = StyleSheet.create({
   selCheckWrap: { width: 34, alignItems: "flex-start", justifyContent: "center" },
 });
 import { useGuestGuard } from "@/hooks/use-guest-guard";
+import { MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS, MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";

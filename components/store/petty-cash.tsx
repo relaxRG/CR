@@ -21,6 +21,7 @@ import {
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { importIcostExcel } from "@/lib/store/icost-import";
 import { useColors } from "@/hooks/use-colors";
+import { MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS, MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
 
 // ─── iCost 背景色 ─────────────────────────────────────────────────────────────
 const ICOST_BG = "#F7F7F7"; // Manus背景色
@@ -447,7 +448,7 @@ export default function StorePettyCashScreen() {
 
   // ── 账本视图 ──────────────────────────────────────────────────────────────
   const renderLedger = () => (
-    <FlatList
+    <FlatList {...MOBILE_VIRTUAL_LIST_PROPS}
       data={ledgerGroups}
       keyExtractor={g => g.date}
       ListHeaderComponent={renderSummaryCard}

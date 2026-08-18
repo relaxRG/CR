@@ -25,6 +25,7 @@ import { WineSupplierTrendChart } from "@/components/wine-supplier-trend-chart";
 import { HorizontalLedgerColumn, HorizontalLedgerGroup, HorizontalLedgerTable } from "@/components/inventory/HorizontalLedgerTable";
 import { MonthlyLedgerDetailSheet } from "@/components/inventory/MonthlyLedgerDetailSheet";
 import { MonthlyLedgerItem } from "@/lib/inventory-core/types";
+import { MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS, MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
 
 type ViewTab = "ledger" | "supplier" | "purchase" | "summary";
 
@@ -779,7 +780,7 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
               </TouchableOpacity>
             </View>
           ) : (
-            <FlatList
+            <FlatList {...MOBILE_VIRTUAL_LIST_PROPS}
               data={monthPurchaseRecords}
               keyExtractor={(p) => p.id}
               renderItem={({ item: p }) => {

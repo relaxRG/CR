@@ -54,6 +54,7 @@ import { genId, FLAVOR_TAGS } from "@/lib/recipes/types";
 import { useRecipeStore } from "@/lib/recipes/store";
 import { Switch } from "react-native";
 import { LinkPickerSheet } from "@/components/link-picker-sheet";
+import { MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS, MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
 
 interface IngRow {
   id: string;
@@ -1824,7 +1825,7 @@ export default function HomemadeFormScreen() {
           })()}
 
           {fieldLabel(t("hmform.ingredients"))}
-          <NestableDraggableFlatList
+          <NestableDraggableFlatList {...MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS}
             data={ingRows}
             keyExtractor={(item) => item.id}
             renderItem={renderIngRow}
@@ -2170,7 +2171,7 @@ export default function HomemadeFormScreen() {
                       elevation: 4,
                     }}
                   >
-                    <FlatList
+                    <FlatList {...MOBILE_VIRTUAL_LIST_PROPS}
                       data={familyKeySuggestions}
                       keyExtractor={(item) => item}
                       keyboardShouldPersistTaps="always"

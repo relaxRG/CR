@@ -22,6 +22,7 @@ import { useLabStore } from "@/lib/lab/store";
 import { useGuestGuard } from "@/hooks/use-guest-guard";
 import { getLabTemplate } from "@/lib/lab/templates";
 import { LAB_STATUS_ORDER, LabProject, LabProjectStatus } from "@/lib/lab/types";
+import { MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS, MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
 
 const STATUS_COLORS: Record<LabProjectStatus, string> = {
   ideation: "#8B5CF6",
@@ -218,7 +219,7 @@ export function LabIndexScreen({ embedded = false }: { embedded?: boolean }) {
             </Text>
           </View>
         ) : (
-        <FlatList
+        <FlatList {...MOBILE_VIRTUAL_LIST_PROPS}
           ref={labListRef}
           data={rows}
           keyExtractor={(item) =>

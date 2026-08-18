@@ -70,6 +70,7 @@ import {
 } from "@/lib/recipes/types";
 import { FLAVOR_TAG_DEFAULT_COLORS } from "@/lib/settings/card-tags";
 import { parseFlavorDesc, buildFlavorDesc } from "@/lib/recipes/flavor-desc";
+import { MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS, MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
 
 function ChipGroup({
   options,
@@ -2266,7 +2267,7 @@ export default function RecipeFormScreen() {
 
           {/* Ingredients */}
           <Text className="text-[13px] text-muted uppercase mt-5 mb-2" style={{ letterSpacing: 0.4 }}>{t("form.ingredients")}</Text>
-          <NestableDraggableFlatList
+          <NestableDraggableFlatList {...MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS}
             data={ingredients}
             keyExtractor={(item) => item.id}
             renderItem={renderIngredientItem}

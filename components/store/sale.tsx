@@ -21,6 +21,7 @@ import { useMenuPackageStore, MenuPackage } from "@/lib/menu/package-store";
 import { WINE_STYLE_LABELS, WineStyle } from "@/lib/wine/types";
 import { FOOD_CATEGORY_LABELS, FoodCategory } from "@/lib/food/types";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS, MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
 
 type SaleCat = "cocktail" | "wine" | "food" | "package";
 const CATS: { key: SaleCat; label: string; emoji: string }[] = [
@@ -242,7 +243,7 @@ export default function StoreSaleScreen() {
             </TouchableOpacity>
           </View>
         ) : (
-          <FlatList
+          <FlatList {...MOBILE_VIRTUAL_LIST_PROPS}
             ref={saleListRef}
             data={cocktailItems}
             keyExtractor={(i) => i.id}
@@ -307,7 +308,7 @@ export default function StoreSaleScreen() {
               <Text style={[S.emptyDesc, { color: colors.muted }]}>在葡萄酒库中添加库存</Text>
             </View>
           ) : (
-            <FlatList
+            <FlatList {...MOBILE_VIRTUAL_LIST_PROPS}
               ref={saleListRef}
               data={wineItems}
               keyExtractor={(b) => b.id}
@@ -406,7 +407,7 @@ export default function StoreSaleScreen() {
               <Text style={[S.emptyDesc, { color: colors.muted }]}>在餐食 → 菜单中添加餐食</Text>
             </View>
           ) : (
-            <FlatList
+            <FlatList {...MOBILE_VIRTUAL_LIST_PROPS}
               ref={saleListRef}
               data={foodItems}
               keyExtractor={(i) => i.id}
@@ -478,7 +479,7 @@ export default function StoreSaleScreen() {
               <Text style={[S.emptyDesc, { color: colors.muted }]}>点击「新增套餐」创建组合套餐</Text>
             </View>
           ) : (
-            <FlatList
+            <FlatList {...MOBILE_VIRTUAL_LIST_PROPS}
               ref={saleListRef}
               data={packages}
               keyExtractor={(p) => p.id}

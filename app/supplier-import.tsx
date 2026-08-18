@@ -25,6 +25,7 @@ import {
   MatchConfidence, CONFIDENCE_LABELS, CONFIDENCE_COLORS,
   ParsedRow, SupplierImportPreview,
 } from "@/lib/store/supplier-import";
+import { MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS, MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
 
 const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
@@ -84,7 +85,7 @@ function IngredientPickerModal({
           <IconSymbol name="plus.circle.fill" size={16} color={colors.primary} />
           <Text style={[PM.createBtnText, { color: colors.primary }]}>新建原料条目</Text>
         </Pressable>
-        <FlatList
+        <FlatList {...MOBILE_VIRTUAL_LIST_PROPS}
           data={filtered}
           keyExtractor={(i) => i.id}
           renderItem={({ item }) => (
@@ -549,7 +550,7 @@ export default function SupplierImportScreen() {
           </View>
 
           {/* 列表 */}
-          <FlatList
+          <FlatList {...MOBILE_VIRTUAL_LIST_PROPS}
             data={rowStates}
             keyExtractor={(_, i) => String(i)}
             renderItem={renderRow}

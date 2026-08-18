@@ -41,6 +41,7 @@ import {
 import { displayNames } from "@/lib/utils";
 import { Bottle } from "@/lib/bottles/types";
 import { HomemadePrep } from "@/lib/homemade/types";
+import { MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS, MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
 
 // ─── 智能匹配工具 ─────────────────────────────────────────────────────────────
 
@@ -799,7 +800,7 @@ export default function ShoppingScreen() {
           </Text>
         </View>
       ) : (
-        <FlatList
+        <FlatList {...MOBILE_VIRTUAL_LIST_PROPS}
           data={displayItems}
           keyExtractor={({ agg }) => getItemKey(agg.name)}
           renderItem={({ item: { agg, saved } }) => (

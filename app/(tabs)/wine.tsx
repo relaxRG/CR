@@ -14,6 +14,7 @@ import { useWineStore } from "@/lib/wine/store";
 import { WineBottle, WINE_STYLE_LABELS } from "@/lib/wine/types";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
+import { MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS, MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
 
 type WineTab = "list" | "region" | "grape";
 
@@ -188,7 +189,7 @@ export default function WineScreen() {
           </Text>
         </View>
       ) : tab === "list" ? (
-        <FlatList
+        <FlatList {...MOBILE_VIRTUAL_LIST_PROPS}
           ref={wineListRef}
           data={filtered}
           keyExtractor={(b) => b.id}
@@ -198,7 +199,7 @@ export default function WineScreen() {
           scrollEventThrottle={100}
         />
       ) : tab === "region" ? (
-        <FlatList
+        <FlatList {...MOBILE_VIRTUAL_LIST_PROPS}
           ref={wineListRef}
           data={byRegion}
           keyExtractor={([key]) => key}
@@ -208,7 +209,7 @@ export default function WineScreen() {
           scrollEventThrottle={100}
         />
       ) : (
-        <FlatList
+        <FlatList {...MOBILE_VIRTUAL_LIST_PROPS}
           ref={wineListRef}
           data={byGrape}
           keyExtractor={([key]) => key}

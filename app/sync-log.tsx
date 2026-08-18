@@ -7,6 +7,7 @@ import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
 import { getSyncLog, subscribeSyncState, type SyncLogEntry } from "@/lib/sync/engine";
 import { useSync } from "@/lib/cf-sync/provider";
+import { MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS, MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
 
 type FilterKey = "all" | "error" | "conflict" | "backup" | "push" | "pull";
 
@@ -125,7 +126,7 @@ export default function SyncLogScreen() {
           </Text>
         </View>
       ) : (
-        <FlatList
+        <FlatList {...MOBILE_VIRTUAL_LIST_PROPS}
           data={filteredLog}
           keyExtractor={(_, i) => String(i)}
           contentContainerStyle={{ padding: 16, gap: 10 }}
