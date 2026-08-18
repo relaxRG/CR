@@ -3,7 +3,7 @@
  * 显示公司账户/私人账户/备用金账户/开店宝后台的期初/期末余额及差异分析
  */
 import React, { useState } from "react";
-import { ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { Alert, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { Platform } from "react-native";
@@ -14,6 +14,7 @@ import { useReportMonthNavigation } from "@/hooks/use-report-month-navigation";
 import { useMonthlySummaryStore } from "@/lib/store/monthly-summary/store";
 import { AccountBalance, AccountType, ACCOUNT_TYPE_COLORS, ACCOUNT_TYPE_LABELS } from "@/lib/store/monthly-summary/types";
 import BalanceModal from "@/components/store/balance-modal";
+import { useModuleMonthCloseStore } from "@/lib/month-close/module-month-close-store";
 
 export default function StoreAccountsScreen({ embedded = false }: { embedded?: boolean }) {
   const colors = useColors();
@@ -24,6 +25,13 @@ export default function StoreAccountsScreen({ embedded = false }: { embedded?: b
 
   const { month: selectedMonth, bounds: reportMonthBounds, selectMonth: setSelectedMonth } = useReportMonthNavigation();
 
+  const moduleClose = useModuleMonthCloseStore();
+  const accountCloseStatus = moduleClose.getStatus("accounts", selectedMonth);
+  const assertAccountsWritable = () => {
+    if (moduleClose.isWritable("accounts", selectedMonth)) return true;
+    Alert.alert("账户月份已归档", `${selectedMonth} 账户已归档。请先在账户模块开启调整，不能直接修改历史余额。`);
+    return false;
+  };
   const balances = getBalancesForMonth(selectedMonth);
   const report = reports?.find((r) => r.month === selectedMonth);
   const allItems = [...(report?.lineItems ?? []), ...(report?.manualItems ?? [])];
@@ -45,6 +53,28 @@ export default function StoreAccountsScreen({ embedded = false }: { embedded?: b
           bounds={reportMonthBounds}
           onChange={setSelectedMonth}
         />}
+
+        <View style={{ flexDirection: "row", justifyContent: "flex-end", marginBottom: 10 }}>
+          <TouchableOpacity onPress={() => {
+            if (!assertAccountsWritable()) return;
+            Alert.alert("账户月度归档", `确认归档 ${selectedMonth} 账户余额？归档后需先开启调整才能修改。`, [
+              { text: "取消", style: "cancel" },
+              { text: "确认归档", onPress: () => {
+                moduleClose.finalize({
+                  module: "accounts",
+                  month: selectedMonth,
+                  snapshot: { month: selectedMonth, balances, netProfit },
+                  paymentSummary: { payable: 0, paid: 0, remaining: 0 },
+                });
+                Alert.alert("归档完成", `${selectedMonth} 账户已独立归档。`);
+              } },
+            ]);
+          }} style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: accountCloseStatus === "draft" ? colors.primary + "12" : colors.success + "14" }}>
+            <Text style={{ color: accountCloseStatus === "draft" ? colors.primary : colors.success, fontSize: 12, fontWeight: "700" }}>
+              {accountCloseStatus === "draft" ? "归档本月账户" : "账户已归档"}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         {/* 净利润参考 */}
         <View style={{ borderRadius: 10, borderWidth: 1, padding: 12, marginBottom: 12,
@@ -111,6 +141,7 @@ export default function StoreAccountsScreen({ embedded = false }: { embedded?: b
                   )}
                 </View>
                 <TouchableOpacity onPress={() => {
+                  if (!assertAccountsWritable()) return;
                   tap();
                   setBalanceAccountType(at);
                   setEditingBalance(bal ?? null);
@@ -143,7 +174,7 @@ export default function StoreAccountsScreen({ embedded = false }: { embedded?: b
         accountType={balanceAccountType}
         month={selectedMonth}
         colors={colors}
-        onSave={(bal) => { upsertBalance(bal); setShowBalanceModal(false); }}
+        onSave={(bal) => { if (!assertAccountsWritable()) return; upsertBalance(bal); setShowBalanceModal(false); }}
         onClose={() => setShowBalanceModal(false)}
       />
     </>

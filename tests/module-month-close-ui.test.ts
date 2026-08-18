@@ -35,6 +35,15 @@ describe("模块独立月结界面接入", () => {
     expect(food).toContain("recordStocktake");
   });
 
+  it("账户归档只保护账户余额录入，不锁工资、库存或备用金", () => {
+    const accounts = read("components/store/accounts.tsx");
+    expect(accounts).toContain('moduleClose.getStatus("accounts", selectedMonth)');
+    expect(accounts).toContain('moduleClose.isWritable("accounts", selectedMonth)');
+    expect(accounts).toContain('module: "accounts"');
+    expect(accounts).toContain("snapshot: { month: selectedMonth, balances, netProfit }");
+    expect(accounts).toContain("if (!assertAccountsWritable()) return;");
+  });
+
   it("备用金归档只冻结备用金账本，并统一保护导入、编辑、期初和删除", () => {
     const petty = read("components/store/petty-cash.tsx");
     expect(petty).toContain('moduleClose.getStatus("petty_cash", month)');
