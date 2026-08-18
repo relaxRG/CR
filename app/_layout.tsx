@@ -233,7 +233,6 @@ export default function RootLayout() {
               <Stack.Screen name="wine-inventory" />
               <Stack.Screen name="wine-inventory-import" options={{ presentation: "modal" }} />
               <Stack.Screen name="spirits-inventory" />
-              <Stack.Screen name="monthly-report" />
               <Stack.Screen name="monthly-report-import" options={{ presentation: "modal" }} />
               <Stack.Screen name="labor" />
               <Stack.Screen name="labor-employees" />
