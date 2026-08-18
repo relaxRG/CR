@@ -9,6 +9,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
 import * as Device from "expo-device";
 import { Platform } from "react-native";
+import { resolveSyncDevicePlatform, type SyncDevicePlatform } from "@/lib/sync/device-platform";
 
 export const CF_WORKER_URL = "https://cocktail-ai.kikikong2017.workers.dev";
 // AsyncStorage keys for device identity
@@ -96,6 +97,20 @@ function getWebMemoryTicket(deviceId: string | null): string | undefined {
 
 // ─── Device info ──────────────────────────────────────────────────────────────
 export type DeviceRole = "owner" | "collaborator" | "guest";
+
+/**
+ * 同步身份的平台分类必须优先使用expo-device的硬件类型，而不是只看Platform.OS。
+ * Apple Silicon Mac运行iOS应用时Platform.OS仍可能是ios；deviceType=DESKTOP才是权威信号。
+ */
+export function getSyncDevicePlatform(): SyncDevicePlatform {
+  return resolveSyncDevicePlatform({
+    nativePlatform: Platform.OS,
+    deviceType: Device.deviceType,
+    desktopType: Device.DeviceType.DESKTOP,
+    osName: Device.osName,
+    modelName: Device.modelName,
+  });
+}
 
 export type DeviceInfo = {
   deviceId: string;
@@ -207,7 +222,7 @@ export async function createNewSyncGroup(deviceName?: string): Promise<DeviceInf
 
   const res = await cfFetch("/api/device/register", {
     method: "POST",
-    body: JSON.stringify({ deviceId, deviceName: name, platform: Platform.OS }),
+    body: JSON.stringify({ deviceId, deviceName: name, platform: getSyncDevicePlatform() }),
   });
 
   if (!res.ok) {
@@ -233,11 +248,16 @@ export async function createNewSyncGroup(deviceName?: string): Promise<DeviceInf
  * 用户后续改名会永久覆盖该建议值，身份与令牌始终保持独立。
  */
 export function getSuggestedDeviceName(): string {
+  const platform = getSyncDevicePlatform();
   const modelName = typeof Device.modelName === "string" ? Device.modelName.trim() : "";
+  // iOS-on-Mac有时会回报通用iPad型号；桌面硬件判定优先，防止初始名称误导用户。
+  if (platform === "macos") {
+    return /^ipad\b/i.test(modelName) || !modelName ? "Mac" : modelName.slice(0, 40);
+  }
   if (modelName) return modelName.slice(0, 40);
-  if (Platform.OS === "ios") return "iPhone";
-  if (Platform.OS === "android") return "Android";
-  if (Platform.OS === "web") return "Web 浏览器";
+  if (platform === "ios") return "iPhone";
+  if (platform === "android") return "Android";
+  if (platform === "web") return "Web 浏览器";
   return "设备";
 }
 
@@ -284,7 +304,7 @@ export async function pairWithCode(
 
   const res = await cfFetch("/api/device/pair", {
     method: "POST",
-    body: JSON.stringify({ code, deviceId, deviceName: name, platform: Platform.OS }),
+    body: JSON.stringify({ code, deviceId, deviceName: name, platform: getSyncDevicePlatform() }),
   });
 
   if (!res.ok) {
@@ -354,7 +374,7 @@ export async function recoverJoinWithCode(input: {
   const deviceName = input.deviceName?.trim() || getSuggestedDeviceName();
   const res = await cfFetch("/api/device/recover-join", {
     method: "POST",
-    body: JSON.stringify({ deviceId, deviceName, platform: Platform.OS, code: input.code }),
+    body: JSON.stringify({ deviceId, deviceName, platform: getSyncDevicePlatform(), code: input.code }),
   });
   if (!res.ok) return readError(res, `RECOVERY_JOIN_FAILED_${res.status}`);
   const data = await res.json() as { membership: DeviceInfo };
@@ -362,6 +382,18 @@ export async function recoverJoinWithCode(input: {
     throw new Error("RECOVERY_MEMBERSHIP_INVALID");
   }
   return data.membership;
+}
+
+/** 仅更新服务端展示元数据；不会修改本地名称、角色、组或权限。 */
+export async function refreshCurrentDevicePlatform(): Promise<void> {
+  const deviceInfo = await getDeviceInfo();
+  if (!deviceInfo) return;
+  const res = await cfFetch("/api/device/update-metadata", {
+    method: "POST",
+    deviceInfo,
+    body: JSON.stringify({ platform: getSyncDevicePlatform() }),
+  });
+  if (!res.ok) return;
 }
 
 export async function prepareGroupSwitch(input: {
@@ -433,6 +465,7 @@ export async function pullCompleteTargetSnapshot(membership: DeviceInfo): Promis
 export type RemoteDevice = {
   id: string;
   name: string;
+  platform: SyncDevicePlatform;
   role: DeviceRole;
   allowedKeys: string[] | null;
   last_seen: number | null;

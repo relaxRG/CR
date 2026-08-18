@@ -18,10 +18,10 @@ describe("设备权限授予后的刷新与服务端边界", () => {
   it("Worker必须按当前设备授权过滤拉取、墓碑和推送，客户端不能单独承担安全边界", () => {
     const worker = source("workers/cocktail-ai/worker-v4.js");
 
-    expect(worker).toContain("new Set(Array.isArray(pullAllowedKeys) ? pullAllowedKeys : [])");
+    expect(worker).toContain("!Array.isArray(pullAllowedKeys) ? null");
     expect(worker).toContain("allowedSet.has(r.storage_key)");
     expect(worker).toContain("allowedSet.has(t.storage_key)");
-    expect(worker).toContain("const writableEntries = device.role === \"collaborator\"");
+    expect(worker).toContain("device.role === \"collaborator\" && Array.isArray(serverAllowedKeys)");
     expect(worker).toContain("serverAllowedKeys.includes(entry?.storageKey)");
   });
 

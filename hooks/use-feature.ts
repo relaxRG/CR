@@ -17,7 +17,7 @@
  */
 import { useMemo } from "react";
 import { useSync } from "@/lib/cf-sync/provider";
-import { FEATURE_MODULES, type FeatureKey } from "@/lib/sync/feature-modules";
+import { hasFeaturePermission, type FeatureKey } from "@/lib/sync/feature-modules";
 
 export interface UseFeatureResult {
   /** 当前设备是否有权访问该模块（owner 始终 true，未登录始终 false） */
@@ -44,14 +44,13 @@ export function useFeature(): UseFeatureResult {
     const isOwner = deviceRole === "owner";
     const isGuest = deviceRole === "guest";
     const isAuthenticated = !!deviceInfo;
-    const allowedKeys: string[] = deviceInfo?.allowedKeys ?? [];
+    // null 是“无限制/全部模块”，而不是空数组。权限编辑页已按此语义写入服务端。
+    const allowedKeys = deviceInfo?.allowedKeys ?? null;
 
     function hasFeature(feature: FeatureKey): boolean {
       if (!isAuthenticated) return false;
-      if (isOwner) return true;
-      const mod = FEATURE_MODULES.find((m) => m.key === feature);
-      if (!mod) return false;
-      return mod.storageKeys.some((k) => allowedKeys.includes(k));
+      if (isOwner || allowedKeys === null) return true;
+      return hasFeaturePermission(allowedKeys, feature);
     }
 
     function canWrite(feature: FeatureKey): boolean {

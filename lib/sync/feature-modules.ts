@@ -42,6 +42,19 @@ export interface FeatureModule {
   storageKeys: string[];
 }
 
+/**
+ * null 表示无限制的全功能授权；只有非空数组才按存储键逐项限制。
+ * 此函数是设备设置、页面守卫与回归测试共同使用的语义来源。
+ */
+export function hasFeaturePermission(
+  allowedKeys: string[] | null,
+  feature: FeatureKey,
+): boolean {
+  if (allowedKeys === null) return true;
+  const module = FEATURE_MODULES.find((item) => item.key === feature);
+  return !!module && module.storageKeys.some((storageKey) => allowedKeys.includes(storageKey));
+}
+
 export const FEATURE_MODULES: FeatureModule[] = [
   {
     key: "recipes",

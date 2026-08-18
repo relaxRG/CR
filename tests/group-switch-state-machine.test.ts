@@ -63,6 +63,7 @@ vi.mock("@/lib/sync/engine", () => ({
 }));
 vi.mock("@/lib/cf-sync/client", () => ({
   getDeviceInfo: vi.fn(async () => currentMember),
+  getSyncDevicePlatform: vi.fn(() => "ios"),
   prepareGroupSwitch: vi.fn(async () => {
     calls.push("prepare");
     return { switchId: "switch-a-b", recoveryTicket: "ticket-" + "x".repeat(32), target: { groupId: "group-b", role: "collaborator", expiresAt: 1 } };

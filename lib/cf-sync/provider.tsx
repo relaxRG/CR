@@ -19,6 +19,7 @@ import {
   clearDeviceInfo,
   createNewSyncGroup,
   getDeviceInfo,
+  refreshCurrentDevicePlatform,
   saveDeviceInfo,
   type DeviceInfo,
   type DeviceRole,
@@ -121,9 +122,10 @@ export function SyncProvider({
     async (entries: { storageKey: string; value: string; clientUpdatedAt: number }[]) => {
       // Collaborator devices: filter entries to only allowed keys
       const info = deviceInfo;
+      const allowedKeys = info?.allowedKeys;
       const filtered =
-        info && info.role === "collaborator" && Array.isArray(info.allowedKeys)
-          ? entries.filter((e) => (info.allowedKeys as string[]).includes(e.storageKey))
+        info && info.role === "collaborator" && Array.isArray(allowedKeys)
+          ? entries.filter((e) => allowedKeys.includes(e.storageKey))
           : entries;
       if (filtered.length === 0) return;
       await cfPush(filtered);
@@ -265,6 +267,8 @@ export function SyncProvider({
         await saveDeviceInfo(effectiveInfo);
         setDeviceInfo(effectiveInfo);
       }
+      // 历史iOS-on-Mac记录会在下次成功同步时只更新平台展示元数据，不改名称、角色或权限。
+      void refreshCurrentDevicePlatform();
       if (effectiveInfo.role !== "owner") {
         void checkAndNotifyPermissionChange(effectiveInfo.allowedKeys);
       }

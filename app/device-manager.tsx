@@ -68,6 +68,19 @@ const ROLE_DESC: Record<DeviceRole, { zh: string; en: string }> = {
   guest: { zh: "只读，不同步回主设备", en: "Read-only, no push back" },
 };
 
+const PLATFORM_LABELS: Record<string, { zh: string; en: string }> = {
+  ios: { zh: "iPhone / iPad", en: "iPhone / iPad" },
+  android: { zh: "Android", en: "Android" },
+  macos: { zh: "Mac", en: "Mac" },
+  web: { zh: "Web", en: "Web" },
+  unknown: { zh: "未知设备", en: "Unknown device" },
+};
+
+function platformLabel(platform: string | undefined, lang: string): string {
+  const label = PLATFORM_LABELS[platform ?? "unknown"] ?? PLATFORM_LABELS.unknown;
+  return lang === "zh" ? label.zh : label.en;
+}
+
 // ─── 快捷预设定义 ────────────────────────────────────────────────────────────────────────────────
 const INVITE_PRESETS: {
   labelZh: string;
@@ -1072,6 +1085,7 @@ export default function DeviceManagerScreen() {
                     <Text style={[styles.deviceRowRole, { color: ROLE_LABELS[item.role].color }]}>
                       {lang === "zh" ? ROLE_LABELS[item.role].zh : ROLE_LABELS[item.role].en}
                       {customRoleNames[item.id] ? `（${customRoleNames[item.id]}）` : ""}
+                      {` · ${platformLabel(item.platform, lang)}`}
                     </Text>
                   </View>
                  {isOwner && !item.isCurrentDevice && (

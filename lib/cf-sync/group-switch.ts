@@ -15,6 +15,7 @@ import {
   commitGroupSwitch,
   getDeviceInfo,
   getGroupSwitchStatus,
+  getSyncDevicePlatform,
   prepareGroupSwitch,
   pullCompleteTargetSnapshot,
   recoverJoinWithCode,
@@ -173,7 +174,7 @@ export async function switchToAnotherGroup(
     preparation = await prepareGroupSwitch({
       ...input,
       deviceName: source.deviceName,
-      platform: Platform.OS,
+      platform: getSyncDevicePlatform(),
     });
     await appendGroupSwitchDiagnostic({
       event: "switch_prepared",

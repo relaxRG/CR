@@ -1402,9 +1402,9 @@ async function handleSyncPull(env, body, headers, origin) {
   ).bind(device.group_id).all();
   let pullAllowedKeys = null;
   try { pullAllowedKeys = device.allowed_keys ? JSON.parse(device.allowed_keys) : null; } catch {}
-  // 权限必须在服务端生效：协作/访客设备只可读取明确授权的存储键。
-  const allowedSet = device.role === "owner" ? null : new Set(Array.isArray(pullAllowedKeys) ? pullAllowedKeys : []);
-  const canWrite = device.role === "owner" || (device.role === "collaborator" && allowedSet.size > 0);
+  // null = 全功能，不是空权限；只有明确数组才启用逐键过滤。
+  const allowedSet = device.role === "owner" || !Array.isArray(pullAllowedKeys) ? null : new Set(pullAllowedKeys);
+  const canWrite = device.role === "owner" || device.role === "collaborator";
   const camelEntries = (rows.results || [])
     .filter((r) => !allowedSet || allowedSet.has(r.storage_key))
     .map((r) => ({
@@ -1438,8 +1438,8 @@ async function handleSyncPush(env, body, headers, origin) {
   if (!Array.isArray(entries)) return err("entries required", 400, origin);
   let serverAllowedKeys = null;
   try { serverAllowedKeys = device.allowed_keys ? JSON.parse(device.allowed_keys) : null; } catch {}
-  const writableEntries = device.role === "collaborator"
-    ? entries.filter((entry) => Array.isArray(serverAllowedKeys) && serverAllowedKeys.includes(entry?.storageKey))
+  const writableEntries = device.role === "collaborator" && Array.isArray(serverAllowedKeys)
+    ? entries.filter((entry) => serverAllowedKeys.includes(entry?.storageKey))
     : entries;
   let pushed = 0;
   for (const entry of writableEntries.slice(0, 40)) {
@@ -1818,6 +1818,18 @@ async function handleSyncCompleteSnapshot(env, headers, origin) {
   return json({ groupId: device.group_id, revision, complete: true, presentKeys: entries.map((entry) => entry.storageKey), entries }, 200, origin);
 }
 
+function normalizeDevicePlatform(value) {
+  return ["ios", "android", "web", "macos", "unknown"].includes(value) ? value : "unknown";
+}
+
+async function handleDeviceUpdateMetadata(env, body, headers, origin) {
+  const device = await verifyRequestDevice(env, headers);
+  if (!device) return err("DEVICE_AUTH_UNAUTHORIZED", 401, origin);
+  const platform = normalizeDevicePlatform(body?.platform);
+  await env.DB.prepare("UPDATE devices SET platform = ? WHERE device_id = ? AND group_id = ? AND is_active = 1").bind(platform, device.device_id, device.group_id).run();
+  return json({ platform }, 200, origin);
+}
+
 async function handleDeviceRegister(env, body, origin) {
   const { deviceName, platform } = body || {};
   const deviceId = (body && typeof body.deviceId === "string" && body.deviceId.length >= 8 && body.deviceId.length <= 64) ? body.deviceId : generateToken().slice(0, 16);
@@ -1828,7 +1840,7 @@ async function handleDeviceRegister(env, body, origin) {
   ).bind(groupId, deviceId, Date.now()).run();
   await env.DB.prepare(
     "INSERT INTO devices (device_id, group_id, token, name, platform, role, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?)"
-  ).bind(deviceId, groupId, token, deviceName || "Unknown", platform || "ios", "owner", Date.now()).run();
+  ).bind(deviceId, groupId, token, deviceName || "Unknown", normalizeDevicePlatform(platform), "owner", Date.now()).run();
   const membership = { deviceId, deviceToken: token, groupId, role: "owner", allowedKeys: null, deviceName: deviceName || "Unknown" };
   return deviceMembershipResponse(env, membership, origin, platform === "web");
 }
@@ -1862,7 +1874,7 @@ async function handleDevicePair(env, body, origin) {
   const token = generateToken();
   await env.DB.prepare(
     "INSERT INTO devices (device_id, group_id, token, name, platform, role, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?)"
-  ).bind(deviceId, pairRow.group_id, token, deviceName || "Unknown", platform || "ios", pairRow.role, Date.now()).run();
+  ).bind(deviceId, pairRow.group_id, token, deviceName || "Unknown", normalizeDevicePlatform(platform), pairRow.role, Date.now()).run();
   await env.DB.prepare("UPDATE pair_codes SET used = 1 WHERE code = ?").bind(code).run();
   let pairAllowedKeys = null;
   try { pairAllowedKeys = pairRow.allowed_keys ? JSON.parse(pairRow.allowed_keys) : null; } catch {}
@@ -2247,6 +2259,11 @@ var worker_v3_default = {
     }
     if (path === "/api/device/list" && method === "GET") {
       return handleDeviceList(env, request.headers, origin);
+    }
+    if (path === "/api/device/update-metadata" && method === "POST") {
+      let body = {};
+      try { body = await request.json(); } catch {}
+      return handleDeviceUpdateMetadata(env, body, request.headers, origin);
     }
     if (path === "/api/device/rename" && method === "POST") {
       let body = {};
