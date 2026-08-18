@@ -1,7 +1,7 @@
 {
   "version": 1,
   "generatedFrom": "docs/local-storage-schema.json",
-  "entryCount": 127,
+  "entryCount": 128,
   "dynamicEntryCount": 25,
   "entries": [
     {
@@ -186,6 +186,25 @@
       ],
       "operations": [
         "getItem",
+        "setItem"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "startup-ttl",
+        "leave-group"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "backup.restore.journal.v1",
+      "status": "resolved",
+      "classification": "S3-diagnostic",
+      "ownerFiles": [
+        "lib/backup/local-backup.ts"
+      ],
+      "operations": [
+        "getItem",
+        "removeItem",
         "setItem"
       ],
       "dynamic": false,
@@ -1457,6 +1476,7 @@
       "status": "unresolved",
       "classification": "S0-public",
       "ownerFiles": [
+        "lib/backup/local-backup.ts",
         "lib/sync/engine.ts"
       ],
       "operations": [

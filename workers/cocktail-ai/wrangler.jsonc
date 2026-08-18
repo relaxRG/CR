@@ -1,0 +1,39 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "cocktail-ai",
+  "main": "worker-v4.js",
+  "compatibility_date": "2026-08-18",
+  "account_id": "c079066172316a7f47847b1277208cec",
+  "workers_dev": true,
+  "keep_vars": true,
+
+  // 此文件是生产配置模板。部署前必须把尖括号内容替换为Cloudflare Dashboard中已存在资源的ID。
+  // 不要在此文件写入API Token、设备token、配对码、模型API key或邮件密钥。
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "cocktail-r-db",
+      "database_id": "<EXISTING_D1_DATABASE_ID>",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  "kv_namespaces": [
+    {
+      "binding": "CACHE",
+      "id": "<EXISTING_KV_NAMESPACE_ID>"
+    }
+  ],
+
+  "ai": {
+    "binding": "AI"
+  },
+
+  // Dashboard既有变量和Secrets由 keep_vars 保留：
+  // ALERT_EMAIL、DEEPSEEK_API_KEY、GEMINI_API_KEY、QWEN_API_KEY。
+  // 只有在将变量迁入仓库管理后，才可以显式声明非敏感 vars。
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 0.1
+  }
+}

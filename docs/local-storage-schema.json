@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-18T08:16:57.305Z",
+  "generatedAt": "2026-08-18T08:48:32.186Z",
   "records": [
     {
       "backend": "AsyncStorage",
@@ -16,16 +16,16 @@
         {
           "operation": "multiGet",
           "file": "lib/backup/local-backup.ts",
-          "line": 151,
+          "line": 172,
           "value": "",
-          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
         {
           "operation": "multiGet",
           "file": "lib/backup/local-backup.ts",
-          "line": 495,
+          "line": 564,
           "value": "",
-          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         }
       ]
     },
@@ -86,16 +86,16 @@
         {
           "operation": "setItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 117,
+          "line": 125,
           "value": "json.slice(index * CHUNK_SIZE_LIMIT",
-          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
         {
           "operation": "getItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 131,
+          "line": 139,
           "value": "",
-          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         }
       ]
     },
@@ -107,51 +107,51 @@
         {
           "operation": "getItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 100,
+          "line": 108,
           "value": "",
-          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
         {
           "operation": "setItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 119,
+          "line": 127,
           "value": "String(chunks",
-          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
         {
           "operation": "getItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 125,
+          "line": 133,
           "value": "",
-          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
         {
           "operation": "setItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 170,
+          "line": 191,
           "value": "snapshotJson",
-          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
         {
           "operation": "removeItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 213,
+          "line": 235,
           "value": "",
-          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
         {
           "operation": "getItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 265,
+          "line": 286,
           "value": "",
-          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
         {
           "operation": "removeItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 323,
+          "line": 392,
           "value": "",
-          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         }
       ]
     },
@@ -163,16 +163,16 @@
         {
           "operation": "setItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 216,
+          "line": 238,
           "value": "chunk",
-          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
         {
           "operation": "getItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 241,
+          "line": 263,
           "value": "",
-          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         }
       ]
     },
@@ -184,23 +184,23 @@
         {
           "operation": "setItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 218,
+          "line": 240,
           "value": "String(chunks",
-          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
         {
           "operation": "getItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 224,
+          "line": 246,
           "value": "",
-          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
         {
           "operation": "getItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 236,
+          "line": 258,
           "value": "",
-          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         }
       ]
     },
@@ -289,23 +289,58 @@
         {
           "operation": "getItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 83,
+          "line": 91,
           "value": "",
-          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
         {
           "operation": "setItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 204,
+          "line": 226,
           "value": "JSON.stringify(newMeta",
-          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
         {
           "operation": "setItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 327,
+          "line": 396,
           "value": "JSON.stringify(meta",
-          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "backup.restore.journal.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/backup/local-backup.ts",
+          "line": 326,
+          "value": "",
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
+        },
+        {
+          "operation": "removeItem",
+          "file": "lib/backup/local-backup.ts",
+          "line": 334,
+          "value": "",
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/backup/local-backup.ts",
+          "line": 366,
+          "value": "JSON.stringify(journal",
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
+        },
+        {
+          "operation": "removeItem",
+          "file": "lib/backup/local-backup.ts",
+          "line": 370,
+          "value": "",
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         }
       ]
     },
@@ -317,16 +352,16 @@
         {
           "operation": "setItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 112,
+          "line": 120,
           "value": "json",
-          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
         {
           "operation": "getItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 137,
+          "line": 145,
           "value": "",
-          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         }
       ]
     },
@@ -1696,9 +1731,9 @@
         {
           "operation": "setItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 579,
+          "line": 648,
           "value": "value",
-          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
         {
           "operation": "setItem",
@@ -1857,16 +1892,23 @@
         {
           "operation": "multiRemove",
           "file": "lib/backup/local-backup.ts",
-          "line": 104,
+          "line": 112,
           "value": "",
-          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
         {
           "operation": "multiRemove",
           "file": "lib/backup/local-backup.ts",
-          "line": 229,
+          "line": 251,
           "value": "",
-          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
+        },
+        {
+          "operation": "multiGet",
+          "file": "lib/backup/local-backup.ts",
+          "line": 360,
+          "value": "",
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         }
       ]
     },
@@ -2430,6 +2472,20 @@
       "calls": [
         {
           "operation": "multiRemove",
+          "file": "lib/backup/local-backup.ts",
+          "line": 320,
+          "value": "",
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
+        },
+        {
+          "operation": "multiRemove",
+          "file": "lib/backup/local-backup.ts",
+          "line": 368,
+          "value": "",
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
+        },
+        {
+          "operation": "multiRemove",
           "file": "lib/sync/engine.ts",
           "line": 506,
           "value": "",
@@ -2963,9 +3019,9 @@
         {
           "operation": "multiGet",
           "file": "lib/backup/local-backup.ts",
-          "line": 396,
+          "line": 465,
           "value": "",
-          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         }
       ]
     },
@@ -3327,9 +3383,16 @@
         {
           "operation": "multiSet",
           "file": "lib/backup/local-backup.ts",
-          "line": 309,
+          "line": 321,
           "value": "",
-          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
+        },
+        {
+          "operation": "multiSet",
+          "file": "lib/backup/local-backup.ts",
+          "line": 369,
+          "value": "",
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
         {
           "operation": "multiSet",
@@ -3357,16 +3420,16 @@
         {
           "operation": "multiGet",
           "file": "lib/backup/local-backup.ts",
-          "line": 151,
+          "line": 172,
           "value": "",
-          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
         {
           "operation": "multiGet",
           "file": "lib/backup/local-backup.ts",
-          "line": 495,
+          "line": 564,
           "value": "",
-          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         }
       ]
     },
@@ -3427,16 +3490,16 @@
         {
           "operation": "setItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 112,
+          "line": 120,
           "value": "json",
-          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
         {
           "operation": "getItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 137,
+          "line": 145,
           "value": "",
-          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         }
       ]
     },
@@ -3546,9 +3609,9 @@
         {
           "operation": "setItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 579,
+          "line": 648,
           "value": "value",
-          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
         {
           "operation": "setItem",
@@ -3707,16 +3770,23 @@
         {
           "operation": "multiRemove",
           "file": "lib/backup/local-backup.ts",
-          "line": 104,
+          "line": 112,
           "value": "",
-          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
         {
           "operation": "multiRemove",
           "file": "lib/backup/local-backup.ts",
-          "line": 229,
+          "line": 251,
           "value": "",
-          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
+        },
+        {
+          "operation": "multiGet",
+          "file": "lib/backup/local-backup.ts",
+          "line": 360,
+          "value": "",
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         }
       ]
     },
@@ -3725,6 +3795,20 @@
       "key": "removals",
       "status": "unresolved",
       "calls": [
+        {
+          "operation": "multiRemove",
+          "file": "lib/backup/local-backup.ts",
+          "line": 320,
+          "value": "",
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
+        },
+        {
+          "operation": "multiRemove",
+          "file": "lib/backup/local-backup.ts",
+          "line": 368,
+          "value": "",
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
+        },
         {
           "operation": "multiRemove",
           "file": "lib/sync/engine.ts",
@@ -3763,9 +3847,9 @@
         {
           "operation": "multiGet",
           "file": "lib/backup/local-backup.ts",
-          "line": 396,
+          "line": 465,
           "value": "",
-          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         }
       ]
     },
@@ -3910,9 +3994,16 @@
         {
           "operation": "multiSet",
           "file": "lib/backup/local-backup.ts",
-          "line": 309,
+          "line": 321,
           "value": "",
-          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
+        },
+        {
+          "operation": "multiSet",
+          "file": "lib/backup/local-backup.ts",
+          "line": 369,
+          "value": "",
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
         {
           "operation": "multiSet",

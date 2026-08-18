@@ -13,21 +13,29 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import { Platform } from "react-native";
 import {
+  createStaticSnapshotV2KeyResolver,
   decryptSnapshotV2,
   migrateSnapshotV1ToEncryptedV2,
   type EncryptedSnapshotV2,
   type SnapshotV2Crypto,
+  type SnapshotV2KeyResolver,
 } from "@/lib/backup/snapshot-v2";
 
 const SNAPSHOT_PREFIX = "backup.snapshot.";
 const SNAPSHOT_V2_PREFIX = "backup.snapshot.v2.";
 const SNAPSHOT_META_KEY = "backup.meta";
 const V1_FALLBACK_RETAIN_MS = 30 * 24 * 60 * 60 * 1000;
-let snapshotV2Crypto: SnapshotV2Crypto | null = null;
+const SNAPSHOT_RESTORE_JOURNAL_KEY = "backup.restore.journal.v1";
+let snapshotV2KeyResolver: SnapshotV2KeyResolver | null = null;
 
-/** 原生AES-GCM提供器接入后由应用启动层注入；未注入时不会伪造V2加密快照。 */
+/** 旧单密钥注入入口保留为安全适配；正式原生模块应改用configureSnapshotV2KeyResolver。 */
 export function configureSnapshotV2Crypto(crypto: SnapshotV2Crypto | null): void {
-  snapshotV2Crypto = crypto;
+  snapshotV2KeyResolver = crypto ? createStaticSnapshotV2KeyResolver(crypto) : null;
+}
+
+/** 原生AES-GCM提供器接入后由应用启动层注入；支持密钥轮换后读取历史V2快照。 */
+export function configureSnapshotV2KeyResolver(resolver: SnapshotV2KeyResolver | null): void {
+  snapshotV2KeyResolver = resolver;
 }
 const MAX_SNAPSHOTS = 7; // ★ 升级：3 → 7 个循环快照
 const CHUNK_SIZE_LIMIT = 1.5 * 1024 * 1024; // ★ 1.5MB 分片阈値（防 AsyncStorage 2MB 上限）
@@ -141,8 +149,21 @@ async function readSnapshotV2(slot: number): Promise<EncryptedSnapshotV2 | null>
   }
 }
 
+async function decryptSnapshotV2ForSlot(slot: number, encrypted: EncryptedSnapshotV2): Promise<Record<string, string | null>> {
+  if (!snapshotV2KeyResolver) throw new Error("SNAPSHOT_V2_KEY_RESOLVER_UNAVAILABLE");
+  const crypto = await snapshotV2KeyResolver.getByKeyId(encrypted.keyId);
+  if (!crypto) throw new Error("SNAPSHOT_V2_KEY_UNAVAILABLE");
+  const meta = await getSnapshotMeta();
+  const mirror = meta.slots[slot];
+  if (!mirror || mirror.createdAt !== encrypted.source.createdAt || mirror.hash !== encrypted.source.hash) {
+    throw new Error("SNAPSHOT_V2_MIRROR_STALE");
+  }
+  return decryptSnapshotV2(encrypted, crypto);
+}
+
 /** 创建新快照（循环覆盖最旧的槽位） */
 export async function createSnapshot(): Promise<SnapshotMeta> {
+  await recoverPendingSnapshotRestore();
   await retireVerifiedV1Snapshots();
   const meta = await getSnapshotMeta();
   const slot = meta.currentSlot % MAX_SNAPSHOTS;
@@ -173,11 +194,12 @@ export async function createSnapshot(): Promise<SnapshotMeta> {
   // V2 双写只在受审查的原生 AES-GCM 提供器已注入时发生。写入后立即解密验证；
   // V2认证失败时不删除V1，避免生成不可恢复的唯一快照。
   let v2State: "verified" | "unavailable" | "failed" = "unavailable";
-  if (snapshotV2Crypto) {
+  if (snapshotV2KeyResolver) {
     try {
-      const encrypted = await migrateSnapshotV1ToEncryptedV2(snapshot, snapshotV2Crypto);
+      const crypto = await snapshotV2KeyResolver.getActive();
+      const encrypted = await migrateSnapshotV1ToEncryptedV2(snapshot, crypto);
       await writeSnapshotV2(slot, encrypted);
-      const verified = await decryptSnapshotV2(encrypted, snapshotV2Crypto);
+      const verified = await decryptSnapshotV2(encrypted, crypto);
       if (Object.keys(verified).length !== encrypted.manifest.keyCount) throw new Error("SNAPSHOT_V2_VERIFY_COUNT_MISMATCH");
       v2State = "verified";
     } catch {
@@ -252,9 +274,8 @@ async function readSnapshotChunked(slot: number): Promise<string | null> {
 export async function readSnapshot(slot: number): Promise<Snapshot | null> {
   const encrypted = await readSnapshotV2(slot);
   if (encrypted) {
-    if (!snapshotV2Crypto) return null;
-    const data = await decryptSnapshotV2(encrypted, snapshotV2Crypto);
-    return { createdAt: encrypted.createdAt, hash: `v2:${encrypted.keyId}`, data };
+    const data = await decryptSnapshotV2ForSlot(slot, encrypted);
+    return { createdAt: encrypted.createdAt, hash: encrypted.source.hash, data };
   }
   try {
     const meta = await getSnapshotMeta();
@@ -274,8 +295,7 @@ export async function verifySnapshot(slot: number): Promise<boolean> {
   try {
     const encrypted = await readSnapshotV2(slot);
     if (encrypted) {
-      if (!snapshotV2Crypto) return false;
-      await decryptSnapshotV2(encrypted, snapshotV2Crypto);
+      await decryptSnapshotV2ForSlot(slot, encrypted);
       return true;
     }
     const snapshot = await readSnapshot(slot);
@@ -286,7 +306,39 @@ export async function verifySnapshot(slot: number): Promise<boolean> {
   }
 }
 
-/** 从快照恢复数据；V2认证失败、密钥不可用或结构无效时保持当前数据不变。 */
+type SnapshotRestoreJournal = {
+  slot: number;
+  before: Record<string, string | null>;
+};
+
+async function rollbackSnapshotRestore(journal: SnapshotRestoreJournal): Promise<void> {
+  const writes = Object.entries(journal.before)
+    .filter((entry): entry is [string, string] => entry[1] !== null);
+  const removals = Object.entries(journal.before)
+    .filter((entry) => entry[1] === null)
+    .map(([key]) => key);
+  if (removals.length) await AsyncStorage.multiRemove(removals);
+  if (writes.length) await AsyncStorage.multiSet(writes);
+}
+
+/** 应用启动时调用：检测崩溃遗留恢复日志并回滚到恢复前的完整本地状态。 */
+export async function recoverPendingSnapshotRestore(): Promise<boolean> {
+  const raw = await AsyncStorage.getItem(SNAPSHOT_RESTORE_JOURNAL_KEY).catch(() => null);
+  if (!raw) return false;
+  try {
+    const journal = JSON.parse(raw) as SnapshotRestoreJournal;
+    if (!journal || typeof journal.slot !== "number" || !journal.before || typeof journal.before !== "object") {
+      throw new Error("SNAPSHOT_RESTORE_JOURNAL_INVALID");
+    }
+    await rollbackSnapshotRestore(journal);
+    await AsyncStorage.removeItem(SNAPSHOT_RESTORE_JOURNAL_KEY);
+    return true;
+  } catch (error) {
+    throw new Error(error instanceof Error ? error.message : "SNAPSHOT_RESTORE_RECOVERY_FAILED");
+  }
+}
+
+/** 从快照恢复数据；采用恢复日志、null键删除和失败回滚，避免半恢复状态。 */
 export async function restoreFromSnapshot(slot: number): Promise<{ restored: number; failed: number }> {
   let snapshot: Snapshot;
   try {
@@ -302,13 +354,23 @@ export async function restoreFromSnapshot(slot: number): Promise<{ restored: num
     throw new Error("SNAPSHOT_V1_INTEGRITY_FAILED");
   }
 
-  const writes = Object.entries(snapshot.data)
-    .filter(([key, value]) => value !== null && (SYNC_KEYS as readonly string[]).includes(key))
-    .map(([key, value]) => [key, value as string] as const);
+  const applicable = Object.entries(snapshot.data)
+    .filter(([key]) => (SYNC_KEYS as readonly string[]).includes(key));
+  const keys = applicable.map(([key]) => key);
+  const before = Object.fromEntries(await AsyncStorage.multiGet(keys));
+  const journal: SnapshotRestoreJournal = { slot, before };
+  const writes = applicable
+    .filter((entry): entry is [string, string] => entry[1] !== null);
+  const removals = applicable.filter(([, value]) => value === null).map(([key]) => key);
+
+  await AsyncStorage.setItem(SNAPSHOT_RESTORE_JOURNAL_KEY, JSON.stringify(journal));
   try {
-    await AsyncStorage.multiSet(writes);
-    return { restored: writes.length, failed: 0 };
+    if (removals.length) await AsyncStorage.multiRemove(removals);
+    if (writes.length) await AsyncStorage.multiSet(writes);
+    await AsyncStorage.removeItem(SNAPSHOT_RESTORE_JOURNAL_KEY);
+    return { restored: writes.length + removals.length, failed: 0 };
   } catch {
+    try { await rollbackSnapshotRestore(journal); } catch {}
     throw new Error("SNAPSHOT_RESTORE_WRITE_FAILED");
   }
 }
@@ -319,6 +381,13 @@ export async function retireVerifiedV1Snapshots(now = Date.now()): Promise<numbe
   let retired = 0;
   for (const slotMeta of meta.slots) {
     if (!slotMeta || slotMeta.v2State !== "verified" || slotMeta.v1Retired || !slotMeta.v1RetireAt || slotMeta.v1RetireAt > now) continue;
+    const encrypted = await readSnapshotV2(slotMeta.slot);
+    if (!encrypted) continue;
+    try {
+      await decryptSnapshotV2ForSlot(slotMeta.slot, encrypted);
+    } catch {
+      continue;
+    }
     await clearSnapshotChunks(slotMeta.slot);
     await AsyncStorage.removeItem(`${SNAPSHOT_PREFIX}${slotMeta.slot}`);
     slotMeta.v1Retired = true;
