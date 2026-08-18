@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "
 import { join, relative } from "node:path";
 
 const root = process.cwd();
-const sourceRoots = ["app", "components", "hooks", "lib", "server"];
+const sourceRoots = ["app", "components", "constants", "hooks", "lib", "server"];
 const extensions = new Set([".ts", ".tsx", ".js", ".mjs", ".cjs"]);
 const ignored = new Set(["node_modules", ".git", "dist", "dist-web", ".expo", "coverage"]);
 
@@ -31,7 +31,7 @@ function valueExpression(source, index) {
   return match?.[1]?.trim() ?? "";
 }
 
-function literalKey(expression, constants) {
+function literalKey(expression, constants, globalConstants) {
   const raw = expression.trim();
   const quoted = raw.match(/^(["'])(.*?)\1$/s);
   if (quoted) return { key: quoted[2], status: "resolved" };
@@ -41,11 +41,18 @@ function literalKey(expression, constants) {
     status: template[1].includes("${") ? "pattern" : "resolved",
   };
   if (constants.has(raw)) return { key: constants.get(raw), status: "resolved" };
+  if (globalConstants.has(raw)) return { key: globalConstants.get(raw), status: "resolved" };
   return { key: raw, status: "unresolved" };
 }
 
 const files = sourceRoots.flatMap(walk);
-const entries = [];
+const globalConstants = new Map();
+for (const file of files) {
+  const source = readFileSync(join(root, file), "utf8");
+  for (const match of source.matchAll(/\b(?:export\s+)?const\s+([A-Z][A-Z0-9_]*)\s*=\s*(["'`])([^"'`]+)\2/g)) {
+    if (!globalConstants.has(match[1])) globalConstants.set(match[1], match[3]);
+  }
+}
 const calls = [];
 const factoryPattern = /createGenericInventoryStore\s*\(\s*(["'`][^,\n)]+["'`])/g;
 const storagePattern = /\b(AsyncStorage|SecureStore|localStorage)\.(getItem|setItem|removeItem|multiGet|multiSet|multiRemove|getAllKeys|clear|getItemAsync|setItemAsync|deleteItemAsync)\s*\(\s*([^,\n)]+)/g;
@@ -61,7 +68,7 @@ for (const file of files) {
     .filter((name) => /(State|Store|Data|Record|Entry|Config|Settings|Info|Snapshot|Report|Item|Category|Payment|Balance|Template|Rule|Ticket|Session)/.test(name));
 
   for (const match of source.matchAll(storagePattern)) {
-    const resolved = literalKey(match[3], constants);
+    const resolved = literalKey(match[3], constants, globalConstants);
     const operation = match[2];
     const value = /setItem/.test(operation) ? valueExpression(source, match.index ?? 0) : "";
     calls.push({
@@ -71,7 +78,7 @@ for (const file of files) {
   }
 
   for (const match of source.matchAll(factoryPattern)) {
-    const resolved = literalKey(match[1], constants);
+    const resolved = literalKey(match[1], constants, globalConstants);
     calls.push({
       backend: "AsyncStorage", operation: "factory-key", key: resolved.key, status: resolved.status,
       file, line: lineAt(source, match.index ?? 0), value: "GenericInventoryState", structure: "GenericInventoryState, GenericInventoryItem, PurchaseRecord, ConsumeRecord, MonthlySnapshot",

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-18T06:44:07.349Z",
+  "generatedAt": "2026-08-18T07:05:32.387Z",
   "records": [
     {
       "backend": "AsyncStorage",
@@ -152,6 +152,34 @@
           "line": 150,
           "value": "",
           "structure": "SnapshotMeta, Snapshot, DataCounts"
+        }
+      ]
+    },
+    {
+      "backend": "SecureStore",
+      "key": "app_session_token",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItemAsync",
+          "file": "lib/_core/auth.ts",
+          "line": 24,
+          "value": "",
+          "structure": ""
+        },
+        {
+          "operation": "setItemAsync",
+          "file": "lib/_core/auth.ts",
+          "line": 43,
+          "value": "token",
+          "structure": ""
+        },
+        {
+          "operation": "deleteItemAsync",
+          "file": "lib/_core/auth.ts",
+          "line": 61,
+          "value": "",
+          "structure": ""
         }
       ]
     },
@@ -1878,6 +1906,62 @@
       ]
     },
     {
+      "backend": "localStorage",
+      "key": "manus-runtime-user-info",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/_core/auth.ts",
+          "line": 75,
+          "value": "",
+          "structure": ""
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/_core/auth.ts",
+          "line": 100,
+          "value": "JSON.stringify(user",
+          "structure": ""
+        },
+        {
+          "operation": "removeItem",
+          "file": "lib/_core/auth.ts",
+          "line": 117,
+          "value": "",
+          "structure": ""
+        }
+      ]
+    },
+    {
+      "backend": "SecureStore",
+      "key": "manus-runtime-user-info",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "getItemAsync",
+          "file": "lib/_core/auth.ts",
+          "line": 78,
+          "value": "",
+          "structure": ""
+        },
+        {
+          "operation": "setItemAsync",
+          "file": "lib/_core/auth.ts",
+          "line": 106,
+          "value": "JSON.stringify(user",
+          "structure": ""
+        },
+        {
+          "operation": "deleteItemAsync",
+          "file": "lib/_core/auth.ts",
+          "line": 122,
+          "value": "",
+          "structure": ""
+        }
+      ]
+    },
+    {
       "backend": "AsyncStorage",
       "key": "menu_store_v1",
       "status": "resolved",
@@ -2266,34 +2350,6 @@
           "line": 93,
           "value": "JSON.stringify(state.shiftTemplates",
           "structure": "ScheduleState"
-        }
-      ]
-    },
-    {
-      "backend": "SecureStore",
-      "key": "SESSION_TOKEN_KEY",
-      "status": "unresolved",
-      "calls": [
-        {
-          "operation": "getItemAsync",
-          "file": "lib/_core/auth.ts",
-          "line": 24,
-          "value": "",
-          "structure": ""
-        },
-        {
-          "operation": "setItemAsync",
-          "file": "lib/_core/auth.ts",
-          "line": 46,
-          "value": "token",
-          "structure": ""
-        },
-        {
-          "operation": "deleteItemAsync",
-          "file": "lib/_core/auth.ts",
-          "line": 64,
-          "value": "",
-          "structure": ""
         }
       ]
     },
@@ -3103,62 +3159,6 @@
       ]
     },
     {
-      "backend": "localStorage",
-      "key": "USER_INFO_KEY",
-      "status": "unresolved",
-      "calls": [
-        {
-          "operation": "getItem",
-          "file": "lib/_core/auth.ts",
-          "line": 78,
-          "value": "",
-          "structure": ""
-        },
-        {
-          "operation": "setItem",
-          "file": "lib/_core/auth.ts",
-          "line": 103,
-          "value": "JSON.stringify(user",
-          "structure": ""
-        },
-        {
-          "operation": "removeItem",
-          "file": "lib/_core/auth.ts",
-          "line": 120,
-          "value": "",
-          "structure": ""
-        }
-      ]
-    },
-    {
-      "backend": "SecureStore",
-      "key": "USER_INFO_KEY",
-      "status": "unresolved",
-      "calls": [
-        {
-          "operation": "getItemAsync",
-          "file": "lib/_core/auth.ts",
-          "line": 81,
-          "value": "",
-          "structure": ""
-        },
-        {
-          "operation": "setItemAsync",
-          "file": "lib/_core/auth.ts",
-          "line": 109,
-          "value": "JSON.stringify(user",
-          "structure": ""
-        },
-        {
-          "operation": "deleteItemAsync",
-          "file": "lib/_core/auth.ts",
-          "line": 125,
-          "value": "",
-          "structure": ""
-        }
-      ]
-    },
-    {
       "backend": "AsyncStorage",
       "key": "wine.bottles.v1",
       "status": "resolved",
@@ -3609,34 +3609,6 @@
       ]
     },
     {
-      "backend": "SecureStore",
-      "key": "SESSION_TOKEN_KEY",
-      "status": "unresolved",
-      "calls": [
-        {
-          "operation": "getItemAsync",
-          "file": "lib/_core/auth.ts",
-          "line": 24,
-          "value": "",
-          "structure": ""
-        },
-        {
-          "operation": "setItemAsync",
-          "file": "lib/_core/auth.ts",
-          "line": 46,
-          "value": "token",
-          "structure": ""
-        },
-        {
-          "operation": "deleteItemAsync",
-          "file": "lib/_core/auth.ts",
-          "line": 64,
-          "value": "",
-          "structure": ""
-        }
-      ]
-    },
-    {
       "backend": "AsyncStorage",
       "key": "storageKey",
       "status": "unresolved",
@@ -3829,62 +3801,6 @@
           "line": 113,
           "value": "JSON.stringify([...set]",
           "structure": "DeviceInfo"
-        }
-      ]
-    },
-    {
-      "backend": "localStorage",
-      "key": "USER_INFO_KEY",
-      "status": "unresolved",
-      "calls": [
-        {
-          "operation": "getItem",
-          "file": "lib/_core/auth.ts",
-          "line": 78,
-          "value": "",
-          "structure": ""
-        },
-        {
-          "operation": "setItem",
-          "file": "lib/_core/auth.ts",
-          "line": 103,
-          "value": "JSON.stringify(user",
-          "structure": ""
-        },
-        {
-          "operation": "removeItem",
-          "file": "lib/_core/auth.ts",
-          "line": 120,
-          "value": "",
-          "structure": ""
-        }
-      ]
-    },
-    {
-      "backend": "SecureStore",
-      "key": "USER_INFO_KEY",
-      "status": "unresolved",
-      "calls": [
-        {
-          "operation": "getItemAsync",
-          "file": "lib/_core/auth.ts",
-          "line": 81,
-          "value": "",
-          "structure": ""
-        },
-        {
-          "operation": "setItemAsync",
-          "file": "lib/_core/auth.ts",
-          "line": 109,
-          "value": "JSON.stringify(user",
-          "structure": ""
-        },
-        {
-          "operation": "deleteItemAsync",
-          "file": "lib/_core/auth.ts",
-          "line": 125,
-          "value": "",
-          "structure": ""
         }
       ]
     },

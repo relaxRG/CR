@@ -1,6 +1,6 @@
 # 本地存储键与数据结构清单
 
-> 由 `pnpm audit:storage` 从生产源代码生成；生成时间：2026-08-18T06:44:07.348Z。
+> 由 `pnpm audit:storage` 从生产源代码生成；生成时间：2026-08-18T07:05:32.386Z。
 > 本清单覆盖 `AsyncStorage`、`SecureStore`、Web `localStorage` 与通用库存工厂传入的键。`{variable}` 表示按运行时参数生成的键模式。
 
 ## 已解析键
@@ -10,6 +10,7 @@
 | AsyncStorage | `{variable}{variable}` | setItem, removeItem, getItem | `snapshotJson` | SnapshotMeta, Snapshot, DataCounts | `lib/backup/local-backup.ts:102`<br>`lib/backup/local-backup.ts:127`<br>`lib/backup/local-backup.ts:172` |
 | AsyncStorage | `{variable}{variable}.chunk.{variable}` | setItem, getItem | `chunk` | SnapshotMeta, Snapshot, DataCounts | `lib/backup/local-backup.ts:130`<br>`lib/backup/local-backup.ts:155` |
 | AsyncStorage | `{variable}{variable}{variable}` | setItem, getItem | `String(chunks` | SnapshotMeta, Snapshot, DataCounts | `lib/backup/local-backup.ts:132`<br>`lib/backup/local-backup.ts:138`<br>`lib/backup/local-backup.ts:150` |
+| SecureStore | `app_session_token` | getItemAsync, setItemAsync, deleteItemAsync | `token` | 见源文件的写入表达式 | `lib/_core/auth.ts:24`<br>`lib/_core/auth.ts:43`<br>`lib/_core/auth.ts:61` |
 | AsyncStorage | `app.lang.v1` | getItem, setItem | `next` | DeviceInfo, SyncState | `lib/cf-sync/provider.tsx:747`<br>`lib/i18n/index.tsx:21`<br>`lib/i18n/index.tsx:28` |
 | AsyncStorage | `backup.icloud.meta` | getItem, setItem | `JSON.stringify(newMeta` | 见源文件的写入表达式 | `lib/backup/icloud-backup.ts:108`<br>`lib/backup/icloud-backup.ts:176` |
 | AsyncStorage | `backup.meta` | getItem, setItem | `JSON.stringify(newMeta` | SnapshotMeta, Snapshot, DataCounts | `lib/backup/local-backup.ts:66`<br>`lib/backup/local-backup.ts:118` |
@@ -64,6 +65,8 @@
 | AsyncStorage | `labor.advance_categories.v1` | getItem, setItem | `JSON.stringify(state.customCategories` | AdvanceCategory, AdvanceState, CategoryState, CategoryAction, CategoryContextValue | `lib/labor/advance-store.tsx:144`<br>`lib/labor/advance-store.tsx:152` |
 | AsyncStorage | `labor.salary_advances.v1` | getItem, setItem | `JSON.stringify(state` | AdvanceCategory, AdvanceState, CategoryState, CategoryAction, CategoryContextValue | `lib/labor/advance-store.tsx:185`<br>`lib/labor/advance-store.tsx:203` |
 | AsyncStorage | `labor.separate_payments.v1` | getItem, setItem | `JSON.stringify(payments` | SeparatePaymentState, SeparatePaymentStore | `lib/labor/separate-payment-store.tsx:94`<br>`lib/labor/separate-payment-store.tsx:98`<br>`lib/labor/separate-payment-store.tsx:106` |
+| localStorage | `manus-runtime-user-info` | getItem, setItem, removeItem | `JSON.stringify(user` | 见源文件的写入表达式 | `lib/_core/auth.ts:75`<br>`lib/_core/auth.ts:100`<br>`lib/_core/auth.ts:117` |
+| SecureStore | `manus-runtime-user-info` | getItemAsync, setItemAsync, deleteItemAsync | `JSON.stringify(user` | 见源文件的写入表达式 | `lib/_core/auth.ts:78`<br>`lib/_core/auth.ts:106`<br>`lib/_core/auth.ts:122` |
 | AsyncStorage | `menu_store_v1` | getItem, setItem | `JSON.stringify(state` | MenuEntry, MenuState | `lib/menu/store.tsx:334`<br>`lib/menu/store.tsx:351`<br>`lib/menu/store.tsx:362` |
 | AsyncStorage | `menu.packages.v1` | getItem, setItem | `JSON.stringify(packages` | PackageItem | `lib/menu/package-store.tsx:71`<br>`lib/menu/package-store.tsx:82` |
 | AsyncStorage | `migration_clean_empty_shifts_v1_done` | getItem, setItem, removeItem | `"1"` | ShiftEntryRaw | `lib/migrations/clean-empty-shift-entries.ts:55`<br>`lib/migrations/clean-empty-shift-entries.ts:60`<br>`lib/migrations/clean-empty-shift-entries.ts:68`<br>`lib/migrations/clean-empty-shift-entries.ts:73`<br>`lib/migrations/clean-empty-shift-entries.ts:87`<br>`lib/migrations/clean-empty-shift-entries.ts:99` |
@@ -124,7 +127,6 @@
 | SecureStore | `key` | setItemAsync, getItemAsync, deleteItemAsync | `app/role-settings.tsx:222`<br>`lib/cf-sync/client.ts:39`<br>`lib/cf-sync/client.ts:47`<br>`lib/cf-sync/client.ts:54` |
 | AsyncStorage | `keys` | multiGet, multiRemove | `app/data-manager.tsx:51`<br>`app/data-manager.tsx:114`<br>`lib/backup/local-backup.ts:143` |
 | AsyncStorage | `removals` | multiRemove | `lib/sync/engine.ts:506` |
-| SecureStore | `SESSION_TOKEN_KEY` | getItemAsync, setItemAsync, deleteItemAsync | `lib/_core/auth.ts:24`<br>`lib/_core/auth.ts:46`<br>`lib/_core/auth.ts:64` |
 | AsyncStorage | `storageKey` | getItem, setItem | `lib/inventory-core/store.tsx:173`<br>`lib/inventory-core/store.tsx:182` |
 | AsyncStorage | `SUMMARY_KEYS` | multiGet | `lib/backup/local-backup.ts:281` |
 | AsyncStorage | `ticketKey(switchId` | setItem, getItem, removeItem | `lib/cf-sync/group-switch.ts:64`<br>`lib/cf-sync/group-switch.ts:71`<br>`lib/cf-sync/group-switch.ts:77` |
@@ -133,8 +135,6 @@
 | AsyncStorage | `TS_PREFIX + conflict.storageKey` | setItem | `lib/sync/engine.ts:953`<br>`lib/sync/engine.ts:960` |
 | AsyncStorage | `TS_PREFIX + key` | setItem, getItem | `lib/sync/engine.ts:721`<br>`lib/sync/engine.ts:749`<br>`lib/sync/engine.ts:818`<br>`lib/sync/engine.ts:838`<br>`lib/sync/engine.ts:885` |
 | AsyncStorage | `uploadedSetKey(groupId` | getItem, setItem | `lib/sync/photo-sync.ts:105`<br>`lib/sync/photo-sync.ts:113` |
-| localStorage | `USER_INFO_KEY` | getItem, setItem, removeItem | `lib/_core/auth.ts:78`<br>`lib/_core/auth.ts:103`<br>`lib/_core/auth.ts:120` |
-| SecureStore | `USER_INFO_KEY` | getItemAsync, setItemAsync, deleteItemAsync | `lib/_core/auth.ts:81`<br>`lib/_core/auth.ts:109`<br>`lib/_core/auth.ts:125` |
 | AsyncStorage | `writes` | multiSet | `lib/sync/engine.ts:505` |
 
 ## 维护规则
