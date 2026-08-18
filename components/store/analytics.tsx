@@ -8,7 +8,6 @@ import {
 } from "react-native";
 import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { BoundedBusinessMonthNavigator } from "@/components/months/BoundedBusinessMonthNavigator";
@@ -16,7 +15,6 @@ import { useReportMonthNavigation } from "@/hooks/use-report-month-navigation";
 import { useRevenueStore, REVENUE_CATEGORY_LABELS, RevenueCategory } from "@/lib/store/revenue-store";
 import { usePettyCashStore } from "@/lib/store/petty-store";
 import { useMonthlyReportStore } from "@/lib/store/monthly-report/store";
-import { useEmployeeStore, usePaySlipStore } from "@/lib/labor/store";
 
 type PeriodMode = "day" | "month" | "year" | "custom";
 type CompareMode = "none" | "prev";
@@ -122,14 +120,11 @@ function DayPicker({ value, onChange, colors }: { value: string; onChange: (v: s
   );
 }
 
-export default function StoreAnalyticsScreen() {
+export default function StoreAnalyticsScreen({ embedded = false }: { embedded?: boolean }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const router = useRouter();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
   const { reports } = useMonthlyReportStore();
-  const { employees } = useEmployeeStore();
-  const { paySlips } = usePaySlipStore();
   const { records } = useRevenueStore();
   const { records: pettyRecords } = usePettyCashStore();
   const { month: reportMonth, bounds: reportMonthBounds, selectMonth: selectReportMonth } = useReportMonthNavigation();
@@ -140,7 +135,6 @@ export default function StoreAnalyticsScreen() {
   const [customStart, setCustomStart] = useState(() => { const d = new Date(); d.setDate(d.getDate() - 29); return fmtDate(d); });
   const [customEnd, setCustomEnd] = useState(fmtDate(new Date()));
   const [showCustomPicker, setShowCustomPicker] = useState(false);
-  const monthLaborCost = paySlips.filter((s) => s.month === reportMonth).reduce((sum, s) => sum + s.finalSalary, 0);
   const costCategories: RevenueCategory[] = ["food_cost", "spirit_cost", "wine_cost", "petty_cash", "labor_cost", "rent", "utilities", "operations"];
   const currentRange = useMemo((): { start: Date; end: Date } => {
     if (mode === "day") return dayRange(selectedDay);
@@ -182,7 +176,7 @@ export default function StoreAnalyticsScreen() {
         </View>
         <View style={{ marginTop: 8 }}>
           {mode === "day" && <DayPicker value={selectedDay} onChange={setSelectedDay} colors={colors} />}
-          {mode === "month" && (
+          {mode === "month" && !embedded && (
             <BoundedBusinessMonthNavigator
               testID="analytics-month-navigator"
               subject="经营分析"
@@ -253,36 +247,6 @@ export default function StoreAnalyticsScreen() {
           {costCategories.every((cat) => (cur[cat] ?? 0) === 0) && <Text style={[styles.emptyText, { color: colors.muted }]}>{label} 暂无数据</Text>}
         </View>
       </View>
-      <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
-        <Text style={[styles.sectionTitle, { color: colors.muted }]}>功能入口</Text>
-        <View style={{ gap: 10 }}>
-          {[
-            { icon: "chart.bar.fill", color: "#007AFF", title: "店铺月度经营分析", sub: reports.length > 0 ? `已有 ${reports.length} 份报告 · 最新 ${reports[0].monthLabel}` : "导入报表数据开始分析", route: "/monthly-report" },
-            { icon: "clock.fill", color: "#5856D6", title: "时段营业分析", sub: "午/晚/深夜/凌晨时段对比 · 加班性价比提醒", route: "/period-analysis" },
-            { icon: "person.2.fill", color: "#FF9500", title: "人工成本管理", sub: employees.filter((e) => e.active).length > 0 ? `${employees.filter((e) => e.active).length} 名员工 · 本月薪资${monthLaborCost > 0 ? ` ¥${monthLaborCost.toFixed(0)}` : "未填写"}` : "排班 · 考勤 · 薪资结算", route: "/labor" },
-            { icon: "doc.text.fill", color: "#30D158", title: `${Number(reportMonth.slice(5, 7))}月报表`, sub: "收入/成本/工资/货款 · 账户余额追踪", route: "/monthly-summary" },
-          ].map((item) => (
-            <Pressable key={item.route} onPress={() => {
-              tap();
-              if (item.route === "/monthly-summary") {
-                router.push({ pathname: "/monthly-summary" as any, params: { month: reportMonth } });
-              } else {
-                router.push(item.route as any);
-              }
-            }}
-              style={[styles.entryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <View style={[styles.entryIcon, { backgroundColor: item.color + "22" }]}>
-                <IconSymbol name={item.icon as any} size={20} color={item.color} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.entryTitle, { color: colors.foreground }]}>{item.title}</Text>
-                <Text style={[styles.entrySub, { color: colors.muted }]}>{item.sub}</Text>
-              </View>
-              <IconSymbol name="chevron.right" size={16} color={colors.muted} />
-            </Pressable>
-          ))}
-        </View>
-      </View>
       <CustomRangePicker visible={showCustomPicker} start={customStart} end={customEnd}
         onConfirm={(s, e) => { setCustomStart(s); setCustomEnd(e); setShowCustomPicker(false); }}
         onClose={() => setShowCustomPicker(false)} colors={colors} />
@@ -309,8 +273,4 @@ const styles = StyleSheet.create({
   detailPrev: { fontSize: 12 },
   detailPct: { fontSize: 12, fontWeight: "600" },
   emptyText: { padding: 16, fontSize: 14 },
-  entryCard: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: 14, borderWidth: 1 },
-  entryIcon: { width: 40, height: 40, borderRadius: 10, alignItems: "center", justifyContent: "center" },
-  entryTitle: { fontSize: 15, fontWeight: "600", marginBottom: 2 },
-  entrySub: { fontSize: 12 },
 });

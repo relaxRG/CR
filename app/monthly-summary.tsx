@@ -285,7 +285,7 @@ function ManualItemModal({ visible, item, colors, onSave, onClose }: {
 }
 
 // ─── 主页面 ───────────────────────────────────────────────────────────────────
-export default function MonthlySummaryScreen() {
+export default function MonthlySummaryScreen({ embedded = false }: { embedded?: boolean }) {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -663,14 +663,14 @@ export default function MonthlySummaryScreen() {
 
     return (
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }}>
-        {/* 月份选择 */}
-        <BoundedBusinessMonthNavigator
+        {/* 工作台内由统一月份导航控制；独立路由保留自己的月份选择。 */}
+        {!embedded && <BoundedBusinessMonthNavigator
           testID="monthly-summary-month-navigator"
           subject="总月报"
           month={selectedMonth}
           bounds={reportMonthBounds}
           onChange={setSelectedMonth}
-        />
+        />}
 
         {/* 净利润大卡 */}
         <View style={[S.profitCard, {
@@ -801,13 +801,13 @@ export default function MonthlySummaryScreen() {
                                   </View>
                                   <View style={S.amtBlock}>
                                     <Text style={S.amtLabel}>已预支</Text>
-                                    <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={[S.amtValue, { color: advAmt > 0 ? colors.warning : colors.muted }]}>
+                                    <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={[S.amtValue, { color: colors.muted }]}>
                                       {advAmt > 0 ? `-¥${formatMoney(advAmt)}` : "0"}
                                     </Text>
                                   </View>
                                   <View style={S.amtBlock}>
                                     <Text style={S.amtLabel}>待发</Text>
-                                    <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={[S.amtValue, { color: isPaid ? colors.success : colors.error, fontWeight: "800" }]}>¥{formatMoney(finalAmt)}</Text>
+                                    <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={[S.amtValue, { color: finalAmt <= 0 ? colors.muted : (isPaid ? colors.foreground : colors.error), fontWeight: "800" }]}>¥{formatMoney(finalAmt)}</Text>
                                   </View>
                                 </View>
                                 {/* 右：未发/已发（上）+ 复制付款（下）*/}
@@ -1133,8 +1133,8 @@ export default function MonthlySummaryScreen() {
 
   return (
     <ScreenContainer>
-      {/* 导航栏：左返回 + 标题 + 右上角历史/供应商 */}
-      <View style={[S.navbar, { borderBottomColor: colors.border }]}>
+      {/* 独立路由才显示返回与右侧入口；工作台内由上方页签承载导航。 */}
+      {!embedded && <View style={[S.navbar, { borderBottomColor: colors.border }]}>
         <Pressable onPress={() => router.back()} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
           <IconSymbol name="chevron.left" size={22} color={colors.primary} />
         </Pressable>
@@ -1160,7 +1160,7 @@ export default function MonthlySummaryScreen() {
             <IconSymbol name="building.2.fill" size={20} color={colors.muted} />
           </Pressable>
         </View>
-      </View>
+      </View>}
 
       {renderReport()}
 

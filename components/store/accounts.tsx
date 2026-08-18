@@ -15,7 +15,7 @@ import { useMonthlySummaryStore } from "@/lib/store/monthly-summary/store";
 import { AccountBalance, AccountType, ACCOUNT_TYPE_COLORS, ACCOUNT_TYPE_LABELS } from "@/lib/store/monthly-summary/types";
 import BalanceModal from "@/components/store/balance-modal";
 
-export default function StoreAccountsScreen() {
+export default function StoreAccountsScreen({ embedded = false }: { embedded?: boolean }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
@@ -38,13 +38,13 @@ export default function StoreAccountsScreen() {
   return (
     <>
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }}>
-        <BoundedBusinessMonthNavigator
+        {!embedded && <BoundedBusinessMonthNavigator
           testID="accounts-month-navigator"
           subject="账户"
           month={selectedMonth}
           bounds={reportMonthBounds}
           onChange={setSelectedMonth}
-        />
+        />}
 
         {/* 净利润参考 */}
         <View style={{ borderRadius: 10, borderWidth: 1, padding: 12, marginBottom: 12,

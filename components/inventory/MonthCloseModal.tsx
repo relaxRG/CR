@@ -16,6 +16,18 @@ import {
   MonthlyLedgerItem, MonthlySnapshot,
   calcClosingUnitCost, calcClosingQty, getCurrentMonth
 } from "@/lib/inventory-core/types";
+import { useModuleMonthCloseStore } from "@/lib/month-close/module-month-close-store";
+import type { MonthCloseModule } from "@/lib/month-close/module-month-close";
+
+const INVENTORY_MODULE_BY_CATEGORY: Record<string, MonthCloseModule> = {
+  beer: "beer",
+  fruit: "fruit",
+  ice: "ice",
+  glassware: "glassware",
+  tableware: "tableware",
+  daily: "daily_supplies",
+  equipment: "equipment",
+};
 
 interface Props {
   visible: boolean;
@@ -35,6 +47,9 @@ export function MonthCloseModal({
 }: Props) {
   const colors = useColors();
   const currentMonth = getCurrentMonth();
+  const module = INVENTORY_MODULE_BY_CATEGORY[categoryId] ?? null;
+  const moduleClose = useModuleMonthCloseStore();
+  const moduleStatus = module ? moduleClose.getStatus(module, currentMonth) : "draft";
 
   // 构建本月台账数据
   const ledgerItems = useMemo((): (MonthlyLedgerItem & { _manualClose?: number })[] => {
@@ -99,6 +114,10 @@ export function MonthCloseModal({
   }, 0), [ledgerItems, getFinalClosingQty]);
 
   const handleConfirm = () => {
+    if (module && !moduleClose.isWritable(module, currentMonth)) {
+      Alert.alert("本模块已归档", `${categoryLabel} ${currentMonth} 已归档。请先在该模块中开启调整，不能重复直接月结。`);
+      return;
+    }
     Alert.alert(
       "确认月结",
       `确认完成 ${currentMonth} 月结？\n期末库存将自动带入下月期初。`,
@@ -128,6 +147,14 @@ export function MonthCloseModal({
             };
 
             store.addSnapshot(snapshot);
+            if (module) {
+              moduleClose.finalize({
+                module,
+                month: currentMonth,
+                snapshot,
+                paymentSummary: { payable: 0, paid: 0, remaining: 0 },
+              });
+            }
             // 同步更新各商品当前库存
             finalItems.forEach((item) => {
               store.updateItem(item.itemId, { currentStock: item.closingQty });
@@ -151,7 +178,9 @@ export function MonthCloseModal({
             <Pressable onPress={onClose}><Text style={{ fontSize: 17, color: colors.error }}>取消</Text></Pressable>
             <View style={{ alignItems: "center" }}>
               <Text style={[S.title, { color: colors.foreground }]}>{currentMonth} 月结</Text>
-              <Text style={{ fontSize: 11, color: colors.muted }}>{categoryLabel}</Text>
+              <Text style={{ fontSize: 11, color: colors.muted }}>
+                {categoryLabel}{moduleStatus === "draft" ? " · 草稿" : " · 已独立归档"}
+              </Text>
             </View>
             <Pressable onPress={handleConfirm}>
               <Text style={{ fontSize: 17, fontWeight: "600", color: accentColor }}>确认月结</Text>

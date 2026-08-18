@@ -21,6 +21,7 @@ import { useRouter } from "expo-router";
 import { useColors } from "@/hooks/use-colors";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useReportMonthNavigation } from "@/hooks/use-report-month-navigation";
+import { BoundedBusinessMonthNavigator } from "@/components/months/BoundedBusinessMonthNavigator";
 import { useSync } from "@/lib/cf-sync/provider";
 import { useFeature } from "@/hooks/use-feature";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -30,9 +31,11 @@ import StoreAccountsScreen from "@/components/store/accounts";
 import StoreInventoryScreen from "@/components/store/inventory";
 import StoreShopScreen from "@/components/store/shop";
 import LaborScreen from "@/app/labor";
+import MonthlySummaryScreen from "@/app/monthly-summary";
+import PeriodAnalysisScreen from "@/app/period-analysis";
 
 type MainTab = "monthly" | "labor" | "petty" | "shop" | "inventory";
-type ReportTab = "summary" | "analytics" | "accounts";
+type ReportTab = "summary" | "analytics" | "accounts" | "period";
 
 const ALL_MAIN_TABS: { key: MainTab; label: string; feature: "store_ops" | "labor" }[] = [
   { key: "monthly",   label: "报表",  feature: "store_ops" },
@@ -46,6 +49,7 @@ const REPORT_TABS: { key: ReportTab; label: string }[] = [
   { key: "summary",   label: "总月报" },
   { key: "analytics", label: "经营分析" },
   { key: "accounts",  label: "账户" },
+  { key: "period",    label: "时段经营分析" },
 ];
 
 // ── 无权限占位组件 ─────────────────────────────────────────────────────────────
@@ -63,11 +67,10 @@ function AccessDenied({ label, colors }: { label: string; colors: any }) {
 
 // ── 报表模块（含总月报 / 经营分析 / 账户三个子入口）──────────────────────────────
 function ReportModule({ insets, colors }: { insets: any; colors: any }) {
-  const router = useRouter();
   const { hasFeature, isAuthenticated } = useFeature();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
-  const [reportTab, setReportTab] = usePersistedState<ReportTab>("store.report.tab.v2", "analytics");
-  const { month: reportMonth } = useReportMonthNavigation();
+  const [reportTab, setReportTab] = usePersistedState<ReportTab>("store.report.tab.v3", "summary");
+  const { month: reportMonth, bounds: reportMonthBounds, selectMonth: selectReportMonth } = useReportMonthNavigation();
 
   if (isAuthenticated && !hasFeature("store_ops")) {
     return <AccessDenied label="报表" colors={colors} />;
@@ -84,11 +87,7 @@ function ReportModule({ insets, colors }: { insets: any; colors: any }) {
           return (
             <Pressable key={t.key} testID={`store-report-tab-${t.key}`} onPress={() => {
                 tap();
-                if (t.key === "summary") {
-                  router.push({ pathname: "/monthly-summary" as any, params: { month: reportMonth } });
-                } else {
-                  setReportTab(t.key);
-                }
+                setReportTab(t.key);
               }}
               style={({ pressed }) => [S.subChip, {
                 backgroundColor: active ? colors.primary : colors.surface,
@@ -106,14 +105,34 @@ function ReportModule({ insets, colors }: { insets: any; colors: any }) {
         })}
       </ScrollView>
 
+      <View style={{ paddingHorizontal: 16, paddingBottom: 4 }}>
+        <BoundedBusinessMonthNavigator
+          testID="report-workspace-month-navigator"
+          subject="报表"
+          month={reportMonth}
+          bounds={reportMonthBounds}
+          onChange={selectReportMonth}
+        />
+      </View>
+
+      {reportTab === "summary" && (
+        <SafeAreaInsetsContext.Provider value={insets}>
+          <MonthlySummaryScreen embedded />
+        </SafeAreaInsetsContext.Provider>
+      )}
       {reportTab === "analytics" && (
         <SafeAreaInsetsContext.Provider value={insets}>
-          <StoreAnalyticsScreen />
+          <StoreAnalyticsScreen embedded />
         </SafeAreaInsetsContext.Provider>
       )}
       {reportTab === "accounts" && (
         <SafeAreaInsetsContext.Provider value={insets}>
-          <StoreAccountsScreen />
+          <StoreAccountsScreen embedded />
+        </SafeAreaInsetsContext.Provider>
+      )}
+      {reportTab === "period" && (
+        <SafeAreaInsetsContext.Provider value={insets}>
+          <PeriodAnalysisScreen embedded />
         </SafeAreaInsetsContext.Provider>
       )}
     </View>

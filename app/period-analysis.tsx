@@ -19,6 +19,7 @@ import * as Haptics from "expo-haptics";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import { useRouter } from "expo-router";
+import { useReportMonthNavigation } from "@/hooks/use-report-month-navigation";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -189,7 +190,7 @@ function SettingsModal({ visible, settings, colors, onSave, onClose }: {
 }
 
 // ─── 主页面 ───────────────────────────────────────────────────────────────────
-export default function PeriodAnalysisScreen() {
+export default function PeriodAnalysisScreen({ embedded = false }: { embedded?: boolean }) {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -202,7 +203,12 @@ export default function PeriodAnalysisScreen() {
   const { shifts, getShifts } = useShiftStore();
   const { employees } = useEmployeeStore();
   const [tab, setTab] = useState<MainTab>("overview");
-  const [selectedMonth, setSelectedMonth] = useState<string>(latestReport?.month ?? "");
+  const { month: reportWorkspaceMonth } = useReportMonthNavigation();
+  const [selectedMonth, setSelectedMonth] = useState<string>(embedded ? reportWorkspaceMonth : (latestReport?.month ?? ""));
+
+  React.useEffect(() => {
+    if (embedded) setSelectedMonth(reportWorkspaceMonth);
+  }, [embedded, reportWorkspaceMonth]);
   const [showSettings, setShowSettings] = useState(false);
   const [showBizHoursModal, setShowBizHoursModal] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -798,8 +804,8 @@ export default function PeriodAnalysisScreen() {
 
   return (
     <ScreenContainer>
-      {/* 导航栏 */}
-      <View style={[S.navbar, { borderBottomColor: colors.border }]}>
+      {/* 独立路由才显示返回键；报表工作台内不产生额外跳转层级。 */}
+      {!embedded && <View style={[S.navbar, { borderBottomColor: colors.border }]}>
         <Pressable onPress={() => router.back()} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
           <IconSymbol name="chevron.left" size={22} color={colors.primary} />
         </Pressable>
@@ -811,11 +817,11 @@ export default function PeriodAnalysisScreen() {
           <Pressable onPress={() => { tap(); setShowSettings(true); }} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
             <IconSymbol name="slider.horizontal.3" size={20} color={colors.muted} />
           </Pressable>
-          <Pressable onPress={handleImport} disabled={importing} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+          {!embedded && <Pressable onPress={handleImport} disabled={importing} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
             <IconSymbol name="arrow.down.doc.fill" size={20} color={colors.primary} />
-          </Pressable>
+          </Pressable>}
         </View>
-      </View>
+      </View>}
 
       {/* Tab 栏 */}
       <View style={[S.tabBar, { backgroundColor: colors.border + "33", borderBottomColor: colors.border }]}>

@@ -19,6 +19,8 @@ import { useMonthlyReportStore } from "@/lib/store/monthly-report/store";
 import { parseMonthlyReport } from "@/lib/store/monthly-report/excel-parser";
 import { MonthlyReport } from "@/lib/store/monthly-report/types";
 import { useDishAnalysisStore } from "@/lib/store/monthly-report/dish-analysis-store";
+import { usePeriodAnalysisStore } from "@/lib/store/period-analysis/store";
+import { parsePeriodAnalysisExcel } from "@/lib/store/period-analysis/excel-parser";
 import {
   detectReportTypeByFilename,
   detectReportTypeByContent,
@@ -59,6 +61,23 @@ const FILE_TYPE_COLORS: Record<ReportFileType, string> = {
   unknown: "#8E8E93",
 };
 
+function base64ToArrayBuffer(base64: string): ArrayBuffer {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  const clean = base64.replace(/[^A-Za-z0-9+/]/g, "");
+  const bytes = new Uint8Array(Math.floor((clean.length * 3) / 4));
+  let p = 0;
+  for (let i = 0; i < clean.length; i += 4) {
+    const a = chars.indexOf(clean[i]);
+    const b = chars.indexOf(clean[i + 1]);
+    const c = i + 2 < clean.length ? chars.indexOf(clean[i + 2]) : -1;
+    const d = i + 3 < clean.length ? chars.indexOf(clean[i + 3]) : -1;
+    bytes[p++] = (a << 2) | (b >> 4);
+    if (c >= 0) bytes[p++] = ((b & 15) << 4) | (c >> 2);
+    if (d >= 0) bytes[p++] = ((c & 3) << 6) | d;
+  }
+  return bytes.buffer.slice(0, p);
+}
+
 interface UploadedFile {
   name: string;
   uri: string;
@@ -88,6 +107,7 @@ export default function MonthlyReportImportScreen() {
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
   const { addReport } = useMonthlyReportStore();
   const { upsertSnapshot } = useDishAnalysisStore();
+  const { addReport: addPeriodReport, settings: periodSettings } = usePeriodAnalysisStore();
 
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [loading, setLoading] = useState(false);
@@ -178,7 +198,19 @@ export default function MonthlyReportImportScreen() {
         }
       }
 
-      // 3. 检测缺失报表
+      // 3. 同一批次的时段文件直接生成时段分析报告；不再要求用户去时段页重复上传。
+      const periodFiles = files.filter((file) =>
+        file.base64 && (file.type === "time_slot_order" || file.type === "time_slot_checkout"),
+      );
+      if (periodFiles.length > 0) {
+        const periodReport = parsePeriodAnalysisExcel(
+          periodFiles.map((file) => base64ToArrayBuffer(file.base64!)),
+          periodSettings,
+        );
+        if (periodReport) addPeriodReport(periodReport);
+      }
+
+      // 4. 检测缺失报表
       const missing = REQUIRED_REPORT_TYPES.filter((t) => !detectedTypes.has(t));
       setMissingTypes(missing);
       setPreview(report);
@@ -201,7 +233,7 @@ export default function MonthlyReportImportScreen() {
         "导入成功（部分）",
         `${preview.monthLabel} 报告已导入\n\n⚠️ 以下报表尚未导入：\n${missingTypes.map((t) => `• ${REPORT_FILE_TYPE_LABELS[t]}`).join("\n")}\n\n可稍后补充导入。`,
         [
-          { text: "查看分析", onPress: () => router.replace("/monthly-report" as any) },
+          { text: "进入报表", onPress: () => router.replace("/(tabs)/store" as any) },
           { text: "继续导入" },
         ]
       );
@@ -210,7 +242,7 @@ export default function MonthlyReportImportScreen() {
         "导入成功",
         `${preview.monthLabel} 经营报告已完整导入\n营业收入 ¥${formatMoney(preview.kpi.revenue)}\n订单量 ${preview.kpi.orderCount} 单`,
         [
-          { text: "查看分析", onPress: () => router.replace("/monthly-report" as any) },
+          { text: "进入报表", onPress: () => router.replace("/(tabs)/store" as any) },
           { text: "继续导入" },
         ]
       );

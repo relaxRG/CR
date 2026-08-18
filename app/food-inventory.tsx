@@ -22,6 +22,7 @@ import { FoodIngredient, INGREDIENT_CATEGORY_LABELS, IngredientCategory } from "
 import { HorizontalLedgerTable, HorizontalLedgerColumn, HorizontalLedgerGroup } from "@/components/inventory/HorizontalLedgerTable";
 import { FoodLedgerMovementModal } from "@/components/food/FoodLedgerMovementModal";
 import { getCurrentMonth } from "@/lib/inventory-core/types";
+import { useModuleMonthCloseStore } from "@/lib/month-close/module-month-close-store";
 
 const FOOD_COLOR = "#10B981";
 type Tab = "ledger" | "purchase" | "summary";
@@ -170,6 +171,13 @@ export default function FoodInventoryScreen({ month, embedded = false }: FoodInv
   const [selectedLedgerRow, setSelectedLedgerRow] = useState<FoodMonthlyLedgerRow | null>(null);
 
   const currentMonth = month ?? getCurrentMonth();
+  const moduleClose = useModuleMonthCloseStore();
+  const foodCloseStatus = moduleClose.getStatus("food", currentMonth);
+  const assertFoodWritable = () => {
+    if (moduleClose.isWritable("food", currentMonth)) return true;
+    Alert.alert("食材月份已归档", `${currentMonth} 食材已归档。请先在食材模块开启调整，不能直接修改历史台账。`);
+    return false;
+  };
 
   const totalStockValue = useMemo(() =>
     sumMoney(ingredients.map((ingredient) => multiplyMoney(ingredient.stock, ingredient.costPrice))),
@@ -177,6 +185,7 @@ export default function FoodInventoryScreen({ month, embedded = false }: FoodInv
   );
 
   const handlePurchase = (ingredientId: string, qty: number, price: number, supplier: string, notes: string, date: string) => {
+    if (!assertFoodWritable()) return;
     recordPurchase({ ingredientId, quantity: qty, unitPrice: price, supplier, notes, date });
   };
 
@@ -241,20 +250,30 @@ export default function FoodInventoryScreen({ month, embedded = false }: FoodInv
       <ScrollView horizontal showsHorizontalScrollIndicator={false} testID="food-ledger-action-toolbar"
         style={{ flexGrow: 0, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}
         contentContainerStyle={{ gap: 8, paddingHorizontal: 12, paddingVertical: 8, alignItems: "center" }}>
-        <TouchableOpacity onPress={() => { tap(); setShowPurchase(true); }} style={[S.actionBtn, { backgroundColor: FOOD_COLOR + "15", borderColor: FOOD_COLOR + "33" }]}>
+        <TouchableOpacity onPress={() => { if (!assertFoodWritable()) return; tap(); setShowPurchase(true); }} style={[S.actionBtn, { backgroundColor: FOOD_COLOR + "15", borderColor: FOOD_COLOR + "33" }]}>
           <Text style={{ fontSize: 12, color: FOOD_COLOR, fontWeight: "700" }}>📦 录入进货</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => { tap(); setShowConsume(true); }} style={[S.actionBtn, { backgroundColor: colors.warning + "15", borderColor: colors.warning + "33" }]}>
+        <TouchableOpacity onPress={() => { if (!assertFoodWritable()) return; tap(); setShowConsume(true); }} style={[S.actionBtn, { backgroundColor: colors.warning + "15", borderColor: colors.warning + "33" }]}>
           <Text style={{ fontSize: 12, color: colors.warning, fontWeight: "700" }}>🍽️ 录入消耗</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => { tap(); setShowStocktake(true); }} style={[S.actionBtn, { backgroundColor: "#F59E0B22", borderColor: "#F59E0B" }]}>
+        <TouchableOpacity onPress={() => { if (!assertFoodWritable()) return; tap(); setShowStocktake(true); }} style={[S.actionBtn, { backgroundColor: "#F59E0B22", borderColor: "#F59E0B" }]}>
           <Text style={{ fontSize: 12, color: "#F59E0B", fontWeight: "700" }}>📋 月末盘点</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => Alert.alert("月结确认", `确认结转 ${currentMonth} 的食材期末库存至下月期初？`, [
           { text: "取消", style: "cancel" },
-          { text: "确认月结", onPress: () => { closeMonth(currentMonth); Alert.alert("月结完成", "食材期末库存已结转为下月期初。 "); } },
+          { text: "确认月结", onPress: () => {
+            if (!assertFoodWritable()) return;
+            closeMonth(currentMonth);
+            moduleClose.finalize({
+              module: "food",
+              month: currentMonth,
+              snapshot: { month: currentMonth, ledger: monthLedger },
+              paymentSummary: { payable: sumMoney(monthLedger.map((row) => row.purchaseCost)), paid: 0, remaining: sumMoney(monthLedger.map((row) => row.purchaseCost)) },
+            });
+            Alert.alert("月结完成", "食材期末库存已结转为下月期初。 ");
+          } },
         ])} style={[S.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "700" }}>🔒 月结</Text>
+          <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "700" }}>🔒 月结 · {foodCloseStatus === "draft" ? "草稿" : "已归档"}</Text>
         </TouchableOpacity>
       </ScrollView>
 
@@ -342,7 +361,7 @@ export default function FoodInventoryScreen({ month, embedded = false }: FoodInv
         mode="consume"
         ingredients={ingredients}
         colors={colors}
-        onSave={({ ingredientId, quantity, date, unitCost, notes }) => recordConsume({ ingredientId, quantity, date, unitCost, notes })}
+        onSave={({ ingredientId, quantity, date, unitCost, notes }) => { if (assertFoodWritable()) recordConsume({ ingredientId, quantity, date, unitCost, notes }); }}
         onClose={() => setShowConsume(false)}
       />
       <FoodLedgerMovementModal
@@ -350,7 +369,7 @@ export default function FoodInventoryScreen({ month, embedded = false }: FoodInv
         mode="stocktake"
         ingredients={ingredients}
         colors={colors}
-        onSave={({ ingredientId, quantity, date, unitCost, notes }) => recordStocktake({ ingredientId, actualClosingQty: quantity, date, unitCost, notes })}
+        onSave={({ ingredientId, quantity, date, unitCost, notes }) => { if (assertFoodWritable()) recordStocktake({ ingredientId, actualClosingQty: quantity, date, unitCost, notes }); }}
         onClose={() => setShowStocktake(false)}
       />
       <Modal visible={Boolean(selectedLedgerRow)} animationType="slide" transparent onRequestClose={() => setSelectedLedgerRow(null)}>
