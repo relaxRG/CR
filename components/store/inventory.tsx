@@ -6,9 +6,7 @@ import { useColors } from "@/hooks/use-colors";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { BoundedMonthNavigator } from "@/components/inventory/BoundedMonthNavigator";
 import {
-  clampInventoryMonth,
   deriveInventoryMonthBounds,
-  getCurrentInventoryMonth,
   normalizeInventoryMonth,
   type InventoryMonth,
 } from "@/lib/inventory-core/month-browser";
@@ -22,6 +20,7 @@ import { useGlasswareInventoryStore } from "@/lib/glassware/inventory-store";
 import { useTablewareInventoryStore } from "@/lib/tableware/inventory-store";
 import { useDailyInventoryStore } from "@/lib/daily/inventory-store";
 import { useEquipmentInventoryStore } from "@/lib/equipment/inventory-store";
+import { useGlobalBusinessMonth } from "@/lib/months/global-business-month";
 import SpiritsInventoryScreen from "@/app/spirits-inventory";
 import WineInventoryScreen from "@/app/wine-inventory";
 import FruitInventoryScreen from "@/app/fruit-inventory";
@@ -61,10 +60,9 @@ export default function StoreInventoryScreen({ mode = "inventory" }: { mode?: In
   const insets = useSafeAreaInsets();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
   const categoryStorageKey = mode === "shop" ? "store.shop.category.v2" : "store.inventory.category.v2";
-  const monthStorageKey = mode === "shop" ? "store.shop.month.v1" : "store.inventory.month.v1";
   const defaultCategory = mode === "shop" ? "glassware" : "spirits";
   const [activeCategory, setActiveCategory] = usePersistedState<InventoryCategoryKey>(categoryStorageKey, defaultCategory);
-  const [persistedMonth, setPersistedMonth] = usePersistedState<string>(monthStorageKey, getCurrentInventoryMonth());
+  const { month: globalMonth, selectMonth: selectGlobalMonth } = useGlobalBusinessMonth();
 
   const spiritsStore = useSpiritsInventoryStore();
   const wineSnapshots = useWineSnapshotStore();
@@ -118,15 +116,16 @@ export default function StoreInventoryScreen({ mode = "inventory" }: { mode?: In
     return allMonths;
   }, [spiritsStore, wineSnapshots, wineManualPurchases, foodStore, foodPurchases, fruitStore, beerStore, iceStore, glasswareStore, tablewareStore, dailyStore, equipmentStore]);
 
-  const bounds = useMemo(
+  const localBounds = useMemo(
     () => deriveInventoryMonthBounds(categories.flatMap((category) => normalizeMany(categoryMonths[category.key]))),
     [categories, categoryMonths],
   );
-  const selectedMonth = clampInventoryMonth(persistedMonth, bounds);
-
-  useEffect(() => {
-    if (persistedMonth !== selectedMonth) setPersistedMonth(selectedMonth);
-  }, [persistedMonth, selectedMonth, setPersistedMonth]);
+  // 库存没有该月数据时也必须展示全局月份的空状态，不能把全局月份跳回库存数据月。
+  const bounds = useMemo(() => ({
+    min: globalMonth < localBounds.min ? globalMonth : localBounds.min,
+    max: globalMonth > localBounds.max ? globalMonth : localBounds.max,
+  }), [globalMonth, localBounds]);
+  const selectedMonth = globalMonth;
 
   useEffect(() => {
     if (!categories.some((category) => category.key === activeCategory)) setActiveCategory(defaultCategory);
@@ -166,7 +165,7 @@ export default function StoreInventoryScreen({ mode = "inventory" }: { mode?: In
         })}
       </ScrollView>
 
-      <BoundedMonthNavigator month={selectedMonth} bounds={bounds} onChange={setPersistedMonth} testID={`${mode}-month-navigator`} />
+      <BoundedMonthNavigator month={selectedMonth} bounds={bounds} onChange={selectGlobalMonth} testID={`${mode}-month-navigator`} />
 
       <View testID={`${mode}-workspace-${currentCategory.key}`} style={{ flex: 1, paddingBottom: insets.bottom }}>
         <InventoryBusinessPanel category={currentCategory.key} month={selectedMonth} />

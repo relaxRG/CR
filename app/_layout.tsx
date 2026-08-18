@@ -54,6 +54,7 @@ import { TablewareInventoryProvider } from "@/lib/tableware/inventory-store";
 import { DailyInventoryProvider } from "@/lib/daily/inventory-store";
 import { EquipmentInventoryProvider } from "@/lib/equipment/inventory-store";
 import { ModuleMonthCloseProvider } from "@/lib/month-close/module-month-close-store";
+import { GlobalBusinessMonthProvider } from "@/lib/months/global-business-month";
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
@@ -84,6 +85,11 @@ export default function RootLayout() {
     import("@/lib/migrations/clean-monthly-fixed-salary").then(({ cleanMonthlyFixedSalary }) => {
       cleanMonthlyFixedSalary().then((cleaned) => {
         if (cleaned > 0) console.log(`[Startup] 已清理 ${cleaned} 条员工记录中的 monthlyFixedSalary 字段`);
+      });
+    });
+    import("@/lib/migrations/clean-legacy-business-month-keys").then(({ cleanLegacyBusinessMonthKeys }) => {
+      cleanLegacyBusinessMonthKeys().then((removed) => {
+        if (removed > 0) console.log(`[Startup] 已清理 ${removed} 个旧模块月份键`);
       });
     });
   }, []);
@@ -174,6 +180,7 @@ export default function RootLayout() {
           <PeriodAnalysisProvider>
           <MonthlySummaryProvider>
           <ModuleMonthCloseProvider>
+          <GlobalBusinessMonthProvider>
             <Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="recipe/[id]" />
@@ -254,6 +261,7 @@ export default function RootLayout() {
               <Stack.Screen name="dish-analysis" />
             </Stack>
             <StatusBar style="auto" />
+          </GlobalBusinessMonthProvider>
           </ModuleMonthCloseProvider>
           </MonthlySummaryProvider>
           </PeriodAnalysisProvider>

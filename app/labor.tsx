@@ -49,6 +49,7 @@ import { useThrottleFn } from "@/hooks/use-debounce-fn";
 import { useFeature } from "@/hooks/use-feature";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
+import { useGlobalBusinessMonth } from "@/lib/months/global-business-month";
 import { MoneyInput } from "@/components/forms/MoneyInput";
 import {
   useEmployeeStore, useAttendanceStore,
@@ -5373,7 +5374,7 @@ export default function LaborScreen({ embedded = true }: { embedded?: boolean })
   const { width: winW } = useWindowDimensions();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
   const { initialPage } = useLocalSearchParams<{ initialPage?: string }>();
-  const [currentMonth, setCurrentMonth] = useState(currentMonthStr());
+  const { month: currentMonth, selectMonth: setCurrentMonth } = useGlobalBusinessMonth();
   const [activePage, setActivePage] = useState<PageKey>((initialPage as PageKey) ?? "roster");
   const scrollRef = useRef<ScrollView>(null);
   const previousPagerWidth = useRef(winW);

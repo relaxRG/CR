@@ -22,6 +22,9 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { importIcostExcel } from "@/lib/store/icost-import";
 import { useColors } from "@/hooks/use-colors";
 import { useModuleMonthCloseStore } from "@/lib/month-close/module-month-close-store";
+import { useGlobalBusinessMonth } from "@/lib/months/global-business-month";
+import { BoundedBusinessMonthNavigator } from "@/components/months/BoundedBusinessMonthNavigator";
+import { deriveInventoryMonthBounds } from "@/lib/inventory-core/month-browser";
 import { MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS, MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
 
 // ─── iCost 背景色 ─────────────────────────────────────────────────────────────
@@ -114,53 +117,6 @@ type ViewMode = "ledger" | "calendar" | "stats";
 type StatsTab = "expense" | "income";
 type PeriodMode = "week" | "month" | "year" | "all" | "range";
 
-// ─── 年月快速选择器 Modal ──────────────────────────────────────────────────────
-function MonthPickerModal({
-  visible, currentMonth, onSelect, onClose, colors,
-}: {
-  visible: boolean; currentMonth: string;
-  onSelect: (month: string) => void; onClose: () => void; colors: any;
-}) {
-  const parts = currentMonth.split("-").map(Number);
-  const selYear = parts[0]; const selMonth = parts[1];
-  const [pickerYear, setPickerYear] = React.useState(selYear);
-  const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 10 }, (_: any, i: number) => currentYear - 4 + i);
-  const months = Array.from({ length: 12 }, (_: any, i: number) => i + 1);
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={SP.backdrop} onPress={onClose}>
-        <Pressable style={[SP.pickerCard, { backgroundColor: ICOST_CARD }]}>
-          <Text style={[SP.pickerTitle, { color: colors.foreground }]}>选择年月</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={SP.yearRow}>
-            {years.map((yr: number) => (
-              <Pressable key={yr} onPress={() => setPickerYear(yr)}
-                style={[SP.yearChip, { backgroundColor: pickerYear === yr ? colors.primary : ICOST_BG, borderColor: pickerYear === yr ? colors.primary : colors.border }]}>
-                <Text style={[SP.yearChipText, { color: pickerYear === yr ? "#fff" : colors.foreground }]}>{yr}</Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-          <View style={SP.monthGrid}>
-            {months.map((mo: number) => {
-              const isSel = pickerYear === selYear && mo === selMonth;
-              return (
-                <Pressable key={mo}
-                  onPress={() => { onSelect(`${pickerYear}-${String(mo).padStart(2, "0")}`); onClose(); }}
-                  style={[SP.monthCell, { backgroundColor: isSel ? colors.primary : ICOST_BG, borderColor: isSel ? colors.primary : colors.border }]}>
-                  <Text style={[SP.monthCellText, { color: isSel ? "#fff" : colors.foreground }]}>{mo}月</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-          <Pressable onPress={onClose} style={[SP.cancelBtn, { borderTopColor: colors.border }]}>
-            <Text style={[SP.cancelText, { color: colors.muted }]}>取消</Text>
-          </Pressable>
-        </Pressable>
-      </Pressable>
-    </Modal>
-  );
-}
-
 const PERIOD_MODE_LABELS: Record<PeriodMode, string> = {
   week: "按周统计", month: "按月统计", year: "按年统计", all: "全部统计", range: "范围统计",
 };
@@ -171,7 +127,7 @@ export default function StorePettyCashScreen() {
   const colors = useColors();
   const { records, addRecord, updateRecord, deleteRecord, setPeriod, calcPeriod, periods } = usePettyCashStore();
 
-  const [month, setMonth] = useState(todayMonth());
+  const { month, selectMonth: setMonth } = useGlobalBusinessMonth();
   const moduleClose = useModuleMonthCloseStore();
   const pettyCloseStatus = moduleClose.getStatus("petty_cash", month);
   const assertPettyWritable = () => {
@@ -189,7 +145,6 @@ export default function StorePettyCashScreen() {
   const [addCode, setAddCode] = useState<PettyCode>("A1");
   const [periodMode, setPeriodMode] = useState<PeriodMode>("month");
   const [showPeriodMenu, setShowPeriodMenu] = useState(false);
-  const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [addAmount, setAddAmount] = useState("");
   const [addDate, setAddDate] = useState(new Date().toISOString().slice(0, 10));
   const [addDesc, setAddDesc] = useState("");
@@ -202,6 +157,11 @@ export default function StorePettyCashScreen() {
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
   const router = useRouter();
 
+  const pettyLocalBounds = useMemo(() => deriveInventoryMonthBounds(records.map((record) => record.date)), [records]);
+  const pettyBounds = useMemo(() => ({
+    min: month < pettyLocalBounds.min ? month : pettyLocalBounds.min,
+    max: month > pettyLocalBounds.max ? month : pettyLocalBounds.max,
+  }), [month, pettyLocalBounds]);
   const summary = useMemo(() => calcPeriod(month), [calcPeriod, month, records, periods]);
   const monthRecords = useMemo(() => records.filter(r => r.date.startsWith(month)), [records, month]);
 
@@ -343,18 +303,13 @@ export default function StorePettyCashScreen() {
   // ── 月份导航栏 ────────────────────────────────────────────────────────────
   const renderHeader = () => (
     <View style={[S.header, { backgroundColor: ICOST_BG }]}>
-      <Pressable onPress={() => { tap(); setMonth(prevMonth(month)); setSelectedDay(null); }}
-        style={[S.navBtn, { backgroundColor: colors.primary }]}>
-        <IconSymbol name="chevron.left" size={18} color="#fff" />
-      </Pressable>
-      <Pressable onPress={() => { tap(); setShowMonthPicker(true); }} style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-        <Text style={[S.monthLabel, { color: colors.foreground }]}>{getMonthLabel(month)}</Text>
-        <IconSymbol name="chevron.down" size={14} color={colors.muted} />
-      </Pressable>
-      <Pressable onPress={() => { tap(); setMonth(nextMonth(month)); setSelectedDay(null); }}
-        style={[S.navBtn, { backgroundColor: colors.primary }]}>
-        <IconSymbol name="chevron.right" size={18} color="#fff" />
-      </Pressable>
+      <BoundedBusinessMonthNavigator
+        month={month}
+        bounds={pettyBounds}
+        onChange={(next) => { setMonth(next); setSelectedDay(null); }}
+        subject="备用金"
+        testID="petty-month-navigator"
+      />
     </View>
   );
 
@@ -824,7 +779,7 @@ export default function StorePettyCashScreen() {
       {renderAddModal()}
       {renderOpeningModal()}
       <Modal visible={showPeriodMenu} transparent animationType="fade" onRequestClose={() => setShowPeriodMenu(false)}>
-        <Pressable style={SP.backdrop} onPress={() => setShowPeriodMenu(false)}>
+        <Pressable style={S.modalBackdrop} onPress={() => setShowPeriodMenu(false)}>
           <View style={[S.periodMenu, { position: "absolute", top: 140, left: 16, backgroundColor: ICOST_CARD, borderColor: colors.border, shadowColor: "#000" }]}>
             {(Object.keys(PERIOD_MODE_LABELS) as PeriodMode[]).map(mode => (
               <Pressable key={mode} onPress={() => { tap(); setPeriodMode(mode); setShowPeriodMenu(false); }}
@@ -838,13 +793,6 @@ export default function StorePettyCashScreen() {
           </View>
         </Pressable>
       </Modal>
-      <MonthPickerModal
-        visible={showMonthPicker}
-        currentMonth={month}
-        onSelect={(newM) => { setMonth(newM); setSelectedDay(null); }}
-        onClose={() => setShowMonthPicker(false)}
-        colors={colors}
-      />
     </View>
   );
 }
@@ -945,19 +893,5 @@ const S = StyleSheet.create({
   codeChip: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1 },
   payBtn: { flex: 1, height: 36, borderRadius: 8, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   typeBtn: { flex: 1, height: 36, borderRadius: 8, borderWidth: 1, alignItems: "center", justifyContent: "center" },
-});
-
-// ─── MonthPickerModal 专用样式 ─────────────────────────────────────────────────
-const SP = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", alignItems: "center", justifyContent: "center" },
-  pickerCard: { width: 300, borderRadius: 18, overflow: "hidden", paddingTop: 20 },
-  pickerTitle: { fontSize: 16, fontWeight: "700", textAlign: "center", marginBottom: 14 },
-  yearRow: { paddingHorizontal: 12, gap: 8, paddingBottom: 12 },
-  yearChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
-  yearChipText: { fontSize: 14, fontWeight: "600" },
-  monthGrid: { flexDirection: "row", flexWrap: "wrap", paddingHorizontal: 12, gap: 8, paddingBottom: 16 },
-  monthCell: { width: "22%", paddingVertical: 10, borderRadius: 10, borderWidth: 1, alignItems: "center" },
-  monthCellText: { fontSize: 14, fontWeight: "600" },
-  cancelBtn: { borderTopWidth: StyleSheet.hairlineWidth, paddingVertical: 14, alignItems: "center" },
-  cancelText: { fontSize: 16 },
+  modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)" },
 });

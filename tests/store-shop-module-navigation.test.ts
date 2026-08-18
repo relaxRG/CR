@@ -39,8 +39,10 @@ describe("店铺顶级模块与库存分类", () => {
     expect(inventory).toContain('testID={mode === "shop" ? "shop-segmented-tabs" : "inventory-segmented-tabs"}');
     expect(inventory).toContain('"store.inventory.category.v2"');
     expect(inventory).toContain('"store.shop.category.v2"');
-    expect(inventory).toContain('"store.inventory.month.v1"');
-    expect(inventory).toContain('"store.shop.month.v1"');
+    expect(inventory).toContain('useGlobalBusinessMonth');
+    expect(inventory).not.toContain('"store.inventory.month.v1"');
+    expect(inventory).not.toContain('"store.shop.month.v1"');
+    expect(inventory).toContain('const selectedMonth = globalMonth');
     expect(inventory).toContain('BoundedMonthNavigator');
     expect(inventory).toContain('testID={`${mode}-workspace-${currentCategory.key}`}');
     expect(inventory).toContain('marginTop: showPortalHeader ? 14 : 8');
