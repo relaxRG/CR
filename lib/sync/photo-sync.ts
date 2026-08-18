@@ -123,13 +123,16 @@ async function photoFetch(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      "X-Device-Id": deviceInfo.deviceId,
+    };
+    if (deviceInfo.deviceToken) headers["X-Device-Token"] = deviceInfo.deviceToken;
+    if (deviceInfo.webMemoryTicket) headers["X-Web-Device-Ticket"] = deviceInfo.webMemoryTicket;
     return await fetch(`${CF_WORKER_URL}${path}`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Device-Id": deviceInfo.deviceId,
-        "X-Device-Token": deviceInfo.deviceToken,
-      },
+      headers,
+      credentials: Platform.OS === "web" ? "include" : undefined,
       body: JSON.stringify(body),
       signal: controller.signal,
     });

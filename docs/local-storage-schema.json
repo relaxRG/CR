@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-18T07:35:09.476Z",
+  "generatedAt": "2026-08-18T08:12:45.481Z",
   "records": [
     {
       "backend": "AsyncStorage",
@@ -16,16 +16,16 @@
         {
           "operation": "multiGet",
           "file": "lib/backup/local-backup.ts",
-          "line": 83,
+          "line": 151,
           "value": "",
-          "structure": "SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
         },
         {
           "operation": "multiGet",
           "file": "lib/backup/local-backup.ts",
-          "line": 380,
+          "line": 495,
           "value": "",
-          "structure": "SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
         }
       ]
     },
@@ -80,29 +80,78 @@
     },
     {
       "backend": "AsyncStorage",
-      "key": "{variable}{variable}",
+      "key": "{variable}.chunk.{variable}",
       "status": "pattern",
       "calls": [
         {
           "operation": "setItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 102,
-          "value": "snapshotJson",
-          "structure": "SnapshotMeta, Snapshot, DataCounts"
-        },
-        {
-          "operation": "removeItem",
-          "file": "lib/backup/local-backup.ts",
-          "line": 127,
-          "value": "",
-          "structure": "SnapshotMeta, Snapshot, DataCounts"
+          "line": 117,
+          "value": "json.slice(index * CHUNK_SIZE_LIMIT",
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
         },
         {
           "operation": "getItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 172,
+          "line": 131,
           "value": "",
-          "structure": "SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "{variable}{variable}",
+      "status": "pattern",
+      "calls": [
+        {
+          "operation": "getItem",
+          "file": "lib/backup/local-backup.ts",
+          "line": 100,
+          "value": "",
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/backup/local-backup.ts",
+          "line": 119,
+          "value": "String(chunks",
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/backup/local-backup.ts",
+          "line": 125,
+          "value": "",
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/backup/local-backup.ts",
+          "line": 170,
+          "value": "snapshotJson",
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+        },
+        {
+          "operation": "removeItem",
+          "file": "lib/backup/local-backup.ts",
+          "line": 213,
+          "value": "",
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/backup/local-backup.ts",
+          "line": 265,
+          "value": "",
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+        },
+        {
+          "operation": "removeItem",
+          "file": "lib/backup/local-backup.ts",
+          "line": 323,
+          "value": "",
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
         }
       ]
     },
@@ -114,16 +163,16 @@
         {
           "operation": "setItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 130,
+          "line": 216,
           "value": "chunk",
-          "structure": "SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
         },
         {
           "operation": "getItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 155,
+          "line": 241,
           "value": "",
-          "structure": "SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
         }
       ]
     },
@@ -135,23 +184,23 @@
         {
           "operation": "setItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 132,
+          "line": 218,
           "value": "String(chunks",
-          "structure": "SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
         },
         {
           "operation": "getItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 138,
+          "line": 224,
           "value": "",
-          "structure": "SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
         },
         {
           "operation": "getItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 150,
+          "line": 236,
           "value": "",
-          "structure": "SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
         }
       ]
     },
@@ -240,16 +289,44 @@
         {
           "operation": "getItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 66,
+          "line": 83,
           "value": "",
-          "structure": "SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
         },
         {
           "operation": "setItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 118,
+          "line": 204,
           "value": "JSON.stringify(newMeta",
-          "structure": "SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/backup/local-backup.ts",
+          "line": 327,
+          "value": "JSON.stringify(meta",
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "base",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "setItem",
+          "file": "lib/backup/local-backup.ts",
+          "line": 112,
+          "value": "json",
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/backup/local-backup.ts",
+          "line": 137,
+          "value": "",
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
         }
       ]
     },
@@ -390,6 +467,34 @@
           "line": 1010,
           "value": "valueToWrite",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        }
+      ]
+    },
+    {
+      "backend": "SecureStore",
+      "key": "cf.sync.deviceToken",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "setItemAsync",
+          "file": "lib/cf-sync/client.ts",
+          "line": 64,
+          "value": "token",
+          "structure": "WebMemoryTicket, DeviceInfo, CompleteSyncSnapshot, SyncEntry"
+        },
+        {
+          "operation": "getItemAsync",
+          "file": "lib/cf-sync/client.ts",
+          "line": 69,
+          "value": "",
+          "structure": "WebMemoryTicket, DeviceInfo, CompleteSyncSnapshot, SyncEntry"
+        },
+        {
+          "operation": "deleteItemAsync",
+          "file": "lib/cf-sync/client.ts",
+          "line": 74,
+          "value": "",
+          "structure": "WebMemoryTicket, DeviceInfo, CompleteSyncSnapshot, SyncEntry"
         }
       ]
     },
@@ -912,14 +1017,14 @@
         {
           "operation": "getItem",
           "file": "lib/sync/photo-sync.ts",
-          "line": 144,
+          "line": 147,
           "value": "",
           "structure": "DeviceInfo"
         },
         {
           "operation": "setItem",
           "file": "lib/sync/photo-sync.ts",
-          "line": 328,
+          "line": 331,
           "value": "JSON.stringify(data.list",
           "structure": "DeviceInfo"
         }
@@ -1570,37 +1675,30 @@
         {
           "operation": "setItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 205,
+          "line": 579,
           "value": "value",
-          "structure": "SnapshotMeta, Snapshot, DataCounts"
-        },
-        {
-          "operation": "setItem",
-          "file": "lib/backup/local-backup.ts",
-          "line": 464,
-          "value": "value",
-          "structure": "SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
         },
         {
           "operation": "setItem",
           "file": "lib/cf-sync/client.ts",
-          "line": 37,
+          "line": 41,
           "value": "value",
-          "structure": "DeviceInfo, CompleteSyncSnapshot, SyncEntry"
+          "structure": "WebMemoryTicket, DeviceInfo, CompleteSyncSnapshot, SyncEntry"
         },
         {
           "operation": "getItem",
           "file": "lib/cf-sync/client.ts",
-          "line": 45,
+          "line": 49,
           "value": "",
-          "structure": "DeviceInfo, CompleteSyncSnapshot, SyncEntry"
+          "structure": "WebMemoryTicket, DeviceInfo, CompleteSyncSnapshot, SyncEntry"
         },
         {
           "operation": "removeItem",
           "file": "lib/cf-sync/client.ts",
-          "line": 52,
+          "line": 56,
           "value": "",
-          "structure": "DeviceInfo, CompleteSyncSnapshot, SyncEntry"
+          "structure": "WebMemoryTicket, DeviceInfo, CompleteSyncSnapshot, SyncEntry"
         },
         {
           "operation": "getItem",
@@ -1696,23 +1794,23 @@
         {
           "operation": "setItemAsync",
           "file": "lib/cf-sync/client.ts",
-          "line": 39,
+          "line": 43,
           "value": "value",
-          "structure": "DeviceInfo, CompleteSyncSnapshot, SyncEntry"
+          "structure": "WebMemoryTicket, DeviceInfo, CompleteSyncSnapshot, SyncEntry"
         },
         {
           "operation": "getItemAsync",
           "file": "lib/cf-sync/client.ts",
-          "line": 47,
+          "line": 51,
           "value": "",
-          "structure": "DeviceInfo, CompleteSyncSnapshot, SyncEntry"
+          "structure": "WebMemoryTicket, DeviceInfo, CompleteSyncSnapshot, SyncEntry"
         },
         {
           "operation": "deleteItemAsync",
           "file": "lib/cf-sync/client.ts",
-          "line": 54,
+          "line": 58,
           "value": "",
-          "structure": "DeviceInfo, CompleteSyncSnapshot, SyncEntry"
+          "structure": "WebMemoryTicket, DeviceInfo, CompleteSyncSnapshot, SyncEntry"
         }
       ]
     },
@@ -1738,9 +1836,16 @@
         {
           "operation": "multiRemove",
           "file": "lib/backup/local-backup.ts",
-          "line": 143,
+          "line": 104,
           "value": "",
-          "structure": "SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+        },
+        {
+          "operation": "multiRemove",
+          "file": "lib/backup/local-backup.ts",
+          "line": 229,
+          "value": "",
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
         }
       ]
     },
@@ -2837,9 +2942,9 @@
         {
           "operation": "multiGet",
           "file": "lib/backup/local-backup.ts",
-          "line": 281,
+          "line": 396,
           "value": "",
-          "structure": "SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
         }
       ]
     },
@@ -3200,6 +3305,13 @@
       "calls": [
         {
           "operation": "multiSet",
+          "file": "lib/backup/local-backup.ts",
+          "line": 309,
+          "value": "",
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+        },
+        {
+          "operation": "multiSet",
           "file": "lib/sync/engine.ts",
           "line": 505,
           "value": "",
@@ -3224,16 +3336,16 @@
         {
           "operation": "multiGet",
           "file": "lib/backup/local-backup.ts",
-          "line": 83,
+          "line": 151,
           "value": "",
-          "structure": "SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
         },
         {
           "operation": "multiGet",
           "file": "lib/backup/local-backup.ts",
-          "line": 380,
+          "line": 495,
           "value": "",
-          "structure": "SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
         }
       ]
     },
@@ -3283,6 +3395,27 @@
           "line": 510,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "base",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "setItem",
+          "file": "lib/backup/local-backup.ts",
+          "line": 112,
+          "value": "json",
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/backup/local-backup.ts",
+          "line": 137,
+          "value": "",
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
         }
       ]
     },
@@ -3392,37 +3525,30 @@
         {
           "operation": "setItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 205,
+          "line": 579,
           "value": "value",
-          "structure": "SnapshotMeta, Snapshot, DataCounts"
-        },
-        {
-          "operation": "setItem",
-          "file": "lib/backup/local-backup.ts",
-          "line": 464,
-          "value": "value",
-          "structure": "SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
         },
         {
           "operation": "setItem",
           "file": "lib/cf-sync/client.ts",
-          "line": 37,
+          "line": 41,
           "value": "value",
-          "structure": "DeviceInfo, CompleteSyncSnapshot, SyncEntry"
+          "structure": "WebMemoryTicket, DeviceInfo, CompleteSyncSnapshot, SyncEntry"
         },
         {
           "operation": "getItem",
           "file": "lib/cf-sync/client.ts",
-          "line": 45,
+          "line": 49,
           "value": "",
-          "structure": "DeviceInfo, CompleteSyncSnapshot, SyncEntry"
+          "structure": "WebMemoryTicket, DeviceInfo, CompleteSyncSnapshot, SyncEntry"
         },
         {
           "operation": "removeItem",
           "file": "lib/cf-sync/client.ts",
-          "line": 52,
+          "line": 56,
           "value": "",
-          "structure": "DeviceInfo, CompleteSyncSnapshot, SyncEntry"
+          "structure": "WebMemoryTicket, DeviceInfo, CompleteSyncSnapshot, SyncEntry"
         },
         {
           "operation": "getItem",
@@ -3518,23 +3644,23 @@
         {
           "operation": "setItemAsync",
           "file": "lib/cf-sync/client.ts",
-          "line": 39,
+          "line": 43,
           "value": "value",
-          "structure": "DeviceInfo, CompleteSyncSnapshot, SyncEntry"
+          "structure": "WebMemoryTicket, DeviceInfo, CompleteSyncSnapshot, SyncEntry"
         },
         {
           "operation": "getItemAsync",
           "file": "lib/cf-sync/client.ts",
-          "line": 47,
+          "line": 51,
           "value": "",
-          "structure": "DeviceInfo, CompleteSyncSnapshot, SyncEntry"
+          "structure": "WebMemoryTicket, DeviceInfo, CompleteSyncSnapshot, SyncEntry"
         },
         {
           "operation": "deleteItemAsync",
           "file": "lib/cf-sync/client.ts",
-          "line": 54,
+          "line": 58,
           "value": "",
-          "structure": "DeviceInfo, CompleteSyncSnapshot, SyncEntry"
+          "structure": "WebMemoryTicket, DeviceInfo, CompleteSyncSnapshot, SyncEntry"
         }
       ]
     },
@@ -3560,9 +3686,16 @@
         {
           "operation": "multiRemove",
           "file": "lib/backup/local-backup.ts",
-          "line": 143,
+          "line": 104,
           "value": "",
-          "structure": "SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+        },
+        {
+          "operation": "multiRemove",
+          "file": "lib/backup/local-backup.ts",
+          "line": 229,
+          "value": "",
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
         }
       ]
     },
@@ -3609,9 +3742,9 @@
         {
           "operation": "multiGet",
           "file": "lib/backup/local-backup.ts",
-          "line": 281,
+          "line": 396,
           "value": "",
-          "structure": "SnapshotMeta, Snapshot, DataCounts"
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
         }
       ]
     },
@@ -3753,6 +3886,13 @@
       "key": "writes",
       "status": "unresolved",
       "calls": [
+        {
+          "operation": "multiSet",
+          "file": "lib/backup/local-backup.ts",
+          "line": 309,
+          "value": "",
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotMeta, Snapshot, DataCounts"
+        },
         {
           "operation": "multiSet",
           "file": "lib/sync/engine.ts",

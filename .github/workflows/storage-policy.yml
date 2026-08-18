@@ -1,0 +1,54 @@
+name: Storage Policy
+
+on:
+  pull_request:
+    paths:
+      - "app/**"
+      - "components/**"
+      - "constants/**"
+      - "hooks/**"
+      - "lib/**"
+      - "server/**"
+      - "scripts/audit-local-storage.mjs"
+      - "scripts/generate-storage-registry.mjs"
+      - "scripts/check-storage-policy.mjs"
+      - "docs/local-storage-schema.json"
+      - "docs/local-storage-registry.json"
+      - "package.json"
+      - "pnpm-lock.yaml"
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "components/**"
+      - "constants/**"
+      - "hooks/**"
+      - "lib/**"
+      - "server/**"
+      - "scripts/audit-local-storage.mjs"
+      - "scripts/generate-storage-registry.mjs"
+      - "scripts/check-storage-policy.mjs"
+      - "docs/local-storage-schema.json"
+      - "docs/local-storage-registry.json"
+      - "package.json"
+      - "pnpm-lock.yaml"
+
+permissions:
+  contents: read
+
+jobs:
+  storage-policy:
+    name: Storage registry and dynamic-key policy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm ci:storage
+      - run: git diff --exit-code -- docs/local-storage-schema.json docs/local-storage-registry.json

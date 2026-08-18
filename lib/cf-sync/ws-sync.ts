@@ -52,7 +52,7 @@ export async function notifyPushDone(): Promise<void> {
     if (now - lastNotifiedAt < NOTIFY_THROTTLE_MS) return;
     lastNotifiedAt = now;
     const deviceInfo = await getDeviceInfo();
-    if (!deviceInfo) return;
+    if (!deviceInfo?.deviceToken) return;
     await fetch(`${CF_WORKER_URL}/api/sync/notify`, {
       method: "POST",
       headers: {
@@ -76,12 +76,13 @@ async function checkForUpdates(): Promise<number | null> {
   try {
     const deviceInfo = await getDeviceInfo();
     if (!deviceInfo) return null;
+    const headers: Record<string, string> = { "X-Device-Id": deviceInfo.deviceId };
+    if (deviceInfo.deviceToken) headers["X-Device-Token"] = deviceInfo.deviceToken;
+    if (deviceInfo.webMemoryTicket) headers["X-Web-Device-Ticket"] = deviceInfo.webMemoryTicket;
     const res = await fetch(`${CF_WORKER_URL}/api/sync/check`, {
       method: "GET",
-      headers: {
-        "X-Device-Id": deviceInfo.deviceId,
-        "X-Device-Token": deviceInfo.deviceToken,
-      },
+      headers,
+      credentials: Platform.OS === "web" ? "include" : undefined,
       signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) return null;

@@ -1,0 +1,1722 @@
+{
+  "version": 1,
+  "generatedFrom": "docs/local-storage-schema.json",
+  "entryCount": 126,
+  "dynamicEntryCount": 25,
+  "entries": [
+    {
+      "backend": "AsyncStorage",
+      "key": "[...SYNC_KEYS]",
+      "status": "unresolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/backup/icloud-backup.ts",
+        "lib/backup/local-backup.ts"
+      ],
+      "dynamic": true,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "[\"cocktail.recipes\"",
+      "status": "unresolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "app/backup.tsx"
+      ],
+      "dynamic": true,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "[\"labor_schedule_snapshots_v1\"",
+      "status": "unresolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/labor/store.tsx"
+      ],
+      "dynamic": true,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "[DIRTY_KEYS_PERSIST_KEY",
+      "status": "unresolved",
+      "classification": "S3-diagnostic",
+      "ownerFiles": [
+        "lib/sync/engine.ts"
+      ],
+      "dynamic": true,
+      "purgeOn": [
+        "startup-ttl",
+        "leave-group"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "{variable}.chunk.{variable}",
+      "status": "pattern",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/backup/local-backup.ts"
+      ],
+      "dynamic": true,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "{variable}{variable}",
+      "status": "pattern",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/backup/local-backup.ts"
+      ],
+      "dynamic": true,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "{variable}{variable}.chunk.{variable}",
+      "status": "pattern",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/backup/local-backup.ts"
+      ],
+      "dynamic": true,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "{variable}{variable}{variable}",
+      "status": "pattern",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/backup/local-backup.ts"
+      ],
+      "dynamic": true,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "app.lang.v1",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/cf-sync/provider.tsx",
+        "lib/i18n/index.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "backup.icloud.meta",
+      "status": "resolved",
+      "classification": "S3-diagnostic",
+      "ownerFiles": [
+        "lib/backup/icloud-backup.ts"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "startup-ttl",
+        "leave-group"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "backup.meta",
+      "status": "resolved",
+      "classification": "S3-diagnostic",
+      "ownerFiles": [
+        "lib/backup/local-backup.ts"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "startup-ttl",
+        "leave-group"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "base",
+      "status": "unresolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/backup/local-backup.ts"
+      ],
+      "dynamic": true,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "beer.inventory.v2",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/beer/inventory-store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "bottles.material.migrated.v8",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/bottles/store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "bottles.material.migrated.v9",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/bottles/store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "bottles.taxonomy.categories.v1",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/bottles/taxonomy.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "bottles.taxonomy.styles.v1",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/bottles/taxonomy.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "c.storageKey",
+      "status": "unresolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/sync/engine.ts"
+      ],
+      "dynamic": true,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "cf.sync.groupSwitchSession.v1",
+      "status": "resolved",
+      "classification": "S3-diagnostic",
+      "ownerFiles": [
+        "lib/cf-sync/group-switch.ts"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "startup-ttl",
+        "leave-group"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "cf.sync.prevAllowedKeys.v1",
+      "status": "resolved",
+      "classification": "S3-diagnostic",
+      "ownerFiles": [
+        "lib/cf-sync/provider.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "startup-ttl",
+        "leave-group"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "cf.sync.switchDiagnostics.v1",
+      "status": "resolved",
+      "classification": "S3-diagnostic",
+      "ownerFiles": [
+        "lib/cf-sync/switch-diagnostics.ts"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "startup-ttl",
+        "leave-group"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "chapterKey(bookId",
+      "status": "unresolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/books/store.tsx"
+      ],
+      "dynamic": true,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "chapterKey(id",
+      "status": "unresolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/books/store.tsx"
+      ],
+      "dynamic": true,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "cocktail_recent_units",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "hooks/use-recent-units.ts"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "cocktail.books.v1",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/books/store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "cocktail.bottles",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/bottles/store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "cocktail.bottles.seeded",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/bottles/store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "cocktail.categories",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/recipes/store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "cocktail.categoryGroups",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/recipes/store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "cocktail.iceSettings.v2",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/ice/cost.ts"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "cocktail.lab.batches",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/lab/store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "cocktail.lab.projects",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/lab/store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "cocktail.prefs.v1",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/recipes/store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "cocktail.reader.highlights.v1.${id}",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "app/book-reader.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "cocktail.reader.settings.v1.${id}",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "app/book-reader.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "cocktail.recipes",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/recipes/store.tsx",
+        "lib/sync/photo-sync.ts"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "cocktail.seeded",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/recipes/store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "cocktail.tagGroups",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/recipes/store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "cocktail.tags",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/recipes/store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "conflict.storageKey",
+      "status": "unresolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/sync/engine.ts"
+      ],
+      "dynamic": true,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "daily.inventory.v1",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/daily/inventory-store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "device.customRoleNames.v1",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "app/role-settings.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "dish_analysis.snapshots.v1",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/store/monthly-report/dish-analysis-store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "equipment.inventory.v1",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/equipment/inventory-store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "food.ingredients.v1",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/food/ingredient-store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "food.ingredients.v2",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/food/ingredient-store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "food.menu.v1",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/food/menu-store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "food.purchases.v1",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/food/ingredient-store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "fruit.inventory.v2",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/fruit/new-inventory-store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "glassware.inventory.v1",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/glassware/inventory-store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "homemade.preps.v1",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/homemade/store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "homemade.sections.v1",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/homemade/store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "homemade.seeded.v1",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/homemade/store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "homemade.source.v3",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/homemade/store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "homemade.taxonomy.v2",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/homemade/store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "homemade.types.v1",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/homemade/store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "homemade.waldorf.v1",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/homemade/store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "homemade.waldorf.v2",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/homemade/store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "ice.inventory.v2",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/ice/new-inventory-store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "iosColorPicker.recent.v1",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "components/ios-color-picker.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "key",
+      "status": "unresolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "app/role-settings.tsx",
+        "hooks/use-persisted-state.ts",
+        "lib/backup/icloud-backup.ts",
+        "lib/backup/local-backup.ts",
+        "lib/cf-sync/client.ts",
+        "lib/labor/store.tsx",
+        "lib/sync/engine.ts"
+      ],
+      "dynamic": true,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "keys",
+      "status": "unresolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "app/data-manager.tsx",
+        "lib/backup/local-backup.ts"
+      ],
+      "dynamic": true,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "lab.plan.v1",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/lab/plan-store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "labor_dept_order_v1",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/labor/store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "labor_employees_v1",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/migrations/clean-monthly-fixed-salary.ts"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "labor_shifts_v1",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/migrations/clean-empty-shift-entries.ts"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "labor.advance_categories.v1",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/labor/advance-store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "labor.salary_advances.v1",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/labor/advance-store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "labor.separate_payments.v1",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/labor/separate-payment-store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "menu_store_v1",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/menu/store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "menu.packages.v1",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/menu/package-store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "migration_clean_empty_shifts_v1_done",
+      "status": "resolved",
+      "classification": "S3-diagnostic",
+      "ownerFiles": [
+        "lib/migrations/clean-empty-shift-entries.ts"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "startup-ttl",
+        "leave-group"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "migration_clean_monthly_fixed_salary_v1_done",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/migrations/clean-monthly-fixed-salary.ts"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "monthly_reports_v1",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/store/monthly-report/store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "monthly_summary.balances.v1",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/store/monthly-summary/store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "monthly_summary.inventory_configs.v1",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/store/monthly-summary/store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "monthly_summary.payments.v1",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/store/monthly-summary/store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "monthly_summary.petty_configs.v1",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/store/monthly-summary/store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "monthly_summary.reports.v1",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/store/monthly-summary/store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "monthly_summary.suppliers.v1",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/store/monthly-summary/store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "period_analysis.reports.v1",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/store/period-analysis/store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "period_analysis.settings.v1",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/store/period-analysis/store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "removals",
+      "status": "unresolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/sync/engine.ts"
+      ],
+      "dynamic": true,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "schedule.business_hours.v1",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/store/period-analysis/schedule-store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "schedule.shift_templates.v1",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/store/period-analysis/schedule-store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "shopping_store_v1",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/shopping/store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "spirits.customCategories.v1",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/spirits/crud-store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "spirits.groupMatchMemory.v1",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/spirits/crud-store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "spirits.groups.v1",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/spirits/crud-store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "spirits.items.v3",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/spirits/crud-store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "spirits.ledger.v3",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/spirits/crud-store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "spirits.matchMemory.v1",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/spirits/crud-store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "spirits.purchases.v3",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/spirits/crud-store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "spirits.refPrices.v1",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/spirits/crud-store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "spirits.selfBuyConfig.v1",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/spirits/crud-store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "spirits.suppliers.v1",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/spirits/crud-store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "storageKey",
+      "status": "unresolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/inventory-core/store.tsx"
+      ],
+      "dynamic": true,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "store_business_hours_v1",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "app/store-hours.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "store.employee_name_aliases.v1",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/store/petty-labor-link-store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "store.petty_categories.v1",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/store/petty-category-store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "store.petty_inv_links.v1",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/store/petty-inventory-link-store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "store.petty_labor_links.v1",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/store/petty-labor-link-store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "store.petty.v1",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/store/petty-store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "store.purchase.v1",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "components/store/purchase.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "store.revenue.v1",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/store/revenue-store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "SUMMARY_KEYS",
+      "status": "unresolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/backup/local-backup.ts"
+      ],
+      "dynamic": true,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "supplier.match.memory.v1",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/store/supplier-import.ts"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "sync.backup.v1",
+      "status": "resolved",
+      "classification": "S3-diagnostic",
+      "ownerFiles": [
+        "lib/sync/engine.ts"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "startup-ttl",
+        "leave-group"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "sync.dirtyKeys.pending",
+      "status": "resolved",
+      "classification": "S3-diagnostic",
+      "ownerFiles": [
+        "lib/sync/engine.ts"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "startup-ttl",
+        "leave-group"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "sync.lastPulledAt",
+      "status": "resolved",
+      "classification": "S3-diagnostic",
+      "ownerFiles": [
+        "lib/sync/engine.ts"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "startup-ttl",
+        "leave-group"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "sync.log.v1",
+      "status": "resolved",
+      "classification": "S3-diagnostic",
+      "ownerFiles": [
+        "lib/sync/engine.ts"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "startup-ttl",
+        "leave-group"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "tableware.inventory.v1",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/tableware/inventory-store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "TS_PREFIX + c.storageKey",
+      "status": "unresolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/sync/engine.ts"
+      ],
+      "dynamic": true,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "TS_PREFIX + conflict.storageKey",
+      "status": "unresolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/sync/engine.ts"
+      ],
+      "dynamic": true,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "TS_PREFIX + key",
+      "status": "unresolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/sync/engine.ts"
+      ],
+      "dynamic": true,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "uploadedSetKey(groupId",
+      "status": "unresolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/sync/photo-sync.ts"
+      ],
+      "dynamic": true,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "wine.bottles.v1",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/wine/store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "wine.manual_purchases.v1",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/wine/store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "wine.snapshots.v2",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/wine/store.tsx"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "writes",
+      "status": "unresolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/backup/local-backup.ts",
+        "lib/sync/engine.ts"
+      ],
+      "dynamic": true,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "localStorage",
+      "key": "manus-runtime-user-info",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/_core/auth.ts"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "SecureStore",
+      "key": "app_session_token",
+      "status": "resolved",
+      "classification": "S2-credential",
+      "ownerFiles": [
+        "lib/_core/auth.ts"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "logout",
+        "leave-group",
+        "switch-complete"
+      ]
+    },
+    {
+      "backend": "SecureStore",
+      "key": "cf.sync.deviceToken",
+      "status": "resolved",
+      "classification": "S2-credential",
+      "ownerFiles": [
+        "lib/cf-sync/client.ts"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "logout",
+        "leave-group",
+        "switch-complete"
+      ]
+    },
+    {
+      "backend": "SecureStore",
+      "key": "key",
+      "status": "unresolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "app/role-settings.tsx",
+        "lib/cf-sync/client.ts"
+      ],
+      "dynamic": true,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "SecureStore",
+      "key": "manus-runtime-user-info",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/_core/auth.ts"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "SecureStore",
+      "key": "ticketKey(switchId",
+      "status": "unresolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/cf-sync/group-switch.ts"
+      ],
+      "dynamic": true,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    }
+  ]
+}

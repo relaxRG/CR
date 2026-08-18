@@ -18,6 +18,10 @@ const DEVICE_TOKEN_KEY = "cf.sync.deviceToken";
 const DEVICE_ROLE_KEY = "cf.sync.deviceRole";
 const DEVICE_ALLOWED_KEYS_KEY = "cf.sync.allowedKeys";
 const DEVICE_NAME_KEY = "cf.sync.deviceName";
+const WEB_MEMORY_TOKEN_TTL_MS = 10 * 60 * 1000;
+
+type WebMemoryTicket = { ticket: string; expiresAt: number };
+const webMemoryTickets = new Map<string, WebMemoryTicket>();
 
 // ─── UUID generation ──────────────────────────────────────────────────────────
 function generateUUID(): string {
@@ -55,28 +59,64 @@ async function deleteSecure(key: string): Promise<void> {
   }
 }
 
+async function storeDeviceToken(token: string): Promise<void> {
+  if (Platform.OS === "web") return;
+  await SecureStore.setItemAsync(DEVICE_TOKEN_KEY, token);
+}
+
+async function getDeviceToken(): Promise<string | null> {
+  if (Platform.OS === "web") return null;
+  return SecureStore.getItemAsync(DEVICE_TOKEN_KEY);
+}
+
+async function deleteDeviceToken(): Promise<void> {
+  if (Platform.OS === "web") return;
+  await SecureStore.deleteItemAsync(DEVICE_TOKEN_KEY);
+}
+
+function storeWebMemoryTicket(deviceId: string, ticket: string | undefined): void {
+  if (Platform.OS !== "web") return;
+  if (!ticket) webMemoryTickets.delete(deviceId);
+  else webMemoryTickets.set(deviceId, { ticket, expiresAt: Date.now() + WEB_MEMORY_TOKEN_TTL_MS });
+}
+
+function getWebMemoryTicket(deviceId: string | null): string | undefined {
+  if (Platform.OS !== "web" || !deviceId) return undefined;
+  const entry = webMemoryTickets.get(deviceId);
+  if (!entry) return undefined;
+  if (entry.expiresAt <= Date.now()) {
+    webMemoryTickets.delete(deviceId);
+    return undefined;
+  }
+  return entry.ticket;
+}
+
 // ─── Device info ──────────────────────────────────────────────────────────────
 export type DeviceRole = "owner" | "collaborator" | "guest";
 
 export type DeviceInfo = {
   deviceId: string;
   groupId: string;
-  deviceToken: string;
+  /** 原生端为SecureStore令牌；Web端绝不持久化或返回该令牌。 */
+  deviceToken?: string;
+  /** Worker仅为Cookie受阻场景签发的当前页面短期票据；不写入任何持久化后端。 */
+  webMemoryTicket?: string;
   role: DeviceRole;
   allowedKeys: string[] | null;
   deviceName: string;
 };
 
 export async function getDeviceInfo(): Promise<DeviceInfo | null> {
-  const [deviceId, groupId, deviceToken, role, allowedKeysRaw, deviceName] = await Promise.all([
+  const [deviceId, groupId, role, allowedKeysRaw, deviceName] = await Promise.all([
     getSecure(DEVICE_ID_KEY),
     getSecure(GROUP_ID_KEY),
-    getSecure(DEVICE_TOKEN_KEY),
     getSecure(DEVICE_ROLE_KEY),
     getSecure(DEVICE_ALLOWED_KEYS_KEY),
     getSecure(DEVICE_NAME_KEY),
   ]);
-  if (!deviceId || !groupId || !deviceToken || !role) return null;
+  const deviceToken = await getDeviceToken();
+  const webMemoryTicket = getWebMemoryTicket(deviceId);
+  if (!deviceId || !groupId || !role || (Platform.OS !== "web" && !deviceToken)) return null;
   let allowedKeys: string[] | null = null;
   if (allowedKeysRaw) {
     try { allowedKeys = JSON.parse(allowedKeysRaw); } catch { allowedKeys = null; }
@@ -84,7 +124,8 @@ export async function getDeviceInfo(): Promise<DeviceInfo | null> {
   return {
     deviceId,
     groupId,
-    deviceToken,
+    ...(deviceToken ? { deviceToken } : {}),
+    ...(webMemoryTicket ? { webMemoryTicket } : {}),
     role: role as DeviceRole,
     allowedKeys,
     deviceName: deviceName ?? "Unknown Device",
@@ -95,7 +136,8 @@ export async function saveDeviceInfo(info: DeviceInfo): Promise<void> {
   await Promise.all([
     storeSecure(DEVICE_ID_KEY, info.deviceId),
     storeSecure(GROUP_ID_KEY, info.groupId),
-    storeSecure(DEVICE_TOKEN_KEY, info.deviceToken),
+    storeDeviceToken(info.deviceToken ?? ""),
+    Promise.resolve(storeWebMemoryTicket(info.deviceId, info.webMemoryTicket)),
     storeSecure(DEVICE_ROLE_KEY, info.role),
     storeSecure(DEVICE_ALLOWED_KEYS_KEY, info.allowedKeys ? JSON.stringify(info.allowedKeys) : "null"),
     storeSecure(DEVICE_NAME_KEY, info.deviceName),
@@ -103,10 +145,12 @@ export async function saveDeviceInfo(info: DeviceInfo): Promise<void> {
 }
 
 export async function clearDeviceInfo(): Promise<void> {
+  const deviceId = await getSecure(DEVICE_ID_KEY);
   await Promise.all([
     deleteSecure(DEVICE_ID_KEY),
     deleteSecure(GROUP_ID_KEY),
-    deleteSecure(DEVICE_TOKEN_KEY),
+    deleteDeviceToken(),
+    Promise.resolve(storeWebMemoryTicket(deviceId ?? "", undefined)),
     deleteSecure(DEVICE_ROLE_KEY),
     deleteSecure(DEVICE_ALLOWED_KEYS_KEY),
     deleteSecure(DEVICE_NAME_KEY),
@@ -125,7 +169,9 @@ async function cfFetch(
   };
   if (deviceInfo) {
     headers["X-Device-Id"] = deviceInfo.deviceId;
-    headers["X-Device-Token"] = deviceInfo.deviceToken;
+    // Web优先由HttpOnly Cookie鉴权；短期内存票据仅在Cookie受策略阻止时作为同页降级。
+    if (deviceInfo.deviceToken) headers["X-Device-Token"] = deviceInfo.deviceToken;
+    if (deviceInfo.webMemoryTicket) headers["X-Web-Device-Ticket"] = deviceInfo.webMemoryTicket;
   }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 10000);
@@ -133,6 +179,7 @@ async function cfFetch(
     return await fetch(`${CF_WORKER_URL}${path}`, {
       ...fetchOptions,
       headers,
+      credentials: Platform.OS === "web" ? "include" : undefined,
       signal: controller.signal,
     });
   } finally {
@@ -155,7 +202,7 @@ export async function createNewSyncGroup(deviceName?: string): Promise<DeviceInf
 
   const res = await cfFetch("/api/device/register", {
     method: "POST",
-    body: JSON.stringify({ deviceId, deviceName: name }),
+    body: JSON.stringify({ deviceId, deviceName: name, platform: Platform.OS }),
   });
 
   if (!res.ok) {
@@ -232,7 +279,7 @@ export async function pairWithCode(
 
   const res = await cfFetch("/api/device/pair", {
     method: "POST",
-    body: JSON.stringify({ code, deviceId, deviceName: name }),
+    body: JSON.stringify({ code, deviceId, deviceName: name, platform: Platform.OS }),
   });
 
   if (!res.ok) {

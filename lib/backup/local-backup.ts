@@ -12,9 +12,23 @@ import { SYNC_KEYS } from "@/lib/sync/engine";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import { Platform } from "react-native";
+import {
+  decryptSnapshotV2,
+  migrateSnapshotV1ToEncryptedV2,
+  type EncryptedSnapshotV2,
+  type SnapshotV2Crypto,
+} from "@/lib/backup/snapshot-v2";
 
 const SNAPSHOT_PREFIX = "backup.snapshot.";
+const SNAPSHOT_V2_PREFIX = "backup.snapshot.v2.";
 const SNAPSHOT_META_KEY = "backup.meta";
+const V1_FALLBACK_RETAIN_MS = 30 * 24 * 60 * 60 * 1000;
+let snapshotV2Crypto: SnapshotV2Crypto | null = null;
+
+/** 原生AES-GCM提供器接入后由应用启动层注入；未注入时不会伪造V2加密快照。 */
+export function configureSnapshotV2Crypto(crypto: SnapshotV2Crypto | null): void {
+  snapshotV2Crypto = crypto;
+}
 const MAX_SNAPSHOTS = 7; // ★ 升级：3 → 7 个循环快照
 const CHUNK_SIZE_LIMIT = 1.5 * 1024 * 1024; // ★ 1.5MB 分片阈値（防 AsyncStorage 2MB 上限）
 const CHUNK_SUFFIX = ".chunks";
@@ -29,6 +43,9 @@ export type SnapshotMeta = {
     hash: string;
     keyCount: number;
     label: string; // e.g. "2026-07-14 17:30"
+    v2State?: "verified" | "unavailable" | "failed";
+    v1RetireAt?: number;
+    v1Retired?: boolean;
   } | null>;
 };
 
@@ -74,8 +91,59 @@ export async function getSnapshotMeta(): Promise<SnapshotMeta> {
   return { currentSlot: 0, slots: Array(MAX_SNAPSHOTS).fill(null) };
 }
 
+function snapshotV2Key(slot: number): string {
+  return `${SNAPSHOT_V2_PREFIX}${slot}`;
+}
+
+async function clearSnapshotV2(slot: number): Promise<void> {
+  const base = snapshotV2Key(slot);
+  const chunksRaw = await AsyncStorage.getItem(`${base}${CHUNK_SUFFIX}`).catch(() => null);
+  const keys = [base, `${base}${CHUNK_SUFFIX}`];
+  const chunks = Number(chunksRaw || 0);
+  for (let index = 0; index < chunks; index += 1) keys.push(`${base}.chunk.${index}`);
+  await AsyncStorage.multiRemove(keys).catch(() => {});
+}
+
+async function writeSnapshotV2(slot: number, snapshot: EncryptedSnapshotV2): Promise<void> {
+  const base = snapshotV2Key(slot);
+  const json = JSON.stringify(snapshot);
+  await clearSnapshotV2(slot);
+  if (json.length <= CHUNK_SIZE_LIMIT) {
+    await AsyncStorage.setItem(base, json);
+    return;
+  }
+  const chunks = Math.ceil(json.length / CHUNK_SIZE_LIMIT);
+  for (let index = 0; index < chunks; index += 1) {
+    await AsyncStorage.setItem(`${base}.chunk.${index}`, json.slice(index * CHUNK_SIZE_LIMIT, (index + 1) * CHUNK_SIZE_LIMIT));
+  }
+  await AsyncStorage.setItem(`${base}${CHUNK_SUFFIX}`, String(chunks));
+}
+
+async function readSnapshotV2(slot: number): Promise<EncryptedSnapshotV2 | null> {
+  try {
+    const base = snapshotV2Key(slot);
+    const chunksRaw = await AsyncStorage.getItem(`${base}${CHUNK_SUFFIX}`);
+    if (chunksRaw) {
+      const chunks = Number(chunksRaw);
+      if (!Number.isInteger(chunks) || chunks < 1 || chunks > 10_000) return null;
+      let json = "";
+      for (let index = 0; index < chunks; index += 1) {
+        const part = await AsyncStorage.getItem(`${base}.chunk.${index}`);
+        if (!part) return null;
+        json += part;
+      }
+      return JSON.parse(json) as EncryptedSnapshotV2;
+    }
+    const raw = await AsyncStorage.getItem(base);
+    return raw ? JSON.parse(raw) as EncryptedSnapshotV2 : null;
+  } catch {
+    return null;
+  }
+}
+
 /** 创建新快照（循环覆盖最旧的槽位） */
 export async function createSnapshot(): Promise<SnapshotMeta> {
+  await retireVerifiedV1Snapshots();
   const meta = await getSnapshotMeta();
   const slot = meta.currentSlot % MAX_SNAPSHOTS;
 
@@ -102,7 +170,23 @@ export async function createSnapshot(): Promise<SnapshotMeta> {
     await AsyncStorage.setItem(`${SNAPSHOT_PREFIX}${slot}`, snapshotJson);
   }
 
-  // 更新元数据
+  // V2 双写只在受审查的原生 AES-GCM 提供器已注入时发生。写入后立即解密验证；
+  // V2认证失败时不删除V1，避免生成不可恢复的唯一快照。
+  let v2State: "verified" | "unavailable" | "failed" = "unavailable";
+  if (snapshotV2Crypto) {
+    try {
+      const encrypted = await migrateSnapshotV1ToEncryptedV2(snapshot, snapshotV2Crypto);
+      await writeSnapshotV2(slot, encrypted);
+      const verified = await decryptSnapshotV2(encrypted, snapshotV2Crypto);
+      if (Object.keys(verified).length !== encrypted.manifest.keyCount) throw new Error("SNAPSHOT_V2_VERIFY_COUNT_MISMATCH");
+      v2State = "verified";
+    } catch {
+      await clearSnapshotV2(slot);
+      v2State = "failed";
+    }
+  }
+
+  // 更新元数据。仅在V2认证验证完成后启动V1淘汰窗口。
   const newMeta: SnapshotMeta = {
     currentSlot: (slot + 1) % MAX_SNAPSHOTS,
     slots: [...meta.slots],
@@ -113,6 +197,8 @@ export async function createSnapshot(): Promise<SnapshotMeta> {
     hash,
     keyCount: Object.keys(data).filter((k) => data[k] !== null).length,
     label: formatLabel(now),
+    v2State,
+    ...(v2State === "verified" ? { v1RetireAt: now + V1_FALLBACK_RETAIN_MS } : {}),
   };
 
   await AsyncStorage.setItem(SNAPSHOT_META_KEY, JSON.stringify(newMeta));
@@ -162,55 +248,84 @@ async function readSnapshotChunked(slot: number): Promise<string | null> {
   }
 }
 
-/** 读取指定槽位的快照（自动处理分片） */
+/** 读取指定槽位的快照：V2存在时必须成功认证解密，绝不降级读取V1。 */
 export async function readSnapshot(slot: number): Promise<Snapshot | null> {
+  const encrypted = await readSnapshotV2(slot);
+  if (encrypted) {
+    if (!snapshotV2Crypto) return null;
+    const data = await decryptSnapshotV2(encrypted, snapshotV2Crypto);
+    return { createdAt: encrypted.createdAt, hash: `v2:${encrypted.keyId}`, data };
+  }
   try {
-    // 先尝试分片读取
+    const meta = await getSnapshotMeta();
+    const slotMeta = meta.slots[slot];
+    if (slotMeta?.v1Retired) return null;
     const chunked = await readSnapshotChunked(slot);
     if (chunked) return JSON.parse(chunked) as Snapshot;
-    // 常规单条读取
     const raw = await AsyncStorage.getItem(`${SNAPSHOT_PREFIX}${slot}`);
-    if (!raw) return null;
-    return JSON.parse(raw) as Snapshot;
+    return raw ? JSON.parse(raw) as Snapshot : null;
   } catch {
     return null;
   }
 }
 
-/** 校验快照完整性 */
+/** 校验快照完整性：V2依赖AEAD认证标签；V1仅用于淘汰窗口内的意外损坏检测。 */
 export async function verifySnapshot(slot: number): Promise<boolean> {
-  const snapshot = await readSnapshot(slot);
-  if (!snapshot) return false;
-  const serialized = JSON.stringify(snapshot.data);
-  const hash = simpleHash(serialized);
-  return hash === snapshot.hash;
+  try {
+    const encrypted = await readSnapshotV2(slot);
+    if (encrypted) {
+      if (!snapshotV2Crypto) return false;
+      await decryptSnapshotV2(encrypted, snapshotV2Crypto);
+      return true;
+    }
+    const snapshot = await readSnapshot(slot);
+    if (!snapshot) return false;
+    return simpleHash(JSON.stringify(snapshot.data)) === snapshot.hash;
+  } catch {
+    return false;
+  }
 }
 
-/** 从快照恢复数据 */
+/** 从快照恢复数据；V2认证失败、密钥不可用或结构无效时保持当前数据不变。 */
 export async function restoreFromSnapshot(slot: number): Promise<{ restored: number; failed: number }> {
-  const snapshot = await readSnapshot(slot);
-  if (!snapshot) throw new Error(`Snapshot slot ${slot} not found`);
-
-  // 校验完整性
-  const serialized = JSON.stringify(snapshot.data);
-  const hash = simpleHash(serialized);
-  if (hash !== snapshot.hash) throw new Error("Snapshot integrity check failed");
-
-  let restored = 0;
-  let failed = 0;
-
-  for (const [key, value] of Object.entries(snapshot.data)) {
-    try {
-      if (value !== null) {
-        await AsyncStorage.setItem(key, value);
-        restored++;
-      }
-    } catch {
-      failed++;
-    }
+  let snapshot: Snapshot;
+  try {
+    const resolved = await readSnapshot(slot);
+    if (!resolved) throw new Error("SNAPSHOT_UNAVAILABLE_OR_RETIRED");
+    snapshot = resolved;
+  } catch (error) {
+    throw new Error(error instanceof Error ? error.message : "SNAPSHOT_RESTORE_REJECTED");
   }
 
-  return { restored, failed };
+  const encrypted = await readSnapshotV2(slot);
+  if (!encrypted && simpleHash(JSON.stringify(snapshot.data)) !== snapshot.hash) {
+    throw new Error("SNAPSHOT_V1_INTEGRITY_FAILED");
+  }
+
+  const writes = Object.entries(snapshot.data)
+    .filter(([key, value]) => value !== null && (SYNC_KEYS as readonly string[]).includes(key))
+    .map(([key, value]) => [key, value as string] as const);
+  try {
+    await AsyncStorage.multiSet(writes);
+    return { restored: writes.length, failed: 0 };
+  } catch {
+    throw new Error("SNAPSHOT_RESTORE_WRITE_FAILED");
+  }
+}
+
+/** 淘汰已认证V2副本对应的V1明文；只能在30天回退窗口结束后调用。 */
+export async function retireVerifiedV1Snapshots(now = Date.now()): Promise<number> {
+  const meta = await getSnapshotMeta();
+  let retired = 0;
+  for (const slotMeta of meta.slots) {
+    if (!slotMeta || slotMeta.v2State !== "verified" || slotMeta.v1Retired || !slotMeta.v1RetireAt || slotMeta.v1RetireAt > now) continue;
+    await clearSnapshotChunks(slotMeta.slot);
+    await AsyncStorage.removeItem(`${SNAPSHOT_PREFIX}${slotMeta.slot}`);
+    slotMeta.v1Retired = true;
+    retired += 1;
+  }
+  if (retired) await AsyncStorage.setItem(SNAPSHOT_META_KEY, JSON.stringify(meta));
+  return retired;
 }
 
 /** ★ 升级：全模块数据摘要统计 */

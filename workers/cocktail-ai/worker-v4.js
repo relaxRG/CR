@@ -19,6 +19,7 @@ function corsHeaders(origin) {
     "Access-Control-Allow-Origin": allowed,
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Device-Id, X-Device-Token",
+    "Access-Control-Allow-Credentials": "true",
     "Access-Control-Max-Age": "86400"
   };
 }
@@ -1285,10 +1286,78 @@ function generateToken() {
 __name(generateToken, "generateToken");
 __name2(generateToken, "generateToken");
 __name22(generateToken, "generateToken");
+const WEB_DEVICE_SESSION_COOKIE = "cr_sync_session";
+const WEB_DEVICE_SESSION_TTL_MS = 60 * 60 * 1000;
+const WEB_DEVICE_MEMORY_TICKET_TTL_MS = 10 * 60 * 1000;
+
+function isWebOrigin(origin) {
+  return ALLOWED_ORIGINS.includes(origin);
+}
+
+function readCookie(cookieHeader, name) {
+  if (!cookieHeader) return null;
+  for (const part of cookieHeader.split(";")) {
+    const [rawName, ...rawValue] = part.trim().split("=");
+    if (rawName === name) return rawValue.join("=") || null;
+  }
+  return null;
+}
+
+function webSessionCookie(sessionId, maxAgeSeconds) {
+  return `${WEB_DEVICE_SESSION_COOKIE}=${sessionId}; Path=/api; HttpOnly; Secure; SameSite=None; Max-Age=${maxAgeSeconds}`;
+}
+
+function jsonWithWebSession(data, origin, sessionId) {
+  const headers = { "Content-Type": "application/json", ...corsHeaders(origin) };
+  if (sessionId && isWebOrigin(origin)) headers["Set-Cookie"] = webSessionCookie(sessionId, Math.floor(WEB_DEVICE_SESSION_TTL_MS / 1000));
+  return new Response(JSON.stringify(data), { status: 200, headers });
+}
+
+async function ensureWebDeviceSessions(env) {
+  await env.DB.prepare("CREATE TABLE IF NOT EXISTS web_device_sessions (session_id TEXT PRIMARY KEY, device_id TEXT NOT NULL, created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL)").run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_web_device_sessions_expiry ON web_device_sessions(expires_at)").run();
+  await env.DB.prepare("CREATE TABLE IF NOT EXISTS web_device_memory_tickets (ticket TEXT PRIMARY KEY, device_id TEXT NOT NULL, created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL)").run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_web_device_memory_tickets_expiry ON web_device_memory_tickets(expires_at)").run();
+}
+
+async function issueWebDeviceSession(env, deviceId, origin) {
+  if (!isWebOrigin(origin)) return null;
+  await ensureWebDeviceSessions(env);
+  const now = Date.now();
+  const sessionId = generateToken();
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM web_device_sessions WHERE expires_at <= ?").bind(now),
+    env.DB.prepare("INSERT INTO web_device_sessions (session_id, device_id, created_at, expires_at) VALUES (?, ?, ?, ?)").bind(sessionId, deviceId, now, now + WEB_DEVICE_SESSION_TTL_MS)
+  ]);
+  return sessionId;
+}
+
+async function clearWebDeviceSessions(env, deviceId) {
+  try {
+    await ensureWebDeviceSessions(env);
+    await env.DB.batch([
+      env.DB.prepare("DELETE FROM web_device_sessions WHERE device_id = ?").bind(deviceId),
+      env.DB.prepare("DELETE FROM web_device_memory_tickets WHERE device_id = ?").bind(deviceId)
+    ]);
+  } catch {}
+}
+
+async function issueWebMemoryTicket(env, deviceId, origin) {
+  if (!isWebOrigin(origin)) return null;
+  await ensureWebDeviceSessions(env);
+  const now = Date.now();
+  const ticket = generateToken();
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM web_device_memory_tickets WHERE expires_at <= ?").bind(now),
+    env.DB.prepare("INSERT INTO web_device_memory_tickets (ticket, device_id, created_at, expires_at) VALUES (?, ?, ?, ?)").bind(ticket, deviceId, now, now + WEB_DEVICE_MEMORY_TICKET_TTL_MS)
+  ]);
+  return ticket;
+}
+
 async function verifyDevice(env, deviceId, token) {
   if (!deviceId || !token) return null;
   const row = await env.DB.prepare(
-    "SELECT d.device_id, d.group_id, d.role, d.name, d.allowed_keys FROM devices d WHERE d.device_id = ? AND d.token = ? AND d.is_active = 1"
+    "SELECT d.device_id, d.group_id, d.role, d.name, d.allowed_keys, d.token FROM devices d WHERE d.device_id = ? AND d.token = ? AND d.is_active = 1"
   ).bind(deviceId, token).first();
   if (row) {
     try {
@@ -1297,13 +1366,28 @@ async function verifyDevice(env, deviceId, token) {
   }
   return row || null;
 }
+
+async function verifyRequestDevice(env, headers) {
+  const requestedDeviceId = headers.get("X-Device-Id");
+  const token = headers.get("X-Device-Token");
+  if (requestedDeviceId && token) return verifyDevice(env, requestedDeviceId, token);
+  const sessionId = readCookie(headers.get("Cookie"), WEB_DEVICE_SESSION_COOKIE);
+  const memoryTicket = headers.get("X-Web-Device-Ticket");
+  if (!sessionId && !memoryTicket) return null;
+  await ensureWebDeviceSessions(env);
+  const now = Date.now();
+  const row = sessionId
+    ? await env.DB.prepare("SELECT d.device_id, d.group_id, d.role, d.name, d.allowed_keys, d.token FROM web_device_sessions s JOIN devices d ON d.device_id = s.device_id WHERE s.session_id = ? AND s.expires_at > ? AND d.is_active = 1").bind(sessionId, now).first()
+    : await env.DB.prepare("SELECT d.device_id, d.group_id, d.role, d.name, d.allowed_keys, d.token FROM web_device_memory_tickets t JOIN devices d ON d.device_id = t.device_id WHERE t.ticket = ? AND t.expires_at > ? AND d.is_active = 1").bind(memoryTicket, now).first();
+  if (!row || (requestedDeviceId && row.device_id !== requestedDeviceId)) return null;
+  try { await env.DB.prepare("UPDATE devices SET last_seen = ? WHERE device_id = ?").bind(now, row.device_id).run(); } catch {}
+  return row;
+}
 __name(verifyDevice, "verifyDevice");
 __name2(verifyDevice, "verifyDevice");
 __name22(verifyDevice, "verifyDevice");
 async function handleSyncPull(env, body, headers, origin) {
-  const deviceId = headers.get("X-Device-Id");
-  const token = headers.get("X-Device-Token");
-  const device = await verifyDevice(env, deviceId, token);
+  const device = await verifyRequestDevice(env, headers);
   if (!device) return err("Unauthorized", 401, origin);
   const { since } = body || {};
   let query = "SELECT storage_key, value, client_updated_at, updated_at FROM sync_data WHERE group_id = ?";
@@ -1347,9 +1431,7 @@ __name(handleSyncPull, "handleSyncPull");
 __name2(handleSyncPull, "handleSyncPull");
 __name22(handleSyncPull, "handleSyncPull");
 async function handleSyncPush(env, body, headers, origin) {
-  const deviceId = headers.get("X-Device-Id");
-  const token = headers.get("X-Device-Token");
-  const device = await verifyDevice(env, deviceId, token);
+  const device = await verifyRequestDevice(env, headers);
   if (!device) return err("Unauthorized", 401, origin);
   if (device.role === "guest") return err("Guest devices cannot push", 403, origin);
   const { entries } = body || {};
@@ -1373,9 +1455,7 @@ __name(handleSyncPush, "handleSyncPush");
 __name2(handleSyncPush, "handleSyncPush");
 __name22(handleSyncPush, "handleSyncPush");
 async function handleSyncNotify(env, headers, origin) {
-  const deviceId = headers.get("X-Device-Id");
-  const token = headers.get("X-Device-Token");
-  const device = await verifyDevice(env, deviceId, token);
+  const device = await verifyRequestDevice(env, headers);
   if (!device) return err("Unauthorized", 401, origin);
   const now = Date.now();
   await env.DB.prepare(
@@ -1387,9 +1467,7 @@ __name(handleSyncNotify, "handleSyncNotify");
 __name2(handleSyncNotify, "handleSyncNotify");
 __name22(handleSyncNotify, "handleSyncNotify");
 async function handleSyncCheck(env, headers, origin) {
-  const deviceId = headers.get("X-Device-Id");
-  const token = headers.get("X-Device-Token");
-  const device = await verifyDevice(env, deviceId, token);
+  const device = await verifyRequestDevice(env, headers);
   if (!device) return err("Unauthorized", 401, origin);
   const row = await env.DB.prepare(
     "SELECT last_push_at FROM group_ts WHERE group_id = ?"
@@ -1414,7 +1492,7 @@ __name(ensurePhotosTable, "ensurePhotosTable");
 // ─── Photo sync (D1 base64 storage) ──────────────────────────────────────────
 async function handlePhotoUpload(env, body, headers, origin) {
   await ensurePhotosTable(env);
-  const device = await verifyDevice(env, headers.get("X-Device-Id"), headers.get("X-Device-Token"));
+  const device = await verifyRequestDevice(env, headers);
   if (!device) return err("Unauthorized", 401, origin);
   if (device.role === "guest") return err("Guest devices cannot upload", 403, origin);
   const { photoId, recipeId, dataBase64, contentType } = body || {};
@@ -1432,7 +1510,7 @@ __name(handlePhotoUpload, "handlePhotoUpload");
 
 async function handlePhotoList(env, body, headers, origin) {
   await ensurePhotosTable(env);
-  const device = await verifyDevice(env, headers.get("X-Device-Id"), headers.get("X-Device-Token"));
+  const device = await verifyRequestDevice(env, headers);
   if (!device) return err("Unauthorized", 401, origin);
   const { since } = body || {};
   let query = "SELECT photo_id, recipe_id, content_type, size, client_updated_at, deleted FROM photos WHERE group_id = ?";
@@ -1453,7 +1531,7 @@ __name(handlePhotoList, "handlePhotoList");
 
 async function handlePhotoDownload(env, body, headers, origin) {
   await ensurePhotosTable(env);
-  const device = await verifyDevice(env, headers.get("X-Device-Id"), headers.get("X-Device-Token"));
+  const device = await verifyRequestDevice(env, headers);
   if (!device) return err("Unauthorized", 401, origin);
   const { photoId } = body || {};
   if (!photoId) return err("photoId required", 400, origin);
@@ -1467,7 +1545,7 @@ __name(handlePhotoDownload, "handlePhotoDownload");
 
 async function handlePhotoDelete(env, body, headers, origin) {
   await ensurePhotosTable(env);
-  const device = await verifyDevice(env, headers.get("X-Device-Id"), headers.get("X-Device-Token"));
+  const device = await verifyRequestDevice(env, headers);
   if (!device) return err("Unauthorized", 401, origin);
   if (device.role === "guest") return err("Guest devices cannot delete", 403, origin);
   const { photoId } = body || {};
@@ -1539,17 +1617,41 @@ async function logSwitchEvent(env, switchId, event, errorCode = null) {
   } catch {}
 }
 
-function switchMemberPayload(row) {
+function switchMemberPayload(row, includeToken = true) {
   let allowedKeys = null;
   try { allowedKeys = row.allowed_keys ? JSON.parse(row.allowed_keys) : null; } catch {}
   return {
     deviceId: row.device_id,
-    deviceToken: row.token,
+    ...(includeToken ? { deviceToken: row.token } : {}),
     groupId: row.group_id,
     role: row.role,
     allowedKeys,
     deviceName: row.name || "Unknown"
   };
+}
+
+async function deviceMembershipResponse(env, membership, origin, isWeb) {
+  if (!isWeb) return json({ membership }, 200, origin);
+  const [sessionId, webMemoryTicket] = await Promise.all([
+    issueWebDeviceSession(env, membership.deviceId, origin),
+    issueWebMemoryTicket(env, membership.deviceId, origin)
+  ]);
+  const payload = { ...membership, deviceToken: undefined, webMemoryTicket };
+  return jsonWithWebSession({ membership: payload }, origin, sessionId);
+}
+
+async function committedSwitchResponse(env, origin, row) {
+  const isWeb = isWebOrigin(origin);
+  const membership = switchMemberPayload(row, !isWeb);
+  if (!isWeb) return json({ state: "committed", membership }, 200, origin);
+  const [sessionId, webMemoryTicket] = await Promise.all([
+    issueWebDeviceSession(env, membership.deviceId, origin),
+    issueWebMemoryTicket(env, membership.deviceId, origin)
+  ]);
+  return jsonWithWebSession({
+    state: "committed",
+    membership: { ...membership, deviceToken: undefined, webMemoryTicket }
+  }, origin, sessionId);
 }
 
 async function getSwitchByTicket(env, switchId, recoveryTicket) {
@@ -1570,7 +1672,7 @@ async function ownerHandoffError(env, source, handoffDeviceId) {
 
 async function handleDevicePrepareSwitch(env, body, headers, origin) {
   await ensureSwitchSchema(env);
-  const source = await verifyDevice(env, headers.get("X-Device-Id"), headers.get("X-Device-Token"));
+  const source = await verifyRequestDevice(env, headers);
   // 失效的来源成员资格可通过显式恢复加入处理；绝不能用笼统Unauthorized诱导客户端走不安全降级。
   if (!source) {
     console.warn("[cf-sync] source_membership_unavailable", { hasDeviceId: Boolean(headers.get("X-Device-Id")) });
@@ -1642,18 +1744,19 @@ async function handleDeviceRecoverJoin(env, body, origin) {
   let allowedKeys = null;
   try { allowedKeys = pair.allowed_keys ? JSON.parse(pair.allowed_keys) : null; } catch {}
   console.info("[cf-sync] recovery_join_completed", { targetGroup: String(pair.group_id).slice(0, 8), role: pair.role });
-  return json({ membership: { deviceId, deviceToken: token, groupId: pair.group_id, role: pair.role, allowedKeys, deviceName: normalizedName } }, 200, origin);
+  return deviceMembershipResponse(env, { deviceId, deviceToken: token, groupId: pair.group_id, role: pair.role, allowedKeys, deviceName: normalizedName }, origin, platform === "web");
 }
 
 async function handleDeviceCommitSwitch(env, body, headers, origin) {
   await ensureSwitchSchema(env);
-  const source = await verifyDevice(env, headers.get("X-Device-Id"), headers.get("X-Device-Token"));
+  const source = await verifyRequestDevice(env, headers);
   if (!source) return err("Unauthorized", 401, origin);
   const record = await getSwitchByTicket(env, body?.switchId, body?.recoveryTicket);
   if (!record || record.source_device_id !== source.device_id) return err("SWITCH_RECOVERY_UNAUTHORIZED", 403, origin);
   if (record.state === "committed") {
     const target = await env.DB.prepare("SELECT device_id, group_id, token, name, role, allowed_keys FROM devices WHERE device_id = ? AND is_active = 1").bind(record.target_device_id).first();
-    return target ? json({ state: "committed", membership: switchMemberPayload(target) }, 200, origin) : err("SWITCH_TARGET_MISSING", 409, origin);
+    if (!target) return err("SWITCH_TARGET_MISSING", 409, origin);
+    return committedSwitchResponse(env, origin, target);
   }
   if (record.state !== "prepared") return err("SWITCH_NOT_COMMITTABLE", 409, origin);
   const handoffError = await ownerHandoffError(env, source, record.handoff_device_id);
@@ -1664,7 +1767,7 @@ async function handleDeviceCommitSwitch(env, body, headers, origin) {
   const now = Date.now();
   const statements = [
     env.DB.prepare("INSERT OR IGNORE INTO devices (id, device_id, group_id, token, name, platform, role, allowed_keys, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)").bind(record.target_device_id, record.target_device_id, record.target_group_id, record.target_token, record.target_name, record.target_platform, record.target_role, record.target_allowed_keys, now),
-    env.DB.prepare("UPDATE devices SET is_active = 0 WHERE device_id = ? AND group_id = ? AND token = ? AND is_active = 1").bind(source.device_id, source.group_id, headers.get("X-Device-Token")),
+    env.DB.prepare("UPDATE devices SET is_active = 0 WHERE device_id = ? AND group_id = ? AND token = ? AND is_active = 1").bind(source.device_id, source.group_id, source.token),
     env.DB.prepare("UPDATE pair_codes SET used = 1 WHERE code = ? AND reserved_switch_id = ?").bind(record.pair_code, record.switch_id),
     env.DB.prepare("UPDATE group_switches SET state = 'committed', committed_at = ?, last_error_code = NULL WHERE switch_id = ?").bind(now, record.switch_id)
   ];
@@ -1676,9 +1779,11 @@ async function handleDeviceCommitSwitch(env, body, headers, origin) {
     );
   }
   await env.DB.batch(statements);
+  await clearWebDeviceSessions(env, source.device_id);
   await logSwitchEvent(env, record.switch_id, "switch_committed");
   const target = await env.DB.prepare("SELECT device_id, group_id, token, name, role, allowed_keys FROM devices WHERE device_id = ? AND is_active = 1").bind(record.target_device_id).first();
-  return target ? json({ state: "committed", membership: switchMemberPayload(target) }, 200, origin) : err("SWITCH_TARGET_MISSING", 409, origin);
+  if (!target) return err("SWITCH_TARGET_MISSING", 409, origin);
+  return committedSwitchResponse(env, origin, target);
 }
 
 async function handleDeviceSwitchStatus(env, body, origin) {
@@ -1687,7 +1792,8 @@ async function handleDeviceSwitchStatus(env, body, origin) {
   if (!record) return err("SWITCH_RECOVERY_UNAUTHORIZED", 403, origin);
   if (record.state !== "committed") return json({ state: record.state }, 200, origin);
   const target = await env.DB.prepare("SELECT device_id, group_id, token, name, role, allowed_keys FROM devices WHERE device_id = ? AND is_active = 1").bind(record.target_device_id).first();
-  return target ? json({ state: "committed", membership: switchMemberPayload(target) }, 200, origin) : err("SWITCH_TARGET_MISSING", 409, origin);
+  if (!target) return err("SWITCH_TARGET_MISSING", 409, origin);
+  return committedSwitchResponse(env, origin, target);
 }
 
 async function handleDeviceCancelSwitch(env, body, origin) {
@@ -1704,7 +1810,7 @@ async function handleDeviceCancelSwitch(env, body, origin) {
 }
 
 async function handleSyncCompleteSnapshot(env, headers, origin) {
-  const device = await verifyDevice(env, headers.get("X-Device-Id"), headers.get("X-Device-Token"));
+  const device = await verifyRequestDevice(env, headers);
   if (!device) return err("Unauthorized", 401, origin);
   const rows = await env.DB.prepare("SELECT storage_key, value, client_updated_at FROM sync_data WHERE group_id = ? ORDER BY storage_key ASC").bind(device.group_id).all();
   const entries = (rows.results || []).map((row) => ({ storageKey: row.storage_key, value: row.value, clientUpdatedAt: row.client_updated_at }));
@@ -1723,15 +1829,14 @@ async function handleDeviceRegister(env, body, origin) {
   await env.DB.prepare(
     "INSERT INTO devices (device_id, group_id, token, name, platform, role, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?)"
   ).bind(deviceId, groupId, token, deviceName || "Unknown", platform || "ios", "owner", Date.now()).run();
-  return json({ deviceId, token, deviceToken: token, groupId, role: "owner" }, 200, origin);
+  const membership = { deviceId, deviceToken: token, groupId, role: "owner", allowedKeys: null, deviceName: deviceName || "Unknown" };
+  return deviceMembershipResponse(env, membership, origin, platform === "web");
 }
 __name(handleDeviceRegister, "handleDeviceRegister");
 __name2(handleDeviceRegister, "handleDeviceRegister");
 __name22(handleDeviceRegister, "handleDeviceRegister");
 async function handleDeviceGenerateCode(env, body, headers, origin) {
-  const deviceId = headers.get("X-Device-Id");
-  const token = headers.get("X-Device-Token");
-  const device = await verifyDevice(env, deviceId, token);
+  const device = await verifyRequestDevice(env, headers);
   if (!device) return err("Unauthorized", 401, origin);
   if (device.role !== "owner") return err("Only owner can generate pair codes", 403, origin);
   const { role = "collaborator", expiresInMinutes = 10, allowedKeys = null } = body || {};
@@ -1761,15 +1866,17 @@ async function handleDevicePair(env, body, origin) {
   await env.DB.prepare("UPDATE pair_codes SET used = 1 WHERE code = ?").bind(code).run();
   let pairAllowedKeys = null;
   try { pairAllowedKeys = pairRow.allowed_keys ? JSON.parse(pairRow.allowed_keys) : null; } catch {}
-  return json({ deviceId, token, deviceToken: token, groupId: pairRow.group_id, role: pairRow.role, allowedKeys: pairAllowedKeys }, 200, origin);
+  const membership = { deviceId, deviceToken: token, groupId: pairRow.group_id, role: pairRow.role, allowedKeys: pairAllowedKeys, deviceName: deviceName || "Unknown" };
+  const isWeb = platform === "web";
+  if (!isWeb) return json({ ...membership, token }, 200, origin);
+  const sessionId = await issueWebDeviceSession(env, deviceId, origin);
+  return jsonWithWebSession({ ...membership, deviceToken: undefined }, origin, sessionId);
 }
 __name(handleDevicePair, "handleDevicePair");
 __name2(handleDevicePair, "handleDevicePair");
 __name22(handleDevicePair, "handleDevicePair");
 async function handleDeviceList(env, headers, origin) {
-  const deviceId = headers.get("X-Device-Id");
-  const token = headers.get("X-Device-Token");
-  const device = await verifyDevice(env, deviceId, token);
+  const device = await verifyRequestDevice(env, headers);
   if (!device) return err("Unauthorized", 401, origin);
   const rows = await env.DB.prepare(
     "SELECT device_id, name, platform, role, allowed_keys, is_active, last_seen, created_at FROM devices WHERE group_id = ? AND is_active = 1"
@@ -1794,7 +1901,7 @@ __name(handleDeviceList, "handleDeviceList");
 __name2(handleDeviceList, "handleDeviceList");
 __name22(handleDeviceList, "handleDeviceList");
 async function handleDeviceRename(env, body, headers, origin) {
-  const device = await verifyDevice(env, headers.get("X-Device-Id"), headers.get("X-Device-Token"));
+  const device = await verifyRequestDevice(env, headers);
   if (!device) return err("DEVICE_AUTH_UNAUTHORIZED", 401, origin);
   const requestedName = typeof body?.deviceName === "string" ? body.deviceName.trim() : "";
   if (!requestedName || requestedName.length > 40 || /[\u0000-\u001F\u007F]/.test(requestedName)) return err("DEVICE_NAME_INVALID", 400, origin);
@@ -1814,9 +1921,7 @@ async function handleDeviceRename(env, body, headers, origin) {
 }
 
 async function handleDeviceKick(env, body, headers, origin) {
-  const deviceId = headers.get("X-Device-Id");
-  const token = headers.get("X-Device-Token");
-  const device = await verifyDevice(env, deviceId, token);
+  const device = await verifyRequestDevice(env, headers);
   if (!device) return err("Unauthorized", 401, origin);
   if (device.role !== "owner") return err("Only owner can kick devices", 403, origin);
   const { targetDeviceId } = body || {};
@@ -1830,9 +1935,7 @@ __name(handleDeviceKick, "handleDeviceKick");
 __name2(handleDeviceKick, "handleDeviceKick");
 __name22(handleDeviceKick, "handleDeviceKick");
 async function handleDeviceUpdateRole(env, body, headers, origin) {
-  const deviceId = headers.get("X-Device-Id");
-  const token = headers.get("X-Device-Token");
-  const device = await verifyDevice(env, deviceId, token);
+  const device = await verifyRequestDevice(env, headers);
   if (!device) return err("Unauthorized", 401, origin);
   if (device.role !== "owner") return err("Only owner can update roles", 403, origin);
   const { targetDeviceId, role, allowedKeys = null } = body || {};
