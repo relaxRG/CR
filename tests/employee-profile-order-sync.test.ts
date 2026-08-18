@@ -72,7 +72,7 @@ describe("员工档案排序同步", () => {
     expect(advanceChoices.map((item) => item.id)).toEqual(["front-b", "front-a", "kitchen-a"]);
   });
 
-  it("月结冻结排班的 employeeIds 也按员工档案组内顺序保存", () => {
+  it("新建月结冻结排班的 employeeIds 按当时员工档案组内顺序保存", () => {
     const employees = [
       employee("front-a", "front", 2, "F02"),
       employee("front-b", "front", 1, "F01"),
@@ -84,13 +84,28 @@ describe("员工档案排序同步", () => {
     expect(snapshot.kitchen?.employeeIds).toEqual(["kitchen-a"]);
   });
 
-  it("所有员工列表页面都显式使用统一排序工具，禁止退回到数组原始顺序", () => {
+  it("离职员工保留归档时间顺序，不受在职员工档案重排影响", () => {
+    const employees = [
+      { ...employee("old", "front", 2, "F02"), archived: true, archivedAt: "2026-07-01T00:00:00.000Z" },
+      { ...employee("new", "front", 1, "F01"), archived: true, archivedAt: "2026-08-01T00:00:00.000Z" },
+    ];
+    const archivedIds = [...employees]
+      .filter((item) => item.archived)
+      .sort((left, right) => (right.archivedAt ?? right.createdAt).localeCompare(left.archivedAt ?? left.createdAt))
+      .map((item) => item.id);
+
+    expect(sortEmployeesByProfileOrder(employees, [...deptOrder]).map((item) => item.id)).toEqual(["new", "old"]);
+    expect(archivedIds).toEqual(["new", "old"]);
+    expect(readFileSync(`${new URL("..", import.meta.url).pathname}/app/labor-archived.tsx`, "utf8"))
+      .toContain("按归档时间倒序");
+  });
+
+  it("所有在职员工列表页面都显式使用统一排序工具，禁止退回到数组原始顺序", () => {
     const sourcePaths = [
       "app/labor.tsx",
       "app/labor-attendance.tsx",
       "app/labor-advances.tsx",
       "app/labor-employees.tsx",
-      "app/labor-archived.tsx",
       "app/monthly-summary.tsx",
       "lib/labor/export.ts",
       "lib/labor/month-close.ts",
@@ -99,8 +114,8 @@ describe("员工档案排序同步", () => {
     const sources = sourcePaths.map((path) => readFileSync(`${root}/${path}`, "utf8"));
 
     expect(sources[0]).toContain("sortEmployeesWithinProfileGroup");
-    for (const source of sources.slice(1, 6)) expect(source).toContain("sortEmployeesByProfileOrder");
+    for (const source of sources.slice(1, 5)) expect(source).toContain("sortEmployeesByProfileOrder");
+    expect(sources[5]).toContain("sortEmployeesWithinProfileGroup");
     expect(sources[6]).toContain("sortEmployeesWithinProfileGroup");
-    expect(sources[7]).toContain("sortEmployeesWithinProfileGroup");
   });
 });

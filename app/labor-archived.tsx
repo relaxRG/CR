@@ -14,8 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
-import { useEmployeeStore, useDeptOrderStore } from "@/lib/labor/store";
-import { sortEmployeesByProfileOrder } from "@/lib/labor/employee-profile-order";
+import { useEmployeeStore } from "@/lib/labor/store";
 import { DEPT_LABELS, DEPT_COLORS, Employee } from "@/lib/labor/types";
 
 export default function LaborArchivedScreen() {
@@ -24,11 +23,17 @@ export default function LaborArchivedScreen() {
   const insets = useSafeAreaInsets();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
   const { employees, restoreEmployee, deleteEmployee } = useEmployeeStore();
-  const { deptOrder } = useDeptOrderStore();
 
-  const archived = useMemo(
-    () => sortEmployeesByProfileOrder(employees.filter((e) => e.archived), deptOrder),
-    [employees, deptOrder],
+  // 离职归档是历史记录：固定按归档时间倒序，不能被后续员工档案重排改写。
+  const archived = useMemo(() =>
+    [...employees]
+      .filter((e) => e.archived)
+      .sort((a, b) => {
+        const leftArchivedAt = a.archivedAt ?? a.createdAt;
+        const rightArchivedAt = b.archivedAt ?? b.createdAt;
+        return rightArchivedAt.localeCompare(leftArchivedAt);
+      }),
+    [employees],
   );
 
   const handleRestore = (emp: Employee) => {
