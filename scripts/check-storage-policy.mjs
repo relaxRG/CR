@@ -25,7 +25,8 @@ for (const entry of registry.entries) {
 
 for (const entry of registry.entries) {
   const isCredential = entry.classification === "S2-credential";
-  if (isCredential && ["AsyncStorage", "localStorage"].includes(entry.backend)) {
+  const hasUnsafeCredentialAccess = entry.operations?.some((operation) => /^(getItem|getItemAsync|setItem|setItemAsync|multiGet|multiSet)$/.test(operation));
+  if (isCredential && ["AsyncStorage", "localStorage"].includes(entry.backend) && hasUnsafeCredentialAccess) {
     errors.push(`STORAGE_CREDENTIAL_BACKEND_UNSAFE: ${id(entry)}`);
   }
   if (entry.dynamic && (!entry.ownerFiles?.length || !entry.purgeOn?.length)) {

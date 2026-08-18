@@ -1,7 +1,7 @@
 {
   "version": 1,
   "generatedFrom": "docs/local-storage-schema.json",
-  "entryCount": 126,
+  "entryCount": 127,
   "dynamicEntryCount": 25,
   "entries": [
     {
@@ -12,6 +12,9 @@
       "ownerFiles": [
         "lib/backup/icloud-backup.ts",
         "lib/backup/local-backup.ts"
+      ],
+      "operations": [
+        "multiGet"
       ],
       "dynamic": true,
       "purgeOn": [
@@ -26,6 +29,9 @@
       "ownerFiles": [
         "app/backup.tsx"
       ],
+      "operations": [
+        "multiGet"
+      ],
       "dynamic": true,
       "purgeOn": [
         "version-retirement"
@@ -38,6 +44,9 @@
       "classification": "S1-business",
       "ownerFiles": [
         "lib/labor/store.tsx"
+      ],
+      "operations": [
+        "multiRemove"
       ],
       "dynamic": true,
       "purgeOn": [
@@ -53,6 +62,9 @@
       "ownerFiles": [
         "lib/sync/engine.ts"
       ],
+      "operations": [
+        "multiRemove"
+      ],
       "dynamic": true,
       "purgeOn": [
         "startup-ttl",
@@ -67,6 +79,10 @@
       "ownerFiles": [
         "lib/backup/local-backup.ts"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": true,
       "purgeOn": [
         "version-retirement"
@@ -79,6 +95,11 @@
       "classification": "S0-public",
       "ownerFiles": [
         "lib/backup/local-backup.ts"
+      ],
+      "operations": [
+        "getItem",
+        "removeItem",
+        "setItem"
       ],
       "dynamic": true,
       "purgeOn": [
@@ -93,6 +114,10 @@
       "ownerFiles": [
         "lib/backup/local-backup.ts"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": true,
       "purgeOn": [
         "version-retirement"
@@ -105,6 +130,10 @@
       "classification": "S0-public",
       "ownerFiles": [
         "lib/backup/local-backup.ts"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
       ],
       "dynamic": true,
       "purgeOn": [
@@ -120,6 +149,10 @@
         "lib/cf-sync/provider.tsx",
         "lib/i18n/index.tsx"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "version-retirement"
@@ -132,6 +165,10 @@
       "classification": "S3-diagnostic",
       "ownerFiles": [
         "lib/backup/icloud-backup.ts"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -147,6 +184,10 @@
       "ownerFiles": [
         "lib/backup/local-backup.ts"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "startup-ttl",
@@ -161,6 +202,10 @@
       "ownerFiles": [
         "lib/backup/local-backup.ts"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": true,
       "purgeOn": [
         "version-retirement"
@@ -173,6 +218,9 @@
       "classification": "S1-business",
       "ownerFiles": [
         "lib/beer/inventory-store.tsx"
+      ],
+      "operations": [
+        "factory-key"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -188,6 +236,10 @@
       "ownerFiles": [
         "lib/bottles/store.tsx"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "version-retirement"
@@ -200,6 +252,10 @@
       "classification": "S0-public",
       "ownerFiles": [
         "lib/bottles/store.tsx"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -214,6 +270,10 @@
       "ownerFiles": [
         "lib/bottles/taxonomy.tsx"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "version-retirement"
@@ -226,6 +286,10 @@
       "classification": "S0-public",
       "ownerFiles": [
         "lib/bottles/taxonomy.tsx"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -240,9 +304,30 @@
       "ownerFiles": [
         "lib/sync/engine.ts"
       ],
+      "operations": [
+        "setItem"
+      ],
       "dynamic": true,
       "purgeOn": [
         "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "cf.sync.deviceToken",
+      "status": "resolved",
+      "classification": "S2-credential",
+      "ownerFiles": [
+        "lib/cf-sync/client.ts"
+      ],
+      "operations": [
+        "removeItem"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "logout",
+        "leave-group",
+        "switch-complete"
       ]
     },
     {
@@ -252,6 +337,11 @@
       "classification": "S3-diagnostic",
       "ownerFiles": [
         "lib/cf-sync/group-switch.ts"
+      ],
+      "operations": [
+        "getItem",
+        "removeItem",
+        "setItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -267,6 +357,10 @@
       "ownerFiles": [
         "lib/cf-sync/provider.tsx"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "startup-ttl",
@@ -280,6 +374,10 @@
       "classification": "S3-diagnostic",
       "ownerFiles": [
         "lib/cf-sync/switch-diagnostics.ts"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -295,6 +393,10 @@
       "ownerFiles": [
         "lib/books/store.tsx"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": true,
       "purgeOn": [
         "version-retirement"
@@ -307,6 +409,10 @@
       "classification": "S0-public",
       "ownerFiles": [
         "lib/books/store.tsx"
+      ],
+      "operations": [
+        "removeItem",
+        "setItem"
       ],
       "dynamic": true,
       "purgeOn": [
@@ -321,6 +427,10 @@
       "ownerFiles": [
         "hooks/use-recent-units.ts"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "version-retirement"
@@ -333,6 +443,10 @@
       "classification": "S0-public",
       "ownerFiles": [
         "lib/books/store.tsx"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -347,6 +461,10 @@
       "ownerFiles": [
         "lib/bottles/store.tsx"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "version-retirement"
@@ -359,6 +477,10 @@
       "classification": "S0-public",
       "ownerFiles": [
         "lib/bottles/store.tsx"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -373,6 +495,10 @@
       "ownerFiles": [
         "lib/recipes/store.tsx"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "version-retirement"
@@ -385,6 +511,10 @@
       "classification": "S0-public",
       "ownerFiles": [
         "lib/recipes/store.tsx"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -399,6 +529,10 @@
       "ownerFiles": [
         "lib/ice/cost.ts"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "version-retirement"
@@ -411,6 +545,10 @@
       "classification": "S0-public",
       "ownerFiles": [
         "lib/lab/store.tsx"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -425,6 +563,10 @@
       "ownerFiles": [
         "lib/lab/store.tsx"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "version-retirement"
@@ -437,6 +579,10 @@
       "classification": "S0-public",
       "ownerFiles": [
         "lib/recipes/store.tsx"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -451,6 +597,10 @@
       "ownerFiles": [
         "app/book-reader.tsx"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "version-retirement"
@@ -463,6 +613,10 @@
       "classification": "S0-public",
       "ownerFiles": [
         "app/book-reader.tsx"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -478,6 +632,10 @@
         "lib/recipes/store.tsx",
         "lib/sync/photo-sync.ts"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "version-retirement"
@@ -490,6 +648,10 @@
       "classification": "S0-public",
       "ownerFiles": [
         "lib/recipes/store.tsx"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -504,6 +666,10 @@
       "ownerFiles": [
         "lib/recipes/store.tsx"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "version-retirement"
@@ -516,6 +682,10 @@
       "classification": "S0-public",
       "ownerFiles": [
         "lib/recipes/store.tsx"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -530,6 +700,9 @@
       "ownerFiles": [
         "lib/sync/engine.ts"
       ],
+      "operations": [
+        "setItem"
+      ],
       "dynamic": true,
       "purgeOn": [
         "version-retirement"
@@ -542,6 +715,9 @@
       "classification": "S1-business",
       "ownerFiles": [
         "lib/daily/inventory-store.tsx"
+      ],
+      "operations": [
+        "factory-key"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -557,6 +733,10 @@
       "ownerFiles": [
         "app/role-settings.tsx"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "version-retirement"
@@ -570,6 +750,10 @@
       "ownerFiles": [
         "lib/store/monthly-report/dish-analysis-store.tsx"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "version-retirement"
@@ -582,6 +766,10 @@
       "classification": "S1-business",
       "ownerFiles": [
         "lib/equipment/inventory-store.tsx"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -597,6 +785,9 @@
       "ownerFiles": [
         "lib/food/ingredient-store.tsx"
       ],
+      "operations": [
+        "getItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "leave-group",
@@ -610,6 +801,10 @@
       "classification": "S1-business",
       "ownerFiles": [
         "lib/food/ingredient-store.tsx"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -625,6 +820,10 @@
       "ownerFiles": [
         "lib/food/menu-store.tsx"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "leave-group",
@@ -638,6 +837,10 @@
       "classification": "S1-business",
       "ownerFiles": [
         "lib/food/ingredient-store.tsx"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -653,6 +856,9 @@
       "ownerFiles": [
         "lib/fruit/new-inventory-store.tsx"
       ],
+      "operations": [
+        "factory-key"
+      ],
       "dynamic": false,
       "purgeOn": [
         "leave-group",
@@ -666,6 +872,9 @@
       "classification": "S1-business",
       "ownerFiles": [
         "lib/glassware/inventory-store.tsx"
+      ],
+      "operations": [
+        "factory-key"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -681,6 +890,10 @@
       "ownerFiles": [
         "lib/homemade/store.tsx"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "version-retirement"
@@ -693,6 +906,10 @@
       "classification": "S0-public",
       "ownerFiles": [
         "lib/homemade/store.tsx"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -707,6 +924,9 @@
       "ownerFiles": [
         "lib/homemade/store.tsx"
       ],
+      "operations": [
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "version-retirement"
@@ -719,6 +939,10 @@
       "classification": "S0-public",
       "ownerFiles": [
         "lib/homemade/store.tsx"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -733,6 +957,10 @@
       "ownerFiles": [
         "lib/homemade/store.tsx"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "version-retirement"
@@ -745,6 +973,10 @@
       "classification": "S0-public",
       "ownerFiles": [
         "lib/homemade/store.tsx"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -759,6 +991,10 @@
       "ownerFiles": [
         "lib/homemade/store.tsx"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "version-retirement"
@@ -771,6 +1007,10 @@
       "classification": "S0-public",
       "ownerFiles": [
         "lib/homemade/store.tsx"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -785,6 +1025,9 @@
       "ownerFiles": [
         "lib/ice/new-inventory-store.tsx"
       ],
+      "operations": [
+        "factory-key"
+      ],
       "dynamic": false,
       "purgeOn": [
         "leave-group",
@@ -798,6 +1041,10 @@
       "classification": "S0-public",
       "ownerFiles": [
         "components/ios-color-picker.tsx"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -818,6 +1065,11 @@
         "lib/labor/store.tsx",
         "lib/sync/engine.ts"
       ],
+      "operations": [
+        "getItem",
+        "removeItem",
+        "setItem"
+      ],
       "dynamic": true,
       "purgeOn": [
         "version-retirement"
@@ -832,6 +1084,10 @@
         "app/data-manager.tsx",
         "lib/backup/local-backup.ts"
       ],
+      "operations": [
+        "multiGet",
+        "multiRemove"
+      ],
       "dynamic": true,
       "purgeOn": [
         "version-retirement"
@@ -845,6 +1101,10 @@
       "ownerFiles": [
         "lib/lab/plan-store.tsx"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "version-retirement"
@@ -857,6 +1117,10 @@
       "classification": "S1-business",
       "ownerFiles": [
         "lib/labor/store.tsx"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -872,6 +1136,10 @@
       "ownerFiles": [
         "lib/migrations/clean-monthly-fixed-salary.ts"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "leave-group",
@@ -885,6 +1153,10 @@
       "classification": "S1-business",
       "ownerFiles": [
         "lib/migrations/clean-empty-shift-entries.ts"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -900,6 +1172,10 @@
       "ownerFiles": [
         "lib/labor/advance-store.tsx"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "leave-group",
@@ -913,6 +1189,10 @@
       "classification": "S1-business",
       "ownerFiles": [
         "lib/labor/advance-store.tsx"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -928,6 +1208,10 @@
       "ownerFiles": [
         "lib/labor/separate-payment-store.tsx"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "leave-group",
@@ -942,6 +1226,10 @@
       "ownerFiles": [
         "lib/menu/store.tsx"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "version-retirement"
@@ -955,6 +1243,10 @@
       "ownerFiles": [
         "lib/menu/package-store.tsx"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "version-retirement"
@@ -967,6 +1259,11 @@
       "classification": "S3-diagnostic",
       "ownerFiles": [
         "lib/migrations/clean-empty-shift-entries.ts"
+      ],
+      "operations": [
+        "getItem",
+        "removeItem",
+        "setItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -982,6 +1279,11 @@
       "ownerFiles": [
         "lib/migrations/clean-monthly-fixed-salary.ts"
       ],
+      "operations": [
+        "getItem",
+        "removeItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "leave-group",
@@ -995,6 +1297,10 @@
       "classification": "S1-business",
       "ownerFiles": [
         "lib/store/monthly-report/store.tsx"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -1010,6 +1316,10 @@
       "ownerFiles": [
         "lib/store/monthly-summary/store.tsx"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "leave-group",
@@ -1023,6 +1333,10 @@
       "classification": "S1-business",
       "ownerFiles": [
         "lib/store/monthly-summary/store.tsx"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -1038,6 +1352,10 @@
       "ownerFiles": [
         "lib/store/monthly-summary/store.tsx"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "leave-group",
@@ -1051,6 +1369,10 @@
       "classification": "S1-business",
       "ownerFiles": [
         "lib/store/monthly-summary/store.tsx"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -1066,6 +1388,10 @@
       "ownerFiles": [
         "lib/store/monthly-summary/store.tsx"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "leave-group",
@@ -1079,6 +1405,10 @@
       "classification": "S1-business",
       "ownerFiles": [
         "lib/store/monthly-summary/store.tsx"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -1094,6 +1424,10 @@
       "ownerFiles": [
         "lib/store/period-analysis/store.tsx"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "leave-group",
@@ -1108,6 +1442,10 @@
       "ownerFiles": [
         "lib/store/period-analysis/store.tsx"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "version-retirement"
@@ -1120,6 +1458,9 @@
       "classification": "S0-public",
       "ownerFiles": [
         "lib/sync/engine.ts"
+      ],
+      "operations": [
+        "multiRemove"
       ],
       "dynamic": true,
       "purgeOn": [
@@ -1134,6 +1475,10 @@
       "ownerFiles": [
         "lib/store/period-analysis/schedule-store.tsx"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "version-retirement"
@@ -1146,6 +1491,10 @@
       "classification": "S0-public",
       "ownerFiles": [
         "lib/store/period-analysis/schedule-store.tsx"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -1160,6 +1509,10 @@
       "ownerFiles": [
         "lib/shopping/store.tsx"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "version-retirement"
@@ -1172,6 +1525,10 @@
       "classification": "S1-business",
       "ownerFiles": [
         "lib/spirits/crud-store.tsx"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -1187,6 +1544,10 @@
       "ownerFiles": [
         "lib/spirits/crud-store.tsx"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "leave-group",
@@ -1200,6 +1561,10 @@
       "classification": "S1-business",
       "ownerFiles": [
         "lib/spirits/crud-store.tsx"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -1215,6 +1580,10 @@
       "ownerFiles": [
         "lib/spirits/crud-store.tsx"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "leave-group",
@@ -1228,6 +1597,10 @@
       "classification": "S1-business",
       "ownerFiles": [
         "lib/spirits/crud-store.tsx"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -1243,6 +1616,10 @@
       "ownerFiles": [
         "lib/spirits/crud-store.tsx"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "leave-group",
@@ -1256,6 +1633,10 @@
       "classification": "S1-business",
       "ownerFiles": [
         "lib/spirits/crud-store.tsx"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -1271,6 +1652,10 @@
       "ownerFiles": [
         "lib/spirits/crud-store.tsx"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "leave-group",
@@ -1284,6 +1669,10 @@
       "classification": "S1-business",
       "ownerFiles": [
         "lib/spirits/crud-store.tsx"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -1299,6 +1688,10 @@
       "ownerFiles": [
         "lib/spirits/crud-store.tsx"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "leave-group",
@@ -1313,6 +1706,10 @@
       "ownerFiles": [
         "lib/inventory-core/store.tsx"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": true,
       "purgeOn": [
         "version-retirement"
@@ -1326,6 +1723,10 @@
       "ownerFiles": [
         "app/store-hours.tsx"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "version-retirement"
@@ -1338,6 +1739,10 @@
       "classification": "S1-business",
       "ownerFiles": [
         "lib/store/petty-labor-link-store.tsx"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -1353,6 +1758,10 @@
       "ownerFiles": [
         "lib/store/petty-category-store.tsx"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "leave-group",
@@ -1366,6 +1775,10 @@
       "classification": "S1-business",
       "ownerFiles": [
         "lib/store/petty-inventory-link-store.tsx"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -1381,6 +1794,10 @@
       "ownerFiles": [
         "lib/store/petty-labor-link-store.tsx"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "leave-group",
@@ -1394,6 +1811,10 @@
       "classification": "S1-business",
       "ownerFiles": [
         "lib/store/petty-store.tsx"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -1409,6 +1830,10 @@
       "ownerFiles": [
         "components/store/purchase.tsx"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "leave-group",
@@ -1423,6 +1848,10 @@
       "ownerFiles": [
         "lib/store/revenue-store.tsx"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "version-retirement"
@@ -1436,6 +1865,9 @@
       "ownerFiles": [
         "lib/backup/local-backup.ts"
       ],
+      "operations": [
+        "multiGet"
+      ],
       "dynamic": true,
       "purgeOn": [
         "version-retirement"
@@ -1448,6 +1880,10 @@
       "classification": "S1-business",
       "ownerFiles": [
         "lib/store/supplier-import.ts"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -1463,6 +1899,10 @@
       "ownerFiles": [
         "lib/sync/engine.ts"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "startup-ttl",
@@ -1476,6 +1916,11 @@
       "classification": "S3-diagnostic",
       "ownerFiles": [
         "lib/sync/engine.ts"
+      ],
+      "operations": [
+        "getItem",
+        "removeItem",
+        "setItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -1491,6 +1936,9 @@
       "ownerFiles": [
         "lib/sync/engine.ts"
       ],
+      "operations": [
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "startup-ttl",
@@ -1504,6 +1952,10 @@
       "classification": "S3-diagnostic",
       "ownerFiles": [
         "lib/sync/engine.ts"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -1519,6 +1971,9 @@
       "ownerFiles": [
         "lib/tableware/inventory-store.tsx"
       ],
+      "operations": [
+        "factory-key"
+      ],
       "dynamic": false,
       "purgeOn": [
         "leave-group",
@@ -1533,6 +1988,9 @@
       "ownerFiles": [
         "lib/sync/engine.ts"
       ],
+      "operations": [
+        "setItem"
+      ],
       "dynamic": true,
       "purgeOn": [
         "version-retirement"
@@ -1545,6 +2003,9 @@
       "classification": "S0-public",
       "ownerFiles": [
         "lib/sync/engine.ts"
+      ],
+      "operations": [
+        "setItem"
       ],
       "dynamic": true,
       "purgeOn": [
@@ -1559,6 +2020,10 @@
       "ownerFiles": [
         "lib/sync/engine.ts"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": true,
       "purgeOn": [
         "version-retirement"
@@ -1572,6 +2037,10 @@
       "ownerFiles": [
         "lib/sync/photo-sync.ts"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": true,
       "purgeOn": [
         "version-retirement"
@@ -1584,6 +2053,10 @@
       "classification": "S1-business",
       "ownerFiles": [
         "lib/wine/store.tsx"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -1599,6 +2072,10 @@
       "ownerFiles": [
         "lib/wine/store.tsx"
       ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
       "dynamic": false,
       "purgeOn": [
         "leave-group",
@@ -1612,6 +2089,10 @@
       "classification": "S1-business",
       "ownerFiles": [
         "lib/wine/store.tsx"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -1628,6 +2109,9 @@
         "lib/backup/local-backup.ts",
         "lib/sync/engine.ts"
       ],
+      "operations": [
+        "multiSet"
+      ],
       "dynamic": true,
       "purgeOn": [
         "version-retirement"
@@ -1640,6 +2124,11 @@
       "classification": "S1-business",
       "ownerFiles": [
         "lib/_core/auth.ts"
+      ],
+      "operations": [
+        "getItem",
+        "removeItem",
+        "setItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -1655,6 +2144,11 @@
       "ownerFiles": [
         "lib/_core/auth.ts"
       ],
+      "operations": [
+        "deleteItemAsync",
+        "getItemAsync",
+        "setItemAsync"
+      ],
       "dynamic": false,
       "purgeOn": [
         "logout",
@@ -1669,6 +2163,11 @@
       "classification": "S2-credential",
       "ownerFiles": [
         "lib/cf-sync/client.ts"
+      ],
+      "operations": [
+        "deleteItemAsync",
+        "getItemAsync",
+        "setItemAsync"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -1686,6 +2185,11 @@
         "app/role-settings.tsx",
         "lib/cf-sync/client.ts"
       ],
+      "operations": [
+        "deleteItemAsync",
+        "getItemAsync",
+        "setItemAsync"
+      ],
       "dynamic": true,
       "purgeOn": [
         "version-retirement"
@@ -1698,6 +2202,11 @@
       "classification": "S1-business",
       "ownerFiles": [
         "lib/_core/auth.ts"
+      ],
+      "operations": [
+        "deleteItemAsync",
+        "getItemAsync",
+        "setItemAsync"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -1712,6 +2221,11 @@
       "classification": "S0-public",
       "ownerFiles": [
         "lib/cf-sync/group-switch.ts"
+      ],
+      "operations": [
+        "deleteItemAsync",
+        "getItemAsync",
+        "setItemAsync"
       ],
       "dynamic": true,
       "purgeOn": [

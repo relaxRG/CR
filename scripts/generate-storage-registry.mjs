@@ -30,6 +30,7 @@ const entries = schema.records
     status: record.status,
     classification: classify(record.key),
     ownerFiles: [...new Set(record.calls.map((call) => call.file))].sort(),
+    operations: [...new Set(record.calls.map((call) => call.operation))].sort(),
     dynamic: record.status !== "resolved",
     purgeOn: lifecycle(classify(record.key)),
   }))

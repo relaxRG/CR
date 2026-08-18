@@ -11,6 +11,7 @@ describe("Web deviceToken 安全会话", () => {
     expect(client).toContain("if (Platform.OS === \"web\") return;");
     expect(client).not.toContain("AsyncStorage.setItem(DEVICE_TOKEN_KEY");
     expect(client).not.toContain("AsyncStorage.getItem(DEVICE_TOKEN_KEY");
+    expect(client).toContain('AsyncStorage.removeItem(DEVICE_TOKEN_KEY)');
     expect(client).toContain('headers["X-Web-Device-Ticket"] = deviceInfo.webMemoryTicket');
     expect(client).toContain('credentials: Platform.OS === "web" ? "include" : undefined');
   });

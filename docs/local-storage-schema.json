@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-18T08:12:45.481Z",
+  "generatedAt": "2026-08-18T08:16:57.305Z",
   "records": [
     {
       "backend": "AsyncStorage",
@@ -471,6 +471,27 @@
       ]
     },
     {
+      "backend": "AsyncStorage",
+      "key": "cf.sync.deviceToken",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "removeItem",
+          "file": "lib/cf-sync/client.ts",
+          "line": 64,
+          "value": "",
+          "structure": "WebMemoryTicket, DeviceInfo, CompleteSyncSnapshot, SyncEntry"
+        },
+        {
+          "operation": "removeItem",
+          "file": "lib/cf-sync/client.ts",
+          "line": 114,
+          "value": "",
+          "structure": "WebMemoryTicket, DeviceInfo, CompleteSyncSnapshot, SyncEntry"
+        }
+      ]
+    },
+    {
       "backend": "SecureStore",
       "key": "cf.sync.deviceToken",
       "status": "resolved",
@@ -478,21 +499,21 @@
         {
           "operation": "setItemAsync",
           "file": "lib/cf-sync/client.ts",
-          "line": 64,
+          "line": 67,
           "value": "token",
           "structure": "WebMemoryTicket, DeviceInfo, CompleteSyncSnapshot, SyncEntry"
         },
         {
           "operation": "getItemAsync",
           "file": "lib/cf-sync/client.ts",
-          "line": 69,
+          "line": 72,
           "value": "",
           "structure": "WebMemoryTicket, DeviceInfo, CompleteSyncSnapshot, SyncEntry"
         },
         {
           "operation": "deleteItemAsync",
           "file": "lib/cf-sync/client.ts",
-          "line": 74,
+          "line": 77,
           "value": "",
           "structure": "WebMemoryTicket, DeviceInfo, CompleteSyncSnapshot, SyncEntry"
         }

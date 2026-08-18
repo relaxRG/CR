@@ -1,6 +1,6 @@
 # 本地存储键与数据结构清单
 
-> 由 `pnpm audit:storage` 从生产源代码生成；生成时间：2026-08-18T08:12:45.480Z。
+> 由 `pnpm audit:storage` 从生产源代码生成；生成时间：2026-08-18T08:16:57.304Z。
 > 本清单覆盖 `AsyncStorage`、`SecureStore`、Web `localStorage` 与通用库存工厂传入的键。`{variable}` 表示按运行时参数生成的键模式。
 
 ## 已解析键
@@ -20,7 +20,8 @@
 | AsyncStorage | `bottles.material.migrated.v9` | getItem, setItem | `"1"` | BottleStore | `lib/bottles/store.tsx:191`<br>`lib/bottles/store.tsx:281` |
 | AsyncStorage | `bottles.taxonomy.categories.v1` | getItem, setItem | `JSON.stringify(v10.next；JSON.stringify(next` | BottleCategoryDef, BottleTaxonomyStore | `lib/bottles/taxonomy.tsx:572`<br>`lib/bottles/taxonomy.tsx:583`<br>`lib/bottles/taxonomy.tsx:606`<br>`lib/bottles/taxonomy.tsx:622` |
 | AsyncStorage | `bottles.taxonomy.styles.v1` | getItem, setItem | `JSON.stringify(v9s.next；JSON.stringify(next` | BottleCategoryDef, BottleTaxonomyStore | `lib/bottles/taxonomy.tsx:573`<br>`lib/bottles/taxonomy.tsx:592`<br>`lib/bottles/taxonomy.tsx:607`<br>`lib/bottles/taxonomy.tsx:627` |
-| SecureStore | `cf.sync.deviceToken` | setItemAsync, getItemAsync, deleteItemAsync | `token` | WebMemoryTicket, DeviceInfo, CompleteSyncSnapshot, SyncEntry | `lib/cf-sync/client.ts:64`<br>`lib/cf-sync/client.ts:69`<br>`lib/cf-sync/client.ts:74` |
+| AsyncStorage | `cf.sync.deviceToken` | removeItem | `读取或删除操作` | WebMemoryTicket, DeviceInfo, CompleteSyncSnapshot, SyncEntry | `lib/cf-sync/client.ts:64`<br>`lib/cf-sync/client.ts:114` |
+| SecureStore | `cf.sync.deviceToken` | setItemAsync, getItemAsync, deleteItemAsync | `token` | WebMemoryTicket, DeviceInfo, CompleteSyncSnapshot, SyncEntry | `lib/cf-sync/client.ts:67`<br>`lib/cf-sync/client.ts:72`<br>`lib/cf-sync/client.ts:77` |
 | AsyncStorage | `cf.sync.groupSwitchSession.v1` | setItem, removeItem, getItem | `JSON.stringify(session` | DeviceInfo, PersistedGroupSwitchSession | `lib/cf-sync/group-switch.ts:90`<br>`lib/cf-sync/group-switch.ts:95`<br>`lib/cf-sync/group-switch.ts:102` |
 | AsyncStorage | `cf.sync.prevAllowedKeys.v1` | getItem, setItem | `JSON.stringify(newAllowedKeys` | DeviceInfo, SyncState | `lib/cf-sync/provider.tsx:737`<br>`lib/cf-sync/provider.tsx:739`<br>`lib/cf-sync/provider.tsx:746` |
 | AsyncStorage | `cf.sync.switchDiagnostics.v1` | getItem, setItem | `JSON.stringify(entries` | 见源文件的写入表达式 | `lib/cf-sync/switch-diagnostics.ts:76`<br>`lib/cf-sync/switch-diagnostics.ts:80`<br>`lib/cf-sync/switch-diagnostics.ts:88` |

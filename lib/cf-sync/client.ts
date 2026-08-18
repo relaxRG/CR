@@ -60,7 +60,10 @@ async function deleteSecure(key: string): Promise<void> {
 }
 
 async function storeDeviceToken(token: string): Promise<void> {
-  if (Platform.OS === "web") return;
+  if (Platform.OS === "web") {
+    await AsyncStorage.removeItem(DEVICE_TOKEN_KEY).catch(() => {});
+    return;
+  }
   await SecureStore.setItemAsync(DEVICE_TOKEN_KEY, token);
 }
 
@@ -107,6 +110,8 @@ export type DeviceInfo = {
 };
 
 export async function getDeviceInfo(): Promise<DeviceInfo | null> {
+  // 退役补丁：旧版本曾在Web AsyncStorage存储deviceToken；本版本首次读取即永久清除。
+  if (Platform.OS === "web") await AsyncStorage.removeItem(DEVICE_TOKEN_KEY).catch(() => {});
   const [deviceId, groupId, role, allowedKeysRaw, deviceName] = await Promise.all([
     getSecure(DEVICE_ID_KEY),
     getSecure(GROUP_ID_KEY),
