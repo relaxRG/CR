@@ -12,7 +12,7 @@ import { getResponsivePagerIndex, getResponsivePagerOffset } from "@/lib/theme/r
 import { exportLaborData, type ExportType } from "@/lib/labor/export";
 import { buildImportTemplate, parseImportFile, type ImportResult } from "@/lib/labor/import";
 import { getNonWritableScheduleMonths } from "@/lib/labor/schedule-guards";
-import { sortEmployeesWithinProfileGroup } from "@/lib/labor/employee-profile-order";
+import { sortEmployeesByProfileOrder, sortEmployeesWithinProfileGroup } from "@/lib/labor/employee-profile-order";
 import { createMonthCloseOperationGate } from "@/lib/labor/month-close-operation-gate";
 import { createSnapshot } from "@/lib/backup/local-backup";
 import { applyHolidayRestAllocation } from "@/lib/labor/holiday-pay";
@@ -1120,8 +1120,11 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
   const [customMonth, setCustomMonth] = useState<string | undefined>();
   const compareMonth = getCompareMonth(month, compareMode, customMonth);
 
-  const activeEmployees = useMemo(() => employees.filter((e) => e.active && !e.archived), [employees]);
   const { deptOrder } = useDeptOrderStore();
+  const activeEmployees = useMemo(
+    () => sortEmployeesByProfileOrder(employees.filter((e) => e.active && !e.archived), deptOrder),
+    [employees, deptOrder],
+  );
   // 统一分组规则：按用户设置的分组顺序动态排列
   const DEPT_GROUP_DEFS: Record<string, { label: string; color: string; filter: (e: Employee) => boolean }> = {
     front:    { label: "前厅",   color: "#007AFF", filter: (e) => e.dept === "front" && e.type !== "parttime" },
@@ -1465,7 +1468,7 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
 
       {/* 自动部门分组：前厅/后厨/公司（全职+长期兼职）+ 临时兼职 */}
       {AUTO_DEPT_GROUPS.map(({ key, label, color, filter }) => {
-        const deptEmps = activeEmployees.filter(filter).sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+        const deptEmps = activeEmployees.filter(filter);
         if (deptEmps.length === 0) return null;
         return (
           <View key={key} style={[{ borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, overflow: "hidden" }]}>
@@ -1506,6 +1509,7 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
 function AdvancePage({ month, colors, headerComponent }: { month: string; colors: any; headerComponent?: React.ReactNode }) {
   const insets = useSafeAreaInsets();
   const { employees } = useEmployeeStore();
+  const { deptOrder } = useDeptOrderStore();
   const { advances, addAdvance, updateAdvance, deleteAdvance } = useSalaryAdvanceStore();
   const { allCategories, addCategory: addAdvanceCategory, updateCategory, deleteCategory } = useAdvanceCategoryStore();
   const { records: pettyRecords, addRecord: addPettyRecord } = usePettyCashStore();
@@ -1568,23 +1572,22 @@ function AdvancePage({ month, colors, headerComponent }: { month: string; colors
     [unlinkedLaborRecords, aliases, employees]
   );
 
-  const activeEmployees = React.useMemo(() => employees.filter((e) => e.active && !e.archived), [employees]);
+  const activeEmployees = React.useMemo(
+    () => sortEmployeesByProfileOrder(employees.filter((e) => e.active && !e.archived), deptOrder),
+    [employees, deptOrder],
+  );
   const getEmployee = (id: string) => employees.find((e) => e.id === id);
 
   // ── 员工按部门分组 ──
   const employeesByDept = React.useMemo(() => {
-    const groups: { dept: EmployeeDept; label: string; color: string; employees: Employee[] }[] = [
-      { dept: "front", label: "前厅", color: DEPT_COLORS.front, employees: [] },
-      { dept: "kitchen", label: "后厨", color: DEPT_COLORS.kitchen, employees: [] },
-      { dept: "parttime", label: "兼职", color: DEPT_COLORS.parttime, employees: [] },
-      { dept: "other", label: "其他", color: DEPT_COLORS.other, employees: [] },
-    ];
-    for (const emp of activeEmployees) {
-      const group = groups.find((g) => g.dept === emp.dept);
-      if (group) group.employees.push(emp);
-    }
-    return groups.filter((g) => g.employees.length > 0);
-  }, [activeEmployees]);
+    const labels: Record<EmployeeDept, string> = { front: "前厅", kitchen: "后厨", other: "其他", parttime: "兼职" };
+    return deptOrder.map((dept) => ({
+      dept,
+      label: labels[dept],
+      color: DEPT_COLORS[dept],
+      employees: activeEmployees.filter((employee) => employee.dept === dept),
+    })).filter((group) => group.employees.length > 0);
+  }, [activeEmployees, deptOrder]);
 
   // ── 当月可选备用金条目（K1/K9，未被关联）──
   const availablePettyForAdvance = React.useMemo(() =>

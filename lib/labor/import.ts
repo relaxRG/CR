@@ -25,6 +25,7 @@ import * as Sharing from "expo-sharing";
 import * as XLSX from "xlsx";
 
 import type { Employee, ShiftEntry, ShiftTemplate } from "./types";
+import { sortEmployeesWithinProfileGroup } from "./employee-profile-order";
 
 // 内部辅助：生成当月所有日期字符串数组（"2026-08-01" ... "2026-08-31"）
 function getDaysInMonthArr(month: string): string[] {
@@ -82,7 +83,7 @@ export async function buildImportTemplate(params: {
 }): Promise<void> {
   const { month, employees, shiftTemplates } = params;
   const days = getDaysInMonthArr(month);
-  const activeEmps = employees.filter((e) => e.active && !e.archived);
+  const activeEmps = sortEmployeesWithinProfileGroup(employees.filter((e) => e.active && !e.archived));
 
   const wb = XLSX.utils.book_new();
 
@@ -188,7 +189,7 @@ export async function parseImportFile(params: {
   const wb = XLSX.read(base64, { type: "base64" });
 
   const days = getDaysInMonthArr(month);
-  const activeEmps = employees.filter((e) => e.active && !e.archived);
+  const activeEmps = sortEmployeesWithinProfileGroup(employees.filter((e) => e.active && !e.archived));
 
   // 构建员工代号 → Employee 的查找 Map
   const empByCode = new Map<string, Employee>();

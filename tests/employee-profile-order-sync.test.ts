@@ -108,6 +108,7 @@ describe("员工档案排序同步", () => {
       "app/labor-employees.tsx",
       "app/monthly-summary.tsx",
       "lib/labor/export.ts",
+      "lib/labor/import.ts",
       "lib/labor/month-close.ts",
     ];
     const root = new URL("..", import.meta.url).pathname;
@@ -117,5 +118,6 @@ describe("员工档案排序同步", () => {
     for (const source of sources.slice(1, 5)) expect(source).toContain("sortEmployeesByProfileOrder");
     expect(sources[5]).toContain("sortEmployeesWithinProfileGroup");
     expect(sources[6]).toContain("sortEmployeesWithinProfileGroup");
+    expect(sources[7]).toContain("sortEmployeesWithinProfileGroup");
   });
 });
