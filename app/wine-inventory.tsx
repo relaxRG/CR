@@ -614,7 +614,7 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
     if (dangerousAction === "clear") {
       const restorePoint = clearMonthPurchases(selectedMonth);
       setDangerousAction(null);
-      Alert.alert("已清空本月进货", `${selectedMonth} 的采购流水已清空，库存派生数据可在“库存管理”执行强制重新计算。\n恢复点：${restorePoint.createdAt.slice(0, 16)}`);
+      Alert.alert("已清空本月进货", `${selectedMonth} 的采购流水已清空；库存、供应商和总结已按剩余流水重建。\n恢复点：${restorePoint.createdAt.slice(0, 16)}`);
       return;
     }
     const restorePoint = recalculateMonthInventory(selectedMonth);

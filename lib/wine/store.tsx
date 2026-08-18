@@ -392,17 +392,23 @@ export function WineProvider({ children }: { children: React.ReactNode }) {
   const clearMonthPurchases = useCallback((month: string): WineMonthRestorePoint => {
     const restorePoint = createRestorePoint(month, "before_clear_purchases");
     const affected = manualState.purchases.filter((purchase) => purchase.date.startsWith(month)).length;
+    const remainingPurchases = manualState.purchases.filter((purchase) => !purchase.date.startsWith(month));
+    const targetLabel = `${month.slice(0, 4)}年${Number(month.slice(5))}月`;
+    const snapshot = snapshotState.snapshots.find((item) => item.monthLabel === targetLabel);
     manualDispatch({ type: "CLEAR_MONTH", month });
+    if (snapshot) {
+      snapshotDispatch({ type: "UPDATE_SNAPSHOT", id: snapshot.id, updates: rebuildWineSnapshotFromPurchases(snapshot, remainingPurchases) });
+    }
     importControlDispatch({
       type: "ADD_AUDIT",
       entry: {
         id: uuid(), month, action: "clear_month_purchases", occurredAt: new Date().toISOString(),
-        detail: `强制清空 ${month} 采购流水 ${affected} 笔。`,
-        affected: { snapshots: 0, purchases: affected, batches: 0 }, restorePointId: restorePoint.id,
+        detail: `强制清空 ${month} 采购流水 ${affected} 笔，并已基于剩余流水重建库存派生字段。`,
+        affected: { snapshots: snapshot ? 1 : 0, purchases: affected, batches: 0 }, restorePointId: restorePoint.id,
       },
     });
     return restorePoint;
-  }, [createRestorePoint, manualState.purchases]);
+  }, [createRestorePoint, manualState.purchases, snapshotState.snapshots]);
 
   const recalculateMonthInventory = useCallback((month: string): WineMonthRestorePoint | null => {
     const snapshot = snapshotState.snapshots.find((item) => item.monthLabel === `${month.slice(0, 4)}年${Number(month.slice(5))}月`);
