@@ -10,6 +10,8 @@ export interface HorizontalLedgerColumn<Row> {
   render: (row: Row) => ReactNode;
   onPress?: (row: Row) => void;
   testID?: (row: Row) => string;
+  /** 可选：点击表头时使用的排序键；未提供则维持纯展示列。 */
+  sortKey?: string;
 }
 
 export interface HorizontalLedgerGroup<Row> {
@@ -27,6 +29,8 @@ interface HorizontalLedgerTableProps<Row> {
   footer?: ReactNode;
   testID?: string;
   rowTone?: (row: Row, index: number) => "default" | "negative";
+  sort?: { key: string; direction: "asc" | "desc" };
+  onSort?: (key: string) => void;
 }
 
 /**
@@ -41,6 +45,8 @@ export function HorizontalLedgerTable<Row>({
   footer,
   testID,
   rowTone,
+  sort,
+  onSort,
 }: HorizontalLedgerTableProps<Row>) {
   const colors = useColors();
   const hasRows = groups.some((group) => group.rows.length > 0);
@@ -57,11 +63,30 @@ export function HorizontalLedgerTable<Row>({
     <ScrollView horizontal nestedScrollEnabled directionalLockEnabled showsHorizontalScrollIndicator testID={testID} style={{ flexGrow: 0 }}>
       <View>
         <View style={[S.header, { backgroundColor: colors.primary }]}>
-          {columns.map((column) => (
-            <View key={column.key} style={[S.headerCell, { width: column.width, alignItems: alignment(column.align) }]}>
-              <Text style={S.headerText} numberOfLines={1}>{column.label}</Text>
-            </View>
-          ))}
+          {columns.map((column) => {
+            const isSortable = Boolean(onSort && column.sortKey);
+            const active = sort?.key === column.sortKey;
+            const header = (
+              <View style={[S.headerCell, { width: column.width, alignItems: alignment(column.align) }]}>
+                <View style={S.headerLabel}>
+                  <Text style={S.headerText} numberOfLines={1}>{column.label}</Text>
+                  {isSortable && <Text style={[S.sortMark, { color: active ? "#fff" : "#DCEBFF" }]}>{active ? (sort?.direction === "asc" ? "↑" : "↓") : "↕"}</Text>}
+                </View>
+              </View>
+            );
+            return isSortable ? (
+              <Pressable
+                key={column.key}
+                testID={testID ? `${testID}-sort-${column.sortKey}` : undefined}
+                onPress={() => onSort?.(column.sortKey!)}
+                accessibilityRole="button"
+                accessibilityLabel={`按${column.label}排序`}
+                style={({ pressed }) => ({ opacity: pressed ? 0.68 : 1 })}
+              >
+                {header}
+              </Pressable>
+            ) : <React.Fragment key={column.key}>{header}</React.Fragment>;
+          })}
         </View>
 
         {groups.map((group) => (
@@ -118,6 +143,8 @@ const S = StyleSheet.create({
   header: { flexDirection: "row", minHeight: 40 },
   headerCell: { justifyContent: "center", paddingHorizontal: 7, paddingVertical: 8 },
   headerText: { color: "#fff", fontSize: 11, fontWeight: "800" },
+  headerLabel: { flexDirection: "row", alignItems: "center", gap: 2 },
+  sortMark: { fontSize: 10, fontWeight: "800" },
   groupHeader: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 30, paddingHorizontal: 10 },
   groupDot: { width: 8, height: 8, borderRadius: 4 },
   row: { flexDirection: "row", minHeight: 48, borderBottomWidth: StyleSheet.hairlineWidth },

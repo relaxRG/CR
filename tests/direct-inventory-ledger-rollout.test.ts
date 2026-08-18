@@ -35,7 +35,8 @@ describe("库存直接完整台账改造", () => {
     expect(wine).toContain('testID="wine-horizontal-ledger-table"');
     expect(wine).toContain("wineLedgerColumns");
     expect(wine).toContain("wineLedgerGroups");
-    expect(wine).toContain("<MonthlyLedgerDetailSheet item={selectedLedgerItem}");
+    expect(wine).toContain("<MonthlyLedgerDetailSheet");
+    expect(wine).toContain('testID="wine-ledger-open-library-record"');
   });
 
   it("食材库存直接展示月度横向台账，并提供采购、消耗、盘点和月结的真实入口", () => {

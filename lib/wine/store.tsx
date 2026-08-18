@@ -38,6 +38,7 @@ type ManualPurchaseAction =
   | { type: "LOAD"; payload: WineManualPurchaseState }
   | { type: "ADD"; purchase: WineManualPurchase }
   | { type: "UPDATE"; id: string; updates: Partial<WineManualPurchase> }
+  | { type: "BATCH_UPDATE"; ids: string[]; updates: Partial<WineManualPurchase> }
   | { type: "BATCH_UPDATE_DATE"; ids: string[]; date: string }
   | { type: "DELETE"; id: string }
   | { type: "BATCH_DELETE"; ids: string[] };
@@ -88,7 +89,7 @@ function snapshotReducer(state: WineSnapshotState, action: SnapshotAction): Wine
   }
 }
 
-function manualReducer(state: WineManualPurchaseState, action: ManualPurchaseAction): WineManualPurchaseState {
+export function wineManualPurchaseReducer(state: WineManualPurchaseState, action: ManualPurchaseAction): WineManualPurchaseState {
   switch (action.type) {
     case "LOAD": return action.payload;
     case "ADD": return { purchases: [action.purchase, ...state.purchases] };
@@ -96,6 +97,17 @@ function manualReducer(state: WineManualPurchaseState, action: ManualPurchaseAct
       purchases: state.purchases.map((p) =>
         p.id === action.id ? { ...p, ...action.updates } : p
       ),
+    };
+    case "BATCH_UPDATE": return {
+      purchases: state.purchases.map((purchase) => {
+        if (!action.ids.includes(purchase.id)) return purchase;
+        const next = { ...purchase, ...action.updates };
+        // 数量或单价调整后必须同步重算总价，禁止留下旧金额。
+        if (action.updates.quantity !== undefined || action.updates.unitPrice !== undefined) {
+          next.amount = next.quantity * next.unitPrice;
+        }
+        return next;
+      }),
     };
     case "BATCH_UPDATE_DATE": return {
       purchases: state.purchases.map((p) =>
@@ -137,6 +149,8 @@ interface WineManualPurchaseContextValue extends WineManualPurchaseState {
   deleteManualPurchase: (id: string) => void;
   /** ★ 批量删除 */
   batchDeleteManualPurchases: (ids: string[]) => void;
+  /** ★ 原子化批量修改；数量或单价变更时同步重算总价。 */
+  batchUpdateManualPurchases: (ids: string[], updates: Partial<WineManualPurchase>) => void;
   /** ★ 批量修改日期 */
   batchUpdateManualPurchaseDate: (ids: string[], date: string) => void;
   /** ★ 获取某供应商某月的进货记录 */
@@ -152,7 +166,7 @@ const WineManualPurchaseContext = createContext<WineManualPurchaseContextValue |
 export function WineProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const [snapshotState, snapshotDispatch] = useReducer(snapshotReducer, initialSnapshotState);
-  const [manualState, manualDispatch] = useReducer(manualReducer, initialManualState);
+  const [manualState, manualDispatch] = useReducer(wineManualPurchaseReducer, initialManualState);
 
   useEffect(() => {
     const loadBottles = () => AsyncStorage.getItem(STORAGE_KEY).then((raw) => {
@@ -309,6 +323,10 @@ export function WineProvider({ children }: { children: React.ReactNode }) {
     manualDispatch({ type: "BATCH_DELETE", ids });
   }, []);
 
+  const batchUpdateManualPurchases = useCallback((ids: string[], updates: Partial<WineManualPurchase>) => {
+    manualDispatch({ type: "BATCH_UPDATE", ids, updates });
+  }, []);
+
   const batchUpdateManualPurchaseDate = useCallback((ids: string[], date: string) => {
     manualDispatch({ type: "BATCH_UPDATE_DATE", ids, date });
   }, []);
@@ -335,7 +353,7 @@ export function WineProvider({ children }: { children: React.ReactNode }) {
         <WineManualPurchaseContext.Provider value={{
           ...manualState,
           addManualPurchase, updateManualPurchase, deleteManualPurchase,
-          batchDeleteManualPurchases, batchUpdateManualPurchaseDate,
+          batchDeleteManualPurchases, batchUpdateManualPurchases, batchUpdateManualPurchaseDate,
           getSupplierMonthPurchases, getMonthPurchases,
         }}>
           {children}

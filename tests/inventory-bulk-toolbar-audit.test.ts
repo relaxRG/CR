@@ -29,9 +29,15 @@ describe("库存与店铺批量操作栏审计", () => {
     expect(toolbar).toContain("取消多选");
   });
 
-  it("葡萄酒的批量操作已由selectMode与已选数量共同守卫", () => {
+  it("葡萄酒进入多选模式即显示全选、清空与编辑工具栏，避免用户先勾选才知道可用操作", () => {
     const wine = read("app/wine-inventory.tsx");
-    expect(wine).toContain("{selectMode && selectedIds.size > 0 && (");
+    expect(wine).toContain("{selectMode && (");
+    expect(wine).toContain('testID="wine-purchase-bulk-toolbar"');
+    expect(wine).toContain("全选");
+    expect(wine).toContain("清空选择");
+    expect(wine).toContain("修改供应商");
+    expect(wine).toContain("修改数量");
+    expect(wine).toContain("修改单价");
   });
 
   it("其余六类通用库存与三个店铺面板不包含另一套常驻多选工具栏", () => {

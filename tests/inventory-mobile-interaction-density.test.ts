@@ -13,13 +13,15 @@ describe("库存工作台紧凑布局与移动端交互护栏", () => {
     expect(food).not.toContain("summaryRow:");
   });
 
-  it("葡萄酒供应商使用同页标签和直接横向台账，彻底删除供应商卡片入口", () => {
+  it("葡萄酒供应商使用同页标签和供货商信息工作台，不再重复渲染库存台账", () => {
     const wine = read("app/wine-inventory.tsx");
     expect(wine).toContain('testID="wine-supplier-inline-workspace"');
     expect(wine).toContain('testID="wine-supplier-tabs"');
-    expect(wine).toContain('testID="wine-supplier-horizontal-ledger-table"');
+    expect(wine).toContain("supplierInfoCard");
     expect(wine).toContain('testID="wine-supplier-record-purchase"');
+    expect(wine).toContain('testID="wine-supplier-open-library"');
     expect(wine).toContain('testID={`wine-tab-${t.key}`}');
+    expect(wine).not.toContain("wine-supplier-horizontal-ledger-table");
     expect(wine).not.toContain("function SupplierCard");
     expect(wine).not.toContain("supplierSummaryCard:");
   });
@@ -63,11 +65,11 @@ describe("库存工作台紧凑布局与移动端交互护栏", () => {
     expect(equipment).toContain('testID={`equipment-tab-${t.key}`}');
   });
 
-  it("H5回归覆盖十类分类页签的尺寸一致性以及葡萄酒供应商同页明细", () => {
+  it("H5回归覆盖十类分类页签的尺寸一致性以及葡萄酒供货商信息工作台", () => {
     const h5 = read("scripts/h5-schedule-correction-e2e.mjs");
-    expect(h5).toContain("葡萄酒供应商同页明细");
+    expect(h5).toContain("葡萄酒供货商信息工作台");
     expect(h5).toContain("wine-tab-supplier");
-    expect(h5).toContain("wine-supplier-horizontal-ledger-table");
+    expect(h5).toContain("wine-supplier-open-library");
     expect(h5).toContain("wine-supplier-record-purchase");
     expect(h5).toContain("fruit-inventory-tab-summary");
     expect(h5).toContain("水果总结页签");

@@ -405,7 +405,16 @@ try {
     const genericItem = (id, name, category, unit) => ({ id, name, category, spec: 'H5规格', unit, currentStock: 4, latestCostPrice: 12, supplier: 'H5供应商', notes: '', active: true, createdAt: now, updatedAt: now });
     localStorage.setItem('fruit.inventory.v2', JSON.stringify({ items: [genericItem('h5-fruit', 'H5青柠', 'citrus', 'kg')], purchases: [], consumes: [], snapshots: [] }));
     localStorage.setItem('beer.inventory.v2', JSON.stringify({ items: [genericItem('h5-beer', 'H5精酿啤酒', 'bottle', '瓶')], purchases: [], consumes: [], snapshots: [] }));
-    localStorage.setItem('wine.snapshots.v2', JSON.stringify({ snapshots: [{ id: 'h5-wine-snapshot', monthLabel: month, importedAt: now, supplierTotals: { 'H5酒商': 36 }, totalPurchase: 36, totalConsume: 24, totalEndCost: 96, items: [{ seq: 1, wineType: 'Red', supplier: 'H5酒商', name: 'H5赤霞珠', initUnitCost: 20, initQty: 4, initCost: 80, purchaseQty: 2, purchaseCost: 36, endQty: 4, unitCost: 24, endCost: 96, consumeBottles: 2, consumeQty: 24 }], purchaseOrders: [] }] }));
+    const wineTypes = ['Red', 'White', 'Sparkling'];
+    const wineItems = Array.from({ length: 36 }, (_, index) => {
+      const seq = index + 1;
+      const unitCost = 20 + (index % 5);
+      const initQty = 4 + (index % 3);
+      const purchaseQty = index % 2 === 0 ? 2 : 0;
+      const endQty = initQty + purchaseQty - 1;
+      return { seq, wineType: wineTypes[index % wineTypes.length], supplier: 'H5酒商', name: 'H5酒款' + seq + ' 赤霞珠', initUnitCost: unitCost, initQty, initCost: initQty * unitCost, purchaseQty, purchaseCost: purchaseQty * unitCost, endQty, unitCost, endCost: endQty * unitCost, consumeBottles: 1, consumeQty: unitCost };
+    });
+    localStorage.setItem('wine.snapshots.v2', JSON.stringify({ snapshots: [{ id: 'h5-wine-snapshot', monthLabel: month, importedAt: now, supplierTotals: { 'H5酒商': 396 }, totalPurchase: 396, totalConsume: 792, totalEndCost: wineItems.reduce((sum, item) => sum + item.endCost, 0), items: wineItems, purchaseOrders: [] }] }));
     localStorage.setItem('food.ingredients.v2', JSON.stringify({ ingredients: [{ id: 'h5-food', name: 'H5牛肉', category: 'meat', spec: '1kg/包', unit: '包', costPrice: 30, stock: 3, supplier: 'H5食材商', notes: '', createdAt: now, updatedAt: now }], priceHistory: {}, ledgerEntries: [{ id: 'h5-food-ledger', month, ingredientId: 'h5-food', openingQty: 2, openingUnitCost: 28, purchaseQty: 2, purchaseCost: 64, consumeQty: 1, consumeCost: 32, createdAt: now, updatedAt: now }], ledgerMovements: [] }));
     return month;
   })()`, returnByValue: true });
@@ -492,7 +501,7 @@ try {
   }
   report.push({ reportPage: "十类分类页签尺寸一致性", viewports: categoryTabLayoutViewports });
 
-  // 葡萄酒供应商：标签同页切换、直接明细表与录入入口均不再依赖供应商卡片页面。
+  // 葡萄酒供应商：标签在当前工作台切换，展示往来信息和酒库档案，而不是重复库存台账。
   const wineSupplierViewports = [];
   for (const width of MOBILE_VIEWPORTS) {
     await call("Emulation.setDeviceMetricsOverride", { width, height: 844, deviceScaleFactor: 3, mobile: true });
@@ -504,23 +513,39 @@ try {
     const supplierState = await call("Runtime.evaluate", { expression: `(() => {
       const workspace = document.querySelector('[data-testid="wine-supplier-inline-workspace"]');
       const tabs = document.querySelector('[data-testid="wine-supplier-tabs"]');
-      const table = document.querySelector('[data-testid="wine-supplier-horizontal-ledger-table"]');
+      const info = document.querySelector('[data-testid="wine-supplier-info-scroll"]');
       const record = document.querySelector('[data-testid="wine-supplier-record-purchase"]');
-      const name = document.querySelector('[data-testid="wine-ledger-name-1"]');
-      if (table) table.scrollLeft = Math.max(0, table.scrollWidth - table.clientWidth);
-      return { workspace: Boolean(workspace), tabs: Boolean(tabs), table: Boolean(table), record: Boolean(record), name: Boolean(name), clientWidth: table?.clientWidth ?? 0, scrollWidth: table?.scrollWidth ?? 0, reachedEnd: table?.scrollLeft ?? 0, rootClientWidth: document.documentElement.clientWidth, rootScrollWidth: document.documentElement.scrollWidth, bodyScrollWidth: document.body.scrollWidth };
+      const library = document.querySelector('[data-testid="wine-supplier-open-library"]');
+      const legacyTable = document.querySelector('[data-testid="wine-supplier-horizontal-ledger-table"]');
+      if (info) info.scrollTop = Math.max(0, info.scrollHeight - info.clientHeight);
+      return { workspace: Boolean(workspace), tabs: Boolean(tabs), info: Boolean(info), record: Boolean(record), library: Boolean(library), legacyTable: Boolean(legacyTable), clientHeight: info?.clientHeight ?? 0, scrollHeight: info?.scrollHeight ?? 0, reachedEnd: info?.scrollTop ?? 0, rootClientWidth: document.documentElement.clientWidth, rootScrollWidth: document.documentElement.scrollWidth, bodyScrollWidth: document.body.scrollWidth };
     })()`, returnByValue: true });
     const state = supplierState.result.value;
-    if (!state.workspace || !state.tabs || !state.table || !state.record || !state.name || (state.scrollWidth > state.clientWidth + 1 && state.reachedEnd < 1)) throw new Error(`葡萄酒供应商 ${width}pt 未直接展示可滚动明细：${JSON.stringify(state)}`);
+    if (!state.workspace || !state.tabs || !state.info || !state.record || !state.library || state.legacyTable || (state.scrollHeight > state.clientHeight + 1 && state.reachedEnd < 1)) throw new Error(`葡萄酒供应商 ${width}pt 信息工作台或纵向滚动异常：${JSON.stringify(state)}`);
     if (state.rootScrollWidth > state.rootClientWidth || state.bodyScrollWidth > state.rootClientWidth) throw new Error(`葡萄酒供应商 ${width}pt 出现根级横向溢出：${JSON.stringify(state)}`);
-    const clicked = await call("Runtime.evaluate", { expression: `(() => { const name = document.querySelector('[data-testid="wine-ledger-name-1"]'); if (!name) return false; name.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window })); return true; })()`, returnByValue: true });
-    if (!clicked.result.value) throw new Error(`葡萄酒供应商 ${width}pt 未能点击明细商品名称`);
-    await sleep(140);
-    const detail = await call("Runtime.evaluate", { expression: `Boolean(document.querySelector('[data-testid="generic-ledger-detail-sheet"]'))`, returnByValue: true });
-    if (!detail.result.value) throw new Error(`葡萄酒供应商 ${width}pt 商品名称未打开详情卡片`);
     wineSupplierViewports.push({ width, ...state });
   }
-  report.push({ reportPage: '葡萄酒供应商同页明细', viewports: wineSupplierViewports });
+  report.push({ reportPage: '葡萄酒供货商信息工作台', viewports: wineSupplierViewports });
+
+  // 葡萄酒库存台账：外层必须可纵向下滑，内层只处理横向列浏览。
+  const wineLedgerScrollViewports = [];
+  for (const width of MOBILE_VIEWPORTS) {
+    await call("Emulation.setDeviceMetricsOverride", { width, height: 844, deviceScaleFactor: 3, mobile: true });
+    await call("Page.navigate", { url: `http://localhost:${port}/wine-inventory` });
+    await sleep(760);
+    const state = (await call("Runtime.evaluate", { expression: `(() => {
+      const workspace = document.querySelector('[data-testid="wine-ledger-scroll-workspace"]');
+      const table = document.querySelector('[data-testid="wine-horizontal-ledger-table"]');
+      const vertical = workspace?.querySelector('[style*="overflow-y"]') || workspace?.firstElementChild;
+      if (vertical) vertical.scrollTop = Math.max(0, vertical.scrollHeight - vertical.clientHeight);
+      if (table) table.scrollLeft = Math.max(0, table.scrollWidth - table.clientWidth);
+      return { workspace: Boolean(workspace), table: Boolean(table), verticalClientHeight: vertical?.clientHeight ?? 0, verticalScrollHeight: vertical?.scrollHeight ?? 0, verticalReachedEnd: vertical?.scrollTop ?? 0, horizontalClientWidth: table?.clientWidth ?? 0, horizontalScrollWidth: table?.scrollWidth ?? 0, horizontalReachedEnd: table?.scrollLeft ?? 0, rootClientWidth: document.documentElement.clientWidth, rootScrollWidth: document.documentElement.scrollWidth };
+    })()`, returnByValue: true })).result.value;
+    if (!state.workspace || !state.table || (state.verticalScrollHeight > state.verticalClientHeight + 1 && state.verticalReachedEnd < 1) || (state.horizontalScrollWidth > state.horizontalClientWidth + 1 && state.horizontalReachedEnd < 1)) throw new Error(`葡萄酒库存 ${width}pt 横纵向滚动异常：${JSON.stringify(state)}`);
+    if (state.rootScrollWidth > state.rootClientWidth) throw new Error(`葡萄酒库存 ${width}pt 出现根级横向溢出：${JSON.stringify(state)}`);
+    wineLedgerScrollViewports.push({ width, ...state });
+  }
+  report.push({ reportPage: '葡萄酒库存横纵向滚动', viewports: wineLedgerScrollViewports });
 
   // 报表四页签：总月报、经营分析、账户、时段经营分析均在同一工作台切换，且只保留一套月份导航。
   const reportMonthNavigatorViewports = [];

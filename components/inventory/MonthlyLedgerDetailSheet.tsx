@@ -8,10 +8,12 @@ interface MonthlyLedgerDetailSheetProps {
   item: MonthlyLedgerItem | null;
   accentColor: string;
   onClose: () => void;
+  /** 领域页面可在标准月度摘要下追加安全操作，例如查看商品档案。 */
+  footer?: React.ReactNode;
 }
 
 /** 通用台账名称详情：桌面宽表与移动端卡片阅读共用同一数据，不引入第二份汇总逻辑。 */
-export function MonthlyLedgerDetailSheet({ item, accentColor, onClose }: MonthlyLedgerDetailSheetProps) {
+export function MonthlyLedgerDetailSheet({ item, accentColor, onClose, footer }: MonthlyLedgerDetailSheetProps) {
   const colors = useColors();
   if (!item) return null;
   const metrics: Array<[string, string]> = [
@@ -39,6 +41,7 @@ export function MonthlyLedgerDetailSheet({ item, accentColor, onClose }: Monthly
             {metrics.map(([label, value]) => <View key={label} style={[S.metric, { backgroundColor: colors.surface, borderColor: colors.border }]}><Text style={{ color: colors.muted, fontSize: 13 }}>{label}</Text><Text style={{ color: colors.foreground, fontSize: 14, fontWeight: "800" }}>{value}</Text></View>)}
             <View style={[S.metric, { backgroundColor: accentColor + "12", borderColor: accentColor + "33" }]}><Text style={{ color: accentColor, fontSize: 13 }}>期末单位成本</Text><Text style={{ color: accentColor, fontSize: 14, fontWeight: "800" }}>¥{item.closingUnitCost.toFixed(2)}</Text></View>
             {item.notes ? <Text style={{ color: colors.muted, fontSize: 12, marginTop: 10 }}>备注：{item.notes}</Text> : null}
+            {footer}
           </ScrollView>
         </View>
       </View>
