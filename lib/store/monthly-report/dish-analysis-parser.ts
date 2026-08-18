@@ -13,6 +13,7 @@
  *   - 营业概览（已有，此处补充识别逻辑）
  */
 import * as XLSX from "xlsx";
+import { canonicalizeDishCategoryName } from "./excel-parser";
 import {
   ReportFileType,
   DishCategoryData,
@@ -121,21 +122,26 @@ export function parseDishCategories(base64: string): {
     const month = extractMonthFromRow1(safeStr(rows[1]?.[0]));
     const categories: DishCategoryData[] = [];
 
-    // 表头在第3行（index 2），数据从第5行（index 4）开始
-    for (let i = 4; i < rows.length; i++) {
+    // 不能假设大类固定在第 0 列：不同导出模板会在最前面插入“营业月份”。
+    // 直接从表头定位“菜品大类”列，防止把销量（如 3485）错误展示为类别名称。
+    const headerIndex = rows.findIndex((row) => row?.some((cell) => safeStr(cell) === "菜品大类"));
+    if (headerIndex < 0) return { categories: [], month };
+    const categoryColumn = rows[headerIndex].findIndex((cell: unknown) => safeStr(cell) === "菜品大类");
+
+    for (let i = headerIndex + 1; i < rows.length; i++) {
       const row = rows[i];
-      if (!row || !row[0]) continue;
-      const name = safeStr(row[0]);
-      if (!name || name === "合计") continue;
+      if (!row) continue;
+      const category = canonicalizeDishCategoryName(safeStr(row[categoryColumn]));
+      if (!category) continue;
       categories.push({
-        name,
-        salesQty: safeNum(row[1]),
-        salesQtyPct: safeNum(row[2]),
-        salesAmount: safeNum(row[3]),
-        salesAmountPct: safeNum(row[4]),
-        revenue: safeNum(row[5]),
-        revenuePct: safeNum(row[6]),
-        discount: safeNum(row[7]),
+        name: category.label,
+        salesQty: safeNum(row[categoryColumn + 1]),
+        salesQtyPct: safeNum(row[categoryColumn + 2]),
+        salesAmount: safeNum(row[categoryColumn + 3]),
+        salesAmountPct: safeNum(row[categoryColumn + 4]),
+        revenue: safeNum(row[categoryColumn + 5]),
+        revenuePct: safeNum(row[categoryColumn + 6]),
+        discount: safeNum(row[categoryColumn + 7]),
       });
     }
     return { categories, month };

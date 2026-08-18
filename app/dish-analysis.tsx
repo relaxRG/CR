@@ -21,6 +21,8 @@ import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
 import { useDishAnalysisStore } from "@/lib/store/monthly-report/dish-analysis-store";
+import { useMonthlyReportStore } from "@/lib/store/monthly-report/store";
+import { findMonthlyReportForDishAnalysis, rebuildDishCategoriesFromMonthlyReport } from "@/lib/store/monthly-report/rebuild-dish-categories";
 import {
   DishCategoryData, DishSubCategoryData, DishItemData, DishSpecData,
 } from "@/lib/store/monthly-report/dish-analysis-types";
@@ -107,7 +109,8 @@ export default function DishAnalysisScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
-  const { snapshots } = useDishAnalysisStore();
+  const { snapshots, upsertSnapshot, deleteSnapshot } = useDishAnalysisStore();
+  const { reports } = useMonthlyReportStore();
 
   const [tab, setTab] = useState<MainTab>("category");
   const [selectedMonth, setSelectedMonth] = useState<string>(snapshots[0]?.month ?? "");
@@ -135,6 +138,31 @@ export default function DishAnalysisScreen() {
       .sort((a, b) => b[sortKey] - a[sortKey]);
     return { filtered };
   }, [snapshot, searchText, sortKey]);
+
+  const resetCurrentMonthAnalysis = () => {
+    if (!snapshot) return;
+    const report = findMonthlyReportForDishAnalysis(reports, snapshot.month);
+    const action = () => {
+      if (report) {
+        upsertSnapshot(rebuildDishCategoriesFromMonthlyReport(snapshot, report));
+        Alert.alert("已重建", `${snapshot.monthLabel} 的菜品大类已从同月原始月报重新生成。`);
+        return;
+      }
+      // 没有同月主月报时不能伪造正确分类：只删除错误快照并要求重新导入。
+      deleteSnapshot(snapshot.id);
+      Alert.alert("已清除错误快照", "未找到同月原始月报，无法安全重建。请重新导入该月报表后再查看经营分析。", [
+        { text: "取消", style: "cancel" },
+        { text: "去导入", onPress: () => router.push("/monthly-report-import") },
+      ]);
+    };
+    Alert.alert(
+      "重置本月经营分析",
+      report
+        ? "将清除本月旧的菜品大类派生数据，并从同月原始月报重新生成。小类、菜品与规格明细不会被删除。"
+        : "将清除本月错误菜品分析快照；由于没有保存的同月原始月报，随后需要重新导入一次。",
+      [{ text: "取消", style: "cancel" }, { text: report ? "重置并重建" : "清除错误数据", style: "destructive", onPress: action }],
+    );
+  };
 
   // ── 大类 Tab ────────────────────────────────────────────────────────────────────────────
   const renderCategory = () => {
@@ -446,7 +474,16 @@ export default function DishAnalysisScreen() {
           <IconSymbol name="chevron.left" size={22} color={colors.primary} />
         </Pressable>
         <Text style={[S.navTitle, { color: colors.foreground }]}>菜品分析</Text>
-        <View style={{ width: 22 }} />
+        <Pressable
+          testID="dish-analysis-reset-current-month"
+          accessibilityRole="button"
+          accessibilityLabel="重置本月经营分析"
+          onPress={resetCurrentMonthAnalysis}
+          disabled={!snapshot}
+          style={({ pressed }) => ({ opacity: !snapshot ? 0.35 : pressed ? 0.6 : 1, padding: 2 })}
+        >
+          <IconSymbol name="arrow.clockwise" size={19} color={colors.primary} />
+        </Pressable>
       </View>
 
       {/* 月份选择 */}

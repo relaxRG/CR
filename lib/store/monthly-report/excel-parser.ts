@@ -34,7 +34,7 @@ function safeStr(v: any): string {
   return v == null ? "" : String(v).trim();
 }
 
-function canonicalizeDishCategoryName(value: string): { key: string; label: string } | null {
+export function canonicalizeDishCategoryName(value: string): { key: string; label: string } | null {
   const label = String(value ?? "")
     .normalize("NFKC")
     .replace(/[\u200B-\u200D\uFEFF]/g, "")
@@ -43,7 +43,8 @@ function canonicalizeDishCategoryName(value: string): { key: string; label: stri
     .replace(/\s+/g, " ")
     .replace(/\s*([·/+()&-])\s*/g, "$1")
     .trim();
-  if (!label || label === "合计") return null;
+  // 分类名必须是可读业务文本；纯数字、数字金额和百分比说明列位错位，绝不进入快照。
+  if (!label || label === "合计" || /^[-+]?\d+(?:[,.]\d+)?%?$/.test(label)) return null;
   return { key: label.toLocaleLowerCase("en-US"), label };
 }
 
