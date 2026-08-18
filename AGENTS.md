@@ -9,7 +9,7 @@
 | 项目名 | cocktail R |
 | 技术栈 | Expo (React Native) + TypeScript + NativeWind + Drizzle |
 | Bundle ID | `com.app.cocktailrecipes` |
-| 当前 Build | **139**（app.config.ts `buildNumber`） |
+| 当前 iOS 远端构建号 | **127**（EAS远端版本源；下一次production构建自动递增为128） |
 | EAS Project ID | `3ab89cc0-c646-4fb8-bceb-ba24204a8811` |
 | EAS Owner | `rgsds-team` |
 | App Store Connect App ID | `6788653669` |
@@ -18,9 +18,10 @@
 
 ## 当前状态（2026-08-11）
 
-- **代码质量**：TypeScript 0 错误，vitest 624/625 通过（1 skipped）
-- **最新 commit**：`c694523` — "docs: API 金额字段精度注释 + 生产监控大盘配置"
-- **待触发**：EAS Build 57（代码已完成，等待 Apple 凭证文件就位后触发）
+- **代码质量**：TypeScript 0 错误，Vitest 100 个文件、962 个用例通过
+- **最新 commit**：`e0fa623` — "feat: 加固快照轮换与恢复协议"
+- **版本管理**：iOS构建号由EAS远端版本源管理；app.config.ts不再声明会造成manifest偏差的本地buildNumber
+- **TestFlight**：等待用户确认后触发下一次production构建（远端将从127自动递增至128）
 
 ## 关键文件索引
 
