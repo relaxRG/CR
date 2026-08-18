@@ -1,14 +1,14 @@
 /**
- * 将一次需要用户确认的高风险操作限制为单飞执行。
- * 同一确认框未结束前，重复点击直接忽略；确认、取消或系统关闭后必须显式释放。
+ * 将同一高风险交互限制为单飞执行。
+ * 在异步任务、确认弹窗或状态提交完成前，后续触发会被忽略；调用方必须在 finally 中释放门闩。
  */
-export interface ResetActionGate {
+export interface SingleFlightGate {
   tryAcquire: () => boolean;
   release: () => void;
   isLocked: () => boolean;
 }
 
-export function createResetActionGate(): ResetActionGate {
+export function createSingleFlightGate(): SingleFlightGate {
   let locked = false;
   return {
     tryAcquire() {

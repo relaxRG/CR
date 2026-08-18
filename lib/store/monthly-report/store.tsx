@@ -6,6 +6,7 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { notifySyncChange, registerStoreReload } from "../../sync/engine";
 import { MonthlyReport } from "./types";
+import { replaceMonthlyReportForBusinessMonth } from "./month-key";
 
 const STORAGE_KEY = "monthly_reports_v1";
 
@@ -55,9 +56,8 @@ export function MonthlyReportProvider({ children }: { children: React.ReactNode 
   }, []);
 
   const addReport = useCallback((report: MonthlyReport) => {
-    // 同月份只保留最新一份
-    const filtered = reportsRef.current.filter((r) => r.rawMonth !== report.rawMonth);
-    persist([report, ...filtered]);
+    // 同业务月份只保留最新一份；2026/07 与 2026-07 必须视为同月。
+    persist(replaceMonthlyReportForBusinessMonth(reportsRef.current, report));
   }, [persist]);
 
   const deleteReport = useCallback((id: string) => {

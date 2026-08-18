@@ -15,7 +15,7 @@ describe("经营分析按月重置入口", () => {
     expect(screen).toContain("rebuildDishCategoriesFromMonthlyReport(snapshot, report)");
     expect(screen).toContain("小类、菜品与规格明细不会被删除");
     expect(screen).toContain("resetGateRef.current.tryAcquire()");
-    expect(screen).toContain("createResetActionGate");
+    expect(screen).toContain("createSingleFlightGate");
     expect(screen).toContain("isResetPromptOpen");
     expect(screen).toContain("onDismiss: releaseResetLock");
     expect(rebuild).toContain("...snapshot,");

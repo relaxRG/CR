@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeMonthlyReportMonth } from "@/lib/store/monthly-report/rebuild-dish-categories";
+import { normalizeMonthlyReportMonth } from "@/lib/store/monthly-report/month-key";
 import {
   appendRawExcelArchiveEntries,
   formatArchiveMonthLabel,

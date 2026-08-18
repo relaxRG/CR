@@ -1,14 +1,7 @@
 import type { DishAnalysisSnapshot } from "./dish-analysis-types";
 import type { MonthlyReport } from "./types";
+import { normalizeMonthlyReportMonth } from "./month-key";
 
-export function normalizeMonthlyReportMonth(value: string): string {
-  const match = String(value ?? "").match(/(\d{4})[^\d]?(\d{1,2})/);
-  if (!match) return "";
-  const month = Number(match[2]);
-  return Number.isInteger(month) && month >= 1 && month <= 12
-    ? `${match[1]}-${String(month).padStart(2, "0")}`
-    : "";
-}
 
 /**
  * 用同月《菜品销售统计（菜品大类）》的主月报结果重建菜品分析快照中的大类区。

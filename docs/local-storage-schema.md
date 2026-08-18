@@ -1,6 +1,6 @@
 # 本地存储键与数据结构清单
 
-> 由 `pnpm audit:storage` 从生产源代码生成；生成时间：2026-08-18T18:55:11.284Z。
+> 由 `pnpm audit:storage` 从生产源代码生成；生成时间：2026-08-18T19:13:35.941Z。
 > 本清单覆盖 `AsyncStorage`、`SecureStore`、Web `localStorage` 与通用库存工厂传入的键。`{variable}` 表示按运行时参数生成的键模式。
 
 ## 已解析键
@@ -78,8 +78,8 @@
 | AsyncStorage | `migration_clean_monthly_fixed_salary_v1_done` | getItem, setItem, removeItem | `"1"` | 见源文件的写入表达式 | `lib/migrations/clean-monthly-fixed-salary.ts:41`<br>`lib/migrations/clean-monthly-fixed-salary.ts:46`<br>`lib/migrations/clean-monthly-fixed-salary.ts:54`<br>`lib/migrations/clean-monthly-fixed-salary.ts:59`<br>`lib/migrations/clean-monthly-fixed-salary.ts:79`<br>`lib/migrations/clean-monthly-fixed-salary.ts:91` |
 | AsyncStorage | `module_month_adjustment_sessions_v1` | setItem, getItem | `JSON.stringify(next` | ModuleMonthCloseStore | `lib/month-close/module-month-close-store.tsx:88`<br>`lib/month-close/module-month-close-store.tsx:95` |
 | AsyncStorage | `module_month_close_archives_v1` | setItem, getItem | `JSON.stringify(next` | ModuleMonthCloseStore | `lib/month-close/module-month-close-store.tsx:81`<br>`lib/month-close/module-month-close-store.tsx:94` |
-| AsyncStorage | `monthly_report.raw_excel_archive.v1` | getItem, setItem | `JSON.stringify(next` | RawExcelArchiveStore | `lib/store/monthly-report/raw-excel-archive-store.tsx:79`<br>`lib/store/monthly-report/raw-excel-archive-store.tsx:95` |
-| AsyncStorage | `monthly_reports_v1` | getItem, setItem | `JSON.stringify(next` | MonthlyReportStore | `lib/store/monthly-report/store.tsx:34`<br>`lib/store/monthly-report/store.tsx:52` |
+| AsyncStorage | `monthly_report.raw_excel_archive.v1` | getItem, setItem | `JSON.stringify(next` | RawExcelArchiveStore | `lib/store/monthly-report/raw-excel-archive-store.tsx:83`<br>`lib/store/monthly-report/raw-excel-archive-store.tsx:100` |
+| AsyncStorage | `monthly_reports_v1` | getItem, setItem | `JSON.stringify(next` | MonthlyReportStore | `lib/store/monthly-report/store.tsx:35`<br>`lib/store/monthly-report/store.tsx:53` |
 | AsyncStorage | `monthly_summary.balances.v1` | getItem, setItem | `JSON.stringify(state.balances` | SummaryState | `lib/store/monthly-summary/store.tsx:181`<br>`lib/store/monthly-summary/store.tsx:220` |
 | AsyncStorage | `monthly_summary.inventory_configs.v1` | getItem, setItem | `JSON.stringify(state.inventoryConfigs` | SummaryState | `lib/store/monthly-summary/store.tsx:183`<br>`lib/store/monthly-summary/store.tsx:222` |
 | AsyncStorage | `monthly_summary.payments.v1` | getItem, setItem | `JSON.stringify(state.payments` | SummaryState | `lib/store/monthly-summary/store.tsx:180`<br>`lib/store/monthly-summary/store.tsx:219` |

@@ -23,7 +23,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { useDishAnalysisStore } from "@/lib/store/monthly-report/dish-analysis-store";
 import { useMonthlyReportStore } from "@/lib/store/monthly-report/store";
 import { findMonthlyReportForDishAnalysis, rebuildDishCategoriesFromMonthlyReport } from "@/lib/store/monthly-report/rebuild-dish-categories";
-import { createResetActionGate } from "@/lib/store/monthly-report/reset-action-gate";
+import { createSingleFlightGate } from "@/lib/utils/single-flight-gate";
 import {
   DishCategoryData, DishSubCategoryData, DishItemData, DishSpecData,
 } from "@/lib/store/monthly-report/dish-analysis-types";
@@ -121,7 +121,7 @@ export default function DishAnalysisScreen() {
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [compareMonths, setCompareMonths] = useState<string[]>([]);
   const [isResetPromptOpen, setIsResetPromptOpen] = useState(false);
-  const resetGateRef = useRef(createResetActionGate());
+  const resetGateRef = useRef(createSingleFlightGate());
 
   const snapshot = useMemo(() =>
     snapshots.find((s) => s.month === selectedMonth) ?? snapshots[0],

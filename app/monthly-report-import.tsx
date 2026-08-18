@@ -2,7 +2,7 @@
  * 月度经营报表导入页 (Build 135)
  * 支持9种报表类型自动识别 + 缺失检测 + 多文件同时导入
  */
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { formatMoney } from "@/lib/utils";
 import {
   Alert, ActivityIndicator, Modal, Platform, Pressable,
@@ -23,8 +23,9 @@ import { usePeriodAnalysisStore } from "@/lib/store/period-analysis/store";
 import { parsePeriodAnalysisExcel } from "@/lib/store/period-analysis/excel-parser";
 import { PeriodAnalysisReport } from "@/lib/store/period-analysis/types";
 import { useRawExcelArchiveStore } from "@/lib/store/monthly-report/raw-excel-archive-store";
-import { normalizeMonthlyReportMonth } from "@/lib/store/monthly-report/rebuild-dish-categories";
+import { normalizeMonthlyReportMonth } from "@/lib/store/monthly-report/month-key";
 import { formatRawExcelSize, getRawExcelExportFilename } from "@/lib/store/monthly-report/raw-excel-archive";
+import { createSingleFlightGate } from "@/lib/utils/single-flight-gate";
 import {
   detectReportTypeByFilename,
   detectReportTypeByContent,
@@ -128,8 +129,12 @@ export default function MonthlyReportImportScreen() {
   const [missingTypes, setMissingTypes] = useState<ReportFileType[]>([]);
   const [dishSnapshotPreview, setDishSnapshotPreview] = useState<DishAnalysisSnapshot | null>(null);
   const [periodReportPreview, setPeriodReportPreview] = useState<PeriodAnalysisReport | null>(null);
+  const pickGateRef = useRef(createSingleFlightGate());
+  const parseGateRef = useRef(createSingleFlightGate());
+  const confirmGateRef = useRef(createSingleFlightGate());
   // ─── 文件选择 ──────────────────────────────────────────────────────────────
   const handlePickFiles = async () => {
+    if (!pickGateRef.current.tryAcquire()) return;
     tap();
     try {
       const result = await DocumentPicker.getDocumentAsync({
@@ -156,10 +161,11 @@ export default function MonthlyReportImportScreen() {
         const existing = new Set(prev.map((f) => f.name));
         return [...prev, ...newFiles.filter((f) => !existing.has(f.name))];
       });
-      setLoading(false);
     } catch (e) {
-      setLoading(false);
       Alert.alert("选择文件失败", String(e));
+    } finally {
+      pickGateRef.current.release();
+      setLoading(false);
     }
   };
 
@@ -178,6 +184,7 @@ export default function MonthlyReportImportScreen() {
   // ─── 解析并预览 ────────────────────────────────────────────────────────────
   const handleParse = async () => {
     if (files.length === 0) { Alert.alert("请先选择文件"); return; }
+    if (!parseGateRef.current.tryAcquire()) return;
     tap();
     setLoading(true);
     setDishSnapshotPreview(null);
@@ -196,7 +203,6 @@ export default function MonthlyReportImportScreen() {
         dishCatsBase64: dishCatFile?.base64,
       });
 
-      setLoading(false);
       if (!report) {
         Alert.alert("解析失败", error ?? "未能识别报表数据");
         return;
@@ -235,13 +241,15 @@ export default function MonthlyReportImportScreen() {
       setPreview(report);
       setShowPreview(true);
     } catch (e) {
-      setLoading(false);
       Alert.alert("解析失败", String(e));
+    } finally {
+      parseGateRef.current.release();
+      setLoading(false);
     }
   };
 
   const handleConfirm = async () => {
-    if (!preview || loading) return;
+    if (!preview || !confirmGateRef.current.tryAcquire()) return;
     setLoading(true);
     try {
       const archiveMonth = normalizeMonthlyReportMonth(preview.rawMonth);
@@ -261,11 +269,12 @@ export default function MonthlyReportImportScreen() {
       setFiles([]);
       setDishSnapshotPreview(null);
       setPeriodReportPreview(null);
-      setLoading(false);
     } catch (error) {
-      setLoading(false);
       Alert.alert("归档失败", `本次数据未确认导入。请检查设备可用存储后重试。\n\n${String(error)}`);
       return;
+    } finally {
+      confirmGateRef.current.release();
+      setLoading(false);
     }
 
     if (missingTypes.length > 0) {
@@ -433,7 +442,7 @@ export default function MonthlyReportImportScreen() {
                 {/* 手动修正类型 */}
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxWidth: 130 }}>
                   {ALL_REPORT_TYPES.map((t) => (
-                    <TouchableOpacity key={t} onPress={() => handleSetType(f.name, t)}
+                    <TouchableOpacity key={t} disabled={loading} onPress={() => handleSetType(f.name, t)}
                       style={[S.typeChip, {
                         backgroundColor: f.type === t ? FILE_TYPE_COLORS[t] : colors.border + "44",
                         marginRight: 3,
@@ -444,7 +453,7 @@ export default function MonthlyReportImportScreen() {
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
-                <Pressable onPress={() => handleRemoveFile(f.name)} style={{ padding: 4 }}>
+                <Pressable disabled={loading} onPress={() => handleRemoveFile(f.name)} style={({ pressed }) => ({ padding: 4, opacity: loading ? 0.4 : pressed ? 0.6 : 1 })}>
                   <IconSymbol name="xmark.circle.fill" size={16} color={colors.muted} />
                 </Pressable>
               </View>
@@ -492,7 +501,7 @@ export default function MonthlyReportImportScreen() {
                 {missingTypes.length === 0 ? "✓ 数据完整" : `⚠️ 缺失 ${missingTypes.length} 种报表`}
               </Text>
             </View>
-            <Pressable onPress={handleConfirm}>
+            <Pressable disabled={loading} onPress={handleConfirm} style={({ pressed }) => ({ opacity: loading ? 0.42 : pressed ? 0.6 : 1 })}>
               <Text style={[S.sheetDone, { color: colors.primary }]}>确认导入</Text>
             </Pressable>
           </View>
