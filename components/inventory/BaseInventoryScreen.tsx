@@ -15,6 +15,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { StoreSegmentedTabs } from "@/components/store/store-visual-primitives";
 import { ScreenContainer } from "@/components/screen-container";
 import { GenericInventoryContextValue, GenericInventoryItem } from "@/lib/inventory-core/store";
 import { getCurrentMonth, MonthlyLedgerItem, MonthlySnapshot } from "@/lib/inventory-core/types";
@@ -164,18 +165,18 @@ export function BaseInventoryScreen({
     id: label || "uncategorized", label: label || "未分类", color: accentColor, rows,
   })), [groupedLedger, accentColor]);
   const ledgerColumns = useMemo<HorizontalLedgerColumn<MonthlyLedgerItem>[]>(() => [
-    { key: "name", label: "商品名称", width: 184, pinned: true, flexWeight: 3, onPress: setSelectedLedgerItem, testID: (item) => `${categoryId}-ledger-name-${item.itemId}`, render: (item) => <><Text numberOfLines={1} style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.nameFontSize, fontWeight: "800" }}>{item.name}</Text><Text numberOfLines={1} style={{ color: colors.muted, fontSize: 11 }}>{item.spec || item.unit}</Text></> },
+    { key: "name", label: "商品名称", width: 184, pinned: true, flexWeight: 3, onPress: setSelectedLedgerItem, testID: (item) => `${categoryId}-ledger-name-${item.itemId}`, render: (item) => <><Text numberOfLines={1} style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.nameFontSize, fontWeight: "600" }}>{item.name}</Text><Text numberOfLines={1} style={{ color: colors.muted, fontSize: 11 }}>{item.spec || item.unit}</Text></> },
     { key: "openingQty", label: "期初量", width: 88, flexWeight: 1, align: "right", render: (item) => <Text style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{formatStoreQuantity(item.openingQty)}</Text> },
     { key: "openingUnitCost", label: "期初单价", width: 104, flexWeight: 1.2, align: "right", render: (item) => <Text style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{formatStoreMoney(item.openingUnitCost)}</Text> },
     { key: "openingCost", label: "期初成本", width: 112, flexWeight: 1.3, align: "right", render: (item) => <Text style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{formatStoreMoney(item.openingCost)}</Text> },
-    { key: "purchaseQty", label: "进货量", width: 88, flexWeight: 1, align: "right", render: (item) => <Text style={{ color: item.purchaseQty > 0 ? accentColor : colors.muted, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{item.purchaseQty > 0 ? `+${formatStoreQuantity(item.purchaseQty)}` : "—"}</Text> },
-    { key: "purchaseCost", label: "进货成本", width: 112, flexWeight: 1.3, align: "right", render: (item) => <Text style={{ color: item.purchaseCost > 0 ? accentColor : colors.muted, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{item.purchaseCost > 0 ? formatStoreMoney(item.purchaseCost) : "—"}</Text> },
-    { key: "consumeQty", label: "消耗量", width: 88, flexWeight: 1, align: "right", render: (item) => <Text style={{ color: item.consumeQty > 0 ? colors.warning : colors.muted, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{item.consumeQty > 0 ? formatStoreQuantity(item.consumeQty) : "—"}</Text> },
-    { key: "consumeCost", label: "消耗成本", width: 112, flexWeight: 1.3, align: "right", render: (item) => <Text style={{ color: item.consumeCost > 0 ? colors.warning : colors.muted, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{item.consumeCost > 0 ? formatStoreMoney(item.consumeCost) : "—"}</Text> },
+    { key: "purchaseQty", label: "进货量", width: 88, flexWeight: 1, align: "right", render: (item) => <Text style={{ color: item.purchaseQty > 0 ? colors.foreground : colors.muted, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{item.purchaseQty > 0 ? `+${formatStoreQuantity(item.purchaseQty)}` : "—"}</Text> },
+    { key: "purchaseCost", label: "进货成本", width: 112, flexWeight: 1.3, align: "right", render: (item) => <Text style={{ color: item.purchaseCost > 0 ? colors.foreground : colors.muted, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{item.purchaseCost > 0 ? formatStoreMoney(item.purchaseCost) : "—"}</Text> },
+    { key: "consumeQty", label: "消耗量", width: 88, flexWeight: 1, align: "right", render: (item) => <Text style={{ color: item.consumeQty > 0 ? colors.foreground : colors.muted, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{item.consumeQty > 0 ? formatStoreQuantity(item.consumeQty) : "—"}</Text> },
+    { key: "consumeCost", label: "消耗成本", width: 112, flexWeight: 1.3, align: "right", render: (item) => <Text style={{ color: item.consumeCost > 0 ? colors.foreground : colors.muted, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{item.consumeCost > 0 ? formatStoreMoney(item.consumeCost) : "—"}</Text> },
     ...(showLoss ? [{ key: "lossQty", label: "损耗量", width: 88, flexWeight: 1, align: "right" as const, render: (item: MonthlyLedgerItem) => <Text style={{ color: item.lossQty > 0 ? colors.error : colors.muted, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{item.lossQty > 0 ? formatStoreQuantity(item.lossQty) : "—"}</Text> }] : []),
-    { key: "closingQty", label: "期末量", width: 88, flexWeight: 1, align: "right", render: (item) => <Text style={{ color: item.closingQty <= 0 ? colors.muted : colors.foreground, fontSize: STORE_TABLE_METRICS.numericFontSize, fontWeight: "800" }}>{formatStoreQuantity(item.closingQty)}</Text> },
+    { key: "closingQty", label: "期末量", width: 88, flexWeight: 1, align: "right", render: (item) => <Text style={{ color: item.closingQty <= 0 ? colors.muted : colors.foreground, fontSize: STORE_TABLE_METRICS.numericFontSize, fontWeight: "600" }}>{formatStoreQuantity(item.closingQty)}</Text> },
     { key: "closingUnitCost", label: "期末单价", width: 112, flexWeight: 1.3, align: "right", render: (item) => <Text style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{formatStoreMoney(item.closingUnitCost)}</Text> },
-    { key: "closingCost", label: "期末成本", width: 120, flexWeight: 1.5, align: "right", render: (item) => <Text style={{ color: accentColor, fontSize: STORE_TABLE_METRICS.numericFontSize, fontWeight: "800" }}>{formatStoreMoney(item.closingCost)}</Text> },
+    { key: "closingCost", label: "期末成本", width: 120, flexWeight: 1.5, align: "right", render: (item) => <Text style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.numericFontSize, fontWeight: "600" }}>{formatStoreMoney(item.closingCost)}</Text> },
   ], [accentColor, categoryId, colors, showLoss]);
 
 
@@ -231,24 +232,14 @@ export function BaseInventoryScreen({
         </View>
       </View>}
 
-      {/* Tab 切换 */}
-      <ScrollView horizontal nestedScrollEnabled directionalLockEnabled showsHorizontalScrollIndicator={false}
-        style={{ flexGrow: 0 }}
-        contentContainerStyle={{ paddingHorizontal: INVENTORY_WORKSPACE_METRICS.horizontalPadding, paddingVertical: 6, gap: INVENTORY_WORKSPACE_METRICS.horizontalGap, alignItems: "center" }}>
-        {allTabs.map((t) => (
-          <TouchableOpacity key={t.key} testID={`${categoryId}-inventory-tab-${t.key}`} hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }} onPress={() => { tap(); setTab(t.key); }}
-            style={[S.tabChip, {
-              minHeight: INVENTORY_WORKSPACE_METRICS.segmentHeight,
-              borderRadius: INVENTORY_WORKSPACE_METRICS.segmentRadius,
-              backgroundColor: tab === t.key ? colors.foreground : colors.surface,
-              borderColor: tab === t.key ? colors.foreground : colors.border,
-            }]}>
-            <Text style={{ fontSize: 13, fontWeight: "600", color: tab === t.key ? "#fff" : colors.muted }}>
-              {t.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      {/* 工作台页签统一使用门店40pt纯文本分段栏：选择状态由细下划线表达，而非深色块。 */}
+      <StoreSegmentedTabs
+        items={allTabs}
+        active={tab}
+        onChange={(next) => { tap(); setTab(next); }}
+        colors={colors}
+        testID={`${categoryId}-inventory-tabs`}
+      />
 
       <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }}>
 
@@ -257,14 +248,14 @@ export function BaseInventoryScreen({
           <View style={{ gap: 14 }}>
             {/* 本月核心指标卡 */}
             <View style={[S.summaryCard, { backgroundColor: accentColor + "0a", borderColor: accentColor + "22" }]}>
-              <Text style={{ fontSize: 15, fontWeight: "700", color: accentColor, marginBottom: 10 }}>
+              <Text style={{ fontSize: 15, fontWeight: "600", color: colors.foreground, marginBottom: 10 }}>
                 {currentMonth} 月度概况
               </Text>
               {[
                 { label: "品种数量", value: `${activeItems.length} 款`, color: colors.foreground },
-                { label: "期初库存成本", value: `¥${totalOpeningCost.toFixed(0)}`, color: colors.muted },
-                { label: "本月进货总额", value: `¥${totalMonthPurchase.toFixed(0)}`, color: accentColor },
-                { label: "本月消耗成本", value: `¥${totalMonthConsume.toFixed(0)}`, color: colors.warning },
+                { label: "期初库存成本", value: `¥${totalOpeningCost.toFixed(0)}`, color: colors.foreground },
+                { label: "本月进货总额", value: `¥${totalMonthPurchase.toFixed(0)}`, color: colors.foreground },
+                { label: "本月消耗成本", value: `¥${totalMonthConsume.toFixed(0)}`, color: colors.foreground },
                 { label: "期末库存成本", value: `¥${totalClosingCost.toFixed(0)}`, color: colors.foreground },
               ].map((row, i) => (
                 <View key={i} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 5, borderTopWidth: i > 0 ? StyleSheet.hairlineWidth : 0, borderTopColor: colors.border }}>
@@ -277,7 +268,7 @@ export function BaseInventoryScreen({
             {/* 与上月对比 */}
             {lastSnapshot && (
               <View style={[S.summaryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground, marginBottom: 8 }}>
+                <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground, marginBottom: 8 }}>
                   与上月对比（{lastSnapshot.month}）
                 </Text>
                 {[
@@ -300,7 +291,8 @@ export function BaseInventoryScreen({
                   const diff = row.cur - row.prev;
                   const pct = row.prev > 0 ? (diff / row.prev) * 100 : 0;
                   const sign = diff > 0 ? "▲" : diff < 0 ? "▼" : "—";
-                  const color = diff > 0 ? colors.error : diff < 0 ? colors.success : colors.muted;
+                  // 环比增加或下降本身不等价于异常或完成；保留中性趋势，由标签和箭头表达方向。
+                  const color = colors.muted;
                   return (
                     <View key={i} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 5, borderTopWidth: i > 0 ? StyleSheet.hairlineWidth : 0, borderTopColor: colors.border }}>
                       <Text style={{ fontSize: 13, color: colors.muted }}>{row.label}</Text>
@@ -379,7 +371,7 @@ export function BaseInventoryScreen({
                 <View key={group} style={{ marginBottom: 16 }}>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
                     <View style={{ width: 4, height: 16, borderRadius: 2, backgroundColor: accentColor }} />
-                    <Text style={{ fontSize: 14, fontWeight: "700", color: accentColor }}>{group}</Text>
+                    <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>{group}</Text>
                     <Text style={{ fontSize: 12, color: colors.muted }}>({items.length} 款)</Text>
                   </View>
                   {items.map((item) => (
@@ -401,8 +393,8 @@ export function BaseInventoryScreen({
             {/* 录入操作统一为紧凑文本控制；状态不依赖红绿大色块表达。 */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: INVENTORY_WORKSPACE_METRICS.horizontalGap, paddingBottom: 2 }}>
               <TouchableOpacity onPress={() => { tap(); setPurchaseMode("in"); setPreselectedId(undefined); setShowPurchase(true); }}
-                style={[S.actionBtn, { minHeight: INVENTORY_WORKSPACE_METRICS.actionHeight, borderRadius: INVENTORY_WORKSPACE_METRICS.segmentRadius, backgroundColor: colors.foreground, borderColor: colors.foreground }]}>
-                <Text style={{ fontSize: 13, fontWeight: "700", color: "#fff" }}>录入进货</Text>
+                style={[S.actionBtn, { minHeight: INVENTORY_WORKSPACE_METRICS.actionHeight, borderRadius: INVENTORY_WORKSPACE_METRICS.segmentRadius, backgroundColor: colors.primary, borderColor: colors.primary }]}>
+                <Text style={{ fontSize: 13, fontWeight: "600", color: colors.surface }}>录入进货</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => { tap(); setPurchaseMode("out"); setPreselectedId(undefined); setShowPurchase(true); }}
                 style={[S.actionBtn, { minHeight: INVENTORY_WORKSPACE_METRICS.actionHeight, borderRadius: INVENTORY_WORKSPACE_METRICS.segmentRadius, backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -411,24 +403,24 @@ export function BaseInventoryScreen({
             </ScrollView>
 
             {/* 当月进货汇总 */}
-            <View style={[S.summaryCard, { backgroundColor: accentColor + "0a", borderColor: accentColor + "22" }]}>
-              <Text style={{ fontSize: 13, fontWeight: "700", color: accentColor, marginBottom: 6 }}>
+            <View style={[S.summaryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground, marginBottom: 6 }}>
                 {currentMonth} 进货汇总
               </Text>
               <View style={{ flexDirection: "row", gap: 12 }}>
                 <View style={{ flex: 1, alignItems: "center" }}>
                   <Text style={{ fontSize: 11, color: colors.muted }}>进货笔数</Text>
-                  <Text style={{ fontSize: 18, fontWeight: "700", color: accentColor }}>{monthPurchases.length}</Text>
+                  <Text style={{ fontSize: 18, fontWeight: "600", color: colors.foreground }}>{monthPurchases.length}</Text>
                 </View>
                 <View style={{ width: 1, backgroundColor: colors.border }} />
                 <View style={{ flex: 1, alignItems: "center" }}>
                   <Text style={{ fontSize: 11, color: colors.muted }}>进货总额</Text>
-                  <Text style={{ fontSize: 18, fontWeight: "700", color: accentColor }}>¥{totalMonthPurchase.toFixed(0)}</Text>
+                  <Text style={{ fontSize: 18, fontWeight: "600", color: colors.foreground }}>¥{totalMonthPurchase.toFixed(0)}</Text>
                 </View>
                 <View style={{ width: 1, backgroundColor: colors.border }} />
                 <View style={{ flex: 1, alignItems: "center" }}>
                   <Text style={{ fontSize: 11, color: colors.muted }}>出库笔数</Text>
-                  <Text style={{ fontSize: 18, fontWeight: "700", color: colors.error }}>{monthConsumes.length}</Text>
+                  <Text style={{ fontSize: 18, fontWeight: "600", color: colors.foreground }}>{monthConsumes.length}</Text>
                 </View>
               </View>
               {pettyHint && (
@@ -444,8 +436,8 @@ export function BaseInventoryScreen({
               <View style={{ alignItems: "center", paddingVertical: 20 }}>
                 <Text style={{ fontSize: 13, color: colors.muted }}>本月暂无进货记录</Text>
                 <TouchableOpacity onPress={() => { tap(); setPurchaseMode("in"); setShowPurchase(true); }}
-                  style={{ marginTop: 10, backgroundColor: accentColor, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 8 }}>
-                  <Text style={{ fontSize: 13, fontWeight: "600", color: "#fff" }}>立即录入进货</Text>
+                  style={{ marginTop: 10, backgroundColor: colors.primary, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 8 }}>
+                  <Text style={{ fontSize: 13, fontWeight: "600", color: colors.surface }}>立即录入进货</Text>
                 </TouchableOpacity>
               </View>
             ) : (
@@ -456,7 +448,7 @@ export function BaseInventoryScreen({
                     <Text style={{ fontSize: 12, color: colors.muted }}>{formatInventoryMonthDay(r.date)} · {r.supplier || "自采"}</Text>
                   </View>
                   <View style={{ alignItems: "flex-end" }}>
-                    <Text style={{ fontSize: 15, fontWeight: "700", color: accentColor }}>+{r.quantity}</Text>
+                    <Text style={{ fontSize: 15, fontWeight: "600", color: colors.foreground }}>+{r.quantity}</Text>
                     <Text style={{ fontSize: 12, color: colors.muted }}>¥{r.totalAmount.toFixed(2)}</Text>
                   </View>
                 </View>
@@ -476,7 +468,7 @@ export function BaseInventoryScreen({
                       </Text>
                     </View>
                     <View style={{ alignItems: "flex-end" }}>
-                      <Text style={{ fontSize: 15, fontWeight: "700", color: colors.error }}>-{r.quantity}</Text>
+                      <Text style={{ fontSize: 15, fontWeight: "600", color: r.reason === "loss" || r.reason === "adjust" ? colors.error : colors.foreground }}>-{r.quantity}</Text>
                       <Text style={{ fontSize: 12, color: colors.muted }}>¥{r.totalCost.toFixed(2)}</Text>
                     </View>
                   </View>
@@ -571,7 +563,6 @@ function EmptyState({ emoji, accentColor, excelFormatHint, colors }: any) {
 const S = StyleSheet.create({
   navbar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   navTitle: { fontSize: 17, fontWeight: "600" },
-  tabChip: { minHeight: INVENTORY_WORKSPACE_METRICS.segmentHeight, paddingHorizontal: 14, paddingVertical: 6, borderRadius: INVENTORY_WORKSPACE_METRICS.segmentRadius, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   actionBtn: { flexShrink: 0, minHeight: INVENTORY_WORKSPACE_METRICS.actionHeight, paddingHorizontal: 12, paddingVertical: 6, borderRadius: INVENTORY_WORKSPACE_METRICS.segmentRadius, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   bigBtn: { flex: 1, minHeight: INVENTORY_WORKSPACE_METRICS.actionHeight, paddingVertical: 8, borderRadius: INVENTORY_WORKSPACE_METRICS.segmentRadius, alignItems: "center", justifyContent: "center" },
   recordCard: { flexDirection: "row", alignItems: "center", borderRadius: 12, borderWidth: 1, padding: 12, gap: 10 },

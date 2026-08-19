@@ -183,6 +183,11 @@ try {
   const { call } = cdp;
   await call("Page.enable");
   await call("Performance.enable");
+  await call("HeapProfiler.enable");
+  const collectRetainedHeap = async () => {
+    await call("HeapProfiler.collectGarbage");
+    await sleep(80);
+  };
   const results = [];
 
   for (const width of viewports) {
@@ -201,6 +206,8 @@ try {
     await sleep(280);
     await call("Runtime.evaluate", { expression: `(() => { const list = document.querySelector('[data-testid="wine-horizontal-ledger-table-virtual-list"]'); if (!list) return false; list.scrollTop = 0; return true; })()`, returnByValue: true });
     await sleep(280);
+    // 在基线采样前回收预热与切换产生的短生命周期对象；仅评估真正被页面保留的堆增长。
+    await collectRetainedHeap();
     const before = metricSnapshot((await call("Performance.getMetrics")).metrics);
     const beforeLiveNodeCount = (await call("Runtime.evaluate", { expression: "document.querySelectorAll('*').length", returnByValue: true })).result.value;
     const frame = (await call("Runtime.evaluate", { expression: scrollFrameSampleExpression, awaitPromise: true, returnByValue: true })).result.value;
@@ -219,6 +226,7 @@ try {
       }
     }
     await sleep(180);
+    await collectRetainedHeap();
     const after = metricSnapshot((await call("Performance.getMetrics")).metrics);
     const afterLiveNodeCount = (await call("Runtime.evaluate", { expression: "document.querySelectorAll('*').length", returnByValue: true })).result.value;
     const heapGrowth = before.jsHeapUsedSize !== null && after.jsHeapUsedSize !== null ? after.jsHeapUsedSize - before.jsHeapUsedSize : null;
@@ -239,7 +247,7 @@ try {
       averageFrameGapMs: "<= 17ms（60Hz 浏览器稳定滚动基线；采样已排除首屏预热帧）",
       p95FrameGapMs: "<= 20ms",
       maxFrameGapMs: "<= 34ms",
-      heapGrowth: "<= 12 MiB / 12 次页签循环",
+      heapGrowth: "<= 12 MiB / 12 次页签循环（GC 后的保留堆）",
       liveNodeGrowth: "<= 180 个存活 DOM 节点 / 12 次页签循环",
     },
     results,

@@ -114,15 +114,15 @@ export function VirtualizedHorizontalLedgerTable<Row>({
   }
 
   const renderHeader = (sourceColumns: HorizontalLedgerColumn<Row>[]) => (
-    <View style={[S.header, { backgroundColor: colors.primary }]}>
+    <View style={[S.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
       {sourceColumns.map((column) => {
         const isSortable = Boolean(onSort && column.sortKey);
         const active = sort?.key === column.sortKey;
         const header = (
           <View style={[S.headerCell, { width: column.width, alignItems: alignment(column.align) }]}>
             <View style={S.headerLabel}>
-              <Text style={S.headerText} numberOfLines={1}>{column.label}</Text>
-              {isSortable && <Text style={[S.sortMark, { color: active ? "#fff" : "#DCEBFF" }]}>{active ? (sort?.direction === "asc" ? "↑" : "↓") : "↕"}</Text>}
+              <Text style={[S.headerText, { color: active ? colors.primary : colors.foreground }]} numberOfLines={1}>{column.label}</Text>
+              {isSortable && <Text style={[S.sortMark, { color: active ? colors.primary : colors.muted }]}>{active ? (sort?.direction === "asc" ? "↑" : "↓") : "↕"}</Text>}
             </View>
           </View>
         );
@@ -145,9 +145,9 @@ export function VirtualizedHorizontalLedgerTable<Row>({
   const renderEntry = (entry: WindowEntry<Row>, sourceColumns: HorizontalLedgerColumn<Row>[], isPinned: boolean) => entry.kind === "group" ? (
     <View
       key={`${isPinned ? "pinned" : "data"}-group-${entry.group.id}`}
-      style={[S.groupHeader, { height: GROUP_HEIGHT, backgroundColor: entry.group.color + "20", width: sourceColumns.reduce((sum, column) => sum + column.width, 0) }, containment]}
+      style={[S.groupHeader, { height: GROUP_HEIGHT, backgroundColor: entry.group.color + "10", borderBottomColor: colors.border, width: sourceColumns.reduce((sum, column) => sum + column.width, 0) }, containment]}
     >
-      {isPinned ? <><View style={[S.groupDot, { backgroundColor: entry.group.color }]} /><Text style={{ color: entry.group.color, fontSize: STORE_TABLE_METRICS.bodyFontSize, fontWeight: "800" }}>{entry.group.label}</Text><Text style={{ color: colors.muted, fontSize: 11 }}>({entry.group.rows.length})</Text></> : null}
+      {isPinned ? <><View style={[S.groupDot, { backgroundColor: entry.group.color }]} /><Text style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.bodyFontSize, fontWeight: "600" }}>{entry.group.label}</Text><Text style={{ color: colors.muted, fontSize: 11 }}>({entry.group.rows.length})</Text></> : null}
     </View>
   ) : (
     <View
@@ -228,12 +228,12 @@ const S = StyleSheet.create({
   pinnedPanel: { borderRightWidth: StyleSheet.hairlineWidth, zIndex: 2 },
   horizontalScroller: { flex: 1, minWidth: 0 },
   list: { flex: 1 },
-  header: { flexDirection: "row", minHeight: STORE_TABLE_METRICS.headerHeight },
+  header: { flexDirection: "row", minHeight: STORE_TABLE_METRICS.headerHeight, borderBottomWidth: StyleSheet.hairlineWidth },
   headerCell: { justifyContent: "center", paddingHorizontal: 9, paddingVertical: 8 },
-  headerText: { color: "#fff", fontSize: STORE_TABLE_METRICS.bodyFontSize, fontWeight: "800" },
+  headerText: { fontSize: STORE_TABLE_METRICS.bodyFontSize, fontWeight: "600" },
   headerLabel: { flexDirection: "row", alignItems: "center", gap: 3 },
-  sortMark: { fontSize: 11, fontWeight: "800" },
-  groupHeader: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10 },
+  sortMark: { fontSize: 11, fontWeight: "600" },
+  groupHeader: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, borderBottomWidth: StyleSheet.hairlineWidth },
   groupDot: { width: 8, height: 8, borderRadius: 4 },
   row: { flexDirection: "row", borderBottomWidth: StyleSheet.hairlineWidth },
   cell: { justifyContent: "center", paddingHorizontal: 9, paddingVertical: 6 },

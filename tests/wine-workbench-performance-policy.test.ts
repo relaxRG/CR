@@ -24,6 +24,10 @@ describe("葡萄酒工作台长列表性能护栏", () => {
     expect(table).toContain('testID={source === "data" && testID ? `${testID}-virtual-list` : undefined}');
     expect(table).toContain("pinnedScrollRef");
     expect(table).toContain("dataScrollRef");
+    expect(table).toContain('backgroundColor: colors.surface, borderBottomColor: colors.border');
+    expect(table).toContain('fontWeight: "600"');
+    expect(table).not.toContain('backgroundColor: colors.primary');
+    expect(table).not.toContain('fontWeight: "800"');
   });
 
   it("移动端性能脚本以360条库存和180条采购做60 FPS与内存稳定性压力验证", () => {
@@ -34,6 +38,8 @@ describe("葡萄酒工作台长列表性能护栏", () => {
     expect(script).toContain("const measuredGaps = gaps.slice(6)");
     expect(script).toContain("frame.averageFrameGapMs > 17");
     expect(script).toContain("for (let cycle = 0; cycle < 12");
+    expect(script).toContain('await call("HeapProfiler.enable")');
+    expect(script).toContain('await call("HeapProfiler.collectGarbage")');
     expect(script).toContain("heapGrowth > 12 * 1024 * 1024");
     expect(script).toContain("liveNodeGrowth > 180");
     expect(script).toContain("beforeLiveNodeCount");

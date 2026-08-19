@@ -41,6 +41,23 @@ describe("库存六类与店铺四类工作台统一规范", () => {
     expect(wineLedgerToolbar).not.toContain('<IconSymbol');
   });
 
+  it("通用库存台账仅将分类色用于分组色点，普通进货、消耗和期末金额保持中性", () => {
+    const table = read("components/inventory/HorizontalLedgerTable.tsx");
+    expect(table).toContain('backgroundColor: colors.surface, borderBottomColor: colors.border');
+    expect(table).toContain('fontWeight: "600"');
+    expect(table).not.toContain('backgroundColor: colors.primary');
+    expect(table).not.toContain('fontWeight: "800"');
+    expect(base).toContain('<StoreSegmentedTabs');
+    expect(base).not.toContain('backgroundColor: tab === t.key ? colors.foreground');
+    expect(base).toContain('color: item.purchaseCost > 0 ? colors.foreground : colors.muted');
+    expect(base).toContain('color: item.consumeCost > 0 ? colors.foreground : colors.muted');
+    expect(base).toContain('color: colors.foreground, fontSize: STORE_TABLE_METRICS.numericFontSize, fontWeight: "600"');
+    expect(base).toContain('backgroundColor: colors.primary, borderColor: colors.primary');
+    expect(base).toContain('r.reason === "loss" || r.reason === "adjust" ? colors.error : colors.foreground');
+    expect(base).not.toContain('fontWeight: "700"');
+    expect(base).not.toContain('fontWeight: "800"');
+  });
+
   it("当月进货使用月日、无色分类分组和整列筛选入口", () => {
     expect(spirits).toContain("purchaseDisplayGroups.map");
     expect(spirits).toContain("formatInventoryMonthDay(p.date)");

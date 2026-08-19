@@ -75,15 +75,15 @@ export function HorizontalLedgerTable<Row>({
   return (
     <ScrollView horizontal nestedScrollEnabled directionalLockEnabled showsHorizontalScrollIndicator testID={testID} style={{ flexGrow: 0 }}>
       <View style={{ width: totalWidth, minWidth: "100%" }}>
-        <View style={[S.header, { backgroundColor: colors.primary }]}>
+        <View style={[S.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
           {responsiveColumns.map((column) => {
             const isSortable = Boolean(onSort && column.sortKey);
             const active = sort?.key === column.sortKey;
             const header = (
               <View style={[S.headerCell, { width: column.width, alignItems: alignment(column.align) }]}>
                 <View style={S.headerLabel}>
-                  <Text style={S.headerText} numberOfLines={1}>{column.label}</Text>
-                  {isSortable && <Text style={[S.sortMark, { color: active ? "#fff" : "#DCEBFF" }]}>{active ? (sort?.direction === "asc" ? "↑" : "↓") : "↕"}</Text>}
+                  <Text style={[S.headerText, { color: active ? colors.primary : colors.foreground }]} numberOfLines={1}>{column.label}</Text>
+                  {isSortable && <Text style={[S.sortMark, { color: active ? colors.primary : colors.muted }]}>{active ? (sort?.direction === "asc" ? "↑" : "↓") : "↕"}</Text>}
                 </View>
               </View>
             );
@@ -104,9 +104,9 @@ export function HorizontalLedgerTable<Row>({
 
         {groups.map((group) => (
           <React.Fragment key={group.id}>
-            <View style={[S.groupHeader, { backgroundColor: group.color + "20" }]}>
+            <View style={[S.groupHeader, { backgroundColor: group.color + "10", borderBottomColor: colors.border }]}>
               <View style={[S.groupDot, { backgroundColor: group.color }]} />
-              <Text style={{ color: group.color, fontSize: STORE_TABLE_METRICS.bodyFontSize, fontWeight: "800" }}>{group.label}</Text>
+              <Text style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.bodyFontSize, fontWeight: "600" }}>{group.label}</Text>
               <Text style={{ color: colors.muted, fontSize: 11 }}>({group.rows.length})</Text>
             </View>
             {group.rows.map((row, index) => {
@@ -150,12 +150,12 @@ function alignment(align: HorizontalLedgerColumn<unknown>["align"]) {
 }
 
 const S = StyleSheet.create({
-  header: { flexDirection: "row", minHeight: STORE_TABLE_METRICS.headerHeight },
+  header: { flexDirection: "row", minHeight: STORE_TABLE_METRICS.headerHeight, borderBottomWidth: StyleSheet.hairlineWidth },
   headerCell: { justifyContent: "center", paddingHorizontal: 9, paddingVertical: 8 },
-  headerText: { color: "#fff", fontSize: STORE_TABLE_METRICS.bodyFontSize, fontWeight: "800" },
+  headerText: { fontSize: STORE_TABLE_METRICS.bodyFontSize, fontWeight: "600" },
   headerLabel: { flexDirection: "row", alignItems: "center", gap: 3 },
-  sortMark: { fontSize: 11, fontWeight: "800" },
-  groupHeader: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: STORE_TABLE_METRICS.groupHeight, paddingHorizontal: 10 },
+  sortMark: { fontSize: 11, fontWeight: "600" },
+  groupHeader: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: STORE_TABLE_METRICS.groupHeight, paddingHorizontal: 10, borderBottomWidth: StyleSheet.hairlineWidth },
   groupDot: { width: 8, height: 8, borderRadius: 4 },
   row: { flexDirection: "row", minHeight: STORE_TABLE_METRICS.rowHeight, borderBottomWidth: StyleSheet.hairlineWidth },
   cell: { justifyContent: "center", paddingHorizontal: 9, paddingVertical: 6 },

@@ -36,8 +36,9 @@ describe("库存工作台紧凑布局与移动端交互护栏", () => {
 
     expect(base).toContain("horizontal nestedScrollEnabled directionalLockEnabled");
     expect(base).toContain('keyboardShouldPersistTaps="handled"');
-    expect(base).toContain("INVENTORY_WORKSPACE_METRICS.segmentHeight");
-    expect(base).toContain('testID={`${categoryId}-inventory-tab-${t.key}`}');
+    expect(base).toContain("<StoreSegmentedTabs");
+    expect(base).toContain('testID={`${categoryId}-inventory-tabs`}');
+    expect(read("components/store/store-visual-primitives.tsx")).toContain("minHeight: 40");
     expect(table).toContain("horizontal nestedScrollEnabled directionalLockEnabled");
     expect(table).toContain("hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}");
 
