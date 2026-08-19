@@ -13,6 +13,7 @@ import {
   useState,
 } from "react";
 import { Alert, AppState, Platform } from "react-native";
+import { addNetworkStateListener } from "expo-network";
 import {
   cfPull,
   cfPush,
@@ -48,6 +49,12 @@ import { recoverJoinAfterUnavailableSource, recoverPendingGroupSwitch, switchToA
 import type { DeviceSessionState } from "@/lib/sync/device-session";
 import { STORAGE_POLICY, isStorageKeyWritable } from "@/lib/sync/capabilities";
 import type { SyncStorageKey } from "@/lib/sync/engine";
+import {
+  MAX_SESSION_RETRY_ATTEMPTS,
+  nextSessionRetryDelay,
+  sessionAfterTransportFailure,
+  shouldRetryAfterNetworkChange,
+} from "@/lib/sync/session-recovery";
 
 // ─── Context type (compatible with original useSync) ─────────────────────────
 type SyncContextValue = {
@@ -129,6 +136,7 @@ export function SyncProvider({
   const startedRef = useRef(false);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryCountRef = useRef(0);
+  const sessionRefreshInFlightRef = useRef<Promise<boolean> | null>(null);
   const syncingRef = useRef(false);
   const lastSyncAtRef = useRef(0);
   const stopRealtimeRef = useRef<(() => void) | null>(null);
@@ -139,7 +147,9 @@ export function SyncProvider({
    * 刷新 Worker 已核验的成员与策略事实。网络失败时仅在已有已验证会话的前提下退化为离线缓存；
    * 从不把本机旧角色或旧授权键重新解释为权限。
    */
-  const refreshDeviceSession = useCallback(async (): Promise<boolean> => {
+  const refreshDeviceSession = useCallback((): Promise<boolean> => {
+    if (sessionRefreshInFlightRef.current) return sessionRefreshInFlightRef.current;
+    const task = (async (): Promise<boolean> => {
     const credentials = await getDeviceCredentials();
     if (!credentials) {
       setSession({ tag: "local_single_device" });
@@ -173,6 +183,12 @@ export function SyncProvider({
       }
       return false;
     }
+    })();
+    sessionRefreshInFlightRef.current = task;
+    void task.finally(() => {
+      if (sessionRefreshInFlightRef.current === task) sessionRefreshInFlightRef.current = null;
+    });
+    return task;
   }, [setSession]);
 
   // 推送只依据当前 Worker 已核验的 DeviceSessionV2 能力策略；不再读取本机角色或 allowed_keys。
@@ -356,7 +372,9 @@ export function SyncProvider({
       const msg = err instanceof Error ? err.message : String(err);
       console.warn("[CFSync] sync failed:", msg);
       setSyncError(msg);
-      // Non-blocking: app works offline
+      // 会话核验成功后在 pull/push 期间断网，也必须显式降级为离线缓存，
+      // 不能继续把过期在线状态展示为可执行高风险操作。
+      setSession(sessionAfterTransportFailure(sessionRef.current, msg));
       setAuthLoading(false);
       return false;
     } finally {
@@ -364,13 +382,13 @@ export function SyncProvider({
     }
   }, [refreshDeviceSession, setSession]);
 
-  // Auto-retry with exponential backoff: 30s * 2^n, capped at 10 min, max 8 attempts
+  // 指数退避加抖动，单个定时器且最多 8 次；避免弱网下多个页面事件叠加为并发重试风暴。
   const scheduleRetry = useCallback(() => {
-    if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
-    if (retryCountRef.current >= 8) return;
-    const delay = Math.min(30_000 * 2 ** retryCountRef.current, 600_000);
+    if (retryTimerRef.current || retryCountRef.current >= MAX_SESSION_RETRY_ATTEMPTS) return;
+    const delay = nextSessionRetryDelay(retryCountRef.current);
     retryCountRef.current += 1;
     retryTimerRef.current = setTimeout(async () => {
+      retryTimerRef.current = null;
       const ok = await performSync();
       if (!ok) scheduleRetry();
     }, delay);
@@ -387,6 +405,23 @@ export function SyncProvider({
     if (!ok) scheduleRetry();
     return ok;
   }, [performSync, scheduleRetry]);
+
+  // 网络从断开恢复时立即触发一次受控重试；不等待退避上限或应用重新回到前台。
+  useEffect(() => {
+    const recover = () => { void retrySync(); };
+    if (Platform.OS === "web") {
+      if (typeof window === "undefined") return;
+      window.addEventListener("online", recover);
+      return () => window.removeEventListener("online", recover);
+    }
+    let wasOnline: boolean | null = null;
+    const subscription = addNetworkStateListener((state) => {
+      const isOnline = state.isConnected === true && state.isInternetReachable !== false;
+      if (shouldRetryAfterNetworkChange(wasOnline, isOnline)) recover();
+      wasOnline = isOnline;
+    });
+    return () => subscription.remove();
+  }, [retrySync]);
 
   // Initialize on mount
   useEffect(() => {
@@ -427,7 +462,7 @@ export function SyncProvider({
   useEffect(() => {
     const syncIfStale = () => {
       if (Date.now() - lastSyncAtRef.current < 60_000) return;
-      void performSync();
+      void retrySync();
     };
     if (Platform.OS === "web") {
       if (typeof document === "undefined") return;
@@ -445,7 +480,7 @@ export function SyncProvider({
       if (state === "active") syncIfStale();
     });
     return () => sub.remove();
-  }, [performSync]);
+  }, [retrySync]);
 
   // "login" = enter pair code to join an existing group
   const login = useCallback(() => {
