@@ -1,8 +1,6 @@
 import type { SummaryLineItem } from "./types";
 import { sumMoney } from "@/lib/finance/money";
 
-export type RevenuePresentationKind = "dish_category" | "other_operating" | "fee" | "uncategorized";
-
 export interface MonthlySummaryPresentation {
   dishRevenueItems: SummaryLineItem[];
   otherRevenueItems: SummaryLineItem[];
@@ -30,7 +28,10 @@ export function buildMonthlySummaryPresentation(items: SummaryLineItem[]): Month
   const dishRevenueItems = revenueItems.filter((item) => item.revenueKind === "dish_category");
   const feeItems = revenueItems.filter((item) => item.revenueKind === "fee");
   const otherRevenueItems = revenueItems.filter((item) => (
-    item.revenueKind === "other_operating" || item.revenueKind === "uncategorized"
+    item.revenueKind === "other_operating"
+    || item.revenueKind === "uncategorized"
+    // 旧版手动营业收入没有 revenueKind；在新展示中透明归入其他经营收入。
+    || item.revenueKind === undefined
   ));
   const expenseItems = effectiveItems.filter((item) => item.category !== "revenue");
 

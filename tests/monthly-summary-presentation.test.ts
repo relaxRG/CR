@@ -57,6 +57,24 @@ describe("总月报展示分组", () => {
     ]);
   });
 
+  it("旧手动营业收入在新展示中归入其他经营收入而不丢失", () => {
+    const presentation = buildMonthlySummaryPresentation([
+      {
+        id: "legacy-manual-revenue",
+        code: "manual_revenue",
+        label: "活动收入",
+        category: "revenue",
+        amount: 888.5,
+        source: "manual",
+        isDuplicate: false,
+      } as any,
+    ]);
+
+    expect(presentation.dishRevenueItems).toHaveLength(0);
+    expect(presentation.otherRevenueItems).toMatchObject([{ label: "活动收入", amount: 888.5 }]);
+    expect(presentation.totalOtherRevenue).toBe(888.5);
+  });
+
   it("门店金额格式与总月报密度使用完整两位小数和统一紧凑高度", () => {
     expect(formatStoreMoney(250655.74)).toBe("¥250,655.74");
     expect(formatStoreMoney(0)).toBe("¥0.00");
