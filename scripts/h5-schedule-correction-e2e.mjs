@@ -214,7 +214,7 @@ try {
     const employee = { id: 'h5-e2e-employee', code: 'E2E', realName: 'H5测试', phone: '', dept: 'front', type: 'fulltime', baseSalary: 10000, restDaysPerMonth: 4, hourlyRate: 0, overtimeHourlyRate: 50, notes: '', active: true, createdAt: new Date().toISOString() };
     const employees = [
       employee,
-      ...Array.from({ length: 4 }, (_, i) => ({ ...employee, id: 'h5-front-' + i, code: 'F' + i, realName: '前厅测试' + i, dept: 'front' })),
+      ...Array.from({ length: 45 }, (_, i) => ({ ...employee, id: 'h5-front-' + i, code: 'F' + i, realName: '前厅测试' + i, dept: 'front' })),
       ...Array.from({ length: 3 }, (_, i) => ({ ...employee, id: 'h5-kitchen-' + i, code: 'K' + i, realName: '后厨测试' + i, dept: 'kitchen' })),
     ];
     const slip = { id: 'h5-e2e-slip', employeeId: employee.id, month, attendanceDays: 27, attendanceSalary: 10000, performanceBonus: 0, salesCommission: 0, mealAllowance: 0, transportAllowance: 0, otherAllowance: 0, rewardPenalty: 0, advanceAmount: 0, grossSalary: 10000, socialInsuranceDeduction: 0, housingFundDeduction: 0, incomeTax: 0, finalSalary: 10000, employerSocialInsurance: 0, employerHousingFund: 0, totalEmployerCost: 10000, notes: '', updatedAt: new Date().toISOString() };
@@ -298,6 +298,35 @@ try {
     }
     report.push({ reportPage: label, viewports });
   }
+
+  // 薪资核对：小屏必须可打开虚拟化长列表、滚动到底并保持固定操作区，外层不能横向溢出。
+  const reconciliationViewports = [];
+  for (const width of MOBILE_VIEWPORTS) {
+    await call("Emulation.setDeviceMetricsOverride", { width, height: 844, deviceScaleFactor: 3, mobile: true });
+    await call("Page.navigate", { url: `http://localhost:${port}/labor` });
+    await sleep(700);
+    await click(call, clickTestIdExpression("payroll-reconciliation-open"), `薪资核对 ${width}pt 未找到打开入口`);
+    await sleep(250);
+    const panelState = await call("Runtime.evaluate", { expression: `(() => {
+      const list = document.querySelector('[data-testid="payroll-reconciliation-list"]');
+      const action = [...document.querySelectorAll('*')].find((el) => ['从兑现流水重建草稿', '创建薪资更正会话'].includes(el.textContent?.trim() ?? ''));
+      if (list) list.scrollTop = list.scrollHeight;
+      return {
+        visible: document.body.innerText.includes('薪资核对与修正'),
+        hasList: Boolean(list),
+        scrollable: Boolean(list && list.scrollHeight > list.clientHeight),
+        hasAction: Boolean(action),
+        rootClientWidth: document.documentElement.clientWidth,
+        rootScrollWidth: document.documentElement.scrollWidth,
+        bodyScrollWidth: document.body.scrollWidth,
+      };
+    })()`, returnByValue: true });
+    const panel = panelState.result.value;
+    if (!panel.visible || !panel.hasList || !panel.scrollable || !panel.hasAction) throw new Error(`薪资核对 ${width}pt 面板或长列表不完整：${JSON.stringify(panel)}`);
+    if (panel.rootScrollWidth > panel.rootClientWidth || panel.bodyScrollWidth > panel.rootClientWidth) throw new Error(`薪资核对 ${width}pt 出现根级横向溢出：${JSON.stringify(panel)}`);
+    reconciliationViewports.push({ width, ...panel });
+  }
+  report.push({ reportPage: "薪资核对面板长列表", viewports: reconciliationViewports });
 
   // 烈酒库存：模拟已确认的当月导入记录，验证同一采购会同步显示在库存台账与当月进货两个移动端页面。
   await call("Runtime.evaluate", { expression: `(() => {

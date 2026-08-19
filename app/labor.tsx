@@ -1265,6 +1265,7 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
         {/* 薪资对比开关 */}
         <CompareToggle mode={compareMode} customMonth={customMonth} baseMonth={month} onChange={setCompareMode} onCustomMonthChange={setCustomMonth} colors={colors} />
         <TouchableOpacity
+          testID="payroll-reconciliation-open"
           accessibilityRole="button"
           accessibilityLabel={`打开所选月 ${month} 薪资核对与修正`}
           accessibilityHint="核对调休兑现来源、历史差额和薪资修正路径"
@@ -4964,14 +4965,12 @@ function SchedulePage({ colors, month, onMonthChange, pageWidth }: { colors: any
                             const amount = entry.source === "overtime"
                               ? Math.round((entry.hoursDeducted ?? entry.days * 8) * (emp.overtimeHourlyRate ?? emp.hourlyRate ?? 0) * 100) / 100
                               : Math.round(entry.days * dailyRateVal * 100) / 100;
+                            const settledBefore = settleCompOffCashOut(getCompOffEntries(empId), empId, currentMonthStr).amount;
                             cashOutCompOff(entry.id, amount / entry.days, currentMonthStr);
                             if (slip) {
-                              const patched = { ...slip, compOffCashOut: (slip.compOffCashOut ?? 0) + amount, compOffCashOutNote: `兑换调休 ${entry.days}天 ￥${formatMoney(amount)}`, updatedAt: new Date().toISOString() };
-                              upsertPaySlip(patched);
                               const advTotal = advances.filter((a) => a.employeeId === empId && (a.deductMonth === currentMonthStr || a.date.startsWith(currentMonthStr)) && (a.status === "pending" || a.status === "deducted")).reduce((s, a) => s + a.amount, 0);
-                              const draft = buildPaySlipDraft(emp, currentMonthStr, att!, advTotal, globalSettings);
-                              // draft 已包含所有控制字段（allowanceOverrides/workKPISelections/revenueActuals/compOffCashOut/holidayBonusAllocation 等）
-                              upsertPaySlip({ ...draft, id: slip.id });
+                              const rebuilt = buildPaySlipDraft(emp, currentMonthStr, att!, advTotal, globalSettings, settledBefore + amount);
+                              upsertPaySlip({ ...rebuilt, id: slip.id });
                             }
                           };
                           const otEntries = getCompOffEntries(empId).filter((e: any) => e.source === "overtime" && e.status === "available" && e.expiresMonth >= currentMonthStr).sort((a: any, b: any) => a.expiresMonth.localeCompare(b.expiresMonth));

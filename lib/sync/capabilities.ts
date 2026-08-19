@@ -273,5 +273,7 @@ export const ONLINE_REQUIRED_CAPABILITIES = new Set<Capability>([
   "inventory_ice.import",
   "inventory_ice.export",
   "inventory_ice.close",
+  "payroll.edit",
   "payroll.close",
+  "labor_comp_off.edit",
 ]);
