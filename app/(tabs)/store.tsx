@@ -117,24 +117,32 @@ function ReportModule({ insets, colors }: { insets: any; colors: any }) {
       </View>
 
       {reportTab === "summary" && (
-        <SafeAreaInsetsContext.Provider value={insets}>
-          <MonthlySummaryScreen embedded />
-        </SafeAreaInsetsContext.Provider>
+        <View style={{ flex: 1 }}>
+          <SafeAreaInsetsContext.Provider value={insets}>
+            <MonthlySummaryScreen embedded />
+          </SafeAreaInsetsContext.Provider>
+        </View>
       )}
       {reportTab === "analytics" && (
-        <SafeAreaInsetsContext.Provider value={insets}>
-          <StoreAnalyticsScreen embedded />
-        </SafeAreaInsetsContext.Provider>
+        <View style={{ flex: 1 }}>
+          <SafeAreaInsetsContext.Provider value={insets}>
+            <StoreAnalyticsScreen embedded />
+          </SafeAreaInsetsContext.Provider>
+        </View>
       )}
       {reportTab === "accounts" && (
-        <SafeAreaInsetsContext.Provider value={insets}>
-          <StoreAccountsScreen embedded />
-        </SafeAreaInsetsContext.Provider>
+        <View style={{ flex: 1 }}>
+          <SafeAreaInsetsContext.Provider value={insets}>
+            <StoreAccountsScreen embedded />
+          </SafeAreaInsetsContext.Provider>
+        </View>
       )}
       {reportTab === "period" && (
-        <SafeAreaInsetsContext.Provider value={insets}>
-          <PeriodAnalysisScreen embedded />
-        </SafeAreaInsetsContext.Provider>
+        <View style={{ flex: 1 }}>
+          <SafeAreaInsetsContext.Provider value={insets}>
+            <PeriodAnalysisScreen embedded />
+          </SafeAreaInsetsContext.Provider>
+        </View>
       )}
     </View>
   );

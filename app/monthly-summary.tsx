@@ -32,6 +32,8 @@ import { useMonthlyReportStore } from "@/lib/store/monthly-report/store";
 import { useSupplierPurchaseStore } from "@/lib/food/ingredient-store";
 import { useWineSnapshotStore, useWineManualPurchaseStore } from "@/lib/wine/store";
 import { aggregateMonthlyReport } from "@/lib/store/monthly-summary/aggregator";
+import { buildMonthlySummaryPresentation, hasVisibleMonthlySummaryItems } from "@/lib/store/monthly-summary/presentation";
+import { formatStoreMoney } from "@/lib/store/table-display";
 import { usePettyLaborLinkStore } from "@/lib/store/petty-labor-link-store";
 import {
   MonthlySummaryReport, SummaryLineItem,
@@ -46,21 +48,20 @@ function uuid(): string { return Math.random().toString(36).slice(2) + Date.now(
 
 
 const CATEGORY_SECTIONS = [
-  { key: "revenue", label: "本月收入", sign: 1, color: "#52C41A" },
-  { key: "cogs_food", label: "进货成本·食材", sign: -1, color: "#FA8C16" },
-  { key: "cogs_beverage", label: "进货成本·酒水", sign: -1, color: "#5856D6" },
-  { key: "cogs_wine", label: "进货成本·葡萄酒", sign: -1, color: "#C2185B" },
-  { key: "labor", label: "工资", sign: -1, color: "#FF4D4F" },
-  { key: "rent", label: "房租", sign: -1, color: "#1677FF" },
-  { key: "utilities", label: "水电", sign: -1, color: "#00BCD4" },
-  { key: "petty_other", label: "备用金其他费用", sign: -1, color: "#FA8C16" },
-  { key: "extra", label: "Extra INFO", sign: -1, color: "#8E8E93" },
+  { key: "cogs_food", label: "进货成本 · 食材", color: "#64748B" },
+  { key: "cogs_beverage", label: "进货成本 · 酒水", color: "#64748B" },
+  { key: "cogs_wine", label: "进货成本 · 葡萄酒", color: "#64748B" },
+  { key: "labor", label: "工资", color: "#64748B" },
+  { key: "rent", label: "房租", color: "#64748B" },
+  { key: "utilities", label: "水电", color: "#64748B" },
+  { key: "petty_other", label: "备用金其他费用", color: "#64748B" },
+  { key: "extra", label: "其他支出", color: "#64748B" },
 ];
 
 // ─── 科目行组件 ───────────────────────────────────────────────────────────────
 function LineItemRow({ item, colors, linkedModule }: { item: SummaryLineItem; colors: any; linkedModule?: string }) {
-  const isPositive = item.amount > 0;
-  const amtColor = item.isDuplicate ? colors.muted : isPositive ? colors.success ?? colors.success : colors.error;
+  // 日常账目金额保持中性；颜色仅表达“已结算／待处理／风险”等状态，而不是收入或支出的方向。
+  const amtColor = item.isDuplicate ? colors.muted : colors.foreground;
   const isNavigable = !item.isManual && !!linkedModule;
 
   return (
@@ -93,7 +94,7 @@ function LineItemRow({ item, colors, linkedModule }: { item: SummaryLineItem; co
       </View>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
         <Text style={{ fontSize: 14, fontWeight: "700", color: amtColor, minWidth: 80, textAlign: "right" }}>
-          {item.amount === 0 ? "—" : `${isPositive ? "+" : ""}¥${formatMoney(Math.abs(item.amount))}`}
+          {item.amount === 0 ? "—" : `${item.amount < 0 ? "−" : ""}${formatStoreMoney(Math.abs(item.amount))}`}
         </Text>
         {isNavigable && (
           <IconSymbol name="chevron.right" size={12} color={colors.muted} />
@@ -646,23 +647,30 @@ export default function MonthlySummaryScreen({ embedded = false }: { embedded?: 
   const reportCalc = useMemo(() => {
     const allItems = [...(report?.lineItems ?? []), ...(report?.manualItems ?? [])];
     const payrollPaymentsR = payments.filter((p) => p.payeeType === "employee");
+    const presentation = buildMonthlySummaryPresentation(allItems);
+    const effective = allItems.filter((item) => !(item.manualDuplicate ?? item.isDuplicate));
     const sections = CATEGORY_SECTIONS.map((cs) => ({
       ...cs,
-      items: allItems.filter((i) => i.category === cs.key),
-      subtotal: allItems.filter((i) => i.category === cs.key && !i.isDuplicate).reduce((s, i) => s + i.amount, 0),
+      items: allItems.filter((item) => item.category === cs.key),
+      subtotal: effective.filter((item) => item.category === cs.key).reduce((sum, item) => sum + item.amount, 0),
     }));
-    const totalRevenue = sections.find((s) => s.key === "revenue")?.subtotal ?? 0;
-    const totalExpenses = sections.filter((s) => s.key !== "revenue").reduce((s, sec) => s + sec.subtotal, 0);
-    const netProfit = totalRevenue + totalExpenses;
-    return { allItems, payrollPaymentsR, sections, totalRevenue, totalExpenses, netProfit };
+    const totalRevenue = presentation.totalDishRevenue + presentation.totalOtherRevenue;
+    const totalExpenses = Math.abs(effective
+      .filter((item) => item.category !== "revenue")
+      .reduce((sum, item) => sum + item.amount, 0)) + presentation.totalFees;
+    const netProfit = totalRevenue - totalExpenses;
+    return { allItems, payrollPaymentsR, presentation, sections, totalRevenue, totalExpenses, netProfit };
   }, [report, payments]);
 
   // ── 总报表 Tab ────────────────────────────────────────────────────────────
   const renderReport = () => {
-    const { allItems, payrollPaymentsR, sections, totalRevenue, totalExpenses, netProfit } = reportCalc;
+    const { payrollPaymentsR, presentation, sections, totalRevenue, totalExpenses, netProfit } = reportCalc;
+    const visibleSections = sections.filter((section) => (
+      section.key === "labor" || hasVisibleMonthlySummaryItems(section.items)
+    ));
 
     return (
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }}>
+      <ScrollView testID="monthly-summary-scroll" style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingTop: 12, paddingBottom: 16 + insets.bottom }}>
         {/* 工作台内由统一月份导航控制；独立路由保留自己的月份选择。 */}
         {!embedded && <BoundedBusinessMonthNavigator
           testID="monthly-summary-month-navigator"
@@ -672,37 +680,78 @@ export default function MonthlySummaryScreen({ embedded = false }: { embedded?: 
           onChange={setSelectedMonth}
         />}
 
-        {/* 净利润大卡 */}
-        <View style={[S.profitCard, {
-          backgroundColor: netProfit >= 0 ? "#52C41A08" : colors.error + "08",
-          borderColor: netProfit >= 0 ? "#52C41A33" : colors.error + "33",
-        }]}>
-          <Text style={{ fontSize: 12, color: colors.muted }}>本月净利润</Text>
+        {/* 净利润：白卡、单一状态色。收入与支出是中性会计信息，不再使用绿／红。 */}
+        <View style={[S.profitCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={{ width: 3, height: 18, borderRadius: 2, backgroundColor: netProfit >= 0 ? colors.success : colors.error, marginBottom: 8 }} />
+          <Text style={{ fontSize: 13, color: colors.muted }}>本月净利润</Text>
           <Text style={{ fontSize: 32, fontWeight: "800", color: netProfit >= 0 ? colors.success : colors.error }}>
-            {netProfit >= 0 ? "+" : ""}¥{formatMoney(netProfit)}
+            {netProfit >= 0 ? "+" : "−"}{formatStoreMoney(Math.abs(netProfit))}
           </Text>
-          <View style={{ flexDirection: "row", gap: 16, marginTop: 8 }}>
+          <View style={{ flexDirection: "row", gap: 28, marginTop: 10 }}>
             <View>
-              <Text style={{ fontSize: 10, color: colors.muted }}>总收入</Text>
-              <Text style={{ fontSize: 14, fontWeight: "600", color: colors.success }}>+¥{formatMoney(totalRevenue)}</Text>
+              <Text style={{ fontSize: 11, color: colors.muted }}>总营业收入</Text>
+              <Text style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>{formatStoreMoney(totalRevenue)}</Text>
             </View>
             <View>
-              <Text style={{ fontSize: 10, color: colors.muted }}>总支出</Text>
-              <Text style={{ fontSize: 14, fontWeight: "600", color: colors.error }}>-¥{formatMoney(Math.abs(totalExpenses))}</Text>
+              <Text style={{ fontSize: 11, color: colors.muted }}>总支出</Text>
+              <Text style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>{formatStoreMoney(totalExpenses)}</Text>
             </View>
           </View>
         </View>
 
-        {/* 各科目分组 */}
-        {sections.map((sec) => (
+        {presentation.dishRevenueItems.length > 0 && (
+          <View style={[S.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={[S.sectionHeader, { borderBottomColor: colors.border }]}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <View style={{ width: 4, height: 16, borderRadius: 2, backgroundColor: colors.primary }} />
+                <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>本营业收入 · 菜品大类</Text>
+              </View>
+              <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>{formatStoreMoney(presentation.totalDishRevenue)}</Text>
+            </View>
+            {presentation.dishRevenueItems.map((item) => (
+              <TouchableOpacity key={item.id} onPress={() => router.push("/dish-analysis" as any)}>
+                <LineItemRow item={item} colors={colors} linkedModule={item.linkedModule} />
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
+        {presentation.otherRevenueItems.length > 0 && (
+          <View style={[S.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={[S.sectionHeader, { borderBottomColor: colors.border }]}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <View style={{ width: 4, height: 16, borderRadius: 2, backgroundColor: "#64748B" }} />
+                <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>其他经营收入</Text>
+              </View>
+              <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>{formatStoreMoney(presentation.totalOtherRevenue)}</Text>
+            </View>
+            {presentation.otherRevenueItems.map((item) => <LineItemRow key={item.id} item={item} colors={colors} linkedModule={item.linkedModule} />)}
+          </View>
+        )}
+
+        {presentation.feeItems.length > 0 && (
+          <View style={[S.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={[S.sectionHeader, { borderBottomColor: colors.border }]}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <View style={{ width: 4, height: 16, borderRadius: 2, backgroundColor: "#64748B" }} />
+                <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>手续费</Text>
+              </View>
+              <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>{formatStoreMoney(presentation.totalFees)}</Text>
+            </View>
+            {presentation.feeItems.map((item) => <LineItemRow key={item.id} item={item} colors={colors} linkedModule={item.linkedModule} />)}
+          </View>
+        )}
+
+        {/* 仅渲染实际有数据的费用科目，避免空白卡片撑开总月报。 */}
+        {visibleSections.map((sec) => (
           <View key={sec.key} style={[S.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <View style={[S.sectionHeader, { borderBottomColor: colors.border }]}>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                 <View style={{ width: 4, height: 16, borderRadius: 2, backgroundColor: sec.color }} />
                 <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>{sec.label}</Text>
               </View>
-              <Text style={{ fontSize: 14, fontWeight: "700", color: sec.sign > 0 ? colors.success : colors.error }}>
-                {sec.sign > 0 ? "+" : ""}¥{formatMoney(sec.subtotal)}
+              <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>
+                {formatStoreMoney(Math.abs(sec.subtotal))}
               </Text>
             </View>
             {/* 工资科目不渲染科目行，只保留下方的「工资发放明细」卡片（避免重复） */}
@@ -725,11 +774,6 @@ export default function MonthlySummaryScreen({ embedded = false }: { embedded?: 
                 <LineItemRow item={item} colors={colors} linkedModule={item.linkedModule} />
               </TouchableOpacity>
             ))}
-            {sec.key !== "labor" && sec.items.length === 0 && (
-              <View style={{ padding: 12, alignItems: "center" }}>
-                <Text style={{ fontSize: 12, color: colors.muted }}>暂无数据 · 长按手动录入行可编辑</Text>
-              </View>
-            )}
 
             {/* 工资科目：按部门分组的员工薪资卡片（自动同步，无需手动刷新）*/}
             {sec.key === "labor" && (() => {
@@ -1132,7 +1176,7 @@ export default function MonthlySummaryScreen({ embedded = false }: { embedded?: 
 
 
   return (
-    <ScreenContainer>
+    <ScreenContainer edges={embedded ? [] : undefined}>
       {/* 独立路由才显示返回与右侧入口；工作台内由上方页签承载导航。 */}
       {!embedded && <View style={[S.navbar, { borderBottomColor: colors.border }]}>
         <Pressable onPress={() => router.back()} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>

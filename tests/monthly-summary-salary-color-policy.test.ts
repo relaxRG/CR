@@ -23,3 +23,28 @@ describe("总月报工资区颜色语义", () => {
     expect(source).toContain('`金额：${finalAmt.toFixed(0)}`');
   });
 });
+
+
+describe("总月报营业收入与财务颜色语义", () => {
+  const source = read("app/monthly-summary.tsx");
+
+  it("营业收入固定按菜品大类呈现，并将手续费作为独立区块", () => {
+    expect(source).toContain("本营业收入 · 菜品大类");
+    expect(source).toContain(">手续费</Text>");
+    expect(source).toContain("presentation.dishRevenueItems");
+    expect(source).toContain("presentation.feeItems");
+  });
+
+  it("净利润是唯一按正负颜色变化的主金额，日常收入、支出和费用金额使用中性色", () => {
+    expect(source).toContain('netProfit >= 0 ? colors.success : colors.error');
+    expect(source).toContain('color: colors.foreground }}>{formatStoreMoney(totalRevenue)}</Text>');
+    expect(source).toContain('color: colors.foreground }}>{formatStoreMoney(totalExpenses)}</Text>');
+    expect(source).not.toContain('color: sec.sign > 0 ? colors.success : colors.error');
+  });
+
+  it("嵌入报表页不重复处理顶部安全区，滚动内容使用紧凑顶部和安全底部预留", () => {
+    expect(source).toContain('edges={embedded ? [] : undefined}');
+    expect(source).toContain('paddingTop: 12');
+    expect(source).toContain('paddingBottom: 16 + insets.bottom');
+  });
+});

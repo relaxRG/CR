@@ -2,10 +2,10 @@
  * 月度总报表数据模型 (Build 134)
  *
  * 科目树结构：
- *   本月收入
- *     ├─ 收款渠道（来自月度经营分析 paymentMethods）
- *     ├─ 手续费/服务费（负数，红字）
- *     └─ 手工录入（活动收入/外卖等）
+ *   本营业收入
+ *     ├─ 菜品大类（来自月度经营分析 dishCategories）
+ *     ├─ 其他经营收入（充电宝 / 手工营业收入等）
+ *     └─ 手续费/服务费（独立区块，计入利润但不计入营业收入）
  *   进货成本-食材
  *     ├─ A1-A10 各分类（备用金，已付）
  *     └─ 食材供应商（转账，待付）
@@ -29,7 +29,7 @@
 
 // ─── 科目类型 ─────────────────────────────────────────────────────────────────
 export type AccountCategory =
-  | "revenue"          // 本月收入
+  | "revenue"          // 本营业收入 / 其他经营收入 / 手续费
   | "cogs_food"        // 进货成本-食材
   | "cogs_beverage"    // 进货成本-酒水（烈酒/啤酒/冰块）
   | "cogs_wine"        // 进货成本-葡萄酒
@@ -52,6 +52,9 @@ export type DataSource =
   | "supplier_purchase" // 食材供应商采购
   | "computed";         // 自动计算
 
+/** 总月报收入区的展示归属，避免将账户收款渠道、菜品收入和手续费混在同一列表。 */
+export type RevenueKind = "dish_category" | "other_operating" | "fee" | "uncategorized";
+
 /** 付款状态 */
 export type PaymentStatus = "unpaid" | "partial" | "paid";
 
@@ -68,6 +71,8 @@ export interface SummaryLineItem {
   amount: number;
   /** 数据来源 */
   source: DataSource;
+  /** 收入展示归属；仅 category="revenue" 的记录使用。 */
+  revenueKind?: RevenueKind;
   /** 是否已付 */
   isPaid: boolean;
   /** 付款说明（如「已付(备用金)」「20号前付」） */

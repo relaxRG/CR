@@ -146,57 +146,63 @@ export function aggregateMonthlyReport(input: AggregatorInput): Partial<MonthlyS
   // 动态计算应排除的备用金分类（单独显示的分类从汇总中排除）
   const excludedFromOther = new Set(calcPettyExcludedCodes(pettyCfgs));
 
-  // ── 1. 本月收入（来自月度经营分析 - 收款渠道） ──────────────────────────────
+  // ── 1. 营业收入：菜品大类是总月报唯一主展示，手续费独立列示 ────────────────
   if (input.monthlyReport) {
     const mr = input.monthlyReport;
+    const dishCategories = (mr.dishCategories ?? []).filter((cat) => cat.revenue !== 0);
 
-    // 1a. 收款渠道（paymentMethods）
-    if (mr.paymentMethods && mr.paymentMethods.length > 0) {
-      for (const pm of mr.paymentMethods) {
-        if (pm.amount === 0) continue;
-        const isNegative = pm.amount < 0; // 手续费/服务费
-        items.push(makeItem({
-          code: `revenue_pm_${pm.name.replace(/\s/g, "_").slice(0, 20)}`,
-          label: pm.name,
-          category: "revenue",
-          amount: pm.amount,
-          source: "monthly_report",
-          linkedModule: "monthly-report",
-          isPaid: !isNegative,
-          paymentNote: isNegative ? "手续费/服务费扣减" : "已收",
-          notes: isNegative ? "支出项（红字）" : "",
-        }));
-      }
-    } else if (mr.dishCategories && mr.dishCategories.length > 0) {
-      // 降级：无收款渠道时用菜品大类
-      for (const cat of mr.dishCategories) {
-        if (cat.revenue === 0) continue;
+    if (dishCategories.length > 0) {
+      for (const cat of dishCategories) {
         items.push(makeItem({
           code: `revenue_dish_${cat.name}`,
           label: cat.name,
           category: "revenue",
           amount: cat.revenue,
           source: "monthly_report",
+          revenueKind: "dish_category",
           linkedModule: "monthly-report",
           isPaid: true,
           paymentNote: "已收",
         }));
       }
+    } else {
+      // 缺少菜品大类文件时，账户正向流水只作为不中断利润计算的透明降级项；
+      // 一旦导入菜品大类，下面这条路径不再产生任何收入行。
+      for (const pm of mr.paymentMethods ?? []) {
+        if (pm.amount <= 0) continue;
+        items.push(makeItem({
+          code: `revenue_unmatched_${pm.name.replace(/\s/g, "_").slice(0, 20)}`,
+          label: `未匹配菜品大类 · ${pm.name}`,
+          category: "revenue",
+          amount: pm.amount,
+          source: "monthly_report",
+          revenueKind: "uncategorized",
+          linkedModule: "monthly-report",
+          isPaid: true,
+          paymentNote: "账户校验收入",
+          notes: "请导入同月菜品大类报表以替换账户校验收入",
+        }));
+      }
     }
 
-    // 1b. 优惠扣减
-    if (mr.kpi?.discountAmount && mr.kpi.discountAmount > 0) {
+    // 所有收款渠道负数统一为手续费；收款渠道正数只留在账户页对账。
+    for (const pm of mr.paymentMethods ?? []) {
+      if (pm.amount >= 0) continue;
       items.push(makeItem({
-        code: "revenue_discount",
-        label: "优惠金额（扣减）",
+        code: `revenue_fee_${pm.name.replace(/\s/g, "_").slice(0, 20)}`,
+        label: pm.name,
         category: "revenue",
-        amount: -mr.kpi.discountAmount,
+        amount: pm.amount,
         source: "monthly_report",
-        notes: "已在营业额中扣除",
-        isDuplicate: true,
-        duplicateNote: "营业额已扣除优惠，此行仅供参考",
+        revenueKind: "fee",
+        linkedModule: "monthly-report",
+        isPaid: true,
+        paymentNote: "手续费/服务费",
+        notes: "已计入净利润，不计入本营业收入",
       }));
     }
+
+    // 优惠已在营业收入中扣减：保留原始月报数据供经营分析使用，但不再生成总月报参考行。
   }
 
   // ── 2. 备用金各分类（完全按配置动态路由） ────────────────────────────────────
@@ -289,6 +295,7 @@ export function aggregateMonthlyReport(input: AggregatorInput): Partial<MonthlyS
         category: "revenue",
         amount: n4Total,
         source: "petty_cash",
+        revenueKind: "other_operating",
         pettyCode: "N4",
         isPaid: true,
         paymentNote: "已在备用金 N4 中计算",
