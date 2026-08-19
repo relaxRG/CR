@@ -8,7 +8,7 @@ import { StarRating } from "@/components/star-rating";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
-import { useGuestGuard } from "@/hooks/use-guest-guard";
+import { useCan } from "@/hooks/use-can";
 import { displayNames, formatMoney} from "@/lib/utils";
 import { useHomemadeStore } from "@/lib/homemade/store";
 import { useBottleStore } from "@/lib/bottles/store";
@@ -22,7 +22,7 @@ export default function HomemadeDetailScreen() {
   const colors = useColors();
   const router = useRouter();
   const { t, lang } = useI18n();
-  const { isGuest } = useGuestGuard();
+  const editDecision = useCan("homemade.edit");
   const { id } = useLocalSearchParams<{ id: string }>();
   const { getPrep, deletePrep, togglePrepMade, setPrepRating, updatePrep, types, sections, preps } = useHomemadeStore();
   const { bottles } = useBottleStore();
@@ -152,7 +152,7 @@ export default function HomemadeDetailScreen() {
             color={prep.made ? colors.success : colors.muted}
           />
         </Pressable>
-        {!isGuest && (
+        {editDecision.allowed && (
           <>
             <Pressable
               onPress={() => router.push({ pathname: "/homemade-form", params: { id: prep.id } })}

@@ -141,6 +141,9 @@ export const SYNC_KEYS = [
   "schedule.shift_templates.v1",
 ] as const;
 
+/** 全 App 同步数据键；权限策略必须对该联合类型逐项声明读写归属。 */
+export type SyncStorageKey = (typeof SYNC_KEYS)[number];
+
 const TS_PREFIX = "sync.ts.";
 const LAST_SYNC_KEY = "sync.lastPulledAt";
 const BACKUP_KEY = "sync.backup.v1";

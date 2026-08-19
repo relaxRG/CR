@@ -13,14 +13,14 @@ import {
 import {
   cancelPreparedGroupSwitch as cancelPreparedGroupSwitchOnServer,
   commitGroupSwitch,
-  getDeviceInfo,
+  getDeviceCredentials,
   getGroupSwitchStatus,
   getSyncDevicePlatform,
   prepareGroupSwitch,
   pullCompleteTargetSnapshot,
   recoverJoinWithCode,
-  saveDeviceInfo,
-  type DeviceInfo,
+  saveDeviceCredentials,
+  type DeviceCredentials,
   type GroupSwitchPreparation,
 } from "./client";
 import { appendGroupSwitchDiagnostic } from "./switch-diagnostics";
@@ -41,7 +41,7 @@ export type PersistedGroupSwitchSession = {
   version: 1;
   switchId: string;
   mode: GroupSwitchMode;
-  source: Pick<DeviceInfo, "deviceId" | "groupId" | "deviceName">;
+  source: Pick<DeviceCredentials, "deviceId" | "groupId" | "deviceName">;
   targetGroupId: string;
   localSnapshotSlot: number;
   writeEpoch: number;
@@ -55,11 +55,11 @@ export type GroupSwitchRuntime = {
   /** 停止旧成员令牌下的实时轮询、通知和延迟任务。 */
   stopSourceRealtime: () => void;
   /** 将当前Provider内存成员资格切换至Worker返回的新资格。 */
-  setActiveMembership: (membership: DeviceInfo) => void;
+  setActiveMembership: (membership: DeviceCredentials) => void;
   /** 目标照片仅下载/修复；实现不得上传本机旧组文件。 */
   syncTargetPhotosReadOnly: () => Promise<void>;
   /** 只有完整水合成功后才注册普通推送函数。 */
-  createTargetPush: (membership: DeviceInfo) => (entries: { storageKey: string; value: string; clientUpdatedAt: number }[]) => Promise<unknown>;
+  createTargetPush: (membership: DeviceCredentials) => (entries: { storageKey: string; value: string; clientUpdatedAt: number }[]) => Promise<unknown>;
 };
 
 function ticketKey(switchId: string): string {
@@ -119,10 +119,10 @@ function errorCode(error: unknown): string {
 
 async function hydrateCommittedSwitch(
   session: PersistedGroupSwitchSession,
-  membership: DeviceInfo,
+  membership: DeviceCredentials,
   runtime: GroupSwitchRuntime,
 ): Promise<void> {
-  await saveDeviceInfo(membership);
+  await saveDeviceCredentials(membership);
   runtime.setActiveMembership(membership);
   await appendGroupSwitchDiagnostic({
     event: "target_snapshot_requested",
@@ -162,7 +162,7 @@ export async function switchToAnotherGroup(
   input: { code: string; switchId: string; handoffDeviceId?: string },
   runtime: GroupSwitchRuntime,
 ): Promise<void> {
-  const source = await getDeviceInfo();
+  const source = await getDeviceCredentials();
   if (!source) throw new Error("SYNC_GROUP_NOT_ACTIVE");
   let preparation: GroupSwitchPreparation | null = null;
   let session: PersistedGroupSwitchSession | null = null;
@@ -261,7 +261,7 @@ export async function recoverJoinAfterUnavailableSource(
   code: string,
   runtime: GroupSwitchRuntime,
 ): Promise<void> {
-  const source = await getDeviceInfo();
+  const source = await getDeviceCredentials();
   if (!source) throw new Error("SYNC_GROUP_NOT_ACTIVE");
   const switchId = `recovery-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   const snapshotMeta = await createSnapshot();
@@ -289,7 +289,7 @@ export async function recoverJoinAfterUnavailableSource(
   try {
     const membership = await recoverJoinWithCode({ code });
     // 先持久化目标身份，再更新事务状态：强退后只能以目标令牌继续完整水合。
-    await saveDeviceInfo(membership);
+    await saveDeviceCredentials(membership);
     runtime.setActiveMembership(membership);
     session = { ...session, mode: "committed", targetGroupId: membership.groupId };
     await saveSession(session);
@@ -326,7 +326,7 @@ export async function recoverPendingGroupSwitch(
   const epoch = await beginGroupSwitchWriteBarrier(session.switchId);
   if (session.flow === "recovery-join") {
     runtime.stopSourceRealtime();
-    const current = await getDeviceInfo();
+    const current = await getDeviceCredentials();
     // API成功后身份已落盘：只能继续目标组完整水合，绝不回到旧组推送。
     if (current && current.groupId !== session.source.groupId && session.targetGroupId !== "pending") {
       try {
@@ -364,7 +364,7 @@ export async function recoverPendingGroupSwitch(
     const status = await getGroupSwitchStatus({ switchId: recoverySession.switchId, recoveryTicket: ticket });
     if (status.state === "prepared" || status.state === "cancelled") {
       if (status.state === "prepared") await cancelPreparedGroupSwitchOnServer({ switchId: recoverySession.switchId, recoveryTicket: ticket });
-      const source = await getDeviceInfo();
+      const source = await getDeviceCredentials();
       if (!source || source.groupId !== recoverySession.source.groupId) throw new Error("SOURCE_MEMBERSHIP_UNAVAILABLE");
       releasePreparedGroupSwitchBarrier(epoch, runtime.createTargetPush(source));
       await clearSession(recoverySession);

@@ -9,7 +9,7 @@ import { StarRating } from "@/components/star-rating";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
-import { useGuestGuard } from "@/hooks/use-guest-guard";
+import { useCan } from "@/hooks/use-can";
 import { useBottleStore } from "@/lib/bottles/store";
 import { useBottleTaxonomy } from "@/lib/bottles/taxonomy";
 import { isPerishableWholeBottle } from "@/lib/recipes/smart-cost";
@@ -19,7 +19,7 @@ export default function BottleDetailScreen() {
   const colors = useColors();
   const router = useRouter();
   const { t, lang } = useI18n();
-  const { isGuest } = useGuestGuard();
+  const editDecision = useCan("bottles.edit");
   const { id } = useLocalSearchParams<{ id: string }>();
   const { getBottle, deleteBottle, setBottleRating } = useBottleStore();
   const { categoryLabel } = useBottleTaxonomy();
@@ -135,7 +135,7 @@ export default function BottleDetailScreen() {
           <IconSymbol name="chevron.left" size={26} color={colors.foreground} />
         </Pressable>
         <View className="flex-1" />
-        {!isGuest && (
+        {editDecision.allowed && (
           <>
             <Pressable
               onPress={() => router.push({ pathname: "/bottle-channels", params: { id: bottle.id } })}

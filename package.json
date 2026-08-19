@@ -26,6 +26,8 @@
     "generate:storage-registry": "node scripts/generate-storage-registry.mjs",
     "check:storage-policy": "node scripts/check-storage-policy.mjs",
     "ci:storage": "pnpm audit:storage && pnpm generate:storage-registry && pnpm check:storage-policy",
+    "generate:device-policy-v2": "node scripts/generate-device-policy-v2-worker-map.mjs && node scripts/inject-device-policy-v2-worker-map.mjs",
+    "check:device-policy-v2": "pnpm generate:device-policy-v2 && git diff --exit-code -- workers/cocktail-ai/worker-v4.js workers/cocktail-ai/device-policy-v2.generated.js && pnpm vitest run tests/device-session-v2.test.ts --reporter=dot",
     "db:push": "drizzle-kit generate && drizzle-kit migrate",
     "android": "expo start --android",
     "ios": "expo start --ios",

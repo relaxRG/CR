@@ -67,7 +67,7 @@ export function RecipesScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { t, lang } = useI18n();
-  const { guardWrite } = useGuestGuard();
+  const { guard: guardWrite } = useCapabilityGuard("recipes.edit");
   const {
     ready,
     recipes,
@@ -1119,5 +1119,5 @@ const styles = StyleSheet.create({
 });
 
 export default RecipesScreen;
-import { useGuestGuard } from "@/hooks/use-guest-guard";
+import { useCapabilityGuard } from "@/hooks/use-can";
 import { MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS, MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";

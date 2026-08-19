@@ -16,14 +16,15 @@ import { Alert, AppState, Platform } from "react-native";
 import {
   cfPull,
   cfPush,
-  clearDeviceInfo,
+  clearDeviceCredentials,
   createNewSyncGroup,
-  getDeviceInfo,
+  getDeviceCredentials,
+  getDeviceSessionV2,
   leaveCurrentSyncGroup,
   recoverStaleOwner,
   refreshCurrentDevicePlatform,
-  saveDeviceInfo,
-  type DeviceInfo,
+  saveDeviceCredentials,
+  type DeviceCredentials,
   type DeviceRole,
 } from "./client";
 import {
@@ -44,6 +45,9 @@ import { syncPhotos } from "@/lib/sync/photo-sync";
 import { useI18n } from "@/lib/i18n";
 import { startRealtimeSync, notifyPushDone, resetRealtimeSync } from "./ws-sync";
 import { recoverJoinAfterUnavailableSource, recoverPendingGroupSwitch, switchToAnotherGroup, type GroupSwitchRuntime } from "./group-switch";
+import type { DeviceSessionState } from "@/lib/sync/device-session";
+import { STORAGE_POLICY, isStorageKeyWritable } from "@/lib/sync/capabilities";
+import type { SyncStorageKey } from "@/lib/sync/engine";
 
 // ─── Context type (compatible with original useSync) ─────────────────────────
 type SyncContextValue = {
@@ -57,7 +61,7 @@ type SyncContextValue = {
   login: () => void;
   logout: () => Promise<void>;
   /** CF-specific extras */
-  deviceInfo: DeviceInfo | null;
+  deviceInfo: DeviceCredentials | null;
   deviceRole: DeviceRole | null;
   /** Last sync error message (registration or pull/push failure), null when healthy */
   syncError: string | null;
@@ -72,10 +76,10 @@ type SyncContextValue = {
   /** 是否有未解决的同步冲突（用于角标显示） */
   hasPendingConflicts: boolean;
   /** 刷新本地设备信息（重命名后调用） */
-  refreshDeviceInfo: () => Promise<void>;
+  refreshDeviceCredentials: () => Promise<void>;
   /**
    * 重启同步引擎（退出同步组后重新配对时调用）
-   * 会重置 startedRef 并重新执行完整同步流程（读取新 DeviceInfo → pull → merge → push）
+   * 会重置 startedRef 并重新执行完整同步流程（读取新 DeviceCredentials → pull → merge → push）
    */
   restartSync: () => Promise<boolean>;
   /** 用户明确创建新的独立同步组；未配对本地模式绝不会自动调用。 */
@@ -90,6 +94,8 @@ type SyncContextValue = {
   forceClearLocalSyncCredentials: () => Promise<void>;
   /** 正在执行原子切组或冷启动补偿时禁用高风险设备管理操作。 */
   isGroupSwitching: boolean;
+  /** Worker 核验的唯一成员与策略事实；新页面只能通过此状态调用 useCan()。 */
+  deviceSessionState: DeviceSessionState;
 };
 
 const SyncContext = createContext<SyncContextValue | null>(null);
@@ -108,11 +114,17 @@ export function SyncProvider({
   onRequestDeviceManager,
 }: SyncProviderProps) {
   const [syncState, setSyncState] = useState<SyncState>(getSyncState());
-  const [deviceInfo, setDeviceInfo] = useState<DeviceInfo | null>(null);
+  const [deviceInfo, setDeviceCredentials] = useState<DeviceCredentials | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [pendingConflicts, setPendingConflicts] = useState<SyncConflict[]>([]);
   const [isGroupSwitching, setIsGroupSwitching] = useState(false);
+  const [deviceSessionState, setDeviceSessionState] = useState<DeviceSessionState>({ tag: "booting" });
+  const sessionRef = useRef<DeviceSessionState>({ tag: "booting" });
+  const setSession = useCallback((next: DeviceSessionState) => {
+    sessionRef.current = next;
+    setDeviceSessionState(next);
+  }, []);
   const { lang } = useI18n();
   const startedRef = useRef(false);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -123,22 +135,60 @@ export function SyncProvider({
 
   useEffect(() => subscribeSyncState(setSyncState), []);
 
-  // Build push function using CF API
+  /**
+   * 刷新 Worker 已核验的成员与策略事实。网络失败时仅在已有已验证会话的前提下退化为离线缓存；
+   * 从不把本机旧角色或旧授权键重新解释为权限。
+   */
+  const refreshDeviceSession = useCallback(async (): Promise<boolean> => {
+    const credentials = await getDeviceCredentials();
+    if (!credentials) {
+      setSession({ tag: "local_single_device" });
+      return true;
+    }
+    const current = sessionRef.current;
+    const cached = current.tag === "authorized" || current.tag === "offline_cache" || current.tag === "policy_stale"
+      ? current.session
+      : null;
+    setSession({ tag: "verifying", cached });
+    try {
+      const session = await getDeviceSessionV2();
+      if (session.membership.status === "active") {
+        setSession({ tag: "authorized", session });
+        return true;
+      }
+      if (session.membership.status === "pending_switch") {
+        setSession({ tag: "group_switch_recovery", switchId: session.membership.groupId });
+        return false;
+      }
+      setSession({ tag: "membership_revoked", session, code: "REVOKED" });
+      return false;
+    } catch (error) {
+      const code = error instanceof Error ? error.message : String(error);
+      if (code.includes("401") || code.includes("403") || code.includes("UNAUTHORIZED")) {
+        setSession({ tag: "membership_revoked", session: cached, code: "UNAUTHORIZED" });
+      } else if (cached) {
+        setSession({ tag: "offline_cache", session: cached, retryAt: Date.now() + 30_000 });
+      } else {
+        setSession({ tag: "blocked", code, recoverable: true, session: null });
+      }
+      return false;
+    }
+  }, [setSession]);
+
+  // 推送只依据当前 Worker 已核验的 DeviceSessionV2 能力策略；不再读取本机角色或 allowed_keys。
   const pushFn = useCallback(
     async (entries: { storageKey: string; value: string; clientUpdatedAt: number }[]) => {
-      // Collaborator devices: filter entries to only allowed keys
-      const info = deviceInfo;
-      const allowedKeys = info?.allowedKeys;
-      const filtered =
-        info && info.role === "collaborator" && Array.isArray(allowedKeys)
-          ? entries.filter((e) => allowedKeys.includes(e.storageKey))
-          : entries;
+      const state = sessionRef.current;
+      if (state.tag !== "authorized") return;
+      const filtered = entries.filter((entry) => {
+        if (!Object.prototype.hasOwnProperty.call(STORAGE_POLICY, entry.storageKey)) return false;
+        return isStorageKeyWritable(entry.storageKey as SyncStorageKey, state.session.policy.capabilities);
+      });
       if (filtered.length === 0) return;
-      await cfPush(filtered);
-      // 推送成功后通知其他设备（非阻塞）
+      await cfPush(filtered, state.session.policy.revision);
       void notifyPushDone();
     },
-    [deviceInfo],
+    [],
   );
 
   const groupSwitchRuntime: GroupSwitchRuntime = {
@@ -147,17 +197,19 @@ export function SyncProvider({
       stopRealtimeRef.current = null;
       resetRealtimeSync();
     },
-    setActiveMembership: (membership) => setDeviceInfo(membership),
+    setActiveMembership: (membership) => setDeviceCredentials(membership),
     // 首次水合必须仅下载目标组照片，禁止旧组文件被上传到新成员资格。
     syncTargetPhotosReadOnly: async () => {
       await syncPhotos(undefined, "download-only");
     },
-    createTargetPush: (membership) => async (entries) => {
-      const filtered = membership.role === "collaborator" && Array.isArray(membership.allowedKeys)
-        ? entries.filter((entry) => (membership.allowedKeys as string[]).includes(entry.storageKey))
-        : entries;
-      if (filtered.length === 0 || membership.role === "guest") return;
-      await cfPush(filtered);
+    createTargetPush: () => async (entries) => {
+      const session = await getDeviceSessionV2();
+      const filtered = entries.filter((entry) =>
+        Object.prototype.hasOwnProperty.call(STORAGE_POLICY, entry.storageKey)
+        && isStorageKeyWritable(entry.storageKey as SyncStorageKey, session.policy.capabilities),
+      );
+      if (filtered.length === 0) return;
+      await cfPush(filtered, session.policy.revision);
       void notifyPushDone();
     },
   };
@@ -248,58 +300,34 @@ export function SyncProvider({
     syncingRef.current = true;
     try {
       // 仅使用已有成员资格。未配对状态是本地模式，绝不能因启动、重试或前后台回归而自动创建主设备组。
-      const info = await getDeviceInfo();
+      const info = await getDeviceCredentials();
       if (!info) {
-        setDeviceInfo(null);
+        setDeviceCredentials(null);
+        setSession({ tag: "local_single_device" });
         setAuthLoading(false);
         setSyncError(null);
         disableSync();
         return true;
       }
-      setDeviceInfo(info);
+      setDeviceCredentials(info);
+      const sessionReady = await refreshDeviceSession();
       setAuthLoading(false);
+      if (!sessionReady) return false;
 
-      // 首次请求先由Worker权威成员记录覆盖本机角色/授权缓存。
-      // 不能依据旧缓存决定本轮模块守卫、拉取范围或推送范围。
       const pull = await cfPull();
-      const effectiveInfo: DeviceInfo = {
-        ...info,
-        role: pull.role,
-        allowedKeys: pull.allowedKeys,
-      };
-      const permissionsChanged = info.role !== effectiveInfo.role
-        || JSON.stringify(info.allowedKeys?.slice().sort() ?? null) !== JSON.stringify(effectiveInfo.allowedKeys?.slice().sort() ?? null);
-      if (permissionsChanged) {
-        await saveDeviceInfo(effectiveInfo);
-        setDeviceInfo(effectiveInfo);
+      const activeSession = sessionRef.current;
+      if (activeSession.tag !== "authorized") return false;
+      if (pull.policyRevision !== activeSession.session.policy.revision) {
+        setSession({ tag: "policy_stale", session: activeSession.session });
+        throw new Error("POLICY_OUTDATED");
       }
-      // 历史iOS-on-Mac记录会在下次成功同步时只更新平台展示元数据，不改名称、角色或权限。
+
+      // 历史 iOS-on-Mac 记录仅更新平台展示元数据，不参与任何业务授权判断。
       void refreshCurrentDevicePlatform();
-      if (effectiveInfo.role !== "owner") {
-        void checkAndNotifyPermissionChange(effectiveInfo.allowedKeys);
-      }
+      void createSnapshot().catch((e) => console.warn("[CFSync] local snapshot failed:", e));
+      startAutoBackup(activeSession.session.device.name);
 
-      // ── Backup channels ────────────────────────────────────────────────
-      void createSnapshot().catch((e) =>
-        console.warn("[CFSync] local snapshot failed:", e),
-      );
-      startAutoBackup(effectiveInfo.deviceName);
-      // ───────────────────────────────────────────────────────────────────
-
-      const pushWithEffectivePermission = async (entries: { storageKey: string; value: string; clientUpdatedAt: number }[]) => {
-        if (effectiveInfo.role === "guest") return;
-        const allowedKeys = effectiveInfo.allowedKeys;
-        const filtered = effectiveInfo.role === "collaborator" && Array.isArray(allowedKeys)
-          ? entries.filter((entry) => allowedKeys.includes(entry.storageKey))
-          : entries;
-        if (filtered.length === 0) return;
-        await cfPush(filtered);
-        void notifyPushDone();
-      };
-      const { overwritten, conflicts } = await runInitialSync(
-        pull.entries,
-        effectiveInfo.role === "guest" ? async () => {} : pushWithEffectivePermission,
-      );
+      const { overwritten, conflicts } = await runInitialSync(pull.entries, pushFn);
       if (overwritten && Platform.OS === "web" && typeof window !== "undefined") {
         window.location.reload();
       } else if (overwritten && Platform.OS !== "web") {
@@ -334,7 +362,7 @@ export function SyncProvider({
     } finally {
       syncingRef.current = false;
     }
-  }, []);
+  }, [refreshDeviceSession, setSession]);
 
   // Auto-retry with exponential backoff: 30s * 2^n, capped at 10 min, max 8 attempts
   const scheduleRetry = useCallback(() => {
@@ -375,7 +403,7 @@ export function SyncProvider({
       }
       const ok = await performSync();
       if (!ok) scheduleRetry();
-      else if (await getDeviceInfo()) {
+      else if (await getDeviceCredentials()) {
         // 仅已有活跃成员资格时才启动实时监听。
         stopRealtimeRef.current?.();
         stopRealtimeRef.current = startRealtimeSync(() => {
@@ -426,10 +454,11 @@ export function SyncProvider({
 
   // "logout" = leave the current sync group. Remote revocation must succeed before local credentials are cleared.
   const logout = useCallback(async () => {
-    if (await getDeviceInfo()) await leaveCurrentSyncGroup();
+    if (await getDeviceCredentials()) await leaveCurrentSyncGroup();
     disableSync();
-    await clearDeviceInfo();
-    setDeviceInfo(null);
+    await clearDeviceCredentials();
+    setDeviceCredentials(null);
+    setSession({ tag: "local_single_device" });
     setSyncError(null);
     retryCountRef.current = 0;
     if (retryTimerRef.current) {
@@ -441,7 +470,7 @@ export function SyncProvider({
     stopRealtimeRef.current?.();
     stopRealtimeRef.current = null;
     resetRealtimeSync();
-  }, []);
+  }, [setSession]);
 
   /**
    * 紧急本机解除：刻意不请求 Worker，避免在服务不可用时无法交还设备。
@@ -449,8 +478,9 @@ export function SyncProvider({
    */
   const forceClearLocalSyncCredentials = useCallback(async () => {
     disableSync();
-    await clearDeviceInfo();
-    setDeviceInfo(null);
+    await clearDeviceCredentials();
+    setDeviceCredentials(null);
+    setSession({ tag: "local_single_device" });
     setSyncError(null);
     retryCountRef.current = 0;
     if (retryTimerRef.current) {
@@ -461,7 +491,7 @@ export function SyncProvider({
     stopRealtimeRef.current?.();
     stopRealtimeRef.current = null;
     resetRealtimeSync();
-  }, []);
+  }, [setSession]);
 
   const openPairModal = useCallback(() => {
     onRequestPair?.();
@@ -492,7 +522,7 @@ export function SyncProvider({
     startedRef.current = false;
     // 执行当前成员资格的完整同步；未配对时安全停留在本地模式。
     const ok = await performSync();
-    if (ok && await getDeviceInfo()) {
+    if (ok && await getDeviceCredentials()) {
       // 仅已有活跃成员资格时重新启动实时监听
       stopRealtimeRef.current = startRealtimeSync(() => {
         // 重启后的实时通知同样必须走完整成员资格刷新，不能绕过权限缓存写回。
@@ -505,11 +535,11 @@ export function SyncProvider({
   }, [performSync, scheduleRetry]);
 
   const createCurrentDeviceSyncGroup = useCallback(async (deviceName?: string) => {
-    if (await getDeviceInfo()) throw new Error("SYNC_GROUP_ALREADY_ACTIVE");
+    if (await getDeviceCredentials()) throw new Error("SYNC_GROUP_ALREADY_ACTIVE");
     setIsGroupSwitching(true);
     try {
       const membership = await createNewSyncGroup(deviceName);
-      setDeviceInfo(membership);
+      setDeviceCredentials(membership);
       await restartSync();
     } finally {
       setIsGroupSwitching(false);
@@ -543,7 +573,7 @@ export function SyncProvider({
     setIsGroupSwitching(true);
     try {
       const membership = await recoverStaleOwner();
-      setDeviceInfo(membership);
+      setDeviceCredentials(membership);
       await restartSync();
     } finally {
       setIsGroupSwitching(false);
@@ -570,16 +600,18 @@ export function SyncProvider({
         login,
         logout,
         deviceInfo,
-        deviceRole: deviceInfo?.role ?? null,
+        deviceRole: deviceSessionState.tag === "authorized" || deviceSessionState.tag === "offline_cache" || deviceSessionState.tag === "policy_stale"
+          ? deviceSessionState.session.membership.role
+          : null,
         syncError,
         retrySync,
         openPairModal,
         openDeviceManager,
         dismissSyncError,
         hasPendingConflicts: pendingConflicts.length > 0,
-        refreshDeviceInfo: async () => {
-          const info = await getDeviceInfo();
-          setDeviceInfo(info);
+        refreshDeviceCredentials: async () => {
+          const info = await getDeviceCredentials();
+          setDeviceCredentials(info);
         },
         restartSync,
         createSyncGroup: createCurrentDeviceSyncGroup,
@@ -588,6 +620,7 @@ export function SyncProvider({
         recoverStaleGroupOwner,
         forceClearLocalSyncCredentials,
         isGroupSwitching,
+        deviceSessionState,
       }}
     >
       {children}

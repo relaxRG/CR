@@ -1,15 +1,7 @@
 /**
  * 门店 Tab — 四大顶级模块
- * 【报表】经营分析 / 账户        → 需要 store_ops 权限
- * 【员工】薪资统计 / 排班表 / 薪资预支  → 需要 labor 权限
- * 【备用金】备用金管理            → 需要 store_ops 权限
- * 【店铺】杯具 / 餐具 / 日用品 / 设备 → 需要 store_ops 权限
- * 【库存】酒水 / 食材 / 冰块 / 水果    → 需要 store_ops 权限
- *
- * 权限控制：
- *   - owner：所有 Tab 可见
- *   - collaborator/guest：仅显示 allowedKeys 包含对应模块的 Tab
- *   - 未登录：显示所有 Tab（本地单机模式）
+ * 所有顶级页签始终可见；查看、编辑、导入、导出、月结和管理动作均由 DeviceSessionV2 的独立能力决定。
+ * 顶级页签始终可见，未获查看能力时展示精确锁定状态。
  */
 import React from "react";
 import {
@@ -23,7 +15,7 @@ import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useReportMonthNavigation } from "@/hooks/use-report-month-navigation";
 import { BoundedBusinessMonthNavigator } from "@/components/months/BoundedBusinessMonthNavigator";
 import { useSync } from "@/lib/cf-sync/provider";
-import { useFeature } from "@/hooks/use-feature";
+import { useCan } from "@/hooks/use-can";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { floatingTabContentBottomInset } from "@/components/floating-tab-bar";
 import StorePettyCashScreen from "@/components/store/petty-cash";
@@ -38,12 +30,12 @@ import PeriodAnalysisScreen from "@/app/period-analysis";
 type MainTab = "monthly" | "labor" | "petty" | "shop" | "inventory";
 type ReportTab = "summary" | "analytics" | "accounts" | "period";
 
-const ALL_MAIN_TABS: { key: MainTab; label: string; feature: "store_ops" | "labor" }[] = [
-  { key: "monthly",   label: "报表",  feature: "store_ops" },
-  { key: "labor",     label: "员工",  feature: "labor" },
-  { key: "petty",     label: "备用金", feature: "store_ops" },
-  { key: "inventory", label: "库存",  feature: "store_ops" },
-  { key: "shop",      label: "店铺",  feature: "store_ops" },
+const ALL_MAIN_TABS: { key: MainTab; label: string }[] = [
+  { key: "monthly", label: "报表" },
+  { key: "labor", label: "员工" },
+  { key: "petty", label: "备用金" },
+  { key: "inventory", label: "库存" },
+  { key: "shop", label: "店铺" },
 ];
 
 const REPORT_TABS: { key: ReportTab; label: string }[] = [
@@ -68,14 +60,18 @@ function AccessDenied({ label, colors }: { label: string; colors: any }) {
 
 // ── 报表模块（含总月报 / 经营分析 / 账户三个子入口）──────────────────────────────
 function ReportModule({ insets, colors }: { insets: any; colors: any }) {
-  const { hasFeature, isAuthenticated } = useFeature();
+  const summaryAccess = useCan("reports_monthly.view");
+  const analyticsAccess = useCan("analytics_business.view");
+  const accountsAccess = useCan("accounts.view");
+  const periodAccess = useCan("analytics_period.view");
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
   const [reportTab, setReportTab] = usePersistedState<ReportTab>("store.report.tab.v3", "summary");
   const { month: reportMonth, bounds: reportMonthBounds, selectMonth: selectReportMonth } = useReportMonthNavigation();
 
-  if (isAuthenticated && !hasFeature("store_ops")) {
-    return <AccessDenied label="报表" colors={colors} />;
-  }
+  const activeAccess = reportTab === "summary" ? summaryAccess
+    : reportTab === "analytics" ? analyticsAccess
+    : reportTab === "accounts" ? accountsAccess
+    : periodAccess;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -116,28 +112,27 @@ function ReportModule({ insets, colors }: { insets: any; colors: any }) {
         />
       </View>
 
-      {reportTab === "summary" && (
+      {!activeAccess.allowed ? (
+        <AccessDenied label={REPORT_TABS.find((tab) => tab.key === reportTab)?.label ?? "报表"} colors={colors} />
+      ) : reportTab === "summary" ? (
         <View style={{ flex: 1 }}>
           <SafeAreaInsetsContext.Provider value={insets}>
             <MonthlySummaryScreen embedded />
           </SafeAreaInsetsContext.Provider>
         </View>
-      )}
-      {reportTab === "analytics" && (
+      ) : reportTab === "analytics" ? (
         <View style={{ flex: 1 }}>
           <SafeAreaInsetsContext.Provider value={insets}>
             <StoreAnalyticsScreen embedded />
           </SafeAreaInsetsContext.Provider>
         </View>
-      )}
-      {reportTab === "accounts" && (
+      ) : reportTab === "accounts" ? (
         <View style={{ flex: 1 }}>
           <SafeAreaInsetsContext.Provider value={insets}>
             <StoreAccountsScreen embedded />
           </SafeAreaInsetsContext.Provider>
         </View>
-      )}
-      {reportTab === "period" && (
+      ) : (
         <View style={{ flex: 1 }}>
           <SafeAreaInsetsContext.Provider value={insets}>
             <PeriodAnalysisScreen embedded />
@@ -155,23 +150,29 @@ export default function StoreScreen() {
   const router = useRouter();
   const [mainTab, setMainTab] = usePersistedState<MainTab>("store.main.tab.v3", "monthly");
   const { syncState } = useSync();
-  const { hasFeature, isAuthenticated } = useFeature();
-  const canAccess = (feature: "store_ops" | "labor") => !isAuthenticated || hasFeature(feature);
+  const laborAccess = useCan("labor_employees.view");
+  const pettyAccess = useCan("petty_cash.view");
+  const inventorySpiritsAccess = useCan("inventory_spirits.view");
+  const inventoryWineAccess = useCan("inventory_wine.view");
+  const inventoryFruitAccess = useCan("inventory_fruit.view");
+  const inventoryFoodAccess = useCan("inventory_food.view");
+  const inventoryBeerAccess = useCan("inventory_beer.view");
+  const inventoryIceAccess = useCan("inventory_ice.view");
+  const shopGlasswareAccess = useCan("shop_glassware.view");
+  const shopTablewareAccess = useCan("shop_tableware.view");
+  const shopSuppliesAccess = useCan("shop_supplies.view");
+  const shopEquipmentAccess = useCan("shop_equipment.view");
+  const inventoryAllowed = [inventorySpiritsAccess, inventoryWineAccess, inventoryFruitAccess, inventoryFoodAccess, inventoryBeerAccess, inventoryIceAccess].some((decision) => decision.allowed);
+  const shopAllowed = [shopGlasswareAccess, shopTablewareAccess, shopSuppliesAccess, shopEquipmentAccess].some((decision) => decision.allowed);
   const hasSyncBadge = !!syncState.error;
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
   const contentBottomInset = floatingTabContentBottomInset(insets.bottom);
   // 子页面沿用原有安全区 API，但 bottom 已包含浮动导航高度，所有现有 ScrollView 自动获得末行预留。
   const childInsets = { ...insets, top: 0, bottom: contentBottomInset };
 
-  // 过滤出当前设备有权访问的 Tab（未登录时显示全部，保持本地单机模式可用）
-  const visibleTabs = ALL_MAIN_TABS.filter((t) =>
-    !isAuthenticated || hasFeature(t.feature)
-  );
-
-  // 如果当前选中的 Tab 不可见，自动切换到第一个可见 Tab
-  const effectiveTab = visibleTabs.find((t) => t.key === mainTab)
-    ? mainTab
-    : (visibleTabs[0]?.key ?? "monthly");
+  // 顶级页签始终可见；每个业务页面按照对应的细粒度 capability 展示锁定与可用动作。
+  const visibleTabs = ALL_MAIN_TABS;
+  const effectiveTab = mainTab;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background, paddingBottom: contentBottomInset }}>
@@ -214,25 +215,21 @@ export default function StoreScreen() {
       {/* 内容区 */}
       <SafeAreaInsetsContext.Provider value={childInsets}>
         {effectiveTab === "monthly"   && <ReportModule insets={childInsets} colors={colors} />}
-        {effectiveTab === "labor"     && (
-          canAccess("labor")
-            ? <View style={{ flex: 1 }}><LaborScreen embedded /></View>
-            : <AccessDenied label="员工" colors={colors} />
+        {effectiveTab === "labor" && (laborAccess.allowed
+          ? <View style={{ flex: 1 }}><LaborScreen embedded /></View>
+          : <AccessDenied label="员工" colors={colors} />
         )}
-        {effectiveTab === "petty"     && (
-          canAccess("store_ops")
-            ? <SafeAreaInsetsContext.Provider value={childInsets}><StorePettyCashScreen /></SafeAreaInsetsContext.Provider>
-            : <AccessDenied label="备用金" colors={colors} />
+        {effectiveTab === "petty" && (pettyAccess.allowed
+          ? <SafeAreaInsetsContext.Provider value={childInsets}><StorePettyCashScreen /></SafeAreaInsetsContext.Provider>
+          : <AccessDenied label="备用金" colors={colors} />
         )}
-        {effectiveTab === "shop"      && (
-          canAccess("store_ops")
-            ? <StoreShopScreen />
-            : <AccessDenied label="店铺" colors={colors} />
+        {effectiveTab === "shop" && (shopAllowed
+          ? <StoreShopScreen />
+          : <AccessDenied label="店铺" colors={colors} />
         )}
-        {effectiveTab === "inventory" && (
-          canAccess("store_ops")
-            ? <StoreInventoryScreen mode="inventory" />
-            : <AccessDenied label="库存" colors={colors} />
+        {effectiveTab === "inventory" && (inventoryAllowed
+          ? <StoreInventoryScreen mode="inventory" />
+          : <AccessDenied label="库存" colors={colors} />
         )}
       </SafeAreaInsetsContext.Provider>
     </View>

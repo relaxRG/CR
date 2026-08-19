@@ -79,7 +79,7 @@ export default function HomemadeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { t, lang } = useI18n();
-  const { guardWrite } = useGuestGuard();
+  const { guard: guardWrite } = useCapabilityGuard("homemade.edit");
   const {
     ready,
     preps,
@@ -1656,5 +1656,5 @@ const styles = StyleSheet.create({
   selRow: { flexDirection: "row", alignItems: "center" },
   selCheckWrap: { width: 34, alignItems: "flex-start", justifyContent: "center" },
 });
-import { useGuestGuard } from "@/hooks/use-guest-guard";
+import { useCapabilityGuard } from "@/hooks/use-can";
 import { MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS, MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";

@@ -50,7 +50,7 @@ import { enrichBottles } from "@/lib/api/smart-router";
 import { smartLinkIngredient, smartLinkDisplayName } from "@/lib/recipes/smart-link";
 import { useRecipeStore } from "@/lib/recipes/store";
 import { Image } from "expo-image";
-import { useGuestGuard } from "@/hooks/use-guest-guard";
+import { useCan } from "@/hooks/use-can";
 import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as FileSystem from "expo-file-system/legacy";
@@ -71,7 +71,7 @@ export default function RecipeDetailScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { t, lang } = useI18n();
-  const { isGuest } = useGuestGuard();
+  const editDecision = useCan("recipes.edit");
   const { getRecipe, getCategory, toggleFavorite, toggleMade, setRating, deleteRecipe, tags } =
     useRecipeStore();
   const { updateRecipePhoto, updateRecipe, removeRecipePhoto } = useRecipeStore();
@@ -398,7 +398,7 @@ export default function RecipeDetailScreen() {
               color={recipe.favorite ? colors.primary : colors.muted}
             />
           </Pressable>
-        {!isGuest && (
+        {editDecision.allowed && (
           <>
             <Pressable
               onPress={() => router.push({ pathname: "/recipe-form", params: { id: recipe.id } })}

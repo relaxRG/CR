@@ -40,7 +40,6 @@ const legacySnapshot = {
     "monthly_reports_v1": JSON.stringify([{ month: "2026-07", revenue: 282933.28 }]),
     "app_session_token": "session-secret",
     "cf.sync.deviceToken": "device-secret",
-    "cf.sync.allowedKeys": JSON.stringify(["labor_employees_v1"]),
     "cf.sync.groupSwitchTicket.switch-a-b": "recovery-secret",
   },
 };
@@ -54,7 +53,6 @@ describe("Snapshot V2 加密迁移", () => {
     expect(encrypted.manifest.includedKeys).toEqual(["labor_employees_v1", "monthly_reports_v1"]);
     expect(encrypted.manifest.excludedCredentialKeys).toEqual([
       "app_session_token",
-      "cf.sync.allowedKeys",
       "cf.sync.deviceToken",
       "cf.sync.groupSwitchTicket.switch-a-b",
     ]);

@@ -1357,7 +1357,7 @@ async function issueWebMemoryTicket(env, deviceId, origin) {
 async function verifyDevice(env, deviceId, token) {
   if (!deviceId || !token) return null;
   const row = await env.DB.prepare(
-    "SELECT d.device_id, d.group_id, d.role, d.name, d.allowed_keys, d.token FROM devices d WHERE d.device_id = ? AND d.token = ? AND d.is_active = 1"
+    "SELECT d.device_id, d.group_id, d.role, d.name, d.token FROM devices d WHERE d.device_id = ? AND d.token = ? AND d.is_active = 1"
   ).bind(deviceId, token).first();
   if (!row || !normalizeDeviceRole(row.role)) return null;
   try {
@@ -1376,8 +1376,8 @@ async function verifyRequestDevice(env, headers) {
   await ensureWebDeviceSessions(env);
   const now = Date.now();
   const row = sessionId
-    ? await env.DB.prepare("SELECT d.device_id, d.group_id, d.role, d.name, d.allowed_keys, d.token FROM web_device_sessions s JOIN devices d ON d.device_id = s.device_id WHERE s.session_id = ? AND s.expires_at > ? AND d.is_active = 1").bind(sessionId, now).first()
-    : await env.DB.prepare("SELECT d.device_id, d.group_id, d.role, d.name, d.allowed_keys, d.token FROM web_device_memory_tickets t JOIN devices d ON d.device_id = t.device_id WHERE t.ticket = ? AND t.expires_at > ? AND d.is_active = 1").bind(memoryTicket, now).first();
+    ? await env.DB.prepare("SELECT d.device_id, d.group_id, d.role, d.name, d.token FROM web_device_sessions s JOIN devices d ON d.device_id = s.device_id WHERE s.session_id = ? AND s.expires_at > ? AND d.is_active = 1").bind(sessionId, now).first()
+    : await env.DB.prepare("SELECT d.device_id, d.group_id, d.role, d.name, d.token FROM web_device_memory_tickets t JOIN devices d ON d.device_id = t.device_id WHERE t.ticket = ? AND t.expires_at > ? AND d.is_active = 1").bind(memoryTicket, now).first();
   if (!row || !normalizeDeviceRole(row.role) || (requestedDeviceId && row.device_id !== requestedDeviceId)) return null;
   try { await env.DB.prepare("UPDATE devices SET last_seen = ? WHERE device_id = ?").bind(now, row.device_id).run(); } catch {}
   return row;
@@ -1386,58 +1386,52 @@ __name(verifyDevice, "verifyDevice");
 __name2(verifyDevice, "verifyDevice");
 __name22(verifyDevice, "verifyDevice");
 async function handleSyncPull(env, body, headers, origin) {
-  const device = await verifyRequestDevice(env, headers);
-  if (!device) return err("Unauthorized", 401, origin);
+  const session = await resolveDeviceSessionV2(env, headers);
+  if (!session) return err("DEVICE_AUTH_UNAUTHORIZED", 401, origin);
   const { since } = body || {};
   let query = "SELECT storage_key, value, client_updated_at, updated_at FROM sync_data WHERE group_id = ?";
-  const params = [device.group_id];
+  const params = [session.membership.groupId];
   if (since) {
     query += " AND client_updated_at > ?";
     params.push(since);
   }
   const rows = await env.DB.prepare(query).bind(...params).all();
-  const tombstones = await env.DB.prepare(
-    "SELECT storage_key, deleted_at FROM sync_tombstones WHERE group_id = ?"
-  ).bind(device.group_id).all();
-  const pullAllowedKeys = parseStoredAllowedKeys(device.allowed_keys);
-  const canWrite = device.role === "owner" || device.role === "collaborator";
-  const camelEntries = filterSyncEntriesForDevice(device, (rows.results || []).map((r) => ({
+  const tombstones = await env.DB.prepare("SELECT storage_key, deleted_at FROM sync_tombstones WHERE group_id = ?").bind(session.membership.groupId).all();
+  const entries = filterSyncEntriesForSession(session, (rows.results || []).map((r) => ({
     storageKey: r.storage_key,
     value: r.value,
-    clientUpdatedAt: r.client_updated_at
-  })));
-  const camelTombstones = filterSyncEntriesForDevice(device, (tombstones.results || []).map((t) => ({
+    clientUpdatedAt: r.client_updated_at,
+  })), "read");
+  const visibleTombstones = filterSyncEntriesForSession(session, (tombstones.results || []).map((t) => ({
     storageKey: t.storage_key,
-    deletedAt: t.deleted_at
-  })));
-  return json({
-    entries: camelEntries,
-    tombstones: camelTombstones,
-    role: device.role,
-    allowedKeys: pullAllowedKeys,
-    canWrite,
-    serverTime: Date.now()
-  }, 200, origin);
+    deletedAt: t.deleted_at,
+  })), "read");
+  return json({ entries, tombstones: visibleTombstones, policyRevision: session.policy.revision, serverTime: Date.now() }, 200, origin);
 }
 __name(handleSyncPull, "handleSyncPull");
 __name2(handleSyncPull, "handleSyncPull");
 __name22(handleSyncPull, "handleSyncPull");
 async function handleSyncPush(env, body, headers, origin) {
-  const device = await verifyRequestDevice(env, headers);
-  if (!device) return err("Unauthorized", 401, origin);
-  if (device.role === "guest") return err("Guest devices cannot push", 403, origin);
-  const { entries } = body || {};
-  if (!Array.isArray(entries)) return err("entries required", 400, origin);
-  const writableEntries = filterSyncEntriesForDevice(device, entries);
+  const session = await resolveDeviceSessionV2(env, headers);
+  if (!session) return err("DEVICE_AUTH_UNAUTHORIZED", 401, origin);
+  const { entries, policyRevision } = body || {};
+  if (!Array.isArray(entries)) return err("SYNC_ENTRIES_REQUIRED", 400, origin);
+  if (Number(policyRevision) !== session.policy.revision) {
+    return json({ error: "POLICY_OUTDATED", session }, 409, origin);
+  }
+  const denied = entries.filter((entry) => !isSessionStorageAllowed(session, entry?.storageKey, "write"));
+  if (denied.length > 0) {
+    return json({ error: "CAPABILITY_DENIED", rejectedStorageKeys: denied.map((entry) => entry?.storageKey).filter(Boolean), policyRevision: session.policy.revision }, 403, origin);
+  }
   let pushed = 0;
-  for (const entry of writableEntries.slice(0, 40)) {
+  for (const entry of entries.slice(0, 40)) {
     if (!entry.storageKey || entry.value === void 0) continue;
     await env.DB.prepare(
       "INSERT INTO sync_data (group_id, storage_key, value, client_updated_at, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(group_id, storage_key) DO UPDATE SET value = excluded.value, client_updated_at = excluded.client_updated_at, updated_at = excluded.updated_at WHERE excluded.client_updated_at > sync_data.client_updated_at"
-    ).bind(device.group_id, entry.storageKey, entry.value, entry.clientUpdatedAt || Date.now(), Date.now()).run();
+    ).bind(session.membership.groupId, entry.storageKey, entry.value, entry.clientUpdatedAt || Date.now(), Date.now()).run();
     pushed++;
   }
-  return json({ success: true, count: pushed }, 200, origin);
+  return json({ success: true, count: pushed, policyRevision: session.policy.revision }, 200, origin);
 }
 __name(handleSyncPush, "handleSyncPush");
 __name2(handleSyncPush, "handleSyncPush");
@@ -1568,7 +1562,7 @@ async function ensureSwitchSchema(env) {
     target_name TEXT NOT NULL,
     target_platform TEXT,
     target_role TEXT NOT NULL,
-    target_allowed_keys TEXT,
+    target_capabilities_json TEXT NOT NULL,
     handoff_device_id TEXT,
     pair_code TEXT NOT NULL,
     recovery_ticket_hash TEXT NOT NULL,
@@ -1586,7 +1580,8 @@ async function ensureSwitchSchema(env) {
   )`).run();
   for (const statement of [
     "ALTER TABLE pair_codes ADD COLUMN reserved_switch_id TEXT",
-    "ALTER TABLE pair_codes ADD COLUMN reserved_at INTEGER"
+    "ALTER TABLE pair_codes ADD COLUMN reserved_at INTEGER",
+    "ALTER TABLE group_switches ADD COLUMN target_capabilities_json TEXT NOT NULL DEFAULT '[]'"
   ]) {
     try { await env.DB.prepare(statement).run(); } catch {}
   }
@@ -1606,13 +1601,11 @@ async function logSwitchEvent(env, switchId, event, errorCode = null) {
 }
 
 function switchMemberPayload(row, includeToken = true) {
-  const allowedKeys = parseStoredAllowedKeys(row.allowed_keys);
   return {
     deviceId: row.device_id,
     ...(includeToken ? { deviceToken: row.token } : {}),
     groupId: row.group_id,
     role: row.role,
-    allowedKeys,
     deviceName: row.name || "Unknown"
   };
 }
@@ -1671,14 +1664,16 @@ async function handleDevicePrepareSwitch(env, body, headers, origin) {
   if (existing) return err("SWITCH_ID_ALREADY_EXISTS", 409, origin);
   const pair = await env.DB.prepare("SELECT * FROM pair_codes WHERE code = ? AND used = 0 AND expires_at > ? AND reserved_switch_id IS NULL").bind(code, Date.now()).first();
   if (!pair) return err("PAIR_CODE_UNAVAILABLE", 400, origin);
+  const pairPolicy = await env.DB.prepare("SELECT capabilities_json FROM pair_code_policies WHERE code = ? AND group_id = ?").bind(code, pair.group_id).first();
+  if (!pairPolicy) return err("PAIR_POLICY_MISSING", 409, origin);
   if (pair.group_id === source.group_id) return err("TARGET_GROUP_SAME_AS_SOURCE", 400, origin);
   const handoffError = await ownerHandoffError(env, source, handoffDeviceId);
   if (handoffError) return err(handoffError, 409, origin);
   const recoveryTicket = generateToken();
   const targetDeviceId = generateToken().slice(0, 16);
   const targetToken = generateToken();
-  const targetAllowedKeys = parseStoredAllowedKeys(pair.allowed_keys);
-  await env.DB.prepare("INSERT INTO group_switches (switch_id, state, source_device_id, source_group_id, target_group_id, target_device_id, target_token, target_name, target_platform, target_role, target_allowed_keys, handoff_device_id, pair_code, recovery_ticket_hash, created_at) VALUES (?, 'prepared', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(
+  const targetCapabilitiesJson = JSON.stringify(parseCapabilities(pairPolicy.capabilities_json));
+  await env.DB.prepare("INSERT INTO group_switches (switch_id, state, source_device_id, source_group_id, target_group_id, target_device_id, target_token, target_name, target_platform, target_role, target_capabilities_json, handoff_device_id, pair_code, recovery_ticket_hash, created_at) VALUES (?, 'prepared', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(
     switchId,
     source.device_id,
     source.group_id,
@@ -1688,7 +1683,7 @@ async function handleDevicePrepareSwitch(env, body, headers, origin) {
     typeof deviceName === "string" && deviceName.trim() ? deviceName.trim().slice(0, 80) : source.name || "Device",
     normalizeDevicePlatform(platform),
     normalizeDeviceRole(pair.role) ?? "guest",
-    targetAllowedKeys === null ? null : JSON.stringify(targetAllowedKeys),
+    targetCapabilitiesJson,
     handoffDeviceId || null,
     code,
     await hashSwitchTicket(recoveryTicket),
@@ -1717,22 +1712,26 @@ async function handleDeviceRecoverJoin(env, body, origin) {
   const reservation = await env.DB.prepare("UPDATE pair_codes SET reserved_switch_id = ?, reserved_at = ? WHERE code = ? AND used = 0 AND expires_at > ? AND reserved_switch_id IS NULL").bind(reservationId, Date.now(), code, Date.now()).run();
   if (Number(reservation.meta?.changes || 0) !== 1) return err("PAIR_CODE_UNAVAILABLE", 409, origin);
 
+  const policy = await env.DB.prepare("SELECT revision, capabilities_json FROM pair_code_policies WHERE code = ? AND group_id = ?").bind(code, pair.group_id).first();
+  if (!policy) return err("PAIR_POLICY_MISSING", 409, origin);
   const token = generateToken();
-  const recoveryAllowedKeys = parseStoredAllowedKeys(pair.allowed_keys);
+  const now = Date.now();
+  const capabilities = parseCapabilities(policy.capabilities_json);
   try {
     await env.DB.batch([
-      env.DB.prepare("INSERT INTO devices (device_id, group_id, token, name, platform, role, allowed_keys, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)").bind(deviceId, pair.group_id, token, normalizedName, normalizeDevicePlatform(platform), normalizeDeviceRole(pair.role) ?? "guest", recoveryAllowedKeys === null ? null : JSON.stringify(recoveryAllowedKeys), Date.now()),
+      env.DB.prepare("INSERT INTO devices (device_id, group_id, token, name, platform, role, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?)").bind(deviceId, pair.group_id, token, normalizedName, normalizeDevicePlatform(platform), normalizeDeviceRole(pair.role) ?? "guest", now),
+      env.DB.prepare("INSERT INTO device_policies (device_id, group_id, revision, capabilities_json, updated_at, updated_by) VALUES (?, ?, ?, ?, ?, ?)").bind(deviceId, pair.group_id, Number(policy.revision || 1), JSON.stringify(capabilities), now, deviceId),
       env.DB.prepare("UPDATE pair_codes SET used = 1 WHERE code = ? AND reserved_switch_id = ?").bind(code, reservationId),
-      env.DB.prepare("INSERT INTO group_ts (group_id, last_push_at) VALUES (?, ?) ON CONFLICT(group_id) DO UPDATE SET last_push_at = excluded.last_push_at").bind(pair.group_id, Date.now())
+      env.DB.prepare("DELETE FROM pair_code_policies WHERE code = ?").bind(code),
+      env.DB.prepare("INSERT INTO group_ts (group_id, last_push_at) VALUES (?, ?) ON CONFLICT(group_id) DO UPDATE SET last_push_at = excluded.last_push_at").bind(pair.group_id, now)
     ]);
   } catch (error) {
     await env.DB.prepare("UPDATE pair_codes SET reserved_switch_id = NULL, reserved_at = NULL WHERE code = ? AND reserved_switch_id = ? AND used = 0").bind(code, reservationId).run();
     console.error("[cf-sync] recovery_join_failed", { code: "RECOVERY_JOIN_WRITE_FAILED" });
     return err("RECOVERY_JOIN_WRITE_FAILED", 500, origin);
   }
-  const allowedKeys = recoveryAllowedKeys;
   console.info("[cf-sync] recovery_join_completed", { targetGroup: String(pair.group_id).slice(0, 8), role: pair.role });
-  return deviceMembershipResponse(env, { deviceId, deviceToken: token, groupId: pair.group_id, role: normalizeDeviceRole(pair.role) ?? "guest", allowedKeys, deviceName: normalizedName }, origin, normalizeDevicePlatform(platform) === "web");
+  return deviceMembershipResponse(env, { deviceId, deviceToken: token, groupId: pair.group_id, role: normalizeDeviceRole(pair.role) ?? "guest", deviceName: normalizedName }, origin, normalizeDevicePlatform(platform) === "web");
 }
 
 async function handleDeviceCommitSwitch(env, body, headers, origin) {
@@ -1742,7 +1741,7 @@ async function handleDeviceCommitSwitch(env, body, headers, origin) {
   const record = await getSwitchByTicket(env, body?.switchId, body?.recoveryTicket);
   if (!record || record.source_device_id !== source.device_id) return err("SWITCH_RECOVERY_UNAUTHORIZED", 403, origin);
   if (record.state === "committed") {
-    const target = await env.DB.prepare("SELECT device_id, group_id, token, name, role, allowed_keys FROM devices WHERE device_id = ? AND is_active = 1").bind(record.target_device_id).first();
+    const target = await env.DB.prepare("SELECT device_id, group_id, token, name, role FROM devices WHERE device_id = ? AND is_active = 1").bind(record.target_device_id).first();
     if (!target) return err("SWITCH_TARGET_MISSING", 409, origin);
     return committedSwitchResponse(env, origin, target);
   }
@@ -1754,9 +1753,11 @@ async function handleDeviceCommitSwitch(env, body, headers, origin) {
   if (Number(reservation.meta?.changes || 0) !== 1) return err("PAIR_CODE_UNAVAILABLE", 409, origin);
   const now = Date.now();
   const statements = [
-    env.DB.prepare("INSERT OR IGNORE INTO devices (id, device_id, group_id, token, name, platform, role, allowed_keys, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)").bind(record.target_device_id, record.target_device_id, record.target_group_id, record.target_token, record.target_name, record.target_platform, record.target_role, record.target_allowed_keys, now),
+    env.DB.prepare("INSERT OR IGNORE INTO devices (id, device_id, group_id, token, name, platform, role, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)").bind(record.target_device_id, record.target_device_id, record.target_group_id, record.target_token, record.target_name, record.target_platform, record.target_role, now),
+    env.DB.prepare("INSERT OR REPLACE INTO device_policies (device_id, group_id, revision, capabilities_json, updated_at, updated_by) VALUES (?, ?, 1, ?, ?, ?)").bind(record.target_device_id, record.target_group_id, record.target_capabilities_json, now, source.device_id),
     env.DB.prepare("UPDATE devices SET is_active = 0 WHERE device_id = ? AND group_id = ? AND token = ? AND is_active = 1").bind(source.device_id, source.group_id, source.token),
     env.DB.prepare("UPDATE pair_codes SET used = 1 WHERE code = ? AND reserved_switch_id = ?").bind(record.pair_code, record.switch_id),
+    env.DB.prepare("DELETE FROM pair_code_policies WHERE code = ?").bind(record.pair_code),
     env.DB.prepare("UPDATE group_switches SET state = 'committed', committed_at = ?, last_error_code = NULL WHERE switch_id = ?").bind(now, record.switch_id)
   ];
   if (source.role === "owner" && record.handoff_device_id) {
@@ -1769,7 +1770,7 @@ async function handleDeviceCommitSwitch(env, body, headers, origin) {
   await env.DB.batch(statements);
   await clearWebDeviceSessions(env, source.device_id);
   await logSwitchEvent(env, record.switch_id, "switch_committed");
-  const target = await env.DB.prepare("SELECT device_id, group_id, token, name, role, allowed_keys FROM devices WHERE device_id = ? AND is_active = 1").bind(record.target_device_id).first();
+  const target = await env.DB.prepare("SELECT device_id, group_id, token, name, role FROM devices WHERE device_id = ? AND is_active = 1").bind(record.target_device_id).first();
   if (!target) return err("SWITCH_TARGET_MISSING", 409, origin);
   return committedSwitchResponse(env, origin, target);
 }
@@ -1779,7 +1780,7 @@ async function handleDeviceSwitchStatus(env, body, origin) {
   const record = await getSwitchByTicket(env, body?.switchId, body?.recoveryTicket);
   if (!record) return err("SWITCH_RECOVERY_UNAUTHORIZED", 403, origin);
   if (record.state !== "committed") return json({ state: record.state }, 200, origin);
-  const target = await env.DB.prepare("SELECT device_id, group_id, token, name, role, allowed_keys FROM devices WHERE device_id = ? AND is_active = 1").bind(record.target_device_id).first();
+  const target = await env.DB.prepare("SELECT device_id, group_id, token, name, role FROM devices WHERE device_id = ? AND is_active = 1").bind(record.target_device_id).first();
   if (!target) return err("SWITCH_TARGET_MISSING", 409, origin);
   return committedSwitchResponse(env, origin, target);
 }
@@ -1798,12 +1799,12 @@ async function handleDeviceCancelSwitch(env, body, origin) {
 }
 
 async function handleSyncCompleteSnapshot(env, headers, origin) {
-  const device = await verifyRequestDevice(env, headers);
-  if (!device) return err("Unauthorized", 401, origin);
-  const rows = await env.DB.prepare("SELECT storage_key, value, client_updated_at FROM sync_data WHERE group_id = ? ORDER BY storage_key ASC").bind(device.group_id).all();
-  const entries = filterSyncEntriesForDevice(device, (rows.results || []).map((row) => ({ storageKey: row.storage_key, value: row.value, clientUpdatedAt: row.client_updated_at })));
+  const session = await resolveDeviceSessionV2(env, headers);
+  if (!session) return err("DEVICE_AUTH_UNAUTHORIZED", 401, origin);
+  const rows = await env.DB.prepare("SELECT storage_key, value, client_updated_at FROM sync_data WHERE group_id = ? ORDER BY storage_key ASC").bind(session.membership.groupId).all();
+  const entries = filterSyncEntriesForSession(session, (rows.results || []).map((row) => ({ storageKey: row.storage_key, value: row.value, clientUpdatedAt: row.client_updated_at })), "read");
   const revision = `${entries.length}:${entries.reduce((max, entry) => Math.max(max, Number(entry.clientUpdatedAt) || 0), 0)}`;
-  return json({ groupId: device.group_id, revision, complete: true, presentKeys: entries.map((entry) => entry.storageKey), entries }, 200, origin);
+  return json({ groupId: session.membership.groupId, revision, complete: true, presentKeys: entries.map((entry) => entry.storageKey), entries }, 200, origin);
 }
 
 function normalizeDevicePlatform(value) {
@@ -1814,31 +1815,531 @@ function normalizeDeviceRole(value, allowedRoles = ["owner", "collaborator", "gu
   return allowedRoles.includes(value) ? value : null;
 }
 
-/**
- * null 是明确的全功能授权；格式损坏、非数组或包含非法键的历史值必须失败关闭为[]，
- * 不得因解析失败升级为全权限。
- */
-function filterSyncEntriesForDevice(device, entries) {
-  const allowedKeys = parseStoredAllowedKeys(device.allowed_keys);
-  if (device.role === "owner" || allowedKeys === null) return entries;
-  const allowedSet = new Set(allowedKeys);
-  return entries.filter((entry) => allowedSet.has(entry?.storageKey));
+// ─── DeviceSessionV2 policy core ─────────────────────────────────────────────
+// 角色仅描述设备成员身份；资源、动作和逐键策略由前端唯一能力注册表自动生成。
+// V2_STORAGE_CAPABILITY_GENERATED
+// Generated from lib/sync/capabilities.ts by scripts/generate-device-policy-v2-worker-map.mjs.
+// Do not edit manually; regenerate whenever capabilities or storage policy changes.
+const V2_ACTIONS = ["view","edit","import","export","close","manage"];
+const V2_RESOURCES = ["devices","sync_diagnostics","backup","data","recipes","bottles","homemade","lab_projects","lab_batches","lab_plan","books","menu","shopping","wine_catalog","food_menu","food_ingredients","inventory_spirits","inventory_wine","inventory_fruit","inventory_food","inventory_beer","inventory_ice","shop_glassware","shop_tableware","shop_supplies","shop_equipment","suppliers","reports_monthly","accounts","analytics_business","analytics_period","petty_cash","store_schedule","labor_employees","labor_schedule","labor_attendance","labor_comp_off","payroll","preferences"];
+const V2_ALL_CAPABILITIES = V2_RESOURCES.flatMap((resource) => V2_ACTIONS.map((action) => `${resource}.${action}`));
+const V2_CAPABILITY_SET = new Set(V2_ALL_CAPABILITIES);
+const V2_STORAGE_CAPABILITY = {
+  "cocktail.recipes": [
+    "recipes.view",
+    "recipes.edit"
+  ],
+  "cocktail.categories": [
+    "recipes.view",
+    "recipes.manage"
+  ],
+  "cocktail.tags": [
+    "recipes.view",
+    "recipes.manage"
+  ],
+  "cocktail.tagGroups": [
+    "recipes.view",
+    "recipes.manage"
+  ],
+  "cocktail.categoryGroups": [
+    "recipes.view",
+    "recipes.manage"
+  ],
+  "cocktail.seeded": [
+    "recipes.view",
+    "recipes.manage"
+  ],
+  "cocktail_waldorf_imported_v1": [
+    "recipes.view",
+    "recipes.import"
+  ],
+  "cocktail.bottles": [
+    "bottles.view",
+    "bottles.edit"
+  ],
+  "cocktail.bottles.seeded": [
+    "bottles.view",
+    "bottles.manage"
+  ],
+  "cocktail.bottles.waldorf.v1": [
+    "bottles.view",
+    "bottles.import"
+  ],
+  "bottles.taxonomy.categories.v1": [
+    "bottles.view",
+    "bottles.manage"
+  ],
+  "bottles.taxonomy.styles.v1": [
+    "bottles.view",
+    "bottles.manage"
+  ],
+  "homemade.preps.v1": [
+    "homemade.view",
+    "homemade.edit"
+  ],
+  "homemade.seeded.v1": [
+    "homemade.view",
+    "homemade.manage"
+  ],
+  "homemade.sections.v1": [
+    "homemade.view",
+    "homemade.manage"
+  ],
+  "homemade.types.v1": [
+    "homemade.view",
+    "homemade.manage"
+  ],
+  "homemade.taxonomy.v2": [
+    "homemade.view",
+    "homemade.manage"
+  ],
+  "homemade.waldorf.v1": [
+    "homemade.view",
+    "homemade.import"
+  ],
+  "homemade.waldorf.v2": [
+    "homemade.view",
+    "homemade.import"
+  ],
+  "homemade.source.v3": [
+    "homemade.view",
+    "homemade.manage"
+  ],
+  "cocktail.lab.projects": [
+    "lab_projects.view",
+    "lab_projects.edit"
+  ],
+  "cocktail.lab.batches": [
+    "lab_batches.view",
+    "lab_batches.edit"
+  ],
+  "lab.plan.v1": [
+    "lab_plan.view",
+    "lab_plan.edit"
+  ],
+  "cocktail.books.v1": [
+    "books.view",
+    "books.manage"
+  ],
+  "menu_store_v1": [
+    "menu.view",
+    "menu.edit"
+  ],
+  "menu.packages.v1": [
+    "menu.view",
+    "menu.edit"
+  ],
+  "shopping_store_v1": [
+    "shopping.view",
+    "shopping.edit"
+  ],
+  "cocktail.prefs.v1": [
+    "preferences.view",
+    "preferences.edit"
+  ],
+  "app.lang.v1": [
+    "preferences.view",
+    "preferences.edit"
+  ],
+  "wine.bottles.v1": [
+    "wine_catalog.view",
+    "wine_catalog.edit"
+  ],
+  "wine.snapshots.v2": [
+    "inventory_wine.view",
+    "inventory_wine.close"
+  ],
+  "wine.manual_purchases.v1": [
+    "inventory_wine.view",
+    "inventory_wine.edit"
+  ],
+  "food.menu.v1": [
+    "food_menu.view",
+    "food_menu.edit"
+  ],
+  "food.ingredients.v2": [
+    "food_ingredients.view",
+    "food_ingredients.edit"
+  ],
+  "food.purchases.v1": [
+    "inventory_food.view",
+    "inventory_food.edit"
+  ],
+  "store.revenue.v1": [
+    "accounts.view",
+    "accounts.edit"
+  ],
+  "store.petty.v1": [
+    "petty_cash.view",
+    "petty_cash.edit"
+  ],
+  "store.petty_categories.v1": [
+    "petty_cash.view",
+    "petty_cash.manage"
+  ],
+  "store.petty_inv_links.v1": [
+    "petty_cash.view",
+    "petty_cash.manage"
+  ],
+  "store.petty_labor_links.v1": [
+    "petty_cash.view",
+    "petty_cash.manage"
+  ],
+  "store.employee_name_aliases.v1": [
+    "labor_employees.view",
+    "labor_employees.manage"
+  ],
+  "store.inventory.v1": [
+    "shop_equipment.view",
+    "shop_equipment.edit"
+  ],
+  "monthly_summary.reports.v1": [
+    "reports_monthly.view",
+    "reports_monthly.edit"
+  ],
+  "monthly_summary.suppliers.v1": [
+    "suppliers.view",
+    "suppliers.edit"
+  ],
+  "monthly_summary.payments.v1": [
+    "accounts.view",
+    "accounts.edit"
+  ],
+  "monthly_summary.balances.v1": [
+    "accounts.view",
+    "accounts.edit"
+  ],
+  "monthly_summary.petty_configs.v1": [
+    "petty_cash.view",
+    "petty_cash.manage"
+  ],
+  "monthly_summary.inventory_configs.v1": [
+    "reports_monthly.view",
+    "reports_monthly.manage"
+  ],
+  "monthly_reports_v1": [
+    "reports_monthly.view",
+    "reports_monthly.import"
+  ],
+  "period_analysis.reports.v1": [
+    "analytics_period.view",
+    "analytics_period.edit"
+  ],
+  "period_analysis.settings.v1": [
+    "analytics_period.view",
+    "analytics_period.manage"
+  ],
+  "dish_analysis.snapshots.v1": [
+    "analytics_business.view",
+    "analytics_business.edit"
+  ],
+  "schedule.business_hours.v1": [
+    "store_schedule.view",
+    "store_schedule.manage"
+  ],
+  "schedule.shift_templates.v1": [
+    "store_schedule.view",
+    "store_schedule.manage"
+  ],
+  "labor_employees_v1": [
+    "labor_employees.view",
+    "labor_employees.edit"
+  ],
+  "labor_employee_groups_v1": [
+    "labor_employees.view",
+    "labor_employees.manage"
+  ],
+  "labor_custom_depts_v1": [
+    "labor_employees.view",
+    "labor_employees.manage"
+  ],
+  "labor_dept_order_v1": [
+    "labor_employees.view",
+    "labor_employees.manage"
+  ],
+  "labor_shifts_v1": [
+    "labor_schedule.view",
+    "labor_schedule.edit"
+  ],
+  "labor_shift_templates_v1": [
+    "labor_schedule.view",
+    "labor_schedule.manage"
+  ],
+  "labor_shift_groups_v1": [
+    "labor_schedule.view",
+    "labor_schedule.manage"
+  ],
+  "labor_fill_presets_v1": [
+    "labor_schedule.view",
+    "labor_schedule.manage"
+  ],
+  "labor_business_hours_v1": [
+    "labor_schedule.view",
+    "labor_schedule.manage"
+  ],
+  "labor_attendance_v1": [
+    "labor_attendance.view",
+    "labor_attendance.edit"
+  ],
+  "labor_month_configs_v1": [
+    "labor_schedule.view",
+    "labor_schedule.manage"
+  ],
+  "labor_holiday_configs_v1": [
+    "labor_schedule.view",
+    "labor_schedule.manage"
+  ],
+  "labor_comp_off_v1": [
+    "labor_comp_off.view",
+    "labor_comp_off.edit"
+  ],
+  "labor_comp_off_entries_v1": [
+    "labor_comp_off.view",
+    "labor_comp_off.edit"
+  ],
+  "labor_holiday_comp_off_v1": [
+    "labor_comp_off.view",
+    "labor_comp_off.edit"
+  ],
+  "labor_unexplained_rest_alerts_v1": [
+    "labor_comp_off.view",
+    "labor_comp_off.manage"
+  ],
+  "labor_special_statuses_v1": [
+    "labor_attendance.view",
+    "labor_attendance.manage"
+  ],
+  "labor_payslips_v1": [
+    "payroll.view",
+    "payroll.edit"
+  ],
+  "labor_month_close_archives_v1": [
+    "payroll.view",
+    "payroll.close"
+  ],
+  "labor_month_adjustment_sessions_v1": [
+    "payroll.view",
+    "payroll.edit"
+  ],
+  "labor.salary_advances.v1": [
+    "payroll.view",
+    "payroll.edit"
+  ],
+  "labor.advance_categories.v1": [
+    "payroll.view",
+    "payroll.manage"
+  ],
+  "labor_performance_templates_v1": [
+    "payroll.view",
+    "payroll.manage"
+  ],
+  "labor_performance_records_v1": [
+    "payroll.view",
+    "payroll.edit"
+  ],
+  "labor_global_payroll_settings_v1": [
+    "payroll.view",
+    "payroll.manage"
+  ],
+  "spirits.items.v3": [
+    "inventory_spirits.view",
+    "inventory_spirits.edit"
+  ],
+  "spirits.purchases.v3": [
+    "inventory_spirits.view",
+    "inventory_spirits.edit"
+  ],
+  "spirits.ledger.v3": [
+    "inventory_spirits.view",
+    "inventory_spirits.edit"
+  ],
+  "spirits.refPrices.v1": [
+    "inventory_spirits.view",
+    "inventory_spirits.manage"
+  ],
+  "spirits.suppliers.v1": [
+    "inventory_spirits.view",
+    "suppliers.edit"
+  ],
+  "spirits.groups.v1": [
+    "inventory_spirits.view",
+    "inventory_spirits.manage"
+  ],
+  "spirits.matchMemory.v1": [
+    "inventory_spirits.view",
+    "inventory_spirits.manage"
+  ],
+  "spirits.selfBuyConfig.v1": [
+    "inventory_spirits.view",
+    "inventory_spirits.manage"
+  ],
+  "spirits.customCategories.v1": [
+    "inventory_spirits.view",
+    "inventory_spirits.manage"
+  ],
+  "spirits.groupMatchMemory.v1": [
+    "inventory_spirits.view",
+    "inventory_spirits.manage"
+  ],
+  "fruit.items.v1": [
+    "inventory_fruit.view",
+    "inventory_fruit.edit"
+  ],
+  "fruit.transactions.v1": [
+    "inventory_fruit.view",
+    "inventory_fruit.edit"
+  ],
+  "fruit.snapshots.v1": [
+    "inventory_fruit.view",
+    "inventory_fruit.close"
+  ],
+  "beer.items.v1": [
+    "inventory_beer.view",
+    "inventory_beer.edit"
+  ],
+  "beer.transactions.v1": [
+    "inventory_beer.view",
+    "inventory_beer.edit"
+  ],
+  "beer.snapshots.v1": [
+    "inventory_beer.view",
+    "inventory_beer.close"
+  ],
+  "ice.inv.items.v1": [
+    "inventory_ice.view",
+    "inventory_ice.edit"
+  ],
+  "ice.inv.tx.v1": [
+    "inventory_ice.view",
+    "inventory_ice.edit"
+  ],
+  "ice.inventory.v1": [
+    "inventory_ice.view",
+    "inventory_ice.close"
+  ],
+  "cocktail.iceSettings.v2": [
+    "inventory_ice.view",
+    "inventory_ice.manage"
+  ],
+  "equipment.inventory.v1": [
+    "shop_equipment.view",
+    "shop_equipment.edit"
+  ],
+  "supplier.match.memory.v1": [
+    "suppliers.view",
+    "suppliers.manage"
+  ]
+};
+// V2_STORAGE_CAPABILITY_GENERATED_END
+
+function isSessionStorageAllowed(session, storageKey, operation) {
+  if (typeof storageKey !== "string") return false;
+  const rule = V2_STORAGE_CAPABILITY[storageKey];
+  if (!rule) return false;
+  const required = operation === "read" ? rule[0] : rule[1];
+  return typeof required === "string" && session.policy.capabilities.includes(required);
 }
 
-function parseStoredAllowedKeys(raw) {
-  if (raw == null) return null;
+function filterSyncEntriesForSession(session, entries, operation) {
+  return entries.filter((entry) => isSessionStorageAllowed(session, entry?.storageKey, operation));
+}
+
+function parseCapabilities(raw) {
   try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.every((key) => typeof key === "string" && key.length > 0 && key.length <= 160) ? parsed : [];
+    const values = JSON.parse(raw || "[]");
+    if (!Array.isArray(values)) return [];
+    return [...new Set(values.filter((value) => typeof value === "string" && V2_CAPABILITY_SET.has(value)))];
   } catch {
     return [];
   }
 }
 
-function normalizeRequestedAllowedKeys(value) {
-  if (value == null) return null;
-  if (!Array.isArray(value) || !value.every((key) => typeof key === "string" && key.length > 0 && key.length <= 160)) return [];
-  return [...new Set(value)];
+async function resolveDeviceSessionV2(env, headers) {
+  const device = await verifyRequestDevice(env, headers);
+  if (!device) return null;
+  const [group, policy, revision] = await Promise.all([
+    env.DB.prepare("SELECT owner_device_id FROM device_groups WHERE id = ?").bind(device.group_id).first(),
+    env.DB.prepare("SELECT revision, capabilities_json, updated_at FROM device_policies WHERE device_id = ? AND group_id = ?").bind(device.device_id, device.group_id).first(),
+    env.DB.prepare("SELECT revision, updated_at FROM group_policy_revisions WHERE group_id = ?").bind(device.group_id).first(),
+  ]);
+  const role = normalizeDeviceRole(device.role) || "guest";
+  // 业务权限只来自 device_policies；成员角色仅用于设备组所有权与交接。
+  // 缺失策略视为零权限，防止旧成员角色被解释为业务授权。
+  const capabilities = parseCapabilities(policy?.capabilities_json);
+  const policyRevision = Number(policy?.revision || revision?.revision || 0);
+  const policyUpdatedAt = Number(policy?.updated_at || revision?.updated_at || 0);
+  return {
+    schemaVersion: 2,
+    device: {
+      id: device.device_id,
+      name: device.name || "Unknown Device",
+      platform: normalizeDevicePlatform(device.platform),
+    },
+    membership: {
+      groupId: device.group_id,
+      status: "active",
+      role,
+      ownerDeviceId: group?.owner_device_id || null,
+      lastVerifiedAt: Date.now(),
+    },
+    policy: {
+      revision: policyRevision,
+      issuedAt: policyUpdatedAt,
+      capabilities,
+    },
+    sync: {
+      freshness: "verified_online",
+      serverTime: Date.now(),
+      latestGroupChangeAt: Number(revision?.updated_at || 0),
+    },
+  };
+}
+
+async function handleDeviceSessionV2(env, headers, origin) {
+  const session = await resolveDeviceSessionV2(env, headers);
+  if (!session) return err("DEVICE_AUTH_UNAUTHORIZED", 401, origin);
+  return json(session, 200, origin);
+}
+
+function normalizeRequestedCapabilities(value) {
+  if (!Array.isArray(value)) return null;
+  const unique = [...new Set(value)];
+  if (!unique.every((item) => typeof item === "string" && V2_CAPABILITY_SET.has(item))) return null;
+  return unique;
+}
+
+async function writeDevicePolicyV2(env, input) {
+  const now = Date.now();
+  const current = await env.DB.prepare("SELECT revision FROM group_policy_revisions WHERE group_id = ?").bind(input.groupId).first();
+  const revision = Number(current?.revision || 0) + 1;
+  const capabilitiesJson = JSON.stringify(input.capabilities);
+  await env.DB.batch([
+    env.DB.prepare("INSERT INTO group_policy_revisions (group_id, revision, updated_at) VALUES (?, ?, ?) ON CONFLICT(group_id) DO UPDATE SET revision = excluded.revision, updated_at = excluded.updated_at").bind(input.groupId, revision, now),
+    env.DB.prepare("INSERT INTO device_policies (device_id, group_id, revision, capabilities_json, updated_at, updated_by) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(device_id) DO UPDATE SET group_id = excluded.group_id, revision = excluded.revision, capabilities_json = excluded.capabilities_json, updated_at = excluded.updated_at, updated_by = excluded.updated_by").bind(input.targetDeviceId, input.groupId, revision, capabilitiesJson, now, input.actorDeviceId),
+    env.DB.prepare("INSERT INTO device_policy_audit (group_id, target_device_id, revision, actor_device_id, event_type, capabilities_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)").bind(input.groupId, input.targetDeviceId, revision, input.actorDeviceId, input.eventType, capabilitiesJson, now),
+    env.DB.prepare("INSERT INTO group_ts (group_id, last_push_at) VALUES (?, ?) ON CONFLICT(group_id) DO UPDATE SET last_push_at = excluded.last_push_at").bind(input.groupId, now),
+  ]);
+  return { revision, updatedAt: now };
+}
+
+async function handleDeviceUpdatePolicyV2(env, body, headers, origin) {
+  const actor = await verifyRequestDevice(env, headers);
+  if (!actor) return err("DEVICE_AUTH_UNAUTHORIZED", 401, origin);
+  if (actor.role !== "owner") return err("DEVICE_POLICY_OWNER_REQUIRED", 403, origin);
+  const targetDeviceId = typeof body?.targetDeviceId === "string" ? body.targetDeviceId : "";
+  const capabilities = normalizeRequestedCapabilities(body?.capabilities);
+  if (!targetDeviceId || !capabilities) return err("DEVICE_POLICY_INVALID", 400, origin);
+  const target = await env.DB.prepare("SELECT device_id, role FROM devices WHERE device_id = ? AND group_id = ? AND is_active = 1").bind(targetDeviceId, actor.group_id).first();
+  if (!target) return err("DEVICE_POLICY_TARGET_NOT_FOUND", 404, origin);
+
+  const written = await writeDevicePolicyV2(env, {
+    groupId: actor.group_id,
+    targetDeviceId,
+    actorDeviceId: actor.device_id,
+    capabilities,
+    eventType: "policy_updated",
+  });
+  return json({ success: true, targetDeviceId, capabilities, policyRevision: written.revision, updatedAt: written.updatedAt }, 200, origin);
 }
 
 async function handleDeviceUpdateMetadata(env, body, headers, origin) {
@@ -1858,29 +2359,34 @@ async function handleDeviceRegister(env, body, origin) {
   await env.DB.prepare(
     "INSERT INTO device_groups (id, owner_device_id, created_at) VALUES (?, ?, ?)"
   ).bind(groupId, deviceId, Date.now()).run();
-  await env.DB.prepare(
-    "INSERT INTO devices (device_id, group_id, token, name, platform, role, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?)"
-  ).bind(deviceId, groupId, token, deviceName || "Unknown", normalizeDevicePlatform(platform), "owner", Date.now()).run();
-  const membership = { deviceId, deviceToken: token, groupId, role: "owner", allowedKeys: null, deviceName: deviceName || "Unknown" };
+  const now = Date.now();
+  await env.DB.batch([
+    env.DB.prepare("INSERT INTO devices (device_id, group_id, token, name, platform, role, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?)").bind(deviceId, groupId, token, deviceName || "Unknown", normalizeDevicePlatform(platform), "owner", now),
+    env.DB.prepare("INSERT INTO group_policy_revisions (group_id, revision, updated_at) VALUES (?, 1, ?)").bind(groupId, now),
+    env.DB.prepare("INSERT INTO device_policies (device_id, group_id, revision, capabilities_json, updated_at, updated_by) VALUES (?, ?, 1, ?, ?, ?)").bind(deviceId, groupId, JSON.stringify(V2_ALL_CAPABILITIES), now, deviceId),
+  ]);
+  const membership = { deviceId, deviceToken: token, groupId, role: "owner", deviceName: deviceName || "Unknown" };
   return deviceMembershipResponse(env, membership, origin, normalizeDevicePlatform(platform) === "web");
 }
 __name(handleDeviceRegister, "handleDeviceRegister");
 __name2(handleDeviceRegister, "handleDeviceRegister");
 __name22(handleDeviceRegister, "handleDeviceRegister");
 async function handleDeviceGenerateCode(env, body, headers, origin) {
-  const device = await verifyRequestDevice(env, headers);
-  if (!device) return err("Unauthorized", 401, origin);
-  if (device.role !== "owner") return err("Only owner can generate pair codes", 403, origin);
-  const { role = "collaborator", expiresInMinutes = 10, allowedKeys = null } = body || {};
+  const session = await resolveDeviceSessionV2(env, headers);
+  if (!session) return err("DEVICE_AUTH_UNAUTHORIZED", 401, origin);
+  if (!session.policy.capabilities.includes("devices.manage")) return err("CAPABILITY_DENIED", 403, origin);
+  const { role = "collaborator", expiresInMinutes = 10, capabilities = [] } = body || {};
   const normalizedRole = normalizeDeviceRole(role, ["collaborator", "guest"]);
-  if (!normalizedRole) return err("Invalid role", 400, origin);
-  const normalizedAllowedKeys = normalizeRequestedAllowedKeys(allowedKeys);
+  if (!normalizedRole) return err("INVALID_DEVICE_ROLE", 400, origin);
+  const normalizedCapabilities = parseCapabilities(JSON.stringify(capabilities));
   const code = String(Math.floor(100000 + Math.random() * 900000));
-  const expiresAt = Date.now() + Math.min(60, Math.max(1, Number(expiresInMinutes) || 10)) * 60 * 1e3;
-  await env.DB.prepare(
-    "INSERT INTO pair_codes (code, group_id, role, allowed_keys, expires_at, used) VALUES (?, ?, ?, ?, ?, 0)"
-  ).bind(code, device.group_id, normalizedRole, normalizedAllowedKeys === null ? null : JSON.stringify(normalizedAllowedKeys), expiresAt).run();
-  return json({ code, expiresAt, role: normalizedRole, allowedKeys: normalizedAllowedKeys }, 200, origin);
+  const now = Date.now();
+  const expiresAt = now + Math.min(60, Math.max(1, Number(expiresInMinutes) || 10)) * 60 * 1e3;
+  await env.DB.batch([
+    env.DB.prepare("INSERT INTO pair_codes (code, group_id, role, expires_at, used) VALUES (?, ?, ?, ?, 0)").bind(code, session.membership.groupId, normalizedRole, expiresAt),
+    env.DB.prepare("INSERT INTO pair_code_policies (code, group_id, revision, capabilities_json, created_at) VALUES (?, ?, 1, ?, ?)").bind(code, session.membership.groupId, JSON.stringify(normalizedCapabilities), now),
+  ]);
+  return json({ code, expiresAt, role: normalizedRole, capabilities: normalizedCapabilities }, 200, origin);
 }
 __name(handleDeviceGenerateCode, "handleDeviceGenerateCode");
 __name2(handleDeviceGenerateCode, "handleDeviceGenerateCode");
@@ -1894,12 +2400,17 @@ async function handleDevicePair(env, body, origin) {
   if (!pairRow) return err("Invalid or expired code", 400, origin);
   const deviceId = (body && typeof body.deviceId === "string" && body.deviceId.length >= 8 && body.deviceId.length <= 64) ? body.deviceId : generateToken().slice(0, 16);
   const token = generateToken();
-  await env.DB.prepare(
-    "INSERT INTO devices (device_id, group_id, token, name, platform, role, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?)"
-  ).bind(deviceId, pairRow.group_id, token, deviceName || "Unknown", normalizeDevicePlatform(platform), normalizeDeviceRole(pairRow.role) ?? "guest", Date.now()).run();
-  await env.DB.prepare("UPDATE pair_codes SET used = 1 WHERE code = ?").bind(code).run();
-  const pairAllowedKeys = parseStoredAllowedKeys(pairRow.allowed_keys);
-  const membership = { deviceId, deviceToken: token, groupId: pairRow.group_id, role: normalizeDeviceRole(pairRow.role) ?? "guest", allowedKeys: pairAllowedKeys, deviceName: deviceName || "Unknown" };
+  const policy = await env.DB.prepare("SELECT revision, capabilities_json FROM pair_code_policies WHERE code = ? AND group_id = ?").bind(code, pairRow.group_id).first();
+  if (!policy) return err("PAIR_POLICY_MISSING", 409, origin);
+  const now = Date.now();
+  const capabilities = parseCapabilities(policy.capabilities_json);
+  await env.DB.batch([
+    env.DB.prepare("INSERT INTO devices (device_id, group_id, token, name, platform, role, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?)").bind(deviceId, pairRow.group_id, token, deviceName || "Unknown", normalizeDevicePlatform(platform), normalizeDeviceRole(pairRow.role) ?? "guest", now),
+    env.DB.prepare("INSERT INTO device_policies (device_id, group_id, revision, capabilities_json, updated_at, updated_by) VALUES (?, ?, ?, ?, ?, ?)").bind(deviceId, pairRow.group_id, Number(policy.revision || 1), JSON.stringify(capabilities), now, deviceId),
+    env.DB.prepare("UPDATE pair_codes SET used = 1 WHERE code = ?").bind(code),
+    env.DB.prepare("DELETE FROM pair_code_policies WHERE code = ?").bind(code),
+  ]);
+  const membership = { deviceId, deviceToken: token, groupId: pairRow.group_id, role: normalizeDeviceRole(pairRow.role) ?? "guest", capabilities, deviceName: deviceName || "Unknown" };
   const isWeb = normalizeDevicePlatform(platform) === "web";
   if (!isWeb) return json({ ...membership, token }, 200, origin);
   const [sessionId, webMemoryTicket] = await Promise.all([
@@ -1915,16 +2426,17 @@ async function handleDeviceList(env, headers, origin) {
   const device = await verifyRequestDevice(env, headers);
   if (!device) return err("Unauthorized", 401, origin);
   const rows = await env.DB.prepare(
-    "SELECT device_id, name, platform, role, allowed_keys, is_active, last_seen, created_at FROM devices WHERE group_id = ? AND is_active = 1"
+    "SELECT d.device_id, d.name, d.platform, d.role, d.is_active, d.last_seen, d.created_at, p.capabilities_json, p.revision AS policy_revision FROM devices d LEFT JOIN device_policies p ON p.device_id = d.device_id AND p.group_id = d.group_id WHERE d.group_id = ? AND d.is_active = 1"
   ).bind(device.group_id).all();
   const mapped = (rows.results || []).map((r) => {
-    const ak = parseStoredAllowedKeys(r.allowed_keys);
+    const role = normalizeDeviceRole(r.role) ?? "guest";
     return {
       id: r.device_id,
       name: r.name,
       platform: normalizeDevicePlatform(r.platform),
-      role: normalizeDeviceRole(r.role) ?? "guest",
-      allowedKeys: ak,
+      role,
+      capabilities: parseCapabilities(r.capabilities_json),
+      policyRevision: Number(r.policy_revision || 0),
       last_seen: r.last_seen ?? null,
       created_at: r.created_at,
       isCurrentDevice: r.device_id === device.device_id
@@ -2001,55 +2513,48 @@ async function handleDeviceRecoverStaleOwner(env, headers, origin) {
   const device = await verifyRequestDevice(env, headers);
   if (!device) return err("DEVICE_AUTH_UNAUTHORIZED", 401, origin);
   const owner = await env.DB.prepare("SELECT device_id, last_seen FROM devices WHERE group_id = ? AND is_active = 1 AND role = 'owner' LIMIT 1").bind(device.group_id).first();
-  if (!owner || owner.device_id === device.device_id) return json({ deviceId: device.device_id, deviceToken: device.token, groupId: device.group_id, role: "owner", allowedKeys: null, deviceName: device.name }, 200, origin);
+  if (!owner || owner.device_id === device.device_id) return json({ deviceId: device.device_id, deviceToken: device.token, groupId: device.group_id, role: "owner", deviceName: device.name }, 200, origin);
   const offlineFor = Date.now() - Number(owner.last_seen || 0);
   const minimumOffline = 7 * 24 * 60 * 60 * 1000;
   if (owner.last_seen && offlineFor < minimumOffline) return err("STALE_OWNER_RECOVERY_TOO_EARLY", 409, origin);
   const now = Date.now();
   await env.DB.batch([
     env.DB.prepare("UPDATE devices SET is_active = 0 WHERE device_id = ? AND group_id = ? AND role = 'owner' AND is_active = 1").bind(owner.device_id, device.group_id),
-    env.DB.prepare("UPDATE devices SET role = 'owner', allowed_keys = NULL WHERE device_id = ? AND group_id = ? AND is_active = 1").bind(device.device_id, device.group_id),
+    env.DB.prepare("UPDATE devices SET role = 'owner' WHERE device_id = ? AND group_id = ? AND is_active = 1").bind(device.device_id, device.group_id),
     env.DB.prepare("UPDATE device_groups SET owner_device_id = ? WHERE id = ?").bind(device.device_id, device.group_id),
     env.DB.prepare("INSERT INTO group_ts (group_id, last_push_at) VALUES (?, ?) ON CONFLICT(group_id) DO UPDATE SET last_push_at = excluded.last_push_at").bind(device.group_id, now)
   ]);
   await clearWebDeviceSessions(env, owner.device_id);
   console.warn("[cf-sync] stale_owner_recovered", { group: String(device.group_id).slice(0, 8) });
-  return json({ deviceId: device.device_id, deviceToken: device.token, groupId: device.group_id, role: "owner", allowedKeys: null, deviceName: device.name }, 200, origin);
+  return json({ deviceId: device.device_id, deviceToken: device.token, groupId: device.group_id, role: "owner", deviceName: device.name }, 200, origin);
 }
 async function handleDeviceUpdateRole(env, body, headers, origin) {
-  const device = await verifyRequestDevice(env, headers);
-  if (!device) return err("Unauthorized", 401, origin);
-  if (device.role !== "owner") return err("Only owner can update roles", 403, origin);
-  const { targetDeviceId, role, allowedKeys = null } = body || {};
+  const session = await resolveDeviceSessionV2(env, headers);
+  if (!session) return err("DEVICE_AUTH_UNAUTHORIZED", 401, origin);
+  if (!session.policy.capabilities.includes("devices.manage")) return err("CAPABILITY_DENIED", 403, origin);
+  const { targetDeviceId, role } = body || {};
   const normalizedRole = normalizeDeviceRole(role);
-  if (!targetDeviceId || !normalizedRole) return err("Invalid params", 400, origin);
-  const normalizedAllowedKeys = normalizeRequestedAllowedKeys(allowedKeys);
-  const serializedAllowedKeys = normalizedAllowedKeys === null ? null : JSON.stringify(normalizedAllowedKeys);
+  if (!targetDeviceId || !normalizedRole) return err("INVALID_ROLE_UPDATE", 400, origin);
   const target = await env.DB.prepare(
     "SELECT device_id FROM devices WHERE device_id = ? AND group_id = ? AND is_active = 1"
-  ).bind(targetDeviceId, device.group_id).first();
+  ).bind(targetDeviceId, session.membership.groupId).first();
   if (!target) return err("Target device not found", 404, origin);
   if (normalizedRole === "owner") {
     await env.DB.batch([
-      env.DB.prepare("UPDATE devices SET role = 'collaborator' WHERE group_id = ? AND role = 'owner'").bind(device.group_id),
-      env.DB.prepare("UPDATE devices SET role = 'owner', allowed_keys = NULL WHERE device_id = ? AND group_id = ? AND is_active = 1").bind(targetDeviceId, device.group_id),
-      env.DB.prepare("UPDATE device_groups SET owner_device_id = ? WHERE id = ?").bind(targetDeviceId, device.group_id)
+      env.DB.prepare("UPDATE devices SET role = 'collaborator' WHERE group_id = ? AND role = 'owner'").bind(session.membership.groupId),
+      env.DB.prepare("UPDATE devices SET role = 'owner' WHERE device_id = ? AND group_id = ? AND is_active = 1").bind(targetDeviceId, session.membership.groupId),
+      env.DB.prepare("UPDATE device_groups SET owner_device_id = ? WHERE id = ?").bind(targetDeviceId, session.membership.groupId)
     ]);
   } else {
     await env.DB.prepare(
-      "UPDATE devices SET role = ?, allowed_keys = ? WHERE device_id = ? AND group_id = ?"
-    ).bind(normalizedRole, serializedAllowedKeys, targetDeviceId, device.group_id).run();
+      "UPDATE devices SET role = ? WHERE device_id = ? AND group_id = ?"
+    ).bind(normalizedRole, targetDeviceId, session.membership.groupId).run();
   }
   // 权限不是sync_data条目；单独更新时间戳以唤醒目标设备的实时刷新。
   await env.DB.prepare(
     "INSERT INTO group_ts (group_id, last_push_at) VALUES (?, ?) ON CONFLICT(group_id) DO UPDATE SET last_push_at = excluded.last_push_at"
-  ).bind(device.group_id, Date.now()).run();
-  return json({
-    success: true,
-    targetDeviceId,
-    role: normalizedRole,
-    allowedKeys: normalizedRole === "owner" ? null : normalizedAllowedKeys,
-  }, 200, origin);
+  ).bind(session.membership.groupId, Date.now()).run();
+  return json({ success: true, targetDeviceId, role: normalizedRole }, 200, origin);
 }
 __name(handleDeviceUpdateRole, "handleDeviceUpdateRole");
 __name2(handleDeviceUpdateRole, "handleDeviceUpdateRole");
@@ -2105,7 +2610,6 @@ async function initDB(env) {
       group_id TEXT NOT NULL,
       name TEXT,
       role TEXT NOT NULL DEFAULT 'collaborator',
-      allowed_keys TEXT,
       last_seen INTEGER,
       created_at INTEGER NOT NULL
     )`,
@@ -2113,7 +2617,6 @@ async function initDB(env) {
       code TEXT PRIMARY KEY,
       group_id TEXT NOT NULL,
       role TEXT NOT NULL DEFAULT 'collaborator',
-      allowed_keys TEXT,
       expires_at INTEGER NOT NULL,
       used INTEGER NOT NULL DEFAULT 0
     )`,
@@ -2304,6 +2807,14 @@ var worker_v3_default = {
       let body = {};
       try { body = await request.json(); } catch {}
       return handleDeviceCancelSwitch(env, body, origin);
+    }
+    if (path === "/api/device/session-v2" && method === "GET") {
+      return handleDeviceSessionV2(env, request.headers, origin);
+    }
+    if (path === "/api/device/update-policy-v2" && method === "POST") {
+      let body = {};
+      try { body = await request.json(); } catch {}
+      return handleDeviceUpdatePolicyV2(env, body, request.headers, origin);
     }
     if (path === "/api/device/register" && method === "POST") {
       let body = {};

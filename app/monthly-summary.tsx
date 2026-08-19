@@ -18,7 +18,7 @@ import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
-import { useFeature } from "@/hooks/use-feature";
+import { useCan } from "@/hooks/use-can";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
 import { BoundedBusinessMonthNavigator } from "@/components/months/BoundedBusinessMonthNavigator";
@@ -290,7 +290,8 @@ export default function MonthlySummaryScreen({ embedded = false }: { embedded?: 
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { isReadOnly } = useFeature();
+  const reportEditAccess = useCan("reports_monthly.edit");
+  const isReadOnly = !reportEditAccess.allowed;
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
   const {

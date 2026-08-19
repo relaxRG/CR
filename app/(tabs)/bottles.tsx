@@ -59,7 +59,7 @@ export default function BottlesScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { t, lang } = useI18n();
-  const { guardWrite } = useGuestGuard();
+  const { guard: guardWrite } = useCapabilityGuard("bottles.edit");
   const { ready, bottles, reorderBottles, deleteBottles, bulkUpdateBottles, updateBottle } =
     useBottleStore();
   const { duplicateBottle } = useBottleStore();
@@ -1700,5 +1700,5 @@ const styles = StyleSheet.create({
   selCheckWrap: { width: 34, alignItems: "flex-start", justifyContent: "center" },
 });
       {/* 二级分组切换器：基酒库 / 酒款库 / 软饮库 / 原材料库 + 多选按钮 */}
-import { useGuestGuard } from "@/hooks/use-guest-guard";
+import { useCapabilityGuard } from "@/hooks/use-can";
 import { MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS, MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";

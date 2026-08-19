@@ -46,7 +46,7 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
 import { useThrottleFn } from "@/hooks/use-debounce-fn";
-import { useFeature } from "@/hooks/use-feature";
+import { useCan } from "@/hooks/use-can";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
 import { useGlobalBusinessMonth } from "@/lib/months/global-business-month";
@@ -353,9 +353,9 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
   // 直接订阅 alerts 响应式 state，避免通过 getAlert 读 ref.current
   const { alerts, resolveAlert } = useUnexplainedRestAlertStore();
   const router = useRouter();
-  const { isReadOnly } = useFeature();
+  const payrollEditAccess = useCan("payroll.edit");
   const { getStatus: getMonthCloseStatus, isMonthWritable: isMonthWritableForCard } = useMonthCloseStore();
-  const canWrite = !isReadOnly && isMonthWritableForCard(month);
+  const canWrite = payrollEditAccess.allowed && isMonthWritableForCard(month);
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
   const [expanded, setExpanded] = useState(false);
   const [showCompOffModal, setShowCompOffModal] = useState(false);

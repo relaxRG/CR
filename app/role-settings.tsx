@@ -4,7 +4,7 @@
  * 功能：
  * 1. 查看指定设备的当前角色和功能权限
  * 2. 自定义角色显示名称（本地存储）
- * 3. 开关各功能模块的同步权限（写入 allowedKeys）
+ * 3. 按业务资源与动作配置 DeviceSessionV2 capabilities
  * 4. 转移主设备权限（owner → 本机降级为 collaborator）
  */
 import {
@@ -28,20 +28,16 @@ import { useI18n } from "@/lib/i18n";
 import {
   kickDevice,
   updateDeviceRole,
+  updateDevicePolicyV2,
   type DeviceRole,
   type RemoteDevice,
   listDevices,
-  getDeviceInfo,
 } from "@/lib/cf-sync/client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
 import { useSync } from "@/lib/cf-sync/provider";
-
-// ─── 功能模块定义（从纯 TS 文件导入，不依赖 React Native）─────────────────────────────
-export type { FeatureKey } from "@/lib/sync/feature-modules";
-export { FEATURE_MODULES } from "@/lib/sync/feature-modules";
-import type { FeatureKey } from "@/lib/sync/feature-modules";
-import { FEATURE_MODULES } from "@/lib/sync/feature-modules";
+import { useCan } from "@/hooks/use-can";
+import { CAPABILITY_ACTIONS, CAPABILITY_RESOURCES, type Capability, type CapabilityResource } from "@/lib/sync/capabilities";
 // ─── 自定义角色名称存储 ───────────────────────────────────────────────────────
 const CUSTOM_ROLE_NAMES_KEY = "device.customRoleNames.v1";
 
@@ -69,31 +65,18 @@ export async function setCustomRoleName(deviceId: string, name: string): Promise
   } catch {}
 }
 
-// ─── allowedKeys ↔ FeatureKey 转换 ───────────────────────────────────────────
-export function allowedKeysToFeatures(allowedKeys: string[] | null): Set<FeatureKey> {
-  if (!allowedKeys) {
-    // null = 全部权限
-    return new Set(FEATURE_MODULES.map((m) => m.key));
+// ─── V2 capabilities ─────────────────────────────────────────────────────────
+function parseCapabilities(raw: string | undefined): Set<Capability> {
+  try {
+    const parsed = JSON.parse(raw ?? "[]");
+    return new Set(Array.isArray(parsed) ? parsed.filter((value): value is Capability => typeof value === "string") : []);
+  } catch {
+    return new Set();
   }
-  const result = new Set<FeatureKey>();
-  for (const mod of FEATURE_MODULES) {
-    if (mod.storageKeys.some((k) => allowedKeys.includes(k))) {
-      result.add(mod.key);
-    }
-  }
-  return result;
 }
 
-export function featuresToAllowedKeys(features: Set<FeatureKey>): string[] | null {
-  // 全部选中 → null（无限制）
-  if (features.size === FEATURE_MODULES.length) return null;
-  const keys: string[] = [];
-  for (const mod of FEATURE_MODULES) {
-    if (features.has(mod.key)) {
-      keys.push(...mod.storageKeys);
-    }
-  }
-  return keys;
+function capabilityFor(resource: CapabilityResource, action: string): Capability {
+  return `${resource}.${action}` as Capability;
 }
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
@@ -105,25 +88,18 @@ export default function RoleSettingsScreen() {
     deviceId: string;
     deviceName: string;
     deviceRole: string;
-    allowedKeys: string; // JSON string or ""
+    capabilities: string; // JSON string
   }>();
 
   const deviceId = params.deviceId ?? "";
   const deviceName = params.deviceName ?? "";
   const initialRole = (params.deviceRole ?? "collaborator") as DeviceRole;
-  const initialAllowedKeys: string[] | null = (() => {
-    try {
-      return params.allowedKeys ? JSON.parse(params.allowedKeys) : null;
-    } catch {
-      return null;
-    }
-  })();
+  const initialCapabilities = parseCapabilities(params.capabilities);
 
-  const { refreshDeviceInfo } = useSync();
+  const { refreshDeviceCredentials } = useSync();
+  const devicesManageAccess = useCan("devices.manage");
   const [role, setRole] = useState<DeviceRole>(initialRole);
-  const [enabledFeatures, setEnabledFeatures] = useState<Set<FeatureKey>>(
-    allowedKeysToFeatures(initialAllowedKeys),
-  );
+  const [enabledCapabilities, setEnabledCapabilities] = useState<Set<Capability>>(initialCapabilities);
   const [customName, setCustomName] = useState("");
   const [saving, setSaving] = useState(false);
   const [isOwnerDevice, setIsOwnerDevice] = useState(false);
@@ -137,23 +113,17 @@ export default function RoleSettingsScreen() {
     void getCustomRoleName(deviceId).then((n) => setCustomName(n ?? ""));
   }, [deviceId]);
 
-  // 检查当前设备是否是主设备
+  // 设备管理能力由 Worker 核验的 DeviceSessionV2 决定，不读取本机角色缓存。
   useEffect(() => {
-    void getDeviceInfo().then((info) => {
-      setIsOwnerDevice(info?.role === "owner");
-    });
-  }, []);
+    setIsOwnerDevice(devicesManageAccess.allowed);
+  }, [devicesManageAccess.allowed]);
 
-  const toggleFeature = (key: FeatureKey) => {
+  const toggleCapability = (capability: Capability) => {
     tap();
-    setEnabledFeatures((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) {
-        // 至少保留一个功能
-        if (next.size > 1) next.delete(key);
-      } else {
-        next.add(key);
-      }
+    setEnabledCapabilities((previous) => {
+      const next = new Set(previous);
+      if (next.has(capability)) next.delete(capability);
+      else next.add(capability);
       return next;
     });
   };
@@ -168,8 +138,9 @@ export default function RoleSettingsScreen() {
     }
     setSaving(true);
     try {
-      const allowedKeys = featuresToAllowedKeys(enabledFeatures);
-      await updateDeviceRole(deviceId, role, allowedKeys);
+      await updateDevicePolicyV2(deviceId, [...enabledCapabilities]);
+      // 角色仅用于成员身份与主设备交接；业务读写权限完全由 capabilities 决定。
+      await updateDeviceRole(deviceId, role);
       await setCustomRoleName(deviceId, customName);
       tap();
       if (Platform.OS !== "web") {
@@ -211,19 +182,10 @@ export default function RoleSettingsScreen() {
     setSaving(true);
     try {
       // 1. 将目标设备升级为 owner
-      await updateDeviceRole(deviceId, "owner", null);
-      // 2. 本机本地角色降级为 collaborator（写入 SecureStore / AsyncStorage）
-      const localInfo = await getDeviceInfo();
-      if (localInfo) {
-        const key = "cf.sync.deviceRole";
-        if (Platform.OS === "web") {
-          await AsyncStorage.setItem(key, "collaborator");
-        } else {
-          await SecureStore.setItemAsync(key, "collaborator");
-        }
-      }
-      // 转移后立即刷新本机的 deviceInfo State，无需重新进入页面
-      await refreshDeviceInfo();
+      await updateDeviceRole(deviceId, "owner");
+      // 本机不保存角色；交接后立即从 Worker 重新核验 DeviceSessionV2。
+      // 转移后立即刷新本机会话，无需重新进入页面
+      await refreshDeviceCredentials();
       if (Platform.OS !== "web") {
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
@@ -357,34 +319,42 @@ export default function RoleSettingsScreen() {
           </View>
         )}
 
-        {/* 功能权限开关（访客不可写，仅展示） */}
+        {/* 全 App 资源 × 动作能力矩阵 */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.muted }]}>
-            {lang === "zh" ? "功能权限" : "Feature Permissions"}
+            {lang === "zh" ? "业务能力" : "Business Capabilities"}
           </Text>
           <Text style={[styles.sectionDesc, { color: colors.muted }]}>
-            {role === "guest"
-              ? (lang === "zh" ? "访客设备只读，无法写入任何功能模块。" : "Guest devices are read-only for all modules.")
-              : (lang === "zh" ? "关闭的模块将不会同步到该设备（拉取和推送均受限）。" : "Disabled modules will not sync to this device.")}
+            {lang === "zh"
+              ? "每项能力同时控制页面展示、业务操作、同步读写和服务端校验。未授权动作会显示明确原因，不会静默丢失数据。"
+              : "Each capability governs page visibility, actions, sync read/write, and server enforcement."}
           </Text>
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            {FEATURE_MODULES.map((mod, idx) => (
-              <View key={mod.key}>
-                {idx > 0 && <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 52 }} />}
-                <View style={styles.featureRow}>
-                  <Text style={styles.featureIcon}>{mod.icon}</Text>
+            {CAPABILITY_RESOURCES.map((resource, resourceIndex) => (
+              <View key={resource}>
+                {resourceIndex > 0 && <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border }} />}
+                <View style={styles.capabilityResource}>
                   <Text style={[styles.featureLabel, { color: colors.foreground }]}>
-                    {lang === "zh" ? mod.labelZh : mod.labelEn}
+                    {resource.replace(/_/g, " · ")}
                   </Text>
-                  <Switch
-                    value={enabledFeatures.has(mod.key)}
-                    onValueChange={() => {
-                      if (isOwnerDevice && role !== "guest") toggleFeature(mod.key);
-                    }}
-                    disabled={!isOwnerDevice || role === "guest"}
-                    trackColor={{ false: colors.border, true: mod.color + "80" }}
-                    thumbColor={enabledFeatures.has(mod.key) ? mod.color : colors.muted}
-                  />
+                  <View style={styles.capabilityActions}>
+                    {CAPABILITY_ACTIONS.map((action) => {
+                      const capability = capabilityFor(resource, action);
+                      const enabled = enabledCapabilities.has(capability);
+                      return (
+                        <View key={capability} style={styles.capabilityAction}>
+                          <Text style={[styles.capabilityActionLabel, { color: colors.muted }]}>{action}</Text>
+                          <Switch
+                            value={enabled}
+                            onValueChange={() => { if (isOwnerDevice) toggleCapability(capability); }}
+                            disabled={!isOwnerDevice}
+                            trackColor={{ false: colors.border, true: colors.primary + "80" }}
+                            thumbColor={enabled ? colors.primary : colors.muted}
+                          />
+                        </View>
+                      );
+                    })}
+                  </View>
                 </View>
               </View>
             ))}
@@ -464,15 +434,11 @@ const styles = StyleSheet.create({
   roleLabel: { fontSize: 15, fontWeight: "600", lineHeight: 20 },
   roleDesc: { fontSize: 12, lineHeight: 16, marginTop: 2 },
   checkDot: { width: 10, height: 10, borderRadius: 5 },
-  featureRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 12,
-  },
-  featureIcon: { fontSize: 22, width: 28, textAlign: "center" },
-  featureLabel: { flex: 1, fontSize: 15, lineHeight: 20 },
+  capabilityResource: { paddingHorizontal: 16, paddingVertical: 12, gap: 10 },
+  featureLabel: { fontSize: 15, fontWeight: "600", lineHeight: 20 },
+  capabilityActions: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  capabilityAction: { alignItems: "center", gap: 2, minWidth: 54 },
+  capabilityActionLabel: { fontSize: 10, fontWeight: "600", textTransform: "uppercase" },
   dangerRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14, gap: 12 },
   dangerIcon: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   dangerLabel: { fontSize: 15, fontWeight: "600", lineHeight: 20 },

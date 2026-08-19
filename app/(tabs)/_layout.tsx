@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import { StyleSheet, Text, View } from "react-native";
+import { View } from "react-native";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { FloatingTabBar, FloatingTabItem } from "@/components/floating-tab-bar";
@@ -19,9 +19,8 @@ export default function TabLayout() {
     : pathname.startsWith("/cocktail") ? "cocktail"
     : "cocktail";
 
-  const { syncState, syncError, hasPendingConflicts, deviceInfo } = useSync();
+  const { syncState, syncError, hasPendingConflicts } = useSync();
   const syncBadge = !!syncError || !!syncState.error || hasPendingConflicts;
-  const isGuest = deviceInfo?.role === "guest";
 
   const TAB_ITEMS: FloatingTabItem[] = [
     {
@@ -63,13 +62,6 @@ export default function TabLayout() {
 
   return (
     <View style={{ flex: 1 }}>
-      {isGuest && (
-        <View style={[guestBannerStyles.banner, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-          <Text style={[guestBannerStyles.text, { color: colors.muted }]}>
-            访客模式 · 仅可查看
-          </Text>
-        </View>
-      )}
       <Tabs
         screenOptions={{
           headerShown: false,
@@ -102,17 +94,3 @@ export default function TabLayout() {
     </View>
   );
 }
-
-const guestBannerStyles = StyleSheet.create({
-  banner: {
-    paddingVertical: 6,
-    paddingHorizontal: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    alignItems: "center",
-  },
-  text: {
-    fontSize: 12,
-    fontWeight: "500",
-    letterSpacing: 0.2,
-  },
-});

@@ -10,14 +10,13 @@ import * as SecureStore from "expo-secure-store";
 import * as Device from "expo-device";
 import { Platform } from "react-native";
 import { resolveSyncDevicePlatform, type SyncDevicePlatform } from "@/lib/sync/device-platform";
+import type { DeviceSessionV2 } from "@/lib/sync/device-session";
 
 export const CF_WORKER_URL = "https://cocktail-ai.kikikong2017.workers.dev";
 // AsyncStorage keys for device identity
 const DEVICE_ID_KEY = "cf.sync.deviceId";
 const GROUP_ID_KEY = "cf.sync.groupId";
 const DEVICE_TOKEN_KEY = "cf.sync.deviceToken";
-const DEVICE_ROLE_KEY = "cf.sync.deviceRole";
-const DEVICE_ALLOWED_KEYS_KEY = "cf.sync.allowedKeys";
 const DEVICE_NAME_KEY = "cf.sync.deviceName";
 const WEB_MEMORY_TOKEN_TTL_MS = 10 * 60 * 1000;
 
@@ -112,67 +111,56 @@ export function getSyncDevicePlatform(): SyncDevicePlatform {
   });
 }
 
-export type DeviceInfo = {
+export type DeviceCredentials = {
   deviceId: string;
   groupId: string;
-  /** 原生端为SecureStore令牌；Web端绝不持久化或返回该令牌。 */
+  /** 原生端为 SecureStore 令牌；Web 端只保留页面内短期票据。 */
   deviceToken?: string;
-  /** Worker仅为Cookie受阻场景签发的当前页面短期票据；不写入任何持久化后端。 */
+  /** Worker 为 Web Cookie 受阻场景签发的短期内存票据；绝不持久化。 */
   webMemoryTicket?: string;
-  role: DeviceRole;
-  allowedKeys: string[] | null;
   deviceName: string;
 };
 
-export async function getDeviceInfo(): Promise<DeviceInfo | null> {
-  // 退役补丁：旧版本曾在Web AsyncStorage存储deviceToken；本版本首次读取即永久清除。
+export async function getDeviceCredentials(): Promise<DeviceCredentials | null> {
+  // 退役旧版本持久化的角色与授权键：成员和能力只能来自 DeviceSessionV2。
   if (Platform.OS === "web") await AsyncStorage.removeItem(DEVICE_TOKEN_KEY).catch(() => {});
-  const [deviceId, groupId, role, allowedKeysRaw, deviceName] = await Promise.all([
+  await Promise.all([deleteSecure("cf.sync.deviceRole"), deleteSecure("cf.sync.allowedKeys")]);
+  const [deviceId, groupId, deviceName] = await Promise.all([
     getSecure(DEVICE_ID_KEY),
     getSecure(GROUP_ID_KEY),
-    getSecure(DEVICE_ROLE_KEY),
-    getSecure(DEVICE_ALLOWED_KEYS_KEY),
     getSecure(DEVICE_NAME_KEY),
   ]);
   const deviceToken = await getDeviceToken();
   const webMemoryTicket = getWebMemoryTicket(deviceId);
-  if (!deviceId || !groupId || !role || (Platform.OS !== "web" && !deviceToken)) return null;
-  let allowedKeys: string[] | null = null;
-  if (allowedKeysRaw) {
-    try { allowedKeys = JSON.parse(allowedKeysRaw); } catch { allowedKeys = null; }
-  }
+  if (!deviceId || !groupId || (Platform.OS !== "web" && !deviceToken)) return null;
   return {
     deviceId,
     groupId,
     ...(deviceToken ? { deviceToken } : {}),
     ...(webMemoryTicket ? { webMemoryTicket } : {}),
-    role: role as DeviceRole,
-    allowedKeys,
     deviceName: deviceName ?? "Unknown Device",
   };
 }
 
-export async function saveDeviceInfo(info: DeviceInfo): Promise<void> {
+export async function saveDeviceCredentials(info: DeviceCredentials): Promise<void> {
   await Promise.all([
     storeSecure(DEVICE_ID_KEY, info.deviceId),
     storeSecure(GROUP_ID_KEY, info.groupId),
     storeDeviceToken(info.deviceToken ?? ""),
     Promise.resolve(storeWebMemoryTicket(info.deviceId, info.webMemoryTicket)),
-    storeSecure(DEVICE_ROLE_KEY, info.role),
-    storeSecure(DEVICE_ALLOWED_KEYS_KEY, info.allowedKeys ? JSON.stringify(info.allowedKeys) : "null"),
     storeSecure(DEVICE_NAME_KEY, info.deviceName),
   ]);
 }
 
-export async function clearDeviceInfo(): Promise<void> {
+export async function clearDeviceCredentials(): Promise<void> {
   const deviceId = await getSecure(DEVICE_ID_KEY);
   await Promise.all([
     deleteSecure(DEVICE_ID_KEY),
     deleteSecure(GROUP_ID_KEY),
     deleteDeviceToken(),
     Promise.resolve(storeWebMemoryTicket(deviceId ?? "", undefined)),
-    deleteSecure(DEVICE_ROLE_KEY),
-    deleteSecure(DEVICE_ALLOWED_KEYS_KEY),
+    deleteSecure("cf.sync.deviceRole"),
+    deleteSecure("cf.sync.allowedKeys"),
     deleteSecure(DEVICE_NAME_KEY),
   ]);
 }
@@ -180,7 +168,7 @@ export async function clearDeviceInfo(): Promise<void> {
 // ─── API helpers ──────────────────────────────────────────────────────────────
 async function cfFetch(
   path: string,
-  options: RequestInit & { deviceInfo?: DeviceInfo } = {},
+  options: RequestInit & { deviceInfo?: DeviceCredentials } = {},
 ): Promise<Response> {
   const { deviceInfo, ...fetchOptions } = options;
   const headers: Record<string, string> = {
@@ -212,8 +200,8 @@ async function cfFetch(
  * 显式创建一个新的独立同步组。
  * 只能由用户点击“创建新的同步组”后调用；启动、重试、前后台回归和退出操作绝不能调用它。
  */
-export async function createNewSyncGroup(deviceName?: string): Promise<DeviceInfo> {
-  const existing = await getDeviceInfo();
+export async function createNewSyncGroup(deviceName?: string): Promise<DeviceCredentials> {
+  const existing = await getDeviceCredentials();
   if (existing) throw new Error("SYNC_GROUP_ALREADY_ACTIVE");
 
   // Generate new device ID
@@ -230,19 +218,17 @@ export async function createNewSyncGroup(deviceName?: string): Promise<DeviceInf
     throw new Error(`Device registration failed: ${res.status} ${body}`);
   }
 
-  const data = await res.json() as { membership?: DeviceInfo; groupId?: string; deviceToken?: string; role?: DeviceRole };
+  const data = await res.json() as { membership?: DeviceCredentials; groupId?: string; deviceToken?: string; role?: DeviceRole };
   // Worker的安全会话包装会返回membership；兼容已部署的扁平响应，但不依赖任一固定形状。
   const membership = data.membership ?? data;
-  if (!membership.groupId || !membership.deviceToken || !membership.role) throw new Error("DEVICE_REGISTRATION_RESPONSE_INVALID");
-  const info: DeviceInfo = {
+  if (!membership.groupId || !membership.deviceToken) throw new Error("DEVICE_REGISTRATION_RESPONSE_INVALID");
+  const info: DeviceCredentials = {
     deviceId,
     groupId: membership.groupId,
     deviceToken: membership.deviceToken,
-    role: membership.role,
-    allowedKeys: null,
     deviceName: name,
   };
-  await saveDeviceInfo(info);
+  await saveDeviceCredentials(info);
   return info;
 }
 
@@ -269,21 +255,24 @@ export type GenerateCodeResult = {
   code: string;
   expiresAt: number;
   role: DeviceRole;
-  allowedKeys: string[] | null;
+  capabilities: readonly import("@/lib/sync/capabilities").Capability[];
 };
 
 export async function generatePairCode(
   role: DeviceRole,
-  allowedKeys: string[] | null = null,
+  capabilities: readonly import("@/lib/sync/capabilities").Capability[],
 ): Promise<GenerateCodeResult> {
-  const deviceInfo = await getDeviceInfo();
+  const deviceInfo = await getDeviceCredentials();
   if (!deviceInfo) throw new Error("Device not registered");
-  if (deviceInfo.role !== "owner") throw new Error("Only owner can generate pair codes");
+  const session = await getDeviceSessionV2();
+  if (!session.policy.capabilities.includes("devices.manage")) {
+    throw new Error("CAPABILITY_DENIED");
+  }
 
   const res = await cfFetch("/api/device/generate-code", {
     method: "POST",
     deviceInfo,
-    body: JSON.stringify({ role, allowedKeys }),
+    body: JSON.stringify({ role, capabilities }),
   });
 
   if (!res.ok) {
@@ -297,10 +286,10 @@ export async function generatePairCode(
 export async function pairWithCode(
   code: string,
   deviceName?: string,
-): Promise<DeviceInfo> {
+): Promise<DeviceCredentials> {
   // 旧 /pair 协议只能安全用于未加入任何同步组的设备。
   // 已激活设备切换群组必须使用Worker原子switch协议，不能覆盖旧成员资格。
-  if (await getDeviceInfo()) throw new Error("SYNC_GROUP_SWITCH_REQUIRES_ATOMIC_WORKER_PROTOCOL");
+  if (await getDeviceCredentials()) throw new Error("SYNC_GROUP_SWITCH_REQUIRES_ATOMIC_WORKER_PROTOCOL");
   // Generate new device ID
   const deviceId = generateUUID();
   const name = deviceName ?? getSuggestedDeviceName();
@@ -318,19 +307,15 @@ export async function pairWithCode(
   const data = await res.json() as {
     groupId: string;
     deviceToken: string;
-    role: DeviceRole;
-    allowedKeys: string[] | null;
   };
 
-  const info: DeviceInfo = {
+  const info: DeviceCredentials = {
     deviceId,
     groupId: data.groupId,
     deviceToken: data.deviceToken,
-    role: data.role,
-    allowedKeys: data.allowedKeys,
     deviceName: name,
   };
-  await saveDeviceInfo(info);
+  await saveDeviceCredentials(info);
   return info;
 }
 
@@ -349,7 +334,7 @@ export type GroupSwitchPreparation = {
 
 export type GroupSwitchStatus =
   | { state: "prepared" | "cancelled" }
-  | { state: "committed"; membership: DeviceInfo };
+  | { state: "committed"; membership: DeviceCredentials };
 
 export type CompleteSyncSnapshot = {
   groupId: string;
@@ -368,10 +353,29 @@ async function readError(res: Response, fallback: string): Promise<never> {
   throw new Error(code);
 }
 
+/**
+ * 取得 Worker 已核验的唯一会话事实。
+ * 角色和业务能力不能再从本机存储推断；后续所有页面守卫应以此响应为准。
+ */
+export async function getDeviceSessionV2(): Promise<DeviceSessionV2> {
+  const credentials = await getDeviceCredentials();
+  if (!credentials) throw new Error("DEVICE_CREDENTIALS_MISSING");
+  const res = await cfFetch("/api/device/session-v2", {
+    method: "GET",
+    deviceInfo: credentials,
+  });
+  if (!res.ok) return readError(res, `DEVICE_SESSION_FAILED_${res.status}`);
+  const session = await res.json() as DeviceSessionV2;
+  if (session.schemaVersion !== 2 || !session.membership?.groupId || !Array.isArray(session.policy?.capabilities)) {
+    throw new Error("DEVICE_SESSION_INVALID");
+  }
+  return session;
+}
+
 export async function recoverJoinWithCode(input: {
   code: string;
   deviceName?: string;
-}): Promise<DeviceInfo> {
+}): Promise<DeviceCredentials> {
   if (!/^\d{6}$/.test(input.code)) throw new Error("PAIR_CODE_INVALID");
   const deviceId = generateUUID();
   const deviceName = input.deviceName?.trim() || getSuggestedDeviceName();
@@ -380,7 +384,7 @@ export async function recoverJoinWithCode(input: {
     body: JSON.stringify({ deviceId, deviceName, platform: getSyncDevicePlatform(), code: input.code }),
   });
   if (!res.ok) return readError(res, `RECOVERY_JOIN_FAILED_${res.status}`);
-  const data = await res.json() as { membership: DeviceInfo };
+  const data = await res.json() as { membership: DeviceCredentials };
   if (!data.membership?.deviceId || !data.membership?.deviceToken || !data.membership?.groupId) {
     throw new Error("RECOVERY_MEMBERSHIP_INVALID");
   }
@@ -389,7 +393,7 @@ export async function recoverJoinWithCode(input: {
 
 /** 仅更新服务端展示元数据；不会修改本地名称、角色、组或权限。 */
 export async function refreshCurrentDevicePlatform(): Promise<void> {
-  const deviceInfo = await getDeviceInfo();
+  const deviceInfo = await getDeviceCredentials();
   if (!deviceInfo) return;
   const res = await cfFetch("/api/device/update-metadata", {
     method: "POST",
@@ -406,7 +410,7 @@ export async function prepareGroupSwitch(input: {
   deviceName?: string;
   platform?: string;
 }): Promise<GroupSwitchPreparation> {
-  const source = await getDeviceInfo();
+  const source = await getDeviceCredentials();
   if (!source) throw new Error("SYNC_GROUP_NOT_ACTIVE");
   const res = await cfFetch("/api/device/prepare-switch", {
     method: "POST",
@@ -421,7 +425,7 @@ export async function commitGroupSwitch(input: {
   switchId: string;
   recoveryTicket: string;
 }): Promise<GroupSwitchStatus> {
-  const source = await getDeviceInfo();
+  const source = await getDeviceCredentials();
   if (!source) throw new Error("SYNC_GROUP_NOT_ACTIVE");
   const res = await cfFetch("/api/device/commit-switch", {
     method: "POST",
@@ -455,7 +459,7 @@ export async function cancelPreparedGroupSwitch(input: {
   if (!res.ok) return readError(res, `SWITCH_CANCEL_FAILED_${res.status}`);
 }
 
-export async function pullCompleteTargetSnapshot(membership: DeviceInfo): Promise<CompleteSyncSnapshot> {
+export async function pullCompleteTargetSnapshot(membership: DeviceCredentials): Promise<CompleteSyncSnapshot> {
   const res = await cfFetch("/api/sync/snapshot", {
     method: "GET",
     deviceInfo: membership,
@@ -469,15 +473,17 @@ export type RemoteDevice = {
   id: string;
   name: string;
   platform: SyncDevicePlatform;
+  /** 成员身份，仅用于设备归属与主设备交接；业务权限由 capabilities 决定。 */
   role: DeviceRole;
-  allowedKeys: string[] | null;
+  capabilities: readonly import("@/lib/sync/capabilities").Capability[];
+  policyRevision: number;
   last_seen: number | null;
   created_at: number;
   isCurrentDevice: boolean;
 };
 
 export async function listDevices(): Promise<RemoteDevice[]> {
-  const deviceInfo = await getDeviceInfo();
+  const deviceInfo = await getDeviceCredentials();
   if (!deviceInfo) throw new Error("Device not registered");
 
   const res = await cfFetch("/api/device/list", { method: "GET", deviceInfo });
@@ -490,7 +496,7 @@ export async function listDevices(): Promise<RemoteDevice[]> {
 }
 
 export async function kickDevice(targetDeviceId: string): Promise<void> {
-  const deviceInfo = await getDeviceInfo();
+  const deviceInfo = await getDeviceCredentials();
   if (!deviceInfo) throw new Error("Device not registered");
 
   const res = await cfFetch("/api/device/kick", {
@@ -509,7 +515,7 @@ export async function kickDevice(targetDeviceId: string): Promise<void> {
  * 调用方才能清除本机凭据，避免“本机未配对但其他设备仍显示成员”的状态分裂。
  */
 export async function leaveCurrentSyncGroup(): Promise<void> {
-  const deviceInfo = await getDeviceInfo();
+  const deviceInfo = await getDeviceCredentials();
   if (!deviceInfo) return;
   const res = await cfFetch("/api/device/leave", {
     method: "POST",
@@ -522,31 +528,56 @@ export async function leaveCurrentSyncGroup(): Promise<void> {
  * 显式恢复失联主设备：仅当服务端确认主设备从未在线或超过恢复阈值未在线时可用。
  * Worker 会撤销旧主设备并把当前活跃设备提升为主设备；不会删除同步数据。
  */
-export async function recoverStaleOwner(): Promise<DeviceInfo> {
-  const deviceInfo = await getDeviceInfo();
+export async function recoverStaleOwner(): Promise<DeviceCredentials> {
+  const deviceInfo = await getDeviceCredentials();
   if (!deviceInfo) throw new Error("Device not registered");
   const res = await cfFetch("/api/device/recover-stale-owner", {
     method: "POST",
     deviceInfo,
   });
   if (!res.ok) return readError(res, `STALE_OWNER_RECOVERY_FAILED_${res.status}`);
-  const membership = await res.json() as DeviceInfo;
-  await saveDeviceInfo(membership);
+  const membership = await res.json() as DeviceCredentials;
+  await saveDeviceCredentials(membership);
   return membership;
+}
+
+export type UpdateDevicePolicyV2Result = Readonly<{
+  success: true;
+  targetDeviceId: string;
+  capabilities: readonly import("@/lib/sync/capabilities").Capability[];
+  policyRevision: number;
+  updatedAt: number;
+}>;
+
+/**
+ * V2 唯一业务授权写入接口。角色只描述成员身份，页面与同步范围由 capabilities 决定。
+ */
+export async function updateDevicePolicyV2(
+  targetDeviceId: string,
+  capabilities: readonly import("@/lib/sync/capabilities").Capability[],
+): Promise<UpdateDevicePolicyV2Result> {
+  const credentials = await getDeviceCredentials();
+  if (!credentials) throw new Error("DEVICE_CREDENTIALS_MISSING");
+  const res = await cfFetch("/api/device/update-policy-v2", {
+    method: "POST",
+    deviceInfo: credentials,
+    body: JSON.stringify({ targetDeviceId, capabilities }),
+  });
+  if (!res.ok) return readError(res, `DEVICE_POLICY_UPDATE_FAILED_${res.status}`);
+  return res.json() as Promise<UpdateDevicePolicyV2Result>;
 }
 
 export async function updateDeviceRole(
   targetDeviceId: string,
   role: DeviceRole,
-  allowedKeys: string[] | null = null,
 ): Promise<void> {
-  const deviceInfo = await getDeviceInfo();
+  const deviceInfo = await getDeviceCredentials();
   if (!deviceInfo) throw new Error("Device not registered");
 
   const res = await cfFetch("/api/device/update-role", {
     method: "POST",
     deviceInfo,
-    body: JSON.stringify({ targetDeviceId, role, allowedKeys }),
+    body: JSON.stringify({ targetDeviceId, role }),
   });
   if (!res.ok) {
     const body = await res.json() as { error?: string };
@@ -556,10 +587,10 @@ export async function updateDeviceRole(
 
 /**
  * 重命名当前设备。名称是展示字段，必须由Worker在当前组内持久化后再写回本机，
- * 不会改变设备ID、令牌、角色、授权键或同步组。
+ * 不会改变设备 ID、令牌、成员角色、能力策略或同步组。
  */
 export async function renameCurrentDevice(newName: string): Promise<void> {
-  const deviceInfo = await getDeviceInfo();
+  const deviceInfo = await getDeviceCredentials();
   if (!deviceInfo) throw new Error("Device not registered");
   const normalized = newName.trim();
   if (!normalized) throw new Error("DEVICE_NAME_REQUIRED");
@@ -572,7 +603,7 @@ export async function renameCurrentDevice(newName: string): Promise<void> {
   });
   if (!res.ok) return readError(res, `DEVICE_RENAME_FAILED_${res.status}`);
   const data = await res.json() as { deviceName?: string };
-  await saveDeviceInfo({ ...deviceInfo, deviceName: data.deviceName ?? normalized });
+  await saveDeviceCredentials({ ...deviceInfo, deviceName: data.deviceName ?? normalized });
 }
 
 // ─── Sync ─────────────────────────────────────────────────────────────────────
@@ -584,10 +615,9 @@ export type SyncEntry = {
 
 export async function cfPull(since?: number): Promise<{
   entries: SyncEntry[];
-  role: DeviceRole;
-  allowedKeys: string[] | null;
+  policyRevision: number;
 }> {
-  const deviceInfo = await getDeviceInfo();
+  const deviceInfo = await getDeviceCredentials();
   if (!deviceInfo) throw new Error("Device not registered");
 
   const res = await cfFetch("/api/sync/pull", {
@@ -602,15 +632,14 @@ export async function cfPull(since?: number): Promise<{
   return res.json();
 }
 
-export async function cfPush(entries: SyncEntry[]): Promise<{ count: number }> {
-  const deviceInfo = await getDeviceInfo();
+export async function cfPush(entries: SyncEntry[], policyRevision: number): Promise<{ count: number }> {
+  const deviceInfo = await getDeviceCredentials();
   if (!deviceInfo) throw new Error("Device not registered");
-  if (deviceInfo.role === "guest") return { count: 0 };
 
   const res = await cfFetch("/api/sync/push", {
     method: "POST",
     deviceInfo,
-    body: JSON.stringify({ entries }),
+    body: JSON.stringify({ entries, policyRevision }),
   });
   if (!res.ok) {
     const body = await res.json() as { error?: string };
@@ -621,7 +650,7 @@ export async function cfPush(entries: SyncEntry[]): Promise<{ count: number }> {
 
 // ─── Balance check ────────────────────────────────────────────────────────────
 export async function checkBalance(): Promise<{ balance: number | null; currency: string; checkedAt: number }> {
-  const deviceInfo = await getDeviceInfo();
+  const deviceInfo = await getDeviceCredentials();
   if (!deviceInfo) throw new Error("Device not registered");
 
   const res = await cfFetch("/api/balance", { method: "GET", deviceInfo });

@@ -45,7 +45,7 @@ import {
   type DeviceRole,
   type RemoteDevice,
 } from "@/lib/cf-sync/client";
-import { FEATURE_MODULES, allowedKeysToFeatures, featuresToAllowedKeys, type FeatureKey } from "./role-settings";
+import { CAPABILITY_ACTIONS, CAPABILITY_RESOURCES, type Capability, type CapabilityResource } from "@/lib/sync/capabilities";
 import { Switch } from "react-native";
 import { useSync } from "@/lib/cf-sync/provider";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -81,69 +81,37 @@ function platformLabel(platform: string | undefined, lang: string): string {
   return lang === "zh" ? label.zh : label.en;
 }
 
-// ─── 快捷预设定义 ────────────────────────────────────────────────────────────────────────────────
+// ─── DeviceSessionV2 快捷预设 ──────────────────────────────────────────────────
+function capabilitySet(resources: readonly CapabilityResource[], actions: readonly string[]): Capability[] {
+  return resources.flatMap((resource) => actions.map((action) => `${resource}.${action}` as Capability));
+}
+
 const INVITE_PRESETS: {
   labelZh: string;
   labelEn: string;
   icon: string;
   role: DeviceRole;
-  features: FeatureKey[];
+  capabilities: Capability[];
 }[] = [
-  {
-    labelZh: "🏪 吧台设备",
-    labelEn: "Bar Device",
-    icon: "🏪",
-    role: "collaborator",
-    features: ["recipes", "bottles", "homemade", "menu", "shopping"],
-  },
-  {
-    labelZh: "🍽️ 厨房设备",
-    labelEn: "Kitchen Device",
-    icon: "🍽️",
-    role: "collaborator",
-    features: ["food", "shopping"],
-  },
-  {
-    labelZh: "💰 财务只读",
-    labelEn: "Finance Read-Only",
-    icon: "💰",
-    role: "guest",
-    features: ["store_ops", "labor", "payroll"],
-  },
-  {
-    labelZh: "📊 运营只读",
-    labelEn: "Ops Read-Only",
-    icon: "📊",
-    role: "guest",
-    features: ["store_ops", "recipes", "wine", "food", "menu"],
-  },
-  {
-    labelZh: "⚗️ 研发设备",
-    labelEn: "Lab Device",
-    icon: "⚗️",
-    role: "collaborator",
-    features: ["recipes", "lab", "bottles", "homemade", "books"],
-  },
-  {
-    labelZh: "🔓 全功能协作",
-    labelEn: "Full Collaborator",
-    icon: "🔓",
-    role: "collaborator",
-    features: FEATURE_MODULES.map((m) => m.key) as FeatureKey[],
-  },
+  { labelZh: "吧台设备", labelEn: "Bar Device", icon: "🏪", role: "collaborator", capabilities: capabilitySet(["recipes", "bottles", "homemade", "menu", "shopping"], CAPABILITY_ACTIONS) },
+  { labelZh: "厨房设备", labelEn: "Kitchen Device", icon: "🍽️", role: "collaborator", capabilities: capabilitySet(["food_menu", "food_ingredients", "inventory_food", "shopping"], CAPABILITY_ACTIONS) },
+  { labelZh: "财务只读", labelEn: "Finance Read-Only", icon: "💰", role: "guest", capabilities: capabilitySet(["reports_monthly", "accounts", "analytics_business", "analytics_period", "petty_cash", "payroll"], ["view"]) },
+  { labelZh: "运营只读", labelEn: "Ops Read-Only", icon: "📊", role: "guest", capabilities: capabilitySet(["reports_monthly", "analytics_business", "analytics_period", "recipes", "wine_catalog", "food_menu", "menu"], ["view"]) },
+  { labelZh: "研发设备", labelEn: "Lab Device", icon: "⚗️", role: "collaborator", capabilities: capabilitySet(["recipes", "lab_projects", "lab_batches", "lab_plan", "bottles", "homemade", "books"], CAPABILITY_ACTIONS) },
+  { labelZh: "全功能协作", labelEn: "Full Collaborator", icon: "🔓", role: "collaborator", capabilities: capabilitySet(CAPABILITY_RESOURCES, CAPABILITY_ACTIONS) },
 ];
 
 function InvitePermissionSheet({
   role,
-  features,
+  capabilities,
   onToggle,
   onApplyPreset,
   lang,
   colors,
 }: {
   role: DeviceRole;
-  features: Set<FeatureKey>;
-  onToggle: (key: FeatureKey) => void;
+  capabilities: Set<Capability>;
+  onToggle: (capability: Capability) => void;
   onApplyPreset: (preset: typeof INVITE_PRESETS[0]) => void;
   lang: string;
   colors: ReturnType<typeof import("@/hooks/use-colors").useColors>;
@@ -176,30 +144,24 @@ function InvitePermissionSheet({
           </Pressable>
         ))}
       </View>
-      {/* 模块权限开关 */}
+      {/* 配对时的查看范围；配对完成后可在完整资源 × 动作矩阵中继续细调。 */}
       <Text style={{ fontSize: 13, color: colors.muted, marginBottom: 8 }}>
-        {lang === "zh" ? "自定义权限（可邀请后再调整）" : "Custom permissions (adjustable later)"}
+        {lang === "zh" ? "初始查看范围（配对后可细调动作）" : "Initial view scope (fine-tune actions after pairing)"}
       </Text>
-      {FEATURE_MODULES.map((mod) => (
-        <View key={mod.key} style={{ flexDirection: "row", alignItems: "center", paddingVertical: 6, gap: 10 }}>
-          <Text style={{ fontSize: 18, width: 24, textAlign: "center" }}>{mod.icon}</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 14, color: colors.foreground }}>
-              {lang === "zh" ? mod.labelZh : mod.labelEn}
-            </Text>
-            <Text style={{ fontSize: 11, color: colors.muted, marginTop: 1 }}>
-              {lang === "zh" ? mod.descZh : mod.descEn}
-            </Text>
+      {CAPABILITY_RESOURCES.map((resource) => {
+        const viewCapability = `${resource}.view` as Capability;
+        return (
+          <View key={resource} style={{ flexDirection: "row", alignItems: "center", paddingVertical: 6, gap: 10 }}>
+            <Text style={{ flex: 1, fontSize: 14, color: colors.foreground }}>{resource.replace(/_/g, " · ")}</Text>
+            <Switch
+              value={capabilities.has(viewCapability)}
+              onValueChange={() => onToggle(viewCapability)}
+              trackColor={{ false: colors.border, true: colors.primary + "80" }}
+              thumbColor={capabilities.has(viewCapability) ? colors.primary : colors.muted}
+            />
           </View>
-          <Switch
-            value={features.has(mod.key)}
-            onValueChange={() => { if (role !== "guest") onToggle(mod.key); }}
-            disabled={role === "guest"}
-            trackColor={{ false: colors.border, true: mod.color + "80" }}
-            thumbColor={features.has(mod.key) ? mod.color : colors.muted}
-          />
-        </View>
-      ))}
+        );
+      })}
     </View>
   );
 }
@@ -351,7 +313,8 @@ export default function DeviceManagerScreen() {
   const router = useRouter();
   const { lang } = useI18n();
   const insets = useSafeAreaInsets();
-  const { deviceInfo, deviceRole, syncState, syncError, retrySync, logout, refreshDeviceInfo, createSyncGroup, recoverStaleGroupOwner, forceClearLocalSyncCredentials, isGroupSwitching } = useSync();
+  const { deviceInfo, deviceRole, syncState, syncError, retrySync, logout, refreshDeviceCredentials, createSyncGroup, recoverStaleGroupOwner, forceClearLocalSyncCredentials, isGroupSwitching } = useSync();
+  const currentRole: DeviceRole = deviceRole ?? "guest";
   const [manualSyncing, setManualSyncing] = useState(false);
   const [forceClearing, setForceClearing] = useState(false);
   const [renamingDevice, setRenamingDevice] = useState(false);
@@ -382,27 +345,23 @@ export default function DeviceManagerScreen() {
   const [icloudLastBackup, setIcloudLastBackup] = useState<number | null>(null);
   const [customRoleNames, setCustomRoleNames] = useState<Record<string, string>>({});
 
-  // 邀请时预设功能权限
-  const [inviteFeatures, setInviteFeatures] = useState<Set<FeatureKey>>(
-    new Set(FEATURE_MODULES.map((m) => m.key)),
+  // 邀请时预设 DeviceSessionV2 capabilities。
+  const [inviteCapabilities, setInviteCapabilities] = useState<Set<Capability>>(
+    new Set(capabilitySet(CAPABILITY_RESOURCES, CAPABILITY_ACTIONS)),
   );
-  const toggleInviteFeature = (key: FeatureKey) => {
-    setInviteFeatures((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) {
-        if (next.size > 1) next.delete(key);
-      } else {
-        next.add(key);
-      }
+  const toggleInviteCapability = (capability: Capability) => {
+    setInviteCapabilities((previous) => {
+      const next = new Set(previous);
+      if (next.has(capability)) next.delete(capability);
+      else next.add(capability);
       return next;
     });
   };
 
   const applyInvitePreset = (preset: typeof INVITE_PRESETS[0]) => {
     tap();
-    setInviteFeatures(new Set(preset.features));
-    // 如果预设指定了角色，同时应用角色并生成配对码
-    void handleGenerateCode(preset.role);
+    setInviteCapabilities(new Set(preset.capabilities));
+    void handleGenerateCode(preset.role, preset.capabilities);
   };
 
   const tap = () => {
@@ -465,12 +424,10 @@ export default function DeviceManagerScreen() {
     return () => clearInterval(id);
   }, [pairExpiry]);
 
-  const handleGenerateCode = async (role: DeviceRole) => {
+  const handleGenerateCode = async (role: DeviceRole, capabilities = [...inviteCapabilities]) => {
     try {
       setGeneratingCode(true);
-      // 邀请时携带预设功能权限
-      const allowedKeys = featuresToAllowedKeys(inviteFeatures);
-      const result = await generatePairCode(role, allowedKeys);
+      const result = await generatePairCode(role, capabilities);
       setPairCode(result.code);
       setPairExpiry(result.expiresAt);
       tap();
@@ -533,14 +490,14 @@ export default function DeviceManagerScreen() {
         deviceId: device.id,
         deviceName: device.name,
         deviceRole: device.role,
-        allowedKeys: device.allowedKeys ? JSON.stringify(device.allowedKeys) : "",
+        capabilities: JSON.stringify(device.capabilities),
       },
     });
   };
 
   const doChangeRole = async (targetId: string, role: DeviceRole) => {
     try {
-      await updateDeviceRole(targetId, role, null);
+      await updateDeviceRole(targetId, role);
       await loadDevices();
     } catch (e: unknown) {
       Alert.alert(lang === "zh" ? "修改失败" : "Failed", String(e));
@@ -586,12 +543,12 @@ export default function DeviceManagerScreen() {
   };
 
   const handleRecoverStaleOwner = () => {
-    if (!deviceInfo || deviceInfo.role === "owner" || isGroupSwitching) return;
+    if (!deviceInfo || currentRole === "owner" || isGroupSwitching) return;
     const execute = async () => {
       try {
         await recoverStaleGroupOwner();
         await loadDevices();
-        await refreshDeviceInfo();
+        await refreshDeviceCredentials();
         Alert.alert(
           lang === "zh" ? "已恢复同步组" : "Sync Group Recovered",
           lang === "zh" ? "已撤销长期失联的旧主设备，并将本机安全交接为主设备。同步数据未删除。" : "The long-offline owner was revoked and this device is now the owner. Sync data was preserved.",
@@ -690,7 +647,7 @@ export default function DeviceManagerScreen() {
     if (!deviceInfo || isGroupSwitching) return;
     tap();
     const candidates = devices.filter((item) => !item.isCurrentDevice);
-    if (deviceInfo.role === "owner" && candidates.length > 0) {
+    if (currentRole === "owner" && candidates.length > 0) {
       Alert.alert(
         lang === "zh" ? "交接主设备后加入新组" : "Hand off owner role before switching",
         lang === "zh"
@@ -706,7 +663,7 @@ export default function DeviceManagerScreen() {
       );
       return;
     }
-    if (deviceInfo.role === "owner") {
+    if (currentRole === "owner") {
       Alert.alert(
         lang === "zh" ? "加入其他同步组" : "Join another sync group",
         lang === "zh"
@@ -976,9 +933,9 @@ export default function DeviceManagerScreen() {
         {/* ── 4. Current Device Card ── */}
         {deviceInfo && (
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <View style={[styles.roleTag, { backgroundColor: ROLE_LABELS[deviceInfo.role].color + "20" }]}>
-              <Text style={[styles.roleTagText, { color: ROLE_LABELS[deviceInfo.role].color }]}>
-                {lang === "zh" ? ROLE_LABELS[deviceInfo.role].zh : ROLE_LABELS[deviceInfo.role].en}
+            <View style={[styles.roleTag, { backgroundColor: ROLE_LABELS[currentRole].color + "20" }]}>
+              <Text style={[styles.roleTagText, { color: ROLE_LABELS[currentRole].color }]}>
+                {lang === "zh" ? ROLE_LABELS[currentRole].zh : ROLE_LABELS[currentRole].en}
               </Text>
             </View>
             {renamingDevice ? (
@@ -1001,7 +958,7 @@ export default function DeviceManagerScreen() {
                   onSubmitEditing={async () => {
                     if (renameInput.trim()) {
                       await renameCurrentDevice(renameInput.trim());
-                      await refreshDeviceInfo();
+                      await refreshDeviceCredentials();
                     }
                     setRenamingDevice(false);
                     setRenameInput("");
@@ -1011,7 +968,7 @@ export default function DeviceManagerScreen() {
                   onPress={async () => {
                     if (renameInput.trim()) {
                       await renameCurrentDevice(renameInput.trim());
-                      await refreshDeviceInfo();
+                      await refreshDeviceCredentials();
                     }
                     setRenamingDevice(false);
                     setRenameInput("");
@@ -1045,7 +1002,7 @@ export default function DeviceManagerScreen() {
               </View>
             )}
             <Text style={[styles.deviceDesc, { color: colors.muted }]}>
-              {lang === "zh" ? ROLE_DESC[deviceInfo.role].zh : ROLE_DESC[deviceInfo.role].en}
+              {lang === "zh" ? ROLE_DESC[currentRole].zh : ROLE_DESC[currentRole].en}
             </Text>
             {/* Bug 5：显示同步组短码，便于跨设备核对是否在同一组 */}
             <Text style={[styles.deviceDesc, { color: colors.muted, marginTop: 4 }]}>
@@ -1079,7 +1036,7 @@ export default function DeviceManagerScreen() {
                   <Text style={styles.roleBtnText}>{lang === "zh" ? "加入其他同步组" : "Join Another Group"}</Text>
                 )}
               </Pressable>
-              {deviceInfo.role !== "owner" && (
+              {currentRole !== "owner" && (
                 <Pressable
                   testID="recover-stale-sync-owner"
                   onPress={handleRecoverStaleOwner}
@@ -1090,7 +1047,7 @@ export default function DeviceManagerScreen() {
                 </Pressable>
               )}
             </View>
-            {deviceInfo.role !== "owner" && (
+            {currentRole !== "owner" && (
               <Text style={[styles.hint, { color: colors.muted, marginTop: 10 }]}>
                 {lang === "zh" ? "仅当原主设备已连续 7 天未在线时可恢复；不会删除同步组数据。" : "Available only after the former owner has been offline for 7 days; sync data is preserved."}
               </Text>
@@ -1152,8 +1109,8 @@ export default function DeviceManagerScreen() {
             {!pairCode && (
               <InvitePermissionSheet
                 role={"collaborator"}
-                features={inviteFeatures}
-                onToggle={toggleInviteFeature}
+                capabilities={inviteCapabilities}
+                onToggle={toggleInviteCapability}
                 onApplyPreset={applyInvitePreset}
                 lang={lang}
                 colors={colors}

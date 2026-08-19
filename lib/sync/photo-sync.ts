@@ -14,7 +14,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as ImageManipulator from "expo-image-manipulator";
 import { Platform } from "react-native";
 
-import { CF_WORKER_URL, getDeviceInfo, type DeviceInfo } from "@/lib/cf-sync/client";
+import { CF_WORKER_URL, getDeviceCredentials, getDeviceSessionV2, type DeviceCredentials } from "@/lib/cf-sync/client";
 
 const LEGACY_PHOTO_DIR = `${FileSystem.documentDirectory ?? ""}recipe-photos/`;
 const UPLOADED_SET_KEY_PREFIX = "cf.photoSync.uploaded";
@@ -116,7 +116,7 @@ async function saveUploadedSet(groupId: string, set: Set<string>): Promise<void>
 
 async function photoFetch(
   path: string,
-  deviceInfo: DeviceInfo,
+  deviceInfo: DeviceCredentials,
   body: unknown,
   timeoutMs = 30_000,
 ): Promise<Response> {
@@ -158,10 +158,9 @@ async function readRecipesRaw(): Promise<{ raw: string; list: any[] } | null> {
 
 /** 扫描本地 photoUris，上传尚未上传的照片文件 */
 async function uploadPendingPhotos(
-  deviceInfo: DeviceInfo,
+  deviceInfo: DeviceCredentials,
   onProgress?: (phase: "upload" | "download" | "repair", done: number, total: number) => void,
 ): Promise<number> {
-  if (deviceInfo.role === "guest") return 0;
   const data = await readRecipesRaw();
   if (!data) return 0;
 
@@ -246,7 +245,7 @@ async function uploadPendingPhotos(
  * 下载云端存在但本机缺失的照片，并把 recipes.photoUris 中
  * 指向其它设备路径的 URI 重写为本机路径。
  */
-async function downloadMissingPhotos(deviceInfo: DeviceInfo): Promise<number> {
+async function downloadMissingPhotos(deviceInfo: DeviceCredentials): Promise<number> {
   const res = await photoFetch("/api/photos/list", deviceInfo, {});
   if (!res.ok) return 0;
   const { photos } = (await res.json()) as {
@@ -294,7 +293,7 @@ async function downloadMissingPhotos(deviceInfo: DeviceInfo): Promise<number> {
  * 修复 photoUris 路径：把非本机前缀的 URI 重写为本机 PHOTO_DIR 路径
  * （仅当本机文件确实存在时才重写；返回是否有修改）。
  */
-async function repairPhotoUriPaths(deviceInfo: DeviceInfo): Promise<boolean> {
+async function repairPhotoUriPaths(deviceInfo: DeviceCredentials): Promise<boolean> {
   const data = await readRecipesRaw();
   if (!data) return false;
 
@@ -342,8 +341,10 @@ async function repairPhotoUriPaths(deviceInfo: DeviceInfo): Promise<boolean> {
 export async function deleteCloudPhoto(photoUri: string): Promise<void> {
   if (Platform.OS === "web") return;
   try {
-    const deviceInfo = await getDeviceInfo();
-    if (!deviceInfo || deviceInfo.role === "guest") return;
+    const deviceInfo = await getDeviceCredentials();
+    if (!deviceInfo) return;
+    const session = await getDeviceSessionV2();
+    if (!session.policy.capabilities.includes("recipes.edit")) return;
     const name = fileNameOf(photoUri);
     if (!name) return;
     await photoFetch("/api/photos/delete", deviceInfo, { photoId: name });
@@ -368,10 +369,14 @@ export async function syncPhotos(
   if (running) return { downloaded: 0, repaired: false, oversized: 0 };
   running = true;
   try {
-    const deviceInfo = await getDeviceInfo();
+    const deviceInfo = await getDeviceCredentials();
     if (!deviceInfo) return { downloaded: 0, repaired: false, oversized: 0 };
+    const session = await getDeviceSessionV2();
+    const canReadRecipes = session.policy.capabilities.includes("recipes.view");
+    const canEditRecipes = session.policy.capabilities.includes("recipes.edit");
+    if (!canReadRecipes) return { downloaded: 0, repaired: false, oversized: 0 };
     // 目标组首次水合只能下载，绝不允许把旧组文件上传到新成员资格。
-    const oversized = mode === "full" ? await uploadPendingPhotos(deviceInfo, onProgress) : 0;
+    const oversized = mode === "full" && canEditRecipes ? await uploadPendingPhotos(deviceInfo, onProgress) : 0;
     const downloaded = await downloadMissingPhotos(deviceInfo);
     const repaired = await repairPhotoUriPaths(deviceInfo);
     onProgress?.("repair", 1, 1);

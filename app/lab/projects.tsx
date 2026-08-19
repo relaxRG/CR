@@ -19,7 +19,7 @@ import { LabChangeChips } from "@/components/lab-change-chips";
 import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
 import { useLabStore } from "@/lib/lab/store";
-import { useGuestGuard } from "@/hooks/use-guest-guard";
+import { useCapabilityGuard } from "@/hooks/use-can";
 import { getLabTemplate } from "@/lib/lab/templates";
 import { LAB_STATUS_ORDER, LabProject, LabProjectStatus } from "@/lib/lab/types";
 import { MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS, MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
@@ -39,7 +39,7 @@ export function LabIndexScreen({ embedded = false }: { embedded?: boolean }) {
   const colors = useColors();
   const router = useRouter();
   const { t, lang } = useI18n();
-  const { guardWrite } = useGuestGuard();
+  const { guard: guardWrite } = useCapabilityGuard("lab_projects.edit");
   const { projects, batchesOf } = useLabStore();
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<LabProjectStatus | null>(null);

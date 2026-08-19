@@ -19,7 +19,7 @@
  * 3. 客户端接口（onPushDetected 回调）保持不变
  */
 import { AppState, Platform } from "react-native";
-import { getDeviceInfo } from "./client";
+import { getDeviceCredentials } from "./client";
 import { CF_WORKER_URL } from "./client";
 
 type PushDetectedCallback = (since: number) => void;
@@ -51,7 +51,7 @@ export async function notifyPushDone(): Promise<void> {
     const now = Date.now();
     if (now - lastNotifiedAt < NOTIFY_THROTTLE_MS) return;
     lastNotifiedAt = now;
-    const deviceInfo = await getDeviceInfo();
+    const deviceInfo = await getDeviceCredentials();
     if (!deviceInfo?.deviceToken) return;
     await fetch(`${CF_WORKER_URL}/api/sync/notify`, {
       method: "POST",
@@ -74,7 +74,7 @@ export async function notifyPushDone(): Promise<void> {
  */
 async function checkForUpdates(): Promise<number | null> {
   try {
-    const deviceInfo = await getDeviceInfo();
+    const deviceInfo = await getDeviceCredentials();
     if (!deviceInfo) return null;
     const headers: Record<string, string> = { "X-Device-Id": deviceInfo.deviceId };
     if (deviceInfo.deviceToken) headers["X-Device-Token"] = deviceInfo.deviceToken;

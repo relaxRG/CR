@@ -1,7 +1,7 @@
 import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
 import { Alert, Platform } from "react-native";
-import { getDeviceInfo } from "@/lib/cf-sync/client";
+import { getDeviceCredentials } from "@/lib/cf-sync/client";
 
 /** 未配对本地模式与旧版本照片的兼容根目录。 */
 const LEGACY_PHOTO_DIR = `${FileSystem.documentDirectory}recipe-photos/`;
@@ -11,7 +11,7 @@ const LEGACY_PHOTO_DIR = `${FileSystem.documentDirectory}recipe-photos/`;
  * 与 lib/sync/photo-sync.ts 使用相同的目录规则，避免旧组文件进入目标组。
  */
 export async function ensureRecipePhotoDirectory(): Promise<string> {
-  const device = await getDeviceInfo();
+  const device = await getDeviceCredentials();
   const safeGroupId = device?.groupId.replace(/[^A-Za-z0-9_-]/g, "_");
   const directory = safeGroupId ? `${LEGACY_PHOTO_DIR}${safeGroupId}/` : LEGACY_PHOTO_DIR;
   const info = await FileSystem.getInfoAsync(directory);
