@@ -14,7 +14,7 @@ const session = (): DeviceSessionV2 => ({
   schemaVersion: 2,
   device: { id: "device-1", name: "iPhone", platform: "ios" },
   membership: { groupId: "group-1", status: "active", role: "collaborator", ownerDeviceId: "owner-1", lastVerifiedAt: 1_735_689_600_000 },
-  policy: { revision: 7, issuedAt: 1_735_689_600_000, capabilities: ["recipes.edit"] as Capability[] },
+  policy: { revision: 7, issuedAt: 1_735_689_600_000, tabs: ["cocktail"], capabilities: ["recipes.edit"] as Capability[] },
   sync: { freshness: "verified_online", serverTime: 1_735_689_600_000, latestGroupChangeAt: 1_735_689_600_000 },
 });
 

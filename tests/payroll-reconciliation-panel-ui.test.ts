@@ -15,7 +15,7 @@ describe("薪资核对与修正面板：弱网与长列表交互", () => {
         schemaVersion: 2,
         device: { id: "device-1", name: "iPhone", platform: "ios" },
         membership: { groupId: "group-1", status: "active", role: "owner", ownerDeviceId: "device-1", lastVerifiedAt: Date.now() },
-        policy: { revision: 3, issuedAt: Date.now(), capabilities: ["payroll.view", "payroll.edit"] },
+        policy: { revision: 3, issuedAt: Date.now(), tabs: ["store"], capabilities: ["payroll.view", "payroll.edit"] },
         sync: { freshness: "offline_cache", serverTime: Date.now(), latestGroupChangeAt: 0 },
       },
     };

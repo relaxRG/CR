@@ -11,6 +11,7 @@ import * as Device from "expo-device";
 import { Platform } from "react-native";
 import { resolveSyncDevicePlatform, type SyncDevicePlatform } from "@/lib/sync/device-platform";
 import type { DeviceSessionV2 } from "@/lib/sync/device-session";
+import type { BusinessTab } from "@/lib/sync/capabilities";
 
 export const CF_WORKER_URL = "https://cocktail-ai.kikikong2017.workers.dev";
 // AsyncStorage keys for device identity
@@ -255,12 +256,13 @@ export type GenerateCodeResult = {
   code: string;
   expiresAt: number;
   role: DeviceRole;
-  capabilities: readonly import("@/lib/sync/capabilities").Capability[];
+  /** 用户可配置的唯一业务授权：五个底部 Tab。 */
+  tabs: readonly BusinessTab[];
 };
 
 export async function generatePairCode(
   role: DeviceRole,
-  capabilities: readonly import("@/lib/sync/capabilities").Capability[],
+  tabs: readonly BusinessTab[],
 ): Promise<GenerateCodeResult> {
   const deviceInfo = await getDeviceCredentials();
   if (!deviceInfo) throw new Error("Device not registered");
@@ -272,7 +274,7 @@ export async function generatePairCode(
   const res = await cfFetch("/api/device/generate-code", {
     method: "POST",
     deviceInfo,
-    body: JSON.stringify({ role, capabilities }),
+    body: JSON.stringify({ role, tabs }),
   });
 
   if (!res.ok) {
@@ -366,7 +368,7 @@ export async function getDeviceSessionV2(): Promise<DeviceSessionV2> {
   });
   if (!res.ok) return readError(res, `DEVICE_SESSION_FAILED_${res.status}`);
   const session = await res.json() as DeviceSessionV2;
-  if (session.schemaVersion !== 2 || !session.membership?.groupId || !Array.isArray(session.policy?.capabilities)) {
+  if (session.schemaVersion !== 2 || !session.membership?.groupId || !Array.isArray(session.policy?.tabs) || !Array.isArray(session.policy?.capabilities)) {
     throw new Error("DEVICE_SESSION_INVALID");
   }
   return session;
@@ -473,9 +475,9 @@ export type RemoteDevice = {
   id: string;
   name: string;
   platform: SyncDevicePlatform;
-  /** 成员身份，仅用于设备归属与主设备交接；业务权限由 capabilities 决定。 */
+  /** 成员身份，仅用于设备归属与主设备交接；业务权限由五个 tabs 决定。 */
   role: DeviceRole;
-  capabilities: readonly import("@/lib/sync/capabilities").Capability[];
+  tabs: readonly BusinessTab[];
   policyRevision: number;
   last_seen: number | null;
   created_at: number;
@@ -567,24 +569,24 @@ export async function recoverStaleOwner(): Promise<StaleOwnerRecoveryResult> {
 export type UpdateDevicePolicyV2Result = Readonly<{
   success: true;
   targetDeviceId: string;
-  capabilities: readonly import("@/lib/sync/capabilities").Capability[];
+  tabs: readonly BusinessTab[];
   policyRevision: number;
   updatedAt: number;
 }>;
 
 /**
- * V2 唯一业务授权写入接口。角色只描述成员身份，页面与同步范围由 capabilities 决定。
+ * 唯一业务授权写入接口。用户只能配置五个底部业务Tab；角色只描述成员身份。
  */
 export async function updateDevicePolicyV2(
   targetDeviceId: string,
-  capabilities: readonly import("@/lib/sync/capabilities").Capability[],
+  tabs: readonly BusinessTab[],
 ): Promise<UpdateDevicePolicyV2Result> {
   const credentials = await getDeviceCredentials();
   if (!credentials) throw new Error("DEVICE_CREDENTIALS_MISSING");
   const res = await cfFetch("/api/device/update-policy-v2", {
     method: "POST",
     deviceInfo: credentials,
-    body: JSON.stringify({ targetDeviceId, capabilities }),
+    body: JSON.stringify({ targetDeviceId, tabs }),
   });
   if (!res.ok) return readError(res, `DEVICE_POLICY_UPDATE_FAILED_${res.status}`);
   return res.json() as Promise<UpdateDevicePolicyV2Result>;

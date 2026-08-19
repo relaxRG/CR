@@ -2,8 +2,12 @@
 // Do not edit manually; regenerate whenever capabilities or storage policy changes.
 const V2_ACTIONS = ["view","edit","import","export","close","manage"];
 const V2_RESOURCES = ["devices","sync_diagnostics","backup","data","recipes","bottles","homemade","lab_projects","lab_batches","lab_plan","books","menu","shopping","wine_catalog","food_menu","food_ingredients","inventory_spirits","inventory_wine","inventory_fruit","inventory_food","inventory_beer","inventory_ice","shop_glassware","shop_tableware","shop_supplies","shop_equipment","suppliers","reports_monthly","accounts","analytics_business","analytics_period","petty_cash","store_schedule","labor_employees","labor_schedule","labor_attendance","labor_comp_off","payroll","preferences"];
+const V2_BUSINESS_TABS = ["cocktail","wine","lab","food","store"];
+const V2_BUSINESS_TAB_RESOURCES = {"cocktail":["recipes","bottles","homemade","books","menu","shopping"],"wine":["wine_catalog","inventory_wine"],"lab":["lab_projects","lab_batches","lab_plan"],"food":["food_menu","food_ingredients","inventory_food"],"store":["inventory_spirits","inventory_fruit","inventory_beer","inventory_ice","shop_glassware","shop_tableware","shop_supplies","shop_equipment","suppliers","reports_monthly","accounts","analytics_business","analytics_period","petty_cash","store_schedule","labor_employees","labor_schedule","labor_attendance","labor_comp_off","payroll"]};
+const V2_RESOURCE_TAB = {"recipes":"cocktail","bottles":"cocktail","homemade":"cocktail","books":"cocktail","menu":"cocktail","shopping":"cocktail","wine_catalog":"wine","inventory_wine":"wine","lab_projects":"lab","lab_batches":"lab","lab_plan":"lab","food_menu":"food","food_ingredients":"food","inventory_food":"food","inventory_spirits":"store","inventory_fruit":"store","inventory_beer":"store","inventory_ice":"store","shop_glassware":"store","shop_tableware":"store","shop_supplies":"store","shop_equipment":"store","suppliers":"store","reports_monthly":"store","accounts":"store","analytics_business":"store","analytics_period":"store","petty_cash":"store","store_schedule":"store","labor_employees":"store","labor_schedule":"store","labor_attendance":"store","labor_comp_off":"store","payroll":"store"};
 const V2_ALL_CAPABILITIES = V2_RESOURCES.flatMap((resource) => V2_ACTIONS.map((action) => `${resource}.${action}`));
 const V2_CAPABILITY_SET = new Set(V2_ALL_CAPABILITIES);
+const V2_TAB_GRANT_SET = new Set(V2_BUSINESS_TABS.map((tab) => `${tab}.access`));
 const V2_STORAGE_CAPABILITY = {
   "cocktail.recipes": [
     "recipes.view",

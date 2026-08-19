@@ -5,6 +5,9 @@ import {
   ONLINE_REQUIRED_HIGH_RISK_RESOURCES,
   ONLINE_REQUIRED_WRITE_ACTIONS,
   STORAGE_POLICY,
+  BUSINESS_TABS,
+  businessTabForCapability,
+  type BusinessTab,
   type Capability,
 } from "@/lib/sync/capabilities";
 import {
@@ -15,7 +18,11 @@ import {
 import { SYNC_KEYS } from "@/lib/sync/engine";
 import { FEATURE_CONTRACTS } from "@/lib/sync/feature-contract";
 
-const baseSession = (capabilities: readonly Capability[]): DeviceSessionV2 => ({
+const tabsForCapabilities = (capabilities: readonly Capability[]): BusinessTab[] => [
+  ...new Set(capabilities.map(businessTabForCapability).filter((tab): tab is BusinessTab => tab !== null)),
+];
+
+const baseSession = (capabilities: readonly Capability[], tabs: readonly BusinessTab[] = tabsForCapabilities(capabilities)): DeviceSessionV2 => ({
   schemaVersion: 2,
   device: { id: "device-1", name: "iPhone", platform: "ios" },
   membership: {
@@ -25,13 +32,13 @@ const baseSession = (capabilities: readonly Capability[]): DeviceSessionV2 => ({
     ownerDeviceId: "owner-1",
     lastVerifiedAt: 1_735_689_600_000,
   },
-  policy: { revision: 17, issuedAt: 1_735_689_600_000, capabilities },
+  policy: { revision: 17, issuedAt: 1_735_689_600_000, tabs, capabilities },
   sync: { freshness: "verified_online", serverTime: 1_735_689_600_000, latestGroupChangeAt: 1_735_689_600_000 },
 });
 
-const authorized = (capabilities: readonly Capability[]): DeviceSessionState => ({
+const authorized = (tabs: readonly BusinessTab[], capabilities: readonly Capability[] = []): DeviceSessionState => ({
   tag: "authorized",
-  session: baseSession(capabilities),
+  session: baseSession(capabilities, tabs),
 });
 
 describe("DeviceSessionV2 状态机与 can()", () => {
@@ -42,23 +49,15 @@ describe("DeviceSessionV2 状态机与 can()", () => {
     });
   });
 
-  it("在线已核验设备仅允许策略中明确授予的能力", () => {
-    const state = authorized(["inventory_wine.view", "inventory_wine.edit"]);
-    expect(can(state, "inventory_wine.edit")).toMatchObject({ allowed: true, policyRevision: 17 });
-    expect(can(state, "inventory_wine.close")).toMatchObject({
-      allowed: false,
-      reason: "missing_capability",
-      policyRevision: 17,
-    });
+  it("在线已核验设备按五Tab授权内部全部内容，内部页签不再单独拒绝", () => {
+    const state = authorized(["store"]);
+    expect(can(state, "analytics_period.view")).toMatchObject({ allowed: true, policyRevision: 17 });
+    expect(can(state, "payroll.close")).toMatchObject({ allowed: true, policyRevision: 17 });
+    expect(can(state, "recipes.view")).toMatchObject({ allowed: false, reason: "missing_capability" });
   });
 
   it("离线缓存可查看已授权数据，但禁止导入、导出、月结与设备管理等高风险动作", () => {
-    const session = baseSession([
-      "inventory_wine.view",
-      "inventory_wine.edit",
-      "inventory_wine.close",
-      "reports_monthly.import",
-    ]);
+    const session = baseSession(["inventory_wine.view", "inventory_wine.edit", "inventory_wine.close", "reports_monthly.import"], ["wine", "store"]);
     const state: DeviceSessionState = { tag: "offline_cache", session, retryAt: 1_735_689_660_000 };
     expect(can(state, "inventory_wine.view")).toMatchObject({ allowed: true });
     expect(can(state, "inventory_wine.edit")).toMatchObject({ allowed: false, reason: "offline", retryable: true });
@@ -67,7 +66,7 @@ describe("DeviceSessionV2 状态机与 can()", () => {
   });
 
   it("策略过期时禁止继续使用旧权限，必须重新向 Worker 核验", () => {
-    const state: DeviceSessionState = { tag: "policy_stale", session: baseSession(["payroll.edit"]) };
+    const state: DeviceSessionState = { tag: "policy_stale", session: baseSession(["payroll.edit"], ["store"]) };
     expect(can(state, "payroll.edit")).toMatchObject({
       allowed: false,
       reason: "policy_stale",
@@ -79,7 +78,7 @@ describe("DeviceSessionV2 状态机与 can()", () => {
   it("远端撤销成员资格后，缓存中的旧能力不能继续用于读取或写入", () => {
     const state: DeviceSessionState = {
       tag: "membership_revoked",
-      session: { ...baseSession(["recipes.edit"]), membership: { ...baseSession([]).membership, status: "revoked" } },
+      session: { ...baseSession(["recipes.edit"], ["cocktail"]), membership: { ...baseSession([]).membership, status: "revoked" } },
       code: "REVOKED",
     };
     expect(can(state, "recipes.edit")).toMatchObject({ allowed: false, reason: "membership_revoked" });
@@ -121,7 +120,9 @@ describe("全 App 跨设备策略收敛", () => {
   it("每个已注册业务资源都可由同一 can() 状态机判定，任何新资源不会绕过统一会话", () => {
     for (const resource of CAPABILITY_RESOURCES) {
       const capability = `${resource}.view` as Capability;
-      expect(can(authorized([capability]), capability), resource).toMatchObject({ allowed: true });
+      const tab = businessTabForCapability(capability);
+      if (!tab) continue;
+      expect(can(authorized([tab]), capability), resource).toMatchObject({ allowed: true });
       expect(can(authorized([]), capability), resource).toMatchObject({
         allowed: false,
         reason: "missing_capability",
@@ -130,14 +131,14 @@ describe("全 App 跨设备策略收敛", () => {
   });
 
   it("策略版本提升后，旧设备的策略状态必须失效，不能继续以旧权限推送跨设备数据", () => {
-    const beforeChange = authorized(["recipes.edit"]);
+    const beforeChange = authorized(["cocktail"]);
     expect(can(beforeChange, "recipes.edit")).toMatchObject({ allowed: true, policyRevision: 17 });
 
     const afterRemotePolicyChange: DeviceSessionState = {
       tag: "policy_stale",
       session: {
-        ...baseSession(["recipes.edit"]),
-        policy: { ...baseSession([]).policy, revision: 18 },
+        ...baseSession(["recipes.edit"], ["cocktail"]),
+        policy: { ...baseSession([], []).policy, revision: 18 },
       },
     };
     expect(can(afterRemotePolicyChange, "recipes.edit")).toMatchObject({
@@ -150,16 +151,15 @@ describe("全 App 跨设备策略收敛", () => {
   it("同步键的读写能力分别由策略注册表决定，只有具备写能力的设备才可向另一设备可见的共享数据推送变更", () => {
     for (const storageKey of SYNC_KEYS) {
       const policy = STORAGE_POLICY[storageKey];
-      const reader = authorized([policy.read]);
+      const tab = businessTabForCapability(policy.read);
+      if (!tab) continue;
+      const reader = authorized([tab]);
       expect(can(reader, policy.read), `${storageKey}: read`).toMatchObject({ allowed: true });
 
       if (policy.write) {
-        const writer = authorized([policy.write]);
+        const writer = authorized([tab]);
         expect(can(writer, policy.write), `${storageKey}: write`).toMatchObject({ allowed: true });
-        expect(can(reader, policy.write), `${storageKey}: reader cannot write`).toMatchObject({
-          allowed: false,
-          reason: "missing_capability",
-        });
+        expect(can(reader, policy.write), `${storageKey}: same Tab grants internal write`).toMatchObject({ allowed: true });
       }
     }
   });
@@ -168,7 +168,7 @@ describe("全 App 跨设备策略收敛", () => {
     const highRisk = ["devices.manage", "reports_monthly.close", "inventory_wine.import", "payroll.close"] as const;
     const offline: DeviceSessionState = {
       tag: "offline_cache",
-      session: baseSession(highRisk),
+      session: baseSession(highRisk, ["store"]),
       retryAt: 1_735_689_660_000,
     };
     for (const capability of highRisk) {
@@ -183,7 +183,7 @@ describe("全 App 跨设备策略收敛", () => {
         expect(ONLINE_REQUIRED_CAPABILITIES.has(capability), capability).toBe(true);
         const offline: DeviceSessionState = {
           tag: "offline_cache",
-          session: baseSession([capability]),
+          session: baseSession([capability], [businessTabForCapability(capability) ?? "store"]),
           retryAt: 1_735_689_660_000,
         };
         expect(can(offline, capability), capability).toMatchObject({ allowed: false, reason: "offline", retryable: true });

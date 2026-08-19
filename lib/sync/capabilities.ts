@@ -62,6 +62,61 @@ export const CAPABILITY_RESOURCES = [
 export type CapabilityResource = (typeof CAPABILITY_RESOURCES)[number];
 export type Capability = `${CapabilityResource}.${CapabilityAction}`;
 
+/**
+ * 用户可配置的唯一业务授权边界，严格对应底部五个业务 Tab。
+ * 门店内部的报表、员工、备用金、库存和店铺，以及各自二级页签，均归属 store，
+ * 不得在设备权限界面中作为独立开关出现。
+ */
+export const BUSINESS_TABS = ["cocktail", "wine", "lab", "food", "store"] as const;
+export type BusinessTab = (typeof BUSINESS_TABS)[number];
+
+/** 仅供策略持久化与接口传输使用；用户界面只展示对应 Tab 名称。 */
+export type BusinessTabGrant = `${BusinessTab}.access`;
+export const BUSINESS_TAB_GRANTS = BUSINESS_TABS.map((tab) => `${tab}.access` as BusinessTabGrant);
+
+export const BUSINESS_TAB_RESOURCES: Readonly<Record<BusinessTab, readonly CapabilityResource[]>> = {
+  cocktail: ["recipes", "bottles", "homemade", "books", "menu", "shopping"],
+  wine: ["wine_catalog", "inventory_wine"],
+  lab: ["lab_projects", "lab_batches", "lab_plan"],
+  food: ["food_menu", "food_ingredients", "inventory_food"],
+  store: [
+    "inventory_spirits", "inventory_fruit", "inventory_beer", "inventory_ice",
+    "shop_glassware", "shop_tableware", "shop_supplies", "shop_equipment", "suppliers",
+    "reports_monthly", "accounts", "analytics_business", "analytics_period", "petty_cash", "store_schedule",
+    "labor_employees", "labor_schedule", "labor_attendance", "labor_comp_off", "payroll",
+  ],
+} as const;
+
+/** 设备、诊断、备份、数据维护和偏好属于系统职责，不成为第六个用户业务Tab。 */
+export const SYSTEM_CAPABILITY_RESOURCES: readonly CapabilityResource[] = [
+  "devices", "sync_diagnostics", "backup", "data", "preferences",
+] as const;
+
+const RESOURCE_TO_BUSINESS_TAB: Readonly<Partial<Record<CapabilityResource, BusinessTab>>> = Object.fromEntries(
+  BUSINESS_TABS.flatMap((tab) => BUSINESS_TAB_RESOURCES[tab].map((resource) => [resource, tab])),
+) as Partial<Record<CapabilityResource, BusinessTab>>;
+
+export function businessTabForResource(resource: CapabilityResource): BusinessTab | null {
+  return RESOURCE_TO_BUSINESS_TAB[resource] ?? null;
+}
+
+export function businessTabForCapability(capability: Capability): BusinessTab | null {
+  return businessTabForResource(capability.split(".")[0] as CapabilityResource);
+}
+
+export function normalizeBusinessTabs(value: readonly unknown[]): readonly BusinessTab[] {
+  const allowed = new Set<BusinessTab>(BUSINESS_TABS);
+  return [...new Set(value.filter((item): item is BusinessTab => typeof item === "string" && allowed.has(item as BusinessTab)))];
+}
+
+/** 内部资源能力只从五Tab授权派生，禁止再持久化为用户可编辑的资源级开关。 */
+export function capabilitiesForBusinessTabs(tabs: readonly BusinessTab[]): readonly Capability[] {
+  const granted = new Set(tabs);
+  return BUSINESS_TABS.flatMap((tab) => granted.has(tab)
+    ? BUSINESS_TAB_RESOURCES[tab].flatMap((resource) => CAPABILITY_ACTIONS.map((action) => `${resource}.${action}` as Capability))
+    : []);
+}
+
 export type StorageCapabilityPolicy = Readonly<{
   /** 拉取此键到设备与展示相应业务页面需要的能力。 */
   read: Capability;

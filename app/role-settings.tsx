@@ -34,10 +34,9 @@ import {
   listDevices,
 } from "@/lib/cf-sync/client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as SecureStore from "expo-secure-store";
 import { useSync } from "@/lib/cf-sync/provider";
 import { useCan } from "@/hooks/use-can";
-import { CAPABILITY_ACTIONS, CAPABILITY_RESOURCES, type Capability, type CapabilityResource } from "@/lib/sync/capabilities";
+import { BUSINESS_TABS, type BusinessTab } from "@/lib/sync/capabilities";
 // ─── 自定义角色名称存储 ───────────────────────────────────────────────────────
 const CUSTOM_ROLE_NAMES_KEY = "device.customRoleNames.v1";
 
@@ -65,18 +64,22 @@ export async function setCustomRoleName(deviceId: string, name: string): Promise
   } catch {}
 }
 
-// ─── V2 capabilities ─────────────────────────────────────────────────────────
-function parseCapabilities(raw: string | undefined): Set<Capability> {
+// ─── 五个业务Tab授权 ─────────────────────────────────────────────────────────
+const TAB_LABELS: Record<BusinessTab, { zh: string; en: string; descriptionZh: string; descriptionEn: string }> = {
+  cocktail: { zh: "鸡尾酒", en: "Cocktail", descriptionZh: "配方、酒款、自制、酒单与采购", descriptionEn: "Recipes, bottles, homemade, menus and shopping" },
+  wine: { zh: "葡萄酒", en: "Wine", descriptionZh: "葡萄酒档案、库存和采购", descriptionEn: "Wine catalog, inventory and purchasing" },
+  lab: { zh: "研发", en: "Lab", descriptionZh: "研发项目、批次和计划", descriptionEn: "Projects, batches and plans" },
+  food: { zh: "餐食", en: "Food", descriptionZh: "菜单、食材、采购和食材库存", descriptionEn: "Menus, ingredients, purchasing and food inventory" },
+  store: { zh: "门店", en: "Store", descriptionZh: "报表、员工、备用金、全部库存与店铺管理", descriptionEn: "Reports, staff, petty cash, all store inventory and operations" },
+};
+
+function parseTabs(raw: string | undefined): Set<BusinessTab> {
   try {
     const parsed = JSON.parse(raw ?? "[]");
-    return new Set(Array.isArray(parsed) ? parsed.filter((value): value is Capability => typeof value === "string") : []);
+    return new Set(Array.isArray(parsed) ? parsed.filter((value): value is BusinessTab => typeof value === "string" && (BUSINESS_TABS as readonly string[]).includes(value)) : []);
   } catch {
     return new Set();
   }
-}
-
-function capabilityFor(resource: CapabilityResource, action: string): Capability {
-  return `${resource}.${action}` as Capability;
 }
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
@@ -88,18 +91,18 @@ export default function RoleSettingsScreen() {
     deviceId: string;
     deviceName: string;
     deviceRole: string;
-    capabilities: string; // JSON string
+    tabs: string; // JSON string
   }>();
 
   const deviceId = params.deviceId ?? "";
   const deviceName = params.deviceName ?? "";
   const initialRole = (params.deviceRole ?? "collaborator") as DeviceRole;
-  const initialCapabilities = parseCapabilities(params.capabilities);
+  const initialTabs = parseTabs(params.tabs);
 
   const { refreshDeviceCredentials } = useSync();
   const devicesManageAccess = useCan("devices.manage");
   const [role, setRole] = useState<DeviceRole>(initialRole);
-  const [enabledCapabilities, setEnabledCapabilities] = useState<Set<Capability>>(initialCapabilities);
+  const [enabledTabs, setEnabledTabs] = useState<Set<BusinessTab>>(initialTabs);
   const [customName, setCustomName] = useState("");
   const [saving, setSaving] = useState(false);
   const [isOwnerDevice, setIsOwnerDevice] = useState(false);
@@ -118,12 +121,12 @@ export default function RoleSettingsScreen() {
     setIsOwnerDevice(devicesManageAccess.allowed);
   }, [devicesManageAccess.allowed]);
 
-  const toggleCapability = (capability: Capability) => {
+  const toggleTab = (tab: BusinessTab) => {
     tap();
-    setEnabledCapabilities((previous) => {
+    setEnabledTabs((previous) => {
       const next = new Set(previous);
-      if (next.has(capability)) next.delete(capability);
-      else next.add(capability);
+      if (next.has(tab)) next.delete(tab);
+      else next.add(tab);
       return next;
     });
   };
@@ -138,8 +141,8 @@ export default function RoleSettingsScreen() {
     }
     setSaving(true);
     try {
-      await updateDevicePolicyV2(deviceId, [...enabledCapabilities]);
-      // 角色仅用于成员身份与主设备交接；业务读写权限完全由 capabilities 决定。
+      await updateDevicePolicyV2(deviceId, [...enabledTabs]);
+      // 角色仅用于成员身份与主设备交接；业务读写权限只由五个底部Tab决定。
       await updateDeviceRole(deviceId, role);
       await setCustomRoleName(deviceId, customName);
       tap();
@@ -319,45 +322,39 @@ export default function RoleSettingsScreen() {
           </View>
         )}
 
-        {/* 全 App 资源 × 动作能力矩阵 */}
+        {/* 唯一用户可配置的五个底部业务Tab；内部页签绝不能单独授权。 */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.muted }]}>
-            {lang === "zh" ? "业务能力" : "Business Capabilities"}
+            {lang === "zh" ? "业务访问范围" : "Business Access"}
           </Text>
           <Text style={[styles.sectionDesc, { color: colors.muted }]}>
             {lang === "zh"
-              ? "每项能力同时控制页面展示、业务操作、同步读写和服务端校验。未授权动作会显示明确原因，不会静默丢失数据。"
-              : "Each capability governs page visibility, actions, sync read/write, and server enforcement."}
+              ? "只配置鸡尾酒、葡萄酒、研发、餐食、门店五个底部Tab。门店包含报表、员工、备用金、库存、店铺及全部内部页签，不会再出现单个页面无权访问。"
+              : "Only the five bottom business tabs are configurable. Internal pages inherit their tab access."}
           </Text>
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            {CAPABILITY_RESOURCES.map((resource, resourceIndex) => (
-              <View key={resource}>
-                {resourceIndex > 0 && <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border }} />}
-                <View style={styles.capabilityResource}>
-                  <Text style={[styles.featureLabel, { color: colors.foreground }]}>
-                    {resource.replace(/_/g, " · ")}
-                  </Text>
-                  <View style={styles.capabilityActions}>
-                    {CAPABILITY_ACTIONS.map((action) => {
-                      const capability = capabilityFor(resource, action);
-                      const enabled = enabledCapabilities.has(capability);
-                      return (
-                        <View key={capability} style={styles.capabilityAction}>
-                          <Text style={[styles.capabilityActionLabel, { color: colors.muted }]}>{action}</Text>
-                          <Switch
-                            value={enabled}
-                            onValueChange={() => { if (isOwnerDevice) toggleCapability(capability); }}
-                            disabled={!isOwnerDevice}
-                            trackColor={{ false: colors.border, true: colors.primary + "80" }}
-                            thumbColor={enabled ? colors.primary : colors.muted}
-                          />
-                        </View>
-                      );
-                    })}
+            {BUSINESS_TABS.map((tab, index) => {
+              const item = TAB_LABELS[tab];
+              const enabled = enabledTabs.has(tab);
+              return (
+                <View key={tab}>
+                  {index > 0 && <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border }} />}
+                  <View style={styles.capabilityResource}>
+                    <View style={{ flex: 1, paddingRight: 12 }}>
+                      <Text style={[styles.featureLabel, { color: colors.foreground }]}>{lang === "zh" ? item.zh : item.en}</Text>
+                      <Text style={[styles.roleDesc, { color: colors.muted }]}>{lang === "zh" ? item.descriptionZh : item.descriptionEn}</Text>
+                    </View>
+                    <Switch
+                      value={enabled}
+                      onValueChange={() => { if (isOwnerDevice) toggleTab(tab); }}
+                      disabled={!isOwnerDevice}
+                      trackColor={{ false: colors.border, true: colors.primary + "80" }}
+                      thumbColor={enabled ? colors.primary : colors.muted}
+                    />
                   </View>
                 </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
         </View>
 
@@ -434,11 +431,8 @@ const styles = StyleSheet.create({
   roleLabel: { fontSize: 15, fontWeight: "600", lineHeight: 20 },
   roleDesc: { fontSize: 12, lineHeight: 16, marginTop: 2 },
   checkDot: { width: 10, height: 10, borderRadius: 5 },
-  capabilityResource: { paddingHorizontal: 16, paddingVertical: 12, gap: 10 },
+  capabilityResource: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12 },
   featureLabel: { fontSize: 15, fontWeight: "600", lineHeight: 20 },
-  capabilityActions: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  capabilityAction: { alignItems: "center", gap: 2, minWidth: 54 },
-  capabilityActionLabel: { fontSize: 10, fontWeight: "600", textTransform: "uppercase" },
   dangerRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14, gap: 12 },
   dangerIcon: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   dangerLabel: { fontSize: 15, fontWeight: "600", lineHeight: 20 },

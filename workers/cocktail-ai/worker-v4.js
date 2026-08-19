@@ -1672,7 +1672,7 @@ async function handleDevicePrepareSwitch(env, body, headers, origin) {
   const recoveryTicket = generateToken();
   const targetDeviceId = generateToken().slice(0, 16);
   const targetToken = generateToken();
-  const targetCapabilitiesJson = JSON.stringify(parseCapabilities(pairPolicy.capabilities_json));
+  const targetCapabilitiesJson = encodeBusinessTabs(parseBusinessTabs(pairPolicy.capabilities_json));
   await env.DB.prepare("INSERT INTO group_switches (switch_id, state, source_device_id, source_group_id, target_group_id, target_device_id, target_token, target_name, target_platform, target_role, target_capabilities_json, handoff_device_id, pair_code, recovery_ticket_hash, created_at) VALUES (?, 'prepared', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(
     switchId,
     source.device_id,
@@ -1716,11 +1716,11 @@ async function handleDeviceRecoverJoin(env, body, origin) {
   if (!policy) return err("PAIR_POLICY_MISSING", 409, origin);
   const token = generateToken();
   const now = Date.now();
-  const capabilities = parseCapabilities(policy.capabilities_json);
+  const tabs = parseBusinessTabs(policy.capabilities_json);
   try {
     await env.DB.batch([
       env.DB.prepare("INSERT INTO devices (device_id, group_id, token, name, platform, role, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?)").bind(deviceId, pair.group_id, token, normalizedName, normalizeDevicePlatform(platform), normalizeDeviceRole(pair.role) ?? "guest", now),
-      env.DB.prepare("INSERT INTO device_policies (device_id, group_id, revision, capabilities_json, updated_at, updated_by) VALUES (?, ?, ?, ?, ?, ?)").bind(deviceId, pair.group_id, Number(policy.revision || 1), JSON.stringify(capabilities), now, deviceId),
+      env.DB.prepare("INSERT INTO device_policies (device_id, group_id, revision, capabilities_json, updated_at, updated_by) VALUES (?, ?, ?, ?, ?, ?)").bind(deviceId, pair.group_id, Number(policy.revision || 1), encodeBusinessTabs(tabs), now, deviceId),
       env.DB.prepare("UPDATE pair_codes SET used = 1 WHERE code = ? AND reserved_switch_id = ?").bind(code, reservationId),
       env.DB.prepare("DELETE FROM pair_code_policies WHERE code = ?").bind(code),
       env.DB.prepare("INSERT INTO group_ts (group_id, last_push_at) VALUES (?, ?) ON CONFLICT(group_id) DO UPDATE SET last_push_at = excluded.last_push_at").bind(pair.group_id, now)
@@ -1822,8 +1822,12 @@ function normalizeDeviceRole(value, allowedRoles = ["owner", "collaborator", "gu
 // Do not edit manually; regenerate whenever capabilities or storage policy changes.
 const V2_ACTIONS = ["view","edit","import","export","close","manage"];
 const V2_RESOURCES = ["devices","sync_diagnostics","backup","data","recipes","bottles","homemade","lab_projects","lab_batches","lab_plan","books","menu","shopping","wine_catalog","food_menu","food_ingredients","inventory_spirits","inventory_wine","inventory_fruit","inventory_food","inventory_beer","inventory_ice","shop_glassware","shop_tableware","shop_supplies","shop_equipment","suppliers","reports_monthly","accounts","analytics_business","analytics_period","petty_cash","store_schedule","labor_employees","labor_schedule","labor_attendance","labor_comp_off","payroll","preferences"];
+const V2_BUSINESS_TABS = ["cocktail","wine","lab","food","store"];
+const V2_BUSINESS_TAB_RESOURCES = {"cocktail":["recipes","bottles","homemade","books","menu","shopping"],"wine":["wine_catalog","inventory_wine"],"lab":["lab_projects","lab_batches","lab_plan"],"food":["food_menu","food_ingredients","inventory_food"],"store":["inventory_spirits","inventory_fruit","inventory_beer","inventory_ice","shop_glassware","shop_tableware","shop_supplies","shop_equipment","suppliers","reports_monthly","accounts","analytics_business","analytics_period","petty_cash","store_schedule","labor_employees","labor_schedule","labor_attendance","labor_comp_off","payroll"]};
+const V2_RESOURCE_TAB = {"recipes":"cocktail","bottles":"cocktail","homemade":"cocktail","books":"cocktail","menu":"cocktail","shopping":"cocktail","wine_catalog":"wine","inventory_wine":"wine","lab_projects":"lab","lab_batches":"lab","lab_plan":"lab","food_menu":"food","food_ingredients":"food","inventory_food":"food","inventory_spirits":"store","inventory_fruit":"store","inventory_beer":"store","inventory_ice":"store","shop_glassware":"store","shop_tableware":"store","shop_supplies":"store","shop_equipment":"store","suppliers":"store","reports_monthly":"store","accounts":"store","analytics_business":"store","analytics_period":"store","petty_cash":"store","store_schedule":"store","labor_employees":"store","labor_schedule":"store","labor_attendance":"store","labor_comp_off":"store","payroll":"store"};
 const V2_ALL_CAPABILITIES = V2_RESOURCES.flatMap((resource) => V2_ACTIONS.map((action) => `${resource}.${action}`));
 const V2_CAPABILITY_SET = new Set(V2_ALL_CAPABILITIES);
+const V2_TAB_GRANT_SET = new Set(V2_BUSINESS_TABS.map((tab) => `${tab}.access`));
 const V2_STORAGE_CAPABILITY = {
   "cocktail.recipes": [
     "recipes.view",
@@ -2232,26 +2236,56 @@ const V2_STORAGE_CAPABILITY = {
 };
 // V2_STORAGE_CAPABILITY_GENERATED_END
 
+function parseBusinessTabs(raw) {
+  try {
+    const values = JSON.parse(raw || "[]");
+    if (!Array.isArray(values)) return [];
+    const grants = new Set(values.filter((value) => typeof value === "string" && V2_TAB_GRANT_SET.has(value))
+      .map((grant) => grant.replace(/\.access$/, "")));
+    if (grants.size > 0) return V2_BUSINESS_TABS.filter((tab) => grants.has(tab));
+
+    // 仅用于一次性迁移窗口：历史资源策略只有在一个Tab的全部资源均具备view时，
+    // 才安全折算为该Tab，绝不因任一单项授权扩大设备权限。
+    const legacy = new Set(values.filter((value) => typeof value === "string" && V2_CAPABILITY_SET.has(value)));
+    return V2_BUSINESS_TABS.filter((tab) => V2_BUSINESS_TAB_RESOURCES[tab].every((resource) => legacy.has(`${resource}.view`)));
+  } catch {
+    return [];
+  }
+}
+
+function encodeBusinessTabs(tabs) {
+  return JSON.stringify([...new Set(tabs)].filter((tab) => V2_BUSINESS_TABS.includes(tab)).map((tab) => `${tab}.access`));
+}
+
+function capabilitiesForBusinessTabs(tabs, role) {
+  const grants = new Set(tabs);
+  const actions = role === "guest" ? ["view"] : V2_ACTIONS;
+  const businessCapabilities = V2_BUSINESS_TABS.flatMap((tab) => grants.has(tab)
+    ? V2_BUSINESS_TAB_RESOURCES[tab].flatMap((resource) => actions.map((action) => `${resource}.${action}`))
+    : []);
+  const systemCapabilities = role === "owner"
+    ? V2_RESOURCES.filter((resource) => !V2_RESOURCE_TAB[resource]).flatMap((resource) => V2_ACTIONS.map((action) => `${resource}.${action}`))
+    : [];
+  return [...new Set([...businessCapabilities, ...systemCapabilities])];
+}
+
+function isSessionCapabilityAllowed(session, required) {
+  if (typeof required !== "string") return false;
+  const [resource] = required.split(".");
+  const tab = V2_RESOURCE_TAB[resource];
+  return tab ? session.policy.tabs.includes(tab) && session.policy.capabilities.includes(required) : session.policy.capabilities.includes(required);
+}
+
 function isSessionStorageAllowed(session, storageKey, operation) {
   if (typeof storageKey !== "string") return false;
   const rule = V2_STORAGE_CAPABILITY[storageKey];
   if (!rule) return false;
   const required = operation === "read" ? rule[0] : rule[1];
-  return typeof required === "string" && session.policy.capabilities.includes(required);
+  return isSessionCapabilityAllowed(session, required);
 }
 
 function filterSyncEntriesForSession(session, entries, operation) {
   return entries.filter((entry) => isSessionStorageAllowed(session, entry?.storageKey, operation));
-}
-
-function parseCapabilities(raw) {
-  try {
-    const values = JSON.parse(raw || "[]");
-    if (!Array.isArray(values)) return [];
-    return [...new Set(values.filter((value) => typeof value === "string" && V2_CAPABILITY_SET.has(value)))];
-  } catch {
-    return [];
-  }
 }
 
 async function resolveDeviceSessionV2(env, headers) {
@@ -2263,9 +2297,9 @@ async function resolveDeviceSessionV2(env, headers) {
     env.DB.prepare("SELECT revision, updated_at FROM group_policy_revisions WHERE group_id = ?").bind(device.group_id).first(),
   ]);
   const role = normalizeDeviceRole(device.role) || "guest";
-  // 业务权限只来自 device_policies；成员角色仅用于设备组所有权与交接。
-  // 缺失策略视为零权限，防止旧成员角色被解释为业务授权。
-  const capabilities = parseCapabilities(policy?.capabilities_json);
+  // 主设备总是拥有五个业务Tab；其他成员仅以五Tab策略作为唯一授权事实。
+  const tabs = role === "owner" ? [...V2_BUSINESS_TABS] : parseBusinessTabs(policy?.capabilities_json);
+  const capabilities = capabilitiesForBusinessTabs(tabs, role);
   const policyRevision = Number(policy?.revision || revision?.revision || 0);
   const policyUpdatedAt = Number(policy?.updated_at || revision?.updated_at || 0);
   return {
@@ -2285,6 +2319,7 @@ async function resolveDeviceSessionV2(env, headers) {
     policy: {
       revision: policyRevision,
       issuedAt: policyUpdatedAt,
+      tabs,
       capabilities,
     },
     sync: {
@@ -2301,10 +2336,10 @@ async function handleDeviceSessionV2(env, headers, origin) {
   return json(session, 200, origin);
 }
 
-function normalizeRequestedCapabilities(value) {
+function normalizeRequestedTabs(value) {
   if (!Array.isArray(value)) return null;
   const unique = [...new Set(value)];
-  if (!unique.every((item) => typeof item === "string" && V2_CAPABILITY_SET.has(item))) return null;
+  if (!unique.every((item) => typeof item === "string" && V2_BUSINESS_TABS.includes(item))) return null;
   return unique;
 }
 
@@ -2312,11 +2347,11 @@ async function writeDevicePolicyV2(env, input) {
   const now = Date.now();
   const current = await env.DB.prepare("SELECT revision FROM group_policy_revisions WHERE group_id = ?").bind(input.groupId).first();
   const revision = Number(current?.revision || 0) + 1;
-  const capabilitiesJson = JSON.stringify(input.capabilities);
+  const tabsJson = encodeBusinessTabs(input.tabs);
   await env.DB.batch([
     env.DB.prepare("INSERT INTO group_policy_revisions (group_id, revision, updated_at) VALUES (?, ?, ?) ON CONFLICT(group_id) DO UPDATE SET revision = excluded.revision, updated_at = excluded.updated_at").bind(input.groupId, revision, now),
-    env.DB.prepare("INSERT INTO device_policies (device_id, group_id, revision, capabilities_json, updated_at, updated_by) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(device_id) DO UPDATE SET group_id = excluded.group_id, revision = excluded.revision, capabilities_json = excluded.capabilities_json, updated_at = excluded.updated_at, updated_by = excluded.updated_by").bind(input.targetDeviceId, input.groupId, revision, capabilitiesJson, now, input.actorDeviceId),
-    env.DB.prepare("INSERT INTO device_policy_audit (group_id, target_device_id, revision, actor_device_id, event_type, capabilities_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)").bind(input.groupId, input.targetDeviceId, revision, input.actorDeviceId, input.eventType, capabilitiesJson, now),
+    env.DB.prepare("INSERT INTO device_policies (device_id, group_id, revision, capabilities_json, updated_at, updated_by) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(device_id) DO UPDATE SET group_id = excluded.group_id, revision = excluded.revision, capabilities_json = excluded.capabilities_json, updated_at = excluded.updated_at, updated_by = excluded.updated_by").bind(input.targetDeviceId, input.groupId, revision, tabsJson, now, input.actorDeviceId),
+    env.DB.prepare("INSERT INTO device_policy_audit (group_id, target_device_id, revision, actor_device_id, event_type, capabilities_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)").bind(input.groupId, input.targetDeviceId, revision, input.actorDeviceId, input.eventType, tabsJson, now),
     env.DB.prepare("INSERT INTO group_ts (group_id, last_push_at) VALUES (?, ?) ON CONFLICT(group_id) DO UPDATE SET last_push_at = excluded.last_push_at").bind(input.groupId, now),
   ]);
   return { revision, updatedAt: now };
@@ -2327,8 +2362,8 @@ async function handleDeviceUpdatePolicyV2(env, body, headers, origin) {
   if (!actor) return err("DEVICE_AUTH_UNAUTHORIZED", 401, origin);
   if (actor.role !== "owner") return err("DEVICE_POLICY_OWNER_REQUIRED", 403, origin);
   const targetDeviceId = typeof body?.targetDeviceId === "string" ? body.targetDeviceId : "";
-  const capabilities = normalizeRequestedCapabilities(body?.capabilities);
-  if (!targetDeviceId || !capabilities) return err("DEVICE_POLICY_INVALID", 400, origin);
+  const tabs = normalizeRequestedTabs(body?.tabs);
+  if (!targetDeviceId || !tabs) return err("DEVICE_TAB_POLICY_INVALID", 400, origin);
   const target = await env.DB.prepare("SELECT device_id, role FROM devices WHERE device_id = ? AND group_id = ? AND is_active = 1").bind(targetDeviceId, actor.group_id).first();
   if (!target) return err("DEVICE_POLICY_TARGET_NOT_FOUND", 404, origin);
 
@@ -2336,10 +2371,10 @@ async function handleDeviceUpdatePolicyV2(env, body, headers, origin) {
     groupId: actor.group_id,
     targetDeviceId,
     actorDeviceId: actor.device_id,
-    capabilities,
-    eventType: "policy_updated",
+    tabs,
+    eventType: "tab_policy_updated",
   });
-  return json({ success: true, targetDeviceId, capabilities, policyRevision: written.revision, updatedAt: written.updatedAt }, 200, origin);
+  return json({ success: true, targetDeviceId, tabs, policyRevision: written.revision, updatedAt: written.updatedAt }, 200, origin);
 }
 
 async function handleDeviceUpdateMetadata(env, body, headers, origin) {
@@ -2363,7 +2398,7 @@ async function handleDeviceRegister(env, body, origin) {
   await env.DB.batch([
     env.DB.prepare("INSERT INTO devices (device_id, group_id, token, name, platform, role, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?)").bind(deviceId, groupId, token, deviceName || "Unknown", normalizeDevicePlatform(platform), "owner", now),
     env.DB.prepare("INSERT INTO group_policy_revisions (group_id, revision, updated_at) VALUES (?, 1, ?)").bind(groupId, now),
-    env.DB.prepare("INSERT INTO device_policies (device_id, group_id, revision, capabilities_json, updated_at, updated_by) VALUES (?, ?, 1, ?, ?, ?)").bind(deviceId, groupId, JSON.stringify(V2_ALL_CAPABILITIES), now, deviceId),
+    env.DB.prepare("INSERT INTO device_policies (device_id, group_id, revision, capabilities_json, updated_at, updated_by) VALUES (?, ?, 1, ?, ?, ?)").bind(deviceId, groupId, encodeBusinessTabs(V2_BUSINESS_TABS), now, deviceId),
   ]);
   const membership = { deviceId, deviceToken: token, groupId, role: "owner", deviceName: deviceName || "Unknown" };
   return deviceMembershipResponse(env, membership, origin, normalizeDevicePlatform(platform) === "web");
@@ -2375,18 +2410,19 @@ async function handleDeviceGenerateCode(env, body, headers, origin) {
   const session = await resolveDeviceSessionV2(env, headers);
   if (!session) return err("DEVICE_AUTH_UNAUTHORIZED", 401, origin);
   if (!session.policy.capabilities.includes("devices.manage")) return err("CAPABILITY_DENIED", 403, origin);
-  const { role = "collaborator", expiresInMinutes = 10, capabilities = [] } = body || {};
+  const { role = "collaborator", expiresInMinutes = 10, tabs = [] } = body || {};
   const normalizedRole = normalizeDeviceRole(role, ["collaborator", "guest"]);
   if (!normalizedRole) return err("INVALID_DEVICE_ROLE", 400, origin);
-  const normalizedCapabilities = parseCapabilities(JSON.stringify(capabilities));
+  const normalizedTabs = normalizeRequestedTabs(tabs);
+  if (!normalizedTabs) return err("DEVICE_TAB_POLICY_INVALID", 400, origin);
   const code = String(Math.floor(100000 + Math.random() * 900000));
   const now = Date.now();
   const expiresAt = now + Math.min(60, Math.max(1, Number(expiresInMinutes) || 10)) * 60 * 1e3;
   await env.DB.batch([
     env.DB.prepare("INSERT INTO pair_codes (code, group_id, role, expires_at, used) VALUES (?, ?, ?, ?, 0)").bind(code, session.membership.groupId, normalizedRole, expiresAt),
-    env.DB.prepare("INSERT INTO pair_code_policies (code, group_id, revision, capabilities_json, created_at) VALUES (?, ?, 1, ?, ?)").bind(code, session.membership.groupId, JSON.stringify(normalizedCapabilities), now),
+    env.DB.prepare("INSERT INTO pair_code_policies (code, group_id, revision, capabilities_json, created_at) VALUES (?, ?, 1, ?, ?)").bind(code, session.membership.groupId, encodeBusinessTabs(normalizedTabs), now),
   ]);
-  return json({ code, expiresAt, role: normalizedRole, capabilities: normalizedCapabilities }, 200, origin);
+  return json({ code, expiresAt, role: normalizedRole, tabs: normalizedTabs }, 200, origin);
 }
 __name(handleDeviceGenerateCode, "handleDeviceGenerateCode");
 __name2(handleDeviceGenerateCode, "handleDeviceGenerateCode");
@@ -2403,14 +2439,14 @@ async function handleDevicePair(env, body, origin) {
   const policy = await env.DB.prepare("SELECT revision, capabilities_json FROM pair_code_policies WHERE code = ? AND group_id = ?").bind(code, pairRow.group_id).first();
   if (!policy) return err("PAIR_POLICY_MISSING", 409, origin);
   const now = Date.now();
-  const capabilities = parseCapabilities(policy.capabilities_json);
+  const tabs = parseBusinessTabs(policy.capabilities_json);
   await env.DB.batch([
     env.DB.prepare("INSERT INTO devices (device_id, group_id, token, name, platform, role, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?)").bind(deviceId, pairRow.group_id, token, deviceName || "Unknown", normalizeDevicePlatform(platform), normalizeDeviceRole(pairRow.role) ?? "guest", now),
-    env.DB.prepare("INSERT INTO device_policies (device_id, group_id, revision, capabilities_json, updated_at, updated_by) VALUES (?, ?, ?, ?, ?, ?)").bind(deviceId, pairRow.group_id, Number(policy.revision || 1), JSON.stringify(capabilities), now, deviceId),
+    env.DB.prepare("INSERT INTO device_policies (device_id, group_id, revision, capabilities_json, updated_at, updated_by) VALUES (?, ?, ?, ?, ?, ?)").bind(deviceId, pairRow.group_id, Number(policy.revision || 1), encodeBusinessTabs(tabs), now, deviceId),
     env.DB.prepare("UPDATE pair_codes SET used = 1 WHERE code = ?").bind(code),
     env.DB.prepare("DELETE FROM pair_code_policies WHERE code = ?").bind(code),
   ]);
-  const membership = { deviceId, deviceToken: token, groupId: pairRow.group_id, role: normalizeDeviceRole(pairRow.role) ?? "guest", capabilities, deviceName: deviceName || "Unknown" };
+  const membership = { deviceId, deviceToken: token, groupId: pairRow.group_id, role: normalizeDeviceRole(pairRow.role) ?? "guest", tabs, deviceName: deviceName || "Unknown" };
   const isWeb = normalizeDevicePlatform(platform) === "web";
   if (!isWeb) return json({ ...membership, token }, 200, origin);
   const [sessionId, webMemoryTicket] = await Promise.all([
@@ -2435,7 +2471,7 @@ async function handleDeviceList(env, headers, origin) {
       name: r.name,
       platform: normalizeDevicePlatform(r.platform),
       role,
-      capabilities: parseCapabilities(r.capabilities_json),
+      tabs: role === "owner" ? [...V2_BUSINESS_TABS] : parseBusinessTabs(r.capabilities_json),
       policyRevision: Number(r.policy_revision || 0),
       last_seen: r.last_seen ?? null,
       created_at: r.created_at,
@@ -2724,7 +2760,17 @@ var worker_v3_default = {
       return new Response(null, { status: 204, headers: corsHeaders(origin) });
     }
     if (path === "/health") {
-      return json({ status: "ok", version: "v4", release: "group-switch-safe", timestamp: Date.now() }, 200, origin);
+      return json({ status: "ok", version: "v4", release: "five-tab-device-session", timestamp: Date.now() }, 200, origin);
+    }
+    if (path === "/api/device/health/session-v2" && method === "GET") {
+      return json({
+        status: "ok",
+        schemaVersion: 2,
+        policyModel: "five_business_tabs",
+        tabs: V2_BUSINESS_TABS,
+        routes: ["/api/device/session-v2", "/api/device/update-policy-v2", "/api/device/recover-stale-owner", "/api/device/leave"],
+        timestamp: Date.now(),
+      }, 200, origin);
     }
     if (path.startsWith("/api/ai/")) {
       const ip = request.headers.get("CF-Connecting-IP") || "unknown";

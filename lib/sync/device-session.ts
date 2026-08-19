@@ -1,5 +1,7 @@
 import {
   ONLINE_REQUIRED_CAPABILITIES,
+  businessTabForCapability,
+  type BusinessTab,
   type Capability,
 } from "./capabilities";
 import type { SyncDevicePlatform } from "./device-platform";
@@ -35,6 +37,9 @@ export type DeviceSessionV2 = Readonly<{
   policy: Readonly<{
     revision: number;
     issuedAt: number;
+    /** 用户可配置的唯一业务授权：鸡尾酒、葡萄酒、研发、餐食、门店。 */
+    tabs: readonly BusinessTab[];
+    /** 仅用于系统职责（设备组、备份、诊断）的派生能力；不作为用户权限入口。 */
     capabilities: readonly Capability[];
   }>;
   sync: Readonly<{
@@ -119,7 +124,10 @@ export function can(state: DeviceSessionState, capability: Capability): CanDecis
       if (state.tag === "offline_cache" && ONLINE_REQUIRED_CAPABILITIES.has(capability)) {
         return deny("offline", true, session.policy.revision);
       }
-      if (!session.policy.capabilities.includes(capability)) {
+      const businessTab = businessTabForCapability(capability);
+      if (businessTab
+        ? !session.policy.tabs.includes(businessTab)
+        : !session.policy.capabilities.includes(capability)) {
         return deny("missing_capability", false, session.policy.revision);
       }
       return { allowed: true, reason: "allowed", retryable: false, policyRevision: session.policy.revision };

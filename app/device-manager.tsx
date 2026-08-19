@@ -45,7 +45,7 @@ import {
   type DeviceRole,
   type RemoteDevice,
 } from "@/lib/cf-sync/client";
-import { CAPABILITY_ACTIONS, CAPABILITY_RESOURCES, type Capability, type CapabilityResource } from "@/lib/sync/capabilities";
+import { BUSINESS_TABS, type BusinessTab } from "@/lib/sync/capabilities";
 import { Switch } from "react-native";
 import { useSync } from "@/lib/cf-sync/provider";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -81,37 +81,40 @@ function platformLabel(platform: string | undefined, lang: string): string {
   return lang === "zh" ? label.zh : label.en;
 }
 
-// ─── DeviceSessionV2 快捷预设 ──────────────────────────────────────────────────
-function capabilitySet(resources: readonly CapabilityResource[], actions: readonly string[]): Capability[] {
-  return resources.flatMap((resource) => actions.map((action) => `${resource}.${action}` as Capability));
-}
+// ─── 五Tab授权配对预设 ─────────────────────────────────────────────────────────
+const TAB_LABELS: Record<BusinessTab, { zh: string; en: string }> = {
+  cocktail: { zh: "鸡尾酒", en: "Cocktail" },
+  wine: { zh: "葡萄酒", en: "Wine" },
+  lab: { zh: "研发", en: "Lab" },
+  food: { zh: "餐食", en: "Food" },
+  store: { zh: "门店", en: "Store" },
+};
 
 const INVITE_PRESETS: {
   labelZh: string;
   labelEn: string;
-  icon: string;
   role: DeviceRole;
-  capabilities: Capability[];
+  tabs: BusinessTab[];
 }[] = [
-  { labelZh: "吧台设备", labelEn: "Bar Device", icon: "🏪", role: "collaborator", capabilities: capabilitySet(["recipes", "bottles", "homemade", "menu", "shopping"], CAPABILITY_ACTIONS) },
-  { labelZh: "厨房设备", labelEn: "Kitchen Device", icon: "🍽️", role: "collaborator", capabilities: capabilitySet(["food_menu", "food_ingredients", "inventory_food", "shopping"], CAPABILITY_ACTIONS) },
-  { labelZh: "财务只读", labelEn: "Finance Read-Only", icon: "💰", role: "guest", capabilities: capabilitySet(["reports_monthly", "accounts", "analytics_business", "analytics_period", "petty_cash", "payroll"], ["view"]) },
-  { labelZh: "运营只读", labelEn: "Ops Read-Only", icon: "📊", role: "guest", capabilities: capabilitySet(["reports_monthly", "analytics_business", "analytics_period", "recipes", "wine_catalog", "food_menu", "menu"], ["view"]) },
-  { labelZh: "研发设备", labelEn: "Lab Device", icon: "⚗️", role: "collaborator", capabilities: capabilitySet(["recipes", "lab_projects", "lab_batches", "lab_plan", "bottles", "homemade", "books"], CAPABILITY_ACTIONS) },
-  { labelZh: "全功能协作", labelEn: "Full Collaborator", icon: "🔓", role: "collaborator", capabilities: capabilitySet(CAPABILITY_RESOURCES, CAPABILITY_ACTIONS) },
+  { labelZh: "吧台设备", labelEn: "Bar Device", role: "collaborator", tabs: ["cocktail"] },
+  { labelZh: "厨房设备", labelEn: "Kitchen Device", role: "collaborator", tabs: ["food"] },
+  { labelZh: "门店只读", labelEn: "Store Read-Only", role: "guest", tabs: ["store"] },
+  { labelZh: "运营只读", labelEn: "Ops Read-Only", role: "guest", tabs: ["cocktail", "wine", "food", "store"] },
+  { labelZh: "研发设备", labelEn: "Lab Device", role: "collaborator", tabs: ["lab"] },
+  { labelZh: "全功能协作", labelEn: "Full Collaborator", role: "collaborator", tabs: [...BUSINESS_TABS] },
 ];
 
 function InvitePermissionSheet({
   role,
-  capabilities,
+  tabs,
   onToggle,
   onApplyPreset,
   lang,
   colors,
 }: {
   role: DeviceRole;
-  capabilities: Set<Capability>;
-  onToggle: (capability: Capability) => void;
+  tabs: Set<BusinessTab>;
+  onToggle: (tab: BusinessTab) => void;
   onApplyPreset: (preset: typeof INVITE_PRESETS[0]) => void;
   lang: string;
   colors: ReturnType<typeof import("@/hooks/use-colors").useColors>;
@@ -144,24 +147,20 @@ function InvitePermissionSheet({
           </Pressable>
         ))}
       </View>
-      {/* 配对时的查看范围；配对完成后可在完整资源 × 动作矩阵中继续细调。 */}
       <Text style={{ fontSize: 13, color: colors.muted, marginBottom: 8 }}>
-        {lang === "zh" ? "初始查看范围（配对后可细调动作）" : "Initial view scope (fine-tune actions after pairing)"}
+        {lang === "zh" ? "初始业务范围（内部页面自动继承）" : "Initial business access"}
       </Text>
-      {CAPABILITY_RESOURCES.map((resource) => {
-        const viewCapability = `${resource}.view` as Capability;
-        return (
-          <View key={resource} style={{ flexDirection: "row", alignItems: "center", paddingVertical: 6, gap: 10 }}>
-            <Text style={{ flex: 1, fontSize: 14, color: colors.foreground }}>{resource.replace(/_/g, " · ")}</Text>
-            <Switch
-              value={capabilities.has(viewCapability)}
-              onValueChange={() => onToggle(viewCapability)}
-              trackColor={{ false: colors.border, true: colors.primary + "80" }}
-              thumbColor={capabilities.has(viewCapability) ? colors.primary : colors.muted}
-            />
-          </View>
-        );
-      })}
+      {BUSINESS_TABS.map((tab) => (
+        <View key={tab} style={{ flexDirection: "row", alignItems: "center", paddingVertical: 6, gap: 10 }}>
+          <Text style={{ flex: 1, fontSize: 14, color: colors.foreground }}>{lang === "zh" ? TAB_LABELS[tab].zh : TAB_LABELS[tab].en}</Text>
+          <Switch
+            value={tabs.has(tab)}
+            onValueChange={() => onToggle(tab)}
+            trackColor={{ false: colors.border, true: colors.primary + "80" }}
+            thumbColor={tabs.has(tab) ? colors.primary : colors.muted}
+          />
+        </View>
+      ))}
     </View>
   );
 }
@@ -369,23 +368,21 @@ export default function DeviceManagerScreen() {
   const [icloudLastBackup, setIcloudLastBackup] = useState<number | null>(null);
   const [customRoleNames, setCustomRoleNames] = useState<Record<string, string>>({});
 
-  // 邀请时预设 DeviceSessionV2 capabilities。
-  const [inviteCapabilities, setInviteCapabilities] = useState<Set<Capability>>(
-    new Set(capabilitySet(CAPABILITY_RESOURCES, CAPABILITY_ACTIONS)),
-  );
-  const toggleInviteCapability = (capability: Capability) => {
-    setInviteCapabilities((previous) => {
+  // 邀请时只能配置五个底部业务Tab；所有内部页签从所属Tab继承。
+  const [inviteTabs, setInviteTabs] = useState<Set<BusinessTab>>(new Set(BUSINESS_TABS));
+  const toggleInviteTab = (tab: BusinessTab) => {
+    setInviteTabs((previous) => {
       const next = new Set(previous);
-      if (next.has(capability)) next.delete(capability);
-      else next.add(capability);
+      if (next.has(tab)) next.delete(tab);
+      else next.add(tab);
       return next;
     });
   };
 
   const applyInvitePreset = (preset: typeof INVITE_PRESETS[0]) => {
     tap();
-    setInviteCapabilities(new Set(preset.capabilities));
-    void handleGenerateCode(preset.role, preset.capabilities);
+    setInviteTabs(new Set(preset.tabs));
+    void handleGenerateCode(preset.role, preset.tabs);
   };
 
   const tap = () => {
@@ -448,10 +445,10 @@ export default function DeviceManagerScreen() {
     return () => clearInterval(id);
   }, [pairExpiry]);
 
-  const handleGenerateCode = async (role: DeviceRole, capabilities = [...inviteCapabilities]) => {
+  const handleGenerateCode = async (role: DeviceRole, tabs = [...inviteTabs]) => {
     try {
       setGeneratingCode(true);
-      const result = await generatePairCode(role, capabilities);
+      const result = await generatePairCode(role, tabs);
       setPairCode(result.code);
       setPairExpiry(result.expiresAt);
       tap();
@@ -514,7 +511,7 @@ export default function DeviceManagerScreen() {
         deviceId: device.id,
         deviceName: device.name,
         deviceRole: device.role,
-        capabilities: JSON.stringify(device.capabilities),
+        tabs: JSON.stringify(device.tabs),
       },
     });
   };
@@ -1149,8 +1146,8 @@ export default function DeviceManagerScreen() {
             {!pairCode && (
               <InvitePermissionSheet
                 role={"collaborator"}
-                capabilities={inviteCapabilities}
-                onToggle={toggleInviteCapability}
+                tabs={inviteTabs}
+                onToggle={toggleInviteTab}
                 onApplyPreset={applyInvitePreset}
                 lang={lang}
                 colors={colors}

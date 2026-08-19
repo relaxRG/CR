@@ -4,88 +4,41 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
+import { BUSINESS_TABS, type BusinessTab } from "@/lib/sync/capabilities";
 
-type PermRow = {
-  feature: string;
-  featureEn: string;
-  owner: boolean;
-  collaborator: boolean;
-  guest: boolean;
+type TabGuide = {
+  zh: string;
+  en: string;
+  descriptionZh: string;
+  descriptionEn: string;
 };
 
-const PERM_ROWS: PermRow[] = [
-  // ── 酒尺配方
-  { feature: "查看配方库", featureEn: "View Recipes", owner: true, collaborator: true, guest: true },
-  { feature: "新建 / 编辑 / 删除配方", featureEn: "Add / Edit / Delete Recipe", owner: true, collaborator: true, guest: false },
-  { feature: "收藏 / 评分 / 做过", featureEn: "Favorite / Rating / Made", owner: true, collaborator: true, guest: true },
-  // ── 酒款库
-  { feature: "查看酒款库", featureEn: "View Bottles", owner: true, collaborator: true, guest: true },
-  { feature: "新建 / 编辑 / 删除酒款", featureEn: "Add / Edit / Delete Bottle", owner: true, collaborator: true, guest: false },
-  // ── 自制品
-  { feature: "查看自制品", featureEn: "View Homemade", owner: true, collaborator: true, guest: true },
-  { feature: "新建 / 编辑自制品", featureEn: "Add / Edit Homemade", owner: true, collaborator: true, guest: false },
-  // ── 研发室
-  { feature: "研发室（查看）", featureEn: "Lab (View)", owner: true, collaborator: true, guest: true },
-  { feature: "研发室（新建项目）", featureEn: "Lab (New Project)", owner: true, collaborator: true, guest: false },
-  // ── 书库
-  { feature: "书库（查看）", featureEn: "Books (View)", owner: true, collaborator: true, guest: true },
-  { feature: "书库（导入图书）", featureEn: "Books (Import)", owner: true, collaborator: true, guest: false },
-  // ── 门店酒单 + 采购
-  { feature: "门店酒单", featureEn: "Menu", owner: true, collaborator: true, guest: true },
-  { feature: "采购清单", featureEn: "Shopping", owner: true, collaborator: true, guest: true },
-  // ── 葡萄酒库
-  { feature: "葡萄酒库（查看）", featureEn: "Wine (View)", owner: true, collaborator: true, guest: true },
-  { feature: "葡萄酒库（编辑）", featureEn: "Wine (Edit)", owner: true, collaborator: true, guest: false },
-  // ── 餐食菜单
-  { feature: "餐食菜单（查看）", featureEn: "Food (View)", owner: true, collaborator: true, guest: true },
-  { feature: "餐食菜单（编辑）", featureEn: "Food (Edit)", owner: true, collaborator: true, guest: false },
-  // ── 库存管理
-  { feature: "烈酒 / 啤酒 / 水果 / 冰块库存（查看）", featureEn: "Spirits / Beer / Fruit / Ice (View)", owner: true, collaborator: true, guest: true },
-  { feature: "库存管理（编辑）", featureEn: "Inventory (Edit)", owner: true, collaborator: true, guest: false },
-  // ── 门店运营
-  { feature: "月报 / 备用金 / 供应商（查看）", featureEn: "Reports / Petty Cash / Suppliers (View)", owner: true, collaborator: true, guest: true },
-  { feature: "门店运营（编辑）", featureEn: "Store Operations (Edit)", owner: true, collaborator: true, guest: false },
-  // ── 员工管理
-  { feature: "员工档案 / 排班表（查看）", featureEn: "Staff / Shifts (View)", owner: true, collaborator: true, guest: true },
-  { feature: "员工管理（编辑）", featureEn: "Staff Management (Edit)", owner: true, collaborator: true, guest: false },
-  // ── 薪资数据
-  { feature: "薪资单 / 预支（查看）", featureEn: "Payroll / Advances (View)", owner: true, collaborator: true, guest: true },
-  { feature: "薪资数据（编辑）", featureEn: "Payroll (Edit)", owner: true, collaborator: true, guest: false },
-  // ── 设备管理
-  { feature: "邀请 / 管理设备", featureEn: "Manage Devices", owner: true, collaborator: false, guest: false },
-  { feature: "转移主设备权限", featureEn: "Transfer Owner", owner: true, collaborator: false, guest: false },
-  { feature: "数据备份 / 恢复", featureEn: "Backup / Restore", owner: true, collaborator: false, guest: false },
-  { feature: "同步设置", featureEn: "Sync Settings", owner: true, collaborator: false, guest: false },
-];
-
-const ROLE_LABELS = {
-  owner: { zh: "主设备", en: "Owner" },
-  collaborator: { zh: "协作者", en: "Collaborator" },
-  guest: { zh: "访客", en: "Guest" },
+const TAB_GUIDE: Record<BusinessTab, TabGuide> = {
+  cocktail: { zh: "鸡尾酒", en: "Cocktail", descriptionZh: "配方、酒款、自制、书库、酒单与采购", descriptionEn: "Recipes, bottles, homemade, books, menus and shopping" },
+  wine: { zh: "葡萄酒", en: "Wine", descriptionZh: "葡萄酒档案、库存、采购与供应商关联", descriptionEn: "Wine catalog, inventory, purchasing and supplier links" },
+  lab: { zh: "研发", en: "Lab", descriptionZh: "研发项目、批次、计划与自制研发数据", descriptionEn: "Projects, batches, plans and R&D data" },
+  food: { zh: "餐食", en: "Food", descriptionZh: "菜单、食材、采购和食材库存", descriptionEn: "Menus, ingredients, purchasing and food inventory" },
+  store: { zh: "门店", en: "Store", descriptionZh: "报表、员工、薪资、备用金、全部库存、店铺、账户与供应商", descriptionEn: "Reports, staff, payroll, petty cash, all inventory, operations, accounts and suppliers" },
 };
 
-const ROLE_DESC = {
+const ROLE_GUIDE = {
   owner: {
-    zh: "拥有全部权限，可邀请其他设备、管理角色、备份数据。您的多台设备（iPhone/iPad/Mac）均可设为主设备。",
-    en: "Full access. Can invite devices, manage roles, and backup data. Multiple personal devices can all be set as owner.",
+    zh: "主设备：始终拥有五个业务Tab，并独占设备组、配对、备份、成员和主设备交接管理。",
+    en: "Owner: always has all five business tabs and exclusively manages the device group, pairing, backups, members and ownership handoff.",
   },
   collaborator: {
-    zh: "可查看和编辑大部分内容，但不能管理设备或备份数据。适合团队成员设备。",
-    en: "Can view and edit most content, but cannot manage devices or backup. Suitable for team member devices.",
+    zh: "协作设备：由主设备勾选可用的业务Tab；获准Tab内可按协作角色处理业务，但不能管理设备组。",
+    en: "Collaborator: the owner selects business tabs; permitted tabs are available for collaboration, but device-group management is unavailable.",
   },
   guest: {
-    zh: "仅可查看内容，不可新建、编辑或删除任何数据。收藏、评分、做过标记仅在本设备保留。适合展示用设备。",
-    en: "View-only access. Cannot create, edit, or delete data. Favorites, ratings, and 'made' marks are local-only. Suitable for display devices.",
+    zh: "访客设备：由主设备勾选可查看的业务Tab；获准Tab内只读，不能创建、修改、导入、月结或管理设备。",
+    en: "Guest: the owner selects readable business tabs; permitted tabs are read-only and cannot create, edit, import, close periods or manage devices.",
   },
 };
 
 function Check({ value }: { value: boolean }) {
   const colors = useColors();
-  return (
-    <Text style={{ color: value ? colors.success : colors.muted, fontSize: 16, textAlign: "center" }}>
-      {value ? "✓" : "–"}
-    </Text>
-  );
+  return <Text style={{ color: value ? colors.success : colors.muted, fontSize: 16, textAlign: "center" }}>{value ? "✓" : "–"}</Text>;
 }
 
 export default function RoleGuideScreen() {
@@ -97,146 +50,52 @@ export default function RoleGuideScreen() {
 
   return (
     <ScreenContainer>
-      {/* 手动 header */}
-      <View style={[rgStyles.header, { paddingTop: Math.max(insets.top, 8) }]}>
-        <Pressable style={rgStyles.backBtn} onPress={() => router.back()}>
-          <Text style={[rgStyles.backText, { color: colors.primary }]}>
-            {isEn ? "‹ Back" : "‹ 返回"}
-          </Text>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, 8) }]}>
+        <Pressable style={styles.backBtn} onPress={() => router.back()}>
+          <Text style={[styles.backText, { color: colors.primary }]}>{isEn ? "‹ Back" : "‹ 返回"}</Text>
         </Pressable>
-        <Text style={[rgStyles.title, { color: colors.foreground }]} numberOfLines={1}>
-          {isEn ? "Role Permissions" : "角色权限说明"}
-        </Text>
+        <Text style={[styles.title, { color: colors.foreground }]} numberOfLines={1}>{isEn ? "Device Access" : "设备访问说明"}</Text>
         <View style={{ width: 64 }} />
       </View>
+
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
-        {/* 标题 */}
-        <Text style={{ fontSize: 13, color: colors.muted, marginBottom: 20, marginTop: 4 }}>
+        <Text style={[styles.intro, { color: colors.muted }]}>
           {isEn
-            ? "Choose the right role when inviting a new device."
-            : "邀请新设备时，根据用途选择合适的角色。"}
+            ? "Business access has exactly five top-level tabs. Internal pages inherit their parent tab and are never authorized separately."
+            : "业务访问只有五个顶级Tab。内部页面自动继承所属Tab，不会再按总月报、时段经营分析、库存分类或薪资等单独授权。"}
         </Text>
 
-        {/* 角色说明卡片 */}
         {(["owner", "collaborator", "guest"] as const).map((role) => (
-          <View
-            key={role}
-            style={{
-              backgroundColor: colors.surface,
-              borderRadius: 12,
-              padding: 14,
-              marginBottom: 12,
-              borderWidth: 0.5,
-              borderColor: colors.border,
-            }}
-          >
-            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
-              <View
-                style={{
-                  backgroundColor:
-                    role === "owner"
-                      ? colors.primary
-                      : role === "collaborator"
-                        ? colors.success
-                        : colors.muted,
-                  borderRadius: 6,
-                  paddingHorizontal: 8,
-                  paddingVertical: 2,
-                  marginRight: 8,
-                }}
-              >
-                <Text style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}>
-                  {isEn ? ROLE_LABELS[role].en : ROLE_LABELS[role].zh}
-                </Text>
-              </View>
-            </View>
-            <Text style={{ fontSize: 13, color: colors.muted, lineHeight: 18 }}>
-              {isEn ? ROLE_DESC[role].en : ROLE_DESC[role].zh}
-            </Text>
+          <View key={role} style={[styles.roleCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.roleTitle, { color: colors.foreground }]}>{isEn ? role : role === "owner" ? "主设备" : role === "collaborator" ? "协作设备" : "访客设备"}</Text>
+            <Text style={[styles.roleDescription, { color: colors.muted }]}>{isEn ? ROLE_GUIDE[role].en : ROLE_GUIDE[role].zh}</Text>
           </View>
         ))}
 
-        {/* 权限对比表 */}
-        <Text style={{ fontSize: 15, fontWeight: "600", color: colors.foreground, marginTop: 8, marginBottom: 10 }}>
-          {isEn ? "Permission Comparison" : "权限对比"}
-        </Text>
-        <View
-          style={{
-            backgroundColor: colors.surface,
-            borderRadius: 12,
-            borderWidth: 0.5,
-            borderColor: colors.border,
-            overflow: "hidden",
-          }}
-        >
-          {/* 表头 */}
-          <View
-            style={{
-              flexDirection: "row",
-              backgroundColor: colors.border,
-              paddingVertical: 8,
-              paddingHorizontal: 12,
-            }}
-          >
-            <Text style={{ flex: 2, fontSize: 12, fontWeight: "600", color: colors.foreground }}>
-              {isEn ? "Feature" : "功能"}
-            </Text>
-            {(["owner", "collaborator", "guest"] as const).map((role) => (
-              <Text
-                key={role}
-                style={{ flex: 1, fontSize: 11, fontWeight: "600", color: colors.foreground, textAlign: "center" }}
-              >
-                {isEn ? ROLE_LABELS[role].en : ROLE_LABELS[role].zh}
-              </Text>
-            ))}
-          </View>
-          {/* 表格行 */}
-          {PERM_ROWS.map((row, idx) => (
-            <View
-              key={row.feature}
-              style={{
-                flexDirection: "row",
-                paddingVertical: 9,
-                paddingHorizontal: 12,
-                borderTopWidth: idx === 0 ? 0 : 0.5,
-                borderTopColor: colors.border,
-                backgroundColor: idx % 2 === 0 ? "transparent" : colors.background,
-              }}
-            >
-              <Text style={{ flex: 2, fontSize: 13, color: colors.foreground }}>
-                {isEn ? row.featureEn : row.feature}
-              </Text>
-              <View style={{ flex: 1, alignItems: "center" }}>
-                <Check value={row.owner} />
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{isEn ? "Five Business Tabs" : "五个业务Tab"}</Text>
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          {BUSINESS_TABS.map((tab, index) => {
+            const item = TAB_GUIDE[tab];
+            return (
+              <View key={tab} style={[styles.tabRow, index > 0 ? { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border } : undefined]}>
+                <View style={{ flex: 2, paddingRight: 12 }}>
+                  <Text style={[styles.tabName, { color: colors.foreground }]}>{isEn ? item.en : item.zh}</Text>
+                  <Text style={[styles.tabDescription, { color: colors.muted }]}>{isEn ? item.descriptionEn : item.descriptionZh}</Text>
+                </View>
+                <View style={{ flex: 0.45, alignItems: "center" }}><Check value /></View>
+                <View style={{ flex: 0.45, alignItems: "center" }}><Check value /></View>
+                <View style={{ flex: 0.45, alignItems: "center" }}><Check value /></View>
               </View>
-              <View style={{ flex: 1, alignItems: "center" }}>
-                <Check value={row.collaborator} />
-              </View>
-              <View style={{ flex: 1, alignItems: "center" }}>
-                <Check value={row.guest} />
-              </View>
-            </View>
-          ))}
+            );
+          })}
         </View>
 
-        {/* 个人偏好说明 */}
-        <View
-          style={{
-            backgroundColor: colors.surface,
-            borderRadius: 12,
-            padding: 14,
-            marginTop: 16,
-            borderWidth: 0.5,
-            borderColor: colors.border,
-          }}
-        >
-          <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground, marginBottom: 6 }}>
-            {isEn ? "Personal Preferences (Device-Isolated)" : "个人偏好（按设备隔离）"}
-          </Text>
-          <Text style={{ fontSize: 13, color: colors.muted, lineHeight: 20 }}>
+        <View style={[styles.notice, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.noticeTitle, { color: colors.foreground }]}>{isEn ? "Important" : "重要说明"}</Text>
+          <Text style={[styles.noticeText, { color: colors.muted }]}>
             {isEn
-              ? "Favorites, ratings, and 'made' marks are stored separately per device role. Owner devices (your iPhone/iPad/Mac) share the same preferences. Collaborator and guest devices each maintain their own independent preferences."
-              : "收藏、评分、「做过」标记按设备角色独立存储。主设备（您的 iPhone/iPad/Mac）之间共享同一份偏好数据；协作者和访客设备各自维护独立的偏好，互不干扰。"}
+              ? "The checks above mean a tab can be granted. The owner chooses the actual tabs for each collaborator or guest in Device Management. Store includes reports, staff, petty cash, all inventory and operations; a permitted Store tab cannot show an individual internal-page access error."
+              : "上表表示五个Tab可以被授予。主设备会在“设备管理”中选择每台协作/访客设备实际可用的Tab。门店包含报表、员工、备用金、全部库存和店铺；只要门店已获准，任何内部页签都不能再显示单独的无权访问。"}
           </Text>
         </View>
       </ScrollView>
@@ -244,26 +103,21 @@ export default function RoleGuideScreen() {
   );
 }
 
-const rgStyles = StyleSheet.create({
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingBottom: 8,
-    gap: 8,
-  },
-  backBtn: {
-    width: 64,
-    paddingVertical: 4,
-  },
-  backText: {
-    fontSize: 17,
-    fontWeight: "400",
-  },
-  title: {
-    flex: 1,
-    fontSize: 17,
-    fontWeight: "600",
-    textAlign: "center",
-  },
+const styles = StyleSheet.create({
+  header: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingBottom: 8, gap: 8 },
+  backBtn: { width: 64, paddingVertical: 4 },
+  backText: { fontSize: 17, fontWeight: "400" },
+  title: { flex: 1, fontSize: 17, fontWeight: "600", textAlign: "center" },
+  intro: { fontSize: 13, lineHeight: 20, marginBottom: 14 },
+  roleCard: { borderRadius: 12, padding: 14, marginBottom: 10, borderWidth: StyleSheet.hairlineWidth },
+  roleTitle: { fontSize: 15, fontWeight: "600", marginBottom: 5 },
+  roleDescription: { fontSize: 13, lineHeight: 19 },
+  sectionTitle: { fontSize: 15, fontWeight: "600", marginTop: 10, marginBottom: 10 },
+  card: { borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, overflow: "hidden" },
+  tabRow: { flexDirection: "row", paddingVertical: 12, paddingHorizontal: 12 },
+  tabName: { fontSize: 14, fontWeight: "600", marginBottom: 3 },
+  tabDescription: { fontSize: 12, lineHeight: 17 },
+  notice: { borderRadius: 12, padding: 14, marginTop: 16, borderWidth: StyleSheet.hairlineWidth },
+  noticeTitle: { fontSize: 14, fontWeight: "600", marginBottom: 6 },
+  noticeText: { fontSize: 13, lineHeight: 20 },
 });
