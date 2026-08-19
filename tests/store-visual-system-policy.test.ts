@@ -5,8 +5,10 @@ import {
   getStoreDensity,
   getStoreSummaryColumns,
   getStoreVisibleMetricColumns,
+  STORE_CATEGORY_COLOR_KEYS,
   STORE_CATEGORY_TONES,
   STORE_DOMAIN_COLOR_RULES,
+  storeCategoryColor,
   STORE_TEXT,
   STORE_VISUAL_RULES,
   STORE_VISUAL_SYSTEM,
@@ -35,7 +37,19 @@ describe("门店唯一视觉系统规范", () => {
     expect(STORE_TEXT.body.fontWeight).toBe("500");
     expect(STORE_TEXT.metric.fontWeight).toBe("600");
     expect(STORE_CATEGORY_TONES).toEqual(["primary", "accent", "attention", "positive", "muted"]);
+    expect(STORE_CATEGORY_COLOR_KEYS).toEqual([
+      "primary", "categoryTeal", "aiAccent", "categoryIndigo", "categoryCyan",
+      "categoryMint", "categoryAmber", "categoryPink", "categoryCoral",
+    ]);
     expect(STORE_CATEGORY_TONES).not.toContain("danger");
+    expect(STORE_CATEGORY_COLOR_KEYS).not.toContain("error");
+    const colors = {
+      primary: "#1", foreground: "#2", muted: "#3", border: "#4", surface: "#5", background: "#6",
+      success: "#7", warning: "#8", error: "#9", aiAccent: "#10", categoryTeal: "#11", categoryCyan: "#12",
+      categoryIndigo: "#13", categoryPink: "#14", categoryMint: "#15", categoryAmber: "#16", categoryCoral: "#17",
+    };
+    expect(storeCategoryColor(colors, 1)).toBe("#11");
+    expect(storeCategoryColor(colors, 10)).toBe("#11");
     expect(STORE_VISUAL_RULES.color).toContain("STORE_DOMAIN_COLOR_RULES");
     expect(STORE_VISUAL_RULES.type).toContain("禁止700/800/900");
   });

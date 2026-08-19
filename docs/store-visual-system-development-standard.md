@@ -232,3 +232,57 @@ pnpm test:h5:global-month-stress
 [2]: https://developer.apple.com/design/human-interface-guidelines/color "Apple Human Interface Guidelines — Color"
 [3]: https://developer.apple.com/design/human-interface-guidelines/sf-symbols "Apple Human Interface Guidelines — SF Symbols"
 [4]: https://help.icostapp.com/guide/other/update.html "iCost 更新记录"
+
+
+## 附录 A：色彩如何增加、选择与展示
+
+颜色不是固定配额，也不是只允许少数几种。新增颜色时必须先声明其属于哪一类用途：**领域分类、状态反馈、数据编码、操作强调或装饰品牌**。同一颜色不得跨类别承担相反含义。Apple 的颜色指南明确要求避免同色多义，并建议系统或自定义颜色同时覆盖浅色、深色和增强对比度；颜色不能作为关键信息的唯一载体。[1]
+
+| 使用类别 | 允许增加颜色的条件 | 推荐展示位置 | 禁止展示位置 |
+|---|---|---|---|
+| 领域分类 | 用户需要在多个稳定类别中快速辨识；类别及颜色可长期保存 | 分组标题色点、分类图标背景、图例、图表系列、日历色点 | 每条普通台账行的整行底色、每个金额文本 |
+| 状态反馈 | 状态可操作、可改变，且用户需要立即识别 | 状态标签、异常提示、确认结果、受控图标 | 普通金额、普通分类或纯装饰背景 |
+| 数据编码 | 图表同时展示三种以上独立系列，且存在图例 | 柱线、饼图扇区、图例和对应分组色点 | 无图例的密集表格、阅读型正文 |
+| 操作强调 | 当前页面只存在一个真正的主要动作 | 主要按钮背景、当前页签、选中态 | 多个相邻按钮同时高亮、普通文字 |
+| 品牌装饰 | 内容区域单色且品牌色能提升连续性 | 页面级小面积背景、顶部细强调线 | 大面积卡片、账本/库存的高密度数据区 |
+
+新增颜色的评审顺序为：先复用现有基础角色；若不能表达，再新增为“领域分类色”或“图表色”；只有在需要可操作的异常/完成状态时才新增状态色。新增项必须定义浅色、深色、高对比度三组变体，定义对应图标或文字描述，并在 `STORE_DOMAIN_COLOR_RULES` 和测试门禁中登记。
+
+Apple 的 SF Symbols 建议可以通过单色、层级、调色板和多彩渲染区分图标层级；其中层级渲染适合使用单一颜色和不同透明度表达主次，调色板渲染适合确实需要两种以上语义层的图标。工具栏和列表优先使用轮廓符号，选中态才考虑填充符号。[3] iCost 的公开更新记录显示其支持分类图标与自定义配色、分类统计图标跟随饼图或使用自定义色系，并持续维护 iPad 与 Mac 的具体兼容问题；这支持“分类可扩展、状态不滥用、跨端要逐项验证”的策略。[4]
+
+## 附录 B：Apple / iCost 研究摘录与本项目决策
+
+| 研究发现 | cocktail R 决策 |
+|---|---|
+| Apple：系统颜色以语义而非固定数值定义，并随外观和辅助功能适配。[1] | 主题色不在业务页面硬编码；`storeTone()` 统一从当前主题读取。 |
+| Apple：主/次/第三层背景和主/次/第三层文本用来表达层级。[1] | 先用表面、留白、分隔线、`STORE_TEXT` 区分层级，颜色只负责额外语义。 |
+| Apple：颜色不应成为状态或交互的唯一表达。[1] | 所有异常、完成、待处理状态都要求颜色 + 文字或图标。 |
+| Apple：SF Symbols 的轮廓、填充、层级和调色板模式对应不同强调强度。[3] | 分组/工具栏以小号线性图标为默认；选中页签或高优先级状态才使用填充或双层颜色。 |
+| Apple：布局在窗口调整、设备切换时应保持熟悉结构，只在不再容纳时转紧凑视图。[2] | 五大模块统一顺序；iPhone 减少可见指标、iPad 扩展列、Mac 限制内容宽度而不放大卡片。 |
+| iCost：分类图标与统计颜色可跟随图表或使用自定义配色，并维护 iPad/Mac 适配。[4] | 用户可管理的分类使用稳定分类色；统计图、图例、分组标题共享同色，但危险状态色不参与普通分类轮换。 |
+
+[1]: https://developer.apple.com/design/human-interface-guidelines/color "Apple Human Interface Guidelines — Color"
+[2]: https://developer.apple.com/design/human-interface-guidelines/layout "Apple Human Interface Guidelines — Layout"
+[3]: https://developer.apple.com/design/human-interface-guidelines/sf-symbols "Apple Human Interface Guidelines — SF Symbols"
+[4]: https://help.icostapp.com/guide/other/update.html "iCost 更新记录"
+
+
+## 附录 C：门店可扩展分类调色板
+
+分类颜色并非限制为五种。门店统一主题提供九个可轮换的分类槽位：`primary`、`categoryTeal`、`aiAccent`、`categoryIndigo`、`categoryCyan`、`categoryMint`、`categoryAmber`、`categoryPink`、`categoryCoral`。它们仅用于**用户可管理的分类、统计图系列、图例、分组色点和分类图标背景**；不会替换 `success`、`warning`、`error` 的状态语义，也不用于普通台账金额。
+
+当一个图表或分类列表超过九类时，不得直接增加一串相近新颜色。应首先采用以下策略：合并“其他”、按用户排序只突出前九类、使用可点击图例筛选、通过图标/标签形状补充识别，或分面展示。只有当第十个类别也是稳定且高频的业务实体时，才可以新增第十种主题分类色；新增前必须同时提供浅色、深色与增强对比度版本，并补充主题令牌、`STORE_CATEGORY_COLOR_KEYS`、领域映射说明和自动化测试。
+
+| 颜色槽位 | 推荐第一用途 | 推荐展示方式 |
+|---|---|---|
+| `primary` | 当前选中分类或第一图表系列 | 细下划线、色点、线条、图例 |
+| `categoryTeal` | 第二稳定分类 | 图表系列、分组标题图标 |
+| `aiAccent` | 关联/自定义分类 | 图例与轻量图标背景 |
+| `categoryIndigo` | 第四稳定分类 | 图表系列与日历色点 |
+| `categoryCyan` | 第五稳定分类 | 图表系列与分组色点 |
+| `categoryMint` | 第六稳定分类 | 图表系列与分组色点 |
+| `categoryAmber` | 第七稳定分类；不表示待处理 | 图表系列与分类图标背景 |
+| `categoryPink` | 第八稳定分类 | 图表系列与分类图标背景 |
+| `categoryCoral` | 第九稳定分类；不表示错误 | 图表系列与分类图标背景 |
+
+> `warning` 和 `error` 永远是状态色；即使它们在视觉上同样是橙/红，也不能进入普通分类轮换。分类色的含义来自图例和类别名称，状态色的含义来自状态文字和操作路径。

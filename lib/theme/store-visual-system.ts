@@ -74,6 +74,14 @@ export type StoreVisualColors = {
   warning: string;
   error: string;
   aiAccent: string;
+  /** 分类色仅用于图表、图例、色点和用户管理的分类图标；页面不得直接硬编码。 */
+  categoryTeal?: string;
+  categoryCyan?: string;
+  categoryIndigo?: string;
+  categoryPink?: string;
+  categoryMint?: string;
+  categoryAmber?: string;
+  categoryCoral?: string;
 };
 
 /**
@@ -110,10 +118,44 @@ export function storeToneSurface(colors: StoreVisualColors, tone: StoreVisualTon
 }
 
 /**
- * 图表和用户配置分类仅可从此稳定色序列轮换。危险红不参与普通分类配色，
- * 以免把普通菜品、库存分类或费用科目误读为异常。
+ * 用户可管理的分类与统计系列使用稳定九色调色板。危险红不参与普通分类，
+ * 以免把普通菜品、库存分类或费用科目误读为异常。色彩不足时优先配合图例、形状、排序或分面，
+ * 而不是无限继续增加相近颜色。
  */
+export const STORE_CATEGORY_COLOR_KEYS = [
+  "primary",
+  "categoryTeal",
+  "aiAccent",
+  "categoryIndigo",
+  "categoryCyan",
+  "categoryMint",
+  "categoryAmber",
+  "categoryPink",
+  "categoryCoral",
+] as const;
+
+/** 兼容已有图表调用；语义 tone 不再被误用为分类颜色池。 */
 export const STORE_CATEGORY_TONES = ["primary", "accent", "attention", "positive", "muted"] as const satisfies readonly StoreVisualTone[];
+
+export type StoreCategoryColorKey = (typeof STORE_CATEGORY_COLOR_KEYS)[number];
+
+export function storeCategoryColor(colors: StoreVisualColors, index: number): string {
+  const key = STORE_CATEGORY_COLOR_KEYS[Math.abs(index) % STORE_CATEGORY_COLOR_KEYS.length];
+  const resolved = colors[key];
+  if (resolved) return resolved;
+  const fallbacks: Record<StoreCategoryColorKey, StoreVisualTone> = {
+    primary: "primary",
+    categoryTeal: "positive",
+    aiAccent: "accent",
+    categoryIndigo: "primary",
+    categoryCyan: "primary",
+    categoryMint: "positive",
+    categoryAmber: "attention",
+    categoryPink: "accent",
+    categoryCoral: "attention",
+  };
+  return storeTone(colors, fallbacks[key]);
+}
 
 /**
  * 领域映射是唯一允许解释“同一种基础色在此页面是什么意思”的位置。
@@ -161,10 +203,6 @@ export const STORE_DOMAIN_COLOR_RULES = {
     danger: "损耗、维修异常、盘点差异或数据冲突。",
   },
 } as const;
-
-export function storeCategoryColor(colors: StoreVisualColors, index: number): string {
-  return storeTone(colors, STORE_CATEGORY_TONES[index % STORE_CATEGORY_TONES.length]);
-}
 
 export type StoreDensity = "phone" | "tablet" | "desktop";
 

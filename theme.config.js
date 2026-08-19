@@ -15,6 +15,14 @@ const themeColors = {
   warning:    { light: '#FA8C16', dark: '#D87A16' },
   error:      { light: '#FF4D4F', dark: '#DC4446' },
   aiAccent:   { light: '#722ED1', dark: '#9254DE' },
+  // 分类色仅用于图表、分类图标、色点和图例；不替代 success / warning / error 状态色。
+  categoryTeal:   { light: '#0F766E', dark: '#2DD4BF' },
+  categoryCyan:   { light: '#0E7490', dark: '#22D3EE' },
+  categoryIndigo: { light: '#4F46E5', dark: '#818CF8' },
+  categoryPink:   { light: '#BE185D', dark: '#F472B6' },
+  categoryMint:   { light: '#047857', dark: '#34D399' },
+  categoryAmber:  { light: '#B45309', dark: '#FBBF24' },
+  categoryCoral:  { light: '#C2410C', dark: '#FB923C' },
 };
 
 module.exports = { themeColors };
