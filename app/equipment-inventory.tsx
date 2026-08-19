@@ -464,7 +464,7 @@ export default function EquipmentInventoryScreen({ month, embedded = false }: Eq
 const S = StyleSheet.create({
   navbar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   navTitle: { fontSize: 17, fontWeight: "600" },
-  tabChip: { minHeight: 44, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  tabChip: { minHeight: 40, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   summaryRow: { flexDirection: "row", paddingVertical: 10, paddingHorizontal: 8, borderBottomWidth: StyleSheet.hairlineWidth },
   card: { flexDirection: "row", alignItems: "flex-start", borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 8, gap: 10 },
   tag: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
@@ -475,7 +475,7 @@ const S = StyleSheet.create({
   label: { fontSize: 13, fontWeight: "500", marginBottom: 4 },
   input: { borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15 },
   textarea: { borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, minHeight: 80 },
-  chip: { minHeight: 44, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  chip: { minHeight: 40, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   totalRow: { borderRadius: 10, padding: 12, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   summaryCard: { borderRadius: 12, borderWidth: 1, padding: 14 },
   hintCard: { borderRadius: 10, borderWidth: 1, padding: 12 },

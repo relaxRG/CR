@@ -39,6 +39,6 @@ describe("标签与数量徽标 Design Token", () => {
     expect(labChanges).toContain('CHIP_BADGE_LAYOUT.wrapChip');
     expect(labChanges).toContain('numberOfLines={2}');
     expect(inventory).toContain('horizontal\n        showsHorizontalScrollIndicator={false}\n        testID={mode === "shop" ? "shop-segmented-tabs" : "inventory-segmented-tabs"}');
-    expect(inventory).toContain('segment: { minHeight: 36');
+    expect(inventory).toContain('segment: { minHeight: INVENTORY_WORKSPACE_METRICS.segmentHeight');
   });
 });

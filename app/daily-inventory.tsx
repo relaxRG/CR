@@ -195,7 +195,7 @@ const S = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 16, borderBottomWidth: StyleSheet.hairlineWidth },
   title: { fontSize: 17, fontWeight: "600" },
   input: { borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8, fontSize: 14 },
-  modeBtn: { flex: 1, minHeight: 44, paddingVertical: 10, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  modeBtn: { flex: 1, minHeight: 40, paddingVertical: 6, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   totalRow: { borderRadius: 10, padding: 12, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   batchRow: { flexDirection: "row", alignItems: "center", borderRadius: 10, borderWidth: 1, padding: 10, gap: 8 },
   batchInput: { borderRadius: 8, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 6, fontSize: 14, textAlign: "center", width: 60 },

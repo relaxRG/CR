@@ -203,7 +203,7 @@ const S = StyleSheet.create({
   title: { fontSize: 17, fontWeight: "600" },
   label: { fontSize: 13, fontWeight: "500", marginBottom: 4 },
   input: { borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15 },
-  chip: { minHeight: 44, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center", minWidth: 80 },
+  chip: { minHeight: 40, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center", minWidth: 80 },
   hint: { borderRadius: 8, borderWidth: 1, padding: 10 },
   totalRow: { borderRadius: 10, padding: 12, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
 });

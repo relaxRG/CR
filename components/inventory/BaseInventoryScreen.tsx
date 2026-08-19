@@ -21,6 +21,7 @@ import { getCurrentMonth, MonthlyLedgerItem, MonthlySnapshot } from "@/lib/inven
 import { MonthlyLedgerRow } from "./MonthlyLedgerSheet";
 import { HorizontalLedgerColumn, HorizontalLedgerGroup, HorizontalLedgerTable } from "./HorizontalLedgerTable";
 import { formatStoreMoney, formatStoreQuantity, STORE_TABLE_METRICS } from "@/lib/store/table-display";
+import { formatInventoryMonthDay, INVENTORY_WORKSPACE_METRICS, inventoryTabLabel } from "@/lib/store/inventory-workspace-ui";
 import { MonthlyLedgerDetailSheet } from "./MonthlyLedgerDetailSheet";
 import { MonthCloseModal } from "./MonthCloseModal";
 import { OpeningStockModal } from "./OpeningStockModal";
@@ -204,10 +205,10 @@ export function BaseInventoryScreen({
   };
 
   const allTabs: { key: string; label: string }[] = [
-    { key: "summary", label: "📊 总结" },
-    { key: "ledger", label: "📋 库存管理" },
-    { key: "purchase", label: "📦 当月进货" },
-    ...extraTabs,
+    { key: "summary", label: "总结" },
+    { key: "ledger", label: "库存管理" },
+    { key: "purchase", label: "当月进货" },
+    ...extraTabs.map((tab) => ({ ...tab, label: inventoryTabLabel(tab.label) })),
   ];
 
   return (
@@ -233,12 +234,14 @@ export function BaseInventoryScreen({
       {/* Tab 切换 */}
       <ScrollView horizontal nestedScrollEnabled directionalLockEnabled showsHorizontalScrollIndicator={false}
         style={{ flexGrow: 0 }}
-        contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 8, gap: 8, alignItems: "center" }}>
+        contentContainerStyle={{ paddingHorizontal: INVENTORY_WORKSPACE_METRICS.horizontalPadding, paddingVertical: 6, gap: INVENTORY_WORKSPACE_METRICS.horizontalGap, alignItems: "center" }}>
         {allTabs.map((t) => (
           <TouchableOpacity key={t.key} testID={`${categoryId}-inventory-tab-${t.key}`} hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }} onPress={() => { tap(); setTab(t.key); }}
             style={[S.tabChip, {
-              backgroundColor: tab === t.key ? accentColor : colors.surface,
-              borderColor: tab === t.key ? accentColor : colors.border,
+              minHeight: INVENTORY_WORKSPACE_METRICS.segmentHeight,
+              borderRadius: INVENTORY_WORKSPACE_METRICS.segmentRadius,
+              backgroundColor: tab === t.key ? colors.foreground : colors.surface,
+              borderColor: tab === t.key ? colors.foreground : colors.border,
             }]}>
             <Text style={{ fontSize: 13, fontWeight: "600", color: tab === t.key ? "#fff" : colors.muted }}>
               {t.label}
@@ -395,17 +398,17 @@ export function BaseInventoryScreen({
         {/* ── 当月进货 Tab ──────────────────────────────────────────────────── */}
         {tab === "purchase" && (
           <View style={{ gap: 10 }}>
-            {/* 录入按钮 */}
-            <View style={{ flexDirection: "row", gap: 8, marginBottom: 4 }}>
+            {/* 录入操作统一为紧凑文本控制；状态不依赖红绿大色块表达。 */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: INVENTORY_WORKSPACE_METRICS.horizontalGap, paddingBottom: 2 }}>
               <TouchableOpacity onPress={() => { tap(); setPurchaseMode("in"); setPreselectedId(undefined); setShowPurchase(true); }}
-                style={[S.bigBtn, { backgroundColor: accentColor }]}>
-                <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}>+ 录入进货</Text>
+                style={[S.actionBtn, { minHeight: INVENTORY_WORKSPACE_METRICS.actionHeight, borderRadius: INVENTORY_WORKSPACE_METRICS.segmentRadius, backgroundColor: colors.foreground, borderColor: colors.foreground }]}>
+                <Text style={{ fontSize: 13, fontWeight: "700", color: "#fff" }}>录入进货</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => { tap(); setPurchaseMode("out"); setPreselectedId(undefined); setShowPurchase(true); }}
-                style={[S.bigBtn, { backgroundColor: colors.error }]}>
-                <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}>- 录入出库</Text>
+                style={[S.actionBtn, { minHeight: INVENTORY_WORKSPACE_METRICS.actionHeight, borderRadius: INVENTORY_WORKSPACE_METRICS.segmentRadius, backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>录入出库</Text>
               </TouchableOpacity>
-            </View>
+            </ScrollView>
 
             {/* 当月进货汇总 */}
             <View style={[S.summaryCard, { backgroundColor: accentColor + "0a", borderColor: accentColor + "22" }]}>
@@ -450,7 +453,7 @@ export function BaseInventoryScreen({
                 <View key={r.id} style={[S.recordCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>{r.itemName}</Text>
-                    <Text style={{ fontSize: 12, color: colors.muted }}>{r.date} · {r.supplier || "自采"}</Text>
+                    <Text style={{ fontSize: 12, color: colors.muted }}>{formatInventoryMonthDay(r.date)} · {r.supplier || "自采"}</Text>
                   </View>
                   <View style={{ alignItems: "flex-end" }}>
                     <Text style={{ fontSize: 15, fontWeight: "700", color: accentColor }}>+{r.quantity}</Text>
@@ -469,7 +472,7 @@ export function BaseInventoryScreen({
                     <View style={{ flex: 1 }}>
                       <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>{r.itemName}</Text>
                       <Text style={{ fontSize: 12, color: colors.muted }}>
-                        {r.date} · {r.reason === "loss" ? "损耗" : r.reason === "adjust" ? "盘点调整" : "消耗"}
+                        {formatInventoryMonthDay(r.date)} · {r.reason === "loss" ? "损耗" : r.reason === "adjust" ? "盘点调整" : "消耗"}
                       </Text>
                     </View>
                     <View style={{ alignItems: "flex-end" }}>
@@ -568,9 +571,9 @@ function EmptyState({ emoji, accentColor, excelFormatHint, colors }: any) {
 const S = StyleSheet.create({
   navbar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   navTitle: { fontSize: 17, fontWeight: "600" },
-  tabChip: { minHeight: 44, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1, alignItems: "center", justifyContent: "center" },
-  actionBtn: { flexShrink: 0, minHeight: 44, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center" },
-  bigBtn: { flex: 1, minHeight: 48, paddingVertical: 14, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  tabChip: { minHeight: INVENTORY_WORKSPACE_METRICS.segmentHeight, paddingHorizontal: 14, paddingVertical: 6, borderRadius: INVENTORY_WORKSPACE_METRICS.segmentRadius, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  actionBtn: { flexShrink: 0, minHeight: INVENTORY_WORKSPACE_METRICS.actionHeight, paddingHorizontal: 12, paddingVertical: 6, borderRadius: INVENTORY_WORKSPACE_METRICS.segmentRadius, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  bigBtn: { flex: 1, minHeight: INVENTORY_WORKSPACE_METRICS.actionHeight, paddingVertical: 8, borderRadius: INVENTORY_WORKSPACE_METRICS.segmentRadius, alignItems: "center", justifyContent: "center" },
   recordCard: { flexDirection: "row", alignItems: "center", borderRadius: 12, borderWidth: 1, padding: 12, gap: 10 },
   summaryCard: { borderRadius: 12, borderWidth: 1, padding: 14 },
   importOverlay: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },

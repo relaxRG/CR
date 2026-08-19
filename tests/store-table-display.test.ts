@@ -36,10 +36,10 @@ describe("门店台账显示规范", () => {
   });
 
   it("维持统一的紧凑可读行高，防止库存台账再次出现高低不齐", () => {
-    expect(STORE_TABLE_METRICS.headerHeight).toBe(48);
-    expect(STORE_TABLE_METRICS.rowHeight).toBe(46);
+    expect(STORE_TABLE_METRICS.headerHeight).toBe(36);
+    expect(STORE_TABLE_METRICS.rowHeight).toBe(44);
     expect(STORE_TABLE_METRICS.groupHeight).toBe(34);
-    expect(STORE_TABLE_METRICS.summaryHeaderHeight).toBe(42);
-    expect(STORE_TABLE_METRICS.summaryRowHeight).toBe(40);
+    expect(STORE_TABLE_METRICS.summaryHeaderHeight).toBe(38);
+    expect(STORE_TABLE_METRICS.summaryRowHeight).toBe(38);
   });
 });

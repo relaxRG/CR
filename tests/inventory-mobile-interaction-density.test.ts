@@ -36,7 +36,7 @@ describe("库存工作台紧凑布局与移动端交互护栏", () => {
 
     expect(base).toContain("horizontal nestedScrollEnabled directionalLockEnabled");
     expect(base).toContain('keyboardShouldPersistTaps="handled"');
-    expect(base).toContain("tabChip: { minHeight: 44");
+    expect(base).toContain("INVENTORY_WORKSPACE_METRICS.segmentHeight");
     expect(base).toContain('testID={`${categoryId}-inventory-tab-${t.key}`}');
     expect(table).toContain("horizontal nestedScrollEnabled directionalLockEnabled");
     expect(table).toContain("hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}");
@@ -44,23 +44,24 @@ describe("库存工作台紧凑布局与移动端交互护栏", () => {
     for (const source of [glassware, tableware]) {
       expect(source).toContain('keyboardShouldPersistTaps="handled"');
       expect(source).toContain("horizontal nestedScrollEnabled directionalLockEnabled");
-      expect(source).toContain("chip: { minHeight: 44");
+      expect(source).toContain("chip: { minHeight: 40");
     }
     expect(daily).toContain('keyboardShouldPersistTaps="handled"');
-    expect(daily).toContain("modeBtn: { flex: 1, minHeight: 44");
+    expect(daily).toContain("modeBtn: { flex: 1, minHeight: 40");
     expect(equipment).toContain('keyboardShouldPersistTaps="handled"');
     expect(equipment).toContain("horizontal nestedScrollEnabled directionalLockEnabled");
-    expect(equipment).toContain("chip: { minHeight: 44");
+    expect(equipment).toContain("chip: { minHeight: 40");
   });
 
-  it("十个库存与店铺分类的业务页签均使用44pt最小触控尺寸", () => {
+  it("十个库存与店铺分类的业务页签均使用40pt紧凑触控尺寸", () => {
     const spirits = read("app/spirits-inventory.tsx");
     const wine = read("app/wine-inventory.tsx");
     const food = read("app/food-inventory.tsx");
     const equipment = read("app/equipment-inventory.tsx");
-    for (const source of [spirits, wine, food, equipment]) {
-      expect(source).toContain("minHeight: 44");
+    for (const source of [spirits, wine, food]) {
+      expect(source).toContain("INVENTORY_WORKSPACE_METRICS.segmentHeight");
     }
+    expect(equipment).toContain("minHeight: 40");
     expect(food).toContain('testID={`food-tab-${t.key}`}');
     expect(equipment).toContain('testID={`equipment-tab-${t.key}`}');
   });

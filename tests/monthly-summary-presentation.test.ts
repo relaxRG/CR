@@ -79,11 +79,11 @@ describe("总月报展示分组", () => {
     expect(formatStoreMoney(250655.74)).toBe("¥250,655.74");
     expect(formatStoreMoney(0)).toBe("¥0.00");
     expect(STORE_TABLE_METRICS).toMatchObject({
-      headerHeight: 48,
-      rowHeight: 46,
+      headerHeight: 36,
+      rowHeight: 44,
       groupHeight: 34,
-      summaryHeaderHeight: 42,
-      summaryRowHeight: 40,
+      summaryHeaderHeight: 38,
+      summaryRowHeight: 38,
     });
   });
 });

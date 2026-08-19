@@ -31,14 +31,15 @@ import { MonthlyLedgerItem } from "@/lib/inventory-core/types";
 import { MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS, MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
 import { useModuleMonthCloseStore } from "@/lib/month-close/module-month-close-store";
 import { formatStoreMoney, formatStoreQuantity, STORE_TABLE_METRICS } from "@/lib/store/table-display";
+import { INVENTORY_WORKSPACE_METRICS } from "@/lib/store/inventory-workspace-ui";
 
 type ViewTab = "ledger" | "supplier" | "purchase" | "summary";
 
 const VIEW_TABS: { key: ViewTab; label: string }[] = [
-  { key: "summary", label: "📊 总结" },
-  { key: "ledger", label: "📋 库存管理" },
-  { key: "purchase", label: "📦 当月进货" },
-  { key: "supplier", label: "🏢 供应商" },
+  { key: "summary", label: "总结" },
+  { key: "ledger", label: "库存管理" },
+  { key: "purchase", label: "当月进货" },
+  { key: "supplier", label: "供应商信息" },
 ];
 
 function getCurrentMonth(): string {
@@ -614,7 +615,7 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
       <View style={[S.tabBar, { backgroundColor: colors.border + "33" }]}>
         {VIEW_TABS.map((t) => (
           <TouchableOpacity key={t.key} testID={`wine-tab-${t.key}`} hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }} onPress={() => { tap(); setViewTab(t.key); }}
-            style={[S.tabBtn, viewTab === t.key && { backgroundColor: colors.background }]}>
+            style={[S.tabBtn, { minHeight: INVENTORY_WORKSPACE_METRICS.segmentHeight, borderRadius: INVENTORY_WORKSPACE_METRICS.segmentRadius }, viewTab === t.key && { backgroundColor: colors.background }]}>
             <Text style={[S.tabText, { color: viewTab === t.key ? colors.foreground : colors.muted, fontWeight: viewTab === t.key ? "600" : "400" }]}>
               {t.label}
             </Text>
@@ -646,7 +647,7 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
               <StatCell label="本月进货" value={formatStoreMoney(ledgerStats.totalPurchaseCost)} color={colors.primary} />
               <StatCell label="本月消耗" value={`${formatStoreQuantity(ledgerStats.totalConsumeBottles)}瓶`} color={colors.warning} />
             </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, minHeight: 60, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }} contentContainerStyle={{ minHeight: 60, paddingHorizontal: 16, paddingVertical: 8, gap: 8, alignItems: "center" }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, minHeight: INVENTORY_WORKSPACE_METRICS.actionHeight + 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }} contentContainerStyle={{ minHeight: INVENTORY_WORKSPACE_METRICS.actionHeight + 12, paddingHorizontal: INVENTORY_WORKSPACE_METRICS.horizontalPadding, paddingVertical: 6, gap: INVENTORY_WORKSPACE_METRICS.horizontalGap, alignItems: "center" }}>
               <TouchableOpacity onPress={() => {
                 if (!assertWineWritable()) return;
                 tap();

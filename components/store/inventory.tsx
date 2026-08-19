@@ -20,6 +20,7 @@ import { useTablewareInventoryStore } from "@/lib/tableware/inventory-store";
 import { useDailyInventoryStore } from "@/lib/daily/inventory-store";
 import { useEquipmentInventoryStore } from "@/lib/equipment/inventory-store";
 import { useGlobalBusinessMonth } from "@/lib/months/global-business-month";
+import { INVENTORY_WORKSPACE_METRICS } from "@/lib/store/inventory-workspace-ui";
 import SpiritsInventoryScreen from "@/app/spirits-inventory";
 import WineInventoryScreen from "@/app/wine-inventory";
 import FruitInventoryScreen from "@/app/fruit-inventory";
@@ -34,17 +35,17 @@ import EquipmentInventoryScreen from "@/app/equipment-inventory";
 export type InventoryPortalMode = "inventory" | "shop";
 type InventoryCategoryKey = "spirits" | "wine" | "fruit" | "food" | "beer" | "ice" | "glassware" | "tableware" | "daily" | "equipment";
 
-const CATEGORIES: Array<{ key: InventoryCategoryKey; label: string; emoji: string; color: string; mode: InventoryPortalMode }> = [
-  { key: "spirits", label: "烈酒", emoji: "🥃", color: "#6B7280", mode: "inventory" },
-  { key: "wine", label: "葡萄酒", emoji: "🍷", color: "#9F1239", mode: "inventory" },
-  { key: "fruit", label: "水果", emoji: "🍋", color: "#22C55E", mode: "inventory" },
-  { key: "food", label: "食材", emoji: "🥩", color: "#10B981", mode: "inventory" },
-  { key: "beer", label: "啤酒", emoji: "🍺", color: "#F4A300", mode: "inventory" },
-  { key: "ice", label: "冰块", emoji: "🧊", color: "#00BCD4", mode: "inventory" },
-  { key: "glassware", label: "杯具", emoji: "🥂", color: "#6366F1", mode: "shop" },
-  { key: "tableware", label: "餐具", emoji: "🍽️", color: "#0EA5E9", mode: "shop" },
-  { key: "daily", label: "日用品", emoji: "🧴", color: "#F59E0B", mode: "shop" },
-  { key: "equipment", label: "设备", emoji: "🔧", color: "#6366F1", mode: "shop" },
+const CATEGORIES: Array<{ key: InventoryCategoryKey; label: string; mode: InventoryPortalMode }> = [
+  { key: "spirits", label: "烈酒", mode: "inventory" },
+  { key: "wine", label: "葡萄酒", mode: "inventory" },
+  { key: "fruit", label: "水果", mode: "inventory" },
+  { key: "food", label: "食材", mode: "inventory" },
+  { key: "beer", label: "啤酒", mode: "inventory" },
+  { key: "ice", label: "冰块", mode: "inventory" },
+  { key: "glassware", label: "杯具", mode: "shop" },
+  { key: "tableware", label: "餐具", mode: "shop" },
+  { key: "daily", label: "日用品", mode: "shop" },
+  { key: "equipment", label: "设备", mode: "shop" },
 ];
 
 const INVENTORY_CATEGORIES = CATEGORIES.filter((category) => category.mode === "inventory");
@@ -129,23 +130,14 @@ export default function StoreInventoryScreen({ mode = "inventory" }: { mode?: In
     if (!categories.some((category) => category.key === activeCategory)) setActiveCategory(defaultCategory);
   }, [activeCategory, categories, defaultCategory, setActiveCategory]);
 
-  const showPortalHeader = mode === "shop";
-
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      {showPortalHeader && (
-        <View style={{ paddingTop: 16, paddingHorizontal: 16 }}>
-          <Text style={{ fontSize: 22, fontWeight: "700", color: colors.foreground }}>店铺</Text>
-          <Text style={{ fontSize: 13, color: colors.muted, marginTop: 2 }}>杯具、餐具、日用品与设备</Text>
-        </View>
-      )}
-
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         testID={mode === "shop" ? "shop-segmented-tabs" : "inventory-segmented-tabs"}
-        style={{ flexGrow: 0, marginTop: showPortalHeader ? 14 : 8 }}
-        contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
+        style={{ flexGrow: 0, marginTop: 8 }}
+        contentContainerStyle={{ paddingHorizontal: INVENTORY_WORKSPACE_METRICS.horizontalPadding, gap: INVENTORY_WORKSPACE_METRICS.horizontalGap }}
       >
         {categories.map((category) => {
           const active = currentCategory?.key === category.key;
@@ -155,7 +147,7 @@ export default function StoreInventoryScreen({ mode = "inventory" }: { mode?: In
               testID={`${mode}-segment-${category.key}`}
               onPress={() => { tap(); setActiveCategory(category.key); }}
               activeOpacity={0.75}
-              style={[S.segment, { backgroundColor: active ? category.color : colors.surface, borderColor: active ? category.color : colors.border }]}
+              style={[S.segment, { backgroundColor: active ? colors.foreground : colors.surface, borderColor: active ? colors.foreground : colors.border }]}
             >
               <Text style={[S.segmentText, { color: active ? "#fff" : colors.foreground }]}>{category.label}</Text>
             </TouchableOpacity>
@@ -188,6 +180,6 @@ function InventoryBusinessPanel({ category, month }: { category: InventoryCatego
 }
 
 const S = StyleSheet.create({
-  segment: { minHeight: 36, justifyContent: "center", paddingHorizontal: 16, borderRadius: 10, borderWidth: 1 },
+  segment: { minHeight: INVENTORY_WORKSPACE_METRICS.segmentHeight, justifyContent: "center", paddingHorizontal: 16, borderRadius: INVENTORY_WORKSPACE_METRICS.segmentRadius, borderWidth: 1 },
   segmentText: { fontSize: 14, fontWeight: "600" },
 });

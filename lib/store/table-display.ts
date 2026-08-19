@@ -2,15 +2,16 @@ import { roundMoney } from "@/lib/finance/money";
 
 /** 门店 Excel 台账的统一视觉尺度。 */
 export const STORE_TABLE_METRICS = {
-  headerHeight: 48,
-  rowHeight: 46,
+  /** 手机台账优先保证单行可扫读；平板和桌面由列宽扩张而不是无意义放大行高。 */
+  headerHeight: 36,
+  rowHeight: 44,
   groupHeight: 34,
-  summaryHeaderHeight: 42,
-  summaryRowHeight: 40,
-  summaryTotalHeight: 42,
-  nameFontSize: 14.5,
-  bodyFontSize: 13,
-  numericFontSize: 13.5,
+  summaryHeaderHeight: 38,
+  summaryRowHeight: 38,
+  summaryTotalHeight: 40,
+  nameFontSize: 13,
+  bodyFontSize: 12,
+  numericFontSize: 12.5,
 } as const;
 
 export type StoreTableViewport = "phone" | "tablet" | "desktop";

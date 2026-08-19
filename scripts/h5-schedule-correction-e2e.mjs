@@ -487,7 +487,7 @@ try {
           return { found: Boolean(summary && ledger), summaryHeight: summaryRect?.height ?? 0, ledgerHeight: ledgerRect?.height ?? 0, summaryTop: summaryRect?.top ?? 0, ledgerTop: ledgerRect?.top ?? 0, rootClientWidth: document.documentElement.clientWidth, rootScrollWidth: document.documentElement.scrollWidth, bodyScrollWidth: document.body.scrollWidth };
         })()`, returnByValue: true });
         summaryTab = summaryState.result.value;
-        if (!summaryTab.found || summaryTab.summaryHeight < 44 || Math.abs(summaryTab.summaryHeight - summaryTab.ledgerHeight) > 1 || Math.abs(summaryTab.summaryTop - summaryTab.ledgerTop) > 1) throw new Error(`水果总结页签 ${width}pt 尺寸或对齐异常：${JSON.stringify(summaryTab)}`);
+        if (!summaryTab.found || summaryTab.summaryHeight < 40 || Math.abs(summaryTab.summaryHeight - summaryTab.ledgerHeight) > 1 || Math.abs(summaryTab.summaryTop - summaryTab.ledgerTop) > 1) throw new Error(`水果总结页签 ${width}pt 尺寸或对齐异常：${JSON.stringify(summaryTab)}`);
         if (summaryTab.rootScrollWidth > summaryTab.rootClientWidth || summaryTab.bodyScrollWidth > summaryTab.rootClientWidth) throw new Error(`水果总结页签 ${width}pt 出现根级横向溢出：${JSON.stringify(summaryTab)}`);
       }
       directLedgerViewports.push({ width, label: spec.label, ...state, summaryTab });
@@ -525,7 +525,7 @@ try {
         return { found: Boolean(active && peer), activeHeight: activeRect?.height ?? 0, peerHeight: peerRect?.height ?? 0, activeTop: activeRect?.top ?? 0, peerTop: peerRect?.top ?? 0, rootClientWidth: document.documentElement.clientWidth, rootScrollWidth: document.documentElement.scrollWidth, bodyScrollWidth: document.body.scrollWidth };
       })()`, returnByValue: true });
       const state = tabState.result.value;
-      if (!state.found || state.activeHeight < 44 || Math.abs(state.activeHeight - state.peerHeight) > 1 || Math.abs(state.activeTop - state.peerTop) > 1) throw new Error(`${spec.label} ${width}pt 页签选中态尺寸或对齐异常：${JSON.stringify(state)}`);
+      if (!state.found || state.activeHeight < 40 || Math.abs(state.activeHeight - state.peerHeight) > 1 || Math.abs(state.activeTop - state.peerTop) > 1) throw new Error(`${spec.label} ${width}pt 页签选中态尺寸或对齐异常：${JSON.stringify(state)}`);
       if (state.rootScrollWidth > state.rootClientWidth || state.bodyScrollWidth > state.rootClientWidth) throw new Error(`${spec.label} ${width}pt 页签选中态出现根级横向溢出：${JSON.stringify(state)}`);
       categoryTabLayoutViewports.push({ width, label: spec.label, ...state });
     }

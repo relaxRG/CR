@@ -23,6 +23,7 @@ import { HorizontalLedgerTable, HorizontalLedgerColumn, HorizontalLedgerGroup } 
 import { FoodLedgerMovementModal } from "@/components/food/FoodLedgerMovementModal";
 import { getCurrentMonth } from "@/lib/inventory-core/types";
 import { useModuleMonthCloseStore } from "@/lib/month-close/module-month-close-store";
+import { INVENTORY_WORKSPACE_METRICS } from "@/lib/store/inventory-workspace-ui";
 
 const FOOD_COLOR = "#10B981";
 type Tab = "ledger" | "purchase" | "summary";
@@ -213,9 +214,9 @@ export default function FoodInventoryScreen({ month, embedded = false }: FoodInv
   ], [colors]);
 
   const TABS: { key: Tab; label: string }[] = [
-    { key: "summary", label: "📊 总结" },
-    { key: "ledger", label: "📋 库存管理" },
-    { key: "purchase", label: "📦 当月进货" },
+    { key: "summary", label: "总结" },
+    { key: "ledger", label: "库存管理" },
+    { key: "purchase", label: "当月进货" },
   ];
 
   return (
@@ -234,12 +235,14 @@ export default function FoodInventoryScreen({ month, embedded = false }: FoodInv
       {/* Tab */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
         style={{ flexGrow: 0 }}
-        contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 8, gap: 8, alignItems: "center" }}>
+        contentContainerStyle={{ paddingHorizontal: INVENTORY_WORKSPACE_METRICS.horizontalPadding, paddingVertical: 6, gap: INVENTORY_WORKSPACE_METRICS.horizontalGap, alignItems: "center" }}>
         {TABS.map((t) => (
           <TouchableOpacity key={t.key} testID={`food-tab-${t.key}`} hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }} onPress={() => { tap(); setTab(t.key); }}
             style={[S.tabChip, {
-              backgroundColor: tab === t.key ? FOOD_COLOR : colors.surface,
-              borderColor: tab === t.key ? FOOD_COLOR : colors.border,
+              minHeight: INVENTORY_WORKSPACE_METRICS.segmentHeight,
+              borderRadius: INVENTORY_WORKSPACE_METRICS.segmentRadius,
+              backgroundColor: tab === t.key ? colors.foreground : colors.surface,
+              borderColor: tab === t.key ? colors.foreground : colors.border,
             }]}>
             <Text style={{ fontSize: 13, fontWeight: "600", color: tab === t.key ? "#fff" : colors.muted }}>{t.label}</Text>
           </TouchableOpacity>
@@ -249,15 +252,15 @@ export default function FoodInventoryScreen({ month, embedded = false }: FoodInv
       {/* 食材月度台账操作栏：同一行局部横向滚动。 */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} testID="food-ledger-action-toolbar"
         style={{ flexGrow: 0, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}
-        contentContainerStyle={{ gap: 8, paddingHorizontal: 12, paddingVertical: 8, alignItems: "center" }}>
+        contentContainerStyle={{ gap: INVENTORY_WORKSPACE_METRICS.horizontalGap, paddingHorizontal: INVENTORY_WORKSPACE_METRICS.horizontalPadding, paddingVertical: 6, alignItems: "center" }}>
         <TouchableOpacity onPress={() => { if (!assertFoodWritable()) return; tap(); setShowPurchase(true); }} style={[S.actionBtn, { backgroundColor: FOOD_COLOR + "15", borderColor: FOOD_COLOR + "33" }]}>
-          <Text style={{ fontSize: 12, color: FOOD_COLOR, fontWeight: "700" }}>📦 录入进货</Text>
+          <Text style={{ fontSize: 12, color: colors.foreground, fontWeight: "700" }}>录入进货</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => { if (!assertFoodWritable()) return; tap(); setShowConsume(true); }} style={[S.actionBtn, { backgroundColor: colors.warning + "15", borderColor: colors.warning + "33" }]}>
-          <Text style={{ fontSize: 12, color: colors.warning, fontWeight: "700" }}>🍽️ 录入消耗</Text>
+          <Text style={{ fontSize: 12, color: colors.foreground, fontWeight: "700" }}>录入消耗</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => { if (!assertFoodWritable()) return; tap(); setShowStocktake(true); }} style={[S.actionBtn, { backgroundColor: "#F59E0B22", borderColor: "#F59E0B" }]}>
-          <Text style={{ fontSize: 12, color: "#F59E0B", fontWeight: "700" }}>📋 月末盘点</Text>
+          <Text style={{ fontSize: 12, color: colors.foreground, fontWeight: "700" }}>月末盘点</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => Alert.alert("月结确认", `确认结转 ${currentMonth} 的食材期末库存至下月期初？`, [
           { text: "取消", style: "cancel" },
@@ -390,9 +393,9 @@ export default function FoodInventoryScreen({ month, embedded = false }: FoodInv
 const S = StyleSheet.create({
   navbar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   navTitle: { fontSize: 17, fontWeight: "600" },
-  tabChip: { minHeight: 44, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  tabChip: { minHeight: INVENTORY_WORKSPACE_METRICS.segmentHeight, paddingHorizontal: 14, paddingVertical: 6, borderRadius: INVENTORY_WORKSPACE_METRICS.segmentRadius, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   actionRow: { flexDirection: "row", paddingHorizontal: 12, paddingVertical: 8, gap: 8, borderBottomWidth: StyleSheet.hairlineWidth },
-  actionBtn: { flexShrink: 0, minHeight: 44, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  actionBtn: { flexShrink: 0, minHeight: INVENTORY_WORKSPACE_METRICS.actionHeight, paddingHorizontal: 12, paddingVertical: 6, borderRadius: INVENTORY_WORKSPACE_METRICS.segmentRadius, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   foodCard: { flexDirection: "row", alignItems: "flex-start", borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 8, gap: 10 },
   tag: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
   sheet: { flex: 1 },

@@ -10,7 +10,7 @@ describe("供应商当月进货表展示", () => {
 
   it("按数量、既有瓶箱规格、单价、总价、集团的顺序渲染表头", () => {
     const headerStart = screen.indexOf('testID="spirits-purchase-column-name"');
-    const headerEnd = screen.indexOf("{/* 数据行 */}", headerStart);
+    const headerEnd = screen.indexOf("{/* 数据行：常规浏览按分类分组", headerStart);
     const header = screen.slice(headerStart, headerEnd);
 
     expect(header).toContain("商品名称");
@@ -29,12 +29,19 @@ describe("供应商当月进货表展示", () => {
     expect(screen).toContain('displayName: preferred?.trim() || fallback?.trim() || purchase.rawName');
   });
 
-  it("每个数据行固定高度并为名称预留两行，避免一行和两行名称造成高低不齐", () => {
-    expect(screen).toContain("height: 58,");
-    expect(screen).toContain("minHeight: 58,");
-    expect(screen).toContain('height: 34 }}');
-    expect(screen).toContain("lineHeight: 16");
+  it("使用高密度固定行、单行名称与无色分类分组，避免名称高度不齐和重复分类标签", () => {
+    expect(screen).toContain("height: INVENTORY_WORKSPACE_METRICS.phoneRowHeight");
+    expect(screen).toContain("minHeight: INVENTORY_WORKSPACE_METRICS.phoneRowHeight");
+    expect(screen).toContain("purchaseDisplayGroups.map");
+    expect(screen).toContain("group.label} · {group.rows.length} 笔");
     expect(screen).toContain("numberOfLines={2}");
+    expect(screen).not.toContain("{/* 分类列 */}");
+  });
+
+  it("表头整列点击筛选排序且不再显示重复下拉箭头", () => {
+    expect(screen).toContain("tableHeaderAccessibilityLabel");
+    expect(screen).not.toContain(">⌄<");
+    expect(screen).toContain("formatInventoryMonthDay(p.date)");
   });
 
   it("Excel解析继续使用原有字段映射，不感知表格显示语言或列重排", () => {
