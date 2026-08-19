@@ -22,7 +22,7 @@ describe("薪资与考勤数字颜色层级", () => {
     expect(extra).not.toContain("colors.success");
     expect(extra).not.toContain("colors.warning");
     expect(extra).not.toContain("#FF2D55");
-    expect(extra).toContain("color: extraTotal >= 0 ? colors.primary : colors.error");
+    expect(extra).toContain("color: extraTotal >= 0 ? colors.foreground : colors.error");
     expect(extra).toContain("color: reward < 0 ? colors.error : reward > 0 ? colors.foreground");
     expect(labor).toContain('import { numericColor, NUMERIC_TONE } from "@/lib/theme/numeric-color-tokens";');
   });

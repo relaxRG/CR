@@ -10,7 +10,7 @@ const read = (relative: string) => fs.readFileSync(path.join(root, relative), "u
 describe("数字颜色 Design Token", () => {
   it("只提供普通、主结果、异常和次要信息四种数值语义", () => {
     expect(numericColor(colors)).toBe(colors.foreground);
-    expect(numericColor(colors, NUMERIC_TONE.primary)).toBe(colors.primary);
+    expect(numericColor(colors, NUMERIC_TONE.primary)).toBe(colors.foreground);
     expect(numericColor(colors, NUMERIC_TONE.negative)).toBe(colors.error);
     expect(numericColor(colors, NUMERIC_TONE.muted)).toBe(colors.muted);
     expect(Object.keys(NUMERIC_COLOR_RULES)).toEqual(["value", "primary", "negative", "muted"]);

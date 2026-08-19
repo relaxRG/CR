@@ -272,7 +272,6 @@ function buildPaySlipDraftPure(
     otherAllowance: extras.otherAllowance,
     rewardPenalty: existing?.rewardPenalty ?? 0,
     compOffCashOut: existing?.compOffCashOut ?? 0,
-    compOffCashOutNote: existing?.compOffCashOutNote,
     grossSalary,
     socialInsuranceDeduction,
     housingFundDeduction,
@@ -544,7 +543,6 @@ describe("Suite B：兑换调休余额（handleCashOut 重构验证）", () => {
     const slip1 = buildPaySlipDraftPure(emp, MONTH, att, 0, undefined, {
       ...slip0,
       compOffCashOut: cashOutAmount,
-      compOffCashOutNote: `兑换调休 1天 ¥${cashOutAmount.toFixed(2)}`,
     });
     expect(slip1.compOffCashOut).toBe(cashOutAmount);
     expect(slip1.grossSalary).toBe(Math.round((6000 + cashOutAmount) * 100) / 100);

@@ -726,6 +726,8 @@ interface PaySlipStore {
     cumulativeIncome?: number,
     /** 年度累计已预扣税额 */
     cumulativeTaxPaid?: number,
+    /** 调休兑现由余额结算流水唯一汇总；传入后不得回退到旧薪资单字段。 */
+    compOffCashOutOverride?: number,
   ) => PaySlip;
   /** 用指定月份薪资单完整替换当前月，用于受控差额调整的回滚。 */
   replaceMonthPaySlips: (month: string, nextSlips: PaySlip[]) => void;
@@ -783,8 +785,10 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
     globalSettings?: GlobalPayrollSettings,
     cumulativeIncome: number = 0,
     cumulativeTaxPaid: number = 0,
+    compOffCashOutOverride?: number,
   ): PaySlip => {
     const existing = ref.current.find((s) => s.employeeId === employee.id && s.month === month);
+    const compOffCashOut = compOffCashOutOverride ?? existing?.compOffCashOut ?? 0;
     const attendanceDays = attendance?.attendanceDays ?? 0;
     const attendanceSalary = attendance?.attendanceSalary ?? 0;
 
@@ -810,7 +814,7 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
       mealAllowance: extras.mealAllowance,
       otherAllowance: extras.otherAllowance,
       rewardPenalty: existing?.rewardPenalty ?? 0,
-      compOffCashOut: existing?.compOffCashOut ?? 0,
+      compOffCashOut,
     });
 
     // ── 社保/公积金计算（双轨制：个人+公司）──
@@ -894,7 +898,7 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
       mealAllowance: extras.mealAllowance,
       otherAllowance: extras.otherAllowance,
       rewardPenalty: existing?.rewardPenalty ?? 0,
-      compOffCashOut: existing?.compOffCashOut ?? 0,
+      compOffCashOut,
       socialInsuranceDeduction,
       housingFundDeduction,
       incomeTax,
@@ -933,8 +937,7 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
       employerInsuranceDetails,
       incomeTaxNote,
       // 保留手动控制字段：调休兑现、节假日分配、备用金人工已付
-      compOffCashOut: existing?.compOffCashOut,
-      compOffCashOutNote: existing?.compOffCashOutNote,
+      compOffCashOut,
       compOffUsage: existing?.compOffUsage,
       holidayBonusAllocation: existing?.holidayBonusAllocation,
       pettyLaborPaid: existing?.pettyLaborPaid,

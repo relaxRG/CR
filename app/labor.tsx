@@ -28,6 +28,7 @@ import {
 } from "@/lib/labor/payroll-draft-reconciliation";
 import { checkControlFieldsIntegrity, checkAdvanceCrossMonthPollution } from "@/lib/labor/payroll-monitor";
 import { calculateFinalSalary, calculateGrossSalary, reconcilePaySlip } from "@/lib/labor/payroll-reconciliation";
+import { settleCompOffCashOut } from "@/lib/labor/comp-off-cashout-settlement";
 import {
   BALANCE_COMP_OFF_STATUS,
   HOLIDAY_COMP_OFF_STATUS,
@@ -48,6 +49,7 @@ import { useColors } from "@/hooks/use-colors";
 import { useThrottleFn } from "@/hooks/use-debounce-fn";
 import { useCan } from "@/hooks/use-can";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { PayrollReconciliationPanel } from "@/components/labor/PayrollReconciliationPanel";
 import { ScreenContainer } from "@/components/screen-container";
 import { useGlobalBusinessMonth } from "@/lib/months/global-business-month";
 import { MoneyInput } from "@/components/forms/MoneyInput";
@@ -215,6 +217,8 @@ function OverviewCard({ month, colors }: { month: string; colors: any }) {
   const [compareMode, setCompareMode] = useState<CompareMode>("none");
   const [customMonth, setCustomMonth] = useState<string | undefined>();
   const [showTrend, setShowTrend] = useState(false);
+  const [selectedTrendMonth, setSelectedTrendMonth] = useState(month);
+  const { selectMonth } = useGlobalBusinessMonth();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
   const compareMonth = getCompareMonth(month, compareMode, customMonth);
@@ -245,6 +249,7 @@ function OverviewCard({ month, colors }: { month: string; colors: any }) {
   }, [paySlips, month]);
 
   const maxTrend = useMemo(() => Math.max(...trendData.map((d) => d.total), 1), [trendData]);
+  const selectedTrend = trendData.find((item) => item.month === selectedTrendMonth) ?? trendData.at(-1);
 
   return (
     <View style={[OV.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -282,7 +287,7 @@ function OverviewCard({ month, colors }: { month: string; colors: any }) {
         <View style={[OV.divider, { backgroundColor: colors.border }]} />
         <View style={OV.item}>
           <Text style={[OV.label, { color: colors.muted }]}>待发</Text>
-          <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={[OV.value, { color: totalPending > 0 ? colors.error : colors.muted }]}>
+          <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={[OV.value, { color: totalPending > 0 ? colors.foreground : colors.muted }]}>
             {totalPending > 0 ? `¥${formatMoney(totalPending)}` : "—"}
           </Text>
         </View>
@@ -316,18 +321,23 @@ function OverviewCard({ month, colors }: { month: string; colors: any }) {
             {trendData.map((d, i) => {
               const barH = maxTrend > 0 ? Math.max(4, (d.total / maxTrend) * 72) : 4;
               const isCurrent = d.month === month;
+              const isSelected = d.month === selectedTrendMonth;
               return (
-                <View key={d.month} style={{ flex: 1, alignItems: "center", gap: 2 }}>
-                  <View style={{ width: "100%", height: barH, borderRadius: 3, backgroundColor: isCurrent ? colors.primary : colors.primary + "44" }} />
-                  <Text style={{ fontSize: 8, color: isCurrent ? colors.primary : colors.muted, fontWeight: isCurrent ? "700" : "400" }}>{d.label}</Text>
-                </View>
+                <TouchableOpacity key={d.month} accessibilityRole="button" accessibilityLabel={`核对${d.month}薪资 ¥${formatMoney(d.total)}`} onPress={() => { tap(); setSelectedTrendMonth(d.month); }} style={{ flex: 1, alignItems: "center", gap: 2 }}>
+                  <View style={{ width: "100%", height: barH, borderRadius: 3, backgroundColor: isCurrent ? colors.primary : isSelected ? colors.foreground : colors.border }} />
+                  <Text style={{ fontSize: 8, color: isCurrent || isSelected ? colors.foreground : colors.muted, fontWeight: isCurrent || isSelected ? "700" : "400" }}>{d.label}</Text>
+                </TouchableOpacity>
               );
             })}
           </View>
           <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
             <Text style={{ fontSize: 10, color: colors.muted }}>最高：¥{formatMoney(maxTrend)}</Text>
-            <Text style={{ fontSize: 10, color: colors.primary, fontWeight: "600" }}>本月：¥{formatMoney(totalSalary)}</Text>
+            <Text style={{ fontSize: 10, color: colors.foreground, fontWeight: "600" }}>本月：¥{formatMoney(totalSalary)}</Text>
           </View>
+          {selectedTrend && <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 6 }}>
+            <Text style={{ fontSize: 11, color: colors.foreground, fontWeight: "700" }}>已选 {monthLabel(selectedTrend.month)}：¥{formatMoney(selectedTrend.total)}</Text>
+            {selectedTrend.month !== month && <TouchableOpacity accessibilityRole="button" accessibilityLabel={`切换全局月份至${selectedTrend.month}`} onPress={() => { tap(); selectMonth(selectedTrend.month); }}><Text style={{ color: colors.primary, fontSize: 11, fontWeight: "700" }}>切换到此月</Text></TouchableOpacity>}
+          </View>}
         </View>
       )}
     </View>
@@ -478,29 +488,10 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
       ? Math.round((entry.hoursDeducted ?? entry.days * 8) * overtimeHourlyRate * 100) / 100
       : Math.round(entry.days * dailyRate * 100) / 100;
     cashOutCompOff(entry.id, amount / entry.days, month);
-    // 修复：删除旧的增量计算（grossSalary + amount）
-    // 改用 buildPaySlipDraft 重算全部薪资字段，避免多次兑换导致的累积误差
-    const currentSlip = slip;
-    if (currentSlip) {
-      // 先写入 compOffCashOut 控制字段
-      const patched = {
-        ...currentSlip,
-        compOffCashOut: (currentSlip.compOffCashOut ?? 0) + amount,
-        compOffCashOutNote: `兑换调休 ${entry.days}天 ¥${formatMoney(amount)}`,
-        updatedAt: new Date().toISOString(),
-      };
-      upsertPaySlip(patched);
-      // 再用 buildPaySlipDraft 重算（内部从 ref.current 读取最新 compOffCashOut）
-      const advanceTotal = advances
-        .filter((a) => a.employeeId === employee.id && (a.deductMonth === month || a.date.startsWith(month)) && (a.status === "pending" || a.status === "deducted"))
-        .reduce((s, a) => s + a.amount, 0);
-      const draft = buildPaySlipDraft(employee, month, att, advanceTotal, globalSettings);
-      // draft 已包含所有控制字段（allowanceOverrides/workKPISelections/revenueActuals/compOffCashOut 等）
-      // 不需再次显式传入
-      upsertPaySlip({ ...draft, id: currentSlip.id });
-    }
+    // 薪资单不再增量写入 compOffCashOut。余额流水是唯一来源，
+    // 父级草稿对账会按 usedMonth 汇总有效兑现并一次性重建薪资。
     setShowCompOffModal(false);
-    Alert.alert("兑换成功", `已将 ${entry.days} 天调休余额兑换 ¥${formatMoney(amount)}，已加入本月薪资单`);
+    Alert.alert("兑换已登记", `已登记 ${entry.days} 天调休余额兑现 ¥${formatMoney(amount)}。薪资草稿将从兑现流水重新汇总。`);
   };
 
   return (
@@ -523,7 +514,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
         </View>
         {/* 右侧：实发薪资 */}
         {slip ? (
-          <Text style={{ fontSize: 14, fontWeight: "800", color: colors.primary }}>实发 ¥{formatMoney(slip.finalSalary)}</Text>
+          <Text style={{ fontSize: 14, fontWeight: "800", color: colors.foreground }}>实发 ¥{formatMoney(slip.finalSalary)}</Text>
         ) : (
           <View style={{ backgroundColor: colors.warning + "22", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
             <Text style={{ fontSize: 10, fontWeight: "600", color: colors.warning }}>待录入</Text>
@@ -626,7 +617,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
                     { label: "工作绩效", value: workKPI !== 0 ? `${workKPI >= 0 ? "+" : ""}¥${formatMoney(workKPI)}` : "—", color: workKPI < 0 ? colors.error : workKPI > 0 ? colors.foreground : colors.muted },
                     { label: "业绩绩效", value: revenueKPI !== 0 ? `${revenueKPI >= 0 ? "+" : ""}¥${formatMoney(revenueKPI)}` : "—", color: revenueKPI < 0 ? colors.error : revenueKPI > 0 ? colors.foreground : colors.muted },
                     { label: "奖惩小计", value: reward !== 0 ? `${reward >= 0 ? "+" : ""}¥${formatMoney(reward)}` : "—", color: reward < 0 ? colors.error : reward > 0 ? colors.foreground : colors.muted },
-                    { label: "综合额外", value: `${extraTotal >= 0 ? "+" : ""}¥${formatMoney(extraTotal)}`, color: extraTotal >= 0 ? colors.primary : colors.error },
+                    { label: "综合额外", value: `${extraTotal >= 0 ? "+" : ""}¥${formatMoney(extraTotal)}`, color: extraTotal >= 0 ? colors.foreground : colors.error },
                   ].map(({ label, value, color }) => (
                     <View key={label} style={{ flex: 1, minWidth: 0, alignItems: "center", paddingVertical: 3 }}>
                       <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ fontSize: 11, fontWeight: "700", color }}>{value}</Text>
@@ -676,7 +667,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
               )}
               <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
                 <Text style={{ fontSize: 14, fontWeight: "800", color: colors.foreground }}>实发薪资</Text>
-                <Text style={{ fontSize: 17, fontWeight: "900", color: colors.primary }}>¥{formatMoney(slip.finalSalary)}</Text>
+                <Text style={{ fontSize: 17, fontWeight: "900", color: colors.foreground }}>¥{formatMoney(slip.finalSalary)}</Text>
               </View>
               <Text style={{ fontSize: 10, color: colors.muted }}>
                 应发 ¥{formatMoney(payrollReconciliation.grossSalary)} − 扣款 ¥{formatMoney(payrollReconciliation.deductionsTotal)} = 实发 ¥{formatMoney(payrollReconciliation.finalSalary)}
@@ -1032,9 +1023,11 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
   const { records: attendances } = useAttendanceStore();
   const { advances } = useSalaryAdvanceStore();
   const { settings: globalSettings } = useGlobalPayrollSettingsStore();
-  const { getStatus: getRosterMonthStatus, isMonthWritable: isMonthWritableRoster } = useMonthCloseStore();
+  const { entries: compOffEntries } = useCompOffBalanceEntryStore();
+  const { getStatus: getRosterMonthStatus, isMonthWritable: isMonthWritableRoster, openAdjustmentSession } = useMonthCloseStore();
   const router = useRouter();
   const [recalculatingMonth, setRecalculatingMonth] = useState(false);
+  const [showPayrollReconciliation, setShowPayrollReconciliation] = useState(false);
   const payrollRecalculationGateRef = useRef(createMonthCloseOperationGate());
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
@@ -1195,6 +1188,7 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
                     globalSettings,
                     cumulativeIncome,
                     cumulativeTaxPaid,
+                    settleCompOffCashOut(compOffEntries, employee.id, month).amount,
                   );
                   rebuiltByEmployee.set(employee.id, {
                     ...rebuilt,
@@ -1218,7 +1212,7 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
         },
       ],
     );
-  }, [activeEmployees, advances, buildPaySlipDraft, getRosterMonthStatus, globalSettings, month, paySlips, replaceMonthPaySlips, rosterAttMap, rosterSlipMap]);
+  }, [activeEmployees, advances, buildPaySlipDraft, compOffEntries, getRosterMonthStatus, globalSettings, month, paySlips, replaceMonthPaySlips, rosterAttMap, rosterSlipMap]);
 
   // DRAFT 唯一对账：控制字段、出勤或规则变化后，立即将旧聚合金额重建为唯一结算结果。
   // FROZEN / ADJUSTING 绝不在此处写入，历史快照及差额会话由月度状态机单独保护。
@@ -1239,12 +1233,21 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
         paySlips,
         globalSettings,
       );
-      const rebuilt = buildPaySlipDraft(employee, month, attendance, advanceAmount, globalSettings, cumulativeIncome, cumulativeTaxPaid);
+      const rebuilt = buildPaySlipDraft(
+        employee,
+        month,
+        attendance,
+        advanceAmount,
+        globalSettings,
+        cumulativeIncome,
+        cumulativeTaxPaid,
+        settleCompOffCashOut(compOffEntries, employee.id, month).amount,
+      );
       if (hasDraftPayrollReconciliationDelta(current, rebuilt)) {
         upsertPaySlip({ ...rebuilt, id: current.id });
       }
     }
-  }, [activeEmployees, advances, buildPaySlipDraft, getRosterMonthStatus, globalSettings, month, paySlips, rosterAttMap, rosterSlipMap, upsertPaySlip]);
+  }, [activeEmployees, advances, buildPaySlipDraft, compOffEntries, getRosterMonthStatus, globalSettings, month, paySlips, rosterAttMap, rosterSlipMap, upsertPaySlip]);
 
   return (
     <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: fabBottom(rosterInsets.bottom) + 20 }}>
@@ -1263,12 +1266,20 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
         <CompareToggle mode={compareMode} customMonth={customMonth} baseMonth={month} onChange={setCompareMode} onCustomMonthChange={setCustomMonth} colors={colors} />
         <TouchableOpacity
           accessibilityRole="button"
+          accessibilityLabel={`打开所选月 ${month} 薪资核对与修正`}
+          accessibilityHint="核对调休兑现来源、历史差额和薪资修正路径"
+          onPress={() => { tap(); setShowPayrollReconciliation(true); }}
+          style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: colors.border + "44", alignItems: "center", justifyContent: "center" }}>
+          <IconSymbol name="checklist" size={15} color={colors.foreground} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          accessibilityRole="button"
           accessibilityLabel={`重新计算所选月 ${month} 草稿薪资`}
           accessibilityHint="仅重建所选月草稿薪资，不修改其他月份或已确认发薪数据"
           onPress={() => { tap(); handleRecalculateSelectedDraftMonth(); }}
           disabled={recalculatingMonth || getRosterMonthStatus(month) !== "draft"}
           style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: colors.primary + "15", borderWidth: 1, borderColor: colors.primary + "44", alignItems: "center", justifyContent: "center", opacity: recalculatingMonth || getRosterMonthStatus(month) !== "draft" ? 0.42 : 1 }}>
-          <IconSymbol name="arrow.clockwise" size={15} color={colors.primary} />
+          <IconSymbol name="arrow.clockwise" size={15} color={colors.foreground} />
         </TouchableOpacity>
         {/* 导入按钮 */}
         <TouchableOpacity onPress={() => { tap(); setShowImportMenu(true); }}
@@ -1295,6 +1306,19 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
         );
         return null;
       })()}
+
+      <PayrollReconciliationPanel
+        visible={showPayrollReconciliation}
+        month={month}
+        employees={activeEmployees}
+        paySlips={paySlips}
+        entries={compOffEntries}
+        monthStatus={getRosterMonthStatus(month)}
+        colors={colors}
+        onClose={() => setShowPayrollReconciliation(false)}
+        onRebuildDraft={async () => { handleRecalculateSelectedDraftMonth(); }}
+        onOpenAdjustment={async () => !!openAdjustmentSession(month, "调休兑现核对与修正", "next_month")}
+      />
 
       {/* 导入菜单 Modal */}
       <Modal visible={showImportMenu} transparent animationType="fade" onRequestClose={() => setShowImportMenu(false)}>
@@ -1473,9 +1497,9 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
         if (deptEmps.length === 0) return null;
         return (
           <View key={key} style={[{ borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, overflow: "hidden" }]}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, padding: 12, backgroundColor: color + "10" }}>
-              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: color }} />
-              <Text style={{ fontSize: 14, fontWeight: "700", color }}>{label}</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, padding: 12, backgroundColor: colors.surface }}>
+              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.muted }} />
+              <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>{label}</Text>
               <Text style={{ fontSize: 12, color: colors.muted, marginLeft: 2 }}>({deptEmps.length}人)</Text>
             </View>
             {deptEmps.map((emp) => (
@@ -4251,13 +4275,19 @@ function SchedulePage({ colors, month, onMonthChange, pageWidth }: { colors: any
             updateCompOffEntry(nextEntry.id, { days: nextEntry.days, status: nextEntry.status, usedMonth: nextEntry.usedMonth });
           }
         }
-        const slip = buildPaySlipDraft(emp, currentMonth, att, advanceTotal, globalSettings, cumulativeIncome, cumulativeTaxPaid);
-        if (expiringCashOutAmount > 0) {
-          slip.compOffCashOut = sumMoney([existingSlip?.compOffCashOut, expiringCashOutAmount]);
-          slip.compOffCashOutNote = `到期调休兑换 ¥${formatMoney(expiringCashOutAmount)}`;
-          slip.grossSalary = calculateGrossSalary(slip);
-          slip.finalSalary = calculateFinalSalary(slip);
-        }
+        // 到期兑换已经作为余额条目写入 cashOutCompOff；草稿金额始终由兑现流水汇总。
+        // 当前批次尚未触发 Store 状态刷新时，显式加上本批金额，绝不再累计旧薪资单字段。
+        const existingCashOut = settleCompOffCashOut(getCompOffEntries(emp.id), emp.id, currentMonth).amount;
+        const slip = buildPaySlipDraft(
+          emp,
+          currentMonth,
+          att,
+          advanceTotal,
+          globalSettings,
+          cumulativeIncome,
+          cumulativeTaxPaid,
+          sumMoney([existingCashOut, expiringCashOutAmount]),
+        );
         if (Object.keys(holidayBonusAllocation).length > 0) slip.holidayBonusAllocation = holidayBonusAllocation;
         if (Object.keys(nextUsage).length > 0) slip.compOffUsage = nextUsage;
         else delete slip.compOffUsage;

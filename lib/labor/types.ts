@@ -1164,8 +1164,6 @@ export interface PaySlip {
    * 兑现时按兑现当月日薪计算，可人工修改
    */
   compOffCashOut?: number;
-  /** 调休兑现备注（如"兑现X天加班换休余额，日薪¥XX"） */
-  compOffCashOutNote?: string;
   /**
    * 由本月排班中的余额休状态消耗的条目明细；key = date|shift|specialStatusId。
    * 每个排班日可按最早到期优先分配多条余额，重算时由唯一结算器原子释放和重建。
