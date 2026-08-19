@@ -86,6 +86,8 @@ type SyncContextValue = {
   switchToAnotherGroup: (code: string, handoffDeviceId?: string) => Promise<void>;
   /** 明确恢复已失联主设备的同步组；Worker 仅在主设备已长期离线时允许交接。 */
   recoverStaleGroupOwner: () => Promise<void>;
+  /** 仅在远端服务不可用等紧急情形下使用：停止本机同步并删除本机凭据，不更改远端成员记录。 */
+  forceClearLocalSyncCredentials: () => Promise<void>;
   /** 正在执行原子切组或冷启动补偿时禁用高风险设备管理操作。 */
   isGroupSwitching: boolean;
 };
@@ -441,6 +443,26 @@ export function SyncProvider({
     resetRealtimeSync();
   }, []);
 
+  /**
+   * 紧急本机解除：刻意不请求 Worker，避免在服务不可用时无法交还设备。
+   * 它不删除业务数据，但远端仍会保留该设备成员行，必须由当前主设备稍后移除或恢复所有权。
+   */
+  const forceClearLocalSyncCredentials = useCallback(async () => {
+    disableSync();
+    await clearDeviceInfo();
+    setDeviceInfo(null);
+    setSyncError(null);
+    retryCountRef.current = 0;
+    if (retryTimerRef.current) {
+      clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+    startedRef.current = false;
+    stopRealtimeRef.current?.();
+    stopRealtimeRef.current = null;
+    resetRealtimeSync();
+  }, []);
+
   const openPairModal = useCallback(() => {
     onRequestPair?.();
   }, [onRequestPair]);
@@ -564,6 +586,7 @@ export function SyncProvider({
         recoverJoinToAnotherGroup: recoverCurrentDeviceToAnotherGroup,
         switchToAnotherGroup: switchCurrentDeviceToAnotherGroup,
         recoverStaleGroupOwner,
+        forceClearLocalSyncCredentials,
         isGroupSwitching,
       }}
     >

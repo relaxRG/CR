@@ -52,6 +52,21 @@ describe("设备组退出远端传播与失联主设备恢复", () => {
     expect(deviceManager).toContain("连续 7 天未在线");
   });
 
+  it("紧急本机凭据清除不访问远端、不删除业务数据，并要求明确二次确认", () => {
+    const clearStart = provider.indexOf("const forceClearLocalSyncCredentials");
+    const clearEnd = provider.indexOf("const openPairModal", clearStart);
+    const forceClear = provider.slice(clearStart, clearEnd);
+    expect(forceClear).toContain("await clearDeviceInfo()");
+    expect(forceClear).toContain("disableSync()");
+    expect(forceClear).toContain("resetRealtimeSync()");
+    expect(forceClear).not.toContain("leaveCurrentSyncGroup");
+    expect(forceClear).not.toContain("AsyncStorage.clear");
+    expect(deviceManager).toContain('testID="force-clear-local-sync-credentials"');
+    expect(deviceManager).toContain("const finalConfirm");
+    expect(deviceManager).toContain("最后确认");
+    expect(deviceManager).toContain("远端成员记录会保留");
+  });
+
   it("Worker 将成员变更写入组时间戳，并且恢复日志不输出任何令牌", () => {
     const leave = handler("handleDeviceLeave", "handleDeviceRecoverStaleOwner");
     const recovery = handler("handleDeviceRecoverStaleOwner", "handleDeviceUpdateRole");

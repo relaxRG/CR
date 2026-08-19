@@ -351,7 +351,7 @@ export default function DeviceManagerScreen() {
   const router = useRouter();
   const { lang } = useI18n();
   const insets = useSafeAreaInsets();
-  const { deviceInfo, deviceRole, syncState, syncError, retrySync, logout, refreshDeviceInfo, createSyncGroup, recoverStaleGroupOwner, isGroupSwitching } = useSync();
+  const { deviceInfo, deviceRole, syncState, syncError, retrySync, logout, refreshDeviceInfo, createSyncGroup, recoverStaleGroupOwner, forceClearLocalSyncCredentials, isGroupSwitching } = useSync();
   const [manualSyncing, setManualSyncing] = useState(false);
   const [renamingDevice, setRenamingDevice] = useState(false);
   const [renameInput, setRenameInput] = useState("");
@@ -631,6 +631,46 @@ export default function DeviceManagerScreen() {
         lang === "zh" ? "远端成员撤销未完成，因此系统保留了本机同步凭据和数据，避免其他设备出现陈旧成员记录。请检查网络后重试。" : "Remote member revocation did not complete, so local credentials and data were kept to avoid a stale remote member. Check your network and retry.",
       );
     }
+  };
+
+  const forceClearLocalCredentials = () => {
+    if (!deviceInfo || isGroupSwitching) return;
+    const execute = async () => {
+      await forceClearLocalSyncCredentials();
+      Alert.alert(
+        lang === "zh" ? "本机凭据已清除" : "Local Credentials Cleared",
+        lang === "zh"
+          ? "本机已停止同步，业务数据仍保留。远端设备组仍可能显示本机；请在其他主设备上移除本机，或待服务恢复后使用“恢复失联主设备”。"
+          : "This device stopped syncing and local business data was kept. The remote group may still list this device; remove it from another owner device or use Recover Offline Owner after service recovers.",
+      );
+    };
+    const finalConfirm = () => Alert.alert(
+      lang === "zh" ? "最后确认" : "Final Confirmation",
+      lang === "zh"
+        ? "此操作不能撤销：仅删除本机同步身份，绝不删除本机业务数据；远端成员记录会保留，直到由主设备手动移除。"
+        : "This cannot be undone: only local sync identity is deleted, local business data is kept, and the remote member record stays until an owner removes it.",
+      [
+        { text: lang === "zh" ? "取消" : "Cancel", style: "cancel" },
+        { text: lang === "zh" ? "仅清除本机凭据" : "Clear Local Credentials", style: "destructive", onPress: () => void execute() },
+      ],
+    );
+    tap();
+    if (Platform.OS === "web") {
+      if (typeof window === "undefined") return;
+      const first = window.confirm(lang === "zh" ? "强制解除只会清除本机同步凭据，远端成员记录不会改变。继续？" : "Force detach only clears local credentials; the remote member remains. Continue?");
+      if (first && window.confirm(lang === "zh" ? "最后确认：本机将停止同步，但业务数据保留。" : "Final confirmation: syncing stops locally; business data is kept.")) void execute();
+      return;
+    }
+    Alert.alert(
+      lang === "zh" ? "强制解除本机同步凭据" : "Force Clear Local Sync Credentials",
+      lang === "zh"
+        ? "仅用于服务不可用或自动化异常时的紧急止损。它不会请求服务器、不删除业务数据，也不会撤销远端成员记录。"
+        : "Only for emergency containment when the service or automation fails. It does not contact the server, delete business data, or revoke the remote member.",
+      [
+        { text: lang === "zh" ? "取消" : "Cancel", style: "cancel" },
+        { text: lang === "zh" ? "继续" : "Continue", style: "destructive", onPress: finalConfirm },
+      ],
+    );
   };
 
   const handleOpenGroupSwitch = () => {
@@ -1304,6 +1344,26 @@ export default function DeviceManagerScreen() {
                   </Text>
                   <Text style={[styles.deviceRowRole, { color: colors.muted }]}>
                     {lang === "zh" ? "退出同步组并删除本机所有本地数据" : "Leave group and wipe all local data"}
+                  </Text>
+                </View>
+              </Pressable>
+              <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 64 }} />
+              {/* 仅限紧急止损：不调用 Worker，防止服务不可用时无法释放本机身份 */}
+              <Pressable
+                testID="force-clear-local-sync-credentials"
+                onPress={forceClearLocalCredentials}
+                disabled={isGroupSwitching}
+                style={({ pressed }) => [styles.deviceRow, pressed && { opacity: 0.7 }, isGroupSwitching && { opacity: 0.45 }]}
+              >
+                <View style={[styles.deviceIcon, { backgroundColor: "#8E8E93" }]}>
+                  <IconSymbol name="lock.slash.fill" size={18} color="#FFFFFF" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.deviceRowName, { color: colors.foreground }]}>
+                    {lang === "zh" ? "强制解除本机同步凭据" : "Force Clear Local Sync Credentials"}
+                  </Text>
+                  <Text style={[styles.deviceRowRole, { color: colors.muted }]}>
+                    {lang === "zh" ? "紧急止损：仅清除本机凭据，保留本地数据与远端成员记录" : "Emergency only: clear local credentials; preserve business data and remote membership"}
                   </Text>
                 </View>
               </Pressable>
