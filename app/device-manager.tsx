@@ -650,7 +650,7 @@ export default function DeviceManagerScreen() {
         Alert.alert(
           lang === "zh" ? "本机凭据未完全清除" : "Local Credentials Not Fully Cleared",
           lang === "zh"
-            ? "系统保留了当前状态，未继续执行。请关闭 App 后重新打开并重试；若仍失败，请联系运维处理设备安全存储。"
+            ? "同步已停止，但安全存储可能只完成了部分清除。请不要重新配对或反复点击；关闭 App 后重新打开并核对设备状态。若仍异常，请联系运维处理设备安全存储。"
             : "The current state was retained and no further action was taken. Restart the app and try again; contact operations if secure storage continues to fail.",
         );
       } finally {
