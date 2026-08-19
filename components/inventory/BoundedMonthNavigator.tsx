@@ -42,7 +42,6 @@ export function BoundedMonthNavigator({ month, bounds, onChange, testID = "inven
         </Pressable>
         <Pressable testID={`${testID}-picker`} accessibilityRole="button" accessibilityLabel={`选择库存月份，当前${inventoryMonthLabel(month)}`} onPress={() => setVisible(true)} style={({ pressed }) => [S.monthButton, { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.7 : 1 }]}>
           <Text style={[S.monthText, { color: colors.foreground }]}>{inventoryMonthLabel(month)}</Text>
-          <IconSymbol name="chevron.down" size={14} color={colors.muted} />
         </Pressable>
         <Pressable testID={`${testID}-next`} accessibilityRole="button" accessibilityLabel="下一个库存月份" accessibilityState={{ disabled: !canNext }} disabled={!canNext} onPress={() => onChange(addInventoryMonths(month, 1))} style={({ pressed }) => [S.arrow, { backgroundColor: colors.border + "55", opacity: !canNext ? 0.32 : pressed ? 0.55 : 1 }]}>
           <IconSymbol name="chevron.right" size={15} color={colors.muted} />
@@ -50,8 +49,9 @@ export function BoundedMonthNavigator({ month, bounds, onChange, testID = "inven
       </View>
 
       <Modal visible={visible} transparent animationType="fade" onRequestClose={() => setVisible(false)}>
-        <Pressable testID={`${testID}-backdrop`} style={S.backdrop} onPress={() => setVisible(false)}>
+        <Pressable testID={`${testID}-backdrop`} accessibilityLabel="关闭月份选择" style={S.backdrop} onPress={() => setVisible(false)}>
           <Pressable testID={`${testID}-floating-card`} style={[S.card, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={() => undefined}>
+            <Text style={[S.cardTitle, { color: colors.foreground }]}>选择库存月份</Text>
             <View style={S.cardHeader}>
               <Pressable disabled={year <= firstYear} onPress={() => setYear((value) => value - 1)} hitSlop={8} style={({ pressed }) => [S.yearArrow, { opacity: year <= firstYear ? 0.28 : pressed ? 0.55 : 1 }]}><IconSymbol name="chevron.left" size={15} color={colors.muted} /></Pressable>
               <Text style={[S.yearText, { color: colors.foreground }]}>{year}年</Text>
@@ -76,10 +76,11 @@ export function BoundedMonthNavigator({ month, bounds, onChange, testID = "inven
 const S = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12, minHeight: 52, paddingVertical: 8, paddingHorizontal: 16 },
   arrow: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center" },
-  monthButton: { minWidth: 164, minHeight: 36, borderWidth: StyleSheet.hairlineWidth, borderRadius: 10, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingHorizontal: 12 },
+  monthButton: { minWidth: 164, minHeight: 36, borderWidth: StyleSheet.hairlineWidth, borderRadius: 10, alignItems: "center", justifyContent: "center", paddingHorizontal: 12 },
   monthText: { fontSize: 16, fontWeight: "600", letterSpacing: -0.3 },
   backdrop: { flex: 1, alignItems: "center", justifyContent: "flex-start", paddingTop: 112, paddingHorizontal: 16, backgroundColor: "#00000033" },
   card: { width: "100%", maxWidth: 336, borderWidth: StyleSheet.hairlineWidth, borderRadius: 16, padding: 14, shadowColor: "#0f172a", shadowOpacity: 0.2, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 12 },
+  cardTitle: { textAlign: "center", fontSize: 13, fontWeight: "700", marginBottom: 6 },
   cardHeader: { minHeight: 30, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 20, marginBottom: 10 },
   yearArrow: { width: 30, height: 30, alignItems: "center", justifyContent: "center", borderRadius: 8 },
   yearText: { minWidth: 84, textAlign: "center", fontSize: 16, fontWeight: "800" },

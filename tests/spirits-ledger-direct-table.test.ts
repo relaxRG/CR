@@ -35,9 +35,10 @@ describe("烈酒库存完整Excel台账", () => {
   });
 
   it("新增、导入、编辑期初、分类管理、月结和月末盘点在同一横向工具栏中可达", () => {
-    const toolbar = source.slice(source.indexOf('/* 操作栏：同一行横向滚动，不裁切文字或图标。 */'), source.indexOf('/* 库存管理直接展示完整Excel台账；商品名称点击仍打开详情卡片。 */'));
+    const toolbar = source.slice(source.indexOf('/* 操作栏：同一行横向滚动，保留完整文本操作。 */'), source.indexOf('/* 库存管理直接展示完整Excel台账；商品名称点击仍打开详情卡片。 */'));
     for (const label of ["新增酒款", "导入Excel", "编辑期初", "管理进销存分类", "月结", "月末盘点"]) expect(toolbar).toContain(label);
     expect(toolbar).toContain('horizontal showsHorizontalScrollIndicator={false}');
+    expect(toolbar).not.toContain('<IconSymbol');
     expect(source).toContain('INVENTORY_WORKSPACE_METRICS.actionHeight');
     expect(source).toContain('INVENTORY_WORKSPACE_METRICS.segmentHeight');
   });

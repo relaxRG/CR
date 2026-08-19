@@ -656,11 +656,9 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
                 setStocktakeValues(initVals);
                 setShowStocktakeModal(true);
               }} style={[S.actionBtn, { backgroundColor: "#F59E0B22", borderColor: "#F59E0B" }]}>
-                <IconSymbol name="checklist" size={13} color="#F59E0B" />
                 <Text style={{ fontSize: 12, color: "#92400E", fontWeight: "600" }}>月末盘点</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => openDangerousAction("recalculate")} style={[S.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <IconSymbol name="arrow.clockwise" size={13} color={colors.primary} />
                 <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "600" }}>强制重新计算</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => {
@@ -680,7 +678,6 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
                   } },
                 ]);
               }} style={[S.actionBtn, { backgroundColor: wineCloseStatus === "draft" ? colors.primary + "12" : colors.success + "14", borderColor: wineCloseStatus === "draft" ? colors.primary : colors.success }]}>
-                <IconSymbol name="archivebox" size={13} color={wineCloseStatus === "draft" ? colors.primary : colors.success} />
                 <Text style={{ fontSize: 12, color: wineCloseStatus === "draft" ? colors.primary : colors.success, fontWeight: "600" }}>{wineCloseStatus === "draft" ? "月度归档" : "已归档"}</Text>
               </TouchableOpacity>
             </ScrollView>
@@ -784,11 +781,9 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
                 </View>
                 <View style={{ flexDirection: "row", gap: 8, marginTop: 14 }}>
                   <TouchableOpacity testID="wine-supplier-record-purchase" onPress={() => handlePurchaseEntry(selectedSupplierView)} style={[S.actionBtn, { flex: 1, justifyContent: "center", backgroundColor: colors.primary, borderColor: colors.primary }]}>
-                    <IconSymbol name="plus" size={14} color="#fff" />
                     <Text style={{ color: "#fff", fontSize: 12, fontWeight: "700" }}>手动录入进货</Text>
                   </TouchableOpacity>
                   <TouchableOpacity testID="wine-supplier-open-library" onPress={() => router.push("/(tabs)/wine" as any)} style={[S.actionBtn, { flex: 1, justifyContent: "center", backgroundColor: colors.background, borderColor: colors.border }]}>
-                    <IconSymbol name="wineglass" size={14} color={colors.primary} />
                     <Text style={{ color: colors.primary, fontSize: 12, fontWeight: "700" }}>查看葡萄酒库</Text>
                   </TouchableOpacity>
                 </View>
@@ -858,11 +853,9 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
           </ScrollView>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 8, gap: 8, alignItems: "center", borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
             <TouchableOpacity onPress={() => { tap(); router.push("/wine-inventory-import" as any); }} style={[S.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <IconSymbol name="square.and.arrow.down.fill" size={13} color={colors.primary} />
               <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "600" }}>导入完整 Excel</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => openDangerousAction("clear")} style={[S.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <IconSymbol name="trash" size={13} color={colors.foreground} />
               <Text style={{ fontSize: 12, color: colors.foreground, fontWeight: "600" }}>强制清空本月</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => {
@@ -872,11 +865,9 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
               setActiveSupplierForEntry(supplier);
               setShowPurchaseSheet(true);
             }} style={[S.actionBtn, { backgroundColor: colors.primary, borderColor: colors.primary, flex: 1 }]}>
-              <IconSymbol name="plus" size={13} color="#fff" />
               <Text style={{ fontSize: 12, color: "#fff", fontWeight: "600" }}>{purchaseFilterSupplier ? `向 ${purchaseFilterSupplier} 录入` : "选择供应商后录入"}</Text>
             </TouchableOpacity>
             <TouchableOpacity testID="wine-purchase-select-mode" onPress={() => { tap(); setSelectMode((enabled) => { if (enabled) setSelectedIds(new Set()); return !enabled; }); }} style={[S.actionBtn, { backgroundColor: selectMode ? colors.primary : colors.surface, borderColor: selectMode ? colors.primary : colors.border }]}>
-              <IconSymbol name="checkmark.circle" size={13} color={selectMode ? "#fff" : colors.muted} />
               <Text style={{ fontSize: 12, color: selectMode ? "#fff" : colors.muted, fontWeight: "600" }}>{selectMode ? `已选 ${selectedIds.size}` : "多选"}</Text>
             </TouchableOpacity>
           </ScrollView>
@@ -893,7 +884,7 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
                 <TouchableOpacity onPress={() => { if (!selectedIds.size) { Alert.alert("提示", "请先勾选记录"); return; } setBatchEditValue(purchaseFilterSupplier ?? ""); setBatchEditField("supplier"); }} style={[S.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}><Text style={{ color: colors.primary, fontSize: 12, fontWeight: "700" }}>修改供应商</Text></TouchableOpacity>
                 <TouchableOpacity onPress={() => { if (!selectedIds.size) { Alert.alert("提示", "请先勾选记录"); return; } setBatchEditValue(""); setBatchEditField("quantity"); }} style={[S.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}><Text style={{ color: colors.primary, fontSize: 12, fontWeight: "700" }}>修改数量</Text></TouchableOpacity>
                 <TouchableOpacity onPress={() => { if (!selectedIds.size) { Alert.alert("提示", "请先勾选记录"); return; } setBatchEditValue(""); setBatchEditField("unitPrice"); }} style={[S.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}><Text style={{ color: colors.primary, fontSize: 12, fontWeight: "700" }}>修改单价</Text></TouchableOpacity>
-                <TouchableOpacity onPress={handleBatchDelete} style={[S.actionBtn, { backgroundColor: "#FEF2F2", borderColor: "#FECACA" }]}><IconSymbol name="trash" size={13} color={colors.error} /><Text style={{ color: colors.error, fontSize: 12, fontWeight: "700" }}>删除</Text></TouchableOpacity>
+                <TouchableOpacity onPress={handleBatchDelete} style={[S.actionBtn, { backgroundColor: "#FEF2F2", borderColor: "#FECACA" }]}><Text style={{ color: colors.error, fontSize: 12, fontWeight: "700" }}>删除</Text></TouchableOpacity>
               </ScrollView>
             </View>
           )}
@@ -1198,7 +1189,7 @@ const S = StyleSheet.create({
   navbar: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   navTitle: { flex: 1, fontSize: 17, fontWeight: "600", textAlign: "center" },
   tabBar: { flexDirection: "row", margin: 12, borderRadius: 10, padding: 2, gap: 2 },
-  tabBtn: { flex: 1, minHeight: 44, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  tabBtn: { flex: 1, minHeight: INVENTORY_WORKSPACE_METRICS.segmentHeight, borderRadius: INVENTORY_WORKSPACE_METRICS.segmentRadius, alignItems: "center", justifyContent: "center" },
   tabText: { fontSize: 13, lineHeight: 18 },
   statsRow: { flexDirection: "row", paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   filterScroll: { borderBottomWidth: StyleSheet.hairlineWidth, paddingVertical: 8 },
@@ -1206,7 +1197,7 @@ const S = StyleSheet.create({
   filterChipText: { fontSize: 13, fontWeight: "500" },
   searchBox: { flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 7 },
   searchInput: { flex: 1, fontSize: 14, lineHeight: 19 },
-  actionBtn: { flexDirection: "row", flexShrink: 0, minHeight: 44, alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, borderWidth: 1 },
+  actionBtn: { flexDirection: "row", flexShrink: 0, minHeight: INVENTORY_WORKSPACE_METRICS.actionHeight, alignItems: "center", justifyContent: "center", paddingHorizontal: 12, paddingVertical: 6, borderRadius: INVENTORY_WORKSPACE_METRICS.segmentRadius, borderWidth: 1 },
   ledgerRow: { borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 8 },
   ledgerMain: { flexDirection: "row", alignItems: "center", gap: 8 },
   ledgerSeq: { fontSize: 11, fontWeight: "600" },

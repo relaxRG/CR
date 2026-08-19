@@ -1,4 +1,4 @@
-import React, { ReactNode, useCallback, useMemo, useRef, useState } from "react";
+import React, { startTransition, type ReactNode, useCallback, useMemo, useRef, useState } from "react";
 import { LayoutChangeEvent, NativeScrollEvent, NativeSyntheticEvent, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useColors } from "@/hooks/use-colors";
 import { HorizontalLedgerColumn, HorizontalLedgerGroup } from "@/components/inventory/HorizontalLedgerTable";
@@ -25,7 +25,7 @@ interface VirtualizedHorizontalLedgerTableProps<Row> {
 
 const ROW_HEIGHT = STORE_TABLE_METRICS.rowHeight;
 const GROUP_HEIGHT = STORE_TABLE_METRICS.groupHeight;
-const OVERSCAN_PX = ROW_HEIGHT * 24;
+const OVERSCAN_PX = ROW_HEIGHT * 12;
 
 /**
  * 长台账的“固定身份列 + 横向指标区”实现。
@@ -82,13 +82,11 @@ export function VirtualizedHorizontalLedgerTable<Row>({
     const until = scrollTop + viewportHeight + OVERSCAN_PX;
     return entries.filter((entry) => entry.offset + entry.height >= from && entry.offset <= until);
   }, [entries, scrollTop, viewportHeight]);
-  const renderedEntries = Platform.OS === "web" ? entries : visibleEntries;
-  const firstOffset = Platform.OS === "web" ? 0 : visibleEntries[0]?.offset ?? 0;
-  const lastEnd = Platform.OS === "web"
-    ? totalHeight
-    : visibleEntries.length
-      ? visibleEntries[visibleEntries.length - 1].offset + visibleEntries[visibleEntries.length - 1].height
-      : firstOffset;
+  const renderedEntries = visibleEntries;
+  const firstOffset = visibleEntries[0]?.offset ?? 0;
+  const lastEnd = visibleEntries.length
+    ? visibleEntries[visibleEntries.length - 1].offset + visibleEntries[visibleEntries.length - 1].height
+    : firstOffset;
   const containment = Platform.OS === "web" ? { contentVisibility: "auto", containIntrinsicSize: `auto ${ROW_HEIGHT}px` } as any : undefined;
 
   const syncVerticalPosition = useCallback((y: number, source: "data" | "pinned") => {
@@ -102,10 +100,9 @@ export function VirtualizedHorizontalLedgerTable<Row>({
   const handleScroll = (source: "data" | "pinned") => (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const next = event.nativeEvent.contentOffset.y;
     syncVerticalPosition(next, source);
-    if (Platform.OS === "web") return;
     if (Math.abs(next - lastReportedOffset.current) < ROW_HEIGHT / 2) return;
     lastReportedOffset.current = next;
-    setScrollTop(next);
+    startTransition(() => setScrollTop(next));
   };
 
   if (!groups.some((group) => group.rows.length > 0)) {

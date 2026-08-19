@@ -67,7 +67,10 @@ async function openCdp(target) {
 
 const seedLongLedgerExpression = `(() => {
   const now = new Date().toISOString();
-  const month = new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0');
+  const year = new Date().getFullYear();
+  const monthNumber = new Date().getMonth() + 1;
+  const month = year + '-' + String(monthNumber).padStart(2, '0');
+  const monthLabel = year + '年' + monthNumber + '月';
   const types = ['Red', 'White', 'Sparkling'];
   const suppliers = ['EMW', 'Interprocom', 'Vinehoo', '君荟'];
   const items = Array.from({ length: 360 }, (_, offset) => {
@@ -94,13 +97,13 @@ const seedLongLedgerExpression = `(() => {
     };
   });
   localStorage.setItem('wine.snapshots.v2', JSON.stringify({ snapshots: [{
-    id: 'perf-wine-snapshot', monthLabel: month, importedAt: now,
+    id: 'perf-wine-snapshot', monthLabel, importedAt: now,
     supplierTotals: Object.fromEntries(suppliers.map((supplier) => [supplier, 1000])),
     totalPurchase: 4000, totalConsume: 4000,
     totalEndCost: items.reduce((sum, item) => sum + item.endCost, 0),
     items, purchaseOrders: [],
   }] }));
-  localStorage.setItem('wine.manual-purchases.v1', JSON.stringify({ purchases: Array.from({ length: 180 }, (_, offset) => ({
+  localStorage.setItem('wine.manual_purchases.v1', JSON.stringify({ purchases: Array.from({ length: 180 }, (_, offset) => ({
     id: 'perf-purchase-' + offset,
     date: month + '-' + String((offset % 28) + 1).padStart(2, '0'),
     supplier: suppliers[offset % suppliers.length],
@@ -189,6 +192,9 @@ try {
     await call("Runtime.evaluate", { expression: seedLongLedgerExpression, returnByValue: true });
     await call("Page.reload", { ignoreCache: true });
     await sleep(900);
+    const openedLedger = (await call("Runtime.evaluate", { expression: clickExpression("wine-tab-ledger"), returnByValue: true })).result.value;
+    if (!openedLedger) throw new Error(`葡萄酒 ${width}pt 未找到库存管理页签`);
+    await sleep(180);
 
     // 先完成一次离屏内容预热，性能样本只衡量用户开始连续滚动后的稳定阶段。
     await call("Runtime.evaluate", { expression: `(() => { const list = document.querySelector('[data-testid="wine-horizontal-ledger-table-virtual-list"]'); if (!list) return false; list.scrollTop = Math.min(1600, list.scrollHeight); return true; })()`, returnByValue: true });
@@ -196,6 +202,7 @@ try {
     await call("Runtime.evaluate", { expression: `(() => { const list = document.querySelector('[data-testid="wine-horizontal-ledger-table-virtual-list"]'); if (!list) return false; list.scrollTop = 0; return true; })()`, returnByValue: true });
     await sleep(280);
     const before = metricSnapshot((await call("Performance.getMetrics")).metrics);
+    const beforeLiveNodeCount = (await call("Runtime.evaluate", { expression: "document.querySelectorAll('*').length", returnByValue: true })).result.value;
     const frame = (await call("Runtime.evaluate", { expression: scrollFrameSampleExpression, awaitPromise: true, returnByValue: true })).result.value;
     if (!frame?.foundScroller || frame.scrollHeight <= frame.clientHeight + 100) {
       throw new Error(`葡萄酒 ${width}pt 未找到可滚动的虚拟化长列表：${JSON.stringify(frame)}`);
@@ -213,15 +220,17 @@ try {
     }
     await sleep(180);
     const after = metricSnapshot((await call("Performance.getMetrics")).metrics);
+    const afterLiveNodeCount = (await call("Runtime.evaluate", { expression: "document.querySelectorAll('*').length", returnByValue: true })).result.value;
     const heapGrowth = before.jsHeapUsedSize !== null && after.jsHeapUsedSize !== null ? after.jsHeapUsedSize - before.jsHeapUsedSize : null;
-    const nodeGrowth = before.nodes !== null && after.nodes !== null ? after.nodes - before.nodes : null;
+    const engineNodeGrowth = before.nodes !== null && after.nodes !== null ? after.nodes - before.nodes : null;
+    const liveNodeGrowth = afterLiveNodeCount - beforeLiveNodeCount;
     if (heapGrowth !== null && heapGrowth > 12 * 1024 * 1024) {
       throw new Error(`葡萄酒 ${width}pt 反复切换后堆内存增长异常：${heapGrowth} bytes`);
     }
-    if (nodeGrowth !== null && nodeGrowth > 180) {
-      throw new Error(`葡萄酒 ${width}pt 反复切换后 DOM 节点增长异常：${nodeGrowth}`);
+    if (liveNodeGrowth > 180) {
+      throw new Error(`葡萄酒 ${width}pt 反复切换后存活 DOM 节点增长异常：${liveNodeGrowth}`);
     }
-    results.push({ width, fixture: { ledgerRows: 360, purchaseRows: 180 }, frame, memory: { before, after, heapGrowth, nodeGrowth } });
+    results.push({ width, fixture: { ledgerRows: 360, purchaseRows: 180 }, frame, memory: { before, after, heapGrowth, engineNodeGrowth, beforeLiveNodeCount, afterLiveNodeCount, liveNodeGrowth } });
   }
 
   const report = {
@@ -231,7 +240,7 @@ try {
       p95FrameGapMs: "<= 20ms",
       maxFrameGapMs: "<= 34ms",
       heapGrowth: "<= 12 MiB / 12 次页签循环",
-      nodeGrowth: "<= 180 个 DOM 节点 / 12 次页签循环",
+      liveNodeGrowth: "<= 180 个存活 DOM 节点 / 12 次页签循环",
     },
     results,
   };

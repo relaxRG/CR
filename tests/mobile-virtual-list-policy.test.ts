@@ -53,7 +53,7 @@ describe("移动端虚拟列表性能规范", () => {
     const source = readSource("app/wine-inventory.tsx");
     const table = readSource("components/inventory/VirtualizedHorizontalLedgerTable.tsx");
     expect(source).toContain("VirtualizedHorizontalLedgerTable");
-    expect(table).toContain("const OVERSCAN_PX = ROW_HEIGHT * 24");
+    expect(table).toContain("const OVERSCAN_PX = ROW_HEIGHT * 12");
     expect(table).toContain("scrollEventThrottle={48}");
     expect(table).toContain("pinnedScrollRef");
     expect(table).toContain("dataScrollRef");

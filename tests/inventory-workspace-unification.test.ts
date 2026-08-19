@@ -24,7 +24,7 @@ describe("库存六类与店铺四类工作台统一规范", () => {
 
   it("烈酒、葡萄酒与通用九类页面使用同一紧凑工作台尺度和纯文本结构页签", () => {
     expect(metrics).toContain("segmentHeight: 40");
-    expect(metrics).toContain("actionHeight: 40");
+    expect(metrics).toContain("actionHeight: 36");
     expect(metrics).toContain("phoneHeaderHeight: 36");
     expect(metrics).toContain("phoneRowHeight: 44");
     expect(base).toContain('label: "总结"');
@@ -34,6 +34,10 @@ describe("库存六类与店铺四类工作台统一规范", () => {
     expect(wine).toContain('label: "供应商信息"');
     expect(spirits).not.toContain('label: "📦 当月进货"');
     expect(wine).not.toContain('label: "📦 当月进货"');
+    expect(wine).toContain('tabBtn: { flex: 1, minHeight: INVENTORY_WORKSPACE_METRICS.segmentHeight');
+    expect(wine).toContain('actionBtn: { flexDirection: "row", flexShrink: 0, minHeight: INVENTORY_WORKSPACE_METRICS.actionHeight');
+    const wineLedgerToolbar = wine.slice(wine.indexOf('style={{ flexGrow: 0, minHeight: INVENTORY_WORKSPACE_METRICS.actionHeight + 12'), wine.indexOf('style={[S.filterScroll'));
+    expect(wineLedgerToolbar).not.toContain('<IconSymbol');
   });
 
   it("当月进货使用月日、无色分类分组和整列筛选入口", () => {

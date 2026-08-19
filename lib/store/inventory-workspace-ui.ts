@@ -1,6 +1,6 @@
 export const INVENTORY_WORKSPACE_METRICS = {
   segmentHeight: 40,
-  actionHeight: 40,
+  actionHeight: 36,
   contextHeight: 32,
   segmentRadius: 12,
   horizontalGap: 8,

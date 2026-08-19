@@ -1,9 +1,6 @@
 /**
- * 烈酒库存管理（全面重构版 v2）
- * Tab 1: 📊 总结 — 分类汇总表 + 月度对比 + 进货汇总表 + 环形图
- * Tab 2: 📋 库存管理 — 横向滚动表格 + 内联编辑期初 + Excel导入 + 负库存警告
- * Tab 3: 📦 当月进货 — 供应商主界面 + 每供应商独立子界面 + 自采备用金导入
- * Tab 4: 🔍 采购分析 — 供应商分析 + 品牌集团分析
+ * 烈酒库存统一工作台。
+ * 总结、库存管理、当月进货与采购分析共享当前全局月份；库存管理直接展示横向 Excel 台账。
  */
 import React, { useMemo, useState } from "react";
 import { formatMoney } from "@/lib/utils";
@@ -680,24 +677,22 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
 
   const renderLedger = () => (
     <View style={{ flex: 1 }}>
-      {/* 操作栏：同一行横向滚动，不裁切文字或图标。 */}
+      {/* 操作栏：同一行横向滚动，保留完整文本操作。 */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} testID="spirits-inventory-action-toolbar"
         style={{ flexGrow: 0, minHeight: 60, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}
         contentContainerStyle={{ gap: 8, minHeight: 60, paddingHorizontal: 12, paddingVertical: 8, alignItems: "center" }}>
         <TouchableOpacity onPress={() => { tap(); setShowAddItem(true); }}
           style={[S.actionBtn, { backgroundColor: "#EF4444" + "15", borderColor: "#EF4444" + "33" }]}>
-          <IconSymbol name="plus" size={13} color="#EF4444" />
           <Text style={{ fontSize: 12, color: "#EF4444", fontWeight: "600" }}>新增酒款</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={handleLedgerExcelImport}
           style={[S.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          {ledgerImporting ? <ActivityIndicator size="small" color={colors.primary} /> : <IconSymbol name="square.and.arrow.down" size={13} color={colors.primary} />}
+          {ledgerImporting && <ActivityIndicator size="small" color={colors.primary} />}
           <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "600" }}>导入Excel</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => setShowInventoryCategoryManager(true)}
           style={[S.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
           testID="spirits-inventory-category-manager">
-          <IconSymbol name="square.grid.2x2" size={13} color={colors.primary} />
           <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "600" }}>管理进销存分类</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => {
@@ -718,12 +713,10 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
             } },
           ]);
         }} style={[S.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <IconSymbol name="checkmark.seal.fill" size={13} color={colors.primary} />
           <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "600" }}>月结 · {spiritsCloseStatus === "draft" ? "草稿" : "已归档"}</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => { tap(); setLedgerEditMode(!ledgerEditMode); }}
           style={[S.actionBtn, { backgroundColor: ledgerEditMode ? "#EF4444" : colors.surface, borderColor: ledgerEditMode ? "#EF4444" : colors.border }]}>
-          <IconSymbol name="pencil" size={13} color={ledgerEditMode ? "#fff" : colors.muted} />
           <Text style={{ fontSize: 12, color: ledgerEditMode ? "#fff" : colors.muted, fontWeight: "600" }}>
             {ledgerEditMode ? "完成" : "编辑期初"}
           </Text>
@@ -737,7 +730,6 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
           setStocktakeValues(initVals);
           setShowStocktakeModal(true);
         }} style={[S.actionBtn, { backgroundColor: "#F59E0B22", borderColor: "#F59E0B" }]}>
-          <IconSymbol name="checklist" size={13} color="#F59E0B" />
           <Text style={{ fontSize: 12, color: "#F59E0B", fontWeight: "600" }}>月末盘点</Text>
         </TouchableOpacity>
       </ScrollView>

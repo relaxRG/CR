@@ -13,8 +13,12 @@ describe("葡萄酒工作台长列表性能护栏", () => {
 
   it("虚拟化表格以可视区窗口和上下缓冲渲染，保留固定表头和横向滚动", () => {
     const table = read("components/inventory/VirtualizedHorizontalLedgerTable.tsx");
-    expect(table).toContain("const OVERSCAN_PX = ROW_HEIGHT * 24");
+    expect(table).toContain("const OVERSCAN_PX = ROW_HEIGHT * 12");
     expect(table).toContain("visibleEntries");
+    expect(table).toContain("const renderedEntries = visibleEntries");
+    expect(table).not.toContain('Platform.OS === "web" ? entries : visibleEntries');
+    expect(table).not.toContain('if (Platform.OS === "web") return;');
+    expect(table).toContain("startTransition(() => setScrollTop(next))");
     expect(table).toContain("scrollEventThrottle={48}");
     expect(table).toContain("horizontal");
     expect(table).toContain('testID={source === "data" && testID ? `${testID}-virtual-list` : undefined}');
@@ -31,7 +35,12 @@ describe("葡萄酒工作台长列表性能护栏", () => {
     expect(script).toContain("frame.averageFrameGapMs > 17");
     expect(script).toContain("for (let cycle = 0; cycle < 12");
     expect(script).toContain("heapGrowth > 12 * 1024 * 1024");
-    expect(script).toContain("nodeGrowth > 180");
+    expect(script).toContain("liveNodeGrowth > 180");
+    expect(script).toContain("beforeLiveNodeCount");
+    expect(script).toContain("afterLiveNodeCount");
+    expect(script).toContain('clickExpression("wine-tab-ledger")');
+    expect(script).toContain("wine.manual_purchases.v1");
+    expect(script).toContain("const monthLabel = year + '年' + monthNumber + '月'");
   });
 
   it("通用移动端回归直接采样虚拟列表，避免把静态工作台容器误判为滚动区域", () => {

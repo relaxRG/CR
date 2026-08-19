@@ -55,6 +55,9 @@ describe("全局业务月份与紧凑选择器规范", () => {
     expect(inventoryNavigator).toContain('animationType="fade"');
     expect(inventoryNavigator).toContain('justifyContent: "flex-start"');
     expect(inventoryNavigator).toContain('maxWidth: 336');
+    expect(inventoryNavigator).toContain('>选择库存月份</Text>');
+    expect(inventoryNavigator).toContain('accessibilityLabel="关闭月份选择"');
+    expect(inventoryNavigator).not.toContain('name="chevron.down"');
     expect(inventoryNavigator).not.toContain("sheetTitle");
   });
 
