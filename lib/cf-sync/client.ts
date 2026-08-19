@@ -504,6 +504,37 @@ export async function kickDevice(targetDeviceId: string): Promise<void> {
   }
 }
 
+/**
+ * 当前设备主动退出同步组。必须先让 Worker 原子撤销远端成员行，
+ * 调用方才能清除本机凭据，避免“本机未配对但其他设备仍显示成员”的状态分裂。
+ */
+export async function leaveCurrentSyncGroup(): Promise<void> {
+  const deviceInfo = await getDeviceInfo();
+  if (!deviceInfo) return;
+  const res = await cfFetch("/api/device/leave", {
+    method: "POST",
+    deviceInfo,
+  });
+  if (!res.ok) return readError(res, `DEVICE_LEAVE_FAILED_${res.status}`);
+}
+
+/**
+ * 显式恢复失联主设备：仅当服务端确认主设备从未在线或超过恢复阈值未在线时可用。
+ * Worker 会撤销旧主设备并把当前活跃设备提升为主设备；不会删除同步数据。
+ */
+export async function recoverStaleOwner(): Promise<DeviceInfo> {
+  const deviceInfo = await getDeviceInfo();
+  if (!deviceInfo) throw new Error("Device not registered");
+  const res = await cfFetch("/api/device/recover-stale-owner", {
+    method: "POST",
+    deviceInfo,
+  });
+  if (!res.ok) return readError(res, `STALE_OWNER_RECOVERY_FAILED_${res.status}`);
+  const membership = await res.json() as DeviceInfo;
+  await saveDeviceInfo(membership);
+  return membership;
+}
+
 export async function updateDeviceRole(
   targetDeviceId: string,
   role: DeviceRole,

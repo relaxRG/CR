@@ -19,6 +19,8 @@ import {
   clearDeviceInfo,
   createNewSyncGroup,
   getDeviceInfo,
+  leaveCurrentSyncGroup,
+  recoverStaleOwner,
   refreshCurrentDevicePlatform,
   saveDeviceInfo,
   type DeviceInfo,
@@ -82,6 +84,8 @@ type SyncContextValue = {
   recoverJoinToAnotherGroup: (code: string) => Promise<void>;
   /** 加入另一个同步组；主设备可选择先把原组主角色交接给其他活跃设备。 */
   switchToAnotherGroup: (code: string, handoffDeviceId?: string) => Promise<void>;
+  /** 明确恢复已失联主设备的同步组；Worker 仅在主设备已长期离线时允许交接。 */
+  recoverStaleGroupOwner: () => Promise<void>;
   /** 正在执行原子切组或冷启动补偿时禁用高风险设备管理操作。 */
   isGroupSwitching: boolean;
 };
@@ -418,8 +422,9 @@ export function SyncProvider({
     onRequestPair?.();
   }, [onRequestPair]);
 
-  // "logout" = stop the current local sync session. Provider never recreates a group after this call.
+  // "logout" = leave the current sync group. Remote revocation must succeed before local credentials are cleared.
   const logout = useCallback(async () => {
+    if (await getDeviceInfo()) await leaveCurrentSyncGroup();
     disableSync();
     await clearDeviceInfo();
     setDeviceInfo(null);
@@ -512,6 +517,17 @@ export function SyncProvider({
     }
   }, [groupSwitchRuntime, restartSync]);
 
+  const recoverStaleGroupOwner = useCallback(async () => {
+    setIsGroupSwitching(true);
+    try {
+      const membership = await recoverStaleOwner();
+      setDeviceInfo(membership);
+      await restartSync();
+    } finally {
+      setIsGroupSwitching(false);
+    }
+  }, [restartSync]);
+
   // Build a user-like object for compatibility with existing UI
   const user = deviceInfo
     ? {
@@ -547,6 +563,7 @@ export function SyncProvider({
         createSyncGroup: createCurrentDeviceSyncGroup,
         recoverJoinToAnotherGroup: recoverCurrentDeviceToAnotherGroup,
         switchToAnotherGroup: switchCurrentDeviceToAnotherGroup,
+        recoverStaleGroupOwner,
         isGroupSwitching,
       }}
     >

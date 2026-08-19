@@ -1961,14 +1961,61 @@ async function handleDeviceKick(env, body, headers, origin) {
   if (device.role !== "owner") return err("Only owner can kick devices", 403, origin);
   const { targetDeviceId } = body || {};
   if (!targetDeviceId) return err("targetDeviceId required", 400, origin);
-  await env.DB.prepare(
-    "UPDATE devices SET is_active = 0 WHERE device_id = ? AND group_id = ?"
-  ).bind(targetDeviceId, device.group_id).run();
+  await env.DB.batch([
+    env.DB.prepare("UPDATE devices SET is_active = 0 WHERE device_id = ? AND group_id = ? AND is_active = 1").bind(targetDeviceId, device.group_id),
+    env.DB.prepare("INSERT INTO group_ts (group_id, last_push_at) VALUES (?, ?) ON CONFLICT(group_id) DO UPDATE SET last_push_at = excluded.last_push_at").bind(device.group_id, Date.now())
+  ]);
+  await clearWebDeviceSessions(env, targetDeviceId);
   return json({ success: true }, 200, origin);
 }
 __name(handleDeviceKick, "handleDeviceKick");
 __name2(handleDeviceKick, "handleDeviceKick");
 __name22(handleDeviceKick, "handleDeviceKick");
+
+/**
+ * 当前设备主动离开同步组。远端成员撤销必须先成功，客户端才允许清除本机凭据。
+ * 主设备在仍有其他活跃成员时必须先走原有的交接流程，禁止制造无主组。
+ */
+async function handleDeviceLeave(env, headers, origin) {
+  const device = await verifyRequestDevice(env, headers);
+  if (!device) return err("DEVICE_AUTH_UNAUTHORIZED", 401, origin);
+  const others = await env.DB.prepare("SELECT COUNT(*) AS count FROM devices WHERE group_id = ? AND is_active = 1 AND device_id <> ?").bind(device.group_id, device.device_id).first();
+  if (device.role === "owner" && Number(others?.count || 0) > 0) return err("OWNER_HANDOFF_REQUIRED", 409, origin);
+  const now = Date.now();
+  const statements = [
+    env.DB.prepare("UPDATE devices SET is_active = 0 WHERE device_id = ? AND group_id = ? AND token = ? AND is_active = 1").bind(device.device_id, device.group_id, device.token),
+    env.DB.prepare("INSERT INTO group_ts (group_id, last_push_at) VALUES (?, ?) ON CONFLICT(group_id) DO UPDATE SET last_push_at = excluded.last_push_at").bind(device.group_id, now)
+  ];
+  if (device.role === "owner") statements.splice(1, 0, env.DB.prepare("UPDATE device_groups SET owner_device_id = NULL WHERE id = ? AND owner_device_id = ?").bind(device.group_id, device.device_id));
+  await env.DB.batch(statements);
+  await clearWebDeviceSessions(env, device.device_id);
+  console.info("[cf-sync] device_left_group", { group: String(device.group_id).slice(0, 8), self: true });
+  return json({ success: true }, 200, origin);
+}
+
+/**
+ * 已知主设备失联的恢复入口。仅活跃协作设备可执行；旧主设备必须超过 7 天未在线。
+ * 操作仅撤销旧成员资格并交接所有者，不会删除组内同步数据。
+ */
+async function handleDeviceRecoverStaleOwner(env, headers, origin) {
+  const device = await verifyRequestDevice(env, headers);
+  if (!device) return err("DEVICE_AUTH_UNAUTHORIZED", 401, origin);
+  const owner = await env.DB.prepare("SELECT device_id, last_seen FROM devices WHERE group_id = ? AND is_active = 1 AND role = 'owner' LIMIT 1").bind(device.group_id).first();
+  if (!owner || owner.device_id === device.device_id) return json({ deviceId: device.device_id, deviceToken: device.token, groupId: device.group_id, role: "owner", allowedKeys: null, deviceName: device.name }, 200, origin);
+  const offlineFor = Date.now() - Number(owner.last_seen || 0);
+  const minimumOffline = 7 * 24 * 60 * 60 * 1000;
+  if (owner.last_seen && offlineFor < minimumOffline) return err("STALE_OWNER_RECOVERY_TOO_EARLY", 409, origin);
+  const now = Date.now();
+  await env.DB.batch([
+    env.DB.prepare("UPDATE devices SET is_active = 0 WHERE device_id = ? AND group_id = ? AND role = 'owner' AND is_active = 1").bind(owner.device_id, device.group_id),
+    env.DB.prepare("UPDATE devices SET role = 'owner', allowed_keys = NULL WHERE device_id = ? AND group_id = ? AND is_active = 1").bind(device.device_id, device.group_id),
+    env.DB.prepare("UPDATE device_groups SET owner_device_id = ? WHERE id = ?").bind(device.device_id, device.group_id),
+    env.DB.prepare("INSERT INTO group_ts (group_id, last_push_at) VALUES (?, ?) ON CONFLICT(group_id) DO UPDATE SET last_push_at = excluded.last_push_at").bind(device.group_id, now)
+  ]);
+  await clearWebDeviceSessions(env, owner.device_id);
+  console.warn("[cf-sync] stale_owner_recovered", { group: String(device.group_id).slice(0, 8) });
+  return json({ deviceId: device.device_id, deviceToken: device.token, groupId: device.group_id, role: "owner", allowedKeys: null, deviceName: device.name }, 200, origin);
+}
 async function handleDeviceUpdateRole(env, body, headers, origin) {
   const device = await verifyRequestDevice(env, headers);
   if (!device) return err("Unauthorized", 401, origin);
@@ -2302,6 +2349,12 @@ var worker_v3_default = {
       } catch {
       }
       return handleDeviceKick(env, body, request.headers, origin);
+    }
+    if (path === "/api/device/leave" && method === "POST") {
+      return handleDeviceLeave(env, request.headers, origin);
+    }
+    if (path === "/api/device/recover-stale-owner" && method === "POST") {
+      return handleDeviceRecoverStaleOwner(env, request.headers, origin);
     }
     if (path === "/api/device/update-role" && method === "POST") {
       let body = {};

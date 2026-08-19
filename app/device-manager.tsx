@@ -351,7 +351,7 @@ export default function DeviceManagerScreen() {
   const router = useRouter();
   const { lang } = useI18n();
   const insets = useSafeAreaInsets();
-  const { deviceInfo, deviceRole, syncState, syncError, retrySync, logout, refreshDeviceInfo, createSyncGroup, isGroupSwitching } = useSync();
+  const { deviceInfo, deviceRole, syncState, syncError, retrySync, logout, refreshDeviceInfo, createSyncGroup, recoverStaleGroupOwner, isGroupSwitching } = useSync();
   const [manualSyncing, setManualSyncing] = useState(false);
   const [renamingDevice, setRenamingDevice] = useState(false);
   const [renameInput, setRenameInput] = useState("");
@@ -582,6 +582,55 @@ export default function DeviceManagerScreen() {
       { text: lang === "zh" ? "取消" : "Cancel", style: "cancel" },
       { text: lang === "zh" ? "创建" : "Create", onPress: () => void create() },
     ]);
+  };
+
+  const handleRecoverStaleOwner = () => {
+    if (!deviceInfo || deviceInfo.role === "owner" || isGroupSwitching) return;
+    const execute = async () => {
+      try {
+        await recoverStaleGroupOwner();
+        await loadDevices();
+        await refreshDeviceInfo();
+        Alert.alert(
+          lang === "zh" ? "已恢复同步组" : "Sync Group Recovered",
+          lang === "zh" ? "已撤销长期失联的旧主设备，并将本机安全交接为主设备。同步数据未删除。" : "The long-offline owner was revoked and this device is now the owner. Sync data was preserved.",
+        );
+      } catch (error) {
+        const code = String(error);
+        Alert.alert(
+          lang === "zh" ? "暂时无法恢复" : "Recovery Unavailable",
+          code.includes("STALE_OWNER_RECOVERY_TOO_EARLY")
+            ? (lang === "zh" ? "原主设备近期仍在线。为避免误移除，请使用原主设备完成退出或稍后重试。" : "The previous owner was recently active. Use that device to leave or try later.")
+            : code,
+        );
+      }
+    };
+    const message = lang === "zh"
+      ? "仅当原主设备已长期失联时才会执行。系统会撤销旧主设备成员资格，并将本机交接为主设备；组内云端数据不会删除。"
+      : "Only available when the former owner has been offline for a long time. The old membership will be revoked and this device becomes owner; cloud data is preserved.";
+    Alert.alert(lang === "zh" ? "恢复失联主设备" : "Recover Offline Owner", message, [
+      { text: lang === "zh" ? "取消" : "Cancel", style: "cancel" },
+      { text: lang === "zh" ? "确认恢复" : "Recover", style: "destructive", onPress: () => void execute() },
+    ]);
+  };
+
+  const leaveCurrentGroupSafely = async (wipeLocalData = false) => {
+    try {
+      await logout();
+      if (wipeLocalData) await AsyncStorage.clear();
+      if (Platform.OS !== "web") void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert(
+        wipeLocalData ? (lang === "zh" ? "已清除" : "Cleared") : (lang === "zh" ? "已退出同步组" : "Left Sync Group"),
+        wipeLocalData
+          ? (lang === "zh" ? "已从同步组安全退出并清除本机数据，请重启 App。" : "Left the sync group safely and cleared local data. Please restart the app.")
+          : (lang === "zh" ? "本机成员资格已从同步组撤销，本地数据仍保留。" : "This device was revoked from the sync group. Local data was kept."),
+      );
+    } catch (error) {
+      Alert.alert(
+        lang === "zh" ? "未退出同步组" : "Did Not Leave Sync Group",
+        lang === "zh" ? "远端成员撤销未完成，因此系统保留了本机同步凭据和数据，避免其他设备出现陈旧成员记录。请检查网络后重试。" : "Remote member revocation did not complete, so local credentials and data were kept to avoid a stale remote member. Check your network and retry.",
+      );
+    }
   };
 
   const handleOpenGroupSwitch = () => {
@@ -967,15 +1016,32 @@ export default function DeviceManagerScreen() {
                 ? "加入其他同步组会先创建本地快照，再仅下载并替换为目标组数据；不会把当前组的数据上传到目标组。"
                 : "Joining another group creates a local snapshot, then download-replaces with target data. Current-group data is never uploaded to the target group."}
             </Text>
-            <Pressable
-              onPress={handleOpenGroupSwitch}
-              disabled={isGroupSwitching}
-              style={({ pressed }) => [styles.roleBtn, { backgroundColor: colors.primary, opacity: pressed || isGroupSwitching ? 0.65 : 1, alignSelf: "flex-start" }]}
-            >
-              {isGroupSwitching ? <ActivityIndicator color="#fff" size="small" /> : (
-                <Text style={styles.roleBtnText}>{lang === "zh" ? "加入其他同步组" : "Join Another Group"}</Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+              <Pressable
+                onPress={handleOpenGroupSwitch}
+                disabled={isGroupSwitching}
+                style={({ pressed }) => [styles.roleBtn, { backgroundColor: colors.primary, opacity: pressed || isGroupSwitching ? 0.65 : 1, alignSelf: "flex-start" }]}
+              >
+                {isGroupSwitching ? <ActivityIndicator color="#fff" size="small" /> : (
+                  <Text style={styles.roleBtnText}>{lang === "zh" ? "加入其他同步组" : "Join Another Group"}</Text>
+                )}
+              </Pressable>
+              {deviceInfo.role !== "owner" && (
+                <Pressable
+                  testID="recover-stale-sync-owner"
+                  onPress={handleRecoverStaleOwner}
+                  disabled={isGroupSwitching}
+                  style={({ pressed }) => [styles.roleBtn, { backgroundColor: colors.surface, borderWidth: 1, borderColor: "#FF9500", opacity: pressed || isGroupSwitching ? 0.65 : 1, alignSelf: "flex-start" }]}
+                >
+                  <Text style={[styles.roleBtnText, { color: "#C46A00" }]}>{lang === "zh" ? "恢复失联主设备" : "Recover Offline Owner"}</Text>
+                </Pressable>
               )}
-            </Pressable>
+            </View>
+            {deviceInfo.role !== "owner" && (
+              <Text style={[styles.hint, { color: colors.muted, marginTop: 10 }]}>
+                {lang === "zh" ? "仅当原主设备已连续 7 天未在线时可恢复；不会删除同步组数据。" : "Available only after the former owner has been offline for 7 days; sync data is preserved."}
+              </Text>
+            )}
           </View>
         )}
 
@@ -1178,7 +1244,7 @@ export default function DeviceManagerScreen() {
                   tap();
                   if (Platform.OS === "web") {
                     if (typeof window !== "undefined" && window.confirm(lang === "zh" ? "退出同步组？" : "Leave sync group?")) {
-                      void logout();
+                      void leaveCurrentGroupSafely();
                     }
                   } else {
                     Alert.alert(
@@ -1186,7 +1252,7 @@ export default function DeviceManagerScreen() {
                       lang === "zh" ? "退出后本设备将停止同步，数据仍保留在本地。" : "You will stop syncing. Local data is kept.",
                       [
                         { text: lang === "zh" ? "取消" : "Cancel", style: "cancel" },
-                        { text: lang === "zh" ? "退出" : "Leave", style: "destructive", onPress: () => void logout() },
+                        { text: lang === "zh" ? "退出" : "Leave", style: "destructive", onPress: () => void leaveCurrentGroupSafely() },
                       ],
                     );
                   }
@@ -1221,15 +1287,7 @@ export default function DeviceManagerScreen() {
                         text: lang === "zh" ? "退出并清除" : "Leave & Clear",
                         style: "destructive",
                         onPress: async () => {
-                          await logout();
-                          await AsyncStorage.clear();
-                          if (Platform.OS !== "web") {
-                            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                          }
-                          Alert.alert(
-                            lang === "zh" ? "已清除" : "Cleared",
-                            lang === "zh" ? "所有本地数据已清除，请重启 App。" : "All local data cleared. Please restart the App.",
-                          );
+                          await leaveCurrentGroupSafely(true);
                         },
                       },
                     ],
