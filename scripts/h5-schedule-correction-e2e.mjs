@@ -366,7 +366,7 @@ try {
 
     await call("Page.navigate", { url: `http://localhost:${port}/spirits-inventory` });
     await sleep(350);
-    const purchaseClicked = await call("Runtime.evaluate", { expression: clickTextExpression("📦 当月进货"), returnByValue: true });
+    const purchaseClicked = await call("Runtime.evaluate", { expression: clickTestIdExpression("spirits-tab-purchase"), returnByValue: true });
     if (!purchaseClicked.result.value) throw new Error(`烈酒库存 ${width}pt 缺少当月进货Tab`);
     await sleep(200);
     const supplierTabClicked = await call("Runtime.evaluate", { expression: `(() => {
