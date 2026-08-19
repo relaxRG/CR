@@ -904,13 +904,36 @@ export interface CompOffBalanceEntry {
   status: "available" | "used_rest" | "cashed_out" | "expired";
   /** 使用月份（status=used_rest/cashed_out 时填写） */
   usedMonth?: string;
-  /** 兑换单位费率（加班换休=时薪，节假日换休=日薪，直接扣除=0） */
-  cashOutUnitRate?: number;
-  /** 兑换金额（days × cashOutUnitRate） */
-  cashOutAmount?: number;
+  /**
+   * 唯一的兑现事件快照。它在兑现时一次性写入费率、金额和来源，之后只能作废，
+   * 不允许再分别编辑费率或金额。
+   */
+  settlement?: CompOffCashOutEvent;
+  /** 已作废的历史兑现事件，仅用于审计；任一余额同时最多只有一笔 active 兑现事件。 */
+  settlementHistory?: readonly CompOffCashOutEvent[];
   /** 备注 */
   notes?: string;
   createdAt: string;
+}
+
+export interface CompOffCashOutEvent {
+  id: string;
+  entryId: string;
+  employeeId: string;
+  source: "overtime" | "holiday";
+  earnedMonth: string;
+  usedMonth: string;
+  days: number;
+  /** 兑现时按余额天数计算的单位费率快照；必须大于零。 */
+  unitRate: number;
+  /** days × unitRate，创建时校验并固定。 */
+  amount: number;
+  createdAt: string;
+  /** active 才进入薪资；quarantined 是历史损坏数据，voided 是已安全作废。 */
+  status: "active" | "quarantined" | "voided";
+  issueCode?: "ZERO_RATE_NON_ZERO_AMOUNT" | "AMOUNT_RATE_MISMATCH" | "MISSING_SETTLEMENT";
+  voidedAt?: string;
+  voidReason?: string;
 }
 
 /** 计算换休余额到期月份（存入月 + 3个月） */

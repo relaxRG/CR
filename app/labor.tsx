@@ -350,7 +350,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
   const { settings: globalSettings } = useGlobalPayrollSettingsStore();
   const { advances } = useSalaryAdvanceStore();
   // 直接订阅 entries 响应式 state，避免通过 getXxx 读 ref.current
-  const { entries: compOffEntries, addEntry: addCompOffEntry, getEntries: getCompOffEntries, cashOutEntry: cashOutCompOff } = useCompOffBalanceEntryStore();
+  const { entries: compOffEntries, addEntry: addCompOffEntry, updateEntry: updateCompOffEntry, getEntries: getCompOffEntries, cashOutEntry: cashOutCompOff } = useCompOffBalanceEntryStore();
   // 直接订阅 alerts 响应式 state，避免通过 getAlert 读 ref.current
   const { alerts, resolveAlert } = useUnexplainedRestAlertStore();
   const router = useRouter();
@@ -464,7 +464,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
     for (const entry of avail) {
       if (remaining <= 0) break;
       if (entry.days <= remaining) {
-        cashOutCompOff(entry.id, 0, month);
+        updateCompOffEntry(entry.id, { status: "used_rest", usedMonth: month });
         remaining -= entry.days;
       }
     }
@@ -481,7 +481,10 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
     const amount = entry.source === "overtime"
       ? Math.round((entry.hoursDeducted ?? entry.days * 8) * overtimeHourlyRate * 100) / 100
       : Math.round(entry.days * dailyRate * 100) / 100;
-    cashOutCompOff(entry.id, amount / entry.days, month);
+    if (amount <= 0 || entry.days <= 0 || !cashOutCompOff(entry.id, amount / entry.days, month)) {
+      Alert.alert("无法兑换现金", "当前兑现费率或金额为 ¥0。请使用“减少调休余额”，或先修正员工的加班时薪/日薪后再兑换。");
+      return;
+    }
     // 薪资单不再增量写入 compOffCashOut。余额流水是唯一来源，
     // 父级草稿对账会按 usedMonth 汇总有效兑现并一次性重建薪资。
     setShowCompOffModal(false);
@@ -1018,7 +1021,7 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
   const { records: attendances } = useAttendanceStore();
   const { advances } = useSalaryAdvanceStore();
   const { settings: globalSettings } = useGlobalPayrollSettingsStore();
-  const { entries: compOffEntries } = useCompOffBalanceEntryStore();
+  const { entries: compOffEntries, voidCashOutEntry: voidCashOutCompOff } = useCompOffBalanceEntryStore();
   const { getStatus: getRosterMonthStatus, isMonthWritable: isMonthWritableRoster, openAdjustmentSession } = useMonthCloseStore();
   const router = useRouter();
   const [recalculatingMonth, setRecalculatingMonth] = useState(false);
@@ -1254,7 +1257,7 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
         <View style={{ flex: 1 }} />
         {/* 薪资对比开关 */}
         <CompareToggle mode={compareMode} customMonth={customMonth} baseMonth={month} onChange={setCompareMode} onCustomMonthChange={setCustomMonth} colors={colors} />
-        <StoreToolbarAction label="核对" icon="checkmark.square.fill" colors={colors} accessibilityLabel={`打开所选月 ${month} 薪资核对与修正`} accessibilityHint="核对调休兑现来源、历史差额和薪资修正路径" onPress={() => { tap(); setShowPayrollReconciliation(true); }} />
+        <StoreToolbarAction testID="payroll-reconciliation-open" label="核对" icon="checkmark.square.fill" colors={colors} accessibilityLabel={`打开所选月 ${month} 薪资核对与修正`} accessibilityHint="核对调休兑现来源、历史差额和薪资修正路径" onPress={() => { tap(); setShowPayrollReconciliation(true); }} />
         <StoreToolbarAction label="重算" icon="arrow.clockwise" tone="primary" emphasis colors={colors} accessibilityLabel={`重新计算所选月 ${month} 草稿薪资`} accessibilityHint="仅重建所选月草稿薪资，不修改其他月份或已确认发薪数据" onPress={() => { tap(); handleRecalculateSelectedDraftMonth(); }} disabled={recalculatingMonth || getRosterMonthStatus(month) !== "draft"} />
         <StoreToolbarAction label="导入" icon="square.and.arrow.down" colors={colors} onPress={() => { tap(); setShowImportMenu(true); }} disabled={importing} />
         <StoreToolbarAction label="导出" icon="square.and.arrow.up" colors={colors} onPress={() => { tap(); setShowExportMenu(true); }} disabled={exporting} />
@@ -1283,6 +1286,12 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
         onClose={() => setShowPayrollReconciliation(false)}
         onRebuildDraft={async () => { handleRecalculateSelectedDraftMonth(); }}
         onOpenAdjustment={async () => !!openAdjustmentSession(month, "调休兑现核对与修正", "next_month")}
+        onVoidDraftSettlement={async (entryId, reason) => {
+          if (getRosterMonthStatus(month) !== "draft") return false;
+          const voided = voidCashOutCompOff(entryId, reason);
+          if (voided) handleRecalculateSelectedDraftMonth();
+          return voided;
+        }}
       />
 
       {/* 导入菜单 Modal */}
@@ -3578,7 +3587,7 @@ function SchedulePage({ colors, month, onMonthChange, pageWidth }: { colors: any
   const { holidays, getHolidayForDate } = useHolidayConfigStore();
   const { advances } = useSalaryAdvanceStore();
   const { settings: globalSettings } = useGlobalPayrollSettingsStore();
-  const { entries: compOffEntriesSched, getAvailableDays: getCompOffAvailDays, addEntry: addCompOffEntry, updateEntry: updateCompOffEntry, getEntries: getCompOffEntries, expireOldEntries: expireCompOff, cashOutEntry: cashOutCompOff } = useCompOffBalanceEntryStore();
+  const { entries: compOffEntriesSched, getAvailableDays: getCompOffAvailDays, addEntry: addCompOffEntry, updateEntry: updateCompOffEntry, getEntries: getCompOffEntries, expireOldEntries: expireCompOff, cashOutEntry: cashOutCompOff, voidCashOutEntry: voidCashOutCompOff } = useCompOffBalanceEntryStore();
   const { upsertAlert } = useUnexplainedRestAlertStore();
   const { businessHours, setBusinessHours } = useBusinessHoursStore();
   const { shiftGroups, setShiftGroups } = useShiftGroupStore();
@@ -4094,17 +4103,16 @@ function SchedulePage({ colors, month, onMonthChange, pageWidth }: { colors: any
         let holidayRestBonus = 0;
         const existingSlip = getPaySlip(emp.id, currentMonth);
         const expiringCashOutEntries = getCompOffEntries(emp.id).filter((entry) => expiringCashOutEntryIds.includes(entry.id) && entry.status === "available" && entry.expiresMonth === currentMonth);
-        const expiringCashOutAmount = sumMoney(expiringCashOutEntries.map((entry) => {
-          const unitAmount = entry.source === "overtime"
-            ? (entry.hoursDeducted ?? entry.days * (emp.compOffRule?.hoursPerDay ?? 8)) * (emp.overtimeHourlyRate ?? emp.hourlyRate ?? 0)
-            : entry.days * baseAtt.dailyRate;
-          return unitAmount;
-        }));
+        // 先读取已有有效事件；本批次只累加实际创建成功的事件，禁止零费率或重复累计进入薪资。
+        const existingCashOutBefore = settleCompOffCashOut(getCompOffEntries(emp.id), emp.id, currentMonth).amount;
+        let newlyCreatedExpiringCashOutAmount = 0;
         for (const entry of expiringCashOutEntries) {
           const unitRate = entry.days > 0 ? (entry.source === "overtime"
             ? ((entry.hoursDeducted ?? entry.days * (emp.compOffRule?.hoursPerDay ?? 8)) * (emp.overtimeHourlyRate ?? emp.hourlyRate ?? 0)) / entry.days
             : baseAtt.dailyRate) : 0;
-          cashOutCompOff(entry.id, unitRate, currentMonth);
+          if (unitRate > 0 && cashOutCompOff(entry.id, unitRate, currentMonth)) {
+            newlyCreatedExpiringCashOutAmount = sumMoney([newlyCreatedExpiringCashOutAmount, entry.days * unitRate]);
+          }
         }
         empShifts.forEach((s) => {
           const ss = s.specialStatusId ? specialStatuses.find((st) => st.id === s.specialStatusId) : undefined;
@@ -4238,9 +4246,7 @@ function SchedulePage({ colors, month, onMonthChange, pageWidth }: { colors: any
             updateCompOffEntry(nextEntry.id, { days: nextEntry.days, status: nextEntry.status, usedMonth: nextEntry.usedMonth });
           }
         }
-        // 到期兑换已经作为余额条目写入 cashOutCompOff；草稿金额始终由兑现流水汇总。
-        // 当前批次尚未触发 Store 状态刷新时，显式加上本批金额，绝不再累计旧薪资单字段。
-        const existingCashOut = settleCompOffCashOut(getCompOffEntries(emp.id), emp.id, currentMonth).amount;
+        // 薪资金额只由已有有效兑现事件和本批实际创建成功的事件组成，绝不继承旧薪资单字段。
         const slip = buildPaySlipDraft(
           emp,
           currentMonth,
@@ -4249,7 +4255,7 @@ function SchedulePage({ colors, month, onMonthChange, pageWidth }: { colors: any
           globalSettings,
           cumulativeIncome,
           cumulativeTaxPaid,
-          sumMoney([existingCashOut, expiringCashOutAmount]),
+          sumMoney([existingCashOutBefore, newlyCreatedExpiringCashOutAmount]),
         );
         if (Object.keys(holidayBonusAllocation).length > 0) slip.holidayBonusAllocation = holidayBonusAllocation;
         if (Object.keys(nextUsage).length > 0) slip.compOffUsage = nextUsage;
@@ -4928,7 +4934,10 @@ function SchedulePage({ colors, month, onMonthChange, pageWidth }: { colors: any
                               ? Math.round((entry.hoursDeducted ?? entry.days * 8) * (emp.overtimeHourlyRate ?? emp.hourlyRate ?? 0) * 100) / 100
                               : Math.round(entry.days * dailyRateVal * 100) / 100;
                             const settledBefore = settleCompOffCashOut(getCompOffEntries(empId), empId, currentMonthStr).amount;
-                            cashOutCompOff(entry.id, amount / entry.days, currentMonthStr);
+                            if (amount <= 0 || entry.days <= 0 || !cashOutCompOff(entry.id, amount / entry.days, currentMonthStr)) {
+                              Alert.alert("无法兑换现金", "当前兑现费率或金额为 ¥0。请使用“减少调休余额”，或先修正费率后再兑换。");
+                              return;
+                            }
                             if (slip) {
                               const advTotal = advances.filter((a) => a.employeeId === empId && (a.deductMonth === currentMonthStr || a.date.startsWith(currentMonthStr)) && (a.status === "pending" || a.status === "deducted")).reduce((s, a) => s + a.amount, 0);
                               const rebuilt = buildPaySlipDraft(emp, currentMonthStr, att!, advTotal, globalSettings, settledBefore + amount);

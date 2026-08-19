@@ -27,6 +27,7 @@ import {
 import { settlePayrollExtras } from "./payroll-extras";
 import { calculateFinalSalary, calculateGrossSalary } from "./payroll-reconciliation";
 import { CURRENT_ALLOWANCE_RULES_SCHEMA_VERSION, getActiveAllowanceControls, needsHistoricalAllowanceRulesReset, resetHistoricalAllowanceRules } from "./allowance-rules-reset";
+import { createCompOffCashOutEvent, migrateLegacyCompOffSettlement, voidCompOffCashOutEvent } from "./comp-off-cashout-settlement";
 import {
   buildFinalScheduleByDept,
   buildFrozenPayrollByEmployee,
@@ -788,7 +789,8 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
     compOffCashOutOverride?: number,
   ): PaySlip => {
     const existing = ref.current.find((s) => s.employeeId === employee.id && s.month === month);
-    const compOffCashOut = compOffCashOutOverride ?? existing?.compOffCashOut ?? 0;
+    // 兑现额只能由唯一事件账本明确传入；禁止旧薪资单金额在草稿重建时无来源回流。
+    const compOffCashOut = compOffCashOutOverride ?? 0;
     const attendanceDays = attendance?.attendanceDays ?? 0;
     const attendanceSalary = attendance?.attendanceSalary ?? 0;
 
@@ -1228,8 +1230,10 @@ interface CompOffBalanceEntryStore {
   getEntries: (employeeId: string) => CompOffBalanceEntry[];
   /** 获取某员工在某月可用的余额总天数（available 状态且未过期） */
   getAvailableDays: (employeeId: string, month: string) => number;
-  /** 将余额兑现成钱（标记为 cashed_out，记录兑现金额） */
-  cashOutEntry: (id: string, dailyRate: number, usedMonth: string) => void;
+  /** 将余额兑换为唯一、可审计的现金事件；零费率或跨月倒流会被拒绝。 */
+  cashOutEntry: (id: string, unitRate: number, usedMonth: string) => boolean;
+  /** 草稿月作废错误兑现并恢复该余额；已确认月必须走更正会话。 */
+  voidCashOutEntry: (id: string, reason: string) => boolean;
   /** 自动将过期余额标记为 expired */
   expireOldEntries: (currentMonth: string) => void;
   ready: boolean;
@@ -1237,29 +1241,30 @@ interface CompOffBalanceEntryStore {
 
 const CompOffBalanceEntryContext = createContext<CompOffBalanceEntryStore>({
   entries: [], addEntry: () => {}, updateEntry: () => {},
-  getEntries: () => [], getAvailableDays: () => 0, cashOutEntry: () => {}, expireOldEntries: () => {},
+  getEntries: () => [], getAvailableDays: () => 0, cashOutEntry: () => false, voidCashOutEntry: () => false, expireOldEntries: () => {},
   ready: false,
 });
 
 function CompOffBalanceEntryProvider({ children }: { children: React.ReactNode }) {
   const { data: entries, ref, persist, ready } = usePersisted<CompOffBalanceEntry>("labor_comp_off_entries_v1");
 
-  // 迁移旧数据：修复 expiresMonth 为空字符串的条目（旧版错误写入空字符串）
+  // 一次性规范化历史余额：修复缺失到期月，并把旧的可分裂兑现字段迁移为唯一事件快照。
+  // 损坏历史（如 ¥0 费率却写入 ¥1）会被 quarantined，绝不进入薪资结算或被静默删除。
   React.useEffect(() => {
     if (!ready) return;
-    const needsFix = ref.current.some((e) => e.status === "available" && !e.expiresMonth);
-    if (needsFix) {
-      const fixed = ref.current.map((e) => {
-        if (e.status === "available" && !e.expiresMonth) {
-          // 根据 earnedMonth 计算3个月后过期
-          return { ...e, expiresMonth: calcCompOffExpiresMonth(e.earnedMonth) };
-        }
-        return e;
-      });
-      console.log("[CompOffBalanceEntryProvider] 迁移旧数据，修复 expiresMonth 为空的条目");
-      persist(fixed);
-    }
-  }, [ready]);
+    let changed = false;
+    const fixed = ref.current.map((raw) => {
+      let entry = raw;
+      if (entry.status === "available" && !entry.expiresMonth) {
+        entry = { ...entry, expiresMonth: calcCompOffExpiresMonth(entry.earnedMonth) };
+        changed = true;
+      }
+      const migrated = migrateLegacyCompOffSettlement(entry);
+      if (migrated !== entry) changed = true;
+      return migrated;
+    });
+    if (changed) persist(fixed);
+  }, [ready, persist, ref]);
 
   const addEntry = useCallback((entry: Omit<CompOffBalanceEntry, "id" | "createdAt">) => {
     const newEntry: CompOffBalanceEntry = {
@@ -1289,16 +1294,23 @@ function CompOffBalanceEntryProvider({ children }: { children: React.ReactNode }
       .reduce((sum, e) => sum + e.days, 0);
   }, [ref]);
 
-  const cashOutEntry = useCallback((id: string, unitRate: number, usedMonth: string) => {
-    // unitRate：单位兑换费率（加班换休=时薪，节假日换休=日薪），传0表示直接扣除不产生金额
+  const cashOutEntry = useCallback((id: string, unitRate: number, usedMonth: string): boolean => {
     const entry = ref.current.find((e) => e.id === id);
-    if (!entry || entry.status !== "available") return;
-    const cashOutAmount = Math.round(entry.days * unitRate * 100) / 100;
-    const next = ref.current.map((e) => e.id === id
-      ? { ...e, status: "cashed_out" as const, usedMonth, cashOutUnitRate: unitRate, cashOutAmount }
-      : e
-    );
-    persist(next);
+    if (!entry || entry.status !== "available") return false;
+    const event = createCompOffCashOutEvent(entry, unitRate, usedMonth);
+    if (!event) return false;
+    persist(ref.current.map((e) => e.id === id
+      ? { ...e, status: "cashed_out" as const, usedMonth, settlement: event, settlementHistory: e.settlementHistory ?? [] }
+      : e,
+    ));
+    return true;
+  }, [persist, ref]);
+
+  const voidCashOutEntry = useCallback((id: string, reason: string): boolean => {
+    const entry = ref.current.find((e) => e.id === id);
+    if (!entry || entry.status !== "cashed_out" || !entry.settlement || entry.settlement.status === "voided") return false;
+    persist(ref.current.map((e) => e.id === id ? voidCompOffCashOutEvent(e, reason) : e));
+    return true;
   }, [persist, ref]);
 
   const expireOldEntries = useCallback((currentMonth: string) => {
@@ -1312,7 +1324,7 @@ function CompOffBalanceEntryProvider({ children }: { children: React.ReactNode }
   }, [persist, ref]);
 
   return (
-    <CompOffBalanceEntryContext.Provider value={{ entries, addEntry, updateEntry, getEntries, getAvailableDays, cashOutEntry, expireOldEntries, ready }}>
+    <CompOffBalanceEntryContext.Provider value={{ entries, addEntry, updateEntry, getEntries, getAvailableDays, cashOutEntry, voidCashOutEntry, expireOldEntries, ready }}>
       {children}
     </CompOffBalanceEntryContext.Provider>
   );

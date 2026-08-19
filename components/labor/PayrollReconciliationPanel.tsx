@@ -25,6 +25,7 @@ type Props = {
   onClose: () => void;
   onRebuildDraft: () => Promise<void>;
   onOpenAdjustment: () => Promise<boolean>;
+  onVoidDraftSettlement?: (entryId: string, reason: string) => Promise<boolean>;
 };
 
 function accessMessage(reason: string): string {
@@ -34,7 +35,7 @@ function accessMessage(reason: string): string {
   return "当前设备没有薪资修正权限。";
 }
 
-export function PayrollReconciliationPanel({ visible, month, employees, paySlips, entries, monthStatus, colors, onClose, onRebuildDraft, onOpenAdjustment }: Props) {
+export function PayrollReconciliationPanel({ visible, month, employees, paySlips, entries, monthStatus, colors, onClose, onRebuildDraft, onOpenAdjustment, onVoidDraftSettlement }: Props) {
   const [state, dispatch] = useReducer(reducePayrollReconciliationState, { tag: "closed" });
   const payrollEditAccess = useCan("payroll.edit");
   const rows = useMemo<readonly ReconciliationRow[]>(() => employees.map((employee) => {
@@ -42,7 +43,7 @@ export function PayrollReconciliationPanel({ visible, month, employees, paySlips
     const settlement = settleCompOffCashOut(entries, employee.id, month);
     return { employee, slip, settlement, legacyDelta: slip ? getLegacyCompOffCashOutDelta(slip, settlement) : 0 };
   }), [employees, entries, month, paySlips]);
-  const issueCount = rows.filter((row) => Math.abs(row.legacyDelta) >= 0.01).length;
+  const issueCount = rows.reduce((count, row) => count + row.settlement.issues.length + (Math.abs(row.legacyDelta) >= 0.01 ? 1 : 0), 0);
   const busy = state.tag === "rebuilding_draft" || state.tag === "opening_adjustment";
   const actionable = payrollEditAccess.allowed && !busy;
 
@@ -62,6 +63,14 @@ export function PayrollReconciliationPanel({ visible, month, employees, paySlips
       dispatch({ type: "SUCCESS", message: "已创建已结算月份的薪资更正会话。" });
     } catch { dispatch({ type: "FAIL", message: "无法创建更正会话；网络恢复后或关闭现有调整后可再次尝试。" }); }
   };
+  const voidIssue = async (entryId: string) => {
+    if (!onVoidDraftSettlement || monthStatus !== "draft" || !payrollEditAccess.allowed) return;
+    dispatch({ type: "REBUILD_DRAFT" });
+    try {
+      if (!await onVoidDraftSettlement(entryId, "核对面板作废：费率、金额或来源不一致")) throw new Error("VOID_FAILED");
+      dispatch({ type: "SUCCESS", message: "错误兑现事件已作废，余额已恢复为可用；请重建本月草稿。" });
+    } catch { dispatch({ type: "FAIL", message: "未能作废该错误事件，原始数据未被修改。" }); }
+  };
 
   const renderRow = ({ item }: { item: ReconciliationRow }) => {
     const { employee, slip, settlement, legacyDelta } = item;
@@ -69,8 +78,9 @@ export function PayrollReconciliationPanel({ visible, month, employees, paySlips
       <View style={S.rowHeader}><Text style={[S.name, { color: colors.foreground }]}>{employee.code} {employee.realName}</Text><Text style={[S.sub, { color: colors.muted }]}>{settlement.lines.length} 笔兑现流水</Text></View>
       <View style={S.amountLine}><Text style={[S.sub, { color: colors.muted }]}>流水兑现</Text><Text style={[S.amount, { color: colors.foreground }]}>+¥{formatMoney(settlement.amount)}</Text></View>
       <View style={S.amountLine}><Text style={[S.sub, { color: colors.muted }]}>薪资单兑现</Text><Text style={[S.amount, { color: colors.foreground }]}>+¥{formatMoney(slip?.compOffCashOut ?? 0)}</Text></View>
-      {Math.abs(legacyDelta) >= 0.01 && <View style={S.warning}><IconSymbol name="exclamationmark.triangle.fill" size={13} color="#B45309" /><Text style={S.warningText}>未关联历史金额 {legacyDelta >= 0 ? "+" : ""}¥{formatMoney(legacyDelta)}，重建后将以兑现流水为准。</Text></View>}
-      {settlement.lines.map((line) => <Text key={line.entryId} style={[S.source, { color: colors.muted }]}>来源：{line.earnedMonth} {line.source === "overtime" ? "加班" : "节假日"}余额 {line.days}天 × ¥{formatMoney(line.unitRate)}</Text>)}
+      {Math.abs(legacyDelta) >= 0.01 && <View style={S.warning}><IconSymbol name="exclamationmark.triangle.fill" size={13} color="#B45309" /><Text style={S.warningText}>孤儿薪资兑现额 {legacyDelta >= 0 ? "+" : ""}¥{formatMoney(legacyDelta)}：没有同员工、同月份的有效兑现事件。{monthStatus === "draft" ? "重建草稿会按有效事件归零。" : "请创建更正会话，历史发薪不会被直接改写。"}</Text></View>}
+      {settlement.lines.map((line) => <Text key={line.eventId} style={[S.source, { color: colors.muted }]}>事件 {line.eventId.slice(-8)} · 来源：{line.earnedMonth} {line.source === "overtime" ? "加班" : "节假日"}余额 {line.days}天 × ¥{formatMoney(line.unitRate)} · ¥{formatMoney(line.amount)}</Text>)}
+      {settlement.issues.map((issue) => <View key={`${issue.entryId ?? "slip"}-${issue.code}`} style={S.issue}><View style={{ flex: 1, gap: 2 }}><Text style={S.issueTitle}>数据异常 · {issue.code === "ZERO_RATE_NON_ZERO_AMOUNT" ? "零费率却有金额" : issue.code === "AMOUNT_RATE_MISMATCH" ? "费率与金额不匹配" : "兑现来源缺失"}</Text><Text style={S.warningText}>{issue.description} {issue.entryId ? `事件 ${issue.entryId.slice(-8)} · ¥${formatMoney(issue.amount)}` : ""}</Text></View>{monthStatus === "draft" && issue.entryId && onVoidDraftSettlement && <Pressable accessibilityRole="button" accessibilityLabel={`作废错误兑现事件 ${issue.entryId}`} disabled={!actionable} onPress={() => void voidIssue(issue.entryId!)} style={[S.voidButton, { opacity: actionable ? 1 : 0.42 }]}><Text style={S.voidText}>作废</Text></Pressable>}</View>)}
     </View>;
   };
 
@@ -115,6 +125,6 @@ const S = StyleSheet.create({
   summary: { borderWidth: 1, borderRadius: 12, padding: 12, gap: 3, marginBottom: 2 }, summaryValue: { fontSize: 22, fontWeight: "900" },
   row: { paddingVertical: 10, gap: 4, borderBottomWidth: StyleSheet.hairlineWidth }, rowHeader: { flexDirection: "row", justifyContent: "space-between" }, name: { fontSize: 14, fontWeight: "700" },
   amountLine: { flexDirection: "row", justifyContent: "space-between" }, amount: { fontSize: 12, fontWeight: "700" }, source: { fontSize: 10 },
-  warning: { flexDirection: "row", gap: 5, alignItems: "center", paddingTop: 3 }, warningText: { color: "#92400E", fontSize: 11, flex: 1 }, accessNote: { color: "#92400E", fontSize: 11, lineHeight: 16, paddingTop: 4 }, feedback: { fontSize: 12, fontWeight: "600", textAlign: "center", paddingVertical: 8 },
+  warning: { flexDirection: "row", gap: 5, alignItems: "center", paddingTop: 3 }, warningText: { color: "#92400E", fontSize: 11, flex: 1 }, issue: { flexDirection: "row", gap: 8, borderRadius: 8, padding: 8, backgroundColor: "#FEF3C7", marginTop: 4 }, issueTitle: { color: "#92400E", fontSize: 11, fontWeight: "600" }, voidButton: { alignSelf: "center", borderWidth: 1, borderColor: "#B45309", borderRadius: 6, paddingHorizontal: 9, paddingVertical: 5 }, voidText: { color: "#92400E", fontSize: 11, fontWeight: "600" }, accessNote: { color: "#92400E", fontSize: 11, lineHeight: 16, paddingTop: 4 }, feedback: { fontSize: 12, fontWeight: "600", textAlign: "center", paddingVertical: 8 },
   actions: { padding: 12, borderTopWidth: StyleSheet.hairlineWidth }, primary: { alignItems: "center", paddingVertical: 12, borderRadius: 10 }, primaryText: { color: "#FFFFFF", fontWeight: "700", fontSize: 14 },
 });
