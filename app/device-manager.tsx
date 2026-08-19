@@ -313,8 +313,32 @@ export default function DeviceManagerScreen() {
   const router = useRouter();
   const { lang } = useI18n();
   const insets = useSafeAreaInsets();
-  const { deviceInfo, deviceRole, syncState, syncError, retrySync, logout, refreshDeviceCredentials, createSyncGroup, recoverStaleGroupOwner, forceClearLocalSyncCredentials, isGroupSwitching } = useSync();
-  const currentRole: DeviceRole = deviceRole ?? "guest";
+  const { deviceInfo, deviceRole, deviceSessionState, syncState, syncError, retrySync, logout, refreshDeviceCredentials, createSyncGroup, recoverStaleGroupOwner, forceClearLocalSyncCredentials, isGroupSwitching } = useSync();
+  // 角色只能来自 DeviceSessionV2 的核验结果。未核验绝不能降级伪装成“访客设备”。
+  const currentRole = deviceRole;
+  const isVerifiedOnline = deviceSessionState.tag === "authorized";
+  const isVerifiedCached = deviceSessionState.tag === "offline_cache" || deviceSessionState.tag === "policy_stale";
+  const isOwner = isVerifiedOnline && currentRole === "owner";
+  const canRecoverStaleOwner = isVerifiedOnline && currentRole !== null && currentRole !== "owner" && !isGroupSwitching;
+  const identityPresentation = currentRole
+    ? {
+        label: `${lang === "zh" ? ROLE_LABELS[currentRole].zh : ROLE_LABELS[currentRole].en}${isVerifiedCached ? (lang === "zh" ? " · 上次已验证" : " · Previously verified") : (lang === "zh" ? " · 已验证" : " · Verified")}`,
+        description: lang === "zh" ? ROLE_DESC[currentRole].zh : ROLE_DESC[currentRole].en,
+        color: ROLE_LABELS[currentRole].color,
+      }
+    : {
+        label: deviceSessionState.tag === "verifying"
+          ? (lang === "zh" ? "正在核验设备身份" : "Verifying device identity")
+          : deviceSessionState.tag === "membership_revoked"
+          ? (lang === "zh" ? "成员资格已撤销" : "Membership revoked")
+          : deviceSessionState.tag === "local_single_device"
+          ? (lang === "zh" ? "本机单机模式" : "Local single-device mode")
+          : (lang === "zh" ? "设备身份暂未核验" : "Device identity pending verification"),
+        description: deviceSessionState.tag === "membership_revoked"
+          ? (lang === "zh" ? "本机不再拥有此同步组成员资格；请重新加入或创建新组。" : "This device no longer has membership in the sync group. Rejoin or create a new group.")
+          : (lang === "zh" ? "暂不执行角色管理、恢复主设备或同步组切换；请完成同步核验后重试。" : "Role management, owner recovery, and group switching stay unavailable until verification completes."),
+        color: deviceSessionState.tag === "membership_revoked" ? "#FF3B30" : deviceSessionState.tag === "blocked" ? "#FF9500" : colors.muted,
+      };
   const [manualSyncing, setManualSyncing] = useState(false);
   const [forceClearing, setForceClearing] = useState(false);
   const [renamingDevice, setRenamingDevice] = useState(false);
@@ -543,24 +567,32 @@ export default function DeviceManagerScreen() {
   };
 
   const handleRecoverStaleOwner = () => {
-    if (!deviceInfo || currentRole === "owner" || isGroupSwitching) return;
+    if (!canRecoverStaleOwner) return;
     const execute = async () => {
       try {
-        await recoverStaleGroupOwner();
+        const outcome = await recoverStaleGroupOwner();
         await loadDevices();
         await refreshDeviceCredentials();
         Alert.alert(
-          lang === "zh" ? "已恢复同步组" : "Sync Group Recovered",
-          lang === "zh" ? "已撤销长期失联的旧主设备，并将本机安全交接为主设备。同步数据未删除。" : "The long-offline owner was revoked and this device is now the owner. Sync data was preserved.",
+          outcome === "ALREADY_OWNER"
+            ? (lang === "zh" ? "本机已是主设备" : "This Device Is Already the Owner")
+            : (lang === "zh" ? "已恢复同步组" : "Sync Group Recovered"),
+          outcome === "ALREADY_OWNER"
+            ? (lang === "zh" ? "已重新核验本机的主设备身份，无需撤销任何成员或删除同步数据。" : "The owner identity was reverified. No member was revoked and no sync data was deleted.")
+            : (lang === "zh" ? "已撤销长期失联的旧主设备，并将本机安全交接为主设备。同步数据未删除。" : "The long-offline owner was revoked and this device is now the owner. Sync data was preserved."),
         );
       } catch (error) {
-        const code = String(error);
-        Alert.alert(
-          lang === "zh" ? "暂时无法恢复" : "Recovery Unavailable",
-          code.includes("STALE_OWNER_RECOVERY_TOO_EARLY")
-            ? (lang === "zh" ? "原主设备近期仍在线。为避免误移除，请使用原主设备完成退出或稍后重试。" : "The previous owner was recently active. Use that device to leave or try later.")
-            : code,
-        );
+        const code = error instanceof Error ? error.message : String(error);
+        const message = code.includes("STALE_OWNER_RECOVERY_ROUTE_UNAVAILABLE")
+          ? (lang === "zh" ? "服务器尚未部署“恢复失联主设备”功能，因此本机不会执行任何角色变更。请先由运维按既定迁移顺序部署 Worker，部署完成后再重试。" : "The server has not deployed owner recovery. No role changed on this device. Deploy the Worker, then retry.")
+          : code.includes("STALE_OWNER_RECOVERY_TOO_EARLY")
+          ? (lang === "zh" ? "原主设备在最近 7 天内仍有活动记录。为避免误移除，本次恢复未执行。请使用原主设备安全退出或在保护期结束后重试。" : "The former owner was active within the last 7 days, so recovery was not performed. Use that device to leave or retry after the protection period.")
+          : code.includes("DEVICE_GROUP_NOT_FOUND")
+          ? (lang === "zh" ? "该同步组的远端记录已不存在。本机业务数据未受影响；请创建新组或使用有效配对码重新加入。" : "The remote sync group no longer exists. Local business data is unchanged; create a new group or rejoin with a valid code.")
+          : code.includes("DEVICE_AUTH_UNAUTHORIZED") || code.includes("MEMBERSHIP")
+          ? (lang === "zh" ? "本机成员资格未通过核验，无法恢复主设备。请先完成同步核验或重新加入原同步组。" : "This device membership could not be verified, so owner recovery is unavailable. Verify sync or rejoin the group first.")
+          : (lang === "zh" ? "恢复未完成，系统没有修改本机身份或远端成员。请检查网络后重试。" : "Recovery did not complete. No local identity or remote membership was changed. Check the network and retry.");
+        Alert.alert(lang === "zh" ? "暂时无法恢复" : "Recovery Unavailable", message);
       }
     };
     const message = lang === "zh"
@@ -575,6 +607,8 @@ export default function DeviceManagerScreen() {
   const leaveCurrentGroupSafely = async (wipeLocalData = false) => {
     try {
       await logout();
+      setDevices([]);
+      setCustomRoleNames({});
       if (wipeLocalData) await AsyncStorage.clear();
       if (Platform.OS !== "web") void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert(
@@ -597,6 +631,8 @@ export default function DeviceManagerScreen() {
       setForceClearing(true);
       try {
         await forceClearLocalSyncCredentials();
+        setDevices([]);
+        setCustomRoleNames({});
         Alert.alert(
           lang === "zh" ? "本机凭据已清除" : "Local Credentials Cleared",
           lang === "zh"
@@ -647,7 +683,7 @@ export default function DeviceManagerScreen() {
     if (!deviceInfo || isGroupSwitching) return;
     tap();
     const candidates = devices.filter((item) => !item.isCurrentDevice);
-    if (currentRole === "owner" && candidates.length > 0) {
+    if (isOwner && candidates.length > 0) {
       Alert.alert(
         lang === "zh" ? "交接主设备后加入新组" : "Hand off owner role before switching",
         lang === "zh"
@@ -663,7 +699,7 @@ export default function DeviceManagerScreen() {
       );
       return;
     }
-    if (currentRole === "owner") {
+    if (isOwner) {
       Alert.alert(
         lang === "zh" ? "加入其他同步组" : "Join another sync group",
         lang === "zh"
@@ -717,7 +753,6 @@ export default function DeviceManagerScreen() {
     }
   };
 
-  const isOwner = deviceRole === "owner";
   const isSyncing = syncState.syncing || manualSyncing;
   const combinedError = syncState.error || syncError;
   const syncColor = combinedError ? "#FF3B30" : isSyncing ? "#0A84FF" : "#34C759";
@@ -933,9 +968,9 @@ export default function DeviceManagerScreen() {
         {/* ── 4. Current Device Card ── */}
         {deviceInfo && (
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <View style={[styles.roleTag, { backgroundColor: ROLE_LABELS[currentRole].color + "20" }]}>
-              <Text style={[styles.roleTagText, { color: ROLE_LABELS[currentRole].color }]}>
-                {lang === "zh" ? ROLE_LABELS[currentRole].zh : ROLE_LABELS[currentRole].en}
+            <View style={[styles.roleTag, { backgroundColor: identityPresentation.color + "20" }]}>
+              <Text style={[styles.roleTagText, { color: identityPresentation.color }]}>
+                {identityPresentation.label}
               </Text>
             </View>
             {renamingDevice ? (
@@ -1002,7 +1037,7 @@ export default function DeviceManagerScreen() {
               </View>
             )}
             <Text style={[styles.deviceDesc, { color: colors.muted }]}>
-              {lang === "zh" ? ROLE_DESC[currentRole].zh : ROLE_DESC[currentRole].en}
+              {identityPresentation.description}
             </Text>
             {/* Bug 5：显示同步组短码，便于跨设备核对是否在同一组 */}
             <Text style={[styles.deviceDesc, { color: colors.muted, marginTop: 4 }]}>
@@ -1029,14 +1064,14 @@ export default function DeviceManagerScreen() {
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
               <Pressable
                 onPress={handleOpenGroupSwitch}
-                disabled={isGroupSwitching}
-                style={({ pressed }) => [styles.roleBtn, { backgroundColor: colors.primary, opacity: pressed || isGroupSwitching ? 0.65 : 1, alignSelf: "flex-start" }]}
+                disabled={!isVerifiedOnline || isGroupSwitching}
+                style={({ pressed }) => [styles.roleBtn, { backgroundColor: colors.primary, opacity: pressed || !isVerifiedOnline || isGroupSwitching ? 0.45 : 1, alignSelf: "flex-start" }]}
               >
                 {isGroupSwitching ? <ActivityIndicator color="#fff" size="small" /> : (
                   <Text style={styles.roleBtnText}>{lang === "zh" ? "加入其他同步组" : "Join Another Group"}</Text>
                 )}
               </Pressable>
-              {currentRole !== "owner" && (
+              {canRecoverStaleOwner && (
                 <Pressable
                   testID="recover-stale-sync-owner"
                   onPress={handleRecoverStaleOwner}
@@ -1047,9 +1082,14 @@ export default function DeviceManagerScreen() {
                 </Pressable>
               )}
             </View>
-            {currentRole !== "owner" && (
+            {canRecoverStaleOwner && (
               <Text style={[styles.hint, { color: colors.muted, marginTop: 10 }]}>
                 {lang === "zh" ? "仅当原主设备已连续 7 天未在线时可恢复；不会删除同步组数据。" : "Available only after the former owner has been offline for 7 days; sync data is preserved."}
+              </Text>
+            )}
+            {!isVerifiedOnline && (
+              <Text style={[styles.hint, { color: identityPresentation.color, marginTop: 10 }]}>
+                {lang === "zh" ? "当前身份尚未完成线上核验，已暂停切换同步组和恢复主设备，避免误操作。" : "Online identity verification is incomplete, so group switching and owner recovery are paused to prevent unsafe actions."}
               </Text>
             )}
           </View>
@@ -1154,7 +1194,7 @@ export default function DeviceManagerScreen() {
                       {item.name}
                       {item.isCurrentDevice && (
                         <Text style={{ color: colors.muted, fontSize: 12 }}>
-                          {lang === "zh" ? " (本机)" : " (this)"}
+                          {isVerifiedOnline ? (lang === "zh" ? " (本机)" : " (this)") : (lang === "zh" ? " (远端登记，待核验)" : " (remote record, pending verification)")}
                         </Text>
                       )}
                     </Text>

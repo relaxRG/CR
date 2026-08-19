@@ -528,17 +528,40 @@ export async function leaveCurrentSyncGroup(): Promise<void> {
  * 显式恢复失联主设备：仅当服务端确认主设备从未在线或超过恢复阈值未在线时可用。
  * Worker 会撤销旧主设备并把当前活跃设备提升为主设备；不会删除同步数据。
  */
-export async function recoverStaleOwner(): Promise<DeviceCredentials> {
+export type StaleOwnerRecoveryResult = Readonly<{
+  outcome: "RECOVERED" | "ALREADY_OWNER";
+  membership: DeviceCredentials;
+  previousOwnerDeviceId: string | null;
+}>;
+
+export async function recoverStaleOwner(): Promise<StaleOwnerRecoveryResult> {
   const deviceInfo = await getDeviceCredentials();
-  if (!deviceInfo) throw new Error("Device not registered");
+  if (!deviceInfo) throw new Error("DEVICE_CREDENTIALS_MISSING");
   const res = await cfFetch("/api/device/recover-stale-owner", {
     method: "POST",
     deviceInfo,
   });
-  if (!res.ok) return readError(res, `STALE_OWNER_RECOVERY_FAILED_${res.status}`);
-  const membership = await res.json() as DeviceCredentials;
-  await saveDeviceCredentials(membership);
-  return membership;
+  if (!res.ok) {
+    // 生产端尚未部署该路由时，边缘层会返回纯文本 Not found；不能直接暴露给用户。
+    if (res.status === 404) {
+      const raw = await res.text().catch(() => "");
+      if (!raw || /not found/i.test(raw)) throw new Error("STALE_OWNER_RECOVERY_ROUTE_UNAVAILABLE");
+      try {
+        const body = JSON.parse(raw) as { error?: string };
+        throw new Error(body.error ?? "STALE_OWNER_RECOVERY_ROUTE_UNAVAILABLE");
+      } catch (error) {
+        if (error instanceof Error && error.message !== raw) throw error;
+        throw new Error("STALE_OWNER_RECOVERY_ROUTE_UNAVAILABLE");
+      }
+    }
+    return readError(res, `STALE_OWNER_RECOVERY_FAILED_${res.status}`);
+  }
+  const result = await res.json() as StaleOwnerRecoveryResult;
+  if (!result.membership?.deviceId || !result.membership?.deviceToken || !result.membership?.groupId || !["RECOVERED", "ALREADY_OWNER"].includes(result.outcome)) {
+    throw new Error("STALE_OWNER_RECOVERY_INVALID_RESPONSE");
+  }
+  await saveDeviceCredentials(result.membership);
+  return result;
 }
 
 export type UpdateDevicePolicyV2Result = Readonly<{

@@ -2512,21 +2512,43 @@ async function handleDeviceLeave(env, headers, origin) {
 async function handleDeviceRecoverStaleOwner(env, headers, origin) {
   const device = await verifyRequestDevice(env, headers);
   if (!device) return err("DEVICE_AUTH_UNAUTHORIZED", 401, origin);
+  const group = await env.DB.prepare("SELECT id, owner_device_id FROM device_groups WHERE id = ?").bind(device.group_id).first();
+  if (!group) return err("DEVICE_GROUP_NOT_FOUND", 404, origin);
   const owner = await env.DB.prepare("SELECT device_id, last_seen FROM devices WHERE group_id = ? AND is_active = 1 AND role = 'owner' LIMIT 1").bind(device.group_id).first();
-  if (!owner || owner.device_id === device.device_id) return json({ deviceId: device.device_id, deviceToken: device.token, groupId: device.group_id, role: "owner", deviceName: device.name }, 200, origin);
+  const membership = () => ({ deviceId: device.device_id, deviceToken: device.token, groupId: device.group_id, role: "owner", deviceName: device.name });
+  const now = Date.now();
+
+  // 没有活跃主设备时，同样必须原子地提升当前成员并修复 group owner 指针；不能只返回一份伪 owner 凭据。
+  if (!owner) {
+    await env.DB.batch([
+      env.DB.prepare("UPDATE devices SET role = 'owner' WHERE device_id = ? AND group_id = ? AND is_active = 1").bind(device.device_id, device.group_id),
+      env.DB.prepare("UPDATE device_groups SET owner_device_id = ? WHERE id = ?").bind(device.device_id, device.group_id),
+      env.DB.prepare("INSERT INTO group_ts (group_id, last_push_at) VALUES (?, ?) ON CONFLICT(group_id) DO UPDATE SET last_push_at = excluded.last_push_at").bind(device.group_id, now),
+    ]);
+    console.warn("[cf-sync] owner_recovered_without_active_owner", { group: String(device.group_id).slice(0, 8) });
+    return json({ outcome: "RECOVERED", membership: membership(), previousOwnerDeviceId: null }, 200, origin);
+  }
+
+  // 已是活跃主设备时只校正 group 指针并返回幂等结果，不撤销任何成员。
+  if (owner.device_id === device.device_id) {
+    if (group.owner_device_id !== device.device_id) {
+      await env.DB.prepare("UPDATE device_groups SET owner_device_id = ? WHERE id = ?").bind(device.device_id, device.group_id).run();
+    }
+    return json({ outcome: "ALREADY_OWNER", membership: membership(), previousOwnerDeviceId: device.device_id }, 200, origin);
+  }
+
   const offlineFor = Date.now() - Number(owner.last_seen || 0);
   const minimumOffline = 7 * 24 * 60 * 60 * 1000;
   if (owner.last_seen && offlineFor < minimumOffline) return err("STALE_OWNER_RECOVERY_TOO_EARLY", 409, origin);
-  const now = Date.now();
   await env.DB.batch([
     env.DB.prepare("UPDATE devices SET is_active = 0 WHERE device_id = ? AND group_id = ? AND role = 'owner' AND is_active = 1").bind(owner.device_id, device.group_id),
     env.DB.prepare("UPDATE devices SET role = 'owner' WHERE device_id = ? AND group_id = ? AND is_active = 1").bind(device.device_id, device.group_id),
     env.DB.prepare("UPDATE device_groups SET owner_device_id = ? WHERE id = ?").bind(device.device_id, device.group_id),
-    env.DB.prepare("INSERT INTO group_ts (group_id, last_push_at) VALUES (?, ?) ON CONFLICT(group_id) DO UPDATE SET last_push_at = excluded.last_push_at").bind(device.group_id, now)
+    env.DB.prepare("INSERT INTO group_ts (group_id, last_push_at) VALUES (?, ?) ON CONFLICT(group_id) DO UPDATE SET last_push_at = excluded.last_push_at").bind(device.group_id, now),
   ]);
   await clearWebDeviceSessions(env, owner.device_id);
   console.warn("[cf-sync] stale_owner_recovered", { group: String(device.group_id).slice(0, 8) });
-  return json({ deviceId: device.device_id, deviceToken: device.token, groupId: device.group_id, role: "owner", deviceName: device.name }, 200, origin);
+  return json({ outcome: "RECOVERED", membership: membership(), previousOwnerDeviceId: owner.device_id }, 200, origin);
 }
 async function handleDeviceUpdateRole(env, body, headers, origin) {
   const session = await resolveDeviceSessionV2(env, headers);

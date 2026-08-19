@@ -96,7 +96,7 @@ type SyncContextValue = {
   /** 加入另一个同步组；主设备可选择先把原组主角色交接给其他活跃设备。 */
   switchToAnotherGroup: (code: string, handoffDeviceId?: string) => Promise<void>;
   /** 明确恢复已失联主设备的同步组；Worker 仅在主设备已长期离线时允许交接。 */
-  recoverStaleGroupOwner: () => Promise<void>;
+  recoverStaleGroupOwner: () => Promise<"RECOVERED" | "ALREADY_OWNER">;
   /** 仅在远端服务不可用等紧急情形下使用：停止本机同步并删除本机凭据，不更改远端成员记录。 */
   forceClearLocalSyncCredentials: () => Promise<void>;
   /** 正在执行原子切组或冷启动补偿时禁用高风险设备管理操作。 */
@@ -607,9 +607,10 @@ export function SyncProvider({
   const recoverStaleGroupOwner = useCallback(async () => {
     setIsGroupSwitching(true);
     try {
-      const membership = await recoverStaleOwner();
-      setDeviceCredentials(membership);
+      const result = await recoverStaleOwner();
+      setDeviceCredentials(result.membership);
       await restartSync();
+      return result.outcome;
     } finally {
       setIsGroupSwitching(false);
     }
@@ -838,33 +839,4 @@ function getConflictRecommendation(
   if (remoteCount > localCount + 2) return "remote";
   if (localCount > remoteCount + 2) return "local";
   return null;
-}
-import AsyncStorage from "@react-native-async-storage/async-storage";
-
-// ─── 权限变更检测 ─────────────────────────────────────────────────────────────
-const PREV_ALLOWED_KEYS_STORAGE = "cf.sync.prevAllowedKeys.v1";
-const LANG_STORAGE_KEY = "app.lang.v1";
-async function checkAndNotifyPermissionChange(newAllowedKeys: string[] | null): Promise<void> {
-  try {
-    const raw = await AsyncStorage.getItem(PREV_ALLOWED_KEYS_STORAGE);
-    if (raw === null) {
-      await AsyncStorage.setItem(PREV_ALLOWED_KEYS_STORAGE, JSON.stringify(newAllowedKeys));
-      return;
-    }
-    const prev: string[] | null = JSON.parse(raw);
-    const prevJson = JSON.stringify(prev?.slice().sort() ?? null);
-    const newJson = JSON.stringify(newAllowedKeys?.slice().sort() ?? null);
-    if (prevJson !== newJson) {
-      await AsyncStorage.setItem(PREV_ALLOWED_KEYS_STORAGE, JSON.stringify(newAllowedKeys));
-      const lang = await AsyncStorage.getItem(LANG_STORAGE_KEY).catch(() => null);
-      const isEn = lang === "en";
-      Alert.alert(
-        isEn ? "Permissions Updated" : "权限已更新",
-        isEn
-          ? "The administrator has updated your device permissions. Some features may be restricted or newly available. Contact the owner device if you have questions."
-          : "管理员已修改您的设备权限，部分功能可能受限或已开放。如有疑问请联系主设备管理员。",
-        [{ text: isEn ? "OK" : "知道了" }],
-      );
-    }
-  } catch {}
 }
