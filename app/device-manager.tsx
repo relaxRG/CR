@@ -353,6 +353,7 @@ export default function DeviceManagerScreen() {
   const insets = useSafeAreaInsets();
   const { deviceInfo, deviceRole, syncState, syncError, retrySync, logout, refreshDeviceInfo, createSyncGroup, recoverStaleGroupOwner, forceClearLocalSyncCredentials, isGroupSwitching } = useSync();
   const [manualSyncing, setManualSyncing] = useState(false);
+  const [forceClearing, setForceClearing] = useState(false);
   const [renamingDevice, setRenamingDevice] = useState(false);
   const [renameInput, setRenameInput] = useState("");
   // 照片同步进度
@@ -634,15 +635,27 @@ export default function DeviceManagerScreen() {
   };
 
   const forceClearLocalCredentials = () => {
-    if (!deviceInfo || isGroupSwitching) return;
+    if (!deviceInfo || isGroupSwitching || forceClearing) return;
     const execute = async () => {
-      await forceClearLocalSyncCredentials();
-      Alert.alert(
-        lang === "zh" ? "本机凭据已清除" : "Local Credentials Cleared",
-        lang === "zh"
-          ? "本机已停止同步，业务数据仍保留。远端设备组仍可能显示本机；请在其他主设备上移除本机，或待服务恢复后使用“恢复失联主设备”。"
-          : "This device stopped syncing and local business data was kept. The remote group may still list this device; remove it from another owner device or use Recover Offline Owner after service recovers.",
-      );
+      setForceClearing(true);
+      try {
+        await forceClearLocalSyncCredentials();
+        Alert.alert(
+          lang === "zh" ? "本机凭据已清除" : "Local Credentials Cleared",
+          lang === "zh"
+            ? "本机已停止同步，业务数据仍保留。远端设备组仍可能显示本机；请在其他主设备上移除本机，或待服务恢复后使用“恢复失联主设备”。"
+            : "This device stopped syncing and local business data was kept. The remote group may still list this device; remove it from another owner device or use Recover Offline Owner after service recovers.",
+        );
+      } catch {
+        Alert.alert(
+          lang === "zh" ? "本机凭据未完全清除" : "Local Credentials Not Fully Cleared",
+          lang === "zh"
+            ? "系统保留了当前状态，未继续执行。请关闭 App 后重新打开并重试；若仍失败，请联系运维处理设备安全存储。"
+            : "The current state was retained and no further action was taken. Restart the app and try again; contact operations if secure storage continues to fail.",
+        );
+      } finally {
+        setForceClearing(false);
+      }
     };
     const finalConfirm = () => Alert.alert(
       lang === "zh" ? "最后确认" : "Final Confirmation",
@@ -1352,8 +1365,11 @@ export default function DeviceManagerScreen() {
               <Pressable
                 testID="force-clear-local-sync-credentials"
                 onPress={forceClearLocalCredentials}
-                disabled={isGroupSwitching}
-                style={({ pressed }) => [styles.deviceRow, pressed && { opacity: 0.7 }, isGroupSwitching && { opacity: 0.45 }]}
+                disabled={isGroupSwitching || forceClearing}
+                accessibilityRole="button"
+                accessibilityLabel={lang === "zh" ? "强制解除本机同步凭据" : "Force Clear Local Sync Credentials"}
+                accessibilityHint={lang === "zh" ? "仅在服务或自动化异常时使用，需要两次确认" : "Emergency use only; requires two confirmations"}
+                style={({ pressed }) => [styles.deviceRow, pressed && { opacity: 0.7 }, (isGroupSwitching || forceClearing) && { opacity: 0.45 }]}
               >
                 <View style={[styles.deviceIcon, { backgroundColor: "#8E8E93" }]}>
                   <IconSymbol name="lock.slash.fill" size={18} color="#FFFFFF" />

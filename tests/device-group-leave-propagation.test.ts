@@ -65,6 +65,10 @@ describe("设备组退出远端传播与失联主设备恢复", () => {
     expect(deviceManager).toContain("const finalConfirm");
     expect(deviceManager).toContain("最后确认");
     expect(deviceManager).toContain("远端成员记录会保留");
+    expect(deviceManager).toContain("const [forceClearing, setForceClearing]");
+    expect(deviceManager).toContain("disabled={isGroupSwitching || forceClearing}");
+    expect(deviceManager).toContain("本机凭据未完全清除");
+    expect(deviceManager).toContain("accessibilityHint");
   });
 
   it("Worker 将成员变更写入组时间戳，并且恢复日志不输出任何令牌", () => {
