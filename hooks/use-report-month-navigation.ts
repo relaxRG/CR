@@ -1,13 +1,11 @@
-import { useCallback, useMemo } from "react";
+import { useMemo } from "react";
 import { useMonthlySummaryStore } from "@/lib/store/monthly-summary/store";
 import { useMonthlyReportStore } from "@/lib/store/monthly-report/store";
 import { useRevenueStore } from "@/lib/store/revenue-store";
 import { usePettyCashStore } from "@/lib/store/petty-store";
 import { usePaySlipStore } from "@/lib/labor/store";
 import {
-  clampReportMonth,
   deriveReportMonthBounds,
-  normalizeReportMonth,
   type ReportMonth,
 } from "@/lib/reporting/month-navigation";
 import { useGlobalBusinessMonth } from "@/lib/months/global-business-month";
@@ -22,7 +20,7 @@ export function useReportMonthNavigation() {
   const { records: revenueRecords } = useRevenueStore();
   const { records: pettyRecords } = usePettyCashStore();
   const { paySlips } = usePaySlipStore();
-  const bounds = useMemo(() => deriveReportMonthBounds([
+  const localBounds = useMemo(() => deriveReportMonthBounds([
     ...summaryReports.map((report) => report.month),
     ...balances.map((balance) => balance.month),
     ...monthlyReports.map((report) => report.rawMonth ?? report.monthLabel),
@@ -31,15 +29,11 @@ export function useReportMonthNavigation() {
     ...(paySlips ?? []).map((slip) => slip.month),
   ]), [summaryReports, balances, monthlyReports, revenueRecords, pettyRecords, paySlips]);
 
-  const month = useMemo(
-    () => clampReportMonth(globalMonth, bounds),
-    [globalMonth, bounds],
-  );
+  // 任一模块选择的业务月必须原样保留；报表无数据时由页面展示空状态，绝不私自跳月。
+  const bounds = useMemo(() => ({
+    min: globalMonth < localBounds.min ? globalMonth : localBounds.min,
+    max: globalMonth > localBounds.max ? globalMonth : localBounds.max,
+  }), [globalMonth, localBounds]);
 
-  const selectMonth = useCallback((next: ReportMonth) => {
-    const canonical = clampReportMonth(next, bounds);
-    selectGlobalMonth(canonical);
-  }, [bounds, selectGlobalMonth]);
-
-  return { month, bounds, selectMonth };
+  return { month: globalMonth, bounds, selectMonth: selectGlobalMonth as (month: ReportMonth) => void };
 }

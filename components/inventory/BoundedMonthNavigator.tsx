@@ -16,11 +16,13 @@ interface BoundedMonthNavigatorProps {
   month: InventoryMonth;
   bounds: InventoryMonthBounds;
   onChange: (month: InventoryMonth) => void;
+  /** 五大模块共用同一导航组件，只替换无障碍与面板主题文案。 */
+  subject?: string;
   testID?: string;
 }
 
 /** 库存、店铺与其他模块共用的库存风格紧凑上浮月份卡片。 */
-export function BoundedMonthNavigator({ month, bounds, onChange, testID = "inventory-month-navigator" }: BoundedMonthNavigatorProps) {
+export function BoundedMonthNavigator({ month, bounds, onChange, subject = "库存", testID = "inventory-month-navigator" }: BoundedMonthNavigatorProps) {
   const colors = useColors();
   const [visible, setVisible] = useState(false);
   const [year, setYear] = useState(Number(month.slice(0, 4)));
@@ -37,13 +39,13 @@ export function BoundedMonthNavigator({ month, bounds, onChange, testID = "inven
   return (
     <>
       <View testID={testID} style={S.row}>
-        <Pressable testID={`${testID}-previous`} accessibilityRole="button" accessibilityLabel="上一个库存月份" accessibilityState={{ disabled: !canPrevious }} disabled={!canPrevious} onPress={() => onChange(addInventoryMonths(month, -1))} style={({ pressed }) => [S.arrow, { backgroundColor: colors.border + "55", opacity: !canPrevious ? 0.32 : pressed ? 0.55 : 1 }]}>
+        <Pressable testID={`${testID}-previous`} accessibilityRole="button" accessibilityLabel={`上一个${subject}月份`} accessibilityState={{ disabled: !canPrevious }} disabled={!canPrevious} onPress={() => onChange(addInventoryMonths(month, -1))} style={({ pressed }) => [S.arrow, { backgroundColor: colors.border + "55", opacity: !canPrevious ? 0.32 : pressed ? 0.55 : 1 }]}>
           <IconSymbol name="chevron.left" size={15} color={colors.muted} />
         </Pressable>
-        <Pressable testID={`${testID}-picker`} accessibilityRole="button" accessibilityLabel={`选择库存月份，当前${inventoryMonthLabel(month)}`} onPress={() => setVisible(true)} style={({ pressed }) => [S.monthButton, { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.7 : 1 }]}>
+        <Pressable testID={`${testID}-picker`} accessibilityRole="button" accessibilityLabel={`选择${subject}月份，当前${inventoryMonthLabel(month)}`} onPress={() => setVisible(true)} style={({ pressed }) => [S.monthButton, { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.7 : 1 }]}>
           <Text style={[S.monthText, { color: colors.foreground }]}>{inventoryMonthLabel(month)}</Text>
         </Pressable>
-        <Pressable testID={`${testID}-next`} accessibilityRole="button" accessibilityLabel="下一个库存月份" accessibilityState={{ disabled: !canNext }} disabled={!canNext} onPress={() => onChange(addInventoryMonths(month, 1))} style={({ pressed }) => [S.arrow, { backgroundColor: colors.border + "55", opacity: !canNext ? 0.32 : pressed ? 0.55 : 1 }]}>
+        <Pressable testID={`${testID}-next`} accessibilityRole="button" accessibilityLabel={`下一个${subject}月份`} accessibilityState={{ disabled: !canNext }} disabled={!canNext} onPress={() => onChange(addInventoryMonths(month, 1))} style={({ pressed }) => [S.arrow, { backgroundColor: colors.border + "55", opacity: !canNext ? 0.32 : pressed ? 0.55 : 1 }]}>
           <IconSymbol name="chevron.right" size={15} color={colors.muted} />
         </Pressable>
       </View>
@@ -51,7 +53,7 @@ export function BoundedMonthNavigator({ month, bounds, onChange, testID = "inven
       <Modal visible={visible} transparent animationType="fade" onRequestClose={() => setVisible(false)}>
         <Pressable testID={`${testID}-backdrop`} accessibilityLabel="关闭月份选择" style={S.backdrop} onPress={() => setVisible(false)}>
           <Pressable testID={`${testID}-floating-card`} style={[S.card, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={() => undefined}>
-            <Text style={[S.cardTitle, { color: colors.foreground }]}>选择库存月份</Text>
+            <Text style={[S.cardTitle, { color: colors.foreground }]}>选择{subject}月份</Text>
             <View style={S.cardHeader}>
               <Pressable disabled={year <= firstYear} onPress={() => setYear((value) => value - 1)} hitSlop={8} style={({ pressed }) => [S.yearArrow, { opacity: year <= firstYear ? 0.28 : pressed ? 0.55 : 1 }]}><IconSymbol name="chevron.left" size={15} color={colors.muted} /></Pressable>
               <Text style={[S.yearText, { color: colors.foreground }]}>{year}年</Text>

@@ -1,0 +1,47 @@
+import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
+
+describe("备用金月份导航与页面操作层级", () => {
+  const petty = read("components/store/petty-cash.tsx");
+  const businessNavigator = read("components/months/BoundedBusinessMonthNavigator.tsx");
+  const sharedNavigator = read("components/inventory/BoundedMonthNavigator.tsx");
+  const labor = read("app/labor.tsx");
+  const store = read("app/(tabs)/store.tsx");
+  const inventory = read("components/store/inventory.tsx");
+
+  it("二级页签位于月份选择器之前，并使用员工Tag同层级的40pt文字分段", () => {
+    expect(petty.indexOf("{renderViewTabs()}")).toBeLessThan(petty.indexOf("{renderHeader()}"));
+    expect(petty).toContain('viewTabs: { minHeight: 40');
+    expect(petty).toContain('viewTab: { minHeight: 40');
+    expect(petty).toContain("contentContainerStyle={S.viewTabsContent}");
+  });
+
+  it("备用金、报表与库存通过同一月份导航实现，且中间按钮不显示下拉箭头", () => {
+    expect(businessNavigator).toContain('import { BoundedMonthNavigator }');
+    expect(businessNavigator).toContain("<BoundedMonthNavigator");
+    expect(sharedNavigator).toContain("subject?: string");
+    expect(sharedNavigator).not.toContain('name="chevron.down"');
+    expect(sharedNavigator).toContain('>选择{subject}月份</Text>');
+  });
+
+  it("报表、员工、库存和店铺均使用同一40pt层级与月份组件", () => {
+    expect(labor).toContain("<BoundedBusinessMonthNavigator");
+    expect(labor).toContain('testID="labor-month-navigator"');
+    expect(labor).toContain("minHeight: 40");
+    expect(store).toContain('testID="report-workspace-month-navigator"');
+    expect(store).toContain("minHeight: 40");
+    expect(inventory).toContain('subject={mode === "shop" ? "店铺" : "库存"}');
+  });
+
+  it("新增记录属于当前页面操作栏，日历选中日期会作为新增记录日期，且不存在悬浮加号", () => {
+    expect(petty).toContain("const renderContextActions");
+    expect(petty).toContain(">新增记录</Text>");
+    expect(petty).toContain("selectedDay ? `${month}-${String(selectedDay).padStart(2, \"0\")}`");
+    expect(petty).not.toContain("S.fab");
+    expect(petty).not.toContain("fabIcon");
+    expect(petty).toContain("contextActionBtn: { minHeight: 36");
+  });
+});

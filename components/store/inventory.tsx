@@ -136,7 +136,7 @@ export default function StoreInventoryScreen({ mode = "inventory" }: { mode?: In
         horizontal
         showsHorizontalScrollIndicator={false}
         testID={mode === "shop" ? "shop-segmented-tabs" : "inventory-segmented-tabs"}
-        style={{ flexGrow: 0, marginTop: 8 }}
+        style={{ flexGrow: 0, marginTop: 0 }}
         contentContainerStyle={{ paddingHorizontal: INVENTORY_WORKSPACE_METRICS.horizontalPadding, gap: INVENTORY_WORKSPACE_METRICS.horizontalGap }}
       >
         {categories.map((category) => {
@@ -155,7 +155,7 @@ export default function StoreInventoryScreen({ mode = "inventory" }: { mode?: In
         })}
       </ScrollView>
 
-      <BoundedMonthNavigator month={selectedMonth} bounds={bounds} onChange={selectGlobalMonth} testID={`${mode}-month-navigator`} />
+      <BoundedMonthNavigator month={selectedMonth} bounds={bounds} onChange={selectGlobalMonth} subject={mode === "shop" ? "店铺" : "库存"} testID={`${mode}-month-navigator`} />
 
       <View testID={`${mode}-workspace-${currentCategory.key}`} style={{ flex: 1 }}>
         <InventoryBusinessPanel category={currentCategory.key} month={selectedMonth} />

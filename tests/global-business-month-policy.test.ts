@@ -36,6 +36,8 @@ describe("全局业务月份与紧凑选择器规范", () => {
     expect(inventory).toContain("库存没有该月数据时也必须展示全局月份的空状态");
     expect(inventory).toContain("const selectedMonth = globalMonth");
     expect(petty).toContain("min: month < pettyLocalBounds.min ? month : pettyLocalBounds.min");
+    expect(reportMonth).toContain("return { month: globalMonth");
+    expect(reportMonth).not.toContain("clampReportMonth(globalMonth, bounds)");
   });
 
   it("快速连续切月立即更新界面，并将持久化写入合并为最后一次选择", () => {
@@ -45,17 +47,14 @@ describe("全局业务月份与紧凑选择器规范", () => {
     expect(provider).toContain("setStoredMonth(normalized)");
   });
 
-  it("月份选择器使用紧凑上浮卡片而非大底部抽屉", () => {
-    expect(navigator).toContain('animationType="fade"');
-    expect(navigator).toContain('justifyContent: "flex-start"');
-    expect(navigator).toContain('maxWidth: 336');
-    expect(navigator).toContain('testID={`${testID}-floating-card`}');
-    expect(navigator).not.toContain("borderTopLeftRadius");
-    expect(navigator).not.toContain('justifyContent: "flex-end"');
+  it("月份选择器使用唯一共享的紧凑上浮卡片而非大底部抽屉", () => {
+    expect(navigator).toContain('import { BoundedMonthNavigator }');
+    expect(navigator).toContain("<BoundedMonthNavigator");
+    expect(navigator).toContain("subject={subject}");
     expect(inventoryNavigator).toContain('animationType="fade"');
     expect(inventoryNavigator).toContain('justifyContent: "flex-start"');
     expect(inventoryNavigator).toContain('maxWidth: 336');
-    expect(inventoryNavigator).toContain('>选择库存月份</Text>');
+    expect(inventoryNavigator).toContain('>选择{subject}月份</Text>');
     expect(inventoryNavigator).toContain('accessibilityLabel="关闭月份选择"');
     expect(inventoryNavigator).not.toContain('name="chevron.down"');
     expect(inventoryNavigator).not.toContain("sheetTitle");

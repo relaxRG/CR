@@ -75,42 +75,28 @@ function ReportModule({ insets, colors }: { insets: any; colors: any }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      {/* 子 Tab Chip 切换栏 */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} testID="store-report-tabs"
-        style={{ flexGrow: 0 }}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 8, gap: 8, alignItems: "center" }}>
-        {REPORT_TABS.map((t) => {
-          const active = reportTab === t.key;
-          return (
-            <Pressable key={t.key} testID={`store-report-tab-${t.key}`} onPress={() => {
-                tap();
-                setReportTab(t.key);
-              }}
-              style={({ pressed }) => [S.subChip, {
-                backgroundColor: active ? colors.primary : colors.surface,
-                borderColor: active ? colors.primary : colors.border,
-                opacity: pressed ? 0.75 : 1,
-              }]}>
-              <Text style={[S.subChipText, {
-                color: active ? "#fff" : colors.foreground,
-                fontWeight: active ? "600" : "400",
-              }]}>
-                {t.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+      {/* 报表二级页签与员工、备用金采用同一40pt纯文字分段栏。 */}
+      <View style={{ minHeight: 40, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} testID="store-report-tabs" style={{ flexGrow: 0 }} contentContainerStyle={{ minHeight: 40, paddingHorizontal: 12, gap: 8, alignItems: "center" }}>
+          {REPORT_TABS.map((t) => {
+            const active = reportTab === t.key;
+            return (
+              <Pressable key={t.key} testID={`store-report-tab-${t.key}`} onPress={() => { tap(); setReportTab(t.key); }} style={({ pressed }) => [{ minHeight: 40, paddingHorizontal: 12, alignItems: "center", justifyContent: "center", opacity: pressed ? 0.7 : 1 }]}>
+                <Text style={{ color: active ? colors.primary : colors.muted, fontSize: 15, fontWeight: active ? "700" : "400" }}>{t.label}</Text>
+                {active && <View style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 2, borderRadius: 1, backgroundColor: colors.primary }} />}
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </View>
 
-      <View style={{ paddingHorizontal: 16, paddingBottom: 4 }}>
-        <BoundedBusinessMonthNavigator
+      <BoundedBusinessMonthNavigator
           testID="report-workspace-month-navigator"
           subject="报表"
           month={reportMonth}
           bounds={reportMonthBounds}
           onChange={selectReportMonth}
         />
-      </View>
 
       {!activeAccess.allowed ? (
         <AccessDenied label={REPORT_TABS.find((tab) => tab.key === reportTab)?.label ?? "报表"} colors={colors} />
@@ -243,6 +229,4 @@ const S = StyleSheet.create({
   mainTabRow: { flexDirection: "row", borderBottomWidth: StyleSheet.hairlineWidth },
   mainTabBtn: { flex: 1, alignItems: "center", paddingVertical: 10, borderBottomWidth: 2, borderBottomColor: "transparent" },
   mainTabText: { fontSize: 16 },
-  subChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
-  subChipText: { fontSize: 14, lineHeight: 20 },
 });

@@ -313,33 +313,37 @@ export default function StorePettyCashScreen() {
     </View>
   );
 
-  // ── 视图切换 Tab + 下载按钮 ───────────────────────────────────────────────
+  // ── 二级页签在前、月份选择在后：所有五大模块保持同一层级顺序。 ─────────────
   const renderViewTabs = () => (
     <View style={[S.viewTabs, { backgroundColor: ICOST_BG, borderBottomColor: colors.border }]}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={S.viewTabsContent}>
       {([["ledger","账本"],["calendar","日历"],["stats","统计"]] as [ViewMode, string][]).map(([v, label]) => (
         <Pressable key={v} onPress={() => { tap(); setViewMode(v); }} style={S.viewTab}>
           <Text style={[S.viewTabText, { color: viewMode === v ? colors.primary : colors.muted }]}>{label}</Text>
           {viewMode === v && <View style={[S.viewTabUnderline, { backgroundColor: colors.primary }]} />}
         </Pressable>
       ))}
-      <View style={{ flex: 1 }} />
-      <Pressable onPress={handleCloseMonth}
-        style={[S.downloadBtn, { backgroundColor: pettyCloseStatus === "draft" ? ICOST_CARD : colors.success + "14", marginRight: 4 }]}>
-        <Text style={{ color: pettyCloseStatus === "draft" ? colors.primary : colors.success, fontSize: 11, fontWeight: "700" }}>
-          {pettyCloseStatus === "draft" ? "归档" : "已归档"}
-        </Text>
-      </Pressable>
-      <Pressable onPress={handleImportExcel} disabled={importing}
-        style={[S.downloadBtn, { backgroundColor: ICOST_CARD }]}>
-        {importing
-          ? <ActivityIndicator size="small" color={colors.primary} />
-          : <IconSymbol name="arrow.down.doc.fill" size={20} color={colors.primary} />}
-      </Pressable>
-      <Pressable onPress={() => { tap(); router.push("/petty-category-settings" as any); }}
-        style={[S.downloadBtn, { backgroundColor: ICOST_CARD, marginLeft: 4 }]}>
-        <IconSymbol name="slider.horizontal.3" size={20} color={colors.muted} />
-      </Pressable>
+      </ScrollView>
     </View>
+  );
+
+  // 当前视图操作与页面归属一致；不再使用遮挡底部导航的全局悬浮按钮。
+  const renderContextActions = () => (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[S.contextActions, { backgroundColor: ICOST_BG, borderBottomColor: colors.border }]} contentContainerStyle={S.contextActionsContent}>
+      <View style={{ flex: 1 }} />
+      <Pressable onPress={handleCloseMonth} style={[S.contextActionBtn, { backgroundColor: pettyCloseStatus === "draft" ? ICOST_CARD : colors.success + "14", borderColor: pettyCloseStatus === "draft" ? colors.primary + "33" : colors.success + "33" }]}>
+        <Text style={{ color: pettyCloseStatus === "draft" ? colors.primary : colors.success, fontSize: 12, fontWeight: "700" }}>{pettyCloseStatus === "draft" ? "归档" : "已归档"}</Text>
+      </Pressable>
+      <Pressable onPress={handleImportExcel} disabled={importing} style={[S.contextActionBtn, { backgroundColor: ICOST_CARD, borderColor: colors.border }]}>
+        {importing ? <ActivityIndicator size="small" color={colors.primary} /> : <Text style={{ color: colors.primary, fontSize: 12, fontWeight: "700" }}>导入</Text>}
+      </Pressable>
+      <Pressable onPress={() => { tap(); router.push("/petty-category-settings" as any); }} style={[S.contextActionBtn, { backgroundColor: ICOST_CARD, borderColor: colors.border }]}>
+        <Text style={{ color: colors.muted, fontSize: 12, fontWeight: "700" }}>分类</Text>
+      </Pressable>
+      <Pressable onPress={() => { tap(); setEditingId(null); setAddCode("A1"); setAddAmount(""); setAddDate(selectedDay ? `${month}-${String(selectedDay).padStart(2, "0")}` : new Date().toISOString().slice(0, 10)); setAddDesc(""); setAddPayment("微信"); setAddType("expense"); setShowAdd(true); }} style={[S.contextActionBtn, { backgroundColor: colors.primary, borderColor: colors.primary }]}>
+        <Text style={{ color: "#fff", fontSize: 12, fontWeight: "700" }}>新增记录</Text>
+      </Pressable>
+    </ScrollView>
   );
 
   // ── 月度总览卡片（保留原有功能，只改背景色）────────────────────────────────
@@ -765,17 +769,12 @@ export default function StorePettyCashScreen() {
   // ── 主渲染 ────────────────────────────────────────────────────────────────
   return (
     <View style={[S.root, { backgroundColor: ICOST_BG }]}>
-      {renderHeader()}
       {renderViewTabs()}
+      {renderHeader()}
+      {renderContextActions()}
       {viewMode === "ledger" && renderLedger()}
       {viewMode === "calendar" && renderCalendar()}
       {viewMode === "stats" && renderStats()}
-      {/* FAB：蓝色 + 按钮（右下角，iCost 位置）*/}
-      <Pressable
-        onPress={() => { tap(); setEditingId(null); setAddCode("A1"); setAddAmount(""); setAddDate(new Date().toISOString().slice(0, 10)); setAddDesc(""); setAddPayment("微信"); setAddType("expense"); setShowAdd(true); }}
-        style={[S.fab, { bottom: 20 + insets.bottom, backgroundColor: colors.primary, shadowColor: colors.primary }]}>
-        <Text style={S.fabIcon}>+</Text>
-      </Pressable>
       {renderAddModal()}
       {renderOpeningModal()}
       <Modal visible={showPeriodMenu} transparent animationType="fade" onRequestClose={() => setShowPeriodMenu(false)}>
@@ -804,12 +803,15 @@ const S = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingVertical: 12 },
   navBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
   monthLabel: { fontSize: 18, fontWeight: "700" },
-  // 视图 Tab
-  viewTabs: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
-  viewTab: { paddingVertical: 10, marginRight: 24, alignItems: "center" },
+  // 二级文字分段：与员工 Tag 同一高度和视觉层级。
+  viewTabs: { minHeight: 40, borderBottomWidth: StyleSheet.hairlineWidth },
+  viewTabsContent: { minHeight: 40, paddingHorizontal: 12, gap: 8, alignItems: "center" },
+  viewTab: { minHeight: 40, paddingHorizontal: 12, alignItems: "center", justifyContent: "center" },
   viewTabText: { fontSize: 15, fontWeight: "600" },
   viewTabUnderline: { position: "absolute", bottom: 0, left: 0, right: 0, height: 2, borderRadius: 1 },
-  downloadBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", marginLeft: 4 },
+  contextActions: { flexGrow: 0, borderBottomWidth: StyleSheet.hairlineWidth },
+  contextActionsContent: { minHeight: 48, paddingHorizontal: 12, gap: 8, alignItems: "center" },
+  contextActionBtn: { minHeight: 36, paddingHorizontal: 12, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth, alignItems: "center", justifyContent: "center" },
   // 总览卡片
   summaryCard: { marginHorizontal: 12, marginTop: 12, marginBottom: 8, borderRadius: 16, overflow: "hidden" },
   summaryRow: { flexDirection: "row" },
@@ -880,9 +882,6 @@ const S = StyleSheet.create({
   subCode: { flex: 1, fontSize: 13 },
   subDetail: { fontSize: 11, marginHorizontal: 8 },
   subAmt: { fontSize: 13, fontWeight: "600" },
-  // FAB
-  fab: { position: "absolute", right: 20, width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 8, zIndex: 100 },
-  fabIcon: { fontSize: 28, color: "#fff", fontWeight: "300", lineHeight: 34, marginTop: -2 },
   // 弹窗
   sheet: { flex: 1 },
   sheetHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 16, borderBottomWidth: StyleSheet.hairlineWidth },

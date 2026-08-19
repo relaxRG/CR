@@ -52,6 +52,8 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { PayrollReconciliationPanel } from "@/components/labor/PayrollReconciliationPanel";
 import { ScreenContainer } from "@/components/screen-container";
 import { useGlobalBusinessMonth } from "@/lib/months/global-business-month";
+import { BoundedBusinessMonthNavigator } from "@/components/months/BoundedBusinessMonthNavigator";
+import { deriveInventoryMonthBounds } from "@/lib/inventory-core/month-browser";
 import { MoneyInput } from "@/components/forms/MoneyInput";
 import {
   useEmployeeStore, useAttendanceStore,
@@ -5404,6 +5406,21 @@ export default function LaborScreen({ embedded = true }: { embedded?: boolean })
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
   const { initialPage } = useLocalSearchParams<{ initialPage?: string }>();
   const { month: currentMonth, selectMonth: setCurrentMonth } = useGlobalBusinessMonth();
+  const { paySlips } = usePaySlipStore();
+  const { shifts } = useShiftStore();
+  const { records: attendanceRecords } = useAttendanceStore();
+  const { advances } = useSalaryAdvanceStore();
+  const laborLocalBounds = useMemo(() => deriveInventoryMonthBounds([
+    ...paySlips.map((slip) => slip.month),
+    ...shifts.map((shift) => shift.date),
+    ...attendanceRecords.map((record) => record.month),
+    ...advances.flatMap((advance) => [advance.date, advance.deductMonth]),
+  ]), [paySlips, shifts, attendanceRecords, advances]);
+  // 员工无数据月份仍显示全局选择；边界仅限制最早业务月前一月与最晚业务月后一月。
+  const laborMonthBounds = useMemo(() => ({
+    min: currentMonth < laborLocalBounds.min ? currentMonth : laborLocalBounds.min,
+    max: currentMonth > laborLocalBounds.max ? currentMonth : laborLocalBounds.max,
+  }), [currentMonth, laborLocalBounds]);
   const [activePage, setActivePage] = useState<PageKey>((initialPage as PageKey) ?? "roster");
   const scrollRef = useRef<ScrollView>(null);
   const previousPagerWidth = useRef(winW);
@@ -5460,37 +5477,29 @@ export default function LaborScreen({ embedded = true }: { embedded?: boolean })
         </View>
       )}
 
-      {/* Tab 切换栏：移到月份导航上方，固定不动 */}
-      <View style={{ paddingHorizontal: 16, paddingVertical: 8, backgroundColor: colors.background }}>
-        <View style={{ flexDirection: "row", backgroundColor: colors.border + "44", borderRadius: 12, padding: 3 }}>
+      {/* 与备用金、报表同层级的40pt纯文字分段栏，位于月份选择器上方。 */}
+      <View style={{ minHeight: 40, backgroundColor: colors.background, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ minHeight: 40, paddingHorizontal: 12, gap: 8, alignItems: "center" }}>
           {PAGES.map((p) => {
             const active = activePage === p.key;
             return (
-              <TouchableOpacity key={p.key} onPress={() => handleTabPress(p.key)}
-                style={[{ flex: 1, alignItems: "center", paddingVertical: 7, borderRadius: 10 },
-                  active && { backgroundColor: colors.surface, shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 4, elevation: 2 }
-                ]}>
-                <Text style={{ fontSize: 13, fontWeight: active ? "700" : "400", color: active ? colors.foreground : colors.muted }}>
-                  {p.label}
-                </Text>
+              <TouchableOpacity key={p.key} onPress={() => handleTabPress(p.key)} style={{ minHeight: 40, paddingHorizontal: 12, alignItems: "center", justifyContent: "center" }}>
+                <Text style={{ fontSize: 15, fontWeight: active ? "700" : "400", color: active ? colors.primary : colors.muted }}>{p.label}</Text>
+                {active && <View style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 2, borderRadius: 1, backgroundColor: colors.primary }} />}
               </TouchableOpacity>
             );
           })}
-        </View>
+        </ScrollView>
       </View>
 
-      {/* 月份导航行（Tab 下方，内容区上方） */}
-      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 8, paddingHorizontal: 16, gap: 12 }}>
-        <Pressable onPress={() => { tap(); const [y, m] = currentMonth.split("-").map(Number); const d = new Date(y, m - 2, 1); setCurrentMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); }}
-          style={({ pressed }) => [{ width: 32, height: 32, borderRadius: 10, backgroundColor: colors.border + "55", alignItems: "center", justifyContent: "center", opacity: pressed ? 0.5 : 1 }]}>
-          <IconSymbol name="chevron.left" size={15} color={colors.muted} />
-        </Pressable>
-        <Text style={{ flex: 1, textAlign: "center", fontSize: 16, fontWeight: "600", color: colors.foreground, letterSpacing: -0.3 }}>{monthLabel(currentMonth)}</Text>
-        <Pressable onPress={() => { tap(); const [y, m] = currentMonth.split("-").map(Number); const d = new Date(y, m, 1); setCurrentMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); }}
-          style={({ pressed }) => [{ width: 32, height: 32, borderRadius: 10, backgroundColor: colors.border + "55", alignItems: "center", justifyContent: "center", opacity: pressed ? 0.5 : 1 }]}>
-          <IconSymbol name="chevron.right" size={15} color={colors.muted} />
-        </Pressable>
-      </View>
+      {/* 与报表、备用金、库存和店铺相同的上浮月份选择器。 */}
+      <BoundedBusinessMonthNavigator
+        month={currentMonth}
+        bounds={laborMonthBounds}
+        onChange={setCurrentMonth}
+        subject="员工"
+        testID="labor-month-navigator"
+      />
 
       {/* 横滑内容区（总览卡片 + 各页面内容，整体可横滑切换） */}
       <ScrollView
