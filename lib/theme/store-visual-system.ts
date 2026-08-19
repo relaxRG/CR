@@ -50,14 +50,18 @@ export const STORE_VISUAL_SYSTEM = {
 export type StoreVisualTone =
   | "neutral"
   | "primary"
+  | "positive"
+  | "attention"
+  | "accent"
+  | "danger"
+  | "muted"
+  // 以下为员工领域的兼容别名；新模块优先使用通用角色而非职业或动作名称。
   | "front"
   | "kitchen"
   | "overtime"
   | "allowance"
   | "settled"
-  | "warning"
-  | "danger"
-  | "muted";
+  | "warning";
 
 export type StoreVisualColors = {
   primary: string;
@@ -72,18 +76,24 @@ export type StoreVisualColors = {
   aiAccent: string;
 };
 
-/** 每种颜色只拥有一个稳定的业务语义，不能在不同页面重定义。 */
+/**
+ * 基础颜色角色跨所有门店页面一致：它们描述展示意图，不直接替代领域事实。
+ * 例如“收入”不是天然绿色，“库存”也不是天然蓝色；应由领域映射决定是否需要强调。
+ */
 export function storeTone(colors: StoreVisualColors, tone: StoreVisualTone): string {
   switch (tone) {
     case "primary":
     case "front":
       return colors.primary;
+    case "positive":
     case "kitchen":
     case "settled":
       return colors.success;
+    case "attention":
     case "overtime":
     case "warning":
       return colors.warning;
+    case "accent":
     case "allowance":
       return colors.aiAccent;
     case "danger":
@@ -99,8 +109,58 @@ export function storeToneSurface(colors: StoreVisualColors, tone: StoreVisualTon
   return `${storeTone(colors, tone)}14`;
 }
 
-/** 统计图和可配置分类可在此稳定色序列中轮换；不得在业务页面自建颜色池。 */
-export const STORE_CATEGORY_TONES = ["primary", "overtime", "kitchen", "allowance", "danger", "front"] as const satisfies readonly StoreVisualTone[];
+/**
+ * 图表和用户配置分类仅可从此稳定色序列轮换。危险红不参与普通分类配色，
+ * 以免把普通菜品、库存分类或费用科目误读为异常。
+ */
+export const STORE_CATEGORY_TONES = ["primary", "accent", "attention", "positive", "muted"] as const satisfies readonly StoreVisualTone[];
+
+/**
+ * 领域映射是唯一允许解释“同一种基础色在此页面是什么意思”的位置。
+ * 页面代码应引用通用 tone；设计评审与开发规范按本映射判断是否可使用该颜色。
+ */
+export const STORE_DOMAIN_COLOR_RULES = {
+  reports: {
+    neutral: "常规营业收入、支出、手续费、科目金额与历史同比；不因金额正负自动着色。",
+    primary: "当前选择的报表页签、筛选和唯一的主操作。",
+    positive: "净利润为正、已完成归档或明确达标的趋势；必须同时显示文字或趋势符号。",
+    attention: "需要关注的环比变化、待补充数据或尚未核对的期间；不是普通费用颜色。",
+    accent: "菜品大类、收入构成和图例中的第二分类色；仅用于图表、色点或分组标题。",
+    danger: "净利润为负、金额校验差额、导入失败或明确财务异常。",
+  },
+  labor: {
+    neutral: "姓名、常规底薪、实发金额、已预支和普通薪资字段。",
+    primary: "前厅分类、当前操作与待发薪资。",
+    positive: "后厨分类、已发薪资、已完成核对或已归档。",
+    attention: "加班、到期调休、待确认或需关注的考勤变化。",
+    accent: "补贴、绩效、预支关联和非异常的附加项。",
+    danger: "薪资差额、扣款异常、数据冲突或确需人工处理的状态。",
+  },
+  pettyCash: {
+    neutral: "普通支出、期初/期末余额、账本金额与历史记录。",
+    primary: "当前账本视图、手工录入与需要处理的当月动作。",
+    positive: "确认入账、正常收入或已完成月结。",
+    attention: "待分类、待核对、临近月结或需补充凭证。",
+    accent: "备用金转入与内部资金调拨；不用于普通收入。",
+    danger: "账实不符、负余额、重复导入或明确错误记录。",
+  },
+  inventory: {
+    neutral: "库存量、单位成本、进货成本、消耗、期初/期末及普通台账金额。",
+    primary: "当前分类、当前工作台、采购录入和可执行的主操作。",
+    positive: "已月结、盘点已确认、成功导入或完成归档。",
+    attention: "待盘点、待补全分类、待确认的月结草稿；不恢复已删除的库存预警功能。",
+    accent: "统计图或分类分组的第二色，仅出现在分组标题、色点和图例，不进入每行台账。",
+    danger: "损耗、盘点差异、导入冲突或不允许的负库存数据。",
+  },
+  shop: {
+    neutral: "杯具、餐具、日用品、设备的普通数量、成本和台账字段。",
+    primary: "当前品类、登记/录入等主操作。",
+    positive: "维护完成、折旧确认、已归档或完成盘点。",
+    attention: "待维护、待盘点、待补全资料。",
+    accent: "统计图与分类分组的辅助颜色，不能替代状态文字。",
+    danger: "损耗、维修异常、盘点差异或数据冲突。",
+  },
+} as const;
 
 export function storeCategoryColor(colors: StoreVisualColors, index: number): string {
   return storeTone(colors, STORE_CATEGORY_TONES[index % STORE_CATEGORY_TONES.length]);
@@ -152,7 +212,7 @@ export const STORE_TEXT = {
 /** 页面接入契约，既用作团队规范，也由自动化测试检查关键页面。 */
 export const STORE_VISUAL_RULES = {
   scope: "报表、员工、备用金、库存、店铺只能使用本模块的语义色彩、图标尺度、文本层级与响应式密度函数。",
-  color: "蓝=当前主操作/前厅，绿=完成/后厨，琥珀=加班或待处理，紫=补贴关联，红=真实异常，灰=辅助或无数据。重要状态必须同时提供文字或图标。",
+  color: "基础角色为蓝=当前选择/主操作，绿=确认完成或正向结果，琥珀=待关注，紫=关联/辅助分类，红=真实异常，灰=中性数据与历史。报表、员工、备用金、库存和店铺必须按 STORE_DOMAIN_COLOR_RULES 解释领域事实；普通收入、支出、库存量和成本默认中性。重要状态必须同时提供文字或图标。",
   icon: "分类标题使用14pt图标且每组仅一次；工具栏使用16pt轮廓图标；行内详情最多12pt；常规页面不得出现超过18pt的装饰图标。",
   type: "正文使用400/500，名称与关键金额最多600；日常标题、金额、台账行禁止700/800/900。",
   density: "iPhone仅展示3个关键指标并通过展开查看详情；iPad和Mac展示5个指标；Mac内容最大宽度1240pt且不放大手机卡片。",
