@@ -245,35 +245,25 @@ export function isStorageKeyWritable(storageKey: SyncStorageKey, capabilities: r
   return write !== null && capabilities.includes(write);
 }
 
-/** 在线核验前或离线缓存下禁止的高风险能力。 */
-export const ONLINE_REQUIRED_CAPABILITIES = new Set<Capability>([
-  "devices.manage",
-  "backup.export",
-  "data.manage",
-  "reports_monthly.import",
-  "reports_monthly.export",
-  "reports_monthly.close",
-  "accounts.export",
-  "petty_cash.close",
-  "inventory_spirits.import",
-  "inventory_spirits.export",
-  "inventory_spirits.close",
-  "inventory_wine.import",
-  "inventory_wine.export",
-  "inventory_wine.close",
-  "inventory_fruit.import",
-  "inventory_fruit.export",
-  "inventory_fruit.close",
-  "inventory_food.import",
-  "inventory_food.export",
-  "inventory_food.close",
-  "inventory_beer.import",
-  "inventory_beer.export",
-  "inventory_beer.close",
-  "inventory_ice.import",
-  "inventory_ice.export",
-  "inventory_ice.close",
-  "payroll.edit",
-  "payroll.close",
-  "labor_comp_off.edit",
+/**
+ * 离线缓存只能展示低风险、已同步的内容。以下资源一旦发生非查看动作，就会形成
+ * 资金、库存、排班、薪资、人员或设备组的共享事实，必须等待 DeviceSessionV2 在线核验。
+ * 新增高风险资源必须加入此清单；ONLINE_REQUIRED_CAPABILITIES 会自动覆盖其全部写入动作。
+ */
+export const ONLINE_REQUIRED_HIGH_RISK_RESOURCES = new Set<CapabilityResource>([
+  "devices", "backup", "data",
+  "wine_catalog", "food_ingredients",
+  "inventory_spirits", "inventory_wine", "inventory_fruit", "inventory_food", "inventory_beer", "inventory_ice",
+  "shop_glassware", "shop_tableware", "shop_supplies", "shop_equipment", "suppliers",
+  "reports_monthly", "accounts", "analytics_business", "analytics_period", "petty_cash",
+  "store_schedule", "labor_employees", "labor_schedule", "labor_attendance", "labor_comp_off", "payroll",
 ]);
+
+export const ONLINE_REQUIRED_WRITE_ACTIONS = CAPABILITY_ACTIONS.filter((action) => action !== "view");
+
+/** 由高风险资源和写入动作自动派生；禁止手写零散 capability 白名单。 */
+export const ONLINE_REQUIRED_CAPABILITIES: ReadonlySet<Capability> = new Set(
+  [...ONLINE_REQUIRED_HIGH_RISK_RESOURCES].flatMap((resource) =>
+    ONLINE_REQUIRED_WRITE_ACTIONS.map((action) => `${resource}.${action}` as Capability),
+  ),
+);

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   CAPABILITY_RESOURCES,
+  ONLINE_REQUIRED_CAPABILITIES,
+  ONLINE_REQUIRED_HIGH_RISK_RESOURCES,
+  ONLINE_REQUIRED_WRITE_ACTIONS,
   STORAGE_POLICY,
   type Capability,
 } from "@/lib/sync/capabilities";
@@ -58,7 +61,7 @@ describe("DeviceSessionV2 状态机与 can()", () => {
     ]);
     const state: DeviceSessionState = { tag: "offline_cache", session, retryAt: 1_735_689_660_000 };
     expect(can(state, "inventory_wine.view")).toMatchObject({ allowed: true });
-    expect(can(state, "inventory_wine.edit")).toMatchObject({ allowed: true });
+    expect(can(state, "inventory_wine.edit")).toMatchObject({ allowed: false, reason: "offline", retryable: true });
     expect(can(state, "inventory_wine.close")).toMatchObject({ allowed: false, reason: "offline", retryable: true });
     expect(can(state, "reports_monthly.import")).toMatchObject({ allowed: false, reason: "offline", retryable: true });
   });
@@ -170,6 +173,21 @@ describe("全 App 跨设备策略收敛", () => {
     };
     for (const capability of highRisk) {
       expect(can(offline, capability), capability).toMatchObject({ allowed: false, reason: "offline", retryable: true });
+    }
+  });
+
+  it("每一个高风险资源的非查看动作必须自动纳入离线在线核验门禁", () => {
+    for (const resource of ONLINE_REQUIRED_HIGH_RISK_RESOURCES) {
+      for (const action of ONLINE_REQUIRED_WRITE_ACTIONS) {
+        const capability = `${resource}.${action}` as Capability;
+        expect(ONLINE_REQUIRED_CAPABILITIES.has(capability), capability).toBe(true);
+        const offline: DeviceSessionState = {
+          tag: "offline_cache",
+          session: baseSession([capability]),
+          retryAt: 1_735_689_660_000,
+        };
+        expect(can(offline, capability), capability).toMatchObject({ allowed: false, reason: "offline", retryable: true });
+      }
     }
   });
 });
