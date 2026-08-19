@@ -32,7 +32,9 @@ describe("报表工作台四页签与统一月份导航", () => {
     expect(store).not.toContain('pathname: "/monthly-summary"');
     expect(store).not.toContain("router.push({ pathname");
     expect(store).toContain('testID="store-report-tabs"');
-    expect(store).toContain('testID={`store-report-tab-${t.key}`}');
+    expect(store).toContain("<StoreSegmentedTabs");
+    expect(read("components/store/store-visual-primitives.tsx")).toContain("function storeSegmentItemTestID");
+    expect(read("components/store/store-visual-primitives.tsx")).toContain('return `${testID.slice(0, -1)}-${key}`;');
   });
 
   it("经营分析的重复功能入口与人工成本管理跳转已删除", () => {

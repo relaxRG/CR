@@ -9,6 +9,8 @@ import * as Haptics from "expo-haptics";
 import { Platform } from "react-native";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { StoreMetric, StoreSectionHeader, StoreToolbarAction } from "@/components/store/store-visual-primitives";
+import { storeTone, STORE_TEXT } from "@/lib/theme/store-visual-system";
 import { BoundedBusinessMonthNavigator } from "@/components/months/BoundedBusinessMonthNavigator";
 import { useReportMonthNavigation } from "@/hooks/use-report-month-navigation";
 import { useMonthlySummaryStore } from "@/lib/store/monthly-summary/store";
@@ -55,37 +57,21 @@ export default function StoreAccountsScreen({ embedded = false }: { embedded?: b
         />}
 
         <View style={{ flexDirection: "row", justifyContent: "flex-end", marginBottom: 10 }}>
-          <TouchableOpacity onPress={() => {
+          <StoreToolbarAction label={accountCloseStatus === "draft" ? "归档本月账户" : "账户已归档"} icon="checkmark.circle" tone={accountCloseStatus === "draft" ? "primary" : "settled"} emphasis={accountCloseStatus === "draft"} colors={colors} onPress={() => {
             if (!assertAccountsWritable()) return;
             Alert.alert("账户月度归档", `确认归档 ${selectedMonth} 账户余额？归档后需先开启调整才能修改。`, [
               { text: "取消", style: "cancel" },
               { text: "确认归档", onPress: () => {
-                moduleClose.finalize({
-                  module: "accounts",
-                  month: selectedMonth,
-                  snapshot: { month: selectedMonth, balances, netProfit },
-                  paymentSummary: { payable: 0, paid: 0, remaining: 0 },
-                });
+                moduleClose.finalize({ module: "accounts", month: selectedMonth, snapshot: { month: selectedMonth, balances, netProfit }, paymentSummary: { payable: 0, paid: 0, remaining: 0 } });
                 Alert.alert("归档完成", `${selectedMonth} 账户已独立归档。`);
               } },
             ]);
-          }} style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: accountCloseStatus === "draft" ? colors.primary + "12" : colors.success + "14" }}>
-            <Text style={{ color: accountCloseStatus === "draft" ? colors.primary : colors.success, fontSize: 12, fontWeight: "700" }}>
-              {accountCloseStatus === "draft" ? "归档本月账户" : "账户已归档"}
-            </Text>
-          </TouchableOpacity>
+          }} />
         </View>
 
-        {/* 净利润参考 */}
-        <View style={{ borderRadius: 10, borderWidth: 1, padding: 12, marginBottom: 12,
-          backgroundColor: colors.primary + "08", borderColor: colors.primary + "22" }}>
-          <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "700" }}>本月经营净利润（参考）</Text>
-          <Text style={{ fontSize: 20, fontWeight: "800", color: netProfit >= 0 ? colors.success : colors.error }}>
-            {netProfit >= 0 ? "+" : ""}¥{netProfit.toFixed(2)}
-          </Text>
-          <Text style={{ fontSize: 11, color: colors.muted, marginTop: 4 }}>
-            账户余额差异 = 手动录入期末余额 - 系统计算期末余额
-          </Text>
+        <View style={{ borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 12, backgroundColor: colors.surface, borderColor: colors.border }}>
+          <StoreMetric label="本月经营净利润（参考）" value={`${netProfit >= 0 ? "+" : ""}¥${netProfit.toFixed(2)}`} tone={netProfit >= 0 ? "settled" : "danger"} icon="chart.line.uptrend.xyaxis" colors={colors} primary />
+          <Text style={{ ...STORE_TEXT.supporting, color: colors.muted, marginTop: 6 }}>账户余额差异 = 手动录入期末余额 - 系统计算期末余额</Text>
         </View>
 
         {/* 四账户卡片 */}
@@ -100,18 +86,18 @@ export default function StoreAccountsScreen({ embedded = false }: { embedded?: b
               borderLeftColor: color, borderLeftWidth: 3 }}>
               <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 13, fontWeight: "700", color }}>{ACCOUNT_TYPE_LABELS[at]}</Text>
+                  <StoreSectionHeader label={ACCOUNT_TYPE_LABELS[at]} icon="banknote.fill" tone="primary" colors={colors} />
                   {bal ? (
                     <>
                       <Text style={{ fontSize: 11, color: colors.muted }}>{bal.accountName}</Text>
                       <View style={{ flexDirection: "row", gap: 16, marginTop: 8 }}>
                         <View>
                           <Text style={{ fontSize: 10, color: colors.muted }}>期初余额</Text>
-                          <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>¥{bal.openingBalance.toFixed(2)}</Text>
+                          <Text style={{ ...STORE_TEXT.metric, color: colors.foreground }}>¥{bal.openingBalance.toFixed(2)}</Text>
                         </View>
                         <View>
                           <Text style={{ fontSize: 10, color: colors.muted }}>期末余额（实际）</Text>
-                          <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>¥{bal.closingBalance.toFixed(2)}</Text>
+                          <Text style={{ ...STORE_TEXT.metric, color: colors.foreground }}>¥{bal.closingBalance.toFixed(2)}</Text>
                         </View>
                       </View>
                       {hasVariance && (

@@ -20,6 +20,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
 import { useCan } from "@/hooks/use-can";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { StoreSectionHeader } from "@/components/store/store-visual-primitives";
+import { storeTone, STORE_TEXT } from "@/lib/theme/store-visual-system";
 import { ScreenContainer } from "@/components/screen-container";
 import { BoundedBusinessMonthNavigator } from "@/components/months/BoundedBusinessMonthNavigator";
 import { useReportMonthNavigation } from "@/hooks/use-report-month-navigation";
@@ -68,7 +70,7 @@ function LineItemRow({ item, colors, linkedModule }: { item: SummaryLineItem; co
     <View style={[LI.row, { borderBottomColor: colors.border, opacity: item.isDuplicate ? 0.5 : 1 }]}>
       <View style={{ flex: 1 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-          <Text style={{ fontSize: 13, color: item.isDuplicate ? colors.muted : colors.foreground }}>
+          <Text style={{ ...STORE_TEXT.body, color: item.isDuplicate ? colors.muted : colors.foreground }}>
             {item.label}
           </Text>
           {item.isDuplicate && (
@@ -93,7 +95,7 @@ function LineItemRow({ item, colors, linkedModule }: { item: SummaryLineItem; co
         ) : null}
       </View>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-        <Text style={{ fontSize: 14, fontWeight: "700", color: amtColor, minWidth: 80, textAlign: "right" }}>
+        <Text style={{ ...STORE_TEXT.metric, color: amtColor, minWidth: 80, textAlign: "right" }}>
           {item.amount === 0 ? "—" : `${item.amount < 0 ? "−" : ""}${formatStoreMoney(Math.abs(item.amount))}`}
         </Text>
         {isNavigable && (
@@ -685,30 +687,24 @@ export default function MonthlySummaryScreen({ embedded = false }: { embedded?: 
         <View style={[S.profitCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <View style={{ width: 3, height: 18, borderRadius: 2, backgroundColor: netProfit >= 0 ? colors.success : colors.error, marginBottom: 8 }} />
           <Text style={{ fontSize: 13, color: colors.muted }}>本月净利润</Text>
-          <Text style={{ fontSize: 32, fontWeight: "800", color: netProfit >= 0 ? colors.success : colors.error }}>
+          <Text style={{ ...STORE_TEXT.metricLarge, fontSize: 30, color: netProfit >= 0 ? storeTone(colors, "settled") : storeTone(colors, "danger") }}>
             {netProfit >= 0 ? "+" : "−"}{formatStoreMoney(Math.abs(netProfit))}
           </Text>
           <View style={{ flexDirection: "row", gap: 28, marginTop: 10 }}>
             <View>
               <Text style={{ fontSize: 11, color: colors.muted }}>总营业收入</Text>
-              <Text style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>{formatStoreMoney(totalRevenue)}</Text>
+              <Text style={{ ...STORE_TEXT.metric, color: colors.foreground }}>{formatStoreMoney(totalRevenue)}</Text>
             </View>
             <View>
               <Text style={{ fontSize: 11, color: colors.muted }}>总支出</Text>
-              <Text style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>{formatStoreMoney(totalExpenses)}</Text>
+              <Text style={{ ...STORE_TEXT.metric, color: colors.foreground }}>{formatStoreMoney(totalExpenses)}</Text>
             </View>
           </View>
         </View>
 
         {presentation.dishRevenueItems.length > 0 && (
           <View style={[S.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <View style={[S.sectionHeader, { borderBottomColor: colors.border }]}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                <View style={{ width: 4, height: 16, borderRadius: 2, backgroundColor: colors.primary }} />
-                <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>本营业收入 · 菜品大类</Text>
-              </View>
-              <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>{formatStoreMoney(presentation.totalDishRevenue)}</Text>
-            </View>
+            <StoreSectionHeader label="本营业收入 · 菜品大类" icon="fork.knife" tone="primary" colors={colors} action={<Text style={{ ...STORE_TEXT.metric, color: colors.foreground }}>{formatStoreMoney(presentation.totalDishRevenue)}</Text>} style={[S.sectionHeader, { borderBottomColor: colors.border }]} />
             {presentation.dishRevenueItems.map((item) => (
               <TouchableOpacity key={item.id} onPress={() => router.push("/dish-analysis" as any)}>
                 <LineItemRow item={item} colors={colors} linkedModule={item.linkedModule} />
@@ -719,26 +715,14 @@ export default function MonthlySummaryScreen({ embedded = false }: { embedded?: 
 
         {presentation.otherRevenueItems.length > 0 && (
           <View style={[S.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <View style={[S.sectionHeader, { borderBottomColor: colors.border }]}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                <View style={{ width: 4, height: 16, borderRadius: 2, backgroundColor: "#64748B" }} />
-                <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>其他经营收入</Text>
-              </View>
-              <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>{formatStoreMoney(presentation.totalOtherRevenue)}</Text>
-            </View>
+            <StoreSectionHeader label="其他经营收入" icon="banknote.fill" tone="settled" colors={colors} action={<Text style={{ ...STORE_TEXT.metric, color: colors.foreground }}>{formatStoreMoney(presentation.totalOtherRevenue)}</Text>} style={[S.sectionHeader, { borderBottomColor: colors.border }]} />
             {presentation.otherRevenueItems.map((item) => <LineItemRow key={item.id} item={item} colors={colors} linkedModule={item.linkedModule} />)}
           </View>
         )}
 
         {presentation.feeItems.length > 0 && (
           <View style={[S.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <View style={[S.sectionHeader, { borderBottomColor: colors.border }]}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                <View style={{ width: 4, height: 16, borderRadius: 2, backgroundColor: "#64748B" }} />
-                <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>手续费</Text>
-              </View>
-              <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>{formatStoreMoney(presentation.totalFees)}</Text>
-            </View>
+            <StoreSectionHeader label="手续费" icon="creditcard.fill" tone="allowance" colors={colors} action={<Text style={{ ...STORE_TEXT.metric, color: colors.foreground }}>{formatStoreMoney(presentation.totalFees)}</Text>} style={[S.sectionHeader, { borderBottomColor: colors.border }]} />
             {presentation.feeItems.map((item) => <LineItemRow key={item.id} item={item} colors={colors} linkedModule={item.linkedModule} />)}
           </View>
         )}

@@ -30,7 +30,7 @@ describe("总月报营业收入与财务颜色语义", () => {
 
   it("营业收入固定按菜品大类呈现，并将手续费作为独立区块", () => {
     expect(source).toContain("本营业收入 · 菜品大类");
-    expect(source).toContain(">手续费</Text>");
+    expect(source).toContain('label="手续费"');
     expect(source).toContain("presentation.dishRevenueItems");
     expect(source).toContain("presentation.feeItems");
   });

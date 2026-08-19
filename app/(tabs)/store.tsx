@@ -17,6 +17,8 @@ import { BoundedBusinessMonthNavigator } from "@/components/months/BoundedBusine
 import { useSync } from "@/lib/cf-sync/provider";
 import { useCan } from "@/hooks/use-can";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { StoreSegmentedTabs } from "@/components/store/store-visual-primitives";
+import { STORE_TEXT, STORE_VISUAL_SYSTEM } from "@/lib/theme/store-visual-system";
 import { floatingTabContentBottomInset } from "@/components/floating-tab-bar";
 import StorePettyCashScreen from "@/components/store/petty-cash";
 import StoreAnalyticsScreen from "@/components/store/analytics";
@@ -75,20 +77,13 @@ function ReportModule({ insets, colors }: { insets: any; colors: any }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      {/* 报表二级页签与员工、备用金采用同一40pt纯文字分段栏。 */}
-      <View style={{ minHeight: 40, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} testID="store-report-tabs" style={{ flexGrow: 0 }} contentContainerStyle={{ minHeight: 40, paddingHorizontal: 12, gap: 8, alignItems: "center" }}>
-          {REPORT_TABS.map((t) => {
-            const active = reportTab === t.key;
-            return (
-              <Pressable key={t.key} testID={`store-report-tab-${t.key}`} onPress={() => { tap(); setReportTab(t.key); }} style={({ pressed }) => [{ minHeight: 40, paddingHorizontal: 12, alignItems: "center", justifyContent: "center", opacity: pressed ? 0.7 : 1 }]}>
-                <Text style={{ color: active ? colors.primary : colors.muted, fontSize: 15, fontWeight: active ? "700" : "400" }}>{t.label}</Text>
-                {active && <View style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 2, borderRadius: 1, backgroundColor: colors.primary }} />}
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-      </View>
+      <StoreSegmentedTabs
+        testID="store-report-tabs"
+        items={REPORT_TABS}
+        active={reportTab}
+        colors={colors}
+        onChange={(next) => { tap(); setReportTab(next); }}
+      />
 
       <BoundedBusinessMonthNavigator
           testID="report-workspace-month-navigator"
@@ -181,7 +176,7 @@ export default function StoreScreen() {
                   }]}>
                   <Text style={[S.mainTabText, {
                     color: active ? colors.primary : colors.muted,
-                    fontWeight: active ? "700" : "400",
+                    fontWeight: active ? STORE_VISUAL_SYSTEM.weight.emphasis : STORE_VISUAL_SYSTEM.weight.quiet,
                   }]}>
                     {t.label}
                   </Text>
@@ -228,5 +223,5 @@ const S = StyleSheet.create({
   syncDot: { position: "absolute", top: 0, right: 0, width: 8, height: 8, borderRadius: 4, zIndex: 1 },
   mainTabRow: { flexDirection: "row", borderBottomWidth: StyleSheet.hairlineWidth },
   mainTabBtn: { flex: 1, alignItems: "center", paddingVertical: 10, borderBottomWidth: 2, borderBottomColor: "transparent" },
-  mainTabText: { fontSize: 16 },
+  mainTabText: { ...STORE_TEXT.body, fontSize: 16 },
 });

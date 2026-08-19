@@ -23,6 +23,8 @@ import { useReportMonthNavigation } from "@/hooks/use-report-month-navigation";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { StoreMetric, StoreSectionHeader, StoreSegmentedTabs } from "@/components/store/store-visual-primitives";
+import { STORE_TEXT } from "@/lib/theme/store-visual-system";
 import { ScreenContainer } from "@/components/screen-container";
 import { usePeriodAnalysisStore } from "@/lib/store/period-analysis/store";
 import { parsePeriodAnalysisExcel } from "@/lib/store/period-analysis/excel-parser";
@@ -42,12 +44,12 @@ import { useShiftStore, useEmployeeStore } from "@/lib/labor/store";
 
 type MainTab = "overview" | "periods" | "latenight" | "alerts";
 
-const TAB_ITEMS: { key: MainTab; label: string; icon: string }[] = [
+const TAB_ITEMS = [
   { key: "overview", label: "总览", icon: "chart.bar.fill" },
   { key: "periods", label: "时段", icon: "clock.fill" },
   { key: "latenight", label: "凌晨", icon: "moon.fill" },
   { key: "alerts", label: "提醒", icon: "exclamationmark.triangle.fill" },
-];
+] as const;
 
 const PERIOD_ORDER: PeriodKey[] = ["lunch", "dinner", "midnight", "late_night"];
 
@@ -61,26 +63,26 @@ function PeriodSummaryCard({ periodKey, totals, colors }: {
   return (
     <View style={[PC.card, { backgroundColor: colors.surface, borderColor: color + "33", borderLeftColor: color, borderLeftWidth: 3 }]}>
       <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: 13, fontWeight: "700", color }}>{PERIOD_LABELS[periodKey]}</Text>
+        <Text style={{ ...STORE_TEXT.sectionTitle, color }}>{PERIOD_LABELS[periodKey]}</Text>
         <Text style={{ fontSize: 11, color: colors.muted }}>{PERIOD_TIME_RANGE[periodKey]}</Text>
         <View style={{ flexDirection: "row", gap: 12, marginTop: 6 }}>
           <View>
             <Text style={{ fontSize: 10, color: colors.muted }}>总营业额</Text>
-            <Text style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>{fmtRevenue(totals.revenue)}</Text>
+            <Text style={{ ...STORE_TEXT.metric, color: colors.foreground }}>{fmtRevenue(totals.revenue)}</Text>
           </View>
           <View>
             <Text style={{ fontSize: 10, color: colors.muted }}>总订单</Text>
-            <Text style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>{totals.orders}单</Text>
+            <Text style={{ ...STORE_TEXT.metric, color: colors.foreground }}>{totals.orders}单</Text>
           </View>
           <View>
             <Text style={{ fontSize: 10, color: colors.muted }}>营业天数</Text>
-            <Text style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>{totals.activeDays}天</Text>
+            <Text style={{ ...STORE_TEXT.metric, color: colors.foreground }}>{totals.activeDays}天</Text>
           </View>
         </View>
       </View>
       <View style={{ alignItems: "flex-end" }}>
         <Text style={{ fontSize: 10, color: colors.muted }}>日均</Text>
-        <Text style={{ fontSize: 18, fontWeight: "800", color: numericColor(colors) }}>{fmtRevenue(totals.avgDailyRevenue)}</Text>
+        <Text style={{ ...STORE_TEXT.metric, color: numericColor(colors) }}>{fmtRevenue(totals.avgDailyRevenue)}</Text>
         <Text style={{ fontSize: 11, color: colors.muted }}>{totals.avgDailyOrders}单/天</Text>
       </View>
     </View>
@@ -336,16 +338,14 @@ export default function PeriodAnalysisScreen({ embedded = false }: { embedded?: 
           ))}
         </ScrollView>
 
-        {/* 总营业额 */}
-        <View style={[S.totalCard, { backgroundColor: colors.primary + "0e", borderColor: colors.primary + "22" }]}>
-          <Text style={{ fontSize: 12, color: colors.muted }}>月度总营业额</Text>
-          <Text style={{ fontSize: 28, fontWeight: "800", color: colors.primary }}>{fmtRevenue(totalRevenue)}</Text>
-          <Text style={{ fontSize: 12, color: colors.muted }}>{report.sourceNote}</Text>
+        <View style={[S.totalCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <StoreMetric label="月度总营业额" value={fmtRevenue(totalRevenue)} tone="primary" icon="banknote.fill" colors={colors} primary />
+          <Text style={{ ...STORE_TEXT.supporting, color: colors.muted }}>{report.sourceNote}</Text>
         </View>
 
         {/* 四时段占比条 */}
         <View style={[S.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[S.cardTitle, { color: colors.foreground }]}>时段营业额占比</Text>
+          <StoreSectionHeader label="时段营业额占比" icon="chart.pie.fill" tone="primary" colors={colors} />
           <View style={{ flexDirection: "row", height: 20, borderRadius: 10, overflow: "hidden", marginVertical: 10 }}>
             {PERIOD_ORDER.map((pk) => {
               const pct = totalRevenue > 0 ? totals[pk].revenue / totalRevenue : 0;
@@ -823,26 +823,13 @@ export default function PeriodAnalysisScreen({ embedded = false }: { embedded?: 
         </View>
       </View>}
 
-      {/* Tab 栏 */}
-      <View style={[S.tabBar, { backgroundColor: colors.border + "33", borderBottomColor: colors.border }]}>
-        {TAB_ITEMS.map((t) => {
-          const isActive = tab === t.key;
-          const hasAlert = t.key === "alerts" && (report?.overtimeAlerts.length ?? 0) > 0;
-          return (
-            <TouchableOpacity key={t.key} onPress={() => { tap(); setTab(t.key); }}
-              style={[S.tabBtn, isActive && { backgroundColor: colors.background }]}>
-              <Text style={[S.tabText, { color: isActive ? colors.primary : colors.muted, fontWeight: isActive ? "700" : "400" }]}>
-                {t.label}
-              </Text>
-              {hasAlert && (
-                <View style={[S.alertDot, { backgroundColor: colors.error }]}>
-                  <Text style={{ fontSize: 9, color: "#fff" }}>{report!.overtimeAlerts.length}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+      <StoreSegmentedTabs
+        items={TAB_ITEMS}
+        active={tab}
+        colors={colors}
+        testID="period-analysis-tabs"
+        onChange={(next) => { tap(); setTab(next); }}
+      />
 
       {/* 内容区 */}
       {tab === "overview" && renderOverview()}

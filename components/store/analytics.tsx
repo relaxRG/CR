@@ -10,6 +10,8 @@ import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { StoreMetric, StoreSectionHeader } from "@/components/store/store-visual-primitives";
+import { storeTone, STORE_TEXT } from "@/lib/theme/store-visual-system";
 import { BoundedBusinessMonthNavigator } from "@/components/months/BoundedBusinessMonthNavigator";
 import { useReportMonthNavigation } from "@/hooks/use-report-month-navigation";
 import { useRevenueStore, REVENUE_CATEGORY_LABELS, RevenueCategory } from "@/lib/store/revenue-store";
@@ -204,21 +206,18 @@ export default function StoreAnalyticsScreen({ embedded = false }: { embedded?: 
         </View>
       </View>
       <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
-        <Text style={[styles.sectionTitle, { color: colors.muted }]}>{label} 总览</Text>
+        <StoreSectionHeader label={`${label} 总览`} icon="chart.pie.fill" tone="primary" colors={colors} />
         <View style={[styles.overviewCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           {[
-            { label: "营收", cur: totalRevCur, prev: totalRevPrev, isRevenue: true },
-            { label: "总成本", cur: totalCostCur, prev: totalCostPrev, isRevenue: false },
-            { label: "利润", cur: profitCur, prev: profitPrev, isRevenue: profitCur >= 0 },
+            { label: "营收", cur: totalRevCur, prev: totalRevPrev, tone: "settled" as const, icon: "banknote.fill" as const },
+            { label: "总成本", cur: totalCostCur, prev: totalCostPrev, tone: "neutral" as const, icon: "cart.fill" as const },
+            { label: "利润", cur: profitCur, prev: profitPrev, tone: profitCur >= 0 ? "settled" as const : "danger" as const, icon: "chart.line.uptrend.xyaxis" as const },
           ].map((item, i, arr) => {
             const pct = compare === "prev" ? pctChange(item.cur, item.prev) : null;
             return (
               <React.Fragment key={item.label}>
-                <View style={styles.overviewItem}>
-                  <Text style={[styles.overviewLabel, { color: colors.muted }]}>{item.label}</Text>
-                  <Text style={[styles.overviewValue, { color: item.isRevenue ? colors.success : colors.error }]}>¥{item.cur.toFixed(0)}</Text>
-                  {pct !== null && <Text style={[styles.overviewPct, { color: parseFloat(pct) > 0 ? colors.success : colors.error }]}>{parseFloat(pct) > 0 ? "▲" : "▼"}{Math.abs(parseFloat(pct))}%</Text>}
-                </View>
+                <StoreMetric label={item.label} value={`¥${item.cur.toFixed(0)}`} tone={item.tone} icon={item.icon} colors={colors} primary={item.label === "利润"} />
+                {pct !== null ? <Text style={{ ...STORE_TEXT.caption, color: parseFloat(pct) > 0 ? storeTone(colors, "settled") : storeTone(colors, "danger") }}>{parseFloat(pct) > 0 ? "▲" : "▼"}{Math.abs(parseFloat(pct))}%</Text> : null}
                 {i < arr.length - 1 && <View style={{ width: StyleSheet.hairlineWidth, backgroundColor: colors.border, alignSelf: "stretch" }} />}
               </React.Fragment>
             );
@@ -226,7 +225,7 @@ export default function StoreAnalyticsScreen({ embedded = false }: { embedded?: 
         </View>
       </View>
       <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
-        <Text style={[styles.sectionTitle, { color: colors.muted }]}>成本明细</Text>
+        <StoreSectionHeader label="成本明细" icon="list.bullet" tone="neutral" colors={colors} />
         <View style={[styles.detailCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           {costCategories.map((cat, i) => {
             const curVal = cur[cat] ?? 0; const prevVal = prev[cat] ?? 0;
@@ -236,7 +235,7 @@ export default function StoreAnalyticsScreen({ embedded = false }: { embedded?: 
               <React.Fragment key={cat}>
                 <View style={styles.detailRow}>
                   <Text style={[styles.detailLabel, { color: colors.foreground }]}>{REVENUE_CATEGORY_LABELS[cat]}</Text>
-                  <Text style={[styles.detailValue, { color: colors.error }]}>¥{curVal.toFixed(0)}</Text>
+                  <Text style={[styles.detailValue, { color: storeTone(colors, "neutral") }]}>¥{curVal.toFixed(0)}</Text>
                   {compare === "prev" && <Text style={[styles.detailPrev, { color: colors.muted }]}>上期 ¥{prevVal.toFixed(0)}</Text>}
                   {pct !== null && <Text style={[styles.detailPct, { color: parseFloat(pct) > 0 ? colors.error : colors.success }]}>{parseFloat(pct) > 0 ? "▲" : "▼"}{Math.abs(parseFloat(pct))}%</Text>}
                 </View>

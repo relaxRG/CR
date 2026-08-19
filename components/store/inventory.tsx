@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo } from "react";
-import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Platform, View } from "react-native";
 import * as Haptics from "expo-haptics";
 import { useColors } from "@/hooks/use-colors";
 import { usePersistedState } from "@/hooks/use-persisted-state";
@@ -20,7 +20,7 @@ import { useTablewareInventoryStore } from "@/lib/tableware/inventory-store";
 import { useDailyInventoryStore } from "@/lib/daily/inventory-store";
 import { useEquipmentInventoryStore } from "@/lib/equipment/inventory-store";
 import { useGlobalBusinessMonth } from "@/lib/months/global-business-month";
-import { INVENTORY_WORKSPACE_METRICS } from "@/lib/store/inventory-workspace-ui";
+import { StoreSegmentedTabs } from "@/components/store/store-visual-primitives";
 import SpiritsInventoryScreen from "@/app/spirits-inventory";
 import WineInventoryScreen from "@/app/wine-inventory";
 import FruitInventoryScreen from "@/app/fruit-inventory";
@@ -132,28 +132,13 @@ export default function StoreInventoryScreen({ mode = "inventory" }: { mode?: In
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
+      <StoreSegmentedTabs
+        items={categories}
+        active={currentCategory.key}
+        colors={colors}
         testID={mode === "shop" ? "shop-segmented-tabs" : "inventory-segmented-tabs"}
-        style={{ flexGrow: 0, marginTop: 0 }}
-        contentContainerStyle={{ paddingHorizontal: INVENTORY_WORKSPACE_METRICS.horizontalPadding, gap: INVENTORY_WORKSPACE_METRICS.horizontalGap }}
-      >
-        {categories.map((category) => {
-          const active = currentCategory?.key === category.key;
-          return (
-            <TouchableOpacity
-              key={category.key}
-              testID={`${mode}-segment-${category.key}`}
-              onPress={() => { tap(); setActiveCategory(category.key); }}
-              activeOpacity={0.75}
-              style={[S.segment, { backgroundColor: active ? colors.foreground : colors.surface, borderColor: active ? colors.foreground : colors.border }]}
-            >
-              <Text style={[S.segmentText, { color: active ? "#fff" : colors.foreground }]}>{category.label}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+        onChange={(next) => { tap(); setActiveCategory(next); }}
+      />
 
       <BoundedMonthNavigator month={selectedMonth} bounds={bounds} onChange={selectGlobalMonth} subject={mode === "shop" ? "店铺" : "库存"} testID={`${mode}-month-navigator`} />
 
@@ -178,8 +163,3 @@ function InventoryBusinessPanel({ category, month }: { category: InventoryCatego
     case "equipment": return <EquipmentInventoryScreen month={month} embedded />;
   }
 }
-
-const S = StyleSheet.create({
-  segment: { minHeight: INVENTORY_WORKSPACE_METRICS.segmentHeight, justifyContent: "center", paddingHorizontal: 16, borderRadius: INVENTORY_WORKSPACE_METRICS.segmentRadius, borderWidth: 1 },
-  segmentText: { fontSize: 14, fontWeight: "600" },
-});

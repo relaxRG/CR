@@ -19,7 +19,8 @@ describe("库存六类与店铺四类工作台统一规范", () => {
     expect(portal).not.toContain("emoji:");
     expect(portal).not.toContain("showPortalHeader");
     expect(portal).not.toContain("杯具、餐具、日用品与设备");
-    expect(portal).toContain("active ? colors.foreground : colors.surface");
+    expect(portal).toContain("<StoreSegmentedTabs");
+    expect(read("components/store/store-visual-primitives.tsx")).toContain('const tint = selected ? storeTone(colors, "primary") : colors.muted;');
   });
 
   it("烈酒、葡萄酒与通用九类页面使用同一紧凑工作台尺度和纯文本结构页签", () => {

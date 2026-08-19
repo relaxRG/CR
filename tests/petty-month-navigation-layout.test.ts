@@ -14,9 +14,9 @@ describe("备用金月份导航与页面操作层级", () => {
 
   it("二级页签位于月份选择器之前，并使用员工Tag同层级的40pt文字分段", () => {
     expect(petty.indexOf("{renderViewTabs()}")).toBeLessThan(petty.indexOf("{renderHeader()}"));
-    expect(petty).toContain('viewTabs: { minHeight: 40');
-    expect(petty).toContain('viewTab: { minHeight: 40');
-    expect(petty).toContain("contentContainerStyle={S.viewTabsContent}");
+    expect(petty).toContain("<StoreSegmentedTabs");
+    expect(petty).toContain('testID="petty-workspace-tabs"');
+    expect(petty).toContain("minHeight: 40");
   });
 
   it("备用金、报表与库存通过同一月份导航实现，且中间按钮不显示下拉箭头", () => {
@@ -30,18 +30,19 @@ describe("备用金月份导航与页面操作层级", () => {
   it("报表、员工、库存和店铺均使用同一40pt层级与月份组件", () => {
     expect(labor).toContain("<BoundedBusinessMonthNavigator");
     expect(labor).toContain('testID="labor-month-navigator"');
-    expect(labor).toContain("minHeight: 40");
+    expect(labor).toContain("<StoreSegmentedTabs");
     expect(store).toContain('testID="report-workspace-month-navigator"');
-    expect(store).toContain("minHeight: 40");
+    expect(store).toContain("<StoreSegmentedTabs");
     expect(inventory).toContain('subject={mode === "shop" ? "店铺" : "库存"}');
   });
 
   it("新增记录属于当前页面操作栏，日历选中日期会作为新增记录日期，且不存在悬浮加号", () => {
     expect(petty).toContain("const renderContextActions");
-    expect(petty).toContain(">新增记录</Text>");
+    expect(petty).toContain('label="新增记录"');
     expect(petty).toContain("selectedDay ? `${month}-${String(selectedDay).padStart(2, \"0\")}`");
     expect(petty).not.toContain("S.fab");
     expect(petty).not.toContain("fabIcon");
-    expect(petty).toContain("contextActionBtn: { minHeight: 36");
+    expect(petty).toContain("<StoreToolbarAction");
+    expect(petty).toContain("minHeight: 36");
   });
 });

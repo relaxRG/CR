@@ -53,6 +53,8 @@ import { PayrollReconciliationPanel } from "@/components/labor/PayrollReconcilia
 import { ScreenContainer } from "@/components/screen-container";
 import { useGlobalBusinessMonth } from "@/lib/months/global-business-month";
 import { BoundedBusinessMonthNavigator } from "@/components/months/BoundedBusinessMonthNavigator";
+import { StoreMetric, StoreSectionHeader, StoreSegmentedTabs, StoreToolbarAction } from "@/components/store/store-visual-primitives";
+import { getStoreSummaryColumns, getStoreVisibleMetricColumns, storeTone, STORE_TEXT, STORE_VISUAL_SYSTEM } from "@/lib/theme/store-visual-system";
 import { deriveInventoryMonthBounds } from "@/lib/inventory-core/month-browser";
 import { MoneyInput } from "@/components/forms/MoneyInput";
 import {
@@ -221,6 +223,8 @@ function OverviewCard({ month, colors }: { month: string; colors: any }) {
   const [showTrend, setShowTrend] = useState(false);
   const [selectedTrendMonth, setSelectedTrendMonth] = useState(month);
   const { selectMonth } = useGlobalBusinessMonth();
+  const { width } = useWindowDimensions();
+  const summaryColumns = getStoreSummaryColumns(width);
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
   const compareMonth = getCompareMonth(month, compareMode, customMonth);
@@ -261,39 +265,24 @@ function OverviewCard({ month, colors }: { month: string; colors: any }) {
         <CompareToggle mode={compareMode} customMonth={customMonth} baseMonth={month} onChange={setCompareMode} onCustomMonthChange={setCustomMonth} colors={colors} />
       </View>
 
-      {/* 核心数字行：移除已录考勤，改为已发薪资 */}
-      <View style={OV.row}>
-        <View style={OV.item}>
-          <Text style={[OV.label, { color: colors.muted }]}>在职</Text>
-          <Text style={[OV.value, { color: colors.foreground }]}>{activeEmployees.length}<Text style={OV.unit}>人</Text></Text>
-        </View>
-        <View style={[OV.divider, { backgroundColor: colors.border }]} />
-        <View style={OV.item}>
-          <Text style={[OV.label, { color: colors.muted }]}>薪资合计</Text>
-          <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={[OV.value, { color: colors.foreground }]}>
-            {totalSalary > 0 ? `¥${formatMoney(totalSalary)}` : "—"}
-          </Text>
-          {diffSalary !== null && (
-            <Text style={{ fontSize: 10, color: diffSalary > 0 ? colors.error : colors.success }}>
-              {diffSalary > 0 ? "▲" : "▼"} ¥{formatMoney(Math.abs(diffSalary))}
-            </Text>
-          )}
-        </View>
-        <View style={[OV.divider, { backgroundColor: colors.border }]} />
-        <View style={OV.item}>
-          <Text style={[OV.label, { color: colors.muted }]}>已预支</Text>
-          <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={[OV.value, { color: colors.foreground }]}>
-            {totalAdvancePaid > 0 ? `¥${formatMoney(totalAdvancePaid)}` : "—"}
-          </Text>
-        </View>
-        <View style={[OV.divider, { backgroundColor: colors.border }]} />
-        <View style={OV.item}>
-          <Text style={[OV.label, { color: colors.muted }]}>待发</Text>
-          <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={[OV.value, { color: totalPending > 0 ? colors.foreground : colors.muted }]}>
-            {totalPending > 0 ? `¥${formatMoney(totalPending)}` : "—"}
-          </Text>
-        </View>
+      {/* 同一数据在手机以2×2显示，在iPad/Mac以4列显示；颜色与小图标均绑定固定业务语义。 */}
+      <View style={[OV.row, { flexWrap: "wrap" }]}>
+        {[
+          { label: "在职", value: `${activeEmployees.length}人`, tone: "front" as const, icon: "person.2.fill" as const },
+          { label: "薪资合计", value: totalSalary > 0 ? `¥${formatMoney(totalSalary)}` : "—", tone: "neutral" as const, icon: "banknote.fill" as const },
+          { label: "已预支", value: totalAdvancePaid > 0 ? `¥${formatMoney(totalAdvancePaid)}` : "—", tone: "allowance" as const, icon: "creditcard.fill" as const },
+          { label: "待发", value: totalPending > 0 ? `¥${formatMoney(totalPending)}` : "—", tone: "primary" as const, icon: "clock.fill" as const, primary: true },
+        ].map((metric) => (
+          <View key={metric.label} style={{ width: `${100 / summaryColumns}%` as any, minWidth: 0, paddingVertical: summaryColumns === 2 ? 8 : 0, paddingHorizontal: 8 }}>
+            <StoreMetric {...metric} colors={colors} />
+          </View>
+        ))}
       </View>
+      {diffSalary !== null ? (
+        <Text style={{ ...STORE_TEXT.caption, color: diffSalary > 0 ? storeTone(colors, "danger") : storeTone(colors, "settled"), marginTop: 2 }}>
+          {diffSalary > 0 ? "较对比月增加" : "较对比月减少"} ¥{formatMoney(Math.abs(diffSalary))}
+        </Text>
+      ) : null}
 
       {/* 对比详情行 */}
       {compareMonth && compareTotalSalary > 0 && (
@@ -382,8 +371,11 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
   const [deductDaysInput, setDeductDaysInput] = useState("1");
 
   // slip/att/compareSlip 由父组件从响应式数组派生后传入，保证即时更新
-  const deptColor = DEPT_COLORS[employee.dept];
   const isParttime = employee.type === "parttime" || employee.type === "longterm_parttime";
+  const deptTone = employee.dept === "front" ? "front" : employee.dept === "kitchen" ? "kitchen" : isParttime ? "overtime" : "allowance";
+  const deptColor = storeTone(colors, deptTone);
+  const { width: employeeRowWidth } = useWindowDimensions();
+  const visibleMetricColumns = getStoreVisibleMetricColumns(employeeRowWidth);
   // DRAFT 卡片不能直接读取可能滞后的薪资单聚合金额；只读月保留历史快照。
   const extrasDisplay = useMemo(() => {
     if (!slip) return null;
@@ -505,9 +497,8 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
       {/* ─── 顶部行：姓名 + 实发薪资（右侧） ─── */}
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap", flex: 1 }}>
-          <Text style={{ fontSize: 15, fontWeight: "800", color: colors.foreground }}>{employee.code}</Text>
-          <Text style={{ fontSize: 13, color: colors.muted }}>{employee.realName}</Text>
-          <Text style={{ fontSize: 12, color: colors.muted }}>{employee.dept}</Text>
+          <Text style={{ ...STORE_TEXT.rowTitle, color: colors.foreground }}>{employee.code}</Text>
+          <Text style={{ ...STORE_TEXT.supporting, color: colors.muted }}>{employee.realName}</Text>
           {isParttime && (
             <View style={{ backgroundColor: colors.warning + "22", paddingHorizontal: 5, paddingVertical: 2, borderRadius: 5 }}>
               <Text style={{ fontSize: 10, fontWeight: "700", color: colors.warning }}>兼职</Text>
@@ -516,7 +507,7 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
         </View>
         {/* 右侧：实发薪资 */}
         {slip ? (
-          <Text style={{ fontSize: 14, fontWeight: "800", color: colors.foreground }}>实发 ¥{formatMoney(slip.finalSalary)}</Text>
+          <Text style={{ ...STORE_TEXT.metric, color: deptColor }}>实发 ¥{formatMoney(slip.finalSalary)}</Text>
         ) : (
           <View style={{ backgroundColor: colors.warning + "22", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
             <Text style={{ fontSize: 10, fontWeight: "600", color: colors.warning }}>待录入</Text>
@@ -536,18 +527,20 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
         const extraTotal = extrasDisplay?.grandTotal ?? 0;
         const advanceAmount = (slip?.advanceAmount ?? 0) + (slip?.pettyLaborPaid ?? 0);
         const finalSalary = slip?.finalSalary ?? null;
+        const metrics = [
+          { label: firstLabel, value: `¥${formatMoney(firstValue)}`, color: storeTone(colors, "neutral") },
+          { label: "加班考勤", value: overtimeAndHoliday > 0 ? `+¥${formatMoney(overtimeAndHoliday)}` : "—", color: overtimeAndHoliday > 0 ? storeTone(colors, "overtime") : storeTone(colors, "muted") },
+          { label: "综合额外", value: extraTotal !== 0 ? `${extraTotal >= 0 ? "+" : ""}¥${formatMoney(extraTotal)}` : "—", color: extraTotal > 0 ? storeTone(colors, "allowance") : extraTotal < 0 ? storeTone(colors, "danger") : storeTone(colors, "muted") },
+          { label: "已预支", value: advanceAmount > 0 ? `-¥${formatMoney(advanceAmount)}` : "—", color: advanceAmount > 0 ? storeTone(colors, "allowance") : storeTone(colors, "muted") },
+          { label: "总工资", value: finalSalary !== null ? `¥${formatMoney(finalSalary)}` : "—", color: storeTone(colors, "primary") },
+        ];
+        const visibleMetrics = visibleMetricColumns === 3 ? [metrics[0], metrics[1], metrics[4]] : metrics;
         return (
           <View style={{ flexDirection: "row", marginTop: 8, paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border + "44" }}>
-            {[
-              { label: firstLabel, value: `¥${formatMoney(firstValue)}`, color: numericColor(colors) },
-              { label: "加班考勤", value: overtimeAndHoliday > 0 ? `+¥${formatMoney(overtimeAndHoliday)}` : "—", color: overtimeAndHoliday > 0 ? numericColor(colors) : numericColor(colors, NUMERIC_TONE.muted) },
-              { label: "综合额外", value: extraTotal !== 0 ? `${extraTotal >= 0 ? "+" : ""}¥${formatMoney(extraTotal)}` : "—", color: extraTotal > 0 ? numericColor(colors, NUMERIC_TONE.primary) : extraTotal < 0 ? numericColor(colors, NUMERIC_TONE.negative) : numericColor(colors, NUMERIC_TONE.muted) },
-              { label: "已预支", value: advanceAmount > 0 ? `-¥${formatMoney(advanceAmount)}` : "—", color: advanceAmount > 0 ? numericColor(colors) : numericColor(colors, NUMERIC_TONE.muted) },
-              { label: "总工资", value: finalSalary !== null ? `¥${formatMoney(finalSalary)}` : "—", color: numericColor(colors, NUMERIC_TONE.primary) },
-            ].map(({ label, value, color }) => (
-              <View key={label} style={{ flex: 1, alignItems: "center" }}>
-                <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ fontSize: 12, fontWeight: "800", color }}>{value}</Text>
-                <Text numberOfLines={1} style={{ fontSize: 9, color: colors.muted, marginTop: 2 }}>{label}</Text>
+            {visibleMetrics.map(({ label, value, color }) => (
+              <View key={label} style={{ flex: 1, alignItems: "center", minWidth: 0 }}>
+                <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ ...STORE_TEXT.body, fontWeight: STORE_VISUAL_SYSTEM.weight.emphasis, color }}>{value}</Text>
+                <Text numberOfLines={1} style={{ ...STORE_TEXT.caption, color: colors.muted, marginTop: 2 }}>{label}</Text>
               </View>
             ))}
           </View>
@@ -1256,46 +1249,15 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
       {headerComponent}
       {/* 工具栏：员工管理 + 对比开关 + 设置 */}
       <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-        {/* 员工管理按鈕 - 跳转到员工列表页 */}
-        <TouchableOpacity onPress={() => { tap(); router.push("/labor-employees" as any); }}
-          style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: colors.border + "44" }}>
-          <IconSymbol name="person.2.fill" size={15} color={colors.foreground} />
-          <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>员工管理</Text>
-        </TouchableOpacity>
+        <StoreToolbarAction label="员工管理" icon="person.2.fill" colors={colors} onPress={() => { tap(); router.push("/labor-employees" as any); }} />
 
         <View style={{ flex: 1 }} />
         {/* 薪资对比开关 */}
         <CompareToggle mode={compareMode} customMonth={customMonth} baseMonth={month} onChange={setCompareMode} onCustomMonthChange={setCustomMonth} colors={colors} />
-        <TouchableOpacity
-          testID="payroll-reconciliation-open"
-          accessibilityRole="button"
-          accessibilityLabel={`打开所选月 ${month} 薪资核对与修正`}
-          accessibilityHint="核对调休兑现来源、历史差额和薪资修正路径"
-          onPress={() => { tap(); setShowPayrollReconciliation(true); }}
-          style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: colors.border + "44", alignItems: "center", justifyContent: "center" }}>
-          <IconSymbol name="checklist" size={15} color={colors.foreground} />
-        </TouchableOpacity>
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel={`重新计算所选月 ${month} 草稿薪资`}
-          accessibilityHint="仅重建所选月草稿薪资，不修改其他月份或已确认发薪数据"
-          onPress={() => { tap(); handleRecalculateSelectedDraftMonth(); }}
-          disabled={recalculatingMonth || getRosterMonthStatus(month) !== "draft"}
-          style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: colors.primary + "15", borderWidth: 1, borderColor: colors.primary + "44", alignItems: "center", justifyContent: "center", opacity: recalculatingMonth || getRosterMonthStatus(month) !== "draft" ? 0.42 : 1 }}>
-          <IconSymbol name="arrow.clockwise" size={15} color={colors.foreground} />
-        </TouchableOpacity>
-        {/* 导入按钮 */}
-        <TouchableOpacity onPress={() => { tap(); setShowImportMenu(true); }}
-          style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: colors.border + "44", alignItems: "center", justifyContent: "center", opacity: importing ? 0.5 : 1 }}
-          disabled={importing}>
-          <IconSymbol name="square.and.arrow.down" size={16} color={importing ? colors.muted : colors.foreground} />
-        </TouchableOpacity>
-        {/* 导出按钮 */}
-        <TouchableOpacity onPress={() => { tap(); setShowExportMenu(true); }}
-          style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: colors.border + "44", alignItems: "center", justifyContent: "center", opacity: exporting ? 0.5 : 1 }}
-          disabled={exporting}>
-          <IconSymbol name="square.and.arrow.up" size={16} color={exporting ? colors.muted : colors.foreground} />
-        </TouchableOpacity>
+        <StoreToolbarAction label="核对" icon="checkmark.square.fill" colors={colors} accessibilityLabel={`打开所选月 ${month} 薪资核对与修正`} accessibilityHint="核对调休兑现来源、历史差额和薪资修正路径" onPress={() => { tap(); setShowPayrollReconciliation(true); }} />
+        <StoreToolbarAction label="重算" icon="arrow.clockwise" tone="primary" emphasis colors={colors} accessibilityLabel={`重新计算所选月 ${month} 草稿薪资`} accessibilityHint="仅重建所选月草稿薪资，不修改其他月份或已确认发薪数据" onPress={() => { tap(); handleRecalculateSelectedDraftMonth(); }} disabled={recalculatingMonth || getRosterMonthStatus(month) !== "draft"} />
+        <StoreToolbarAction label="导入" icon="square.and.arrow.down" colors={colors} onPress={() => { tap(); setShowImportMenu(true); }} disabled={importing} />
+        <StoreToolbarAction label="导出" icon="square.and.arrow.up" colors={colors} onPress={() => { tap(); setShowExportMenu(true); }} disabled={exporting} />
       </View>
 
       {/* 确认发薪状态栏 */}
@@ -1495,16 +1457,14 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
       </Modal>
 
       {/* 自动部门分组：前厅/后厨/公司（全职+长期兼职）+ 临时兼职 */}
-      {AUTO_DEPT_GROUPS.map(({ key, label, color, filter }) => {
+      {AUTO_DEPT_GROUPS.map(({ key, label, filter }) => {
         const deptEmps = activeEmployees.filter(filter);
         if (deptEmps.length === 0) return null;
+        const groupTone = key === "front" ? "front" : key === "kitchen" ? "kitchen" : key === "parttime" ? "overtime" : "allowance";
+        const groupIcon = key === "front" ? "person.2.fill" : key === "kitchen" ? "fork.knife" : key === "parttime" ? "clock.fill" : "building.2";
         return (
           <View key={key} style={[{ borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, overflow: "hidden" }]}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, padding: 12, backgroundColor: colors.surface }}>
-              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.muted }} />
-              <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>{label}</Text>
-              <Text style={{ fontSize: 12, color: colors.muted, marginLeft: 2 }}>({deptEmps.length}人)</Text>
-            </View>
+            <StoreSectionHeader label={label} detail={`${deptEmps.length}人`} icon={groupIcon} tone={groupTone} colors={colors} style={{ paddingHorizontal: 12, backgroundColor: storeTone(colors, groupTone) + "0A" }} />
             {deptEmps.map((emp) => (
               <View key={emp.id} style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
                 <PaySlipMiniCard
@@ -5391,9 +5351,9 @@ function SchedulePage({ colors, month, onMonthChange, pageWidth }: { colors: any
 // ─── 主页面 ───────────────────────────────────────────────────────────────────
 const PAGES = [
   { key: "roster",   label: "薪资统计", icon: "person.2.fill" },
-  { key: "schedule", label: "排班表",   icon: "calendar.badge.clock" },
+  { key: "schedule", label: "排班表",   icon: "calendar" },
   { key: "advances", label: "薪资预支", icon: "creditcard.fill" },
-];
+] as const;
 type PageKey = typeof PAGES[number]["key"];
 
 
@@ -5477,20 +5437,13 @@ export default function LaborScreen({ embedded = true }: { embedded?: boolean })
         </View>
       )}
 
-      {/* 与备用金、报表同层级的40pt纯文字分段栏，位于月份选择器上方。 */}
-      <View style={{ minHeight: 40, backgroundColor: colors.background, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ minHeight: 40, paddingHorizontal: 12, gap: 8, alignItems: "center" }}>
-          {PAGES.map((p) => {
-            const active = activePage === p.key;
-            return (
-              <TouchableOpacity key={p.key} onPress={() => handleTabPress(p.key)} style={{ minHeight: 40, paddingHorizontal: 12, alignItems: "center", justifyContent: "center" }}>
-                <Text style={{ fontSize: 15, fontWeight: active ? "700" : "400", color: active ? colors.primary : colors.muted }}>{p.label}</Text>
-                {active && <View style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 2, borderRadius: 1, backgroundColor: colors.primary }} />}
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </View>
+      <StoreSegmentedTabs
+        items={PAGES}
+        active={activePage}
+        colors={colors}
+        testID="labor-workspace-tabs"
+        onChange={handleTabPress}
+      />
 
       {/* 与报表、备用金、库存和店铺相同的上浮月份选择器。 */}
       <BoundedBusinessMonthNavigator
@@ -5539,12 +5492,12 @@ const S = StyleSheet.create({
 
 const OV = StyleSheet.create({
   card: { borderRadius: 14, borderWidth: 1, padding: 14 },
-  title: { fontSize: 13, fontWeight: "700" },
+  title: { ...STORE_TEXT.sectionTitle },
   row: { flexDirection: "row", alignItems: "center" },
   item: { flex: 1, alignItems: "center" },
   divider: { width: StyleSheet.hairlineWidth, height: 32 },
   label: { fontSize: 10, marginBottom: 3 },
-  value: { fontSize: 16, fontWeight: "800" },
+  value: { ...STORE_TEXT.metric },
   unit: { fontSize: 12, fontWeight: "400" },
   compareRow: { flexDirection: "row", alignItems: "center", paddingTop: 8, marginTop: 8, borderTopWidth: StyleSheet.hairlineWidth },
 });
@@ -5555,7 +5508,7 @@ const PC = StyleSheet.create({
   detailRow: { flexDirection: "row", flexWrap: "wrap", gap: 12, paddingTop: 8, marginTop: 8, borderTopWidth: StyleSheet.hairlineWidth },
   detailItem: { alignItems: "center", minWidth: 52 },
   detailLabel: { fontSize: 10, color: "#8E8E93", marginBottom: 2 },
-  detailValue: { fontSize: 13, fontWeight: "600" },
+  detailValue: { ...STORE_TEXT.body, fontWeight: STORE_VISUAL_SYSTEM.weight.emphasis },
 });
 
 const CT = StyleSheet.create({

@@ -26,18 +26,8 @@ import { useGlobalBusinessMonth } from "@/lib/months/global-business-month";
 import { BoundedBusinessMonthNavigator } from "@/components/months/BoundedBusinessMonthNavigator";
 import { deriveInventoryMonthBounds } from "@/lib/inventory-core/month-browser";
 import { MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS, MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
-
-// ─── iCost 背景色 ─────────────────────────────────────────────────────────────
-const ICOST_BG = "#F7F7F7"; // Manus背景色
-const ICOST_CARD = "#FFFFFF";
-const ICOST_SELECTED_DAY = "#E6F4FF"; // Manus主色浅蓝 // 当日浅蓝背景
-
-// ─── 大类颜色池（iCost 风格）──────────────────────────────────────────────────
-const GROUP_COLORS = [
-  "#4A90E2","#E8864A","#50C878","#9B59B6","#E74C3C",
-  "#1ABC9C","#F39C12","#3498DB","#E91E63","#00BCD4",
-  "#8BC34A","#FF5722","#607D8B","#795548",
-];
+import { StoreMetric, StoreSectionHeader, StoreSegmentedTabs, StoreToolbarAction } from "@/components/store/store-visual-primitives";
+import { storeCategoryColor, storeTone, storeToneSurface, STORE_TEXT, STORE_VISUAL_SYSTEM } from "@/lib/theme/store-visual-system";
 
 // ─── 工具函数 ─────────────────────────────────────────────────────────────────
 function getMonthLabel(month: string) {
@@ -218,7 +208,7 @@ export default function StorePettyCashScreen() {
       .map(([key, v]) => ({ key, ...v, pct: total > 0 ? v.total / total : 0 }))
       .sort((a, b) => b.total - a.total);
     const slices: PieSlice[] = groups.map((g, i) => ({
-      label: g.label, value: g.total, color: GROUP_COLORS[i % GROUP_COLORS.length], pct: g.pct,
+      label: g.label, value: g.total, color: storeCategoryColor(colors, i), pct: g.pct,
     }));
     const prevM = prevMonth(month);
     const prevRecords = records.filter(r => r.date.startsWith(prevM) && (isExpense ? !INCOME_CODES.includes(r.code) : INCOME_CODES.includes(r.code)));
@@ -302,7 +292,7 @@ export default function StorePettyCashScreen() {
 
   // ── 月份导航栏 ────────────────────────────────────────────────────────────
   const renderHeader = () => (
-    <View style={[S.header, { backgroundColor: ICOST_BG }]}>
+    <View style={[S.header, { backgroundColor: colors.background }]}>
       <BoundedBusinessMonthNavigator
         month={month}
         bounds={pettyBounds}
@@ -315,40 +305,33 @@ export default function StorePettyCashScreen() {
 
   // ── 二级页签在前、月份选择在后：所有五大模块保持同一层级顺序。 ─────────────
   const renderViewTabs = () => (
-    <View style={[S.viewTabs, { backgroundColor: ICOST_BG, borderBottomColor: colors.border }]}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={S.viewTabsContent}>
-      {([["ledger","账本"],["calendar","日历"],["stats","统计"]] as [ViewMode, string][]).map(([v, label]) => (
-        <Pressable key={v} onPress={() => { tap(); setViewMode(v); }} style={S.viewTab}>
-          <Text style={[S.viewTabText, { color: viewMode === v ? colors.primary : colors.muted }]}>{label}</Text>
-          {viewMode === v && <View style={[S.viewTabUnderline, { backgroundColor: colors.primary }]} />}
-        </Pressable>
-      ))}
-      </ScrollView>
-    </View>
+    <StoreSegmentedTabs
+      items={[
+        { key: "ledger", label: "账本", icon: "list.bullet" },
+        { key: "calendar", label: "日历", icon: "calendar" },
+        { key: "stats", label: "统计", icon: "chart.pie.fill" },
+      ] as const}
+      active={viewMode}
+      onChange={(next) => { tap(); setViewMode(next); }}
+      colors={colors}
+      testID="petty-workspace-tabs"
+    />
   );
 
   // 当前视图操作与页面归属一致；不再使用遮挡底部导航的全局悬浮按钮。
   const renderContextActions = () => (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[S.contextActions, { backgroundColor: ICOST_BG, borderBottomColor: colors.border }]} contentContainerStyle={S.contextActionsContent}>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[S.contextActions, { backgroundColor: colors.background, borderBottomColor: colors.border }]} contentContainerStyle={S.contextActionsContent}>
       <View style={{ flex: 1 }} />
-      <Pressable onPress={handleCloseMonth} style={[S.contextActionBtn, { backgroundColor: pettyCloseStatus === "draft" ? ICOST_CARD : colors.success + "14", borderColor: pettyCloseStatus === "draft" ? colors.primary + "33" : colors.success + "33" }]}>
-        <Text style={{ color: pettyCloseStatus === "draft" ? colors.primary : colors.success, fontSize: 12, fontWeight: "700" }}>{pettyCloseStatus === "draft" ? "归档" : "已归档"}</Text>
-      </Pressable>
-      <Pressable onPress={handleImportExcel} disabled={importing} style={[S.contextActionBtn, { backgroundColor: ICOST_CARD, borderColor: colors.border }]}>
-        {importing ? <ActivityIndicator size="small" color={colors.primary} /> : <Text style={{ color: colors.primary, fontSize: 12, fontWeight: "700" }}>导入</Text>}
-      </Pressable>
-      <Pressable onPress={() => { tap(); router.push("/petty-category-settings" as any); }} style={[S.contextActionBtn, { backgroundColor: ICOST_CARD, borderColor: colors.border }]}>
-        <Text style={{ color: colors.muted, fontSize: 12, fontWeight: "700" }}>分类</Text>
-      </Pressable>
-      <Pressable onPress={() => { tap(); setEditingId(null); setAddCode("A1"); setAddAmount(""); setAddDate(selectedDay ? `${month}-${String(selectedDay).padStart(2, "0")}` : new Date().toISOString().slice(0, 10)); setAddDesc(""); setAddPayment("微信"); setAddType("expense"); setShowAdd(true); }} style={[S.contextActionBtn, { backgroundColor: colors.primary, borderColor: colors.primary }]}>
-        <Text style={{ color: "#fff", fontSize: 12, fontWeight: "700" }}>新增记录</Text>
-      </Pressable>
+      <StoreToolbarAction label={pettyCloseStatus === "draft" ? "归档" : "已归档"} icon="checkmark.circle" tone={pettyCloseStatus === "draft" ? "primary" : "settled"} emphasis={pettyCloseStatus === "draft"} colors={colors} onPress={handleCloseMonth} />
+      {importing ? <View style={{ minHeight: 36, justifyContent: "center", paddingHorizontal: 10 }}><ActivityIndicator size="small" color={colors.primary} /></View> : <StoreToolbarAction label="导入" icon="square.and.arrow.down" colors={colors} onPress={handleImportExcel} />}
+      <StoreToolbarAction label="分类" icon="tag" colors={colors} onPress={() => { tap(); router.push("/petty-category-settings" as any); }} />
+      <StoreToolbarAction label="新增记录" icon="plus" tone="primary" emphasis colors={colors} onPress={() => { tap(); setEditingId(null); setAddCode("A1"); setAddAmount(""); setAddDate(selectedDay ? `${month}-${String(selectedDay).padStart(2, "0")}` : new Date().toISOString().slice(0, 10)); setAddDesc(""); setAddPayment("微信"); setAddType("expense"); setShowAdd(true); }} />
     </ScrollView>
   );
 
   // ── 月度总览卡片（保留原有功能，只改背景色）────────────────────────────────
   const renderSummaryCard = () => (
-    <View style={[S.summaryCard, { backgroundColor: ICOST_CARD }]}>
+    <View style={[S.summaryCard, { backgroundColor: colors.surface }]}>
       <View style={[S.summaryRow, { borderBottomColor: colors.border }]}>
         <View style={[S.summaryHalf, { borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: colors.border }]}>
           <View style={S.summaryHalfHeader}>
@@ -412,23 +395,23 @@ export default function StorePettyCashScreen() {
   const renderRecordRow = (item: PettyRecord, showBorder = true) => {
     const isIncome = INCOME_CODES.includes(item.code);
     const catLabel = (PETTY_CODE_LABELS[item.code as PettyCode] ?? item.code).replace(/^[A-Z0-9]+ /, "");
-    const amtColor = isIncome ? "#52C41A" : "#FF4D4F";
-    const badgeBg = isIncome ? "#F6FFED" : "#E6F4FF";
-    const badgeColor = isIncome ? "#52C41A" : "#1677FF";
+    const amtColor = isIncome ? storeTone(colors, "settled") : storeTone(colors, "neutral");
+    const badgeBg = isIncome ? storeToneSurface(colors, "settled") : colors.border + "55";
+    const badgeColor = isIncome ? storeTone(colors, "settled") : storeTone(colors, "primary");
     return (
       <Pressable key={item.id}
         onPress={() => { tap(); openEdit(item); }}
         onLongPress={() => { if (!assertPettyWritable()) return; Alert.alert("删除", "确认删除？", [{ text: "取消", style: "cancel" }, { text: "删除", style: "destructive", onPress: () => deleteRecord(item.id) }]); }}
-        style={[S.recordRow, { backgroundColor: ICOST_CARD, borderBottomWidth: showBorder ? StyleSheet.hairlineWidth : 0, borderBottomColor: "#EBEBEB" }]}>
+        style={[S.recordRow, { backgroundColor: colors.surface, borderBottomWidth: showBorder ? StyleSheet.hairlineWidth : 0, borderBottomColor: colors.border }]}>
         {/* 左侧圆角方块图标 */}
         <View style={[S.codeBadge, { backgroundColor: badgeBg }]}>
           <Text style={[S.codeText, { color: badgeColor }]}>{item.code}</Text>
         </View>
         {/* 中间：分类名称 + 描述 */}
         <View style={{ flex: 1, marginLeft: 14 }}>
-          <Text style={[S.recordName, { color: "#1A1A1A" }]} numberOfLines={1}>{catLabel}</Text>
+          <Text style={[S.recordName, { color: colors.foreground }]} numberOfLines={1}>{catLabel}</Text>
           {(item.description || item.paymentMethod) && (
-            <Text style={[S.recordSub, { color: "#8C8C8C" }]} numberOfLines={1}>
+            <Text style={[S.recordSub, { color: colors.muted }]} numberOfLines={1}>
               {[item.description, item.paymentMethod].filter(Boolean).join("  ")}
             </Text>
           )}
@@ -450,7 +433,7 @@ export default function StorePettyCashScreen() {
       renderItem={({ item: group }) => (
         <View style={{ marginBottom: 0 }}>
           {/* iCost 风格日期头：MM/DD 星期X + 支出金额 */}
-          <View style={[S.dayHeader, { backgroundColor: ICOST_BG }]}>
+          <View style={[S.dayHeader, { backgroundColor: colors.background }]}>
             <View style={{ flexDirection: "row", alignItems: "baseline", gap: 6 }}>
               <Text style={[S.dayHeaderDate, { color: "#1A1A1A" }]}>
                 {group.date.slice(5).replace("-", "/")}
@@ -499,7 +482,7 @@ export default function StorePettyCashScreen() {
       <ScrollView contentContainerStyle={{ paddingBottom: 100 + insets.bottom }}>
         {renderSummaryCard()}
         {/* iCost 日历：白色大卡片，无内部格线 */}
-        <View style={[S.calendarWrap, { backgroundColor: ICOST_CARD }]}>
+        <View style={[S.calendarWrap, { backgroundColor: colors.surface }]}>
           {/* 星期头：一 二 三 四 五 六 日 */}
           <View style={S.calWeekRow}>
             {["一","二","三","四","五","六","日"].map(d => (
@@ -520,7 +503,7 @@ export default function StorePettyCashScreen() {
                     onPress={() => { if (day) { tap(); setSelectedDay(isSelected ? null : day); } }}
                     style={[
                       S.calCell,
-                      isSelected && { backgroundColor: ICOST_SELECTED_DAY, borderRadius: 10 },
+                      isSelected && { backgroundColor: storeToneSurface(colors, "primary"), borderRadius: 10 },
                     ]}>
                     {/* 日期数字：左对齐，今日蓝色 */}
                     <Text style={[
@@ -553,7 +536,7 @@ export default function StorePettyCashScreen() {
         {selectedDay !== null && (
           <View style={{ marginTop: 8 }}>
             {/* 日期头 */}
-            <View style={[S.dayHeader, { backgroundColor: ICOST_BG }]}>
+            <View style={[S.dayHeader, { backgroundColor: colors.background }]}>
               <View style={{ flexDirection: "row", alignItems: "baseline", gap: 6 }}>
                 <Text style={[S.dayHeaderDate, { color: "#1A1A1A" }]}>
                   {month.slice(5)}/{String(selectedDay).padStart(2, "0")}
@@ -587,21 +570,21 @@ export default function StorePettyCashScreen() {
         <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 10, gap: 10 }}>
           <Pressable
             onPress={() => { tap(); setShowPeriodMenu(v => !v); }}
-            style={[S.periodBtn, { backgroundColor: ICOST_CARD, borderColor: colors.border }]}>
+            style={[S.periodBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={[S.periodBtnText, { color: colors.primary }]}>{PERIOD_MODE_LABELS[periodMode]}</Text>
             <IconSymbol name="chevron.down" size={12} color={colors.primary} />
           </Pressable>
           <View style={[S.segControl, { backgroundColor: colors.border + "88", flex: 1 }]}>
           {([["expense","支出"],["income","收入"]] as [StatsTab, string][]).map(([v, label]) => (
             <Pressable key={v} onPress={() => { tap(); setStatsTab(v); }}
-              style={[S.segItem, statsTab === v && { backgroundColor: ICOST_CARD, shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 2 }]}>
+              style={[S.segItem, statsTab === v && { backgroundColor: colors.surface, shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 2 }]}>
               <Text style={[S.segText, { color: statsTab === v ? colors.foreground : colors.muted, fontWeight: statsTab === v ? "600" : "400" }]}>{label}</Text>
             </Pressable>
           ))}
           </View>
         </View>
 
-        <View style={[S.pieWrap, { backgroundColor: ICOST_CARD }]}>
+        <View style={[S.pieWrap, { backgroundColor: colors.surface }]}>
           {total > 0 ? (
             <View style={{ alignItems: "center", paddingVertical: 8 }}>
               <DonutChart slices={slices} total={total} size={200} textColor={colors.foreground} subColor={colors.muted} centerLabel={statsTab === "income" ? "总收入" : "总支出"} />
@@ -621,7 +604,7 @@ export default function StorePettyCashScreen() {
         </View>
 
         {groups.map((g, gi) => {
-          const color = GROUP_COLORS[gi % GROUP_COLORS.length];
+          const color = storeCategoryColor(colors, gi);
           const expanded = expandedGroups.has(g.key);
           const prevTotal = prevGroupMap.get(g.key) ?? 0;
           const diff = g.total - prevTotal;
@@ -629,7 +612,7 @@ export default function StorePettyCashScreen() {
             .map(([code, v]) => ({ code, ...v, pct: g.total > 0 ? v.total / g.total : 0 }))
             .sort((a, b) => b.total - a.total);
           return (
-            <View key={g.key} style={[S.groupCard, { backgroundColor: ICOST_CARD }]}>
+            <View key={g.key} style={[S.groupCard, { backgroundColor: colors.surface }]}>
               <Pressable onPress={() => toggleGroup(g.key)} style={S.groupRow}>
                 <View style={[S.groupColorDot, { backgroundColor: color }]} />
                 <View style={{ flex: 1 }}>
@@ -677,8 +660,8 @@ export default function StorePettyCashScreen() {
       : [{ label: "N 其他收入", codes: otherCodes }];
     return (
       <Modal visible={showAdd} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => { setShowAdd(false); setEditingId(null); }}>
-        <View style={[S.sheet, { backgroundColor: ICOST_BG }]}>
-          <View style={[S.sheetHeader, { borderBottomColor: colors.border, backgroundColor: ICOST_CARD }]}>
+        <View style={[S.sheet, { backgroundColor: colors.background }]}>
+          <View style={[S.sheetHeader, { borderBottomColor: colors.border, backgroundColor: colors.surface }]}>
             <Pressable onPress={() => { setShowAdd(false); setEditingId(null); }}><Text style={[S.sheetAction, { color: colors.primary }]}>取消</Text></Pressable>
             <Text style={[S.sheetTitle, { color: colors.foreground }]}>{editingId ? "编辑记录" : "添加记录"}</Text>
             <Pressable onPress={handleAdd}><Text style={[S.sheetAction, { color: colors.primary, fontWeight: "700" }]}>{editingId ? "保存" : "添加"}</Text></Pressable>
@@ -687,7 +670,7 @@ export default function StorePettyCashScreen() {
             <View style={{ flexDirection: "row", gap: 8 }}>
               {([["expense","支出"],["inflow","备用金转入"],["other","其他收入"]] as [typeof addType, string][]).map(([v, label]) => (
                 <Pressable key={v} onPress={() => { setAddType(v); setAddCode(v === "inflow" ? "N0" : v === "other" ? "N3" : "A1"); }}
-                  style={[S.typeBtn, { borderColor: addType === v ? colors.primary : colors.border, backgroundColor: addType === v ? colors.primary + "22" : ICOST_CARD }]}>
+                  style={[S.typeBtn, { borderColor: addType === v ? colors.primary : colors.border, backgroundColor: addType === v ? colors.primary + "22" : colors.surface }]}>
                   <Text style={{ color: addType === v ? colors.primary : colors.muted, fontSize: 13, fontWeight: "600" }}>{label}</Text>
                 </Pressable>
               ))}
@@ -701,7 +684,7 @@ export default function StorePettyCashScreen() {
                     <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
                       {group.codes.map(code => (
                         <Pressable key={code} onPress={() => setAddCode(code)}
-                          style={[S.codeChip, { borderColor: addCode === code ? colors.primary : colors.border, backgroundColor: addCode === code ? colors.primary + "22" : ICOST_CARD }]}>
+                          style={[S.codeChip, { borderColor: addCode === code ? colors.primary : colors.border, backgroundColor: addCode === code ? colors.primary + "22" : colors.surface }]}>
                           <Text style={{ color: addCode === code ? colors.primary : colors.muted, fontSize: 12, fontWeight: "700" }}>{code}</Text>
                         </Pressable>
                       ))}
@@ -714,13 +697,13 @@ export default function StorePettyCashScreen() {
             <View>
               <Text style={[S.fieldLabel, { color: colors.muted }]}>金额（元）*</Text>
               <TextInput value={addAmount} onChangeText={setAddAmount} placeholder="0.000" placeholderTextColor={colors.muted}
-                style={[S.input, { borderColor: colors.border, backgroundColor: ICOST_CARD, color: colors.foreground }]}
+                style={[S.input, { borderColor: colors.border, backgroundColor: colors.surface, color: colors.foreground }]}
                 keyboardType="decimal-pad" returnKeyType="next" />
             </View>
             <View>
               <Text style={[S.fieldLabel, { color: colors.muted }]}>日期</Text>
               <TextInput value={addDate} onChangeText={setAddDate} placeholder="YYYY-MM-DD" placeholderTextColor={colors.muted}
-                style={[S.input, { borderColor: colors.border, backgroundColor: ICOST_CARD, color: colors.foreground }]}
+                style={[S.input, { borderColor: colors.border, backgroundColor: colors.surface, color: colors.foreground }]}
                 returnKeyType="next" />
             </View>
             <View>
@@ -728,7 +711,7 @@ export default function StorePettyCashScreen() {
               <View style={{ flexDirection: "row", gap: 8 }}>
                 {["现金","微信","支付宝","招商银行","工商银行"].map(m => (
                   <Pressable key={m} onPress={() => setAddPayment(m)}
-                    style={[S.payBtn, { borderColor: addPayment === m ? colors.primary : colors.border, backgroundColor: addPayment === m ? colors.primary + "22" : ICOST_CARD }]}>
+                    style={[S.payBtn, { borderColor: addPayment === m ? colors.primary : colors.border, backgroundColor: addPayment === m ? colors.primary + "22" : colors.surface }]}>
                     <Text style={{ color: addPayment === m ? colors.primary : colors.muted, fontSize: 11, fontWeight: "600" }}>{m}</Text>
                   </Pressable>
                 ))}
@@ -737,7 +720,7 @@ export default function StorePettyCashScreen() {
             <View>
               <Text style={[S.fieldLabel, { color: colors.muted }]}>描述</Text>
               <TextInput value={addDesc} onChangeText={setAddDesc} placeholder="可选备注" placeholderTextColor={colors.muted}
-                style={[S.input, { borderColor: colors.border, backgroundColor: ICOST_CARD, color: colors.foreground }]}
+                style={[S.input, { borderColor: colors.border, backgroundColor: colors.surface, color: colors.foreground }]}
                 returnKeyType="done" />
             </View>
           </ScrollView>
@@ -749,8 +732,8 @@ export default function StorePettyCashScreen() {
   // ── 期初编辑弹窗 ──────────────────────────────────────────────────────────
   const renderOpeningModal = () => (
     <Modal visible={showOpeningEdit} animationType="slide" presentationStyle="formSheet" onRequestClose={() => setShowOpeningEdit(false)}>
-      <View style={[S.sheet, { backgroundColor: ICOST_BG }]}>
-        <View style={[S.sheetHeader, { borderBottomColor: colors.border, backgroundColor: ICOST_CARD }]}>
+      <View style={[S.sheet, { backgroundColor: colors.background }]}>
+        <View style={[S.sheetHeader, { borderBottomColor: colors.border, backgroundColor: colors.surface }]}>
           <Pressable onPress={() => setShowOpeningEdit(false)}><Text style={[S.sheetAction, { color: colors.primary }]}>取消</Text></Pressable>
           <Text style={[S.sheetTitle, { color: colors.foreground }]}>期初备用金</Text>
           <Pressable onPress={handleSaveOpening}><Text style={[S.sheetAction, { color: colors.primary, fontWeight: "700" }]}>保存</Text></Pressable>
@@ -758,7 +741,7 @@ export default function StorePettyCashScreen() {
         <View style={{ padding: 20, gap: 16 }}>
           <Text style={[S.fieldLabel, { color: colors.muted }]}>上月期末自动带入：¥{summary.openingAutoValue.toFixed(3)}</Text>
           <TextInput value={openingInput} onChangeText={setOpeningInput} placeholder="手动输入期初金额" placeholderTextColor={colors.muted}
-            style={[S.input, { fontSize: 20, borderColor: colors.border, backgroundColor: ICOST_CARD, color: colors.foreground }]}
+            style={[S.input, { fontSize: 20, borderColor: colors.border, backgroundColor: colors.surface, color: colors.foreground }]}
             keyboardType="decimal-pad" returnKeyType="done" autoFocus />
           <Text style={[S.fieldLabel, { color: colors.muted }]}>若与上月期末不一致，保存时会提醒确认。</Text>
         </View>
@@ -768,7 +751,7 @@ export default function StorePettyCashScreen() {
 
   // ── 主渲染 ────────────────────────────────────────────────────────────────
   return (
-    <View style={[S.root, { backgroundColor: ICOST_BG }]}>
+    <View style={[S.root, { backgroundColor: colors.background }]}>
       {renderViewTabs()}
       {renderHeader()}
       {renderContextActions()}
@@ -779,7 +762,7 @@ export default function StorePettyCashScreen() {
       {renderOpeningModal()}
       <Modal visible={showPeriodMenu} transparent animationType="fade" onRequestClose={() => setShowPeriodMenu(false)}>
         <Pressable style={S.modalBackdrop} onPress={() => setShowPeriodMenu(false)}>
-          <View style={[S.periodMenu, { position: "absolute", top: 140, left: 16, backgroundColor: ICOST_CARD, borderColor: colors.border, shadowColor: "#000" }]}>
+          <View style={[S.periodMenu, { position: "absolute", top: 140, left: 16, backgroundColor: colors.surface, borderColor: colors.border, shadowColor: "#000" }]}>
             {(Object.keys(PERIOD_MODE_LABELS) as PeriodMode[]).map(mode => (
               <Pressable key={mode} onPress={() => { tap(); setPeriodMode(mode); setShowPeriodMenu(false); }}
                 style={[S.periodMenuItem, periodMode === mode && { backgroundColor: colors.primary + "18" }]}>

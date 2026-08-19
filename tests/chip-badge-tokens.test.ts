@@ -38,7 +38,8 @@ describe("标签与数量徽标 Design Token", () => {
     expect(quickFilters).toContain('subChip: {\n    flexDirection: "row",\n    alignItems: "center",\n    gap: 3,\n    flexShrink: 0,');
     expect(labChanges).toContain('CHIP_BADGE_LAYOUT.wrapChip');
     expect(labChanges).toContain('numberOfLines={2}');
-    expect(inventory).toContain('horizontal\n        showsHorizontalScrollIndicator={false}\n        testID={mode === "shop" ? "shop-segmented-tabs" : "inventory-segmented-tabs"}');
-    expect(inventory).toContain('segment: { minHeight: INVENTORY_WORKSPACE_METRICS.segmentHeight');
+    expect(inventory).toContain("<StoreSegmentedTabs");
+    expect(inventory).toContain('testID={mode === "shop" ? "shop-segmented-tabs" : "inventory-segmented-tabs"}');
+    expect(read("components/store/store-visual-primitives.tsx")).toContain("minHeight: 40");
   });
 });
