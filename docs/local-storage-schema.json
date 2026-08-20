@@ -3222,14 +3222,14 @@
         {
           "operation": "getItem",
           "file": "lib/wine/store.tsx",
-          "line": 178,
+          "line": 179,
           "value": "",
           "structure": "WineState, WineSnapshotState, WineImportControlState, SnapshotAction, WineSnapshotContextValue"
         },
         {
           "operation": "setItem",
           "file": "lib/wine/store.tsx",
-          "line": 210,
+          "line": 224,
           "value": "JSON.stringify(state",
           "structure": "WineState, WineSnapshotState, WineImportControlState, SnapshotAction, WineSnapshotContextValue"
         }
@@ -3243,14 +3243,14 @@
         {
           "operation": "getItem",
           "file": "lib/wine/store.tsx",
-          "line": 202,
+          "line": 216,
           "value": "",
           "structure": "WineState, WineSnapshotState, WineImportControlState, SnapshotAction, WineSnapshotContextValue"
         },
         {
           "operation": "setItem",
           "file": "lib/wine/store.tsx",
-          "line": 225,
+          "line": 239,
           "value": "JSON.stringify(importControlState",
           "structure": "WineState, WineSnapshotState, WineImportControlState, SnapshotAction, WineSnapshotContextValue"
         }
@@ -3264,14 +3264,14 @@
         {
           "operation": "getItem",
           "file": "lib/wine/store.tsx",
-          "line": 194,
+          "line": 208,
           "value": "",
           "structure": "WineState, WineSnapshotState, WineImportControlState, SnapshotAction, WineSnapshotContextValue"
         },
         {
           "operation": "setItem",
           "file": "lib/wine/store.tsx",
-          "line": 220,
+          "line": 234,
           "value": "JSON.stringify(manualState",
           "structure": "WineState, WineSnapshotState, WineImportControlState, SnapshotAction, WineSnapshotContextValue"
         }
@@ -3285,14 +3285,14 @@
         {
           "operation": "getItem",
           "file": "lib/wine/store.tsx",
-          "line": 186,
+          "line": 200,
           "value": "",
           "structure": "WineState, WineSnapshotState, WineImportControlState, SnapshotAction, WineSnapshotContextValue"
         },
         {
           "operation": "setItem",
           "file": "lib/wine/store.tsx",
-          "line": 215,
+          "line": 229,
           "value": "JSON.stringify(snapshotState",
           "structure": "WineState, WineSnapshotState, WineImportControlState, SnapshotAction, WineSnapshotContextValue"
         }

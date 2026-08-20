@@ -1,6 +1,6 @@
 # 本地存储键与数据结构清单
 
-> 由 `pnpm audit:storage` 从生产源代码生成；生成时间：2026-08-20T08:17:19.327Z。
+> 由 `pnpm audit:storage` 从生产源代码生成；生成时间：2026-08-20T11:29:22.445Z。
 > 本清单覆盖 `AsyncStorage`、`SecureStore`、Web `localStorage` 与通用库存工厂传入的键。`{variable}` 表示按运行时参数生成的键模式。
 
 ## 已解析键
@@ -108,10 +108,10 @@
 | AsyncStorage | `sync.lastPulledAt` | setItem | `String(now` | PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState | `lib/sync/engine.ts:766`<br>`lib/sync/engine.ts:908` |
 | AsyncStorage | `sync.log.v1` | getItem, setItem | `JSON.stringify(log` | PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState | `lib/sync/engine.ts:627`<br>`lib/sync/engine.ts:631`<br>`lib/sync/engine.ts:639`<br>`lib/sync/engine.ts:700` |
 | AsyncStorage | `tableware.inventory.v1` | factory-key | `GenericInventoryState` | GenericInventoryState, GenericInventoryItem, PurchaseRecord, ConsumeRecord, MonthlySnapshot | `lib/tableware/inventory-store.tsx:8` |
-| AsyncStorage | `wine.bottles.v1` | getItem, setItem | `JSON.stringify(state` | WineState, WineSnapshotState, WineImportControlState, SnapshotAction, WineSnapshotContextValue | `lib/wine/store.tsx:178`<br>`lib/wine/store.tsx:210` |
-| AsyncStorage | `wine.import_control.v1` | getItem, setItem | `JSON.stringify(importControlState` | WineState, WineSnapshotState, WineImportControlState, SnapshotAction, WineSnapshotContextValue | `lib/wine/store.tsx:202`<br>`lib/wine/store.tsx:225` |
-| AsyncStorage | `wine.manual_purchases.v1` | getItem, setItem | `JSON.stringify(manualState` | WineState, WineSnapshotState, WineImportControlState, SnapshotAction, WineSnapshotContextValue | `lib/wine/store.tsx:194`<br>`lib/wine/store.tsx:220` |
-| AsyncStorage | `wine.snapshots.v2` | getItem, setItem | `JSON.stringify(snapshotState` | WineState, WineSnapshotState, WineImportControlState, SnapshotAction, WineSnapshotContextValue | `lib/wine/store.tsx:186`<br>`lib/wine/store.tsx:215` |
+| AsyncStorage | `wine.bottles.v1` | getItem, setItem | `JSON.stringify(state` | WineState, WineSnapshotState, WineImportControlState, SnapshotAction, WineSnapshotContextValue | `lib/wine/store.tsx:179`<br>`lib/wine/store.tsx:224` |
+| AsyncStorage | `wine.import_control.v1` | getItem, setItem | `JSON.stringify(importControlState` | WineState, WineSnapshotState, WineImportControlState, SnapshotAction, WineSnapshotContextValue | `lib/wine/store.tsx:216`<br>`lib/wine/store.tsx:239` |
+| AsyncStorage | `wine.manual_purchases.v1` | getItem, setItem | `JSON.stringify(manualState` | WineState, WineSnapshotState, WineImportControlState, SnapshotAction, WineSnapshotContextValue | `lib/wine/store.tsx:208`<br>`lib/wine/store.tsx:234` |
+| AsyncStorage | `wine.snapshots.v2` | getItem, setItem | `JSON.stringify(snapshotState` | WineState, WineSnapshotState, WineImportControlState, SnapshotAction, WineSnapshotContextValue | `lib/wine/store.tsx:200`<br>`lib/wine/store.tsx:229` |
 
 ## 需要人工跟踪的动态键表达式
 
