@@ -90,7 +90,8 @@ describe("门店唯一视觉系统规范", () => {
     expect(labor).toContain("加班考勤");
     expect(labor).toContain("已预支");
     expect(labor).toContain("考勤明细（5格）");
-    expect(labor).toContain("visibleMetricColumns === 3");
+    expect(labor).toContain("{metrics.map(({ label, value, color }) => (");
+    expect(labor).not.toContain("visibleMetricColumns === 3");
     expect(labor).toContain("getStoreSummaryColumns(width)");
     expect(labor).not.toContain("{employee.dept}</Text>");
   });

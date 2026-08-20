@@ -14,9 +14,16 @@ describe("员工统一 UI 契约", () => {
     expect(labor).toContain('label: "综合额外"');
     expect(labor).toContain('label: "已预支", value: advanceAmount');
     expect(labor).toContain('label: "总工资"');
-    expect(labor).toContain("visibleMetricColumns === 3");
+    expect(labor).toContain("{metrics.map(({ label, value, color }) => (");
+    expect(labor).not.toContain("visibleMetricColumns === 3");
     expect(labor).toContain("实发薪资");
     expect(labor).toContain("考勤明细（5格）");
+  });
+
+  it("iPhone 工资卡完整展示五项摘要，加班考勤与综合额外均为中性深色，后厨总工资跟随实发颜色", () => {
+    expect(labor).toContain('label: "加班考勤", value: overtimeAndHoliday > 0 ? `+¥${formatMoney(overtimeAndHoliday)}` : "—", color: overtimeAndHoliday > 0 ? storeTone(colors, "neutral")');
+    expect(labor).toContain('label: "综合额外", value: extraTotal !== 0 ? `${extraTotal >= 0 ? "+" : ""}¥${formatMoney(extraTotal)}` : "—", color: extraTotal !== 0 ? storeTone(colors, "neutral")');
+    expect(labor).toContain('label: "总工资", value: finalSalary !== null ? `¥${formatMoney(finalSalary)}` : "—", color: deptColor');
   });
 
   it("人力总览恢复原始自适应结构，不再被强制为一行四列", () => {
