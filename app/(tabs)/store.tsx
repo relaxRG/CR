@@ -5,7 +5,7 @@
  */
 import React from "react";
 import {
-  Platform, Pressable, ScrollView, StyleSheet, Text, View
+  Platform, Pressable, StyleSheet, Text, View
 } from "react-native";
 import * as Haptics from "expo-haptics";
 import { SafeAreaInsetsContext, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -18,7 +18,6 @@ import { useSync } from "@/lib/cf-sync/provider";
 import { useCan } from "@/hooks/use-can";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { StoreSegmentedTabs } from "@/components/store/store-visual-primitives";
-import { STORE_TEXT, STORE_VISUAL_SYSTEM } from "@/lib/theme/store-visual-system";
 import { floatingTabContentBottomInset } from "@/components/floating-tab-bar";
 import StorePettyCashScreen from "@/components/store/petty-cash";
 import StoreAnalyticsScreen from "@/components/store/analytics";
@@ -157,36 +156,19 @@ export default function StoreScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background, paddingBottom: contentBottomInset }}>
-      {/* 顶部导航栏：Tab + 头像合并为一行（修复顶部留白过宽 Bug） */}
+      {/* 五个门店模块为同一层级的胶囊选择器；头像单独保留在右侧。 */}
       <View style={{ paddingTop: insets.top, backgroundColor: colors.background, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
-        <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 20 }}>
-          {/* Tab 列表：第五个主模块在窄屏水平滚动，头像始终固定可见 */}
-          <ScrollView testID="store-main-tabs" horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ flexDirection: "row" }}>
-            {visibleTabs.map((t) => {
-              const active = effectiveTab === t.key;
-              return (
-                <Pressable key={t.key} testID={`store-main-tab-${t.key}`} onPress={() => { tap(); setMainTab(t.key); }}
-                  style={({ pressed }) => [{
-                    paddingVertical: 12,
-                    paddingHorizontal: 4,
-                    marginRight: 16,
-                    borderBottomWidth: 2,
-                    borderBottomColor: active ? colors.primary : "transparent",
-                    opacity: pressed ? 0.6 : 1,
-                  }]}>
-                  <Text style={[S.mainTabText, {
-                    color: active ? colors.primary : colors.muted,
-                    fontWeight: active ? STORE_VISUAL_SYSTEM.weight.emphasis : STORE_VISUAL_SYSTEM.weight.quiet,
-                  }]}>
-                    {t.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-          {/* 头像按鈕（右侧对齐） */}
-          <Pressable onPress={() => { tap(); router.push("/me"); }}
-            style={({ pressed }) => [S.meBtn, { opacity: pressed ? 0.7 : 1 }]}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 2, paddingRight: 8 }}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <StoreSegmentedTabs
+              testID="store-main-tabs"
+              items={visibleTabs}
+              active={effectiveTab}
+              colors={colors}
+              onChange={(next) => { tap(); setMainTab(next); }}
+            />
+          </View>
+          <Pressable onPress={() => { tap(); router.push("/me"); }} style={({ pressed }) => [S.meBtn, { opacity: pressed ? 0.7 : 1 }]}>
             {hasSyncBadge && <View style={[S.syncDot, { backgroundColor: colors.error }]} />}
             <IconSymbol name="person.crop.circle" size={28} color={colors.primary} />
           </Pressable>
@@ -218,10 +200,6 @@ export default function StoreScreen() {
 }
 
 const S = StyleSheet.create({
-  header: { paddingHorizontal: 20, paddingBottom: 0 },
-  meBtn: { position: "relative" },
+  meBtn: { position: "relative", width: 36, alignItems: "center", justifyContent: "center" },
   syncDot: { position: "absolute", top: 0, right: 0, width: 8, height: 8, borderRadius: 4, zIndex: 1 },
-  mainTabRow: { flexDirection: "row", borderBottomWidth: StyleSheet.hairlineWidth },
-  mainTabBtn: { flex: 1, alignItems: "center", paddingVertical: 10, borderBottomWidth: 2, borderBottomColor: "transparent" },
-  mainTabText: { ...STORE_TEXT.body, fontSize: 16 },
 });

@@ -70,18 +70,26 @@ describe("门店唯一视觉系统规范", () => {
       "components/store/inventory.tsx",
     ];
     consumers.slice(0, -1).forEach((path) => {
-      expect(source(path), path).toContain("store-visual-system");
+      const content = source(path);
+      expect(content.includes("store-visual-system") || content.includes("StoreSegmentedTabs"), path).toBe(true);
     });
     expect(source("components/store/inventory.tsx")).toContain("StoreSegmentedTabs");
     expect(source("components/store/shop.tsx")).toContain('<StoreInventoryScreen mode="shop" />');
   });
 
-  it("门店根页与员工页使用共享分段页签，员工不再渲染重复英文部门字段", () => {
-    expect(source("app/(tabs)/store.tsx")).toContain("StoreSegmentedTabs");
+  it("门店根页与员工页使用共享胶囊选择器，员工总览和工资摘要不因设备宽度改变行列结构", () => {
+    const primitives = source("components/store/store-visual-primitives.tsx");
+    const store = source("app/(tabs)/store.tsx");
     const labor = source("components/labor/LaborWorkspaceScreen.tsx");
+    expect(primitives).toContain("fitsSingleRow = items.length <= 5");
+    expect(primitives).toContain('backgroundColor: selected ? colors.surface : "transparent"');
+    expect(store).toContain("StoreSegmentedTabs");
+    expect(store).toContain('testID="store-main-tabs"');
     expect(labor).toContain("StoreSegmentedTabs");
     expect(labor).toContain("StoreSectionHeader");
-    expect(labor).toContain("visibleMetricColumns === 3");
+    expect(labor).toContain("考勤调整");
+    expect(labor).toContain("考勤明细（含比例底薪）");
+    expect(labor).not.toContain("visibleMetricColumns === 3");
     expect(labor).not.toContain("{employee.dept}</Text>");
   });
 });

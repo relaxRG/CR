@@ -24,10 +24,14 @@ function storeSegmentItemTestID(testID: string | undefined, key: string) {
 export type StoreSegmentItem<T extends string> = {
   key: T;
   label: string;
+  /** 仅保留数据兼容；胶囊选择器统一以纯文字呈现，避免同组混用图标与文字。 */
   icon?: StoreIconName;
 };
 
-/** 整个门店唯一的模块二级页签。视觉仅以文字和细下划线体现选中，图标只在确有业务辨识必要时出现。 */
+/**
+ * 门店所有层级唯一的视图选择器。
+ * 五项以内在 iPhone/iPad/Mac 始终等宽同一行；库存六类保持单行横向滚动，绝不拆成两行。
+ */
 export function StoreSegmentedTabs<T extends string>({
   items,
   active,
@@ -41,29 +45,55 @@ export function StoreSegmentedTabs<T extends string>({
   colors: StoreVisualColors;
   testID?: string;
 }) {
+  const { width } = useWindowDimensions();
+  const [availableWidth, setAvailableWidth] = React.useState(0);
+  const fitsSingleRow = items.length <= 5;
+  const compactWidth = Math.max((availableWidth || width) - 24, 0);
+  const minimumPillWidth = 72;
+  const contentWidth = fitsSingleRow ? compactWidth : Math.max(compactWidth, items.length * minimumPillWidth + 4);
+
   return (
-    <View style={{ minHeight: 40, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.background }}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} testID={testID} contentContainerStyle={{ minHeight: 40, alignItems: "center", gap: 4, paddingHorizontal: 12 }}>
-        {items.map((item) => {
-          const selected = item.key === active;
-          const tint = selected ? storeTone(colors, "primary") : colors.muted;
-          return (
-            <Pressable
-              key={item.key}
-              testID={storeSegmentItemTestID(testID, item.key)}
-              accessibilityRole="tab"
-              accessibilityState={{ selected }}
-              onPress={() => onChange(item.key)}
-              style={({ pressed }) => ({ minHeight: 40, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 5, opacity: pressed ? 0.65 : 1 })}
-            >
-              {item.icon ? <IconSymbol name={item.icon} size={STORE_VISUAL_SYSTEM.icon.detail} color={tint} /> : null}
-              <Text style={{ ...STORE_TEXT.body, color: tint, fontWeight: selected ? STORE_VISUAL_SYSTEM.weight.emphasis : STORE_VISUAL_SYSTEM.weight.quiet }}>
-                {item.label}
-              </Text>
-              {selected ? <View style={{ position: "absolute", height: 2, left: 10, right: 10, bottom: 0, borderRadius: 1, backgroundColor: tint }} /> : null}
-            </Pressable>
-          );
-        })}
+    <View onLayout={(event) => setAvailableWidth(event.nativeEvent.layout.width)} style={{ minHeight: 40, paddingHorizontal: 12, paddingTop: 4, paddingBottom: 4, backgroundColor: colors.background }}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        testID={testID}
+        contentContainerStyle={{ minWidth: contentWidth, minHeight: 32, flexGrow: fitsSingleRow ? 1 : 0 }}
+      >
+        <View style={{ minHeight: 32, flexDirection: "row", flex: fitsSingleRow ? 1 : 0, gap: 2, padding: 2, borderRadius: 10, backgroundColor: colors.border + "55" }}>
+          {items.map((item) => {
+            const selected = item.key === active;
+            return (
+              <Pressable
+                key={item.key}
+                testID={storeSegmentItemTestID(testID, item.key)}
+                accessibilityRole="tab"
+                accessibilityState={{ selected }}
+                onPress={() => onChange(item.key)}
+                style={({ pressed }) => ({
+                  minHeight: 28,
+                  minWidth: fitsSingleRow ? 0 : minimumPillWidth - 4,
+                  flex: fitsSingleRow ? 1 : 0,
+                  paddingHorizontal: 8,
+                  borderRadius: 8,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor: selected ? colors.surface : "transparent",
+                  shadowColor: selected ? "#000" : "transparent",
+                  shadowOpacity: selected ? 0.08 : 0,
+                  shadowRadius: selected ? 2 : 0,
+                  shadowOffset: { width: 0, height: 1 },
+                  elevation: selected ? 1 : 0,
+                  opacity: pressed ? 0.65 : 1,
+                })}
+              >
+                <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.78} style={{ ...STORE_TEXT.body, color: selected ? colors.foreground : colors.muted, fontWeight: selected ? STORE_VISUAL_SYSTEM.weight.emphasis : STORE_VISUAL_SYSTEM.weight.quiet }}>
+                  {item.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
       </ScrollView>
     </View>
   );

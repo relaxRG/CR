@@ -55,10 +55,10 @@ export function LaborCompareToggle({ mode, customMonth, baseMonth, onChange, onC
     <View style={{ position: "relative" }}>
       <TouchableOpacity
         onPress={() => { tap(); setOpen((value) => !value); setShowMonthPicker(false); }}
-        style={[styles.button, { backgroundColor: mode !== "none" ? colors.primary + "22" : colors.surface, borderColor: mode !== "none" ? colors.primary + "44" : colors.border }]}
+        style={[styles.button, { backgroundColor: colors.surface, borderColor: colors.border }]}
       >
-        <IconSymbol name="chart.bar.xaxis" size={12} color={mode !== "none" ? colors.primary : colors.muted} />
-        <Text style={{ fontSize: 11, fontWeight: "600", color: mode !== "none" ? colors.primary : colors.muted }}>{mode !== "none" ? laborCompareModeLabel(mode, customMonth) : "对比"}</Text>
+        <IconSymbol name="chart.bar.xaxis" size={16} color={mode !== "none" ? colors.primary : colors.muted} />
+        <Text style={{ fontSize: 12, fontWeight: "600", color: mode !== "none" ? colors.primary : colors.foreground }}>{mode !== "none" ? laborCompareModeLabel(mode, customMonth) : "对比"}</Text>
       </TouchableOpacity>
 
       {open && !showMonthPicker ? (
@@ -95,7 +95,7 @@ export function LaborCompareToggle({ mode, customMonth, baseMonth, onChange, onC
 }
 
 const styles = StyleSheet.create({
-  button: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 6, borderRadius: 8, borderWidth: 1 },
+  button: { minHeight: 36, flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1 },
   panel: { position: "absolute", right: 0, top: 34, borderRadius: 10, borderWidth: 1, zIndex: 100, minWidth: 110, overflow: "hidden", shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 8, elevation: 4 },
   option: { paddingHorizontal: 12, paddingVertical: 9 },
 });

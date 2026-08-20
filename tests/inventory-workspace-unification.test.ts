@@ -20,7 +20,10 @@ describe("库存六类与店铺四类工作台统一规范", () => {
     expect(portal).not.toContain("showPortalHeader");
     expect(portal).not.toContain("杯具、餐具、日用品与设备");
     expect(portal).toContain("<StoreSegmentedTabs");
-    expect(read("components/store/store-visual-primitives.tsx")).toContain('const tint = selected ? storeTone(colors, "primary") : colors.muted;');
+    const sharedTabs = read("components/store/store-visual-primitives.tsx");
+    expect(sharedTabs).toContain("fitsSingleRow = items.length <= 5");
+    expect(sharedTabs).toContain('backgroundColor: selected ? colors.surface : "transparent"');
+    expect(sharedTabs).toContain('color: selected ? colors.foreground : colors.muted');
   });
 
   it("烈酒、葡萄酒与通用九类页面使用同一紧凑工作台尺度和纯文本结构页签", () => {
