@@ -26,6 +26,15 @@ describe("员工统一 UI 契约", () => {
     expect(labor).toContain('label: "总工资", value: finalSalary !== null ? `¥${formatMoney(finalSalary)}` : "—", color: deptColor');
   });
 
+  it("薪资预支操作位于正常内容流，保留原有蓝紫颜色且不再以悬浮层遮挡内容或底部导航", () => {
+    expect(labor).toContain('testID="advance-inline-actions"');
+    expect(labor).toContain('paddingBottom: insets.bottom + 24');
+    expect(labor).toContain('backgroundColor: "#5856D6"');
+    expect(labor).toContain('backgroundColor: "#AF52DE"');
+    expect(labor).not.toContain('position: "absolute", right: 20, bottom: fabBottom(insets.bottom) + 64');
+    expect(labor).not.toContain('position: "absolute", right: 20, bottom: fabBottom(insets.bottom)');
+  });
+
   it("人力总览恢复原始自适应结构，不再被强制为一行四列", () => {
     expect(labor).toContain("const summaryColumns = getStoreSummaryColumns(width)");
     expect(labor).toContain('flexWrap: "wrap"');

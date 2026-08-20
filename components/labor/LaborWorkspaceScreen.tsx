@@ -1660,7 +1660,7 @@ function AdvancePage({ month, colors, headerComponent }: { month: string; colors
 
   return (
     <View style={{ flex: 1 }}>
-      <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: fabBottom(insets.bottom) + 80 }}>
+      <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: insets.bottom + 24 }}>
         {headerComponent}
 
         {/* 汇总卡片 */}
@@ -1682,6 +1682,24 @@ function AdvancePage({ month, colors, headerComponent }: { month: string; colors
               </View>
             )}
           </View>
+        </View>
+
+        {/* 固定在内容流顶部的操作区：不使用绝对定位，避免遮挡空状态和底部导航。 */}
+        <View testID="advance-inline-actions" style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingTop: 2 }}>
+          <TouchableOpacity onPress={() => { tap(); initMatchPettySelections(); }}
+            style={{ flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+              paddingHorizontal: 12, paddingVertical: 13, borderRadius: 28, backgroundColor: "#5856D6",
+              shadowColor: "#5856D6", shadowOpacity: 0.35, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 7 }}>
+            <IconSymbol name="link" size={16} color="#fff" />
+            <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: "700", color: "#fff" }}>匹配备用金</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => { tap(); setShowAddModal(true); }}
+            style={{ flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+              paddingHorizontal: 12, paddingVertical: 13, borderRadius: 28, backgroundColor: "#AF52DE",
+              shadowColor: "#AF52DE", shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 8 }}>
+            <IconSymbol name="plus" size={16} color="#fff" />
+            <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: "700", color: "#fff" }}>新增预支</Text>
+          </TouchableOpacity>
         </View>
 
         {/* 智能识别草稿（待确认纳入） */}
@@ -2186,21 +2204,6 @@ function AdvancePage({ month, colors, headerComponent }: { month: string; colors
         </Modal>
       </ScrollView>
 
-      {/* FAB：匹配备用金（上）+ 新增预支（下） */}
-      <TouchableOpacity onPress={() => { tap(); initMatchPettySelections(); }}
-        style={{ position: "absolute", right: 20, bottom: fabBottom(insets.bottom) + 64, flexDirection: "row", alignItems: "center", gap: 6,
-          paddingHorizontal: 18, paddingVertical: 13, borderRadius: 28, backgroundColor: "#5856D6",
-          shadowColor: "#5856D6", shadowOpacity: 0.35, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 7 }}>
-        <IconSymbol name="link" size={16} color="#fff" />
-        <Text style={{ fontSize: 14, fontWeight: "700", color: "#fff" }}>匹配备用金</Text>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => { tap(); setShowAddModal(true); }}
-        style={{ position: "absolute", right: 20, bottom: fabBottom(insets.bottom), flexDirection: "row", alignItems: "center", gap: 6,
-          paddingHorizontal: 18, paddingVertical: 13, borderRadius: 28, backgroundColor: "#AF52DE",
-          shadowColor: "#AF52DE", shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 8 }}>
-        <IconSymbol name="plus" size={16} color="#fff" />
-        <Text style={{ fontSize: 14, fontWeight: "700", color: "#fff" }}>新增预支</Text>
-      </TouchableOpacity>
     </View>
   );
 }
