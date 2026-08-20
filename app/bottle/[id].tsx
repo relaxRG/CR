@@ -14,6 +14,7 @@ import { useBottleStore } from "@/lib/bottles/store";
 import { useBottleTaxonomy } from "@/lib/bottles/taxonomy";
 import { isPerishableWholeBottle } from "@/lib/recipes/smart-cost";
 import { bottleGroupOf, getEffectiveCostPrice, getSupplierChannelPurchaseNames, resolveCostChannelId } from "@/lib/bottles/types";
+import { getBottleCostPriceImpact } from "@/lib/bottles/price-impact";
 
 export default function BottleDetailScreen() {
   const colors = useColors();
@@ -24,6 +25,7 @@ export default function BottleDetailScreen() {
   const { getBottle, deleteBottle, setBottleRating } = useBottleStore();
   const { categoryLabel } = useBottleTaxonomy();
   const bottle = getBottle(id);
+  const costPriceImpact = bottle ? getBottleCostPriceImpact(bottle) : null;
 
   // 计算当前条目实际所属库
   const effectiveGroup = bottle
@@ -291,11 +293,18 @@ export default function BottleDetailScreen() {
             </Text>
           </View>
           {costChannel ? (
-            <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 10 }} numberOfLines={1}>
-              {getSupplierChannelPurchaseNames(costChannel).length > 0
-                ? `采购名称：${getSupplierChannelPurchaseNames(costChannel).map((entry) => entry.name).join("、")}`
-                : "尚未记录该渠道采购名称"}
-            </Text>
+            <>
+              <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 6 }} numberOfLines={1}>
+                {getSupplierChannelPurchaseNames(costChannel).length > 0
+                  ? `采购名称：${getSupplierChannelPurchaseNames(costChannel).map((entry) => entry.name).join("、")}`
+                  : "尚未记录该渠道采购名称"}
+              </Text>
+              {costPriceImpact && costPriceImpact.previousPrice !== null ? (
+                <Text testID="bottle-cost-price-impact" style={{ fontSize: 12, color: costPriceImpact.delta > 0 ? colors.warning : costPriceImpact.delta < 0 ? colors.success : colors.muted, marginBottom: 10 }}>
+                  较上次报价 {costPriceImpact.delta > 0 ? "+" : ""}¥{formatMoney(costPriceImpact.delta)}{costPriceImpact.deltaPercent !== null ? ` · ${(costPriceImpact.deltaPercent * 100).toFixed(1)}%` : ""}
+                </Text>
+              ) : null}
+            </>
           ) : null}
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
             <Text style={{ fontSize: 12, color: colors.muted }}>
