@@ -14,6 +14,7 @@ type LaborCompareToggleProps = {
   onChange: (mode: LaborCompareMode) => void;
   onCustomMonthChange?: (month: string) => void;
   colors: { primary: string; surface: string; border: string; muted: string; foreground: string };
+  compact?: boolean;
 };
 
 export function getLaborCompareMonth(base: string, mode: LaborCompareMode, customMonth?: string): string | null {
@@ -43,7 +44,7 @@ function recentMonths(base: string, count = 24): string[] {
 }
 
 /** 员工总览和薪资区共用的对比筛选控件；状态封装在自身，月份与业务结果仍由父工作台控制。 */
-export function LaborCompareToggle({ mode, customMonth, baseMonth, onChange, onCustomMonthChange, colors }: LaborCompareToggleProps) {
+export function LaborCompareToggle({ mode, customMonth, baseMonth, onChange, onCustomMonthChange, colors, compact = false }: LaborCompareToggleProps) {
   const [open, setOpen] = useState(false);
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const months = recentMonths(baseMonth);
@@ -52,13 +53,13 @@ export function LaborCompareToggle({ mode, customMonth, baseMonth, onChange, onC
   };
 
   return (
-    <View style={{ position: "relative" }}>
+    <View style={{ position: "relative", flex: compact ? 1 : undefined, minWidth: 0 }}>
       <TouchableOpacity
         onPress={() => { tap(); setOpen((value) => !value); setShowMonthPicker(false); }}
-        style={[styles.button, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        style={[styles.button, compact && styles.compactButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
       >
-        <IconSymbol name="chart.bar.xaxis" size={16} color={mode !== "none" ? colors.primary : colors.muted} />
-        <Text style={{ fontSize: 12, fontWeight: "600", color: mode !== "none" ? colors.primary : colors.foreground }}>{mode !== "none" ? laborCompareModeLabel(mode, customMonth) : "对比"}</Text>
+        <IconSymbol name="chart.bar.xaxis" size={compact ? 12 : 16} color={mode !== "none" ? colors.primary : colors.muted} />
+        <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82} style={{ fontSize: compact ? 11 : 12, fontWeight: "600", color: mode !== "none" ? colors.primary : colors.foreground }}>{mode !== "none" ? laborCompareModeLabel(mode, customMonth) : "对比"}</Text>
       </TouchableOpacity>
 
       {open && !showMonthPicker ? (
@@ -95,7 +96,8 @@ export function LaborCompareToggle({ mode, customMonth, baseMonth, onChange, onC
 }
 
 const styles = StyleSheet.create({
-  button: { minHeight: 36, flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1 },
+  button: { minHeight: 36, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1 },
+  compactButton: { minWidth: 0, paddingHorizontal: 4, gap: 3 },
   panel: { position: "absolute", right: 0, top: 34, borderRadius: 10, borderWidth: 1, zIndex: 100, minWidth: 110, overflow: "hidden", shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 8, elevation: 4 },
   option: { paddingHorizontal: 12, paddingVertical: 9 },
 });

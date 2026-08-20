@@ -943,16 +943,12 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
   const [showPayrollReconciliation, setShowPayrollReconciliation] = useState(false);
   const payrollRecalculationGateRef = useRef(createMonthCloseOperationGate());
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
-  const { width: workspaceWidth } = useWindowDimensions();
-  const compactToolbar = workspaceWidth < 600;
-
   // ─── 导出功能（薪资报表 + 排班表，Excel/PDF）────────────────────────────────
   const { shifts } = useShiftStore();
   const { deptOrder: exportDeptOrder } = useDeptOrderStore();
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [showImportMenu, setShowImportMenu] = useState(false);
-  const [showMoreActions, setShowMoreActions] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [showImportPreview, setShowImportPreview] = useState(false);
@@ -1174,35 +1170,15 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
   return (
     <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: fabBottom(rosterInsets.bottom) + 20 }}>
       {headerComponent}
-      {/* 所有上下文操作统一 36pt；iPhone 只保留高频入口，低频操作收纳到更多。 */}
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-        <StoreToolbarAction label={compactToolbar ? "员工" : "员工管理"} icon="person.2.fill" colors={colors} onPress={() => { tap(); router.push("/labor-employees" as any); }} />
-        <LaborCompareToggle mode={compareMode} customMonth={customMonth} baseMonth={month} onChange={setCompareMode} onCustomMonthChange={setCustomMonth} colors={colors} />
-        <StoreToolbarAction testID="payroll-reconciliation-open" label="核对" icon="checkmark.square.fill" colors={colors} accessibilityLabel={`打开所选月 ${month} 薪资核对与修正`} accessibilityHint="核对调休兑现来源、历史差额和薪资修正路径" onPress={() => { tap(); setShowPayrollReconciliation(true); }} />
-        <View style={{ flex: 1 }} />
-        {compactToolbar ? (
-          <StoreToolbarAction label="更多" icon="ellipsis.circle" colors={colors} onPress={() => { tap(); setShowMoreActions(true); }} />
-        ) : (
-          <>
-            <StoreToolbarAction label="重算" icon="arrow.clockwise" colors={colors} accessibilityLabel={`重新计算所选月 ${month} 草稿薪资`} accessibilityHint="仅重建所选月草稿薪资，不修改其他月份或已确认发薪数据" onPress={() => { tap(); handleRecalculateSelectedDraftMonth(); }} disabled={recalculatingMonth || getRosterMonthStatus(month) !== "draft"} />
-            <StoreToolbarAction label="导入" icon="square.and.arrow.down" colors={colors} onPress={() => { tap(); setShowImportMenu(true); }} disabled={importing} />
-            <StoreToolbarAction label="导出" icon="square.and.arrow.up" colors={colors} onPress={() => { tap(); setShowExportMenu(true); }} disabled={exporting} />
-          </>
-        )}
+      {/* 六项完整工具在任意设备均同一行显示：等宽、36pt、高频操作不再被收纳或出屏。 */}
+      <View testID="payroll-inline-tools" style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+        <StoreToolbarAction compact label="员工" icon="person.2.fill" colors={colors} onPress={() => { tap(); router.push("/labor-employees" as any); }} />
+        <LaborCompareToggle compact mode={compareMode} customMonth={customMonth} baseMonth={month} onChange={setCompareMode} onCustomMonthChange={setCustomMonth} colors={colors} />
+        <StoreToolbarAction compact testID="payroll-reconciliation-open" label="核对" icon="checkmark.square.fill" colors={colors} accessibilityLabel={`打开所选月 ${month} 薪资核对与修正`} accessibilityHint="核对调休兑现来源、历史差额和薪资修正路径" onPress={() => { tap(); setShowPayrollReconciliation(true); }} />
+        <StoreToolbarAction compact label="重算" icon="arrow.clockwise" colors={colors} accessibilityLabel={`重新计算所选月 ${month} 草稿薪资`} accessibilityHint="仅重建所选月草稿薪资，不修改其他月份或已确认发薪数据" onPress={() => { tap(); handleRecalculateSelectedDraftMonth(); }} disabled={recalculatingMonth || getRosterMonthStatus(month) !== "draft"} />
+        <StoreToolbarAction compact label="导入" icon="square.and.arrow.down" colors={colors} onPress={() => { tap(); setShowImportMenu(true); }} disabled={importing} />
+        <StoreToolbarAction compact label="导出" icon="square.and.arrow.up" colors={colors} onPress={() => { tap(); setShowExportMenu(true); }} disabled={exporting} />
       </View>
-
-      <Modal visible={showMoreActions} transparent animationType="fade" onRequestClose={() => setShowMoreActions(false)}>
-        <TouchableOpacity activeOpacity={1} onPress={() => setShowMoreActions(false)} style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.22)", justifyContent: "flex-end" }}>
-          <TouchableOpacity activeOpacity={1} onPress={(event) => event.stopPropagation()} style={{ backgroundColor: colors.surface, borderTopLeftRadius: 18, borderTopRightRadius: 18, padding: 16, gap: 10 }}>
-            <Text style={{ ...STORE_TEXT.sectionTitle, color: colors.foreground }}>更多操作</Text>
-            <View style={{ flexDirection: "row", gap: 8 }}>
-              <StoreToolbarAction label="重算" icon="arrow.clockwise" colors={colors} onPress={() => { tap(); setShowMoreActions(false); handleRecalculateSelectedDraftMonth(); }} disabled={recalculatingMonth || getRosterMonthStatus(month) !== "draft"} />
-              <StoreToolbarAction label="导入" icon="square.and.arrow.down" colors={colors} onPress={() => { tap(); setShowMoreActions(false); setShowImportMenu(true); }} disabled={importing} />
-              <StoreToolbarAction label="导出" icon="square.and.arrow.up" colors={colors} onPress={() => { tap(); setShowMoreActions(false); setShowExportMenu(true); }} disabled={exporting} />
-            </View>
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
 
       {/* 确认发薪状态栏 */}
       {(() => {

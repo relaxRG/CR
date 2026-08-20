@@ -18,12 +18,20 @@ describe("员工统一 UI 契约", () => {
     expect(labor).not.toContain('label: "已预支", value: advanceAmount');
   });
 
-  it("手机端将低频操作收纳到更多，且重算不再使用特殊强调样式", () => {
-    expect(labor).toContain("const compactToolbar = workspaceWidth < 600");
-    expect(labor).toContain('label="更多"');
-    expect(labor).toContain("showMoreActions");
-    expect(labor).toContain('label="重算" icon="arrow.clockwise" colors={colors}');
+  it("六个工具在手机端完整同一行显示，且重算不再使用特殊强调或更多收纳", () => {
+    const primitives = source("components/store/store-visual-primitives.tsx");
+    const compare = source("components/labor/LaborCompareToggle.tsx");
+    expect(labor).toContain('testID="payroll-inline-tools"');
+    for (const label of ["员工", "核对", "重算", "导入", "导出"]) {
+      expect(labor).toContain(`label="${label}"`);
+    }
+    expect((labor.match(/\bcompact\b/g) ?? []).length).toBeGreaterThanOrEqual(6);
+    expect(labor).toContain("<LaborCompareToggle compact");
+    expect(labor).not.toContain('label="更多"');
+    expect(labor).not.toContain("showMoreActions");
     expect(labor).not.toContain('label="重算" icon="arrow.clockwise" tone="primary" emphasis');
+    expect(primitives).toContain("flex: compact ? 1 : undefined");
+    expect(compare).toContain("compactButton: { minWidth: 0");
   });
 
   it("总览趋势保持轻量蓝灰层级，未选柱不得使用黑色强调", () => {

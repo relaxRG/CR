@@ -171,6 +171,7 @@ export function StoreToolbarAction({
   colors,
   onPress,
   disabled = false,
+  compact = false,
 }: {
   label: string;
   icon?: StoreIconName;
@@ -182,6 +183,8 @@ export function StoreToolbarAction({
   colors: StoreVisualColors;
   onPress: () => void;
   disabled?: boolean;
+  /** 适用于六项同一行工具栏：等宽、36pt 高、短文字与小图标。 */
+  compact?: boolean;
 }) {
   const tint = storeTone(colors, tone);
   return (
@@ -194,7 +197,9 @@ export function StoreToolbarAction({
       onPress={onPress}
       style={({ pressed }) => ({
         minHeight: 36,
-        paddingHorizontal: 10,
+        minWidth: 0,
+        flex: compact ? 1 : undefined,
+        paddingHorizontal: compact ? 4 : 10,
         borderRadius: STORE_VISUAL_SYSTEM.radius.control,
         borderWidth: 1,
         borderColor: emphasis ? `${tint}44` : colors.border,
@@ -202,12 +207,12 @@ export function StoreToolbarAction({
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "center",
-        gap: 5,
+        gap: compact ? 3 : 5,
         opacity: disabled ? 0.45 : pressed ? 0.66 : 1,
       })}
     >
-      {icon ? <IconSymbol name={icon} size={STORE_VISUAL_SYSTEM.icon.toolbar} color={tint} /> : null}
-      <Text style={{ ...STORE_TEXT.supporting, color: tint, fontWeight: STORE_VISUAL_SYSTEM.weight.emphasis }}>{label}</Text>
+      {icon ? <IconSymbol name={icon} size={compact ? 12 : STORE_VISUAL_SYSTEM.icon.toolbar} color={tint} /> : null}
+      <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82} style={{ ...STORE_TEXT.supporting, fontSize: compact ? 11 : STORE_TEXT.supporting.fontSize, color: tint, fontWeight: STORE_VISUAL_SYSTEM.weight.emphasis }}>{label}</Text>
     </Pressable>
   );
 }
