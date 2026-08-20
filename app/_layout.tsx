@@ -93,11 +93,13 @@ export default function RootLayout() {
         if (removed > 0) console.log(`[Startup] 已清理 ${removed} 个旧模块月份键`);
       });
     });
-    purgeRetiredBookLibrary().then((result) => {
-      if (result.removedStorageKeys > 0) console.log(`[Startup] 已永久清理 ${result.removedStorageKeys} 项退役内容数据`);
-      if (result.cleanedRecipeSourceRefs > 0) console.log(`[Startup] 已清理 ${result.cleanedRecipeSourceRefs} 条配方中的退役来源字段`);
-      if (result.directoryDeleteFailed) console.warn("[Startup] 退役内容目录尚未清理完成，将在下次启动重试");
-    });
+    void purgeRetiredBookLibrary()
+      .then((result) => {
+        if (result.removedStorageKeys > 0) console.log(`[Startup] 已永久清理 ${result.removedStorageKeys} 项退役内容数据`);
+        if (result.cleanedRecipeSourceRefs > 0) console.log(`[Startup] 已清理 ${result.cleanedRecipeSourceRefs} 条配方中的退役来源字段`);
+        if (result.directoryDeleteFailed) console.warn("[Startup] 退役内容目录尚未清理完成，将在下次启动重试");
+      })
+      .catch(() => console.warn("[Startup] 退役内容清理未完成，将在下次启动重试"));
   }, []);
 
   const handleSafeAreaUpdate = useCallback((metrics: Metrics) => {
