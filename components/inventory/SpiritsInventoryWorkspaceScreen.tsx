@@ -26,9 +26,10 @@ import {
   useSpiritsInventoryStore, getCurrentMonth, SpiritGroupDef, fuzzyMatchScore,
 } from "@/lib/spirits/crud-store";
 import {
-  SpiritItem, SpiritPurchaseRecord, SpiritLedgerEntry,
+  SpiritItem, SpiritPurchaseRecord, SpiritLedgerEntry, SpiritSupplierAlias,
   SPIRIT_CATEGORY_COLORS, SPIRIT_CATEGORIES,
 } from "@/lib/spirits/types";
+import { normalizeSpiritSupplierAliases, removeSpiritSupplierAlias, resolveSpiritItemForSupplierName, upsertSpiritSupplierAlias } from "@/lib/spirits/supplier-alias";
 import {
   ParsedPurchaseRow, previewSheets, parseSheetFromWorkbook,
 } from "@/lib/spirits/excel-import";
@@ -958,7 +959,7 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
                   </TouchableOpacity>
                 </View>
 
-                <View style={{ flexDirection: "row", gap: 8, marginBottom: 14 }}>
+                <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>
                   <TouchableOpacity
                     onPress={() => { setEditingItem(selectedLedgerItem); setShowItemForm(true); setSelectedLedgerItemId(null); }}
                     style={[S.actionBtn, { flex: 1, justifyContent: "center", backgroundColor: colors.surface, borderColor: colors.border }]}
@@ -966,18 +967,29 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
                     <IconSymbol name="pencil" size={13} color={colors.primary} />
                     <Text style={{ fontSize: 12, fontWeight: "700", color: colors.primary }}>编辑酒款</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => {
-                      setCatPickerTitle(`修改分类：${selectedLedgerItem.name}`);
-                      setCatPickerCallback(() => (name: string) => updateItem(selectedLedgerItem.id, { category: name, categorySource: "manual" }));
-                      setShowCatPicker(true);
-                      setSelectedLedgerItemId(null);
-                    }}
-                    style={[S.actionBtn, { flex: 1, justifyContent: "center", backgroundColor: colors.surface, borderColor: colors.border }]}
-                  >
-                    <IconSymbol name="folder" size={13} color={colors.primary} />
-                    <Text style={{ fontSize: 12, fontWeight: "700", color: colors.primary }}>修改分类</Text>
-                  </TouchableOpacity>
+                </View>
+
+                <View style={{ marginBottom: 14 }} testID="spirits-ledger-quick-category">
+                  <Text style={{ fontSize: 12, fontWeight: "700", color: colors.muted, marginBottom: 8 }}>快速选择分类</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 7, paddingRight: 8 }}>
+                    {getAllCategories().map((category) => {
+                      const active = selectedLedgerItem.category === category.name;
+                      return (
+                        <TouchableOpacity
+                          key={category.id}
+                          testID={`spirits-ledger-category-${category.id}`}
+                          onPress={() => updateItem(selectedLedgerItem.id, { category: category.name, categorySource: "manual" })}
+                          style={[S.catChip, {
+                            minHeight: 32,
+                            backgroundColor: active ? category.color : colors.surface,
+                            borderColor: category.color,
+                          }]}
+                        >
+                          <Text style={{ fontSize: 11, fontWeight: "700", color: active ? "#fff" : category.color }}>{category.name}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
                 </View>
 
                 {selectedLedgerEntry && ledgerEditMode && (
@@ -2797,6 +2809,9 @@ function ItemFormModal({ visible, item, colors, allCategories, onSave, onClose }
   const [unit, setUnit] = useState(item?.unit ?? "瓶");
   const [refPrice, setRefPrice] = useState(String(item?.refPrice ?? ""));
   const [supplier, setSupplier] = useState(item?.supplier ?? "");
+  const [supplierAliases, setSupplierAliases] = useState<SpiritSupplierAlias[]>(normalizeSpiritSupplierAliases(item?.supplierAliases));
+  const [aliasSupplier, setAliasSupplier] = useState("");
+  const [aliasPurchaseName, setAliasPurchaseName] = useState("");
   const [priceAlertPct, setPriceAlertPct] = useState(String(item?.priceAlertPct ?? ""));
   const [specMl, setSpecMl] = useState(item?.specMl != null ? String(item.specMl) : "");
 
@@ -2804,10 +2819,11 @@ function ItemFormModal({ visible, item, colors, allCategories, onSave, onClose }
     if (item) {
       setName(item.name); setNameEn(item.nameEn ?? ""); setCategory(item.category);
       setUnit(item.unit); setRefPrice(String(item.refPrice)); setSupplier(item.supplier ?? "");
+      setSupplierAliases(normalizeSpiritSupplierAliases(item.supplierAliases)); setAliasSupplier(""); setAliasPurchaseName("");
       setPriceAlertPct(item.priceAlertPct != null ? String(item.priceAlertPct) : "");
       setSpecMl(item.specMl != null ? String(item.specMl) : "");
     } else {
-      setName(""); setNameEn(""); setCategory(allCategories[0]?.name ?? "Other"); setUnit("瓶"); setRefPrice(""); setSupplier(""); setPriceAlertPct(""); setSpecMl("");
+      setName(""); setNameEn(""); setCategory(allCategories[0]?.name ?? "Other"); setUnit("瓶"); setRefPrice(""); setSupplier(""); setSupplierAliases([]); setAliasSupplier(""); setAliasPurchaseName(""); setPriceAlertPct(""); setSpecMl("");
     }
   }, [item, visible]);
 
@@ -2828,7 +2844,7 @@ function ItemFormModal({ visible, item, colors, allCategories, onSave, onClose }
               if (!name.trim()) { Alert.alert("提示", "请填写中文名"); return; }
               const alertPct = priceAlertPct.trim() !== "" ? parseFloat(priceAlertPct) : undefined;
               const specMlVal = specMl.trim() !== "" ? parseFloat(specMl) : undefined;
-              onSave({ name: name.trim(), nameEn: nameEn.trim() || undefined, category, unit, refPrice: parseFloat(refPrice) || 0, supplier: supplier.trim() || undefined, priceAlertPct: alertPct, specMl: specMlVal, active: true });
+              onSave({ name: name.trim(), nameEn: nameEn.trim() || undefined, category, unit, refPrice: parseFloat(refPrice) || 0, supplier: supplier.trim() || undefined, supplierAliases: normalizeSpiritSupplierAliases(supplierAliases), priceAlertPct: alertPct, specMl: specMlVal, active: true });
               onClose();
             }} style={{ padding: 4 }}>
               <Text style={{ fontSize: 16, color: "#EF4444", fontWeight: "700" }}>保存</Text>
@@ -2855,7 +2871,48 @@ function ItemFormModal({ visible, item, colors, allCategories, onSave, onClose }
                 </View>
               ))}
             </View>
-            {/* 区块二：价格与规格 */}
+            {/* 区块二：供应商采购名称 */}
+            <View style={{ backgroundColor: colors.surface, borderRadius: 14, padding: 16, marginBottom: 16,
+              borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border }} testID="spirits-supplier-alias-form">
+              <Text style={{ fontSize: 13, fontWeight: "700", color: colors.muted, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>供应商采购名称</Text>
+              <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 12 }}>同一标准酒款可记录各供应商使用的不同采购名称，不会新增重复酒款。</Text>
+              {supplierAliases.map((alias) => (
+                <View key={`${alias.normalizedSupplier}:${alias.normalizedName}`} style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={{ fontSize: 12, fontWeight: "700", color: colors.foreground }} numberOfLines={1}>{alias.purchaseName}</Text>
+                    <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }} numberOfLines={1}>{alias.supplier}</Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => setSupplierAliases((current) => removeSpiritSupplierAlias(current, alias))}
+                    style={{ width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center", backgroundColor: "#FEE2E2" }}
+                    accessibilityLabel={`删除 ${alias.supplier} 的采购名称 ${alias.purchaseName}`}
+                  >
+                    <IconSymbol name="trash" size={13} color="#DC2626" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+              <View style={{ flexDirection: "row", gap: 8, marginTop: 10 }}>
+                <TextInput style={[S.input, { flex: 1, color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
+                  value={aliasSupplier} onChangeText={setAliasSupplier} placeholder="供应商" placeholderTextColor={colors.muted} />
+                <TextInput style={[S.input, { flex: 1.35, color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
+                  value={aliasPurchaseName} onChangeText={setAliasPurchaseName} placeholder="该供应商的名称" placeholderTextColor={colors.muted} />
+              </View>
+              <TouchableOpacity
+                onPress={() => {
+                  try {
+                    setSupplierAliases((current) => upsertSpiritSupplierAlias(current, aliasSupplier, aliasPurchaseName));
+                    setAliasSupplier(""); setAliasPurchaseName("");
+                  } catch {
+                    Alert.alert("提示", "请填写供应商和该供应商使用的采购名称");
+                  }
+                }}
+                style={[S.actionBtn, { alignSelf: "flex-start", marginTop: 10, backgroundColor: colors.background, borderColor: colors.border }]}
+              >
+                <IconSymbol name="plus" size={13} color={colors.primary} />
+                <Text style={{ fontSize: 12, fontWeight: "700", color: colors.primary }}>添加对应名称</Text>
+              </TouchableOpacity>
+            </View>
+            {/* 区块三：价格与规格 */}
             <View style={{ backgroundColor: colors.surface, borderRadius: 14, padding: 16, marginBottom: 16,
               borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border }}>
               <Text style={{ fontSize: 13, fontWeight: "700", color: colors.muted, marginBottom: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>价格与规格</Text>
@@ -2886,7 +2943,7 @@ function ItemFormModal({ visible, item, colors, allCategories, onSave, onClose }
                 />
               </View>
             </View>
-            {/* 区块三：进销存分类 */}
+            {/* 区块四：进销存分类 */}
             <View style={{ backgroundColor: colors.surface, borderRadius: 14, padding: 16, marginBottom: 16,
               borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border }}>
               <Text style={{ fontSize: 13, fontWeight: "700", color: colors.muted, marginBottom: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>进销存分类</Text>
@@ -3006,10 +3063,12 @@ function PurchaseFormModal({ visible, items, month, supplier, colors, getRefPric
                   if (!rawName.trim() || !qty || !unitPrice) { Alert.alert("提示", "请填写商品名称、数量和单价"); return; }
                   const q = parseFloat(qty), up = parseFloat(unitPrice);
                   if (isNaN(q) || isNaN(up)) { Alert.alert("提示", "数量和单价必须为数字"); return; }
+                  const resolvedItem = selectedItem ?? resolveSpiritItemForSupplierName(items, supplier, rawName.trim())?.item;
                   onSave({
                     month, date, rawName: rawName.trim(),
-                    itemId: selectedItem?.id,
-                    supplier, quantity: q, unit, unitPrice: up, amount: q * up, source: "manual",
+                    itemId: resolvedItem?.id,
+                    supplier, quantity: q, unit: unit || resolvedItem?.unit || "瓶", unitPrice: up, amount: q * up,
+                    group: resolvedItem?.group, category: resolvedItem?.category, source: "manual",
                   });
                   onClose();
                 }} style={{ flex: 1, padding: 14, backgroundColor: "#EF4444", borderRadius: 12, alignItems: "center" }}>

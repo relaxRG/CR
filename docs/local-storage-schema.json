@@ -2473,14 +2473,14 @@
         {
           "operation": "getItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 439,
+          "line": 440,
           "value": "",
           "structure": "SelfBuyConfig, SpiritsState"
         },
         {
           "operation": "setItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 477,
+          "line": 482,
           "value": "JSON.stringify(state.customCategories",
           "structure": "SelfBuyConfig, SpiritsState"
         }
@@ -2494,14 +2494,14 @@
         {
           "operation": "getItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 440,
+          "line": 441,
           "value": "",
           "structure": "SelfBuyConfig, SpiritsState"
         },
         {
           "operation": "setItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 478,
+          "line": 483,
           "value": "JSON.stringify(state.groupMatchMemory",
           "structure": "SelfBuyConfig, SpiritsState"
         }
@@ -2515,14 +2515,14 @@
         {
           "operation": "getItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 436,
+          "line": 437,
           "value": "",
           "structure": "SelfBuyConfig, SpiritsState"
         },
         {
           "operation": "setItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 474,
+          "line": 479,
           "value": "JSON.stringify(state.groups",
           "structure": "SelfBuyConfig, SpiritsState"
         }
@@ -2536,14 +2536,14 @@
         {
           "operation": "getItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 431,
+          "line": 432,
           "value": "",
           "structure": "SelfBuyConfig, SpiritsState"
         },
         {
           "operation": "setItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 469,
+          "line": 474,
           "value": "JSON.stringify(state.items",
           "structure": "SelfBuyConfig, SpiritsState"
         }
@@ -2557,14 +2557,14 @@
         {
           "operation": "getItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 433,
+          "line": 434,
           "value": "",
           "structure": "SelfBuyConfig, SpiritsState"
         },
         {
           "operation": "setItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 471,
+          "line": 476,
           "value": "JSON.stringify(state.ledger",
           "structure": "SelfBuyConfig, SpiritsState"
         }
@@ -2578,14 +2578,14 @@
         {
           "operation": "getItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 437,
+          "line": 438,
           "value": "",
           "structure": "SelfBuyConfig, SpiritsState"
         },
         {
           "operation": "setItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 475,
+          "line": 480,
           "value": "JSON.stringify(state.matchMemory",
           "structure": "SelfBuyConfig, SpiritsState"
         }
@@ -2599,14 +2599,14 @@
         {
           "operation": "getItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 432,
+          "line": 433,
           "value": "",
           "structure": "SelfBuyConfig, SpiritsState"
         },
         {
           "operation": "setItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 470,
+          "line": 475,
           "value": "JSON.stringify(state.purchases",
           "structure": "SelfBuyConfig, SpiritsState"
         }
@@ -2620,14 +2620,14 @@
         {
           "operation": "getItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 434,
+          "line": 435,
           "value": "",
           "structure": "SelfBuyConfig, SpiritsState"
         },
         {
           "operation": "setItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 472,
+          "line": 477,
           "value": "JSON.stringify(state.refPrices",
           "structure": "SelfBuyConfig, SpiritsState"
         }
@@ -2641,14 +2641,14 @@
         {
           "operation": "getItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 438,
+          "line": 439,
           "value": "",
           "structure": "SelfBuyConfig, SpiritsState"
         },
         {
           "operation": "setItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 476,
+          "line": 481,
           "value": "JSON.stringify(state.selfBuyConfig",
           "structure": "SelfBuyConfig, SpiritsState"
         }
@@ -2662,14 +2662,14 @@
         {
           "operation": "getItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 435,
+          "line": 436,
           "value": "",
           "structure": "SelfBuyConfig, SpiritsState"
         },
         {
           "operation": "setItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 473,
+          "line": 478,
           "value": "JSON.stringify(state.suppliers",
           "structure": "SelfBuyConfig, SpiritsState"
         }

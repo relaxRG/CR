@@ -8,6 +8,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { registerStoreReload } from "../sync/engine";
 import { purchasesForMonth, type PendingSpiritPurchase } from "./import-bridge";
 import { moveInventoryCategory } from "./category-lifecycle";
+import { normalizeSpiritSupplierAliases } from "./supplier-alias";
 import { sumMoney } from "@/lib/finance/money";
 import {
   SpiritItem, SpiritPurchaseRecord, SpiritLedgerEntry,
@@ -439,7 +440,11 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
       AsyncStorage.getItem(CUSTOM_CATEGORIES_KEY),
       AsyncStorage.getItem(GROUP_MATCH_MEMORY_KEY),
     ]).then(([itemsRaw, purchasesRaw, ledgerRaw, refPricesRaw, suppliersRaw, groupsRaw, matchMemoryRaw, selfBuyRaw, customCatsRaw, groupMatchRaw]) => {
-      const items = itemsRaw ? JSON.parse(itemsRaw) : [];
+      const parsedItems: SpiritItem[] = itemsRaw ? JSON.parse(itemsRaw) : [];
+      const items = parsedItems.map((item) => ({
+        ...item,
+        supplierAliases: normalizeSpiritSupplierAliases(item.supplierAliases),
+      }));
       const purchases = purchasesRaw ? JSON.parse(purchasesRaw) : [];
       const parsedLedger: unknown = ledgerRaw ? JSON.parse(ledgerRaw) : [];
       const ledger: SpiritLedgerEntry[] = Array.isArray(parsedLedger)
@@ -481,13 +486,22 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
   // ── 酒款档案 ──────────────────────────────────────────────────────────────
   const addItem = (data: Omit<SpiritItem, "id" | "createdAt" | "updatedAt">): SpiritItem => {
     const now = new Date().toISOString();
-    const item: SpiritItem = { ...data, id: uuid(), createdAt: now, updatedAt: now };
+    const item: SpiritItem = {
+      ...data,
+      supplierAliases: normalizeSpiritSupplierAliases(data.supplierAliases),
+      id: uuid(),
+      createdAt: now,
+      updatedAt: now,
+    };
     dispatch({ type: "ADD_ITEM", item });
     return item;
   };
 
   const updateItem = (id: string, patch: Partial<SpiritItem>) => {
-    dispatch({ type: "UPDATE_ITEM", id, patch });
+    const normalizedPatch = patch.supplierAliases === undefined
+      ? patch
+      : { ...patch, supplierAliases: normalizeSpiritSupplierAliases(patch.supplierAliases) };
+    dispatch({ type: "UPDATE_ITEM", id, patch: normalizedPatch });
     // ★ 分类传播：当酒款分类被修改时，自动同步到该酒款的所有进货记录
     if (patch.category !== undefined) {
       dispatch({ type: "BATCH_UPDATE_PURCHASES_CATEGORY", itemId: id, category: patch.category });

@@ -291,6 +291,14 @@ export interface SpiritMatchRecord {
 
 // ─── 新版 CRUD 类型 ──────────────────────────────────────────────────────────
 
+/** 同一烈酒主档在某个供应商处使用的采购名称；用于匹配与展示，不复制酒款主档。 */
+export interface SpiritSupplierAlias {
+  supplier: string;
+  purchaseName: string;
+  normalizedSupplier: string;
+  normalizedName: string;
+}
+
 /** 酒款档案（品类目录），独立于月份存在 */
 export interface SpiritItem {
   id: string;
@@ -305,7 +313,10 @@ export interface SpiritItem {
   unit: string;
   /** 当前参考单价（最新值，用于显示；历史按月查 refPrices） */
   refPrice: number;
+  /** 主要供应商；保留既有字段以兼容历史档案。 */
   supplier?: string;
+  /** 供应商专属采购名称；同一标准烈酒可对应不同供应商写法。 */
+  supplierAliases?: SpiritSupplierAlias[];
   spec?: string;
   /** 规格容量（ml），用于计算每 ml 单价。
    * 优先使用此字段；未设置时自动从 spec 字段解析（如 "700ML" → 700）。 */

@@ -1,15 +1,16 @@
 import type { SpiritItem, SpiritPurchaseOrderItem, SpiritPurchaseRecord } from "./types";
+import { normalizeSpiritSupplierAlias, resolveSpiritItemForSupplierName } from "./supplier-alias";
 
 export type PendingSpiritPurchase = Omit<SpiritPurchaseRecord, "id" | "createdAt">;
 
-const normalize = (value: string) => value
-  .toLowerCase()
-  .replace(/[（）()\[\]{}<>]/g, "")
-  .replace(/[\s·・_\-/\\,，。:：]/g, "")
-  .replace(/\d+(?:\.\d+)?(?:ml|cl|l|oz|瓶|箱|件|支|罐|袋|盒)/gi, "")
-  .trim();
+const normalize = normalizeSpiritSupplierAlias;
 
 export function findImportedPurchaseItem(order: SpiritPurchaseOrderItem, items: SpiritItem[]): SpiritItem | undefined {
+  for (const name of [order.nameZh, order.nameEn, order.rawName]) {
+    const supplierMatch = resolveSpiritItemForSupplierName(items, order.supplier, name);
+    if (supplierMatch) return supplierMatch.item;
+  }
+
   const candidates = [order.nameZh, order.nameEn, order.rawName]
     .map(normalize)
     .filter((name) => name.length > 0);

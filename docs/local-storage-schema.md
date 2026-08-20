@@ -1,6 +1,6 @@
 # 本地存储键与数据结构清单
 
-> 由 `pnpm audit:storage` 从生产源代码生成；生成时间：2026-08-20T08:17:19.327Z。
+> 由 `pnpm audit:storage` 从生产源代码生成；生成时间：2026-08-20T11:49:16.056Z。
 > 本清单覆盖 `AsyncStorage`、`SecureStore`、Web `localStorage` 与通用库存工厂传入的键。`{variable}` 表示按运行时参数生成的键模式。
 
 ## 已解析键
@@ -84,16 +84,16 @@
 | AsyncStorage | `schedule.business_hours.v1` | getItem, setItem | `JSON.stringify(state.businessHours` | ScheduleState | `lib/store/period-analysis/schedule-store.tsx:74`<br>`lib/store/period-analysis/schedule-store.tsx:92` |
 | AsyncStorage | `schedule.shift_templates.v1` | getItem, setItem | `JSON.stringify(state.shiftTemplates` | ScheduleState | `lib/store/period-analysis/schedule-store.tsx:75`<br>`lib/store/period-analysis/schedule-store.tsx:93` |
 | AsyncStorage | `shopping_store_v1` | getItem, setItem | `JSON.stringify(state` | ShoppingItem, ShoppingState | `lib/shopping/store.tsx:186`<br>`lib/shopping/store.tsx:203`<br>`lib/shopping/store.tsx:213` |
-| AsyncStorage | `spirits.customCategories.v1` | getItem, setItem | `JSON.stringify(state.customCategories` | SelfBuyConfig, SpiritsState | `lib/spirits/crud-store.tsx:439`<br>`lib/spirits/crud-store.tsx:477` |
-| AsyncStorage | `spirits.groupMatchMemory.v1` | getItem, setItem | `JSON.stringify(state.groupMatchMemory` | SelfBuyConfig, SpiritsState | `lib/spirits/crud-store.tsx:440`<br>`lib/spirits/crud-store.tsx:478` |
-| AsyncStorage | `spirits.groups.v1` | getItem, setItem | `JSON.stringify(state.groups` | SelfBuyConfig, SpiritsState | `lib/spirits/crud-store.tsx:436`<br>`lib/spirits/crud-store.tsx:474` |
-| AsyncStorage | `spirits.items.v3` | getItem, setItem | `JSON.stringify(state.items` | SelfBuyConfig, SpiritsState | `lib/spirits/crud-store.tsx:431`<br>`lib/spirits/crud-store.tsx:469` |
-| AsyncStorage | `spirits.ledger.v3` | getItem, setItem | `JSON.stringify(state.ledger` | SelfBuyConfig, SpiritsState | `lib/spirits/crud-store.tsx:433`<br>`lib/spirits/crud-store.tsx:471` |
-| AsyncStorage | `spirits.matchMemory.v1` | getItem, setItem | `JSON.stringify(state.matchMemory` | SelfBuyConfig, SpiritsState | `lib/spirits/crud-store.tsx:437`<br>`lib/spirits/crud-store.tsx:475` |
-| AsyncStorage | `spirits.purchases.v3` | getItem, setItem | `JSON.stringify(state.purchases` | SelfBuyConfig, SpiritsState | `lib/spirits/crud-store.tsx:432`<br>`lib/spirits/crud-store.tsx:470` |
-| AsyncStorage | `spirits.refPrices.v1` | getItem, setItem | `JSON.stringify(state.refPrices` | SelfBuyConfig, SpiritsState | `lib/spirits/crud-store.tsx:434`<br>`lib/spirits/crud-store.tsx:472` |
-| AsyncStorage | `spirits.selfBuyConfig.v1` | getItem, setItem | `JSON.stringify(state.selfBuyConfig` | SelfBuyConfig, SpiritsState | `lib/spirits/crud-store.tsx:438`<br>`lib/spirits/crud-store.tsx:476` |
-| AsyncStorage | `spirits.suppliers.v1` | getItem, setItem | `JSON.stringify(state.suppliers` | SelfBuyConfig, SpiritsState | `lib/spirits/crud-store.tsx:435`<br>`lib/spirits/crud-store.tsx:473` |
+| AsyncStorage | `spirits.customCategories.v1` | getItem, setItem | `JSON.stringify(state.customCategories` | SelfBuyConfig, SpiritsState | `lib/spirits/crud-store.tsx:440`<br>`lib/spirits/crud-store.tsx:482` |
+| AsyncStorage | `spirits.groupMatchMemory.v1` | getItem, setItem | `JSON.stringify(state.groupMatchMemory` | SelfBuyConfig, SpiritsState | `lib/spirits/crud-store.tsx:441`<br>`lib/spirits/crud-store.tsx:483` |
+| AsyncStorage | `spirits.groups.v1` | getItem, setItem | `JSON.stringify(state.groups` | SelfBuyConfig, SpiritsState | `lib/spirits/crud-store.tsx:437`<br>`lib/spirits/crud-store.tsx:479` |
+| AsyncStorage | `spirits.items.v3` | getItem, setItem | `JSON.stringify(state.items` | SelfBuyConfig, SpiritsState | `lib/spirits/crud-store.tsx:432`<br>`lib/spirits/crud-store.tsx:474` |
+| AsyncStorage | `spirits.ledger.v3` | getItem, setItem | `JSON.stringify(state.ledger` | SelfBuyConfig, SpiritsState | `lib/spirits/crud-store.tsx:434`<br>`lib/spirits/crud-store.tsx:476` |
+| AsyncStorage | `spirits.matchMemory.v1` | getItem, setItem | `JSON.stringify(state.matchMemory` | SelfBuyConfig, SpiritsState | `lib/spirits/crud-store.tsx:438`<br>`lib/spirits/crud-store.tsx:480` |
+| AsyncStorage | `spirits.purchases.v3` | getItem, setItem | `JSON.stringify(state.purchases` | SelfBuyConfig, SpiritsState | `lib/spirits/crud-store.tsx:433`<br>`lib/spirits/crud-store.tsx:475` |
+| AsyncStorage | `spirits.refPrices.v1` | getItem, setItem | `JSON.stringify(state.refPrices` | SelfBuyConfig, SpiritsState | `lib/spirits/crud-store.tsx:435`<br>`lib/spirits/crud-store.tsx:477` |
+| AsyncStorage | `spirits.selfBuyConfig.v1` | getItem, setItem | `JSON.stringify(state.selfBuyConfig` | SelfBuyConfig, SpiritsState | `lib/spirits/crud-store.tsx:439`<br>`lib/spirits/crud-store.tsx:481` |
+| AsyncStorage | `spirits.suppliers.v1` | getItem, setItem | `JSON.stringify(state.suppliers` | SelfBuyConfig, SpiritsState | `lib/spirits/crud-store.tsx:436`<br>`lib/spirits/crud-store.tsx:478` |
 | AsyncStorage | `store_business_hours_v1` | getItem, setItem | `JSON.stringify(updated` | BusinessHoursConfig | `app/store-hours.tsx:56`<br>`app/store-hours.tsx:72`<br>`app/store-hours.tsx:83` |
 | AsyncStorage | `store.employee_name_aliases.v1` | getItem, setItem | `JSON.stringify(state.aliases` | LinkState | `lib/store/petty-labor-link-store.tsx:231`<br>`lib/store/petty-labor-link-store.tsx:235`<br>`lib/store/petty-labor-link-store.tsx:245` |
 | AsyncStorage | `store.petty_categories.v1` | getItem, setItem | `JSON.stringify(state` | BaseInventoryCategory, ExtendedInventoryCategory, PettyCategory, PettyCategoryState, PettyCategoryContextValue | `lib/store/petty-category-store.tsx:248`<br>`lib/store/petty-category-store.tsx:257`<br>`lib/store/petty-category-store.tsx:264` |
