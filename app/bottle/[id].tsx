@@ -15,6 +15,7 @@ import { useBottleTaxonomy } from "@/lib/bottles/taxonomy";
 import { isPerishableWholeBottle } from "@/lib/recipes/smart-cost";
 import { bottleGroupOf, getEffectiveCostPrice, getSupplierChannelPurchaseNames, resolveCostChannelId } from "@/lib/bottles/types";
 import { getBottleCostPriceImpact } from "@/lib/bottles/price-impact";
+import { usePriceAlerts } from "@/lib/bottles/price-alert-store";
 
 export default function BottleDetailScreen() {
   const colors = useColors();
@@ -25,6 +26,8 @@ export default function BottleDetailScreen() {
   const { getBottle, deleteBottle, setBottleRating } = useBottleStore();
   const { categoryLabel } = useBottleTaxonomy();
   const bottle = getBottle(id);
+  const { alertsForBottle } = usePriceAlerts();
+  const bottleAlerts = bottle ? alertsForBottle(bottle.id).filter((alert) => alert.status === "open") : [];
   const costPriceImpact = bottle ? getBottleCostPriceImpact(bottle) : null;
 
   // 计算当前条目实际所属库
@@ -305,6 +308,11 @@ export default function BottleDetailScreen() {
                 </Text>
               ) : null}
             </>
+          ) : null}
+          {bottleAlerts.length > 0 ? (
+            <View testID="bottle-price-alert-summary" style={{ marginBottom: 10, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 8, backgroundColor: colors.warning + "16" }}>
+              <Text style={{ fontSize: 12, color: colors.warning, fontWeight: "500" }}>价格待确认：{bottleAlerts.length} 项</Text>
+            </View>
           ) : null}
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
             <Text style={{ fontSize: 12, color: colors.muted }}>

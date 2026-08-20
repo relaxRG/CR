@@ -21,6 +21,7 @@ import { RecipeProvider } from "@/lib/recipes/store";
 import { I18nProvider } from "@/lib/i18n";
 import { SyncProvider } from "@/lib/cf-sync/provider";
 import { BottleProvider } from "@/lib/bottles/store";
+import { PriceAlertProvider } from "@/lib/bottles/price-alert-store";
 import { BottleTaxonomyProvider } from "@/lib/bottles/taxonomy";
 import { HomemadeProvider } from "@/lib/homemade/store";
 import { IceSettingsProvider } from "@/lib/ice/store";
@@ -154,6 +155,7 @@ export default function RootLayout() {
       <RecipeProvider>
           <BottleTaxonomyProvider>
           <BottleProvider>
+          <PriceAlertProvider>
           <HomemadeProvider>
           <IceSettingsProvider>
           <LabProvider>
@@ -301,6 +303,7 @@ export default function RootLayout() {
           </LabProvider>
           </IceSettingsProvider>
           </HomemadeProvider>
+          </PriceAlertProvider>
           </BottleProvider>
           </BottleTaxonomyProvider>
           </RecipeProvider>
