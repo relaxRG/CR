@@ -25,7 +25,7 @@ describe("烈酒分类管理与库存多选 UI 契约", () => {
   it("库存表头不显示排序符号，提供紧凑列宽和选择后的批量分类、归档删除", () => {
     expect(workspace).toContain('>序号</Text>');
     expect(workspace).not.toContain("{label}⌄");
-    expect(workspace).toContain('["商品名称", "name", 156]');
+    expect(workspace).toContain('["商品名称", "name", 140]');
     expect(workspace).toContain('testID="spirits-ledger-select-toggle"');
     expect(workspace).toContain('testID="spirits-ledger-batch-toolbar"');
     expect(workspace).toContain("requestBatchLedgerCategory");

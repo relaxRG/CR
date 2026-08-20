@@ -16,15 +16,26 @@ describe("烈酒库存完整Excel台账", () => {
   });
 
   it("完整表固定包含期初、进货、期末、消耗字段并将集团置于最右", () => {
-    const header = source.slice(source.indexOf('/* 紧凑横向台账：'), source.indexOf('/* 按分类分组'));
-    expect(header).toContain('["商品名称", "name", 156]');
-    expect(header).toContain('["参考价", "referencePrice", 72]');
-    expect(header).toContain('["期初量", "openingQty", 68]');
-    expect(header).toContain('["进货量", "purchaseQty", 68]');
-    expect(header).toContain('["期末单价", "closingUnitCost", 78]');
-    expect(header).toContain('["消耗成本", "consumeCost", 84]');
-    expect(header).toContain('["集团", "group", 104]');
+    const header = source.slice(source.indexOf('const SPIRIT_LEDGER_COLUMNS'), source.indexOf('// ─── 主页面'));
+    expect(header).toContain('["商品名称", "name", 140]');
+    expect(header).toContain('["参考价", "referencePrice", 62]');
+    expect(header).toContain('["期初量", "openingQty", 56]');
+    expect(header).toContain('["进货量", "purchaseQty", 56]');
+    expect(header).toContain('["期末单价", "closingUnitCost", 68]');
+    expect(header).toContain('["消耗成本", "consumeCost", 76]');
+    expect(header).toContain('["集团", "group", 84]');
     expect(header.indexOf('"consumeCost"')).toBeLessThan(header.indexOf('"group"'));
+  });
+
+  it("表头、分类条、商品行和合计行共享唯一紧凑列轨道，不产生横向错位", () => {
+    expect(source).toContain('const SPIRIT_LEDGER_COLUMNS');
+    expect(source).toContain('const spiritLedgerTableWidth');
+    expect(source).toContain('testID="spirits-ledger-header"');
+    expect(source).toContain('testID={`spirits-ledger-category-${cat}`}');
+    expect(source).toContain('testID="spirits-ledger-total"');
+    expect(source).toContain('width: spiritLedgerTableWidth(ledgerSelectMode)');
+    expect(source).toContain('SPIRIT_LEDGER_COLUMN_WIDTH.name');
+    expect(source).toContain('ledgerCell: { paddingHorizontal: 3');
   });
 
   it("名称点击继续打开详情卡片，完整表的筛选合计只计算可见行", () => {

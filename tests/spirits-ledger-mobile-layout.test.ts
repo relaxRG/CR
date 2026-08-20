@@ -29,11 +29,11 @@ describe("烈酒库存移动端Excel台账", () => {
     expect(source).toContain('期初量');
     expect(source).toContain('进货量');
     expect(source).toContain('消耗量');
-    expect(source).toContain('["集团", "group", 104]');
-    expect(source).toContain('["商品名称", "name", 156]');
+    expect(source).toContain('["集团", "group", 84]');
+    expect(source).toContain('["商品名称", "name", 140]');
     expect(source).not.toContain('{label}⌄');
     expect(source).toContain('minHeight: STORE_TABLE_METRICS.rowHeight');
-    expect(source).toContain('backgroundColor: colors.primary, minHeight: STORE_TABLE_METRICS.headerHeight');
+    expect(source).toContain('width: spiritLedgerTableWidth(ledgerSelectMode), backgroundColor: colors.primary');
   });
 
   it("为窄屏横向滚动回归保留稳定的业务页签和操作栏定位标识", () => {
