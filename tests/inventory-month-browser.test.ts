@@ -23,6 +23,11 @@ describe("库存统一月份浏览器", () => {
     expect(canNavigateInventoryMonth("2025-12", -1, bounds)).toBe(true);
   });
 
+  it("单月数据跨年时仍只向首尾各扩展一个月", () => {
+    expect(deriveInventoryMonthBounds(["2025-01-01"])).toEqual({ min: "2024-12", max: "2025-02" });
+    expect(deriveInventoryMonthBounds(["2025-12-31"])).toEqual({ min: "2025-11", max: "2026-01" });
+  });
+
   it("忽略非法日期和商品建档类非业务日期，避免错误扩大可浏览范围", () => {
     const bounds = deriveInventoryMonthBounds([
       "", null, undefined, "2024-13-01", "2024-02-30", "not-a-month", "2025-06-18",
@@ -32,11 +37,16 @@ describe("库存统一月份浏览器", () => {
     expect(normalizeInventoryMonth("2024-02-30")).toBeNull();
   });
 
-  it("在没有任何业务记录时只允许当前自然月", () => {
+  it("在没有任何业务记录时默认选中当前自然月且前后按钮均禁用", () => {
     const bounds = deriveInventoryMonthBounds([], "2026-08");
     expect(bounds).toEqual({ min: "2026-08", max: "2026-08" });
     expect(canNavigateInventoryMonth("2026-08", -1, bounds)).toBe(false);
     expect(canNavigateInventoryMonth("2026-08", 1, bounds)).toBe(false);
+  });
+
+  it("无数据跨年默认月保持调用方给定的当前自然月", () => {
+    expect(deriveInventoryMonthBounds([], "2025-01")).toEqual({ min: "2025-01", max: "2025-01" });
+    expect(deriveInventoryMonthBounds([null, "invalid"], "2026-12")).toEqual({ min: "2026-12", max: "2026-12" });
   });
 
   it("持久化月份、路由参数或同步旧值超出新范围时必须钳制", () => {
