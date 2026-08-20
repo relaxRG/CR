@@ -1570,7 +1570,8 @@ function SupplierDetailScreen({
     getMonthLedger,
     groups, detectPurchaseGroup, getItemGroup, rememberGroupMatch,
     upsertGroup, deleteGroup, mergeGroup,
-    addItem,
+    addItem, updateItem,
+    getAllCategories,
     getMonthPurchases,
   } = store;
   const router2 = useRouter();
@@ -2280,6 +2281,32 @@ function SupplierDetailScreen({
                   </View>
                 ));
               })()}
+              <View testID="spirits-purchase-quick-category" style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 2, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
+                <Text style={{ fontSize: 12, fontWeight: "700", color: colors.muted, marginBottom: 8 }}>快速选择分类</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 7, paddingRight: 8 }}>
+                  {getAllCategories().map((category) => {
+                    const active = previewItem.category === category.name;
+                    return (
+                      <TouchableOpacity
+                        key={category.id}
+                        testID={`spirits-purchase-category-${category.id}`}
+                        onPress={() => {
+                          updateItem(previewItem.id, { category: category.name, categorySource: "manual" });
+                          setPreviewItem((current) => current ? { ...current, category: category.name, categorySource: "manual" } : null);
+                        }}
+                        style={[S.catChip, {
+                          minHeight: 32,
+                          backgroundColor: active ? category.color : colors.surface,
+                          borderColor: category.color,
+                        }]}
+                      >
+                        <Text style={{ fontSize: 11, fontWeight: "700", color: active ? "#fff" : category.color }}>{category.name}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+
               {/* 底部按鈕 */}
               <View style={{ flexDirection: "row", gap: 10, padding: 16, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
                 <TouchableOpacity onPress={() => {

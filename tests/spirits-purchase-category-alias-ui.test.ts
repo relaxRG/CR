@@ -7,10 +7,13 @@ const types = fs.readFileSync(path.join(process.cwd(), "lib/spirits/types.ts"), 
 const bridge = fs.readFileSync(path.join(process.cwd(), "lib/spirits/import-bridge.ts"), "utf8");
 
 describe("烈酒当月进货分类与供应商名称 UI 契约", () => {
-  it("名称详情卡提供不关闭卡片的快速分类选择，并写入当前酒款主档", () => {
+  it("库存管理与当月进货的名称详情卡均提供不关闭卡片的快速分类选择，并写入当前酒款主档", () => {
     expect(workspace).toContain('testID="spirits-ledger-quick-category"');
+    expect(workspace).toContain('testID="spirits-purchase-quick-category"');
     expect(workspace).toContain("快速选择分类");
     expect(workspace).toContain('updateItem(selectedLedgerItem.id, { category: category.name, categorySource: "manual" })');
+    expect(workspace).toContain('updateItem(previewItem.id, { category: category.name, categorySource: "manual" })');
+    expect(workspace).toContain('setPreviewItem((current) => current ? { ...current, category: category.name, categorySource: "manual" } : null)');
     expect(workspace).not.toContain("修改分类：${selectedLedgerItem.name}");
   });
 
