@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { notifySyncChange, registerStoreReload } from "@/lib/sync/engine";
+import { upsertPriceAlertsRemote } from "@/lib/cf-sync/client";
 import { useBottleStore } from "./store";
 import { PRICE_ALERTS_KEY, emptyPriceAlertLedger, inspectBottlePrices, resolvePriceAlert, type PriceAlert, type PriceAlertLedger, type PriceAlertSource, upsertPriceAlerts } from "./price-alerts";
 
@@ -16,7 +17,7 @@ const PriceAlertContext = createContext<PriceAlertContextValue | null>(null);
 export function PriceAlertProvider({ children }: { children: React.ReactNode }) {
   const { bottles } = useBottleStore();
   const [ledger, setLedger] = useState<PriceAlertLedger>(emptyPriceAlertLedger);
-  const persist = useCallback((next: PriceAlertLedger) => { setLedger(next); AsyncStorage.setItem(PRICE_ALERTS_KEY, JSON.stringify(next)).then(() => notifySyncChange(PRICE_ALERTS_KEY)).catch(() => {}); }, []);
+  const persist = useCallback((next: PriceAlertLedger) => { setLedger(next); AsyncStorage.setItem(PRICE_ALERTS_KEY, JSON.stringify(next)).then(() => { notifySyncChange(PRICE_ALERTS_KEY); return upsertPriceAlertsRemote(next.alerts); }).catch(() => {}); }, []);
   useEffect(() => {
     const load = async () => { const raw = await AsyncStorage.getItem(PRICE_ALERTS_KEY); if (!raw) return; try { const parsed = JSON.parse(raw); if (parsed?.schemaVersion === 1 && Array.isArray(parsed.alerts)) setLedger(parsed); } catch {} };
     void load(); return registerStoreReload(() => { void load(); });

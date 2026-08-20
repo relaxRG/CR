@@ -1861,6 +1861,10 @@ const V2_STORAGE_CAPABILITY = {
     "bottles.view",
     "bottles.edit"
   ],
+  "bottles.price-alerts.v1": [
+    "bottles.view",
+    "bottles.edit"
+  ],
   "cocktail.bottles.seeded": [
     "bottles.view",
     "bottles.manage"
@@ -2328,6 +2332,43 @@ async function resolveDeviceSessionV2(env, headers) {
       latestGroupChangeAt: Number(revision?.updated_at || 0),
     },
   };
+}
+
+async function handlePriceAlertsUpsert(env, body, headers, origin) {
+  const device = await verifyRequestDevice(env, headers);
+  if (!device) return err("DEVICE_AUTH_UNAUTHORIZED", 401, origin);
+  const inputs = Array.isArray(body?.alerts) ? body.alerts.slice(0, 100) : [];
+  const now = new Date().toISOString();
+  const statements = [];
+  for (const input of inputs) {
+    const fingerprint = typeof input?.fingerprint === "string" ? input.fingerprint.slice(0, 240) : "";
+    const bottleId = typeof input?.bottleId === "string" ? input.bottleId.slice(0, 120) : "";
+    const rule = typeof input?.rule === "string" ? input.rule.slice(0, 64) : "";
+    const severity = typeof input?.severity === "string" ? input.severity.slice(0, 32) : "";
+    if (!fingerprint || !bottleId || !rule || !severity) continue;
+    const id = typeof input.id === "string" ? input.id.slice(0, 120) : crypto.randomUUID();
+    const version = Math.max(1, Number(input.version) || 1);
+    statements.push(env.DB.prepare("INSERT INTO price_alerts (id, sync_group_id, fingerprint, bottle_id, channel_id, rule, severity, status, price, reference_price, delta, delta_percent, unit, detail, source, first_detected_at, last_detected_at, detected_count, version, resolution, suppression_until, operation_id, updated_by_device_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(sync_group_id, fingerprint) DO UPDATE SET severity = excluded.severity, status = CASE WHEN excluded.version >= price_alerts.version THEN excluded.status ELSE price_alerts.status END, price = excluded.price, reference_price = excluded.reference_price, delta = excluded.delta, delta_percent = excluded.delta_percent, detail = excluded.detail, last_detected_at = MAX(price_alerts.last_detected_at, excluded.last_detected_at), detected_count = MAX(price_alerts.detected_count, excluded.detected_count), version = MAX(price_alerts.version, excluded.version), resolution = CASE WHEN excluded.version >= price_alerts.version THEN excluded.resolution ELSE price_alerts.resolution END, suppression_until = CASE WHEN excluded.version >= price_alerts.version THEN excluded.suppression_until ELSE price_alerts.suppression_until END, updated_by_device_id = excluded.updated_by_device_id, updated_at = excluded.updated_at").bind(id, device.group_id, fingerprint, bottleId, typeof input.channelId === "string" ? input.channelId.slice(0, 120) : null, rule, severity, typeof input.status === "string" ? input.status.slice(0, 32) : "open", Number.isFinite(input.price) ? input.price : null, Number.isFinite(input.referencePrice) ? input.referencePrice : null, Number.isFinite(input.delta) ? input.delta : null, Number.isFinite(input.deltaPercent) ? input.deltaPercent : null, typeof input.unit === "string" ? input.unit.slice(0, 32) : null, typeof input.detail === "string" ? input.detail.slice(0, 600) : "", typeof input.source === "string" ? input.source.slice(0, 48) : "recovery_scan", typeof input.firstDetectedAt === "string" ? input.firstDetectedAt : now, typeof input.lastDetectedAt === "string" ? input.lastDetectedAt : now, Math.max(1, Number(input.detectedCount) || 1), version, typeof input.resolution === "string" ? input.resolution.slice(0, 48) : null, typeof input.suppressionUntil === "string" ? input.suppressionUntil : null, typeof input.operationId === "string" ? input.operationId.slice(0, 120) : null, device.device_id, now, now));
+  }
+  if (statements.length) await env.DB.batch(statements);
+  return json({ accepted: statements.length }, 200, origin);
+}
+async function runPriceAlertDailySweep(env) {
+  const now = new Date().toISOString();
+  const groups = await env.DB.prepare("SELECT DISTINCT sync_group_id FROM price_alerts WHERE status IN ('open', 'suppressed')").all();
+  for (const row of groups.results || []) {
+    const groupId = String(row.sync_group_id || "");
+    if (!groupId) continue;
+    const counts = await env.DB.prepare("SELECT COUNT(*) AS scanned, SUM(CASE WHEN status = 'open' THEN 1 ELSE 0 END) AS open_count FROM price_alerts WHERE sync_group_id = ?").bind(groupId).first();
+    await env.DB.prepare("INSERT INTO price_alert_runs (id, sync_group_id, source, started_at, finished_at, status, scanned_count, created_count, updated_count) VALUES (?, ?, 'daily_sweep', ?, ?, 'completed', ?, 0, ?)").bind(crypto.randomUUID(), groupId, now, now, Number(counts?.scanned || 0), Number(counts?.open_count || 0)).run();
+  }
+}
+
+async function handlePriceAlertsList(env, headers, origin) {
+  const device = await verifyRequestDevice(env, headers);
+  if (!device) return err("DEVICE_AUTH_UNAUTHORIZED", 401, origin);
+  const rows = await env.DB.prepare("SELECT * FROM price_alerts WHERE sync_group_id = ? AND status IN ('open', 'suppressed') ORDER BY CASE severity WHEN 'critical' THEN 1 WHEN 'attention' THEN 2 WHEN 'notice' THEN 3 ELSE 4 END, last_detected_at DESC LIMIT 200").bind(device.group_id).all();
+  return json({ alerts: rows.results || [] }, 200, origin);
 }
 
 async function handleDeviceSessionV2(env, headers, origin) {
@@ -2879,6 +2920,14 @@ var worker_v3_default = {
     if (path === "/api/device/session-v2" && method === "GET") {
       return handleDeviceSessionV2(env, request.headers, origin);
     }
+    if (path === "/api/price-alerts/upsert" && method === "POST") {
+      let body = {};
+      try { body = await request.json(); } catch {}
+      return handlePriceAlertsUpsert(env, body, request.headers, origin);
+    }
+    if (path === "/api/price-alerts" && method === "GET") {
+      return handlePriceAlertsList(env, request.headers, origin);
+    }
     if (path === "/api/device/update-policy-v2" && method === "POST") {
       let body = {};
       try { body = await request.json(); } catch {}
@@ -2955,6 +3004,12 @@ var worker_v3_default = {
   },
   // ?????? Cron: ?????? 17:00 ???????????????????????? ???????????????????????????????????????????????????????????????????????????????????????????????????????????????
   async scheduled(event, env, ctx) {
+    try {
+      await runPriceAlertDailySweep(env);
+      console.log("[Cron] PRICE_ALERT_SWEEP_SUCCEEDED");
+    } catch (e) {
+      console.error("[Cron] PRICE_ALERT_SWEEP_FAILED");
+    }
     try {
       const balance = await checkDeepSeekBalance(env);
       console.log("[Cron] BALANCE_CHECK_SUCCEEDED");

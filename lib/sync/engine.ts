@@ -28,6 +28,7 @@ export const SYNC_KEYS = [
   "cocktail.categoryGroups",
   "cocktail.seeded",
   "cocktail.bottles",
+  "bottles.price-alerts.v1",
   "cocktail.bottles.seeded",
   "homemade.preps.v1",
   "homemade.sections.v1",
@@ -311,6 +312,7 @@ const ID_LIST_KEYS = new Set<string>([
   // 原有
   "cocktail.recipes",
   "cocktail.bottles",
+  "bottles.price-alerts.v1",
   "homemade.preps.v1",
   "cocktail.lab.projects",
   "cocktail.lab.batches",

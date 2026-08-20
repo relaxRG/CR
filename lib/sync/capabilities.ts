@@ -140,6 +140,7 @@ export const STORAGE_POLICY: Readonly<Record<SyncStorageKey, StorageCapabilityPo
 
   // 酒款库
   "cocktail.bottles": policy("bottles.view", "bottles.edit"),
+  "bottles.price-alerts.v1": policy("bottles.view", "bottles.edit"),
   "cocktail.bottles.seeded": policy("bottles.view", "bottles.manage"),
   "bottles.taxonomy.categories.v1": policy("bottles.view", "bottles.manage"),
   "bottles.taxonomy.styles.v1": policy("bottles.view", "bottles.manage"),

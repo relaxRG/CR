@@ -196,6 +196,24 @@ async function cfFetch(
   }
 }
 
+export async function upsertPriceAlertsRemote(alerts: unknown[]): Promise<number> {
+  const credentials = await getDeviceCredentials();
+  if (!credentials || !alerts.length) return 0;
+  const res = await cfFetch("/api/price-alerts/upsert", { method: "POST", deviceInfo: credentials, body: JSON.stringify({ alerts }) });
+  if (!res.ok) return 0;
+  const body = await res.json() as { accepted?: number };
+  return Number(body.accepted || 0);
+}
+
+export async function listPriceAlertsRemote(): Promise<unknown[]> {
+  const credentials = await getDeviceCredentials();
+  if (!credentials) return [];
+  const res = await cfFetch("/api/price-alerts", { method: "GET", deviceInfo: credentials });
+  if (!res.ok) return [];
+  const body = await res.json() as { alerts?: unknown[] };
+  return Array.isArray(body.alerts) ? body.alerts : [];
+}
+
 // ─── Registration ─────────────────────────────────────────────────────────────
 /**
  * 显式创建一个新的独立同步组。
