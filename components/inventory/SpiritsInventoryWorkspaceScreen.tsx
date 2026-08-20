@@ -25,6 +25,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { StoreSegmentedTabs } from "@/components/store/store-visual-primitives";
 import {
   useSpiritsInventoryStore, getCurrentMonth, SpiritGroupDef, fuzzyMatchScore,
+  getSpiritGroupDisplayName, getSpiritGroupKeywords,
 } from "@/lib/spirits/crud-store";
 import {
   SpiritItem, SpiritPurchaseRecord, SpiritLedgerEntry,
@@ -149,7 +150,7 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
     upsertLedger,
     setRefPrice, getRefPrice,
     upsertSupplier, getSupplierByName,
-    upsertGroup, deleteGroup, mergeGroup, getItemGroup, 
+    upsertGroup, deleteGroup, getItemGroup,
     getAllCategories, upsertCustomCategory, moveCategory, removeCategorySafely, 
     
     
@@ -306,7 +307,7 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
     });
     const total = Object.values(groupTotals).reduce((s, v) => s + v, 0) || 1;
     const GROUP_COLORS: Record<string, string> = {};
-    groups.forEach((g) => { GROUP_COLORS[g.name] = g.color; });
+    groups.forEach((group) => { GROUP_COLORS[getSpiritGroupDisplayName(group)] = group.color; });
     return Object.entries(groupTotals).map(([g, v]) => ({
       label: g, value: v, pct: Math.round(v / total * 100), color: GROUP_COLORS[g] ?? "#6B7280",
     })).sort((a, b) => b.value - a.value);
@@ -1330,7 +1331,7 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
           <Text style={[S.cardTitle, { color: colors.foreground }]}>🏷️ 品牌集团分析</Text>
           {Object.entries(groupTotals).sort((a, b) => b[1] - a[1]).map(([g, amt], i) => {
             const pct = Math.round(amt / groupTotal * 100);
-            const groupDef = groups.find((gd) => gd.name === g);
+            const groupDef = groups.find((group) => getSpiritGroupDisplayName(group) === g);
             const color = groupDef?.color ?? COLORS[i % COLORS.length];
             return (
               <View key={g} style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
@@ -1366,15 +1367,16 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
               onPress={() => { tap(); setEditingGroup(g); setShowGroupManager(true); }}
               style={[S.supplierRow, { borderBottomColor: colors.border }]}>
               <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: g.color, marginRight: 8 }} />
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>{g.name}</Text>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }} numberOfLines={1}>{g.nameZh || g.nameEn}</Text>
+                {g.nameEn ? <Text style={{ fontSize: 11, color: colors.muted }} numberOfLines={1}>{g.nameEn}</Text> : null}
                 <Text style={{ fontSize: 11, color: colors.muted }} numberOfLines={1}>
-                  {g.keywords.slice(0, 6).join(" · ")}
+                  中文：{g.keywordsZh.slice(0, 3).join(" · ") || "—"}　English: {g.keywordsEn.slice(0, 3).join(" · ") || "—"}
                 </Text>
               </View>
               <View style={{ alignItems: "flex-end" }}>
-                <Text style={{ fontSize: 10, color: colors.muted }}>{g.keywords.length} 个关键词</Text>
-                {!g.builtin && <Text style={{ fontSize: 9, color: "#10B981" }}>自定义</Text>}
+                <Text style={{ fontSize: 10, color: colors.muted }}>{getSpiritGroupKeywords(g).length} 个关键词</Text>
+                {g.builtin && <Text style={{ fontSize: 9, color: colors.muted }}>预置</Text>}
               </View>
             </TouchableOpacity>
           ))}
@@ -1574,7 +1576,6 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
         colors={colors}
         onUpsert={upsertGroup}
         onDelete={deleteGroup}
-        onMerge={mergeGroup}
         onClose={() => { setShowGroupManager(false); setEditingGroup(null); }}
       />
 
@@ -1681,7 +1682,7 @@ function SupplierDetailScreen({
     selfBuyConfig, syncLedgerFromPurchases,
     getMonthLedger,
     groups, detectPurchaseGroup, getItemGroup, rememberGroupMatch,
-    upsertGroup, deleteGroup, mergeGroup,
+    upsertGroup, deleteGroup,
     addItem, updateItem,
     getAllCategories,
     getMonthPurchases,
@@ -2262,7 +2263,7 @@ function SupplierDetailScreen({
                       onPress={() => {
                         if (selectMode) return;
                         tap();
-                        const groupNames = groups.map((g) => g.name);
+                        const groupNames = groups.map((group) => getSpiritGroupDisplayName(group));
                         Alert.alert("设置集团归属", `「${p.rawName}」`, [
                           ...groupNames.map((gn) => ({
                             text: gn,
@@ -2276,8 +2277,8 @@ function SupplierDetailScreen({
                         ]);
                       }}>
                       {purchaseGroup ? (
-                        <View style={{ backgroundColor: (groups.find((g) => g.name === purchaseGroup)?.color ?? "#6B7280") + "20", borderRadius: 6, paddingHorizontal: 4, paddingVertical: 2 }}>
-                          <Text style={{ fontSize: 9, fontWeight: "700", color: groups.find((g) => g.name === purchaseGroup)?.color ?? "#6B7280" }} numberOfLines={2}>
+                        <View style={{ backgroundColor: (groups.find((group) => getSpiritGroupDisplayName(group) === purchaseGroup)?.color ?? "#6B7280") + "20", borderRadius: 6, paddingHorizontal: 4, paddingVertical: 2 }}>
+                          <Text style={{ fontSize: 9, fontWeight: "700", color: groups.find((group) => getSpiritGroupDisplayName(group) === purchaseGroup)?.color ?? "#6B7280" }} numberOfLines={2}>
                             {purchaseGroup.replace(/ \(.*\)/, "")}
                           </Text>
                         </View>
@@ -2767,7 +2768,6 @@ function SupplierDetailScreen({
         colors={colors}
         onUpsert={upsertGroup}
         onDelete={deleteGroup}
-        onMerge={mergeGroup}
         onClose={() => { setShowGroupManager(false); setEditingGroup(null); }}
       />
 
@@ -2840,7 +2840,7 @@ function SupplierDetailScreen({
         visible={activePurchaseColumn !== null}
         column={activePurchaseColumn}
         colors={colors}
-        groups={groups.map((group) => group.name)}
+        groups={groups.map((group) => getSpiritGroupDisplayName(group))}
         nameOptions={supplierPurchaseNameOptions}
         nameLanguage={purchaseNameLanguage}
         onNameLanguageChange={setPurchaseNameLanguage}
@@ -3748,16 +3748,18 @@ function GroupManagerModal({ visible, groups, editingGroup, colors, onUpsert, on
   colors: any;
   onUpsert: (data: Omit<SpiritGroupDef, "id" | "createdAt"> & { id?: string }) => void;
   onDelete: (id: string) => void;
-  onMerge: (fromId: string, toId: string) => void;
   onClose: () => void;
 }) {
   const [mode, setMode] = useState<"list" | "edit">("list");
   const [editId, setEditId] = useState<string | undefined>(undefined);
-  const [editName, setEditName] = useState("");
+  const [editNameZh, setEditNameZh] = useState("");
+  const [editNameEn, setEditNameEn] = useState("");
   const [editColor, setEditColor] = useState("#6B7280");
   const [editBuiltin, setEditBuiltin] = useState(false);
-  const [keywords, setKeywords] = useState<string[]>([]);
-  const [newKeyword, setNewKeyword] = useState("");
+  const [keywordsZh, setKeywordsZh] = useState<string[]>([]);
+  const [keywordsEn, setKeywordsEn] = useState<string[]>([]);
+  const [newKeywordZh, setNewKeywordZh] = useState("");
+  const [newKeywordEn, setNewKeywordEn] = useState("");
 
   const PRESET_COLORS = ["#1D4ED8","#DC2626","#7C3AED","#92400E","#B45309","#059669","#0891B2","#BE185D","#6B7280","#EF4444","#10B981","#F59E0B"];
 
@@ -3765,33 +3767,67 @@ function GroupManagerModal({ visible, groups, editingGroup, colors, onUpsert, on
     if (editingGroup) {
       setMode("edit");
       setEditId(editingGroup.id);
-      setEditName(editingGroup.name);
+      setEditNameZh(editingGroup.nameZh);
+      setEditNameEn(editingGroup.nameEn);
       setEditColor(editingGroup.color);
       setEditBuiltin(editingGroup.builtin);
-      setKeywords([...editingGroup.keywords]);
+      setKeywordsZh([...editingGroup.keywordsZh]);
+      setKeywordsEn([...editingGroup.keywordsEn]);
+      setNewKeywordZh("");
+      setNewKeywordEn("");
     } else {
       setMode("list");
       setEditId(undefined);
-      setEditName("");
+      setEditNameZh("");
+      setEditNameEn("");
       setEditColor("#6B7280");
       setEditBuiltin(false);
-      setKeywords([]);
+      setKeywordsZh([]);
+      setKeywordsEn([]);
+      setNewKeywordZh("");
+      setNewKeywordEn("");
     }
   }, [editingGroup, visible]);
 
   const startNew = () => {
     setMode("edit");
     setEditId(undefined);
-    setEditName("");
+    setEditNameZh("");
+    setEditNameEn("");
     setEditColor("#6B7280");
     setEditBuiltin(false);
-    setKeywords([]);
+    setKeywordsZh([]);
+    setKeywordsEn([]);
+    setNewKeywordZh("");
+    setNewKeywordEn("");
   };
 
   const handleSave = () => {
-    if (!editName.trim()) { Alert.alert("提示", "请填写集团名称"); return; }
-    onUpsert({ id: editId, name: editName.trim(), color: editColor, keywords, builtin: editBuiltin });
+    if (!editNameZh.trim() && !editNameEn.trim()) { Alert.alert("提示", "请至少填写中文名或英文名"); return; }
+    onUpsert({
+      id: editId,
+      nameZh: editNameZh.trim(),
+      nameEn: editNameEn.trim(),
+      color: editColor,
+      keywordsZh,
+      keywordsEn,
+      builtin: editBuiltin,
+    });
     setMode("list");
+  };
+
+  const addKeywordZh = () => {
+    const keyword = newKeywordZh.trim();
+    if (!keyword || keywordsZh.includes(keyword)) return;
+    setKeywordsZh([...keywordsZh, keyword]);
+    setNewKeywordZh("");
+  };
+
+  const addKeywordEn = () => {
+    const keyword = newKeywordEn.trim();
+    if (!keyword || keywordsEn.some((entry) => entry.toLowerCase() === keyword.toLowerCase())) return;
+    setKeywordsEn([...keywordsEn, keyword]);
+    setNewKeywordEn("");
   };
 
   return (
@@ -3829,47 +3865,61 @@ function GroupManagerModal({ visible, groups, editingGroup, colors, onUpsert, on
                   padding: 14, backgroundColor: colors.surface, borderRadius: 14, marginBottom: 10,
                   borderWidth: 1, borderColor: colors.border }}>
                   <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: g.color }} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>{g.name}</Text>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }} numberOfLines={1}>{g.nameZh || g.nameEn}</Text>
+                    {g.nameEn ? <Text style={{ fontSize: 11, color: colors.muted }} numberOfLines={1}>{g.nameEn}</Text> : null}
                     <Text style={{ fontSize: 11, color: colors.muted }} numberOfLines={1}>
-                      {g.keywords.slice(0, 5).join(" · ")}
+                      中文：{g.keywordsZh.slice(0, 2).join(" · ") || "—"}　English: {g.keywordsEn.slice(0, 2).join(" · ") || "—"}
                     </Text>
                   </View>
                   <View style={{ flexDirection: "row", gap: 8 }}>
                     <TouchableOpacity onPress={() => {
                       setMode("edit");
                       setEditId(g.id);
-                      setEditName(g.name);
+                      setEditNameZh(g.nameZh);
+                      setEditNameEn(g.nameEn);
                       setEditColor(g.color);
                       setEditBuiltin(g.builtin);
-                      setKeywords([...g.keywords]);
+                      setKeywordsZh([...g.keywordsZh]);
+                      setKeywordsEn([...g.keywordsEn]);
+                      setNewKeywordZh("");
+                      setNewKeywordEn("");
                     }} style={{ padding: 6, backgroundColor: colors.primary + "15", borderRadius: 8 }}>
                       <IconSymbol name="pencil" size={14} color={colors.primary} />
                     </TouchableOpacity>
-                    {!g.builtin && (
-                      <TouchableOpacity onPress={() => {
-                        Alert.alert("删除集团", `确认删除「${g.name}」？`, [
-                          { text: "取消", style: "cancel" },
-                          { text: "删除", style: "destructive", onPress: () => { onDelete(g.id); } },
-                        ]);
-                      }} style={{ padding: 6, backgroundColor: "#EF444415", borderRadius: 8 }}>
-                        <IconSymbol name="trash" size={14} color="#EF4444" />
-                      </TouchableOpacity>
-                    )}
+                    <TouchableOpacity onPress={() => {
+                      const groupName = getSpiritGroupDisplayName(g);
+                      Alert.alert("删除集团", `删除「${groupName}」后，已手动归属的酒款和采购记录会恢复为未分配；历史金额不会删除。确认继续？`, [
+                        { text: "取消", style: "cancel" },
+                        { text: "删除", style: "destructive", onPress: () => { onDelete(g.id); } },
+                      ]);
+                    }} style={{ padding: 6, backgroundColor: "#EF444415", borderRadius: 8 }}>
+                      <IconSymbol name="trash" size={14} color="#EF4444" />
+                    </TouchableOpacity>
                   </View>
                 </View>
               ))
             ) : (
               // 编辑表单
               <>
-                {/* 集团名称 */}
-                <Text style={{ fontSize: 13, color: colors.muted, marginBottom: 6 }}>集团名称</Text>
+                {/* 关联集团名称：中文作为主展示，英文作为关联副名称。 */}
+                <Text style={{ fontSize: 13, color: colors.muted, marginBottom: 6 }}>中文名</Text>
+                <TextInput
+                  style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 12,
+                    color: colors.foreground, backgroundColor: colors.surface, fontSize: 14, marginBottom: 10 }}
+                  value={editNameZh}
+                  onChangeText={setEditNameZh}
+                  placeholder="如：保乐力加"
+                  placeholderTextColor={colors.muted}
+                />
+                <Text style={{ fontSize: 13, color: colors.muted, marginBottom: 6 }}>英文名</Text>
                 <TextInput
                   style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 12,
                     color: colors.foreground, backgroundColor: colors.surface, fontSize: 14, marginBottom: 16 }}
-                  value={editName}
-                  onChangeText={setEditName}
-                  placeholder="如：保乐力加 (Pernod Ricard)"
+                  value={editNameEn}
+                  onChangeText={setEditNameEn}
+                  placeholder="e.g. Pernod Ricard"
+                  autoCapitalize="words"
                   placeholderTextColor={colors.muted}
                 />
                 {/* 颜色选择 */}
@@ -3882,65 +3932,76 @@ function GroupManagerModal({ visible, groups, editingGroup, colors, onUpsert, on
                         shadowColor: editColor === c ? c : "transparent", shadowOpacity: 0.6, shadowRadius: 4, elevation: 3 }} />
                   ))}
                 </View>
-                {/* 品牌关键词 */}
+                {/* 品牌关键词按语言分开维护，但共同属于同一个集团。 */}
                 <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                  <Text style={{ fontSize: 13, color: colors.muted }}>品牌关键词（{keywords.length} 个）</Text>
-                  <TouchableOpacity onPress={() => {
-                    Alert.alert("批量删除", "确认清空所有关键词？", [
-                      { text: "取消", style: "cancel" },
-                      { text: "清空", style: "destructive", onPress: () => setKeywords([]) },
-                    ]);
-                  }}>
-                    <Text style={{ fontSize: 11, color: "#EF4444" }}>清空全部</Text>
+                  <Text style={{ fontSize: 13, color: colors.muted }}>中文品牌关键词（{keywordsZh.length} 个）</Text>
+                  <TouchableOpacity onPress={() => setKeywordsZh([])}>
+                    <Text style={{ fontSize: 11, color: "#EF4444" }}>清空中文</Text>
                   </TouchableOpacity>
                 </View>
-                {/* 关键词 Chips */}
                 <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-                  {keywords.map((kw, i) => (
-                    <TouchableOpacity key={i} onPress={() => setKeywords(keywords.filter((_, j) => j !== i))}
-                      style={{ flexDirection: "row", alignItems: "center", gap: 4,
-                        backgroundColor: editColor + "20", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5,
-                        borderWidth: 1, borderColor: editColor + "60" }}>
-                      <Text style={{ fontSize: 12, color: editColor, fontWeight: "600" }}>{kw}</Text>
+                  {keywordsZh.map((keyword) => (
+                    <TouchableOpacity key={keyword} onPress={() => setKeywordsZh(keywordsZh.filter((entry) => entry !== keyword))}
+                      style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: editColor + "20", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: editColor + "60" }}>
+                      <Text style={{ fontSize: 12, color: editColor, fontWeight: "600" }}>{keyword}</Text>
                       <IconSymbol name="xmark" size={10} color={editColor} />
                     </TouchableOpacity>
                   ))}
                 </View>
-                {/* 新增关键词输入 */}
                 <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
                   <TextInput
-                    style={{ flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 10,
-                      color: colors.foreground, backgroundColor: colors.surface, fontSize: 13 }}
-                    value={newKeyword}
-                    onChangeText={setNewKeyword}
-                    placeholder="输入品牌名或关键词，如：tanqueray"
+                    style={{ flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 10, color: colors.foreground, backgroundColor: colors.surface, fontSize: 13 }}
+                    value={newKeywordZh}
+                    onChangeText={setNewKeywordZh}
+                    placeholder="如：芝华士"
                     placeholderTextColor={colors.muted}
-                    onSubmitEditing={() => {
-                      if (newKeyword.trim() && !keywords.includes(newKeyword.trim())) {
-                        setKeywords([...keywords, newKeyword.trim().toLowerCase()]);
-                        setNewKeyword("");
-                      }
-                    }}
+                    onSubmitEditing={addKeywordZh}
                   />
-                  <TouchableOpacity onPress={() => {
-                    if (newKeyword.trim() && !keywords.includes(newKeyword.trim())) {
-                      setKeywords([...keywords, newKeyword.trim().toLowerCase()]);
-                      setNewKeyword("");
-                    }
-                  }} style={{ padding: 10, backgroundColor: editColor, borderRadius: 10, alignItems: "center", justifyContent: "center" }}>
+                  <TouchableOpacity onPress={addKeywordZh} style={{ padding: 10, backgroundColor: editColor, borderRadius: 10, alignItems: "center", justifyContent: "center" }}>
                     <IconSymbol name="plus" size={16} color="#fff" />
                   </TouchableOpacity>
                 </View>
-                {/* 删除集团（非内置） */}
-                {editId && !editBuiltin && (
+
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <Text style={{ fontSize: 13, color: colors.muted }}>English brand keywords（{keywordsEn.length}）</Text>
+                  <TouchableOpacity onPress={() => setKeywordsEn([])}>
+                    <Text style={{ fontSize: 11, color: "#EF4444" }}>Clear English</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+                  {keywordsEn.map((keyword) => (
+                    <TouchableOpacity key={keyword} onPress={() => setKeywordsEn(keywordsEn.filter((entry) => entry !== keyword))}
+                      style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: editColor + "20", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: editColor + "60" }}>
+                      <Text style={{ fontSize: 12, color: editColor, fontWeight: "600" }}>{keyword}</Text>
+                      <IconSymbol name="xmark" size={10} color={editColor} />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
+                  <TextInput
+                    style={{ flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 10, color: colors.foreground, backgroundColor: colors.surface, fontSize: 13 }}
+                    value={newKeywordEn}
+                    onChangeText={setNewKeywordEn}
+                    placeholder="e.g. Chivas"
+                    autoCapitalize="none"
+                    placeholderTextColor={colors.muted}
+                    onSubmitEditing={addKeywordEn}
+                  />
+                  <TouchableOpacity onPress={addKeywordEn} style={{ padding: 10, backgroundColor: editColor, borderRadius: 10, alignItems: "center", justifyContent: "center" }}>
+                    <IconSymbol name="plus" size={16} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+                {/* 删除集团：预置和自定义集团都可删除，删除时同步清理悬挂归属。 */}
+                {editId && (
                   <TouchableOpacity onPress={() => {
-                    Alert.alert("删除集团", `确认删除「${editName}」？此操作不可撤销。`, [
+                    const groupName = editNameZh.trim() || editNameEn.trim();
+                    Alert.alert("删除集团", `删除「${groupName}」后，已手动归属的酒款和采购记录会恢复为未分配；历史金额不会删除。确认继续？`, [
                       { text: "取消", style: "cancel" },
                       { text: "删除", style: "destructive", onPress: () => { onDelete(editId); onClose(); } },
                     ]);
                   }} style={{ padding: 14, backgroundColor: "#FEF2F2", borderRadius: 12, alignItems: "center",
                     borderWidth: 1, borderColor: "#FECACA", marginTop: 8 }}>
-                    <Text style={{ fontSize: 14, color: "#EF4444", fontWeight: "700" }}>删除此集团</Text>
+                    <Text style={{ fontSize: 14, color: "#EF4444", fontWeight: "600" }}>删除此集团</Text>
                   </TouchableOpacity>
                 )}
               </>

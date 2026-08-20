@@ -122,67 +122,6 @@ export const SPIRIT_CATEGORY_COLORS: Record<string, string> = {
   Other: "#6B7280",
 };
 
-// ─── 品牌集团归属 ────────────────────────────────────────────────────────────
-export const SPIRIT_GROUPS = [
-  "保乐力加 (Pernod Ricard)",
-  "金巴利集团 (Campari Group)",
-  "帝亚吉欧 (Diageo)",
-  "百富门 (Brown-Forman)",
-  "宾三得利 (Beam Suntory)",
-  "人头马君度 (Rémy Cointreau)",
-  "路威酩轩 (LVMH)",
-  "独立品牌",
-  "其他",
-] as const;
-
-export type SpiritGroup = (typeof SPIRIT_GROUPS)[number];
-
-/** 品牌集团旗下品牌关键词（用于自动识别，扩充版） */
-export const GROUP_BRAND_KEYWORDS: Record<string, string[]> = {
-  "保乐力加 (Pernod Ricard)": [
-    "芝华士", "chivas", "百龄坛", "ballantine", "必富达", "beefeater", "哈瓦那", "havana",
-    "马爹利", "martell", "甘露", "kahlua", "马利宝", "malibu", "三得利响", "hibiki",
-    "皇家礼炮", "royal salute", "绝对", "absolut", "必富达", "beefeater",
-    "格兰利威", "glenlivet", "格兰冠", "glen grant", "朗格斯", "longmorn",
-    "布纳哈本", "bunnahabhain", "斯特拉塞斯拉", "strathisla",
-  ],
-  "金巴利集团 (Campari Group)": [
-    "金巴利", "campari", "阿佩罗", "aperol", "深蓝", "skyy", "野火鸡", "wild turkey",
-    "大马利尼", "grand marnier", "古贝塔", "courvoisier", "appleton",
-    "拉斐尔", "russell", "奥维尔", "averna", "cynar", "braulio",
-  ],
-  "帝亚吉欧 (Diageo)": [
-    "尊尼获加", "johnnie walker", "添加利", "tanqueray", "贝利", "baileys",
-    "摩根船长", "captain morgan", "卡露华", "kahlua", "斯米诺", "smirnoff",
-    "尊美醇", "jameson", "乐加维林", "lagavulin", "泰斯卡", "talisker",
-    "克里尼利基", "clynelish", "卡尔里拉", "caol ila", "布朗拉", "brora",
-    "格兰乌吉", "glenkinchie", "欧本", "oban", "克拉格摩尔", "cragganmore",
-    "皇家蓝勋", "royal blue", "温莎", "windsor", "百利", "baileys",
-  ],
-  "百富门 (Brown-Forman)": [
-    "杰克丹尼", "jack daniel", "白占边", "jim beam", "美格", "maker",
-    "老福斯特", "old forester", "伍德福德", "woodford",
-    "本利亚克", "benriach", "格兰多纳", "glendronach", "格兰格拉索", "glenglassaugh",
-    "芬兰", "finlandia", "圣诞老人", "santa",
-  ],
-  "宾三得利 (Beam Suntory)": [
-    "山崎", "yamazaki", "白州", "hakushu", "知多", "chita", "角瓶", "kakubin",
-    "三得利", "suntory", "响", "hibiki", "乐加维林", "laphroaig",
-    "波摩", "bowmore", "艾登", "auchentoshan", "格兰吉斯", "glen garioch",
-    "麦卡伦", "macallan",
-  ],
-  "人头马君度 (Rémy Cointreau)": [
-    "人头马", "remy martin", "君度", "cointreau", "路易十三", "louis xiii",
-    "圣哲曼", "st germain", "metaxa", "布鲁克拉迪", "bruichladdich",
-    "波特夏洛特", "port charlotte", "奥特摩", "octomore",
-    "安格斯图拉", "angostura",
-  ],
-  "路威酩轩 (LVMH)": [
-    "轩尼诗", "hennessy", "格兰摩兰吉", "glenmorangie", "阿贝", "ardbeg",
-    "克鲁格", "krug", "唐培里侬", "dom perignon", "酩悦", "moet",
-  ],
-};
-
 // ─── 供应商信息卡 ────────────────────────────────────────────────────────────
 export interface SpiritSupplierInfo {
   id: string;

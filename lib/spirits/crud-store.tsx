@@ -14,7 +14,7 @@ import { sumMoney } from "@/lib/finance/money";
 import {
   SpiritItem, SpiritPurchaseRecord, SpiritLedgerEntry,
   SpiritRefPrice, SpiritSupplierInfo, SpiritCustomCategory,
-  GROUP_BRAND_KEYWORDS, SPIRIT_CATEGORIES, SPIRIT_CATEGORY_COLORS,
+  SPIRIT_CATEGORIES, SPIRIT_CATEGORY_COLORS,
 } from "./types";
 
 const ITEMS_KEY = "spirits.items.v3";
@@ -106,26 +106,35 @@ export function isLikelyAlcoholPurchase(description: string): boolean {
   return keywords.some((k) => lower.includes(k));
 }
 
-/** 自动识别酒款所属集团 */
-export function autoDetectGroup(name: string, nameEn?: string): string {
-  const combined = `${name} ${nameEn ?? ""}`.toLowerCase();
-  for (const [group, keywords] of Object.entries(GROUP_BRAND_KEYWORDS)) {
-    if (keywords.some((k) => combined.includes(k.toLowerCase()))) {
-      return group;
-    }
-  }
-  return "独立品牌";
-}
-
 // ─── 品牌集团类型 ─────────────────────────────────────────────────────────────
 export interface SpiritGroupDef {
   id: string;
-  name: string;
-  /** 旗下品牌关键词（用于自动匹配） */
-  keywords: string[];
+  /** 集团中文名：页面中的主名称。 */
+  nameZh: string;
+  /** 集团英文名：与中文名关联的副名称，可为空。 */
+  nameEn: string;
+  /** 中文品牌关键词：用于中文采购名称和酒款的自动识别。 */
+  keywordsZh: string[];
+  /** 英文品牌关键词：用于英文采购名称和酒款的自动识别。 */
+  keywordsEn: string[];
   color: string;
-  builtin: boolean;  // 内置集团不可删除，但可修改关键词
+  /** 是否为首次安装时提供的预置集团；仅用于标识来源，不再限制删除。 */
+  builtin: boolean;
   createdAt: string;
+}
+
+export function getSpiritGroupDisplayName(group: Pick<SpiritGroupDef, "nameZh" | "nameEn">): string {
+  return group.nameZh.trim() || group.nameEn.trim() || "未命名集团";
+}
+
+export function getSpiritGroupLegacyName(group: Pick<SpiritGroupDef, "nameZh" | "nameEn">): string {
+  const nameZh = group.nameZh.trim();
+  const nameEn = group.nameEn.trim();
+  return nameZh && nameEn ? `${nameZh} (${nameEn})` : nameZh || nameEn;
+}
+
+export function getSpiritGroupKeywords(group: Pick<SpiritGroupDef, "keywordsZh" | "keywordsEn">): string[] {
+  return [...group.keywordsZh, ...group.keywordsEn];
 }
 
 /** 备用金匹配记忆：记住「描述X → 酒款ID Y」的映射 */
@@ -167,25 +176,76 @@ const DEFAULT_SELF_BUY_CONFIG: SelfBuyConfig = {
 
 // ─── 内置品牌集团 ─────────────────────────────────────────────────────────────
 const BUILTIN_GROUPS: SpiritGroupDef[] = [
-  { id: "group_pernod", name: "保乐力加 (Pernod Ricard)", color: "#1D4ED8",
-    keywords: ["芝华士","chivas","百龄坛","ballantine","必富达","beefeater","哈瓦那","havana","马爹利","martell","甘露","kahlua","马利宝","malibu","三得利响","hibiki","皇家礼炮","royal salute","绝对","absolut"],
+  { id: "group_pernod", nameZh: "保乐力加", nameEn: "Pernod Ricard", color: "#1D4ED8",
+    keywordsZh: ["芝华士", "百龄坛", "必富达", "哈瓦那", "马爹利", "甘露", "马利宝", "三得利响", "皇家礼炮", "绝对"],
+    keywordsEn: ["chivas", "ballantine", "beefeater", "havana", "martell", "kahlua", "malibu", "hibiki", "royal salute", "absolut"],
     builtin: true, createdAt: new Date().toISOString() },
-  { id: "group_campari", name: "金巴利集团 (Campari Group)", color: "#DC2626",
-    keywords: ["金巴利","campari","阿佩罗","aperol","深蓝","skyy","野火鸡","wild turkey","大马利尼","grand marnier","古贝塔","courvoisier","appleton"],
+  { id: "group_campari", nameZh: "金巴利集团", nameEn: "Campari Group", color: "#DC2626",
+    keywordsZh: ["金巴利", "阿佩罗", "深蓝", "野火鸡", "大马利尼", "古贝塔"],
+    keywordsEn: ["campari", "aperol", "skyy", "wild turkey", "grand marnier", "courvoisier", "appleton"],
     builtin: true, createdAt: new Date().toISOString() },
-  { id: "group_diageo", name: "帝亚吉欧 (Diageo)", color: "#7C3AED",
-    keywords: ["尊尼获加","johnnie walker","添加利","tanqueray","贝利","baileys","摩根船长","captain morgan","斯米诺","smirnoff","尊美醇","jameson"],
+  { id: "group_diageo", nameZh: "帝亚吉欧", nameEn: "Diageo", color: "#7C3AED",
+    keywordsZh: ["尊尼获加", "添加利", "贝利", "摩根船长", "斯米诺", "尊美醇"],
+    keywordsEn: ["johnnie walker", "tanqueray", "baileys", "captain morgan", "smirnoff", "jameson"],
     builtin: true, createdAt: new Date().toISOString() },
-  { id: "group_brownforman", name: "百富门 (Brown-Forman)", color: "#92400E",
-    keywords: ["杰克丹尼","jack daniel","白占边","jim beam","美格","maker","老福斯特","old forester","伍德福德","woodford"],
+  { id: "group_brownforman", nameZh: "百富门", nameEn: "Brown-Forman", color: "#92400E",
+    keywordsZh: ["杰克丹尼", "白占边", "美格", "老福斯特", "伍德福德"],
+    keywordsEn: ["jack daniel", "jim beam", "maker", "old forester", "woodford"],
     builtin: true, createdAt: new Date().toISOString() },
-  { id: "group_beamsuntory", name: "宾三得利 (Beam Suntory)", color: "#B45309",
-    keywords: ["山崎","yamazaki","白州","hakushu","知多","chita","角瓶","kakubin","三得利","suntory","响","hibiki","乐加维林","laphroaig"],
+  { id: "group_beamsuntory", nameZh: "宾三得利", nameEn: "Beam Suntory", color: "#B45309",
+    keywordsZh: ["山崎", "白州", "知多", "角瓶", "三得利", "响", "乐加维林"],
+    keywordsEn: ["yamazaki", "hakushu", "chita", "kakubin", "suntory", "hibiki", "laphroaig"],
     builtin: true, createdAt: new Date().toISOString() },
-  { id: "group_remy", name: "人头马君度 (Rémy Cointreau)", color: "#059669",
-    keywords: ["人头马","remy martin","君度","cointreau","路易十三","louis xiii","圣哲曼","st germain","metaxa"],
+  { id: "group_remy", nameZh: "人头马君度", nameEn: "Rémy Cointreau", color: "#059669",
+    keywordsZh: ["人头马", "君度", "路易十三", "圣哲曼"],
+    keywordsEn: ["remy martin", "cointreau", "louis xiii", "st germain", "metaxa"],
     builtin: true, createdAt: new Date().toISOString() },
 ];
+
+function normalizedKeywords(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.filter((keyword): keyword is string => typeof keyword === "string").map((keyword) => keyword.trim()).filter(Boolean))];
+}
+
+function splitLegacyGroupName(value: string): { nameZh: string; nameEn: string } {
+  const match = /^(.+?)\s*[（(]\s*(.+?)\s*[)）]\s*$/.exec(value.trim());
+  if (match) return { nameZh: match[1].trim(), nameEn: match[2].trim() };
+  return { nameZh: value.trim(), nameEn: "" };
+}
+
+function splitLegacyKeywords(keywords: string[]): { keywordsZh: string[]; keywordsEn: string[] } {
+  return {
+    keywordsZh: keywords.filter((keyword) => /[\u3400-\u9FFF]/.test(keyword)),
+    keywordsEn: keywords.filter((keyword) => !/[\u3400-\u9FFF]/.test(keyword)),
+  };
+}
+
+function normalizeSpiritGroup(value: unknown): SpiritGroupDef | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Partial<SpiritGroupDef> & { name?: unknown; keywords?: unknown };
+  if (typeof raw.id !== "string" || typeof raw.color !== "string") return null;
+  const fallback = BUILTIN_GROUPS.find((group) => group.id === raw.id);
+  const legacyName = typeof raw.name === "string" ? splitLegacyGroupName(raw.name) : { nameZh: "", nameEn: "" };
+  const legacyKeywords = splitLegacyKeywords(normalizedKeywords(raw.keywords));
+  const hasKeywordsZh = Array.isArray(raw.keywordsZh);
+  const hasKeywordsEn = Array.isArray(raw.keywordsEn);
+  const nameZh = typeof raw.nameZh === "string" ? raw.nameZh.trim() : legacyName.nameZh || fallback?.nameZh || "";
+  const nameEn = typeof raw.nameEn === "string" ? raw.nameEn.trim() : legacyName.nameEn || fallback?.nameEn || "";
+  return {
+    id: raw.id,
+    nameZh,
+    nameEn,
+    keywordsZh: hasKeywordsZh ? normalizedKeywords(raw.keywordsZh) : legacyKeywords.keywordsZh.length > 0 ? legacyKeywords.keywordsZh : fallback?.keywordsZh ?? [],
+    keywordsEn: hasKeywordsEn ? normalizedKeywords(raw.keywordsEn) : legacyKeywords.keywordsEn.length > 0 ? legacyKeywords.keywordsEn : fallback?.keywordsEn ?? [],
+    color: raw.color,
+    builtin: Boolean(raw.builtin ?? fallback?.builtin),
+    createdAt: typeof raw.createdAt === "string" ? raw.createdAt : fallback?.createdAt ?? new Date().toISOString(),
+  };
+}
+
+function groupReferenceNames(group: SpiritGroupDef): Set<string> {
+  return new Set([getSpiritGroupDisplayName(group), getSpiritGroupLegacyName(group), group.nameZh, group.nameEn].filter(Boolean));
+}
 
 // ─── State 定义 ───────────────────────────────────────────────────────────────
 interface SpiritsState {
@@ -238,7 +298,6 @@ type Action =
   | { type: "DELETE_SUPPLIER"; id: string }
   | { type: "UPSERT_GROUP"; group: SpiritGroupDef }
   | { type: "DELETE_GROUP"; id: string }
-  | { type: "MERGE_GROUP"; fromId: string; toId: string }
   | { type: "SET_MATCH_MEMORY"; memory: PettyMatchMemory }
   | { type: "UPDATE_SELF_BUY_CONFIG"; config: SelfBuyConfig }
   | { type: "UPSERT_CUSTOM_CATEGORY"; category: SpiritCustomCategory }
@@ -290,28 +349,32 @@ function reducer(state: SpiritsState, action: Action): SpiritsState {
     }
     case "DELETE_SUPPLIER": return { ...state, suppliers: state.suppliers.filter((s) => s.id !== action.id) };
     case "UPSERT_GROUP": {
-      const idx = state.groups.findIndex((g) => g.id === action.group.id);
-      if (idx >= 0) {
-        const next = [...state.groups];
-        next[idx] = action.group;
-        return { ...state, groups: next };
-      }
-      return { ...state, groups: [...state.groups, action.group] };
+      const idx = state.groups.findIndex((group) => group.id === action.group.id);
+      if (idx < 0) return { ...state, groups: [...state.groups, action.group] };
+      const previous = state.groups[idx];
+      const previousNames = groupReferenceNames(previous);
+      const displayName = getSpiritGroupDisplayName(action.group);
+      const groups = [...state.groups];
+      groups[idx] = action.group;
+      return {
+        ...state,
+        groups,
+        items: state.items.map((item) => previousNames.has(item.group ?? "") ? { ...item, group: displayName, updatedAt: new Date().toISOString() } : item),
+        purchases: state.purchases.map((purchase) => previousNames.has(purchase.group ?? "") ? { ...purchase, group: displayName } : purchase),
+        groupMatchMemory: state.groupMatchMemory.map((memory) => previousNames.has(memory.groupName) ? { ...memory, groupName: displayName, confirmedAt: new Date().toISOString() } : memory),
+      };
     }
-    case "DELETE_GROUP": return { ...state, groups: state.groups.filter((g) => !(g.id === action.id && !g.builtin)) };
-    case "MERGE_GROUP": {
-      const toGroup = state.groups.find((g) => g.id === action.toId);
-      if (!toGroup) return state;
-      const fromGroup = state.groups.find((g) => g.id === action.fromId);
-      if (!fromGroup) return state;
-      const updatedItems = state.items.map((item) =>
-        item.group === fromGroup.name ? { ...item, group: toGroup.name, updatedAt: new Date().toISOString() } : item
-      );
-      const updatedPurchases = state.purchases.map((p) =>
-        p.group === fromGroup.name ? { ...p, group: toGroup.name } : p
-      );
-      const filteredGroups = state.groups.filter((g) => !(g.id === action.fromId && !g.builtin));
-      return { ...state, items: updatedItems, purchases: updatedPurchases, groups: filteredGroups };
+    case "DELETE_GROUP": {
+      const group = state.groups.find((entry) => entry.id === action.id);
+      if (!group) return state;
+      const names = groupReferenceNames(group);
+      return {
+        ...state,
+        groups: state.groups.filter((entry) => entry.id !== action.id),
+        items: state.items.map((item) => names.has(item.group ?? "") ? { ...item, group: undefined, updatedAt: new Date().toISOString() } : item),
+        purchases: state.purchases.map((purchase) => names.has(purchase.group ?? "") ? { ...purchase, group: undefined } : purchase),
+        groupMatchMemory: state.groupMatchMemory.filter((memory) => !names.has(memory.groupName)),
+      };
     }
     case "UPSERT_CUSTOM_CATEGORY": {
       const idx = state.customCategories.findIndex((c) => c.id === action.category.id);
@@ -380,7 +443,6 @@ interface SpiritsContextValue extends SpiritsState {
   // 品牌集团
   upsertGroup: (group: Omit<SpiritGroupDef, "id" | "createdAt"> & { id?: string }) => void;
   deleteGroup: (id: string) => void;
-  mergeGroup: (fromId: string, toId: string) => void;
   getItemGroup: (item: SpiritItem) => string;
   detectPurchaseGroup: (rawName: string) => string;
   rememberGroupMatch: (rawName: string, groupName: string) => void;
@@ -446,13 +508,11 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
         : [];
       const refPrices = refPricesRaw ? JSON.parse(refPricesRaw) : [];
       const suppliers = suppliersRaw ? JSON.parse(suppliersRaw) : [];
-      const storedGroups: SpiritGroupDef[] = groupsRaw ? JSON.parse(groupsRaw) : [];
-      const mergedGroups = BUILTIN_GROUPS.map((bg) => {
-        const stored = storedGroups.find((g) => g.id === bg.id);
-        return stored ? { ...bg, keywords: stored.keywords, name: stored.name ?? bg.name } : bg;
-      });
-      const customGroups = storedGroups.filter((g) => !g.builtin);
-      const groups = [...mergedGroups, ...customGroups];
+      const parsedGroups: unknown = groupsRaw ? JSON.parse(groupsRaw) : null;
+      // 首次安装才提供预置集团。只要用户曾保存过集团列表，就尊重其删除结果，绝不把已删集团重新注入。
+      const groups = Array.isArray(parsedGroups)
+        ? parsedGroups.map(normalizeSpiritGroup).filter((group): group is SpiritGroupDef => Boolean(group))
+        : BUILTIN_GROUPS;
       const matchMemory = matchMemoryRaw ? JSON.parse(matchMemoryRaw) : [];
       const selfBuyConfig = selfBuyRaw ? JSON.parse(selfBuyRaw) : DEFAULT_SELF_BUY_CONFIG;
       const customCategories: SpiritCustomCategory[] = customCatsRaw ? JSON.parse(customCatsRaw) : [];
@@ -619,17 +679,13 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
     dispatch({ type: "DELETE_GROUP", id });
   };
 
-  const mergeGroup = (fromId: string, toId: string) => {
-    dispatch({ type: "MERGE_GROUP", fromId, toId });
-  };
-
-  /** 获取酒款所属集团名称 */
+  /** 获取酒款所属集团中文主名称；名称识别同时覆盖中英文关键词。 */
   const getItemGroup = (item: SpiritItem): string => {
     if (item.group) return item.group;
     const combined = `${item.name} ${item.nameEn ?? ""}`.toLowerCase();
     for (const group of state.groups) {
-      if (group.keywords.some((k) => combined.includes(k.toLowerCase()))) {
-        return group.name;
+      if (getSpiritGroupKeywords(group).some((keyword) => combined.includes(keyword.toLowerCase()))) {
+        return getSpiritGroupDisplayName(group);
       }
     }
     return "独立品牌";
@@ -637,10 +693,10 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
 
   const detectPurchaseGroup = (rawName: string): string => {
     const key = rawName.toLowerCase().trim();
-    const mem = state.groupMatchMemory.find((m) => m.rawName === key);
-    if (mem) return mem.groupName;
+    const memory = state.groupMatchMemory.find((entry) => entry.rawName === key);
+    if (memory) return memory.groupName;
     for (const group of state.groups) {
-      if (group.keywords.some((k) => key.includes(k.toLowerCase()))) return group.name;
+      if (getSpiritGroupKeywords(group).some((keyword) => key.includes(keyword.toLowerCase()))) return getSpiritGroupDisplayName(group);
     }
     return "";
   };
@@ -913,7 +969,7 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
     upsertLedger, deleteLedger,
     setRefPrice, getRefPrice,
     upsertSupplier, deleteSupplier, getSupplierByName,
-    upsertGroup, deleteGroup, mergeGroup, getItemGroup, detectPurchaseGroup, rememberGroupMatch,
+    upsertGroup, deleteGroup, getItemGroup, detectPurchaseGroup, rememberGroupMatch,
     getAllCategories, upsertCustomCategory, moveCategory, removeCategorySafely, getCategoryColor,
     setMatchMemory, findMatchMemory, matchPettyToItem,
     updateSelfBuyConfig,
