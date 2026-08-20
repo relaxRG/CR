@@ -41,7 +41,7 @@ import {   SpiritMonthlySnapshot, SpiritInventoryItem, SpiritPriceChange, Spirit
 import { normalizeLLMRows } from "@/lib/spirits/pdf-import";
 import { exportToExcel, exportToPdf, ExportData } from "@/lib/spirits/export";
 import { formatStoreMoney, STORE_TABLE_METRICS } from "@/lib/store/table-display";
-import { formatInventoryMonthDay, INVENTORY_WORKSPACE_METRICS, tableHeaderAccessibilityLabel } from "@/lib/store/inventory-workspace-ui";
+import { INVENTORY_WORKSPACE_METRICS, tableHeaderAccessibilityLabel } from "@/lib/store/inventory-workspace-ui";
 import {
   applySupplierPurchaseTableView,
   collectSupplierPurchaseNameOptions,
@@ -81,6 +81,21 @@ const SPIRIT_LEDGER_COLUMNS: ReadonlyArray<readonly [string, LedgerSortKey, numb
 const SPIRIT_LEDGER_COLUMN_WIDTH = Object.fromEntries(SPIRIT_LEDGER_COLUMNS.map(([, key, width]) => [key, width])) as Record<LedgerSortKey, number>;
 const SPIRIT_LEDGER_BASE_WIDTH = SPIRIT_LEDGER_INDEX_WIDTH + SPIRIT_LEDGER_COLUMNS.reduce((total, [, , width]) => total + width, 0);
 const spiritLedgerTableWidth = (selectionEnabled: boolean) => SPIRIT_LEDGER_BASE_WIDTH + (selectionEnabled ? SPIRIT_LEDGER_SELECT_WIDTH : 0);
+
+// 当月进货表独立使用紧凑列轨道。分类取代旧“月日”列；完整日期上移为分组行。
+// 前六列在 iPhone 首屏连续呈现序号、分类、名称、数量、单价和总价，集团按需横滑。
+const SPIRIT_PURCHASE_SELECT_WIDTH = 26;
+const SPIRIT_PURCHASE_INDEX_WIDTH = 26;
+const SPIRIT_PURCHASE_COLUMN_WIDTH = {
+  category: 54,
+  name: 112,
+  quantity: 42,
+  unitPrice: 62,
+  amount: 66,
+  group: 64,
+} as const;
+const SPIRIT_PURCHASE_BASE_WIDTH = SPIRIT_PURCHASE_INDEX_WIDTH + Object.values(SPIRIT_PURCHASE_COLUMN_WIDTH).reduce((total, width) => total + width, 0);
+const spiritPurchaseTableWidth = (selectionEnabled: boolean) => SPIRIT_PURCHASE_BASE_WIDTH + (selectionEnabled ? SPIRIT_PURCHASE_SELECT_WIDTH : 0);
 
 function LedgerDetailSection({
   title,
@@ -1749,29 +1764,25 @@ function SupplierDetailScreen({
   ].filter(Boolean).join(" · ");
 
   /**
-   * 常规浏览按进销存分类展示，和库存管理一致；筛选或全局排序后使用单一结果组，
-   * 以免分类分段打断用户主动选择的排序语义。
+   * 当月进货按完整业务日期分组。分类是每条采购记录的固定列，不再占用分组行。
+   * 筛选和排序只缩减、重排各日期内的结果；日期分组始终保留，避免用户失去采购发生日。
    */
   const purchaseDisplayGroups = useMemo(() => {
-    if (purchaseTableHasAdjustments) {
-      return [{ id: "filtered", label: "筛选结果", rows: visibleSupplierPurchases, amount: visibleSupplierPurchaseTotal }];
-    }
     const grouped = new Map<string, typeof visibleSupplierPurchases>();
     visibleSupplierPurchases.forEach((purchase) => {
-      const item = items.find((candidate) => candidate.id === purchase.itemId);
-      const label = purchase.category || item?.category || "未分类";
-      const rows = grouped.get(label) ?? [];
+      const date = /^\d{4}-\d{2}-\d{2}$/.test(purchase.date) ? purchase.date : "未填写日期";
+      const rows = grouped.get(date) ?? [];
       rows.push(purchase);
-      grouped.set(label, rows);
+      grouped.set(date, rows);
     });
     return [...grouped.entries()]
       .sort(([left], [right]) => {
-        if (left === "未分类") return -1;
-        if (right === "未分类") return 1;
-        return left.localeCompare(right, "zh-Hans-CN");
+        if (left === "未填写日期") return 1;
+        if (right === "未填写日期") return -1;
+        return right.localeCompare(left);
       })
       .map(([label, rows]) => ({ id: label, label, rows, amount: sumMoney(rows.map((row) => row.amount)) }));
-  }, [items, purchaseTableHasAdjustments, visibleSupplierPurchaseTotal, visibleSupplierPurchases]);
+  }, [visibleSupplierPurchases]);
 
   // 备用金导入
   const pettyRecords = useMemo(() => {
@@ -2064,39 +2075,38 @@ function SupplierDetailScreen({
           <ScrollView horizontal showsHorizontalScrollIndicator style={{ flexGrow: 0 }}>
             <View>
               {/* 表头 */}
-              <View style={[S.tableHeader, { height: INVENTORY_WORKSPACE_METRICS.phoneHeaderHeight, backgroundColor: colors.foreground }]}>
-                {selectMode && <Text style={[S.thCell, { width: 32 }]} />}
-                <Text style={[S.thCell, { width: 44 }]}>行号</Text>
-                <Text style={[S.thCell, { width: 62 }]}>月日</Text>
+              <View testID="spirits-purchase-header" style={[S.tableHeader, { width: spiritPurchaseTableWidth(selectMode), height: INVENTORY_WORKSPACE_METRICS.phoneHeaderHeight, backgroundColor: colors.foreground }]}>
+                {selectMode && <Text style={[S.thCell, { width: SPIRIT_PURCHASE_SELECT_WIDTH, paddingHorizontal: 0 }]} />}
+                <Text style={[S.thCell, { width: SPIRIT_PURCHASE_INDEX_WIDTH, paddingHorizontal: 0 }]}>序号</Text>
+                <Text style={[S.thCell, { width: SPIRIT_PURCHASE_COLUMN_WIDTH.category, paddingHorizontal: 2 }]}>分类</Text>
                 <TouchableOpacity testID="spirits-purchase-column-name" accessibilityRole="button" accessibilityLabel={tableHeaderAccessibilityLabel("商品名称", Boolean(purchaseTableView.sort?.key === "name" || purchaseTableView.filters.nameQuery))}
                   onPress={() => setActivePurchaseColumn("name")}
-                  style={{ width: 144, height: INVENTORY_WORKSPACE_METRICS.phoneHeaderHeight, alignItems: "center", justifyContent: "center" }}>
-                  <Text style={S.thCell}>商品名称</Text>
+                  style={{ width: SPIRIT_PURCHASE_COLUMN_WIDTH.name, height: INVENTORY_WORKSPACE_METRICS.phoneHeaderHeight, alignItems: "center", justifyContent: "center", paddingHorizontal: 2 }}>
+                  <Text style={[S.thCell, { width: "auto", paddingHorizontal: 0 }]}>商品名称</Text>
                 </TouchableOpacity>
                 <TouchableOpacity testID="spirits-purchase-column-quantity" accessibilityRole="button" accessibilityLabel={tableHeaderAccessibilityLabel("数量", Boolean(purchaseTableView.sort?.key === "quantity" || purchaseTableView.filters.quantityMin || purchaseTableView.filters.quantityMax))}
-                  onPress={() => setActivePurchaseColumn("quantity")} style={{ width: 54, height: INVENTORY_WORKSPACE_METRICS.phoneHeaderHeight, alignItems: "center", justifyContent: "center" }}>
-                  <Text style={S.thCell}>数量</Text>
+                  onPress={() => setActivePurchaseColumn("quantity")} style={{ width: SPIRIT_PURCHASE_COLUMN_WIDTH.quantity, height: INVENTORY_WORKSPACE_METRICS.phoneHeaderHeight, alignItems: "center", justifyContent: "center", paddingHorizontal: 2 }}>
+                  <Text style={[S.thCell, { width: "auto", paddingHorizontal: 0 }]}>数量</Text>
                 </TouchableOpacity>
-                <Text style={[S.thCell, { width: 52 }]}>规格</Text>
                 <TouchableOpacity testID="spirits-purchase-column-unit-price" accessibilityRole="button" accessibilityLabel={tableHeaderAccessibilityLabel("单价", Boolean(purchaseTableView.sort?.key === "unitPrice" || purchaseTableView.filters.unitPriceMin || purchaseTableView.filters.unitPriceMax))}
-                  onPress={() => setActivePurchaseColumn("unitPrice")} style={{ width: 82, height: INVENTORY_WORKSPACE_METRICS.phoneHeaderHeight, alignItems: "center", justifyContent: "center" }}>
-                  <Text style={S.thCell}>单价</Text>
+                  onPress={() => setActivePurchaseColumn("unitPrice")} style={{ width: SPIRIT_PURCHASE_COLUMN_WIDTH.unitPrice, height: INVENTORY_WORKSPACE_METRICS.phoneHeaderHeight, alignItems: "center", justifyContent: "center", paddingHorizontal: 2 }}>
+                  <Text style={[S.thCell, { width: "auto", paddingHorizontal: 0 }]}>单价</Text>
                 </TouchableOpacity>
                 <TouchableOpacity testID="spirits-purchase-column-amount" accessibilityRole="button" accessibilityLabel={tableHeaderAccessibilityLabel("总价", Boolean(purchaseTableView.sort?.key === "amount" || purchaseTableView.filters.amountMin || purchaseTableView.filters.amountMax))}
-                  onPress={() => setActivePurchaseColumn("amount")} style={{ width: 82, height: INVENTORY_WORKSPACE_METRICS.phoneHeaderHeight, alignItems: "center", justifyContent: "center" }}>
-                  <Text style={S.thCell}>总价</Text>
+                  onPress={() => setActivePurchaseColumn("amount")} style={{ width: SPIRIT_PURCHASE_COLUMN_WIDTH.amount, height: INVENTORY_WORKSPACE_METRICS.phoneHeaderHeight, alignItems: "center", justifyContent: "center", paddingHorizontal: 2 }}>
+                  <Text style={[S.thCell, { width: "auto", paddingHorizontal: 0 }]}>总价</Text>
                 </TouchableOpacity>
                 <TouchableOpacity testID="spirits-purchase-column-group" accessibilityRole="button" accessibilityLabel={tableHeaderAccessibilityLabel("集团", Boolean(purchaseTableView.sort?.key === "group" || purchaseTableView.filters.groups.length || purchaseTableView.filters.onlyUnassignedGroup))}
-                  onPress={() => setActivePurchaseColumn("group")} style={{ width: 76, height: INVENTORY_WORKSPACE_METRICS.phoneHeaderHeight, alignItems: "center", justifyContent: "center" }}>
-                  <Text style={S.thCell}>集团</Text>
+                  onPress={() => setActivePurchaseColumn("group")} style={{ width: SPIRIT_PURCHASE_COLUMN_WIDTH.group, height: INVENTORY_WORKSPACE_METRICS.phoneHeaderHeight, alignItems: "center", justifyContent: "center", paddingHorizontal: 2 }}>
+                  <Text style={[S.thCell, { width: "auto", paddingHorizontal: 0 }]}>集团</Text>
                 </TouchableOpacity>
               </View>
 
-              {/* 数据行：常规浏览按分类分组；筛选或排序时收敛为单一结果组。 */}
+              {/* 数据行始终按完整年月日分组；分类在每条采购记录中显示。 */}
               {purchaseDisplayGroups.map((group) => (
                 <React.Fragment key={group.id}>
-                  <View style={{ minHeight: STORE_TABLE_METRICS.groupHeight, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, backgroundColor: colors.surface }}>
-                    <Text style={{ color: colors.foreground, fontSize: 12, fontWeight: "700" }}>{group.label} · {group.rows.length} 笔</Text>
+                  <View style={{ width: spiritPurchaseTableWidth(selectMode), minHeight: STORE_TABLE_METRICS.groupHeight, paddingHorizontal: 8, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, backgroundColor: colors.surface }}>
+                    <Text style={{ color: colors.foreground, fontSize: 12, fontWeight: "600" }}>{group.label} · {group.rows.length} 笔</Text>
                     <Text style={{ color: colors.muted, fontSize: 11 }}>{formatStoreMoney(group.amount)}</Text>
                   </View>
                   {group.rows.map((p, idx) => {
@@ -2115,6 +2125,16 @@ function SupplierDetailScreen({
                       tap();
                       if (!selectMode) {
                         Alert.alert("操作", `「${p.rawName}」`, [
+                          { text: "修改日期", onPress: () => {
+                            Alert.prompt("修改日期", "格式：YYYY-MM-DD", (val) => {
+                              if (val && /^\d{4}-\d{2}-\d{2}$/.test(val)) {
+                                updatePurchase(p.id, { date: val, month: val.slice(0, 7) });
+                                syncLedgerFromPurchases(month);
+                              } else if (val) {
+                                Alert.alert("格式错误", "请输入 YYYY-MM-DD 格式");
+                              }
+                            }, "plain-text", p.date, "numbers-and-punctuation");
+                          }},
                           { text: "删除此记录", style: "destructive", onPress: () => {
                             Alert.alert("确认删除", `删除「${p.rawName}」的进货记录？`, [
                               { text: "取消", style: "cancel" },
@@ -2126,12 +2146,13 @@ function SupplierDetailScreen({
                       }
                     }}
                     style={[S.tableRow, {
+                      width: spiritPurchaseTableWidth(selectMode),
                       height: INVENTORY_WORKSPACE_METRICS.phoneRowHeight,
                       minHeight: INVENTORY_WORKSPACE_METRICS.phoneRowHeight,
                       backgroundColor: isSelected ? "#FEF2F2" : idx % 2 === 0 ? colors.surface : colors.background,
                     }]}>
                     {selectMode && (
-                      <View style={[S.tdCell, { width: 32, alignItems: "center" }]}>
+                      <View style={[S.ledgerCell, { width: SPIRIT_PURCHASE_SELECT_WIDTH, alignItems: "center" }]}>
                         <View style={{ width: 18, height: 18, borderRadius: 9, borderWidth: 2,
                           borderColor: isSelected ? "#EF4444" : colors.border,
                           backgroundColor: isSelected ? "#EF4444" : "transparent",
@@ -2140,24 +2161,11 @@ function SupplierDetailScreen({
                         </View>
                       </View>
                     )}
-                    <Text style={[S.tdCell, { width: 44, textAlign: "center", fontSize: 11, color: colors.muted }]}>{visibleSupplierPurchases.indexOf(p) + 1}</Text>
-                    {/* 日期列（可点击编辑） */}
-                    <TouchableOpacity style={[S.tdCell, { width: 62 }]}
-                      onPress={() => {
-                        if (selectMode) return;
-                        tap();
-                        Alert.prompt("修改日期", "格式：YYYY-MM-DD", (val) => {
-                          if (val && /^\d{4}-\d{2}-\d{2}$/.test(val)) {
-                            updatePurchase(p.id, { date: val, month: val.slice(0, 7) });
-                            syncLedgerFromPurchases(month);
-                          } else if (val) {
-                            Alert.alert("格式错误", "请输入 YYYY-MM-DD 格式");
-                          }
-                        }, "plain-text", p.date, "numbers-and-punctuation");
-                      }}>
-                      <Text style={{ fontSize: 11, color: colors.foreground }}>{formatInventoryMonthDay(p.date)}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[S.tdCell, { width: 144, height: INVENTORY_WORKSPACE_METRICS.phoneRowHeight, justifyContent: "center" }]}
+                    <Text style={[S.ledgerCell, { width: SPIRIT_PURCHASE_INDEX_WIDTH, textAlign: "center", fontSize: 10, color: colors.muted }]}>{visibleSupplierPurchases.indexOf(p) + 1}</Text>
+                    <Text style={[S.ledgerCell, { width: SPIRIT_PURCHASE_COLUMN_WIDTH.category, textAlign: "center", fontSize: 10, lineHeight: 14, color: catColor(p.category || item?.category || "未分类") }]} numberOfLines={2}>
+                      {p.category || item?.category || "未分类"}
+                    </Text>
+                    <TouchableOpacity style={[S.ledgerCell, { width: SPIRIT_PURCHASE_COLUMN_WIDTH.name, height: INVENTORY_WORKSPACE_METRICS.phoneRowHeight, justifyContent: "center" }]}
                       onPress={() => {
                         if (!selectMode) {
                           tap();
@@ -2183,7 +2191,7 @@ function SupplierDetailScreen({
                       </View>
                     </TouchableOpacity>
                     {/* 数量列（可点击编辑） */}
-                    <TouchableOpacity style={[S.tdCell, { width: 54, alignItems: "flex-end" }]}
+                    <TouchableOpacity style={[S.ledgerCell, { width: SPIRIT_PURCHASE_COLUMN_WIDTH.quantity, alignItems: "flex-end" }]}
                       onPress={() => {
                         if (selectMode) return;
                         tap();
@@ -2199,9 +2207,8 @@ function SupplierDetailScreen({
                       }}>
                       <Text style={{ fontSize: 11, color: colors.foreground }}>{p.quantity}</Text>
                     </TouchableOpacity>
-                    <Text style={[S.tdCell, { width: 52, textAlign: "center", fontSize: 11, color: colors.muted }]}>{p.unit || "—"}</Text>
-                    {/* 单价列（可点击编辑，90pt，价格涨跌独占第二行） */}
-                    <TouchableOpacity style={[S.tdCell, { width: 82, alignItems: "flex-end" }]}
+                    {/* 单价列（可点击编辑；价格涨跌独占第二行） */}
+                    <TouchableOpacity style={[S.ledgerCell, { width: SPIRIT_PURCHASE_COLUMN_WIDTH.unitPrice, alignItems: "flex-end" }]}
                       onPress={() => {
                         if (selectMode) return;
                         tap();
@@ -2227,8 +2234,8 @@ function SupplierDetailScreen({
                         </Text>
                       )}
                     </TouchableOpacity>
-                    {/* 应收增加列（可点击编辑，90pt） */}
-                    <TouchableOpacity style={[S.tdCell, { width: 82, alignItems: "flex-end" }]}
+                    {/* 总价列（可点击编辑） */}
+                    <TouchableOpacity style={[S.ledgerCell, { width: SPIRIT_PURCHASE_COLUMN_WIDTH.amount, alignItems: "flex-end" }]}
                       onPress={() => {
                         if (selectMode) return;
                         tap();
@@ -2250,8 +2257,8 @@ function SupplierDetailScreen({
                         </Text>
                       )}
                     </TouchableOpacity>
-                    {/* 集团列：位于应收增加之后。 */}
-                    <TouchableOpacity style={[S.tdCell, { width: 76 }]}
+                    {/* 集团列位于总价之后，按需横滑。 */}
+                    <TouchableOpacity style={[S.ledgerCell, { width: SPIRIT_PURCHASE_COLUMN_WIDTH.group }]}
                       onPress={() => {
                         if (selectMode) return;
                         tap();
@@ -2282,20 +2289,19 @@ function SupplierDetailScreen({
                 </React.Fragment>
               ))}
               {/* 合计行 */}
-              <View style={[S.tableRow, { minHeight: INVENTORY_WORKSPACE_METRICS.phoneRowHeight, backgroundColor: colors.surface, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}>
-                {selectMode && <Text style={[S.tdCell, { width: 32 }]} />}
-                <Text style={[S.tdCell, { width: 44 }]} />
-                <Text style={[S.tdCell, { width: 62 }]} />
-                <Text style={[S.tdCell, { width: 144, fontWeight: "700", color: colors.foreground, fontSize: 12 }]}>合计</Text>
-                <Text style={[S.tdCell, { width: 54, textAlign: "right", fontWeight: "700", color: colors.foreground, fontSize: 11 }]}>
-                  {supPurchases.reduce((s, p) => s + p.quantity, 0)}
+              <View style={[S.tableRow, { width: spiritPurchaseTableWidth(selectMode), minHeight: INVENTORY_WORKSPACE_METRICS.phoneRowHeight, backgroundColor: colors.surface, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}>
+                {selectMode && <Text style={[S.ledgerCell, { width: SPIRIT_PURCHASE_SELECT_WIDTH }]} />}
+                <Text style={[S.ledgerCell, { width: SPIRIT_PURCHASE_INDEX_WIDTH }]} />
+                <Text style={[S.ledgerCell, { width: SPIRIT_PURCHASE_COLUMN_WIDTH.category }]} />
+                <Text style={[S.ledgerCell, { width: SPIRIT_PURCHASE_COLUMN_WIDTH.name, fontWeight: "600", color: colors.foreground, fontSize: 12 }]}>合计</Text>
+                <Text style={[S.ledgerCell, { width: SPIRIT_PURCHASE_COLUMN_WIDTH.quantity, textAlign: "right", fontWeight: "600", color: colors.foreground, fontSize: 11 }]}>
+                  {visibleSupplierPurchases.reduce((sum, purchase) => sum + purchase.quantity, 0)}
                 </Text>
-                <Text style={[S.tdCell, { width: 52 }]} />
-                <Text style={[S.tdCell, { width: 82 }]} />
-                <Text style={[S.tdCell, { width: 82, textAlign: "right", fontWeight: "700", color: colors.foreground, fontSize: 12 }]}>
+                <Text style={[S.ledgerCell, { width: SPIRIT_PURCHASE_COLUMN_WIDTH.unitPrice }]} />
+                <Text style={[S.ledgerCell, { width: SPIRIT_PURCHASE_COLUMN_WIDTH.amount, textAlign: "right", fontWeight: "600", color: colors.foreground, fontSize: 12 }]}>
                   ¥{formatMoney(visibleSupplierPurchaseTotal)}
                 </Text>
-                <Text style={[S.tdCell, { width: 76 }]} />
+                <Text style={[S.ledgerCell, { width: SPIRIT_PURCHASE_COLUMN_WIDTH.group }]} />
 
               </View>
             </View>

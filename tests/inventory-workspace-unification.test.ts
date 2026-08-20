@@ -63,11 +63,14 @@ describe("库存六类与店铺四类工作台统一规范", () => {
     expect(base).not.toContain('fontWeight: "800"');
   });
 
-  it("当月进货使用月日、无色分类分组和整列筛选入口", () => {
+  it("烈酒当月进货按完整年月日分组、以分类替换旧日期列，并保留整列筛选入口", () => {
     expect(spirits).toContain("purchaseDisplayGroups.map");
-    expect(spirits).toContain("formatInventoryMonthDay(p.date)");
+    expect(spirits).toContain('const date = /^\\d{4}-\\d{2}-\\d{2}$/.test(purchase.date) ? purchase.date : "未填写日期"');
+    expect(spirits).toContain("{/* 数据行始终按完整年月日分组；分类在每条采购记录中显示。 */}");
+    expect(spirits).toContain('>分类</Text>');
+    expect(spirits).toContain("p.category || item?.category || \"未分类\"");
     expect(spirits).toContain("tableHeaderAccessibilityLabel");
-    expect(spirits).not.toContain("{/* 分类列 */}");
+    expect(spirits).not.toContain("formatInventoryMonthDay(p.date)");
     expect(base).toContain("formatInventoryMonthDay(r.date)");
   });
 });
