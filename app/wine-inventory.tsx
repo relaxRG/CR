@@ -21,7 +21,8 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
 import { useWineImportControlStore, useWineSnapshotStore, useWineManualPurchaseStore, useWineStore } from "@/lib/wine/store";
 import { exportWinePdf, exportWineWorkbook, summarizeWineProducts, summarizeWineSuppliers } from "@/lib/wine/workbook-export";
-import { WineInventoryItem } from "@/lib/wine/types";
+import { WineInventoryItem, WineManualPurchase, WineStyle, WINE_STYLE_LABELS } from "@/lib/wine/types";
+import { bottleHasWineSupplier, getWinePurchaseNameForSupplier, resolveWineBottleForSupplierName } from "@/lib/wine/supplier-alias";
 import { applyWineLedgerView, applyWinePurchaseView, collectWineTypes, getWineSupplierNames, SortState, toggleSort, WineLedgerSortKey, WinePurchaseSortKey } from "@/lib/wine/table-view";
 import { WineSupplierTrendChart } from "@/components/wine-supplier-trend-chart";
 import { HorizontalLedgerColumn, HorizontalLedgerGroup } from "@/components/inventory/HorizontalLedgerTable";
@@ -230,7 +231,7 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
 
   const { snapshots, deleteSnapshot, batchSetActualEndQty } = useWineSnapshotStore();
   const { bottles } = useWineStore();
-  const { purchases, addManualPurchase, deleteManualPurchase, batchDeleteManualPurchases, batchUpdateManualPurchases, batchUpdateManualPurchaseDate, getMonthPurchases } = useWineManualPurchaseStore();
+  const { purchases, addManualPurchase, updateManualPurchase, deleteManualPurchase, batchDeleteManualPurchases, batchUpdateManualPurchases, batchUpdateManualPurchaseDate, getMonthPurchases } = useWineManualPurchaseStore();
   const { clearMonthPurchases, recalculateMonthInventory, batches, auditEntries } = useWineImportControlStore();
 
   const [viewTab, setViewTab] = useState<ViewTab>("ledger");
@@ -243,6 +244,7 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
   const [activeSupplierForEntry, setActiveSupplierForEntry] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedLedgerItem, setSelectedLedgerItem] = useState<MonthlyLedgerItem | null>(null);
+  const [selectedPurchaseForCategory, setSelectedPurchaseForCategory] = useState<WineManualPurchase | null>(null);
   const selectedMonth = month ?? getCurrentMonth();
   const moduleClose = useModuleMonthCloseStore();
   const wineCloseStatus = moduleClose.getStatus("wine", selectedMonth);
@@ -276,7 +278,11 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
 
   // 所有供应商统一来自台账、手动采购与葡萄酒库；没有采购记录时也能先选供应商录入。
   const allSuppliers = useMemo(
-    () => getWineSupplierNames(items, purchases, bottles.map((bottle) => bottle.supplier)),
+    () => getWineSupplierNames(
+      items,
+      purchases,
+      bottles.flatMap((bottle) => [bottle.supplier, ...(bottle.supplierAliases ?? []).map((alias) => alias.supplier)]).filter(Boolean),
+    ),
     [items, purchases, bottles],
   );
   const wineTypes = useMemo(() => collectWineTypes(items), [items]);
@@ -367,17 +373,15 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
     [selectedSupplierView, purchases, selectedMonth],
   );
   const selectedSupplierBottles = useMemo(
-    () => selectedSupplierView ? bottles.filter((bottle) => bottle.supplier === selectedSupplierView) : [],
+    () => selectedSupplierView ? bottles.filter((bottle) => bottleHasWineSupplier(bottle, selectedSupplierView)) : [],
     [bottles, selectedSupplierView],
   );
   const selectedSupplierMonthAmount = useMemo(
     () => selectedSupplierPurchases.reduce((total, purchase) => total + purchase.amount, 0),
     [selectedSupplierPurchases],
   );
-  const findBottleForItem = (name: string, supplier: string) => bottles.find((bottle) =>
-    normalizeWineIdentity(bottle.name) === normalizeWineIdentity(name)
-    && (!supplier || !bottle.supplier || bottle.supplier === supplier),
-  ) ?? bottles.find((bottle) => normalizeWineIdentity(bottle.name) === normalizeWineIdentity(name));
+  const findBottleForItem = (name: string, supplier: string) =>
+    resolveWineBottleForSupplierName(bottles, supplier, name)?.bottle ?? null;
   const selectedBottle = useMemo(() => {
     if (!selectedLedgerItem) return null;
     const source = items.find((item) => String(item.seq) === selectedLedgerItem.itemId);
@@ -392,7 +396,10 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
   const purchaseSuppliers = allSuppliers;
   const purchaseLedgerRows = useMemo(() => monthPurchaseRecords.map((purchase) => ({
     ...purchase,
-    category: bottles.find((bottle) => bottle.id === purchase.bottleId)?.style ?? "Other",
+    category: purchase.category
+      ?? bottles.find((bottle) => bottle.id === purchase.bottleId)?.style
+      ?? resolveWineBottleForSupplierName(bottles, purchase.supplier, purchase.productName)?.bottle.style
+      ?? "other",
   })), [monthPurchaseRecords, bottles]);
   const purchaseLedgerGroups = useMemo<HorizontalLedgerGroup<(typeof purchaseLedgerRows)[number]>[]>(() => [{
     id: "month-purchases",
@@ -400,8 +407,15 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
     color: colors.muted,
     rows: purchaseLedgerRows,
   }], [purchaseLedgerRows, colors.muted]);
+  const quickWineCategories: WineStyle[] = ["red", "white", "rose", "sparkling", "sweet", "fortified", "other"];
+  const selectPurchaseCategory = (purchase: WineManualPurchase, category: WineStyle) => {
+    if (!assertWineWritable()) return;
+    updateManualPurchase(purchase.id, { category });
+    setSelectedPurchaseForCategory(null);
+  };
+
   const purchaseLedgerColumns = useMemo<HorizontalLedgerColumn<(typeof purchaseLedgerRows)[number]>[]>(() => [
-    { key: "category", label: "分类", width: 88, compactWidth: 56, pinned: true, flexWeight: 0.9, render: (row) => <Text numberOfLines={1} style={{ color: colors.muted, fontSize: STORE_TABLE_METRICS.bodyFontSize, fontWeight: "700" }}>{row.category}</Text> },
+    { key: "category", label: "分类", width: 88, compactWidth: 56, pinned: true, flexWeight: 0.9, render: (row) => <Text numberOfLines={1} style={{ color: colors.muted, fontSize: STORE_TABLE_METRICS.bodyFontSize, fontWeight: "700" }}>{WINE_STYLE_LABELS[row.category as WineStyle] ?? "其他"}</Text> },
     { key: "date", sortKey: "date", label: "日期", width: 112, compactWidth: 64, pinned: true, flexWeight: 1.1, render: (row) => <Text numberOfLines={1} style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.bodyFontSize }}>{row.date}</Text> },
     { key: "name", sortKey: "name", label: "商品名称", width: 220, compactWidth: 158, pinned: true, flexWeight: 3, onPress: (row) => {
       if (selectMode) {
@@ -413,13 +427,7 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
         });
         return;
       }
-      Alert.alert(row.productName, `供应商：${row.supplier}\n日期：${row.date}\n数量：${formatStoreQuantity(row.quantity)}瓶\n单价：${formatStoreMoney(row.unitPrice)}\n金额：${formatStoreMoney(row.amount)}`, [
-        { text: "关闭" },
-        { text: "删除", style: "destructive", onPress: () => Alert.alert("确认删除", `删除「${row.productName}」这条进货记录？`, [
-          { text: "取消", style: "cancel" },
-          { text: "删除", style: "destructive", onPress: () => deleteManualPurchase(row.id) },
-        ]) },
-      ]);
+      setSelectedPurchaseForCategory(row);
     }, testID: (row) => `wine-purchase-name-${row.id}`, render: (row) => <Text numberOfLines={1} style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.nameFontSize, fontWeight: "800" }}>{row.productName}</Text> },
     { key: "quantity", sortKey: "quantity", label: "数量", width: 88, flexWeight: 1, align: "right", render: (row) => <Text style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{formatStoreQuantity(row.quantity)}</Text> },
     { key: "unit", label: "单位", width: 68, flexWeight: 0.6, align: "center", render: () => <Text style={{ color: colors.muted, fontSize: STORE_TABLE_METRICS.bodyFontSize }}>瓶</Text> },
@@ -427,7 +435,7 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
     { key: "amount", sortKey: "amount", label: "总价", width: 120, flexWeight: 1.4, align: "right", render: (row) => <Text style={{ color: colors.primary, fontSize: STORE_TABLE_METRICS.numericFontSize, fontWeight: "800" }}>{formatStoreMoney(row.amount)}</Text> },
     { key: "supplier", label: "供应商", width: 156, flexWeight: 1.6, render: (row) => <Text numberOfLines={1} style={{ color: colors.muted, fontSize: STORE_TABLE_METRICS.bodyFontSize }}>{row.supplier}</Text> },
     { key: "notes", label: "备注", width: 180, flexWeight: 1.8, render: (row) => <Text numberOfLines={1} style={{ color: colors.muted, fontSize: STORE_TABLE_METRICS.bodyFontSize }}>{row.notes || "—"}</Text> },
-  ], [colors, deleteManualPurchase, selectMode]);
+  ], [colors, selectMode]);
 
   // 台账统计
   const ledgerStats = useMemo(() => ({
@@ -473,9 +481,9 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
     const ledgerItems = bySupplier.get(activeSupplierForEntry) ?? [];
     const knownNames = new Set(ledgerItems.map((item) => normalizeWineIdentity(item.name)));
     const libraryOnlyItems = bottles
-      .filter((bottle) => bottle.supplier === activeSupplierForEntry && !knownNames.has(normalizeWineIdentity(bottle.name)))
+      .filter((bottle) => bottleHasWineSupplier(bottle, activeSupplierForEntry) && !knownNames.has(normalizeWineIdentity(getWinePurchaseNameForSupplier(bottle, activeSupplierForEntry))))
       .map((bottle, index): WineInventoryItem => ({
-        seq: -(index + 1), wineType: bottle.style, supplier: bottle.supplier, name: bottle.name,
+        seq: -(index + 1), wineType: bottle.style, supplier: activeSupplierForEntry, name: getWinePurchaseNameForSupplier(bottle, activeSupplierForEntry),
         initUnitCost: bottle.costPrice ?? 0, initQty: 0, initCost: 0,
         purchaseQty: 0, purchaseCost: 0, endQty: 0, unitCost: bottle.costPrice ?? 0,
         endCost: 0, consumeBottles: 0, consumeQty: 0,
@@ -1001,6 +1009,43 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
         onClose={() => setShowPurchaseSheet(false)}
         onSave={handleSavePurchase}
       />
+
+      {/* 当月进货名称详情：分类只写入当前采购流水；主档仍由酒款档案统一维护。 */}
+      <Modal visible={selectedPurchaseForCategory !== null} transparent animationType="fade" onRequestClose={() => setSelectedPurchaseForCategory(null)}>
+        <View style={{ flex: 1, backgroundColor: "#00000066", justifyContent: "flex-end" }}>
+          <Pressable style={{ flex: 1 }} onPress={() => setSelectedPurchaseForCategory(null)} />
+          {selectedPurchaseForCategory ? (() => {
+            const purchase = selectedPurchaseForCategory;
+            const matched = purchase.bottleId ? bottles.find((bottle) => bottle.id === purchase.bottleId) : resolveWineBottleForSupplierName(bottles, purchase.supplier, purchase.productName)?.bottle;
+            const selectedCategory = purchase.category ?? matched?.style ?? "other";
+            return <View testID="wine-purchase-category-sheet" style={{ backgroundColor: colors.background, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 18, paddingBottom: Math.max(insets.bottom, 18) }}>
+              <View style={{ alignItems: "center", marginBottom: 14 }}>
+                <View style={{ width: 34, height: 4, borderRadius: 2, backgroundColor: colors.border, marginBottom: 14 }} />
+                <Text numberOfLines={2} style={{ color: colors.foreground, fontSize: 18, fontWeight: "800", textAlign: "center" }}>{purchase.productName}</Text>
+                <Text style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>{purchase.supplier} · {purchase.date} · {formatStoreQuantity(purchase.quantity)}瓶</Text>
+              </View>
+              <Text style={{ color: colors.muted, fontSize: 12, fontWeight: "700", marginBottom: 8 }}>快速选择分类</Text>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                {quickWineCategories.map((category) => {
+                  const active = category === selectedCategory;
+                  return <Pressable key={category} testID={`wine-purchase-category-${category}`} onPress={() => selectPurchaseCategory(purchase, category)} style={{ minHeight: 36, paddingHorizontal: 12, justifyContent: "center", borderRadius: 18, borderWidth: 1, borderColor: active ? colors.primary : colors.border, backgroundColor: active ? colors.primary + "14" : colors.surface }}>
+                    <Text style={{ color: active ? colors.primary : colors.muted, fontSize: 12, fontWeight: "700" }}>{WINE_STYLE_LABELS[category]}</Text>
+                  </Pressable>;
+                })}
+              </View>
+              <Text style={{ color: colors.muted, fontSize: 11, lineHeight: 16, marginTop: 12 }}>分类仅影响这笔采购的展示与筛选；不会改写历史商品名称或重复建立酒款档案。</Text>
+              <View style={{ flexDirection: "row", gap: 10, marginTop: 16 }}>
+                <Pressable onPress={() => { setSelectedPurchaseForCategory(null); router.push(matched ? (`/wine/${matched.id}` as any) : ({ pathname: "/wine-form", params: { supplier: purchase.supplier, purchaseName: purchase.productName } } as any)); }} style={{ flex: 1, minHeight: 42, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.border, borderRadius: 11 }}>
+                  <Text style={{ color: colors.foreground, fontSize: 13, fontWeight: "700" }}>{matched ? "查看酒款档案" : "新建酒款档案"}</Text>
+                </Pressable>
+                <Pressable onPress={() => Alert.alert("确认删除", `删除「${purchase.productName}」这条进货记录？`, [{ text: "取消", style: "cancel" }, { text: "删除", style: "destructive", onPress: () => { deleteManualPurchase(purchase.id); setSelectedPurchaseForCategory(null); } }])} style={{ minWidth: 74, minHeight: 42, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.error + "55", borderRadius: 11 }}>
+                  <Text style={{ color: colors.error, fontSize: 13, fontWeight: "700" }}>删除</Text>
+                </Pressable>
+              </View>
+            </View>;
+          })() : null}
+        </View>
+      </Modal>
 
       {/* 批量修改供应商、数量或单价：底层会原子更新，并在数量/单价变化时重算总价。 */}
       <Modal visible={batchEditField !== null} transparent animationType="fade" onRequestClose={() => setBatchEditField(null)}>

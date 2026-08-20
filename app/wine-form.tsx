@@ -8,7 +8,8 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
 import { useWineStore } from "@/lib/wine/store";
-import { WineStyle, WINE_STYLE_LABELS } from "@/lib/wine/types";
+import { WineStyle, WineSupplierAlias, WINE_STYLE_LABELS } from "@/lib/wine/types";
+import { removeWineSupplierAlias, upsertWineSupplierAlias } from "@/lib/wine/supplier-alias";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
 
@@ -18,11 +19,11 @@ export default function WineFormScreen() {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  const { id, supplier: supplierParam, purchaseName } = useLocalSearchParams<{ id?: string; supplier?: string; purchaseName?: string }>();
   const { bottles, addBottle, updateBottle } = useWineStore();
   const existing = id ? bottles.find((b) => b.id === id) : undefined;
 
-  const [name, setName] = useState(existing?.name ?? "");
+  const [name, setName] = useState(existing?.name ?? purchaseName ?? "");
   const [nameEn, setNameEn] = useState(existing?.nameEn ?? "");
   const [vintage, setVintage] = useState(existing?.vintage ?? "");
   const [region, setRegion] = useState(existing?.region ?? "");
@@ -34,13 +35,30 @@ export default function WineFormScreen() {
   const [salePrice, setSalePrice] = useState(existing?.salePrice?.toString() ?? "");
   const [stock, setStock] = useState(existing?.stock?.toString() ?? "0");
   const [rating, setRating] = useState(existing?.rating?.toString() ?? "");
-  const [supplier, setSupplier] = useState(existing?.supplier ?? "");
+  const [supplier, setSupplier] = useState(existing?.supplier ?? supplierParam ?? "");
+  const [supplierAliases, setSupplierAliases] = useState<WineSupplierAlias[]>(existing?.supplierAliases ?? []);
+  const [aliasSupplier, setAliasSupplier] = useState("");
+  const [aliasPurchaseName, setAliasPurchaseName] = useState("");
   const [notes, setNotes] = useState(existing?.notes ?? "");
 
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
+  const addSupplierAlias = () => {
+    try {
+      const next = upsertWineSupplierAlias(supplierAliases, aliasSupplier, aliasPurchaseName);
+      setSupplierAliases(next);
+      setAliasSupplier("");
+      setAliasPurchaseName("");
+    } catch {
+      Alert.alert("请填写供应商名称和该供应商的采购名称");
+    }
+  };
+
   const handleSave = () => {
     if (!name.trim()) { Alert.alert("请输入酒名"); return; }
+    const aliasesForSave = !existing && supplier.trim() && purchaseName?.trim()
+      ? upsertWineSupplierAlias(supplierAliases, supplier, purchaseName)
+      : supplierAliases;
     const data = {
       name: name.trim(), nameEn: nameEn.trim(), vintage: vintage.trim(),
       region: region.trim(), grape: grape.trim(), winery: winery.trim(), style,
@@ -49,7 +67,7 @@ export default function WineFormScreen() {
       salePrice: salePrice ? parseFloat(salePrice) : null,
       stock: parseInt(stock) || 0,
       rating: rating ? parseFloat(rating) : null,
-      supplier: supplier.trim(), notes: notes.trim(), photoUri: existing?.photoUri ?? "",
+      supplier: supplier.trim(), supplierAliases: aliasesForSave, notes: notes.trim(), photoUri: existing?.photoUri ?? "",
     };
     if (existing) { updateBottle(existing.id, data); }
     else { addBottle(data); }
@@ -103,6 +121,33 @@ export default function WineFormScreen() {
               keyboardType={(f as any).keyboardType} returnKeyType="next" />
           </View>
         ))}
+        <View style={[styles.aliasSection, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+          <Text style={[styles.fieldLabel, { color: colors.foreground }]}>供应商采购名称</Text>
+          <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 18, marginBottom: 10 }}>
+            同一酒款可记录不同供应商使用的名称。导入和当月进货会优先按“供应商 + 采购名称”匹配，不会新建重复酒款。
+          </Text>
+          {supplierAliases.length === 0 ? <Text style={{ color: colors.muted, fontSize: 12, marginBottom: 10 }}>暂未添加供应商别名。</Text> : supplierAliases.map((alias) => (
+            <View key={`${alias.normalizedSupplier}-${alias.normalizedName}`} style={[styles.aliasRow, { borderTopColor: colors.border }]}>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text numberOfLines={1} style={{ color: colors.foreground, fontSize: 13, fontWeight: "700" }}>{alias.purchaseName}</Text>
+                <Text numberOfLines={1} style={{ color: colors.muted, fontSize: 11, marginTop: 2 }}>{alias.supplier}</Text>
+              </View>
+              <Pressable onPress={() => setSupplierAliases((current) => removeWineSupplierAlias(current, alias))} hitSlop={10}>
+                <Text style={{ color: colors.error, fontSize: 12, fontWeight: "600" }}>移除</Text>
+              </Pressable>
+            </View>
+          ))}
+          <View style={{ gap: 8, marginTop: 10 }}>
+            <TextInput value={aliasSupplier} onChangeText={setAliasSupplier} placeholder="供应商名称，如：至缘" placeholderTextColor={colors.muted}
+              style={[styles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.foreground }]} />
+            <TextInput value={aliasPurchaseName} onChangeText={setAliasPurchaseName} placeholder="该供应商的采购名称，如：白占边（金宾波本）" placeholderTextColor={colors.muted}
+              style={[styles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.foreground }]} />
+            <Pressable onPress={addSupplierAlias} style={[styles.aliasAddButton, { borderColor: colors.primary, backgroundColor: colors.primary + "12" }]}>
+              <IconSymbol name="plus" size={14} color={colors.primary} />
+              <Text style={{ color: colors.primary, fontSize: 13, fontWeight: "700" }}>添加供应商名称</Text>
+            </Pressable>
+          </View>
+        </View>
         <View>
           <Text style={[styles.fieldLabel, { color: colors.muted }]}>品鉴笔记</Text>
           <TextInput value={notes} onChangeText={setNotes} placeholder="香气、口感、配餐建议…" placeholderTextColor={colors.muted}
@@ -121,5 +166,8 @@ const styles = StyleSheet.create({
   input: { borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15 },
   textarea: { minHeight: 100, textAlignVertical: "top" },
   styleChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1 },
+  aliasSection: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, padding: 12 },
+  aliasRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 9, borderTopWidth: StyleSheet.hairlineWidth },
+  aliasAddButton: { minHeight: 36, borderWidth: 1, borderRadius: 10, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
 });
 

@@ -1,6 +1,15 @@
 /** 葡萄酒风格 */
 export type WineStyle = "red" | "white" | "rose" | "sparkling" | "sweet" | "fortified" | "other";
 
+/** 同一标准酒款在特定供应商处使用的采购名称；仅用于识别与展示，不复制酒款主档。 */
+export interface WineSupplierAlias {
+  supplier: string;
+  purchaseName: string;
+  /** 规范化后用于确定性匹配，历史记录首次读取时可重建。 */
+  normalizedSupplier: string;
+  normalizedName: string;
+}
+
 /** 葡萄酒条目 */
 export interface WineBottle {
   id: string;
@@ -32,8 +41,10 @@ export interface WineBottle {
   notes: string;
   /** 照片 URI */
   photoUri: string;
-  /** 供应商 */
+  /** 默认/主要供应商；保留以兼容既有酒款档案。 */
   supplier: string;
+  /** 供应商专属采购名称；一款标准酒可对应多个供应商写法。 */
+  supplierAliases?: WineSupplierAlias[];
   /** 创建时间 */
   createdAt: string;
   /** 更新时间 */
@@ -127,6 +138,8 @@ export interface WineManualPurchase {
   /** 对应 WineBottle.id（若已匹配） */
   bottleId: string | null;
   productName: string;
+  /** 当前采购流水的人工分类；缺省时按已关联酒款或台账分类展示。 */
+  category?: WineStyle;
   unitPrice: number;
   quantity: number;
   amount: number;
