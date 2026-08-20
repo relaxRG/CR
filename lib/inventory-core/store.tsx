@@ -5,6 +5,12 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useReducer, useState } from "react";
 import { MonthlySnapshot, PurchaseRecord, ConsumeRecord, getCurrentMonth, getPrevMonth, getOpeningFromLastMonth } from "./types";
+import {
+  createInventoryOperationReceipt,
+  InventoryBulkPreflight,
+  InventoryOperationReceipt,
+  prepareInventoryBulkOperation,
+} from "./bulk-operation";
 
 function uuid() { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
 
@@ -26,6 +32,9 @@ export interface GenericInventoryItem {
   /** 备注 */
   notes: string;
   active: boolean;
+  /** 归档不删除采购、消耗与月结快照；用于恢复与审计。 */
+  archivedAt?: string;
+  archiveReason?: string;
   createdAt: string;
   updatedAt: string;
   /** 扩展字段（各品类自定义，如售价/用途/包装类型等） */
@@ -37,6 +46,7 @@ export interface GenericInventoryState {
   purchases: PurchaseRecord[];
   consumes: ConsumeRecord[];
   snapshots: MonthlySnapshot[];
+  operationReceipts: InventoryOperationReceipt[];
 }
 
 export function sanitizeGenericInventoryState(raw: unknown): GenericInventoryState {
@@ -48,6 +58,7 @@ export function sanitizeGenericInventoryState(raw: unknown): GenericInventorySta
     purchases: Array.isArray(source.purchases) ? source.purchases as PurchaseRecord[] : [],
     consumes: Array.isArray(source.consumes) ? source.consumes as ConsumeRecord[] : [],
     snapshots: Array.isArray(source.snapshots) ? source.snapshots as MonthlySnapshot[] : [],
+    operationReceipts: Array.isArray(source.operationReceipts) ? source.operationReceipts as InventoryOperationReceipt[] : [],
   };
 }
 
@@ -61,7 +72,9 @@ type Action =
   | { type: "ADD_CONSUME"; record: ConsumeRecord }
   | { type: "DELETE_CONSUME"; id: string }
   | { type: "ADD_SNAPSHOT"; snapshot: MonthlySnapshot }
-  | { type: "DELETE_SNAPSHOT"; id: string };
+  | { type: "DELETE_SNAPSHOT"; id: string }
+  | { type: "APPLY_BULK_ITEM_OPERATION"; preflight: InventoryBulkPreflight; targetCategory?: string; receipt: InventoryOperationReceipt }
+  | { type: "RESTORE_ARCHIVED_ITEMS"; ids: string[]; receipt: InventoryOperationReceipt };
 
 function reducer(state: GenericInventoryState, action: Action): GenericInventoryState {
   switch (action.type) {
@@ -126,6 +139,36 @@ function reducer(state: GenericInventoryState, action: Action): GenericInventory
     case "DELETE_SNAPSHOT":
       return { ...state, snapshots: state.snapshots.filter((s) => s.id !== action.id) };
 
+    case "APPLY_BULK_ITEM_OPERATION": {
+      const deleteIds = new Set(action.preflight.deletableIds);
+      const archiveIds = new Set(action.preflight.archivableIds);
+      const reclassifyIds = new Set(action.preflight.reclassifiableIds);
+      const now = action.receipt.completedAt;
+      return {
+        ...state,
+        items: state.items
+          .filter((item) => !deleteIds.has(item.id))
+          .map((item) => archiveIds.has(item.id)
+            ? { ...item, active: false, archivedAt: now, archiveReason: action.preflight.action, updatedAt: now }
+            : reclassifyIds.has(item.id)
+              ? { ...item, category: action.targetCategory ?? item.category, updatedAt: now }
+              : item),
+        operationReceipts: [action.receipt, ...state.operationReceipts].slice(0, 100),
+      };
+    }
+
+    case "RESTORE_ARCHIVED_ITEMS": {
+      const restoreIds = new Set(action.ids);
+      const now = action.receipt.completedAt;
+      return {
+        ...state,
+        items: state.items.map((item) => restoreIds.has(item.id)
+          ? { ...item, active: true, archivedAt: undefined, archiveReason: undefined, updatedAt: now }
+          : item),
+        operationReceipts: [action.receipt, ...state.operationReceipts].slice(0, 100),
+      };
+    }
+
     default: return state;
   }
 }
@@ -146,6 +189,12 @@ export interface GenericInventoryContextValue extends GenericInventoryState {
   // Snapshots
   addSnapshot: (data: Omit<MonthlySnapshot, "id" | "createdAt">) => void;
   deleteSnapshot: (id: string) => void;
+  /** 共享安全批量预检：历史数据项目自动降级为归档。 */
+  prepareBulkOperation: (input: { action: "archive" | "delete" | "reclassify"; ids: string[]; isMonthWritable: boolean; targetCategory?: string }) => InventoryBulkPreflight;
+  applyBulkOperation: (preflight: InventoryBulkPreflight, targetCategory?: string) => InventoryOperationReceipt;
+  restoreArchivedItems: (ids: string[]) => InventoryOperationReceipt;
+  operationReceipts: InventoryOperationReceipt[];
+  getArchivedItems: () => GenericInventoryItem[];
   // Computed helpers
   getLastSnapshot: () => MonthlySnapshot | null;
   getSnapshotByMonth: (month: string) => MonthlySnapshot | null;
@@ -163,7 +212,7 @@ export function createGenericInventoryStore(storageKey: string, categoryId: stri
 
   function Provider({ children }: { children: React.ReactNode }) {
     const [state, dispatch] = useReducer(reducer, {
-      items: [], purchases: [], consumes: [], snapshots: [],
+      items: [], purchases: [], consumes: [], snapshots: [], operationReceipts: [],
     });
     const [ready, setReady] = useState(false);
 
@@ -221,6 +270,48 @@ export function createGenericInventoryStore(storageKey: string, categoryId: stri
       dispatch({ type: "DELETE_SNAPSHOT", id });
     }, []);
 
+    const prepareBulkOperation = useCallback((input: { action: "archive" | "delete" | "reclassify"; ids: string[]; isMonthWritable: boolean; targetCategory?: string }) => prepareInventoryBulkOperation({
+      scope: categoryId,
+      action: input.action,
+      selectedIds: input.ids,
+      items: state.items,
+      isMonthWritable: input.isMonthWritable,
+      targetCategory: input.targetCategory,
+      getHistory: (itemId) => ({
+        purchases: state.purchases.filter((record) => record.itemId === itemId).length,
+        consumes: state.consumes.filter((record) => record.itemId === itemId).length,
+        ledger: 0,
+        snapshots: state.snapshots.filter((snapshot) => snapshot.items.some((item) => item.itemId === itemId)).length,
+        referencePrices: 0,
+        currentStock: state.items.find((item) => item.id === itemId)?.currentStock ?? 0,
+      }),
+    }), [categoryId, state]);
+
+    const applyBulkOperation = useCallback((preflight: InventoryBulkPreflight, targetCategory?: string): InventoryOperationReceipt => {
+      const receipt = createInventoryOperationReceipt({ scope: categoryId, preflight });
+      dispatch({ type: "APPLY_BULK_ITEM_OPERATION", preflight, targetCategory, receipt });
+      return receipt;
+    }, [categoryId]);
+
+    const restoreArchivedItems = useCallback((ids: string[]): InventoryOperationReceipt => {
+      const now = new Date().toISOString();
+      const receipt: InventoryOperationReceipt = {
+        operationId: `${categoryId}-restore-${Date.now()}`,
+        scope: categoryId,
+        action: "archive",
+        createdAt: now,
+        completedAt: now,
+        deletedIds: [],
+        archivedIds: [],
+        reclassifiedIds: [],
+        skippedIds: [],
+      };
+      dispatch({ type: "RESTORE_ARCHIVED_ITEMS", ids: [...new Set(ids)], receipt });
+      return receipt;
+    }, [categoryId]);
+
+    const getArchivedItems = useCallback(() => state.items.filter((item) => !item.active), [state.items]);
+
     const getLastSnapshot = useCallback((): MonthlySnapshot | null => {
       if (!state.snapshots.length) return null;
       return [...state.snapshots].sort((a, b) => b.month.localeCompare(a.month))[0];
@@ -260,6 +351,7 @@ export function createGenericInventoryStore(storageKey: string, categoryId: stri
         addPurchase, deletePurchase,
         addConsume, deleteConsume,
         addSnapshot, deleteSnapshot,
+        prepareBulkOperation, applyBulkOperation, restoreArchivedItems, operationReceipts: state.operationReceipts, getArchivedItems,
         getLastSnapshot, getSnapshotByMonth,
         getMonthPurchases, getMonthConsumes,
         getItemMonthPurchases, getItemMonthConsumes,

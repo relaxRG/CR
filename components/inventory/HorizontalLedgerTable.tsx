@@ -37,6 +37,13 @@ interface HorizontalLedgerTableProps<Row> {
   testID?: string;
   sort?: { key: string; direction: "asc" | "desc" };
   onSort?: (key: string) => void;
+  selection?: {
+    selectedRowKeys: readonly string[];
+    onToggleRow: (row: Row) => void;
+    onToggleAll: () => void;
+    allSelected: boolean;
+    testIDPrefix?: string;
+  };
 }
 
 /**
@@ -52,6 +59,7 @@ export function HorizontalLedgerTable<Row>({
   testID,
   sort,
   onSort,
+  selection,
 }: HorizontalLedgerTableProps<Row>) {
   const colors = useColors();
   const { width: windowWidth } = useWindowDimensions();
@@ -61,7 +69,8 @@ export function HorizontalLedgerTable<Row>({
       : columns;
     return expandStoreTableColumns(baseColumns, Math.max(0, windowWidth - 32));
   }, [columns, windowWidth]);
-  const totalWidth = responsiveColumns.reduce((total, column) => total + column.width, 0);
+  const selectionWidth = selection ? 38 : 0;
+  const totalWidth = responsiveColumns.reduce((total, column) => total + column.width, selectionWidth);
   const hasRows = groups.some((group) => group.rows.length > 0);
 
   if (!hasRows) {
@@ -76,6 +85,17 @@ export function HorizontalLedgerTable<Row>({
     <ScrollView horizontal nestedScrollEnabled directionalLockEnabled showsHorizontalScrollIndicator testID={testID} style={{ flexGrow: 0 }}>
       <View style={{ width: totalWidth, minWidth: "100%" }}>
         <View style={[S.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+          {selection && (
+            <Pressable
+              testID={selection.testIDPrefix ? `${selection.testIDPrefix}-select-all` : undefined}
+              onPress={selection.onToggleAll}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: selection.allSelected }}
+              style={[S.selectionCell, { width: selectionWidth }]}
+            >
+              <Text style={{ color: colors.primary, fontSize: 15, fontWeight: "600" }}>{selection.allSelected ? "✓" : "○"}</Text>
+            </Pressable>
+          )}
           {responsiveColumns.map((column) => {
             const isSortable = Boolean(onSort && column.sortKey);
             const active = sort?.key === column.sortKey;
@@ -111,8 +131,21 @@ export function HorizontalLedgerTable<Row>({
             </View>
             {group.rows.map((row, index) => {
               const backgroundColor = index % 2 === 0 ? colors.surface : colors.background;
+              const key = rowKey(row);
+              const selected = selection?.selectedRowKeys.includes(key) ?? false;
               return (
-                <View key={rowKey(row)} style={[S.row, { backgroundColor, borderBottomColor: colors.border }]}>
+                <View key={key} style={[S.row, { backgroundColor: selected ? colors.primary + "0d" : backgroundColor, borderBottomColor: colors.border }]}>
+                  {selection && (
+                    <Pressable
+                      testID={selection.testIDPrefix ? `${selection.testIDPrefix}-select-${key}` : undefined}
+                      onPress={() => selection.onToggleRow(row)}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: selected }}
+                      style={[S.selectionCell, { width: selectionWidth }]}
+                    >
+                      <Text style={{ color: selected ? colors.primary : colors.muted, fontSize: 16, fontWeight: "600" }}>{selected ? "✓" : "○"}</Text>
+                    </Pressable>
+                  )}
                   {responsiveColumns.map((column) => {
                     const content = (
                       <View style={[S.cell, { width: column.width, alignItems: alignment(column.align) }]}>
@@ -159,5 +192,6 @@ const S = StyleSheet.create({
   groupDot: { width: 8, height: 8, borderRadius: 4 },
   row: { flexDirection: "row", minHeight: STORE_TABLE_METRICS.rowHeight, borderBottomWidth: StyleSheet.hairlineWidth },
   cell: { justifyContent: "center", paddingHorizontal: 9, paddingVertical: 6 },
+  selectionCell: { alignItems: "center", justifyContent: "center", minHeight: STORE_TABLE_METRICS.rowHeight },
   empty: { minHeight: 120, alignItems: "center", justifyContent: "center", borderWidth: StyleSheet.hairlineWidth, borderRadius: 12 },
 });

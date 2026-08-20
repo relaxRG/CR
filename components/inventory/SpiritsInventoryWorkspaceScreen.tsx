@@ -597,7 +597,7 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
   });
   const exitLedgerSelection = () => { setLedgerSelectMode(false); setSelectedLedgerItemIds(new Set()); };
   const requestBatchLedgerCategory = () => {
-    if (selectedLedgerItemIds.size === 0) return;
+    if (!assertSpiritsWritable() || selectedLedgerItemIds.size === 0) return;
     setCatPickerTitle(`批量修改分类（已选 ${selectedLedgerItemIds.size} 款）`);
     setCatPickerCallback(() => (name: string) => {
       selectedLedgerItemIds.forEach((id) => updateItem(id, { category: name, categorySource: "manual" }));
@@ -606,9 +606,11 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
     setShowCatPicker(true);
   };
   const requestBatchLedgerRemove = () => {
-    if (selectedLedgerItemIds.size === 0) return;
+    if (!assertSpiritsWritable() || selectedLedgerItemIds.size === 0) return;
     const selected = items.filter((item) => selectedLedgerItemIds.has(item.id));
-    const archive = selected.filter((item) => purchases.some((purchase) => purchase.itemId === item.id) || ledger.some((entry) => entry.itemId === item.id));
+    const archive = selected.filter((item) => purchases.some((purchase) => purchase.itemId === item.id)
+      || ledger.some((entry) => entry.itemId === item.id)
+      || store.refPrices.some((entry) => entry.itemId === item.id));
     Alert.alert("处理酒款", `已选 ${selected.length} 款：${archive.length} 款有采购、盘点或月结历史，将归档；其余 ${selected.length - archive.length} 款将删除。`, [
       { text: "取消", style: "cancel" },
       { text: "确认处理", style: "destructive", onPress: () => {

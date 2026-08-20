@@ -94,14 +94,46 @@ export function BaseInventoryScreen({
   const [importLoading, setImportLoading] = useState(false);
   const [importPreview, setImportPreview] = useState<Omit<GenericInventoryItem, "id" | "createdAt" | "updatedAt">[]>([]);
   const [showImportPreview, setShowImportPreview] = useState(false);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
+  const [showArchived, setShowArchived] = useState(false);
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
 
   const currentMonth = month ?? getCurrentMonth();
-  const activeItems = useMemo(() => store.items.filter((i) => i.active), [store.items]);
+  const monthLocked = useMemo(() => store.snapshots.some((snapshot) => snapshot.month === currentMonth), [store.snapshots, currentMonth]);
+  const activeItems = useMemo(() => store.items.filter((item) => showArchived ? !item.active : item.active), [store.items, showArchived]);
   const monthPurchases = useMemo(() => store.getMonthPurchases(currentMonth), [store, currentMonth]);
   const monthConsumes = useMemo(() => store.getMonthConsumes(currentMonth), [store, currentMonth]);
   const totalMonthPurchase = useMemo(() => monthPurchases.reduce((s, r) => s + r.totalAmount, 0), [monthPurchases]);
   const totalMonthConsume = useMemo(() => monthConsumes.reduce((s, r) => s + r.totalCost, 0), [monthConsumes]);
   const lastSnapshot = useMemo(() => store.getLastSnapshot(), [store]);
+  const selectedVisibleItemIds = useMemo(() => activeItems.map((item) => item.id).filter((id) => selectedItemIds.includes(id)), [activeItems, selectedItemIds]);
+  const exitSelection = () => { setSelectionMode(false); setSelectedItemIds([]); };
+  const toggleSelection = (itemId: string) => setSelectedItemIds((current) => current.includes(itemId) ? current.filter((id) => id !== itemId) : [...current, itemId]);
+  const applyBulkLifecycle = (action: "delete" | "archive") => {
+    if (!selectedVisibleItemIds.length || bulkSubmitting) return;
+    const preflight = store.prepareBulkOperation({ action, ids: selectedVisibleItemIds, isMonthWritable: !monthLocked });
+    const summary = action === "delete"
+      ? `将删除 ${preflight.counts.delete} 项，并归档 ${preflight.counts.archive} 项历史项目。${preflight.counts.skipped ? `另有 ${preflight.counts.skipped} 项未处理。` : ""}`
+      : `将归档 ${preflight.counts.archive} 项。${preflight.counts.skipped ? `另有 ${preflight.counts.skipped} 项未处理。` : ""}`;
+    Alert.alert(action === "delete" ? "删除或归档所选项目" : "归档所选项目", summary, [
+      { text: "取消", style: "cancel" },
+      { text: "确认", style: action === "delete" ? "destructive" : "default", onPress: () => {
+        setBulkSubmitting(true);
+        const receipt = store.applyBulkOperation(preflight);
+        setBulkSubmitting(false);
+        exitSelection();
+        Alert.alert("处理完成", `删除 ${receipt.deletedIds.length} 项，归档 ${receipt.archivedIds.length} 项，跳过 ${receipt.skippedIds.length} 项。`);
+      } },
+    ]);
+  };
+  const restoreSelectedItems = () => {
+    if (!selectedVisibleItemIds.length || bulkSubmitting || monthLocked) return;
+    Alert.alert("恢复归档项目", `恢复 ${selectedVisibleItemIds.length} 项到当前库存列表？不会改写历史采购或月结。`, [
+      { text: "取消", style: "cancel" },
+      { text: "恢复", onPress: () => { setBulkSubmitting(true); store.restoreArchivedItems(selectedVisibleItemIds); setBulkSubmitting(false); exitSelection(); } },
+    ]);
+  };
 
   // 构建台账数据（当月实时）
   const ledgerItems = useMemo(() => {
@@ -354,7 +386,40 @@ export function BaseInventoryScreen({
                 style={[S.actionBtn, { backgroundColor: colors.primary + "15", borderColor: colors.primary + "33" }]}>
                 <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "600" }}>+ 新增品类</Text>
               </TouchableOpacity>
+              <TouchableOpacity testID={`${categoryId}-bulk-select-toggle`} onPress={() => { tap(); selectionMode ? exitSelection() : setSelectionMode(true); }}
+                style={[S.actionBtn, { backgroundColor: selectionMode ? accentColor + "18" : colors.surface, borderColor: selectionMode ? accentColor : colors.border }]}>
+                <Text style={{ fontSize: 12, color: selectionMode ? accentColor : colors.foreground, fontWeight: "600" }}>{selectionMode ? "取消选择" : "选择"}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity testID={`${categoryId}-archived-toggle`} onPress={() => { tap(); setShowArchived((current) => !current); exitSelection(); }}
+                style={[S.actionBtn, { backgroundColor: showArchived ? colors.muted + "15" : colors.surface, borderColor: colors.border }]}>
+                <Text style={{ fontSize: 12, color: colors.muted, fontWeight: "600" }}>{showArchived ? "现行库存" : "已归档"}</Text>
+              </TouchableOpacity>
             </ScrollView>
+
+            {selectionMode && (
+              <View testID={`${categoryId}-bulk-action-bar`} style={[S.bulkBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <Text style={{ fontSize: 12, color: colors.foreground, fontWeight: "600" }}>已选 {selectedVisibleItemIds.length} 项{monthLocked ? " · 当月已归档，不能修改" : ""}</Text>
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  <TouchableOpacity onPress={() => setSelectedItemIds(selectedVisibleItemIds.length === activeItems.length ? [] : activeItems.map((item) => item.id))} style={S.bulkBtn}>
+                    <Text style={{ color: colors.primary, fontSize: 12, fontWeight: "600" }}>{selectedVisibleItemIds.length === activeItems.length ? "取消全选" : "全选"}</Text>
+                  </TouchableOpacity>
+                  {showArchived ? (
+                    <TouchableOpacity onPress={restoreSelectedItems} disabled={monthLocked || bulkSubmitting} style={S.bulkBtn}>
+                      <Text style={{ color: monthLocked ? colors.muted : colors.primary, fontSize: 12, fontWeight: "600" }}>恢复</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <>
+                      <TouchableOpacity onPress={() => applyBulkLifecycle("archive")} disabled={monthLocked || bulkSubmitting} style={S.bulkBtn}>
+                        <Text style={{ color: monthLocked ? colors.muted : colors.foreground, fontSize: 12, fontWeight: "600" }}>归档</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => applyBulkLifecycle("delete")} disabled={monthLocked || bulkSubmitting} style={S.bulkBtn}>
+                        <Text style={{ color: monthLocked ? colors.muted : colors.error, fontSize: 12, fontWeight: "600" }}>删除</Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
+                </View>
+              </View>
+            )}
 
             {/* 台账列表 */}
             {activeItems.length === 0 ? (
@@ -365,6 +430,13 @@ export function BaseInventoryScreen({
                 columns={ledgerColumns}
                 groups={ledgerGroups}
                 rowKey={(item) => item.itemId}
+                selection={selectionMode ? {
+                  selectedRowKeys: selectedItemIds,
+                  allSelected: activeItems.length > 0 && selectedVisibleItemIds.length === activeItems.length,
+                  onToggleAll: () => setSelectedItemIds(selectedVisibleItemIds.length === activeItems.length ? [] : activeItems.map((item) => item.id)),
+                  onToggleRow: (item) => toggleSelection(item.itemId),
+                  testIDPrefix: `${categoryId}-bulk`,
+                } : undefined}
               />
             ) : getGroupLabel ? (
               Object.entries(groupedLedger).map(([group, items]) => (
@@ -564,6 +636,8 @@ const S = StyleSheet.create({
   navbar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   navTitle: { fontSize: 17, fontWeight: "600" },
   actionBtn: { flexShrink: 0, minHeight: INVENTORY_WORKSPACE_METRICS.actionHeight, paddingHorizontal: 12, paddingVertical: 6, borderRadius: INVENTORY_WORKSPACE_METRICS.segmentRadius, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  bulkBar: { minHeight: 44, borderWidth: StyleSheet.hairlineWidth, borderRadius: 10, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  bulkBtn: { minHeight: 30, justifyContent: "center", paddingHorizontal: 5 },
   bigBtn: { flex: 1, minHeight: INVENTORY_WORKSPACE_METRICS.actionHeight, paddingVertical: 8, borderRadius: INVENTORY_WORKSPACE_METRICS.segmentRadius, alignItems: "center", justifyContent: "center" },
   recordCard: { flexDirection: "row", alignItems: "center", borderRadius: 12, borderWidth: 1, padding: 12, gap: 10 },
   summaryCard: { borderRadius: 12, borderWidth: 1, padding: 14 },

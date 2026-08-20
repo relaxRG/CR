@@ -57,21 +57,23 @@ export function resolveSpiritItemForSupplierName(
 ): SpiritSupplierMatch | null {
   const normalizedSupplier = normalizeSpiritSupplierAlias(supplier ?? "");
   const normalizedName = normalizeSpiritSupplierAlias(purchaseName);
+  // 已归档酒款不能作为默认导入匹配目标；调用方可显式提示恢复或新建。
+  const activeItems = items.filter((item) => item.active);
   if (!normalizedName) return null;
 
-  const aliases = items.filter((item) => (item.supplierAliases ?? []).some((alias) =>
+  const aliases = activeItems.filter((item) => (item.supplierAliases ?? []).some((alias) =>
     alias.normalizedSupplier === normalizedSupplier && alias.normalizedName === normalizedName,
   ));
   if (aliases.length === 1) return { item: aliases[0], reason: "supplier-alias" };
   if (aliases.length > 1) return null;
 
-  const supplierCanonical = items.filter((item) =>
+  const supplierCanonical = activeItems.filter((item) =>
     normalizeSpiritSupplierAlias(item.supplier ?? "") === normalizedSupplier
     && [item.name, item.nameEn ?? ""].some((name) => normalizeSpiritSupplierAlias(name) === normalizedName),
   );
   if (supplierCanonical.length === 1) return { item: supplierCanonical[0], reason: "supplier-canonical-name" };
   if (supplierCanonical.length > 1) return null;
 
-  const canonical = items.filter((item) => [item.name, item.nameEn ?? ""].some((name) => normalizeSpiritSupplierAlias(name) === normalizedName));
+  const canonical = activeItems.filter((item) => [item.name, item.nameEn ?? ""].some((name) => normalizeSpiritSupplierAlias(name) === normalizedName));
   return canonical.length === 1 ? { item: canonical[0], reason: "unique-canonical-name" } : null;
 }

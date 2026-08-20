@@ -245,8 +245,7 @@ type Action =
   | { type: "DELETE_CUSTOM_CATEGORY"; id: string }
   | { type: "MIGRATE_CATEGORY_CONTENT"; fromCategory: string; toCategory: string }
   | { type: "MIGRATE_AND_DELETE_CATEGORY"; id: string; fromCategory: string; toCategory: string }
-  | { type: "SET_GROUP_MATCH_MEMORY"; memory: GroupMatchMemory }
-  | { type: "BATCH_UPDATE_PURCHASES_CATEGORY"; itemId: string; category: string };
+  | { type: "SET_GROUP_MATCH_MEMORY"; memory: GroupMatchMemory };
 
 function reducer(state: SpiritsState, action: Action): SpiritsState {
   switch (action.type) {
@@ -330,16 +329,16 @@ function reducer(state: SpiritsState, action: Action): SpiritsState {
     }
     case "MIGRATE_CATEGORY_CONTENT": return {
       ...state,
+      // 采购分类是发生时快照；当前主档迁移不得改写已归档或历史月份。
       items: state.items.map((item) => item.category === action.fromCategory ? { ...item, category: action.toCategory, categorySource: "manual", updatedAt: new Date().toISOString() } : item),
-      purchases: state.purchases.map((purchase) => purchase.category === action.fromCategory ? { ...purchase, category: action.toCategory } : purchase),
     };
     case "MIGRATE_AND_DELETE_CATEGORY": {
       const category = state.customCategories.find((entry) => entry.id === action.id);
       if (!category || category.builtin) return state;
       return {
         ...state,
+        // 只迁移现行主档；历史采购分类永久保留原始快照。
         items: state.items.map((item) => item.category === action.fromCategory ? { ...item, category: action.toCategory, categorySource: "manual", updatedAt: new Date().toISOString() } : item),
-        purchases: state.purchases.map((purchase) => purchase.category === action.fromCategory ? { ...purchase, category: action.toCategory } : purchase),
         customCategories: state.customCategories.filter((entry) => entry.id !== action.id),
       };
     }
@@ -352,12 +351,6 @@ function reducer(state: SpiritsState, action: Action): SpiritsState {
       return { ...state, matchMemory: [...filtered, action.memory] };
     }
     case "UPDATE_SELF_BUY_CONFIG": return { ...state, selfBuyConfig: action.config };
-    case "BATCH_UPDATE_PURCHASES_CATEGORY": return {
-      ...state,
-      purchases: state.purchases.map((p) =>
-        p.itemId === action.itemId ? { ...p, category: action.category } : p
-      ),
-    };
     default: return state;
   }
 }
@@ -502,11 +495,8 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
     const normalizedPatch = patch.supplierAliases === undefined
       ? patch
       : { ...patch, supplierAliases: normalizeSpiritSupplierAliases(patch.supplierAliases) };
+    // 分类只影响现行酒款；采购记录保存发生时快照，不得被当前编辑改写。
     dispatch({ type: "UPDATE_ITEM", id, patch: normalizedPatch });
-    // ★ 分类传播：当酒款分类被修改时，自动同步到该酒款的所有进货记录
-    if (patch.category !== undefined) {
-      dispatch({ type: "BATCH_UPDATE_PURCHASES_CATEGORY", itemId: id, category: patch.category });
-    }
   };
 
   const deleteItem = (id: string) => {
