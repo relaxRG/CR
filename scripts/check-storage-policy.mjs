@@ -13,11 +13,25 @@ if (!existsSync(schemaPath) || !existsSync(registryPath)) {
 const schema = JSON.parse(readFileSync(schemaPath, "utf8"));
 const registry = JSON.parse(readFileSync(registryPath, "utf8"));
 const id = (record) => `${record.backend}|${record.key}`;
-const schemaIds = new Set(schema.records.map(id));
+
+/** 与生成器一致：将审计器无法求值的 SecureStore 参数映射为可治理的模式键。 */
+function normalizedSchemaKey(record) {
+  const owners = new Set(record.calls?.map((call) => call.file) ?? []);
+  if (record.backend === "SecureStore" && owners.has("lib/cf-sync/client.ts") && record.key === "key") {
+    return "cf.sync.{deviceId|groupId|deviceName}";
+  }
+  if (record.backend === "SecureStore" && owners.has("lib/cf-sync/group-switch.ts") && record.key.startsWith("ticketKey(")) {
+    return "cf.sync.groupSwitchTicket.{switchId}";
+  }
+  return record.key;
+}
+
+const schemaIds = new Set(schema.records.map((record) => `${record.backend}|${normalizedSchemaKey(record)}`));
 const registryIds = new Set(registry.entries.map(id));
 
 for (const record of schema.records) {
-  if (!registryIds.has(id(record))) errors.push(`STORAGE_KEY_UNREGISTERED: ${id(record)}`);
+  const normalizedId = `${record.backend}|${normalizedSchemaKey(record)}`;
+  if (!registryIds.has(normalizedId)) errors.push(`STORAGE_KEY_UNREGISTERED: ${normalizedId}`);
 }
 for (const entry of registry.entries) {
   if (!schemaIds.has(id(entry))) errors.push(`STORAGE_REGISTRY_STALE: ${id(entry)}`);
@@ -26,6 +40,15 @@ for (const entry of registry.entries) {
 for (const entry of registry.entries) {
   const isCredential = entry.classification === "S2-credential";
   const hasUnsafeCredentialAccess = entry.operations?.some((operation) => /^(getItem|getItemAsync|setItem|setItemAsync|multiGet|multiSet)$/.test(operation));
+  if (entry.backend === "SecureStore" && !isCredential) {
+    errors.push(`STORAGE_SECURESTORE_CLASSIFICATION_REQUIRED: ${id(entry)}`);
+  }
+  if (entry.backend === "SecureStore" && entry.status === "unresolved") {
+    errors.push(`STORAGE_SECURESTORE_UNRESOLVED: ${id(entry)}`);
+  }
+  if (isCredential && !["logout", "leave-group", "switch-complete"].every((event) => entry.purgeOn?.includes(event))) {
+    errors.push(`STORAGE_CREDENTIAL_LIFECYCLE_INCOMPLETE: ${id(entry)}`);
+  }
   if (isCredential && ["AsyncStorage", "localStorage"].includes(entry.backend) && hasUnsafeCredentialAccess) {
     errors.push(`STORAGE_CREDENTIAL_BACKEND_UNSAFE: ${id(entry)}`);
   }

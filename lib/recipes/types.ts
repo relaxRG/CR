@@ -30,7 +30,7 @@ export interface SourceRef {
   rawText: string;
   /** 网络来源 URL（非书籍时） */
   sourceUrl: string;
-  /** 文字来源的置信度：书库导入=high，AI推断=medium/low */
+  /** 文字来源的置信度：受支持导入=high，AI 推断=medium/low。 */
   sourceConfidence: "high" | "medium" | "low";
 }
 

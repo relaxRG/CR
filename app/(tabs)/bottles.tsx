@@ -46,8 +46,6 @@ import {
 } from "@/lib/bottles/types";
 import { useCardTagSettings } from "@/lib/settings/card-tags";
 import { useNetwork } from "@/hooks/use-network";
-import { useBookStore } from "@/lib/books/store";
-import { lookupInOfflineKb, extractBookSnippets, offlineEntryToEnrichResult } from "@/lib/bottles/offline-lookup";
 import { useRecipeStore } from "@/lib/recipes/store";
 import { smartLinkIngredient } from "@/lib/recipes/smart-link";
 import type { Recipe } from "@/lib/recipes/types";
@@ -116,7 +114,6 @@ export default function BottlesScreen() {
   const [sheetOpen, setSheetOpen] = useState(false);
 
   const { isOnline } = useNetwork();
-  const { books } = useBookStore();
 
  const groupBottles = useMemo(
     () => bottles.filter((b) => {
@@ -328,42 +325,11 @@ export default function BottlesScreen() {
       setAiQueueFetching(false);
       const msg = err instanceof Error ? err.message : String(err);
       const isTimeout = msg.includes("timeout") || msg.includes("ETIMEDOUT");
-      // 联网失败时降级到离线知识库
-      const kbResult = lookupInOfflineKb({
-        nameZh: b.nameZh || undefined,
-        nameEn: b.nameEn || undefined,
-        brand: b.brand || undefined,
-        category: b.category || undefined,
-      });
-      const allSections = books.flatMap((bk) => bk.sections ?? []);
-      const bookSnippets = extractBookSnippets({
-        nameZh: b.nameZh || undefined,
-        nameEn: b.nameEn || undefined,
-        brand: b.brand || undefined,
-        bookSections: allSections,
-      });
-      if (kbResult.found && kbResult.entry) {
-        const offlineRes = offlineEntryToEnrichResult(kbResult.entry, bookSnippets);
-        if (mode === "autofill" || mode === "sel-autofill") {
-          const draft = autoFillBlanks(b, offlineRes);
-          updateBottle(b.id, draft);
-          setAiQueueIdx(idx + 1);
-          fetchQueueItem(queue, idx + 1, mode, appliedSoFar + 1);
-        } else {
-          const fields = buildQueueFields(b, offlineRes);
-          const defaults: Record<string, boolean> = {};
-          for (const f of fields) defaults[f.key] = f.conflict === "new" || f.conflict === "confirm";
-          setAiQueueToggles(defaults);
-          setAiQueueResult(offlineRes);
-          setAiQueueError(lang === "zh" ? "AI 服务不可用，已从本地知识库补全（离线模式）" : "AI unavailable, filled from local KB (offline)");
-        }
-      } else {
-        setAiQueueError(isTimeout
-          ? (lang === "zh" ? "AI 响应超时，可跳过或重试" : "AI timeout, skip or retry")
-          : (lang === "zh" ? "网络错误，请检查连接" : "Network error, check connection"));
-      }
+      setAiQueueError(isTimeout
+        ? (lang === "zh" ? "AI 响应超时，可跳过或重试" : "AI timeout, skip or retry")
+        : (lang === "zh" ? "网络错误，请检查连接" : "Network error, check connection"));
     }
-  }, [updateBottle, buildQueueFields, autoFillBlanks, lang, books]);
+  }, [updateBottle, buildQueueFields, autoFillBlanks, lang]);
 
   /** Banner：启动缺资料条目补全队列 */
   const handleBatchEnrich = useCallback((mode: QueueMode) => {

@@ -131,7 +131,7 @@ export async function enrichRecipe(params: {
 
 export async function enrichBottle(params: {
   nameZh?: string; nameEn?: string; category?: string; style?: string; brand?: string; origin?: string;
-  imageBase64?: string; imageMime?: string; bookSnippets?: string[]; cellarBottles?: string[];
+  imageBase64?: string; imageMime?: string; cellarBottles?: string[];
   lang?: 'zh' | 'en';
 }) {
   const result = await callAI<{

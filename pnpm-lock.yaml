@@ -158,9 +158,6 @@ importers:
       nativewind:
         specifier: ^4.2.1
         version: 4.2.1(react-native-reanimated@4.1.6(@babel/core@7.28.5)(react-native-worklets@0.5.1(@babel/core@7.28.5)(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0))(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0))(react-native-safe-area-context@5.6.2(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0))(react-native-svg@15.12.1(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0))(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)(tailwindcss@3.4.19(tsx@4.21.0)(yaml@2.8.2))
-      pdfjs-dist:
-        specifier: 2.16.105
-        version: 2.16.105
       react:
         specifier: 19.1.0
         version: 19.1.0
@@ -3254,10 +3251,6 @@ packages:
     resolution: {integrity: sha512-cgwlv/1iFQiFnU96XXgROh8xTeetsnJiDsTc7TYCLFd9+/WNkIqPTxiM/8pSd8VIrhXGTf1Ny1q1hquVqDJB5w==}
     engines: {node: '>= 4'}
 
-  dommatrix@1.0.3:
-    resolution: {integrity: sha512-l32Xp/TLgWb8ReqbVJAFIvXmY7go4nTxxlWiAFyhoQw9RKEOHBZNnyGvJWqDVSPmq3Y9HlM4npqF/T6VMOXhww==}
-    deprecated: dommatrix is no longer maintained. Please use @thednp/dommatrix.
-
   domutils@3.2.2:
     resolution: {integrity: sha512-6kZKyUajlDuqlHKVX1w7gyslj9MPIXzIFiz/rGu35uC1wMi+kMhQwGhl4lt9unC9Vb9INnY9Z3/ZA3+FhASLaw==}
 
@@ -5157,14 +5150,6 @@ packages:
     resolution: {integrity: sha512-//nshmD55c46FuFw26xV/xFAaB5HF9Xdap7HJBBnrKdAd6/GxDBaNA1870O79+9ueg61cZLSVc+OaFlfmObYVQ==}
     engines: {node: '>= 14.16'}
 
-  pdfjs-dist@2.16.105:
-    resolution: {integrity: sha512-J4dn41spsAwUxCpEoVf6GVoz908IAA3mYiLmNxg8J9kfRXc2jxpbUepcP0ocp0alVNLFthTAM8DZ1RaHh8sU0A==}
-    peerDependencies:
-      worker-loader: ^3.0.8
-    peerDependenciesMeta:
-      worker-loader:
-        optional: true
-
   picocolors@1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
 
@@ -6260,10 +6245,6 @@ packages:
 
   wcwidth@1.0.1:
     resolution: {integrity: sha512-XHPEwS0q6TaxcvG85+8EYkbiCux2XtWG2mkc47Ng2A77BQu9+DqIOJldST4HgPkuea7dvKSj5VgX3P1d4rW8Tg==}
-
-  web-streams-polyfill@3.3.3:
-    resolution: {integrity: sha512-d2JWLCivmZYTSIoge9MsgFCZrt571BikcWGYkjC1khllbTeDlGqZ2D8vD8E/lJa8WGWbb7Plm8/XJYV7IJHZZw==}
-    engines: {node: '>= 8'}
 
   webidl-conversions@3.0.1:
     resolution: {integrity: sha512-2JAn3z8AR6rjK8Sm8orRC0h/bcl/DqL7tRPdGZ4I1CjdF+EaMLmYxBHyXuKL849eucPFhvBoxMsflfOb8kxaeQ==}
@@ -9585,8 +9566,6 @@ snapshots:
     dependencies:
       domelementtype: 2.3.0
 
-  dommatrix@1.0.3: {}
-
   domutils@3.2.2:
     dependencies:
       dom-serializer: 2.0.0
@@ -11782,11 +11761,6 @@ snapshots:
 
   pathval@2.0.1: {}
 
-  pdfjs-dist@2.16.105:
-    dependencies:
-      dommatrix: 1.0.3
-      web-streams-polyfill: 3.3.3
-
   picocolors@1.1.1: {}
 
   picomatch@2.3.1: {}
@@ -13004,8 +12978,6 @@ snapshots:
   wcwidth@1.0.1:
     dependencies:
       defaults: 1.0.4
-
-  web-streams-polyfill@3.3.3: {}
 
   webidl-conversions@3.0.1: {}
 

@@ -86,7 +86,6 @@ export default function MePage() {
               { label: "分类管理", desc: "烈酒风格与自制原料分类", icon: "tray.2.fill", color: "#AF52DE", route: "/taxonomy-manager" },
               { label: "系统标签", desc: "配方系统标签设置", icon: "tag.fill", color: "#00C7BE", route: "/system-tags" },
               { label: "卡片标签", desc: "自定义卡片显示标签", icon: "rectangle.3.group.fill", color: "#FF9500", route: "/card-tag-settings" },
-              { label: "书籍导入", desc: "从 Apple Books 导入调酒书", icon: "book.fill", color: "#FF9500", route: "/book-import" },
               { label: "冰块设置", desc: "冰块类型与成本设置", icon: "snowflake", color: "#5AC8FA", route: "/ice-settings" },
             ].map((item, i, arr) => (
               <React.Fragment key={item.route}>

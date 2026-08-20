@@ -44,7 +44,7 @@
         {
           "operation": "multiGet",
           "file": "lib/backup/local-backup.ts",
-          "line": 564,
+          "line": 562,
           "value": "",
           "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         }
@@ -86,14 +86,14 @@
         {
           "operation": "multiRemove",
           "file": "lib/sync/engine.ts",
-          "line": 434,
+          "line": 433,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         },
         {
           "operation": "multiRemove",
           "file": "lib/sync/engine.ts",
-          "line": 507,
+          "line": 506,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         }
@@ -513,7 +513,7 @@
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 1007,
+          "line": 1006,
           "value": "valueToWrite",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         }
@@ -626,48 +626,6 @@
     },
     {
       "backend": "AsyncStorage",
-      "key": "chapterKey(bookId",
-      "status": "unresolved",
-      "calls": [
-        {
-          "operation": "getItem",
-          "file": "lib/books/store.tsx",
-          "line": 178,
-          "value": "",
-          "structure": "StoredBook, BookStore"
-        },
-        {
-          "operation": "setItem",
-          "file": "lib/books/store.tsx",
-          "line": 187,
-          "value": "idx",
-          "structure": "StoredBook, BookStore"
-        }
-      ]
-    },
-    {
-      "backend": "AsyncStorage",
-      "key": "chapterKey(id",
-      "status": "unresolved",
-      "calls": [
-        {
-          "operation": "setItem",
-          "file": "lib/books/store.tsx",
-          "line": 151,
-          "value": "i",
-          "structure": "StoredBook, BookStore"
-        },
-        {
-          "operation": "removeItem",
-          "file": "lib/books/store.tsx",
-          "line": 206,
-          "value": "",
-          "structure": "StoredBook, BookStore"
-        }
-      ]
-    },
-    {
-      "backend": "AsyncStorage",
       "key": "cocktail_recent_units",
       "status": "resolved",
       "calls": [
@@ -684,34 +642,6 @@
           "line": 30,
           "value": "JSON.stringify(next",
           "structure": ""
-        }
-      ]
-    },
-    {
-      "backend": "AsyncStorage",
-      "key": "cocktail.books.v1",
-      "status": "resolved",
-      "calls": [
-        {
-          "operation": "getItem",
-          "file": "lib/books/store.tsx",
-          "line": 99,
-          "value": "",
-          "structure": "StoredBook, BookStore"
-        },
-        {
-          "operation": "setItem",
-          "file": "lib/books/store.tsx",
-          "line": 117,
-          "value": "JSON.stringify(next",
-          "structure": "StoredBook, BookStore"
-        },
-        {
-          "operation": "getItem",
-          "file": "lib/books/store.tsx",
-          "line": 181,
-          "value": "",
-          "structure": "StoredBook, BookStore"
         }
       ]
     },
@@ -983,48 +913,6 @@
     },
     {
       "backend": "AsyncStorage",
-      "key": "cocktail.reader.highlights.v1.${id}",
-      "status": "resolved",
-      "calls": [
-        {
-          "operation": "getItem",
-          "file": "app/book-reader.tsx",
-          "line": 868,
-          "value": "",
-          "structure": "ReviewItem"
-        },
-        {
-          "operation": "setItem",
-          "file": "app/book-reader.tsx",
-          "line": 897,
-          "value": "JSON.stringify(highlights",
-          "structure": "ReviewItem"
-        }
-      ]
-    },
-    {
-      "backend": "AsyncStorage",
-      "key": "cocktail.reader.settings.v1.${id}",
-      "status": "resolved",
-      "calls": [
-        {
-          "operation": "getItem",
-          "file": "app/book-reader.tsx",
-          "line": 855,
-          "value": "",
-          "structure": "ReviewItem"
-        },
-        {
-          "operation": "setItem",
-          "file": "app/book-reader.tsx",
-          "line": 877,
-          "value": "JSON.stringify({ fontSize",
-          "structure": "ReviewItem"
-        }
-      ]
-    },
-    {
-      "backend": "AsyncStorage",
       "key": "cocktail.recipes",
       "status": "resolved",
       "calls": [
@@ -1220,7 +1108,7 @@
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 956,
+          "line": 955,
           "value": "valueToWrite",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         }
@@ -1612,7 +1500,7 @@
         {
           "operation": "setItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 648,
+          "line": 646,
           "value": "value",
           "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
@@ -1668,49 +1556,49 @@
         {
           "operation": "getItem",
           "file": "lib/sync/engine.ts",
-          "line": 652,
+          "line": 651,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         },
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 670,
+          "line": 669,
           "value": "value",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         },
         {
           "operation": "removeItem",
           "file": "lib/sync/engine.ts",
-          "line": 672,
+          "line": 671,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         },
         {
           "operation": "getItem",
           "file": "lib/sync/engine.ts",
-          "line": 745,
+          "line": 744,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         },
         {
           "operation": "getItem",
           "file": "lib/sync/engine.ts",
-          "line": 814,
+          "line": 813,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         },
         {
           "operation": "getItem",
           "file": "lib/sync/engine.ts",
-          "line": 834,
+          "line": 833,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         },
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 881,
+          "line": 880,
           "value": "mergedValue",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         }
@@ -1752,14 +1640,14 @@
         {
           "operation": "multiGet",
           "file": "app/data-manager.tsx",
-          "line": 50,
+          "line": 49,
           "value": "",
           "structure": ""
         },
         {
           "operation": "multiRemove",
           "file": "app/data-manager.tsx",
-          "line": 113,
+          "line": 112,
           "value": "",
           "structure": ""
         },
@@ -2452,9 +2340,23 @@
         {
           "operation": "multiRemove",
           "file": "lib/sync/engine.ts",
-          "line": 503,
+          "line": 502,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "retiredKeys",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "multiRemove",
+          "file": "lib/migrations/purge-retired-book-library.ts",
+          "line": 12,
+          "value": "",
+          "structure": ""
         }
       ]
     },
@@ -2984,7 +2886,7 @@
         {
           "operation": "multiGet",
           "file": "lib/backup/local-backup.ts",
-          "line": 465,
+          "line": 463,
           "value": "",
           "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         }
@@ -3019,28 +2921,28 @@
         {
           "operation": "getItem",
           "file": "lib/sync/engine.ts",
-          "line": 641,
+          "line": 640,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         },
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 655,
+          "line": 654,
           "value": "JSON.stringify(backup",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         },
         {
           "operation": "getItem",
           "file": "lib/sync/engine.ts",
-          "line": 665,
+          "line": 664,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         },
         {
           "operation": "getItem",
           "file": "lib/sync/engine.ts",
-          "line": 690,
+          "line": 689,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         }
@@ -3054,21 +2956,21 @@
         {
           "operation": "removeItem",
           "file": "lib/sync/engine.ts",
-          "line": 562,
+          "line": 561,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         },
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 564,
+          "line": 563,
           "value": "JSON.stringify(arr",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         },
         {
           "operation": "getItem",
           "file": "lib/sync/engine.ts",
-          "line": 570,
+          "line": 569,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         }
@@ -3082,14 +2984,14 @@
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 767,
+          "line": 766,
           "value": "String(now",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         },
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 909,
+          "line": 908,
           "value": "String(now",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         }
@@ -3103,28 +3005,28 @@
         {
           "operation": "getItem",
           "file": "lib/sync/engine.ts",
-          "line": 628,
+          "line": 627,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         },
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 632,
+          "line": 631,
           "value": "JSON.stringify(log",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         },
         {
           "operation": "getItem",
           "file": "lib/sync/engine.ts",
-          "line": 640,
+          "line": 639,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         },
         {
           "operation": "getItem",
           "file": "lib/sync/engine.ts",
-          "line": 701,
+          "line": 700,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         }
@@ -3180,14 +3082,14 @@
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 992,
+          "line": 991,
           "value": "String(now",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         },
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 1008,
+          "line": 1007,
           "value": "String(c.remoteTs",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         }
@@ -3201,14 +3103,14 @@
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 950,
+          "line": 949,
           "value": "String(now",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         },
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 957,
+          "line": 956,
           "value": "String(conflict.remoteTs",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         }
@@ -3222,35 +3124,35 @@
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 718,
+          "line": 717,
           "value": "String(now",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         },
         {
           "operation": "getItem",
           "file": "lib/sync/engine.ts",
-          "line": 746,
+          "line": 745,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         },
         {
           "operation": "getItem",
           "file": "lib/sync/engine.ts",
-          "line": 815,
+          "line": 814,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         },
         {
           "operation": "getItem",
           "file": "lib/sync/engine.ts",
-          "line": 835,
+          "line": 834,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         },
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 882,
+          "line": 881,
           "value": "String(remote!.clientUpdatedAt",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         }
@@ -3383,7 +3285,7 @@
         {
           "operation": "multiSet",
           "file": "lib/sync/engine.ts",
-          "line": 502,
+          "line": 501,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         }
@@ -3434,7 +3336,7 @@
         {
           "operation": "multiGet",
           "file": "lib/backup/local-backup.ts",
-          "line": 564,
+          "line": 562,
           "value": "",
           "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         }
@@ -3476,14 +3378,14 @@
         {
           "operation": "multiRemove",
           "file": "lib/sync/engine.ts",
-          "line": 434,
+          "line": 433,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         },
         {
           "operation": "multiRemove",
           "file": "lib/sync/engine.ts",
-          "line": 507,
+          "line": 506,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         }
@@ -3518,51 +3420,9 @@
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 1007,
+          "line": 1006,
           "value": "valueToWrite",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
-        }
-      ]
-    },
-    {
-      "backend": "AsyncStorage",
-      "key": "chapterKey(bookId",
-      "status": "unresolved",
-      "calls": [
-        {
-          "operation": "getItem",
-          "file": "lib/books/store.tsx",
-          "line": 178,
-          "value": "",
-          "structure": "StoredBook, BookStore"
-        },
-        {
-          "operation": "setItem",
-          "file": "lib/books/store.tsx",
-          "line": 187,
-          "value": "idx",
-          "structure": "StoredBook, BookStore"
-        }
-      ]
-    },
-    {
-      "backend": "AsyncStorage",
-      "key": "chapterKey(id",
-      "status": "unresolved",
-      "calls": [
-        {
-          "operation": "setItem",
-          "file": "lib/books/store.tsx",
-          "line": 151,
-          "value": "i",
-          "structure": "StoredBook, BookStore"
-        },
-        {
-          "operation": "removeItem",
-          "file": "lib/books/store.tsx",
-          "line": 206,
-          "value": "",
-          "structure": "StoredBook, BookStore"
         }
       ]
     },
@@ -3574,7 +3434,7 @@
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 956,
+          "line": 955,
           "value": "valueToWrite",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         }
@@ -3609,7 +3469,7 @@
         {
           "operation": "setItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 648,
+          "line": 646,
           "value": "value",
           "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
@@ -3665,49 +3525,49 @@
         {
           "operation": "getItem",
           "file": "lib/sync/engine.ts",
-          "line": 652,
+          "line": 651,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         },
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 670,
+          "line": 669,
           "value": "value",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         },
         {
           "operation": "removeItem",
           "file": "lib/sync/engine.ts",
-          "line": 672,
+          "line": 671,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         },
         {
           "operation": "getItem",
           "file": "lib/sync/engine.ts",
-          "line": 745,
+          "line": 744,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         },
         {
           "operation": "getItem",
           "file": "lib/sync/engine.ts",
-          "line": 814,
+          "line": 813,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         },
         {
           "operation": "getItem",
           "file": "lib/sync/engine.ts",
-          "line": 834,
+          "line": 833,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         },
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 881,
+          "line": 880,
           "value": "mergedValue",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         }
@@ -3749,14 +3609,14 @@
         {
           "operation": "multiGet",
           "file": "app/data-manager.tsx",
-          "line": 50,
+          "line": 49,
           "value": "",
           "structure": ""
         },
         {
           "operation": "multiRemove",
           "file": "app/data-manager.tsx",
-          "line": 113,
+          "line": 112,
           "value": "",
           "structure": ""
         },
@@ -3805,9 +3665,23 @@
         {
           "operation": "multiRemove",
           "file": "lib/sync/engine.ts",
-          "line": 503,
+          "line": 502,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "retiredKeys",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "multiRemove",
+          "file": "lib/migrations/purge-retired-book-library.ts",
+          "line": 12,
+          "value": "",
+          "structure": ""
         }
       ]
     },
@@ -3840,7 +3714,7 @@
         {
           "operation": "multiGet",
           "file": "lib/backup/local-backup.ts",
-          "line": 465,
+          "line": 463,
           "value": "",
           "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         }
@@ -3882,14 +3756,14 @@
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 992,
+          "line": 991,
           "value": "String(now",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         },
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 1008,
+          "line": 1007,
           "value": "String(c.remoteTs",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         }
@@ -3903,14 +3777,14 @@
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 950,
+          "line": 949,
           "value": "String(now",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         },
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 957,
+          "line": 956,
           "value": "String(conflict.remoteTs",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         }
@@ -3924,35 +3798,35 @@
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 718,
+          "line": 717,
           "value": "String(now",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         },
         {
           "operation": "getItem",
           "file": "lib/sync/engine.ts",
-          "line": 746,
+          "line": 745,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         },
         {
           "operation": "getItem",
           "file": "lib/sync/engine.ts",
-          "line": 815,
+          "line": 814,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         },
         {
           "operation": "getItem",
           "file": "lib/sync/engine.ts",
-          "line": 835,
+          "line": 834,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         },
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 882,
+          "line": 881,
           "value": "String(remote!.clientUpdatedAt",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         }
@@ -4001,7 +3875,7 @@
         {
           "operation": "multiSet",
           "file": "lib/sync/engine.ts",
-          "line": 502,
+          "line": 501,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
         }

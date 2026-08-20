@@ -691,7 +691,6 @@ const STORAGE_KEY_LABELS: Record<string, string> = {
   "bottles.taxonomy.styles.v1":    "酒款风格",
   "cocktail.lab.projects":         "研发项目",
   "cocktail.lab.batches":          "研发批次",
-  "cocktail.books.v1":             "书库",
   "menu_store_v1":                 "门店酒单",
   "shopping_store_v1":             "采购清单",
   "cocktail.iceSettings.v2":       "冰块设置",

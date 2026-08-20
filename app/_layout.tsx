@@ -25,7 +25,6 @@ import { BottleTaxonomyProvider } from "@/lib/bottles/taxonomy";
 import { HomemadeProvider } from "@/lib/homemade/store";
 import { IceSettingsProvider } from "@/lib/ice/store";
 import { LabProvider } from "@/lib/lab/store";
-import { BookStoreProvider } from "@/lib/books/store";
 import { MenuProvider } from "@/lib/menu/store";
 import { ShoppingProvider } from "@/lib/shopping/store";
 import { WineProvider } from "@/lib/wine/store";
@@ -56,6 +55,7 @@ import { EquipmentInventoryProvider } from "@/lib/equipment/inventory-store";
 import { ModuleMonthCloseProvider } from "@/lib/month-close/module-month-close-store";
 import { GlobalBusinessMonthProvider } from "@/lib/months/global-business-month";
 import { RawExcelArchiveProvider } from "@/lib/store/monthly-report/raw-excel-archive-store";
+import { purgeRetiredBookLibrary } from "@/lib/migrations/purge-retired-book-library";
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
@@ -92,6 +92,9 @@ export default function RootLayout() {
       cleanLegacyBusinessMonthKeys().then((removed) => {
         if (removed > 0) console.log(`[Startup] 已清理 ${removed} 个旧模块月份键`);
       });
+    });
+    purgeRetiredBookLibrary().then((removed) => {
+      if (removed > 0) console.log(`[Startup] 已永久清理 ${removed} 项退役内容数据`);
     });
   }, []);
 
@@ -150,7 +153,6 @@ export default function RootLayout() {
           <HomemadeProvider>
           <IceSettingsProvider>
           <LabProvider>
-          <BookStoreProvider>
           <MenuPackageProvider>
           <MenuProvider>
           <ShoppingProvider>
@@ -210,11 +212,9 @@ export default function RootLayout() {
               <Stack.Screen name="lab/new" options={{ presentation: "modal" }} />
               <Stack.Screen name="lab/batch-form" options={{ presentation: "modal" }} />
               <Stack.Screen name="lab/compare" />
-              <Stack.Screen name="book-reader" />
               <Stack.Screen name="card-tag-settings" options={{ presentation: "modal" }} />
               <Stack.Screen name="device-manager" options={{ presentation: "modal" }} />
               <Stack.Screen name="pair-device" options={{ presentation: "modal" }} />
-              <Stack.Screen name="book-import" options={{ presentation: "modal" }} />
               <Stack.Screen name="bulk-import" options={{ presentation: "modal" }} />
               <Stack.Screen name="data-manager" options={{ presentation: "modal" }} />
               <Stack.Screen name="me" options={{ presentation: "modal" }} />
@@ -294,7 +294,6 @@ export default function RootLayout() {
           </ShoppingProvider>
           </MenuProvider>
           </MenuPackageProvider>
-          </BookStoreProvider>
           </LabProvider>
           </IceSettingsProvider>
           </HomemadeProvider>

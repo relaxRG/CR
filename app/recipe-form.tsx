@@ -253,7 +253,7 @@ export default function RecipeFormScreen() {
   const { bottles } = useBottleStore();
   const { groupOf } = useBottleTaxonomy();
   const editing = getRecipe(id);
-  // Parse prefill ingredients from JSON string (from book reader extract)
+  // Parse structured prefill ingredients from a supported import flow.
   const prefillIngredientsArr = useMemo<Ingredient[]>(() => {
     if (!prefillIngredients) return [];
     try { return JSON.parse(prefillIngredients) as Ingredient[]; } catch { return []; }
@@ -449,7 +449,7 @@ export default function RecipeFormScreen() {
     if (prefillNotes) setNotes(prefillNotes);
     if (prefillIngredientsArr.length > 0) setIngredients(prefillIngredientsArr);
     if (prefillName || prefillNameEn || prefillIngredientsArr.length > 0) {
-      setImportHint(lang === "zh" ? "已从书库提取配方，请核对后保存" : "Recipe extracted from book. Review before saving.");
+      setImportHint(lang === "zh" ? "已提取配方内容，请核对后保存" : "Recipe content extracted. Review before saving.");
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -1593,7 +1593,7 @@ export default function RecipeFormScreen() {
           {/* Smart import: paste / camera / photos */}
           <SmartImportBar
             targetType="recipe"
-            onExtracted={(item, _all, sourceMeta) => {
+            onExtracted={(item) => {
               if (item.nameZh || item.nameEn) {
                 setName(item.nameZh || item.nameEn);
                 setNameEn(item.nameEn);
@@ -1620,23 +1620,6 @@ export default function RecipeFormScreen() {
               if (item.garnish) setGarnishRows(parseGarnishRows(item.garnish));
               if (item.source) setSource(item.source);
               if (item.notes) setNotes(item.notes);
-              // Apple Books 摘录尾注：本地解析的书名/作者写入结构化引用来源（Bug 9）
-              if (sourceMeta?.bookTitle) {
-                setSourceRef((prev) => ({
-                  ...prev,
-                  bookTitle: sourceMeta.bookTitle,
-                  bookAuthor: sourceMeta.bookAuthor || prev.bookAuthor,
-                  rawText: sourceMeta.rawText || prev.rawText,
-                  sourceConfidence: "high",
-                }));
-                if (!item.source) {
-                  setSource(
-                    sourceMeta.bookAuthor
-                      ? `${sourceMeta.bookTitle} — ${sourceMeta.bookAuthor}`
-                      : sourceMeta.bookTitle,
-                  );
-                }
-              }
               setImportHint(t("smartImport.filled"));
             }}
           />

@@ -38,7 +38,6 @@ export const SYNC_KEYS = [
   "cocktail.lab.projects",
   "cocktail.lab.batches",
   "app.lang.v1",
-  "cocktail.books.v1",
   "menu_store_v1",
   "shopping_store_v1",
   "cocktail.iceSettings.v2",

@@ -27,7 +27,6 @@ const PREP_KEYS = [
   "homemade.types.v1", "homemade.taxonomy.v2",
 ];
 const LAB_KEYS = ["cocktail.lab.projects", "cocktail.lab.batches"];
-const BOOK_KEYS = ["cocktail.books.v1"];
 const MISC_KEYS = ["menu_store_v1", "shopping_store_v1", "cocktail.iceSettings.v2", "card.tag.settings.v2"];
 const SYNC_BASE_KEYS = [
   "cocktail.recipes","cocktail.categories","cocktail.tags","cocktail.tagGroups",
@@ -36,11 +35,11 @@ const SYNC_BASE_KEYS = [
   "homemade.sections.v1","homemade.types.v1",
   "homemade.taxonomy.v2","bottles.taxonomy.categories.v1",
   "bottles.taxonomy.styles.v1","cocktail.lab.projects","cocktail.lab.batches",
-  "app.lang.v1","cocktail.books.v1","menu_store_v1","shopping_store_v1",
+  "app.lang.v1","menu_store_v1","shopping_store_v1",
   "cocktail.iceSettings.v2",
 ];
 const ALL_KEYS = [
-  ...RECIPE_KEYS, ...BOTTLE_KEYS, ...PREP_KEYS, ...LAB_KEYS, ...BOOK_KEYS, ...MISC_KEYS,
+  ...RECIPE_KEYS, ...BOTTLE_KEYS, ...PREP_KEYS, ...LAB_KEYS, ...MISC_KEYS,
   ...SYNC_BASE_KEYS.map((k) => `sync.ts.${k}`),
   "sync.lastPulledAt",
 ];
@@ -146,7 +145,6 @@ export default function DataManagerScreen() {
     { titleKey: "dataManager.clearBottles", descKey: "dataManager.clearBottles.desc", icon: "wineglass.fill", iconBg: "#8B5CF6", keys: BOTTLE_KEYS, confirmKey: "dataManager.confirm.bottles" },
     { titleKey: "dataManager.clearPreps", descKey: "dataManager.clearPreps.desc", icon: "flask.fill", iconBg: "#F59E0B", keys: PREP_KEYS, confirmKey: "dataManager.confirm.preps" },
     { titleKey: "dataManager.clearLab", descKey: "dataManager.clearLab.desc", icon: "cross.vial", iconBg: "#10B981", keys: LAB_KEYS, confirmKey: "dataManager.confirm.lab" },
-    { titleKey: "dataManager.clearBooks", descKey: "dataManager.clearBooks.desc", icon: "book.fill", iconBg: "#EC4899", keys: BOOK_KEYS, confirmKey: "dataManager.confirm.books" },
   ];
 
   return (

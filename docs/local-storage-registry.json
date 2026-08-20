@@ -1,8 +1,8 @@
 {
-  "version": 1,
+  "version": 2,
   "generatedFrom": "docs/local-storage-schema.json",
-  "entryCount": 129,
-  "dynamicEntryCount": 26,
+  "entryCount": 125,
+  "dynamicEntryCount": 25,
   "entries": [
     {
       "backend": "AsyncStorage",
@@ -404,62 +404,11 @@
     },
     {
       "backend": "AsyncStorage",
-      "key": "chapterKey(bookId",
-      "status": "unresolved",
-      "classification": "S0-public",
-      "ownerFiles": [
-        "lib/books/store.tsx"
-      ],
-      "operations": [
-        "getItem",
-        "setItem"
-      ],
-      "dynamic": true,
-      "purgeOn": [
-        "version-retirement"
-      ]
-    },
-    {
-      "backend": "AsyncStorage",
-      "key": "chapterKey(id",
-      "status": "unresolved",
-      "classification": "S0-public",
-      "ownerFiles": [
-        "lib/books/store.tsx"
-      ],
-      "operations": [
-        "removeItem",
-        "setItem"
-      ],
-      "dynamic": true,
-      "purgeOn": [
-        "version-retirement"
-      ]
-    },
-    {
-      "backend": "AsyncStorage",
       "key": "cocktail_recent_units",
       "status": "resolved",
       "classification": "S0-public",
       "ownerFiles": [
         "hooks/use-recent-units.ts"
-      ],
-      "operations": [
-        "getItem",
-        "setItem"
-      ],
-      "dynamic": false,
-      "purgeOn": [
-        "version-retirement"
-      ]
-    },
-    {
-      "backend": "AsyncStorage",
-      "key": "cocktail.books.v1",
-      "status": "resolved",
-      "classification": "S0-public",
-      "ownerFiles": [
-        "lib/books/store.tsx"
       ],
       "operations": [
         "getItem",
@@ -596,40 +545,6 @@
       "classification": "S0-public",
       "ownerFiles": [
         "lib/recipes/store.tsx"
-      ],
-      "operations": [
-        "getItem",
-        "setItem"
-      ],
-      "dynamic": false,
-      "purgeOn": [
-        "version-retirement"
-      ]
-    },
-    {
-      "backend": "AsyncStorage",
-      "key": "cocktail.reader.highlights.v1.${id}",
-      "status": "resolved",
-      "classification": "S0-public",
-      "ownerFiles": [
-        "app/book-reader.tsx"
-      ],
-      "operations": [
-        "getItem",
-        "setItem"
-      ],
-      "dynamic": false,
-      "purgeOn": [
-        "version-retirement"
-      ]
-    },
-    {
-      "backend": "AsyncStorage",
-      "key": "cocktail.reader.settings.v1.${id}",
-      "status": "resolved",
-      "classification": "S0-public",
-      "ownerFiles": [
-        "app/book-reader.tsx"
       ],
       "operations": [
         "getItem",
@@ -1490,6 +1405,22 @@
     },
     {
       "backend": "AsyncStorage",
+      "key": "retiredKeys",
+      "status": "unresolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/migrations/purge-retired-book-library.ts"
+      ],
+      "operations": [
+        "multiRemove"
+      ],
+      "dynamic": true,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
       "key": "schedule.business_hours.v1",
       "status": "resolved",
       "classification": "S0-public",
@@ -2197,6 +2128,26 @@
     },
     {
       "backend": "SecureStore",
+      "key": "cf.sync.{deviceId|groupId|deviceName}",
+      "status": "pattern",
+      "classification": "S2-credential",
+      "ownerFiles": [
+        "lib/cf-sync/client.ts"
+      ],
+      "operations": [
+        "deleteItemAsync",
+        "getItemAsync",
+        "setItemAsync"
+      ],
+      "dynamic": true,
+      "purgeOn": [
+        "logout",
+        "leave-group",
+        "switch-complete"
+      ]
+    },
+    {
+      "backend": "SecureStore",
       "key": "cf.sync.deviceToken",
       "status": "resolved",
       "classification": "S2-credential",
@@ -2217,46 +2168,9 @@
     },
     {
       "backend": "SecureStore",
-      "key": "key",
-      "status": "unresolved",
-      "classification": "S0-public",
-      "ownerFiles": [
-        "lib/cf-sync/client.ts"
-      ],
-      "operations": [
-        "deleteItemAsync",
-        "getItemAsync",
-        "setItemAsync"
-      ],
-      "dynamic": true,
-      "purgeOn": [
-        "version-retirement"
-      ]
-    },
-    {
-      "backend": "SecureStore",
-      "key": "manus-runtime-user-info",
-      "status": "resolved",
-      "classification": "S1-business",
-      "ownerFiles": [
-        "lib/_core/auth.ts"
-      ],
-      "operations": [
-        "deleteItemAsync",
-        "getItemAsync",
-        "setItemAsync"
-      ],
-      "dynamic": false,
-      "purgeOn": [
-        "leave-group",
-        "version-retirement"
-      ]
-    },
-    {
-      "backend": "SecureStore",
-      "key": "ticketKey(switchId",
-      "status": "unresolved",
-      "classification": "S0-public",
+      "key": "cf.sync.groupSwitchTicket.{switchId}",
+      "status": "pattern",
+      "classification": "S2-credential",
       "ownerFiles": [
         "lib/cf-sync/group-switch.ts"
       ],
@@ -2267,7 +2181,29 @@
       ],
       "dynamic": true,
       "purgeOn": [
-        "version-retirement"
+        "logout",
+        "leave-group",
+        "switch-complete"
+      ]
+    },
+    {
+      "backend": "SecureStore",
+      "key": "manus-runtime-user-info",
+      "status": "resolved",
+      "classification": "S2-credential",
+      "ownerFiles": [
+        "lib/_core/auth.ts"
+      ],
+      "operations": [
+        "deleteItemAsync",
+        "getItemAsync",
+        "setItemAsync"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "logout",
+        "leave-group",
+        "switch-complete"
       ]
     }
   ]

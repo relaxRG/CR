@@ -152,20 +152,6 @@ export default function MeScreen() {
             </Pressable>
             <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 64 }} />
             <Pressable
-              onPress={() => { tap(); router.push("/book-import"); }}
-              style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
-            >
-              <View style={[styles.iconWrap, { backgroundColor: "#FF9500" }]}>
-                <IconSymbol name="book.fill" size={18} color="#FFFFFF" />
-              </View>
-              <View style={styles.rowContent}>
-                <Text style={styles.rowTitle} className="text-foreground">{t("me.bookImport")}</Text>
-                <Text style={styles.rowDesc} className="text-muted" numberOfLines={2}>{t("me.bookImport.desc")}</Text>
-              </View>
-              <IconSymbol name="chevron.right" size={18} color={colors.muted} />
-            </Pressable>
-            <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 64 }} />
-            <Pressable
               onPress={() => { tap(); router.push("/ice-settings"); }}
               style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
             >

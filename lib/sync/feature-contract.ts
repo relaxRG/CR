@@ -47,7 +47,6 @@ export const FEATURE_CONTRACTS = [
   defineFeatureContract({ id: "lab.projects", label: "研发项目", resource: "lab_projects", actions: { open: "lab_projects.view", edit: "lab_projects.edit" }, sync: "shared", storageKeys: ["cocktail.lab.projects"], offline: cachedEditable }),
   defineFeatureContract({ id: "lab.batches", label: "研发批次", resource: "lab_batches", actions: { open: "lab_batches.view", edit: "lab_batches.edit" }, sync: "shared", storageKeys: ["cocktail.lab.batches"], offline: cachedEditable }),
   defineFeatureContract({ id: "lab.plan", label: "研发计划", resource: "lab_plan", actions: { open: "lab_plan.view", edit: "lab_plan.edit" }, sync: "shared", storageKeys: ["lab.plan.v1"], offline: cachedEditable }),
-  defineFeatureContract({ id: "books.workspace", label: "书库", resource: "books", actions: { open: "books.view", manage: "books.manage" }, sync: "shared", storageKeys: ["cocktail.books.v1"], offline: { ...cachedReadOnly, requiresOnlineActions: ["manage"] } }),
 
   // 酒单、采购、餐食与葡萄酒
   defineFeatureContract({ id: "menu.workspace", label: "门店酒单", resource: "menu", actions: { open: "menu.view", edit: "menu.edit" }, sync: "shared", storageKeys: ["menu_store_v1", "menu.packages.v1"], offline: cachedEditable }),

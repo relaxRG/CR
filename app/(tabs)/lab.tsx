@@ -1,5 +1,5 @@
 /**
- * 研发 Tab（清单 / 计划清单 / 研发计划 / 书库）
+ * 研发 Tab（清单 / 计划清单 / 研发计划）
  * 【清单】从门店迁移过来，优先展示（在售清单 / 采购清单）
  */
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -10,19 +10,17 @@ import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useLabStore } from "@/lib/lab/store";
 import { useLabPlanStore } from "@/lib/lab/plan-store";
 import { LabIndexScreen } from "../lab/projects";
-import BooksScreen from "./books";
 import LabPlanScreen from "../lab/plan";
 import StoreSaleScreen from "@/components/store/sale";
 import StorePurchaseScreen from "@/components/store/purchase";
 
-type LabTab = "list" | "plan" | "rd" | "books";
+type LabTab = "list" | "plan" | "rd";
 type ListSubTab = "sale" | "purchase";
 
 const TABS: { key: LabTab; label: string }[] = [
   { key: "list",  label: "清单" },
   { key: "plan",  label: "计划清单" },
   { key: "rd",    label: "研发计划" },
-  { key: "books", label: "书库" },
 ];
 
 const LIST_SUBTABS: { key: ListSubTab; label: string }[] = [
@@ -43,17 +41,14 @@ export default function LabScreen() {
   const title =
     tab === "list"  ? "清单"
     : tab === "plan"  ? "计划清单"
-    : tab === "rd"    ? "研发计划"
-    : "书库";
+    : "研发计划";
 
   const subtitle =
     tab === "list"
       ? "在售清单 · 采购清单"
       : tab === "plan"
         ? items.length > 0 ? `${items.filter((i) => i.status === "pending").length} 项待处理 · 共 ${items.length} 项` : "规划下一步研发方向"
-        : tab === "rd"
-          ? projects.length > 0 ? `${projects.length} 个研发项目` : "实验与迭代"
-          : "调酒参考书库";
+        : projects.length > 0 ? `${projects.length} 个研发项目` : "实验与迭代";
 
   const childInsets = { ...insets, top: 0 };
 
@@ -133,10 +128,6 @@ export default function LabScreen() {
         {/* 研发计划 */}
         <View style={[{ flex: 1 }, tab !== "rd" && styles.hidden]}>
           <LabIndexScreen embedded />
-        </View>
-        {/* 书库 */}
-        <View style={[{ flex: 1 }, tab !== "books" && styles.hidden]}>
-          <BooksScreen />
         </View>
       </SafeAreaInsetsContext.Provider>
     </View>

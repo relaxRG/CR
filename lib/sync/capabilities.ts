@@ -28,7 +28,6 @@ export const CAPABILITY_RESOURCES = [
   "lab_projects",
   "lab_batches",
   "lab_plan",
-  "books",
   "menu",
   "shopping",
   "wine_catalog",
@@ -75,7 +74,7 @@ export type BusinessTabGrant = `${BusinessTab}.access`;
 export const BUSINESS_TAB_GRANTS = BUSINESS_TABS.map((tab) => `${tab}.access` as BusinessTabGrant);
 
 export const BUSINESS_TAB_RESOURCES: Readonly<Record<BusinessTab, readonly CapabilityResource[]>> = {
-  cocktail: ["recipes", "bottles", "homemade", "books", "menu", "shopping"],
+  cocktail: ["recipes", "bottles", "homemade", "menu", "shopping"],
   wine: ["wine_catalog", "inventory_wine"],
   lab: ["lab_projects", "lab_batches", "lab_plan"],
   food: ["food_menu", "food_ingredients", "inventory_food"],
@@ -155,7 +154,6 @@ export const STORAGE_POLICY: Readonly<Record<SyncStorageKey, StorageCapabilityPo
   "lab.plan.v1": policy("lab_plan.view", "lab_plan.edit"),
 
   // 用户内容、酒单和采购
-  "cocktail.books.v1": policy("books.view", "books.manage"),
   "menu_store_v1": policy("menu.view", "menu.edit"),
   "menu.packages.v1": policy("menu.view", "menu.edit"),
   "shopping_store_v1": policy("shopping.view", "shopping.edit"),

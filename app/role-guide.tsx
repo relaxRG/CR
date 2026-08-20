@@ -14,7 +14,7 @@ type TabGuide = {
 };
 
 const TAB_GUIDE: Record<BusinessTab, TabGuide> = {
-  cocktail: { zh: "鸡尾酒", en: "Cocktail", descriptionZh: "配方、酒款、自制、书库、酒单与采购", descriptionEn: "Recipes, bottles, homemade, books, menus and shopping" },
+  cocktail: { zh: "鸡尾酒", en: "Cocktail", descriptionZh: "配方、酒款、自制、酒单与采购", descriptionEn: "Recipes, bottles, homemade, menus and shopping" },
   wine: { zh: "葡萄酒", en: "Wine", descriptionZh: "葡萄酒档案、库存、采购与供应商关联", descriptionEn: "Wine catalog, inventory, purchasing and supplier links" },
   lab: { zh: "研发", en: "Lab", descriptionZh: "研发项目、批次、计划与自制研发数据", descriptionEn: "Projects, batches, plans and R&D data" },
   food: { zh: "餐食", en: "Food", descriptionZh: "菜单、食材、采购和食材库存", descriptionEn: "Menus, ingredients, purchasing and food inventory" },

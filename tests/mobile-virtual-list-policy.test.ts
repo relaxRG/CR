@@ -7,7 +7,6 @@ import {
 } from "../lib/performance/mobile-virtual-list-policy";
 
 const flatListFiles = [
-  "app/(tabs)/books.tsx",
   "app/(tabs)/bottles.tsx",
   "app/(tabs)/food.tsx",
   "app/(tabs)/homemade.tsx",

@@ -1,6 +1,6 @@
 # 本地存储键与数据结构清单
 
-> 由 `pnpm audit:storage` 从生产源代码生成；生成时间：2026-08-20T06:33:34.945Z。
+> 由 `pnpm audit:storage` 从生产源代码生成；生成时间：2026-08-20T07:02:07.143Z。
 > 本清单覆盖 `AsyncStorage`、`SecureStore`、Web `localStorage` 与通用库存工厂传入的键。`{variable}` 表示按运行时参数生成的键模式。
 
 ## 已解析键
@@ -26,7 +26,6 @@
 | AsyncStorage | `cf.sync.groupSwitchSession.v1` | setItem, removeItem, getItem | `JSON.stringify(session` | PersistedGroupSwitchSession | `lib/cf-sync/group-switch.ts:91`<br>`lib/cf-sync/group-switch.ts:96`<br>`lib/cf-sync/group-switch.ts:103` |
 | AsyncStorage | `cf.sync.switchDiagnostics.v1` | getItem, setItem | `JSON.stringify(entries` | 见源文件的写入表达式 | `lib/cf-sync/switch-diagnostics.ts:76`<br>`lib/cf-sync/switch-diagnostics.ts:80`<br>`lib/cf-sync/switch-diagnostics.ts:88` |
 | AsyncStorage | `cocktail_recent_units` | getItem, setItem | `JSON.stringify(next` | 见源文件的写入表达式 | `hooks/use-recent-units.ts:15`<br>`hooks/use-recent-units.ts:30` |
-| AsyncStorage | `cocktail.books.v1` | getItem, setItem | `JSON.stringify(next` | StoredBook, BookStore | `lib/books/store.tsx:99`<br>`lib/books/store.tsx:117`<br>`lib/books/store.tsx:181` |
 | AsyncStorage | `cocktail.bottles` | getItem, setItem | `JSON.stringify(list；JSON.stringify(next` | BottleStore | `lib/bottles/store.tsx:94`<br>`lib/bottles/store.tsx:114`<br>`lib/bottles/store.tsx:128`<br>`lib/bottles/store.tsx:141`<br>`lib/bottles/store.tsx:158`<br>`lib/bottles/store.tsx:181`<br>`lib/bottles/store.tsx:278`<br>`lib/bottles/store.tsx:297`<br>`lib/bottles/store.tsx:310` |
 | AsyncStorage | `cocktail.bottles.seeded` | getItem, setItem | `SEED_VERSION` | BottleStore | `lib/bottles/store.tsx:95`<br>`lib/bottles/store.tsx:160` |
 | AsyncStorage | `cocktail.categories` | getItem, setItem | `JSON.stringify(cats；JSON.stringify(next` | RecipeStore | `lib/recipes/store.tsx:49`<br>`lib/recipes/store.tsx:232`<br>`lib/recipes/store.tsx:278`<br>`lib/recipes/store.tsx:464` |
@@ -35,8 +34,6 @@
 | AsyncStorage | `cocktail.lab.batches` | getItem, setItem | `JSON.stringify(next` | LabStore | `lib/lab/store.tsx:71`<br>`lib/lab/store.tsx:90`<br>`lib/lab/store.tsx:105` |
 | AsyncStorage | `cocktail.lab.projects` | getItem, setItem | `JSON.stringify(next` | LabStore | `lib/lab/store.tsx:70`<br>`lib/lab/store.tsx:89`<br>`lib/lab/store.tsx:100` |
 | AsyncStorage | `cocktail.prefs.v1` | getItem, setItem | `JSON.stringify(loadedPrefs；JSON.stringify(next` | RecipeStore | `lib/recipes/store.tsx:53`<br>`lib/recipes/store.tsx:398`<br>`lib/recipes/store.tsx:421`<br>`lib/recipes/store.tsx:718` |
-| AsyncStorage | `cocktail.reader.highlights.v1.${id}` | getItem, setItem | `JSON.stringify(highlights` | ReviewItem | `app/book-reader.tsx:868`<br>`app/book-reader.tsx:897` |
-| AsyncStorage | `cocktail.reader.settings.v1.${id}` | getItem, setItem | `JSON.stringify({ fontSize` | ReviewItem | `app/book-reader.tsx:855`<br>`app/book-reader.tsx:877` |
 | AsyncStorage | `cocktail.recipes` | getItem, setItem | `JSON.stringify(recs；JSON.stringify(next；JSON.stringify(data.list` | RecipeStore | `lib/recipes/store.tsx:48`<br>`lib/recipes/store.tsx:231`<br>`lib/recipes/store.tsx:284`<br>`lib/recipes/store.tsx:458`<br>`lib/sync/photo-sync.ts:147`<br>`lib/sync/photo-sync.ts:330` |
 | AsyncStorage | `cocktail.seeded` | getItem, setItem | `"1"` | RecipeStore | `lib/recipes/store.tsx:233`<br>`lib/recipes/store.tsx:280` |
 | AsyncStorage | `cocktail.tagGroups` | getItem, setItem | `JSON.stringify(mutableGroupList；JSON.stringify(next` | RecipeStore | `lib/recipes/store.tsx:51`<br>`lib/recipes/store.tsx:235`<br>`lib/recipes/store.tsx:356`<br>`lib/recipes/store.tsx:365`<br>`lib/recipes/store.tsx:378`<br>`lib/recipes/store.tsx:478` |
@@ -105,10 +102,10 @@
 | AsyncStorage | `store.purchase.v1` | getItem, setItem | `JSON.stringify(next` | PurchaseItem | `components/store/purchase.tsx:42`<br>`components/store/purchase.tsx:48` |
 | AsyncStorage | `store.revenue.v1` | getItem, setItem | `JSON.stringify(state` | RevenueCategory, RevenueRecord, StaffRecord, RevenueState | `lib/store/revenue-store.tsx:94`<br>`lib/store/revenue-store.tsx:98`<br>`lib/store/revenue-store.tsx:105` |
 | AsyncStorage | `supplier.match.memory.v1` | getItem, setItem | `JSON.stringify(memory` | 见源文件的写入表达式 | `lib/store/supplier-import.ts:113`<br>`lib/store/supplier-import.ts:122` |
-| AsyncStorage | `sync.backup.v1` | getItem, setItem | `JSON.stringify(backup` | PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState | `lib/sync/engine.ts:641`<br>`lib/sync/engine.ts:655`<br>`lib/sync/engine.ts:665`<br>`lib/sync/engine.ts:690` |
-| AsyncStorage | `sync.dirtyKeys.pending` | removeItem, setItem, getItem | `JSON.stringify(arr` | PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState | `lib/sync/engine.ts:562`<br>`lib/sync/engine.ts:564`<br>`lib/sync/engine.ts:570` |
-| AsyncStorage | `sync.lastPulledAt` | setItem | `String(now` | PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState | `lib/sync/engine.ts:767`<br>`lib/sync/engine.ts:909` |
-| AsyncStorage | `sync.log.v1` | getItem, setItem | `JSON.stringify(log` | PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState | `lib/sync/engine.ts:628`<br>`lib/sync/engine.ts:632`<br>`lib/sync/engine.ts:640`<br>`lib/sync/engine.ts:701` |
+| AsyncStorage | `sync.backup.v1` | getItem, setItem | `JSON.stringify(backup` | PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState | `lib/sync/engine.ts:640`<br>`lib/sync/engine.ts:654`<br>`lib/sync/engine.ts:664`<br>`lib/sync/engine.ts:689` |
+| AsyncStorage | `sync.dirtyKeys.pending` | removeItem, setItem, getItem | `JSON.stringify(arr` | PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState | `lib/sync/engine.ts:561`<br>`lib/sync/engine.ts:563`<br>`lib/sync/engine.ts:569` |
+| AsyncStorage | `sync.lastPulledAt` | setItem | `String(now` | PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState | `lib/sync/engine.ts:766`<br>`lib/sync/engine.ts:908` |
+| AsyncStorage | `sync.log.v1` | getItem, setItem | `JSON.stringify(log` | PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState | `lib/sync/engine.ts:627`<br>`lib/sync/engine.ts:631`<br>`lib/sync/engine.ts:639`<br>`lib/sync/engine.ts:700` |
 | AsyncStorage | `tableware.inventory.v1` | factory-key | `GenericInventoryState` | GenericInventoryState, GenericInventoryItem, PurchaseRecord, ConsumeRecord, MonthlySnapshot | `lib/tableware/inventory-store.tsx:8` |
 | AsyncStorage | `wine.bottles.v1` | getItem, setItem | `JSON.stringify(state` | WineState, WineSnapshotState, WineImportControlState, SnapshotAction, WineSnapshotContextValue | `lib/wine/store.tsx:178`<br>`lib/wine/store.tsx:210` |
 | AsyncStorage | `wine.import_control.v1` | getItem, setItem | `JSON.stringify(importControlState` | WineState, WineSnapshotState, WineImportControlState, SnapshotAction, WineSnapshotContextValue | `lib/wine/store.tsx:202`<br>`lib/wine/store.tsx:225` |
@@ -120,27 +117,26 @@
 | 后端 | 表达式 | 操作 | 源文件 |
 |---|---|---|---|
 | AsyncStorage | `[...LEGACY_MONTH_KEYS]` | multiGet, multiRemove | `lib/migrations/clean-legacy-business-month-keys.ts:17`<br>`lib/migrations/clean-legacy-business-month-keys.ts:19` |
-| AsyncStorage | `[...SYNC_KEYS]` | multiGet | `lib/backup/icloud-backup.ts:137`<br>`lib/backup/local-backup.ts:172`<br>`lib/backup/local-backup.ts:564` |
+| AsyncStorage | `[...SYNC_KEYS]` | multiGet | `lib/backup/icloud-backup.ts:137`<br>`lib/backup/local-backup.ts:172`<br>`lib/backup/local-backup.ts:562` |
 | AsyncStorage | `["cocktail.recipes"` | multiGet | `app/backup.tsx:72` |
 | AsyncStorage | `["labor_schedule_snapshots_v1"` | multiRemove | `lib/labor/store.tsx:1053` |
-| AsyncStorage | `[DIRTY_KEYS_PERSIST_KEY` | multiRemove | `lib/sync/engine.ts:434`<br>`lib/sync/engine.ts:507` |
+| AsyncStorage | `[DIRTY_KEYS_PERSIST_KEY` | multiRemove | `lib/sync/engine.ts:433`<br>`lib/sync/engine.ts:506` |
 | AsyncStorage | `base` | setItem, getItem | `lib/backup/local-backup.ts:120`<br>`lib/backup/local-backup.ts:145` |
-| AsyncStorage | `c.storageKey` | setItem | `lib/sync/engine.ts:1007` |
-| AsyncStorage | `chapterKey(bookId` | getItem, setItem | `lib/books/store.tsx:178`<br>`lib/books/store.tsx:187` |
-| AsyncStorage | `chapterKey(id` | setItem, removeItem | `lib/books/store.tsx:151`<br>`lib/books/store.tsx:206` |
-| AsyncStorage | `conflict.storageKey` | setItem | `lib/sync/engine.ts:956` |
-| AsyncStorage | `key` | getItem, setItem, removeItem | `hooks/use-persisted-state.ts:14`<br>`hooks/use-persisted-state.ts:37`<br>`lib/backup/icloud-backup.ts:248`<br>`lib/backup/local-backup.ts:648`<br>`lib/cf-sync/client.ts:42`<br>`lib/cf-sync/client.ts:50`<br>`lib/cf-sync/client.ts:57`<br>`lib/labor/store.tsx:53`<br>`lib/labor/store.tsx:66`<br>`lib/labor/store.tsx:80`<br>`lib/labor/store.tsx:91`<br>`lib/sync/engine.ts:652`<br>`lib/sync/engine.ts:670`<br>`lib/sync/engine.ts:672`<br>`lib/sync/engine.ts:745`<br>`lib/sync/engine.ts:814`<br>`lib/sync/engine.ts:834`<br>`lib/sync/engine.ts:881` |
+| AsyncStorage | `c.storageKey` | setItem | `lib/sync/engine.ts:1006` |
+| AsyncStorage | `conflict.storageKey` | setItem | `lib/sync/engine.ts:955` |
+| AsyncStorage | `key` | getItem, setItem, removeItem | `hooks/use-persisted-state.ts:14`<br>`hooks/use-persisted-state.ts:37`<br>`lib/backup/icloud-backup.ts:248`<br>`lib/backup/local-backup.ts:646`<br>`lib/cf-sync/client.ts:42`<br>`lib/cf-sync/client.ts:50`<br>`lib/cf-sync/client.ts:57`<br>`lib/labor/store.tsx:53`<br>`lib/labor/store.tsx:66`<br>`lib/labor/store.tsx:80`<br>`lib/labor/store.tsx:91`<br>`lib/sync/engine.ts:651`<br>`lib/sync/engine.ts:669`<br>`lib/sync/engine.ts:671`<br>`lib/sync/engine.ts:744`<br>`lib/sync/engine.ts:813`<br>`lib/sync/engine.ts:833`<br>`lib/sync/engine.ts:880` |
 | SecureStore | `key` | setItemAsync, getItemAsync, deleteItemAsync | `lib/cf-sync/client.ts:44`<br>`lib/cf-sync/client.ts:52`<br>`lib/cf-sync/client.ts:59` |
-| AsyncStorage | `keys` | multiGet, multiRemove | `app/data-manager.tsx:50`<br>`app/data-manager.tsx:113`<br>`lib/backup/local-backup.ts:112`<br>`lib/backup/local-backup.ts:251`<br>`lib/backup/local-backup.ts:360` |
-| AsyncStorage | `removals` | multiRemove | `lib/backup/local-backup.ts:320`<br>`lib/backup/local-backup.ts:368`<br>`lib/sync/engine.ts:503` |
+| AsyncStorage | `keys` | multiGet, multiRemove | `app/data-manager.tsx:49`<br>`app/data-manager.tsx:112`<br>`lib/backup/local-backup.ts:112`<br>`lib/backup/local-backup.ts:251`<br>`lib/backup/local-backup.ts:360` |
+| AsyncStorage | `removals` | multiRemove | `lib/backup/local-backup.ts:320`<br>`lib/backup/local-backup.ts:368`<br>`lib/sync/engine.ts:502` |
+| AsyncStorage | `retiredKeys` | multiRemove | `lib/migrations/purge-retired-book-library.ts:12` |
 | AsyncStorage | `storageKey` | getItem, setItem | `lib/inventory-core/store.tsx:173`<br>`lib/inventory-core/store.tsx:182` |
-| AsyncStorage | `SUMMARY_KEYS` | multiGet | `lib/backup/local-backup.ts:465` |
+| AsyncStorage | `SUMMARY_KEYS` | multiGet | `lib/backup/local-backup.ts:463` |
 | SecureStore | `ticketKey(switchId` | setItemAsync, getItemAsync, deleteItemAsync | `lib/cf-sync/group-switch.ts:74`<br>`lib/cf-sync/group-switch.ts:79`<br>`lib/cf-sync/group-switch.ts:87` |
-| AsyncStorage | `TS_PREFIX + c.storageKey` | setItem | `lib/sync/engine.ts:992`<br>`lib/sync/engine.ts:1008` |
-| AsyncStorage | `TS_PREFIX + conflict.storageKey` | setItem | `lib/sync/engine.ts:950`<br>`lib/sync/engine.ts:957` |
-| AsyncStorage | `TS_PREFIX + key` | setItem, getItem | `lib/sync/engine.ts:718`<br>`lib/sync/engine.ts:746`<br>`lib/sync/engine.ts:815`<br>`lib/sync/engine.ts:835`<br>`lib/sync/engine.ts:882` |
+| AsyncStorage | `TS_PREFIX + c.storageKey` | setItem | `lib/sync/engine.ts:991`<br>`lib/sync/engine.ts:1007` |
+| AsyncStorage | `TS_PREFIX + conflict.storageKey` | setItem | `lib/sync/engine.ts:949`<br>`lib/sync/engine.ts:956` |
+| AsyncStorage | `TS_PREFIX + key` | setItem, getItem | `lib/sync/engine.ts:717`<br>`lib/sync/engine.ts:745`<br>`lib/sync/engine.ts:814`<br>`lib/sync/engine.ts:834`<br>`lib/sync/engine.ts:881` |
 | AsyncStorage | `uploadedSetKey(groupId` | getItem, setItem | `lib/sync/photo-sync.ts:105`<br>`lib/sync/photo-sync.ts:113` |
-| AsyncStorage | `writes` | multiSet | `lib/backup/local-backup.ts:321`<br>`lib/backup/local-backup.ts:369`<br>`lib/sync/engine.ts:502` |
+| AsyncStorage | `writes` | multiSet | `lib/backup/local-backup.ts:321`<br>`lib/backup/local-backup.ts:369`<br>`lib/sync/engine.ts:501` |
 
 ## 维护规则
 

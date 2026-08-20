@@ -407,7 +407,6 @@ export type DataCounts = {
   foodIngredients: number;
   labProjects: number;
   labPlan: number;
-  books: number;
   employees: number;
   paySlips: number;
   monthlyReports: number;
@@ -440,7 +439,6 @@ function parseDataCounts(data: Record<string, string | null>): DataCounts {
     foodIngredients: parse("food.ingredients.v2"),
     labProjects:    parse("cocktail.lab.projects"),
     labPlan:        parse("lab.plan.v1"),
-    books:          parse("cocktail.books.v1"),
     employees:      parse("labor_employees_v1"),
     paySlips:       parse("labor_payslips_v1"),
     monthlyReports: parse("monthly_summary.reports.v1"),
@@ -458,7 +456,7 @@ export async function computeSnapshotDiff(slot: number): Promise<{
   const SUMMARY_KEYS = [
     "cocktail.recipes", "cocktail.bottles", "homemade.preps.v1",
     "wine.bottles.v1", "food.menu.v1", "food.ingredients.v2",
-    "cocktail.lab.projects", "lab.plan.v1", "cocktail.books.v1",
+    "cocktail.lab.projects", "lab.plan.v1",
     "labor_employees_v1", "labor_payslips_v1",
     "monthly_summary.reports.v1", "store.petty.v1",
   ];

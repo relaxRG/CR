@@ -28,8 +28,6 @@ import { useRecipeStore } from "@/lib/recipes/store";
 import { useBottleTaxonomy } from "@/lib/bottles/taxonomy";
 import { normalizeStyleToTaxonomy } from "@/lib/bottles/style-normalize";
 import { enrichBottle, deepAnalyzeBottle, OfflineError } from "@/lib/api/smart-router";
-import { lookupInOfflineKb, extractBookSnippets, offlineEntryToEnrichResult } from "@/lib/bottles/offline-lookup";
-import { useBookStore } from "@/lib/books/store";
 import * as ImagePicker from "expo-image-picker";
 import { BOTTLE_GROUPS, bottleGroupOf } from "@/lib/bottles/types";
 
@@ -69,7 +67,6 @@ export default function BottleFormScreen() {
     return () => { isMountedRef.current = false; };
   }, []);
   const { isOnline } = useNetwork();
-  const { books } = useBookStore();
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [nameZh, setNameZh] = useState(editing?.nameZh ?? prefillNameAlt ?? "");
@@ -325,64 +322,12 @@ export default function BottleFormScreen() {
     const query = [nameZh.trim(), nameEn.trim(), brand.trim()].filter(Boolean).join(" ");
     if (!query && !opts.imageBase64) return;
     if (!isOnline) {
-      // 离线时：尝试从本地知识库 + 书库文本补全
-      if (opts.imageBase64) {
-        // 照片识别需要联网，离线无法处理
-        if (opts.mode !== "auto") Alert.alert(t("offline.title"), t("offline.aiUnavailable"));
-        return;
-      }
-      setLookupStatus(null);
-      setLookupBusy(opts.mode);
-      try {
-        // 1. 先查内置离线知识库
-        const kbResult = lookupInOfflineKb({
-          nameZh: nameZh.trim() || undefined,
-          nameEn: nameEn.trim() || undefined,
-          brand: brand.trim() || undefined,
-          category: category || undefined,
-        });
-
-        // 2. 从书库中提取相关段落
-        const allSections = books.flatMap((b) => b.sections ?? []);
-        const bookSnippets = extractBookSnippets({
-          nameZh: nameZh.trim() || undefined,
-          nameEn: nameEn.trim() || undefined,
-          brand: brand.trim() || undefined,
-          bookSections: allSections,
-        });
-
-        if (kbResult.found && kbResult.entry) {
-          const result = offlineEntryToEnrichResult(kbResult.entry, bookSnippets);
-          if (!isMountedRef.current) return;
-          setAiResult(result);
-          const snippetInfo = bookSnippets.length > 0 ? `，并在书库中找到 ${bookSnippets.length} 处相关段落` : "";
-          setLookupStatus({ kind: "warn", msg: lang === "zh" ? `离线模式：已从本地知识库补全${snippetInfo}` : `Offline: filled from local knowledge base${snippetInfo}` });
-        } else if (bookSnippets.length > 0) {
-          // 知识库没找到，但书库有相关内容，给出提示
-          if (!isMountedRef.current) return;
-          setLookupStatus({ kind: "warn", msg: lang === "zh" ? `离线模式：未在知识库中找到，但书库中有 ${bookSnippets.length} 处相关段落，联网后可获得完整补全` : `Offline: not in local KB, but found ${bookSnippets.length} book snippets. Connect for full AI lookup.` });
-        } else {
-          if (!isMountedRef.current) return;
-          if (opts.mode !== "auto") {
-            setLookupStatus({ kind: "err", msg: lang === "zh" ? "离线模式：未在本地知识库中找到该酒款，请联网后重试" : "Offline: not found in local KB, please connect to internet" });
-          }
-        }
-      } finally {
-        if (isMountedRef.current) setLookupBusy(null);
-      }
+      if (opts.mode !== "auto") Alert.alert(t("offline.title"), t("offline.aiUnavailable"));
       return;
     }
     setLookupStatus(null);
     setLookupBusy(opts.mode);
     try {
-      // 提取书库片段，传给服务器作为上下文（AI 补全时参考用户书库内容）
-      const allSectionsOnline = books.flatMap((b) => b.sections ?? []);
-      const onlineBookSnippets = extractBookSnippets({
-        nameZh: nameZh.trim() || undefined,
-        nameEn: nameEn.trim() || undefined,
-        brand: brand.trim() || undefined,
-        bookSections: allSectionsOnline,
-      });
       const enrichInput = {
         nameZh: nameZh.trim() || undefined,
         nameEn: nameEn.trim() || undefined,
@@ -392,7 +337,6 @@ export default function BottleFormScreen() {
         origin: origin.trim() || undefined,
         imageBase64: opts.imageBase64,
         imageMime: opts.imageMime,
-        bookSnippets: onlineBookSnippets.length > 0 ? onlineBookSnippets : undefined,
         lang: lang as 'zh' | 'en',
       };
       const res = await enrichBottle(enrichInput);
@@ -405,27 +349,6 @@ export default function BottleFormScreen() {
       setAiResult(res);
     } catch (err: unknown) {
       if (!isMountedRef.current) return;
-      // 联网失败时降级到离线知识库
-      const kbResult = lookupInOfflineKb({
-        nameZh: nameZh.trim() || undefined,
-        nameEn: nameEn.trim() || undefined,
-        brand: brand.trim() || undefined,
-        category: category || undefined,
-      });
-      const allSections = books.flatMap((b) => b.sections ?? []);
-      const bookSnippets = extractBookSnippets({
-        nameZh: nameZh.trim() || undefined,
-        nameEn: nameEn.trim() || undefined,
-        brand: brand.trim() || undefined,
-        bookSections: allSections,
-      });
-      if (kbResult.found && kbResult.entry) {
-        const result = offlineEntryToEnrichResult(kbResult.entry, bookSnippets);
-        setAiResult(result);
-        const snippetInfo = bookSnippets.length > 0 ? `，书库补充 ${bookSnippets.length} 处` : "";
-        setLookupStatus({ kind: "warn", msg: lang === "zh" ? `AI 服务暂时不可用，已从本地知识库补全${snippetInfo}` : `AI unavailable, filled from local KB${snippetInfo}` });
-        return;
-      }
       const isTimeout = err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError" || err.message.includes("超时"));
       const isNotFound = err instanceof Error && err.message.includes("未找到");
       const msg = isTimeout
@@ -437,7 +360,7 @@ export default function BottleFormScreen() {
     } finally {
       if (isMountedRef.current) setLookupBusy(null);
     }
-  }, [nameZh, nameEn, brand, category, style, origin, isOnline, lang, t, books]);
+  }, [nameZh, nameEn, brand, category, style, origin, isOnline, lang, t]);
 
   /** 深度解析：使用强模型（claude-sonnet）补全所有字段 */
   const handleDeepAnalyze = () => {

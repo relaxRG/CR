@@ -950,7 +950,7 @@ export default function RecipeDetailScreen() {
           </>
         ) : null}
 
-        {/* SourceRef — 结构化引用来源（书库导入 / AI 补全） */}
+        {/* SourceRef — 结构化引用来源（AI 补全 / 手动填写） */}
         {recipe.sourceRef && (recipe.sourceRef.bookTitle || recipe.sourceRef.creator || recipe.sourceRef.createdYear) ? (
           <>
             <Text className="text-[13px] text-muted uppercase mt-6 mb-2 px-4" style={styles.groupHeader}>
