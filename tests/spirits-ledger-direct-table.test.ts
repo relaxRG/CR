@@ -16,27 +16,28 @@ describe("烈酒库存完整Excel台账", () => {
   });
 
   it("完整表固定包含期初、进货、期末、消耗字段并将集团置于最右", () => {
-    const header = source.slice(source.indexOf('/* 14列：'), source.indexOf('/* 按分类分组'));
-    expect(header).toContain('["商品名称", "name", 184]');
-    expect(header).toContain('["参考价", "referencePrice", 96]');
-    expect(header).toContain('["期初量", "openingQty", 88]');
-    expect(header).toContain('["进货量", "purchaseQty", 88]');
-    expect(header).toContain('["期末单价", "closingUnitCost", 112]');
-    expect(header).toContain('["消耗成本", "consumeCost", 112]');
-    expect(header).toContain('["集团", "group", 140]');
+    const header = source.slice(source.indexOf('/* 紧凑横向台账：'), source.indexOf('/* 按分类分组'));
+    expect(header).toContain('["商品名称", "name", 156]');
+    expect(header).toContain('["参考价", "referencePrice", 72]');
+    expect(header).toContain('["期初量", "openingQty", 68]');
+    expect(header).toContain('["进货量", "purchaseQty", 68]');
+    expect(header).toContain('["期末单价", "closingUnitCost", 78]');
+    expect(header).toContain('["消耗成本", "consumeCost", 84]');
+    expect(header).toContain('["集团", "group", 104]');
     expect(header.indexOf('"consumeCost"')).toBeLessThan(header.indexOf('"group"'));
   });
 
   it("名称点击继续打开详情卡片，完整表的筛选合计只计算可见行", () => {
     expect(source).toContain('testID={`spirits-ledger-table-name-${item.id}`}');
-    expect(source).toContain('onPress={() => { tap(); setSelectedLedgerItemId(item.id); }}');
+    expect(source).toContain('if (ledgerSelectMode) toggleLedgerSelection(item.id); else setSelectedLedgerItemId(item.id);');
+    expect(source).toContain('testID={`spirits-ledger-select-${item.id}`}');
     expect(source).toContain('calculateLedgerTableTotals(visibleLedgerRows)');
     expect(source).toContain('visibleLedgerTotals.consumeCost');
   });
 
   it("新增、导入、编辑期初、分类管理、月结和月末盘点在同一横向工具栏中可达", () => {
     const toolbar = source.slice(source.indexOf('/* 操作栏：同一行横向滚动，保留完整文本操作。 */'), source.indexOf('/* 库存管理直接展示完整Excel台账；商品名称点击仍打开详情卡片。 */'));
-    for (const label of ["新增酒款", "导入Excel", "编辑期初", "管理进销存分类", "月结", "月末盘点"]) expect(toolbar).toContain(label);
+    for (const label of ["新增酒款", "选择", "导入Excel", "编辑期初", "管理进销存分类", "月结", "月末盘点"]) expect(toolbar).toContain(label);
     expect(toolbar).toContain('horizontal showsHorizontalScrollIndicator={false}');
     expect(toolbar).not.toContain('<IconSymbol');
     expect(source).toContain('INVENTORY_WORKSPACE_METRICS.actionHeight');

@@ -2,7 +2,7 @@
  * 烈酒库存统一工作台。
  * 总结、库存管理、当月进货与采购分析共享当前全局月份；库存管理直接展示横向 Excel 台账。
  */
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { formatMoney } from "@/lib/utils";
 import { sumMoney } from "@/lib/finance/money";
 import {
@@ -27,10 +27,10 @@ import {
   useSpiritsInventoryStore, getCurrentMonth, SpiritGroupDef, fuzzyMatchScore,
 } from "@/lib/spirits/crud-store";
 import {
-  SpiritItem, SpiritPurchaseRecord, SpiritLedgerEntry, SpiritSupplierAlias,
+  SpiritItem, SpiritPurchaseRecord, SpiritLedgerEntry,
   SPIRIT_CATEGORY_COLORS, SPIRIT_CATEGORIES,
 } from "@/lib/spirits/types";
-import { normalizeSpiritSupplierAliases, removeSpiritSupplierAlias, resolveSpiritItemForSupplierName, upsertSpiritSupplierAlias } from "@/lib/spirits/supplier-alias";
+import { resolveSpiritItemForSupplierName } from "@/lib/spirits/supplier-alias";
 import {
   ParsedPurchaseRow, previewSheets, parseSheetFromWorkbook,
 } from "@/lib/spirits/excel-import";
@@ -61,6 +61,9 @@ import { usePettyCashStore } from "@/lib/store/petty-store";
 import { getApiBaseUrl } from "@/constants/oauth";
 import * as Auth from "@/lib/_core/auth";
 import { useModuleMonthCloseStore } from "@/lib/month-close/module-month-close-store";
+import { useBottleStore } from "@/lib/bottles/store";
+import { resolveBottleForSupplierProductName } from "@/lib/bottles/supplier-channel-resolver";
+import { migrateSpiritAliasesToBottleChannels } from "@/lib/spirits/bottle-channel-migration";
 
 // ─── 工具 ─────────────────────────────────────────────────────────────────────
 function catColor(cat: string) { return SPIRIT_CATEGORY_COLORS[cat] ?? "#6B7280"; }
@@ -110,6 +113,7 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const store = useSpiritsInventoryStore();
+  const { bottles, updateBottle } = useBottleStore();
   const {
     items, purchases, ledger, suppliers, groups,
     addItem, updateItem, deleteItem,
@@ -138,6 +142,39 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
     return false;
   };
   const [activeSupplier, setActiveSupplier] = useState<string | null>(null);
+  const hasMigratedLegacyAliasesRef = useRef(false);
+
+  // 打开烈酒库存时，把可唯一解析的旧别名迁入鸡尾酒库渠道；歧义条目保持待关联，绝不自动误绑。
+  useEffect(() => {
+    if (hasMigratedLegacyAliasesRef.current || items.length === 0 || bottles.length === 0) return;
+    hasMigratedLegacyAliasesRef.current = true;
+    const migration = migrateSpiritAliasesToBottleChannels(items, bottles);
+    migration.bottleUpdates.forEach((bottle) => updateBottle(bottle.id, bottle));
+    migration.itemPatches.forEach(({ id, patch }) => updateItem(id, patch));
+  }, [bottles, items, updateBottle, updateItem]);
+
+  /** 打开唯一鸡尾酒库酒款；无匹配时进入自动预填名称的新建表单，绝不创建重复烈酒详情页。 */
+  const openBottleForSpiritItem = (item: SpiritItem) => {
+    const linkedBottle = item.bottleId ? bottles.find((bottle) => bottle.id === item.bottleId) : undefined;
+    if (linkedBottle) {
+      router.push({ pathname: "/bottle/[id]", params: { id: linkedBottle.id } });
+      return;
+    }
+    const resolution = resolveBottleForSupplierProductName(bottles, item.supplier, item.name);
+    if (resolution) {
+      updateItem(item.id, { bottleId: resolution.bottle.id, bottleLinkConfidence: "auto" });
+      router.push({ pathname: "/bottle/[id]", params: { id: resolution.bottle.id } });
+      return;
+    }
+    router.push({
+      pathname: "/bottle-form",
+      params: {
+        prefillNameAlt: item.name,
+        ...(item.nameEn ? { prefillName: item.nameEn } : {}),
+        sourceSpiritItemId: item.id,
+      },
+    });
+  };
   // ★ 月末盘点状态
   const [showStocktakeModal, setShowStocktakeModal] = useState(false);
   const [showInventoryCategoryManager, setShowInventoryCategoryManager] = useState(false);
@@ -504,6 +541,8 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
   const [showAddItem, setShowAddItem] = useState(false);
   const [editingItem, setEditingItem] = useState<SpiritItem | null>(null);
   const [showItemForm, setShowItemForm] = useState(false);
+  const [ledgerSelectMode, setLedgerSelectMode] = useState(false);
+  const [selectedLedgerItemIds, setSelectedLedgerItemIds] = useState<Set<string>>(new Set());
 
 
   const [ledgerNameLanguage, setLedgerNameLanguage] = usePersistedState<"zh" | "en">("spirits.ledger.name-language.v1", "zh");
@@ -551,6 +590,36 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
   const [catPickerTitle, setCatPickerTitle] = useState("");
   const [catPickerCallback, setCatPickerCallback] = useState<((name: string) => void) | null>(null);
   const [ledgerImporting, setLedgerImporting] = useState(false);
+  const toggleLedgerSelection = (itemId: string) => setSelectedLedgerItemIds((current) => {
+    const next = new Set(current);
+    if (next.has(itemId)) next.delete(itemId); else next.add(itemId);
+    return next;
+  });
+  const exitLedgerSelection = () => { setLedgerSelectMode(false); setSelectedLedgerItemIds(new Set()); };
+  const requestBatchLedgerCategory = () => {
+    if (selectedLedgerItemIds.size === 0) return;
+    setCatPickerTitle(`批量修改分类（已选 ${selectedLedgerItemIds.size} 款）`);
+    setCatPickerCallback(() => (name: string) => {
+      selectedLedgerItemIds.forEach((id) => updateItem(id, { category: name, categorySource: "manual" }));
+      exitLedgerSelection();
+    });
+    setShowCatPicker(true);
+  };
+  const requestBatchLedgerRemove = () => {
+    if (selectedLedgerItemIds.size === 0) return;
+    const selected = items.filter((item) => selectedLedgerItemIds.has(item.id));
+    const archive = selected.filter((item) => purchases.some((purchase) => purchase.itemId === item.id) || ledger.some((entry) => entry.itemId === item.id));
+    Alert.alert("处理酒款", `已选 ${selected.length} 款：${archive.length} 款有采购、盘点或月结历史，将归档；其余 ${selected.length - archive.length} 款将删除。`, [
+      { text: "取消", style: "cancel" },
+      { text: "确认处理", style: "destructive", onPress: () => {
+        selected.forEach((item) => {
+          if (archive.some((entry) => entry.id === item.id)) updateItem(item.id, { active: false });
+          else deleteItem(item.id);
+        });
+        exitLedgerSelection();
+      } },
+    ]);
+  };
 
   const handleSaveOpeningQty = (entry: SpiritLedgerEntry, rawVal: string) => {
     const val = parseFloat(rawVal);
@@ -640,7 +709,7 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
       addedLedger++;
     });
 
-    const firstPass = buildImportedPurchaseRecords(snapshot.purchaseOrders, resolvedItems, importMonth);
+    const firstPass = buildImportedPurchaseRecords(snapshot.purchaseOrders, resolvedItems, importMonth, "excel", bottles);
     firstPass.unmatched.forEach((order: SpiritPurchaseOrderItem) => {
       const existing = resolvedItems.find((item) => item.name.trim() === (order.nameZh || order.rawName).trim());
       if (existing) return;
@@ -656,7 +725,7 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
       resolvedItems.push(item);
       addedItems++;
     });
-    const purchaseImport = buildImportedPurchaseRecords(snapshot.purchaseOrders, resolvedItems, importMonth);
+    const purchaseImport = buildImportedPurchaseRecords(snapshot.purchaseOrders, resolvedItems, importMonth, "excel", bottles);
     batchAddPurchases(purchaseImport.records);
 
     // 盘点主月份以Excel台账为准；跨月订单仅重建其实际归属月份，避免覆盖盘点期末数。
@@ -686,6 +755,13 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
         <TouchableOpacity onPress={() => { tap(); setShowAddItem(true); }}
           style={[S.actionBtn, { backgroundColor: "#EF4444" + "15", borderColor: "#EF4444" + "33" }]}>
           <Text style={{ fontSize: 12, color: "#EF4444", fontWeight: "600" }}>新增酒款</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          testID="spirits-ledger-select-toggle"
+          onPress={() => ledgerSelectMode ? exitLedgerSelection() : setLedgerSelectMode(true)}
+          style={[S.actionBtn, { backgroundColor: ledgerSelectMode ? colors.primary : colors.surface, borderColor: ledgerSelectMode ? colors.primary : colors.border }]}
+        >
+          <Text style={{ fontSize: 12, color: ledgerSelectMode ? "#fff" : colors.primary, fontWeight: "600" }}>{ledgerSelectMode ? "取消选择" : "选择"}</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={handleLedgerExcelImport}
           style={[S.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -736,6 +812,14 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
         </TouchableOpacity>
       </ScrollView>
 
+      {ledgerSelectMode && (
+        <View testID="spirits-ledger-batch-toolbar" style={{ minHeight: 44, flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, backgroundColor: colors.surface }}>
+          <TouchableOpacity onPress={() => setSelectedLedgerItemIds(new Set(visibleLedgerRows.map((row) => row.id)))}><Text style={{ color: colors.primary, fontSize: 12, fontWeight: "600" }}>全选</Text></TouchableOpacity>
+          <Text style={{ flex: 1, color: colors.muted, fontSize: 12 }}>已选 {selectedLedgerItemIds.size} 项</Text>
+          <TouchableOpacity disabled={selectedLedgerItemIds.size === 0} onPress={requestBatchLedgerCategory} style={{ opacity: selectedLedgerItemIds.size === 0 ? 0.35 : 1 }}><Text style={{ color: colors.primary, fontSize: 12, fontWeight: "600" }}>修改分类</Text></TouchableOpacity>
+          <TouchableOpacity disabled={selectedLedgerItemIds.size === 0} onPress={requestBatchLedgerRemove} style={{ opacity: selectedLedgerItemIds.size === 0 ? 0.35 : 1 }}><Text style={{ color: "#DC2626", fontSize: 12, fontWeight: "600" }}>删除</Text></TouchableOpacity>
+        </View>
+      )}
       {/* 库存管理直接展示完整Excel台账；商品名称点击仍打开详情卡片。 */}
       <ScrollView contentContainerStyle={{ paddingBottom: 40 + insets.bottom }}>
         {items.length === 0 ? (
@@ -748,14 +832,15 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
           <ScrollView horizontal showsHorizontalScrollIndicator style={{ flexGrow: 0 }}>
             <View>
               {ledgerTableHasAdjustments && <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 10, paddingVertical: 6, backgroundColor: "#FEF2F2" }}><Text style={{ fontSize: 11, color: "#991B1B", fontWeight: "700" }}>已筛选/排序 · 显示 {visibleLedgerRows.length} 款</Text><TouchableOpacity onPress={() => setLedgerTableView(DEFAULT_LEDGER_TABLE_VIEW)}><Text style={{ color: "#991B1B", fontSize: 11, fontWeight: "700" }}>清除全部</Text></TouchableOpacity></View>}
-              {/* 14列：序号 + 12项库存成本字段 + 最右集团。 */}
+              {/* 紧凑横向台账：iPhone 优先显示序号、名称、参考价与首列库存数据，剩余列可横滑。 */}
               <View style={[S.tableHeader, { backgroundColor: colors.primary, minHeight: STORE_TABLE_METRICS.headerHeight }]}>
-                <Text style={[S.thCell, { width: 44 }]}>序</Text>
+                {ledgerSelectMode && <Text style={[S.thCell, { width: 34 }]}>选</Text>}
+                <Text style={[S.thCell, { width: 34 }]}>序号</Text>
                 {([
-                  ["商品名称", "name", 184], ["参考价", "referencePrice", 96], ["期初量", "openingQty", 88], ["期初单价", "openingUnitCost", 104], ["期初成本", "openingCost", 112],
-                  ["进货量", "purchaseQty", 88], ["进货成本", "purchaseCost", 112], ["期末量", "closingQty", 88], ["期末单价", "closingUnitCost", 112], ["期末成本", "closingCost", 112],
-                  ["消耗量", "consumeQty", 88], ["消耗成本", "consumeCost", 112], ["集团", "group", 140],
-                ] as Array<[string, LedgerSortKey, number]>).map(([label, key, width]) => <TouchableOpacity key={key} testID={`spirits-ledger-column-${key}`} onPress={() => setActiveLedgerColumn(key)} style={{ width, minHeight: STORE_TABLE_METRICS.headerHeight, justifyContent: "center", paddingHorizontal: 8 }}><Text style={[S.thCell, { width: "auto", paddingHorizontal: 0 }]}>{label}⌄</Text></TouchableOpacity>)}
+                  ["商品名称", "name", 156], ["参考价", "referencePrice", 72], ["期初量", "openingQty", 68], ["期初单价", "openingUnitCost", 78], ["期初成本", "openingCost", 84],
+                  ["进货量", "purchaseQty", 68], ["进货成本", "purchaseCost", 84], ["期末量", "closingQty", 68], ["期末单价", "closingUnitCost", 78], ["期末成本", "closingCost", 84],
+                  ["消耗量", "consumeQty", 68], ["消耗成本", "consumeCost", 84], ["集团", "group", 104],
+                ] as Array<[string, LedgerSortKey, number]>).map(([label, key, width]) => <TouchableOpacity key={key} testID={`spirits-ledger-column-${key}`} onPress={() => setActiveLedgerColumn(key)} style={{ width, minHeight: STORE_TABLE_METRICS.headerHeight, justifyContent: "center", paddingHorizontal: 5 }} accessibilityLabel={tableHeaderAccessibilityLabel(label, ledgerTableView.sort?.key === key)}><Text style={[S.thCell, { width: "auto", paddingHorizontal: 0 }]}>{label}</Text></TouchableOpacity>)}
               </View>
               {/* 按分类分组（动态，未分类置顶） */}
               {(() => {
@@ -783,7 +868,7 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
                   const color = isFiltered ? colors.primary : isUnclassified ? "#F59E0B" : catColor(cat);
                   return (
                     <React.Fragment key={cat}>
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: color + "20" }}>
+                      <View style={{ minWidth: ledgerSelectMode ? 1164 : 1130, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: color + "20" }}>
                         <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />
                         <Text style={{ fontSize: 11, fontWeight: "700", color }}>{displayCat}</Text>
                         {isUnclassified && <Text style={{ fontSize: 10, color: "#F59E0B" }}>（请补充分类）</Text>}
@@ -795,22 +880,21 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
                         const editKey = `${item.id}:${selectedMonth}`;
                         return (
                           <TouchableOpacity key={item.id}
-                            onPress={() => { tap(); setSelectedLedgerItemId(item.id); }}
-                            onLongPress={() => {
+                            onPress={() => { tap(); if (ledgerSelectMode) toggleLedgerSelection(item.id); else setSelectedLedgerItemId(item.id); }}
+                            onLongPress={ledgerSelectMode ? undefined : () => {
                               tap();
                               Alert.alert(item.name, "选择操作", [
-                                { text: "编辑酒款", onPress: () => { setEditingItem(item); setShowItemForm(true); } },
+                                { text: "编辑酒款", onPress: () => openBottleForSpiritItem(item) },
                                 { text: "修改分类", onPress: () => {
                                   setCatPickerTitle(`修改分类：${item.name}\n当前：${item.category || "未分类"}`);
                                   setCatPickerCallback(() => (name: string) => updateItem(item.id, { category: name, categorySource: "manual" }));
                                   setShowCatPicker(true);
                                 }},
                                 ...(item.bottleId ? [
-                                  { text: "查看酒库档案 →", onPress: () => router.push(`/bottle/${item.bottleId}` as any) },
-                                  { text: "更换酒库链接", onPress: () => { setEditingItem(item); setShowItemForm(true); } },
+                                  { text: "查看酒库档案 →", onPress: () => openBottleForSpiritItem(item) },
                                   { text: "取消酒库链接", onPress: () => updateItem(item.id, { bottleId: undefined, bottleLinkConfidence: "none" }) },
                                 ] : [
-                                  { text: "关联酒库档案", onPress: () => { setEditingItem(item); setShowItemForm(true); } },
+                                  { text: "关联或新建酒库档案", onPress: () => openBottleForSpiritItem(item) },
                                 ]),
                                 { text: "删除酒款", style: "destructive" as const, onPress: () => {
                                   Alert.alert("确认删除", `删除「${item.name}」？`, [
@@ -822,13 +906,14 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
                               ]);
                             }}
                             style={[S.tableRow, { minHeight: STORE_TABLE_METRICS.rowHeight, backgroundColor: idx % 2 === 0 ? colors.surface : colors.background }]}>
-                            <Text style={[S.tdCell, { width: 44, textAlign: "center", fontSize: STORE_TABLE_METRICS.bodyFontSize, color: colors.muted }]}>{idx + 1}</Text>
-                            <Text testID={`spirits-ledger-table-name-${item.id}`} style={[S.tdCell, { width: 184, fontSize: STORE_TABLE_METRICS.nameFontSize, fontWeight: "800", color: colors.foreground }]} numberOfLines={1}>{ledgerTableRows.find((row) => row.id === item.id)?.displayName ?? item.name}</Text>
+                            {ledgerSelectMode && <View style={[S.tdCell, { width: 34, alignItems: "center" }]}><View testID={`spirits-ledger-select-${item.id}`} style={{ width: 18, height: 18, borderRadius: 5, borderWidth: 1.5, borderColor: selectedLedgerItemIds.has(item.id) ? colors.primary : colors.border, backgroundColor: selectedLedgerItemIds.has(item.id) ? colors.primary : "transparent", alignItems: "center", justifyContent: "center" }}>{selectedLedgerItemIds.has(item.id) && <Text style={{ color: "#fff", fontSize: 12, fontWeight: "700" }}>✓</Text>}</View></View>}
+                            <Text style={[S.tdCell, { width: 34, textAlign: "center", fontSize: STORE_TABLE_METRICS.bodyFontSize, color: colors.muted }]}>{idx + 1}</Text>
+                            <Text testID={`spirits-ledger-table-name-${item.id}`} style={[S.tdCell, { width: 156, fontSize: STORE_TABLE_METRICS.nameFontSize, fontWeight: "500", color: colors.foreground }]} numberOfLines={1}>{ledgerTableRows.find((row) => row.id === item.id)?.displayName ?? item.name}</Text>
                           {/* 参考价列（可点击编辑） */}
                           {(() => {
                             const rp = getRefPrice(item.id, selectedMonth);
                             return (
-                              <TouchableOpacity style={[S.tdCell, { width: 70, alignItems: "flex-end" }]}
+                              <TouchableOpacity style={[S.tdCell, { width: 72, alignItems: "flex-end" }]}
                                 onPress={() => {
                                   tap();
                                   Alert.prompt(
@@ -854,7 +939,7 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
                             );
                           })()}
                           {/* 期初库存量（内联编辑） */}
-                          <View style={[S.tdCell, { width: 76, alignItems: "flex-end" }]}>
+                          <View style={[S.tdCell, { width: 68, alignItems: "flex-end" }]}>
                             {ledgerEditMode ? (
                               <TextInput
                                 style={[S.inlineInput, { color: colors.foreground, borderColor: isOverride ? "#F59E0B" : colors.border }]}
@@ -876,35 +961,35 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
                               </View>
                             )}
                           </View>
-                          <Text style={[S.tdCell, { width: 70, textAlign: "right", fontSize: 11, color: colors.foreground }]}>
+                          <Text style={[S.tdCell, { width: 78, textAlign: "right", fontSize: 11, color: colors.foreground }]}>
                             {entry ? `¥${formatMoney(entry.openingUnitCost)}` : "—"}
                           </Text>
-                          <Text style={[S.tdCell, { width: 76, textAlign: "right", fontSize: 11, color: colors.foreground }]}>
+                          <Text style={[S.tdCell, { width: 84, textAlign: "right", fontSize: 11, color: colors.foreground }]}>
                             {entry ? `¥${formatMoney((entry.openingQty * entry.openingUnitCost))}` : "—"}
                           </Text>
-                          <Text style={[S.tdCell, { width: 76, textAlign: "right", fontSize: 11, color: colors.primary }]}>
+                          <Text style={[S.tdCell, { width: 68, textAlign: "right", fontSize: 11, color: colors.primary }]}>
                             {entry ? (entry.purchaseQty > 0 ? `+${entry.purchaseQty}` : "—") : "—"}
                           </Text>
-                          <Text style={[S.tdCell, { width: 76, textAlign: "right", fontSize: 11, color: colors.primary }]}>
+                          <Text style={[S.tdCell, { width: 84, textAlign: "right", fontSize: 11, color: colors.primary }]}>
                             {entry ? (entry.purchaseCost > 0 ? `¥${formatMoney(entry.purchaseCost)}` : "—") : "—"}
                           </Text>
-                          <Text style={[S.tdCell, { width: 76, textAlign: "right", fontSize: 12, fontWeight: "700",
+                          <Text style={[S.tdCell, { width: 68, textAlign: "right", fontSize: 12, fontWeight: "700",
                             color: isNeg ? "#EF4444" : colors.foreground }]}>
                             {entry ? `${isNeg ? "⚠️" : ""}${entry.closingQty.toFixed(2)}` : "—"}
                           </Text>
-                          <Text style={[S.tdCell, { width: 82, textAlign: "right", fontSize: 11, color: colors.foreground }]}>
+                          <Text style={[S.tdCell, { width: 78, textAlign: "right", fontSize: 11, color: colors.foreground }]}>
                             {entry ? `¥${formatMoney(entry.closingUnitCost)}` : "—"}
                           </Text>
-                          <Text style={[S.tdCell, { width: 76, textAlign: "right", fontSize: 11, color: "#EF4444" }]}>
+                          <Text style={[S.tdCell, { width: 84, textAlign: "right", fontSize: 11, color: "#EF4444" }]}>
                             {entry ? `¥${formatMoney(entry.closingCost)}` : "—"}
                           </Text>
-                          <Text style={[S.tdCell, { width: 70, textAlign: "right", fontSize: 11, color: colors.muted }]}>
+                          <Text style={[S.tdCell, { width: 68, textAlign: "right", fontSize: 11, color: colors.muted }]}>
                             {entry ? (entry.consumeQty > 0 ? entry.consumeQty.toFixed(1) : "—") : "—"}
                           </Text>
-                          <Text style={[S.tdCell, { width: 76, textAlign: "right", fontSize: 11, color: colors.muted }]}>
+                          <Text style={[S.tdCell, { width: 84, textAlign: "right", fontSize: 11, color: colors.muted }]}>
                             {entry ? (entry.consumeQty > 0 ? `¥${formatMoney(entry.consumeCost ?? (entry.consumeQty * entry.closingUnitCost))}` : "—") : "—"}
                           </Text>
-                          <Text style={[S.tdCell, { width: 100, textAlign: "right", fontSize: 11, color: colors.foreground }]} numberOfLines={1}>{getItemGroup(item)}</Text>
+                          <Text style={[S.tdCell, { width: 104, textAlign: "right", fontSize: 11, color: colors.foreground }]} numberOfLines={1}>{getItemGroup(item)}</Text>
                         </TouchableOpacity>
                       );
                     })}
@@ -915,21 +1000,22 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
               })()}
               {/* 合计行 */}
               {visibleLedgerRows.length > 0 && (
-                <View style={[S.tableRow, { backgroundColor: "#FEF2F2" }]}>
-                  <Text style={[S.tdCell, { width: 36 }]} />
-                  <Text style={[S.tdCell, { width: 136, fontWeight: "700", color: "#991B1B", fontSize: 12 }]}>合计</Text>
-                  <Text style={[S.tdCell, { width: 70 }]} />
-                  <Text style={[S.tdCell, { width: 76, textAlign: "right", fontWeight: "700", color: "#991B1B", fontSize: 11 }]}>{visibleLedgerTotals.openingQty.toFixed(2)}</Text>
-                  <Text style={[S.tdCell, { width: 70 }]} />
-                  <Text style={[S.tdCell, { width: 76, textAlign: "right", fontWeight: "700", color: "#991B1B", fontSize: 11 }]}>¥{formatMoney(visibleLedgerTotals.openingCost)}</Text>
-                  <Text style={[S.tdCell, { width: 76, textAlign: "right", fontWeight: "700", color: "#991B1B", fontSize: 11 }]}>{visibleLedgerTotals.purchaseQty.toFixed(2)}</Text>
-                  <Text style={[S.tdCell, { width: 76, textAlign: "right", fontWeight: "700", color: "#991B1B", fontSize: 11 }]}>¥{formatMoney(visibleLedgerTotals.purchaseCost)}</Text>
-                  <Text style={[S.tdCell, { width: 76, textAlign: "right", fontWeight: "700", color: "#991B1B", fontSize: 12 }]}>{visibleLedgerTotals.closingQty.toFixed(2)}</Text>
-                  <Text style={[S.tdCell, { width: 82 }]} />
-                  <Text style={[S.tdCell, { width: 76, textAlign: "right", fontWeight: "700", color: "#991B1B", fontSize: 11 }]}>¥{formatMoney(visibleLedgerTotals.closingCost)}</Text>
-                  <Text style={[S.tdCell, { width: 70, textAlign: "right", fontWeight: "700", color: "#991B1B", fontSize: 11 }]}>{visibleLedgerTotals.consumeQty.toFixed(1)}</Text>
-                  <Text style={[S.tdCell, { width: 76, textAlign: "right", fontWeight: "700", color: "#991B1B", fontSize: 11 }]}>¥{formatMoney(visibleLedgerTotals.consumeCost)}</Text>
-                  <Text style={[S.tdCell, { width: 100 }]} />
+                <View style={[S.tableRow, { backgroundColor: "#F3F4F6" }]}>
+                  {ledgerSelectMode && <Text style={[S.tdCell, { width: 34 }]} /> }
+                  <Text style={[S.tdCell, { width: 34 }]} />
+                  <Text style={[S.tdCell, { width: 156, fontWeight: "600", color: colors.foreground, fontSize: 12 }]}>合计</Text>
+                  <Text style={[S.tdCell, { width: 72 }]} />
+                  <Text style={[S.tdCell, { width: 68, textAlign: "right", fontWeight: "600", color: colors.foreground, fontSize: 11 }]}>{visibleLedgerTotals.openingQty.toFixed(2)}</Text>
+                  <Text style={[S.tdCell, { width: 78 }]} />
+                  <Text style={[S.tdCell, { width: 84, textAlign: "right", fontWeight: "600", color: colors.foreground, fontSize: 11 }]}>¥{formatMoney(visibleLedgerTotals.openingCost)}</Text>
+                  <Text style={[S.tdCell, { width: 68, textAlign: "right", fontWeight: "600", color: colors.foreground, fontSize: 11 }]}>{visibleLedgerTotals.purchaseQty.toFixed(2)}</Text>
+                  <Text style={[S.tdCell, { width: 84, textAlign: "right", fontWeight: "600", color: colors.foreground, fontSize: 11 }]}>¥{formatMoney(visibleLedgerTotals.purchaseCost)}</Text>
+                  <Text style={[S.tdCell, { width: 68, textAlign: "right", fontWeight: "600", color: colors.foreground, fontSize: 12 }]}>{visibleLedgerTotals.closingQty.toFixed(2)}</Text>
+                  <Text style={[S.tdCell, { width: 78 }]} />
+                  <Text style={[S.tdCell, { width: 84, textAlign: "right", fontWeight: "600", color: colors.foreground, fontSize: 11 }]}>¥{formatMoney(visibleLedgerTotals.closingCost)}</Text>
+                  <Text style={[S.tdCell, { width: 68, textAlign: "right", fontWeight: "600", color: colors.foreground, fontSize: 11 }]}>{visibleLedgerTotals.consumeQty.toFixed(1)}</Text>
+                  <Text style={[S.tdCell, { width: 84, textAlign: "right", fontWeight: "600", color: colors.foreground, fontSize: 11 }]}>¥{formatMoney(visibleLedgerTotals.consumeCost)}</Text>
+                  <Text style={[S.tdCell, { width: 104 }]} />
                 </View>
               )}
             </View>
@@ -964,7 +1050,7 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
 
                 <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>
                   <TouchableOpacity
-                    onPress={() => { setEditingItem(selectedLedgerItem); setShowItemForm(true); setSelectedLedgerItemId(null); }}
+                    onPress={() => { openBottleForSpiritItem(selectedLedgerItem); setSelectedLedgerItemId(null); }}
                     style={[S.actionBtn, { flex: 1, justifyContent: "center", backgroundColor: colors.surface, borderColor: colors.border }]}
                   >
                     <IconSymbol name="pencil" size={13} color={colors.primary} />
@@ -1132,6 +1218,7 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
             colors={colors}
             insets={insets}
             items={items}
+            bottles={bottles}
             purchases={purchases}
             store={store}
             pettyStore={pettyStore}
@@ -1421,7 +1508,7 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
                     <Text style={[S.tdCell, { width: 60, textAlign: "right", fontSize: 12, fontWeight: "700", color: inv.endQty < 0 ? "#EF4444" : colors.foreground }]}>
                       {inv.endQty < 0 ? `⚠️${inv.endQty}` : inv.endQty}
                     </Text>
-                    <Text style={[S.tdCell, { width: 70, textAlign: "right", fontSize: 11, color: colors.foreground }]}>¥{formatMoney(inv.unitCost)}</Text>
+                    <Text style={[S.tdCell, { width: 78, textAlign: "right", fontSize: 11, color: colors.foreground }]}>¥{formatMoney(inv.unitCost)}</Text>
                     <Text style={[S.tdCell, { width: 80, textAlign: "right", fontSize: 11, color: "#EF4444" }]}>¥{formatMoney(inv.endCost)}</Text>
                   </View>
                 ))}
@@ -1548,10 +1635,10 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
 
 // ─── 供应商详情子界面 ──────────────────────────────────────────────────────────
 function SupplierDetailScreen({
-  supplier, month, colors, insets, items, purchases, store, pettyStore,
+  supplier, month, colors, insets, items, bottles, purchases, store, pettyStore,
 }: {
   supplier: string; month: string; colors: any; insets: any;
-  items: SpiritItem[]; purchases: SpiritPurchaseRecord[];
+  items: SpiritItem[]; bottles: import("@/lib/bottles/types").Bottle[]; purchases: SpiritPurchaseRecord[];
   store: ReturnType<typeof useSpiritsInventoryStore>;
   pettyStore: any;
 }) {
@@ -2204,6 +2291,7 @@ function SupplierDetailScreen({
         <PurchaseFormModal
           visible={showAddPurchase}
           items={items.filter((i) => i.active)}
+          bottles={bottles}
           month={month}
           supplier={supplier}
           colors={colors}
@@ -2683,7 +2771,7 @@ function SupplierDetailScreen({
             }));
             const resolvedItems = [...items];
             let addedItems = 0;
-            const initial = buildImportedPurchaseRecords(orders, resolvedItems, month, importPreviewSource);
+            const initial = buildImportedPurchaseRecords(orders, resolvedItems, month, importPreviewSource, bottles);
             initial.unmatched.forEach((order) => {
               const name = order.nameZh || order.rawName;
               if (resolvedItems.some((item) => item.name.trim() === name.trim())) return;
@@ -2699,7 +2787,7 @@ function SupplierDetailScreen({
               resolvedItems.push(item);
               addedItems++;
             });
-            const purchaseImport = buildImportedPurchaseRecords(orders, resolvedItems, month, importPreviewSource);
+            const purchaseImport = buildImportedPurchaseRecords(orders, resolvedItems, month, importPreviewSource, bottles);
             batchAddPurchases(purchaseImport.records);
             for (const targetMonth of new Set(purchaseImport.records.map((record) => record.month))) {
               syncLedgerFromPurchases(
@@ -2828,22 +2916,18 @@ function ItemFormModal({ visible, item, colors, allCategories, onSave, onClose }
   const [category, setCategory] = useState(item?.category ?? (allCategories[0]?.name ?? "Other"));
   const [unit, setUnit] = useState(item?.unit ?? "瓶");
   const [refPrice, setRefPrice] = useState(String(item?.refPrice ?? ""));
-  const [supplier, setSupplier] = useState(item?.supplier ?? "");
-  const [supplierAliases, setSupplierAliases] = useState<SpiritSupplierAlias[]>(normalizeSpiritSupplierAliases(item?.supplierAliases));
-  const [aliasSupplier, setAliasSupplier] = useState("");
-  const [aliasPurchaseName, setAliasPurchaseName] = useState("");
+
   const [priceAlertPct, setPriceAlertPct] = useState(String(item?.priceAlertPct ?? ""));
   const [specMl, setSpecMl] = useState(item?.specMl != null ? String(item.specMl) : "");
 
   React.useEffect(() => {
     if (item) {
       setName(item.name); setNameEn(item.nameEn ?? ""); setCategory(item.category);
-      setUnit(item.unit); setRefPrice(String(item.refPrice)); setSupplier(item.supplier ?? "");
-      setSupplierAliases(normalizeSpiritSupplierAliases(item.supplierAliases)); setAliasSupplier(""); setAliasPurchaseName("");
+      setUnit(item.unit); setRefPrice(String(item.refPrice));
       setPriceAlertPct(item.priceAlertPct != null ? String(item.priceAlertPct) : "");
       setSpecMl(item.specMl != null ? String(item.specMl) : "");
     } else {
-      setName(""); setNameEn(""); setCategory(allCategories[0]?.name ?? "Other"); setUnit("瓶"); setRefPrice(""); setSupplier(""); setSupplierAliases([]); setAliasSupplier(""); setAliasPurchaseName(""); setPriceAlertPct(""); setSpecMl("");
+      setName(""); setNameEn(""); setCategory(allCategories[0]?.name ?? "Other"); setUnit("瓶"); setRefPrice(""); setPriceAlertPct(""); setSpecMl("");
     }
   }, [item, visible]);
 
@@ -2864,7 +2948,7 @@ function ItemFormModal({ visible, item, colors, allCategories, onSave, onClose }
               if (!name.trim()) { Alert.alert("提示", "请填写中文名"); return; }
               const alertPct = priceAlertPct.trim() !== "" ? parseFloat(priceAlertPct) : undefined;
               const specMlVal = specMl.trim() !== "" ? parseFloat(specMl) : undefined;
-              onSave({ name: name.trim(), nameEn: nameEn.trim() || undefined, category, unit, refPrice: parseFloat(refPrice) || 0, supplier: supplier.trim() || undefined, supplierAliases: normalizeSpiritSupplierAliases(supplierAliases), priceAlertPct: alertPct, specMl: specMlVal, active: true });
+              onSave({ name: name.trim(), nameEn: nameEn.trim() || undefined, category, unit, refPrice: parseFloat(refPrice) || 0, priceAlertPct: alertPct, specMl: specMlVal, active: true });
               onClose();
             }} style={{ padding: 4 }}>
               <Text style={{ fontSize: 16, color: "#EF4444", fontWeight: "700" }}>保存</Text>
@@ -2879,7 +2963,6 @@ function ItemFormModal({ visible, item, colors, allCategories, onSave, onClose }
                 { label: "中文名 *", value: name, onChange: setName, placeholder: "如：添加利金酒" },
                 { label: "英文名", value: nameEn, onChange: setNameEn, placeholder: "如：Tanqueray Gin" },
                 { label: "单位", value: unit, onChange: setUnit, placeholder: "瓶/箱/cl" },
-                { label: "供应商", value: supplier, onChange: setSupplier, placeholder: "如：至缘" },
               ].map((f) => (
                 <View key={f.label} style={{ marginBottom: 12 }}>
                   <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 4 }}>{f.label}</Text>
@@ -2891,48 +2974,8 @@ function ItemFormModal({ visible, item, colors, allCategories, onSave, onClose }
                 </View>
               ))}
             </View>
-            {/* 区块二：供应商采购名称 */}
-            <View style={{ backgroundColor: colors.surface, borderRadius: 14, padding: 16, marginBottom: 16,
-              borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border }} testID="spirits-supplier-alias-form">
-              <Text style={{ fontSize: 13, fontWeight: "700", color: colors.muted, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>供应商采购名称</Text>
-              <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 12 }}>同一标准酒款可记录各供应商使用的不同采购名称，不会新增重复酒款。</Text>
-              {supplierAliases.map((alias) => (
-                <View key={`${alias.normalizedSupplier}:${alias.normalizedName}`} style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={{ fontSize: 12, fontWeight: "700", color: colors.foreground }} numberOfLines={1}>{alias.purchaseName}</Text>
-                    <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }} numberOfLines={1}>{alias.supplier}</Text>
-                  </View>
-                  <TouchableOpacity
-                    onPress={() => setSupplierAliases((current) => removeSpiritSupplierAlias(current, alias))}
-                    style={{ width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center", backgroundColor: "#FEE2E2" }}
-                    accessibilityLabel={`删除 ${alias.supplier} 的采购名称 ${alias.purchaseName}`}
-                  >
-                    <IconSymbol name="trash" size={13} color="#DC2626" />
-                  </TouchableOpacity>
-                </View>
-              ))}
-              <View style={{ flexDirection: "row", gap: 8, marginTop: 10 }}>
-                <TextInput style={[S.input, { flex: 1, color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
-                  value={aliasSupplier} onChangeText={setAliasSupplier} placeholder="供应商" placeholderTextColor={colors.muted} />
-                <TextInput style={[S.input, { flex: 1.35, color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
-                  value={aliasPurchaseName} onChangeText={setAliasPurchaseName} placeholder="该供应商的名称" placeholderTextColor={colors.muted} />
-              </View>
-              <TouchableOpacity
-                onPress={() => {
-                  try {
-                    setSupplierAliases((current) => upsertSpiritSupplierAlias(current, aliasSupplier, aliasPurchaseName));
-                    setAliasSupplier(""); setAliasPurchaseName("");
-                  } catch {
-                    Alert.alert("提示", "请填写供应商和该供应商使用的采购名称");
-                  }
-                }}
-                style={[S.actionBtn, { alignSelf: "flex-start", marginTop: 10, backgroundColor: colors.background, borderColor: colors.border }]}
-              >
-                <IconSymbol name="plus" size={13} color={colors.primary} />
-                <Text style={{ fontSize: 12, fontWeight: "700", color: colors.primary }}>添加对应名称</Text>
-              </TouchableOpacity>
-            </View>
-            {/* 区块三：价格与规格 */}
+            {/* 区块二：价格与规格；供应渠道、多采购名称与成本基准统一在鸡尾酒库酒款详情中管理。 */}
+            {/* 区块二：价格与规格 */}
             <View style={{ backgroundColor: colors.surface, borderRadius: 14, padding: 16, marginBottom: 16,
               borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border }}>
               <Text style={{ fontSize: 13, fontWeight: "700", color: colors.muted, marginBottom: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>价格与规格</Text>
@@ -2985,8 +3028,8 @@ function ItemFormModal({ visible, item, colors, allCategories, onSave, onClose }
 }
 
 // ─── 进货录入 Modal ────────────────────────────────────────────────────────────
-function PurchaseFormModal({ visible, items, month, supplier, colors, getRefPrice, onSave, onClose }: {
-  visible: boolean; items: SpiritItem[]; month: string; supplier?: string; colors: any;
+function PurchaseFormModal({ visible, items, bottles, month, supplier, colors, getRefPrice, onSave, onClose }: {
+  visible: boolean; items: SpiritItem[]; bottles: import("@/lib/bottles/types").Bottle[]; month: string; supplier?: string; colors: any;
   getRefPrice: (itemId: string, month: string) => number;
   onSave: (data: Omit<SpiritPurchaseRecord, "id" | "createdAt">) => void;
   onClose: () => void;
@@ -3083,7 +3126,11 @@ function PurchaseFormModal({ visible, items, month, supplier, colors, getRefPric
                   if (!rawName.trim() || !qty || !unitPrice) { Alert.alert("提示", "请填写商品名称、数量和单价"); return; }
                   const q = parseFloat(qty), up = parseFloat(unitPrice);
                   if (isNaN(q) || isNaN(up)) { Alert.alert("提示", "数量和单价必须为数字"); return; }
-                  const resolvedItem = selectedItem ?? resolveSpiritItemForSupplierName(items, supplier, rawName.trim())?.item;
+                  const channelMatch = resolveBottleForSupplierProductName(bottles, supplier, rawName.trim());
+                  const channelItem = channelMatch
+                    ? items.filter((item) => item.bottleId === channelMatch.bottle.id).at(0)
+                    : undefined;
+                  const resolvedItem = selectedItem ?? channelItem ?? resolveSpiritItemForSupplierName(items, supplier, rawName.trim())?.item;
                   onSave({
                     month, date, rawName: rawName.trim(),
                     itemId: resolvedItem?.id,

@@ -301,10 +301,23 @@ export function normalizeBottle(b: Partial<Bottle> & Pick<Bottle, "id" | "nameZh
     ...(b.homemadeType ? { homemadeType: b.homemadeType } : {}),
     ...(typeof b.packQty === "number" && isFinite(b.packQty) && b.packQty > 0 ? { packQty: b.packQty } : {}),
     ...(b.packUnit ? { packUnit: b.packUnit } : {}),
+    ...(normalizeSupplierChannels(b.supplierChannels, b.costChannelId).length > 0
+      ? { supplierChannels: normalizeSupplierChannels(b.supplierChannels, b.costChannelId) }
+      : {}),
+    ...(resolveCostChannelId(normalizeSupplierChannels(b.supplierChannels, b.costChannelId), b.costChannelId)
+      ? { costChannelId: resolveCostChannelId(normalizeSupplierChannels(b.supplierChannels, b.costChannelId), b.costChannelId) }
+      : {}),
   };
 }
 
 // ─── 供货渠道 ─────────────────────────────────────────────────────────────────
+
+/** 渠道下可被导入、手动录入和智能匹配识别的一个采购名称。 */
+export interface SupplierChannelPurchaseName {
+  name: string;
+  normalizedName: string;
+  createdAt?: string;
+}
 
 /** 一个供货渠道（供应商或自采电商） */
 export interface SupplierChannel {
@@ -313,8 +326,10 @@ export interface SupplierChannel {
   type: "supplier" | "self";
   /** 供应商/渠道名称，如「至缘」「京东自采」「1919」 */
   name: string;
-  /** 供应商给这款酒的商品名（可能与官方名不同） */
+  /** 兼容旧数据的首个采购名称；新逻辑统一读取 purchaseNames。 */
   supplierProductName?: string;
+  /** 供应商或电商对这款酒的现名、旧名、简称等多个采购名称。 */
+  purchaseNames?: SupplierChannelPurchaseName[];
   /** 最新进货价（元/瓶或元/箱等） */
   latestPrice: number;
   /** 进货单位，如「瓶」「箱」 */
@@ -329,6 +344,74 @@ export interface SupplierChannel {
   notes?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+function normalizeChannelName(value: unknown): string {
+  return typeof value === "string"
+    ? value.trim().toLocaleLowerCase().replace(/[（）()\[\]【】]/g, "").replace(/[\s·•\-_/]/g, "")
+    : "";
+}
+
+/** 创建可用于渠道匹配的采购名称；无效空名称返回 null。 */
+export function createSupplierChannelPurchaseName(value: string, createdAt?: string): SupplierChannelPurchaseName | null {
+  const name = value.trim();
+  const normalizedName = normalizeChannelName(name);
+  if (!name || !normalizedName) return null;
+  return { name, normalizedName, ...(createdAt ? { createdAt } : {}) };
+}
+
+/** 读取渠道的全部采购名称，兼容旧 supplierProductName 字段并去重。 */
+export function getSupplierChannelPurchaseNames(channel: Partial<Pick<SupplierChannel, "supplierProductName" | "purchaseNames">>): SupplierChannelPurchaseName[] {
+  const source = [
+    ...(Array.isArray(channel.purchaseNames) ? channel.purchaseNames : []),
+    ...(channel.supplierProductName ? [{ name: channel.supplierProductName }] : []),
+  ];
+  const seen = new Set<string>();
+  return source.reduce<SupplierChannelPurchaseName[]>((result, entry) => {
+    const createdAt = "createdAt" in entry && typeof entry.createdAt === "string" ? entry.createdAt : undefined;
+    const created = createSupplierChannelPurchaseName(typeof entry.name === "string" ? entry.name : "", createdAt);
+    if (!created || seen.has(created.normalizedName)) return result;
+    seen.add(created.normalizedName);
+    result.push(created);
+    return result;
+  }, []);
+}
+
+/** 规范化渠道并保证成本基准只有一个。 */
+export function normalizeSupplierChannels(rawChannels: unknown, requestedCostChannelId?: string): SupplierChannel[] {
+  if (!Array.isArray(rawChannels)) return [];
+  const channels = rawChannels
+    .filter((channel): channel is Partial<SupplierChannel> => Boolean(channel && typeof channel === "object"))
+    .map((channel) => {
+      const purchaseNames = getSupplierChannelPurchaseNames(channel);
+      const id = typeof channel.id === "string" && channel.id ? channel.id : "";
+      const createdAt = typeof channel.createdAt === "string" ? channel.createdAt : new Date(0).toISOString();
+      const updatedAt = typeof channel.updatedAt === "string" ? channel.updatedAt : createdAt;
+      return {
+        id,
+        type: channel.type === "self" ? "self" : "supplier",
+        name: typeof channel.name === "string" ? channel.name.trim() : "",
+        ...(purchaseNames[0] ? { supplierProductName: purchaseNames[0].name } : {}),
+        ...(purchaseNames.length > 0 ? { purchaseNames } : {}),
+        latestPrice: typeof channel.latestPrice === "number" && Number.isFinite(channel.latestPrice) ? channel.latestPrice : 0,
+        unit: typeof channel.unit === "string" && channel.unit.trim() ? channel.unit.trim() : "瓶",
+        ...(typeof channel.purchaseUrl === "string" && channel.purchaseUrl.trim() ? { purchaseUrl: channel.purchaseUrl.trim() } : {}),
+        isCostBasis: Boolean(channel.isCostBasis),
+        ...(Array.isArray(channel.priceHistory) ? { priceHistory: channel.priceHistory.filter((record): record is SupplierPriceRecord => Boolean(record && typeof record === "object" && typeof record.date === "string" && typeof record.price === "number" && Number.isFinite(record.price))) } : {}),
+        ...(typeof channel.notes === "string" && channel.notes.trim() ? { notes: channel.notes.trim() } : {}),
+        createdAt,
+        updatedAt,
+      } satisfies SupplierChannel;
+    })
+    .filter((channel) => Boolean(channel.id && channel.name));
+  const basisId = resolveCostChannelId(channels, requestedCostChannelId);
+  return channels.map((channel) => ({ ...channel, isCostBasis: Boolean(basisId && channel.id === basisId) }));
+}
+
+/** 解析唯一成本基准渠道，优先显式 costChannelId，再兼容旧 isCostBasis。 */
+export function resolveCostChannelId(channels: SupplierChannel[], requestedCostChannelId?: string): string | undefined {
+  if (requestedCostChannelId && channels.some((channel) => channel.id === requestedCostChannelId)) return requestedCostChannelId;
+  return channels.find((channel) => channel.isCostBasis)?.id;
 }
 
 /** 历史进货价记录 */
@@ -346,7 +429,7 @@ export interface SupplierPriceRecord {
  * 3. 否则回退到 priceCny
  */
 export function getEffectiveCostPrice(bottle: Bottle): number {
-  const channels = bottle.supplierChannels ?? [];
+  const channels = normalizeSupplierChannels(bottle.supplierChannels, bottle.costChannelId);
   if (channels.length === 0) return bottle.priceCny;
   // 优先使用指定的成本基准渠道
   if (bottle.costChannelId) {

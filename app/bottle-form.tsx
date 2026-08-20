@@ -30,6 +30,7 @@ import { normalizeStyleToTaxonomy } from "@/lib/bottles/style-normalize";
 import { enrichBottle, deepAnalyzeBottle } from "@/lib/api/smart-router";
 import * as ImagePicker from "expo-image-picker";
 import { BOTTLE_GROUPS, bottleGroupOf } from "@/lib/bottles/types";
+import { useSpiritsInventoryStore } from "@/lib/spirits/crud-store";
 
 const FLAVOR_TAGS_ALL = ["草本","果味","柑橘","花香","甜润","酸爽","苦韵","辛香","烟熏","咸鲜","清爽","浓郁","坚果","奶油","干爽","热带","焦糖","咖啡","巧克力","泥煤","蜂蜜","香草","坚硬","辛辣"];
 
@@ -48,15 +49,17 @@ export default function BottleFormScreen() {
   const colors = useColors();
   const router = useRouter();
   const { t, lang } = useI18n();
-  const { id, category: categoryParam, prefillName, prefillNameAlt, prefillStyle } =
+  const { id, category: categoryParam, prefillName, prefillNameAlt, prefillStyle, sourceSpiritItemId } =
     useLocalSearchParams<{
       id?: string;
       category?: string;
       prefillName?: string;
       prefillNameAlt?: string;
       prefillStyle?: string;
+      sourceSpiritItemId?: string;
     }>();
   const { getBottle, addBottle, updateBottle, deleteBottle } = useBottleStore();
+  const { updateItem: updateSpiritItem } = useSpiritsInventoryStore();
   const { addPrep } = useHomemadeStore();
   const { recipes, updateRecipe } = useRecipeStore();
   const { categories: taxCategories, categoryLabel, stylesOf, categoriesOfGroup } = useBottleTaxonomy();
@@ -563,7 +566,10 @@ export default function BottleFormScreen() {
     if (editing) {
       updateBottle(editing.id, draft);
     } else {
-      addBottle(draft);
+      const created = addBottle(draft);
+      if (sourceSpiritItemId) {
+        updateSpiritItem(sourceSpiritItemId, { bottleId: created.id, bottleLinkConfidence: "confirmed" });
+      }
     }
     if (Platform.OS !== "web") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);

@@ -25,6 +25,8 @@ const BOTTLES_SEEDED_KEY = "cocktail.bottles.seeded";
 const MATERIAL_MIGRATED_V8_FLAG = "bottles.material.migrated.v8";
 /** v9 分类更名(果蔬/茶咖与可可)+复合名条目拆分去重迁移标记 */
 const MATERIAL_MIGRATED_V9_FLAG = "bottles.material.migrated.v9";
+/** 供应渠道多采购名称与唯一成本基准迁移标记。 */
+const SUPPLIER_CHANNELS_MIGRATED_V1_FLAG = "bottles.supplier-channels.migrated.v1";
 
 export type BottleDraft = Omit<
   Bottle,
@@ -185,6 +187,16 @@ export function BottleProvider({ children }: { children: React.ReactNode }) {
             notifySyncChange(MATERIAL_MIGRATED_V8_FLAG);
           }
         }
+        // v10:供应渠道从单一采购名称升级为多名称列表，并收敛为唯一成本基准。
+        {
+          const channelMigrationDone = await AsyncStorage.getItem(SUPPLIER_CHANNELS_MIGRATED_V1_FLAG);
+          if (!channelMigrationDone) {
+            await AsyncStorage.setItem(BOTTLES_KEY, JSON.stringify(list));
+            notifySyncChange(BOTTLES_KEY);
+            await AsyncStorage.setItem(SUPPLIER_CHANNELS_MIGRATED_V1_FLAG, "1");
+            notifySyncChange(SUPPLIER_CHANNELS_MIGRATED_V1_FLAG);
+          }
+        }
         // v9:①分类更名(新鲜果蔬→果蔬/茶与咖啡→茶咖与可可)+果蔬旧子风格并入;
         //    ②存量复合名条目(如"橙皮和柠檬片")连接词拆分为独立条目并与已有条目去重
         {
@@ -296,7 +308,7 @@ export function BottleProvider({ children }: { children: React.ReactNode }) {
     return registerStoreReload(() => {
       AsyncStorage.getItem(BOTTLES_KEY).then((raw) => {
         if (raw) {
-          try { setBottles(JSON.parse(raw) as Bottle[]); } catch {}
+          try { setBottles(JSON.parse(raw).map((b: Bottle) => normalizeBottle(b))); } catch {}
         }
       });
     });
@@ -306,8 +318,9 @@ export function BottleProvider({ children }: { children: React.ReactNode }) {
   bottlesRef.current = bottles;
 
   const persist = useCallback((next: Bottle[]) => {
-    setBottles(next);
-    AsyncStorage.setItem(BOTTLES_KEY, JSON.stringify(next)).catch(() => {});
+    const normalized = next.map((b) => normalizeBottle(b));
+    setBottles(normalized);
+    AsyncStorage.setItem(BOTTLES_KEY, JSON.stringify(normalized)).catch(() => {});
     notifySyncChange(BOTTLES_KEY);
   }, []);
 

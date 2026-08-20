@@ -1,3 +1,5 @@
+import type { Bottle } from "@/lib/bottles/types";
+import { resolveBottleForSupplierProductName } from "@/lib/bottles/supplier-channel-resolver";
 import type { SpiritItem, SpiritPurchaseOrderItem, SpiritPurchaseRecord } from "./types";
 import { normalizeSpiritSupplierAlias, resolveSpiritItemForSupplierName } from "./supplier-alias";
 
@@ -5,8 +7,14 @@ export type PendingSpiritPurchase = Omit<SpiritPurchaseRecord, "id" | "createdAt
 
 const normalize = normalizeSpiritSupplierAlias;
 
-export function findImportedPurchaseItem(order: SpiritPurchaseOrderItem, items: SpiritItem[]): SpiritItem | undefined {
+export function findImportedPurchaseItem(order: SpiritPurchaseOrderItem, items: SpiritItem[], bottles: Bottle[] = []): SpiritItem | undefined {
   for (const name of [order.nameZh, order.nameEn, order.rawName]) {
+    const bottleMatch = resolveBottleForSupplierProductName(bottles, order.supplier, name);
+    if (bottleMatch) {
+      const linkedItems = items.filter((item) => item.bottleId === bottleMatch.bottle.id);
+      if (linkedItems.length === 1) return linkedItems[0];
+      if (linkedItems.length > 1) return undefined;
+    }
     const supplierMatch = resolveSpiritItemForSupplierName(items, order.supplier, name);
     if (supplierMatch) return supplierMatch.item;
   }
@@ -42,12 +50,13 @@ export function buildImportedPurchaseRecords(
   items: SpiritItem[],
   fallbackMonth: string,
   source: PendingSpiritPurchase["source"] = "excel",
+  bottles: Bottle[] = [],
 ): { records: PendingSpiritPurchase[]; unmatched: SpiritPurchaseOrderItem[] } {
   const records: PendingSpiritPurchase[] = [];
   const unmatched: SpiritPurchaseOrderItem[] = [];
 
   for (const order of orders) {
-    const item = findImportedPurchaseItem(order, items);
+    const item = findImportedPurchaseItem(order, items, bottles);
     if (!item) unmatched.push(order);
     const month = /^\d{4}-\d{2}$/.test(order.date?.slice(0, 7) ?? "")
       ? order.date.slice(0, 7)

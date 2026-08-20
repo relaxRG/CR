@@ -20,7 +20,7 @@ import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
 import { useBottleStore } from "@/lib/bottles/store";
-import { SupplierChannel, SupplierPriceRecord, getEffectiveCostPrice } from "@/lib/bottles/types";
+import { createSupplierChannelPurchaseName, getEffectiveCostPrice, getSupplierChannelPurchaseNames, normalizeSupplierChannels, resolveCostChannelId, SupplierChannel, SupplierPriceRecord } from "@/lib/bottles/types";
 
 function uuid() { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
 
@@ -34,7 +34,7 @@ function ChannelFormModal({ visible, channel, colors, onSave, onClose }: {
 }) {
   const [type, setType] = useState<"supplier" | "self">(channel?.type ?? "supplier");
   const [name, setName] = useState(channel?.name ?? "");
-  const [supplierProductName, setSupplierProductName] = useState(channel?.supplierProductName ?? "");
+  const [purchaseNamesText, setPurchaseNamesText] = useState(getSupplierChannelPurchaseNames(channel ?? {}).map((entry) => entry.name).join("\n"));
   const [latestPrice, setLatestPrice] = useState(channel?.latestPrice ? String(channel.latestPrice) : "");
   const [unit, setUnit] = useState(channel?.unit ?? "瓶");
   const [purchaseUrl, setPurchaseUrl] = useState(channel?.purchaseUrl ?? "");
@@ -45,7 +45,7 @@ function ChannelFormModal({ visible, channel, colors, onSave, onClose }: {
     if (visible) {
       setType(channel?.type ?? "supplier");
       setName(channel?.name ?? "");
-      setSupplierProductName(channel?.supplierProductName ?? "");
+      setPurchaseNamesText(getSupplierChannelPurchaseNames(channel ?? {}).map((entry) => entry.name).join("\n"));
       setLatestPrice(channel?.latestPrice ? String(channel.latestPrice) : "");
       setUnit(channel?.unit ?? "瓶");
       setPurchaseUrl(channel?.purchaseUrl ?? "");
@@ -57,9 +57,14 @@ function ChannelFormModal({ visible, channel, colors, onSave, onClose }: {
   const handleSave = () => {
     if (!name.trim()) { Alert.alert("请填写渠道名称"); return; }
     if (!latestPrice || Number(latestPrice) <= 0) { Alert.alert("请填写进货价格"); return; }
+    const purchaseNames = purchaseNamesText
+      .split(/\n|\r|,|，|、/)
+      .map((value) => createSupplierChannelPurchaseName(value))
+      .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
     onSave({
       type, name: name.trim(),
-      supplierProductName: supplierProductName.trim() || undefined,
+      ...(purchaseNames[0] ? { supplierProductName: purchaseNames[0].name } : {}),
+      ...(purchaseNames.length > 0 ? { purchaseNames } : {}),
       latestPrice: Number(latestPrice),
       unit: unit.trim() || "瓶",
       purchaseUrl: purchaseUrl.trim() || undefined,
@@ -106,18 +111,19 @@ function ChannelFormModal({ visible, channel, colors, onSave, onClose }: {
                 style={[S.input, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.surface }]} />
             </View>
 
-            {/* 供应商商品名 */}
+            {/* 渠道采购名称：允许现名、旧名和简称共同参与智能匹配。 */}
             <View>
               <Text style={[S.label, { color: colors.muted }]}>
-                {type === "supplier" ? "供应商商品名（可选）" : "平台商品名（可选）"}
+                {type === "supplier" ? "供应商采购名称（可选）" : "平台商品名称（可选）"}
               </Text>
               <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 6 }}>
-                供应商给这款酒的名称，可能与官方名不同
+                一行一个名称；可同时记录现名、旧名和简称，用于导入、手动进货和智能链接匹配。
               </Text>
-              <TextInput value={supplierProductName} onChangeText={setSupplierProductName}
-                placeholder="如：添加利金酒Tanqueray Gin 700ml"
+              <TextInput value={purchaseNamesText} onChangeText={setPurchaseNamesText}
+                multiline
+                placeholder={type === "supplier" ? "如：君度 FP\n君度橙味利口酒" : "如：君度橙味利口酒 700ml\nCointreau 700ml"}
                 placeholderTextColor={colors.muted}
-                style={[S.input, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.surface }]} />
+                style={[S.input, { minHeight: 88, textAlignVertical: "top", color: colors.foreground, borderColor: colors.border, backgroundColor: colors.surface }]} />
             </View>
 
             {/* 进货价格 */}
@@ -200,6 +206,7 @@ export default function BottleChannelsScreen() {
 
   const [showForm, setShowForm] = useState(false);
   const [editingChannel, setEditingChannel] = useState<SupplierChannel | null>(null);
+  const [priceHistoryChannel, setPriceHistoryChannel] = useState<SupplierChannel | null>(null);
 
   if (!bottle) {
     return (
@@ -248,33 +255,41 @@ export default function BottleChannelsScreen() {
         : [...channels, newChannel];
     }
 
-    // 如果成本基准渠道有价格，更新 priceCny
-    const basisChannel = updatedChannels.find((c) => c.isCostBasis);
-    const newPriceCny = basisChannel ? basisChannel.latestPrice : bottle.priceCny;
+    const activeChannelId = editingChannel?.id ?? updatedChannels.at(-1)?.id;
+    const requestedCostChannelId = data.isCostBasis && activeChannelId ? activeChannelId : bottle.costChannelId;
+    const normalizedChannels = normalizeSupplierChannels(updatedChannels, requestedCostChannelId);
+    const basisChannelId = resolveCostChannelId(normalizedChannels, requestedCostChannelId);
+    const basisChannel = normalizedChannels.find((channel) => channel.id === basisChannelId);
 
     updateBottle(bottle.id, {
       ...bottle,
-      supplierChannels: updatedChannels,
-      costChannelId: basisChannel?.id ?? bottle.costChannelId,
-      priceCny: newPriceCny,
+      supplierChannels: normalizedChannels,
+      ...(basisChannelId ? { costChannelId: basisChannelId } : { costChannelId: undefined }),
+      ...(basisChannel ? { priceCny: basisChannel.latestPrice } : {}),
     });
   };
 
   const handleDeleteChannel = (channelId: string) => {
+    if (channelId === resolveCostChannelId(channels, bottle.costChannelId) && channels.length > 1) {
+      Alert.alert("请先切换成本基准", "当前渠道正在用于成本计算。请先在另一条渠道上选择“设为成本计算基准”，再删除此渠道。");
+      return;
+    }
     Alert.alert("删除渠道", "确认删除此供货渠道？", [
       { text: "取消", style: "cancel" },
       {
         text: "删除", style: "destructive", onPress: () => {
           const updatedChannels = channels.filter((c) => c.id !== channelId);
-          updateBottle(bottle.id, { ...bottle, supplierChannels: updatedChannels, costChannelId: bottle.costChannelId === channelId ? undefined : bottle.costChannelId });
+          const normalizedChannels = normalizeSupplierChannels(updatedChannels, bottle.costChannelId === channelId ? undefined : bottle.costChannelId);
+          const basisChannelId = resolveCostChannelId(normalizedChannels, bottle.costChannelId === channelId ? undefined : bottle.costChannelId);
+          updateBottle(bottle.id, { ...bottle, supplierChannels: normalizedChannels, ...(basisChannelId ? { costChannelId: basisChannelId } : { costChannelId: undefined }) });
         },
       },
     ]);
   };
 
   const handleSetCostBasis = (channelId: string) => {
-    const updatedChannels = channels.map((c) => ({ ...c, isCostBasis: c.id === channelId }));
-    const basisChannel = updatedChannels.find((c) => c.isCostBasis)!;
+    const updatedChannels = normalizeSupplierChannels(channels.map((c) => ({ ...c, isCostBasis: c.id === channelId })), channelId);
+    const basisChannel = updatedChannels.find((c) => c.id === channelId)!;
     updateBottle(bottle.id, { ...bottle, supplierChannels: updatedChannels, costChannelId: channelId, priceCny: basisChannel.latestPrice });
     Alert.alert("已设置", `成本计算基准已切换为「${basisChannel.name}」\n进货价：¥${basisChannel.latestPrice}/${basisChannel.unit}`);
   };
@@ -345,9 +360,9 @@ export default function BottleChannelsScreen() {
                       </View>
                     )}
                   </View>
-                  {ch.supplierProductName && (
-                    <Text style={{ fontSize: 12, color: colors.muted, marginTop: 3 }}>
-                      商品名：{ch.supplierProductName}
+                  {getSupplierChannelPurchaseNames(ch).length > 0 && (
+                    <Text style={{ fontSize: 12, color: colors.muted, marginTop: 3 }} numberOfLines={2}>
+                      采购名称：{getSupplierChannelPurchaseNames(ch).map((entry) => entry.name).join("、")}
                     </Text>
                   )}
                 </View>
@@ -373,13 +388,13 @@ export default function BottleChannelsScreen() {
                     <Text style={{ fontSize: 13, fontWeight: "400", color: colors.muted }}>/{ch.unit}</Text>
                   </Text>
                 </View>
-                {ch.priceHistory && ch.priceHistory.length > 1 && (
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 11, color: colors.muted }}>历史价格</Text>
-                    <Text style={{ fontSize: 11, color: colors.muted, lineHeight: 16 }}>
-                      {ch.priceHistory.slice(0, 3).map((h) => `¥${h.price}(${h.date.slice(0, 7)})`).join(" → ")}
+                {(ch.priceHistory ?? []).length > 0 && (
+                  <TouchableOpacity onPress={() => { tap(); setPriceHistoryChannel(ch); }} style={{ flex: 1, alignItems: "flex-start" }}>
+                    <Text style={{ fontSize: 11, color: colors.muted }}>价格变化</Text>
+                    <Text style={{ fontSize: 12, color: colors.primary, marginTop: 2 }}>
+                      查看 {(ch.priceHistory ?? []).length} 条记录
                     </Text>
-                  </View>
+                  </TouchableOpacity>
                 )}
               </View>
 
@@ -417,6 +432,41 @@ export default function BottleChannelsScreen() {
           可随时切换不同渠道作为成本基准
         </Text>
       </ScrollView>
+
+      <Modal
+        visible={Boolean(priceHistoryChannel)}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setPriceHistoryChannel(null)}
+      >
+        <View style={[S.sheet, { backgroundColor: colors.background }]}>
+          <View style={[S.sheetHeader, { borderBottomColor: colors.border }]}>
+            <Pressable onPress={() => setPriceHistoryChannel(null)}><Text style={{ fontSize: 17, color: colors.primary }}>完成</Text></Pressable>
+            <Text style={[S.sheetTitle, { color: colors.foreground }]} numberOfLines={1}>价格变化</Text>
+            <View style={{ width: 34 }} />
+          </View>
+          <ScrollView contentContainerStyle={{ padding: 16 }}>
+            <Text style={{ fontSize: 16, fontWeight: "600", color: colors.foreground }}>{priceHistoryChannel?.name}</Text>
+            <Text style={{ fontSize: 13, color: colors.muted, marginTop: 4, marginBottom: 12 }}>
+              当前价格与所有历史报价；历史记录不会因渠道名称修改或删除而改写采购流水。
+            </Text>
+            {(priceHistoryChannel?.priceHistory ?? [])
+              .slice()
+              .sort((a, b) => b.date.localeCompare(a.date))
+              .map((record, index, records) => (
+                <View key={`${record.date}-${record.price}-${index}`} style={{ paddingVertical: 12, borderBottomWidth: index < records.length - 1 ? StyleSheet.hairlineWidth : 0, borderBottomColor: colors.border, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <View>
+                    <Text style={{ fontSize: 14, color: colors.foreground, fontWeight: "500" }}>{record.date}</Text>
+                    <Text style={{ fontSize: 12, color: colors.muted, marginTop: 3 }}>
+                      {record.source ?? "手动录入"}{record.quantity ? ` · ${record.quantity} 件` : ""}
+                    </Text>
+                  </View>
+                  <Text style={{ fontSize: 17, color: colors.foreground, fontWeight: "600" }}>¥{formatMoney(record.price)}</Text>
+                </View>
+              ))}
+          </ScrollView>
+        </View>
+      </Modal>
 
       <ChannelFormModal
         visible={showForm}

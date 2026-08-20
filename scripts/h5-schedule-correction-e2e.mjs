@@ -434,6 +434,30 @@ try {
     if (ledgerState.result.value.rootScrollWidth > ledgerState.result.value.rootClientWidth || ledgerState.result.value.bodyScrollWidth > ledgerState.result.value.rootClientWidth) {
       throw new Error(`烈酒库存台账 ${width}pt 出现根级横向溢出：${JSON.stringify(ledgerState.result.value)}`);
     }
+    const selectClicked = await call("Runtime.evaluate", { expression: clickTestIdExpression("spirits-ledger-select-toggle"), returnByValue: true });
+    if (!selectClicked.result.value) throw new Error(`烈酒库存 ${width}pt 缺少选择入口`);
+    await sleep(120);
+    const rowSelectClicked = await call("Runtime.evaluate", { expression: clickTestIdExpression("spirits-ledger-select-h5-spirit-item"), returnByValue: true });
+    if (!rowSelectClicked.result.value) throw new Error(`烈酒库存 ${width}pt 未显示酒款选择框`);
+    await sleep(120);
+    const selectionState = await call("Runtime.evaluate", { expression: `(() => {
+      const header = document.querySelector('[data-testid="spirits-ledger-column-name"]')?.parentElement;
+      const batch = document.querySelector('[data-testid="spirits-ledger-batch-toolbar"]');
+      return {
+        batchVisible: Boolean(batch),
+        selected: batch?.innerText.includes('已选 1 项'),
+        hasBatchCategory: batch?.innerText.includes('修改分类'),
+        hasBatchDelete: batch?.innerText.includes('删除'),
+        hasVisibleSortGlyph: header?.innerText.includes('⌄') ?? false,
+        rootClientWidth: document.documentElement.clientWidth,
+        rootScrollWidth: document.documentElement.scrollWidth,
+      };
+    })()`, returnByValue: true });
+    if (!selectionState.result.value.batchVisible || !selectionState.result.value.selected || !selectionState.result.value.hasBatchCategory || !selectionState.result.value.hasBatchDelete || selectionState.result.value.hasVisibleSortGlyph || selectionState.result.value.rootScrollWidth > selectionState.result.value.rootClientWidth) {
+      throw new Error(`烈酒库存 ${width}pt 紧凑表头或多选操作异常：${JSON.stringify(selectionState.result.value)}`);
+    }
+    await call("Runtime.evaluate", { expression: clickTestIdExpression("spirits-ledger-select-toggle"), returnByValue: true });
+    await sleep(80);
     const nameClicked = await call("Runtime.evaluate", { expression: `(() => {
       const name = document.querySelector('[data-testid="spirits-ledger-table-name-h5-spirit-item"]');
       if (!name) return false;
