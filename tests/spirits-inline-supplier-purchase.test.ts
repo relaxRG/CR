@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 const read = (relativePath: string) => readFileSync(resolve(process.cwd(), relativePath), "utf8");
 
 describe("烈酒当月进货供应商同页工作台", () => {
-  const screen = read("app/spirits-inventory.tsx");
+  const screen = read("components/inventory/SpiritsInventoryWorkspaceScreen.tsx");
   const h5 = read("scripts/h5-schedule-correction-e2e.mjs");
 
   it("以供应商标签和同排新增入口替代重复合计卡与供应商入口卡片", () => {

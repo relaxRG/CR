@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 
-const source = fs.readFileSync(path.resolve(__dirname, "../app/labor.tsx"), "utf8");
+const source = fs.readFileSync(path.resolve(__dirname, "../components/labor/LaborWorkspaceScreen.tsx"), "utf8");
 
 describe("排班表响应式分页与网页缩放护栏", () => {
   it("不再读取模块加载时的静态窗口宽度", () => {

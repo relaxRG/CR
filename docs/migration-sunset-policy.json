@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "policy": "一次性迁移不得永久保留；到期前必须在所有受支持客户端完成升级验证后删除，若需延期必须更新原因与日期。",
+  "migrations": [
+    {
+      "file": "clean-empty-shift-entries.ts",
+      "expiresOn": "2027-08-31",
+      "removalCondition": "所有仍受支持版本已完成空班次条目清理"
+    },
+    {
+      "file": "clean-legacy-business-month-keys.ts",
+      "expiresOn": "2027-08-31",
+      "removalCondition": "所有仍受支持版本已切换到全局业务月份键"
+    },
+    {
+      "file": "clean-monthly-fixed-salary.ts",
+      "expiresOn": "2027-08-31",
+      "removalCondition": "所有仍受支持版本已完成薪资字段迁移"
+    },
+    {
+      "file": "purge-retired-book-library.ts",
+      "expiresOn": "2027-08-31",
+      "removalCondition": "所有活跃设备至少完成一次书库退役物理清理"
+    }
+  ]
+}

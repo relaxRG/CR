@@ -36,9 +36,6 @@ type SectionKey = "category" | TagKind;
 const SECTION_KEYS: SectionKey[] = ["category", "spirit", "glass", "flavor"];
 const isTagKind = (s: SectionKey): s is TagKind =>
   s === "spirit" || s === "glass" || s === "flavor";
-/** 系统标签分组（固定，不可增删改名） */
-const SYSTEM_SECTIONS = ["duration", "occasion"] as const;
-type SystemSection = (typeof SYSTEM_SECTIONS)[number];
 const SECTION_LABEL_KEY = {
   category: "tags.section.category",
   spirit: "tags.section.spirit",
@@ -116,48 +113,11 @@ function DraggableRow({
 
 
 // ─── 标签 Chip（彩色淡底 + 同色文字）─────────────────────────────────────────
-function TagChip({
-  name,
-  color,
-  onPress,
-  onColorPress,
-  locked,
-}: {
-  name: string;
-  color: string;
-  onPress: () => void;
-  onColorPress?: () => void;
-  locked?: boolean;
-}) {
-  const bg = color + "22";
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.chip,
-        { backgroundColor: pressed ? color + "33" : bg },
-      ]}
-    >
-      <Pressable
-        onPress={() => { onColorPress?.(); }}
-        hitSlop={6}
-        style={[styles.chipDot, { backgroundColor: color }]}
-      />
-      <Text style={[styles.chipText, { color }]} numberOfLines={1}>
-        {name}
-      </Text>
-      {locked ? (
-        <IconSymbol name="lock.fill" size={10} color={color} />
-      ) : null}
-    </Pressable>
-  );
-}
 
 // ─── 分组卡片（可折叠）────────────────────────────────────────────────────────
 function GroupCard({
   group,
   items,
-  rows,
   section,
   lang,
   colors,
@@ -166,7 +126,6 @@ function GroupCard({
   editingName,
   editingNameEn,
   draggingId,
-  groupPickerId,
   groups,
   setEditingId,
   setEditingName,
@@ -795,7 +754,6 @@ export default function CategoriesScreen() {
     categoryGroups,
     recipes,
     tags,
-    tagGroups,
     addCategory,
     renameCategory,
     setCategoryNameEn,
@@ -806,7 +764,6 @@ export default function CategoriesScreen() {
     renameCategoryGroup,
     setCategoryGroupNameEn,
     deleteCategoryGroup,
-    reorderCategoryGroups,
     setCategoryGroup,
     addTag,
     renameTag,
@@ -818,7 +775,6 @@ export default function CategoriesScreen() {
     renameTagGroup,
     setTagGroupNameEn,
     deleteTagGroup,
-    reorderTagGroups,
     setTagGroup,
     tagGroupsOf,
     toggleTagLocked,
@@ -923,17 +879,6 @@ export default function CategoriesScreen() {
     [section, reorderCategories, reorderTags],
   );
 
-  const moveRow = useCallback(
-    (fromIndex: number, toIndex: number) => {
-      if (toIndex < 0 || toIndex >= rows.length || fromIndex === toIndex) return;
-      const ids = rows.map((r) => r.id);
-      const [moved] = ids.splice(fromIndex, 1);
-      ids.splice(toIndex, 0, moved);
-      applyOrder(ids);
-      if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    },
-    [rows, applyOrder],
-  );
 
   const moveRowInBlock = useCallback(
     (blockItems: RowData[], fromIndex: number, toIndex: number) => {

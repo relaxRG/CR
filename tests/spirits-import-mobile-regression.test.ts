@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 const root = path.resolve(__dirname, "..");
-const spirits = fs.readFileSync(path.join(root, "app/spirits-inventory.tsx"), "utf8");
+const spirits = fs.readFileSync(path.join(root, "components/inventory/SpiritsInventoryWorkspaceScreen.tsx"), "utf8");
 
 describe("烈酒导入与台账移动端回归", () => {
   it("默认台账模式不渲染全选和批量编辑工具栏", () => {

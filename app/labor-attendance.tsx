@@ -33,7 +33,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import {
   useEmployeeStore, useAttendanceStore, usePaySlipStore,
   useCompOffBalanceEntryStore,
-  useGlobalPayrollSettingsStore, useDeptOrderStore, DEFAULT_DEPT_ORDER,
+  useGlobalPayrollSettingsStore, useDeptOrderStore,
   useMonthCloseStore,
 } from "@/lib/labor/store";
 import { useSalaryAdvanceStore } from "@/lib/labor/advance-store";
@@ -305,7 +305,6 @@ function EmployeeCard({
     const workKPI = slip?.workKPIBonus ?? 0;
     const revenueKPI = slip?.revenueKPIBonus ?? 0;
     const allowance = (slip?.mealAllowance ?? 0) + (slip?.transportAllowance ?? 0) + (slip?.otherAllowance ?? 0);
-    const reward = slip?.rewardPenalty ?? 0;
     const cashOut = slip ? getCompOffCashOutSettlementAmount(slip) : 0;
     // 已预支 = 手动预支 + 备用金已付（与展开状态保持一致）
     const advance = advanceTotal + (slip?.pettyLaborPaid ?? 0);
@@ -594,7 +593,7 @@ function EmployeeCard({
 }
 
 // ─── 辅助组件 ─────────────────────────────────────────────────────────────────
-function DetailRow({ label, value, colors, bold, positive, negative, primary, muted: isMuted }: {
+function DetailRow({ label, value, colors, bold, negative, primary, muted: isMuted }: {
   label: string; value: string; colors: any; bold?: boolean; positive?: boolean; negative?: boolean; primary?: boolean; muted?: boolean;
 }) {
   // 普通收入、补贴和扣款只靠正负号表达；颜色只强调主结果、真实异常和次要信息。

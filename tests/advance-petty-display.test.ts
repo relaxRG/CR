@@ -5,7 +5,7 @@
 import { describe, it, expect } from "vitest";
 import type { PaySlip } from "../lib/labor/types";
 
-// ─── 模拟薪资卡片的展示逻辑（与 app/labor.tsx L499 一致）──────────────────────
+// ─── 模拟薪资卡片的展示逻辑（与 components/labor/LaborWorkspaceScreen.tsx L499 一致）──────────────────────
 
 function getDisplayAdvanceAmount(slip: Partial<PaySlip> | null | undefined): number {
   return (slip?.advanceAmount ?? 0) + (slip?.pettyLaborPaid ?? 0);

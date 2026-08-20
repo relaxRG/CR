@@ -13,6 +13,7 @@ import {
   useState,
 } from "react";
 import { Alert, AppState, Platform } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { addNetworkStateListener } from "expo-network";
 import {
   cfPull,
@@ -24,7 +25,6 @@ import {
   leaveCurrentSyncGroup,
   recoverStaleOwner,
   refreshCurrentDevicePlatform,
-  saveDeviceCredentials,
   type DeviceCredentials,
   type DeviceRole,
 } from "./client";
@@ -40,12 +40,24 @@ import {
   type SyncState,
   type SyncConflict,
 } from "@/lib/sync/engine";
-import { createSnapshot } from "@/lib/backup/local-backup";
+import { createSnapshot, createVerifiedSnapshot } from "@/lib/backup/local-backup";
+import {
+  FRESH_BASELINE_AUDIT_KEY,
+  createFreshBusinessBaseline,
+  type FreshBaselineResult,
+} from "@/lib/data/fresh-business-baseline";
+import { clearAllBusinessRecipePhotos } from "@/lib/recipes/photo";
 import { startAutoBackup } from "@/lib/backup/icloud-backup";
 import { syncPhotos } from "@/lib/sync/photo-sync";
 import { useI18n } from "@/lib/i18n";
 import { startRealtimeSync, notifyPushDone, resetRealtimeSync } from "./ws-sync";
-import { recoverJoinAfterUnavailableSource, recoverPendingGroupSwitch, switchToAnotherGroup, type GroupSwitchRuntime } from "./group-switch";
+import {
+  clearLocalGroupSwitchArtifacts,
+  recoverJoinAfterUnavailableSource,
+  recoverPendingGroupSwitch,
+  switchToAnotherGroup,
+  type GroupSwitchRuntime,
+} from "./group-switch";
 import type { DeviceSessionState } from "@/lib/sync/device-session";
 import { STORAGE_POLICY, isStorageKeyWritable } from "@/lib/sync/capabilities";
 import type { SyncStorageKey } from "@/lib/sync/engine";
@@ -101,6 +113,8 @@ type SyncContextValue = {
   forceClearLocalSyncCredentials: () => Promise<void>;
   /** 正在执行原子切组或冷启动补偿时禁用高风险设备管理操作。 */
   isGroupSwitching: boolean;
+  /** 用户明确确认后：备份、退出旧组、清空业务数据并创建新的空主同步组。 */
+  createFreshBusinessBaseline: (deviceName?: string) => Promise<FreshBaselineResult>;
   /** Worker 核验的唯一成员与策略事实；新页面只能通过此状态调用 useCan()。 */
   deviceSessionState: DeviceSessionState;
 };
@@ -616,6 +630,70 @@ export function SyncProvider({
     }
   }, [restartSync]);
 
+  /**
+   * 受确认保护的业务归零流程。注意：它不会删除备份快照或远端旧同步组，
+   * 只让当前设备退出旧组并注册一个没有任何业务键的新空主组。
+   */
+  const createCurrentDeviceFreshBusinessBaseline = useCallback(async (deviceName?: string) => {
+    if (isGroupSwitching) throw new Error("SYNC_GROUP_SWITCH_IN_PROGRESS");
+    setIsGroupSwitching(true);
+    try {
+      const result = await createFreshBusinessBaseline({
+        getAllStorageKeys: () => AsyncStorage.getAllKeys(),
+        createVerifiedBackup: async (keys) => {
+          const backup = await createVerifiedSnapshot(keys);
+          return { slot: backup.slot, keyCount: backup.keyCount };
+        },
+        leaveOldGroup: async () => {
+          const source = await getDeviceCredentials();
+          if (!source) return null;
+          await leaveCurrentSyncGroup();
+          return source.groupId;
+        },
+        clearLocalSyncIdentity: async () => {
+          disableSync();
+          if (retryTimerRef.current) {
+            clearTimeout(retryTimerRef.current);
+            retryTimerRef.current = null;
+          }
+          retryCountRef.current = 0;
+          startedRef.current = false;
+          stopRealtimeRef.current?.();
+          stopRealtimeRef.current = null;
+          resetRealtimeSync();
+          await clearLocalGroupSwitchArtifacts();
+          await clearDeviceCredentials();
+          setDeviceCredentials(null);
+          setSession({ tag: "local_single_device" });
+          setSyncError(null);
+        },
+        removeStorageKeys: (keys) => AsyncStorage.multiRemove([...keys]),
+        removeBusinessFiles: clearAllBusinessRecipePhotos,
+        createEmptyGroup: async (name) => {
+          const membership = await createNewSyncGroup(name);
+          setDeviceCredentials(membership);
+          return { groupId: membership.groupId };
+        },
+        writeAudit: async (result) => {
+          await AsyncStorage.setItem(FRESH_BASELINE_AUDIT_KEY, JSON.stringify({
+            version: 1,
+            createdAt: new Date().toISOString(),
+            ...result,
+          }));
+        },
+        startEmptyGroupSync: async () => {
+          // Provider 内存中可能仍保留旧 Store 快照；先重载，再让同步引擎读取已清空的持久化键。
+          triggerStoreReload();
+          const synced = await restartSync();
+          if (!synced) throw new Error("FRESH_BASELINE_NEW_GROUP_SYNC_FAILED");
+        },
+      }, deviceName);
+      return result;
+    } finally {
+      setIsGroupSwitching(false);
+    }
+  }, [isGroupSwitching, restartSync, setSession]);
+
   // Build a user-like object for compatibility with existing UI
   const user = deviceInfo
     ? {
@@ -656,6 +734,7 @@ export function SyncProvider({
         recoverStaleGroupOwner,
         forceClearLocalSyncCredentials,
         isGroupSwitching,
+        createFreshBusinessBaseline: createCurrentDeviceFreshBusinessBaseline,
         deviceSessionState,
       }}
     >

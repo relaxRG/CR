@@ -5,7 +5,6 @@
  */
 import React from "react";
 import { View } from "react-native";
-import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
 import StoreAccountsScreen from "@/components/store/accounts";
@@ -13,7 +12,6 @@ import StoreAccountsScreen from "@/components/store/accounts";
 export default function StoreAccountsPage() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const router = useRouter();
   return (
     <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: insets.top }}>
       <StoreAccountsScreen />

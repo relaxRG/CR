@@ -7,7 +7,7 @@
  */
 import React, { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import Svg, { Circle, Line, Path, Polyline, Text as SvgText } from "react-native-svg";
+import Svg, { Circle, Line, Polyline, Text as SvgText } from "react-native-svg";
 import { useColors } from "@/hooks/use-colors";
 import { PriceHistoryEntry } from "@/lib/food/types";
 
@@ -39,7 +39,6 @@ export function PriceHistoryChart({
   history,
   width = 320,
   height = 160,
-  unit = "",
   showLegend = true,
 }: PriceChartProps) {
   const colors = useColors();
@@ -212,7 +211,7 @@ export function SupplierPriceCompare({ supplierPrices, unit = "", width = 320 }:
 
   return (
     <View style={S.compareWrap}>
-      {sorted.map((item, i) => {
+      {sorted.map((item) => {
         const color = getSupplierColor(item.supplier, allSuppliers);
         const barWidth = maxPrice > 0 ? (item.latestPrice / maxPrice) * (width - 140) : 0;
         const isCheapest = item.latestPrice === minPrice;

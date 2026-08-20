@@ -20,7 +20,7 @@ import * as Sharing from "expo-sharing";
 import * as XLSX from "xlsx";
 
 import type { Employee, EmployeeDept, ShiftEntry, MonthlyAttendance, PaySlip, ShiftTemplate } from "./types";
-import { DEPT_LABELS, EMPLOYEE_TYPE_LABELS, getAttendanceBaseSalary } from "./types";
+import { EMPLOYEE_TYPE_LABELS, getAttendanceBaseSalary } from "./types";
 import { DEFAULT_DEPT_ORDER } from "../labor/store";
 import { sumMoney } from "@/lib/finance/money";
 import { sortEmployeesWithinProfileGroup } from "./employee-profile-order";

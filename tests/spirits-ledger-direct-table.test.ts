@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const source = readFileSync(resolve(process.cwd(), "app/spirits-inventory.tsx"), "utf8");
+const source = readFileSync(resolve(process.cwd(), "components/inventory/SpiritsInventoryWorkspaceScreen.tsx"), "utf8");
 
 describe("烈酒库存完整Excel台账", () => {
   it("库存管理不再提供移动概览或持久化视图切换，直接展示唯一Excel台账", () => {

@@ -16,7 +16,6 @@ import {
   HalfHourSlot, DailyPeriodRecord, PeriodAnalysisReport,
   PeriodAnalysisSettings, DEFAULT_PERIOD_SETTINGS,
   classifySlot, isAfterTime, slotToMinutes,
-  PERIOD_LABELS,
 } from "./types";
 import type { PeriodKey } from "./types";
 

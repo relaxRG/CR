@@ -7,7 +7,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -20,9 +19,8 @@ import { SmartImportBar } from "@/components/smart-import-bar";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
-import { enrichHomemade, deepAnalyzeHomemade } from "@/lib/api/smart-router";
+import { enrichHomemade } from "@/lib/api/smart-router";
 import { analyzeUnknownIngredient } from "@/lib/classify";
-import * as Clipboard from "expo-clipboard";
 import type { EnrichHomemadeResult } from "@/lib/api/smart-router";
 import { suggestPrep } from "@/lib/homemade/match";
 import { useNetwork } from "@/hooks/use-network";
@@ -32,18 +30,14 @@ import { useRecentUnits } from "@/hooks/use-recent-units";
 import { NestableScrollContainer, NestableDraggableFlatList, RenderItemParams } from "react-native-draggable-flatlist";
 import { useHomemadeStore } from "@/lib/homemade/store";
 import {
-  PREP_GROUPS,
   guessPrepType,
-  joinPrepIngredient,
   prepGroupOfSection,
   splitPrepIngredientLine,
 } from "@/lib/homemade/types";
 import {
   SHELF_LIFE_OPTIONS,
-  calcGarnishCostPerUnit,
   PrepGroup,
 } from "@/lib/homemade/types";
-import { prepSectionOfIn } from "@/lib/homemade/types";
 import { useBottleStore } from "@/lib/bottles/store";
 import { estimatePrepCost, type PrepCostEstimate } from "@/lib/homemade/cost";
 import { suggestIngredients } from "@/lib/suggest";
@@ -221,12 +215,6 @@ export default function HomemadeFormScreen() {
   const [yieldUnitPickerOpen, setYieldUnitPickerOpen] = useState(false);
   const { recentUnits, addRecentUnit } = useRecentUnits();
 
-  /** 当前选中类型是否属于装饰分组 */
-  const isGarnishType = useMemo(() => {
-    const sec = typeList.find((pt) => pt.key === type)?.section ?? "";
-    const grp = sections.find((s) => s.key === sec)?.group ?? "";
-    return grp === "garnish";
-  }, [type, typeList, sections]);
   // selectedGroup 变化时，如果当前 type 不属于新分组，重置到新分组第一个类型
   const handleGroupChange = (grp: PrepGroup) => {
     setSelectedGroup(grp);
@@ -334,13 +322,6 @@ export default function HomemadeFormScreen() {
   }, [debouncedIngRows, bottles, allPreps, editing?.id, name, type, selectedGroup, yieldQty, yieldUnit]);
 
   // 风险3：用 Map<rowId, item> 建立 ingRow → 估算结果的映射，避免空行索引错位
-  const liveEstimateMap = useMemo(() => {
-    const map = new Map<string, NonNullable<typeof liveEstimate>["items"][0]>();
-    if (!liveEstimate) return map;
-    const validRows = debouncedIngRows.filter((r) => r.name.trim());
-    validRows.forEach((row, i) => { if (liveEstimate.items[i]) map.set(row.id, liveEstimate.items[i]); });
-    return map;
-  }, [liveEstimate, debouncedIngRows]);
 
   // 风险7：成本明细默认折叠；风险4：有手动值时自动展开批次总成本输入框
   const [costDetailOpen, setCostDetailOpen] = useState(false);
@@ -504,58 +485,6 @@ export default function HomemadeFormScreen() {
     if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
   }, [undoSnapshot]);
 
-  /** 深度解析：使用强模型（claude-sonnet）补全所有字段 */
-  const handleDeepAnalyze = async () => {
-    const displayName = [name.trim(), nameAlt.trim()].filter(Boolean).join(" / ");
-    if (!displayName) return;
-    if (!isOnline) {
-      Alert.alert(lang === "zh" ? "网络不可用" : "Offline", lang === "zh" ? "深度解析需要网络连接" : "Deep analysis requires network");
-      return;
-    }
-    setAiBusy(true);
-    try {
-      const ingStr = ingRows.filter((r) => r.name.trim()).map((r) => r.name.trim()).join(", ");
-      const res = await deepAnalyzeHomemade({
-        name: name.trim() || undefined,
-        nameAlt: nameAlt.trim() || undefined,
-        type: type || undefined,
-        ingredients: ingStr || undefined,
-      });
-      const r = res as Record<string, unknown>;
-      // 自动应用步骤（若当前为空）
-      if (typeof r.steps === "string" && r.steps && !recipe.trim()) {
-        setStepRows(parseStepRows(r.steps));
-      }
-      // 自动应用产量（若当前为空）
-      if (typeof r.yieldQty === "number" && r.yieldQty > 0 && !yieldQty) {
-        setYieldQty(String(r.yieldQty));
-        if (typeof r.yieldUnit === "string" && r.yieldUnit) setYieldUnit(r.yieldUnit);
-      }
-      // 自动预填成分行（若当前为空）
-      if (Array.isArray(r.prepIngredients) && (r.prepIngredients as {name:string;amount:string}[]).length > 0 && ingRows.every((row) => !row.name.trim())) {
-        const newRows = (r.prepIngredients as {name:string;amount:string}[]).map((ing) => ({
-          id: `ai-${Math.random().toString(36).slice(2)}`,
-          name: ing.name,
-          amount: ing.amount,
-          linkedBottleId: undefined,
-          linkedPrepId: undefined,
-          linkDismissed: false,
-        }));
-        setIngRows([...newRows, { id: `blank-${Date.now()}`, name: "", amount: "", linkedBottleId: undefined, linkedPrepId: undefined, linkDismissed: false }]);
-      }
-      // 将深度解析结果合并到 aiResult 供建议面板显示
-      setAiResult({ ...((aiResult ?? {}) as typeof aiResult), ...r } as unknown as typeof aiResult);
-      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch {
-      Alert.alert(
-        lang === "zh" ? "深度解析失败" : "Deep Analysis Failed",
-        lang === "zh" ? "AI 服务暂时不可用，请稍后重试" : "AI service unavailable, please retry",
-        [{ text: lang === "zh" ? "好的" : "OK" }]
-      );
-    } finally {
-      setAiBusy(false);
-    }
-  };
   const handleAiEnrich = async () => {
     const displayName = [name.trim(), nameAlt.trim()].filter(Boolean).join(" / ");
     if (!displayName) return;
@@ -615,80 +544,6 @@ export default function HomemadeFormScreen() {
     }
   };
 
-  /** 文字配方解析（粘贴导入） */
-  const applyParsedPrep = (text: string) => {
-    const lang2 = lang as "zh" | "en";
-    // 简单解析：提取名称、配料、步骤
-    const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
-    let parsedName = "";
-    let parsedSteps = "";
-    const parsedIngs: { name: string; amount: string }[] = [];
-    let inSteps = false;
-    for (const line of lines) {
-      if (!parsedName && line.length < 60 && !/^[\d\-•·]/.test(line)) {
-        parsedName = line;
-        continue;
-      }
-      const ingMatch = line.match(/^([\d.]+\s*(?:ml|g|oz|tsp|tbsp|个|片|颗|枝|条|块|份|滴|dash|drop|barspoon|bsp)?)\s+(.+)$/) ||
-                       line.match(/^(.+?)[：:]\s*([\d.]+\s*(?:ml|g|oz|tsp|tbsp|个|片|颗|枝|条|块|份|滴|dash|drop|barspoon|bsp)?)$/);
-      if (ingMatch) {
-        const isAmountFirst = /^[\d.]/.test(line);
-        parsedIngs.push(isAmountFirst
-          ? { amount: ingMatch[1].trim(), name: ingMatch[2].trim() }
-          : { amount: ingMatch[2].trim(), name: ingMatch[1].trim() }
-        );
-        continue;
-      }
-      if (/^(步骤|做法|制作|method|steps|instructions)/i.test(line)) { inSteps = true; continue; }
-      if (inSteps || /^[\d]+[.、。]/.test(line) || /^[-•·]/.test(line)) {
-        inSteps = true;
-        parsedSteps += (parsedSteps ? "\n" : "") + line.replace(/^[\d]+[.、。]\s*/, "").replace(/^[-•·]\s*/, "");
-      }
-    }
-    if (parsedName && !name.trim()) {
-      setName(parsedName);
-    }
-    if (parsedIngs.length > 0 && ingRows.every((r) => !r.name.trim())) {
-      const newRows = parsedIngs.map((ing) => ({
-        id: `paste-${Math.random().toString(36).slice(2)}`,
-        name: ing.name,
-        amount: ing.amount,
-        linkedBottleId: undefined as string | undefined,
-        linkedPrepId: undefined as string | undefined,
-        linkDismissed: false,
-      }));
-      setIngRows([...newRows, { id: `blank-${Date.now()}`, name: "", amount: "", linkedBottleId: undefined, linkedPrepId: undefined, linkDismissed: false }]);
-    }
-    if (parsedSteps && !recipe.trim()) {
-      setStepRows(parseStepRows(parsedSteps));
-    }
-    void lang2;
-  };
-  const handlePasteImport = async () => {
-    try {
-      const text = await Clipboard.getStringAsync();
-      if (!text || !text.trim()) {
-        Alert.alert(lang === "zh" ? "剪贴板为空" : "Clipboard Empty", lang === "zh" ? "请先复制配方文字" : "Please copy recipe text first");
-        return;
-      }
-      const hasContent = name.trim() || ingRows.some((r) => r.name.trim()) || recipe.trim();
-      if (hasContent) {
-        Alert.alert(
-          lang === "zh" ? "粘贴导入" : "Paste Import",
-          lang === "zh" ? "当前已有内容，是否覆盖？" : "Current content will be overwritten. Continue?",
-          [
-            { text: lang === "zh" ? "取消" : "Cancel", style: "cancel" },
-            { text: lang === "zh" ? "覆盖导入" : "Import", onPress: () => applyParsedPrep(text) },
-          ]
-        );
-        return;
-      }
-      applyParsedPrep(text);
-      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch {
-      Alert.alert(lang === "zh" ? "读取失败" : "Read Failed", lang === "zh" ? "无法读取剪贴板" : "Cannot read clipboard");
-    }
-  };
   /** 名称/配料变化后智能推断类型(仅在用户未手动选择时) */
   const autoGuessType = () => {
     if (typeTouched) return;

@@ -37,14 +37,13 @@ describe("基础组件响应式布局 Token", () => {
     expect(unit).toContain('numberOfLines={2}');
   });
 
-  it("两个可访问的个人中心入口均允许长说明换行，且正文容器可在箭头和状态点之间安全收缩", () => {
-    for (const page of ["app/(tabs)/me.tsx", "app/me.tsx"]) {
-      const source = read(page);
-      expect(source).toContain("rowContent:");
-      expect(source).toContain("minWidth: 0");
-      expect(source).toContain("style={styles.rowContent}");
-      expect(source).toContain("numberOfLines={2}");
-    }
+  it("唯一正式个人中心入口允许长说明换行，且正文容器可在箭头和状态点之间安全收缩", () => {
+    const source = read("app/me.tsx");
+    expect(source).toContain("rowContent:");
+    expect(source).toContain("minWidth: 0");
+    expect(source).toContain("style={styles.rowContent}");
+    expect(source).toContain("numberOfLines={2}");
+    expect(fs.existsSync(path.join(root, "app/(tabs)/me.tsx"))).toBe(false);
   });
 
   it("链接选择抽屉和底部Tab栏保留长文字与固定控制元素的边界", () => {

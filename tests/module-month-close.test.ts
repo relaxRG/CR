@@ -4,8 +4,6 @@ import {
   getCurrentModuleArchive,
   getModuleMonthCloseStatus,
   isModuleMonthWritable,
-  ModuleMonthAdjustment,
-  ModuleMonthCloseArchive,
   openModuleAdjustment,
   summarizeModuleMonth,
 } from "@/lib/month-close/module-month-close";

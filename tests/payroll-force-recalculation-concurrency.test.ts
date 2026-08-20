@@ -35,7 +35,7 @@ describe("所选月草稿薪资强制重算并发保护", () => {
   });
 
   it("页面在重算前创建快照，按月批量替换而非逐员工upsert，并只允许DRAFT执行", () => {
-    const source = fs.readFileSync(path.join(process.cwd(), "app/labor.tsx"), "utf8");
+    const source = fs.readFileSync(path.join(process.cwd(), "components/labor/LaborWorkspaceScreen.tsx"), "utf8");
     expect(source).toContain('getRosterMonthStatus(month) !== "draft"');
     expect(source).toContain("createSnapshot()");
     expect(source).toContain("replaceMonthPaySlips(month, nextMonthSlips)");

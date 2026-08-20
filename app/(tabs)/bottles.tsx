@@ -34,7 +34,6 @@ import { useColors } from "@/hooks/use-colors";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useI18n } from "@/lib/i18n";
 import { filterBottles, useBottleStore } from "@/lib/bottles/store";
-import { applyEnrichedToBottle } from "@/lib/bottles/enrich";
 import type { BottleDraft } from "@/lib/bottles/store";
 import { enrichBottle } from "@/lib/api/smart-router";
 import { useBottleTaxonomy } from "@/lib/bottles/taxonomy";
@@ -113,7 +112,7 @@ export default function BottlesScreen() {
   const [sort, setSort] = useState<BottleSort>("default");
   const [sheetOpen, setSheetOpen] = useState(false);
 
-  const { isOnline } = useNetwork();
+  useNetwork();
 
  const groupBottles = useMemo(
     () => bottles.filter((b) => {
@@ -331,37 +330,6 @@ export default function BottlesScreen() {
     }
   }, [updateBottle, buildQueueFields, autoFillBlanks, lang]);
 
-  /** Banner：启动缺资料条目补全队列 */
-  const handleBatchEnrich = useCallback((mode: QueueMode) => {
-    if (aiQueueFetching || aiQueue.length > 0) return;
-    const isMissing = (b: Bottle) =>
-      b.priceCny <= 0 || !b.origin || !b.brand || !(b.flavorTags?.length > 0) || !b.story;
-    // 计算每个酒款的缺失字段分数（权重：核心字段权重更高）
-    const missingScore = (b: Bottle): number => {
-      let score = 0;
-      if (!b.story) score += 3;
-      if (!(b.flavorTags?.length > 0)) score += 3;
-      if (!b.origin) score += 2;
-      if (!b.brand) score += 2;
-      if (b.priceCny <= 0) score += 2;
-      if (!b.style) score += 1;
-      if (!b.notes) score += 1;
-      if (!b.nameEn) score += 1;
-      if (!b.abv) score += 1;
-      if (!b.notesEn) score += 1;
-      return score;
-    };
-    const targets = groupBottles
-      .filter(isMissing)
-      .sort((a, b) => missingScore(b) - missingScore(a))
-      .slice(0, 30);
-    if (targets.length === 0) return;
-    clearAiQueue();
-    setAiQueueMode(mode);
-    setAiQueue(targets);
-    setAiQueueIdx(0);
-    fetchQueueItem(targets, 0, mode, 0);
-  }, [aiQueueFetching, aiQueue.length, groupBottles, clearAiQueue, fetchQueueItem]);
 
   /** 多选：启动已选条目补全队列 */
   const handleBatchEnrichSelected = useCallback((mode: QueueMode) => {
@@ -415,12 +383,6 @@ export default function BottlesScreen() {
     fetchQueueItem(aiQueue, nextIdx, aiQueueMode, aiQueueIdx);
   }, [aiQueue, aiQueueIdx, aiQueueMode, fetchQueueItem]);
 
-  const missingCount = useMemo(
-    () => groupBottles.filter((b) =>
-      b.priceCny <= 0 || !b.origin || !b.brand || !(b.flavorTags?.length > 0) || !b.story
-    ).length,
-    [groupBottles],
-  );
 
   // 快捷筛选解析:大分类(类别)与其下细化的风格集合
   const quickCats = Object.keys(quickSel);
@@ -710,13 +672,6 @@ export default function BottlesScreen() {
     return opts;
   }, [bottles, selectedIds, stylesOf, styleLabel]);
 
-  const chipStyle = (active: boolean) => [
-    styles.chip,
-    {
-      backgroundColor: active ? colors.primary : colors.surface,
-      borderColor: active ? colors.primary : colors.border,
-    },
-  ];
   const chipTextStyle = (active: boolean) => [
     styles.chipText,
     { color: active ? "#FFFFFF" : colors.foreground },
@@ -1667,4 +1622,4 @@ const styles = StyleSheet.create({
 });
       {/* 二级分组切换器：基酒库 / 酒款库 / 软饮库 / 原材料库 + 多选按钮 */}
 import { useCapabilityGuard } from "@/hooks/use-can";
-import { MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS, MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
+import { MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";

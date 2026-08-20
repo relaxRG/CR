@@ -126,7 +126,7 @@ export default function StoreAnalyticsScreen({ embedded = false }: { embedded?: 
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
-  const { reports } = useMonthlyReportStore();
+  useMonthlyReportStore();
   const { records } = useRevenueStore();
   const { records: pettyRecords } = usePettyCashStore();
   const { month: reportMonth, bounds: reportMonthBounds, selectMonth: selectReportMonth } = useReportMonthNavigation();
@@ -227,7 +227,7 @@ export default function StoreAnalyticsScreen({ embedded = false }: { embedded?: 
       <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
         <StoreSectionHeader label="成本明细" icon="list.bullet" tone="neutral" colors={colors} />
         <View style={[styles.detailCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          {costCategories.map((cat, i) => {
+          {costCategories.map((cat) => {
             const curVal = cur[cat] ?? 0; const prevVal = prev[cat] ?? 0;
             const pct = compare === "prev" ? pctChange(curVal, prevVal) : null;
             if (curVal === 0 && prevVal === 0) return null;

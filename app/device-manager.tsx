@@ -10,7 +10,6 @@
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
   Platform,
   Pressable,
   RefreshControl,
@@ -30,7 +29,7 @@ import Animated, {
   withSequence,
   withTiming,
 } from "react-native-reanimated";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ScreenContainer } from "@/components/screen-container";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -487,20 +486,6 @@ export default function DeviceManagerScreen() {
     }
   };
 
-  const handleChangeRole = (device: RemoteDevice) => {
-    const roles: DeviceRole[] = ["owner", "collaborator", "guest"];
-    const options = roles
-      .filter((r) => r !== device.role)
-      .map((r) => ({
-        text: lang === "zh" ? ROLE_LABELS[r].zh : ROLE_LABELS[r].en,
-        onPress: () => void doChangeRole(device.id, r),
-      }));
-    Alert.alert(
-      lang === "zh" ? "修改角色" : "Change Role",
-      device.name,
-      [...options, { text: lang === "zh" ? "取消" : "Cancel", style: "cancel" as const }],
-    );
-  };
 
   // 跳转到权限配置页
   const handleOpenRoleSettings = (device: RemoteDevice) => {

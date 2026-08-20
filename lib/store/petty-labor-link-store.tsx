@@ -215,7 +215,7 @@ const LinkContext = createContext<LinkContextValue>({
 
 export function PettyLaborLinkProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, { links: [], aliases: [] });
-  const [ready, setReady] = React.useState(false);
+  const [, setReady] = React.useState(false);
 
   useEffect(() => {
     const loadLinks = (raw: string | null) => {

@@ -322,7 +322,6 @@ export function parseDailyPayments(base64: string): {
   // 表头跨两行（第3、4行），需要合并列头
   // 第3行：营业日期/业务大类/收款小计/扫码支付/会员卡/美团/大众点评团购
   // 第4行：微信/支付宝/银联二维码（储蓄卡）/银联二维码（信用卡）/卡余额消费-储值余额/套餐名称...
-  const headerRow3 = rows[2] ?? [];
   const headerRow4 = rows[3] ?? [];
 
   // 找美团套餐列的起始位置（第4行中，从第6列开始是套餐名称）
@@ -334,7 +333,6 @@ export function parseDailyPayments(base64: string): {
     }
   }
 
-  const dailyPayments: DailyPaymentDetail[] = [];
   const dateMap: Map<string, DailyPaymentDetail> = new Map();
 
   for (let i = 4; i < rows.length; i++) {

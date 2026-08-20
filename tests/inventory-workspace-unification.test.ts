@@ -8,7 +8,7 @@ const read = (relative: string) => fs.readFileSync(path.join(root, relative), "u
 describe("库存六类与店铺四类工作台统一规范", () => {
   const portal = read("components/store/inventory.tsx");
   const base = read("components/inventory/BaseInventoryScreen.tsx");
-  const spirits = read("app/spirits-inventory.tsx");
+  const spirits = read("components/inventory/SpiritsInventoryWorkspaceScreen.tsx");
   const wine = read("app/wine-inventory.tsx");
   const metrics = read("lib/store/inventory-workspace-ui.ts");
 

@@ -400,4 +400,17 @@ export async function recoverPendingGroupSwitch(
   }
 }
 
+/**
+ * 清除本机遗留的切组会话与对应恢复票据。仅用于已完成备份、且用户明确确认的全新业务基线；
+ * 不请求 Worker，也不修改任何远端同步组数据。
+ */
+export async function clearLocalGroupSwitchArtifacts(): Promise<void> {
+  const session = await getPendingGroupSwitchSession();
+  if (session) {
+    await clearSession(session);
+    return;
+  }
+  await AsyncStorage.removeItem(SESSION_KEY);
+}
+
 export { SESSION_KEY };

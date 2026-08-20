@@ -40,7 +40,7 @@ describe("响应式横向分页几何规则", () => {
   });
 
   it("不允许无分页需求的库存页面保留可误用的模块级静态宽度快照", () => {
-    const spiritsSource = fs.readFileSync(path.join(root, "app/spirits-inventory.tsx"), "utf8");
+    const spiritsSource = fs.readFileSync(path.join(root, "components/inventory/SpiritsInventoryWorkspaceScreen.tsx"), "utf8");
     expect(spiritsSource).not.toContain("Dimensions.get(\"window\")");
     expect(spiritsSource).not.toContain("SCREEN_W");
   });

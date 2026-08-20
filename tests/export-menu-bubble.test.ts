@@ -8,7 +8,7 @@
  * 4. 点击背景（非按钮区域）正确关闭 Modal
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 
 // ─── 模拟导出菜单状态 ─────────────────────────────────────────────────────────
 

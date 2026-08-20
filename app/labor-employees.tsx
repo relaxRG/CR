@@ -45,7 +45,7 @@ function SwipeableEmpCard({
 }) {
   const deptColor = DEPT_COLORS[emp.dept];
   const translateX = useRef(new Animated.Value(0)).current;
-  const [swiping, setSwiping] = useState<"left" | "right" | null>(null);
+  const [, setSwiping] = useState<"left" | "right" | null>(null);
 
   const panResponder = useRef(
     PanResponder.create({

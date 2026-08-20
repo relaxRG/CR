@@ -4,15 +4,15 @@ import { SourceRef } from "@/lib/recipes/types";
 
 import {
   FRAC_CHARS, UNICODE_FRACTIONS,
-  ML_PER_OZ, ML_PER_CL, ML_PER_DL, ML_PER_L,
-  ML_PER_TSP, ML_PER_TBSP, ML_PER_BSP,
-  ML_PER_DASH, ML_PER_DROP, ML_PER_SPLASH,
-  ML_PER_SHOT, ML_PER_PONY, ML_PER_CUP,
-  ML_PER_PINT, ML_PER_QUART, ML_PER_GALLON,
-  ML_PER_DSP, ML_PER_RINSE, ML_PER_SCSP,
-  G_PER_KG, G_PER_MG, G_PER_LB,
-  G_PER_JIN, G_PER_LIANG, G_PER_QIAN,
-  G_PER_STONE, G_PER_TONNE,
+  ML_PER_OZ,
+
+
+
+
+
+
+
+
   isLiquidContext,
 } from "@/lib/units";
 import {
@@ -736,7 +736,7 @@ export function splitPrepIngredientLine(line: string): { amount: string; name: s
   const ofMatch = trimmed.match(OF_FRAC_RE);
   let candidate = trimmed;
   if (ofMatch) {
-    const [, prefix, qty, rest] = ofMatch;
+    const [,, qty, rest] = ofMatch;
     // Rewrite: "Zest of ¼ pomelo, cut into strips" → "¼ pomelo, cut into strips"
     // We'll use qty as amount and reconstruct name as "prefix of rest"
     candidate = `${qty} ${rest}`;
@@ -745,7 +745,7 @@ export function splitPrepIngredientLine(line: string): { amount: string; name: s
   if (m && m[2]) {
     if (ofMatch) {
       // Restore full name: "prefix of rest"
-      const [, prefix, , rest] = ofMatch;
+      const [, prefix,] = ofMatch;
       const n = `${prefix} of ${m[2].trim()}`;
       return { amount: normalizeIngredientAmount(m[1].trim(), n), ...splitOrAlternativesClient(n) };
     }

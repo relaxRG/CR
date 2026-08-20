@@ -27,7 +27,7 @@ import { useHomemadeStore } from "@/lib/homemade/store";
 import { useRecipeStore } from "@/lib/recipes/store";
 import { useBottleTaxonomy } from "@/lib/bottles/taxonomy";
 import { normalizeStyleToTaxonomy } from "@/lib/bottles/style-normalize";
-import { enrichBottle, deepAnalyzeBottle, OfflineError } from "@/lib/api/smart-router";
+import { enrichBottle, deepAnalyzeBottle } from "@/lib/api/smart-router";
 import * as ImagePicker from "expo-image-picker";
 import { BOTTLE_GROUPS, bottleGroupOf } from "@/lib/bottles/types";
 
@@ -148,7 +148,7 @@ export default function BottleFormScreen() {
   const canSave = nameZh.trim().length > 0 || nameEn.trim().length > 0;
 
   // ── AI 补全 ────────────────────────────────────────────────────────────────
-  const [enrichBusy, setEnrichBusy] = useState(false);
+  const [] = useState(false);
   const [lookupBusy, setLookupBusy] = useState<"auto" | "manual" | "photo" | null>(null);
   const [lookupStatus, setLookupStatus] = useState<{ kind: "ok" | "err" | "warn"; msg: string } | null>(null);
 
@@ -617,10 +617,6 @@ export default function BottleFormScreen() {
     : bottleGroupOf(category);
 
   // ── 单位选项（按库类型）──
-  const unitOptions =
-    effectiveGroup === "spirits" ? ["瓶", "ml", "cl", "L", "oz"]
-    : effectiveGroup === "bottles" ? ["瓶", "罐", "箱", "ml", "cl"]
-    : ["个", "听", "瓶", "g", "kg", "斤", "ml", "L"];
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (

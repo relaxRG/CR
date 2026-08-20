@@ -55,7 +55,7 @@ describe("库存工作台紧凑布局与移动端交互护栏", () => {
   });
 
   it("十个库存与店铺分类的业务页签均使用40pt紧凑触控尺寸", () => {
-    const spirits = read("app/spirits-inventory.tsx");
+    const spirits = read("components/inventory/SpiritsInventoryWorkspaceScreen.tsx");
     const wine = read("app/wine-inventory.tsx");
     const food = read("app/food-inventory.tsx");
     const equipment = read("app/equipment-inventory.tsx");

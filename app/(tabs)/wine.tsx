@@ -3,7 +3,7 @@
  * Segment：酒款列表 / 按产区 / 按品种
  */
 import React, { useMemo, useState } from "react";
-import { Alert, FlatList, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { FlatList, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -13,8 +13,7 @@ import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useWineStore } from "@/lib/wine/store";
 import { WineBottle, WINE_STYLE_LABELS } from "@/lib/wine/types";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { ScreenContainer } from "@/components/screen-container";
-import { MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS, MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
+import { MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
 
 type WineTab = "list" | "region" | "grape";
 

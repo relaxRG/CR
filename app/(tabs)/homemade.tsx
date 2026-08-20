@@ -7,10 +7,8 @@ import {
   FlatList,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { ActivityIndicator } from "react-native";
@@ -41,7 +39,7 @@ import { useBottleStore } from "@/lib/bottles/store";
 import { estimatePrepCostFull } from "@/lib/homemade/cost";
 import { primaryTechnique, techniqueLabel, TECHNIQUES, detectPrepTechniques } from "@/lib/homemade/technique";
 import { BASE_SPIRITS, detectPrepBaseSpirits } from "@/lib/homemade/base-spirit";
-import { groupPrepsByName, groupPrepsByFamily } from "@/lib/recipes/grouping";
+import { groupPrepsByFamily } from "@/lib/recipes/grouping";
 import { sortPreps, PREP_SORTS, PrepSort } from "@/lib/recipes/sort";
 import { Bottle } from "@/lib/bottles/types";
 import { useCardTagSettings } from "@/lib/settings/card-tags";
@@ -94,7 +92,7 @@ export default function HomemadeScreen() {
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkSheet, setBulkSheet] = useState<"type" | null>(null);
-  const { bottles, deleteBottle, deleteBottles, updateBottle } = useBottleStore();
+  const { bottles, deleteBottles } = useBottleStore();
   const [query, setQuery] = useState("");
 
   // ── 将 libraryOverride='homemade' 的酒款条目转换为虚拟 HomemadePrep ──────
@@ -691,13 +689,6 @@ export default function HomemadeScreen() {
     [types, sections, lang],
   );
 
-  const chipStyle = (active: boolean) => [
-    styles.chip,
-    {
-      backgroundColor: active ? colors.primary : colors.surface,
-      borderColor: active ? colors.primary : colors.border,
-    },
-  ];
   const chipTextStyle = (active: boolean) => [
     styles.chipText,
     { color: active ? "#FFFFFF" : colors.foreground },
@@ -1493,24 +1484,7 @@ function PrepRowInner({
   );
 }
 
-const subChipStyle = (
-  active: boolean,
-  colors: { primary: string; border: string },
-) => [
-  styles.subChip,
-  {
-    backgroundColor: active ? colors.primary + "1A" : "transparent",
-    borderColor: active ? colors.primary : colors.border,
-  },
-];
 
-const subChipTextStyle = (
-  active: boolean,
-  colors: { primary: string; muted: string },
-) => [
-  styles.subChipText,
-  { color: active ? colors.primary : colors.muted },
-];
 
 const styles = StyleSheet.create({
   chipRowWrap: {
@@ -1657,4 +1631,4 @@ const styles = StyleSheet.create({
   selCheckWrap: { width: 34, alignItems: "flex-start", justifyContent: "center" },
 });
 import { useCapabilityGuard } from "@/hooks/use-can";
-import { MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS, MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
+import { MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";

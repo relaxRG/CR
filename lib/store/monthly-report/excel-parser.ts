@@ -144,15 +144,14 @@ function parseOverviewExcel(base64: string): {
   const returnDishes: ReturnDishItem[] = [];
 
   let inReturn = false;
-  let inBestseller = false;
   for (const row of dishRows) {
     const r0 = safeStr(row?.[0]);
     const r1 = safeStr(row?.[1]);
     if (r0 === "菜品销量(份)") kpi.dishSalesCount = safeNum(r1);
     if (r0 === "退菜数量(份)") kpi.returnDishCount = safeNum(r1);
     if (r0 === "增菜数量(份)") kpi.giftDishCount = safeNum(r1);
-    if (r0 === "退菜菜品排行") { inReturn = true; inBestseller = false; continue; }
-    if (r0 === "畅销菜品排行") { inReturn = false; inBestseller = true; continue; }
+    if (r0 === "退菜菜品排行") { inReturn = true; continue; }
+    if (r0 === "畅销菜品排行") { inReturn = false; continue; }
     if (inReturn && r0 && r0 !== "菜品名称" && r1) {
       returnDishes.push({ name: r0, count: safeNum(r1) });
     }

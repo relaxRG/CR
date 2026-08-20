@@ -50,6 +50,19 @@ export async function deletePhoto(photoUri: string | undefined) {
 }
 
 /**
+ * 仅在用户明确启动“全新业务基线”后调用：删除旧业务照片根目录。
+ * 备份目录与应用运行时目录不使用此根路径，因此不会受到影响。
+ */
+export async function clearAllBusinessRecipePhotos(): Promise<void> {
+  try {
+    const info = await FileSystem.getInfoAsync(LEGACY_PHOTO_DIR);
+    if (info.exists) await FileSystem.deleteAsync(LEGACY_PHOTO_DIR, { idempotent: true });
+  } catch {
+    // 图片清理失败不应阻断凭据切换或新同步组创建；下次受确认基线操作可再次执行。
+  }
+}
+
+/**
  * 请求相册权限（iOS 13+ 需要 READ_MEDIA_IMAGES / MEDIA_LIBRARY）
  * 返回 true 表示已授权，false 表示被拒绝
  */

@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const laborSource = readFileSync(resolve(process.cwd(), "app/labor.tsx"), "utf8");
+const laborSource = readFileSync(resolve(process.cwd(), "components/labor/LaborWorkspaceScreen.tsx"), "utf8");
 
 describe("薪资生成确认与排班纠错清空 UI 守卫", () => {
   it("生成薪资单在执行前必须经过独立的二次确认，不承担清空排班职责", () => {

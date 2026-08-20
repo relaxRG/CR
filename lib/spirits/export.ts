@@ -227,7 +227,7 @@ export async function exportToExcel(data: ExportData): Promise<void> {
 
 // ─── PDF 导出 ─────────────────────────────────────────────────────────────────
 export async function exportToPdf(data: ExportData): Promise<void> {
-  const { month, items, purchases, ledger, getRefPrice, categorySummary, supplierSummary } = data;
+  const { month, items, purchases, ledger, categorySummary, supplierSummary } = data;
   const monthPurchases = purchases.filter((p) => p.month === month);
   const monthLedger = ledger.filter((e) => e.month === month);
 

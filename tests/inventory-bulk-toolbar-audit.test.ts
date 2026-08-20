@@ -18,7 +18,7 @@ const embeddedGenericPanels = [
 
 describe("库存与店铺批量操作栏审计", () => {
   it("烈酒的全选、清空选择和批量编辑仅在多选模式条件内渲染", () => {
-    const spirits = read("app/spirits-inventory.tsx");
+    const spirits = read("components/inventory/SpiritsInventoryWorkspaceScreen.tsx");
     const start = spirits.indexOf('{selectMode && (\n        <View style={{ backgroundColor: "#FEF2F2"');
     const end = spirits.indexOf('{/* 供应商信息头 */}', start);
     const toolbar = spirits.slice(start, end);

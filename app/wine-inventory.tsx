@@ -8,7 +8,7 @@
 import React, { useMemo, useState } from "react";
 import { formatMoney } from "@/lib/utils";
 import {
-  Alert, FlatList, Modal, Platform, Pressable, ScrollView,
+  Alert, Modal, Platform, Pressable, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View
 } from "react-native";
 import * as Haptics from "expo-haptics";
@@ -21,14 +21,13 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
 import { useWineImportControlStore, useWineSnapshotStore, useWineManualPurchaseStore, useWineStore } from "@/lib/wine/store";
 import { exportWinePdf, exportWineWorkbook, summarizeWineProducts, summarizeWineSuppliers } from "@/lib/wine/workbook-export";
-import { WineInventoryItem, WineManualPurchase } from "@/lib/wine/types";
+import { WineInventoryItem } from "@/lib/wine/types";
 import { applyWineLedgerView, applyWinePurchaseView, collectWineTypes, getWineSupplierNames, SortState, toggleSort, WineLedgerSortKey, WinePurchaseSortKey } from "@/lib/wine/table-view";
 import { WineSupplierTrendChart } from "@/components/wine-supplier-trend-chart";
 import { HorizontalLedgerColumn, HorizontalLedgerGroup } from "@/components/inventory/HorizontalLedgerTable";
 import { VirtualizedHorizontalLedgerTable } from "@/components/inventory/VirtualizedHorizontalLedgerTable";
 import { MonthlyLedgerDetailSheet } from "@/components/inventory/MonthlyLedgerDetailSheet";
 import { MonthlyLedgerItem } from "@/lib/inventory-core/types";
-import { MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS, MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
 import { useModuleMonthCloseStore } from "@/lib/month-close/module-month-close-store";
 import { formatStoreMoney, formatStoreQuantity, STORE_TABLE_METRICS } from "@/lib/store/table-display";
 import { INVENTORY_WORKSPACE_METRICS } from "@/lib/store/inventory-workspace-ui";
@@ -228,7 +227,7 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
   const insets = useSafeAreaInsets();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
-  const { snapshots, deleteSnapshot, setActualEndQty, batchSetActualEndQty } = useWineSnapshotStore();
+  const { snapshots, deleteSnapshot, batchSetActualEndQty } = useWineSnapshotStore();
   const { bottles } = useWineStore();
   const { purchases, addManualPurchase, deleteManualPurchase, batchDeleteManualPurchases, batchUpdateManualPurchases, batchUpdateManualPurchaseDate, getMonthPurchases } = useWineManualPurchaseStore();
   const { clearMonthPurchases, recalculateMonthInventory, batches, auditEntries } = useWineImportControlStore();
@@ -491,14 +490,6 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
   };
 
   // ★ 多选操作
-  const toggleSelect = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
 
   const handleBatchDelete = () => {
     if (selectedIds.size === 0) return;

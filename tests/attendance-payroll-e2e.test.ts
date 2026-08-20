@@ -45,7 +45,7 @@
  *     F1. 绩效补贴与综合额外采用统一分项口径
  *     F2. 旧版「绩效补贴小计」漏掉 transportAllowance 的回归测试
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   calcAttendanceBaseSalary,
   calcDailyRate,
@@ -53,7 +53,6 @@ import {
   parseMonth,
   getContractHoursForDate,
   DEFAULT_SPECIAL_STATUSES,
-  DEFAULT_GLOBAL_PAYROLL_SETTINGS,
   type Employee,
   type ShiftEntry,
   type MonthlyAttendance,
@@ -228,7 +227,7 @@ function buildPaySlipDraftPure(
   month: string,
   attendance: MonthlyAttendance | null,
   advanceAmount: number,
-  globalSettings?: GlobalPayrollSettings,
+  _globalSettings?: GlobalPayrollSettings,
   existing?: Partial<PaySlip>
 ): PaySlip {
   const attendanceDays = attendance?.attendanceDays ?? 0;
@@ -250,8 +249,6 @@ function buildPaySlipDraftPure(
   ) * 100) / 100;
 
   // 社保/个税（简化：关闭时为0）
-  const siEnabled = false;
-  const taxEnabled = false;
   const socialInsuranceDeduction = 0;
   const housingFundDeduction = 0;
   const incomeTax = 0;
@@ -303,7 +300,6 @@ function buildPaySlipDraftPure(
 const MONTH = "2026-07";
 const DAYS_IN_MONTH = 31;
 const REST_DAYS = 8;
-const EXPECTED_ATT_DAYS = DAYS_IN_MONTH - REST_DAYS; // 23
 
 /** 标准全职员工：底薪 6000，每天8小时，加班时薪 50 */
 function makeEmployee(overrides: Partial<Employee> = {}): Employee {

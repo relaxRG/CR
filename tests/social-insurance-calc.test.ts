@@ -23,11 +23,10 @@ import {
   DEFAULT_SOCIAL_INSURANCE,
   BUILTIN_CITY_POLICIES,
   SocialInsuranceConfig,
-  INCOME_TAX_BRACKETS,
 } from "../lib/labor/types";
 
 // ─── 辅助函数：构建上海社保配置 ────────────────────────────────────────────────
-function buildShanghaiConfig(overrides: Partial<SocialInsuranceConfig> = {}): SocialInsuranceConfig {
+function buildShanghaiConfig(_overrides: Partial<SocialInsuranceConfig> = {}): SocialInsuranceConfig {
   const policy = BUILTIN_CITY_POLICIES.find((p) => p.city === "上海")!;
   return applyCityPolicy({ ...DEFAULT_SOCIAL_INSURANCE, enabled: true, base: 0 }, policy);
 }

@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "scope": ["app", "components", "lib", "server", "workers"],
+  "maxExplicitAnyOccurrences": 307,
+  "policy": "任何新增的显式 any 都必须先降低现存数量，或经审查后同步下调或调整预算。"
+}

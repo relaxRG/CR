@@ -19,7 +19,7 @@ import { LabChangeChips } from "@/components/lab-change-chips";
 import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
 import { suggestPrep } from "@/lib/homemade/match";
-import { smartLinkIngredient, smartLinkDisplayName } from "@/lib/recipes/smart-link";
+import { smartLinkIngredient } from "@/lib/recipes/smart-link";
 import { analyzeUnknownIngredient } from "@/lib/classify";
 import { useHomemadeStore } from "@/lib/homemade/store";
 import { useBottleStore } from "@/lib/bottles/store";

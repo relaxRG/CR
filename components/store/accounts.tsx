@@ -10,7 +10,7 @@ import { Platform } from "react-native";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { StoreMetric, StoreSectionHeader, StoreToolbarAction } from "@/components/store/store-visual-primitives";
-import { storeTone, STORE_TEXT } from "@/lib/theme/store-visual-system";
+import { STORE_TEXT } from "@/lib/theme/store-visual-system";
 import { BoundedBusinessMonthNavigator } from "@/components/months/BoundedBusinessMonthNavigator";
 import { useReportMonthNavigation } from "@/hooks/use-report-month-navigation";
 import { useMonthlySummaryStore } from "@/lib/store/monthly-summary/store";

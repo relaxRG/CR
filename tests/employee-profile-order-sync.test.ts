@@ -102,7 +102,7 @@ describe("员工档案排序同步", () => {
 
   it("所有在职员工列表页面都显式使用统一排序工具，禁止退回到数组原始顺序", () => {
     const sourcePaths = [
-      "app/labor.tsx",
+      "components/labor/LaborWorkspaceScreen.tsx",
       "app/labor-attendance.tsx",
       "app/labor-advances.tsx",
       "app/labor-employees.tsx",

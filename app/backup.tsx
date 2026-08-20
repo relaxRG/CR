@@ -36,7 +36,7 @@ export default function BackupScreen() {
   const [restoring, setRestoring] = useState(false);
   const [icloudBacking, setIcloudBacking] = useState(false);
   const [icloudLastAt, setIcloudLastAt] = useState<number | null>(null);
-  const [icloudRestoring, setIcloudRestoring] = useState(false);
+  const [] = useState(false);
   const [importing, setImporting] = useState(false);
   // 本地快照列表（含 diff）
   const [snapshots, setSnapshots] = useState<Array<{
@@ -120,7 +120,7 @@ export default function BackupScreen() {
     );
   };
 
-  const handleSnapshotRestore = (slot: number, label: string) => {
+  const handleSnapshotRestore = (_slot: number, label: string) => {
     Alert.alert(
       lang === "zh" ? "恢复快照" : "Restore Snapshot",
       lang === "zh"
@@ -191,69 +191,6 @@ export default function BackupScreen() {
   };
 
   // ─── iCloud 恢复 ──────────────────────────────────────────────────────────
-  const handleICloudRestore = async () => {
-    setIcloudRestoring(true);
-    try {
-      const versions = await listBackupVersions();
-      if (versions.length === 0) {
-        Alert.alert(
-          lang === "zh" ? "无可用备份" : "No Backups Available",
-          lang === "zh" ? "iCloud Drive 中暂无备份文件，请先执行备份。" : "No backup files found in iCloud Drive. Please back up first.",
-        );
-        return;
-      }
-      const buttons = versions.map((v) => ({
-        text: `${v.label}  ·  ${v.keyCount} 项  ·  ${(v.sizeBytes / 1024).toFixed(1)} KB`,
-        onPress: () => {
-          Alert.alert(
-            lang === "zh" ? "确认恢复" : "Confirm Restore",
-            lang === "zh"
-              ? `确定要恢复 ${v.label} 的备份吗？\n\n当前所有数据将被替换，此操作不可撤销。`
-              : `Restore backup from ${v.label}?\n\nAll current data will be replaced. This cannot be undone.`,
-            [
-              { text: lang === "zh" ? "取消" : "Cancel", style: "cancel" },
-              {
-                text: lang === "zh" ? "确认恢复" : "Restore",
-                style: "destructive",
-                onPress: async () => {
-                  try {
-                    const result = await restoreFromICloud(v.slot);
-                    triggerStoreReload();
-                    getICloudMeta().then((meta) => setIcloudLastAt(meta.lastBackupAt));
-                    Alert.alert(
-                      lang === "zh" ? "恢复成功" : "Restore Complete",
-                      lang === "zh"
-                        ? `已成功恢复 ${result.restored} 项数据，配方/酒款/自制品统计已自动更新。`
-                        : `Restored ${result.restored} items. Stats updated automatically.`,
-                    );
-                  } catch {
-                    Alert.alert(
-                      lang === "zh" ? "恢复失败" : "Restore Failed",
-                      lang === "zh" ? "无法读取备份文件，请重试。" : "Could not read backup file. Please try again.",
-                    );
-                  }
-                },
-              },
-            ],
-          );
-        },
-      }));
-      buttons.push({ text: lang === "zh" ? "取消" : "Cancel", onPress: () => {} });
-      Alert.alert(
-        lang === "zh" ? "选择恢复版本" : "Select Backup Version",
-        lang === "zh" ? "选择要恢复的 iCloud 备份版本：" : "Choose a backup version to restore:",
-        buttons as any,
-        { cancelable: true },
-      );
-    } catch {
-      Alert.alert(
-        lang === "zh" ? "读取失败" : "Load Failed",
-        lang === "zh" ? "无法读取 iCloud 备份列表，请检查 iCloud 设置。" : "Could not load iCloud backups. Check your iCloud settings.",
-      );
-    } finally {
-      setIcloudRestoring(false);
-    }
-  };
 
   // ─── iCloud 手动备份 ──────────────────────────────────────────────────────
   const handleICloudBackup = async () => {

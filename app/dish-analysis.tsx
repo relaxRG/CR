@@ -25,7 +25,7 @@ import { useMonthlyReportStore } from "@/lib/store/monthly-report/store";
 import { findMonthlyReportForDishAnalysis, rebuildDishCategoriesFromMonthlyReport } from "@/lib/store/monthly-report/rebuild-dish-categories";
 import { createSingleFlightGate } from "@/lib/utils/single-flight-gate";
 import {
-  DishCategoryData, DishSubCategoryData, DishItemData, DishSpecData,
+  DishCategoryData, DishSubCategoryData, DishSpecData,
 } from "@/lib/store/monthly-report/dish-analysis-types";
 
 type MainTab = "category" | "subcategory" | "ranking" | "spec" | "compare";
@@ -40,15 +40,6 @@ const TAB_ITEMS: { key: MainTab; label: string; icon: string }[] = [
 ];
 
 // 品类大类 Tab（Cocktail/Wine/Food/Beer/套餐等）
-const CATEGORY_TABS = [
-  { key: "all", label: "全部" },
-  { key: "Cocktail", label: "Cocktail" },
-  { key: "Wine", label: "Wine" },
-  { key: "Food", label: "Food" },
-  { key: "Beer", label: "Beer" },
-  { key: "Beverage", label: "Beverage" },
-  { key: "Shot", label: "Shot" },
-];
 
 // 大类颜色
 const CATEGORY_COLORS: Record<string, string> = {
@@ -115,7 +106,7 @@ export default function DishAnalysisScreen() {
 
   const [tab, setTab] = useState<MainTab>("category");
   const [selectedMonth, setSelectedMonth] = useState<string>(snapshots[0]?.month ?? "");
-  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [] = useState("all");
   const [sortKey, setSortKey] = useState<SortKey>("salesAmount");
   const [searchText, setSearchText] = useState("");
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
@@ -369,7 +360,7 @@ export default function DishAnalysisScreen() {
                   <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground, flex: 1 }} numberOfLines={1}>{name}</Text>
                   <Text style={{ fontSize: 13, fontWeight: "600", color: colors.primary }}>{fmtAmt(total)}</Text>
                 </View>
-                {specs.map((spec, i) => (
+                {specs.map((spec) => (
                   <View key={spec.spec} style={[{ flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border + "66", backgroundColor: colors.primary + "04" }]}>
                     <Text style={{ fontSize: 12, color: colors.muted, flex: 1 }}>{spec.spec}</Text>
                     <Text style={{ fontSize: 12, fontWeight: "600", color: colors.foreground }}>{spec.salesQty}份</Text>

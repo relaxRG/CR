@@ -1,314 +1,245 @@
 import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { File as FSFile, Paths } from "expo-file-system";
-import * as Sharing from "expo-sharing";
 import { useState } from "react";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
-import { createSnapshot } from "@/lib/backup/local-backup";
+import { useSync } from "@/lib/cf-sync/provider";
+import type { FreshBaselineResult } from "@/lib/data/fresh-business-baseline";
 
-// ── Key groups ──────────────────────────────────────────────────────────────
-const RECIPE_KEYS = [
-  "cocktail.recipes", "cocktail.categories", "cocktail.seeded",
-  "cocktail.tags", "cocktail.tagGroups",
-];
-const BOTTLE_KEYS = [
-  "cocktail.bottles", "cocktail.bottles.seeded",
-  "bottles.material.migrated.v8", "bottles.material.migrated.v9",
-  "bottles.taxonomy.categories.v1", "bottles.taxonomy.styles.v1",
-];
-const PREP_KEYS = [
-  "homemade.preps.v1", "homemade.sections.v1",
-  "homemade.types.v1", "homemade.taxonomy.v2",
-];
-const LAB_KEYS = ["cocktail.lab.projects", "cocktail.lab.batches"];
-const MISC_KEYS = ["menu_store_v1", "shopping_store_v1", "cocktail.iceSettings.v2", "card.tag.settings.v2"];
-const SYNC_BASE_KEYS = [
-  "cocktail.recipes","cocktail.categories","cocktail.tags","cocktail.tagGroups",
-  "cocktail.seeded","cocktail.bottles",
-  "cocktail.bottles.seeded","homemade.preps.v1",
-  "homemade.sections.v1","homemade.types.v1",
-  "homemade.taxonomy.v2","bottles.taxonomy.categories.v1",
-  "bottles.taxonomy.styles.v1","cocktail.lab.projects","cocktail.lab.batches",
-  "app.lang.v1","menu_store_v1","shopping_store_v1",
-  "cocktail.iceSettings.v2",
-];
-const ALL_KEYS = [
-  ...RECIPE_KEYS, ...BOTTLE_KEYS, ...PREP_KEYS, ...LAB_KEYS, ...MISC_KEYS,
-  ...SYNC_BASE_KEYS.map((k) => `sync.ts.${k}`),
-  "sync.lastPulledAt",
-];
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-async function readKeys(keys: string[]): Promise<Record<string, unknown>> {
-  const pairs = await AsyncStorage.multiGet(keys);
-  const result: Record<string, unknown> = {};
-  for (const [k, v] of pairs) {
-    if (v !== null) {
-      try { result[k] = JSON.parse(v); } catch { result[k] = v; }
-    }
-  }
-  return result;
-}
-
-async function exportBackup(): Promise<void> {
-  const data = await readKeys(ALL_KEYS);
-  const json = JSON.stringify({ exportedAt: new Date().toISOString(), data }, null, 2);
-  const filename = `cocktail-r-backup-${new Date().toISOString().slice(0, 10)}.json`;
-
-  if (Platform.OS === "web") {
-    // Web: trigger download via anchor
-    const blob = new Blob([json], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = filename; a.click();
-    URL.revokeObjectURL(url);
-    return;
-  }
-
-  const cacheFile = new FSFile(Paths.cache, filename);
-  await cacheFile.write(json);
-  const path = cacheFile.uri;
-  const canShare = await Sharing.isAvailableAsync();
-  if (canShare) {
-    await Sharing.shareAsync(path, { mimeType: "application/json", dialogTitle: filename });
-  }
-}
-
-// ── Component ────────────────────────────────────────────────────────────────
+/**
+ * 数据管理只提供可恢复备份入口与受确认保护的“全新业务基线”。
+ * 禁止在页面内维护业务键清单、局部删除清单或直接调用 AsyncStorage.clear()。
+ */
 export default function DataManagerScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { t, lang } = useI18n();
-  const [exporting, setExporting] = useState(false);
-  const [resetting, setResetting] = useState(false);
+  const { lang } = useI18n();
+  const { createFreshBusinessBaseline, isGroupSwitching } = useSync();
+  const [baselineRunning, setBaselineRunning] = useState(false);
+  const [baselineResult, setBaselineResult] = useState<FreshBaselineResult | null>(null);
 
+  const zh = lang === "zh";
   const tap = () => {
-    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (Platform.OS !== "web") void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
-  const handleExport = async () => {
-    tap();
-    setExporting(true);
+  const runFreshBaseline = async () => {
+    setBaselineRunning(true);
     try {
-      await exportBackup();
-    } catch {
-      Alert.alert(t("dataManager.export.error"));
+      const result = await createFreshBusinessBaseline();
+      setBaselineResult(result);
+      if (Platform.OS !== "web") void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert(
+        zh ? "已创建全新业务基线" : "Fresh business baseline created",
+        zh
+          ? `已验证备份 ${result.backup.keyCount} 项业务数据，并创建新的空同步组。旧同步组仍保留为归档，不会回流到本机。`
+          : `A verified backup contains ${result.backup.keyCount} business records. A new empty sync group is now active; the old group remains archived and cannot flow back.`,
+      );
+    } catch (error) {
+      const code = error instanceof Error ? error.message : String(error);
+      Alert.alert(
+        zh ? "未完成切换" : "Baseline not completed",
+        zh
+          ? `没有继续清空或创建新组。请先检查网络、旧组成员资格和备份，再重试。\n\n${code}`
+          : `No further clearing or new-group creation was completed. Check network, old membership, and backup before retrying.\n\n${code}`,
+      );
     } finally {
-      setExporting(false);
+      setBaselineRunning(false);
     }
   };
 
-  const confirmClear = (keys: string[], messageKey: string) => {
+  const requestFreshBaseline = () => {
     tap();
-    const doDelete = async () => {
-      // Auto-backup before destructive operation
-      try { await createSnapshot(); } catch { /* snapshot failure is non-blocking */ }
-      await AsyncStorage.multiRemove(keys);
-      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      const cleared = keys.length;
+    const firstMessage = zh
+      ? "这不是普通更新：系统会先验证本机业务备份，然后让当前设备退出旧同步组、清空本机业务数据与业务图片，最后创建新的空主同步组。旧云端组和备份不会被删除。"
+      : "This is not a normal update: the app verifies a local business backup, leaves the old group, clears this device's business data and business photos, then creates a new empty owner group. The archived cloud group and backup are not deleted.";
+    const finalMessage = zh
+      ? "最后确认：当前设备将从零开始。其他设备不会自动加入新组，必须使用新的配对码重新加入。"
+      : "Final confirmation: this device will start from zero. Other devices will not join automatically and must use a new pair code.";
+
+    const confirmFinal = () => {
+      if (Platform.OS === "web") {
+        if (window.confirm(finalMessage)) void runFreshBaseline();
+        return;
+      }
       Alert.alert(
-        lang === "zh" ? "已清除" : "Cleared",
-        lang === "zh"
-          ? `已删除 ${cleared} 个数据键，已自动创建本地快照备份。`
-          : `Removed ${cleared} data keys. A local snapshot was created automatically.`,
-      );
-    };
-    if (Platform.OS === "web") {
-      if (window.confirm(t(messageKey as any))) void doDelete();
-    } else {
-      Alert.alert(
-        t("common.delete"),
-        t(messageKey as any),
+        zh ? "最终确认" : "Final confirmation",
+        finalMessage,
         [
-          { text: t("common.cancel"), style: "cancel" },
-          { text: t("common.delete"), style: "destructive", onPress: () => void doDelete() },
+          { text: zh ? "取消" : "Cancel", style: "cancel" },
+          { text: zh ? "开始全新基线" : "Start fresh baseline", style: "destructive", onPress: () => void runFreshBaseline() },
         ],
       );
-    }
-  };
+    };
 
-  const sections: {
-    titleKey: string;
-    descKey: string;
-    icon: string;
-    iconBg: string;
-    keys: string[];
-    confirmKey: string;
-  }[] = [
-    { titleKey: "dataManager.clearRecipes", descKey: "dataManager.clearRecipes.desc", icon: "list.bullet", iconBg: colors.primary, keys: RECIPE_KEYS, confirmKey: "dataManager.confirm.recipes" },
-    { titleKey: "dataManager.clearBottles", descKey: "dataManager.clearBottles.desc", icon: "wineglass.fill", iconBg: "#8B5CF6", keys: BOTTLE_KEYS, confirmKey: "dataManager.confirm.bottles" },
-    { titleKey: "dataManager.clearPreps", descKey: "dataManager.clearPreps.desc", icon: "flask.fill", iconBg: "#F59E0B", keys: PREP_KEYS, confirmKey: "dataManager.confirm.preps" },
-    { titleKey: "dataManager.clearLab", descKey: "dataManager.clearLab.desc", icon: "cross.vial", iconBg: "#10B981", keys: LAB_KEYS, confirmKey: "dataManager.confirm.lab" },
-  ];
+    if (Platform.OS === "web") {
+      if (window.confirm(firstMessage)) confirmFinal();
+      return;
+    }
+    Alert.alert(
+      zh ? "创建全新业务基线" : "Create fresh business baseline",
+      firstMessage,
+      [
+        { text: zh ? "取消" : "Cancel", style: "cancel" },
+        { text: zh ? "继续" : "Continue", style: "destructive", onPress: confirmFinal },
+      ],
+    );
+  };
 
   return (
     <ScreenContainer>
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-        {/* Header */}
         <View style={styles.header}>
           <Pressable
             onPress={() => router.back()}
             style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
+            accessibilityRole="button"
+            accessibilityLabel={zh ? "返回" : "Back"}
           >
             <IconSymbol name="chevron.left" size={20} color={colors.primary} />
-            <Text style={[styles.backText, { color: colors.primary }]}>{t("common.back")}</Text>
+            <Text style={[styles.backText, { color: colors.primary }]}>{zh ? "返回" : "Back"}</Text>
           </Pressable>
-          <Text style={[styles.title, { color: colors.foreground }]}>{t("dataManager.title")}</Text>
+          <Text style={[styles.title, { color: colors.foreground }]}>{zh ? "数据管理" : "Data management"}</Text>
+          <Text style={[styles.subtitle, { color: colors.muted }]}>
+            {zh ? "备份、设备同步与全新业务基线" : "Backup, device sync, and fresh business baseline"}
+          </Text>
         </View>
 
-        {/* Export Section */}
-        <View style={styles.sectionLabel}>
-          <Text style={[styles.sectionLabelText, { color: colors.muted }]}>{t("dataManager.export")}</Text>
-        </View>
+        <SectionLabel color={colors.muted} title={zh ? "备份与恢复" : "Backup and recovery"} />
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Pressable
-            onPress={handleExport}
-            style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
-            disabled={exporting}
-          >
-            <View style={[styles.iconWrap, { backgroundColor: "#0EA5E9" }]}>
-              {exporting
-                ? <ActivityIndicator size="small" color="#fff" />
-                : <IconSymbol name="square.and.arrow.up" size={18} color="#FFFFFF" />
-              }
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.rowTitle, { color: colors.foreground }]}>{t("dataManager.export")}</Text>
-              <Text style={[styles.rowDesc, { color: colors.muted }]} numberOfLines={1}>
-                {t("dataManager.export.desc")}
-              </Text>
-            </View>
-          </Pressable>
+          <ActionRow
+            color="#0EA5E9"
+            icon="externaldrive.fill"
+            title={zh ? "备份与恢复" : "Backup and recovery"}
+            description={zh ? "查看可恢复快照、导出与恢复记录" : "View recoverable snapshots, exports, and restore records"}
+            foreground={colors.foreground}
+            muted={colors.muted}
+            onPress={() => { tap(); router.push("/backup"); }}
+          />
         </View>
 
-        {/* Selective Clear Section */}
-        <View style={styles.sectionLabel}>
-          <Text style={[styles.sectionLabelText, { color: colors.muted }]}>{t("dataManager.clearSection")}</Text>
-        </View>
+        <SectionLabel color={colors.muted} title={zh ? "设备与同步" : "Device and sync"} />
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          {sections.map((s, i) => (
-            <View key={s.titleKey}>
-              {i > 0 && <View style={[styles.divider, { backgroundColor: colors.border }]} />}
-              <Pressable
-                onPress={() => confirmClear(s.keys, s.confirmKey)}
-                style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
-              >
-                <View style={[styles.iconWrap, { backgroundColor: s.iconBg }]}>
-                  <IconSymbol name={s.icon as any} size={18} color="#FFFFFF" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.rowTitle, { color: colors.foreground }]}>{t(s.titleKey as any)}</Text>
-                  <Text style={[styles.rowDesc, { color: colors.muted }]} numberOfLines={1}>
-                    {t(s.descKey as any)}
-                  </Text>
-                </View>
-              </Pressable>
-            </View>
-          ))}
+          <ActionRow
+            color="#5856D6"
+            icon="laptopcomputer.and.iphone"
+            title={zh ? "设备管理" : "Device manager"}
+            description={zh ? "查看当前同步组、设备身份与配对状态" : "Review the active group, identity, and pairing state"}
+            foreground={colors.foreground}
+            muted={colors.muted}
+            onPress={() => { tap(); router.push("/device-manager"); }}
+          />
         </View>
 
-        {/* Clear All Section */}
-        <View style={styles.sectionLabel}>
-          <Text style={[styles.sectionLabelText, { color: colors.muted }]}>{t("me.clearData")}</Text>
-        </View>
+        <SectionLabel color={colors.muted} title={zh ? "危险操作" : "Danger zone"} />
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Pressable
-            onPress={() => confirmClear(ALL_KEYS, "dataManager.confirm.all")}
-            style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
-          >
-            <View style={[styles.iconWrap, { backgroundColor: colors.error }]}>
-              <IconSymbol name="trash.fill" size={18} color="#FFFFFF" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.rowTitle, { color: colors.error }]}>{t("dataManager.clearAll")}</Text>
-              <Text style={[styles.rowDesc, { color: colors.muted }]} numberOfLines={1}>
-                {t("dataManager.clearAll.desc")}
-              </Text>
-            </View>
-          </Pressable>
+          <ActionRow
+            color={colors.error}
+            icon="arrow.counterclockwise"
+            title={baselineRunning || isGroupSwitching
+              ? (zh ? "正在创建全新业务基线…" : "Creating fresh business baseline…")
+              : (zh ? "开始全新业务基线" : "Start fresh business baseline")}
+            description={zh
+              ? "验证备份后退出旧组，清空本机业务数据并创建新的空同步组"
+              : "Verify backup, leave old group, clear this device's business data, and create a new empty sync group"}
+            foreground={colors.error}
+            muted={colors.muted}
+            disabled={baselineRunning || isGroupSwitching}
+            onPress={requestFreshBaseline}
+            testID="fresh-business-baseline-start"
+          />
         </View>
 
-        {/* Factory Reset Section */}
-        <View style={styles.sectionLabel}>
-          <Text style={[styles.sectionLabelText, { color: colors.muted }]}>{t("dataManager.dangerZone")}</Text>
+        <View style={[styles.notice, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <IconSymbol name="shield.fill" size={16} color={colors.primary} />
+          <Text style={[styles.noticeText, { color: colors.muted }]}>
+            {zh
+              ? "普通 App 更新不会触发此操作。旧同步组和验证后的本地快照会保留为归档；新组只在你完成两次确认后创建，其他设备必须重新配对。"
+              : "A normal app update never triggers this operation. The old sync group and verified local snapshot remain archived; the new group is created only after two confirmations and every other device must pair again."}
+          </Text>
         </View>
-        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Pressable
-            onPress={() => {
-              tap();
-              if (Platform.OS === "web") {
-                if (window.confirm(t("dataManager.confirm.reset"))) {
-                  setResetting(true);
-                  AsyncStorage.clear()
-                    .then(() => {
-                      Alert.alert(t("dataManager.reset.done"), t("dataManager.reset.restart"));
-                    })
-                    .catch(() => Alert.alert(t("dataManager.export.error")))
-                    .finally(() => setResetting(false));
-                }
-              } else {
-                Alert.alert(
-                  t("dataManager.reset.title"),
-                  t("dataManager.confirm.reset"),
-                  [
-                    { text: t("common.cancel"), style: "cancel" },
-                    {
-                      text: t("dataManager.reset.confirm"),
-                      style: "destructive",
-                      onPress: () => {
-                        setResetting(true);
-                        AsyncStorage.clear()
-                          .then(() => {
-                            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                            Alert.alert(t("dataManager.reset.done"), t("dataManager.reset.restart"));
-                          })
-                          .catch(() => Alert.alert(t("dataManager.export.error")))
-                          .finally(() => setResetting(false));
-                      },
-                    },
-                  ],
-                );
-              }
-            }}
-            disabled={resetting}
-            style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
-          >
-            <View style={[styles.iconWrap, { backgroundColor: "#FF3B30" }]}>
-              {resetting
-                ? <ActivityIndicator size="small" color="#fff" />
-                : <IconSymbol name="arrow.counterclockwise" size={18} color="#FFFFFF" />
-              }
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.rowTitle, { color: "#FF3B30" }]}>{t("dataManager.reset.title")}</Text>
-              <Text style={[styles.rowDesc, { color: colors.muted }]} numberOfLines={1}>
-                {t("dataManager.reset.desc")}
-              </Text>
-            </View>
-          </Pressable>
-        </View>
+
+        {baselineResult ? (
+          <View style={[styles.result, { backgroundColor: colors.surface, borderColor: colors.border }]} testID="fresh-business-baseline-result">
+            <Text style={[styles.resultTitle, { color: colors.foreground }]}>{zh ? "最近一次完成结果" : "Latest completed result"}</Text>
+            <Text style={[styles.resultText, { color: colors.muted }]}>{zh ? `已验证备份槽位：${baselineResult.backup.slot}` : `Verified backup slot: ${baselineResult.backup.slot}`}</Text>
+            <Text style={[styles.resultText, { color: colors.muted }]}>{zh ? `已清理业务键：${baselineResult.removedBusinessKeyCount}` : `Business keys cleared: ${baselineResult.removedBusinessKeyCount}`}</Text>
+            <Text style={[styles.resultText, { color: colors.muted }]}>{zh ? `新同步组：${baselineResult.newGroupId}` : `New sync group: ${baselineResult.newGroupId}`}</Text>
+          </View>
+        ) : null}
       </ScrollView>
     </ScreenContainer>
   );
 }
 
+function SectionLabel({ title, color }: { title: string; color: string }) {
+  return (
+    <View style={styles.sectionLabel}>
+      <Text style={[styles.sectionLabelText, { color }]}>{title}</Text>
+    </View>
+  );
+}
+
+function ActionRow({
+  color,
+  icon,
+  title,
+  description,
+  foreground,
+  muted,
+  disabled = false,
+  onPress,
+  testID,
+}: {
+  color: string;
+  icon: string;
+  title: string;
+  description: string;
+  foreground: string;
+  muted: string;
+  disabled?: boolean;
+  onPress: () => void;
+  testID?: string;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      testID={testID}
+      style={({ pressed }) => [styles.row, (pressed || disabled) && { opacity: disabled ? 0.55 : 0.7 }]}
+    >
+      <View style={[styles.iconWrap, { backgroundColor: color }]}>
+        {disabled ? <ActivityIndicator size="small" color="#FFFFFF" /> : <IconSymbol name={icon as any} size={18} color="#FFFFFF" />}
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.rowTitle, { color: foreground }]}>{title}</Text>
+        <Text style={[styles.rowDesc, { color: muted }]}>{description}</Text>
+      </View>
+      <IconSymbol name="chevron.right" size={18} color={muted} />
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
-  header: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16 },
+  header: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 14 },
   backBtn: { flexDirection: "row", alignItems: "center", marginBottom: 12 },
   backText: { fontSize: 16, marginLeft: 2 },
-  title: { fontSize: 28, fontWeight: "700" },
+  title: { fontSize: 28, fontWeight: "600" },
+  subtitle: { fontSize: 13, marginTop: 4 },
   sectionLabel: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 6 },
-  sectionLabelText: { fontSize: 13, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.5 },
-  card: { marginHorizontal: 16, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, overflow: "hidden" },
+  sectionLabelText: { fontSize: 13, fontWeight: "500" },
+  card: { marginHorizontal: 16, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, overflow: "hidden" },
   row: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14, gap: 12 },
   iconWrap: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
-  rowTitle: { fontSize: 16, fontWeight: "600", marginBottom: 2 },
-  rowDesc: { fontSize: 13 },
-  divider: { height: StyleSheet.hairlineWidth, marginLeft: 64 },
+  rowTitle: { fontSize: 16, fontWeight: "500", marginBottom: 2 },
+  rowDesc: { fontSize: 13, lineHeight: 18 },
+  notice: { marginHorizontal: 16, marginTop: 16, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, padding: 14, flexDirection: "row", gap: 10 },
+  noticeText: { flex: 1, fontSize: 13, lineHeight: 19 },
+  result: { marginHorizontal: 16, marginTop: 14, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, padding: 14 },
+  resultTitle: { fontSize: 15, fontWeight: "600", marginBottom: 6 },
+  resultText: { fontSize: 13, lineHeight: 19 },
 });

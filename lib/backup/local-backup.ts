@@ -162,14 +162,14 @@ async function decryptSnapshotV2ForSlot(slot: number, encrypted: EncryptedSnapsh
 }
 
 /** 创建新快照（循环覆盖最旧的槽位） */
-export async function createSnapshot(): Promise<SnapshotMeta> {
+export async function createSnapshot(keys: readonly string[] = SYNC_KEYS): Promise<SnapshotMeta> {
   await recoverPendingSnapshotRestore();
   await retireVerifiedV1Snapshots();
   const meta = await getSnapshotMeta();
   const slot = meta.currentSlot % MAX_SNAPSHOTS;
 
-  // 读取所有 SYNC_KEYS 数据
-  const pairs = await AsyncStorage.multiGet([...SYNC_KEYS]);
+  // 仅读取调用方明确声明的业务键。默认仍是完整同步键集合；全新业务基线会传入经注册表筛选的业务键。
+  const pairs = await AsyncStorage.multiGet([...new Set(keys)]);
   const data: Record<string, string | null> = {};
   for (const [key, value] of pairs) {
     data[key] = value;
@@ -225,6 +225,18 @@ export async function createSnapshot(): Promise<SnapshotMeta> {
 
   await AsyncStorage.setItem(SNAPSHOT_META_KEY, JSON.stringify(newMeta));
   return newMeta;
+}
+
+/**
+ * 创建并验证一个快照。任何校验失败都会抛错，调用方不得继续执行不可逆的数据清理。
+ */
+export async function createVerifiedSnapshot(keys: readonly string[] = SYNC_KEYS): Promise<{ meta: SnapshotMeta; slot: number; keyCount: number }> {
+  const meta = await createSnapshot(keys);
+  const slot = (meta.currentSlot + MAX_SNAPSHOTS - 1) % MAX_SNAPSHOTS;
+  const verified = await verifySnapshot(slot);
+  if (!verified) throw new Error("SNAPSHOT_VERIFICATION_FAILED");
+  const keyCount = meta.slots[slot]?.keyCount ?? 0;
+  return { meta, slot, keyCount };
 }
 
 /** ★ 分片写入快照 */

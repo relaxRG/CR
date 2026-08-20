@@ -20,7 +20,6 @@ import {
   usePettyCategoryStore,
   PettyCategory, ExtendedInventoryCategory,
   EXTENDED_INVENTORY_LABELS, EXTENDED_INVENTORY_COLORS,
-  DEFAULT_PETTY_CATEGORIES,
 } from "@/lib/store/petty-category-store";
 
 const INV_OPTIONS: ExtendedInventoryCategory[] = [
@@ -168,7 +167,7 @@ export default function PettyCategorySettingsScreen() {
   const colors = useColors();
   const router = useRouter();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
-  const { categories, groups, upsertCategory, deleteCategory, toggleEnabled, updateMapping, resetToDefault } = usePettyCategoryStore();
+  const { groups, upsertCategory, deleteCategory, toggleEnabled, resetToDefault } = usePettyCategoryStore();
 
   const [editModal, setEditModal] = useState(false);
   const [editCat, setEditCat] = useState<PettyCategory | null>(null);
@@ -219,13 +218,6 @@ export default function PettyCategorySettingsScreen() {
   };
 
   // 包含已禁用的分类（用于管理页）
-  const allCategories = React.useMemo(() => {
-    const customMap = new Map(
-      // 从 DEFAULT_PETTY_CATEGORIES 合并自定义
-      DEFAULT_PETTY_CATEGORIES.map((d) => [d.code, d])
-    );
-    return customMap;
-  }, []);
 
   return (
     <ScreenContainer>

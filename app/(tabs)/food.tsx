@@ -2,9 +2,9 @@
  * 餐食 Tab（菜单 + 原料库，独立数据，与鸡尾酒完全隔离）
  */
 import React, { useMemo, useState } from "react";
-import { Alert, FlatList, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { FlatList, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import * as Haptics from "expo-haptics";
-import { useSafeAreaInsets, SafeAreaInsetsContext } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useScrollPreservation } from "@/hooks/use-scroll-preservation";
 import { useColors } from "@/hooks/use-colors";
@@ -13,7 +13,7 @@ import { useFoodMenuStore } from "@/lib/food/menu-store";
 import { useFoodIngredientStore } from "@/lib/food/ingredient-store";
 import { FoodItem, FOOD_CATEGORY_LABELS, FoodIngredient, INGREDIENT_CATEGORY_LABELS } from "@/lib/food/types";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS, MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
+import { MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
 
 type FoodTab = "menu" | "ingredients";
 

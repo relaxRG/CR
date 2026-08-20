@@ -10,7 +10,7 @@ import { useColors } from "@/hooks/use-colors";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useLabPlanStore, PlanCategory, PlanItemType, PlanItemStatus, PlanItem } from "@/lib/lab/plan-store";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS, MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
+import { MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
 
 type MainCat = PlanCategory;
 type SubType = PlanItemType;

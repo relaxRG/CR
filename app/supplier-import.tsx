@@ -6,11 +6,11 @@
  * - 价格涨跌提示
  * - 确认后批量写入进销存 + 原料库
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { formatMoney } from "@/lib/utils";
 import {
   ActivityIndicator, Alert, FlatList, Modal, Platform, Pressable,
-  ScrollView, StyleSheet, Text, TextInput, View,
+  StyleSheet, Text, TextInput, View,
 } from "react-native";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
@@ -20,12 +20,12 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useFoodIngredientStore, useSupplierPurchaseStore } from "@/lib/food/ingredient-store";
 import { FoodIngredient, IngredientCategory, SupplierPurchaseRecord } from "@/lib/food/types";
 import {
-  parseSupplierExcel, matchIngredient, splitProductName,
-  loadMatchMemory, saveMatchMemory, rememberMatch,
+  parseSupplierExcel, matchIngredient,
+  loadMatchMemory, rememberMatch,
   MatchConfidence, CONFIDENCE_LABELS, CONFIDENCE_COLORS,
   ParsedRow, SupplierImportPreview,
 } from "@/lib/store/supplier-import";
-import { MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS, MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
+import { MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
 
 const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
@@ -173,7 +173,7 @@ export default function SupplierImportScreen() {
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<SupplierImportPreview | null>(null);
   const [rowStates, setRowStates] = useState<RowState[]>([]);
-  const [memory, setMemory] = useState<Record<string, string>>({});
+  const [, setMemory] = useState<Record<string, string>>({});
 
   // 选择器/编辑器状态
   const [pickerVisible, setPickerVisible] = useState(false);

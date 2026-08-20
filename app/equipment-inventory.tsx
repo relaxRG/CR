@@ -267,8 +267,8 @@ export default function EquipmentInventoryScreen({ month, embedded = false }: Eq
   const [showPurchase, setShowPurchase] = useState(false);
   const [editItem, setEditItem] = useState<EquipmentItem | null>(null);
   const [showMaintenance, setShowMaintenance] = useState(false);
-  const [maintenanceItem, setMaintenanceItem] = useState<EquipmentItem | null>(null);
-  const [importLoading, setImportLoading] = useState(false);
+  const [, setMaintenanceItem] = useState<EquipmentItem | null>(null);
+  const [, setImportLoading] = useState(false);
 
   const currentMonth = month ?? new Date().toISOString().slice(0, 7);
   const totalMonthlyDepreciation = store.getTotalMonthlyDepreciation();

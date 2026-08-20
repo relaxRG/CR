@@ -20,18 +20,15 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
 import {
-  kickDevice,
   updateDeviceRole,
   updateDevicePolicyV2,
   type DeviceRole,
-  type RemoteDevice,
-  listDevices,
 } from "@/lib/cf-sync/client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSync } from "@/lib/cf-sync/provider";

@@ -598,7 +598,7 @@ export const CLASSIC_ANCHORS: ClassicAnchor[] = [
 export function inferFamily(
   roles: Set<StructureRole>,
   ingText: string,
-  method: string,
+  _method: string,
 ): FamilyKey {
   const hasCitrus = roles.has("acid_citrus") || roles.has("acid_other");
   if (textHas(ingText, K.tomato)) return "snapper";
@@ -691,7 +691,7 @@ function deriveDeviations(
   anchor: ClassicAnchor,
   spirit: SpiritClass,
   roles: Set<StructureRole>,
-  ingText: string,
+  _ingText: string,
 ): string[] {
   const out: string[] = [];
   if (!anchor.spirits.includes(spirit) && spirit !== "other") {
@@ -722,7 +722,7 @@ function deriveDeviations(
 
 function buildNarrative(
   verdict: Omit<LineageVerdict, "narrative">,
-  recipeName: string,
+  _recipeName: string,
 ): string {
   const fam = FAMILY_LABELS[verdict.family].zh;
   const parts: string[] = [];

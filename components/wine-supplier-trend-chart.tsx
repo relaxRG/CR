@@ -4,7 +4,7 @@
  */
 import React, { useMemo } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
-import Svg, { Circle, Line, Path, Rect, Text as SvgText } from "react-native-svg";
+import Svg, { Circle, Line, Path, Text as SvgText } from "react-native-svg";
 import { useColors } from "@/hooks/use-colors";
 import { WineMonthlySnapshot } from "@/lib/wine/types";
 

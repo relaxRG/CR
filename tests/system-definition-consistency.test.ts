@@ -15,7 +15,7 @@ describe("系统定义一致性", () => {
 
   it("生产薪资代码不再将已删除的聚合字段作为现行计算或回退来源", () => {
     const payroll = read("lib/labor/payroll-extras.ts");
-    const laborPage = read("app/labor.tsx");
+    const laborPage = read("components/labor/LaborWorkspaceScreen.tsx");
     expect(payroll).not.toMatch(/\.performanceBonus\b|\.salesCommission\b/);
     expect(laborPage).not.toMatch(/\.performanceBonus\b|\.salesCommission\b/);
     expect(payroll).toContain("settlePayrollExtras");
@@ -33,7 +33,7 @@ describe("系统定义一致性", () => {
   });
 
   it("强制重算文案限定为所选DRAFT月，不使用跨月删除语义", () => {
-    const labor = read("app/labor.tsx");
+    const labor = read("components/labor/LaborWorkspaceScreen.tsx");
     expect(labor).toContain("重新计算所选月草稿薪资");
     expect(labor).toContain("不会修改其他月份或已确认发薪数据");
     expect(labor).toContain('getRosterMonthStatus(month) !== "draft"');

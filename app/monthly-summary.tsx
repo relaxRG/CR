@@ -26,9 +26,8 @@ import { ScreenContainer } from "@/components/screen-container";
 import { BoundedBusinessMonthNavigator } from "@/components/months/BoundedBusinessMonthNavigator";
 import { useReportMonthNavigation } from "@/hooks/use-report-month-navigation";
 import { useMonthlySummaryStore } from "@/lib/store/monthly-summary/store";
-import { useEmployeeStore, usePaySlipStore, useDeptOrderStore, DEFAULT_DEPT_ORDER, useMonthCloseStore } from "@/lib/labor/store";
+import { useEmployeeStore, usePaySlipStore, useDeptOrderStore, useMonthCloseStore } from "@/lib/labor/store";
 import { useSpiritsInventoryStore } from "@/lib/spirits/crud-store";
-import { calcMonthlyPourCost, pourCostColor } from "@/lib/spirits/pour-cost";
 import { usePettyCashStore } from "@/lib/store/petty-store";
 import { useMonthlyReportStore } from "@/lib/store/monthly-report/store";
 import { useSupplierPurchaseStore } from "@/lib/food/ingredient-store";
@@ -39,10 +38,10 @@ import { formatStoreMoney } from "@/lib/store/table-display";
 import { usePettyLaborLinkStore } from "@/lib/store/petty-labor-link-store";
 import {
   MonthlySummaryReport, SummaryLineItem,
-  ACCOUNT_TYPE_LABELS, ACCOUNT_TYPE_COLORS,
-  maskCardNumber, generatePaymentCopyText, SUPPLIER_CATEGORY_COLORS,
-  PettyCodeConfig, InventoryReportConfig,
-  DEFAULT_PETTY_CODE_CONFIGS, DEFAULT_INVENTORY_CONFIGS,
+
+  maskCardNumber,
+
+  DEFAULT_INVENTORY_CONFIGS,
 } from "@/lib/store/monthly-summary/types";
 import { PETTY_CODE_LABELS, PETTY_GROUPS } from "@/lib/store/petty-store";
 
@@ -300,7 +299,7 @@ export default function MonthlySummaryScreen({ embedded = false }: { embedded?: 
     reports, upsertReport, getReport, getPaymentsForMonth,
     upsertPayment, deletePayment, suppliers,
     pettyCodeConfigs, inventoryConfigs,
-    upsertPettyCodeConfig, deletePettyCodeConfig, resetPettyCodeConfigs,
+    upsertPettyCodeConfig, resetPettyCodeConfigs,
     upsertInventoryConfig, resetInventoryConfigs,
     getPettyCodeConfig, getInventoryConfig,
   } = useMonthlySummaryStore();

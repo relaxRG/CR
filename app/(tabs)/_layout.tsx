@@ -82,8 +82,6 @@ export default function TabLayout() {
         <Tabs.Screen name="store" options={{ title: "门店" }} />
         {/* 旧路由保留兼容性，隐藏 Tab */}
         <Tabs.Screen name="index" options={{ href: null }} />
-        <Tabs.Screen name="library" options={{ href: null }} />
-        <Tabs.Screen name="me" options={{ href: null }} />
         <Tabs.Screen name="bottles" options={{ href: null }} />
         <Tabs.Screen name="homemade" options={{ href: null }} />
         <Tabs.Screen name="menu" options={{ href: null }} />

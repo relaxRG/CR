@@ -5,7 +5,7 @@
  * 接口：value (hex string) + onChange (hex string)
  * 使用方式：底部抽屉内嵌，不含 Modal 包装（由调用方控制显隐）
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   GestureResponderEvent,
   LayoutChangeEvent,
@@ -355,9 +355,6 @@ export function IOSColorPicker({ value, onChange }: IOSColorPickerProps) {
   }, [commit, value]);
 
   // 色相渐变轨道
-  const hueTrack = useMemo(() => Array.from({ length: 13 }, (_, i) => hueToHex(i / 12)), []);
-  const satTrack = useMemo(() => [hsvToRgb(h, 0, v), hsvToRgb(h, 1, v)].map(({ r, g, b }) => rgbToHex(r, g, b)), [h, v]);
-  const valTrack = useMemo(() => [rgbToHex(0, 0, 0), hueToHex(h)], [h]);
   const rTrack = useMemo(() => [rgbToHex(0, currentRgb.g, currentRgb.b), rgbToHex(255, currentRgb.g, currentRgb.b)], [currentRgb]);
   const gTrack = useMemo(() => [rgbToHex(currentRgb.r, 0, currentRgb.b), rgbToHex(currentRgb.r, 255, currentRgb.b)], [currentRgb]);
   const bTrack = useMemo(() => [rgbToHex(currentRgb.r, currentRgb.g, 0), rgbToHex(currentRgb.r, currentRgb.g, 255)], [currentRgb]);

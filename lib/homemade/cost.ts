@@ -726,5 +726,5 @@ import {
   ML_PER_CUP, ML_PER_PINT, ML_PER_QUART, ML_PER_GALLON,
   G_PER_KG, G_PER_MG, G_PER_OZ_SOLID, G_PER_LB,
   G_PER_JIN, G_PER_LIANG, G_PER_QIAN, G_PER_STONE, G_PER_TONNE,
-  FRAC_CHARS, isLiquidContext, isFuzzyUnit,
+  FRAC_CHARS, isLiquidContext,
 } from "@/lib/units";

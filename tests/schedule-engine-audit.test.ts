@@ -19,7 +19,7 @@ import { calculateAttendanceFromShifts } from "../lib/labor/attendance-calculato
 import { canWriteScheduleDates, getNonWritableScheduleMonths, monthFromScheduleDate } from "../lib/labor/schedule-guards";
 import { applyHolidayRestAllocation, getHolidayRestBonus } from "../lib/labor/holiday-pay";
 import { getHolidayAllocationKey, getHolidayWorkInfo } from "../lib/labor/holiday-work";
-import type { Employee, ShiftEntry, SpecialStatus } from "../lib/labor/types";
+import type { Employee, ShiftEntry } from "../lib/labor/types";
 import { calcAttendanceBaseSalary, calcDailyRate, DEFAULT_SPECIAL_STATUSES, getAttendanceBaseSalary } from "../lib/labor/types";
 
 // ─── 测试夹具 ─────────────────────────────────────────────────────────────────
@@ -56,7 +56,6 @@ function makeShift(date: string, hours: number, specialStatusId?: string): Shift
 const MONTH = "2026-07";
 const DAYS_IN_MONTH = 31;
 const REST_DAYS = 8;
-const EXPECTED_ATTENDANCE = DAYS_IN_MONTH - REST_DAYS; // 23 天
 const DAILY_RATE = Math.round((6000 / (DAYS_IN_MONTH - REST_DAYS)) * 100) / 100;
 
 // ─── Suite A: 节假日配置倍率实际进入考勤计算 ──────────────────────────────────

@@ -164,7 +164,7 @@ describe("烈酒普通手动录入即时库存更新", () => {
 
     expect(purchasesForMonth([], [manualPending], "2026-08")).toEqual([manualPending]);
 
-    const inventoryPage = readFileSync(resolve(process.cwd(), "app/spirits-inventory.tsx"), "utf8");
+    const inventoryPage = readFileSync(resolve(process.cwd(), "components/inventory/SpiritsInventoryWorkspaceScreen.tsx"), "utf8");
     const storeSource = readFileSync(resolve(process.cwd(), "lib/spirits/crud-store.tsx"), "utf8");
     expect(storeSource).toContain("addPurchase: (data: Omit<SpiritPurchaseRecord, \"id\" | \"createdAt\">) => SpiritPurchaseRecord;");
     expect(storeSource).toContain("return record;");

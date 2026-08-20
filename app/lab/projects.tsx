@@ -22,7 +22,7 @@ import { useLabStore } from "@/lib/lab/store";
 import { useCapabilityGuard } from "@/hooks/use-can";
 import { getLabTemplate } from "@/lib/lab/templates";
 import { LAB_STATUS_ORDER, LabProject, LabProjectStatus } from "@/lib/lab/types";
-import { MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS, MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
+import { MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
 
 const STATUS_COLORS: Record<LabProjectStatus, string> = {
   ideation: "#8B5CF6",

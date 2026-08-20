@@ -111,7 +111,6 @@ export function groupPrepsByFamily(preps: HomemadePrep[]): FamilyGroup<HomemadeP
   for (const [fKey, items] of familyMap) {
     if (items.length >= 2) {
       // 家族显示名：取第一条的 name（去掉变体标签后缀）
-      const head = items[0];
       out.push({
         key: `family:${fKey}`,
         items,

@@ -2,7 +2,6 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
-import { ReportFileType } from "./dish-analysis-types";
 import {
   formatArchiveMonthLabel,
   appendRawExcelArchiveEntries,

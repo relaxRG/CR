@@ -20,7 +20,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { useEmployeeStore, useMonthCloseStore, useDeptOrderStore } from "@/lib/labor/store";
 import { useSalaryAdvanceStore, useAdvanceCategoryStore, SalaryAdvance, AdvanceStatus } from "@/lib/labor/advance-store";
 import { usePettyLaborLinkStore } from "@/lib/store/petty-labor-link-store";
-import { EMPLOYEE_TYPE_LABELS, EMPLOYEE_TYPE_COLORS, DEPT_COLORS, monthLabel } from "@/lib/labor/types";
+import { EMPLOYEE_TYPE_LABELS, EMPLOYEE_TYPE_COLORS, monthLabel } from "@/lib/labor/types";
 import { sortEmployeesByProfileOrder } from "@/lib/labor/employee-profile-order";
 
 const STATUS_LABELS: Record<AdvanceStatus, string> = {

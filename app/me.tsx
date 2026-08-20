@@ -2,7 +2,7 @@
  * 「我的」独立页面（从门店 Tab 顶部入口进入）
  * 保留原有全部功能：数据总览、标签管理、备份、设备同步
  */
-import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -22,7 +22,7 @@ export default function MePage() {
   const { recipes } = useRecipeStore();
   const { bottles } = useBottleStore();
   const { preps } = useHomemadeStore();
-  const { syncState, isAuthenticated, user, deviceRole } = useSync();
+  const { syncState, isAuthenticated, user } = useSync();
   const insets = useSafeAreaInsets();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 

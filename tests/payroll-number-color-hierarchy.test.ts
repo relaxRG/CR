@@ -14,7 +14,7 @@ function block(source: string, start: string, end: string): string {
 }
 
 describe("薪资与考勤数字颜色层级", () => {
-  const labor = read("app/labor.tsx");
+  const labor = read("components/labor/LaborWorkspaceScreen.tsx");
   const attendance = read("app/labor-attendance.tsx");
 
   it("薪资统计的综合额外只使用正文色、主结果色和负向异常色", () => {

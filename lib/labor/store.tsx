@@ -16,10 +16,9 @@ import {
   MonthCloseArchive, MonthCloseStatus, MonthAdjustmentSession, PayrollAdjustment, AdjustmentSettleMethod,
   CompOffBalanceEntry, HolidayCompOffEntry, UnexplainedRestAlert,
   CustomDept, BusinessHoursEntry, ShiftGroup, FillPreset,
-  DeptCategory,
   calcSocialInsurance, calcIncomeTax,
-  getDaysInMonth, parseMonth, getContractHoursForDate,
-  calcCompOffExpiresMonth, getAvailableCompOffDays,
+
+  calcCompOffExpiresMonth,
   DEFAULT_SHIFT_TEMPLATES, DEFAULT_SPECIAL_STATUSES,
   DEFAULT_GLOBAL_PAYROLL_SETTINGS, DEFAULT_CUSTOM_DEPTS,
   DEFAULT_BUSINESS_HOURS, DEFAULT_SHIFT_GROUPS,

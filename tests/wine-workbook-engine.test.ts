@@ -8,7 +8,7 @@ import {
   parseWineWorkbook,
   rebuildWineSnapshotFromPurchases,
 } from "@/lib/wine/workbook-engine";
-import type { WineManualPurchase, WineMonthlySnapshot } from "@/lib/wine/types";
+import type { WineManualPurchase } from "@/lib/wine/types";
 
 function workbookBase64() {
   const workbook = utils.book_new();

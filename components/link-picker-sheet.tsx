@@ -11,7 +11,7 @@ import type { Bottle } from "@/lib/bottles/types";
 import type { HomemadePrep } from "@/lib/homemade/types";
 import type { GroupResolver } from "@/lib/suggest";
 import { RESPONSIVE_LAYOUT } from "@/lib/theme/responsive-layout-tokens";
-import { MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS, MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
+import { MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
 
 export type LinkPickResult =
   | { kind: "bottle"; bottleId: string; name: string }

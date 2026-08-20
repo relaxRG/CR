@@ -41,7 +41,7 @@ import {
 import { displayNames } from "@/lib/utils";
 import { Bottle } from "@/lib/bottles/types";
 import { HomemadePrep } from "@/lib/homemade/types";
-import { MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS, MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
+import { MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
 
 // ─── 智能匹配工具 ─────────────────────────────────────────────────────────────
 
@@ -667,7 +667,6 @@ export default function ShoppingScreen() {
   // 合并显示：自动聚合 + 手动添加
   const displayItems = useMemo(() => {
     // 自动聚合的 key 集合
-    const autoKeys = new Set(aggregated.map((a) => a.name.toLowerCase()));
     // 手动添加的条目
     const manualItems = savedItems.filter((i) => i.isManual);
     // 合并：自动聚合优先，手动添加追加

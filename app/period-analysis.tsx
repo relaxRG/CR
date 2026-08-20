@@ -37,8 +37,7 @@ import {
 } from "@/lib/store/period-analysis/types";
 import { useScheduleStore } from "@/lib/store/period-analysis/schedule-store";
 import {
-  calcOvertimeJudgment, minutesToDisplayStr,
-  OVERTIME_ALERT_COLORS, OVERTIME_ALERT_LABELS,
+  calcOvertimeJudgment,
 } from "@/lib/store/period-analysis/schedule-types";
 import { useShiftStore, useEmployeeStore } from "@/lib/labor/store";
 
@@ -198,12 +197,12 @@ export default function PeriodAnalysisScreen({ embedded = false }: { embedded?: 
   const insets = useSafeAreaInsets();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
-  const { reports, settings, latestReport, addReport, deleteReport, updateSettings } = usePeriodAnalysisStore();
+  const { reports, settings, latestReport, addReport, updateSettings } = usePeriodAnalysisStore();
   const spiritsStore = useSpiritsInventoryStore();
   const supplierPurchaseStore = useSupplierPurchaseStore();
-  const { businessHours, shiftTemplates, addDateOverride, removeDateOverride, updateBusinessHours } = useScheduleStore();
+  const { businessHours, shiftTemplates, removeDateOverride, updateBusinessHours } = useScheduleStore();
   const { shifts, getShifts } = useShiftStore();
-  const { employees } = useEmployeeStore();
+  useEmployeeStore();
   const [tab, setTab] = useState<MainTab>("overview");
   const { month: reportWorkspaceMonth } = useReportMonthNavigation();
   const [selectedMonth, setSelectedMonth] = useState<string>(embedded ? reportWorkspaceMonth : (latestReport?.month ?? ""));

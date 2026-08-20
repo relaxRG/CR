@@ -9,7 +9,7 @@ import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import * as XLSX from "xlsx";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { FoodIngredient, SupplierPurchaseItem } from "@/lib/food/types";
+import { FoodIngredient } from "@/lib/food/types";
 import { normalizeImportDate } from "@/lib/import/date-utils";
 
 // ─── 常量 ─────────────────────────────────────────────────────────────────────

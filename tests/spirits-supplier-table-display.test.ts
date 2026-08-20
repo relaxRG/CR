@@ -6,7 +6,7 @@ const root = path.resolve(__dirname, "..");
 const read = (relative: string) => fs.readFileSync(path.join(root, relative), "utf8");
 
 describe("供应商当月进货表展示", () => {
-  const screen = read("app/spirits-inventory.tsx");
+  const screen = read("components/inventory/SpiritsInventoryWorkspaceScreen.tsx");
 
   it("按数量、既有瓶箱规格、单价、总价、集团的顺序渲染表头", () => {
     const headerStart = screen.indexOf('testID="spirits-purchase-column-name"');

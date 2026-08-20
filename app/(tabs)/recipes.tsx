@@ -5,10 +5,8 @@ import {
   FlatList,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
   ActivityIndicator,
   Modal,
@@ -81,7 +79,6 @@ export function RecipesScreen() {
   } = useRecipeStore();
   const { bottles } = useBottleStore();
   const { preps } = useHomemadeStore();
-  const flavorTags = tagsOf("flavor");
   const isTablet = useIsTablet();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>({ type: "all" });
@@ -1118,4 +1115,4 @@ const styles = StyleSheet.create({
 
 export default RecipesScreen;
 import { useCapabilityGuard } from "@/hooks/use-can";
-import { MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS, MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
+import { MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";

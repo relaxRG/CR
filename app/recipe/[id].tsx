@@ -36,7 +36,6 @@ import { CodexFamilyBadge } from "@/components/codex-family-badge";
 import { LabOriginBadge } from "@/components/lab-origin-badge";
 import {
   ingredientDisplayName,
-  stepsDisplayText,
 } from "@/lib/recipes/ingredient-display";
 import { useBottleStore } from "@/lib/bottles/store";
 import {
@@ -59,9 +58,7 @@ import { useMenuStore } from "@/lib/menu/store";
 import {
   STRENGTH_LABELS,
   STRENGTH_BAND_LABELS,
-  codexFamilyLabel,
   localizedTagName,
-  type SourceRef,
 } from "@/lib/recipes/types";
 import { FLAVOR_TAG_DEFAULT_COLORS } from "@/lib/settings/card-tags";
 import { ensureRecipePhotoDirectory } from "@/lib/recipes/photo";
@@ -188,7 +185,7 @@ export default function RecipeDetailScreen() {
   }, [recipe, t, handlePickPhoto, updateRecipePhoto]);
 
   // 联网补全:零价空壳条目(多为自动添加)→ LLM 知识补全资料并更新入库
-  const [enrichPending, setEnrichPending] = React.useState(false);
+  const [enrichPending] = React.useState(false);
   const { isOnline } = useNetwork();
   const [enrichMsg, setEnrichMsg] = React.useState<string | null>(null);
   const [addAltIngId, setAddAltIngId] = React.useState<string | null>(null);
@@ -1309,7 +1306,7 @@ export default function RecipeDetailScreen() {
         {(recipe?.photoUris ?? []).length > 0 ? (
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
-              {(recipe.photoUris ?? []).map((uri, idx) => (
+              {(recipe.photoUris ?? []).map((uri) => (
                 <View key={uri} style={{ marginRight: 6, borderRadius: 8, overflow: "hidden", position: "relative" }}>
                   <Pressable onPress={() => setPhotoPreviewUri(uri)}>
                     <Image

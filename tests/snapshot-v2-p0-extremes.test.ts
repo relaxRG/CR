@@ -26,7 +26,6 @@ vi.mock("expo-sharing", () => ({}));
 import {
   configureSnapshotV2Crypto,
   createSnapshot,
-  getSnapshotMeta,
   readSnapshot,
   recoverPendingSnapshotRestore,
   retireVerifiedV1Snapshots,

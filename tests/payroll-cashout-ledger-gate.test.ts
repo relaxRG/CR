@@ -18,7 +18,7 @@ describe("调休兑现唯一事件账本门禁", () => {
       "lib/labor/store.tsx",
       "lib/labor/payroll-reconciliation.ts",
       "lib/labor/payroll-draft-reconciliation.ts",
-      "app/labor.tsx",
+      "components/labor/LaborWorkspaceScreen.tsx",
       "app/labor-attendance.tsx",
       "components/labor/PayrollReconciliationPanel.tsx",
       "lib/labor/export.ts",

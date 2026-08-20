@@ -89,7 +89,7 @@ describe("薪资卡唯一额外项解析", () => {
   });
 
   it("薪资卡不再直接读取DRAFT旧聚合字段，五项综合额外必须强制单行", () => {
-    const source = fs.readFileSync(path.join(process.cwd(), "app/labor.tsx"), "utf8");
+    const source = fs.readFileSync(path.join(process.cwd(), "components/labor/LaborWorkspaceScreen.tsx"), "utf8");
     expect(source).toContain("resolveDraftPayrollExtrasForDisplay");
     expect(source).toContain('getMonthCloseStatus(month) !== "draft"');
     expect(source).toContain('flexDirection: "row", flexWrap: "nowrap"');

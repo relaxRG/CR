@@ -21,7 +21,7 @@ import { useMenuPackageStore, MenuPackage } from "@/lib/menu/package-store";
 import { WINE_STYLE_LABELS, WineStyle } from "@/lib/wine/types";
 import { FOOD_CATEGORY_LABELS, FoodCategory } from "@/lib/food/types";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS, MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
+import { MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
 
 type SaleCat = "cocktail" | "wine" | "food" | "package";
 const CATS: { key: SaleCat; label: string; emoji: string }[] = [
@@ -181,8 +181,8 @@ export default function StoreSaleScreen() {
 
   const { groups, ungroupedEntries } = useMenuStore();
   const { recipes } = useRecipeStore();
-  const { bottles: wineBottles, deleteBottle, batchDeleteBottles, reorderBottles } = useWineStore();
-  const { items: foodItems, deleteItem: deleteFoodItem, batchDeleteItems, reorderItems, batchToggleAvailable } = useFoodMenuStore();
+  const { bottles: wineBottles, batchDeleteBottles } = useWineStore();
+  const { items: foodItems, deleteItem: deleteFoodItem, batchDeleteItems, batchToggleAvailable } = useFoodMenuStore();
   const { packages, addPackage, updatePackage, deletePackage, toggleAvailable } = useMenuPackageStore();
   // 葡萄酒多选
   const [wineSelectMode, setWineSelectMode] = useState(false);

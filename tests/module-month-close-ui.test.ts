@@ -63,7 +63,7 @@ describe("模块独立月结界面接入", () => {
   });
 
   it("烈酒月结使用烈酒自身台账和进货金额，不能改写工资或其他库存状态", () => {
-    const spirits = read("app/spirits-inventory.tsx");
+    const spirits = read("components/inventory/SpiritsInventoryWorkspaceScreen.tsx");
     expect(spirits).toContain('moduleClose.getStatus("spirits", selectedMonth)');
     expect(spirits).toContain('moduleClose.isWritable("spirits", selectedMonth)');
     expect(spirits).toContain('module: "spirits"');

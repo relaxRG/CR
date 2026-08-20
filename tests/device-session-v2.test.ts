@@ -5,7 +5,6 @@ import {
   ONLINE_REQUIRED_HIGH_RISK_RESOURCES,
   ONLINE_REQUIRED_WRITE_ACTIONS,
   STORAGE_POLICY,
-  BUSINESS_TABS,
   businessTabForCapability,
   type BusinessTab,
   type Capability,

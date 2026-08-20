@@ -18,7 +18,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { StoreSegmentedTabs } from "@/components/store/store-visual-primitives";
 import { ScreenContainer } from "@/components/screen-container";
 import { GenericInventoryContextValue, GenericInventoryItem } from "@/lib/inventory-core/store";
-import { getCurrentMonth, MonthlyLedgerItem, MonthlySnapshot } from "@/lib/inventory-core/types";
+import { getCurrentMonth, MonthlyLedgerItem } from "@/lib/inventory-core/types";
 import { MonthlyLedgerRow } from "./MonthlyLedgerSheet";
 import { HorizontalLedgerColumn, HorizontalLedgerGroup, HorizontalLedgerTable } from "./HorizontalLedgerTable";
 import { formatStoreMoney, formatStoreQuantity, STORE_TABLE_METRICS } from "@/lib/store/table-display";

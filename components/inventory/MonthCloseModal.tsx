@@ -210,7 +210,6 @@ export function MonthCloseModal({
 
           <ScrollView contentContainerStyle={{ padding: 16, gap: 8 }}>
             {ledgerItems.map((item) => {
-              const finalQty = getFinalClosingQty(item);
               const hasAdj = adjustments[item.itemId] !== undefined && adjustments[item.itemId] !== "";
               return (
                 <View key={item.itemId} style={[S.itemRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>

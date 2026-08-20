@@ -165,7 +165,6 @@ export default function GlasswareInventoryScreen({ month, embedded = false }: Gl
         renderExtraTabContent={(tab) => {
           if (tab !== "loss") return null;
           const lossRecords = store.consumes.filter((c) => c.reason === "loss");
-          const colors_inner = { muted: "#888" };
           return (
             <View style={{ gap: 8 }}>
               <TouchableOpacity onPress={() => setShowLoss(true)}

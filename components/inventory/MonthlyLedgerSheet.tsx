@@ -20,7 +20,6 @@ export function MonthlyLedgerRow({ item, accentColor, showLoss = false }: Props)
   const accent = accentColor ?? colors.primary;
   const [expanded, setExpanded] = useState(false);
 
-  const hasMovement = item.purchaseQty > 0 || item.consumeQty > 0 || item.lossQty > 0;
   const isLowClose = item.closingQty === 0;
 
   return (

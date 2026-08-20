@@ -65,7 +65,7 @@ describe("门店唯一视觉系统规范", () => {
   it("报表、员工、备用金、库存和店铺均依赖共享视觉系统而非新建局部标准", () => {
     const consumers = [
       "app/(tabs)/store.tsx",
-      "app/labor.tsx",
+      "components/labor/LaborWorkspaceScreen.tsx",
       "components/store/petty-cash.tsx",
       "components/store/inventory.tsx",
     ];
@@ -78,7 +78,7 @@ describe("门店唯一视觉系统规范", () => {
 
   it("门店根页与员工页使用共享分段页签，员工不再渲染重复英文部门字段", () => {
     expect(source("app/(tabs)/store.tsx")).toContain("StoreSegmentedTabs");
-    const labor = source("app/labor.tsx");
+    const labor = source("components/labor/LaborWorkspaceScreen.tsx");
     expect(labor).toContain("StoreSegmentedTabs");
     expect(labor).toContain("StoreSectionHeader");
     expect(labor).toContain("visibleMetricColumns === 3");

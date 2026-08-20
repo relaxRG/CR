@@ -6,7 +6,7 @@ const root = path.resolve(__dirname, "..");
 const read = (relative: string) => fs.readFileSync(path.join(root, relative), "utf8");
 
 describe("统一月度归档 UI 与旧入口清理", () => {
-  const labor = read("app/labor.tsx");
+  const labor = read("components/labor/LaborWorkspaceScreen.tsx");
   const monthlySummary = read("app/monthly-summary.tsx");
   const store = read("lib/labor/store.tsx");
 

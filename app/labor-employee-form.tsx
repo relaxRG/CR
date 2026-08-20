@@ -34,12 +34,11 @@ import {
   AllowanceRule, SocialInsuranceConfig, InsuranceItem, HousingFundItem,
   IncomeTaxConfig, INCOME_TAX_BRACKETS,
   ALLOWANCE_UNIT_LABELS, ALLOWANCE_PERIOD_MODE_LABELS,
-  WorkKPIRule, WorkKPITier,
-  RevenueKPIRule, RevenueKPITier, RevenueKPISource, RevenueKPIPayMode, RevenueKPICalcType,
-  REVENUE_KPI_SOURCE_LABELS, REVENUE_KPI_PAY_MODE_LABELS, REVENUE_KPI_CALC_TYPE_LABELS,
-  calcRevenueKPIBonus,
-  DEPT_LABELS, DEPT_COLORS, EMPLOYEE_TYPE_LABELS, EMPLOYEE_TYPE_COLORS,
-  calcDailyRate, getDaysInMonth, WEEKDAY_LABELS,
+  WorkKPIRule,
+  RevenueKPIRule, RevenueKPISource, RevenueKPIPayMode, RevenueKPICalcType,
+  REVENUE_KPI_SOURCE_LABELS, REVENUE_KPI_CALC_TYPE_LABELS,
+
+  calcDailyRate, getDaysInMonth,
   DEFAULT_SOCIAL_INSURANCE, DEFAULT_INCOME_TAX, BUILTIN_CITY_POLICIES, getCityPolicy, applyCityPolicy,
 } from "@/lib/labor/types";
 

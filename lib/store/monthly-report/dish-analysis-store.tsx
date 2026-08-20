@@ -9,7 +9,6 @@ import { DishAnalysisSnapshot } from "./dish-analysis-types";
 
 const SNAPSHOTS_KEY = "dish_analysis.snapshots.v1";
 
-function uuid(): string { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
 
 interface DishAnalysisState {
   snapshots: DishAnalysisSnapshot[];

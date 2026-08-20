@@ -9,7 +9,7 @@
 import React from "react";
 import { formatMoney } from "@/lib/utils";
 import {
-  Image, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View,
+  Image, Pressable, ScrollView, StyleSheet, Text, View,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -54,7 +54,6 @@ export default function LaborEmployeeProfileScreen() {
   const dept = resolveEmployeeDept(emp);
   const deptColor = dept.color ?? DEPT_COLORS[emp.dept] ?? colors.primary;
   const isFulltime = emp.type === "fulltime";
-  const isParttime = emp.type === "parttime" || emp.type === "longterm_parttime";
   const typeColor = EMPLOYEE_TYPE_COLORS[emp.type] ?? colors.primary;
 
   return (

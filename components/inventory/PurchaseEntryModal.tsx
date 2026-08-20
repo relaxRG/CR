@@ -9,7 +9,7 @@ import {
   ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View
 } from "react-native";
 import { useColors } from "@/hooks/use-colors";
-import { GenericInventoryItem, GenericInventoryContextValue } from "@/lib/inventory-core/store";
+import { GenericInventoryContextValue } from "@/lib/inventory-core/store";
 
 interface Props {
   visible: boolean;

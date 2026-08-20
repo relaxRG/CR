@@ -32,7 +32,7 @@ function renderFiveGridSummary(
   slip: Partial<PaySlip> | null,
   employee: { type: string; baseSalary?: number },
   att: { attendanceDays: number; expectedAttendanceDays: number; overtimePay?: number; holidayBonus?: number } | null,
-  deptColor: string = "#1677FF"
+  _deptColor: string = "#1677FF"
 ): FiveGridCell[] {
   const isParttime = employee.type === "parttime" || employee.type === "longterm_parttime";
 

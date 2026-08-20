@@ -30,10 +30,9 @@ import { useBottleStore } from "@/lib/bottles/store";
 import { useHomemadeStore } from "@/lib/homemade/store";
 import { estimateRecipeCostSmart } from "@/lib/recipes/smart-cost";
 import { displayNames } from "@/lib/utils";
-import { Recipe } from "@/lib/recipes/types";
 import { useSpiritsInventoryStore } from "@/lib/spirits/crud-store";
 import { calcDirectPourCost, calcRecipePourCost, pourCostColor, confidenceLabel } from "@/lib/spirits/pour-cost";
-import { MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS, MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
+import { MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
 
 // ─── 售价行（内联编辑） ───────────────────────────────────────────────────────
 
@@ -499,11 +498,9 @@ export default function MenuScreen() {
     groups,
     ungroupedEntries,
     addGroup,
-    addEntry,
     removeEntry,
     setPrice,
     toggleAvailable,
-    addUngroupedEntry,
     removeUngroupedEntry,
     setUngroupedPrice,
     toggleUngroupedAvailable,

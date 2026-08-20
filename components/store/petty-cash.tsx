@@ -25,9 +25,9 @@ import { useModuleMonthCloseStore } from "@/lib/month-close/module-month-close-s
 import { useGlobalBusinessMonth } from "@/lib/months/global-business-month";
 import { BoundedBusinessMonthNavigator } from "@/components/months/BoundedBusinessMonthNavigator";
 import { deriveInventoryMonthBounds } from "@/lib/inventory-core/month-browser";
-import { MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS, MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
-import { StoreMetric, StoreSectionHeader, StoreSegmentedTabs, StoreToolbarAction } from "@/components/store/store-visual-primitives";
-import { storeCategoryColor, storeTone, storeToneSurface, STORE_TEXT, STORE_VISUAL_SYSTEM } from "@/lib/theme/store-visual-system";
+import { MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
+import { StoreSegmentedTabs, StoreToolbarAction } from "@/components/store/store-visual-primitives";
+import { storeCategoryColor, storeTone, storeToneSurface } from "@/lib/theme/store-visual-system";
 
 // ─── 工具函数 ─────────────────────────────────────────────────────────────────
 function getMonthLabel(month: string) {
@@ -37,14 +37,6 @@ function getMonthLabel(month: string) {
 function prevMonth(month: string) {
   const [y, m] = month.split("-").map(Number);
   return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
-}
-function nextMonth(month: string) {
-  const [y, m] = month.split("-").map(Number);
-  return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`;
-}
-function todayMonth() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 function daysInMonth(month: string) {
   const [y, m] = month.split("-").map(Number);
@@ -59,10 +51,6 @@ function fmtAmt(n: number, decimals = 3) {
   return n.toLocaleString("zh-CN", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 }
 // iCost 风格：超过1万显示 1.5w，否则直接显示整数（无小数）
-function fmtShort(n: number) {
-  if (n >= 10000) return `${(n / 10000).toFixed(1)}w`;
-  return n.toFixed(0);
-}
 // iCost 日历金额：无负号，灰色数字
 function fmtCalAmt(n: number) {
   if (n <= 0) return "";

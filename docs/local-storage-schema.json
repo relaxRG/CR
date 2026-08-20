@@ -3,6 +3,20 @@
   "records": [
     {
       "backend": "AsyncStorage",
+      "key": "[...keys]",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "multiRemove",
+          "file": "lib/cf-sync/provider.tsx",
+          "line": 670,
+          "value": "",
+          "structure": "SyncState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
       "key": "[...LEGACY_MONTH_KEYS]",
       "status": "unresolved",
       "calls": [
@@ -24,6 +38,20 @@
     },
     {
       "backend": "AsyncStorage",
+      "key": "[...new Set(keys",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "multiGet",
+          "file": "lib/backup/local-backup.ts",
+          "line": 172,
+          "value": "",
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
       "key": "[...SYNC_KEYS]",
       "status": "unresolved",
       "calls": [
@@ -37,14 +65,7 @@
         {
           "operation": "multiGet",
           "file": "lib/backup/local-backup.ts",
-          "line": 172,
-          "value": "",
-          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
-        },
-        {
-          "operation": "multiGet",
-          "file": "lib/backup/local-backup.ts",
-          "line": 562,
+          "line": 574,
           "value": "",
           "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         }
@@ -72,7 +93,7 @@
         {
           "operation": "multiRemove",
           "file": "lib/labor/store.tsx",
-          "line": 1053,
+          "line": 1052,
           "value": "",
           "structure": "EmployeeStore, CustomDeptStore, DeptOrderStore, ShiftTemplateStore, SpecialStatusStore, HolidayConfigStore, ShiftStore, AttendanceStore, PaySlipStore, GlobalPayrollSettingsStore, MonthCloseStore, MonthConfigStore, CompOffBalanceEntryStore, HolidayCompOffStore, BusinessHoursStore, ShiftGroupStore, UnexplainedRestAlertStore, FillPresetStore"
         }
@@ -156,21 +177,21 @@
         {
           "operation": "removeItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 235,
+          "line": 247,
           "value": "",
           "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
         {
           "operation": "getItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 286,
+          "line": 298,
           "value": "",
           "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
         {
           "operation": "removeItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 392,
+          "line": 404,
           "value": "",
           "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         }
@@ -184,14 +205,14 @@
         {
           "operation": "setItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 238,
+          "line": 250,
           "value": "chunk",
           "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
         {
           "operation": "getItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 263,
+          "line": 275,
           "value": "",
           "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         }
@@ -205,21 +226,21 @@
         {
           "operation": "setItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 240,
+          "line": 252,
           "value": "String(chunks",
           "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
         {
           "operation": "getItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 246,
+          "line": 258,
           "value": "",
           "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
         {
           "operation": "getItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 258,
+          "line": 270,
           "value": "",
           "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         }
@@ -250,6 +271,20 @@
           "line": 61,
           "value": "",
           "structure": ""
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "app.freshBusinessBaseline.v1",
+      "status": "resolved",
+      "calls": [
+        {
+          "operation": "setItem",
+          "file": "lib/cf-sync/provider.tsx",
+          "line": 678,
+          "value": "JSON.stringify({ version: 1",
+          "structure": "SyncState"
         }
       ]
     },
@@ -317,7 +352,7 @@
         {
           "operation": "setItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 396,
+          "line": 408,
           "value": "JSON.stringify(meta",
           "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         }
@@ -331,28 +366,28 @@
         {
           "operation": "getItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 326,
+          "line": 338,
           "value": "",
           "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
         {
           "operation": "removeItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 334,
+          "line": 346,
           "value": "",
           "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
         {
           "operation": "setItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 366,
+          "line": 378,
           "value": "JSON.stringify(journal",
           "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
         {
           "operation": "removeItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 370,
+          "line": 382,
           "value": "",
           "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         }
@@ -591,6 +626,13 @@
           "operation": "getItem",
           "file": "lib/cf-sync/group-switch.ts",
           "line": 103,
+          "value": "",
+          "structure": "PersistedGroupSwitchSession"
+        },
+        {
+          "operation": "removeItem",
+          "file": "lib/cf-sync/group-switch.ts",
+          "line": 413,
           "value": "",
           "structure": "PersistedGroupSwitchSession"
         }
@@ -1150,21 +1192,21 @@
         {
           "operation": "getItem",
           "file": "app/role-settings.tsx",
-          "line": 45,
+          "line": 42,
           "value": "",
           "structure": ""
         },
         {
           "operation": "getItem",
           "file": "app/role-settings.tsx",
-          "line": 56,
+          "line": 53,
           "value": "",
           "structure": ""
         },
         {
           "operation": "setItem",
           "file": "app/role-settings.tsx",
-          "line": 63,
+          "line": 60,
           "value": "JSON.stringify(map",
           "structure": ""
         }
@@ -1178,14 +1220,14 @@
         {
           "operation": "getItem",
           "file": "lib/store/monthly-report/dish-analysis-store.tsx",
-          "line": 55,
+          "line": 54,
           "value": "",
           "structure": "DishAnalysisState"
         },
         {
           "operation": "setItem",
           "file": "lib/store/monthly-report/dish-analysis-store.tsx",
-          "line": 64,
+          "line": 63,
           "value": "JSON.stringify(state.snapshots",
           "structure": "DishAnalysisState"
         }
@@ -1514,7 +1556,7 @@
         {
           "operation": "setItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 646,
+          "line": 658,
           "value": "value",
           "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
@@ -1542,28 +1584,28 @@
         {
           "operation": "getItem",
           "file": "lib/labor/store.tsx",
-          "line": 53,
+          "line": 52,
           "value": "",
           "structure": "EmployeeStore, CustomDeptStore, DeptOrderStore, ShiftTemplateStore, SpecialStatusStore, HolidayConfigStore, ShiftStore, AttendanceStore, PaySlipStore, GlobalPayrollSettingsStore, MonthCloseStore, MonthConfigStore, CompOffBalanceEntryStore, HolidayCompOffStore, BusinessHoursStore, ShiftGroupStore, UnexplainedRestAlertStore, FillPresetStore"
         },
         {
           "operation": "setItem",
           "file": "lib/labor/store.tsx",
-          "line": 66,
+          "line": 65,
           "value": "JSON.stringify(next",
           "structure": "EmployeeStore, CustomDeptStore, DeptOrderStore, ShiftTemplateStore, SpecialStatusStore, HolidayConfigStore, ShiftStore, AttendanceStore, PaySlipStore, GlobalPayrollSettingsStore, MonthCloseStore, MonthConfigStore, CompOffBalanceEntryStore, HolidayCompOffStore, BusinessHoursStore, ShiftGroupStore, UnexplainedRestAlertStore, FillPresetStore"
         },
         {
           "operation": "getItem",
           "file": "lib/labor/store.tsx",
-          "line": 80,
+          "line": 79,
           "value": "",
           "structure": "EmployeeStore, CustomDeptStore, DeptOrderStore, ShiftTemplateStore, SpecialStatusStore, HolidayConfigStore, ShiftStore, AttendanceStore, PaySlipStore, GlobalPayrollSettingsStore, MonthCloseStore, MonthConfigStore, CompOffBalanceEntryStore, HolidayCompOffStore, BusinessHoursStore, ShiftGroupStore, UnexplainedRestAlertStore, FillPresetStore"
         },
         {
           "operation": "setItem",
           "file": "lib/labor/store.tsx",
-          "line": 91,
+          "line": 90,
           "value": "JSON.stringify(next",
           "structure": "EmployeeStore, CustomDeptStore, DeptOrderStore, ShiftTemplateStore, SpecialStatusStore, HolidayConfigStore, ShiftStore, AttendanceStore, PaySlipStore, GlobalPayrollSettingsStore, MonthCloseStore, MonthConfigStore, CompOffBalanceEntryStore, HolidayCompOffStore, BusinessHoursStore, ShiftGroupStore, UnexplainedRestAlertStore, FillPresetStore"
         },
@@ -1652,20 +1694,6 @@
       "status": "unresolved",
       "calls": [
         {
-          "operation": "multiGet",
-          "file": "app/data-manager.tsx",
-          "line": 49,
-          "value": "",
-          "structure": ""
-        },
-        {
-          "operation": "multiRemove",
-          "file": "app/data-manager.tsx",
-          "line": 112,
-          "value": "",
-          "structure": ""
-        },
-        {
           "operation": "multiRemove",
           "file": "lib/backup/local-backup.ts",
           "line": 112,
@@ -1675,14 +1703,14 @@
         {
           "operation": "multiRemove",
           "file": "lib/backup/local-backup.ts",
-          "line": 251,
+          "line": 263,
           "value": "",
           "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
         {
           "operation": "multiGet",
           "file": "lib/backup/local-backup.ts",
-          "line": 360,
+          "line": 372,
           "value": "",
           "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
@@ -1731,14 +1759,14 @@
         {
           "operation": "getItem",
           "file": "lib/labor/store.tsx",
-          "line": 327,
+          "line": 326,
           "value": "",
           "structure": "EmployeeStore, CustomDeptStore, DeptOrderStore, ShiftTemplateStore, SpecialStatusStore, HolidayConfigStore, ShiftStore, AttendanceStore, PaySlipStore, GlobalPayrollSettingsStore, MonthCloseStore, MonthConfigStore, CompOffBalanceEntryStore, HolidayCompOffStore, BusinessHoursStore, ShiftGroupStore, UnexplainedRestAlertStore, FillPresetStore"
         },
         {
           "operation": "setItem",
           "file": "lib/labor/store.tsx",
-          "line": 341,
+          "line": 340,
           "value": "JSON.stringify(order",
           "structure": "EmployeeStore, CustomDeptStore, DeptOrderStore, ShiftTemplateStore, SpecialStatusStore, HolidayConfigStore, ShiftStore, AttendanceStore, PaySlipStore, GlobalPayrollSettingsStore, MonthCloseStore, MonthConfigStore, CompOffBalanceEntryStore, HolidayCompOffStore, BusinessHoursStore, ShiftGroupStore, UnexplainedRestAlertStore, FillPresetStore"
         }
@@ -2137,14 +2165,14 @@
         {
           "operation": "getItem",
           "file": "lib/store/monthly-report/raw-excel-archive-store.tsx",
-          "line": 83,
+          "line": 82,
           "value": "",
           "structure": "RawExcelArchiveStore"
         },
         {
           "operation": "setItem",
           "file": "lib/store/monthly-report/raw-excel-archive-store.tsx",
-          "line": 100,
+          "line": 99,
           "value": "JSON.stringify(next",
           "structure": "RawExcelArchiveStore"
         }
@@ -2305,14 +2333,14 @@
         {
           "operation": "getItem",
           "file": "lib/store/period-analysis/store.tsx",
-          "line": 63,
+          "line": 62,
           "value": "",
           "structure": "PeriodAnalysisState"
         },
         {
           "operation": "setItem",
           "file": "lib/store/period-analysis/store.tsx",
-          "line": 81,
+          "line": 80,
           "value": "JSON.stringify(state.reports",
           "structure": "PeriodAnalysisState"
         }
@@ -2326,14 +2354,14 @@
         {
           "operation": "getItem",
           "file": "lib/store/period-analysis/store.tsx",
-          "line": 64,
+          "line": 63,
           "value": "",
           "structure": "PeriodAnalysisState"
         },
         {
           "operation": "setItem",
           "file": "lib/store/period-analysis/store.tsx",
-          "line": 82,
+          "line": 81,
           "value": "JSON.stringify(state.settings",
           "structure": "PeriodAnalysisState"
         }
@@ -2347,14 +2375,14 @@
         {
           "operation": "multiRemove",
           "file": "lib/backup/local-backup.ts",
-          "line": 320,
+          "line": 332,
           "value": "",
           "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
         {
           "operation": "multiRemove",
           "file": "lib/backup/local-backup.ts",
-          "line": 368,
+          "line": 380,
           "value": "",
           "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
@@ -2893,7 +2921,7 @@
         {
           "operation": "multiGet",
           "file": "lib/backup/local-backup.ts",
-          "line": 463,
+          "line": 475,
           "value": "",
           "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         }
@@ -3278,14 +3306,14 @@
         {
           "operation": "multiSet",
           "file": "lib/backup/local-backup.ts",
-          "line": 321,
+          "line": 333,
           "value": "",
           "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
         {
           "operation": "multiSet",
           "file": "lib/backup/local-backup.ts",
-          "line": 369,
+          "line": 381,
           "value": "",
           "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
@@ -3300,6 +3328,20 @@
     }
   ],
   "unresolved": [
+    {
+      "backend": "AsyncStorage",
+      "key": "[...keys]",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "multiRemove",
+          "file": "lib/cf-sync/provider.tsx",
+          "line": 670,
+          "value": "",
+          "structure": "SyncState"
+        }
+      ]
+    },
     {
       "backend": "AsyncStorage",
       "key": "[...LEGACY_MONTH_KEYS]",
@@ -3323,6 +3365,20 @@
     },
     {
       "backend": "AsyncStorage",
+      "key": "[...new Set(keys",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "multiGet",
+          "file": "lib/backup/local-backup.ts",
+          "line": 172,
+          "value": "",
+          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
       "key": "[...SYNC_KEYS]",
       "status": "unresolved",
       "calls": [
@@ -3336,14 +3392,7 @@
         {
           "operation": "multiGet",
           "file": "lib/backup/local-backup.ts",
-          "line": 172,
-          "value": "",
-          "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
-        },
-        {
-          "operation": "multiGet",
-          "file": "lib/backup/local-backup.ts",
-          "line": 562,
+          "line": 574,
           "value": "",
           "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         }
@@ -3371,7 +3420,7 @@
         {
           "operation": "multiRemove",
           "file": "lib/labor/store.tsx",
-          "line": 1053,
+          "line": 1052,
           "value": "",
           "structure": "EmployeeStore, CustomDeptStore, DeptOrderStore, ShiftTemplateStore, SpecialStatusStore, HolidayConfigStore, ShiftStore, AttendanceStore, PaySlipStore, GlobalPayrollSettingsStore, MonthCloseStore, MonthConfigStore, CompOffBalanceEntryStore, HolidayCompOffStore, BusinessHoursStore, ShiftGroupStore, UnexplainedRestAlertStore, FillPresetStore"
         }
@@ -3476,7 +3525,7 @@
         {
           "operation": "setItem",
           "file": "lib/backup/local-backup.ts",
-          "line": 646,
+          "line": 658,
           "value": "value",
           "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
@@ -3504,28 +3553,28 @@
         {
           "operation": "getItem",
           "file": "lib/labor/store.tsx",
-          "line": 53,
+          "line": 52,
           "value": "",
           "structure": "EmployeeStore, CustomDeptStore, DeptOrderStore, ShiftTemplateStore, SpecialStatusStore, HolidayConfigStore, ShiftStore, AttendanceStore, PaySlipStore, GlobalPayrollSettingsStore, MonthCloseStore, MonthConfigStore, CompOffBalanceEntryStore, HolidayCompOffStore, BusinessHoursStore, ShiftGroupStore, UnexplainedRestAlertStore, FillPresetStore"
         },
         {
           "operation": "setItem",
           "file": "lib/labor/store.tsx",
-          "line": 66,
+          "line": 65,
           "value": "JSON.stringify(next",
           "structure": "EmployeeStore, CustomDeptStore, DeptOrderStore, ShiftTemplateStore, SpecialStatusStore, HolidayConfigStore, ShiftStore, AttendanceStore, PaySlipStore, GlobalPayrollSettingsStore, MonthCloseStore, MonthConfigStore, CompOffBalanceEntryStore, HolidayCompOffStore, BusinessHoursStore, ShiftGroupStore, UnexplainedRestAlertStore, FillPresetStore"
         },
         {
           "operation": "getItem",
           "file": "lib/labor/store.tsx",
-          "line": 80,
+          "line": 79,
           "value": "",
           "structure": "EmployeeStore, CustomDeptStore, DeptOrderStore, ShiftTemplateStore, SpecialStatusStore, HolidayConfigStore, ShiftStore, AttendanceStore, PaySlipStore, GlobalPayrollSettingsStore, MonthCloseStore, MonthConfigStore, CompOffBalanceEntryStore, HolidayCompOffStore, BusinessHoursStore, ShiftGroupStore, UnexplainedRestAlertStore, FillPresetStore"
         },
         {
           "operation": "setItem",
           "file": "lib/labor/store.tsx",
-          "line": 91,
+          "line": 90,
           "value": "JSON.stringify(next",
           "structure": "EmployeeStore, CustomDeptStore, DeptOrderStore, ShiftTemplateStore, SpecialStatusStore, HolidayConfigStore, ShiftStore, AttendanceStore, PaySlipStore, GlobalPayrollSettingsStore, MonthCloseStore, MonthConfigStore, CompOffBalanceEntryStore, HolidayCompOffStore, BusinessHoursStore, ShiftGroupStore, UnexplainedRestAlertStore, FillPresetStore"
         },
@@ -3614,20 +3663,6 @@
       "status": "unresolved",
       "calls": [
         {
-          "operation": "multiGet",
-          "file": "app/data-manager.tsx",
-          "line": 49,
-          "value": "",
-          "structure": ""
-        },
-        {
-          "operation": "multiRemove",
-          "file": "app/data-manager.tsx",
-          "line": 112,
-          "value": "",
-          "structure": ""
-        },
-        {
           "operation": "multiRemove",
           "file": "lib/backup/local-backup.ts",
           "line": 112,
@@ -3637,14 +3672,14 @@
         {
           "operation": "multiRemove",
           "file": "lib/backup/local-backup.ts",
-          "line": 251,
+          "line": 263,
           "value": "",
           "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
         {
           "operation": "multiGet",
           "file": "lib/backup/local-backup.ts",
-          "line": 360,
+          "line": 372,
           "value": "",
           "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
@@ -3665,14 +3700,14 @@
         {
           "operation": "multiRemove",
           "file": "lib/backup/local-backup.ts",
-          "line": 320,
+          "line": 332,
           "value": "",
           "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
         {
           "operation": "multiRemove",
           "file": "lib/backup/local-backup.ts",
-          "line": 368,
+          "line": 380,
           "value": "",
           "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
@@ -3714,7 +3749,7 @@
         {
           "operation": "multiGet",
           "file": "lib/backup/local-backup.ts",
-          "line": 463,
+          "line": 475,
           "value": "",
           "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         }
@@ -3861,14 +3896,14 @@
         {
           "operation": "multiSet",
           "file": "lib/backup/local-backup.ts",
-          "line": 321,
+          "line": 333,
           "value": "",
           "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },
         {
           "operation": "multiSet",
           "file": "lib/backup/local-backup.ts",
-          "line": 369,
+          "line": 381,
           "value": "",
           "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
         },

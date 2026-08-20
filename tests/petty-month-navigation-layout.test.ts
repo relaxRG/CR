@@ -8,7 +8,7 @@ describe("备用金月份导航与页面操作层级", () => {
   const petty = read("components/store/petty-cash.tsx");
   const businessNavigator = read("components/months/BoundedBusinessMonthNavigator.tsx");
   const sharedNavigator = read("components/inventory/BoundedMonthNavigator.tsx");
-  const labor = read("app/labor.tsx");
+  const labor = read("components/labor/LaborWorkspaceScreen.tsx");
   const store = read("app/(tabs)/store.tsx");
   const inventory = read("components/store/inventory.tsx");
 

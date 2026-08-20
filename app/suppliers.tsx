@@ -63,7 +63,6 @@ function SupplierFormModal({ visible, supplier, colors, onSave, onClose }: {
     onClose();
   };
 
-  const catColor = SUPPLIER_CATEGORY_COLORS[category];
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
@@ -203,7 +202,7 @@ function BankAccountModal({ visible, account, colors, onSave, onClose }: {
 }
 
 // ─── 供应商详情页 ─────────────────────────────────────────────────────────────
-function SupplierDetail({ supplier, colors, onEdit, onBack, onAddBank, onEditBank, onDeleteBank, onCopy }: {
+function SupplierDetail({ supplier, colors, onEdit, onAddBank, onEditBank, onDeleteBank, onCopy }: {
   supplier: Supplier; colors: any;
   onEdit: () => void; onBack: () => void;
   onAddBank: () => void;
@@ -366,7 +365,7 @@ export default function SuppliersScreen() {
   const colors = useColors();
   const router = useRouter();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
-  const { suppliers, addSupplier, updateSupplier, deleteSupplier } = useMonthlySummaryStore();
+  const { suppliers, addSupplier, updateSupplier } = useMonthlySummaryStore();
 
   const [filterCat, setFilterCat] = useState<SupplierCategory | "all">("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const source = readFileSync("app/spirits-inventory.tsx", "utf8");
+const source = readFileSync("components/inventory/SpiritsInventoryWorkspaceScreen.tsx", "utf8");
 
 describe("烈酒库存移动端Excel台账", () => {
   it("库存管理移除移动概览分区并直接渲染唯一的完整Excel台账", () => {

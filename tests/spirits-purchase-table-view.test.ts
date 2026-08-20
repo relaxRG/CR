@@ -98,7 +98,7 @@ describe("供应商进货表排序筛选与Excel隔离", () => {
 
     const parser = readFileSync(resolve(process.cwd(), "lib/spirits/excel-parser.ts"), "utf8");
     const exporter = readFileSync(resolve(process.cwd(), "lib/spirits/export.ts"), "utf8");
-    const screen = readFileSync(resolve(process.cwd(), "app/spirits-inventory.tsx"), "utf8");
+    const screen = readFileSync(resolve(process.cwd(), "components/inventory/SpiritsInventoryWorkspaceScreen.tsx"), "utf8");
 
     expect(parser).toContain("列：0=行号 1=日期 2=商品名称 3=规格 4=数量 5=单价 6=应收增加");
     expect(exporter).toContain('"序号", "日期", "商品名称", "英文名", "分类", "规格", "数量(瓶)", "单价(¥)", "金额(¥)", "供应商", "来源"');

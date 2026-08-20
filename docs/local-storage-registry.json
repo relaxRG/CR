@@ -1,9 +1,25 @@
 {
   "version": 2,
   "generatedFrom": "docs/local-storage-schema.json",
-  "entryCount": 124,
-  "dynamicEntryCount": 24,
+  "entryCount": 127,
+  "dynamicEntryCount": 26,
   "entries": [
+    {
+      "backend": "AsyncStorage",
+      "key": "[...keys]",
+      "status": "unresolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/cf-sync/provider.tsx"
+      ],
+      "operations": [
+        "multiRemove"
+      ],
+      "dynamic": true,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
     {
       "backend": "AsyncStorage",
       "key": "[...LEGACY_MONTH_KEYS]",
@@ -15,6 +31,22 @@
       "operations": [
         "multiGet",
         "multiRemove"
+      ],
+      "dynamic": true,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "[...new Set(keys",
+      "status": "unresolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/backup/local-backup.ts"
+      ],
+      "operations": [
+        "multiGet"
       ],
       "dynamic": true,
       "purgeOn": [
@@ -153,6 +185,22 @@
         "setItem"
       ],
       "dynamic": true,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "app.freshBusinessBaseline.v1",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/cf-sync/provider.tsx"
+      ],
+      "operations": [
+        "setItem"
+      ],
+      "dynamic": false,
       "purgeOn": [
         "version-retirement"
       ]
@@ -946,7 +994,6 @@
       "status": "unresolved",
       "classification": "S0-public",
       "ownerFiles": [
-        "app/data-manager.tsx",
         "lib/backup/local-backup.ts",
         "lib/migrations/purge-retired-book-library.ts"
       ],

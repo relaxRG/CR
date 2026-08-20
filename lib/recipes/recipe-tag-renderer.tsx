@@ -20,7 +20,7 @@ import {
   codexFamilyLabel,
   localizedTagName,
 } from "@/lib/recipes/types";
-import { DRINK_DURATIONS, OCCASIONS, localizeField } from "@/lib/recipes/types";
+import { localizeField } from "@/lib/recipes/types";
 import {
   useCardTagSettings,
   DEFAULT_CARD_TAG_SETTINGS,
@@ -278,7 +278,6 @@ export function useRecipeTagRows(
       if (!recipe.drinkDuration) return null;
       const dTag = tags.find((tg) => tg.kind === "duration" && tg.name === recipe.drinkDuration);
       const color = dTag?.color ?? customColors.duration ?? "#007AFF";
-      const durEn: Record<string, string> = { "短饮": "Short", "长饮": "Long" };
       const label = localizeField(recipe.drinkDuration, lang);
       return (
         <Pressable
@@ -298,7 +297,6 @@ export function useRecipeTagRows(
       if (!recipe.occasion) return null;
       const oTag = tags.find((tg) => tg.kind === "occasion" && tg.name === recipe.occasion);
       const color = oTag?.color ?? customColors.occasion ?? "#AF52DE";
-      const occEn: Record<string, string> = { "餐前酒": "Aperitif", "餐后酒": "Digestif", "全天酒": "All Day", "佐餐酒": "With Dinner", "睡前酒": "Nightcap", "派对酒": "Party" };
       const label = localizeField(recipe.occasion, lang);
       return (
         <Pressable

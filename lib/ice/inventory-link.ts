@@ -52,7 +52,6 @@ export function computeNewKindPrice(
 ): number {
   // 进销存单位推断：如果单位含"kg"则 1000g，含"袋"则用 packGrams
   const unit = (item.unit || "").toLowerCase();
-  const spec = (item.spec || "").toLowerCase();
 
   if (kind.pricing === "perDrink") {
     // perDrink：一份规格（一袋）可供 drinksPerPack 杯

@@ -11,7 +11,6 @@ import {
 const REPORTS_KEY = "period_analysis.reports.v1";
 const SETTINGS_KEY = "period_analysis.settings.v1";
 
-function uuid(): string { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
 
 interface PeriodAnalysisState {
   reports: PeriodAnalysisReport[];

@@ -1416,7 +1416,7 @@ export function calcSocialInsurance(
  * @param cumulativeIncome 年度累计应税收入（当月及之前各月应税收入之和）
  * @param cumulativeDeductions 年度累计专项扣除（社保+公积金+专项附加扣除）
  * @param cumulativeTaxPaid 年度累计已预扣税额
- * @param threshold 起征点（默认5000）
+ * @param _threshold 起征点（默认5000）
  * @returns 本月应预扣税额
  */
 export function calcIncomeTax(
@@ -1427,8 +1427,8 @@ export function calcIncomeTax(
    */
   cumulativeIncome: number,
   cumulativeTaxPaid: number,
-  threshold: number = 5000,
-  specialDeductions: number = 0
+  _threshold: number = 5000,
+  _specialDeductions: number = 0
 ): { tax: number; note: string } {
   // 累计应纳税所得额直接使用传入值（调用方已扣除社保、起征点、专项附加扣除）
   const taxableIncome = Math.max(0, cumulativeIncome);

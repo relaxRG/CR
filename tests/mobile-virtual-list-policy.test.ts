@@ -59,7 +59,7 @@ describe("移动端虚拟列表性能规范", () => {
   });
 
   it("嵌套拖拽列表使用专用的自动滚动与虚拟化配置", () => {
-    for (const path of ["app/homemade-form.tsx", "app/recipe-form.tsx"]) {
+    for (const path of ["app/homemade-form.tsx", "components/recipes/RecipeFormWorkspaceScreen.tsx"]) {
       const source = readSource(path);
       const draggableCount = [...source.matchAll(/<NestableDraggableFlatList\s+\{\.\.\.MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS\}/g)].length;
       expect(draggableCount).toBeGreaterThan(0);
