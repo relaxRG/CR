@@ -7,8 +7,7 @@ CREATE TABLE IF NOT EXISTS device_policies (
   revision INTEGER NOT NULL,
   capabilities_json TEXT NOT NULL,
   updated_at INTEGER NOT NULL,
-  updated_by TEXT,
-  FOREIGN KEY(device_id) REFERENCES devices(device_id)
+  updated_by TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_device_policies_group ON device_policies(group_id);

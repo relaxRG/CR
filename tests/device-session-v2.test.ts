@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   CAPABILITY_RESOURCES,
@@ -81,6 +83,17 @@ describe("DeviceSessionV2 状态机与 can()", () => {
       code: "REVOKED",
     };
     expect(can(state, "recipes.edit")).toMatchObject({ allowed: false, reason: "membership_revoked" });
+  });
+});
+
+describe("DeviceSessionV2 D1 迁移兼容性", () => {
+  it("策略表不对历史 devices 双标识结构建立外键，避免已注册设备无法核验", async () => {
+    const migration = await readFile(
+      resolve(process.cwd(), "workers/cocktail-ai/migrations/20260819_device_session_v2.sql"),
+      "utf8",
+    );
+    expect(migration).toContain("device_id TEXT PRIMARY KEY NOT NULL");
+    expect(migration).not.toMatch(/FOREIGN\s+KEY\s*\(\s*device_id\s*\)/i);
   });
 });
 
