@@ -8,14 +8,22 @@ const source = (relativePath: string) => fs.readFileSync(path.join(ROOT, relativ
 describe("员工统一 UI 契约", () => {
   const labor = source("components/labor/LaborWorkspaceScreen.tsx");
 
-  it("工资卡始终使用互不重叠的四项摘要，不以屏幕宽度删列", () => {
-    expect(labor).toContain("固定四项工资摘要");
-    expect(labor).toContain('label: "考勤调整"');
+  it("工资卡恢复原有五项摘要与展开明细，预支与实发仍由原始结算路径展示", () => {
+    expect(labor).toContain("5格摘要行");
+    expect(labor).toContain('label: "加班考勤"');
     expect(labor).toContain('label: "综合额外"');
+    expect(labor).toContain('label: "已预支", value: advanceAmount');
     expect(labor).toContain('label: "总工资"');
-    expect(labor).toContain("考勤明细（含比例底薪）");
-    expect(labor).not.toContain("visibleMetricColumns");
-    expect(labor).not.toContain('label: "已预支", value: advanceAmount');
+    expect(labor).toContain("visibleMetricColumns === 3");
+    expect(labor).toContain("实发薪资");
+    expect(labor).toContain("考勤明细（5格）");
+  });
+
+  it("人力总览恢复原始自适应结构，不再被强制为一行四列", () => {
+    expect(labor).toContain("const summaryColumns = getStoreSummaryColumns(width)");
+    expect(labor).toContain('flexWrap: "wrap"');
+    expect(labor).toContain('label: "待发"');
+    expect(labor).toContain('label: "已预支"');
   });
 
   it("六个工具在手机端完整同一行显示，且重算不再使用特殊强调或更多收纳", () => {
