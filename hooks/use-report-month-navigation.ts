@@ -4,6 +4,7 @@ import { useMonthlyReportStore } from "@/lib/store/monthly-report/store";
 import { useRevenueStore } from "@/lib/store/revenue-store";
 import { usePettyCashStore } from "@/lib/store/petty-store";
 import { usePaySlipStore } from "@/lib/labor/store";
+import { usePeriodAnalysisStore } from "@/lib/store/period-analysis/store";
 import {
   deriveReportMonthBounds,
   type ReportMonth,
@@ -20,20 +21,18 @@ export function useReportMonthNavigation() {
   const { records: revenueRecords } = useRevenueStore();
   const { records: pettyRecords } = usePettyCashStore();
   const { paySlips } = usePaySlipStore();
-  const localBounds = useMemo(() => deriveReportMonthBounds([
+  const { reports: periodReports } = usePeriodAnalysisStore();
+  const bounds = useMemo(() => deriveReportMonthBounds([
     ...summaryReports.map((report) => report.month),
     ...balances.map((balance) => balance.month),
     ...monthlyReports.map((report) => report.rawMonth ?? report.monthLabel),
     ...revenueRecords.map((record) => record.date),
     ...pettyRecords.map((record) => record.date),
     ...(paySlips ?? []).map((slip) => slip.month),
-  ]), [summaryReports, balances, monthlyReports, revenueRecords, pettyRecords, paySlips]);
+    ...periodReports.map((report) => report.month),
+  ]), [summaryReports, balances, monthlyReports, revenueRecords, pettyRecords, paySlips, periodReports]);
 
-  // 任一模块选择的业务月必须原样保留；报表无数据时由页面展示空状态，绝不私自跳月。
-  const bounds = useMemo(() => ({
-    min: globalMonth < localBounds.min ? globalMonth : localBounds.min,
-    max: globalMonth > localBounds.max ? globalMonth : localBounds.max,
-  }), [globalMonth, localBounds]);
+  // 与库存一致：可选范围只由实际业务数据确定，首尾各保留一个相邻月；无数据时仅当前自然月。
 
   return { month: globalMonth, bounds, selectMonth: selectGlobalMonth as (month: ReportMonth) => void };
 }

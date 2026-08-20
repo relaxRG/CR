@@ -119,11 +119,8 @@ export default function StoreInventoryScreen({ mode = "inventory" }: { mode?: In
     () => deriveInventoryMonthBounds(categories.flatMap((category) => normalizeMany(categoryMonths[category.key]))),
     [categories, categoryMonths],
   );
-  // 库存没有该月数据时也必须展示全局月份的空状态，不能把全局月份跳回库存数据月。
-  const bounds = useMemo(() => ({
-    min: globalMonth < localBounds.min ? globalMonth : localBounds.min,
-    max: globalMonth > localBounds.max ? globalMonth : localBounds.max,
-  }), [globalMonth, localBounds]);
+  // 所有门店模块遵循同一数据边界：实际数据最早月前一月到最晚月后一月；无数据时仅当前自然月。
+  const bounds = localBounds;
   const selectedMonth = globalMonth;
 
   useEffect(() => {

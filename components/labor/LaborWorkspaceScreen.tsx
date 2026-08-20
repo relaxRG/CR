@@ -5314,11 +5314,8 @@ export default function LaborScreen({ embedded = true }: { embedded?: boolean })
     ...attendanceRecords.map((record) => record.month),
     ...advances.flatMap((advance) => [advance.date, advance.deductMonth]),
   ]), [paySlips, shifts, attendanceRecords, advances]);
-  // 员工无数据月份仍显示全局选择；边界仅限制最早业务月前一月与最晚业务月后一月。
-  const laborMonthBounds = useMemo(() => ({
-    min: currentMonth < laborLocalBounds.min ? currentMonth : laborLocalBounds.min,
-    max: currentMonth > laborLocalBounds.max ? currentMonth : laborLocalBounds.max,
-  }), [currentMonth, laborLocalBounds]);
+  // 与库存一致：仅开放实际业务数据最早月前一月到最晚月后一月；无数据时仅当前自然月。
+  const laborMonthBounds = laborLocalBounds;
   const [activePage, setActivePage] = useState<PageKey>((initialPage as PageKey) ?? "roster");
   const scrollRef = useRef<ScrollView>(null);
   const previousPagerWidth = useRef(winW);

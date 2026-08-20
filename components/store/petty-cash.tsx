@@ -135,11 +135,8 @@ export default function StorePettyCashScreen() {
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
   const router = useRouter();
 
-  const pettyLocalBounds = useMemo(() => deriveInventoryMonthBounds(records.map((record) => record.date)), [records]);
-  const pettyBounds = useMemo(() => ({
-    min: month < pettyLocalBounds.min ? month : pettyLocalBounds.min,
-    max: month > pettyLocalBounds.max ? month : pettyLocalBounds.max,
-  }), [month, pettyLocalBounds]);
+  // 与库存一致：仅开放实际业务数据最早月前一月到最晚月后一月；无数据时仅当前自然月。
+  const pettyBounds = useMemo(() => deriveInventoryMonthBounds(records.map((record) => record.date)), [records]);
   const summary = useMemo(() => calcPeriod(month), [calcPeriod, month, records, periods]);
   const monthRecords = useMemo(() => records.filter(r => r.date.startsWith(month)), [records, month]);
 

@@ -32,12 +32,21 @@ describe("全局业务月份与紧凑选择器规范", () => {
     expect(petty).toContain("const { month, selectMonth: setMonth } = useGlobalBusinessMonth()");
   });
 
-  it("模块无数据时保留全局月份而不是跳回自身数据月", () => {
-    expect(inventory).toContain("库存没有该月数据时也必须展示全局月份的空状态");
-    expect(inventory).toContain("const selectedMonth = globalMonth");
-    expect(petty).toContain("min: month < pettyLocalBounds.min ? month : pettyLocalBounds.min");
-    expect(reportMonth).toContain("return { month: globalMonth");
-    expect(reportMonth).not.toContain("clampReportMonth(globalMonth, bounds)");
+  it("报表、员工、备用金、库存和店铺均严格使用数据最早月前一月到最晚月后一月", () => {
+    expect(inventory).toContain("所有门店模块遵循同一数据边界");
+    expect(inventory).toContain("const bounds = localBounds");
+    expect(inventory).not.toContain("globalMonth < localBounds.min");
+    expect(inventory).not.toContain("globalMonth > localBounds.max");
+    expect(labor).toContain("const laborMonthBounds = laborLocalBounds");
+    expect(labor).not.toContain("currentMonth < laborLocalBounds.min");
+    expect(labor).not.toContain("currentMonth > laborLocalBounds.max");
+    expect(petty).toContain("const pettyBounds = useMemo(() => deriveInventoryMonthBounds");
+    expect(petty).not.toContain("month < pettyLocalBounds.min");
+    expect(petty).not.toContain("month > pettyLocalBounds.max");
+    expect(reportMonth).toContain("usePeriodAnalysisStore");
+    expect(reportMonth).toContain("periodReports.map((report) => report.month)");
+    expect(reportMonth).not.toContain("globalMonth < localBounds.min");
+    expect(reportMonth).not.toContain("globalMonth > localBounds.max");
   });
 
   it("快速连续切月立即更新界面，并将持久化写入合并为最后一次选择", () => {
