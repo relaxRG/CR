@@ -4402,17 +4402,20 @@ function SchedulePage({ colors, month, pageWidth }: { colors: any; month: string
           return (
             <View key={`${groupId}_${tpl.id}`}>
               {rowIdx > 0 && <View style={{ height: 6, backgroundColor: colors.border + "44" }} />}
-              {/* 班次组标题行 */}
-              <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 3, paddingHorizontal: 8, backgroundColor: groupColor + "10" }}>
-                <View style={{ width: 3, height: 16, borderRadius: 1.5, backgroundColor: groupColor, marginRight: 6 }} />
-                <Text style={{ fontSize: 10, fontWeight: "700", color: groupColor }}>{tpl.session}</Text>
-                <Text style={{ fontSize: 10, color: colors.muted, marginLeft: 4 }}>({empList.length}人)</Text>
+              {/* 班次组标题行：首列与员工姓名使用同一宽度和中心基线。 */}
+              <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 3, backgroundColor: groupColor + "10" }}>
+                <View style={[EXL.sessionHeaderNameCell, { width: EXL_NAME_W }]}>
+                  <View style={{ position: "absolute", left: 0, width: 3, height: 16, borderRadius: 1.5, backgroundColor: groupColor }} />
+                  <Text style={{ fontSize: 10, fontWeight: "600", color: groupColor }}>{tpl.session}</Text>
+                  <Text style={{ fontSize: 10, color: colors.muted, marginLeft: 4 }}>({empList.length}人)</Text>
+                </View>
               </View>
               {/* 员工行 */}
               {empList.map((emp, empIdx) => {
                 const isLast = empIdx === empList.length - 1;
                 return (
                   <View key={emp.id} style={[EXL.empRow,
+                    { backgroundColor: empIdx % 2 === 1 ? colors.border + "0A" : colors.surface },
                     !isLast && { borderBottomColor: colors.border + "33", borderBottomWidth: StyleSheet.hairlineWidth }
                   ]}>
                     <View style={{ width: 3, height: 34, backgroundColor: groupColor + "CC" }} />
@@ -4595,8 +4598,8 @@ function SchedulePage({ colors, month, pageWidth }: { colors: any; month: string
               onPress={() => { tap(); handleGeneratePayroll(); }}
               disabled={generating}
               accessibilityLabel="生成薪资单"
-              style={[EXL.gearBtn, { backgroundColor: generating ? colors.border + "22" : colors.primary + "18" }]}>
-              <IconSymbol name="banknote.fill" size={15} color={generating ? colors.muted : colors.primary} />
+              style={[EXL.gearBtn, { backgroundColor: generating ? colors.border + "22" : colors.border + "44" }]}>
+              <IconSymbol name="banknote.fill" size={15} color={colors.muted} />
             </Pressable>
             {/* 班次设置 */}
             <Pressable onPress={() => { tap(); setShowTplModal(true); }} style={[EXL.gearBtn, { backgroundColor: colors.border + "44" }]}>
@@ -5467,6 +5470,7 @@ const EXL = StyleSheet.create({
   dateCellText: { fontSize: 12, fontWeight: "700", color: "#fff" },
   dateLabel: { fontSize: 9, fontWeight: "600", color: "rgba(255,255,255,0.85)" },
   nameCol: { width: EXL_NAME_W, height: 34, alignItems: "center", justifyContent: "center" },
+  sessionHeaderNameCell: { height: 22, flexDirection: "row", alignItems: "center", justifyContent: "center" },
   empRow: { flexDirection: "row", alignItems: "center" },
   cell: { flex: 1, height: 34, alignItems: "center", justifyContent: "center" },
   sessionDivider: { height: 4 },

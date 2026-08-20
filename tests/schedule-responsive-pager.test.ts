@@ -30,4 +30,12 @@ describe("排班表响应式分页与网页缩放护栏", () => {
   it("排班控制栏可换行，缩放时不会为了保持单行而挤压日历网格", () => {
     expect(source).toContain('controlBar: { flexDirection: "row", flexWrap: "wrap"');
   });
+
+  it("iOS 班次标题与姓名列使用同一基线，相邻员工行白灰交替，薪资单按钮保持中性工具样式", () => {
+    expect(source).toContain("sessionHeaderNameCell");
+    expect(source).toContain('width: EXL_NAME_W');
+    expect(source).toContain('backgroundColor: empIdx % 2 === 1 ? colors.border + "0A" : colors.surface');
+    expect(source).toContain('backgroundColor: generating ? colors.border + "22" : colors.border + "44"');
+    expect(source).toContain('name="banknote.fill" size={15} color={colors.muted}');
+  });
 });
