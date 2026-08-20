@@ -5391,6 +5391,7 @@ export default function LaborScreen({ embedded = true }: { embedded?: boolean })
       {/* 横滑内容区（总览卡片 + 各页面内容，整体可横滑切换） */}
       <ScrollView
         ref={scrollRef}
+        testID="labor-workspace-pager"
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}

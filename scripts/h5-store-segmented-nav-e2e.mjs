@@ -15,6 +15,7 @@ import { extname, join, normalize } from "node:path";
 
 const root = join(process.cwd(), "dist-web");
 const port = Number(process.env.H5_E2E_PORT ?? 8094);
+const cdpPort = Number(process.env.H5_CDP_PORT ?? 9222);
 const route = `http://localhost:${port}/store`;
 // 极窄屏、主流窄屏与大屏手机均需覆盖分类切换和滚动边界。
 const MOBILE_VIEWPORTS = [320, 360, 375, 390, 412, 430];
@@ -42,8 +43,18 @@ const server = createServer((request, response) => {
 
 function sleep(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
 
+async function cdpFetch(path, options = {}) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8_000);
+  try {
+    return await fetch(`http://127.0.0.1:${cdpPort}${path}`, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function getDedicatedTestTarget() {
-  const response = await fetch("http://localhost:9222/json/new?about:blank", { method: "PUT" });
+  const response = await cdpFetch("/json/new?about:blank", { method: "PUT" });
   if (!response.ok) throw new Error(`无法创建专用H5测试标签页：HTTP ${response.status}`);
   const target = await response.json();
   if (!target?.webSocketDebuggerUrl) throw new Error("专用H5测试标签页缺少CDP连接地址。");
@@ -52,10 +63,13 @@ async function getDedicatedTestTarget() {
 
 async function openCdp(target) {
   const socket = new WebSocket(target.webSocketDebuggerUrl);
-  await new Promise((resolve, reject) => {
-    socket.addEventListener("open", resolve, { once: true });
-    socket.addEventListener("error", reject, { once: true });
-  });
+  await Promise.race([
+    new Promise((resolve, reject) => {
+      socket.addEventListener("open", resolve, { once: true });
+      socket.addEventListener("error", reject, { once: true });
+    }),
+    sleep(8_000).then(() => { throw new Error("CDP_SOCKET_OPEN_TIMEOUT"); }),
+  ]);
   let id = 0;
   const pending = new Map();
   socket.addEventListener("message", (event) => {
@@ -149,6 +163,8 @@ async function click(call, expression, error) {
   if (!result.result.value) throw new Error(error);
 }
 
+server.keepAliveTimeout = 1_000;
+server.headersTimeout = 5_000;
 server.listen(port, "127.0.0.1");
 await new Promise((resolve) => server.once("listening", resolve));
 
@@ -286,8 +302,9 @@ try {
   console.log(JSON.stringify({ passed: true, route, report }, null, 2));
 } finally {
   if (testTarget?.id) {
-    await fetch(`http://localhost:9222/json/close/${testTarget.id}`).catch(() => {});
+    await cdpFetch(`/json/close/${testTarget.id}`).catch(() => {});
   }
   testSocket?.close();
-  server.close();
+  server.closeAllConnections?.();
+  await new Promise((resolve) => server.close(resolve));
 }

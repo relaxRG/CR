@@ -184,6 +184,54 @@ try {
     report.push({ width, normalMode: initialState, editMode: editState });
   }
 
+  // 员工薪资工作台：三枚顶部胶囊必须真实切换分页，而不仅是渲染出三个文字标签。
+  const laborWorkspaceViewports = [];
+  const laborWorkspaceTabs = [
+    { key: "roster", page: "labor-roster-page", index: 0 },
+    { key: "schedule", page: "labor-schedule-page", index: 1 },
+    { key: "advances", page: "labor-advance-page", index: 2 },
+  ];
+  for (const width of MOBILE_VIEWPORTS) {
+    await call("Emulation.setDeviceMetricsOverride", { width, height: 844, deviceScaleFactor: 3, mobile: true });
+    await call("Page.navigate", { url: route });
+    await sleep(700);
+    const tabs = [];
+    for (const spec of laborWorkspaceTabs) {
+      await click(call, clickTestIdExpression(`labor-workspace-tab-${spec.key}`), `员工工作台 ${width}pt 未找到 ${spec.key} 胶囊`);
+      await sleep(420);
+      const layout = await call("Runtime.evaluate", { expression: `(() => {
+        const tab = document.querySelector('[data-testid="labor-workspace-tab-${spec.key}"]');
+        const page = document.querySelector('[data-testid="${spec.page}"]');
+        const pager = document.querySelector('[data-testid="labor-workspace-pager"]');
+        const pageRect = page?.getBoundingClientRect();
+        const pagerRect = pager?.getBoundingClientRect();
+        const expectedOffset = ${spec.index} * document.documentElement.clientWidth;
+        return {
+          tabFound: Boolean(tab),
+          pageFound: Boolean(page),
+          pagerFound: Boolean(pager),
+          pagerScrollLeft: pager?.scrollLeft ?? null,
+          expectedOffset,
+          pageWidth: pageRect?.width ?? null,
+          pagerWidth: pagerRect?.width ?? null,
+          rootClientWidth: document.documentElement.clientWidth,
+          rootScrollWidth: document.documentElement.scrollWidth,
+          bodyScrollWidth: document.body.scrollWidth,
+        };
+      })()`, returnByValue: true });
+      const state = layout.result.value;
+      if (!state.tabFound || !state.pageFound || !state.pagerFound || Math.abs(state.pagerScrollLeft - state.expectedOffset) > 1 || Math.abs(state.pageWidth - state.rootClientWidth) > 1 || Math.abs(state.pagerWidth - state.rootClientWidth) > 1) {
+        throw new Error(`员工工作台 ${width}pt ${spec.key} 胶囊未同步到当前分页：${JSON.stringify(state)}`);
+      }
+      if (state.rootScrollWidth > state.rootClientWidth || state.bodyScrollWidth > state.rootClientWidth) {
+        throw new Error(`员工工作台 ${width}pt ${spec.key} 切换出现根级横向溢出：${JSON.stringify(state)}`);
+      }
+      tabs.push({ key: spec.key, ...state });
+    }
+    laborWorkspaceViewports.push({ width, tabs });
+  }
+  report.push({ reportPage: "员工薪资工作台三页胶囊切换", viewports: laborWorkspaceViewports });
+
   // 桌面网页缩放/分屏等价回归：连续改变当前页面宽度后，外层三页与排班内两页必须同步为同一页宽，
   // 且保持“排班表”当前页，不能露出薪资预支页面或遗留旧页宽坐标。
   await call("Emulation.setDeviceMetricsOverride", { width: 1024, height: 900, deviceScaleFactor: 1, mobile: false });
