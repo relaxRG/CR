@@ -28,7 +28,11 @@ import {
 } from "@/lib/labor/payroll-draft-reconciliation";
 import { checkControlFieldsIntegrity, checkAdvanceCrossMonthPollution } from "@/lib/labor/payroll-monitor";
 import { calculateFinalSalary, calculateGrossSalary, reconcilePaySlip } from "@/lib/labor/payroll-reconciliation";
-import { settleCompOffCashOut } from "@/lib/labor/comp-off-cashout-settlement";
+import {
+  createCompOffCashOutSettlementSnapshot,
+  getCompOffCashOutSettlementAmount,
+  settleCompOffCashOut,
+} from "@/lib/labor/comp-off-cashout-settlement";
 import {
   BALANCE_COMP_OFF_STATUS,
   HOLIDAY_COMP_OFF_STATUS,
@@ -485,8 +489,8 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
       Alert.alert("无法兑换现金", "当前兑现费率或金额为 ¥0。请使用“减少调休余额”，或先修正员工的加班时薪/日薪后再兑换。");
       return;
     }
-    // 薪资单不再增量写入 compOffCashOut。余额流水是唯一来源，
-    // 父级草稿对账会按 usedMonth 汇总有效兑现并一次性重建薪资。
+    // 薪资单不再写入裸兑现金额。余额流水是唯一来源，
+    // 父级草稿对账会按 usedMonth 汇总有效事件并生成可验证快照。
     setShowCompOffModal(false);
     Alert.alert("兑换已登记", `已登记 ${entry.days} 天调休余额兑现 ¥${formatMoney(amount)}。薪资草稿将从兑现流水重新汇总。`);
   };
@@ -657,10 +661,10 @@ function PaySlipMiniCard({ employee, month, compareMonth, compareMode, colors, s
           {/* ─── 薪资对账：调休兑现单列，实发公式与已保存薪资单按分核对 ─── */}
           {slip && payrollReconciliation && (
             <View style={{ paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border + "44", gap: 5 }}>
-              {(slip.compOffCashOut ?? 0) !== 0 && (
+              {getCompOffCashOutSettlementAmount(slip) !== 0 && (
                 <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
                   <Text style={{ fontSize: 11, color: colors.muted }}>调休兑现（已计入应发）</Text>
-                  <Text style={{ fontSize: 12, fontWeight: "700", color: colors.foreground }}>{slip.compOffCashOut! >= 0 ? "+" : ""}¥{formatMoney(slip.compOffCashOut ?? 0)}</Text>
+                  <Text style={{ fontSize: 12, fontWeight: "700", color: colors.foreground }}>+¥{formatMoney(getCompOffCashOutSettlementAmount(slip))}</Text>
                 </View>
               )}
               <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
@@ -1022,6 +1026,7 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
   const { advances } = useSalaryAdvanceStore();
   const { settings: globalSettings } = useGlobalPayrollSettingsStore();
   const { entries: compOffEntries, voidCashOutEntry: voidCashOutCompOff } = useCompOffBalanceEntryStore();
+  const { links: pettyLaborLinks } = usePettyLaborLinkStore();
   const { getStatus: getRosterMonthStatus, isMonthWritable: isMonthWritableRoster, openAdjustmentSession } = useMonthCloseStore();
   const router = useRouter();
   const [recalculatingMonth, setRecalculatingMonth] = useState(false);
@@ -1186,7 +1191,10 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
                     globalSettings,
                     cumulativeIncome,
                     cumulativeTaxPaid,
-                    settleCompOffCashOut(compOffEntries, employee.id, month).amount,
+                    (() => {
+                      const settlement = settleCompOffCashOut(compOffEntries, employee.id, month);
+                      return settlement.lines.length > 0 ? createCompOffCashOutSettlementSnapshot(settlement) : undefined;
+                    })(),
                   );
                   rebuiltByEmployee.set(employee.id, {
                     ...rebuilt,
@@ -1239,7 +1247,10 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
         globalSettings,
         cumulativeIncome,
         cumulativeTaxPaid,
-        settleCompOffCashOut(compOffEntries, employee.id, month).amount,
+        (() => {
+          const settlement = settleCompOffCashOut(compOffEntries, employee.id, month);
+          return settlement.lines.length > 0 ? createCompOffCashOutSettlementSnapshot(settlement) : undefined;
+        })(),
       );
       if (hasDraftPayrollReconciliationDelta(current, rebuilt)) {
         upsertPaySlip({ ...rebuilt, id: current.id });
@@ -1281,6 +1292,7 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
         employees={activeEmployees}
         paySlips={paySlips}
         entries={compOffEntries}
+        pettyLaborLinks={pettyLaborLinks}
         monthStatus={getRosterMonthStatus(month)}
         colors={colors}
         onClose={() => setShowPayrollReconciliation(false)}
@@ -3913,7 +3925,17 @@ function SchedulePage({ colors, month, onMonthChange, pageWidth }: { colors: any
         );
         // buildPaySlipDraft 从当前薪资单读取绩效/补贴控制字段，并统一实时结算所有分项。
         // 不再传递旧聚合金额，避免自动同步覆盖工作绩效或业绩绩效。
-        const slip = buildPaySlipDraft(emp, currentMonth, att, advanceTotal, globalSettings, cumulativeIncome, cumulativeTaxPaid);
+        const settlement = settleCompOffCashOut(compOffEntriesSched, emp.id, currentMonth);
+        const slip = buildPaySlipDraft(
+          emp,
+          currentMonth,
+          att,
+          advanceTotal,
+          globalSettings,
+          cumulativeIncome,
+          cumulativeTaxPaid,
+          settlement.lines.length > 0 ? createCompOffCashOutSettlementSnapshot(settlement) : undefined,
+        );
         upsertPaySlip(slip);
         // 监控规则 A6：检测控制字段丢失（跨月闭包污染典型症状）
         checkControlFieldsIntegrity(
@@ -4103,16 +4125,12 @@ function SchedulePage({ colors, month, onMonthChange, pageWidth }: { colors: any
         let holidayRestBonus = 0;
         const existingSlip = getPaySlip(emp.id, currentMonth);
         const expiringCashOutEntries = getCompOffEntries(emp.id).filter((entry) => expiringCashOutEntryIds.includes(entry.id) && entry.status === "available" && entry.expiresMonth === currentMonth);
-        // 先读取已有有效事件；本批次只累加实际创建成功的事件，禁止零费率或重复累计进入薪资。
-        const existingCashOutBefore = settleCompOffCashOut(getCompOffEntries(emp.id), emp.id, currentMonth).amount;
-        let newlyCreatedExpiringCashOutAmount = 0;
+        // 本批只创建符合费率门禁的兑现事件；最终金额统一在所有事件写入后重新汇总。
         for (const entry of expiringCashOutEntries) {
           const unitRate = entry.days > 0 ? (entry.source === "overtime"
             ? ((entry.hoursDeducted ?? entry.days * (emp.compOffRule?.hoursPerDay ?? 8)) * (emp.overtimeHourlyRate ?? emp.hourlyRate ?? 0)) / entry.days
             : baseAtt.dailyRate) : 0;
-          if (unitRate > 0 && cashOutCompOff(entry.id, unitRate, currentMonth)) {
-            newlyCreatedExpiringCashOutAmount = sumMoney([newlyCreatedExpiringCashOutAmount, entry.days * unitRate]);
-          }
+          if (unitRate > 0) cashOutCompOff(entry.id, unitRate, currentMonth);
         }
         empShifts.forEach((s) => {
           const ss = s.specialStatusId ? specialStatuses.find((st) => st.id === s.specialStatusId) : undefined;
@@ -4246,7 +4264,8 @@ function SchedulePage({ colors, month, onMonthChange, pageWidth }: { colors: any
             updateCompOffEntry(nextEntry.id, { days: nextEntry.days, status: nextEntry.status, usedMonth: nextEntry.usedMonth });
           }
         }
-        // 薪资金额只由已有有效兑现事件和本批实际创建成功的事件组成，绝不继承旧薪资单字段。
+        // 薪资金额只由本月有效兑现事件汇总产生；绝不继承薪资单旧金额或手工累加值。
+        const settlement = settleCompOffCashOut(getCompOffEntries(emp.id), emp.id, currentMonth);
         const slip = buildPaySlipDraft(
           emp,
           currentMonth,
@@ -4255,7 +4274,7 @@ function SchedulePage({ colors, month, onMonthChange, pageWidth }: { colors: any
           globalSettings,
           cumulativeIncome,
           cumulativeTaxPaid,
-          sumMoney([existingCashOutBefore, newlyCreatedExpiringCashOutAmount]),
+          settlement.lines.length > 0 ? createCompOffCashOutSettlementSnapshot(settlement) : undefined,
         );
         if (Object.keys(holidayBonusAllocation).length > 0) slip.holidayBonusAllocation = holidayBonusAllocation;
         if (Object.keys(nextUsage).length > 0) slip.compOffUsage = nextUsage;
@@ -4933,14 +4952,24 @@ function SchedulePage({ colors, month, onMonthChange, pageWidth }: { colors: any
                             const amount = entry.source === "overtime"
                               ? Math.round((entry.hoursDeducted ?? entry.days * 8) * (emp.overtimeHourlyRate ?? emp.hourlyRate ?? 0) * 100) / 100
                               : Math.round(entry.days * dailyRateVal * 100) / 100;
-                            const settledBefore = settleCompOffCashOut(getCompOffEntries(empId), empId, currentMonthStr).amount;
                             if (amount <= 0 || entry.days <= 0 || !cashOutCompOff(entry.id, amount / entry.days, currentMonthStr)) {
                               Alert.alert("无法兑换现金", "当前兑现费率或金额为 ¥0。请使用“减少调休余额”，或先修正费率后再兑换。");
                               return;
                             }
                             if (slip) {
                               const advTotal = advances.filter((a) => a.employeeId === empId && (a.deductMonth === currentMonthStr || a.date.startsWith(currentMonthStr)) && (a.status === "pending" || a.status === "deducted")).reduce((s, a) => s + a.amount, 0);
-                              const rebuilt = buildPaySlipDraft(emp, currentMonthStr, att!, advTotal, globalSettings, settledBefore + amount);
+                              const { cumulativeIncome, cumulativeTaxPaid } = getDraftPayrollCumulativeTaxInputs(emp, currentMonthStr, paySlips, globalSettings);
+                              const settlement = settleCompOffCashOut(getCompOffEntries(empId), empId, currentMonthStr);
+                              const rebuilt = buildPaySlipDraft(
+                                emp,
+                                currentMonthStr,
+                                att!,
+                                advTotal,
+                                globalSettings,
+                                cumulativeIncome,
+                                cumulativeTaxPaid,
+                                settlement.lines.length > 0 ? createCompOffCashOutSettlementSnapshot(settlement) : undefined,
+                              );
                               upsertPaySlip({ ...rebuilt, id: slip.id });
                             }
                           };

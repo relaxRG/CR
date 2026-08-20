@@ -75,12 +75,23 @@ UI 组件
 
 **禁止**：UI 组件直接修改 `attendanceSalary`、`grossSalary`、`finalSalary` 的基础值。
 
-**允许**：以下增量操作可以直接 patch 薪资单（因为它们是独立的增量项，不依赖排班）：
-- `compOffCashOut`（调休兑现，增量加入）
-- `rewardPenalty`（奖惩，增量加入）
+**允许**：仅允许写入带有明确来源和可复算依据的控制字段；所有金额仍必须由其唯一结算器汇总：
+- `rewardPenalty`（奖惩明细的受控编辑；草稿重建时由奖惩条目汇总）
 - `allowanceOverrides`、`workKPISelections`、`revenueActuals`（绩效补贴控制字段；金额必须由唯一结算引擎生成）
-- `advanceAmount`（预支，手动录入）
-- `pettyLaborPaid`（备用金已付，同步）
+- `advanceAmount`（预支，手动录入且按员工、月份、状态过滤）
+- `pettyLaborLinkIds`（备用金已付关联；金额必须由 linkIds 对应记录汇总）
+
+**绝对禁止**：直接向 `PaySlip` 写入、继承或累计任何调休兑现金额。调休兑现的唯一链路必须是：
+
+```text
+CompOffBalanceEntry
+  → CompOffCashOutEvent（费率、天数、金额、员工、月份、来源一次性快照）
+  → settleCompOffCashOut()（只汇总 active 且载荷完整事件）
+  → CompOffCashOutSettlementSnapshot（eventIds + amount + verifiedAt）
+  → buildPaySlipDraft()
+```
+
+`PaySlip.compOffCashOutSettlement` 只能由 `createCompOffCashOutSettlementSnapshot()` 生成。不得传入裸金额，不得从 `existing` 薪资单回流，不得在 UI 中直接 patch。
 
 ---
 
@@ -129,7 +140,21 @@ UI 组件
 
 ---
 
-### 规范 6：数据迁移代码的生命周期
+### 规范 6：账本完整性与隔离区
+
+任何“金额 + 来源记录”业务必须在写入、重建、导出前满足以下不变量：
+
+| 不变量 | 强制校验 | 失败后的处理 |
+|---|---|---|
+| 金额可复算 | `days × unitRate = amount`，以分为单位比较 | 标为 `quarantined`，不得入账 |
+| 事件归属一致 | `entryId`、`employeeId`、`usedMonth`、`source`、`earnedMonth`、`days` 必须与余额条目一致 | 标为异常，排除出汇总 |
+| 唯一性 | 同一 active 事件 ID 不能被多个余额条目引用 | 标为 `DUPLICATE_EVENT_ID`，排除出汇总 |
+| 薪资快照可追溯 | `eventIds` 集合和 amount 必须等于当前有效事件汇总 | 草稿月重建；已确认月创建更正会话 |
+| 作废可审计 | 只能把 active/quarantined 事件移入 `settlementHistory`，必须记录 `voidedAt` 与 `voidReason` | 不允许覆盖或静默删除 |
+
+隔离区是**证据保留区**，不是容错入账区。`quarantined`、`payrollDataQuarantine` 和不完整快照均不得进入 `grossSalary`、`finalSalary`、月结或导出金额。隔离区核查统一使用 `auditCompOffCashOutIntegrity()`；它必须在核对面板和自动化测试中覆盖。
+
+### 规范 7：数据迁移代码的生命周期
 
 持久化迁移代码（`useEffect` 中的 migration）应在以下情况下删除：
 
@@ -152,7 +177,7 @@ UI 组件
 | 废弃注释（DEPT_OPTIONS_SCH） | `app/labor.tsx:4209` | 代码噪音 | ✅ 已删除 |
 | 员工废弃字段迁移 | `lib/labor/store.tsx:101` | 持久化迁移（保留） | ✅ 正常运行 |
 | 排班废弃字段迁移 | `lib/labor/store.tsx:443` | 持久化迁移（保留） | ✅ 正常运行 |
-| 调休兑现 patch | `app/labor.tsx:404` | 增量 patch（合理） | ✅ 无需修改 |
+| 调休兑现旧裸金额 | `PaySlip.compOffCashOut` | 可被历史薪资单直接保存并在重建时回流 | ✅ 已删除；迁移为事件账本快照或隔离证据 |
 | KPI/补贴 patch | `app/labor-kpi-allowance.tsx:128` | 增量 patch（合理） | ✅ 无需修改 |
 
 ---

@@ -58,7 +58,7 @@ function renderFiveGridSummary(
   const extraTotal = (slip?.workKPIBonus ?? 0) + (slip?.revenueKPIBonus ?? 0) +
     (slip?.mealAllowance ?? 0) + (slip?.transportAllowance ?? 0) +
     (slip?.otherAllowance ?? 0) + (slip?.rewardPenalty ?? 0) +
-    (slip?.compOffCashOut ?? 0);
+    (slip?.compOffCashOutSettlement?.amount ?? 0);
 
   // 第4格：已预支（合计手动 + 备用金）
   const advanceAmount = (slip?.advanceAmount ?? 0) + (slip?.pettyLaborPaid ?? 0);

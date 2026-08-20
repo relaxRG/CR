@@ -18,7 +18,7 @@
  *     A7. 加班换休：明确占用本月加班小时，计费加班相应减少
  *
  *   Suite B：兑换调休余额（handleCashOut 重构验证）
- *     B1. 首次兑换：grossSalary 增加 compOffCashOut 金额
+ *     B1. 首次兑换：grossSalary 增加经事件账本验证的兑现快照金额
  *     B2. 多次兑换：grossSalary 不累积误差（每次基于 buildPaySlipDraft 重算）
  *     B3. 兑换后 finalSalary 正确（grossSalary - 预支）
  *     B4. 兑换金额计算：overtime 按时薪×小时，holiday 按日薪×天数
@@ -36,7 +36,7 @@
  *     D4. compOffEntries 变化 → 重算触发 → overtimePay 同步减少
  *
  *   Suite E：grossSalary 构成完整性验证
- *     E1. compOffCashOut 纳入 grossSalary（修复旧版遗漏）
+ *     E1. 已验证调休兑现快照纳入 grossSalary
  *     E2. 工作绩效与业绩绩效各自只计一次
  *     E3. rewardPenalty 纳入 grossSalary
  *     E4. 所有分项之和 = grossSalary（闭环验证）
@@ -219,6 +219,10 @@ function calcFromShiftsPure(
  * 纯函数版 buildPaySlipDraft（从 store.tsx 提取核心逻辑）
  * 用于 E2E 测试中模拟薪资单生成
  */
+function settlementSnapshot(amount: number, eventIds: readonly string[] = ["test-event"]): NonNullable<PaySlip["compOffCashOutSettlement"]> {
+  return { source: "comp_off_event_ledger", eventIds, amount, verifiedAt: "2026-07-31T00:00:00.000Z" };
+}
+
 function buildPaySlipDraftPure(
   employee: Employee,
   month: string,
@@ -242,7 +246,7 @@ function buildPaySlipDraftPure(
     attendanceSalary + extras.performanceTotal +
     extras.transportAllowance + extras.mealAllowance + extras.otherAllowance +
     (existing?.rewardPenalty ?? 0) +
-    (existing?.compOffCashOut ?? 0)
+    (existing?.compOffCashOutSettlement?.amount ?? 0)
   ) * 100) / 100;
 
   // 社保/个税（简化：关闭时为0）
@@ -271,7 +275,7 @@ function buildPaySlipDraftPure(
     transportAllowance: extras.transportAllowance,
     otherAllowance: extras.otherAllowance,
     rewardPenalty: existing?.rewardPenalty ?? 0,
-    compOffCashOut: existing?.compOffCashOut ?? 0,
+    compOffCashOutSettlement: existing?.compOffCashOutSettlement,
     grossSalary,
     socialInsuranceDeduction,
     housingFundDeduction,
@@ -531,20 +535,20 @@ describe("Suite B：兑换调休余额（handleCashOut 重构验证）", () => {
     return calcFromShiftsPure("emp-001", MONTH, emp, shifts, DEFAULT_SPECIAL_STATUSES);
   }
 
-  it("B1. 首次兑换调休：grossSalary 增加 compOffCashOut 金额", () => {
+  it("B1. 首次兑换调休：grossSalary 增加经验证账本快照金额", () => {
     const att = makeBaseAtt();
     // 初始薪资单（无兑换）
     const slip0 = buildPaySlipDraftPure(emp, MONTH, att, 0);
     expect(slip0.grossSalary).toBe(6000);
-    expect(slip0.compOffCashOut).toBe(0);
+    expect(slip0.compOffCashOutSettlement).toBeUndefined();
 
     // 兑换1天调休（按日薪计算）
     const cashOutAmount = Math.round(DAILY_RATE * 1 * 100) / 100;
     const slip1 = buildPaySlipDraftPure(emp, MONTH, att, 0, undefined, {
       ...slip0,
-      compOffCashOut: cashOutAmount,
+      compOffCashOutSettlement: settlementSnapshot(cashOutAmount),
     });
-    expect(slip1.compOffCashOut).toBe(cashOutAmount);
+    expect(slip1.compOffCashOutSettlement?.amount).toBe(cashOutAmount);
     expect(slip1.grossSalary).toBe(Math.round((6000 + cashOutAmount) * 100) / 100);
     expect(slip1.finalSalary).toBe(slip1.grossSalary);
   });
@@ -557,7 +561,7 @@ describe("Suite B：兑换调休余额（handleCashOut 重构验证）", () => {
     const amount1 = Math.round(DAILY_RATE * 100) / 100;
     const slip1 = buildPaySlipDraftPure(emp, MONTH, att, 0, undefined, {
       ...slip0,
-      compOffCashOut: amount1,
+      compOffCashOutSettlement: settlementSnapshot(amount1, ["event-1"]),
     });
 
     // 第2次兑换：再兑换0.5天
@@ -565,12 +569,12 @@ describe("Suite B：兑换调休余额（handleCashOut 重构验证）", () => {
     const totalCashOut = Math.round((amount1 + amount2) * 100) / 100;
     const slip2 = buildPaySlipDraftPure(emp, MONTH, att, 0, undefined, {
       ...slip1,
-      compOffCashOut: totalCashOut,
+      compOffCashOutSettlement: settlementSnapshot(totalCashOut, ["event-1", "event-2"]),
     });
 
     // 验证：grossSalary = 6000 + totalCashOut（不是 6000 + amount1 + amount1 + amount2）
     expect(slip2.grossSalary).toBe(Math.round((6000 + totalCashOut) * 100) / 100);
-    expect(slip2.compOffCashOut).toBe(totalCashOut);
+    expect(slip2.compOffCashOutSettlement?.amount).toBe(totalCashOut);
 
     // 旧版增量计算的错误结果（验证修复有效）
     const wrongGross = slip1.grossSalary + amount2; // 旧版：在 slip1.grossSalary 基础上加 amount2
@@ -585,7 +589,7 @@ describe("Suite B：兑换调休余额（handleCashOut 重构验证）", () => {
     const cashOutAmount = Math.round(DAILY_RATE * 100) / 100;
     const advanceAmount = 1000;
     const slip = buildPaySlipDraftPure(emp, MONTH, att, advanceAmount, undefined, {
-      compOffCashOut: cashOutAmount,
+      compOffCashOutSettlement: settlementSnapshot(cashOutAmount),
     });
     expect(slip.grossSalary).toBe(Math.round((6000 + cashOutAmount) * 100) / 100);
     expect(slip.finalSalary).toBe(Math.round((6000 + cashOutAmount - advanceAmount) * 100) / 100);
@@ -790,7 +794,7 @@ describe("Suite E：唯一薪资结算引擎", () => {
   }
 
   it("E1. 调休兑现纳入应发", () => {
-    const slip = buildPaySlipDraftPure(emp, MONTH, makeFullAtt(), 0, undefined, { compOffCashOut: 500 });
+    const slip = buildPaySlipDraftPure(emp, MONTH, makeFullAtt(), 0, undefined, { compOffCashOutSettlement: settlementSnapshot(500) });
     expect(slip.grossSalary).toBe(6500);
   });
 
@@ -816,9 +820,9 @@ describe("Suite E：唯一薪资结算引擎", () => {
       workKPISelections: { "work-quality": "good" },
       revenueActuals: { "revenue-store": 280000 },
       rewardPenalty: 200,
-      compOffCashOut: 500,
+      compOffCashOutSettlement: settlementSnapshot(500),
     });
-    const expected = slip.attendanceSalary + (slip.workKPIBonus ?? 0) + (slip.revenueKPIBonus ?? 0) + slip.mealAllowance + slip.transportAllowance + slip.otherAllowance + (slip.rewardPenalty ?? 0) + (slip.compOffCashOut ?? 0);
+    const expected = slip.attendanceSalary + (slip.workKPIBonus ?? 0) + (slip.revenueKPIBonus ?? 0) + slip.mealAllowance + slip.transportAllowance + slip.otherAllowance + (slip.rewardPenalty ?? 0) + (slip.compOffCashOutSettlement?.amount ?? 0);
     expect(slip.grossSalary).toBe(expected);
   });
 });

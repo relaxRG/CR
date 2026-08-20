@@ -12,7 +12,7 @@ describe("薪资对账与按分金额运算", () => {
       workKPIBonus: 0,
       revenueKPIBonus: 0,
       rewardPenalty: 200,
-      compOffCashOut: 296.3,
+      compOffCashOutSettlement: { source: "comp_off_event_ledger" as const, eventIds: ["cashout-29630"], amount: 296.3, verifiedAt: "2026-08-01T00:00:00.000Z" },
       socialInsuranceDeduction: 0,
       housingFundDeduction: 0,
       incomeTax: 0,
@@ -38,7 +38,7 @@ describe("薪资对账与按分金额运算", () => {
       workKPIBonus: 0,
       revenueKPIBonus: 0,
       rewardPenalty: 200,
-      compOffCashOut: 296.3,
+      compOffCashOutSettlement: { source: "comp_off_event_ledger" as const, eventIds: ["cashout-29630"], amount: 296.3, verifiedAt: "2026-08-01T00:00:00.000Z" },
       socialInsuranceDeduction: 0,
       housingFundDeduction: 0,
       incomeTax: 0,
@@ -72,7 +72,7 @@ describe("薪资草稿重算触发器", () => {
     workKPIBonus: 0,
     revenueKPIBonus: 0,
     rewardPenalty: 0,
-    compOffCashOut: 0,
+    compOffCashOutSettlement: undefined,
     grossSalary: 8000,
     socialInsuranceDeduction: 0,
     housingFundDeduction: 0,
@@ -86,7 +86,7 @@ describe("薪资草稿重算触发器", () => {
   };
 
   it("调休兑现与备用金人工已付任一变化都会触发草稿重算", () => {
-    expect(hasDraftPayrollReconciliationDelta(baseSlip, { ...baseSlip, compOffCashOut: 296.3 })).toBe(true);
+    expect(hasDraftPayrollReconciliationDelta(baseSlip, { ...baseSlip, compOffCashOutSettlement: { source: "comp_off_event_ledger", eventIds: ["cashout-29630"], amount: 296.3, verifiedAt: "2026-08-01T00:00:00.000Z" } })).toBe(true);
     expect(hasDraftPayrollReconciliationDelta(baseSlip, { ...baseSlip, pettyLaborPaid: 12.25 })).toBe(true);
   });
 });

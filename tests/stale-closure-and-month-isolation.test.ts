@@ -22,7 +22,7 @@
  *     C1. autoSync 后 allowanceOverrides 不丢失
  *     C2. autoSync 后 workKPISelections 不丢失
  *     C3. autoSync 后 revenueActuals 不丢失
- *     C4. autoSync 后 compOffCashOut 不丢失
+ *     C4. autoSync 不得从旧薪资单回流调休兑现，必须接收当次账本快照
  *     C5. autoSync 后 pettyLaborPaid 不丢失
  *
  *   Suite D：autoSync 依赖数组完整性
@@ -72,7 +72,7 @@ function makePaySlip(overrides: {
   allowanceOverrides?: Record<string, boolean>;
   workKPISelections?: Record<string, string>;
   revenueActuals?: Record<string, number>;
-  compOffCashOut?: number;
+  compOffCashOutSettlement?: { source: "comp_off_event_ledger"; eventIds: readonly string[]; amount: number; verifiedAt: string };
   pettyLaborPaid?: number;
   socialInsuranceDeduction?: number;
   housingFundDeduction?: number;
@@ -89,7 +89,7 @@ function makePaySlip(overrides: {
     allowanceOverrides: overrides.allowanceOverrides,
     workKPISelections: overrides.workKPISelections,
     revenueActuals: overrides.revenueActuals,
-    compOffCashOut: overrides.compOffCashOut,
+    compOffCashOutSettlement: overrides.compOffCashOutSettlement,
     pettyLaborPaid: overrides.pettyLaborPaid,
     socialInsuranceDeduction: overrides.socialInsuranceDeduction ?? 0,
     housingFundDeduction: overrides.housingFundDeduction ?? 0,
@@ -238,7 +238,10 @@ describe("Suite B：月份隔离（paySlips 过滤）", () => {
 
 describe("Suite C：buildPaySlipDraft 控制字段保留（autoSync 不清除）", () => {
   // 模拟 buildPaySlipDraft 的返回值（修复后包含所有控制字段）
-  function mockBuildPaySlipDraft(existing: ReturnType<typeof makePaySlip> | null) {
+  function mockBuildPaySlipDraft(
+    existing: ReturnType<typeof makePaySlip> | null,
+    compOffCashOutSettlement?: ReturnType<typeof makePaySlip>["compOffCashOutSettlement"],
+  ) {
     return {
       grossSalary: 5500,
       finalSalary: 5500,
@@ -251,7 +254,8 @@ describe("Suite C：buildPaySlipDraft 控制字段保留（autoSync 不清除）
       allowanceOverrides: existing?.allowanceOverrides,
       workKPISelections: existing?.workKPISelections,
       revenueActuals: existing?.revenueActuals,
-      compOffCashOut: existing?.compOffCashOut,
+      // 调休兑现不是控制字段；只能接收由实时事件账本验证的快照，绝不从 existing 继承。
+      compOffCashOutSettlement,
       pettyLaborPaid: existing?.pettyLaborPaid,
     };
   }
@@ -274,10 +278,11 @@ describe("Suite C：buildPaySlipDraft 控制字段保留（autoSync 不清除）
     expect(draft.revenueActuals).toEqual({ "rev-1": 80000 });
   });
 
-  it("C4. autoSync 后 compOffCashOut 不丢失", () => {
-    const savedSlip = makePaySlip({ compOffCashOut: 300 });
-    const draft = mockBuildPaySlipDraft(savedSlip);
-    expect(draft.compOffCashOut).toBe(300);
+  it("C4. autoSync 不得回流旧薪资调休金额；只能接收当次账本快照", () => {
+    const savedSlip = makePaySlip({ compOffCashOutSettlement: { source: "comp_off_event_ledger", eventIds: ["old-event"], amount: 300, verifiedAt: "2026-07-01T00:00:00.000Z" } });
+    expect(mockBuildPaySlipDraft(savedSlip).compOffCashOutSettlement).toBeUndefined();
+    const rebuilt = mockBuildPaySlipDraft(savedSlip, { source: "comp_off_event_ledger", eventIds: ["live-event"], amount: 200, verifiedAt: "2026-07-02T00:00:00.000Z" });
+    expect(rebuilt.compOffCashOutSettlement).toMatchObject({ eventIds: ["live-event"], amount: 200 });
   });
 
   it("C5. autoSync 后 pettyLaborPaid 不丢失", () => {

@@ -1,12 +1,13 @@
 import type { Employee, GlobalPayrollSettings, PaySlip } from "./types";
 import { subtractMoney, sumMoney } from "@/lib/finance/money";
+import { getCompOffCashOutSettlementAmount } from "./comp-off-cashout-settlement";
 
 const MONEY_FIELDS: Array<keyof PaySlip> = [
   "attendanceDays", "attendanceSalary",
   "mealAllowance", "transportAllowance", "otherAllowance",
   "workKPIBonus", "revenueKPIBonus", "rewardPenalty",
   "grossSalary", "socialInsuranceDeduction", "housingFundDeduction", "incomeTax",
-  "compOffCashOut", "pettyLaborPaid",
+  "pettyLaborPaid",
   "finalSalary", "employerSocialInsurance", "employerHousingFund", "totalEmployerCost",
 ];
 
@@ -40,7 +41,12 @@ export function getDraftPayrollCumulativeTaxInputs(
  * 不得据此触发无限写回。
  */
 export function hasDraftPayrollReconciliationDelta(current: PaySlip, next: PaySlip): boolean {
-  return MONEY_FIELDS.some((field) =>
+  const moneyChanged = MONEY_FIELDS.some((field) =>
     Math.abs(subtractMoney(current[field] as number | undefined, [next[field] as number | undefined])) >= 0.01,
   );
+  if (moneyChanged) return true;
+  const currentSnapshot = current.compOffCashOutSettlement;
+  const nextSnapshot = next.compOffCashOutSettlement;
+  const idsChanged = (currentSnapshot?.eventIds ?? []).join("|") !== (nextSnapshot?.eventIds ?? []).join("|");
+  return idsChanged || Math.abs(subtractMoney(getCompOffCashOutSettlementAmount(current), [getCompOffCashOutSettlementAmount(next)])) >= 0.01;
 }

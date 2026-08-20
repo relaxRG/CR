@@ -27,7 +27,12 @@ import {
 import { settlePayrollExtras } from "./payroll-extras";
 import { calculateFinalSalary, calculateGrossSalary } from "./payroll-reconciliation";
 import { CURRENT_ALLOWANCE_RULES_SCHEMA_VERSION, getActiveAllowanceControls, needsHistoricalAllowanceRulesReset, resetHistoricalAllowanceRules } from "./allowance-rules-reset";
-import { createCompOffCashOutEvent, migrateLegacyCompOffSettlement, voidCompOffCashOutEvent } from "./comp-off-cashout-settlement";
+import {
+  createCompOffCashOutEvent,
+  migrateLegacyCompOffSettlement,
+  migrateLegacyPaySlipCompOffCashOut,
+  voidCompOffCashOutEvent,
+} from "./comp-off-cashout-settlement";
 import {
   buildFinalScheduleByDept,
   buildFrozenPayrollByEmployee,
@@ -727,8 +732,8 @@ interface PaySlipStore {
     cumulativeIncome?: number,
     /** 年度累计已预扣税额 */
     cumulativeTaxPaid?: number,
-    /** 调休兑现由余额结算流水唯一汇总；传入后不得回退到旧薪资单字段。 */
-    compOffCashOutOverride?: number,
+    /** 调休兑现由余额结算流水唯一汇总；仅接受可验证事件快照，绝不接受裸金额。 */
+    compOffCashOutSettlementOverride?: PaySlip["compOffCashOutSettlement"],
   ) => PaySlip;
   /** 用指定月份薪资单完整替换当前月，用于受控差额调整的回滚。 */
   replaceMonthPaySlips: (month: string, nextSlips: PaySlip[]) => void;
@@ -744,6 +749,7 @@ const PaySlipContext = createContext<PaySlipStore>({
 
 function PaySlipProvider({ children }: { children: React.ReactNode }) {
   const { data: paySlips, ref, persist, ready } = usePersisted<PaySlip>("labor_payslips_v1");
+  const compOffLedger = useContext(CompOffBalanceEntryContext);
 
   // 加载后一次性物理删除废弃字段，避免旧本地草稿在实时结算时继续回流。
   useEffect(() => {
@@ -756,6 +762,14 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
       return next;
     }));
   }, [ready, persist, ref]);
+
+  // 旧薪资单直接保存过调休兑现裸金额。首次加载时：匹配有效事件的值转换为快照；
+  // 无来源或不一致的值移动至 payrollDataQuarantine，保留审计证据但不再参加任何薪资计算。
+  useEffect(() => {
+    if (!ready || !compOffLedger.ready) return;
+    const migrated = ref.current.map((slip) => migrateLegacyPaySlipCompOffCashOut(slip, compOffLedger.entries));
+    if (migrated.some((slip, index) => slip !== ref.current[index])) persist(migrated);
+  }, [compOffLedger.entries, compOffLedger.ready, persist, ready, ref]);
 
   const upsertPaySlip = useCallback((slip: PaySlip) => {
     const idx = ref.current.findIndex((s) => s.employeeId === slip.employeeId && s.month === slip.month);
@@ -786,11 +800,11 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
     globalSettings?: GlobalPayrollSettings,
     cumulativeIncome: number = 0,
     cumulativeTaxPaid: number = 0,
-    compOffCashOutOverride?: number,
+    compOffCashOutSettlementOverride?: PaySlip["compOffCashOutSettlement"],
   ): PaySlip => {
     const existing = ref.current.find((s) => s.employeeId === employee.id && s.month === month);
-    // 兑现额只能由唯一事件账本明确传入；禁止旧薪资单金额在草稿重建时无来源回流。
-    const compOffCashOut = compOffCashOutOverride ?? 0;
+    // 兑现额只能由唯一事件账本快照明确传入；禁止旧薪资单金额在草稿重建时无来源回流。
+    const compOffCashOutSettlement = compOffCashOutSettlementOverride;
     const attendanceDays = attendance?.attendanceDays ?? 0;
     const attendanceSalary = attendance?.attendanceSalary ?? 0;
 
@@ -806,8 +820,7 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
     });
 
     // ── 应发薪资（税前）──
-    // compOffCashOut = 兑换调休余额现金，应加入应发薪资
-    // 修复：旧版未将 compOffCashOut 纳入 grossSalary，导致兑换后应发薪资不变
+    // 已验证兑现账本快照金额加入应发薪资；没有快照即为 ¥0。
     const grossSalary = calculateGrossSalary({
       attendanceSalary,
       workKPIBonus: extras.workKPIBonus,
@@ -816,7 +829,7 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
       mealAllowance: extras.mealAllowance,
       otherAllowance: extras.otherAllowance,
       rewardPenalty: existing?.rewardPenalty ?? 0,
-      compOffCashOut,
+      compOffCashOutSettlement,
     });
 
     // ── 社保/公积金计算（双轨制：个人+公司）──
@@ -900,7 +913,7 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
       mealAllowance: extras.mealAllowance,
       otherAllowance: extras.otherAllowance,
       rewardPenalty: existing?.rewardPenalty ?? 0,
-      compOffCashOut,
+      compOffCashOutSettlement,
       socialInsuranceDeduction,
       housingFundDeduction,
       incomeTax,
@@ -938,8 +951,9 @@ function PaySlipProvider({ children }: { children: React.ReactNode }) {
       socialInsuranceDetails,
       employerInsuranceDetails,
       incomeTaxNote,
-      // 保留手动控制字段：调休兑现、节假日分配、备用金人工已付
-      compOffCashOut,
+      // 调休兑现不属于手动控制字段，仅保存本次已验证事件账本快照。
+      compOffCashOutSettlement,
+      payrollDataQuarantine: existing?.payrollDataQuarantine,
       compOffUsage: existing?.compOffUsage,
       holidayBonusAllocation: existing?.holidayBonusAllocation,
       pettyLaborPaid: existing?.pettyLaborPaid,

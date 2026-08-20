@@ -24,6 +24,7 @@ import { DEPT_LABELS, EMPLOYEE_TYPE_LABELS, getAttendanceBaseSalary } from "./ty
 import { DEFAULT_DEPT_ORDER } from "../labor/store";
 import { sumMoney } from "@/lib/finance/money";
 import { sortEmployeesWithinProfileGroup } from "./employee-profile-order";
+import { getCompOffCashOutSettlementAmount } from "./comp-off-cashout-settlement";
 
 // ─── 辅助函数 ──────────────────────────────────────────────────────────────────
 
@@ -152,7 +153,7 @@ export function buildPayrollWorkbook(params: ExportParams): XLSX.WorkBook {
       const workKPIBonus = slip?.workKPIBonus ?? 0;
       const revenueKPIBonus = slip?.revenueKPIBonus ?? 0;
       const rewardPenalty = slip?.rewardPenalty ?? 0;
-      const compOffCashOut = slip?.compOffCashOut ?? 0;
+      const cashOutSettlementAmount = slip ? getCompOffCashOutSettlementAmount(slip) : 0;
 
       // 应发/扣款/实发
       const grossSalary = slip?.grossSalary ?? 0;
@@ -193,7 +194,7 @@ export function buildPayrollWorkbook(params: ExportParams): XLSX.WorkBook {
         +workKPIBonus.toFixed(2),
         +revenueKPIBonus.toFixed(2),
         +rewardPenalty.toFixed(2),
-        +compOffCashOut.toFixed(2),
+        +cashOutSettlementAmount.toFixed(2),
         // 应发
         +grossSalary.toFixed(2),
         // 扣款
@@ -298,7 +299,7 @@ export function buildPayrollWorkbook(params: ExportParams): XLSX.WorkBook {
         +rewards.toFixed(2),
         penalties > 0 ? -+penalties.toFixed(2) : 0,
         +(slip?.rewardPenalty ?? 0).toFixed(2),
-        +(slip?.compOffCashOut ?? 0).toFixed(2),
+        +(slip ? getCompOffCashOutSettlementAmount(slip) : 0).toFixed(2),
         // 应发
         +(slip?.grossSalary ?? 0).toFixed(2),
         // 扣款
@@ -463,7 +464,7 @@ export function buildPayrollHtml(params: ExportParams): string {
           <td>¥${fmt(slip?.revenueKPIBonus)}</td>
           <td>¥${fmt(allowanceTotal)}</td>
           <td>¥${fmt(slip?.rewardPenalty)}</td>
-          <td>¥${fmt(slip?.compOffCashOut)}</td>
+          <td>¥${fmt(slip ? getCompOffCashOutSettlementAmount(slip) : 0)}</td>
           <td>¥${fmt(slip?.grossSalary)}</td>
           <td class="deduct">-¥${fmt(slip?.socialInsuranceDeduction)}</td>
           <td class="deduct">-¥${fmt(slip?.housingFundDeduction)}</td>
@@ -814,7 +815,7 @@ export function buildCombinedWorkbook(params: ExportParams): XLSX.WorkBook {
       const workKPIBonus = slip?.workKPIBonus ?? 0;
       const revenueKPIBonus = slip?.revenueKPIBonus ?? 0;
       const rewardPenalty = slip?.rewardPenalty ?? 0;
-      const compOffCashOut = slip?.compOffCashOut ?? 0;
+      const cashOutSettlementAmount = slip ? getCompOffCashOutSettlementAmount(slip) : 0;
       const grossSalary = slip?.grossSalary ?? 0;
       const advance = sumMoney([slip?.advanceAmount, slip?.pettyLaborPaid]);
       const socialIns = slip?.socialInsuranceDeduction ?? 0;
@@ -837,7 +838,7 @@ export function buildCombinedWorkbook(params: ExportParams): XLSX.WorkBook {
         +holidayBonus.toFixed(2), specialDeduction > 0 ? -+specialDeduction.toFixed(2) : 0,
         +attendanceSalary.toFixed(2),
         +allowanceTotal.toFixed(2), +workKPIBonus.toFixed(2), +revenueKPIBonus.toFixed(2),
-        +rewardPenalty.toFixed(2), +compOffCashOut.toFixed(2),
+        +rewardPenalty.toFixed(2), +cashOutSettlementAmount.toFixed(2),
         +grossSalary.toFixed(2),
         advance > 0 ? -+advance.toFixed(2) : 0,
         socialIns > 0 ? -+socialIns.toFixed(2) : 0,

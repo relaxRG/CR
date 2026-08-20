@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { createCompOffCashOutEvent, findCompOffCashOutIssues, getLegacyCompOffCashOutDelta, settleCompOffCashOut, voidCompOffCashOutEvent } from "@/lib/labor/comp-off-cashout-settlement";
+import {
+  auditCompOffCashOutIntegrity,
+  createCompOffCashOutEvent,
+  createCompOffCashOutSettlementSnapshot,
+  findCompOffCashOutIssues,
+  getCompOffCashOutSnapshotIssue,
+  getLegacyCompOffCashOutDelta,
+  migrateLegacyPaySlipCompOffCashOut,
+  settleCompOffCashOut,
+  voidCompOffCashOutEvent,
+} from "@/lib/labor/comp-off-cashout-settlement";
 import { reducePayrollReconciliationState } from "@/lib/labor/payroll-reconciliation-state";
 import type { CompOffBalanceEntry } from "@/lib/labor/types";
 
@@ -68,7 +78,38 @@ describe("调休兑现薪资核对", () => {
     expect(getLegacyCompOffCashOutDelta({ compOffCashOut: 296.3 }, result)).toBe(296);
     expect(getLegacyCompOffCashOutDelta({ compOffCashOut: 0.3 }, result)).toBe(0);
     expect(findCompOffCashOutIssues([one, two], [{ employeeId: "e-1", month: "2026-07", compOffCashOut: 296.3 } as any]))
-      .toMatchObject([{ employeeId: "e-1", month: "2026-07", code: "ORPHAN_PAYSLIP_CASHOUT", amount: 296 }]);
+      .toEqual(expect.arrayContaining([
+        expect.objectContaining({ employeeId: "e-1", month: "2026-07", code: "ORPHAN_PAYSLIP_CASHOUT", amount: 296 }),
+        expect.objectContaining({ employeeId: "e-1", month: "2026-07", code: "SETTLEMENT_SNAPSHOT_MISMATCH" }),
+      ]));
+  });
+
+  it("隔离区完整性审计会发现事件归属篡改、重复事件和非法作废历史", () => {
+    const valid = entry("valid");
+    const forged = entry("forged", { settlement: { ...entry("forged").settlement!, entryId: "other-entry" } });
+    const duplicated = entry("duplicated", { settlement: { ...entry("valid").settlement!, entryId: "duplicated" } });
+    const invalidHistory = entry("history", { status: "available", usedMonth: undefined, settlement: undefined, settlementHistory: [{ ...entry("history").settlement!, status: "voided", voidedAt: undefined, voidReason: undefined }] });
+    const report = auditCompOffCashOutIntegrity([valid, forged, duplicated, invalidHistory], []);
+    expect(report.activeEvents).toBe(3);
+    expect(report.issues.map((issue) => issue.code)).toEqual(expect.arrayContaining(["EVENT_ENTRY_ID_MISMATCH", "DUPLICATE_EVENT_ID", "INVALID_SETTLEMENT_HISTORY"]));
+  });
+
+  it("旧薪资直接金额只会迁移为可验证快照或隔离证据，绝不继续入账", () => {
+    const valid = entry("valid");
+    const matchingLegacy = migrateLegacyPaySlipCompOffCashOut({ id: "slip-ok", employeeId: "e-1", month: "2026-07", compOffCashOut: 296.3 } as any, [valid]);
+    expect(matchingLegacy.compOffCashOutSettlement).toEqual(createCompOffCashOutSettlementSnapshot(settleCompOffCashOut([valid], "e-1", "2026-07"), expect.any(String)));
+    expect("compOffCashOut" in matchingLegacy).toBe(false);
+
+    const orphanLegacy = migrateLegacyPaySlipCompOffCashOut({ id: "slip-bad", employeeId: "e-1", month: "2026-07", compOffCashOut: 296.3 } as any, []);
+    expect(orphanLegacy.compOffCashOutSettlement?.amount).toBe(0);
+    expect(orphanLegacy.payrollDataQuarantine).toMatchObject([{ code: "ORPHAN_COMP_OFF_CASHOUT", amount: 296.3, status: "quarantined" }]);
+  });
+
+  it("薪资快照必须精确引用当前有效事件，否则对账区将报告不一致", () => {
+    const valid = entry("valid");
+    const settlement = settleCompOffCashOut([valid], "e-1", "2026-07");
+    expect(getCompOffCashOutSnapshotIssue({ employeeId: "e-1", month: "2026-07", compOffCashOutSettlement: createCompOffCashOutSettlementSnapshot(settlement) }, settlement)).toBeNull();
+    expect(getCompOffCashOutSnapshotIssue({ employeeId: "e-1", month: "2026-07", compOffCashOutSettlement: { source: "comp_off_event_ledger", eventIds: ["forged"], amount: 296.3, verifiedAt: "2026-07-01T00:00:00.000Z" } }, settlement)?.code).toBe("SETTLEMENT_SNAPSHOT_MISMATCH");
   });
 
   it("草稿月作废错误兑现会恢复余额并保留不可改写的作废审计历史", () => {

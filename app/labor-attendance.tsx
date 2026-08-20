@@ -16,6 +16,11 @@ import { formatEditableMoney, moneyDraftToAmount, normalizeMoneyDraft, roundMone
 import { numericColor, NUMERIC_TONE } from "@/lib/theme/numeric-color-tokens";
 import { sortEmployeesByProfileOrder } from "@/lib/labor/employee-profile-order";
 import {
+  createCompOffCashOutSettlementSnapshot,
+  getCompOffCashOutSettlementAmount,
+  settleCompOffCashOut,
+} from "@/lib/labor/comp-off-cashout-settlement";
+import {
   Alert, Platform, ScrollView, StyleSheet,
   Text, TextInput, TouchableOpacity, View
 } from "react-native";
@@ -189,8 +194,8 @@ function EmployeeCard({
     [compOffEntries]
   );
   const totalCompOff = overtimeCompOff + holidayCompOff;
-  // ── 本月调休兑换 ──
-  const compOffCashOut = slip?.compOffCashOut ?? 0;
+  // ── 本月调休兑换：只展示经事件账本验证的快照金额 ──
+  const cashOutSettlementAmount = slip ? getCompOffCashOutSettlementAmount(slip) : 0;
   // ── 当月手动预支合计（useMemo 缓存）──
   // 过滤条件：employeeId + month（deductMonth 或 date 前缀）+ 未扣除/已扣除状态
   // 注意：这里只统计手动预支（advances），备用金已付由 slip.pettyLaborPaid 单独记录
@@ -275,9 +280,16 @@ function EmployeeCard({
     // 若先 buildPaySlipDraft 再覆盖 rewardPenalty，grossSalary 会基于旧值计算，导致应发薪资不正确
     upsertPaySlip({ ...slip, rewardPenalty: totalReward, rewardPenaltyItems: normalizedItems, notes: currentNotes });
     // 此时 ref.current 已更新，buildPaySlipDraft 能读到最新 rewardPenalty
+    const settlement = settleCompOffCashOut(compOffEntries, employee.id, month);
     const draft = buildPaySlipDraft(
-      employee, month, att ?? null,
-      advanceTotal, globalSettings
+      employee,
+      month,
+      att ?? null,
+      advanceTotal,
+      globalSettings,
+      undefined,
+      undefined,
+      settlement.lines.length > 0 ? createCompOffCashOutSettlementSnapshot(settlement) : undefined,
     );
     // draft 已包含所有控制字段（allowanceOverrides/workKPISelections/revenueActuals 等）
     // rewardPenalty/rewardPenaltyItems/notes 由 buildPaySlipDraft 内部从 existing 读取（Step 1 已写入）
@@ -285,7 +297,7 @@ function EmployeeCard({
     // 如果备注正在编辑中，同步到 notes state 并退出编辑态
     if (noteEditing) { setNotes(noteInput); setNoteEditing(false); }
     onToggleRewardEdit();
-  }, [slip, employee, rewardItems, notes, noteEditing, noteInput, upsertPaySlip, buildPaySlipDraft, att, month, advanceTotal, globalSettings, onToggleRewardEdit]);
+  }, [slip, employee, rewardItems, notes, noteEditing, noteInput, upsertPaySlip, buildPaySlipDraft, att, month, advanceTotal, globalSettings, compOffEntries, onToggleRewardEdit]);
 
   // ── 收起状态：2行4列网格摘要 ──
   if (!expanded) {
@@ -294,7 +306,7 @@ function EmployeeCard({
     const revenueKPI = slip?.revenueKPIBonus ?? 0;
     const allowance = (slip?.mealAllowance ?? 0) + (slip?.transportAllowance ?? 0) + (slip?.otherAllowance ?? 0);
     const reward = slip?.rewardPenalty ?? 0;
-    const cashOut = slip?.compOffCashOut ?? 0;
+    const cashOut = slip ? getCompOffCashOutSettlementAmount(slip) : 0;
     // 已预支 = 手动预支 + 备用金已付（与展开状态保持一致）
     const advance = advanceTotal + (slip?.pettyLaborPaid ?? 0);
     const gross = slip?.grossSalary ?? 0;
@@ -496,8 +508,8 @@ function EmployeeCard({
         {totalCompOff === 0 && (
           <DetailRow label="调休余额" value="0 天" colors={colors} />
         )}
-        {compOffCashOut > 0 && (
-          <DetailRow label="本月调休兑换" value={`+¥${formatMoney(compOffCashOut)}`} colors={colors} positive />
+        {cashOutSettlementAmount > 0 && (
+          <DetailRow label="本月调休兑换" value={`+¥${formatMoney(cashOutSettlementAmount)}`} colors={colors} positive />
         )}
         {/* 已预支 = 手动预支（advanceTotal）+ 备用金已付（pettyLaborPaid）合并展示 */}
         {(() => {

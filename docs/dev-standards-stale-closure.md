@@ -47,7 +47,7 @@ const existingSlip = paySlips.find(s => s.employeeId === emp.id && s.month === c
 const existingSlip = getPaySlip(emp.id, currentMonth);
 ```
 
-### 规则 3：buildPaySlipDraft 必须保留所有手动控制字段
+### 规则 3：buildPaySlipDraft 必须保留手动控制字段，但绝不继承调休兑现金额
 
 `buildPaySlipDraft` 的返回值**必须**包含以下字段（从 `existing` 读取）：
 
@@ -56,14 +56,18 @@ const existingSlip = getPaySlip(emp.id, currentMonth);
 | `allowanceOverrides` | `existing?.allowanceOverrides` | 用户手动勾选/取消的补贴 |
 | `workKPISelections` | `existing?.workKPISelections` | 用户选择的工作绩效档位 |
 | `revenueActuals` | `existing?.revenueActuals` | 用户填写的业绩实际金额 |
-| `compOffCashOut` | `existing?.compOffCashOut` | 调休兑现金额 |
+| `compOffCashOutSettlement` | **不得从 `existing` 读取** | 必须由当次 `settleCompOffCashOut()` 的 active 事件生成快照 |
 | `holidayBonusAllocation` | `existing?.holidayBonusAllocation` | 节假日奖金分配 |
 | `pettyLaborPaid` | `existing?.pettyLaborPaid` | 备用金已付金额 |
 | `rewardPenaltyItems` | `existing?.rewardPenaltyItems` | 奖惩明细 |
 
-**不保留这些字段会导致 `autoSync` 每次触发时清除用户的手动设置。**
+**不保留手动控制字段会导致 `autoSync` 每次触发时清除用户设置。** 调休兑现不属于手动控制字段：重建时必须重新汇总实时账本，生成 `eventIds + amount + verifiedAt` 快照；旧薪资单的裸金额只能迁入隔离区，绝不能继承。
 
 ---
+
+### 规则 3.1：隔离区完整性检查不得被自动同步跳过
+
+自动同步、手动重算、导出和月结前均必须运行兑现账本完整性检查。只允许 `active` 且费率、金额、员工、月份、余额条目、来源、天数全部一致的事件参与汇总；`quarantined`、`voided`、重复事件 ID、快照不一致和旧裸金额必须停留在核对区，草稿月重建、已确认月创建更正会话。
 
 ## 三、stale closure 防治规范
 

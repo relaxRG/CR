@@ -936,6 +936,26 @@ export interface CompOffCashOutEvent {
   voidReason?: string;
 }
 
+/** 薪资草稿唯一允许保存的调休兑现依据：金额必须与 eventIds 指向的 active 事件精确一致。 */
+export interface CompOffCashOutSettlementSnapshot {
+  source: "comp_off_event_ledger";
+  eventIds: readonly string[];
+  amount: number;
+  verifiedAt: string;
+}
+
+/** 仅保存不可自动入账的历史异常证据；它不参与应发、实发或月结金额计算。 */
+export interface PayrollDataQuarantineRecord {
+  id: string;
+  field: "legacy_comp_off_cash_out";
+  code: "ORPHAN_COMP_OFF_CASHOUT" | "SETTLEMENT_SNAPSHOT_MISMATCH";
+  amount: number;
+  expectedAmount: number;
+  detectedAt: string;
+  description: string;
+  status: "quarantined";
+}
+
 /** 计算换休余额到期月份（存入月 + 3个月） */
 export function calcCompOffExpiresMonth(earnedMonth: string): string {
   const [y, m] = earnedMonth.split("-").map(Number);
@@ -1103,7 +1123,7 @@ export interface PaySlip {
   /**
    * 应发薪资（税前，扣除社保个税前）。精度：2位小数
    * grossSalary = attendanceSalary + workKPIBonus + revenueKPIBonus +
-   *              mealAllowance + transportAllowance + otherAllowance + rewardPenalty + compOffCashOut
+   *              mealAllowance + transportAllowance + otherAllowance + rewardPenalty + 已验证调休兑现快照金额
    */
   grossSalary: number;
   /** 社保个人缴纳金额（自动计算，可手动覆盖）。精度：2位小数 */
@@ -1183,10 +1203,13 @@ export interface PaySlip {
     mode: "cash" | "rest" | "split";
   }>;
   /**
-   * 调休兑现金额（将调休余额兑现成錢，加入应发）
-   * 兑现时按兑现当月日薪计算，可人工修改
+   * 调休兑现账本快照。它仅由 active 兑现事件汇总产生，严禁人工编辑金额或从旧薪资单继承。
    */
-  compOffCashOut?: number;
+  compOffCashOutSettlement?: CompOffCashOutSettlementSnapshot;
+  /**
+   * 从旧版直接金额迁移出的隔离证据。只用于核对和更正，绝不参与薪资计算。
+   */
+  payrollDataQuarantine?: readonly PayrollDataQuarantineRecord[];
   /**
    * 由本月排班中的余额休状态消耗的条目明细；key = date|shift|specialStatusId。
    * 每个排班日可按最早到期优先分配多条余额，重算时由唯一结算器原子释放和重建。

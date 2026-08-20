@@ -589,7 +589,7 @@ try {
     const state = (await call("Runtime.evaluate", { expression: `(() => {
       const table = document.querySelector('[data-testid="wine-purchase-ledger-table"]');
       const list = document.querySelector('[data-testid="wine-purchase-ledger-table-virtual-list"]');
-      const name = document.querySelector('[data-testid="wine-purchase-name-h5-wine-purchase-1"]');
+      const name = document.querySelector('[data-testid^="wine-purchase-name-h5-wine-purchase-"]');
       if (list) list.scrollTop = Math.max(0, list.scrollHeight - list.clientHeight);
       if (table) table.scrollLeft = Math.max(0, table.scrollWidth - table.clientWidth);
       const fixedText = table?.parentElement?.textContent ?? '';
