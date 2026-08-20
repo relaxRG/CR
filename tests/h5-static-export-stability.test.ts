@@ -38,6 +38,10 @@ describe("H5 静态导出与真实浏览器回归稳定性", () => {
     expect(storeSegmentedScript).toContain("server.closeAllConnections?.();");
     expect(storeSegmentedScript).toContain("await new Promise((resolve) => server.close(resolve));");
     expect(storeSegmentedScript).toContain("cdpFetch(`/json/close/${testTarget.id}`)");
+    expect(storeSegmentedScript).toContain("const verifyPillSet = async");
+    expect(storeSegmentedScript).toContain('"spirits-tab-analysis"');
+    expect(storeSegmentedScript).toContain('"wine-workspace-tab-supplier"');
+    expect(storeSegmentedScript).toContain('"equipment-tab-depreciation"');
   });
 
   it("共享胶囊选择器以 28pt 真实高度验证对齐，不再沿用旧的 40pt 页面容器高度", () => {

@@ -177,6 +177,44 @@ try {
   const report = [];
   await call("Page.enable");
 
+  const verifyPillSet = async (label, tabIds) => {
+    const states = [];
+    for (const tabId of tabIds) {
+      await click(call, clickTestIdExpression(tabId), `${label} 未找到 ${tabId} 胶囊`);
+      await sleep(140);
+      const layout = await call("Runtime.evaluate", { expression: `(() => {
+        const tab = document.querySelector('[data-testid="${tabId}"]');
+        const background = tab ? getComputedStyle(tab).backgroundColor : null;
+        return {
+          found: Boolean(tab),
+          selected: Boolean(background && background !== 'transparent' && background !== 'rgba(0, 0, 0, 0)'),
+          rootClientWidth: document.documentElement.clientWidth,
+          rootScrollWidth: document.documentElement.scrollWidth,
+          bodyScrollWidth: document.body.scrollWidth,
+        };
+      })()`, returnByValue: true });
+      const state = layout.result.value;
+      if (!state.found || !state.selected) throw new Error(`${label} ${tabId} 未显示选中态：${JSON.stringify(state)}`);
+      assertNoRootOverflow(`${label} ${tabId}`, state);
+      states.push({ tabId, ...state });
+    }
+    return states;
+  };
+  const inventoryInnerTabs = {
+    spirits: ["spirits-tab-summary", "spirits-tab-ledger", "spirits-tab-purchase", "spirits-tab-analysis"],
+    wine: ["wine-workspace-tab-summary", "wine-workspace-tab-ledger", "wine-workspace-tab-purchase", "wine-workspace-tab-supplier"],
+    fruit: ["fruit-inventory-tab-summary", "fruit-inventory-tab-ledger", "fruit-inventory-tab-purchase"],
+    food: ["food-tab-summary", "food-tab-ledger", "food-tab-purchase"],
+    beer: ["beer-inventory-tab-summary", "beer-inventory-tab-ledger", "beer-inventory-tab-purchase"],
+    ice: ["ice-inventory-tab-summary", "ice-inventory-tab-ledger", "ice-inventory-tab-purchase", "ice-inventory-tab-costLink"],
+  };
+  const shopInnerTabs = {
+    glassware: ["glassware-inventory-tab-summary", "glassware-inventory-tab-ledger", "glassware-inventory-tab-purchase", "glassware-inventory-tab-loss"],
+    tableware: ["tableware-inventory-tab-summary", "tableware-inventory-tab-ledger", "tableware-inventory-tab-purchase", "tableware-inventory-tab-loss"],
+    daily: ["daily-inventory-tab-summary", "daily-inventory-tab-ledger", "daily-inventory-tab-purchase", "daily-inventory-tab-batch"],
+    equipment: ["equipment-tab-ledger", "equipment-tab-purchase", "equipment-tab-maintenance", "equipment-tab-depreciation"],
+  };
+
   for (const width of MOBILE_VIEWPORTS) {
     await call("Emulation.setDeviceMetricsOverride", {
       width, height: 844, deviceScaleFactor: 3, mobile: true,
@@ -219,6 +257,7 @@ try {
       expression: horizontalScrollExpression("spirits-inventory-action-toolbar"), returnByValue: true,
     });
     assertHorizontalScroller(`${width}pt 烈酒库存操作栏`, spiritsToolbarScroller.result.value);
+    const spiritsInnerStates = await verifyPillSet(`${width}pt 烈酒二级页签`, inventoryInnerTabs.spirits);
 
     const inventoryMonthBeforeCategoryChange = await call("Runtime.evaluate", {
       expression: `document.querySelector('[data-testid="inventory-month-navigator"]')?.innerText.replace(/\\s+/g, ' ').trim() ?? ''`,
@@ -244,7 +283,7 @@ try {
       if (inventoryMonthBeforeCategoryChange.result.value !== inventoryMonthAfterCategoryChange.result.value) {
         throw new Error(`${width}pt 切换${label}分类后月份状态发生错位`);
       }
-      inventoryCategoryStates[key] = state;
+      inventoryCategoryStates[key] = { ...state, innerTabs: await verifyPillSet(`${width}pt ${label}二级页签`, inventoryInnerTabs[key]) };
     }
     await click(call, clickTestIdExpression("inventory-month-navigator-picker"), `${width}pt 未找到库存快速选月`);
     await sleep(120);
@@ -273,6 +312,7 @@ try {
       expression: horizontalScrollExpression("shop-segmented-tabs"), returnByValue: true,
     });
     assertHorizontalScroller(`${width}pt 店铺分类标签`, shopTabsScroller.result.value);
+    const glasswareInnerStates = await verifyPillSet(`${width}pt 杯具二级页签`, shopInnerTabs.glassware);
 
     const shopCategoryStates = {};
     for (const [key, label] of [["tableware", "餐具"], ["daily", "日用品"], ["equipment", "设备"]]) {
@@ -287,7 +327,7 @@ try {
       if (!state.workspaceFound) {
         throw new Error(`${width}pt 切换${label}分段后原有业务工作区未同步：${JSON.stringify(state)}`);
       }
-      shopCategoryStates[key] = state;
+      shopCategoryStates[key] = { ...state, innerTabs: await verifyPillSet(`${width}pt ${label}二级页签`, shopInnerTabs[key]) };
     }
     const legacyEntry = await call("Runtime.evaluate", {
       expression: `document.body.innerText.includes('进入烈酒管理') || document.body.innerText.includes('进入设备管理')`,
@@ -295,7 +335,7 @@ try {
     });
     if (legacyEntry.result.value) throw new Error(`${width}pt 仍保留已删除的中间管理页跳转入口`);
 
-    report.push({ width, inventory: { initial: inventoryState, ...inventoryCategoryStates }, shop: { initial: shopState, ...shopCategoryStates } });
+    report.push({ width, inventory: { initial: { ...inventoryState, innerTabs: spiritsInnerStates }, ...inventoryCategoryStates }, shop: { initial: { ...shopState, innerTabs: glasswareInnerStates }, ...shopCategoryStates } });
   }
 
   await call("Emulation.clearDeviceMetricsOverride");
