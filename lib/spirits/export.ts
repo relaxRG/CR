@@ -16,6 +16,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import * as Print from "expo-print";
 import { SpiritItem, SpiritPurchaseRecord, SpiritLedgerEntry } from "./types";
+import type { SpiritCategorySummary } from "./category-summary";
 import { multiplyMoney, sumMoney } from "@/lib/finance/money";
 
 // ─── 类型定义 ─────────────────────────────────────────────────────────────────
@@ -25,7 +26,7 @@ export interface ExportData {
   purchases: SpiritPurchaseRecord[];
   ledger: SpiritLedgerEntry[];
   getRefPrice: (itemId: string, month: string) => number;
-  categorySummary: Record<string, { openingQty: number; purchaseQty: number; consumeQty: number; closingQty: number }>;
+  categorySummary: Record<string, SpiritCategorySummary>;
   supplierSummary: Record<string, { qty: number; amount: number; items: number }>;
 }
 
@@ -72,10 +73,10 @@ export async function exportToExcel(data: ExportData): Promise<void> {
     ["期末库存成本", `¥${fmt(totalClosingCost)}`],
     ["活跃供应商数", `${supplierCount} 家`],
     [],
-    ["二、分类汇总"],
-    ["分类", "期初库存(瓶)", "本月进货(瓶)", "本月消耗(瓶)", "期末库存(瓶)"],
+    ["二、分类汇总（成本金额）"],
+    ["分类", "期初金额(¥)", "本月进货金额(¥)", "本月消耗金额(¥)", "期末金额(¥)"],
     ...Object.entries(categorySummary).map(([cat, v]) => [
-      cat, v.openingQty, v.purchaseQty, v.consumeQty, v.closingQty,
+      cat, fmt(v.openingCost), fmt(v.purchaseCost), fmt(v.consumeCost), fmt(v.closingCost),
     ]),
     [],
     ["三、供应商汇总"],
@@ -285,17 +286,17 @@ export async function exportToPdf(data: ExportData): Promise<void> {
 <!-- 分类汇总 -->
 <h2>二、分类汇总</h2>
 <table>
-  <thead><tr><th>分类</th><th>期初(瓶)</th><th>进货(瓶)</th><th>消耗(瓶)</th><th>期末(瓶)</th></tr></thead>
+  <thead><tr><th>分类</th><th>期初金额(¥)</th><th>进货金额(¥)</th><th>消耗金额(¥)</th><th>期末金额(¥)</th></tr></thead>
   <tbody>
     ${Object.entries(categorySummary).map(([cat, v]) => `
-    <tr><td>${cat}</td><td class="text-right">${v.openingQty}</td><td class="text-right">${v.purchaseQty}</td><td class="text-right">${v.consumeQty}</td><td class="text-right">${v.closingQty}</td></tr>
+    <tr><td>${cat}</td><td class="text-right">¥${fmt(v.openingCost)}</td><td class="text-right">¥${fmt(v.purchaseCost)}</td><td class="text-right">¥${fmt(v.consumeCost)}</td><td class="text-right">¥${fmt(v.closingCost)}</td></tr>
     `).join("")}
     <tr class="total-row">
       <td>合计</td>
-      <td class="text-right">${Object.values(categorySummary).reduce((s, v) => s + v.openingQty, 0)}</td>
-      <td class="text-right">${Object.values(categorySummary).reduce((s, v) => s + v.purchaseQty, 0)}</td>
-      <td class="text-right">${Object.values(categorySummary).reduce((s, v) => s + v.consumeQty, 0)}</td>
-      <td class="text-right">${Object.values(categorySummary).reduce((s, v) => s + v.closingQty, 0)}</td>
+      <td class="text-right">¥${fmt(sumMoney(Object.values(categorySummary).map((v) => v.openingCost)))}</td>
+      <td class="text-right">¥${fmt(sumMoney(Object.values(categorySummary).map((v) => v.purchaseCost)))}</td>
+      <td class="text-right">¥${fmt(sumMoney(Object.values(categorySummary).map((v) => v.consumeCost)))}</td>
+      <td class="text-right">¥${fmt(sumMoney(Object.values(categorySummary).map((v) => v.closingCost)))}</td>
     </tr>
   </tbody>
 </table>

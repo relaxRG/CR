@@ -22,6 +22,7 @@ import { SupplierPurchaseColumnMenu } from "@/components/spirits/supplier-purcha
 import { LedgerColumnMenu } from "@/components/spirits/ledger-column-menu";
 import { InventoryCategoryManager } from "@/components/spirits/inventory-category-manager";
 import { ScreenContainer } from "@/components/screen-container";
+import { StoreSegmentedTabs } from "@/components/store/store-visual-primitives";
 import {
   useSpiritsInventoryStore, getCurrentMonth, SpiritGroupDef, fuzzyMatchScore,
 } from "@/lib/spirits/crud-store";
@@ -39,7 +40,7 @@ import { normalizeImportDate } from "@/lib/import/date-utils";
 import {   SpiritMonthlySnapshot, SpiritInventoryItem, SpiritPriceChange, SpiritPurchaseOrderItem } from "@/lib/spirits/types";
 import { normalizeLLMRows } from "@/lib/spirits/pdf-import";
 import { exportToExcel, exportToPdf, ExportData } from "@/lib/spirits/export";
-import { formatStoreMoney, formatStoreQuantity, STORE_TABLE_METRICS } from "@/lib/store/table-display";
+import { formatStoreMoney, STORE_TABLE_METRICS } from "@/lib/store/table-display";
 import { formatInventoryMonthDay, INVENTORY_WORKSPACE_METRICS, tableHeaderAccessibilityLabel } from "@/lib/store/inventory-workspace-ui";
 import {
   applySupplierPurchaseTableView,
@@ -218,9 +219,9 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
   // 环形图数据
   const chartData = useMemo(() => {
     if (chartDimension === "category") {
-      const total = Object.values(categorySummary).reduce((s, v) => s + v.purchaseQty, 0) || 1;
+      const total = Object.values(categorySummary).reduce((s, v) => s + v.purchaseCost, 0) || 1;
       return Object.entries(categorySummary).map(([cat, v]) => ({
-        label: cat, value: v.purchaseQty, pct: Math.round(v.purchaseQty / total * 100), color: catColor(cat),
+        label: cat, value: v.purchaseCost, pct: Math.round(v.purchaseCost / total * 100), color: catColor(cat),
       })).sort((a, b) => b.value - a.value).slice(0, 10);
     }
     if (chartDimension === "supplier") {
@@ -313,12 +314,12 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, width: "100%" }}>
           <View style={S.summaryTableContent}>
             {/* 表头 */}
-            <View style={[S.tableHeader, { backgroundColor: colors.primary }]}>
-              <Text style={[S.thCell, S.colCat]}>烈酒分类</Text>
-              <Text style={[S.thCell, S.colNum]}>期初库存</Text>
-              <Text style={[S.thCell, S.colNum]}>本月进货</Text>
-              <Text style={[S.thCell, S.colNum]}>本月消耗</Text>
-              <Text style={[S.thCell, S.colNum]}>期末库存</Text>
+            <View style={[S.summaryTableHeader, { backgroundColor: colors.primary }]}>
+              <Text style={[S.summaryThCell, S.summaryColCat]}>烈酒分类</Text>
+              <Text style={[S.summaryThCell, S.summaryColAmount]}>期初金额</Text>
+              <Text style={[S.summaryThCell, S.summaryColAmount]}>本月进货</Text>
+              <Text style={[S.summaryThCell, S.summaryColAmount]}>本月消耗</Text>
+              <Text style={[S.summaryThCell, S.summaryColAmount]}>期末金额</Text>
             </View>
             {/* 分类行 */}
             {SPIRIT_CATEGORIES.map((cat, idx) => {
@@ -327,22 +328,22 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
               if (!data && !prev) return null;
               const isEven = idx % 2 === 0;
               return (
-                <View key={cat} style={[S.tableRow, { backgroundColor: isEven ? colors.surface : colors.background }]}>
-                  <View style={[S.tdCell, S.colCat, { flexDirection: "row", alignItems: "center", gap: 4 }]}>
+                <View key={cat} style={[S.summaryTableRow, { backgroundColor: isEven ? colors.surface : colors.background }]}>
+                  <View style={[S.summaryTdCell, S.summaryColCat, { flexDirection: "row", alignItems: "center", gap: 4 }]}>
                     <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: catColor(cat) }} />
-                    <Text style={{ fontSize: 11, color: colors.foreground }} numberOfLines={1}>{cat}</Text>
+                    <Text style={{ flex: 1, fontSize: 11, color: colors.foreground }} numberOfLines={1}>{cat}</Text>
                   </View>
-                  {(["openingQty", "purchaseQty", "consumeQty", "closingQty"] as const).map((field) => {
-                    const val = (data as any)?.[field] ?? 0;
-                    const prevVal = (prev as any)?.[field] ?? 0;
+                  {(["openingCost", "purchaseCost", "consumeCost", "closingCost"] as const).map((field) => {
+                    const val = data?.[field] ?? 0;
+                    const prevVal = prev?.[field] ?? 0;
                     return (
-                      <View key={field} style={[S.tdCell, S.colNum, { alignItems: "flex-end" }]}>
-                        <Text style={{ fontSize: 12, color: val < 0 ? "#EF4444" : colors.foreground, fontWeight: val < 0 ? "700" : "400" }}>
-                          {val === 0 ? "—" : formatStoreQuantity(val)}
+                      <View key={field} style={[S.summaryTdCell, S.summaryColAmount, { alignItems: "flex-end" }]}>
+                        <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} style={{ fontSize: 10, color: val < 0 ? "#EF4444" : colors.foreground, fontWeight: val < 0 ? "700" : "500" }}>
+                          {val === 0 ? "—" : formatStoreMoney(val)}
                         </Text>
                         {showComparison && prevVal !== 0 && (
-                          <Text style={{ fontSize: 9, color: val > prevVal ? "#EF4444" : "#10B981" }}>
-                            {val > prevVal ? "↑" : "↓"}{Math.abs(val - prevVal).toFixed(1)}
+                          <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} style={{ fontSize: 8, color: val > prevVal ? "#EF4444" : "#10B981" }}>
+                            {val > prevVal ? "↑" : "↓"}{formatStoreMoney(Math.abs(val - prevVal))}
                           </Text>
                         )}
                       </View>
@@ -354,17 +355,17 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
             {/* 分隔线 */}
             <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 4 }} />
             {/* 合计行 */}
-            <View style={[S.tableRow, { backgroundColor: "#FEF2F2" }]}>
-              <Text style={[S.tdCell, S.colCat, { fontWeight: "700", color: "#991B1B", fontSize: 12 }]}>合计</Text>
-              {(["openingQty", "purchaseQty", "consumeQty", "closingQty"] as const).map((field) => {
-                const total = Object.values(categorySummary).reduce((s, v) => s + ((v as any)[field] ?? 0), 0);
-                const prevTotal = Object.values(prevCategorySummary).reduce((s, v) => s + ((v as any)[field] ?? 0), 0);
+            <View style={[S.summaryTableRow, { backgroundColor: colors.background, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}>
+              <Text style={[S.summaryTdCell, S.summaryColCat, { fontWeight: "700", color: colors.foreground, fontSize: 12 }]}>合计</Text>
+              {(["openingCost", "purchaseCost", "consumeCost", "closingCost"] as const).map((field) => {
+                const total = Object.values(categorySummary).reduce((s, v) => s + v[field], 0);
+                const prevTotal = Object.values(prevCategorySummary).reduce((s, v) => s + v[field], 0);
                 return (
-                  <View key={field} style={[S.tdCell, S.colNum, { alignItems: "flex-end" }]}>
-                    <Text style={{ fontSize: 12, fontWeight: "700", color: "#991B1B" }}>{total.toFixed(2)}</Text>
+                  <View key={field} style={[S.summaryTdCell, S.summaryColAmount, { alignItems: "flex-end" }]}>
+                    <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} style={{ fontSize: 10, fontWeight: "700", color: colors.foreground }}>{formatStoreMoney(total)}</Text>
                     {showComparison && prevTotal !== 0 && (
-                      <Text style={{ fontSize: 9, color: total > prevTotal ? "#EF4444" : "#10B981" }}>
-                        {total > prevTotal ? "↑" : "↓"}{Math.abs(total - prevTotal).toFixed(1)}
+                      <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} style={{ fontSize: 8, color: total > prevTotal ? "#EF4444" : "#10B981" }}>
+                        {total > prevTotal ? "↑" : "↓"}{formatStoreMoney(Math.abs(total - prevTotal))}
                       </Text>
                     )}
                   </View>
@@ -468,13 +469,15 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
             </View>
           </View>
           {chartData.map((item, i) => (
-            <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 }}>
-              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: item.color }} />
-              <View style={{ flex: 1, height: 8, backgroundColor: colors.border, borderRadius: 4, overflow: "hidden" }}>
+            <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: 7, marginBottom: 6 }}>
+              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: item.color }} />
+              <Text style={{ width: 88, flexShrink: 1, fontSize: 11, color: colors.foreground }} numberOfLines={1}>{item.label}</Text>
+              <View style={{ flex: 1, minWidth: 32, height: 8, backgroundColor: colors.border, borderRadius: 4, overflow: "hidden" }}>
                 <View style={{ width: `${item.pct}%`, height: "100%", backgroundColor: item.color, borderRadius: 4 }} />
               </View>
-              <Text style={{ fontSize: 11, color: colors.foreground, width: 120 }} numberOfLines={1}>{item.label}</Text>
-              <Text style={{ fontSize: 11, fontWeight: "600", color: "#EF4444", width: 40, textAlign: "right" }}>{item.pct}%</Text>
+              <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.72} style={{ width: 110, fontSize: 10, fontWeight: "600", color: colors.foreground, textAlign: "right" }}>
+                {formatStoreMoney(item.value)} · {item.pct}%
+              </Text>
             </View>
           ))}
         </View>
@@ -1269,24 +1272,14 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
   // ── 主渲染 ────────────────────────────────────────────────────────────────────
   return (
     <ScreenContainer edges={embedded ? [] : undefined}>
-      {/* Tab 选择器：供应商选择仅在“当月进货”内容区切换，不再隐藏业务页签。 */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}
-          style={{ flexGrow: 0, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}
-          contentContainerStyle={{ paddingHorizontal: INVENTORY_WORKSPACE_METRICS.horizontalPadding, paddingVertical: 6, gap: INVENTORY_WORKSPACE_METRICS.horizontalGap, alignItems: "center" }}>
-          {TABS.map((t) => (
-            <TouchableOpacity key={t.key} testID={`spirits-tab-${t.key}`} hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }} onPress={() => { tap(); setTab(t.key); }}
-              style={[S.tabChip, {
-                minHeight: INVENTORY_WORKSPACE_METRICS.segmentHeight,
-                borderRadius: INVENTORY_WORKSPACE_METRICS.segmentRadius,
-                backgroundColor: tab === t.key ? colors.foreground : colors.surface,
-                borderColor: tab === t.key ? colors.foreground : colors.border,
-              }]}>
-              <Text style={{ fontSize: 13, fontWeight: "600", color: tab === t.key ? "#fff" : colors.muted }}>
-                {t.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-      </ScrollView>
+      {/* 门店统一二级胶囊选择器：四项等宽同一行。 */}
+      <StoreSegmentedTabs
+        testID="spirits-tab-"
+        items={TABS}
+        active={tab}
+        onChange={(nextTab) => { tap(); setTab(nextTab); }}
+        colors={colors}
+      />
 
       {/* Tab 内容 */}
       <>
@@ -3264,7 +3257,13 @@ const S = StyleSheet.create({
   cardTitle: { fontSize: 14, fontWeight: "700", marginBottom: 10 },
   actionBtn: { flexDirection: "row", flexShrink: 0, minHeight: INVENTORY_WORKSPACE_METRICS.actionHeight, alignItems: "center", justifyContent: "center", gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: INVENTORY_WORKSPACE_METRICS.segmentRadius, borderWidth: 1 },
   toggleBtn: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 14, borderWidth: 1 },
-  summaryTableContent: { width: "100%", minWidth: 440 },
+  summaryTableContent: { width: "100%", minWidth: 380 },
+  summaryTableHeader: { flexDirection: "row", alignItems: "center", minHeight: 36 },
+  summaryTableRow: { flexDirection: "row", alignItems: "center", minHeight: 40, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "rgba(0,0,0,0.06)" },
+  summaryThCell: { fontSize: 11, fontWeight: "700", color: "#fff", paddingHorizontal: 6, textAlign: "center" },
+  summaryTdCell: { paddingHorizontal: 6, paddingVertical: 2 },
+  summaryColCat: { width: 116 },
+  summaryColAmount: { width: 66 },
   tableHeader: { flexDirection: "row", alignItems: "center", minHeight: STORE_TABLE_METRICS.headerHeight },
   tableRow: { flexDirection: "row", alignItems: "center", minHeight: STORE_TABLE_METRICS.rowHeight, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "rgba(0,0,0,0.06)" },
   thCell: { fontSize: STORE_TABLE_METRICS.bodyFontSize, fontWeight: "700", color: "#fff", paddingHorizontal: 10, textAlign: "center" },

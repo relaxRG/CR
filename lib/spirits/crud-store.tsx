@@ -9,6 +9,7 @@ import { registerStoreReload } from "../sync/engine";
 import { purchasesForMonth, type PendingSpiritPurchase } from "./import-bridge";
 import { moveInventoryCategory } from "./category-lifecycle";
 import { normalizeSpiritSupplierAliases } from "./supplier-alias";
+import { summarizeSpiritLedgerByCategory, type SpiritCategorySummary } from "./category-summary";
 import { sumMoney } from "@/lib/finance/money";
 import {
   SpiritItem, SpiritPurchaseRecord, SpiritLedgerEntry,
@@ -408,7 +409,7 @@ interface SpiritsContextValue extends SpiritsState {
   getMonthLedger: (month: string) => SpiritLedgerEntry[];
   getItemLedger: (itemId: string, month: string) => SpiritLedgerEntry | undefined;
   getAvailableMonths: () => string[];
-  getPurchaseSummaryByCategory: (month: string) => Record<string, { openingQty: number; purchaseQty: number; consumeQty: number; closingQty: number }>;
+  getPurchaseSummaryByCategory: (month: string) => Record<string, SpiritCategorySummary>;
   getPurchaseSummaryBySupplier: (month: string) => Record<string, { qty: number; amount: number; items: number }>;
   // 月结
   closeMonth: (month: string) => void;
@@ -787,22 +788,9 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
     return [...months].sort().reverse();
   };
 
-  /** 按分类汇总台账数据（用于总结 Tab 分类汇总表） */
-  const getPurchaseSummaryByCategory = (month: string): Record<string, { openingQty: number; purchaseQty: number; consumeQty: number; closingQty: number }> => {
-    const result: Record<string, { openingQty: number; purchaseQty: number; consumeQty: number; closingQty: number }> = {};
-    const monthLedger = getMonthLedger(month);
-    for (const entry of monthLedger) {
-      const item = state.items.find((i) => i.id === entry.itemId);
-      if (!item) continue;
-      const cat = item.category;
-      if (!result[cat]) result[cat] = { openingQty: 0, purchaseQty: 0, consumeQty: 0, closingQty: 0 };
-      result[cat].openingQty += entry.openingQty;
-      result[cat].purchaseQty += entry.purchaseQty;
-      result[cat].consumeQty += entry.consumeQty;
-      result[cat].closingQty += entry.closingQty;
-    }
-    return result;
-  };
+  /** 按分类汇总月度台账：数量用于库存管理，成本用于总结、占比与导出。 */
+  const getPurchaseSummaryByCategory = (month: string): Record<string, SpiritCategorySummary> =>
+    summarizeSpiritLedgerByCategory(state.items, getMonthLedger(month));
 
   /** 按供应商汇总进货数据 */
   const getPurchaseSummaryBySupplier = (month: string): Record<string, { qty: number; amount: number; items: number }> => {

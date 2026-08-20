@@ -36,6 +36,7 @@ describe("烈酒库存移动端Excel台账", () => {
 
   it("为窄屏横向滚动回归保留稳定的业务页签和操作栏定位标识", () => {
     expect(source).toContain('testID="spirits-inventory-action-toolbar"');
-    expect(source).toContain('testID={`spirits-tab-${t.key}`}');
+    expect(source).toContain('testID="spirits-tab-"');
+    expect(source).toContain("StoreSegmentedTabs");
   });
 });
