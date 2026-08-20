@@ -31,6 +31,7 @@ import { MonthlyLedgerItem } from "@/lib/inventory-core/types";
 import { useModuleMonthCloseStore } from "@/lib/month-close/module-month-close-store";
 import { formatStoreMoney, formatStoreQuantity, STORE_TABLE_METRICS } from "@/lib/store/table-display";
 import { INVENTORY_WORKSPACE_METRICS } from "@/lib/store/inventory-workspace-ui";
+import { StoreSegmentedTabs } from "@/components/store/store-visual-primitives";
 
 type ViewTab = "ledger" | "supplier" | "purchase" | "summary";
 
@@ -602,16 +603,15 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
         </View>
       </View>}
 
-      {/* Tab 切换 */}
-      <View style={[S.tabBar, { backgroundColor: colors.border + "33" }]}>
-        {VIEW_TABS.map((t) => (
-          <TouchableOpacity key={t.key} testID={`wine-tab-${t.key}`} hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }} onPress={() => { tap(); setViewTab(t.key); }}
-            style={[S.tabBtn, { minHeight: INVENTORY_WORKSPACE_METRICS.segmentHeight, borderRadius: INVENTORY_WORKSPACE_METRICS.segmentRadius }, viewTab === t.key && { backgroundColor: colors.background }]}>
-            <Text style={[S.tabText, { color: viewTab === t.key ? colors.foreground : colors.muted, fontWeight: viewTab === t.key ? "600" : "400" }]}>
-              {t.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
+      {/* 四个葡萄酒工作台使用门店唯一胶囊选择器。 */}
+      <View style={{ marginHorizontal: 12, marginTop: 8 }}>
+        <StoreSegmentedTabs
+          testID="wine-workspace-tabs"
+          items={VIEW_TABS}
+          active={viewTab}
+          colors={colors}
+          onChange={(next) => { tap(); setViewTab(next); }}
+        />
       </View>
 
       {/* 无数据提示 */}
@@ -1179,9 +1179,6 @@ function SummaryStatCell({ label, value, color }: { label: string; value: string
 const S = StyleSheet.create({
   navbar: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   navTitle: { flex: 1, fontSize: 17, fontWeight: "600", textAlign: "center" },
-  tabBar: { flexDirection: "row", margin: 12, borderRadius: 10, padding: 2, gap: 2 },
-  tabBtn: { flex: 1, minHeight: INVENTORY_WORKSPACE_METRICS.segmentHeight, borderRadius: INVENTORY_WORKSPACE_METRICS.segmentRadius, alignItems: "center", justifyContent: "center" },
-  tabText: { fontSize: 13, lineHeight: 18 },
   statsRow: { flexDirection: "row", paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   filterScroll: { borderBottomWidth: StyleSheet.hairlineWidth, paddingVertical: 8 },
   filterChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1 },

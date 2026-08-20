@@ -20,7 +20,8 @@ describe("库存工作台紧凑布局与移动端交互护栏", () => {
     expect(wine).toContain("supplierInfoCard");
     expect(wine).toContain('testID="wine-supplier-record-purchase"');
     expect(wine).toContain('testID="wine-supplier-open-library"');
-    expect(wine).toContain('testID={`wine-tab-${t.key}`}');
+    expect(wine).toContain('testID="wine-workspace-tabs"');
+    expect(wine).toContain("<StoreSegmentedTabs");
     expect(wine).not.toContain("wine-supplier-horizontal-ledger-table");
     expect(wine).not.toContain("function SupplierCard");
     expect(wine).not.toContain("supplierSummaryCard:");
@@ -59,9 +60,11 @@ describe("库存工作台紧凑布局与移动端交互护栏", () => {
     const wine = read("app/wine-inventory.tsx");
     const food = read("app/food-inventory.tsx");
     const equipment = read("app/equipment-inventory.tsx");
-    for (const source of [spirits, wine, food]) {
+    for (const source of [spirits, food]) {
       expect(source).toContain("INVENTORY_WORKSPACE_METRICS.segmentHeight");
     }
+    expect(wine).toContain("<StoreSegmentedTabs");
+    expect(read("components/store/store-visual-primitives.tsx")).toContain("minHeight: 40");
     expect(equipment).toContain("minHeight: 40");
     expect(food).toContain('testID={`food-tab-${t.key}`}');
     expect(equipment).toContain('testID={`equipment-tab-${t.key}`}');
@@ -70,7 +73,7 @@ describe("库存工作台紧凑布局与移动端交互护栏", () => {
   it("H5回归覆盖十类分类页签的尺寸一致性以及葡萄酒供货商信息工作台", () => {
     const h5 = read("scripts/h5-schedule-correction-e2e.mjs");
     expect(h5).toContain("葡萄酒供货商信息工作台");
-    expect(h5).toContain("wine-tab-supplier");
+    expect(h5).toContain("wine-workspace-tabs-supplier");
     expect(h5).toContain("wine-supplier-open-library");
     expect(h5).toContain("wine-supplier-record-purchase");
     expect(h5).toContain("fruit-inventory-tab-summary");

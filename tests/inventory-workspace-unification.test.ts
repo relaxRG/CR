@@ -38,7 +38,9 @@ describe("库存六类与店铺四类工作台统一规范", () => {
     expect(wine).toContain('label: "供应商信息"');
     expect(spirits).not.toContain('label: "📦 当月进货"');
     expect(wine).not.toContain('label: "📦 当月进货"');
-    expect(wine).toContain('tabBtn: { flex: 1, minHeight: INVENTORY_WORKSPACE_METRICS.segmentHeight');
+    expect(wine).toContain('<StoreSegmentedTabs');
+    expect(wine).toContain('testID="wine-workspace-tabs"');
+    expect(wine).not.toContain('tabBtn: { flex: 1, minHeight: INVENTORY_WORKSPACE_METRICS.segmentHeight');
     expect(wine).toContain('actionBtn: { flexDirection: "row", flexShrink: 0, minHeight: INVENTORY_WORKSPACE_METRICS.actionHeight');
     const wineLedgerToolbar = wine.slice(wine.indexOf('style={{ flexGrow: 0, minHeight: INVENTORY_WORKSPACE_METRICS.actionHeight + 12'), wine.indexOf('style={[S.filterScroll'));
     expect(wineLedgerToolbar).not.toContain('<IconSymbol');

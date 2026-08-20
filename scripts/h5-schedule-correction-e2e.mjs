@@ -539,7 +539,7 @@ try {
     await call("Emulation.setDeviceMetricsOverride", { width, height: 844, deviceScaleFactor: 3, mobile: true });
     await call("Page.navigate", { url: `http://localhost:${port}/wine-inventory` });
     await sleep(760);
-    const switched = await call("Runtime.evaluate", { expression: `(() => { const tab = document.querySelector('[data-testid="wine-tab-supplier"]'); if (!tab) return false; tab.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window })); return true; })()`, returnByValue: true });
+    const switched = await call("Runtime.evaluate", { expression: `(() => { const tab = document.querySelector('[data-testid="wine-workspace-tabs-supplier"]'); if (!tab) return false; tab.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window })); return true; })()`, returnByValue: true });
     if (!switched.result.value) throw new Error(`葡萄酒供应商 ${width}pt 未找到同页标签入口`);
     await sleep(160);
     const supplierState = await call("Runtime.evaluate", { expression: `(() => {
