@@ -11,7 +11,6 @@ import {
 } from "./types";
 import { rebuildWineSnapshotFromPurchases } from "./workbook-engine";
 import { wineManualPurchaseReducer, WineManualPurchaseState } from "./manual-purchase-reducer";
-import { normalizeWineSupplierAliases, resolveWineBottleForSupplierName } from "./supplier-alias";
 
 const STORAGE_KEY = "wine.bottles.v1";
 const SNAPSHOT_KEY = "wine.snapshots.v2";
@@ -177,20 +176,7 @@ export function WineProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const loadBottles = () => AsyncStorage.getItem(STORAGE_KEY).then((raw) => {
-      if (raw) {
-        try {
-          const parsed = JSON.parse(raw) as WineState;
-          dispatch({
-            type: "LOAD",
-            payload: {
-              bottles: (parsed.bottles ?? []).map((bottle) => ({
-                ...bottle,
-                supplierAliases: normalizeWineSupplierAliases(bottle.supplierAliases),
-              })),
-            },
-          });
-        } catch {}
-      }
+      if (raw) { try { dispatch({ type: "LOAD", payload: JSON.parse(raw) }); } catch {} }
     });
     loadBottles();
     return registerStoreReload(loadBottles);
@@ -391,12 +377,7 @@ export function WineProvider({ children }: { children: React.ReactNode }) {
     const existingPurchases = manualState.purchases.some((purchase) => purchase.date.startsWith(input.month));
     const restorePoint = existingSnapshot || existingPurchases ? createRestorePoint(input.month, "before_replace_import") : null;
     if (input.snapshot) snapshotDispatch({ type: "REPLACE_MONTH_SNAPSHOT", month: input.month, snapshot: input.snapshot });
-    const matchedPurchases = input.purchases.map((purchase) => {
-      if (purchase.bottleId) return purchase;
-      const matched = resolveWineBottleForSupplierName(state.bottles, purchase.supplier, purchase.productName);
-      return { ...purchase, bottleId: matched?.bottle.id ?? null };
-    });
-    if (matchedPurchases.length > 0) manualDispatch({ type: "BATCH_ADD", purchases: matchedPurchases });
+    if (input.purchases.length > 0) manualDispatch({ type: "BATCH_ADD", purchases: input.purchases });
     importControlDispatch({ type: "ADD_BATCH", batch: input.batch });
     importControlDispatch({
       type: "ADD_AUDIT",
@@ -406,7 +387,7 @@ export function WineProvider({ children }: { children: React.ReactNode }) {
         affected: { snapshots: input.snapshot ? 1 : 0, purchases: input.purchases.length, batches: 1 }, restorePointId: restorePoint?.id,
       },
     });
-  }, [createRestorePoint, snapshotState.snapshots, manualState.purchases, state.bottles]);
+  }, [createRestorePoint, snapshotState.snapshots, manualState.purchases]);
 
   const clearMonthPurchases = useCallback((month: string): WineMonthRestorePoint => {
     const restorePoint = createRestorePoint(month, "before_clear_purchases");
