@@ -951,67 +951,29 @@ export default function RecipeDetailScreen() {
         ) : null}
 
         {/* SourceRef — 结构化引用来源（AI 补全 / 手动填写） */}
-        {recipe.sourceRef && (recipe.sourceRef.bookTitle || recipe.sourceRef.creator || recipe.sourceRef.createdYear) ? (
+        {recipe.sourceRef && (recipe.sourceRef.sourceUrl || recipe.sourceRef.creator || recipe.sourceRef.createdYear) ? (
           <>
             <Text className="text-[13px] text-muted uppercase mt-6 mb-2 px-4" style={styles.groupHeader}>
               {lang === "zh" ? "引用来源详情" : "Source Details"}
             </Text>
             <View className="bg-surface rounded-xl p-4" style={{ gap: 10 }}>
-              {/* 文字来源（书/网站） */}
-              {(recipe.sourceRef.bookTitle || recipe.sourceRef.chapterTitle) ? (
+              {recipe.sourceRef.sourceUrl ? (
                 <View>
                   <View className="flex-row items-center" style={{ gap: 6, marginBottom: 6 }}>
                     <Text className="text-[11px] font-semibold text-muted uppercase">
-                      {lang === "zh" ? "文字来源" : "Text Source"}
+                      {lang === "zh" ? "网络来源" : "Web Source"}
                     </Text>
                     <SourceConfidenceBadge confidence={recipe.sourceRef.sourceConfidence} />
                   </View>
-                  {recipe.sourceRef.bookTitle ? (
-                    <View className="flex-row items-start justify-between">
-                      <Text className="text-sm text-muted" style={{ width: 80 }}>{lang === "zh" ? "书名" : "Book"}</Text>
-                      <Text className="text-sm text-foreground flex-1 text-right" style={{ lineHeight: 19 }}>
-                        {recipe.sourceRef.bookTitle}
-                      </Text>
-                    </View>
-                  ) : null}
-                  {recipe.sourceRef.bookAuthor ? (
-                    <View className="flex-row items-start justify-between" style={{ marginTop: 4 }}>
-                      <Text className="text-sm text-muted" style={{ width: 80 }}>{lang === "zh" ? "作者" : "Author"}</Text>
-                      <Text className="text-sm text-foreground flex-1 text-right" style={{ lineHeight: 19 }}>
-                        {recipe.sourceRef.bookAuthor}
-                      </Text>
-                    </View>
-                  ) : null}
-                  {recipe.sourceRef.publishYear ? (
-                    <View className="flex-row items-start justify-between" style={{ marginTop: 4 }}>
-                      <Text className="text-sm text-muted" style={{ width: 80 }}>{lang === "zh" ? "出版年份" : "Published"}</Text>
-                      <Text className="text-sm text-foreground flex-1 text-right" style={{ lineHeight: 19 }}>
-                        {recipe.sourceRef.publishYear}
-                      </Text>
-                    </View>
-                  ) : null}
-                  {recipe.sourceRef.chapterTitle ? (
-                    <View className="flex-row items-start justify-between" style={{ marginTop: 4 }}>
-                      <Text className="text-sm text-muted" style={{ width: 80 }}>{lang === "zh" ? "章节" : "Chapter"}</Text>
-                      <Text className="text-sm text-foreground flex-1 text-right" style={{ lineHeight: 19 }}>
-                        {recipe.sourceRef.chapterTitle}
-                      </Text>
-                    </View>
-                  ) : null}
-                  {recipe.sourceRef.pageRef ? (
-                    <View className="flex-row items-start justify-between" style={{ marginTop: 4 }}>
-                      <Text className="text-sm text-muted" style={{ width: 80 }}>{lang === "zh" ? "页码" : "Page"}</Text>
-                      <Text className="text-sm text-foreground flex-1 text-right" style={{ lineHeight: 19 }}>
-                        {recipe.sourceRef.pageRef}
-                      </Text>
-                    </View>
-                  ) : null}
+                  <Text className="text-sm text-foreground" style={{ lineHeight: 19 }}>
+                    {recipe.sourceRef.sourceUrl}
+                  </Text>
                 </View>
               ) : null}
 
-              {/* 配方创作者（与文字来源分隔） */}
+              {/* 配方创作者 */}
               {(recipe.sourceRef.creator || recipe.sourceRef.createdYear) ? (
-                <View style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, paddingTop: 10 }}>
+                <View style={recipe.sourceRef.sourceUrl ? { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, paddingTop: 10 } : undefined}>
                   <View className="flex-row items-center" style={{ gap: 6, marginBottom: 6 }}>
                     <Text className="text-[11px] font-semibold text-muted uppercase">
                       {lang === "zh" ? "配方创作者" : "Creator"}

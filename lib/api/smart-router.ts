@@ -104,7 +104,7 @@ export async function callAI<T = unknown>(route: AiRoute, body: Record<string, u
 export async function enrichRecipe(params: {
   name: string; nameEn?: string; baseSpirit?: string; method?: string;
   ingredients?: string[]; story?: string;
-  flavorDesc?: string; source?: string; rawText?: string; bookTitle?: string;
+  flavorDesc?: string; source?: string;
   lang?: 'zh' | 'en';
 }) {
   const result = await callAI<{

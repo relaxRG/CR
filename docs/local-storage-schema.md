@@ -1,6 +1,6 @@
 # 本地存储键与数据结构清单
 
-> 由 `pnpm audit:storage` 从生产源代码生成；生成时间：2026-08-20T07:02:07.143Z。
+> 由 `pnpm audit:storage` 从生产源代码生成；生成时间：2026-08-20T07:20:06.643Z。
 > 本清单覆盖 `AsyncStorage`、`SecureStore`、Web `localStorage` 与通用库存工厂传入的键。`{variable}` 表示按运行时参数生成的键模式。
 
 ## 已解析键
@@ -34,7 +34,7 @@
 | AsyncStorage | `cocktail.lab.batches` | getItem, setItem | `JSON.stringify(next` | LabStore | `lib/lab/store.tsx:71`<br>`lib/lab/store.tsx:90`<br>`lib/lab/store.tsx:105` |
 | AsyncStorage | `cocktail.lab.projects` | getItem, setItem | `JSON.stringify(next` | LabStore | `lib/lab/store.tsx:70`<br>`lib/lab/store.tsx:89`<br>`lib/lab/store.tsx:100` |
 | AsyncStorage | `cocktail.prefs.v1` | getItem, setItem | `JSON.stringify(loadedPrefs；JSON.stringify(next` | RecipeStore | `lib/recipes/store.tsx:53`<br>`lib/recipes/store.tsx:398`<br>`lib/recipes/store.tsx:421`<br>`lib/recipes/store.tsx:718` |
-| AsyncStorage | `cocktail.recipes` | getItem, setItem | `JSON.stringify(recs；JSON.stringify(next；JSON.stringify(data.list` | RecipeStore | `lib/recipes/store.tsx:48`<br>`lib/recipes/store.tsx:231`<br>`lib/recipes/store.tsx:284`<br>`lib/recipes/store.tsx:458`<br>`lib/sync/photo-sync.ts:147`<br>`lib/sync/photo-sync.ts:330` |
+| AsyncStorage | `cocktail.recipes` | getItem, setItem | `sourceFieldResult.serializedRecipes；JSON.stringify(recs；JSON.stringify(next；JSON.stringify(data.list` | RecipeStore | `lib/migrations/purge-retired-book-library.ts:31`<br>`lib/migrations/purge-retired-book-library.ts:36`<br>`lib/recipes/store.tsx:48`<br>`lib/recipes/store.tsx:231`<br>`lib/recipes/store.tsx:284`<br>`lib/recipes/store.tsx:458`<br>`lib/sync/photo-sync.ts:147`<br>`lib/sync/photo-sync.ts:330` |
 | AsyncStorage | `cocktail.seeded` | getItem, setItem | `"1"` | RecipeStore | `lib/recipes/store.tsx:233`<br>`lib/recipes/store.tsx:280` |
 | AsyncStorage | `cocktail.tagGroups` | getItem, setItem | `JSON.stringify(mutableGroupList；JSON.stringify(next` | RecipeStore | `lib/recipes/store.tsx:51`<br>`lib/recipes/store.tsx:235`<br>`lib/recipes/store.tsx:356`<br>`lib/recipes/store.tsx:365`<br>`lib/recipes/store.tsx:378`<br>`lib/recipes/store.tsx:478` |
 | AsyncStorage | `cocktail.tags` | getItem, setItem | `JSON.stringify(tagList；JSON.stringify(next` | RecipeStore | `lib/recipes/store.tsx:50`<br>`lib/recipes/store.tsx:234`<br>`lib/recipes/store.tsx:292`<br>`lib/recipes/store.tsx:303`<br>`lib/recipes/store.tsx:312`<br>`lib/recipes/store.tsx:323`<br>`lib/recipes/store.tsx:335`<br>`lib/recipes/store.tsx:391`<br>`lib/recipes/store.tsx:470` |
@@ -126,9 +126,8 @@
 | AsyncStorage | `conflict.storageKey` | setItem | `lib/sync/engine.ts:955` |
 | AsyncStorage | `key` | getItem, setItem, removeItem | `hooks/use-persisted-state.ts:14`<br>`hooks/use-persisted-state.ts:37`<br>`lib/backup/icloud-backup.ts:248`<br>`lib/backup/local-backup.ts:646`<br>`lib/cf-sync/client.ts:42`<br>`lib/cf-sync/client.ts:50`<br>`lib/cf-sync/client.ts:57`<br>`lib/labor/store.tsx:53`<br>`lib/labor/store.tsx:66`<br>`lib/labor/store.tsx:80`<br>`lib/labor/store.tsx:91`<br>`lib/sync/engine.ts:651`<br>`lib/sync/engine.ts:669`<br>`lib/sync/engine.ts:671`<br>`lib/sync/engine.ts:744`<br>`lib/sync/engine.ts:813`<br>`lib/sync/engine.ts:833`<br>`lib/sync/engine.ts:880` |
 | SecureStore | `key` | setItemAsync, getItemAsync, deleteItemAsync | `lib/cf-sync/client.ts:44`<br>`lib/cf-sync/client.ts:52`<br>`lib/cf-sync/client.ts:59` |
-| AsyncStorage | `keys` | multiGet, multiRemove | `app/data-manager.tsx:49`<br>`app/data-manager.tsx:112`<br>`lib/backup/local-backup.ts:112`<br>`lib/backup/local-backup.ts:251`<br>`lib/backup/local-backup.ts:360` |
+| AsyncStorage | `keys` | multiGet, multiRemove | `app/data-manager.tsx:49`<br>`app/data-manager.tsx:112`<br>`lib/backup/local-backup.ts:112`<br>`lib/backup/local-backup.ts:251`<br>`lib/backup/local-backup.ts:360`<br>`lib/migrations/purge-retired-book-library.ts:25` |
 | AsyncStorage | `removals` | multiRemove | `lib/backup/local-backup.ts:320`<br>`lib/backup/local-backup.ts:368`<br>`lib/sync/engine.ts:502` |
-| AsyncStorage | `retiredKeys` | multiRemove | `lib/migrations/purge-retired-book-library.ts:12` |
 | AsyncStorage | `storageKey` | getItem, setItem | `lib/inventory-core/store.tsx:173`<br>`lib/inventory-core/store.tsx:182` |
 | AsyncStorage | `SUMMARY_KEYS` | multiGet | `lib/backup/local-backup.ts:463` |
 | SecureStore | `ticketKey(switchId` | setItemAsync, getItemAsync, deleteItemAsync | `lib/cf-sync/group-switch.ts:74`<br>`lib/cf-sync/group-switch.ts:79`<br>`lib/cf-sync/group-switch.ts:87` |

@@ -4,7 +4,7 @@
  *
  * 前置：
  *   1. npx expo export --platform web --output-dir dist-web
- *   2. Chromium 已以 remote debugging port 9222 启动（Manus 浏览器环境默认满足）
+ *   2. Chromium 已以 H5_CDP_PORT（默认 9222）启动。
  *
  * 此脚本启动带 SPA fallback 的静态服务，并在 375/390/430pt 下验证：
  *   - /labor 可加载且无根级横向溢出；
@@ -23,6 +23,7 @@ import { extname, join, normalize } from "node:path";
 const root = join(process.cwd(), "dist-web");
 const port = Number(process.env.H5_E2E_PORT ?? 8093);
 const route = `http://localhost:${port}/labor`;
+const cdpPort = Number(process.env.H5_CDP_PORT ?? 9222);
 // 极窄屏、主流窄屏与大屏手机均纳入回归，台账只能在自身容器内横向滚动。
 const MOBILE_VIEWPORTS = [320, 360, 375, 390, 412, 430];
 const contentTypes = {
@@ -47,7 +48,7 @@ function sleep(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
 async function getDedicatedTestTarget() {
   // 不复用“第一个页面”：它可能是用户正在登录Cloudflare或其他敏感站点的标签页。
   // Chromium DevTools允许创建专用about:blank页，H5测试只导航这一页。
-  const response = await fetch("http://localhost:9222/json/new?about:blank", { method: "PUT" });
+  const response = await fetch(`http://localhost:${cdpPort}/json/new?about:blank`, { method: "PUT" });
   if (!response.ok) throw new Error(`无法创建专用H5测试标签页：HTTP ${response.status}`);
   const target = await response.json();
   if (!target?.webSocketDebuggerUrl) throw new Error("专用H5测试标签页缺少CDP连接地址。");

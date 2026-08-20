@@ -532,9 +532,7 @@ export function RecipesScreen() {
         if (res.creator || res.createdYear) {
           const prevRef = r.sourceRef ?? {
             creator: "", createdYear: "", creatorConfidence: "low" as const,
-            bookTitle: "", bookAuthor: "", publisher: "", publishYear: "",
-            pageRef: "", chapterTitle: "", rawText: "", sourceUrl: "",
-            sourceConfidence: "medium" as const,
+            sourceUrl: "", sourceConfidence: "medium" as const,
           };
           if (!prevRef.creator && res.creator) {
             patch.sourceRef = { ...prevRef, creator: res.creator, createdYear: res.createdYear || prevRef.createdYear, creatorConfidence: "medium" };

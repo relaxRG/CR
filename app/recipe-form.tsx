@@ -284,7 +284,7 @@ export default function RecipeFormScreen() {
   const [source, setSource] = useState(editing?.source ?? "");
   const [sourceRef, setSourceRef] = useState<SourceRef>(editing?.sourceRef ?? emptySourceRef());
   const [showSourceRef, setShowSourceRef] = useState(
-    !!(editing?.sourceRef && (editing.sourceRef.bookTitle || editing.sourceRef.creator || editing.sourceRef.createdYear))
+    !!(editing?.sourceRef && (editing.sourceRef.creator || editing.sourceRef.createdYear || editing.sourceRef.sourceUrl))
   );
   const [story, setStory] = useState(editing?.story ?? "");
   const [flavorDesc, setFlavorDesc] = useState(editing?.flavorDesc ?? "");
@@ -1536,10 +1536,10 @@ export default function RecipeFormScreen() {
       cardTagOrder: null,
       drinkDuration: drinkDuration || undefined,
       occasion: occasion || undefined,
-      // 只有当用户填写了至少一个 sourceRef 字段时才保存
-      sourceRef: (sourceRef.bookTitle || sourceRef.creator || sourceRef.createdYear || sourceRef.bookAuthor || sourceRef.publishYear || sourceRef.chapterTitle || sourceRef.pageRef)
+      // 仅在存在创作者或网络来源时保存结构化来源。
+      sourceRef: (sourceRef.creator || sourceRef.createdYear || sourceRef.sourceUrl)
         ? sourceRef
-        : editing?.sourceRef,
+        : undefined,
   };
     if (editing) {
       updateRecipe(editing.id, draft);
@@ -2576,18 +2576,14 @@ export default function RecipeFormScreen() {
             onPress={() => setShowSourceRef((v) => !v)}
           >
             <IconSymbol name={showSourceRef ? "chevron.down" : "chevron.right"} size={14} color={colors.muted} />
-            <Text className="text-sm text-muted">{lang === "zh" ? "详细引用来源（书名/创作者/年份）" : "Detailed Source (book / creator / year)"}</Text>
+            <Text className="text-sm text-muted">{lang === "zh" ? "详细引用来源（创作者/网络地址）" : "Detailed Source (creator / web URL)"}</Text>
           </Pressable>
           {showSourceRef ? (
             <View className="bg-surface border border-border rounded-xl p-4 mt-2" style={{ gap: 10 }}>
               {([
-                { key: "bookTitle", label: lang === "zh" ? "书名" : "Book Title" },
-                { key: "bookAuthor", label: lang === "zh" ? "书作者" : "Book Author" },
-                { key: "publishYear", label: lang === "zh" ? "出版年份" : "Publish Year" },
-                { key: "chapterTitle", label: lang === "zh" ? "章节" : "Chapter" },
-                { key: "pageRef", label: lang === "zh" ? "页码" : "Page" },
                 { key: "creator", label: lang === "zh" ? "配方创作者" : "Creator" },
                 { key: "createdYear", label: lang === "zh" ? "创作年份" : "Created Year" },
+                { key: "sourceUrl", label: lang === "zh" ? "网络来源" : "Web URL" },
               ] as { key: keyof SourceRef; label: string }[]).map(({ key, label }) => (
                 <View key={String(key)}>
                   <Text className="text-xs text-muted mb-1">{label}</Text>

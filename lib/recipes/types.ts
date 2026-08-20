@@ -1,8 +1,6 @@
 /**
- * 引用来源结构体：区分「配方创作者」和「文字来源（书/网站）」
- * 创作者 = 谁发明了这款配方（调酒师/酒吧）
- * 文字来源 = 从哪里获得这个配方文本（书/网站）
- * 两者完全独立：一款1920年代的经典配方可能被收录在2014年出版的书中
+ * 引用来源结构体：保留配方创作者与可访问的网络来源。
+ * 已退役书库的书名、作者、出版、章节、页码及原文片段字段不再属于业务模型。
  */
 export interface SourceRef {
   // ── 配方创作者（谁发明了这款配方）──
@@ -13,24 +11,9 @@ export interface SourceRef {
   /** AI 对创作者信息的置信度 */
   creatorConfidence: "high" | "medium" | "low";
 
-  // ── 文字来源（从哪里获得这个配方文本）──
-  /** 书名/网站名，如 "Death & Co: Modern Classic Cocktails" */
-  bookTitle: string;
-  /** 书的作者，如 "David Kaplan, Nick Fauchald, Alex Day" */
-  bookAuthor: string;
-  /** 出版社，如 "Ten Speed Press" */
-  publisher: string;
-  /** 出版年份，如 "2014" */
-  publishYear: string;
-  /** 页码或章节位置，如 "p.234" / "Chapter 5" */
-  pageRef: string;
-  /** 章节标题，如 "Chapter Five: THE SPECS" */
-  chapterTitle: string;
-  /** 原始文字片段（直接复制的原文，供对照核实） */
-  rawText: string;
-  /** 网络来源 URL（非书籍时） */
+  /** 网络来源 URL。 */
   sourceUrl: string;
-  /** 文字来源的置信度：受支持导入=high，AI 推断=medium/low。 */
+  /** 网络来源的置信度：手动填写=high，AI 推断=medium/low。 */
   sourceConfidence: "high" | "medium" | "low";
 }
 
@@ -40,13 +23,6 @@ export function emptySourceRef(): SourceRef {
     creator: "",
     createdYear: "",
     creatorConfidence: "low",
-    bookTitle: "",
-    bookAuthor: "",
-    publisher: "",
-    publishYear: "",
-    pageRef: "",
-    chapterTitle: "",
-    rawText: "",
     sourceUrl: "",
     sourceConfidence: "low",
   };
@@ -352,7 +328,16 @@ export function normalizeRecipe(r: Partial<Recipe> & Pick<Recipe, "id" | "name">
   base.drinkDuration = r.drinkDuration ?? "";
   base.occasion = r.occasion ?? "";
   base.source = r.source ?? "";
-  base.sourceRef = r.sourceRef ?? undefined;
+  const legacySourceRef = r.sourceRef as Partial<SourceRef> | undefined;
+  base.sourceRef = legacySourceRef && (legacySourceRef.creator || legacySourceRef.createdYear || legacySourceRef.sourceUrl)
+    ? {
+        creator: legacySourceRef.creator ?? "",
+        createdYear: legacySourceRef.createdYear ?? "",
+        creatorConfidence: legacySourceRef.creatorConfidence ?? "low",
+        sourceUrl: legacySourceRef.sourceUrl ?? "",
+        sourceConfidence: legacySourceRef.sourceConfidence ?? "low",
+      }
+    : undefined;
   base.story = r.story ?? "";
   base.flavorDesc = r.flavorDesc ?? "";
   base.strengthBand = (r.strengthBand ?? "") as StrengthBand | "";

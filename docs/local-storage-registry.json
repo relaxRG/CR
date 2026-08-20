@@ -1,8 +1,8 @@
 {
   "version": 2,
   "generatedFrom": "docs/local-storage-schema.json",
-  "entryCount": 125,
-  "dynamicEntryCount": 25,
+  "entryCount": 124,
+  "dynamicEntryCount": 24,
   "entries": [
     {
       "backend": "AsyncStorage",
@@ -561,6 +561,7 @@
       "status": "resolved",
       "classification": "S0-public",
       "ownerFiles": [
+        "lib/migrations/purge-retired-book-library.ts",
         "lib/recipes/store.tsx",
         "lib/sync/photo-sync.ts"
       ],
@@ -946,7 +947,8 @@
       "classification": "S0-public",
       "ownerFiles": [
         "app/data-manager.tsx",
-        "lib/backup/local-backup.ts"
+        "lib/backup/local-backup.ts",
+        "lib/migrations/purge-retired-book-library.ts"
       ],
       "operations": [
         "multiGet",
@@ -1394,22 +1396,6 @@
       "ownerFiles": [
         "lib/backup/local-backup.ts",
         "lib/sync/engine.ts"
-      ],
-      "operations": [
-        "multiRemove"
-      ],
-      "dynamic": true,
-      "purgeOn": [
-        "version-retirement"
-      ]
-    },
-    {
-      "backend": "AsyncStorage",
-      "key": "retiredKeys",
-      "status": "unresolved",
-      "classification": "S0-public",
-      "ownerFiles": [
-        "lib/migrations/purge-retired-book-library.ts"
       ],
       "operations": [
         "multiRemove"

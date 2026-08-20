@@ -918,6 +918,20 @@
       "calls": [
         {
           "operation": "getItem",
+          "file": "lib/migrations/purge-retired-book-library.ts",
+          "line": 31,
+          "value": "",
+          "structure": ""
+        },
+        {
+          "operation": "setItem",
+          "file": "lib/migrations/purge-retired-book-library.ts",
+          "line": 36,
+          "value": "sourceFieldResult.serializedRecipes",
+          "structure": ""
+        },
+        {
+          "operation": "getItem",
           "file": "lib/recipes/store.tsx",
           "line": 48,
           "value": "",
@@ -1671,6 +1685,13 @@
           "line": 360,
           "value": "",
           "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
+        },
+        {
+          "operation": "multiRemove",
+          "file": "lib/migrations/purge-retired-book-library.ts",
+          "line": 25,
+          "value": "",
+          "structure": ""
         }
       ]
     },
@@ -2343,20 +2364,6 @@
           "line": 502,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
-        }
-      ]
-    },
-    {
-      "backend": "AsyncStorage",
-      "key": "retiredKeys",
-      "status": "unresolved",
-      "calls": [
-        {
-          "operation": "multiRemove",
-          "file": "lib/migrations/purge-retired-book-library.ts",
-          "line": 12,
-          "value": "",
-          "structure": ""
         }
       ]
     },
@@ -3640,6 +3647,13 @@
           "line": 360,
           "value": "",
           "structure": "EncryptedSnapshotV2, SnapshotV2Crypto, SnapshotV2KeyResolver, SnapshotMeta, Snapshot, SnapshotRestoreJournal, DataCounts"
+        },
+        {
+          "operation": "multiRemove",
+          "file": "lib/migrations/purge-retired-book-library.ts",
+          "line": 25,
+          "value": "",
+          "structure": ""
         }
       ]
     },
@@ -3668,20 +3682,6 @@
           "line": 502,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState"
-        }
-      ]
-    },
-    {
-      "backend": "AsyncStorage",
-      "key": "retiredKeys",
-      "status": "unresolved",
-      "calls": [
-        {
-          "operation": "multiRemove",
-          "file": "lib/migrations/purge-retired-book-library.ts",
-          "line": 12,
-          "value": "",
-          "structure": ""
         }
       ]
     },
