@@ -787,13 +787,7 @@ const STORAGE_KEY_LABELS: Record<string, string> = {
   "dish_analysis.snapshots.v1":      "菜品分析快照",
   // ★ 种子数据和迁移键（不常冲突，但需有友好名称）
   "cocktail.seeded":                 "酒库初始化标记",
-  "cocktail_waldorf_imported_v1":    "Waldorf 导入标记",
   "cocktail.bottles.seeded":         "酒款库初始化标记",
-  "cocktail.bottles.waldorf.v1":     "Waldorf 酒款库导入",
-  "homemade.seeded.v1":              "自制库初始化标记",
-  "homemade.waldorf.v1":             "Waldorf 自制库导入",
-  "homemade.waldorf.v2":             "Waldorf 自制库导入 v2",
-  "homemade.source.v3":              "自制库来源数据",
 };
 
 /** ★ 获取数据预览（条目数量） */

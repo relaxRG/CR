@@ -59,9 +59,6 @@ export function inferDrinkDuration(r: Pick<Recipe, "categoryId" | "glass" | "ing
   const codex = (r as { codexFamily?: string }).codexFamily ?? "";
   if (codex.includes("高球") || codex.includes("Highball") || codex.includes("菲兹") || codex.includes("Flip")) return "长饮";
   if (codex && (codex.includes("古典") || codex.includes("马天尼") || codex.includes("大吉利") || codex.includes("边车"))) return "短饮";
-  // 1. 原始分类直接给出答案(Waldorf 数据集)
-  if (r.categoryId === "cat-waldorf-short") return "短饮";
-  if (r.categoryId === "cat-waldorf-long") return "长饮";
   const glass = r.glass ?? "";
   const ingText = (r.ingredients ?? []).map((i) => `${i.name} ${i.amount}`).join(" ");
   // 2. 杯型判断
@@ -81,9 +78,6 @@ export function inferDrinkDuration(r: Pick<Recipe, "categoryId" | "glass" | "ing
 export function inferOccasion(
   r: Pick<Recipe, "categoryId" | "glass" | "ingredients" | "abv" | "codexFamily"> & { method?: string },
 ): string {
-  // 1. 原始分类直接给出答案
-  if (r.categoryId === "cat-waldorf-aperitif") return "餐前酒";
-  if (r.categoryId === "cat-waldorf-digestif") return "餐后酒";
   // 1b. Codex 家族维度（比配料规则优先级更高）
   const codexF = r.codexFamily ?? "";
   if (codexF.includes("古典") || codexF.includes("Old-Fashioned")) return "睡前酒";
@@ -100,8 +94,7 @@ export function inferOccasion(
     return hit(ingText, ["金巴利", "阿佩罗", "campari", "aperol"]) ? "餐前酒" : "睡前酒";
   }
   // 4. 提基/热带与无酒精 → 派对/全天
-  if (r.categoryId === "cat-waldorf-tiki" || hit(ingText, ["椰浆", "coconut"])) return "派对酒";
-  if (r.categoryId === "cat-waldorf-na") return "全天酒";
+  if (hit(ingText, ["椰浆", "coconut"])) return "派对酒";
   // 5. 按 ABV:>30% 烈性慢饮 → 睡前;<15% 清爽 → 全天;其余全天
   if (typeof r.abv === "number") {
     if (r.abv >= 30) return "睡前酒";

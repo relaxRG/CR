@@ -106,7 +106,7 @@ export interface HomemadePrep {
   storage: string;
   /**
    * 引用来源,与配方 source 标准一致:
-   * 如 "The Waldorf Astoria Bar Book · Frank Caiafa · 2016" 或 "店名 · 创作者 · 年份"。
+   * 如“书名 · 创作者 · 年份”或“店名 · 创作者 · 年份”。
    */
   source: string;
   /** 结构化引用来源（比 source 字符串更精细的版本，可选） */

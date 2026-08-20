@@ -138,24 +138,18 @@ export const STORAGE_POLICY: Readonly<Record<SyncStorageKey, StorageCapabilityPo
   "cocktail.tagGroups": policy("recipes.view", "recipes.manage"),
   "cocktail.categoryGroups": policy("recipes.view", "recipes.manage"),
   "cocktail.seeded": policy("recipes.view", "recipes.manage"),
-  "cocktail_waldorf_imported_v1": policy("recipes.view", "recipes.import"),
 
   // 酒款库
   "cocktail.bottles": policy("bottles.view", "bottles.edit"),
   "cocktail.bottles.seeded": policy("bottles.view", "bottles.manage"),
-  "cocktail.bottles.waldorf.v1": policy("bottles.view", "bottles.import"),
   "bottles.taxonomy.categories.v1": policy("bottles.view", "bottles.manage"),
   "bottles.taxonomy.styles.v1": policy("bottles.view", "bottles.manage"),
 
   // 自制品与研发
   "homemade.preps.v1": policy("homemade.view", "homemade.edit"),
-  "homemade.seeded.v1": policy("homemade.view", "homemade.manage"),
   "homemade.sections.v1": policy("homemade.view", "homemade.manage"),
   "homemade.types.v1": policy("homemade.view", "homemade.manage"),
   "homemade.taxonomy.v2": policy("homemade.view", "homemade.manage"),
-  "homemade.waldorf.v1": policy("homemade.view", "homemade.import"),
-  "homemade.waldorf.v2": policy("homemade.view", "homemade.import"),
-  "homemade.source.v3": policy("homemade.view", "homemade.manage"),
   "cocktail.lab.projects": policy("lab_projects.view", "lab_projects.edit"),
   "cocktail.lab.batches": policy("lab_batches.view", "lab_batches.edit"),
   "lab.plan.v1": policy("lab_plan.view", "lab_plan.edit"),

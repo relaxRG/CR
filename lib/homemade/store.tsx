@@ -9,8 +9,6 @@ import React, {
   useState,
 } from "react";
 
-import { buildSamplePreps } from "./seed";
-import { buildWaldorfPreps, findFullPrepByName } from "../bottles/waldorf-ingredients";
 import {
   HomemadePrep,
   PREP_SECTION_MIGRATION,
@@ -25,17 +23,10 @@ import {
 } from "./types";
 
 const PREPS_KEY = "homemade.preps.v1";
-const PREPS_SEEDED_KEY = "homemade.seeded.v1";
 const SECTIONS_KEY = "homemade.sections.v1";
 const TYPES_KEY = "homemade.types.v1";
 /** v2 迁移标记:含酒精/无酒精分组体系 */
 const TAXONOMY_V2_KEY = "homemade.taxonomy.v2";
-/** 《Waldorf》自制配料数据集导入标记 */
-const WALDORF_PREPS_FLAG = "homemade.waldorf.v1";
-/** 《Waldorf》v2:书中 House-Made Recipes 完整做法回填/去重/增补标记 */
-const WALDORF_PREPS_V2_FLAG = "homemade.waldorf.v2";
-/** v3:notes 中来源类文字提取归入 source 字段并去重的一次性迁移标记 */
-const PREP_SOURCE_V3_FLAG = "homemade.source.v3";
 
 /** 从 notes 中辩证提取来源类文字:返回 [提取出的来源, 清理后的 notes];无来源时返回 [null, 原 notes] */
 export function extractSourceFromNotes(notes: string): [string | null, string] {
@@ -49,8 +40,6 @@ export function extractSourceFromNotes(notes: string): [string | null, string] {
     /^(?:Adapted|Taken)\s+from\s+(.+)$/i,
     /^(?:摘录自|改编自)\s*(.+)$/,
   ];
-  // 书名类内嵌:整行提及 Waldorf Astoria Bar Book 且为纯来源句(短句,无做法动词)
-  const bookRe = /The\s+Waldorf\s+Astoria\s+Bar\s+Book|《?华尔道夫[·・]?阿斯托里亚酒吧手册》?/i;
   for (const line of lines) {
     const trimmed = line.trim();
     let matched = false;
@@ -61,10 +50,6 @@ export function extractSourceFromNotes(notes: string): [string | null, string] {
         matched = true;
         break;
       }
-    }
-    if (!matched && bookRe.test(trimmed) && trimmed.length <= 60) {
-      sourceLines.push(trimmed.replace(/^[-·•\s]+/, ""));
-      matched = true;
     }
     if (!matched) kept.push(line);
   }
@@ -96,7 +81,6 @@ interface HomemadeStore {
   setPrepRating: (id: string, rating: number | null) => void;
   setPrepGroup: (id: string, group: PrepGroup | null) => void;
   reorderPreps: (orderedIds: string[]) => void;
-  importSamples: () => number;
   getPrep: (id: string | undefined) => HomemadePrep | undefined;
   // Section management
   addSection: (en: string, zh: string, group?: PrepGroup) => PrepSection | null;
@@ -226,131 +210,7 @@ export function HomemadeProvider({ children }: { children: React.ReactNode }) {
             notifySyncChange(PREPS_KEY);
           }
         }
-        // 《Waldorf》自制配料数据集:首次加载时一次性合入(按中/英名去重,幂等)
-        {
-          const waldorfDone = await AsyncStorage.getItem(WALDORF_PREPS_FLAG);
-          if (!waldorfDone) {
-            const names = new Set<string>();
-            for (const p of finalList) {
-              if (p.name) names.add(p.name.trim().toLowerCase());
-              if (p.nameAlt) names.add(p.nameAlt.trim().toLowerCase());
-            }
-            const fresh = buildWaldorfPreps().filter(
-              (p) =>
-                !names.has(p.name.trim().toLowerCase()) &&
-                !names.has(p.nameAlt.trim().toLowerCase()),
-            );
-            if (fresh.length > 0) {
-              finalList = [...finalList, ...fresh];
-              AsyncStorage.setItem(PREPS_KEY, JSON.stringify(finalList)).catch(() => {});
-              notifySyncChange(PREPS_KEY);
-            }
-            AsyncStorage.setItem(WALDORF_PREPS_FLAG, "1").catch(() => {});
-            notifySyncChange(WALDORF_PREPS_FLAG);
-          }
-        }
-        // 《Waldorf》v2:书中完整做法回填存量空壳条目 + 归一去重 + 增补新条目(一次性,幂等)
-        {
-          const v2Done = await AsyncStorage.getItem(WALDORF_PREPS_V2_FLAG);
-          if (!v2Done) {
-            let changed = false;
-            // 1) 存量空壳 builtin 条目(无配料且无做法)按名回填完整数据
-            finalList = finalList.map((p) => {
-              if (!p.builtin || p.ingredients.length > 0 || p.recipe.trim()) return p;
-              const full = findFullPrepByName(p.name) ?? findFullPrepByName(p.nameAlt);
-              if (!full) return p;
-              changed = true;
-              return {
-                ...p,
-                type: full.type,
-                ingredients: full.ingredients,
-                recipe: full.recipe,
-                yield: full.yield,
-                shelfLife: full.shelfLife,
-                storage: full.storage,
-                notes: p.notes && !full.notes.includes(p.notes) ? `${full.notes}\n${p.notes}` : full.notes,
-                updatedAt: Date.now(),
-              };
-            });
-            // 2) 回填后按"英文名|中文名"去重(保留用户自建/信息更全的一条)
-            const seen = new Map<string, number>();
-            const deduped: HomemadePrep[] = [];
-            for (const p of finalList) {
-              const key = `${p.name.trim().toLowerCase()}|${p.nameAlt.trim()}`;
-              const prev = seen.get(key);
-              if (prev === undefined) {
-                seen.set(key, deduped.length);
-                deduped.push(p);
-              } else {
-                const a = deduped[prev];
-                const score = (x: HomemadePrep) =>
-                  (x.builtin ? 0 : 4) + (x.recipe.trim() ? 1 : 0) + (x.ingredients.length ? 1 : 0);
-                if (score(p) > score(a)) deduped[prev] = p;
-                changed = true;
-              }
-            }
-            finalList = deduped;
-            // 3) 补入书中新提取、库内尚无的条目
-            const names = new Set<string>();
-            for (const p of finalList) {
-              if (p.name) names.add(p.name.trim().toLowerCase());
-              if (p.nameAlt) names.add(p.nameAlt.trim().toLowerCase());
-            }
-            const fresh = buildWaldorfPreps().filter(
-              (p) =>
-                !names.has(p.name.trim().toLowerCase()) &&
-                !names.has(p.nameAlt.trim().toLowerCase()),
-            );
-            if (fresh.length > 0) {
-              finalList = [...finalList, ...fresh];
-              changed = true;
-            }
-            if (changed) {
-              AsyncStorage.setItem(PREPS_KEY, JSON.stringify(finalList)).catch(() => {});
-              notifySyncChange(PREPS_KEY);
-            }
-            AsyncStorage.setItem(WALDORF_PREPS_V2_FLAG, "1").catch(() => {});
-            notifySyncChange(WALDORF_PREPS_V2_FLAG);
-          }
-        }
-        // v3:notes 中来源类文字提取归入 source 字段,并从 notes 删除重复信息(一次性,幂等)
-        {
-          const v3Done = await AsyncStorage.getItem(PREP_SOURCE_V3_FLAG);
-          if (!v3Done) {
-            let changed = false;
-            finalList = finalList.map((p) => {
-              // builtin Waldorf 条目:统一补书籍来源
-              const isWaldorf =
-                p.builtin &&
-                (/waldorf/i.test(p.notes) || /waldorf/i.test(p.source ?? "") || p.builtin);
-              const [extracted, cleanedNotes] = extractSourceFromNotes(p.notes);
-              let nextSource = p.source ?? "";
-              let nextNotes = p.notes;
-              if (extracted) {
-                nextSource = nextSource
-                  ? nextSource.includes(extracted)
-                    ? nextSource
-                    : `${nextSource} · ${extracted}`
-                  : extracted;
-                nextNotes = cleanedNotes;
-              }
-              if (!nextSource && isWaldorf && /waldorf/i.test(`${p.notes} ${p.recipe}`)) {
-                nextSource = "The Waldorf Astoria Bar Book · Frank Caiafa";
-              }
-              if (nextSource !== (p.source ?? "") || nextNotes !== p.notes) {
-                changed = true;
-                return { ...p, source: nextSource, notes: nextNotes, updatedAt: Date.now() };
-              }
-              return p;
-            });
-            if (changed) {
-              AsyncStorage.setItem(PREPS_KEY, JSON.stringify(finalList)).catch(() => {});
-              notifySyncChange(PREPS_KEY);
-            }
-            AsyncStorage.setItem(PREP_SOURCE_V3_FLAG, "1").catch(() => {});
-            notifySyncChange(PREP_SOURCE_V3_FLAG);
-          }
-        }
+        // 参考资料不属于首次安装数据：仅保留用户主动创建或导入的自制条目。
         setPreps(finalList);
         if (needMigrate) {
           AsyncStorage.setItem(SECTIONS_KEY, JSON.stringify(nextSections)).catch(() => {});
@@ -524,19 +384,6 @@ export function HomemadeProvider({ children }: { children: React.ReactNode }) {
     [preps, persist],
   );
 
-  const importSamples = useCallback(() => {
-    const existing = new Set(preps.map((p) => p.name.trim().toLowerCase()));
-    const fresh = buildSamplePreps().filter(
-      (p) => !existing.has(p.name.trim().toLowerCase()),
-    );
-    if (fresh.length > 0) {
-      persist([...fresh, ...preps]);
-      AsyncStorage.setItem(PREPS_SEEDED_KEY, "1").catch(() => {});
-      notifySyncChange(PREPS_SEEDED_KEY);
-    }
-    return fresh.length;
-  }, [preps, persist]);
-
   const getPrep = useCallback(
     (id: string | undefined) => preps.find((p) => p.id === id),
     [preps],
@@ -690,7 +537,6 @@ export function HomemadeProvider({ children }: { children: React.ReactNode }) {
       setPrepRating,
       setPrepGroup,
       reorderPreps,
-      importSamples,
       getPrep,
       addSection,
       renameSection,
@@ -718,7 +564,6 @@ export function HomemadeProvider({ children }: { children: React.ReactNode }) {
       setPrepRating,
       setPrepGroup,
       reorderPreps,
-      importSamples,
       getPrep,
       addSection,
       renameSection,

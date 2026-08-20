@@ -15,27 +15,26 @@ import { createSnapshot } from "@/lib/backup/local-backup";
 // ── Key groups ──────────────────────────────────────────────────────────────
 const RECIPE_KEYS = [
   "cocktail.recipes", "cocktail.categories", "cocktail.seeded",
-  "cocktail.tags", "cocktail.tagGroups", "cocktail_waldorf_imported_v1",
+  "cocktail.tags", "cocktail.tagGroups",
 ];
 const BOTTLE_KEYS = [
-  "cocktail.bottles", "cocktail.bottles.seeded", "cocktail.bottles.waldorf.v1",
+  "cocktail.bottles", "cocktail.bottles.seeded",
   "bottles.material.migrated.v8", "bottles.material.migrated.v9",
   "bottles.taxonomy.categories.v1", "bottles.taxonomy.styles.v1",
 ];
 const PREP_KEYS = [
-  "homemade.preps.v1", "homemade.seeded.v1", "homemade.sections.v1",
+  "homemade.preps.v1", "homemade.sections.v1",
   "homemade.types.v1", "homemade.taxonomy.v2",
-  "homemade.waldorf.v1", "homemade.waldorf.v2", "homemade.source.v3",
 ];
 const LAB_KEYS = ["cocktail.lab.projects", "cocktail.lab.batches"];
 const BOOK_KEYS = ["cocktail.books.v1"];
 const MISC_KEYS = ["menu_store_v1", "shopping_store_v1", "cocktail.iceSettings.v2", "card.tag.settings.v2"];
 const SYNC_BASE_KEYS = [
   "cocktail.recipes","cocktail.categories","cocktail.tags","cocktail.tagGroups",
-  "cocktail.seeded","cocktail_waldorf_imported_v1","cocktail.bottles",
-  "cocktail.bottles.seeded","cocktail.bottles.waldorf.v1","homemade.preps.v1",
-  "homemade.seeded.v1","homemade.sections.v1","homemade.types.v1",
-  "homemade.taxonomy.v2","homemade.waldorf.v1","bottles.taxonomy.categories.v1",
+  "cocktail.seeded","cocktail.bottles",
+  "cocktail.bottles.seeded","homemade.preps.v1",
+  "homemade.sections.v1","homemade.types.v1",
+  "homemade.taxonomy.v2","bottles.taxonomy.categories.v1",
   "bottles.taxonomy.styles.v1","cocktail.lab.projects","cocktail.lab.batches",
   "app.lang.v1","cocktail.books.v1","menu_store_v1","shopping_store_v1",
   "cocktail.iceSettings.v2",

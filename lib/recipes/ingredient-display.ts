@@ -1,16 +1,7 @@
 /**
  * 配料/装饰/做法的双语显示工具。
- * 解决历史配方(如 Waldorf 数据集)中配料名混写存储、
- * 在英文界面显示中文或在中文界面显示英文的混杂问题。
- *
- * 匹配优先级:
- * 1. Waldorf 别名映射(903 条原始名 → 规范中英名)
- * 2. 酒库条目(nameZh / nameEn 双语)
- * 3. 自制库条目(name 英文 / nameAlt 中文)
- * 4. 常用调酒词词典(冷水/柠檬皮/薄荷叶等通用词)
- * 5. 回退:原文显示(不生造翻译)
+ * 优先使用用户主动录入的酒库和自制库资料；无法解析时保持原文，绝不从安装包注入业务参考数据。
  */
-import { WALDORF_ALIAS_MAP, WALDORF_STEPS_EN } from "../bottles/waldorf-ingredients";
 import type { Bottle } from "../bottles/types";
 import type { HomemadePrep } from "../homemade/types";
 
@@ -80,20 +71,6 @@ const COMMON_EN_ZH: Record<string, string> = Object.fromEntries(
   Object.entries(COMMON_ZH_EN).map(([zh, en]) => [norm(en), zh]),
 );
 
-/** Waldorf 别名反查索引(规范化小写名 → {en, zh}),懒构建 */
-let aliasIndex: Map<string, { en: string; zh: string }> | null = null;
-function getAliasIndex(): Map<string, { en: string; zh: string }> {
-  if (!aliasIndex) {
-    aliasIndex = new Map();
-    for (const [alias, v] of Object.entries(WALDORF_ALIAS_MAP)) {
-      aliasIndex.set(norm(alias), { en: v.en, zh: v.zh });
-      aliasIndex.set(norm(v.en), { en: v.en, zh: v.zh });
-      aliasIndex.set(norm(v.zh), { en: v.en, zh: v.zh });
-    }
-  }
-  return aliasIndex;
-}
-
 /** 解析配料名的规范中英文名;返回 null 表示无法解析(调用方回退原文) */
 export function resolveIngredientNames(
   rawName: string,
@@ -102,8 +79,6 @@ export function resolveIngredientNames(
 ): { en: string; zh: string } | null {
   const key = norm(rawName);
   if (!key) return null;
-  const hit = getAliasIndex().get(key);
-  if (hit && hit.en && hit.zh) return hit;
   if (bottles) {
     const b = bottles.find((x) => norm(x.nameZh) === key || norm(x.nameEn) === key);
     if (b && b.nameZh && b.nameEn) return { en: b.nameEn, zh: b.nameZh };
@@ -115,7 +90,6 @@ export function resolveIngredientNames(
   const trimmed = rawName.trim();
   if (COMMON_ZH_EN[trimmed]) return { en: COMMON_ZH_EN[trimmed], zh: trimmed };
   if (COMMON_EN_ZH[key]) return { en: trimmed, zh: COMMON_EN_ZH[key] };
-  if (hit) return { en: hit.en || trimmed, zh: hit.zh || trimmed };
   return null;
 }
 
@@ -142,7 +116,6 @@ export function garnishDisplayText(
   if (!t) return t;
   if (lang === "zh" && hasCJK(t) && !/[A-Za-z]{3,}/.test(t)) return t;
   if (lang === "en" && !hasCJK(t)) return t;
-  if (lang === "en" && WALDORF_STEPS_EN[t]) return WALDORF_STEPS_EN[t];
   const whole = resolveIngredientNames(t, bottles, preps);
   if (whole) return lang === "en" ? whole.en || t : whole.zh || t;
   const parts = t.split(/([,,;;、/]|\s+和\s+|\s+and\s+)/);
@@ -167,7 +140,7 @@ export function stepsDisplayText(raw: string, lang: Lang): string {
     .map((ln) => {
       const t = ln.trim();
       if (!t || !hasCJK(t)) return ln;
-      return WALDORF_STEPS_EN[t] ?? ln;
+      return ln;
     })
     .join("\n");
 }

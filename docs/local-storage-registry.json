@@ -1,7 +1,7 @@
 {
   "version": 1,
   "generatedFrom": "docs/local-storage-schema.json",
-  "entryCount": 134,
+  "entryCount": 129,
   "dynamicEntryCount": 26,
   "entries": [
     {
@@ -163,7 +163,6 @@
       "status": "resolved",
       "classification": "S0-public",
       "ownerFiles": [
-        "lib/cf-sync/provider.tsx",
         "lib/i18n/index.tsx"
       ],
       "operations": [
@@ -377,24 +376,6 @@
       "operations": [
         "getItem",
         "removeItem",
-        "setItem"
-      ],
-      "dynamic": false,
-      "purgeOn": [
-        "startup-ttl",
-        "leave-group"
-      ]
-    },
-    {
-      "backend": "AsyncStorage",
-      "key": "cf.sync.prevAllowedKeys.v1",
-      "status": "resolved",
-      "classification": "S3-diagnostic",
-      "ownerFiles": [
-        "lib/cf-sync/provider.tsx"
-      ],
-      "operations": [
-        "getItem",
         "setItem"
       ],
       "dynamic": false,
@@ -954,39 +935,6 @@
     },
     {
       "backend": "AsyncStorage",
-      "key": "homemade.seeded.v1",
-      "status": "resolved",
-      "classification": "S0-public",
-      "ownerFiles": [
-        "lib/homemade/store.tsx"
-      ],
-      "operations": [
-        "setItem"
-      ],
-      "dynamic": false,
-      "purgeOn": [
-        "version-retirement"
-      ]
-    },
-    {
-      "backend": "AsyncStorage",
-      "key": "homemade.source.v3",
-      "status": "resolved",
-      "classification": "S0-public",
-      "ownerFiles": [
-        "lib/homemade/store.tsx"
-      ],
-      "operations": [
-        "getItem",
-        "setItem"
-      ],
-      "dynamic": false,
-      "purgeOn": [
-        "version-retirement"
-      ]
-    },
-    {
-      "backend": "AsyncStorage",
       "key": "homemade.taxonomy.v2",
       "status": "resolved",
       "classification": "S0-public",
@@ -1005,40 +953,6 @@
     {
       "backend": "AsyncStorage",
       "key": "homemade.types.v1",
-      "status": "resolved",
-      "classification": "S0-public",
-      "ownerFiles": [
-        "lib/homemade/store.tsx"
-      ],
-      "operations": [
-        "getItem",
-        "setItem"
-      ],
-      "dynamic": false,
-      "purgeOn": [
-        "version-retirement"
-      ]
-    },
-    {
-      "backend": "AsyncStorage",
-      "key": "homemade.waldorf.v1",
-      "status": "resolved",
-      "classification": "S0-public",
-      "ownerFiles": [
-        "lib/homemade/store.tsx"
-      ],
-      "operations": [
-        "getItem",
-        "setItem"
-      ],
-      "dynamic": false,
-      "purgeOn": [
-        "version-retirement"
-      ]
-    },
-    {
-      "backend": "AsyncStorage",
-      "key": "homemade.waldorf.v2",
       "status": "resolved",
       "classification": "S0-public",
       "ownerFiles": [
@@ -1093,7 +1007,6 @@
       "status": "unresolved",
       "classification": "S0-public",
       "ownerFiles": [
-        "app/role-settings.tsx",
         "hooks/use-persisted-state.ts",
         "lib/backup/icloud-backup.ts",
         "lib/backup/local-backup.ts",
@@ -2308,7 +2221,6 @@
       "status": "unresolved",
       "classification": "S0-public",
       "ownerFiles": [
-        "app/role-settings.tsx",
         "lib/cf-sync/client.ts"
       ],
       "operations": [

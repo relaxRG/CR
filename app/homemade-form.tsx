@@ -2225,8 +2225,8 @@ export default function HomemadeFormScreen() {
             onChangeText={setSource}
             placeholder={
               lang === "en"
-                ? "e.g. The Waldorf Astoria Bar Book · Frank Caiafa · 2016"
-                : "如:The Waldorf Astoria Bar Book · Frank Caiafa · 2016"
+                ? "e.g. Book / Creator / Year"
+                : "如:书名 · 创作者 · 年份"
             }
             placeholderTextColor={colors.muted}
             returnKeyType="done"
