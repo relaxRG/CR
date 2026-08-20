@@ -73,7 +73,7 @@ describe("库存工作台紧凑布局与移动端交互护栏", () => {
   it("H5回归覆盖十类分类页签的尺寸一致性以及葡萄酒供货商信息工作台", () => {
     const h5 = read("scripts/h5-schedule-correction-e2e.mjs");
     expect(h5).toContain("葡萄酒供货商信息工作台");
-    expect(h5).toContain("wine-workspace-tabs-supplier");
+    expect(h5).toContain("wine-workspace-tab-supplier");
     expect(h5).toContain("wine-supplier-open-library");
     expect(h5).toContain("wine-supplier-record-purchase");
     expect(h5).toContain("fruit-inventory-tab-summary");

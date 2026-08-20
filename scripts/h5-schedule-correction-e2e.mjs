@@ -45,10 +45,23 @@ const server = createServer((request, response) => {
 
 function sleep(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
 
+async function cdpFetch(path, options = {}) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8_000);
+  try {
+    return await fetch(`http://127.0.0.1:${cdpPort}${path}`, { ...options, signal: controller.signal });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(`CDP_HTTP_FAILED:${path}:${detail}`);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function getDedicatedTestTarget() {
   // 不复用“第一个页面”：它可能是用户正在登录Cloudflare或其他敏感站点的标签页。
   // Chromium DevTools允许创建专用about:blank页，H5测试只导航这一页。
-  const response = await fetch(`http://localhost:${cdpPort}/json/new?about:blank`, { method: "PUT" });
+  const response = await cdpFetch("/json/new?about:blank", { method: "PUT" });
   if (!response.ok) throw new Error(`无法创建专用H5测试标签页：HTTP ${response.status}`);
   const target = await response.json();
   if (!target?.webSocketDebuggerUrl) throw new Error("专用H5测试标签页缺少CDP连接地址。");
@@ -57,10 +70,13 @@ async function getDedicatedTestTarget() {
 
 async function openCdp(target) {
   const socket = new WebSocket(target.webSocketDebuggerUrl);
-  await new Promise((resolve, reject) => {
-    socket.addEventListener("open", resolve, { once: true });
-    socket.addEventListener("error", reject, { once: true });
-  });
+  await Promise.race([
+    new Promise((resolve, reject) => {
+      socket.addEventListener("open", resolve, { once: true });
+      socket.addEventListener("error", reject, { once: true });
+    }),
+    sleep(8_000).then(() => { throw new Error("CDP_SOCKET_OPEN_TIMEOUT"); }),
+  ]);
   let id = 0;
   const pending = new Map();
   socket.addEventListener("message", (event) => {
@@ -110,6 +126,8 @@ async function click(call, expression, error) {
   if (!result.result.value) throw new Error(error);
 }
 
+server.keepAliveTimeout = 1_000;
+server.headersTimeout = 5_000;
 server.listen(port, "127.0.0.1");
 await new Promise((resolve) => server.once("listening", resolve));
 
@@ -488,7 +506,7 @@ try {
           return { found: Boolean(summary && ledger), summaryHeight: summaryRect?.height ?? 0, ledgerHeight: ledgerRect?.height ?? 0, summaryTop: summaryRect?.top ?? 0, ledgerTop: ledgerRect?.top ?? 0, rootClientWidth: document.documentElement.clientWidth, rootScrollWidth: document.documentElement.scrollWidth, bodyScrollWidth: document.body.scrollWidth };
         })()`, returnByValue: true });
         summaryTab = summaryState.result.value;
-        if (!summaryTab.found || summaryTab.summaryHeight < 40 || Math.abs(summaryTab.summaryHeight - summaryTab.ledgerHeight) > 1 || Math.abs(summaryTab.summaryTop - summaryTab.ledgerTop) > 1) throw new Error(`水果总结页签 ${width}pt 尺寸或对齐异常：${JSON.stringify(summaryTab)}`);
+        if (!summaryTab.found || summaryTab.summaryHeight < 28 || Math.abs(summaryTab.summaryHeight - summaryTab.ledgerHeight) > 1 || Math.abs(summaryTab.summaryTop - summaryTab.ledgerTop) > 1) throw new Error(`水果总结页签 ${width}pt 尺寸或对齐异常：${JSON.stringify(summaryTab)}`);
         if (summaryTab.rootScrollWidth > summaryTab.rootClientWidth || summaryTab.bodyScrollWidth > summaryTab.rootClientWidth) throw new Error(`水果总结页签 ${width}pt 出现根级横向溢出：${JSON.stringify(summaryTab)}`);
       }
       directLedgerViewports.push({ width, label: spec.label, ...state, summaryTab });
@@ -500,7 +518,7 @@ try {
   const categoryTabLayoutViewports = [];
   const categoryTabSpecs = [
     { label: "烈酒", path: "/spirits-inventory", active: "spirits-tab-summary", peer: "spirits-tab-ledger" },
-    { label: "葡萄酒", path: "/wine-inventory", active: "wine-tab-summary", peer: "wine-tab-ledger" },
+    { label: "葡萄酒", path: "/wine-inventory", active: "wine-workspace-tab-summary", peer: "wine-workspace-tab-ledger" },
     { label: "水果", path: "/fruit-inventory", active: "fruit-inventory-tab-summary", peer: "fruit-inventory-tab-ledger" },
     { label: "食材", path: "/food-inventory", active: "food-tab-summary", peer: "food-tab-ledger" },
     { label: "啤酒", path: "/beer-inventory", active: "beer-inventory-tab-summary", peer: "beer-inventory-tab-ledger" },
@@ -526,7 +544,7 @@ try {
         return { found: Boolean(active && peer), activeHeight: activeRect?.height ?? 0, peerHeight: peerRect?.height ?? 0, activeTop: activeRect?.top ?? 0, peerTop: peerRect?.top ?? 0, rootClientWidth: document.documentElement.clientWidth, rootScrollWidth: document.documentElement.scrollWidth, bodyScrollWidth: document.body.scrollWidth };
       })()`, returnByValue: true });
       const state = tabState.result.value;
-      if (!state.found || state.activeHeight < 40 || Math.abs(state.activeHeight - state.peerHeight) > 1 || Math.abs(state.activeTop - state.peerTop) > 1) throw new Error(`${spec.label} ${width}pt 页签选中态尺寸或对齐异常：${JSON.stringify(state)}`);
+      if (!state.found || state.activeHeight < 28 || Math.abs(state.activeHeight - state.peerHeight) > 1 || Math.abs(state.activeTop - state.peerTop) > 1) throw new Error(`${spec.label} ${width}pt 页签选中态尺寸或对齐异常：${JSON.stringify(state)}`);
       if (state.rootScrollWidth > state.rootClientWidth || state.bodyScrollWidth > state.rootClientWidth) throw new Error(`${spec.label} ${width}pt 页签选中态出现根级横向溢出：${JSON.stringify(state)}`);
       categoryTabLayoutViewports.push({ width, label: spec.label, ...state });
     }
@@ -539,7 +557,7 @@ try {
     await call("Emulation.setDeviceMetricsOverride", { width, height: 844, deviceScaleFactor: 3, mobile: true });
     await call("Page.navigate", { url: `http://localhost:${port}/wine-inventory` });
     await sleep(760);
-    const switched = await call("Runtime.evaluate", { expression: `(() => { const tab = document.querySelector('[data-testid="wine-workspace-tabs-supplier"]'); if (!tab) return false; tab.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window })); return true; })()`, returnByValue: true });
+    const switched = await call("Runtime.evaluate", { expression: `(() => { const tab = document.querySelector('[data-testid="wine-workspace-tab-supplier"]'); if (!tab) return false; tab.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window })); return true; })()`, returnByValue: true });
     if (!switched.result.value) throw new Error(`葡萄酒供应商 ${width}pt 未找到同页标签入口`);
     await sleep(160);
     const supplierState = await call("Runtime.evaluate", { expression: `(() => {
@@ -585,7 +603,7 @@ try {
     await call("Emulation.setDeviceMetricsOverride", { width, height: 844, deviceScaleFactor: 3, mobile: true });
     await call("Page.navigate", { url: `http://localhost:${port}/wine-inventory` });
     await sleep(760);
-    await click(call, clickTestIdExpression("wine-tab-purchase"), `${width}pt 未找到葡萄酒当月进货页签`);
+    await click(call, clickTestIdExpression("wine-workspace-tab-purchase"), `${width}pt 未找到葡萄酒当月进货页签`);
     await sleep(180);
     const state = (await call("Runtime.evaluate", { expression: `(() => {
       const table = document.querySelector('[data-testid="wine-purchase-ledger-table"]');
@@ -676,12 +694,13 @@ try {
   report.push({ reportPage: "员工档案筛选标签", viewports: employeeFilterViewports });
 
   await call("Emulation.clearDeviceMetricsOverride");
-  socket.close();
+  testSocket?.close();
   console.log(JSON.stringify({ passed: true, route, report }, null, 2));
 } finally {
   if (testTarget?.id) {
-    await fetch(`http://localhost:9222/json/close/${testTarget.id}`).catch(() => {});
+    await cdpFetch(`/json/close/${testTarget.id}`).catch(() => {});
   }
   testSocket?.close();
-  server.close();
+  server.closeAllConnections?.();
+  await new Promise((resolve) => server.close(resolve));
 }

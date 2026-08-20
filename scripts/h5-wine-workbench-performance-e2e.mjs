@@ -4,6 +4,7 @@ import { dirname, extname, join, normalize } from "node:path";
 
 const root = join(process.cwd(), "dist-web");
 const port = Number(process.env.H5_E2E_PORT ?? 8097);
+const cdpPort = Number(process.env.H5_CDP_PORT ?? 9222);
 const reportPath = process.env.WINE_PERF_REPORT ?? "/tmp/cocktail-r-wine-workbench-performance.json";
 const viewports = [320, 375, 430];
 const contentTypes = {
@@ -29,8 +30,18 @@ const server = createServer((request, response) => {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+async function cdpFetch(path, options = {}) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8_000);
+  try {
+    return await fetch(`http://127.0.0.1:${cdpPort}${path}`, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function getTarget() {
-  const response = await fetch("http://localhost:9222/json/new?about:blank", { method: "PUT" });
+  const response = await cdpFetch("/json/new?about:blank", { method: "PUT" });
   if (!response.ok) throw new Error(`无法创建性能测试页面：HTTP ${response.status}`);
   const target = await response.json();
   if (!target?.webSocketDebuggerUrl) throw new Error("性能测试页面缺少 DevTools 地址。");
@@ -39,10 +50,13 @@ async function getTarget() {
 
 async function openCdp(target) {
   const socket = new WebSocket(target.webSocketDebuggerUrl);
-  await new Promise((resolve, reject) => {
-    socket.addEventListener("open", resolve, { once: true });
-    socket.addEventListener("error", reject, { once: true });
-  });
+  await Promise.race([
+    new Promise((resolve, reject) => {
+      socket.addEventListener("open", resolve, { once: true });
+      socket.addEventListener("error", reject, { once: true });
+    }),
+    sleep(8_000).then(() => { throw new Error("CDP_SOCKET_OPEN_TIMEOUT"); }),
+  ]);
   let id = 0;
   const pending = new Map();
   socket.addEventListener("message", (event) => {
@@ -172,12 +186,15 @@ function metricSnapshot(metrics) {
   };
 }
 
+server.keepAliveTimeout = 1_000;
+server.headersTimeout = 5_000;
 server.listen(port, "127.0.0.1");
 await new Promise((resolve) => server.once("listening", resolve));
 
 let socket;
+let target;
 try {
-  const target = await getTarget();
+  target = await getTarget();
   const cdp = await openCdp(target);
   socket = cdp.socket;
   const { call } = cdp;
@@ -197,7 +214,7 @@ try {
     await call("Runtime.evaluate", { expression: seedLongLedgerExpression, returnByValue: true });
     await call("Page.reload", { ignoreCache: true });
     await sleep(900);
-    const openedLedger = (await call("Runtime.evaluate", { expression: clickExpression("wine-tab-ledger"), returnByValue: true })).result.value;
+    const openedLedger = (await call("Runtime.evaluate", { expression: clickExpression("wine-workspace-tab-ledger"), returnByValue: true })).result.value;
     if (!openedLedger) throw new Error(`葡萄酒 ${width}pt 未找到库存管理页签`);
     await sleep(180);
 
@@ -219,7 +236,7 @@ try {
     }
 
     for (let cycle = 0; cycle < 12; cycle += 1) {
-      for (const tab of ["wine-tab-purchase", "wine-tab-supplier", "wine-tab-summary", "wine-tab-ledger"]) {
+      for (const tab of ["wine-workspace-tab-purchase", "wine-workspace-tab-supplier", "wine-workspace-tab-summary", "wine-workspace-tab-ledger"]) {
         const clicked = (await call("Runtime.evaluate", { expression: clickExpression(tab), returnByValue: true })).result.value;
         if (!clicked) throw new Error(`葡萄酒 ${width}pt 找不到页签 ${tab}`);
         await sleep(42);
@@ -256,6 +273,8 @@ try {
   writeFileSync(reportPath, JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
 } finally {
+  if (target?.id) await cdpFetch(`/json/close/${target.id}`).catch(() => {});
   socket?.close();
-  server.close();
+  server.closeAllConnections?.();
+  await new Promise((resolve) => server.close(resolve));
 }

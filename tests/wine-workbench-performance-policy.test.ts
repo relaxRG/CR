@@ -44,9 +44,12 @@ describe("葡萄酒工作台长列表性能护栏", () => {
     expect(script).toContain("liveNodeGrowth > 180");
     expect(script).toContain("beforeLiveNodeCount");
     expect(script).toContain("afterLiveNodeCount");
-    expect(script).toContain('clickExpression("wine-tab-ledger")');
+    expect(script).toContain('clickExpression("wine-workspace-tab-ledger")');
     expect(script).toContain("wine.manual_purchases.v1");
     expect(script).toContain("const monthLabel = year + '年' + monthNumber + '月'");
+    expect(script).toContain('const cdpPort = Number(process.env.H5_CDP_PORT ?? 9222);');
+    expect(script).toContain('cdpFetch(`/json/close/${target.id}`)');
+    expect(script).toContain("server.closeAllConnections?.();");
   });
 
   it("通用移动端回归直接采样虚拟列表，避免把静态工作台容器误判为滚动区域", () => {
