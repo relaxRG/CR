@@ -2532,7 +2532,7 @@ function SupplierDetailScreen({
             </View>
             <ScrollView contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingBottom: 12 }}>
               {bottleLinkOptions.map(({ bottle, score }) => (
-                <TouchableOpacity key={bottle.id} onPress={() => confirmBottleLink(bottle, bottleLinkMode === "manual" ? "confirmed" : "auto")}
+                <TouchableOpacity key={bottle.id} onPress={() => confirmBottleLink(bottle, "confirmed")}
                   style={{ minHeight: 58, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, borderRadius: 12, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.surface }}>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text numberOfLines={1} style={{ color: colors.foreground, fontSize: 14, fontWeight: "600" }}>{bottle.nameZh}</Text>
