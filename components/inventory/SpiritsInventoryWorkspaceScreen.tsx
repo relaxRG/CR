@@ -66,6 +66,7 @@ import { useModuleMonthCloseStore } from "@/lib/month-close/module-month-close-s
 import { useBottleStore } from "@/lib/bottles/store";
 import { resolveBottleForSupplierProductName } from "@/lib/bottles/supplier-channel-resolver";
 import { migrateSpiritAliasesToBottleChannels } from "@/lib/spirits/bottle-channel-migration";
+import { hasBottlePurchaseProjectionChanged, projectBottleSupplierChannelsFromPurchases } from "@/lib/spirits/purchase-bottle-projection";
 
 // ─── 工具 ─────────────────────────────────────────────────────────────────────
 function catColor(cat: string) { return SPIRIT_CATEGORY_COLORS[cat] ?? "#6B7280"; }
@@ -182,6 +183,25 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
     migration.bottleUpdates.forEach((bottle) => updateBottle(bottle.id, bottle));
     migration.itemPatches.forEach(({ id, patch }) => updateItem(id, patch));
   }, [bottles, items, updateBottle, updateItem]);
+
+  // 采购是供应渠道和价格历史的唯一事实来源：所有已链接采购自动投影到对应酒库酒款。
+  useEffect(() => {
+    const itemsByBottleId = new Map<string, SpiritItem[]>();
+    items.forEach((item) => {
+      if (!item.bottleId) return;
+      itemsByBottleId.set(item.bottleId, [...(itemsByBottleId.get(item.bottleId) ?? []), item]);
+    });
+    itemsByBottleId.forEach((linkedItems, bottleId) => {
+      const bottle = bottles.find((candidate) => candidate.id === bottleId);
+      if (!bottle) return;
+      const itemIds = new Set(linkedItems.map((item) => item.id));
+      const linkedPurchases = purchases.filter((purchase) => purchase.itemId && itemIds.has(purchase.itemId));
+      const projection = projectBottleSupplierChannelsFromPurchases(bottle, linkedPurchases);
+      if (hasBottlePurchaseProjectionChanged(bottle, projection)) {
+        updateBottle(bottle.id, { ...bottle, ...projection });
+      }
+    });
+  }, [bottles, items, purchases, updateBottle]);
 
   /** 打开唯一鸡尾酒库酒款；无匹配时进入自动预填名称的新建表单，绝不创建重复烈酒详情页。 */
   const openBottleForSpiritItem = (item: SpiritItem) => {
@@ -1714,6 +1734,46 @@ function SupplierDetailScreen({
   const [previewItem, setPreviewItem] = useState<SpiritItem | null>(null);
   // 详情卡由采购表打开时保留当前记录 ID，快速分类需同步写回该采购快照。
   const [previewPurchaseId, setPreviewPurchaseId] = useState<string | null>(null);
+  // 酒库关联：人工选择与智能候选是两条独立路径，均需人工确认后写回烈酒主档。
+  const [bottleLinkMode, setBottleLinkMode] = useState<"manual" | "smart" | null>(null);
+  const [bottleLinkQuery, setBottleLinkQuery] = useState("");
+  const previewPurchase = useMemo(
+    () => previewPurchaseId ? purchases.find((purchase) => purchase.id === previewPurchaseId) : undefined,
+    [previewPurchaseId, purchases],
+  );
+  const bottleLinkOptions = useMemo(() => {
+    if (!previewItem || !bottleLinkMode) return [] as Array<{ bottle: import("@/lib/bottles/types").Bottle; score: number }>;
+    const query = bottleLinkQuery.trim().toLocaleLowerCase();
+    const sourceNames = [previewItem.name, previewItem.nameEn, previewPurchase?.rawName].filter(Boolean) as string[];
+    const exactChannelBottleId = bottleLinkMode === "smart" && previewPurchase?.rawName
+      ? resolveBottleForSupplierProductName(bottles, previewPurchase.supplier ?? previewItem.supplier, previewPurchase.rawName)?.bottle.id
+      : undefined;
+    return bottles
+      .map((bottle) => {
+        const candidates = [bottle.nameZh, bottle.nameEn, bottle.brand].filter(Boolean);
+        const score = bottle.id === exactChannelBottleId
+          ? 1
+          : Math.max(0, ...sourceNames.flatMap((source) => candidates.map((candidate) => fuzzyMatchScore(source, candidate))));
+        const searchable = candidates.join(" ").toLocaleLowerCase();
+        return { bottle, score, searchable };
+      })
+      .filter((entry) => bottleLinkMode === "smart" ? entry.score >= 0.2 : !query || entry.searchable.includes(query))
+      .sort((left, right) => bottleLinkMode === "smart" ? right.score - left.score : left.bottle.nameZh.localeCompare(right.bottle.nameZh, "zh-Hans-CN"))
+      .slice(0, 20)
+      .map(({ bottle, score }) => ({ bottle, score }));
+  }, [bottleLinkMode, bottleLinkQuery, bottles, previewItem, previewPurchase]);
+  const confirmBottleLink = (bottle: import("@/lib/bottles/types").Bottle, confidence: "confirmed" | "auto") => {
+    if (!previewItem) return;
+    updateItem(previewItem.id, { bottleId: bottle.id, bottleLinkConfidence: confidence });
+    setPreviewItem((current) => current ? { ...current, bottleId: bottle.id, bottleLinkConfidence: confidence } : null);
+    setBottleLinkMode(null);
+    setBottleLinkQuery("");
+    Alert.alert("酒库关联成功", `已将「${previewItem.name}」关联至酒库「${bottle.nameZh}」。`);
+  };
+  const openBottleLinkPicker = (mode: "manual" | "smart") => {
+    setBottleLinkQuery("");
+    setBottleLinkMode(mode);
+  };
   // 未匹配商品操作 Modal
   const [unmatchedPurchase, setUnmatchedPurchase] = useState<SpiritPurchaseRecord | null>(null);
   const [showUnmatchedModal, setShowUnmatchedModal] = useState(false);
@@ -2421,37 +2481,74 @@ function SupplierDetailScreen({
                 </ScrollView>
               </View>
 
-              {/* 底部按鈕 */}
-              <View style={{ flexDirection: "row", gap: 10, padding: 16, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
-                <TouchableOpacity onPress={() => {
-                  setPreviewItem(null);
-                  setPreviewPurchaseId(null);
-                  if (previewItem?.bottleId) {
+              {/* 酒库关联路径：已有档案可人工确认或智能候选关联；确实不存在时才新建。 */}
+              <View style={{ flexDirection: "row", gap: 10, paddingHorizontal: 16, paddingTop: 14, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
+                {previewItem.bottleId ? (
+                  <TouchableOpacity testID="spirits-purchase-view-linked-bottle" onPress={() => {
+                    setPreviewItem(null); setPreviewPurchaseId(null); setBottleLinkMode(null);
                     router2.push(("/bottle/" + previewItem.bottleId) as any);
-                  } else {
-                    Alert.alert(
-                      "酒库档案",
-                      `「${previewItem?.name}」暂未关联酒库档案`,
-                      [
-                        { text: "取消", style: "cancel" },
-                        { text: "新建酒库档案", onPress: () => router2.push(("/bottle-form?name=" + encodeURIComponent(previewItem?.name ?? "")) as any) },
-                      ]
-                    );
-                  }
-                }} style={{ flex: 1, padding: 13, borderRadius: 12, borderWidth: 1, borderColor: colors.border, alignItems: "center" }}>
-                  <Text style={{ fontSize: 14, color: colors.foreground, fontWeight: "600" }}>
-                    {previewItem?.bottleId ? "查看酒库档案 →" : "新建酒库档案 →"}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => { setPreviewItem(null); setPreviewPurchaseId(null); }}
-                  style={{ flex: 1, padding: 13, backgroundColor: "#EF4444", borderRadius: 12, alignItems: "center" }}>
-                  <Text style={{ fontSize: 14, color: "#fff", fontWeight: "700" }}>关闭</Text>
+                  }} style={{ flex: 1, minHeight: 44, borderRadius: 12, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" }}>
+                    <Text style={{ fontSize: 13, color: colors.foreground, fontWeight: "600" }}>查看已关联酒库档案</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <>
+                    <TouchableOpacity testID="spirits-purchase-manual-bottle-link" onPress={() => openBottleLinkPicker("manual")}
+                      style={{ flex: 1, minHeight: 44, borderRadius: 12, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" }}>
+                      <Text style={{ fontSize: 13, color: colors.foreground, fontWeight: "600" }}>人工链接酒库</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity testID="spirits-purchase-smart-bottle-link" onPress={() => openBottleLinkPicker("smart")}
+                      style={{ flex: 1, minHeight: 44, borderRadius: 12, borderWidth: 1, borderColor: colors.primary, alignItems: "center", justifyContent: "center" }}>
+                      <Text style={{ fontSize: 13, color: colors.primary, fontWeight: "600" }}>智能链接</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
+              </View>
+              <View style={{ flexDirection: "row", gap: 10, padding: 16 }}>
+                {!previewItem.bottleId && <TouchableOpacity testID="spirits-purchase-create-bottle" onPress={() => {
+                  const item = previewItem;
+                  setPreviewItem(null); setPreviewPurchaseId(null); setBottleLinkMode(null);
+                  router2.push({ pathname: "/bottle-form", params: { prefillNameAlt: item.name, ...(item.nameEn ? { prefillName: item.nameEn } : {}), sourceSpiritItemId: item.id } });
+                }} style={{ flex: 1, minHeight: 44, borderRadius: 12, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" }}>
+                  <Text style={{ fontSize: 13, color: colors.foreground, fontWeight: "600" }}>新建酒库档案</Text>
+                </TouchableOpacity>}
+                <TouchableOpacity onPress={() => { setPreviewItem(null); setPreviewPurchaseId(null); setBottleLinkMode(null); setBottleLinkQuery(""); }}
+                  style={{ flex: 1, minHeight: 44, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12, alignItems: "center", justifyContent: "center" }}>
+                  <Text style={{ fontSize: 13, color: colors.muted, fontWeight: "600" }}>关闭</Text>
                 </TouchableOpacity>
               </View>
             </TouchableOpacity>
           </TouchableOpacity>
         </Modal>
       )}
+
+      <Modal visible={bottleLinkMode !== null} transparent animationType="slide" onRequestClose={() => setBottleLinkMode(null)}>
+        <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.45)" }}>
+          <View style={{ maxHeight: "82%", backgroundColor: colors.background, borderTopLeftRadius: 22, borderTopRightRadius: 22, paddingTop: 12, paddingBottom: Math.max(insets.bottom, 16) }}>
+            <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: "center", marginBottom: 12 }} />
+            <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
+              <Text style={{ fontSize: 17, color: colors.foreground, fontWeight: "600" }}>{bottleLinkMode === "manual" ? "人工链接酒库信息" : "智能链接酒库信息"}</Text>
+              <Text style={{ fontSize: 12, color: colors.muted, marginTop: 4 }}>{bottleLinkMode === "manual" ? "从已有酒库档案中搜索并确认关联。" : "根据采购名称、中英文酒名和品牌给出候选，确认后才关联。"}</Text>
+              {bottleLinkMode === "manual" && <TextInput value={bottleLinkQuery} onChangeText={setBottleLinkQuery} placeholder="搜索中文名、英文名或品牌" placeholderTextColor={colors.muted} autoFocus style={[S.input, { marginTop: 12, color: colors.foreground, borderColor: colors.border, backgroundColor: colors.surface }]} />}
+            </View>
+            <ScrollView contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingBottom: 12 }}>
+              {bottleLinkOptions.map(({ bottle, score }) => (
+                <TouchableOpacity key={bottle.id} onPress={() => confirmBottleLink(bottle, bottleLinkMode === "manual" ? "confirmed" : "auto")}
+                  style={{ minHeight: 58, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, borderRadius: 12, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.surface }}>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text numberOfLines={1} style={{ color: colors.foreground, fontSize: 14, fontWeight: "600" }}>{bottle.nameZh}</Text>
+                    <Text numberOfLines={1} style={{ color: colors.muted, fontSize: 11, marginTop: 2 }}>{[bottle.nameEn, bottle.brand, bottle.category].filter(Boolean).join(" · ")}</Text>
+                  </View>
+                  {bottleLinkMode === "smart" && <Text style={{ color: score >= 0.8 ? "#16A34A" : colors.primary, fontSize: 11, fontWeight: "600" }}>{Math.round(score * 100)}%</Text>}
+                </TouchableOpacity>
+              ))}
+              {bottleLinkOptions.length === 0 && <Text style={{ color: colors.muted, textAlign: "center", paddingVertical: 28, fontSize: 13 }}>{bottleLinkMode === "smart" ? "没有足够可信的候选，请使用人工链接或新建档案。" : "没有匹配的酒库档案。"}</Text>}
+            </ScrollView>
+            <TouchableOpacity onPress={() => { setBottleLinkMode(null); setBottleLinkQuery(""); }} style={{ minHeight: 44, alignItems: "center", justifyContent: "center", marginHorizontal: 16, borderRadius: 12, borderWidth: 1, borderColor: colors.border }}>
+              <Text style={{ color: colors.muted, fontWeight: "600" }}>取消</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* 批量修改供应商 Modal */}
       <Modal visible={showBatchSupplier} transparent animationType="slide">

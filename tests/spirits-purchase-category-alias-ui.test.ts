@@ -19,15 +19,20 @@ describe("烈酒分类与统一供应渠道 UI 契约", () => {
     expect(workspace).toContain("syncLedgerFromPurchases(month)");
   });
 
-  it("烈酒库存不再维护重复别名表单，编辑酒款会进入已有酒款详情或名称预填的新建表单", () => {
+  it("采购详情提供人工链接、智能链接和名称预填的新建档案三条路径，不复制第二套供应商表单", () => {
     expect(workspace).not.toContain('testID="spirits-supplier-alias-form"');
-    expect(workspace).toContain("openBottleForSpiritItem");
-    expect(workspace).toContain('pathname: "/bottle/[id]"');
+    expect(workspace).toContain('testID="spirits-purchase-manual-bottle-link"');
+    expect(workspace).toContain('testID="spirits-purchase-smart-bottle-link"');
+    expect(workspace).toContain('testID="spirits-purchase-create-bottle"');
+    expect(workspace).toContain("openBottleLinkPicker(\"manual\")");
+    expect(workspace).toContain("openBottleLinkPicker(\"smart\")");
+    expect(workspace).toContain("resolveBottleForSupplierProductName(bottles, previewPurchase.supplier ?? previewItem.supplier, previewPurchase.rawName)");
     expect(workspace).toContain('pathname: "/bottle-form"');
     expect(workspace).toContain("sourceSpiritItemId: item.id");
     expect(bottleForm).toContain("sourceSpiritItemId");
     expect(bottleForm).toContain('bottleLinkConfidence: "confirmed"');
-    expect(channelPage).toContain("采购名称：");
+    expect(channelPage).toContain("笔已链接进货自动汇总");
+    expect(channelPage).not.toContain("添加第一个渠道");
   });
 
   it("手工、Excel 与 PDF 录入优先使用鸡尾酒库统一供应渠道，旧别名仅作为兼容回退", () => {

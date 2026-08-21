@@ -420,6 +420,8 @@ export interface SupplierPriceRecord {
   price: number;
   quantity?: number;
   source?: string;    // 来源说明，如「Excel导入」「手动录入」
+  /** 源烈酒采购记录 ID；存在时由采购投影维护，用于覆盖、撤销与重复防护。 */
+  sourcePurchaseId?: string;
 }
 
 /**

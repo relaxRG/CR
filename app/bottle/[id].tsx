@@ -90,6 +90,9 @@ export default function BottleDetailScreen() {
     .map((record) => record.date)
     .sort()
     .at(-1);
+  const projectedPurchaseCount = supplierChannels
+    .flatMap((channel) => channel.priceHistory ?? [])
+    .filter((record) => Boolean(record.sourcePurchaseId)).length;
 
   const rows: { label: string; value: string }[] = [
     { label: t("bottle.nameEn"), value: bottle.nameEn || "—" },
@@ -287,7 +290,7 @@ export default function BottleDetailScreen() {
             <View>
               <Text style={{ fontSize: 15, color: colors.foreground, fontWeight: "500" }}>中国参考价</Text>
               <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>
-                {costChannel ? `成本基准：${costChannel.name}` : "尚未选择成本计算基准"}
+                {costChannel ? `成本基准：${costChannel.name}` : "完成进货并链接酒库后自动生成"}
               </Text>
             </View>
             <Text style={{ fontSize: 22, color: colors.foreground, fontWeight: "600" }}>
@@ -316,14 +319,16 @@ export default function BottleDetailScreen() {
           ) : null}
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
             <Text style={{ fontSize: 12, color: colors.muted }}>
-              {supplierChannels.length > 0 ? `${supplierChannels.length} 个供货渠道${latestPriceDate ? ` · 最近报价 ${latestPriceDate}` : ""}` : "尚无供应渠道，可录入供应商或自采电商"}
+              {supplierChannels.length > 0
+                ? `${supplierChannels.length} 个采购渠道 · ${projectedPurchaseCount} 笔已链接进货${latestPriceDate ? ` · 最近报价 ${latestPriceDate}` : ""}`
+                : "尚无已链接采购；完成进货并链接酒库后自动生成"}
             </Text>
             <Pressable
               testID="bottle-manage-supplier-channels"
               onPress={() => router.push({ pathname: "/bottle-channels", params: { id: bottle.id } })}
               style={({ pressed }) => [{ opacity: pressed ? 0.65 : 1, paddingVertical: 3 }]}
             >
-              <Text style={{ fontSize: 13, color: colors.primary, fontWeight: "500" }}>管理供应渠道</Text>
+              <Text style={{ fontSize: 13, color: colors.primary, fontWeight: "500" }}>查看采购渠道</Text>
             </Pressable>
           </View>
         </View>
