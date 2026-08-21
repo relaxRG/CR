@@ -5,7 +5,7 @@
  */
 
 // ─── 自定义分类类型 ──────────────────────────────────────────────────────────
-/** 用户自定义分类（内置分类不在此列表中，但可被重命名覆盖） */
+/** 用户自定义分类；内置分类可在此保存名称、颜色、顺序覆盖或删除标记。 */
 export interface SpiritCustomCategory {
   /** 唯一 ID，内置分类使用原名作为 ID，自定义分类使用 uuid */
   id: string;
@@ -15,8 +15,10 @@ export interface SpiritCustomCategory {
   originalName?: string;
   /** 颜色 hex */
   color: string;
-  /** 是否为内置分类（内置不可删除） */
+  /** 是否来自初始内置分类集。 */
   builtin: boolean;
+  /** 内置分类删除后的持久化墓碑；防止下次启动被默认分类重新注入。 */
+  deleted?: boolean;
   /** 用户自定义显示顺序；历史数据缺失时按原始内置顺序与创建时间回退。 */
   order?: number;
   createdAt: string;

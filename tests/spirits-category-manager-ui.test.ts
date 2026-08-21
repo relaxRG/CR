@@ -7,19 +7,23 @@ const manager = fs.readFileSync(path.join(root, "components/spirits/inventory-ca
 const workspace = fs.readFileSync(path.join(root, "components/inventory/SpiritsInventoryWorkspaceScreen.tsx"), "utf8");
 
 describe("烈酒分类管理与库存多选 UI 契约", () => {
-  it("分类管理将取消、标题和保存固定在同一页面式卡片内，并支持颜色编辑", () => {
-    expect(manager).toContain('testID="inventory-category-manager-cancel"');
-    expect(manager).toContain('testID="inventory-category-manager-save"');
+  it("编辑分类卡将取消和保存固定在卡片内部，外层分类页只保留关闭操作", () => {
+    expect(manager).toContain('testID="inventory-category-manager-close"');
+    expect(manager).toContain('testID="inventory-category-edit-cancel"');
+    expect(manager).toContain('testID="inventory-category-edit-save"');
+    expect(manager).toContain("S.editCardFooter");
     expect(manager).toContain(">进销存分类</Text>");
     expect(manager).toContain("分类颜色");
     expect(manager).toContain("inventory-category-color-");
+    expect(manager).not.toContain('testID="inventory-category-manager-save"');
   });
 
-  it("自定义分类支持删除，且有酒款时必须迁移到目标分类或未分类", () => {
+  it("所有分类均支持删除，有酒款时统一迁移到目标分类或未分类", () => {
+    expect(manager).toContain("所有分类都可删除");
     expect(manager).toContain("迁移并删除");
     expect(manager).toContain("删除前必须先迁移分类归属或设为未分类");
     expect(manager).toContain("inventory-category-delete-");
-    expect(manager).toContain("内置");
+    expect(manager).not.toContain("!category.builtin ?");
   });
 
   it("库存表头不显示排序符号，提供紧凑列宽和选择后的批量分类、归档删除", () => {

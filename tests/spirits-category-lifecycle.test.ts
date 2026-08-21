@@ -19,9 +19,9 @@ describe("进销存分类安全生命周期", () => {
     expect(moveInventoryCategory(categories, "custom", "down")).toEqual([]);
   });
 
-  it("内置分类不能删除；有内容的自定义分类必须先处理内容", () => {
-    expect(canDeleteInventoryCategory(categories[0], 0)).toBe(false);
-    expect(requiresCategoryContentHandling(categories[0], 10)).toBe(false);
+  it("内置与自定义分类均可删除；有内容时统一要求先处理迁移", () => {
+    expect(canDeleteInventoryCategory(categories[0], 0)).toBe(true);
+    expect(requiresCategoryContentHandling(categories[0], 10)).toBe(true);
     expect(canDeleteInventoryCategory(categories[2], 4)).toBe(false);
     expect(requiresCategoryContentHandling(categories[2], 4)).toBe(true);
     expect(canDeleteInventoryCategory(categories[2], 0)).toBe(true);

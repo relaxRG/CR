@@ -20,12 +20,12 @@ export function moveInventoryCategory(
   ];
 }
 
-export function canDeleteInventoryCategory(category: ManagedInventoryCategory, itemCount: number) {
-  return !category.builtin && itemCount === 0;
+export function canDeleteInventoryCategory(_category: ManagedInventoryCategory, itemCount: number) {
+  return itemCount === 0;
 }
 
-export function requiresCategoryContentHandling(category: ManagedInventoryCategory, itemCount: number) {
-  return !category.builtin && itemCount > 0;
+export function requiresCategoryContentHandling(_category: ManagedInventoryCategory, itemCount: number) {
+  return itemCount > 0;
 }
 
 export function normalizeCategoryMigrationTarget(targetCategory: string) {

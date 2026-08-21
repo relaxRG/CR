@@ -301,9 +301,8 @@ type Action =
   | { type: "SET_MATCH_MEMORY"; memory: PettyMatchMemory }
   | { type: "UPDATE_SELF_BUY_CONFIG"; config: SelfBuyConfig }
   | { type: "UPSERT_CUSTOM_CATEGORY"; category: SpiritCustomCategory }
-  | { type: "DELETE_CUSTOM_CATEGORY"; id: string }
   | { type: "MIGRATE_CATEGORY_CONTENT"; fromCategory: string; toCategory: string }
-  | { type: "MIGRATE_AND_DELETE_CATEGORY"; id: string; fromCategory: string; toCategory: string }
+  | { type: "MIGRATE_AND_DELETE_CATEGORY"; category: { id: string; name: string; color: string; builtin: boolean; order: number }; toCategory: string }
   | { type: "SET_GROUP_MATCH_MEMORY"; memory: GroupMatchMemory };
 
 function reducer(state: SpiritsState, action: Action): SpiritsState {
@@ -385,24 +384,30 @@ function reducer(state: SpiritsState, action: Action): SpiritsState {
       }
       return { ...state, customCategories: [...state.customCategories, action.category] };
     }
-    case "DELETE_CUSTOM_CATEGORY": {
-      const category = state.customCategories.find((entry) => entry.id === action.id);
-      if (!category || category.builtin || state.items.some((item) => item.category === category.name)) return state;
-      return { ...state, customCategories: state.customCategories.filter((entry) => entry.id !== action.id) };
-    }
     case "MIGRATE_CATEGORY_CONTENT": return {
       ...state,
       // 采购分类是发生时快照；当前主档迁移不得改写已归档或历史月份。
       items: state.items.map((item) => item.category === action.fromCategory ? { ...item, category: action.toCategory, categorySource: "manual", updatedAt: new Date().toISOString() } : item),
     };
     case "MIGRATE_AND_DELETE_CATEGORY": {
-      const category = state.customCategories.find((entry) => entry.id === action.id);
-      if (!category || category.builtin) return state;
+      const previous = state.customCategories.find((entry) => entry.id === action.category.id);
+      const remaining = state.customCategories.filter((entry) => entry.id !== action.category.id);
+      const deletedBuiltinMarker: SpiritCustomCategory | null = action.category.builtin ? {
+        id: action.category.id,
+        originalName: action.category.id,
+        name: action.category.name,
+        color: action.category.color,
+        builtin: true,
+        deleted: true,
+        order: action.category.order,
+        createdAt: previous?.createdAt ?? new Date().toISOString(),
+      } : null;
       return {
         ...state,
         // 只迁移现行主档；历史采购分类永久保留原始快照。
-        items: state.items.map((item) => item.category === action.fromCategory ? { ...item, category: action.toCategory, categorySource: "manual", updatedAt: new Date().toISOString() } : item),
-        customCategories: state.customCategories.filter((entry) => entry.id !== action.id),
+        items: state.items.map((item) => item.category === action.category.name ? { ...item, category: action.toCategory, categorySource: "manual", updatedAt: new Date().toISOString() } : item),
+        // 内置分类通过墓碑记录被删除，避免下一次启动时由默认分类集重新注入。
+        customCategories: deletedBuiltinMarker ? [...remaining, deletedBuiltinMarker] : remaining,
       };
     }
     case "SET_GROUP_MATCH_MEMORY": {
@@ -710,18 +715,19 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
 
   // ── 自定义分类管理 ───────────────────────────────────────────────────────────────
   const getAllCategories = (): { name: string; color: string; builtin: boolean; id: string; order: number }[] => {
-    const builtinList = (SPIRIT_CATEGORIES as readonly string[]).map((cat, index) => {
-      const override = state.customCategories.find((c) => c.originalName === cat || c.id === cat);
-      return {
+    const builtinList = (SPIRIT_CATEGORIES as readonly string[]).flatMap((cat, index) => {
+      const override = state.customCategories.find((category) => category.originalName === cat || category.id === cat);
+      if (override?.deleted) return [];
+      return [{
         id: cat,
         name: override ? override.name : cat,
         color: override ? override.color : (SPIRIT_CATEGORY_COLORS[cat] ?? "#6B7280"),
         builtin: true,
         order: override?.order ?? index,
-      };
+      }];
     });
     const customList = state.customCategories
-      .filter((c) => !c.builtin)
+      .filter((category) => !category.builtin && !category.deleted)
       .map((c, index) => ({ id: c.id, name: c.name, color: c.color, builtin: false, order: c.order ?? SPIRIT_CATEGORIES.length + index }));
     return [...builtinList, ...customList].sort((left, right) => left.order - right.order || left.name.localeCompare(right.name, "zh-Hans-CN"));
   };
@@ -760,9 +766,13 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
   };
 
   const removeCategorySafely = (id: string, toCategory: string) => {
-    const category = state.customCategories.find((entry) => entry.id === id);
-    if (!category || category.builtin) return false;
-    dispatch({ type: "MIGRATE_AND_DELETE_CATEGORY", id, fromCategory: category.name, toCategory });
+    const category = getAllCategories().find((entry) => entry.id === id);
+    if (!category) return false;
+    dispatch({
+      type: "MIGRATE_AND_DELETE_CATEGORY",
+      category: { id: category.id, name: category.name, color: category.color, builtin: category.builtin, order: category.order },
+      toCategory: toCategory.trim(),
+    });
     return true;
   };
 
