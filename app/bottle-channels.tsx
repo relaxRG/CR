@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { formatMoney } from "@/lib/utils";
-import { Alert, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Alert, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import * as Haptics from "expo-haptics";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useColors } from "@/hooks/use-colors";
@@ -23,7 +23,13 @@ export default function BottleChannelsScreen() {
   const { items, purchases } = useSpiritsInventoryStore();
   const bottle = getBottle(id);
   const [priceHistoryChannel, setPriceHistoryChannel] = useState<SupplierChannel | null>(null);
+  const [purchaseLinkChannel, setPurchaseLinkChannel] = useState<SupplierChannel | null>(null);
+  const [purchaseUrlDraft, setPurchaseUrlDraft] = useState("");
   const tap = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  const openPurchaseLinkEditor = (channel: SupplierChannel) => {
+    setPurchaseLinkChannel(channel);
+    setPurchaseUrlDraft(channel.purchaseUrl ?? "");
+  };
 
   // 即使用户从酒库直接打开此页，也会用当前已链接采购刷新价格卡片投影。
   useEffect(() => {
@@ -113,9 +119,13 @@ export default function BottleChannelsScreen() {
               </TouchableOpacity> : null}
             </View>
 
-            {channel.purchaseUrl ? <TouchableOpacity onPress={() => { tap(); Linking.openURL(channel.purchaseUrl!); }} style={[S.purchaseBtn, { backgroundColor: colors.primary }]}>
-              <IconSymbol name="arrow.up.right.square" size={14} color="#fff" />
-              <Text style={{ fontSize: 13, fontWeight: "600", color: "#fff" }}>打开采购链接</Text>
+            {channel.type === "self" ? <TouchableOpacity testID={`bottle-self-purchase-link-${channel.id}`} onPress={() => {
+              tap();
+              if (channel.purchaseUrl) Linking.openURL(channel.purchaseUrl);
+              else openPurchaseLinkEditor(channel);
+            }} style={[S.purchaseBtn, { backgroundColor: channel.purchaseUrl ? colors.primary : colors.surface, borderWidth: channel.purchaseUrl ? 0 : 1, borderColor: colors.border }]}>
+              <IconSymbol name={channel.purchaseUrl ? "arrow.up.right.square" : "link"} size={14} color={channel.purchaseUrl ? "#fff" : colors.primary} />
+              <Text style={{ fontSize: 13, fontWeight: "600", color: channel.purchaseUrl ? "#fff" : colors.primary }}>{channel.purchaseUrl ? "打开采购链接" : "补充采购链接"}</Text>
             </TouchableOpacity> : null}
           </View>
         ))}
@@ -124,6 +134,25 @@ export default function BottleChannelsScreen() {
           渠道和价格历史仅由已链接采购生成；成本基准可在已有采购渠道间切换。
         </Text>
       </ScrollView>
+
+      <Modal visible={Boolean(purchaseLinkChannel)} animationType="slide" presentationStyle="formSheet" onRequestClose={() => setPurchaseLinkChannel(null)}>
+        <View style={[S.sheet, { backgroundColor: colors.background }]}>
+          <View style={[S.sheetHeader, { borderBottomColor: colors.border }]}>
+            <Pressable onPress={() => setPurchaseLinkChannel(null)}><Text style={{ fontSize: 17, color: colors.muted }}>取消</Text></Pressable>
+            <Text style={[S.sheetTitle, { color: colors.foreground }]} numberOfLines={1}>补充采购链接</Text>
+            <Pressable onPress={() => {
+              if (!purchaseLinkChannel || !purchaseUrlDraft.trim()) { Alert.alert("请填写购买链接"); return; }
+              const nextChannels = channels.map((channel) => channel.id === purchaseLinkChannel.id ? { ...channel, purchaseUrl: purchaseUrlDraft.trim(), updatedAt: new Date().toISOString() } : channel);
+              updateBottle(bottle.id, { ...bottle, supplierChannels: nextChannels });
+              setPurchaseLinkChannel(null);
+            }}><Text style={{ fontSize: 17, color: colors.primary, fontWeight: "600" }}>保存</Text></Pressable>
+          </View>
+          <View style={{ padding: 16 }}>
+            <Text style={{ fontSize: 13, color: colors.muted, lineHeight: 19, marginBottom: 12 }}>此处仅补充已由真实自采进货生成的渠道跳转链接；供应商、采购名称、价格和价格历史仍只能由采购记录同步。</Text>
+            <TextInput value={purchaseUrlDraft} onChangeText={setPurchaseUrlDraft} placeholder="https://item.jd.com/..." placeholderTextColor={colors.muted} autoCapitalize="none" autoCorrect={false} style={[S.input, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.surface }]} />
+          </View>
+        </View>
+      </Modal>
 
       <Modal visible={Boolean(priceHistoryChannel)} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setPriceHistoryChannel(null)}>
         <View style={[S.sheet, { backgroundColor: colors.background }]}>
@@ -161,6 +190,7 @@ const S = StyleSheet.create({
   sheet: { flex: 1 },
   sheetHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 16, borderBottomWidth: StyleSheet.hairlineWidth },
   sheetTitle: { fontSize: 17, fontWeight: "600" },
+  input: { minHeight: 44, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, fontSize: 14 },
   secondaryAction: { flex: 1, minHeight: 36, borderRadius: 9, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   purchaseBtn: { minHeight: 38, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, borderRadius: 9, marginTop: 10 },
 });

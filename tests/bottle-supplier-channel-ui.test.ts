@@ -25,6 +25,8 @@ describe("酒款中国参考价与供应渠道 UI 契约", () => {
     expect(channels).toContain("更正名称、价格或日期请返回对应采购记录操作。");
     expect(channels).not.toContain("ChannelFormModal");
     expect(channels).not.toContain("添加第一个渠道");
+    expect(channels).toContain("补充采购链接");
+    expect(channels).toContain("供应商、采购名称、价格和价格历史仍只能由采购记录同步。");
   });
 
   it("渠道价格可查看完整变化，且只允许在真实采购渠道间切换成本基准", () => {
