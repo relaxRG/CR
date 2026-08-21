@@ -32,6 +32,7 @@ import {
   SPIRIT_CATEGORY_COLORS, SPIRIT_CATEGORIES,
 } from "@/lib/spirits/types";
 import { resolveSpiritItemForSupplierName } from "@/lib/spirits/supplier-alias";
+import { buildPurchaseCategorySelection, resolvePurchaseDisplayCategory } from "@/lib/spirits/purchase-category-sync";
 import {
   ParsedPurchaseRow, previewSheets, parseSheetFromWorkbook,
 } from "@/lib/spirits/excel-import";
@@ -1711,6 +1712,8 @@ function SupplierDetailScreen({
   const [importPreviewSource, setImportPreviewSource] = useState<"excel" | "pdf">("excel");
   // 商品名点击预览卡片
   const [previewItem, setPreviewItem] = useState<SpiritItem | null>(null);
+  // 详情卡由采购表打开时保留当前记录 ID，快速分类需同步写回该采购快照。
+  const [previewPurchaseId, setPreviewPurchaseId] = useState<string | null>(null);
   // 未匹配商品操作 Modal
   const [unmatchedPurchase, setUnmatchedPurchase] = useState<SpiritPurchaseRecord | null>(null);
   const [showUnmatchedModal, setShowUnmatchedModal] = useState(false);
@@ -2163,8 +2166,8 @@ function SupplierDetailScreen({
                       </View>
                     )}
                     <Text style={[S.ledgerCell, { width: SPIRIT_PURCHASE_INDEX_WIDTH, textAlign: "center", fontSize: 10, color: colors.muted }]}>{visibleSupplierPurchases.indexOf(p) + 1}</Text>
-                    <Text style={[S.ledgerCell, { width: SPIRIT_PURCHASE_COLUMN_WIDTH.category, textAlign: "center", fontSize: 10, lineHeight: 14, color: catColor(p.category || item?.category || "未分类") }]} numberOfLines={2}>
-                      {p.category || item?.category || "未分类"}
+                    <Text style={[S.ledgerCell, { width: SPIRIT_PURCHASE_COLUMN_WIDTH.category, textAlign: "center", fontSize: 10, lineHeight: 14, color: catColor(resolvePurchaseDisplayCategory(p, item)) }]} numberOfLines={2}>
+                      {resolvePurchaseDisplayCategory(p, item)}
                     </Text>
                     <TouchableOpacity style={[S.ledgerCell, { width: SPIRIT_PURCHASE_COLUMN_WIDTH.name, height: INVENTORY_WORKSPACE_METRICS.phoneRowHeight, justifyContent: "center" }]}
                       onPress={() => {
@@ -2175,6 +2178,7 @@ function SupplierDetailScreen({
                               p.rawName.includes(i.name) || (i.nameEn && p.rawName.includes(i.nameEn)));
                           if (matched) {
                             setPreviewItem(matched);
+                            setPreviewPurchaseId(p.id);
                           } else {
                             // 弹出操作卡片：从现有酒款选择 / 新建酒款档案
                             setUnmatchedPurchase(p);
@@ -2355,7 +2359,7 @@ function SupplierDetailScreen({
       {previewItem && (
         <Modal visible={!!previewItem} transparent animationType="fade">
           <TouchableOpacity style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center", paddingHorizontal: 20 }}
-            activeOpacity={1} onPress={() => setPreviewItem(null)}>
+            activeOpacity={1} onPress={() => { setPreviewItem(null); setPreviewPurchaseId(null); }}>
             <TouchableOpacity activeOpacity={1} style={{ width: "100%", borderRadius: 20, backgroundColor: colors.background,
               shadowColor: "#000", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.25, shadowRadius: 20, elevation: 20 }}>
               {/* 标题区 */}
@@ -2396,7 +2400,12 @@ function SupplierDetailScreen({
                         key={category.id}
                         testID={`spirits-purchase-category-${category.id}`}
                         onPress={() => {
+                          // 库存酒款主档是分类事实来源；在采购详情选择时，当前采购记录也必须立即写回。
                           updateItem(previewItem.id, { category: category.name, categorySource: "manual" });
+                          if (previewPurchaseId) {
+                            updatePurchase(previewPurchaseId, buildPurchaseCategorySelection(previewItem.id, category.name));
+                            syncLedgerFromPurchases(month);
+                          }
                           setPreviewItem((current) => current ? { ...current, category: category.name, categorySource: "manual" } : null);
                         }}
                         style={[S.catChip, {
@@ -2416,6 +2425,7 @@ function SupplierDetailScreen({
               <View style={{ flexDirection: "row", gap: 10, padding: 16, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
                 <TouchableOpacity onPress={() => {
                   setPreviewItem(null);
+                  setPreviewPurchaseId(null);
                   if (previewItem?.bottleId) {
                     router2.push(("/bottle/" + previewItem.bottleId) as any);
                   } else {
@@ -2433,7 +2443,7 @@ function SupplierDetailScreen({
                     {previewItem?.bottleId ? "查看酒库档案 →" : "新建酒库档案 →"}
                   </Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => setPreviewItem(null)}
+                <TouchableOpacity onPress={() => { setPreviewItem(null); setPreviewPurchaseId(null); }}
                   style={{ flex: 1, padding: 13, backgroundColor: "#EF4444", borderRadius: 12, alignItems: "center" }}>
                   <Text style={{ fontSize: 14, color: "#fff", fontWeight: "700" }}>关闭</Text>
                 </TouchableOpacity>

@@ -8,12 +8,15 @@ const bottleForm = fs.readFileSync(path.join(process.cwd(), "app/bottle-form.tsx
 const channelPage = fs.readFileSync(path.join(process.cwd(), "app/bottle-channels.tsx"), "utf8");
 
 describe("烈酒分类与统一供应渠道 UI 契约", () => {
-  it("库存管理与当月进货的名称详情卡均提供不关闭卡片的快速分类选择，并写入当前酒款主档", () => {
+  it("库存管理与当月进货的名称详情卡均提供不关闭卡片的快速分类选择，并同步写回当前采购记录", () => {
     expect(workspace).toContain('testID="spirits-ledger-quick-category"');
     expect(workspace).toContain('testID="spirits-purchase-quick-category"');
     expect(workspace).toContain("快速选择分类");
     expect(workspace).toContain('updateItem(selectedLedgerItem.id, { category: category.name, categorySource: "manual" })');
     expect(workspace).toContain('updateItem(previewItem.id, { category: category.name, categorySource: "manual" })');
+    expect(workspace).toContain("setPreviewPurchaseId(p.id)");
+    expect(workspace).toContain("buildPurchaseCategorySelection(previewItem.id, category.name)");
+    expect(workspace).toContain("syncLedgerFromPurchases(month)");
   });
 
   it("烈酒库存不再维护重复别名表单，编辑酒款会进入已有酒款详情或名称预填的新建表单", () => {
