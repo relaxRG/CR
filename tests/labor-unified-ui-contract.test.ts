@@ -35,9 +35,12 @@ describe("员工统一 UI 契约", () => {
     expect(labor).not.toContain('position: "absolute", right: 20, bottom: fabBottom(insets.bottom)');
   });
 
-  it("人力总览恢复原始自适应结构，不再被强制为一行四列", () => {
-    expect(labor).toContain("const summaryColumns = getStoreSummaryColumns(width)");
-    expect(labor).toContain('flexWrap: "wrap"');
+  it("人力总览在 iPhone、iPad 和 Mac 均保持一行四列，手机仅收紧列内边距而不换行", () => {
+    expect(labor).toContain("const summaryColumns = 4");
+    expect(labor).toContain("const isPhoneSummary = width <= STORE_VISUAL_SYSTEM.density.phoneMax");
+    expect(labor).toContain('testID="labor-overview-four-column-row"');
+    expect(labor).toContain('flexWrap: "nowrap"');
+    expect(labor).toContain('paddingHorizontal: isPhoneSummary ? 4 : 8');
     expect(labor).toContain('label: "待发"');
     expect(labor).toContain('label: "已预支"');
   });

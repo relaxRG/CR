@@ -77,7 +77,7 @@ describe("门店唯一视觉系统规范", () => {
     expect(source("components/store/shop.tsx")).toContain('<StoreInventoryScreen mode="shop" />');
   });
 
-  it("门店根页与员工页使用共享胶囊选择器，员工卡恢复既有的自适应总览与工资摘要结构", () => {
+  it("门店根页与员工页使用共享胶囊选择器，员工卡保持三端一行四列的人力总览与工资摘要结构", () => {
     const primitives = source("components/store/store-visual-primitives.tsx");
     const store = source("app/(tabs)/store.tsx");
     const labor = source("components/labor/LaborWorkspaceScreen.tsx");
@@ -92,7 +92,9 @@ describe("门店唯一视觉系统规范", () => {
     expect(labor).toContain("考勤明细（5格）");
     expect(labor).toContain("{metrics.map(({ label, value, color }) => (");
     expect(labor).not.toContain("visibleMetricColumns === 3");
-    expect(labor).toContain("getStoreSummaryColumns(width)");
+    expect(labor).toContain("const summaryColumns = 4");
+    expect(labor).toContain('testID="labor-overview-four-column-row"');
+    expect(labor).toContain('flexWrap: "nowrap"');
     expect(labor).not.toContain("{employee.dept}</Text>");
   });
 });

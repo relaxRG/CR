@@ -55,7 +55,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { useGlobalBusinessMonth } from "@/lib/months/global-business-month";
 import { BoundedBusinessMonthNavigator } from "@/components/months/BoundedBusinessMonthNavigator";
 import { StoreMetric, StoreSectionHeader, StoreSegmentedTabs, StoreToolbarAction } from "@/components/store/store-visual-primitives";
-import { getStoreSummaryColumns, storeTone, STORE_TEXT, STORE_VISUAL_SYSTEM } from "@/lib/theme/store-visual-system";
+import { storeTone, STORE_TEXT, STORE_VISUAL_SYSTEM } from "@/lib/theme/store-visual-system";
 import { deriveInventoryMonthBounds } from "@/lib/inventory-core/month-browser";
 import { MoneyInput } from "@/components/forms/MoneyInput";
 import {
@@ -139,7 +139,9 @@ function OverviewCard({ month, colors }: { month: string; colors: any }) {
   const [selectedTrendMonth, setSelectedTrendMonth] = useState(month);
   const { selectMonth } = useGlobalBusinessMonth();
   const { width } = useWindowDimensions();
-  const summaryColumns = getStoreSummaryColumns(width);
+  const isPhoneSummary = width <= STORE_VISUAL_SYSTEM.density.phoneMax;
+  // 人力总览是同一层级的四项工资摘要，iPhone/iPad/Mac 均保持一行四列；只在手机收紧横向内边距。
+  const summaryColumns = 4;
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
   const compareMonth = getCompareMonth(month, compareMode, customMonth);
@@ -180,15 +182,15 @@ function OverviewCard({ month, colors }: { month: string; colors: any }) {
         <LaborCompareToggle mode={compareMode} customMonth={customMonth} baseMonth={month} onChange={setCompareMode} onCustomMonthChange={setCustomMonth} colors={colors} />
       </View>
 
-      {/* 同一数据在手机以2×2显示，在iPad/Mac以4列显示；颜色与小图标均绑定固定业务语义。 */}
-      <View style={[OV.row, { flexWrap: "wrap" }]}>
+      {/* 人力总览三端均保持一行四列，手机只收紧列内边距，避免换行造成巨大空白和趋势入口下沉。 */}
+      <View testID="labor-overview-four-column-row" style={[OV.row, { flexWrap: "nowrap" }]}>
         {[
           { label: "在职", value: `${activeEmployees.length}人`, tone: "front" as const, icon: "person.2.fill" as const },
           { label: "薪资合计", value: totalSalary > 0 ? `¥${formatMoney(totalSalary)}` : "—", tone: "neutral" as const, icon: "banknote.fill" as const },
           { label: "已预支", value: totalAdvancePaid > 0 ? `¥${formatMoney(totalAdvancePaid)}` : "—", tone: "allowance" as const, icon: "creditcard.fill" as const },
           { label: "待发", value: totalPending > 0 ? `¥${formatMoney(totalPending)}` : "—", tone: "primary" as const, icon: "clock.fill" as const, primary: true },
         ].map((metric) => (
-          <View key={metric.label} style={{ width: `${100 / summaryColumns}%` as `${number}%`, minWidth: 0, paddingVertical: summaryColumns === 2 ? 8 : 0, paddingHorizontal: 8 }}>
+          <View key={metric.label} style={{ width: `${100 / summaryColumns}%` as `${number}%`, minWidth: 0, paddingVertical: 0, paddingHorizontal: isPhoneSummary ? 4 : 8 }}>
             <StoreMetric {...metric} colors={colors} />
           </View>
         ))}
