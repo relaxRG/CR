@@ -53,4 +53,22 @@ describe("烈酒采购到酒库价格卡片投影", () => {
     const emptied = projectBottleSupplierChannelsFromPurchases(onceProjected, []);
     expect(emptied.supplierChannels).toHaveLength(0);
   });
+
+  it("采购重链到另一款酒时，旧酒款的渠道、源采购历史、成本基准与有效成本均被撤销", () => {
+    const source = bottle({ id: "bottle-source", nameZh: "旧酒款" });
+    const firstProjection = projectBottleSupplierChannelsFromPurchases(source, [purchase()]);
+    const sourceWithPurchase = { ...source, ...firstProjection } as Bottle;
+
+    // 当前采购被重新链接至另一款酒：旧酒款收到空采购集，新酒款收到原采购记录。
+    const sourceAfterRelink = projectBottleSupplierChannelsFromPurchases(sourceWithPurchase, []);
+    const targetAfterRelink = projectBottleSupplierChannelsFromPurchases(
+      bottle({ id: "bottle-target", nameZh: "新酒款" }),
+      [purchase()],
+    );
+
+    expect(sourceAfterRelink).toEqual({ supplierChannels: [], costChannelId: undefined, priceCny: 0 });
+    expect(hasBottlePurchaseProjectionChanged(sourceWithPurchase, sourceAfterRelink)).toBe(true);
+    expect(targetAfterRelink.supplierChannels[0].priceHistory?.[0].sourcePurchaseId).toBe("purchase-1");
+    expect(targetAfterRelink.priceCny).toBe(195);
+  });
 });

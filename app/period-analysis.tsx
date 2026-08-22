@@ -569,20 +569,20 @@ export default function PeriodAnalysisScreen({ embedded = false }: { embedded?: 
         {/* 汇总 */}
         <View style={[S.card, { backgroundColor: color + "0a", borderColor: color + "22" }]}>
           <Text style={{ fontSize: 14, fontWeight: "700", color }}>🌙 凌晨加班时段（01:00-11:00）</Text>
-          <View style={{ flexDirection: "row", gap: 16, marginTop: 10 }}>
-            <View>
-              <Text style={{ fontSize: 10, color: colors.muted }}>有加班天数</Text>
-              <Text style={{ fontSize: 18, fontWeight: "700", color }}>{lateNightDays.length}天</Text>
+          <View style={{ flexDirection: "row", gap: 8, marginTop: 10 }}>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text numberOfLines={1} style={{ fontSize: 10, color: colors.muted }}>有加班天数</Text>
+              <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ fontSize: 18, fontWeight: "700", color }}>{lateNightDays.length}天</Text>
             </View>
-            <View>
-              <Text style={{ fontSize: 10, color: colors.muted }}>月度总营业额</Text>
-              <Text style={{ fontSize: 18, fontWeight: "700", color }}>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text numberOfLines={1} style={{ fontSize: 10, color: colors.muted }}>月度总营业额</Text>
+              <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.58} style={{ fontSize: 18, fontWeight: "700", color }}>
                 {fmtRevenue(report.monthlyTotals.late_night.revenue)}
               </Text>
             </View>
-            <View>
-              <Text style={{ fontSize: 10, color: colors.muted }}>总订单</Text>
-              <Text style={{ fontSize: 18, fontWeight: "700", color }}>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text numberOfLines={1} style={{ fontSize: 10, color: colors.muted }}>总订单</Text>
+              <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ fontSize: 18, fontWeight: "700", color }}>
                 {report.monthlyTotals.late_night.orders}单
               </Text>
             </View>

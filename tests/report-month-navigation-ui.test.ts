@@ -56,6 +56,14 @@ describe("报表工作台四页签与统一月份导航", () => {
     expect(analytics).not.toContain('route: "/period-analysis"');
   });
 
+  it("时段经营分析凌晨汇总在 iPhone 上将三项数据固定为可收缩列，避免大额营业额换行拉高卡片", () => {
+    const period = read("app/period-analysis.tsx");
+
+    expect(period).toContain('flexDirection: "row", gap: 8, marginTop: 10');
+    expect(period).toContain('minimumFontScale={0.58}');
+    expect(period).toContain('style={{ flex: 1, minWidth: 0 }}');
+  });
+
   it("同次月度导入直接生成时段分析报告，时段工作台内不显示重复导入按钮", () => {
     const importer = read("app/monthly-report-import.tsx");
     const period = read("app/period-analysis.tsx");

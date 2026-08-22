@@ -122,11 +122,19 @@ export function projectBottleSupplierChannelsFromPurchases(
     requestedCostChannelId,
   );
   const costChannelId = resolveCostChannelId(supplierChannels, requestedCostChannelId);
+  const hadPurchaseProjection = existingChannels.some((channel) =>
+    (channel.priceHistory ?? []).some((record) => Boolean(record.sourcePurchaseId)),
+  );
+  const hasLegacyChannel = existingChannels.some((channel) =>
+    (channel.priceHistory ?? []).some((record) => !record.sourcePurchaseId),
+  );
   const costPrice = costChannelId
     ? supplierChannels.find((channel) => channel.id === costChannelId)?.latestPrice ?? bottle.priceCny
-    : bottle.priceCny;
+    // 仅由采购投影形成的价格在解除最后一笔采购后必须归零；旧人工渠道仍保留其原有参考价。
+    : hadPurchaseProjection && !hasLegacyChannel ? 0 : bottle.priceCny;
 
-  return { supplierChannels, ...(costChannelId ? { costChannelId } : {}), priceCny: costPrice };
+  // 始终写入 costChannelId，令重链 / 解除链接能覆盖旧基准而不留下悬挂 ID。
+  return { supplierChannels, costChannelId, priceCny: costPrice };
 }
 
 export function hasBottlePurchaseProjectionChanged(bottle: Bottle, projection: BottlePurchaseProjection) {
