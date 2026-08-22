@@ -107,29 +107,36 @@ function LineItemRow({ item, colors, linkedModule }: { item: SummaryLineItem; co
 
 // ─── 手动录入 Modal ───────────────────────────────────────────────────────────
 // ─── 部分付款 Modal ────────────────────────────────────────────────────────────
+type PaymentAccountType = "company" | "personal" | "petty" | "pos";
+const PAYMENT_ACCOUNT_TYPES: ReadonlyArray<{ value: PaymentAccountType; label: string }> = [
+  { value: "company", label: "公司账户" },
+  { value: "personal", label: "私人账户" },
+  { value: "petty", label: "备用金" },
+  { value: "pos", label: "POS汇款" },
+];
+
 function PaymentEntryModal({ visible, target, colors, onConfirm, onClose }: {
   visible: boolean;
   target: { id: string; name: string; remaining: number } | null;
   colors: any;
-  onConfirm: (paymentId: string, amount: number, method: string, accountType: string, notes: string) => void;
+  onConfirm: (paymentId: string, amount: number, method: string, accountType: PaymentAccountType, notes: string) => void;
   onClose: () => void;
 }) {
   const [amount, setAmount] = React.useState("");
   const [method, setMethod] = React.useState("转账");
-  const [accountType, setAccountType] = React.useState("公司账户");
+  const [accountType, setAccountType] = React.useState<PaymentAccountType>("company");
   const [notes, setNotes] = React.useState("");
 
   React.useEffect(() => {
     if (visible && target) {
       setAmount(target.remaining > 0 ? String(target.remaining.toFixed(0)) : "");
       setMethod("转账");
-      setAccountType("公司账户");
+      setAccountType("company");
       setNotes("");
     }
   }, [visible, target]);
 
   const METHODS = ["转账", "现金", "微信", "支付宝"];
-  const ACCOUNT_TYPES = ["公司账户", "私人账户", "备用金", "POS汇款"];
 
   const handleConfirm = () => {
     if (!target) return;
@@ -172,10 +179,10 @@ function PaymentEntryModal({ visible, target, colors, onConfirm, onClose }: {
               </View>
               <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 4, marginTop: 10 }}>付款账户</Text>
               <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
-                {ACCOUNT_TYPES.map((a) => (
-                  <TouchableOpacity key={a} onPress={() => setAccountType(a)}
-                    style={[MI.catChip, { backgroundColor: accountType === a ? colors.primary : colors.surface, borderColor: accountType === a ? colors.primary : colors.border }]}>
-                    <Text style={{ fontSize: 12, fontWeight: "600", color: accountType === a ? "#fff" : colors.foreground }}>{a}</Text>
+                {PAYMENT_ACCOUNT_TYPES.map((account) => (
+                  <TouchableOpacity key={account.value} onPress={() => setAccountType(account.value)}
+                    style={[MI.catChip, { backgroundColor: accountType === account.value ? colors.primary : colors.surface, borderColor: accountType === account.value ? colors.primary : colors.border }]}>
+                    <Text style={{ fontSize: 12, fontWeight: "600", color: accountType === account.value ? "#fff" : colors.foreground }}>{account.label}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -335,7 +342,7 @@ export default function MonthlySummaryScreen({ embedded = false }: { embedded?: 
   const [settingsTab, setSettingsTab] = useState<"petty" | "inventory">("petty");
 
   const report = useMemo(() => getReport(selectedMonth), [reports, selectedMonth]);
-  const payments = useMemo(() => getPaymentsForMonth(selectedMonth), [selectedMonth]);
+  const payments = useMemo(() => getPaymentsForMonth(selectedMonth), [selectedMonth, getPaymentsForMonth]);
 
   const handleCopy = (text: string) => {
     Clipboard.setString(text);
@@ -1226,7 +1233,7 @@ export default function MonthlySummaryScreen({ embedded = false }: { embedded?: 
               amount,
               bankAccountId: "",
               paymentMethod: method,
-              accountType: accountType as any,
+              accountType,
               notes,
               paidAt: now,
             }],
