@@ -21,6 +21,8 @@ interface VirtualizedHorizontalLedgerTableProps<Row> {
   onSort?: (key: string) => void;
   /** 当月进货等逐笔台账不需要额外分组行时关闭。 */
   showGroupHeaders?: boolean;
+  /** 保留表头排序点击，但可隐藏箭头辅助图标。 */
+  showHeaderSortIndicators?: boolean;
 }
 
 const ROW_HEIGHT = STORE_TABLE_METRICS.rowHeight;
@@ -42,6 +44,7 @@ export function VirtualizedHorizontalLedgerTable<Row>({
   sort,
   onSort,
   showGroupHeaders = true,
+  showHeaderSortIndicators = true,
 }: VirtualizedHorizontalLedgerTableProps<Row>) {
   const colors = useColors();
   const { width: windowWidth } = useWindowDimensions();
@@ -122,7 +125,7 @@ export function VirtualizedHorizontalLedgerTable<Row>({
           <View style={[S.headerCell, { width: column.width, alignItems: alignment(column.align) }]}>
             <View style={S.headerLabel}>
               <Text style={[S.headerText, { color: active ? colors.primary : colors.foreground }]} numberOfLines={1}>{column.label}</Text>
-              {isSortable && <Text style={[S.sortMark, { color: active ? colors.primary : colors.muted }]}>{active ? (sort?.direction === "asc" ? "↑" : "↓") : "↕"}</Text>}
+              {isSortable && showHeaderSortIndicators && <Text style={[S.sortMark, { color: active ? colors.primary : colors.muted }]}>{active ? (sort?.direction === "asc" ? "↑" : "↓") : "↕"}</Text>}
             </View>
           </View>
         );

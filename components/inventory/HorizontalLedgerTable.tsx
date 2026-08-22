@@ -37,6 +37,8 @@ interface HorizontalLedgerTableProps<Row> {
   testID?: string;
   sort?: { key: string; direction: "asc" | "desc" };
   onSort?: (key: string) => void;
+  /** 保留点击表头排序，但可隐藏箭头辅助图标以降低表头噪声。 */
+  showHeaderSortIndicators?: boolean;
   selection?: {
     selectedRowKeys: readonly string[];
     onToggleRow: (row: Row) => void;
@@ -59,6 +61,7 @@ export function HorizontalLedgerTable<Row>({
   testID,
   sort,
   onSort,
+  showHeaderSortIndicators = true,
   selection,
 }: HorizontalLedgerTableProps<Row>) {
   const colors = useColors();
@@ -103,7 +106,7 @@ export function HorizontalLedgerTable<Row>({
               <View style={[S.headerCell, { width: column.width, alignItems: alignment(column.align) }]}>
                 <View style={S.headerLabel}>
                   <Text style={[S.headerText, { color: active ? colors.primary : colors.foreground }]} numberOfLines={1}>{column.label}</Text>
-                  {isSortable && <Text style={[S.sortMark, { color: active ? colors.primary : colors.muted }]}>{active ? (sort?.direction === "asc" ? "↑" : "↓") : "↕"}</Text>}
+                  {isSortable && showHeaderSortIndicators && <Text style={[S.sortMark, { color: active ? colors.primary : colors.muted }]}>{active ? (sort?.direction === "asc" ? "↑" : "↓") : "↕"}</Text>}
                 </View>
               </View>
             );

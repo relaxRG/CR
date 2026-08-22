@@ -1,21 +1,26 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import React, { createContext, useCallback, useContext, useEffect, useReducer } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useReducer, useRef, useState } from "react";
 import { notifySyncChange, registerStoreReload } from "../sync/engine";
 import {
   WineAuditEntry,
   WineBottle,
   WineImportBatch,
+  WineInventoryCategory,
   WineManualPurchase,
   WineMonthRestorePoint,
   WineMonthlySnapshot,
+  WineSupplierProfile,
 } from "./types";
 import { rebuildWineSnapshotFromPurchases } from "./workbook-engine";
 import { wineManualPurchaseReducer, WineManualPurchaseState } from "./manual-purchase-reducer";
+import { hydrateWineMasterData } from "./master-data";
+import { reconcileWineBottlePurchaseProjection } from "./purchase-bottle-projection";
 
 const STORAGE_KEY = "wine.bottles.v1";
 const SNAPSHOT_KEY = "wine.snapshots.v2";
 const MANUAL_PURCHASE_KEY = "wine.manual_purchases.v1";
 const IMPORT_CONTROL_KEY = "wine.import_control.v1";
+const MASTER_DATA_KEY = "wine.master_data.v1";
 
 export interface WineState {
   bottles: WineBottle[];
@@ -29,6 +34,11 @@ export interface WineImportControlState {
   batches: WineImportBatch[];
   restorePoints: WineMonthRestorePoint[];
   auditEntries: WineAuditEntry[];
+}
+
+export interface WineMasterDataState {
+  suppliers: WineSupplierProfile[];
+  categories: WineInventoryCategory[];
 }
 
 type Action =
@@ -53,6 +63,15 @@ type ImportControlAction =
   | { type: "ADD_RESTORE_POINT"; restorePoint: WineMonthRestorePoint }
   | { type: "ADD_AUDIT"; entry: WineAuditEntry };
 
+type MasterDataAction =
+  | { type: "LOAD"; payload: WineMasterDataState }
+  | { type: "ADD_SUPPLIER"; supplier: WineSupplierProfile }
+  | { type: "UPDATE_SUPPLIER"; id: string; updates: Partial<WineSupplierProfile> }
+  | { type: "REORDER_SUPPLIERS"; suppliers: WineSupplierProfile[] }
+  | { type: "ADD_CATEGORY"; category: WineInventoryCategory }
+  | { type: "UPDATE_CATEGORY"; id: string; updates: Partial<WineInventoryCategory> }
+  | { type: "REORDER_CATEGORIES"; categories: WineInventoryCategory[] };
+
 function uuid(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
@@ -62,6 +81,7 @@ const initialState: WineState = { bottles: [] };
 const initialSnapshotState: WineSnapshotState = { snapshots: [] };
 const initialManualState: WineManualPurchaseState = { purchases: [] };
 const initialImportControlState: WineImportControlState = { batches: [], restorePoints: [], auditEntries: [] };
+const initialMasterDataState: WineMasterDataState = { suppliers: [], categories: [] };
 
 function importControlReducer(state: WineImportControlState, action: ImportControlAction): WineImportControlState {
   switch (action.type) {
@@ -69,6 +89,20 @@ function importControlReducer(state: WineImportControlState, action: ImportContr
     case "ADD_BATCH": return { ...state, batches: [action.batch, ...state.batches] };
     case "ADD_RESTORE_POINT": return { ...state, restorePoints: [action.restorePoint, ...state.restorePoints].slice(0, 24) };
     case "ADD_AUDIT": return { ...state, auditEntries: [action.entry, ...state.auditEntries].slice(0, 240) };
+    default: return state;
+  }
+}
+
+function masterDataReducer(state: WineMasterDataState, action: MasterDataAction): WineMasterDataState {
+  const now = new Date().toISOString();
+  switch (action.type) {
+    case "LOAD": return action.payload;
+    case "ADD_SUPPLIER": return { ...state, suppliers: [...state.suppliers, action.supplier] };
+    case "UPDATE_SUPPLIER": return { ...state, suppliers: state.suppliers.map((supplier) => supplier.id === action.id ? { ...supplier, ...action.updates, updatedAt: now } : supplier) };
+    case "REORDER_SUPPLIERS": return { ...state, suppliers: action.suppliers.map((supplier, index) => ({ ...supplier, sortOrder: index, updatedAt: now })) };
+    case "ADD_CATEGORY": return { ...state, categories: [...state.categories, action.category] };
+    case "UPDATE_CATEGORY": return { ...state, categories: state.categories.map((category) => category.id === action.id ? { ...category, ...action.updates, updatedAt: now } : category) };
+    case "REORDER_CATEGORIES": return { ...state, categories: action.categories.map((category, index) => ({ ...category, sortOrder: index, updatedAt: now })) };
     default: return state;
   }
 }
@@ -118,7 +152,8 @@ function snapshotReducer(state: WineSnapshotState, action: SnapshotAction): Wine
 }
 
 interface WineContextValue extends WineState {
-  addBottle: (data: Omit<WineBottle, "id" | "createdAt" | "updatedAt">) => void;
+  /** 可传入预分配 ID，供库存快照与档案创建在同一交互内先校验后提交。 */
+  addBottle: (data: Omit<WineBottle, "id" | "createdAt" | "updatedAt"> & { id?: string }) => string;
   updateBottle: (id: string, updates: Partial<WineBottle>) => void;
   deleteBottle: (id: string) => void;
   batchDeleteBottles: (ids: string[]) => void;
@@ -156,6 +191,15 @@ interface WineManualPurchaseContextValue extends WineManualPurchaseState {
   getMonthPurchases: (month: string) => WineManualPurchase[];
 }
 
+interface WineMasterDataContextValue extends WineMasterDataState {
+  addSupplier: (data: Omit<WineSupplierProfile, "id" | "createdAt" | "updatedAt" | "sortOrder" | "archived">) => void;
+  updateSupplier: (id: string, updates: Partial<WineSupplierProfile>) => void;
+  reorderSuppliers: (suppliers: WineSupplierProfile[]) => void;
+  addCategory: (data: Omit<WineInventoryCategory, "id" | "createdAt" | "updatedAt" | "sortOrder" | "archived">) => void;
+  updateCategory: (id: string, updates: Partial<WineInventoryCategory>) => void;
+  reorderCategories: (categories: WineInventoryCategory[]) => void;
+}
+
 interface WineImportControlContextValue extends WineImportControlState {
   applyWorkbookImport: (input: { month: string; snapshot: WineMonthlySnapshot | null; purchases: WineManualPurchase[]; batch: WineImportBatch }) => void;
   clearMonthPurchases: (month: string) => WineMonthRestorePoint;
@@ -167,69 +211,131 @@ const WineContext = createContext<WineContextValue | null>(null);
 const WineSnapshotContext = createContext<WineSnapshotContextValue | null>(null);
 const WineManualPurchaseContext = createContext<WineManualPurchaseContextValue | null>(null);
 const WineImportControlContext = createContext<WineImportControlContextValue | null>(null);
+const WineMasterDataContext = createContext<WineMasterDataContextValue | null>(null);
 
 export function WineProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const [snapshotState, snapshotDispatch] = useReducer(snapshotReducer, initialSnapshotState);
   const [manualState, manualDispatch] = useReducer(wineManualPurchaseReducer, initialManualState);
   const [importControlState, importControlDispatch] = useReducer(importControlReducer, initialImportControlState);
+  const [masterDataState, masterDataDispatch] = useReducer(masterDataReducer, initialMasterDataState);
+  const [loadedStores, setLoadedStores] = useState({ bottles: false, snapshots: false, purchases: false, importControl: false, masterData: false });
+  const didHydrateMasterData = useRef(false);
+  const markStoreLoaded = useCallback((store: keyof typeof loadedStores) => {
+    setLoadedStores((current) => current[store] ? current : { ...current, [store]: true });
+  }, []);
 
   useEffect(() => {
     const loadBottles = () => AsyncStorage.getItem(STORAGE_KEY).then((raw) => {
       if (raw) { try { dispatch({ type: "LOAD", payload: JSON.parse(raw) }); } catch {} }
-    });
+    }).finally(() => markStoreLoaded("bottles"));
     loadBottles();
     return registerStoreReload(loadBottles);
-  }, []);
+  }, [markStoreLoaded]);
 
   useEffect(() => {
     const loadSnap = () => AsyncStorage.getItem(SNAPSHOT_KEY).then((raw) => {
       if (raw) { try { snapshotDispatch({ type: "LOAD", payload: JSON.parse(raw) }); } catch {} }
-    });
+    }).finally(() => markStoreLoaded("snapshots"));
     loadSnap();
     return registerStoreReload(loadSnap);
-  }, []);
+  }, [markStoreLoaded]);
 
   useEffect(() => {
     const loadManual = () => AsyncStorage.getItem(MANUAL_PURCHASE_KEY).then((raw) => {
       if (raw) { try { manualDispatch({ type: "LOAD", payload: JSON.parse(raw) }); } catch {} }
-    });
+    }).finally(() => markStoreLoaded("purchases"));
     loadManual();
     return registerStoreReload(loadManual);
-  }, []);
+  }, [markStoreLoaded]);
 
   useEffect(() => {
     const loadImportControl = () => AsyncStorage.getItem(IMPORT_CONTROL_KEY).then((raw) => {
       if (raw) { try { importControlDispatch({ type: "LOAD", payload: JSON.parse(raw) }); } catch {} }
-    });
+    }).finally(() => markStoreLoaded("importControl"));
     loadImportControl();
     return registerStoreReload(loadImportControl);
-  }, []);
+  }, [markStoreLoaded]);
 
   useEffect(() => {
+    const loadMasterData = () => AsyncStorage.getItem(MASTER_DATA_KEY).then((raw) => {
+      if (raw) { try { masterDataDispatch({ type: "LOAD", payload: JSON.parse(raw) }); } catch {} }
+    }).finally(() => markStoreLoaded("masterData"));
+    loadMasterData();
+    return registerStoreReload(loadMasterData);
+  }, [markStoreLoaded]);
+
+  useEffect(() => {
+    const allStoresLoaded = loadedStores.bottles && loadedStores.snapshots && loadedStores.purchases && loadedStores.masterData;
+    if (!allStoresLoaded || didHydrateMasterData.current) return;
+    didHydrateMasterData.current = true;
+    const hydrated = hydrateWineMasterData(masterDataState, {
+      bottles: state.bottles,
+      snapshots: snapshotState.snapshots,
+      purchases: manualState.purchases,
+    }, { now: new Date().toISOString(), nextId: uuid });
+    if (hydrated.suppliers.length !== masterDataState.suppliers.length || hydrated.categories.length !== masterDataState.categories.length) {
+      masterDataDispatch({ type: "LOAD", payload: hydrated });
+    }
+  }, [loadedStores.bottles, loadedStores.snapshots, loadedStores.purchases, loadedStores.masterData, masterDataState, state.bottles, snapshotState.snapshots, manualState.purchases]);
+
+  useEffect(() => {
+    if (!loadedStores.bottles || !loadedStores.purchases) return;
+    state.bottles.forEach((bottle) => {
+      const updates = reconcileWineBottlePurchaseProjection(bottle, manualState.purchases);
+      if (updates) dispatch({ type: "UPDATE", id: bottle.id, updates });
+    });
+  }, [state.bottles, manualState.purchases, loadedStores.bottles, loadedStores.purchases]);
+
+  useEffect(() => {
+    if (!loadedStores.bottles) return;
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state)).catch(() => {});
     notifySyncChange(STORAGE_KEY);
-  }, [state]);
+  }, [state, loadedStores.bottles]);
 
   useEffect(() => {
+    if (!loadedStores.snapshots) return;
     AsyncStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshotState)).catch(() => {});
     notifySyncChange(SNAPSHOT_KEY);
-  }, [snapshotState]);
+  }, [snapshotState, loadedStores.snapshots]);
 
   useEffect(() => {
+    if (!loadedStores.purchases) return;
     AsyncStorage.setItem(MANUAL_PURCHASE_KEY, JSON.stringify(manualState)).catch(() => {});
     notifySyncChange(MANUAL_PURCHASE_KEY);
-  }, [manualState]);
+  }, [manualState, loadedStores.purchases]);
 
   useEffect(() => {
+    if (!loadedStores.importControl) return;
     AsyncStorage.setItem(IMPORT_CONTROL_KEY, JSON.stringify(importControlState)).catch(() => {});
     notifySyncChange(IMPORT_CONTROL_KEY);
-  }, [importControlState]);
+  }, [importControlState, loadedStores.importControl]);
+
+  useEffect(() => {
+    if (!loadedStores.masterData) return;
+    AsyncStorage.setItem(MASTER_DATA_KEY, JSON.stringify(masterDataState)).catch(() => {});
+    notifySyncChange(MASTER_DATA_KEY);
+  }, [masterDataState, loadedStores.masterData]);
+
+  const addSupplier = useCallback((data: Omit<WineSupplierProfile, "id" | "createdAt" | "updatedAt" | "sortOrder" | "archived">) => {
+    const now = new Date().toISOString();
+    masterDataDispatch({ type: "ADD_SUPPLIER", supplier: { ...data, id: uuid(), sortOrder: masterDataState.suppliers.length, archived: false, createdAt: now, updatedAt: now } });
+  }, [masterDataState.suppliers.length]);
+  const updateSupplier = useCallback((id: string, updates: Partial<WineSupplierProfile>) => masterDataDispatch({ type: "UPDATE_SUPPLIER", id, updates }), []);
+  const reorderSuppliers = useCallback((suppliers: WineSupplierProfile[]) => masterDataDispatch({ type: "REORDER_SUPPLIERS", suppliers }), []);
+  const addCategory = useCallback((data: Omit<WineInventoryCategory, "id" | "createdAt" | "updatedAt" | "sortOrder" | "archived">) => {
+    const now = new Date().toISOString();
+    masterDataDispatch({ type: "ADD_CATEGORY", category: { ...data, id: uuid(), sortOrder: masterDataState.categories.length, archived: false, createdAt: now, updatedAt: now } });
+  }, [masterDataState.categories.length]);
+  const updateCategory = useCallback((id: string, updates: Partial<WineInventoryCategory>) => masterDataDispatch({ type: "UPDATE_CATEGORY", id, updates }), []);
+  const reorderCategories = useCallback((categories: WineInventoryCategory[]) => masterDataDispatch({ type: "REORDER_CATEGORIES", categories }), []);
 
   // ── WineBottle 方法 ────────────────────────────────────────────────────────
-  const addBottle = useCallback((data: Omit<WineBottle, "id" | "createdAt" | "updatedAt">) => {
+  const addBottle = useCallback((data: Omit<WineBottle, "id" | "createdAt" | "updatedAt"> & { id?: string }) => {
     const now = new Date().toISOString();
-    dispatch({ type: "ADD", bottle: { ...data, id: uuid(), createdAt: now, updatedAt: now } });
+    const id = data.id ?? uuid();
+    dispatch({ type: "ADD", bottle: { ...data, id, createdAt: now, updatedAt: now } });
+    return id;
   }, []);
 
   const updateBottle = useCallback((id: string, updates: Partial<WineBottle>) => {
@@ -464,7 +570,13 @@ export function WineProvider({ children }: { children: React.ReactNode }) {
             ...importControlState,
             applyWorkbookImport, clearMonthPurchases, recalculateMonthInventory, restoreMonth,
           }}>
-            {children}
+            <WineMasterDataContext.Provider value={{
+              ...masterDataState,
+              addSupplier, updateSupplier, reorderSuppliers,
+              addCategory, updateCategory, reorderCategories,
+            }}>
+              {children}
+            </WineMasterDataContext.Provider>
           </WineImportControlContext.Provider>
         </WineManualPurchaseContext.Provider>
       </WineSnapshotContext.Provider>
@@ -493,5 +605,11 @@ export function useWineManualPurchaseStore(): WineManualPurchaseContextValue {
 export function useWineImportControlStore(): WineImportControlContextValue {
   const ctx = useContext(WineImportControlContext);
   if (!ctx) throw new Error("useWineImportControlStore must be used within WineProvider");
+  return ctx;
+}
+
+export function useWineMasterDataStore(): WineMasterDataContextValue {
+  const ctx = useContext(WineMasterDataContext);
+  if (!ctx) throw new Error("useWineMasterDataStore must be used within WineProvider");
   return ctx;
 }

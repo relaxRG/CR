@@ -30,6 +30,24 @@ describe("葡萄酒工作台长列表性能护栏", () => {
     expect(table).not.toContain('fontWeight: "800"');
   });
 
+  it("葡萄酒台账在窄窗口只固定商品名称，保留期末库存、期末单价、期末成本、消耗量、消耗成本的顺序，并隐藏表头排序箭头", () => {
+    const wine = read("app/wine-inventory.tsx");
+    const virtualTable = read("components/inventory/VirtualizedHorizontalLedgerTable.tsx");
+    const columnSlice = wine.slice(wine.indexOf("const wineLedgerColumns"), wine.indexOf("const selectedSupplierView"));
+    expect(columnSlice).toContain('key: "name"');
+    expect(columnSlice).toContain("pinned: true");
+    expect(columnSlice).not.toContain('key: "sequence", label: "序号", width: 46, compactWidth: 40, pinned: true');
+    expect(columnSlice.indexOf('key: "closingQty"')).toBeLessThan(columnSlice.indexOf('key: "closingUnitCost"'));
+    expect(columnSlice.indexOf('key: "closingUnitCost"')).toBeLessThan(columnSlice.indexOf('key: "closingCost"'));
+    expect(columnSlice.indexOf('key: "closingCost"')).toBeLessThan(columnSlice.indexOf('key: "consumeQty"'));
+    expect(columnSlice.indexOf('key: "consumeQty"')).toBeLessThan(columnSlice.indexOf('key: "consumeCost"'));
+    expect(wine).toContain("showHeaderSortIndicators={false}");
+    expect(wine).toContain("label,");
+    expect(wine).toContain("categoryColor ?? colors.muted");
+    expect(virtualTable).toContain("showHeaderSortIndicators = true");
+    expect(virtualTable).toContain("isSortable && showHeaderSortIndicators");
+  });
+
   it("移动端性能脚本以360条库存和180条采购做60 FPS与内存稳定性压力验证", () => {
     const script = read("scripts/h5-wine-workbench-performance-e2e.mjs");
     expect(script).toContain("length: 360");

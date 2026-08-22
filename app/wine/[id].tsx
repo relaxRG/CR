@@ -17,7 +17,7 @@ export default function WineDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { bottles, deleteBottle, updateStock } = useWineStore();
+  const { bottles, deleteBottle, updateBottle, updateStock } = useWineStore();
   const bottle = bottles.find((b) => b.id === id);
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
@@ -30,6 +30,8 @@ export default function WineDetailScreen() {
       </ScreenContainer>
     );
   }
+
+  const purchaseChannels = bottle.purchaseChannelProjections ?? [];
 
   const handleDelete = () => {
     Alert.alert("删除", `确认删除「${bottle.name}」？`, [
@@ -66,8 +68,9 @@ export default function WineDetailScreen() {
           </View>
         </View>
 
-        {/* 价格与库存 */}
+        {/* 价格、供应渠道与库存。渠道只能由已确认采购自动投影，禁止在此独立虚构。 */}
         <View style={[styles.infoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.channelTitle, { color: colors.foreground }]}>采购价格与成本基准</Text>
           <View style={{ flexDirection: "row", justifyContent: "space-around" }}>
             {bottle.costPrice != null && (
               <View style={{ alignItems: "center" }}>
@@ -86,6 +89,18 @@ export default function WineDetailScreen() {
               <Text style={[styles.priceValue, { color: bottle.stock > 0 ? colors.success : colors.error }]}>{bottle.stock} 瓶</Text>
             </View>
           </View>
+          {purchaseChannels.length > 0 ? <View style={{ marginTop: 16, gap: 8 }}>
+            <Text style={{ color: colors.muted, fontSize: 12 }}>以下渠道和价格历史由已确认采购自动生成。点选渠道即可设为成本计算基准。</Text>
+            {purchaseChannels.map((channel) => {
+              const latest = channel.priceHistory[channel.priceHistory.length - 1];
+              const selected = channel.id === bottle.costChannelId;
+              return <Pressable key={channel.id} onPress={() => { tap(); updateBottle(bottle.id, { costChannelId: channel.id }); }} style={[styles.channelRow, { backgroundColor: selected ? colors.primary + "12" : colors.background, borderColor: selected ? colors.primary : colors.border }]}>
+                <View style={{ flex: 1, minWidth: 0 }}><Text style={{ color: colors.foreground, fontSize: 14, fontWeight: "600" }} numberOfLines={1}>{channel.type === "self_purchase" ? "自采／电商" : channel.supplier}</Text><Text style={{ color: colors.muted, fontSize: 11, marginTop: 2 }} numberOfLines={1}>{channel.supplierProductNames.join("、") || "采购名称待补充"} · {channel.priceHistory.length} 笔采购</Text></View>
+                <View style={{ alignItems: "flex-end", marginLeft: 8 }}><Text style={{ color: selected ? colors.primary : colors.foreground, fontSize: 15, fontWeight: "700" }}>¥{latest?.unitPrice ?? "—"}</Text><Text style={{ color: selected ? colors.primary : colors.muted, fontSize: 11, marginTop: 2 }}>{selected ? "当前成本基准" : "设为成本基准"}</Text></View>
+              </Pressable>;
+            })}
+            {purchaseChannels.map((channel) => <View key={`${channel.id}-history`} style={{ marginLeft: 8, gap: 3 }}>{channel.priceHistory.slice().reverse().slice(0, 4).map((entry) => <Text key={entry.sourcePurchaseId} style={{ color: colors.muted, fontSize: 11 }}>{channel.supplier} · {entry.date} · {entry.quantity} 瓶 × ¥{entry.unitPrice}</Text>)}</View>)}
+          </View> : <Text style={{ color: colors.muted, fontSize: 12, marginTop: 16 }}>尚无已确认采购。请先从葡萄酒库存的采购记录人工确认链接后查看供应渠道和价格历史。</Text>}
           <View style={{ flexDirection: "row", gap: 12, marginTop: 12 }}>
             <Pressable onPress={() => { tap(); updateStock(bottle.id, 1); }}
               style={[styles.stockBtn, { backgroundColor: colors.success + "22", flex: 1 }]}>
@@ -134,6 +149,8 @@ const styles = StyleSheet.create({
   tagText: { fontSize: 13, fontWeight: "500" },
   priceLabel: { fontSize: 13, marginBottom: 4 },
   priceValue: { fontSize: 20, fontWeight: "700" },
+  channelTitle: { fontSize: 16, fontWeight: "700", marginBottom: 12 },
+  channelRow: { borderWidth: 1, borderRadius: 10, minHeight: 56, paddingHorizontal: 12, paddingVertical: 9, flexDirection: "row", alignItems: "center" },
   stockBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 10, borderRadius: 10 },
   detailRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderRadius: 12, borderWidth: 1, padding: 14 },
   detailLabel: { fontSize: 14 },

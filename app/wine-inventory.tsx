@@ -19,9 +19,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
-import { useWineImportControlStore, useWineSnapshotStore, useWineManualPurchaseStore, useWineStore } from "@/lib/wine/store";
+import { useWineImportControlStore, useWineMasterDataStore, useWineSnapshotStore, useWineManualPurchaseStore, useWineStore, wineUuid } from "@/lib/wine/store";
 import { exportWinePdf, exportWineWorkbook, summarizeWineProducts, summarizeWineSuppliers } from "@/lib/wine/workbook-export";
 import { WineInventoryItem } from "@/lib/wine/types";
+import { appendWineFirstPurchaseInventory, appendWineInitialInventory, WineInitialInventoryInput } from "@/lib/wine/initial-inventory";
+import { rankWineLinkCandidates } from "@/lib/wine/link-candidates";
 import { applyWineLedgerView, applyWinePurchaseView, collectWineTypes, getWineSupplierNames, SortState, toggleSort, WineLedgerSortKey, WinePurchaseSortKey } from "@/lib/wine/table-view";
 import { WineSupplierTrendChart } from "@/components/wine-supplier-trend-chart";
 import { HorizontalLedgerColumn, HorizontalLedgerGroup } from "@/components/inventory/HorizontalLedgerTable";
@@ -76,17 +78,22 @@ function buildPurchaseText(
 
 // ─── 进货录入 Sheet ───────────────────────────────────────────────────────────
 function PurchaseEntrySheet({
-  visible, supplier, items, colors, onClose, onSave
+  visible, supplier, items, colors, onClose, onSave, onCreateWine
 }: {
   visible: boolean;
   supplier: string;
   items: WineInventoryItem[];
   colors: any;
   onClose: () => void;
-  onSave: (entries: { item: WineInventoryItem; qty: number; unitPrice: number }[]) => void;
+  onSave: (entries: { item: WineInventoryItem; qty: number; unitPrice: number }[], date: string) => void;
+  onCreateWine: (input: { name: string; quantity: number; unitPrice: number; date: string }) => void;
 }) {
   const [qtys, setQtys] = useState<Record<number, string>>({});
   const [prices, setPrices] = useState<Record<number, string>>({});
+  const [purchaseDate, setPurchaseDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [newWineName, setNewWineName] = useState("");
+  const [newWineQuantity, setNewWineQuantity] = useState("");
+  const [newWineUnitPrice, setNewWineUnitPrice] = useState("");
   const [sharing, setSharing] = useState(false);
 
   const buildEntries = () =>
@@ -101,7 +108,8 @@ function PurchaseEntrySheet({
   const handleSave = () => {
     const entries = buildEntries();
     if (entries.length === 0) { Alert.alert("请至少填写一款酒的进货数量"); return; }
-    onSave(entries);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(purchaseDate)) { Alert.alert("请输入 YYYY-MM-DD 格式的进货日期"); return; }
+    onSave(entries, purchaseDate);
     setQtys({}); setPrices({});
     onClose();
   };
@@ -109,9 +117,9 @@ function PurchaseEntrySheet({
   const handleSaveAndShare = async () => {
     const entries = buildEntries();
     if (entries.length === 0) { Alert.alert("请至少填写一款酒的进货数量"); return; }
-    onSave(entries);
-    const today = new Date().toISOString().slice(0, 10);
-    const text = buildPurchaseText(supplier, entries, today);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(purchaseDate)) { Alert.alert("请输入 YYYY-MM-DD 格式的进货日期"); return; }
+    onSave(entries, purchaseDate);
+    const text = buildPurchaseText(supplier, entries, purchaseDate);
     try {
       setSharing(true);
       const fileUri = (FileSystem.cacheDirectory ?? "") + `purchase_${Date.now()}.txt`;
@@ -150,6 +158,27 @@ function PurchaseEntrySheet({
         </View>
 
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
+          <View style={[S.entryRow, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+            <Text style={[S.entryFieldLabel, { color: colors.muted }]}>实际进货日期</Text>
+            <TextInput value={purchaseDate} onChangeText={setPurchaseDate} placeholder="YYYY-MM-DD" placeholderTextColor={colors.muted} style={[S.entryInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.foreground, marginTop: 6 }]} />
+          </View>
+
+          <View style={[S.entryRow, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+            <Text style={[S.entryFieldLabel, { color: colors.muted }]}>新增葡萄酒款</Text>
+            <View style={{ flexDirection: "row", gap: 8, marginTop: 6 }}>
+              <TextInput value={newWineName} onChangeText={setNewWineName} placeholder="酒款名称" placeholderTextColor={colors.muted} style={[S.entryInput, { flex: 1, backgroundColor: colors.background, borderColor: colors.border, color: colors.foreground }]} />
+              <Pressable onPress={() => {
+                const name = newWineName.trim(); const quantity = Number(newWineQuantity); const unitPrice = Number(newWineUnitPrice);
+                if (!name || quantity <= 0 || unitPrice < 0 || !/^\d{4}-\d{2}-\d{2}$/.test(purchaseDate)) { Alert.alert("请填写酒款名称、有效数量、单价和日期"); return; }
+                onCreateWine({ name, quantity, unitPrice, date: purchaseDate }); setNewWineName(""); setNewWineQuantity(""); setNewWineUnitPrice("");
+              }} style={[S.actionBtn, { justifyContent: "center", backgroundColor: colors.primary, borderColor: colors.primary }]}><Text style={{ color: "#fff", fontWeight: "700" }}>新增并入库</Text></Pressable>
+            </View>
+            <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
+              <TextInput value={newWineQuantity} onChangeText={setNewWineQuantity} keyboardType="decimal-pad" placeholder="数量" placeholderTextColor={colors.muted} style={[S.entryInput, { flex: 1, backgroundColor: colors.background, borderColor: colors.border, color: colors.foreground }]} />
+              <TextInput value={newWineUnitPrice} onChangeText={setNewWineUnitPrice} keyboardType="decimal-pad" placeholder="单价" placeholderTextColor={colors.muted} style={[S.entryInput, { flex: 1, backgroundColor: colors.background, borderColor: colors.border, color: colors.foreground }]} />
+            </View>
+          </View>
+
           {total > 0 && (
             <View style={[S.totalBanner, { backgroundColor: colors.primary + "12", borderColor: colors.primary + "33" }]}>
               <Text style={[S.totalText, { color: colors.primary }]}>本次进货合计：¥{formatMoney(total)}</Text>
@@ -216,6 +245,48 @@ function PurchaseEntrySheet({
   );
 }
 
+// ─── 期初库存录入 Sheet ───────────────────────────────────────────────────────
+function InitialWineInventorySheet({
+  visible, month, suppliers, categories, colors, onClose, onSave,
+}: {
+  visible: boolean;
+  month: string;
+  suppliers: string[];
+  categories: { name: string; color: string }[];
+  colors: any;
+  onClose: () => void;
+  onSave: (input: Omit<WineInitialInventoryInput, "month" | "bottleId">) => void;
+}) {
+  const [supplier, setSupplier] = useState("");
+  const [category, setCategory] = useState("");
+  const [name, setName] = useState("");
+  const [quantity, setQuantity] = useState("");
+  const [unitCost, setUnitCost] = useState("");
+  const amount = (Number(quantity) || 0) * (Number(unitCost) || 0);
+  const reset = () => { setSupplier(""); setCategory(""); setName(""); setQuantity(""); setUnitCost(""); };
+  const submit = () => {
+    if (!supplier.trim() || !category.trim() || !name.trim()) { Alert.alert("请填写供应商、分类和葡萄酒名称"); return; }
+    if (!(Number(quantity) > 0) || !(Number(unitCost) >= 0)) { Alert.alert("请填写大于 0 的期初数量和有效单价"); return; }
+    onSave({ supplier: supplier.trim(), category: category.trim(), categoryColor: categories.find((item) => item.name === category.trim())?.color, name: name.trim(), quantity: Number(quantity), unitCost: Number(unitCost) });
+    reset();
+  };
+  return <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <View style={{ height: 52, paddingHorizontal: 16, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}><Pressable onPress={onClose}><Text style={{ color: colors.primary, fontSize: 16 }}>取消</Text></Pressable><Text style={{ color: colors.foreground, fontSize: 16, fontWeight: "700" }}>建立期初库存</Text><Pressable onPress={submit}><Text style={{ color: colors.primary, fontSize: 16, fontWeight: "700" }}>保存</Text></Pressable></View>
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 48 }} keyboardShouldPersistTaps="handled">
+        <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 18, marginBottom: 14 }}>为 {month} 录入期初盘点事实。期初数量与金额不会记为采购；之后实际进货必须使用带日期的采购流水。</Text>
+        <TextInput value={supplier} onChangeText={setSupplier} placeholder="供应商名称" placeholderTextColor={colors.muted} style={{ borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, color: colors.foreground, borderRadius: 10, paddingHorizontal: 12, height: 44 }} />
+        {suppliers.length > 0 ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingTop: 8, gap: 8 }}>{suppliers.slice(0, 12).map((item) => <TouchableOpacity key={item} onPress={() => setSupplier(item)} style={{ borderRadius: 14, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: supplier === item ? colors.primary : colors.surface, borderWidth: 1, borderColor: supplier === item ? colors.primary : colors.border }}><Text style={{ color: supplier === item ? "#fff" : colors.muted, fontSize: 12 }}>{item}</Text></TouchableOpacity>)}</ScrollView> : null}
+        <TextInput value={category} onChangeText={setCategory} placeholder="库存分类" placeholderTextColor={colors.muted} style={{ marginTop: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, color: colors.foreground, borderRadius: 10, paddingHorizontal: 12, height: 44 }} />
+        {categories.length > 0 ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingTop: 8, gap: 8 }}>{categories.map((item) => <TouchableOpacity key={item.name} onPress={() => setCategory(item.name)} style={{ borderRadius: 14, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: category === item.name ? item.color : colors.surface, borderWidth: 1, borderColor: item.color }}><Text style={{ color: category === item.name ? "#fff" : colors.muted, fontSize: 12 }}>{item.name}</Text></TouchableOpacity>)}</ScrollView> : null}
+        <TextInput value={name} onChangeText={setName} placeholder="葡萄酒名称" placeholderTextColor={colors.muted} style={{ marginTop: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, color: colors.foreground, borderRadius: 10, paddingHorizontal: 12, height: 44 }} />
+        <View style={{ flexDirection: "row", gap: 10, marginTop: 14 }}><TextInput value={quantity} onChangeText={setQuantity} placeholder="期初数量（瓶）" placeholderTextColor={colors.muted} keyboardType="decimal-pad" style={{ flex: 1, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, color: colors.foreground, borderRadius: 10, paddingHorizontal: 12, height: 44 }} /><TextInput value={unitCost} onChangeText={setUnitCost} placeholder="期初单价" placeholderTextColor={colors.muted} keyboardType="decimal-pad" style={{ flex: 1, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, color: colors.foreground, borderRadius: 10, paddingHorizontal: 12, height: 44 }} /></View>
+        <View style={{ marginTop: 12, padding: 12, backgroundColor: colors.surface, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border }}><Text style={{ color: colors.muted, fontSize: 12 }}>初始金额</Text><Text style={{ color: colors.foreground, fontSize: 20, fontWeight: "700", marginTop: 2 }}>¥{formatMoney(amount)}</Text></View>
+      </ScrollView>
+    </View>
+  </Modal>;
+}
+
 // ─── 主页面 ───────────────────────────────────────────────────────────────────
 export interface WineInventoryScreenProps {
   month?: string;
@@ -228,8 +299,9 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
   const insets = useSafeAreaInsets();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
-  const { snapshots, deleteSnapshot, batchSetActualEndQty } = useWineSnapshotStore();
-  const { bottles } = useWineStore();
+  const { snapshots, addSnapshot, updateSnapshot, deleteSnapshot, batchSetActualEndQty } = useWineSnapshotStore();
+  const { bottles, addBottle } = useWineStore();
+  const { suppliers: supplierProfiles, categories: categoryProfiles, addSupplier, updateSupplier, reorderSuppliers, addCategory, updateCategory, reorderCategories } = useWineMasterDataStore();
   const { purchases, addManualPurchase, deleteManualPurchase, batchDeleteManualPurchases, batchUpdateManualPurchases, batchUpdateManualPurchaseDate, getMonthPurchases } = useWineManualPurchaseStore();
   const { clearMonthPurchases, recalculateMonthInventory, batches, auditEntries } = useWineImportControlStore();
 
@@ -240,6 +312,7 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
   // 供应商页仅切换当前同页信息，不影响库存管理页的筛选。
   const [supplierViewSupplier, setSupplierViewSupplier] = useState<string | null>(null);
   const [showPurchaseSheet, setShowPurchaseSheet] = useState(false);
+  const [showInitialInventorySheet, setShowInitialInventorySheet] = useState(false);
   const [activeSupplierForEntry, setActiveSupplierForEntry] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedLedgerItem, setSelectedLedgerItem] = useState<MonthlyLedgerItem | null>(null);
@@ -269,17 +342,35 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
   const [stocktakeValues, setStocktakeValues] = useState<Record<number, string>>({});
   const [dangerousAction, setDangerousAction] = useState<"clear" | "recalculate" | null>(null);
   const [dangerousConfirmation, setDangerousConfirmation] = useState("");
+  const [showSupplierManager, setShowSupplierManager] = useState(false);
+  const [supplierDraftName, setSupplierDraftName] = useState("");
+  const [supplierDraftEn, setSupplierDraftEn] = useState("");
+  const [supplierDraftAliases, setSupplierDraftAliases] = useState("");
+  const [supplierDraftContactName, setSupplierDraftContactName] = useState("");
+  const [supplierDraftContactPhone, setSupplierDraftContactPhone] = useState("");
+  const [supplierDraftNotes, setSupplierDraftNotes] = useState("");
+  const [editingSupplierId, setEditingSupplierId] = useState<string | null>(null);
+  const [showCategoryManager, setShowCategoryManager] = useState(false);
+  const [categoryDraftName, setCategoryDraftName] = useState("");
+  const [categoryDraftColor, setCategoryDraftColor] = useState("#64748B");
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [showWineLinkPicker, setShowWineLinkPicker] = useState(false);
 
   // 当前工作台只读取全局业务月份对应的快照；绝不能按导入时间把其他月份的数据带入当前页。
   const latestSnapshot = snapshots.find((snapshot) => snapshot.monthLabel === `${selectedMonth.slice(0, 4)}年${Number(selectedMonth.slice(5))}月`) ?? null;
   const items: WineInventoryItem[] = latestSnapshot?.items ?? [];
 
   // 所有供应商统一来自台账、手动采购与葡萄酒库；没有采购记录时也能先选供应商录入。
-  const allSuppliers = useMemo(
-    () => getWineSupplierNames(items, purchases, bottles.map((bottle) => bottle.supplier)),
-    [items, purchases, bottles],
-  );
-  const wineTypes = useMemo(() => collectWineTypes(items), [items]);
+  const allSuppliers = useMemo(() => {
+    const existing = getWineSupplierNames(items, purchases, bottles.map((bottle) => bottle.supplier));
+    const activeProfiles = supplierProfiles.filter((supplier) => !supplier.archived).sort((left, right) => left.sortOrder - right.sortOrder).map((supplier) => supplier.name);
+    return [...new Set([...activeProfiles, ...existing])];
+  }, [items, purchases, bottles, supplierProfiles]);
+  const wineTypes = useMemo(() => {
+    const existing = collectWineTypes(items);
+    const activeProfiles = categoryProfiles.filter((category) => !category.archived).sort((left, right) => left.sortOrder - right.sortOrder).map((category) => category.name);
+    return [...new Set([...activeProfiles, ...existing])];
+  }, [items, categoryProfiles]);
 
   // 按供应商分组
   const bySupplier = useMemo(() => {
@@ -314,7 +405,7 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
   const toWineLedgerRow = (item: WineInventoryItem): MonthlyLedgerItem => ({
     itemId: String(item.seq),
     name: item.name,
-    category: item.wineType || "其他",
+    category: item.category || item.wineType || "其他",
     spec: item.supplier,
     unit: "瓶",
     openingQty: item.initQty,
@@ -336,23 +427,28 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
   const wineLedgerGroups = useMemo<HorizontalLedgerGroup<MonthlyLedgerItem>[]>(() => {
     const groups = new Map<string, MonthlyLedgerItem[]>();
     wineLedgerRows.forEach((row) => groups.set(row.category, [...(groups.get(row.category) ?? []), row]));
-    // 分组只承担信息组织，不再以红/白/起泡等高饱和色编码酒类；台账维持专业中性层级。
-    return [...groups.entries()].map(([label, rows]) => ({ id: label, label, color: colors.muted, rows }));
-  }, [wineLedgerRows, colors.muted]);
+    const categoryOrder = new Map(categoryProfiles.slice().sort((left, right) => left.sortOrder - right.sortOrder).map((category, index) => [category.name, index]));
+    return [...groups.entries()].sort(([left], [right]) => (categoryOrder.get(left) ?? Number.MAX_SAFE_INTEGER) - (categoryOrder.get(right) ?? Number.MAX_SAFE_INTEGER) || left.localeCompare(right, "zh-CN")).map(([label, rows]) => ({
+      id: label,
+      label,
+      color: categoryProfiles.find((category) => category.name === label)?.color ?? filteredItems.find((item) => (item.category ?? item.wineType) === label)?.categoryColor ?? colors.muted,
+      rows,
+    }));
+  }, [wineLedgerRows, filteredItems, categoryProfiles, colors.muted]);
   const wineLedgerColumns = useMemo<HorizontalLedgerColumn<MonthlyLedgerItem>[]>(() => [
-    { key: "sequence", label: "序号", width: 46, compactWidth: 40, pinned: true, flexWeight: 0.4, align: "center", render: (row) => <Text style={{ color: colors.muted, fontSize: STORE_TABLE_METRICS.bodyFontSize }}>{row.itemId}</Text> },
-    { key: "name", sortKey: "name", label: "商品名称", width: 184, compactWidth: 150, pinned: true, flexWeight: 3, onPress: setSelectedLedgerItem, testID: (row) => `wine-ledger-name-${row.itemId}`, render: (row) => <><Text numberOfLines={1} style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.nameFontSize, fontWeight: "800" }}>{row.name}</Text><Text numberOfLines={1} style={{ color: colors.muted, fontSize: 11 }}>{row.spec}</Text></> },
-    { key: "referencePrice", label: "参考价", width: 96, compactWidth: 68, pinned: true, flexWeight: 1.1, align: "right", render: (row) => <Text style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{formatStoreMoney(row.openingUnitCost)}</Text> },
+    { key: "sequence", label: "序号", width: 46, compactWidth: 40, flexWeight: 0.4, align: "center", render: (row) => <Text style={{ color: colors.muted, fontSize: STORE_TABLE_METRICS.bodyFontSize }}>{row.itemId}</Text> },
+    { key: "name", sortKey: "name", label: "商品名称", width: 184, compactWidth: 150, pinned: true, flexWeight: 3, onPress: setSelectedLedgerItem, testID: (row) => `wine-ledger-name-${row.itemId}`, render: (row) => <Text numberOfLines={2} style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.nameFontSize, fontWeight: "500", lineHeight: 16 }}>{row.name}</Text> },
+    { key: "referencePrice", label: "参考价", width: 96, compactWidth: 68, flexWeight: 1.1, align: "right", render: (row) => <Text style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{formatStoreMoney(row.openingUnitCost)}</Text> },
     { key: "openingQty", sortKey: "openingQty", label: "期初量", width: 88, flexWeight: 1, align: "right", render: (row) => <Text style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{formatStoreQuantity(row.openingQty)}</Text> },
     { key: "openingUnitCost", sortKey: "openingUnitCost", label: "期初单价", width: 104, flexWeight: 1.2, align: "right", render: (row) => <Text style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{formatStoreMoney(row.openingUnitCost)}</Text> },
     { key: "openingCost", sortKey: "openingCost", label: "期初成本", width: 112, flexWeight: 1.3, align: "right", render: (row) => <Text style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{formatStoreMoney(row.openingCost)}</Text> },
     { key: "purchaseQty", sortKey: "purchaseQty", label: "进货量", width: 88, flexWeight: 1, align: "right", render: (row) => <Text style={{ color: row.purchaseQty > 0 ? colors.primary : colors.muted, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{row.purchaseQty > 0 ? `+${formatStoreQuantity(row.purchaseQty)}` : "—"}</Text> },
     { key: "purchaseCost", sortKey: "purchaseCost", label: "进货成本", width: 112, flexWeight: 1.3, align: "right", render: (row) => <Text style={{ color: row.purchaseCost > 0 ? colors.primary : colors.muted, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{row.purchaseCost > 0 ? formatStoreMoney(row.purchaseCost) : "—"}</Text> },
+    { key: "closingQty", sortKey: "closingQty", label: "期末库存", width: 96, flexWeight: 1.1, align: "right", render: (row) => <Text style={{ color: row.closingQty <= 0 ? colors.muted : colors.foreground, fontSize: STORE_TABLE_METRICS.numericFontSize, fontWeight: "600" }}>{formatStoreQuantity(row.closingQty)}</Text> },
+    { key: "closingUnitCost", sortKey: "closingUnitCost", label: "期末单价", width: 112, flexWeight: 1.3, align: "right", render: (row) => <Text style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{formatStoreMoney(row.closingUnitCost)}</Text> },
+    { key: "closingCost", sortKey: "closingCost", label: "期末成本", width: 120, flexWeight: 1.5, align: "right", render: (row) => <Text style={{ color: colors.primary, fontSize: STORE_TABLE_METRICS.numericFontSize, fontWeight: "600" }}>{formatStoreMoney(row.closingCost)}</Text> },
     { key: "consumeQty", sortKey: "consumeQty", label: "消耗量", width: 88, flexWeight: 1, align: "right", render: (row) => <Text style={{ color: row.consumeQty > 0 ? colors.warning : colors.muted, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{row.consumeQty > 0 ? formatStoreQuantity(row.consumeQty) : "—"}</Text> },
     { key: "consumeCost", sortKey: "consumeCost", label: "消耗成本", width: 112, flexWeight: 1.3, align: "right", render: (row) => <Text style={{ color: row.consumeCost > 0 ? colors.warning : colors.muted, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{row.consumeCost > 0 ? formatStoreMoney(row.consumeCost) : "—"}</Text> },
-    { key: "closingQty", sortKey: "closingQty", label: "期末量", width: 88, flexWeight: 1, align: "right", render: (row) => <Text style={{ color: row.closingQty <= 0 ? colors.muted : colors.foreground, fontSize: STORE_TABLE_METRICS.numericFontSize, fontWeight: "800" }}>{formatStoreQuantity(row.closingQty)}</Text> },
-    { key: "closingUnitCost", sortKey: "closingUnitCost", label: "期末单价", width: 112, flexWeight: 1.3, align: "right", render: (row) => <Text style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{formatStoreMoney(row.closingUnitCost)}</Text> },
-    { key: "closingCost", sortKey: "closingCost", label: "期末成本", width: 120, flexWeight: 1.5, align: "right", render: (row) => <Text style={{ color: colors.primary, fontSize: STORE_TABLE_METRICS.numericFontSize, fontWeight: "800" }}>{formatStoreMoney(row.closingCost)}</Text> },
   ], [colors]);
 
   const selectedSupplierView = supplierViewSupplier && allSuppliers.includes(supplierViewSupplier)
@@ -374,15 +470,22 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
     () => selectedSupplierPurchases.reduce((total, purchase) => total + purchase.amount, 0),
     [selectedSupplierPurchases],
   );
-  const findBottleForItem = (name: string, supplier: string) => bottles.find((bottle) =>
-    normalizeWineIdentity(bottle.name) === normalizeWineIdentity(name)
-    && (!supplier || !bottle.supplier || bottle.supplier === supplier),
-  ) ?? bottles.find((bottle) => normalizeWineIdentity(bottle.name) === normalizeWineIdentity(name));
+  const selectedInventoryItem = useMemo(() => selectedLedgerItem ? items.find((item) => String(item.seq) === selectedLedgerItem.itemId) ?? null : null, [selectedLedgerItem, items]);
   const selectedBottle = useMemo(() => {
-    if (!selectedLedgerItem) return null;
-    const source = items.find((item) => String(item.seq) === selectedLedgerItem.itemId);
-    return source ? findBottleForItem(source.name, source.supplier) : null;
-  }, [selectedLedgerItem, items, bottles]);
+    if (!selectedInventoryItem?.bottleId) return null;
+    return bottles.find((bottle) => bottle.id === selectedInventoryItem.bottleId) ?? null;
+  }, [selectedInventoryItem, bottles]);
+  const wineLinkCandidates = useMemo(() => selectedInventoryItem ? rankWineLinkCandidates(selectedInventoryItem, bottles) : [], [selectedInventoryItem, bottles]);
+
+  const confirmWineBottleLink = (bottleId: string, confidence: "manual" | "confirmed", bottleName?: string) => {
+    if (!selectedInventoryItem || !latestSnapshot) return;
+    const resolvedName = bottleName ?? bottles.find((candidate) => candidate.id === bottleId)?.name ?? selectedInventoryItem.name;
+    updateSnapshot(latestSnapshot.id, { items: latestSnapshot.items.map((item) => item.seq === selectedInventoryItem.seq ? { ...item, bottleId, category: item.category ?? item.wineType } : item) });
+    // 已绑定库存行的采购全部随人工确认重链；旧版无 seq 的同供应商同名采购仅在人工确认时纳入。
+    const linkedPurchases = purchases.filter((purchase) => purchase.inventoryItemSeq === selectedInventoryItem.seq || (purchase.inventoryItemSeq === undefined && purchase.productName === selectedInventoryItem.name && purchase.supplier === selectedInventoryItem.supplier));
+    if (linkedPurchases.length > 0) batchUpdateManualPurchases(linkedPurchases.map((purchase) => purchase.id), { bottleId, linkConfidence: confidence });
+    Alert.alert("已确认链接", `库存酒款已链接至「${resolvedName}」。供应渠道和价格历史会由已确认采购自动同步；重链或删除采购时旧档案残留会自动清理。`);
+  };
 
   // 当月进货沿用库存管理的标签分组，并允许在没有历史采购时从酒库供应商直接开始手动录入。
   const monthPurchaseRecords = useMemo(
@@ -438,14 +541,49 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
     totalConsumeBottles: items.reduce((s, i) => s + i.consumeBottles, 0),
   }), [items]);
 
+  const saveSupplierProfile = () => {
+    const name = supplierDraftName.trim();
+    if (!name) { Alert.alert("请输入供应商名称"); return; }
+    const duplicate = supplierProfiles.some((supplier) => supplier.id !== editingSupplierId && supplier.name.trim() === name);
+    if (duplicate) { Alert.alert("供应商已存在", "请编辑已有供应商，避免分散采购统计。"); return; }
+    const details = {
+      name,
+      nameEn: supplierDraftEn.trim() || undefined,
+      aliases: supplierDraftAliases.split(/[，,\n]/).map((alias) => alias.trim()).filter(Boolean),
+      contactName: supplierDraftContactName.trim() || undefined,
+      contactPhone: supplierDraftContactPhone.trim() || undefined,
+      notes: supplierDraftNotes.trim() || undefined,
+    };
+    if (editingSupplierId) updateSupplier(editingSupplierId, details);
+    else addSupplier(details);
+    setSupplierDraftName(""); setSupplierDraftEn(""); setSupplierDraftAliases(""); setSupplierDraftContactName(""); setSupplierDraftContactPhone(""); setSupplierDraftNotes(""); setEditingSupplierId(null);
+  };
+  const archiveSupplierProfile = (id: string, name: string) => Alert.alert("归档供应商", `归档「${name}」后不再显示在新采购列表；历史采购不会改变。`, [
+    { text: "取消", style: "cancel" },
+    { text: "归档", style: "destructive", onPress: () => updateSupplier(id, { archived: true }) },
+  ]);
+  const saveCategoryProfile = () => {
+    const name = categoryDraftName.trim();
+    if (!name) { Alert.alert("请输入分类名称"); return; }
+    const duplicate = categoryProfiles.some((category) => category.id !== editingCategoryId && category.name.trim() === name);
+    if (duplicate) { Alert.alert("分类已存在"); return; }
+    if (editingCategoryId) updateCategory(editingCategoryId, { name, color: categoryDraftColor });
+    else addCategory({ name, color: categoryDraftColor });
+    setCategoryDraftName(""); setCategoryDraftColor("#64748B"); setEditingCategoryId(null);
+  };
+  const archiveCategoryProfile = (id: string, name: string) => Alert.alert("归档分类", `归档「${name}」后将不再出现在新录入选项；历史台账分类快照不改变。`, [
+    { text: "取消", style: "cancel" },
+    { text: "归档", style: "destructive", onPress: () => updateCategory(id, { archived: true }) },
+  ]);
+
   const handlePurchaseEntry = (supplier: string) => {
     tap();
     setActiveSupplierForEntry(supplier);
     setShowPurchaseSheet(true);
   };
 
-  const handleSavePurchase = (entries: { item: WineInventoryItem; qty: number; unitPrice: number }[]) => {
-    const today = new Date().toISOString().slice(0, 10);
+  const handleSavePurchase = (entries: { item: WineInventoryItem; qty: number; unitPrice: number }[], purchaseDate: string) => {
+    const today = purchaseDate;
     entries.forEach(({ item, qty, unitPrice }) => {
       // 从唯一采购流水中定位同供应商同酒款的最近历史单价。
       const prevPurchase = purchases
@@ -455,7 +593,10 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
       addManualPurchase({
         date: today,
         supplier: item.supplier,
-        bottleId: findBottleForItem(item.name, item.supplier)?.id ?? null,
+        bottleId: item.bottleId ?? null,
+        category: item.category ?? item.wineType,
+        inventoryItemSeq: item.seq,
+        linkConfidence: item.bottleId ? "confirmed" : undefined,
         productName: item.name,
         unitPrice,
         quantity: qty,
@@ -467,6 +608,26 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
     });
     const total = entries.reduce((s, e) => s + e.qty * e.unitPrice, 0);
     Alert.alert("进货已记录", `${activeSupplierForEntry} 共 ${entries.length} 款，合计 ¥${formatMoney(total)}`);
+  };
+
+  const handleCreateInitialInventory = (input: Omit<WineInitialInventoryInput, "month" | "bottleId">) => {
+    if (!assertWineWritable()) return;
+    const normalizedSupplier = input.supplier.trim().toLocaleLowerCase();
+    const normalizedCategory = input.category.trim().toLocaleLowerCase();
+    if (!supplierProfiles.some((profile) => profile.name.trim().toLocaleLowerCase() === normalizedSupplier)) addSupplier({ name: input.supplier, aliases: [] });
+    if (!categoryProfiles.some((profile) => profile.name.trim().toLocaleLowerCase() === normalizedCategory)) addCategory({ name: input.category, color: input.categoryColor ?? "#64748B" });
+    const existingBottle = bottles.find((bottle) => bottle.supplier.trim().toLocaleLowerCase() === normalizedSupplier && normalizeWineIdentity(bottle.name) === normalizeWineIdentity(input.name));
+    const bottleId = existingBottle?.id ?? wineUuid();
+    try {
+      const snapshot = appendWineInitialInventory(latestSnapshot, { ...input, month: selectedMonth, bottleId }, { now: new Date().toISOString(), snapshotId: `wine-initial-${Date.now()}` });
+      if (!existingBottle) addBottle({ id: bottleId, name: input.name, nameEn: "", vintage: "", region: "", grape: "", winery: "", style: "other", abv: null, costPrice: input.unitCost, salePrice: null, stock: input.quantity, rating: null, notes: "由期初库存建档创建", photoUri: "", supplier: input.supplier, purchaseChannelProjections: [] });
+      if (latestSnapshot) updateSnapshot(latestSnapshot.id, snapshot);
+      else addSnapshot(snapshot);
+      setShowInitialInventorySheet(false);
+      Alert.alert("期初库存已建立", `「${input.name}」已写入 ${selectedMonth} 期初库存，初始金额 ¥${formatMoney(input.quantity * input.unitCost)}；未计入当月进货。`);
+    } catch (error) {
+      Alert.alert("无法建立期初库存", error instanceof Error ? error.message : "请检查输入后重试。");
+    }
   };
 
   const activeSupplierItems = useMemo(() => {
@@ -625,6 +786,9 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
             <IconSymbol name="square.and.arrow.down.fill" size={16} color="#fff" />
             <Text style={S.importBtnText}>导入 Excel</Text>
           </Pressable>
+          <Pressable testID="wine-create-initial-inventory-empty" onPress={() => setShowInitialInventorySheet(true)} style={[S.importBtn, { marginTop: 10, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }]}>
+            <Text style={{ color: colors.primary, fontSize: 14, fontWeight: "700" }}>建立期初库存</Text>
+          </Pressable>
         </View>
       )}
 
@@ -649,8 +813,14 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
               }} style={[S.actionBtn, { backgroundColor: "#F59E0B22", borderColor: "#F59E0B" }]}>
                 <Text style={{ fontSize: 12, color: "#92400E", fontWeight: "600" }}>月末盘点</Text>
               </TouchableOpacity>
+              <TouchableOpacity testID="wine-create-initial-inventory" onPress={() => setShowInitialInventorySheet(true)} style={[S.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "600" }}>建立期初库存</Text>
+              </TouchableOpacity>
               <TouchableOpacity onPress={() => openDangerousAction("recalculate")} style={[S.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "600" }}>强制重新计算</Text>
+              </TouchableOpacity>
+              <TouchableOpacity testID="wine-manage-categories" onPress={() => setShowCategoryManager(true)} style={[S.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "600" }}>管理进销存分类</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => {
                 if (!assertWineWritable()) return;
@@ -682,7 +852,7 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
                   <Text style={[S.filterChipText, { color: filterSupplier === supplier ? "#fff" : colors.muted }]}>{supplier}</Text>
                 </TouchableOpacity>
               ))}
-              {wineTypes.length > 0 && <Text style={{ color: colors.muted, fontSize: 12, fontWeight: "700", marginLeft: 6 }}>酒类</Text>}
+              {wineTypes.length > 0 && <Text style={{ color: colors.muted, fontSize: 12, fontWeight: "700", marginLeft: 6 }}>分类</Text>}
               <TouchableOpacity testID="wine-ledger-sort-category" onPress={() => setLedgerSort((current) => toggleSort(current, "category"))} style={[S.filterChip, { backgroundColor: ledgerSort.key === "category" ? colors.primary : colors.surface, borderColor: ledgerSort.key === "category" ? colors.primary : colors.border }]}>
                 <Text style={[S.filterChipText, { color: ledgerSort.key === "category" ? "#fff" : colors.muted }]}>分类排序{ledgerSort.key === "category" ? (ledgerSort.direction === "asc" ? " ↑" : " ↓") : " ↕"}</Text>
               </TouchableOpacity>
@@ -705,6 +875,7 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
                 emptyLabel="当前筛选条件下没有葡萄酒台账记录。"
                 sort={ledgerSort}
                 onSort={(key) => setLedgerSort((current) => toggleSort(current, key as WineLedgerSortKey))}
+                showHeaderSortIndicators={false}
               />
             </View>
           </View>
@@ -726,7 +897,20 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
               <Text style={{ color: colors.primary, fontSize: 13, fontWeight: "800" }}>查看葡萄酒库档案</Text>
               <IconSymbol name="chevron.right" size={13} color={colors.primary} />
             </TouchableOpacity>
-          ) : <Text style={{ color: colors.muted, fontSize: 12, marginTop: 14 }}>尚未关联葡萄酒库档案；可在葡萄酒库中新建同名酒款后自动匹配。</Text>
+          ) : (
+            <View style={{ marginTop: 14, gap: 8 }}>
+              <Text style={{ color: colors.muted, fontSize: 12 }}>尚未关联真实葡萄酒档案。请选择人工链接、确认智能候选，或新建档案；系统不会按名称自动跳转。</Text>
+              {wineLinkCandidates.slice(0, 3).map(({ bottle, score, reasons }) => <TouchableOpacity key={bottle.id} testID={`wine-smart-link-${bottle.id}`} onPress={() => confirmWineBottleLink(bottle.id, "confirmed")} style={[S.supplierBottleRow, { backgroundColor: colors.surface, borderColor: colors.border }]}><View style={{ flex: 1, minWidth: 0 }}><Text numberOfLines={1} style={{ color: colors.foreground, fontWeight: "600" }}>{bottle.name}</Text><Text numberOfLines={1} style={{ color: colors.muted, fontSize: 11 }}>待人工确认 · {Math.round(score * 100)}% · {reasons.join("、") || "名称相似"}</Text></View><IconSymbol name="link" size={14} color={colors.primary} /></TouchableOpacity>)}
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                <TouchableOpacity testID="wine-manual-link" onPress={() => setShowWineLinkPicker(true)} style={[S.actionBtn, { flex: 1, justifyContent: "center", backgroundColor: colors.background, borderColor: colors.border }]}><Text style={{ color: colors.primary, fontSize: 12, fontWeight: "700" }}>人工链接档案</Text></TouchableOpacity>
+                <TouchableOpacity testID="wine-create-library-record" onPress={() => {
+                  if (!selectedInventoryItem) return;
+                  const bottleId = addBottle({ name: selectedInventoryItem.name, nameEn: "", vintage: "", region: "", grape: "", winery: "", style: "other", abv: null, costPrice: selectedInventoryItem.initUnitCost, salePrice: null, stock: selectedInventoryItem.endQty, rating: null, notes: "由葡萄酒库存档案链接创建", photoUri: "", supplier: selectedInventoryItem.supplier, purchaseChannelProjections: [] });
+                  confirmWineBottleLink(bottleId, "manual", selectedInventoryItem.name);
+                }} style={[S.actionBtn, { flex: 1, justifyContent: "center", backgroundColor: colors.primary, borderColor: colors.primary }]}><Text style={{ color: "#fff", fontSize: 12, fontWeight: "700" }}>新建葡萄酒档案</Text></TouchableOpacity>
+              </View>
+            </View>
+          )
         ) : null}
       />
 
@@ -742,6 +926,9 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
             style={{ flexGrow: 0, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}
             contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 8, gap: 8, alignItems: "center" }}
           >
+            <TouchableOpacity testID="wine-manage-suppliers" onPress={() => setShowSupplierManager(true)} style={[S.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "700" }}>管理供应商</Text>
+            </TouchableOpacity>
             {allSuppliers.map((supplier) => {
               const active = selectedSupplierView === supplier;
               return (
@@ -1000,6 +1187,34 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
         colors={colors}
         onClose={() => setShowPurchaseSheet(false)}
         onSave={handleSavePurchase}
+        onCreateWine={({ name, quantity, unitPrice, date }) => {
+          const exists = bottles.some((bottle) => normalizeWineIdentity(bottle.name) === normalizeWineIdentity(name) && bottle.supplier === activeSupplierForEntry);
+          if (exists) { Alert.alert("酒款已存在", "该供应商下已有同名葡萄酒款，请直接使用上方现有酒款行录入采购。 "); return; }
+          const bottleId = wineUuid();
+          const category = categoryProfiles.find((profile) => !profile.archived)?.name ?? "其他";
+          const categoryColor = categoryProfiles.find((profile) => profile.name === category)?.color;
+          try {
+            const now = new Date().toISOString();
+            const snapshot = appendWineFirstPurchaseInventory(latestSnapshot, { month: selectedMonth, supplier: activeSupplierForEntry, category, categoryColor, name, bottleId, quantity, unitCost: unitPrice }, { now, date, snapshotId: `wine-first-purchase-${Date.now()}` });
+            addBottle({ id: bottleId, name, nameEn: "", vintage: "", region: "", grape: "", winery: "", style: "other", abv: null, costPrice: unitPrice, salePrice: null, stock: quantity, rating: null, notes: "由进货录入创建", photoUri: "", supplier: activeSupplierForEntry, purchaseChannelProjections: [] });
+            if (latestSnapshot) updateSnapshot(latestSnapshot.id, snapshot);
+            else addSnapshot(snapshot);
+            addManualPurchase({ date, supplier: activeSupplierForEntry, bottleId, category, inventoryItemSeq: snapshot.items.find((item) => item.bottleId === bottleId)?.seq, linkConfidence: "confirmed", productName: name, unitPrice, quantity, amount: quantity * unitPrice, notes: "新建葡萄酒款的首笔采购" });
+            Alert.alert("已新增并入库", `「${name}」已创建真实葡萄酒档案、写入库存台账，并记录 ${date} 的首笔采购。`);
+          } catch (error) {
+            Alert.alert("无法新增并入库", error instanceof Error ? error.message : "请检查数据后重试。");
+          }
+        }}
+      />
+
+      <InitialWineInventorySheet
+        visible={showInitialInventorySheet}
+        month={selectedMonth}
+        suppliers={allSuppliers}
+        categories={categoryProfiles.filter((category) => !category.archived).sort((left, right) => left.sortOrder - right.sortOrder).map((category) => ({ name: category.name, color: category.color }))}
+        colors={colors}
+        onClose={() => setShowInitialInventorySheet(false)}
+        onSave={handleCreateInitialInventory}
       />
 
       {/* 批量修改供应商、数量或单价：底层会原子更新，并在数量/单价变化时重算总价。 */}
@@ -1142,6 +1357,82 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
                 </View>
               );
             })}
+          </ScrollView>
+        </View>
+      </Modal>
+
+      <Modal visible={showWineLinkPicker} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowWineLinkPicker(false)}>
+        <View style={[S.sheet, { backgroundColor: colors.background }]}>
+          <View style={[S.sheetHeader, { borderBottomColor: colors.border }]}><Pressable onPress={() => setShowWineLinkPicker(false)}><Text style={[S.sheetCancel, { color: colors.primary }]}>取消</Text></Pressable><Text style={[S.sheetTitle, { color: colors.foreground }]}>人工链接葡萄酒档案</Text><View style={{ width: 34 }} /></View>
+          <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 48 + insets.bottom }}>
+            <Text style={{ color: colors.muted, fontSize: 12, marginBottom: 12 }}>从真实葡萄酒档案库中选择一款确认关联。库存名称不会再自行猜测跳转。</Text>
+            {bottles.map((bottle) => <TouchableOpacity key={bottle.id} testID={`wine-manual-link-option-${bottle.id}`} onPress={() => { confirmWineBottleLink(bottle.id, "manual"); setShowWineLinkPicker(false); }} style={[S.supplierBottleRow, { backgroundColor: colors.surface, borderColor: colors.border }]}><View style={{ flex: 1, minWidth: 0 }}><Text numberOfLines={1} style={{ color: colors.foreground, fontSize: 14, fontWeight: "600" }}>{bottle.name}</Text><Text numberOfLines={1} style={{ color: colors.muted, fontSize: 11 }}>{[bottle.supplier, bottle.vintage, bottle.region].filter(Boolean).join(" · ") || "待补充资料"}</Text></View><IconSymbol name="chevron.right" size={14} color={colors.muted} /></TouchableOpacity>)}
+            {bottles.length === 0 && <Text style={{ color: colors.muted, textAlign: "center", paddingTop: 32 }}>葡萄酒档案库暂无酒款，请先新建档案。</Text>}
+          </ScrollView>
+        </View>
+      </Modal>
+
+      <Modal visible={showSupplierManager} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowSupplierManager(false)}>
+        <View style={[S.sheet, { backgroundColor: colors.background }]}>
+          <View style={[S.sheetHeader, { borderBottomColor: colors.border }]}>
+            <Pressable onPress={() => setShowSupplierManager(false)}><Text style={[S.sheetCancel, { color: colors.primary }]}>关闭</Text></Pressable>
+            <Text style={[S.sheetTitle, { color: colors.foreground }]}>管理供应商</Text>
+            <View style={{ width: 34 }} />
+          </View>
+          <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 56 + insets.bottom }}>
+            <Text style={{ color: colors.muted, fontSize: 12, marginBottom: 10 }}>新增、编辑、排序或归档供应商。归档不改变任何历史采购记录。</Text>
+            <View style={[S.entryRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <TextInput value={supplierDraftName} onChangeText={setSupplierDraftName} placeholder="供应商中文名称" placeholderTextColor={colors.muted} style={[S.entryInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.foreground }]} />
+              <TextInput value={supplierDraftEn} onChangeText={setSupplierDraftEn} placeholder="英文名称（可选）" placeholderTextColor={colors.muted} style={[S.entryInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.foreground, marginTop: 8 }]} />
+              <TextInput value={supplierDraftAliases} onChangeText={setSupplierDraftAliases} placeholder="别名（逗号分隔，可选）" placeholderTextColor={colors.muted} style={[S.entryInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.foreground, marginTop: 8 }]} />
+              <TextInput value={supplierDraftContactName} onChangeText={setSupplierDraftContactName} placeholder="联系人（可选）" placeholderTextColor={colors.muted} style={[S.entryInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.foreground, marginTop: 8 }]} />
+              <TextInput value={supplierDraftContactPhone} onChangeText={setSupplierDraftContactPhone} placeholder="联系电话（可选）" placeholderTextColor={colors.muted} keyboardType="phone-pad" style={[S.entryInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.foreground, marginTop: 8 }]} />
+              <TextInput value={supplierDraftNotes} onChangeText={setSupplierDraftNotes} placeholder="备注（可选）" placeholderTextColor={colors.muted} multiline style={[S.entryInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.foreground, marginTop: 8, minHeight: 64, textAlignVertical: "top" }]} />
+              <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
+                {editingSupplierId && <Pressable onPress={() => { setEditingSupplierId(null); setSupplierDraftName(""); setSupplierDraftEn(""); setSupplierDraftAliases(""); setSupplierDraftContactName(""); setSupplierDraftContactPhone(""); setSupplierDraftNotes(""); }} style={[S.actionBtn, { flex: 1, justifyContent: "center", backgroundColor: colors.background, borderColor: colors.border }]}><Text style={{ color: colors.muted }}>取消编辑</Text></Pressable>}
+                <Pressable onPress={saveSupplierProfile} style={[S.actionBtn, { flex: 1, justifyContent: "center", backgroundColor: colors.primary, borderColor: colors.primary }]}><Text style={{ color: "#fff", fontWeight: "700" }}>{editingSupplierId ? "保存供应商" : "新增供应商"}</Text></Pressable>
+              </View>
+            </View>
+            {supplierProfiles.filter((supplier) => !supplier.archived).sort((left, right) => left.sortOrder - right.sortOrder).map((supplier, index, list) => (
+              <View key={supplier.id} style={[S.supplierBottleRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <View style={{ flex: 1, minWidth: 0 }}><Text style={{ color: colors.foreground, fontSize: 14, fontWeight: "600" }}>{supplier.name}</Text>{supplier.nameEn ? <Text style={{ color: colors.muted, fontSize: 11 }}>{supplier.nameEn}</Text> : null}{supplier.aliases.length > 0 ? <Text numberOfLines={1} style={{ color: colors.muted, fontSize: 11 }}>别名：{supplier.aliases.join("、")}</Text> : null}{[supplier.contactName, supplier.contactPhone].filter(Boolean).length > 0 ? <Text numberOfLines={1} style={{ color: colors.muted, fontSize: 11 }}>{[supplier.contactName, supplier.contactPhone].filter(Boolean).join(" · ")}</Text> : null}</View>
+                <TouchableOpacity disabled={index === 0} onPress={() => reorderSuppliers([...list.slice(0, index - 1), supplier, list[index - 1], ...list.slice(index + 1)])} style={{ padding: 8, opacity: index === 0 ? 0.35 : 1 }}><Text style={{ color: colors.primary }}>↑</Text></TouchableOpacity>
+                <TouchableOpacity disabled={index === list.length - 1} onPress={() => reorderSuppliers([...list.slice(0, index), list[index + 1], supplier, ...list.slice(index + 2)])} style={{ padding: 8, opacity: index === list.length - 1 ? 0.35 : 1 }}><Text style={{ color: colors.primary }}>↓</Text></TouchableOpacity>
+                <TouchableOpacity onPress={() => { setEditingSupplierId(supplier.id); setSupplierDraftName(supplier.name); setSupplierDraftEn(supplier.nameEn ?? ""); setSupplierDraftAliases(supplier.aliases.join("，")); setSupplierDraftContactName(supplier.contactName ?? ""); setSupplierDraftContactPhone(supplier.contactPhone ?? ""); setSupplierDraftNotes(supplier.notes ?? ""); }} style={{ padding: 8 }}><Text style={{ color: colors.primary }}>编辑</Text></TouchableOpacity>
+                <TouchableOpacity onPress={() => archiveSupplierProfile(supplier.id, supplier.name)} style={{ padding: 8 }}><Text style={{ color: colors.error }}>归档</Text></TouchableOpacity>
+              </View>
+            ))}
+            {supplierProfiles.some((supplier) => supplier.archived) ? <View style={{ marginTop: 18 }}><Text style={{ color: colors.muted, fontSize: 12, marginBottom: 8 }}>已归档供应商（历史记录仍保留）</Text>{supplierProfiles.filter((supplier) => supplier.archived).sort((left, right) => left.sortOrder - right.sortOrder).map((supplier) => <View key={supplier.id} style={[S.supplierBottleRow, { backgroundColor: colors.surface, borderColor: colors.border, opacity: 0.78 }]}><Text style={{ flex: 1, color: colors.muted, fontSize: 14 }}>{supplier.name}</Text><TouchableOpacity onPress={() => updateSupplier(supplier.id, { archived: false })} style={{ padding: 8 }}><Text style={{ color: colors.primary }}>恢复</Text></TouchableOpacity></View>)}</View> : null}
+          </ScrollView>
+        </View>
+      </Modal>
+
+      <Modal visible={showCategoryManager} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowCategoryManager(false)}>
+        <View style={[S.sheet, { backgroundColor: colors.background }]}>
+          <View style={[S.sheetHeader, { borderBottomColor: colors.border }]}>
+            <Pressable onPress={() => setShowCategoryManager(false)}><Text style={[S.sheetCancel, { color: colors.primary }]}>关闭</Text></Pressable>
+            <Text style={[S.sheetTitle, { color: colors.foreground }]}>管理进销存分类</Text>
+            <View style={{ width: 34 }} />
+          </View>
+          <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 56 + insets.bottom }}>
+            <View style={[S.entryRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <TextInput value={categoryDraftName} onChangeText={setCategoryDraftName} placeholder="分类名称" placeholderTextColor={colors.muted} style={[S.entryInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.foreground }]} />
+              <View style={{ flexDirection: "row", gap: 8, marginTop: 10, flexWrap: "wrap" }}>{["#64748B", "#2563EB", "#059669", "#D97706", "#7C3AED", "#DB2777"].map((color) => <TouchableOpacity key={color} onPress={() => setCategoryDraftColor(color)} style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: color, borderWidth: categoryDraftColor === color ? 3 : 0, borderColor: colors.foreground }} />)}</View>
+              <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
+                {editingCategoryId && <Pressable onPress={() => { setEditingCategoryId(null); setCategoryDraftName(""); setCategoryDraftColor("#64748B"); }} style={[S.actionBtn, { flex: 1, justifyContent: "center", backgroundColor: colors.background, borderColor: colors.border }]}><Text style={{ color: colors.muted }}>取消编辑</Text></Pressable>}
+                <Pressable onPress={saveCategoryProfile} style={[S.actionBtn, { flex: 1, justifyContent: "center", backgroundColor: colors.primary, borderColor: colors.primary }]}><Text style={{ color: "#fff", fontWeight: "700" }}>{editingCategoryId ? "保存分类" : "新增分类"}</Text></Pressable>
+              </View>
+            </View>
+            {categoryProfiles.filter((category) => !category.archived).sort((left, right) => left.sortOrder - right.sortOrder).map((category, index, list) => (
+              <View key={category.id} style={[S.supplierBottleRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: category.color, marginRight: 10 }} /><Text style={{ flex: 1, color: colors.foreground, fontSize: 14, fontWeight: "600" }}>{category.name}</Text>
+                <TouchableOpacity disabled={index === 0} onPress={() => reorderCategories([...list.slice(0, index - 1), category, list[index - 1], ...list.slice(index + 1)])} style={{ padding: 8, opacity: index === 0 ? 0.35 : 1 }}><Text style={{ color: colors.primary }}>↑</Text></TouchableOpacity>
+                <TouchableOpacity disabled={index === list.length - 1} onPress={() => reorderCategories([...list.slice(0, index), list[index + 1], category, ...list.slice(index + 2)])} style={{ padding: 8, opacity: index === list.length - 1 ? 0.35 : 1 }}><Text style={{ color: colors.primary }}>↓</Text></TouchableOpacity>
+                <TouchableOpacity onPress={() => { setEditingCategoryId(category.id); setCategoryDraftName(category.name); setCategoryDraftColor(category.color); }} style={{ padding: 8 }}><Text style={{ color: colors.primary }}>编辑</Text></TouchableOpacity>
+                <TouchableOpacity onPress={() => archiveCategoryProfile(category.id, category.name)} style={{ padding: 8 }}><Text style={{ color: colors.error }}>归档</Text></TouchableOpacity>
+              </View>
+            ))}
+            {categoryProfiles.some((category) => category.archived) ? <View style={{ marginTop: 18 }}><Text style={{ color: colors.muted, fontSize: 12, marginBottom: 8 }}>已归档分类（历史台账分类保持不变）</Text>{categoryProfiles.filter((category) => category.archived).sort((left, right) => left.sortOrder - right.sortOrder).map((category) => <View key={category.id} style={[S.supplierBottleRow, { backgroundColor: colors.surface, borderColor: colors.border, opacity: 0.78 }]}><View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: category.color, marginRight: 10 }} /><Text style={{ flex: 1, color: colors.muted, fontSize: 14 }}>{category.name}</Text><TouchableOpacity onPress={() => updateCategory(category.id, { archived: false })} style={{ padding: 8 }}><Text style={{ color: colors.primary }}>恢复</Text></TouchableOpacity></View>)}</View> : null}
           </ScrollView>
         </View>
       </Modal>

@@ -2,6 +2,29 @@
 export type WineStyle = "red" | "white" | "rose" | "sparkling" | "sweet" | "fortified" | "other";
 
 /** 葡萄酒条目 */
+export type WineLinkConfidence = "manual" | "confirmed" | "exact";
+
+/** 采购事实投影到葡萄酒档案的单次价格历史。 */
+export interface WinePurchasePriceRecord {
+  sourcePurchaseId: string;
+  date: string;
+  unitPrice: number;
+  quantity: number;
+  amount: number;
+  supplierProductName: string;
+}
+
+/** 由已确认采购自动生成的葡萄酒供应渠道；不可脱离采购事实独立建价。 */
+export interface WinePurchaseChannelProjection {
+  id: string;
+  supplier: string;
+  type: "supplier" | "self_purchase";
+  supplierProductNames: string[];
+  priceHistory: WinePurchasePriceRecord[];
+  purchaseLink?: string;
+  notes?: string;
+}
+
 export interface WineBottle {
   id: string;
   /** 中文名称 */
@@ -47,6 +70,36 @@ export interface WineBottle {
   priceAlertPct?: number;
   /** 历史参考单价 { "YYYY-MM": price } */
   refPrices?: Record<string, number>;
+  /** 由已确认采购投影的供应渠道与价格历史。 */
+  purchaseChannelProjections?: WinePurchaseChannelProjection[];
+  /** 当前成本计算采用的真实采购渠道。 */
+  costChannelId?: string;
+}
+
+/** 葡萄酒供应商主数据；历史采购只保存名称快照，不会因改名失真。 */
+export interface WineSupplierProfile {
+  id: string;
+  name: string;
+  nameEn?: string;
+  aliases: string[];
+  contactName?: string;
+  contactPhone?: string;
+  notes?: string;
+  sortOrder: number;
+  archived: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 葡萄酒库存当前分类；颜色仅从固定语义色板选择。 */
+export interface WineInventoryCategory {
+  id: string;
+  name: string;
+  color: string;
+  sortOrder: number;
+  archived: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // ─── 进销存台账字段 ─────────────────────────────────────────────────────────
@@ -57,8 +110,14 @@ export interface WineInventoryItem {
   seq: number;
   /** 酒类（Red / White / Rose / Sparkling / Natural Wine 等） */
   wineType: string;
-  /** 盘点分类（即供应商名称，如：甘澧、Interprocom） */
+  /** 供应商名称快照，如：甘澧、Interprocom。 */
   supplier: string;
+  /** 当前库存分类；缺省历史数据回退 wineType。 */
+  category?: string;
+  /** 分类固定语义色。 */
+  categoryColor?: string;
+  /** 已确认的真实葡萄酒档案 ID。 */
+  bottleId?: string | null;
   /** 中文名 */
   name: string;
   /** 期初单位成本 */
@@ -124,8 +183,14 @@ export interface WineManualPurchase {
   id: string;
   date: string;          // YYYY-MM-DD
   supplier: string;
-  /** 对应 WineBottle.id（若已匹配） */
+  /** 对应 WineBottle.id（若已确认链接） */
   bottleId: string | null;
+  /** 当前采购分类快照；主档分类变化不得回写历史事实。 */
+  category?: string;
+  /** 关联库存台账条目，用于手动采购与期初库存回写。 */
+  inventoryItemSeq?: number;
+  /** 链接必须有来源，避免名称猜测被误当成确认关系。 */
+  linkConfidence?: WineLinkConfidence;
   productName: string;
   unitPrice: number;
   quantity: number;
