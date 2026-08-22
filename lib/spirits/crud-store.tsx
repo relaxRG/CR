@@ -10,6 +10,7 @@ import { purchasesForMonth, type PendingSpiritPurchase } from "./import-bridge";
 import { moveInventoryCategory } from "./category-lifecycle";
 import { normalizeSpiritSupplierAliases } from "./supplier-alias";
 import { summarizeSpiritLedgerByCategory, type SpiritCategorySummary } from "./category-summary";
+import { applyAtomicSpiritCategorySelection } from "./category-selection";
 import { sumMoney } from "@/lib/finance/money";
 import {
   SpiritItem, SpiritPurchaseRecord, SpiritLedgerEntry,
@@ -285,6 +286,7 @@ type Action =
   | { type: "LOAD"; payload: SpiritsState }
   | { type: "ADD_ITEM"; item: SpiritItem }
   | { type: "UPDATE_ITEM"; id: string; patch: Partial<SpiritItem> }
+  | { type: "SET_ITEM_AND_PURCHASE_CATEGORY"; itemId: string; purchaseId?: string; category: string }
   | { type: "DELETE_ITEM"; id: string }
   | { type: "ADD_PURCHASE"; record: SpiritPurchaseRecord }
   | { type: "UPDATE_PURCHASE"; id: string; patch: Partial<SpiritPurchaseRecord> }
@@ -312,6 +314,12 @@ function reducer(state: SpiritsState, action: Action): SpiritsState {
     case "UPDATE_ITEM": return {
       ...state,
       items: state.items.map((i) => i.id === action.id ? { ...i, ...action.patch, updatedAt: new Date().toISOString() } : i),
+    };
+    // 采购详情的快速分类必须在同一个 reducer transition 中更新库存主档和当前采购记录。
+    // 这样列表分类列与库存管理不会经历两个渲染周期或保留旧快照。
+    case "SET_ITEM_AND_PURCHASE_CATEGORY": return {
+      ...state,
+      ...applyAtomicSpiritCategorySelection(state.items, state.purchases, action.itemId, action.category, action.purchaseId),
     };
     case "DELETE_ITEM": return { ...state, items: state.items.filter((i) => i.id !== action.id) };
     case "ADD_PURCHASE": return { ...state, purchases: [...state.purchases, action.record] };
@@ -428,6 +436,7 @@ interface SpiritsContextValue extends SpiritsState {
   // 酒款档案
   addItem: (data: Omit<SpiritItem, "id" | "createdAt" | "updatedAt">) => SpiritItem;
   updateItem: (id: string, patch: Partial<SpiritItem>) => void;
+  setItemAndPurchaseCategory: (itemId: string, category: string, purchaseId?: string) => void;
   deleteItem: (id: string) => void;
   // 进货流水
   addPurchase: (data: Omit<SpiritPurchaseRecord, "id" | "createdAt">) => SpiritPurchaseRecord;
@@ -562,6 +571,10 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
       : { ...patch, supplierAliases: normalizeSpiritSupplierAliases(patch.supplierAliases) };
     // 分类只影响现行酒款；采购记录保存发生时快照，不得被当前编辑改写。
     dispatch({ type: "UPDATE_ITEM", id, patch: normalizedPatch });
+  };
+
+  const setItemAndPurchaseCategory = (itemId: string, category: string, purchaseId?: string) => {
+    dispatch({ type: "SET_ITEM_AND_PURCHASE_CATEGORY", itemId, category: category.trim(), ...(purchaseId ? { purchaseId } : {}) });
   };
 
   const deleteItem = (id: string) => {
@@ -974,8 +987,7 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
 
   const value: SpiritsContextValue = {
     ...state,
-    addItem, updateItem, deleteItem,
-    addPurchase, updatePurchase, deletePurchase, batchAddPurchases, batchDeletePurchases,
+        addItem, updateItem, setItemAndPurchaseCategory, deleteItem, addPurchase, updatePurchase, deletePurchase, batchAddPurchases, batchDeletePurchases,
     upsertLedger, deleteLedger,
     setRefPrice, getRefPrice,
     upsertSupplier, deleteSupplier, getSupplierByName,

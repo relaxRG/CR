@@ -13,10 +13,10 @@ describe("烈酒分类与统一供应渠道 UI 契约", () => {
     expect(workspace).toContain('testID="spirits-purchase-quick-category"');
     expect(workspace).toContain("快速选择分类");
     expect(workspace).toContain('updateItem(selectedLedgerItem.id, { category: category.name, categorySource: "manual" })');
-    expect(workspace).toContain('updateItem(previewItem.id, { category: category.name, categorySource: "manual" })');
     expect(workspace).toContain("setPreviewPurchaseId(p.id)");
-    expect(workspace).toContain("buildPurchaseCategorySelection(previewItem.id, category.name)");
-    expect(workspace).toContain("syncLedgerFromPurchases(month)");
+    expect(workspace).toContain("setItemAndPurchaseCategory(previewItem.id, category.name, previewPurchaseId ?? undefined)");
+    expect(workspace).toContain("表格分类列与库存管理在同一 state transition 刷新");
+    expect(workspace).not.toContain("buildPurchaseCategorySelection(previewItem.id, category.name)");
   });
 
   it("采购详情提供人工链接、智能链接和名称预填的新建档案三条路径，不复制第二套供应商表单", () => {

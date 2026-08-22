@@ -10,8 +10,3 @@ export function resolvePurchaseDisplayCategory(
 ) {
   return item?.category || purchase.category || "未分类";
 }
-
-/** 采购详情中选择分类时，同时将关联酒款与当前采购记录对齐到同一分类。 */
-export function buildPurchaseCategorySelection(itemId: string, category: string) {
-  return { itemId, category: category.trim() };
-}

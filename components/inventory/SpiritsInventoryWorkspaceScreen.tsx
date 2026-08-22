@@ -32,7 +32,7 @@ import {
   SPIRIT_CATEGORY_COLORS, SPIRIT_CATEGORIES,
 } from "@/lib/spirits/types";
 import { resolveSpiritItemForSupplierName } from "@/lib/spirits/supplier-alias";
-import { buildPurchaseCategorySelection, resolvePurchaseDisplayCategory } from "@/lib/spirits/purchase-category-sync";
+import { resolvePurchaseDisplayCategory } from "@/lib/spirits/purchase-category-sync";
 import {
   ParsedPurchaseRow, previewSheets, parseSheetFromWorkbook,
 } from "@/lib/spirits/excel-import";
@@ -1704,7 +1704,7 @@ function SupplierDetailScreen({
     getMonthLedger,
     groups, detectPurchaseGroup, getItemGroup, rememberGroupMatch,
     upsertGroup, deleteGroup,
-    addItem, updateItem,
+    addItem, updateItem, setItemAndPurchaseCategory,
     getAllCategories,
     getMonthPurchases,
   } = store;
@@ -2460,12 +2460,8 @@ function SupplierDetailScreen({
                         key={category.id}
                         testID={`spirits-purchase-category-${category.id}`}
                         onPress={() => {
-                          // 库存酒款主档是分类事实来源；在采购详情选择时，当前采购记录也必须立即写回。
-                          updateItem(previewItem.id, { category: category.name, categorySource: "manual" });
-                          if (previewPurchaseId) {
-                            updatePurchase(previewPurchaseId, buildPurchaseCategorySelection(previewItem.id, category.name));
-                            syncLedgerFromPurchases(month);
-                          }
+                          // 原子写回库存主档与当前采购行，表格分类列与库存管理在同一 state transition 刷新。
+                          setItemAndPurchaseCategory(previewItem.id, category.name, previewPurchaseId ?? undefined);
                           setPreviewItem((current) => current ? { ...current, category: category.name, categorySource: "manual" } : null);
                         }}
                         style={[S.catChip, {
