@@ -488,7 +488,7 @@ interface SpiritsContextValue extends SpiritsState {
   getPurchaseSummaryBySupplier: (month: string) => Record<string, { qty: number; amount: number; items: number }>;
   // 月结
   closeMonth: (month: string) => void;
-  syncLedgerFromPurchases: (month: string, pending?: readonly PendingSpiritPurchase[]) => void;
+  syncLedgerFromPurchases: (month: string, pending?: readonly PendingSpiritPurchase[], purchaseSource?: readonly SpiritPurchaseRecord[]) => void;
   /** ★ 月末盘点：录入实际期末库存量，自动反推消耗量 */
   setActualClosing: (itemId: string, month: string, actualQty: number) => void;
   /** ★ 批量月末盘点：一次性录入所有酒款的实际期末库存量 */
@@ -916,17 +916,26 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
     }
   };
 
-  const syncLedgerFromPurchases = (month: string, pending: readonly PendingSpiritPurchase[] = []) => {
-    const monthPurchases = purchasesForMonth(state.purchases, pending, month);
+  const syncLedgerFromPurchases = (
+    month: string,
+    pending: readonly PendingSpiritPurchase[] = [],
+    purchaseSource: readonly SpiritPurchaseRecord[] = state.purchases,
+  ) => {
+    const monthPurchases = purchasesForMonth(purchaseSource, pending, month);
     const byItem: Record<string, Array<SpiritPurchaseRecord | PendingSpiritPurchase>> = {};
     monthPurchases.forEach((p) => {
       const key = p.itemId ?? `raw:${p.rawName}`;
       if (!byItem[key]) byItem[key] = [];
       byItem[key].push(p);
     });
-    Object.entries(byItem).forEach(([key, records]) => {
-      if (key.startsWith("raw:")) return;
-      const itemId = key;
+    // 以既有台账行与本月采购行的并集作为重算范围；删除最后一笔采购后，
+    // 原有台账也必须显式归零，不能因缺少 records 而残留旧金额。
+    const itemIds = new Set([
+      ...Object.keys(byItem).filter((key) => !key.startsWith("raw:")),
+      ...getMonthLedger(month).map((entry) => entry.itemId),
+    ]);
+    itemIds.forEach((itemId) => {
+      const records = byItem[itemId] ?? [];
       const purchaseQty = records.reduce((s, r) => s + r.quantity, 0);
       const purchaseCost = records.reduce((s, r) => s + r.amount, 0);
       const existing = getItemLedger(itemId, month);

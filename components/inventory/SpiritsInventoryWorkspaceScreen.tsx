@@ -1697,7 +1697,7 @@ function SupplierDetailScreen({
   pettyStore: any;
 }) {
   const {
-    addPurchase, deletePurchase, batchAddPurchases, batchDeletePurchases,
+    addPurchase, batchAddPurchases, batchDeletePurchases,
     updatePurchase, 
     getRefPrice, setMatchMemory, matchPettyToItem,
     selfBuyConfig, syncLedgerFromPurchases,
@@ -1720,6 +1720,13 @@ function SupplierDetailScreen({
   );
 
   const totalAmt = supPurchases.reduce((s, p) => s + p.amount, 0);
+  const deletePurchasesAndResync = (ids: readonly string[]) => {
+    const deletedIds = new Set(ids);
+    const affectedMonths = new Set(purchases.filter((purchase) => deletedIds.has(purchase.id)).map((purchase) => purchase.month));
+    const remainingPurchases = purchases.filter((purchase) => !deletedIds.has(purchase.id));
+    batchDeletePurchases([...deletedIds]);
+    affectedMonths.forEach((affectedMonth) => syncLedgerFromPurchases(affectedMonth, [], remainingPurchases));
+  };
   const [showAddPurchase, setShowAddPurchase] = useState(false);
   const [showPettyImport, setShowPettyImport] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
@@ -1989,7 +1996,7 @@ function SupplierDetailScreen({
             Alert.alert("批量删除", `删除选中的 ${selectedIds.size} 条记录？`, [
               { text: "取消", style: "cancel" },
               { text: "删除", style: "destructive", onPress: () => {
-                batchDeletePurchases([...selectedIds]);
+                deletePurchasesAndResync([...selectedIds]);
                 setSelectedIds(new Set());
                 setSelectMode(false);
               }},
@@ -2202,7 +2209,7 @@ function SupplierDetailScreen({
                           { text: "删除此记录", style: "destructive", onPress: () => {
                             Alert.alert("确认删除", `删除「${p.rawName}」的进货记录？`, [
                               { text: "取消", style: "cancel" },
-                              { text: "删除", style: "destructive", onPress: () => deletePurchase(p.id) },
+                              { text: "删除", style: "destructive", onPress: () => deletePurchasesAndResync([p.id]) },
                             ]);
                           }},
                           { text: "取消", style: "cancel" },
@@ -2897,7 +2904,7 @@ function SupplierDetailScreen({
             }));
             const resolvedItems = [...items];
             let addedItems = 0;
-            const initial = buildImportedPurchaseRecords(orders, resolvedItems, month, importPreviewSource, bottles);
+            const initial = buildImportedPurchaseRecords(orders, resolvedItems, month, importPreviewSource, bottles, purchases);
             initial.unmatched.forEach((order) => {
               const name = order.nameZh || order.rawName;
               if (resolvedItems.some((item) => item.name.trim() === name.trim())) return;
@@ -2913,7 +2920,8 @@ function SupplierDetailScreen({
               resolvedItems.push(item);
               addedItems++;
             });
-            const purchaseImport = buildImportedPurchaseRecords(orders, resolvedItems, month, importPreviewSource, bottles);
+            const purchaseImport = buildImportedPurchaseRecords(orders, resolvedItems, month, importPreviewSource, bottles, purchases);
+            const skippedDuplicates = orders.length - purchaseImport.records.length;
             batchAddPurchases(purchaseImport.records);
             for (const targetMonth of new Set(purchaseImport.records.map((record) => record.month))) {
               syncLedgerFromPurchases(
@@ -2924,7 +2932,7 @@ function SupplierDetailScreen({
             setShowImportPreview(false);
             Alert.alert(
               "导入成功 ✅",
-              `进货记录：${purchaseImport.records.length} 条已同步\n酒款档案：新增 ${addedItems} 款\n台账：已按每条记录的实际日期归属重算`,
+              `进货记录：${purchaseImport.records.length} 条已同步${skippedDuplicates > 0 ? `（重复跳过 ${skippedDuplicates} 条）` : ""}\n酒款档案：新增 ${addedItems} 款\n台账：已按每条记录的实际日期归属重算`,
             );
           }}
           onClose={() => setShowImportPreview(false)}

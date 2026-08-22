@@ -45,7 +45,7 @@ describe("烈酒分类与统一供应渠道 UI 契约", () => {
     expect(bridge).toContain("resolveBottleForSupplierProductName");
     expect(bridge).toContain("bottles: Bottle[] = []");
     expect(workspace).toContain("resolveBottleForSupplierProductName(bottles, supplier, rawName.trim())");
-    expect(workspace).toContain("buildImportedPurchaseRecords(orders, resolvedItems, month, importPreviewSource, bottles)");
+    expect(workspace).toContain("buildImportedPurchaseRecords(orders, resolvedItems, month, importPreviewSource, bottles, purchases)");
     expect(workspace).toContain("migrateSpiritAliasesToBottleChannels");
   });
 

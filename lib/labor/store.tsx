@@ -223,7 +223,7 @@ function EmployeeProvider({ children }: { children: React.ReactNode }) {
   // 恢复归档员工为在职
   const restoreEmployee = useCallback((id: string) => {
     persist(ref.current.map((e) => e.id === id
-      ? { ...e, archived: false, archivedAt: undefined }
+      ? { ...e, archived: false, archivedAt: undefined, active: true, updatedAt: Date.now() }
       : e
     ));
   }, [persist, ref]);

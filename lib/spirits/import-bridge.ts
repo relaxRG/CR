@@ -7,6 +7,18 @@ export type PendingSpiritPurchase = Omit<SpiritPurchaseRecord, "id" | "createdAt
 
 const normalize = normalizeSpiritSupplierAlias;
 
+function purchaseFingerprint(purchase: Pick<SpiritPurchaseRecord, "date" | "supplier" | "rawName" | "itemId" | "unit" | "quantity" | "unitPrice" | "amount">): string {
+  return [
+    purchase.date,
+    normalize(purchase.supplier ?? ""),
+    purchase.itemId ?? normalize(purchase.rawName),
+    normalize(purchase.unit),
+    purchase.quantity,
+    purchase.unitPrice,
+    purchase.amount,
+  ].join("|");
+}
+
 export function findImportedPurchaseItem(order: SpiritPurchaseOrderItem, items: SpiritItem[], bottles: Bottle[] = []): SpiritItem | undefined {
   for (const name of [order.nameZh, order.nameEn, order.rawName]) {
     const bottleMatch = resolveBottleForSupplierProductName(bottles, order.supplier, name);
@@ -51,9 +63,11 @@ export function buildImportedPurchaseRecords(
   fallbackMonth: string,
   source: PendingSpiritPurchase["source"] = "excel",
   bottles: Bottle[] = [],
+  existingPurchases: readonly SpiritPurchaseRecord[] = [],
 ): { records: PendingSpiritPurchase[]; unmatched: SpiritPurchaseOrderItem[] } {
   const records: PendingSpiritPurchase[] = [];
   const unmatched: SpiritPurchaseOrderItem[] = [];
+  const fingerprints = new Set(existingPurchases.map(purchaseFingerprint));
 
   for (const order of orders) {
     const item = findImportedPurchaseItem(order, items, bottles);
@@ -61,7 +75,7 @@ export function buildImportedPurchaseRecords(
     const month = /^\d{4}-\d{2}$/.test(order.date?.slice(0, 7) ?? "")
       ? order.date.slice(0, 7)
       : fallbackMonth;
-    records.push({
+    const record: PendingSpiritPurchase = {
       month,
       date: order.date,
       itemId: item?.id,
@@ -74,7 +88,11 @@ export function buildImportedPurchaseRecords(
       group: item?.group,
       category: item?.category,
       source,
-    });
+    };
+    const fingerprint = purchaseFingerprint(record);
+    if (fingerprints.has(fingerprint)) continue;
+    fingerprints.add(fingerprint);
+    records.push(record);
   }
 
   return { records, unmatched };

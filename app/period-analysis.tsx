@@ -216,8 +216,8 @@ export default function PeriodAnalysisScreen({ embedded = false }: { embedded?: 
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodKey>("dinner");
 
   const report = useMemo(() =>
-    reports.find((r) => r.month === selectedMonth) ?? latestReport,
-    [reports, selectedMonth, latestReport]
+    reports.find((r) => r.month === selectedMonth),
+    [reports, selectedMonth]
   );
   // 性能优化：将 renderOverview 内的 totalRevenue 提取为 useMemo
   const overviewTotalRevenue = useMemo(() => {

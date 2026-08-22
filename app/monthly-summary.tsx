@@ -370,10 +370,16 @@ export default function MonthlySummaryScreen({ embedded = false }: { embedded?: 
     // 关键修复：employees 未加载完成时不执行，防止 label 写入 employeeId
     if (!employeesReady || employees.length === 0) return;
     const slips = paySlipStore?.paySlips?.filter((s: any) => s.month === month) ?? [];
-    if (slips.length === 0) return;
     const r = getReport(month);
     if (!r) return; // 月报不存在时不自动创建
     const existingNonLabor = (r.lineItems ?? []).filter((i: any) => i.category !== "labor");
+    if (slips.length === 0) {
+      // 薪资单被全部删除时，必须显式归零并移除旧工资科目，不能遗留历史金额。
+      if (existingNonLabor.length !== (r.lineItems ?? []).length || r.totalLabor !== 0) {
+        upsertReport({ ...r, lineItems: existingNonLabor, totalLabor: 0, updatedAt: new Date().toISOString() });
+      }
+      return;
+    }
     const laborItems = slips.map((slip: any) => {
       const emp = employees.find((e) => e.id === slip.employeeId);
       return {

@@ -93,6 +93,20 @@ describe("烈酒当月进货导入与库存同步", () => {
     expect(dominantPurchaseMonth([order({ date: "2026-07-31" }), order(), order({ date: "2026-08-04" })], "2026-01")).toBe("2026-08");
   });
 
+  it("重复导入相同采购事实时自动跳过，相近但数量不同的采购仍正常保留", () => {
+    const existing: SpiritPurchaseRecord[] = [{
+      id: "already-imported", month: "2026-08", date: "2026-08-03", itemId: item.id,
+      rawName: "金宾波本/Jim Beam White", unit: "700ML", quantity: 2, unitPrice: 118, amount: 236,
+      supplier: "至缘", category: "Whisky", source: "excel", createdAt: "2026-08-03T00:00:00.000Z",
+    }];
+    const duplicate = buildImportedPurchaseRecords([order()], [item], "2026-08", "excel", [], existing);
+    const distinct = buildImportedPurchaseRecords([order({ quantity: 3, amount: 354 })], [item], "2026-08", "excel", [], existing);
+
+    expect(duplicate.records).toEqual([]);
+    expect(distinct.records).toHaveLength(1);
+    expect(distinct.records[0]).toMatchObject({ quantity: 3, amount: 354, itemId: item.id });
+  });
+
   it("台账重算输入合并已持久化与同批待写入采购，避免React状态尚未刷新时遗漏本次导入", () => {
     const persisted: SpiritPurchaseRecord[] = [{
       id: "persisted", month: "2026-08", date: "2026-08-01", itemId: item.id,

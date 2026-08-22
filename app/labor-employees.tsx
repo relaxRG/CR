@@ -46,6 +46,8 @@ function SwipeableEmpCard({
   const deptColor = DEPT_COLORS[emp.dept];
   const translateX = useRef(new Animated.Value(0)).current;
   const [, setSwiping] = useState<"left" | "right" | null>(null);
+  const callbacksRef = useRef({ onArchive, onDelete });
+  callbacksRef.current = { onArchive, onDelete };
 
   const panResponder = useRef(
     PanResponder.create({
@@ -63,7 +65,7 @@ function SwipeableEmpCard({
           setTimeout(() => {
             Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
             setSwiping(null);
-            onArchive();
+            callbacksRef.current.onArchive();
           }, 300);
         } else if (g.dx > SWIPE_THRESHOLD) {
           // 右滑：删除确认
@@ -72,7 +74,7 @@ function SwipeableEmpCard({
           setTimeout(() => {
             Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
             setSwiping(null);
-            onDelete();
+            callbacksRef.current.onDelete();
           }, 300);
         } else {
           Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
@@ -118,17 +120,17 @@ function SwipeableEmpCard({
           </View>
 
           {/* 主体信息 */}
-          <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <Text style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>{emp.code}</Text>
-              <Text style={{ fontSize: 13, color: colors.muted }}>{emp.realName}</Text>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, minWidth: 0 }}>
+              <Text numberOfLines={1} style={{ flexShrink: 1, fontSize: 15, fontWeight: "700", color: colors.foreground }}>{emp.code}</Text>
+              <Text numberOfLines={1} style={{ flexShrink: 1, fontSize: 13, color: colors.muted }}>{emp.realName}</Text>
               {!emp.active && (
                 <View style={[S.tag, { backgroundColor: colors.error + "22" }]}>
                   <Text style={{ fontSize: 10, fontWeight: "700", color: colors.error }}>离职</Text>
                 </View>
               )}
             </View>
-            <Text style={{ fontSize: 12, color: colors.muted, marginTop: 3 }}>
+            <Text numberOfLines={2} style={{ fontSize: 12, color: colors.muted, marginTop: 3 }}>
               {emp.type === "fulltime"
                 ? `底薪¥${emp.baseSalary} · ${emp.weeklyHoursRules?.length ? `${emp.weeklyHoursRules.length}条工时规则` : "未配置工时"} · 休${emp.restDaysPerMonth}天/月 · 加班时薪¥${emp.overtimeHourlyRate}`
                 : `兼职 · 时薪¥${emp.overtimeHourlyRate}/h`}
@@ -143,7 +145,7 @@ function SwipeableEmpCard({
 
           {/* 右侧：拖拽把手 */}
           {onDragStart && (
-            <TouchableOpacity onLongPress={onDragStart} style={{ padding: 8 }}>
+            <TouchableOpacity onLongPress={onDragStart} hitSlop={6} style={{ minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" }}>
               <Text style={{ fontSize: 18, color: colors.muted }}>⠿</Text>
             </TouchableOpacity>
           )}

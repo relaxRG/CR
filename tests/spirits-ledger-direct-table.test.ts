@@ -46,6 +46,15 @@ describe("烈酒库存完整Excel台账", () => {
     expect(source).toContain('visibleLedgerTotals.consumeCost');
   });
 
+  it("采购删除以删除后的采购集重算台账，最后一笔采购删除后会显式归零", () => {
+    const storeSource = readFileSync(resolve(process.cwd(), "lib/spirits/crud-store.tsx"), "utf8");
+    expect(storeSource).toContain("purchaseSource: readonly SpiritPurchaseRecord[] = state.purchases");
+    expect(storeSource).toContain("...getMonthLedger(month).map((entry) => entry.itemId)");
+    expect(storeSource).toContain("const records = byItem[itemId] ?? [];");
+    expect(source).toContain("const deletePurchasesAndResync");
+    expect(source).toContain("syncLedgerFromPurchases(affectedMonth, [], remainingPurchases)");
+  });
+
   it("新增、导入、编辑期初、分类管理、月结和月末盘点在同一横向工具栏中可达", () => {
     const toolbar = source.slice(source.indexOf('/* 操作栏：同一行横向滚动，保留完整文本操作。 */'), source.indexOf('/* 库存管理直接展示完整Excel台账；商品名称点击仍打开详情卡片。 */'));
     for (const label of ["新增酒款", "选择", "导入Excel", "编辑期初", "管理进销存分类", "月结", "月末盘点"]) expect(toolbar).toContain(label);
