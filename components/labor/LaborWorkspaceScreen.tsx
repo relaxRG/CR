@@ -2147,7 +2147,7 @@ function AdvancePage({ month, colors, headerComponent }: { month: string; colors
         {/* ── 分类管理 Modal ── */}
         <Modal visible={showCategoryModal} transparent animationType="slide">
           <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.4)" }}>
-            <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 14, maxHeight: "70%" }}>
+            <View style={{ width: "100%", maxWidth: 720, alignSelf: "center", backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 14, maxHeight: "70%" }}>
               <Text style={{ fontSize: 17, fontWeight: "700", color: colors.foreground }}>分类管理</Text>
               <ScrollView>
                 {allCategories.map((cat) => (

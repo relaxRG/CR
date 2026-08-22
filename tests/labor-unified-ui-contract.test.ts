@@ -45,6 +45,10 @@ describe("员工统一 UI 契约", () => {
     expect(labor).toContain('label: "已预支"');
   });
 
+  it("人力分类管理表单在 iPad 浮窗与 Mac 宽窗口下保持居中适中宽度", () => {
+    expect(labor).toContain('width: "100%", maxWidth: 720, alignSelf: "center", backgroundColor: colors.surface');
+  });
+
   it("六个工具在手机端完整同一行显示，且重算不再使用特殊强调或更多收纳", () => {
     const primitives = source("components/store/store-visual-primitives.tsx");
     const compare = source("components/labor/LaborCompareToggle.tsx");

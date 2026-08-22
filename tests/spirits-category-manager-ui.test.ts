@@ -26,6 +26,11 @@ describe("烈酒分类管理与库存多选 UI 契约", () => {
     expect(manager).not.toContain("!category.builtin ?");
   });
 
+  it("分类管理抽屉和编辑卡在 iPad 浮窗与 Mac 窗口中保持适中最大宽度", () => {
+    expect(manager).toContain('sheet: { width: "100%", maxWidth: 720, alignSelf: "center"');
+    expect(manager).toContain('dialog: { width: "100%", maxWidth: 540, alignSelf: "center"');
+  });
+
   it("库存表头不显示排序符号，提供紧凑列宽和选择后的批量分类、归档删除", () => {
     expect(workspace).toContain('>序号</Text>');
     expect(workspace).not.toContain("{label}⌄");

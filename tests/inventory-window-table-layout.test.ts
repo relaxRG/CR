@@ -13,6 +13,21 @@ describe("库存 Excel 表格窗口响应式轨道", () => {
     expect(splitIpad).toMatchObject({ density: "compact", scale: 1, tableWidth: 978, expanded: false });
   });
 
+  it("在紧凑、标准与扩展临界点附近连续增宽，不产生列轨道跳变", () => {
+    const baseWidth = 978;
+    const atThreshold = resolveInventoryTableWindowLayout(1002, baseWidth, 24);
+    const justAboveThreshold = resolveInventoryTableWindowLayout(1003, baseWidth, 24);
+    const beforeExpanded = resolveInventoryTableWindowLayout(1442, baseWidth, 24);
+    const atExpanded = resolveInventoryTableWindowLayout(1443, baseWidth, 24);
+
+    expect(atThreshold).toMatchObject({ density: "compact", scale: 1, tableWidth: 978 });
+    expect(justAboveThreshold.scale).toBeCloseTo(979 / 978, 6);
+    expect(justAboveThreshold.tableWidth).toBe(979);
+    expect(beforeExpanded.density).toBe("standard");
+    expect(atExpanded.density).toBe("expanded");
+    expect(atExpanded.tableWidth - beforeExpanded.tableWidth).toBe(1);
+  });
+
   it("iPad 宽窗口与 Mac 缩放窗口按实时可用宽度扩展同一列轨道", () => {
     const wideIpad = resolveInventoryTableWindowLayout(1194, 978, 24);
     const mac = resolveInventoryTableWindowLayout(1728, 978, 24);
