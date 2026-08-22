@@ -323,14 +323,14 @@ export default function StorePettyCashScreen() {
             <View style={[S.summaryDot, { backgroundColor: colors.error }]} />
             <Text style={[S.summaryHalfTitle, { color: colors.muted }]}>总支出</Text>
           </View>
-          <Text style={[S.summaryBigAmt, { color: colors.foreground }]}>¥{fmtAmt(summary.expense)}</Text>
+          <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.62} style={[S.summaryBigAmt, { color: colors.foreground }]}>¥{fmtAmt(summary.expense)}</Text>
           <View style={S.summarySubRow}>
-            <Text style={[S.summarySub, { color: colors.muted }]}>总收入</Text>
-            <Text style={[S.summarySub, { color: colors.muted }]}>¥{fmtAmt(summary.inflow + summary.otherIncome)}</Text>
+            <Text numberOfLines={1} style={[S.summarySub, { color: colors.muted }]}>总收入</Text>
+            <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={[S.summarySub, { color: colors.muted }]}>¥{fmtAmt(summary.inflow + summary.otherIncome)}</Text>
           </View>
           <View style={S.summarySubRow}>
-            <Text style={[S.summarySub, { color: colors.muted }]}>结余</Text>
-            <Text style={[S.summarySub, { color: colors.muted }]}>{summary.closingBalance >= 0 ? "" : "-"}¥{fmtAmt(Math.abs(summary.closingBalance))}</Text>
+            <Text numberOfLines={1} style={[S.summarySub, { color: colors.muted }]}>结余</Text>
+            <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={[S.summarySub, { color: colors.muted }]}>{summary.closingBalance >= 0 ? "" : "-"}¥{fmtAmt(Math.abs(summary.closingBalance))}</Text>
           </View>
         </View>
         <View style={S.summaryHalf}>
@@ -339,15 +339,15 @@ export default function StorePettyCashScreen() {
             <Text style={[S.summaryHalfTitle, { color: colors.muted }]}>备用金</Text>
           </View>
           <Pressable onPress={() => { tap(); setOpeningInput(summary.openingBalance.toFixed(2)); setShowOpeningEdit(true); }}>
-            <Text style={[S.summaryBigAmt, { color: colors.foreground }]}>¥{fmtAmt(summary.closingBalance)}</Text>
+            <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.62} style={[S.summaryBigAmt, { color: colors.foreground }]}>¥{fmtAmt(summary.closingBalance)}</Text>
           </Pressable>
           <View style={S.summarySubRow}>
-            <Text style={[S.summarySub, { color: colors.muted }]}>期初</Text>
-            <Text style={[S.summarySub, { color: colors.muted }]}>¥{fmtAmt(summary.openingBalance)}</Text>
+            <Text numberOfLines={1} style={[S.summarySub, { color: colors.muted }]}>期初</Text>
+            <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={[S.summarySub, { color: colors.muted }]}>¥{fmtAmt(summary.openingBalance)}</Text>
           </View>
           <View style={S.summarySubRow}>
-            <Text style={[S.summarySub, { color: colors.muted }]}>转入</Text>
-            <Text style={[S.summarySub, { color: colors.muted }]}>+¥{fmtAmt(summary.inflow)}</Text>
+            <Text numberOfLines={1} style={[S.summarySub, { color: colors.muted }]}>转入</Text>
+            <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={[S.summarySub, { color: colors.muted }]}>+¥{fmtAmt(summary.inflow)}</Text>
           </View>
         </View>
       </View>
@@ -355,22 +355,22 @@ export default function StorePettyCashScreen() {
       <View style={[S.periodRow, { borderTopColor: colors.border }]}>
         <Pressable onPress={() => { tap(); setOpeningInput(summary.openingBalance.toFixed(2)); setShowOpeningEdit(true); }} style={S.periodItem}>
           <Text style={[S.periodLabel, { color: colors.muted }]}>期初备用金</Text>
-          <Text style={[S.periodValue, { color: colors.foreground }]}>¥{fmtAmt(summary.openingBalance)}</Text>
+          <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.62} style={[S.periodValue, { color: colors.foreground }]}>¥{fmtAmt(summary.openingBalance)}</Text>
         </Pressable>
         <Text style={[S.periodArrow, { color: colors.muted }]}>›</Text>
         <View style={S.periodItem}>
           <Text style={[S.periodLabel, { color: colors.muted }]}>转入</Text>
-          <Text style={[S.periodValue, { color: colors.foreground }]}>+¥{fmtAmt(summary.inflow)}</Text>
+          <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.62} style={[S.periodValue, { color: colors.foreground }]}>+¥{fmtAmt(summary.inflow)}</Text>
         </View>
         <Text style={[S.periodArrow, { color: colors.muted }]}>›</Text>
         <View style={S.periodItem}>
           <Text style={[S.periodLabel, { color: colors.muted }]}>其他收入</Text>
-          <Text style={[S.periodValue, { color: colors.foreground }]}>+¥{fmtAmt(summary.otherIncome)}</Text>
+          <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.62} style={[S.periodValue, { color: colors.foreground }]}>+¥{fmtAmt(summary.otherIncome)}</Text>
         </View>
         <Text style={[S.periodArrow, { color: colors.muted }]}>›</Text>
         <View style={S.periodItem}>
           <Text style={[S.periodLabel, { color: colors.muted }]}>期末备用金</Text>
-          <Text style={[S.periodValue, { color: colors.foreground }]}>¥{fmtAmt(summary.closingBalance)}</Text>
+          <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.62} style={[S.periodValue, { color: colors.foreground }]}>¥{fmtAmt(summary.closingBalance)}</Text>
         </View>
       </View>
     </View>
@@ -783,18 +783,18 @@ const S = StyleSheet.create({
   // 总览卡片
   summaryCard: { marginHorizontal: 12, marginTop: 12, marginBottom: 8, borderRadius: 16, overflow: "hidden" },
   summaryRow: { flexDirection: "row" },
-  summaryHalf: { flex: 1, padding: 16 },
+  summaryHalf: { flex: 1, minWidth: 0, padding: 16 },
   summaryHalfHeader: { flexDirection: "row", alignItems: "center", marginBottom: 6 },
   summaryDot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
   summaryHalfTitle: { fontSize: 13, fontWeight: "500" },
   summaryBigAmt: { fontSize: 22, fontWeight: "700", marginBottom: 6, lineHeight: 28 },
   summarySubRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 2, gap: 4 },
-  summarySub: { fontSize: 12, flex: 1 },
+  summarySub: { fontSize: 12, flex: 1, minWidth: 0 },
   periodRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth },
-  periodItem: { flex: 1, alignItems: "center" },
+  periodItem: { flex: 1, minWidth: 0, alignItems: "center" },
   periodLabel: { fontSize: 10, marginBottom: 3 },
   periodValue: { fontSize: 12, fontWeight: "600", textAlign: "center" },
-  periodArrow: { fontSize: 16, marginHorizontal: 2 },
+  periodArrow: { fontSize: 16, marginHorizontal: 1 },
   // 账本 - iCost 风格
   dayHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 8 },
   dayHeaderDate: { fontSize: 14, fontWeight: "600" },

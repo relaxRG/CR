@@ -37,6 +37,15 @@ describe("报表工作台四页签与统一月份导航", () => {
     expect(read("components/store/store-visual-primitives.tsx")).toContain('return `${testID.slice(0, -1)}-${key}`;');
   });
 
+  it("经营分析总览在 iPhone 上将每个对比值收纳进所属指标列，避免同级横向挤压与换行", () => {
+    const analytics = read("components/store/analytics.tsx");
+
+    expect(analytics).toContain("<View style={styles.overviewMetric}>");
+    expect(analytics).toContain('numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}');
+    expect(analytics).toContain('overviewMetric: { flex: 1, minWidth: 0, gap: 3, paddingHorizontal: 4 }');
+    expect(analytics).toContain('overviewCard: { borderRadius: 16, borderWidth: 1, padding: 12, flexDirection: "row", alignItems: "stretch" }');
+  });
+
   it("经营分析的重复功能入口与人工成本管理跳转已删除", () => {
     const analytics = read("components/store/analytics.tsx");
 

@@ -35,6 +35,12 @@ describe("烈酒分类与统一供应渠道 UI 契约", () => {
     expect(channelPage).not.toContain("添加第一个渠道");
   });
 
+  it("采购重新链接或解除链接后会遍历全部酒库酒款，撤销原酒款的价格历史投影", () => {
+    expect(workspace).toContain("bottles.forEach((bottle) => {");
+    expect(workspace).toContain("const linkedItems = itemsByBottleId.get(bottle.id) ?? []");
+    expect(workspace).toContain("当一笔采购重新链接或解除链接时，原酒款也需收敛并撤销旧投影");
+  });
+
   it("手工、Excel 与 PDF 录入优先使用鸡尾酒库统一供应渠道，旧别名仅作为兼容回退", () => {
     expect(bridge).toContain("resolveBottleForSupplierProductName");
     expect(bridge).toContain("bottles: Bottle[] = []");

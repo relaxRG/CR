@@ -191,9 +191,9 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
       if (!item.bottleId) return;
       itemsByBottleId.set(item.bottleId, [...(itemsByBottleId.get(item.bottleId) ?? []), item]);
     });
-    itemsByBottleId.forEach((linkedItems, bottleId) => {
-      const bottle = bottles.find((candidate) => candidate.id === bottleId);
-      if (!bottle) return;
+    // 必须遍历全部酒库酒款：当一笔采购重新链接或解除链接时，原酒款也需收敛并撤销旧投影。
+    bottles.forEach((bottle) => {
+      const linkedItems = itemsByBottleId.get(bottle.id) ?? [];
       const itemIds = new Set(linkedItems.map((item) => item.id));
       const linkedPurchases = purchases.filter((purchase) => purchase.itemId && itemIds.has(purchase.itemId));
       const projection = projectBottleSupplierChannelsFromPurchases(bottle, linkedPurchases);

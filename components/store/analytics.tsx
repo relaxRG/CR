@@ -216,8 +216,10 @@ export default function StoreAnalyticsScreen({ embedded = false }: { embedded?: 
             const pct = compare === "prev" ? pctChange(item.cur, item.prev) : null;
             return (
               <React.Fragment key={item.label}>
-                <StoreMetric label={item.label} value={`¥${item.cur.toFixed(0)}`} tone={item.tone} icon={item.icon} colors={colors} primary={item.label === "利润"} />
-                {pct !== null ? <Text style={{ ...STORE_TEXT.caption, color: parseFloat(pct) > 0 ? storeTone(colors, "settled") : storeTone(colors, "danger") }}>{parseFloat(pct) > 0 ? "▲" : "▼"}{Math.abs(parseFloat(pct))}%</Text> : null}
+                <View style={styles.overviewMetric}>
+                  <StoreMetric label={item.label} value={`¥${item.cur.toFixed(0)}`} tone={item.tone} icon={item.icon} colors={colors} primary={item.label === "利润"} />
+                  {pct !== null ? <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ ...STORE_TEXT.caption, color: parseFloat(pct) > 0 ? storeTone(colors, "settled") : storeTone(colors, "danger") }}>{parseFloat(pct) > 0 ? "▲" : "▼"}{Math.abs(parseFloat(pct))}%</Text> : null}
+                </View>
                 {i < arr.length - 1 && <View style={{ width: StyleSheet.hairlineWidth, backgroundColor: colors.border, alignSelf: "stretch" }} />}
               </React.Fragment>
             );
@@ -259,7 +261,9 @@ const styles = StyleSheet.create({
   segItem: { flex: 1, height: 32, borderRadius: 8, alignItems: "center", justifyContent: "center" },
   segText: { fontSize: 13, lineHeight: 19 },
   compareChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1 },
-  overviewCard: { borderRadius: 16, borderWidth: 1, padding: 16, flexDirection: "row", justifyContent: "space-around" },
+  overviewCard: { borderRadius: 16, borderWidth: 1, padding: 12, flexDirection: "row", alignItems: "stretch" },
+  // 三项概览各自收纳指标与对比值；iPhone 不把百分比作为同级列，避免金额被挤压换行。
+  overviewMetric: { flex: 1, minWidth: 0, gap: 3, paddingHorizontal: 4 },
   overviewItem: { alignItems: "center", gap: 4 },
   overviewLabel: { fontSize: 13 },
   overviewValue: { fontSize: 20, fontWeight: "700" },

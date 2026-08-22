@@ -36,6 +36,13 @@ describe("备用金月份导航与页面操作层级", () => {
     expect(inventory).toContain('subject={mode === "shop" ? "店铺" : "库存"}');
   });
 
+  it("备用金总览在 iPhone 上对大额金额保持单行缩放，期间摘要不发生横向溢出或卡片拉高", () => {
+    expect(petty).toContain('numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.62}');
+    expect(petty).toContain('summaryHalf: { flex: 1, minWidth: 0, padding: 16 }');
+    expect(petty).toContain('summarySub: { fontSize: 12, flex: 1, minWidth: 0 }');
+    expect(petty).toContain('periodItem: { flex: 1, minWidth: 0, alignItems: "center" }');
+  });
+
   it("新增记录属于当前页面操作栏，日历选中日期会作为新增记录日期，且不存在悬浮加号", () => {
     expect(petty).toContain("const renderContextActions");
     expect(petty).toContain('label="新增记录"');
