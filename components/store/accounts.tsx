@@ -2,7 +2,7 @@
  * 账户余额组件（当月月报 → 账户 Tab）
  * 显示公司账户/私人账户/备用金账户/开店宝后台的期初/期末余额及差异分析
  */
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { Alert, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
@@ -38,6 +38,8 @@ export default function StoreAccountsScreen({ embedded = false }: { embedded?: b
   const report = reports?.find((r) => r.month === selectedMonth);
   const allItems = [...(report?.lineItems ?? []), ...(report?.manualItems ?? [])];
   const netProfit = allItems.filter((i) => !i.isDuplicate).reduce((s, i) => s + i.amount, 0);
+  const latestArchiveSnapshot = useRef({ month: selectedMonth, balances, netProfit });
+  latestArchiveSnapshot.current = { month: selectedMonth, balances, netProfit };
 
   const [showBalanceModal, setShowBalanceModal] = useState(false);
   const [balanceAccountType, setBalanceAccountType] = useState<AccountType>("company");
@@ -62,8 +64,9 @@ export default function StoreAccountsScreen({ embedded = false }: { embedded?: b
             Alert.alert("账户月度归档", `确认归档 ${selectedMonth} 账户余额？归档后需先开启调整才能修改。`, [
               { text: "取消", style: "cancel" },
               { text: "确认归档", onPress: () => {
-                moduleClose.finalize({ module: "accounts", month: selectedMonth, snapshot: { month: selectedMonth, balances, netProfit }, paymentSummary: { payable: 0, paid: 0, remaining: 0 } });
-                Alert.alert("归档完成", `${selectedMonth} 账户已独立归档。`);
+                const snapshot = latestArchiveSnapshot.current;
+                moduleClose.finalize({ module: "accounts", month: snapshot.month, snapshot, paymentSummary: { payable: 0, paid: 0, remaining: 0 } });
+                Alert.alert("归档完成", `${snapshot.month} 账户已独立归档。`);
               } },
             ]);
           }} />

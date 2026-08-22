@@ -49,7 +49,9 @@ describe("模块独立月结界面接入", () => {
     expect(accounts).toContain('moduleClose.getStatus("accounts", selectedMonth)');
     expect(accounts).toContain('moduleClose.isWritable("accounts", selectedMonth)');
     expect(accounts).toContain('module: "accounts"');
-    expect(accounts).toContain("snapshot: { month: selectedMonth, balances, netProfit }");
+    expect(accounts).toContain("const latestArchiveSnapshot = useRef({ month: selectedMonth, balances, netProfit })");
+    expect(accounts).toContain("const snapshot = latestArchiveSnapshot.current;");
+    expect(accounts).toContain('snapshot, paymentSummary: { payable: 0, paid: 0, remaining: 0 }');
     expect(accounts).toContain("if (!assertAccountsWritable()) return;");
   });
 
