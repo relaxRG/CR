@@ -10,7 +10,7 @@ import { purchasesForMonth, type PendingSpiritPurchase } from "./import-bridge";
 import { moveInventoryCategory } from "./category-lifecycle";
 import { normalizeSpiritSupplierAliases } from "./supplier-alias";
 import { summarizeSpiritLedgerByCategory, type SpiritCategorySummary } from "./category-summary";
-import { applyAtomicSpiritCategorySelection } from "./category-selection";
+import { applyAtomicSpiritBatchCategorySelection, applyAtomicSpiritCategorySelection } from "./category-selection";
 import { sumMoney } from "@/lib/finance/money";
 import {
   SpiritItem, SpiritPurchaseRecord, SpiritLedgerEntry,
@@ -287,6 +287,7 @@ type Action =
   | { type: "ADD_ITEM"; item: SpiritItem }
   | { type: "UPDATE_ITEM"; id: string; patch: Partial<SpiritItem> }
   | { type: "SET_ITEM_AND_PURCHASE_CATEGORY"; itemId: string; purchaseId?: string; category: string }
+  | { type: "SET_ITEMS_AND_PURCHASES_CATEGORY"; purchaseIds: string[]; category: string }
   | { type: "DELETE_ITEM"; id: string }
   | { type: "ADD_PURCHASE"; record: SpiritPurchaseRecord }
   | { type: "UPDATE_PURCHASE"; id: string; patch: Partial<SpiritPurchaseRecord> }
@@ -320,6 +321,10 @@ function reducer(state: SpiritsState, action: Action): SpiritsState {
     case "SET_ITEM_AND_PURCHASE_CATEGORY": return {
       ...state,
       ...applyAtomicSpiritCategorySelection(state.items, state.purchases, action.itemId, action.category, action.purchaseId),
+    };
+    case "SET_ITEMS_AND_PURCHASES_CATEGORY": return {
+      ...state,
+      ...applyAtomicSpiritBatchCategorySelection(state.items, state.purchases, action.purchaseIds, action.category),
     };
     case "DELETE_ITEM": return { ...state, items: state.items.filter((i) => i.id !== action.id) };
     case "ADD_PURCHASE": return { ...state, purchases: [...state.purchases, action.record] };
@@ -437,6 +442,7 @@ interface SpiritsContextValue extends SpiritsState {
   addItem: (data: Omit<SpiritItem, "id" | "createdAt" | "updatedAt">) => SpiritItem;
   updateItem: (id: string, patch: Partial<SpiritItem>) => void;
   setItemAndPurchaseCategory: (itemId: string, category: string, purchaseId?: string) => void;
+  setItemsAndPurchasesCategory: (purchaseIds: string[], category: string) => void;
   deleteItem: (id: string) => void;
   // 进货流水
   addPurchase: (data: Omit<SpiritPurchaseRecord, "id" | "createdAt">) => SpiritPurchaseRecord;
@@ -575,6 +581,10 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
 
   const setItemAndPurchaseCategory = (itemId: string, category: string, purchaseId?: string) => {
     dispatch({ type: "SET_ITEM_AND_PURCHASE_CATEGORY", itemId, category: category.trim(), ...(purchaseId ? { purchaseId } : {}) });
+  };
+
+  const setItemsAndPurchasesCategory = (purchaseIds: string[], category: string) => {
+    dispatch({ type: "SET_ITEMS_AND_PURCHASES_CATEGORY", purchaseIds, category: category.trim() });
   };
 
   const deleteItem = (id: string) => {
@@ -987,7 +997,7 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
 
   const value: SpiritsContextValue = {
     ...state,
-        addItem, updateItem, setItemAndPurchaseCategory, deleteItem, addPurchase, updatePurchase, deletePurchase, batchAddPurchases, batchDeletePurchases,
+        addItem, updateItem, setItemAndPurchaseCategory, setItemsAndPurchasesCategory, deleteItem, addPurchase, updatePurchase, deletePurchase, batchAddPurchases, batchDeletePurchases,
     upsertLedger, deleteLedger,
     setRefPrice, getRefPrice,
     upsertSupplier, deleteSupplier, getSupplierByName,

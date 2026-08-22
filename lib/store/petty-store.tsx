@@ -102,6 +102,7 @@ export interface PettyState { records: PettyRecord[]; periods: PettyPeriod[] }
 type Action =
   | { type: "LOAD"; payload: PettyState }
   | { type: "ADD"; record: PettyRecord }
+  | { type: "BATCH_ADD"; records: PettyRecord[] }
   | { type: "UPDATE"; id: string; updates: Partial<PettyRecord> }
   | { type: "DELETE"; id: string }
   | { type: "SET_PERIOD"; period: PettyPeriod };
@@ -112,6 +113,7 @@ function reducer(state: PettyState, action: Action): PettyState {
   switch (action.type) {
     case "LOAD": return action.payload;
     case "ADD": return { ...state, records: [action.record, ...state.records] };
+    case "BATCH_ADD": return { ...state, records: [...action.records, ...state.records] };
     case "UPDATE": return { ...state, records: state.records.map((r) => r.id === action.id ? { ...r, ...action.updates } : r) };
     case "DELETE": return { ...state, records: state.records.filter((r) => r.id !== action.id) };
     case "SET_PERIOD": {
@@ -127,6 +129,7 @@ function reducer(state: PettyState, action: Action): PettyState {
 
 interface PettyContextValue extends PettyState {
   addRecord: (data: Omit<PettyRecord, "id" | "createdAt">) => void;
+  batchAddRecords: (records: Array<Omit<PettyRecord, "id" | "createdAt">>) => void;
   updateRecord: (id: string, updates: Partial<PettyRecord>) => void;
   deleteRecord: (id: string) => void;
   setPeriod: (period: PettyPeriod) => void;
@@ -186,6 +189,10 @@ export function PettyCashProvider({ children }: { children: React.ReactNode }) {
   const addRecord = useCallback((data: Omit<PettyRecord, "id" | "createdAt">) => {
     dispatch({ type: "ADD", record: { ...data, id: uuid(), createdAt: new Date().toISOString() } });
   }, []);
+  const batchAddRecords = useCallback((records: Array<Omit<PettyRecord, "id" | "createdAt">>) => {
+    const now = new Date().toISOString();
+    dispatch({ type: "BATCH_ADD", records: records.map((record) => ({ ...record, id: uuid(), createdAt: now })) });
+  }, []);
   const updateRecord = useCallback((id: string, updates: Partial<PettyRecord>) => dispatch({ type: "UPDATE", id, updates }), []);
   const deleteRecord = useCallback((id: string) => dispatch({ type: "DELETE", id }), []);
   const setPeriod = useCallback((period: PettyPeriod) => dispatch({ type: "SET_PERIOD", period }), []);
@@ -226,7 +233,7 @@ export function PettyCashProvider({ children }: { children: React.ReactNode }) {
   }, [state]);
 
   return (
-    <PettyContext.Provider value={{ ...state, addRecord, updateRecord, deleteRecord, setPeriod, calcPeriod, calcClosing }}>
+    <PettyContext.Provider value={{ ...state, addRecord, batchAddRecords, updateRecord, deleteRecord, setPeriod, calcPeriod, calcClosing }}>
       {children}
     </PettyContext.Provider>
   );

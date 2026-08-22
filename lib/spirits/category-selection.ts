@@ -29,3 +29,32 @@ export function applyAtomicSpiritCategorySelection(
       : purchases,
   };
 }
+
+/**
+ * 批量采购分类操作的唯一状态转换。仅更新所选采购行及其已关联的库存酒款；
+ * 无关联酒款的采购保留为独立历史记录，不能凭空创建库存关联。
+ */
+export function applyAtomicSpiritBatchCategorySelection(
+  items: SpiritItem[],
+  purchases: SpiritPurchaseRecord[],
+  purchaseIds: readonly string[],
+  category: string,
+  updatedAt = new Date().toISOString(),
+): AtomicCategorySelectionResult {
+  const selectedIds = new Set(purchaseIds);
+  const normalizedCategory = category.trim();
+  const relatedItemIds = new Set(
+    purchases
+      .filter((purchase) => selectedIds.has(purchase.id) && purchase.itemId)
+      .map((purchase) => purchase.itemId!),
+  );
+
+  return {
+    items: items.map((item) => relatedItemIds.has(item.id)
+      ? { ...item, category: normalizedCategory, categorySource: "manual", updatedAt }
+      : item),
+    purchases: purchases.map((purchase) => selectedIds.has(purchase.id)
+      ? { ...purchase, category: normalizedCategory }
+      : purchase),
+  };
+}

@@ -1704,7 +1704,7 @@ function SupplierDetailScreen({
     getMonthLedger,
     groups, detectPurchaseGroup, getItemGroup, rememberGroupMatch,
     upsertGroup, deleteGroup,
-    addItem, updateItem, setItemAndPurchaseCategory,
+    addItem, updateItem, setItemAndPurchaseCategory, setItemsAndPurchasesCategory,
     getAllCategories,
     getMonthPurchases,
   } = store;
@@ -2048,10 +2048,10 @@ function SupplierDetailScreen({
           const count = selectedIds.size;
           setCatPickerTitle2(`批量修改分类（选中 ${count} 条记录）`);
           setCatPickerCallback2(() => (name: string) => {
-            [...selectedIds].forEach((id) => updatePurchase(id, { category: name }));
-            syncLedgerFromPurchases(month);
+            // 批量分类以单个状态提交同步所有选中采购行及其关联库存酒款。
+            setItemsAndPurchasesCategory([...selectedIds], name);
             setSelectedIds(new Set()); setSelectMode(false);
-            Alert.alert("修改成功", `已更新 ${count} 条记录的分类`);
+            Alert.alert("修改成功", `已同步更新 ${count} 条采购记录与关联库存酒款的分类`);
           });
           setShowCatPicker2(true);
         }} style={[S.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}>

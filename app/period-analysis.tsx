@@ -805,18 +805,18 @@ export default function PeriodAnalysisScreen({ embedded = false }: { embedded?: 
     <ScreenContainer>
       {/* 独立路由才显示返回键；报表工作台内不产生额外跳转层级。 */}
       {!embedded && <View style={[S.navbar, { borderBottomColor: colors.border }]}>
-        <Pressable onPress={() => router.back()} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
+        <Pressable onPress={() => router.back()} hitSlop={8} style={({ pressed }) => ({ minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center", opacity: pressed ? 0.6 : 1 })}>
           <IconSymbol name="chevron.left" size={22} color={colors.primary} />
         </Pressable>
         <Text style={[S.navTitle, { color: colors.foreground }]}>时段营业分析</Text>
         <View style={{ flexDirection: "row", gap: 8 }}>
-          <Pressable onPress={() => { tap(); setShowBizHoursModal(true); }} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+          <Pressable onPress={() => { tap(); setShowBizHoursModal(true); }} hitSlop={8} style={({ pressed }) => ({ minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center", opacity: pressed ? 0.7 : 1 })}>
             <IconSymbol name="clock.badge.fill" size={20} color={colors.muted} />
           </Pressable>
-          <Pressable onPress={() => { tap(); setShowSettings(true); }} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+          <Pressable onPress={() => { tap(); setShowSettings(true); }} hitSlop={8} style={({ pressed }) => ({ minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center", opacity: pressed ? 0.7 : 1 })}>
             <IconSymbol name="slider.horizontal.3" size={20} color={colors.muted} />
           </Pressable>
-          {!embedded && <Pressable onPress={handleImport} disabled={importing} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+          {!embedded && <Pressable onPress={handleImport} disabled={importing} hitSlop={8} style={({ pressed }) => ({ minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center", opacity: pressed ? 0.7 : 1 })}>
             <IconSymbol name="arrow.down.doc.fill" size={20} color={colors.primary} />
           </Pressable>}
         </View>

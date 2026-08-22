@@ -103,16 +103,16 @@ const INCOME_CODES = ["N0","N1","N2","N3","N4","N5"];
 export default function StorePettyCashScreen() {
   const insets = useSafeAreaInsets();
   const colors = useColors();
-  const { records, addRecord, updateRecord, deleteRecord, setPeriod, calcPeriod, periods } = usePettyCashStore();
+  const { records, addRecord, batchAddRecords, updateRecord, deleteRecord, setPeriod, calcPeriod, periods } = usePettyCashStore();
 
   const { month, selectMonth: setMonth } = useGlobalBusinessMonth();
   const moduleClose = useModuleMonthCloseStore();
   const pettyCloseStatus = moduleClose.getStatus("petty_cash", month);
-  const assertPettyWritable = () => {
+  const assertPettyWritable = useCallback(() => {
     if (moduleClose.isWritable("petty_cash", month)) return true;
     Alert.alert("备用金月份已归档", `${month} 备用金已归档。请先在备用金模块开启调整，不能直接修改历史账本。`);
     return false;
-  };
+  }, [moduleClose, month]);
   const [viewMode, setViewMode] = useState<ViewMode>("ledger");
   const [statsTab, setStatsTab] = useState<StatsTab>("expense");
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
@@ -203,7 +203,7 @@ export default function StorePettyCashScreen() {
       prevGroupMap.set(g, (prevGroupMap.get(g) ?? 0) + r.amount);
     }
     return { total, groups, slices, prevGroupMap };
-  }, [monthRecords, statsTab, month, records]);
+  }, [monthRecords, statsTab, month, records, colors]);
 
   const handleImportExcel = useCallback(async () => {
     if (!assertPettyWritable()) return;
@@ -212,12 +212,12 @@ export default function StorePettyCashScreen() {
     try {
       const result = await importIcostExcel();
       if (!result) { setImporting(false); return; }
-      for (const rec of result.records) addRecord(rec);
+      batchAddRecords(result.records);
       Alert.alert("导入成功 ✓", `成功导入 ${result.imported} 条${result.skipped > 0 ? `\n跳过 ${result.skipped} 行` : ""}`);
     } catch (e: unknown) {
       Alert.alert("导入失败", e instanceof Error ? e.message : "请重试");
     } finally { setImporting(false); }
-  }, [addRecord]);
+  }, [assertPettyWritable, batchAddRecords]);
 
   const openEdit = (item: PettyRecord) => {
     setEditingId(item.id);

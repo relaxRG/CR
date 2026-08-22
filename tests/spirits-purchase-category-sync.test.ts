@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyAtomicSpiritCategorySelection } from "../lib/spirits/category-selection";
+import { applyAtomicSpiritBatchCategorySelection, applyAtomicSpiritCategorySelection } from "../lib/spirits/category-selection";
 import { resolvePurchaseDisplayCategory } from "../lib/spirits/purchase-category-sync";
 
 const item = {
@@ -35,5 +35,18 @@ describe("烈酒采购分类同步", () => {
     expect(next.items[0].category).toBe("Mezcal");
     expect(next.purchases[0].category).toBe("Other");
     expect(resolvePurchaseDisplayCategory(next.purchases[0], next.items[0])).toBe("Mezcal");
+  });
+
+  it("批量分类以单个状态转换同步所有所选采购行和关联库存酒款", () => {
+    const secondItem = { ...item, id: "spirit-2", name: "第二款酒", category: "Base" };
+    const secondPurchase = { ...purchase, id: "purchase-2", itemId: "spirit-2", rawName: "第二款酒", category: "Base" };
+    const unmatchedPurchase = { ...purchase, id: "purchase-3", itemId: undefined, rawName: "未关联采购" };
+    const next = applyAtomicSpiritBatchCategorySelection(
+      [item, secondItem], [purchase, secondPurchase, unmatchedPurchase], ["purchase-1", "purchase-2", "purchase-3"], "Mezcal", "2026-02-01T00:00:00.000Z",
+    );
+
+    expect(next.items.map((entry) => entry.category)).toEqual(["Mezcal", "Mezcal"]);
+    expect(next.purchases.map((entry) => entry.category)).toEqual(["Mezcal", "Mezcal", "Mezcal"]);
+    expect(next.purchases[2].itemId).toBeUndefined();
   });
 });
