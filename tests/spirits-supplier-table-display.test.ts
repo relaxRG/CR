@@ -37,10 +37,11 @@ describe("供应商当月进货表展示", () => {
 
   it("使用高密度固定行、紧凑列轨道与低内边距，避免表头、分组行、数据行和合计行错位", () => {
     expect(screen).toContain("SPIRIT_PURCHASE_COLUMN_WIDTH");
-    expect(screen).toContain("spiritPurchaseTableWidth(selectMode)");
-    expect(screen).toContain("width: SPIRIT_PURCHASE_COLUMN_WIDTH.category");
-    expect(screen).toContain("width: SPIRIT_PURCHASE_COLUMN_WIDTH.name");
-    expect(screen).toContain("width: SPIRIT_PURCHASE_COLUMN_WIDTH.amount");
+    expect(screen).toContain("resolveInventoryTableWindowLayout");
+    expect(screen).toContain("purchaseWindowLayout.tableWidth");
+    expect(screen).toContain("width: purchaseColumnWidths.category");
+    expect(screen).toContain("width: purchaseColumnWidths.name");
+    expect(screen).toContain("width: purchaseColumnWidths.amount");
     expect(screen).toContain("height: INVENTORY_WORKSPACE_METRICS.phoneRowHeight");
     expect(screen).toContain("minHeight: INVENTORY_WORKSPACE_METRICS.phoneRowHeight");
     expect(screen).toContain("S.ledgerCell");

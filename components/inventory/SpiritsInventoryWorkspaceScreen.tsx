@@ -8,7 +8,7 @@ import { sumMoney } from "@/lib/finance/money";
 import {
   Alert, KeyboardAvoidingView, Modal, Platform, Pressable,
   ScrollView, StyleSheet, Text, TextInput, TouchableOpacity,
-  View, ActivityIndicator,
+  View, ActivityIndicator, useWindowDimensions,
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
@@ -43,7 +43,7 @@ import {   SpiritMonthlySnapshot, SpiritInventoryItem, SpiritPriceChange, Spirit
 import { normalizeLLMRows } from "@/lib/spirits/pdf-import";
 import { exportToExcel, exportToPdf, ExportData } from "@/lib/spirits/export";
 import { formatStoreMoney, STORE_TABLE_METRICS } from "@/lib/store/table-display";
-import { INVENTORY_WORKSPACE_METRICS, tableHeaderAccessibilityLabel } from "@/lib/store/inventory-workspace-ui";
+import { INVENTORY_WORKSPACE_METRICS, resolveInventoryTableWindowLayout, scaleInventoryTableWidths, tableHeaderAccessibilityLabel } from "@/lib/store/inventory-workspace-ui";
 import {
   applySupplierPurchaseTableView,
   collectSupplierPurchaseNameOptions,
@@ -81,9 +81,7 @@ const SPIRIT_LEDGER_COLUMNS: ReadonlyArray<readonly [string, LedgerSortKey, numb
   ["进货量", "purchaseQty", 56], ["进货成本", "purchaseCost", 76], ["期末量", "closingQty", 56], ["期末单价", "closingUnitCost", 68], ["期末成本", "closingCost", 76],
   ["消耗量", "consumeQty", 56], ["消耗成本", "consumeCost", 76], ["集团", "group", 84],
 ];
-const SPIRIT_LEDGER_COLUMN_WIDTH = Object.fromEntries(SPIRIT_LEDGER_COLUMNS.map(([, key, width]) => [key, width])) as Record<LedgerSortKey, number>;
 const SPIRIT_LEDGER_BASE_WIDTH = SPIRIT_LEDGER_INDEX_WIDTH + SPIRIT_LEDGER_COLUMNS.reduce((total, [, , width]) => total + width, 0);
-const spiritLedgerTableWidth = (selectionEnabled: boolean) => SPIRIT_LEDGER_BASE_WIDTH + (selectionEnabled ? SPIRIT_LEDGER_SELECT_WIDTH : 0);
 
 // 当月进货表独立使用紧凑列轨道。分类取代旧“月日”列；完整日期上移为分组行。
 // 前六列在 iPhone 首屏连续呈现序号、分类、名称、数量、单价和总价，集团按需横滑。
@@ -98,7 +96,6 @@ const SPIRIT_PURCHASE_COLUMN_WIDTH = {
   group: 64,
 } as const;
 const SPIRIT_PURCHASE_BASE_WIDTH = SPIRIT_PURCHASE_INDEX_WIDTH + Object.values(SPIRIT_PURCHASE_COLUMN_WIDTH).reduce((total, width) => total + width, 0);
-const spiritPurchaseTableWidth = (selectionEnabled: boolean) => SPIRIT_PURCHASE_BASE_WIDTH + (selectionEnabled ? SPIRIT_PURCHASE_SELECT_WIDTH : 0);
 
 function LedgerDetailSection({
   title,
@@ -143,6 +140,7 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { width: appWindowWidth } = useWindowDimensions();
   const store = useSpiritsInventoryStore();
   const { bottles, updateBottle } = useBottleStore();
   const {
@@ -259,6 +257,14 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
   // ── 总结 Tab ────────────────────────────────────────────────────────────────
   const [showComparison, setShowComparison] = useState(false);
   const [chartDimension, setChartDimension] = useState<"category" | "group" | "supplier">("category");
+  const summaryTableLayout = useMemo(
+    () => resolveInventoryTableWindowLayout(appWindowWidth, 380, 48),
+    [appWindowWidth],
+  );
+  const summaryColumnWidths = useMemo(() => ({
+    category: Math.round(116 * summaryTableLayout.scale),
+    amount: Math.round(66 * summaryTableLayout.scale),
+  }), [summaryTableLayout.scale]);
   const [exporting, setExporting] = useState(false);
   const [, setShowExportMenu] = useState(false);
 
@@ -399,14 +405,14 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
           </TouchableOpacity>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, width: "100%" }}>
-          <View style={S.summaryTableContent}>
+          <View style={[S.summaryTableContent, { width: summaryTableLayout.tableWidth }]}>
             {/* 表头 */}
             <View style={[S.summaryTableHeader, { backgroundColor: colors.primary }]}>
-              <Text style={[S.summaryThCell, S.summaryColCat]}>烈酒分类</Text>
-              <Text style={[S.summaryThCell, S.summaryColAmount]}>期初金额</Text>
-              <Text style={[S.summaryThCell, S.summaryColAmount]}>本月进货</Text>
-              <Text style={[S.summaryThCell, S.summaryColAmount]}>本月消耗</Text>
-              <Text style={[S.summaryThCell, S.summaryColAmount]}>期末金额</Text>
+              <Text style={[S.summaryThCell, S.summaryColCat, { width: summaryColumnWidths.category }]}>烈酒分类</Text>
+              <Text style={[S.summaryThCell, S.summaryColAmount, { width: summaryColumnWidths.amount }]}>期初金额</Text>
+              <Text style={[S.summaryThCell, S.summaryColAmount, { width: summaryColumnWidths.amount }]}>本月进货</Text>
+              <Text style={[S.summaryThCell, S.summaryColAmount, { width: summaryColumnWidths.amount }]}>本月消耗</Text>
+              <Text style={[S.summaryThCell, S.summaryColAmount, { width: summaryColumnWidths.amount }]}>期末金额</Text>
             </View>
             {/* 分类行 */}
             {SPIRIT_CATEGORIES.map((cat, idx) => {
@@ -416,7 +422,7 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
               const isEven = idx % 2 === 0;
               return (
                 <View key={cat} style={[S.summaryTableRow, { backgroundColor: isEven ? colors.surface : colors.background }]}>
-                  <View style={[S.summaryTdCell, S.summaryColCat, { flexDirection: "row", alignItems: "center", gap: 4 }]}>
+                  <View style={[S.summaryTdCell, S.summaryColCat, { width: summaryColumnWidths.category, flexDirection: "row", alignItems: "center", gap: 4 }]}>
                     <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: catColor(cat) }} />
                     <Text style={{ flex: 1, fontSize: 11, color: colors.foreground }} numberOfLines={1}>{cat}</Text>
                   </View>
@@ -424,7 +430,7 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
                     const val = data?.[field] ?? 0;
                     const prevVal = prev?.[field] ?? 0;
                     return (
-                      <View key={field} style={[S.summaryTdCell, S.summaryColAmount, { alignItems: "flex-end" }]}>
+                      <View key={field} style={[S.summaryTdCell, S.summaryColAmount, { width: summaryColumnWidths.amount, alignItems: "flex-end" }]}>
                         <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} style={{ fontSize: 10, color: val < 0 ? "#EF4444" : colors.foreground, fontWeight: val < 0 ? "700" : "500" }}>
                           {val === 0 ? "—" : formatStoreMoney(val)}
                         </Text>
@@ -443,12 +449,12 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
             <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 4 }} />
             {/* 合计行 */}
             <View style={[S.summaryTableRow, { backgroundColor: colors.background, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}>
-              <Text style={[S.summaryTdCell, S.summaryColCat, { fontWeight: "700", color: colors.foreground, fontSize: 12 }]}>合计</Text>
+              <Text style={[S.summaryTdCell, S.summaryColCat, { width: summaryColumnWidths.category, fontWeight: "700", color: colors.foreground, fontSize: 12 }]}>合计</Text>
               {(["openingCost", "purchaseCost", "consumeCost", "closingCost"] as const).map((field) => {
                 const total = Object.values(categorySummary).reduce((s, v) => s + v[field], 0);
                 const prevTotal = Object.values(prevCategorySummary).reduce((s, v) => s + v[field], 0);
                 return (
-                  <View key={field} style={[S.summaryTdCell, S.summaryColAmount, { alignItems: "flex-end" }]}>
+                  <View key={field} style={[S.summaryTdCell, S.summaryColAmount, { width: summaryColumnWidths.amount, alignItems: "flex-end" }]}>
                     <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} style={{ fontSize: 10, fontWeight: "700", color: colors.foreground }}>{formatStoreMoney(total)}</Text>
                     {showComparison && prevTotal !== 0 && (
                       <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} style={{ fontSize: 8, color: total > prevTotal ? "#EF4444" : "#10B981" }}>
@@ -593,7 +599,22 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
   const [showItemForm, setShowItemForm] = useState(false);
   const [ledgerSelectMode, setLedgerSelectMode] = useState(false);
   const [selectedLedgerItemIds, setSelectedLedgerItemIds] = useState<Set<string>>(new Set());
-
+  const ledgerWindowLayout = useMemo(
+    () => resolveInventoryTableWindowLayout(
+      appWindowWidth,
+      SPIRIT_LEDGER_BASE_WIDTH + (ledgerSelectMode ? SPIRIT_LEDGER_SELECT_WIDTH : 0),
+    ),
+    [appWindowWidth, ledgerSelectMode],
+  );
+  const ledgerColumnWidths = useMemo(
+    () => scaleInventoryTableWidths(
+      Object.fromEntries(SPIRIT_LEDGER_COLUMNS.map(([, key, width]) => [key, width])) as Record<LedgerSortKey, number>,
+      ledgerWindowLayout.scale,
+    ),
+    [ledgerWindowLayout.scale],
+  );
+  const ledgerIndexWidth = Math.round(SPIRIT_LEDGER_INDEX_WIDTH * ledgerWindowLayout.scale);
+  const ledgerSelectWidth = Math.round(SPIRIT_LEDGER_SELECT_WIDTH * ledgerWindowLayout.scale);
 
   const [ledgerNameLanguage, setLedgerNameLanguage] = usePersistedState<"zh" | "en">("spirits.ledger.name-language.v1", "zh");
   const [ledgerTableView, setLedgerTableView] = useState(DEFAULT_LEDGER_TABLE_VIEW);
@@ -885,10 +906,10 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
             <View>
               {ledgerTableHasAdjustments && <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 10, paddingVertical: 6, backgroundColor: "#FEF2F2" }}><Text style={{ fontSize: 11, color: "#991B1B", fontWeight: "700" }}>已筛选/排序 · 显示 {visibleLedgerRows.length} 款</Text><TouchableOpacity onPress={() => setLedgerTableView(DEFAULT_LEDGER_TABLE_VIEW)}><Text style={{ color: "#991B1B", fontSize: 11, fontWeight: "700" }}>清除全部</Text></TouchableOpacity></View>}
               {/* 紧凑横向台账：iPhone 优先显示序号、名称、参考价与首列库存数据，剩余列可横滑。 */}
-              <View testID="spirits-ledger-header" style={[S.tableHeader, { width: spiritLedgerTableWidth(ledgerSelectMode), backgroundColor: colors.primary, minHeight: STORE_TABLE_METRICS.headerHeight }]}>
-                {ledgerSelectMode && <Text style={[S.thCell, { width: SPIRIT_LEDGER_SELECT_WIDTH, paddingHorizontal: 0 }]}>选</Text>}
-                <Text style={[S.thCell, { width: SPIRIT_LEDGER_INDEX_WIDTH, paddingHorizontal: 0 }]}>序号</Text>
-                {SPIRIT_LEDGER_COLUMNS.map(([label, key, width]) => <TouchableOpacity key={key} testID={`spirits-ledger-column-${key}`} onPress={() => setActiveLedgerColumn(key)} style={{ width, minHeight: STORE_TABLE_METRICS.headerHeight, justifyContent: "center", paddingHorizontal: 3 }} accessibilityLabel={tableHeaderAccessibilityLabel(label, ledgerTableView.sort?.key === key)}><Text style={[S.thCell, { width: "auto", paddingHorizontal: 0 }]}>{label}</Text></TouchableOpacity>)}
+              <View testID="spirits-ledger-header" style={[S.tableHeader, { width: ledgerWindowLayout.tableWidth, backgroundColor: colors.primary, minHeight: STORE_TABLE_METRICS.headerHeight }]}>
+                {ledgerSelectMode && <Text style={[S.thCell, { width: ledgerSelectWidth, paddingHorizontal: 0 }]}>选</Text>}
+                <Text style={[S.thCell, { width: ledgerIndexWidth, paddingHorizontal: 0 }]}>序号</Text>
+                {SPIRIT_LEDGER_COLUMNS.map(([label, key]) => <TouchableOpacity key={key} testID={`spirits-ledger-column-${key}`} onPress={() => setActiveLedgerColumn(key)} style={{ width: ledgerColumnWidths[key], minHeight: STORE_TABLE_METRICS.headerHeight, justifyContent: "center", paddingHorizontal: 3 }} accessibilityLabel={tableHeaderAccessibilityLabel(label, ledgerTableView.sort?.key === key)}><Text style={[S.thCell, { width: "auto", paddingHorizontal: 0 }]}>{label}</Text></TouchableOpacity>)}
               </View>
               {/* 按分类分组（动态，未分类置顶） */}
               {(() => {
@@ -916,10 +937,10 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
                   const color = isFiltered ? colors.primary : isUnclassified ? "#F59E0B" : catColor(cat);
                   return (
                     <React.Fragment key={cat}>
-                      <View testID={`spirits-ledger-category-${cat}`} style={{ width: spiritLedgerTableWidth(ledgerSelectMode), flexDirection: "row", alignItems: "center", paddingVertical: 5, backgroundColor: color + "20" }}>
-                        {ledgerSelectMode && <View style={{ width: SPIRIT_LEDGER_SELECT_WIDTH }} />}
-                        <View style={{ width: SPIRIT_LEDGER_INDEX_WIDTH }} />
-                        <View style={{ width: SPIRIT_LEDGER_COLUMN_WIDTH.name, flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 3 }}>
+                      <View testID={`spirits-ledger-category-${cat}`} style={{ width: ledgerWindowLayout.tableWidth, flexDirection: "row", alignItems: "center", paddingVertical: 5, backgroundColor: color + "20" }}>
+                        {ledgerSelectMode && <View style={{ width: ledgerSelectWidth }} />}
+                        <View style={{ width: ledgerIndexWidth }} />
+                        <View style={{ width: ledgerColumnWidths.name, flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 3 }}>
                           <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />
                           <Text style={{ fontSize: 11, fontWeight: "600", color }} numberOfLines={1}>{displayCat}</Text>
                         </View>
@@ -960,14 +981,14 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
                               ]);
                             }}
                             style={[S.tableRow, { minHeight: STORE_TABLE_METRICS.rowHeight, backgroundColor: idx % 2 === 0 ? colors.surface : colors.background }]}>
-                            {ledgerSelectMode && <View style={[S.ledgerCell, { width: SPIRIT_LEDGER_SELECT_WIDTH, alignItems: "center" }]}><View testID={`spirits-ledger-select-${item.id}`} style={{ width: 18, height: 18, borderRadius: 5, borderWidth: 1.5, borderColor: selectedLedgerItemIds.has(item.id) ? colors.primary : colors.border, backgroundColor: selectedLedgerItemIds.has(item.id) ? colors.primary : "transparent", alignItems: "center", justifyContent: "center" }}>{selectedLedgerItemIds.has(item.id) && <Text style={{ color: "#fff", fontSize: 12, fontWeight: "700" }}>✓</Text>}</View></View>}
-                            <Text style={[S.ledgerCell, { width: SPIRIT_LEDGER_INDEX_WIDTH, textAlign: "center", fontSize: STORE_TABLE_METRICS.bodyFontSize, color: colors.muted }]}>{idx + 1}</Text>
-                            <Text testID={`spirits-ledger-table-name-${item.id}`} style={[S.ledgerCell, { width: SPIRIT_LEDGER_COLUMN_WIDTH.name, fontSize: STORE_TABLE_METRICS.nameFontSize, fontWeight: "500", color: colors.foreground }]} numberOfLines={1}>{ledgerTableRows.find((row) => row.id === item.id)?.displayName ?? item.name}</Text>
+                            {ledgerSelectMode && <View style={[S.ledgerCell, { width: ledgerSelectWidth, alignItems: "center" }]}><View testID={`spirits-ledger-select-${item.id}`} style={{ width: 18, height: 18, borderRadius: 5, borderWidth: 1.5, borderColor: selectedLedgerItemIds.has(item.id) ? colors.primary : colors.border, backgroundColor: selectedLedgerItemIds.has(item.id) ? colors.primary : "transparent", alignItems: "center", justifyContent: "center" }}>{selectedLedgerItemIds.has(item.id) && <Text style={{ color: "#fff", fontSize: 12, fontWeight: "700" }}>✓</Text>}</View></View>}
+                            <Text style={[S.ledgerCell, { width: ledgerIndexWidth, textAlign: "center", fontSize: STORE_TABLE_METRICS.bodyFontSize, color: colors.muted }]}>{idx + 1}</Text>
+                            <Text testID={`spirits-ledger-table-name-${item.id}`} style={[S.ledgerCell, { width: ledgerColumnWidths.name, fontSize: STORE_TABLE_METRICS.nameFontSize, fontWeight: "500", color: colors.foreground }]} numberOfLines={1}>{ledgerTableRows.find((row) => row.id === item.id)?.displayName ?? item.name}</Text>
                           {/* 参考价列（可点击编辑） */}
                           {(() => {
                             const rp = getRefPrice(item.id, selectedMonth);
                             return (
-                              <TouchableOpacity style={[S.ledgerCell, { width: SPIRIT_LEDGER_COLUMN_WIDTH.referencePrice, alignItems: "flex-end" }]}
+                              <TouchableOpacity style={[S.ledgerCell, { width: ledgerColumnWidths.referencePrice, alignItems: "flex-end" }]}
                                 onPress={() => {
                                   tap();
                                   Alert.prompt(
@@ -993,7 +1014,7 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
                             );
                           })()}
                           {/* 期初库存量（内联编辑） */}
-                          <View style={[S.ledgerCell, { width: SPIRIT_LEDGER_COLUMN_WIDTH.openingQty, alignItems: "flex-end" }]}>
+                          <View style={[S.ledgerCell, { width: ledgerColumnWidths.openingQty, alignItems: "flex-end" }]}>
                             {ledgerEditMode ? (
                               <TextInput
                                 style={[S.inlineInput, { color: colors.foreground, borderColor: isOverride ? "#F59E0B" : colors.border }]}
@@ -1015,35 +1036,35 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
                               </View>
                             )}
                           </View>
-                          <Text style={[S.ledgerCell, { width: SPIRIT_LEDGER_COLUMN_WIDTH.openingUnitCost, textAlign: "right", fontSize: 11, color: colors.foreground }]}>
+                          <Text style={[S.ledgerCell, { width: ledgerColumnWidths.openingUnitCost, textAlign: "right", fontSize: 11, color: colors.foreground }]}>
                             {entry ? `¥${formatMoney(entry.openingUnitCost)}` : "—"}
                           </Text>
-                          <Text style={[S.ledgerCell, { width: SPIRIT_LEDGER_COLUMN_WIDTH.openingCost, textAlign: "right", fontSize: 11, color: colors.foreground }]}>
+                          <Text style={[S.ledgerCell, { width: ledgerColumnWidths.openingCost, textAlign: "right", fontSize: 11, color: colors.foreground }]}>
                             {entry ? `¥${formatMoney((entry.openingQty * entry.openingUnitCost))}` : "—"}
                           </Text>
-                          <Text style={[S.ledgerCell, { width: SPIRIT_LEDGER_COLUMN_WIDTH.purchaseQty, textAlign: "right", fontSize: 11, color: colors.primary }]}>
+                          <Text style={[S.ledgerCell, { width: ledgerColumnWidths.purchaseQty, textAlign: "right", fontSize: 11, color: colors.primary }]}>
                             {entry ? (entry.purchaseQty > 0 ? `+${entry.purchaseQty}` : "—") : "—"}
                           </Text>
-                          <Text style={[S.ledgerCell, { width: SPIRIT_LEDGER_COLUMN_WIDTH.purchaseCost, textAlign: "right", fontSize: 11, color: colors.primary }]}>
+                          <Text style={[S.ledgerCell, { width: ledgerColumnWidths.purchaseCost, textAlign: "right", fontSize: 11, color: colors.primary }]}>
                             {entry ? (entry.purchaseCost > 0 ? `¥${formatMoney(entry.purchaseCost)}` : "—") : "—"}
                           </Text>
-                          <Text style={[S.ledgerCell, { width: SPIRIT_LEDGER_COLUMN_WIDTH.closingQty, textAlign: "right", fontSize: 12, fontWeight: "700",
+                          <Text style={[S.ledgerCell, { width: ledgerColumnWidths.closingQty, textAlign: "right", fontSize: 12, fontWeight: "700",
                             color: isNeg ? "#EF4444" : colors.foreground }]}>
                             {entry ? `${isNeg ? "⚠️" : ""}${entry.closingQty.toFixed(2)}` : "—"}
                           </Text>
-                          <Text style={[S.ledgerCell, { width: SPIRIT_LEDGER_COLUMN_WIDTH.closingUnitCost, textAlign: "right", fontSize: 11, color: colors.foreground }]}>
+                          <Text style={[S.ledgerCell, { width: ledgerColumnWidths.closingUnitCost, textAlign: "right", fontSize: 11, color: colors.foreground }]}>
                             {entry ? `¥${formatMoney(entry.closingUnitCost)}` : "—"}
                           </Text>
-                          <Text style={[S.ledgerCell, { width: SPIRIT_LEDGER_COLUMN_WIDTH.closingCost, textAlign: "right", fontSize: 11, color: "#EF4444" }]}>
+                          <Text style={[S.ledgerCell, { width: ledgerColumnWidths.closingCost, textAlign: "right", fontSize: 11, color: "#EF4444" }]}>
                             {entry ? `¥${formatMoney(entry.closingCost)}` : "—"}
                           </Text>
-                          <Text style={[S.ledgerCell, { width: SPIRIT_LEDGER_COLUMN_WIDTH.consumeQty, textAlign: "right", fontSize: 11, color: colors.muted }]}>
+                          <Text style={[S.ledgerCell, { width: ledgerColumnWidths.consumeQty, textAlign: "right", fontSize: 11, color: colors.muted }]}>
                             {entry ? (entry.consumeQty > 0 ? entry.consumeQty.toFixed(1) : "—") : "—"}
                           </Text>
-                          <Text style={[S.ledgerCell, { width: SPIRIT_LEDGER_COLUMN_WIDTH.consumeCost, textAlign: "right", fontSize: 11, color: colors.muted }]}>
+                          <Text style={[S.ledgerCell, { width: ledgerColumnWidths.consumeCost, textAlign: "right", fontSize: 11, color: colors.muted }]}>
                             {entry ? (entry.consumeQty > 0 ? `¥${formatMoney(entry.consumeCost ?? (entry.consumeQty * entry.closingUnitCost))}` : "—") : "—"}
                           </Text>
-                          <Text style={[S.ledgerCell, { width: SPIRIT_LEDGER_COLUMN_WIDTH.group, textAlign: "right", fontSize: 11, color: colors.foreground }]} numberOfLines={1}>{getItemGroup(item)}</Text>
+                          <Text style={[S.ledgerCell, { width: ledgerColumnWidths.group, textAlign: "right", fontSize: 11, color: colors.foreground }]} numberOfLines={1}>{getItemGroup(item)}</Text>
                         </TouchableOpacity>
                       );
                     })}
@@ -1054,22 +1075,22 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
               })()}
               {/* 合计行 */}
               {visibleLedgerRows.length > 0 && (
-                <View testID="spirits-ledger-total" style={[S.tableRow, { width: spiritLedgerTableWidth(ledgerSelectMode), backgroundColor: "#F3F4F6" }]}>
-                  {ledgerSelectMode && <Text style={[S.ledgerCell, { width: SPIRIT_LEDGER_SELECT_WIDTH }]} /> }
-                  <Text style={[S.ledgerCell, { width: SPIRIT_LEDGER_INDEX_WIDTH }]} />
-                  <Text style={[S.ledgerCell, { width: SPIRIT_LEDGER_COLUMN_WIDTH.name, fontWeight: "600", color: colors.foreground, fontSize: 12 }]}>合计</Text>
-                  <Text style={[S.ledgerCell, { width: SPIRIT_LEDGER_COLUMN_WIDTH.referencePrice }]} />
-                  <Text style={[S.ledgerCell, { width: SPIRIT_LEDGER_COLUMN_WIDTH.openingQty, textAlign: "right", fontWeight: "600", color: colors.foreground, fontSize: 11 }]}>{visibleLedgerTotals.openingQty.toFixed(2)}</Text>
-                  <Text style={[S.ledgerCell, { width: SPIRIT_LEDGER_COLUMN_WIDTH.openingUnitCost }]} />
-                  <Text style={[S.ledgerCell, { width: SPIRIT_LEDGER_COLUMN_WIDTH.openingCost, textAlign: "right", fontWeight: "600", color: colors.foreground, fontSize: 11 }]}>¥{formatMoney(visibleLedgerTotals.openingCost)}</Text>
-                  <Text style={[S.ledgerCell, { width: SPIRIT_LEDGER_COLUMN_WIDTH.purchaseQty, textAlign: "right", fontWeight: "600", color: colors.foreground, fontSize: 11 }]}>{visibleLedgerTotals.purchaseQty.toFixed(2)}</Text>
-                  <Text style={[S.ledgerCell, { width: SPIRIT_LEDGER_COLUMN_WIDTH.purchaseCost, textAlign: "right", fontWeight: "600", color: colors.foreground, fontSize: 11 }]}>¥{formatMoney(visibleLedgerTotals.purchaseCost)}</Text>
-                  <Text style={[S.ledgerCell, { width: SPIRIT_LEDGER_COLUMN_WIDTH.closingQty, textAlign: "right", fontWeight: "600", color: colors.foreground, fontSize: 12 }]}>{visibleLedgerTotals.closingQty.toFixed(2)}</Text>
-                  <Text style={[S.ledgerCell, { width: SPIRIT_LEDGER_COLUMN_WIDTH.closingUnitCost }]} />
-                  <Text style={[S.ledgerCell, { width: SPIRIT_LEDGER_COLUMN_WIDTH.closingCost, textAlign: "right", fontWeight: "600", color: colors.foreground, fontSize: 11 }]}>¥{formatMoney(visibleLedgerTotals.closingCost)}</Text>
-                  <Text style={[S.ledgerCell, { width: SPIRIT_LEDGER_COLUMN_WIDTH.consumeQty, textAlign: "right", fontWeight: "600", color: colors.foreground, fontSize: 11 }]}>{visibleLedgerTotals.consumeQty.toFixed(1)}</Text>
-                  <Text style={[S.ledgerCell, { width: SPIRIT_LEDGER_COLUMN_WIDTH.consumeCost, textAlign: "right", fontWeight: "600", color: colors.foreground, fontSize: 11 }]}>¥{formatMoney(visibleLedgerTotals.consumeCost)}</Text>
-                  <Text style={[S.ledgerCell, { width: SPIRIT_LEDGER_COLUMN_WIDTH.group }]} />
+                <View testID="spirits-ledger-total" style={[S.tableRow, { width: ledgerWindowLayout.tableWidth, backgroundColor: "#F3F4F6" }]}>
+                  {ledgerSelectMode && <Text style={[S.ledgerCell, { width: ledgerSelectWidth }]} /> }
+                  <Text style={[S.ledgerCell, { width: ledgerIndexWidth }]} />
+                  <Text style={[S.ledgerCell, { width: ledgerColumnWidths.name, fontWeight: "600", color: colors.foreground, fontSize: 12 }]}>合计</Text>
+                  <Text style={[S.ledgerCell, { width: ledgerColumnWidths.referencePrice }]} />
+                  <Text style={[S.ledgerCell, { width: ledgerColumnWidths.openingQty, textAlign: "right", fontWeight: "600", color: colors.foreground, fontSize: 11 }]}>{visibleLedgerTotals.openingQty.toFixed(2)}</Text>
+                  <Text style={[S.ledgerCell, { width: ledgerColumnWidths.openingUnitCost }]} />
+                  <Text style={[S.ledgerCell, { width: ledgerColumnWidths.openingCost, textAlign: "right", fontWeight: "600", color: colors.foreground, fontSize: 11 }]}>¥{formatMoney(visibleLedgerTotals.openingCost)}</Text>
+                  <Text style={[S.ledgerCell, { width: ledgerColumnWidths.purchaseQty, textAlign: "right", fontWeight: "600", color: colors.foreground, fontSize: 11 }]}>{visibleLedgerTotals.purchaseQty.toFixed(2)}</Text>
+                  <Text style={[S.ledgerCell, { width: ledgerColumnWidths.purchaseCost, textAlign: "right", fontWeight: "600", color: colors.foreground, fontSize: 11 }]}>¥{formatMoney(visibleLedgerTotals.purchaseCost)}</Text>
+                  <Text style={[S.ledgerCell, { width: ledgerColumnWidths.closingQty, textAlign: "right", fontWeight: "600", color: colors.foreground, fontSize: 12 }]}>{visibleLedgerTotals.closingQty.toFixed(2)}</Text>
+                  <Text style={[S.ledgerCell, { width: ledgerColumnWidths.closingUnitCost }]} />
+                  <Text style={[S.ledgerCell, { width: ledgerColumnWidths.closingCost, textAlign: "right", fontWeight: "600", color: colors.foreground, fontSize: 11 }]}>¥{formatMoney(visibleLedgerTotals.closingCost)}</Text>
+                  <Text style={[S.ledgerCell, { width: ledgerColumnWidths.consumeQty, textAlign: "right", fontWeight: "600", color: colors.foreground, fontSize: 11 }]}>{visibleLedgerTotals.consumeQty.toFixed(1)}</Text>
+                  <Text style={[S.ledgerCell, { width: ledgerColumnWidths.consumeCost, textAlign: "right", fontWeight: "600", color: colors.foreground, fontSize: 11 }]}>¥{formatMoney(visibleLedgerTotals.consumeCost)}</Text>
+                  <Text style={[S.ledgerCell, { width: ledgerColumnWidths.group }]} />
                 </View>
               )}
             </View>
@@ -1709,6 +1730,7 @@ function SupplierDetailScreen({
     getMonthPurchases,
   } = store;
   const router2 = useRouter();
+  const { width: appWindowWidth } = useWindowDimensions();
   const monthPurchases = useMemo(() => getMonthPurchases(month), [purchases, month]);
   const isSelfBuy = supplier === "自采";
   const [] = month.split("-").map(Number);
@@ -1730,6 +1752,19 @@ function SupplierDetailScreen({
   const [showAddPurchase, setShowAddPurchase] = useState(false);
   const [showPettyImport, setShowPettyImport] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
+  const purchaseWindowLayout = useMemo(
+    () => resolveInventoryTableWindowLayout(
+      appWindowWidth,
+      SPIRIT_PURCHASE_BASE_WIDTH + (selectMode ? SPIRIT_PURCHASE_SELECT_WIDTH : 0),
+    ),
+    [appWindowWidth, selectMode],
+  );
+  const purchaseColumnWidths = useMemo(
+    () => scaleInventoryTableWidths(SPIRIT_PURCHASE_COLUMN_WIDTH, purchaseWindowLayout.scale),
+    [purchaseWindowLayout.scale],
+  );
+  const purchaseIndexWidth = Math.round(SPIRIT_PURCHASE_INDEX_WIDTH * purchaseWindowLayout.scale);
+  const purchaseSelectWidth = Math.round(SPIRIT_PURCHASE_SELECT_WIDTH * purchaseWindowLayout.scale);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [importing, setImporting] = useState(false);
   const [pdfImporting, setPdfImporting] = useState(false);
@@ -2146,29 +2181,29 @@ function SupplierDetailScreen({
           <ScrollView horizontal showsHorizontalScrollIndicator style={{ flexGrow: 0 }}>
             <View>
               {/* 表头 */}
-              <View testID="spirits-purchase-header" style={[S.tableHeader, { width: spiritPurchaseTableWidth(selectMode), height: INVENTORY_WORKSPACE_METRICS.phoneHeaderHeight, backgroundColor: colors.foreground }]}>
-                {selectMode && <Text style={[S.thCell, { width: SPIRIT_PURCHASE_SELECT_WIDTH, paddingHorizontal: 0 }]} />}
-                <Text style={[S.thCell, { width: SPIRIT_PURCHASE_INDEX_WIDTH, paddingHorizontal: 0 }]}>序号</Text>
-                <Text style={[S.thCell, { width: SPIRIT_PURCHASE_COLUMN_WIDTH.category, paddingHorizontal: 2 }]}>分类</Text>
+              <View testID="spirits-purchase-header" style={[S.tableHeader, { width: purchaseWindowLayout.tableWidth, height: INVENTORY_WORKSPACE_METRICS.phoneHeaderHeight, backgroundColor: colors.foreground }]}>
+                {selectMode && <Text style={[S.thCell, { width: purchaseSelectWidth, paddingHorizontal: 0 }]} />}
+                <Text style={[S.thCell, { width: purchaseIndexWidth, paddingHorizontal: 0 }]}>序号</Text>
+                <Text style={[S.thCell, { width: purchaseColumnWidths.category, paddingHorizontal: 2 }]}>分类</Text>
                 <TouchableOpacity testID="spirits-purchase-column-name" accessibilityRole="button" accessibilityLabel={tableHeaderAccessibilityLabel("商品名称", Boolean(purchaseTableView.sort?.key === "name" || purchaseTableView.filters.nameQuery))}
                   onPress={() => setActivePurchaseColumn("name")}
-                  style={{ width: SPIRIT_PURCHASE_COLUMN_WIDTH.name, height: INVENTORY_WORKSPACE_METRICS.phoneHeaderHeight, alignItems: "center", justifyContent: "center", paddingHorizontal: 2 }}>
+                  style={{ width: purchaseColumnWidths.name, height: INVENTORY_WORKSPACE_METRICS.phoneHeaderHeight, alignItems: "center", justifyContent: "center", paddingHorizontal: 2 }}>
                   <Text style={[S.thCell, { width: "auto", paddingHorizontal: 0 }]}>商品名称</Text>
                 </TouchableOpacity>
                 <TouchableOpacity testID="spirits-purchase-column-quantity" accessibilityRole="button" accessibilityLabel={tableHeaderAccessibilityLabel("数量", Boolean(purchaseTableView.sort?.key === "quantity" || purchaseTableView.filters.quantityMin || purchaseTableView.filters.quantityMax))}
-                  onPress={() => setActivePurchaseColumn("quantity")} style={{ width: SPIRIT_PURCHASE_COLUMN_WIDTH.quantity, height: INVENTORY_WORKSPACE_METRICS.phoneHeaderHeight, alignItems: "center", justifyContent: "center", paddingHorizontal: 2 }}>
+                  onPress={() => setActivePurchaseColumn("quantity")} style={{ width: purchaseColumnWidths.quantity, height: INVENTORY_WORKSPACE_METRICS.phoneHeaderHeight, alignItems: "center", justifyContent: "center", paddingHorizontal: 2 }}>
                   <Text style={[S.thCell, { width: "auto", paddingHorizontal: 0 }]}>数量</Text>
                 </TouchableOpacity>
                 <TouchableOpacity testID="spirits-purchase-column-unit-price" accessibilityRole="button" accessibilityLabel={tableHeaderAccessibilityLabel("单价", Boolean(purchaseTableView.sort?.key === "unitPrice" || purchaseTableView.filters.unitPriceMin || purchaseTableView.filters.unitPriceMax))}
-                  onPress={() => setActivePurchaseColumn("unitPrice")} style={{ width: SPIRIT_PURCHASE_COLUMN_WIDTH.unitPrice, height: INVENTORY_WORKSPACE_METRICS.phoneHeaderHeight, alignItems: "center", justifyContent: "center", paddingHorizontal: 2 }}>
+                  onPress={() => setActivePurchaseColumn("unitPrice")} style={{ width: purchaseColumnWidths.unitPrice, height: INVENTORY_WORKSPACE_METRICS.phoneHeaderHeight, alignItems: "center", justifyContent: "center", paddingHorizontal: 2 }}>
                   <Text style={[S.thCell, { width: "auto", paddingHorizontal: 0 }]}>单价</Text>
                 </TouchableOpacity>
                 <TouchableOpacity testID="spirits-purchase-column-amount" accessibilityRole="button" accessibilityLabel={tableHeaderAccessibilityLabel("总价", Boolean(purchaseTableView.sort?.key === "amount" || purchaseTableView.filters.amountMin || purchaseTableView.filters.amountMax))}
-                  onPress={() => setActivePurchaseColumn("amount")} style={{ width: SPIRIT_PURCHASE_COLUMN_WIDTH.amount, height: INVENTORY_WORKSPACE_METRICS.phoneHeaderHeight, alignItems: "center", justifyContent: "center", paddingHorizontal: 2 }}>
+                  onPress={() => setActivePurchaseColumn("amount")} style={{ width: purchaseColumnWidths.amount, height: INVENTORY_WORKSPACE_METRICS.phoneHeaderHeight, alignItems: "center", justifyContent: "center", paddingHorizontal: 2 }}>
                   <Text style={[S.thCell, { width: "auto", paddingHorizontal: 0 }]}>总价</Text>
                 </TouchableOpacity>
                 <TouchableOpacity testID="spirits-purchase-column-group" accessibilityRole="button" accessibilityLabel={tableHeaderAccessibilityLabel("集团", Boolean(purchaseTableView.sort?.key === "group" || purchaseTableView.filters.groups.length || purchaseTableView.filters.onlyUnassignedGroup))}
-                  onPress={() => setActivePurchaseColumn("group")} style={{ width: SPIRIT_PURCHASE_COLUMN_WIDTH.group, height: INVENTORY_WORKSPACE_METRICS.phoneHeaderHeight, alignItems: "center", justifyContent: "center", paddingHorizontal: 2 }}>
+                  onPress={() => setActivePurchaseColumn("group")} style={{ width: purchaseColumnWidths.group, height: INVENTORY_WORKSPACE_METRICS.phoneHeaderHeight, alignItems: "center", justifyContent: "center", paddingHorizontal: 2 }}>
                   <Text style={[S.thCell, { width: "auto", paddingHorizontal: 0 }]}>集团</Text>
                 </TouchableOpacity>
               </View>
@@ -2176,7 +2211,7 @@ function SupplierDetailScreen({
               {/* 数据行始终按完整年月日分组；分类在每条采购记录中显示。 */}
               {purchaseDisplayGroups.map((group) => (
                 <React.Fragment key={group.id}>
-                  <View style={{ width: spiritPurchaseTableWidth(selectMode), minHeight: STORE_TABLE_METRICS.groupHeight, paddingHorizontal: 8, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, backgroundColor: colors.surface }}>
+                  <View style={{ width: purchaseWindowLayout.tableWidth, minHeight: STORE_TABLE_METRICS.groupHeight, paddingHorizontal: 8, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, backgroundColor: colors.surface }}>
                     <Text style={{ color: colors.foreground, fontSize: 12, fontWeight: "600" }}>{group.label} · {group.rows.length} 笔</Text>
                     <Text style={{ color: colors.muted, fontSize: 11 }}>{formatStoreMoney(group.amount)}</Text>
                   </View>
@@ -2217,13 +2252,13 @@ function SupplierDetailScreen({
                       }
                     }}
                     style={[S.tableRow, {
-                      width: spiritPurchaseTableWidth(selectMode),
+                      width: purchaseWindowLayout.tableWidth,
                       height: INVENTORY_WORKSPACE_METRICS.phoneRowHeight,
                       minHeight: INVENTORY_WORKSPACE_METRICS.phoneRowHeight,
                       backgroundColor: isSelected ? "#FEF2F2" : idx % 2 === 0 ? colors.surface : colors.background,
                     }]}>
                     {selectMode && (
-                      <View style={[S.ledgerCell, { width: SPIRIT_PURCHASE_SELECT_WIDTH, alignItems: "center" }]}>
+                      <View style={[S.ledgerCell, { width: purchaseSelectWidth, alignItems: "center" }]}>
                         <View style={{ width: 18, height: 18, borderRadius: 9, borderWidth: 2,
                           borderColor: isSelected ? "#EF4444" : colors.border,
                           backgroundColor: isSelected ? "#EF4444" : "transparent",
@@ -2232,11 +2267,11 @@ function SupplierDetailScreen({
                         </View>
                       </View>
                     )}
-                    <Text style={[S.ledgerCell, { width: SPIRIT_PURCHASE_INDEX_WIDTH, textAlign: "center", fontSize: 10, color: colors.muted }]}>{visibleSupplierPurchases.indexOf(p) + 1}</Text>
-                    <Text style={[S.ledgerCell, { width: SPIRIT_PURCHASE_COLUMN_WIDTH.category, textAlign: "center", fontSize: 10, lineHeight: 14, color: catColor(resolvePurchaseDisplayCategory(p, item)) }]} numberOfLines={2}>
+                    <Text style={[S.ledgerCell, { width: purchaseIndexWidth, textAlign: "center", fontSize: 10, color: colors.muted }]}>{visibleSupplierPurchases.indexOf(p) + 1}</Text>
+                    <Text style={[S.ledgerCell, { width: purchaseColumnWidths.category, textAlign: "center", fontSize: 10, lineHeight: 14, color: catColor(resolvePurchaseDisplayCategory(p, item)) }]} numberOfLines={2}>
                       {resolvePurchaseDisplayCategory(p, item)}
                     </Text>
-                    <TouchableOpacity style={[S.ledgerCell, { width: SPIRIT_PURCHASE_COLUMN_WIDTH.name, height: INVENTORY_WORKSPACE_METRICS.phoneRowHeight, justifyContent: "center" }]}
+                    <TouchableOpacity style={[S.ledgerCell, { width: purchaseColumnWidths.name, height: INVENTORY_WORKSPACE_METRICS.phoneRowHeight, justifyContent: "center" }]}
                       onPress={() => {
                         if (!selectMode) {
                           tap();
@@ -2263,7 +2298,7 @@ function SupplierDetailScreen({
                       </View>
                     </TouchableOpacity>
                     {/* 数量列（可点击编辑） */}
-                    <TouchableOpacity style={[S.ledgerCell, { width: SPIRIT_PURCHASE_COLUMN_WIDTH.quantity, alignItems: "flex-end" }]}
+                    <TouchableOpacity style={[S.ledgerCell, { width: purchaseColumnWidths.quantity, alignItems: "flex-end" }]}
                       onPress={() => {
                         if (selectMode) return;
                         tap();
@@ -2280,7 +2315,7 @@ function SupplierDetailScreen({
                       <Text style={{ fontSize: 11, color: colors.foreground }}>{p.quantity}</Text>
                     </TouchableOpacity>
                     {/* 单价列（可点击编辑；价格涨跌独占第二行） */}
-                    <TouchableOpacity style={[S.ledgerCell, { width: SPIRIT_PURCHASE_COLUMN_WIDTH.unitPrice, alignItems: "flex-end" }]}
+                    <TouchableOpacity style={[S.ledgerCell, { width: purchaseColumnWidths.unitPrice, alignItems: "flex-end" }]}
                       onPress={() => {
                         if (selectMode) return;
                         tap();
@@ -2307,7 +2342,7 @@ function SupplierDetailScreen({
                       )}
                     </TouchableOpacity>
                     {/* 总价列（可点击编辑） */}
-                    <TouchableOpacity style={[S.ledgerCell, { width: SPIRIT_PURCHASE_COLUMN_WIDTH.amount, alignItems: "flex-end" }]}
+                    <TouchableOpacity style={[S.ledgerCell, { width: purchaseColumnWidths.amount, alignItems: "flex-end" }]}
                       onPress={() => {
                         if (selectMode) return;
                         tap();
@@ -2330,7 +2365,7 @@ function SupplierDetailScreen({
                       )}
                     </TouchableOpacity>
                     {/* 集团列位于总价之后，按需横滑。 */}
-                    <TouchableOpacity style={[S.ledgerCell, { width: SPIRIT_PURCHASE_COLUMN_WIDTH.group }]}
+                    <TouchableOpacity style={[S.ledgerCell, { width: purchaseColumnWidths.group }]}
                       onPress={() => {
                         if (selectMode) return;
                         tap();
@@ -2361,19 +2396,19 @@ function SupplierDetailScreen({
                 </React.Fragment>
               ))}
               {/* 合计行 */}
-              <View style={[S.tableRow, { width: spiritPurchaseTableWidth(selectMode), minHeight: INVENTORY_WORKSPACE_METRICS.phoneRowHeight, backgroundColor: colors.surface, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}>
-                {selectMode && <Text style={[S.ledgerCell, { width: SPIRIT_PURCHASE_SELECT_WIDTH }]} />}
-                <Text style={[S.ledgerCell, { width: SPIRIT_PURCHASE_INDEX_WIDTH }]} />
-                <Text style={[S.ledgerCell, { width: SPIRIT_PURCHASE_COLUMN_WIDTH.category }]} />
-                <Text style={[S.ledgerCell, { width: SPIRIT_PURCHASE_COLUMN_WIDTH.name, fontWeight: "600", color: colors.foreground, fontSize: 12 }]}>合计</Text>
-                <Text style={[S.ledgerCell, { width: SPIRIT_PURCHASE_COLUMN_WIDTH.quantity, textAlign: "right", fontWeight: "600", color: colors.foreground, fontSize: 11 }]}>
+              <View style={[S.tableRow, { width: purchaseWindowLayout.tableWidth, minHeight: INVENTORY_WORKSPACE_METRICS.phoneRowHeight, backgroundColor: colors.surface, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}>
+                {selectMode && <Text style={[S.ledgerCell, { width: purchaseSelectWidth }]} />}
+                <Text style={[S.ledgerCell, { width: purchaseIndexWidth }]} />
+                <Text style={[S.ledgerCell, { width: purchaseColumnWidths.category }]} />
+                <Text style={[S.ledgerCell, { width: purchaseColumnWidths.name, fontWeight: "600", color: colors.foreground, fontSize: 12 }]}>合计</Text>
+                <Text style={[S.ledgerCell, { width: purchaseColumnWidths.quantity, textAlign: "right", fontWeight: "600", color: colors.foreground, fontSize: 11 }]}>
                   {visibleSupplierPurchases.reduce((sum, purchase) => sum + purchase.quantity, 0)}
                 </Text>
-                <Text style={[S.ledgerCell, { width: SPIRIT_PURCHASE_COLUMN_WIDTH.unitPrice }]} />
-                <Text style={[S.ledgerCell, { width: SPIRIT_PURCHASE_COLUMN_WIDTH.amount, textAlign: "right", fontWeight: "600", color: colors.foreground, fontSize: 12 }]}>
+                <Text style={[S.ledgerCell, { width: purchaseColumnWidths.unitPrice }]} />
+                <Text style={[S.ledgerCell, { width: purchaseColumnWidths.amount, textAlign: "right", fontWeight: "600", color: colors.foreground, fontSize: 12 }]}>
                   ¥{formatMoney(visibleSupplierPurchaseTotal)}
                 </Text>
-                <Text style={[S.ledgerCell, { width: SPIRIT_PURCHASE_COLUMN_WIDTH.group }]} />
+                <Text style={[S.ledgerCell, { width: purchaseColumnWidths.group }]} />
 
               </View>
             </View>

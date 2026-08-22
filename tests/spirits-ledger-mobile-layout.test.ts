@@ -33,7 +33,10 @@ describe("烈酒库存移动端Excel台账", () => {
     expect(source).toContain('["商品名称", "name", 140]');
     expect(source).not.toContain('{label}⌄');
     expect(source).toContain('minHeight: STORE_TABLE_METRICS.rowHeight');
-    expect(source).toContain('width: spiritLedgerTableWidth(ledgerSelectMode), backgroundColor: colors.primary');
+    expect(source).toContain('resolveInventoryTableWindowLayout');
+    expect(source).toContain('ledgerWindowLayout.tableWidth, backgroundColor: colors.primary');
+    expect(source).toContain('width: ledgerColumnWidths.name');
+    expect(source).toContain('width: ledgerColumnWidths.group');
   });
 
   it("为窄屏横向滚动回归保留稳定的业务页签和操作栏定位标识", () => {

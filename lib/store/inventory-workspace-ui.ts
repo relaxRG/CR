@@ -54,3 +54,44 @@ export type InventoryWorkspaceKind = typeof INVENTORY_WORKSPACE_TEN[number];
 export function isInventoryWorkspaceKind(value: string): value is InventoryWorkspaceKind {
   return (INVENTORY_WORKSPACE_TEN as readonly string[]).includes(value);
 }
+
+/**
+ * Excel 型台账依据当前 App 窗口可用宽度，而不是设备型号，选择列宽密度。
+ * 窗口窄时保持基准轨道并局部横滑；窗口变宽时同一列轨道等比伸展，避免表格停留在左侧。
+ */
+export type InventoryTableDensity = "compact" | "standard" | "expanded";
+
+export interface InventoryTableWindowLayout {
+  density: InventoryTableDensity;
+  scale: number;
+  tableWidth: number;
+  expanded: boolean;
+}
+
+export function resolveInventoryTableWindowLayout(
+  windowWidth: number,
+  baseWidth: number,
+  horizontalGutter = 24,
+  maxScale = Number.POSITIVE_INFINITY,
+): InventoryTableWindowLayout {
+  const availableWidth = Math.max(0, Math.floor(windowWidth - horizontalGutter));
+  const scale = availableWidth > baseWidth
+    ? Math.min(maxScale, availableWidth / baseWidth)
+    : 1;
+  const expanded = scale > 1.02;
+  return {
+    density: scale >= 1.45 ? "expanded" : expanded ? "standard" : "compact",
+    scale,
+    tableWidth: Math.round(baseWidth * scale),
+    expanded,
+  };
+}
+
+export function scaleInventoryTableWidths<T extends string>(
+  widths: Record<T, number>,
+  scale: number,
+): Record<T, number> {
+  return Object.fromEntries(
+    Object.entries(widths).map(([key, width]) => [key, Math.round(Number(width) * scale)]),
+  ) as Record<T, number>;
+}

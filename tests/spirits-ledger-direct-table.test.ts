@@ -29,12 +29,13 @@ describe("烈酒库存完整Excel台账", () => {
 
   it("表头、分类条、商品行和合计行共享唯一紧凑列轨道，不产生横向错位", () => {
     expect(source).toContain('const SPIRIT_LEDGER_COLUMNS');
-    expect(source).toContain('const spiritLedgerTableWidth');
+    expect(source).toContain('resolveInventoryTableWindowLayout');
+    expect(source).toContain('ledgerWindowLayout.tableWidth');
     expect(source).toContain('testID="spirits-ledger-header"');
     expect(source).toContain('testID={`spirits-ledger-category-${cat}`}');
     expect(source).toContain('testID="spirits-ledger-total"');
-    expect(source).toContain('width: spiritLedgerTableWidth(ledgerSelectMode)');
-    expect(source).toContain('SPIRIT_LEDGER_COLUMN_WIDTH.name');
+    expect(source).toContain('width: ledgerColumnWidths.name');
+    expect(source).toContain('width: ledgerColumnWidths.group');
     expect(source).toContain('ledgerCell: { paddingHorizontal: 3');
   });
 
