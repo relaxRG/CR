@@ -121,8 +121,10 @@ describe("ArchiveConflictResolutionController", () => {
     expect(text(renderer, "archive-conflict-feedback")).toBe("已放弃旧本机提交，不会修改云端版本。");
   });
 
-  it("策略失败时保留冲突、不调用解决回调并显示受控错误", async () => {
-    store.reimportArchiveConflictAsNew.mockRejectedValueOnce(new Error("ARCHIVE_LOCAL_SOURCE_MISSING"));
+  it("网络中断后释放busy、保留冲突并允许用户再次尝试同一策略", async () => {
+    store.reimportArchiveConflictAsNew
+      .mockRejectedValueOnce(new Error("NETWORK_INTERRUPTED"))
+      .mockResolvedValueOnce();
     const onResolved = vi.fn();
     let renderer!: ReactTestRenderer;
     await act(async () => {
@@ -131,6 +133,14 @@ describe("ArchiveConflictResolutionController", () => {
 
     await act(async () => { press(renderer, "archive-conflict-reimport"); });
     expect(onResolved).not.toHaveBeenCalled();
-    expect(text(renderer, "archive-conflict-feedback")).toBe("处理未完成：ARCHIVE_LOCAL_SOURCE_MISSING");
+    expect(text(renderer, "archive-conflict-feedback")).toBe("处理未完成：NETWORK_INTERRUPTED");
+    for (const testID of ["archive-conflict-view-remote", "archive-conflict-reimport", "archive-conflict-discard"]) {
+      expect(renderer.root.find((node) => node.props.testID === testID).props.disabled).toBe(false);
+    }
+
+    await act(async () => { press(renderer, "archive-conflict-reimport"); });
+    expect(store.reimportArchiveConflictAsNew).toHaveBeenCalledTimes(2);
+    expect(onResolved).toHaveBeenCalledTimes(1);
+    expect(text(renderer, "archive-conflict-feedback")).toBe("已将本机文件作为新条目重新提交。");
   });
 });

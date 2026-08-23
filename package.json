@@ -31,6 +31,7 @@
     "check:storage-policy": "node scripts/check-storage-policy.mjs",
     "check:business-sync-coverage": "tsx scripts/check-business-sync-coverage.ts",
     "ci:storage": "pnpm audit:storage && pnpm generate:storage-registry && pnpm check:storage-policy && pnpm check:business-sync-coverage",
+    "cloudflare:archive:preflight": "node scripts/cloudflare/archive-resource-preflight.mjs",
     "generate:device-policy-v2": "node scripts/generate-device-policy-v2-worker-map.mjs && node scripts/inject-device-policy-v2-worker-map.mjs",
     "check:feature-contract": "tsx scripts/check-feature-contract.ts",
     "check:device-policy-v2": "pnpm generate:device-policy-v2 && git diff --exit-code -- workers/cocktail-ai/worker-v4.js workers/cocktail-ai/device-policy-v2.generated.js && pnpm check:feature-contract && pnpm vitest run tests/device-session-v2.test.ts tests/five-business-tab-policy.test.ts --reporter=dot",

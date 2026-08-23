@@ -136,6 +136,30 @@ describe("归档墓碑GC Worker", () => {
     expect(remove).toHaveBeenCalledWith(orphan);
   });
 
+  it("孤儿对象在15分钟宽限期内保留，恰满15分钟后才具备清理资格", async () => {
+    const key = "groups/group-a/monthly-raw/objects/boundary-op.xlsx";
+    const remove = vi.fn(async () => undefined);
+    const env = {
+      ARCHIVES: {
+        delete: remove,
+        list: vi.fn(async () => ({ objects: [{ key, uploaded: new Date(0) }] })),
+      },
+      DB: {
+        prepare() {
+          return { bind() { return { first: async () => null }; } };
+        },
+      },
+    };
+
+    const before = await runArchiveOrphanReconciliation(env, { now: 15 * 60 * 1000 - 1 });
+    expect(before).toEqual(expect.objectContaining({ deleted: 0, skippedFresh: 1 }));
+    expect(remove).not.toHaveBeenCalled();
+
+    const atBoundary = await runArchiveOrphanReconciliation(env, { now: 15 * 60 * 1000 });
+    expect(atBoundary).toEqual(expect.objectContaining({ deleted: 1, skippedFresh: 0 }));
+    expect(remove).toHaveBeenCalledWith(key);
+  });
+
   it("R2删除失败时保存错误并按退避时间重试；跨组或路径穿越对象键不会触达R2", async () => {
     const failing = createEnv({ tombstones: [tombstone], deleteError: new Error("temporary R2 outage") });
     const failed = await runArchiveTombstoneGc(failing.env, { now: 1000 });
