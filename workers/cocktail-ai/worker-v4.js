@@ -2784,8 +2784,95 @@ async function initDB(env) {
   } catch (e) {}
   __dbInitialized = true;
 }
-__name(initDB, "initDB");
+__name(initDB);
 
+let archiveSchemaReady = false;
+async function ensureArchiveSchema(env) {
+  if (archiveSchemaReady) return;
+  await env.DB.batch([
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS archive_entries (entry_id TEXT NOT NULL, group_id TEXT NOT NULL, month TEXT NOT NULL, file_type TEXT NOT NULL, filename TEXT NOT NULL, object_key TEXT NOT NULL, sha256 TEXT NOT NULL, size_bytes INTEGER NOT NULL, revision INTEGER NOT NULL, status TEXT NOT NULL CHECK (status IN ('active', 'deleted')), created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY (entry_id, group_id))"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS archive_operations (group_id TEXT NOT NULL, operation_id TEXT NOT NULL, response_json TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (group_id, operation_id))"),
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_archive_entries_group_status ON archive_entries (group_id, status, updated_at DESC)"),
+  ]);
+  archiveSchemaReady = true;
+}
+function archiveError(code, status, origin, extra = {}) { return json({ code, ...extra }, status, origin); }
+function archiveString(value, max) { return typeof value === "string" && value.length > 0 && value.length <= max && !/[\u0000\r\n]/.test(value); }
+function archiveObjectKey(groupId, entryId, operationId) {
+  const entry = entryId.replace(/[^A-Za-z0-9._-]/g, "_");
+  const operation = operationId.replace(/[^A-Za-z0-9._-]/g, "_");
+  return `groups/${groupId}/monthly-raw/objects/${entry}-${operation}.xlsx`;
+}
+function archiveBytes(base64) {
+  if (typeof base64 !== "string" || base64.length === 0 || base64.length > 16e6 || !/^[A-Za-z0-9+/=]+$/.test(base64)) return null;
+  try {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+    return bytes;
+  } catch { return null; }
+}
+async function archiveDigest(bytes) {
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+async function archiveSession(env, headers, capability, origin) {
+  const session = await resolveDeviceSessionV2(env, headers);
+  if (!session) return { error: archiveError("DEVICE_AUTH_UNAUTHORIZED", 401, origin) };
+  if (!isSessionCapabilityAllowed(session, capability)) return { error: archiveError("CAPABILITY_DENIED", 403, origin) };
+  return { session };
+}
+async function handleArchiveIndex(env, headers, origin) {
+  const resolved = await archiveSession(env, headers, "reports_monthly.view", origin);
+  if (resolved.error) return resolved.error;
+  await ensureArchiveSchema(env);
+  const rows = await env.DB.prepare("SELECT entry_id, object_key, revision, status, month, file_type, filename, size_bytes, updated_at FROM archive_entries WHERE group_id = ? ORDER BY updated_at DESC, entry_id ASC").bind(resolved.session.membership.groupId).all();
+  const entries = (rows.results || []).map((row) => ({ entryId: row.entry_id, objectKey: row.object_key, revision: Number(row.revision), status: row.status, month: row.month, fileType: row.file_type, filename: row.filename, sizeBytes: Number(row.size_bytes), updatedAt: Number(row.updated_at) }));
+  return json({ entries, serverTime: Date.now() }, 200, origin);
+}
+async function handleArchiveCommit(env, body, headers, origin) {
+  const resolved = await archiveSession(env, headers, "reports_monthly.import", origin);
+  if (resolved.error) return resolved.error;
+  if (!env.ARCHIVES) return archiveError("ARCHIVE_STORAGE_NOT_CONFIGURED", 503, origin);
+  await ensureArchiveSchema(env);
+  const groupId = resolved.session.membership.groupId;
+  const operationId = body?.operationId;
+  const entryId = body?.entryId;
+  const parentRevision = body?.parentRevision;
+  if (!archiveString(operationId, 128) || !archiveString(entryId, 160) || !Number.isInteger(parentRevision) || parentRevision < 0) return archiveError("ARCHIVE_REQUEST_INVALID", 400, origin);
+  const previous = await env.DB.prepare("SELECT response_json FROM archive_operations WHERE group_id = ? AND operation_id = ?").bind(groupId, operationId).first();
+  if (previous?.response_json) return json(JSON.parse(previous.response_json), 200, origin);
+  const existing = await env.DB.prepare("SELECT revision, status FROM archive_entries WHERE group_id = ? AND entry_id = ?").bind(groupId, entryId).first();
+  if (existing?.status === "deleted") return archiveError("ENTRY_DELETED", 409, origin, { tombstoneRevision: Number(existing.revision) });
+  if (existing && Number(existing.revision) !== parentRevision) return archiveError("ARCHIVE_REVISION_CONFLICT", 409, origin, { currentRevision: Number(existing.revision), currentStatus: existing.status });
+  if (!archiveString(body?.month, 16) || !/^\d{4}-\d{2}$/.test(body.month) || !archiveString(body?.fileType, 80) || !archiveString(body?.filename, 200)) return archiveError("ARCHIVE_METADATA_INVALID", 400, origin);
+  const bytes = archiveBytes(body?.dataBase64);
+  if (!bytes || bytes.byteLength > 12e6) return archiveError("ARCHIVE_FILE_INVALID", 413, origin);
+  const objectKey = archiveObjectKey(groupId, entryId, operationId);
+  const now = Date.now();
+  const revision = parentRevision + 1;
+  const sha256 = await archiveDigest(bytes);
+  await env.ARCHIVES.put(objectKey, bytes, { httpMetadata: { contentType: body.filename.toLowerCase().endsWith(".xls") ? "application/vnd.ms-excel" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }, customMetadata: { groupId, entryId, revision: String(revision), sha256 } });
+  let changed = false;
+  if (existing) {
+    const result = await env.DB.prepare("UPDATE archive_entries SET month = ?, file_type = ?, filename = ?, object_key = ?, sha256 = ?, size_bytes = ?, revision = ?, status = 'active', updated_at = ? WHERE group_id = ? AND entry_id = ? AND revision = ? AND status = 'active'").bind(body.month, body.fileType, body.filename, objectKey, sha256, bytes.byteLength, revision, now, groupId, entryId, parentRevision).run();
+    changed = Number(result.meta?.changes || 0) === 1;
+  } else {
+    try {
+      await env.DB.prepare("INSERT INTO archive_entries (entry_id, group_id, month, file_type, filename, object_key, sha256, size_bytes, revision, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)").bind(entryId, groupId, body.month, body.fileType, body.filename, objectKey, sha256, bytes.byteLength, revision, now, now).run();
+      changed = true;
+    } catch { changed = false; }
+  }
+  if (!changed) {
+    await env.ARCHIVES.delete(objectKey);
+    const current = await env.DB.prepare("SELECT revision, status FROM archive_entries WHERE group_id = ? AND entry_id = ?").bind(groupId, entryId).first();
+    if (current?.status === "deleted") return archiveError("ENTRY_DELETED", 409, origin, { tombstoneRevision: Number(current.revision) });
+    return archiveError("ARCHIVE_REVISION_CONFLICT", 409, origin, { currentRevision: Number(current?.revision || 0), currentStatus: "active" });
+  }
+  const response = { entryId, revision };
+  await env.DB.prepare("INSERT OR IGNORE INTO archive_operations (group_id, operation_id, response_json, created_at) VALUES (?, ?, ?, ?)").bind(groupId, operationId, JSON.stringify(response), now).run();
+  return json(response, 201, origin);
+}
 var worker_v3_default = {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -2919,6 +3006,14 @@ var worker_v3_default = {
     }
     if (path === "/api/device/session-v2" && method === "GET") {
       return handleDeviceSessionV2(env, request.headers, origin);
+    }
+    if (path === "/api/archives/index" && method === "GET") {
+      return handleArchiveIndex(env, request.headers, origin);
+    }
+    if (path === "/api/archives/commit" && method === "POST") {
+      let body = {};
+      try { body = await request.json(); } catch {}
+      return handleArchiveCommit(env, body, request.headers, origin);
     }
     if (path === "/api/price-alerts/upsert" && method === "POST") {
       let body = {};
