@@ -167,7 +167,7 @@ export async function clearDeviceCredentials(): Promise<void> {
 }
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
-async function cfFetch(
+export async function cfFetch(
   path: string,
   options: RequestInit & { deviceInfo?: DeviceCredentials } = {},
 ): Promise<Response> {

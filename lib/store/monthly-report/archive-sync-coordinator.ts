@@ -14,7 +14,13 @@ export type ArchiveOutboxRequest = Readonly<{
   endpoint: string;
   operationId: string;
   body: Readonly<Record<string, unknown>>;
+  /** 仅设备本地使用的原始文件路径；不会作为网络请求体发送。 */
+  localSourceUri?: string;
+  /** 该操作创建时的同步组；恢复时必须严格匹配当前成员资格。 */
+  groupId?: string;
 }>;
+
+export type ArchiveRequestHydrator = (item: ArchiveOutboxItem) => Promise<Readonly<Record<string, unknown>>>;
 
 export type ArchiveOutboxItem = Readonly<{
   operationId: string;
@@ -97,7 +103,14 @@ function replaceItem(items: readonly ArchiveOutboxItem[], next: ArchiveOutboxIte
 }
 
 function toOutboxRequest(request: ArchiveMutationRequest): ArchiveOutboxRequest {
-  return Object.freeze({ endpoint: request.endpoint, operationId: request.operationId, body: request.body });
+  const { localSourceUri, groupId, ...body } = request.body;
+  return Object.freeze({
+    endpoint: request.endpoint,
+    operationId: request.operationId,
+    body,
+    ...(typeof localSourceUri === "string" ? { localSourceUri } : {}),
+    ...(typeof groupId === "string" ? { groupId } : {}),
+  });
 }
 
 function buildItem(request: ArchiveMutationRequest, now: number): ArchiveOutboxItem {
@@ -127,6 +140,8 @@ export class ArchiveMutationCoordinator {
     private readonly getAccessToken: () => Promise<string | null>,
     private readonly fetcher: ArchiveFetch = fetch,
     private readonly now: () => number = Date.now,
+    private readonly hydrateRequest: ArchiveRequestHydrator = async (item) => item.request.body,
+    private readonly getRequestHeaders: () => Promise<Readonly<Record<string, string>>> = async () => ({}),
   ) {}
 
   async list(): Promise<readonly ArchiveOutboxItem[]> {
@@ -146,6 +161,22 @@ export class ArchiveMutationCoordinator {
     const item = buildItem(request, this.now());
     await this.persist([...current, item]);
     return item;
+  }
+
+  /**
+   * 进程意外终止时 applying 可能已持久化；新进程将其视为可恢复操作。
+   * conflict/deleted/committed/abandoned 均为终态，不允许被自动重放。
+   */
+  async resumePending(shouldResume: (item: ArchiveOutboxItem) => boolean = () => true): Promise<readonly ArchiveMutationCoordinatorResult[]> {
+    const now = this.now();
+    const candidates = (await this.list()).filter((item) => (
+      shouldResume(item)
+      && (item.state === "pending" || item.state === "applying" || item.state === "retry_scheduled")
+      && (item.nextRetryAt === null || item.nextRetryAt <= now)
+    ));
+    const results: ArchiveMutationCoordinatorResult[] = [];
+    for (const item of candidates) results.push(await this.apply(item.operationId));
+    return results;
   }
 
   private async update(item: ArchiveOutboxItem): Promise<ArchiveOutboxItem> {
@@ -169,8 +200,11 @@ export class ArchiveMutationCoordinator {
         nextRetryAt: null,
         updatedAt: this.now(),
       }));
-      const accessToken = await this.getAccessToken();
-      if (!accessToken) {
+      const [accessToken, requestHeaders] = await Promise.all([
+        this.getAccessToken(),
+        this.getRequestHeaders(),
+      ]);
+      if (!accessToken && Object.keys(requestHeaders).length === 0) {
         const outcome: Extract<ArchiveMutationOutcome, { status: "forbidden" }> = {
           status: "forbidden",
           operationId: applying.operationId,
@@ -178,9 +212,25 @@ export class ArchiveMutationCoordinator {
         await this.update(Object.freeze({ ...applying, state: "pending", updatedAt: this.now() }));
         return { status: "forbidden", outcome };
       }
+      let body: Readonly<Record<string, unknown>>;
+      try {
+        body = await this.hydrateRequest(applying);
+      } catch (error) {
+        const outcome: Extract<ArchiveMutationOutcome, { status: "failed" }> = {
+          status: "failed",
+          retryable: false,
+          operationId: applying.operationId,
+          message: error instanceof Error ? error.message : "ARCHIVE_PAYLOAD_UNAVAILABLE",
+        };
+        await this.update(Object.freeze({ ...applying, state: "pending", updatedAt: this.now() }));
+        return { status: "failed", outcome };
+      }
       const outcome = await commitArchiveMutation({
-        ...applying.request,
+        endpoint: applying.request.endpoint,
+        operationId: applying.operationId,
         accessToken,
+        requestHeaders,
+        body,
         retryAttempt: applying.retryAttempt,
       }, this.fetcher);
 

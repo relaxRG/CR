@@ -3,6 +3,11 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import {
+  ArchiveMutationCoordinatorResult,
+  ArchiveRemoteIndex,
+} from "./archive-sync-coordinator";
+import { getRawExcelArchiveRemoteBridge } from "./archive-remote-bridge";
+import {
   formatArchiveMonthLabel,
   appendRawExcelArchiveEntries,
   getArchiveEntryId,
@@ -32,6 +37,11 @@ interface RawExcelArchiveStore {
   getFilesForMonth: (month: string) => RawExcelArchiveEntry[];
   getAllMonths: () => RawExcelArchiveGroup[];
   exportFile: (entry: RawExcelArchiveEntry) => Promise<void>;
+  /** 最近一次云端归档提交的受控结果；冲突时包含权威索引，供页面展示三种处理入口。 */
+  remoteResults: readonly ArchiveMutationCoordinatorResult[];
+  remoteIndex: ArchiveRemoteIndex | null;
+  resumeRemoteArchiveSync: () => Promise<void>;
+  refreshRemoteArchiveIndex: () => Promise<ArchiveRemoteIndex | null>;
 }
 
 const RawExcelArchiveContext = createContext<RawExcelArchiveStore>({
@@ -43,6 +53,10 @@ const RawExcelArchiveContext = createContext<RawExcelArchiveStore>({
   getFilesForMonth: () => [],
   getAllMonths: () => [],
   exportFile: async () => {},
+  remoteResults: [],
+  remoteIndex: null,
+  resumeRemoteArchiveSync: async () => {},
+  refreshRemoteArchiveIndex: async () => null,
 });
 
 function getArchiveRootDirectory(): string {
@@ -77,6 +91,37 @@ export function RawExcelArchiveProvider({ children }: { children: React.ReactNod
   const [entries, setEntries] = useState<RawExcelArchiveEntry[]>([]);
   const entriesRef = useRef<RawExcelArchiveEntry[]>([]);
   const [ready, setReady] = useState(false);
+  const [remoteResults, setRemoteResults] = useState<ArchiveMutationCoordinatorResult[]>([]);
+  const [remoteIndex, setRemoteIndex] = useState<ArchiveRemoteIndex | null>(null);
+  const remoteBridgeRef = useRef(getRawExcelArchiveRemoteBridge());
+
+  const recordRemoteResults = useCallback((results: readonly ArchiveMutationCoordinatorResult[]) => {
+    if (results.length === 0) return;
+    setRemoteResults((current) => [...results, ...current].slice(0, 20));
+    const latestIndex = [...results].reverse().find((result) => result.status === "conflict" || result.status === "deleted");
+    if (latestIndex && "index" in latestIndex) setRemoteIndex(latestIndex.index);
+  }, []);
+
+  const resumeRemoteArchiveSync = useCallback(async () => {
+    try {
+      const results = await remoteBridgeRef.current.resumePending();
+      recordRemoteResults(results);
+    } catch (error) {
+      // 未加入同步组、无权限或暂时离线都不能影响本机原始文件归档。
+      console.warn("[RawExcelArchive] 恢复云端归档队列失败", error);
+    }
+  }, [recordRemoteResults]);
+
+  const refreshRemoteArchiveIndex = useCallback(async (): Promise<ArchiveRemoteIndex | null> => {
+    try {
+      const index = await remoteBridgeRef.current.refreshIndex();
+      setRemoteIndex(index);
+      return index;
+    } catch (error) {
+      console.warn("[RawExcelArchive] 刷新云端归档索引失败", error);
+      return null;
+    }
+  }, []);
 
   useEffect(() => {
     AsyncStorage.getItem(RAW_EXCEL_ARCHIVE_STORAGE_KEY)
@@ -90,8 +135,11 @@ export function RawExcelArchiveProvider({ children }: { children: React.ReactNod
         }
       })
       .catch((error) => console.warn("[RawExcelArchive] 加载归档索引失败", error))
-      .finally(() => setReady(true));
-  }, []);
+      .finally(() => {
+        setReady(true);
+        void resumeRemoteArchiveSync();
+      });
+  }, [resumeRemoteArchiveSync]);
 
   const persist = useCallback((next: RawExcelArchiveEntry[]) => {
     entriesRef.current = next;
@@ -147,6 +195,13 @@ export function RawExcelArchiveProvider({ children }: { children: React.ReactNod
       }
 
       await persist(appendRawExcelArchiveEntries(entriesRef.current, incoming));
+      // 本机文件与索引已经是唯一可用副本；云端提交只能异步追加，失败后保留设备本地outbox等待恢复。
+      void Promise.all(incoming.map(async (entry) => {
+        const operationId = await remoteBridgeRef.current.enqueueEntry(entry);
+        return remoteBridgeRef.current.submit(operationId);
+      }))
+        .then(recordRemoteResults)
+        .catch((error) => console.warn("[RawExcelArchive] 云端归档提交延后", error));
     } finally {
       await safelyDelete(stagingDirectory).catch(() => undefined);
     }
@@ -201,6 +256,10 @@ export function RawExcelArchiveProvider({ children }: { children: React.ReactNod
       getFilesForMonth,
       getAllMonths,
       exportFile,
+      remoteResults,
+      remoteIndex,
+      resumeRemoteArchiveSync,
+      refreshRemoteArchiveIndex,
     }}>
       {children}
     </RawExcelArchiveContext.Provider>

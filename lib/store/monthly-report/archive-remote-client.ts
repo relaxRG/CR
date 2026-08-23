@@ -1,6 +1,8 @@
 export type ArchiveMutationRequest = Readonly<{
   endpoint: string;
-  accessToken: string;
+  accessToken: string | null;
+  /** 仅本次网络请求使用的设备会话头；绝不持久化进outbox。 */
+  requestHeaders?: Readonly<Record<string, string>>;
   operationId: string;
   body: Readonly<Record<string, unknown>>;
   /** 离线队列重试次数；仅用于计算429/5xx的下一次建议延迟。 */
@@ -58,9 +60,10 @@ export async function commitArchiveMutation(
     response = await fetcher(request.endpoint, {
       method: "POST",
       headers: {
-        authorization: `Bearer ${request.accessToken}`,
+        ...(request.accessToken ? { authorization: `Bearer ${request.accessToken}` } : {}),
         "content-type": "application/json",
         "idempotency-key": request.operationId,
+        ...request.requestHeaders,
       },
       body: JSON.stringify({ ...request.body, operationId: request.operationId }),
     });
