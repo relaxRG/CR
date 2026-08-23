@@ -7,11 +7,13 @@ const read = (relative: string) => fs.readFileSync(path.join(process.cwd(), rela
 describe("iOS 真机性能 CI 协议", () => {
   it("以至少五次独立采样和 P95 比较启动、滚动与图片内存指标", () => {
     const checker = read("scripts/ci/assert-ios-performance.mjs");
-    expect(checker).toContain("samples.length < 5");
-    expect(checker).toContain("percentile(values, 0.95)");
-    expect(checker).toContain('"scrollFrameP95Ms"');
-    expect(checker).toContain('"photoUploadPeakMemoryMB"');
-    expect(checker).toContain("regressionAllowance");
+    const thresholds = read("scripts/ci/ios-performance-thresholds.json");
+    expect(checker).toContain("config.minSamples");
+    expect(checker).toContain("config.percentile");
+    expect(checker).toContain("defaultTolerance");
+    expect(checker).toContain("defaultAbsoluteLimit");
+    expect(thresholds).toContain("scrollFrameP95Ms");
+    expect(thresholds).toContain("photoUploadPeakMemoryMB");
   });
 
   it("使用独立性能 scheme 与 xcresult，且不读取业务数据", () => {

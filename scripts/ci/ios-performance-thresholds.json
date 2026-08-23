@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "minSamples": 5,
+  "percentile": 0.95,
+  "requireComparableDevice": true,
+  "requiredMetrics": [
+    "launchMs",
+    "interactiveMs",
+    "peakMemoryMB",
+    "scrollFrameP95Ms",
+    "hitchesOver100Ms",
+    "photoUploadPeakMemoryMB"
+  ],
+  "defaultTolerance": {
+    "launchMs": 0.15,
+    "interactiveMs": 0.15,
+    "peakMemoryMB": 0.12,
+    "scrollFrameP95Ms": 0.12,
+    "hitchesOver100Ms": 0.2,
+    "photoUploadPeakMemoryMB": 0.12
+  },
+  "defaultAbsoluteLimit": {
+    "launchMs": 3500,
+    "interactiveMs": 5000,
+    "peakMemoryMB": 420,
+    "scrollFrameP95Ms": 33.4,
+    "hitchesOver100Ms": 3,
+    "photoUploadPeakMemoryMB": 460
+  },
+  "scenarioOverrides": {
+    "store_inventory_long_list": {
+      "absoluteLimit": {
+        "scrollFrameP95Ms": 24,
+        "hitchesOver100Ms": 1,
+        "peakMemoryMB": 360
+      }
+    },
+    "schedule_employee_picker_long_list": {
+      "absoluteLimit": {
+        "scrollFrameP95Ms": 24,
+        "hitchesOver100Ms": 1,
+        "peakMemoryMB": 340
+      }
+    },
+    "recipe_photo_upload_4k": {
+      "absoluteLimit": {
+        "photoUploadPeakMemoryMB": 380,
+        "hitchesOver100Ms": 2
+      }
+    }
+  }
+}
