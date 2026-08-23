@@ -70,7 +70,8 @@ describe("库存六类与店铺四类工作台统一规范", () => {
     expect(spirits).toContain('const date = /^\\d{4}-\\d{2}-\\d{2}$/.test(purchase.date) ? purchase.date : "未填写日期"');
     expect(spirits).toContain("{/* 数据行始终按完整年月日分组；分类在每条采购记录中显示。 */}");
     expect(spirits).toContain('>分类</Text>');
-    expect(spirits).toContain("resolvePurchaseDisplayCategory(p, item)");
+    expect(spirits).toContain("displayCategory: resolvePurchaseDisplayCategory(purchase, item)");
+    expect(spirits).toContain("{p.displayCategory}");
     expect(spirits).toContain("setItemAndPurchaseCategory(previewItem.id, category.name, previewPurchaseId ?? undefined)");
     expect(spirits).not.toContain("buildPurchaseCategorySelection(previewItem.id, category.name)");
     expect(spirits).toContain("tableHeaderAccessibilityLabel");

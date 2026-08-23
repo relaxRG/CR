@@ -29,7 +29,8 @@ describe("供应商当月进货表展示", () => {
     expect(screen).toContain('const date = /^\\d{4}-\\d{2}-\\d{2}$/.test(purchase.date) ? purchase.date : "未填写日期"');
     expect(screen).toContain("return right.localeCompare(left);");
     expect(screen).toContain("{/* 数据行始终按完整年月日分组；分类在每条采购记录中显示。 */}");
-    expect(screen).toContain("resolvePurchaseDisplayCategory(p, item)");
+    expect(screen).toContain("displayCategory: resolvePurchaseDisplayCategory(purchase, item)");
+    expect(screen).toContain("{p.displayCategory}");
     expect(screen).toContain('from "@/lib/spirits/purchase-category-sync"');
     expect(screen).not.toContain("formatInventoryMonthDay(p.date)");
     expect(screen).toContain('{ text: "修改日期"');

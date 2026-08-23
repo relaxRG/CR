@@ -108,16 +108,36 @@ export function isLikelyAlcoholPurchase(description: string): boolean {
 }
 
 // ─── 品牌集团类型 ─────────────────────────────────────────────────────────────
+/**
+ * 一个品牌关键词是一条中英文关联事实，而不是两份互不相关的语言字符串。
+ * 任意一侧可以暂未填写，但不会因数组下标或名称相似被自动配成另一侧。
+ */
+export interface SpiritBrandKeyword {
+  id: string;
+  nameZh: string;
+  nameEn: string;
+  sortOrder: number;
+  status: "active" | "historical" | "disabled";
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface SpiritGroupDef {
   id: string;
   /** 集团中文名：页面中的主名称。 */
   nameZh: string;
   /** 集团英文名：与中文名关联的副名称，可为空。 */
   nameEn: string;
-  /** 中文品牌关键词：用于中文采购名称和酒款的自动识别。 */
-  keywordsZh: string[];
-  /** 英文品牌关键词：用于英文采购名称和酒款的自动识别。 */
-  keywordsEn: string[];
+  /** 成对品牌关键词：每一行同时承载中文和英文名称。 */
+  brandKeywords: SpiritBrandKeyword[];
+  /** 集团管理入口写入的唯一权威排序。 */
+  sortOrder: number;
+  /**
+   * 仅用于读取尚未迁移的旧数据。新写入不得再依赖这两个分离数组；
+   * 它们会在一次性迁移成功后被持久化数据淘汰。
+   */
+  keywordsZh?: string[];
+  keywordsEn?: string[];
   color: string;
   /** 是否为首次安装时提供的预置集团；仅用于标识来源，不再限制删除。 */
   builtin: boolean;
@@ -134,8 +154,12 @@ export function getSpiritGroupLegacyName(group: Pick<SpiritGroupDef, "nameZh" | 
   return nameZh && nameEn ? `${nameZh} (${nameEn})` : nameZh || nameEn;
 }
 
-export function getSpiritGroupKeywords(group: Pick<SpiritGroupDef, "keywordsZh" | "keywordsEn">): string[] {
-  return [...group.keywordsZh, ...group.keywordsEn];
+export function getSpiritGroupKeywords(group: Pick<SpiritGroupDef, "brandKeywords" | "keywordsZh" | "keywordsEn">): string[] {
+  const paired = group.brandKeywords
+    .filter((keyword) => keyword.status === "active" || keyword.status === "historical")
+    .flatMap((keyword) => [keyword.nameZh, keyword.nameEn]);
+  if (paired.some(Boolean)) return [...new Set(paired.map((value) => value.trim()).filter(Boolean))];
+  return [...(group.keywordsZh ?? []), ...(group.keywordsEn ?? [])];
 }
 
 /** 备用金匹配记忆：记住「描述X → 酒款ID Y」的映射 */
@@ -176,30 +200,36 @@ const DEFAULT_SELF_BUY_CONFIG: SelfBuyConfig = {
 };
 
 // ─── 内置品牌集团 ─────────────────────────────────────────────────────────────
+function createBrandKeywords(pairs: ReadonlyArray<readonly [string, string]>, now = new Date().toISOString()): SpiritBrandKeyword[] {
+  return pairs.map(([nameZh, nameEn], index) => ({
+    id: `builtin_brand_${index}_${nameZh || nameEn}`.toLowerCase().replace(/[^a-z0-9\u3400-\u9FFF]+/g, "_"),
+    nameZh,
+    nameEn,
+    sortOrder: index,
+    status: "active",
+    createdAt: now,
+    updatedAt: now,
+  }));
+}
+
 const BUILTIN_GROUPS: SpiritGroupDef[] = [
-  { id: "group_pernod", nameZh: "保乐力加", nameEn: "Pernod Ricard", color: "#1D4ED8",
-    keywordsZh: ["芝华士", "百龄坛", "必富达", "哈瓦那", "马爹利", "甘露", "马利宝", "三得利响", "皇家礼炮", "绝对"],
-    keywordsEn: ["chivas", "ballantine", "beefeater", "havana", "martell", "kahlua", "malibu", "hibiki", "royal salute", "absolut"],
+  { id: "group_pernod", nameZh: "保乐力加", nameEn: "Pernod Ricard", color: "#1D4ED8", sortOrder: 0,
+    brandKeywords: createBrandKeywords([["芝华士", "Chivas"], ["百龄坛", "Ballantine's"], ["必富达", "Beefeater"], ["哈瓦那", "Havana"], ["马爹利", "Martell"], ["甘露", "Kahlua"], ["马利宝", "Malibu"], ["三得利响", "Hibiki"], ["皇家礼炮", "Royal Salute"], ["绝对", "Absolut"]]),
     builtin: true, createdAt: new Date().toISOString() },
-  { id: "group_campari", nameZh: "金巴利集团", nameEn: "Campari Group", color: "#DC2626",
-    keywordsZh: ["金巴利", "阿佩罗", "深蓝", "野火鸡", "大马利尼", "古贝塔"],
-    keywordsEn: ["campari", "aperol", "skyy", "wild turkey", "grand marnier", "courvoisier", "appleton"],
+  { id: "group_campari", nameZh: "金巴利集团", nameEn: "Campari Group", color: "#DC2626", sortOrder: 1,
+    brandKeywords: createBrandKeywords([["金巴利", "Campari"], ["阿佩罗", "Aperol"], ["深蓝", "SKYY"], ["野火鸡", "Wild Turkey"], ["大马利尼", "Grand Marnier"], ["古贝塔", "Courvoisier"], ["", "Appleton"]]),
     builtin: true, createdAt: new Date().toISOString() },
-  { id: "group_diageo", nameZh: "帝亚吉欧", nameEn: "Diageo", color: "#7C3AED",
-    keywordsZh: ["尊尼获加", "添加利", "贝利", "摩根船长", "斯米诺", "尊美醇"],
-    keywordsEn: ["johnnie walker", "tanqueray", "baileys", "captain morgan", "smirnoff", "jameson"],
+  { id: "group_diageo", nameZh: "帝亚吉欧", nameEn: "Diageo", color: "#7C3AED", sortOrder: 2,
+    brandKeywords: createBrandKeywords([["尊尼获加", "Johnnie Walker"], ["添加利", "Tanqueray"], ["贝利", "Baileys"], ["摩根船长", "Captain Morgan"], ["斯米诺", "Smirnoff"], ["尊美醇", "Jameson"]]),
     builtin: true, createdAt: new Date().toISOString() },
-  { id: "group_brownforman", nameZh: "百富门", nameEn: "Brown-Forman", color: "#92400E",
-    keywordsZh: ["杰克丹尼", "白占边", "美格", "老福斯特", "伍德福德"],
-    keywordsEn: ["jack daniel", "jim beam", "maker", "old forester", "woodford"],
+  { id: "group_brownforman", nameZh: "百富门", nameEn: "Brown-Forman", color: "#92400E", sortOrder: 3,
+    brandKeywords: createBrandKeywords([["杰克丹尼", "Jack Daniel's"], ["白占边", "Jim Beam"], ["美格", "Maker's Mark"], ["老福斯特", "Old Forester"], ["伍德福德", "Woodford"]]),
     builtin: true, createdAt: new Date().toISOString() },
-  { id: "group_beamsuntory", nameZh: "宾三得利", nameEn: "Beam Suntory", color: "#B45309",
-    keywordsZh: ["山崎", "白州", "知多", "角瓶", "三得利", "响", "乐加维林"],
-    keywordsEn: ["yamazaki", "hakushu", "chita", "kakubin", "suntory", "hibiki", "laphroaig"],
+  { id: "group_beamsuntory", nameZh: "宾三得利", nameEn: "Beam Suntory", color: "#B45309", sortOrder: 4,
+    brandKeywords: createBrandKeywords([["山崎", "Yamazaki"], ["白州", "Hakushu"], ["知多", "Chita"], ["角瓶", "Kakubin"], ["三得利", "Suntory"], ["响", "Hibiki"], ["乐加维林", "Laphroaig"]]),
     builtin: true, createdAt: new Date().toISOString() },
-  { id: "group_remy", nameZh: "人头马君度", nameEn: "Rémy Cointreau", color: "#059669",
-    keywordsZh: ["人头马", "君度", "路易十三", "圣哲曼"],
-    keywordsEn: ["remy martin", "cointreau", "louis xiii", "st germain", "metaxa"],
+  { id: "group_remy", nameZh: "人头马君度", nameEn: "Rémy Cointreau", color: "#059669", sortOrder: 5,
+    brandKeywords: createBrandKeywords([["人头马", "Rémy Martin"], ["君度", "Cointreau"], ["路易十三", "Louis XIII"], ["圣哲曼", "St-Germain"], ["", "Metaxa"]]),
     builtin: true, createdAt: new Date().toISOString() },
 ];
 
@@ -221,26 +251,83 @@ function splitLegacyKeywords(keywords: string[]): { keywordsZh: string[]; keywor
   };
 }
 
+function legacyBrandKeywords(keywordsZh: string[], keywordsEn: string[], now: string): SpiritBrandKeyword[] {
+  // 旧数组没有可靠的成对语义，绝不能按相同下标把中英文强行配成一条记录。
+  return [
+    ...keywordsZh.map((nameZh, index) => ({
+      id: `legacy_zh_${index}_${nameZh}`.toLowerCase().replace(/[^a-z0-9\u3400-\u9FFF]+/g, "_"),
+      nameZh,
+      nameEn: "",
+      sortOrder: index,
+      status: "active" as const,
+      createdAt: now,
+      updatedAt: now,
+    })),
+    ...keywordsEn.map((nameEn, index) => ({
+      id: `legacy_en_${index}_${nameEn}`.toLowerCase().replace(/[^a-z0-9\u3400-\u9FFF]+/g, "_"),
+      nameZh: "",
+      nameEn,
+      sortOrder: keywordsZh.length + index,
+      status: "active" as const,
+      createdAt: now,
+      updatedAt: now,
+    })),
+  ];
+}
+
+function normalizeBrandKeywords(value: unknown, fallback: readonly SpiritBrandKeyword[], now: string): SpiritBrandKeyword[] {
+  if (!Array.isArray(value)) return fallback.map((keyword) => ({ ...keyword }));
+  const seen = new Set<string>();
+  return value.flatMap((candidate, index) => {
+    if (!candidate || typeof candidate !== "object") return [];
+    const raw = candidate as Partial<SpiritBrandKeyword>;
+    const nameZh = typeof raw.nameZh === "string" ? raw.nameZh.trim() : "";
+    const nameEn = typeof raw.nameEn === "string" ? raw.nameEn.trim() : "";
+    if (!nameZh && !nameEn) return [];
+    const identity = `${nameZh.toLocaleLowerCase()}\u0000${nameEn.toLocaleLowerCase()}`;
+    if (seen.has(identity)) return [];
+    seen.add(identity);
+    const status: SpiritBrandKeyword["status"] = raw.status === "historical" || raw.status === "disabled" ? raw.status : "active";
+    return [{
+      id: typeof raw.id === "string" && raw.id.trim() ? raw.id : `brand_${index}_${nameZh || nameEn}`.toLowerCase().replace(/[^a-z0-9\u3400-\u9FFF]+/g, "_"),
+      nameZh,
+      nameEn,
+      sortOrder: typeof raw.sortOrder === "number" && Number.isFinite(raw.sortOrder) ? raw.sortOrder : index,
+      status,
+      createdAt: typeof raw.createdAt === "string" ? raw.createdAt : now,
+      updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : now,
+    }];
+  }).sort((left, right) => left.sortOrder - right.sortOrder || left.id.localeCompare(right.id));
+}
+
 function normalizeSpiritGroup(value: unknown): SpiritGroupDef | null {
   if (!value || typeof value !== "object") return null;
   const raw = value as Partial<SpiritGroupDef> & { name?: unknown; keywords?: unknown };
   if (typeof raw.id !== "string" || typeof raw.color !== "string") return null;
   const fallback = BUILTIN_GROUPS.find((group) => group.id === raw.id);
+  const now = typeof raw.createdAt === "string" ? raw.createdAt : fallback?.createdAt ?? new Date().toISOString();
   const legacyName = typeof raw.name === "string" ? splitLegacyGroupName(raw.name) : { nameZh: "", nameEn: "" };
   const legacyKeywords = splitLegacyKeywords(normalizedKeywords(raw.keywords));
-  const hasKeywordsZh = Array.isArray(raw.keywordsZh);
-  const hasKeywordsEn = Array.isArray(raw.keywordsEn);
+  const keywordsZh = Array.isArray(raw.keywordsZh) ? normalizedKeywords(raw.keywordsZh) : legacyKeywords.keywordsZh;
+  const keywordsEn = Array.isArray(raw.keywordsEn) ? normalizedKeywords(raw.keywordsEn) : legacyKeywords.keywordsEn;
+  const hasPairedKeywords = Array.isArray(raw.brandKeywords);
+  const pairedFallback = fallback?.brandKeywords ?? [];
+  const brandKeywords = hasPairedKeywords
+    ? normalizeBrandKeywords(raw.brandKeywords, pairedFallback, now)
+    : keywordsZh.length || keywordsEn.length
+      ? legacyBrandKeywords(keywordsZh, keywordsEn, now)
+      : pairedFallback.map((keyword) => ({ ...keyword }));
   const nameZh = typeof raw.nameZh === "string" ? raw.nameZh.trim() : legacyName.nameZh || fallback?.nameZh || "";
   const nameEn = typeof raw.nameEn === "string" ? raw.nameEn.trim() : legacyName.nameEn || fallback?.nameEn || "";
   return {
     id: raw.id,
     nameZh,
     nameEn,
-    keywordsZh: hasKeywordsZh ? normalizedKeywords(raw.keywordsZh) : legacyKeywords.keywordsZh.length > 0 ? legacyKeywords.keywordsZh : fallback?.keywordsZh ?? [],
-    keywordsEn: hasKeywordsEn ? normalizedKeywords(raw.keywordsEn) : legacyKeywords.keywordsEn.length > 0 ? legacyKeywords.keywordsEn : fallback?.keywordsEn ?? [],
+    brandKeywords,
+    sortOrder: typeof raw.sortOrder === "number" && Number.isFinite(raw.sortOrder) ? raw.sortOrder : fallback?.sortOrder ?? 0,
     color: raw.color,
     builtin: Boolean(raw.builtin ?? fallback?.builtin),
-    createdAt: typeof raw.createdAt === "string" ? raw.createdAt : fallback?.createdAt ?? new Date().toISOString(),
+    createdAt: now,
   };
 }
 
@@ -300,6 +387,7 @@ type Action =
   | { type: "UPSERT_SUPPLIER"; supplier: SpiritSupplierInfo }
   | { type: "DELETE_SUPPLIER"; id: string }
   | { type: "UPSERT_GROUP"; group: SpiritGroupDef }
+  | { type: "REORDER_GROUPS"; groups: SpiritGroupDef[] }
   | { type: "DELETE_GROUP"; id: string }
   | { type: "SET_MATCH_MEMORY"; memory: PettyMatchMemory }
   | { type: "UPDATE_SELF_BUY_CONFIG"; config: SelfBuyConfig }
@@ -376,6 +464,7 @@ function reducer(state: SpiritsState, action: Action): SpiritsState {
         groupMatchMemory: state.groupMatchMemory.map((memory) => previousNames.has(memory.groupName) ? { ...memory, groupName: displayName, confirmedAt: new Date().toISOString() } : memory),
       };
     }
+    case "REORDER_GROUPS": return { ...state, groups: action.groups };
     case "DELETE_GROUP": {
       const group = state.groups.find((entry) => entry.id === action.id);
       if (!group) return state;
@@ -462,6 +551,7 @@ interface SpiritsContextValue extends SpiritsState {
   getSupplierByName: (name: string) => SpiritSupplierInfo | undefined;
   // 品牌集团
   upsertGroup: (group: Omit<SpiritGroupDef, "id" | "createdAt"> & { id?: string }) => void;
+  moveGroup: (id: string, direction: "up" | "down") => void;
   deleteGroup: (id: string) => void;
   getItemGroup: (item: SpiritItem) => string;
   detectPurchaseGroup: (rawName: string) => string;
@@ -532,9 +622,10 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
       const suppliers = suppliersRaw ? JSON.parse(suppliersRaw) : [];
       const parsedGroups: unknown = groupsRaw ? JSON.parse(groupsRaw) : null;
       // 首次安装才提供预置集团。只要用户曾保存过集团列表，就尊重其删除结果，绝不把已删集团重新注入。
-      const groups = Array.isArray(parsedGroups)
+      const groups = (Array.isArray(parsedGroups)
         ? parsedGroups.map(normalizeSpiritGroup).filter((group): group is SpiritGroupDef => Boolean(group))
-        : BUILTIN_GROUPS;
+        : BUILTIN_GROUPS)
+        .sort((left, right) => left.sortOrder - right.sortOrder || left.id.localeCompare(right.id));
       const matchMemory = matchMemoryRaw ? JSON.parse(matchMemoryRaw) : [];
       const selfBuyConfig = selfBuyRaw ? JSON.parse(selfBuyRaw) : DEFAULT_SELF_BUY_CONFIG;
       const customCategories: SpiritCustomCategory[] = customCatsRaw ? JSON.parse(customCatsRaw) : [];
@@ -709,12 +800,33 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
   // ── 品牌集团 ──────────────────────────────────────────────────────────────
   const upsertGroup = (data: Omit<SpiritGroupDef, "id" | "createdAt"> & { id?: string }) => {
     const now = new Date().toISOString();
+    const existing = data.id ? state.groups.find((group) => group.id === data.id) : undefined;
     const group: SpiritGroupDef = {
       ...data,
+      brandKeywords: data.brandKeywords.map((keyword, index) => ({
+        ...keyword,
+        id: keyword.id || `brand_${uuid()}`,
+        nameZh: keyword.nameZh.trim(),
+        nameEn: keyword.nameEn.trim(),
+        sortOrder: Number.isFinite(keyword.sortOrder) ? keyword.sortOrder : index,
+        status: keyword.status ?? "active",
+        createdAt: keyword.createdAt || now,
+        updatedAt: now,
+      })).filter((keyword) => keyword.nameZh || keyword.nameEn),
+      sortOrder: Number.isFinite(data.sortOrder) ? data.sortOrder : existing?.sortOrder ?? state.groups.length,
       id: data.id ?? uuid(),
-      createdAt: data.id ? (state.groups.find((g) => g.id === data.id)?.createdAt ?? now) : now,
+      createdAt: existing?.createdAt ?? now,
     };
     dispatch({ type: "UPSERT_GROUP", group });
+  };
+
+  const moveGroup = (id: string, direction: "up" | "down") => {
+    const ordered = [...state.groups].sort((left, right) => left.sortOrder - right.sortOrder || left.id.localeCompare(right.id));
+    const currentIndex = ordered.findIndex((group) => group.id === id);
+    const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= ordered.length) return;
+    [ordered[currentIndex], ordered[targetIndex]] = [ordered[targetIndex], ordered[currentIndex]];
+    dispatch({ type: "REORDER_GROUPS", groups: ordered.map((group, index) => ({ ...group, sortOrder: index })) });
   };
 
   const deleteGroup = (id: string) => {
@@ -725,7 +837,7 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
   const getItemGroup = (item: SpiritItem): string => {
     if (item.group) return item.group;
     const combined = `${item.name} ${item.nameEn ?? ""}`.toLowerCase();
-    for (const group of state.groups) {
+    for (const group of [...state.groups].sort((left, right) => left.sortOrder - right.sortOrder || left.id.localeCompare(right.id))) {
       if (getSpiritGroupKeywords(group).some((keyword) => combined.includes(keyword.toLowerCase()))) {
         return getSpiritGroupDisplayName(group);
       }
@@ -737,7 +849,7 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
     const key = rawName.toLowerCase().trim();
     const memory = state.groupMatchMemory.find((entry) => entry.rawName === key);
     if (memory) return memory.groupName;
-    for (const group of state.groups) {
+    for (const group of [...state.groups].sort((left, right) => left.sortOrder - right.sortOrder || left.id.localeCompare(right.id))) {
       if (getSpiritGroupKeywords(group).some((keyword) => key.includes(keyword.toLowerCase()))) return getSpiritGroupDisplayName(group);
     }
     return "";
@@ -1024,7 +1136,7 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
     upsertLedger, deleteLedger,
     setRefPrice, getRefPrice,
     upsertSupplier, deleteSupplier, getSupplierByName,
-    upsertGroup, deleteGroup, getItemGroup, detectPurchaseGroup, rememberGroupMatch,
+    upsertGroup, moveGroup, deleteGroup, getItemGroup, detectPurchaseGroup, rememberGroupMatch,
     getAllCategories, upsertCustomCategory, moveCategory, removeCategorySafely, getCategoryColor,
     setMatchMemory, findMatchMemory, matchPettyToItem,
     updateSelfBuyConfig,

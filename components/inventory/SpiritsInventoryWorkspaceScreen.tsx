@@ -24,7 +24,7 @@ import { InventoryCategoryManager } from "@/components/spirits/inventory-categor
 import { ScreenContainer } from "@/components/screen-container";
 import { StoreSegmentedTabs } from "@/components/store/store-visual-primitives";
 import {
-  useSpiritsInventoryStore, getCurrentMonth, SpiritGroupDef, fuzzyMatchScore,
+  useSpiritsInventoryStore, getCurrentMonth, SpiritBrandKeyword, SpiritGroupDef, fuzzyMatchScore,
   getSpiritGroupDisplayName, getSpiritGroupKeywords,
 } from "@/lib/spirits/crud-store";
 import {
@@ -73,8 +73,8 @@ function tap() { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFe
 const SPIRIT_LEDGER_SELECT_WIDTH = 28;
 const SPIRIT_LEDGER_INDEX_WIDTH = 28;
 const SPIRIT_LEDGER_COLUMNS: ReadonlyArray<readonly [string, LedgerSortKey, number]> = [
-  ["商品名称", "name", 140], ["参考价", "referencePrice", 62], ["期初量", "openingQty", 56], ["期初单价", "openingUnitCost", 68], ["期初成本", "openingCost", 76],
-  ["进货量", "purchaseQty", 56], ["进货成本", "purchaseCost", 76], ["期末量", "closingQty", 56], ["期末单价", "closingUnitCost", 68], ["期末成本", "closingCost", 76],
+  ["商品名称", "name", 140], ["参考价", "referencePrice", 62], ["期初库存", "openingQty", 56], ["期初单价", "openingUnitCost", 68], ["期初成本", "openingCost", 76],
+  ["进货量", "purchaseQty", 56], ["进货成本", "purchaseCost", 76], ["期末库存", "closingQty", 56], ["期末单价", "closingUnitCost", 68], ["期末成本", "closingCost", 76],
   ["消耗量", "consumeQty", 56], ["消耗成本", "consumeCost", 76], ["集团", "group", 84],
 ];
 const SPIRIT_LEDGER_BASE_WIDTH = SPIRIT_LEDGER_INDEX_WIDTH + SPIRIT_LEDGER_COLUMNS.reduce((total, [, , width]) => total + width, 0);
@@ -146,14 +146,14 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
     upsertLedger,
     setRefPrice, getRefPrice,
     upsertSupplier, getSupplierByName,
-    upsertGroup, deleteGroup, getItemGroup,
+    upsertGroup, moveGroup, deleteGroup, getItemGroup,
     getAllCategories, upsertCustomCategory, moveCategory, removeCategorySafely, 
     
     
     getMonthPurchases, getMonthLedger, getItemLedger,
     getPurchaseSummaryByCategory, getPurchaseSummaryBySupplier,
     closeMonth, syncLedgerFromPurchases,
-    batchSetActualClosing,
+    setActualClosing, batchSetActualClosing,
   } = store;
   const pettyStore = usePettyCashStore();
 
@@ -592,6 +592,7 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
   // ── 库存管理 Tab ─────────────────────────────────────────────────────────────
   const [ledgerEditMode, setLedgerEditMode] = useState(false);
   const [editingOpeningQty, setEditingOpeningQty] = useState<Record<string, string>>({});
+  const [editingClosingQty, setEditingClosingQty] = useState<Record<string, string>>({});
   const [selectedLedgerItemId, setSelectedLedgerItemId] = useState<string | null>(null);
   const [showAddItem, setShowAddItem] = useState(false);
   const [editingItem, setEditingItem] = useState<SpiritItem | null>(null);
@@ -657,6 +658,8 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
   );
   // 分类选择器 Modal
   const [showCatPicker, setShowCatPicker] = useState(false);
+  // 默认展开，用户可按当前工作上下文收起；不会影响分类筛选或酒款写入事实。
+  const [ledgerQuickCategoryExpanded, setLedgerQuickCategoryExpanded] = useState(true);
   const [catPickerTitle, setCatPickerTitle] = useState("");
   const [catPickerCallback, setCatPickerCallback] = useState<((name: string) => void) | null>(null);
   const [ledgerImporting, setLedgerImporting] = useState(false);
@@ -705,6 +708,13 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
       closingQty: val + entry.purchaseQty - entry.consumeQty,
       closingCost: (val + entry.purchaseQty - entry.consumeQty) * entry.closingUnitCost,
     });
+  };
+
+  /** 期末实际盘点只能在库存管理内修改；保存后由唯一台账命令反推本期消耗。 */
+  const handleSaveClosingQty = (entry: SpiritLedgerEntry, rawVal: string) => {
+    const val = parseFloat(rawVal);
+    if (isNaN(val) || val < 0 || !assertSpiritsWritable()) return;
+    setActualClosing(entry.itemId, selectedMonth, val);
   };
 
   // 库存管理 Tab：复合 Excel 导入（解析「烈酒盘点」sheet → 写入 SpiritItem + SpiritLedgerEntry）
@@ -1014,10 +1024,10 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
                             );
                           })()}
                           {/* 期初库存量（内联编辑） */}
-                          <View style={[S.ledgerCell, { width: ledgerColumnWidths.openingQty, alignItems: "flex-end" }]}>
+                          <View style={[S.ledgerCell, { width: ledgerColumnWidths.openingQty, alignItems: "flex-end", overflow: "hidden" }]}>
                             {ledgerEditMode ? (
                               <TextInput
-                                style={[S.inlineInput, { color: colors.foreground, borderColor: isOverride ? "#F59E0B" : colors.border }]}
+                                style={[S.inlineInput, { width: Math.max(42, ledgerColumnWidths.openingQty - 8), maxWidth: "100%", paddingHorizontal: 4, color: colors.foreground, borderColor: isOverride ? "#F59E0B" : colors.border }]}
                                 value={editingOpeningQty[editKey] ?? String(entry?.openingQty ?? "")}
                                 onChangeText={(v) => setEditingOpeningQty((prev) => ({ ...prev, [editKey]: v }))}
                                 onBlur={() => {
@@ -1133,32 +1143,9 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
                   </TouchableOpacity>
                 </View>
 
-                <View style={{ marginBottom: 14 }} testID="spirits-ledger-quick-category">
-                  <Text style={{ fontSize: 12, fontWeight: "700", color: colors.muted, marginBottom: 8 }}>快速选择分类</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 7, paddingRight: 8 }}>
-                    {getAllCategories().map((category) => {
-                      const active = selectedLedgerItem.category === category.name;
-                      return (
-                        <TouchableOpacity
-                          key={category.id}
-                          testID={`spirits-ledger-category-${category.id}`}
-                          onPress={() => updateItem(selectedLedgerItem.id, { category: category.name, categorySource: "manual" })}
-                          style={[S.catChip, {
-                            minHeight: 32,
-                            backgroundColor: active ? category.color : colors.surface,
-                            borderColor: category.color,
-                          }]}
-                        >
-                          <Text style={{ fontSize: 11, fontWeight: "700", color: active ? "#fff" : category.color }}>{category.name}</Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </ScrollView>
-                </View>
-
                 {selectedLedgerEntry && ledgerEditMode && (
                   <View style={{ padding: 12, borderRadius: 12, backgroundColor: "#F59E0B14", borderWidth: 1, borderColor: "#F59E0B55", marginBottom: 12 }}>
-                    <Text style={{ fontSize: 12, fontWeight: "700", color: "#B45309", marginBottom: 7 }}>编辑期初库存量</Text>
+                    <Text style={{ fontSize: 12, fontWeight: "700", color: "#B45309", marginBottom: 7 }}>编辑期初库存</Text>
                     <TextInput
                       style={[S.inlineInput, { width: "100%", color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background, textAlign: "left" }]}
                       value={editingOpeningQty[`${selectedLedgerItem.id}:${selectedMonth}`] ?? String(selectedLedgerEntry.openingQty)}
@@ -1175,7 +1162,7 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
                 <LedgerDetailSection
                   title="期初"
                   metrics={[
-                    ["期初库存量", selectedLedgerEntry?.openingQty ?? "—"],
+                    ["期初库存", selectedLedgerEntry?.openingQty ?? "—"],
                     ["期初单价", selectedLedgerEntry ? `¥${formatMoney(selectedLedgerEntry.openingUnitCost)}` : "—"],
                     ["期初成本", selectedLedgerEntry ? `¥${formatMoney(selectedLedgerEntry.openingQty * selectedLedgerEntry.openingUnitCost)}` : "—"],
                   ]}
@@ -1189,11 +1176,28 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
                   ]}
                   colors={colors}
                 />
+                {selectedLedgerEntry && ledgerEditMode && (
+                  <View style={{ padding: 12, borderRadius: 12, backgroundColor: colors.primary + "0d", borderWidth: 1, borderColor: colors.primary + "44", marginBottom: 12 }}>
+                    <Text style={{ fontSize: 12, fontWeight: "700", color: colors.primary, marginBottom: 7 }}>编辑期末库存</Text>
+                    <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 8 }}>保存后自动反推本期消耗；仅在库存管理中可修改。</Text>
+                    <TextInput
+                      testID="spirits-ledger-closing-qty-input"
+                      style={[S.inlineInput, { width: "100%", color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background, textAlign: "left" }]}
+                      value={editingClosingQty[`${selectedLedgerItem.id}:${selectedMonth}`] ?? String(selectedLedgerEntry.closingQty)}
+                      onChangeText={(value) => setEditingClosingQty((previous) => ({ ...previous, [`${selectedLedgerItem.id}:${selectedMonth}`]: value }))}
+                      onBlur={() => {
+                        const raw = editingClosingQty[`${selectedLedgerItem.id}:${selectedMonth}`];
+                        if (raw !== undefined) handleSaveClosingQty(selectedLedgerEntry, raw);
+                      }}
+                      keyboardType="decimal-pad"
+                    />
+                  </View>
+                )}
                 <LedgerDetailSection
                   title="期末库存"
                   tone={selectedLedgerEntry && selectedLedgerEntry.closingQty < 0 ? "negative" : "default"}
                   metrics={[
-                    ["期末库存量", selectedLedgerEntry ? selectedLedgerEntry.closingQty.toFixed(2) : "—"],
+                    ["期末库存", selectedLedgerEntry ? selectedLedgerEntry.closingQty.toFixed(2) : "—"],
                     ["单位成本", selectedLedgerEntry ? `¥${formatMoney(selectedLedgerEntry.closingUnitCost)}` : "—"],
                     ["期末成本", selectedLedgerEntry ? `¥${formatMoney(selectedLedgerEntry.closingCost)}` : "—"],
                   ]}
@@ -1207,6 +1211,30 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
                   ]}
                   colors={colors}
                 />
+
+                <View style={{ marginBottom: 14 }} testID="spirits-ledger-quick-category">
+                  <TouchableOpacity onPress={() => setLedgerQuickCategoryExpanded((expanded) => !expanded)} accessibilityRole="button" accessibilityState={{ expanded: ledgerQuickCategoryExpanded }} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", minHeight: 38, marginBottom: ledgerQuickCategoryExpanded ? 8 : 0 }}>
+                    <Text style={{ fontSize: 12, fontWeight: "700", color: colors.muted }}>快速选择分类</Text>
+                    <IconSymbol name={ledgerQuickCategoryExpanded ? "chevron.up" : "chevron.down"} size={14} color={colors.muted} />
+                  </TouchableOpacity>
+                  {ledgerQuickCategoryExpanded && (
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 7, paddingRight: 8 }}>
+                      {getAllCategories().map((category) => {
+                        const active = selectedLedgerItem.category === category.name;
+                        return (
+                          <TouchableOpacity
+                            key={category.id}
+                            testID={`spirits-ledger-category-${category.id}`}
+                            onPress={() => updateItem(selectedLedgerItem.id, { category: category.name, categorySource: "manual" })}
+                            style={[S.catChip, { minHeight: 32, backgroundColor: active ? category.color : colors.surface, borderColor: category.color }]}
+                          >
+                            <Text style={{ fontSize: 11, fontWeight: "700", color: active ? "#fff" : category.color }}>{category.name}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </ScrollView>
+                  )}
+                </View>
               </ScrollView>
             )}
           </View>
@@ -1413,7 +1441,7 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
                 <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }} numberOfLines={1}>{g.nameZh || g.nameEn}</Text>
                 {g.nameEn ? <Text style={{ fontSize: 11, color: colors.muted }} numberOfLines={1}>{g.nameEn}</Text> : null}
                 <Text style={{ fontSize: 11, color: colors.muted }} numberOfLines={1}>
-                  中文：{g.keywordsZh.slice(0, 3).join(" · ") || "—"}　English: {g.keywordsEn.slice(0, 3).join(" · ") || "—"}
+                  {g.brandKeywords.slice(0, 3).map((keyword) => [keyword.nameZh, keyword.nameEn].filter(Boolean).join(" / ")).join(" · ") || "暂无品牌关键词"}
                 </Text>
               </View>
               <View style={{ alignItems: "flex-end" }}>
@@ -1617,6 +1645,7 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
         editingGroup={editingGroup}
         colors={colors}
         onUpsert={upsertGroup}
+        onMove={moveGroup}
         onDelete={deleteGroup}
         onClose={() => { setShowGroupManager(false); setEditingGroup(null); }}
       />
@@ -1724,7 +1753,7 @@ function SupplierDetailScreen({
     selfBuyConfig, syncLedgerFromPurchases,
     getMonthLedger,
     groups, detectPurchaseGroup, getItemGroup, rememberGroupMatch,
-    upsertGroup, deleteGroup,
+    upsertGroup, moveGroup, deleteGroup,
     addItem, updateItem, setItemAndPurchaseCategory, setItemsAndPurchasesCategory,
     getAllCategories,
     getMonthPurchases,
@@ -1774,6 +1803,8 @@ function SupplierDetailScreen({
   const [importPreviewSource, setImportPreviewSource] = useState<"excel" | "pdf">("excel");
   // 商品名点击预览卡片
   const [previewItem, setPreviewItem] = useState<SpiritItem | null>(null);
+  // 当月进货与库存详情使用相同的快速分类展开语义：默认展开，用户可按需收起。
+  const [purchaseQuickCategoryExpanded, setPurchaseQuickCategoryExpanded] = useState(true);
   // 详情卡由采购表打开时保留当前记录 ID，快速分类需同步写回该采购快照。
   const [previewPurchaseId, setPreviewPurchaseId] = useState<string | null>(null);
   // 酒库关联：人工选择与智能候选是两条独立路径，均需人工确认后写回烈酒主档。
@@ -1839,6 +1870,11 @@ function SupplierDetailScreen({
   const [purchaseTableView, setPurchaseTableView] = useState(DEFAULT_SUPPLIER_PURCHASE_TABLE_VIEW);
   const [activePurchaseColumn, setActivePurchaseColumn] = useState<SupplierPurchaseSortKey | null>(null);
   const purchaseItemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
+  const purchaseCategories = useMemo(() => getAllCategories(), [getAllCategories]);
+  const purchaseCategoryOrderByName = useMemo(
+    () => new Map(purchaseCategories.map((category) => [category.name, category.order])),
+    [purchaseCategories],
+  );
   const purchaseGroupColorByName = useMemo(
     () => new Map(groups.map((group) => [getSpiritGroupDisplayName(group), group.color])),
     [groups],
@@ -1854,9 +1890,11 @@ function SupplierDetailScreen({
       isMatched,
       searchableName: [item?.name, item?.nameEn, purchase.rawName].filter(Boolean).join(" "),
       displayName: preferred?.trim() || fallback?.trim() || purchase.rawName,
+      displayCategory: resolvePurchaseDisplayCategory(purchase, item),
+      categoryOrder: purchaseCategoryOrderByName.get(resolvePurchaseDisplayCategory(purchase, item)) ?? Number.MAX_SAFE_INTEGER,
       displayGroup: purchase.group || detectPurchaseGroup(purchase.rawName) || (item ? getItemGroup(item) : ""),
     };
-  }), [supPurchases, purchaseItemById, purchaseNameLanguage, groups]);
+  }), [supPurchases, purchaseItemById, purchaseNameLanguage, groups, purchaseCategoryOrderByName]);
   const supplierPurchaseNameOptions = useMemo(
     () => collectSupplierPurchaseNameOptions(supplierPurchaseRows),
     [supplierPurchaseRows],
@@ -1879,8 +1917,10 @@ function SupplierDetailScreen({
   }, [getRefPrice, month, visibleSupplierPurchases]);
   const purchaseTableHasAdjustments = Boolean(purchaseTableView.sort) || hasSupplierPurchaseTableFilters(purchaseTableView.filters);
   const purchaseTableSummary = [
-    purchaseTableView.sort ? `${({ name: "商品名称", quantity: "数量", unitPrice: "单价", amount: "总价", group: "集团" } as const)[purchaseTableView.sort.key]}${purchaseTableView.sort.direction === "asc" ? "升序" : "降序"}` : "",
+    purchaseTableView.sort ? `${({ category: "分类", name: "商品名称", quantity: "数量", unitPrice: "单价", amount: "总价", group: "集团" } as const)[purchaseTableView.sort.key]}${purchaseTableView.sort.direction === "asc" ? "升序" : "降序"}` : "",
     purchaseTableView.filters.nameQuery ? `名称含「${purchaseTableView.filters.nameQuery}」` : "",
+    purchaseTableView.filters.categories.length ? `分类 ${purchaseTableView.filters.categories.length} 个` : "",
+    purchaseTableView.filters.onlyUnassignedCategory ? "仅未分类" : "",
     purchaseTableView.filters.groups.length ? `集团 ${purchaseTableView.filters.groups.length} 个` : "",
     purchaseTableView.filters.onlyUnassignedGroup ? "仅待填集团" : "",
   ].filter(Boolean).join(" · ");
@@ -2215,7 +2255,10 @@ function SupplierDetailScreen({
               <View testID="spirits-purchase-header" style={[S.tableHeader, { width: purchaseWindowLayout.tableWidth, height: INVENTORY_WORKSPACE_METRICS.phoneHeaderHeight, backgroundColor: colors.foreground }]}>
                 {selectMode && <Text style={[S.thCell, { width: purchaseSelectWidth, paddingHorizontal: 0 }]} />}
                 <Text style={[S.thCell, { width: purchaseIndexWidth, paddingHorizontal: 0 }]}>序号</Text>
-                <Text style={[S.thCell, { width: purchaseColumnWidths.category, paddingHorizontal: 2 }]}>分类</Text>
+                <TouchableOpacity testID="spirits-purchase-column-category" accessibilityRole="button" accessibilityLabel={tableHeaderAccessibilityLabel("分类", Boolean(purchaseTableView.sort?.key === "category" || purchaseTableView.filters.categories.length || purchaseTableView.filters.onlyUnassignedCategory))}
+                  onPress={() => setActivePurchaseColumn("category")} style={{ width: purchaseColumnWidths.category, height: INVENTORY_WORKSPACE_METRICS.phoneHeaderHeight, alignItems: "center", justifyContent: "center", paddingHorizontal: 2 }}>
+                  <Text style={[S.thCell, { width: "auto", paddingHorizontal: 0 }]}>分类</Text>
+                </TouchableOpacity>
                 <TouchableOpacity testID="spirits-purchase-column-name" accessibilityRole="button" accessibilityLabel={tableHeaderAccessibilityLabel("商品名称", Boolean(purchaseTableView.sort?.key === "name" || purchaseTableView.filters.nameQuery))}
                   onPress={() => setActivePurchaseColumn("name")}
                   style={{ width: purchaseColumnWidths.name, height: INVENTORY_WORKSPACE_METRICS.phoneHeaderHeight, alignItems: "center", justifyContent: "center", paddingHorizontal: 2 }}>
@@ -2307,8 +2350,8 @@ function SupplierDetailScreen({
                       </View>
                     )}
                     <Text style={[S.ledgerCell, { width: purchaseIndexWidth, textAlign: "center", fontSize: 10, color: colors.muted }]}>{visibleSupplierPurchaseIndexById.get(p.id) ?? "—"}</Text>
-                    <Text style={[S.ledgerCell, { width: purchaseColumnWidths.category, textAlign: "center", fontSize: 10, lineHeight: 14, color: catColor(resolvePurchaseDisplayCategory(p, item)) }]} numberOfLines={2}>
-                      {resolvePurchaseDisplayCategory(p, item)}
+                    <Text style={[S.ledgerCell, { width: purchaseColumnWidths.category, textAlign: "center", fontSize: 10, lineHeight: 14, color: catColor(p.displayCategory) }]} numberOfLines={2}>
+                      {p.displayCategory}
                     </Text>
                     <TouchableOpacity style={[S.ledgerCell, { width: purchaseColumnWidths.name, height: INVENTORY_WORKSPACE_METRICS.phoneRowHeight, justifyContent: "center" }]}
                       onPress={() => {
@@ -2533,54 +2576,54 @@ function SupplierDetailScreen({
                   </View>
                 ));
               })()}
-              <View testID="spirits-purchase-quick-category" style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 2, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
-                <Text style={{ fontSize: 12, fontWeight: "700", color: colors.muted, marginBottom: 8 }}>快速选择分类</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 7, paddingRight: 8 }}>
-                  {getAllCategories().map((category) => {
-                    const active = previewItem.category === category.name;
-                    return (
-                      <TouchableOpacity
-                        key={category.id}
-                        testID={`spirits-purchase-category-${category.id}`}
-                        onPress={() => {
-                          // 原子写回库存主档与当前采购行，表格分类列与库存管理在同一 state transition 刷新。
-                          setItemAndPurchaseCategory(previewItem.id, category.name, previewPurchaseId ?? undefined);
-                          setPreviewItem((current) => current ? { ...current, category: category.name, categorySource: "manual" } : null);
-                        }}
-                        style={[S.catChip, {
-                          minHeight: 32,
-                          backgroundColor: active ? category.color : colors.surface,
-                          borderColor: category.color,
-                        }]}
-                      >
-                        <Text style={{ fontSize: 11, fontWeight: "700", color: active ? "#fff" : category.color }}>{category.name}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
+              <View testID="spirits-purchase-quick-category" style={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 2, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
+                <TouchableOpacity onPress={() => setPurchaseQuickCategoryExpanded((expanded) => !expanded)} accessibilityRole="button" accessibilityState={{ expanded: purchaseQuickCategoryExpanded }} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", minHeight: 38, marginBottom: purchaseQuickCategoryExpanded ? 8 : 0 }}>
+                  <Text style={{ fontSize: 12, fontWeight: "700", color: colors.muted }}>快速选择分类</Text>
+                  <IconSymbol name={purchaseQuickCategoryExpanded ? "chevron.up" : "chevron.down"} size={14} color={colors.muted} />
+                </TouchableOpacity>
+                {purchaseQuickCategoryExpanded && (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 7, paddingRight: 8 }}>
+                    {getAllCategories().map((category) => {
+                      const active = previewItem.category === category.name;
+                      return (
+                        <TouchableOpacity
+                          key={category.id}
+                          testID={`spirits-purchase-category-${category.id}`}
+                          onPress={() => {
+                            // 原子写回库存主档与当前采购行，表格分类列与库存管理在同一 state transition 刷新。
+                            setItemAndPurchaseCategory(previewItem.id, category.name, previewPurchaseId ?? undefined);
+                            setPreviewItem((current) => current ? { ...current, category: category.name, categorySource: "manual" } : null);
+                          }}
+                          style={[S.catChip, { minHeight: 32, backgroundColor: active ? category.color : colors.surface, borderColor: category.color }]}
+                        >
+                          <Text style={{ fontSize: 11, fontWeight: "700", color: active ? "#fff" : category.color }}>{category.name}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                )}
               </View>
 
-              {/* 酒库关联路径：已有档案可人工确认或智能候选关联；确实不存在时才新建。 */}
-              <View style={{ flexDirection: "row", gap: 10, paddingHorizontal: 16, paddingTop: 14, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
-                {previewItem.bottleId ? (
+              {/* 酒库关联始终可被人工纠错：即使已经关联，也可查看、人工重连或查看智能候选。 */}
+              <View style={{ paddingHorizontal: 16, paddingTop: 14, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, gap: 10 }}>
+                {previewItem.bottleId && (
                   <TouchableOpacity testID="spirits-purchase-view-linked-bottle" onPress={() => {
                     setPreviewItem(null); setPreviewPurchaseId(null); setBottleLinkMode(null);
                     router2.push(("/bottle/" + previewItem.bottleId) as any);
-                  }} style={{ flex: 1, minHeight: 44, borderRadius: 12, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" }}>
+                  }} style={{ minHeight: 44, borderRadius: 12, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" }}>
                     <Text style={{ fontSize: 13, color: colors.foreground, fontWeight: "600" }}>查看已关联酒库档案</Text>
                   </TouchableOpacity>
-                ) : (
-                  <>
-                    <TouchableOpacity testID="spirits-purchase-manual-bottle-link" onPress={() => openBottleLinkPicker("manual")}
-                      style={{ flex: 1, minHeight: 44, borderRadius: 12, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" }}>
-                      <Text style={{ fontSize: 13, color: colors.foreground, fontWeight: "600" }}>人工链接酒库</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity testID="spirits-purchase-smart-bottle-link" onPress={() => openBottleLinkPicker("smart")}
-                      style={{ flex: 1, minHeight: 44, borderRadius: 12, borderWidth: 1, borderColor: colors.primary, alignItems: "center", justifyContent: "center" }}>
-                      <Text style={{ fontSize: 13, color: colors.primary, fontWeight: "600" }}>智能链接</Text>
-                    </TouchableOpacity>
-                  </>
                 )}
+                <View style={{ flexDirection: "row", gap: 10 }}>
+                  <TouchableOpacity testID="spirits-purchase-manual-bottle-link" onPress={() => openBottleLinkPicker("manual")}
+                    style={{ flex: 1, minHeight: 44, borderRadius: 12, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" }}>
+                    <Text style={{ fontSize: 13, color: colors.foreground, fontWeight: "600" }}>{previewItem.bottleId ? "人工重连酒库" : "人工链接酒库"}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity testID="spirits-purchase-smart-bottle-link" onPress={() => openBottleLinkPicker("smart")}
+                    style={{ flex: 1, minHeight: 44, borderRadius: 12, borderWidth: 1, borderColor: colors.primary, alignItems: "center", justifyContent: "center" }}>
+                    <Text style={{ fontSize: 13, color: colors.primary, fontWeight: "600" }}>{previewItem.bottleId ? "智能重连" : "智能链接"}</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
               <View style={{ flexDirection: "row", gap: 10, padding: 16 }}>
                 {!previewItem.bottleId && <TouchableOpacity testID="spirits-purchase-create-bottle" onPress={() => {
@@ -2953,6 +2996,7 @@ function SupplierDetailScreen({
         editingGroup={editingGroup}
         colors={colors}
         onUpsert={upsertGroup}
+        onMove={moveGroup}
         onDelete={deleteGroup}
         onClose={() => { setShowGroupManager(false); setEditingGroup(null); }}
       />
@@ -3028,6 +3072,7 @@ function SupplierDetailScreen({
         column={activePurchaseColumn}
         colors={colors}
         groups={groups.map((group) => getSpiritGroupDisplayName(group))}
+        categories={purchaseCategories.map((category) => category.name)}
         nameOptions={supplierPurchaseNameOptions}
         nameLanguage={purchaseNameLanguage}
         onNameLanguageChange={setPurchaseNameLanguage}
@@ -3928,12 +3973,13 @@ function ImportPreviewModal({
 }
 
 // ─── 集团管理 Modal ────────────────────────────────────────────────────────────
-function GroupManagerModal({ visible, groups, editingGroup, colors, onUpsert, onDelete, onClose }: {
+function GroupManagerModal({ visible, groups, editingGroup, colors, onUpsert, onMove, onDelete, onClose }: {
   visible: boolean;
   groups: SpiritGroupDef[];
   editingGroup: SpiritGroupDef | null;
   colors: any;
   onUpsert: (data: Omit<SpiritGroupDef, "id" | "createdAt"> & { id?: string }) => void;
+  onMove: (id: string, direction: "up" | "down") => void;
   onDelete: (id: string) => void;
   onClose: () => void;
 }) {
@@ -3943,8 +3989,8 @@ function GroupManagerModal({ visible, groups, editingGroup, colors, onUpsert, on
   const [editNameEn, setEditNameEn] = useState("");
   const [editColor, setEditColor] = useState("#6B7280");
   const [editBuiltin, setEditBuiltin] = useState(false);
-  const [keywordsZh, setKeywordsZh] = useState<string[]>([]);
-  const [keywordsEn, setKeywordsEn] = useState<string[]>([]);
+  const [editSortOrder, setEditSortOrder] = useState(0);
+  const [brandKeywords, setBrandKeywords] = useState<SpiritBrandKeyword[]>([]);
   const [newKeywordZh, setNewKeywordZh] = useState("");
   const [newKeywordEn, setNewKeywordEn] = useState("");
 
@@ -3958,8 +4004,8 @@ function GroupManagerModal({ visible, groups, editingGroup, colors, onUpsert, on
       setEditNameEn(editingGroup.nameEn);
       setEditColor(editingGroup.color);
       setEditBuiltin(editingGroup.builtin);
-      setKeywordsZh([...editingGroup.keywordsZh]);
-      setKeywordsEn([...editingGroup.keywordsEn]);
+      setEditSortOrder(editingGroup.sortOrder);
+      setBrandKeywords(editingGroup.brandKeywords.map((keyword) => ({ ...keyword })));
       setNewKeywordZh("");
       setNewKeywordEn("");
     } else {
@@ -3969,8 +4015,8 @@ function GroupManagerModal({ visible, groups, editingGroup, colors, onUpsert, on
       setEditNameEn("");
       setEditColor("#6B7280");
       setEditBuiltin(false);
-      setKeywordsZh([]);
-      setKeywordsEn([]);
+      setEditSortOrder(groups.length);
+      setBrandKeywords([]);
       setNewKeywordZh("");
       setNewKeywordEn("");
     }
@@ -3983,8 +4029,8 @@ function GroupManagerModal({ visible, groups, editingGroup, colors, onUpsert, on
     setEditNameEn("");
     setEditColor("#6B7280");
     setEditBuiltin(false);
-    setKeywordsZh([]);
-    setKeywordsEn([]);
+    setEditSortOrder(groups.length);
+    setBrandKeywords([]);
     setNewKeywordZh("");
     setNewKeywordEn("");
   };
@@ -3996,24 +4042,38 @@ function GroupManagerModal({ visible, groups, editingGroup, colors, onUpsert, on
       nameZh: editNameZh.trim(),
       nameEn: editNameEn.trim(),
       color: editColor,
-      keywordsZh,
-      keywordsEn,
+      brandKeywords,
+      sortOrder: editSortOrder,
       builtin: editBuiltin,
     });
     setMode("list");
   };
 
-  const addKeywordZh = () => {
-    const keyword = newKeywordZh.trim();
-    if (!keyword || keywordsZh.includes(keyword)) return;
-    setKeywordsZh([...keywordsZh, keyword]);
-    setNewKeywordZh("");
+  const updateBrandKeyword = (id: string, patch: Partial<Pick<SpiritBrandKeyword, "nameZh" | "nameEn">>) => {
+    setBrandKeywords((current) => current.map((keyword) => keyword.id === id ? { ...keyword, ...patch, updatedAt: new Date().toISOString() } : keyword));
   };
 
-  const addKeywordEn = () => {
-    const keyword = newKeywordEn.trim();
-    if (!keyword || keywordsEn.some((entry) => entry.toLowerCase() === keyword.toLowerCase())) return;
-    setKeywordsEn([...keywordsEn, keyword]);
+  const removeBrandKeyword = (id: string) => {
+    setBrandKeywords((current) => current.filter((keyword) => keyword.id !== id));
+  };
+
+  const addBrandKeyword = () => {
+    const nameZh = newKeywordZh.trim();
+    const nameEn = newKeywordEn.trim();
+    if (!nameZh && !nameEn) return;
+    const duplicate = brandKeywords.some((keyword) => keyword.nameZh.toLocaleLowerCase() === nameZh.toLocaleLowerCase() && keyword.nameEn.toLocaleLowerCase() === nameEn.toLocaleLowerCase());
+    if (duplicate) return;
+    const now = new Date().toISOString();
+    setBrandKeywords((current) => [...current, {
+      id: `brand_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+      nameZh,
+      nameEn,
+      sortOrder: current.length,
+      status: "active",
+      createdAt: now,
+      updatedAt: now,
+    }]);
+    setNewKeywordZh("");
     setNewKeywordEn("");
   };
 
@@ -4056,10 +4116,18 @@ function GroupManagerModal({ visible, groups, editingGroup, colors, onUpsert, on
                     <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }} numberOfLines={1}>{g.nameZh || g.nameEn}</Text>
                     {g.nameEn ? <Text style={{ fontSize: 11, color: colors.muted }} numberOfLines={1}>{g.nameEn}</Text> : null}
                     <Text style={{ fontSize: 11, color: colors.muted }} numberOfLines={1}>
-                      中文：{g.keywordsZh.slice(0, 2).join(" · ") || "—"}　English: {g.keywordsEn.slice(0, 2).join(" · ") || "—"}
+                      {g.brandKeywords.slice(0, 2).map((keyword) => [keyword.nameZh, keyword.nameEn].filter(Boolean).join(" / ")).join(" · ") || "暂无品牌关键词"}
                     </Text>
                   </View>
-                  <View style={{ flexDirection: "row", gap: 8 }}>
+                  <View style={{ flexDirection: "row", gap: 6 }}>
+                    <View style={{ gap: 2 }}>
+                      <TouchableOpacity onPress={() => onMove(g.id, "up")} accessibilityLabel={`上移${getSpiritGroupDisplayName(g)}`} style={{ padding: 3, backgroundColor: colors.surface, borderRadius: 6, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border }}>
+                        <IconSymbol name="chevron.up" size={12} color={colors.muted} />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => onMove(g.id, "down")} accessibilityLabel={`下移${getSpiritGroupDisplayName(g)}`} style={{ padding: 3, backgroundColor: colors.surface, borderRadius: 6, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border }}>
+                        <IconSymbol name="chevron.down" size={12} color={colors.muted} />
+                      </TouchableOpacity>
+                    </View>
                     <TouchableOpacity onPress={() => {
                       setMode("edit");
                       setEditId(g.id);
@@ -4067,8 +4135,8 @@ function GroupManagerModal({ visible, groups, editingGroup, colors, onUpsert, on
                       setEditNameEn(g.nameEn);
                       setEditColor(g.color);
                       setEditBuiltin(g.builtin);
-                      setKeywordsZh([...g.keywordsZh]);
-                      setKeywordsEn([...g.keywordsEn]);
+                      setEditSortOrder(g.sortOrder);
+                      setBrandKeywords(g.brandKeywords.map((keyword) => ({ ...keyword })));
                       setNewKeywordZh("");
                       setNewKeywordEn("");
                     }} style={{ padding: 6, backgroundColor: colors.primary + "15", borderRadius: 8 }}>
@@ -4119,64 +4187,59 @@ function GroupManagerModal({ visible, groups, editingGroup, colors, onUpsert, on
                         shadowColor: editColor === c ? c : "transparent", shadowOpacity: 0.6, shadowRadius: 4, elevation: 3 }} />
                   ))}
                 </View>
-                {/* 品牌关键词按语言分开维护，但共同属于同一个集团。 */}
+                {/* 每一条品牌关键词同时保存中文和英文，绝不再拆成两份无关联数组。 */}
                 <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                  <Text style={{ fontSize: 13, color: colors.muted }}>中文品牌关键词（{keywordsZh.length} 个）</Text>
-                  <TouchableOpacity onPress={() => setKeywordsZh([])}>
-                    <Text style={{ fontSize: 11, color: "#EF4444" }}>清空中文</Text>
-                  </TouchableOpacity>
+                  <Text style={{ fontSize: 13, color: colors.muted }}>品牌关键词（{brandKeywords.length} 条）</Text>
+                  <Text style={{ fontSize: 11, color: colors.muted }}>中文主名 · 英文副名</Text>
                 </View>
-                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-                  {keywordsZh.map((keyword) => (
-                    <TouchableOpacity key={keyword} onPress={() => setKeywordsZh(keywordsZh.filter((entry) => entry !== keyword))}
-                      style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: editColor + "20", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: editColor + "60" }}>
-                      <Text style={{ fontSize: 12, color: editColor, fontWeight: "600" }}>{keyword}</Text>
-                      <IconSymbol name="xmark" size={10} color={editColor} />
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
+                {brandKeywords.map((keyword, index) => (
+                  <View key={keyword.id} style={{ padding: 10, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, borderRadius: 12, backgroundColor: colors.surface, marginBottom: 8 }}>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                      <Text style={{ fontSize: 12, fontWeight: "700", color: editColor }}>品牌关键词 {index + 1}</Text>
+                      <TouchableOpacity onPress={() => removeBrandKeyword(keyword.id)} accessibilityLabel={`删除品牌关键词 ${index + 1}`} style={{ padding: 4 }}>
+                        <IconSymbol name="trash" size={14} color="#EF4444" />
+                      </TouchableOpacity>
+                    </View>
+                    <TextInput
+                      style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 9, paddingHorizontal: 10, paddingVertical: 8, color: colors.foreground, backgroundColor: colors.background, fontSize: 14, marginBottom: 7 }}
+                      value={keyword.nameZh}
+                      onChangeText={(nameZh) => updateBrandKeyword(keyword.id, { nameZh })}
+                      placeholder="中文名，例如：芝华士"
+                      placeholderTextColor={colors.muted}
+                    />
+                    <TextInput
+                      style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 9, paddingHorizontal: 10, paddingVertical: 8, color: colors.foreground, backgroundColor: colors.background, fontSize: 14 }}
+                      value={keyword.nameEn}
+                      onChangeText={(nameEn) => updateBrandKeyword(keyword.id, { nameEn })}
+                      placeholder="英文名，例如：Chivas"
+                      autoCapitalize="words"
+                      placeholderTextColor={colors.muted}
+                    />
+                  </View>
+                ))}
+                <View style={{ padding: 10, borderWidth: StyleSheet.hairlineWidth, borderColor: editColor + "55", borderRadius: 12, backgroundColor: editColor + "0d", marginBottom: 16 }}>
+                  <Text style={{ fontSize: 12, fontWeight: "700", color: editColor, marginBottom: 8 }}>新增品牌关键词</Text>
                   <TextInput
-                    style={{ flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 10, color: colors.foreground, backgroundColor: colors.surface, fontSize: 13 }}
+                    style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 9, paddingHorizontal: 10, paddingVertical: 8, color: colors.foreground, backgroundColor: colors.surface, fontSize: 14, marginBottom: 7 }}
                     value={newKeywordZh}
                     onChangeText={setNewKeywordZh}
-                    placeholder="如：芝华士"
+                    placeholder="中文名，例如：芝华士"
                     placeholderTextColor={colors.muted}
-                    onSubmitEditing={addKeywordZh}
                   />
-                  <TouchableOpacity onPress={addKeywordZh} style={{ padding: 10, backgroundColor: editColor, borderRadius: 10, alignItems: "center", justifyContent: "center" }}>
-                    <IconSymbol name="plus" size={16} color="#fff" />
-                  </TouchableOpacity>
-                </View>
-
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                  <Text style={{ fontSize: 13, color: colors.muted }}>English brand keywords（{keywordsEn.length}）</Text>
-                  <TouchableOpacity onPress={() => setKeywordsEn([])}>
-                    <Text style={{ fontSize: 11, color: "#EF4444" }}>Clear English</Text>
-                  </TouchableOpacity>
-                </View>
-                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-                  {keywordsEn.map((keyword) => (
-                    <TouchableOpacity key={keyword} onPress={() => setKeywordsEn(keywordsEn.filter((entry) => entry !== keyword))}
-                      style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: editColor + "20", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: editColor + "60" }}>
-                      <Text style={{ fontSize: 12, color: editColor, fontWeight: "600" }}>{keyword}</Text>
-                      <IconSymbol name="xmark" size={10} color={editColor} />
+                  <View style={{ flexDirection: "row", gap: 8 }}>
+                    <TextInput
+                      style={{ flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: 9, paddingHorizontal: 10, paddingVertical: 8, color: colors.foreground, backgroundColor: colors.surface, fontSize: 14 }}
+                      value={newKeywordEn}
+                      onChangeText={setNewKeywordEn}
+                      placeholder="英文名，例如：Chivas"
+                      autoCapitalize="words"
+                      placeholderTextColor={colors.muted}
+                      onSubmitEditing={addBrandKeyword}
+                    />
+                    <TouchableOpacity onPress={addBrandKeyword} accessibilityLabel="新增成对品牌关键词" style={{ minWidth: 44, paddingHorizontal: 12, backgroundColor: editColor, borderRadius: 9, alignItems: "center", justifyContent: "center" }}>
+                      <IconSymbol name="plus" size={16} color="#fff" />
                     </TouchableOpacity>
-                  ))}
-                </View>
-                <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
-                  <TextInput
-                    style={{ flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 10, color: colors.foreground, backgroundColor: colors.surface, fontSize: 13 }}
-                    value={newKeywordEn}
-                    onChangeText={setNewKeywordEn}
-                    placeholder="e.g. Chivas"
-                    autoCapitalize="none"
-                    placeholderTextColor={colors.muted}
-                    onSubmitEditing={addKeywordEn}
-                  />
-                  <TouchableOpacity onPress={addKeywordEn} style={{ padding: 10, backgroundColor: editColor, borderRadius: 10, alignItems: "center", justifyContent: "center" }}>
-                    <IconSymbol name="plus" size={16} color="#fff" />
-                  </TouchableOpacity>
+                  </View>
                 </View>
                 {/* 删除集团：预置和自定义集团都可删除，删除时同步清理悬挂归属。 */}
                 {editId && (

@@ -3,6 +3,7 @@ import {
   resolveInventoryTableWindowLayout,
   scaleInventoryTableWidths,
 } from "@/lib/store/inventory-workspace-ui";
+import { resolveStoreTableTypography } from "@/lib/store/table-display";
 
 describe("库存 Excel 表格窗口响应式轨道", () => {
   it("iPhone 与 iPad 分屏在可用宽度不足时保持紧凑基准轨道并局部横滑", () => {
@@ -47,5 +48,19 @@ describe("库存 Excel 表格窗口响应式轨道", () => {
     expect(widths.name / 112).toBeCloseTo(layout.scale, 2);
     expect(widths.amount / 66).toBeCloseTo(layout.scale, 2);
     expect(widths.group / 64).toBeCloseTo(layout.scale, 2);
+  });
+
+  it("iPhone、iPad 与 Mac 使用不同但不低于可读下限的表格文字；辅助字体放大时行高同步增加", () => {
+    const phone = resolveStoreTableTypography(375, 1);
+    const splitIpad = resolveStoreTableTypography(744, 1);
+    const mac = resolveStoreTableTypography(1440, 1);
+    const enlarged = resolveStoreTableTypography(375, 1.3);
+
+    expect(phone).toMatchObject({ viewport: "phone", nameFontSize: 14, bodyFontSize: 13, rowHeight: 48 });
+    expect(splitIpad).toMatchObject({ viewport: "tablet", nameFontSize: 15, bodyFontSize: 14, rowHeight: 50 });
+    expect(mac).toMatchObject({ viewport: "desktop", nameFontSize: 15, bodyFontSize: 14, rowHeight: 52 });
+    expect(enlarged.bodyFontSize).toBeGreaterThan(phone.bodyFontSize);
+    expect(enlarged.rowHeight).toBeGreaterThanOrEqual(phone.rowHeight);
+    expect(enlarged.headerHeight).toBeGreaterThanOrEqual(phone.headerHeight);
   });
 });

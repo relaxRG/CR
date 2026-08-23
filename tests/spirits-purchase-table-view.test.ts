@@ -12,15 +12,15 @@ import {
 const rows: SupplierPurchaseTableRow[] = [
   {
     id: "a", month: "2026-08", date: "2026-08-01", itemId: "gin-001", rawName: "添加利金酒/Tanqueray Gin", unit: "瓶", quantity: 2, unitPrice: 85, amount: 170, source: "excel", createdAt: "x",
-    nameKey: "item:gin-001", isMatched: true, searchableName: "添加利金酒 Tanqueray Gin 添加利金酒/Tanqueray Gin", displayName: "添加利金酒", displayGroup: "帝亚吉欧",
+    nameKey: "item:gin-001", isMatched: true, searchableName: "添加利金酒 Tanqueray Gin 添加利金酒/Tanqueray Gin", displayName: "添加利金酒", displayCategory: "金酒", categoryOrder: 1, displayGroup: "帝亚吉欧",
   },
   {
     id: "b", month: "2026-08", date: "2026-08-02", itemId: "macallan-012", rawName: "麦卡伦12年/Macallan 12", unit: "箱", quantity: 1, unitPrice: 720, amount: 720, source: "excel", createdAt: "x",
-    nameKey: "item:macallan-012", isMatched: true, searchableName: "麦卡伦12年 Macallan 12 麦卡伦12年/Macallan 12", displayName: "麦卡伦12年", displayGroup: "独立品牌",
+    nameKey: "item:macallan-012", isMatched: true, searchableName: "麦卡伦12年 Macallan 12 麦卡伦12年/Macallan 12", displayName: "麦卡伦12年", displayCategory: "威士忌", categoryOrder: 0, displayGroup: "独立品牌",
   },
   {
     id: "c", month: "2026-08", date: "2026-08-03", rawName: "泰象苏打水/Chang Soda", unit: "瓶", quantity: 6, unitPrice: 55, amount: 330, source: "manual", createdAt: "x",
-    nameKey: "raw:泰象苏打水/chang soda", isMatched: false, searchableName: "泰象苏打水 Chang Soda 泰象苏打水/Chang Soda", displayName: "泰象苏打水", displayGroup: "",
+    nameKey: "raw:泰象苏打水/chang soda", isMatched: false, searchableName: "泰象苏打水 Chang Soda 泰象苏打水/Chang Soda", displayName: "泰象苏打水", displayCategory: "未分类", categoryOrder: Number.MAX_SAFE_INTEGER, displayGroup: "",
   },
 ];
 
@@ -56,6 +56,26 @@ describe("供应商进货表排序筛选与Excel隔离", () => {
     expect(byName.map((row) => row.id)).toEqual(["a"]);
     expect(byGroup.map((row) => row.id)).toEqual(["a", "b"]);
     expect(unassigned.map((row) => row.id)).toEqual(["c"]);
+  });
+
+  it("支持分类多选、仅未分类和按分类管理入口顺序排序，且与其他条件取交集", () => {
+    const categories = applySupplierPurchaseTableView(rows, view({
+      filters: { ...DEFAULT_SUPPLIER_PURCHASE_TABLE_VIEW.filters, categories: ["金酒", "未分类"] },
+    }));
+    const unassigned = applySupplierPurchaseTableView(rows, view({
+      filters: { ...DEFAULT_SUPPLIER_PURCHASE_TABLE_VIEW.filters, onlyUnassignedCategory: true },
+    }));
+    const ordered = applySupplierPurchaseTableView(rows, view({
+      sort: { key: "category", direction: "asc" },
+    }));
+    const intersection = applySupplierPurchaseTableView(rows, view({
+      filters: { ...DEFAULT_SUPPLIER_PURCHASE_TABLE_VIEW.filters, categories: ["金酒"], groups: ["帝亚吉欧"] },
+    }));
+
+    expect(categories.map((row) => row.id)).toEqual(["a", "c"]);
+    expect(unassigned.map((row) => row.id)).toEqual(["c"]);
+    expect(ordered.map((row) => row.id)).toEqual(["b", "a", "c"]);
+    expect(intersection.map((row) => row.id)).toEqual(["a"]);
   });
 
   it("中英文显示切换后，已选名称使用稳定键保持不变", () => {
@@ -114,6 +134,8 @@ describe("供应商进货表排序筛选与Excel隔离", () => {
     expect(parser).toContain("列：0=行号 1=日期 2=商品名称 3=规格 4=数量 5=单价 6=应收增加");
     expect(exporter).toContain('"序号", "日期", "商品名称", "英文名", "分类", "规格", "数量(瓶)", "单价(¥)", "金额(¥)", "供应商", "来源"');
     expect(screen).toContain("applySupplierPurchaseTableView");
+    expect(screen).toContain("spirits-purchase-column-category");
+    expect(screen).toContain("categories={purchaseCategories.map((category) => category.name)}");
     expect(screen).not.toContain("sortPurchaseRecordsAndPersist");
   });
 });

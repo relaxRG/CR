@@ -16,6 +16,11 @@ describe("烈酒分类与统一供应渠道 UI 契约", () => {
     expect(workspace).toContain("setPreviewPurchaseId(p.id)");
     expect(workspace).toContain("setItemAndPurchaseCategory(previewItem.id, category.name, previewPurchaseId ?? undefined)");
     expect(workspace).toContain("表格分类列与库存管理在同一 state transition 刷新");
+    expect(workspace).toContain("const [ledgerQuickCategoryExpanded, setLedgerQuickCategoryExpanded] = useState(true)");
+    expect(workspace).toContain("const [purchaseQuickCategoryExpanded, setPurchaseQuickCategoryExpanded] = useState(true)");
+    expect(workspace).toContain('accessibilityState={{ expanded: ledgerQuickCategoryExpanded }}');
+    expect(workspace).toContain('accessibilityState={{ expanded: purchaseQuickCategoryExpanded }}');
+    expect(workspace.indexOf('title="本期消耗"')).toBeLessThan(workspace.indexOf('testID="spirits-ledger-quick-category"'));
     expect(workspace).not.toContain("buildPurchaseCategorySelection(previewItem.id, category.name)");
   });
 
@@ -26,6 +31,9 @@ describe("烈酒分类与统一供应渠道 UI 契约", () => {
     expect(workspace).toContain('testID="spirits-purchase-create-bottle"');
     expect(workspace).toContain("openBottleLinkPicker(\"manual\")");
     expect(workspace).toContain("openBottleLinkPicker(\"smart\")");
+    expect(workspace).toContain("酒库关联始终可被人工纠错");
+    expect(workspace).toContain('previewItem.bottleId ? "人工重连酒库" : "人工链接酒库"');
+    expect(workspace).toContain('previewItem.bottleId ? "智能重连" : "智能链接"');
     expect(workspace).toContain("resolveBottleForSupplierProductName(bottles, previewPurchase.supplier ?? previewItem.supplier, previewPurchase.rawName)");
     expect(workspace).toContain('pathname: "/bottle-form"');
     expect(workspace).toContain("sourceSpiritItemId: item.id");

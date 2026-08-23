@@ -10,6 +10,8 @@ type Props = {
   column: SupplierPurchaseSortKey | null;
   colors: { background: string; surface: string; foreground: string; muted: string; border: string; primary: string };
   groups: string[];
+  /** 已按分类管理入口权威顺序排列，供分类列多选筛选使用。 */
+  categories: string[];
   nameOptions: SupplierPurchaseNameOption[];
   nameLanguage: NameLanguage;
   onNameLanguageChange: (language: NameLanguage) => void;
@@ -23,6 +25,7 @@ const TITLES: Record<SupplierPurchaseSortKey, string> = {
   quantity: "数量",
   unitPrice: "单价",
   amount: "总价",
+  category: "分类",
   group: "集团",
 };
 
@@ -31,7 +34,7 @@ function updateFilters(view: SupplierPurchaseTableView, key: keyof SupplierPurch
 }
 
 export function SupplierPurchaseColumnMenu({
-  visible, column, colors, groups, nameOptions, nameLanguage, onNameLanguageChange, view, onViewChange, onClose,
+  visible, column, colors, groups, categories, nameOptions, nameLanguage, onNameLanguageChange, view, onViewChange, onClose,
 }: Props) {
   const insets = useSafeAreaInsets();
   const range = useMemo(() => {
@@ -50,6 +53,7 @@ export function SupplierPurchaseColumnMenu({
     if (column === "quantity") { next.filters.quantityMin = ""; next.filters.quantityMax = ""; }
     if (column === "unitPrice") { next.filters.unitPriceMin = ""; next.filters.unitPriceMax = ""; }
     if (column === "amount") { next.filters.amountMin = ""; next.filters.amountMax = ""; }
+    if (column === "category") { next.filters.categories = []; next.filters.onlyUnassignedCategory = false; }
     if (column === "group") { next.filters.groups = []; next.filters.onlyUnassignedGroup = false; }
     if (next.sort?.key === column) next.sort = null;
     onViewChange(next);
@@ -128,6 +132,24 @@ export function SupplierPurchaseColumnMenu({
                 <TextInput value={view.filters[range[1]]} onChangeText={(value) => onViewChange(updateFilters(view, range[1], value))}
                   keyboardType="decimal-pad" placeholder="最大值" placeholderTextColor={colors.muted}
                   style={[S.input, S.halfInput, { borderColor: colors.border, color: colors.foreground }]} />
+              </View>
+            </>
+          )}
+          {column === "category" && (
+            <>
+              <Text style={[S.label, { color: colors.muted }]}>分类筛选</Text>
+              <View style={S.chips}>
+                <TouchableOpacity testID="supplier-category-only-unassigned" onPress={() => onViewChange(updateFilters(view, "onlyUnassignedCategory", !view.filters.onlyUnassignedCategory))}
+                  style={[S.chip, { borderColor: view.filters.onlyUnassignedCategory ? colors.primary : colors.border, backgroundColor: view.filters.onlyUnassignedCategory ? colors.primary + "18" : colors.surface }]}>
+                  <Text style={{ color: view.filters.onlyUnassignedCategory ? colors.primary : colors.foreground }}>{view.filters.onlyUnassignedCategory ? "✓ 仅未分类" : "仅未分类"}</Text>
+                </TouchableOpacity>
+                {categories.map((category) => {
+                  const selected = view.filters.categories.includes(category);
+                  return <TouchableOpacity key={category} testID={`supplier-category-option-${category}`} onPress={() => onViewChange(updateFilters(view, "categories", selected ? view.filters.categories.filter((value) => value !== category) : [...view.filters.categories, category]))}
+                    style={[S.chip, { borderColor: selected ? colors.primary : colors.border, backgroundColor: selected ? colors.primary + "18" : colors.surface }]}>
+                    <Text style={{ color: selected ? colors.primary : colors.foreground }}>{category}</Text>
+                  </TouchableOpacity>;
+                })}
               </View>
             </>
           )}

@@ -19,8 +19,9 @@ describe("烈酒库存完整Excel台账", () => {
     const header = source.slice(source.indexOf('const SPIRIT_LEDGER_COLUMNS'), source.indexOf('// ─── 主页面'));
     expect(header).toContain('["商品名称", "name", 140]');
     expect(header).toContain('["参考价", "referencePrice", 62]');
-    expect(header).toContain('["期初量", "openingQty", 56]');
+    expect(header).toContain('["期初库存", "openingQty", 56]');
     expect(header).toContain('["进货量", "purchaseQty", 56]');
+    expect(header).toContain('["期末库存", "closingQty", 56]');
     expect(header).toContain('["期末单价", "closingUnitCost", 68]');
     expect(header).toContain('["消耗成本", "consumeCost", 76]');
     expect(header).toContain('["集团", "group", 84]');
@@ -63,5 +64,11 @@ describe("烈酒库存完整Excel台账", () => {
     expect(toolbar).not.toContain('<IconSymbol');
     expect(source).toContain('INVENTORY_WORKSPACE_METRICS.actionHeight');
     expect(source).toContain('INVENTORY_WORKSPACE_METRICS.segmentHeight');
+    expect(source).toContain('testID="spirits-ledger-closing-qty-input"');
+    expect(source).toContain("const handleSaveClosingQty =");
+    expect(source).toContain("setActualClosing(entry.itemId, selectedMonth, val)");
+    expect(source).toContain("仅在库存管理中可修改");
+    expect(source).toContain("width: Math.max(42, ledgerColumnWidths.openingQty - 8)");
+    expect(source).toContain('overflow: "hidden"');
   });
 });

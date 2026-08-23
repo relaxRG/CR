@@ -1,7 +1,7 @@
 import React, { ReactNode, useMemo } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useColors } from "@/hooks/use-colors";
-import { expandStoreTableColumns, getStoreTableViewport, STORE_TABLE_METRICS } from "@/lib/store/table-display";
+import { expandStoreTableColumns, getStoreTableViewport, resolveStoreTableTypography, STORE_TABLE_METRICS } from "@/lib/store/table-display";
 
 export interface HorizontalLedgerColumn<Row> {
   key: string;
@@ -65,7 +65,8 @@ export function HorizontalLedgerTable<Row>({
   selection,
 }: HorizontalLedgerTableProps<Row>) {
   const colors = useColors();
-  const { width: windowWidth } = useWindowDimensions();
+  const { width: windowWidth, fontScale } = useWindowDimensions();
+  const typography = useMemo(() => resolveStoreTableTypography(windowWidth, fontScale), [windowWidth, fontScale]);
   const responsiveColumns = useMemo(() => {
     const baseColumns = getStoreTableViewport(windowWidth) === "phone"
       ? columns.map((column) => ({ ...column, width: column.compactWidth ?? column.width }))
@@ -87,14 +88,14 @@ export function HorizontalLedgerTable<Row>({
   return (
     <ScrollView horizontal nestedScrollEnabled directionalLockEnabled showsHorizontalScrollIndicator testID={testID} style={{ flexGrow: 0 }}>
       <View style={{ width: totalWidth, minWidth: "100%" }}>
-        <View style={[S.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <View style={[S.header, { minHeight: typography.headerHeight, backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
           {selection && (
             <Pressable
               testID={selection.testIDPrefix ? `${selection.testIDPrefix}-select-all` : undefined}
               onPress={selection.onToggleAll}
               accessibilityRole="checkbox"
               accessibilityState={{ checked: selection.allSelected }}
-              style={[S.selectionCell, { width: selectionWidth }]}
+              style={[S.selectionCell, { minHeight: typography.rowHeight, width: selectionWidth }]}
             >
               <Text style={{ color: colors.primary, fontSize: 15, fontWeight: "600" }}>{selection.allSelected ? "✓" : "○"}</Text>
             </Pressable>
@@ -105,7 +106,7 @@ export function HorizontalLedgerTable<Row>({
             const header = (
               <View style={[S.headerCell, { width: column.width, alignItems: alignment(column.align) }]}>
                 <View style={S.headerLabel}>
-                  <Text style={[S.headerText, { color: active ? colors.primary : colors.foreground }]} numberOfLines={1}>{column.label}</Text>
+                  <Text style={[S.headerText, { fontSize: typography.headerFontSize, color: active ? colors.primary : colors.foreground }]} numberOfLines={1}>{column.label}</Text>
                   {isSortable && showHeaderSortIndicators && <Text style={[S.sortMark, { color: active ? colors.primary : colors.muted }]}>{active ? (sort?.direction === "asc" ? "↑" : "↓") : "↕"}</Text>}
                 </View>
               </View>
@@ -127,24 +128,24 @@ export function HorizontalLedgerTable<Row>({
 
         {groups.map((group) => (
           <React.Fragment key={group.id}>
-            <View style={[S.groupHeader, { backgroundColor: group.color + "10", borderBottomColor: colors.border }]}>
+            <View style={[S.groupHeader, { minHeight: typography.groupHeight, backgroundColor: group.color + "10", borderBottomColor: colors.border }]}>
               <View style={[S.groupDot, { backgroundColor: group.color }]} />
-              <Text style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.bodyFontSize, fontWeight: "600" }}>{group.label}</Text>
-              <Text style={{ color: colors.muted, fontSize: 11 }}>({group.rows.length})</Text>
+              <Text style={{ color: colors.foreground, fontSize: typography.bodyFontSize, fontWeight: "600" }}>{group.label}</Text>
+              <Text style={{ color: colors.muted, fontSize: Math.max(12, typography.bodyFontSize - 1) }}>({group.rows.length})</Text>
             </View>
             {group.rows.map((row, index) => {
               const backgroundColor = index % 2 === 0 ? colors.surface : colors.background;
               const key = rowKey(row);
               const selected = selection?.selectedRowKeys.includes(key) ?? false;
               return (
-                <View key={key} style={[S.row, { backgroundColor: selected ? colors.primary + "0d" : backgroundColor, borderBottomColor: colors.border }]}>
+                <View key={key} style={[S.row, { minHeight: typography.rowHeight, backgroundColor: selected ? colors.primary + "0d" : backgroundColor, borderBottomColor: colors.border }]}>
                   {selection && (
                     <Pressable
                       testID={selection.testIDPrefix ? `${selection.testIDPrefix}-select-${key}` : undefined}
                       onPress={() => selection.onToggleRow(row)}
                       accessibilityRole="checkbox"
                       accessibilityState={{ checked: selected }}
-                      style={[S.selectionCell, { width: selectionWidth }]}
+                      style={[S.selectionCell, { minHeight: typography.rowHeight, width: selectionWidth }]}
                     >
                       <Text style={{ color: selected ? colors.primary : colors.muted, fontSize: 16, fontWeight: "600" }}>{selected ? "✓" : "○"}</Text>
                     </Pressable>
