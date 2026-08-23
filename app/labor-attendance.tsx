@@ -21,7 +21,7 @@ import {
   settleCompOffCashOut,
 } from "@/lib/labor/comp-off-cashout-settlement";
 import {
-  Alert, Platform, ScrollView, StyleSheet,
+  Alert, FlatList, Platform, StyleSheet,
   Text, TextInput, TouchableOpacity, View
 } from "react-native";
 import * as Haptics from "expo-haptics";
@@ -43,6 +43,7 @@ import {
 } from "@/lib/labor/types";
 
 const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
+type AttendanceListRow = { kind: "header"; key: string; label: string; color: string; count: number } | { kind: "employee"; key: string; employee: Employee };
 
 function calcTenure(joinDate?: string): string {
   if (!joinDate) return "";
@@ -98,6 +99,23 @@ export default function LaborAttendancePage() {
     return m;
   }, [compOffEntries]);
 
+  const attendanceListRows = useMemo<AttendanceListRow[]>(() => {
+    const groupDefinitions: { key: string; label: string; color: string; filter: (employee: Employee) => boolean }[] = [
+      { key: "front", label: "前厅", color: "#007AFF", filter: (employee) => employee.dept === "front" && employee.type !== "parttime" },
+      { key: "kitchen", label: "后厨", color: "#34C759", filter: (employee) => employee.dept === "kitchen" && employee.type !== "parttime" },
+      { key: "other", label: "公司", color: "#722ED1", filter: (employee) => employee.dept === "other" && employee.type !== "parttime" },
+      { key: "parttime", label: "临时兼职", color: "#FF9500", filter: (employee) => employee.type === "parttime" },
+    ];
+    return deptOrder.flatMap((key) => {
+      const definition = groupDefinitions.find((entry) => entry.key === key) ?? groupDefinitions[0];
+      const members = activeEmployees.filter(definition.filter);
+      return members.length === 0 ? [] : [
+        { kind: "header" as const, key: `header-${definition.key}`, label: definition.label, color: definition.color, count: members.length },
+        ...members.map((employee) => ({ kind: "employee" as const, key: `employee-${employee.id}`, employee })),
+      ];
+    });
+  }, [activeEmployees, deptOrder]);
+
   return (
     <ScreenContainer>
       <View style={[S.navbar, { paddingTop: 8 }]}>
@@ -108,54 +126,38 @@ export default function LaborAttendancePage() {
         <View style={{ width: 36 }} />
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: 40 + insets.bottom, gap: 16 }}>
-        {(() => {
-          const DEPT_GROUP_DEFS_ATT: Record<string, { label: string; color: string; filter: (e: Employee) => boolean }> = {
-            front:    { label: "前厅",   color: "#007AFF", filter: (e) => e.dept === "front" && e.type !== "parttime" },
-            kitchen:  { label: "后厨",   color: "#34C759", filter: (e) => e.dept === "kitchen" && e.type !== "parttime" },
-            other:    { label: "公司",   color: "#722ED1", filter: (e) => e.dept === "other" && e.type !== "parttime" },
-            parttime: { label: "临时兼职", color: "#FF9500", filter: (e) => e.type === "parttime" },
-          };
-          return deptOrder.map((k) => ({ key: k, ...(DEPT_GROUP_DEFS_ATT[k] ?? DEPT_GROUP_DEFS_ATT.front) }));
-        })().map(({ key, label, color, filter }) => {
-          const deptEmps = activeEmployees.filter(filter);
-          if (deptEmps.length === 0) return null;
-          return (
-            <View key={key} style={{ gap: 0 }}>
-              {/* 分组标题 */}
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 4, paddingBottom: 6 }}>
-                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />
-                <Text style={{ fontSize: 13, fontWeight: "700", color }}>{label}</Text>
-                <Text style={{ fontSize: 11, color: colors.muted }}>({deptEmps.length}人)</Text>
-              </View>
-              {/* 员工卡片 */}
-              {deptEmps.map((emp) => {
-                const att = attMap.get(emp.id) ?? null;
-                const slip = slipMap.get(emp.id) ?? null;
-                const empCompOff = compOffByEmp.get(emp.id) ?? [];
-                return (
-                  <EmployeeCard
-                    key={emp.id}
-                    employee={emp}
-                    month={currentMonth}
-                    att={att}
-                    slip={slip}
-                    compOffEntries={empCompOff}
-                    advances={advances}
-                    expanded={expandedId === emp.id}
-                    onToggle={() => { tap(); setExpandedId(expandedId === emp.id ? "" : emp.id); }}
-                    colors={colors}
-                    upsertPaySlip={upsertPaySlip}
-                    editingReward={editingRewardFor === emp.id}
-                    onToggleRewardEdit={() => setEditingRewardFor(editingRewardFor === emp.id ? "" : emp.id)}
-                    router={router}
-                  />
-                );
-              })}
-            </View>
-          );
-        })}
-      </ScrollView>
+      <FlatList<AttendanceListRow>
+        data={attendanceListRows}
+        keyExtractor={(row) => row.key}
+        initialNumToRender={10}
+        maxToRenderPerBatch={10}
+        windowSize={7}
+        removeClippedSubviews={Platform.OS !== "web"}
+        contentContainerStyle={{ padding: 12, paddingBottom: 40 + insets.bottom, flexGrow: 1 }}
+        renderItem={({ item: row }) => row.kind === "header" ? (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 4, paddingTop: 12, paddingBottom: 6 }}>
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: row.color }} />
+            <Text style={{ fontSize: 13, fontWeight: "700", color: row.color }}>{row.label}</Text>
+            <Text style={{ fontSize: 11, color: colors.muted }}>({row.count}人)</Text>
+          </View>
+        ) : (
+          <EmployeeCard
+            employee={row.employee}
+            month={currentMonth}
+            att={attMap.get(row.employee.id) ?? null}
+            slip={slipMap.get(row.employee.id) ?? null}
+            compOffEntries={compOffByEmp.get(row.employee.id) ?? []}
+            advances={advances}
+            expanded={expandedId === row.employee.id}
+            onToggle={() => { tap(); setExpandedId(expandedId === row.employee.id ? "" : row.employee.id); }}
+            colors={colors}
+            upsertPaySlip={upsertPaySlip}
+            editingReward={editingRewardFor === row.employee.id}
+            onToggleRewardEdit={() => setEditingRewardFor(editingRewardFor === row.employee.id ? "" : row.employee.id)}
+            router={router}
+          />
+        )}
+      />
     </ScreenContainer>
   );
 }

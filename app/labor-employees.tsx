@@ -7,7 +7,7 @@
  */
 import React, { useRef, useState, useMemo } from "react";
 import {
-  Alert, Animated, Platform, Pressable, PanResponder,
+  Alert, Animated, FlatList, Platform, Pressable, PanResponder,
   ScrollView, StyleSheet, Text, TouchableOpacity, View,
 } from "react-native";
 import * as Haptics from "expo-haptics";
@@ -30,6 +30,7 @@ const DEPT_FILTERS: { key: EmployeeDept | "all"; label: string }[] = [
   { key: "other",    label: "其他" },
 ];
 const SWIPE_THRESHOLD = 60; // 触发操作的滑动距离
+type EmployeeListRow = { kind: "header"; key: string; dept: EmployeeDept; count: number } | { kind: "employee"; key: string; employee: Employee };
 
 // ── 可左右滑动的员工卡片 ──────────────────────────────────────────────────────
 function SwipeableEmpCard({
@@ -155,46 +156,6 @@ function SwipeableEmpCard({
   );
 }
 
-// ── 部门分组区块 ──────────────────────────────────────────────────────────────
-function DeptSection({
-  dept, employees, colors, onPress, onArchive, onDelete,
-}: {
-  dept: EmployeeDept;
-  employees: Employee[];
-  colors: any;
-  onPress: (emp: Employee) => void;
-  onArchive: (emp: Employee) => void;
-  onDelete: (emp: Employee) => void;
-}) {
-  const deptColor = DEPT_COLORS[dept];
-
-  if (employees.length === 0) return null;
-
-  return (
-    <View style={{ marginBottom: 4 }}>
-      <View style={[S.deptHeader, { borderLeftColor: deptColor }]}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <Text style={{ fontSize: 13, fontWeight: "700", color: deptColor }}>{DEPT_LABELS[dept]}</Text>
-          <View style={[S.tag, { backgroundColor: deptColor + "22" }]}>
-            <Text style={{ fontSize: 10, fontWeight: "600", color: deptColor }}>{employees.length} 人</Text>
-          </View>
-        </View>
-        <Text style={{ fontSize: 10, color: colors.muted }}>← 左滑归档  右滑删除 →</Text>
-      </View>
-      {employees.map((emp) => (
-        <SwipeableEmpCard
-          key={emp.id}
-          emp={emp}
-          colors={colors}
-          onPress={() => onPress(emp)}
-          onArchive={() => onArchive(emp)}
-          onDelete={() => onDelete(emp)}
-        />
-      ))}
-    </View>
-  );
-}
-
 // ── 主页面 ────────────────────────────────────────────────────────────────────
 export default function LaborEmployeesScreen() {
   const colors = useColors();
@@ -256,8 +217,20 @@ export default function LaborEmployeesScreen() {
     router.push({ pathname: "/labor-employee-profile", params: { id: emp.id } } as any);
   };
 
-  // 滚动位置保持：从员工详情页返回时恢复滚动位置；deptFilter 切换时重置
-  const { listRef: empScrollRef, onScroll: onEmpScroll } = useScrollPreservation<ScrollView>(deptFilter);
+  const employeeListRows = useMemo<EmployeeListRow[]>(() => {
+    const sections = deptFilter === "all"
+      ? deptOrder.map((dept) => [dept, grouped[dept]] as const)
+      : [[deptFilter as EmployeeDept, filtered ?? []] as const];
+    return sections.flatMap(([dept, members]) => members.length === 0
+      ? []
+      : [
+          { kind: "header" as const, key: `header-${dept}`, dept, count: members.length },
+          ...members.map((employee) => ({ kind: "employee" as const, key: `employee-${employee.id}`, employee })),
+        ]);
+  }, [deptFilter, deptOrder, filtered, grouped]);
+
+  // 滚动位置保持：从员工详情页返回时恢复滚动位置；deptFilter 切换时重置。
+  const { listRef: empScrollRef, onScroll: onEmpScroll } = useScrollPreservation<FlatList>(deptFilter);
 
   const totalCount = activeEmployees.length;
 
@@ -331,60 +304,46 @@ export default function LaborEmployeesScreen() {
         })}
       </ScrollView>
 
-      {/* 列表主体 */}
-      <ScrollView
+      {/* 扁平分组行由 FlatList 窗口化：每个员工卡片包含独立手势和动画，不能全量挂载。 */}
+      <FlatList<EmployeeListRow>
         ref={empScrollRef}
-        contentContainerStyle={{ padding: 12, paddingBottom: 40 + insets.bottom }}
+        data={employeeListRows}
+        keyExtractor={(row) => row.key}
         onScroll={onEmpScroll}
         scrollEventThrottle={100}
-      >
-
-        {/* 全部 Tab：按部门分组 */}
-        {deptFilter === "all" && deptOrder.map((dept) =>
-          grouped[dept].length > 0 ? (
-            <DeptSection
-              key={dept}
-              dept={dept}
-              employees={grouped[dept]}
-              colors={colors}
-              onPress={handlePress}
-              onArchive={handleArchive}
-              onDelete={handleDelete}
-          />
-        ) : null
-        )}
-
-        {/* 单部门 Tab */}
-        {deptFilter !== "all" && filtered && (
-          <DeptSection
-            dept={deptFilter as EmployeeDept}
-            employees={filtered}
+        initialNumToRender={12}
+        maxToRenderPerBatch={12}
+        windowSize={7}
+        removeClippedSubviews={Platform.OS !== "web"}
+        contentContainerStyle={{ padding: 12, paddingBottom: 40 + insets.bottom, flexGrow: 1 }}
+        renderItem={({ item: row }) => row.kind === "header" ? (
+          <View style={[S.deptHeader, { borderLeftColor: DEPT_COLORS[row.dept] }]}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <Text style={{ fontSize: 13, fontWeight: "700", color: DEPT_COLORS[row.dept] }}>{DEPT_LABELS[row.dept]}</Text>
+              <View style={[S.tag, { backgroundColor: DEPT_COLORS[row.dept] + "22" }]}>
+                <Text style={{ fontSize: 10, fontWeight: "600", color: DEPT_COLORS[row.dept] }}>{row.count} 人</Text>
+              </View>
+            </View>
+            <Text style={{ fontSize: 10, color: colors.muted }}>← 左滑归档  右滑删除 →</Text>
+          </View>
+        ) : (
+          <SwipeableEmpCard
+            emp={row.employee}
             colors={colors}
-            onPress={handlePress}
-            onArchive={handleArchive}
-            onDelete={handleDelete}
+            onPress={() => handlePress(row.employee)}
+            onArchive={() => handleArchive(row.employee)}
+            onDelete={() => handleDelete(row.employee)}
           />
         )}
-
-        {/* 空状态 */}
-        {activeEmployees.length === 0 && (
+        ListEmptyComponent={activeEmployees.length === 0 ? (
           <View style={{ alignItems: "center", padding: 40 }}>
             <IconSymbol name="person.2.fill" size={48} color={colors.border} />
             <Text style={{ fontSize: 16, fontWeight: "600", color: colors.foreground, marginTop: 12 }}>暂无在职员工</Text>
-            {archivedCount > 0 && (
-              <TouchableOpacity onPress={() => { tap(); router.push("/labor-archived" as any); }}
-                style={{ marginTop: 8 }}>
-                <Text style={{ fontSize: 13, color: "#FF9500" }}>查看离职归档（{archivedCount} 人）</Text>
-              </TouchableOpacity>
-            )}
-            <Pressable onPress={() => { tap(); router.push("/labor-employee-form" as any); }}
-              style={[S.addBtn, { backgroundColor: colors.primary }]}>
-              <IconSymbol name="plus" size={16} color="#fff" />
-              <Text style={{ color: "#fff", fontSize: 15, fontWeight: "600" }}>添加员工</Text>
-            </Pressable>
+            {archivedCount > 0 && <TouchableOpacity onPress={() => { tap(); router.push("/labor-archived" as any); }} style={{ marginTop: 8 }}><Text style={{ fontSize: 13, color: "#FF9500" }}>查看离职归档（{archivedCount} 人）</Text></TouchableOpacity>}
+            <Pressable onPress={() => { tap(); router.push("/labor-employee-form" as any); }} style={[S.addBtn, { backgroundColor: colors.primary }]}><IconSymbol name="plus" size={16} color="#fff" /><Text style={{ color: "#fff", fontSize: 15, fontWeight: "600" }}>添加员工</Text></Pressable>
           </View>
-        )}
-      </ScrollView>
+        ) : null}
+      />
     </ScreenContainer>
   );
 }

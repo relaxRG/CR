@@ -2,7 +2,7 @@
  * 葡萄酒 Tab（独立数据，与鸡尾酒酒库完全隔离）
  * Segment：酒款列表 / 按产区 / 按品种
  */
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { FlatList, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -16,6 +16,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
 
 type WineTab = "list" | "region" | "grape";
+type WineGroupedRow = { kind: "header"; key: string; title: string } | { kind: "bottle"; key: string; bottle: WineBottle };
 
 const TABS: { key: WineTab; label: string }[] = [
   { key: "list", label: "全部" },
@@ -54,15 +55,6 @@ function WineCard({ bottle, onPress }: { bottle: WineBottle; onPress: () => void
   );
 }
 
-function GroupSection({ title, items, onPress }: { title: string; items: WineBottle[]; onPress: (b: WineBottle) => void }) {
-  const colors = useColors();
-  return (
-    <View style={{ marginBottom: 16 }}>
-      <Text style={[styles.groupTitle, { color: colors.muted }]}>{title}</Text>
-      {items.map((b) => <WineCard key={b.id} bottle={b} onPress={() => onPress(b)} />)}
-    </View>
-  );
-}
 
 export default function WineScreen() {
   const colors = useColors();
@@ -86,25 +78,24 @@ export default function WineScreen() {
     );
   }, [bottles, query]);
 
-  const byRegion = useMemo(() => {
-    const map = new Map<string, WineBottle[]>();
-    filtered.forEach((b) => {
-      const key = b.region || "未分类";
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(b);
+  const createGroupedRows = useCallback((getKey: (bottle: WineBottle) => string): WineGroupedRow[] => {
+    const groups = new Map<string, WineBottle[]>();
+    filtered.forEach((bottle) => {
+      const key = getKey(bottle) || "未分类";
+      const entries = groups.get(key) ?? [];
+      entries.push(bottle);
+      groups.set(key, entries);
     });
-    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+    return Array.from(groups.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .flatMap(([title, entries]) => [
+        { kind: "header" as const, key: `header-${title}`, title },
+        ...entries.map((bottle) => ({ kind: "bottle" as const, key: `bottle-${bottle.id}`, bottle })),
+      ]);
   }, [filtered]);
 
-  const byGrape = useMemo(() => {
-    const map = new Map<string, WineBottle[]>();
-    filtered.forEach((b) => {
-      const key = b.grape || "未分类";
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(b);
-    });
-    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
-  }, [filtered]);
+  const byRegionRows = useMemo(() => createGroupedRows((bottle) => bottle.region), [createGroupedRows]);
+  const byGrapeRows = useMemo(() => createGroupedRows((bottle) => bottle.grape), [createGroupedRows]);
 
   const handlePress = (b: WineBottle) => {
     tap();
@@ -200,9 +191,11 @@ export default function WineScreen() {
       ) : tab === "region" ? (
         <FlatList {...MOBILE_VIRTUAL_LIST_PROPS}
           ref={wineListRef}
-          data={byRegion}
-          keyExtractor={([key]) => key}
-          renderItem={({ item: [key, items] }) => <GroupSection title={key} items={items} onPress={handlePress} />}
+          data={byRegionRows}
+          keyExtractor={(row) => row.key}
+          renderItem={({ item: row }) => row.kind === "header"
+            ? <Text style={[styles.groupTitle, { color: colors.muted }]}>{row.title}</Text>
+            : <WineCard bottle={row.bottle} onPress={() => handlePress(row.bottle)} />}
           contentContainerStyle={{ padding: 16, paddingBottom: 100 + insets.bottom }}
           onScroll={onWineScroll}
           scrollEventThrottle={100}
@@ -210,9 +203,11 @@ export default function WineScreen() {
       ) : (
         <FlatList {...MOBILE_VIRTUAL_LIST_PROPS}
           ref={wineListRef}
-          data={byGrape}
-          keyExtractor={([key]) => key}
-          renderItem={({ item: [key, items] }) => <GroupSection title={key} items={items} onPress={handlePress} />}
+          data={byGrapeRows}
+          keyExtractor={(row) => row.key}
+          renderItem={({ item: row }) => row.kind === "header"
+            ? <Text style={[styles.groupTitle, { color: colors.muted }]}>{row.title}</Text>
+            : <WineCard bottle={row.bottle} onPress={() => handlePress(row.bottle)} />}
           contentContainerStyle={{ padding: 16, paddingBottom: 100 + insets.bottom }}
           onScroll={onWineScroll}
           scrollEventThrottle={100}

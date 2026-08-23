@@ -110,25 +110,11 @@ export default function LabScreen() {
       </View>
 
       <SafeAreaInsetsContext.Provider value={childInsets}>
-        {/* 清单模块 */}
-        {tab === "list" && (
-          <>
-            <View style={[{ flex: 1 }, listSubTab !== "sale" && styles.hidden]}>
-              <StoreSaleScreen />
-            </View>
-            <View style={[{ flex: 1 }, listSubTab !== "purchase" && styles.hidden]}>
-              <StorePurchaseScreen />
-            </View>
-          </>
-        )}
-        {/* 计划清单 */}
-        <View style={[{ flex: 1 }, tab !== "plan" && styles.hidden]}>
-          <LabPlanScreen />
-        </View>
-        {/* 研发计划 */}
-        <View style={[{ flex: 1 }, tab !== "rd" && styles.hidden]}>
-          <LabIndexScreen embedded />
-        </View>
+        {/* 仅挂载当前子页：隐藏不等于停止渲染、订阅和数据计算。 */}
+        {tab === "list" && listSubTab === "sale" && <View style={{ flex: 1 }}><StoreSaleScreen /></View>}
+        {tab === "list" && listSubTab === "purchase" && <View style={{ flex: 1 }}><StorePurchaseScreen /></View>}
+        {tab === "plan" && <View style={{ flex: 1 }}><LabPlanScreen /></View>}
+        {tab === "rd" && <View style={{ flex: 1 }}><LabIndexScreen embedded /></View>}
       </SafeAreaInsetsContext.Provider>
     </View>
   );
@@ -143,5 +129,4 @@ const styles = StyleSheet.create({
   segText: { fontSize: 14, lineHeight: 19 },
   subChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
   subChipText: { fontSize: 14, lineHeight: 20 },
-  hidden: { display: "none" },
 });

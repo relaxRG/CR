@@ -40,7 +40,7 @@ import {
   planCompOffBalanceConsumption,
 } from "@/lib/labor/comp-off-settlement";
 import {
-  Alert, Clipboard, InteractionManager, Modal, Platform, Pressable, ScrollView,
+  Alert, Clipboard, FlatList, InteractionManager, Modal, Platform, Pressable, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions, KeyboardAvoidingView} from "react-native";
 import * as Haptics from "expo-haptics";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -3940,6 +3940,24 @@ function SchedulePage({ colors, month, pageWidth }: { colors: any; month: string
     () => sortEmployeesWithinProfileGroup(employees.filter((e) => e.active && !e.archived && resolveEmployeeDept(e).category === deptCategory)),
     [employees, deptCategory, resolveEmployeeDept, deptOrder],
   );
+  const attendanceByEmployee = useMemo(() => {
+    const byEmployee = new Map<string, typeof attendanceRecords[number]>();
+    attendanceRecords.forEach((record) => { if (record.month === currentMonth) byEmployee.set(record.employeeId, record); });
+    return byEmployee;
+  }, [attendanceRecords, currentMonth]);
+  const availableCompOffDaysByEmployee = useMemo(() => {
+    const byEmployee = new Map<string, number>();
+    compOffEntriesSched.forEach((entry) => {
+      if (entry.status !== "available" || entry.expiresMonth < currentMonth) return;
+      byEmployee.set(entry.employeeId, (byEmployee.get(entry.employeeId) ?? 0) + entry.days);
+    });
+    return byEmployee;
+  }, [compOffEntriesSched, currentMonth]);
+  const paySlipByEmployee = useMemo(() => {
+    const byEmployee = new Map<string, typeof paySlips[number]>();
+    paySlips.forEach((slip) => { if (slip.month === currentMonth) byEmployee.set(slip.employeeId, slip); });
+    return byEmployee;
+  }, [paySlips, currentMonth]);
   const departmentEmployeeIds = useMemo(() => new Set(allDeptEmployees.map((employee) => employee.id)), [allDeptEmployees]);
   const validMonthShiftEmployeeIdsBySession = useMemo(() => {
     const bySession = new Map<string, Set<string>>();
@@ -3951,6 +3969,16 @@ function SchedulePage({ colors, month, pageWidth }: { colors: any; month: string
     });
     return bySession;
   }, [departmentEmployeeIds, monthShifts]);
+  const monthShiftEntriesByEmployeeSession = useMemo(() => {
+    const byEmployeeSession = new Map<string, ShiftEntry[]>();
+    monthShifts.forEach((shift) => {
+      const key = `${shift.employeeId}|${shift.shift}`;
+      const entries = byEmployeeSession.get(key) ?? [];
+      entries.push(shift);
+      byEmployeeSession.set(key, entries);
+    });
+    return byEmployeeSession;
+  }, [monthShifts]);
   const shiftEntryByEmployeeDateSession = useMemo(() => {
     const byKey = new Map<string, ShiftEntry>();
     [...adjacentShifts, ...monthShifts].forEach((shift) => byKey.set(`${shift.employeeId}|${shift.date}|${shift.shift}`, shift));
@@ -4501,56 +4529,63 @@ function SchedulePage({ colors, month, pageWidth }: { colors: any; month: string
                     </TouchableOpacity>
                   </View>
                   {(() => {
-                    // pendingKey 提到循环外，避免每次迭代重复计算
                     const pendingKey = `${currentMonth}|${deptCategory}|${groupId}|${tpl.id}`;
                     const pendingSet = pendingEmpIds.get(pendingKey);
-                    return allDeptEmployees.map((emp) => {
-                    const hasShift = monthShifts.some((s) => s.employeeId === emp.id && s.shift === tpl.session);
-                    const isPending = pendingSet?.has(emp.id) ?? false;
-                    const inGroup = hasShift || isPending;
+                    const assignedEmployeeIds = validMonthShiftEmployeeIdsBySession.get(tpl.session) ?? new Set<string>();
                     return (
-                      <TouchableOpacity key={emp.id}
-                        onPress={() => {
-                          tap();
-                          if (inGroup) {
-                            // 取消勾选：删除该员工本月该班次的所有 ShiftEntry，员工行立即消失
-                            const toDelete = monthShifts
-                              .filter((s) => s.employeeId === emp.id && s.shift === tpl.session)
-                              .map((s) => ({ employeeId: s.employeeId, date: s.date, shift: s.shift }));
-                            if (toDelete.length > 0) batchDeleteShifts(toDelete);
-                            // 同时从 pending 中移除
-                            setPendingEmpIds((prev) => {
-                              const next = new Map(prev);
-                              const set = new Set(next.get(pendingKey) ?? []);
-                              set.delete(emp.id);
-                              if (set.size === 0) next.delete(pendingKey); else next.set(pendingKey, set);
-                              return next;
-                            });
-                          } else {
-                            // 勾选：加入 pending，员工行立即出现（格子空白，等待填写）
-                            setPendingEmpIds((prev) => {
-                              const next = new Map(prev);
-                              const set = new Set(next.get(pendingKey) ?? []);
-                              set.add(emp.id);
-                              next.set(pendingKey, set);
-                              return next;
-                            });
-                          }
+                      <FlatList
+                        data={allDeptEmployees}
+                        keyExtractor={(emp) => emp.id}
+                        nestedScrollEnabled
+                        style={{ maxHeight: 360 }}
+                        initialNumToRender={16}
+                        maxToRenderPerBatch={12}
+                        windowSize={5}
+                        removeClippedSubviews={Platform.OS !== "web"}
+                        renderItem={({ item: emp }) => {
+                          const isPending = pendingSet?.has(emp.id) ?? false;
+                          const inGroup = assignedEmployeeIds.has(emp.id) || isPending;
+                          return (
+                            <TouchableOpacity
+                              onPress={() => {
+                                tap();
+                                if (inGroup) {
+                                  const toDelete = (monthShiftEntriesByEmployeeSession.get(`${emp.id}|${tpl.session}`) ?? [])
+                                    .map((shift) => ({ employeeId: shift.employeeId, date: shift.date, shift: shift.shift }));
+                                  if (toDelete.length > 0) batchDeleteShifts(toDelete);
+                                  setPendingEmpIds((prev) => {
+                                    const next = new Map(prev);
+                                    const set = new Set(next.get(pendingKey) ?? []);
+                                    set.delete(emp.id);
+                                    if (set.size === 0) next.delete(pendingKey); else next.set(pendingKey, set);
+                                    return next;
+                                  });
+                                } else {
+                                  setPendingEmpIds((prev) => {
+                                    const next = new Map(prev);
+                                    const set = new Set(next.get(pendingKey) ?? []);
+                                    set.add(emp.id);
+                                    next.set(pendingKey, set);
+                                    return next;
+                                  });
+                                }
+                              }}
+                              style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 8,
+                                borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border + "44",
+                                backgroundColor: inGroup ? groupColor + "10" : "transparent" }}>
+                              <View style={{ width: 16, height: 16, borderRadius: 8, borderWidth: 1.5,
+                                borderColor: inGroup ? groupColor : colors.muted + "88",
+                                backgroundColor: inGroup ? groupColor : "transparent",
+                                alignItems: "center", justifyContent: "center", marginRight: 8 }}>
+                                {inGroup && <Text style={{ fontSize: 9, color: "#fff", fontWeight: "700" }}>✓</Text>}
+                              </View>
+                              <Text style={{ fontSize: 13, fontWeight: inGroup ? "700" : "400", color: inGroup ? groupColor : colors.foreground }}>{emp.code}</Text>
+                              {emp.realName !== emp.code && <Text style={{ fontSize: 11, color: colors.muted, marginLeft: 4 }}>{emp.realName}</Text>}
+                            </TouchableOpacity>
+                          );
                         }}
-                        style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 8,
-                          borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border + "44",
-                          backgroundColor: inGroup ? groupColor + "10" : "transparent" }}>
-                        <View style={{ width: 16, height: 16, borderRadius: 8, borderWidth: 1.5,
-                          borderColor: inGroup ? groupColor : colors.muted + "88",
-                          backgroundColor: inGroup ? groupColor : "transparent",
-                          alignItems: "center", justifyContent: "center", marginRight: 8 }}>
-                          {inGroup && <Text style={{ fontSize: 9, color: "#fff", fontWeight: "700" }}>✓</Text>}
-                        </View>
-                        <Text style={{ fontSize: 13, fontWeight: inGroup ? "700" : "400", color: inGroup ? groupColor : colors.foreground }}>{emp.code}</Text>
-                        {emp.realName !== emp.code && <Text style={{ fontSize: 11, color: colors.muted, marginLeft: 4 }}>{emp.realName}</Text>}
-                      </TouchableOpacity>
+                      />
                     );
-                  });
                   })()}
                 </View>
               )}
@@ -4674,8 +4709,7 @@ function SchedulePage({ colors, month, pageWidth }: { colors: any; month: string
           <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground, marginBottom: 4 }}>考勤概况（{monthLabel(currentMonth)}）</Text>
           <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 8 }}>← 左滑返回排班表</Text>
           {allDeptEmployees.map((emp) => {
-            const att = attendanceRecords.find((r) => r.employeeId === emp.id && r.month === currentMonth) ?? null;
-            const compOffEntries = getCompOffEntries(emp.id);
+            const att = attendanceByEmployee.get(emp.id) ?? null;
             const currentMonthStr = currentMonth;
             const isAttExpanded = expandedAttCards.has(emp.id);
             const toggleAttExpand = () => {
@@ -4687,7 +4721,7 @@ function SchedulePage({ colors, month, pageWidth }: { colors: any; month: string
               });
             };
             // 计算调休余额
-            const totalCompOffDays = compOffEntries.filter((e: any) => e.status === "available" && e.expiresMonth >= currentMonthStr).reduce((s: number, e: any) => s + e.days, 0);
+            const totalCompOffDays = availableCompOffDaysByEmployee.get(emp.id) ?? 0;
             return (
               <TouchableOpacity key={emp.id} activeOpacity={0.85} onPress={toggleAttExpand}
                 style={{ backgroundColor: colors.surface, borderRadius: 12, borderWidth: 1, borderColor: colors.border, padding: 12, borderLeftWidth: 3, borderLeftColor: DEPT_COLORS[emp.dept] }}>
@@ -4784,7 +4818,7 @@ function SchedulePage({ colors, month, pageWidth }: { colors: any; month: string
                         </View>
                         {/* ─── 分区三：节假日明细（始终显示）─── */}
                         {(() => {
-                          const slip = paySlips.find((s) => s.employeeId === emp.id && s.month === currentMonthStr) ?? null;
+                          const slip = paySlipByEmployee.get(emp.id) ?? null;
                           const hwDays = att.holidayWorkDays ?? 0;
                           const hrDays = slip ? Object.values(slip.holidayBonusAllocation ?? {}).filter((a: any) => a.mode === "rest").length : 0;
                           const hcDays = hwDays - hrDays;
