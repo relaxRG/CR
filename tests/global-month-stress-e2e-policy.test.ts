@@ -9,12 +9,13 @@ describe("全局月份多模块压力回归规范", () => {
   const script = read("scripts/h5-global-month-stress-e2e.mjs");
   const packageJson = read("package.json");
 
-  it("通过真实月份卡片连续切换 24 次并验证最后月份", () => {
+  it("通过真实月份前后导航连续切换 24 次并回到水合后的起始月份", () => {
     expect(script).toContain('rapidSwitches: 24');
-    expect(script).toContain('report-workspace-month-navigator-picker');
-    expect(script).toContain('report-workspace-month-navigator-month-${targetMonth}');
-    expect(script).toContain('selected.month !== "2026-07"');
-    expect(script).toContain('selected.label.includes("2026年7月")');
+    expect(script).toContain('report-workspace-month-navigator-next');
+    expect(script).toContain('report-workspace-month-navigator-previous');
+    expect(script).toContain('const initialMonth');
+    expect(script).toContain('selected.month !== initialMonth');
+    expect(script).toContain('快速切月后界面月份未同步');
   });
 
   it("采样 30 帧并将主线程卡顿阈值固定为 100ms", () => {

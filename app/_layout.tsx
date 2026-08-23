@@ -17,45 +17,17 @@ import {
 import type { EdgeInsets, Metrics, Rect } from "react-native-safe-area-context";
 
 import { initManusRuntime, subscribeSafeAreaInsets } from "@/lib/_core/manus-runtime";
-import { RecipeProvider } from "@/lib/recipes/store";
 import { I18nProvider } from "@/lib/i18n";
 import { SyncProvider } from "@/lib/cf-sync/provider";
+import { GlobalBusinessMonthProvider } from "@/lib/months/global-business-month";
+import { SupplierPurchaseProvider } from "@/lib/food/ingredient-store";
+import { WineProvider } from "@/lib/wine/store";
+import { RecipeProvider } from "@/lib/recipes/store";
 import { BottleProvider } from "@/lib/bottles/store";
-import { PriceAlertProvider } from "@/lib/bottles/price-alert-store";
 import { BottleTaxonomyProvider } from "@/lib/bottles/taxonomy";
 import { HomemadeProvider } from "@/lib/homemade/store";
-import { IceSettingsProvider } from "@/lib/ice/store";
-import { LabProvider } from "@/lib/lab/store";
-import { MenuProvider } from "@/lib/menu/store";
-import { ShoppingProvider } from "@/lib/shopping/store";
-import { WineProvider } from "@/lib/wine/store";
-import { FoodMenuProvider } from "@/lib/food/menu-store";
-import { MenuPackageProvider } from "@/lib/menu/package-store";
-import { FoodIngredientProvider, SupplierPurchaseProvider } from "@/lib/food/ingredient-store";
-import { RevenueProvider } from "@/lib/store/revenue-store";
-import { PettyCashProvider } from "@/lib/store/petty-store";
-import { LabPlanProvider } from "@/lib/lab/plan-store";
-import { SpiritsInventoryProvider } from "@/lib/spirits/crud-store";
-import { MonthlyReportProvider } from "@/lib/store/monthly-report/store";
-import { LaborProvider } from "@/lib/labor/store";
-import { SalaryAdvanceProvider, SalaryAdvanceCategoryProvider } from "@/lib/labor/advance-store";
-import { PettyCategoryProvider } from "@/lib/store/petty-category-store";
-import { PettyInventoryLinkProvider } from "@/lib/store/petty-inventory-link-store";
-import { PettyLaborLinkProvider } from "@/lib/store/petty-labor-link-store";
-import { PeriodAnalysisProvider } from "@/lib/store/period-analysis/store";
-import { MonthlySummaryProvider } from "@/lib/store/monthly-summary/store";
-import { DishAnalysisProvider } from "@/lib/store/monthly-report/dish-analysis-store";
-import { ScheduleProvider } from "@/lib/store/period-analysis/schedule-store";
-import { BeerInventoryProvider } from "@/lib/beer/inventory-store";
-import { IceNewInventoryProvider } from "@/lib/ice/new-inventory-store";
-import { FruitNewInventoryProvider } from "@/lib/fruit/new-inventory-store";
-import { GlasswareInventoryProvider } from "@/lib/glassware/inventory-store";
-import { TablewareInventoryProvider } from "@/lib/tableware/inventory-store";
-import { DailyInventoryProvider } from "@/lib/daily/inventory-store";
-import { EquipmentInventoryProvider } from "@/lib/equipment/inventory-store";
-import { ModuleMonthCloseProvider } from "@/lib/month-close/module-month-close-store";
-import { GlobalBusinessMonthProvider } from "@/lib/months/global-business-month";
-import { RawExcelArchiveProvider } from "@/lib/store/monthly-report/raw-excel-archive-store";
+import { AppFeatureBoundary } from "@/components/providers/AppFeatureBoundary";
+import { markAppPerformance } from "@/lib/performance/app-performance-marks";
 import { purgeRetiredBookLibrary } from "@/lib/migrations/purge-retired-book-library";
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
@@ -74,8 +46,11 @@ export default function RootLayout() {
 
   // 初始化运行时必须尽快完成；历史数据维护不属于首屏依赖，必须在首轮交互完成后串行执行。
   useEffect(() => {
+    markAppPerformance("root.layout_effect_started");
     initManusRuntime();
+    markAppPerformance("root.runtime_ready");
     const maintenance = InteractionManager.runAfterInteractions(() => {
+      markAppPerformance("root.post_interaction_maintenance_started");
       void (async () => {
         try {
           const { cleanEmptyShiftEntries } = await import("@/lib/migrations/clean-empty-shift-entries");
@@ -98,6 +73,7 @@ export default function RootLayout() {
           if (result.cleanedRecipeSourceRefs > 0) console.log(`[Startup] 已清理 ${result.cleanedRecipeSourceRefs} 条配方中的退役来源字段`);
           if (result.directoryDeleteFailed) console.warn("[Startup] 退役内容目录尚未清理完成，将在下次启动重试");
         } catch { console.warn("[Startup] 退役内容清理未完成，将在下次启动重试"); }
+        markAppPerformance("root.post_interaction_maintenance_finished");
       })();
     });
     return () => maintenance.cancel();
@@ -151,46 +127,15 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
         <QueryClientProvider client={queryClient}>
       <I18nProvider>
-      <SyncProvider>
-      <RecipeProvider>
-          <BottleTaxonomyProvider>
-          <BottleProvider>
-          <PriceAlertProvider>
-          <HomemadeProvider>
-          <IceSettingsProvider>
-          <LabProvider>
-          <MenuPackageProvider>
-          <MenuProvider>
-          <ShoppingProvider>
-          <WineProvider>
-          <FoodMenuProvider>
-          <FoodIngredientProvider>
-          <RevenueProvider>
-          <PettyCashProvider>
-          <LabPlanProvider>
-          <SupplierPurchaseProvider>
-          <SpiritsInventoryProvider>
-          <MonthlyReportProvider>
-          <RawExcelArchiveProvider>
-          <LaborProvider>
-          <SalaryAdvanceCategoryProvider>
-          <SalaryAdvanceProvider>
-          <PettyCategoryProvider>
-          <PettyInventoryLinkProvider>
-          <PettyLaborLinkProvider>
-          <BeerInventoryProvider>
-          <IceNewInventoryProvider>
-          <FruitNewInventoryProvider>
-          <GlasswareInventoryProvider>
-          <TablewareInventoryProvider>
-          <DailyInventoryProvider>
-          <EquipmentInventoryProvider>
-          <DishAnalysisProvider>
-          <ScheduleProvider>
-          <PeriodAnalysisProvider>
-          <MonthlySummaryProvider>
-          <ModuleMonthCloseProvider>
-          <GlobalBusinessMonthProvider>
+        <SyncProvider>
+          <RecipeProvider>
+            <BottleTaxonomyProvider>
+              <BottleProvider>
+                <HomemadeProvider>
+                  <SupplierPurchaseProvider>
+            <WineProvider>
+              <GlobalBusinessMonthProvider>
+                <AppFeatureBoundary>
             <Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="recipe/[id]" />
@@ -267,48 +212,17 @@ export default function RootLayout() {
               <Stack.Screen name="suppliers" />
               <Stack.Screen name="dish-analysis" />
             </Stack>
-            <StatusBar style="auto" />
-          </GlobalBusinessMonthProvider>
-          </ModuleMonthCloseProvider>
-          </MonthlySummaryProvider>
-          </PeriodAnalysisProvider>
-          </ScheduleProvider>
-          </DishAnalysisProvider>
-          </EquipmentInventoryProvider>
-          </DailyInventoryProvider>
-          </TablewareInventoryProvider>
-          </GlasswareInventoryProvider>
-          </FruitNewInventoryProvider>
-          </IceNewInventoryProvider>
-          </BeerInventoryProvider>
-          </PettyLaborLinkProvider>
-          </PettyInventoryLinkProvider>
-          </PettyCategoryProvider>
-          </SalaryAdvanceProvider>
-          </SalaryAdvanceCategoryProvider>
-          </LaborProvider>
-          </RawExcelArchiveProvider>
-          </MonthlyReportProvider>
-          </SpiritsInventoryProvider>
-          </SupplierPurchaseProvider>
-          </LabPlanProvider>
-          </PettyCashProvider>
-          </RevenueProvider>
-          </FoodIngredientProvider>
-          </FoodMenuProvider>
-          </WineProvider>
-          </ShoppingProvider>
-          </MenuProvider>
-          </MenuPackageProvider>
-          </LabProvider>
-          </IceSettingsProvider>
-          </HomemadeProvider>
-          </PriceAlertProvider>
-          </BottleProvider>
-          </BottleTaxonomyProvider>
+              <StatusBar style="auto" />
+                </AppFeatureBoundary>
+              </GlobalBusinessMonthProvider>
+            </WineProvider>
+                  </SupplierPurchaseProvider>
+                </HomemadeProvider>
+              </BottleProvider>
+            </BottleTaxonomyProvider>
           </RecipeProvider>
-          </SyncProvider>
-          </I18nProvider>
+        </SyncProvider>
+      </I18nProvider>
         </QueryClientProvider>
     </GestureHandlerRootView>
   );
