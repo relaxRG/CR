@@ -41,3 +41,16 @@ CREATE INDEX IF NOT EXISTS idx_archive_tombstones_due
   ON archive_tombstones (purged_at, purge_after, next_attempt_at);
 CREATE INDEX IF NOT EXISTS idx_archive_tombstones_object
   ON archive_tombstones (group_id, object_key, purged_at);
+
+-- 条件提交的幂等操作记录：同一同步组内同一 operation_id 必须返回已提交的权威响应。
+CREATE TABLE IF NOT EXISTS archive_operations (
+  operation_id TEXT NOT NULL,
+  group_id TEXT NOT NULL,
+  entry_id TEXT NOT NULL,
+  response_json TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (operation_id, group_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_archive_operations_group_entry
+  ON archive_operations (group_id, entry_id, created_at DESC);
