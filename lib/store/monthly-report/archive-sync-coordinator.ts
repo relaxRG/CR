@@ -187,7 +187,7 @@ export class ArchiveMutationCoordinator {
   async apply(operationId: string): Promise<ArchiveMutationCoordinatorResult> {
     const item = (await this.list()).find((candidate) => candidate.operationId === operationId);
     if (!item) throw new Error(`找不到归档离线操作：${operationId}`);
-    if (item.state === "committed" || item.state === "deleted" || item.state === "abandoned") {
+    if (item.state === "committed" || item.state === "conflict" || item.state === "deleted" || item.state === "abandoned") {
       throw new Error(`归档离线操作不可再次提交：${operationId}`);
     }
     if (this.applying.has(operationId)) throw new Error(`归档离线操作正在执行：${operationId}`);
