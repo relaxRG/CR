@@ -9,11 +9,13 @@ import {
 const index = { entries: [], fetchedAt: 1 };
 const conflict: ArchiveConflictViewState = {
   status: "conflict",
+  operationId: "op-conflict",
   outcome: { status: "conflict", currentRevision: 4, currentStatus: "active", operationId: "op-1" },
   index,
 };
 const deleted: ArchiveConflictViewState = {
   status: "deleted",
+  operationId: "op-deleted",
   outcome: { status: "deleted", tombstoneRevision: 5, operationId: "op-2" },
   index,
 };

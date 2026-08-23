@@ -147,6 +147,36 @@ export class RawExcelArchiveRemoteBridge {
     return indexApi.fetchAuthoritativeIndex();
   }
 
+  async viewRemoteConflict(operationId: string) {
+    return this.coordinator.viewRemote(operationId);
+  }
+
+  async reimportConflictAsNew(operationId: string): Promise<ArchiveMutationCoordinatorResult> {
+    const source = (await this.coordinator.list()).find((item) => item.operationId === operationId);
+    if (!source?.request.localSourceUri) throw new Error("ARCHIVE_LOCAL_SOURCE_MISSING");
+    const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const replacementOperationId = `${source.operationId}-reimport-${suffix}`;
+    const replacementEntryId = `${source.entryId}-reimport-${suffix}`;
+    const resolution = await this.coordinator.reimportAsNewEntry(operationId, {
+      endpoint: source.request.endpoint,
+      accessToken: null,
+      operationId: replacementOperationId,
+      body: {
+        ...source.request.body,
+        entryId: replacementEntryId,
+        parentRevision: 0,
+        localSourceUri: source.request.localSourceUri,
+        ...(source.request.groupId ? { groupId: source.request.groupId } : {}),
+      },
+    });
+    if (resolution.strategy !== "reimport_new") throw new Error("ARCHIVE_REIMPORT_RESOLUTION_INVALID");
+    return this.submit(resolution.replacement.operationId);
+  }
+
+  async discardLocalConflict(operationId: string) {
+    return this.coordinator.discardLocalCopy(operationId);
+  }
+
   async resumePending(): Promise<readonly ArchiveMutationCoordinatorResult[]> {
     const [session, credentials] = await Promise.all([getDeviceSessionV2(), getDeviceCredentials()]);
     ensureArchiveImportCapability(session.policy.capabilities);

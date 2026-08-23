@@ -21,6 +21,8 @@ import { useDishAnalysisStore } from "@/lib/store/monthly-report/dish-analysis-s
 import { usePeriodAnalysisStore } from "@/lib/store/period-analysis/store";
 import type { PeriodAnalysisReport } from "@/lib/store/period-analysis/types";
 import { useRawExcelArchiveStore } from "@/lib/store/monthly-report/raw-excel-archive-store";
+import { toArchiveConflictViewState } from "@/lib/store/monthly-report/archive-conflict-view-model";
+import { ArchiveConflictResolutionController } from "@/components/store/ArchiveConflictResolutionController";
 import { normalizeMonthlyReportMonth } from "@/lib/store/monthly-report/month-key";
 import { formatRawExcelSize, getRawExcelExportFilename } from "@/lib/store/monthly-report/raw-excel-archive";
 import { createSingleFlightGate } from "@/lib/utils/single-flight-gate";
@@ -115,7 +117,11 @@ export default function MonthlyReportImportScreen() {
     archiveFiles,
     deleteFile: deleteArchivedFile,
     exportFile: exportArchivedFile,
+    remoteResults,
   } = useRawExcelArchiveStore();
+  const latestArchiveConflict = remoteResults
+    .map((result) => ({ result, conflict: toArchiveConflictViewState(result) }))
+    .find((item) => item.conflict !== null);
 
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [loading, setLoading] = useState(false);
@@ -346,6 +352,15 @@ export default function MonthlyReportImportScreen() {
             可同时选择多个文件，系统自动识别类型。业务数据按月以最新确认导入显示；每一次上传的原始 Excel 都会独立归档，可随时重新导出。
           </Text>
         </View>
+
+        {latestArchiveConflict?.conflict ? (
+          <View testID="monthly-report-archive-conflict" style={[S.archiveCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <ArchiveConflictResolutionController
+              operationId={latestArchiveConflict.conflict.operationId}
+              conflict={latestArchiveConflict.conflict}
+            />
+          </View>
+        ) : null}
 
         {/* 已归档原始文件：按业务月份和报表分类整理，可重新获取。 */}
         {archiveReady && archivedGroups.length > 0 && (

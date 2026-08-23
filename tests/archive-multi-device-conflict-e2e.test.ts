@@ -83,7 +83,12 @@ describe("多设备归档并发提交端到端模拟", () => {
     expect(indexApi.fetchAuthoritativeIndex).toHaveBeenCalledTimes(1);
 
     if (conflict.status !== "conflict" || conflict.outcome.status !== "conflict") throw new Error("预期设备B进入冲突状态");
-    const view = buildArchiveConflictViewModel({ status: "conflict", outcome: conflict.outcome, index: conflict.index });
+    const view = buildArchiveConflictViewModel({
+      status: "conflict",
+      operationId: conflict.outcome.operationId,
+      outcome: conflict.outcome,
+      index: conflict.index,
+    });
     expect(view).toEqual(expect.objectContaining({
       title: "另一台设备已更新归档",
       revision: 1,

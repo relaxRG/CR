@@ -42,6 +42,9 @@ interface RawExcelArchiveStore {
   remoteIndex: ArchiveRemoteIndex | null;
   resumeRemoteArchiveSync: () => Promise<void>;
   refreshRemoteArchiveIndex: () => Promise<ArchiveRemoteIndex | null>;
+  viewRemoteArchiveConflict: (operationId: string) => Promise<void>;
+  reimportArchiveConflictAsNew: (operationId: string) => Promise<void>;
+  discardLocalArchiveConflict: (operationId: string) => Promise<void>;
 }
 
 const RawExcelArchiveContext = createContext<RawExcelArchiveStore>({
@@ -57,6 +60,9 @@ const RawExcelArchiveContext = createContext<RawExcelArchiveStore>({
   remoteIndex: null,
   resumeRemoteArchiveSync: async () => {},
   refreshRemoteArchiveIndex: async () => null,
+  viewRemoteArchiveConflict: async () => {},
+  reimportArchiveConflictAsNew: async () => {},
+  discardLocalArchiveConflict: async () => {},
 });
 
 function getArchiveRootDirectory(): string {
@@ -121,6 +127,21 @@ export function RawExcelArchiveProvider({ children }: { children: React.ReactNod
       console.warn("[RawExcelArchive] 刷新云端归档索引失败", error);
       return null;
     }
+  }, []);
+
+  const viewRemoteArchiveConflict = useCallback(async (operationId: string) => {
+    const resolution = await remoteBridgeRef.current.viewRemoteConflict(operationId);
+    if (resolution.strategy === "view_remote") setRemoteIndex(resolution.index);
+  }, []);
+
+  const reimportArchiveConflictAsNew = useCallback(async (operationId: string) => {
+    const result = await remoteBridgeRef.current.reimportConflictAsNew(operationId);
+    recordRemoteResults([result]);
+    await refreshRemoteArchiveIndex();
+  }, [recordRemoteResults, refreshRemoteArchiveIndex]);
+
+  const discardLocalArchiveConflict = useCallback(async (operationId: string) => {
+    await remoteBridgeRef.current.discardLocalConflict(operationId);
   }, []);
 
   useEffect(() => {
@@ -260,6 +281,9 @@ export function RawExcelArchiveProvider({ children }: { children: React.ReactNod
       remoteIndex,
       resumeRemoteArchiveSync,
       refreshRemoteArchiveIndex,
+      viewRemoteArchiveConflict,
+      reimportArchiveConflictAsNew,
+      discardLocalArchiveConflict,
     }}>
       {children}
     </RawExcelArchiveContext.Provider>

@@ -1,9 +1,21 @@
 import type { ArchiveMutationOutcome } from "./archive-remote-client";
-import type { ArchiveRemoteIndex } from "./archive-sync-coordinator";
+import type { ArchiveMutationCoordinatorResult, ArchiveRemoteIndex } from "./archive-sync-coordinator";
 
 export type ArchiveConflictViewState =
-  | Readonly<{ status: "conflict"; outcome: Extract<ArchiveMutationOutcome, { status: "conflict" }>; index: ArchiveRemoteIndex }>
-  | Readonly<{ status: "deleted"; outcome: Extract<ArchiveMutationOutcome, { status: "deleted" }>; index: ArchiveRemoteIndex }>;
+  | Readonly<{ status: "conflict"; operationId: string; outcome: Extract<ArchiveMutationOutcome, { status: "conflict" }>; index: ArchiveRemoteIndex }>
+  | Readonly<{ status: "deleted"; operationId: string; outcome: Extract<ArchiveMutationOutcome, { status: "deleted" }>; index: ArchiveRemoteIndex }>;
+
+export function toArchiveConflictViewState(
+  result: ArchiveMutationCoordinatorResult,
+): ArchiveConflictViewState | null {
+  if (result.status === "conflict" && result.outcome.status === "conflict") {
+    return Object.freeze({ status: "conflict", operationId: result.outcome.operationId, outcome: result.outcome, index: result.index });
+  }
+  if (result.status === "deleted" && result.outcome.status === "deleted") {
+    return Object.freeze({ status: "deleted", operationId: result.outcome.operationId, outcome: result.outcome, index: result.index });
+  }
+  return null;
+}
 
 export type ArchiveConflictViewModel = Readonly<{
   title: string;

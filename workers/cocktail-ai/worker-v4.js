@@ -2831,47 +2831,58 @@ async function handleArchiveIndex(env, headers, origin) {
   return json({ entries, serverTime: Date.now() }, 200, origin);
 }
 async function handleArchiveCommit(env, body, headers, origin) {
-  const resolved = await archiveSession(env, headers, "reports_monthly.import", origin);
-  if (resolved.error) return resolved.error;
-  if (!env.ARCHIVES) return archiveError("ARCHIVE_STORAGE_NOT_CONFIGURED", 503, origin);
-  await ensureArchiveSchema(env);
-  const groupId = resolved.session.membership.groupId;
-  const operationId = body?.operationId;
-  const entryId = body?.entryId;
-  const parentRevision = body?.parentRevision;
-  if (!archiveString(operationId, 128) || !archiveString(entryId, 160) || !Number.isInteger(parentRevision) || parentRevision < 0) return archiveError("ARCHIVE_REQUEST_INVALID", 400, origin);
-  const previous = await env.DB.prepare("SELECT response_json FROM archive_operations WHERE group_id = ? AND operation_id = ?").bind(groupId, operationId).first();
-  if (previous?.response_json) return json(JSON.parse(previous.response_json), 200, origin);
-  const existing = await env.DB.prepare("SELECT revision, status FROM archive_entries WHERE group_id = ? AND entry_id = ?").bind(groupId, entryId).first();
-  if (existing?.status === "deleted") return archiveError("ENTRY_DELETED", 409, origin, { tombstoneRevision: Number(existing.revision) });
-  if (existing && Number(existing.revision) !== parentRevision) return archiveError("ARCHIVE_REVISION_CONFLICT", 409, origin, { currentRevision: Number(existing.revision), currentStatus: existing.status });
-  if (!archiveString(body?.month, 16) || !/^\d{4}-\d{2}$/.test(body.month) || !archiveString(body?.fileType, 80) || !archiveString(body?.filename, 200)) return archiveError("ARCHIVE_METADATA_INVALID", 400, origin);
-  const bytes = archiveBytes(body?.dataBase64);
-  if (!bytes || bytes.byteLength > 12e6) return archiveError("ARCHIVE_FILE_INVALID", 413, origin);
-  const objectKey = archiveObjectKey(groupId, entryId, operationId);
-  const now = Date.now();
-  const revision = parentRevision + 1;
-  const sha256 = await archiveDigest(bytes);
-  await env.ARCHIVES.put(objectKey, bytes, { httpMetadata: { contentType: body.filename.toLowerCase().endsWith(".xls") ? "application/vnd.ms-excel" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }, customMetadata: { groupId, entryId, revision: String(revision), sha256 } });
-  let changed = false;
-  if (existing) {
-    const result = await env.DB.prepare("UPDATE archive_entries SET month = ?, file_type = ?, filename = ?, object_key = ?, sha256 = ?, size_bytes = ?, revision = ?, status = 'active', updated_at = ? WHERE group_id = ? AND entry_id = ? AND revision = ? AND status = 'active'").bind(body.month, body.fileType, body.filename, objectKey, sha256, bytes.byteLength, revision, now, groupId, entryId, parentRevision).run();
-    changed = Number(result.meta?.changes || 0) === 1;
-  } else {
-    try {
-      await env.DB.prepare("INSERT INTO archive_entries (entry_id, group_id, month, file_type, filename, object_key, sha256, size_bytes, revision, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)").bind(entryId, groupId, body.month, body.fileType, body.filename, objectKey, sha256, bytes.byteLength, revision, now, now).run();
-      changed = true;
-    } catch { changed = false; }
+  let uploadedObjectKey = null;
+  try {
+    const resolved = await archiveSession(env, headers, "reports_monthly.import", origin);
+    if (resolved.error) return resolved.error;
+    if (!env.ARCHIVES) return archiveError("ARCHIVE_STORAGE_NOT_CONFIGURED", 503, origin);
+    await ensureArchiveSchema(env);
+    const groupId = resolved.session.membership.groupId;
+    const operationId = body?.operationId;
+    const entryId = body?.entryId;
+    const parentRevision = body?.parentRevision;
+    if (!archiveString(operationId, 128) || !archiveString(entryId, 160) || !Number.isInteger(parentRevision) || parentRevision < 0) return archiveError("ARCHIVE_REQUEST_INVALID", 400, origin);
+    const previous = await env.DB.prepare("SELECT response_json FROM archive_operations WHERE group_id = ? AND operation_id = ?").bind(groupId, operationId).first();
+    if (previous?.response_json) return json(JSON.parse(previous.response_json), 200, origin);
+    const existing = await env.DB.prepare("SELECT revision, status FROM archive_entries WHERE group_id = ? AND entry_id = ?").bind(groupId, entryId).first();
+    if (existing?.status === "deleted") return archiveError("ENTRY_DELETED", 409, origin, { tombstoneRevision: Number(existing.revision) });
+    if (existing && Number(existing.revision) !== parentRevision) return archiveError("ARCHIVE_REVISION_CONFLICT", 409, origin, { currentRevision: Number(existing.revision), currentStatus: existing.status });
+    if (!archiveString(body?.month, 16) || !/^\d{4}-\d{2}$/.test(body.month) || !archiveString(body?.fileType, 80) || !archiveString(body?.filename, 200)) return archiveError("ARCHIVE_METADATA_INVALID", 400, origin);
+    const bytes = archiveBytes(body?.dataBase64);
+    if (!bytes || bytes.byteLength > 12e6) return archiveError("ARCHIVE_FILE_INVALID", 413, origin);
+    const objectKey = archiveObjectKey(groupId, entryId, operationId);
+    const now = Date.now();
+    const revision = parentRevision + 1;
+    const sha256 = await archiveDigest(bytes);
+    await env.ARCHIVES.put(objectKey, bytes, { httpMetadata: { contentType: body.filename.toLowerCase().endsWith(".xls") ? "application/vnd.ms-excel" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }, customMetadata: { groupId, entryId, revision: String(revision), sha256 } });
+    uploadedObjectKey = objectKey;
+    let changed = false;
+    if (existing) {
+      const result = await env.DB.prepare("UPDATE archive_entries SET month = ?, file_type = ?, filename = ?, object_key = ?, sha256 = ?, size_bytes = ?, revision = ?, status = 'active', updated_at = ? WHERE group_id = ? AND entry_id = ? AND revision = ? AND status = 'active'").bind(body.month, body.fileType, body.filename, objectKey, sha256, bytes.byteLength, revision, now, groupId, entryId, parentRevision).run();
+      changed = Number(result.meta?.changes || 0) === 1;
+    } else {
+      try {
+        await env.DB.prepare("INSERT INTO archive_entries (entry_id, group_id, month, file_type, filename, object_key, sha256, size_bytes, revision, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)").bind(entryId, groupId, body.month, body.fileType, body.filename, objectKey, sha256, bytes.byteLength, revision, now, now).run();
+        changed = true;
+      } catch { changed = false; }
+    }
+    if (!changed) {
+      await env.ARCHIVES.delete(objectKey);
+      uploadedObjectKey = null;
+      const current = await env.DB.prepare("SELECT revision, status FROM archive_entries WHERE group_id = ? AND entry_id = ?").bind(groupId, entryId).first();
+      if (current?.status === "deleted") return archiveError("ENTRY_DELETED", 409, origin, { tombstoneRevision: Number(current.revision) });
+      return archiveError("ARCHIVE_REVISION_CONFLICT", 409, origin, { currentRevision: Number(current?.revision || 0), currentStatus: "active" });
+    }
+    const response = { entryId, revision };
+    await env.DB.prepare("INSERT OR IGNORE INTO archive_operations (group_id, operation_id, response_json, created_at) VALUES (?, ?, ?, ?)").bind(groupId, operationId, JSON.stringify(response), now).run();
+    return json(response, 201, origin);
+  } catch (error) {
+    if (uploadedObjectKey && env.ARCHIVES) {
+      try { await env.ARCHIVES.delete(uploadedObjectKey); } catch {}
+    }
+    console.error("[archive] ARCHIVE_STORAGE_FAILURE", error instanceof Error ? error.name : "unknown");
+    return archiveError("ARCHIVE_STORAGE_FAILURE", 503, origin);
   }
-  if (!changed) {
-    await env.ARCHIVES.delete(objectKey);
-    const current = await env.DB.prepare("SELECT revision, status FROM archive_entries WHERE group_id = ? AND entry_id = ?").bind(groupId, entryId).first();
-    if (current?.status === "deleted") return archiveError("ENTRY_DELETED", 409, origin, { tombstoneRevision: Number(current.revision) });
-    return archiveError("ARCHIVE_REVISION_CONFLICT", 409, origin, { currentRevision: Number(current?.revision || 0), currentStatus: "active" });
-  }
-  const response = { entryId, revision };
-  await env.DB.prepare("INSERT OR IGNORE INTO archive_operations (group_id, operation_id, response_json, created_at) VALUES (?, ?, ?, ?)").bind(groupId, operationId, JSON.stringify(response), now).run();
-  return json(response, 201, origin);
 }
 var worker_v3_default = {
   async fetch(request, env, ctx) {
