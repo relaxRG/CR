@@ -1,0 +1,31 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "cocktail-archive-gc",
+  "main": "archive-gc-worker.js",
+  "compatibility_date": "2026-08-18",
+  "account_id": "c079066172316a7f47847b1277208cec",
+  "workers_dev": false,
+  "keep_vars": true,
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "cocktail-r-db",
+      "database_id": "<EXISTING_D1_DATABASE_ID>",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "ARCHIVES",
+      "bucket_name": "<EXISTING_PRIVATE_ARCHIVE_BUCKET>"
+    }
+  ],
+  "triggers": {
+    "crons": ["17 3 * * *"]
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 0.1
+  }
+}
