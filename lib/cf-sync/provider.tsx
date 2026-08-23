@@ -12,7 +12,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Alert, AppState, Platform } from "react-native";
+import { Alert, AppState, InteractionManager, Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { addNetworkStateListener } from "expo-network";
 import {
@@ -354,8 +354,11 @@ export function SyncProvider({
 
       // 历史 iOS-on-Mac 记录仅更新平台展示元数据，不参与任何业务授权判断。
       void refreshCurrentDevicePlatform();
-      void createSnapshot().catch((e) => console.warn("[CFSync] local snapshot failed:", e));
-      startAutoBackup(activeSession.session.device.name);
+      // 备份、iCloud 备份和照片扫描可等待当前动画/手势结束；它们从不属于同步合并的前置条件。
+      InteractionManager.runAfterInteractions(() => {
+        void createSnapshot().catch((e) => console.warn("[CFSync] local snapshot failed:", e));
+        startAutoBackup(activeSession.session.device.name);
+      });
 
       const { overwritten, conflicts } = await runInitialSync(pull.entries, pushFn);
       if (overwritten && Platform.OS === "web" && typeof window !== "undefined") {
@@ -366,18 +369,20 @@ export function SyncProvider({
       if (conflicts.length > 0) {
         setPendingConflicts(conflicts);
       }
-      // 成品照片同步（非阻塞）：上传本地新照片、下载云端缺失照片并修复路径。
+      // 成品照片同步（非阻塞）：必须等当前交互结束，避免首次打开/前台恢复时文件扫描占用 JS 线程。
       // 下载/路径修复发生后触发 store 重载，让详情页立即显示照片。
-      void syncPhotos()
-        .then(({ downloaded, repaired, oversized }) => {
-          if ((downloaded > 0 || repaired) && Platform.OS !== "web") {
-            triggerStoreReload();
-          }
-          if (oversized > 0) {
-            console.warn(`[CFSync] ${oversized} photo(s) skipped (too large to sync)`);
-          }
-        })
-        .catch(() => {});
+      InteractionManager.runAfterInteractions(() => {
+        void syncPhotos()
+          .then(({ downloaded, repaired, oversized }) => {
+            if ((downloaded > 0 || repaired) && Platform.OS !== "web") {
+              triggerStoreReload();
+            }
+            if (oversized > 0) {
+              console.warn(`[CFSync] ${oversized} photo(s) skipped (too large to sync)`);
+            }
+          })
+          .catch(() => {});
+      });
      setSyncError(null);
      retryCountRef.current = 0;
      lastSyncAtRef.current = Date.now();
@@ -441,7 +446,8 @@ export function SyncProvider({
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
-    void (async () => {
+    const startup = InteractionManager.runAfterInteractions(() => {
+      void (async () => {
       setIsGroupSwitching(true);
       const recovery = await recoverPendingGroupSwitch(groupSwitchRuntime);
       setIsGroupSwitching(false);
@@ -460,8 +466,10 @@ export function SyncProvider({
           void performSync();
         });
       }
-    })();
+      })();
+    });
     return () => {
+      startup.cancel();
       if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
       stopRealtimeRef.current?.();
       stopRealtimeRef.current = null;

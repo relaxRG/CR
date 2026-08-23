@@ -5,7 +5,7 @@ import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
-import { Platform } from "react-native";
+import { InteractionManager, Platform } from "react-native";
 import "@/lib/_core/nativewind-pressable";
 import { ThemeProvider } from "@/lib/theme-provider";
 import {
@@ -72,35 +72,35 @@ export default function RootLayout() {
   const [insets, setInsets] = useState<EdgeInsets>(initialInsets);
   const [frame, setFrame] = useState<Rect>(initialFrame);
 
-  // Initialize Manus runtime for cookie injection from parent container
+  // 初始化运行时必须尽快完成；历史数据维护不属于首屏依赖，必须在首轮交互完成后串行执行。
   useEffect(() => {
     initManusRuntime();
-    // 迁移脚本：清理历史遗留的空排班记录（hoursValue=null 且无特殊状态）
-    // 根因：SchHoursModal 旧版本清空工时保留了空记录，导致考勤统计异常（已修复于 commit e70c4c5）
-    import("@/lib/migrations/clean-empty-shift-entries").then(({ cleanEmptyShiftEntries }) => {
-      cleanEmptyShiftEntries().then((removed) => {
-        if (removed > 0) console.log(`[Startup] 已清理 ${removed} 条空排班记录`);
-      });
+    const maintenance = InteractionManager.runAfterInteractions(() => {
+      void (async () => {
+        try {
+          const { cleanEmptyShiftEntries } = await import("@/lib/migrations/clean-empty-shift-entries");
+          const removed = await cleanEmptyShiftEntries();
+          if (removed > 0) console.log(`[Startup] 已清理 ${removed} 条空排班记录`);
+        } catch { /* 迁移失败允许下次启动重试，不阻塞业务首屏。 */ }
+        try {
+          const { cleanMonthlyFixedSalary } = await import("@/lib/migrations/clean-monthly-fixed-salary");
+          const cleaned = await cleanMonthlyFixedSalary();
+          if (cleaned > 0) console.log(`[Startup] 已清理 ${cleaned} 条员工记录中的 monthlyFixedSalary 字段`);
+        } catch { /* 同上。 */ }
+        try {
+          const { cleanLegacyBusinessMonthKeys } = await import("@/lib/migrations/clean-legacy-business-month-keys");
+          const removed = await cleanLegacyBusinessMonthKeys();
+          if (removed > 0) console.log(`[Startup] 已清理 ${removed} 个旧模块月份键`);
+        } catch { /* 同上。 */ }
+        try {
+          const result = await purgeRetiredBookLibrary();
+          if (result.removedStorageKeys > 0) console.log(`[Startup] 已永久清理 ${result.removedStorageKeys} 项退役内容数据`);
+          if (result.cleanedRecipeSourceRefs > 0) console.log(`[Startup] 已清理 ${result.cleanedRecipeSourceRefs} 条配方中的退役来源字段`);
+          if (result.directoryDeleteFailed) console.warn("[Startup] 退役内容目录尚未清理完成，将在下次启动重试");
+        } catch { console.warn("[Startup] 退役内容清理未完成，将在下次启动重试"); }
+      })();
     });
-    // 迁移脚本：清理历史遗留的 monthlyFixedSalary 字段（幽灵字段，已删除于 commit be4f76e）
-    // 根因：该字段存在于 Employee 接口但从未被计算引擎使用，属于幽灵字段
-    import("@/lib/migrations/clean-monthly-fixed-salary").then(({ cleanMonthlyFixedSalary }) => {
-      cleanMonthlyFixedSalary().then((cleaned) => {
-        if (cleaned > 0) console.log(`[Startup] 已清理 ${cleaned} 条员工记录中的 monthlyFixedSalary 字段`);
-      });
-    });
-    import("@/lib/migrations/clean-legacy-business-month-keys").then(({ cleanLegacyBusinessMonthKeys }) => {
-      cleanLegacyBusinessMonthKeys().then((removed) => {
-        if (removed > 0) console.log(`[Startup] 已清理 ${removed} 个旧模块月份键`);
-      });
-    });
-    void purgeRetiredBookLibrary()
-      .then((result) => {
-        if (result.removedStorageKeys > 0) console.log(`[Startup] 已永久清理 ${result.removedStorageKeys} 项退役内容数据`);
-        if (result.cleanedRecipeSourceRefs > 0) console.log(`[Startup] 已清理 ${result.cleanedRecipeSourceRefs} 条配方中的退役来源字段`);
-        if (result.directoryDeleteFailed) console.warn("[Startup] 退役内容目录尚未清理完成，将在下次启动重试");
-      })
-      .catch(() => console.warn("[Startup] 退役内容清理未完成，将在下次启动重试"));
+    return () => maintenance.cancel();
   }, []);
 
   const handleSafeAreaUpdate = useCallback((metrics: Metrics) => {

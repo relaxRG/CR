@@ -648,10 +648,9 @@ export async function initSyncState() {
 
 export async function backupLocalData(): Promise<void> {
   try {
-    const snapshot: Record<string, string | null> = {};
-    for (const key of SYNC_KEYS) {
-      snapshot[key] = await AsyncStorage.getItem(key);
-    }
+    // 使用一次批量读取而不是逐键跨桥调用，避免首次同步的自动备份抢占首屏交互。
+    const pairs = await AsyncStorage.multiGet([...SYNC_KEYS]);
+    const snapshot: Record<string, string | null> = Object.fromEntries(pairs);
     const backup = { time: Date.now(), data: snapshot };
     await AsyncStorage.setItem(BACKUP_KEY, JSON.stringify(backup));
     setState({ hasBackup: true });
@@ -787,6 +786,19 @@ async function flushDirtyKeys() {
  * 2. 有时间戳的键才允许上传（localTs > 0 守卫）
  * 3. 同步完成后解锁 initialSyncDone，允许后续 flushDirtyKeys 推送
  */
+type LocalSyncEntry = { value: string | null; timestamp: number };
+
+/** 一次读取同步值与时间戳，保证首次同步在同一份本地快照上决策。 */
+async function readLocalSyncSnapshot(): Promise<Map<string, LocalSyncEntry>> {
+  const keys = SYNC_KEYS.flatMap((key) => [key, TS_PREFIX + key]);
+  const pairs = await AsyncStorage.multiGet(keys);
+  const values = new Map(pairs);
+  return new Map(SYNC_KEYS.map((key) => [key, {
+    value: values.get(key) ?? null,
+    timestamp: Number(values.get(TS_PREFIX + key) ?? 0) || 0,
+  }]));
+}
+
 export async function runInitialSync(
   remoteEntries: { storageKey: string; value: string; clientUpdatedAt: number }[],
   push: PushFn,
@@ -805,17 +817,18 @@ export async function runInitialSync(
 
   try {
     const remoteMap = new Map(remoteEntries.map((e) => [e.storageKey, e]));
+    const localSnapshot = await readLocalSyncSnapshot();
     const toUpload: { storageKey: string; value: string; clientUpdatedAt: number }[] = [];
     const pulledKeys: string[] = [];
+    const pullWrites: [string, string][] = [];
 
-    // 预扫描：是否需要备份（有时间戳的键才参与判断）
+    // 预扫描：是否需要备份（有时间戳的键才参与判断）。使用同一批本地快照，
+    // 避免 95 个键在预扫描与主循环之间重复跨桥读取。
     let willOverwrite = false;
     for (const key of SYNC_KEYS) {
-      const [localValue, localTsRaw] = await Promise.all([
-        AsyncStorage.getItem(key),
-        AsyncStorage.getItem(TS_PREFIX + key),
-      ]);
-      const localTs = localTsRaw ? Number(localTsRaw) : 0;
+      const local = localSnapshot.get(key)!;
+      const localValue = local.value;
+      const localTs = local.timestamp;
       const remote = remoteMap.get(key);
       if (remote && localValue && localTs > 0 && remote.clientUpdatedAt > localTs) {
         const diff = Math.abs(remote.clientUpdatedAt - localTs);
@@ -831,11 +844,9 @@ export async function runInitialSync(
 
     // ── 主同步循环 ────────────────────────────────────────────────────────────
     for (const key of SYNC_KEYS) {
-      const [localValue, localTsRaw] = await Promise.all([
-        AsyncStorage.getItem(key),
-        AsyncStorage.getItem(TS_PREFIX + key),
-      ]);
-      const localTs = localTsRaw ? Number(localTsRaw) : 0;
+      const local = localSnapshot.get(key)!;
+      const localValue = local.value;
+      const localTs = local.timestamp;
       const remote = remoteMap.get(key);
 
       // ★ P0-B：空设备标志（无时间戳 = 从未同步过，或全新安装）
@@ -875,12 +886,16 @@ export async function runInitialSync(
           const { merged, changed } = mergeByKey(key, localValue, remote!.value);
           mergedValue = merged;
           if (changed) {
-            const now2 = Date.now();
-            toUpload.push({ storageKey: key, value: merged, clientUpdatedAt: now2 });
+            const mergedAt = Date.now();
+            toUpload.push({ storageKey: key, value: merged, clientUpdatedAt: mergedAt });
+            // 字段级合并后的本地时间戳必须与待上传值一致，避免下次前台同步重复合并。
+            pullWrites.push([key, mergedValue], [TS_PREFIX + key, String(mergedAt)]);
+          } else {
+            pullWrites.push([key, mergedValue], [TS_PREFIX + key, String(remote!.clientUpdatedAt)]);
           }
+        } else {
+          pullWrites.push([key, mergedValue], [TS_PREFIX + key, String(remote!.clientUpdatedAt)]);
         }
-        await AsyncStorage.setItem(key, mergedValue);
-        await AsyncStorage.setItem(TS_PREFIX + key, String(remote!.clientUpdatedAt));
         localOverwritten = true;
         pulledKeys.push(key);
       }
@@ -899,6 +914,8 @@ export async function runInitialSync(
         });
       }
     }
+
+    if (pullWrites.length > 0) await AsyncStorage.multiSet(pullWrites);
 
     if (toUpload.length > 0) {
       for (let i = 0; i < toUpload.length; i += 8) {
