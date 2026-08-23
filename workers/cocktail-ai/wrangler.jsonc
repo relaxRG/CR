@@ -25,6 +25,13 @@
     }
   ],
 
+  "r2_buckets": [
+    {
+      "binding": "ARCHIVES",
+      "bucket_name": "<EXISTING_PRIVATE_ARCHIVE_BUCKET>"
+    }
+  ],
+
   "ai": {
     "binding": "AI"
   },
