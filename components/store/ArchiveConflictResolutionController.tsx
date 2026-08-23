@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { Text, View } from "react-native";
 import {
   ArchiveConflictResolutionPanel,
@@ -28,9 +28,11 @@ export function ArchiveConflictResolutionController({
   } = useRawExcelArchiveStore();
   const [busy, setBusy] = useState<"view" | "reimport" | "discard" | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const inFlightRef = useRef(false);
 
   const run = async (kind: "view" | "reimport" | "discard", action: () => Promise<void>) => {
-    if (busy) return;
+    if (busy || inFlightRef.current) return;
+    inFlightRef.current = true;
     setBusy(kind);
     setFeedback(null);
     try {
@@ -44,6 +46,7 @@ export function ArchiveConflictResolutionController({
     } catch (error) {
       setFeedback(error instanceof Error ? `处理未完成：${error.message}` : "处理未完成，请稍后重试。");
     } finally {
+      inFlightRef.current = false;
       setBusy(null);
     }
   };

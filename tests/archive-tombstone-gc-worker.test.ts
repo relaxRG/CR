@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { isArchiveObjectKeyForGroup, runArchiveTombstoneGc } from "../workers/cocktail-ai/archive-gc-worker.js";
+import { isArchiveObjectKeyForGroup, runArchiveOrphanReconciliation, runArchiveTombstoneGc } from "../workers/cocktail-ai/archive-gc-worker.js";
 
 type Tombstone = {
   entry_id: string;
@@ -93,6 +93,47 @@ describe("归档墓碑GC Worker", () => {
         values: expect.arrayContaining(["OBJECT_STILL_REFERENCED"]),
       }),
     ]));
+  });
+
+  it("R2先写D1后失败且即时删除也失败时，超过宽限期的无索引对象会被协调任务清理", async () => {
+    const orphan = "groups/group-a/monthly-raw/objects/orphan-op.xlsx";
+    const active = "groups/group-a/monthly-raw/objects/active-op.xlsx";
+    const protectedObject = "groups/group-a/monthly-raw/objects/deleted-op.xlsx";
+    const fresh = "groups/group-a/monthly-raw/objects/fresh-op.xlsx";
+    const remove = vi.fn(async () => undefined);
+    const env = {
+      ARCHIVES: {
+        delete: remove,
+        list: vi.fn(async () => ({ objects: [
+          { key: orphan, uploaded: new Date(0) },
+          { key: active, uploaded: new Date(0) },
+          { key: protectedObject, uploaded: new Date(0) },
+          { key: fresh, uploaded: new Date(19_500) },
+          { key: "groups/group-a/monthly-raw/2026-08/legacy.xlsx", uploaded: new Date(0) },
+        ] })),
+      },
+      DB: {
+        prepare(sql: string) {
+          return {
+            bind(...values: unknown[]) {
+              return {
+                first: async () => {
+                  const objectKey = String(values[1]);
+                  if (sql.includes("FROM archive_entries") && objectKey === active) return { entry_id: "active-entry" };
+                  if (sql.includes("FROM archive_tombstones") && objectKey === protectedObject) return { entry_id: "deleted-entry" };
+                  return null;
+                },
+              };
+            },
+          };
+        },
+      },
+    };
+
+    const summary = await runArchiveOrphanReconciliation(env, { now: 20_000, graceMs: 1_000 });
+    expect(summary).toEqual({ scanned: 4, deleted: 1, retainedActive: 1, retainedTombstone: 1, skippedFresh: 1, skippedUnmanaged: 1 });
+    expect(remove).toHaveBeenCalledTimes(1);
+    expect(remove).toHaveBeenCalledWith(orphan);
   });
 
   it("R2删除失败时保存错误并按退避时间重试；跨组或路径穿越对象键不会触达R2", async () => {

@@ -3,6 +3,7 @@ const MAX_BATCH_SIZE = 200;
 const RETRY_BASE_MS = 5 * 60 * 1000;
 const RETRY_MAX_MS = 24 * 60 * 60 * 1000;
 const REFERENCE_RETRY_MS = 60 * 60 * 1000;
+const ORPHAN_GRACE_MS = 15 * 60 * 1000;
 
 function json(payload, status = 200) {
   return new Response(JSON.stringify(payload), {
@@ -108,6 +109,57 @@ export async function runArchiveTombstoneGc(env, options = {}) {
   return Object.freeze(summary);
 }
 
+/**
+ * 处理“R2写入成功但D1条件提交与即时删除均失败”留下的对象。
+ * 仅在对象超过宽限期、没有active索引且不受未清理tombstone保护时删除，
+ * 避免与正常的R2先写、D1后提交窗口竞争。
+ */
+export async function runArchiveOrphanReconciliation(env, options = {}) {
+  assertBinding(env, "DB");
+  assertBinding(env, "ARCHIVES");
+
+  const now = options.now ?? Date.now();
+  const graceMs = Math.max(0, options.graceMs ?? ORPHAN_GRACE_MS);
+  const listed = await env.ARCHIVES.list({
+    prefix: "groups/",
+    limit: Math.max(1, Math.min(MAX_BATCH_SIZE, options.batchSize ?? DEFAULT_BATCH_SIZE)),
+  });
+  const summary = { scanned: 0, deleted: 0, retainedActive: 0, retainedTombstone: 0, skippedFresh: 0, skippedUnmanaged: 0 };
+
+  for (const object of listed.objects || []) {
+    const match = /^groups\/([^/]+)\/monthly-raw\/objects\/[^/]+\.xlsx$/.exec(object.key);
+    if (!match) {
+      summary.skippedUnmanaged += 1;
+      continue;
+    }
+    summary.scanned += 1;
+    const uploadedAt = object.uploaded instanceof Date ? object.uploaded.getTime() : Number.NaN;
+    if (!Number.isFinite(uploadedAt) || now - uploadedAt < graceMs) {
+      summary.skippedFresh += 1;
+      continue;
+    }
+    const groupId = match[1];
+    const active = await env.DB.prepare(
+      "SELECT entry_id FROM archive_entries WHERE group_id = ? AND object_key = ? AND status = 'active' LIMIT 1",
+    ).bind(groupId, object.key).first();
+    if (active) {
+      summary.retainedActive += 1;
+      continue;
+    }
+    const protectedByTombstone = await env.DB.prepare(
+      "SELECT entry_id FROM archive_tombstones WHERE group_id = ? AND object_key = ? AND purged_at IS NULL LIMIT 1",
+    ).bind(groupId, object.key).first();
+    if (protectedByTombstone) {
+      summary.retainedTombstone += 1;
+      continue;
+    }
+    await env.ARCHIVES.delete(object.key);
+    summary.deleted += 1;
+  }
+
+  return Object.freeze(summary);
+}
+
 export default {
   async fetch(request) {
     const url = new URL(request.url);
@@ -117,8 +169,8 @@ export default {
 
   async scheduled(event, env, ctx) {
     ctx.waitUntil(
-      runArchiveTombstoneGc(env)
-        .then((summary) => console.log("[ArchiveGC] completed", JSON.stringify(summary)))
+      Promise.all([runArchiveTombstoneGc(env), runArchiveOrphanReconciliation(env)])
+        .then(([tombstones, orphans]) => console.log("[ArchiveGC] completed", JSON.stringify({ tombstones, orphans })))
         .catch((error) => console.error("[ArchiveGC] failed", error instanceof Error ? error.message : "unknown")),
     );
   },
