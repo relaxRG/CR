@@ -7,7 +7,6 @@
  */
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
-import * as XLSX from "xlsx";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { FoodIngredient } from "@/lib/food/types";
 import { normalizeImportDate } from "@/lib/import/date-utils";
@@ -286,8 +285,10 @@ export async function parseSupplierExcel(): Promise<SupplierImportPreview | null
     throw new Error("无法读取文件，请确认文件权限");
   }
 
-  let workbook: XLSX.WorkBook;
+  let XLSX: typeof import("xlsx");
+  let workbook: import("xlsx").WorkBook;
   try {
+    XLSX = await import("xlsx");
     workbook = XLSX.read(base64, { type: "base64" });
   } catch {
     throw new Error("文件格式不支持，请使用 .xlsx 文件");

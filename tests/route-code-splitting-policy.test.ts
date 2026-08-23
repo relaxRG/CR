@@ -23,6 +23,25 @@ describe("路由按需加载护栏", () => {
     expect(pettyCash).not.toContain('import { importIcostExcel }');
   });
 
+  it("仅在烈酒用户导入、导出或 PDF 识别时加载重型模块", () => {
+    const spirits = source("components/inventory/SpiritsInventoryWorkspaceScreen.tsx");
+
+    expect(spirits).toContain('await import("@/lib/spirits/export")');
+    expect(spirits).toContain('await import("@/lib/spirits/excel-parser")');
+    expect(spirits).toContain('await import("@/lib/spirits/pdf-import")');
+    expect(spirits).toContain('import("@/lib/spirits/excel-import")');
+    expect(spirits).toContain('import("xlsx")');
+    expect(spirits).not.toContain('import { parseSpiritInventoryExcel }');
+    expect(spirits).not.toContain('import { exportToExcel');
+  });
+
+  it("仅在供应商选择 Excel 文件后加载 XLSX 读取器", () => {
+    const supplierImport = source("lib/store/supplier-import.ts");
+
+    expect(supplierImport).toContain('XLSX = await import("xlsx")');
+    expect(supplierImport).not.toContain('import * as XLSX from "xlsx"');
+  });
+
   it("仅在选择葡萄酒工作簿后加载 XLSX 读取器", () => {
     const engine = source("lib/wine/workbook-engine.ts");
     const importer = source("app/wine-inventory-import.tsx");

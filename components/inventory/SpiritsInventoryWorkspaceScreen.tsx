@@ -33,15 +33,11 @@ import {
 } from "@/lib/spirits/types";
 import { resolveSpiritItemForSupplierName } from "@/lib/spirits/supplier-alias";
 import { resolvePurchaseDisplayCategory } from "@/lib/spirits/purchase-category-sync";
-import {
-  ParsedPurchaseRow, previewSheets, parseSheetFromWorkbook,
-} from "@/lib/spirits/excel-import";
-import { parseSpiritInventoryExcel } from "@/lib/spirits/excel-parser";
+import type { ParsedPurchaseRow } from "@/lib/spirits/excel-import";
 import { buildImportedPurchaseRecords, dominantPurchaseMonth } from "@/lib/spirits/import-bridge";
 import { normalizeImportDate } from "@/lib/import/date-utils";
 import {   SpiritMonthlySnapshot, SpiritInventoryItem, SpiritPriceChange, SpiritPurchaseOrderItem } from "@/lib/spirits/types";
-import { normalizeLLMRows } from "@/lib/spirits/pdf-import";
-import { exportToExcel, exportToPdf, ExportData } from "@/lib/spirits/export";
+import type { ExportData } from "@/lib/spirits/export";
 import { formatStoreMoney, STORE_TABLE_METRICS } from "@/lib/store/table-display";
 import { INVENTORY_WORKSPACE_METRICS, resolveInventoryTableWindowLayout, scaleInventoryTableWidths, tableHeaderAccessibilityLabel } from "@/lib/store/inventory-workspace-ui";
 import {
@@ -283,6 +279,7 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
         categorySummary,
         supplierSummary,
       };
+      const { exportToExcel, exportToPdf } = await import("@/lib/spirits/export");
       if (format === "excel") {
         await exportToExcel(exportData);
       } else {
@@ -725,6 +722,7 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
       if (result.canceled || !result.assets?.[0]) { setLedgerImporting(false); return; }
       const asset = result.assets[0];
       const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 });
+      const { parseSpiritInventoryExcel } = await import("@/lib/spirits/excel-parser");
       const { snapshot, priceChanges: changes, error } = parseSpiritInventoryExcel(base64);
       if (!snapshot || snapshot.items.length === 0) {
         Alert.alert("解析失败", error ?? "未能识别烈酒盘点数据\n\n请确认 Excel 包含「烈酒盘点」工作表，格式为：产品序号/盘点分类/中文名/期初库存量/期初单位成本/期初库存成本/本月进货量/本月进货成本/期末库存量/单位成本/期末库存成本/消耗瓶数/本期消耗量");
@@ -1970,6 +1968,7 @@ function SupplierDetailScreen({
         Alert.alert("解析失败", "AI 未能识别进货单内容，请尝试 Excel 导入或手动录入");
         setPdfImporting(false); return;
       }
+      const { normalizeLLMRows } = await import("@/lib/spirits/pdf-import");
       const normalized = normalizeLLMRows(llmResult, supplier);
       if (!normalized.rows.length) {
         Alert.alert("提示", `AI 解析完成但未找到有效记录\n\n${normalized.errors.join("\n") || "请确认 PDF 包含进货单表格数据"}`);
@@ -1996,15 +1995,18 @@ function SupplierDetailScreen({
       if (result.canceled || !result.assets?.[0]) { setImporting(false); return; }
       const asset = result.assets[0];
       const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 });
-      const XLSX = require("xlsx");
+      const [XLSX, excelImport] = await Promise.all([
+        import("xlsx"),
+        import("@/lib/spirits/excel-import"),
+      ]);
       const workbook = XLSX.read(base64, { type: "base64", cellDates: true, raw: false });
       let targetSheet = workbook.SheetNames[0];
       if (workbook.SheetNames.length > 1) {
-        const sheets = previewSheets(workbook);
+        const sheets = excelImport.previewSheets(workbook);
         const valid = sheets.filter((s) => s.isValid);
         if (valid.length >= 1) targetSheet = valid.sort((a, b) => b.rowCount - a.rowCount)[0].name;
       }
-      const parsed = parseSheetFromWorkbook(workbook, targetSheet, { supplierHint: supplier, fileName: asset.name ?? "import.xlsx" });
+      const parsed = excelImport.parseSheetFromWorkbook(workbook, targetSheet, { supplierHint: supplier, fileName: asset.name ?? "import.xlsx" });
       if (!parsed.rows.length) { Alert.alert("提示", "未解析到有效数据，请检查文件格式"); setImporting(false); return; }
       // 打开全屏预览 Modal（可编辑）
       setImportPreviewRows(parsed.rows);
