@@ -6,7 +6,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { formatMoney } from "@/lib/utils";
 import { sumMoney } from "@/lib/finance/money";
 import {
-  Alert, KeyboardAvoidingView, Modal, Platform, Pressable,
+  Alert, FlatList, KeyboardAvoidingView, Modal, Platform, Pressable,
   ScrollView, StyleSheet, Text, TextInput, TouchableOpacity,
   View, ActivityIndicator, useWindowDimensions,
 } from "react-native";
@@ -230,6 +230,8 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
 
   const monthPurchases = useMemo(() => getMonthPurchases(selectedMonth), [purchases, selectedMonth]);
   const monthLedger = useMemo(() => getMonthLedger(selectedMonth), [ledger, selectedMonth]);
+  const itemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
+  const monthLedgerByItemId = useMemo(() => new Map(monthLedger.map((entry) => [entry.itemId, entry])), [monthLedger]);
 
   // 上月
   const [y, m] = selectedMonth.split("-").map(Number);
@@ -298,7 +300,7 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
     const supplierNames = [...new Set(monthPurchases.map((p) => p.supplier ?? "未知"))];
     const byItem: Record<string, { item: SpiritItem; bySupplier: Record<string, { qty: number; amount: number; unitPrice: number }> }> = {};
     monthPurchases.forEach((p) => {
-      const item = items.find((i) => i.id === p.itemId);
+      const item = p.itemId ? itemById.get(p.itemId) : undefined;
       if (!item) return;
       if (!byItem[item.id]) byItem[item.id] = { item, bySupplier: {} };
       const sup = p.supplier ?? "未知";
@@ -307,7 +309,7 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
       byItem[item.id].bySupplier[sup].amount += p.amount;
     });
     return { rows: Object.values(byItem), supplierNames };
-  }, [monthPurchases, items]);
+  }, [monthPurchases, itemById]);
 
   // 环形图数据
   const chartData = useMemo(() => {
@@ -327,7 +329,7 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
     // group
     const groupTotals: Record<string, number> = {};
     monthPurchases.forEach((p) => {
-      const item = items.find((i) => i.id === p.itemId);
+      const item = p.itemId ? itemById.get(p.itemId) : undefined;
       if (!item) return;
       const g = getItemGroup(item);
       groupTotals[g] = (groupTotals[g] ?? 0) + p.amount;
@@ -338,7 +340,7 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
     return Object.entries(groupTotals).map(([g, v]) => ({
       label: g, value: v, pct: Math.round(v / total * 100), color: GROUP_COLORS[g] ?? "#6B7280",
     })).sort((a, b) => b.value - a.value);
-  }, [chartDimension, categorySummary, supplierSummary, monthPurchases, items, groups]);
+  }, [chartDimension, categorySummary, supplierSummary, monthPurchases, itemById, groups]);
 
   const renderSummary = () => (
     <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }}>
@@ -620,7 +622,7 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
   const [ledgerTableView, setLedgerTableView] = useState(DEFAULT_LEDGER_TABLE_VIEW);
   const [activeLedgerColumn, setActiveLedgerColumn] = useState<LedgerSortKey | null>(null);
   const ledgerTableRows = useMemo(() => items.filter((item) => item.active).map((item) => {
-    const entry = getItemLedger(item.id, selectedMonth);
+    const entry = monthLedgerByItemId.get(item.id);
     const displayName = (ledgerNameLanguage === "zh" ? item.name : item.nameEn)?.trim() || (ledgerNameLanguage === "zh" ? item.nameEn : item.name)?.trim() || item.name;
     const consumeCost = entry?.consumeCost ?? ((entry?.consumeQty ?? 0) * (entry?.closingUnitCost ?? 0));
     return {
@@ -641,7 +643,7 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
       consumeQty: entry?.consumeQty ?? 0,
       consumeCost,
     };
-  }), [items, ledger, selectedMonth, ledgerNameLanguage, groups]);
+  }), [items, monthLedgerByItemId, selectedMonth, ledgerNameLanguage, groups]);
   const ledgerNameOptions = useMemo(() => collectLedgerNameOptions(ledgerTableRows), [ledgerTableRows]);
   const visibleLedgerRows = useMemo(() => applyLedgerTableView(ledgerTableRows, ledgerTableView), [ledgerTableRows, ledgerTableView]);
   const visibleLedgerTotals = useMemo(() => calculateLedgerTableTotals(visibleLedgerRows), [visibleLedgerRows]);
@@ -649,12 +651,12 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
   const ledgerGroupOptions = useMemo(() => [...new Set(ledgerTableRows.map((row) => row.group).filter(Boolean))].sort((a, b) => a.localeCompare(b, "zh-Hans-CN")), [ledgerTableRows]);
 
   const selectedLedgerItem = useMemo(
-    () => items.find((item) => item.id === selectedLedgerItemId) ?? null,
-    [items, selectedLedgerItemId],
+    () => selectedLedgerItemId ? itemById.get(selectedLedgerItemId) ?? null : null,
+    [itemById, selectedLedgerItemId],
   );
   const selectedLedgerEntry = useMemo(
-    () => selectedLedgerItem ? getItemLedger(selectedLedgerItem.id, selectedMonth) : undefined,
-    [ledger, selectedLedgerItem, selectedMonth],
+    () => selectedLedgerItem ? monthLedgerByItemId.get(selectedLedgerItem.id) : undefined,
+    [monthLedgerByItemId, selectedLedgerItem],
   );
   // 分类选择器 Modal
   const [showCatPicker, setShowCatPicker] = useState(false);
@@ -917,7 +919,7 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
                 const catGroups: Array<{ cat: string; catItems: SpiritItem[] }> = [];
                 if (ledgerTableHasAdjustments) {
                   // Excel排序/筛选时必须保持全局顺序，不能再被分类标题分段打断。
-                  catGroups.push({ cat: "__filtered__", catItems: visibleLedgerRows.map((row) => items.find((item) => item.id === row.id)).filter((item): item is SpiritItem => Boolean(item)) });
+                  catGroups.push({ cat: "__filtered__", catItems: visibleLedgerRows.map((row) => itemById.get(row.id)).filter((item): item is SpiritItem => Boolean(item)) });
                 } else {
                   const unclassified = items.filter((i) => i.active && (!i.category || i.category === "" || (!SPIRIT_CATEGORIES.includes(i.category as any) && !allCats.find((c) => c.name === i.category))));
                   if (unclassified.length > 0) catGroups.push({ cat: "__unclassified__", catItems: unclassified });
@@ -949,7 +951,7 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
                         </View>
                       </View>
                       {catItems.map((item, idx) => {
-                        const entry = getItemLedger(item.id, selectedMonth);
+                        const entry = monthLedgerByItemId.get(item.id);
                         const isNeg = entry && entry.closingQty < 0;
                         const isOverride = entry?.openingManualOverride;
                         const editKey = `${item.id}:${selectedMonth}`;
@@ -1838,8 +1840,13 @@ function SupplierDetailScreen({
   const [purchaseNameLanguage, setPurchaseNameLanguage] = usePersistedState<"zh" | "en">("spirits.purchase.name-language.v1", "zh");
   const [purchaseTableView, setPurchaseTableView] = useState(DEFAULT_SUPPLIER_PURCHASE_TABLE_VIEW);
   const [activePurchaseColumn, setActivePurchaseColumn] = useState<SupplierPurchaseSortKey | null>(null);
+  const purchaseItemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
+  const purchaseGroupColorByName = useMemo(
+    () => new Map(groups.map((group) => [getSpiritGroupDisplayName(group), group.color])),
+    [groups],
+  );
   const supplierPurchaseRows = useMemo(() => supPurchases.map((purchase) => {
-    const item = items.find((candidate) => candidate.id === purchase.itemId);
+    const item = purchase.itemId ? purchaseItemById.get(purchase.itemId) : undefined;
     const preferred = purchaseNameLanguage === "zh" ? item?.name : item?.nameEn;
     const fallback = purchaseNameLanguage === "zh" ? item?.nameEn : item?.name;
     const isMatched = Boolean(item?.id);
@@ -1851,7 +1858,7 @@ function SupplierDetailScreen({
       displayName: preferred?.trim() || fallback?.trim() || purchase.rawName,
       displayGroup: purchase.group || detectPurchaseGroup(purchase.rawName) || (item ? getItemGroup(item) : ""),
     };
-  }), [supPurchases, items, purchaseNameLanguage, groups]);
+  }), [supPurchases, purchaseItemById, purchaseNameLanguage, groups]);
   const supplierPurchaseNameOptions = useMemo(
     () => collectSupplierPurchaseNameOptions(supplierPurchaseRows),
     [supplierPurchaseRows],
@@ -1861,6 +1868,17 @@ function SupplierDetailScreen({
     [supplierPurchaseRows, purchaseTableView],
   );
   const visibleSupplierPurchaseTotal = sumMoney(visibleSupplierPurchases.map((purchase) => purchase.amount));
+  const visibleSupplierPurchaseIndexById = useMemo(
+    () => new Map(visibleSupplierPurchases.map((purchase, index) => [purchase.id, index + 1])),
+    [visibleSupplierPurchases],
+  );
+  const visiblePurchaseReferencePriceByItemId = useMemo(() => {
+    const prices = new Map<string, number>();
+    visibleSupplierPurchases.forEach((purchase) => {
+      if (purchase.itemId && !prices.has(purchase.itemId)) prices.set(purchase.itemId, getRefPrice(purchase.itemId, month));
+    });
+    return prices;
+  }, [getRefPrice, month, visibleSupplierPurchases]);
   const purchaseTableHasAdjustments = Boolean(purchaseTableView.sort) || hasSupplierPurchaseTableFilters(purchaseTableView.filters);
   const purchaseTableSummary = [
     purchaseTableView.sort ? `${({ name: "商品名称", quantity: "数量", unitPrice: "单价", amount: "总价", group: "集团" } as const)[purchaseTableView.sort.key]}${purchaseTableView.sort.direction === "asc" ? "升序" : "降序"}` : "",
@@ -1889,6 +1907,17 @@ function SupplierDetailScreen({
       })
       .map(([label, rows]) => ({ id: label, label, rows, amount: sumMoney(rows.map((row) => row.amount)) }));
   }, [visibleSupplierPurchases]);
+  // 虚拟列表按固定行数切分日期组：即使单日导入上万条，也不会在一个 renderItem 内创建整天的全部行。
+  const purchaseVirtualGroups = useMemo(
+    () => purchaseDisplayGroups.flatMap((group) => {
+      const chunks = [] as Array<typeof group>;
+      for (let start = 0; start < group.rows.length; start += 32) {
+        chunks.push({ ...group, id: `${group.id}:${start}`, rows: group.rows.slice(start, start + 32) });
+      }
+      return chunks;
+    }),
+    [purchaseDisplayGroups],
+  );
 
   // 备用金导入
   const pettyRecords = useMemo(() => {
@@ -2170,7 +2199,7 @@ function SupplierDetailScreen({
       </View>
 
       {/* 进货流水表格 */}
-      <ScrollView contentContainerStyle={{ paddingBottom: 40 + insets.bottom }}>
+      <View style={{ flex: 1 }}>
         {visibleSupplierPurchases.length === 0 ? (
           <View style={{ alignItems: "center", padding: 40 }}>
             <Text style={{ fontSize: 48 }}>📦</Text>
@@ -2209,20 +2238,28 @@ function SupplierDetailScreen({
               </View>
 
               {/* 数据行始终按完整年月日分组；分类在每条采购记录中显示。 */}
-              {purchaseDisplayGroups.map((group) => (
-                <React.Fragment key={group.id}>
-                  <View style={{ width: purchaseWindowLayout.tableWidth, minHeight: STORE_TABLE_METRICS.groupHeight, paddingHorizontal: 8, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, backgroundColor: colors.surface }}>
-                    <Text style={{ color: colors.foreground, fontSize: 12, fontWeight: "600" }}>{group.label} · {group.rows.length} 笔</Text>
-                    <Text style={{ color: colors.muted, fontSize: 11 }}>{formatStoreMoney(group.amount)}</Text>
-                  </View>
-                  {group.rows.map((p, idx) => {
-                const item = items.find((i) => i.id === p.itemId);
-                const refPrice = item ? getRefPrice(item.id, month) : 0;
+              <FlatList
+                data={purchaseVirtualGroups}
+                keyExtractor={(group) => group.id}
+                initialNumToRender={4}
+                maxToRenderPerBatch={3}
+                windowSize={5}
+                removeClippedSubviews={Platform.OS !== "web"}
+                contentContainerStyle={{ paddingBottom: 40 + insets.bottom }}
+                renderItem={({ item: group }) => (
+                  <View>
+                    <View style={{ width: purchaseWindowLayout.tableWidth, minHeight: STORE_TABLE_METRICS.groupHeight, paddingHorizontal: 8, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, backgroundColor: colors.surface }}>
+                      <Text style={{ color: colors.foreground, fontSize: 12, fontWeight: "600" }}>{group.label} · {group.rows.length} 笔</Text>
+                      <Text style={{ color: colors.muted, fontSize: 11 }}>{formatStoreMoney(group.amount)}</Text>
+                    </View>
+                    {group.rows.map((p, idx) => {
+                const item = p.itemId ? purchaseItemById.get(p.itemId) : undefined;
+                const refPrice = p.itemId ? (visiblePurchaseReferencePriceByItemId.get(p.itemId) ?? 0) : 0;
                 const priceDiff = refPrice > 0 ? p.unitPrice - refPrice : 0;
                 const priceDiffPct = refPrice > 0 ? Math.abs(priceDiff / refPrice * 100) : 0;
                 const isPriceAlert = refPrice > 0 && priceDiffPct > (item?.priceAlertPct ?? 0);
                 // 集团归属：优先用记录上的 group 字段，否则实时检测
-                const purchaseGroup = p.group || detectPurchaseGroup(p.rawName) || (item ? getItemGroup(item) : "");
+                const purchaseGroup = p.displayGroup;
                 const isSelected = selectedIds.has(p.id);
                 return (
                   <TouchableOpacity key={p.id}
@@ -2267,7 +2304,7 @@ function SupplierDetailScreen({
                         </View>
                       </View>
                     )}
-                    <Text style={[S.ledgerCell, { width: purchaseIndexWidth, textAlign: "center", fontSize: 10, color: colors.muted }]}>{visibleSupplierPurchases.indexOf(p) + 1}</Text>
+                    <Text style={[S.ledgerCell, { width: purchaseIndexWidth, textAlign: "center", fontSize: 10, color: colors.muted }]}>{visibleSupplierPurchaseIndexById.get(p.id) ?? "—"}</Text>
                     <Text style={[S.ledgerCell, { width: purchaseColumnWidths.category, textAlign: "center", fontSize: 10, lineHeight: 14, color: catColor(resolvePurchaseDisplayCategory(p, item)) }]} numberOfLines={2}>
                       {resolvePurchaseDisplayCategory(p, item)}
                     </Text>
@@ -2383,8 +2420,8 @@ function SupplierDetailScreen({
                         ]);
                       }}>
                       {purchaseGroup ? (
-                        <View style={{ backgroundColor: (groups.find((group) => getSpiritGroupDisplayName(group) === purchaseGroup)?.color ?? "#6B7280") + "20", borderRadius: 6, paddingHorizontal: 4, paddingVertical: 2 }}>
-                          <Text style={{ fontSize: 9, fontWeight: "700", color: groups.find((group) => getSpiritGroupDisplayName(group) === purchaseGroup)?.color ?? "#6B7280" }} numberOfLines={2}>
+                        <View style={{ backgroundColor: (purchaseGroupColorByName.get(purchaseGroup) ?? "#6B7280") + "20", borderRadius: 6, paddingHorizontal: 4, paddingVertical: 2 }}>
+                          <Text style={{ fontSize: 9, fontWeight: "700", color: purchaseGroupColorByName.get(purchaseGroup) ?? "#6B7280" }} numberOfLines={2}>
                             {purchaseGroup.replace(/ \(.*\)/, "")}
                           </Text>
                         </View>
@@ -2392,11 +2429,12 @@ function SupplierDetailScreen({
                     </TouchableOpacity>
                   </TouchableOpacity>
                 );
-              })}
-                </React.Fragment>
-              ))}
-              {/* 合计行 */}
-              <View style={[S.tableRow, { width: purchaseWindowLayout.tableWidth, minHeight: INVENTORY_WORKSPACE_METRICS.phoneRowHeight, backgroundColor: colors.surface, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}>
+                    })}
+                  </View>
+                )}
+                ListFooterComponent={(
+                  <View style={[S.tableRow, { width: purchaseWindowLayout.tableWidth, minHeight: INVENTORY_WORKSPACE_METRICS.phoneRowHeight, backgroundColor: colors.surface, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}>
+
                 {selectMode && <Text style={[S.ledgerCell, { width: purchaseSelectWidth }]} />}
                 <Text style={[S.ledgerCell, { width: purchaseIndexWidth }]} />
                 <Text style={[S.ledgerCell, { width: purchaseColumnWidths.category }]} />
@@ -2408,13 +2446,14 @@ function SupplierDetailScreen({
                 <Text style={[S.ledgerCell, { width: purchaseColumnWidths.amount, textAlign: "right", fontWeight: "600", color: colors.foreground, fontSize: 12 }]}>
                   ¥{formatMoney(visibleSupplierPurchaseTotal)}
                 </Text>
-                <Text style={[S.ledgerCell, { width: purchaseColumnWidths.group }]} />
-
-              </View>
+                    <Text style={[S.ledgerCell, { width: purchaseColumnWidths.group }]} />
+                  </View>
+                )}
+              />
             </View>
           </ScrollView>
         )}
-      </ScrollView>
+      </View>
 
       {/* 手动录入进货 Modal */}
       {showAddPurchase && (

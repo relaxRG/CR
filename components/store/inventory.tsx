@@ -140,7 +140,7 @@ export default function StoreInventoryScreen({ mode = "inventory" }: { mode?: In
       <BoundedMonthNavigator month={selectedMonth} bounds={bounds} onChange={selectGlobalMonth} subject={mode === "shop" ? "店铺" : "库存"} testID={`${mode}-month-navigator`} />
 
       <View testID={`${mode}-workspace-${currentCategory.key}`} style={{ flex: 1 }}>
-        <InventoryBusinessPanel category={currentCategory.key} month={selectedMonth} />
+        <MemoizedInventoryBusinessPanel category={currentCategory.key} month={selectedMonth} />
       </View>
     </View>
   );
@@ -160,3 +160,7 @@ function InventoryBusinessPanel({ category, month }: { category: InventoryCatego
     case "equipment": return <EquipmentInventoryScreen month={month} embedded />;
   }
 }
+
+// 门店入口必须订阅所有库存库以保持统一月份边界；仅用当前分类与月份作为输入，
+// 阻断未选中分类的异步加载、同步写入向当前库存工作台传播的无效重渲染。
+const MemoizedInventoryBusinessPanel = React.memo(InventoryBusinessPanel);

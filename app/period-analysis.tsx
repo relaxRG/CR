@@ -226,6 +226,11 @@ export default function PeriodAnalysisScreen({ embedded = false }: { embedded?: 
     return PERIOD_ORDER.reduce((s, k) => s + totals[k].revenue, 0);
   }, [report]);
 
+  const dailyRecordByDate = useMemo(
+    () => new Map((report?.dailyRecords ?? []).map((record) => [record.date, record])),
+    [report],
+  );
+
   // 计算当月加班预警（联动排班表 + 时段数据）
   // 匹配逐轮班：与经营分析模块的晚班模板匹配（type === "evening"）
   const overtimeAlertMap = useMemo(() => {
@@ -250,7 +255,7 @@ export default function PeriodAnalysisScreen({ embedded = false }: { embedded?: 
         businessHours,
       });
       if (!judgment || !judgment.isOvertime) continue;
-      const dailyRecord = report.dailyRecords.find((dr) => dr.date === shift.date);
+      const dailyRecord = dailyRecordByDate.get(shift.date);
       if (!dailyRecord) continue;
       const closingMin = judgment.closingMinutes;
       const overtimeRevenue = sumMoney(dailyRecord.slots
@@ -266,7 +271,7 @@ export default function PeriodAnalysisScreen({ embedded = false }: { embedded?: 
       }
     }
     return alertMap;
-  }, [report, shifts, shiftTemplates, businessHours, settings.overtimeThreshold]);
+  }, [report, shifts, shiftTemplates, businessHours, settings.overtimeThreshold, dailyRecordByDate]);
 
   React.useEffect(() => {
     if (latestReport && !selectedMonth) setSelectedMonth(latestReport.month);

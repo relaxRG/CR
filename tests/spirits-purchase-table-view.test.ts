@@ -89,6 +89,17 @@ describe("供应商进货表排序筛选与Excel隔离", () => {
     expect(unmatched.map((row) => row.id)).toEqual(["c"]);
   });
 
+  it("万级采购行使用固定大小日期分组块虚拟化，并消除逐行 items.find、groups.find 与 indexOf", () => {
+    const screen = readFileSync(resolve(process.cwd(), "components/inventory/SpiritsInventoryWorkspaceScreen.tsx"), "utf8");
+    expect(screen).toContain("const purchaseVirtualGroups = useMemo");
+    expect(screen).toContain("start += 32");
+    expect(screen).toContain("<FlatList");
+    expect(screen).toContain("data={purchaseVirtualGroups}");
+    expect(screen).toContain("visibleSupplierPurchaseIndexById.get(p.id)");
+    expect(screen).toContain("purchaseItemById.get(p.itemId)");
+    expect(screen).not.toContain("visibleSupplierPurchases.indexOf(p)");
+  });
+
   it("中英文显示、字段重排和排序筛选不参与Excel导入列解析或导出字段定义", () => {
     const parsed = parseSpiritsExcel([
       ["日期", "商品名称", "单位", "数量", "单价", "金额"],
