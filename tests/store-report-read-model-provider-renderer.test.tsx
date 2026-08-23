@@ -88,8 +88,11 @@ describe("报表只读快照 Provider 渲染器刷新", () => {
     await act(async () => { reloadHandlers.forEach((handler) => handler()); });
     await flush();
 
-    expect(storageApi.multiGet.mock.calls).toHaveLength(callsAfterInitialLoad + 1);
-    expect(storageApi.multiGet.mock.calls.at(-1)?.[0]).toEqual(expect.arrayContaining(["sync.ts.store.revenue.v1"]));
+    expect(storageApi.multiGet.mock.calls).toHaveLength(callsAfterInitialLoad + 2);
+    const postReloadReads = storageApi.multiGet.mock.calls.slice(callsAfterInitialLoad).map(([keys]) => keys);
+    expect(postReloadReads).toHaveLength(2);
+    expect(postReloadReads).toEqual(postReloadReads.map(() => expect.arrayContaining(["sync.ts.store.revenue.v1"])));
+    expect(postReloadReads.every((keys) => !keys.includes("store.revenue.v1"))).toBe(true);
   });
 
   it("慢旧 revision 完成后不能覆盖最新 revision 的物化模型", async () => {

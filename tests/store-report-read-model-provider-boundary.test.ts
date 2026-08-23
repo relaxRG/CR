@@ -7,19 +7,25 @@ describe("报表只读物化视图边界", () => {
   it("只批量读取登记的跨域事实键，并在卸载时注销 reload 订阅", () => {
     const provider = source("components/providers/StoreReportReadModelProvider.tsx");
 
-    expect(provider).toContain('"store.revenue.v1"');
-    expect(provider).toContain('"store.petty.v1"');
-    expect(provider).toContain('"labor_employees_v1"');
-    expect(provider).toContain('"labor_payslips_v1"');
-    expect(provider).toContain('"labor_shifts_v1"');
-    expect(provider).toContain('"spirits.purchases.v3"');
-    expect(provider).toContain('"food.purchases.v1"');
-    expect(provider).toContain('"store.petty_labor_links.v1"');
-    expect(provider).toContain('"wine.snapshots.v2"');
-    expect(provider).toContain('"wine.manual_purchases.v1"');
-    expect(provider).toContain("loadStoreReportFacts(AsyncStorage, REPORT_SNAPSHOT_KEYS");
+    expect(provider).toContain("useStoreReportReadManifest");
+    expect(provider).toContain("loadConsistentReportSnapshot");
+    expect(provider).toContain("committedRevision: committedRevision.current");
+    expect(provider).toContain("snapshot.unchanged");
     expect(provider).toContain("const unregister = registerStoreReload(guardedRefresh)");
-    expect(provider).toContain("unregister();");
+    expect(provider).toContain("return unregister;");
+    expect(provider).toContain("refreshController.current.dispose()");
+
+    const manifest = source("lib/store/report-read-manifest.ts");
+    expect(manifest).toContain('"store.revenue.v1"');
+    expect(manifest).toContain('"store.petty.v1"');
+    expect(manifest).toContain('"labor_employees_v1"');
+    expect(manifest).toContain('"labor_payslips_v1"');
+    expect(manifest).toContain('"labor_shifts_v1"');
+    expect(manifest).toContain('"spirits.purchases.v3"');
+    expect(manifest).toContain('"food.purchases.v1"');
+    expect(manifest).toContain('"store.petty_labor_links.v1"');
+    expect(manifest).toContain('"wine.snapshots.v2"');
+    expect(manifest).toContain('"wine.manual_purchases.v1"');
     expect(provider).not.toContain("AsyncStorage.setItem");
     expect(provider).not.toContain("notifySyncChange");
   });
