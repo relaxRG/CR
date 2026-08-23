@@ -8,7 +8,12 @@ type Tombstone = {
   attempts: number;
 };
 
-function createEnv(options: { tombstones: Tombstone[]; reference?: unknown; deleteError?: Error }) {
+function createEnv(options: {
+  tombstones: Tombstone[];
+  reference?: unknown;
+  referencesByObjectKey?: Readonly<Record<string, unknown>>;
+  deleteError?: Error;
+}) {
   const updates: Array<{ sql: string; values: unknown[] }> = [];
   const remove = vi.fn(async () => {
     if (options.deleteError) throw options.deleteError;
@@ -19,7 +24,9 @@ function createEnv(options: { tombstones: Tombstone[]; reference?: unknown; dele
         bind(...values: unknown[]) {
           return {
             all: async () => ({ results: sql.includes("FROM archive_tombstones") ? options.tombstones : [] }),
-            first: async () => sql.includes("FROM archive_entries") ? options.reference ?? null : null,
+            first: async () => sql.includes("FROM archive_entries")
+              ? options.referencesByObjectKey?.[String(values[1])] ?? options.reference ?? null
+              : null,
             run: async () => {
               updates.push({ sql, values });
               return { success: true };
@@ -48,6 +55,29 @@ describe("归档墓碑GC Worker", () => {
     expect(remove).toHaveBeenCalledWith(tombstone.object_key);
     expect(updates).toEqual(expect.arrayContaining([
       expect.objectContaining({ sql: expect.stringContaining("SET purged_at = ?"), values: [1000, "archive-1", "group-a"] }),
+    ]));
+  });
+
+  it("同一批次中只清理无引用的到期墓碑，并独立延迟仍引用或非法路径记录", async () => {
+    const activeObject = "groups/group-a/monthly-raw/2026-08/revenue/2.xlsx";
+    const { env, remove, updates } = createEnv({
+      tombstones: [
+        tombstone,
+        { ...tombstone, entry_id: "archive-2", object_key: activeObject },
+        { ...tombstone, entry_id: "archive-3", object_key: "groups/group-b/monthly-raw/../../secret.xlsx" },
+      ],
+      referencesByObjectKey: { [activeObject]: { entry_id: "active-reference" } },
+    });
+
+    const summary = await runArchiveTombstoneGc(env, { now: 1000, batchSize: 3 });
+
+    expect(summary).toEqual({ scanned: 3, purged: 1, deferredReferenced: 1, deferredInvalid: 1, retryScheduled: 0 });
+    expect(remove).toHaveBeenCalledTimes(1);
+    expect(remove).toHaveBeenCalledWith(tombstone.object_key);
+    expect(updates).toEqual(expect.arrayContaining([
+      expect.objectContaining({ values: expect.arrayContaining(["OBJECT_STILL_REFERENCED"]) }),
+      expect.objectContaining({ values: expect.arrayContaining(["INVALID_OBJECT_KEY"]) }),
+      expect.objectContaining({ values: expect.arrayContaining([1000, "archive-1", "group-a"]) }),
     ]));
   });
 
