@@ -2823,12 +2823,17 @@ async function archiveSession(env, headers, capability, origin) {
   return { session };
 }
 async function handleArchiveIndex(env, headers, origin) {
-  const resolved = await archiveSession(env, headers, "reports_monthly.view", origin);
-  if (resolved.error) return resolved.error;
-  await ensureArchiveSchema(env);
-  const rows = await env.DB.prepare("SELECT entry_id, object_key, revision, status, month, file_type, filename, size_bytes, updated_at FROM archive_entries WHERE group_id = ? ORDER BY updated_at DESC, entry_id ASC").bind(resolved.session.membership.groupId).all();
-  const entries = (rows.results || []).map((row) => ({ entryId: row.entry_id, objectKey: row.object_key, revision: Number(row.revision), status: row.status, month: row.month, fileType: row.file_type, filename: row.filename, sizeBytes: Number(row.size_bytes), updatedAt: Number(row.updated_at) }));
-  return json({ entries, serverTime: Date.now() }, 200, origin);
+  try {
+    const resolved = await archiveSession(env, headers, "reports_monthly.view", origin);
+    if (resolved.error) return resolved.error;
+    await ensureArchiveSchema(env);
+    const rows = await env.DB.prepare("SELECT entry_id, object_key, revision, status, month, file_type, filename, size_bytes, updated_at FROM archive_entries WHERE group_id = ? ORDER BY updated_at DESC, entry_id ASC").bind(resolved.session.membership.groupId).all();
+    const entries = (rows.results || []).map((row) => ({ entryId: row.entry_id, objectKey: row.object_key, revision: Number(row.revision), status: row.status, month: row.month, fileType: row.file_type, filename: row.filename, sizeBytes: Number(row.size_bytes), updatedAt: Number(row.updated_at) }));
+    return json({ entries, serverTime: Date.now() }, 200, origin);
+  } catch (error) {
+    console.error("[archive] ARCHIVE_STORAGE_FAILURE", error instanceof Error ? error.name : "unknown");
+    return archiveError("ARCHIVE_STORAGE_FAILURE", 503, origin);
+  }
 }
 async function handleArchiveCommit(env, body, headers, origin) {
   let uploadedObjectKey = null;

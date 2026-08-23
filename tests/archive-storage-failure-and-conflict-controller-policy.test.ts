@@ -10,6 +10,8 @@ const importScreen = source("app/monthly-report-import.tsx");
 
 describe("归档存储异常与冲突交互契约", () => {
   it("D1/R2运行时异常会清理本次上传对象并返回不泄露内部细节的503", () => {
+    expect(worker).toContain("async function handleArchiveIndex(env, headers, origin) {\n  try {");
+    expect(worker).toContain("async function handleArchiveCommit(env, body, headers, origin) {\n  let uploadedObjectKey = null;\n  try {");
     expect(worker).toContain("let uploadedObjectKey = null");
     expect(worker).toContain("uploadedObjectKey = objectKey");
     expect(worker).toContain("ARCHIVE_STORAGE_FAILURE");
