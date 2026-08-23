@@ -62,4 +62,29 @@ describe("归档对象客户端并发冲突处理", () => {
       message: "offline",
     });
   });
+
+  it("429 优先遵守服务端Retry-After，5xx采用有上限的本地退避建议，二者均不在本函数内盲目重放写入", async () => {
+    const throttled = await commitArchiveMutation({ ...request, retryAttempt: 3 }, async () => new Response(JSON.stringify({
+      message: "slow down",
+    }), {
+      status: 429,
+      headers: { "content-type": "application/json", "retry-after": "7" },
+    }));
+    expect(throttled).toEqual({
+      status: "failed",
+      retryable: true,
+      retryAfterMs: 7_000,
+      operationId: "op-archive-1",
+      message: "slow down",
+    });
+
+    const unavailable = await commitArchiveMutation({ ...request, retryAttempt: 3 }, async () => new Response("", { status: 503 }));
+    expect(unavailable).toEqual({
+      status: "failed",
+      retryable: true,
+      retryAfterMs: 8_000,
+      operationId: "op-archive-1",
+      message: "ARCHIVE_HTTP_503",
+    });
+  });
 });
