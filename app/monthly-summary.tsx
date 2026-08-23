@@ -27,15 +27,10 @@ import { BoundedBusinessMonthNavigator } from "@/components/months/BoundedBusine
 import { useReportMonthNavigation } from "@/hooks/use-report-month-navigation";
 import { useMonthlySummaryStore } from "@/lib/store/monthly-summary/store";
 import { useMonthCloseStore } from "@/lib/labor/store";
-import { useSpiritsInventoryStore } from "@/lib/spirits/crud-store";
-import { usePettyCashStore } from "@/lib/store/petty-store";
 import { useMonthlyReportStore } from "@/lib/store/monthly-report/store";
-import { useSupplierPurchaseStore } from "@/lib/food/ingredient-store";
-import { useWineSnapshotStore, useWineManualPurchaseStore } from "@/lib/wine/store";
 import { aggregateMonthlyReport } from "@/lib/store/monthly-summary/aggregator";
 import { buildMonthlySummaryPresentation, hasVisibleMonthlySummaryItems } from "@/lib/store/monthly-summary/presentation";
 import { formatStoreMoney } from "@/lib/store/table-display";
-import { usePettyLaborLinkStore } from "@/lib/store/petty-labor-link-store";
 import { useStoreReportReadModel } from "@/components/providers/StoreReportReadModelProvider";
 import {
   MonthlySummaryReport, SummaryLineItem,
@@ -313,6 +308,7 @@ export default function MonthlySummaryScreen({ embedded = false }: { embedded?: 
   } = useMonthlySummaryStore();
   const { model: reportReadModel, ready: reportFactsReady } = useStoreReportReadModel();
   const { employees, paySlips, deptOrder } = reportReadModel.laborDetails;
+  const { pettyRecords: reportPettyRecords, pettyLaborLinks, purchases: reportPurchases, spiritSupplierNames } = reportReadModel.monthlyDetails;
   const {
     getStatus: getMonthCloseStatus,
     getCurrentArchive,
@@ -322,13 +318,7 @@ export default function MonthlySummaryScreen({ embedded = false }: { embedded?: 
     discardAdjustmentSession,
     applyArchivedSchedule,
   } = useMonthCloseStore();
-  const spiritsStore = useSpiritsInventoryStore();
-  const pettyStore = usePettyCashStore();
-  const pettyLaborLinkStore = usePettyLaborLinkStore();
   const monthlyReportStore = useMonthlyReportStore();
-  const supplierPurchaseStore = useSupplierPurchaseStore();
-  const wineSnapshotStore = useWineSnapshotStore();
-  const wineManualPurchaseStore = useWineManualPurchaseStore();
 
   const { month: selectedMonth, bounds: reportMonthBounds, selectMonth: setSelectedMonth } = useReportMonthNavigation();
   const [showManualModal, setShowManualModal] = useState(false);
@@ -482,8 +472,23 @@ export default function MonthlySummaryScreen({ embedded = false }: { embedded?: 
   // 一键自动汇总：调用 aggregator 从各模块拉取数据并写入 lineItems
   const handleAutoAggregate = () => {
     tap();
-    // 备用金原始记录
-    const pettyRecords = pettyStore?.records?.filter((r: any) => r.date?.startsWith(selectedMonth)) ?? [];
+    // 跨域事实一律来自只读物化快照；本函数只写月报自有科目与付款记录。
+    const pettyRecords = reportPettyRecords.filter((record): record is typeof record & { id: string } =>
+      record.date.startsWith(selectedMonth) && typeof record.id === "string",
+    );
+    const monthPurchases = reportPurchases.filter((purchase) => purchase.domain === "spirits" && purchase.date.startsWith(selectedMonth));
+    const foodPurchaseRecords = reportPurchases
+      .filter((purchase) => purchase.domain === "food" && purchase.date.startsWith(selectedMonth))
+      .map((purchase) => ({ supplierName: purchase.supplier ?? "未知", totalAmount: purchase.amount }));
+    const wineSnapshotPurchases = reportPurchases.filter((purchase) => purchase.domain === "wine_snapshot" && purchase.date.startsWith(selectedMonth));
+    const wineSnapshotSupplierTotals = wineSnapshotPurchases.reduce<Record<string, number>>((totals, purchase) => {
+      const supplier = purchase.supplier ?? "未知";
+      totals[supplier] = (totals[supplier] ?? 0) + purchase.amount;
+      return totals;
+    }, {});
+    const wineManualPurchases = reportPurchases
+      .filter((purchase) => purchase.domain === "wine_manual" && purchase.date.startsWith(selectedMonth))
+      .map((purchase) => ({ supplier: purchase.supplier ?? "未知", amount: purchase.amount, productName: purchase.productName ?? "" }));
     // 月度经营分析报告
     // 月度经营分析报告（rawMonth 格式 "2026/07"，需转换匹配）
     const monthlyReport = monthlyReportStore?.reports?.find((r: any) => {
@@ -494,7 +499,6 @@ export default function MonthlySummaryScreen({ embedded = false }: { embedded?: 
     // 薪资单（只读报表快照）
     const monthPaySlips = paySlips.filter((s: any) => s.month === selectedMonth);
     // 烈酒进货汇总（按供应商分组）
-    const monthPurchases = spiritsStore.getMonthPurchases(selectedMonth);
     const spiritSupplierMap: Record<string, { totalAmount: number; itemCount: number }> = {};
     monthPurchases.forEach((p: any) => {
       const sup = p.supplier ?? "未知";
@@ -508,33 +512,15 @@ export default function MonthlySummaryScreen({ embedded = false }: { embedded?: 
       itemCount: v.itemCount,
       isPaid: false,
     }));
-    // 食材进货记录（当月）
-    const foodPurchaseRecords = supplierPurchaseStore?.records?.filter((r: any) => {
-      // periodLabel 格式如 "2026年6月"，需要匹配当月
-      const [y, m] = selectedMonth.split("-");
-      return r.periodLabel?.includes(`${parseInt(y)}年`) && r.periodLabel?.includes(`${parseInt(m)}月`);
-    }) ?? [];
-    // ★ 葡萄酒进货数据
-    const wineSnap = wineSnapshotStore.snapshots.find((s: any) => {
-      const [y, m] = selectedMonth.split("-");
-      return s.monthLabel?.includes(`${parseInt(y)}年`) && s.monthLabel?.includes(`${parseInt(m)}月`);
-    });
-    const wineSnapshotSupplierTotals = wineSnap?.supplierTotals ?? {};
-    const wineManualPurchases = wineManualPurchaseStore.getMonthPurchases(selectedMonth).map((p: any) => ({
-      supplier: p.supplier,
-      amount: p.amount,
-      productName: p.productName,
-    }));
     // 所有烈酒供应商名称（用于生成金额为0的行）
-    const allSpiritSupplierNames = spiritsStore.suppliers.map((s: any) => s.name);
-    // 所有葡萄酒供应商名称（从历史进货记录中提取）
-    const allWineSupplierNamesSet = new Set<string>([
-      ...Object.keys(wineSnapshotSupplierTotals),
-      ...wineManualPurchaseStore.purchases.map((p: any) => p.supplier),
-    ]);
+    const allSpiritSupplierNames = spiritSupplierNames;
+    // 所有葡萄酒供应商名称（从只读历史采购快照提取）
+    const allWineSupplierNamesSet = new Set<string>(reportPurchases
+      .filter((purchase) => purchase.domain === "wine_snapshot" || purchase.domain === "wine_manual")
+      .map((purchase) => purchase.supplier ?? "未知"));
     const allWineSupplierNames = Array.from(allWineSupplierNamesSet);
     // 备用金人工关联数据（已纳入薪资预支的条目）
-    const monthLaborLinks = pettyLaborLinkStore.getLinksForMonth(selectedMonth);
+    const monthLaborLinks = pettyLaborLinks.filter((link) => link.month === selectedMonth);
     const laborLinkedPettyIds = new Set(monthLaborLinks.map((l) => l.pettyRecordId));
     const laborLinkedTotal = monthLaborLinks.reduce((s, l) => s + l.amount, 0);
     // 调用聚合器（labor 科目由自动同步负责，不传入 paySlips/allEmployees）

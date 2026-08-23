@@ -28,9 +28,7 @@ import { STORE_TEXT } from "@/lib/theme/store-visual-system";
 import { ScreenContainer } from "@/components/screen-container";
 import { usePeriodAnalysisStore } from "@/lib/store/period-analysis/store";
 import { parsePeriodAnalysisExcel } from "@/lib/store/period-analysis/excel-parser";
-import { useSpiritsInventoryStore } from "@/lib/spirits/crud-store";
 import { pourCostColor } from "@/lib/spirits/pour-cost";
-import { useSupplierPurchaseStore } from "@/lib/food/ingredient-store";
 import {
   PeriodKey, PERIOD_LABELS, PERIOD_TIME_RANGE, PERIOD_COLORS,
   fmtRevenue, slotToMinutes,
@@ -39,7 +37,7 @@ import { useScheduleStore } from "@/lib/store/period-analysis/schedule-store";
 import {
   calcOvertimeJudgment,
 } from "@/lib/store/period-analysis/schedule-types";
-import { useShiftStore, useEmployeeStore } from "@/lib/labor/store";
+import { useStoreReportReadModel } from "@/components/providers/StoreReportReadModelProvider";
 
 type MainTab = "overview" | "periods" | "latenight" | "alerts";
 
@@ -198,11 +196,9 @@ export default function PeriodAnalysisScreen({ embedded = false }: { embedded?: 
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
   const { reports, settings, latestReport, addReport, updateSettings } = usePeriodAnalysisStore();
-  const spiritsStore = useSpiritsInventoryStore();
-  const supplierPurchaseStore = useSupplierPurchaseStore();
+  const { model: reportReadModel } = useStoreReportReadModel();
+  const { shifts, purchases } = reportReadModel.periodDetails;
   const { businessHours, shiftTemplates, removeDateOverride, updateBusinessHours } = useScheduleStore();
-  const { shifts, getShifts } = useShiftStore();
-  useEmployeeStore();
   const [tab, setTab] = useState<MainTab>("overview");
   const { month: reportWorkspaceMonth } = useReportMonthNavigation();
   const [selectedMonth, setSelectedMonth] = useState<string>(embedded ? reportWorkspaceMonth : (latestReport?.month ?? ""));
@@ -236,7 +232,7 @@ export default function PeriodAnalysisScreen({ embedded = false }: { embedded?: 
   const overtimeAlertMap = useMemo(() => {
     if (!report) return new Map<string, "poor" | "ok">();
     const month = report.month;
-    const monthShifts = getShifts(month);
+    const monthShifts = shifts.filter((shift) => shift.date.startsWith(month));
     const alertMap = new Map<string, "poor" | "ok">();
     // 找出经营分析模块中类型为 evening 的模板（即晚班模板）
     const eveningTemplate = shiftTemplates.find((t) => t.type === "evening");
@@ -398,13 +394,10 @@ export default function PeriodAnalysisScreen({ embedded = false }: { embedded?: 
         {/* 成本维度卡片 */}
         {(() => {
           const month = report.month;
-          const spiritPurchases = spiritsStore.getMonthPurchases(month);
+          const spiritPurchases = purchases.filter((purchase) => purchase.domain === "spirits" && purchase.date.startsWith(month));
           const spiritCost = spiritPurchases.reduce((s: number, p: any) => s + p.amount, 0);
-          const [y, mo] = month.split("-");
-          const foodRecords = supplierPurchaseStore?.records?.filter((r: any) =>
-            r.periodLabel?.includes(`${parseInt(y)}年`) && r.periodLabel?.includes(`${parseInt(mo)}月`)
-          ) ?? [];
-          const foodCost = foodRecords.reduce((s: number, r: any) => s + r.totalAmount, 0);
+          const foodRecords = purchases.filter((purchase) => purchase.domain === "food" && purchase.date.startsWith(month));
+          const foodCost = foodRecords.reduce((sum, purchase) => sum + purchase.amount, 0);
           if (spiritCost === 0 && foodCost === 0) return null;
           const beverageCostPct = totalRevenue > 0 && spiritCost > 0 ? (spiritCost / totalRevenue * 100) : null;
           const foodCostPct = totalRevenue > 0 && foodCost > 0 ? (foodCost / totalRevenue * 100) : null;

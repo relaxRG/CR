@@ -43,8 +43,18 @@ const reportUsesCompatibilityBridge = componentBody("StoreReportProviders").incl
 const reportUsesReadModel = componentBody("StoreReportProviders").includes("StoreReportReadModelProvider");
 const monthlySummary = read("app/monthly-summary.tsx");
 const monthlySummaryUsesReadModel = monthlySummary.includes("useStoreReportReadModel")
+  && monthlySummary.includes("reportReadModel.monthlyDetails")
   && !monthlySummary.includes("useEmployeeStore")
-  && !monthlySummary.includes("usePaySlipStore");
+  && !monthlySummary.includes("usePaySlipStore")
+  && !monthlySummary.includes("usePettyCashStore")
+  && !monthlySummary.includes("useSpiritsInventoryStore")
+  && !monthlySummary.includes("useSupplierPurchaseStore")
+  && !monthlySummary.includes("useWineSnapshotStore");
+const periodAnalysis = read("app/period-analysis.tsx");
+const periodAnalysisUsesReadModel = periodAnalysis.includes("useStoreReportReadModel")
+  && !periodAnalysis.includes("useSpiritsInventoryStore")
+  && !periodAnalysis.includes("useSupplierPurchaseStore")
+  && !periodAnalysis.includes("useShiftStore");
 const runtimeBoundaryWired = boundary.includes("key={tab}")
   && screen.includes("<StoreTabBoundary tab={effectiveTab}>")
   && featureBoundary.includes('pathname === "/store"');
@@ -61,10 +71,13 @@ const report = {
     usesCompatibilityBridge: reportUsesCompatibilityBridge,
     usesReadonlyMaterializedView: reportUsesReadModel,
     monthlySummaryUsesReadModel,
+    periodAnalysisUsesReadModel,
     migrationState: !reportUsesReadModel
       ? "not_started"
-      : reportUsesCompatibilityBridge && monthlySummaryUsesReadModel
-        ? "partial_analytics_and_monthly_summary_payroll_use_read_model_period_analysis_still_uses_compatibility_contexts"
+      : reportUsesCompatibilityBridge && monthlySummaryUsesReadModel && periodAnalysisUsesReadModel
+        ? "all_report_cross_domain_reads_use_read_model_month_close_commands_still_use_compatibility_bridge"
+        : reportUsesCompatibilityBridge && monthlySummaryUsesReadModel
+          ? "partial_analytics_and_monthly_summary_payroll_use_read_model_period_analysis_still_uses_compatibility_contexts"
         : reportUsesCompatibilityBridge
           ? "partial_analytics_only_monthly_summary_and_period_analysis_still_use_compatibility_contexts"
           : "complete",

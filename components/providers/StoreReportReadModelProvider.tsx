@@ -13,6 +13,8 @@ import {
 
 const REPORT_SNAPSHOT_KEYS = [
   "store.revenue.v1", "store.petty.v1", "labor_employees_v1", "labor_payslips_v1", "labor_dept_order_v1",
+  "labor_shifts_v1", "spirits.purchases.v3", "spirits.suppliers.v1", "food.purchases.v1",
+  "store.petty_labor_links.v1", "wine.snapshots.v2", "wine.manual_purchases.v1",
 ] as const;
 const EMPLOYEE_DEPTS = new Set<EmployeeDept>(["front", "kitchen", "parttime", "other"]);
 const EMPLOYEE_TYPES = new Set<EmployeeType>(["fulltime", "longterm_parttime", "parttime"]);
@@ -91,6 +93,76 @@ export function decodeStoreReportSnapshot(snapshot: ReadonlyMap<string, string |
   const parsedDeptOrder = parseArray(snapshot.get("labor_dept_order_v1") ?? null)
     .filter((value): value is EmployeeDept => typeof value === "string" && EMPLOYEE_DEPTS.has(value as EmployeeDept));
   const deptOrder = parsedDeptOrder.length > 0 ? parsedDeptOrder : DEFAULT_DEPT_ORDER;
+  const shifts = parseArray(snapshot.get("labor_shifts_v1") ?? null).flatMap((value) => {
+    const shift = asRecord(value);
+    if (!shift) return [];
+    const employeeId = typeof shift.employeeId === "string" ? shift.employeeId : "";
+    const date = typeof shift.date === "string" ? shift.date : "";
+    const shiftName = typeof shift.shift === "string" ? shift.shift : "";
+    return employeeId && /^\d{4}-\d{2}-\d{2}$/.test(date) && shiftName
+      ? [{ employeeId, date, shift: shiftName, hoursValue: finite(shift.hoursValue) }]
+      : [];
+  });
+  const pettyLaborLinks = parseArray(snapshot.get("store.petty_labor_links.v1") ?? null).flatMap((value) => {
+    const link = asRecord(value);
+    if (!link) return [];
+    const pettyRecordId = typeof link.pettyRecordId === "string" ? link.pettyRecordId : "";
+    const month = typeof link.month === "string" ? link.month : "";
+    return pettyRecordId && /^\d{4}-\d{2}$/.test(month)
+      ? [{ pettyRecordId, month, amount: finite(link.amount) }]
+      : [];
+  });
+  const spiritPurchases = parseArray(snapshot.get("spirits.purchases.v3") ?? null).flatMap((value) => {
+    const purchase = asRecord(value);
+    if (!purchase) return [];
+    const id = typeof purchase.id === "string" ? purchase.id : "";
+    const date = typeof purchase.date === "string" ? purchase.date : "";
+    return id && /^\d{4}-\d{2}-\d{2}$/.test(date)
+      ? [{ id, date, supplier: typeof purchase.supplier === "string" ? purchase.supplier : undefined, amount: finite(purchase.amount), domain: "spirits" as const }]
+      : [];
+  });
+  const wineSnapshotPurchases = parseArray(snapshot.get("wine.snapshots.v2") ?? null).flatMap((value) => {
+    const snapshot = asRecord(value);
+    if (!snapshot) return [];
+    const monthLabel = typeof snapshot.monthLabel === "string" ? snapshot.monthLabel : "";
+    const match = monthLabel.match(/^(\d{4})年(\d{1,2})月$/);
+    const supplierTotals = asRecord(snapshot.supplierTotals);
+    if (!match || !supplierTotals) return [];
+    const date = `${match[1]}-${match[2]!.padStart(2, "0")}-01`;
+    return Object.entries(supplierTotals).flatMap(([supplier, amount]) => typeof amount === "number" && Number.isFinite(amount)
+      ? [{ id: `wine-snapshot:${snapshot.id ?? monthLabel}:${supplier}`, date, supplier, amount, domain: "wine_snapshot" as const }]
+      : []);
+  });
+  const wineManualPurchases = parseArray(snapshot.get("wine.manual_purchases.v1") ?? null).flatMap((value) => {
+    const purchase = asRecord(value);
+    if (!purchase) return [];
+    const id = typeof purchase.id === "string" ? purchase.id : "";
+    const date = typeof purchase.date === "string" ? purchase.date : "";
+    const supplier = typeof purchase.supplier === "string" ? purchase.supplier : "";
+    const productName = typeof purchase.productName === "string" ? purchase.productName : "";
+    return id && /^\d{4}-\d{2}-\d{2}$/.test(date) && supplier
+      ? [{ id, date, supplier, amount: finite(purchase.amount), domain: "wine_manual" as const, productName }]
+      : [];
+  });
+  const spiritSupplierNames = parseArray(snapshot.get("spirits.suppliers.v1") ?? null).flatMap((value) => {
+    const supplier = asRecord(value);
+    const name = typeof supplier?.name === "string" ? supplier.name.trim() : "";
+    return name ? [name] : [];
+  });
+  const foodPurchases = parseArray(snapshot.get("food.purchases.v1") ?? null).flatMap((value) => {
+    const purchase = asRecord(value);
+    if (!purchase) return [];
+    const id = typeof purchase.id === "string" ? purchase.id : "";
+    const importDate = typeof purchase.importDate === "string" ? purchase.importDate : "";
+    const periodLabel = typeof purchase.periodLabel === "string" ? purchase.periodLabel : "";
+    const periodMatch = periodLabel.match(/^(\d{4})年(\d{1,2})月$/);
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(importDate)
+      ? importDate
+      : periodMatch ? `${periodMatch[1]}-${periodMatch[2]!.padStart(2, "0")}-01` : "";
+    return id && date
+      ? [{ id, date, supplier: typeof purchase.supplierName === "string" ? purchase.supplierName : undefined, amount: finite(purchase.totalAmount), domain: "food" as const }]
+      : [];
+  });
   const revenueRecords = Array.isArray(revenueState.records)
     ? revenueState.records.flatMap((value) => {
       const record = asRecord(value);
@@ -103,11 +175,12 @@ export function decodeStoreReportSnapshot(snapshot: ReadonlyMap<string, string |
   const pettyRecords = Array.isArray(pettyState.records)
     ? pettyState.records.flatMap((value) => {
       const record = asRecord(value);
+      const id = typeof record?.id === "string" ? record.id : "";
       const date = typeof record?.date === "string" ? record.date : "";
       const code = typeof record?.code === "string" ? record.code : "";
       const amount = typeof record?.amount === "number" ? record.amount : NaN;
-      return /^\d{4}-\d{2}-\d{2}$/.test(date) && Object.hasOwn(PETTY_CODE_LABELS, code) && Number.isFinite(amount)
-        ? [{ date, code: code as PettyCode, amount }]
+      return id && /^\d{4}-\d{2}-\d{2}$/.test(date) && Object.hasOwn(PETTY_CODE_LABELS, code) && Number.isFinite(amount)
+        ? [{ id, date, code: code as PettyCode, amount }]
         : [];
     })
     : [];
@@ -116,11 +189,14 @@ export function decodeStoreReportSnapshot(snapshot: ReadonlyMap<string, string |
       month: slip.month, employeeId: slip.employeeId, totalEmployerCost: slip.totalEmployerCost, finalSalary: slip.finalSalary,
     }))),
     pettyRecords: Object.freeze(pettyRecords),
+    pettyLaborLinks: Object.freeze(pettyLaborLinks),
+    spiritSupplierNames: Object.freeze(spiritSupplierNames),
     employees: Object.freeze(employees),
     payrollDetails: Object.freeze(payrollDetails),
     deptOrder: Object.freeze(deptOrder),
+    shifts: Object.freeze(shifts),
     revenueRecords: Object.freeze(revenueRecords),
-    purchases: [],
+    purchases: Object.freeze([...spiritPurchases, ...wineSnapshotPurchases, ...wineManualPurchases, ...foodPurchases]),
     inventory: [],
   });
 }

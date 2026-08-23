@@ -1,4 +1,4 @@
-import type { Employee, EmployeeDept, PaySlip } from "@/lib/labor/types";
+import type { Employee, EmployeeDept, PaySlip, ShiftEntry } from "@/lib/labor/types";
 import type { PettyRecord } from "@/lib/store/petty-store";
 
 export type ReportEmployeeFact = Readonly<{
@@ -20,12 +20,18 @@ export type ReportRevenueFact = Readonly<{
   amount: number;
 }>;
 
+export type ReportPettyFact = Readonly<{ id?: string; date: string; code: PettyRecord["code"]; amount: number }>;
+export type ReportPettyLaborLinkFact = Readonly<{ pettyRecordId: string; month: string; amount: number }>;
+
 export type ReportPurchaseFact = Readonly<{
   id: string;
   date: string;
   supplier?: string;
   amount: number;
+  domain?: "spirits" | "food" | "wine_snapshot" | "wine_manual";
+  productName?: string;
 }>;
+export type ReportShiftFact = Readonly<Pick<ShiftEntry, "employeeId" | "date" | "shift" | "hoursValue">>;
 
 export type ReportInventoryFact = Readonly<{
   id: string;
@@ -45,6 +51,16 @@ export type StoreReportReadModel = Readonly<{
     paySlips: ReadonlyArray<ReportPaySlipFact>;
     deptOrder: ReadonlyArray<EmployeeDept>;
   }>;
+  periodDetails: Readonly<{
+    shifts: ReadonlyArray<ReportShiftFact>;
+    purchases: ReadonlyArray<ReportPurchaseFact>;
+  }>;
+  monthlyDetails: Readonly<{
+    pettyRecords: ReadonlyArray<ReportPettyFact>;
+    pettyLaborLinks: ReadonlyArray<ReportPettyLaborLinkFact>;
+    purchases: ReadonlyArray<ReportPurchaseFact>;
+    spiritSupplierNames: ReadonlyArray<string>;
+  }>;
   suppliers: ReadonlyArray<Readonly<{ supplier: string; purchaseAmount: number }>>;
   /** 全时段按日归集，只读供经营分析按日、月、年与自定义范围筛选。 */
   analyticsByDate: ReadonlyArray<Readonly<{ date: string; amounts: Readonly<Record<string, number>> }>>;
@@ -53,10 +69,13 @@ export type StoreReportReadModel = Readonly<{
 
 export type StoreReportFacts = Readonly<{
   payslips: readonly Pick<PaySlip, "month" | "employeeId" | "totalEmployerCost" | "finalSalary">[];
-  pettyRecords: readonly Pick<PettyRecord, "date" | "code" | "amount">[];
+  pettyRecords: readonly ReportPettyFact[];
+  pettyLaborLinks?: readonly ReportPettyLaborLinkFact[];
+  spiritSupplierNames?: readonly string[];
   employees?: readonly ReportEmployeeFact[];
   payrollDetails?: readonly ReportPaySlipFact[];
   deptOrder?: readonly EmployeeDept[];
+  shifts?: readonly ReportShiftFact[];
   revenueRecords?: readonly ReportRevenueFact[];
   purchases: readonly ReportPurchaseFact[];
   inventory: readonly ReportInventoryFact[];
@@ -68,9 +87,10 @@ const isPettyOtherIncome = (code: string) => ["N3", "N4", "N5"].includes(code);
 
 function* reportFactFingerprintParts(
   slips: readonly Pick<PaySlip, "month" | "employeeId" | "totalEmployerCost" | "finalSalary">[],
-  pettyRecords: readonly Pick<PettyRecord, "date" | "code" | "amount">[],
+  pettyRecords: readonly ReportPettyFact[],
   employees: readonly ReportEmployeeFact[],
   payrollDetails: readonly ReportPaySlipFact[],
+  shifts: readonly ReportShiftFact[],
   revenueRecords: readonly ReportRevenueFact[],
   purchases: readonly ReportPurchaseFact[],
   inventoryRows: readonly ReportInventoryFact[],
@@ -102,6 +122,13 @@ function* reportFactFingerprintParts(
     yield slip.advanceAmount;
     yield slip.pettyLaborPaid ?? 0;
   }
+  yield shifts.length;
+  for (const shift of shifts) {
+    yield shift.employeeId;
+    yield shift.date;
+    yield shift.shift;
+    yield shift.hoursValue ?? "";
+  }
   yield revenueRecords.length;
   for (const record of revenueRecords) {
     yield record.date;
@@ -111,6 +138,8 @@ function* reportFactFingerprintParts(
   yield purchases.length;
   for (const purchase of purchases) {
     yield purchase.id;
+    yield purchase.date;
+    yield purchase.domain ?? "";
     yield purchase.supplier ?? "";
     yield purchase.amount;
   }
@@ -172,7 +201,7 @@ export function buildStoreReportReadModel(month: string, facts: StoreReportFacts
   }
 
   const sourceVersion = `${month}:${fingerprintParts(
-    reportFactFingerprintParts(slips, pettyRecords, facts.employees ?? [], facts.payrollDetails ?? [], revenueRecords, purchases, inventoryRows),
+    reportFactFingerprintParts(slips, pettyRecords, facts.employees ?? [], facts.payrollDetails ?? [], facts.shifts ?? [], revenueRecords, purchases, inventoryRows),
   )}`;
 
   return Object.freeze({
@@ -196,6 +225,16 @@ export function buildStoreReportReadModel(month: string, facts: StoreReportFacts
       employees: Object.freeze([...(facts.employees ?? [])]),
       paySlips: Object.freeze([...(facts.payrollDetails ?? [])]),
       deptOrder: Object.freeze([...(facts.deptOrder ?? [])]),
+    }),
+    periodDetails: Object.freeze({
+      shifts: Object.freeze([...(facts.shifts ?? [])]),
+      purchases: Object.freeze([...facts.purchases]),
+    }),
+    monthlyDetails: Object.freeze({
+      pettyRecords: Object.freeze([...facts.pettyRecords]),
+      pettyLaborLinks: Object.freeze([...(facts.pettyLaborLinks ?? [])]),
+      purchases: Object.freeze([...facts.purchases]),
+      spiritSupplierNames: Object.freeze([...(facts.spiritSupplierNames ?? [])]),
     }),
     suppliers: Object.freeze([...supplierAmounts.entries()]
       .map(([supplier, purchaseAmount]) => Object.freeze({ supplier, purchaseAmount }))

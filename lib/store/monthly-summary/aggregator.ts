@@ -55,7 +55,7 @@ export interface AggregatorInput {
   /** 月度经营分析报告（收款渠道/菜品大类数据） */
   monthlyReport?: MonthlyReport;
   /** 备用金原始记录（用于逐分类提取） */
-  pettyRecords?: PettyRecord[];
+  pettyRecords?: ReadonlyArray<Pick<PettyRecord, "id" | "date" | "code" | "amount">>;
   /** 薪资单列表 */
   paySlips?: PaySlip[];
   /** 手动录入项（房租/外卖/活动收入等） */
@@ -63,17 +63,17 @@ export interface AggregatorInput {
   /** 烈酒当月进货汇总（按供应商分组）——来自烈酒库存管理 */
   spiritPurchaseSummary?: SpiritPurchaseSupplierSummary[];
   /** 所有烈酒供应商名称（用于生成金额为0的行）*/
-  allSpiritSupplierNames?: string[];
+  allSpiritSupplierNames?: readonly string[];
   /** 食材当月进货记录——来自供应商采购管理 */
-  foodPurchaseRecords?: SupplierPurchaseRecord[];
+  foodPurchaseRecords?: ReadonlyArray<Pick<SupplierPurchaseRecord, "supplierName" | "totalAmount">>;
   /** 葡萄酒当月进货快照供应商汇总——来自葡萄酒库存管理 */
   wineSnapshotSupplierTotals?: Record<string, number>;
   /** 葡萄酒当月手动进货记录 */
   wineManualPurchases?: { supplier: string; amount: number; productName: string }[];
   /** 所有葡萄酒供应商名称（用于生成金额为0的行）*/
-  allWineSupplierNames?: string[];
+  allWineSupplierNames?: readonly string[];
   /** 所有食材供应商名称（用于生成金额为0的行）*/
-  allFoodSupplierNames?: string[];
+  allFoodSupplierNames?: readonly string[];
   /** 员工列表（用于生成金额为0的薪资行）*/
   allEmployees?: { id: string; realName: string; code: string }[];
   /**
