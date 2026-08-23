@@ -33,8 +33,8 @@ function classify(key, backend) {
   if (/^cf\.sync\.(deviceToken|groupSwitchTicket\.|\{deviceId\|groupId\|deviceName\})/.test(key)) return "S2-credential";
   if (/^(cf\.sync\.|sync\.|backup\.)/.test(key)) return "S3-diagnostic";
   if (/^manus-runtime-user-info$/.test(key)) return "S1-business";
-  if (/^(sync\.|backup\.|.*(?:labor|salary|payslip|employee|supplier|purchase|monthly|report|petty|spirits|wine|food|inventory))/i.test(key)) return "S1-business";
-  if (/log|diagnostic|timestamp|lastPulled|dirty|migration/i.test(key)) return "S3-diagnostic";
+  if (/log|diagnostic|timestamp|lastPulled|dirty|migration|migrated/i.test(key)) return "S3-diagnostic";
+  if (/^(sync\.|backup\.|.*(?:labor|salary|payslip|employee|supplier|purchase|monthly|report|petty|spirits|wine|food|inventory|module_month))/i.test(key)) return "S1-business";
   return "S0-public";
 }
 

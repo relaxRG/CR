@@ -13,6 +13,10 @@
 export interface WeekdayClosingTime {
   /** 0=周日 1=周一 ... 6=周六 */
   weekday: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  /** 该日是否营业；未设置时兼容历史数据并视为营业。 */
+  open?: boolean;
+  /** 该日开门时间；未设置时回退到全局 openingTime。 */
+  openingTime?: string;
   /** 关门时间 "HH:MM"，跨日用 "25:00" 表示次日01:00 */
   closingTime: string;
 }
@@ -25,6 +29,10 @@ export interface BusinessHoursConfig {
   weekdayClosingTimes: WeekdayClosingTime[];
   /** 按日期的手工覆盖（优先于星期默认值） */
   dateOverrides: { date: string; closingTime: string; note?: string }[];
+  /** 旧营业时间页面的加班预警开关；纳入同一共享配置。 */
+  overtimeAlertEnabled?: boolean;
+  /** 旧营业时间页面的临近关门预警分钟数；纳入同一共享配置。 */
+  closingAlertMinutes?: number;
   updatedAt: string;
 }
 
@@ -32,15 +40,17 @@ export const DEFAULT_BUSINESS_HOURS: BusinessHoursConfig = {
   id: "default",
   openingTime: "12:00",
   weekdayClosingTimes: [
-    { weekday: 0, closingTime: "25:00" }, // 周日 01:00次日
-    { weekday: 1, closingTime: "24:00" }, // 周一 00:00次日
-    { weekday: 2, closingTime: "24:00" }, // 周二
-    { weekday: 3, closingTime: "24:00" }, // 周三
-    { weekday: 4, closingTime: "24:00" }, // 周四
-    { weekday: 5, closingTime: "25:00" }, // 周五 01:00次日
-    { weekday: 6, closingTime: "25:00" }, // 周六 01:00次日
+    { weekday: 0, open: true, openingTime: "12:00", closingTime: "25:00" }, // 周日 01:00次日
+    { weekday: 1, open: true, openingTime: "12:00", closingTime: "24:00" }, // 周一 00:00次日
+    { weekday: 2, open: true, openingTime: "12:00", closingTime: "24:00" }, // 周二
+    { weekday: 3, open: true, openingTime: "12:00", closingTime: "24:00" }, // 周三
+    { weekday: 4, open: true, openingTime: "12:00", closingTime: "24:00" }, // 周四
+    { weekday: 5, open: true, openingTime: "12:00", closingTime: "25:00" }, // 周五 01:00次日
+    { weekday: 6, open: true, openingTime: "12:00", closingTime: "25:00" }, // 周六 01:00次日
   ],
   dateOverrides: [],
+  overtimeAlertEnabled: true,
+  closingAlertMinutes: 90,
   updatedAt: new Date().toISOString(),
 };
 

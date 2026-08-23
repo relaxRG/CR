@@ -41,12 +41,15 @@ export const SYNC_KEYS = [
   "app.lang.v1",
   "menu_store_v1",
   "shopping_store_v1",
+  "store.purchase.v1",
   "cocktail.iceSettings.v2",
   "cocktail.prefs.v1",
   // ── 葡萄酒模块（新增）────────────────────────────────────────────────────────
   "wine.bottles.v1",
   "wine.snapshots.v2",
   "wine.manual_purchases.v1",
+  "wine.import_control.v1",
+  "wine.master_data.v1",
   // ── 餐食模块（新增）──────────────────────────────────────────────────────────
   "food.menu.v1",
   "food.ingredients.v2",
@@ -66,6 +69,8 @@ export const SYNC_KEYS = [
   "monthly_summary.payments.v1",
   "monthly_summary.balances.v1",
   "monthly_reports_v1",
+  "module_month_close_archives_v1",
+  "module_month_adjustment_sessions_v1",
   // ── 经营分析（新增）──────────────────────────────────────────────────────────
   "period_analysis.reports.v1",
   "period_analysis.settings.v1",
@@ -76,6 +81,7 @@ export const SYNC_KEYS = [
   "labor_shift_templates_v1",
   "labor_attendance_v1",
   "labor_payslips_v1",
+  "labor.separate_payments.v1",
   "labor_month_close_archives_v1",
   "labor_month_adjustment_sessions_v1",
   "labor_month_configs_v1",
@@ -325,6 +331,10 @@ const ID_LIST_KEYS = new Set<string>([
   "labor_payslips_v1",
   "labor_month_close_archives_v1",
   "labor_month_adjustment_sessions_v1",
+  "labor.separate_payments.v1",
+  "module_month_close_archives_v1",
+  "module_month_adjustment_sessions_v1",
+  "store.purchase.v1",
   "monthly_summary.suppliers.v1",
   "monthly_summary.payments.v1",
   // 烈酒进销存
@@ -346,6 +356,8 @@ const ID_LIST_KEYS = new Set<string>([
 const STORE_OBJECT_KEYS = new Map<string, string[]>([
   ["menu_store_v1", ["groups"]],
   ["shopping_store_v1", ["items"]],
+  ["wine.import_control.v1", ["batches", "restorePoints", "auditEntries"]],
+  ["wine.master_data.v1", ["suppliers", "categories"]],
   ["store.petty.v1", ["records"]],
   ["store.revenue.v1", ["records"]],
 ]);

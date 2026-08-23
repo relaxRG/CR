@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useColors } from "@/hooks/use-colors";
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import { notifySyncChange, registerStoreReload } from "@/lib/sync/engine";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useRouter } from "expo-router";
 import { useScrollPreservation } from "@/hooks/use-scroll-preservation";
@@ -39,13 +40,18 @@ function uuid(): string { return Math.random().toString(36).slice(2) + Date.now(
 function usePurchaseStore() {
   const [items, setItems] = React.useState<PurchaseItem[]>([]);
   React.useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY).then((raw) => {
+    const load = () => AsyncStorage.getItem(STORAGE_KEY).then((raw) => {
       if (raw) { try { setItems(JSON.parse(raw)); } catch {} }
+      else setItems([]);
     });
+    void load();
+    return registerStoreReload(load);
   }, []);
   const save = (next: PurchaseItem[]) => {
     setItems(next);
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)).catch(() => {});
+    void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+      .then(() => notifySyncChange(STORAGE_KEY))
+      .catch(() => {});
   };
   const addItem = (data: Omit<PurchaseItem, "id" | "createdAt">) => {
     save([{ ...data, id: uuid(), createdAt: new Date().toISOString() }, ...items]);

@@ -1,9 +1,27 @@
 {
   "version": 2,
   "generatedFrom": "docs/local-storage-schema.json",
-  "entryCount": 127,
-  "dynamicEntryCount": 26,
+  "entryCount": 137,
+  "dynamicEntryCount": 31,
   "entries": [
+    {
+      "backend": "AsyncStorage",
+      "key": "[",
+      "status": "unresolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/labor/report-month-close-provider.tsx",
+        "lib/recipes/store.tsx"
+      ],
+      "operations": [
+        "multiGet",
+        "multiSet"
+      ],
+      "dynamic": true,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
     {
       "backend": "AsyncStorage",
       "key": "[...keys]",
@@ -60,7 +78,8 @@
       "classification": "S0-public",
       "ownerFiles": [
         "lib/backup/icloud-backup.ts",
-        "lib/backup/local-backup.ts"
+        "lib/backup/local-backup.ts",
+        "lib/sync/engine.ts"
       ],
       "operations": [
         "multiGet"
@@ -105,6 +124,38 @@
     },
     {
       "backend": "AsyncStorage",
+      "key": "[ARCHIVES_KEY",
+      "status": "unresolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/labor/report-month-close-provider.tsx"
+      ],
+      "operations": [
+        "multiGet"
+      ],
+      "dynamic": true,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "[BIZ_HOURS_KEY",
+      "status": "unresolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/store/period-analysis/schedule-store.tsx"
+      ],
+      "operations": [
+        "multiGet"
+      ],
+      "dynamic": true,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
       "key": "[DIRTY_KEYS_PERSIST_KEY",
       "status": "unresolved",
       "classification": "S3-diagnostic",
@@ -118,6 +169,23 @@
       "purgeOn": [
         "startup-ttl",
         "leave-group"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "[EMPLOYEES_KEY",
+      "status": "unresolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/labor/report-month-close-provider.tsx"
+      ],
+      "operations": [
+        "multiGet"
+      ],
+      "dynamic": true,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
       ]
     },
     {
@@ -315,9 +383,45 @@
       "backend": "AsyncStorage",
       "key": "bottles.material.migrated.v8",
       "status": "resolved",
-      "classification": "S0-public",
+      "classification": "S3-diagnostic",
       "ownerFiles": [
         "lib/bottles/store.tsx"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "startup-ttl",
+        "leave-group"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "bottles.material.migrated.v9",
+      "status": "resolved",
+      "classification": "S3-diagnostic",
+      "ownerFiles": [
+        "lib/bottles/store.tsx"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "startup-ttl",
+        "leave-group"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "bottles.price-alerts.v1",
+      "status": "resolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/bottles/price-alert-store.tsx"
       ],
       "operations": [
         "getItem",
@@ -330,9 +434,9 @@
     },
     {
       "backend": "AsyncStorage",
-      "key": "bottles.material.migrated.v9",
+      "key": "bottles.supplier-channels.migrated.v1",
       "status": "resolved",
-      "classification": "S0-public",
+      "classification": "S3-diagnostic",
       "ownerFiles": [
         "lib/bottles/store.tsx"
       ],
@@ -342,7 +446,8 @@
       ],
       "dynamic": false,
       "purgeOn": [
-        "version-retirement"
+        "startup-ttl",
+        "leave-group"
       ]
     },
     {
@@ -510,7 +615,6 @@
         "lib/recipes/store.tsx"
       ],
       "operations": [
-        "getItem",
         "setItem"
       ],
       "dynamic": false,
@@ -527,7 +631,6 @@
         "lib/recipes/store.tsx"
       ],
       "operations": [
-        "getItem",
         "setItem"
       ],
       "dynamic": false,
@@ -595,7 +698,6 @@
         "lib/recipes/store.tsx"
       ],
       "operations": [
-        "getItem",
         "setItem"
       ],
       "dynamic": false,
@@ -631,7 +733,6 @@
         "lib/recipes/store.tsx"
       ],
       "operations": [
-        "getItem",
         "setItem"
       ],
       "dynamic": false,
@@ -648,7 +749,6 @@
         "lib/recipes/store.tsx"
       ],
       "operations": [
-        "getItem",
         "setItem"
       ],
       "dynamic": false,
@@ -665,7 +765,6 @@
         "lib/recipes/store.tsx"
       ],
       "operations": [
-        "getItem",
         "setItem"
       ],
       "dynamic": false,
@@ -995,7 +1094,8 @@
       "classification": "S0-public",
       "ownerFiles": [
         "lib/backup/local-backup.ts",
-        "lib/migrations/purge-retired-book-library.ts"
+        "lib/migrations/purge-retired-book-library.ts",
+        "lib/sync/engine.ts"
       ],
       "operations": [
         "multiGet",
@@ -1061,10 +1161,45 @@
     },
     {
       "backend": "AsyncStorage",
+      "key": "labor_month_adjustment_sessions_v1",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/labor/report-month-close-provider.tsx"
+      ],
+      "operations": [
+        "setItem"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "labor_month_close_archives_v1",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/labor/report-month-close-provider.tsx"
+      ],
+      "operations": [
+        "setItem"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
       "key": "labor_shifts_v1",
       "status": "resolved",
       "classification": "S1-business",
       "ownerFiles": [
+        "lib/labor/report-month-close-provider.tsx",
         "lib/migrations/clean-empty-shift-entries.ts"
       ],
       "operations": [
@@ -1207,7 +1342,7 @@
       "backend": "AsyncStorage",
       "key": "migration_clean_monthly_fixed_salary_v1_done",
       "status": "resolved",
-      "classification": "S1-business",
+      "classification": "S3-diagnostic",
       "ownerFiles": [
         "lib/migrations/clean-monthly-fixed-salary.ts"
       ],
@@ -1218,15 +1353,15 @@
       ],
       "dynamic": false,
       "purgeOn": [
-        "leave-group",
-        "version-retirement"
+        "startup-ttl",
+        "leave-group"
       ]
     },
     {
       "backend": "AsyncStorage",
       "key": "module_month_adjustment_sessions_v1",
       "status": "resolved",
-      "classification": "S0-public",
+      "classification": "S1-business",
       "ownerFiles": [
         "lib/month-close/module-month-close-store.tsx"
       ],
@@ -1236,6 +1371,7 @@
       ],
       "dynamic": false,
       "purgeOn": [
+        "leave-group",
         "version-retirement"
       ]
     },
@@ -1243,7 +1379,7 @@
       "backend": "AsyncStorage",
       "key": "module_month_close_archives_v1",
       "status": "resolved",
-      "classification": "S0-public",
+      "classification": "S1-business",
       "ownerFiles": [
         "lib/month-close/module-month-close-store.tsx"
       ],
@@ -1253,6 +1389,7 @@
       ],
       "dynamic": false,
       "purgeOn": [
+        "leave-group",
         "version-retirement"
       ]
     },
@@ -1437,6 +1574,22 @@
     },
     {
       "backend": "AsyncStorage",
+      "key": "pullWrites",
+      "status": "unresolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/sync/engine.ts"
+      ],
+      "operations": [
+        "multiSet"
+      ],
+      "dynamic": true,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
       "key": "removals",
       "status": "unresolved",
       "classification": "S0-public",
@@ -1461,7 +1614,6 @@
         "lib/store/period-analysis/schedule-store.tsx"
       ],
       "operations": [
-        "getItem",
         "setItem"
       ],
       "dynamic": false,
@@ -1478,7 +1630,6 @@
         "lib/store/period-analysis/schedule-store.tsx"
       ],
       "operations": [
-        "getItem",
         "setItem"
       ],
       "dynamic": false,
@@ -1689,6 +1840,7 @@
       "status": "unresolved",
       "classification": "S0-public",
       "ownerFiles": [
+        "hooks/use-persisted-state.ts",
         "lib/inventory-core/store.tsx"
       ],
       "operations": [
@@ -1706,11 +1858,10 @@
       "status": "resolved",
       "classification": "S0-public",
       "ownerFiles": [
-        "app/store-hours.tsx"
+        "lib/store/period-analysis/schedule-store.tsx"
       ],
       "operations": [
-        "getItem",
-        "setItem"
+        "removeItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -2070,6 +2221,24 @@
     {
       "backend": "AsyncStorage",
       "key": "wine.manual_purchases.v1",
+      "status": "resolved",
+      "classification": "S1-business",
+      "ownerFiles": [
+        "lib/wine/store.tsx"
+      ],
+      "operations": [
+        "getItem",
+        "setItem"
+      ],
+      "dynamic": false,
+      "purgeOn": [
+        "leave-group",
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "wine.master_data.v1",
       "status": "resolved",
       "classification": "S1-business",
       "ownerFiles": [

@@ -11,6 +11,57 @@ import {
 
 const BIZ_HOURS_KEY = "schedule.business_hours.v1";
 const SHIFT_TEMPLATES_KEY = "schedule.shift_templates.v1";
+const LEGACY_STORE_HOURS_KEY = "store_business_hours_v1";
+
+type LegacyStoreHours = Readonly<{
+  days?: readonly { open?: unknown; openTime?: unknown; closeTime?: unknown }[];
+  overtimeAlertEnabled?: unknown;
+  closingAlertMinutes?: unknown;
+  updatedAt?: unknown;
+}>;
+
+function toSharedClosingTime(value: unknown, fallback: string): string {
+  if (typeof value !== "string") return fallback;
+  const matched = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
+  if (!matched) return fallback;
+  const hour = Number(matched[1]);
+  const minute = Number(matched[2]);
+  if (!Number.isInteger(hour) || !Number.isInteger(minute) || hour < 0 || hour > 25 || minute < 0 || minute > 59) return fallback;
+  return `${String(hour < 12 ? hour + 24 : hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+export function migrateLegacyStoreHours(raw: string | null): BusinessHoursConfig | null {
+  if (!raw) return null;
+  try {
+    const legacy = JSON.parse(raw) as LegacyStoreHours;
+    if (!Array.isArray(legacy.days) || legacy.days.length !== 7) return null;
+    const defaults = new Map(DEFAULT_BUSINESS_HOURS.weekdayClosingTimes.map((item) => [item.weekday, item]));
+    const weekdayClosingTimes = legacy.days.map((day, mondayIndex) => {
+      const weekday = ((mondayIndex + 1) % 7) as 0 | 1 | 2 | 3 | 4 | 5 | 6;
+      const fallback = defaults.get(weekday) ?? DEFAULT_BUSINESS_HOURS.weekdayClosingTimes[0]!;
+      return {
+        weekday,
+        open: day?.open !== false,
+        openingTime: typeof day?.openTime === "string" ? day.openTime : fallback.openingTime ?? DEFAULT_BUSINESS_HOURS.openingTime,
+        closingTime: toSharedClosingTime(day?.closeTime, fallback.closingTime),
+      };
+    });
+    const firstOpen = weekdayClosingTimes.find((item) => item.open)?.openingTime;
+    return {
+      id: "default",
+      openingTime: firstOpen ?? DEFAULT_BUSINESS_HOURS.openingTime,
+      weekdayClosingTimes,
+      dateOverrides: [],
+      overtimeAlertEnabled: legacy.overtimeAlertEnabled !== false,
+      closingAlertMinutes: typeof legacy.closingAlertMinutes === "number" && legacy.closingAlertMinutes > 0
+        ? legacy.closingAlertMinutes
+        : DEFAULT_BUSINESS_HOURS.closingAlertMinutes,
+      updatedAt: typeof legacy.updatedAt === "string" ? legacy.updatedAt : new Date().toISOString(),
+    };
+  } catch {
+    return null;
+  }
+}
 
 function uuid(): string { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
 
@@ -70,14 +121,20 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const load = async () => {
       try {
-        const [bhRaw, stRaw] = await Promise.all([
-          AsyncStorage.getItem(BIZ_HOURS_KEY),
-          AsyncStorage.getItem(SHIFT_TEMPLATES_KEY),
-        ]);
+        const rows = new Map(await AsyncStorage.multiGet([BIZ_HOURS_KEY, SHIFT_TEMPLATES_KEY, LEGACY_STORE_HOURS_KEY]));
+        const bhRaw = rows.get(BIZ_HOURS_KEY) ?? null;
+        const stRaw = rows.get(SHIFT_TEMPLATES_KEY) ?? null;
+        const migrated = bhRaw ? null : migrateLegacyStoreHours(rows.get(LEGACY_STORE_HOURS_KEY) ?? null);
+        const businessHours = bhRaw ? JSON.parse(bhRaw) : migrated ?? { ...DEFAULT_BUSINESS_HOURS };
+        if (migrated) {
+          await AsyncStorage.setItem(BIZ_HOURS_KEY, JSON.stringify(migrated));
+          await AsyncStorage.removeItem(LEGACY_STORE_HOURS_KEY);
+          notifySyncChange(BIZ_HOURS_KEY);
+        }
         dispatch({
           type: "LOAD",
           state: {
-            businessHours: bhRaw ? JSON.parse(bhRaw) : { ...DEFAULT_BUSINESS_HOURS },
+            businessHours,
             shiftTemplates: stRaw ? JSON.parse(stRaw) : [...DEFAULT_SHIFT_TEMPLATES],
           },
         });

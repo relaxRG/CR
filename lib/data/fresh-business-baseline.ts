@@ -1,4 +1,5 @@
 import { SYNC_KEYS, type SyncStorageKey } from "@/lib/sync/engine";
+import { LOCAL_ONLY_BUSINESS_STORAGE_BOUNDARIES } from "@/lib/sync/local-business-storage-boundaries";
 
 /**
  * 全新业务基线：保留 App 代码和可恢复备份，清空当前设备业务状态并切换到新的空同步组。
@@ -19,12 +20,8 @@ export const RETIRED_LOCAL_BUSINESS_KEYS = [
   "fruit.inventory.v2",
   "glassware.inventory.v1",
   "ice.inventory.v2",
-  "labor.separate_payments.v1",
   "labor_schedule_snapshots_v1",
-  "monthly_report.raw_excel_archive.v1",
-  "store.purchase.v1",
   "tableware.inventory.v1",
-  "wine.import_control.v1",
 ] as const;
 
 const RETIRED_LOCAL_BUSINESS_PREFIXES = [
@@ -47,6 +44,7 @@ const SYNC_RUNTIME_KEYS = new Set([
 
 const sharedBusinessKeySet = new Set<string>(SYNC_KEYS as readonly SyncStorageKey[]);
 const retiredBusinessKeySet = new Set<string>(RETIRED_LOCAL_BUSINESS_KEYS);
+const localBusinessBoundaryKeySet = new Set<string>(Object.keys(LOCAL_ONLY_BUSINESS_STORAGE_BOUNDARIES));
 
 export type FreshBaselineKeyPlan = Readonly<{
   businessKeys: readonly string[];
@@ -90,6 +88,7 @@ export function createFreshBaselineKeyPlan(allStorageKeys: readonly string[]): F
   const businessKeys = [...unique]
     .filter((key) => sharedBusinessKeySet.has(key)
       || retiredBusinessKeySet.has(key)
+      || localBusinessBoundaryKeySet.has(key)
       || RETIRED_LOCAL_BUSINESS_PREFIXES.some((prefix) => key.startsWith(prefix)))
     .sort();
   const syncRuntimeKeys = [...unique]

@@ -5,20 +5,21 @@
  * - 数据持久化到 AsyncStorage
  * - 供加班预警和经营分析使用
  */
-import React, { useEffect, useState } from "react";
+import React, { useMemo } from "react";
 import {
   Alert, Platform, Pressable, ScrollView, StyleSheet,
   Switch, Text, TextInput, TouchableOpacity, View
 } from "react-native";
 import * as Haptics from "expo-haptics";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
+import { useScheduleStore } from "@/lib/store/period-analysis/schedule-store";
+import { DEFAULT_BUSINESS_HOURS, type BusinessHoursConfig as SharedBusinessHoursConfig } from "@/lib/store/period-analysis/schedule-types";
 
-const STORAGE_KEY = "store_business_hours_v1";
+
 const WEEKDAY_LABELS = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
 // 0=周一, 1=周二, ..., 6=周日
 
@@ -39,48 +40,66 @@ export interface BusinessHoursConfig {
   updatedAt: string;
 }
 
-const DEFAULT_CONFIG: BusinessHoursConfig = {
-  days: Array.from({ length: 7 }, (_, i) => ({
-    open: true,
-    openTime: "11:00",
-    closeTime: i >= 4 ? "01:00" : "24:00", // 周五周六延长到凌晨1点
-  })),
-  closingAlertMinutes: 90,
-  overtimeAlertEnabled: true,
-  updatedAt: new Date().toISOString(),
-};
+function toScreenClosingTime(value: string): string {
+  const matched = /^(\d{1,2}):(\d{2})$/.exec(value);
+  if (!matched) return "24:00";
+  const hour = Number(matched[1]);
+  return `${String(hour >= 24 ? hour - 24 : hour).padStart(2, "0")}:${matched[2]}`;
+}
 
-/** 全局读取营业时间配置（供其他模块使用） */
-export async function getBusinessHoursConfig(): Promise<BusinessHoursConfig> {
-  try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw) as BusinessHoursConfig;
-  } catch {}
-  return DEFAULT_CONFIG;
+function toSharedClosingTime(value: string): string {
+  const matched = /^(\d{1,2}):(\d{2})$/.exec(value);
+  if (!matched) return "24:00";
+  const hour = Number(matched[1]);
+  return `${String(hour < 12 ? hour + 24 : hour).padStart(2, "0")}:${matched[2]}`;
+}
+
+function toScreenConfig(source: SharedBusinessHoursConfig): BusinessHoursConfig {
+  return {
+    days: Array.from({ length: 7 }, (_, mondayIndex) => {
+      const weekday = ((mondayIndex + 1) % 7) as 0 | 1 | 2 | 3 | 4 | 5 | 6;
+      const day = source.weekdayClosingTimes.find((item) => item.weekday === weekday);
+      return {
+        open: day?.open !== false,
+        openTime: day?.openingTime ?? source.openingTime,
+        closeTime: toScreenClosingTime(day?.closingTime ?? "24:00"),
+      };
+    }),
+    closingAlertMinutes: source.closingAlertMinutes ?? 90,
+    overtimeAlertEnabled: source.overtimeAlertEnabled !== false,
+    updatedAt: source.updatedAt,
+  };
+}
+
+function toSharedConfig(next: BusinessHoursConfig, current: SharedBusinessHoursConfig): SharedBusinessHoursConfig {
+  const weekdayClosingTimes = next.days.map((day, mondayIndex) => ({
+    weekday: ((mondayIndex + 1) % 7) as 0 | 1 | 2 | 3 | 4 | 5 | 6,
+    open: day.open,
+    openingTime: day.openTime,
+    closingTime: toSharedClosingTime(day.closeTime),
+  }));
+  const firstOpen = weekdayClosingTimes.find((day) => day.open)?.openingTime;
+  return {
+    ...current,
+    openingTime: firstOpen ?? current.openingTime,
+    weekdayClosingTimes,
+    overtimeAlertEnabled: next.overtimeAlertEnabled,
+    closingAlertMinutes: next.closingAlertMinutes,
+    updatedAt: next.updatedAt,
+  };
 }
 
 export default function StoreHoursScreen() {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { businessHours, updateBusinessHours } = useScheduleStore();
+  const config = useMemo(() => toScreenConfig(businessHours ?? DEFAULT_BUSINESS_HOURS), [businessHours]);
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
-  const [config, setConfig] = useState<BusinessHoursConfig>(DEFAULT_CONFIG);
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY).then((raw) => {
-      if (raw) {
-        try { setConfig(JSON.parse(raw)); } catch {}
-      }
-      setLoaded(true);
-    });
-  }, []);
-
-  const save = async (next: BusinessHoursConfig) => {
+  const save = (next: BusinessHoursConfig) => {
     const updated = { ...next, updatedAt: new Date().toISOString() };
-    setConfig(updated);
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    updateBusinessHours(toSharedConfig(updated, businessHours ?? DEFAULT_BUSINESS_HOURS));
   };
 
   const updateDay = (idx: number, patch: Partial<DayHours>) => {
@@ -105,8 +124,6 @@ export default function StoreHoursScreen() {
     })};
     save(next);
   };
-
-  if (!loaded) return null;
 
   return (
     <ScreenContainer>

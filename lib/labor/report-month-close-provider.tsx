@@ -24,7 +24,7 @@ const ARCHIVES_KEY = "labor_month_close_archives_v1";
 const SESSIONS_KEY = "labor_month_adjustment_sessions_v1";
 const EMPLOYEES_KEY = "labor_employees_v1";
 const SHIFTS_KEY = "labor_shifts_v1";
-const ATTENDANCES_KEY = "labor_attendances_v1";
+const ATTENDANCES_KEY = "labor_attendance_v1";
 const PAYSLIPS_KEY = "labor_payslips_v1";
 
 function parseArray<T>(raw: string | null): T[] | null {
