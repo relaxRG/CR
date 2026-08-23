@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "platform": "android",
+  "minSamples": 5,
+  "percentile": 0.95,
+  "requireComparableDevice": true,
+  "comparableDeviceFields": ["model", "apiLevel", "abi", "buildType", "compilationMode"],
+  "requiredMetrics": [
+    "timeToInitialDisplayMs",
+    "timeToFullDisplayMs",
+    "peakPssMB",
+    "frameDurationCpuP95Ms",
+    "frameOverrunP95Ms",
+    "jankFramesOver16Ms",
+    "photoUploadPeakPssMB"
+  ],
+  "defaultTolerance": {
+    "timeToInitialDisplayMs": 0.15,
+    "timeToFullDisplayMs": 0.15,
+    "peakPssMB": 0.12,
+    "frameDurationCpuP95Ms": 0.12,
+    "frameOverrunP95Ms": 0.15,
+    "jankFramesOver16Ms": 0.2,
+    "photoUploadPeakPssMB": 0.12
+  },
+  "defaultAbsoluteLimit": {
+    "timeToInitialDisplayMs": 3200,
+    "timeToFullDisplayMs": 4500,
+    "peakPssMB": 420,
+    "frameDurationCpuP95Ms": 24,
+    "frameOverrunP95Ms": 8,
+    "jankFramesOver16Ms": 3,
+    "photoUploadPeakPssMB": 460
+  },
+  "scenarioOverrides": {
+    "store_inventory_long_list": {
+      "absoluteLimit": {
+        "frameDurationCpuP95Ms": 18,
+        "frameOverrunP95Ms": 4,
+        "jankFramesOver16Ms": 1,
+        "peakPssMB": 360
+      }
+    },
+    "schedule_employee_picker_long_list": {
+      "absoluteLimit": {
+        "frameDurationCpuP95Ms": 18,
+        "frameOverrunP95Ms": 4,
+        "jankFramesOver16Ms": 1,
+        "peakPssMB": 340
+      }
+    },
+    "recipe_photo_upload_4k": {
+      "absoluteLimit": {
+        "photoUploadPeakPssMB": 380,
+        "jankFramesOver16Ms": 2
+      }
+    }
+  }
+}

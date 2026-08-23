@@ -10,6 +10,7 @@ if (!reportPath) {
 
 const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
 const failures = Array.isArray(report.failures) ? report.failures : [];
+const platform = report.platform ?? report.candidateDevice?.platform ?? "ios";
 const build = process.env.GITHUB_SHA?.slice(0, 12) ?? process.env.PERFORMANCE_BUILD_ID ?? "local";
 const workflowUrl = process.env.GITHUB_SERVER_URL && process.env.GITHUB_REPOSITORY && process.env.GITHUB_RUN_ID
   ? `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`
@@ -21,7 +22,8 @@ const fingerprint = crypto.createHash("sha256")
 
 const payload = {
   version: 1,
-  type: "ios_performance_regression",
+  type: `${platform}_performance_regression`,
+  platform,
   severity: failures.length ? "warning" : "info",
   fingerprint,
   build,
