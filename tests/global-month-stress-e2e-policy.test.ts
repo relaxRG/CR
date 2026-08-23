@@ -26,7 +26,7 @@ describe("全局月份多模块压力回归规范", () => {
   });
 
   it("覆盖员工、报表、烈酒、葡萄酒、食材和账户的真实路由加载", () => {
-    for (const route of ["/labor", "/store", "/spirits-inventory", "/wine-inventory", "/food-inventory", "/store-accounts"]) {
+    for (const route of ["/labor", "/store", "/spirits-inventory", "/wine-inventory", "/food-inventory", "/store-accounts", "/device-manager", "/sync-log"]) {
       expect(script).toContain(`"${route}"`);
     }
     expect(script).not.toContain('"/monthly-report"');

@@ -191,7 +191,7 @@ try {
   if (selected.rootScrollWidth > selected.rootWidth) throw new Error(`快速切月造成根级横向溢出：${JSON.stringify(selected)}`);
   if (frames.maxFrameGapMs > 100) throw new Error(`快速切月渲染帧间隔过大：${frames.maxFrameGapMs.toFixed(1)}ms`);
 
-  const routes = ["/labor", "/store", "/spirits-inventory", "/wine-inventory", "/food-inventory", "/store-accounts"];
+  const routes = ["/labor", "/store", "/spirits-inventory", "/wine-inventory", "/food-inventory", "/store-accounts", "/device-manager", "/sync-log"];
   const moduleLoads = [];
   for (const route of routes) {
     console.log(`验证功能域路由：${route}`);

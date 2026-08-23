@@ -12,9 +12,10 @@ describe("功能域 Provider 边界", () => {
     expect(resolveFeatureBoundary("/wine-inventory-import")).toBe("wine");
     expect(resolveFeatureBoundary("/lab/projects")).toBe("lab");
     expect(resolveFeatureBoundary("/food-ingredient/abc")).toBe("food");
-    expect(resolveFeatureBoundary("/labor-attendance")).toBe("store");
+    expect(resolveFeatureBoundary("/labor")).toBe("store");
+    expect(resolveFeatureBoundary("/device-manager")).toBe("core");
+    expect(resolveFeatureBoundary("/backup")).toBe("core");
     expect(resolveFeatureBoundary("/glassware-inventory")).toBe("store");
-    expect(resolveFeatureBoundary("/backup")).toBe("all");
   });
 
   it("根布局只保留共享内核、全局月份与动态功能域边界", () => {
@@ -41,7 +42,8 @@ describe("功能域 Provider 边界", () => {
     expect(boundary).toContain('import { LabFeatureProviders }');
     expect(boundary).toContain('import { FoodFeatureProviders }');
     expect(boundary).toContain('import { StoreFeatureProviders }');
-    expect(boundary).toContain("boundary === \"all\"");
+    expect(boundary).toContain('if (boundary === "all")');
+    expect(boundary).toContain('if (boundary === "core") return <>{children}</>');
     expect(boundary).not.toContain("<Suspense");
   });
 

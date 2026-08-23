@@ -26,6 +26,8 @@ const MAX_BASE64_LEN = 1_400_000;
 const COMPRESS_THRESHOLD = 1_000_000;
 /** 最低压缩质量，低于此值直接放弃 */
 const MIN_QUALITY = 0.3;
+/** 上传前的最长边；保留配方照片可读性，同时限制解码和 Base64 峰值内存。 */
+const MAX_UPLOAD_EDGE = 1600;
 
 let running = false;
 
@@ -82,7 +84,7 @@ async function compressToLimit(uri: string): Promise<string | null> {
     try {
       const result = await ImageManipulator.manipulateAsync(
         uri,
-        [],
+        [{ resize: { width: MAX_UPLOAD_EDGE } }],
         { compress: quality, format: ImageManipulator.SaveFormat.JPEG, base64: true },
       );
       if (result.base64 && result.base64.length <= MAX_BASE64_LEN) {
@@ -186,31 +188,15 @@ async function uploadPendingPhotos(
         const localPath = await resolveScopedPhotoPath(deviceInfo.groupId, name, true);
         const info = await FileSystem.getInfoAsync(localPath);
         if (!info.exists) continue; // 本机没有该文件（等对端上传）
-        const base64 = await FileSystem.readAsStringAsync(localPath, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-        if (base64.length > MAX_BASE64_LEN) {
-          // 超大照片先尝试压缩再上传
-          if (base64.length > COMPRESS_THRESHOLD) {
-            const compressed = await compressToLimit(localPath);
-            if (compressed) {
-              // 压缩成功，用压缩后的 base64 继续上传
-              const res = await photoFetch("/api/photos/upload", deviceInfo, {
-                photoId: name,
-                recipeId: recipe?.id ?? "",
-                dataBase64: compressed,
-                contentType: "image/jpeg",
-              });
-              if (res.ok) {
-                uploaded.add(name);
-                count++;
-              }
-              done++;
-              onProgress?.("upload", done, pendingNames.length);
-              continue;
-            }
-          }
-          // 压缩失败或仍超限，跳过并标记
+        // 先依据文件大小决定是否压缩。旧实现会先读入完整 Base64，再判断是否超限，
+        // 在 4K 相机照片上会形成不必要的 JS 堆峰值。
+        const estimatedBase64Length = (info.size ?? 0) * 4 / 3;
+        const useCompression = estimatedBase64Length > COMPRESS_THRESHOLD;
+        const payload = useCompression
+          ? await compressToLimit(localPath)
+          : await FileSystem.readAsStringAsync(localPath, { encoding: FileSystem.EncodingType.Base64 });
+        if (!payload || payload.length > MAX_BASE64_LEN) {
+          // 压缩失败或仍超限，跳过并标记，避免将超大字符串继续保留在内存中。
           uploaded.add(name);
           oversizedCount++;
           done++;
@@ -220,8 +206,8 @@ async function uploadPendingPhotos(
         const res = await photoFetch("/api/photos/upload", deviceInfo, {
           photoId: name,
           recipeId: recipe?.id ?? "",
-          dataBase64: base64,
-          contentType: contentTypeOf(name),
+          dataBase64: payload,
+          contentType: useCompression ? "image/jpeg" : contentTypeOf(name),
         });
         if (res.ok) {
           uploaded.add(name);

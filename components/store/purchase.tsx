@@ -150,9 +150,15 @@ export default function StorePurchaseScreen() {
   // 滚动位置保持：cat 切换时重置偏移量
   const { listRef, onScroll } = useScrollPreservation(cat);
 
-  const filtered = useMemo(() => items.filter((i) => i.category === cat), [items, cat]);
-  const pending = filtered.filter((i) => !i.done);
-  const done = filtered.filter((i) => i.done);
+  const visibleItems = useMemo(() => {
+    const pending: PurchaseItem[] = [];
+    const done: PurchaseItem[] = [];
+    for (const item of items) {
+      if (item.category !== cat) continue;
+      (item.done ? done : pending).push(item);
+    }
+    return [...pending, ...done];
+  }, [items, cat]);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -195,7 +201,7 @@ export default function StorePurchaseScreen() {
         ref={listRef}
         onScroll={onScroll}
         scrollEventThrottle={100}
-        data={[...pending, ...done]}
+        data={visibleItems}
         keyExtractor={(i) => i.id}
         renderItem={({ item }) => (
           <Pressable

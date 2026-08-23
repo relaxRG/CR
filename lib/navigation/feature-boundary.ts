@@ -1,4 +1,4 @@
-export type FeatureBoundary = "cocktail" | "wine" | "lab" | "food" | "store" | "all";
+export type FeatureBoundary = "cocktail" | "wine" | "lab" | "food" | "store" | "core" | "all";
 
 /**
  * 将稳定 URL 映射到 Provider 功能域。
@@ -7,6 +7,18 @@ export type FeatureBoundary = "cocktail" | "wine" | "lab" | "food" | "store" | "
  */
 export function resolveFeatureBoundary(pathname: string): FeatureBoundary {
   const path = pathname.split("?")[0] || "/";
+
+  if (
+    path === "/sync-log" ||
+    path === "/device-manager" ||
+    path === "/pair-device" ||
+    path === "/me" ||
+    path === "/role-guide" ||
+    path === "/role-settings" ||
+    path === "/card-tag-settings" ||
+    path === "/backup" ||
+    path === "/data-manager"
+  ) return "core";
 
   if (
     path === "/" ||

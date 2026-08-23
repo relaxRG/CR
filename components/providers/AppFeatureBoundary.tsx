@@ -8,7 +8,7 @@ import { LabFeatureProviders } from "@/components/providers/LabFeatureProviders"
 import { FoodFeatureProviders } from "@/components/providers/FoodFeatureProviders";
 import { StoreFeatureProviders } from "@/components/providers/StoreFeatureProviders";
 
-const PROVIDERS: Record<Exclude<FeatureBoundary, "all">, ComponentType<{ children: ReactNode }>> = {
+const PROVIDERS: Record<Exclude<FeatureBoundary, "all" | "core">, ComponentType<{ children: ReactNode }>> = {
   cocktail: CocktailFeatureProviders,
   wine: WineFeatureProviders,
   lab: LabFeatureProviders,
@@ -43,6 +43,7 @@ export function AppFeatureBoundary({ children }: { children: ReactNode }) {
   }, [boundary, pathname]);
 
   if (boundary === "all") return <AllFeatureProviders>{children}</AllFeatureProviders>;
+  if (boundary === "core") return <>{children}</>;
   const Provider = PROVIDERS[boundary];
   return <Provider>{children}</Provider>;
 }
