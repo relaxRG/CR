@@ -17,7 +17,8 @@ describe("iOS 真机性能 CI 协议", () => {
   it("使用独立性能 scheme 与 xcresult，且不读取业务数据", () => {
     const runner = read("scripts/ci/run-ios-performance.sh");
     expect(runner).toContain("-only-testing:CocktailRPerformanceTests");
-    expect(runner).toContain("xcrun xcresulttool get test-results metrics");
+    expect(runner).toContain("IOS_METRICS_NORMALIZER");
+    expect(runner).toContain('"$IOS_METRICS_NORMALIZER" "$RESULT_BUNDLE" "$METRICS_JSON"');
     expect(runner).toContain("PERFORMANCE_BASELINE");
     expect(runner).toContain("无业务数据测试账户");
   });

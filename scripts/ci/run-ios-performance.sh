@@ -5,6 +5,7 @@ set -euo pipefail
 : "${IOS_SCHEME:?Set IOS_SCHEME to the performance test scheme}"
 : "${IOS_DESTINATION:?Set IOS_DESTINATION, for example platform=iOS,name=CI iPhone}"
 : "${PERFORMANCE_BASELINE:?Set PERFORMANCE_BASELINE to the committed baseline JSON path}"
+: "${IOS_METRICS_NORMALIZER:?Set IOS_METRICS_NORMALIZER to the XCTest/xcresult metrics normalizer command}"
 
 RESULT_BUNDLE="${RESULT_BUNDLE:-artifacts/ios-performance.xcresult}"
 METRICS_JSON="${METRICS_JSON:-artifacts/ios-performance-candidate.json}"
@@ -18,6 +19,7 @@ xcodebuild test \
   -only-testing:CocktailRPerformanceTests \
   -resultBundlePath "$RESULT_BUNDLE"
 
-# CI 项目需将 XCTest 指标导出为约定 JSON。这个导出步骤不读取或上传业务数据。
-xcrun xcresulttool get test-results metrics --path "$RESULT_BUNDLE" --format json > "$METRICS_JSON"
+# 原始 xcresult 结构会随 Xcode 版本变化。由受版本控制的 normalizer 读取原始指标，
+# 输出 assert-ios-performance.mjs 所需的 scenario/samples JSON；过程不读取或上传业务数据。
+"$IOS_METRICS_NORMALIZER" "$RESULT_BUNDLE" "$METRICS_JSON"
 node scripts/ci/assert-ios-performance.mjs "$METRICS_JSON" "$PERFORMANCE_BASELINE"
