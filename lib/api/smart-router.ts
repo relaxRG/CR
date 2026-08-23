@@ -24,6 +24,7 @@ const circuitBreakers: Record<string, CircuitState> = {
 };
 const CIRCUIT_THRESHOLD = 3;
 const CIRCUIT_RESET_MS = 60_000;
+const inFlightCalls = new Map<string, Promise<unknown>>();
 
 function isCircuitOpen(name: string): boolean {
   const s = circuitBreakers[name];
@@ -40,13 +41,38 @@ function recordFailure(name: string) {
 
 async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number): Promise<Response> {
   const controller = new AbortController();
+  const abortFromCaller = () => controller.abort();
+  options.signal?.addEventListener("abort", abortFromCaller, { once: true });
+  if (options.signal?.aborted) controller.abort();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try { const res = await fetch(url, { ...options, signal: controller.signal }); clearTimeout(timer); return res; }
-  catch (e) { clearTimeout(timer); throw e; }
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+    options.signal?.removeEventListener("abort", abortFromCaller);
+  }
+}
+
+function waitForRetry(signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const abortRetry = () => {
+      cleanup();
+      const error = new Error("Request aborted");
+      error.name = "AbortError";
+      reject(error);
+    };
+    const timer = setTimeout(() => { cleanup(); resolve(); }, 1_000);
+    const cleanup = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", abortRetry);
+    };
+    if (signal?.aborted) abortRetry();
+    else signal?.addEventListener("abort", abortRetry, { once: true });
+  });
 }
 
 export type AiRoute = 'enrich-recipe' | 'enrich-recipe/stream' | 'enrich-bottle' | 'enrich-homemade' | 'extract-recipes' | 'ocr' | 'translate' | 'bulk-import';
-export interface SmartRouterOptions { timeoutMs?: number; }
+export interface SmartRouterOptions { timeoutMs?: number; signal?: AbortSignal; }
 
 // ─────────────────────────────────────────────
 // 枚举规范化层
@@ -73,32 +99,50 @@ export class OfflineError extends Error {
   constructor(message: string) { super(message); this.name = 'OfflineError'; }
 }
 
-export async function callAI<T = unknown>(route: AiRoute, body: Record<string, unknown>, options: SmartRouterOptions = {}): Promise<T> {
-  const { timeoutMs = 45_000 } = options;
-  const reqOptions: RequestInit = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
+async function requestAI<T>(route: AiRoute, body: Record<string, unknown>, options: SmartRouterOptions): Promise<T> {
+  const { timeoutMs = 45_000, signal } = options;
+  if (isCircuitOpen("cf")) throw new OfflineError("AI 服务暂时不可用，请稍后重试");
+  const reqOptions: RequestInit = { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal };
 
-  if (!isCircuitOpen('cf')) {
-    try {
-      const res = await fetchWithTimeout(`${CF_WORKER_URL}/api/ai/${route}`, reqOptions, timeoutMs);
-      if (res.ok) { recordSuccess('cf'); return await res.json() as T; }
-      if (res.status >= 500) recordFailure('cf');
-      const errData = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-      throw new Error((errData as { error?: string }).error || `HTTP ${res.status}`);
-    } catch (e: unknown) {
-      const isNet = e instanceof TypeError || (e instanceof Error && e.name === 'AbortError');
-      if (isNet) recordFailure('cf');
-      console.warn(`[SmartRouter] CF Worker failed (${route}):`, (e as Error).message);
-    }
-  }
-
-  // Retry after 1s
-  await new Promise(r => setTimeout(r, 1000));
   try {
     const res = await fetchWithTimeout(`${CF_WORKER_URL}/api/ai/${route}`, reqOptions, timeoutMs);
-    if (res.ok) { recordSuccess('cf'); return await res.json() as T; }
-  } catch { /* fall through */ }
+    if (res.ok) { recordSuccess("cf"); return await res.json() as T; }
+    if (res.status >= 500) recordFailure("cf");
+    const errData = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+    throw new Error((errData as { error?: string }).error || `HTTP ${res.status}`);
+  } catch (error: unknown) {
+    if (signal?.aborted) throw error;
+    const isNetworkFailure = error instanceof TypeError || (error instanceof Error && error.name === "AbortError");
+    if (isNetworkFailure) recordFailure("cf");
+    console.warn(`[SmartRouter] CF Worker failed (${route}):`, (error as Error).message);
+  }
 
-  throw new OfflineError('AI 服务暂时不可用，请检查网络连接后重试');
+  if (isCircuitOpen("cf")) throw new OfflineError("AI 服务暂时不可用，请稍后重试");
+  await waitForRetry(signal);
+  try {
+    const res = await fetchWithTimeout(`${CF_WORKER_URL}/api/ai/${route}`, reqOptions, timeoutMs);
+    if (res.ok) { recordSuccess("cf"); return await res.json() as T; }
+  } catch (error) {
+    if (signal?.aborted) throw error;
+  }
+
+  throw new OfflineError("AI 服务暂时不可用，请检查网络连接后重试");
+}
+
+export async function callAI<T = unknown>(route: AiRoute, body: Record<string, unknown>, options: SmartRouterOptions = {}): Promise<T> {
+  // 相同请求共享唯一在途 Promise，页面重渲染或重复点击不会叠加远端负载；携带取消信号的请求不与他人共享。
+  const key = options.signal ? null : `${route}:${JSON.stringify(body)}`;
+  if (key) {
+    const active = inFlightCalls.get(key);
+    if (active) return active as Promise<T>;
+  }
+  const request = requestAI<T>(route, body, options);
+  if (key) inFlightCalls.set(key, request);
+  try {
+    return await request;
+  } finally {
+    if (key && inFlightCalls.get(key) === request) inFlightCalls.delete(key);
+  }
 }
 
 export async function enrichRecipe(params: {

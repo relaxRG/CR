@@ -2,8 +2,24 @@ import { Platform } from "react-native";
 import { getApiBaseUrl } from "@/constants/oauth";
 import * as Auth from "./auth";
 
+const DEFAULT_API_TIMEOUT_MS = 15_000;
+type ApiCallOptions = RequestInit & { timeoutMs?: number };
 
-export async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+async function fetchWithRequestTimeout(url: string, options: RequestInit, timeoutMs = DEFAULT_API_TIMEOUT_MS): Promise<Response> {
+  const controller = new AbortController();
+  const abortFromCaller = () => controller.abort();
+  options.signal?.addEventListener("abort", abortFromCaller, { once: true });
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+    options.signal?.removeEventListener("abort", abortFromCaller);
+  }
+}
+
+export async function apiCall<T>(endpoint: string, options: ApiCallOptions = {}): Promise<T> {
+  const { timeoutMs = DEFAULT_API_TIMEOUT_MS, ...requestOptions } = options;
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...((options.headers as Record<string, string>) || {}),
@@ -15,17 +31,7 @@ export async function apiCall<T>(endpoint: string, options: RequestInit = {}): P
   //   Cookie is set on backend domain via POST /api/auth/session after receiving token via postMessage
   if (Platform.OS !== "web") {
     const sessionToken = await Auth.getSessionToken();
-    console.log("[API] apiCall:", {
-      endpoint,
-      hasToken: !!sessionToken,
-      method: options.method || "GET",
-    });
-    if (sessionToken) {
-      headers["Authorization"] = `Bearer ${sessionToken}`;
-      console.log("[API] Authorization header added");
-    }
-  } else {
-    console.log("[API] apiCall:", { endpoint, platform: "web", method: options.method || "GET" });
+    if (sessionToken) headers["Authorization"] = `Bearer ${sessionToken}`;
   }
 
   const baseUrl = getApiBaseUrl();
@@ -33,25 +39,12 @@ export async function apiCall<T>(endpoint: string, options: RequestInit = {}): P
   const cleanBaseUrl = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
   const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
   const url = baseUrl ? `${cleanBaseUrl}${cleanEndpoint}` : endpoint;
-  console.log("[API] Full URL:", url);
-
   try {
-    console.log("[API] Making request...");
-    const response = await fetch(url, {
-      ...options,
+    const response = await fetchWithRequestTimeout(url, {
+      ...requestOptions,
       headers,
       credentials: "include",
-    });
-
-    console.log("[API] Response status:", response.status, response.statusText);
-    const responseHeaders = Object.fromEntries(response.headers.entries());
-    console.log("[API] Response headers:", responseHeaders);
-
-    // Check if Set-Cookie header is present (cookies are automatically handled in React Native)
-    const setCookie = response.headers.get("Set-Cookie");
-    if (setCookie) {
-      console.log("[API] Set-Cookie header received:", setCookie);
-    }
+    }, timeoutMs);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -68,13 +61,10 @@ export async function apiCall<T>(endpoint: string, options: RequestInit = {}): P
 
     const contentType = response.headers.get("content-type");
     if (contentType && contentType.includes("application/json")) {
-      const data = await response.json();
-      console.log("[API] JSON response received");
-      return data as T;
+      return await response.json() as T;
     }
 
     const text = await response.text();
-    console.log("[API] Text response received");
     return (text ? JSON.parse(text) : {}) as T;
   } catch (error) {
     console.error("[API] Request failed:", error);
@@ -141,26 +131,17 @@ export async function getMe(): Promise<{
 // Called after receiving token via postMessage to get a proper Set-Cookie from the backend
 export async function establishSession(token: string): Promise<boolean> {
   try {
-    console.log("[API] establishSession: setting cookie on backend...");
     const baseUrl = getApiBaseUrl();
-    const url = `${baseUrl}/api/auth/session`;
-
-    const response = await fetch(url, {
+    const response = await fetchWithRequestTimeout(`${baseUrl}/api/auth/session`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      credentials: "include", // Important: allows Set-Cookie to be stored
+      credentials: "include",
     });
 
-    if (!response.ok) {
-      console.error("[API] establishSession failed:", response.status);
-      return false;
-    }
-
-    console.log("[API] establishSession: cookie set successfully");
-    return true;
+    return response.ok;
   } catch (error) {
     console.error("[API] establishSession error:", error);
     return false;

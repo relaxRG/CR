@@ -83,9 +83,14 @@ export const PDF_PARSE_SYSTEM_PROMPT = `你是一个专业的进货单数据提�
  */
 export async function parsePdfInvoice(
   pdfBase64: string,
-  options: { fileName?: string; supplierHint?: string; apiBaseUrl?: string } = {}
+  options: { fileName?: string; supplierHint?: string; apiBaseUrl?: string; timeoutMs?: number; signal?: AbortSignal } = {}
 ): Promise<PdfParseResponse> {
   const apiUrl = options.apiBaseUrl ?? "";
+  const controller = new AbortController();
+  const abortFromCaller = () => controller.abort();
+  options.signal?.addEventListener("abort", abortFromCaller, { once: true });
+  if (options.signal?.aborted) controller.abort();
+  const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? 45_000);
 
   try {
     const response = await fetch(`${apiUrl}/api/parse-invoice`, {
@@ -96,6 +101,7 @@ export async function parsePdfInvoice(
         fileName: options.fileName,
         supplierHint: options.supplierHint,
       }),
+      signal: controller.signal,
     });
 
     if (!response.ok) {
@@ -113,6 +119,9 @@ export async function parsePdfInvoice(
       success: false, rows: [], month: "", totalAmount: 0,
       errors: [`网络请求失败: ${String(e)}`], warnings: [],
     };
+  } finally {
+    clearTimeout(timer);
+    options.signal?.removeEventListener("abort", abortFromCaller);
   }
 }
 
