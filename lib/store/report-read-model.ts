@@ -36,6 +36,53 @@ const roundMoney = (value: number) => Math.round((value + Number.EPSILON) * 100)
 const isPettyInflow = (code: string) => ["N0", "N1", "N2"].includes(code);
 const isPettyOtherIncome = (code: string) => ["N3", "N4", "N5"].includes(code);
 
+function* reportFactFingerprintParts(
+  slips: readonly Pick<PaySlip, "month" | "employeeId" | "totalEmployerCost" | "finalSalary">[],
+  pettyRecords: readonly Pick<PettyRecord, "date" | "code" | "amount">[],
+  purchases: readonly ReportPurchaseFact[],
+  inventoryRows: readonly ReportInventoryFact[],
+): Iterable<string | number> {
+  yield slips.length;
+  for (const slip of slips) {
+    yield slip.employeeId;
+    yield slip.totalEmployerCost;
+    yield slip.finalSalary;
+  }
+  yield pettyRecords.length;
+  for (const record of pettyRecords) {
+    yield record.date;
+    yield record.code;
+    yield record.amount;
+  }
+  yield purchases.length;
+  for (const purchase of purchases) {
+    yield purchase.id;
+    yield purchase.supplier ?? "";
+    yield purchase.amount;
+  }
+  yield inventoryRows.length;
+  for (const row of inventoryRows) {
+    yield row.id;
+    yield row.purchaseCost;
+    yield row.consumptionCost;
+    yield row.endingValue;
+  }
+}
+
+function fingerprintParts(parts: Iterable<string | number>): string {
+  let hash = 2_166_136_261;
+  for (const part of parts) {
+    const value = String(part);
+    for (let index = 0; index < value.length; index += 1) {
+      hash ^= value.charCodeAt(index);
+      hash = Math.imul(hash, 16_777_619);
+    }
+    hash ^= 124; // 分隔符，避免 ["12", "3"] 与 ["1", "23"] 发生同序拼接歧义。
+    hash = Math.imul(hash, 16_777_619);
+  }
+  return (hash >>> 0).toString(36);
+}
+
 /**
  * 只读、确定性聚合：不修改输入，不访问 React Context，不写 AsyncStorage，也不暴露增删改命令。
  */
@@ -51,13 +98,9 @@ export function buildStoreReportReadModel(month: string, facts: StoreReportFacts
     supplierAmounts.set(supplier, roundMoney((supplierAmounts.get(supplier) ?? 0) + purchase.amount));
   }
 
-  const sourceVersion = [
-    month,
-    slips.map((slip) => slip.employeeId).sort().join(","),
-    pettyRecords.length,
-    purchases.map((purchase) => purchase.id).sort().join(","),
-    inventoryRows.map((row) => row.id).sort().join(","),
-  ].join("|");
+  const sourceVersion = `${month}:${fingerprintParts(
+    reportFactFingerprintParts(slips, pettyRecords, purchases, inventoryRows),
+  )}`;
 
   return Object.freeze({
     month,

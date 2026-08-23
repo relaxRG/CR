@@ -4,11 +4,7 @@ import * as Haptics from "expo-haptics";
 import { useColors } from "@/hooks/use-colors";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { BoundedMonthNavigator } from "@/components/inventory/BoundedMonthNavigator";
-import {
-  deriveInventoryMonthBounds,
-  normalizeInventoryMonth,
-  type InventoryMonth,
-} from "@/lib/inventory-core/month-browser";
+import { deriveInventoryMonthBounds, normalizeInventoryMonth, type InventoryMonth } from "@/lib/inventory-core/month-browser";
 import { useSpiritsInventoryStore } from "@/lib/spirits/crud-store";
 import { useWineManualPurchaseStore, useWineSnapshotStore } from "@/lib/wine/store";
 import { useFoodIngredientStore, useSupplierPurchaseStore } from "@/lib/food/ingredient-store";
@@ -34,35 +30,59 @@ import EquipmentInventoryScreen from "@/app/equipment-inventory";
 
 export type InventoryPortalMode = "inventory" | "shop";
 type InventoryCategoryKey = "spirits" | "wine" | "fruit" | "food" | "beer" | "ice" | "glassware" | "tableware" | "daily" | "equipment";
+type Category = { key: InventoryCategoryKey; label: string };
+type MonthMap = Partial<Record<InventoryCategoryKey, string[]>>;
 
-const CATEGORIES: Array<{ key: InventoryCategoryKey; label: string; mode: InventoryPortalMode }> = [
-  { key: "spirits", label: "烈酒", mode: "inventory" },
-  { key: "wine", label: "葡萄酒", mode: "inventory" },
-  { key: "fruit", label: "水果", mode: "inventory" },
-  { key: "food", label: "食材", mode: "inventory" },
-  { key: "beer", label: "啤酒", mode: "inventory" },
-  { key: "ice", label: "冰块", mode: "inventory" },
-  { key: "glassware", label: "杯具", mode: "shop" },
-  { key: "tableware", label: "餐具", mode: "shop" },
-  { key: "daily", label: "日用品", mode: "shop" },
-  { key: "equipment", label: "设备", mode: "shop" },
+const INVENTORY_CATEGORIES: Category[] = [
+  { key: "spirits", label: "烈酒" }, { key: "wine", label: "葡萄酒" }, { key: "fruit", label: "水果" },
+  { key: "food", label: "食材" }, { key: "beer", label: "啤酒" }, { key: "ice", label: "冰块" },
 ];
-
-const INVENTORY_CATEGORIES = CATEGORIES.filter((category) => category.mode === "inventory");
-const SHOP_CATEGORIES = CATEGORIES.filter((category) => category.mode === "shop");
+const SHOP_CATEGORIES: Category[] = [
+  { key: "glassware", label: "杯具" }, { key: "tableware", label: "餐具" },
+  { key: "daily", label: "日用品" }, { key: "equipment", label: "设备" },
+];
 
 function normalizeMany(values: Array<string | null | undefined>): string[] {
   return values.filter((value): value is string => normalizeInventoryMonth(value) !== null);
 }
 
+function genericMonths(store: { snapshots: Array<{ month: string }>; purchases: Array<{ date: string }>; consumes: Array<{ date: string }> }) {
+  return [...store.snapshots.map((snapshot) => snapshot.month), ...store.purchases.map((purchase) => purchase.date), ...store.consumes.map((consume) => consume.date)];
+}
+
 export default function StoreInventoryScreen({ mode = "inventory" }: { mode?: InventoryPortalMode }) {
+  return mode === "shop" ? <StoreShopInventoryPortal /> : <StoreCoreInventoryPortal />;
+}
+
+function InventoryPortalShell({ mode, categories, categoryMonths }: { mode: InventoryPortalMode; categories: Category[]; categoryMonths: MonthMap }) {
   const colors = useColors();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
   const categoryStorageKey = mode === "shop" ? "store.shop.category.v2" : "store.inventory.category.v2";
   const defaultCategory = mode === "shop" ? "glassware" : "spirits";
   const [activeCategory, setActiveCategory] = usePersistedState<InventoryCategoryKey>(categoryStorageKey, defaultCategory);
   const { month: globalMonth, selectMonth: selectGlobalMonth } = useGlobalBusinessMonth();
+  const currentCategory = categories.find((category) => category.key === activeCategory) ?? categories[0]!;
+  const bounds = useMemo(
+    () => deriveInventoryMonthBounds(categories.flatMap((category) => normalizeMany(categoryMonths[category.key] ?? []))),
+    [categories, categoryMonths],
+  );
 
+  useEffect(() => {
+    if (!categories.some((category) => category.key === activeCategory)) setActiveCategory(defaultCategory);
+  }, [activeCategory, categories, defaultCategory, setActiveCategory]);
+
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <StoreSegmentedTabs items={categories} active={currentCategory.key} colors={colors} testID={mode === "shop" ? "shop-segmented-tabs" : "inventory-segmented-tabs"} onChange={(next) => { tap(); setActiveCategory(next); }} />
+      <BoundedMonthNavigator month={globalMonth} bounds={bounds} onChange={selectGlobalMonth} subject={mode === "shop" ? "店铺" : "库存"} testID={`${mode}-month-navigator`} />
+      <View testID={`${mode}-workspace-${currentCategory.key}`} style={{ flex: 1 }}>
+        <MemoizedInventoryBusinessPanel category={currentCategory.key} month={globalMonth} />
+      </View>
+    </View>
+  );
+}
+
+function StoreCoreInventoryPortal() {
   const spiritsStore = useSpiritsInventoryStore();
   const wineSnapshots = useWineSnapshotStore();
   const wineManualPurchases = useWineManualPurchaseStore();
@@ -71,74 +91,25 @@ export default function StoreInventoryScreen({ mode = "inventory" }: { mode?: In
   const beerStore = useBeerInventoryStore();
   const iceStore = useIceNewInventoryStore();
   const fruitStore = useFruitNewInventoryStore();
+  const categoryMonths = useMemo<MonthMap>(() => ({
+    spirits: [...spiritsStore.ledger.map((entry) => entry.month), ...spiritsStore.purchases.map((purchase) => purchase.date ?? purchase.month)],
+    wine: [...wineSnapshots.snapshots.map((snapshot) => snapshot.monthLabel), ...wineSnapshots.snapshots.flatMap((snapshot) => snapshot.purchaseOrders.map((purchase) => purchase.date)), ...wineManualPurchases.purchases.map((purchase) => purchase.date)],
+    food: [...foodStore.ledgerEntries.map((entry) => entry.month), ...foodStore.ledgerMovements.flatMap((movement) => [movement.month, movement.date]), ...foodStore.ingredients.flatMap((ingredient) => (ingredient.priceHistory ?? []).map((entry) => entry.date)), ...foodPurchases.records.flatMap((record: any) => [record.importDate, ...(record.items ?? []).map((item: any) => item.date)])],
+    fruit: genericMonths(fruitStore), beer: genericMonths(beerStore), ice: genericMonths(iceStore),
+  }), [spiritsStore, wineSnapshots, wineManualPurchases, foodStore, foodPurchases, fruitStore, beerStore, iceStore]);
+  return <InventoryPortalShell mode="inventory" categories={INVENTORY_CATEGORIES} categoryMonths={categoryMonths} />;
+}
+
+function StoreShopInventoryPortal() {
   const glasswareStore = useGlasswareInventoryStore();
   const tablewareStore = useTablewareInventoryStore();
   const dailyStore = useDailyInventoryStore();
   const equipmentStore = useEquipmentInventoryStore();
-
-  const categories = mode === "shop" ? SHOP_CATEGORIES : INVENTORY_CATEGORIES;
-  const currentCategory = categories.find((category) => category.key === activeCategory) ?? categories[0];
-
-  const categoryMonths = useMemo(() => {
-    const genericMonths = (store: { snapshots: Array<{ month: string }>; purchases: Array<{ date: string }>; consumes: Array<{ date: string }> }) => [
-      ...store.snapshots.map((snapshot) => snapshot.month),
-      ...store.purchases.map((purchase) => purchase.date),
-      ...store.consumes.map((consume) => consume.date),
-    ];
-    const monthsByCategory: Partial<Record<InventoryCategoryKey, string[]>> = {};
-    categories.forEach((category) => {
-      switch (category.key) {
-        case "spirits":
-          monthsByCategory.spirits = [...spiritsStore.ledger.map((entry) => entry.month), ...spiritsStore.purchases.map((purchase) => purchase.date ?? purchase.month)];
-          break;
-        case "wine":
-          monthsByCategory.wine = [...wineSnapshots.snapshots.map((snapshot) => snapshot.monthLabel), ...wineSnapshots.snapshots.flatMap((snapshot) => snapshot.purchaseOrders.map((purchase) => purchase.date)), ...wineManualPurchases.purchases.map((purchase) => purchase.date)];
-          break;
-        case "food":
-          monthsByCategory.food = [...foodStore.ledgerEntries.map((entry) => entry.month), ...foodStore.ledgerMovements.flatMap((movement) => [movement.month, movement.date]), ...foodStore.ingredients.flatMap((ingredient) => (ingredient.priceHistory ?? []).map((entry) => entry.date)), ...foodPurchases.records.flatMap((record: any) => [record.importDate, ...(record.items ?? []).map((item: any) => item.date)])];
-          break;
-        case "fruit": monthsByCategory.fruit = genericMonths(fruitStore); break;
-        case "beer": monthsByCategory.beer = genericMonths(beerStore); break;
-        case "ice": monthsByCategory.ice = genericMonths(iceStore); break;
-        case "glassware": monthsByCategory.glassware = genericMonths(glasswareStore); break;
-        case "tableware": monthsByCategory.tableware = genericMonths(tablewareStore); break;
-        case "daily": monthsByCategory.daily = genericMonths(dailyStore); break;
-        case "equipment": monthsByCategory.equipment = [...equipmentStore.items.map((item) => item.purchaseDate), ...equipmentStore.maintenanceRecords.map((record) => record.date)];
-          break;
-      }
-    });
-    return monthsByCategory;
-  }, [categories, spiritsStore, wineSnapshots, wineManualPurchases, foodStore, foodPurchases, fruitStore, beerStore, iceStore, glasswareStore, tablewareStore, dailyStore, equipmentStore]);
-
-  const localBounds = useMemo(
-    () => deriveInventoryMonthBounds(categories.flatMap((category) => normalizeMany(categoryMonths[category.key] ?? []))),
-    [categories, categoryMonths],
-  );
-  // 所有门店模块遵循同一数据边界：实际数据最早月前一月到最晚月后一月；无数据时仅当前自然月。
-  const bounds = localBounds;
-  const selectedMonth = globalMonth;
-
-  useEffect(() => {
-    if (!categories.some((category) => category.key === activeCategory)) setActiveCategory(defaultCategory);
-  }, [activeCategory, categories, defaultCategory, setActiveCategory]);
-
-  return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <StoreSegmentedTabs
-        items={categories}
-        active={currentCategory.key}
-        colors={colors}
-        testID={mode === "shop" ? "shop-segmented-tabs" : "inventory-segmented-tabs"}
-        onChange={(next) => { tap(); setActiveCategory(next); }}
-      />
-
-      <BoundedMonthNavigator month={selectedMonth} bounds={bounds} onChange={selectGlobalMonth} subject={mode === "shop" ? "店铺" : "库存"} testID={`${mode}-month-navigator`} />
-
-      <View testID={`${mode}-workspace-${currentCategory.key}`} style={{ flex: 1 }}>
-        <MemoizedInventoryBusinessPanel category={currentCategory.key} month={selectedMonth} />
-      </View>
-    </View>
-  );
+  const categoryMonths = useMemo<MonthMap>(() => ({
+    glassware: genericMonths(glasswareStore), tableware: genericMonths(tablewareStore), daily: genericMonths(dailyStore),
+    equipment: [...equipmentStore.items.map((item) => item.purchaseDate), ...equipmentStore.maintenanceRecords.map((record) => record.date)],
+  }), [glasswareStore, tablewareStore, dailyStore, equipmentStore]);
+  return <InventoryPortalShell mode="shop" categories={SHOP_CATEGORIES} categoryMonths={categoryMonths} />;
 }
 
 function InventoryBusinessPanel({ category, month }: { category: InventoryCategoryKey; month: InventoryMonth }) {
@@ -156,6 +127,4 @@ function InventoryBusinessPanel({ category, month }: { category: InventoryCatego
   }
 }
 
-// 门店入口必须订阅所有库存库以保持统一月份边界；仅用当前分类与月份作为输入，
-// 阻断未选中分类的异步加载、同步写入向当前库存工作台传播的无效重渲染。
 const MemoizedInventoryBusinessPanel = React.memo(InventoryBusinessPanel);

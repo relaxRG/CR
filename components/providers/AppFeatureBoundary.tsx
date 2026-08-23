@@ -43,7 +43,7 @@ export function AppFeatureBoundary({ children }: { children: ReactNode }) {
   }, [boundary, pathname]);
 
   if (boundary === "all") return <AllFeatureProviders>{children}</AllFeatureProviders>;
-  if (boundary === "core") return <>{children}</>;
+  if (boundary === "core" || pathname === "/store") return <>{children}</>;
   const Provider = PROVIDERS[boundary];
   return <Provider>{children}</Provider>;
 }

@@ -43,8 +43,17 @@ describe("功能域 Provider 边界", () => {
     expect(boundary).toContain('import { FoodFeatureProviders }');
     expect(boundary).toContain('import { StoreFeatureProviders }');
     expect(boundary).toContain('if (boundary === "all")');
-    expect(boundary).toContain('if (boundary === "core") return <>{children}</>');
+    expect(boundary).toContain('pathname === "/store"');
     expect(boundary).not.toContain("<Suspense");
+  });
+
+  it("门店主路由交由顶级 Tab 子边界装配，避免与旧复合树重复实例化", () => {
+    const storeScreen = source("app/(tabs)/store.tsx");
+    const tabBoundary = source("components/providers/StoreTabBoundary.tsx");
+
+    expect(storeScreen).toContain('<StoreTabBoundary tab={effectiveTab}>');
+    expect(tabBoundary).toContain("key={tab}");
+    expect(tabBoundary).toContain("lifecycle.current.dispose()");
   });
 
   it("门店域不持有跨域全局月份，跨域葡萄酒事实由共享内核唯一装配", () => {

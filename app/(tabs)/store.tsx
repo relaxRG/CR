@@ -27,6 +27,7 @@ import StoreShopScreen from "@/components/store/shop";
 import LaborScreen from "@/app/labor";
 import MonthlySummaryScreen from "@/app/monthly-summary";
 import PeriodAnalysisScreen from "@/app/period-analysis";
+import { StoreTabBoundary } from "@/components/providers/StoreTabBoundary";
 
 type MainTab = "monthly" | "labor" | "petty" | "shop" | "inventory";
 type ReportTab = "summary" | "analytics" | "accounts" | "period";
@@ -177,23 +178,25 @@ export default function StoreScreen() {
 
       {/* 内容区 */}
       <SafeAreaInsetsContext.Provider value={childInsets}>
-        {effectiveTab === "monthly"   && <ReportModule insets={childInsets} colors={colors} />}
-        {effectiveTab === "labor" && (laborAccess.allowed
-          ? <View style={{ flex: 1 }}><LaborScreen embedded /></View>
-          : <AccessDenied label="员工" colors={colors} />
-        )}
-        {effectiveTab === "petty" && (pettyAccess.allowed
-          ? <SafeAreaInsetsContext.Provider value={childInsets}><StorePettyCashScreen /></SafeAreaInsetsContext.Provider>
-          : <AccessDenied label="备用金" colors={colors} />
-        )}
-        {effectiveTab === "shop" && (shopAllowed
-          ? <StoreShopScreen />
-          : <AccessDenied label="店铺" colors={colors} />
-        )}
-        {effectiveTab === "inventory" && (inventoryAllowed
-          ? <StoreInventoryScreen mode="inventory" />
-          : <AccessDenied label="库存" colors={colors} />
-        )}
+        <StoreTabBoundary tab={effectiveTab}>
+          {effectiveTab === "monthly" && <ReportModule insets={childInsets} colors={colors} />}
+          {effectiveTab === "labor" && (laborAccess.allowed
+            ? <View style={{ flex: 1 }}><LaborScreen embedded /></View>
+            : <AccessDenied label="员工" colors={colors} />
+          )}
+          {effectiveTab === "petty" && (pettyAccess.allowed
+            ? <SafeAreaInsetsContext.Provider value={childInsets}><StorePettyCashScreen /></SafeAreaInsetsContext.Provider>
+            : <AccessDenied label="备用金" colors={colors} />
+          )}
+          {effectiveTab === "shop" && (shopAllowed
+            ? <StoreShopScreen />
+            : <AccessDenied label="店铺" colors={colors} />
+          )}
+          {effectiveTab === "inventory" && (inventoryAllowed
+            ? <StoreInventoryScreen mode="inventory" />
+            : <AccessDenied label="库存" colors={colors} />
+          )}
+        </StoreTabBoundary>
       </SafeAreaInsetsContext.Provider>
     </View>
   );

@@ -8,7 +8,7 @@ describe("门店库存与时段分析性能护栏", () => {
   it("库存入口只向当前分类工作台传递分类与月份，隔离其他分类异步更新的无效重渲染", () => {
     const inventory = source("components/store/inventory.tsx");
     expect(inventory).toContain("const MemoizedInventoryBusinessPanel = React.memo(InventoryBusinessPanel)");
-    expect(inventory).toContain("<MemoizedInventoryBusinessPanel category={currentCategory.key} month={selectedMonth} />");
+    expect(inventory).toContain("<MemoizedInventoryBusinessPanel category={currentCategory.key} month={globalMonth} />");
   });
 
   it("烈酒采购台账对万级数据按 32 行日期块虚拟化，并使用固定窗口参数", () => {

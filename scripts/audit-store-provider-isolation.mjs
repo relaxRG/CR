@@ -2,29 +2,63 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const sourcePath = path.resolve("components/providers/StoreFeatureProviders.tsx");
-const source = fs.readFileSync(sourcePath, "utf8");
-const providerNames = [...source.matchAll(/<([A-Za-z][A-Za-z0-9]+Provider)(?:\s|>)/g)].map((match) => match[1]);
-const counts = Object.fromEntries([...new Set(providerNames)].sort().map((name) => [name, providerNames.filter((value) => value === name).length]));
-const duplicatedProviders = Object.entries(counts).filter(([, count]) => count !== 1).map(([name]) => name);
+const read = (relative) => fs.readFileSync(path.resolve(relative), "utf8");
+const tabProvidersPath = "components/providers/StoreTabProviders.tsx";
+const boundaryPath = "components/providers/StoreTabBoundary.tsx";
+const screenPath = "app/(tabs)/store.tsx";
+const featureBoundaryPath = "components/providers/AppFeatureBoundary.tsx";
+const tabProviders = read(tabProvidersPath);
+const boundary = read(boundaryPath);
+const screen = read(screenPath);
+const featureBoundary = read(featureBoundaryPath);
+
+function componentBody(name) {
+  const match = tabProviders.match(new RegExp(`export function ${name}\\([^]*?\\n}`));
+  if (!match) throw new Error(`未找到 ${name}`);
+  return match[0];
+}
+
+function providersIn(name) {
+  return [...componentBody(name).matchAll(/<([A-Za-z][A-Za-z0-9]+Provider)(?:\s|>)/g)].map((match) => match[1]);
+}
+
+const activeTabs = {
+  shop: providersIn("StoreShopProviders"),
+  petty: providersIn("StorePettyProviders"),
+  inventory: providersIn("StoreInventoryProviders"),
+  labor: providersIn("StoreLaborProviders"),
+};
+const expectedTabs = {
+  shop: ["GlasswareInventoryProvider", "TablewareInventoryProvider", "DailyInventoryProvider", "EquipmentInventoryProvider"],
+  petty: ["PettyCashProvider", "PettyCategoryProvider", "PettyInventoryLinkProvider", "PettyLaborLinkProvider"],
+  inventory: ["SpiritsInventoryProvider", "FoodIngredientProvider", "BeerInventoryProvider", "IceNewInventoryProvider", "FruitNewInventoryProvider"],
+  labor: ["LaborProvider", "SalaryAdvanceCategoryProvider", "SalaryAdvanceProvider"],
+};
+const allStableProviders = Object.values(activeTabs).flat();
+const duplicateStableProviders = [...new Set(allStableProviders)].filter((provider) => allStableProviders.filter((value) => value === provider).length > 1);
+const expectedMismatch = Object.entries(expectedTabs)
+  .filter(([tab, expected]) => expected.some((provider) => !activeTabs[tab].includes(provider)) || activeTabs[tab].some((provider) => !expected.includes(provider)))
+  .map(([tab]) => tab);
+const reportUsesCompatibilityBridge = componentBody("StoreReportProviders").includes("<StoreFeatureProviders>");
+const reportUsesReadModel = componentBody("StoreReportProviders").includes("StoreReportReadModelProvider");
+const runtimeBoundaryWired = boundary.includes("key={tab}")
+  && screen.includes("<StoreTabBoundary tab={effectiveTab}>")
+  && featureBoundary.includes('pathname === "/store"');
 
 const report = {
-  schemaVersion: 1,
-  source: path.relative(process.cwd(), sourcePath),
-  currentArchitecture: "single_store_feature_boundary",
-  subBoundaryInstances: {
-    report: false,
-    labor: false,
-    petty: false,
-    inventory: false,
-    shop: false,
+  schemaVersion: 2,
+  currentArchitecture: reportUsesCompatibilityBridge ? "five_runtime_tab_boundaries_with_report_compatibility_bridge" : "five_runtime_tab_boundaries",
+  activeTabs,
+  sharedRootFacts: ["WineProvider", "SupplierPurchaseProvider", "GlobalBusinessMonthProvider"],
+  duplicateStableProviders,
+  expectedMismatch,
+  runtimeBoundaryWired,
+  report: {
+    usesCompatibilityBridge: reportUsesCompatibilityBridge,
+    usesReadonlyMaterializedView: reportUsesReadModel,
+    migrationState: reportUsesReadModel ? "complete" : "blocked_by_monthly_summary_and_period_analysis_cross_domain_context_reads",
   },
-  providerCounts: counts,
-  duplicatedProviders,
-  instanceIsolation: duplicatedProviders.length === 0,
-  implicitCouplingRisk: "所有门店事实仍在同一 StoreFeatureProviders 树中常驻装配；尚未形成五个运行时子边界，因此不存在跨子边界双实例，但存在跨顶级 Tab 的加载与内存耦合。",
-  migrationRequirement: "实施 StoreTabBoundary 后，每个事实 Provider 必须只出现在共享内核或一个子边界；报表跨域数据必须经只读物化视图访问。",
+  instanceIsolation: duplicateStableProviders.length === 0 && expectedMismatch.length === 0 && runtimeBoundaryWired,
 };
-
 console.log(JSON.stringify(report, null, 2));
-if (duplicatedProviders.length) process.exit(1);
+if (!report.instanceIsolation) process.exit(1);

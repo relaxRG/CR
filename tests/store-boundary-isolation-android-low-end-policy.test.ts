@@ -4,12 +4,12 @@ import { describe, expect, it } from "vitest";
 const read = (path: string) => fs.readFileSync(path, "utf8");
 
 describe("门店边界实例隔离与低端 Android 性能策略", () => {
-  it("当前门店复合边界中每个事实 Provider 只装配一次，并明确尚未拆为五个运行时子边界", () => {
+  it("五个顶级 Tab 通过运行时子边界装配，稳定事实 Provider 不跨边界重复实例化", () => {
     const source = read("scripts/audit-store-provider-isolation.mjs");
-    expect(source).toContain('currentArchitecture: "single_store_feature_boundary"');
-    expect(source).toContain("duplicatedProviders.length === 0");
-    expect(source).toContain("subBoundaryInstances");
-    expect(source).toContain("implicitCouplingRisk");
+    expect(source).toContain("five_runtime_tab_boundaries");
+    expect(source).toContain("duplicateStableProviders.length === 0");
+    expect(source).toContain("runtimeBoundaryWired");
+    expect(source).toContain("usesCompatibilityBridge");
   });
 
   it("低端 Android 脚本强制受控物理设备、API 31+、PSS/trace/logcat/bugreport 采集", () => {

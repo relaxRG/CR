@@ -33,10 +33,10 @@ describe("全局业务月份与紧凑选择器规范", () => {
   });
 
   it("报表、员工、备用金、库存和店铺均严格使用数据最早月前一月到最晚月后一月", () => {
-    expect(inventory).toContain("所有门店模块遵循同一数据边界");
-    expect(inventory).toContain("const bounds = localBounds");
-    expect(inventory).not.toContain("globalMonth < localBounds.min");
-    expect(inventory).not.toContain("globalMonth > localBounds.max");
+    expect(inventory).toContain("const { month: globalMonth, selectMonth: selectGlobalMonth } = useGlobalBusinessMonth()");
+    expect(inventory).toContain("deriveInventoryMonthBounds(categories.flatMap");
+    expect(inventory).not.toContain("globalMonth < bounds.min");
+    expect(inventory).not.toContain("globalMonth > bounds.max");
     expect(labor).toContain("const laborMonthBounds = laborLocalBounds");
     expect(labor).not.toContain("currentMonth < laborLocalBounds.min");
     expect(labor).not.toContain("currentMonth > laborLocalBounds.max");

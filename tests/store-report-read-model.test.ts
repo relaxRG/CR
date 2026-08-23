@@ -31,6 +31,13 @@ describe("StoreReportReadModel", () => {
     expect(model.suppliers).toEqual([{ supplier: "乙", purchaseAmount: 120 }, { supplier: "甲", purchaseAmount: 90 }]);
     expect(JSON.stringify(facts)).toBe(before);
     expect(Object.isFrozen(model)).toBe(true);
+    expect(model.sourceVersion.length).toBeLessThan(32);
+
+    const changed = buildStoreReportReadModel("2026-08", {
+      ...facts,
+      purchases: [...facts.purchases.slice(0, 1), { ...facts.purchases[1]!, amount: 121 }],
+    });
+    expect(changed.sourceVersion).not.toBe(model.sourceVersion);
   });
 
   it("只读快照加载仅调用 multiGet，不允许写入跨域事实", async () => {
