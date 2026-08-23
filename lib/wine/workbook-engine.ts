@@ -1,4 +1,3 @@
-import { utils, read as xlsxRead } from "xlsx";
 import { normalizeImportDate } from "@/lib/import/date-utils";
 import { dominantPurchaseMonth } from "@/lib/spirits/import-bridge";
 import { multiplyMoney, roundMoney, sumMoney } from "@/lib/finance/money";
@@ -216,8 +215,9 @@ function readPurchaseRows(rows: unknown[][]): Omit<WineWorkbookPurchaseLine, "fi
 }
 
 /** 解析用户现有的四 Sheet 葡萄酒工作簿；汇总表只用于完整性校验，绝不二次入账。 */
-export function parseWineWorkbook(base64: string, fallbackMonth: string): WineWorkbookImportPreview | null {
+export async function parseWineWorkbook(base64: string, fallbackMonth: string): Promise<WineWorkbookImportPreview | null> {
   try {
+    const { utils, read: xlsxRead } = await import("xlsx");
     const workbook = xlsxRead(base64, { type: "base64", cellDates: true });
     const inventorySheet = workbook.Sheets["葡萄酒盘点"];
     const purchaseSheet = workbook.Sheets["进货总单"];

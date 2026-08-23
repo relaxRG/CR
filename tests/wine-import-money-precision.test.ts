@@ -3,7 +3,7 @@ import { utils, write } from "xlsx";
 import { createWineWorkbookSnapshot, parseWineWorkbook } from "@/lib/wine/workbook-engine";
 
 describe("葡萄酒导入金额精度", () => {
-  it("按供应商归并采购成本并汇总期末成本时按分计算", () => {
+  it("按供应商归并采购成本并汇总期末成本时按分计算", async () => {
     const sheet = utils.aoa_to_sheet([
       ["序号", "类型", "供应商", "商品名称", "期初单价", "期初数量", "期初成本", "进货数量", "进货成本", "期末数量", "期末单价", "期末成本", "消耗瓶数", "消耗数量"],
       [1, "红葡萄酒", "供应商 A", "A-1", 0, 0, 0, 1, 0.1, 1, 0.1, 0.1, 0, 0],
@@ -15,7 +15,7 @@ describe("葡萄酒导入金额精度", () => {
     const workbook = utils.book_new();
     utils.book_append_sheet(workbook, sheet, "葡萄酒盘点");
 
-    const preview = parseWineWorkbook(write(workbook, { type: "base64", bookType: "xlsx" }), "2026-02");
+    const preview = await parseWineWorkbook(write(workbook, { type: "base64", bookType: "xlsx" }), "2026-02");
     const purchases = (preview?.items ?? []).map((item, index) => ({
       id: `p-${index}`, date: "2026-02-01", supplier: item.supplier, bottleId: null,
       productName: item.name, unitPrice: item.purchaseQty > 0 ? item.purchaseCost / item.purchaseQty : item.unitCost,

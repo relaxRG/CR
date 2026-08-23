@@ -21,7 +21,7 @@ function toBase64(sheets: Array<{ name: string; rows: unknown[][] }>): string {
 }
 
 describe("葡萄酒库存导入日期边界", () => {
-  it("跳过非法日期，继承合并单元格空日期，并按有效采购主月份生成快照标签", () => {
+  it("跳过非法日期，继承合并单元格空日期，并按有效采购主月份生成快照标签", async () => {
     const base64 = toBase64([
       {
         name: "葡萄酒盘点",
@@ -44,7 +44,7 @@ describe("葡萄酒库存导入日期边界", () => {
       },
     ]);
 
-    const preview = parseWineWorkbook(base64, "2026-07");
+    const preview = await parseWineWorkbook(base64, "2026-07");
 
     expect(preview?.purchaseLines.map((order) => order.date)).toEqual([
       "2026-07-31", "2026-07-31", "2026-08-01", "2026-08-01",

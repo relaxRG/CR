@@ -8,8 +8,8 @@ import React, { useCallback, useMemo, useRef, useState } from "react";
 import { formatMoney } from "@/lib/utils";
 import { numericColor, NUMERIC_TONE } from "@/lib/theme/numeric-color-tokens";
 import { getResponsivePagerIndex, getResponsivePagerOffset } from "@/lib/theme/responsive-pager";
-import { exportLaborData, type ExportType } from "@/lib/labor/export";
-import { buildImportTemplate, parseImportFile, type ImportResult } from "@/lib/labor/import";
+import type { ExportType } from "@/lib/labor/export";
+import type { ImportResult } from "@/lib/labor/import";
 import { getNonWritableScheduleMonths } from "@/lib/labor/schedule-guards";
 import { sortEmployeesByProfileOrder, sortEmployeesWithinProfileGroup } from "@/lib/labor/employee-profile-order";
 import { createMonthCloseOperationGate } from "@/lib/labor/month-close-operation-gate";
@@ -943,6 +943,7 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
     setShowExportMenu(false);
     setExporting(true);
     try {
+      const { exportLaborData } = await import("@/lib/labor/export");
       await exportLaborData(type, {
         month,
         employees,
@@ -968,6 +969,7 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
     tap();
     setShowImportMenu(false);
     try {
+      const { buildImportTemplate } = await import("@/lib/labor/import");
       await buildImportTemplate({ month, employees, shiftTemplates });
     } catch (e) {
       Alert.alert("模版生成失败", String(e));
@@ -979,6 +981,7 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
     setShowImportMenu(false);
     setImporting(true);
     try {
+      const { parseImportFile } = await import("@/lib/labor/import");
       const result = await parseImportFile({
         month,
         employees,

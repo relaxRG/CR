@@ -33,9 +33,9 @@ function purchase(overrides: Partial<WineManualPurchase> = {}): WineManualPurcha
 }
 
 describe("复杂葡萄酒工作簿引擎", () => {
-  it("将四 Sheet 工作簿分配为盘点输入、逐笔进货和仅校验的汇总表", () => {
+  it("将四 Sheet 工作簿分配为盘点输入、逐笔进货和仅校验的汇总表", async () => {
     const base64 = workbookBase64();
-    const preview = parseWineWorkbook(base64, "2026-02");
+    const preview = await parseWineWorkbook(base64, "2026-02");
     expect(preview?.month).toBe("2026-02");
     expect(preview?.sourceSheets).toEqual(["葡萄酒盘点", "进货总单", "进货汇总", "Summary"]);
     expect(preview?.sourceRows).toEqual({ inventory: 1, purchases: 1, purchaseSummary: 2, summary: 2 });
@@ -46,8 +46,8 @@ describe("复杂葡萄酒工作簿引擎", () => {
     expect(preview?.fileFingerprint).toBe(createWineFileFingerprint(base64));
   });
 
-  it("阻止重复文件和已存在的采购流水，但不把它们再次写入", () => {
-    const preview = parseWineWorkbook(workbookBase64(), "2026-02")!;
+  it("阻止重复文件和已存在的采购流水，但不把它们再次写入", async () => {
+    const preview = (await parseWineWorkbook(workbookBase64(), "2026-02"))!;
     const current = purchase({ importFingerprint: preview.purchaseLines[0].fingerprint });
     const assessment = assessWineWorkbookImport(preview, [current], [{
       id: "batch-1", month: "2026-02", filename: "wine.xlsx", fileFingerprint: preview.fileFingerprint,
@@ -59,8 +59,8 @@ describe("复杂葡萄酒工作簿引擎", () => {
     expect(assessment.applicablePurchaseLines).toEqual([]);
   });
 
-  it("以唯一采购流水重建库存派生字段，保留期初和期末盘点输入", () => {
-    const preview = parseWineWorkbook(workbookBase64(), "2026-02")!;
+  it("以唯一采购流水重建库存派生字段，保留期初和期末盘点输入", async () => {
+    const preview = (await parseWineWorkbook(workbookBase64(), "2026-02"))!;
     const snapshot = createWineWorkbookSnapshot("snapshot-1", preview, [purchase()]);
     const rebuilt = rebuildWineSnapshotFromPurchases(snapshot, [purchase()]);
     expect(rebuilt.items[0]).toMatchObject({

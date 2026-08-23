@@ -19,7 +19,6 @@ import {
   PettyRecord,
 } from "@/lib/store/petty-store";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { importIcostExcel } from "@/lib/store/icost-import";
 import { useColors } from "@/hooks/use-colors";
 import { useModuleMonthCloseStore } from "@/lib/month-close/module-month-close-store";
 import { useGlobalBusinessMonth } from "@/lib/months/global-business-month";
@@ -210,6 +209,7 @@ export default function StorePettyCashScreen() {
     tap();
     setImporting(true);
     try {
+      const { importIcostExcel } = await import("@/lib/store/icost-import");
       const result = await importIcostExcel();
       if (!result) { setImporting(false); return; }
       batchAddRecords(result.records);

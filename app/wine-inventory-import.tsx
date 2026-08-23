@@ -21,7 +21,6 @@ import { wineUuid, useWineImportControlStore, useWineManualPurchaseStore, useWin
 import { WineInventoryItem } from "@/lib/wine/types";
 import { assessWineWorkbookImport, createWineImportBatch, createWineWorkbookSnapshot, parseWineWorkbook, WineWorkbookImportPreview } from "@/lib/wine/workbook-engine";
 import { useGlobalBusinessMonth } from "@/lib/months/global-business-month";
-import { downloadWineWorkbookTemplate } from "@/lib/wine/workbook-export";
 
 // ─── 预览行 ───────────────────────────────────────────────────────────────────
 function PreviewRow({ item, colors }: { item: WineInventoryItem; colors: any }) {
@@ -71,7 +70,7 @@ export default function WineInventoryImportScreen() {
       const asset = result.assets[0];
       setLoading(true);
       const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 });
-      const parsed = parseWineWorkbook(base64, activeMonth);
+      const parsed = await parseWineWorkbook(base64, activeMonth);
       setLoading(false);
       if (!parsed || (parsed.items.length === 0 && parsed.purchaseLines.length === 0)) {
         Alert.alert("解析失败", "未能识别葡萄酒盘点或进货总单数据，请确认工作簿包含「葡萄酒盘点」或「进货总单」工作表。");
@@ -202,7 +201,11 @@ export default function WineInventoryImportScreen() {
         </View>
 
         <TouchableOpacity
-          onPress={() => { void downloadWineWorkbookTemplate(activeMonth).catch((error) => Alert.alert("模板下载失败", String(error))); }}
+          onPress={() => {
+            void import("@/lib/wine/workbook-export")
+              .then(({ downloadWineWorkbookTemplate }) => downloadWineWorkbookTemplate(activeMonth))
+              .catch((error) => Alert.alert("模板下载失败", String(error)));
+          }}
           style={[PS.templateBtn, { borderColor: colors.primary, backgroundColor: colors.primary + "0d" }]}
         >
           <IconSymbol name="square.and.arrow.down" size={20} color={colors.primary} />

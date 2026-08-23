@@ -16,24 +16,19 @@ import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
 import { useMonthlyReportStore } from "@/lib/store/monthly-report/store";
-import { parseMonthlyReport } from "@/lib/store/monthly-report/excel-parser";
-import { MonthlyReport } from "@/lib/store/monthly-report/types";
+import type { MonthlyReport } from "@/lib/store/monthly-report/types";
 import { useDishAnalysisStore } from "@/lib/store/monthly-report/dish-analysis-store";
 import { usePeriodAnalysisStore } from "@/lib/store/period-analysis/store";
-import { parsePeriodAnalysisExcel } from "@/lib/store/period-analysis/excel-parser";
-import { PeriodAnalysisReport } from "@/lib/store/period-analysis/types";
+import type { PeriodAnalysisReport } from "@/lib/store/period-analysis/types";
 import { useRawExcelArchiveStore } from "@/lib/store/monthly-report/raw-excel-archive-store";
 import { normalizeMonthlyReportMonth } from "@/lib/store/monthly-report/month-key";
 import { formatRawExcelSize, getRawExcelExportFilename } from "@/lib/store/monthly-report/raw-excel-archive";
 import { createSingleFlightGate } from "@/lib/utils/single-flight-gate";
-import {
-  detectReportTypeByFilename,
-  detectReportTypeByContent,
-  parseDishAnalysis,
-} from "@/lib/store/monthly-report/dish-analysis-parser";
-import {
+import type {
   DishAnalysisSnapshot,
   ReportFileType,
+} from "@/lib/store/monthly-report/dish-analysis-types";
+import {
   REPORT_FILE_TYPE_LABELS,
   REPORT_FILE_TYPE_DESC,
   REQUIRED_REPORT_TYPES,
@@ -146,6 +141,7 @@ export default function MonthlyReportImportScreen() {
       if (result.canceled || !result.assets?.length) return;
 
       setLoading(true);
+      const { detectReportTypeByFilename, detectReportTypeByContent } = await import("@/lib/store/monthly-report/dish-analysis-parser");
       const newFiles: UploadedFile[] = [];
       for (const asset of result.assets) {
         const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 });
@@ -196,7 +192,12 @@ export default function MonthlyReportImportScreen() {
       const dishNameFile = files.find((f) => f.type === "dish_by_name");
       const dishCatFile = files.find((f) => f.type === "dish_by_category");
 
-      const { report, error } = parseMonthlyReport({
+      const [monthlyModule, dishModule, periodModule] = await Promise.all([
+        import("@/lib/store/monthly-report/excel-parser"),
+        import("@/lib/store/monthly-report/dish-analysis-parser"),
+        import("@/lib/store/period-analysis/excel-parser"),
+      ]);
+      const { report, error } = monthlyModule.parseMonthlyReport({
         overviewBase64: overviewFile?.base64,
         dailyBase64: dailyFile?.base64,
         dishItemsBase64: dishNameFile?.base64,
@@ -214,7 +215,7 @@ export default function MonthlyReportImportScreen() {
         .map((f) => ({ base64: f.base64!, filename: f.name }));
 
       if (dishFiles.length > 0) {
-        const { snapshot } = parseDishAnalysis({ files: dishFiles });
+        const { snapshot } = dishModule.parseDishAnalysis({ files: dishFiles });
         if (snapshot.month && normalizeMonthlyReportMonth(snapshot.month) !== normalizeMonthlyReportMonth(report.rawMonth)) {
           throw new Error(`菜品分析月份 ${snapshot.monthLabel} 与营业概览 ${report.monthLabel} 不一致，请只导入同一自然月文件。`);
         }
@@ -225,7 +226,7 @@ export default function MonthlyReportImportScreen() {
         file.base64 && (file.type === "time_slot_order" || file.type === "time_slot_checkout"),
       );
       if (periodFiles.length > 0) {
-        const periodReport = parsePeriodAnalysisExcel(
+        const periodReport = periodModule.parsePeriodAnalysisExcel(
           periodFiles.map((file) => base64ToArrayBuffer(file.base64!)),
           periodSettings,
         );
