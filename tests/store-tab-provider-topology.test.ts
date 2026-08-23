@@ -42,7 +42,8 @@ describe("门店顶级 Tab Provider 拓扑", () => {
 
   it("在跨域读写重构完成前明确保留一棵报表兼容事实树，不复制可写 Context", () => {
     const report = componentBody("StoreReportProviders");
-    expect(report).toContain("<StoreFeatureProviders>{children}</StoreFeatureProviders>");
+    expect(report).toContain("<StoreFeatureProviders>");
+    expect(report).toContain("<StoreReportReadModelProvider>{children}</StoreReportReadModelProvider>");
     expect(report).not.toContain("<LaborProvider>");
     expect(report).not.toContain("<PettyCashProvider>");
     expect(report).not.toContain("<SpiritsInventoryProvider>");

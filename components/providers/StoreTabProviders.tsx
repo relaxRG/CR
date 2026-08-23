@@ -15,6 +15,7 @@ import { EquipmentInventoryProvider } from "@/lib/equipment/inventory-store";
 import { LaborProvider } from "@/lib/labor/store";
 import { SalaryAdvanceCategoryProvider, SalaryAdvanceProvider } from "@/lib/labor/advance-store";
 import { StoreFeatureProviders } from "./StoreFeatureProviders";
+import { StoreReportReadModelProvider } from "./StoreReportReadModelProvider";
 
 export type StoreTabKey = "monthly" | "labor" | "petty" | "inventory" | "shop";
 
@@ -72,5 +73,9 @@ export function StoreLaborProviders({ children }: { children: ReactNode }) {
  * StoreTabBoundary 的 key 仍保证离开报表时完整卸载该树。
  */
 export function StoreReportProviders({ children }: { children: ReactNode }) {
-  return <StoreFeatureProviders>{children}</StoreFeatureProviders>;
+  return (
+    <StoreFeatureProviders>
+      <StoreReportReadModelProvider>{children}</StoreReportReadModelProvider>
+    </StoreFeatureProviders>
+  );
 }

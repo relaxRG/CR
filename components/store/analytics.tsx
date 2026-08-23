@@ -14,9 +14,8 @@ import { StoreMetric, StoreSectionHeader } from "@/components/store/store-visual
 import { storeTone, STORE_TEXT } from "@/lib/theme/store-visual-system";
 import { BoundedBusinessMonthNavigator } from "@/components/months/BoundedBusinessMonthNavigator";
 import { useReportMonthNavigation } from "@/hooks/use-report-month-navigation";
-import { useRevenueStore, REVENUE_CATEGORY_LABELS, RevenueCategory } from "@/lib/store/revenue-store";
-import { usePettyCashStore } from "@/lib/store/petty-store";
-import { useMonthlyReportStore } from "@/lib/store/monthly-report/store";
+import { REVENUE_CATEGORY_LABELS, type RevenueCategory } from "@/lib/store/revenue-store";
+import { useStoreReportReadModel } from "@/components/providers/StoreReportReadModelProvider";
 
 type PeriodMode = "day" | "month" | "year" | "custom";
 type CompareMode = "none" | "prev";
@@ -126,9 +125,7 @@ export default function StoreAnalyticsScreen({ embedded = false }: { embedded?: 
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
-  useMonthlyReportStore();
-  const { records } = useRevenueStore();
-  const { records: pettyRecords } = usePettyCashStore();
+  const { model: reportReadModel } = useStoreReportReadModel();
   const { month: reportMonth, bounds: reportMonthBounds, selectMonth: selectReportMonth } = useReportMonthNavigation();
   const [mode, setMode] = useState<PeriodMode>("month");
   const [compare, setCompare] = useState<CompareMode>("prev");
@@ -152,18 +149,15 @@ export default function StoreAnalyticsScreen({ embedded = false }: { embedded?: 
       target[category] = (target[category] ?? 0) + amount;
     };
     const inRange = (date: Date, range: { start: Date; end: Date }) => date >= range.start && date <= range.end;
-    records.forEach((record) => {
-      const date = new Date(record.date);
-      if (inRange(date, currentRange)) add(current, record.category, record.amount);
-      if (compare === "prev" && inRange(date, previousRange)) add(previous, record.category, record.amount);
-    });
-    pettyRecords.forEach((record) => {
-      const date = new Date(record.date);
-      if (inRange(date, currentRange)) add(current, "petty_cash", record.amount);
-      if (compare === "prev" && inRange(date, previousRange)) add(previous, "petty_cash", record.amount);
+    reportReadModel.analyticsByDate.forEach((daily) => {
+      const date = new Date(daily.date);
+      for (const [category, amount] of Object.entries(daily.amounts)) {
+        if (inRange(date, currentRange)) add(current, category as RevenueCategory, amount);
+        if (compare === "prev" && inRange(date, previousRange)) add(previous, category as RevenueCategory, amount);
+      }
     });
     return { cur: current, prev: previous };
-  }, [compare, currentRange, pettyRecords, previousRange, records]);
+  }, [compare, currentRange, previousRange, reportReadModel.analyticsByDate]);
   const totalRevCur = cur.revenue ?? 0;
   const totalCostCur = Object.entries(cur).filter(([k]) => k !== "revenue").reduce((s, [, v]) => s + (v ?? 0), 0);
   const profitCur = totalRevCur - totalCostCur;

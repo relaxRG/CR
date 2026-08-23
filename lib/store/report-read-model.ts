@@ -1,6 +1,12 @@
 import type { PaySlip } from "@/lib/labor/types";
 import type { PettyRecord } from "@/lib/store/petty-store";
 
+export type ReportRevenueFact = Readonly<{
+  date: string;
+  category: string;
+  amount: number;
+}>;
+
 export type ReportPurchaseFact = Readonly<{
   id: string;
   date: string;
@@ -22,12 +28,15 @@ export type StoreReportReadModel = Readonly<{
   petty: Readonly<{ inflow: number; otherIncome: number; expense: number }>;
   inventory: Readonly<{ purchaseCost: number; consumptionCost: number; endingValue: number }>;
   suppliers: ReadonlyArray<Readonly<{ supplier: string; purchaseAmount: number }>>;
+  /** 全时段按日归集，只读供经营分析按日、月、年与自定义范围筛选。 */
+  analyticsByDate: ReadonlyArray<Readonly<{ date: string; amounts: Readonly<Record<string, number>> }>>;
   sourceVersion: string;
 }>;
 
 export type StoreReportFacts = Readonly<{
   payslips: readonly Pick<PaySlip, "month" | "employeeId" | "totalEmployerCost" | "finalSalary">[];
   pettyRecords: readonly Pick<PettyRecord, "date" | "code" | "amount">[];
+  revenueRecords?: readonly ReportRevenueFact[];
   purchases: readonly ReportPurchaseFact[];
   inventory: readonly ReportInventoryFact[];
 }>;
@@ -39,6 +48,7 @@ const isPettyOtherIncome = (code: string) => ["N3", "N4", "N5"].includes(code);
 function* reportFactFingerprintParts(
   slips: readonly Pick<PaySlip, "month" | "employeeId" | "totalEmployerCost" | "finalSalary">[],
   pettyRecords: readonly Pick<PettyRecord, "date" | "code" | "amount">[],
+  revenueRecords: readonly ReportRevenueFact[],
   purchases: readonly ReportPurchaseFact[],
   inventoryRows: readonly ReportInventoryFact[],
 ): Iterable<string | number> {
@@ -52,6 +62,12 @@ function* reportFactFingerprintParts(
   for (const record of pettyRecords) {
     yield record.date;
     yield record.code;
+    yield record.amount;
+  }
+  yield revenueRecords.length;
+  for (const record of revenueRecords) {
+    yield record.date;
+    yield record.category;
     yield record.amount;
   }
   yield purchases.length;
@@ -83,12 +99,31 @@ function fingerprintParts(parts: Iterable<string | number>): string {
   return (hash >>> 0).toString(36);
 }
 
+function buildAnalyticsByDate(revenueRecords: readonly ReportRevenueFact[], pettyRecords: readonly Pick<PettyRecord, "date" | "code" | "amount">[]) {
+  const totals = new Map<string, Map<string, number>>();
+  const add = (date: string, category: string, amount: number) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(amount)) return;
+    const byCategory = totals.get(date) ?? new Map<string, number>();
+    byCategory.set(category, roundMoney((byCategory.get(category) ?? 0) + amount));
+    totals.set(date, byCategory);
+  };
+  for (const record of revenueRecords) add(record.date, record.category, record.amount);
+  for (const record of pettyRecords) add(record.date, "petty_cash", record.amount);
+  return Object.freeze([...totals.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([date, amounts]) => Object.freeze({
+      date,
+      amounts: Object.freeze(Object.fromEntries(amounts.entries())),
+    })));
+}
+
 /**
  * 只读、确定性聚合：不修改输入，不访问 React Context，不写 AsyncStorage，也不暴露增删改命令。
  */
 export function buildStoreReportReadModel(month: string, facts: StoreReportFacts): StoreReportReadModel {
   const slips = facts.payslips.filter((slip) => slip.month === month);
   const pettyRecords = facts.pettyRecords.filter((record) => record.date.startsWith(month));
+  const revenueRecords = facts.revenueRecords ?? [];
   const inventoryRows = facts.inventory.filter((row) => row.month === month);
   const purchases = facts.purchases.filter((purchase) => purchase.date.startsWith(month));
 
@@ -99,7 +134,7 @@ export function buildStoreReportReadModel(month: string, facts: StoreReportFacts
   }
 
   const sourceVersion = `${month}:${fingerprintParts(
-    reportFactFingerprintParts(slips, pettyRecords, purchases, inventoryRows),
+    reportFactFingerprintParts(slips, pettyRecords, revenueRecords, purchases, inventoryRows),
   )}`;
 
   return Object.freeze({
@@ -122,6 +157,7 @@ export function buildStoreReportReadModel(month: string, facts: StoreReportFacts
     suppliers: Object.freeze([...supplierAmounts.entries()]
       .map(([supplier, purchaseAmount]) => Object.freeze({ supplier, purchaseAmount }))
       .sort((a, b) => b.purchaseAmount - a.purchaseAmount || a.supplier.localeCompare(b.supplier))),
+    analyticsByDate: buildAnalyticsByDate(revenueRecords, facts.pettyRecords),
     sourceVersion,
   });
 }

@@ -56,7 +56,11 @@ const report = {
   report: {
     usesCompatibilityBridge: reportUsesCompatibilityBridge,
     usesReadonlyMaterializedView: reportUsesReadModel,
-    migrationState: reportUsesReadModel ? "complete" : "blocked_by_monthly_summary_and_period_analysis_cross_domain_context_reads",
+    migrationState: !reportUsesReadModel
+      ? "not_started"
+      : reportUsesCompatibilityBridge
+        ? "partial_analytics_only_monthly_summary_and_period_analysis_still_use_compatibility_contexts"
+        : "complete",
   },
   instanceIsolation: duplicateStableProviders.length === 0 && expectedMismatch.length === 0 && runtimeBoundaryWired,
 };

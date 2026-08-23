@@ -14,6 +14,11 @@ describe("StoreReportReadModel", () => {
         { date: "2026-08-02", code: "N3", amount: 10 },
         { date: "2026-08-03", code: "A1", amount: 120.555 },
       ],
+      revenueRecords: [
+        { date: "2026-08-01", category: "revenue", amount: 1000 },
+        { date: "2026-08-01", category: "food_cost", amount: -120 },
+        { date: "2026-07-31", category: "revenue", amount: 888 },
+      ],
       purchases: [
         { id: "p1", date: "2026-08-03", supplier: "甲", amount: 90 },
         { id: "p2", date: "2026-08-04", supplier: "乙", amount: 120 },
@@ -29,6 +34,12 @@ describe("StoreReportReadModel", () => {
     expect(model.petty).toEqual({ inflow: 500, otherIncome: 10, expense: 120.56 });
     expect(model.inventory).toEqual({ purchaseCost: 110, consumptionCost: 40, endingValue: 300 });
     expect(model.suppliers).toEqual([{ supplier: "乙", purchaseAmount: 120 }, { supplier: "甲", purchaseAmount: 90 }]);
+    expect(model.analyticsByDate).toEqual([
+      { date: "2026-07-31", amounts: { revenue: 888 } },
+      { date: "2026-08-01", amounts: { revenue: 1000, food_cost: -120, petty_cash: 500 } },
+      { date: "2026-08-02", amounts: { petty_cash: 10 } },
+      { date: "2026-08-03", amounts: { petty_cash: 120.56 } },
+    ]);
     expect(JSON.stringify(facts)).toBe(before);
     expect(Object.isFrozen(model)).toBe(true);
     expect(model.sourceVersion.length).toBeLessThan(32);
