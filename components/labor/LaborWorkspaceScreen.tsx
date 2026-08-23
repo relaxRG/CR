@@ -3514,6 +3514,9 @@ function SchTemplateModal({ visible, templates, specialStatuses, businessHours, 
 // Excel 风格排班表：每周一个区块
 // 结构：日期行（橙色背景）→ 各班次员工行（工时数字）→ 班次间空行分隔
 function SchedulePage({ colors, month, pageWidth }: { colors: any; month: string; onMonthChange: (m: string) => void; pageWidth: number }) {
+  const { fontScale } = useWindowDimensions();
+  // 默认字体缩放下每位员工为单行固定高度；大字体保留自然高度，避免辅助功能文字被裁切。
+  const employeePickerRowHeight = fontScale <= 1.15 ? 44 : undefined;
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
   const { employees, ready: employeesReady } = useEmployeeStore();
   const { deptOrder } = useDeptOrderStore();
@@ -4545,6 +4548,9 @@ function SchedulePage({ colors, month, pageWidth }: { colors: any; month: string
                         maxToRenderPerBatch={12}
                         windowSize={5}
                         removeClippedSubviews={Platform.OS !== "web"}
+                        getItemLayout={employeePickerRowHeight
+                          ? (_, index) => ({ length: employeePickerRowHeight, offset: employeePickerRowHeight * index, index })
+                          : undefined}
                         renderItem={({ item: emp }) => {
                           const isPending = pendingSet?.has(emp.id) ?? false;
                           const inGroup = assignedEmployeeIds.has(emp.id) || isPending;
@@ -4574,6 +4580,7 @@ function SchedulePage({ colors, month, pageWidth }: { colors: any; month: string
                                 }
                               }}
                               style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 8,
+                                minHeight: 44, height: employeePickerRowHeight,
                                 borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border + "44",
                                 backgroundColor: inGroup ? groupColor + "10" : "transparent" }}>
                               <View style={{ width: 16, height: 16, borderRadius: 8, borderWidth: 1.5,

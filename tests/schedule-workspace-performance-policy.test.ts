@@ -13,6 +13,8 @@ describe("考勤排班工作台性能护栏", () => {
     expect(screen).toContain("validMonthShiftEmployeeIdsBySession.get(tpl.session)");
     expect(screen).toContain("shiftEntryByEmployeeDateSession.get(`${employeeId}|${date}|${session}`)");
     expect(screen).not.toContain("monthShifts.find((s) => s.employeeId === employeeId && s.date === date && s.shift === session)");
+    expect(screen).toContain("const employeePickerRowHeight = fontScale <= 1.15 ? 44 : undefined");
+    expect(screen).toContain("getItemLayout={employeePickerRowHeight");
   });
 
   it("浏览器移动端压力脚本覆盖 500 名员工、万级排班与万级库存采购，并在专用标签页清理测试数据", () => {
