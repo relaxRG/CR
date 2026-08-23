@@ -10,6 +10,11 @@ export const LOCAL_ONLY_BUSINESS_STORAGE_BOUNDARIES = {
     owner: "reports.monthly",
     requiredUpgrade: "先将原始Excel文件上传至受权限控制的共享对象存储，并以远端对象标识替换本机 URI 后才能纳入业务同步。",
   },
+  "monthly_report.archive_remote_outbox.v1": {
+    reason: "归档远端写入的设备本地操作队列，包含待提交的条件写入与冲突状态；同步它会导致另一台设备重复执行同一操作。",
+    owner: "reports.monthly",
+    requiredUpgrade: "保持按设备持久化；只有服务端权威归档索引和对象元数据可以跨设备同步。",
+  },
 } as const;
 
 export type LocalOnlyBusinessStorageKey = keyof typeof LOCAL_ONLY_BUSINESS_STORAGE_BOUNDARIES;
