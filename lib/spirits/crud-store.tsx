@@ -385,6 +385,7 @@ type Action =
   | { type: "DELETE_LEDGER"; id: string }
   | { type: "SET_REF_PRICE"; entry: SpiritRefPrice }
   | { type: "UPSERT_SUPPLIER"; supplier: SpiritSupplierInfo }
+  | { type: "REORDER_SUPPLIERS"; suppliers: SpiritSupplierInfo[] }
   | { type: "DELETE_SUPPLIER"; id: string }
   | { type: "UPSERT_GROUP"; group: SpiritGroupDef }
   | { type: "REORDER_GROUPS"; groups: SpiritGroupDef[] }
@@ -447,6 +448,7 @@ function reducer(state: SpiritsState, action: Action): SpiritsState {
       }
       return { ...state, suppliers: [...state.suppliers, action.supplier] };
     }
+    case "REORDER_SUPPLIERS": return { ...state, suppliers: action.suppliers };
     case "DELETE_SUPPLIER": return { ...state, suppliers: state.suppliers.filter((s) => s.id !== action.id) };
     case "UPSERT_GROUP": {
       const idx = state.groups.findIndex((group) => group.id === action.group.id);
@@ -548,6 +550,7 @@ interface SpiritsContextValue extends SpiritsState {
   // 供应商信息卡
   upsertSupplier: (supplier: Omit<SpiritSupplierInfo, "id" | "createdAt" | "updatedAt"> & { id?: string }) => SpiritSupplierInfo;
   deleteSupplier: (id: string) => void;
+  moveSupplier: (id: string, direction: "up" | "down") => void;
   getSupplierByName: (name: string) => SpiritSupplierInfo | undefined;
   // 品牌集团
   upsertGroup: (group: Omit<SpiritGroupDef, "id" | "createdAt"> & { id?: string }) => void;
@@ -780,10 +783,13 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
   // ── 供应商信息卡 ──────────────────────────────────────────────────────────
   const upsertSupplier = (data: Omit<SpiritSupplierInfo, "id" | "createdAt" | "updatedAt"> & { id?: string }): SpiritSupplierInfo => {
     const now = new Date().toISOString();
+    const existing = data.id ? state.suppliers.find((supplier) => supplier.id === data.id) : undefined;
     const supplier: SpiritSupplierInfo = {
       ...data,
       id: data.id ?? uuid(),
-      createdAt: data.id ? (state.suppliers.find((s) => s.id === data.id)?.createdAt ?? now) : now,
+      channelType: data.channelType ?? existing?.channelType ?? (data.isSelfBuy || existing?.isSelfBuy ? "online" : "supplier"),
+      sortOrder: Number.isFinite(data.sortOrder) ? data.sortOrder : existing?.sortOrder ?? state.suppliers.length,
+      createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     };
     dispatch({ type: "UPSERT_SUPPLIER", supplier });
@@ -792,6 +798,15 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
 
   const deleteSupplier = (id: string) => {
     dispatch({ type: "DELETE_SUPPLIER", id });
+  };
+
+  const moveSupplier = (id: string, direction: "up" | "down") => {
+    const ordered = [...state.suppliers].sort((left, right) => (left.sortOrder ?? Number.MAX_SAFE_INTEGER) - (right.sortOrder ?? Number.MAX_SAFE_INTEGER) || left.id.localeCompare(right.id));
+    const currentIndex = ordered.findIndex((supplier) => supplier.id === id);
+    const targetIndex = currentIndex + (direction === "up" ? -1 : 1);
+    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= ordered.length) return;
+    [ordered[currentIndex], ordered[targetIndex]] = [ordered[targetIndex], ordered[currentIndex]];
+    dispatch({ type: "REORDER_SUPPLIERS", suppliers: ordered.map((supplier, sortOrder) => ({ ...supplier, sortOrder, updatedAt: new Date().toISOString() })) });
   };
 
   const getSupplierByName = (name: string) =>
@@ -1135,7 +1150,7 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
         addItem, updateItem, setItemAndPurchaseCategory, setItemsAndPurchasesCategory, deleteItem, addPurchase, updatePurchase, deletePurchase, batchAddPurchases, batchDeletePurchases,
     upsertLedger, deleteLedger,
     setRefPrice, getRefPrice,
-    upsertSupplier, deleteSupplier, getSupplierByName,
+    upsertSupplier, deleteSupplier, moveSupplier, getSupplierByName,
     upsertGroup, moveGroup, deleteGroup, getItemGroup, detectPurchaseGroup, rememberGroupMatch,
     getAllCategories, upsertCustomCategory, moveCategory, removeCategorySafely, getCategoryColor,
     setMatchMemory, findMatchMemory, matchPettyToItem,

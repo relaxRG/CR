@@ -125,9 +125,25 @@ export const SPIRIT_CATEGORY_COLORS: Record<string, string> = {
 };
 
 // ─── 供应商信息卡 ────────────────────────────────────────────────────────────
+export type SpiritProcurementChannelType = "supplier" | "online";
+
+/** 采购档案中可引用的合同、资质或沟通文件元数据；二进制文件不写入业务状态。 */
+export interface SpiritSupplierDocument {
+  id: string;
+  name: string;
+  mimeType: string;
+  storageKey: string;
+  uploadedAt: string;
+}
+
 export interface SpiritSupplierInfo {
   id: string;
   name: string;
+  /** 供货商=集中付款；网络采购=必须通过备用金或明确的付款关联。旧 isSelfBuy 读取时兼容为 online。 */
+  channelType?: SpiritProcurementChannelType;
+  /** 各入口读取同一顺序；缺失时按既有创建顺序迁移。 */
+  sortOrder?: number;
+  companyName?: string;
   contact?: string;
   contactName?: string;
   phone?: string;
@@ -135,8 +151,14 @@ export interface SpiritSupplierInfo {
   address?: string;
   bankName?: string;
   bankAccount?: string;
+  /** 供货商的约定付款周期（天）或文本付款条款。 */
+  paymentCycleDays?: number;
+  paymentTerms?: string;
+  /** 网络采购平台主页；单品跳转链接保留在供应渠道记录，避免污染酒款主档。 */
+  platformUrl?: string;
+  documents?: SpiritSupplierDocument[];
   notes?: string;
-  /** 是否为自采渠道（关联备用金） */
+  /** @deprecated 使用 channelType: "online"；为旧数据兼容保留。 */
   isSelfBuy?: boolean;
   createdAt: string;
   updatedAt: string;
