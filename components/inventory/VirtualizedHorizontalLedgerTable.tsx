@@ -58,9 +58,12 @@ export function VirtualizedHorizontalLedgerTable<Row>({
   selection,
 }: VirtualizedHorizontalLedgerTableProps<Row>) {
   const colors = useColors();
-  const { width: windowWidth } = useWindowDimensions();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const [scrollTop, setScrollTop] = useState(0);
-  const [viewportHeight, setViewportHeight] = useState(520);
+  // 外层工作台是可滚动容器；虚拟表必须拥有独立且受限的纵向视口，
+  // 否则 Web 会把完整内容高度回传为 onLayout 结果并渲染所有行。
+  const maxViewportHeight = Math.max(280, Math.min(640, windowHeight - 260));
+  const [viewportHeight, setViewportHeight] = useState(maxViewportHeight);
   const lastReportedOffset = useRef(0);
   const pinnedScrollRef = useRef<ScrollView>(null);
   const dataScrollRef = useRef<ScrollView>(null);
@@ -109,7 +112,7 @@ export function VirtualizedHorizontalLedgerTable<Row>({
     else dataScrollRef.current?.scrollTo({ y, animated: false });
   }, []);
   const handleLayout = (event: LayoutChangeEvent) => {
-    const height = event.nativeEvent.layout.height;
+    const height = Math.max(280, Math.min(maxViewportHeight, event.nativeEvent.layout.height));
     if (height > 0 && Math.abs(height - viewportHeight) > 2) setViewportHeight(height);
   };
   const handleScroll = (source: "data" | "pinned") => (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -213,7 +216,7 @@ export function VirtualizedHorizontalLedgerTable<Row>({
     <ScrollView
       ref={source === "data" ? dataScrollRef : pinnedScrollRef}
       testID={source === "data" && testID ? `${testID}-virtual-list` : undefined}
-      style={S.list}
+      style={[S.list, { height: viewportHeight, flexGrow: 0, flexShrink: 0 }]}
       onLayout={source === "data" ? handleLayout : undefined}
       onScroll={handleScroll(source)}
       scrollEventThrottle={48}

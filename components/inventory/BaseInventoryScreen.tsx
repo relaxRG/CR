@@ -18,7 +18,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { StoreSegmentedTabs } from "@/components/store/store-visual-primitives";
 import { ScreenContainer } from "@/components/screen-container";
 import { GenericInventoryContextValue, GenericInventoryItem } from "@/lib/inventory-core/store";
-import { getCurrentMonth, MonthlyLedgerItem } from "@/lib/inventory-core/types";
+import { getCurrentMonth, getPrevMonth, MonthlyLedgerItem } from "@/lib/inventory-core/types";
 import { MonthlyLedgerRow } from "./MonthlyLedgerSheet";
 import { HorizontalLedgerColumn, HorizontalLedgerGroup, HorizontalLedgerTable } from "./HorizontalLedgerTable";
 import { VirtualizedHorizontalLedgerTable } from "./VirtualizedHorizontalLedgerTable";
@@ -105,10 +105,23 @@ export function BaseInventoryScreen({
   const activeItems = useMemo(() => store.items.filter((item) => showArchived ? !item.active : item.active), [store.items, showArchived]);
   const monthPurchases = useMemo(() => store.getMonthPurchases(currentMonth), [store, currentMonth]);
   const monthConsumes = useMemo(() => store.getMonthConsumes(currentMonth), [store, currentMonth]);
+  const monthPurchasesByItemId = useMemo(() => {
+    const byItemId = new Map<string, typeof monthPurchases>();
+    monthPurchases.forEach((purchase) => byItemId.set(purchase.itemId, [...(byItemId.get(purchase.itemId) ?? []), purchase]));
+    return byItemId;
+  }, [monthPurchases]);
+  const monthConsumesByItemId = useMemo(() => {
+    const byItemId = new Map<string, typeof monthConsumes>();
+    monthConsumes.forEach((consume) => byItemId.set(consume.itemId, [...(byItemId.get(consume.itemId) ?? []), consume]));
+    return byItemId;
+  }, [monthConsumes]);
+  const selectedItemIdSet = useMemo(() => new Set(selectedItemIds), [selectedItemIds]);
   const totalMonthPurchase = useMemo(() => monthPurchases.reduce((s, r) => s + r.totalAmount, 0), [monthPurchases]);
   const totalMonthConsume = useMemo(() => monthConsumes.reduce((s, r) => s + r.totalCost, 0), [monthConsumes]);
+  const previousSnapshot = useMemo(() => store.snapshots.find((snapshot) => snapshot.month === getPrevMonth(currentMonth)) ?? null, [store.snapshots, currentMonth]);
+  const openingByItemId = useMemo(() => new Map((previousSnapshot?.items ?? []).map((item) => [item.itemId, { qty: item.closingQty, unitCost: item.closingUnitCost }])), [previousSnapshot]);
   const lastSnapshot = useMemo(() => store.getLastSnapshot(), [store]);
-  const selectedVisibleItemIds = useMemo(() => activeItems.map((item) => item.id).filter((id) => selectedItemIds.includes(id)), [activeItems, selectedItemIds]);
+  const selectedVisibleItemIds = useMemo(() => activeItems.map((item) => item.id).filter((id) => selectedItemIdSet.has(id)), [activeItems, selectedItemIdSet]);
   const exitSelection = () => { setSelectionMode(false); setSelectedItemIds([]); };
   const toggleSelection = (itemId: string) => setSelectedItemIds((current) => current.includes(itemId) ? current.filter((id) => id !== itemId) : [...current, itemId]);
   const applyBulkLifecycle = (action: "delete" | "archive") => {
@@ -139,9 +152,9 @@ export function BaseInventoryScreen({
   // 构建台账数据（当月实时）
   const ledgerItems = useMemo(() => {
     return activeItems.map((item) => {
-      const opening = store.getOpeningData(item.id, currentMonth);
-      const purchases = store.getItemMonthPurchases(item.id, currentMonth);
-      const consumes = store.getItemMonthConsumes(item.id, currentMonth);
+      const opening = openingByItemId.get(item.id) ?? { qty: 0, unitCost: 0 };
+      const purchases = monthPurchasesByItemId.get(item.id) ?? [];
+      const consumes = monthConsumesByItemId.get(item.id) ?? [];
       const losses = consumes.filter((c) => c.reason === "loss");
 
       const purchaseQty = purchases.reduce((s, p) => s + p.quantity, 0);
@@ -178,7 +191,7 @@ export function BaseInventoryScreen({
         notes: "",
       };
     });
-  }, [activeItems, store, currentMonth, getGroupLabel]);
+  }, [activeItems, currentMonth, getGroupLabel, monthPurchasesByItemId, monthConsumesByItemId, openingByItemId]);
 
   const totalClosingCost = useMemo(() => ledgerItems.reduce((s, i) => s + i.closingCost, 0), [ledgerItems]);
   const totalOpeningCost = useMemo(() => ledgerItems.reduce((s, i) => s + i.openingCost, 0), [ledgerItems]);
@@ -425,7 +438,7 @@ export function BaseInventoryScreen({
             {/* 台账列表 */}
             {activeItems.length === 0 ? (
               <EmptyState emoji={emoji} accentColor={accentColor} excelFormatHint={excelFormatHint} colors={colors} />
-            ) : ledgerPresentation === "table" ? (
+            ) : (ledgerPresentation === "table" || activeItems.length >= 80) ? (
               activeItems.length >= 80 ? (
                 <VirtualizedHorizontalLedgerTable
                   testID={`${categoryId}-horizontal-ledger-table`}

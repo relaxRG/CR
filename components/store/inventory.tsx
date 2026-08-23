@@ -85,38 +85,33 @@ export default function StoreInventoryScreen({ mode = "inventory" }: { mode?: In
       ...store.purchases.map((purchase) => purchase.date),
       ...store.consumes.map((consume) => consume.date),
     ];
-    const allMonths: Record<InventoryCategoryKey, string[]> = {
-      spirits: [
-        ...spiritsStore.ledger.map((entry) => entry.month),
-        ...spiritsStore.purchases.map((purchase) => purchase.date ?? purchase.month),
-      ],
-      wine: [
-        ...wineSnapshots.snapshots.map((snapshot) => snapshot.monthLabel),
-        ...wineSnapshots.snapshots.flatMap((snapshot) => snapshot.purchaseOrders.map((purchase) => purchase.date)),
-        ...wineManualPurchases.purchases.map((purchase) => purchase.date),
-      ],
-      fruit: genericMonths(fruitStore),
-      beer: genericMonths(beerStore),
-      ice: genericMonths(iceStore),
-      food: [
-        ...foodStore.ledgerEntries.map((entry) => entry.month),
-        ...foodStore.ledgerMovements.flatMap((movement) => [movement.month, movement.date]),
-        ...foodStore.ingredients.flatMap((ingredient) => (ingredient.priceHistory ?? []).map((entry) => entry.date)),
-        ...foodPurchases.records.flatMap((record: any) => [record.importDate, ...(record.items ?? []).map((item: any) => item.date)]),
-      ],
-      glassware: genericMonths(glasswareStore),
-      tableware: genericMonths(tablewareStore),
-      daily: genericMonths(dailyStore),
-      equipment: [
-        ...equipmentStore.items.map((item) => item.purchaseDate),
-        ...equipmentStore.maintenanceRecords.map((record) => record.date),
-      ],
-    };
-    return allMonths;
-  }, [spiritsStore, wineSnapshots, wineManualPurchases, foodStore, foodPurchases, fruitStore, beerStore, iceStore, glasswareStore, tablewareStore, dailyStore, equipmentStore]);
+    const monthsByCategory: Partial<Record<InventoryCategoryKey, string[]>> = {};
+    categories.forEach((category) => {
+      switch (category.key) {
+        case "spirits":
+          monthsByCategory.spirits = [...spiritsStore.ledger.map((entry) => entry.month), ...spiritsStore.purchases.map((purchase) => purchase.date ?? purchase.month)];
+          break;
+        case "wine":
+          monthsByCategory.wine = [...wineSnapshots.snapshots.map((snapshot) => snapshot.monthLabel), ...wineSnapshots.snapshots.flatMap((snapshot) => snapshot.purchaseOrders.map((purchase) => purchase.date)), ...wineManualPurchases.purchases.map((purchase) => purchase.date)];
+          break;
+        case "food":
+          monthsByCategory.food = [...foodStore.ledgerEntries.map((entry) => entry.month), ...foodStore.ledgerMovements.flatMap((movement) => [movement.month, movement.date]), ...foodStore.ingredients.flatMap((ingredient) => (ingredient.priceHistory ?? []).map((entry) => entry.date)), ...foodPurchases.records.flatMap((record: any) => [record.importDate, ...(record.items ?? []).map((item: any) => item.date)])];
+          break;
+        case "fruit": monthsByCategory.fruit = genericMonths(fruitStore); break;
+        case "beer": monthsByCategory.beer = genericMonths(beerStore); break;
+        case "ice": monthsByCategory.ice = genericMonths(iceStore); break;
+        case "glassware": monthsByCategory.glassware = genericMonths(glasswareStore); break;
+        case "tableware": monthsByCategory.tableware = genericMonths(tablewareStore); break;
+        case "daily": monthsByCategory.daily = genericMonths(dailyStore); break;
+        case "equipment": monthsByCategory.equipment = [...equipmentStore.items.map((item) => item.purchaseDate), ...equipmentStore.maintenanceRecords.map((record) => record.date)];
+          break;
+      }
+    });
+    return monthsByCategory;
+  }, [categories, spiritsStore, wineSnapshots, wineManualPurchases, foodStore, foodPurchases, fruitStore, beerStore, iceStore, glasswareStore, tablewareStore, dailyStore, equipmentStore]);
 
   const localBounds = useMemo(
-    () => deriveInventoryMonthBounds(categories.flatMap((category) => normalizeMany(categoryMonths[category.key]))),
+    () => deriveInventoryMonthBounds(categories.flatMap((category) => normalizeMany(categoryMonths[category.key] ?? []))),
     [categories, categoryMonths],
   );
   // 所有门店模块遵循同一数据边界：实际数据最早月前一月到最晚月后一月；无数据时仅当前自然月。

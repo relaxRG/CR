@@ -18,6 +18,9 @@ const INVENTORY_ITEM_COUNT = 1_000;
 const INVENTORY_PURCHASE_COUNT = 10_000;
 const SCHEDULE_SHIFT_COUNT = 10_000;
 const SCHEDULE_DAYS = 31;
+const SHOP_ITEM_COUNT = 1_000;
+const SHOP_PURCHASE_COUNT = 10_000;
+const SHOP_CONSUME_COUNT = 10_000;
 const MONTH = "2026-08";
 const PREVIOUS_MONTH = "2026-07";
 const RUNS = 7;
@@ -60,6 +63,10 @@ const scheduleShifts = Array.from({ length: SCHEDULE_SHIFT_COUNT }, (_, index) =
   date: `${MONTH}-${String((index % SCHEDULE_DAYS) + 1).padStart(2, "0")}`,
   session: index % 2 === 0 ? "晚班" : "早班",
 }));
+const shopItems = Array.from({ length: SHOP_ITEM_COUNT }, (_, index) => ({ id: `shop-item-${index + 1}`, latestCostPrice: 20 + (index % 80) }));
+const shopPurchases = Array.from({ length: SHOP_PURCHASE_COUNT }, (_, index) => ({ itemId: shopItems[index % shopItems.length]!.id, quantity: (index % 8) + 1, totalAmount: 100 + (index % 300) }));
+const shopConsumes = Array.from({ length: SHOP_CONSUME_COUNT }, (_, index) => ({ itemId: shopItems[index % shopItems.length]!.id, quantity: (index % 5) + 1, totalCost: 30 + (index % 120), reason: index % 7 === 0 ? "loss" : "normal" }));
+const shopPreviousSnapshotItems = shopItems.map((item, index) => ({ itemId: item.id, closingQty: 20 + (index % 10), closingUnitCost: 20 + (index % 80) }));
 
 function forceGc() {
   global.gc?.();
@@ -190,6 +197,39 @@ function virtualizedInventoryInitialWindow() {
   return inventoryPurchases.slice(0, initialRowCount).reduce((sum, purchase) => sum + purchase.quantity, 0);
 }
 
+function baselineShopLedger() {
+  let checksum = 0;
+  for (const item of shopItems) {
+    const opening = shopPreviousSnapshotItems.find((entry) => entry.itemId === item.id) ?? { closingQty: 0, closingUnitCost: 0 };
+    const purchases = shopPurchases.filter((record) => record.itemId === item.id);
+    const consumes = shopConsumes.filter((record) => record.itemId === item.id);
+    const purchaseQty = purchases.reduce((sum, record) => sum + record.quantity, 0);
+    const consumeQty = consumes.filter((record) => record.reason !== "loss").reduce((sum, record) => sum + record.quantity, 0);
+    const lossQty = consumes.filter((record) => record.reason === "loss").reduce((sum, record) => sum + record.quantity, 0);
+    checksum += opening.closingQty + opening.closingUnitCost + purchaseQty + consumeQty + lossQty;
+  }
+  return checksum;
+}
+
+function indexedShopLedger() {
+  const purchasesByItemId = new Map<string, typeof shopPurchases>();
+  const consumesByItemId = new Map<string, typeof shopConsumes>();
+  const openingByItemId = new Map(shopPreviousSnapshotItems.map((entry) => [entry.itemId, entry]));
+  shopPurchases.forEach((record) => purchasesByItemId.set(record.itemId, [...(purchasesByItemId.get(record.itemId) ?? []), record]));
+  shopConsumes.forEach((record) => consumesByItemId.set(record.itemId, [...(consumesByItemId.get(record.itemId) ?? []), record]));
+  let checksum = 0;
+  for (const item of shopItems) {
+    const opening = openingByItemId.get(item.id) ?? { closingQty: 0, closingUnitCost: 0 };
+    const purchases = purchasesByItemId.get(item.id) ?? [];
+    const consumes = consumesByItemId.get(item.id) ?? [];
+    const purchaseQty = purchases.reduce((sum, record) => sum + record.quantity, 0);
+    const consumeQty = consumes.filter((record) => record.reason !== "loss").reduce((sum, record) => sum + record.quantity, 0);
+    const lossQty = consumes.filter((record) => record.reason === "loss").reduce((sum, record) => sum + record.quantity, 0);
+    checksum += opening.closingQty + opening.closingUnitCost + purchaseQty + consumeQty + lossQty;
+  }
+  return checksum;
+}
+
 function baselineScheduleGridLookups() {
   let checksum = 0;
   for (const employeeId of employees) {
@@ -221,6 +261,8 @@ const results = [
   measure("inventory_rows_linear_lookups", baselineInventoryRows),
   measure("inventory_rows_indexed_lookups", indexedInventoryRows),
   measure("inventory_virtualized_initial_window", virtualizedInventoryInitialWindow),
+  measure("shop_ledger_repeated_filters", baselineShopLedger),
+  measure("shop_ledger_indexed_records_and_opening", indexedShopLedger),
   measure("schedule_grid_linear_lookup", baselineScheduleGridLookups, 3),
   measure("schedule_grid_indexed_lookup", indexedScheduleGridLookups, 3),
 ];
@@ -236,6 +278,9 @@ console.log(JSON.stringify({
     inventoryPurchases: INVENTORY_PURCHASE_COUNT,
     scheduleShifts: SCHEDULE_SHIFT_COUNT,
     scheduleDays: SCHEDULE_DAYS,
+    shopItems: SHOP_ITEM_COUNT,
+    shopPurchases: SHOP_PURCHASE_COUNT,
+    shopConsumes: SHOP_CONSUME_COUNT,
     runsPerMeasurement: RUNS,
   },
   results,

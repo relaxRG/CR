@@ -13,6 +13,7 @@ const testKeys = [
   "labor_employees_v1", "labor_shifts_v1", "labor_comp_off_entries_v1", "labor_unexplained_rest_alerts_v1",
   "spirits.items.v3", "spirits.purchases.v3", "spirits.ledger.v3", "spirits.refPrices.v1", "spirits.suppliers.v1",
   "spirits.groups.v1", "spirits.matchMemory.v1", "spirits.selfBuyConfig.v1", "spirits.customCategories.v1", "spirits.groupMatchMemory.v1",
+  "glassware.inventory.v1", "tableware.inventory.v1", "daily.inventory.v1", "store.shop.category.v2",
 ];
 
 if (!existsSync(join(root, "index.html"))) throw new Error("未找到 dist-web/index.html；请先执行 Expo Web 导出。");
@@ -77,6 +78,8 @@ const snapshot = async (call, route, loadStartedAt) => {
     domNodes: document.getElementsByTagName('*').length,
     rootWidth: document.documentElement.clientWidth,
     rootScrollWidth: document.documentElement.scrollWidth,
+    stressFixtureVisible: document.body.innerText.includes("压力物资") || document.body.innerText.includes("压力酒款"),
+    glasswareStorageBytes: localStorage.getItem("glassware.inventory.v1")?.length ?? 0,
   }))()`);
   return { route, loadMs: performance.now() - loadStartedAt, frames, heapBytes: memoryMetric(await call("Performance.getMetrics")), ...state };
 };
@@ -95,9 +98,7 @@ try {
   await call("Performance.enable");
   await call("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 3, mobile: true });
 
-  await call("Page.navigate", { url: `${origin}/` });
-  await sleep(450);
-  await evaluate(call, `(() => {
+  const stressFixtureBootstrap = `(() => {
     const month = "2026-08"; const now = new Date().toISOString();
     const employees = Array.from({ length: 500 }, (_, index) => ({
       id: "stress-employee-" + index, code: "S" + String(index + 1).padStart(4, "0"), realName: "压力员工" + (index + 1), phone: "1380000" + String(index).padStart(4, "0"),
@@ -125,7 +126,20 @@ try {
     localStorage.setItem("spirits.selfBuyConfig.v1", JSON.stringify({}));
     localStorage.setItem("spirits.customCategories.v1", JSON.stringify([]));
     localStorage.setItem("spirits.groupMatchMemory.v1", JSON.stringify({}));
-  })()`);
+    const shopItems = Array.from({ length: 1_000 }, (_, index) => ({ id: "stress-shop-item-" + index, name: "压力物资" + (index + 1), category: index % 2 ? "glassware" : "tableware", spec: "标准规格", unit: "个", currentStock: 30, latestCostPrice: 20 + (index % 80), supplier: "压力供应商", notes: "stress", active: true, createdAt: now, updatedAt: now }));
+    const shopPurchases = Array.from({ length: 10_000 }, (_, index) => ({ id: "stress-shop-purchase-" + index, itemId: shopItems[index % shopItems.length].id, itemName: shopItems[index % shopItems.length].name, quantity: 1 + (index % 8), unitPrice: 20 + (index % 80), totalAmount: (1 + (index % 8)) * (20 + (index % 80)), supplier: "压力供应商", date: month + "-" + String((index % 31) + 1).padStart(2, "0"), notes: "stress", createdAt: now }));
+    const shopConsumes = Array.from({ length: 10_000 }, (_, index) => ({ id: "stress-shop-consume-" + index, itemId: shopItems[index % shopItems.length].id, itemName: shopItems[index % shopItems.length].name, quantity: 1 + (index % 5), unitCost: 20 + (index % 80), totalCost: (1 + (index % 5)) * (20 + (index % 80)), reason: index % 7 === 0 ? "loss" : "normal", date: month + "-" + String((index % 31) + 1).padStart(2, "0"), notes: "stress", createdAt: now }));
+    const previousSnapshot = { id: "stress-shop-prev", month: "2026-07", category: "glassware", items: shopItems.map((item, index) => ({ itemId: item.id, name: item.name, category: item.category, unit: item.unit, openingQty: 0, openingUnitCost: 0, openingCost: 0, purchaseQty: 0, purchaseCost: 0, consumeQty: 0, consumeCost: 0, closingQty: 20 + (index % 10), closingUnitCost: item.latestCostPrice, closingCost: 0, lossQty: 0, lossCost: 0 })), totalPurchaseCost: 0, totalConsumeCost: 0, totalClosingCost: 0, totalLossCost: 0, notes: "stress", createdAt: now };
+    const shopState = { items: shopItems, purchases: shopPurchases, consumes: shopConsumes, snapshots: [previousSnapshot], operationReceipts: [] };
+    localStorage.setItem("glassware.inventory.v1", JSON.stringify(shopState));
+    localStorage.setItem("tableware.inventory.v1", JSON.stringify({ items: [], purchases: [], consumes: [], snapshots: [], operationReceipts: [] }));
+    localStorage.setItem("daily.inventory.v1", JSON.stringify({ items: [], purchases: [], consumes: [], snapshots: [], operationReceipts: [] }));
+    localStorage.setItem("store.shop.category.v2", JSON.stringify("glassware"));
+  })()`;
+  // 在任何应用脚本和根层 Provider 运行前写入隔离夹具，确保初次水合读取的就是压力数据。
+  await call("Page.addScriptToEvaluateOnNewDocument", { source: stressFixtureBootstrap });
+  await call("Page.navigate", { url: `${origin}/` });
+  await sleep(1800);
 
   const runs = [];
   let startedAt = performance.now();
@@ -146,12 +160,26 @@ try {
   await sleep(900);
   runs.push(await snapshot(call, "/spirits-inventory?tab=ledger", performance.now() - 900));
 
+  startedAt = performance.now();
+  await call("Page.navigate", { url: `${origin}/store` });
+  await sleep(1200);
+  if (!await evaluate(call, click("store-main-tab-shop"))) throw new Error("未找到门店主导航中的店铺页签。");
+  await sleep(900);
+  if (!await evaluate(call, click("shop-segment-glassware"))) throw new Error("未找到店铺分类中的杯具页签。");
+  await sleep(500);
+  if (!await evaluate(call, click("glassware-inventory-tab-ledger"))) throw new Error("未找到杯具库存管理页签。");
+  await sleep(900);
+  runs.push(await snapshot(call, "/shop?category=glassware&tab=ledger", startedAt));
+
   runs.forEach((run) => {
     if (!run.contentLength || run.rootScrollWidth > run.rootWidth) throw new Error(`压力页面异常：${JSON.stringify(run)}`);
   });
+  const shopRuns = runs.filter((run) => run.route.startsWith("/shop"));
+  const shopFixtureRendered = shopRuns.every((run) => run.stressFixtureVisible);
   console.log(JSON.stringify({
     script: "h5-store-large-dataset-stress-e2e", viewport: { width: 390, height: 844, deviceScaleFactor: 3 },
-    scenario: { employees: 500, shifts: 10_000, compOffEntries: 10_000, alerts: 10_000, inventoryItems: 1_000, inventoryPurchases: 10_000 },
+    scenario: { employees: 500, shifts: 10_000, compOffEntries: 10_000, alerts: 10_000, inventoryItems: 1_000, inventoryPurchases: 10_000, shopItems: 1_000, shopPurchases: 10_000, shopConsumes: 10_000 },
+    shopFixtureRendered,
     runs,
   }, null, 2));
 } finally {

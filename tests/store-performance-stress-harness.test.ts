@@ -12,5 +12,10 @@ describe("门店大规模压力基准", () => {
     expect(benchmark).toContain("employee_cards_parent_index");
     expect(benchmark).toContain("analytics_two_pass_filters");
     expect(benchmark).toContain("analytics_single_pass");
+    expect(benchmark).toContain("const SHOP_ITEM_COUNT = 1_000");
+    expect(benchmark).toContain("const SHOP_PURCHASE_COUNT = 10_000");
+    expect(benchmark).toContain("const SHOP_CONSUME_COUNT = 10_000");
+    expect(benchmark).toContain("shop_ledger_repeated_filters");
+    expect(benchmark).toContain("shop_ledger_indexed_records_and_opening");
   });
 });

@@ -8,6 +8,7 @@ describe("通用库存长台账性能护栏", () => {
   it("超过 80 条库存时使用窗口化横向台账，短列表保留轻量普通表格", () => {
     const screen = read("components/inventory/BaseInventoryScreen.tsx");
     expect(screen).toContain('import { VirtualizedHorizontalLedgerTable } from "./VirtualizedHorizontalLedgerTable"');
+    expect(screen).toContain('(ledgerPresentation === "table" || activeItems.length >= 80) ? (');
     expect(screen).toContain("activeItems.length >= 80 ? (");
     expect(screen).toContain("<VirtualizedHorizontalLedgerTable");
     expect(screen).toContain("<HorizontalLedgerTable");
@@ -20,6 +21,8 @@ describe("通用库存长台账性能护栏", () => {
     expect(table).toContain("onToggleAll: () => void");
     expect(table).toContain("onToggleRow: (row: Row) => void");
     expect(table).toContain("selectionWidth");
+    expect(table).toContain("maxViewportHeight");
+    expect(table).toContain("height: viewportHeight, flexGrow: 0, flexShrink: 0");
     expect(table).toContain("testIDPrefix ? `${selection.testIDPrefix}-select-${rowKey(entry.row)}`");
   });
 });

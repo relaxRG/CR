@@ -3,7 +3,7 @@
  * 为 beer/ice/fruit/glassware/tableware/daily 等品类提供统一的月度台账 Store
  */
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import React, { createContext, useCallback, useContext, useEffect, useReducer, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useReducer, useRef, useState } from "react";
 import { MonthlySnapshot, PurchaseRecord, ConsumeRecord, getCurrentMonth, getPrevMonth, getOpeningFromLastMonth } from "./types";
 import {
   createInventoryOperationReceipt,
@@ -215,21 +215,33 @@ export function createGenericInventoryStore(storageKey: string, categoryId: stri
       items: [], purchases: [], consumes: [], snapshots: [], operationReceipts: [],
     });
     const [ready, setReady] = useState(false);
+    const initialPersistPendingRef = useRef(true);
 
     useEffect(() => {
+      initialPersistPendingRef.current = true;
+      let alive = true;
       (async () => {
         try {
           const raw = await AsyncStorage.getItem(storageKey);
-          if (raw) dispatch({ type: "LOAD", payload: sanitizeGenericInventoryState(JSON.parse(raw)) });
+          if (raw && alive) dispatch({ type: "LOAD", payload: sanitizeGenericInventoryState(JSON.parse(raw)) });
         } catch {}
-        setReady(true);
+        // 必须等待 LOAD 引发的渲染提交后才能打开持久化写回。
+        // 否则在 Web 或慢设备上，默认空 state 可能先覆盖刚读取的业务库存。
+        requestAnimationFrame(() => { if (alive) setReady(true); });
       })();
-    }, []);
+      return () => { alive = false; };
+    }, [storageKey]);
 
     useEffect(() => {
       if (!ready) return;
+      // 水合完成后的首次 effect 只确认加载状态，绝不写入默认 reducer state。
+      // 后续用户操作或同步重载才允许将实际 state 持久化。
+      if (initialPersistPendingRef.current) {
+        initialPersistPendingRef.current = false;
+        return;
+      }
       AsyncStorage.setItem(storageKey, JSON.stringify(state)).catch(() => {});
-    }, [state, ready]);
+    }, [state, ready, storageKey]);
 
     const addItem = useCallback((data: Omit<GenericInventoryItem, "id" | "createdAt" | "updatedAt">): string => {
       const id = uuid();
