@@ -6,15 +6,22 @@ import { CocktailFeatureProviders } from "@/components/providers/CocktailFeature
 import { WineFeatureProviders } from "@/components/providers/WineFeatureProviders";
 import { LabFeatureProviders } from "@/components/providers/LabFeatureProviders";
 import { FoodFeatureProviders } from "@/components/providers/FoodFeatureProviders";
-import { StoreFeatureProviders } from "@/components/providers/StoreFeatureProviders";
-import { StoreReportReadModelProvider } from "@/components/providers/StoreReportReadModelProvider";
+import {
+  StoreAllFeatureProviders,
+  StoreInventoryDeepLinkProviders,
+  StoreLaborProviders,
+  StorePettyProviders,
+  StoreReportImportProviders,
+  StoreReportProviders,
+  StoreShopProviders,
+} from "@/components/providers/StoreTabProviders";
 
 const PROVIDERS: Record<Exclude<FeatureBoundary, "all" | "core">, ComponentType<{ children: ReactNode }>> = {
   cocktail: CocktailFeatureProviders,
   wine: WineFeatureProviders,
   lab: LabFeatureProviders,
   food: FoodFeatureProviders,
-  store: StoreFeatureProviders,
+  store: StoreAllFeatureProviders,
 };
 
 function AllFeatureProviders({ children }: { children: ReactNode }) {
@@ -23,7 +30,7 @@ function AllFeatureProviders({ children }: { children: ReactNode }) {
       <WineFeatureProviders>
         <LabFeatureProviders>
           <FoodFeatureProviders>
-            <StoreFeatureProviders>{children}</StoreFeatureProviders>
+            <StoreAllFeatureProviders>{children}</StoreAllFeatureProviders>
           </FoodFeatureProviders>
         </LabFeatureProviders>
       </WineFeatureProviders>
@@ -46,8 +53,21 @@ export function AppFeatureBoundary({ children }: { children: ReactNode }) {
   if (boundary === "all") return <AllFeatureProviders>{children}</AllFeatureProviders>;
   if (boundary === "core" || pathname === "/store") return <>{children}</>;
   const Provider = PROVIDERS[boundary];
-  if (pathname === "/monthly-summary" || pathname === "/period-analysis") {
-    return <Provider><StoreReportReadModelProvider>{children}</StoreReportReadModelProvider></Provider>;
+  if (pathname === "/monthly-summary" || pathname === "/period-analysis" || pathname === "/store-accounts" || pathname === "/store-hours") {
+    return <StoreReportProviders>{children}</StoreReportProviders>;
   }
+  if (pathname === "/monthly-report-import" || pathname === "/dish-analysis") {
+    return <StoreReportImportProviders>{children}</StoreReportImportProviders>;
+  }
+  if (pathname.startsWith("/labor")) return <StoreLaborProviders>{children}</StoreLaborProviders>;
+  if (pathname === "/petty-category-settings") return <StorePettyProviders>{children}</StorePettyProviders>;
+  if (
+    pathname.startsWith("/spirits-inventory") || pathname.startsWith("/beer-inventory") ||
+    pathname.startsWith("/ice-inventory") || pathname.startsWith("/fruit-inventory") || pathname.startsWith("/food-inventory")
+  ) return <StoreInventoryDeepLinkProviders>{children}</StoreInventoryDeepLinkProviders>;
+  if (
+    pathname.startsWith("/glassware-inventory") || pathname.startsWith("/tableware-inventory") ||
+    pathname.startsWith("/daily-inventory") || pathname.startsWith("/equipment-inventory")
+  ) return <StoreShopProviders>{children}</StoreShopProviders>;
   return <Provider>{children}</Provider>;
 }

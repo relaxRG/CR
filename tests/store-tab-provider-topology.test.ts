@@ -40,12 +40,17 @@ describe("门店顶级 Tab Provider 拓扑", () => {
     expect(storeScreen).toContain('<StoreTabBoundary tab={effectiveTab}>');
   });
 
-  it("在跨域读写重构完成前明确保留一棵报表兼容事实树，不复制可写 Context", () => {
+  it("报表边界只装配报告自有写模型、受控月结命令与只读跨域投影", () => {
     const report = componentBody("StoreReportProviders");
-    expect(report).toContain("<StoreFeatureProviders>");
+    expect(providersIn("StoreReportProviders")).toEqual([
+      "MonthlyReportProvider", "ScheduleProvider", "PeriodAnalysisProvider", "MonthlySummaryProvider",
+      "ModuleMonthCloseProvider", "ReportMonthCloseProvider", "StoreReportReadModelProvider",
+    ]);
     expect(report).toContain("<StoreReportReadModelProvider>{children}</StoreReportReadModelProvider>");
+    expect(report).not.toContain("StoreFeatureProviders");
     expect(report).not.toContain("<LaborProvider>");
     expect(report).not.toContain("<PettyCashProvider>");
     expect(report).not.toContain("<SpiritsInventoryProvider>");
+    expect(report).not.toContain("<FoodIngredientProvider>");
   });
 });

@@ -34,14 +34,17 @@ describe("功能域 Provider 边界", () => {
     expect(root).not.toContain("<FoodMenuProvider>");
   });
 
-  it("功能域边界按路径条件装配五个 Tab，跨域技术页只走兼容路径", () => {
+  it("功能域边界按路径条件装配五个 Tab，跨域技术页只走唯一事实源组合", () => {
     const boundary = source("components/providers/AppFeatureBoundary.tsx");
 
     expect(boundary).toContain('import { CocktailFeatureProviders }');
     expect(boundary).toContain('import { WineFeatureProviders }');
     expect(boundary).toContain('import { LabFeatureProviders }');
     expect(boundary).toContain('import { FoodFeatureProviders }');
-    expect(boundary).toContain('import { StoreFeatureProviders }');
+    expect(boundary).toContain("StoreAllFeatureProviders");
+    expect(boundary).toContain("StoreReportProviders");
+    expect(boundary).toContain("StoreInventoryDeepLinkProviders");
+    expect(boundary).not.toContain("StoreFeatureProviders");
     expect(boundary).toContain('if (boundary === "all")');
     expect(boundary).toContain('pathname === "/store"');
     expect(boundary).not.toContain("<Suspense");
@@ -56,9 +59,10 @@ describe("功能域 Provider 边界", () => {
     expect(tabBoundary).toContain("lifecycle.current.dispose()");
   });
 
-  it("门店域不持有跨域全局月份，跨域葡萄酒事实由共享内核唯一装配", () => {
-    const store = source("components/providers/StoreFeatureProviders.tsx");
+  it("门店域不持有跨域全局月份，跨域葡萄酒事实仍由共享内核唯一装配", () => {
+    const providers = source("components/providers/StoreTabProviders.tsx");
 
-    expect(store).not.toContain("GlobalBusinessMonthProvider");
+    expect(providers).not.toContain("GlobalBusinessMonthProvider");
+    expect(providers).not.toContain("WineProvider");
   });
 });

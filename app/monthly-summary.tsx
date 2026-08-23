@@ -26,7 +26,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { BoundedBusinessMonthNavigator } from "@/components/months/BoundedBusinessMonthNavigator";
 import { useReportMonthNavigation } from "@/hooks/use-report-month-navigation";
 import { useMonthlySummaryStore } from "@/lib/store/monthly-summary/store";
-import { useMonthCloseStore } from "@/lib/labor/store";
+import { useReportMonthCloseStore } from "@/lib/labor/report-month-close-provider";
 import { useMonthlyReportStore } from "@/lib/store/monthly-report/store";
 import { aggregateMonthlyReport } from "@/lib/store/monthly-summary/aggregator";
 import { buildMonthlySummaryPresentation, hasVisibleMonthlySummaryItems } from "@/lib/store/monthly-summary/presentation";
@@ -317,7 +317,7 @@ export default function MonthlySummaryScreen({ embedded = false }: { embedded?: 
     openAdjustmentSession,
     discardAdjustmentSession,
     applyArchivedSchedule,
-  } = useMonthCloseStore();
+  } = useReportMonthCloseStore();
   const monthlyReportStore = useMonthlyReportStore();
 
   const { month: selectedMonth, bounds: reportMonthBounds, selectMonth: setSelectedMonth } = useReportMonthNavigation();
@@ -921,8 +921,8 @@ export default function MonthlySummaryScreen({ embedded = false }: { embedded?: 
                       (reconfirm ? '将创建新的归档版本，并保留旧版本与差额记录。' : '系统将保存最终排班依据和冻结薪资快照。') + '\\n\\n应发 ¥' + formatMoney(totalGross) + ' · 实发 ¥' + formatMoney(totalFinal) + ' · ' + summary.totalEmployees + ' 人',
                       [
                         { text: '取消', style: 'cancel' },
-                        { text: reconfirm ? '重新归档' : '确认归档', onPress: () => {
-                          const archive = finalizeMonthClose(selectedMonth, summary);
+                        { text: reconfirm ? '重新归档' : '确认归档', onPress: async () => {
+                          const archive = await finalizeMonthClose(selectedMonth, summary);
                           if (archive) Alert.alert('归档完成', '已创建月度归档 v' + archive.version + '。');
                           else Alert.alert('暂不可归档', '请等待排班、员工、考勤和薪资数据加载完成；已冻结月份需先进入差额调整。');
                         } },
@@ -961,7 +961,7 @@ export default function MonthlySummaryScreen({ embedded = false }: { embedded?: 
                           </View>
                           <Text style={{ fontSize: 11, color: colors.muted, marginBottom: 10 }}>修改会与归档 v{currentArchive?.version ?? 1} 对比。放弃调整将恢复打开调整时的排班、考勤和薪资基线。</Text>
                           <View style={{ flexDirection: 'row', gap: 8 }}>
-                            <TouchableOpacity onPress={() => Alert.alert('放弃调整', '将恢复进入调整前的完整月度基线，本次修改不会保留。确认放弃？', [{ text: '取消', style: 'cancel' }, { text: '放弃调整', style: 'destructive', onPress: () => discardAdjustmentSession(selectedMonth) }])} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 9, borderRadius: 8, backgroundColor: colors.border + '44' }}>
+                            <TouchableOpacity onPress={() => Alert.alert('放弃调整', '将恢复进入调整前的完整月度基线，本次修改不会保留。确认放弃？', [{ text: '取消', style: 'cancel' }, { text: '放弃调整', style: 'destructive', onPress: async () => { if (!await discardAdjustmentSession(selectedMonth)) Alert.alert('恢复失败', '无法读取或恢复该月基线，请稍后重试。'); } }])} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 9, borderRadius: 8, backgroundColor: colors.border + '44' }}>
                               <Text style={{ fontSize: 12, fontWeight: '600', color: colors.muted }}>放弃调整</Text>
                             </TouchableOpacity>
                             <TouchableOpacity onPress={() => finalize(true)} style={{ flex: 1.3, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 9, borderRadius: 8, backgroundColor: colors.warning }}>
@@ -1311,8 +1311,9 @@ export default function MonthlySummaryScreen({ embedded = false }: { embedded?: 
                   {getMonthCloseStatus(selectedMonth) === "adjusting" && archive.status === "frozen" ? (
                     <TouchableOpacity onPress={() => Alert.alert("应用归档排班", `将归档 v${archive.version} 的完整排班覆盖当前调整草稿；此操作会触发重新计算。确认继续？`, [
                       { text: "取消", style: "cancel" },
-                      { text: "应用归档排班", onPress: () => {
-                        if (applyArchivedSchedule(selectedMonth, archive.id)) Alert.alert("已应用", "归档排班已应用到调整草稿，请核对差额后重新归档。");
+                      { text: "应用归档排班", onPress: async () => {
+                        if (await applyArchivedSchedule(selectedMonth, archive.id)) Alert.alert("已应用", "归档排班已应用到调整草稿，请核对差额后重新归档。");
+                        else Alert.alert("应用失败", "当前没有可用调整草稿或排班事实未能读取，请稍后重试。");
                       } },
                     ])} style={{ marginTop: 10, alignItems: "center", paddingVertical: 8, borderRadius: 8, backgroundColor: colors.primary + "12", borderWidth: 1, borderColor: colors.primary + "33" }}>
                       <Text style={{ fontSize: 12, fontWeight: "600", color: colors.primary }}>应用此归档排班到调整草稿</Text>
@@ -1335,11 +1336,11 @@ export default function MonthlySummaryScreen({ embedded = false }: { embedded?: 
             <TextInput value={adjustmentReason} onChangeText={setAdjustmentReason} placeholder="例如：漏录 7 月 14 日班次" placeholderTextColor={colors.muted} multiline style={{ minHeight: 72, borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 10, color: colors.foreground, textAlignVertical: "top" }} />
             <View style={{ flexDirection: "row", gap: 10 }}>
               <TouchableOpacity onPress={() => setShowAdjustmentModal(false)} style={{ flex: 1, alignItems: "center", paddingVertical: 11, borderRadius: 10, backgroundColor: colors.border + "44" }}><Text style={{ color: colors.foreground, fontWeight: "600" }}>取消</Text></TouchableOpacity>
-              <TouchableOpacity onPress={() => {
+              <TouchableOpacity onPress={async () => {
                 const reason = adjustmentReason.trim();
                 if (!reason) { Alert.alert("请填写调整原因", "冻结月调整必须留下审计原因。"); return; }
-                const session = openAdjustmentSession(selectedMonth, reason, "next_month");
-                if (!session) { Alert.alert("无法进入调整", "本月没有当前正式归档，或已有未完成的调整会话。"); return; }
+                const session = await openAdjustmentSession(selectedMonth, reason, "next_month");
+                if (!session) { Alert.alert("无法进入调整", "本月没有当前正式归档、已有未完成的调整会话，或人力事实未能读取。"); return; }
                 setShowAdjustmentModal(false);
                 Alert.alert("已进入差额调整", `基于归档 v${session.baseVersion} 创建调整草稿。`);
               }} style={{ flex: 1.2, alignItems: "center", paddingVertical: 11, borderRadius: 10, backgroundColor: colors.warning }}><Text style={{ color: "#fff", fontWeight: "700" }}>确认进入</Text></TouchableOpacity>

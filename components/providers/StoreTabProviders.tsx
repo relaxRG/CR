@@ -14,7 +14,14 @@ import { DailyInventoryProvider } from "@/lib/daily/inventory-store";
 import { EquipmentInventoryProvider } from "@/lib/equipment/inventory-store";
 import { LaborProvider } from "@/lib/labor/store";
 import { SalaryAdvanceCategoryProvider, SalaryAdvanceProvider } from "@/lib/labor/advance-store";
-import { StoreFeatureProviders } from "./StoreFeatureProviders";
+import { MonthlyReportProvider } from "@/lib/store/monthly-report/store";
+import { ScheduleProvider } from "@/lib/store/period-analysis/schedule-store";
+import { PeriodAnalysisProvider } from "@/lib/store/period-analysis/store";
+import { MonthlySummaryProvider } from "@/lib/store/monthly-summary/store";
+import { ModuleMonthCloseProvider } from "@/lib/month-close/module-month-close-store";
+import { RawExcelArchiveProvider } from "@/lib/store/monthly-report/raw-excel-archive-store";
+import { DishAnalysisProvider } from "@/lib/store/monthly-report/dish-analysis-store";
+import { ReportMonthCloseProvider } from "@/lib/labor/report-month-close-provider";
 import { StoreReportReadModelProvider } from "./StoreReportReadModelProvider";
 
 export type StoreTabKey = "monthly" | "labor" | "petty" | "inventory" | "shop";
@@ -57,6 +64,14 @@ export function StoreInventoryProviders({ children }: { children: ReactNode }) {
   );
 }
 
+export function StoreInventoryDeepLinkProviders({ children }: { children: ReactNode }) {
+  return (
+    <ModuleMonthCloseProvider>
+      <StoreInventoryProviders>{children}</StoreInventoryProviders>
+    </ModuleMonthCloseProvider>
+  );
+}
+
 export function StoreLaborProviders({ children }: { children: ReactNode }) {
   return (
     <LaborProvider>
@@ -68,14 +83,55 @@ export function StoreLaborProviders({ children }: { children: ReactNode }) {
 }
 
 /**
- * 报表迁移期兼容装配。月报与时段分析仍有跨域 Context 读写路径；在它们全部改为
- * 只读快照和报告自有命令前，保留一棵事实树而不是复制任一可写 Provider。
- * StoreTabBoundary 的 key 仍保证离开报表时完整卸载该树。
+ * 报表边界只装配报告自有写模型、受控月结命令与只读跨域物化视图。
+ * 它不挂载人力、备用金、库存、采购或店铺的可写事实 Provider；离开报表时由 Tab key 完整卸载。
  */
+export function StoreAllFeatureProviders({ children }: { children: ReactNode }) {
+  return (
+    <RawExcelArchiveProvider>
+      <DishAnalysisProvider>
+        <StoreReportProviders>
+          <StoreLaborProviders>
+            <StorePettyProviders>
+              <StoreInventoryProviders>
+                <StoreShopProviders>{children}</StoreShopProviders>
+              </StoreInventoryProviders>
+            </StorePettyProviders>
+          </StoreLaborProviders>
+        </StoreReportProviders>
+      </DishAnalysisProvider>
+    </RawExcelArchiveProvider>
+  );
+}
+
+export function StoreReportImportProviders({ children }: { children: ReactNode }) {
+  return (
+    <MonthlyReportProvider>
+      <RawExcelArchiveProvider>
+        <DishAnalysisProvider>
+          <ScheduleProvider>
+            <PeriodAnalysisProvider>{children}</PeriodAnalysisProvider>
+          </ScheduleProvider>
+        </DishAnalysisProvider>
+      </RawExcelArchiveProvider>
+    </MonthlyReportProvider>
+  );
+}
+
 export function StoreReportProviders({ children }: { children: ReactNode }) {
   return (
-    <StoreFeatureProviders>
-      <StoreReportReadModelProvider>{children}</StoreReportReadModelProvider>
-    </StoreFeatureProviders>
+    <MonthlyReportProvider>
+      <ScheduleProvider>
+        <PeriodAnalysisProvider>
+          <MonthlySummaryProvider>
+            <ModuleMonthCloseProvider>
+              <ReportMonthCloseProvider>
+                <StoreReportReadModelProvider>{children}</StoreReportReadModelProvider>
+              </ReportMonthCloseProvider>
+            </ModuleMonthCloseProvider>
+          </MonthlySummaryProvider>
+        </PeriodAnalysisProvider>
+      </ScheduleProvider>
+    </MonthlyReportProvider>
   );
 }
