@@ -1,0 +1,57 @@
+{
+  "annotations": {"list": [{"builtIn": 1, "enable": true, "hide": true, "iconColor": "rgba(0, 211, 255, 1)", "name": "Annotations & Alerts", "type": "dashboard"}]},
+  "editable": true,
+  "panels": [
+    {
+      "type": "stat", "title": "付款金额不平（笔）", "id": 1,
+      "targets": [{"expr": "count(cocktail_finance_payment_amount_minor != (cocktail_finance_payment_allocated_minor + cocktail_finance_payment_credit_minor))", "refId": "A"}],
+      "fieldConfig": {"defaults": {"thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}, "unit": "none"}}
+    },
+    {
+      "type": "stat", "title": "分类成本拆分差额", "id": 2,
+      "targets": [{"expr": "sum(abs(cocktail_finance_product_class_split_delta_minor))", "refId": "A"}],
+      "fieldConfig": {"defaults": {"thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}, "unit": "currencyCNY"}}
+    },
+    {
+      "type": "timeseries", "title": "统一付款：付款、已分配、预付款余额", "id": 3,
+      "targets": [
+        {"expr": "sum by (supplier_id) (cocktail_finance_payment_amount_minor) / 100", "legendFormat": "付款 {{supplier_id}}", "refId": "A"},
+        {"expr": "sum by (supplier_id) (cocktail_finance_payment_allocated_minor) / 100", "legendFormat": "已分配 {{supplier_id}}", "refId": "B"},
+        {"expr": "sum by (supplier_id) (cocktail_finance_payment_credit_minor) / 100", "legendFormat": "预付款 {{supplier_id}}", "refId": "C"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "currencyCNY"}},
+      "options": {"legend": {"displayMode": "table", "placement": "bottom"}}
+    },
+    {
+      "type": "timeseries", "title": "烈酒内分类成本：啤酒与非啤酒烈酒", "id": 4,
+      "targets": [
+        {"expr": "sum by (month) (cocktail_finance_purchase_cost_minor{product_class=\"beer\"}) / 100", "legendFormat": "啤酒 {{month}}", "refId": "A"},
+        {"expr": "sum by (month) (cocktail_finance_purchase_cost_minor{product_class=\"spirit\"}) / 100", "legendFormat": "非啤酒烈酒 {{month}}", "refId": "B"},
+        {"expr": "sum by (month) (cocktail_finance_purchase_cost_minor{product_class=\"unresolved\"}) / 100", "legendFormat": "待确认 {{month}}", "refId": "C"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "currencyCNY"}},
+      "options": {"legend": {"displayMode": "table", "placement": "bottom"}}
+    },
+    {
+      "type": "table", "title": "待人工处理的财务异常", "id": 5,
+      "targets": [{"expr": "cocktail_finance_open_alerts", "format": "table", "instant": true, "refId": "A"}],
+      "options": {"showHeader": true}
+    },
+    {
+      "type": "stat", "title": "待确认分类占比", "id": 6,
+      "targets": [{"expr": "sum(cocktail_finance_unresolved_product_class_amount_minor) / clamp_min(sum(cocktail_finance_total_spirits_purchase_amount_minor), 1)", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "percentunit", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 0.02}, {"color": "red", "value": 0.05}]}}}
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["finance", "spirits", "payment-reconciliation"],
+  "templating": {"list": [
+    {"name": "supplier_id", "type": "query", "datasource": "Prometheus", "query": "label_values(cocktail_finance_payment_amount_minor, supplier_id)", "includeAll": true, "multi": true},
+    {"name": "month", "type": "query", "datasource": "Prometheus", "query": "label_values(cocktail_finance_purchase_cost_minor, month)", "includeAll": true, "multi": true}
+  ]},
+  "time": {"from": "now-30d", "to": "now"},
+  "title": "Cocktail R · 付款与啤酒成本完整性",
+  "uid": "cocktail-r-payment-finance-integrity",
+  "version": 1
+}

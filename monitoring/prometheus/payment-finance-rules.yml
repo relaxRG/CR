@@ -1,0 +1,110 @@
+groups:
+  - name: cocktail_r_finance_invariants
+    interval: 30s
+    rules:
+      - alert: SupplierPaymentAmountImbalance
+        expr: |
+          sum by (group_id, supplier_id, payment_id) (cocktail_finance_payment_amount_minor)
+          !=
+          (
+            sum by (group_id, supplier_id, payment_id) (cocktail_finance_payment_allocated_minor)
+            + sum by (group_id, supplier_id, payment_id) (cocktail_finance_payment_credit_minor)
+          )
+        for: 0m
+        labels:
+          severity: critical
+          domain: finance
+          rule_id: PAY-001
+          action: block_write
+        annotations:
+          summary: "供应商付款金额不平"
+          description: "付款 {{ $labels.payment_id }} 的支付金额与已分配加预付款余额不一致，差额={{ $value }}（最小货币单位）。禁止继续核销并执行人工对账。"
+          runbook_url: "https://ops.example.invalid/runbooks/payment-imbalance"
+
+      - alert: PurchaseOverSettlement
+        expr: cocktail_finance_purchase_settlement_delta_minor > 0
+        for: 0m
+        labels:
+          severity: critical
+          domain: finance
+          rule_id: PAY-002
+          action: block_write
+        annotations:
+          summary: "采购行超核销"
+          description: "采购行 {{ $labels.purchase_id }} 已核销金额超过采购金额，超额={{ $value }}（最小货币单位）。"
+          runbook_url: "https://ops.example.invalid/runbooks/purchase-over-settlement"
+
+      - alert: SupplierCreditNegative
+        expr: cocktail_finance_supplier_credit_available_minor < 0
+        for: 0m
+        labels:
+          severity: critical
+          domain: finance
+          rule_id: PAY-003
+          action: block_write
+        annotations:
+          summary: "供货商预付款余额为负"
+          description: "供货商 {{ $labels.supplier_id }} 的预付款余额为负：{{ $value }}。请冻结预付款抵扣并审计并发/重复核销。"
+
+      - alert: NetworkPurchaseMissingPettyCashProof
+        expr: cocktail_finance_unresolved_petty_purchase_count > 0
+        for: 15m
+        labels:
+          severity: high
+          domain: finance
+          rule_id: PAY-006
+          action: require_review
+        annotations:
+          summary: "网络采购缺少备用金凭证"
+          description: "供货商 {{ $labels.supplier_id }} 有 {{ $value }} 笔网络采购尚未关联备用金凭证；不得展示为已付款。"
+
+      - alert: BeerCostSplitImbalance
+        expr: cocktail_finance_product_class_split_delta_minor != 0
+        for: 0m
+        labels:
+          severity: critical
+          domain: inventory
+          rule_id: BEER-002
+          action: quarantine_projection
+        annotations:
+          summary: "啤酒/烈酒分类成本拆分不守恒"
+          description: "月份 {{ $labels.month }}、供货商 {{ $labels.supplier_id }} 的啤酒 + 非啤酒烈酒 + 待确认金额与烈酒采购总额不一致，差额={{ $value }}。隔离分类月报投影。"
+          runbook_url: "https://ops.example.invalid/runbooks/beer-cost-split"
+
+      - alert: BeerCostMixedIntoSpiritProjection
+        expr: cocktail_finance_beer_cost_mixed_into_spirit_projection_count > 0
+        for: 0m
+        labels:
+          severity: critical
+          domain: inventory
+          rule_id: BEER-003
+          action: quarantine_projection
+        annotations:
+          summary: "啤酒成本混入非啤酒烈酒投影"
+          description: "月份 {{ $labels.month }} 检测到 {{ $value }} 行啤酒采购被聚合到非啤酒烈酒成本。"
+
+      - alert: UnresolvedBeerClassificationHigh
+        expr: |
+          cocktail_finance_unresolved_product_class_amount_minor
+          / clamp_min(cocktail_finance_total_spirits_purchase_amount_minor, 1) > 0.02
+        for: 24h
+        labels:
+          severity: warning
+          domain: inventory
+          rule_id: BEER-007
+          action: require_review
+        annotations:
+          summary: "历史采购分类待确认金额偏高"
+          description: "月份 {{ $labels.month }} 待确认分类金额占烈酒采购金额超过 2%，当前比例={{ $value | humanizePercentage }}。"
+
+      - alert: FinanceReportProjectionStale
+        expr: cocktail_finance_report_projection_revision_lag > 0
+        for: 15m
+        labels:
+          severity: warning
+          domain: finance
+          rule_id: BEER-006
+          action: observe
+        annotations:
+          summary: "付款/分类月报投影滞后"
+          description: "月份 {{ $labels.month }} 的月报投影 revision 落后于采购或付款事实 {{ $value }} 个版本。"
