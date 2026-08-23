@@ -388,6 +388,8 @@ export type SyncConflict = {
 };
 
 const dirtyKeys = new Set<string>();
+/** 最近一次由云端精确写入的业务值。用于阻止 Provider reload 后的等值回写重新进入脏键队列。 */
+const remoteAppliedValues = new Map<string, string>();
 let pushTimer: ReturnType<typeof setTimeout> | null = null;
 let pushFn: PushFn | null = null;
 let syncEnabled = false;
@@ -677,13 +679,16 @@ export async function restoreFromBackup(): Promise<boolean> {
     const raw = await AsyncStorage.getItem(BACKUP_KEY);
     if (!raw) return false;
     const backup: { time: number; data: Record<string, string | null> } = JSON.parse(raw);
+    const restoredBusinessKeys: string[] = [];
     for (const [key, value] of Object.entries(backup.data)) {
       if (value != null) {
         await AsyncStorage.setItem(key, value);
+        if ((SYNC_KEYS as readonly string[]).includes(key)) restoredBusinessKeys.push(key);
       } else {
         await AsyncStorage.removeItem(key);
       }
     }
+    restoredBusinessKeys.forEach((key) => notifySyncChange(key));
     triggerStoreReload();
     await appendLog({
       time: Date.now(),
@@ -721,11 +726,7 @@ export function clearSyncError(): void {
   setState({ error: null });
 }
 
-/** store 持久化后调用：标记键为脏并调度推送 */
-export function notifySyncChange(key: string) {
-  if (!(SYNC_KEYS as readonly string[]).includes(key)) return;
-  // 跨组水合期间，任何陈旧Store闭包都不得更新时间戳或进入B组脏键队列。
-  if (groupSwitchBarrier) return;
+function markSyncKeyDirty(key: string): void {
   const now = Date.now();
   AsyncStorage.setItem(TS_PREFIX + key, String(now)).catch(() => {});
   if (!syncEnabled || !pushFn) return;
@@ -735,6 +736,32 @@ export function notifySyncChange(key: string) {
   pushTimer = setTimeout(() => {
     void flushDirtyKeys();
   }, 3000);
+}
+
+/**
+ * store 持久化后调用：标记键为脏并调度推送。
+ * 若 Provider 仅把刚从云端加载的完全相同值再写入本地，则这不是用户变更，必须忽略。
+ */
+export function notifySyncChange(key: string) {
+  if (!(SYNC_KEYS as readonly string[]).includes(key)) return;
+  // 跨组水合期间，任何陈旧Store闭包都不得更新时间戳或进入B组脏键队列。
+  if (groupSwitchBarrier) return;
+  const remoteValue = remoteAppliedValues.get(key);
+  if (remoteValue === undefined) {
+    markSyncKeyDirty(key);
+    return;
+  }
+  void AsyncStorage.getItem(key)
+    .then((currentValue) => {
+      if (currentValue === remoteValue) return;
+      remoteAppliedValues.delete(key);
+      markSyncKeyDirty(key);
+    })
+    .catch(() => {
+      // 无法验证当前值时宁可保留真实用户写入，避免静默丢失业务修改。
+      remoteAppliedValues.delete(key);
+      markSyncKeyDirty(key);
+    });
 }
 
 async function flushDirtyKeys() {
@@ -927,7 +954,13 @@ export async function runInitialSync(
       }
     }
 
-    if (pullWrites.length > 0) await AsyncStorage.multiSet(pullWrites);
+    if (pullWrites.length > 0) {
+      await AsyncStorage.multiSet(pullWrites);
+      for (const key of pulledKeys) {
+        const value = pullWrites.find(([writtenKey]) => writtenKey === key)?.[1];
+        if (value !== undefined) remoteAppliedValues.set(key, value);
+      }
+    }
 
     if (toUpload.length > 0) {
       for (let i = 0; i < toUpload.length; i += 8) {
@@ -985,6 +1018,7 @@ export async function resolveConflict(
       : conflict.remoteValue;
     await AsyncStorage.setItem(conflict.storageKey, valueToWrite);
     await AsyncStorage.setItem(TS_PREFIX + conflict.storageKey, String(conflict.remoteTs));
+    remoteAppliedValues.set(conflict.storageKey, valueToWrite);
     if (PREFS_MERGE_KEYS.has(conflict.storageKey)) {
       const { merged, changed } = mergePrefs(conflict.localValue, conflict.remoteValue);
       if (changed) {
@@ -1045,6 +1079,12 @@ export async function resolveAllConflicts(
     // 将需要 push 的 prefs merge 条目合并为一次请求
     if (prefsMergeEntries.length > 0) {
       void push(prefsMergeEntries.map((e) => ({ ...e, clientUpdatedAt: now }))).catch(() => {});
+    }
+    for (const conflict of conflicts) {
+      const appliedValue = PREFS_MERGE_KEYS.has(conflict.storageKey)
+        ? mergePrefs(conflict.localValue, conflict.remoteValue).merged
+        : conflict.remoteValue;
+      remoteAppliedValues.set(conflict.storageKey, appliedValue);
     }
     // 只触发一次 Store 重载（而非 N 次）
     triggerStoreReload();

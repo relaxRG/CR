@@ -13,7 +13,9 @@ describe("启动与同步性能护栏", () => {
     expect(engine).toContain("const pairs = await AsyncStorage.multiGet([...SYNC_KEYS])");
     expect(runInitialSync).toContain("const localSnapshot = await readLocalSyncSnapshot()");
     expect(runInitialSync).not.toContain("await AsyncStorage.getItem(key)");
-    expect(runInitialSync).toContain("if (pullWrites.length > 0) await AsyncStorage.multiSet(pullWrites)");
+    expect(runInitialSync).toContain("if (pullWrites.length > 0) {");
+    expect(runInitialSync).toContain("await AsyncStorage.multiSet(pullWrites);");
+    expect(runInitialSync).toContain("remoteAppliedValues.set(key, value);");
   });
 
   it("根布局把退役迁移安排在首轮交互完成后串行执行，不再在首屏并行竞争 I/O", () => {

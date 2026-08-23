@@ -54,6 +54,39 @@ describe("全App共享事实同步覆盖", () => {
     expect(separatePayments).toContain("registerStoreReload");
   });
 
+  it("烈酒本月进货和库存分类均为受管共享事实，写入后通知同步且远端重载不回推", () => {
+    const syncKeys = new Set<string>(SYNC_KEYS);
+    const contract = FEATURE_CONTRACTS.find((item) => item.id === "inventory.spirits");
+    const spirits = source("lib/spirits/crud-store.tsx");
+
+    for (const key of ["spirits.purchases.v3", "spirits.customCategories.v1"] as const) {
+      expect(syncKeys.has(key)).toBe(true);
+      expect(contract?.storageKeys).toContain(key);
+      expect(STORAGE_POLICY[key]).toEqual(expect.objectContaining({
+        read: "inventory_spirits.view",
+        write: expect.any(String),
+      }));
+    }
+    expect(spirits).toContain("registerStoreReload(() => { void load(); })");
+    expect(spirits).toContain("skipNextPersistenceRef.current = true;");
+    expect(spirits).toContain("[PURCHASES_KEY, JSON.stringify(state.purchases)]");
+    expect(spirits).toContain("[CUSTOM_CATEGORIES_KEY, JSON.stringify(state.customCategories)]");
+    expect(spirits).toContain(".then(() => entries.forEach(([key]) => notifySyncChange(key)))");
+  });
+
+  it("瓶库样式、供应商匹配记忆、薪资设置与备份恢复的直接共享写入均通知同步", () => {
+    const taxonomy = source("lib/bottles/taxonomy.tsx");
+    const supplierImport = source("lib/store/supplier-import.ts");
+    const labor = source("lib/labor/store.tsx");
+    const engine = source("lib/sync/engine.ts");
+
+    expect(taxonomy).toContain(".then(() => notifySyncChange(STYLES_KEY))");
+    expect(supplierImport).toContain("notifySyncChange(MATCH_MEMORY_KEY)");
+    expect(labor).toContain("return registerStoreReload(() => { void load(); });");
+    expect(labor).toContain(".then(() => notifySyncChange(key))");
+    expect(engine).toContain("restoredBusinessKeys.forEach((key) => notifySyncChange(key))");
+  });
+
   it("旧营业时间数据只迁移到唯一共享设置键，保留周序、跨日关门和预警字段", () => {
     const migrated = migrateLegacyStoreHours(JSON.stringify({
       days: [

@@ -579,17 +579,22 @@ export function BottleTaxonomyProvider({ children }: { children: React.ReactNode
           const v9 = migrateCategoriesV9(v8.next);
           const v10 = migrateCategoriesV10(v9.next);
           setCategories(v10.next);
-          if (v7.changed || v8.changed || v9.changed || v10.changed)
-            AsyncStorage.setItem(CATS_KEY, JSON.stringify(v10.next)).catch(() => {});
-          notifySyncChange(CATS_KEY);
+          if (v7.changed || v8.changed || v9.changed || v10.changed) {
+            void AsyncStorage.setItem(CATS_KEY, JSON.stringify(v10.next))
+              .then(() => notifySyncChange(CATS_KEY))
+              .catch(() => {});
+          }
         }
         if (rawS) {
           const parsedS: BottleStyleDef[] = JSON.parse(rawS);
           const v8s = migrateStylesV8(parsedS);
           const v9s = migrateStylesV9(v8s.next);
           setStyles(v9s.next);
-          if (v8s.changed || v9s.changed)
-            AsyncStorage.setItem(STYLES_KEY, JSON.stringify(v9s.next)).catch(() => {});
+          if (v8s.changed || v9s.changed) {
+            void AsyncStorage.setItem(STYLES_KEY, JSON.stringify(v9s.next))
+              .then(() => notifySyncChange(STYLES_KEY))
+              .catch(() => {});
+          }
         }
       } catch (e) {
         console.warn("Failed to load bottle taxonomy", e);

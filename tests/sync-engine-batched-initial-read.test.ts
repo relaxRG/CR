@@ -17,7 +17,7 @@ const { storage, storageApi } = vi.hoisted(() => {
 
 vi.mock("@react-native-async-storage/async-storage", () => ({ default: storageApi }));
 
-import { SYNC_KEYS, backupLocalData, runInitialSync } from "@/lib/sync/engine";
+import { SYNC_KEYS, backupLocalData, notifySyncChange, runInitialSync } from "@/lib/sync/engine";
 
 describe("首次同步批量 I/O", () => {
   beforeEach(() => {
@@ -38,6 +38,28 @@ describe("首次同步批量 I/O", () => {
     ]));
     expect(storageApi.multiGet.mock.calls[0][0]).toHaveLength(SYNC_KEYS.length * 2);
     expect(push).toHaveBeenCalledWith([expect.objectContaining({ storageKey: "cocktail.recipes", clientUpdatedAt: 1800000000000 })]);
+  });
+
+  it("远端事实被Store等值回写时不重新标脏或更新时间戳", async () => {
+    const remoteValue = JSON.stringify([{ id: "remote-revenue", amount: 100 }]);
+    const remoteTs = 1_800_000_000_000;
+
+    await runInitialSync([{ storageKey: "store.revenue.v1", value: remoteValue, clientUpdatedAt: remoteTs }], vi.fn());
+    expect(storage.get("store.revenue.v1")).toBe(remoteValue);
+    expect(storage.get("sync.ts.store.revenue.v1")).toBe(String(remoteTs));
+
+    notifySyncChange("store.revenue.v1");
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(storage.get("sync.ts.store.revenue.v1")).toBe(String(remoteTs));
+
+    storage.set("store.revenue.v1", JSON.stringify([{ id: "user-revenue", amount: 120 }]));
+    notifySyncChange("store.revenue.v1");
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(storage.get("sync.ts.store.revenue.v1")).not.toBe(String(remoteTs));
   });
 
   it("自动备份同样以一次 multiGet 采集全部业务键，保留完整可恢复快照", async () => {

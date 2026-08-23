@@ -10,6 +10,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { FoodIngredient } from "@/lib/food/types";
 import { normalizeImportDate } from "@/lib/import/date-utils";
+import { notifySyncChange } from "@/lib/sync/engine";
 
 // ─── 常量 ─────────────────────────────────────────────────────────────────────
 
@@ -119,6 +120,7 @@ export async function loadMatchMemory(): Promise<Record<string, string>> {
 /** 保存匹配记忆（rawName → ingredientId） */
 export async function saveMatchMemory(memory: Record<string, string>): Promise<void> {
   await AsyncStorage.setItem(MATCH_MEMORY_KEY, JSON.stringify(memory));
+  notifySyncChange(MATCH_MEMORY_KEY);
 }
 
 /** 更新单条记忆 */

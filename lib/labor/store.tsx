@@ -76,18 +76,22 @@ function usePersistedValue<T>(key: string, defaultValue: T) {
   const ref = useRef<T>(defaultValue);
 
   useEffect(() => {
-    AsyncStorage.getItem(key).then((raw) => {
+    const load = () => AsyncStorage.getItem(key).then((raw) => {
       if (raw) {
         try { const parsed = JSON.parse(raw) as T; ref.current = parsed; setData(parsed); } catch {}
       }
       setReady(true);
     });
+    void load();
+    return registerStoreReload(() => { void load(); });
   }, [key]);
 
   const persist = useCallback((next: T) => {
     ref.current = next;
     setData(next);
-    AsyncStorage.setItem(key, JSON.stringify(next)).catch(console.error);
+    void AsyncStorage.setItem(key, JSON.stringify(next))
+      .then(() => notifySyncChange(key))
+      .catch(console.error);
   }, [key]);
 
   return { data, ref, persist, ready };
