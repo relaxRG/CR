@@ -145,15 +145,25 @@ export default function StoreAnalyticsScreen({ embedded = false }: { embedded?: 
     return { start: parseDate(customStart), end: parseDate(customEnd) };
   }, [mode, selectedDay, reportMonth, selectedYear, customStart, customEnd]);
   const previousRange = useMemo(() => prevRange(mode, selectedDay, reportMonth, selectedYear, customStart, customEnd), [mode, selectedDay, reportMonth, selectedYear, customStart, customEnd]);
-  const calcSummary = (start: Date, end: Date) => {
-    const map: Partial<Record<RevenueCategory, number>> = {};
-    records.filter((r) => { const d = new Date(r.date); return d >= start && d <= end; }).forEach((r) => { map[r.category] = (map[r.category] ?? 0) + r.amount; });
-    const pettyTotal = pettyRecords.filter((r) => { const d = new Date(r.date); return d >= start && d <= end; }).reduce((s, r) => s + r.amount, 0);
-    map.petty_cash = (map.petty_cash ?? 0) + pettyTotal;
-    return map;
-  };
-  const cur = useMemo(() => calcSummary(currentRange.start, currentRange.end), [records, pettyRecords, currentRange]);
-  const prev = useMemo(() => calcSummary(previousRange.start, previousRange.end), [records, pettyRecords, previousRange]);
+  const { cur, prev } = useMemo(() => {
+    const current: Partial<Record<RevenueCategory, number>> = {};
+    const previous: Partial<Record<RevenueCategory, number>> = {};
+    const add = (target: Partial<Record<RevenueCategory, number>>, category: RevenueCategory, amount: number) => {
+      target[category] = (target[category] ?? 0) + amount;
+    };
+    const inRange = (date: Date, range: { start: Date; end: Date }) => date >= range.start && date <= range.end;
+    records.forEach((record) => {
+      const date = new Date(record.date);
+      if (inRange(date, currentRange)) add(current, record.category, record.amount);
+      if (compare === "prev" && inRange(date, previousRange)) add(previous, record.category, record.amount);
+    });
+    pettyRecords.forEach((record) => {
+      const date = new Date(record.date);
+      if (inRange(date, currentRange)) add(current, "petty_cash", record.amount);
+      if (compare === "prev" && inRange(date, previousRange)) add(previous, "petty_cash", record.amount);
+    });
+    return { cur: current, prev: previous };
+  }, [compare, currentRange, pettyRecords, previousRange, records]);
   const totalRevCur = cur.revenue ?? 0;
   const totalCostCur = Object.entries(cur).filter(([k]) => k !== "revenue").reduce((s, [, v]) => s + (v ?? 0), 0);
   const profitCur = totalRevCur - totalCostCur;

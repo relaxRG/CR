@@ -40,7 +40,7 @@ import {
   planCompOffBalanceConsumption,
 } from "@/lib/labor/comp-off-settlement";
 import {
-  Alert, Clipboard, Modal, Platform, Pressable, ScrollView,
+  Alert, Clipboard, InteractionManager, Modal, Platform, Pressable, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions, KeyboardAvoidingView} from "react-native";
 import * as Haptics from "expo-haptics";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -253,7 +253,7 @@ function OverviewCard({ month, colors }: { month: string; colors: any }) {
 }
 
 // ─── 个人发薪卡片（嵌入员工档案页） ──────────────────────────────────────────
-function PaySlipMiniCard({ employee, month, colors, slip, att }: {
+function PaySlipMiniCard({ employee, month, colors, slip, att, compOffSummary, restAlert }: {
   employee: Employee;
   month: string;
   compareMonth: string | null;
@@ -262,14 +262,14 @@ function PaySlipMiniCard({ employee, month, colors, slip, att }: {
   slip: PaySlip | null;
   att: MonthlyAttendance | null;
   compareSlip: PaySlip | null;
+  compOffSummary: { overtimeAvailable: number; holidayAvailable: number };
+  restAlert: { resolution: string; unexplainedDays: number } | null;
 }) {
   usePaySlipStore();
   useGlobalPayrollSettingsStore();
   useSalaryAdvanceStore();
-  // 直接订阅 entries 响应式 state，避免通过 getXxx 读 ref.current
   const { entries: compOffEntries, addEntry: addCompOffEntry, updateEntry: updateCompOffEntry, getEntries: getCompOffEntries, cashOutEntry: cashOutCompOff } = useCompOffBalanceEntryStore();
-  // 直接订阅 alerts 响应式 state，避免通过 getAlert 读 ref.current
-  const { alerts, resolveAlert } = useUnexplainedRestAlertStore();
+  const { resolveAlert } = useUnexplainedRestAlertStore();
   const router = useRouter();
   const payrollEditAccess = useCan("payroll.edit");
   const { getStatus: getMonthCloseStatus, isMonthWritable: isMonthWritableForCard } = useMonthCloseStore();
@@ -310,26 +310,10 @@ function PaySlipMiniCard({ employee, month, colors, slip, att }: {
   }, [att?.attendanceDays, employee, getMonthCloseStatus, month, slip]);
   const payrollReconciliation = useMemo(() => slip ? reconcilePaySlip(slip) : null, [slip]);
 
-  // 换休余额（useMemo 避免每次渲染对全量 entries 重复 filter/reduce）
-  const compOffDays = useMemo(() =>
-    compOffEntries
-      .filter((e) => e.employeeId === employee.id && e.source === "overtime" && e.status === "available" && e.expiresMonth >= month)
-      .reduce((sum, e) => sum + e.days, 0),
-    [compOffEntries, employee.id, month]
-  );
-  const holidayCompOffDays = useMemo(() =>
-    compOffEntries
-      .filter((e) => e.employeeId === employee.id && e.source === "holiday" && e.status === "available" && e.expiresMonth >= month)
-      .reduce((sum, e) => sum + e.days, 0),
-    [compOffEntries, employee.id, month]
-  );
+  // 收起态高频展示的余额与异常提醒由父级一次遍历汇总后传入，避免员工卡片重复扫描全量流水。
+  const compOffDays = compOffSummary.overtimeAvailable;
+  const holidayCompOffDays = compOffSummary.holidayAvailable;
   const totalCompOffDays = compOffDays + holidayCompOffDays;
-
-  // 无来源多休提醒（useMemo 避免每次渲染对全量 alerts 重复 find）
-  const restAlert = useMemo(() =>
-    alerts.find((a) => a.employeeId === employee.id && a.month === month) ?? null,
-    [alerts, employee.id, month]
-  );
 
   // ── 增加：按加班小时存入 ──
   const handleAddByHours = () => {
@@ -931,11 +915,12 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
   const rosterInsets = useSafeAreaInsets();
   const { employees } = useEmployeeStore();
   const { templates: shiftTemplates } = useShiftTemplateStore();
-  const { paySlips, buildPaySlipDraft, upsertPaySlip, replaceMonthPaySlips } = usePaySlipStore();
+  const { paySlips, buildPaySlipDraft, replaceMonthPaySlips } = usePaySlipStore();
   const { records: attendances } = useAttendanceStore();
   const { advances } = useSalaryAdvanceStore();
   const { settings: globalSettings } = useGlobalPayrollSettingsStore();
   const { entries: compOffEntries, voidCashOutEntry: voidCashOutCompOff } = useCompOffBalanceEntryStore();
+  const { alerts: unexplainedRestAlerts } = useUnexplainedRestAlertStore();
   const { links: pettyLaborLinks } = usePettyLaborLinkStore();
   const { getStatus: getRosterMonthStatus, isMonthWritable: isMonthWritableRoster, openAdjustmentSession } = useMonthCloseStore();
   const router = useRouter();
@@ -1058,6 +1043,24 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
     paySlips.forEach((s) => { if (s.month === compareMonth) m.set(s.employeeId, s); });
     return m;
   }, [paySlips, compareMonth]);
+  const rosterCompOffSummaryMap = useMemo(() => {
+    const summary = new Map<string, { overtimeAvailable: number; holidayAvailable: number }>();
+    compOffEntries.forEach((entry) => {
+      if (entry.status !== "available" || entry.expiresMonth < month) return;
+      const current = summary.get(entry.employeeId) ?? { overtimeAvailable: 0, holidayAvailable: 0 };
+      if (entry.source === "overtime") current.overtimeAvailable += entry.days;
+      if (entry.source === "holiday") current.holidayAvailable += entry.days;
+      summary.set(entry.employeeId, current);
+    });
+    return summary;
+  }, [compOffEntries, month]);
+  const rosterRestAlertMap = useMemo(() => {
+    const alerts = new Map<string, { resolution: string; unexplainedDays: number }>();
+    unexplainedRestAlerts.forEach((alert) => {
+      if (alert.month === month) alerts.set(alert.employeeId, { resolution: alert.resolution, unexplainedDays: alert.unexplainedDays });
+    });
+    return alerts;
+  }, [month, unexplainedRestAlerts]);
 
   const handleRecalculateSelectedDraftMonth = useCallback(() => {
     if (getRosterMonthStatus(month) !== "draft") {
@@ -1129,43 +1132,53 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
     );
   }, [activeEmployees, advances, buildPaySlipDraft, compOffEntries, getRosterMonthStatus, globalSettings, month, paySlips, replaceMonthPaySlips, rosterAttMap, rosterSlipMap]);
 
-  // DRAFT 唯一对账：控制字段、出勤或规则变化后，立即将旧聚合金额重建为唯一结算结果。
+  // DRAFT 唯一对账：控制字段、出勤或规则变化后批量重建有差额的薪资单。
+  // 这不是首屏依赖：等待当前点击、滚动和页面转场结束，且一次替换整月，避免每名员工各触发一次持久化和重渲染。
   // FROZEN / ADJUSTING 绝不在此处写入，历史快照及差额会话由月度状态机单独保护。
   React.useEffect(() => {
     if (getRosterMonthStatus(month) !== "draft") return;
-    for (const employee of activeEmployees) {
-      const current = rosterSlipMap.get(employee.id);
-      if (!current) continue;
-      const attendance = rosterAttMap.get(employee.id) ?? null;
-      const advanceAmount = advances
-        .filter((advance) => advance.employeeId === employee.id
-          && (advance.deductMonth === month || advance.date.startsWith(month))
-          && (advance.status === "pending" || advance.status === "deducted"))
-        .reduce((sum, advance) => sum + advance.amount, 0);
-      const { cumulativeIncome, cumulativeTaxPaid } = getDraftPayrollCumulativeTaxInputs(
-        employee,
-        month,
-        paySlips,
-        globalSettings,
-      );
-      const rebuilt = buildPaySlipDraft(
-        employee,
-        month,
-        attendance,
-        advanceAmount,
-        globalSettings,
-        cumulativeIncome,
-        cumulativeTaxPaid,
-        (() => {
-          const settlement = settleCompOffCashOut(compOffEntries, employee.id, month);
-          return settlement.lines.length > 0 ? createCompOffCashOutSettlementSnapshot(settlement) : undefined;
-        })(),
-      );
-      if (hasDraftPayrollReconciliationDelta(current, rebuilt)) {
-        upsertPaySlip({ ...rebuilt, id: current.id });
+    const task = InteractionManager.runAfterInteractions(() => {
+      const rebuiltByEmployee = new Map<string, PaySlip>();
+      for (const employee of activeEmployees) {
+        const current = rosterSlipMap.get(employee.id);
+        if (!current) continue;
+        const attendance = rosterAttMap.get(employee.id) ?? null;
+        const advanceAmount = advances
+          .filter((advance) => advance.employeeId === employee.id
+            && (advance.deductMonth === month || advance.date.startsWith(month))
+            && (advance.status === "pending" || advance.status === "deducted"))
+          .reduce((sum, advance) => sum + advance.amount, 0);
+        const { cumulativeIncome, cumulativeTaxPaid } = getDraftPayrollCumulativeTaxInputs(
+          employee,
+          month,
+          paySlips,
+          globalSettings,
+        );
+        const rebuilt = buildPaySlipDraft(
+          employee,
+          month,
+          attendance,
+          advanceAmount,
+          globalSettings,
+          cumulativeIncome,
+          cumulativeTaxPaid,
+          (() => {
+            const settlement = settleCompOffCashOut(compOffEntries, employee.id, month);
+            return settlement.lines.length > 0 ? createCompOffCashOutSettlementSnapshot(settlement) : undefined;
+          })(),
+        );
+        if (hasDraftPayrollReconciliationDelta(current, rebuilt)) {
+          rebuiltByEmployee.set(employee.id, { ...rebuilt, id: current.id });
+        }
       }
-    }
-  }, [activeEmployees, advances, buildPaySlipDraft, compOffEntries, getRosterMonthStatus, globalSettings, month, paySlips, rosterAttMap, rosterSlipMap, upsertPaySlip]);
+      if (rebuiltByEmployee.size === 0) return;
+      const nextMonthSlips = paySlips
+        .filter((slip) => slip.month === month && !rebuiltByEmployee.has(slip.employeeId))
+        .concat([...rebuiltByEmployee.values()]);
+      replaceMonthPaySlips(month, nextMonthSlips);
+    });
+    return () => task.cancel();
+  }, [activeEmployees, advances, buildPaySlipDraft, compOffEntries, getRosterMonthStatus, globalSettings, month, paySlips, replaceMonthPaySlips, rosterAttMap, rosterSlipMap]);
 
   return (
     <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: fabBottom(rosterInsets.bottom) + 20 }}>
@@ -1399,6 +1412,8 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
                   slip={rosterSlipMap.get(emp.id) ?? null}
                   att={rosterAttMap.get(emp.id) ?? null}
                   compareSlip={compareMonth ? (rosterCompareSlipMap.get(emp.id) ?? null) : null}
+                  compOffSummary={rosterCompOffSummaryMap.get(emp.id) ?? { overtimeAvailable: 0, holidayAvailable: 0 }}
+                  restAlert={rosterRestAlertMap.get(emp.id) ?? null}
                 />
               </View>
             ))}

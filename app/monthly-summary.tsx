@@ -380,8 +380,9 @@ export default function MonthlySummaryScreen({ embedded = false }: { embedded?: 
       }
       return;
     }
+    const employeeById = new Map(employees.map((employee) => [employee.id, employee]));
     const laborItems = slips.map((slip: any) => {
-      const emp = employees.find((e) => e.id === slip.employeeId);
+      const emp = employeeById.get(slip.employeeId);
       return {
         id: `labor_${slip.employeeId}`,
         code: `labor_${slip.employeeId}`,
@@ -401,6 +402,16 @@ export default function MonthlySummaryScreen({ embedded = false }: { embedded?: 
     });
     const newLineItems = [...existingNonLabor, ...laborItems];
     const totalLabor = laborItems.reduce((s: number, i: any) => s + Math.abs(i.amount), 0);
+    const existingLaborSignature = (r.lineItems ?? [])
+      .filter((item: any) => item.category === "labor")
+      .map((item: any) => `${item.id}|${item.label}|${item.amount}|${item.notes ?? ""}`)
+      .sort()
+      .join("\u0001");
+    const nextLaborSignature = laborItems
+      .map((item: any) => `${item.id}|${item.label}|${item.amount}|${item.notes ?? ""}`)
+      .sort()
+      .join("\u0001");
+    if (existingLaborSignature === nextLaborSignature && r.totalLabor === totalLabor) return;
     upsertReport({ ...r, lineItems: newLineItems, totalLabor, updatedAt: new Date().toISOString() });
   }, [paySlipStore, employees, employeesReady, getReport, upsertReport]);
 
