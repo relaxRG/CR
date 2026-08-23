@@ -1,0 +1,90 @@
+name: Fixed Mobile Performance Baseline
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Target fixed physical-device runner
+        required: true
+        type: choice
+        options: [ios, android]
+      mode:
+        description: Capture an approval candidate or compare against an approved committed baseline
+        required: true
+        default: compare
+        type: choice
+        options: [capture, compare]
+
+permissions:
+  contents: read
+
+jobs:
+  ios-fixed-device:
+    if: inputs.platform == 'ios'
+    name: iOS fixed-device performance (${{ inputs.mode }})
+    runs-on: [self-hosted, cocktail-r, ios, performance]
+    timeout-minutes: 50
+    env:
+      PERFORMANCE_MODE: ${{ inputs.mode }}
+      PERFORMANCE_BASELINE: baselines/mobile/ios-fixed-device.json
+      IOS_WORKSPACE: ${{ vars.COCKTAIL_R_IOS_WORKSPACE }}
+      IOS_SCHEME: ${{ vars.COCKTAIL_R_IOS_PERFORMANCE_SCHEME }}
+      IOS_DESTINATION: ${{ vars.COCKTAIL_R_IOS_DESTINATION }}
+      IOS_METRICS_NORMALIZER: ${{ vars.COCKTAIL_R_IOS_METRICS_NORMALIZER }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Run fixed iOS device performance suite
+        run: bash scripts/ci/run-ios-performance.sh
+      - name: Upload iOS candidate, result bundle and comparison
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-fixed-device-${{ inputs.mode }}-${{ github.run_id }}
+          path: |
+            artifacts/ios-performance.xcresult
+            artifacts/ios-performance-candidate.json
+            baselines/mobile/ios-fixed-device.json
+          if-no-files-found: warn
+
+  android-low-end-device:
+    if: inputs.platform == 'android'
+    name: Android fixed low-end device performance (${{ inputs.mode }})
+    runs-on: [self-hosted, cocktail-r, android, performance]
+    timeout-minutes: 50
+    env:
+      PERFORMANCE_MODE: ${{ inputs.mode }}
+      PERFORMANCE_BASELINE: baselines/mobile/android-low-end-fixed-device.json
+      ANDROID_METRICS_NORMALIZER: ${{ vars.COCKTAIL_R_ANDROID_METRICS_NORMALIZER }}
+      ANDROID_BENCHMARK_MODULE: ${{ vars.COCKTAIL_R_ANDROID_BENCHMARK_MODULE }}
+      ANDROID_BENCHMARK_TASK: ${{ vars.COCKTAIL_R_ANDROID_BENCHMARK_TASK }}
+      LOW_END_DEVICE_SERIAL: ${{ vars.COCKTAIL_R_ANDROID_LOW_END_SERIAL }}
+      LOW_END_DEVICE_MODEL: ${{ vars.COCKTAIL_R_ANDROID_LOW_END_MODEL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Run fixed Android low-end device performance suite
+        run: bash scripts/ci/run-android-low-end-performance.sh
+      - name: Upload Android candidate, traces, logs and comparison
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-low-end-fixed-device-${{ inputs.mode }}-${{ github.run_id }}
+          path: |
+            artifacts/android-low-end
+            baselines/mobile/android-low-end-fixed-device.json
+          if-no-files-found: warn

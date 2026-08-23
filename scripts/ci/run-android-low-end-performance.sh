@@ -2,6 +2,11 @@
 set -euo pipefail
 
 : "${PERFORMANCE_BASELINE:?必须提供 PERFORMANCE_BASELINE}"
+PERFORMANCE_MODE="${PERFORMANCE_MODE:-compare}"
+if [[ "$PERFORMANCE_MODE" != "capture" && "$PERFORMANCE_MODE" != "compare" ]]; then
+  echo "PERFORMANCE_MODE 必须为 capture 或 compare" >&2
+  exit 2
+fi
 : "${ANDROID_METRICS_NORMALIZER:?必须提供 ANDROID_METRICS_NORMALIZER}"
 : "${ANDROID_BENCHMARK_MODULE:=:macrobenchmark}"
 : "${ANDROID_BENCHMARK_TASK:=connectedCheck}"
@@ -50,11 +55,19 @@ CANDIDATE_REPORT="$ARTIFACT_DIR/candidate.json"
   --low-end-device true
 
 set +e
-node scripts/ci/assert-mobile-performance.mjs \
-  "$CANDIDATE_REPORT" \
-  "$PERFORMANCE_BASELINE" \
-  scripts/ci/android-performance-thresholds.json \
-  > "$ARTIFACT_DIR/comparison.json"
+if [[ "$PERFORMANCE_MODE" == "capture" ]]; then
+  node scripts/ci/capture-mobile-performance-baseline.mjs \
+    "$CANDIDATE_REPORT" \
+    "$PERFORMANCE_BASELINE" \
+    scripts/ci/android-performance-thresholds.json \
+    > "$ARTIFACT_DIR/comparison.json"
+else
+  node scripts/ci/assert-mobile-performance.mjs \
+    "$CANDIDATE_REPORT" \
+    "$PERFORMANCE_BASELINE" \
+    scripts/ci/android-performance-thresholds.json \
+    > "$ARTIFACT_DIR/comparison.json"
+fi
 ASSERT_STATUS=$?
 set -e
 

@@ -5,6 +5,11 @@ set -euo pipefail
 : "${IOS_SCHEME:?Set IOS_SCHEME to the performance test scheme}"
 : "${IOS_DESTINATION:?Set IOS_DESTINATION, for example platform=iOS,name=CI iPhone}"
 : "${PERFORMANCE_BASELINE:?Set PERFORMANCE_BASELINE to the committed baseline JSON path}"
+PERFORMANCE_MODE="${PERFORMANCE_MODE:-compare}"
+if [[ "$PERFORMANCE_MODE" != "capture" && "$PERFORMANCE_MODE" != "compare" ]]; then
+  echo "PERFORMANCE_MODE 必须为 capture 或 compare" >&2
+  exit 2
+fi
 : "${IOS_METRICS_NORMALIZER:?Set IOS_METRICS_NORMALIZER to the XCTest/xcresult metrics normalizer command}"
 
 RESULT_BUNDLE="${RESULT_BUNDLE:-artifacts/ios-performance.xcresult}"
@@ -22,4 +27,9 @@ xcodebuild test \
 # 原始 xcresult 结构会随 Xcode 版本变化。由受版本控制的 normalizer 读取原始指标，
 # 输出 assert-ios-performance.mjs 所需的 scenario/samples JSON；过程不读取或上传业务数据。
 "$IOS_METRICS_NORMALIZER" "$RESULT_BUNDLE" "$METRICS_JSON"
-node scripts/ci/assert-ios-performance.mjs "$METRICS_JSON" "$PERFORMANCE_BASELINE"
+if [[ "$PERFORMANCE_MODE" == "capture" ]]; then
+  node scripts/ci/capture-mobile-performance-baseline.mjs \
+    "$METRICS_JSON" "$PERFORMANCE_BASELINE" scripts/ci/ios-performance-thresholds.json
+else
+  node scripts/ci/assert-ios-performance.mjs "$METRICS_JSON" "$PERFORMANCE_BASELINE"
+fi

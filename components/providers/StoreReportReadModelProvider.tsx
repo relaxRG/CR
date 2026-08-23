@@ -1,9 +1,10 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { registerStoreReload } from "@/lib/sync/engine";
 import { PETTY_CODE_LABELS, type PettyCode } from "@/lib/store/petty-store";
 import type { EmployeeDept, EmployeeType } from "@/lib/labor/types";
 import { useGlobalBusinessMonth } from "@/lib/months/global-business-month";
+import { createReportReadRefreshController } from "@/lib/store/report-read-refresh-controller";
 import {
   buildStoreReportReadModel,
   loadStoreReportFacts,
@@ -16,6 +17,7 @@ const REPORT_SNAPSHOT_KEYS = [
   "labor_shifts_v1", "spirits.purchases.v3", "spirits.suppliers.v1", "food.purchases.v1",
   "store.petty_labor_links.v1", "wine.snapshots.v2", "wine.manual_purchases.v1",
 ] as const;
+const REPORT_REVISION_KEYS = REPORT_SNAPSHOT_KEYS.map((key) => `sync.ts.${key}`);
 const EMPLOYEE_DEPTS = new Set<EmployeeDept>(["front", "kitchen", "parttime", "other"]);
 const EMPLOYEE_TYPES = new Set<EmployeeType>(["fulltime", "longterm_parttime", "parttime"]);
 const DEFAULT_DEPT_ORDER: EmployeeDept[] = ["front", "kitchen", "other", "parttime"];
@@ -50,6 +52,11 @@ function parseArray(raw: string | null): unknown[] {
 
 function finite(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function readSnapshotRevision(rows: readonly [string, string | null][]): string {
+  const values = new Map(rows);
+  return REPORT_SNAPSHOT_KEYS.map((key) => values.get(`sync.ts.${key}`) ?? "0").join(":");
 }
 
 /** 将持久化载荷投影为报表所需的只读事实，不回写、修复或迁移原始载荷。 */
@@ -205,20 +212,33 @@ export function StoreReportReadModelProvider({ children }: { children: React.Rea
   const { month } = useGlobalBusinessMonth();
   const [facts, setFacts] = useState<StoreReportFacts>(EMPTY_FACTS);
   const [ready, setReady] = useState(false);
+  const refreshController = useRef(createReportReadRefreshController());
+  const committedRevision = useRef<string | null>(null);
   const refresh = useCallback(async () => {
-    const nextFacts = await loadStoreReportFacts(AsyncStorage, REPORT_SNAPSHOT_KEYS, decodeStoreReportSnapshot);
-    setFacts(nextFacts);
-    setReady(true);
+    const ticket = refreshController.current.begin();
+    try {
+      const revisionRows = await AsyncStorage.multiGet(REPORT_REVISION_KEYS);
+      const revision = readSnapshotRevision(revisionRows);
+      if (!refreshController.current.isCurrent(ticket)) return;
+      if (committedRevision.current === revision) {
+        setReady(true);
+        return;
+      }
+      const nextFacts = await loadStoreReportFacts(AsyncStorage, REPORT_SNAPSHOT_KEYS, decodeStoreReportSnapshot);
+      if (!refreshController.current.isCurrent(ticket)) return;
+      committedRevision.current = revision;
+      setFacts(nextFacts);
+      setReady(true);
+    } catch {
+      if (refreshController.current.isCurrent(ticket)) setReady(true);
+    }
   }, []);
 
   useEffect(() => {
-    let active = true;
-    const guardedRefresh = () => refresh().catch(() => {
-      if (active) setReady(true);
-    });
-    void guardedRefresh();
+    const guardedRefresh = () => { void refresh(); };
+    void refresh();
     const unregister = registerStoreReload(guardedRefresh);
-    return () => { active = false; unregister(); };
+    return () => { refreshController.current.dispose(); unregister(); };
   }, [refresh]);
 
   const value = useMemo<ReportReadModelContextValue>(() => Object.freeze({

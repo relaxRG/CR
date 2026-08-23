@@ -84,17 +84,29 @@ export function ReportMonthCloseProvider({ children }: { children: React.ReactNo
   const sessionsRef = useRef<MonthAdjustmentSession[]>([]);
   const gateRef = useRef(createMonthCloseOperationGate());
 
-  const persistArchives = useCallback((next: MonthCloseArchive[]) => {
-    archivesRef.current = next;
-    setArchives(next);
-    AsyncStorage.setItem(ARCHIVES_KEY, JSON.stringify(next)).catch(console.error);
-    notifySyncChange(ARCHIVES_KEY);
+  const persistArchives = useCallback(async (next: MonthCloseArchive[]): Promise<boolean> => {
+    try {
+      await AsyncStorage.setItem(ARCHIVES_KEY, JSON.stringify(next));
+      archivesRef.current = next;
+      setArchives(next);
+      notifySyncChange(ARCHIVES_KEY);
+      return true;
+    } catch (error) {
+      console.warn("报告月结归档写入失败", error);
+      return false;
+    }
   }, []);
-  const persistSessions = useCallback((next: MonthAdjustmentSession[]) => {
-    sessionsRef.current = next;
-    setSessions(next);
-    AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify(next)).catch(console.error);
-    notifySyncChange(SESSIONS_KEY);
+  const persistSessions = useCallback(async (next: MonthAdjustmentSession[]): Promise<boolean> => {
+    try {
+      await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify(next));
+      sessionsRef.current = next;
+      setSessions(next);
+      notifySyncChange(SESSIONS_KEY);
+      return true;
+    } catch (error) {
+      console.warn("报告月结调整会话写入失败", error);
+      return false;
+    }
   }, []);
 
   useEffect(() => {
@@ -168,9 +180,12 @@ export function ReportMonthCloseProvider({ children }: { children: React.ReactNo
           ? { ...archive, status: "superseded" as const, supersededByArchiveId: nextArchive.id }
           : archive).concat(nextArchive)
         : [...archivesRef.current, nextArchive];
-      persistArchives(nextArchives);
-      if (session) persistSessions(sessionsRef.current.filter((item) => item.id !== session.id));
+      if (!await persistArchives(nextArchives)) return null;
+      if (session && !await persistSessions(sessionsRef.current.filter((item) => item.id !== session.id))) return null;
       return nextArchive;
+    } catch (error) {
+      console.warn("报告月结归档命令失败", error);
+      return null;
     } finally {
       gateRef.current.release(month);
     }
@@ -200,8 +215,10 @@ export function ReportMonthCloseProvider({ children }: { children: React.ReactNo
           paySlips: facts.paySlips.filter((slip) => slip.month === month).map((slip) => ({ ...slip })),
         },
       };
-      persistSessions([...sessionsRef.current, session]);
-      return session;
+      return await persistSessions([...sessionsRef.current, session]) ? session : null;
+    } catch (error) {
+      console.warn("报告月结调整会话创建失败", error);
+      return null;
     } finally {
       gateRef.current.release(month);
     }
@@ -225,8 +242,10 @@ export function ReportMonthCloseProvider({ children }: { children: React.ReactNo
       notifySyncChange(SHIFTS_KEY);
       notifySyncChange(ATTENDANCES_KEY);
       notifySyncChange(PAYSLIPS_KEY);
-      persistSessions(sessionsRef.current.filter((item) => item.id !== session.id));
-      return true;
+      return await persistSessions(sessionsRef.current.filter((item) => item.id !== session.id));
+    } catch (error) {
+      console.warn("报告月结调整恢复失败", error);
+      return false;
     } finally {
       gateRef.current.release(month);
     }
@@ -244,6 +263,9 @@ export function ReportMonthCloseProvider({ children }: { children: React.ReactNo
       await AsyncStorage.setItem(SHIFTS_KEY, JSON.stringify([...facts.shifts.filter((shift) => !shift.date.startsWith(month)), ...entries]));
       notifySyncChange(SHIFTS_KEY);
       return true;
+    } catch (error) {
+      console.warn("报告月结归档排班应用失败", error);
+      return false;
     } finally {
       gateRef.current.release(month);
     }
@@ -254,12 +276,14 @@ export function ReportMonthCloseProvider({ children }: { children: React.ReactNo
     try {
       const current = getCurrentArchive(month);
       if (!current) return;
-      persistArchives(archivesRef.current.map((archive) => archive.id !== current.id ? archive : {
+      await persistArchives(archivesRef.current.map((archive) => archive.id !== current.id ? archive : {
         ...archive,
         adjustments: archive.adjustments.map((adjustment) => adjustment.id === adjustmentId
           ? { ...adjustment, settled: true, settleMethod: method, settledInMonth }
           : adjustment),
       }));
+    } catch (error) {
+      console.warn("报告月结差额结算失败", error);
     } finally {
       gateRef.current.release(month);
     }
