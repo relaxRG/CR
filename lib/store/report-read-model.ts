@@ -1,5 +1,18 @@
-import type { PaySlip } from "@/lib/labor/types";
+import type { Employee, EmployeeDept, PaySlip } from "@/lib/labor/types";
 import type { PettyRecord } from "@/lib/store/petty-store";
+
+export type ReportEmployeeFact = Readonly<{
+  id: Employee["id"];
+  code: Employee["code"];
+  realName: Employee["realName"];
+  dept: Employee["dept"];
+  type: Employee["type"];
+  sortOrder?: Employee["sortOrder"];
+  active: Employee["active"];
+  archived: boolean;
+  bankAccounts: ReadonlyArray<Readonly<{ bankName: string; cardNumber: string; isDefault: boolean }>>;
+}>;
+export type ReportPaySlipFact = Readonly<Pick<PaySlip, "employeeId" | "month" | "grossSalary" | "advanceAmount" | "pettyLaborPaid" | "finalSalary" | "totalEmployerCost" | "notes">>;
 
 export type ReportRevenueFact = Readonly<{
   date: string;
@@ -27,6 +40,11 @@ export type StoreReportReadModel = Readonly<{
   labor: Readonly<{ employeeCount: number; employerCost: number; netPaid: number }>;
   petty: Readonly<{ inflow: number; otherIncome: number; expense: number }>;
   inventory: Readonly<{ purchaseCost: number; consumptionCost: number; endingValue: number }>;
+  laborDetails: Readonly<{
+    employees: ReadonlyArray<ReportEmployeeFact>;
+    paySlips: ReadonlyArray<ReportPaySlipFact>;
+    deptOrder: ReadonlyArray<EmployeeDept>;
+  }>;
   suppliers: ReadonlyArray<Readonly<{ supplier: string; purchaseAmount: number }>>;
   /** 全时段按日归集，只读供经营分析按日、月、年与自定义范围筛选。 */
   analyticsByDate: ReadonlyArray<Readonly<{ date: string; amounts: Readonly<Record<string, number>> }>>;
@@ -36,6 +54,9 @@ export type StoreReportReadModel = Readonly<{
 export type StoreReportFacts = Readonly<{
   payslips: readonly Pick<PaySlip, "month" | "employeeId" | "totalEmployerCost" | "finalSalary">[];
   pettyRecords: readonly Pick<PettyRecord, "date" | "code" | "amount">[];
+  employees?: readonly ReportEmployeeFact[];
+  payrollDetails?: readonly ReportPaySlipFact[];
+  deptOrder?: readonly EmployeeDept[];
   revenueRecords?: readonly ReportRevenueFact[];
   purchases: readonly ReportPurchaseFact[];
   inventory: readonly ReportInventoryFact[];
@@ -48,6 +69,8 @@ const isPettyOtherIncome = (code: string) => ["N3", "N4", "N5"].includes(code);
 function* reportFactFingerprintParts(
   slips: readonly Pick<PaySlip, "month" | "employeeId" | "totalEmployerCost" | "finalSalary">[],
   pettyRecords: readonly Pick<PettyRecord, "date" | "code" | "amount">[],
+  employees: readonly ReportEmployeeFact[],
+  payrollDetails: readonly ReportPaySlipFact[],
   revenueRecords: readonly ReportRevenueFact[],
   purchases: readonly ReportPurchaseFact[],
   inventoryRows: readonly ReportInventoryFact[],
@@ -63,6 +86,21 @@ function* reportFactFingerprintParts(
     yield record.date;
     yield record.code;
     yield record.amount;
+  }
+  yield employees.length;
+  for (const employee of employees) {
+    yield employee.id;
+    yield employee.realName;
+    yield employee.active ? 1 : 0;
+    yield employee.archived ? 1 : 0;
+  }
+  yield payrollDetails.length;
+  for (const slip of payrollDetails) {
+    yield slip.employeeId;
+    yield slip.grossSalary;
+    yield slip.finalSalary;
+    yield slip.advanceAmount;
+    yield slip.pettyLaborPaid ?? 0;
   }
   yield revenueRecords.length;
   for (const record of revenueRecords) {
@@ -134,7 +172,7 @@ export function buildStoreReportReadModel(month: string, facts: StoreReportFacts
   }
 
   const sourceVersion = `${month}:${fingerprintParts(
-    reportFactFingerprintParts(slips, pettyRecords, revenueRecords, purchases, inventoryRows),
+    reportFactFingerprintParts(slips, pettyRecords, facts.employees ?? [], facts.payrollDetails ?? [], revenueRecords, purchases, inventoryRows),
   )}`;
 
   return Object.freeze({
@@ -153,6 +191,11 @@ export function buildStoreReportReadModel(month: string, facts: StoreReportFacts
       purchaseCost: roundMoney(inventoryRows.reduce((sum, row) => sum + row.purchaseCost, 0)),
       consumptionCost: roundMoney(inventoryRows.reduce((sum, row) => sum + row.consumptionCost, 0)),
       endingValue: roundMoney(inventoryRows.reduce((sum, row) => sum + row.endingValue, 0)),
+    }),
+    laborDetails: Object.freeze({
+      employees: Object.freeze([...(facts.employees ?? [])]),
+      paySlips: Object.freeze([...(facts.payrollDetails ?? [])]),
+      deptOrder: Object.freeze([...(facts.deptOrder ?? [])]),
     }),
     suppliers: Object.freeze([...supplierAmounts.entries()]
       .map(([supplier, purchaseAmount]) => Object.freeze({ supplier, purchaseAmount }))

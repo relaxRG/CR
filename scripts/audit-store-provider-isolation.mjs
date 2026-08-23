@@ -41,6 +41,10 @@ const expectedMismatch = Object.entries(expectedTabs)
   .map(([tab]) => tab);
 const reportUsesCompatibilityBridge = componentBody("StoreReportProviders").includes("<StoreFeatureProviders>");
 const reportUsesReadModel = componentBody("StoreReportProviders").includes("StoreReportReadModelProvider");
+const monthlySummary = read("app/monthly-summary.tsx");
+const monthlySummaryUsesReadModel = monthlySummary.includes("useStoreReportReadModel")
+  && !monthlySummary.includes("useEmployeeStore")
+  && !monthlySummary.includes("usePaySlipStore");
 const runtimeBoundaryWired = boundary.includes("key={tab}")
   && screen.includes("<StoreTabBoundary tab={effectiveTab}>")
   && featureBoundary.includes('pathname === "/store"');
@@ -56,11 +60,14 @@ const report = {
   report: {
     usesCompatibilityBridge: reportUsesCompatibilityBridge,
     usesReadonlyMaterializedView: reportUsesReadModel,
+    monthlySummaryUsesReadModel,
     migrationState: !reportUsesReadModel
       ? "not_started"
-      : reportUsesCompatibilityBridge
-        ? "partial_analytics_only_monthly_summary_and_period_analysis_still_use_compatibility_contexts"
-        : "complete",
+      : reportUsesCompatibilityBridge && monthlySummaryUsesReadModel
+        ? "partial_analytics_and_monthly_summary_payroll_use_read_model_period_analysis_still_uses_compatibility_contexts"
+        : reportUsesCompatibilityBridge
+          ? "partial_analytics_only_monthly_summary_and_period_analysis_still_use_compatibility_contexts"
+          : "complete",
   },
   instanceIsolation: duplicateStableProviders.length === 0 && expectedMismatch.length === 0 && runtimeBoundaryWired,
 };

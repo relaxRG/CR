@@ -26,7 +26,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { BoundedBusinessMonthNavigator } from "@/components/months/BoundedBusinessMonthNavigator";
 import { useReportMonthNavigation } from "@/hooks/use-report-month-navigation";
 import { useMonthlySummaryStore } from "@/lib/store/monthly-summary/store";
-import { useEmployeeStore, usePaySlipStore, useDeptOrderStore, useMonthCloseStore } from "@/lib/labor/store";
+import { useMonthCloseStore } from "@/lib/labor/store";
 import { useSpiritsInventoryStore } from "@/lib/spirits/crud-store";
 import { usePettyCashStore } from "@/lib/store/petty-store";
 import { useMonthlyReportStore } from "@/lib/store/monthly-report/store";
@@ -36,6 +36,7 @@ import { aggregateMonthlyReport } from "@/lib/store/monthly-summary/aggregator";
 import { buildMonthlySummaryPresentation, hasVisibleMonthlySummaryItems } from "@/lib/store/monthly-summary/presentation";
 import { formatStoreMoney } from "@/lib/store/table-display";
 import { usePettyLaborLinkStore } from "@/lib/store/petty-labor-link-store";
+import { useStoreReportReadModel } from "@/components/providers/StoreReportReadModelProvider";
 import {
   MonthlySummaryReport, SummaryLineItem,
 
@@ -310,9 +311,8 @@ export default function MonthlySummaryScreen({ embedded = false }: { embedded?: 
     upsertInventoryConfig, resetInventoryConfigs,
     getPettyCodeConfig, getInventoryConfig,
   } = useMonthlySummaryStore();
-  const { employees, ready: employeesReady } = useEmployeeStore();
-  const { deptOrder } = useDeptOrderStore();
-  const paySlipStore = usePaySlipStore();
+  const { model: reportReadModel, ready: reportFactsReady } = useStoreReportReadModel();
+  const { employees, paySlips, deptOrder } = reportReadModel.laborDetails;
   const {
     getStatus: getMonthCloseStatus,
     getCurrentArchive,
@@ -368,8 +368,8 @@ export default function MonthlySummaryScreen({ embedded = false }: { embedded?: 
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const syncLaborLineItems = useCallback((month: string) => {
     // 关键修复：employees 未加载完成时不执行，防止 label 写入 employeeId
-    if (!employeesReady || employees.length === 0) return;
-    const slips = paySlipStore?.paySlips?.filter((s: any) => s.month === month) ?? [];
+    if (!reportFactsReady || employees.length === 0) return;
+    const slips = paySlips?.filter((s: any) => s.month === month) ?? [];
     const r = getReport(month);
     if (!r) return; // 月报不存在时不自动创建
     const existingNonLabor = (r.lineItems ?? []).filter((i: any) => i.category !== "labor");
@@ -413,7 +413,7 @@ export default function MonthlySummaryScreen({ embedded = false }: { embedded?: 
       .join("\u0001");
     if (existingLaborSignature === nextLaborSignature && r.totalLabor === totalLabor) return;
     upsertReport({ ...r, lineItems: newLineItems, totalLabor, updatedAt: new Date().toISOString() });
-  }, [paySlipStore, employees, employeesReady, getReport, upsertReport]);
+  }, [paySlips, employees, reportFactsReady, getReport, upsertReport]);
 
   useEffect(() => {
     if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
@@ -421,7 +421,7 @@ export default function MonthlySummaryScreen({ embedded = false }: { embedded?: 
       syncLaborLineItems(selectedMonth);
     }, 800);
     return () => { if (syncTimerRef.current) clearTimeout(syncTimerRef.current); };
-  }, [paySlipStore?.paySlips, selectedMonth, syncLaborLineItems, employees]);
+  }, [paySlips, selectedMonth, syncLaborLineItems, employees]);
 
   const handleSaveManualItem = (item: SummaryLineItem) => {
     const r = getOrCreateReport();
@@ -491,8 +491,8 @@ export default function MonthlySummaryScreen({ embedded = false }: { embedded?: 
       // rawMonth 可能是 "2026/07" 或 "2026-07"，统一转换后比较
       return raw.replace("/", "-") === selectedMonth;
     });
-    // 薪资单
-    const paySlips = paySlipStore?.paySlips?.filter((s: any) => s.month === selectedMonth) ?? [];
+    // 薪资单（只读报表快照）
+    const monthPaySlips = paySlips.filter((s: any) => s.month === selectedMonth);
     // 烈酒进货汇总（按供应商分组）
     const monthPurchases = spiritsStore.getMonthPurchases(selectedMonth);
     const spiritSupplierMap: Record<string, { totalAmount: number; itemCount: number }> = {};
@@ -562,7 +562,7 @@ export default function MonthlySummaryScreen({ embedded = false }: { embedded?: 
       `• 烈酒进货：${monthPurchases.length} 条（${Object.keys(spiritSupplierMap).length} 供应商）\n` +
       `• 葡萄酒进货：${Object.keys(wineSnapshotSupplierTotals).length} 供应商 + 手动 ${wineManualPurchases.length} 条\n` +
       `• 食材进货：${foodPurchaseRecords.length} 条记录\n` +
-      `• 薪资单：${paySlips.length} 人\n\n` +
+      `• 薪资单：${monthPaySlips.length} 人\n\n` +
       `将生成 ${(aggregated.lineItems?.length ?? 0)} 个科目行。是否覆盖当前科目？`,
       [
         { text: "取消", style: "cancel" },
@@ -617,7 +617,7 @@ export default function MonthlySummaryScreen({ embedded = false }: { embedded?: 
             });
             // 为所有活跃员工创建薪资发放记录
             employees.filter((e: any) => e.active).forEach((emp: any) => {
-              const slip = paySlips.find((s: any) => s.employeeId === emp.id);
+              const slip = monthPaySlips.find((s: any) => s.employeeId === emp.id);
               const totalAmt = slip?.finalSalary ?? 0;
               const existing = existingPayments.find((p) => p.payeeId === emp.id && p.payeeType === "employee");
               if (existing) {
@@ -823,7 +823,7 @@ export default function MonthlySummaryScreen({ embedded = false }: { embedded?: 
                         {/* 员工卡片 */}
                         {deptEmps.map((emp) => {
                           const payment = payrollPaymentsR.find((p) => p.payeeId === emp.id);
-                          const slip = paySlipStore?.paySlips?.find((s: any) => s.employeeId === emp.id && s.month === selectedMonth);
+                          const slip = paySlips?.find((s: any) => s.employeeId === emp.id && s.month === selectedMonth);
                           const defaultBank = emp.bankAccounts?.find((b: any) => b.isDefault) ?? emp.bankAccounts?.[0];
                           const grossAmt = slip?.grossSalary ?? payment?.totalAmount ?? 0;
                           const advAmt = slip ? ((slip.advanceAmount ?? 0) + (slip.pettyLaborPaid ?? 0)) : (payment?.advanceAmount ?? 0);
@@ -916,15 +916,15 @@ export default function MonthlySummaryScreen({ embedded = false }: { embedded?: 
                     const closeStatus = getMonthCloseStatus(selectedMonth);
                     const currentArchive = getCurrentArchive(selectedMonth);
                     const totalGross = activeEmps.reduce((sum, employee) => {
-                      const slip = paySlipStore?.paySlips?.find((item: any) => item.employeeId === employee.id && item.month === selectedMonth);
+                      const slip = paySlips?.find((item: any) => item.employeeId === employee.id && item.month === selectedMonth);
                       return sum + (slip?.grossSalary ?? 0);
                     }, 0);
                     const totalFinal = activeEmps.reduce((sum, employee) => {
-                      const slip = paySlipStore?.paySlips?.find((item: any) => item.employeeId === employee.id && item.month === selectedMonth);
+                      const slip = paySlips?.find((item: any) => item.employeeId === employee.id && item.month === selectedMonth);
                       return sum + (slip?.finalSalary ?? 0);
                     }, 0);
                     const summary = {
-                      totalEmployees: activeEmps.filter((employee) => paySlipStore?.paySlips?.some((slip: any) => slip.employeeId === employee.id && slip.month === selectedMonth)).length,
+                      totalEmployees: activeEmps.filter((employee) => paySlips?.some((slip: any) => slip.employeeId === employee.id && slip.month === selectedMonth)).length,
                       totalGrossSalary: totalGross,
                       totalFinalSalary: totalFinal,
                       totalDeductions: totalGross - totalFinal,
