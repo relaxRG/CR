@@ -44,14 +44,20 @@ async function reloadAllFromStorage(
   setPrefs?: (p: RecipePrefs) => void,
 ) {
   try {
-    const [rRaw, cRaw, tRaw, gRaw, cgRaw, prefsRaw] = await Promise.all([
-      AsyncStorage.getItem(RECIPES_KEY),
-      AsyncStorage.getItem(CATEGORIES_KEY),
-      AsyncStorage.getItem(TAGS_KEY),
-      AsyncStorage.getItem(TAG_GROUPS_KEY),
-      AsyncStorage.getItem(CATEGORY_GROUPS_KEY),
-      AsyncStorage.getItem(PREFS_KEY),
-    ]);
+    const stored = new Map(await AsyncStorage.multiGet([
+      RECIPES_KEY,
+      CATEGORIES_KEY,
+      TAGS_KEY,
+      TAG_GROUPS_KEY,
+      CATEGORY_GROUPS_KEY,
+      PREFS_KEY,
+    ]));
+    const rRaw = stored.get(RECIPES_KEY) ?? null;
+    const cRaw = stored.get(CATEGORIES_KEY) ?? null;
+    const tRaw = stored.get(TAGS_KEY) ?? null;
+    const gRaw = stored.get(TAG_GROUPS_KEY) ?? null;
+    const cgRaw = stored.get(CATEGORY_GROUPS_KEY) ?? null;
+    const prefsRaw = stored.get(PREFS_KEY) ?? null;
     if (rRaw) {
       try {
         let recs = JSON.parse(rRaw) as Recipe[];
@@ -227,13 +233,22 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     (async () => {
       try {
-        const [rRaw, cRaw, seeded, tRaw, gRaw] = await Promise.all([
-          AsyncStorage.getItem(RECIPES_KEY),
-          AsyncStorage.getItem(CATEGORIES_KEY),
-          AsyncStorage.getItem(SEEDED_KEY),
-          AsyncStorage.getItem(TAGS_KEY),
-          AsyncStorage.getItem(TAG_GROUPS_KEY),
-        ]);
+        const stored = new Map(await AsyncStorage.multiGet([
+          RECIPES_KEY,
+          CATEGORIES_KEY,
+          SEEDED_KEY,
+          TAGS_KEY,
+          TAG_GROUPS_KEY,
+          PREFS_KEY,
+          CATEGORY_GROUPS_KEY,
+        ]));
+        const rRaw = stored.get(RECIPES_KEY) ?? null;
+        const cRaw = stored.get(CATEGORIES_KEY) ?? null;
+        const seeded = stored.get(SEEDED_KEY) ?? null;
+        const tRaw = stored.get(TAGS_KEY) ?? null;
+        const gRaw = stored.get(TAG_GROUPS_KEY) ?? null;
+        const prefsRaw = stored.get(PREFS_KEY) ?? null;
+        const cgRaw = stored.get(CATEGORY_GROUPS_KEY) ?? null;
         let cats: Category[] = (cRaw ? (JSON.parse(cRaw) as Category[]) : []).map((c) =>
           migrateTagNameEn(c),
         );
@@ -394,8 +409,7 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
         setTagGroups(mutableGroupList);
         setTags(tagList);
         setCategories(cats);
-        // 加载收藏/评分偏好（独立键），合并覆盖到 recipe 对象
-        const prefsRaw = await AsyncStorage.getItem(PREFS_KEY);
+        // 加载收藏/评分偏好（独立键），合并覆盖到 recipe 对象。
         let loadedPrefs: RecipePrefs = prefsRaw ? JSON.parse(prefsRaw) : {};
         // 迁移：将 recipes 中已有的 favorite/rating/made 写入 prefs（首次迁移）
         let prefsMigrated = false;
@@ -423,7 +437,6 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
         }
         setPrefs(loadedPrefs);
         setRecipes(recs);
-        const cgRaw = await AsyncStorage.getItem(CATEGORY_GROUPS_KEY);
         const catGroupList: CategoryGroup[] = cgRaw
           ? (JSON.parse(cgRaw) as CategoryGroup[]).map((g) => migrateTagNameEn(g))
           : [];
