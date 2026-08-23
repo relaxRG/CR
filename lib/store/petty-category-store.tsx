@@ -253,7 +253,7 @@ export function PettyCategoryProvider({ children }: { children: React.ReactNode 
         } catch {}
       }
     });
-    registerStoreReload(() => {
+    return registerStoreReload(() => {
       AsyncStorage.getItem(STORAGE_KEY).then((raw) => {
         if (raw) { try { dispatch({ type: "LOAD", payload: JSON.parse(raw) }); } catch {} }
       });

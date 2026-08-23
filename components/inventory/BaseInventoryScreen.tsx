@@ -21,6 +21,7 @@ import { GenericInventoryContextValue, GenericInventoryItem } from "@/lib/invent
 import { getCurrentMonth, MonthlyLedgerItem } from "@/lib/inventory-core/types";
 import { MonthlyLedgerRow } from "./MonthlyLedgerSheet";
 import { HorizontalLedgerColumn, HorizontalLedgerGroup, HorizontalLedgerTable } from "./HorizontalLedgerTable";
+import { VirtualizedHorizontalLedgerTable } from "./VirtualizedHorizontalLedgerTable";
 import { formatStoreMoney, formatStoreQuantity, STORE_TABLE_METRICS } from "@/lib/store/table-display";
 import { formatInventoryMonthDay, INVENTORY_WORKSPACE_METRICS, inventoryTabLabel } from "@/lib/store/inventory-workspace-ui";
 import { MonthlyLedgerDetailSheet } from "./MonthlyLedgerDetailSheet";
@@ -425,19 +426,35 @@ export function BaseInventoryScreen({
             {activeItems.length === 0 ? (
               <EmptyState emoji={emoji} accentColor={accentColor} excelFormatHint={excelFormatHint} colors={colors} />
             ) : ledgerPresentation === "table" ? (
-              <HorizontalLedgerTable
-                testID={`${categoryId}-horizontal-ledger-table`}
-                columns={ledgerColumns}
-                groups={ledgerGroups}
-                rowKey={(item) => item.itemId}
-                selection={selectionMode ? {
-                  selectedRowKeys: selectedItemIds,
-                  allSelected: activeItems.length > 0 && selectedVisibleItemIds.length === activeItems.length,
-                  onToggleAll: () => setSelectedItemIds(selectedVisibleItemIds.length === activeItems.length ? [] : activeItems.map((item) => item.id)),
-                  onToggleRow: (item) => toggleSelection(item.itemId),
-                  testIDPrefix: `${categoryId}-bulk`,
-                } : undefined}
-              />
+              activeItems.length >= 80 ? (
+                <VirtualizedHorizontalLedgerTable
+                  testID={`${categoryId}-horizontal-ledger-table`}
+                  columns={ledgerColumns}
+                  groups={ledgerGroups}
+                  rowKey={(item) => item.itemId}
+                  selection={selectionMode ? {
+                    selectedRowKeys: selectedItemIds,
+                    allSelected: activeItems.length > 0 && selectedVisibleItemIds.length === activeItems.length,
+                    onToggleAll: () => setSelectedItemIds(selectedVisibleItemIds.length === activeItems.length ? [] : activeItems.map((item) => item.id)),
+                    onToggleRow: (item) => toggleSelection(item.itemId),
+                    testIDPrefix: `${categoryId}-bulk`,
+                  } : undefined}
+                />
+              ) : (
+                <HorizontalLedgerTable
+                  testID={`${categoryId}-horizontal-ledger-table`}
+                  columns={ledgerColumns}
+                  groups={ledgerGroups}
+                  rowKey={(item) => item.itemId}
+                  selection={selectionMode ? {
+                    selectedRowKeys: selectedItemIds,
+                    allSelected: activeItems.length > 0 && selectedVisibleItemIds.length === activeItems.length,
+                    onToggleAll: () => setSelectedItemIds(selectedVisibleItemIds.length === activeItems.length ? [] : activeItems.map((item) => item.id)),
+                    onToggleRow: (item) => toggleSelection(item.itemId),
+                    testIDPrefix: `${categoryId}-bulk`,
+                  } : undefined}
+                />
+              )
             ) : getGroupLabel ? (
               Object.entries(groupedLedger).map(([group, items]) => (
                 <View key={group} style={{ marginBottom: 16 }}>

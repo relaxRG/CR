@@ -210,7 +210,7 @@ export function MonthlySummaryProvider({ children }: { children: React.ReactNode
       } catch {}
     };
     load();
-    registerStoreReload(load);
+    return registerStoreReload(load);
   }, []);
 
   useEffect(() => {

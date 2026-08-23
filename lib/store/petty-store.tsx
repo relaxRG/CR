@@ -178,7 +178,7 @@ export function PettyCashProvider({ children }: { children: React.ReactNode }) {
       } catch {}
     };
     AsyncStorage.getItem(STORAGE_KEY).then(load);
-    registerStoreReload(() => AsyncStorage.getItem(STORAGE_KEY).then(load));
+    return registerStoreReload(() => AsyncStorage.getItem(STORAGE_KEY).then(load));
   }, []);
 
   useEffect(() => {

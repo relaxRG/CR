@@ -94,7 +94,7 @@ export function RevenueProvider({ children }: { children: React.ReactNode }) {
     AsyncStorage.getItem(STORAGE_KEY).then((raw) => {
       if (raw) { try { dispatch({ type: "LOAD", payload: JSON.parse(raw) }); } catch {} }
     });
-    registerStoreReload(() => {
+    return registerStoreReload(() => {
       AsyncStorage.getItem(STORAGE_KEY).then((raw) => {
         if (raw) { try { dispatch({ type: "LOAD", payload: JSON.parse(raw) }); } catch {} }
       });

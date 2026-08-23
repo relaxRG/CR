@@ -56,7 +56,7 @@ export function DishAnalysisProvider({ children }: { children: React.ReactNode }
       } catch {}
     };
     load();
-    registerStoreReload(load);
+    return registerStoreReload(load);
   }, []);
 
   useEffect(() => {

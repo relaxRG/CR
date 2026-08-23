@@ -230,7 +230,7 @@ export function PettyLaborLinkProvider({ children }: { children: React.ReactNode
       AsyncStorage.getItem(LINK_STORAGE_KEY).then(loadLinks),
       AsyncStorage.getItem(ALIAS_STORAGE_KEY).then(loadAliases),
     ]).then(() => setReady(true));
-    registerStoreReload(() => {
+    return registerStoreReload(() => {
       AsyncStorage.getItem(LINK_STORAGE_KEY).then(loadLinks);
       AsyncStorage.getItem(ALIAS_STORAGE_KEY).then(loadAliases);
     });

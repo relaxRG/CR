@@ -29,6 +29,8 @@ let lastKnownServerTs = 0;
 let onPushDetectedCb: PushDetectedCallback | null = null;
 let appStateSubscription: ReturnType<typeof AppState.addEventListener> | null = null;
 let isActive = true;
+/** 同一代次只允许一条轮询请求在途；弱网超时不能堆积为并发 HTTP 请求。 */
+let pollInFlightEpoch: number | null = null;
 /** 每次停止、登出或切换同步组递增；遗留异步轮询不得跨代次回调。 */
 let realtimeEpoch = 0;
 /** 上次通知 Worker 的时间戳（用于节流，30s 内不重复通知） */
@@ -101,13 +103,19 @@ function startPolling(onPushDetected: PushDetectedCallback) {
   const pollEpoch = realtimeEpoch;
 
   const poll = async () => {
-    const latestAt = await checkForUpdates();
-    // 切组、登出或停止监听后，旧请求即使稍后返回也不得触发新组回调。
-    if (pollEpoch !== realtimeEpoch) return;
-    if (latestAt && latestAt > lastKnownServerTs) {
-      const prevTs = lastKnownServerTs;
-      lastKnownServerTs = latestAt;
-      onPushDetectedCb?.(prevTs);
+    if (pollInFlightEpoch === pollEpoch) return;
+    pollInFlightEpoch = pollEpoch;
+    try {
+      const latestAt = await checkForUpdates();
+      // 切组、登出或停止监听后，旧请求即使稍后返回也不得触发新组回调。
+      if (pollEpoch !== realtimeEpoch) return;
+      if (latestAt && latestAt > lastKnownServerTs) {
+        const prevTs = lastKnownServerTs;
+        lastKnownServerTs = latestAt;
+        onPushDetectedCb?.(prevTs);
+      }
+    } finally {
+      if (pollInFlightEpoch === pollEpoch) pollInFlightEpoch = null;
     }
   };
 
@@ -176,4 +184,5 @@ export function resetRealtimeSync(): void {
   lastKnownServerTs = 0;
   onPushDetectedCb = null;
   lastNotifiedAt = 0;
+  pollInFlightEpoch = null;
 }

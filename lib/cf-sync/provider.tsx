@@ -47,7 +47,7 @@ import {
   type FreshBaselineResult,
 } from "@/lib/data/fresh-business-baseline";
 import { clearAllBusinessRecipePhotos } from "@/lib/recipes/photo";
-import { startAutoBackup } from "@/lib/backup/icloud-backup";
+import { startAutoBackup, stopAutoBackup } from "@/lib/backup/icloud-backup";
 import { syncPhotos } from "@/lib/sync/photo-sync";
 import { useI18n } from "@/lib/i18n";
 import { startRealtimeSync, notifyPushDone, resetRealtimeSync } from "./ws-sync";
@@ -226,6 +226,7 @@ export function SyncProvider({
       stopRealtimeRef.current?.();
       stopRealtimeRef.current = null;
       resetRealtimeSync();
+      stopAutoBackup();
     },
     setActiveMembership: (membership) => setDeviceCredentials(membership),
     // 首次水合必须仅下载目标组照片，禁止旧组文件被上传到新成员资格。
@@ -470,6 +471,7 @@ export function SyncProvider({
     });
     return () => {
       startup.cancel();
+      stopAutoBackup();
       if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
       stopRealtimeRef.current?.();
       stopRealtimeRef.current = null;
@@ -527,6 +529,7 @@ export function SyncProvider({
     stopRealtimeRef.current?.();
     stopRealtimeRef.current = null;
     resetRealtimeSync();
+    stopAutoBackup();
   }, [setSession]);
 
   /**
@@ -548,6 +551,7 @@ export function SyncProvider({
     stopRealtimeRef.current?.();
     stopRealtimeRef.current = null;
     resetRealtimeSync();
+    stopAutoBackup();
   }, [setSession]);
 
   const openPairModal = useCallback(() => {
@@ -669,6 +673,7 @@ export function SyncProvider({
           stopRealtimeRef.current?.();
           stopRealtimeRef.current = null;
           resetRealtimeSync();
+          stopAutoBackup();
           await clearLocalGroupSwitchArtifacts();
           await clearDeviceCredentials();
           setDeviceCredentials(null);

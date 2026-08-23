@@ -26,12 +26,22 @@ describe("启动与同步性能护栏", () => {
     expect(layout).not.toContain("cleanEmptyShiftEntries().then");
   });
 
-  it("同步、自动备份和照片扫描均让出当前动画与手势，避免前台恢复直接阻塞用户交互", () => {
+  it("同步、自动备份和照片扫描均让出当前动画与手势，且在退出或切组时停止遗留备份任务", () => {
     const provider = read("lib/cf-sync/provider.tsx");
     expect(provider).toContain('import { Alert, AppState, InteractionManager, Platform } from "react-native"');
     expect(provider).toContain("const startup = InteractionManager.runAfterInteractions");
     expect(provider).toContain("void createSnapshot()");
     expect(provider).toContain("startAutoBackup(activeSession.session.device.name)");
     expect(provider).toContain("void syncPhotos()");
+    expect(provider).toContain("stopAutoBackup();");
+  });
+
+  it("实时同步在弱网下同一代次最多保留一条轮询请求，避免五秒定时器积压并发 HTTP", () => {
+    const realtime = read("lib/cf-sync/ws-sync.ts");
+    expect(realtime).toContain("let pollInFlightEpoch: number | null = null");
+    expect(realtime).toContain("if (pollInFlightEpoch === pollEpoch) return");
+    expect(realtime).toContain("pollInFlightEpoch = pollEpoch");
+    expect(realtime).toContain("if (pollInFlightEpoch === pollEpoch) pollInFlightEpoch = null");
+    expect(realtime).toContain("pollInFlightEpoch = null;");
   });
 });
