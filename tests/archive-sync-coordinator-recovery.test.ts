@@ -146,3 +146,49 @@ describe("归档协调器outbox断电恢复", () => {
     ]));
   });
 });
+
+
+describe("归档outbox同步组隔离", () => {
+  it("恢复时只重放当前同步组的待处理操作，旧组操作保持本机待处理而不跨组上传", async () => {
+    const { storage, indexApi } = createPersistentHarness();
+    await storage.setItem(ARCHIVE_REMOTE_OUTBOX_STORAGE_KEY, JSON.stringify([
+      {
+        operationId: "op-group-a",
+        entryId: "entry-group-a",
+        request: { endpoint: request.endpoint, operationId: "op-group-a", body: { entryId: "entry-group-a" }, groupId: "group-a" },
+        state: "pending",
+        retryAttempt: 0,
+        nextRetryAt: null,
+        authoritativeRevision: null,
+        terminalReason: null,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+      {
+        operationId: "op-group-b",
+        entryId: "entry-group-b",
+        request: { endpoint: request.endpoint, operationId: "op-group-b", body: { entryId: "entry-group-b" }, groupId: "group-b" },
+        state: "pending",
+        retryAttempt: 0,
+        nextRetryAt: null,
+        authoritativeRevision: null,
+        terminalReason: null,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    ]));
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({ entryId: "entry-group-b", revision: 1 }), {
+      status: 201,
+      headers: { "content-type": "application/json" },
+    }));
+    const coordinator = new ArchiveMutationCoordinator(storage, indexApi, async () => "fresh-token", fetcher, () => 10_000);
+
+    await expect(coordinator.resumePending((item) => item.request.groupId === "group-b"))
+      .resolves.toEqual([expect.objectContaining({ status: "committed" })]);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect((await coordinator.list()).map((item) => [item.operationId, item.state])).toEqual(expect.arrayContaining([
+      ["op-group-a", "pending"],
+      ["op-group-b", "committed"],
+    ]));
+  });
+});
