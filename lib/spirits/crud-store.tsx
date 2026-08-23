@@ -3,9 +3,9 @@
  * 支持：手动增删改酒款、月份切换、进货流水录入、Excel/PDF 导入、台账月结
  * 新增：参考单价按月生效、品牌集团管理、供应商信息卡、备用金匹配记忆、自采分类配置
  */
-import React, { createContext, useContext, useEffect, useReducer } from "react";
+import React, { createContext, useContext, useEffect, useReducer, useRef } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { registerStoreReload } from "../sync/engine";
+import { notifySyncChange, registerStoreReload } from "../sync/engine";
 import { purchasesForMonth, type PendingSpiritPurchase } from "./import-bridge";
 import { moveInventoryCategory } from "./category-lifecycle";
 import { normalizeSpiritSupplierAliases } from "./supplier-alias";
@@ -501,6 +501,8 @@ const SpiritsContext = createContext<SpiritsContextValue | null>(null);
 
 export function SpiritsInventoryProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initial);
+  const loadedRef = useRef(false);
+  const skipNextPersistenceRef = useRef(true);
 
   // 加载持久化数据
   useEffect(() => {
@@ -537,24 +539,36 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
       const selfBuyConfig = selfBuyRaw ? JSON.parse(selfBuyRaw) : DEFAULT_SELF_BUY_CONFIG;
       const customCategories: SpiritCustomCategory[] = customCatsRaw ? JSON.parse(customCatsRaw) : [];
       const groupMatchMemory: GroupMatchMemory[] = groupMatchRaw ? JSON.parse(groupMatchRaw) : [];
+      skipNextPersistenceRef.current = true;
       dispatch({ type: "LOAD", payload: { items, purchases, ledger, refPrices, suppliers, groups, matchMemory, selfBuyConfig, customCategories, groupMatchMemory } });
+      loadedRef.current = true;
     });
     load();
     return registerStoreReload(() => { void load(); });
   }, []);
 
-  // 持久化
+  // 仅用户命令产生的状态变化才落盘并通知同步；初次加载/远端重载绝不重新标脏。
   useEffect(() => {
-    AsyncStorage.setItem(ITEMS_KEY, JSON.stringify(state.items));
-    AsyncStorage.setItem(PURCHASES_KEY, JSON.stringify(state.purchases));
-    AsyncStorage.setItem(LEDGER_KEY, JSON.stringify(state.ledger));
-    AsyncStorage.setItem(REF_PRICES_KEY, JSON.stringify(state.refPrices));
-    AsyncStorage.setItem(SUPPLIERS_KEY, JSON.stringify(state.suppliers));
-    AsyncStorage.setItem(GROUPS_KEY, JSON.stringify(state.groups));
-    AsyncStorage.setItem(MATCH_MEMORY_KEY, JSON.stringify(state.matchMemory));
-    AsyncStorage.setItem(SELF_BUY_CONFIG_KEY, JSON.stringify(state.selfBuyConfig));
-    AsyncStorage.setItem(CUSTOM_CATEGORIES_KEY, JSON.stringify(state.customCategories));
-    AsyncStorage.setItem(GROUP_MATCH_MEMORY_KEY, JSON.stringify(state.groupMatchMemory));
+    if (!loadedRef.current) return;
+    if (skipNextPersistenceRef.current) {
+      skipNextPersistenceRef.current = false;
+      return;
+    }
+    const entries: [string, string][] = [
+      [ITEMS_KEY, JSON.stringify(state.items)],
+      [PURCHASES_KEY, JSON.stringify(state.purchases)],
+      [LEDGER_KEY, JSON.stringify(state.ledger)],
+      [REF_PRICES_KEY, JSON.stringify(state.refPrices)],
+      [SUPPLIERS_KEY, JSON.stringify(state.suppliers)],
+      [GROUPS_KEY, JSON.stringify(state.groups)],
+      [MATCH_MEMORY_KEY, JSON.stringify(state.matchMemory)],
+      [SELF_BUY_CONFIG_KEY, JSON.stringify(state.selfBuyConfig)],
+      [CUSTOM_CATEGORIES_KEY, JSON.stringify(state.customCategories)],
+      [GROUP_MATCH_MEMORY_KEY, JSON.stringify(state.groupMatchMemory)],
+    ];
+    void AsyncStorage.multiSet(entries)
+      .then(() => entries.forEach(([key]) => notifySyncChange(key)))
+      .catch((error: unknown) => console.warn("烈酒库存写入失败", error));
   }, [state]);
 
   // ── 酒款档案 ──────────────────────────────────────────────────────────────

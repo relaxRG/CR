@@ -121,6 +121,19 @@ describe("烈酒当月进货导入与库存同步", () => {
 });
 
 
+describe("烈酒分类与本月进货的多端同步", () => {
+  it("分类和采购写入通过同一批量持久化路径通知同步，远端重载不回推为本地脏数据", () => {
+    const storeSource = readFileSync(resolve(process.cwd(), "lib/spirits/crud-store.tsx"), "utf8");
+
+    expect(storeSource).toContain("registerStoreReload(() => { void load(); })");
+    expect(storeSource).toContain("skipNextPersistenceRef.current = true;");
+    expect(storeSource).toContain("AsyncStorage.multiSet(entries)");
+    expect(storeSource).toContain(".then(() => entries.forEach(([key]) => notifySyncChange(key)))");
+    expect(storeSource).toContain("[PURCHASES_KEY, JSON.stringify(state.purchases)]");
+    expect(storeSource).toContain("[CUSTOM_CATEGORIES_KEY, JSON.stringify(state.customCategories)]");
+  });
+});
+
 describe("烈酒导入日期边界：非法日期与跨月采购", () => {
   it("跳过非法自然日，保留空日期继承行，并将跨月有效采购分别归入自身月份", () => {
     const parsed = parseSpiritsExcel([
