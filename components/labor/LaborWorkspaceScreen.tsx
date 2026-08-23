@@ -3940,6 +3940,22 @@ function SchedulePage({ colors, month, pageWidth }: { colors: any; month: string
     () => sortEmployeesWithinProfileGroup(employees.filter((e) => e.active && !e.archived && resolveEmployeeDept(e).category === deptCategory)),
     [employees, deptCategory, resolveEmployeeDept, deptOrder],
   );
+  const departmentEmployeeIds = useMemo(() => new Set(allDeptEmployees.map((employee) => employee.id)), [allDeptEmployees]);
+  const validMonthShiftEmployeeIdsBySession = useMemo(() => {
+    const bySession = new Map<string, Set<string>>();
+    monthShifts.forEach((shift) => {
+      if (!departmentEmployeeIds.has(shift.employeeId) || (shift.hoursValue === null && shift.specialStatusId == null)) return;
+      const employeeIds = bySession.get(shift.shift) ?? new Set<string>();
+      employeeIds.add(shift.employeeId);
+      bySession.set(shift.shift, employeeIds);
+    });
+    return bySession;
+  }, [departmentEmployeeIds, monthShifts]);
+  const shiftEntryByEmployeeDateSession = useMemo(() => {
+    const byKey = new Map<string, ShiftEntry>();
+    [...adjacentShifts, ...monthShifts].forEach((shift) => byKey.set(`${shift.employeeId}|${shift.date}|${shift.shift}`, shift));
+    return byKey;
+  }, [adjacentShifts, monthShifts]);
 
   // 班次分组排序
   const sortedShiftGroups = useMemo(() =>
@@ -3961,12 +3977,7 @@ function SchedulePage({ colors, month, pageWidth }: { colors: any; month: string
         coveredTplIds.add(tpl.id);
         // 从 shifts 推导：当月有该班次 ShiftEntry 的员工自动显示
         // 修复 Bug：过滤掉 hoursValue=null 且无特殊状态的空记录（历史遗留的无效记录）
-        const empIdsWithShifts = new Set(
-          monthShifts
-            .filter((s) => s.shift === tpl.session && allDeptEmployees.some((e) => e.id === s.employeeId)
-              && (s.hoursValue !== null || s.specialStatusId != null))
-            .map((s) => s.employeeId)
-        );
+        const empIdsWithShifts = validMonthShiftEmployeeIdsBySession.get(tpl.session) ?? new Set<string>();
         // 加上「待添加」员工（通过选人面板勾选但还没有排班数据）
         const pendingKey = `${currentMonth}|${deptCategory}|${grp.id}|${tpl.id}`;
         const pendingIds = pendingEmpIds.get(pendingKey) ?? new Set<string>();
@@ -3980,12 +3991,7 @@ function SchedulePage({ colors, month, pageWidth }: { colors: any; month: string
       if (coveredTplIds.has(tpl.id)) continue;
       const grpId = "__ungrouped_" + tpl.id;
       // 修复 Bug：过滤掉 hoursValue=null 且无特殊状态的空记录
-      const empIdsWithShifts = new Set(
-        monthShifts
-          .filter((s) => s.shift === tpl.session && allDeptEmployees.some((e) => e.id === s.employeeId)
-            && (s.hoursValue !== null || s.specialStatusId != null))
-          .map((s) => s.employeeId)
-      );
+      const empIdsWithShifts = validMonthShiftEmployeeIdsBySession.get(tpl.session) ?? new Set<string>();
       const pendingKey = `${currentMonth}|${deptCategory}|${grpId}|${tpl.id}`;
       const pendingIds = pendingEmpIds.get(pendingKey) ?? new Set<string>();
       const allIds = new Set([...empIdsWithShifts, ...pendingIds]);
@@ -3993,14 +3999,13 @@ function SchedulePage({ colors, month, pageWidth }: { colors: any; month: string
       rows.push({ groupId: grpId, groupName: tpl.session, groupColor: tpl.color, tpl, empList });
     }
     return rows;
-  }, [sortedShiftGroups, sortedTemplates, monthShifts, currentMonth, deptCategory, allDeptEmployees, pendingEmpIds]);
+  }, [sortedShiftGroups, sortedTemplates, currentMonth, deptCategory, allDeptEmployees, pendingEmpIds, validMonthShiftEmployeeIdsBySession]);
 
-  // getEntry 支持跨月查询：先查当月，再查相邻月
-  const getEntry = useCallback((employeeId: string, date: string, session: string): ShiftEntry | null => {
-    const inMonth = monthShifts.find((s) => s.employeeId === employeeId && s.date === date && s.shift === session);
-    if (inMonth) return inMonth;
-    return adjacentShifts.find((s) => s.employeeId === employeeId && s.date === date && s.shift === session) ?? null;
-  }, [monthShifts, adjacentShifts]);
+  // 跨月排班已预建为键值索引；月视图的每个格子以 O(1) 查询，避免 500 人 × 日期 × 班次反复扫描数组。
+  const getEntry = useCallback(
+    (employeeId: string, date: string, session: string): ShiftEntry | null => shiftEntryByEmployeeDateSession.get(`${employeeId}|${date}|${session}`) ?? null,
+    [shiftEntryByEmployeeDateSession],
+  );
 
   // 班次模式格子点击 → SchShiftModal
   // 时长模式格子点击 → SchHoursModal

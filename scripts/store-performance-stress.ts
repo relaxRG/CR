@@ -14,6 +14,10 @@ type CashRecord = { date: string; category: string; amount: number };
 const EMPLOYEE_COUNT = 500;
 const COMP_OFF_ENTRY_COUNT = 10_000;
 const CASH_RECORD_COUNT = 12_000;
+const INVENTORY_ITEM_COUNT = 1_000;
+const INVENTORY_PURCHASE_COUNT = 10_000;
+const SCHEDULE_SHIFT_COUNT = 10_000;
+const SCHEDULE_DAYS = 31;
 const MONTH = "2026-08";
 const PREVIOUS_MONTH = "2026-07";
 const RUNS = 7;
@@ -42,6 +46,20 @@ const pettyRecords: CashRecord[] = Array.from({ length: CASH_RECORD_COUNT }, (_,
   category: "petty_cash",
   amount: 5 + (index % 120),
 }));
+const inventoryItems = Array.from({ length: INVENTORY_ITEM_COUNT }, (_, index) => ({ id: `item-${index + 1}`, referencePrice: 50 + (index % 300) }));
+const inventoryGroups = Array.from({ length: 20 }, (_, index) => ({ name: `group-${index + 1}`, color: `#${String(100000 + index)}` }));
+const inventoryPurchases = Array.from({ length: INVENTORY_PURCHASE_COUNT }, (_, index) => ({
+  id: `purchase-${index + 1}`,
+  itemId: inventoryItems[index % inventoryItems.length]!.id,
+  group: inventoryGroups[index % inventoryGroups.length]!.name,
+  quantity: (index % 12) + 1,
+  unitPrice: 60 + (index % 300),
+}));
+const scheduleShifts = Array.from({ length: SCHEDULE_SHIFT_COUNT }, (_, index) => ({
+  employeeId: employees[index % employees.length]!,
+  date: `${MONTH}-${String((index % SCHEDULE_DAYS) + 1).padStart(2, "0")}`,
+  session: index % 2 === 0 ? "晚班" : "早班",
+}));
 
 function forceGc() {
   global.gc?.();
@@ -52,12 +70,12 @@ function median(values: number[]) {
   return sorted[Math.floor(sorted.length / 2)] ?? 0;
 }
 
-function measure(name: string, run: () => number) {
+function measure(name: string, run: () => number, runs = RUNS) {
   const elapsed: number[] = [];
   let checksum = 0;
   forceGc();
   const retainedBefore = process.memoryUsage().heapUsed;
-  for (let index = 0; index < RUNS; index += 1) {
+  for (let index = 0; index < runs; index += 1) {
     const startedAt = performance.now();
     checksum += run();
     elapsed.push(performance.now() - startedAt);
@@ -140,11 +158,71 @@ function indexedAnalyticsSummaries() {
   return (current.get("revenue") ?? 0) + (previous.get("revenue") ?? 0);
 }
 
+function baselineInventoryRows() {
+  let checksum = 0;
+  for (const purchase of inventoryPurchases) {
+    const item = inventoryItems.find((candidate) => candidate.id === purchase.itemId);
+    const group = inventoryGroups.find((candidate) => candidate.name === purchase.group);
+    const rowNumber = inventoryPurchases.indexOf(purchase) + 1;
+    checksum += (item?.referencePrice ?? 0) + (group?.color.length ?? 0) + rowNumber + purchase.quantity;
+  }
+  return checksum;
+}
+
+function indexedInventoryRows() {
+  const itemById = new Map(inventoryItems.map((item) => [item.id, item]));
+  const groupByName = new Map(inventoryGroups.map((group) => [group.name, group]));
+  const purchaseIndexById = new Map(inventoryPurchases.map((purchase, index) => [purchase.id, index + 1]));
+  let checksum = 0;
+  for (const purchase of inventoryPurchases) {
+    checksum += (itemById.get(purchase.itemId)?.referencePrice ?? 0)
+      + (groupByName.get(purchase.group)?.color.length ?? 0)
+      + (purchaseIndexById.get(purchase.id) ?? 0)
+      + purchase.quantity;
+  }
+  return checksum;
+}
+
+function virtualizedInventoryInitialWindow() {
+  const maxRowsPerGroupChunk = 32;
+  const initialChunks = 4;
+  const initialRowCount = Math.min(inventoryPurchases.length, maxRowsPerGroupChunk * initialChunks);
+  return inventoryPurchases.slice(0, initialRowCount).reduce((sum, purchase) => sum + purchase.quantity, 0);
+}
+
+function baselineScheduleGridLookups() {
+  let checksum = 0;
+  for (const employeeId of employees) {
+    for (let day = 1; day <= SCHEDULE_DAYS; day += 1) {
+      const date = `${MONTH}-${String(day).padStart(2, "0")}`;
+      checksum += scheduleShifts.find((shift) => shift.employeeId === employeeId && shift.date === date && shift.session === "晚班") ? 1 : 0;
+    }
+  }
+  return checksum;
+}
+
+function indexedScheduleGridLookups() {
+  const entryByKey = new Map(scheduleShifts.map((shift) => [`${shift.employeeId}|${shift.date}|${shift.session}`, shift]));
+  let checksum = 0;
+  for (const employeeId of employees) {
+    for (let day = 1; day <= SCHEDULE_DAYS; day += 1) {
+      const date = `${MONTH}-${String(day).padStart(2, "0")}`;
+      checksum += entryByKey.has(`${employeeId}|${date}|晚班`) ? 1 : 0;
+    }
+  }
+  return checksum;
+}
+
 const results = [
   measure("employee_cards_repeated_scan", baselineEmployeeCardLookups),
   measure("employee_cards_parent_index", indexedEmployeeCardLookups),
   measure("analytics_two_pass_filters", baselineAnalyticsSummaries),
   measure("analytics_single_pass", indexedAnalyticsSummaries),
+  measure("inventory_rows_linear_lookups", baselineInventoryRows),
+  measure("inventory_rows_indexed_lookups", indexedInventoryRows),
+  measure("inventory_virtualized_initial_window", virtualizedInventoryInitialWindow),
+  measure("schedule_grid_linear_lookup", baselineScheduleGridLookups, 3),
+  measure("schedule_grid_indexed_lookup", indexedScheduleGridLookups, 3),
 ];
 
 console.log(JSON.stringify({
@@ -154,6 +232,10 @@ console.log(JSON.stringify({
     restAlerts: COMP_OFF_ENTRY_COUNT,
     revenueRecords: CASH_RECORD_COUNT,
     pettyRecords: CASH_RECORD_COUNT,
+    inventoryItems: INVENTORY_ITEM_COUNT,
+    inventoryPurchases: INVENTORY_PURCHASE_COUNT,
+    scheduleShifts: SCHEDULE_SHIFT_COUNT,
+    scheduleDays: SCHEDULE_DAYS,
     runsPerMeasurement: RUNS,
   },
   results,
