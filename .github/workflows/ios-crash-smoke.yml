@@ -20,9 +20,9 @@ concurrency:
 
 jobs:
   release-simulator-cold-start:
-    # React Native 0.81 rejects Xcode 15.4 during CocoaPods integration; macos-15
-    # supplies the required Xcode 16+ simulator toolchain.
-    runs-on: macos-15
+    # The repository's available macOS-14 pool is schedulable. Select an installed Xcode 16+
+    # explicitly instead of relying on the runner default (which can still point to Xcode 15.4).
+    runs-on: macos-14
     timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
@@ -30,6 +30,22 @@ jobs:
         with: { version: 9.12.0 }
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm }
+      - name: Select React Native compatible Xcode
+        run: |
+          for app in /Applications/Xcode*.app; do
+            developer_dir="$app/Contents/Developer"
+            version="$($developer_dir/usr/bin/xcodebuild -version | awk 'NR == 1 { print $2 }')"
+            case "$version" in
+              16.*|17.*|18.*|19.*|2[0-9].*)
+                echo "DEVELOPER_DIR=$developer_dir" >> "$GITHUB_ENV"
+                echo "Selected $app (Xcode $version)"
+                exit 0
+                ;;
+            esac
+          done
+          echo "React Native 0.81 requires Xcode 16.1 or newer; installed Xcode versions:" >&2
+          ls -1 /Applications/Xcode*.app >&2 || true
+          exit 1
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
       - name: Build and cold-launch iOS simulator five times
