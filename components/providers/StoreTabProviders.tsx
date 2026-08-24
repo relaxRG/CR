@@ -4,7 +4,7 @@ import { PettyCategoryProvider } from "@/lib/store/petty-category-store";
 import { PettyInventoryLinkProvider } from "@/lib/store/petty-inventory-link-store";
 import { PettyLaborLinkProvider } from "@/lib/store/petty-labor-link-store";
 import { SpiritsInventoryProvider } from "@/lib/spirits/crud-store";
-import { FoodIngredientProvider } from "@/lib/food/ingredient-store";
+import { FoodIngredientProvider, SupplierPurchaseProvider } from "@/lib/food/ingredient-store";
 import { BeerInventoryProvider } from "@/lib/beer/inventory-store";
 import { IceNewInventoryProvider } from "@/lib/ice/new-inventory-store";
 import { FruitNewInventoryProvider } from "@/lib/fruit/new-inventory-store";
@@ -61,6 +61,20 @@ export function StoreInventoryProviders({ children }: { children: ReactNode }) {
         </BeerInventoryProvider>
       </FoodIngredientProvider>
     </SpiritsInventoryProvider>
+  );
+}
+
+/**
+ * 供应商管理与导入页面同时消费报表汇总、食材档案及供应商采购记录。
+ * 该组合用于独立深链，避免为此挂载完整门店事实树。
+ */
+export function StoreSupplierManagementProviders({ children }: { children: ReactNode }) {
+  return (
+    <StoreReportProviders>
+      <FoodIngredientProvider>
+        <SupplierPurchaseProvider>{children}</SupplierPurchaseProvider>
+      </FoodIngredientProvider>
+    </StoreReportProviders>
   );
 }
 

@@ -4,6 +4,7 @@
  */
 import React, { useRef, useState } from "react";
 import { formatMoney } from "@/lib/utils";
+import { decodeBase64ToArrayBuffer } from "@/lib/utils/base64";
 import {
   Alert, ActivityIndicator, Modal, Platform, Pressable,
   ScrollView, StyleSheet, Text, TouchableOpacity, View
@@ -64,30 +65,18 @@ const FILE_TYPE_COLORS: Record<ReportFileType, string> = {
   unknown: "#8E8E93",
 };
 
-function base64ToArrayBuffer(base64: string): ArrayBuffer {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-  const clean = base64.replace(/[^A-Za-z0-9+/]/g, "");
-  const bytes = new Uint8Array(Math.floor((clean.length * 3) / 4));
-  let p = 0;
-  for (let i = 0; i < clean.length; i += 4) {
-    const a = chars.indexOf(clean[i]);
-    const b = chars.indexOf(clean[i + 1]);
-    const c = i + 2 < clean.length ? chars.indexOf(clean[i + 2]) : -1;
-    const d = i + 3 < clean.length ? chars.indexOf(clean[i + 3]) : -1;
-    bytes[p++] = (a << 2) | (b >> 4);
-    if (c >= 0) bytes[p++] = ((b & 15) << 4) | (c >> 2);
-    if (d >= 0) bytes[p++] = ((c & 3) << 6) | d;
-  }
-  return bytes.buffer.slice(0, p);
-}
-
 interface UploadedFile {
   name: string;
   uri: string;
   type: ReportFileType;
-  base64?: string;
-  /** 是否正在识别内容 */
-  detecting?: boolean;
+}
+
+const MAX_MONTHLY_IMPORT_FILES = 12;
+const MAX_MONTHLY_IMPORT_BYTES = 10 * 1024 * 1024;
+const MAX_MONTHLY_IMPORT_TOTAL_BYTES = 30 * 1024 * 1024;
+
+function readImportedFileBase64(file: Pick<UploadedFile, "uri">): Promise<string> {
+  return FileSystem.readAsStringAsync(file.uri, { encoding: FileSystem.EncodingType.Base64 });
 }
 
 // ─── 所有支持的报表（用于说明卡片） ───────────────────────────────────────────
@@ -139,25 +128,38 @@ export default function MonthlyReportImportScreen() {
     tap();
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-               "application/vnd.ms-excel", "*/*"],
+        type: ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-excel"],
         copyToCacheDirectory: true,
         multiple: true,
       });
       if (result.canceled || !result.assets?.length) return;
+      if (result.assets.length > MAX_MONTHLY_IMPORT_FILES) {
+        Alert.alert("文件过多", `一次最多选择 ${MAX_MONTHLY_IMPORT_FILES} 个文件，请分批导入。`);
+        return;
+      }
+      const oversized = result.assets.find((asset) => (asset.size ?? 0) > MAX_MONTHLY_IMPORT_BYTES);
+      if (oversized) {
+        Alert.alert("文件过大", `“${oversized.name ?? "所选文件"}”超过 10MB，请拆分后再导入。`);
+        return;
+      }
+      const totalBytes = result.assets.reduce((total, asset) => total + (asset.size ?? 0), 0);
+      if (totalBytes > MAX_MONTHLY_IMPORT_TOTAL_BYTES) {
+        Alert.alert("文件总量过大", "本次选择的文件总量超过 30MB，请分批导入以避免设备内存不足。");
+        return;
+      }
 
       setLoading(true);
       const { detectReportTypeByFilename, detectReportTypeByContent } = await import("@/lib/store/monthly-report/dish-analysis-parser");
       const newFiles: UploadedFile[] = [];
       for (const asset of result.assets) {
+        // 检测阶段只短暂读取内容；不要把完整Base64永久放入React State。
         const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 });
-        // 先按文件名识别，再按内容精确识别
         let type = detectReportTypeByFilename(asset.name);
         if (type === "unknown" || type === "dish_by_name" || type === "time_slot_order") {
           const contentType = detectReportTypeByContent(base64);
           if (contentType !== "unknown") type = contentType;
         }
-        newFiles.push({ name: asset.name, uri: asset.uri, type, base64 });
+        newFiles.push({ name: asset.name, uri: asset.uri, type });
       }
       setFiles((prev) => {
         const existing = new Set(prev.map((f) => f.name));
@@ -203,11 +205,16 @@ export default function MonthlyReportImportScreen() {
         import("@/lib/store/monthly-report/dish-analysis-parser"),
         import("@/lib/store/period-analysis/excel-parser"),
       ]);
+      const filePayloads = new Map<string, string>();
+      await Promise.all(files.map(async (file) => {
+        filePayloads.set(file.name, await readImportedFileBase64(file));
+      }));
+      const payloadFor = (file: UploadedFile | undefined) => file ? filePayloads.get(file.name) : undefined;
       const { report, error } = monthlyModule.parseMonthlyReport({
-        overviewBase64: overviewFile?.base64,
-        dailyBase64: dailyFile?.base64,
-        dishItemsBase64: dishNameFile?.base64,
-        dishCatsBase64: dishCatFile?.base64,
+        overviewBase64: payloadFor(overviewFile),
+        dailyBase64: payloadFor(dailyFile),
+        dishItemsBase64: payloadFor(dishNameFile),
+        dishCatsBase64: payloadFor(dishCatFile),
       });
 
       if (!report) {
@@ -217,8 +224,8 @@ export default function MonthlyReportImportScreen() {
 
       // 2. 解析菜品与时段分析，但仅在用户确认导入后写入 Store，取消预览不会污染已归档数据。
       const dishFiles = files
-        .filter((f) => f.base64 && f.type !== "overview")
-        .map((f) => ({ base64: f.base64!, filename: f.name }));
+        .filter((file) => file.type !== "overview")
+        .map((file) => ({ base64: filePayloads.get(file.name)!, filename: file.name }));
 
       if (dishFiles.length > 0) {
         const { snapshot } = dishModule.parseDishAnalysis({ files: dishFiles });
@@ -229,11 +236,11 @@ export default function MonthlyReportImportScreen() {
       }
 
       const periodFiles = files.filter((file) =>
-        file.base64 && (file.type === "time_slot_order" || file.type === "time_slot_checkout"),
+        file.type === "time_slot_order" || file.type === "time_slot_checkout",
       );
       if (periodFiles.length > 0) {
         const periodReport = periodModule.parsePeriodAnalysisExcel(
-          periodFiles.map((file) => base64ToArrayBuffer(file.base64!)),
+          periodFiles.map((file) => decodeBase64ToArrayBuffer(filePayloads.get(file.name)!)),
           periodSettings,
         );
         if (periodReport && normalizeMonthlyReportMonth(periodReport.month) !== normalizeMonthlyReportMonth(report.rawMonth)) {
@@ -261,12 +268,15 @@ export default function MonthlyReportImportScreen() {
     try {
       const archiveMonth = normalizeMonthlyReportMonth(preview.rawMonth);
       if (!archiveMonth) throw new Error("无法识别营业概览的业务月份，不能将原始文件归档到错误月份。");
+      const archivePayloads = await Promise.all(files.map(async (file) => ({
+        filename: file.name,
+        base64: await readImportedFileBase64(file),
+        fileType: file.type,
+      })));
       await archiveFiles({
         month: archiveMonth,
         monthLabel: preview.monthLabel,
-        files: files
-          .filter((file): file is UploadedFile & { base64: string } => Boolean(file.base64))
-          .map((file) => ({ filename: file.name, base64: file.base64, fileType: file.type })),
+        files: archivePayloads,
       });
       addReport(preview);
       if (dishSnapshotPreview) upsertSnapshot(dishSnapshotPreview);

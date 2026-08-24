@@ -114,7 +114,7 @@ export default function BulkImportScreen() {
     const created = addTag("glass", cleaned, CATEGORY_COLORS[3]);
     return created?.name ?? cleaned;
   }, [addTag, glassNames]);
-  const busy = false;
+  const [busy, setBusy] = useState(false);
 
   const pickFile = useCallback(async () => {
     const res = await DocumentPicker.getDocumentAsync({
@@ -211,12 +211,14 @@ export default function BulkImportScreen() {
   }, [lang, pickImage, applyImageResult]);
 
   const runExtract = useCallback(async () => {
+    if (busy) return;
     if (!isOnline) {
       const msg = lang === "zh" ? "AI 识别需要网络连接，请检查后重试" : "AI extraction requires an internet connection.";
       if (Platform.OS === "web") window.alert(msg); else Alert.alert(lang === "zh" ? "无网络连接" : "No Internet Connection", msg);
       return;
     }
     setImportedCount(null);
+    setBusy(true);
     try {
       const result = await bulkImportExtract(
         imageBase64
@@ -242,8 +244,10 @@ export default function BulkImportScreen() {
       const msg = lang === "zh" ? "识别失败,请稍后重试" : "Extraction failed, please retry";
       if (Platform.OS === "web") window.alert(msg);
       else Alert.alert(msg);
+    } finally {
+      setBusy(false);
     }
-  }, [isOnline, lang, imageBase64, imageMime, fileBase64, fileName, text]);
+  }, [busy, isOnline, lang, imageBase64, imageMime, fileBase64, fileName, text]);
 
   const toggleRow = (key: string) =>
     setRows((rs) => rs.map((r) => (r.key === key ? { ...r, checked: !r.checked } : r)));

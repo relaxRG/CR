@@ -14,7 +14,9 @@ import {
   StoreReportImportProviders,
   StoreReportProviders,
   StoreShopProviders,
+  StoreSupplierManagementProviders,
 } from "@/components/providers/StoreTabProviders";
+import { SpiritsInventoryProvider } from "@/lib/spirits/crud-store";
 
 const PROVIDERS: Record<Exclude<FeatureBoundary, "all" | "core">, ComponentType<{ children: ReactNode }>> = {
   cocktail: CocktailFeatureProviders,
@@ -61,6 +63,12 @@ export function AppFeatureBoundary({ children }: { children: ReactNode }) {
   }
   if (pathname.startsWith("/labor")) return <StoreLaborWorkspaceProviders>{children}</StoreLaborWorkspaceProviders>;
   if (pathname === "/petty-category-settings") return <StorePettyProviders>{children}</StorePettyProviders>;
+  if (pathname.startsWith("/suppliers") || pathname.startsWith("/supplier-import")) {
+    return <StoreSupplierManagementProviders>{children}</StoreSupplierManagementProviders>;
+  }
+  if (pathname.startsWith("/bottle-channels")) {
+    return <SpiritsInventoryProvider>{children}</SpiritsInventoryProvider>;
+  }
   if (
     pathname.startsWith("/spirits-inventory") || pathname.startsWith("/beer-inventory") ||
     pathname.startsWith("/ice-inventory") || pathname.startsWith("/fruit-inventory") || pathname.startsWith("/food-inventory")

@@ -10,6 +10,7 @@
 import React, { useMemo, useState } from "react";
 import { formatMoney } from "@/lib/utils";
 import { sumMoney } from "@/lib/finance/money";
+import { decodeBase64ToArrayBuffer } from "@/lib/utils/base64";
 import { numericColor } from "@/lib/theme/numeric-color-tokens";
 import {
   Alert, KeyboardAvoidingView, Modal, Platform, Pressable,
@@ -49,6 +50,8 @@ const TAB_ITEMS = [
 ] as const;
 
 const PERIOD_ORDER: PeriodKey[] = ["lunch", "dinner", "midnight", "late_night"];
+const MAX_PERIOD_IMPORT_FILES = 6;
+const MAX_PERIOD_IMPORT_BYTES = 10 * 1024 * 1024;
 
 // ─── 时段汇总卡片 ─────────────────────────────────────────────────────────────
 function PeriodSummaryCard({ periodKey, totals, colors }: {
@@ -274,6 +277,7 @@ export default function PeriodAnalysisScreen({ embedded = false }: { embedded?: 
   }, [latestReport, selectedMonth]);
 
   const handleImport = async () => {
+    if (importing) return;
     tap();
     setImporting(true);
     try {
@@ -282,15 +286,21 @@ export default function PeriodAnalysisScreen({ embedded = false }: { embedded?: 
         multiple: true,
         copyToCacheDirectory: true,
       });
-      if (result.canceled || !result.assets?.length) { setImporting(false); return; }
+      if (result.canceled || !result.assets?.length) return;
+      if (result.assets.length > MAX_PERIOD_IMPORT_FILES) {
+        Alert.alert("文件过多", `一次最多导入 ${MAX_PERIOD_IMPORT_FILES} 个Excel文件，请分批导入。`);
+        return;
+      }
+      const oversized = result.assets.find((asset) => (asset.size ?? 0) > MAX_PERIOD_IMPORT_BYTES);
+      if (oversized) {
+        Alert.alert("文件过大", `“${oversized.name ?? "所选文件"}”超过 10MB，请拆分后再导入。`);
+        return;
+      }
 
       const buffers: ArrayBuffer[] = [];
       for (const asset of result.assets) {
         const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 });
-        const binary = atob(base64);
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-        buffers.push(bytes.buffer);
+        buffers.push(decodeBase64ToArrayBuffer(base64));
       }
 
       const parsed = parsePeriodAnalysisExcel(buffers, settings);

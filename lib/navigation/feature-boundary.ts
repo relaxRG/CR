@@ -39,9 +39,7 @@ export function resolveFeatureBoundary(pathname: string): FeatureBoundary {
   if (path === "/lab" || path.startsWith("/lab/")) return "lab";
 
   if (
-    (path.startsWith("/food") && !path.startsWith("/food-inventory")) ||
-    path.startsWith("/supplier-import") ||
-    path.startsWith("/suppliers")
+    path.startsWith("/food") && !path.startsWith("/food-inventory")
   ) return "food";
 
   if (
@@ -59,7 +57,9 @@ export function resolveFeatureBoundary(pathname: string): FeatureBoundary {
     path.startsWith("/monthly-report-import") ||
     path.startsWith("/period-analysis") ||
     path.startsWith("/dish-analysis") ||
-    path.startsWith("/petty-category-settings")
+    path.startsWith("/petty-category-settings") ||
+    path.startsWith("/supplier-import") ||
+    path.startsWith("/suppliers")
   ) return "store";
 
   return "all";
