@@ -37,7 +37,7 @@
         {
           "operation": "multiRemove",
           "file": "lib/cf-sync/provider.tsx",
-          "line": 683,
+          "line": 702,
           "value": "",
           "structure": "SyncState"
         }
@@ -86,7 +86,7 @@
         {
           "operation": "multiGet",
           "file": "lib/backup/icloud-backup.ts",
-          "line": 137,
+          "line": 138,
           "value": "",
           "structure": ""
         },
@@ -100,7 +100,7 @@
         {
           "operation": "multiGet",
           "file": "lib/sync/engine.ts",
-          "line": 664,
+          "line": 666,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -114,7 +114,7 @@
         {
           "operation": "multiGet",
           "file": "app/backup.tsx",
-          "line": 72,
+          "line": 69,
           "value": "",
           "structure": ""
         }
@@ -128,7 +128,7 @@
         {
           "operation": "multiRemove",
           "file": "lib/labor/store.tsx",
-          "line": 1052,
+          "line": 1056,
           "value": "",
           "structure": "EmployeeStore, CustomDeptStore, DeptOrderStore, ShiftTemplateStore, SpecialStatusStore, HolidayConfigStore, ShiftStore, AttendanceStore, PaySlipStore, GlobalPayrollSettingsStore, MonthCloseStore, MonthConfigStore, CompOffBalanceEntryStore, HolidayCompOffStore, BusinessHoursStore, ShiftGroupStore, UnexplainedRestAlertStore, FillPresetStore"
         }
@@ -170,14 +170,14 @@
         {
           "operation": "multiRemove",
           "file": "lib/sync/engine.ts",
-          "line": 447,
+          "line": 449,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         },
         {
           "operation": "multiRemove",
           "file": "lib/sync/engine.ts",
-          "line": 520,
+          "line": 522,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -359,7 +359,7 @@
         {
           "operation": "setItem",
           "file": "lib/cf-sync/provider.tsx",
-          "line": 691,
+          "line": 710,
           "value": "JSON.stringify({ version: 1",
           "structure": "SyncState"
         }
@@ -380,7 +380,7 @@
         {
           "operation": "setItem",
           "file": "lib/i18n/index.tsx",
-          "line": 28,
+          "line": 30,
           "value": "next",
           "structure": ""
         }
@@ -394,14 +394,14 @@
         {
           "operation": "getItem",
           "file": "lib/backup/icloud-backup.ts",
-          "line": 108,
+          "line": 109,
           "value": "",
           "structure": ""
         },
         {
           "operation": "setItem",
           "file": "lib/backup/icloud-backup.ts",
-          "line": 176,
+          "line": 177,
           "value": "JSON.stringify(newMeta",
           "structure": ""
         }
@@ -555,14 +555,14 @@
         {
           "operation": "setItem",
           "file": "lib/bottles/price-alert-store.tsx",
-          "line": 20,
+          "line": 27,
           "value": "JSON.stringify(next",
           "structure": ""
         },
         {
           "operation": "getItem",
           "file": "lib/bottles/price-alert-store.tsx",
-          "line": 22,
+          "line": 29,
           "value": "",
           "structure": ""
         }
@@ -611,14 +611,14 @@
         {
           "operation": "getItem",
           "file": "lib/bottles/taxonomy.tsx",
-          "line": 606,
+          "line": 611,
           "value": "",
           "structure": "BottleCategoryDef, BottleTaxonomyStore"
         },
         {
           "operation": "setItem",
           "file": "lib/bottles/taxonomy.tsx",
-          "line": 622,
+          "line": 629,
           "value": "JSON.stringify(next",
           "structure": "BottleCategoryDef, BottleTaxonomyStore"
         }
@@ -639,21 +639,21 @@
         {
           "operation": "setItem",
           "file": "lib/bottles/taxonomy.tsx",
-          "line": 592,
+          "line": 594,
           "value": "JSON.stringify(v9s.next",
           "structure": "BottleCategoryDef, BottleTaxonomyStore"
         },
         {
           "operation": "getItem",
           "file": "lib/bottles/taxonomy.tsx",
-          "line": 607,
+          "line": 612,
           "value": "",
           "structure": "BottleCategoryDef, BottleTaxonomyStore"
         },
         {
           "operation": "setItem",
           "file": "lib/bottles/taxonomy.tsx",
-          "line": 627,
+          "line": 634,
           "value": "JSON.stringify(next",
           "structure": "BottleCategoryDef, BottleTaxonomyStore"
         }
@@ -667,7 +667,7 @@
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 1037,
+          "line": 1071,
           "value": "valueToWrite",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -877,7 +877,7 @@
         {
           "operation": "setItem",
           "file": "lib/bottles/store.tsx",
-          "line": 323,
+          "line": 325,
           "value": "JSON.stringify(normalized",
           "structure": "BottleStore"
         }
@@ -1199,7 +1199,7 @@
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 986,
+          "line": 1019,
           "value": "valueToWrite",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -1265,6 +1265,20 @@
           "line": 63,
           "value": "JSON.stringify(state.snapshots",
           "structure": "DishAnalysisState"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "entries",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "multiSet",
+          "file": "lib/spirits/crud-store.tsx",
+          "line": 686,
+          "value": "",
+          "structure": "SpiritCategorySummary, SelfBuyConfig, SpiritsState"
         }
       ]
     },
@@ -1360,14 +1374,14 @@
         {
           "operation": "getItem",
           "file": "lib/food/ingredient-store.tsx",
-          "line": 466,
+          "line": 467,
           "value": "",
           "structure": "FoodIngredientState, PurchaseState"
         },
         {
           "operation": "setItem",
           "file": "lib/food/ingredient-store.tsx",
-          "line": 473,
+          "line": 485,
           "value": "JSON.stringify(state",
           "structure": "FoodIngredientState, PurchaseState"
         }
@@ -1430,7 +1444,7 @@
         {
           "operation": "setItem",
           "file": "lib/homemade/store.tsx",
-          "line": 248,
+          "line": 250,
           "value": "JSON.stringify(list",
           "structure": "HomemadeStore"
         }
@@ -1465,7 +1479,7 @@
         {
           "operation": "setItem",
           "file": "lib/homemade/store.tsx",
-          "line": 254,
+          "line": 256,
           "value": "JSON.stringify(list",
           "structure": "HomemadeStore"
         }
@@ -1521,7 +1535,7 @@
         {
           "operation": "setItem",
           "file": "lib/homemade/store.tsx",
-          "line": 260,
+          "line": 262,
           "value": "JSON.stringify(list",
           "structure": "HomemadeStore"
         }
@@ -1576,13 +1590,6 @@
         },
         {
           "operation": "setItem",
-          "file": "lib/backup/icloud-backup.ts",
-          "line": 248,
-          "value": "value",
-          "structure": ""
-        },
-        {
-          "operation": "setItem",
           "file": "lib/backup/local-backup.ts",
           "line": 658,
           "value": "value",
@@ -1633,28 +1640,35 @@
         {
           "operation": "setItem",
           "file": "lib/labor/store.tsx",
-          "line": 90,
+          "line": 92,
           "value": "JSON.stringify(next",
           "structure": "EmployeeStore, CustomDeptStore, DeptOrderStore, ShiftTemplateStore, SpecialStatusStore, HolidayConfigStore, ShiftStore, AttendanceStore, PaySlipStore, GlobalPayrollSettingsStore, MonthCloseStore, MonthConfigStore, CompOffBalanceEntryStore, HolidayCompOffStore, BusinessHoursStore, ShiftGroupStore, UnexplainedRestAlertStore, FillPresetStore"
         },
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 682,
+          "line": 685,
           "value": "value",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         },
         {
           "operation": "removeItem",
           "file": "lib/sync/engine.ts",
-          "line": 684,
+          "line": 688,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         },
         {
           "operation": "getItem",
           "file": "lib/sync/engine.ts",
-          "line": 757,
+          "line": 754,
+          "value": "",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/sync/engine.ts",
+          "line": 784,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -1724,7 +1738,7 @@
         {
           "operation": "multiGet",
           "file": "lib/sync/engine.ts",
-          "line": 806,
+          "line": 833,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -1766,14 +1780,14 @@
         {
           "operation": "getItem",
           "file": "lib/labor/store.tsx",
-          "line": 326,
+          "line": 330,
           "value": "",
           "structure": "EmployeeStore, CustomDeptStore, DeptOrderStore, ShiftTemplateStore, SpecialStatusStore, HolidayConfigStore, ShiftStore, AttendanceStore, PaySlipStore, GlobalPayrollSettingsStore, MonthCloseStore, MonthConfigStore, CompOffBalanceEntryStore, HolidayCompOffStore, BusinessHoursStore, ShiftGroupStore, UnexplainedRestAlertStore, FillPresetStore"
         },
         {
           "operation": "setItem",
           "file": "lib/labor/store.tsx",
-          "line": 340,
+          "line": 344,
           "value": "JSON.stringify(order",
           "structure": "EmployeeStore, CustomDeptStore, DeptOrderStore, ShiftTemplateStore, SpecialStatusStore, HolidayConfigStore, ShiftStore, AttendanceStore, PaySlipStore, GlobalPayrollSettingsStore, MonthCloseStore, MonthConfigStore, CompOffBalanceEntryStore, HolidayCompOffStore, BusinessHoursStore, ShiftGroupStore, UnexplainedRestAlertStore, FillPresetStore"
         }
@@ -2207,14 +2221,14 @@
         {
           "operation": "getItem",
           "file": "lib/store/monthly-report/raw-excel-archive-store.tsx",
-          "line": 82,
+          "line": 148,
           "value": "",
           "structure": "RawExcelArchiveStore"
         },
         {
           "operation": "setItem",
           "file": "lib/store/monthly-report/raw-excel-archive-store.tsx",
-          "line": 99,
+          "line": 168,
           "value": "JSON.stringify(next",
           "structure": "RawExcelArchiveStore"
         }
@@ -2417,7 +2431,7 @@
         {
           "operation": "multiSet",
           "file": "lib/sync/engine.ts",
-          "line": 930,
+          "line": 958,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -2428,6 +2442,13 @@
       "key": "removals",
       "status": "unresolved",
       "calls": [
+        {
+          "operation": "multiRemove",
+          "file": "lib/backup/icloud-backup.ts",
+          "line": 254,
+          "value": "",
+          "structure": ""
+        },
         {
           "operation": "multiRemove",
           "file": "lib/backup/local-backup.ts",
@@ -2445,7 +2466,7 @@
         {
           "operation": "multiRemove",
           "file": "lib/sync/engine.ts",
-          "line": 516,
+          "line": 518,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -2522,15 +2543,8 @@
         {
           "operation": "getItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 516,
+          "line": 622,
           "value": "",
-          "structure": "SpiritCategorySummary, SelfBuyConfig, SpiritsState"
-        },
-        {
-          "operation": "setItem",
-          "file": "lib/spirits/crud-store.tsx",
-          "line": 556,
-          "value": "JSON.stringify(state.customCategories",
           "structure": "SpiritCategorySummary, SelfBuyConfig, SpiritsState"
         }
       ]
@@ -2543,15 +2557,8 @@
         {
           "operation": "getItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 517,
+          "line": 623,
           "value": "",
-          "structure": "SpiritCategorySummary, SelfBuyConfig, SpiritsState"
-        },
-        {
-          "operation": "setItem",
-          "file": "lib/spirits/crud-store.tsx",
-          "line": 557,
-          "value": "JSON.stringify(state.groupMatchMemory",
           "structure": "SpiritCategorySummary, SelfBuyConfig, SpiritsState"
         }
       ]
@@ -2564,15 +2571,8 @@
         {
           "operation": "getItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 513,
+          "line": 619,
           "value": "",
-          "structure": "SpiritCategorySummary, SelfBuyConfig, SpiritsState"
-        },
-        {
-          "operation": "setItem",
-          "file": "lib/spirits/crud-store.tsx",
-          "line": 553,
-          "value": "JSON.stringify(state.groups",
           "structure": "SpiritCategorySummary, SelfBuyConfig, SpiritsState"
         }
       ]
@@ -2585,15 +2585,8 @@
         {
           "operation": "getItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 508,
+          "line": 614,
           "value": "",
-          "structure": "SpiritCategorySummary, SelfBuyConfig, SpiritsState"
-        },
-        {
-          "operation": "setItem",
-          "file": "lib/spirits/crud-store.tsx",
-          "line": 548,
-          "value": "JSON.stringify(state.items",
           "structure": "SpiritCategorySummary, SelfBuyConfig, SpiritsState"
         }
       ]
@@ -2606,15 +2599,8 @@
         {
           "operation": "getItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 510,
+          "line": 616,
           "value": "",
-          "structure": "SpiritCategorySummary, SelfBuyConfig, SpiritsState"
-        },
-        {
-          "operation": "setItem",
-          "file": "lib/spirits/crud-store.tsx",
-          "line": 550,
-          "value": "JSON.stringify(state.ledger",
           "structure": "SpiritCategorySummary, SelfBuyConfig, SpiritsState"
         }
       ]
@@ -2627,15 +2613,8 @@
         {
           "operation": "getItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 514,
+          "line": 620,
           "value": "",
-          "structure": "SpiritCategorySummary, SelfBuyConfig, SpiritsState"
-        },
-        {
-          "operation": "setItem",
-          "file": "lib/spirits/crud-store.tsx",
-          "line": 554,
-          "value": "JSON.stringify(state.matchMemory",
           "structure": "SpiritCategorySummary, SelfBuyConfig, SpiritsState"
         }
       ]
@@ -2648,15 +2627,8 @@
         {
           "operation": "getItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 509,
+          "line": 615,
           "value": "",
-          "structure": "SpiritCategorySummary, SelfBuyConfig, SpiritsState"
-        },
-        {
-          "operation": "setItem",
-          "file": "lib/spirits/crud-store.tsx",
-          "line": 549,
-          "value": "JSON.stringify(state.purchases",
           "structure": "SpiritCategorySummary, SelfBuyConfig, SpiritsState"
         }
       ]
@@ -2669,15 +2641,8 @@
         {
           "operation": "getItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 511,
+          "line": 617,
           "value": "",
-          "structure": "SpiritCategorySummary, SelfBuyConfig, SpiritsState"
-        },
-        {
-          "operation": "setItem",
-          "file": "lib/spirits/crud-store.tsx",
-          "line": 551,
-          "value": "JSON.stringify(state.refPrices",
           "structure": "SpiritCategorySummary, SelfBuyConfig, SpiritsState"
         }
       ]
@@ -2690,15 +2655,8 @@
         {
           "operation": "getItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 515,
+          "line": 621,
           "value": "",
-          "structure": "SpiritCategorySummary, SelfBuyConfig, SpiritsState"
-        },
-        {
-          "operation": "setItem",
-          "file": "lib/spirits/crud-store.tsx",
-          "line": 555,
-          "value": "JSON.stringify(state.selfBuyConfig",
           "structure": "SpiritCategorySummary, SelfBuyConfig, SpiritsState"
         }
       ]
@@ -2711,15 +2669,8 @@
         {
           "operation": "getItem",
           "file": "lib/spirits/crud-store.tsx",
-          "line": 512,
+          "line": 618,
           "value": "",
-          "structure": "SpiritCategorySummary, SelfBuyConfig, SpiritsState"
-        },
-        {
-          "operation": "setItem",
-          "file": "lib/spirits/crud-store.tsx",
-          "line": 552,
-          "value": "JSON.stringify(state.suppliers",
           "structure": "SpiritCategorySummary, SelfBuyConfig, SpiritsState"
         }
       ]
@@ -2886,21 +2837,21 @@
         {
           "operation": "getItem",
           "file": "lib/store/petty-store.tsx",
-          "line": 180,
+          "line": 195,
           "value": "",
           "structure": "PettyRecord, PettyState"
         },
         {
           "operation": "getItem",
           "file": "lib/store/petty-store.tsx",
-          "line": 181,
+          "line": 196,
           "value": "",
           "structure": "PettyRecord, PettyState"
         },
         {
           "operation": "setItem",
           "file": "lib/store/petty-store.tsx",
-          "line": 185,
+          "line": 200,
           "value": "JSON.stringify(state",
           "structure": "PettyRecord, PettyState"
         }
@@ -2977,14 +2928,14 @@
         {
           "operation": "getItem",
           "file": "lib/store/supplier-import.ts",
-          "line": 112,
+          "line": 113,
           "value": "",
           "structure": ""
         },
         {
           "operation": "setItem",
           "file": "lib/store/supplier-import.ts",
-          "line": 121,
+          "line": 122,
           "value": "JSON.stringify(memory",
           "structure": ""
         }
@@ -2998,28 +2949,28 @@
         {
           "operation": "getItem",
           "file": "lib/sync/engine.ts",
-          "line": 654,
+          "line": 656,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         },
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 667,
+          "line": 669,
           "value": "JSON.stringify(backup",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         },
         {
           "operation": "getItem",
           "file": "lib/sync/engine.ts",
-          "line": 677,
+          "line": 679,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         },
         {
           "operation": "getItem",
           "file": "lib/sync/engine.ts",
-          "line": 702,
+          "line": 707,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -3033,21 +2984,21 @@
         {
           "operation": "removeItem",
           "file": "lib/sync/engine.ts",
-          "line": 575,
+          "line": 577,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         },
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 577,
+          "line": 579,
           "value": "JSON.stringify(arr",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         },
         {
           "operation": "getItem",
           "file": "lib/sync/engine.ts",
-          "line": 583,
+          "line": 585,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -3061,14 +3012,14 @@
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 779,
+          "line": 806,
           "value": "String(now",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         },
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 939,
+          "line": 972,
           "value": "String(now",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -3082,28 +3033,28 @@
         {
           "operation": "getItem",
           "file": "lib/sync/engine.ts",
-          "line": 641,
+          "line": 643,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         },
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 645,
+          "line": 647,
           "value": "JSON.stringify(log",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         },
         {
           "operation": "getItem",
           "file": "lib/sync/engine.ts",
-          "line": 653,
+          "line": 655,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         },
         {
           "operation": "getItem",
           "file": "lib/sync/engine.ts",
-          "line": 713,
+          "line": 718,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -3159,14 +3110,14 @@
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 1022,
+          "line": 1056,
           "value": "String(now",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         },
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 1038,
+          "line": 1072,
           "value": "String(c.remoteTs",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -3180,14 +3131,14 @@
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 980,
+          "line": 1013,
           "value": "String(now",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         },
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 987,
+          "line": 1020,
           "value": "String(conflict.remoteTs",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -3201,14 +3152,14 @@
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 730,
+          "line": 731,
           "value": "String(now",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         },
         {
           "operation": "getItem",
           "file": "lib/sync/engine.ts",
-          "line": 758,
+          "line": 785,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -3250,7 +3201,7 @@
         {
           "operation": "setItem",
           "file": "lib/wine/store.tsx",
-          "line": 292,
+          "line": 302,
           "value": "JSON.stringify(state",
           "structure": "WineState, WineSnapshotState, WineImportControlState, WineMasterDataState, SnapshotAction, MasterDataAction, WineSnapshotContextValue, WineMasterDataContextValue"
         }
@@ -3264,14 +3215,14 @@
         {
           "operation": "getItem",
           "file": "lib/wine/store.tsx",
-          "line": 253,
+          "line": 259,
           "value": "",
           "structure": "WineState, WineSnapshotState, WineImportControlState, WineMasterDataState, SnapshotAction, MasterDataAction, WineSnapshotContextValue, WineMasterDataContextValue"
         },
         {
           "operation": "setItem",
           "file": "lib/wine/store.tsx",
-          "line": 310,
+          "line": 320,
           "value": "JSON.stringify(importControlState",
           "structure": "WineState, WineSnapshotState, WineImportControlState, WineMasterDataState, SnapshotAction, MasterDataAction, WineSnapshotContextValue, WineMasterDataContextValue"
         }
@@ -3285,14 +3236,14 @@
         {
           "operation": "getItem",
           "file": "lib/wine/store.tsx",
-          "line": 245,
+          "line": 249,
           "value": "",
           "structure": "WineState, WineSnapshotState, WineImportControlState, WineMasterDataState, SnapshotAction, MasterDataAction, WineSnapshotContextValue, WineMasterDataContextValue"
         },
         {
           "operation": "setItem",
           "file": "lib/wine/store.tsx",
-          "line": 304,
+          "line": 314,
           "value": "JSON.stringify(manualState",
           "structure": "WineState, WineSnapshotState, WineImportControlState, WineMasterDataState, SnapshotAction, MasterDataAction, WineSnapshotContextValue, WineMasterDataContextValue"
         }
@@ -3306,14 +3257,14 @@
         {
           "operation": "getItem",
           "file": "lib/wine/store.tsx",
-          "line": 261,
+          "line": 269,
           "value": "",
           "structure": "WineState, WineSnapshotState, WineImportControlState, WineMasterDataState, SnapshotAction, MasterDataAction, WineSnapshotContextValue, WineMasterDataContextValue"
         },
         {
           "operation": "setItem",
           "file": "lib/wine/store.tsx",
-          "line": 316,
+          "line": 326,
           "value": "JSON.stringify(masterDataState",
           "structure": "WineState, WineSnapshotState, WineImportControlState, WineMasterDataState, SnapshotAction, MasterDataAction, WineSnapshotContextValue, WineMasterDataContextValue"
         }
@@ -3327,14 +3278,14 @@
         {
           "operation": "getItem",
           "file": "lib/wine/store.tsx",
-          "line": 237,
+          "line": 239,
           "value": "",
           "structure": "WineState, WineSnapshotState, WineImportControlState, WineMasterDataState, SnapshotAction, MasterDataAction, WineSnapshotContextValue, WineMasterDataContextValue"
         },
         {
           "operation": "setItem",
           "file": "lib/wine/store.tsx",
-          "line": 298,
+          "line": 308,
           "value": "JSON.stringify(snapshotState",
           "structure": "WineState, WineSnapshotState, WineImportControlState, WineMasterDataState, SnapshotAction, MasterDataAction, WineSnapshotContextValue, WineMasterDataContextValue"
         }
@@ -3345,6 +3296,13 @@
       "key": "writes",
       "status": "unresolved",
       "calls": [
+        {
+          "operation": "multiSet",
+          "file": "lib/backup/icloud-backup.ts",
+          "line": 255,
+          "value": "",
+          "structure": ""
+        },
         {
           "operation": "multiSet",
           "file": "lib/backup/local-backup.ts",
@@ -3362,7 +3320,7 @@
         {
           "operation": "multiSet",
           "file": "lib/sync/engine.ts",
-          "line": 515,
+          "line": 517,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -3406,7 +3364,7 @@
         {
           "operation": "multiRemove",
           "file": "lib/cf-sync/provider.tsx",
-          "line": 683,
+          "line": 702,
           "value": "",
           "structure": "SyncState"
         }
@@ -3455,7 +3413,7 @@
         {
           "operation": "multiGet",
           "file": "lib/backup/icloud-backup.ts",
-          "line": 137,
+          "line": 138,
           "value": "",
           "structure": ""
         },
@@ -3469,7 +3427,7 @@
         {
           "operation": "multiGet",
           "file": "lib/sync/engine.ts",
-          "line": 664,
+          "line": 666,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -3483,7 +3441,7 @@
         {
           "operation": "multiGet",
           "file": "app/backup.tsx",
-          "line": 72,
+          "line": 69,
           "value": "",
           "structure": ""
         }
@@ -3497,7 +3455,7 @@
         {
           "operation": "multiRemove",
           "file": "lib/labor/store.tsx",
-          "line": 1052,
+          "line": 1056,
           "value": "",
           "structure": "EmployeeStore, CustomDeptStore, DeptOrderStore, ShiftTemplateStore, SpecialStatusStore, HolidayConfigStore, ShiftStore, AttendanceStore, PaySlipStore, GlobalPayrollSettingsStore, MonthCloseStore, MonthConfigStore, CompOffBalanceEntryStore, HolidayCompOffStore, BusinessHoursStore, ShiftGroupStore, UnexplainedRestAlertStore, FillPresetStore"
         }
@@ -3539,14 +3497,14 @@
         {
           "operation": "multiRemove",
           "file": "lib/sync/engine.ts",
-          "line": 447,
+          "line": 449,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         },
         {
           "operation": "multiRemove",
           "file": "lib/sync/engine.ts",
-          "line": 520,
+          "line": 522,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -3595,7 +3553,7 @@
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 1037,
+          "line": 1071,
           "value": "valueToWrite",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -3609,9 +3567,23 @@
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 986,
+          "line": 1019,
           "value": "valueToWrite",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
+        }
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
+      "key": "entries",
+      "status": "unresolved",
+      "calls": [
+        {
+          "operation": "multiSet",
+          "file": "lib/spirits/crud-store.tsx",
+          "line": 686,
+          "value": "",
+          "structure": "SpiritCategorySummary, SelfBuyConfig, SpiritsState"
         }
       ]
     },
@@ -3625,13 +3597,6 @@
           "file": "hooks/use-persisted-state.ts",
           "line": 39,
           "value": "",
-          "structure": ""
-        },
-        {
-          "operation": "setItem",
-          "file": "lib/backup/icloud-backup.ts",
-          "line": 248,
-          "value": "value",
           "structure": ""
         },
         {
@@ -3686,28 +3651,35 @@
         {
           "operation": "setItem",
           "file": "lib/labor/store.tsx",
-          "line": 90,
+          "line": 92,
           "value": "JSON.stringify(next",
           "structure": "EmployeeStore, CustomDeptStore, DeptOrderStore, ShiftTemplateStore, SpecialStatusStore, HolidayConfigStore, ShiftStore, AttendanceStore, PaySlipStore, GlobalPayrollSettingsStore, MonthCloseStore, MonthConfigStore, CompOffBalanceEntryStore, HolidayCompOffStore, BusinessHoursStore, ShiftGroupStore, UnexplainedRestAlertStore, FillPresetStore"
         },
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 682,
+          "line": 685,
           "value": "value",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         },
         {
           "operation": "removeItem",
           "file": "lib/sync/engine.ts",
-          "line": 684,
+          "line": 688,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         },
         {
           "operation": "getItem",
           "file": "lib/sync/engine.ts",
-          "line": 757,
+          "line": 754,
+          "value": "",
+          "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
+        },
+        {
+          "operation": "getItem",
+          "file": "lib/sync/engine.ts",
+          "line": 784,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -3777,7 +3749,7 @@
         {
           "operation": "multiGet",
           "file": "lib/sync/engine.ts",
-          "line": 806,
+          "line": 833,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -3791,7 +3763,7 @@
         {
           "operation": "multiSet",
           "file": "lib/sync/engine.ts",
-          "line": 930,
+          "line": 958,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -3802,6 +3774,13 @@
       "key": "removals",
       "status": "unresolved",
       "calls": [
+        {
+          "operation": "multiRemove",
+          "file": "lib/backup/icloud-backup.ts",
+          "line": 254,
+          "value": "",
+          "structure": ""
+        },
         {
           "operation": "multiRemove",
           "file": "lib/backup/local-backup.ts",
@@ -3819,7 +3798,7 @@
         {
           "operation": "multiRemove",
           "file": "lib/sync/engine.ts",
-          "line": 516,
+          "line": 518,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -3903,14 +3882,14 @@
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 1022,
+          "line": 1056,
           "value": "String(now",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         },
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 1038,
+          "line": 1072,
           "value": "String(c.remoteTs",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -3924,14 +3903,14 @@
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 980,
+          "line": 1013,
           "value": "String(now",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         },
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 987,
+          "line": 1020,
           "value": "String(conflict.remoteTs",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -3945,14 +3924,14 @@
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 730,
+          "line": 731,
           "value": "String(now",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         },
         {
           "operation": "getItem",
           "file": "lib/sync/engine.ts",
-          "line": 758,
+          "line": 785,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -3986,6 +3965,13 @@
       "calls": [
         {
           "operation": "multiSet",
+          "file": "lib/backup/icloud-backup.ts",
+          "line": 255,
+          "value": "",
+          "structure": ""
+        },
+        {
+          "operation": "multiSet",
           "file": "lib/backup/local-backup.ts",
           "line": 333,
           "value": "",
@@ -4001,7 +3987,7 @@
         {
           "operation": "multiSet",
           "file": "lib/sync/engine.ts",
-          "line": 515,
+          "line": 517,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }

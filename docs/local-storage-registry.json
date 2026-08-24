@@ -1,8 +1,8 @@
 {
   "version": 2,
   "generatedFrom": "docs/local-storage-schema.json",
-  "entryCount": 137,
-  "dynamicEntryCount": 31,
+  "entryCount": 138,
+  "dynamicEntryCount": 32,
   "entries": [
     {
       "backend": "AsyncStorage",
@@ -841,6 +841,22 @@
     },
     {
       "backend": "AsyncStorage",
+      "key": "entries",
+      "status": "unresolved",
+      "classification": "S0-public",
+      "ownerFiles": [
+        "lib/spirits/crud-store.tsx"
+      ],
+      "operations": [
+        "multiSet"
+      ],
+      "dynamic": true,
+      "purgeOn": [
+        "version-retirement"
+      ]
+    },
+    {
+      "backend": "AsyncStorage",
       "key": "equipment.inventory.v1",
       "status": "resolved",
       "classification": "S1-business",
@@ -1071,7 +1087,6 @@
       "classification": "S0-public",
       "ownerFiles": [
         "hooks/use-persisted-state.ts",
-        "lib/backup/icloud-backup.ts",
         "lib/backup/local-backup.ts",
         "lib/cf-sync/client.ts",
         "lib/labor/store.tsx",
@@ -1594,6 +1609,7 @@
       "status": "unresolved",
       "classification": "S0-public",
       "ownerFiles": [
+        "lib/backup/icloud-backup.ts",
         "lib/backup/local-backup.ts",
         "lib/sync/engine.ts"
       ],
@@ -1663,8 +1679,7 @@
         "lib/spirits/crud-store.tsx"
       ],
       "operations": [
-        "getItem",
-        "setItem"
+        "getItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -1681,8 +1696,7 @@
         "lib/spirits/crud-store.tsx"
       ],
       "operations": [
-        "getItem",
-        "setItem"
+        "getItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -1699,8 +1713,7 @@
         "lib/spirits/crud-store.tsx"
       ],
       "operations": [
-        "getItem",
-        "setItem"
+        "getItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -1717,8 +1730,7 @@
         "lib/spirits/crud-store.tsx"
       ],
       "operations": [
-        "getItem",
-        "setItem"
+        "getItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -1735,8 +1747,7 @@
         "lib/spirits/crud-store.tsx"
       ],
       "operations": [
-        "getItem",
-        "setItem"
+        "getItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -1753,8 +1764,7 @@
         "lib/spirits/crud-store.tsx"
       ],
       "operations": [
-        "getItem",
-        "setItem"
+        "getItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -1771,8 +1781,7 @@
         "lib/spirits/crud-store.tsx"
       ],
       "operations": [
-        "getItem",
-        "setItem"
+        "getItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -1789,8 +1798,7 @@
         "lib/spirits/crud-store.tsx"
       ],
       "operations": [
-        "getItem",
-        "setItem"
+        "getItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -1807,8 +1815,7 @@
         "lib/spirits/crud-store.tsx"
       ],
       "operations": [
-        "getItem",
-        "setItem"
+        "getItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -1825,8 +1832,7 @@
         "lib/spirits/crud-store.tsx"
       ],
       "operations": [
-        "getItem",
-        "setItem"
+        "getItem"
       ],
       "dynamic": false,
       "purgeOn": [
@@ -2278,6 +2284,7 @@
       "status": "unresolved",
       "classification": "S0-public",
       "ownerFiles": [
+        "lib/backup/icloud-backup.ts",
         "lib/backup/local-backup.ts",
         "lib/sync/engine.ts"
       ],
