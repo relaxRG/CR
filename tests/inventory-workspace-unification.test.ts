@@ -35,7 +35,7 @@ describe("库存六类与店铺四类工作台统一规范", () => {
     expect(base).toContain('label: "库存管理"');
     expect(base).toContain('label: "当月进货"');
     expect(spirits).toContain('label: "采购分析"');
-    expect(wine).toContain('label: "供应商信息"');
+    expect(wine).toContain('label: "采购管理"');
     expect(spirits).not.toContain('label: "📦 当月进货"');
     expect(wine).not.toContain('label: "📦 当月进货"');
     expect(wine).toContain('<StoreSegmentedTabs');

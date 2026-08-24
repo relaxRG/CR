@@ -41,7 +41,7 @@ const VIEW_TABS: { key: ViewTab; label: string }[] = [
   { key: "summary", label: "总结" },
   { key: "ledger", label: "库存管理" },
   { key: "purchase", label: "当月进货" },
-  { key: "supplier", label: "供应商信息" },
+  { key: "supplier", label: "采购管理" },
 ];
 
 function getCurrentMonth(): string {
@@ -439,7 +439,7 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
     { key: "sequence", label: "序号", width: 46, compactWidth: 40, flexWeight: 0.4, align: "center", render: (row) => <Text style={{ color: colors.muted, fontSize: STORE_TABLE_METRICS.bodyFontSize }}>{row.itemId}</Text> },
     { key: "name", sortKey: "name", label: "商品名称", width: 184, compactWidth: 150, pinned: true, flexWeight: 3, onPress: setSelectedLedgerItem, testID: (row) => `wine-ledger-name-${row.itemId}`, render: (row) => <Text numberOfLines={2} style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.nameFontSize, fontWeight: "500", lineHeight: 16 }}>{row.name}</Text> },
     { key: "referencePrice", label: "参考价", width: 96, compactWidth: 68, flexWeight: 1.1, align: "right", render: (row) => <Text style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{formatStoreMoney(row.openingUnitCost)}</Text> },
-    { key: "openingQty", sortKey: "openingQty", label: "期初量", width: 88, flexWeight: 1, align: "right", render: (row) => <Text style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{formatStoreQuantity(row.openingQty)}</Text> },
+    { key: "openingQty", sortKey: "openingQty", label: "期初库存", width: 88, flexWeight: 1, align: "right", render: (row) => <Text style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{formatStoreQuantity(row.openingQty)}</Text> },
     { key: "openingUnitCost", sortKey: "openingUnitCost", label: "期初单价", width: 104, flexWeight: 1.2, align: "right", render: (row) => <Text style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{formatStoreMoney(row.openingUnitCost)}</Text> },
     { key: "openingCost", sortKey: "openingCost", label: "期初成本", width: 112, flexWeight: 1.3, align: "right", render: (row) => <Text style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{formatStoreMoney(row.openingCost)}</Text> },
     { key: "purchaseQty", sortKey: "purchaseQty", label: "进货量", width: 88, flexWeight: 1, align: "right", render: (row) => <Text style={{ color: row.purchaseQty > 0 ? colors.primary : colors.muted, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{row.purchaseQty > 0 ? `+${formatStoreQuantity(row.purchaseQty)}` : "—"}</Text> },
@@ -946,7 +946,7 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
           </ScrollView>
 
           {!selectedSupplierView ? (
-            <View style={S.emptyWrap}><Text style={{ color: colors.muted }}>暂无供应商信息</Text></View>
+            <View style={S.emptyWrap}><Text style={{ color: colors.muted }}>暂无采购管理资料</Text></View>
           ) : (
             <ScrollView testID="wine-supplier-info-scroll" contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }}>
               <View style={[S.supplierInfoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -1039,7 +1039,7 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
             <TouchableOpacity onPress={() => {
               tap();
               const supplier = purchaseFilterSupplier ?? allSuppliers[0];
-              if (!supplier) { Alert.alert("提示", "请先在葡萄酒库新增酒款或供应商信息后再录入进货。"); return; }
+              if (!supplier) { Alert.alert("提示", "请先在葡萄酒库建立酒款或采购管理资料后再录入进货。"); return; }
               setActiveSupplierForEntry(supplier);
               setShowPurchaseSheet(true);
             }} style={[S.actionBtn, { backgroundColor: colors.primary, borderColor: colors.primary, flex: 1 }]}>
