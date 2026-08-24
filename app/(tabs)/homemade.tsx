@@ -10,8 +10,7 @@ import {
   StyleSheet,
   Text,
   View,
-} from "react-native";
-import { ActivityIndicator } from "react-native";
+ ActivityIndicator } from "react-native";
 import DraggableFlatList, {
   ScaleDecorator,
   RenderItemParams,
@@ -56,6 +55,10 @@ import {
   prepSectionOfIn,
   prepTypeLabelIn,
 } from "@/lib/homemade/types";
+import { useCapabilityGuard } from "@/hooks/use-can";
+import { MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
+
+const VIRTUAL_PREP_PARENTS: readonly string[] = ["__base", "__tech"];
 
 type ListRow =
   | { kind: "header"; key: string; sectionKey: string; count: number }
@@ -154,20 +157,19 @@ export default function HomemadeScreen() {
   // 快捷筛选解析:选中分区与其下细化的类型集合
   const quickSections = useMemo(() => Object.keys(quickSel), [quickSel]);
   // 虚拟父分类 key(非分区):基酒/工艺,单独解析
-  const VIRTUAL_PARENTS = ["__base", "__tech"];
   const quickBaseSel = quickSel["__base"] ?? [];
   const quickTechSel = quickSel["__tech"] ?? [];
-  const realQuickSections = useMemo(() => quickSections.filter((k) => !VIRTUAL_PARENTS.includes(k)), [quickSections]);
+  const realQuickSections = useMemo(() => quickSections.filter((k) => !VIRTUAL_PREP_PARENTS.includes(k)), [quickSections]);
   const quickTypes = useMemo(
     () =>
       [
         ...new Set(
           Object.entries(quickSel)
-            .filter(([k]) => !VIRTUAL_PARENTS.includes(k))
+            .filter(([k]) => !VIRTUAL_PREP_PARENTS.includes(k))
             .flatMap(([, v]) => v),
         ),
       ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
     [quickSel],
   );
 
@@ -653,7 +655,7 @@ export default function HomemadeScreen() {
       exitSelectMode();
     };
     if (Platform.OS === "web") {
-      // eslint-disable-next-line no-alert
+
       if (window.confirm(t("sel.delete.confirmMsg").replace("{n}", String(n)))) doDelete();
       return;
     }
@@ -665,7 +667,7 @@ export default function HomemadeScreen() {
         { text: t("common.delete"), style: "destructive", onPress: doDelete },
       ],
     );
-  }, [selectedIds, deletePreps, exitSelectMode, t]);
+  }, [selectedIds, t, exitSelectMode, deleteBottles, deletePreps]);
 
   /** 批量改类型(分区/分组随类型隐含带出) */
   const handleBulkApply = useCallback(
@@ -1076,7 +1078,7 @@ function PrepRow({
     const bottleId = isVirtual ? prep.id.replace('bottle-override-', '') : '';
     const doDelete = () => isVirtual ? deleteBottle(bottleId) : deletePrep(prep.id);
     if (Platform.OS === "web") {
-      // eslint-disable-next-line no-alert
+
       if (typeof window !== "undefined" && window.confirm(t("tags.delete.confirm", { name }))) {
         doDelete();
       }
@@ -1630,5 +1632,3 @@ const styles = StyleSheet.create({
   selRow: { flexDirection: "row", alignItems: "center" },
   selCheckWrap: { width: 34, alignItems: "flex-start", justifyContent: "center" },
 });
-import { useCapabilityGuard } from "@/hooks/use-can";
-import { MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";

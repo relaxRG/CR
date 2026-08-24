@@ -11,8 +11,7 @@ import {
   Text,
   TextInput,
   View,
-} from "react-native";
-import { FlatList } from "react-native";
+ FlatList , Switch } from "react-native";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { SmartImportBar } from "@/components/smart-import-bar";
@@ -33,11 +32,9 @@ import {
   guessPrepType,
   prepGroupOfSection,
   splitPrepIngredientLine,
-} from "@/lib/homemade/types";
-import {
+
   SHELF_LIFE_OPTIONS,
-  PrepGroup,
-} from "@/lib/homemade/types";
+  PrepGroup} from "@/lib/homemade/types";
 import { useBottleStore } from "@/lib/bottles/store";
 import { estimatePrepCost, type PrepCostEstimate } from "@/lib/homemade/cost";
 import { suggestIngredients } from "@/lib/suggest";
@@ -46,7 +43,6 @@ import { BOTTLE_GROUPS, BottleGroupKey, categoriesOfGroup } from "@/lib/bottles/
 import { smartLinkIngredient, smartLinkDisplayName } from "@/lib/recipes/smart-link";
 import { genId, FLAVOR_TAGS } from "@/lib/recipes/types";
 import { useRecipeStore } from "@/lib/recipes/store";
-import { Switch } from "react-native";
 import { LinkPickerSheet } from "@/components/link-picker-sheet";
 import { MOBILE_NESTABLE_DRAGGABLE_LIST_PROPS, MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
 
@@ -95,7 +91,7 @@ export default function HomemadeFormScreen() {
     prefillType?: string;
   }>();
   const { ready, getPrep, addPrep, updatePrep, deletePrep, sections, types: typeList, preps: allPreps } = useHomemadeStore();
-  const { bottles, addBottle, deleteBottle: _deleteBottle } = useBottleStore();
+  const { bottles, addBottle } = useBottleStore();
   const { recipes, updateRecipe } = useRecipeStore();
   const { groupOf, categoryLabel } = useBottleTaxonomy();
   const editing = getPrep(id);
@@ -216,7 +212,7 @@ export default function HomemadeFormScreen() {
   const { recentUnits, addRecentUnit } = useRecentUnits();
 
   // selectedGroup 变化时，如果当前 type 不属于新分组，重置到新分组第一个类型
-  const handleGroupChange = (grp: PrepGroup) => {
+  const handleGroupChange = useCallback((grp: PrepGroup) => {
     setSelectedGroup(grp);
     const sec = typeList.find((pt) => pt.key === type)?.section ?? "";
     const currentGrp = sections.find((s) => s.key === sec)?.group ?? prepGroupOfSection(sections, sec);
@@ -229,7 +225,7 @@ export default function HomemadeFormScreen() {
         setTypeTouched(true);
       }
     }
-  };
+  }, [sections, type, typeList]);
 
   const canSave = useMemo(() => name.trim().length > 0, [name]);
 
@@ -329,7 +325,7 @@ export default function HomemadeFormScreen() {
 
   // ── AI 补全 ──────────────────────────────────────────────────────────
   const { isOnline } = useNetwork();
-  
+
   const [aiBusy, setAiBusy] = useState(false);
   const [aiResult, setAiResult] = useState<EnrichHomemadeResult | null>(null);
   const [linkPickerTarget, setLinkPickerTarget] = useState<{ id: string; query: string } | null>(null);
@@ -445,7 +441,7 @@ export default function HomemadeFormScreen() {
         ...(ing.alternatives && ing.alternatives.length > 0 ? { alternatives: ing.alternatives } : {}),
       })));
       // 装饰类：若 prepIngredients 第一条有 suggestedSection 属于 garnish，自动切换分组
-      const firstIngExt = (aiResult.prepIngredients as Array<{ name: string; amount: string; alternatives?: string[]; suggestedSection?: string; suggestedType?: string; garnishUnit?: string }>)[0];
+      const firstIngExt = (aiResult.prepIngredients as { name: string; amount: string; alternatives?: string[]; suggestedSection?: string; suggestedType?: string; garnishUnit?: string }[])[0];
       if (firstIngExt?.suggestedSection) {
         const grp = prepGroupOfSection(sections, firstIngExt.suggestedSection);
         if (grp !== selectedGroup) {
@@ -454,7 +450,7 @@ export default function HomemadeFormScreen() {
         if (firstIngExt.garnishUnit) setGarnishUnit(firstIngExt.garnishUnit);
       }
     }
-  }, [aiResult]);
+  }, [aiResult, handleGroupChange, sections, selectedGroup]);
 
   const applyAiResult = useCallback(() => {
   // applyField intentionally uses [aiResult] only; sections/selectedGroup/handleGroupChange
@@ -527,7 +523,7 @@ export default function HomemadeFormScreen() {
       // 装饰类：若 AI 识别为装饰分组，自动预填 garnishUnit（优先从 prepIngredients 第一条推断）
       if (res.section && prepGroupOfSection(sections, res.section) === "garnish") {
         // 从第一条 prepIngredient 的 garnishUnit 推断，或从 suggestPrep 推断
-        const firstIng = (res.prepIngredients as Array<{ name: string; amount: string; alternatives?: string[]; suggestedSection?: string; suggestedType?: string; garnishUnit?: string }>)[0];
+        const firstIng = (res.prepIngredients as { name: string; amount: string; alternatives?: string[]; suggestedSection?: string; suggestedType?: string; garnishUnit?: string }[])[0];
         const aiGarnishUnit = firstIng?.garnishUnit ?? suggestPrep(name.trim())?.garnishUnit;
         if (aiGarnishUnit) setGarnishUnit(aiGarnishUnit);
       }

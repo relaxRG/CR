@@ -1359,7 +1359,7 @@ export default function RecipeFormScreen() {
         ) : null}
       </View>
     );
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [ingredients, ingSourceMap, dismissedLinks, acceptedLinks, focusedIng, pickedIng, bottles, preps, lang, groupOf, colors, t, addAltIngId, addAltIngValue]);
 
   const toggleFlavor = (tag: string) => {

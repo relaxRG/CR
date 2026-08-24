@@ -386,7 +386,7 @@ export default function CompareScreen() {
       },
     ];
     return { columns, sections };
-  }, [type, ids.join(","), recipes, preps, bottles, types, lang, t, getCategory]);
+  }, [type, ids, t, lang, preps, bottles, types, recipes, getCategory]);
 
   if (columns.length === 0) {
     return (

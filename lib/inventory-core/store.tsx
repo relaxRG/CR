@@ -297,13 +297,13 @@ export function createGenericInventoryStore(storageKey: string, categoryId: stri
         referencePrices: 0,
         currentStock: state.items.find((item) => item.id === itemId)?.currentStock ?? 0,
       }),
-    }), [categoryId, state]);
+    }), [state]);
 
     const applyBulkOperation = useCallback((preflight: InventoryBulkPreflight, targetCategory?: string): InventoryOperationReceipt => {
       const receipt = createInventoryOperationReceipt({ scope: categoryId, preflight });
       dispatch({ type: "APPLY_BULK_ITEM_OPERATION", preflight, targetCategory, receipt });
       return receipt;
-    }, [categoryId]);
+    }, []);
 
     const restoreArchivedItems = useCallback((ids: string[]): InventoryOperationReceipt => {
       const now = new Date().toISOString();
@@ -320,7 +320,7 @@ export function createGenericInventoryStore(storageKey: string, categoryId: stri
       };
       dispatch({ type: "RESTORE_ARCHIVED_ITEMS", ids: [...new Set(ids)], receipt });
       return receipt;
-    }, [categoryId]);
+    }, []);
 
     const getArchivedItems = useCallback(() => state.items.filter((item) => !item.active), [state.items]);
 

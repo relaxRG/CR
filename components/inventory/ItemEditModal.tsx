@@ -3,7 +3,7 @@
  * 适用于：啤酒/冰块/水果/杯具/餐具/日用品
  * 各品类通过 extraFields 扩展专有字段
  */
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Alert, KeyboardAvoidingView, Modal, Platform, Pressable,
   ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View
@@ -56,9 +56,13 @@ export function ItemEditModal({
   const [supplier, setSupplier] = useState("");
   const [notes, setNotes] = useState("");
   const [extra, setExtra] = useState<Record<string, string>>({});
+  // 表单配置的变化不应在用户填写时重置字段；仅在打开弹窗或切换商品时读取最新配置。
+  const initialConfigRef = useRef({ categoryOptions, defaultUnit, extraFields });
+  initialConfigRef.current = { categoryOptions, defaultUnit, extraFields };
 
   useEffect(() => {
     if (!visible) return;
+    const initialConfig = initialConfigRef.current;
     if (item) {
       setName(item.name);
       setNameEn(item.nameEn ?? "");
@@ -71,16 +75,16 @@ export function ItemEditModal({
       setNotes(item.notes);
       // 恢复 extra 字段
       const extraInit: Record<string, string> = {};
-      extraFields.forEach((f) => {
+      initialConfig.extraFields.forEach((f) => {
         extraInit[f.key] = String((item.extra as any)?.[f.key] ?? "");
       });
       setExtra(extraInit);
     } else {
-      setName(""); setNameEn(""); setCategory(categoryOptions?.[0]?.value ?? "other");
-      setSpec(""); setUnit(defaultUnit); setCurrentStock("0");
+      setName(""); setNameEn(""); setCategory(initialConfig.categoryOptions?.[0]?.value ?? "other");
+      setSpec(""); setUnit(initialConfig.defaultUnit); setCurrentStock("0");
       setLatestCostPrice(""); setSupplier(""); setNotes("");
       const extraInit: Record<string, string> = {};
-      extraFields.forEach((f) => { extraInit[f.key] = ""; });
+      initialConfig.extraFields.forEach((f) => { extraInit[f.key] = ""; });
       setExtra(extraInit);
     }
   }, [visible, item]);

@@ -271,7 +271,7 @@ export default function PeriodAnalysisScreen({ embedded = false }: { embedded?: 
 
   React.useEffect(() => {
     if (latestReport && !selectedMonth) setSelectedMonth(latestReport.month);
-  }, [latestReport]);
+  }, [latestReport, selectedMonth]);
 
   const handleImport = async () => {
     tap();

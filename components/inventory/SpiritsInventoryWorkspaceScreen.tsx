@@ -30,13 +30,12 @@ import {
 import {
   SpiritItem, SpiritPurchaseRecord, SpiritLedgerEntry,
   SPIRIT_CATEGORY_COLORS, SPIRIT_CATEGORIES,
-} from "@/lib/spirits/types";
+   SpiritMonthlySnapshot, SpiritInventoryItem, SpiritPriceChange, SpiritPurchaseOrderItem } from "@/lib/spirits/types";
 import { resolveSpiritItemForSupplierName } from "@/lib/spirits/supplier-alias";
 import { resolvePurchaseDisplayCategory } from "@/lib/spirits/purchase-category-sync";
 import type { ParsedPurchaseRow } from "@/lib/spirits/excel-import";
 import { buildImportedPurchaseRecords, dominantPurchaseMonth } from "@/lib/spirits/import-bridge";
 import { normalizeImportDate } from "@/lib/import/date-utils";
-import {   SpiritMonthlySnapshot, SpiritInventoryItem, SpiritPriceChange, SpiritPurchaseOrderItem } from "@/lib/spirits/types";
 import type { ExportData } from "@/lib/spirits/export";
 import { formatStoreMoney, STORE_TABLE_METRICS } from "@/lib/store/table-display";
 import { INVENTORY_WORKSPACE_METRICS, resolveInventoryTableWindowLayout, scaleInventoryTableWidths, tableHeaderAccessibilityLabel } from "@/lib/store/inventory-workspace-ui";
@@ -72,7 +71,7 @@ function tap() { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFe
 // 固定宽度在 iPhone 上保留“序号 + 商品名称 + 参考价 + 首个库存数值”的可读首屏，其余列横滑查看。
 const SPIRIT_LEDGER_SELECT_WIDTH = 28;
 const SPIRIT_LEDGER_INDEX_WIDTH = 28;
-const SPIRIT_LEDGER_COLUMNS: ReadonlyArray<readonly [string, LedgerSortKey, number]> = [
+const SPIRIT_LEDGER_COLUMNS: readonly (readonly [string, LedgerSortKey, number])[] = [
   ["商品名称", "name", 140], ["参考价", "referencePrice", 62], ["期初库存", "openingQty", 56], ["期初单价", "openingUnitCost", 68], ["期初成本", "openingCost", 76],
   ["进货量", "purchaseQty", 56], ["进货成本", "purchaseCost", 76], ["期末库存", "closingQty", 56], ["期末单价", "closingUnitCost", 68], ["期末成本", "closingCost", 76],
   ["消耗量", "consumeQty", 56], ["消耗成本", "consumeCost", 76], ["集团", "group", 84],
@@ -100,7 +99,7 @@ function LedgerDetailSection({
   tone = "default",
 }: {
   title: string;
-  metrics: Array<[string, string | number]>;
+  metrics: [string, string | number][];
   colors: ReturnType<typeof useColors>;
   tone?: "default" | "negative";
 }) {
@@ -142,14 +141,14 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
   const {
     items, purchases, ledger, suppliers, groups,
     addItem, updateItem, deleteItem,
-    batchAddPurchases, 
+    batchAddPurchases,
     upsertLedger,
     setRefPrice, getRefPrice,
     upsertSupplier, getSupplierByName,
     upsertGroup, moveGroup, deleteGroup, getItemGroup,
-    getAllCategories, upsertCustomCategory, moveCategory, removeCategorySafely, 
-    
-    
+    getAllCategories, upsertCustomCategory, moveCategory, removeCategorySafely,
+
+
     getMonthPurchases, getMonthLedger, getItemLedger,
     getPurchaseSummaryByCategory, getPurchaseSummaryBySupplier,
     closeMonth, syncLedgerFromPurchases,
@@ -224,19 +223,19 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
   const [showInventoryCategoryManager, setShowInventoryCategoryManager] = useState(false);
   const [stocktakeValues, setStocktakeValues] = useState<Record<string, string>>({});
 
-  const monthPurchases = useMemo(() => getMonthPurchases(selectedMonth), [purchases, selectedMonth]);
-  const monthLedger = useMemo(() => getMonthLedger(selectedMonth), [ledger, selectedMonth]);
+  const monthPurchases = useMemo(() => getMonthPurchases(selectedMonth), [getMonthPurchases, selectedMonth]);
+  const monthLedger = useMemo(() => getMonthLedger(selectedMonth), [getMonthLedger, selectedMonth]);
   const itemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
   const monthLedgerByItemId = useMemo(() => new Map(monthLedger.map((entry) => [entry.itemId, entry])), [monthLedger]);
 
   // 上月
   const [y, m] = selectedMonth.split("-").map(Number);
   const prevMonth = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
-  const prevMonthLedger = useMemo(() => getMonthLedger(prevMonth), [ledger, prevMonth]);
-  const prevMonthPurchases = useMemo(() => getMonthPurchases(prevMonth), [purchases, prevMonth]);
-  const categorySummary = useMemo(() => getPurchaseSummaryByCategory(selectedMonth), [ledger, selectedMonth]);
-  const prevCategorySummary = useMemo(() => getPurchaseSummaryByCategory(prevMonth), [ledger, prevMonth]);
-  const supplierSummary = useMemo(() => getPurchaseSummaryBySupplier(selectedMonth), [purchases, selectedMonth]);
+  const prevMonthLedger = useMemo(() => getMonthLedger(prevMonth), [getMonthLedger, prevMonth]);
+  const prevMonthPurchases = useMemo(() => getMonthPurchases(prevMonth), [getMonthPurchases, prevMonth]);
+  const categorySummary = useMemo(() => getPurchaseSummaryByCategory(selectedMonth), [getPurchaseSummaryByCategory, selectedMonth]);
+  const prevCategorySummary = useMemo(() => getPurchaseSummaryByCategory(prevMonth), [getPurchaseSummaryByCategory, prevMonth]);
+  const supplierSummary = useMemo(() => getPurchaseSummaryBySupplier(selectedMonth), [getPurchaseSummaryBySupplier, selectedMonth]);
   // 性能优化：将 renderSummary 内的多次 reduce 提取为 useMemo
   const summaryTotals = useMemo(() => ({
     purchaseAmt: monthPurchases.reduce((s, p) => s + p.amount, 0),
@@ -337,7 +336,7 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
     return Object.entries(groupTotals).map(([g, v]) => ({
       label: g, value: v, pct: Math.round(v / total * 100), color: GROUP_COLORS[g] ?? "#6B7280",
     })).sort((a, b) => b.value - a.value);
-  }, [chartDimension, categorySummary, supplierSummary, monthPurchases, itemById, groups]);
+  }, [chartDimension, monthPurchases, groups, categorySummary, supplierSummary, itemById, getItemGroup]);
 
   const renderSummary = () => (
     <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }}>
@@ -641,7 +640,7 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
       consumeQty: entry?.consumeQty ?? 0,
       consumeCost,
     };
-  }), [items, monthLedgerByItemId, selectedMonth, ledgerNameLanguage, groups]);
+  }), [items, monthLedgerByItemId, ledgerNameLanguage, getItemGroup, getRefPrice, selectedMonth]);
   const ledgerNameOptions = useMemo(() => collectLedgerNameOptions(ledgerTableRows), [ledgerTableRows]);
   const visibleLedgerRows = useMemo(() => applyLedgerTableView(ledgerTableRows, ledgerTableView), [ledgerTableRows, ledgerTableView]);
   const visibleLedgerTotals = useMemo(() => calculateLedgerTableTotals(visibleLedgerRows), [visibleLedgerRows]);
@@ -924,7 +923,7 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
               {/* 按分类分组（动态，未分类置顶） */}
               {(() => {
                 const allCats = getAllCategories();
-                const catGroups: Array<{ cat: string; catItems: SpiritItem[] }> = [];
+                const catGroups: { cat: string; catItems: SpiritItem[] }[] = [];
                 if (ledgerTableHasAdjustments) {
                   // Excel排序/筛选时必须保持全局顺序，不能再被分类标题分段打断。
                   catGroups.push({ cat: "__filtered__", catItems: visibleLedgerRows.map((row) => itemById.get(row.id)).filter((item): item is SpiritItem => Boolean(item)) });
@@ -1247,8 +1246,6 @@ export default function SpiritsInventoryScreen({ month, embedded = false }: Spir
   const [showAddSupplier, setShowAddSupplier] = useState(false);
   const [newSupplierName, setNewSupplierName] = useState("");
   // 未匹配商品操作 Modal（供应商列表页提示条使用）
-  const [] = useState<SpiritPurchaseRecord | null>(null);
-  const [] = useState(false);
   // 集团管理 Modal（采购分析 Tab 使用）
   const [showGroupManager, setShowGroupManager] = useState(false);
   const [editingGroup, setEditingGroup] = useState<SpiritGroupDef | null>(null);
@@ -1748,7 +1745,7 @@ function SupplierDetailScreen({
 }) {
   const {
     addPurchase, batchAddPurchases, batchDeletePurchases,
-    updatePurchase, 
+    updatePurchase,
     getRefPrice, setMatchMemory, matchPettyToItem,
     selfBuyConfig, syncLedgerFromPurchases,
     getMonthLedger,
@@ -1760,9 +1757,8 @@ function SupplierDetailScreen({
   } = store;
   const router2 = useRouter();
   const { width: appWindowWidth } = useWindowDimensions();
-  const monthPurchases = useMemo(() => getMonthPurchases(month), [purchases, month]);
+  const monthPurchases = useMemo(() => getMonthPurchases(month), [getMonthPurchases, month]);
   const isSelfBuy = supplier === "自采";
-  const [] = month.split("-").map(Number);
 
   const supPurchases = useMemo(
     () => purchases.filter((p) => p.month === month && (p.supplier ?? "未知供应商") === supplier)
@@ -1815,7 +1811,7 @@ function SupplierDetailScreen({
     [previewPurchaseId, purchases],
   );
   const bottleLinkOptions = useMemo(() => {
-    if (!previewItem || !bottleLinkMode) return [] as Array<{ bottle: import("@/lib/bottles/types").Bottle; score: number }>;
+    if (!previewItem || !bottleLinkMode) return [] as { bottle: import("@/lib/bottles/types").Bottle; score: number }[];
     const query = bottleLinkQuery.trim().toLocaleLowerCase();
     const sourceNames = [previewItem.name, previewItem.nameEn, previewPurchase?.rawName].filter(Boolean) as string[];
     const exactChannelBottleId = bottleLinkMode === "smart" && previewPurchase?.rawName
@@ -1854,7 +1850,6 @@ function SupplierDetailScreen({
   const [showGroupManager, setShowGroupManager] = useState(false);
   const [editingGroup, setEditingGroup] = useState<SpiritGroupDef | null>(null);
   // 分类管理 Modal
-  const [] = useState(false);
   // 分类选择器 Modal
   const [showCatPicker2, setShowCatPicker2] = useState(false);
   const [catPickerTitle2, setCatPickerTitle2] = useState("");
@@ -1894,7 +1889,7 @@ function SupplierDetailScreen({
       categoryOrder: purchaseCategoryOrderByName.get(resolvePurchaseDisplayCategory(purchase, item)) ?? Number.MAX_SAFE_INTEGER,
       displayGroup: purchase.group || detectPurchaseGroup(purchase.rawName) || (item ? getItemGroup(item) : ""),
     };
-  }), [supPurchases, purchaseItemById, purchaseNameLanguage, groups, purchaseCategoryOrderByName]);
+  }), [supPurchases, purchaseItemById, purchaseNameLanguage, purchaseCategoryOrderByName, detectPurchaseGroup, getItemGroup]);
   const supplierPurchaseNameOptions = useMemo(
     () => collectSupplierPurchaseNameOptions(supplierPurchaseRows),
     [supplierPurchaseRows],
@@ -1948,7 +1943,7 @@ function SupplierDetailScreen({
   // 虚拟列表按固定行数切分日期组：即使单日导入上万条，也不会在一个 renderItem 内创建整天的全部行。
   const purchaseVirtualGroups = useMemo(
     () => purchaseDisplayGroups.flatMap((group) => {
-      const chunks = [] as Array<typeof group>;
+      const chunks = [] as typeof group[];
       for (let start = 0; start < group.rows.length; start += 32) {
         chunks.push({ ...group, id: `${group.id}:${start}`, rows: group.rows.slice(start, start + 32) });
       }
@@ -3174,6 +3169,9 @@ function ItemFormModal({ visible, item, colors, allCategories, onSave, onClose }
 
   const [priceAlertPct, setPriceAlertPct] = useState(String(item?.priceAlertPct ?? ""));
   const [specMl, setSpecMl] = useState(item?.specMl != null ? String(item.specMl) : "");
+  // 分类列表异步刷新时不得重置正在填写的新酒款；仅在打开或切换档案时读取最新默认分类。
+  const categoriesRef = useRef(allCategories);
+  categoriesRef.current = allCategories;
 
   React.useEffect(() => {
     if (item) {
@@ -3182,7 +3180,7 @@ function ItemFormModal({ visible, item, colors, allCategories, onSave, onClose }
       setPriceAlertPct(item.priceAlertPct != null ? String(item.priceAlertPct) : "");
       setSpecMl(item.specMl != null ? String(item.specMl) : "");
     } else {
-      setName(""); setNameEn(""); setCategory(allCategories[0]?.name ?? "Other"); setUnit("瓶"); setRefPrice(""); setPriceAlertPct(""); setSpecMl("");
+      setName(""); setNameEn(""); setCategory(categoriesRef.current[0]?.name ?? "Other"); setUnit("瓶"); setRefPrice(""); setPriceAlertPct(""); setSpecMl("");
     }
   }, [item, visible]);
 
@@ -3420,11 +3418,14 @@ function PettyImportModal({ visible, pettyRecords, month, colors, matchPettyToIt
   };
 
   const [states, setStates] = useState<MatchState[]>([]);
+  // 匹配函数的Provider引用可随数据刷新变化；导入会话只在打开或记录集变化时初始化，不能抹去人工调整。
+  const matchPettyToItemRef = useRef(matchPettyToItem);
+  matchPettyToItemRef.current = matchPettyToItem;
 
   React.useEffect(() => {
     if (visible) {
       const initial: MatchState[] = pettyRecords.map((r) => {
-        const match = matchPettyToItem(r.description);
+        const match = matchPettyToItemRef.current(r.description);
         const confidence: MatchState["confidence"] = match ? (match.score >= 0.85 ? "high" : match.score >= 0.6 ? "medium" : "low") : "none";
         return {
           pettyId: r.id, desc: r.description, amount: r.amount, date: r.date,
@@ -3993,6 +3994,9 @@ function GroupManagerModal({ visible, groups, editingGroup, colors, onUpsert, on
   const [brandKeywords, setBrandKeywords] = useState<SpiritBrandKeyword[]>([]);
   const [newKeywordZh, setNewKeywordZh] = useState("");
   const [newKeywordEn, setNewKeywordEn] = useState("");
+  // 新建分组的默认排序只在会话初始化时取值；后台分组列表刷新不能覆盖正在编辑的排序输入。
+  const groupCountRef = useRef(groups.length);
+  groupCountRef.current = groups.length;
 
   const PRESET_COLORS = ["#1D4ED8","#DC2626","#7C3AED","#92400E","#B45309","#059669","#0891B2","#BE185D","#6B7280","#EF4444","#10B981","#F59E0B"];
 
@@ -4015,7 +4019,7 @@ function GroupManagerModal({ visible, groups, editingGroup, colors, onUpsert, on
       setEditNameEn("");
       setEditColor("#6B7280");
       setEditBuiltin(false);
-      setEditSortOrder(groups.length);
+      setEditSortOrder(groupCountRef.current);
       setBrandKeywords([]);
       setNewKeywordZh("");
       setNewKeywordEn("");

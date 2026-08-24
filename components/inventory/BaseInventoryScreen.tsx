@@ -191,7 +191,7 @@ export function BaseInventoryScreen({
         notes: "",
       };
     });
-  }, [activeItems, currentMonth, getGroupLabel, monthPurchasesByItemId, monthConsumesByItemId, openingByItemId]);
+  }, [activeItems, getGroupLabel, monthPurchasesByItemId, monthConsumesByItemId, openingByItemId]);
 
   const totalClosingCost = useMemo(() => ledgerItems.reduce((s, i) => s + i.closingCost, 0), [ledgerItems]);
   const totalOpeningCost = useMemo(() => ledgerItems.reduce((s, i) => s + i.openingCost, 0), [ledgerItems]);
@@ -223,7 +223,7 @@ export function BaseInventoryScreen({
     { key: "closingQty", label: "期末量", width: 88, flexWeight: 1, align: "right", render: (item) => <Text style={{ color: item.closingQty <= 0 ? colors.muted : colors.foreground, fontSize: STORE_TABLE_METRICS.numericFontSize, fontWeight: "600" }}>{formatStoreQuantity(item.closingQty)}</Text> },
     { key: "closingUnitCost", label: "期末单价", width: 112, flexWeight: 1.3, align: "right", render: (item) => <Text style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{formatStoreMoney(item.closingUnitCost)}</Text> },
     { key: "closingCost", label: "期末成本", width: 120, flexWeight: 1.5, align: "right", render: (item) => <Text style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.numericFontSize, fontWeight: "600" }}>{formatStoreMoney(item.closingCost)}</Text> },
-  ], [accentColor, categoryId, colors, showLoss]);
+  ], [categoryId, colors, showLoss]);
 
 
   const handlePickExcel = async () => {

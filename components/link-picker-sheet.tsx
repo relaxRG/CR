@@ -6,10 +6,9 @@ import * as Haptics from "expo-haptics";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
-import { suggestIngredients, type IngredientSuggestion } from "@/lib/suggest";
+import { suggestIngredients, type IngredientSuggestion , GroupResolver } from "@/lib/suggest";
 import type { Bottle } from "@/lib/bottles/types";
 import type { HomemadePrep } from "@/lib/homemade/types";
-import type { GroupResolver } from "@/lib/suggest";
 import { RESPONSIVE_LAYOUT } from "@/lib/theme/responsive-layout-tokens";
 import { MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
 

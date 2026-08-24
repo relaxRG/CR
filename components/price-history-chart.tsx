@@ -5,7 +5,7 @@
  * - 供应商颜色区分
  * - 支持多供应商对比模式
  */
-import React, { useMemo } from "react";
+import React, { useCallback, useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import Svg, { Circle, Line, Polyline, Text as SvgText } from "react-native-svg";
 import { useColors } from "@/hooks/use-colors";
@@ -68,10 +68,14 @@ export function PriceHistoryChart({
   const chartH = height - PAD_TOP - PAD_BOTTOM;
 
   // 坐标映射
-  const toX = (i: number) =>
-    PAD_LEFT + (sorted.length <= 1 ? chartW / 2 : (i / (sorted.length - 1)) * chartW);
-  const toY = (price: number) =>
-    PAD_TOP + chartH - ((price - minPrice) / priceRange) * chartH;
+  const toX = useCallback(
+    (i: number) => PAD_LEFT + (sorted.length <= 1 ? chartW / 2 : (i / (sorted.length - 1)) * chartW),
+    [chartW, sorted.length],
+  );
+  const toY = useCallback(
+    (price: number) => PAD_TOP + chartH - ((price - minPrice) / priceRange) * chartH,
+    [chartH, minPrice, priceRange],
+  );
 
   // 折线路径（按供应商分组）
   const linesBySupplier = useMemo(() => {
@@ -81,7 +85,7 @@ export function PriceHistoryChart({
       map[entry.supplier].push({ x: toX(i), y: toY(entry.price), entry, idx: i });
     });
     return map;
-  }, [sorted]);
+  }, [sorted, toX, toY]);
 
   // Y 轴刻度（3条）
   const yTicks = [minPrice, (minPrice + maxPrice) / 2, maxPrice];

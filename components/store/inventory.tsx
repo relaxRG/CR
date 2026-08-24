@@ -42,11 +42,11 @@ const SHOP_CATEGORIES: Category[] = [
   { key: "daily", label: "日用品" }, { key: "equipment", label: "设备" },
 ];
 
-function normalizeMany(values: Array<string | null | undefined>): string[] {
+function normalizeMany(values: (string | null | undefined)[]): string[] {
   return values.filter((value): value is string => normalizeInventoryMonth(value) !== null);
 }
 
-function genericMonths(store: { snapshots: Array<{ month: string }>; purchases: Array<{ date: string }>; consumes: Array<{ date: string }> }) {
+function genericMonths(store: { snapshots: { month: string }[]; purchases: { date: string }[]; consumes: { date: string }[] }) {
   return [...store.snapshots.map((snapshot) => snapshot.month), ...store.purchases.map((purchase) => purchase.date), ...store.consumes.map((consume) => consume.date)];
 }
 

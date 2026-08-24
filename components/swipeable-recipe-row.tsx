@@ -34,7 +34,7 @@ export function SwipeableRecipeRow({
     const name = displayNames(recipe.nameEn, recipe.name, lang).primary;
     const doDelete = () => deleteRecipe(recipe.id);
     if (Platform.OS === "web") {
-      // eslint-disable-next-line no-alert
+
       if (typeof window !== "undefined" && window.confirm(t("detail.delete.msg", { name }))) {
         doDelete();
       }

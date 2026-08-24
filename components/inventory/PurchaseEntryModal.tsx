@@ -3,7 +3,7 @@
  * 支持：选择商品 → 填写数量/单价 → 保存
  * 各品类通过 props 定制颜色、提示文案、备用金关联提示
  */
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   Alert, KeyboardAvoidingView, Modal, Platform, Pressable,
   ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View
@@ -35,23 +35,28 @@ export function PurchaseEntryModal({ visible, onClose, store, accentColor, petty
 
   const activeItems = store.items.filter((i) => i.active);
   const selectedItem = activeItems.find((i) => i.id === selectedItemId) ?? null;
+  // 表单初始值仅由打开与选择动作驱动；Provider数据重渲染不能覆盖用户正在填写的单价或供应商。
+  const activeItemsRef = useRef(activeItems);
+  activeItemsRef.current = activeItems;
   const total = (Number(qty) || 0) * (Number(unitPrice) || 0);
 
   React.useEffect(() => {
     if (visible) {
+      const preselectedItem = activeItemsRef.current.find((item) => item.id === preselectedItemId) ?? null;
       setSelectedItemId(preselectedItemId ?? "");
       setQty("");
-      setUnitPrice(selectedItem ? String(selectedItem.latestCostPrice) : "");
-      setSupplier(selectedItem?.supplier ?? "");
+      setUnitPrice(preselectedItem ? String(preselectedItem.latestCostPrice) : "");
+      setSupplier(preselectedItem?.supplier ?? "");
       setNotes("");
       setDate(new Date().toISOString().slice(0, 10));
     }
   }, [visible, preselectedItemId]);
 
   React.useEffect(() => {
-    if (selectedItem) {
-      setUnitPrice(String(selectedItem.latestCostPrice || ""));
-      setSupplier(selectedItem.supplier ?? "");
+    const nextSelectedItem = activeItemsRef.current.find((item) => item.id === selectedItemId) ?? null;
+    if (nextSelectedItem) {
+      setUnitPrice(String(nextSelectedItem.latestCostPrice || ""));
+      setSupplier(nextSelectedItem.supplier ?? "");
     }
   }, [selectedItemId]);
 

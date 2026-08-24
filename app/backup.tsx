@@ -17,9 +17,7 @@ import {
   getICloudMeta,
   listBackupVersions,
   restoreFromBackup as restoreFromICloud,
-} from "@/lib/backup/icloud-backup";
-import { readBackupVersion } from "@/lib/backup/icloud-backup";
-import { isUsingICloudDrive } from "@/lib/backup/icloud-backup";
+ readBackupVersion , isUsingICloudDrive } from "@/lib/backup/icloud-backup";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function BackupScreen() {
@@ -36,18 +34,17 @@ export default function BackupScreen() {
   const [restoring, setRestoring] = useState(false);
   const [icloudBacking, setIcloudBacking] = useState(false);
   const [icloudLastAt, setIcloudLastAt] = useState<number | null>(null);
-  const [] = useState(false);
   const [importing, setImporting] = useState(false);
   // 本地快照列表（含 diff）
-  const [snapshots, setSnapshots] = useState<Array<{
+  const [snapshots, setSnapshots] = useState<{
     slot: number; label: string; keyCount: number; createdAt: number; isValid: boolean;
     diff?: { snapshot: { recipes: number; bottles: number; homemade: number }; current: { recipes: number; bottles: number; homemade: number } } | null;
-  }>>([]);
+  }[]>([]);
   // iCloud 版本列表（含 diff）
-  const [icloudVersions, setIcloudVersions] = useState<Array<{
+  const [icloudVersions, setIcloudVersions] = useState<{
     slot: number; label: string; keyCount: number; sizeBytes: number; createdAt: number; exists: boolean;
     diff?: { snapshot: { recipes: number; bottles: number; homemade: number }; current: { recipes: number; bottles: number; homemade: number } } | null;
-  }>>([]);
+  }[]>([]);
   const [icloudVersionsExpanded, setIcloudVersionsExpanded] = useState(false);
   const [icloudVersionsLoading, setIcloudVersionsLoading] = useState(false);
 

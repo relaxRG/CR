@@ -400,7 +400,7 @@ export function SyncProvider({
     } finally {
       syncingRef.current = false;
     }
-  }, [refreshDeviceSession, setSession]);
+  }, [pushFn, refreshDeviceSession, setSession]);
 
   // 指数退避加抖动，单个定时器且最多 8 次；避免弱网下多个页面事件叠加为并发重试风暴。
   const scheduleRetry = useCallback(() => {

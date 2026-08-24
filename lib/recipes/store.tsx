@@ -744,7 +744,7 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
       const nextPrefs = { ...prefsRef.current, [id]: { ...prefsRef.current[id], favorite: newFav } };
       persistPrefs(nextPrefs);
     },
-    [persistRecipes],
+    [persistPrefs, persistRecipes],
   );
 
   /** 切换"做过/未做过"状态 */
@@ -761,7 +761,7 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
       const nextPrefs = { ...prefsRef.current, [id]: { ...prefsRef.current[id], made: newMade } };
       persistPrefs(nextPrefs);
     },
-    [persistRecipes],
+    [persistPrefs, persistRecipes],
   );
 
   /** 设置评分(1-10 整数,null 清除评分) */
@@ -780,7 +780,7 @@ export function RecipeProvider({ children }: { children: React.ReactNode }) {
       const nextPrefs = { ...prefsRef.current, [id]: { ...prefsRef.current[id], rating: v } };
       persistPrefs(nextPrefs);
     },
-    [persistRecipes],
+    [persistPrefs, persistRecipes],
   );
 
   /** 长按拖拽后按新顺序写入 sortIndex(仅对传入的 id 生效,其余保持) */

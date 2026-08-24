@@ -3,10 +3,9 @@
  * 显示公司账户/私人账户/备用金账户/开店宝后台的期初/期末余额及差异分析
  */
 import React, { useRef, useState } from "react";
-import { Alert, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { Alert, ScrollView, Text, TouchableOpacity, View , Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
-import { Platform } from "react-native";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { StoreMetric, StoreSectionHeader, StoreToolbarAction } from "@/components/store/store-visual-primitives";

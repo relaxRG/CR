@@ -58,10 +58,10 @@ export default function LaborKPIAllowancePage() {
   const workKPIRules = employee?.workKPIRules ?? [];
   const revenueKPIRules = employee?.revenueKPIRules ?? [];
 
-  // 从 PaySlip 读取已保存的数据
-  const allowanceOverrides = slip?.allowanceOverrides ?? {};
-  const workKPISelections = slip?.workKPISelections ?? {};
-  const revenueActuals = slip?.revenueActuals ?? {};
+  // 从 PaySlip 读取已保存的数据。缺失薪资单时保持空对象引用稳定，避免结算memo在每次渲染失效。
+  const allowanceOverrides = useMemo(() => slip?.allowanceOverrides ?? {}, [slip?.allowanceOverrides]);
+  const workKPISelections = useMemo(() => slip?.workKPISelections ?? {}, [slip?.workKPISelections]);
+  const revenueActuals = useMemo(() => slip?.revenueActuals ?? {}, [slip?.revenueActuals]);
 
   // 只读页不再重复计算：所有分项均从同一结算引擎读取。
   const extras = useMemo(() => {

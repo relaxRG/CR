@@ -12,7 +12,7 @@ import {
   Text,
   TextInput,
   View,
-} from "react-native";
+ Linking } from "react-native";
 import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -53,7 +53,6 @@ import { useCan } from "@/hooks/use-can";
 import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as FileSystem from "expo-file-system/legacy";
-import { Linking } from "react-native";
 import { useMenuStore } from "@/lib/menu/store";
 import {
   STRENGTH_LABELS,
@@ -183,7 +182,7 @@ export default function RecipeDetailScreen() {
     }
     buttons.push({ text: t("detail.photo.cancel"), style: "cancel" });
     Alert.alert(t("detail.photo.actionTitle"), undefined, buttons);
-  }, [recipe, t, handlePickPhoto, updateRecipePhoto]);
+  }, [recipe, t, handlePickPhoto, removeRecipePhoto]);
 
   // 联网补全:零价空壳条目(多为自动添加)→ LLM 知识补全资料并更新入库
   const [enrichPending] = React.useState(false);
@@ -317,7 +316,7 @@ export default function RecipeDetailScreen() {
       router.back();
     };
     if (Platform.OS === "web") {
-      // eslint-disable-next-line no-alert
+
       if (typeof window !== "undefined" && window.confirm(t("detail.delete.msg", { name: delName }))) {
         doDelete();
       }
@@ -848,7 +847,7 @@ export default function RecipeDetailScreen() {
         const enLabels = ['Core profile', 'Flavor evolution', 'Overall texture'];
         const labels = lang === 'en' ? enLabels : zhLabels;
         const lines = raw.split('\n').map((l: string) => l.trim()).filter(Boolean);
-        const parsed: Array<{ label: string; value: string }> = [];
+        const parsed: { label: string; value: string }[] = [];
         for (const line of lines) {
           const colonIdx = line.indexOf(':');
           if (colonIdx > 0) {

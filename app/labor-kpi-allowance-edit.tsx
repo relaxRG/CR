@@ -48,7 +48,7 @@ export default function LaborKPIAllowanceEditPage() {
   const { employees } = useEmployeeStore();
   const { getPaySlip, upsertPaySlip, buildPaySlipDraft } = usePaySlipStore();
   // 防御性修复：订阅 records state，确保考勤数据变化时 attendanceDays useMemo 能重新计算
-  const { getAttendance, records: attendanceRecords } = useAttendanceStore();
+  const { getAttendance } = useAttendanceStore();
   const { settings: globalSettings } = useGlobalPayrollSettingsStore();
   const { isMonthWritable } = useMonthCloseStore();
 
@@ -105,7 +105,7 @@ export default function LaborKPIAllowanceEditPage() {
   const attendanceDays = useMemo(() => {
     if (!employeeId || !month) return 0;
     return getAttendance(employeeId, month)?.attendanceDays ?? 0;
-  }, [employeeId, month, getAttendance, attendanceRecords]);
+  }, [employeeId, month, getAttendance]);
 
   // ── 实时预览合计（与薪资草稿、只读页完全使用同一结算引擎） ──
   const extras = useMemo(() => {

@@ -59,7 +59,7 @@ function periodLabel(mode: PeriodMode, day: string, month: string, year: string,
 
 function CustomRangePicker({ visible, start, end, onConfirm, onClose, colors }: { visible: boolean; start: string; end: string; onConfirm: (s: string, e: string) => void; onClose: () => void; colors: any }) {
   const [s, setS] = useState(start); const [e, setE] = useState(end);
-  React.useEffect(() => { if (visible) { setS(start); setE(end); } }, [visible]);
+  React.useEffect(() => { if (visible) { setS(start); setE(end); } }, [visible, start, end]);
   return (
     <Modal visible={visible} transparent animationType="slide">
       <View style={{ flex: 1, backgroundColor: "#00000066", justifyContent: "flex-end" }}>

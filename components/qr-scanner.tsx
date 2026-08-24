@@ -33,7 +33,7 @@ let useCameraPermissions: (() => [
 ]) | null = null;
 
 if (Platform.OS !== "web") {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Web环境不能解析原生相机模块，必须在原生平台延迟加载。
   const cam = require("expo-camera") as {
     CameraView: NonNullable<typeof CameraView>;
     useCameraPermissions: NonNullable<typeof useCameraPermissions>;

@@ -136,7 +136,7 @@ export default function StorePettyCashScreen() {
 
   // 与库存一致：仅开放实际业务数据最早月前一月到最晚月后一月；无数据时仅当前自然月。
   const pettyBounds = useMemo(() => deriveInventoryMonthBounds(records.map((record) => record.date)), [records]);
-  const summary = useMemo(() => calcPeriod(month), [calcPeriod, month, records, periods]);
+  const summary = useMemo(() => calcPeriod(month), [calcPeriod, month]);
   const monthRecords = useMemo(() => records.filter(r => r.date.startsWith(month)), [records, month]);
 
   const ledgerGroups = useMemo(() => {

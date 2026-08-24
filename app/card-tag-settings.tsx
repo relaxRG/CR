@@ -10,6 +10,8 @@ import { useI18n } from "@/lib/i18n";
 import { useCardTagSettings, DEFAULT_CARD_TAG_SETTINGS, CardTagSettings } from "@/lib/settings/card-tags";
 import { CardTagSlot, CARD_TAG_SLOT_LABELS } from "@/lib/recipes/types";
 
+import React from "react";
+
 export default function CardTagSettingsScreen() {
   const colors = useColors();
   const router = useRouter();
@@ -413,8 +415,6 @@ export default function CardTagSettingsScreen() {
     </ScreenContainer>
   );
 }
-
-import React from "react";
 
 const styles = StyleSheet.create({
   header: {

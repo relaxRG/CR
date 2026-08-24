@@ -1593,7 +1593,7 @@ function FormRow({ label, required, children, colors }: {
 }
 
 // ─── 灵活工时规则行 ──────────────────────────────────────────────────────────────
-const DAY_OPTIONS: Array<{ value: 0|1|2|3|4|5|6; label: string }> = [
+const DAY_OPTIONS: { value: 0|1|2|3|4|5|6; label: string }[] = [
   { value: 1, label: "周一" }, { value: 2, label: "周二" }, { value: 3, label: "周三" },
   { value: 4, label: "周四" }, { value: 5, label: "周五" }, { value: 6, label: "周六" },
   { value: 0, label: "周日" },

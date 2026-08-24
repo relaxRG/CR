@@ -16,7 +16,7 @@ interface MonthlyLedgerDetailSheetProps {
 export function MonthlyLedgerDetailSheet({ item, accentColor, onClose, footer }: MonthlyLedgerDetailSheetProps) {
   const colors = useColors();
   if (!item) return null;
-  const metrics: Array<[string, string]> = [
+  const metrics: [string, string][] = [
     ["期初", `${item.openingQty.toFixed(2)} ${item.unit} · ¥${item.openingCost.toFixed(2)}`],
     ["本月进货", `${item.purchaseQty.toFixed(2)} ${item.unit} · ¥${item.purchaseCost.toFixed(2)}`],
     ["本月消耗", `${item.consumeQty.toFixed(2)} ${item.unit} · ¥${item.consumeCost.toFixed(2)}`],

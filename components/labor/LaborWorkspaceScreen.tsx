@@ -84,6 +84,14 @@ import {
 
 type CompareMode = "none" | "lastMonth" | "lastYear" | "custom";
 
+const DEPT_GROUP_DEFS: Record<string, { label: string; color: string; filter: (employee: Employee) => boolean }> = {
+  front: { label: "前厅", color: "#007AFF", filter: (employee) => employee.dept === "front" && employee.type !== "parttime" },
+  kitchen: { label: "后厨", color: "#34C759", filter: (employee) => employee.dept === "kitchen" && employee.type !== "parttime" },
+  other: { label: "公司", color: "#722ED1", filter: (employee) => employee.dept === "other" && employee.type !== "parttime" },
+  parttime: { label: "临时兼职", color: "#FF9500", filter: (employee) => employee.type === "parttime" },
+};
+const LABOR_PETTY_CODES: readonly string[] = ["K1", "K9"];
+
 type HolidayDecisionItem = {
   key: string;
   employeeId: string;
@@ -914,6 +922,7 @@ function PaySlipMiniCard({ employee, month, colors, slip, att, compOffSummary, r
 function EmployeeRosterPage({ month, colors, headerComponent }: { month: string; colors: any; headerComponent?: React.ReactNode }) {
   const rosterInsets = useSafeAreaInsets();
   const { employees } = useEmployeeStore();
+  const { deptOrder } = useDeptOrderStore();
   const { templates: shiftTemplates } = useShiftTemplateStore();
   const { paySlips, buildPaySlipDraft, replaceMonthPaySlips } = usePaySlipStore();
   const { records: attendances } = useAttendanceStore();
@@ -1005,7 +1014,7 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
     setShowImportPreview(false);
     setImportResult(null);
     Alert.alert("导入成功", `已写入 ${importResult.parsedCount} 条排班记录${importResult.overwriteCount > 0 ? `，覆盖 ${importResult.overwriteCount} 条原有数据` : ""}`);
-  }, [importResult, batchUpsertShifts]);
+  }, [importResult, isMonthWritableRoster, month, batchUpsertShifts]);
 
   // 班次颜色查找辅助函数（动态读取模板）
 
@@ -1014,21 +1023,15 @@ function EmployeeRosterPage({ month, colors, headerComponent }: { month: string;
   const [customMonth, setCustomMonth] = useState<string | undefined>();
   const compareMonth = getCompareMonth(month, compareMode, customMonth);
 
-  const { deptOrder } = useDeptOrderStore();
   const activeEmployees = useMemo(
     () => sortEmployeesByProfileOrder(employees.filter((e) => e.active && !e.archived), deptOrder),
     [employees, deptOrder],
   );
   // 统一分组规则：按用户设置的分组顺序动态排列
-  const DEPT_GROUP_DEFS: Record<string, { label: string; color: string; filter: (e: Employee) => boolean }> = {
-    front:    { label: "前厅",   color: "#007AFF", filter: (e) => e.dept === "front" && e.type !== "parttime" },
-    kitchen:  { label: "后厨",   color: "#34C759", filter: (e) => e.dept === "kitchen" && e.type !== "parttime" },
-    other:    { label: "公司",   color: "#722ED1", filter: (e) => e.dept === "other" && e.type !== "parttime" },
-    parttime: { label: "临时兼职", color: "#FF9500", filter: (e) => e.type === "parttime" },
-  };
   const AUTO_DEPT_GROUPS = useMemo(() =>
-    deptOrder.map((key) => ({ key, ...DEPT_GROUP_DEFS[key] ?? DEPT_GROUP_DEFS.front }))
-  , [deptOrder]);
+    deptOrder.map((key) => ({ key, ...DEPT_GROUP_DEFS[key] ?? DEPT_GROUP_DEFS.front })),
+    [deptOrder],
+  );
   // 性能优化：预建查找 Map，将 render 循环中的 O(n) paySlips.find/attendances.find 降为 O(1)
   const rosterSlipMap = useMemo(() => {
     const m = new Map<string, PaySlip>();
@@ -1446,7 +1449,7 @@ function AdvancePage({ month, colors, headerComponent }: { month: string; colors
   const { advances, addAdvance, updateAdvance, deleteAdvance } = useSalaryAdvanceStore();
   const { allCategories, addCategory: addAdvanceCategory, updateCategory, deleteCategory } = useAdvanceCategoryStore();
   const { records: pettyRecords, addRecord: addPettyRecord } = usePettyCashStore();
-  const { links, aliases, addLink, updateLink, deleteLink, learnAlias, getLinksForMonth, isLinked } = usePettyLaborLinkStore();
+  const { aliases, addLink, updateLink, deleteLink, learnAlias, getLinksForMonth, isLinked } = usePettyLaborLinkStore();
   const { getPaySlip, upsertPaySlip } = usePaySlipStore();
   const { isMonthWritable } = useMonthCloseStore();
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
@@ -1481,16 +1484,13 @@ function AdvancePage({ month, colors, headerComponent }: { month: string; colors
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [editingCategoryName, setEditingCategoryName] = useState("");
 
-  // 人工相关备用金代码
-  const LABOR_PETTY_CODES = ["K1", "K9"];
-
   // 当月备用金记录（人工相关，未被关联的）
   const monthPettyRecords = React.useMemo(() =>
     pettyRecords.filter((r) => r.date.startsWith(month)),
     [pettyRecords, month]
   );
   // 当月已关联的 links
-  const monthLinks = React.useMemo(() => getLinksForMonth(month), [links, month]);
+  const monthLinks = React.useMemo(() => getLinksForMonth(month), [getLinksForMonth, month]);
   // 智能识别：当月未被关联的人工相关备用金记录
   const unlinkedLaborRecords = React.useMemo(() =>
     monthPettyRecords.filter((r) => LABOR_PETTY_CODES.includes(r.code) && !isLinked(r.id)),
@@ -2692,7 +2692,7 @@ function SchShiftModal({ visible, date, employee, session, existing, currentMont
 
   // 班次按分组展示（已在分组的班次 + 未分组的班次统一展示）
   const coveredTplIds = new Set(shiftGroups.flatMap((g) => g.templateIds));
-  const groupedShifts: Array<{ group: ShiftGroup | null; templates: ShiftTemplate[] }> = [
+  const groupedShifts: { group: ShiftGroup | null; templates: ShiftTemplate[] }[] = [
     ...shiftGroups.map((grp) => ({
       group: grp,
       templates: shiftTemplates.filter((t) => grp.templateIds.includes(t.id)),
@@ -3519,7 +3519,6 @@ function SchedulePage({ colors, month, pageWidth }: { colors: any; month: string
   const employeePickerRowHeight = fontScale <= 1.15 ? 44 : undefined;
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
   const { employees, ready: employeesReady } = useEmployeeStore();
-  const { deptOrder } = useDeptOrderStore();
   const { shifts, upsertShift, batchUpsertShifts, deleteShift, batchDeleteShifts, getShifts, ready: shiftsReady } = useShiftStore();
   const { templates, upsertTemplate, deleteTemplate } = useShiftTemplateStore();
   const { statuses: specialStatuses, upsertStatus, deleteStatus } = useSpecialStatusStore();
@@ -3529,13 +3528,35 @@ function SchedulePage({ colors, month, pageWidth }: { colors: any; month: string
   const { advances } = useSalaryAdvanceStore();
   const { settings: globalSettings } = useGlobalPayrollSettingsStore();
   const { entries: compOffEntriesSched, addEntry: addCompOffEntry, updateEntry: updateCompOffEntry, getEntries: getCompOffEntries, expireOldEntries: expireCompOff, cashOutEntry: cashOutCompOff } = useCompOffBalanceEntryStore();
-  const { upsertAlert } = useUnexplainedRestAlertStore();
   const { businessHours, setBusinessHours } = useBusinessHoursStore();
   const { shiftGroups, setShiftGroups } = useShiftGroupStore();
     const { getStatus: getCloseStatus, isMonthWritable } = useMonthCloseStore();
   const now = new Date();
   const todayStr = now.toISOString().slice(0, 10);
   const currentMonth = month;
+  // 自动薪资同步是带写入的防抖effect：命令引用和工资单变化必须使用最新值，但不能作为触发源造成写入循环。
+  const payrollAutoSyncInputsRef = useRef({
+    buildPaySlipDraft,
+    calcFromShifts,
+    getCloseStatus,
+    getHolidayForDate,
+    getPaySlip,
+    getShifts,
+    paySlips,
+    upsertAttendance,
+    upsertPaySlip,
+  });
+  payrollAutoSyncInputsRef.current = {
+    buildPaySlipDraft,
+    calcFromShifts,
+    getCloseStatus,
+    getHolidayForDate,
+    getPaySlip,
+    getShifts,
+    paySlips,
+    upsertAttendance,
+    upsertPaySlip,
+  };
   const { resolveEmployeeDept } = useCustomDeptStore();
   // 与外层三页使用同一实时页宽；禁止读取模块加载时的静态 Dimensions 宽度。
   const schPageWidth = pageWidth;
@@ -3826,36 +3847,37 @@ function SchedulePage({ colors, month, pageWidth }: { colors: any; month: string
     // 这就是「无排班但有比例底薪」反复出现的根本原因
     if (!shiftsReady || !employeesReady) return;
     // 只有草稿或调整中月份允许自动写入；冻结月绝不重算。
-    if (!shouldAutoSyncPayrollMonth(getCloseStatus(currentMonth))) return;
+    if (!shouldAutoSyncPayrollMonth(payrollAutoSyncInputsRef.current.getCloseStatus(currentMonth))) return;
     // 防抖：500ms 内多次修改只触发一次
     if (autoSyncTimerRef.current) clearTimeout(autoSyncTimerRef.current);
     autoSyncTimerRef.current = setTimeout(() => {
+      const syncInputs = payrollAutoSyncInputsRef.current;
       const activeEmps = employees.filter((e) => e.active && !e.archived);
       for (const emp of activeEmps) {
-        const empShifts = getShifts(currentMonth).filter((s) => s.employeeId === emp.id);
+        const empShifts = syncInputs.getShifts(currentMonth).filter((s) => s.employeeId === emp.id);
         // 注意：不跳过空排班！排班清空时需要重新计算（归零）考勤和薪资单
         // 否则旧的考勤记录（全勤/节假日薪资）会一直留在持久化存储中
         const holidayDaysList = empShifts
-          .map((s) => { const hc = getHolidayForDate(s.date, emp.id); return hc ? { date: s.date, multiplier: hc.multiplier } : null; })
+          .map((s) => { const hc = syncInputs.getHolidayForDate(s.date, emp.id); return hc ? { date: s.date, multiplier: hc.multiplier } : null; })
           .filter((x): x is { date: string; multiplier: number } => x !== null);
-        const baseAtt = calcFromShifts(emp.id, currentMonth, emp, empShifts, specialStatuses, holidayDaysList);
+        const baseAtt = syncInputs.calcFromShifts(emp.id, currentMonth, emp, empShifts, specialStatuses, holidayDaysList);
         // autoSync 必须尊重薪资单中已经确认的“节假日换休”选择，不能把该部分补偿重新加回。
-        const existingSlip = getPaySlip(emp.id, currentMonth);
+        const existingSlip = syncInputs.getPaySlip(emp.id, currentMonth);
         const att = applyHolidayRestAllocation(baseAtt, existingSlip?.holidayBonusAllocation);
-        upsertAttendance(att);
+        syncInputs.upsertAttendance(att);
         const advanceTotal = advances
           .filter((a) => a.employeeId === emp.id && (a.deductMonth === currentMonth || a.date.startsWith(currentMonth)) && (a.status === "pending" || a.status === "deducted"))
           .reduce((s, a) => s + a.amount, 0);
         const { cumulativeIncome, cumulativeTaxPaid } = getDraftPayrollCumulativeTaxInputs(
           emp,
           currentMonth,
-          paySlips,
+          syncInputs.paySlips,
           globalSettings,
         );
         // buildPaySlipDraft 从当前薪资单读取绩效/补贴控制字段，并统一实时结算所有分项。
         // 不再传递旧聚合金额，避免自动同步覆盖工作绩效或业绩绩效。
         const settlement = settleCompOffCashOut(compOffEntriesSched, emp.id, currentMonth);
-        const slip = buildPaySlipDraft(
+        const slip = syncInputs.buildPaySlipDraft(
           emp,
           currentMonth,
           att,
@@ -3865,7 +3887,7 @@ function SchedulePage({ colors, month, pageWidth }: { colors: any; month: string
           cumulativeTaxPaid,
           settlement.lines.length > 0 ? createCompOffCashOutSettlementSnapshot(settlement) : undefined,
         );
-        upsertPaySlip(slip);
+        syncInputs.upsertPaySlip(slip);
         // 监控规则 A6：检测控制字段丢失（跨月闭包污染典型症状）
         checkControlFieldsIntegrity(
           emp.id, emp.realName, currentMonth,
@@ -3927,7 +3949,7 @@ function SchedulePage({ colors, month, pageWidth }: { colors: any; month: string
   }, [currentMonth]);
 
   const dates = useMemo(() => getMonthDates(currentMonth), [currentMonth]);
-  const monthShifts = useMemo(() => getShifts(currentMonth), [shifts, currentMonth]);
+  const monthShifts = useMemo(() => getShifts(currentMonth), [getShifts, currentMonth]);
 
   // 跨月格子需要查询相邻月数据：取上月和下月的排班记录
   const adjacentShifts = useMemo(() => {
@@ -3940,11 +3962,11 @@ function SchedulePage({ colors, month, pageWidth }: { colors: any; month: string
       ...getShifts(prevMonth),
       ...getShifts(nextMonth),
     ];
-  }, [shifts, currentMonth]);
+  }, [currentMonth, getShifts]);
   // 当前部门的所有活跃员工
   const allDeptEmployees = useMemo(
     () => sortEmployeesWithinProfileGroup(employees.filter((e) => e.active && !e.archived && resolveEmployeeDept(e).category === deptCategory)),
-    [employees, deptCategory, resolveEmployeeDept, deptOrder],
+    [employees, deptCategory, resolveEmployeeDept],
   );
   const attendanceByEmployee = useMemo(() => {
     const byEmployee = new Map<string, typeof attendanceRecords[number]>();
@@ -4001,7 +4023,7 @@ function SchedulePage({ colors, month, pageWidth }: { colors: any; month: string
   // 规则：当月有任何 ShiftEntry 的员工自动显示；勾选新员工立即出现（格子空白）；取消勾选删除该员工本月所有排班
   // 响应式：直接订阅 shifts state，任何变化立即触发重渲染，无需 ShiftGroupMember 中间层
   const groupedScheduleRows = useMemo(() => {
-    const rows: Array<{ groupId: string; groupName: string; groupColor: string; tpl: ShiftTemplate; empList: Employee[] }> = [];
+    const rows: { groupId: string; groupName: string; groupColor: string; tpl: ShiftTemplate; empList: Employee[] }[] = [];
     const coveredTplIds = new Set<string>();
     // 已分组的班次模板
     for (const grp of sortedShiftGroups) {
@@ -4250,13 +4272,13 @@ function SchedulePage({ colors, month, pageWidth }: { colors: any; month: string
       setPendingExpiringCompOff([]);
       setGenResult(`✅ 已生成 ${count} 人薪资单`);
       setTimeout(() => setGenResult(null), 4000);
-    } catch (e) {
+    } catch {
       setGenResult("❌ 生成失败，请重试");
       setTimeout(() => setGenResult(null), 3000);
     } finally {
       setGenerating(false);
     }
-  }, [employees, getShifts, currentMonth, getHolidayForDate, calcFromShifts, specialStatuses, getCompOffEntries, getPaySlip, addCompOffEntry, updateCompOffEntry, upsertAttendance, advances, paySlips, expireCompOff, upsertAlert, buildPaySlipDraft, globalSettings, upsertPaySlip]);
+  }, [employees, getShifts, currentMonth, calcFromShifts, specialStatuses, getPaySlip, getCompOffEntries, upsertAttendance, advances, paySlips, expireCompOff, buildPaySlipDraft, globalSettings, upsertPaySlip, getHolidayForDate, cashOutCompOff, addCompOffEntry, updateCompOffEntry]);
 
   /**
    * 生成薪资单入口：扫描当月全部活跃员工的节假日上班记录，若有尚未决策的项目则弹出选择 Modal；

@@ -5,7 +5,7 @@
  * 2. 有上月快照时自动带入，允许人工修改
  * 3. 保存后更新商品当前库存
  */
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   KeyboardAvoidingView, Modal, Platform, Pressable,
   ScrollView, StyleSheet, Text, TextInput, View
@@ -35,6 +35,9 @@ export function OpeningStockModal({ visible, onClose, store, categoryLabel, acce
 
   // 期初数据（qty + unitCost）
   const [openingData, setOpeningData] = useState<Record<string, { qty: string; unitCost: string }>>({});
+  // 仅在打开/月份/库存快照切换时初始化；Provider命令引用变化不应重置用户正在录入的期初数据。
+  const getOpeningDataRef = useRef(store.getOpeningData);
+  getOpeningDataRef.current = store.getOpeningData;
 
   // 初始化：从上月快照自动带入，或使用当前库存
   useEffect(() => {
@@ -42,7 +45,7 @@ export function OpeningStockModal({ visible, onClose, store, categoryLabel, acce
     const initial: Record<string, { qty: string; unitCost: string }> = {};
     store.items.filter((i) => i.active).forEach((item) => {
       if (hasLastSnapshot) {
-        const data = store.getOpeningData(item.id, month);
+        const data = getOpeningDataRef.current(item.id, month);
         initial[item.id] = {
           qty: String(data.qty),
           unitCost: String(data.unitCost || item.latestCostPrice),

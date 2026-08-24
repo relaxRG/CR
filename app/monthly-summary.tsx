@@ -104,7 +104,7 @@ function LineItemRow({ item, colors, linkedModule }: { item: SummaryLineItem; co
 // ─── 手动录入 Modal ───────────────────────────────────────────────────────────
 // ─── 部分付款 Modal ────────────────────────────────────────────────────────────
 type PaymentAccountType = "company" | "personal" | "petty" | "pos";
-const PAYMENT_ACCOUNT_TYPES: ReadonlyArray<{ value: PaymentAccountType; label: string }> = [
+const PAYMENT_ACCOUNT_TYPES: readonly { value: PaymentAccountType; label: string }[] = [
   { value: "company", label: "公司账户" },
   { value: "personal", label: "私人账户" },
   { value: "petty", label: "备用金" },
@@ -299,7 +299,7 @@ export default function MonthlySummaryScreen({ embedded = false }: { embedded?: 
   const tap = () => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
   const {
-    reports, upsertReport, getReport, getPaymentsForMonth,
+     upsertReport, getReport, getPaymentsForMonth,
     upsertPayment, deletePayment, suppliers,
     pettyCodeConfigs, inventoryConfigs,
     upsertPettyCodeConfig, resetPettyCodeConfigs,
@@ -331,7 +331,7 @@ export default function MonthlySummaryScreen({ embedded = false }: { embedded?: 
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [settingsTab, setSettingsTab] = useState<"petty" | "inventory">("petty");
 
-  const report = useMemo(() => getReport(selectedMonth), [reports, selectedMonth]);
+  const report = useMemo(() => getReport(selectedMonth), [getReport, selectedMonth]);
   const payments = useMemo(() => getPaymentsForMonth(selectedMonth), [selectedMonth, getPaymentsForMonth]);
 
   const handleCopy = (text: string) => {

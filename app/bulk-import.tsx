@@ -96,24 +96,24 @@ export default function BulkImportScreen() {
 
   const spiritTags = tagsOf("spirit");
   const glassTags = tagsOf("glass");
-  const spiritNames = spiritTags.map((t) => t.name);
-  const glassNames = glassTags.map((t) => t.name);
-  const ensureSpiritName = (raw: string) => {
+  const spiritNames = useMemo(() => spiritTags.map((tag) => tag.name), [spiritTags]);
+  const glassNames = useMemo(() => glassTags.map((tag) => tag.name), [glassTags]);
+  const ensureSpiritName = useCallback((raw: string) => {
     const cleaned = raw.trim();
     if (!cleaned) return "";
     const hit = spiritNames.find((s) => cleaned.includes(s) || s.includes(cleaned));
     if (hit) return hit;
     const created = addTag("spirit", cleaned, CATEGORY_COLORS[0]);
     return created?.name ?? cleaned;
-  };
-  const ensureGlassName = (raw: string) => {
+  }, [addTag, spiritNames]);
+  const ensureGlassName = useCallback((raw: string) => {
     const cleaned = raw.trim();
     if (!cleaned) return "";
     const hit = glassNames.find((g) => cleaned.includes(g) || g.includes(cleaned));
     if (hit) return hit;
     const created = addTag("glass", cleaned, CATEGORY_COLORS[3]);
     return created?.name ?? cleaned;
-  };
+  }, [addTag, glassNames]);
   const busy = false;
 
   const pickFile = useCallback(async () => {
@@ -243,7 +243,7 @@ export default function BulkImportScreen() {
       if (Platform.OS === "web") window.alert(msg);
       else Alert.alert(msg);
     }
-  }, [fileBase64, fileName, imageBase64, imageMime, text, lang]);
+  }, [isOnline, lang, imageBase64, imageMime, fileBase64, fileName, text]);
 
   const toggleRow = (key: string) =>
     setRows((rs) => rs.map((r) => (r.key === key ? { ...r, checked: !r.checked } : r)));
@@ -385,7 +385,7 @@ export default function BulkImportScreen() {
     if (Platform.OS !== "web") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
-  }, [rows, addBottle, addPrep, addRecipe, addTag, matchBottleCategory, matchPrepType, matchRecipeCategory, sections, types, spiritNames, glassNames]);
+  }, [rows, addBottle, matchBottleCategory, matchPrepType, addPrep, sections, types, addRecipe, matchRecipeCategory, ensureSpiritName, ensureGlassName]);
 
   const selectedCount = useMemo(() => rows.filter((r) => r.checked).length, [rows]);
   const canExtract = !busy && (Boolean(text.trim()) || Boolean(fileBase64) || Boolean(imageBase64));

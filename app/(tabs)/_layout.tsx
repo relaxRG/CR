@@ -1,9 +1,8 @@
-import { Tabs } from "expo-router";
+import { Tabs , useRouter, usePathname } from "expo-router";
 import { View } from "react-native";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { FloatingTabBar, FloatingTabItem } from "@/components/floating-tab-bar";
-import { useRouter, usePathname } from "expo-router";
 import { useSync } from "@/lib/cf-sync/provider";
 
 export default function TabLayout() {

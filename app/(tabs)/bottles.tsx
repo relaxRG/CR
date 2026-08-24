@@ -50,6 +50,8 @@ import { smartLinkIngredient } from "@/lib/recipes/smart-link";
 import type { Recipe } from "@/lib/recipes/types";
 import { fabBottom } from "@/components/floating-tab-bar";
 import { useScrollPreservation } from "@/hooks/use-scroll-preservation";
+import { useCapabilityGuard } from "@/hooks/use-can";
+import { MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
 
 export default function BottlesScreen() {
   const colors = useColors();
@@ -328,7 +330,7 @@ export default function BottlesScreen() {
         ? (lang === "zh" ? "AI 响应超时，可跳过或重试" : "AI timeout, skip or retry")
         : (lang === "zh" ? "网络错误，请检查连接" : "Network error, check connection"));
     }
-  }, [updateBottle, buildQueueFields, autoFillBlanks, lang]);
+  }, [bottles, lang, autoFillBlanks, updateBottle, buildQueueFields, recipes]);
 
 
   /** 多选：启动已选条目补全队列 */
@@ -586,7 +588,7 @@ export default function BottlesScreen() {
         </ScaleDecorator>
       );
     },
-    [colors, sorted.length],
+    [colors.muted, colors.surface, duplicateBottle, sorted.length],
   );
 
   const handleAdd = () => {
@@ -625,7 +627,7 @@ export default function BottlesScreen() {
       exitSelectMode();
     };
     if (Platform.OS === "web") {
-      // eslint-disable-next-line no-alert
+
       if (window.confirm(t("sel.delete.confirmMsg").replace("{n}", String(n)))) doDelete();
       return;
     }
@@ -1621,5 +1623,3 @@ const styles = StyleSheet.create({
   selCheckWrap: { width: 34, alignItems: "flex-start", justifyContent: "center" },
 });
       {/* 二级分组切换器：基酒库 / 酒款库 / 软饮库 / 原材料库 + 多选按钮 */}
-import { useCapabilityGuard } from "@/hooks/use-can";
-import { MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";

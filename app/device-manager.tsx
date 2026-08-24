@@ -18,6 +18,7 @@ import {
   Text,
   TextInput,
   View,
+  Switch,
 } from "react-native";
 import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
@@ -45,13 +46,13 @@ import {
   type RemoteDevice,
 } from "@/lib/cf-sync/client";
 import { BUSINESS_TABS, type BusinessTab } from "@/lib/sync/capabilities";
-import { Switch } from "react-native";
 import { useSync } from "@/lib/cf-sync/provider";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { listSnapshots } from "@/lib/backup/local-backup";
-import { getICloudMeta } from "@/lib/backup/icloud-backup";
+import { getICloudMeta , isUsingICloudDrive } from "@/lib/backup/icloud-backup";
 import { syncPhotos } from "@/lib/sync/photo-sync";
 import { QRCode } from "@/components/qr-code";
+import { getCustomRoleName } from "./role-settings";
 
 const CF_WORKER_URL = "https://cocktail-ai.kikikong2017.workers.dev";
 
@@ -599,7 +600,7 @@ export default function DeviceManagerScreen() {
           ? (lang === "zh" ? "已从同步组安全退出并清除本机数据，请重启 App。" : "Left the sync group safely and cleared local data. Please restart the app.")
           : (lang === "zh" ? "本机成员资格已从同步组撤销，本地数据仍保留。" : "This device was revoked from the sync group. Local data was kept."),
       );
-    } catch (error) {
+    } catch {
       Alert.alert(
         lang === "zh" ? "未退出同步组" : "Did Not Leave Sync Group",
         lang === "zh" ? "远端成员撤销未完成，因此系统保留了本机同步凭据和数据，避免其他设备出现陈旧成员记录。请检查网络后重试。" : "Remote member revocation did not complete, so local credentials and data were kept to avoid a stale remote member. Check your network and retry.",
@@ -1483,5 +1484,3 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: 14, lineHeight: 20, textAlign: "center", paddingVertical: 24 },
   photoProgressText: { fontSize: 12, lineHeight: 16, marginTop: 6, textAlign: "center" },
 });
-import { getCustomRoleName } from "./role-settings";
-import { isUsingICloudDrive } from "@/lib/backup/icloud-backup";

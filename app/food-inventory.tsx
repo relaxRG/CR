@@ -4,7 +4,7 @@
  * 价格波动追踪，月度台账，关联备用金 A1-A4
  * 注意：不关联鸡尾酒原料库
  */
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { formatMoney } from "@/lib/utils";
 import { multiplyMoney, sumMoney } from "@/lib/finance/money";
 import {
@@ -59,12 +59,15 @@ function PurchaseModal({ visible, ingredients, colors, onSave, onClose }: {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
 
   const selected = ingredients.find((i) => i.id === selectedId);
+  const ingredientsRef = useRef(ingredients);
+  ingredientsRef.current = ingredients;
   const total = multiplyMoney(Number(qty) || 0, Number(price) || 0);
 
   React.useEffect(() => {
-    if (selected) {
-      setPrice(String(selected.costPrice ?? ""));
-      setSupplier(selected.supplier ?? "");
+    const nextSelected = ingredientsRef.current.find((item) => item.id === selectedId);
+    if (nextSelected) {
+      setPrice(String(nextSelected.costPrice ?? ""));
+      setSupplier(nextSelected.supplier ?? "");
     }
   }, [selectedId]);
 

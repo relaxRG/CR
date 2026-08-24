@@ -5,7 +5,7 @@
  * - 当月进货：筛选酒商 + 手动录入 + 批量操作（修改日期/删除）+ 价格涨跌显示
  * - 总结：月度趋势折线图 + 快照历史 + Pour Cost 卡片
  */
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { formatMoney } from "@/lib/utils";
 import {
   Alert, Modal, Platform, Pressable, ScrollView,
@@ -358,7 +358,7 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
 
   // 当前工作台只读取全局业务月份对应的快照；绝不能按导入时间把其他月份的数据带入当前页。
   const latestSnapshot = snapshots.find((snapshot) => snapshot.monthLabel === `${selectedMonth.slice(0, 4)}年${Number(selectedMonth.slice(5))}月`) ?? null;
-  const items: WineInventoryItem[] = latestSnapshot?.items ?? [];
+  const items = useMemo<WineInventoryItem[]>(() => latestSnapshot?.items ?? [], [latestSnapshot]);
 
   // 所有供应商统一来自台账、手动采购与葡萄酒库；没有采购记录时也能先选供应商录入。
   const allSuppliers = useMemo(() => {
@@ -402,7 +402,7 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
     [items, searchQuery, filterSupplier, filterWineType, ledgerSort],
   );
 
-  const toWineLedgerRow = (item: WineInventoryItem): MonthlyLedgerItem => ({
+  const toWineLedgerRow = useCallback((item: WineInventoryItem): MonthlyLedgerItem => ({
     itemId: String(item.seq),
     name: item.name,
     nameEn: item.bottleId ? bottles.find((bottle) => bottle.id === item.bottleId)?.nameEn || undefined : undefined,
@@ -422,9 +422,9 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
     closingUnitCost: item.unitCost,
     closingCost: (item.actualEndQty ?? item.endQty) * item.unitCost,
     notes: `供应商：${item.supplier}`,
-  });
+  }), [bottles]);
 
-  const wineLedgerRows = useMemo<MonthlyLedgerItem[]>(() => filteredItems.map(toWineLedgerRow), [filteredItems]);
+  const wineLedgerRows = useMemo<MonthlyLedgerItem[]>(() => filteredItems.map(toWineLedgerRow), [filteredItems, toWineLedgerRow]);
   const wineLedgerGroups = useMemo<HorizontalLedgerGroup<MonthlyLedgerItem>[]>(() => {
     const groups = new Map<string, MonthlyLedgerItem[]>();
     wineLedgerRows.forEach((row) => groups.set(row.category, [...(groups.get(row.category) ?? []), row]));
@@ -461,7 +461,7 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
   );
   const selectedSupplierPurchases = useMemo(
     () => selectedSupplierView ? getMonthPurchases(selectedMonth).filter((purchase) => purchase.supplier === selectedSupplierView) : [],
-    [selectedSupplierView, purchases, selectedMonth],
+    [selectedSupplierView, getMonthPurchases, selectedMonth],
   );
   const selectedSupplierBottles = useMemo(
     () => selectedSupplierView ? bottles.filter((bottle) => bottle.supplier === selectedSupplierView) : [],
@@ -491,7 +491,7 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
   // 当月进货沿用库存管理的标签分组，并允许在没有历史采购时从酒库供应商直接开始手动录入。
   const monthPurchaseRecords = useMemo(
     () => applyWinePurchaseView(getMonthPurchases(selectedMonth), purchaseSearchQuery, purchaseFilterSupplier, purchaseSort),
-    [purchases, selectedMonth, purchaseSearchQuery, purchaseFilterSupplier, purchaseSort],
+    [getMonthPurchases, selectedMonth, purchaseSearchQuery, purchaseFilterSupplier, purchaseSort],
   );
   const purchaseSuppliers = allSuppliers;
   const purchaseLedgerRows = useMemo(() => monthPurchaseRecords.map((purchase) => ({

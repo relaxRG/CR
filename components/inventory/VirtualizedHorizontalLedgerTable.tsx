@@ -74,8 +74,14 @@ export function VirtualizedHorizontalLedgerTable<Row>({
     return expandStoreTableColumns(baseColumns, Math.max(0, windowWidth - 32));
   }, [columns, windowWidth]);
   const usePinnedColumns = getStoreTableViewport(windowWidth) !== "desktop" && responsiveColumns.some((column) => column.pinned);
-  const pinnedColumns = usePinnedColumns ? responsiveColumns.filter((column) => column.pinned) : [];
-  const scrollColumns = usePinnedColumns ? responsiveColumns.filter((column) => !column.pinned) : responsiveColumns;
+  const pinnedColumns = useMemo(
+    () => (usePinnedColumns ? responsiveColumns.filter((column) => column.pinned) : []),
+    [responsiveColumns, usePinnedColumns],
+  );
+  const scrollColumns = useMemo(
+    () => (usePinnedColumns ? responsiveColumns.filter((column) => !column.pinned) : responsiveColumns),
+    [responsiveColumns, usePinnedColumns],
+  );
   const selectionWidth = selection ? 38 : 0;
   const pinnedWidth = useMemo(() => pinnedColumns.reduce((sum, column) => sum + column.width, usePinnedColumns ? selectionWidth : 0), [pinnedColumns, selectionWidth, usePinnedColumns]);
   const dataWidth = useMemo(() => scrollColumns.reduce((sum, column) => sum + column.width, usePinnedColumns ? 0 : selectionWidth), [scrollColumns, selectionWidth, usePinnedColumns]);

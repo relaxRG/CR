@@ -226,7 +226,7 @@ export function RawExcelArchiveProvider({ children }: { children: React.ReactNod
     } finally {
       await safelyDelete(stagingDirectory).catch(() => undefined);
     }
-  }, [persist]);
+  }, [persist, recordRemoteResults]);
 
   const deleteFile = useCallback(async (id: string) => {
     const target = entriesRef.current.find((entry) => entry.id === id);

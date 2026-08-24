@@ -106,7 +106,6 @@ export default function DishAnalysisScreen() {
 
   const [tab, setTab] = useState<MainTab>("category");
   const [selectedMonth, setSelectedMonth] = useState<string>(snapshots[0]?.month ?? "");
-  const [] = useState("all");
   const [sortKey, setSortKey] = useState<SortKey>("salesAmount");
   const [searchText, setSearchText] = useState("");
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);

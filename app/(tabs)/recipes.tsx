@@ -53,11 +53,12 @@ import {
   STRENGTHS,
   codexFamilyLabel,
   localizedTagName,
-} from "@/lib/recipes/types";
-import { FLAVOR_TAGS, FLAVOR_TAG_EN } from "@/lib/recipes/types";
+ FLAVOR_TAGS, FLAVOR_TAG_EN } from "@/lib/recipes/types";
 import { FLAVOR_TAG_DEFAULT_COLORS } from "@/lib/settings/card-tags";
 import { fabBottom } from "@/components/floating-tab-bar";
 import { useScrollPreservation } from "@/hooks/use-scroll-preservation";
+import { useCapabilityGuard } from "@/hooks/use-can";
+import { MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
 
 type Filter = { type: "all" } | { type: "favorites" };
 
@@ -245,7 +246,7 @@ export function RecipesScreen() {
         </ScaleDecorator>
       );
     },
-    [colors, sorted.length],
+    [colors.muted, colors.surface, duplicateRecipe, sorted.length],
   );
 
   /** 快捷筛选大分类:全部配方分类;子分类 = 该分类下库内出现过的基酒 */
@@ -400,7 +401,7 @@ export function RecipesScreen() {
     };
     if (Platform.OS === "web") {
       // web 端 Alert 不支持多按钮,直接用 confirm
-      // eslint-disable-next-line no-alert
+
       if (window.confirm(t("sel.delete.confirmMsg").replace("{n}", String(n)))) doDelete();
       return;
     }
@@ -475,7 +476,7 @@ export function RecipesScreen() {
     setEnrichRecipeMsg(updated > 0 ? t("lookup.batchDone", { n: updated }) : t("lookup.enrichNone"));
     setEnrichingRecipes(false);
     setEnrichRecipeProgress(null);
-  }, [enrichingRecipes, selectedIds, recipes, updateRecipe, t]);
+  }, [enrichingRecipes, selectedIds, recipes, t, lang, updateRecipe]);
 
   const batchDeepTargets = useMemo(
     () =>
@@ -556,7 +557,7 @@ export function RecipesScreen() {
     );
     setBatchDeepRunning(false);
     setBatchDeepProgress(null);
-  }, [batchDeepTargets, updateRecipe, isMountedRef, t]);
+  }, [batchDeepTargets, t, lang, updateRecipe]);
 
   const chipStyle = (active: boolean) => [
     styles.chip,
@@ -1114,5 +1115,3 @@ const styles = StyleSheet.create({
 });
 
 export default RecipesScreen;
-import { useCapabilityGuard } from "@/hooks/use-can";
-import { MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";

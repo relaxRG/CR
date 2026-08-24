@@ -12,8 +12,7 @@ import {
   Text,
   TextInput,
   View,
-} from "react-native";
-import { Alert } from "react-native";
+ Alert } from "react-native";
 import * as Haptics from "expo-haptics";
 
 import { ScreenContainer } from "@/components/screen-container";
@@ -31,6 +30,7 @@ import { enrichBottle, deepAnalyzeBottle } from "@/lib/api/smart-router";
 import * as ImagePicker from "expo-image-picker";
 import { BOTTLE_GROUPS, bottleGroupOf } from "@/lib/bottles/types";
 import { useSpiritsInventoryStore } from "@/lib/spirits/crud-store";
+import { PREP_GROUPS, PREP_TYPES } from "@/lib/homemade/types";
 
 const FLAVOR_TAGS_ALL = ["草本","果味","柑橘","花香","甜润","酸爽","苦韵","辛香","烟熏","咸鲜","清爽","浓郁","坚果","奶油","干爽","热带","焦糖","咖啡","巧克力","泥煤","蜂蜜","香草","坚硬","辛辣"];
 
@@ -151,7 +151,6 @@ export default function BottleFormScreen() {
   const canSave = nameZh.trim().length > 0 || nameEn.trim().length > 0;
 
   // ── AI 补全 ────────────────────────────────────────────────────────────────
-  const [] = useState(false);
   const [lookupBusy, setLookupBusy] = useState<"auto" | "manual" | "photo" | null>(null);
   const [lookupStatus, setLookupStatus] = useState<{ kind: "ok" | "err" | "warn"; msg: string } | null>(null);
 
@@ -278,7 +277,7 @@ export default function BottleFormScreen() {
     else if (key === "storyEn" && aiResult.storyEn) setStoryEn(aiResult.storyEn);
     else if (key === "substituteFor" && aiResult.substituteFor) setSubstituteFor(aiResult.substituteFor);
     else if (key === "pairsWith" && aiResult.pairsWith) setPairsWith(aiResult.pairsWith);
-  }, [aiResult, taxCategories, category, stylesOf]);
+  }, [aiResult, style, stylesOf, taxCategories, category]);
 
   /** 应用所有 toggle=true 的字段，保存 undo 快照 */
   const applyAiResult = useCallback(() => {
@@ -1728,4 +1727,3 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
 });
-import { PREP_GROUPS, PREP_TYPES } from "@/lib/homemade/types";

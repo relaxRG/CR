@@ -299,7 +299,7 @@ function EmployeeCard({
     // 如果备注正在编辑中，同步到 notes state 并退出编辑态
     if (noteEditing) { setNotes(noteInput); setNoteEditing(false); }
     onToggleRewardEdit();
-  }, [slip, employee, rewardItems, notes, noteEditing, noteInput, upsertPaySlip, buildPaySlipDraft, att, month, advanceTotal, globalSettings, compOffEntries, onToggleRewardEdit]);
+  }, [slip, employee, isMonthWritable, month, rewardItems, upsertPaySlip, currentNotes, compOffEntries, buildPaySlipDraft, att, advanceTotal, globalSettings, noteEditing, onToggleRewardEdit, noteInput]);
 
   // ── 收起状态：2行4列网格摘要 ──
   if (!expanded) {
