@@ -20,9 +20,9 @@ concurrency:
 
 jobs:
   release-simulator-cold-start:
-    # The repository's available macOS-14 pool is schedulable. Select an installed Xcode 16+
-    # explicitly instead of relying on the runner default (which can still point to Xcode 15.4).
-    runs-on: macos-14
+    # Keep the Xcode selection dynamic. The macOS-14 hosted pool is currently failing before
+    # runner allocation, so use the compatible macOS-13 pool for the smoke run.
+    runs-on: macos-13
     timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
