@@ -1,0 +1,87 @@
+name: Wine Supplier Trend Mobile E2E
+
+on:
+  pull_request:
+    paths:
+      - 'app/**'
+      - 'components/**'
+      - 'lib/wine/**'
+      - 'tests/wine-supplier-trend-**'
+      - '.github/workflows/wine-supplier-trend-mobile-e2e.yml'
+  workflow_dispatch:
+    inputs:
+      device_matrix:
+        description: 'mobile device matrix profile'
+        required: false
+        default: 'smoke'
+
+concurrency:
+  group: wine-supplier-trend-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-and-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - run: pnpm vitest run tests/wine-supplier-trend-responsive-example.test.ts tests/wine-supplier-trend-touch-layout-e2e.test.ts
+
+  appium-device-cloud:
+    needs: unit-and-contract
+    # 使用已授权的真机云或自托管 macOS runner；不要把真实业务数据、token或截图凭据写进仓库。
+    runs-on: macos-14
+    strategy:
+      fail-fast: false
+      matrix:
+        device:
+          - { name: 'iPhone compact', platform: 'iOS', viewport: '390x844', fontScale: '1.0' }
+          - { name: 'iPad Split View', platform: 'iOS', viewport: '744x1024', fontScale: '1.15' }
+          - { name: 'Android low-end', platform: 'Android', viewport: '360x800', fontScale: '1.0' }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - name: Build test artifact
+        run: pnpm expo export --platform ${{ matrix.device.platform == 'iOS' && 'ios' || 'android' }}
+      - name: Install Appium and driver
+        run: |
+          npm install -g appium@2 appium-doctor
+          appium driver install xcuitest
+          appium driver install uiautomator2
+      - name: Run trend touch E2E
+        env:
+          TEST_DEVICE_NAME: ${{ matrix.device.name }}
+          TEST_VIEWPORT: ${{ matrix.device.viewport }}
+          TEST_FONT_SCALE: ${{ matrix.device.fontScale }}
+          APPIUM_SERVER_URL: ${{ secrets.APPIUM_SERVER_URL }}
+          APPIUM_ACCESS_KEY: ${{ secrets.APPIUM_ACCESS_KEY }}
+          E2E_SEED_MODE: supplier_trend_synthetic
+        run: pnpm e2e:appium --suite wine-supplier-trend-touch
+      - name: Upload failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wine-supplier-trend-${{ matrix.device.name }}
+          path: |
+            artifacts/appium/**
+            artifacts/perf/**
+          if-no-files-found: ignore
+
+  performance-gate:
+    needs: appium-device-cloud
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { path: artifacts }
+      - name: Validate mobile trend performance thresholds
+        run: node scripts/ci/assert-mobile-trend-performance.mjs artifacts
