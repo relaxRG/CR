@@ -11,9 +11,9 @@ const purchaseItems = Array.from({ length: 300 }, (_, index) => ({
 vi.mock("react-native", async () => {
   const ReactModule = await import("react");
   const primitive = (name: string) => ({ children, ...props }: { children?: React.ReactNode; [key: string]: unknown }) => ReactModule.createElement(name, props, children);
-  const flatList = ReactModule.forwardRef(({ data = [], renderItem, ...props }: { data?: unknown[]; renderItem?: (value: { item: unknown; index: number }) => React.ReactNode; [key: string]: unknown }, ref) => {
+  const flatList = ReactModule.forwardRef(({ data = [], renderItem, initialNumToRender = 12, ...props }: { data?: unknown[]; renderItem?: (value: { item: unknown; index: number }) => React.ReactNode; initialNumToRender?: number; [key: string]: unknown }, ref) => {
     ReactModule.useImperativeHandle(ref, () => ({ scrollToOffset: vi.fn() }));
-    return ReactModule.createElement("flat-list", props, data.slice(0, 20).map((item, index) => ReactModule.createElement(ReactModule.Fragment, { key: String((item as { id?: string }).id ?? index) }, renderItem?.({ item, index }))));
+    return ReactModule.createElement("flat-list", props, data.slice(0, initialNumToRender).map((item, index) => ReactModule.createElement(ReactModule.Fragment, { key: String((item as { id?: string }).id ?? index) }, renderItem?.({ item, index }))));
   });
   return { Alert: { alert: vi.fn() }, FlatList: flatList, Linking: { openURL: vi.fn() }, Modal: primitive("modal"), Platform: { OS: "ios" }, Pressable: primitive("pressable"), ScrollView: primitive("scroll"), StyleSheet: { create: <T,>(value: T) => value }, Text: primitive("text"), TextInput: primitive("input"), View: primitive("view") };
 });
@@ -26,7 +26,7 @@ vi.mock("@/hooks/use-persisted-state", async () => { const ReactModule = await i
 vi.mock("@/hooks/use-scroll-preservation", () => ({ useScrollPreservation: () => ({ listRef: { current: null }, onScroll: vi.fn() }) }));
 vi.mock("@/lib/sync/engine", () => ({ notifySyncChange: vi.fn(), registerStoreReload: () => () => {} }));
 vi.mock("@/components/ui/icon-symbol", async () => { const ReactModule = await import("react"); return { IconSymbol: () => ReactModule.createElement("icon") }; });
-vi.mock("@/components/performance/mobile-virtual-list", () => ({ MOBILE_VIRTUAL_LIST_PROPS: {} }));
+vi.mock("@/components/performance/mobile-virtual-list", () => ({ MOBILE_VIRTUAL_LIST_PROPS: { initialNumToRender: 12, maxToRenderPerBatch: 12, windowSize: 7, updateCellsBatchingPeriod: 40 } }));
 
 import StorePurchaseScreen from "@/components/store/purchase";
 

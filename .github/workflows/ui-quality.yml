@@ -61,7 +61,9 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Verify high-frequency workspace render budgets
-        run: pnpm vitest run tests/price-history-hook-render-regression.test.tsx tests/virtualized-ledger-render-performance.test.tsx tests/labor-overview-render-performance.test.tsx tests/spirits-inventory-workspace-render-performance.test.tsx tests/store-analytics-render-performance.test.tsx tests/store-petty-cash-render-performance.test.tsx tests/store-purchase-render-performance.test.tsx --reporter=dot
+        run: pnpm test:performance:quick
+      - name: Verify 10,000-row purchase virtualization boundary
+        run: pnpm test:performance:stress
 
   mobile-h5-regression:
     name: H5 theme and responsive regression
