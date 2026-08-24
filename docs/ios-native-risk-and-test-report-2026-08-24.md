@@ -72,3 +72,19 @@
 云端 iOS Smoke 作业在十分钟上限内仍未获分配 macOS 运行器，因此没有产生 Xcode、Simulator 或 `.ips` 级别的五次启动证据。当前 Linux 环境未安装 CocoaPods，也无法执行 `pod install`。Web 开发服务器和静态导出均在 Metro 打包最后阶段未完成，因此已停止，避免无期限等待。
 
 因此，本报告的准确表述是：**已覆盖路径未在 JavaScript/业务逻辑测试中复现闪退；真实 iPhone 原生风险仍待设备级证据确认。**
+
+## 七、真机日志收集的准确步骤
+
+1. 使用带 macOS 的电脑连接 iPhone，保持设备解锁并信任该电脑。打开 Xcode 的 **Window → Devices and Simulators**，选中该 iPhone；同时打开 macOS 的 **Console**，在侧栏选择该设备。
+2. 先记录时间，再从被系统终止的状态启动 App，按上述第 1 至第 8 项操作复现。若 App 未立即退出，也要在 Console 中保留复现时刻前后至少 30 秒的日志。
+3. 若出现闪退，在 iPhone 打开 **设置 → 隐私与安全性 → 分析与改进 → 分析数据**，查找以 App 二进制名开头的 `.ips`，以及同一时间附近的 `JetsamEvent`。通过分享按钮导出完整文件；不要只截取一小段。
+4. 一并保存 Xcode/Console 中与 `cocktail R`、`com.app.cocktailrecipes`、`SecureStore`、`ImagePicker`、`RCTFatal`、`SIGABRT`、`EXC_CRASH`、`watchdog`、`jetsam` 或 `CFSync` 相关的完整日志区间。提交前应删去设备名称、邮箱、令牌或任何个人内容。
+5. 对 `.ips` 取证时保留对应构建的 archive 和 dSYM；完整符号化报告中的 **Exception Type**、**Termination Reason**、**Triggered by Thread**、**Last Exception Backtrace** 与崩溃线程是根因定位所需的最小字段。
+
+Apple 将 crash report 定义为记录终止机制及全部线程回溯的证据；Jetsam 是系统为回收内存而终止应用时产生的独立内存事件，因此两种文件都必须收集。[1] Apple 也说明设备日志可以通过连接设备并在 Console 中选择该设备来检查；如果没有 Xcode Organizer 报告，可直接从设备“分析数据”导出 `.ips`。[2]
+
+## 参考资料
+
+[1]: https://developer.apple.com/documentation/xcode/diagnosing-issues-using-crash-reports-and-device-logs "Apple: Diagnosing issues using crash reports and device logs"
+[2]: https://developer.apple.com/documentation/xcode/acquiring-crash-reports-and-diagnostic-logs "Apple: Acquiring crash reports and diagnostic logs"
+[3]: https://developer.apple.com/documentation/xcode/analyzing-a-crash-report "Apple: Analyzing a crash report"
