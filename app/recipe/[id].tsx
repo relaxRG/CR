@@ -74,6 +74,7 @@ export default function RecipeDetailScreen() {
   const { updateRecipePhoto, updateRecipe, removeRecipePhoto } = useRecipeStore();
   const { bottles, addBottle, updateBottle } = useBottleStore();
   const { preps } = useHomemadeStore();
+  const { ice: iceSettings } = useIceSettings();
   const recipe = getRecipe(id);
   const { groups, addEntry } = useMenuStore();
   const [menuModalVisible, setMenuModalVisible] = React.useState(false);
@@ -240,7 +241,6 @@ export default function RecipeDetailScreen() {
   };
   // Smart cost: same 5-level matching as ingredient linking (bottles + homemade preps)
   const costEst = estimateRecipeCostSmart(recipe.ingredients, bottles, preps);
-  const { ice: iceSettings } = useIceSettings();
   const iceCost = estimateIceCost(recipe.method, recipe.ice, iceSettings);
   // 装饰成本:连接词智能拆分(「或」取高、「与/及」累加),形态折叠计价
   const garnishCost = recipe.garnish

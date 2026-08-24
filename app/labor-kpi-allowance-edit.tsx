@@ -21,11 +21,24 @@ import {
   ALLOWANCE_UNIT_LABELS, REVENUE_KPI_SOURCE_LABELS,
   REVENUE_KPI_PAY_MODE_LABELS, shouldPayAllowanceThisMonth,
 } from "@/lib/labor/types";
-import { settlePayrollExtras } from "@/lib/labor/payroll-extras";
+import { settlePayrollExtras, type PayrollExtrasSettlement } from "@/lib/labor/payroll-extras";
 import { buildPayrollExtrasEditorState } from "@/lib/labor/payroll-extras-editor-state";
 import { isDailyAllowanceRule } from "@/lib/labor/allowance-rule-semantics";
 
 const tap = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+const EMPTY_PAYROLL_EXTRAS: PayrollExtrasSettlement = {
+  mealAllowance: 0,
+  transportAllowance: 0,
+  otherAllowance: 0,
+  allowanceTotal: 0,
+  allowanceDetails: {},
+  workKPIBonus: 0,
+  workKPIDetails: {},
+  revenueKPIBonus: 0,
+  revenueKPIDetails: {},
+  performanceTotal: 0,
+};
 
 export default function LaborKPIAllowanceEditPage() {
   const { employeeId, month } = useLocalSearchParams<{ employeeId: string; month: string }>();
@@ -62,19 +75,9 @@ export default function LaborKPIAllowanceEditPage() {
     revenueActuals: { ...revenueActuals },
   });
 
-  if (!employee) {
-    return (
-      <ScreenContainer>
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-          <Text style={{ color: colors.muted }}>员工不存在</Text>
-        </View>
-      </ScreenContainer>
-    );
-  }
-
-  const allowanceRules = employee.allowanceRules ?? [];
-  const workKPIRules = employee.workKPIRules ?? [];
-  const revenueKPIRules = employee.revenueKPIRules ?? [];
+  const allowanceRules = employee?.allowanceRules ?? [];
+  const workKPIRules = employee?.workKPIRules ?? [];
+  const revenueKPIRules = employee?.revenueKPIRules ?? [];
 
   // 员工档案由持久化Store异步加载时，useState 初始化器不会再次执行。
   // 因此必须在当前 employeeId + month 第一次就绪时，从薪资单重建本地编辑状态；
@@ -105,11 +108,14 @@ export default function LaborKPIAllowanceEditPage() {
   }, [employeeId, month, getAttendance, attendanceRecords]);
 
   // ── 实时预览合计（与薪资草稿、只读页完全使用同一结算引擎） ──
-  const extras = useMemo(() => settlePayrollExtras(employee, month ?? "", attendanceDays, {
-    allowanceOverrides: allowanceEnabled,
-    workKPISelections,
-    revenueActuals: Object.fromEntries(Object.entries(revenueActuals).map(([id, value]) => [id, Number(value) || 0])),
-  }), [employee, month, attendanceDays, allowanceEnabled, workKPISelections, revenueActuals]);
+  const extras = useMemo(() => {
+    if (!employee) return EMPTY_PAYROLL_EXTRAS;
+    return settlePayrollExtras(employee, month ?? "", attendanceDays, {
+      allowanceOverrides: allowanceEnabled,
+      workKPISelections,
+      revenueActuals: Object.fromEntries(Object.entries(revenueActuals).map(([id, value]) => [id, Number(value) || 0])),
+    });
+  }, [employee, month, attendanceDays, allowanceEnabled, workKPISelections, revenueActuals]);
   const allowanceTotal = extras.allowanceTotal;
   const workKPITotal = extras.workKPIBonus;
   const revenueKPITotal = extras.revenueKPIBonus;
@@ -170,7 +176,7 @@ export default function LaborKPIAllowanceEditPage() {
     upsertPaySlip({ ...draft, id: existing.id });
 
     router.back();
-  }, [month, employeeId, employee, getPaySlip, allowanceEnabled, workKPISelections, revenueActuals, upsertPaySlip, buildPaySlipDraft, getAttendance, globalSettings, router]);
+  }, [month, employeeId, employee, getPaySlip, allowanceEnabled, workKPISelections, revenueActuals, upsertPaySlip, buildPaySlipDraft, getAttendance, globalSettings, isMonthWritable, router]);
 
   // ── 取消：有改动时弹出确认弹窗 ──
   const handleCancel = useCallback(() => {
@@ -187,6 +193,16 @@ export default function LaborKPIAllowanceEditPage() {
       router.back();
     }
   }, [hasChanges, router]);
+
+  if (!employee) {
+    return (
+      <ScreenContainer>
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <Text style={{ color: colors.muted }}>员工不存在</Text>
+        </View>
+      </ScreenContainer>
+    );
+  }
 
   return (
     <ScreenContainer>

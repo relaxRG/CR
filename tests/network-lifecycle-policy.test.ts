@@ -42,5 +42,17 @@ describe("网络请求与第三方依赖生命周期护栏", () => {
     expect(packageJson).not.toContain('"expo-video"');
     expect(packageJson).not.toContain('"react-native-webview"');
     expect(appConfig).not.toContain('"expo-video"');
+    expect(appConfig).not.toContain('"react-native-webview"');
+  });
+
+  it("OAuth回调在页面卸载后不再回写状态或执行延迟跳转", () => {
+    const oauthCallback = source("app/oauth/callback.tsx");
+
+    expect(oauthCallback).toContain("let disposed = false");
+    expect(oauthCallback).toContain("const setSafeStatus");
+    expect(oauthCallback).toContain("const scheduleHomeRedirect");
+    expect(oauthCallback).toContain("if (!disposed) router.replace");
+    expect(oauthCallback).toContain("disposed = true");
+    expect(oauthCallback).toContain("clearTimeout(redirectTimer)");
   });
 });

@@ -228,7 +228,11 @@ export default function StorePurchaseScreen() {
               </Text>
             </View>
             {item.purchaseType === "self" && item.link ? (
-              <Pressable onPress={() => Linking.openURL(item.link)} style={[styles.linkBtn, { backgroundColor: colors.primary + "22" }]}>
+              <Pressable onPress={() => {
+                void Linking.openURL(item.link).catch(() => {
+                  Alert.alert("无法打开链接", "请检查网络采购链接是否有效。");
+                });
+              }} style={[styles.linkBtn, { backgroundColor: colors.primary + "22" }]}>
                 <IconSymbol name="link" size={14} color={colors.primary} />
               </Pressable>
             ) : null}

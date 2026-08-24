@@ -29,6 +29,17 @@ const SELF_BUY_CONFIG_KEY = "spirits.selfBuyConfig.v1";
 const CUSTOM_CATEGORIES_KEY = "spirits.customCategories.v1";
 const GROUP_MATCH_MEMORY_KEY = "spirits.groupMatchMemory.v1";
 
+/** 单个本地键损坏时只回退该键，不能阻断整个烈酒库存Provider的水合。 */
+function parseStoredValue<T>(raw: string | null, fallback: T, key: string): T {
+  if (!raw) return fallback;
+  try {
+    return JSON.parse(raw) as T;
+  } catch (error) {
+    console.warn(`烈酒库存数据解析失败，已回退默认值：${key}`, error);
+    return fallback;
+  }
+}
+
 // ─── 工具函数 ─────────────────────────────────────────────────────────────────
 function uuid() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -611,33 +622,36 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
       AsyncStorage.getItem(CUSTOM_CATEGORIES_KEY),
       AsyncStorage.getItem(GROUP_MATCH_MEMORY_KEY),
     ]).then(([itemsRaw, purchasesRaw, ledgerRaw, refPricesRaw, suppliersRaw, groupsRaw, matchMemoryRaw, selfBuyRaw, customCatsRaw, groupMatchRaw]) => {
-      const parsedItems: SpiritItem[] = itemsRaw ? JSON.parse(itemsRaw) : [];
+      const parsedItems = parseStoredValue<SpiritItem[]>(itemsRaw, [], ITEMS_KEY);
       const items = parsedItems.map((item) => ({
         ...item,
         supplierAliases: normalizeSpiritSupplierAliases(item.supplierAliases),
       }));
-      const purchases = purchasesRaw ? JSON.parse(purchasesRaw) : [];
-      const parsedLedger: unknown = ledgerRaw ? JSON.parse(ledgerRaw) : [];
+      const purchases = parseStoredValue<SpiritPurchaseRecord[]>(purchasesRaw, [], PURCHASES_KEY);
+      const parsedLedger = parseStoredValue<unknown>(ledgerRaw, [], LEDGER_KEY);
       const ledger: SpiritLedgerEntry[] = Array.isArray(parsedLedger)
         ? parsedLedger.filter(isCurrentSpiritLedgerEntry)
         : [];
-      const refPrices = refPricesRaw ? JSON.parse(refPricesRaw) : [];
-      const suppliers = suppliersRaw ? JSON.parse(suppliersRaw) : [];
-      const parsedGroups: unknown = groupsRaw ? JSON.parse(groupsRaw) : null;
+      const refPrices = parseStoredValue<SpiritRefPrice[]>(refPricesRaw, [], REF_PRICES_KEY);
+      const suppliers = parseStoredValue<SpiritSupplierInfo[]>(suppliersRaw, [], SUPPLIERS_KEY);
+      const parsedGroups = parseStoredValue<unknown>(groupsRaw, null, GROUPS_KEY);
       // 首次安装才提供预置集团。只要用户曾保存过集团列表，就尊重其删除结果，绝不把已删集团重新注入。
       const groups = (Array.isArray(parsedGroups)
         ? parsedGroups.map(normalizeSpiritGroup).filter((group): group is SpiritGroupDef => Boolean(group))
         : BUILTIN_GROUPS)
         .sort((left, right) => left.sortOrder - right.sortOrder || left.id.localeCompare(right.id));
-      const matchMemory = matchMemoryRaw ? JSON.parse(matchMemoryRaw) : [];
-      const selfBuyConfig = selfBuyRaw ? JSON.parse(selfBuyRaw) : DEFAULT_SELF_BUY_CONFIG;
-      const customCategories: SpiritCustomCategory[] = customCatsRaw ? JSON.parse(customCatsRaw) : [];
-      const groupMatchMemory: GroupMatchMemory[] = groupMatchRaw ? JSON.parse(groupMatchRaw) : [];
+      const matchMemory = parseStoredValue<PettyMatchMemory[]>(matchMemoryRaw, [], MATCH_MEMORY_KEY);
+      const selfBuyConfig = parseStoredValue<SelfBuyConfig>(selfBuyRaw, DEFAULT_SELF_BUY_CONFIG, SELF_BUY_CONFIG_KEY);
+      const customCategories = parseStoredValue<SpiritCustomCategory[]>(customCatsRaw, [], CUSTOM_CATEGORIES_KEY);
+      const groupMatchMemory = parseStoredValue<GroupMatchMemory[]>(groupMatchRaw, [], GROUP_MATCH_MEMORY_KEY);
       skipNextPersistenceRef.current = true;
       dispatch({ type: "LOAD", payload: { items, purchases, ledger, refPrices, suppliers, groups, matchMemory, selfBuyConfig, customCategories, groupMatchMemory } });
       loadedRef.current = true;
+    }).catch((error: unknown) => {
+      console.warn("烈酒库存加载失败", error);
+      loadedRef.current = true;
     });
-    load();
+    void load();
     return registerStoreReload(() => { void load(); });
   }, []);
 

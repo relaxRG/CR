@@ -121,8 +121,11 @@ export default function BottleChannelsScreen() {
 
             {channel.type === "self" ? <TouchableOpacity testID={`bottle-self-purchase-link-${channel.id}`} onPress={() => {
               tap();
-              if (channel.purchaseUrl) Linking.openURL(channel.purchaseUrl);
-              else openPurchaseLinkEditor(channel);
+              if (channel.purchaseUrl) {
+                void Linking.openURL(channel.purchaseUrl).catch(() => {
+                  Alert.alert("无法打开采购链接", "请检查链接是否有效，或返回采购记录重新填写。");
+                });
+              } else openPurchaseLinkEditor(channel);
             }} style={[S.purchaseBtn, { backgroundColor: channel.purchaseUrl ? colors.primary : colors.surface, borderWidth: channel.purchaseUrl ? 0 : 1, borderColor: colors.border }]}>
               <IconSymbol name={channel.purchaseUrl ? "arrow.up.right.square" : "link"} size={14} color={channel.purchaseUrl ? "#fff" : colors.primary} />
               <Text style={{ fontSize: 13, fontWeight: "600", color: channel.purchaseUrl ? "#fff" : colors.primary }}>{channel.purchaseUrl ? "打开采购链接" : "补充采购链接"}</Text>

@@ -20,6 +20,20 @@ export default function OAuthCallback() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
+    let disposed = false;
+    let redirectTimer: ReturnType<typeof setTimeout> | null = null;
+    const setSafeStatus = (next: "processing" | "success" | "error") => {
+      if (!disposed) setStatus(next);
+    };
+    const setSafeErrorMessage = (next: string | null) => {
+      if (!disposed) setErrorMessage(next);
+    };
+    const scheduleHomeRedirect = () => {
+      redirectTimer = setTimeout(() => {
+        if (!disposed) router.replace("/(tabs)");
+      }, 1000);
+    };
+
     const handleCallback = async () => {
       console.log("[OAuth] Callback handler triggered");
       console.log("[OAuth] Params received:", {
@@ -59,11 +73,9 @@ export default function OAuthCallback() {
             }
           }
 
-          setStatus("success");
+          setSafeStatus("success");
           console.log("[OAuth] Web authentication successful, redirecting to home...");
-          setTimeout(() => {
-            router.replace("/(tabs)");
-          }, 1000);
+          scheduleHomeRedirect();
           return;
         }
 
@@ -95,8 +107,8 @@ export default function OAuthCallback() {
           params.error || (url ? new URL(url, "http://dummy").searchParams.get("error") : null);
         if (error) {
           console.error("[OAuth] Error parameter found:", error);
-          setStatus("error");
-          setErrorMessage(error || "OAuth error occurred");
+          setSafeStatus("error");
+          setSafeErrorMessage(error || "OAuth error occurred");
           return;
         }
 
@@ -156,11 +168,9 @@ export default function OAuthCallback() {
           console.log("[OAuth] Session token stored successfully");
           // User info is already in the OAuth callback response
           // No need to fetch from API
-          setStatus("success");
+          setSafeStatus("success");
           console.log("[OAuth] Redirecting to home...");
-          setTimeout(() => {
-            router.replace("/(tabs)");
-          }, 1000);
+          scheduleHomeRedirect();
           return;
         }
 
@@ -170,8 +180,8 @@ export default function OAuthCallback() {
             hasCode: !!code,
             hasState: !!state,
           });
-          setStatus("error");
-          setErrorMessage("Missing code or state parameter");
+          setSafeStatus("error");
+          setSafeErrorMessage("Missing code or state parameter");
           return;
         }
 
@@ -209,29 +219,30 @@ export default function OAuthCallback() {
             console.log("[OAuth] No user data in result");
           }
 
-          setStatus("success");
+          setSafeStatus("success");
           console.log("[OAuth] Authentication successful, redirecting to home...");
 
           // Redirect to home after a short delay
-          setTimeout(() => {
-            console.log("[OAuth] Executing redirect...");
-            router.replace("/(tabs)");
-          }, 1000);
+          scheduleHomeRedirect();
         } else {
           console.error("[OAuth] No session token in result:", result);
-          setStatus("error");
-          setErrorMessage("No session token received");
+          setSafeStatus("error");
+          setSafeErrorMessage("No session token received");
         }
       } catch (error) {
         console.error("[OAuth] Callback error:", error);
-        setStatus("error");
-        setErrorMessage(
+        setSafeStatus("error");
+        setSafeErrorMessage(
           error instanceof Error ? error.message : "Failed to complete authentication",
         );
       }
     };
 
-    handleCallback();
+    void handleCallback();
+    return () => {
+      disposed = true;
+      if (redirectTimer) clearTimeout(redirectTimer);
+    };
   }, [params.code, params.state, params.error, params.sessionToken, params.user, router]);
 
   return (

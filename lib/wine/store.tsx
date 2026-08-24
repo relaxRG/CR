@@ -228,41 +228,51 @@ export function WineProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const loadBottles = () => AsyncStorage.getItem(STORAGE_KEY).then((raw) => {
       if (raw) { try { dispatch({ type: "LOAD", payload: JSON.parse(raw) }); } catch {} }
+    }).catch((error: unknown) => {
+      console.warn("葡萄酒库存档案加载失败", error);
     }).finally(() => markStoreLoaded("bottles"));
-    loadBottles();
-    return registerStoreReload(loadBottles);
+    void loadBottles();
+    return registerStoreReload(() => { void loadBottles(); });
   }, [markStoreLoaded]);
 
   useEffect(() => {
     const loadSnap = () => AsyncStorage.getItem(SNAPSHOT_KEY).then((raw) => {
       if (raw) { try { snapshotDispatch({ type: "LOAD", payload: JSON.parse(raw) }); } catch {} }
+    }).catch((error: unknown) => {
+      console.warn("葡萄酒库存快照加载失败", error);
     }).finally(() => markStoreLoaded("snapshots"));
-    loadSnap();
-    return registerStoreReload(loadSnap);
+    void loadSnap();
+    return registerStoreReload(() => { void loadSnap(); });
   }, [markStoreLoaded]);
 
   useEffect(() => {
     const loadManual = () => AsyncStorage.getItem(MANUAL_PURCHASE_KEY).then((raw) => {
       if (raw) { try { manualDispatch({ type: "LOAD", payload: JSON.parse(raw) }); } catch {} }
+    }).catch((error: unknown) => {
+      console.warn("葡萄酒采购记录加载失败", error);
     }).finally(() => markStoreLoaded("purchases"));
-    loadManual();
-    return registerStoreReload(loadManual);
+    void loadManual();
+    return registerStoreReload(() => { void loadManual(); });
   }, [markStoreLoaded]);
 
   useEffect(() => {
     const loadImportControl = () => AsyncStorage.getItem(IMPORT_CONTROL_KEY).then((raw) => {
       if (raw) { try { importControlDispatch({ type: "LOAD", payload: JSON.parse(raw) }); } catch {} }
+    }).catch((error: unknown) => {
+      console.warn("葡萄酒采购导入控制数据加载失败", error);
     }).finally(() => markStoreLoaded("importControl"));
-    loadImportControl();
-    return registerStoreReload(loadImportControl);
+    void loadImportControl();
+    return registerStoreReload(() => { void loadImportControl(); });
   }, [markStoreLoaded]);
 
   useEffect(() => {
     const loadMasterData = () => AsyncStorage.getItem(MASTER_DATA_KEY).then((raw) => {
       if (raw) { try { masterDataDispatch({ type: "LOAD", payload: JSON.parse(raw) }); } catch {} }
+    }).catch((error: unknown) => {
+      console.warn("葡萄酒采购主数据加载失败", error);
     }).finally(() => markStoreLoaded("masterData"));
-    loadMasterData();
-    return registerStoreReload(loadMasterData);
+    void loadMasterData();
+    return registerStoreReload(() => { void loadMasterData(); });
   }, [markStoreLoaded]);
 
   useEffect(() => {

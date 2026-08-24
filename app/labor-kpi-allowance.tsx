@@ -19,10 +19,23 @@ import {
   ALLOWANCE_UNIT_LABELS, REVENUE_KPI_SOURCE_LABELS,
   REVENUE_KPI_PAY_MODE_LABELS, shouldPayAllowanceThisMonth,
 } from "@/lib/labor/types";
-import { settlePayrollExtras } from "@/lib/labor/payroll-extras";
+import { settlePayrollExtras, type PayrollExtrasSettlement } from "@/lib/labor/payroll-extras";
 import { isDailyAllowanceRule } from "@/lib/labor/allowance-rule-semantics";
 
 const tap = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+const EMPTY_PAYROLL_EXTRAS: PayrollExtrasSettlement = {
+  mealAllowance: 0,
+  transportAllowance: 0,
+  otherAllowance: 0,
+  allowanceTotal: 0,
+  allowanceDetails: {},
+  workKPIBonus: 0,
+  workKPIDetails: {},
+  revenueKPIBonus: 0,
+  revenueKPIDetails: {},
+  performanceTotal: 0,
+};
 
 export default function LaborKPIAllowancePage() {
   const { employeeId, month } = useLocalSearchParams<{ employeeId: string; month: string }>();
@@ -41,6 +54,30 @@ export default function LaborKPIAllowancePage() {
     [paySlips, employeeId, month]
   );
 
+  const allowanceRules = employee?.allowanceRules ?? [];
+  const workKPIRules = employee?.workKPIRules ?? [];
+  const revenueKPIRules = employee?.revenueKPIRules ?? [];
+
+  // 从 PaySlip 读取已保存的数据
+  const allowanceOverrides = slip?.allowanceOverrides ?? {};
+  const workKPISelections = slip?.workKPISelections ?? {};
+  const revenueActuals = slip?.revenueActuals ?? {};
+
+  // 只读页不再重复计算：所有分项均从同一结算引擎读取。
+  const extras = useMemo(() => {
+    if (!employee) return EMPTY_PAYROLL_EXTRAS;
+    return settlePayrollExtras(employee, month ?? "", slip?.attendanceDays ?? 0, {
+      allowanceOverrides,
+      allowanceDetails: slip?.allowanceDetails,
+      workKPISelections,
+      revenueActuals,
+    });
+  }, [employee, month, slip, allowanceOverrides, workKPISelections, revenueActuals]);
+  const allowanceTotal = extras.allowanceTotal;
+  const workKPIBonus = extras.workKPIBonus;
+  const revenueKPIBonus = extras.revenueKPIBonus;
+  const grandTotal = extras.allowanceTotal + extras.performanceTotal;
+
   if (!employee) {
     return (
       <ScreenContainer>
@@ -50,27 +87,6 @@ export default function LaborKPIAllowancePage() {
       </ScreenContainer>
     );
   }
-
-  const allowanceRules = employee.allowanceRules ?? [];
-  const workKPIRules = employee.workKPIRules ?? [];
-  const revenueKPIRules = employee.revenueKPIRules ?? [];
-
-  // 从 PaySlip 读取已保存的数据
-  const allowanceOverrides = slip?.allowanceOverrides ?? {};
-  const workKPISelections = slip?.workKPISelections ?? {};
-  const revenueActuals = slip?.revenueActuals ?? {};
-
-  // 只读页不再重复计算：所有分项均从同一结算引擎读取。
-  const extras = useMemo(() => settlePayrollExtras(employee, month ?? "", slip?.attendanceDays ?? 0, {
-    allowanceOverrides,
-    allowanceDetails: slip?.allowanceDetails,
-    workKPISelections,
-    revenueActuals,
-  }), [employee, month, slip, allowanceOverrides, workKPISelections, revenueActuals]);
-  const allowanceTotal = extras.allowanceTotal;
-  const workKPIBonus = extras.workKPIBonus;
-  const revenueKPIBonus = extras.revenueKPIBonus;
-  const grandTotal = extras.allowanceTotal + extras.performanceTotal;
 
   return (
     <ScreenContainer>

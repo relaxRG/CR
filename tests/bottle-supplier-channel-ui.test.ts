@@ -5,6 +5,7 @@ import path from "node:path";
 const root = path.resolve(__dirname, "..");
 const detail = fs.readFileSync(path.join(root, "app/bottle/[id].tsx"), "utf8");
 const channels = fs.readFileSync(path.join(root, "app/bottle-channels.tsx"), "utf8");
+const purchase = fs.readFileSync(path.join(root, "components/store/purchase.tsx"), "utf8");
 
 describe("酒款中国参考价与供应渠道 UI 契约", () => {
   it("将中国参考价卡固定在基础信息与评分之间，并以采购渠道查看作为唯一入口", () => {
@@ -43,5 +44,12 @@ describe("酒款中国参考价与供应渠道 UI 契约", () => {
     expect(channels).toContain('>价格变化</Text>');
     expect(channels).toContain("handleSetCostBasis(channel.id)");
     expect(channels).toContain("不在此页手动改价");
+  });
+
+  it("网络采购链接失败时保留在应用内并给出可恢复提示", () => {
+    expect(channels).toContain("void Linking.openURL(channel.purchaseUrl).catch");
+    expect(channels).toContain("无法打开采购链接");
+    expect(purchase).toContain("void Linking.openURL(item.link).catch");
+    expect(purchase).toContain("无法打开链接");
   });
 });

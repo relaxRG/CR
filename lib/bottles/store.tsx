@@ -306,10 +306,12 @@ export function BottleProvider({ children }: { children: React.ReactNode }) {
   // 云端同步覆盖本地后，重新加载酒款数据到内存
   useEffect(() => {
     return registerStoreReload(() => {
-      AsyncStorage.getItem(BOTTLES_KEY).then((raw) => {
+      void AsyncStorage.getItem(BOTTLES_KEY).then((raw) => {
         if (raw) {
           try { setBottles(JSON.parse(raw).map((b: Bottle) => normalizeBottle(b))); } catch {}
         }
+      }).catch((error: unknown) => {
+        console.warn("酒款同步重载失败", error);
       });
     });
   }, []);
