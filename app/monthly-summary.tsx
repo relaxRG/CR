@@ -699,14 +699,14 @@ export default function MonthlySummaryScreen({ embedded = false }: { embedded?: 
           <Text style={{ ...STORE_TEXT.metricLarge, fontSize: 30, color: netProfit >= 0 ? storeTone(colors, "settled") : storeTone(colors, "danger") }}>
             {netProfit >= 0 ? "+" : "−"}{formatStoreMoney(Math.abs(netProfit))}
           </Text>
-          <View style={{ flexDirection: "row", gap: 28, marginTop: 10 }}>
-            <View>
+          <View style={{ flexDirection: "row", gap: 12, marginTop: 10 }}>
+            <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={{ fontSize: 11, color: colors.muted }}>总营业收入</Text>
-              <Text style={{ ...STORE_TEXT.metric, color: colors.foreground }}>{formatStoreMoney(totalRevenue)}</Text>
+              <Text numberOfLines={1} adjustsFontSizeToFit style={{ ...STORE_TEXT.metric, color: colors.foreground }}>{formatStoreMoney(totalRevenue)}</Text>
             </View>
-            <View>
+            <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={{ fontSize: 11, color: colors.muted }}>总支出</Text>
-              <Text style={{ ...STORE_TEXT.metric, color: colors.foreground }}>{formatStoreMoney(totalExpenses)}</Text>
+              <Text numberOfLines={1} adjustsFontSizeToFit style={{ ...STORE_TEXT.metric, color: colors.foreground }}>{formatStoreMoney(totalExpenses)}</Text>
             </View>
           </View>
         </View>
