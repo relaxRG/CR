@@ -204,6 +204,9 @@ export default function StorePurchaseScreen() {
       </View>
 
       <FlatList {...MOBILE_VIRTUAL_LIST_PROPS}
+        initialNumToRender={10_000}
+        maxToRenderPerBatch={10_000}
+        windowSize={10_000}
         ref={listRef}
         onScroll={onScroll}
         scrollEventThrottle={100}
