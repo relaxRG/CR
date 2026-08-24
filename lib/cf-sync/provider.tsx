@@ -154,6 +154,7 @@ export function SyncProvider({
   const syncingRef = useRef(false);
   const lastSyncAtRef = useRef(0);
   const stopRealtimeRef = useRef<(() => void) | null>(null);
+  const conflictAlertVisibleRef = useRef(false);
 
   useEffect(() => subscribeSyncState(setSyncState), []);
 
@@ -247,7 +248,12 @@ export function SyncProvider({
 
   // ★ 冲突解决：升级版—显示数据预览和自动推荐
   useEffect(() => {
-    if (pendingConflicts.length === 0) return;
+    if (pendingConflicts.length === 0) {
+      conflictAlertVisibleRef.current = false;
+      return;
+    }
+    if (conflictAlertVisibleRef.current) return;
+    conflictAlertVisibleRef.current = true;
     const conflict = pendingConflicts[0];
     const label = STORAGE_KEY_LABELS[conflict.storageKey] ?? conflict.storageKey;
     const localTime = new Date(conflict.localTs).toLocaleTimeString();
@@ -273,7 +279,9 @@ export function SyncProvider({
     const resolveAll = (keepLocal: boolean) => {
       const allConflicts = pendingConflicts;
       // 使用批量冲突解决函数：一次 push，一次 triggerStoreReload，避免 N 次网络请求
-      void resolveAllConflicts(allConflicts, keepLocal, pushFn ?? (async () => {}));
+      void resolveAllConflicts(allConflicts, keepLocal, pushFn ?? (async () => {}))
+        .catch((error) => console.warn("[CFSync] resolve all conflicts failed:", error))
+        .finally(() => { conflictAlertVisibleRef.current = false; });
       setPendingConflicts([]);
     };
     Alert.alert(
@@ -288,7 +296,9 @@ export function SyncProvider({
             : `保留本机${rec === "local" ? " ✓推荐" : ""}`,
           style: rec === "remote" ? "destructive" : "default",
           onPress: () => {
-            void resolveConflict(conflict, true, pushFn ?? (async () => {}));
+            conflictAlertVisibleRef.current = false;
+            void resolveConflict(conflict, true, pushFn ?? (async () => {}))
+              .catch((error) => console.warn("[CFSync] resolve conflict failed:", error));
             setPendingConflicts((prev) => prev.slice(1));
           },
         },
@@ -298,7 +308,9 @@ export function SyncProvider({
             : `采用云端${rec === "remote" ? " ✓推荐" : ""}`,
           style: rec === "local" ? "destructive" : "default",
           onPress: () => {
-            void resolveConflict(conflict, false, pushFn ?? (async () => {}));
+            conflictAlertVisibleRef.current = false;
+            void resolveConflict(conflict, false, pushFn ?? (async () => {}))
+              .catch((error) => console.warn("[CFSync] resolve conflict failed:", error));
             setPendingConflicts((prev) => prev.slice(1));
           },
         },
@@ -449,24 +461,31 @@ export function SyncProvider({
     startedRef.current = true;
     const startup = InteractionManager.runAfterInteractions(() => {
       void (async () => {
-      setIsGroupSwitching(true);
-      const recovery = await recoverPendingGroupSwitch(groupSwitchRuntime);
-      setIsGroupSwitching(false);
-      if (recovery === "blocked") {
-        setAuthLoading(false);
-        setSyncError(lang === "zh" ? "同步组切换等待网络恢复，请勿清除应用数据" : "Group switch is awaiting network recovery. Do not clear app data.");
-        return;
-      }
-      const ok = await performSync();
-      if (!ok) scheduleRetry();
-      else if (await getDeviceCredentials()) {
-        // 仅已有活跃成员资格时才启动实时监听。
-        stopRealtimeRef.current?.();
-        stopRealtimeRef.current = startRealtimeSync(() => {
-          // 角色或授权键可能刚在服务端变更；必须复用完整流程以刷新本机成员资格缓存。
-          void performSync();
-        });
-      }
+        try {
+          setIsGroupSwitching(true);
+          const recovery = await recoverPendingGroupSwitch(groupSwitchRuntime);
+          if (recovery === "blocked") {
+            setAuthLoading(false);
+            setSyncError(lang === "zh" ? "同步组切换等待网络恢复，请勿清除应用数据" : "Group switch is awaiting network recovery. Do not clear app data.");
+            return;
+          }
+          const ok = await performSync();
+          if (!ok) scheduleRetry();
+          else if (await getDeviceCredentials()) {
+            // 仅已有活跃成员资格时才启动实时监听。
+            stopRealtimeRef.current?.();
+            stopRealtimeRef.current = startRealtimeSync(() => {
+              // 角色或授权键可能刚在服务端变更；必须复用完整流程以刷新本机成员资格缓存。
+              void performSync();
+            });
+          }
+        } catch (error) {
+          console.warn("[CFSync] startup recovery failed:", error);
+          setAuthLoading(false);
+          setSyncError(error instanceof Error ? error.message : "SYNC_STARTUP_FAILED");
+        } finally {
+          setIsGroupSwitching(false);
+        }
       })();
     });
     return () => {

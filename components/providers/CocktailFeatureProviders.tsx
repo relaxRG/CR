@@ -4,17 +4,20 @@ import { IceSettingsProvider } from "@/lib/ice/store";
 import { MenuProvider } from "@/lib/menu/store";
 import { MenuPackageProvider } from "@/lib/menu/package-store";
 import { ShoppingProvider } from "@/lib/shopping/store";
+import { SpiritsInventoryProvider } from "@/lib/spirits/crud-store";
 
 export function CocktailFeatureProviders({ children }: { children: ReactNode }) {
   return (
-    <PriceAlertProvider>
-      <IceSettingsProvider>
+    <SpiritsInventoryProvider>
+      <PriceAlertProvider>
+        <IceSettingsProvider>
                 <MenuPackageProvider>
                   <MenuProvider>
                     <ShoppingProvider>{children}</ShoppingProvider>
                   </MenuProvider>
                 </MenuPackageProvider>
-      </IceSettingsProvider>
-    </PriceAlertProvider>
+        </IceSettingsProvider>
+      </PriceAlertProvider>
+    </SpiritsInventoryProvider>
   );
 }

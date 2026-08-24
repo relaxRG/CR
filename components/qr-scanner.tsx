@@ -33,13 +33,17 @@ let useCameraPermissions: (() => [
 ]) | null = null;
 
 if (Platform.OS !== "web") {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Web环境不能解析原生相机模块，必须在原生平台延迟加载。
-  const cam = require("expo-camera") as {
-    CameraView: NonNullable<typeof CameraView>;
-    useCameraPermissions: NonNullable<typeof useCameraPermissions>;
-  };
-  CameraView = cam.CameraView;
-  useCameraPermissions = cam.useCameraPermissions;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Web环境不能解析原生相机模块，必须在原生平台延迟加载。
+    const cam = require("expo-camera") as {
+      CameraView?: NonNullable<typeof CameraView>;
+      useCameraPermissions?: NonNullable<typeof useCameraPermissions>;
+    };
+    CameraView = cam.CameraView ?? null;
+    useCameraPermissions = cam.useCameraPermissions ?? null;
+  } catch (error) {
+    console.warn("[QRScanner] expo-camera is unavailable:", error);
+  }
 }
 
 // ─── 原生扫码器内部组件 ────────────────────────────────────────────────────
@@ -50,17 +54,29 @@ function NativeScanner({ onScanned, onClose, lang, onFallback }: QRScannerProps 
   const scannedRef = useRef(false);
 
   useEffect(() => {
+    let active = true;
+    let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
     if (!permission?.granted) {
-      void requestPermission().then((result) => {
-        if (!result.granted) {
+      void requestPermission()
+        .then((result) => {
+          if (!active || result.granted) return;
           setPermDenied(true);
-          setTimeout(() => {
+          fallbackTimer = setTimeout(() => {
+            if (!active) return;
             onFallback?.();
             onClose();
           }, 1500);
-        }
-      });
+        })
+        .catch((error) => {
+          console.warn("[QRScanner] permission request failed:", error);
+          if (!active) return;
+          setPermDenied(true);
+        });
     }
+    return () => {
+      active = false;
+      if (fallbackTimer) clearTimeout(fallbackTimer);
+    };
   }, [permission, requestPermission, onFallback, onClose]);
 
   const handleBarcode = ({ data }: { data: string }) => {
@@ -154,9 +170,31 @@ function NativeScanner({ onScanned, onClose, lang, onFallback }: QRScannerProps 
   );
 }
 
-// ─── 公开组件：Web 平台返回 null ──────────────────────────────────────────
+function CameraUnavailable({ onClose, onFallback, lang }: Pick<QRScannerProps, "onClose" | "onFallback" | "lang">) {
+  useEffect(() => {
+    onFallback?.();
+    return undefined;
+  }, [onFallback]);
+  return (
+    <Modal animationType="slide" transparent={false} onRequestClose={onClose}>
+      <View style={styles.permissionContainer}>
+        <Text style={styles.permissionText}>
+          {lang === "en" ? "Camera scanning is unavailable on this device." : "当前设备无法使用摄像头扫描，请改用手动输入。"}
+        </Text>
+        <Pressable onPress={onClose} style={({ pressed }) => [styles.cancelBtn, pressed && { opacity: 0.7 }]}>
+          <Text style={styles.cancelBtnText}>{lang === "en" ? "Close" : "关闭"}</Text>
+        </Pressable>
+      </View>
+    </Modal>
+  );
+}
+
+// ─── 公开组件：Web 平台返回 null；缺少原生模块时安全回退 ──────────────────────
 export function QRScanner({ onScanned, onClose, lang = "zh", onFallback }: QRScannerProps) {
   if (Platform.OS === "web") return null;
+  if (!CameraView || !useCameraPermissions) {
+    return <CameraUnavailable onClose={onClose} onFallback={onFallback} lang={lang} />;
+  }
   return <NativeScanner onScanned={onScanned} onClose={onClose} lang={lang} onFallback={onFallback} />;
 }
 
