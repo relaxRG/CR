@@ -35,7 +35,7 @@ interface PriceChartProps {
   showLegend?: boolean;
 }
 
-export function PriceHistoryChart({
+export const PriceHistoryChart = React.memo(function PriceHistoryChart({
   history,
   width = 320,
   height = 160,
@@ -193,7 +193,7 @@ export function PriceHistoryChart({
       )}
     </View>
   );
-}
+});
 
 // ─── 供应商价格对比条形图 ─────────────────────────────────────────────────────
 
