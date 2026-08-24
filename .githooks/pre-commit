@@ -1,0 +1,8 @@
+#!/usr/bin/env sh
+set -eu
+
+echo "[pre-commit] 检查 Provider Stability Matrix…"
+pnpm run check:provider-stability
+
+echo "[pre-commit] 检查高频业务组件渲染预算…"
+pnpm run test:performance:quick
