@@ -62,6 +62,6 @@ describe("虚拟化横向台账渲染性能回归", () => {
     const averageDuration = totalDuration / commits.length;
     console.info(`[virtualized-ledger-benchmark] updates=${commits.length} averageDurationMs=${averageDuration.toFixed(3)}`);
     expect(commits).toHaveLength(30);
-    expect(averageDuration).toBeLessThan(16);
+    expect(averageDuration).toBeLessThan(0.0001); // PERF-GATE-DRILL: deliberately impossible budget; never merge
   });
 });
