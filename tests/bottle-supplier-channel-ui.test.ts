@@ -15,8 +15,17 @@ describe("酒款中国参考价与供应渠道 UI 契约", () => {
     expect(cardIndex).toBeGreaterThan(infoIndex);
     expect(ratingIndex).toBeGreaterThan(cardIndex);
     expect(detail).toContain('testID="bottle-manage-supplier-channels"');
+    expect(detail).toContain('flexShrink: 1');
+    expect(detail).toContain('alignSelf: "flex-start"');
     expect(detail).toContain('supplierChannels.length === 0');
     expect(detail).not.toContain("{/* 供货渠道展示 */}");
+  });
+
+  it("价格待确认提供人工确认或返回真实采购渠道修正的入口", () => {
+    expect(detail).toContain('testID="bottle-price-alert-summary"');
+    expect(detail).toContain("确认价格变动");
+    expect(detail).toContain("前往采购渠道修正");
+    expect(detail).toContain('resolvePriceAlert(alert.id, "confirmed_change")');
   });
 
   it("渠道、采购名称与价格变化仅由已链接采购投影，不再提供独立新增或手填价格表单", () => {

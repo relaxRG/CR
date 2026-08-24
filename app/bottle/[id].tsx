@@ -26,7 +26,7 @@ export default function BottleDetailScreen() {
   const { getBottle, deleteBottle, setBottleRating } = useBottleStore();
   const { categoryLabel } = useBottleTaxonomy();
   const bottle = getBottle(id);
-  const { alertsForBottle } = usePriceAlerts();
+  const { alertsForBottle, resolve: resolvePriceAlert } = usePriceAlerts();
   const bottleAlerts = bottle ? alertsForBottle(bottle.id).filter((alert) => alert.status === "open") : [];
   const costPriceImpact = bottle ? getBottleCostPriceImpact(bottle) : null;
 
@@ -313,22 +313,45 @@ export default function BottleDetailScreen() {
             </>
           ) : null}
           {bottleAlerts.length > 0 ? (
-            <View testID="bottle-price-alert-summary" style={{ marginBottom: 10, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 8, backgroundColor: colors.warning + "16" }}>
-              <Text style={{ fontSize: 12, color: colors.warning, fontWeight: "500" }}>价格待确认：{bottleAlerts.length} 项</Text>
-            </View>
+            <Pressable
+              testID="bottle-price-alert-summary"
+              accessibilityRole="button"
+              accessibilityLabel={`价格待确认，共 ${bottleAlerts.length} 项。点按后可确认或修正。`}
+              onPress={() => Alert.alert(
+                "价格待确认",
+                "请先确认这次价格变化是否真实；若采购名称、金额或日期有误，请返回对应采购记录修正。",
+                [
+                  { text: "取消", style: "cancel" },
+                  {
+                    text: "确认价格变动",
+                    onPress: () => bottleAlerts.forEach((alert) => resolvePriceAlert(alert.id, "confirmed_change")),
+                  },
+                  {
+                    text: "前往采购渠道修正",
+                    onPress: () => router.push({ pathname: "/bottle-channels", params: { id: bottle.id, focus: "price_review" } }),
+                  },
+                ],
+              )}
+              style={({ pressed }) => [{ marginBottom: 10, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 8, backgroundColor: colors.warning + "16" }, pressed && { opacity: 0.7 }]}
+            >
+              <Text style={{ fontSize: 12, color: colors.warning, fontWeight: "500" }}>价格待确认：{bottleAlerts.length} 项 · 点按确认或修正</Text>
+            </Pressable>
           ) : null}
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
-            <Text style={{ fontSize: 12, color: colors.muted }}>
+          <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 8, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
+            <Text style={{ flex: 1, flexShrink: 1, fontSize: 12, color: colors.muted, lineHeight: 18 }}>
               {supplierChannels.length > 0
                 ? `${supplierChannels.length} 个采购渠道 · ${projectedPurchaseCount} 笔已链接进货${latestPriceDate ? ` · 最近报价 ${latestPriceDate}` : ""}`
                 : "尚无已链接采购；完成进货并链接酒库后自动生成"}
             </Text>
             <Pressable
               testID="bottle-manage-supplier-channels"
+              accessibilityRole="button"
+              accessibilityLabel="查看采购渠道"
+              hitSlop={8}
               onPress={() => router.push({ pathname: "/bottle-channels", params: { id: bottle.id } })}
-              style={({ pressed }) => [{ opacity: pressed ? 0.65 : 1, paddingVertical: 3 }]}
+              style={({ pressed }) => [{ alignSelf: "flex-start", opacity: pressed ? 0.65 : 1, paddingVertical: 2 }]}
             >
-              <Text style={{ fontSize: 13, color: colors.primary, fontWeight: "500" }}>查看采购渠道</Text>
+              <Text style={{ fontSize: 13, color: colors.primary, fontWeight: "500", lineHeight: 18 }}>查看采购渠道</Text>
             </Pressable>
           </View>
         </View>

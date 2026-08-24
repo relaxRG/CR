@@ -12,7 +12,14 @@ interface PriceAlertContextValue {
   inspect: (source: PriceAlertSource) => void;
   resolve: (id: string, resolution: NonNullable<PriceAlert["resolution"]>, suppressionUntil?: string) => void;
 }
-const PriceAlertContext = createContext<PriceAlertContextValue | null>(null);
+const EMPTY_PRICE_ALERT_CONTEXT: PriceAlertContextValue = {
+  ledger: emptyPriceAlertLedger(),
+  openAlerts: [],
+  alertsForBottle: () => [],
+  inspect: () => {},
+  resolve: () => {},
+};
+const PriceAlertContext = createContext<PriceAlertContextValue>(EMPTY_PRICE_ALERT_CONTEXT);
 
 export function PriceAlertProvider({ children }: { children: React.ReactNode }) {
   const { bottles } = useBottleStore();
@@ -28,4 +35,4 @@ export function PriceAlertProvider({ children }: { children: React.ReactNode }) 
   const value = useMemo<PriceAlertContextValue>(() => ({ ledger, openAlerts: ledger.alerts.filter((alert) => alert.status === "open"), alertsForBottle: (bottleId) => ledger.alerts.filter((alert) => alert.bottleId === bottleId && (alert.status === "open" || alert.status === "suppressed")), inspect, resolve }), [ledger, inspect, resolve]);
   return <PriceAlertContext.Provider value={value}>{children}</PriceAlertContext.Provider>;
 }
-export function usePriceAlerts() { const context = useContext(PriceAlertContext); if (!context) throw new Error("usePriceAlerts must be used within PriceAlertProvider"); return context; }
+export function usePriceAlerts() { return useContext(PriceAlertContext); }
