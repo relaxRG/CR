@@ -405,6 +405,7 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
   const toWineLedgerRow = (item: WineInventoryItem): MonthlyLedgerItem => ({
     itemId: String(item.seq),
     name: item.name,
+    nameEn: item.bottleId ? bottles.find((bottle) => bottle.id === item.bottleId)?.nameEn || undefined : undefined,
     category: item.category || item.wineType || "其他",
     spec: item.supplier,
     unit: "瓶",
@@ -437,7 +438,7 @@ export default function WineInventoryScreen({ month, embedded = false }: WineInv
   }, [wineLedgerRows, filteredItems, categoryProfiles, colors.muted]);
   const wineLedgerColumns = useMemo<HorizontalLedgerColumn<MonthlyLedgerItem>[]>(() => [
     { key: "sequence", label: "序号", width: 46, compactWidth: 40, flexWeight: 0.4, align: "center", render: (row) => <Text style={{ color: colors.muted, fontSize: STORE_TABLE_METRICS.bodyFontSize }}>{row.itemId}</Text> },
-    { key: "name", sortKey: "name", label: "商品名称", width: 184, compactWidth: 150, pinned: true, flexWeight: 3, onPress: setSelectedLedgerItem, testID: (row) => `wine-ledger-name-${row.itemId}`, render: (row) => <Text numberOfLines={2} style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.nameFontSize, fontWeight: "500", lineHeight: 16 }}>{row.name}</Text> },
+    { key: "name", sortKey: "name", label: "商品名称", width: 184, compactWidth: 150, pinned: true, flexWeight: 3, onPress: setSelectedLedgerItem, testID: (row) => `wine-ledger-name-${row.itemId}`, render: (row) => <View><Text numberOfLines={1} style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.nameFontSize, fontWeight: "500", lineHeight: 16 }}>{row.name}</Text>{row.nameEn ? <Text numberOfLines={1} style={{ color: colors.muted, fontSize: 11, fontWeight: "400", lineHeight: 14, marginTop: 1 }}>{row.nameEn}</Text> : null}</View> },
     { key: "referencePrice", label: "参考价", width: 96, compactWidth: 68, flexWeight: 1.1, align: "right", render: (row) => <Text style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{formatStoreMoney(row.openingUnitCost)}</Text> },
     { key: "openingQty", sortKey: "openingQty", label: "期初库存", width: 88, flexWeight: 1, align: "right", render: (row) => <Text style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{formatStoreQuantity(row.openingQty)}</Text> },
     { key: "openingUnitCost", sortKey: "openingUnitCost", label: "期初单价", width: 104, flexWeight: 1.2, align: "right", render: (row) => <Text style={{ color: colors.foreground, fontSize: STORE_TABLE_METRICS.numericFontSize }}>{formatStoreMoney(row.openingUnitCost)}</Text> },
