@@ -105,3 +105,29 @@ export function resolveWineCumulativePurchaseAmount(realPurchaseAmount: number, 
   if (!Number.isFinite(realPurchaseAmount) || realPurchaseAmount < 0) throw new Error("真实累计进货金额必须是非负有限数字");
   return realPurchaseAmount + (baseline?.deletedAt ? 0 : baseline?.initialCumulativeAmount ?? 0);
 }
+
+/** 同一段系统启用前历史采购必须在供应商与酒款两个视角严格守恒。 */
+export function reconcileWinePurchaseBaselineDimensions(baselines: readonly WinePurchaseBaseline[]) {
+  const supplierInitialAmount = baselines
+    .filter((baseline) => baseline.scope === "supplier" && !baseline.deletedAt)
+    .reduce((sum, baseline) => sum + baseline.initialCumulativeAmount, 0);
+  const productInitialAmount = baselines
+    .filter((baseline) => baseline.scope === "product" && !baseline.deletedAt)
+    .reduce((sum, baseline) => sum + baseline.initialCumulativeAmount, 0);
+  const difference = supplierInitialAmount - productInitialAmount;
+  return {
+    supplierInitialAmount,
+    productInitialAmount,
+    difference,
+    isBalanced: Math.abs(difference) < 0.000001,
+  };
+}
+
+/** 月结前阻断未核对的双维度历史基线，避免把不平的历史金额归档为正式事实。 */
+export function assertWinePurchaseBaselineDimensionsBalanced(baselines: readonly WinePurchaseBaseline[]) {
+  const reconciliation = reconcileWinePurchaseBaselineDimensions(baselines);
+  if (!reconciliation.isBalanced) {
+    throw new Error(`供应商与酒款初始累计金额不一致，差额：${reconciliation.difference.toFixed(2)}`);
+  }
+  return reconciliation;
+}
