@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 
@@ -31,8 +31,48 @@ for (const fileName of migrationFiles) {
 }
 
 const anyBudget = readJson("docs/any-budget.json");
-const grep = execFileSync("rg", ["-n", "--glob", "*.{ts,tsx}", "--glob", "!tests/**", "--glob", "!node_modules/**", "\\bany\\b", ...anyBudget.scope], { cwd: root, encoding: "utf8" });
-const actualAny = grep.trim() ? grep.trim().split("\n").length : 0;
+const anyPattern = /\bany\b/;
+
+function collectSourceFiles(relativeDirectory) {
+  const directory = join(root, relativeDirectory);
+  if (!existsSync(directory)) return [];
+  return readdirSync(directory).flatMap((entry) => {
+    const relativePath = join(relativeDirectory, entry);
+    const absolutePath = join(root, relativePath);
+    if (entry === "node_modules" || relativePath.startsWith("tests")) return [];
+    if (statSync(absolutePath).isDirectory()) return collectSourceFiles(relativePath);
+    return /\.(ts|tsx)$/.test(entry) ? [relativePath] : [];
+  });
+}
+
+function countExplicitAnyWithNode() {
+  return anyBudget.scope
+    .flatMap((directory) => collectSourceFiles(directory))
+    .reduce((count, relativePath) => {
+      const matchingLines = readFileSync(join(root, relativePath), "utf8")
+        .split(/\r?\n/)
+        .filter((line) => anyPattern.test(line)).length;
+      return count + matchingLines;
+    }, 0);
+}
+
+function countExplicitAny() {
+  try {
+    const grep = execFileSync(
+      "rg",
+      ["-n", "--glob", "*.{ts,tsx}", "--glob", "!tests/**", "--glob", "!node_modules/**", "\\bany\\b", ...anyBudget.scope],
+      { cwd: root, encoding: "utf8" },
+    );
+    return grep.trim() ? grep.trim().split("\n").length : 0;
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+      return countExplicitAnyWithNode();
+    }
+    throw error;
+  }
+}
+
+const actualAny = countExplicitAny();
 if (actualAny > anyBudget.maxExplicitAnyOccurrences) {
   failures.push(`显式 any 超出预算：${actualAny} > ${anyBudget.maxExplicitAnyOccurrences}`);
 }
