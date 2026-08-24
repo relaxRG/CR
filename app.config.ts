@@ -142,7 +142,8 @@ const config: ExpoConfig = {
     url: "https://u.expo.dev/3ab89cc0-c646-4fb8-bceb-ba24204a8811",
   },
   runtimeVersion: {
-    policy: "appVersion",
+    // 与原生依赖和配置共同生成版本指纹，避免旧二进制加载依赖不兼容的 OTA 更新。
+    policy: "fingerprint",
   },
   experiments: {
     typedRoutes: true,

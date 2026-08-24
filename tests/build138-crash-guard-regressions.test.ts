@@ -31,6 +31,9 @@ describe("build 138 崩溃防护回归", () => {
     expect(syncProvider).toContain('console.warn("[CFSync] resolve conflict failed:"');
     expect(scanner).toContain('console.warn("[QRScanner] expo-camera is unavailable:"');
     expect(scanner).toContain('console.warn("[QRScanner] permission request failed:"');
+    expect(scanner).toContain('console.warn("[QRScanner] manual permission request failed:"');
+    expect(scanner).toContain("onPress={handleManualPermissionRequest}");
+    expect(scanner).not.toContain("onPress={() => void requestPermission()}");
     expect(scanner).toContain("<CameraUnavailable");
   });
 });

@@ -79,6 +79,17 @@ function NativeScanner({ onScanned, onClose, lang, onFallback }: QRScannerProps 
     };
   }, [permission, requestPermission, onFallback, onClose]);
 
+  const handleManualPermissionRequest = () => {
+    void requestPermission()
+      .then((result) => {
+        if (!result.granted) setPermDenied(true);
+      })
+      .catch((error) => {
+        console.warn("[QRScanner] manual permission request failed:", error);
+        setPermDenied(true);
+      });
+  };
+
   const handleBarcode = ({ data }: { data: string }) => {
     if (scannedRef.current) return;
     scannedRef.current = true;
@@ -103,7 +114,7 @@ function NativeScanner({ onScanned, onClose, lang, onFallback }: QRScannerProps 
           </Text>
           {!permDenied && (
             <Pressable
-              onPress={() => void requestPermission()}
+              onPress={handleManualPermissionRequest}
               style={({ pressed }) => [styles.permissionBtn, pressed && { opacity: 0.7 }]}
             >
               <Text style={styles.permissionBtnText}>
