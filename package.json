@@ -21,6 +21,7 @@
     "test:performance:stress": "vitest run tests/store-purchase-virtualization-stress.test.tsx --reporter=dot",
     "test:performance:policy": "vitest run tests/app-performance-marks.test.ts tests/app-workspace-performance-policy.test.ts tests/global-month-stress-e2e-policy.test.ts tests/offline-cache-performance-policy.test.ts tests/schedule-workspace-performance-policy.test.ts tests/startup-sync-performance-policy.test.ts tests/store-analytics-performance-policy.test.ts tests/store-inventory-period-performance-policy.test.ts tests/store-labor-performance-policy.test.ts tests/store-purchase-performance-policy.test.ts tests/wine-workbench-performance-policy.test.ts tests/store-performance-stress-harness.test.ts --reporter=dot",
     "test:performance:nightly:core": "pnpm test:performance:quick && pnpm test:performance:stress && pnpm test:performance:policy",
+    "test:performance:nightly": "pnpm test:performance:nightly:core && CI=true npx expo export --platform web --output-dir dist-web && node scripts/h5-store-large-dataset-stress-e2e.mjs && node scripts/h5-global-month-stress-e2e.mjs",
     "setup:git-hooks": "node scripts/install-git-hooks.mjs",
     "prepare": "pnpm setup:git-hooks",
     "test:h5:schedule-correction": "CI=true npx expo export --platform web --output-dir dist-web && node scripts/h5-schedule-correction-e2e.mjs",
