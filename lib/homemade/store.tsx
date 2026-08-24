@@ -231,15 +231,17 @@ export function HomemadeProvider({ children }: { children: React.ReactNode }) {
   // 云端同步覆盖本地后，重新加载自制库数据到内存
   useEffect(() => {
     return registerStoreReload(() => {
-      Promise.all([
+      void Promise.all([
         AsyncStorage.getItem(PREPS_KEY),
         AsyncStorage.getItem(SECTIONS_KEY),
         AsyncStorage.getItem(TYPES_KEY),
-      ]).then(([pRaw, sRaw, tRaw]) => {
-        if (pRaw) { try { setPreps(JSON.parse(pRaw)); } catch {} }
-        if (sRaw) { try { setSections(JSON.parse(sRaw)); } catch {} }
-        if (tRaw) { try { setTypes(JSON.parse(tRaw)); } catch {} }
-      });
+      ])
+        .then(([pRaw, sRaw, tRaw]) => {
+          if (pRaw) { try { const parsed: unknown = JSON.parse(pRaw); if (Array.isArray(parsed)) setPreps(parsed as HomemadePrep[]); } catch {} }
+          if (sRaw) { try { const parsed: unknown = JSON.parse(sRaw); if (Array.isArray(parsed)) setSections(parsed as PrepSection[]); } catch {} }
+          if (tRaw) { try { const parsed: unknown = JSON.parse(tRaw); if (Array.isArray(parsed)) setTypes(parsed as PrepType[]); } catch {} }
+        })
+        .catch((error) => console.warn("[Homemade] sync reload failed:", error));
     });
   }, []);
 

@@ -10,12 +10,16 @@ describe("烈酒库存持久化水合稳定性", () => {
 
     expect(store).toContain("function parseStoredValue<T>");
     expect(store).toContain("烈酒库存数据解析失败，已回退默认值");
-    expect(store).toContain("parseStoredValue<SpiritItem[]>(itemsRaw, [], ITEMS_KEY)");
-    expect(store).toContain("parseStoredValue<SpiritPurchaseRecord[]>(purchasesRaw, [], PURCHASES_KEY)");
-    expect(store).toContain("parseStoredValue<SpiritRefPrice[]>(refPricesRaw, [], REF_PRICES_KEY)");
-    expect(store).toContain("parseStoredValue<SpiritSupplierInfo[]>(suppliersRaw, [], SUPPLIERS_KEY)");
-    expect(store).toContain("parseStoredValue<PettyMatchMemory[]>(matchMemoryRaw, [], MATCH_MEMORY_KEY)");
-    expect(store).toContain("parseStoredValue<GroupMatchMemory[]>(groupMatchRaw, [], GROUP_MATCH_MEMORY_KEY)");
+    expect(store).toContain("parseStoredValue<unknown>(itemsRaw, [], ITEMS_KEY)");
+    expect(store).toContain("Array.isArray(parsedItems)");
+    expect(store).toContain("parseStoredValue<unknown>(purchasesRaw, [], PURCHASES_KEY)");
+    expect(store).toContain("Array.isArray(parsedPurchases)");
+    expect(store).toContain("parseStoredValue<unknown>(refPricesRaw, [], REF_PRICES_KEY)");
+    expect(store).toContain("Array.isArray(parsedRefPrices)");
+    expect(store).toContain("parseStoredValue<unknown>(suppliersRaw, [], SUPPLIERS_KEY)");
+    expect(store).toContain("Array.isArray(parsedSuppliers)");
+    expect(store).toContain("Array.isArray(parsedMatchMemory)");
+    expect(store).toContain("Array.isArray(parsedGroupMatchMemory)");
   });
 
   it("在AsyncStorage读取本身失败时捕获拒绝，避免reload回调产生未处理Promise", () => {

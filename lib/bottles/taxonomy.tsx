@@ -607,13 +607,15 @@ export function BottleTaxonomyProvider({ children }: { children: React.ReactNode
   // 云端同步覆盖本地后，重新加载酒款分类体系到内存
   useEffect(() => {
     return registerStoreReload(() => {
-      Promise.all([
+      void Promise.all([
         AsyncStorage.getItem(CATS_KEY),
         AsyncStorage.getItem(STYLES_KEY),
-      ]).then(([rawC, rawS]) => {
-        if (rawC) { try { setCategories(JSON.parse(rawC) as BottleCategoryDef[]); } catch {} }
-        if (rawS) { try { setStyles(JSON.parse(rawS) as BottleStyleDef[]); } catch {} }
-      });
+      ])
+        .then(([rawC, rawS]) => {
+          if (rawC) { try { const parsed: unknown = JSON.parse(rawC); if (Array.isArray(parsed)) setCategories(parsed as BottleCategoryDef[]); } catch {} }
+          if (rawS) { try { const parsed: unknown = JSON.parse(rawS); if (Array.isArray(parsed)) setStyles(parsed as BottleStyleDef[]); } catch {} }
+        })
+        .catch((error) => console.warn("[BottleTaxonomy] sync reload failed:", error));
     });
   }, []);
 

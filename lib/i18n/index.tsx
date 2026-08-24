@@ -18,9 +18,11 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   const [lang, setLangState] = useState<Lang>("zh");
 
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY).then((saved) => {
-      if (saved === "zh" || saved === "en") setLangState(saved);
-    });
+    void AsyncStorage.getItem(STORAGE_KEY)
+      .then((saved) => {
+        if (saved === "zh" || saved === "en") setLangState(saved);
+      })
+      .catch((error) => console.warn("[I18n] language hydration failed:", error));
   }, []);
 
   const setLang = useCallback((next: Lang) => {

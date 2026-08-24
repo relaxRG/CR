@@ -21,7 +21,7 @@ export type SmartLink =
   | { kind: "prep"; prep: HomemadePrep; matchConfidence: "exact" | "fuzzy" }
   | null;
 
-const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
+const norm = (s: string | null | undefined) => (s ?? "").trim().toLowerCase().replace(/\s+/g, " ");
 
 /** 精确匹配酒库(中/英/品牌名全等) */
 function exactBottle(name: string, bottles: Bottle[]): Bottle | null {

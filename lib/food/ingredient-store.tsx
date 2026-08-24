@@ -463,9 +463,21 @@ const PurchaseContext = createContext<PurchaseContextValue | null>(null);
 export function SupplierPurchaseProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(purchaseReducer, { records: [] });
   useEffect(() => {
-    const load = () => AsyncStorage.getItem(PURCHASE_KEY).then((raw) => {
-      if (raw) { try { dispatch({ type: "LOAD", payload: JSON.parse(raw) }); } catch {} }
-    });
+    const load = () => {
+      void AsyncStorage.getItem(PURCHASE_KEY)
+        .then((raw) => {
+          if (!raw) return;
+          try {
+            const parsed: unknown = JSON.parse(raw);
+            if (typeof parsed === "object" && parsed !== null && Array.isArray((parsed as PurchaseState).records)) {
+              dispatch({ type: "LOAD", payload: parsed as PurchaseState });
+            }
+          } catch (error) {
+            console.warn("[SupplierPurchase] hydration parse failed:", error);
+          }
+        })
+        .catch((error) => console.warn("[SupplierPurchase] hydration failed:", error));
+    };
     load();
     return registerStoreReload(load);
   }, []);

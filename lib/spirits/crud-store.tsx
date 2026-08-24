@@ -622,28 +622,37 @@ export function SpiritsInventoryProvider({ children }: { children: React.ReactNo
       AsyncStorage.getItem(CUSTOM_CATEGORIES_KEY),
       AsyncStorage.getItem(GROUP_MATCH_MEMORY_KEY),
     ]).then(([itemsRaw, purchasesRaw, ledgerRaw, refPricesRaw, suppliersRaw, groupsRaw, matchMemoryRaw, selfBuyRaw, customCatsRaw, groupMatchRaw]) => {
-      const parsedItems = parseStoredValue<SpiritItem[]>(itemsRaw, [], ITEMS_KEY);
-      const items = parsedItems.map((item) => ({
-        ...item,
-        supplierAliases: normalizeSpiritSupplierAliases(item.supplierAliases),
-      }));
-      const purchases = parseStoredValue<SpiritPurchaseRecord[]>(purchasesRaw, [], PURCHASES_KEY);
+      const parsedItems = parseStoredValue<unknown>(itemsRaw, [], ITEMS_KEY);
+      const items = (Array.isArray(parsedItems) ? parsedItems : []).map((item) => {
+        const spirit = item as SpiritItem;
+        return {
+          ...spirit,
+          supplierAliases: normalizeSpiritSupplierAliases(spirit.supplierAliases),
+        };
+      });
+      const parsedPurchases = parseStoredValue<unknown>(purchasesRaw, [], PURCHASES_KEY);
+      const purchases = Array.isArray(parsedPurchases) ? parsedPurchases as SpiritPurchaseRecord[] : [];
       const parsedLedger = parseStoredValue<unknown>(ledgerRaw, [], LEDGER_KEY);
       const ledger: SpiritLedgerEntry[] = Array.isArray(parsedLedger)
         ? parsedLedger.filter(isCurrentSpiritLedgerEntry)
         : [];
-      const refPrices = parseStoredValue<SpiritRefPrice[]>(refPricesRaw, [], REF_PRICES_KEY);
-      const suppliers = parseStoredValue<SpiritSupplierInfo[]>(suppliersRaw, [], SUPPLIERS_KEY);
+      const parsedRefPrices = parseStoredValue<unknown>(refPricesRaw, [], REF_PRICES_KEY);
+      const refPrices = Array.isArray(parsedRefPrices) ? parsedRefPrices as SpiritRefPrice[] : [];
+      const parsedSuppliers = parseStoredValue<unknown>(suppliersRaw, [], SUPPLIERS_KEY);
+      const suppliers = Array.isArray(parsedSuppliers) ? parsedSuppliers as SpiritSupplierInfo[] : [];
       const parsedGroups = parseStoredValue<unknown>(groupsRaw, null, GROUPS_KEY);
       // 首次安装才提供预置集团。只要用户曾保存过集团列表，就尊重其删除结果，绝不把已删集团重新注入。
       const groups = (Array.isArray(parsedGroups)
         ? parsedGroups.map(normalizeSpiritGroup).filter((group): group is SpiritGroupDef => Boolean(group))
         : BUILTIN_GROUPS)
         .sort((left, right) => left.sortOrder - right.sortOrder || left.id.localeCompare(right.id));
-      const matchMemory = parseStoredValue<PettyMatchMemory[]>(matchMemoryRaw, [], MATCH_MEMORY_KEY);
+      const parsedMatchMemory = parseStoredValue<unknown>(matchMemoryRaw, [], MATCH_MEMORY_KEY);
+      const matchMemory = Array.isArray(parsedMatchMemory) ? parsedMatchMemory as PettyMatchMemory[] : [];
       const selfBuyConfig = parseStoredValue<SelfBuyConfig>(selfBuyRaw, DEFAULT_SELF_BUY_CONFIG, SELF_BUY_CONFIG_KEY);
-      const customCategories = parseStoredValue<SpiritCustomCategory[]>(customCatsRaw, [], CUSTOM_CATEGORIES_KEY);
-      const groupMatchMemory = parseStoredValue<GroupMatchMemory[]>(groupMatchRaw, [], GROUP_MATCH_MEMORY_KEY);
+      const parsedCustomCategories = parseStoredValue<unknown>(customCatsRaw, [], CUSTOM_CATEGORIES_KEY);
+      const customCategories = Array.isArray(parsedCustomCategories) ? parsedCustomCategories as SpiritCustomCategory[] : [];
+      const parsedGroupMatchMemory = parseStoredValue<unknown>(groupMatchRaw, [], GROUP_MATCH_MEMORY_KEY);
+      const groupMatchMemory = Array.isArray(parsedGroupMatchMemory) ? parsedGroupMatchMemory as GroupMatchMemory[] : [];
       skipNextPersistenceRef.current = true;
       dispatch({ type: "LOAD", payload: { items, purchases, ledger, refPrices, suppliers, groups, matchMemory, selfBuyConfig, customCategories, groupMatchMemory } });
       loadedRef.current = true;
