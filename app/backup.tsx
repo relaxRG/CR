@@ -11,7 +11,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
 import { getBackupInfo, restoreFromBackup, backupLocalData, triggerStoreReload } from "@/lib/sync/engine";
-import { exportCurrentDataToFile, importFromJsonFile, listSnapshots, computeSnapshotDiff, computeBackupFileDiff } from "@/lib/backup/local-backup";
+import { exportCurrentDataToFile, importFromJsonFile, listSnapshots, computeSnapshotDiff, computeBackupFileDiff, restoreFromSnapshot } from "@/lib/backup/local-backup";
 import {
   performBackup,
   getICloudMeta,
@@ -117,7 +117,7 @@ export default function BackupScreen() {
     );
   };
 
-  const handleSnapshotRestore = (_slot: number, label: string) => {
+  const handleSnapshotRestore = (slot: number, label: string) => {
     Alert.alert(
       lang === "zh" ? "恢复快照" : "Restore Snapshot",
       lang === "zh"
@@ -130,15 +130,21 @@ export default function BackupScreen() {
           style: "destructive",
           onPress: async () => {
             setRestoring(true);
-            const ok = await restoreFromBackup();
-            setRestoring(false);
-            if (ok) triggerStoreReload();
-            Alert.alert(
-              ok ? (lang === "zh" ? "恢复成功" : "Restored") : (lang === "zh" ? "恢复失败" : "Failed"),
-              ok
-                ? (lang === "zh" ? "数据已恢复。" : "Data restored.")
-                : (lang === "zh" ? "未找到快照数据。" : "Snapshot not found."),
-            );
+            try {
+              const result = await restoreFromSnapshot(slot);
+              triggerStoreReload();
+              Alert.alert(
+                lang === "zh" ? "恢复成功" : "Restored",
+                lang === "zh" ? `已恢复 ${result.restored} 项数据。` : `Restored ${result.restored} item(s).`,
+              );
+            } catch (error) {
+              Alert.alert(
+                lang === "zh" ? "恢复失败" : "Restore Failed",
+                error instanceof Error ? error.message : (lang === "zh" ? "无法恢复所选快照。" : "Could not restore the selected snapshot."),
+              );
+            } finally {
+              setRestoring(false);
+            }
           },
         },
       ],

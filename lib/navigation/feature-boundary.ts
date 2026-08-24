@@ -24,7 +24,9 @@ export function resolveFeatureBoundary(pathname: string): FeatureBoundary {
     path === "/" ||
     path.startsWith("/cocktail") ||
     path.startsWith("/recipe") ||
+    path.startsWith("/recipes") ||
     path.startsWith("/bottle") ||
+    path.startsWith("/bottles") ||
     path.startsWith("/homemade") ||
     path.startsWith("/menu") ||
     path.startsWith("/shopping") ||

@@ -268,7 +268,7 @@ export default function EquipmentInventoryScreen({ month, embedded = false }: Eq
   const [editItem, setEditItem] = useState<EquipmentItem | null>(null);
   const [showMaintenance, setShowMaintenance] = useState(false);
   const [, setMaintenanceItem] = useState<EquipmentItem | null>(null);
-  const [, setImportLoading] = useState(false);
+  const [importLoading, setImportLoading] = useState(false);
 
   const currentMonth = month ?? new Date().toISOString().slice(0, 7);
   const totalMonthlyDepreciation = store.getTotalMonthlyDepreciation();
@@ -277,12 +277,21 @@ export default function EquipmentInventoryScreen({ month, embedded = false }: Eq
   const totalPurchaseValue = useMemo(() => store.items.filter((i) => i.active).reduce((s, i) => s + i.purchasePrice, 0), [store.items]);
 
   const handlePickExcel = async () => {
+    if (importLoading) return;
     tap();
     try {
-      const result = await DocumentPicker.getDocumentAsync({ type: ["*/*"], copyToCacheDirectory: true });
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-excel"],
+        copyToCacheDirectory: true,
+      });
       if (result.canceled || !result.assets?.[0]) return;
+      const asset = result.assets[0];
+      if ((asset.size ?? 0) > 10 * 1024 * 1024) {
+        Alert.alert("文件过大", "设备导入文件不能超过 10MB，请拆分后再导入。");
+        return;
+      }
       setImportLoading(true);
-      const base64 = await FileSystem.readAsStringAsync(result.assets[0].uri, { encoding: FileSystem.EncodingType.Base64 });
+      const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 });
       const { items: parsed, error } = await parseEquipmentExcel(base64);
       setImportLoading(false);
       if (!parsed?.length) { Alert.alert("解析失败", error ?? "未能识别设备数据"); return; }
@@ -310,7 +319,7 @@ export default function EquipmentInventoryScreen({ month, embedded = false }: Eq
         </Pressable>
         <Text style={[S.navTitle, { color: colors.foreground }]}>🔧 设备进销存</Text>
         <View style={{ flexDirection: "row", gap: 12 }}>
-          <Pressable onPress={handlePickExcel} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+          <Pressable onPress={handlePickExcel} disabled={importLoading} style={({ pressed }) => ({ opacity: importLoading ? 0.45 : pressed ? 0.7 : 1 })}>
             <IconSymbol name="arrow.down.doc.fill" size={20} color={EQUIP_COLOR} />
           </Pressable>
           <Pressable onPress={() => { tap(); setEditItem(null); setShowPurchase(true); }} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>

@@ -25,6 +25,7 @@ import { Platform } from "react-native";
 import { SYNC_KEYS } from "@/lib/sync/engine";
 
 const MAX_VERSIONS = 7;
+const BACKUP_SCHEMA_VERSION = 1;
 const ICLOUD_META_KEY = "backup.icloud.meta";
 const AUTO_BACKUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 const APP_FOLDER = "CocktailR";
@@ -144,7 +145,7 @@ export async function performBackup(deviceName = "Unknown Device"): Promise<IClo
   const keyCount = Object.values(data).filter((v) => v !== null).length;
 
   const backupFile: ICloudBackupFile = {
-    version: slot,
+    version: BACKUP_SCHEMA_VERSION,
     createdAt: now,
     deviceName,
     keyCount,
@@ -239,21 +240,24 @@ export async function restoreFromBackup(slot: number): Promise<{ restored: numbe
   const raw = await FileSystem.readAsStringAsync(filePath);
 
   const backup = JSON.parse(raw) as ICloudBackupFile;
-  let restored = 0;
-  let failed = 0;
-
-  for (const [key, value] of Object.entries(backup.data)) {
-    try {
-      if (value !== null) {
-        await AsyncStorage.setItem(key, value);
-        restored++;
-      }
-    } catch {
-      failed++;
-    }
+  if (!backup || !backup.data || typeof backup.data !== "object") {
+    throw new Error("Backup data is invalid");
   }
 
-  return { restored, failed };
+  const allowedKeys = new Set<string>(SYNC_KEYS);
+  const entries = Object.entries(backup.data).filter(([key]) => allowedKeys.has(key));
+  const writes = entries.filter((entry): entry is [string, string] => entry[1] !== null);
+  const removals = entries.filter(([, value]) => value === null).map(([key]) => key);
+  let failed = 0;
+
+  try {
+    if (removals.length > 0) await AsyncStorage.multiRemove(removals);
+    if (writes.length > 0) await AsyncStorage.multiSet(writes);
+  } catch {
+    failed = writes.length + removals.length;
+  }
+
+  return { restored: failed === 0 ? writes.length + removals.length : 0, failed };
 }
 
 /** 获取 iCloud Drive 容器 ID（用于 UI 显示） */

@@ -59,15 +59,19 @@ export default function WineInventoryImportScreen() {
   );
 
   const handlePick = async () => {
+    if (loading) return;
     tap();
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-               "application/vnd.ms-excel", "*/*"],
+        type: ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-excel"],
         copyToCacheDirectory: true,
       });
       if (result.canceled || !result.assets?.[0]) return;
       const asset = result.assets[0];
+      if ((asset.size ?? 0) > 10 * 1024 * 1024) {
+        Alert.alert("文件过大", "葡萄酒工作簿不能超过 10MB，请拆分后再导入。");
+        return;
+      }
       setLoading(true);
       const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 });
       const parsed = await parseWineWorkbook(base64, activeMonth);
