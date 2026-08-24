@@ -712,6 +712,10 @@
 - [x] 存储与异步加固：针对可证实的存储读写和 fire-and-forget 初始化拒绝路径实施最小防御性修复与回归测试。
 - [x] 原生静态修复：为 QR 相机界面中用户触发的二次权限请求补充拒绝处理，避免原生权限 API 失败形成未处理 Promise。
 - [x] OTA 原生兼容加固：将 Expo Updates 运行时版本从 appVersion 策略改为 fingerprint，避免不同原生依赖二进制之间错误加载 JavaScript 更新。
+- [ ] 发布流程：核对主分支最新提交、工作区与 GitHub 自动化检查；全绿后再取得 TestFlight 上传确认。
+- [ ] 发布流程：在用户确认且主分支检查全绿后，执行 TestFlight 上传并记录构建结果。
+- [x] GitHub Actions 排障：审查 Checks API 403、Storage/UI 无步骤失败与 macOS 运行器未分配的根因和最小权限恢复路径。
+- [x] GitHub Actions 修复：将 iOS 烟测从已不在当前托管运行器列表中的 macOS-13 迁移到受支持的 macOS 标签，并保留单任务并发限制。
 
 ---
 

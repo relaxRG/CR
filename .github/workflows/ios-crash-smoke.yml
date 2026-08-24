@@ -20,9 +20,9 @@ concurrency:
 
 jobs:
   release-simulator-cold-start:
-    # Keep the Xcode selection dynamic. The macOS-14 hosted pool is currently failing before
-    # runner allocation, so use the compatible macOS-13 pool for the smoke run.
-    runs-on: macos-13
+    # macOS-13 is no longer in the current GitHub-hosted runner catalog. Keep Xcode selection
+    # dynamic while using an actively supported Apple Silicon hosted image.
+    runs-on: macos-15
     timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
