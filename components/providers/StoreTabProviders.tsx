@@ -83,6 +83,20 @@ export function StoreLaborProviders({ children }: { children: ReactNode }) {
 }
 
 /**
+ * 劳动工作区会将备用金条目投影为预支与人工关联；独立劳动路由必须同时装配这两个只需读取/关联的事实源。
+ * StoreAllFeatureProviders 已由 StorePettyProviders 提供相同来源，因此不在其内部重复使用本组合。
+ */
+export function StoreLaborWorkspaceProviders({ children }: { children: ReactNode }) {
+  return (
+    <PettyCashProvider>
+      <PettyLaborLinkProvider>
+        <StoreLaborProviders>{children}</StoreLaborProviders>
+      </PettyLaborLinkProvider>
+    </PettyCashProvider>
+  );
+}
+
+/**
  * 报表边界只装配报告自有写模型、受控月结命令与只读跨域物化视图。
  * 它不挂载人力、备用金、库存、采购或店铺的可写事实 Provider；离开报表时由 Tab key 完整卸载。
  */

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
@@ -26,6 +26,7 @@ export function BoundedMonthNavigator({ month, bounds, onChange, subject = "库�
   const colors = useColors();
   const [visible, setVisible] = useState(false);
   const [year, setYear] = useState(Number(month.slice(0, 4)));
+  const latestMonthRef = useRef(month);
   const canPrevious = canNavigateInventoryMonth(month, -1, bounds);
   const canNext = canNavigateInventoryMonth(month, 1, bounds);
   const available = useMemo(() => inventoryMonthsForYear(year, bounds), [year, bounds]);
@@ -33,19 +34,30 @@ export function BoundedMonthNavigator({ month, bounds, onChange, subject = "库�
   const lastYear = Number(bounds.max.slice(0, 4));
   const current = getCurrentInventoryMonth();
 
-  useEffect(() => { if (visible) setYear(Number(month.slice(0, 4))); }, [visible, month]);
+  useEffect(() => {
+    latestMonthRef.current = month;
+    if (visible) setYear(Number(month.slice(0, 4)));
+  }, [visible, month]);
   const select = (next: InventoryMonth) => { onChange(next); setVisible(false); };
+  const selectRelative = useCallback((offset: -1 | 1) => {
+    const currentMonth = latestMonthRef.current;
+    if (!canNavigateInventoryMonth(currentMonth, offset, bounds)) return;
+    const nextMonth = addInventoryMonths(currentMonth, offset);
+    // 在React提交新props之前，下一次事件也必须看到本次选择的结果。
+    latestMonthRef.current = nextMonth;
+    onChange(nextMonth);
+  }, [bounds, onChange]);
 
   return (
     <>
       <View testID={testID} style={S.row}>
-        <Pressable testID={`${testID}-previous`} accessibilityRole="button" accessibilityLabel={`上一个${subject}月份`} accessibilityState={{ disabled: !canPrevious }} disabled={!canPrevious} onPress={() => onChange(addInventoryMonths(month, -1))} style={({ pressed }) => [S.arrow, { backgroundColor: colors.border + "55", opacity: !canPrevious ? 0.32 : pressed ? 0.55 : 1 }]}>
+        <Pressable testID={`${testID}-previous`} accessibilityRole="button" accessibilityLabel={`上一个${subject}月份`} accessibilityState={{ disabled: !canPrevious }} disabled={!canPrevious} onPress={() => selectRelative(-1)} style={({ pressed }) => [S.arrow, { backgroundColor: colors.border + "55", opacity: !canPrevious ? 0.32 : pressed ? 0.55 : 1 }]}>
           <IconSymbol name="chevron.left" size={15} color={colors.muted} />
         </Pressable>
         <Pressable testID={`${testID}-picker`} accessibilityRole="button" accessibilityLabel={`选择${subject}月份，当前${inventoryMonthLabel(month)}`} onPress={() => setVisible(true)} style={({ pressed }) => [S.monthButton, { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.7 : 1 }]}>
           <Text style={[S.monthText, { color: colors.foreground }]}>{inventoryMonthLabel(month)}</Text>
         </Pressable>
-        <Pressable testID={`${testID}-next`} accessibilityRole="button" accessibilityLabel={`下一个${subject}月份`} accessibilityState={{ disabled: !canNext }} disabled={!canNext} onPress={() => onChange(addInventoryMonths(month, 1))} style={({ pressed }) => [S.arrow, { backgroundColor: colors.border + "55", opacity: !canNext ? 0.32 : pressed ? 0.55 : 1 }]}>
+        <Pressable testID={`${testID}-next`} accessibilityRole="button" accessibilityLabel={`下一个${subject}月份`} accessibilityState={{ disabled: !canNext }} disabled={!canNext} onPress={() => selectRelative(1)} style={({ pressed }) => [S.arrow, { backgroundColor: colors.border + "55", opacity: !canNext ? 0.32 : pressed ? 0.55 : 1 }]}>
           <IconSymbol name="chevron.right" size={15} color={colors.muted} />
         </Pressable>
       </View>

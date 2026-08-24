@@ -165,6 +165,21 @@ export function calcClosingPure(
   return sumMoney([opening, inflow, otherIncome, -expense]);
 }
 
+const EMPTY_PETTY_CONTEXT: PettyContextValue = Object.freeze({
+  records: [],
+  periods: [],
+  addRecord: () => undefined,
+  batchAddRecords: () => undefined,
+  updateRecord: () => undefined,
+  deleteRecord: () => undefined,
+  setPeriod: () => undefined,
+  calcPeriod: (month: string): PeriodSummary => ({
+    month, openingBalance: 0, inflow: 0, otherIncome: 0, expense: 0, closingBalance: 0,
+    groupExpenses: {}, openingOverridden: false, openingAutoValue: 0,
+  }),
+  calcClosing: () => 0,
+});
+
 export function PettyCashProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, { records: [], periods: [] });
 
@@ -240,7 +255,6 @@ export function PettyCashProvider({ children }: { children: React.ReactNode }) {
 }
 
 export function usePettyCashStore(): PettyContextValue {
-  const ctx = useContext(PettyContext);
-  if (!ctx) throw new Error("usePettyCashStore must be used within PettyCashProvider");
-  return ctx;
+  // 功能边界在路由切换和H5水合时可能短暂重组；先返回安全只读空值，待真实Provider挂载后自动重渲染。
+  return useContext(PettyContext) ?? EMPTY_PETTY_CONTEXT;
 }

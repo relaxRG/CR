@@ -9,7 +9,7 @@ import { FoodFeatureProviders } from "@/components/providers/FoodFeatureProvider
 import {
   StoreAllFeatureProviders,
   StoreInventoryDeepLinkProviders,
-  StoreLaborProviders,
+  StoreLaborWorkspaceProviders,
   StorePettyProviders,
   StoreReportImportProviders,
   StoreReportProviders,
@@ -59,7 +59,7 @@ export function AppFeatureBoundary({ children }: { children: ReactNode }) {
   if (pathname === "/monthly-report-import" || pathname === "/dish-analysis") {
     return <StoreReportImportProviders>{children}</StoreReportImportProviders>;
   }
-  if (pathname.startsWith("/labor")) return <StoreLaborProviders>{children}</StoreLaborProviders>;
+  if (pathname.startsWith("/labor")) return <StoreLaborWorkspaceProviders>{children}</StoreLaborWorkspaceProviders>;
   if (pathname === "/petty-category-settings") return <StorePettyProviders>{children}</StorePettyProviders>;
   if (
     pathname.startsWith("/spirits-inventory") || pathname.startsWith("/beer-inventory") ||

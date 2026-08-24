@@ -3,7 +3,7 @@ import { markAppPerformance } from "@/lib/performance/app-performance-marks";
 import { createStoreTabBoundaryLifecycle, type StoreTabKey as LifecycleTabKey } from "@/lib/store/store-tab-boundary-lifecycle";
 import {
   StoreInventoryProviders,
-  StoreLaborProviders,
+  StoreLaborWorkspaceProviders,
   StorePettyProviders,
   StoreReportProviders,
   StoreShopProviders,
@@ -12,7 +12,7 @@ import {
 
 const PROVIDERS: Record<StoreTabKey, ComponentType<{ children: ReactNode }>> = {
   monthly: StoreReportProviders,
-  labor: StoreLaborProviders,
+  labor: StoreLaborWorkspaceProviders,
   petty: StorePettyProviders,
   inventory: StoreInventoryProviders,
   shop: StoreShopProviders,

@@ -30,6 +30,13 @@ describe("门店顶级 Tab Provider 拓扑", () => {
     expect(new Set(all).size).toBe(all.length);
   });
 
+  it("劳动工作区为预支与备用金人工关联按需组合最小必要事实源", () => {
+    const workspace = componentBody("StoreLaborWorkspaceProviders");
+
+    expect(providersIn("StoreLaborWorkspaceProviders")).toEqual(["PettyCashProvider", "PettyLaborLinkProvider"]);
+    expect(workspace).toContain("<StoreLaborProviders>{children}</StoreLaborProviders>");
+  });
+
   it("以 Tab key 重建 React Provider 子树，确保切换卸载旧边界", () => {
     const boundary = source("components/providers/StoreTabBoundary.tsx");
     const storeScreen = source("app/(tabs)/store.tsx");

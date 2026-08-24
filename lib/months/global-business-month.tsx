@@ -27,10 +27,12 @@ export function GlobalBusinessMonthProvider({ children }: { children: React.Reac
   const [storedMonth, setStoredMonth] = usePersistedState<InventoryMonth>(STORAGE_KEY, getCurrentInventoryMonth());
   const normalizedStoredMonth = normalizeInventoryMonth(storedMonth) ?? getCurrentInventoryMonth();
   const [month, setMonth] = useState<InventoryMonth>(normalizedStoredMonth);
+  const monthRef = useRef<InventoryMonth>(normalizedStoredMonth);
   const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 只同步外部加载或跨设备恢复后的存储值；本地连续点按由 selectMonth 立即驱动。
   useEffect(() => {
+    monthRef.current = normalizedStoredMonth;
     setMonth(normalizedStoredMonth);
   }, [normalizedStoredMonth]);
 
@@ -40,14 +42,16 @@ export function GlobalBusinessMonthProvider({ children }: { children: React.Reac
 
   const selectMonth = useCallback((next: string) => {
     const normalized = normalizeInventoryMonth(next);
-    if (!normalized || normalized === month) return;
+    if (!normalized || normalized === monthRef.current) return;
+    // 事件处理可能在React提交下一帧前连续触发；ref保证每次都基于最新已选月份。
+    monthRef.current = normalized;
     setMonth(normalized);
     if (persistTimer.current) clearTimeout(persistTimer.current);
     persistTimer.current = setTimeout(() => {
       setStoredMonth(normalized);
       persistTimer.current = null;
     }, BUSINESS_MONTH_PERSIST_DEBOUNCE_MS);
-  }, [month, setStoredMonth]);
+  }, [setStoredMonth]);
 
   const value = useMemo(() => ({ month, selectMonth }), [month, selectMonth]);
   return <GlobalBusinessMonthContext.Provider value={value}>{children}</GlobalBusinessMonthContext.Provider>;

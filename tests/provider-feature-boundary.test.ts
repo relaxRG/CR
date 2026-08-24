@@ -44,6 +44,8 @@ describe("功能域 Provider 边界", () => {
     expect(boundary).toContain("StoreAllFeatureProviders");
     expect(boundary).toContain("StoreReportProviders");
     expect(boundary).toContain("StoreInventoryDeepLinkProviders");
+    expect(boundary).toContain("StoreLaborWorkspaceProviders");
+    expect(boundary).toContain('pathname.startsWith("/labor")');
     expect(boundary).not.toContain("StoreFeatureProviders");
     expect(boundary).toContain('if (boundary === "all")');
     expect(boundary).toContain('pathname === "/store"');

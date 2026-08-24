@@ -19,7 +19,7 @@ vi.mock("@/components/providers/StoreTabProviders", () => {
   };
   return {
     StoreReportProviders: provider("monthly"),
-    StoreLaborProviders: provider("labor"),
+    StoreLaborWorkspaceProviders: provider("labor"),
     StorePettyProviders: provider("petty"),
     StoreInventoryProviders: provider("inventory"),
     StoreShopProviders: provider("shop"),

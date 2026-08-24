@@ -119,7 +119,7 @@ export const PROVIDER_STABILITY_MATRIX: readonly ProviderStabilityEntry[] = [
     source: "components/providers/StoreTabProviders.tsx",
     runtimeTests: ["tests/store-tab-boundary-renderer.test.tsx"],
     contractTests: ["tests/store-tab-provider-topology.test.ts", "tests/store-tab-boundary-lifecycle.test.ts"],
-    requiredMarkers: ["StoreAllFeatureProviders", "StoreInventoryProviders", "StoreLaborProviders"],
+    requiredMarkers: ["StoreAllFeatureProviders", "StoreInventoryProviders", "StoreLaborProviders", "StoreLaborWorkspaceProviders"],
   },
   {
     id: "app_feature_boundary",

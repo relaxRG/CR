@@ -146,6 +146,8 @@ try {
     }))));
   })()`);
   await call("Page.navigate", { url: `${origin}/store` });
+  // 注入新的报表事实后需等待只读物化视图完成异步水合，否则导航仍会按初始空数据边界禁用“下一月”。
+  await sleep(700);
   if (!await waitForTestId(call, "report-workspace-month-navigator-picker")) {
     const diagnostic = await evaluate(call, `(() => ({
       text: document.body?.innerText?.slice(0, 800) || "",
