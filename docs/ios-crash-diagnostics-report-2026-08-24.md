@@ -79,6 +79,12 @@
 
 收到原生日志前，不修改业务功能，也不对某个“常见原因”猜测性打补丁。收到完整证据后，将按 `Exception Type`、`Termination Reason`、崩溃线程、最后异常回溯、符号化 App/Framework 帧和应用侧时间线确定唯一或可验证的根因；仅改动相关文件，并使用同一操作路径在 Debug、Release、模拟器和真机重新验证。
 
+## 8. 云端 Xcode 16 模拟器取证更新
+
+在 GitHub macOS-15（Xcode 16.4）运行器上，React Native 0.81 的 CocoaPods 集成及 Release `iphonesimulator` 构建均已完成，构建日志明确显示 `BUILD SUCCEEDED`。首次冷启动时 `simctl launch` 返回了 `com.app.cocktailrecipes: 91693`，并且 SpringBoard 日志显示该 bundle 已进入前台启动序列；已采集的控制台片段中没有 `EXC_CRASH`、`SIGABRT`、`RCTFatal`、未捕获异常或应用退出签名。
+
+该次烟测失败的直接原因是**测试脚本错误地在 iOS Simulator 运行时内调用 `ps -ax`**。运行时不提供该 POSIX 可执行文件，命令返回 `NSPOSIXErrorDomain code=2` / `No such file or directory`，脚本随后误报“App process was not alive”。这不是已证实的应用闪退。下一步将移除这个不可移植的进程探测，改为以成功启动 PID、SpringBoard 前台启动记录和缺失的原生崩溃签名作为冷启动判据，再连续运行五次。
+
 ## 参考资料
 
 [1] [Apple: Acquiring crash reports and diagnostic logs](https://developer.apple.com/documentation/xcode/acquiring-crash-reports-and-diagnostic-logs)  

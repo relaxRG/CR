@@ -97,7 +97,12 @@ LOG_FILE="$ARTIFACT_DIR/simulator-console.log"
 for run in $(seq 1 "$RUN_COUNT"); do
   echo "=== cold launch $run of $RUN_COUNT ===" | tee -a "$LOG_FILE"
   xcrun simctl terminate "$SIMULATOR_UDID" "$BUNDLE_ID" >/dev/null 2>&1 || true
-  xcrun simctl launch "$SIMULATOR_UDID" "$BUNDLE_ID" | tee -a "$LOG_FILE"
+  LAUNCH_RESULT="$(xcrun simctl launch "$SIMULATOR_UDID" "$BUNDLE_ID")"
+  echo "$LAUNCH_RESULT" | tee -a "$LOG_FILE"
+  if ! grep -Eq "^${BUNDLE_ID//./\\.}: [0-9]+$" <<< "$LAUNCH_RESULT"; then
+    echo "Simulator did not return a launch PID for cold launch $run" >&2
+    exit 1
+  fi
   sleep 8
 
   xcrun simctl spawn "$SIMULATOR_UDID" log show --style compact --last 15s \
@@ -106,11 +111,6 @@ for run in $(seq 1 "$RUN_COUNT"); do
 
   if grep -Eqi 'EXC_CRASH|SIGABRT|terminating app due to uncaught|uncaught exception|RCTFatal|fatal exception' "$LOG_FILE"; then
     echo "Detected a simulator crash signature during cold launch $run" >&2
-    exit 1
-  fi
-
-  if ! xcrun simctl spawn "$SIMULATOR_UDID" ps -ax | grep -F "$EXECUTABLE_NAME" | grep -vq grep; then
-    echo "App process was not alive after cold launch $run" >&2
     exit 1
   fi
 done

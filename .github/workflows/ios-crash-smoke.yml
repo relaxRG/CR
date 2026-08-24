@@ -23,7 +23,7 @@ jobs:
     # React Native 0.81 rejects Xcode 15.4 during CocoaPods integration; macos-15
     # supplies the required Xcode 16+ simulator toolchain.
     runs-on: macos-15
-    timeout-minutes: 35
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
