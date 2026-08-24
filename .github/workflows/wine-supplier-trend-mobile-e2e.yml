@@ -54,7 +54,7 @@ jobs:
         run: pnpm expo export --platform ${{ matrix.device.platform == 'iOS' && 'ios' || 'android' }}
       - name: Install Appium and driver
         run: |
-          npm install -g appium@2 appium-doctor
+          npm install -g appium@3 appium-doctor
           appium driver install xcuitest
           appium driver install uiautomator2
       - name: Run trend touch E2E
