@@ -1,0 +1,45 @@
+name: iOS Crash Smoke
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - 'components/**'
+      - 'lib/**'
+      - 'app.config.ts'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'scripts/ci/run-ios-crash-smoke.sh'
+      - '.github/workflows/ios-crash-smoke.yml'
+
+concurrency:
+  group: ios-crash-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release-simulator-cold-start:
+    runs-on: macos-14
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9.12.0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - name: Build and cold-launch iOS simulator five times
+        env:
+          IOS_SMOKE_RUN_COUNT: '5'
+          ARTIFACT_DIR: artifacts/ios-crash-smoke
+        run: bash scripts/ci/run-ios-crash-smoke.sh
+      - name: Upload simulator evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-crash-smoke-evidence
+          path: artifacts/ios-crash-smoke/**
+          if-no-files-found: warn
+
