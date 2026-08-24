@@ -1,6 +1,6 @@
 # 本地存储键与数据结构清单
 
-> 由 `pnpm audit:storage` 从生产源代码生成；生成时间：2026-08-24T14:49:59.941Z。
+> 由 `pnpm audit:storage` 从生产源代码生成；生成时间：2026-08-24T15:31:08.306Z。
 > 本清单覆盖 `AsyncStorage`、`SecureStore`、Web `localStorage` 与通用库存工厂传入的键。`{variable}` 表示按运行时参数生成的键模式。
 
 ## 已解析键
@@ -107,10 +107,10 @@
 | AsyncStorage | `store.purchase.v1` | getItem, setItem | `JSON.stringify(next` | PurchaseItem | `components/store/purchase.tsx:43`<br>`components/store/purchase.tsx:52` |
 | AsyncStorage | `store.revenue.v1` | getItem, setItem | `JSON.stringify(state` | RevenueCategory, RevenueRecord, StaffRecord, RevenueState | `lib/store/revenue-store.tsx:94`<br>`lib/store/revenue-store.tsx:98`<br>`lib/store/revenue-store.tsx:105` |
 | AsyncStorage | `supplier.match.memory.v1` | getItem, setItem | `JSON.stringify(memory` | 见源文件的写入表达式 | `lib/store/supplier-import.ts:113`<br>`lib/store/supplier-import.ts:122` |
-| AsyncStorage | `sync.backup.v1` | getItem, setItem | `JSON.stringify(backup` | PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry | `lib/sync/engine.ts:656`<br>`lib/sync/engine.ts:669`<br>`lib/sync/engine.ts:679`<br>`lib/sync/engine.ts:707` |
+| AsyncStorage | `sync.backup.v1` | getItem, setItem | `JSON.stringify(backup` | PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry | `lib/sync/engine.ts:670`<br>`lib/sync/engine.ts:683`<br>`lib/sync/engine.ts:693`<br>`lib/sync/engine.ts:721` |
 | AsyncStorage | `sync.dirtyKeys.pending` | removeItem, setItem, getItem | `JSON.stringify(arr` | PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry | `lib/sync/engine.ts:577`<br>`lib/sync/engine.ts:579`<br>`lib/sync/engine.ts:585` |
-| AsyncStorage | `sync.lastPulledAt` | setItem | `String(now` | PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry | `lib/sync/engine.ts:806`<br>`lib/sync/engine.ts:972` |
-| AsyncStorage | `sync.log.v1` | getItem, setItem | `JSON.stringify(log` | PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry | `lib/sync/engine.ts:643`<br>`lib/sync/engine.ts:647`<br>`lib/sync/engine.ts:655`<br>`lib/sync/engine.ts:718` |
+| AsyncStorage | `sync.lastPulledAt` | setItem | `String(now` | PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry | `lib/sync/engine.ts:820`<br>`lib/sync/engine.ts:986` |
+| AsyncStorage | `sync.log.v1` | getItem, setItem | `JSON.stringify(log` | PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry | `lib/sync/engine.ts:645`<br>`lib/sync/engine.ts:649`<br>`lib/sync/engine.ts:669`<br>`lib/sync/engine.ts:732` |
 | AsyncStorage | `tableware.inventory.v1` | factory-key | `GenericInventoryState` | GenericInventoryState, GenericInventoryItem, PurchaseRecord, ConsumeRecord, MonthlySnapshot | `lib/tableware/inventory-store.tsx:8` |
 | AsyncStorage | `wine.bottles.v1` | getItem, setItem | `JSON.stringify(state` | WineState, WineSnapshotState, WineImportControlState, WineMasterDataState, SnapshotAction, MasterDataAction, WineSnapshotContextValue, WineMasterDataContextValue | `lib/wine/store.tsx:229`<br>`lib/wine/store.tsx:302` |
 | AsyncStorage | `wine.import_control.v1` | getItem, setItem | `JSON.stringify(importControlState` | WineState, WineSnapshotState, WineImportControlState, WineMasterDataState, SnapshotAction, MasterDataAction, WineSnapshotContextValue, WineMasterDataContextValue | `lib/wine/store.tsx:259`<br>`lib/wine/store.tsx:320` |
@@ -126,7 +126,7 @@
 | AsyncStorage | `[...keys]` | multiRemove | `lib/cf-sync/provider.tsx:702` |
 | AsyncStorage | `[...LEGACY_MONTH_KEYS]` | multiGet, multiRemove | `lib/migrations/clean-legacy-business-month-keys.ts:17`<br>`lib/migrations/clean-legacy-business-month-keys.ts:19` |
 | AsyncStorage | `[...new Set(keys` | multiGet | `lib/backup/local-backup.ts:172` |
-| AsyncStorage | `[...SYNC_KEYS]` | multiGet | `lib/backup/icloud-backup.ts:138`<br>`lib/backup/local-backup.ts:574`<br>`lib/sync/engine.ts:666` |
+| AsyncStorage | `[...SYNC_KEYS]` | multiGet | `lib/backup/icloud-backup.ts:138`<br>`lib/backup/local-backup.ts:574`<br>`lib/sync/engine.ts:680` |
 | AsyncStorage | `["cocktail.recipes"` | multiGet | `app/backup.tsx:69` |
 | AsyncStorage | `["labor_schedule_snapshots_v1"` | multiRemove | `lib/labor/store.tsx:1056` |
 | AsyncStorage | `[ARCHIVES_KEY` | multiGet | `lib/labor/report-month-close-provider.tsx:115` |
@@ -134,20 +134,20 @@
 | AsyncStorage | `[DIRTY_KEYS_PERSIST_KEY` | multiRemove | `lib/sync/engine.ts:449`<br>`lib/sync/engine.ts:522` |
 | AsyncStorage | `[EMPLOYEES_KEY` | multiGet | `lib/labor/report-month-close-provider.tsx:46` |
 | AsyncStorage | `base` | setItem, getItem | `lib/backup/local-backup.ts:120`<br>`lib/backup/local-backup.ts:145` |
-| AsyncStorage | `c.storageKey` | setItem | `lib/sync/engine.ts:1071` |
-| AsyncStorage | `conflict.storageKey` | setItem | `lib/sync/engine.ts:1019` |
+| AsyncStorage | `c.storageKey` | setItem | `lib/sync/engine.ts:1085` |
+| AsyncStorage | `conflict.storageKey` | setItem | `lib/sync/engine.ts:1033` |
 | AsyncStorage | `entries` | multiSet | `lib/spirits/crud-store.tsx:686` |
-| AsyncStorage | `key` | getItem, setItem, removeItem | `hooks/use-persisted-state.ts:39`<br>`lib/backup/local-backup.ts:658`<br>`lib/cf-sync/client.ts:42`<br>`lib/cf-sync/client.ts:50`<br>`lib/cf-sync/client.ts:57`<br>`lib/labor/store.tsx:52`<br>`lib/labor/store.tsx:65`<br>`lib/labor/store.tsx:79`<br>`lib/labor/store.tsx:92`<br>`lib/sync/engine.ts:685`<br>`lib/sync/engine.ts:688`<br>`lib/sync/engine.ts:754`<br>`lib/sync/engine.ts:784` |
+| AsyncStorage | `key` | getItem, setItem, removeItem | `hooks/use-persisted-state.ts:39`<br>`lib/backup/local-backup.ts:658`<br>`lib/cf-sync/client.ts:42`<br>`lib/cf-sync/client.ts:50`<br>`lib/cf-sync/client.ts:57`<br>`lib/labor/store.tsx:52`<br>`lib/labor/store.tsx:65`<br>`lib/labor/store.tsx:79`<br>`lib/labor/store.tsx:92`<br>`lib/sync/engine.ts:699`<br>`lib/sync/engine.ts:702`<br>`lib/sync/engine.ts:768`<br>`lib/sync/engine.ts:798` |
 | SecureStore | `key` | setItemAsync, getItemAsync, deleteItemAsync | `lib/cf-sync/client.ts:44`<br>`lib/cf-sync/client.ts:52`<br>`lib/cf-sync/client.ts:59` |
-| AsyncStorage | `keys` | multiRemove, multiGet | `lib/backup/local-backup.ts:112`<br>`lib/backup/local-backup.ts:263`<br>`lib/backup/local-backup.ts:372`<br>`lib/migrations/purge-retired-book-library.ts:25`<br>`lib/sync/engine.ts:833` |
-| AsyncStorage | `pullWrites` | multiSet | `lib/sync/engine.ts:958` |
+| AsyncStorage | `keys` | multiRemove, multiGet | `lib/backup/local-backup.ts:112`<br>`lib/backup/local-backup.ts:263`<br>`lib/backup/local-backup.ts:372`<br>`lib/migrations/purge-retired-book-library.ts:25`<br>`lib/sync/engine.ts:847` |
+| AsyncStorage | `pullWrites` | multiSet | `lib/sync/engine.ts:972` |
 | AsyncStorage | `removals` | multiRemove | `lib/backup/icloud-backup.ts:254`<br>`lib/backup/local-backup.ts:332`<br>`lib/backup/local-backup.ts:380`<br>`lib/sync/engine.ts:518` |
 | AsyncStorage | `storageKey` | setItem, getItem | `hooks/use-persisted-state.ts:22`<br>`lib/inventory-core/store.tsx:225`<br>`lib/inventory-core/store.tsx:243` |
 | AsyncStorage | `SUMMARY_KEYS` | multiGet | `lib/backup/local-backup.ts:475` |
 | SecureStore | `ticketKey(switchId` | setItemAsync, getItemAsync, deleteItemAsync | `lib/cf-sync/group-switch.ts:74`<br>`lib/cf-sync/group-switch.ts:79`<br>`lib/cf-sync/group-switch.ts:87` |
-| AsyncStorage | `TS_PREFIX + c.storageKey` | setItem | `lib/sync/engine.ts:1056`<br>`lib/sync/engine.ts:1072` |
-| AsyncStorage | `TS_PREFIX + conflict.storageKey` | setItem | `lib/sync/engine.ts:1013`<br>`lib/sync/engine.ts:1020` |
-| AsyncStorage | `TS_PREFIX + key` | setItem, getItem | `lib/sync/engine.ts:731`<br>`lib/sync/engine.ts:785` |
+| AsyncStorage | `TS_PREFIX + c.storageKey` | setItem | `lib/sync/engine.ts:1070`<br>`lib/sync/engine.ts:1086` |
+| AsyncStorage | `TS_PREFIX + conflict.storageKey` | setItem | `lib/sync/engine.ts:1027`<br>`lib/sync/engine.ts:1034` |
+| AsyncStorage | `TS_PREFIX + key` | setItem, getItem | `lib/sync/engine.ts:745`<br>`lib/sync/engine.ts:799` |
 | AsyncStorage | `uploadedSetKey(groupId` | getItem, setItem | `lib/sync/photo-sync.ts:107`<br>`lib/sync/photo-sync.ts:115` |
 | AsyncStorage | `writes` | multiSet | `lib/backup/icloud-backup.ts:255`<br>`lib/backup/local-backup.ts:333`<br>`lib/backup/local-backup.ts:381`<br>`lib/sync/engine.ts:517` |
 

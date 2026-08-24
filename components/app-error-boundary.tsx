@@ -2,6 +2,8 @@ import type { ErrorInfo, ReactNode } from "react";
 import { Component } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { recordRuntimeError } from "@/lib/diagnostics/runtime";
+
 type AppErrorBoundaryProps = {
   children: ReactNode;
 };
@@ -22,6 +24,7 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
+    void recordRuntimeError("react_render_exception", error, info.componentStack || undefined);
     console.error("[AppErrorBoundary] render failed:", error, info.componentStack);
   }
 

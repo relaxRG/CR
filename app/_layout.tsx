@@ -28,6 +28,7 @@ import { BottleTaxonomyProvider } from "@/lib/bottles/taxonomy";
 import { HomemadeProvider } from "@/lib/homemade/store";
 import { AppFeatureBoundary } from "@/components/providers/AppFeatureBoundary";
 import { AppErrorBoundary } from "@/components/app-error-boundary";
+import { RuntimeDiagnosticsBootstrap } from "@/components/runtime-diagnostics-bootstrap";
 import { markAppPerformance } from "@/lib/performance/app-performance-marks";
 import { purgeRetiredBookLibrary } from "@/lib/migrations/purge-retired-book-library";
 
@@ -127,6 +128,7 @@ export default function RootLayout() {
   const content = (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AppErrorBoundary>
+        <RuntimeDiagnosticsBootstrap />
         <QueryClientProvider client={queryClient}>
       <I18nProvider>
         <SyncProvider>

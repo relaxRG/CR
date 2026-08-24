@@ -1,7 +1,10 @@
-import { FlatList, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, FlatList, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as Clipboard from "expo-clipboard";
+import * as FileSystem from "expo-file-system/legacy";
+import * as Sharing from "expo-sharing";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { useI18n } from "@/lib/i18n";
@@ -9,7 +12,7 @@ import { getSyncLog, subscribeSyncState, type SyncLogEntry } from "@/lib/sync/en
 import { useSync } from "@/lib/cf-sync/provider";
 import { MOBILE_VIRTUAL_LIST_PROPS } from "@/components/performance/mobile-virtual-list";
 
-type FilterKey = "all" | "error" | "conflict" | "backup" | "push" | "pull";
+type FilterKey = "all" | "error" | "conflict" | "backup" | "push" | "pull" | "diagnostic";
 
 function typeLabel(type: SyncLogEntry["type"], lang: string) {
   const map: Record<SyncLogEntry["type"], [string, string]> = {
@@ -20,6 +23,7 @@ function typeLabel(type: SyncLogEntry["type"], lang: string) {
     error:    ["错误", "Error"],
     conflict: ["冲突", "Conflict"],
     switch:   ["切换", "Switch"],
+    diagnostic: ["诊断", "Diagnostic"],
   };
   return lang === "zh" ? map[type][0] : map[type][1];
 }
@@ -33,6 +37,7 @@ function typeColor(type: SyncLogEntry["type"]) {
     error:    "#FF3B30",
     conflict: "#FF6B00",
     switch:   "#5856D6",
+    diagnostic: "#AF52DE",
   };
   return colors[type];
 }
@@ -63,6 +68,42 @@ export default function SyncLogScreen() {
     return log.filter((e) => e.type === filter);
   }, [log, filter]);
 
+  const exportPayload = useMemo(() => JSON.stringify({
+    exportedAt: new Date().toISOString(),
+    note: "cocktail R runtime and sync diagnostics. No business records are included.",
+    entries: log,
+  }, null, 2), [log]);
+
+  const copyLogs = async () => {
+    try {
+      await Clipboard.setStringAsync(exportPayload);
+      Alert.alert(lang === "zh" ? "已复制日志" : "Logs copied", lang === "zh" ? "请将完整内容粘贴回对话。" : "Paste the complete content into the support conversation.");
+    } catch (error) {
+      Alert.alert(lang === "zh" ? "复制失败" : "Copy failed", error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  const shareLogs = async () => {
+    if (Platform.OS === "web") {
+      await copyLogs();
+      return;
+    }
+    try {
+      if (!(await Sharing.isAvailableAsync())) {
+        throw new Error(lang === "zh" ? "当前设备无法打开系统分享面板。" : "System sharing is unavailable on this device.");
+      }
+      const uri = `${FileSystem.cacheDirectory}cocktail-r-diagnostics-${Date.now()}.json`;
+      await FileSystem.writeAsStringAsync(uri, exportPayload, { encoding: FileSystem.EncodingType.UTF8 });
+      await Sharing.shareAsync(uri, {
+        dialogTitle: lang === "zh" ? "导出运行日志" : "Export runtime logs",
+        mimeType: "application/json",
+        UTI: "public.json",
+      });
+    } catch (error) {
+      Alert.alert(lang === "zh" ? "导出失败" : "Export failed", error instanceof Error ? error.message : String(error));
+    }
+  };
+
   // 筛选 Chips 配置
   const chips: { key: FilterKey; zh: string; en: string; color: string }[] = [
     { key: "all",      zh: "全部",  en: "All",      color: colors.primary },
@@ -71,6 +112,7 @@ export default function SyncLogScreen() {
     { key: "backup",   zh: "备份",  en: "Backup",   color: "#FF9500" },
     { key: "push",     zh: "上传",  en: "Push",     color: "#007AFF" },
     { key: "pull",     zh: "下载",  en: "Pull",     color: "#34C759" },
+    { key: "diagnostic", zh: "诊断", en: "Diagnostic", color: "#AF52DE" },
   ];
 
   return (
@@ -83,9 +125,18 @@ export default function SyncLogScreen() {
           </Text>
         </Pressable>
         <Text style={[styles.headerTitle, { color: colors.foreground }]} numberOfLines={1}>
-          {lang === "zh" ? "同步日志" : "Sync Log"}
+          {lang === "zh" ? "同步与诊断日志" : "Sync & Diagnostics"}
         </Text>
         <View style={{ width: 64 }} />
+      </View>
+
+      <View style={styles.actions}>
+        <Pressable accessibilityRole="button" onPress={() => void copyLogs()} style={[styles.actionButton, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+          <Text style={[styles.actionLabel, { color: colors.foreground }]}>{lang === "zh" ? "复制完整日志" : "Copy full log"}</Text>
+        </Pressable>
+        <Pressable accessibilityRole="button" onPress={() => void shareLogs()} style={[styles.actionButton, { borderColor: colors.primary, backgroundColor: colors.primary }]}>
+          <Text style={styles.shareLabel}>{lang === "zh" ? "导出文件" : "Export file"}</Text>
+        </Pressable>
       </View>
 
       {/* 筛选 Chips */}
@@ -141,8 +192,18 @@ export default function SyncLogScreen() {
                 </Text>
               </View>
               {item.message ? (
-                <Text style={{ color: colors.foreground, fontSize: 14, marginTop: 4 }}>
+                <Text selectable style={{ color: colors.foreground, fontSize: 14, marginTop: 4 }}>
                   {item.message}
+                </Text>
+              ) : null}
+              {item.source ? (
+                <Text selectable style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>
+                  {item.source}
+                </Text>
+              ) : null}
+              {item.detail ? (
+                <Text selectable style={{ color: colors.muted, fontFamily: "monospace", fontSize: 11, lineHeight: 16, marginTop: 8 }}>
+                  {item.detail}
                 </Text>
               ) : null}
               {item.keys && item.keys.length > 0 ? (
@@ -179,6 +240,29 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: "600",
     textAlign: "center",
+  },
+  actions: {
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingBottom: 4,
+  },
+  actionButton: {
+    alignItems: "center",
+    borderRadius: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    flex: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  actionLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  shareLabel: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "600",
   },
   chip: {
     borderRadius: 20,

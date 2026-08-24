@@ -2,11 +2,18 @@ import React from "react";
 import { act, create } from "react-test-renderer";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const mocks = vi.hoisted(() => ({
+  recordRuntimeError: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock("react-native", () => ({
   View: "View",
   Text: "Text",
   Pressable: "Pressable",
   StyleSheet: { create: <T,>(value: T) => value },
+}));
+vi.mock("@/lib/diagnostics/runtime", () => ({
+  recordRuntimeError: mocks.recordRuntimeError,
 }));
 
 import { AppErrorBoundary } from "@/components/app-error-boundary";
@@ -19,11 +26,11 @@ function ExplodingPage({ shouldThrow }: { shouldThrow: boolean }) {
 describe("AppErrorBoundary", () => {
   beforeEach(() => {
     vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.recordRuntimeError.mockClear();
   });
 
-  it("拦截页面渲染异常并显示可重试降级界面", () => {
+  it("拦截页面渲染异常、记录诊断信息并显示可重试降级界面", () => {
     let renderer: ReturnType<typeof create>;
-
     act(() => {
       renderer = create(
         <AppErrorBoundary>
@@ -31,10 +38,14 @@ describe("AppErrorBoundary", () => {
         </AppErrorBoundary>,
       );
     });
-
     const textNodes = renderer!.root.findAll((node) => String(node.type) === "Text");
     const retryNodes = renderer!.root.findAll((node) => String(node.type) === "Pressable");
     expect(textNodes.map((node) => node.children.join(""))).toContain("页面暂时无法打开");
     expect(retryNodes).toHaveLength(1);
+    expect(mocks.recordRuntimeError).toHaveBeenCalledWith(
+      "react_render_exception",
+      expect.any(Error),
+      expect.any(String),
+    );
   });
 });

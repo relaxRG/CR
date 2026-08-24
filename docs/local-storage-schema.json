@@ -100,7 +100,7 @@
         {
           "operation": "multiGet",
           "file": "lib/sync/engine.ts",
-          "line": 666,
+          "line": 680,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -667,7 +667,7 @@
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 1071,
+          "line": 1085,
           "value": "valueToWrite",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -1199,7 +1199,7 @@
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 1019,
+          "line": 1033,
           "value": "valueToWrite",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -1647,28 +1647,28 @@
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 685,
+          "line": 699,
           "value": "value",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         },
         {
           "operation": "removeItem",
           "file": "lib/sync/engine.ts",
-          "line": 688,
+          "line": 702,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         },
         {
           "operation": "getItem",
           "file": "lib/sync/engine.ts",
-          "line": 754,
+          "line": 768,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         },
         {
           "operation": "getItem",
           "file": "lib/sync/engine.ts",
-          "line": 784,
+          "line": 798,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -1738,7 +1738,7 @@
         {
           "operation": "multiGet",
           "file": "lib/sync/engine.ts",
-          "line": 833,
+          "line": 847,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -2431,7 +2431,7 @@
         {
           "operation": "multiSet",
           "file": "lib/sync/engine.ts",
-          "line": 958,
+          "line": 972,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -2949,28 +2949,28 @@
         {
           "operation": "getItem",
           "file": "lib/sync/engine.ts",
-          "line": 656,
+          "line": 670,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         },
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 669,
+          "line": 683,
           "value": "JSON.stringify(backup",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         },
         {
           "operation": "getItem",
           "file": "lib/sync/engine.ts",
-          "line": 679,
+          "line": 693,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         },
         {
           "operation": "getItem",
           "file": "lib/sync/engine.ts",
-          "line": 707,
+          "line": 721,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -3012,14 +3012,14 @@
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 806,
+          "line": 820,
           "value": "String(now",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         },
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 972,
+          "line": 986,
           "value": "String(now",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -3033,28 +3033,28 @@
         {
           "operation": "getItem",
           "file": "lib/sync/engine.ts",
-          "line": 643,
+          "line": 645,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         },
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 647,
+          "line": 649,
           "value": "JSON.stringify(log",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         },
         {
           "operation": "getItem",
           "file": "lib/sync/engine.ts",
-          "line": 655,
+          "line": 669,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         },
         {
           "operation": "getItem",
           "file": "lib/sync/engine.ts",
-          "line": 718,
+          "line": 732,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -3110,14 +3110,14 @@
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 1056,
+          "line": 1070,
           "value": "String(now",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         },
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 1072,
+          "line": 1086,
           "value": "String(c.remoteTs",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -3131,14 +3131,14 @@
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 1013,
+          "line": 1027,
           "value": "String(now",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         },
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 1020,
+          "line": 1034,
           "value": "String(conflict.remoteTs",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -3152,14 +3152,14 @@
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 731,
+          "line": 745,
           "value": "String(now",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         },
         {
           "operation": "getItem",
           "file": "lib/sync/engine.ts",
-          "line": 785,
+          "line": 799,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -3427,7 +3427,7 @@
         {
           "operation": "multiGet",
           "file": "lib/sync/engine.ts",
-          "line": 666,
+          "line": 680,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -3553,7 +3553,7 @@
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 1071,
+          "line": 1085,
           "value": "valueToWrite",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -3567,7 +3567,7 @@
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 1019,
+          "line": 1033,
           "value": "valueToWrite",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -3658,28 +3658,28 @@
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 685,
+          "line": 699,
           "value": "value",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         },
         {
           "operation": "removeItem",
           "file": "lib/sync/engine.ts",
-          "line": 688,
+          "line": 702,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         },
         {
           "operation": "getItem",
           "file": "lib/sync/engine.ts",
-          "line": 754,
+          "line": 768,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         },
         {
           "operation": "getItem",
           "file": "lib/sync/engine.ts",
-          "line": 784,
+          "line": 798,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -3749,7 +3749,7 @@
         {
           "operation": "multiGet",
           "file": "lib/sync/engine.ts",
-          "line": 833,
+          "line": 847,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -3763,7 +3763,7 @@
         {
           "operation": "multiSet",
           "file": "lib/sync/engine.ts",
-          "line": 958,
+          "line": 972,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -3882,14 +3882,14 @@
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 1056,
+          "line": 1070,
           "value": "String(now",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         },
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 1072,
+          "line": 1086,
           "value": "String(c.remoteTs",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -3903,14 +3903,14 @@
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 1013,
+          "line": 1027,
           "value": "String(now",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         },
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 1020,
+          "line": 1034,
           "value": "String(conflict.remoteTs",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }
@@ -3924,14 +3924,14 @@
         {
           "operation": "setItem",
           "file": "lib/sync/engine.ts",
-          "line": 731,
+          "line": 745,
           "value": "String(now",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         },
         {
           "operation": "getItem",
           "file": "lib/sync/engine.ts",
-          "line": 785,
+          "line": 799,
           "value": "",
           "structure": "PrefEntry, Item, TargetGroupSnapshot, SyncLogEntry, SyncState, LocalSyncEntry"
         }

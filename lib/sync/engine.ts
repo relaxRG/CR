@@ -596,9 +596,11 @@ async function loadPersistedDirtyKeys(): Promise<void> {
 
 export type SyncLogEntry = {
   time: number;
-  type: "push" | "pull" | "backup" | "restore" | "error" | "conflict" | "switch";
+  type: "push" | "pull" | "backup" | "restore" | "error" | "conflict" | "switch" | "diagnostic";
   keys?: string[];
   message?: string;
+  detail?: string;
+  source?: string;
 };
 
 export type SyncState = {
@@ -647,6 +649,18 @@ async function appendLog(entry: SyncLogEntry) {
     await AsyncStorage.setItem(SYNC_LOG_KEY, JSON.stringify(log));
     setState({ log });
   } catch {}
+}
+
+/**
+ * Reuses the established, local-only ring buffer for runtime crash diagnostics. Diagnostic entries
+ * must not include business records, storage values, request bodies or authentication secrets.
+ */
+export async function appendDiagnosticLog(entry: Pick<SyncLogEntry, "source" | "message" | "detail">): Promise<void> {
+  await appendLog({
+    time: Date.now(),
+    type: "diagnostic",
+    ...entry,
+  });
 }
 
 export async function initSyncState() {
