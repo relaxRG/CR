@@ -204,7 +204,7 @@ interface SupplierCompareProps {
   width?: number;
 }
 
-export function SupplierPriceCompare({ supplierPrices, unit = "", width = 320 }: SupplierCompareProps) {
+export const SupplierPriceCompare = React.memo(function SupplierPriceCompare({ supplierPrices, unit = "", width = 320 }: SupplierCompareProps) {
   const colors = useColors();
   if (supplierPrices.length === 0) return null;
 
@@ -258,7 +258,7 @@ export function SupplierPriceCompare({ supplierPrices, unit = "", width = 320 }:
       )}
     </View>
   );
-}
+});
 
 const S = StyleSheet.create({
   empty: { height: 80, alignItems: "center", justifyContent: "center", borderRadius: 12, borderWidth: 1 },

@@ -27,6 +27,40 @@ jobs:
       - run: pnpm check
       - run: pnpm test
 
+  provider-stability:
+    name: Provider Stability Matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Reject unregistered provider boundaries or missing stability coverage
+        run: pnpm check:provider-stability
+
+  render-performance-regression:
+    name: High-frequency render performance
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Verify chart, supplier comparison and virtualized ledger render budgets
+        run: pnpm vitest run tests/price-history-hook-render-regression.test.tsx tests/virtualized-ledger-render-performance.test.tsx --reporter=dot
+
   mobile-h5-regression:
     name: H5 theme and responsive regression
     runs-on: ubuntu-latest

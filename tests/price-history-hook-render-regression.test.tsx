@@ -20,12 +20,17 @@ vi.mock("react-native-svg", async () => {
   return { default: primitive, Circle: primitive, Line: primitive, Polyline: primitive, Text: primitive };
 });
 
-import { PriceHistoryChart } from "@/components/price-history-chart";
+import { PriceHistoryChart, SupplierPriceCompare } from "@/components/price-history-chart";
 
 const history = [
   { id: "p1", itemId: "gin", price: 100, supplier: "A", date: "2026-01-01", source: "manual" as const },
   { id: "p2", itemId: "gin", price: 105, supplier: "A", date: "2026-02-01", source: "manual" as const },
   { id: "p3", itemId: "gin", price: 98, supplier: "B", date: "2026-03-01", source: "manual" as const },
+];
+
+const supplierPrices = [
+  { supplier: "供应商 A", latestPrice: 100, date: "2026-03-01", count: 3 },
+  { supplier: "供应商 B", latestPrice: 105, date: "2026-03-02", count: 2 },
 ];
 
 function Harness({ onCommit }: { onCommit: ProfilerOnRenderCallback }) {
@@ -34,6 +39,18 @@ function Harness({ onCommit }: { onCommit: ProfilerOnRenderCallback }) {
     <>
       <Profiler id="price-history" onRender={onCommit}>
         <PriceHistoryChart history={history} width={320} height={160} />
+      </Profiler>
+      <button onClick={() => setUnrelatedTick((value) => value + 1)}>{unrelatedTick}</button>
+    </>
+  );
+}
+
+function SupplierCompareHarness({ onCommit }: { onCommit: ProfilerOnRenderCallback }) {
+  const [unrelatedTick, setUnrelatedTick] = useState(0);
+  return (
+    <>
+      <Profiler id="supplier-price-compare" onRender={onCommit}>
+        <SupplierPriceCompare supplierPrices={supplierPrices} width={320} unit="瓶" />
       </Profiler>
       <button onClick={() => setUnrelatedTick((value) => value + 1)}>{unrelatedTick}</button>
     </>
@@ -62,5 +79,23 @@ describe("价格历史图 Hook 稳定化渲染回归", () => {
     if (process.env.HOOK_RENDER_BASELINE !== "1") {
       expect(totalUpdateDuration).toBeLessThan(5);
     }
+  });
+
+  it("采购供应商价格对比在30次无关父组件更新中保持低更新成本", () => {
+    const commits: Array<{ phase: string; actualDuration: number }> = [];
+    let renderer: ReturnType<typeof create>;
+    act(() => {
+      renderer = create(<SupplierCompareHarness onCommit={(_id, phase, actualDuration) => commits.push({ phase, actualDuration })} />);
+    });
+    const button = renderer!.root.findByType("button");
+    for (let index = 0; index < 30; index += 1) {
+      act(() => button.props.onClick());
+    }
+
+    const updates = commits.filter((commit) => commit.phase === "update");
+    const totalDuration = updates.reduce((sum, commit) => sum + commit.actualDuration, 0);
+    console.info(`[supplier-price-compare-benchmark] updates=${updates.length} totalDurationMs=${totalDuration.toFixed(3)}`);
+    expect(updates).toHaveLength(30);
+    expect(totalDuration).toBeLessThan(5);
   });
 });
