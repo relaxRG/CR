@@ -366,7 +366,9 @@ export function SyncProvider({
       }
 
       // 历史 iOS-on-Mac 记录仅更新平台展示元数据，不参与任何业务授权判断。
-      void refreshCurrentDevicePlatform();
+      void refreshCurrentDevicePlatform().catch((error) => {
+        console.warn("[CFSync] device platform metadata refresh failed:", error);
+      });
       // 备份、iCloud 备份和照片扫描可等待当前动画/手势结束；它们从不属于同步合并的前置条件。
       InteractionManager.runAfterInteractions(() => {
         void createSnapshot().catch((e) => console.warn("[CFSync] local snapshot failed:", e));

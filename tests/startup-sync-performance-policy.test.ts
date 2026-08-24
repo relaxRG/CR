@@ -35,6 +35,8 @@ describe("启动与同步性能护栏", () => {
     expect(provider).toContain("void createSnapshot()");
     expect(provider).toContain("startAutoBackup(activeSession.session.device.name)");
     expect(provider).toContain("void syncPhotos()");
+    expect(provider).toContain("void refreshCurrentDevicePlatform().catch");
+    expect(provider).toContain("[CFSync] device platform metadata refresh failed:");
     expect(provider).toContain("stopAutoBackup();");
   });
 
