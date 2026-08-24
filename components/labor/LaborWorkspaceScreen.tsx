@@ -137,7 +137,7 @@ function compareModeLabel(mode: CompareMode, customMonth?: string) {
 // ─── 对比按钮组件 ─────────────────────────────────────────────────────────────
 
 // ─── 总览卡片 ─────────────────────────────────────────────────────────────────
-function OverviewCard({ month, colors }: { month: string; colors: any }) {
+export function LaborOverviewCard({ month, colors }: { month: string; colors: any }) {
   const { employees } = useEmployeeStore();
   const { paySlips } = usePaySlipStore();
   useAttendanceStore();
@@ -5489,7 +5489,7 @@ export default function LaborScreen({ embedded = true }: { embedded?: boolean })
         {/* 第一页：薪资统计（含人力总览卡片） */}
         <View testID="labor-roster-page" style={{ width: winW, flexGrow: 0, flexShrink: 0 }}>
           <EmployeeRosterPage month={currentMonth} colors={colors}
-            headerComponent={<OverviewCard month={currentMonth} colors={colors} />} />
+            headerComponent={<LaborOverviewCard month={currentMonth} colors={colors} />} />
         </View>
 
         {/* 第二页：排班表（不显示人力总览卡片） */}

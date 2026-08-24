@@ -60,8 +60,8 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Verify chart, supplier comparison and virtualized ledger render budgets
-        run: pnpm vitest run tests/price-history-hook-render-regression.test.tsx tests/virtualized-ledger-render-performance.test.tsx --reporter=dot
+      - name: Verify high-frequency workspace render budgets
+        run: pnpm vitest run tests/price-history-hook-render-regression.test.tsx tests/virtualized-ledger-render-performance.test.tsx tests/labor-overview-render-performance.test.tsx tests/spirits-inventory-workspace-render-performance.test.tsx tests/store-analytics-render-performance.test.tsx tests/store-petty-cash-render-performance.test.tsx tests/store-purchase-render-performance.test.tsx --reporter=dot
 
   mobile-h5-regression:
     name: H5 theme and responsive regression
